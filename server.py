@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-SATMARKET - BACKEND v1 (Mini App Telegram + Escrow Lightning)
+BARATTOLO - BACKEND v1 (Mini App Telegram + Escrow Lightning)
 Il server che fa funzionare la Mini App: annunci, ricerca AI,
 ordini con escrow in sats via LNbits, notifiche Telegram.
 
@@ -63,7 +63,7 @@ except ImportError:
 
 # ===================================================================
 
-app = FastAPI(title="SatMarket API")
+app = FastAPI(title="Barattolo API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 ai = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -450,7 +450,7 @@ async def compra(req: Request, x_tg_init_data: str = Header("")):
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
 
     inv = await crea_invoice_escrow(
-        a["prezzo_sats"], f"SatMarket escrow #{a['id']}: {a['titolo'][:40]}")
+        a["prezzo_sats"], f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,creato,aggiornato) VALUES(?,?,?,?,?,?,?,?)",
