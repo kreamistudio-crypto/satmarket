@@ -1037,5 +1037,23 @@ async def avvia_orologio():
     asyncio.create_task(orologio())
 
 
-# La Mini App stessa viene servita da qui: https://tuodominio.com/
-app.mount("/", StaticFiles(directory=".", html=True), name="miniapp")
+# ------------------- FILE SERVITI AL PUBBLICO -----------------------
+# SICUREZZA: il server NON espone piu' l'intera cartella (che sul VPS
+# contiene anche config.py, il database e .git!). Al pubblico vanno
+# SOLO la Mini App e le foto degli annunci: tutto il resto e'
+# invisibile per costruzione.
+
+from fastapi.responses import FileResponse
+
+
+@app.get("/")
+def home():
+    return FileResponse("miniapp.html", media_type="text/html")
+
+
+@app.get("/miniapp.html")
+def pagina_miniapp():
+    return FileResponse("miniapp.html", media_type="text/html")
+
+
+app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")
