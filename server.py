@@ -1045,15 +1045,24 @@ async def avvia_orologio():
 
 from fastapi.responses import FileResponse
 
+# Header anti-cache: la WebView di Telegram (e ogni browser) non deve mai
+# conservare la pagina HTML — così ogni push arriva subito fresco a tutti.
+# Si applicano SOLO alla pagina: API e foto restano fuori, zero impatto.
+HEADER_NO_CACHE = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
 
 @app.get("/")
 def home():
-    return FileResponse("miniapp.html", media_type="text/html")
+    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
 
 
 @app.get("/miniapp.html")
 def pagina_miniapp():
-    return FileResponse("miniapp.html", media_type="text/html")
+    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
 
 
 app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")
