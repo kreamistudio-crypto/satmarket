@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SatMarket — il mercatino in sats</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAFAF7; --card:#FFFFFF; --ink:#1B1D22; --muted:#6E7076;
+    --line:#E8E6DF; --sats:#F7931A; --sats-soft:#FDF1E0;
+    --trust:#0E7A4E; --trust-soft:#E7F3EE; --danger:#C0392B;
+    --radius:16px; --pad:16px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:'Manrope',system-ui,sans-serif; background:var(--bg); color:var(--ink);
+    font-size:15px; line-height:1.45; overscroll-behavior:none;
+  }
+  .mono{font-family:'JetBrains Mono',monospace}
+  #app{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:84px}
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky;top:0;z-index:20;background:rgba(250,250,247,.92);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+    padding:14px var(--pad) 10px;
+  }
+  .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+  .brand h1{font-family:'Unbounded',sans-serif;font-weight:700;font-size:17px;letter-spacing:-.02em}
+  .brand h1 .bolt{color:var(--sats)}
+  .brand small{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  .searchbar{display:flex;gap:8px}
+  .searchbar input{
+    flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;
+    padding:11px 14px;font:inherit;font-weight:500;outline:none;
+  }
+  .searchbar input:focus{border-color:var(--ink)}
+  .searchbar button{
+    border:0;background:var(--ink);color:#fff;border-radius:12px;padding:0 16px;
+    font-weight:700;font-size:14px;cursor:pointer;
+  }
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;
+    padding:6px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;
+  }
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* ---------- griglia annunci ---------- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;cursor:pointer;transition:transform .12s ease;
+  }
+  .card:active{transform:scale(.97)}
+  .card .ph{
+    aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
+    font-size:44px;background:linear-gradient(160deg,#F2F1EC,#E9E7DF);overflow:hidden;
+  }
+  .card .ph img{width:100%;height:100%;object-fit:cover}
+  .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
+    scrollbar-width:none;background:#EDECE6}
+  .detail-photos::-webkit-scrollbar{display:none}
+  .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:4/3;object-fit:cover;
+    scroll-snap-align:center}
+  .photo-count{position:absolute;right:10px;bottom:10px;background:rgba(20,20,22,.65);
+    color:#fff;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px}
+  #photoPreview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  #photoPreview .th{position:relative}
+  #photoPreview img{width:64px;height:64px;object-fit:cover;border-radius:10px;
+    border:1px solid var(--line)}
+  #photoPreview .x{position:absolute;top:-6px;right:-6px;background:var(--ink);
+    color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:11px;cursor:pointer}
+  .card .info{padding:10px 12px 12px}
+  .card .title{font-weight:700;font-size:13.5px;line-height:1.3;display:-webkit-box;
+    -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:35px}
+  .price{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700;font-size:14px;margin-top:6px}
+  .price .unit{font-size:10.5px;font-weight:500;color:var(--muted)}
+  .card .meta{display:flex;justify-content:space-between;align-items:center;margin-top:5px;
+    font-size:11.5px;color:var(--muted);font-weight:600}
+  .escrow-dot{display:inline-flex;align-items:center;gap:4px;color:var(--trust);font-weight:700}
+
+  .section-label{
+    padding:16px var(--pad) 0;font-size:11px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.1em;color:var(--muted);
+  }
+  .empty{padding:48px var(--pad);text-align:center;color:var(--muted)}
+  .empty .big{font-size:40px;margin-bottom:10px}
+  .empty b{color:var(--ink)}
+
+  /* ---------- viste / navigazione ---------- */
+  .view{display:none}
+  .view.active{display:block;animation:fadein .18s ease}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  nav{
+    position:fixed;bottom:0;left:0;right:0;z-index:30;
+    background:rgba(255,255,255,.96);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);display:flex;justify-content:space-around;
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;
+  }
+  nav button{
+    flex:1;border:0;background:none;font:inherit;font-size:10.5px;font-weight:700;
+    color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;
+  }
+  nav button.active{color:var(--ink)}
+  nav button .ic{font-size:20px}
+  nav button.sell .ic{
+    width:44px;height:44px;border-radius:14px;background:var(--sats);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:24px;margin-top:-16px;
+    box-shadow:0 4px 14px rgba(247,147,26,.4);
+  }
+
+  /* ---------- dettaglio annuncio ---------- */
+  .detail-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
+    font-size:84px;background:linear-gradient(160deg,#F2F1EC,#E9E7DF)}
+  .detail-body{padding:18px var(--pad)}
+  .detail-body h2{font-size:20px;font-weight:800;line-height:1.25}
+  .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats);
+    font-weight:700;font-size:26px;margin:10px 0 2px}
+  .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
+  .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
+  .seller{
+    display:flex;align-items:center;gap:12px;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin:14px 0;
+  }
+  .avatar{width:42px;height:42px;border-radius:50%;background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+  .seller .who{flex:1}
+  .seller .who b{font-size:14px}
+  .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
+  .stars{color:var(--sats);letter-spacing:1px}
+  .desc{color:#3A3C42;font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
+
+  .trust-note{
+    display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
+    padding:12px 14px;font-size:13px;color:var(--trust);font-weight:600;margin-bottom:16px;
+  }
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    border:0;border-radius:14px;padding:15px;font:inherit;font-weight:800;font-size:15.5px;
+    cursor:pointer;transition:transform .1s;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--trust);color:#fff}
+  .btn.orange{background:var(--sats);color:#fff}
+  .btn.ghost{background:none;border:1.5px solid var(--line);color:var(--ink);margin-top:10px}
+  .btn.danger-ghost{background:none;border:1.5px solid #EAD5D2;color:var(--danger);margin-top:10px}
+  .btn[disabled]{opacity:.5;pointer-events:none}
+
+  /* ---------- FIRMA: la cassaforte escrow ---------- */
+  .vault{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 16px;margin:16px 0;
+  }
+  .vault .vault-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .vault .vault-head .lock{
+    width:38px;height:38px;border-radius:12px;background:var(--trust-soft);
+    display:flex;align-items:center;justify-content:center;font-size:19px;
+  }
+  .vault .vault-head b{font-size:14.5px}
+  .vault .vault-head small{display:block;color:var(--muted);font-weight:600;font-size:12px}
+  .steps{position:relative;margin-left:7px}
+  .steps::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--line)}
+  .step{position:relative;padding:0 0 18px 32px}
+  .step:last-child{padding-bottom:0}
+  .step .dot{
+    position:absolute;left:0;top:2px;width:18px;height:18px;border-radius:50%;
+    background:var(--bg);border:2px solid var(--line);z-index:1;
+    display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;
+  }
+  .step.done .dot{background:var(--trust);border-color:var(--trust)}
+  .step.done .dot::after{content:'✓'}
+  .step.now .dot{border-color:var(--sats);background:var(--sats);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(247,147,26,.45)}70%{box-shadow:0 0 0 9px rgba(247,147,26,0)}100%{box-shadow:0 0 0 0 rgba(247,147,26,0)}}
+  .step b{font-size:13.5px;display:block}
+  .step small{color:var(--muted);font-size:12px;font-weight:600}
+  .step.todo{opacity:.45}
+
+  /* ---------- vendi (form) ---------- */
+  .form{padding:18px var(--pad)}
+  .form h2{font-size:20px;font-weight:800;margin-bottom:4px}
+  .form .sub{color:var(--muted);font-weight:600;font-size:13.5px;margin-bottom:18px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.07em;color:var(--muted);margin-bottom:6px}
+  .field input,.field textarea,.field select{
+    width:100%;border:1px solid var(--line);background:var(--card);border-radius:12px;
+    padding:12px 14px;font:inherit;font-weight:500;outline:none;
+  }
+  .field input:focus,.field textarea:focus{border-color:var(--ink)}
+  .field textarea{min-height:90px;resize:vertical}
+  .sats-input{position:relative}
+  .sats-input input{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--sats);padding-right:56px}
+  .sats-input .suffix{position:absolute;right:14px;top:50%;transform:translateY(-50%);
+    font-size:12px;color:var(--muted);font-weight:700}
+  .photo-drop{
+    border:1.5px dashed var(--line);border-radius:var(--radius);background:var(--card);
+    padding:26px;text-align:center;color:var(--muted);font-weight:600;font-size:13.5px;cursor:pointer;
+  }
+  .photo-drop .big{font-size:30px;display:block;margin-bottom:6px}
+
+  /* ---------- affari (ordini) ---------- */
+  .order{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin:0 var(--pad) 12px;cursor:pointer;
+  }
+  .order .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .order b{font-size:14px}
+  .badge{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .badge.locked{background:var(--sats-soft);color:#B26A0A}
+  .badge.shipped{background:#E8EEF9;color:#2A4E96}
+  .badge.released{background:var(--trust-soft);color:var(--trust)}
+  .badge.dispute{background:#F9E8E6;color:var(--danger)}
+  .badge.confirmed{background:#EDE7F9;color:#5B3FA8}
+  .badge.annullato{background:#EEEDE8;color:#6E7076}
+
+  /* ---------- pannello incasso venditore ---------- */
+  .payout{
+    background:var(--card);border:1.5px solid var(--sats);border-radius:var(--radius);
+    padding:16px;margin:16px 0;
+  }
+  .payout h4{font-size:14.5px;margin-bottom:6px}
+  .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700}
+  .payout .hint{font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5}
+  .payout textarea{
+    width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);
+    padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;min-height:64px;
+    resize:vertical;outline:none;margin:12px 0 10px;word-break:break-all;
+  }
+  .payout textarea:focus{border-color:var(--sats)}
+  .payout .okline{display:flex;gap:6px;align-items:center;color:var(--trust);
+    font-weight:800;font-size:13px;margin-top:10px}
+  .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
+
+  /* ---------- modale pagamento ---------- */
+  .sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;display:none}
+  .sheet-bg.open{display:block;animation:fadein .15s}
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;
+    background:var(--card);border-radius:22px 22px 0 0;padding:20px var(--pad) 28px;
+    transform:translateY(100%);transition:transform .22s ease;
+  }
+  .sheet.open{transform:none}
+  .sheet .grab{width:38px;height:4px;border-radius:4px;background:var(--line);margin:0 auto 16px}
+  .sheet h3{font-size:17px;font-weight:800;margin-bottom:4px}
+  .qr{
+    aspect-ratio:1/1;max-width:230px;margin:16px auto;border-radius:var(--radius);
+    background:repeating-conic-gradient(var(--ink) 0 25%, #fff 0 50%) 0 0/16px 16px;
+    display:flex;align-items:center;justify-content:center;position:relative;
+  }
+  .qr::after{content:'⚡';position:absolute;font-size:30px;background:#fff;
+    width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 4px #fff}
+  .invoice{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;background:var(--bg);
+    border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;
+    color:var(--muted);margin-bottom:14px;
+  }
+  .toast{
+    position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;font-weight:700;font-size:13.5px;padding:11px 18px;
+    border-radius:12px;opacity:0;transition:.25s;z-index:60;pointer-events:none;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  .back{
+    border:0;background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:7px 13px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;margin:14px 0 0 var(--pad);
+  }
+  .demo-banner{
+    background:var(--sats-soft);color:#B26A0A;font-size:12px;font-weight:700;
+    text-align:center;padding:7px;letter-spacing:.02em;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="demo-banner" id="demoBanner">MODALITÀ DEMO — dati di prova, nessun pagamento reale</div>
+
+  <!-- ============ VISTA: ESPLORA ============ -->
+  <div class="view active" id="view-esplora">
+    <header>
+      <div class="brand">
+        <h1>Sat<span class="bolt">⚡</span>Market</h1>
+        <small>compra e vendi in sats</small>
+      </div>
+      <div class="searchbar">
+        <input id="q" type="search" placeholder="Cerca: “tastiera meccanica sotto i 100k”…">
+        <button onclick="doSearch()">Cerca</button>
+      </div>
+      <div class="chips" id="chips"></div>
+    </header>
+    <div class="section-label" id="gridLabel">In vetrina</div>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="gridEmpty" style="display:none">
+      <div class="big">🔍</div>
+      Nessun oggetto trovato per <b id="emptyQ"></b>.<br>
+      Prova con altre parole — o metti in vendita il tuo!
+    </div>
+  </div>
+
+  <!-- ============ VISTA: DETTAGLIO ============ -->
+  <div class="view" id="view-dettaglio">
+    <button class="back" onclick="go('esplora')">← Torna al mercatino</button>
+    <div id="detailContent"></div>
+  </div>
+
+  <!-- ============ VISTA: VENDI ============ -->
+  <div class="view" id="view-vendi">
+    <div class="form">
+      <h2>Metti in vendita</h2>
+      <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Paghi zero: la piattaforma trattiene l'1% solo a vendita conclusa.</div>
+      <div class="field">
+        <input type="file" id="sellPhotos" accept="image/*" multiple style="display:none" onchange="fotoScelte(event)">
+        <div class="photo-drop" onclick="el('sellPhotos').click()">
+          <span class="big">📸</span>Aggiungi foto (fino a 5)
+        </div>
+        <div id="photoPreview"></div>
+      </div>
+      <div class="field"><label>Titolo</label>
+        <input id="sellTitle" placeholder="Es. Tastiera meccanica Keychron K2"></div>
+      <div class="field"><label>Categoria</label>
+        <select id="sellCat"><option>Elettronica</option><option>Casa</option><option>Sport</option><option>Libri</option><option>Abbigliamento</option><option>Altro</option></select></div>
+      <div class="field"><label>Prezzo</label>
+        <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><span class="suffix">sats</span></div></div>
+      <div class="field"><label>Zona</label>
+        <input id="sellZone" placeholder="Es. Pavia — spedisco in tutta Italia"></div>
+      <div class="field"><label>Descrizione</label>
+        <textarea id="sellDesc" placeholder="Condizioni, difetti, motivo della vendita…"></textarea></div>
+      <button class="btn orange" onclick="publish()">⚡ Pubblica annuncio</button>
+      <div class="section-label" style="padding:26px 0 0">I tuoi annunci in vetrina</div>
+      <div id="myListings" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: AFFARI ============ -->
+  <div class="view" id="view-affari">
+    <div class="section-label" style="padding-top:22px">I tuoi affari</div>
+    <div id="ordersList" style="margin-top:12px"></div>
+  </div>
+
+  <!-- ============ VISTA: ESCROW / ORDINE ============ -->
+  <div class="view" id="view-ordine">
+    <button class="back" onclick="go('affari')">← I tuoi affari</button>
+    <div id="orderContent"></div>
+  </div>
+
+  <!-- ============ NAV ============ -->
+  <nav>
+    <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
+    <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
+    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
+  </nav>
+
+  <!-- ============ SHEET PAGAMENTO ============ -->
+  <div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
+  <div class="sheet" id="paySheet">
+    <div class="grab"></div>
+    <h3>Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> in escrow</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600">
+      Paga con qualsiasi wallet Lightning. I sats restano <b style="color:var(--trust)">bloccati e al sicuro</b> finché non confermi di aver ricevuto l'oggetto.
+    </div>
+    <div class="qr"></div>
+    <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
+    <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">tocca la invoice per copiarla, poi pagala dal tuo wallet</div>
+    <button class="btn primary" onclick="sheetPaid()">✓ Ho pagato</button>
+    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* =====================================================================
+   SatMarket — Mini App Telegram
+   Se aperta dentro Telegram usa il backend (API_BASE); aperta nel
+   browser gira in MODALITÀ DEMO con dati finti, per vedere la UX.
+===================================================================== */
+/* API_BASE si adatta da solo:
+   - se la pagina e' servita DAL backend (PC o telefono via WiFi) usa
+     il backend stesso ("/api"), qualunque sia il suo indirizzo
+   - se e' aperta con doppio click come file, cerca il backend in
+     locale su questo PC
+   In produzione non serve toccare nulla: servita da https funziona. */
+const API_BASE = location.protocol.startsWith('http') ? '/api' : 'http://localhost:8080/api';
+const tg = window.Telegram?.WebApp;
+let DEMO = !API_BASE;
+
+if (tg) { tg.ready(); tg.expand(); }
+
+/* ---- COLLAUDO: due identità finte per provare dal browser ---- */
+let collaudo = false;
+let collaudoId = 111, collaudoName = 'Compratore';
+let myTgId = null, isAdmin = false;
+
+function authHdr(){
+  if (tg?.initData) return tg.initData;
+  return `collaudo:${collaudoId}:${collaudoName}`;
+}
+function setCollaudo(id, nome){
+  collaudoId = id; collaudoName = nome;
+  toast(`🧪 Ora sei: ${nome}`);
+  avvia();
+}
+
+/* ---- mappatura dati backend -> formato della Mini App ---- */
+const EMOJI_CAT = {Elettronica:'🔌', Casa:'🪑', Sport:'🚲', Libri:'📚', Abbigliamento:'👕', Altro:'📦'};
+const FOTO_BASE = API_BASE.replace(/\/api$/, '');   // dove stanno le foto sul server
+function fotoUrl(f){
+  if (!f) return '';
+  return (f.startsWith('http') || f.startsWith('data:')) ? f : `${FOTO_BASE}/foto/${f}`;
+}
+function mapListing(a){
+  let photos = [];
+  try { photos = (a.foto ? JSON.parse(a.foto) : []).map(fotoUrl); } catch(e) {}
+  return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
+    price:a.prezzo_sats, cat:a.categoria, zone:a.zona||'—',
+    seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
+    desc:a.descrizione||'—', sellerId:a.venditore_id,
+    photos, username:a.venditore_username||'', nostr:a.contatto_nostr||''};
+}
+function mapOrder(o){
+  const role = o.compratore_id===myTgId ? 'buyer'
+             : o.venditore_id===myTgId ? 'seller' : 'admin';
+  return {id:o.id, listing:{emoji:'📦', title:o.titolo, price:o.prezzo_sats},
+    state:o.stato, role,
+    sellerInvoice:o.invoice_venditore||'',
+    corriere:o.corriere||'', tracking:o.tracking||'',
+    corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
+    consegnato:o.consegnato||0, speditoIl:o.spedito_il||0,
+    usernameCompratore:o.compratore_username||'', usernameVenditore:o.venditore_username||'',
+    when:new Date(o.aggiornato*1000).toLocaleString('it-IT',
+      {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})};
+}
+async function loadListings(){
+  const r = await fetch(`${API_BASE}/listings`, {headers:{'X-Tg-Init-Data': authHdr()}});
+  listings = (await r.json()).map(mapListing);
+}
+async function loadOrders(){
+  const r = await fetch(`${API_BASE}/orders`, {headers:{'X-Tg-Init-Data': authHdr()}});
+  orders = (await r.json()).map(mapOrder);
+}
+
+/* ---------------- dati demo ---------------- */
+const CATS = ["Tutto","Elettronica","Casa","Sport","Libri","Abbigliamento","Altro"];
+let listings = [
+  {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
+   zone:"Pavia", seller:"Massimo R.", rating:4.9, sales:12,
+   desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
+  {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport",
+   zone:"Milano", seller:"Giulia T.", rating:5.0, sales:7,
+   desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
+  {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri",
+   zone:"Torino", seller:"Andrea B.", rating:4.8, sales:31,
+   desc:"Copia nuova, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
+  {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
+   zone:"Roma", seller:"Luca P.", rating:4.7, sales:9,
+   desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
+  {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa",
+   zone:"Bologna", seller:"Sara M.", rating:4.9, sales:15,
+   desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
+  {id:6, emoji:"⚡", title:"Nodo Lightning: Raspberry Pi 4 8GB kit", price:190000, cat:"Elettronica",
+   zone:"Firenze", seller:"Marco V.", rating:5.0, sales:22,
+   desc:"Kit completo: Pi 4, SSD 1TB, case alluminio. Ex nodo, resettato. Not your node… 😉"},
+];
+let orders = [
+  {id:101, listing:listings[2], state:"locked",   role:"buyer",  when:"oggi, 14:02"},
+  {id:104, listing:listings[5], state:"confirmed",role:"seller", when:"oggi, 09:40"},
+  {id:102, listing:listings[0], state:"shipped",  role:"buyer",  when:"ieri"},
+  {id:103, listing:listings[4], state:"released", role:"seller", when:"3 giorni fa"},
+];
+let activeCat = "Tutto", currentListing = null, currentOrder = null;
+
+/* ---------------- helpers ---------------- */
+const fmt = n => n.toLocaleString('it-IT').replace(/\./g,' ');
+const el = id => document.getElementById(id);
+function toast(msg){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200); }
+function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
+
+/* ---------------- navigazione ---------------- */
+function go(view){
+  haptic();
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  el('view-'+view).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  el('nav-'+(['dettaglio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
+    ?.classList.add('active');
+  if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
+  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); }
+  window.scrollTo(0,0);
+}
+
+/* ---------------- esplora ---------------- */
+function renderChips(){
+  el('chips').innerHTML = CATS.map(c=>
+    `<div class="chip ${c===activeCat?'active':''}" onclick="setCat('${c}')">${c}</div>`).join('');
+}
+function setCat(c){ activeCat=c; renderChips(); renderGrid(); haptic(); }
+
+function renderGrid(items){
+  const q = el('q').value.trim().toLowerCase();
+  let data = items || listings.filter(l =>
+    (activeCat==='Tutto' || l.cat===activeCat) &&
+    (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));
+  el('gridLabel').textContent = items ? 'Risultati della ricerca' : (q||activeCat!=='Tutto' ? 'Risultati' : 'In vetrina');
+  el('gridEmpty').style.display = data.length ? 'none':'block';
+  el('emptyQ').textContent = q || activeCat;
+  el('grid').innerHTML = data.map(l=>`
+    <div class="card" onclick="openDetail(${l.id})">
+      <div class="ph">${l.photos && l.photos[0] ? `<img src="${l.photos[0]}" loading="lazy" alt="">` : l.emoji}</div>
+      <div class="info">
+        <div class="title">${l.title}</div>
+        <div class="price">${fmt(l.price)} <span class="unit">sats</span></div>
+        <div class="meta"><span>📍 ${l.zone}</span><span class="escrow-dot">🔒 escrow</span></div>
+      </div>
+    </div>`).join('');
+}
+
+async function doSearch(){
+  haptic();
+  const q = el('q').value.trim();
+  if (!q) { renderGrid(); return; }
+  if (DEMO) {
+    /* In demo: filtro semplice. Col backend attivo qui parte la
+       ricerca AI in linguaggio naturale (capisce "sotto i 100k" ecc.) */
+    renderGrid();
+    toast('Col backend attivo qui cerca l\'AI 🧠');
+  } else {
+    const r = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`,
+      {headers:{'X-Tg-Init-Data': authHdr()}});
+    renderGrid((await r.json()).map(mapListing));
+  }
+}
+
+/* ---------------- dettaglio ---------------- */
+function apriChat(username){
+  if (!username) { toast('Questo utente non ha uno username Telegram pubblico'); return; }
+  if (DEMO || collaudo) { toast(`💬 In produzione apre la chat con @${username}`); return; }
+  window.open(`https://t.me/${username}`, '_blank');
+}
+
+/* Cambio BTC/EUR aggiornato all'avvio (per il "≈ X €" sotto i prezzi) */
+let eurPerSat = 0.00092;   // valore di riserva se la rete non risponde
+function eur(sats){ return (sats * eurPerSat).toFixed(0); }
+fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur')
+  .then(r=>r.json()).then(d=>{ if (d?.bitcoin?.eur) eurPerSat = d.bitcoin.eur / 100000000; })
+  .catch(()=>{});
+
+function openDetail(id){
+  currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
+  if (!currentListing) { toast('Annuncio non trovato'); return; }
+  const l = currentListing;
+  const foto = (l.photos && l.photos.length)
+    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map(p=>`<img src="${p}" alt="">`).join('')}</div>
+       ${l.photos.length>1?`<span class="photo-count">📷 ${l.photos.length}</span>`:''}</div>`
+    : `<div class="detail-ph">${l.emoji}</div>`;
+  const contatto = l.nostr
+    ? `<button class="btn ghost" onclick="window.open('https://njump.me/${l.nostr}','_blank')">💬 Contatta ${l.seller.split(' ')[0]} su Nostr 🟣</button>`
+    : (l.username
+      ? `<button class="btn ghost" onclick="window.open('https://t.me/${l.username}','_blank')">💬 Fai una domanda a ${l.seller.split(' ')[0]}</button>`
+      : `<button class="btn ghost" onclick="toast('Questo venditore non ha un contatto pubblico')">💬 Fai una domanda a ${l.seller.split(' ')[0]}</button>`);
+  el('detailContent').innerHTML = `
+    ${foto}
+    <div class="detail-body">
+      <h2>${l.title}</h2>
+      <div class="detail-price">${fmt(l.price)} <span class="unit">sats</span></div>
+      <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${l.zone}</div>
+      <div class="seller">
+        <div class="avatar">${l.seller[0]}</div>
+        <div class="who"><b>${l.seller}</b>
+          <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
+        </div>
+      </div>
+      <div class="desc">${l.desc}</div>
+      <div class="trust-note">🔒 <span>I tuoi sats restano <b>bloccati in escrow</b> e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
+      ${(!DEMO && myTgId && l.sellerId===myTgId)
+        ? `<button class="btn danger-ghost" style="margin-top:0" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
+        : `<button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${fmt(l.price)} sats</button>`}
+      ${contatto}
+    </div>`;
+  go('dettaglio');
+}
+
+/* ---------------- acquisto / escrow ---------------- */
+let pollTimer = null, currentOrderId = null;
+
+async function startBuy(){
+  haptic();
+  el('payAmount').textContent = fmt(currentListing.price);
+  el('sheetBg').classList.add('open');
+  el('paySheet').classList.add('open');
+  if (DEMO) {
+    el('payInvoice').textContent =
+      'lnbc'+currentListing.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
+    return;
+  }
+  el('payInvoice').textContent = 'creazione invoice…';
+  const r = await fetch(`${API_BASE}/orders`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({annuncio_id: currentListing.id})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
+  currentOrderId = d.ordine_id;
+  el('payInvoice').textContent = d.invoice;
+  /* Controllo automatico ogni 4 secondi: appena paghi, se ne accorge */
+  pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
+}
+
+async function verificaOrdine(oid){
+  try {
+    const r = await fetch(`${API_BASE}/orders/${oid}/verifica-pagamento`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json();
+    if (d.stato === 'locked') {
+      closeSheet();
+      toast('⚡ Sats bloccati in escrow!');
+      await loadOrders(); renderOrders();
+      setTimeout(()=>openOrder(oid), 400);
+    }
+  } catch(e) {}
+}
+
+function copiaInvoice(){
+  const t = el('payInvoice').textContent;
+  if (t.startsWith('ln')) { navigator.clipboard?.writeText(t); toast('📋 Invoice copiata'); }
+}
+
+function closeSheet(){
+  el('sheetBg').classList.remove('open');
+  el('paySheet').classList.remove('open');
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+function sheetPaid(){
+  if (DEMO) return simulatePaid();
+  toast('Verifico il pagamento…');
+  verificaOrdine(currentOrderId);
+}
+
+function simulatePaid(){
+  closeSheet();
+  const o = {id: 100+orders.length+1, listing: currentListing, state:'locked', role:'buyer', when:'adesso'};
+  orders.unshift(o);
+  toast('⚡ Sats bloccati in escrow!');
+  setTimeout(()=>openOrder(o.id), 500);
+}
+
+const STATES = {
+  creato:   {label:'Da pagare',       badge:'locked'},
+  locked:   {label:'Sats in escrow',  badge:'locked'},
+  shipped:  {label:'Spedito',         badge:'shipped'},
+  delivered:{label:'Consegnato',      badge:'confirmed'},
+  confirmed:{label:'Da incassare',    badge:'confirmed'},
+  released: {label:'Concluso',        badge:'released'},
+  dispute:  {label:'In disputa',      badge:'dispute'},
+  return_pending:{label:'Reso richiesto',  badge:'confirmed'},
+  return_shipped:{label:'Reso in viaggio', badge:'shipped'},
+  refund:   {label:'Da rimborsare',   badge:'confirmed'},
+  refunded: {label:'Rimborsato',      badge:'released'},
+  annullato:{label:'Annullato',       badge:'annullato'},
+};
+
+function renderOrders(){
+  el('ordersList').innerHTML = orders.length ? orders.map(o=>`
+    <div class="order" onclick="openOrder(${o.id})">
+      <div class="row">
+        <b>${o.listing.emoji} ${o.listing.title}</b>
+        <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>
+      </div>
+      <div class="sub">${o.role==='buyer'?'Stai comprando':o.role==='seller'?'Stai vendendo':'⚖️ Da moderare'} · <span class="mono" style="color:var(--sats)">${fmt(o.listing.price)}</span> sats · ${o.when}</div>
+    </div>`).join('')
+    : `<div class="empty"><div class="big">🤝</div>Ancora nessun affare.<br>Quando compri o vendi, <b>lo seguirai da qui</b>.</div>`;
+}
+
+function openOrder(id){
+  currentOrder = orders.find(o=>o.id===id);
+  const o = currentOrder, s = o.state;
+  let steps, progress;
+  if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
+    /* Storia della disputa: la cassaforte racconta il congelamento */
+    const conReso = ['return_pending','return_shipped'].includes(s);
+    steps = [
+      {t:'Sats bloccati in escrow', d:'Il pagamento è custodito dalla piattaforma'},
+      {t:'Disputa aperta',          d:'I sats sono congelati: nessuno può toccarli'},
+      conReso
+        ? {t:'Restituzione dell\'oggetto', d:s==='return_pending'?'L\'acquirente deve rispedire l\'oggetto al venditore':'Il reso è in viaggio verso il venditore'}
+        : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso':'Disputa risolta a favore dell\'acquirente'},
+      {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, l\'annuncio torna in vetrina'},
+    ];
+    progress = {dispute:2, return_pending:2, return_shipped:2, refund:3, refunded:4}[s];
+  } else {
+    const oreRestanti = o.consegnato
+      ? Math.max(0, Math.ceil((o.consegnato + 72*3600 - Date.now()/1000)/3600)) : 0;
+    steps = [
+      {t:'Sats bloccati in escrow', d:'Il pagamento è custodito dalla piattaforma'},
+      {t:'Oggetto spedito',         d:o.tracking?`${o.corriere} — tracking ${o.tracking}`:'Il venditore ha consegnato al corriere'},
+      {t:s==='delivered'?'Consegnato: in attesa di conferma':'Ricevuto e confermato',
+       d:s==='delivered'?`Restano ~${oreRestanti} ore per confermare o aprire disputa`:(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
+      {t:'Sats sbloccati al venditore', d:'Affare concluso, feedback reciproco'},
+    ];
+    progress = {creato:0, locked:1, shipped:2, delivered:2, confirmed:3, released:4, annullato:-1}[s];
+  }
+  const testa = s==='released'  ? {ic:'🔓', b:'Escrow completato',  d:'I sats sono stati consegnati al venditore'}
+    : s==='refunded'            ? {ic:'↩️', b:'Escrow rimborsato',  d:'I sats sono tornati all\'acquirente'}
+    : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',  d:'Disputa decisa: i sats tornano all\'acquirente'}
+    : ['return_pending','return_shipped'].includes(s)
+                                ? {ic:'↩️', b:'Reso in corso',      d:'Rimborso alla restituzione: i sats restano congelati'}
+    : s==='dispute'             ? {ic:'⚖️', b:'Escrow congelato',   d:'Disputa in corso: i sats restano fermi fino alla decisione'}
+    : s==='annullato'           ? {ic:'✖️', b:'Ordine annullato',   d:'Nessun pagamento è stato trattenuto'}
+    :                             {ic:'🔒', b:'Cassaforte escrow',  d:'I sats sono al sicuro, nessuno può toccarli'};
+  el('orderContent').innerHTML = `
+    <div class="detail-body">
+      <h2 style="font-size:17px">${o.listing.emoji} ${o.listing.title}</h2>
+      <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span></div>
+
+      <div class="vault">
+        <div class="vault-head">
+          <div class="lock">${testa.ic}</div>
+          <div><b>${testa.b}</b>
+          <small>${testa.d}</small></div>
+        </div>
+        <div class="steps">
+          ${steps.map((st,i)=>`
+            <div class="step ${i<progress?'done':i===progress?'now':'todo'}">
+              <span class="dot"></span><b>${st.t}</b><small>${st.d}</small>
+            </div>`).join('')}
+        </div>
+      </div>
+      ${s==='dispute' ? `<div class="trust-note" style="background:#F9E8E6;color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
+      ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${o.corriere}</b> — tracciamento <b class="mono" style="font-size:12px">${o.tracking}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a></span></div>`:''}
+      ${isAdmin && s==='dispute' ? `
+        <div class="payout" style="border-color:var(--danger)">
+          <h4>⚖️ Decisione del moderatore</h4>
+          <div class="hint">I sats sono congelati in escrow. Ascolta le due parti, poi decidi: la scelta è definitiva.</div>
+          <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso')">↩️ Rimborsa subito l'acquirente (100%)</button>
+          <button class="btn ghost" onclick="adminResolve('reso')">📦 Rimborso previa restituzione dell'oggetto</button>
+          <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore')">⚡ Dai i sats al venditore (−1%)</button>
+        </div>`:''}
+      ${o.role==='buyer' && s==='refund' ? refundPanel(o) : ''}
+      ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>Disputa risolta a tuo favore: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
+      ${o.role==='buyer' && s==='return_pending' ? `
+        <div class="payout">
+          <h4>↩️ Rispedisci l'oggetto per il rimborso</h4>
+          <div class="hint">La disputa prevede il <b>rimborso previa restituzione</b>: accordati col venditore per l'indirizzo (chat), rispedisci l'oggetto e inserisci qui il tracciamento. Il rimborso di <b class="net">${fmt(o.listing.price)} sats</b> parte quando il venditore riceve il reso.</div>
+          ${selettoreCorriere('resoCorriere')}
+          <textarea id="resoTracking" style="min-height:38px" placeholder="Numero di tracciamento del reso"></textarea>
+          <button class="btn orange" onclick="resoSpedito()">↩️ Ho rispedito l'oggetto</button>
+        </div>`:''}
+      ${o.role==='seller' && s==='return_shipped' ? `
+        <div class="payout">
+          <h4>↩️ Reso in arrivo</h4>
+          <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${o.corriereReso}</b> — tracciamento <b class="mono" style="font-size:12px">${o.trackingReso}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
+          <button class="btn primary" style="margin-top:12px" onclick="resoRicevuto()">✓ Ho ricevuto il reso — rimborsa l'acquirente</button>
+        </div>`:''}
+      ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
+      ${o.role==='seller' && ['locked','shipped','delivered','confirmed'].includes(s) ? payoutPanel(o) : ''}
+      ${o.role==='seller' && s==='locked' ? `
+        <div class="payout">
+          <h4>📦 Spedisci l'oggetto</h4>
+          <div class="hint">I sats sono al sicuro in cassaforte. Spedisci e inserisci il tracciamento (l'acquirente lo vedrà e potrà seguire il pacco). Per la consegna di persona scegli "Consegna a mano".</div>
+          ${selettoreCorriere('shipCorriere')}
+          <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
+          <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
+        </div>`:''}
+      ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
+      <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
+      ${o.role==='buyer' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">📬 È arrivato — mi prendo 72h per controllarlo</button>`:''}
+      ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
+      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:#B26A0A">⏳ <span><b>Pacco consegnato!</b> Controlla l'oggetto: conferma qui sotto, o apri una disputa se c'è un problema. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
+      ${o.role==='buyer' && ['shipped','delivered'].includes(s) ? `<button class="btn primary" onclick="confirmReceived()">✓ Ho ricevuto l'oggetto, sblocca i sats</button>`:''}
+      ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
+      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
+      ${o.role==='admin'
+        ? `<button class="btn ghost" onclick="apriChat('${o.usernameCompratore}')">💬 Scrivi all'acquirente</button>
+           <button class="btn ghost" style="margin-top:0" onclick="apriChat('${o.usernameVenditore}')">💬 Scrivi al venditore</button>`
+        : `<button class="btn ghost" onclick="apriChat('${o.role==='buyer'?o.usernameVenditore:o.usernameCompratore}')">💬 Scrivi ${o.role==='buyer'?'al venditore':"all'acquirente"}</button>`}
+    </div>`;
+  go('ordine');
+}
+/* ---- pannello incasso del venditore ---- */
+let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
+
+function payoutPanel(o){
+  const net = Math.floor(o.listing.price * 0.99);   // prezzo − 1% commissione
+
+  /* Incasso automatico già attivo */
+  if (myLnAddress && o.state!=='confirmed') return `
+    <div class="payout">
+      <h4>⚡ Incasso automatico attivo</h4>
+      <div class="hint">Appena l'acquirente conferma la ricezione, <b class="net">${fmt(net)} sats</b>
+        arriveranno da soli su <b>${myLnAddress}</b>. Non devi fare nulla.</div>
+      <div class="okline">✓ Lightning address impostato</div>
+      <button class="btn ghost" onclick="myLnAddress='';openOrder(currentOrder.id)">↻ Cambia indirizzo</button>
+    </div>`;
+
+  /* Invoice depositata per questo ordine */
+  if (o.sellerInvoice) return `
+    <div class="payout">
+      <h4>💰 Incasso pronto</h4>
+      <div class="hint">Hai depositato la tua invoice da <b class="net">${fmt(net)} sats</b>:
+        verrà pagata <b>automaticamente</b> quando l'acquirente conferma la ricezione.</div>
+      <div class="okline">✓ Invoice salvata in cassaforte</div>
+      <button class="btn ghost" onclick="currentOrder.sellerInvoice='';openOrder(currentOrder.id)">↻ Sostituisci invoice</button>
+    </div>`;
+
+  /* Nessun metodo impostato: address consigliato, invoice come piano B */
+  return `
+    <div class="payout">
+      <h4>💰 ${o.state==='confirmed'?'Incassa subito i tuoi sats':'Come vuoi incassare?'}</h4>
+      <div class="hint">${o.state==='confirmed'
+        ? `L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)} sats</b> in cassaforte.`
+        : `Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)} sats</b> (prezzo − 1% di commissione).`}
+        <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address (lo trovi nel tuo wallet,
+        tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
+        lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
+      <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
+      <button class="btn orange" onclick="saveLnAddress()">⚡ Attiva incassi automatici</button>
+      <div class="hint" style="margin-top:14px"><b>Oppure</b>, solo per questo ordine: genera nel tuo wallet
+        una invoice di <b>esattamente ${fmt(net)} sats</b> e incollala qui.</div>
+      <textarea id="sellerInvoice" placeholder="lnbc… (incolla qui la tua invoice Lightning)"></textarea>
+      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice()">${o.state==='confirmed'?'Incassa con questa invoice':'Salva invoice'}</button>
+    </div>`;
+}
+
+async function saveLnAddress(){
+  haptic();
+  const addr = el('lnAddrInput').value.trim().toLowerCase();
+  if (!addr.includes('@') || !addr.split('@')[1]?.includes('.')) {
+    toast('Formato non valido: dev\'essere tipo nome@wallet.com'); return;
+  }
+  if (DEMO) {
+    myLnAddress = addr;
+    if (currentOrder.state==='confirmed') { currentOrder.state='released'; toast('🔓 Sats incassati automaticamente! ⚡'); }
+    else toast('⚡ Incassi automatici attivati!');
+    openOrder(currentOrder.id); return;
+  }
+  const r = await fetch(`${API_BASE}/me/ln-address`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({ln_address: addr})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Indirizzo non accettato, ricontrolla'); return; }
+  myLnAddress = d.ln_address;
+  if (d.incassi_sbloccati > 0) {
+    currentOrder.state = currentOrder.state==='refund' ? 'refunded' : 'released';
+    toast(currentOrder.state==='refunded' ? '↩️ Rimborso in arrivo! ⚡' : '🔓 Sats incassati automaticamente! ⚡');
+  }
+  else toast('⚡ Incassi automatici attivati!');
+  openOrder(currentOrder.id);
+}
+
+/* ---- pannello rimborso dell'acquirente (disputa vinta) ---- */
+function refundPanel(o){
+  if (myLnAddress) return `
+    <div class="payout">
+      <h4>↩️ Rimborso in elaborazione</h4>
+      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)} sats</b> in arrivo su <b>${myLnAddress}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
+      <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
+      <button class="btn orange" onclick="saveSellerInvoice()">↩️ Ricevi il rimborso</button>
+    </div>`;
+  return `
+    <div class="payout">
+      <h4>↩️ Ricevi il tuo rimborso</h4>
+      <div class="hint">La disputa è stata risolta <b>a tuo favore</b>: ti aspettano <b class="net">${fmt(o.listing.price)} sats</b> (rimborso integrale).
+        <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
+      <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
+      <button class="btn orange" onclick="saveLnAddress()">⚡ Ricevi con Lightning address</button>
+      <div class="hint" style="margin-top:14px"><b>Oppure</b> genera nel tuo wallet una invoice di <b>esattamente ${fmt(o.listing.price)} sats</b> e incollala qui.</div>
+      <textarea id="sellerInvoice" placeholder="lnbc… (incolla qui la tua invoice Lightning)"></textarea>
+      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice()">Ricevi con questa invoice</button>
+    </div>`;
+}
+
+/* ---- decisione admin sulle dispute ---- */
+async function adminResolve(esito){
+  haptic();
+  const msg = esito==='rimborso'
+    ? 'Rimborsare SUBITO tutti i sats all\'acquirente?\n\nL\'annuncio tornerà in vetrina. La decisione è definitiva.'
+    : esito==='reso'
+    ? 'Rimborso PREVIA RESTITUZIONE?\n\nL\'acquirente dovrà rispedire l\'oggetto (con tracciamento); il rimborso partirà solo quando il venditore conferma di averlo ricevuto.'
+    : 'Consegnare i sats al venditore (meno l\'1%)?\n\nLa decisione è definitiva.';
+  if (!confirm(msg)) return;
+  if (DEMO) { toast('Le dispute si decidono col backend attivo'); return; }
+  const r = await fetch(`${API_BASE}/admin/orders/${currentOrder.id}/risolvi`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({esito})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.state = d.stato || 'dispute';
+  toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato'
+      : d.stato==='released' ? '⚡ Sats consegnati al venditore'
+      : d.stato==='return_pending' ? '📦 Deciso: rimborso previa restituzione'
+      : '⚖️ Deciso: in attesa del metodo di incasso della parte vincente');
+  openOrder(currentOrder.id);
+}
+
+async function saveSellerInvoice(){
+  haptic();
+  const inv = el('sellerInvoice').value.trim();
+  if (!inv.toLowerCase().startsWith('ln')) { toast('Incolla una invoice Lightning valida (inizia con "ln…")'); return; }
+  if (DEMO) {
+    if (currentOrder.state==='confirmed') { currentOrder.state='released'; toast('🔓 Sats incassati! Affare concluso ⚡'); }
+    else { currentOrder.sellerInvoice=inv; toast('✓ Invoice salvata: incasso automatico alla conferma'); }
+    openOrder(currentOrder.id); return;
+  }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/invoice`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({invoice: inv})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Invoice non accettata, riprova'); return; }
+  if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats incassati! Affare concluso ⚡'); }
+  else if (d.stato==='refunded') { currentOrder.state='refunded'; toast('↩️ Rimborso in arrivo nel tuo wallet!'); }
+  else if (d.stato==='refund') { toast('Il pagamento non è riuscito: riprova con una invoice nuova'); }
+  else { currentOrder.sellerInvoice=inv; toast('✓ Invoice salvata: incasso automatico alla conferma'); }
+  openOrder(currentOrder.id);
+}
+
+async function confirmReceived(){
+  haptic();
+  if (!confirm('Confermi di aver ricevuto l\'oggetto e che è tutto ok?\n\nI sats verranno sbloccati DEFINITIVAMENTE al venditore.')) return;
+  if (DEMO) {
+    currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); openOrder(currentOrder.id); return;
+  }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/conferma`, {
+    method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
+  if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); }
+  else { currentOrder.state='confirmed'; toast('✅ Confermato! I sats partiranno appena il venditore fornisce la invoice'); }
+  openOrder(currentOrder.id);
+}
+async function annullaOrdine(){
+  haptic();
+  if (!confirm('Annullare questo ordine non pagato?\n\nNessun sat è stato mosso: sparirà e basta.')) return;
+  if (DEMO) { orders = orders.filter(x=>x.id!==currentOrder.id); renderOrders(); go('affari'); toast('✖️ Ordine annullato'); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/annulla`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+  await loadOrders(); renderOrders();
+  toast('✖️ Ordine annullato'); go('affari');
+}
+
+function selettoreCorriere(id){
+  const CORRIERI = ['Poste Italiane','BRT','GLS','SDA','DHL','UPS','InPost','Altro corriere','Consegna a mano'];
+  return `<select id="${id}" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-weight:600;background:var(--bg);margin:12px 0 8px;outline:none">
+    ${CORRIERI.map(c=>`<option>${c}</option>`).join('')}</select>`;
+}
+
+async function markShipped(){
+  haptic();
+  const corriere = el('shipCorriere')?.value || '';
+  const tracking = el('shipTracking')?.value.trim() || '';
+  if (corriere !== 'Consegna a mano' && !tracking) {
+    toast('Inserisci il tracciamento (o scegli "Consegna a mano")'); return;
+  }
+  if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking; toast('📦 Segnato come spedito'); openOrder(currentOrder.id); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({corriere, tracking})});
+  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking;
+  toast('📦 Segnato come spedito'); openOrder(currentOrder.id);
+}
+
+async function markDelivered(){
+  haptic();
+  if (!confirm('Il pacco è arrivato?\n\nAvrai 72 ore per controllare l\'oggetto: se non confermi né apri disputa, allo scadere i sats andranno al venditore.')) return;
+  if (DEMO) { currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000); toast('📬 Consegna registrata'); openOrder(currentOrder.id); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/consegnato`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000);
+  toast('📬 Consegna registrata: 72 ore per controllare'); openOrder(currentOrder.id);
+}
+
+async function sollecita(){
+  haptic();
+  if (DEMO) { toast('🔔 Promemoria inviato (simulato)'); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/sollecita`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+  toast('🔔 Promemoria inviato all\'acquirente');
+}
+
+async function resoSpedito(){
+  haptic();
+  const corriere = el('resoCorriere')?.value || '';
+  const tracking = el('resoTracking')?.value.trim() || '';
+  if (corriere !== 'Consegna a mano' && !tracking) {
+    toast('Inserisci il tracciamento del reso'); return;
+  }
+  if (DEMO) { currentOrder.state='return_shipped'; toast('↩️ Reso registrato'); openOrder(currentOrder.id); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/reso-spedito`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({corriere, tracking})});
+  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.state='return_shipped'; currentOrder.corriereReso=corriere; currentOrder.trackingReso=tracking;
+  toast('↩️ Reso registrato: rimborso alla consegna'); openOrder(currentOrder.id);
+}
+
+async function resoRicevuto(){
+  haptic();
+  if (!confirm('Confermi di aver ricevuto il reso?\n\nL\'acquirente verrà rimborsato integralmente.')) return;
+  if (DEMO) { currentOrder.state='refunded'; toast('↩️ Acquirente rimborsato'); openOrder(currentOrder.id); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/reso-ricevuto`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.state = d.stato || 'refund';
+  toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
+  openOrder(currentOrder.id);
+}
+async function openDispute(){
+  if (!confirm('Aprire una disputa? I sats restano bloccati finché un moderatore non decide.')) return;
+  if (DEMO) { currentOrder.state='dispute'; toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/disputa`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.state='dispute'; toast('⚠️ Disputa aperta, ti contatterà un moderatore'); openOrder(currentOrder.id);
+}
+
+/* ---------------- vendi ---------------- */
+let myListings = [];
+
+async function loadMyListings(){
+  if (DEMO) { myListings = listings.filter(l=>l.seller==='Tu'); return; }
+  const r = await fetch(`${API_BASE}/listings/miei`,
+    {headers:{'X-Tg-Init-Data':authHdr()}});
+  myListings = (await r.json()).map(mapListing);
+}
+
+function renderMyListings(){
+  const box = el('myListings');
+  if (!box) return;
+  box.innerHTML = myListings.length ? myListings.map(l=>`
+    <div class="order">
+      <div class="row">
+        <b onclick="openDetail(${l.id})" style="cursor:pointer">${l.photos&&l.photos[0]?'📷':l.emoji} ${l.title}</b>
+        <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#F9E8E6;color:var(--danger)">🗑 Elimina</span>
+      </div>
+      <div class="sub"><span class="mono" style="color:var(--sats)">${fmt(l.price)}</span> sats · 📍 ${l.zone}</div>
+    </div>`).join('')
+    : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo qui sopra! ⚡</div>`;
+}
+
+async function deleteListing(id, dalDettaglio){
+  haptic();
+  if (!confirm('Eliminare questo annuncio dal mercatino?')) return;
+  if (DEMO) {
+    listings = listings.filter(l=>l.id!==id);
+  } else {
+    const r = await fetch(`${API_BASE}/listings/${id}/rimuovi`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+    await loadListings();
+  }
+  await loadMyListings();
+  renderMyListings(); renderGrid();
+  toast('🗑 Annuncio eliminato');
+  if (dalDettaglio) go('vendi');
+}
+
+let sellFoto = [];   // le foto scelte, gia' ridimensionate
+
+function ridimensiona(file){
+  /* Riduce la foto a max 1200px lato lungo, JPEG leggero: cosi'
+     l'upload e' veloce anche dal telefone e il server resta snello */
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const MAX = 1200, k = Math.min(1, MAX/Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      res(c.toDataURL('image/jpeg', .82));
+    };
+    img.onerror = ()=>res(null);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function fotoScelte(ev){
+  for (const file of ev.target.files){
+    if (sellFoto.length >= 5) { toast('Massimo 5 foto'); break; }
+    const f = await ridimensiona(file);
+    if (f) sellFoto.push(f);
+  }
+  ev.target.value = '';
+  renderFotoPreview();
+}
+
+function renderFotoPreview(){
+  el('photoPreview').innerHTML = sellFoto.map((f,i)=>`
+    <div class="th"><img src="${f}" alt="">
+      <span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>
+    </div>`).join('');
+}
+
+async function publish(){
+  const t = el('sellTitle').value.trim(), p = parseInt(el('sellPrice').value)||0;
+  if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }
+  if (DEMO) {
+    listings.unshift({id:Date.now(), emoji:'📦', title:t, price:p, cat:el('sellCat').value,
+      zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
+      desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
+  } else {
+    const r = await fetch(`${API_BASE}/listings`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({titolo:t, prezzo_sats:p, categoria:el('sellCat').value,
+        zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
+        foto:sellFoto})});
+    if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Errore nella pubblicazione'); return; }
+    await loadListings();
+  }
+  ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
+  sellFoto = []; renderFotoPreview();
+  toast('⚡ Annuncio pubblicato!'); setCat('Tutto'); go('esplora');
+}
+
+/* ---------------- avvio ---------------- */
+async function avvia(){
+  renderChips();
+  if (!API_BASE) {                          // nessun backend configurato
+    DEMO = true; renderGrid(); renderOrders(); return;
+  }
+  try {
+    const me = await (await fetch(`${API_BASE}/me`,
+      {headers:{'X-Tg-Init-Data': authHdr()}})).json();
+    myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
+    DEMO = false;
+    collaudo = !tg?.initData;
+    const b = el('demoBanner');
+    if (collaudo) {
+      const btn = (id,nome)=>`<button onclick="setCollaudo(${id},'${nome}')" style="font:inherit;border:1px solid #B26A0A;background:${collaudoId===id?'#B26A0A':'transparent'};color:${collaudoId===id?'#fff':'#B26A0A'};border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">${nome}</button>`;
+      b.style.display = 'block';
+      b.innerHTML = `🧪 COLLAUDO con sats veri — sei: `
+        + btn(111,'Compratore') + btn(222,'Venditore') + btn(999,'Admin');
+    } else b.style.display = 'none';
+    await loadListings();
+    await loadOrders();
+    myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
+    renderGrid(); renderOrders();
+    /* Se eri dentro un ordine o una scheda annuncio (es. cambiando
+       identità nel collaudo), la pagina si aggiorna con i dati freschi
+       invece di restare quella di prima */
+    if (el('view-ordine').classList.contains('active')) {
+      if (currentOrder && orders.find(x=>x.id===currentOrder.id)) openOrder(currentOrder.id);
+      else go('affari');
+    } else if (el('view-dettaglio').classList.contains('active')) {
+      if (currentListing && listings.find(x=>x.id===currentListing.id)) openDetail(currentListing.id);
+      else go('esplora');
+    } else if (el('view-vendi').classList.contains('active')) {
+      loadMyListings().then(renderMyListings).catch(()=>{});
+    }
+  } catch (e) {
+    /* Backend non raggiungibile: si torna alla demo con dati finti */
+    DEMO = true;
+    el('demoBanner').textContent =
+      'BACKEND NON RAGGIUNGIBILE — modalità demo con dati di prova';
+    renderGrid(); renderOrders();
+  }
+}
+avvia();
+el('q').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+</script>
+</body>
+</html>
