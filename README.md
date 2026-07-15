@@ -74,4 +74,4 @@ dati finti: utile per lavorare sulla UX.
 - Pubblicazione degli annunci **verso** Nostr (+ "sold" automatico),
   login Nostr (bunker), feed dei contatti seguiti
 - Escrow on-chain multisig 2-di-3 per gli oggetti di valore
-- Pagamento in un tap via NWC (Nostr Wallet Connect)
+- Pagamento in un tap via NWC (Nostr Wallet Connect).
