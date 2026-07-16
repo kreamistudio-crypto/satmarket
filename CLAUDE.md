@@ -21,6 +21,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la chiamata fallisce), notifica agli admin di ogni annuncio +
   endpoint admin di rimozione. I casi ambigui (cannabis light,
   pistola sparachiodi...) NON vanno nella lista parole: li valuta l'AI.
+  Badge Nostr: colonna `utenti.npub` (AUTO-DICHIARATA e NON verificata
+  per scelta — la firma di sfida è il prossimo gradino della scala),
+  endpoint `/api/me/npub` (formato bech32, rifiuta le nsec), campo
+  `venditore_npub` in `CAMPI_VETRINA` (la npub è pubblica per natura)
+  e nelle SELECT di `/api/search` e `/api/listings/miei`.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Quattro modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); collaudo locale (identità finte); VETRINA pubblica in
@@ -66,14 +71,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    In produzione MODALITA_COLLAUDO deve restare False.
 7. Stile del codice esistente: commenti e nomi in italiano, tono caldo,
    niente refactoring di massa non richiesti, diff piccoli e verificabili.
+8. A fine cantiere, PRIMA del commit finale, valuta se il lavoro ha
+   cambiato architettura, API, schema del database o regole del progetto:
+   se sì, proponi l'aggiornamento di CLAUDE.md come commit separato,
+   senza aspettare che Andrea lo chieda. Ritocchi minori (testi,
+   tarature, fix) non lo richiedono.
 
 ## Stato (lug 2026) e prossimi lavori
 
 Lanciando in rodaggio su community italiana, limite ~100k sats/annuncio.
 Fatti (lug 2026): banner sulla demo browser; vetrina pubblica in sola
 lettura (annunci veri dal browser, azioni → invito al bot); moderazione
-contenuti a tre strati (parole + AI + admin).
-Backlog concordato: badge npub nel profilo + sugli annunci; commissione
-minima fissa; poi post-lancio: firma di sfida Nostr, tracking verificato
-via API corrieri, feedback/stelle, pubblicazione verso Nostr, NWC,
-escrow on-chain 2-di-3, parere legale MiCA prima di crescere.
+contenuti a tre strati (parole + AI + admin); badge npub auto-dichiarato
+nel profilo e sugli annunci (vedi Architettura).
+Backlog concordato: commissione minima fissa; poi post-lancio: firma di
+sfida Nostr (verifica del badge npub), tracking verificato via API
+corrieri, feedback/stelle, pubblicazione verso Nostr, NWC, escrow
+on-chain 2-di-3, parere legale MiCA prima di crescere.
