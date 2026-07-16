@@ -94,6 +94,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS utenti(
         tg_id INTEGER PRIMARY KEY, nome TEXT, username TEXT,
         ln_address TEXT DEFAULT '',   -- es. mario@walletofsatoshi.com: incassi automatici
+        npub TEXT DEFAULT '',         -- npub Nostr AUTO-DICHIARATA (badge, NON verificata)
         vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0,
         rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0
     );
@@ -131,6 +132,11 @@ def init_db():
     # incassi automatici: aggiunge la colonna se manca.
     try:
         con.execute("ALTER TABLE utenti ADD COLUMN ln_address TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    # Migrazione per il badge Nostr (npub auto-dichiarata del profilo)
+    try:
+        con.execute("ALTER TABLE utenti ADD COLUMN npub TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
     # Migrazioni per foto e contatto Nostr degli annunci
@@ -473,11 +479,12 @@ async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
 # La vetrina e' PUBBLICA (si guarda anche dal browser, senza Telegram):
 # questi sono gli UNICI campi che escono verso gli anonimi. Niente
 # venditore_id: l'ID Telegram del venditore non appare mai in vetrina.
+# La npub invece e' pubblica per natura: e' fatta per essere condivisa.
 CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
     "a.foto, a.contatto_nostr, a.creato, "
     "u.nome AS venditore, u.username AS venditore_username, "
-    "u.rating, u.vendite_ok")
+    "u.npub AS venditore_npub, u.rating, u.vendite_ok")
 
 
 @app.get("/api/listings")
@@ -548,7 +555,7 @@ def miei_annunci(x_tg_init_data: str = Header("")):
     con = db()
     righe = [dict(r) for r in con.execute(
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-        "u.rating, u.vendite_ok FROM annunci a "
+        "u.npub AS venditore_npub, u.rating, u.vendite_ok FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
         (user["id"],))]
@@ -636,7 +643,7 @@ def cerca(q: str, x_tg_init_data: str = Header("")):
     con = db()
     annunci = [dict(r) for r in con.execute(
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-        "u.rating FROM annunci a "
+        "u.npub AS venditore_npub, u.rating FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")]
     con.close()
     if not annunci:
@@ -879,6 +886,34 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header("")):
         if r.get("ok"):
             sbloccati += 1
     return {"ok": True, "ln_address": addr, "incassi_sbloccati": sbloccati}
+
+
+# La npub e' "npub1" + 58 caratteri del charset bech32. Controllo di
+# SOLO FORMATO: la npub resta AUTO-DICHIARATA e NON verificata (la
+# verifica di proprieta' con firma di sfida e' un cantiere futuro).
+RE_NPUB = re.compile(r"^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$")
+
+
+@app.post("/api/me/npub")
+async def salva_npub(req: Request, x_tg_init_data: str = Header("")):
+    """Badge Nostr del profilo: l'utente dichiara la sua npub (chiave
+    PUBBLICA) e i suoi annunci mostrano il badge. Stringa vuota = rimozione.
+    REGOLA FERREA: mai chiedere ne' accettare nsec (chiavi private)."""
+    user = verifica_utente(x_tg_init_data)
+    d = await req.json()
+    npub = (d.get("npub") or "").strip().lower().removeprefix("nostr:")
+    if npub.startswith("nsec"):
+        raise HTTPException(400,
+            "Quella e' una chiave PRIVATA (nsec): non incollarla MAI, qui "
+            "o altrove! Serve la npub, la chiave pubblica (inizia con npub1)")
+    if npub and not RE_NPUB.fullmatch(npub):
+        raise HTTPException(400,
+            "Formato non valido: la npub inizia con npub1 ed e' lunga 63 caratteri")
+    con = db()
+    con.execute("UPDATE utenti SET npub=? WHERE tg_id=?", (npub, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "npub": npub}
 
 
 @app.post("/api/orders/{ordine_id}/invoice")

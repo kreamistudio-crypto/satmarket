@@ -351,6 +351,13 @@
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
         protetti. Gli annunci vengono moderati.</div>
+      <div class="field" style="margin-top:24px"><label>Il tuo profilo Nostr (facoltativo)</label>
+        <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
+      <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
+      <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+        La npub è <b>auto-dichiarata e non verificata</b> (la verifica con
+        firma arriverà in futuro): aggiunge il badge 🟣 ai tuoi annunci.
+        Non incollare MAI la nsec: quella è la tua chiave privata.</div>
       <div class="section-label" style="padding:26px 0 0">I tuoi annunci in vetrina</div>
       <div id="myListings" style="margin-top:12px"></div>
     </div>
@@ -451,7 +458,8 @@ function mapListing(a){
     price:a.prezzo_sats, cat:a.categoria, zone:a.zona||'—',
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
-    photos, username:a.venditore_username||'', nostr:a.contatto_nostr||''};
+    photos, username:a.venditore_username||'', nostr:a.contatto_nostr||'',
+    sellerNpub:a.venditore_npub||''};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -553,7 +561,7 @@ function renderGrid(items){
       <div class="info">
         <div class="title">${l.title}</div>
         <div class="price">${fmt(l.price)} <span class="unit">sats</span></div>
-        <div class="meta"><span>📍 ${l.zone}</span><span class="escrow-dot">🔒 escrow</span></div>
+        <div class="meta"><span>📍 ${l.zone}</span>${l.sellerNpub?'<span title="Venditore presente su Nostr (npub non verificata)">🟣</span>':''}<span class="escrow-dot">🔒 escrow</span></div>
       </div>
     </div>`).join('');
 }
@@ -613,8 +621,9 @@ function openDetail(id){
       <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${l.zone}</div>
       <div class="seller">
         <div class="avatar">${l.seller[0]}</div>
-        <div class="who"><b>${l.seller}</b>
+        <div class="who"><b>${l.seller}${l.sellerNpub?' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>':''}</b>
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
+          ${l.sellerNpub?`<div class="rep">🟣 <a href="https://njump.me/${l.sellerNpub}" target="_blank" style="color:inherit">Presente su Nostr</a> · npub auto-dichiarata, non verificata</div>`:''}
         </div>
       </div>
       <div class="desc">${l.desc}</div>
@@ -908,6 +917,31 @@ async function saveLnAddress(){
   }
   else toast('⚡ Incassi automatici attivati!');
   openOrder(currentOrder.id);
+}
+
+/* ---- badge Nostr del profilo (npub AUTO-DICHIARATA, non verificata:
+   il controllo e' solo di formato, la firma di sfida verra' poi) ---- */
+let myNpub = '';
+
+async function saveNpub(){
+  haptic();
+  const npub = el('npubInput').value.trim().toLowerCase().replace(/^nostr:/,'');
+  if (npub.startsWith('nsec')) {
+    toast('⚠️ Quella è la chiave PRIVATA (nsec): non incollarla mai! Qui va la npub'); return;
+  }
+  if (npub && !/^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(npub)) {
+    toast('Formato non valido: la npub inizia con npub1 ed è lunga 63 caratteri'); return;
+  }
+  if (DEMO) { myNpub = npub; toast(npub?'🟣 Badge Nostr attivo!':'npub rimossa'); return; }
+  const r = await fetch(`${API_BASE}/me/npub`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({npub})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'npub non accettata, ricontrolla'); return; }
+  myNpub = d.npub;
+  toast(myNpub ? '🟣 Badge Nostr attivo sui tuoi annunci!' : 'npub rimossa dal profilo');
+  await loadListings(); renderGrid();
 }
 
 /* ---- pannello rimborso dell'acquirente (disputa vinta) ---- */
@@ -1246,6 +1280,8 @@ async function avvia(){
        (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.) */
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
+    myNpub = me.npub || '';
+    if (el('npubInput')) el('npubInput').value = myNpub;
     DEMO = false;
     collaudo = !tg?.initData;
     const b = el('demoBanner');
