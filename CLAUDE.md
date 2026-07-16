@@ -11,8 +11,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Escrow LNbits (invoice key incassa, admin key paga), commissione 1%,
   notifiche via bot Telegram, ricerca AI (Haiku), orologio asyncio per gli
   sblocchi automatici (72h dalla consegna, 10gg dalla spedizione).
+  `/api/listings` è PUBBLICA (vetrina anche senza Telegram) ma serve solo
+  la whitelist esplicita `CAMPI_VETRINA`: `venditore_id` esce solo alle
+  richieste autenticate. La ricerca AI resta riservata agli autenticati
+  (pubblica sarebbe credito API regalato ai bot). Tutto il resto è
+  autenticato via `verifica_utente`.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
-  Dentro Telegram: auth vera via initData. Dal browser: modalità demo.
+  Quattro modalità, decise in `avvia()`: app vera dentro Telegram (auth
+  via initData); collaudo locale (identità finte); VETRINA pubblica in
+  sola lettura dal browser (annunci veri, ogni azione apre l'invito verso
+  @ilbarattolobot); demo coi dati finti come riserva se il backend tace.
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
@@ -54,8 +62,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 ## Stato (lug 2026) e prossimi lavori
 
 Lanciando in rodaggio su community italiana, limite ~100k sats/annuncio.
-Backlog concordato: badge npub nel profilo + sugli annunci; banner sulla
-demo browser ("l'app vera è su Telegram → @ilbarattolobot"); commissione
+Fatti (lug 2026): banner sulla demo browser; vetrina pubblica in sola
+lettura (annunci veri dal browser, azioni → invito al bot).
+Backlog concordato: badge npub nel profilo + sugli annunci; commissione
 minima fissa; poi post-lancio: firma di sfida Nostr, tracking verificato
 via API corrieri, feedback/stelle, pubblicazione verso Nostr, NWC,
 escrow on-chain 2-di-3, parere legale MiCA prima di crescere.
