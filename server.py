@@ -34,7 +34,9 @@ import hmac
 import json
 import os
 import re
+import secrets
 import sqlite3
+import ssl
 import sys
 import time
 import unicodedata
@@ -43,6 +45,13 @@ from urllib.parse import parse_qsl
 import anthropic
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
+
+# websocket-client serve solo alla verifica npub: se manca il pacchetto
+# il server parte lo stesso e la verifica risponde con un errore chiaro.
+try:
+    from websocket import create_connection
+except ImportError:
+    create_connection = None
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -94,7 +103,10 @@ def init_db():
     CREATE TABLE IF NOT EXISTS utenti(
         tg_id INTEGER PRIMARY KEY, nome TEXT, username TEXT,
         ln_address TEXT DEFAULT '',   -- es. mario@walletofsatoshi.com: incassi automatici
-        npub TEXT DEFAULT '',         -- npub Nostr AUTO-DICHIARATA (badge, NON verificata)
+        npub TEXT DEFAULT '',         -- npub Nostr auto-dichiarata (badge)
+        npub_verificata INTEGER DEFAULT 0,  -- 1 = nota di verifica trovata sui relay
+        verifica_codice TEXT DEFAULT '',    -- codice da pubblicare in una nota
+        verifica_scade INTEGER DEFAULT 0,   -- il codice vale 1 ora
         vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0,
         rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0
     );
@@ -134,11 +146,15 @@ def init_db():
         con.execute("ALTER TABLE utenti ADD COLUMN ln_address TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
-    # Migrazione per il badge Nostr (npub auto-dichiarata del profilo)
-    try:
-        con.execute("ALTER TABLE utenti ADD COLUMN npub TEXT DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass
+    # Migrazioni per il badge Nostr (npub del profilo e sua verifica)
+    for colonna in ("npub TEXT DEFAULT ''",
+                    "npub_verificata INTEGER DEFAULT 0",
+                    "verifica_codice TEXT DEFAULT ''",
+                    "verifica_scade INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
     # Migrazioni per foto e contatto Nostr degli annunci
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''"):
         try:
@@ -484,7 +500,8 @@ CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
     "a.foto, a.contatto_nostr, a.creato, "
     "u.nome AS venditore, u.username AS venditore_username, "
-    "u.npub AS venditore_npub, u.rating, u.vendite_ok")
+    "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
+    "u.rating, u.vendite_ok")
 
 
 @app.get("/api/listings")
@@ -555,7 +572,9 @@ def miei_annunci(x_tg_init_data: str = Header("")):
     con = db()
     righe = [dict(r) for r in con.execute(
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-        "u.npub AS venditore_npub, u.rating, u.vendite_ok FROM annunci a "
+        "u.npub AS venditore_npub, "
+        "u.npub_verificata AS venditore_npub_verificata, "
+        "u.rating, u.vendite_ok FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
         (user["id"],))]
@@ -643,7 +662,9 @@ def cerca(q: str, x_tg_init_data: str = Header("")):
     con = db()
     annunci = [dict(r) for r in con.execute(
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-        "u.npub AS venditore_npub, u.rating FROM annunci a "
+        "u.npub AS venditore_npub, "
+        "u.npub_verificata AS venditore_npub_verificata, "
+        "u.rating FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")]
     con.close()
     if not annunci:
@@ -910,10 +931,155 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header("")):
         raise HTTPException(400,
             "Formato non valido: la npub inizia con npub1 ed e' lunga 63 caratteri")
     con = db()
-    con.execute("UPDATE utenti SET npub=? WHERE tg_id=?", (npub, user["id"]))
+    attuale = con.execute(
+        "SELECT npub, npub_verificata FROM utenti WHERE tg_id=?",
+        (user["id"],)).fetchone()
+    verificata = bool(attuale and attuale["npub_verificata"])
+    if not attuale or npub != attuale["npub"]:
+        # npub nuova, cambiata o rimossa: la verifica riparte da zero
+        verificata = False
+        con.execute(
+            "UPDATE utenti SET npub=?, npub_verificata=0, "
+            "verifica_codice='', verifica_scade=0 WHERE tg_id=?",
+            (npub, user["id"]))
     con.commit()
     con.close()
-    return {"ok": True, "npub": npub}
+    return {"ok": True, "npub": npub, "npub_verificata": verificata}
+
+
+# --- Verifica della npub con una nota pubblica -----------------------
+# L'utente dimostra di POSSEDERE la npub pubblicando dal suo client una
+# nota (kind 1) con un codice generato da noi. Nessuna nsec, nessuna
+# firma da consegnare, MAI (regola ferrea): solo una nota pubblica, che
+# dopo la verifica puo' anche cancellare senza conseguenze.
+# Relay e conversione bech32->hex sono lo specchio di importa_nostr.py
+# (che non si puo' importare: pretende NPUB_VENDITORE in config.py).
+
+RELAYS_VERIFICA = [
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.primal.net",
+    "wss://nostr.mom",
+]
+CHARSET_BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
+
+def npub_to_hex(npub: str) -> str:
+    """Converte la npub (bech32) nella chiave esadecimale dei relay."""
+    dati = [CHARSET_BECH32.find(c) for c in npub[5:]]
+    if -1 in dati:
+        raise ValueError("npub non valida: carattere sconosciuto")
+    dati = dati[:-6]                     # togli il checksum
+    bits, val, out = 0, 0, []
+    for d in dati:                       # da gruppi di 5 bit a byte
+        val = (val << 5) | d
+        bits += 5
+        if bits >= 8:
+            bits -= 8
+            out.append((val >> bits) & 0xFF)
+    hexkey = bytes(out).hex()
+    if len(hexkey) != 64:
+        raise ValueError("npub non valida: lunghezza sbagliata")
+    return hexkey
+
+
+def cerca_nota_verifica(relay: str, hexkey: str, codice: str, da: int) -> bool:
+    """Chiede a UN relay le note recenti della npub e guarda se una
+    contiene il codice. E' SINCRONA (websocket-client): il server e'
+    async, quindi va chiamata dentro asyncio.to_thread."""
+    try:
+        ws = create_connection(relay, timeout=5,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "verifica", {
+            "kinds": [1], "authors": [hexkey], "since": da, "limit": 50}]))
+        inizio = time.time()
+        while time.time() - inizio < 6:
+            msg = json.loads(ws.recv())
+            if msg[0] == "EVENT" and msg[1] == "verifica":
+                if codice in msg[2].get("content", ""):
+                    ws.close()
+                    return True
+            elif msg[0] == "EOSE":
+                break
+        ws.close()
+    except Exception:
+        pass                  # relay muto o irraggiungibile: pazienza
+    return False
+
+
+@app.post("/api/me/npub/verifica-avvia")
+async def verifica_npub_avvia(x_tg_init_data: str = Header("")):
+    """Primo passo: generiamo il codice univoco da pubblicare in una
+    nota Nostr. Vale 1 ora."""
+    user = verifica_utente(x_tg_init_data)
+    con = db()
+    u = con.execute("SELECT npub, npub_verificata FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    if not u or not u["npub"]:
+        con.close()
+        raise HTTPException(400, "Prima salva la tua npub nel profilo")
+    if u["npub_verificata"]:
+        con.close()
+        return {"ok": True, "gia_verificata": True}
+    codice = f"barattolo-verify-{secrets.token_hex(3)}"
+    con.execute("UPDATE utenti SET verifica_codice=?, verifica_scade=? "
+                "WHERE tg_id=?", (codice, int(time.time()) + 3600, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "codice": codice,
+            "istruzioni": ("Pubblica dal tuo client Nostr (Damus, Amethyst, "
+                           "Primal…) una nota con questo codice, poi torna "
+                           "qui e premi «Ho pubblicato, controlla». Dopo la "
+                           "verifica puoi cancellare la nota.")}
+
+
+@app.post("/api/me/npub/verifica-controlla")
+async def verifica_npub_controlla(x_tg_init_data: str = Header("")):
+    """Secondo passo: cerchiamo sui relay una nota recente della npub
+    che contenga il codice. Trovata = la npub e' davvero sua."""
+    user = verifica_utente(x_tg_init_data)
+    if create_connection is None:
+        raise HTTPException(503, "Verifica non disponibile: sul server "
+                                 "manca il pacchetto websocket-client")
+    con = db()
+    u = con.execute(
+        "SELECT npub, npub_verificata, verifica_codice, verifica_scade "
+        "FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
+    con.close()
+    if not u or not u["npub"]:
+        raise HTTPException(400, "Prima salva la tua npub nel profilo")
+    if u["npub_verificata"]:
+        return {"ok": True, "verificata": True}
+    if not u["verifica_codice"]:
+        raise HTTPException(400, "Prima avvia la verifica per avere il codice")
+    if time.time() > u["verifica_scade"]:
+        raise HTTPException(400,
+            "Il codice e' scaduto (vale 1 ora): avvia una nuova verifica")
+    try:
+        hexkey = npub_to_hex(u["npub"])
+    except ValueError:
+        raise HTTPException(400, "La npub salvata non e' valida: reinseriscila")
+    # Tutti i relay in parallelo (ognuno nel suo thread): basta un si'.
+    # "da" = poco prima dell'avvio della verifica, per note recenti.
+    da = u["verifica_scade"] - 3600 - 600
+    esiti = await asyncio.gather(*[
+        asyncio.to_thread(cerca_nota_verifica, r, hexkey,
+                          u["verifica_codice"], da)
+        for r in RELAYS_VERIFICA])
+    if not any(esiti):
+        return {"ok": True, "verificata": False,
+                "msg": ("Nota non ancora trovata: i relay a volte tardano "
+                        "qualche minuto. Riprova tra poco!")}
+    con = db()
+    con.execute("UPDATE utenti SET npub_verificata=1, verifica_codice='', "
+                "verifica_scade=0 WHERE tg_id=?", (user["id"],))
+    con.commit()
+    con.close()
+    await notifica(user["id"],
+                   "🟣✓ <b>npub verificata!</b> Da adesso i tuoi annunci "
+                   "portano il badge dei venditori verificati su Nostr. 🎉 "
+                   "(La nota col codice ora puoi anche cancellarla.)")
+    return {"ok": True, "verificata": True}
 
 
 @app.post("/api/orders/{ordine_id}/invoice")

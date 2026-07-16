@@ -355,9 +355,10 @@
         <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
       <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
       <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        La npub è <b>auto-dichiarata e non verificata</b> (la verifica con
-        firma arriverà in futuro): aggiunge il badge 🟣 ai tuoi annunci.
-        Non incollare MAI la nsec: quella è la tua chiave privata.</div>
+        La npub aggiunge il badge 🟣 ai tuoi annunci; con la verifica qui
+        sotto diventa 🟣✓. Non incollare MAI la nsec: quella è la tua
+        chiave privata e nessuno deve chiedertela, noi per primi.</div>
+      <div id="npubVerifica"></div>
       <div class="section-label" style="padding:26px 0 0">I tuoi annunci in vetrina</div>
       <div id="myListings" style="margin-top:12px"></div>
     </div>
@@ -459,7 +460,7 @@ function mapListing(a){
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
     photos, username:a.venditore_username||'', nostr:a.contatto_nostr||'',
-    sellerNpub:a.venditore_npub||''};
+    sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -561,7 +562,7 @@ function renderGrid(items){
       <div class="info">
         <div class="title">${l.title}</div>
         <div class="price">${fmt(l.price)} <span class="unit">sats</span></div>
-        <div class="meta"><span>📍 ${l.zone}</span>${l.sellerNpub?'<span title="Venditore presente su Nostr (npub non verificata)">🟣</span>':''}<span class="escrow-dot">🔒 escrow</span></div>
+        <div class="meta"><span>📍 ${l.zone}</span>${l.sellerNpub?(l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣✓</span>':'<span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}<span class="escrow-dot">🔒 escrow</span></div>
       </div>
     </div>`).join('');
 }
@@ -621,9 +622,9 @@ function openDetail(id){
       <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${l.zone}</div>
       <div class="seller">
         <div class="avatar">${l.seller[0]}</div>
-        <div class="who"><b>${l.seller}${l.sellerNpub?' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>':''}</b>
+        <div class="who"><b>${l.seller}${l.sellerNpub?(l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣✓</span>':' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}</b>
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
-          ${l.sellerNpub?`<div class="rep">🟣 <a href="https://njump.me/${l.sellerNpub}" target="_blank" style="color:inherit">Presente su Nostr</a> · npub auto-dichiarata, non verificata</div>`:''}
+          ${l.sellerNpub?`<div class="rep">${l.sellerNpubOk?'🟣✓':'🟣'} <a href="https://njump.me/${l.sellerNpub}" target="_blank" style="color:inherit">Presente su Nostr</a> · ${l.sellerNpubOk?'npub verificata ✓':'npub auto-dichiarata, non verificata'}</div>`:''}
         </div>
       </div>
       <div class="desc">${l.desc}</div>
@@ -919,9 +920,73 @@ async function saveLnAddress(){
   openOrder(currentOrder.id);
 }
 
-/* ---- badge Nostr del profilo (npub AUTO-DICHIARATA, non verificata:
-   il controllo e' solo di formato, la firma di sfida verra' poi) ---- */
-let myNpub = '';
+/* ---- badge Nostr del profilo: npub auto-dichiarata + verifica con
+   nota pubblica (l'utente pubblica un codice dal SUO client: nessuna
+   nsec, nessuna firma da consegnare, mai) ---- */
+let myNpub = '', myNpubVerified = false, npubCodice = '';
+
+function renderNpubVerifica(){
+  const box = el('npubVerifica');
+  if (!box) return;
+  if (!myNpub) { box.innerHTML = ''; return; }
+  if (myNpubVerified) {
+    box.innerHTML = `<div style="margin-top:10px;font-size:13px;font-weight:800;color:var(--trust)">🟣✓ npub verificata</div>`;
+    return;
+  }
+  if (npubCodice) {
+    box.innerHTML = `
+      <div style="margin-top:12px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+        Pubblica dal tuo client Nostr (Damus, Amethyst, Primal…) una nota
+        con questo codice, poi torna qui. Dopo la verifica potrai anche
+        cancellarla.</div>
+      <div class="mono" onclick="copiaCodice()" title="Tocca per copiare"
+        style="margin:8px 0;padding:10px;border:1.5px dashed var(--muted);border-radius:10px;text-align:center;font-size:14px;cursor:pointer">${npubCodice}</div>
+      <button class="btn orange" style="margin-top:0" onclick="npubControlla()">✅ Ho pubblicato, controlla</button>`;
+    return;
+  }
+  box.innerHTML = `
+    <div style="margin-top:10px;font-size:13px;font-weight:800">🟣 npub non verificata</div>
+    <button class="btn ghost" style="margin-top:8px" onclick="npubAvvia()">✓ Verifica ora</button>`;
+}
+
+function copiaCodice(){
+  navigator.clipboard?.writeText(npubCodice);
+  toast('📋 Codice copiato');
+}
+
+async function npubAvvia(){
+  haptic();
+  if (DEMO) { npubCodice = 'barattolo-verify-demo42'; renderNpubVerifica(); return; }
+  const r = await fetch(`${API_BASE}/me/npub/verifica-avvia`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non riesco ad avviare la verifica'); return; }
+  if (d.gia_verificata) { myNpubVerified = true; renderNpubVerifica(); return; }
+  npubCodice = d.codice;
+  renderNpubVerifica();
+}
+
+async function npubControlla(){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono relay: col backend vero qui parte il controllo 🟣'); return; }
+  toast('🔎 Controllo i relay Nostr… qualche secondo', 8000);
+  const r = await fetch(`${API_BASE}/me/npub/verifica-controlla`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) {
+    if (r.status===400) npubCodice = '';   // codice scaduto o mancante: si riparte
+    toast(d.detail || 'Controllo non riuscito, riprova');
+    renderNpubVerifica(); return;
+  }
+  if (d.verificata) {
+    myNpubVerified = true; npubCodice = '';
+    toast('🎉 npub verificata! Badge 🟣✓ attivo sui tuoi annunci');
+    renderNpubVerifica();
+    await loadListings(); renderGrid();
+  } else {
+    toast(d.msg || 'Nota non ancora trovata: riprova tra poco', 4000);
+  }
+}
 
 async function saveNpub(){
   haptic();
@@ -932,14 +997,20 @@ async function saveNpub(){
   if (npub && !/^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(npub)) {
     toast('Formato non valido: la npub inizia con npub1 ed è lunga 63 caratteri'); return;
   }
-  if (DEMO) { myNpub = npub; toast(npub?'🟣 Badge Nostr attivo!':'npub rimossa'); return; }
+  if (DEMO) {
+    if (npub !== myNpub) { myNpubVerified = false; npubCodice = ''; }
+    myNpub = npub; renderNpubVerifica();
+    toast(npub?'🟣 Badge Nostr attivo!':'npub rimossa'); return;
+  }
   const r = await fetch(`${API_BASE}/me/npub`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({npub})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail || 'npub non accettata, ricontrolla'); return; }
-  myNpub = d.npub;
+  myNpub = d.npub; myNpubVerified = !!d.npub_verificata;
+  if (!myNpubVerified) npubCodice = '';   // npub cambiata: verifica da rifare
+  renderNpubVerifica();
   toast(myNpub ? '🟣 Badge Nostr attivo sui tuoi annunci!' : 'npub rimossa dal profilo');
   await loadListings(); renderGrid();
 }
@@ -1280,8 +1351,10 @@ async function avvia(){
        (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.) */
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
-    myNpub = me.npub || '';
+    myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;
+    npubCodice = '';
     if (el('npubInput')) el('npubInput').value = myNpub;
+    renderNpubVerifica();
     DEMO = false;
     collaudo = !tg?.initData;
     const b = el('demoBanner');
