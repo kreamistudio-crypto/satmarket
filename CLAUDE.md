@@ -21,11 +21,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la chiamata fallisce), notifica agli admin di ogni annuncio +
   endpoint admin di rimozione. I casi ambigui (cannabis light,
   pistola sparachiodi...) NON vanno nella lista parole: li valuta l'AI.
-  Badge Nostr: colonna `utenti.npub` (AUTO-DICHIARATA e NON verificata
-  per scelta — la firma di sfida è il prossimo gradino della scala),
-  endpoint `/api/me/npub` (formato bech32, rifiuta le nsec), campo
-  `venditore_npub` in `CAMPI_VETRINA` (la npub è pubblica per natura)
-  e nelle SELECT di `/api/search` e `/api/listings/miei`.
+  Badge Nostr: colonna `utenti.npub` auto-dichiarata via `/api/me/npub`
+  (formato bech32, rifiuta le nsec) + verifica con NOTA PUBBLICA:
+  `/api/me/npub/verifica-avvia` genera un codice (vale 1h), l'utente lo
+  pubblica in una nota kind-1 dal SUO client, `verifica-controlla`
+  interroga 4 relay (websocket-client è sincrono: gira dentro
+  `asyncio.to_thread`, relay in parallelo) → `utenti.npub_verificata`,
+  badge 🟣✓. Cambiare o rimuovere la npub azzera la verifica.
+  `venditore_npub` e `venditore_npub_verificata` sono in `CAMPI_VETRINA`
+  (pubblici per natura) e nelle SELECT di `/api/search` e
+  `/api/listings/miei`.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Quattro modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); collaudo locale (identità finte); VETRINA pubblica in
@@ -48,14 +53,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `/miniapp.html`: non rimuoverli.
 - Deploy: commit+push su main → sul server `cd satmarket && git pull &&
   systemctl restart barattolo`. Config e database NON viaggiano mai.
+- La verifica npub richiede `websocket-client` (pip) nell'ambiente del
+  servizio: se manca, il server parte lo stesso e l'endpoint risponde 503.
 
 ## Regole ferree
 
 1. MAI committare `config.py`, `*.db`, `foto/`, chiavi, token, npub private.
    Se una chiave viene esposta ovunque (chat, log, commit): va RUOTATA.
 2. MAI chiedere o gestire nsec (chiave privata Nostr) degli utenti.
-   Decisione permanente. La via approvata è: badge npub auto-dichiarato →
-   firma di sfida (post-lancio) → mai custodia di segreti altrui.
+   Decisione permanente. La scala approvata: badge npub auto-dichiarato →
+   verifica con nota pubblica (fatta, lug 2026) → mai custodia di
+   segreti altrui, mai firme che richiedano di consegnare chiavi.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/foto/*` e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
    diventerebbero pubblici — falla già successa e chiusa).
@@ -83,8 +91,8 @@ Lanciando in rodaggio su community italiana, limite ~100k sats/annuncio.
 Fatti (lug 2026): banner sulla demo browser; vetrina pubblica in sola
 lettura (annunci veri dal browser, azioni → invito al bot); moderazione
 contenuti a tre strati (parole + AI + admin); badge npub auto-dichiarato
-nel profilo e sugli annunci (vedi Architettura).
-Backlog concordato: commissione minima fissa; poi post-lancio: firma di
-sfida Nostr (verifica del badge npub), tracking verificato via API
-corrieri, feedback/stelle, pubblicazione verso Nostr, NWC, escrow
-on-chain 2-di-3, parere legale MiCA prima di crescere.
+nel profilo e sugli annunci; verifica della npub via nota pubblica
+(badge 🟣✓, vedi Architettura).
+Backlog concordato: commissione minima fissa; poi post-lancio: tracking
+verificato via API corrieri, feedback/stelle, pubblicazione verso Nostr,
+NWC, escrow on-chain 2-di-3, parere legale MiCA prima di crescere.
