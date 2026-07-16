@@ -1,0 +1,14 @@
+# SEGRETI — mai su GitHub!
+config.py
+
+# Dati locali (database, foto degli annunci)
+*.db
+foto/
+
+# Python
+__pycache__/
+*.pyc
+
+# Varie
+.DS_Store
+Thumbs.db
