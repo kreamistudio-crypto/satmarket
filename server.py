@@ -34,6 +34,7 @@ import json
 import os
 import re
 import sqlite3
+import sys
 import time
 from urllib.parse import parse_qsl
 
@@ -42,6 +43,14 @@ import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+# Le stampe del server contengono emoji (⚠️ 📨 ⏰): sulle console
+# Windows in cp1252 manderebbero in crash l'avvio o il collaudo.
+# Chiediamo l'UTF-8 una volta per tutte; su Linux e' gia' cosi'
+# e non cambia nulla.
+for _canale in (sys.stdout, sys.stderr):
+    if _canale is not None and hasattr(_canale, "reconfigure"):
+        _canale.reconfigure(encoding="utf-8", errors="replace")
 
 # ========================= CONFIGURAZIONE =========================
 # TUTTE le chiavi e le impostazioni vivono in config.py, che NON va
