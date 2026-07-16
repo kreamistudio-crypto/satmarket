@@ -277,11 +277,24 @@
     background:var(--sats-soft);color:#B26A0A;font-size:12px;font-weight:700;
     text-align:center;padding:7px;letter-spacing:.02em;
   }
+  /* Aperta dal browser: qui i dati sono finti, quindi il banner deve
+     saltare all'occhio e portare dov'e' il mercatino vero */
+  .demo-banner.demo-vera{
+    background:var(--sats);color:#fff;font-size:13px;
+    padding:12px var(--pad);line-height:1.5;letter-spacing:0;
+  }
+  .demo-cta{
+    display:inline-block;margin-top:8px;background:#fff;color:#B26A0A;
+    text-decoration:none;border-radius:9px;padding:6px 14px;
+    font-weight:800;font-size:13px;
+  }
 </style>
 </head>
 <body>
 <div id="app">
-  <div class="demo-banner" id="demoBanner">MODALITÀ DEMO — dati di prova, nessun pagamento reale</div>
+  <!-- Riempito da avvia(): banner della demo dal browser, oppure la
+       barra del collaudo. Dentro Telegram resta nascosto. -->
+  <div class="demo-banner" id="demoBanner" style="display:none"></div>
 
   <!-- ============ VISTA: ESPLORA ============ -->
   <div class="view active" id="view-esplora">
@@ -1134,14 +1147,31 @@ async function publish(){
 }
 
 /* ---------------- avvio ---------------- */
+/* Fuori da Telegram gli annunci sono finti: dillo forte e indica la
+   porta d'ingresso vera, cioe' il bot. */
+function mostraBannerDemo(){
+  const b = el('demoBanner');
+  b.className = 'demo-banner demo-vera';
+  b.innerHTML =
+    `<div>🫙 Questa è solo la demo — il mercatino vero vive su Telegram</div>`
+    + `<a class="demo-cta" href="https://t.me/ilbarattolobot"`
+    + ` target="_blank" rel="noopener">Apri @ilbarattolobot →</a>`;
+  b.style.display = 'block';
+}
+
 async function avvia(){
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
-    DEMO = true; renderGrid(); renderOrders(); return;
+    DEMO = true; mostraBannerDemo(); renderGrid(); renderOrders(); return;
   }
   try {
-    const me = await (await fetch(`${API_BASE}/me`,
-      {headers:{'X-Tg-Init-Data': authHdr()}})).json();
+    const r = await fetch(`${API_BASE}/me`,
+      {headers:{'X-Tg-Init-Data': authHdr()}});
+    const me = await r.json();
+    /* Senza initData il backend ci riconosce solo col collaudo acceso.
+       Se ci dice di no siamo nel browser, fuori da Telegram: demo.
+       (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.) */
+    if (!r.ok || !me.tg_id) throw new Error('demo: niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
     DEMO = false;
     collaudo = !tg?.initData;
@@ -1169,10 +1199,10 @@ async function avvia(){
       loadMyListings().then(renderMyListings).catch(()=>{});
     }
   } catch (e) {
-    /* Backend non raggiungibile: si torna alla demo con dati finti */
+    /* Browser fuori da Telegram, oppure backend non raggiungibile:
+       in tutti e due i casi si va in demo con dati finti */
     DEMO = true;
-    el('demoBanner').textContent =
-      'BACKEND NON RAGGIUNGIBILE — modalità demo con dati di prova';
+    mostraBannerDemo();
     renderGrid(); renderOrders();
   }
 }
