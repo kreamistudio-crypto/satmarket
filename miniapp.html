@@ -386,6 +386,16 @@
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
+  <div class="sheet" id="invitoSheet">
+    <div class="grab"></div>
+    <h3>🫙 Ti aspettiamo su Telegram</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600" id="invitoTesto"></div>
+    <a class="btn orange" style="display:block;text-align:center;text-decoration:none;margin-top:14px"
+       href="https://t.me/ilbarattolobot" target="_blank" rel="noopener">Apri @ilbarattolobot</a>
+    <button class="btn ghost" onclick="closeSheet()">Continua a guardare</button>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
@@ -404,6 +414,7 @@
 const API_BASE = location.protocol.startsWith('http') ? '/api' : 'http://localhost:8080/api';
 const tg = window.Telegram?.WebApp;
 let DEMO = !API_BASE;
+let VETRINA = false;   // browser in produzione: annunci veri, sola lettura
 
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -500,6 +511,13 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 /* ---------------- navigazione ---------------- */
 function go(view){
   haptic();
+  /* In vetrina Vendi e Affari non esistono: si fanno su Telegram */
+  if (VETRINA && (view==='vendi' || view==='affari')) {
+    invitoTelegram(view==='vendi'
+      ? 'Qui in vetrina si guarda soltanto: per mettere in vendita i tuoi oggetti apri Barattolo dentro Telegram.'
+      : 'I tuoi affari vivono su Telegram: apri Barattolo per seguirli.');
+    return;
+  }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
@@ -545,6 +563,10 @@ async function doSearch(){
        ricerca AI in linguaggio naturale (capisce "sotto i 100k" ecc.) */
     renderGrid();
     toast('Col backend attivo qui cerca l\'AI 🧠');
+  } else if (VETRINA) {
+    /* Anonimi: filtro locale sui dati veri. La ricerca AI resta a chi
+       e' dentro Telegram (pubblica, sarebbe credito API regalato ai bot) */
+    renderGrid();
   } else {
     const r = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`,
       {headers:{'X-Tg-Init-Data': authHdr()}});
@@ -606,6 +628,11 @@ let pollTimer = null, currentOrderId = null;
 
 async function startBuy(){
   haptic();
+  if (VETRINA) {
+    invitoTelegram('Per comprare con l\'escrow serve l\'app vera dentro '
+      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
+    return;
+  }
   el('payAmount').textContent = fmt(currentListing.price);
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
@@ -646,9 +673,16 @@ function copiaInvoice(){
   if (t.startsWith('ln')) { navigator.clipboard?.writeText(t); toast('📋 Invoice copiata'); }
 }
 
+/* Il foglio-invito della vetrina: spiega e accompagna verso il bot */
+function invitoTelegram(testo){
+  el('invitoTesto').textContent = testo;
+  el('sheetBg').classList.add('open');
+  el('invitoSheet').classList.add('open');
+}
 function closeSheet(){
   el('sheetBg').classList.remove('open');
   el('paySheet').classList.remove('open');
+  el('invitoSheet').classList.remove('open');
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
@@ -1147,31 +1181,52 @@ async function publish(){
 }
 
 /* ---------------- avvio ---------------- */
-/* Fuori da Telegram gli annunci sono finti: dillo forte e indica la
-   porta d'ingresso vera, cioe' il bot. */
-function mostraBannerDemo(){
+/* Fuori da Telegram il banner in testa dice dove siamo (vetrina vera
+   o demo coi dati finti) e indica la porta d'ingresso: il bot. */
+function mostraBanner(testo){
   const b = el('demoBanner');
   b.className = 'demo-banner demo-vera';
   b.innerHTML =
-    `<div>🫙 Questa è solo la demo — il mercatino vero vive su Telegram</div>`
+    `<div>${testo}</div>`
     + `<a class="demo-cta" href="https://t.me/ilbarattolobot"`
     + ` target="_blank" rel="noopener">Apri @ilbarattolobot →</a>`;
   b.style.display = 'block';
+}
+const BANNER_DEMO = '🫙 Questa è solo la demo — il mercatino vero vive su Telegram';
+const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — per comprare e vendere apri Barattolo su Telegram';
+
+/* Browser senza identità Telegram: si prova la vetrina vera, cioè gli
+   annunci pubblici in sola lettura. Niente header di autenticazione:
+   siamo anonimi e il backend non deve sapere nulla di noi. */
+async function avviaVetrina(){
+  try {
+    const r = await fetch(`${API_BASE}/listings`);
+    if (!r.ok) throw new Error('vetrina non disponibile');
+    listings = (await r.json()).map(mapListing);
+    VETRINA = true; DEMO = false; orders = [];
+    mostraBanner(BANNER_VETRINA);
+    renderGrid();
+  } catch (e) {
+    /* Backend non raggiungibile: demo coi dati finti */
+    DEMO = true;
+    mostraBanner(BANNER_DEMO);
+    renderGrid(); renderOrders();
+  }
 }
 
 async function avvia(){
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
-    DEMO = true; mostraBannerDemo(); renderGrid(); renderOrders(); return;
+    DEMO = true; mostraBanner(BANNER_DEMO); renderGrid(); renderOrders(); return;
   }
   try {
     const r = await fetch(`${API_BASE}/me`,
       {headers:{'X-Tg-Init-Data': authHdr()}});
     const me = await r.json();
     /* Senza initData il backend ci riconosce solo col collaudo acceso.
-       Se ci dice di no siamo nel browser, fuori da Telegram: demo.
+       Se ci dice di no siamo nel browser, fuori da Telegram: vetrina.
        (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.) */
-    if (!r.ok || !me.tg_id) throw new Error('demo: niente auth Telegram');
+    if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
     DEMO = false;
     collaudo = !tg?.initData;
@@ -1199,11 +1254,9 @@ async function avvia(){
       loadMyListings().then(renderMyListings).catch(()=>{});
     }
   } catch (e) {
-    /* Browser fuori da Telegram, oppure backend non raggiungibile:
-       in tutti e due i casi si va in demo con dati finti */
-    DEMO = true;
-    mostraBannerDemo();
-    renderGrid(); renderOrders();
+    /* Browser fuori da Telegram: vetrina vera in sola lettura
+       (con la demo finta come rete di sicurezza se il backend tace) */
+    await avviaVetrina();
   }
 }
 avvia();

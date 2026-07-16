@@ -197,6 +197,18 @@ def verifica_utente(init_data: str) -> dict:
         raise HTTPException(401, "Autenticazione Telegram non valida")
 
 
+def utente_se_autenticato(init_data: str) -> dict | None:
+    """Autenticazione FACOLTATIVA, solo per le API di vetrina: chi
+    arriva da Telegram (o dal collaudo) viene riconosciuto, chi guarda
+    dal browser resta anonimo e viene servito lo stesso."""
+    if not init_data:
+        return None
+    try:
+        return verifica_utente(init_data)
+    except HTTPException:
+        return None
+
+
 # ------------------------- LNBITS (escrow) --------------------------
 
 async def crea_invoice_escrow(sats: int, memo: str) -> dict:
@@ -310,11 +322,23 @@ def salva_foto(annuncio_id: int, foto_lista: list) -> list:
     return nomi
 
 
+# La vetrina e' PUBBLICA (si guarda anche dal browser, senza Telegram):
+# questi sono gli UNICI campi che escono verso gli anonimi. Niente
+# venditore_id: l'ID Telegram del venditore non appare mai in vetrina.
+CAMPI_VETRINA = (
+    "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
+    "a.foto, a.contatto_nostr, a.creato, "
+    "u.nome AS venditore, u.username AS venditore_username, "
+    "u.rating, u.vendite_ok")
+
+
 @app.get("/api/listings")
-def lista_annunci(cat: str = ""):
+def lista_annunci(cat: str = "", x_tg_init_data: str = Header("")):
+    user = utente_se_autenticato(x_tg_init_data)
+    # venditore_id serve alla Mini App per "questo annuncio e' tuo"
+    campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
     con = db()
-    q = ("SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-         "u.rating, u.vendite_ok FROM annunci a "
+    q = (f"SELECT {campi} FROM annunci a "
          "JOIN utenti u ON u.tg_id = a.venditore_id WHERE a.stato='attivo'")
     par = []
     if cat and cat != "Tutto":
