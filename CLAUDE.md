@@ -15,7 +15,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la whitelist esplicita `CAMPI_VETRINA`: `venditore_id` esce solo alle
   richieste autenticate. La ricerca AI resta riservata agli autenticati
   (pubblica sarebbe credito API regalato ai bot). Tutto il resto è
-  autenticato via `verifica_utente`.
+  autenticato via `verifica_utente`. Moderazione a tre strati su
+  `pubblica()`: filtro `PAROLE_VIETATE` (parole intere su testo
+  normalizzato), parere AI opzionale (fail-open se la chiave manca o
+  la chiamata fallisce), notifica agli admin di ogni annuncio +
+  endpoint admin di rimozione. I casi ambigui (cannabis light,
+  pistola sparachiodi...) NON vanno nella lista parole: li valuta l'AI.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Quattro modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); collaudo locale (identità finte); VETRINA pubblica in
@@ -25,6 +30,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
   consenziente da Nostr (npub e VENDITORE_ID vengono da config.py).
+  ATTENZIONE: scrive direttamente nel database, quindi BYPASSA la
+  moderazione di `pubblica()`. Limite accettato finché l'import resta
+  manuale e per venditori fidati; da chiudere se mai si aprirà ad altri.
 
 ## Produzione
 
@@ -63,7 +71,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 
 Lanciando in rodaggio su community italiana, limite ~100k sats/annuncio.
 Fatti (lug 2026): banner sulla demo browser; vetrina pubblica in sola
-lettura (annunci veri dal browser, azioni → invito al bot).
+lettura (annunci veri dal browser, azioni → invito al bot); moderazione
+contenuti a tre strati (parole + AI + admin).
 Backlog concordato: badge npub nel profilo + sugli annunci; commissione
 minima fissa; poi post-lancio: firma di sfida Nostr, tracking verificato
 via API corrieri, feedback/stelle, pubblicazione verso Nostr, NWC,
