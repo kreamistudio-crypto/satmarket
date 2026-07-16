@@ -425,13 +425,25 @@ def controlla_vietato(titolo: str, descrizione: str) -> str | None:
 
 PROMPT_MODERAZIONE = (
     "Sei il moderatore di un mercatino dell'usato italiano. Valuta se "
-    "l'annuncio e' lecito. E' VIETATO vendere: armi, droghe, servizi "
-    "sessuali o prostituzione, refurtiva, contraffazioni, documenti "
-    "falsi, dati personali o account, farmaci, animali protetti. "
-    "Riconosci anche storpiature e mascheramenti (numeri al posto di "
-    "lettere, spazi o simboli in mezzo alle parole). Rispondi con UNA "
-    "sola riga: OK se l'annuncio va bene, oppure VIETATO: seguito dal "
-    "motivo in poche parole. Nessun altro testo.")
+    "l'annuncio e' lecito. E' VIETATO vendere: armi da fuoco VERE e "
+    "funzionanti, munizioni, armi bianche da offesa; droghe; servizi "
+    "sessuali o prostituzione; refurtiva; contraffazioni; documenti "
+    "falsi; dati personali o account; farmaci con obbligo di ricetta; "
+    "animali protetti. NON e' vietato l'uso legittimo: attrezzi da "
+    "lavoro (sparachiodi, pistole per silicone o vernice), giocattoli, "
+    "softair e repliche, fucili subacquei, coltelli da cucina, oggetti "
+    "da collezione disattivati, farmaci da banco citati di passaggio "
+    "nella descrizione di altro. Riconosci storpiature e mascheramenti "
+    "(numeri al posto di lettere, spazi o simboli in mezzo alle "
+    "parole). Se l'annuncio e' ambiguo ma plausibilmente lecito "
+    "rispondi OK: ogni annuncio pubblicato viene comunque notificato "
+    "a un moderatore umano che puo' rimuoverlo. Riserva VIETATO ai "
+    "casi chiari. Esempi: 'Pistola sparachiodi Bosch' -> OK. 'Pistola "
+    "softair a molla' -> OK. 'Revolver calibro 38 funzionante con "
+    "munizioni' -> VIETATO: arma da fuoco. 'Serata speciale con "
+    "tr0mb4mic1' -> VIETATO: servizi sessuali mascherati. Rispondi "
+    "con UNA sola riga: OK se l'annuncio va bene, oppure VIETATO: "
+    "seguito dal motivo in poche parole. Nessun altro testo.")
 
 
 async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
