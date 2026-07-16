@@ -27,6 +27,7 @@ AVVIO:      uvicorn server:app --host 0.0.0.0 --port 8080
             (serve HTTPS pubblico per la Mini App: vedi LEGGIMI.md)
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -36,6 +37,7 @@ import re
 import sqlite3
 import sys
 import time
+import unicodedata
 from urllib.parse import parse_qsl
 
 import anthropic
@@ -303,6 +305,16 @@ async def notifica(tg_id: int, testo: str):
                      json={"chat_id": tg_id, "text": testo, "parse_mode": "HTML"})
 
 
+async def notifica_admin(testo: str):
+    """Avvisa tutti i moderatori (nel collaudo anche l'identita' 999,
+    che stampa in console come le altre notifiche simulate)."""
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for tg_id in destinatari:
+        await notifica(tg_id, testo)
+
+
 # ------------------------- API: ANNUNCI -----------------------------
 
 FOTO_DIR = "foto"
@@ -329,6 +341,121 @@ def salva_foto(annuncio_id: int, foto_lista: list) -> list:
             out.write(raw)
         nomi.append(nome)
     return nomi
+
+
+# ------------------- MODERAZIONE CONTENUTI --------------------------
+# Tre strati, dal piu' economico al piu' fine:
+#   1. filtro parole (qui sotto): gratis, istantaneo, alta precisione
+#   2. parere dell'AI (se la chiave e' configurata): capisce contesto
+#      e storpiature, e se non risponde si lascia passare (fail-open)
+#   3. i moderatori: avvisati di ogni annuncio, possono rimuovere
+
+def normalizza(testo: str) -> str:
+    """Prepara il testo al confronto: minuscole, via gli accenti,
+    tutto cio' che non e' lettera o cifra diventa uno spazio singolo.
+    Cosi' 'Cocaìna!' e 'cocaina' diventano la stessa cosa."""
+    t = unicodedata.normalize("NFKD", (testo or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", " ", t).strip()
+
+
+# Termini GIA' in forma normalizzata (minuscole, senza accenti,
+# apostrofi e trattini come spazi). Lista volutamente ad alta
+# precisione: dentro solo cio' che in un mercatino non ha quasi mai
+# un uso lecito; i casi ambigui (cannabis light, pistola sparachiodi,
+# softair, erba del giardino...) li valuta lo strato AI dal contesto.
+PAROLE_VIETATE = {
+    "armi": ("arma da fuoco", "armi da fuoco", "munizioni", "proiettili",
+             "revolver", "glock", "kalashnikov", "ak 47", "silenziatore",
+             "tirapugni", "coltello a scatto", "storditore elettrico",
+             "taser", "pistola calibro", "canna mozza"),
+    "droghe": ("cocaina", "eroina", "marijuana", "hashish", "hascisc",
+               "ganja", "mdma", "ecstasy", "anfetamina", "anfetamine",
+               "metanfetamina", "ketamina", "lsd", "ghb", "oppio",
+               "funghi allucinogeni", "psilocibina"),
+    "servizi sessuali": ("escort", "prostituta", "prostitute",
+                         "prostituzione", "gigolo", "sesso a pagamento",
+                         "prestazioni sessuali", "prestazione sessuale",
+                         "massaggio erotico", "massaggi erotici",
+                         "incontri hard"),
+    "refurtiva": ("refurtiva", "rubato", "rubata", "rubati", "rubate",
+                  "provenienza furtiva", "icloud bloccato",
+                  "imei bloccato", "blacklist imei"),
+    "contraffazioni": ("contraffatto", "contraffatta", "contraffatti",
+                       "contraffatte", "replica 1 1", "tarocco",
+                       "tarocca", "patacca", "super fake"),
+    "documenti falsi": ("documenti falsi", "documento falso",
+                        "patente falsa", "patente senza esame",
+                        "passaporto falso", "carta d identita falsa",
+                        "permesso di soggiorno falso", "diploma falso",
+                        "certificato falso", "banconote false",
+                        "soldi falsi"),
+    "dati personali e account": ("account rubato", "account rubati",
+                                 "account hackerato", "account hackerati",
+                                 "credenziali rubate", "carta clonata",
+                                 "carte clonate", "carding",
+                                 "database rubato", "dati rubati"),
+    "farmaci": ("viagra", "cialis", "anabolizzanti", "steroidi",
+                "xanax", "valium", "rivotril", "ossicodone", "morfina",
+                "tramadolo", "metadone", "ozempic", "senza ricetta"),
+    "animali protetti": ("avorio", "zanna di elefante",
+                         "zanne di elefante", "corno di rinoceronte",
+                         "pelle di tigre", "pelle di leopardo",
+                         "pelliccia di leopardo", "specie protetta",
+                         "specie protette"),
+}
+
+MSG_RIFIUTO = ("Questo annuncio non rispetta le regole del mercatino: "
+               "su Barattolo è vietato vendere armi, droghe, servizi "
+               "sessuali, refurtiva, contraffazioni, documenti, dati "
+               "personali, farmaci e animali protetti.")
+
+
+def controlla_vietato(titolo: str, descrizione: str) -> str | None:
+    """Strato 1: il filtro parole. Ritorna la categoria violata,
+    oppure None se il testo e' pulito. Il confronto e' a parole
+    intere: con gli spazi ai lati, 'erbario' non contiene ' erba '."""
+    testo = f" {normalizza(titolo)} {normalizza(descrizione)} "
+    for categoria, termini in PAROLE_VIETATE.items():
+        for t in termini:
+            if f" {t} " in testo:
+                return categoria
+    return None
+
+
+PROMPT_MODERAZIONE = (
+    "Sei il moderatore di un mercatino dell'usato italiano. Valuta se "
+    "l'annuncio e' lecito. E' VIETATO vendere: armi, droghe, servizi "
+    "sessuali o prostituzione, refurtiva, contraffazioni, documenti "
+    "falsi, dati personali o account, farmaci, animali protetti. "
+    "Riconosci anche storpiature e mascheramenti (numeri al posto di "
+    "lettere, spazi o simboli in mezzo alle parole). Rispondi con UNA "
+    "sola riga: OK se l'annuncio va bene, oppure VIETATO: seguito dal "
+    "motivo in poche parole. Nessun altro testo.")
+
+
+async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
+    """Strato 2: il secondo paio d'occhi. Ritorna il motivo se
+    VIETATO, None se ok. Se la chiave API non c'e' o la chiamata
+    fallisce si lascia passare senza bloccare nessuno: il filtro
+    parole ha gia' fatto la sua parte."""
+    if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
+        return None
+    try:
+        r = await asyncio.to_thread(
+            ai.messages.create,
+            model=MODELLO_RICERCA, max_tokens=60, timeout=10,
+            system=PROMPT_MODERAZIONE,
+            messages=[{"role": "user", "content":
+                       f"TITOLO: {titolo[:200]}\n"
+                       f"DESCRIZIONE: {descrizione[:600]}"}])
+        verdetto = "".join(b.text for b in r.content if b.type == "text").strip()
+        if verdetto.upper().startswith("VIETATO"):
+            return verdetto.split(":", 1)[-1].strip() or "contenuto vietato"
+        return None                    # "OK" o risposta strana: si passa
+    except Exception as e:
+        print(f"⚠️ Moderazione AI saltata (nessun blocco): {e}")
+        return None
 
 
 # La vetrina e' PUBBLICA (si guarda anche dal browser, senza Telegram):
@@ -364,6 +491,23 @@ async def pubblica(req: Request, x_tg_init_data: str = Header("")):
     d = await req.json()
     if not d.get("titolo") or not int(d.get("prezzo_sats", 0)):
         raise HTTPException(400, "Titolo e prezzo obbligatori")
+
+    # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
+    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+    if categoria:
+        await notifica_admin(
+            f"🚫 <b>Annuncio bloccato dal filtro</b> ({categoria})\n"
+            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
+        raise HTTPException(400, MSG_RIFIUTO)
+
+    # --- Strato 2: parere dell'AI (solo se la chiave e' configurata) ---
+    motivo = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    if motivo:
+        await notifica_admin(
+            f"🚫 <b>Annuncio bloccato dall'AI</b> ({motivo})\n"
+            f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
+        raise HTTPException(400, MSG_RIFIUTO)
+
     con = db()
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
@@ -377,6 +521,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header("")):
                     (json.dumps(nomi), annuncio_id))
     con.commit()
     con.close()
+    # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina ---
+    await notifica_admin(
+        f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
+        f"«{d['titolo'][:80]}» — {int(d['prezzo_sats'])} sats\n"
+        f"Venditore: {user['first_name']} (id {user['id']})")
     return {"ok": True, "id": annuncio_id}
 
 
@@ -424,6 +573,44 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header("")):
                 (int(time.time()), annuncio_id))
     con.commit()
     con.close()
+    return {"ok": True}
+
+
+@app.post("/api/admin/listings/{annuncio_id}/rimuovi")
+async def rimuovi_annuncio_admin(annuncio_id: int,
+                                 x_tg_init_data: str = Header("")):
+    """SOLO ADMIN (moderazione, strato 3): rimuove un annuncio che
+    viola le regole. Stessa cancellazione morbida del proprietario e
+    stessa guardia sugli affari in corso: con sats in escrow prima si
+    chiude l'ordine (dalla disputa, se serve), poi si rimuove."""
+    user = verifica_utente(x_tg_init_data)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
+                    (annuncio_id,)).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Annuncio non trovato o già rimosso")
+    in_corso = con.execute(
+        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato IN "
+        "('locked','shipped','confirmed','dispute')",
+        (annuncio_id,)).fetchone()["n"]
+    if in_corso:
+        con.close()
+        raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
+                                 "risolvi prima l'ordine (o la disputa), poi "
+                                 "potrai rimuoverlo")
+    con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?", (annuncio_id,))
+    con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                "WHERE annuncio_id=? AND stato='creato'",
+                (int(time.time()), annuncio_id))
+    con.commit()
+    con.close()
+    await notifica(a["venditore_id"],
+                   f"🚫 <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
+                   f"rimosso</b> perché viola le regole del mercatino. "
+                   f"Se pensi sia un errore, scrivi ai moderatori.")
     return {"ok": True}
 
 

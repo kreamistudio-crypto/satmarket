@@ -347,6 +347,10 @@
       <div class="field"><label>Descrizione</label>
         <textarea id="sellDesc" placeholder="Condizioni, difetti, motivo della vendita…"></textarea></div>
       <button class="btn orange" onclick="publish()">⚡ Pubblica annuncio</button>
+      <div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+        È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
+        contraffazioni, documenti, dati personali, farmaci, animali
+        protetti. Gli annunci vengono moderati.</div>
       <div class="section-label" style="padding:26px 0 0">I tuoi annunci in vetrina</div>
       <div id="myListings" style="margin-top:12px"></div>
     </div>
@@ -504,8 +508,8 @@ let activeCat = "Tutto", currentListing = null, currentOrder = null;
 /* ---------------- helpers ---------------- */
 const fmt = n => n.toLocaleString('it-IT').replace(/\./g,' ');
 const el = id => document.getElementById(id);
-function toast(msg){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200); }
+function toast(msg, ms){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms||2200); }
 function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 
 /* ---------------- navigazione ---------------- */
@@ -618,6 +622,8 @@ function openDetail(id){
       ${(!DEMO && myTgId && l.sellerId===myTgId)
         ? `<button class="btn danger-ghost" style="margin-top:0" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `<button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${fmt(l.price)} sats</button>`}
+      ${(!DEMO && isAdmin && l.sellerId!==myTgId)
+        ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
       ${contatto}
     </div>`;
   go('dettaglio');
@@ -1121,6 +1127,18 @@ async function deleteListing(id, dalDettaglio){
   if (dalDettaglio) go('vendi');
 }
 
+/* Moderazione (solo admin): rimuove dal mercatino un annuncio altrui */
+async function rimuoviModerazione(id){
+  haptic();
+  if (!confirm('Rimuovere questo annuncio perché viola le regole?')) return;
+  const r = await fetch(`${API_BASE}/admin/listings/${id}/rimuovi`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+  await loadListings(); renderGrid();
+  toast('🛡 Annuncio rimosso'); go('esplora');
+}
+
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
 
 function ridimensiona(file){
@@ -1172,7 +1190,7 @@ async function publish(){
       body: JSON.stringify({titolo:t, prezzo_sats:p, categoria:el('sellCat').value,
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
-    if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Errore nella pubblicazione'); return; }
+    if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Errore nella pubblicazione', 6000); return; }
     await loadListings();
   }
   ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
