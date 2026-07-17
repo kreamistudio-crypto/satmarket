@@ -71,9 +71,34 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `barattolo_sessione: str = Cookie("")` esplicitamente — niente
   middleware che concede auth. `guardia_csrf` (middleware) può solo
   NEGARE: sui metodi non-sicuri via cookie esige Origin ≡ Host
-  (login incluso). `POST /api/logout` chiude solo la sessione del
-  browser corrente. Il ramo collaudo di `/api/login/telegram`
-  (`{"collaudo": true}`) vale solo con MODALITA_COLLAUDO.
+  (tutte le rotte `/api/login/*` incluse). `POST /api/logout` chiude
+  solo la sessione del browser corrente. Il ramo collaudo di
+  `/api/login/telegram` (`{"collaudo": true}`) vale solo con
+  MODALITA_COLLAUDO.
+  Login web con Nostr: `GET /api/login/nostr/sfida` emette una sfida
+  monouso (dict in memoria, TTL 5 min: uvicorn è mono-processo);
+  `POST /api/login/nostr` verifica un evento kind-22242 stile NIP-42
+  con `verifica_evento_login` (sfida bruciata PRIMA della firma, tag
+  `relay` ≡ Host, id ricalcolato NIP-01, Schnorr con `PublicKeyXOnly`
+  di coincurve — 503 se il pacchetto manca) e apre la STESSA sessione
+  cookie del login Telegram. Anagrafica: l'utente Nostr ha `tg_id`
+  NEGATIVO derivato dalla pubkey (Telegram usa solo id positivi:
+  tutto il resto funziona invariato; `notifica()` salta gli id
+  negativi) e c'è la colonna `utenti.npub_accesso` = la chiave che
+  può entrare in quella riga (credenziale, distinta dal badge `npub`
+  che è una dichiarazione; indice unico parziale; è il terreno della
+  futura doppia cittadinanza). Ordine di ricerca al login:
+  npub_accesso → npub già VERIFICATA su UN solo account Telegram
+  libero (proposta di collegamento con biglietto monouso,
+  `POST /api/login/nostr/collega`; rifiuto = login annullato, mai
+  doppioni) → account nativo nuovo (nome = npub abbreviata, badge
+  🟣✓ da subito: la firma Schnorr dimostra il possesso). Un badge
+  NON verificato non dà MAI accesso all'account che lo dichiara.
+  `hex_to_npub` (bech32 con checksum vero) è il gemello speculare di
+  `npub_to_hex`. `vendor/nostr.bundle.js` = nostr-tools 2.23.12
+  committato a versione bloccata e servito da `GET /vendor/nostr.js`
+  (file singolo, MAI CDN: nessun terzo deve poter cambiare la pagina
+  dove si può incollare una nsec).
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
@@ -84,6 +109,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   col widget "Entra con Telegram" — `data-request-access=write` chiede
   il permesso per gli avvisi — e ogni azione apre l'invito verso
   @ilbarattolobot); demo coi dati finti come riserva se il backend tace.
+  Login Nostr nel foglio `#nostrSheet` (bottone 🟣 in vetrina e nella
+  barra collaudo — a differenza del widget Telegram funziona anche in
+  locale): astrazione `firmatario = {pubkey, firma}` con tre fabbriche
+  — estensione NIP-07 (zero librerie), bunker NIP-46 (client fatto in
+  casa coi mattoni del bundle: richieste kind-24133 cifrate NIP-44 su
+  relay, `auth_url` in popup), nsec incollata che firma SOLO in pagina
+  (chiave nella closure, azzerata dopo la firma: mai inviata, mai
+  salvata, UI che la sconsiglia). Il bundle si carica pigro da
+  `/vendor/nostr.js` solo per bunker/nsec. `barraWeb` con avviso
+  onesto per chi entra da Nostr (niente avvisi Telegram, per ora);
+  foglio `#collegaSheet` per la proposta di collegamento.
   Vista negozio: il blocco venditore nel dettaglio è cliccabile →
   profilo + griglia dei suoi annunci (card riusate via `cardHTML`);
   all'avvio `avvia()` legge `/negozio/...` da `location.pathname` e
@@ -117,6 +153,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   wheel provano a compilare e falliscono; la 19.0.1 ha wheel ovunque).
   Se manca, o se `NOSTR_NSEC_PIATTAFORMA` resta il segnaposto, la
   funzione Nostr si spegne da sola e il resto vive normalmente.
+  Anche il LOGIN Nostr dipende da coincurve (verifica Schnorr): senza,
+  i suoi endpoint rispondono 503 e tutto il resto vive.
 
 ## Regole ferree
 
@@ -124,10 +162,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    Se una chiave viene esposta ovunque (chat, log, commit): va RUOTATA.
 2. MAI chiedere o gestire nsec (chiave privata Nostr) degli utenti.
    Decisione permanente. La scala approvata: badge npub auto-dichiarato →
-   verifica con nota pubblica (fatta, lug 2026) → mai custodia di
-   segreti altrui, mai firme che richiedano di consegnare chiavi.
+   verifica con nota pubblica (fatta, lug 2026) → login Nostr con firma
+   di sfida (fatto, lug 2026: la nsec incollata nel login web firma
+   SOLO nella pagina, mai trasmessa né salvata, e la UI la sconsiglia
+   a favore di estensione/bunker — è l'estensione approvata della
+   scala, NON un'eccezione) → mai custodia di segreti altrui, mai
+   firme che richiedano di consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/foto/*` e `/api/*`.
+   `/foto/*`, `/vendor/nostr.js` (file singolo) e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
    diventerebbero pubblici — falla già successa e chiusa).
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
@@ -160,7 +202,10 @@ Nostr con la chiave della piattaforma (NIP-99 + NIP-09, vedi
 Architettura); pagina negozio del venditore, interna e pubblica
 (`/negozio/{username|codice}`, vedi Architettura); login web col
 Telegram Login Widget (sessioni cookie, app completa dal browser,
-vedi Architettura — ricordarsi `/setdomain` su BotFather).
+vedi Architettura — ricordarsi `/setdomain` su BotFather); login web
+con Nostr (estensione NIP-07, bunker NIP-46, nsec solo-in-pagina;
+tg_id negativi e npub_accesso, vedi Architettura — gli utenti Nostr
+per ora restano senza notifiche: le vedono nei loro Affari).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, feedback/stelle, NWC, escrow on-chain
 2-di-3, parere legale MiCA prima di crescere.
