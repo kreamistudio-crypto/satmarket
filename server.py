@@ -242,6 +242,18 @@ def utente_se_autenticato(init_data: str) -> dict | None:
         return None
 
 
+async def leggi_json(req: Request) -> dict:
+    """Legge il body JSON della richiesta. Body rotto (non-JSON, non
+    UTF-8, o non un oggetto) = colpa del mittente: 400, non 500."""
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta malformata")
+    if not isinstance(d, dict):
+        raise HTTPException(400, "Richiesta malformata")
+    return d
+
+
 # ------------------------- LNBITS (escrow) --------------------------
 
 async def crea_invoice_escrow(sats: int, memo: str) -> dict:
@@ -524,7 +536,7 @@ def lista_annunci(cat: str = "", x_tg_init_data: str = Header("")):
 @app.post("/api/listings")
 async def pubblica(req: Request, x_tg_init_data: str = Header("")):
     user = verifica_utente(x_tg_init_data)
-    d = await req.json()
+    d = await leggi_json(req)
     if not d.get("titolo") or not int(d.get("prezzo_sats", 0)):
         raise HTTPException(400, "Titolo e prezzo obbligatori")
 
@@ -700,7 +712,7 @@ def cerca(q: str, x_tg_init_data: str = Header("")):
 async def compra(req: Request, x_tg_init_data: str = Header("")):
     """L'acquirente avvia l'acquisto: creiamo la invoice escrow."""
     user = verifica_utente(x_tg_init_data)
-    d = await req.json()
+    d = await leggi_json(req)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
                     (d["annuncio_id"],)).fetchone()
@@ -763,7 +775,7 @@ async def segna_spedito(ordine_id: int, req: Request,
     sblocco d'ufficio: se dopo GIORNI_AUTO_SBLOCCO nessuno segnala
     nulla, i sats vanno al venditore."""
     user = verifica_utente(x_tg_init_data)
-    d = await req.json()
+    d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
     if corriere != "Consegna a mano" and not tracking:
@@ -873,7 +885,7 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header("")):
     Se il venditore ha ordini gia' confermati in attesa, i sats
     partono immediatamente."""
     user = verifica_utente(x_tg_init_data)
-    d = await req.json()
+    d = await leggi_json(req)
     addr = (d.get("ln_address") or "").strip().lower()
 
     if addr:
@@ -921,7 +933,7 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header("")):
     PUBBLICA) e i suoi annunci mostrano il badge. Stringa vuota = rimozione.
     REGOLA FERREA: mai chiedere ne' accettare nsec (chiavi private)."""
     user = verifica_utente(x_tg_init_data)
-    d = await req.json()
+    d = await leggi_json(req)
     npub = (d.get("npub") or "").strip().lower().removeprefix("nostr:")
     if npub.startswith("nsec"):
         raise HTTPException(400,
@@ -1092,7 +1104,7 @@ async def deposita_invoice(ordine_id: int, req: Request,
     - l'ACQUIRENTE (stato refund, disputa vinta) per il rimborso:
       importo = prezzo pieno; il rimborso parte immediatamente."""
     user = verifica_utente(x_tg_init_data)
-    d = await req.json()
+    d = await leggi_json(req)
     bolt11 = (d.get("invoice") or "").strip()
     if not bolt11.lower().startswith("ln"):
         raise HTTPException(400, "Questa non sembra una invoice Lightning")
@@ -1263,7 +1275,7 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     user = verifica_utente(x_tg_init_data)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
-    d = await req.json()
+    d = await leggi_json(req)
     esito = d.get("esito", "")
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND stato IN "
@@ -1301,7 +1313,7 @@ async def reso_spedito(ordine_id: int, req: Request,
     """L'acquirente ha rispedito l'oggetto: registra il tracciamento
     del reso e avvisa il venditore."""
     user = verifica_utente(x_tg_init_data)
-    d = await req.json()
+    d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
     if corriere != "Consegna a mano" and not tracking:
