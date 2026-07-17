@@ -20,6 +20,7 @@ REQUISITI: pip install websocket-client   (gia' installato)
 """
 
 import json
+import os
 import sqlite3
 import ssl
 import time
@@ -46,6 +47,8 @@ except ImportError:
         "\n   VENDITORE_ID = 222\n")
 
 DB = "satmarket.db"
+FOTO_DIR = "foto"                    # stessa cartella degli annunci normali
+MAX_FOTO_BYTES = 3_000_000           # oltre ~3 MB la foto resta un URL
 
 RELAYS = [
     "wss://relay.damus.io",
@@ -139,6 +142,47 @@ def in_sats(importo: float, valuta: str, cambio: dict):
     return None
 
 
+def scarica_foto(url: str, annuncio_id: int, indice: int):
+    """Scarica una foto esterna e la salva in foto/ con lo stesso
+    schema nomi degli annunci normali (a{id}_{indice}.ext).
+    Ritorna il nome del file locale, o None se qualcosa va storto."""
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "Barattolo/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            raw = r.read(MAX_FOTO_BYTES + 1)
+            if len(raw) > MAX_FOTO_BYTES:
+                print(f"    ⚠️  foto troppo grande, tengo l'URL: {url[:60]}")
+                return None
+            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
+        est = {"image/png": "png", "image/webp": "webp",
+               "image/gif": "gif"}.get(ctype, "jpg")
+        nome = f"a{annuncio_id}_{indice}.{est}"
+        with open(os.path.join(FOTO_DIR, nome), "wb") as out:
+            out.write(raw)
+        return nome
+    except Exception as err:
+        print(f"    ⚠️  foto non scaricata ({err}), tengo l'URL: {url[:60]}")
+        return None
+
+
+def localizza_foto(annuncio_id: int, foto_json: str) -> str:
+    """Prende la lista foto (JSON) e scarica in locale gli URL esterni.
+    Se un download fallisce, l'URL resta com'e' (meglio di niente)."""
+    try:
+        lista = json.loads(foto_json or "[]")
+    except Exception:
+        return foto_json
+    nuove = []
+    for i, f in enumerate(lista):
+        if not isinstance(f, str) or not f.startswith("http"):
+            nuove.append(f)                    # gia' un file locale
+            continue
+        nome = scarica_foto(f, annuncio_id, i)
+        nuove.append(nome or f)
+    return json.dumps(nuove) if nuove else ""
+
+
 def categoria_automatica(testo: str) -> str:
     testo = testo.lower()
     MAPPA = [
@@ -205,6 +249,7 @@ def estrai_annuncio(e, valute_stall, cambio):
 
 def main():
     hexkey = npub_to_hex(NPUB_VENDITORE)
+    os.makedirs(FOTO_DIR, exist_ok=True)
     print(f"Cerco gli annunci di {NPUB_VENDITORE[:20]}… sui relay:\n")
     eventi = []
     for r in RELAYS:
@@ -258,23 +303,29 @@ def main():
             "AND (venditore_id=? OR contatto_nostr=?)",
             (a["titolo"], VENDITORE_ID, npub)).fetchone()
         if gia:
-            # Gia' presente: aggiorna foto, contatto, prezzo e
-            # PROPRIETARIO (utile per re-intestare al lancio)
+            # Gia' presente: aggiorna foto (scaricandole in locale),
+            # contatto, prezzo e PROPRIETARIO (utile al lancio)
+            foto_loc = localizza_foto(gia[0], a["foto"])
             con.execute(
                 "UPDATE annunci SET foto=?, contatto_nostr=?, prezzo_sats=?, "
                 "venditore_id=? WHERE id=?",
-                (a["foto"], npub, a["prezzo_sats"], VENDITORE_ID, gia[0]))
+                (foto_loc, npub, a["prezzo_sats"], VENDITORE_ID, gia[0]))
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
             continue
-        con.execute(
+        cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
             "prezzo_sats,zona,foto,contatto_nostr,creato) "
             "VALUES(?,?,?,?,?,?,?,?,?)",
             (VENDITORE_ID, a["titolo"], a["descrizione"], a["categoria"],
              a["prezzo_sats"], a["zona"], a["foto"], npub, int(time.time())))
+        # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
+        foto_loc = localizza_foto(cur.lastrowid, a["foto"])
+        if foto_loc != a["foto"]:
+            con.execute("UPDATE annunci SET foto=? WHERE id=?",
+                        (foto_loc, cur.lastrowid))
         importati += 1
-        n_foto = len(json.loads(a["foto"])) if a["foto"] else 0
+        n_foto = len(json.loads(foto_loc)) if foto_loc else 0
         print(f"  ⚡ {a['titolo'][:50]} — {a['prezzo_sats']} sats "
               f"[{a['categoria']}] {'📷x'+str(n_foto) if n_foto else ''}")
 
