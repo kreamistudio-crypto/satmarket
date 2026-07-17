@@ -595,7 +595,11 @@ function mapListing(a){
     price:a.prezzo_sats, cat:a.categoria, zone:a.zona||'—',
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
-    photos, username:a.venditore_username||'', nostr:a.contatto_nostr||'',
+    /* username e npub finiscono dentro stringhe JS negli onclick:
+       li' l'escaping HTML non basta, quindi si tiene SOLO il loro
+       alfabeto naturale (Telegram: lettere/cifre/_ ; bech32: a-z0-9) */
+    photos, username:(a.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
+    nostr:(a.contatto_nostr||'').replace(/[^a-z0-9]/g,''),
     sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata,
     negozio:a.venditore_negozio||''};
 }
@@ -608,7 +612,9 @@ function mapOrder(o){
     corriere:o.corriere||'', tracking:o.tracking||'',
     corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
     consegnato:o.consegnato||0, speditoIl:o.spedito_il||0,
-    usernameCompratore:o.compratore_username||'', usernameVenditore:o.venditore_username||'',
+    /* stesso filtro-alfabeto di mapListing: vanno negli onclick */
+    usernameCompratore:(o.compratore_username||'').replace(/[^A-Za-z0-9_]/g,''),
+    usernameVenditore:(o.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
     when:new Date(o.aggiornato*1000).toLocaleString('it-IT',
       {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})};
 }
@@ -653,6 +659,12 @@ let activeCat = "Tutto", currentListing = null, currentOrder = null;
 
 /* ---------------- helpers ---------------- */
 const fmt = n => n.toLocaleString('it-IT').replace(/\./g,' ');
+/* Scudo anti-XSS: OGNI testo scritto da un utente (titoli, nomi,
+   descrizioni, tracking...) passa da qui prima di entrare in un
+   template innerHTML. Trasforma i caratteri speciali in entita'
+   innocue: "<b>ciao" resta testo, non diventa HTML. */
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const el = id => document.getElementById(id);
 function toast(msg, ms){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), ms||2200); }
@@ -699,11 +711,11 @@ function renderGrid(items){
 /* La card di un annuncio: la stessa in vetrina e nella vista negozio */
 const cardHTML = l => `
     <div class="card" onclick="openDetail(${l.id})">
-      <div class="ph">${l.photos && l.photos[0] ? `<img src="${l.photos[0]}" loading="lazy" alt="">` : l.emoji}</div>
+      <div class="ph">${l.photos && l.photos[0] ? `<img src="${esc(l.photos[0])}" loading="lazy" alt="">` : l.emoji}</div>
       <div class="info">
-        <div class="title">${l.title}</div>
+        <div class="title">${esc(l.title)}</div>
         <div class="price">${fmt(l.price)} <span class="unit">sats</span></div>
-        <div class="meta"><span>📍 ${l.zone}</span>${l.sellerNpub?(l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣✓</span>':'<span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}<span class="escrow-dot">🔒 escrow</span></div>
+        <div class="meta"><span>📍 ${esc(l.zone)}</span>${l.sellerNpub?(l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣✓</span>':'<span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}<span class="escrow-dot">🔒 escrow</span></div>
       </div>
     </div>`;
 
@@ -778,10 +790,10 @@ function renderNegozio(v, annunci){
     + `${v.vendite_ok||0} vendite concluse`;
   el('negozioHeader').innerHTML = `
     <div class="seller" style="margin-top:14px">
-      <div class="avatar">${(v.nome||'?')[0]}</div>
-      <div class="who"><b>${v.nome||'—'}${badge}</b>
+      <div class="avatar">${esc((v.nome||'?')[0])}</div>
+      <div class="who"><b>${esc(v.nome||'—')}${badge}</b>
         <div class="rep">${rep}</div>
-        ${v.npub?`<div class="rep">${v.npub_verificata?'🟣✓':'🟣'} <a href="https://njump.me/${v.npub}" target="_blank" style="color:inherit">Profilo Nostr completo</a></div>`:''}
+        ${v.npub?`<div class="rep">${v.npub_verificata?'🟣✓':'🟣'} <a href="https://njump.me/${esc(v.npub)}" target="_blank" style="color:inherit">Profilo Nostr completo</a></div>`:''}
       </div>
     </div>
     ${(v.username||v.negozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
@@ -829,31 +841,31 @@ function openDetail(id){
   if (!currentListing) { toast('Annuncio non trovato'); return; }
   const l = currentListing;
   const foto = (l.photos && l.photos.length)
-    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map(p=>`<img src="${p}" alt="">`).join('')}</div>
+    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map(p=>`<img src="${esc(p)}" alt="">`).join('')}</div>
        ${l.photos.length>1?`<span class="photo-count">📷 ${l.photos.length}</span>`:''}</div>`
     : `<div class="detail-ph">${l.emoji}</div>`;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
   const contatto = mio ? ''            /* il venditore non contatta se stesso */
     : l.nostr
-    ? `<button class="btn ghost" onclick="window.open('https://njump.me/${l.nostr}','_blank')">💬 Contatta ${l.seller.split(' ')[0]} su Nostr 🟣</button>`
+    ? `<button class="btn ghost" onclick="window.open('https://njump.me/${l.nostr}','_blank')">💬 Contatta ${esc(l.seller.split(' ')[0])} su Nostr 🟣</button>`
     : (l.username
-      ? `<button class="btn ghost" onclick="window.open('https://t.me/${l.username}','_blank')">💬 Fai una domanda a ${l.seller.split(' ')[0]}</button>`
-      : `<button class="btn ghost" onclick="toast('Questo venditore non ha un contatto pubblico')">💬 Fai una domanda a ${l.seller.split(' ')[0]}</button>`);
+      ? `<button class="btn ghost" onclick="window.open('https://t.me/${l.username}','_blank')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`
+      : `<button class="btn ghost" onclick="toast('Questo venditore non ha un contatto pubblico')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`);
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
-      <h2>${l.title}</h2>
+      <h2>${esc(l.title)}</h2>
       <div class="detail-price">${fmt(l.price)} <span class="unit">sats</span></div>
-      <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${l.zone}</div>
+      <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${esc(l.zone)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
-        <div class="avatar">${l.seller[0]}</div>
-        <div class="who"><b>${l.seller}${l.sellerNpub?(l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣✓</span>':' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}</b>
+        <div class="avatar">${esc(l.seller[0])}</div>
+        <div class="who"><b>${esc(l.seller)}${l.sellerNpub?(l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣✓</span>':' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}</b>
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
-          ${l.sellerNpub?`<div class="rep">${l.sellerNpubOk?'🟣✓':'🟣'} <a href="https://njump.me/${l.sellerNpub}" target="_blank" style="color:inherit" onclick="event.stopPropagation()">Presente su Nostr</a> · ${l.sellerNpubOk?'npub verificata ✓':'npub auto-dichiarata, non verificata'}</div>`:''}
+          ${l.sellerNpub?`<div class="rep">${l.sellerNpubOk?'🟣✓':'🟣'} <a href="https://njump.me/${esc(l.sellerNpub)}" target="_blank" style="color:inherit" onclick="event.stopPropagation()">Presente su Nostr</a> · ${l.sellerNpubOk?'npub verificata ✓':'npub auto-dichiarata, non verificata'}</div>`:''}
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
-      <div class="desc">${l.desc}</div>
+      <div class="desc">${esc(l.desc)}</div>
       <div class="trust-note">🔒 <span>I tuoi sats restano <b>bloccati in escrow</b> e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
       ${mio
         ? `<button class="btn danger-ghost" style="margin-top:0" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
@@ -964,7 +976,7 @@ function renderOrders(){
   el('ordersList').innerHTML = orders.length ? orders.map(o=>`
     <div class="order" onclick="openOrder(${o.id})">
       <div class="row">
-        <b>${o.listing.emoji} ${o.listing.title}</b>
+        <b>${o.listing.emoji} ${esc(o.listing.title)}</b>
         <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>
       </div>
       <div class="sub">${o.role==='buyer'?'Stai comprando':o.role==='seller'?'Stai vendendo':'⚖️ Da moderare'} · <span class="mono" style="color:var(--sats)">${fmt(o.listing.price)}</span> sats · ${o.when}</div>
@@ -995,7 +1007,7 @@ function openOrder(id){
       ? Math.max(0, Math.ceil((o.consegnato + 72*3600 - Date.now()/1000)/3600)) : 0;
     steps = [
       {t:'Sats bloccati in escrow', d:'Il pagamento è custodito dalla piattaforma'},
-      {t:'Oggetto spedito',         d:o.tracking?`${o.corriere} — tracking ${o.tracking}`:'Il venditore ha consegnato al corriere'},
+      {t:'Oggetto spedito',         d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`:'Il venditore ha consegnato al corriere'},
       {t:s==='delivered'?'Consegnato: in attesa di conferma':'Ricevuto e confermato',
        d:s==='delivered'?`Restano ~${oreRestanti} ore per confermare o aprire disputa`:(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
       o.role==='seller'
@@ -1022,7 +1034,7 @@ function openOrder(id){
     :                             {ic:'🔒', b:'Cassaforte escrow',  d:'I sats sono al sicuro, nessuno può toccarli'};
   el('orderContent').innerHTML = `
     <div class="detail-body">
-      <h2 style="font-size:17px">${o.listing.emoji} ${o.listing.title}</h2>
+      <h2 style="font-size:17px">${o.listing.emoji} ${esc(o.listing.title)}</h2>
       <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span></div>
 
       <div class="vault">
@@ -1039,7 +1051,7 @@ function openOrder(id){
         </div>
       </div>
       ${s==='dispute' ? `<div class="trust-note" style="background:#F9E8E6;color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
-      ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${o.corriere}</b> — tracciamento <b class="mono" style="font-size:12px">${o.tracking}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a></span></div>`:''}
+      ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a></span></div>`:''}
       ${isAdmin && s==='dispute' ? `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
@@ -1061,7 +1073,7 @@ function openOrder(id){
       ${o.role==='seller' && s==='return_shipped' ? `
         <div class="payout">
           <h4>↩️ Reso in arrivo</h4>
-          <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${o.corriereReso}</b> — tracciamento <b class="mono" style="font-size:12px">${o.trackingReso}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
+          <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${esc(o.corriereReso)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.trackingReso)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
           <button class="btn primary" style="margin-top:12px" onclick="resoRicevuto(this)">✓ Ho ricevuto il reso — rimborsa l'acquirente</button>
         </div>`:''}
       ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
@@ -1102,7 +1114,7 @@ function payoutPanel(o){
     <div class="payout">
       <h4>⚡ Incasso automatico attivo</h4>
       <div class="hint">Appena l'acquirente conferma la ricezione, <b class="net">${fmt(net)} sats</b>
-        arriveranno da soli su <b>${myLnAddress}</b>. Non devi fare nulla.</div>
+        arriveranno da soli su <b>${esc(myLnAddress)}</b>. Non devi fare nulla.</div>
       <div class="okline">✓ Lightning address impostato</div>
       <button class="btn ghost" onclick="myLnAddress='';openOrder(currentOrder.id)">↻ Cambia indirizzo</button>
     </div>`;
@@ -1265,7 +1277,7 @@ function refundPanel(o){
   if (myLnAddress) return `
     <div class="payout">
       <h4>↩️ Rimborso in elaborazione</h4>
-      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)} sats</b> in arrivo su <b>${myLnAddress}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
+      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)} sats</b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
       <button class="btn orange" onclick="saveSellerInvoice(this)">↩️ Ricevi il rimborso</button>
     </div>`;
@@ -1472,10 +1484,10 @@ function renderMyListings(){
   box.innerHTML = myListings.length ? myListings.map(l=>`
     <div class="order">
       <div class="row">
-        <b onclick="openDetail(${l.id})" style="cursor:pointer">${l.photos&&l.photos[0]?'📷':l.emoji} ${l.title}</b>
+        <b onclick="openDetail(${l.id})" style="cursor:pointer">${l.photos&&l.photos[0]?'📷':l.emoji} ${esc(l.title)}</b>
         <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#F9E8E6;color:var(--danger)">🗑 Elimina</span>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats)">${fmt(l.price)}</span> sats · 📍 ${l.zone}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats)">${fmt(l.price)}</span> sats · 📍 ${esc(l.zone)}</div>
     </div>`).join('')
     : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo qui sopra! ⚡</div>`;
 }
@@ -1508,7 +1520,7 @@ async function loadAdminStats(){
         ${(s.lista_utenti||[]).map(u => `
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px">
             <div style="min-width:0">
-              <b>${u.nome||'—'}</b>${u.username?` <span style="color:var(--muted)">@${u.username}</span>`:''}
+              <b>${esc(u.nome||'—')}</b>${u.username?` <span style="color:var(--muted)">@${esc(u.username)}</span>`:''}
               <div style="color:var(--muted);font-weight:600">dal ${u.registrato?new Date(u.registrato*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div>
             </div>
             <div style="text-align:right;white-space:nowrap;color:var(--muted);font-weight:700">
@@ -1641,7 +1653,7 @@ function barraWeb(nome){
       + `<a href="https://t.me/ilbarattolobot" target="_blank"`
       + ` rel="noopener">@ilbarattolobot</a>`;
   b.innerHTML =
-    `<div>👋 Ciao ${nome} — sei su Barattolo dal browser. ${avvisi}</div>`
+    `<div>👋 Ciao ${esc(nome)} — sei su Barattolo dal browser. ${avvisi}</div>`
     + `<button class="demo-cta" onclick="esciWeb()"`
     + ` style="border:none;cursor:pointer">Esci</button>`;
 }
