@@ -729,8 +729,9 @@ CAMPI_VETRINA = (
 
 
 @app.get("/api/listings")
-def lista_annunci(cat: str = "", x_tg_init_data: str = Header("")):
-    user = utente_se_autenticato(x_tg_init_data)
+def lista_annunci(cat: str = "", x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     # venditore_id serve alla Mini App per "questo annuncio e' tuo"
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
     con = db()
@@ -746,8 +747,9 @@ def lista_annunci(cat: str = "", x_tg_init_data: str = Header("")):
 
 
 @app.post("/api/listings")
-async def pubblica(req: Request, x_tg_init_data: str = Header("")):
-    user = verifica_utente(x_tg_init_data)
+async def pubblica(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     if not d.get("titolo") or not int(d.get("prezzo_sats", 0)):
         raise HTTPException(400, "Titolo e prezzo obbligatori")
@@ -793,9 +795,10 @@ async def pubblica(req: Request, x_tg_init_data: str = Header("")):
 
 
 @app.get("/api/listings/miei")
-def miei_annunci(x_tg_init_data: str = Header("")):
+def miei_annunci(x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie("")):
     """Gli annunci attivi dell'utente che chiede (per gestirli)."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     righe = [dict(r) for r in con.execute(
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
@@ -811,12 +814,13 @@ def miei_annunci(x_tg_init_data: str = Header("")):
 
 
 @app.get("/api/negozio/{chi}")
-def negozio(chi: str, x_tg_init_data: str = Header("")):
+def negozio(chi: str, x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
     """La pagina-negozio di un venditore: profilo pubblico + i suoi
     annunci attivi. Si arriva con lo username Telegram (se ce l'ha) o
     col codice pubblico del negozio: mai col tg_id, che agli anonimi
     resta invisibile come in tutta la vetrina."""
-    user = utente_se_autenticato(x_tg_init_data)
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
                      "rating, vendite_ok, negozio FROM utenti ")
@@ -842,14 +846,15 @@ def negozio(chi: str, x_tg_init_data: str = Header("")):
 
 
 @app.post("/api/listings/{annuncio_id}/rimuovi")
-async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header("")):
+async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
+                                             barattolo_sessione: str = Cookie("")):
     """Cancellazione 'morbida': l'annuncio sparisce dalla vetrina ma
     resta nel database (cosi' gli ordini passati non si rompono e le
     dispute restano ricostruibili). Regole:
     - solo il proprietario puo' rimuovere
     - se c'e' un affare in corso (sats in escrow), prima si chiude quello
     - gli ordini creati ma mai pagati vengono annullati"""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
                     "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
@@ -877,12 +882,13 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header("")):
 
 @app.post("/api/admin/listings/{annuncio_id}/rimuovi")
 async def rimuovi_annuncio_admin(annuncio_id: int,
-                                 x_tg_init_data: str = Header("")):
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
     """SOLO ADMIN (moderazione, strato 3): rimuove un annuncio che
     viola le regole. Stessa cancellazione morbida del proprietario e
     stessa guardia sugli affari in corso: con sats in escrow prima si
     chiude l'ordine (dalla disputa, se serve), poi si rimuove."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
     con = db()
@@ -916,9 +922,10 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
 
 
 @app.get("/api/admin/stats")
-def statistiche_admin(x_tg_init_data: str = Header("")):
+def statistiche_admin(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
     """SOLO ADMIN: i numeri del mercatino a colpo d'occhio."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
     con = db()
@@ -945,10 +952,11 @@ def statistiche_admin(x_tg_init_data: str = Header("")):
 # ---------------------- API: RICERCA AI -----------------------------
 
 @app.get("/api/search")
-def cerca(q: str, x_tg_init_data: str = Header("")):
+def cerca(q: str, x_tg_init_data: str = Header(""),
+                  barattolo_sessione: str = Cookie("")):
     """Ricerca in linguaggio naturale: l'AI legge la richiesta
     ("tastiera sotto i 100k vicino Milano") e seleziona gli annunci."""
-    verifica_utente(x_tg_init_data)
+    verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     annunci = [dict(r) for r in con.execute(
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
@@ -988,9 +996,10 @@ def cerca(q: str, x_tg_init_data: str = Header("")):
 # ---------------------- API: ORDINI / ESCROW ------------------------
 
 @app.post("/api/orders")
-async def compra(req: Request, x_tg_init_data: str = Header("")):
+async def compra(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
     """L'acquirente avvia l'acquisto: creiamo la invoice escrow."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
@@ -1015,10 +1024,11 @@ async def compra(req: Request, x_tg_init_data: str = Header("")):
 
 
 @app.post("/api/orders/{ordine_id}/verifica-pagamento")
-async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header("")):
+async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
+                                             barattolo_sessione: str = Cookie("")):
     """La Mini App chiama questo endpoint dopo il pagamento:
     se la invoice risulta pagata, i sats sono in cassaforte -> LOCKED."""
-    verifica_utente(x_tg_init_data)
+    verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
     if not o:
@@ -1062,12 +1072,13 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header("")):
 
 @app.post("/api/orders/{ordine_id}/spedito")
 async def segna_spedito(ordine_id: int, req: Request,
-                        x_tg_init_data: str = Header("")):
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
     """Il venditore segna la spedizione, con corriere e numero di
     tracciamento (l'acquirente li vedrà). Da qui parte il timer di
     sblocco d'ufficio: se dopo GIORNI_AUTO_SBLOCCO nessuno segnala
     nulla, i sats vanno al venditore."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
@@ -1096,7 +1107,8 @@ async def segna_spedito(ordine_id: int, req: Request,
 
 
 @app.post("/api/orders/{ordine_id}/consegnato")
-async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header("")):
+async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header(""),
+                                           barattolo_sessione: str = Cookie("")):
     """SOLO L'ACQUIRENTE segnala l'arrivo del pacco: si apre la sua
     finestra di ORE_CONFERMA ore per controllare l'oggetto; allo
     scadere, sblocco automatico al venditore.
@@ -1104,7 +1116,7 @@ async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header("")):
     prima della consegna reale. La sua protezione e' lo sblocco
     d'ufficio a GIORNI_AUTO_SBLOCCO giorni. In futuro questo scatto
     arrivera' in automatico dal tracking del corriere.)"""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND stato='shipped' "
                     "AND compratore_id=?",
@@ -1125,10 +1137,11 @@ async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header("")):
 
 
 @app.post("/api/orders/{ordine_id}/sollecita")
-async def sollecita_acquirente(ordine_id: int, x_tg_init_data: str = Header("")):
+async def sollecita_acquirente(ordine_id: int, x_tg_init_data: str = Header(""),
+                                               barattolo_sessione: str = Cookie("")):
     """Il venditore invia un promemoria Telegram all'acquirente
     (massimo uno ogni 24 ore, per non trasformarlo in molestia)."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
                     "AND stato IN ('shipped','delivered')",
@@ -1172,13 +1185,14 @@ def mio_profilo(x_tg_init_data: str = Header(""),
 
 
 @app.post("/api/me/ln-address")
-async def salva_ln_address(req: Request, x_tg_init_data: str = Header("")):
+async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
+                                         barattolo_sessione: str = Cookie("")):
     """Il venditore imposta (una volta sola) il suo Lightning address:
     da quel momento tutti gli incassi sono AUTOMATICI. Prima di
     salvarlo lo verifichiamo dal vivo con una richiesta di prova.
     Se il venditore ha ordini gia' confermati in attesa, i sats
     partono immediatamente."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     addr = (d.get("ln_address") or "").strip().lower()
 
@@ -1222,11 +1236,12 @@ RE_NPUB = re.compile(r"^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$")
 
 
 @app.post("/api/me/npub")
-async def salva_npub(req: Request, x_tg_init_data: str = Header("")):
+async def salva_npub(req: Request, x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
     """Badge Nostr del profilo: l'utente dichiara la sua npub (chiave
     PUBBLICA) e i suoi annunci mostrano il badge. Stringa vuota = rimozione.
     REGOLA FERREA: mai chiedere ne' accettare nsec (chiavi private)."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     npub = (d.get("npub") or "").strip().lower().removeprefix("nostr:")
     if npub.startswith("nsec"):
@@ -1314,10 +1329,11 @@ def cerca_nota_verifica(relay: str, hexkey: str, codice: str, da: int) -> bool:
 
 
 @app.post("/api/me/npub/verifica-avvia")
-async def verifica_npub_avvia(x_tg_init_data: str = Header("")):
+async def verifica_npub_avvia(x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
     """Primo passo: generiamo il codice univoco da pubblicare in una
     nota Nostr. Vale 1 ora."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     u = con.execute("SELECT npub, npub_verificata FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
@@ -1340,10 +1356,11 @@ async def verifica_npub_avvia(x_tg_init_data: str = Header("")):
 
 
 @app.post("/api/me/npub/verifica-controlla")
-async def verifica_npub_controlla(x_tg_init_data: str = Header("")):
+async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
     """Secondo passo: cerchiamo sui relay una nota recente della npub
     che contenga il codice. Trovata = la npub e' davvero sua."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if create_connection is None:
         raise HTTPException(503, "Verifica non disponibile: sul server "
                                  "manca il pacchetto websocket-client")
@@ -1596,14 +1613,15 @@ async def ritira_da_nostr(annuncio_id: int):
 
 @app.post("/api/orders/{ordine_id}/invoice")
 async def deposita_invoice(ordine_id: int, req: Request,
-                           x_tg_init_data: str = Header("")):
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
     """Deposita una invoice Lightning sull'ordine:
     - il VENDITORE (stati locked/shipped/confirmed) per incassare:
       importo = prezzo - commissione; se l'acquirente aveva gia'
       confermato, i sats partono immediatamente
     - l'ACQUIRENTE (stato refund, disputa vinta) per il rimborso:
       importo = prezzo pieno; il rimborso parte immediatamente."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     bolt11 = (d.get("invoice") or "").strip()
     if not bolt11.lower().startswith("ln"):
@@ -1789,7 +1807,8 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
 
 @app.post("/api/admin/orders/{ordine_id}/risolvi")
 async def risolvi_disputa(ordine_id: int, req: Request,
-                          x_tg_init_data: str = Header("")):
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
     """SOLO ADMIN: decide una disputa.
     - esito='venditore': i sats vanno al venditore (meno commissione)
     - esito='rimborso': rimborso immediato all'acquirente (es. oggetto
@@ -1799,7 +1818,7 @@ async def risolvi_disputa(ordine_id: int, req: Request,
       quando il venditore conferma di averlo ricevuto.
     'venditore' e 'rimborso' funzionano anche come intervento d'ufficio
     su un reso che si e' incagliato."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
     d = await leggi_json(req)
@@ -1836,10 +1855,11 @@ async def risolvi_disputa(ordine_id: int, req: Request,
 
 @app.post("/api/orders/{ordine_id}/reso-spedito")
 async def reso_spedito(ordine_id: int, req: Request,
-                       x_tg_init_data: str = Header("")):
+                       x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
     """L'acquirente ha rispedito l'oggetto: registra il tracciamento
     del reso e avvisa il venditore."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
@@ -1867,10 +1887,11 @@ async def reso_spedito(ordine_id: int, req: Request,
 
 
 @app.post("/api/orders/{ordine_id}/reso-ricevuto")
-async def reso_ricevuto(ordine_id: int, x_tg_init_data: str = Header("")):
+async def reso_ricevuto(ordine_id: int, x_tg_init_data: str = Header(""),
+                                        barattolo_sessione: str = Cookie("")):
     """Il venditore conferma di aver ricevuto il reso: parte il
     rimborso integrale all'acquirente."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
                     "AND stato='return_shipped'",
@@ -1882,12 +1903,13 @@ async def reso_ricevuto(ordine_id: int, x_tg_init_data: str = Header("")):
 
 
 @app.post("/api/orders/{ordine_id}/conferma")
-async def conferma_ricezione(ordine_id: int, x_tg_init_data: str = Header("")):
+async def conferma_ricezione(ordine_id: int, x_tg_init_data: str = Header(""),
+                                             barattolo_sessione: str = Cookie("")):
     """L'acquirente conferma la ricezione: i sats vengono consegnati
     automaticamente al venditore (invoice depositata o Lightning
     address). Se nessun metodo e' disponibile, l'ordine va in
     'confirmed' e partiranno appena il venditore ne fornisce uno."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
                     "AND stato IN ('locked','shipped','delivered')",
@@ -1899,8 +1921,9 @@ async def conferma_ricezione(ordine_id: int, x_tg_init_data: str = Header("")):
 
 
 @app.post("/api/orders/{ordine_id}/disputa")
-async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header("")):
-    user = verifica_utente(x_tg_init_data)
+async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
+                                       barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
                     "AND stato IN ('locked','shipped','delivered')",
@@ -1929,10 +1952,11 @@ def pulisci_ordini_fantasma(con):
 
 
 @app.post("/api/orders/{ordine_id}/annulla")
-async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header("")):
+async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
+                                         barattolo_sessione: str = Cookie("")):
     """L'acquirente annulla un ordine non ancora pagato (nessun sat
     e' stato mosso: l'ordine sparisce e basta)."""
-    user = verifica_utente(x_tg_init_data)
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
                     "AND stato='creato'", (ordine_id, user["id"])).fetchone()
@@ -1946,8 +1970,9 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header("")):
 
 
 @app.get("/api/orders")
-def miei_ordini(x_tg_init_data: str = Header("")):
-    user = verifica_utente(x_tg_init_data)
+def miei_ordini(x_tg_init_data: str = Header(""),
+                barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     pulisci_ordini_fantasma(con)
     con.commit()
