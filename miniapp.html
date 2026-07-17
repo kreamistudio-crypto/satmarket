@@ -148,6 +148,14 @@
     cursor:pointer;transition:transform .1s;
   }
   .btn:disabled{opacity:.55;pointer-events:none}
+  /* overlay di attesa: blocca tutto mentre i sats viaggiano */
+  #attesaOverlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    background:rgba(20,20,22,.45);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+  #attesaOverlay.on{display:flex}
+  .attesa-card{background:var(--bg);border-radius:16px;padding:20px 26px;font-weight:800;font-size:15.5px;
+    display:flex;align-items:center;gap:10px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .attesa-clessidra{font-size:22px;animation:gira 1.6s linear infinite}
+  @keyframes gira{to{transform:rotate(360deg)}}
   .btn:active{transform:scale(.98)}
   .btn.primary{background:var(--trust);color:#fff}
   .btn.orange{background:var(--sats);color:#fff}
@@ -362,6 +370,7 @@
       <div id="npubVerifica"></div>
       <div class="section-label" style="padding:26px 0 0">I tuoi annunci in vetrina</div>
       <div id="myListings" style="margin-top:12px"></div>
+      <div id="adminStats"></div>
     </div>
   </div>
 
@@ -410,6 +419,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <div id="attesaOverlay"><div class="attesa-card"><span class="attesa-clessidra">⏳</span> Invio sats in corso…</div></div>
 </div>
 
 <script>
@@ -538,7 +548,7 @@ function go(view){
   el('nav-'+(['dettaglio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
     ?.classList.add('active');
   if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
-  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); }
+  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); }
   window.scrollTo(0,0);
 }
 
@@ -617,7 +627,9 @@ function openDetail(id){
     ? `<div style="position:relative"><div class="detail-photos">${l.photos.map(p=>`<img src="${p}" alt="">`).join('')}</div>
        ${l.photos.length>1?`<span class="photo-count">📷 ${l.photos.length}</span>`:''}</div>`
     : `<div class="detail-ph">${l.emoji}</div>`;
-  const contatto = l.nostr
+  const mio = !DEMO && myTgId && l.sellerId===myTgId;
+  const contatto = mio ? ''            /* il venditore non contatta se stesso */
+    : l.nostr
     ? `<button class="btn ghost" onclick="window.open('https://njump.me/${l.nostr}','_blank')">💬 Contatta ${l.seller.split(' ')[0]} su Nostr 🟣</button>`
     : (l.username
       ? `<button class="btn ghost" onclick="window.open('https://t.me/${l.username}','_blank')">💬 Fai una domanda a ${l.seller.split(' ')[0]}</button>`
@@ -637,10 +649,10 @@ function openDetail(id){
       </div>
       <div class="desc">${l.desc}</div>
       <div class="trust-note">🔒 <span>I tuoi sats restano <b>bloccati in escrow</b> e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
-      ${(!DEMO && myTgId && l.sellerId===myTgId)
+      ${mio
         ? `<button class="btn danger-ghost" style="margin-top:0" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `<button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${fmt(l.price)} sats</button>`}
-      ${(!DEMO && isAdmin && l.sellerId!==myTgId)
+      ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
       ${contatto}
     </div>`;
@@ -1067,10 +1079,13 @@ function refundPanel(o){
    così l'app non sembra bloccata. Restituisce la funzione che lo
    ripristina (da chiamare appena arriva la risposta). */
 function bottoneInAttesa(btn){
-  if (!btn) return ()=>{};
-  const prima = btn.innerHTML;
-  btn.disabled = true; btn.innerHTML = '⏳ Invio in corso…';
-  return ()=>{ btn.disabled = false; btn.innerHTML = prima; };
+  el('attesaOverlay').classList.add('on');    /* blocca tutto: i sats viaggiano */
+  const prima = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Invio in corso…'; }
+  return ()=>{
+    el('attesaOverlay').classList.remove('on');
+    if (btn) { btn.disabled = false; btn.innerHTML = prima; }
+  };
 }
 
 async function adminResolve(esito, btn){
@@ -1255,6 +1270,33 @@ function renderMyListings(){
       <div class="sub"><span class="mono" style="color:var(--sats)">${fmt(l.price)}</span> sats · 📍 ${l.zone}</div>
     </div>`).join('')
     : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo qui sopra! ⚡</div>`;
+}
+
+/* ---- statistiche del mercatino (solo moderatori) ---- */
+async function loadAdminStats(){
+  const box = el('adminStats');
+  if (!box) return;
+  if (!isAdmin || DEMO) { box.innerHTML = ''; return; }
+  try {
+    const r = await fetch(`${API_BASE}/admin/stats`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok) { box.innerHTML = ''; return; }
+    const s = await r.json();
+    const card = (emoji, valore, nome) => `
+      <div style="background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
+        <div style="font-size:20px">${emoji}</div>
+        <div class="mono" style="font-size:20px;font-weight:800;color:var(--sats)">${fmt(valore)}</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:700">${nome}</div>
+      </div>`;
+    box.innerHTML = `
+      <div class="section-label" style="padding:26px 0 0">📊 Statistiche (solo moderatori)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+        ${card('👥', s.utenti, 'utenti')}
+        ${card('🏷️', s.annunci_attivi, 'annunci attivi')}
+        ${card('🤝', s.affari_conclusi, 'affari conclusi')}
+        ${card('⚡', s.volume_sats, 'sats di volume')}
+      </div>`;
+  } catch(e) { box.innerHTML = ''; }
 }
 
 async function deleteListing(id, dalDettaglio){

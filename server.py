@@ -665,6 +665,24 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
     return {"ok": True}
 
 
+@app.get("/api/admin/stats")
+def statistiche_admin(x_tg_init_data: str = Header("")):
+    """SOLO ADMIN: i numeri del mercatino a colpo d'occhio."""
+    user = verifica_utente(x_tg_init_data)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    utenti = con.execute("SELECT COUNT(*) AS n FROM utenti").fetchone()["n"]
+    annunci = con.execute("SELECT COUNT(*) AS n FROM annunci "
+                          "WHERE stato='attivo'").fetchone()["n"]
+    conclusi = con.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(prezzo_sats),0) AS volume "
+        "FROM ordini WHERE stato IN ('released','refunded')").fetchone()
+    con.close()
+    return {"utenti": utenti, "annunci_attivi": annunci,
+            "affari_conclusi": conclusi["n"], "volume_sats": conclusi["volume"]}
+
+
 # ---------------------- API: RICERCA AI -----------------------------
 
 @app.get("/api/search")
