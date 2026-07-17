@@ -40,6 +40,7 @@ import ssl
 import sys
 import time
 import unicodedata
+from collections import defaultdict
 from urllib.parse import parse_qsl
 
 import anthropic
@@ -747,8 +748,19 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header("")):
     if o["stato"] != "creato":
         return {"stato": o["stato"]}
     if await invoice_pagata(o["payment_hash"]):
-        con.execute("UPDATE ordini SET stato='locked', aggiornato=? WHERE id=?",
-                    (int(time.time()), ordine_id))
+        # Passaggio ATOMICO: la Mini App chiama in polling e coi bottoni
+        # "ho pagato", quindi qui possono arrivare piu' chiamate insieme
+        # (la richiesta a LNbits qui sopra e' lenta). Vince solo chi
+        # flippa DAVVERO la riga da 'creato' a 'locked': gli altri escono
+        # senza rinotificare il venditore.
+        cur = con.execute(
+            "UPDATE ordini SET stato='locked', aggiornato=? "
+            "WHERE id=? AND stato='creato'",
+            (int(time.time()), ordine_id))
+        if cur.rowcount == 0:
+            con.commit()
+            con.close()
+            return {"stato": "locked"}
         con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
                     (o["annuncio_id"],))
         a = con.execute("SELECT contatto_nostr FROM annunci WHERE id=?",
@@ -1146,6 +1158,15 @@ async def deposita_invoice(ordine_id: int, req: Request,
     return {"ok": True, "stato": o["stato"], "netto": atteso}
 
 
+# Un lucchetto per ordine: sblocco e rimborso MUOVONO FONDI e possono
+# partire insieme da strade diverse (orologio, conferma dell'acquirente,
+# invoice appena depositata). Il server e' un processo solo: il lucchetto
+# asyncio mette le chiamate in fila, e la guardia sullo stato fa uscire
+# a mani vuote chi arriva a cose gia' fatte. Senza, due invoice diverse
+# (via Lightning address) potrebbero essere pagate entrambe.
+_lucchetti_ordine = defaultdict(asyncio.Lock)
+
+
 async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
     """Consegna i sats al venditore, provando in ordine:
     1. la invoice che il venditore ha eventualmente depositato
@@ -1154,62 +1175,66 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
        avvisato di fornire una invoice o impostare il suo address.
     Se un pagamento fallisce (es. invoice scaduta), i sats restano
     al sicuro in cassaforte e si riprova con metodo nuovo."""
-    con = db()
-    o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
-    if not o:
-        con.close()
-        return {"ok": False, "stato": "?"}
-    v = con.execute("SELECT * FROM utenti WHERE tg_id=?",
-                    (o["venditore_id"],)).fetchone()
-    netto = netto_venditore(o["prezzo_sats"])
+    async with _lucchetti_ordine[ordine_id]:
+        con = db()
+        o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+        if not o:
+            con.close()
+            return {"ok": False, "stato": "?"}
+        if o["stato"] in ("released", "refunded", "refund", "creato", "annullato"):
+            con.close()          # gia' risolto (o mai pagato): niente doppioni
+            return {"ok": o["stato"] == "released", "stato": o["stato"]}
+        v = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (o["venditore_id"],)).fetchone()
+        netto = netto_venditore(o["prezzo_sats"])
 
-    bolt11 = o["invoice_venditore"]
-    if not bolt11 and v and v["ln_address"]:
-        bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
+        bolt11 = o["invoice_venditore"]
+        if not bolt11 and v and v["ln_address"]:
+            bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
 
-    if bolt11 and await paga_venditore(bolt11):
-        con.execute("UPDATE ordini SET stato='released', aggiornato=? WHERE id=?",
-                    (int(time.time()), ordine_id))
-        con.execute("UPDATE utenti SET vendite_ok=vendite_ok+1 WHERE tg_id=?",
-                    (o["venditore_id"],))
-        con.execute("UPDATE utenti SET acquisti_ok=acquisti_ok+1 WHERE tg_id=?",
-                    (o["compratore_id"],))
+        if bolt11 and await paga_venditore(bolt11):
+            con.execute("UPDATE ordini SET stato='released', aggiornato=? WHERE id=?",
+                        (int(time.time()), ordine_id))
+            con.execute("UPDATE utenti SET vendite_ok=vendite_ok+1 WHERE tg_id=?",
+                        (o["venditore_id"],))
+            con.execute("UPDATE utenti SET acquisti_ok=acquisti_ok+1 WHERE tg_id=?",
+                        (o["compratore_id"],))
+            con.commit()
+            con.close()
+            if automatico:
+                await notifica(o["venditore_id"],
+                               f"🔓 <b>Sats sbloccati automaticamente!</b> Il tempo di "
+                               f"conferma è scaduto senza problemi segnalati: "
+                               f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. ⚡")
+                await notifica(o["compratore_id"],
+                               "🔓 L'ordine si è concluso <b>automaticamente</b>: il "
+                               "tempo per confermare o aprire una disputa è scaduto e "
+                               "i sats sono stati sbloccati al venditore.")
+            else:
+                await notifica(o["venditore_id"],
+                               f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
+                               f"ricezione: <b>{netto} sats</b> sono in arrivo nel tuo "
+                               f"wallet. Affare concluso! ⚡")
+            return {"ok": True, "stato": "released"}
+
+        # Niente pagamento riuscito: l'ordine resta/va in 'confirmed',
+        # la invoice (se c'era) viene ripulita, il venditore avvisato.
+        con.execute("UPDATE ordini SET invoice_venditore='', stato='confirmed', "
+                    "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
         con.commit()
         con.close()
-        if automatico:
-            await notifica(o["venditore_id"],
-                           f"🔓 <b>Sats sbloccati automaticamente!</b> Il tempo di "
-                           f"conferma è scaduto senza problemi segnalati: "
-                           f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. ⚡")
-            await notifica(o["compratore_id"],
-                           "🔓 L'ordine si è concluso <b>automaticamente</b>: il "
-                           "tempo per confermare o aprire una disputa è scaduto e "
-                           "i sats sono stati sbloccati al venditore.")
+        if o["invoice_venditore"] or (v and v["ln_address"]):
+            msg = ("⚠️ Il pagamento automatico dei tuoi sats e' <b>fallito</b> "
+                   "(invoice scaduta o wallet non raggiungibile). I sats sono al "
+                   "sicuro in escrow: apri l'ordine nella Mini App per riprovare "
+                   f"con una invoice da <b>{netto} sats</b>.")
         else:
-            await notifica(o["venditore_id"],
-                           f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
-                           f"ricezione: <b>{netto} sats</b> sono in arrivo nel tuo "
-                           f"wallet. Affare concluso! ⚡")
-        return {"ok": True, "stato": "released"}
-
-    # Niente pagamento riuscito: l'ordine resta/va in 'confirmed',
-    # la invoice (se c'era) viene ripulita, il venditore avvisato.
-    con.execute("UPDATE ordini SET invoice_venditore='', stato='confirmed', "
-                "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
-    con.commit()
-    con.close()
-    if o["invoice_venditore"] or (v and v["ln_address"]):
-        msg = ("⚠️ Il pagamento automatico dei tuoi sats e' <b>fallito</b> "
-               "(invoice scaduta o wallet non raggiungibile). I sats sono al "
-               "sicuro in escrow: apri l'ordine nella Mini App per riprovare "
-               f"con una invoice da <b>{netto} sats</b>.")
-    else:
-        msg = (f"✅ <b>L'acquirente ha confermato la ricezione!</b> Per incassare "
-               f"i tuoi <b>{netto} sats</b>: apri l'ordine nella Mini App e "
-               f"imposta il tuo Lightning address (incassi automatici, per "
-               f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
-    await notifica(o["venditore_id"], msg)
-    return {"ok": False, "stato": "confirmed"}
+            msg = (f"✅ <b>L'acquirente ha confermato la ricezione!</b> Per incassare "
+                   f"i tuoi <b>{netto} sats</b>: apri l'ordine nella Mini App e "
+                   f"imposta il tuo Lightning address (incassi automatici, per "
+                   f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
+        await notifica(o["venditore_id"], msg)
+        return {"ok": False, "stato": "confirmed"}
 
 
 async def _rimborsa_compratore(ordine_id: int) -> dict:
@@ -1218,46 +1243,50 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
     Lightning address. Se non c'e' un metodo, l'ordine va in 'refund'
     e l'acquirente viene invitato a fornirne uno nella Mini App.
     L'annuncio torna in vetrina."""
-    con = db()
-    o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
-    if not o:
-        con.close()
-        return {"ok": False, "stato": "?"}
-    c_utente = con.execute("SELECT * FROM utenti WHERE tg_id=?",
-                           (o["compratore_id"],)).fetchone()
-    importo = o["prezzo_sats"]          # rimborso integrale, zero commissioni
+    async with _lucchetti_ordine[ordine_id]:
+        con = db()
+        o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+        if not o:
+            con.close()
+            return {"ok": False, "stato": "?"}
+        if o["stato"] in ("refunded", "released", "creato", "annullato"):
+            con.close()          # gia' risolto (o mai pagato): niente doppioni
+            return {"ok": o["stato"] == "refunded", "stato": o["stato"]}
+        c_utente = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                               (o["compratore_id"],)).fetchone()
+        importo = o["prezzo_sats"]      # rimborso integrale, zero commissioni
 
-    bolt11 = o["invoice_rimborso"]
-    if not bolt11 and c_utente and c_utente["ln_address"]:
-        bolt11 = await invoice_da_ln_address(c_utente["ln_address"], importo)
+        bolt11 = o["invoice_rimborso"]
+        if not bolt11 and c_utente and c_utente["ln_address"]:
+            bolt11 = await invoice_da_ln_address(c_utente["ln_address"], importo)
 
-    if bolt11 and await paga_venditore(bolt11):
-        con.execute("UPDATE ordini SET stato='refunded', aggiornato=? WHERE id=?",
-                    (int(time.time()), ordine_id))
-        con.execute("UPDATE annunci SET stato='attivo' WHERE id=?",
-                    (o["annuncio_id"],))          # l'oggetto torna in vetrina
+        if bolt11 and await paga_venditore(bolt11):
+            con.execute("UPDATE ordini SET stato='refunded', aggiornato=? WHERE id=?",
+                        (int(time.time()), ordine_id))
+            con.execute("UPDATE annunci SET stato='attivo' WHERE id=?",
+                        (o["annuncio_id"],))      # l'oggetto torna in vetrina
+            con.commit()
+            con.close()
+            await notifica(o["compratore_id"],
+                           f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
+                           f"<b>{importo} sats</b> è in arrivo nel tuo wallet.")
+            await notifica(o["venditore_id"],
+                           "⚖️ La disputa è stata risolta a favore dell'acquirente: "
+                           "i sats gli sono stati rimborsati e l'annuncio è tornato "
+                           "in vetrina.")
+            return {"ok": True, "stato": "refunded"}
+
+        # Nessun metodo di rimborso disponibile: si mette in attesa
+        con.execute("UPDATE ordini SET invoice_rimborso='', stato='refund', "
+                    "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
         con.commit()
         con.close()
         await notifica(o["compratore_id"],
-                       f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
-                       f"<b>{importo} sats</b> è in arrivo nel tuo wallet.")
-        await notifica(o["venditore_id"],
-                       "⚖️ La disputa è stata risolta a favore dell'acquirente: "
-                       "i sats gli sono stati rimborsati e l'annuncio è tornato "
-                       "in vetrina.")
-        return {"ok": True, "stato": "refunded"}
-
-    # Nessun metodo di rimborso disponibile: si mette in attesa
-    con.execute("UPDATE ordini SET invoice_rimborso='', stato='refund', "
-                "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
-    con.commit()
-    con.close()
-    await notifica(o["compratore_id"],
-                   f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
-                   f"rimborso di <b>{importo} sats</b>: apri l'ordine nella "
-                   f"Mini App e imposta il tuo Lightning address, oppure "
-                   f"incolla una invoice di esattamente quell'importo.")
-    return {"ok": False, "stato": "refund"}
+                       f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
+                       f"rimborso di <b>{importo} sats</b>: apri l'ordine nella "
+                       f"Mini App e imposta il tuo Lightning address, oppure "
+                       f"incolla una invoice di esattamente quell'importo.")
+        return {"ok": False, "stato": "refund"}
 
 
 @app.post("/api/admin/orders/{ordine_id}/risolvi")
