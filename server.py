@@ -108,6 +108,7 @@ def init_db():
         npub_verificata INTEGER DEFAULT 0,  -- 1 = nota di verifica trovata sui relay
         verifica_codice TEXT DEFAULT '',    -- codice da pubblicare in una nota
         verifica_scade INTEGER DEFAULT 0,   -- il codice vale 1 ora
+        registrato INTEGER DEFAULT 0, -- quando l'utente e' entrato la prima volta
         vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0,
         rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0
     );
@@ -147,11 +148,13 @@ def init_db():
         con.execute("ALTER TABLE utenti ADD COLUMN ln_address TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
-    # Migrazioni per il badge Nostr (npub del profilo e sua verifica)
+    # Migrazioni utenti: badge Nostr (npub e verifica) e data di
+    # registrazione (chi c'era gia' resta senza data: si mostra "—")
     for colonna in ("npub TEXT DEFAULT ''",
                     "npub_verificata INTEGER DEFAULT 0",
                     "verifica_codice TEXT DEFAULT ''",
-                    "verifica_scade INTEGER DEFAULT 0"):
+                    "verifica_scade INTEGER DEFAULT 0",
+                    "registrato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -202,9 +205,11 @@ def verifica_utente(init_data: str) -> dict:
         user = {"id": int(uid), "first_name": nome, "username": nome.lower()}
         con = db()
         con.execute(
-            "INSERT INTO utenti(tg_id, nome, username) VALUES(?,?,?) "
+            "INSERT INTO utenti(tg_id, nome, username, registrato) "
+            "VALUES(?,?,?,?) "
             "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
-            (user["id"], nome, nome.lower(), nome, nome.lower()))
+            (user["id"], nome, nome.lower(), int(time.time()),
+             nome, nome.lower()))
         con.commit()
         con.close()
         return user
@@ -220,9 +225,11 @@ def verifica_utente(init_data: str) -> dict:
         user = json.loads(dati["user"])
         con = db()
         con.execute(
-            "INSERT INTO utenti(tg_id, nome, username) VALUES(?,?,?) "
+            "INSERT INTO utenti(tg_id, nome, username, registrato) "
+            "VALUES(?,?,?,?) "
             "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
             (user["id"], user.get("first_name", ""), user.get("username", ""),
+             int(time.time()),
              user.get("first_name", ""), user.get("username", "")))
         con.commit()
         con.close()
@@ -678,9 +685,18 @@ def statistiche_admin(x_tg_init_data: str = Header("")):
     conclusi = con.execute(
         "SELECT COUNT(*) AS n, COALESCE(SUM(prezzo_sats),0) AS volume "
         "FROM ordini WHERE stato IN ('released','refunded')").fetchone()
+    lista = [dict(r) for r in con.execute(
+        "SELECT u.tg_id, u.nome, u.username, u.registrato, "
+        "  (SELECT COUNT(*) FROM annunci a WHERE a.venditore_id=u.tg_id "
+        "     AND a.stato='attivo') AS annunci_attivi, "
+        "  (SELECT COUNT(*) FROM ordini o WHERE o.stato IN "
+        "     ('released','refunded') AND (o.venditore_id=u.tg_id "
+        "     OR o.compratore_id=u.tg_id)) AS affari_conclusi "
+        "FROM utenti u ORDER BY u.registrato DESC")]
     con.close()
     return {"utenti": utenti, "annunci_attivi": annunci,
-            "affari_conclusi": conclusi["n"], "volume_sats": conclusi["volume"]}
+            "affari_conclusi": conclusi["n"], "volume_sats": conclusi["volume"],
+            "lista_utenti": lista}
 
 
 # ---------------------- API: RICERCA AI -----------------------------
@@ -1211,6 +1227,9 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
 
         if bolt11 and await paga_venditore(bolt11):
+            t = con.execute("SELECT titolo FROM annunci WHERE id=?",
+                            (o["annuncio_id"],)).fetchone()
+            titolo = t["titolo"] if t else "il tuo acquisto"
             con.execute("UPDATE ordini SET stato='released', aggiornato=? WHERE id=?",
                         (int(time.time()), ordine_id))
             con.execute("UPDATE utenti SET vendite_ok=vendite_ok+1 WHERE tg_id=?",
@@ -1225,14 +1244,18 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                                f"conferma è scaduto senza problemi segnalati: "
                                f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. ⚡")
                 await notifica(o["compratore_id"],
-                               "🔓 L'ordine si è concluso <b>automaticamente</b>: il "
-                               "tempo per confermare o aprire una disputa è scaduto e "
-                               "i sats sono stati sbloccati al venditore.")
+                               f"✅ <b>Affare concluso:</b> «{titolo}». Il tempo per "
+                               f"confermare o aprire una disputa è scaduto e i sats "
+                               f"sono stati sbloccati al venditore. Grazie per aver "
+                               f"usato Barattolo 🫙")
             else:
                 await notifica(o["venditore_id"],
                                f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
                                f"ricezione: <b>{netto} sats</b> sono in arrivo nel tuo "
                                f"wallet. Affare concluso! ⚡")
+                await notifica(o["compratore_id"],
+                               f"✅ <b>Affare concluso:</b> «{titolo}». "
+                               f"Grazie per aver usato Barattolo 🫙")
             return {"ok": True, "stato": "released"}
 
         # Niente pagamento riuscito: l'ordine resta/va in 'confirmed',

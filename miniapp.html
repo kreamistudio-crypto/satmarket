@@ -1295,6 +1295,18 @@ async function loadAdminStats(){
         ${card('🏷️', s.annunci_attivi, 'annunci attivi')}
         ${card('🤝', s.affari_conclusi, 'affari conclusi')}
         ${card('⚡', s.volume_sats, 'sats di volume')}
+      </div>
+      <div style="max-height:280px;overflow-y:auto;margin-top:10px;background:#fff;border:1.5px solid var(--line);border-radius:14px">
+        ${(s.lista_utenti||[]).map(u => `
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px">
+            <div style="min-width:0">
+              <b>${u.nome||'—'}</b>${u.username?` <span style="color:var(--muted)">@${u.username}</span>`:''}
+              <div style="color:var(--muted);font-weight:600">dal ${u.registrato?new Date(u.registrato*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div>
+            </div>
+            <div style="text-align:right;white-space:nowrap;color:var(--muted);font-weight:700">
+              🏷️ ${u.annunci_attivi} · 🤝 ${u.affari_conclusi}
+            </div>
+          </div>`).join('')}
       </div>`;
   } catch(e) { box.innerHTML = ''; }
 }
