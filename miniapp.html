@@ -333,6 +333,14 @@
     <div id="detailContent"></div>
   </div>
 
+  <!-- ============ VISTA: NEGOZIO DEL VENDITORE ============ -->
+  <div class="view" id="view-negozio">
+    <button class="back" onclick="tornaDalNegozio()">← Torna</button>
+    <div id="negozioHeader"></div>
+    <div class="section-label">In vetrina in questo negozio</div>
+    <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
+  </div>
+
   <!-- ============ VISTA: VENDI ============ -->
   <div class="view" id="view-vendi">
     <div class="form">
@@ -471,7 +479,8 @@ function mapListing(a){
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
     photos, username:a.venditore_username||'', nostr:a.contatto_nostr||'',
-    sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata};
+    sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata,
+    negozio:a.venditore_negozio||''};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -545,7 +554,7 @@ function go(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  el('nav-'+(['dettaglio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
+  el('nav-'+(['dettaglio','negozio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
     ?.classList.add('active');
   if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
   if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); }
@@ -567,7 +576,11 @@ function renderGrid(items){
   el('gridLabel').textContent = items ? 'Risultati della ricerca' : (q||activeCat!=='Tutto' ? 'Risultati' : 'In vetrina');
   el('gridEmpty').style.display = data.length ? 'none':'block';
   el('emptyQ').textContent = q || activeCat;
-  el('grid').innerHTML = data.map(l=>`
+  el('grid').innerHTML = data.map(cardHTML).join('');
+}
+
+/* La card di un annuncio: la stessa in vetrina e nella vista negozio */
+const cardHTML = l => `
     <div class="card" onclick="openDetail(${l.id})">
       <div class="ph">${l.photos && l.photos[0] ? `<img src="${l.photos[0]}" loading="lazy" alt="">` : l.emoji}</div>
       <div class="info">
@@ -575,8 +588,7 @@ function renderGrid(items){
         <div class="price">${fmt(l.price)} <span class="unit">sats</span></div>
         <div class="meta"><span>📍 ${l.zone}</span>${l.sellerNpub?(l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣✓</span>':'<span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}<span class="escrow-dot">🔒 escrow</span></div>
       </div>
-    </div>`).join('');
-}
+    </div>`;
 
 async function doSearch(){
   haptic();
@@ -596,6 +608,82 @@ async function doSearch(){
       {headers:{'X-Tg-Init-Data': authHdr()}});
     renderGrid((await r.json()).map(mapListing));
   }
+}
+
+/* ---------------- negozio del venditore ---------------- */
+let negozioCorrente = null;   // il profilo pubblico mostrato nella vista
+
+function tornaDalNegozio(){
+  if (currentListing && el('view-negozio').classList.contains('active')
+      && listings.find(x=>x.id===currentListing.id)) go('dettaglio');
+  else go('esplora');
+}
+
+/* Dal dettaglio annuncio: il blocco venditore apre il suo negozio */
+function apriNegozioDaAnnuncio(){
+  const l = currentListing;
+  if (!l) return;
+  if (DEMO) {
+    /* Demo: il "negozio" si ricostruisce dai dati finti in locale */
+    renderNegozio({nome:l.seller, username:'', npub:'', npub_verificata:0,
+                   rating:l.rating, vendite_ok:l.sales, negozio:''},
+                  listings.filter(x=>x.seller===l.seller));
+    return;
+  }
+  apriNegozio(l.negozio || l.username);
+}
+
+async function apriNegozio(chi){
+  if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
+  try {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(`${API_BASE}/negozio/${encodeURIComponent(chi)}`, opz);
+    if (!r.ok) throw new Error('negozio non trovato');
+    const d = await r.json();
+    const annunci = d.annunci.map(mapListing);
+    /* Gli annunci del negozio entrano anche nel catalogo in memoria:
+       cosi' openDetail li trova pure arrivando dal link diretto */
+    annunci.forEach(a=>{ if (!listings.find(x=>x.id===a.id)) listings.push(a); });
+    renderNegozio(d.venditore, annunci);
+  } catch(e) { toast('Negozio non trovato'); }
+}
+
+function renderNegozio(v, annunci){
+  negozioCorrente = v;
+  const badge = v.npub
+    ? (v.npub_verificata?' <span title="Venditore verificato su Nostr">🟣✓</span>'
+                        :' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>')
+    : '';
+  /* Le stelle compaiono solo quando c'e' un rating vero: "0 ★" in
+     vetrina farebbe solo danno a un venditore appena arrivato */
+  const rep = (v.rating>0
+    ? `<span class="stars">${'★'.repeat(Math.round(v.rating))}</span> ${v.rating} · ` : '')
+    + `${v.vendite_ok||0} vendite concluse`;
+  el('negozioHeader').innerHTML = `
+    <div class="seller" style="margin-top:14px">
+      <div class="avatar">${(v.nome||'?')[0]}</div>
+      <div class="who"><b>${v.nome||'—'}${badge}</b>
+        <div class="rep">${rep}</div>
+        ${v.npub?`<div class="rep">${v.npub_verificata?'🟣✓':'🟣'} <a href="https://njump.me/${v.npub}" target="_blank" style="color:inherit">Profilo Nostr completo</a></div>`:''}
+      </div>
+    </div>
+    ${(v.username||v.negozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
+  el('negozioGrid').innerHTML = annunci.length
+    ? annunci.map(cardHTML).join('')
+    : `<div class="empty" style="grid-column:1/-1">Niente in vetrina al momento</div>`;
+  go('negozio');
+}
+
+/* Il biglietto da visita del venditore: link pubblico, si apre anche
+   dal browser senza Telegram. Username se c'e' (piu' leggibile),
+   altrimenti il codice pubblico del negozio. */
+function condividiNegozio(){
+  const v = negozioCorrente;
+  if (!v) return;
+  const link = `${location.origin}/negozio/${encodeURIComponent(v.username || v.negozio)}`;
+  navigator.clipboard?.writeText(link)
+    .then(()=>toast('📋 Link del negozio copiato'))
+    .catch(()=>toast(link, 5000));
 }
 
 /* ---------------- dettaglio ---------------- */
@@ -640,12 +728,13 @@ function openDetail(id){
       <h2>${l.title}</h2>
       <div class="detail-price">${fmt(l.price)} <span class="unit">sats</span></div>
       <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${l.zone}</div>
-      <div class="seller">
+      <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${l.seller[0]}</div>
         <div class="who"><b>${l.seller}${l.sellerNpub?(l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣✓</span>':' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}</b>
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
-          ${l.sellerNpub?`<div class="rep">${l.sellerNpubOk?'🟣✓':'🟣'} <a href="https://njump.me/${l.sellerNpub}" target="_blank" style="color:inherit">Presente su Nostr</a> · ${l.sellerNpubOk?'npub verificata ✓':'npub auto-dichiarata, non verificata'}</div>`:''}
+          ${l.sellerNpub?`<div class="rep">${l.sellerNpubOk?'🟣✓':'🟣'} <a href="https://njump.me/${l.sellerNpub}" target="_blank" style="color:inherit" onclick="event.stopPropagation()">Presente su Nostr</a> · ${l.sellerNpubOk?'npub verificata ✓':'npub auto-dichiarata, non verificata'}</div>`:''}
         </div>
+        <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
       <div class="desc">${l.desc}</div>
       <div class="trust-note">🔒 <span>I tuoi sats restano <b>bloccati in escrow</b> e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
@@ -1415,6 +1504,18 @@ function mostraBanner(testo){
 const BANNER_DEMO = '🫙 Questa è solo la demo — il mercatino vero vive su Telegram';
 const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — per comprare e vendere apri Barattolo su Telegram';
 
+/* Link diretto a un negozio (barattolo.store/negozio/...): il server
+   serve sempre la stessa Mini App, qui leggiamo l'URL e apriamo la
+   vista giusta. Una volta sola: cambiando identità nel collaudo non
+   deve riaprirsi da capo. */
+const NEGOZIO_URL = location.pathname.match(/^\/negozio\/([^/]+)/);
+let negozioAperto = false;
+function apriNegozioDaUrl(){
+  if (!NEGOZIO_URL || negozioAperto) return;
+  negozioAperto = true;
+  apriNegozio(decodeURIComponent(NEGOZIO_URL[1]));
+}
+
 /* Browser senza identità Telegram: si prova la vetrina vera, cioè gli
    annunci pubblici in sola lettura. Niente header di autenticazione:
    siamo anonimi e il backend non deve sapere nulla di noi. */
@@ -1426,6 +1527,7 @@ async function avviaVetrina(){
     VETRINA = true; DEMO = false; orders = [];
     mostraBanner(BANNER_VETRINA);
     renderGrid();
+    apriNegozioDaUrl();
   } catch (e) {
     /* Backend non raggiungibile: demo coi dati finti */
     DEMO = true;
@@ -1477,6 +1579,7 @@ async function avvia(){
     } else if (el('view-vendi').classList.contains('active')) {
       loadMyListings().then(renderMyListings).catch(()=>{});
     }
+    apriNegozioDaUrl();
   } catch (e) {
     /* Browser fuori da Telegram: vetrina vera in sola lettura
        (con la demo finta come rete di sicurezza se il backend tace) */

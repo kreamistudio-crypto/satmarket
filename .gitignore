@@ -12,3 +12,6 @@ __pycache__/
 # Varie
 .DS_Store
 Thumbs.db
+
+# Config locale di Claude Code (launch.json ecc.)
+.claude/

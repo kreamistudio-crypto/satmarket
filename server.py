@@ -113,6 +113,17 @@ def db():
     return con
 
 
+def nuovo_codice_negozio(con) -> str:
+    """Codice pubblico del negozio: 8 caratteri casuali, assegnati una
+    volta e stabili per sempre. Non deriva dal tg_id, quindi si puo'
+    mettere in un URL senza rivelare nulla del venditore."""
+    while True:
+        codice = secrets.token_hex(4)
+        if not con.execute("SELECT 1 FROM utenti WHERE negozio=?",
+                           (codice,)).fetchone():
+            return codice
+
+
 def init_db():
     con = db()
     con.executescript("""
@@ -124,6 +135,7 @@ def init_db():
         verifica_codice TEXT DEFAULT '',    -- codice da pubblicare in una nota
         verifica_scade INTEGER DEFAULT 0,   -- il codice vale 1 ora
         registrato INTEGER DEFAULT 0, -- quando l'utente e' entrato la prima volta
+        negozio TEXT DEFAULT '',      -- codice pubblico del negozio (URL condivisibile)
         vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0,
         rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0
     );
@@ -170,11 +182,18 @@ def init_db():
                     "npub_verificata INTEGER DEFAULT 0",
                     "verifica_codice TEXT DEFAULT ''",
                     "verifica_scade INTEGER DEFAULT 0",
-                    "registrato INTEGER DEFAULT 0"):
+                    "registrato INTEGER DEFAULT 0",
+                    "negozio TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # Ogni utente riceve il codice pubblico del negozio, una volta sola
+    # (i nuovi lo prendono all'ingresso, in verifica_utente)
+    for r in con.execute(
+            "SELECT tg_id FROM utenti WHERE negozio=''").fetchall():
+        con.execute("UPDATE utenti SET negozio=? WHERE tg_id=?",
+                    (nuovo_codice_negozio(con), r["tg_id"]))
     # Migrazioni annunci: foto, contatto Nostr e l'evento NIP-99
     # pubblicato dalla piattaforma
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
@@ -223,11 +242,11 @@ def verifica_utente(init_data: str) -> dict:
         user = {"id": int(uid), "first_name": nome, "username": nome.lower()}
         con = db()
         con.execute(
-            "INSERT INTO utenti(tg_id, nome, username, registrato) "
-            "VALUES(?,?,?,?) "
+            "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
+            "VALUES(?,?,?,?,?) "
             "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
             (user["id"], nome, nome.lower(), int(time.time()),
-             nome, nome.lower()))
+             nuovo_codice_negozio(con), nome, nome.lower()))
         con.commit()
         con.close()
         return user
@@ -243,11 +262,11 @@ def verifica_utente(init_data: str) -> dict:
         user = json.loads(dati["user"])
         con = db()
         con.execute(
-            "INSERT INTO utenti(tg_id, nome, username, registrato) "
-            "VALUES(?,?,?,?) "
+            "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
+            "VALUES(?,?,?,?,?) "
             "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
             (user["id"], user.get("first_name", ""), user.get("username", ""),
-             int(time.time()),
+             int(time.time()), nuovo_codice_negozio(con),
              user.get("first_name", ""), user.get("username", "")))
         con.commit()
         con.close()
@@ -539,6 +558,7 @@ CAMPI_VETRINA = (
     "a.foto, a.contatto_nostr, a.creato, "
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
+    "u.negozio AS venditore_negozio, "
     "u.rating, u.vendite_ok")
 
 
@@ -615,12 +635,44 @@ def miei_annunci(x_tg_init_data: str = Header("")):
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
         "u.npub AS venditore_npub, "
         "u.npub_verificata AS venditore_npub_verificata, "
+        "u.negozio AS venditore_negozio, "
         "u.rating, u.vendite_ok FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
         (user["id"],))]
     con.close()
     return righe
+
+
+@app.get("/api/negozio/{chi}")
+def negozio(chi: str, x_tg_init_data: str = Header("")):
+    """La pagina-negozio di un venditore: profilo pubblico + i suoi
+    annunci attivi. Si arriva con lo username Telegram (se ce l'ha) o
+    col codice pubblico del negozio: mai col tg_id, che agli anonimi
+    resta invisibile come in tutta la vetrina."""
+    user = utente_se_autenticato(x_tg_init_data)
+    con = db()
+    campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
+                     "rating, vendite_ok, negozio FROM utenti ")
+    v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
+                    "AND username!='' LIMIT 1", (chi,)).fetchone()
+    if not v:
+        v = con.execute(campi_profilo + "WHERE negozio=? LIMIT 1",
+                        (chi,)).fetchone()
+    if not v:
+        con.close()
+        raise HTTPException(404, "Negozio non trovato")
+    # venditore_id in piu' solo agli autenticati ("questo annuncio e' tuo")
+    campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
+    annunci = [dict(r) for r in con.execute(
+        f"SELECT {campi} FROM annunci a "
+        "JOIN utenti u ON u.tg_id=a.venditore_id "
+        "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
+        (v["tg_id"],))]
+    con.close()
+    venditore = dict(v)
+    del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
+    return {"venditore": venditore, "annunci": annunci}
 
 
 @app.post("/api/listings/{annuncio_id}/rimuovi")
@@ -736,6 +788,7 @@ def cerca(q: str, x_tg_init_data: str = Header("")):
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
         "u.npub AS venditore_npub, "
         "u.npub_verificata AS venditore_npub_verificata, "
+        "u.negozio AS venditore_negozio, "
         "u.rating FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")]
     con.close()
@@ -1814,6 +1867,13 @@ def home():
 
 @app.get("/miniapp.html")
 def pagina_miniapp():
+    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
+
+
+@app.get("/negozio/{chi}")
+def pagina_negozio(chi: str):
+    """Link condivisibile del negozio: e' sempre la stessa Mini App,
+    il JS legge /negozio/... dall'URL e apre la vista giusta."""
     return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
 
 
