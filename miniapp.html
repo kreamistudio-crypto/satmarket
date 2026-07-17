@@ -451,6 +451,19 @@
         sotto diventa 🟣✓. Non incollare MAI la nsec: quella è la tua
         chiave privata e nessuno deve chiedertela, noi per primi.</div>
       <div id="npubVerifica"></div>
+      <div id="nwcBlocco">
+        <div class="field" style="margin-top:24px" id="nwcCampo"><label>⚡ Wallet Lightning (facoltativo)</label>
+          <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
+        <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
+        <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+          Col wallet collegato gli annunci mostrano «⚡ Compra subito»:
+          l'escrow si paga in un tocco. La stringa resta <b>solo nel tuo
+          browser</b>, su questo dispositivo: Barattolo non la vede e non
+          la salva mai sui suoi server. Nella app del wallet imposta un
+          <b>limite di spesa</b> per questa connessione: può pagare da
+          sola, il tetto lo decidi tu.</div>
+        <div id="nwcStato"></div>
+      </div>
       <div class="section-label" style="padding:26px 0 0">I tuoi annunci in vetrina</div>
       <div id="myListings" style="margin-top:12px"></div>
       <div id="adminStats"></div>
@@ -686,7 +699,7 @@ function go(view){
   el('nav-'+(['dettaglio','negozio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
     ?.classList.add('active');
   if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
-  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); }
+  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); }
   window.scrollTo(0,0);
 }
 
@@ -1897,6 +1910,149 @@ function bottoneLoginNostr(){
   btn.textContent = '🟣 …o entra con Nostr';
   btn.onclick = apriNostrSheet;
   el('demoBanner').appendChild(btn);
+}
+
+/* ---------------- wallet NWC (Nostr Wallet Connect) ---------------- */
+/* «Compra subito»: il wallet dell'utente paga da solo la invoice
+   dell'escrow — stessa invoice, stesso escrow, cambia solo chi paga.
+   La stringa nostr+walletconnect:// contiene un secret che PUÒ
+   SPENDERE (fino al budget scelto nella app del wallet): per questo
+   vive SOLO qui, nel localStorage del dispositivo, e non viene MAI
+   mandata al server — stessa filosofia della nsec solo-in-pagina.
+   Il protocollo (NIP-47) è il gemello del bunker NIP-46 qui sopra:
+   richieste cifrate su un relay, risposte cifrate indietro. */
+const NWC_CHIAVE = 'barattolo_nwc';
+
+function walletNwc(){
+  try { return JSON.parse(localStorage.getItem(NWC_CHIAVE)) || null; }
+  catch(e){ return null; }          // dato corrotto = nessun wallet
+}
+
+/* Interroga il "biglietto da visita" del wallet (evento kind-13194):
+   conferma che la stringa funziona, che il wallet sa fare pay_invoice
+   e quale cifratura parla (nip44 se la dichiara, altrimenti la nip04
+   storica di NWC). Nessun pagamento: solo una lettura. */
+async function infoNwc(stringa){
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const con = NT.nip47.parseConnectionString(stringa.trim());
+  if (!/^[0-9a-f]{64}$/i.test(con.secret || ''))
+    throw new Error('nella stringa manca un secret valido');
+  const walletPub = con.pubkey.toLowerCase();
+  let relay = null;
+  for (const r of con.relays) {
+    try { relay = await NT.Relay.connect(r); break; } catch(e){}
+  }
+  if (!relay) throw new Error('il relay del wallet non è raggiungibile');
+  try {
+    const ev = await new Promise((ok, no)=>{
+      const t = setTimeout(()=>no(new Error('il wallet non risponde sul suo relay')), 10000);
+      relay.subscribe([{kinds:[13194], authors:[walletPub]}], {
+        onevent(e){ clearTimeout(t); ok(e); },
+        oneose(){ clearTimeout(t); no(new Error('il wallet non pubblica il suo evento info: stringa giusta?')); },
+      });
+    });
+    const metodi = (ev.content || '').split(/[\s,]+/);
+    if (!metodi.includes('pay_invoice'))
+      throw new Error('questa connessione non permette pay_invoice');
+    const cifratura = (ev.tags || []).some(tag=>tag[0]==='encryption' && /nip44/.test(tag[1]||''))
+      ? 'nip44' : 'nip04';
+    return {pubkey: walletPub, relays: con.relays, cifratura};
+  } finally { try { relay.close(); } catch(e){} }
+}
+
+/* Il telefono col wallet: gemello di firmatarioBunker, ma coi kind
+   NWC (richiesta 23194, risposta 23195) e la risposta agganciata
+   al tag "e" = id dell'evento richiesta (il bunker usa msg.id). */
+async function clientNwc(dati){
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const con = NT.nip47.parseConnectionString(dati.stringa.trim());
+  const walletPub = con.pubkey.toLowerCase();
+  const sk = NT.utils.hexToBytes(con.secret);
+  const pubClient = NT.getPublicKey(sk);
+  const con44 = dati.cifratura === 'nip44'
+    ? NT.nip44.getConversationKey(sk, walletPub) : null;
+  const cifra   = t => con44 ? NT.nip44.encrypt(t, con44) : NT.nip04.encrypt(sk, walletPub, t);
+  const decifra = t => con44 ? NT.nip44.decrypt(t, con44) : NT.nip04.decrypt(sk, walletPub, t);
+  let relay = null;
+  for (const r of con.relays) {
+    try { relay = await NT.Relay.connect(r); break; } catch(e){}
+  }
+  if (!relay) throw new Error('il relay del wallet non è raggiungibile');
+  const attese = {};   // id evento richiesta -> {ok, no} della Promise
+  relay.subscribe([{kinds:[23195], '#p':[pubClient]}], {onevent(ev){
+    const rif = (ev.tags.find(tag=>tag[0]==='e') || [])[1];
+    const at = attese[rif];
+    if (!at) return;
+    let msg;
+    try { msg = JSON.parse(decifra(ev.content)); } catch(e){ return; }
+    delete attese[rif];
+    if (msg.error) at.no(Object.assign(
+      new Error(msg.error.message || msg.error.code || 'il wallet ha rifiutato'),
+      {code: msg.error.code}));
+    else at.ok(msg.result || {});
+  }});
+  function chiama(metodo, params, timeoutMs){
+    return new Promise((ok, no)=>{
+      const ev = NT.finalizeEvent({kind:23194,
+        created_at: Math.floor(Date.now()/1000), tags:[['p', walletPub]],
+        content: cifra(JSON.stringify({method:metodo, params}))}, sk);
+      attese[ev.id] = {ok, no};
+      relay.publish(ev).catch(()=>{});
+      setTimeout(()=>{ if (attese[ev.id]) { delete attese[ev.id];
+        no(new Error('il wallet non risponde')); } }, timeoutMs || 30000);
+    });
+  }
+  return {
+    paga:   (bolt11) => chiama('pay_invoice', {invoice: bolt11}),
+    chiudi: () => { try { relay.close(); } catch(e){} },
+  };
+}
+
+async function collegaWallet(){
+  haptic();
+  if (DEMO) { toast('Nel demo il wallet non si collega: prova nell\'app vera ⚡'); return; }
+  const stringa = el('nwcInput').value.trim();
+  if (!stringa) { toast('Incolla la stringa del tuo wallet (nostr+walletconnect://…)'); return; }
+  if (!/^nostr\+?walletconnect:\/\//i.test(stringa)) {
+    toast('La stringa NWC inizia con nostr+walletconnect://', 5000); return;
+  }
+  toast('⚡ Busso al wallet… qualche secondo', 6000);
+  try {
+    const info = await infoNwc(stringa);
+    localStorage.setItem(NWC_CHIAVE, JSON.stringify({
+      stringa, pubkey: info.pubkey, relays: info.relays,
+      cifratura: info.cifratura, collegato: Date.now()}));
+    el('nwcInput').value = '';        // via dal campo: ora vive in localStorage
+    renderWallet();
+    toast('⚡ Wallet collegato! Sugli annunci ora trovi «Compra subito»', 5000);
+  } catch(e){
+    toast(`Collegamento non riuscito: ${e.message || 'riprova'}`, 6000);
+  }
+}
+
+function scollegaWallet(){
+  haptic();
+  localStorage.removeItem(NWC_CHIAVE);
+  renderWallet();
+  toast('Wallet scollegato. Per pulizia completa revoca la connessione anche nella app del wallet', 5000);
+}
+
+/* Mostra lo stato nel profilo: collegato (con Scollega) o il campo
+   per incollare la stringa. In demo il blocco sparisce del tutto. */
+function renderWallet(){
+  const blocco = el('nwcBlocco');
+  if (!blocco) return;
+  if (DEMO) { blocco.style.display = 'none'; return; }
+  const w = walletNwc();
+  el('nwcCampo').style.display = w ? 'none' : '';
+  el('nwcBottone').style.display = w ? 'none' : '';
+  el('nwcStato').innerHTML = w ? `
+    <div style="margin-top:24px;font-size:13px;font-weight:800;color:var(--trust)">
+      ⚡ Wallet collegato <span class="mono">${esc((w.pubkey||'').slice(0,8))}…</span>
+      · solo su questo dispositivo</div>
+    <button class="btn ghost" style="margin-top:8px" onclick="scollegaWallet()">Scollega il wallet</button>` : '';
 }
 
 /* Link diretto a un negozio (barattolo.store/negozio/...): il server
