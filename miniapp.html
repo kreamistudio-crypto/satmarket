@@ -2023,10 +2023,31 @@ function walletNwc(){
   catch(e){ return null; }          // dato corrotto = nessun wallet
 }
 
-/* Interroga il "biglietto da visita" del wallet (evento kind-13194):
-   conferma che la stringa funziona, che il wallet sa fare pay_invoice
-   e quale cifratura parla (nip44 se la dichiara, altrimenti la nip04
-   storica di NWC). Nessun pagamento: solo una lettura. */
+/* Il "biglietto da visita" del wallet (evento kind-13194), SE esiste:
+   dice quale cifratura parla. Solo un aiuto, non un requisito. */
+async function leggiEventoInfo(NT, relays, walletPub){
+  let relay = null;
+  for (const r of relays) {
+    try { relay = await NT.Relay.connect(r); break; } catch(e){}
+  }
+  if (!relay) throw new Error('il relay del wallet non è raggiungibile');
+  try {
+    return await new Promise((ok, no)=>{
+      const t = setTimeout(()=>no(new Error('nessuna risposta')), 5000);
+      relay.subscribe([{kinds:[13194], authors:[walletPub]}], {
+        onevent(e){ clearTimeout(t); ok(e); },
+        oneose(){ clearTimeout(t); no(new Error('non pubblicato')); },
+      });
+    });
+  } finally { try { relay.close(); } catch(e){} }
+}
+
+/* Valida il collegamento con una STRETTA DI MANO vera: una chiamata
+   get_info via NIP-47. Prova relay, secret e cifratura in un colpo
+   solo. L'evento info è solo la prima scelta per scoprire la
+   cifratura: Coinos e altri non lo pubblicano affatto (verificato
+   lug 2026), quindi senza si prova nip04 (il default storico di NWC)
+   e poi nip44. Nessun pagamento: solo una domanda di cortesia. */
 async function infoNwc(stringa){
   await caricaNostrTools();
   const NT = window.NostrTools;
@@ -2034,26 +2055,42 @@ async function infoNwc(stringa){
   if (!/^[0-9a-f]{64}$/i.test(con.secret || ''))
     throw new Error('nella stringa manca un secret valido');
   const walletPub = con.pubkey.toLowerCase();
-  let relay = null;
-  for (const r of con.relays) {
-    try { relay = await NT.Relay.connect(r); break; } catch(e){}
-  }
-  if (!relay) throw new Error('il relay del wallet non è raggiungibile');
+  let preferita = null;
   try {
-    const ev = await new Promise((ok, no)=>{
-      const t = setTimeout(()=>no(new Error('il wallet non risponde sul suo relay')), 10000);
-      relay.subscribe([{kinds:[13194], authors:[walletPub]}], {
-        onevent(e){ clearTimeout(t); ok(e); },
-        oneose(){ clearTimeout(t); no(new Error('il wallet non pubblica il suo evento info: stringa giusta?')); },
-      });
-    });
-    const metodi = (ev.content || '').split(/[\s,]+/);
-    if (!metodi.includes('pay_invoice'))
-      throw new Error('questa connessione non permette pay_invoice');
-    const cifratura = (ev.tags || []).some(tag=>tag[0]==='encryption' && /nip44/.test(tag[1]||''))
+    const ev = await leggiEventoInfo(NT, con.relays, walletPub);
+    preferita = (ev.tags || []).some(tag=>tag[0]==='encryption' && /nip44/.test(tag[1]||''))
       ? 'nip44' : 'nip04';
-    return {pubkey: walletPub, relays: con.relays, cifratura};
-  } finally { try { relay.close(); } catch(e){} }
+    console.log('🟪 [nwc] evento info trovato, cifratura dichiarata:', preferita);
+  } catch(e){
+    console.log('🟪 [nwc] niente evento info (' + e.message + '): stringo la mano direttamente');
+    if (/relay/.test(e.message || '')) throw e;   // relay giù: inutile insistere
+  }
+  const daProvare = preferita ? [preferita] : ['nip04', 'nip44'];
+  let ultimo = null;
+  for (const cifratura of daProvare) {
+    let cliente = null;
+    try {
+      cliente = await clientNwc({stringa, cifratura});
+      const info = await cliente.info(12000);
+      console.log('🟪 [nwc] il wallet risponde in ' + cifratura + ':', info);
+      if (Array.isArray(info.methods) && info.methods.length && !info.methods.includes('pay_invoice'))
+        throw Object.assign(new Error('questa connessione non permette pay_invoice'), {definitivo: true});
+      return {pubkey: walletPub, relays: con.relays, cifratura};
+    } catch(e){
+      if (e.definitivo) throw e;
+      if (e.code) {
+        /* il wallet ha RISPOSTO (pur con un errore): relay, secret e
+           cifratura funzionano — per il collegamento basta e avanza */
+        console.log('🟪 [nwc] il wallet risponde in ' + cifratura + ' (errore ' + e.code + '): connessione viva');
+        return {pubkey: walletPub, relays: con.relays, cifratura};
+      }
+      console.log('🟪 [nwc] con ' + cifratura + ' non risponde: ' + (e.message || e));
+      ultimo = e;
+    } finally { if (cliente) cliente.chiudi(); }
+  }
+  throw new Error(/relay/.test((ultimo && ultimo.message) || '')
+    ? ultimo.message
+    : 'il wallet non risponde alla stretta di mano (get_info): secret giusto?');
 }
 
 /* Il telefono col wallet: gemello di firmatarioBunker, ma coi kind
@@ -2101,6 +2138,7 @@ async function clientNwc(dati){
   }
   return {
     paga:   (bolt11) => chiama('pay_invoice', {invoice: bolt11}),
+    info:   (timeoutMs) => chiama('get_info', {}, timeoutMs),
     chiudi: () => { try { relay.close(); } catch(e){} },
   };
 }
