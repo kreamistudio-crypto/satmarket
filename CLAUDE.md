@@ -120,6 +120,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `/vendor/nostr.js` solo per bunker/nsec. `barraWeb` con avviso
   onesto per chi entra da Nostr (niente avvisi Telegram, per ora);
   foglio `#collegaSheet` per la proposta di collegamento.
+  Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
+  da un utente che entra in un template `innerHTML` DEVE passarci
+  (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
+  npub che finiscono dentro stringhe JS negli onclick passano invece
+  dal filtro-alfabeto in `mapListing`/`mapOrder` (l'entity-encoding lì
+  non basterebbe). Obbligo nato col cantiere NWC: in localStorage vive
+  una credenziale di spesa.
+  Compra subito (NWC): la stringa `nostr+walletconnect://` incollata
+  nel profilo (scheda Vendi) vive SOLO in `localStorage['barattolo_nwc']`
+  del dispositivo, MAI trasmessa al server (stessa filosofia della nsec
+  solo-in-pagina: il secret NWC può spendere, fino al budget scelto nel
+  wallet — la UI consiglia di impostarlo). Al collegamento `infoNwc()`
+  valida la stringa leggendo l'evento info del wallet (kind 13194:
+  relay ok, `pay_invoice` permesso, cifratura nip44 se dichiarata nel
+  tag `encryption`, altrimenti nip04 storica). `clientNwc()` è il
+  gemello NIP-47 del bunker NIP-46: richieste kind-23194 cifrate sul
+  relay del wallet, risposte 23195 agganciate per tag `e` = id della
+  richiesta (il bunker usa msg.id). `compraSubito()`: conferma
+  esplicita → ordine+invoice IDENTICI al flusso manuale → poll su
+  LNbits subito attivo (è LUI la fonte di verità del successo, mai la
+  risposta del wallet) → `pay_invoice`. Wallet muto o in errore =
+  ripiego sul paySheet con la STESSA invoice e lo stesso ordine (mai
+  doppioni; reaper 30 min per i non pagati). Bottone ⚡ solo con
+  wallet collegato e mai in DEMO/VETRINA; senza wallet tutto è come
+  prima.
   Vista negozio: il blocco venditore nel dettaglio è cliccabile →
   profilo + griglia dei suoi annunci (card riusate via `cardHTML`);
   all'avvio `avvia()` legge `/negozio/...` da `location.pathname` e
@@ -175,8 +200,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    di sfida (fatto, lug 2026: la nsec incollata nel login web firma
    SOLO nella pagina, mai trasmessa né salvata, e la UI la sconsiglia
    a favore di estensione/bunker — è l'estensione approvata della
-   scala, NON un'eccezione) → mai custodia di segreti altrui, mai
-   firme che richiedano di consegnare chiavi al server.
+   scala, NON un'eccezione) → wallet NWC solo-nel-browser (lug 2026:
+   la stringa nostr+walletconnect:// è una credenziale di SPESA e
+   vive solo in localStorage del dispositivo, mai sul server — un
+   suo salvataggio server-side, anche cifrato, farebbe della
+   piattaforma il custode dei wallet di tutti: da respingere) →
+   mai custodia di segreti altrui, mai firme che richiedano di
+   consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
    `/foto/*`, `/vendor/nostr.js` (file singolo) e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
@@ -214,7 +244,11 @@ Telegram Login Widget (sessioni cookie, app completa dal browser,
 vedi Architettura — ricordarsi `/setdomain` su BotFather); login web
 con Nostr (estensione NIP-07, bunker NIP-46, nsec solo-in-pagina;
 tg_id negativi e npub_accesso, vedi Architettura — gli utenti Nostr
-per ora restano senza notifiche: le vedono nei loro Affari).
+per ora restano senza notifiche: le vedono nei loro Affari); scudo
+anti-XSS `esc()` su tutti i template; Compra subito col wallet NWC
+(NIP-47 lato client, secret solo in localStorage, vedi Architettura
+— il percorso felice va collaudato con un wallet vero a budget
+minuscolo: in locale è verificato il ripiego, non il pagamento).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
-verificato via API corrieri, feedback/stelle, NWC, escrow on-chain
+verificato via API corrieri, feedback/stelle, escrow on-chain
 2-di-3, parere legale MiCA prima di crescere.
