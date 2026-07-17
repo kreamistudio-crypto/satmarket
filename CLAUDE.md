@@ -58,10 +58,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nelle SELECT di `/api/search` e `/api/listings/miei`. La route
   `GET /negozio/{chi}` serve la solita miniapp.html (no-cache): è il
   link condivisibile barattolo.store/negozio/{username|codice}.
+  Login web dal browser: `POST /api/login/telegram` riceve i dati
+  firmati dal Login Widget ufficiale e apre una sessione — tabella
+  `sessioni` (in DB SOLO l'hash SHA-256 del token), cookie
+  `barattolo_sessione` HttpOnly + Secure (fuori collaudo) +
+  SameSite=Lax, 30 giorni (`GIORNI_SESSIONE_WEB`), purga
+  nell'orologio. ATTENZIONE, due derivazioni di chiave DIVERSE:
+  widget = `SHA256(BOT_TOKEN)` (`verifica_login_widget`, auth_date
+  entro 5 min), Mini App = `HMAC("WebAppData", BOT_TOKEN)`.
+  `verifica_utente(init_data, sessione)` cade sul cookie SOLO a
+  header vuoto (initData invalido resta 401); ogni endpoint dichiara
+  `barattolo_sessione: str = Cookie("")` esplicitamente — niente
+  middleware che concede auth. `guardia_csrf` (middleware) può solo
+  NEGARE: sui metodi non-sicuri via cookie esige Origin ≡ Host
+  (login incluso). `POST /api/logout` chiude solo la sessione del
+  browser corrente. Il ramo collaudo di `/api/login/telegram`
+  (`{"collaudo": true}`) vale solo con MODALITA_COLLAUDO.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
-  Quattro modalità, decise in `avvia()`: app vera dentro Telegram (auth
-  via initData); collaudo locale (identità finte); VETRINA pubblica in
-  sola lettura dal browser (annunci veri, ogni azione apre l'invito verso
+  Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
+  via initData); WEB dal browser (cookie di sessione, app completa:
+  `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
+  cookie viene PRIMA di quello collaudo); collaudo locale (identità
+  finte + bottone "cookie web" per provare il login web senza widget);
+  VETRINA pubblica in sola lettura dal browser (annunci veri, banner
+  col widget "Entra con Telegram" — `data-request-access=write` chiede
+  il permesso per gli avvisi — e ogni azione apre l'invito verso
   @ilbarattolobot); demo coi dati finti come riserva se il backend tace.
   Vista negozio: il blocco venditore nel dettaglio è cliccabile →
   profilo + griglia dei suoi annunci (card riusate via `cardHTML`);
@@ -84,6 +105,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 - Dominio: https://barattolo.store — Bot: @ilbarattolobot (BotFather URL
   con `?v=2`, innocuo). Header anti-cache già attivi su `/` e
   `/miniapp.html`: non rimuoverli.
+- Il Login Widget esige il dominio registrato: BotFather → `/setdomain`
+  su @ilbarattolobot → `barattolo.store` (senza, il bottone non compare;
+  su localhost non compare mai: si collauda col bottone "cookie web").
 - Deploy: commit+push su main → sul server `cd satmarket && git pull &&
   systemctl restart barattolo`. Config e database NON viaggiano mai.
 - La verifica npub richiede `websocket-client` (pip) nell'ambiente del
@@ -134,7 +158,9 @@ nel profilo e sugli annunci; verifica della npub via nota pubblica
 (badge 🟣✓, vedi Architettura); pubblicazione degli annunci verso
 Nostr con la chiave della piattaforma (NIP-99 + NIP-09, vedi
 Architettura); pagina negozio del venditore, interna e pubblica
-(`/negozio/{username|codice}`, vedi Architettura).
+(`/negozio/{username|codice}`, vedi Architettura); login web col
+Telegram Login Widget (sessioni cookie, app completa dal browser,
+vedi Architettura — ricordarsi `/setdomain` su BotFather).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, feedback/stelle, NWC, escrow on-chain
 2-di-3, parere legale MiCA prima di crescere.
