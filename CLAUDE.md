@@ -19,8 +19,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `pubblica()`: filtro `PAROLE_VIETATE` (parole intere su testo
   normalizzato), parere AI opzionale (fail-open se la chiave manca o
   la chiamata fallisce), notifica agli admin di ogni annuncio +
-  endpoint admin di rimozione. I casi ambigui (cannabis light,
-  pistola sparachiodi...) NON vanno nella lista parole: li valuta l'AI.
+  endpoint admin di rimozione e di statistiche (`/api/admin/stats`,
+  card 📊 in fondo a Vendi, solo moderatori). I casi ambigui (cannabis
+  light, pistola sparachiodi...) NON vanno nella lista parole: li
+  valuta l'AI.
   Badge Nostr: colonna `utenti.npub` auto-dichiarata via `/api/me/npub`
   (formato bech32, rifiuta le nsec) + verifica con NOTA PUBBLICA:
   `/api/me/npub/verifica-avvia` genera un codice (vale 1h), l'utente lo
