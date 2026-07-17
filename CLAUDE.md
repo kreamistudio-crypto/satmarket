@@ -35,6 +35,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `venditore_npub` e `venditore_npub_verificata` sono in `CAMPI_VETRINA`
   (pubblici per natura) e nelle SELECT di `/api/search` e
   `/api/listings/miei`.
+  Presenza Nostr della piattaforma: `NOSTR_NSEC_PIATTAFORMA` in config
+  (segnaposto = funzione spenta, fail-open). Alla pubblicazione il
+  server firma un evento NIP-99 (kind 30402, tag `d` stabile
+  `barattolo-{id}`) con coincurve (Schnorr BIP-340) e lo manda ai 4
+  relay (stesso pattern sync→`asyncio.to_thread` della verifica);
+  venduto (ordine locked) → ripubblica `status sold`, rimborso →
+  di nuovo `active`, rimosso → deletion NIP-09 (kind 5). La colonna
+  `annunci.nostr_event_id` traccia l'ultimo evento; i ganci di
+  aggiornamento agiscono solo se è valorizzata, così gli annunci
+  importati (contatto_nostr pieno) restano fuori. Tutto in
+  `asyncio.create_task`: mai errori né attese per l'utente. In
+  collaudo gli eventi si firmano ma si stampano soltanto
+  (`🟣 [nostr simulato]`).
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Quattro modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); collaudo locale (identità finte); VETRINA pubblica in
@@ -59,6 +72,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   systemctl restart barattolo`. Config e database NON viaggiano mai.
 - La verifica npub richiede `websocket-client` (pip) nell'ambiente del
   servizio: se manca, il server parte lo stesso e l'endpoint risponde 503.
+- La pubblicazione su Nostr richiede anche `coincurve`: installarla con
+  `pip install --only-binary :all: coincurve` (le versioni 20/21 senza
+  wheel provano a compilare e falliscono; la 19.0.1 ha wheel ovunque).
+  Se manca, o se `NOSTR_NSEC_PIATTAFORMA` resta il segnaposto, la
+  funzione Nostr si spegne da sola e il resto vive normalmente.
 
 ## Regole ferree
 
@@ -96,7 +114,9 @@ Fatti (lug 2026): banner sulla demo browser; vetrina pubblica in sola
 lettura (annunci veri dal browser, azioni → invito al bot); moderazione
 contenuti a tre strati (parole + AI + admin); badge npub auto-dichiarato
 nel profilo e sugli annunci; verifica della npub via nota pubblica
-(badge 🟣✓, vedi Architettura).
+(badge 🟣✓, vedi Architettura); pubblicazione degli annunci verso
+Nostr con la chiave della piattaforma (NIP-99 + NIP-09, vedi
+Architettura).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
-verificato via API corrieri, feedback/stelle, pubblicazione verso Nostr,
-NWC, escrow on-chain 2-di-3, parere legale MiCA prima di crescere.
+verificato via API corrieri, feedback/stelle, NWC, escrow on-chain
+2-di-3, parere legale MiCA prima di crescere.
