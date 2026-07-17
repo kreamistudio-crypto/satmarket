@@ -501,6 +501,46 @@
     <button class="btn ghost" onclick="closeSheet()">Continua a guardare</button>
   </div>
 
+  <!-- ============ SHEET LOGIN NOSTR ============ -->
+  <div class="sheet" id="nostrSheet">
+    <div class="grab"></div>
+    <h3>🟣 Entra con Nostr</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600">
+      Dimostri di possedere la tua chiave firmando una sfida.
+      La chiave privata <b>non viene mai inviata</b> a nessuno.
+    </div>
+    <button class="btn primary" style="margin-top:14px" onclick="loginNostrEstensione()">🧩 Con l'estensione (consigliato)</button>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-weight:700;font-size:14px;padding:6px 0">🔗 Con un bunker remoto (NIP-46)</summary>
+      <div class="field" style="margin-top:8px">
+        <input id="bunkerUri" placeholder="bunker://…" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn primary" onclick="loginNostrBunker()">Collega il bunker</button>
+    </details>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-weight:700;font-size:14px;padding:6px 0">🔑 Con la chiave privata (sconsigliato)</summary>
+      <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:6px 0 8px">
+        La chiave resta SOLO in questa pagina: non viene mai inviata né
+        salvata da nessuna parte. Ma incollare una nsec è comunque
+        rischioso: se puoi, usa l'estensione o il bunker.
+      </div>
+      <div class="field">
+        <input id="nsecInput" type="password" placeholder="nsec1…" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn primary" onclick="loginNostrNsec()">Entra</button>
+    </details>
+    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET COLLEGAMENTO (npub già verificata) ============ -->
+  <div class="sheet" id="collegaSheet">
+    <div class="grab"></div>
+    <h3>🟣 Ti conosciamo già!</h3>
+    <div id="collegaTesto" style="font-size:13px;color:var(--muted);font-weight:600"></div>
+    <button class="btn primary" style="margin-top:14px" onclick="accettaCollega()">Usa l'account esistente</button>
+    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div id="attesaOverlay"><div class="attesa-card"><span class="attesa-clessidra">⏳</span> Invio sats in corso…</div></div>
 </div>
@@ -886,6 +926,8 @@ function closeSheet(){
   el('sheetBg').classList.remove('open');
   el('paySheet').classList.remove('open');
   el('invitoSheet').classList.remove('open');
+  el('nostrSheet').classList.remove('open');
+  el('collegaSheet').classList.remove('open');
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
@@ -1583,16 +1625,23 @@ const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — entra con Telegram
 
 /* ---------------- login web (browser + cookie) ---------------- */
 /* Barra di benvenuto del login web: saluto, invito ad aprire il bot
-   (senza quello Telegram non può recapitare gli avvisi) e l'uscita. */
+   (senza quello Telegram non può recapitare gli avvisi) e l'uscita.
+   Chi è entrato con Nostr (tg_id negativo) non ha una chat col bot:
+   glielo diciamo onestamente invece di fingere che gli avvisi
+   arrivino. */
 function barraWeb(nome){
   const b = el('demoBanner');
   b.className = 'demo-banner demo-vera';
   b.style.display = 'block';
+  const avvisi = myTgId < 0
+    ? `sei entrato con Nostr: per ora gli avvisi arrivano solo su`
+      + ` Telegram o, a breve, via DM Nostr — ricontrolla i tuoi`
+      + ` Affari di tanto in tanto`
+    : `Per ricevere gli avvisi sugli ordini apri una volta `
+      + `<a href="https://t.me/ilbarattolobot" target="_blank"`
+      + ` rel="noopener">@ilbarattolobot</a>`;
   b.innerHTML =
-    `<div>👋 Ciao ${nome} — sei su Barattolo dal browser. Per ricevere`
-    + ` gli avvisi sugli ordini apri una volta `
-    + `<a href="https://t.me/ilbarattolobot" target="_blank"`
-    + ` rel="noopener">@ilbarattolobot</a></div>`
+    `<div>👋 Ciao ${nome} — sei su Barattolo dal browser. ${avvisi}</div>`
     + `<button class="demo-cta" onclick="esciWeb()"`
     + ` style="border:none;cursor:pointer">Esci</button>`;
 }
@@ -1640,6 +1689,204 @@ async function provaLoginWeb(){
   location.reload();
 }
 
+/* ---------------- login Nostr (estensione, bunker, nsec) ----------------
+   Un firmatario è { pubkey: async () => hex, firma: async (evento) =>
+   eventoFirmato }: il resto del codice chiama solo firmatario.firma()
+   senza sapere se dietro c'è l'estensione, il bunker o la chiave
+   incollata. Serve SOLO durante il login: dopo, comanda il cookie.
+   REGOLA FERREA: la nsec non lascia mai questa pagina. */
+
+/* La libreria nostr-tools (bech32, secp256k1, cifratura NIP-44) si
+   carica dal NOSTRO server (/vendor/nostr.js: mai da una CDN) e solo
+   quando serve: per l'estensione NIP-07 non serve affatto. */
+let nostrToolsPromessa = null;
+function caricaNostrTools(){
+  if (window.NostrTools) return Promise.resolve();
+  if (!nostrToolsPromessa) nostrToolsPromessa = new Promise((ok, no)=>{
+    const s = document.createElement('script');
+    s.src = `${FOTO_BASE}/vendor/nostr.js?v=2.23.12`;
+    s.onload = ok;
+    s.onerror = ()=>{ nostrToolsPromessa = null; no(new Error('libreria non raggiungibile')); };
+    document.head.appendChild(s);
+  });
+  return nostrToolsPromessa;
+}
+
+/* 1) Estensione NIP-07 (Alby, nos2x…): firma lei, noi non vediamo nulla */
+function firmatarioEstensione(){
+  return {
+    pubkey: () => window.nostr.getPublicKey(),
+    firma:  (evento) => window.nostr.signEvent(evento),
+  };
+}
+
+/* 2) Bunker NIP-46: le firme le fa un signer remoto. Il protocollo è
+   una chat cifrata su un relay: noi (chiave locale EFFIMERA, vive solo
+   in questa pagina) mandiamo richieste kind-24133 cifrate NIP-44, il
+   bunker risponde. Il bundle non include nip46, quindi il giro di
+   telefonate lo facciamo a mano coi suoi mattoni: sono tre chiamate. */
+async function firmatarioBunker(uri){
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const m = uri.trim().match(/^bunker:\/\/([0-9a-f]{64})\??(.*)$/i);
+  if (!m) throw new Error('URI bunker:// non valida');
+  const bunkerPub = m[1].toLowerCase();
+  const par = new URLSearchParams(m[2]);
+  const relays = par.getAll('relay');
+  if (!relays.length) throw new Error('la URI non indica nessun relay');
+  const skLocale = NT.generateSecretKey();
+  const pubLocale = NT.getPublicKey(skLocale);
+  const chiave = NT.nip44.getConversationKey(skLocale, bunkerPub);
+  let relay = null;
+  for (const r of relays) {
+    try { relay = await NT.Relay.connect(r); break; } catch(e){}
+  }
+  if (!relay) throw new Error('nessun relay del bunker raggiungibile');
+  const attese = {};   // id richiesta -> {ok, no} della Promise in corso
+  relay.subscribe([{kinds:[24133], '#p':[pubLocale]}], {onevent(ev){
+    let msg;
+    try { msg = JSON.parse(NT.nip44.decrypt(ev.content, chiave)); }
+    catch(e){ return; }               // non era per noi (o cifrario vecchio)
+    const at = attese[msg.id];
+    if (!at) return;
+    if (msg.result === 'auth_url') {  // il bunker vuole il tuo permesso
+      window.open(msg.error, '_blank');
+      toast('🔗 Autorizza Barattolo nella finestra del bunker…', 6000);
+      return;                         // la vera risposta arriverà dopo
+    }
+    delete attese[msg.id];
+    if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
+  }});
+  function chiama(metodo, params){
+    return new Promise((ok, no)=>{
+      const id = Math.random().toString(36).slice(2);
+      attese[id] = {ok, no};
+      const ev = NT.finalizeEvent({kind:24133,
+        created_at: Math.floor(Date.now()/1000), tags:[['p', bunkerPub]],
+        content: NT.nip44.encrypt(JSON.stringify({id, method:metodo, params}), chiave)},
+        skLocale);
+      relay.publish(ev).catch(()=>{});
+      setTimeout(()=>{ if (attese[id]) { delete attese[id];
+        no(new Error('il bunker non risponde')); } }, 30000);
+    });
+  }
+  await chiama('connect', [bunkerPub, par.get('secret') || '']);
+  return {
+    pubkey: () => chiama('get_public_key', []),
+    firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)])),
+    chiudi: () => { try { relay.close(); } catch(e){} },
+  };
+}
+
+/* 3) nsec incollata: firma IN QUESTA PAGINA e basta. La chiave vive
+   nella closure, firma UNA volta e si azzera subito dopo: mai inviata,
+   mai in localStorage, mai in un cookie. */
+async function firmatarioNsec(nsec){
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const dec = NT.nip19.decode(nsec.trim());
+  if (dec.type !== 'nsec') throw new Error('non è una nsec');
+  const sk = dec.data;
+  return {
+    pubkey: async () => NT.getPublicKey(sk),
+    firma:  async (evento) => {
+      const firmato = NT.finalizeEvent(evento, sk);
+      sk.fill(0);                     // la chiave ha già finito il suo lavoro
+      return firmato;
+    },
+  };
+}
+
+/* Il flusso, uguale per tutti i firmatari: sfida dal server -> firma
+   dell'evento kind-22242 (stile NIP-42) -> il server verifica e apre
+   la sessione cookie, la stessa del login Telegram. */
+async function entraConNostr(firmatario){
+  const rs = await fetch(`${API_BASE}/login/nostr/sfida`);
+  const ds = await rs.json().catch(()=>({}));
+  if (!rs.ok) { toast(ds.detail || 'Login Nostr non disponibile', 6000); return; }
+  const evento = await firmatario.firma({
+    kind: 22242, created_at: Math.floor(Date.now()/1000), content: '',
+    tags: [['relay', location.origin], ['challenge', ds.sfida]]});
+  const r = await fetch(`${API_BASE}/login/nostr`, {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({evento})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Accesso non riuscito, riprova', 6000); return; }
+  if (d.collega) { apriCollega(d.collega); return; }
+  location.reload();
+}
+
+async function loginNostrEstensione(){
+  if (!window.nostr) {
+    toast('Nessuna estensione Nostr trovata (es. Alby, nos2x)', 6000);
+    return;
+  }
+  try { await entraConNostr(firmatarioEstensione()); }
+  catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
+}
+async function loginNostrBunker(){
+  let f = null;
+  try {
+    toast('🔗 Chiamo il bunker…');
+    f = await firmatarioBunker(el('bunkerUri').value);
+    await entraConNostr(f);
+  } catch(e){ toast(`Bunker: ${e.message || 'non risponde'}`, 6000); }
+  finally { if (f) f.chiudi(); }
+}
+async function loginNostrNsec(){
+  const nsec = el('nsecInput').value;
+  el('nsecInput').value = '';         // via subito dal campo, comunque vada
+  if (!nsec.trim().startsWith('nsec1')) {
+    toast('Serve la chiave privata (inizia con nsec1)', 5000);
+    return;
+  }
+  try { await entraConNostr(await firmatarioNsec(nsec)); }
+  catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
+}
+
+/* La npub è già verificata (🟣✓) su un account Telegram: la firma
+   dimostra il possesso, quindi proponiamo di entrare COL SUO account.
+   Rifiutando, il login si annulla e basta: mai account doppi. */
+let bigliettoCollega = null;
+function apriCollega(c){
+  bigliettoCollega = c.biglietto;
+  el('collegaTesto').textContent =
+    `Questa chiave Nostr è già verificata sull'account Telegram di ${c.nome}`
+    + (c.username ? ` (@${c.username})` : '')
+    + `. Vuoi entrare con quell'account? Se rifiuti, il login si annulla:`
+    + ` niente account doppi con la stessa chiave.`;
+  el('nostrSheet').classList.remove('open');
+  el('sheetBg').classList.add('open');
+  el('collegaSheet').classList.add('open');
+}
+async function accettaCollega(){
+  const r = await fetch(`${API_BASE}/login/nostr/collega`, {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({biglietto: bigliettoCollega})});
+  if (!r.ok) {
+    toast('Invito scaduto: riprova il login', 6000);
+    closeSheet();
+    return;
+  }
+  location.reload();
+}
+
+function apriNostrSheet(){
+  el('sheetBg').classList.add('open');
+  el('nostrSheet').classList.add('open');
+}
+/* Il bottone gemello del widget Telegram, nel banner della vetrina.
+   A differenza del widget non ha bisogno di domini registrati:
+   funziona anche in locale. */
+function bottoneLoginNostr(){
+  const btn = document.createElement('button');
+  btn.className = 'demo-cta';
+  btn.style.cssText = 'border:none;cursor:pointer;margin-top:8px';
+  btn.textContent = '🟣 …o entra con Nostr';
+  btn.onclick = apriNostrSheet;
+  el('demoBanner').appendChild(btn);
+}
+
 /* Link diretto a un negozio (barattolo.store/negozio/...): il server
    serve sempre la stessa Mini App, qui leggiamo l'URL e apriamo la
    vista giusta. Una volta sola: cambiando identità nel collaudo non
@@ -1663,6 +1910,7 @@ async function avviaVetrina(){
     VETRINA = true; DEMO = false; orders = [];
     mostraBanner(BANNER_VETRINA);
     bottoneLoginTelegram();
+    bottoneLoginNostr();
     renderGrid();
     apriNegozioDaUrl();
   } catch (e) {
@@ -1711,7 +1959,8 @@ async function avvia(){
       b.style.display = 'block';
       b.innerHTML = `🧪 COLLAUDO con sats veri — sei: `
         + btn(111,'Compratore') + btn(222,'Venditore') + btn(999,'Admin')
-        + `<button onclick="provaLoginWeb()" title="Prova il login web: cookie di sessione al posto dell'header" style="font:inherit;border:1px dashed #B26A0A;background:transparent;color:#B26A0A;border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🍪 web</button>`;
+        + `<button onclick="provaLoginWeb()" title="Prova il login web: cookie di sessione al posto dell'header" style="font:inherit;border:1px dashed #B26A0A;background:transparent;color:#B26A0A;border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🍪 web</button>`
+        + `<button onclick="apriNostrSheet()" title="Prova il login Nostr: qui la crittografia vera funziona anche in locale" style="font:inherit;border:1px dashed #B26A0A;background:transparent;color:#B26A0A;border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🟣 nostr</button>`;
     } else if (WEB) barraWeb(me.nome || 'amico');
     else b.style.display = 'none';
     await loadListings();
