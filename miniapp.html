@@ -147,6 +147,7 @@
     border:0;border-radius:14px;padding:15px;font:inherit;font-weight:800;font-size:15.5px;
     cursor:pointer;transition:transform .1s;
   }
+  .btn:disabled{opacity:.55;pointer-events:none}
   .btn:active{transform:scale(.98)}
   .btn.primary{background:var(--trust);color:#fff}
   .btn.orange{background:var(--sats);color:#fff}
@@ -594,6 +595,13 @@ function apriChat(username){
   window.open(`https://t.me/${username}`, '_blank');
 }
 
+/* Bottone chat solo se lo username esiste: senza, il link t.me
+   porterebbe a "questo account non ha uno username" */
+function bottoneChat(username, chi, soggetto){
+  if (username) return `<button class="btn ghost" onclick="apriChat('${username}')">💬 Scrivi ${chi}</button>`;
+  return `<div class="trust-note">💬 <span>${soggetto} non ha uno username Telegram pubblico, quindi la chat diretta non è disponibile. Per problemi con l'ordine c'è la disputa: interviene un moderatore.</span></div>`;
+}
+
 /* Cambio BTC/EUR aggiornato all'avvio (per il "≈ X €" sotto i prezzi) */
 let eurPerSat = 0.00092;   // valore di riserva se la rete non risponde
 function eur(sats){ return (sats * eurPerSat).toFixed(0); }
@@ -667,6 +675,7 @@ async function startBuy(){
   currentOrderId = d.ordine_id;
   el('payInvoice').textContent = d.invoice;
   /* Controllo automatico ogni 4 secondi: appena paghi, se ne accorge */
+  if (pollTimer) clearInterval(pollTimer);   /* mai due controlli accavallati */
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
 }
 
@@ -756,7 +765,9 @@ function openOrder(id){
       conReso
         ? {t:'Restituzione dell\'oggetto', d:s==='return_pending'?'L\'acquirente deve rispedire l\'oggetto al venditore':'Il reso è in viaggio verso il venditore'}
         : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso':'Disputa risolta a favore dell\'acquirente'},
-      {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, l\'annuncio torna in vetrina'},
+      o.role==='buyer'
+        ? {t:'Ti abbiamo rimborsato i sats', d:'Rimborso integrale, nessuna commissione'}
+        : {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, l\'annuncio torna in vetrina'},
     ];
     progress = {dispute:2, return_pending:2, return_shipped:2, refund:3, refunded:4}[s];
   } else {
@@ -767,13 +778,23 @@ function openOrder(id){
       {t:'Oggetto spedito',         d:o.tracking?`${o.corriere} — tracking ${o.tracking}`:'Il venditore ha consegnato al corriere'},
       {t:s==='delivered'?'Consegnato: in attesa di conferma':'Ricevuto e confermato',
        d:s==='delivered'?`Restano ~${oreRestanti} ore per confermare o aprire disputa`:(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
-      {t:'Sats sbloccati al venditore', d:'Affare concluso, feedback reciproco'},
+      o.role==='seller'
+        ? {t:'Hai incassato i tuoi sats', d:'Affare concluso: il netto (prezzo − 1%) è nel tuo wallet'}
+        : {t:'Sats sbloccati al venditore', d:'Affare concluso, feedback reciproco'},
     ];
     progress = {creato:0, locked:1, shipped:2, delivered:2, confirmed:3, released:4, annullato:-1}[s];
   }
-  const testa = s==='released'  ? {ic:'🔓', b:'Escrow completato',  d:'I sats sono stati consegnati al venditore'}
-    : s==='refunded'            ? {ic:'↩️', b:'Escrow rimborsato',  d:'I sats sono tornati all\'acquirente'}
-    : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',  d:'Disputa decisa: i sats tornano all\'acquirente'}
+  /* Le frasi di chiusura parlano a CHI legge: il venditore incassa,
+     l'acquirente viene rimborsato, gli altri osservano */
+  const testa = s==='released'  ? {ic:'🔓', b:'Escrow completato',
+      d:o.role==='seller' ? `Hai incassato ${fmt(Math.floor(o.listing.price*0.99))} sats (prezzo − 1%)`
+                          : 'I sats sono stati consegnati al venditore'}
+    : s==='refunded'            ? {ic:'↩️', b:'Escrow rimborsato',
+      d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${fmt(o.listing.price)} sats (integrale)`
+                          : 'I sats sono tornati all\'acquirente'}
+    : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',
+      d:o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
+                          : 'Disputa decisa: i sats tornano all\'acquirente'}
     : ['return_pending','return_shipped'].includes(s)
                                 ? {ic:'↩️', b:'Reso in corso',      d:'Rimborso alla restituzione: i sats restano congelati'}
     : s==='dispute'             ? {ic:'⚖️', b:'Escrow congelato',   d:'Disputa in corso: i sats restano fermi fino alla decisione'}
@@ -803,9 +824,9 @@ function openOrder(id){
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
           <div class="hint">I sats sono congelati in escrow. Ascolta le due parti, poi decidi: la scelta è definitiva.</div>
-          <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso')">↩️ Rimborsa subito l'acquirente (100%)</button>
-          <button class="btn ghost" onclick="adminResolve('reso')">📦 Rimborso previa restituzione dell'oggetto</button>
-          <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore')">⚡ Dai i sats al venditore (−1%)</button>
+          <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>
+          <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
+          <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore (−1%)</button>
         </div>`:''}
       ${o.role==='buyer' && s==='refund' ? refundPanel(o) : ''}
       ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>Disputa risolta a tuo favore: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
@@ -821,7 +842,7 @@ function openOrder(id){
         <div class="payout">
           <h4>↩️ Reso in arrivo</h4>
           <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${o.corriereReso}</b> — tracciamento <b class="mono" style="font-size:12px">${o.trackingReso}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
-          <button class="btn primary" style="margin-top:12px" onclick="resoRicevuto()">✓ Ho ricevuto il reso — rimborsa l'acquirente</button>
+          <button class="btn primary" style="margin-top:12px" onclick="resoRicevuto(this)">✓ Ho ricevuto il reso — rimborsa l'acquirente</button>
         </div>`:''}
       ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
       ${o.role==='seller' && ['locked','shipped','delivered','confirmed'].includes(s) ? payoutPanel(o) : ''}
@@ -838,13 +859,15 @@ function openOrder(id){
       ${o.role==='buyer' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">📬 È arrivato — mi prendo 72h per controllarlo</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:#B26A0A">⏳ <span><b>Pacco consegnato!</b> Controlla l'oggetto: conferma qui sotto, o apri una disputa se c'è un problema. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
-      ${o.role==='buyer' && ['shipped','delivered'].includes(s) ? `<button class="btn primary" onclick="confirmReceived()">✓ Ho ricevuto l'oggetto, sblocca i sats</button>`:''}
+      ${o.role==='buyer' && ['shipped','delivered'].includes(s) ? `<button class="btn primary" onclick="confirmReceived(this)">✓ Ho ricevuto l'oggetto, sblocca i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${o.role==='admin'
-        ? `<button class="btn ghost" onclick="apriChat('${o.usernameCompratore}')">💬 Scrivi all'acquirente</button>
-           <button class="btn ghost" style="margin-top:0" onclick="apriChat('${o.usernameVenditore}')">💬 Scrivi al venditore</button>`
-        : `<button class="btn ghost" onclick="apriChat('${o.role==='buyer'?o.usernameVenditore:o.usernameCompratore}')">💬 Scrivi ${o.role==='buyer'?'al venditore':"all'acquirente"}</button>`}
+        ? bottoneChat(o.usernameCompratore, "all'acquirente", "L'acquirente")
+          + bottoneChat(o.usernameVenditore, 'al venditore', 'Il venditore')
+        : o.role==='buyer'
+          ? bottoneChat(o.usernameVenditore, 'al venditore', 'Il venditore')
+          : bottoneChat(o.usernameCompratore, "all'acquirente", "L'acquirente")}
     </div>`;
   go('ordine');
 }
@@ -885,15 +908,15 @@ function payoutPanel(o){
         tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
         lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
-      <button class="btn orange" onclick="saveLnAddress()">⚡ Attiva incassi automatici</button>
+      <button class="btn orange" onclick="saveLnAddress(this)">⚡ Attiva incassi automatici</button>
       <div class="hint" style="margin-top:14px"><b>Oppure</b>, solo per questo ordine: genera nel tuo wallet
         una invoice di <b>esattamente ${fmt(net)} sats</b> e incollala qui.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (incolla qui la tua invoice Lightning)"></textarea>
-      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice()">${o.state==='confirmed'?'Incassa con questa invoice':'Salva invoice'}</button>
+      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice(this)">${o.state==='confirmed'?'Incassa con questa invoice':'Salva invoice'}</button>
     </div>`;
 }
 
-async function saveLnAddress(){
+async function saveLnAddress(btn){
   haptic();
   const addr = el('lnAddrInput').value.trim().toLowerCase();
   if (!addr.includes('@') || !addr.split('@')[1]?.includes('.')) {
@@ -905,11 +928,13 @@ async function saveLnAddress(){
     else toast('⚡ Incassi automatici attivati!');
     openOrder(currentOrder.id); return;
   }
+  const ripristina = bottoneInAttesa(btn);
   const r = await fetch(`${API_BASE}/me/ln-address`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({ln_address: addr})});
   const d = await r.json().catch(()=>({}));
+  ripristina();
   if (!r.ok) { toast(d.detail || 'Indirizzo non accettato, ricontrolla'); return; }
   myLnAddress = d.ln_address;
   if (d.incassi_sbloccati > 0) {
@@ -1022,7 +1047,7 @@ function refundPanel(o){
       <h4>↩️ Rimborso in elaborazione</h4>
       <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)} sats</b> in arrivo su <b>${myLnAddress}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
-      <button class="btn orange" onclick="saveSellerInvoice()">↩️ Ricevi il rimborso</button>
+      <button class="btn orange" onclick="saveSellerInvoice(this)">↩️ Ricevi il rimborso</button>
     </div>`;
   return `
     <div class="payout">
@@ -1030,15 +1055,25 @@ function refundPanel(o){
       <div class="hint">La disputa è stata risolta <b>a tuo favore</b>: ti aspettano <b class="net">${fmt(o.listing.price)} sats</b> (rimborso integrale).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
-      <button class="btn orange" onclick="saveLnAddress()">⚡ Ricevi con Lightning address</button>
+      <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>
       <div class="hint" style="margin-top:14px"><b>Oppure</b> genera nel tuo wallet una invoice di <b>esattamente ${fmt(o.listing.price)} sats</b> e incollala qui.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (incolla qui la tua invoice Lightning)"></textarea>
-      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice()">Ricevi con questa invoice</button>
+      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice(this)">Ricevi con questa invoice</button>
     </div>`;
 }
 
 /* ---- decisione admin sulle dispute ---- */
-async function adminResolve(esito){
+/* Pagare su Lightning richiede qualche secondo: il bottone lo dice,
+   così l'app non sembra bloccata. Restituisce la funzione che lo
+   ripristina (da chiamare appena arriva la risposta). */
+function bottoneInAttesa(btn){
+  if (!btn) return ()=>{};
+  const prima = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ Invio in corso…';
+  return ()=>{ btn.disabled = false; btn.innerHTML = prima; };
+}
+
+async function adminResolve(esito, btn){
   haptic();
   const msg = esito==='rimborso'
     ? 'Rimborsare SUBITO tutti i sats all\'acquirente?\n\nL\'annuncio tornerà in vetrina. La decisione è definitiva.'
@@ -1047,11 +1082,13 @@ async function adminResolve(esito){
     : 'Consegnare i sats al venditore (meno l\'1%)?\n\nLa decisione è definitiva.';
   if (!confirm(msg)) return;
   if (DEMO) { toast('Le dispute si decidono col backend attivo'); return; }
+  const ripristina = bottoneInAttesa(btn);
   const r = await fetch(`${API_BASE}/admin/orders/${currentOrder.id}/risolvi`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({esito})});
   const d = await r.json().catch(()=>({}));
+  ripristina();
   if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state = d.stato || 'dispute';
   toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato'
@@ -1061,7 +1098,7 @@ async function adminResolve(esito){
   openOrder(currentOrder.id);
 }
 
-async function saveSellerInvoice(){
+async function saveSellerInvoice(btn){
   haptic();
   const inv = el('sellerInvoice').value.trim();
   if (!inv.toLowerCase().startsWith('ln')) { toast('Incolla una invoice Lightning valida (inizia con "ln…")'); return; }
@@ -1070,11 +1107,13 @@ async function saveSellerInvoice(){
     else { currentOrder.sellerInvoice=inv; toast('✓ Invoice salvata: incasso automatico alla conferma'); }
     openOrder(currentOrder.id); return;
   }
+  const ripristina = bottoneInAttesa(btn);
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/invoice`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({invoice: inv})});
   const d = await r.json().catch(()=>({}));
+  ripristina();
   if (!r.ok) { toast(d.detail || 'Invoice non accettata, riprova'); return; }
   if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats incassati! Affare concluso ⚡'); }
   else if (d.stato==='refunded') { currentOrder.state='refunded'; toast('↩️ Rimborso in arrivo nel tuo wallet!'); }
@@ -1083,15 +1122,17 @@ async function saveSellerInvoice(){
   openOrder(currentOrder.id);
 }
 
-async function confirmReceived(){
+async function confirmReceived(btn){
   haptic();
   if (!confirm('Confermi di aver ricevuto l\'oggetto e che è tutto ok?\n\nI sats verranno sbloccati DEFINITIVAMENTE al venditore.')) return;
   if (DEMO) {
     currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); openOrder(currentOrder.id); return;
   }
+  const ripristina = bottoneInAttesa(btn);
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/conferma`, {
     method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
   const d = await r.json().catch(()=>({}));
+  ripristina();
   if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
   if (d.stato==='released') { currentOrder.state='released'; toast('🔓 Sats sbloccati al venditore!'); }
   else { currentOrder.state='confirmed'; toast('✅ Confermato! I sats partiranno appena il venditore fornisce la invoice'); }
@@ -1169,13 +1210,15 @@ async function resoSpedito(){
   toast('↩️ Reso registrato: rimborso alla consegna'); openOrder(currentOrder.id);
 }
 
-async function resoRicevuto(){
+async function resoRicevuto(btn){
   haptic();
   if (!confirm('Confermi di aver ricevuto il reso?\n\nL\'acquirente verrà rimborsato integralmente.')) return;
   if (DEMO) { currentOrder.state='refunded'; toast('↩️ Acquirente rimborsato'); openOrder(currentOrder.id); return; }
+  const ripristina = bottoneInAttesa(btn);
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/reso-ricevuto`,
     {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
   const d = await r.json().catch(()=>({}));
+  ripristina();
   if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state = d.stato || 'refund';
   toast(d.stato==='refunded' ? '↩️ Acquirente rimborsato' : '↩️ Registrato: rimborso in attesa del metodo dell\'acquirente');
