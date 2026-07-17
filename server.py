@@ -1506,7 +1506,8 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header(""),
 # firma da consegnare, MAI (regola ferrea): solo una nota pubblica, che
 # dopo la verifica puo' anche cancellare senza conseguenze.
 # Relay e conversione bech32->hex sono lo specchio di importa_nostr.py
-# (che non si puo' importare: pretende NPUB_VENDITORE in config.py).
+# (oggi importabile, ma i gemelli restano: il server non deve dipendere
+# da uno script che vive di vita propria).
 
 RELAYS_VERIFICA = [
     "wss://relay.damus.io",
@@ -2290,12 +2291,53 @@ async def controlla_scadenze():
         await _sblocca_sats(oid, automatico=True)
 
 
+# --- L'import periodico da Nostr ------------------------------------
+# Ogni ora l'orologio riusa la logica di importa_nostr.py per tenere
+# freschi gli annunci dei venditori consenzienti (per ora uno solo:
+# NPUB_VENDITORE / VENDITORE_ID in config.py — quando serviranno di
+# piu', qui basta far diventare la coppia una lista). Fail-open
+# totale: se qualcosa va storto resta una riga in console e il
+# mercatino vive. Il lavoro e' sincrono (websocket-client, download
+# foto): gira dentro asyncio.to_thread come la verifica npub.
+
+try:
+    from config import NPUB_VENDITORE, VENDITORE_ID
+except ImportError:
+    NPUB_VENDITORE, VENDITORE_ID = "", 0
+
+SECONDI_IMPORT_NOSTR = 3600
+_prossimo_import_nostr = 0.0     # 0 = primo giro subito all'avvio
+
+
+async def importa_nostr_periodico():
+    global _prossimo_import_nostr
+    if (not NPUB_VENDITORE or NPUB_VENDITORE.startswith("INCOLLA")
+            or not VENDITORE_ID):
+        return                   # segnaposto in config = funzione spenta
+    if time.time() < _prossimo_import_nostr:
+        return
+    # L'appuntamento si fissa PRIMA di provare: anche un errore
+    # aspetta la prossima ora, niente tempeste di tentativi.
+    _prossimo_import_nostr = time.time() + SECONDI_IMPORT_NOSTR
+    import importa_nostr         # qui e non in cima: se manca
+    #                              websocket-client il server vive lo stesso
+    importati, aggiornati, saltati = await asyncio.to_thread(
+        importa_nostr.importa_venditore, NPUB_VENDITORE, VENDITORE_ID, DB)
+    print(f"🔄 Import Nostr: {importati} nuovi, {aggiornati} aggiornati, "
+          f"{saltati} saltati")
+
+
 async def orologio():
     while True:
         try:
             await controlla_scadenze()
         except Exception as e:
             print(f"Orologio sblocchi, errore (riprovo tra 10 min): {e}")
+        try:
+            await importa_nostr_periodico()
+        except Exception as e:
+            print(f"⚠️ Import Nostr periodico saltato (riprovo tra "
+                  f"un'ora): {e}")
         await asyncio.sleep(600)
 
 

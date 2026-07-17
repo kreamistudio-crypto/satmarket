@@ -16,6 +16,10 @@ COME SI USA:
   3. Riavvia il server: gli annunci sono in vetrina, intestati
      al "Venditore" del collaudo (che li gestisce dalla Mini App)
 
+Da lug 2026 il server rifa' questo import DA SOLO ogni ora (vedi
+l'orologio in server.py, che importa questo modulo): lo script
+manuale resta per il primo giro e per le prove.
+
 REQUISITI: pip install websocket-client   (gia' installato)
 """
 
@@ -37,14 +41,13 @@ from websocket import create_connection
 #   VENDITORE_ID = 222            # 222 nel collaudo; al lancio il suo
 #                                 # VERO user id Telegram (da @userinfobot)
 
+# Il modulo deve restare IMPORTABILE dal server (import periodico):
+# se config.py o le sue righe mancano, qui entrano segnaposto vuoti
+# e a fermarsi (con la guida di sempre) e' solo main().
 try:
     from config import NPUB_VENDITORE, VENDITORE_ID
 except ImportError:
-    raise SystemExit(
-        "\n⚠️  Manca config.py (o le righe NPUB_VENDITORE e VENDITORE_ID"
-        "\n   al suo interno). Aggiungile e rilancia. Esempio:\n"
-        '\n   NPUB_VENDITORE = "npub1..."'
-        "\n   VENDITORE_ID = 222\n")
+    NPUB_VENDITORE, VENDITORE_ID = "", 0
 
 DB = "satmarket.db"
 FOTO_DIR = "foto"                    # stessa cartella degli annunci normali
@@ -84,6 +87,38 @@ def npub_to_hex(npub: str) -> str:
     if len(hexkey) != 64:
         raise ValueError("npub non valida: lunghezza sbagliata")
     return hexkey
+
+
+def _bech32_polymod(valori: list) -> int:
+    """Il cuore del checksum bech32 (BIP-173) — specchio di server.py."""
+    gen = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+    chk = 1
+    for v in valori:
+        b = chk >> 25
+        chk = ((chk & 0x1ffffff) << 5) ^ v
+        for i in range(5):
+            if (b >> i) & 1:
+                chk ^= gen[i]
+    return chk
+
+
+def hex_to_npub(hexkey: str) -> str:
+    """Gemella speculare di npub_to_hex (specchio di server.py): serve
+    a scrivere il badge del venditore nella forma canonica npub1…"""
+    dati, bits, val = [], 0, 0
+    for byte in bytes.fromhex(hexkey):   # da byte a gruppi di 5 bit
+        val = (val << 8) | byte
+        bits += 8
+        while bits >= 5:
+            bits -= 5
+            dati.append((val >> bits) & 31)
+    if bits:
+        dati.append((val << (5 - bits)) & 31)
+    # hrp "npub" espansa come vuole lo standard: bit alti, zero, bit bassi
+    hrp = [ord(c) >> 5 for c in "npub"] + [0] + [ord(c) & 31 for c in "npub"]
+    polymod = _bech32_polymod(hrp + dati + [0] * 6) ^ 1
+    checksum = [(polymod >> 5 * (5 - i)) & 31 for i in range(6)]
+    return "npub1" + "".join(CHARSET[d] for d in dati + checksum)
 
 
 def tag(e, nome):
@@ -247,10 +282,14 @@ def estrai_annuncio(e, valute_stall, cambio):
             "categoria": categoria_automatica(titolo + " " + desc)}
 
 
-def main():
-    hexkey = npub_to_hex(NPUB_VENDITORE)
+def importa_venditore(npub_venditore: str, venditore_id: int,
+                      db: str = DB):
+    """Il cuore dell'import, in forma riusabile: lo chiama lo script
+    manuale (main, qui sotto) e ogni ora l'orologio del server.
+    Ritorna la terna (importati, aggiornati, saltati)."""
+    hexkey = npub_to_hex(npub_venditore)
     os.makedirs(FOTO_DIR, exist_ok=True)
-    print(f"Cerco gli annunci di {NPUB_VENDITORE[:20]}… sui relay:\n")
+    print(f"Cerco gli annunci di {npub_venditore[:20]}… sui relay:\n")
     eventi = []
     for r in RELAYS:
         eventi += interroga(r, hexkey)
@@ -278,10 +317,11 @@ def main():
     if not prodotti:
         print("Nessun annuncio trovato: controlla la npub, o prova ad "
               "aggiungere ai RELAYS quello usato dal tuo amico.")
-        return
+        return 0, 0, 0
 
     cambio = cambio_btc()
-    con = sqlite3.connect(DB)
+    # timeout generoso: quando gira dal server il database e' conteso
+    con = sqlite3.connect(db, timeout=15)
     # Assicura che il database abbia le colonne nuove (foto, nostr)
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''"):
         try:
@@ -289,10 +329,35 @@ def main():
         except sqlite3.OperationalError:
             pass
     con.execute("INSERT OR IGNORE INTO utenti(tg_id, nome, username) "
-                "VALUES(?, 'Venditore', 'venditore')", (VENDITORE_ID,))
+                "VALUES(?, 'Venditore', 'venditore')", (venditore_id,))
+
+    # Il badge del venditore: gli eventi importati sono firmati dalla
+    # sua chiave, il possesso e' dimostrato. Se il profilo non dichiara
+    # ancora una npub gliela scriviamo gia' verificata (cosi' il login
+    # Nostr lo riconosce); una npub DIVERSA gia' presente non si tocca.
+    for colonna in ("npub TEXT DEFAULT ''",
+                    "npub_verificata INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
+    npub_bech = hex_to_npub(hexkey)        # forma canonica del badge
+    u = con.execute("SELECT npub, npub_verificata FROM utenti "
+                    "WHERE tg_id=?", (venditore_id,)).fetchone()
+    if u:
+        attuale = (u[0] or "").strip()
+        if not attuale:
+            con.execute("UPDATE utenti SET npub=?, npub_verificata=1 "
+                        "WHERE tg_id=?", (npub_bech, venditore_id))
+            print("  🟣 Profilo venditore: npub scritta, badge verificato")
+        elif attuale == npub_bech and not u[1]:
+            con.execute("UPDATE utenti SET npub_verificata=1 "
+                        "WHERE tg_id=?", (venditore_id,))
+            print("  🟣 Profilo venditore: npub gia' dichiarata, "
+                  "badge ora verificato")
 
     importati, aggiornati, saltati = 0, 0, 0
-    npub = NPUB_VENDITORE.strip()
+    npub = npub_venditore.strip()
     for e in prodotti:
         a = estrai_annuncio(e, valute_stall, cambio)
         if not a:
@@ -301,7 +366,7 @@ def main():
         gia = con.execute(
             "SELECT id FROM annunci WHERE titolo=? AND stato='attivo' "
             "AND (venditore_id=? OR contatto_nostr=?)",
-            (a["titolo"], VENDITORE_ID, npub)).fetchone()
+            (a["titolo"], venditore_id, npub)).fetchone()
         if gia:
             # Gia' presente: aggiorna foto (scaricandole in locale),
             # contatto, prezzo e PROPRIETARIO (utile al lancio)
@@ -309,7 +374,7 @@ def main():
             con.execute(
                 "UPDATE annunci SET foto=?, contatto_nostr=?, prezzo_sats=?, "
                 "venditore_id=? WHERE id=?",
-                (foto_loc, npub, a["prezzo_sats"], VENDITORE_ID, gia[0]))
+                (foto_loc, npub, a["prezzo_sats"], venditore_id, gia[0]))
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
             continue
@@ -317,7 +382,7 @@ def main():
             "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
             "prezzo_sats,zona,foto,contatto_nostr,creato) "
             "VALUES(?,?,?,?,?,?,?,?,?)",
-            (VENDITORE_ID, a["titolo"], a["descrizione"], a["categoria"],
+            (venditore_id, a["titolo"], a["descrizione"], a["categoria"],
              a["prezzo_sats"], a["zona"], a["foto"], npub, int(time.time())))
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
         foto_loc = localizza_foto(cur.lastrowid, a["foto"])
@@ -331,6 +396,18 @@ def main():
 
     con.commit()
     con.close()
+    return importati, aggiornati, saltati
+
+
+def main():
+    if not NPUB_VENDITORE or not VENDITORE_ID:
+        raise SystemExit(
+            "\n⚠️  Manca config.py (o le righe NPUB_VENDITORE e VENDITORE_ID"
+            "\n   al suo interno). Aggiungile e rilancia. Esempio:\n"
+            '\n   NPUB_VENDITORE = "npub1..."'
+            "\n   VENDITORE_ID = 222\n")
+    importati, aggiornati, saltati = importa_venditore(
+        NPUB_VENDITORE, VENDITORE_ID)
     print(f"\nFATTO: {importati} importati, {aggiornati} aggiornati, "
           f"{saltati} saltati (venduti o senza prezzo).")
     print("Riavvia il server e guardali in vetrina nella Mini App!")
