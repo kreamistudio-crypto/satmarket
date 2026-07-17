@@ -55,12 +55,15 @@ try:
     from websocket import create_connection
 except ImportError:
     create_connection = None
-# coincurve serve solo a firmare gli annunci pubblicati verso Nostr:
-# se manca, quella funzione resta spenta e il server parte lo stesso.
+# coincurve serve a firmare gli annunci pubblicati verso Nostr e a
+# VERIFICARE le firme di chi entra col login Nostr: se manca, quelle
+# funzioni restano spente e il server parte lo stesso.
 try:
     from coincurve import PrivateKey as ChiavePrivataNostr
+    from coincurve import PublicKeyXOnly as ChiavePubblicaNostr
 except ImportError:
     ChiavePrivataNostr = None
+    ChiavePubblicaNostr = None
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -463,6 +466,88 @@ def logout(response: Response, barattolo_sessione: str = Cookie("")):
         con.close()
     response.delete_cookie("barattolo_sessione", path="/")
     return {"ok": True}
+
+
+# --- Login Nostr: le fondamenta della verifica -----------------------
+# Chi vive su Nostr entra dimostrando di possedere la sua chiave: il
+# server emette una sfida casuale, il client la firma dentro un evento
+# kind-22242 (stile NIP-42, il kind di autenticazione: effimero, i
+# relay non lo conservano) e il server controlla la firma Schnorr.
+# La nsec NON viaggia mai: arriva solo l'evento gia' firmato.
+# Le sfide vivono in memoria: uvicorn e' mono-processo, e se il server
+# riparte la sfida muore — il client ne chiede semplicemente un'altra.
+
+SFIDE_LOGIN: dict[str, int] = {}     # sfida -> scadenza (unix)
+SECONDI_SFIDA_LOGIN = 300            # 5 minuti per firmare, poi si rifa'
+
+RE_HEX_64 = re.compile(r"[0-9a-f]{64}")
+RE_HEX_128 = re.compile(r"[0-9a-f]{128}")
+
+
+def nuova_sfida_login() -> str:
+    """Emette una sfida monouso e fa pulizia di quelle scadute.
+    Il tetto a 1000 tiene a bada i bot: oltre, via le piu' vecchie."""
+    adesso = int(time.time())
+    for s in [s for s, scade in SFIDE_LOGIN.items() if scade < adesso]:
+        SFIDE_LOGIN.pop(s, None)
+    while len(SFIDE_LOGIN) >= 1000:
+        SFIDE_LOGIN.pop(next(iter(SFIDE_LOGIN)))
+    sfida = secrets.token_hex(16)
+    SFIDE_LOGIN[sfida] = adesso + SECONDI_SFIDA_LOGIN
+    return sfida
+
+
+def verifica_evento_login(evento, host: str) -> str:
+    """Controlla l'evento di login firmato dal client, campo per campo,
+    e ritorna la pubkey (esadecimale) di chi ha firmato. Qualsiasi cosa
+    storta = 401: mai dire all'esterno QUALE controllo e' fallito."""
+    err = HTTPException(401, "Login Nostr non valido: riprova")
+    if not isinstance(evento, dict):
+        raise err
+    pubkey, sig = evento.get("pubkey"), evento.get("sig")
+    ev_id, tags = evento.get("id"), evento.get("tags")
+    creato = evento.get("created_at")
+    if evento.get("kind") != 22242 or evento.get("content") != "":
+        raise err
+    if not (isinstance(pubkey, str) and RE_HEX_64.fullmatch(pubkey)):
+        raise err
+    if not (isinstance(sig, str) and RE_HEX_128.fullmatch(sig)):
+        raise err
+    if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)):
+        raise err
+    if not isinstance(creato, int) or abs(int(time.time()) - creato) > 300:
+        raise HTTPException(401, "Login Nostr scaduto: riprova")
+    if not (isinstance(tags, list)
+            and all(isinstance(t, list)
+                    and all(isinstance(x, str) for x in t) for t in tags)):
+        raise err
+    # La sfida si brucia PRIMA di controllare la firma: monouso anche
+    # se il tentativo poi fallisce (chi sbaglia ne chiede un'altra).
+    sfida = next((t[1] for t in tags
+                  if len(t) >= 2 and t[0] == "challenge"), None)
+    if not sfida or SFIDE_LOGIN.pop(sfida, 0) < int(time.time()):
+        raise HTTPException(401, "Sfida scaduta: riprova il login")
+    # Il tag "relay" porta l'origine della pagina: legare la firma al
+    # NOSTRO sito blocca il riuso su altri servizi. Confronto solo su
+    # host:porta, come in guardia_csrf (dietro Caddy lo schema balla).
+    origine = next((t[1] for t in tags
+                    if len(t) >= 2 and t[0] == "relay"), "")
+    if not host or urlparse(origine).netloc != host:
+        raise err
+    # L'id si RICALCOLA con la serializzazione canonica NIP-01 (la
+    # stessa di firma_evento): mai fidarsi di quello ricevuto.
+    serial = json.dumps([0, pubkey, creato, 22242, tags, ""],
+                        separators=(",", ":"), ensure_ascii=False)
+    if hashlib.sha256(serial.encode("utf-8")).hexdigest() != ev_id:
+        raise err
+    try:
+        firma_buona = ChiavePubblicaNostr(bytes.fromhex(pubkey)).verify(
+            bytes.fromhex(sig), bytes.fromhex(ev_id))
+    except Exception:
+        firma_buona = False
+    if not firma_buona:
+        raise err
+    return pubkey
 
 
 # ------------------------- LNBITS (escrow) --------------------------
@@ -1302,6 +1387,41 @@ def npub_to_hex(npub: str) -> str:
     if len(hexkey) != 64:
         raise ValueError("npub non valida: lunghezza sbagliata")
     return hexkey
+
+
+def _bech32_polymod(valori: list) -> int:
+    """Il cuore del checksum bech32 (BIP-173): un registro a scorrimento
+    che 'mastica' i valori a 5 bit. Serve solo a hex_to_npub."""
+    gen = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+    chk = 1
+    for v in valori:
+        b = chk >> 25
+        chk = ((chk & 0x1ffffff) << 5) ^ v
+        for i in range(5):
+            if (b >> i) & 1:
+                chk ^= gen[i]
+    return chk
+
+
+def hex_to_npub(hexkey: str) -> str:
+    """Gemella SPECULARE di npub_to_hex: dalla chiave esadecimale alla
+    npub bech32, checksum vero incluso (a differenza della decodifica,
+    qui il checksum va CALCOLATO, non buttato). Proprieta' di sanita':
+    npub_to_hex(hex_to_npub(h)) == h."""
+    dati, bits, val = [], 0, 0
+    for byte in bytes.fromhex(hexkey):   # da byte a gruppi di 5 bit
+        val = (val << 8) | byte
+        bits += 8
+        while bits >= 5:
+            bits -= 5
+            dati.append((val >> bits) & 31)
+    if bits:
+        dati.append((val << (5 - bits)) & 31)
+    # hrp "npub" espansa come vuole lo standard: bit alti, zero, bit bassi
+    hrp = [ord(c) >> 5 for c in "npub"] + [0] + [ord(c) & 31 for c in "npub"]
+    polymod = _bech32_polymod(hrp + dati + [0] * 6) ^ 1
+    checksum = [(polymod >> 5 * (5 - i)) & 31 for i in range(6)]
+    return "npub1" + "".join(CHARSET_BECH32[d] for d in dati + checksum)
 
 
 def cerca_nota_verifica(relay: str, hexkey: str, codice: str, da: int) -> bool:
