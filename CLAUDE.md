@@ -130,9 +130,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
   consenziente da Nostr (npub e VENDITORE_ID vengono da config.py).
-  ATTENZIONE: scrive direttamente nel database, quindi BYPASSA la
-  moderazione di `pubblica()`. Limite accettato finché l'import resta
-  manuale e per venditori fidati; da chiudere se mai si aprirà ad altri.
+  Il cuore è `importa_venditore()`, importabile: lo usa anche
+  l'orologio del server, che rilancia l'import OGNI ORA in
+  `asyncio.to_thread` (fail-open totale: segnaposto in config =
+  spento, errori = una riga in console). Al primo giro scrive il
+  badge 🟣✓ sul profilo del venditore (npub canonica bech32 via
+  `hex_to_npub`, gemella di quella di server.py; mai sovrascrivere
+  una npub diversa già dichiarata): così il login Nostr lo riconosce
+  invece di creargli un account nuovo. ATTENZIONE: scrive
+  direttamente nel database, quindi BYPASSA la moderazione di
+  `pubblica()`, e le firme degli eventi non vengono verificate
+  (fiducia nei 4 relay). Limite accettato per venditori fidati
+  scelti in config; da chiudere se mai si aprirà ad altri.
 
 ## Produzione
 
