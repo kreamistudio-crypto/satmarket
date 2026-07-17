@@ -504,6 +504,20 @@
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET CONFERMA «COMPRA SUBITO» (wallet NWC) ============ -->
+  <div class="sheet" id="nwcConfermaSheet">
+    <div class="grab"></div>
+    <h3>⚡ Compra subito</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600">
+      Stai per pagare <b class="mono" style="color:var(--sats)"><span id="nwcConfermaSats"></span> sats</b>
+      dal tuo wallet collegato. I sats finiscono <b style="color:var(--trust)">bloccati
+      in escrow</b>, come sempre: al venditore arrivano solo quando
+      confermi di aver ricevuto l'oggetto.
+    </div>
+    <button class="btn orange" style="margin-top:14px" onclick="confermaCompraSubito(this)">⚡ Conferma e paga</button>
+    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+  </div>
+
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
   <div class="sheet" id="invitoSheet">
     <div class="grab"></div>
@@ -555,7 +569,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <div id="attesaOverlay"><div class="attesa-card"><span class="attesa-clessidra">⏳</span> Invio sats in corso…</div></div>
+  <div id="attesaOverlay"><div class="attesa-card"><span class="attesa-clessidra">⏳</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
 
 <script>
@@ -882,7 +896,9 @@ function openDetail(id){
       <div class="trust-note">🔒 <span>I tuoi sats restano <b>bloccati in escrow</b> e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
       ${mio
         ? `<button class="btn danger-ghost" style="margin-top:0" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
-        : `<button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${fmt(l.price)} sats</button>`}
+        : `${(!DEMO && !VETRINA && walletNwc())
+            ? `<button class="btn orange" onclick="compraSubito()">⚡ Compra subito — ${fmt(l.price)} sats</button>` : ''}
+           <button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${fmt(l.price)} sats</button>`}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
       ${contatto}
@@ -928,12 +944,89 @@ async function verificaOrdine(oid){
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
     const d = await r.json();
     if (d.stato === 'locked') {
+      /* se c'era l'overlay del Compra subito, si spegne qui: è il
+         poll su LNbits a decretare il successo, mai il wallet */
+      if (nwcRipristina) { nwcRipristina(); nwcRipristina = null; }
       closeSheet();
       toast('⚡ Sats bloccati in escrow!');
       await loadOrders(); renderOrders();
       setTimeout(()=>openOrder(oid), 400);
     }
   } catch(e) {}
+}
+
+/* ---- «Compra subito»: il wallet NWC paga la invoice escrow ----
+   Stessa invoice, stesso ordine, stesso poll del flusso manuale:
+   cambia solo chi paga. Se il wallet non ce la fa, si ripiega sul
+   foglio invoice di sempre SENZA creare un secondo ordine. */
+let nwcInCorso = false, nwcRipristina = null;
+
+function compraSubito(){
+  haptic();
+  /* cinture: il bottone non compare in vetrina/demo, ma non si sa mai */
+  if (VETRINA) {
+    invitoTelegram('Per comprare con l\'escrow serve l\'app vera dentro '
+      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
+    return;
+  }
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  if (!walletNwc()) { startBuy(); return; }
+  el('nwcConfermaSats').textContent = fmt(currentListing.price);
+  el('sheetBg').classList.add('open');
+  el('nwcConfermaSheet').classList.add('open');
+}
+
+async function confermaCompraSubito(btn){
+  haptic();
+  if (nwcInCorso) return;             /* doppio tocco: un solo pagamento */
+  nwcInCorso = true;
+  const ripristina = bottoneInAttesa(btn, '⚡ Il tuo wallet sta pagando…');
+  nwcRipristina = ripristina;
+  /* il foglio si chiude a mano (NON con closeSheet: il poll che
+     parte tra poco deve sopravvivere) */
+  el('nwcConfermaSheet').classList.remove('open');
+  el('sheetBg').classList.remove('open');
+  let invoice = null, cliente = null;
+  try {
+    /* 1) ordine + invoice: identico in tutto al flusso manuale */
+    const r = await fetch(`${API_BASE}/orders`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({annuncio_id: currentListing.id})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
+    currentOrderId = d.ordine_id;
+    invoice = d.invoice;
+    /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
+       qualunque cosa dica (o non dica) il wallet */
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
+    /* 3) la telefonata al wallet: paga la invoice via NIP-47 */
+    cliente = await clientNwc(walletNwc());
+    await cliente.paga(invoice);
+    /* Il wallet dice "pagato": l'overlay resta finché il poll non
+       vede il locked. Cintura: dopo 60s si libera lo schermo e il
+       poll continua da solo. */
+    setTimeout(()=>{ if (nwcRipristina) { nwcRipristina(); nwcRipristina = null;
+      toast('Pagamento inviato: appena la rete conferma, l\'ordine si sblocca qui', 6000); } }, 60000);
+  } catch(e){
+    const giaPagato = !nwcRipristina;   /* il poll ha già visto il locked */
+    if (nwcRipristina) { nwcRipristina(); nwcRipristina = null; }
+    if (giaPagato) { /* errore tardivo a pagamento avvenuto: nulla da fare */ }
+    else if (invoice) {
+      /* Ripiego: la STESSA invoice nel foglio di sempre. L'ordine
+         c'è già e il poll è vivo: mai un secondo ordine. */
+      el('payAmount').textContent = fmt(currentListing.price);
+      el('payInvoice').textContent = invoice;
+      el('sheetBg').classList.add('open');
+      el('paySheet').classList.add('open');
+      toast(`Il wallet non ha pagato (${e.message || 'non risponde'}): puoi pagare a mano da qui`, 6000);
+    }
+    else toast(`Compra subito non riuscito: ${e.message || 'riprova'}`, 6000);
+  } finally {
+    if (cliente) cliente.chiudi();      /* la telefonata è finita comunque */
+    nwcInCorso = false;
+  }
 }
 
 function copiaInvoice(){
@@ -953,6 +1046,7 @@ function closeSheet(){
   el('invitoSheet').classList.remove('open');
   el('nostrSheet').classList.remove('open');
   el('collegaSheet').classList.remove('open');
+  el('nwcConfermaSheet').classList.remove('open');
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
@@ -1311,7 +1405,8 @@ function refundPanel(o){
 /* Pagare su Lightning richiede qualche secondo: il bottone lo dice,
    così l'app non sembra bloccata. Restituisce la funzione che lo
    ripristina (da chiamare appena arriva la risposta). */
-function bottoneInAttesa(btn){
+function bottoneInAttesa(btn, testo){
+  el('attesaTesto').textContent = testo || 'Invio sats in corso…';
   el('attesaOverlay').classList.add('on');    /* blocca tutto: i sats viaggiano */
   const prima = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Invio in corso…'; }
