@@ -132,9 +132,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   del dispositivo, MAI trasmessa al server (stessa filosofia della nsec
   solo-in-pagina: il secret NWC può spendere, fino al budget scelto nel
   wallet — la UI consiglia di impostarlo). Al collegamento `infoNwc()`
-  valida la stringa leggendo l'evento info del wallet (kind 13194:
-  relay ok, `pay_invoice` permesso, cifratura nip44 se dichiarata nel
-  tag `encryption`, altrimenti nip04 storica). `clientNwc()` è il
+  valida la stringa con una STRETTA DI MANO vera: chiamata `get_info`
+  via NIP-47 (prova relay, secret e cifratura insieme), tentando
+  nip04 (default storico) e poi nip44; una risposta d'errore del
+  wallet conta comunque come connessione viva. L'evento info kind
+  13194 è solo un suggerimento per la cifratura (tag `encryption`):
+  Coinos e altri NON lo pubblicano (verificato lug 2026), mai
+  pretenderlo. Log diagnostici `🟪 [nwc]` in console. `clientNwc()` è il
   gemello NIP-47 del bunker NIP-46: richieste kind-23194 cifrate sul
   relay del wallet, risposte 23195 agganciate per tag `e` = id della
   richiesta (il bunker usa msg.id). `compraSubito()`: conferma
