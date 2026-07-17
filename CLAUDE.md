@@ -48,11 +48,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `asyncio.create_task`: mai errori né attese per l'utente. In
   collaudo gli eventi si firmano ma si stampano soltanto
   (`🟣 [nostr simulato]`).
+  Negozio del venditore: colonna `utenti.negozio` = codice pubblico
+  casuale di 8 caratteri (migrazione per chi c'era, `verifica_utente`
+  per i nuovi; stabile per sempre, NON deriva dal tg_id).
+  `GET /api/negozio/{chi}` risolve `chi` prima come username Telegram
+  (case-insensitive), poi come codice → `{venditore, annunci attivi}`,
+  auth facoltativa stile vetrina (`venditore_id` solo agli autenticati,
+  il tg_id non esce mai). `venditore_negozio` è in `CAMPI_VETRINA` e
+  nelle SELECT di `/api/search` e `/api/listings/miei`. La route
+  `GET /negozio/{chi}` serve la solita miniapp.html (no-cache): è il
+  link condivisibile barattolo.store/negozio/{username|codice}.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Quattro modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); collaudo locale (identità finte); VETRINA pubblica in
   sola lettura dal browser (annunci veri, ogni azione apre l'invito verso
   @ilbarattolobot); demo coi dati finti come riserva se il backend tace.
+  Vista negozio: il blocco venditore nel dettaglio è cliccabile →
+  profilo + griglia dei suoi annunci (card riusate via `cardHTML`);
+  all'avvio `avvia()` legge `/negozio/...` da `location.pathname` e
+  apre direttamente il negozio; bottone condividi = clipboard + toast.
+  Le stelle del rating si mostrano solo se rating > 0 (il sistema
+  feedback non esiste ancora: "0 ★" farebbe danno ai venditori).
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
@@ -86,7 +102,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    Decisione permanente. La scala approvata: badge npub auto-dichiarato →
    verifica con nota pubblica (fatta, lug 2026) → mai custodia di
    segreti altrui, mai firme che richiedano di consegnare chiavi.
-3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/foto/*` e `/api/*`.
+3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
+   `/foto/*` e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
    diventerebbero pubblici — falla già successa e chiusa).
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
@@ -116,7 +133,8 @@ contenuti a tre strati (parole + AI + admin); badge npub auto-dichiarato
 nel profilo e sugli annunci; verifica della npub via nota pubblica
 (badge 🟣✓, vedi Architettura); pubblicazione degli annunci verso
 Nostr con la chiave della piattaforma (NIP-99 + NIP-09, vedi
-Architettura).
+Architettura); pagina negozio del venditore, interna e pubblica
+(`/negozio/{username|codice}`, vedi Architettura).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, feedback/stelle, NWC, escrow on-chain
 2-di-3, parere legale MiCA prima di crescere.
