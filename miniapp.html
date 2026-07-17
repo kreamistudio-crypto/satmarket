@@ -521,6 +521,7 @@ const API_BASE = location.protocol.startsWith('http') ? '/api' : 'http://localho
 const tg = window.Telegram?.WebApp;
 let DEMO = !API_BASE;
 let VETRINA = false;   // browser in produzione: annunci veri, sola lettura
+let WEB = false;       // browser col login web: cookie di sessione, app completa
 
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -531,6 +532,7 @@ let myTgId = null, isAdmin = false;
 
 function authHdr(){
   if (tg?.initData) return tg.initData;
+  if (WEB) return '';   // l'identità viaggia nel cookie di sessione
   return `collaudo:${collaudoId}:${collaudoName}`;
 }
 function setCollaudo(id, nome){
@@ -1577,7 +1579,66 @@ function mostraBanner(testo){
   b.style.display = 'block';
 }
 const BANNER_DEMO = '🫙 Questa è solo la demo — il mercatino vero vive su Telegram';
-const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — per comprare e vendere apri Barattolo su Telegram';
+const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — entra con Telegram per comprare e vendere anche da qui';
+
+/* ---------------- login web (browser + cookie) ---------------- */
+/* Barra di benvenuto del login web: saluto, invito ad aprire il bot
+   (senza quello Telegram non può recapitare gli avvisi) e l'uscita. */
+function barraWeb(nome){
+  const b = el('demoBanner');
+  b.className = 'demo-banner demo-vera';
+  b.style.display = 'block';
+  b.innerHTML =
+    `<div>👋 Ciao ${nome} — sei su Barattolo dal browser. Per ricevere`
+    + ` gli avvisi sugli ordini apri una volta `
+    + `<a href="https://t.me/ilbarattolobot" target="_blank"`
+    + ` rel="noopener">@ilbarattolobot</a></div>`
+    + `<button class="demo-cta" onclick="esciWeb()"`
+    + ` style="border:none;cursor:pointer">Esci</button>`;
+}
+async function esciWeb(){
+  try { await fetch(`${API_BASE}/logout`, {method:'POST'}); } catch(e){}
+  location.reload();
+}
+/* Il bottone ufficiale "Entra con Telegram": lo script di Telegram
+   disegna il widget dentro il banner della vetrina. Funziona solo sul
+   dominio registrato con /setdomain su BotFather (su localhost non
+   compare: per quello c'è il bottone 🍪 web del collaudo). */
+function bottoneLoginTelegram(){
+  const posto = document.createElement('div');
+  posto.id = 'loginTelegram';
+  posto.style.marginTop = '8px';
+  el('demoBanner').appendChild(posto);
+  const s = document.createElement('script');
+  s.src = 'https://telegram.org/js/telegram-widget.js?22';
+  s.setAttribute('data-telegram-login', 'ilbarattolobot');
+  s.setAttribute('data-size', 'medium');
+  s.setAttribute('data-request-access', 'write');  // può scriverci: avvisi!
+  s.setAttribute('data-onauth', 'onTelegramAuth(user)');
+  posto.appendChild(s);
+}
+/* Telegram ci consegna l'utente firmato: lo giriamo al server, che
+   verifica la firma e apre la sessione (cookie). Poi si ricarica e
+   avvia() ci riconosce dal cookie. */
+window.onTelegramAuth = async function(user){
+  try {
+    const r = await fetch(`${API_BASE}/login/telegram`, {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(user)});
+    if (!r.ok) throw new Error('login rifiutato');
+    location.reload();
+  } catch (e) {
+    toast('Accesso non riuscito, riprova', 5000);
+  }
+};
+/* Solo collaudo: finto login web con l'identità corrente, per provare
+   il percorso col cookie senza il widget vero. */
+async function provaLoginWeb(){
+  await fetch(`${API_BASE}/login/telegram`, {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({collaudo:true, id:collaudoId, first_name:collaudoName})});
+  location.reload();
+}
 
 /* Link diretto a un negozio (barattolo.store/negozio/...): il server
    serve sempre la stessa Mini App, qui leggiamo l'URL e apriamo la
@@ -1601,6 +1662,7 @@ async function avviaVetrina(){
     listings = (await r.json()).map(mapListing);
     VETRINA = true; DEMO = false; orders = [];
     mostraBanner(BANNER_VETRINA);
+    bottoneLoginTelegram();
     renderGrid();
     apriNegozioDaUrl();
   } catch (e) {
@@ -1617,11 +1679,23 @@ async function avvia(){
     DEMO = true; mostraBanner(BANNER_DEMO); renderGrid(); renderOrders(); return;
   }
   try {
-    const r = await fetch(`${API_BASE}/me`,
-      {headers:{'X-Tg-Init-Data': authHdr()}});
+    /* Primo sondaggio: initData se siamo dentro Telegram, altrimenti
+       header vuoto — così viaggia l'eventuale cookie del login web.
+       Il cookie va provato PRIMA del collaudo: in produzione l'header
+       collaudo dà sempre 401, e in locale è l'unico modo di esercitare
+       davvero il percorso web. */
+    let r = await fetch(`${API_BASE}/me`,
+      {headers:{'X-Tg-Init-Data': tg?.initData || ''}});
+    WEB = !!(r.ok && !tg?.initData);
+    if (!r.ok && !tg?.initData) {
+      /* Niente cookie: proviamo le identità finte del collaudo */
+      r = await fetch(`${API_BASE}/me`,
+        {headers:{'X-Tg-Init-Data': authHdr()}});
+    }
     const me = await r.json();
-    /* Senza initData il backend ci riconosce solo col collaudo acceso.
-       Se ci dice di no siamo nel browser, fuori da Telegram: vetrina.
+    /* Senza initData il backend ci riconosce solo col cookie o col
+       collaudo acceso. Se ci dice di no siamo nel browser, fuori da
+       Telegram: vetrina.
        (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.) */
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
@@ -1630,14 +1704,16 @@ async function avvia(){
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();
     DEMO = false;
-    collaudo = !tg?.initData;
+    collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
       const btn = (id,nome)=>`<button onclick="setCollaudo(${id},'${nome}')" style="font:inherit;border:1px solid #B26A0A;background:${collaudoId===id?'#B26A0A':'transparent'};color:${collaudoId===id?'#fff':'#B26A0A'};border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">${nome}</button>`;
       b.style.display = 'block';
       b.innerHTML = `🧪 COLLAUDO con sats veri — sei: `
-        + btn(111,'Compratore') + btn(222,'Venditore') + btn(999,'Admin');
-    } else b.style.display = 'none';
+        + btn(111,'Compratore') + btn(222,'Venditore') + btn(999,'Admin')
+        + `<button onclick="provaLoginWeb()" title="Prova il login web: cookie di sessione al posto dell'header" style="font:inherit;border:1px dashed #B26A0A;background:transparent;color:#B26A0A;border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🍪 web</button>`;
+    } else if (WEB) barraWeb(me.nome || 'amico');
+    else b.style.display = 'none';
     await loadListings();
     await loadOrders();
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
