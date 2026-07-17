@@ -122,7 +122,7 @@ async def guardia_csrf(request, call_next):
             and request.url.path.startswith("/api")
             and not request.headers.get("x-tg-init-data")
             and ("barattolo_sessione" in request.cookies
-                 or request.url.path == "/api/login/telegram")):
+                 or request.url.path.startswith("/api/login/"))):
         origin = request.headers.get("origin", "")
         if origin and urlparse(origin).netloc != request.headers.get("host", ""):
             return JSONResponse({"detail": "Origine non consentita"},
@@ -322,6 +322,16 @@ def crea_sessione(tg_id: int) -> str:
     return token
 
 
+def imposta_cookie_sessione(response: Response, token: str):
+    """Il cookie di sessione, identico per ogni porta d'ingresso
+    (login Telegram, login Nostr, collegamento account)."""
+    response.set_cookie(
+        "barattolo_sessione", token,
+        max_age=GIORNI_SESSIONE_WEB * 86400, httponly=True,
+        secure=not MODALITA_COLLAUDO,   # in locale siamo su http
+        samesite="lax", path="/")
+
+
 def utente_da_sessione(token: str) -> dict | None:
     """Riconosce il browser dal cookie di sessione (login web).
     Confronto tra hash: il token in chiaro non tocca mai il DB."""
@@ -455,11 +465,7 @@ async def login_telegram(req: Request, response: Response):
         user = verifica_login_widget(d)
     upsert_utente(user)
     token = crea_sessione(int(user["id"]))
-    response.set_cookie(
-        "barattolo_sessione", token,
-        max_age=GIORNI_SESSIONE_WEB * 86400, httponly=True,
-        secure=not MODALITA_COLLAUDO,   # in locale siamo su http
-        samesite="lax", path="/")
+    imposta_cookie_sessione(response, token)
     return {"ok": True}
 
 
@@ -559,6 +565,129 @@ def verifica_evento_login(evento, host: str) -> str:
     if not firma_buona:
         raise err
     return pubkey
+
+
+# --- Login Nostr: le porte d'ingresso --------------------------------
+# Un utente Nostr non ha tg_id: gli diamo un id NEGATIVO derivato
+# dalla sua pubkey. Telegram garantisce id positivi, quindi lo spazio
+# negativo e' libero per sempre: sessioni, ordini, annunci e admin
+# funzionano invariati. La derivazione serve SOLO alla creazione:
+# i login successivi trovano la riga per npub_accesso.
+
+BIGLIETTI_COLLEGAMENTO: dict[str, tuple] = {}  # biglietto -> (tg_id, npub, scade)
+
+
+def tg_id_da_pubkey(pubkey: str, con) -> int:
+    """Deriva l'id negativo, sempre in [-2^63, -1]. Una collisione tra
+    due chiavi diverse e' fantascienza (compleanno su 2^63), ma se mai
+    capitasse si rideriva con un contatore di sale."""
+    for sale in range(1000):
+        seme = pubkey if sale == 0 else f"{pubkey}:{sale}"
+        n = int.from_bytes(hashlib.sha256(seme.encode()).digest()[:8], "big")
+        tg_id = -(n >> 1) - 1
+        if not con.execute("SELECT 1 FROM utenti WHERE tg_id=?",
+                           (tg_id,)).fetchone():
+            return tg_id
+    raise HTTPException(500, "Riprova tra un attimo")
+
+
+def crea_utente_nostr(pubkey: str, npub: str) -> int:
+    """Nuova riga nativa Nostr: stesso benvenuto di upsert_utente
+    (registrato, codice negozio), nome = npub abbreviata. Il badge
+    nasce gia' verificato: la firma Schnorr dimostra il possesso
+    ancora meglio della nota pubblica."""
+    con = db()
+    tg_id = tg_id_da_pubkey(pubkey, con)
+    con.execute(
+        "INSERT INTO utenti(tg_id, nome, username, registrato, negozio, "
+        "npub, npub_verificata, npub_accesso) VALUES(?,?,?,?,?,?,1,?)",
+        (tg_id, npub[:10] + "…" + npub[-4:], "", int(time.time()),
+         nuovo_codice_negozio(con), npub, npub))
+    con.commit()
+    con.close()
+    return tg_id
+
+
+@app.get("/api/login/nostr/sfida")
+def login_nostr_sfida():
+    """Primo passo del login Nostr: una sfida fresca da firmare."""
+    if ChiavePubblicaNostr is None:
+        raise HTTPException(503, "Login Nostr non disponibile: sul "
+                                 "server manca il pacchetto coincurve")
+    return {"sfida": nuova_sfida_login(),
+            "valida_secondi": SECONDI_SFIDA_LOGIN}
+
+
+@app.post("/api/login/nostr")
+async def login_nostr(req: Request, response: Response):
+    """Secondo passo: arriva l'evento firmato. Tre strade, in ordine:
+    1) npub_accesso conosciuta -> si entra nel suo account;
+    2) npub gia' VERIFICATA (badge 🟣✓) su UN account Telegram non
+       ancora collegato -> proponiamo di usare quello (la firma
+       dimostra il possesso: collegare e' legittimo), con un
+       biglietto monouso e NESSUNA sessione finche' non accetta;
+    3) altrimenti nasce un account nativo Nostr. Un badge NON
+       verificato non conta: potrebbe essere la dichiarazione falsa
+       di qualcun altro, mai dare accesso a quell'account."""
+    if ChiavePubblicaNostr is None:
+        raise HTTPException(503, "Login Nostr non disponibile: sul "
+                                 "server manca il pacchetto coincurve")
+    d = await leggi_json(req)
+    pubkey = verifica_evento_login(d.get("evento"),
+                                   req.headers.get("host", ""))
+    npub = hex_to_npub(pubkey)
+    con = db()
+    r = con.execute("SELECT tg_id FROM utenti WHERE npub_accesso=?",
+                    (npub,)).fetchone()
+    if r:
+        con.close()
+        imposta_cookie_sessione(response, crea_sessione(r["tg_id"]))
+        return {"ok": True}
+    righe = con.execute(
+        "SELECT tg_id, nome, username FROM utenti "
+        "WHERE npub=? AND npub_verificata=1 AND npub_accesso=''",
+        (npub,)).fetchall()
+    con.close()
+    if len(righe) == 1:
+        adesso = int(time.time())
+        for b in [b for b, v in BIGLIETTI_COLLEGAMENTO.items()
+                  if v[2] < adesso]:
+            BIGLIETTI_COLLEGAMENTO.pop(b, None)
+        biglietto = secrets.token_hex(16)
+        BIGLIETTI_COLLEGAMENTO[biglietto] = (
+            righe[0]["tg_id"], npub, adesso + SECONDI_SFIDA_LOGIN)
+        return {"collega": {"nome": righe[0]["nome"],
+                            "username": righe[0]["username"],
+                            "biglietto": biglietto}}
+    tg_id = crea_utente_nostr(pubkey, npub)
+    imposta_cookie_sessione(response, crea_sessione(tg_id))
+    return {"ok": True, "nuovo": True}
+
+
+@app.post("/api/login/nostr/collega")
+async def login_nostr_collega(req: Request, response: Response):
+    """L'utente ha accettato: la sua chiave Nostr diventa la chiave
+    d'accesso dell'account Telegram esistente, e si entra li'.
+    Se invece rifiuta, il client chiude il foglio e basta: il
+    biglietto muore da solo, nessun doppione."""
+    d = await leggi_json(req)
+    dati = BIGLIETTI_COLLEGAMENTO.pop(d.get("biglietto") or "", None)
+    if not dati or dati[2] < int(time.time()):
+        raise HTTPException(401, "Invito scaduto: riprova il login")
+    tg_id, npub = dati[0], dati[1]
+    con = db()
+    try:
+        con.execute("UPDATE utenti SET npub_accesso=? WHERE tg_id=? "
+                    "AND npub_accesso=''", (npub, tg_id))
+        con.commit()
+    except sqlite3.IntegrityError:
+        # qualcun altro ha preso quella chiave nel frattempo: mai due
+        # account con la stessa npub_accesso (indice unico)
+        con.close()
+        raise HTTPException(401, "Riprova il login")
+    con.close()
+    imposta_cookie_sessione(response, crea_sessione(tg_id))
+    return {"ok": True, "collegato": True}
 
 
 # ------------------------- LNBITS (escrow) --------------------------
@@ -1333,7 +1462,8 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
 
 # La npub e' "npub1" + 58 caratteri del charset bech32. Controllo di
 # SOLO FORMATO: la npub resta AUTO-DICHIARATA e NON verificata (la
-# verifica di proprieta' con firma di sfida e' un cantiere futuro).
+# proprieta' si dimostra con la nota pubblica qui sotto, oppure
+# entrando col login Nostr, che firma una sfida).
 RE_NPUB = re.compile(r"^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$")
 
 
