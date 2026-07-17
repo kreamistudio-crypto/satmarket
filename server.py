@@ -23,6 +23,7 @@ della piattaforma). Per un test in community con piccoli importi ok;
 per volumi reali serve un parere legale (normativa MiCA).
 
 REQUISITI:  pip install fastapi uvicorn httpx anthropic python-telegram-bot
+            (per Nostr, opzionali: websocket-client coincurve)
 AVVIO:      uvicorn server:app --host 0.0.0.0 --port 8080
             (serve HTTPS pubblico per la Mini App: vedi LEGGIMI.md)
 """
@@ -53,6 +54,12 @@ try:
     from websocket import create_connection
 except ImportError:
     create_connection = None
+# coincurve serve solo a firmare gli annunci pubblicati verso Nostr:
+# se manca, quella funzione resta spenta e il server parte lo stesso.
+try:
+    from coincurve import PrivateKey as ChiavePrivataNostr
+except ImportError:
+    ChiavePrivataNostr = None
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -81,6 +88,14 @@ except ImportError:
         "\n⚠️  Manca il file config.py!\n"
         "   Copia 'config_esempio.py', rinominalo in 'config.py' e\n"
         "   compila le chiavi al suo interno. Poi riavvia il server.\n")
+
+# La chiave Nostr della piattaforma e' nata dopo: i config.py gia'
+# compilati possono non averla. Se manca (o resta il segnaposto) la
+# pubblicazione su Nostr e' semplicemente spenta, senza drammi.
+try:
+    from config import NOSTR_NSEC_PIATTAFORMA
+except ImportError:
+    NOSTR_NSEC_PIATTAFORMA = ""
 
 # ===================================================================
 
@@ -118,6 +133,7 @@ def init_db():
         categoria TEXT, prezzo_sats INTEGER, zona TEXT,
         foto TEXT DEFAULT '',              -- lista JSON: nomi file o URL
         contatto_nostr TEXT DEFAULT '',    -- npub del venditore (annunci importati)
+        nostr_event_id TEXT DEFAULT '',    -- evento NIP-99 firmato dalla piattaforma
         stato TEXT DEFAULT 'attivo',      -- attivo | venduto | rimosso
         creato INTEGER
     );
@@ -159,8 +175,10 @@ def init_db():
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
-    # Migrazioni per foto e contatto Nostr degli annunci
-    for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''"):
+    # Migrazioni annunci: foto, contatto Nostr e l'evento NIP-99
+    # pubblicato dalla piattaforma
+    for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
+                    "nostr_event_id TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -582,6 +600,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header("")):
         f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
         f"«{d['titolo'][:80]}» — {int(d['prezzo_sats'])} sats\n"
         f"Venditore: {user['first_name']} (id {user['id']})")
+    # E parte anche verso la piazza Nostr, in sottofondo: se i relay
+    # tacciono, chi pubblica non se ne accorge nemmeno.
+    asyncio.create_task(annuncio_su_nostr(annuncio_id, "active"))
     return {"ok": True, "id": annuncio_id}
 
 
@@ -631,6 +652,8 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header("")):
                 (int(time.time()), annuncio_id))
     con.commit()
     con.close()
+    # Se era in piazza su Nostr, si chiede ai relay di toglierlo
+    asyncio.create_task(ritira_da_nostr(annuncio_id))
     return {"ok": True}
 
 
@@ -665,6 +688,8 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
                 (int(time.time()), annuncio_id))
     con.commit()
     con.close()
+    # Se era in piazza su Nostr, si chiede ai relay di toglierlo
+    asyncio.create_task(ritira_da_nostr(annuncio_id))
     await notifica(a["venditore_id"],
                    f"🚫 <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
                    f"rimosso</b> perché viola le regole del mercatino. "
@@ -800,6 +825,9 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header("")):
         a = con.execute("SELECT contatto_nostr FROM annunci WHERE id=?",
                         (o["annuncio_id"],)).fetchone()
         con.commit()
+        # Anche la piazza Nostr deve sapere che l'oggetto e' andato
+        asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "sold",
+                                              solo_aggiornamento=True))
         msg = ("🔒 <b>Hai venduto!</b> I sats dell'acquirente sono in escrow. "
                "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
         if a and a["contatto_nostr"]:
@@ -1140,6 +1168,212 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header("")):
     return {"ok": True, "verificata": True}
 
 
+# --- Barattolo su Nostr: gli annunci in piazza -----------------------
+# Quando un annuncio supera la moderazione, il server lo firma con la
+# chiave DELLA PIATTAFORMA (mai degli utenti: regola ferrea) e lo
+# pubblica come "classified listing" NIP-99 (kind 30402) sugli stessi
+# 4 relay della verifica. Venduto -> si ripubblica con status "sold"
+# (stesso tag "d": i relay sostituiscono il vecchio evento). Rimosso ->
+# richiesta di cancellazione NIP-09 (kind 5). Tutto fail-open: se la
+# chiave e' il segnaposto, mancano coincurve/websocket-client o i relay
+# tacciono, l'annuncio su Barattolo vive normalmente e resta solo un
+# avviso in console. Gli utenti solo-Telegram non vedono nulla.
+
+URL_PUBBLICO = "https://barattolo.store"
+LINK_BOT = "https://t.me/ilbarattolobot"
+
+
+def nsec_to_bytes(nsec: str) -> bytes:
+    """Converte la nsec (bech32) nei 32 byte della chiave privata.
+    Gemella di npub_to_hex qui sopra, ma per la chiave segreta."""
+    if not nsec.startswith("nsec1"):
+        raise ValueError("deve iniziare con nsec1")
+    dati = [CHARSET_BECH32.find(c) for c in nsec[5:]]
+    if -1 in dati:
+        raise ValueError("carattere sconosciuto")
+    dati = dati[:-6]                     # togli il checksum
+    bits, val, out = 0, 0, []
+    for d in dati:                       # da gruppi di 5 bit a byte
+        val = (val << 5) | d
+        bits += 5
+        if bits >= 8:
+            bits -= 8
+            out.append((val >> bits) & 0xFF)
+    if len(out) != 32:
+        raise ValueError("lunghezza sbagliata")
+    return bytes(out)
+
+
+def _prepara_nostr():
+    """Prepara (chiave privata, pubkey esadecimale) della piattaforma,
+    oppure None se la funzione Nostr e' spenta."""
+    if not NOSTR_NSEC_PIATTAFORMA or NOSTR_NSEC_PIATTAFORMA.startswith("INCOLLA"):
+        return None                      # segnaposto: funzione spenta
+    if ChiavePrivataNostr is None or create_connection is None:
+        print("⚠️ Nostr spento: mancano i pacchetti "
+              "(pip install coincurve websocket-client)")
+        return None
+    try:
+        sk = ChiavePrivataNostr(nsec_to_bytes(NOSTR_NSEC_PIATTAFORMA))
+        # La pubkey per Nostr e' "x-only": via il primo byte dei 33
+        pubkey = sk.public_key.format()[1:].hex()
+        print(f"🟣 Barattolo pubblica su Nostr (pubkey {pubkey[:16]}…)")
+        return sk, pubkey
+    except Exception as e:
+        print(f"⚠️ Nostr spento: NOSTR_NSEC_PIATTAFORMA non valida ({e})")
+        return None
+
+
+_NOSTR = _prepara_nostr()
+
+
+def firma_evento(kind: int, tags: list, content: str) -> dict:
+    """Crea e firma un evento Nostr con la chiave della piattaforma.
+    L'id e' lo sha256 della serializzazione canonica (NIP-01), la
+    firma e' Schnorr BIP-340 (coincurve = libsecp256k1)."""
+    sk, pubkey = _NOSTR
+    creato = int(time.time())
+    serial = json.dumps([0, pubkey, creato, kind, tags, content],
+                        separators=(",", ":"), ensure_ascii=False)
+    ev_id = hashlib.sha256(serial.encode("utf-8")).hexdigest()
+    return {"id": ev_id, "pubkey": pubkey, "created_at": creato,
+            "kind": kind, "tags": tags, "content": content,
+            "sig": sk.sign_schnorr(bytes.fromhex(ev_id)).hex()}
+
+
+def _foto_url_nostr(foto_json: str) -> list:
+    """Dai nomi file salvati in DB agli URL assoluti che un client
+    Nostr puo' mostrare (gli annunci importati hanno gia' URL http)."""
+    try:
+        nomi = json.loads(foto_json or "[]")
+    except Exception:
+        return []
+    return [(n if n.startswith("http") else f"{URL_PUBBLICO}/foto/{n}")
+            for n in nomi if n and not n.startswith("data:")]
+
+
+def evento_annuncio(a: dict, status: str) -> dict:
+    """Costruisce l'evento NIP-99 (kind 30402) di un annuncio. Il tag
+    "d" stabile rende l'evento sostituibile: ripubblicare con lo stesso
+    "d" aggiorna lo stato sui relay (e' il meccanismo NIP-99)."""
+    tags = [["d", f"barattolo-{a['id']}"],
+            ["title", a["titolo"]],
+            ["summary", (a["descrizione"] or a["titolo"])[:200]],
+            ["price", str(a["prezzo_sats"]), "sats"],
+            ["status", status],
+            ["published_at", str(a["creato"])],
+            ["r", URL_PUBBLICO]]
+    if a.get("categoria"):
+        tags.append(["t", a["categoria"].lower()])
+    if a.get("zona"):
+        tags.append(["location", a["zona"]])
+    for url in _foto_url_nostr(a.get("foto", "")):
+        tags.append(["image", url])
+    content = ((a["descrizione"] or a["titolo"]).strip() +
+               f"\n\nPrezzo: {a['prezzo_sats']} sats — zona: "
+               f"{a.get('zona') or 'Italia'}"
+               f"\n\n🫙⚡ In vendita su Barattolo, il mercatino in sats "
+               f"con escrow Lightning: {URL_PUBBLICO} · {LINK_BOT}")
+    return firma_evento(30402, tags, content)
+
+
+def invia_evento_relay(relay: str, evento: dict) -> bool:
+    """Consegna un evento firmato a UN relay e aspetta il suo "OK".
+    E' SINCRONA (websocket-client): va chiamata in asyncio.to_thread."""
+    try:
+        ws = create_connection(relay, timeout=5,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["EVENT", evento]))
+        inizio = time.time()
+        while time.time() - inizio < 6:
+            msg = json.loads(ws.recv())
+            if msg[0] == "OK" and msg[1] == evento["id"]:
+                ws.close()
+                return bool(msg[2])
+        ws.close()
+    except Exception:
+        pass                  # relay muto o irraggiungibile: pazienza
+    return False
+
+
+async def _spedisci_ai_relay(evento: dict) -> int:
+    """Manda l'evento a tutti i relay in parallelo (ognuno nel suo
+    thread) e ritorna quanti l'hanno accettato. Nel collaudo non esce
+    nulla dal computer: l'evento si stampa e basta."""
+    if MODALITA_COLLAUDO:
+        print(f"🟣 [nostr simulato] "
+              f"{json.dumps(evento, ensure_ascii=False)[:400]}…")
+        return len(RELAYS_VERIFICA)
+    esiti = await asyncio.gather(*[
+        asyncio.to_thread(invia_evento_relay, r, evento)
+        for r in RELAYS_VERIFICA])
+    return sum(esiti)
+
+
+async def annuncio_su_nostr(annuncio_id: int, status: str,
+                            solo_aggiornamento: bool = False):
+    """Pubblica (o ripubblica con nuovo status) un annuncio su Nostr.
+    Gira in sottofondo e non deve MAI disturbare chi usa la Mini App:
+    qualsiasi intoppo finisce in console e basta.
+    solo_aggiornamento=True: agisci solo se l'evento esiste gia'."""
+    if not _NOSTR:
+        return
+    try:
+        con = db()
+        a = con.execute("SELECT * FROM annunci WHERE id=?",
+                        (annuncio_id,)).fetchone()
+        con.close()
+        if not a or a["contatto_nostr"]:
+            return   # importato da Nostr: l'evento e' gia' del venditore
+        if solo_aggiornamento and not a["nostr_event_id"]:
+            return
+        evento = evento_annuncio(dict(a), status)
+        ok = await _spedisci_ai_relay(evento)
+        if not ok:
+            print(f"⚠️ Annuncio #{annuncio_id}: nessun relay ha "
+                  f"accettato l'evento Nostr ({status})")
+            return
+        con = db()
+        con.execute("UPDATE annunci SET nostr_event_id=? WHERE id=?",
+                    (evento["id"], annuncio_id))
+        con.commit()
+        con.close()
+        print(f"🟣 Annuncio #{annuncio_id} su Nostr ({status}, "
+              f"{ok}/{len(RELAYS_VERIFICA)} relay)")
+    except Exception as e:
+        print(f"⚠️ Pubblicazione Nostr saltata per l'annuncio "
+              f"#{annuncio_id}: {e}")
+
+
+async def ritira_da_nostr(annuncio_id: int):
+    """Chiede ai relay di cancellare l'evento di un annuncio rimosso
+    (NIP-09, kind 5). Come sopra: sottofondo, mai errori all'utente."""
+    if not _NOSTR:
+        return
+    try:
+        con = db()
+        a = con.execute("SELECT nostr_event_id FROM annunci WHERE id=?",
+                        (annuncio_id,)).fetchone()
+        con.close()
+        if not a or not a["nostr_event_id"]:
+            return
+        evento = firma_evento(5, [
+            ["e", a["nostr_event_id"]],
+            ["a", f"30402:{_NOSTR[1]}:barattolo-{annuncio_id}"],
+            ["k", "30402"]],
+            "Annuncio rimosso da Barattolo")
+        ok = await _spedisci_ai_relay(evento)
+        con = db()
+        con.execute("UPDATE annunci SET nostr_event_id='' WHERE id=?",
+                    (annuncio_id,))
+        con.commit()
+        con.close()
+        print(f"🟣 Annuncio #{annuncio_id} ritirato da Nostr "
+              f"({ok}/{len(RELAYS_VERIFICA)} relay)")
+    except Exception as e:
+        print(f"⚠️ Ritiro Nostr saltato per l'annuncio #{annuncio_id}: {e}")
+
+
 @app.post("/api/orders/{ordine_id}/invoice")
 async def deposita_invoice(ordine_id: int, req: Request,
                            x_tg_init_data: str = Header("")):
@@ -1308,6 +1542,9 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                         (o["annuncio_id"],))      # l'oggetto torna in vetrina
             con.commit()
             con.close()
+            # ...e torna disponibile anche sulla piazza Nostr
+            asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "active",
+                                                  solo_aggiornamento=True))
             await notifica(o["compratore_id"],
                            f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
                            f"<b>{importo} sats</b> è in arrivo nel tuo wallet.")

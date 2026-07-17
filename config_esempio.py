@@ -40,6 +40,13 @@ VENDITORE_ID = 222   # a chi intestare gli annunci importati:
                      #    (da @userinfobot); rilanciando lo script gli
                      #    annunci vengono re-intestati automaticamente
 
+# --- Barattolo su Nostr (pubblicazione degli annunci) ----------------
+# La chiave DELLA PIATTAFORMA (mai di utenti!) con cui il server firma
+# gli annunci come eventi NIP-99. Generane una nuova con un client
+# Nostr e incollala SOLO nel config.py del server: mai in chat, mai
+# su GitHub. Finche' resta il segnaposto, la funzione e' spenta.
+NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
+
 # --- Collaudo ---------------------------------------------------------
 # True  = test locale con utenti finti (Compratore/Venditore/Admin)
 # False = OBBLIGATORIO prima di andare online!
