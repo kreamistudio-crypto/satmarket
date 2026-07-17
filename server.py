@@ -2339,4 +2339,17 @@ def pagina_negozio(chi: str):
     return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
 
 
+@app.get("/vendor/nostr.js")
+def vendor_nostr():
+    """La libreria nostr-tools, servita da casa nostra e mai da una CDN:
+    nessun terzo deve poter cambiare il codice della pagina dove
+    qualcuno puo' incollare una nsec. File singolo committato a
+    versione bloccata, rotta esplicita: mai StaticFiles su una
+    directory (regola ferrea 3). Si puo' tenere in cache: cambia solo
+    quando aggiorniamo il file apposta (e col ?v= nel src si sveglia)."""
+    return FileResponse("vendor/nostr.bundle.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")
