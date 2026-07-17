@@ -42,11 +42,12 @@ import sys
 import time
 import unicodedata
 from collections import defaultdict
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlparse
 
 import anthropic
 import httpx
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Cookie, FastAPI, Header, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 
 # websocket-client serve solo alla verifica npub: se manca il pacchetto
 # il server parte lo stesso e la verifica risponde con un errore chiaro.
@@ -103,6 +104,27 @@ app = FastAPI(title="Barattolo API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 ai = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+
+@app.middleware("http")
+async def guardia_csrf(request, call_next):
+    """Cintura oltre le bretelle di SameSite=Lax: quando l'identita'
+    viaggia nel cookie di sessione (login web), le richieste che
+    cambiano stato devono nascere dal nostro stesso sito. Questa
+    guardia puo' solo dire di NO, mai concedere nulla: un suo bug
+    al massimo blocca una richiesta legittima, mai apre una porta.
+    Confrontiamo solo host:porta (netloc): dietro Caddy lo schema
+    visto da uvicorn puo' ballare, l'Host inoltrato e' affidabile."""
+    if (request.method in ("POST", "PUT", "PATCH", "DELETE")
+            and request.url.path.startswith("/api")
+            and not request.headers.get("x-tg-init-data")
+            and ("barattolo_sessione" in request.cookies
+                 or request.url.path == "/api/login/telegram")):
+        origin = request.headers.get("origin", "")
+        if origin and urlparse(origin).netloc != request.headers.get("host", ""):
+            return JSONResponse({"detail": "Origine non consentita"},
+                                status_code=403)
+    return await call_next(request)
 
 
 # ------------------------- DATABASE --------------------------------
@@ -168,6 +190,14 @@ def init_db():
         consegnato INTEGER DEFAULT 0,      -- per la finestra delle 72 ore
         sollecito_il INTEGER DEFAULT 0,    -- ultimo promemoria del venditore
         creato INTEGER, aggiornato INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS sessioni(
+        -- login web dal browser: nel DB c'e' SOLO l'hash del token,
+        -- il token vero vive nel cookie dell'utente e basta
+        token_hash TEXT PRIMARY KEY,
+        tg_id INTEGER,
+        creato INTEGER,
+        scade INTEGER
     );
     """)
     # Migrazione per database creati prima dell'introduzione degli
@@ -235,7 +265,100 @@ if MODALITA_COLLAUDO:
 # Ogni richiesta della Mini App porta l'initData firmato da Telegram:
 # cosi' sappiamo CON CERTEZZA chi e' l'utente, senza login/password.
 
-def verifica_utente(init_data: str) -> dict:
+# ----------------------- LOGIN WEB (BROWSER) ------------------------
+# Chi apre barattolo.store dal browser puo' entrare col bottone
+# "Entra con Telegram" (Login Widget ufficiale). Il server verifica la
+# firma di Telegram e apre una SESSIONE: un token casuale nel cookie
+# (HttpOnly: il JavaScript non lo vede mai), il suo hash nel database.
+# Da li' in poi le API riconoscono l'utente dal cookie, esattamente
+# come dentro Telegram lo riconoscono dall'initData.
+
+GIORNI_SESSIONE_WEB = 30   # quanto dura il login dal browser
+
+
+def upsert_utente(user: dict):
+    """Il benvenuto standard: crea l'utente al primo ingresso (con data
+    di registrazione e codice negozio), aggiorna nome e username se
+    esiste gia'. Stessa accoglienza della Mini App."""
+    con = db()
+    con.execute(
+        "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
+        "VALUES(?,?,?,?,?) "
+        "ON CONFLICT(tg_id) DO UPDATE SET nome=?, username=?",
+        (user["id"], user.get("first_name", ""), user.get("username", ""),
+         int(time.time()), nuovo_codice_negozio(con),
+         user.get("first_name", ""), user.get("username", "")))
+    con.commit()
+    con.close()
+
+
+def crea_sessione(tg_id: int) -> str:
+    """Apre una sessione web: restituisce il token da mettere nel
+    cookie, in DB finisce solo il suo hash."""
+    token = secrets.token_urlsafe(32)
+    adesso = int(time.time())
+    con = db()
+    con.execute(
+        "INSERT INTO sessioni(token_hash, tg_id, creato, scade) "
+        "VALUES(?,?,?,?)",
+        (hashlib.sha256(token.encode()).hexdigest(), tg_id, adesso,
+         adesso + GIORNI_SESSIONE_WEB * 86400))
+    con.commit()
+    con.close()
+    return token
+
+
+def utente_da_sessione(token: str) -> dict | None:
+    """Riconosce il browser dal cookie di sessione (login web).
+    Confronto tra hash: il token in chiaro non tocca mai il DB."""
+    if not token:
+        return None
+    th = hashlib.sha256(token.encode()).hexdigest()
+    con = db()
+    r = con.execute(
+        "SELECT s.tg_id, u.nome, u.username FROM sessioni s "
+        "JOIN utenti u ON u.tg_id = s.tg_id "
+        "WHERE s.token_hash=? AND s.scade > ?",
+        (th, int(time.time()))).fetchone()
+    con.close()
+    if not r:
+        return None
+    return {"id": r["tg_id"], "first_name": r["nome"],
+            "username": r["username"]}
+
+
+def verifica_login_widget(dati: dict) -> dict:
+    """Verifica la firma del Login Widget (bottone 'Entra con Telegram'
+    nel browser). ATTENZIONE: la chiave e' DIVERSA da quella della
+    Mini App! Qui: chiave = SHA256(BOT_TOKEN). Nella Mini App
+    (verifica_utente): chiave = HMAC('WebAppData', BOT_TOKEN).
+    Controlla anche che il login sia fresco (auth_date entro 5 minuti):
+    un payload vecchio non si puo' riusare all'infinito."""
+    try:
+        dati = dict(dati)
+        hash_ricevuto = dati.pop("hash")
+        controllo = "\n".join(f"{k}={dati[k]}" for k in sorted(dati))
+        chiave = hashlib.sha256(BOT_TOKEN.encode()).digest()
+        calcolato = hmac.new(chiave, controllo.encode(),
+                             hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(calcolato, hash_ricevuto):
+            raise ValueError("firma non valida")
+        if int(time.time()) - int(dati["auth_date"]) > 300:
+            raise ValueError("login troppo vecchio")
+        return dati
+    except Exception:
+        raise HTTPException(401, "Login Telegram non valido")
+
+
+def verifica_utente(init_data: str, sessione: str = "") -> dict:
+    # --- browser col cookie di sessione (login web): niente initData.
+    #     Il fallback scatta SOLO a header vuoto: un initData presente
+    #     ma invalido resta 401, nessun "declassamento" possibile. ---
+    if not init_data:
+        user = utente_da_sessione(sessione)
+        if user:
+            return user
+        raise HTTPException(401, "Autenticazione Telegram non valida")
     # --- MODALITA' COLLAUDO: utenti finti per il test dal browser ---
     if MODALITA_COLLAUDO and init_data.startswith("collaudo:"):
         _, uid, nome = init_data.split(":", 2)
@@ -275,14 +398,15 @@ def verifica_utente(init_data: str) -> dict:
         raise HTTPException(401, "Autenticazione Telegram non valida")
 
 
-def utente_se_autenticato(init_data: str) -> dict | None:
+def utente_se_autenticato(init_data: str, sessione: str = "") -> dict | None:
     """Autenticazione FACOLTATIVA, solo per le API di vetrina: chi
-    arriva da Telegram (o dal collaudo) viene riconosciuto, chi guarda
-    dal browser resta anonimo e viene servito lo stesso."""
-    if not init_data:
+    arriva da Telegram (o dal collaudo, o col cookie del login web)
+    viene riconosciuto, chi guarda dal browser resta anonimo e viene
+    servito lo stesso."""
+    if not init_data and not sessione:
         return None
     try:
-        return verifica_utente(init_data)
+        return verifica_utente(init_data, sessione)
     except HTTPException:
         return None
 
@@ -297,6 +421,48 @@ async def leggi_json(req: Request) -> dict:
     if not isinstance(d, dict):
         raise HTTPException(400, "Richiesta malformata")
     return d
+
+
+# ------------------- API: LOGIN WEB DAL BROWSER ---------------------
+
+@app.post("/api/login/telegram")
+async def login_telegram(req: Request, response: Response):
+    """Riceve i dati firmati dal Login Widget, li verifica e apre la
+    sessione: da qui in poi il browser e' riconosciuto dal cookie.
+    In collaudo accetta anche un'identita' finta ({"collaudo": true}),
+    perche' il widget vero pretende il dominio registrato su BotFather
+    e su localhost non si fa nemmeno vedere."""
+    d = await leggi_json(req)
+    if MODALITA_COLLAUDO and d.get("collaudo"):
+        user = {"id": int(d["id"]),
+                "first_name": str(d.get("first_name", "Tester")),
+                "username": str(d.get("first_name", "tester")).lower()}
+    else:
+        user = verifica_login_widget(d)
+    upsert_utente(user)
+    token = crea_sessione(int(user["id"]))
+    response.set_cookie(
+        "barattolo_sessione", token,
+        max_age=GIORNI_SESSIONE_WEB * 86400, httponly=True,
+        secure=not MODALITA_COLLAUDO,   # in locale siamo su http
+        samesite="lax", path="/")
+    return {"ok": True}
+
+
+@app.post("/api/logout")
+def logout(response: Response, barattolo_sessione: str = Cookie("")):
+    """Chiude SOLO la sessione di questo browser (altri dispositivi
+    restano collegati). Funziona anche con un cookie ormai scaduto:
+    pulisce e saluta."""
+    if barattolo_sessione:
+        con = db()
+        con.execute(
+            "DELETE FROM sessioni WHERE token_hash=?",
+            (hashlib.sha256(barattolo_sessione.encode()).hexdigest(),))
+        con.commit()
+        con.close()
+    response.delete_cookie("barattolo_sessione", path="/")
+    return {"ok": True}
 
 
 # ------------------------- LNBITS (escrow) --------------------------
@@ -993,8 +1159,9 @@ def e_admin(tg_id: int) -> bool:
 # ---------------------- API: PROFILO / INCASSI ----------------------
 
 @app.get("/api/me")
-def mio_profilo(x_tg_init_data: str = Header("")):
-    user = verifica_utente(x_tg_init_data)
+def mio_profilo(x_tg_init_data: str = Header(""),
+                barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
@@ -1822,6 +1989,9 @@ async def controlla_scadenze():
     scaduti_silenzio = [r["id"] for r in con.execute(
         "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
         "AND spedito_il < ?", (adesso - GIORNI_AUTO_SBLOCCO * 86400,))]
+    # Spazzatura: via le sessioni web ormai scadute
+    con.execute("DELETE FROM sessioni WHERE scade < ?", (adesso,))
+    con.commit()
     con.close()
     for oid in scaduti_consegna + scaduti_silenzio:
         print(f"⏰ Sblocco automatico dell'ordine #{oid}")
