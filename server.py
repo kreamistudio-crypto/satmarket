@@ -209,18 +209,29 @@ def init_db():
         con.execute("ALTER TABLE utenti ADD COLUMN ln_address TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
-    # Migrazioni utenti: badge Nostr (npub e verifica) e data di
+    # Migrazioni utenti: badge Nostr (npub e verifica), data di
     # registrazione (chi c'era gia' resta senza data: si mostra "—")
+    # e npub_accesso = la chiave Nostr che puo' ENTRARE in questa riga
+    # (login Nostr). Diversa dal badge npub: quella e' una dichiarazione
+    # pubblica, questa e' una credenziale. Oggi la valorizza il login
+    # Nostr; domani anche un account Telegram potra' riceverla (doppia
+    # cittadinanza) senza toccare lo schema.
     for colonna in ("npub TEXT DEFAULT ''",
                     "npub_verificata INTEGER DEFAULT 0",
                     "verifica_codice TEXT DEFAULT ''",
                     "verifica_scade INTEGER DEFAULT 0",
                     "registrato INTEGER DEFAULT 0",
-                    "negozio TEXT DEFAULT ''"):
+                    "negozio TEXT DEFAULT ''",
+                    "npub_accesso TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # Due account non possono condividere la stessa chiave di accesso:
+    # lo garantisce il database stesso, non solo il codice.
+    con.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_utenti_npub_accesso "
+        "ON utenti(npub_accesso) WHERE npub_accesso != ''")
     # Ogni utente riceve il codice pubblico del negozio, una volta sola
     # (i nuovi lo prendono all'ingresso, in verifica_utente)
     for r in con.execute(
@@ -626,6 +637,12 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
 async def notifica(tg_id: int, testo: str):
     """Manda un messaggio Telegram (il bot deve essere stato avviato
     dall'utente almeno una volta)."""
+    if tg_id < 0:
+        # Utente entrato da Nostr: nessuna chat Telegram dove scrivergli.
+        # (Le notifiche via DM Nostr sono un cantiere futuro.)
+        if MODALITA_COLLAUDO:
+            print(f"🔕 [utente Nostr {tg_id}: notifica saltata] {testo}")
+        return
     if MODALITA_COLLAUDO and tg_id < 100000:
         # Utente finto del collaudo: la notifica si stampa in console
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
