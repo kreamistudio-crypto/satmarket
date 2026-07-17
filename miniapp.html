@@ -297,6 +297,81 @@
     text-decoration:none;border-radius:9px;padding:6px 14px;
     font-weight:800;font-size:13px;
   }
+
+  /* ==================== DESKTOP (≥768px) ====================
+     Sotto i 768px non cambia NULLA: il mobile è l'esperienza
+     Telegram e resta identico. Qui sopra l'app respira: container
+     largo, griglia a più colonne, la nav diventa una topbar e i
+     fogli diventano modali centrati. Solo CSS, zero JS. */
+  @media (min-width:768px){
+    #app{max-width:960px;padding-top:76px;padding-bottom:40px}
+
+    /* la tab bar sale in alto: logo a sinistra, voci a destra */
+    nav{
+      top:0;bottom:auto;max-width:none;margin:0;height:60px;
+      align-items:center;justify-content:flex-end;gap:6px;
+      border-top:0;border-bottom:1px solid var(--line);
+      padding:0 max(var(--pad), calc((100% - 960px)/2));
+    }
+    nav::before{
+      content:'Barattolo ⚡';font-family:'Unbounded',sans-serif;
+      font-weight:700;font-size:18px;letter-spacing:-.02em;
+      color:var(--ink);margin-right:auto;
+    }
+    nav button{
+      flex:0 0 auto;flex-direction:row;gap:7px;font-size:14px;
+      padding:8px 14px;border-radius:10px;
+    }
+    nav button .ic{font-size:17px}
+    nav button.sell{background:var(--sats);color:#fff;border-radius:12px}
+    nav button.sell .ic{
+      width:auto;height:auto;border-radius:0;background:none;
+      font-size:17px;margin-top:0;box-shadow:none;
+    }
+    header{top:60px}
+    header .brand{display:none}   /* il logo ora sta nella topbar */
+    .searchbar{max-width:640px}
+    .toast{bottom:40px}           /* niente più bottom bar da scavalcare */
+
+    /* griglia a 3 colonne: vale per home, vetrina e negozio */
+    .grid{grid-template-columns:repeat(3,1fr);gap:14px}
+
+    /* dettaglio a due colonne: foto a sinistra, info a destra */
+    #view-dettaglio{max-width:980px;margin:0 auto}
+    #detailContent{
+      display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
+      gap:28px;align-items:start;padding:18px var(--pad) 24px;
+    }
+    #detailContent > :first-child{border-radius:var(--radius);overflow:hidden}
+    .detail-body{padding:0}
+
+    /* le viste "di lettura" stanno meglio in colonna stretta */
+    #view-vendi,#view-affari,#view-ordine{max-width:680px;margin:0 auto}
+    #negozioHeader{max-width:680px;padding:0 var(--pad)}
+
+    /* i fogli dal basso diventano modali centrati */
+    .sheet{
+      left:50%;right:auto;top:50%;bottom:auto;width:min(560px,92vw);
+      max-width:none;margin:0;border-radius:22px;
+      transform:translate(-50%,-46%);opacity:0;visibility:hidden;
+      transition:transform .22s ease,opacity .22s ease,visibility .22s;
+    }
+    .sheet.open{transform:translate(-50%,-50%);opacity:1;visibility:visible}
+    .sheet .grab{display:none}
+  }
+
+  /* col mouse le card rispondono al passaggio */
+  @media (hover:hover) and (min-width:768px){
+    .card{transition:transform .12s ease,box-shadow .12s ease}
+    .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.07)}
+  }
+
+  /* ==================== DESKTOP LARGO (≥1024px) ==================== */
+  @media (min-width:1024px){
+    #app{max-width:1160px}
+    .grid{grid-template-columns:repeat(4,1fr);gap:16px}
+    nav{padding:0 max(var(--pad), calc((100% - 1160px)/2))}
+  }
 </style>
 </head>
 <body>
