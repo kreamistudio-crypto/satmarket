@@ -58,6 +58,7 @@ RELAYS = [
     "wss://nos.lol",
     "wss://relay.primal.net",
     "wss://nostr.mom",
+    "wss://21milionidinostr.duckdns.org",   # il relay del nostro venditore
 ]
 
 # ==============================================================
