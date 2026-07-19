@@ -99,6 +99,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   committato a versione bloccata e servito da `GET /vendor/nostr.js`
   (file singolo, MAI CDN: nessun terzo deve poter cambiare la pagina
   dove si può incollare una nsec).
+  Doppia cittadinanza (lug 2026): le due direzioni del collegamento.
+  Telegram→Nostr: `POST /api/me/npub/abilita-accesso` promuove il
+  badge VERIFICATO a `npub_accesso` (indice unico = giudice: 409 se
+  la chiave apre già un altro account, e il messaggio indirizza alla
+  fusione); `disabilita-accesso` è il contrario ma RIFIUTA i tg_id
+  negativi (un nativo si chiuderebbe fuori); `salva_npub` che cambia
+  o rimuove il badge azzera anche `npub_accesso` se coincideva (solo
+  su tg_id>0, stessa ragione). Nostr→Telegram: il bot per la prima
+  volta ASCOLTA — webhook `POST /api/telegram/aggiornamenti`
+  (`TELEGRAM_WEBHOOK_SEGRETO` in config, segnaposto = spento;
+  confronto `hmac.compare_digest` sull'header
+  X-Telegram-Bot-Api-Secret-Token; si registra da solo all'avvio con
+  setWebhook, MAI in collaudo: un test locale col token vero non deve
+  rubare il campanello alla produzione). Flusso: dal web
+  `POST /api/me/collega-telegram` (solo id negativi) emette un codice
+  monouso TTL 5 min (`CODICI_FUSIONE` in memoria), il frontend apre
+  t.me/ilbarattolobot?start=CODICE, il bot risponde con la CONFERMA a
+  tastiera inline (token in `CONFERME_FUSIONE`, valido solo per quel
+  from.id: il codice è un bearer token, se il link trapela serve
+  comunque il tocco giusto), e `esegui_fusione` fonde l'account
+  nativo in quello Telegram in UNA transazione `BEGIN IMMEDIATE`:
+  annunci+ordini+sessioni migrano (il browser Nostr resta loggato),
+  la riga negativa MUORE PRIMA che `npub_accesso` si accenda sulla
+  positiva (indice unico), contatori sommati, rating di P (le stelle
+  non esistono ancora). `_guardie_fusione` (ricontrollate DENTRO la
+  transazione) rifiutano: P già collegato, P con badge verificato
+  DIVERSO, affari ancora aperti tra i due (auto-ordine in escrow).
+  `bot_api()` è il gemello completo di `notifica()` ma in collaudo
+  simula SEMPRE (`🤖 [telegram simulato]`); il webhook in collaudo
+  accetta il segreto fisso "collaudo" per suonarlo con curl.
+  `gestisci_update` fa `upsert_utente` sul mittente (che può non
+  aver mai aperto la Mini App) e risponde con garbo a /start nudo
+  e ai messaggi qualsiasi.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
@@ -118,8 +151,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (chiave nella closure, azzerata dopo la firma: mai inviata, mai
   salvata, UI che la sconsiglia). Il bundle si carica pigro da
   `/vendor/nostr.js` solo per bunker/nsec. `barraWeb` con avviso
-  onesto per chi entra da Nostr (niente avvisi Telegram, per ora);
-  foglio `#collegaSheet` per la proposta di collegamento.
+  onesto per chi entra da Nostr (che indica «Collega Telegram» in
+  Vendi); foglio `#collegaSheet` per la proposta di collegamento.
+  Blocco «Le tue identità» in Vendi (`renderIdentita()`, dati già in
+  `/api/me`): riga Telegram (nome+username, o «Collega Telegram» per
+  i tg_id negativi → `collegaTelegram()` apre il deep-link col codice,
+  mai mostrato in chiaro) e riga Nostr (npub nei 4 stati: assente /
+  da verificare / 🟣✓ con «Abilita l'accesso» / 🔑 attiva con
+  «Disabilita» solo su tg_id positivi).
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
@@ -184,6 +223,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   su localhost non compare mai: si collauda col bottone "cookie web").
 - Deploy: commit+push su main → sul server `cd satmarket && git pull &&
   systemctl restart barattolo`. Config e database NON viaggiano mai.
+- Webhook del bot: `TELEGRAM_WEBHOOK_SEGRETO` nel config del server
+  (stringa casuale) e al riavvio si registra da solo (riga «🔔 Webhook
+  Telegram» nel journal). ATTENZIONE: mai avviare MODALITA_COLLAUDO=False
+  col BOT_TOKEN vero fuori dal VPS — ruberebbe il webhook (e quindi i
+  /start) alla produzione.
 - La verifica npub richiede `websocket-client` (pip) nell'ambiente del
   servizio: se manca, il server parte lo stesso e l'endpoint risponde 503.
 - La pubblicazione su Nostr richiede anche `coincurve`: installarla con
@@ -252,7 +296,15 @@ per ora restano senza notifiche: le vedono nei loro Affari); scudo
 anti-XSS `esc()` su tutti i template; Compra subito col wallet NWC
 (NIP-47 lato client, secret solo in localStorage, vedi Architettura
 — il percorso felice va collaudato con un wallet vero a budget
-minuscolo: in locale è verificato il ripiego, non il pagamento).
-Backlog concordato: commissione minima fissa; poi post-lancio: tracking
+minuscolo: in locale è verificato il ripiego, non il pagamento);
+doppia cittadinanza completa (blocco «Le tue identità» in Vendi,
+badge verificato promuovibile a chiave d'accesso, webhook /start del
+bot e fusione atomica Nostr→Telegram, vedi Architettura — in
+produzione va provata una fusione vera con un account di test).
+Backlog concordato: commissione minima fissa; deduplica annunci Nostr
+al collegamento (proporre il ritiro del doppione pubblicato dalla
+piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
+la sua chiave — rimandata: il match sui titoli fa falsi positivi e un
+NIP-09 sbagliato cancella presenza legittima); poi post-lancio: tracking
 verificato via API corrieri, feedback/stelle, escrow on-chain
 2-di-3, parere legale MiCA prima di crescere.
