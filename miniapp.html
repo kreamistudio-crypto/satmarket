@@ -443,7 +443,9 @@
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
         protetti. Gli annunci vengono moderati.</div>
-      <div class="field" style="margin-top:24px"><label>Il tuo profilo Nostr (facoltativo)</label>
+      <div class="section-label" style="padding:26px 0 0">Le tue identità</div>
+      <div id="identitaBlocco" style="margin-top:12px"></div>
+      <div class="field" style="margin-top:16px"><label>Il tuo profilo Nostr (facoltativo)</label>
         <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
       <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
       <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
@@ -713,7 +715,7 @@ function go(view){
   el('nav-'+(['dettaglio','negozio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
     ?.classList.add('active');
   if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
-  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); }
+  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita(); }
   window.scrollTo(0,0);
 }
 
@@ -1288,6 +1290,88 @@ async function saveLnAddress(btn){
    nota pubblica (l'utente pubblica un codice dal SUO client: nessuna
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
+let myNome = '', myUsername = '', myNpubAccesso = '';
+
+/* ---- "Le tue identità": la doppia cittadinanza a colpo d'occhio.
+   Telegram e Nostr, cosa è collegato e cosa manca, con il bottone
+   giusto per il passo successivo. I dati arrivano tutti da /api/me. ---- */
+function renderIdentita(){
+  const box = el('identitaBlocco');
+  if (!box) return;
+  const riga = (emoji, nome, stato, azione) =>
+    `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
+       <div style="font-size:20px">${emoji}</div>
+       <div style="flex:1;min-width:0">
+         <div style="font-weight:800;font-size:13.5px">${nome}</div>
+         <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>
+       </div></div>${azione||''}`;
+  const npubBreve = myNpub ? esc(myNpub.slice(0,10)+'…'+myNpub.slice(-4)) : '';
+  /* — riga Telegram — */
+  let tgRiga;
+  if (myTgId != null && myTgId < 0) {
+    tgRiga = riga('✈️','Telegram','Non collegato: collegalo per ricevere gli avvisi sui tuoi affari direttamente in chat.',
+      `<button class="btn ghost" style="margin:0 0 8px" onclick="collegaTelegram()">✈️ Collega Telegram</button>`);
+  } else {
+    tgRiga = riga('✈️','Telegram',
+      `${esc(myNome||'')}${myUsername?' · @'+esc(myUsername):''} — collegato`);
+  }
+  /* — riga Nostr — */
+  let nsRiga;
+  if (!myNpub) {
+    nsRiga = riga('🟣','Nostr','Nessuna npub nel profilo: puoi dichiararla qui sotto.');
+  } else if (!myNpubVerified) {
+    nsRiga = riga('🟣','Nostr',
+      `${npubBreve} — da verificare. Verificala per il badge 🟣✓ e per poterla usare come chiave d'accesso.`);
+  } else if (!myNpubAccesso) {
+    nsRiga = riga('🟣','Nostr',`${npubBreve} — badge 🟣✓ verificato.`,
+      `<button class="btn ghost" style="margin:0 0 8px" onclick="abilitaAccessoNostr()">🔑 Abilita l'accesso con Nostr</button>
+       <div style="margin:-2px 0 8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+         Con l'accesso attivo entri in questo stesso account anche dal
+         browser, firmando con la tua chiave Nostr.</div>`);
+  } else {
+    nsRiga = riga('🟣','Nostr',`${npubBreve} — 🟣✓ 🔑 puoi entrare dal web con Nostr.`,
+      myTgId > 0 ? `<button class="btn ghost" style="margin:0 0 8px" onclick="disabilitaAccessoNostr()">Disabilita l'accesso con Nostr</button>` : '');
+  }
+  box.innerHTML = tgRiga + nsRiga;
+}
+
+async function abilitaAccessoNostr(){
+  haptic();
+  if (DEMO) { toast('In demo non c\'è un account vero da aprire 🙂'); return; }
+  const r = await fetch(`${API_BASE}/me/npub/abilita-accesso`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  myNpubAccesso = myNpub;
+  renderIdentita();
+  toast('🔑 Fatto! Ora puoi entrare anche dal web con Nostr');
+}
+
+async function disabilitaAccessoNostr(){
+  haptic();
+  const r = await fetch(`${API_BASE}/me/npub/disabilita-accesso`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  myNpubAccesso = '';
+  renderIdentita();
+  toast('Accesso con Nostr spento: si entra solo da Telegram');
+}
+
+/* L'utente nato su Nostr chiede il lasciapassare e vola dal bot:
+   il codice monouso viaggia SOLO dentro il link t.me, mai mostrato.
+   Il resto (conferma e fusione) succede nella chat col bot. */
+async function collegaTelegram(){
+  haptic();
+  if (DEMO) { toast('In demo non c\'è nulla da collegare 🙂'); return; }
+  const r = await fetch(`${API_BASE}/me/collega-telegram`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  if (collaudo) console.log('🧪 codice fusione (per il curl al webhook):', d.codice);
+  toast('✈️ Ti aspetto nella chat del bot: conferma lì il collegamento', 6000);
+  window.open(`https://t.me/ilbarattolobot?start=${d.codice}`, '_blank', 'noopener');
+}
 
 function renderNpubVerifica(){
   const box = el('npubVerifica');
@@ -1346,6 +1430,7 @@ async function npubControlla(){
     myNpubVerified = true; npubCodice = '';
     toast('🎉 npub verificata! Badge 🟣✓ attivo sui tuoi annunci');
     renderNpubVerifica();
+    renderIdentita();
     await loadListings(); renderGrid();
   } else {
     toast(d.msg || 'Nota non ancora trovata: riprova tra poco', 4000);
@@ -1374,7 +1459,12 @@ async function saveNpub(){
   if (!r.ok) { toast(d.detail || 'npub non accettata, ricontrolla'); return; }
   myNpub = d.npub; myNpubVerified = !!d.npub_verificata;
   if (!myNpubVerified) npubCodice = '';   // npub cambiata: verifica da rifare
+  if (d.accesso_revocato) {
+    myNpubAccesso = '';
+    toast('🔑 Accesso con Nostr spento: la chiave era legata alla vecchia npub', 6000);
+  }
   renderNpubVerifica();
+  renderIdentita();
   toast(myNpub ? '🟣 Badge Nostr attivo sui tuoi annunci!' : 'npub rimossa dal profilo');
   await loadListings(); renderGrid();
 }
@@ -1754,9 +1844,9 @@ function barraWeb(nome){
   b.className = 'demo-banner demo-vera';
   b.style.display = 'block';
   const avvisi = myTgId < 0
-    ? `sei entrato con Nostr: per ora gli avvisi arrivano solo su`
-      + ` Telegram o, a breve, via DM Nostr — ricontrolla i tuoi`
-      + ` Affari di tanto in tanto`
+    ? `sei entrato con Nostr: per gli avvisi in chat collega Telegram`
+      + ` dalla scheda Vendi («Le tue identità»), oppure ricontrolla`
+      + ` i tuoi Affari di tanto in tanto`
     : `Per ricevere gli avvisi sugli ordini apri una volta `
       + `<a href="https://t.me/ilbarattolobot" target="_blank"`
       + ` rel="noopener">@ilbarattolobot</a>`;
@@ -2249,9 +2339,12 @@ async function avvia(){
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;
+    myNome = me.nome || ''; myUsername = me.username || '';
+    myNpubAccesso = me.npub_accesso || '';
     npubCodice = '';
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();
+    renderIdentita();
     DEMO = false;
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');

@@ -16,6 +16,14 @@ BOT_TOKEN = "INCOLLA_QUI_IL_TOKEN_DEL_BOT"      # da @BotFather
 ADMIN_IDS = [123456789]      # il TUO user id Telegram (da @userinfobot):
                              # decide le dispute e riceve gli avvisi
 
+# --- Bot Telegram in ricezione (doppia cittadinanza) -----------------
+# Il segreto che Telegram ci rimanda in ogni update (header
+# X-Telegram-Bot-Api-Secret-Token), cosi' il webhook sa che a suonare
+# e' davvero Telegram. Genera una stringa casuale (1-256 caratteri,
+# solo A-Za-z0-9_-) e incollala SOLO nel config.py del server.
+# Finche' resta il segnaposto, il bot resta solo-invio come prima.
+TELEGRAM_WEBHOOK_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+
 # --- Anthropic (ricerca AI in linguaggio naturale) -------------------
 ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"
 MODELLO_RICERCA = "claude-haiku-4-5"

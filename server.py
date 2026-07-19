@@ -101,6 +101,14 @@ try:
 except ImportError:
     NOSTR_NSEC_PIATTAFORMA = ""
 
+# Anche il segreto del webhook e' arrivato dopo: se manca (o resta il
+# segnaposto) il bot continua a SOLO mandare messaggi, come ha sempre
+# fatto, e il campanello in entrata resta spento.
+try:
+    from config import TELEGRAM_WEBHOOK_SEGRETO
+except ImportError:
+    TELEGRAM_WEBHOOK_SEGRETO = ""
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -789,6 +797,321 @@ async def notifica_admin(testo: str):
         destinatari.add(999)
     for tg_id in destinatari:
         await notifica(tg_id, testo)
+
+
+# ---------------- IL CAMPANELLO DEL BOT (webhook) --------------------
+# Per la prima volta il bot non solo parla: ASCOLTA. Telegram consegna
+# ogni messaggio a POST /api/telegram/aggiornamenti (webhook con
+# segreto condiviso), e il bot risponde a /start. Serve a una cosa
+# sola, per ora: il deep-link t.me/ilbarattolobot?start=CODICE con cui
+# un utente nato su Nostr (tg_id negativo) FONDE il suo account
+# nell'identita' Telegram — annunci, ordini e chiave npub migrano, e
+# da quel momento gli arrivano anche gli avvisi Telegram.
+# Fail-open come sempre: segnaposto in config = campanello spento,
+# bot solo-invio come e' sempre stato.
+
+def webhook_attivo() -> bool:
+    return bool(TELEGRAM_WEBHOOK_SEGRETO
+                and not TELEGRAM_WEBHOOK_SEGRETO.startswith("INCOLLA"))
+
+
+async def bot_api(metodo: str, dati: dict):
+    """Chiama l'API del bot (sendMessage con tastiere,
+    answerCallbackQuery, editMessageText...). In collaudo stampa e
+    basta, SEMPRE — a differenza di notifica(), che simula solo gli
+    id piccoli degli utenti finti."""
+    if MODALITA_COLLAUDO:
+        print(f"🤖 [telegram simulato] {metodo} "
+              f"{json.dumps(dati, ensure_ascii=False)}")
+        return
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            await c.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/{metodo}",
+                json=dati)
+    except Exception as e:
+        print(f"⚠️ Bot Telegram, {metodo} non consegnato: {e}")
+
+
+# I lasciapassare della fusione, monouso e a vita breve (in memoria,
+# come SFIDE_LOGIN: uvicorn e' mono-processo). Due passi, due dizionari:
+# il CODICE viaggia nel deep-link t.me/...?start=..., il TOKEN vive
+# solo nella tastiera di conferma dentro la chat col bot.
+CODICI_FUSIONE: dict[str, tuple[int, int]] = {}       # codice -> (tg_id_nostr, scade)
+CONFERME_FUSIONE: dict[str, tuple[int, int, int]] = {}  # token -> (tg_telegram, tg_nostr, scade)
+SECONDI_CODICE_FUSIONE = 300
+
+
+def _pulisci_fusioni():
+    """Via i lasciapassare scaduti; il tetto tiene a bada i bot."""
+    adesso = int(time.time())
+    for d in (CODICI_FUSIONE, CONFERME_FUSIONE):
+        for k in [k for k, v in d.items() if v[-1] < adesso]:
+            d.pop(k, None)
+        while len(d) >= 1000:
+            d.pop(next(iter(d)))
+
+
+@app.post("/api/me/collega-telegram")
+def collega_telegram(x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """L'utente Nostr chiede il lasciapassare per il bot: il frontend
+    apre t.me/ilbarattolobot?start=CODICE e il resto succede in chat."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if user["id"] >= 0:
+        raise HTTPException(400, "Il tuo Telegram e' gia' collegato: "
+                                 "questo bottone serve a chi e' entrato con Nostr")
+    _pulisci_fusioni()
+    # Un solo invito vivo per account: chiederne uno nuovo brucia i vecchi
+    for c in [c for c, v in CODICI_FUSIONE.items() if v[0] == user["id"]]:
+        CODICI_FUSIONE.pop(c, None)
+    codice = secrets.token_hex(16)
+    CODICI_FUSIONE[codice] = (user["id"],
+                              int(time.time()) + SECONDI_CODICE_FUSIONE)
+    return {"codice": codice, "valida_secondi": SECONDI_CODICE_FUSIONE}
+
+
+def _guardie_fusione(con, n, p) -> str | None:
+    """I motivi per dire di no, ognuno con la sua frase gentile.
+    Si chiamano due volte: al /start (feedback immediato) e DENTRO la
+    transazione (la parola finale). None = via libera.
+    Nota: se P e' un moderatore non c'e' nulla da guardare — e_admin
+    ragiona sull'id positivo, che e' proprio quello che sopravvive."""
+    if not n or n["tg_id"] >= 0 or not n["npub_accesso"]:
+        return ("⏳ Questo account Nostr non esiste piu' (forse e' gia' "
+                "stato collegato). Rifai «Collega Telegram» dal sito.")
+    if not p:
+        return ("🤔 Non ti trovo nell'anagrafe: apri prima la Mini App "
+                "del Barattolo, poi riprova col link.")
+    if p["npub_accesso"]:
+        return ("🔗 Questo Telegram e' gia' collegato a una chiave "
+                "Nostr: un account, una chiave.")
+    if p["npub"] and p["npub_verificata"] and p["npub"] != n["npub"]:
+        # Fondere qui creerebbe un profilo col badge di una chiave e
+        # la porta d'ingresso di un'altra: confusione d'identita'.
+        # (Un badge NON verificato invece non blocca: e' solo una
+        # dichiarazione, e verra' sostituito da quella verificata.)
+        return ("🟣 Il tuo profilo dichiara (verificata) un'altra npub: "
+                "rimuovila prima dalla scheda Vendi, poi riprova.")
+    aperti = con.execute(
+        "SELECT COUNT(*) FROM ordini WHERE ((compratore_id=? AND "
+        "venditore_id=?) OR (compratore_id=? AND venditore_id=?)) "
+        "AND stato NOT IN ('released','refunded','annullato')",
+        (n["tg_id"], p["tg_id"], p["tg_id"], n["tg_id"])).fetchone()[0]
+    if aperti:
+        # Un affare pendente diventerebbe un auto-ordine con sats in
+        # cassaforte e regole senza piu' senso. Quelli gia' chiusi
+        # invece passano: restano una curiosita' nello storico.
+        return ("⚖️ C'e' un affare ancora aperto tra questi due account: "
+                "chiudetelo prima, poi collegatevi.")
+    return None
+
+
+def esegui_fusione(id_telegram: int, id_nostr: int):
+    """L'atto della fusione: tutto cio' che era dell'account Nostr
+    passa all'account Telegram, in UNA transazione — o tutto o niente.
+    Ritorna il riepilogo, oppure la frase gentile del rifiuto."""
+    con = db()
+    try:
+        # Lock di scrittura subito: niente corse con l'orologio o con
+        # una seconda conferma arrivata nello stesso istante.
+        con.execute("BEGIN IMMEDIATE")
+        n = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (id_nostr,)).fetchone()
+        p = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (id_telegram,)).fetchone()
+        errore = _guardie_fusione(con, n, p)
+        if errore:
+            con.rollback()
+            return errore
+        annunci = con.execute(
+            "UPDATE annunci SET venditore_id=? WHERE venditore_id=?",
+            (id_telegram, id_nostr)).rowcount
+        acquisti = con.execute(
+            "UPDATE ordini SET compratore_id=? WHERE compratore_id=?",
+            (id_telegram, id_nostr)).rowcount
+        vendite = con.execute(
+            "UPDATE ordini SET venditore_id=? WHERE venditore_id=?",
+            (id_telegram, id_nostr)).rowcount
+        # Il browser dell'utente Nostr resta loggato: le sue sessioni
+        # migrano vive e al prossimo /api/me si risveglia qui.
+        con.execute("UPDATE sessioni SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # PRIMA muore la riga Nostr, POI la chiave si accende su quella
+        # Telegram: l'indice unico su npub_accesso non ammette il
+        # doppio valore nemmeno per un istante.
+        con.execute("DELETE FROM utenti WHERE tg_id=?", (id_nostr,))
+        con.execute(
+            "UPDATE utenti SET npub=?, npub_verificata=1, npub_accesso=?, "
+            "verifica_codice='', verifica_scade=0, "
+            "ln_address=CASE WHEN ln_address!='' THEN ln_address ELSE ? END, "
+            "vendite_ok=vendite_ok+?, acquisti_ok=acquisti_ok+?, "
+            # rating: resta quello di P — le stelle non esistono ancora,
+            # quando arriveranno andra' deciso come pesare i due passati
+            "n_feedback=n_feedback+? WHERE tg_id=?",
+            (n["npub"], n["npub_accesso"], n["ln_address"],
+             n["vendite_ok"], n["acquisti_ok"], n["n_feedback"],
+             id_telegram))
+        con.commit()
+        return {"annunci": annunci, "ordini": acquisti + vendite,
+                "npub": n["npub"], "negozio": p["negozio"]}
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+
+
+def _npub_breve(npub: str) -> str:
+    return npub[:10] + "…" + npub[-4:] if len(npub) > 15 else npub
+
+
+async def avvia_fusione(id_telegram: int, codice: str):
+    """/start CODICE: il codice si brucia subito (monouso anche se poi
+    qualcosa va storto), le guardie danno il feedback immediato, e la
+    parola finale spetta alla conferma sulla tastiera."""
+    dati = CODICI_FUSIONE.pop(codice, None)
+    if not dati or dati[1] < int(time.time()):
+        return await bot_api("sendMessage", {"chat_id": id_telegram,
+            "text": "⏳ Questo invito e' scaduto o gia' usato: rifai "
+                    "«Collega Telegram» dal sito e riprova col link fresco."})
+    id_nostr = dati[0]
+    con = db()
+    n = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                    (id_nostr,)).fetchone()
+    p = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                    (id_telegram,)).fetchone()
+    errore = _guardie_fusione(con, n, p)
+    con.close()
+    if errore:
+        return await bot_api("sendMessage",
+                             {"chat_id": id_telegram, "text": errore})
+    _pulisci_fusioni()
+    token = secrets.token_hex(16)   # 32 char: nei 64 di callback_data ci sta
+    CONFERME_FUSIONE[token] = (id_telegram, id_nostr,
+                               int(time.time()) + SECONDI_CODICE_FUSIONE)
+    await bot_api("sendMessage", {
+        "chat_id": id_telegram, "parse_mode": "HTML",
+        "text": (f"🔗 Stai per collegare l'account Nostr "
+                 f"<b>{_npub_breve(n['npub'])}</b> a QUESTO account "
+                 "Telegram: i suoi annunci, i suoi affari e la sua "
+                 "chiave diventeranno tuoi, per sempre (non si puo' "
+                 "annullare). Sei tu?"),
+        "reply_markup": {"inline_keyboard": [[
+            {"text": "✅ Si', collega", "callback_data": f"fondi:{token}"},
+            {"text": "❌ No, annulla", "callback_data": f"annulla:{token}"},
+        ]]}})
+
+
+async def gestisci_callback(cb: dict):
+    """Il tocco sulla tastiera di conferma. Il token vale solo per il
+    Telegram a cui era destinato: il tocco di chiunque altro non conta."""
+    await bot_api("answerCallbackQuery", {"callback_query_id": cb.get("id")})
+    azione, _, token = (cb.get("data") or "").partition(":")
+    if azione not in ("fondi", "annulla"):
+        return
+    msg = cb.get("message") or {}
+    chat = (msg.get("chat") or {}).get("id")
+    modifica = lambda testo: bot_api("editMessageText", {
+        "chat_id": chat, "message_id": msg.get("message_id"),
+        "text": testo, "parse_mode": "HTML"})
+    dati = CONFERME_FUSIONE.pop(token, None)
+    if (not dati or dati[2] < int(time.time())
+            or dati[0] != (cb.get("from") or {}).get("id")):
+        return await modifica("⏳ Conferma scaduta: rifai «Collega "
+                              "Telegram» dal sito e riprova.")
+    if azione == "annulla":
+        return await modifica("👌 Annullato: non e' cambiato nulla.")
+    esito = esegui_fusione(dati[0], dati[1])
+    if isinstance(esito, str):
+        return await modifica(esito)
+    await modifica(
+        "🎉 <b>Fatto! I tuoi due account ora sono uno.</b>\n"
+        f"Sono passati di qua {esito['annunci']} annunci e "
+        f"{esito['ordini']} affari. Il link del tuo negozio ora e' "
+        f"{URL_PUBBLICO}/negozio/{esito['negozio']} e gli avvisi "
+        "Telegram arrivano anche per gli affari nati su Nostr.\n"
+        "ℹ️ Se pubblicavi gli stessi oggetti anche dal tuo profilo "
+        "Nostr, ora potresti avere qualche doppione sui relay.")
+    await notifica_admin(f"🔗 Doppia cittadinanza: "
+                         f"{_npub_breve(esito['npub'])} → tg {dati[0]}")
+
+
+async def gestisci_update(update: dict):
+    """Smista quel che arriva dal campanello: solo chat private, solo
+    testo. Chi scrive al bot potrebbe non aver MAI aperto la Mini App:
+    prima di tutto il benvenuto standard in anagrafe."""
+    if "callback_query" in update:
+        return await gestisci_callback(update["callback_query"])
+    msg = update.get("message") or {}
+    testo = (msg.get("text") or "").strip()
+    mittente = msg.get("from") or {}
+    if (not testo or not mittente.get("id") or mittente.get("is_bot")
+            or (msg.get("chat") or {}).get("type") != "private"):
+        return
+    upsert_utente({"id": mittente["id"],
+                   "first_name": mittente.get("first_name", ""),
+                   "username": mittente.get("username", "")})
+    if testo.startswith("/start"):
+        parti = testo.split(maxsplit=1)
+        if len(parti) == 2:
+            return await avvia_fusione(mittente["id"], parti[1].strip())
+        return await bot_api("sendMessage", {"chat_id": mittente["id"],
+            "text": "🫙 Ciao! Sono il campanello del Barattolo: ti "
+                    "avviso quando succede qualcosa nei tuoi affari. "
+                    "Il mercatino vero e' nella Mini App: aprila dal "
+                    f"bottone del menu qui sotto, o su {URL_PUBBLICO}"})
+    await bot_api("sendMessage", {"chat_id": mittente["id"],
+        "text": "Non sono un bot chiacchierone 😅 — tutto il mercatino "
+                "vive nella Mini App: aprila dal bottone del menu!"})
+
+
+@app.post("/api/telegram/aggiornamenti")
+async def telegram_aggiornamenti(req: Request):
+    """Il campanello: Telegram suona qui per ogni messaggio al bot.
+    Superato il controllo del segreto si risponde SEMPRE 200: un
+    errore nostro non deve far accodare tentativi a Telegram.
+    guardia_csrf non c'entra (niente cookie in queste richieste).
+    In collaudo il segreto atteso e' la stringa fissa 'collaudo':
+    cosi' il campanello si suona a mano con curl."""
+    if not MODALITA_COLLAUDO and not webhook_attivo():
+        raise HTTPException(404, "Campanello spento")
+    atteso = "collaudo" if MODALITA_COLLAUDO else TELEGRAM_WEBHOOK_SEGRETO
+    segreto = req.headers.get("x-telegram-bot-api-secret-token", "")
+    if not hmac.compare_digest(segreto, atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+    try:
+        await gestisci_update(await req.json())
+    except Exception as e:
+        print(f"⚠️ Update Telegram indigesto: {e}")
+    return {"ok": True}
+
+
+@app.on_event("startup")
+async def registra_webhook_telegram():
+    """Dice a Telegram dove suonare. Idempotente: ogni riavvio ripete
+    la stessa registrazione. GUARDIE anti-pasticcio: in collaudo NON
+    si tocca MAI il webhook (un test locale col token vero non deve
+    rubare il campanello alla produzione), e col segnaposto in config
+    non si registra nulla."""
+    if MODALITA_COLLAUDO or not webhook_attivo():
+        return
+
+    async def _registra():
+        try:
+            async with httpx.AsyncClient(timeout=20) as c:
+                r = await c.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook",
+                    json={"url": f"{URL_PUBBLICO}/api/telegram/aggiornamenti",
+                          "secret_token": TELEGRAM_WEBHOOK_SEGRETO,
+                          "allowed_updates": ["message", "callback_query"]})
+                print("🔔 Webhook Telegram: "
+                      f"{r.json().get('description', '?')}")
+        except Exception as e:
+            print(f"⚠️ Webhook Telegram non registrato (il bot resta "
+                  f"solo-invio): {e}")
+
+    asyncio.create_task(_registra())
 
 
 # ------------------------- API: ANNUNCI -----------------------------
@@ -1485,19 +1808,31 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header(""),
             "Formato non valido: la npub inizia con npub1 ed e' lunga 63 caratteri")
     con = db()
     attuale = con.execute(
-        "SELECT npub, npub_verificata FROM utenti WHERE tg_id=?",
+        "SELECT npub, npub_verificata, npub_accesso FROM utenti WHERE tg_id=?",
         (user["id"],)).fetchone()
     verificata = bool(attuale and attuale["npub_verificata"])
+    accesso_revocato = False
     if not attuale or npub != attuale["npub"]:
-        # npub nuova, cambiata o rimossa: la verifica riparte da zero
+        # npub nuova, cambiata o rimossa: la verifica riparte da zero.
+        # E se quel badge era anche la chiave d'accesso web, la revoca
+        # del badge revoca pure l'accesso (la credenziale era nata DA
+        # quel badge verificato). SOLO su account Telegram (tg_id>0):
+        # a un nativo Nostr la chiave d'ingresso non si toglie mai,
+        # resterebbe chiuso fuori per sempre.
         verificata = False
+        accesso_revocato = bool(attuale and user["id"] > 0
+                                and attuale["npub_accesso"]
+                                and attuale["npub_accesso"] == attuale["npub"])
         con.execute(
             "UPDATE utenti SET npub=?, npub_verificata=0, "
-            "verifica_codice='', verifica_scade=0 WHERE tg_id=?",
-            (npub, user["id"]))
+            "verifica_codice='', verifica_scade=0, "
+            "npub_accesso=CASE WHEN tg_id>0 AND npub_accesso=? "
+            "THEN '' ELSE npub_accesso END WHERE tg_id=?",
+            (npub, attuale["npub"] if attuale else "", user["id"]))
     con.commit()
     con.close()
-    return {"ok": True, "npub": npub, "npub_verificata": verificata}
+    return {"ok": True, "npub": npub, "npub_verificata": verificata,
+            "accesso_revocato": accesso_revocato}
 
 
 # --- Verifica della npub con una nota pubblica -----------------------
@@ -1671,6 +2006,65 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
                    "portano il badge dei venditori verificati su Nostr. 🎉 "
                    "(La nota col codice ora puoi anche cancellarla.)")
     return {"ok": True, "verificata": True}
+
+
+# --- Doppia cittadinanza: il badge diventa chiave d'ingresso ---------
+# Un utente Telegram con la npub VERIFICATA puo' promuoverla a chiave
+# d'accesso (npub_accesso): da quel momento entra nello STESSO account
+# anche dal web col login Nostr. Il badge non verificato non basta mai:
+# potrebbe essere la dichiarazione (falsa) di una chiave altrui.
+
+@app.post("/api/me/npub/abilita-accesso")
+def abilita_accesso_nostr(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    u = con.execute(
+        "SELECT npub, npub_verificata, npub_accesso FROM utenti "
+        "WHERE tg_id=?", (user["id"],)).fetchone()
+    if not u or not u["npub"] or not u["npub_verificata"]:
+        con.close()
+        raise HTTPException(400, "Prima verifica la tua npub (badge 🟣✓): "
+                                 "solo un badge verificato puo' aprire l'account")
+    if u["npub_accesso"]:
+        con.close()
+        raise HTTPException(400, "L'accesso con Nostr e' gia' attivo")
+    try:
+        # Le condizioni si ripetono nella WHERE: tra la lettura sopra e
+        # questa scrittura non deve essere cambiato nulla.
+        con.execute("UPDATE utenti SET npub_accesso=npub WHERE tg_id=? "
+                    "AND npub_accesso='' AND npub_verificata=1",
+                    (user["id"],))
+        con.commit()
+    except sqlite3.IntegrityError:
+        # L'indice unico fa da giudice: quella chiave apre gia' un altro
+        # account (probabilmente il suo account nativo Nostr) e la
+        # strada giusta e' la fusione, non un doppione.
+        con.close()
+        raise HTTPException(409,
+            "Questa chiave apre gia' un altro account: se e' il tuo "
+            "account Nostr, entra dal web con Nostr e usa «Collega Telegram»")
+    con.close()
+    return {"ok": True, "npub_accesso": True}
+
+
+@app.post("/api/me/npub/disabilita-accesso")
+def disabilita_accesso_nostr(x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """Il gesto contrario: l'account torna apribile solo da Telegram."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if user["id"] < 0:
+        # Doppia cintura col tg_id>0 nella WHERE qui sotto: un nativo
+        # Nostr e' entrato PROPRIO con questa chiave, togliergliela
+        # significherebbe chiuderlo fuori per sempre.
+        raise HTTPException(400, "Sei entrato proprio con questa chiave: "
+                                 "toglierla ti chiuderebbe fuori per sempre")
+    con = db()
+    con.execute("UPDATE utenti SET npub_accesso='' WHERE tg_id=? AND tg_id>0",
+                (user["id"],))
+    con.commit()
+    con.close()
+    return {"ok": True, "npub_accesso": False}
 
 
 # --- Barattolo su Nostr: gli annunci in piazza -----------------------
