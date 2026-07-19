@@ -132,6 +132,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `gestisci_update` fa `upsert_utente` sul mittente (che può non
   aver mai aperto la Mini App) e risponde con garbo a /start nudo
   e ai messaggi qualsiasi.
+  Notifiche multi-canale (lug 2026): `notifica()` legge
+  `utenti.canale_notifiche` ('' = automatico: Telegram se tg_id>0,
+  DM Nostr per i nativi; oppure telegram | nostr | entrambi, scelta
+  via `POST /api/me/canale-notifiche` che accetta solo canali
+  raggiungibili). Il DM è NIP-17 (scelto su NIP-04, deprecato e coi
+  metadati in chiaro: nel 2026 Amethyst, Damus, Primal, 0xchat & co.
+  parlano tutti NIP-17): rumor kind 14 NON firmato → sigillo kind 13
+  firmato dalla piattaforma → pacco kind 1059 firmato da una chiave
+  effimera nuova per messaggio, date arretrate a caso ≤2gg. Cifratura
+  NIP-44 v2 in `nip44_cifra`: ECDH con la coordinata X NUDA via
+  `ChiavePubblicaCompleta.multiply` (MAI `PrivateKey.ecdh()` di
+  coincurve, che la hasherebbe), HKDF con hmac/hashlib, ChaCha20 dal
+  pacchetto `cryptography` (import fail-open: senza, canale spento).
+  La npub di DESTINAZIONE è solo dal possesso dimostrato:
+  `npub_accesso`, o il badge `npub` se VERIFICATO — mai un badge
+  nudo (i dettagli degli ordini di Tizio finirebbero nella inbox di
+  Caio). Consegna ai relay del kind 10050 del destinatario (cache
+  1h in memoria) con ripiego sui 4 standard; il ramo Nostr gira in
+  `asyncio.create_task` (mai bloccare: notifica() vive anche
+  nell'orologio) con ripiego Telegram se il DM non parte e la chat
+  c'è. `spoglia_html` toglie i tag Telegram dal testo del DM. In
+  collaudo il pacco si cifra davvero ma si stampa (`💌 [dm nostr
+  simulato]`). Frontend: blocchetto 🔔 Avvisi sotto «Le tue
+  identità» in Vendi (`renderAvvisi`), pillole di scelta solo se
+  entrambi i canali sono disponibili, testo statico altrimenti.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
@@ -237,6 +262,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   funzione Nostr si spegne da sola e il resto vive normalmente.
   Anche il LOGIN Nostr dipende da coincurve (verifica Schnorr): senza,
   i suoi endpoint rispondono 503 e tutto il resto vive.
+- Le notifiche via DM Nostr richiedono anche `cryptography` (ChaCha20
+  per NIP-44): `pip install cryptography` nell'ambiente del servizio,
+  PRIMA del restart. Se manca, il canale DM si spegne da solo (riga
+  in console) e le notifiche Telegram vivono come sempre.
 
 ## Regole ferree
 
@@ -253,6 +282,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    vive solo in localStorage del dispositivo, mai sul server — un
    suo salvataggio server-side, anche cifrato, farebbe della
    piattaforma il custode dei wallet di tutti: da respingere) →
+   DM di notifica NIP-17 (lug 2026: si CIFRA verso la chiave
+   PUBBLICA dell'utente e si firma con la chiave della piattaforma,
+   nessun segreto altrui coinvolto) →
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
@@ -300,7 +332,12 @@ minuscolo: in locale è verificato il ripiego, non il pagamento);
 doppia cittadinanza completa (blocco «Le tue identità» in Vendi,
 badge verificato promuovibile a chiave d'accesso, webhook /start del
 bot e fusione atomica Nostr→Telegram, vedi Architettura — in
-produzione va provata una fusione vera con un account di test).
+produzione va provata una fusione vera con un account di test);
+notifiche via DM Nostr NIP-17 con scelta del canale (i nativi Nostr
+finalmente ricevono gli avvisi, blocchetto 🔔 Avvisi in Vendi, vedi
+Architettura — la cifratura è verificata contro nostr-tools, ma in
+produzione va provato un DM vero verso la propria npub su 0xchat o
+Amethyst; sul VPS serve `pip install cryptography`).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
