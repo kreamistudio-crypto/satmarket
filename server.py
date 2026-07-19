@@ -1087,15 +1087,33 @@ async def telegram_aggiornamenti(req: Request):
     return {"ok": True}
 
 
+_TASK_WEBHOOK = None   # il riferimento tiene vivo il task (senza, il
+#                        garbage collector puo' cancellarlo a meta' volo)
+
+
 @app.on_event("startup")
 async def registra_webhook_telegram():
     """Dice a Telegram dove suonare. Idempotente: ogni riavvio ripete
     la stessa registrazione. GUARDIE anti-pasticcio: in collaudo NON
     si tocca MAI il webhook (un test locale col token vero non deve
     rubare il campanello alla produzione), e col segnaposto in config
-    non si registra nulla."""
-    if MODALITA_COLLAUDO or not webhook_attivo():
+    non si registra nulla. Ogni strada, presa o saltata, lascia una
+    riga nel journal: flush=True perche' sotto systemd lo stdout di
+    Python e' bufferizzato e un print senza flush puo' restare
+    invisibile a lungo."""
+    if MODALITA_COLLAUDO:
+        print("🔕 Webhook Telegram: saltato, siamo in collaudo "
+              "(il campanello di produzione non si tocca mai da qui)",
+              flush=True)
         return
+    if not webhook_attivo():
+        print("🔕 Webhook Telegram: saltato, TELEGRAM_WEBHOOK_SEGRETO "
+              "mancante o ancora segnaposto nel config "
+              f"(letto: {len(TELEGRAM_WEBHOOK_SEGRETO)} caratteri). "
+              "Il bot resta solo-invio.", flush=True)
+        return
+    print(f"🔔 Webhook Telegram: registro "
+          f"{URL_PUBBLICO}/api/telegram/aggiornamenti …", flush=True)
 
     async def _registra():
         try:
@@ -1106,12 +1124,13 @@ async def registra_webhook_telegram():
                           "secret_token": TELEGRAM_WEBHOOK_SEGRETO,
                           "allowed_updates": ["message", "callback_query"]})
                 print("🔔 Webhook Telegram: "
-                      f"{r.json().get('description', '?')}")
+                      f"{r.json().get('description', '?')}", flush=True)
         except Exception as e:
             print(f"⚠️ Webhook Telegram non registrato (il bot resta "
-                  f"solo-invio): {e}")
+                  f"solo-invio): {e}", flush=True)
 
-    asyncio.create_task(_registra())
+    global _TASK_WEBHOOK
+    _TASK_WEBHOOK = asyncio.create_task(_registra())
 
 
 # ------------------------- API: ANNUNCI -----------------------------
