@@ -445,6 +445,7 @@
         protetti. Gli annunci vengono moderati.</div>
       <div class="section-label" style="padding:26px 0 0">Le tue identità</div>
       <div id="identitaBlocco" style="margin-top:12px"></div>
+      <div id="avvisiBlocco"></div>
       <div class="field" style="margin-top:16px"><label>Il tuo profilo Nostr (facoltativo)</label>
         <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
       <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
@@ -1290,7 +1291,7 @@ async function saveLnAddress(btn){
    nota pubblica (l'utente pubblica un codice dal SUO client: nessuna
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
-let myNome = '', myUsername = '', myNpubAccesso = '';
+let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 
 /* ---- "Le tue identità": la doppia cittadinanza a colpo d'occhio.
    Telegram e Nostr, cosa è collegato e cosa manca, con il bottone
@@ -1333,6 +1334,58 @@ function renderIdentita(){
       myTgId > 0 ? `<button class="btn ghost" style="margin:0 0 8px" onclick="disabilitaAccessoNostr()">Disabilita l'accesso con Nostr</button>` : '');
   }
   box.innerHTML = tgRiga + nsRiga;
+  renderAvvisi();
+}
+
+/* ---- Avvisi: dove ricevere le notifiche sugli affari. Le scelte si
+   mostrano solo se il canale può DAVVERO raggiungerti: Telegram con la
+   chat collegata, Nostr solo con una npub dal possesso dimostrato
+   (verificata o chiave d'accesso). Con un canale solo, niente scelta:
+   una riga che dice come stanno le cose. ---- */
+function renderAvvisi(){
+  const box = el('avvisiBlocco');
+  if (!box) return;
+  const tgOk = myTgId != null && myTgId > 0;
+  const nostrOk = !!(myNpubAccesso || (myNpub && myNpubVerified));
+  if (!tgOk && !nostrOk) { box.innerHTML = ''; return; }
+  const attivo = myCanaleNotifiche || (tgOk ? 'telegram' : 'nostr');
+  let dentro;
+  if (tgOk && nostrOk) {
+    const pill = (val, nome) =>
+      `<button onclick="setCanale('${val}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${attivo===val?'var(--sats)':'var(--line)'};background:${attivo===val?'var(--sats)':'transparent'};color:${attivo===val?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${nome}</button>`;
+    dentro = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+      ${pill('telegram','✈️ Telegram')}${pill('nostr','🟣 DM Nostr')}${pill('entrambi','Entrambi')}</div>`;
+  } else if (tgOk) {
+    dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
+      Arrivano nella chat del bot Telegram. Verifica una npub qui sotto
+      e potrai riceverli anche come DM Nostr cifrati.</div>`;
+  } else {
+    dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
+      Arrivano come DM Nostr cifrati alla tua npub: aprili col tuo
+      client (0xchat, Amethyst, Damus…).</div>`;
+  }
+  box.innerHTML = `<div style="padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:20px">🔔</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:800;font-size:13.5px">Avvisi</div>
+        <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">Dove ricevi gli aggiornamenti sui tuoi affari</div>
+      </div></div>${dentro}</div>`;
+}
+
+async function setCanale(canale){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  const r = await fetch(`${API_BASE}/me/canale-notifiche`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+     body: JSON.stringify({canale})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  myCanaleNotifiche = d.canale;
+  renderAvvisi();
+  toast(canale==='nostr' ? '💌 Avvisi via DM Nostr'
+      : canale==='entrambi' ? '🔔 Avvisi su Telegram e Nostr'
+      : '✈️ Avvisi su Telegram');
 }
 
 async function abilitaAccessoNostr(){
@@ -2341,6 +2394,7 @@ async function avvia(){
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;
     myNome = me.nome || ''; myUsername = me.username || '';
     myNpubAccesso = me.npub_accesso || '';
+    myCanaleNotifiche = me.canale_notifiche || '';
     npubCodice = '';
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();

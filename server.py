@@ -32,6 +32,7 @@ import asyncio
 import base64
 import hashlib
 import hmac
+import html
 import json
 import os
 import re
@@ -61,9 +62,21 @@ except ImportError:
 try:
     from coincurve import PrivateKey as ChiavePrivataNostr
     from coincurve import PublicKeyXOnly as ChiavePubblicaNostr
+    from coincurve import PublicKey as ChiavePubblicaCompleta
 except ImportError:
     ChiavePrivataNostr = None
     ChiavePubblicaNostr = None
+    ChiavePubblicaCompleta = None
+# cryptography (il cifrario ChaCha20) serve SOLO ai DM Nostr cifrati
+# (NIP-44): se manca, le notifiche via DM restano spente e tutto il
+# resto vive normalmente (pip install cryptography).
+try:
+    from cryptography.hazmat.primitives.ciphers import Cipher as CifrarioDM
+    from cryptography.hazmat.primitives.ciphers.algorithms import \
+        ChaCha20 as ChaCha20DM
+except ImportError:
+    CifrarioDM = None
+    ChaCha20DM = None
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -230,7 +243,11 @@ def init_db():
                     "verifica_scade INTEGER DEFAULT 0",
                     "registrato INTEGER DEFAULT 0",
                     "negozio TEXT DEFAULT ''",
-                    "npub_accesso TEXT DEFAULT ''"):
+                    "npub_accesso TEXT DEFAULT ''",
+                    # canale_notifiche: '' = automatico (Telegram se
+                    # tg_id>0, DM Nostr per i nativi), oppure la scelta
+                    # esplicita 'telegram' | 'nostr' | 'entrambi'
+                    "canale_notifiche TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -771,15 +788,16 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
         return None
 
 
-async def notifica(tg_id: int, testo: str):
-    """Manda un messaggio Telegram (il bot deve essere stato avviato
-    dall'utente almeno una volta)."""
-    if tg_id < 0:
-        # Utente entrato da Nostr: nessuna chat Telegram dove scrivergli.
-        # (Le notifiche via DM Nostr sono un cantiere futuro.)
-        if MODALITA_COLLAUDO:
-            print(f"🔕 [utente Nostr {tg_id}: notifica saltata] {testo}")
-        return
+def spoglia_html(testo: str) -> str:
+    """Le notifiche nascono con l'HTML di Telegram (<b>, <i>...): per
+    il DM Nostr, che e' testo puro, i tag si tolgono e le entita' si
+    sciolgono."""
+    return html.unescape(re.sub(r"<[^>]+>", "", testo))
+
+
+async def _manda_telegram(tg_id: int, testo: str):
+    """Il ramo Telegram di notifica(): il messaggio via bot (l'utente
+    deve averlo avviato almeno una volta), simulato nel collaudo."""
     if MODALITA_COLLAUDO and tg_id < 100000:
         # Utente finto del collaudo: la notifica si stampa in console
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
@@ -787,6 +805,61 @@ async def notifica(tg_id: int, testo: str):
     async with httpx.AsyncClient() as c:
         await c.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
                      json={"chat_id": tg_id, "text": testo, "parse_mode": "HTML"})
+
+
+async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int):
+    """Il ramo Nostr di notifica(), in sottofondo: prova il DM cifrato
+    e, se non parte e c'e' una chat Telegram di riserva, usa quella."""
+    try:
+        ok = await manda_dm_nostr(npub_to_hex(npub), spoglia_html(testo))
+    except Exception as e:
+        print(f"⚠️ DM Nostr saltato: {e}")
+        ok = False
+    if not ok and ripiego_tg_id > 0:
+        try:
+            await _manda_telegram(ripiego_tg_id, testo)
+        except Exception as e:
+            print(f"⚠️ Anche il ripiego Telegram e' fallito: {e}")
+
+
+async def notifica(tg_id: int, testo: str):
+    """Recapita un avviso sul canale che l'utente preferisce: Telegram,
+    DM Nostr cifrato (NIP-17), o entrambi. Senza preferenza decide il
+    buon senso: chi ha Telegram riceve li', il nativo Nostr riceve il
+    DM. Fail-open totale: mai un errore al flusso chiamante."""
+    riga = None
+    try:
+        con = db()
+        riga = con.execute(
+            "SELECT canale_notifiche, npub, npub_verificata, npub_accesso "
+            "FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+        con.close()
+    except Exception:
+        pass          # admin mai registrato o DB in affanno: si va di bot
+    # La npub di DESTINAZIONE: solo chiavi dal possesso DIMOSTRATO
+    # (credenziale d'accesso, o badge VERIFICATO). Un badge non
+    # verificato e' una dichiarazione: mandarci i dettagli degli ordini
+    # di Tizio recapiterebbe tutto nella inbox di Caio.
+    dest_npub = ""
+    if riga:
+        dest_npub = riga["npub_accesso"] or \
+            (riga["npub"] if riga["npub_verificata"] else "")
+    canale = (riga["canale_notifiche"] if riga else "") or \
+        ("nostr" if tg_id < 0 else "telegram")
+    via_nostr = canale in ("nostr", "entrambi") and bool(dest_npub)
+    via_telegram = canale in ("telegram", "entrambi") and tg_id > 0
+    if canale == "nostr" and not via_nostr and tg_id > 0:
+        via_telegram = True   # preferiva Nostr ma la npub non c'e' piu'
+    if via_nostr:
+        # In sottofondo: i relay possono metterci secondi e notifica()
+        # gira anche dentro l'orologio e gli sblocchi. Il ripiego
+        # Telegram scatta solo se non stiamo gia' avvisando li'.
+        asyncio.create_task(_dm_nostr_con_ripiego(
+            dest_npub, testo, 0 if via_telegram else max(tg_id, 0)))
+    if via_telegram:
+        await _manda_telegram(tg_id, testo)
+    elif not via_nostr and MODALITA_COLLAUDO:
+        print(f"🔕 [utente {tg_id}: nessun canale per la notifica] {testo}")
 
 
 async def notifica_admin(testo: str):
@@ -1854,6 +1927,46 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header(""),
             "accesso_revocato": accesso_revocato}
 
 
+@app.post("/api/me/canale-notifiche")
+async def scegli_canale_notifiche(req: Request,
+                                  x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """L'utente sceglie dove ricevere gli avvisi: 'telegram', 'nostr'
+    (DM cifrato NIP-17), 'entrambi', oppure '' = automatico (Telegram
+    se c'e' la chat, DM Nostr per i nativi). Si accetta solo un canale
+    che puo' davvero raggiungerlo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    canale = (d.get("canale") or "").strip().lower()
+    if canale not in ("", "telegram", "nostr", "entrambi"):
+        raise HTTPException(400, "Canale sconosciuto: telegram, nostr, "
+                                 "entrambi o vuoto (automatico)")
+    con = db()
+    u = con.execute(
+        "SELECT npub, npub_verificata, npub_accesso FROM utenti "
+        "WHERE tg_id=?", (user["id"],)).fetchone()
+    if not u:
+        con.close()
+        raise HTTPException(404, "Profilo non trovato")
+    ha_nostr = bool(u["npub_accesso"] or
+                    (u["npub"] and u["npub_verificata"]))
+    if canale in ("nostr", "entrambi") and not ha_nostr:
+        con.close()
+        raise HTTPException(400,
+            "Prima verifica la tua npub (o entra con Nostr): i DM si "
+            "mandano solo a una chiave di cui hai dimostrato il possesso")
+    if canale in ("telegram", "entrambi") and user["id"] < 0:
+        con.close()
+        raise HTTPException(400,
+            "Questo account non ha una chat Telegram: collegala dal "
+            "blocco «Le tue identita'»")
+    con.execute("UPDATE utenti SET canale_notifiche=? WHERE tg_id=?",
+                (canale, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "canale": canale}
+
+
 # --- Verifica della npub con una nota pubblica -----------------------
 # L'utente dimostra di POSSEDERE la npub pubblicando dal suo client una
 # nota (kind 1) con un codice generato da noi. Nessuna nsec, nessuna
@@ -2145,18 +2258,26 @@ def _prepara_nostr():
 _NOSTR = _prepara_nostr()
 
 
+def evento_non_firmato(pubkey: str, kind: int, tags: list, content: str,
+                       creato: int) -> dict:
+    """Costruisce un evento Nostr con l'id canonico NIP-01 ma SENZA
+    firma. Serve a firma_evento e ai DM NIP-17, dove il messaggio
+    interno (il "rumor") resta volutamente non firmato."""
+    serial = json.dumps([0, pubkey, creato, kind, tags, content],
+                        separators=(",", ":"), ensure_ascii=False)
+    ev_id = hashlib.sha256(serial.encode("utf-8")).hexdigest()
+    return {"id": ev_id, "pubkey": pubkey, "created_at": creato,
+            "kind": kind, "tags": tags, "content": content}
+
+
 def firma_evento(kind: int, tags: list, content: str) -> dict:
     """Crea e firma un evento Nostr con la chiave della piattaforma.
     L'id e' lo sha256 della serializzazione canonica (NIP-01), la
     firma e' Schnorr BIP-340 (coincurve = libsecp256k1)."""
     sk, pubkey = _NOSTR
-    creato = int(time.time())
-    serial = json.dumps([0, pubkey, creato, kind, tags, content],
-                        separators=(",", ":"), ensure_ascii=False)
-    ev_id = hashlib.sha256(serial.encode("utf-8")).hexdigest()
-    return {"id": ev_id, "pubkey": pubkey, "created_at": creato,
-            "kind": kind, "tags": tags, "content": content,
-            "sig": sk.sign_schnorr(bytes.fromhex(ev_id)).hex()}
+    ev = evento_non_firmato(pubkey, kind, tags, content, int(time.time()))
+    ev["sig"] = sk.sign_schnorr(bytes.fromhex(ev["id"])).hex()
+    return ev
 
 
 def _foto_url_nostr(foto_json: str) -> list:
@@ -2226,6 +2347,161 @@ async def _spedisci_ai_relay(evento: dict) -> int:
         asyncio.to_thread(invia_evento_relay, r, evento)
         for r in RELAYS_VERIFICA])
     return sum(esiti)
+
+
+# ------------------- DM NOSTR CIFRATI (NIP-17) -----------------------
+# Le notifiche possono arrivare come messaggi privati Nostr. Si CIFRA
+# verso la chiave PUBBLICA dell'utente e si firma con la chiave della
+# piattaforma: nessuna nsec altrui, mai (regola ferrea). Tre scatole
+# cinesi: il "rumor" (kind 14, non firmato) col testo, il "sigillo"
+# (kind 13, firmato da Barattolo) che lo contiene cifrato, e il "pacco
+# regalo" (kind 1059, firmato da una chiave usa-e-getta) che viaggia
+# sui relay senza rivelare nulla, nemmeno il mittente.
+
+
+def _hkdf_estrai(sale: bytes, seme: bytes) -> bytes:
+    """HKDF-extract (RFC 5869): dal segreto condiviso alla chiave."""
+    return hmac.new(sale, seme, hashlib.sha256).digest()
+
+
+def _hkdf_espandi(chiave: bytes, info: bytes, quanti: int) -> bytes:
+    """HKDF-expand (RFC 5869): dalla chiave ai byte di lavoro."""
+    fuori, blocco, giro = b"", b"", 1
+    while len(fuori) < quanti:
+        blocco = hmac.new(chiave, blocco + info + bytes([giro]),
+                          hashlib.sha256).digest()
+        fuori += blocco
+        giro += 1
+    return fuori[:quanti]
+
+
+def _imbottisci(dati: bytes) -> bytes:
+    """Il padding di NIP-44: 2 byte di lunghezza vera + testo + zeri
+    fino alla misura a scalini (nasconde la lunghezza del messaggio)."""
+    n = len(dati)
+    if not 1 <= n <= 65535:
+        raise ValueError("messaggio vuoto o troppo lungo per NIP-44")
+    if n <= 32:
+        totale = 32
+    else:
+        prossima_potenza = 1 << (n - 1).bit_length()
+        passo = 32 if prossima_potenza <= 256 else prossima_potenza // 8
+        totale = passo * ((n - 1) // passo + 1)
+    return n.to_bytes(2, "big") + dati + b"\x00" * (totale - n)
+
+
+def nip44_cifra(sk_bytes: bytes, dest_hex: str, testo: str) -> str:
+    """Cifra un testo verso una chiave pubblica secondo NIP-44 v2.
+    ATTENZIONE: il segreto condiviso e' la coordinata X NUDA del punto
+    ECDH (mai PrivateKey.ecdh() di coincurve, che la passa per sha256:
+    per Nostr sarebbe una chiave sbagliata)."""
+    punto = ChiavePubblicaCompleta(
+        b"\x02" + bytes.fromhex(dest_hex)).multiply(sk_bytes)
+    x_condivisa = punto.format(compressed=True)[1:33]
+    chiave_conv = _hkdf_estrai(b"nip44-v2", x_condivisa)
+    nonce = secrets.token_bytes(32)
+    lavoro = _hkdf_espandi(chiave_conv, nonce, 76)
+    # ChaCha20 in cryptography vuole 16 byte di nonce: i primi 4 sono
+    # il contatore iniziale (zero), poi i 12 byte veri di NIP-44
+    cifratore = CifrarioDM(
+        ChaCha20DM(lavoro[:32], b"\x00" * 4 + lavoro[32:44]),
+        mode=None).encryptor()
+    cifrato = cifratore.update(_imbottisci(testo.encode("utf-8")))
+    mac = hmac.new(lavoro[44:], nonce + cifrato, hashlib.sha256).digest()
+    return base64.b64encode(b"\x02" + nonce + cifrato + mac).decode()
+
+
+def impacchetta_dm(dest_hex: str, testo: str) -> dict:
+    """Confeziona un DM NIP-17 completo per il destinatario: rumor →
+    sigillo → pacco regalo. Le date del sigillo e del pacco arretrano
+    a caso fino a 2 giorni: cosi' nessuno correla i tempi di invio."""
+    sk, pubkey = _NOSTR
+    adesso = int(time.time())
+    compatto = dict(separators=(",", ":"), ensure_ascii=False)
+    rumor = evento_non_firmato(pubkey, 14, [["p", dest_hex]], testo, adesso)
+    sigillo = evento_non_firmato(
+        pubkey, 13, [],
+        nip44_cifra(sk.secret, dest_hex, json.dumps(rumor, **compatto)),
+        adesso - secrets.randbelow(172800))
+    sigillo["sig"] = sk.sign_schnorr(bytes.fromhex(sigillo["id"])).hex()
+    effimera = ChiavePrivataNostr()      # nuova per ogni messaggio
+    pacco = evento_non_firmato(
+        effimera.public_key.format()[1:].hex(), 1059, [["p", dest_hex]],
+        nip44_cifra(effimera.secret, dest_hex,
+                    json.dumps(sigillo, **compatto)),
+        adesso - secrets.randbelow(172800))
+    pacco["sig"] = effimera.sign_schnorr(bytes.fromhex(pacco["id"])).hex()
+    return pacco
+
+
+def chiedi_relay_dm(relay: str, hexkey: str):
+    """Chiede a UN relay dove il destinatario vuole ricevere i DM
+    (kind 10050, NIP-17). E' SINCRONA: va in asyncio.to_thread."""
+    try:
+        ws = create_connection(relay, timeout=5,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "dm", {
+            "kinds": [10050], "authors": [hexkey], "limit": 1}]))
+        inizio = time.time()
+        trovati = None
+        while time.time() - inizio < 6:
+            msg = json.loads(ws.recv())
+            if msg[0] == "EVENT" and msg[1] == "dm":
+                lista = [t[1] for t in msg[2].get("tags", [])
+                         if len(t) > 1 and t[0] == "relay"
+                         and t[1].startswith("ws")]
+                trovati = lista or trovati
+            elif msg[0] == "EOSE":
+                break
+        ws.close()
+        return trovati
+    except Exception:
+        return None               # relay muto o irraggiungibile: pazienza
+
+
+_RELAY_DM_CACHE = {}   # hex destinatario -> (scadenza, lista relay)
+
+
+async def relay_dm_di(dest_hex: str) -> list:
+    """I relay dove consegnare il DM: quelli dichiarati dal destinatario
+    (kind 10050) se li pubblica, altrimenti i nostri 4 standard — la
+    specifica direbbe di NON inviare, ma per una notifica un tentativo
+    e' meglio di zero. Cache in memoria 1h (uvicorn e' mono-processo)."""
+    voce = _RELAY_DM_CACHE.get(dest_hex)
+    if voce and voce[0] > time.time():
+        return voce[1]
+    risposte = await asyncio.gather(*[
+        asyncio.to_thread(chiedi_relay_dm, r, dest_hex)
+        for r in RELAYS_VERIFICA])
+    relays = next((r for r in risposte if r), None)
+    if not relays:
+        relays = RELAYS_VERIFICA
+    _RELAY_DM_CACHE[dest_hex] = (time.time() + 3600, relays[:4])
+    return relays[:4]
+
+
+async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
+    """Recapita un DM NIP-17 al destinatario. Fail-open totale: ogni
+    intoppo e' una riga in console, mai un errore al chiamante. Nel
+    collaudo il pacco si confeziona davvero (cifratura compresa) ma
+    non esce nulla dal computer."""
+    if not _NOSTR or ChaCha20DM is None:
+        return False
+    try:
+        pacco = impacchetta_dm(dest_hex, testo)
+        if MODALITA_COLLAUDO:
+            print(f"💌 [dm nostr simulato per {dest_hex[:16]}…] {testo}")
+            return True
+        esiti = await asyncio.gather(*[
+            asyncio.to_thread(invia_evento_relay, r, pacco)
+            for r in await relay_dm_di(dest_hex)])
+        if not sum(esiti):
+            print(f"⚠️ DM Nostr: nessun relay l'ha accettato "
+                  f"({dest_hex[:16]}…)")
+        return bool(sum(esiti))
+    except Exception as e:
+        print(f"⚠️ DM Nostr saltato ({dest_hex[:16]}…): {e}")
+        return False
 
 
 async def annuncio_su_nostr(annuncio_id: int, status: str,
