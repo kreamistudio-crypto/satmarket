@@ -30,6 +30,7 @@ AVVIO:      uvicorn server:app --host 0.0.0.0 --port 8080
 
 import asyncio
 import base64
+import csv
 import hashlib
 import hmac
 import html
@@ -444,7 +445,11 @@ def init_db():
                     # disputa, anche se poi risolta (lo stato viene
                     # sovrascritto: senza questa traccia il distintivo
                     # Specchiato non saprebbe chi ha perso una disputa)
-                    "disputata INTEGER DEFAULT 0"):
+                    "disputata INTEGER DEFAULT 0",
+                    # cambio_eur: EUR per BTC al momento della chiusura
+                    # (released/refunded). 0 = sconosciuto: gli ordini
+                    # storici restano cosi', e nel CSV il campo e' vuoto.
+                    "cambio_eur REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -965,6 +970,32 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
             return r.json().get("pr") or None
     except Exception:
         return None
+
+
+# ----------------------- CAMBIO BTC/EUR -----------------------------
+# Serve al controvalore in euro degli affari conclusi (export CSV).
+# Cache di 15 minuti; se la rete non risponde si tiene l'ultimo valore
+# noto, e se non c'e' mai stato resta 0 = "non disponibile".
+
+_cambio_eur_cache = {"valore": 0.0, "quando": 0.0}
+
+
+async def cambio_btc_eur() -> float:
+    adesso = time.time()
+    if (_cambio_eur_cache["valore"] > 0
+            and adesso - _cambio_eur_cache["quando"] < 900):
+        return _cambio_eur_cache["valore"]
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get("https://api.coingecko.com/api/v3/simple/price",
+                            params={"ids": "bitcoin", "vs_currencies": "eur"})
+            r.raise_for_status()
+            valore = float(r.json()["bitcoin"]["eur"])
+            if valore > 0:
+                _cambio_eur_cache.update(valore=valore, quando=adesso)
+    except Exception:
+        pass          # fail-open: meglio un cambio vecchio che un errore
+    return _cambio_eur_cache["valore"]
 
 
 def spoglia_html(testo: str) -> str:
@@ -3088,8 +3119,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             t = con.execute("SELECT titolo FROM annunci WHERE id=?",
                             (o["annuncio_id"],)).fetchone()
             titolo = t["titolo"] if t else "il tuo acquisto"
-            con.execute("UPDATE ordini SET stato='released', aggiornato=? WHERE id=?",
-                        (int(time.time()), ordine_id))
+            cambio = await cambio_btc_eur()
+            con.execute("UPDATE ordini SET stato='released', cambio_eur=?, "
+                        "aggiornato=? WHERE id=?",
+                        (cambio, int(time.time()), ordine_id))
             con.execute("UPDATE utenti SET vendite_ok=vendite_ok+1 WHERE tg_id=?",
                         (o["venditore_id"],))
             con.execute("UPDATE utenti SET acquisti_ok=acquisti_ok+1 WHERE tg_id=?",
@@ -3167,8 +3200,10 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             bolt11 = await invoice_da_ln_address(c_utente["ln_address"], importo)
 
         if bolt11 and await paga_venditore(bolt11):
-            con.execute("UPDATE ordini SET stato='refunded', aggiornato=? WHERE id=?",
-                        (int(time.time()), ordine_id))
+            cambio = await cambio_btc_eur()
+            con.execute("UPDATE ordini SET stato='refunded', cambio_eur=?, "
+                        "aggiornato=? WHERE id=?",
+                        (cambio, int(time.time()), ordine_id))
             con.execute("UPDATE annunci SET stato='attivo' WHERE id=?",
                         (o["annuncio_id"],))      # l'oggetto torna in vetrina
             con.commit()
@@ -3401,6 +3436,64 @@ def miei_ordini(x_tg_init_data: str = Header(""),
                                           par)]
     con.close()
     return righe
+
+
+# ----------------------- EXPORT DATI (CSV) --------------------------
+# Gli affari CONCLUSI dell'utente (released e refunded, da entrambe le
+# parti) in un CSV per la propria contabilita'. Due passi: un biglietto
+# monouso (dentro Telegram il download non puo' portare l'header di
+# autenticazione), poi il GET che lo brucia e serve il file.
+
+BIGLIETTI_EXPORT: dict[str, tuple[int, float]] = {}  # biglietto -> (tg_id, scadenza)
+
+
+@app.post("/api/me/export-biglietto")
+def export_biglietto(x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    adesso = time.time()
+    for b in [b for b, (_, scade) in BIGLIETTI_EXPORT.items() if scade < adesso]:
+        BIGLIETTI_EXPORT.pop(b, None)
+    while len(BIGLIETTI_EXPORT) >= 1000:
+        BIGLIETTI_EXPORT.pop(next(iter(BIGLIETTI_EXPORT)))
+    biglietto = secrets.token_urlsafe(32)
+    BIGLIETTI_EXPORT[biglietto] = (user["id"], adesso + 300)
+    return {"biglietto": biglietto}
+
+
+@app.get("/api/export/{biglietto}")
+def scarica_export(biglietto: str):
+    dati = BIGLIETTI_EXPORT.pop(biglietto, None)      # monouso
+    if not dati or dati[1] < time.time():
+        raise HTTPException(410, "Link scaduto: riprova dal Profilo")
+    tg_id = dati[0]
+    con = db()
+    righe = con.execute(
+        "SELECT o.aggiornato, o.prezzo_sats, o.stato, o.cambio_eur, "
+        "o.venditore_id, a.titolo FROM ordini o "
+        "JOIN annunci a ON a.id=o.annuncio_id "
+        "WHERE (o.venditore_id=? OR o.compratore_id=?) "
+        "AND o.stato IN ('released','refunded') "
+        "ORDER BY o.aggiornato DESC", (tg_id, tg_id)).fetchall()
+    con.close()
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";")    # il ; e' il CSV che Excel italiano apre bene
+    w.writerow(["data", "ruolo", "annuncio", "sats", "esito", "controvalore_eur"])
+    for r in righe:
+        eur = ""
+        if r["cambio_eur"]:               # 0 = ordine storico: campo vuoto, onesto
+            eur = (f"{r['prezzo_sats'] * r['cambio_eur'] / 100_000_000:.2f}"
+                   .replace(".", ","))
+        w.writerow([time.strftime("%Y-%m-%d", time.localtime(r["aggiornato"])),
+                    "vendita" if r["venditore_id"] == tg_id else "acquisto",
+                    r["titolo"], r["prezzo_sats"],
+                    "concluso" if r["stato"] == "released" else "rimborsato",
+                    eur])
+    nome = time.strftime("barattolo-affari-%Y%m%d.csv")
+    return Response(content="\ufeff" + buf.getvalue(),   # BOM: cosi' Excel legge l'UTF-8
+                    media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition":
+                             f'attachment; filename="{nome}"'})
 
 
 # ----------------------- FEEDBACK E STELLE --------------------------

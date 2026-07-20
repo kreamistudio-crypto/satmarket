@@ -502,6 +502,11 @@
             sola, il tetto lo decidi tu.</div>
           <div id="nwcStato"></div>
         </div>
+        <button class="btn ghost" style="margin-top:16px" onclick="esportaDati()">📄 Esporta i tuoi dati</button>
+        <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+          Scarica il CSV dei tuoi affari conclusi (vendite e acquisti:
+          data, sats, esito e controvalore in euro quando disponibile):
+          comodo per la tua contabilità.</div>
       </div>
       <div class="field" style="margin-top:16px"><label>Il tuo profilo Nostr (facoltativo)</label>
         <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
@@ -2708,6 +2713,29 @@ function scollegaWallet(){
   localStorage.removeItem(NWC_CHIAVE);
   renderWallet();
   toast('Wallet scollegato. Per pulizia completa revoca la connessione anche nella app del wallet', 5000);
+}
+
+/* ---- export CSV degli affari conclusi (contabilità) ---- */
+async function esportaDati(){
+  haptic();
+  if (DEMO) { toast('Nel demo non c\'è nulla da esportare: prova nell\'app vera 📄'); return; }
+  try{
+    const r = await fetch(`${API_BASE}/me/export-biglietto`,
+      {method:'POST', headers:{'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) throw new Error();
+    const {biglietto} = await r.json();
+    const url = API_BASE.startsWith('http')
+      ? `${API_BASE}/export/${biglietto}`
+      : `${location.origin}${API_BASE}/export/${biglietto}`;
+    if (tg?.initData && tg.isVersionAtLeast?.('8.0')) {
+      /* dentro Telegram (recente) il download si chiede alla app */
+      tg.downloadFile({url, file_name: 'barattolo-affari.csv'}, ()=>{});
+    } else {
+      const a = document.createElement('a');
+      a.href = url; a.download = 'barattolo-affari.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+  } catch(e){ toast('❌ Export non riuscito, riprova'); }
 }
 
 /* Mostra lo stato nel profilo: collegato (con Scollega) o il campo
