@@ -133,13 +133,18 @@
      il tappo, con l'anello arancione */
   .avatar-btn.attivo{box-shadow:0 0 0 2.5px var(--sats),0 2px 0 rgba(35,40,44,.25)}
   .searchbar{display:flex;gap:8px}
-  /* il campo Cerca vive in un wrapper relativo: il selettore valuta
-     gli sta DENTRO, ancorato al bordo destro */
+  /* il campo Cerca vive in un wrapper relativo: la lente a sinistra
+     e il selettore valuta a destra gli stanno DENTRO */
   .q-wrap{position:relative;flex:1;display:flex}
+  /* la lente e' decorativa e sbiadita (grigia in entrambi i temi:
+     l'emoji passa dal filtro), il testo parte dopo di lei */
+  .q-lente{position:absolute;left:13px;top:50%;transform:translateY(-50%);
+    font-size:14px;line-height:1;opacity:.4;filter:grayscale(1);
+    pointer-events:none}
   .searchbar input{
     flex:1;width:100%;
     border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
-    padding:11px 84px 11px 16px;font:inherit;font-weight:600;outline:none;
+    padding:11px 84px 11px 38px;font:inherit;font-weight:600;outline:none;
   }
   .searchbar input:focus{border-color:var(--ink)}
   /* Il selettore ₿/€: due pillole compatte dentro il campo Cerca,
@@ -708,6 +713,7 @@
            tastiera mobile), cioe' col submit del form -->
       <form class="searchbar" onsubmit="event.preventDefault();doSearch()">
         <div class="q-wrap">
+          <span class="q-lente" aria-hidden="true">🔍</span>
           <input id="q" type="search" enterkeyhint="search" placeholder="Cerca su Barattolo…">
           <div class="cur-seg" id="curSeg" title="Mostra i prezzi in euro o in sats">
             <button type="button" id="curEur" onclick="setValuta('eur')">€</button>
