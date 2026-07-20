@@ -43,11 +43,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ciò che il browser decodifica (WebP ovunque, HEIC su iPhone); ciò
   che non sa leggere (HEIC su Android/desktop) parte grezzo in base64
   (max 15MB; MIME normalizzato a image/heic se il sistema non lo
-  dichiara — Pillow riconosce comunque i byte; anteprima = segnaposto
-  📷 «verrà convertita», il browser non sa mostrarla) e lo converte
-  `salva_foto` con Pillow+pillow-heif in JPEG 1200px, dentro
+  dichiara — Pillow riconosce comunque i byte) e va SUBITO a
+  `POST /api/foto/anteprima`: endpoint autenticato e STATELESS
+  (niente disco né database prima della pubblicazione) che converte
+  con Pillow e restituisce il JPEG — anteprima VERA appena scelta la
+  foto, ed è lo stesso identico JPEG che poi si pubblica, già
+  leggero. Se il server non può (Pillow assente, rete giù), resta
+  l'originale col segnaposto 📷 «verrà convertita» e ci pensa
+  `salva_foto` alla pubblicazione, con Pillow+pillow-heif, dentro
   `asyncio.to_thread` e fuori dalla transazione SQLite: secondi di
-  CPU che non devono congelare il server mono-processo. Import
+  CPU che non devono congelare il server mono-processo. La strada
+  libheif-WASM in pagina è stata valutata e scartata: ~1MB di blob
+  inauditabile nel repo per un caso raro, contro 25 righe che
+  riusano `converti_in_jpeg`. Import
   fail-open: senza `pillow` tutto come prima (JPEG passano, limite
   2.5MB), senza `pillow-heif` le HEIC si saltano con una riga in
   console. Con Pillow anche i PNG/WebP grezzi diventano JPEG veri.
