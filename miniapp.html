@@ -134,11 +134,6 @@
     padding:11px 84px 11px 16px;font:inherit;font-weight:600;outline:none;
   }
   .searchbar input:focus{border-color:var(--ink)}
-  .searchbar button{
-    border:0;background:var(--ink);color:var(--on-ink);border-radius:999px;padding:0 18px;
-    font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 3px 0 #000;
-  }
-  .searchbar button:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
   /* Il selettore ₿/€: due pillole compatte dentro il campo Cerca,
      quella accesa e' la valuta in cui stai leggendo la vetrina — si
      vede subito che l'altra e' cliccabile */
@@ -697,16 +692,17 @@
         </div>
         <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><span class="av-ini"></span></button>
       </div>
-      <div class="searchbar">
+      <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
+           tastiera mobile), cioe' col submit del form -->
+      <form class="searchbar" onsubmit="event.preventDefault();doSearch()">
         <div class="q-wrap">
-          <input id="q" type="search" placeholder="Cerca: “tastiera meccanica sotto i 100k”…">
+          <input id="q" type="search" enterkeyhint="search" placeholder="Cerca su Barattolo…">
           <div class="cur-seg" id="curSeg" title="Mostra i prezzi in euro o in sats">
             <button type="button" id="curEur" onclick="setValuta('eur')">€</button>
             <button type="button" id="curSats" onclick="setValuta('sats')">₿</button>
           </div>
         </div>
-        <button onclick="doSearch()">Cerca</button>
-      </div>
+      </form>
       <div class="chips" id="chips"></div>
       <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
     </header>
@@ -3600,7 +3596,8 @@ async function avvia(){
   }
 }
 avvia();
-el('q').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+/* Invio nel campo Cerca = submit del form .searchbar: niente doppio
+   ascoltatore keydown, o la ricerca partirebbe due volte */
 </script>
 </body>
 </html>
