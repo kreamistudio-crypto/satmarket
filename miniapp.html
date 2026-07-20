@@ -297,6 +297,18 @@
     font-weight:800;font-size:13px;margin-top:10px}
   .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
 
+  /* ---------- onboarding contestuale: una riga discreta, mai un popup ---------- */
+  .hintline{
+    display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+    margin-top:10px;padding:10px 12px;background:var(--sats-soft);
+    border:1px solid var(--line);border-radius:12px;
+    font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.45;
+  }
+  .hintline b{color:var(--ink)}
+  .hintline .hl-az{margin-left:auto;white-space:nowrap}
+  .hintline .hl-az a{color:var(--sats);font-weight:800;text-decoration:none;
+    cursor:pointer;margin-left:12px}
+
   /* ---------- modale pagamento ---------- */
   .sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;display:none}
   .sheet-bg.open{display:block;animation:fadein .15s}
@@ -525,6 +537,7 @@
     <div class="form">
       <div class="section-label" style="padding-top:22px">Il tuo profilo</div>
       <div id="profiloTestata"></div>
+      <div id="profiloChecklist"></div>
 
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
@@ -605,6 +618,7 @@
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">tocca la invoice per copiarla, poi pagala dal tuo wallet</div>
     <button class="btn primary" onclick="sheetPaid()">✓ Ho pagato</button>
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+    <div id="payHint"></div>
   </div>
 
   <!-- ============ SHEET CONFERMA «COMPRA SUBITO» (wallet NWC) ============ -->
@@ -1055,6 +1069,52 @@ function prezzoParte(l){
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
+/* ---------------- onboarding contestuale ----------------
+   Suggerimenti a una riga, mai bloccanti. Tre regole ferree:
+   compaiono solo se la funzione manca davvero, un "Non ora" li
+   spegne per sempre, e in demo/vetrina non esistono proprio. */
+const HINT_CHIAVE = 'barattolo_hint';
+function hintLetti(){
+  try { return JSON.parse(localStorage.getItem(HINT_CHIAVE)) || {}; }
+  catch(e) { return {}; }
+}
+function hintDismesso(id){ return !!hintLetti()[id]; }
+function dismettiHint(id, nodo){
+  const h = hintLetti(); h[id] = Date.now();
+  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  nodo?.closest('.hintline')?.remove();   // la riga sparisce, senza re-render
+}
+function hintAttivi(){ return !DEMO && !VETRINA; }
+/* Il CTA positivo NON dismette: se l'azione si completa, l'hint
+   sparisce da solo perche' la condizione "manca davvero" cade. */
+function hintHTML(id, testo, ctaLabel, ctaJs, dopoLabel){
+  return `<div class="hintline">💡 <span>${testo}</span>
+    <span class="hl-az">
+      <a onclick="${ctaJs}">${ctaLabel}</a>
+      <a onclick="dismettiHint('${id}', this)" style="color:var(--muted)">${dopoLabel||'Non ora'}</a>
+    </span></div>`;
+}
+/* La destinazione dei CTA: il Profilo col cassetto giusto gia' aperto */
+function apriCassettoProfilo(idAcc){
+  closeSheet();               // se un foglio era aperto, si chiude
+  go('profilo');
+  const c = el(idAcc);
+  if (c && !c.classList.contains('open')) c.classList.add('open');
+  setTimeout(()=>c?.scrollIntoView({behavior:'smooth', block:'start'}), 80);
+}
+/* Riga nel foglio di pagamento: solo senza wallet NWC collegato */
+function aggiornaPayHint(){
+  const box = el('payHint'); if (!box) return;
+  box.innerHTML = (hintAttivi() && !walletNwc() && !hintDismesso('nwc'))
+    ? hintHTML('nwc',
+        'Con un wallet collegato paghi in un tocco, senza copiare la invoice.',
+        'Collega', "apriCassettoProfilo('walletBlocco')", 'Non ora')
+    : '';
+}
+/* L'hint post-pubblicazione viaggia fino alla scheda dell'annuncio
+   appena nato: {id, annuncio}, consumato solo su quell'annuncio. */
+let hintPubblicazione = null;
+
 function openDetail(id){
   currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
   if (!currentListing) { toast('Annuncio non trovato'); return; }
@@ -1096,6 +1156,22 @@ function openDetail(id){
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
       ${contatto}
     </div>`;
+  /* La riga di onboarding appesa alla scheda dell'annuncio appena
+     pubblicato: una volta sola, e solo su QUEL annuncio */
+  if (hintPubblicazione) {
+    if (hintPubblicazione.annuncio === id) {
+      const h = hintPubblicazione.id === 'lnaddr'
+        ? hintHTML('lnaddr',
+            'Imposta il tuo Lightning address: quando vendi, i sats ti arrivano da soli.',
+            'Imposta', "apriCassettoProfilo('walletBlocco')", 'Dopo')
+        : hintHTML('npubverifica',
+            'La tua npub non è ancora verificata: il badge 🟣 sugli annunci arriva con la verifica.',
+            'Verifica', "apriCassettoProfilo('accIdentita')", 'Dopo');
+      document.querySelector('#detailContent .detail-body')
+        ?.insertAdjacentHTML('beforeend', h);
+    }
+    hintPubblicazione = null;   // consumato in ogni caso: one-shot
+  }
   go('dettaglio');
 }
 
@@ -1118,6 +1194,7 @@ async function startBuy(){
     `Listino ${fmtEur(currentListing.priceEur)} € — convertito ora in sats: la invoice vale 15 minuti`;
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
+  aggiornaPayHint();
   if (DEMO) {
     el('payInvoice').textContent =
       'lnbc'+currentListing.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
@@ -1224,6 +1301,7 @@ async function confermaCompraSubito(btn){
       el('payInvoice').textContent = invoice;
       el('sheetBg').classList.add('open');
       el('paySheet').classList.add('open');
+      aggiornaPayHint();   /* qui il wallet c'e': svuota solo eventuali righe stantie */
       toast(`Il wallet non ha pagato (${e.message || 'non risponde'}): puoi pagare a mano da qui`, 6000);
     }
     else toast(`Compra subito non riuscito: ${e.message || 'riprova'}`, 6000);
@@ -1635,6 +1713,36 @@ function renderProfilo(){
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
   renderLnAddress();
   renderDistintivi();
+  renderChecklist();
+}
+
+/* ---- «Completa il profilo (N di M)»: il promemoria consultabile.
+   Niente dismiss: e' derivato dai dati veri e quando il profilo e'
+   completo sparisce da solo — sparire E' il premio. ---- */
+let checklistAperta = false;
+function renderChecklist(){
+  const box = el('profiloChecklist');
+  if (!box) return;
+  if (DEMO || VETRINA) { box.innerHTML = ''; return; }
+  const voci = [
+    {ok: !!myLnAddress, txt:'⚡ Lightning address: quando vendi, incassi da solo', acc:'walletBlocco'},
+    {ok: !!(myNpub && myNpubVerified), txt:'🟣 Npub verificata: il badge sui tuoi annunci', acc:'accIdentita'},
+    {ok: !!walletNwc(), txt:'⚡ Wallet collegato su questo dispositivo (Compra subito)', acc:'walletBlocco'},
+  ];
+  if (myTgId != null && myTgId < 0)
+    voci.push({ok:false, txt:'✈️ Telegram collegato: gli avvisi in chat', acc:'accIdentita'});
+  const fatte = voci.filter(v=>v.ok).length;
+  if (fatte === voci.length) { box.innerHTML = ''; return; }
+  const righe = voci.filter(v=>!v.ok).map(v=>
+    `<div class="hintline" style="margin-top:6px;cursor:pointer"
+       onclick="apriCassettoProfilo('${v.acc}')"><span>${v.txt}</span>
+       <span class="hl-az"><a>›</a></span></div>`).join('');
+  box.innerHTML = `
+    <div class="hintline" style="cursor:pointer"
+      onclick="checklistAperta=!checklistAperta;renderChecklist()">
+      <b>Completa il profilo (${fatte} di ${voci.length})</b>
+      <span class="hl-az"><a>${checklistAperta?'▴':'▾'}</a></span></div>
+    ${checklistAperta ? righe : ''}`;
 }
 
 /* ---- 🏅 I distintivi: guadagnati a colori con la data, mancanti in
@@ -2405,6 +2513,14 @@ async function publish(){
     if (!r.ok) { toast(d.detail||'Errore nella pubblicazione', 6000); return; }
     nuovoId = d.id;
     await loadListings();
+    /* Un suggerimento al massimo, sul momento giusto: prima gli
+       incassi (senza ln address restano appesi), poi il badge 🟣 */
+    if (hintAttivi()) {
+      if (!myLnAddress && !hintDismesso('lnaddr'))
+        hintPubblicazione = {id:'lnaddr', annuncio:nuovoId};
+      else if (myNpub && !myNpubVerified && !hintDismesso('npubverifica'))
+        hintPubblicazione = {id:'npubverifica', annuncio:nuovoId};
+    }
   }
   ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
   impostaSellValuta('sats');
