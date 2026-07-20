@@ -122,6 +122,22 @@
     font-weight:600;line-height:1.35;margin-top:2px}
   .distintivo.off{opacity:.55;filter:grayscale(1)}
 
+  /* ---------- profilo: sezioni richiudibili ----------
+     La scheda era un lenzuolo: ora ogni voce e' un cassetto chiuso
+     (stile Vinted), si apre col tocco sull'header e la freccia ruota. */
+  .acc{margin-top:10px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden}
+  .acc-h{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;
+    background:none;border:0;font:inherit;font-weight:800;font-size:14px;
+    color:var(--ink);cursor:pointer;text-align:left}
+  .acc-h .em{font-size:18px;line-height:1}
+  .acc-h .conta{font-weight:700;font-size:12.5px;color:var(--muted)}
+  .acc-h .fr{margin-left:auto;color:var(--muted);font-size:12px;
+    transition:transform .18s ease}
+  .acc.open .acc-h .fr{transform:rotate(180deg)}
+  .acc-b{display:none;padding:0 14px 14px}
+  .acc.open .acc-b{display:block}
+
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
   .view.active{display:block;animation:fadein .18s ease}
@@ -501,50 +517,67 @@
   </div>
 
   <!-- ============ VISTA: PROFILO ============ -->
-  <!-- Il camerino dell'utente: testata, annunci, identità, avvisi,
-       wallet e incassi, npub. I blocchi arrivano dalla scheda Vendi,
-       traslocati tal quali: stessa logica, solo casa nuova. -->
+  <!-- Il camerino dell'utente: testata sempre in vista, tutto il resto
+       in cassetti richiudibili (.acc), chiusi di default. Gli id dei
+       blocchi interni restano gli stessi di sempre: cambia la casa,
+       non la logica. -->
   <div class="view" id="view-profilo">
     <div class="form">
       <div class="section-label" style="padding-top:22px">Il tuo profilo</div>
       <div id="profiloTestata"></div>
-      <div class="section-label" style="padding:26px 0 0">📋 I tuoi annunci</div>
-      <div id="myListings" style="margin-top:12px"></div>
-      <div class="section-label" style="padding:26px 0 0">Le tue identità</div>
-      <div id="identitaBlocco" style="margin-top:12px"></div>
-      <div id="avvisiBlocco"></div>
-      <div id="walletBlocco">
-        <div class="section-label" style="padding:26px 0 0">⚡ Wallet e incassi</div>
-        <div id="lnAddrBlocco"></div>
-        <div id="nwcBlocco">
-          <div class="field" style="margin-top:16px" id="nwcCampo"><label>⚡ Wallet Lightning (facoltativo)</label>
-            <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
-          <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
-          <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-            Col wallet collegato gli annunci mostrano «⚡ Compra subito»:
-            l'escrow si paga in un tocco. La stringa resta <b>solo nel tuo
-            browser</b>, su questo dispositivo: Barattolo non la vede e non
-            la salva mai sui suoi server. Nella app del wallet imposta un
-            <b>limite di spesa</b> per questa connessione: può pagare da
-            sola, il tetto lo decidi tu.</div>
-          <div id="nwcStato"></div>
-        </div>
-        <button class="btn ghost" style="margin-top:16px" onclick="esportaDati()">📄 Esporta i tuoi dati</button>
-        <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-          Scarica il CSV dei tuoi affari conclusi (vendite e acquisti:
-          data, sats, esito e controvalore in euro quando disponibile):
-          comodo per la tua contabilità.</div>
+
+      <div class="acc" id="accAnnunci">
+        <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="myListings"></div></div>
       </div>
-      <div class="field" style="margin-top:16px"><label>Il tuo profilo Nostr (facoltativo)</label>
-        <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
-      <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
-      <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        Con la npub <b>verificata</b> (qui sotto) i tuoi annunci portano
-        il badge 🟣 dei venditori presenti su Nostr; finché non la
-        verifichi la vedi solo tu. Non incollare MAI la nsec: quella è la
-        tua chiave privata e nessuno deve chiedertela, noi per primi.</div>
-      <div id="npubVerifica"></div>
-      <div id="distintiviBlocco"></div>
+
+      <div class="acc" id="accIdentita">
+        <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità e Nostr<span class="fr">▾</span></button>
+        <div class="acc-b">
+          <div id="identitaBlocco"></div>
+          <div class="field" style="margin-top:10px"><label>Il tuo profilo Nostr (facoltativo)</label>
+            <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
+          <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
+          <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+            Con la npub <b>verificata</b> i tuoi annunci portano il badge 🟣:
+            appena la salvi, qui compare il bottone per verificarla. Non
+            incollare MAI la nsec: quella è la tua chiave privata e nessuno
+            deve chiedertela, noi per primi.</div>
+          <div id="npubVerifica"></div>
+        </div>
+      </div>
+
+      <div class="acc" id="walletBlocco">
+        <button class="acc-h" onclick="toggleAcc('walletBlocco')"><span class="em">⚡</span>Incassi e pagamenti<span class="fr">▾</span></button>
+        <div class="acc-b">
+          <div id="lnAddrBlocco"></div>
+          <div id="nwcBlocco">
+            <div class="field" style="margin-top:16px" id="nwcCampo"><label>⚡ Wallet Lightning (facoltativo)</label>
+              <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
+            <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
+            <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+              Col wallet collegato paghi l'escrow in un tocco («⚡ Compra
+              subito»). La stringa resta <b>solo nel tuo browser</b>:
+              Barattolo non la vede mai. Nella app del wallet imposta un
+              <b>limite di spesa</b> per questa connessione.</div>
+            <div id="nwcStato"></div>
+          </div>
+          <button class="btn ghost" style="margin-top:16px" onclick="esportaDati()">📄 Esporta i tuoi dati</button>
+          <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+            Il CSV dei tuoi affari conclusi, comodo per la contabilità.</div>
+        </div>
+      </div>
+
+      <div class="acc" id="accAvvisi">
+        <button class="acc-h" onclick="toggleAcc('accAvvisi')"><span class="em">🔔</span>Avvisi<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="avvisiBlocco"></div></div>
+      </div>
+
+      <div class="acc" id="accDistintivi">
+        <button class="acc-h" onclick="toggleAcc('accDistintivi')"><span class="em">🏅</span>Distintivi <span class="conta" id="distintiviConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="distintiviBlocco"></div></div>
+      </div>
+
       <div id="adminStats"></div>
       <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
     </div>
@@ -1566,6 +1599,12 @@ let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 
+/* ---- i cassetti del Profilo: un tocco sull'header apre e chiude ---- */
+function toggleAcc(id){
+  haptic();
+  el(id)?.classList.toggle('open');
+}
+
 /* ---- la testata della scheda Profilo: chi sei, come vai, il link
    del tuo negozio da condividere. Stesso biglietto da visita della
    vista negozio, ma per te stesso. ---- */
@@ -1577,7 +1616,7 @@ function renderProfilo(){
      quello spento non esiste proprio */
   const badge = myNpub
     ? (myNpubVerified?' <span title="Npub verificata">🟣</span>'
-                     :' <span title="Npub da verificare: solo tu vedi questo badge, verificala dal blocco qui sotto" style="opacity:.45">🟣</span>')
+                     :' <span title="Npub da verificare: solo tu vedi questo badge, verificala dalla sezione 🆔 Identità e Nostr" style="opacity:.45">🟣</span>')
     : '';
   /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
      (stessa regola della vista negozio) */
@@ -1601,15 +1640,22 @@ function renderProfilo(){
 /* ---- 🏅 I distintivi: guadagnati a colori con la data, mancanti in
    grigio con la strada per sbloccarli. Il catalogo arriva TUTTO da
    /api/me (mai una lista a memoria qui); in DEMO non c'e' nulla di
-   vero da mostrare e la sezione sparisce, come il wallet. ---- */
+   vero da mostrare e il cassetto sparisce, come il wallet. Il
+   conteggio «N di M» vive nell'header del cassetto. ---- */
 function renderDistintivi(){
   const box = el('distintiviBlocco');
   if (!box) return;
-  if (DEMO || !myDistintivi.length) { box.innerHTML = ''; return; }
+  const sez = el('accDistintivi');
+  if (DEMO || !myDistintivi.length) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
   const presi = myDistintivi.filter(d=>d.ottenuto).length;
+  const conta = el('distintiviConta');
+  if (conta) conta.textContent = `(${presi} di ${myDistintivi.length})`;
   box.innerHTML = `
-    <div class="section-label" style="padding:26px 0 0">🏅 Distintivi (${presi} di ${myDistintivi.length})</div>
-    <div class="distintivi">${myDistintivi.map(d=>`
+    <div class="distintivi" style="margin-top:0">${myDistintivi.map(d=>`
       <div class="distintivo ${d.ottenuto?'':'off'}">
         <span class="em">${esc(d.emoji)}</span><b>${esc(d.nome)}</b>
         <small>${d.ottenuto
@@ -1677,9 +1723,14 @@ function renderIdentita(){
 function renderAvvisi(){
   const box = el('avvisiBlocco');
   if (!box) return;
+  const sez = el('accAvvisi');
   const tgOk = myTgId != null && myTgId > 0;
   const nostrOk = !!(myNpubAccesso || (myNpub && myNpubVerified));
-  if (!tgOk && !nostrOk) { box.innerHTML = ''; return; }
+  if (!tgOk && !nostrOk) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
   const attivo = myCanaleNotifiche || (tgOk ? 'telegram' : 'nostr');
   /* Lo stato effettivo sempre in chiaro: anche col default automatico
      l'utente deve leggere DOVE arrivano gli avvisi, non dedurlo dal
@@ -1696,20 +1747,18 @@ function renderAvvisi(){
       ${pill('telegram','✈️ Telegram')}${pill('nostr','🟣 DM Nostr')}${pill('entrambi','Entrambi')}</div>`;
   } else if (tgOk) {
     dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
-      Arrivano nella chat del bot Telegram. Verifica una npub qui sotto
-      e potrai riceverli anche come DM Nostr cifrati.</div>`;
+      Arrivano nella chat del bot Telegram. Verifica una npub nella
+      sezione 🆔 Identità e Nostr e potrai riceverli anche come DM
+      Nostr cifrati.</div>`;
   } else {
     dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
       Arrivano come DM Nostr cifrati alla tua npub: aprili col tuo
       client (0xchat, Amethyst, Damus…).</div>`;
   }
-  box.innerHTML = `<div style="padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="font-size:20px">🔔</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:800;font-size:13.5px">Avvisi</div>
-        <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>
-      </div></div>${dentro}</div>`;
+  /* Il titolo «🔔 Avvisi» sta nell'header del cassetto: qui dentro
+     solo lo stato e le scelte */
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}`;
 }
 
 async function setCanale(canale){
@@ -2428,7 +2477,7 @@ function barraWeb(nome){
   b.style.display = 'block';
   const avvisi = myTgId < 0
     ? `sei entrato con Nostr: per gli avvisi in chat collega Telegram`
-      + ` dalla scheda Profilo («Le tue identità»), oppure ricontrolla`
+      + ` dalla scheda Profilo (sezione «🆔 Identità e Nostr»), oppure ricontrolla`
       + ` i tuoi Affari di tanto in tanto`
     : `Per ricevere gli avvisi sugli ordini apri una volta `
       + `<a href="https://t.me/ilbarattolobot" target="_blank"`
