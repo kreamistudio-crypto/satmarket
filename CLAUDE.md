@@ -387,7 +387,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «+ Metti in vendita» (riusa `go('vendi')`) e conteggio «N oggetti»
   nel `section-label` (entrambi concordati). Restano fuori (logica
   nuova, respinta): filtri negli Affari, contatore 🏅 in testata,
-  riga «Prossimo:» nei distintivi. IN SOSPESO: immagini mascotte/
+  riga «Prossimo:» nei distintivi. Festa dei sats: all'apertura di un
+  ordine released, monete ₿ con fisica da confetti dal messaggio di
+  chiusura (`festaSats`: 20 al venditore, 10 mini al compratore,
+  ~1.5s, rAF legato al tempo + rete di sicurezza sull'overlay, spenta
+  con prefers-reduced-motion; una volta per ordine e dispositivo in
+  localStorage['barattolo_festa'], il patto degli hint). IN SOSPESO: immagini mascotte/
   barattolo da Claude Design (superano il tetto 256KiB di DesignSync:
   vanno salvate a mano in `assets/`) + route esplicite stile /vendor
   in server.py + favicon + hero desktop — solo dopo, aggiornare la
