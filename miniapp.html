@@ -17,11 +17,11 @@
     --trust:#1B8B54; --trust-soft:#E7F5EC; --danger:#C2410C;
     --radius:16px; --pad:16px;
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
-       sono leggibili sui fondi tenui; paper e' la carta dell'etichetta */
+       sono leggibili sui fondi tenui */
     --sats-deep:#D97706; --sats-text:#B45309;
     --trust-deep:#10603A; --trust-text:#157347;
     --nostr:#8B5CF6; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
-    --paper:#FFF8EA; --chip-bg:#F3ECDA;
+    --chip-bg:#F3ECDA;
     --field-line:#E0D7C0; --line-soft:#EEE7D6;
     --gold-a:#FFE08A; --gold-b:#F7B32B; --gold-line:#E29B12; --gold-text:#7A4B06;
     /* i colori "di servizio" che prima erano fissi nelle regole:
@@ -52,7 +52,7 @@
     --sats-text:#FFB25C;
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
     --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
-    --paper:#322A19; --chip-bg:#37301F;
+    --chip-bg:#37301F;
     --field-line:#4A4029; --line-soft:#362E1E;
     --header-bg:rgba(33,26,16,.92); --nav-bg:rgba(44,37,23,.96);
     --ph-a:#332B1A; --ph-b:#2B2415;
@@ -151,12 +151,17 @@
     overflow:hidden;
   }
   .card .ph img{width:100%;height:100%;object-fit:cover}
+  /* Il cartellino resta di carta CHIARA anche col tema scuro (valori
+     fissi, non token): e' un'etichetta vera attaccata sulla foto, e il
+     prezzo deve staccare al primo sguardo — i cartellini non
+     diventano scuri di notte */
   .tag-price{
     position:absolute;left:10px;bottom:-26px;z-index:2;
-    background:var(--paper);border:2px solid var(--ink);border-radius:10px;
-    padding:5px 10px;transform:rotate(-2deg);box-shadow:0 2px 0 var(--ink);
+    background:#FFF8EA;border:2px solid #23282C;border-radius:10px;
+    padding:5px 10px;transform:rotate(-2deg);box-shadow:0 2px 0 #23282C;
   }
   .tag-price .price{margin-top:0;font-size:14.5px;color:var(--sats-deep)}
+  .tag-price .price-sub,.tag-price .price .unit{color:#8A8271}
   .tag-price .price-sub{margin-top:0}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
