@@ -100,6 +100,20 @@
   .bmark::before{top:-.02em}
   .bmark::after{bottom:.09em}
   .brand small{color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+  /* La pillola-contatore dei distintivi accanto al lockup: oro come le
+     tessere, con la barretta di avanzamento. La accende il JS
+     (classe .on) SOLO per gli utenti autenticati: in vetrina e demo
+     non esiste. Al tocco apre il cassetto Distintivi del Profilo. */
+  .badge-conta{display:none;align-items:center;gap:7px;margin-left:auto;
+    border:1px solid var(--gold-line);border-radius:999px;padding:5px 11px;
+    background:linear-gradient(180deg,var(--gold-a),var(--gold-b));
+    font:inherit;font-size:12px;font-weight:800;color:var(--gold-text);
+    cursor:pointer;flex:0 0 auto}
+  .badge-conta.on{display:inline-flex}
+  .badge-conta .bc-barra{width:40px;height:5px;border-radius:99px;
+    background:rgba(122,75,6,.22);overflow:hidden}
+  .badge-conta .bc-barra i{display:block;height:100%;border-radius:99px;
+    background:var(--gold-text)}
   .searchbar{display:flex;gap:8px}
   /* il campo Cerca vive in un wrapper relativo: il selettore valuta
      gli sta DENTRO, ancorato al bordo destro */
@@ -668,6 +682,7 @@
           <h1 class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></h1>
           <small>il mercatino in sats</small>
         </div>
+        <button class="badge-conta" onclick="apriCassettoProfilo('accDistintivi')" title="I tuoi distintivi">🏅 <span class="bc-n"></span><span class="bc-barra"><i></i></span></button>
       </div>
       <div class="searchbar">
         <div class="q-wrap">
@@ -846,7 +861,9 @@
 
   <!-- ============ NAV ============ -->
   <nav>
-    <div class="nav-logo" aria-hidden="true"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
+    <!-- aria-hidden sui pezzi decorativi, NON sul contenitore: dentro
+         ora vive anche la pillola-contatore, che e' un bottone vero -->
+    <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span><button class="badge-conta" onclick="apriCassettoProfilo('accDistintivi')" title="I tuoi distintivi">🏅 <span class="bc-n"></span><span class="bc-barra"><i></i></span></button></div>
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
@@ -2158,6 +2175,22 @@ function renderDistintivi(){
       </div>`).join('')}</div>`;
 }
 
+/* La pillola 🏅 N/M accanto al lockup (testata mobile e topbar
+   desktop: due istanze, stessa classe). Si accende SOLO per gli
+   utenti autenticati coi dati veri di /api/me: in demo e vetrina
+   resta spenta. Al tocco porta al cassetto Distintivi. */
+function renderContaDistintivi(){
+  const tot = myDistintivi.length;
+  const presi = myDistintivi.filter(d=>d.ottenuto).length;
+  const mostra = hintAttivi() && tot > 0;
+  document.querySelectorAll('.badge-conta').forEach(p=>{
+    p.classList.toggle('on', mostra);
+    if (!mostra) return;
+    p.querySelector('.bc-n').textContent = `${presi}/${tot}`;
+    p.querySelector('.bc-barra i').style.width = `${Math.round(presi/tot*100)}%`;
+  });
+}
+
 function condividiMioNegozio(){
   const link = `${location.origin}/negozio/${encodeURIComponent(myUsername || myNegozio)}`;
   navigator.clipboard?.writeText(link)
@@ -3463,6 +3496,7 @@ async function avviaVetrina(){
     if (!r.ok) throw new Error('vetrina non disponibile');
     listings = (await r.json()).map(mapListing);
     VETRINA = true; DEMO = false; orders = [];
+    renderContaDistintivi();   // la pillola 🏅 in vetrina non esiste
     mostraBanner(BANNER_VETRINA);
     bottoneLoginTelegram();
     bottoneLoginNostr();
@@ -3514,6 +3548,7 @@ async function avvia(){
     renderNpubVerifica();
     renderIdentita();
     DEMO = false;
+    renderContaDistintivi();
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
