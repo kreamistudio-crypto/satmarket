@@ -33,26 +33,28 @@
   .brand h1{font-family:'Unbounded',sans-serif;font-weight:700;font-size:17px;letter-spacing:-.02em}
   .brand h1 .bolt{color:var(--sats)}
   .brand small{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
-  /* Il wrap e' per il selettore valuta: sugli schermi stretti, dove
-     le due pillole non ci stanno, scivola da solo su una riga sua */
-  .searchbar{display:flex;gap:8px;flex-wrap:wrap}
+  .searchbar{display:flex;gap:8px}
+  /* il campo Cerca vive in un wrapper relativo: il selettore valuta
+     gli sta DENTRO, ancorato al bordo destro */
+  .q-wrap{position:relative;flex:1;display:flex}
   .searchbar input{
-    flex:1;min-width:210px;
+    flex:1;width:100%;
     border:1px solid var(--line);background:var(--card);border-radius:12px;
-    padding:11px 14px;font:inherit;font-weight:500;outline:none;
+    padding:11px 84px 11px 14px;font:inherit;font-weight:500;outline:none;
   }
   .searchbar input:focus{border-color:var(--ink)}
   .searchbar button{
     border:0;background:var(--ink);color:#fff;border-radius:12px;padding:0 16px;
     font-weight:700;font-size:14px;cursor:pointer;
   }
-  /* Il selettore ₿/€: due pillole, quella accesa e' la valuta in cui
-     stai leggendo la vetrina — si vede subito che l'altra e' cliccabile.
-     margin-left:auto = quando finisce su una riga sua, sta a destra */
-  .cur-seg{display:flex;border:1px solid var(--line);border-radius:12px;
-    overflow:hidden;background:var(--card);margin-left:auto}
-  .cur-seg button{border:0;background:none;padding:8px 13px;font-weight:800;
-    font-size:14px;cursor:pointer;color:var(--muted)}
+  /* Il selettore ₿/€: due pillole compatte dentro il campo Cerca,
+     quella accesa e' la valuta in cui stai leggendo la vetrina — si
+     vede subito che l'altra e' cliccabile */
+  .cur-seg{position:absolute;right:6px;top:50%;transform:translateY(-50%);
+    display:flex;border:1px solid var(--line);border-radius:9px;
+    overflow:hidden;background:var(--bg)}
+  .cur-seg button{border:0;background:none;padding:5px 10px;font-weight:800;
+    font-size:13px;cursor:pointer;color:var(--muted)}
   .cur-seg button.active{background:var(--ink);color:#fff}
   .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
@@ -419,12 +421,14 @@
         <small>compra e vendi in sats</small>
       </div>
       <div class="searchbar">
-        <input id="q" type="search" placeholder="Cerca: “tastiera meccanica sotto i 100k”…">
-        <button onclick="doSearch()">Cerca</button>
-        <div class="cur-seg" id="curSeg" title="Mostra i prezzi in euro o in sats">
-          <button type="button" id="curEur" onclick="setValuta('eur')">€</button>
-          <button type="button" id="curSats" onclick="setValuta('sats')">₿</button>
+        <div class="q-wrap">
+          <input id="q" type="search" placeholder="Cerca: “tastiera meccanica sotto i 100k”…">
+          <div class="cur-seg" id="curSeg" title="Mostra i prezzi in euro o in sats">
+            <button type="button" id="curEur" onclick="setValuta('eur')">€</button>
+            <button type="button" id="curSats" onclick="setValuta('sats')">₿</button>
+          </div>
         </div>
+        <button onclick="doSearch()">Cerca</button>
       </div>
       <div class="chips" id="chips"></div>
     </header>
