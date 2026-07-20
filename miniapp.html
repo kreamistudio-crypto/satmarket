@@ -288,31 +288,33 @@
   .btn.link:active,.btn.danger-ghost:active{opacity:.6}
   .btn[disabled]{opacity:.5;pointer-events:none}
 
-  /* ---------- FIRMA: la cassaforte escrow ---------- */
+  /* ---------- FIRMA: la cassaforte escrow ----------
+     Dal redesign e' il recinto verde tratteggiato: i sats "nel
+     barattolo", lo stesso sigillo della zona acquisto */
   .vault{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    padding:18px 16px;margin:16px 0;
+    position:relative;background:var(--trust-soft);border:2px dashed var(--trust);
+    border-radius:20px;padding:20px 16px 18px;margin:20px 0 16px;
   }
   .vault .vault-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
   .vault .vault-head .lock{
-    width:38px;height:38px;border-radius:12px;background:var(--trust-soft);
+    width:38px;height:38px;border-radius:12px;background:var(--card);
     display:flex;align-items:center;justify-content:center;font-size:19px;
   }
   .vault .vault-head b{font-size:14.5px}
   .vault .vault-head small{display:block;color:var(--muted);font-weight:600;font-size:12px}
   .steps{position:relative;margin-left:7px}
-  .steps::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--line)}
+  .steps::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:#BADCC8}
   .step{position:relative;padding:0 0 18px 32px}
   .step:last-child{padding-bottom:0}
   .step .dot{
     position:absolute;left:0;top:2px;width:18px;height:18px;border-radius:50%;
-    background:var(--bg);border:2px solid var(--line);z-index:1;
+    background:var(--card);border:2px solid #BADCC8;z-index:1;
     display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;
   }
   .step.done .dot{background:var(--trust);border-color:var(--trust)}
   .step.done .dot::after{content:'✓'}
-  .step.now .dot{border-color:var(--sats);background:var(--sats);animation:pulse 1.6s infinite}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(247,147,26,.45)}70%{box-shadow:0 0 0 9px rgba(247,147,26,0)}100%{box-shadow:0 0 0 0 rgba(247,147,26,0)}}
+  /* Lo step corrente: il cerchio tratteggiato che aspetta la spunta */
+  .step.now .dot{border:2px dashed var(--trust);background:var(--card)}
   .step b{font-size:13.5px;display:block}
   .step small{color:var(--muted);font-size:12px;font-weight:600}
   .step.todo{opacity:.45}
@@ -347,26 +349,34 @@
 
   /* ---------- affari (ordini) ---------- */
   .order{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    padding:14px;margin:0 var(--pad) 12px;cursor:pointer;
+    background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
+    padding:13px 14px;margin:0 var(--pad) 12px;cursor:pointer;
   }
   .order .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .order b{font-size:14px}
-  .badge{font-size:11px;font-weight:800;padding:4px 10px;border-radius:999px;white-space:nowrap}
-  .badge.locked{background:var(--sats-soft);color:#B26A0A}
-  .badge.shipped{background:#E8EEF9;color:#2A4E96}
-  .badge.released{background:var(--trust-soft);color:var(--trust)}
-  .badge.dispute{background:#F9E8E6;color:var(--danger)}
-  .badge.confirmed{background:#EDE7F9;color:#5B3FA8}
-  .badge.annullato{background:#EEEDE8;color:#6E7076}
+  /* Il quadratino con l'emoji dell'oggetto, a sinistra della riga */
+  .order-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+  .order-ic{width:38px;height:38px;border-radius:12px;background:var(--chip-bg);
+    display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
+  .order-main{min-width:0}
+  .order-main .sub{margin-top:2px}
+  .csv-line{text-align:center;font-size:12px;color:var(--muted);font-weight:700;padding:6px var(--pad) 2px}
+  .badge{font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;white-space:nowrap}
+  .badge.locked{background:var(--sats-soft);color:var(--sats-text)}
+  .badge.shipped{background:#E3F0FB;color:#2A6FB0}
+  .badge.released{background:var(--trust-soft);color:var(--trust-text)}
+  .badge.dispute{background:#FDE8E4;color:var(--danger)}
+  .badge.confirmed{background:var(--nostr-soft);color:var(--nostr-text)}
+  .badge.refunded{background:#EFE9DA;color:var(--muted)}
+  .badge.annullato{background:#EFE9DA;color:var(--muted)}
 
   /* ---------- pannello incasso venditore ---------- */
   .payout{
-    background:var(--card);border:1.5px solid var(--sats);border-radius:var(--radius);
+    background:var(--card);border:1px solid var(--line-soft);border-radius:16px;
     padding:16px;margin:16px 0;
   }
   .payout h4{font-size:14.5px;margin-bottom:6px}
-  .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700}
+  .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5}
   .payout textarea{
     width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);
@@ -1464,7 +1474,7 @@ const STATES = {
   return_pending:{label:'Reso richiesto',  badge:'confirmed'},
   return_shipped:{label:'Reso in viaggio', badge:'shipped'},
   refund:   {label:'Da rimborsare',   badge:'confirmed'},
-  refunded: {label:'Rimborsato',      badge:'released'},
+  refunded: {label:'Rimborsato',      badge:'refunded'},
   annullato:{label:'Annullato',       badge:'annullato'},
 };
 
@@ -1472,11 +1482,17 @@ function renderOrders(){
   el('ordersList').innerHTML = orders.length ? orders.map(o=>`
     <div class="order" onclick="openOrder(${o.id})">
       <div class="row">
-        <b>${o.listing.emoji} ${esc(o.listing.title)}</b>
+        <div class="order-left">
+          <span class="order-ic">${o.listing.emoji}</span>
+          <div class="order-main">
+            <b>${esc(o.listing.title)}</b>
+            <div class="sub">${o.role==='buyer'?'Stai comprando':o.role==='seller'?'Stai vendendo':'⚖️ Da moderare'} · <span class="mono" style="color:var(--sats-deep)">${fmt(o.listing.price)}</span> sats · ${o.when}</div>
+          </div>
+        </div>
         <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>
       </div>
-      <div class="sub">${o.role==='buyer'?'Stai comprando':o.role==='seller'?'Stai vendendo':'⚖️ Da moderare'} · <span class="mono" style="color:var(--sats)">${fmt(o.listing.price)}</span> sats · ${o.when}</div>
     </div>`).join('')
+    + `<div class="csv-line">Il CSV completo è nel Profilo → Esporta i tuoi dati</div>`
     : `<div class="empty"><div class="big">🤝</div>Ancora nessun affare.<br>Quando compri o vendi, <b>lo seguirai da qui</b>.</div>`;
 }
 
@@ -1547,7 +1563,7 @@ function openOrder(id){
             </div>`).join('')}
         </div>
       </div>
-      ${s==='dispute' ? `<div class="trust-note" style="background:#F9E8E6;color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
+      ${s==='dispute' ? `<div class="trust-note" style="background:#FDE8E4;color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
       ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a></span></div>`:''}
       ${isAdmin && s==='dispute' ? `
         <div class="payout" style="border-color:var(--danger)">
@@ -1587,8 +1603,8 @@ function openOrder(id){
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
       ${o.role==='buyer' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">📬 È arrivato — mi prendo 72h per controllarlo</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
-      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:#B26A0A">⏳ <span><b>Pacco consegnato!</b> Controlla l'oggetto: conferma qui sotto, o apri una disputa se c'è un problema. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
-      ${o.role==='buyer' && ['shipped','delivered'].includes(s) ? `<button class="btn primary" onclick="confirmReceived(this)">✓ Ho ricevuto l'oggetto, sblocca i sats</button>`:''}
+      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>Pacco consegnato!</b> Controlla l'oggetto: conferma qui sotto, o apri una disputa se c'è un problema. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
+      ${o.role==='buyer' && ['shipped','delivered'].includes(s) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ Ho ricevuto l'oggetto — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
