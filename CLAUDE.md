@@ -252,7 +252,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   badge in unione (UPDATE OR IGNORE + DELETE) e rivaluta. API:
   `/api/me.distintivi` = catalogo COMPLETO con `ottenuto` (ts o null,
   il frontend non hardcoda mai la lista); `/api/negozio` →
-  `venditore.distintivi` = solo i `fiducia` guadagnati. Frontend:
+  `venditore.distintivi` = solo i `fiducia` guadagnati; dal lug 2026
+  anche gli annunci portano `venditore_distintivi` (subselect
+  GROUP_CONCAT in `CAMPI_VETRINA` + SELECT di search e miei, espanso
+  in chip fiducia {id, emoji, nome, descrizione} da
+  `espandi_distintivi_vetrina`: i non-fiducia verso la vetrina non
+  escono proprio). Frontend:
   griglia `renderDistintivi()` nel cassetto «🏅 Distintivi» del
   Profilo (il conteggio «(N di M)» vive nell'header del cassetto,
   `#distintiviConta`; classe `.distintivo` — `.badge` è degli stati
@@ -386,8 +391,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   le descrizioni sono contenuto vero). Stato vuoto con CTA
   «+ Metti in vendita» (riusa `go('vendi')`) e conteggio «N oggetti»
   nel `section-label` (entrambi concordati). Restano fuori (logica
-  nuova, respinta): filtri negli Affari, contatore 🏅 in testata,
-  riga «Prossimo:» nei distintivi. Festa dei sats: all'apertura di un
+  nuova, respinta): filtri negli Affari e riga «Prossimo:» nei
+  distintivi. Dal mockup sono invece ENTRATI (lug 2026, dopo la dark
+  mode): la pillola-contatore «🏅 N/M» con barretta accanto al lockup
+  (`.badge-conta`, due istanze header/topbar, accesa da
+  `renderContaDistintivi` SOLO per gli autenticati — gate
+  `hintAttivi` — e al tocco apre il cassetto Distintivi) e le
+  medagliette di fiducia `.chip-fiducia` accanto al nome nella card
+  venditore del dettaglio (max 3, `nostrano` filtrato, dati da
+  `venditore_distintivi`, vedi distintivi). Festa dei sats: all'apertura di un
   ordine released, monete ₿ con fisica da confetti dal messaggio di
   chiusura (`festaSats`: 20 al venditore, 10 mini al compratore,
   ~1.5s, rAF legato al tempo + rete di sicurezza sull'overlay, spenta
@@ -417,7 +429,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (il toast si INVERTE: crema su fondo scuro), `--ink-soft`, `--desc`,
   `--shadow-card/hover`; `--on-ink`/`--on-trust` sono il testo sopra
   i fondi `--ink`/`--trust` pieni (bianco in chiaro, scuro al buio:
-  MAI `#fff` fisso sopra quei fondi). Restano fissi di proposito: il
+  MAI `#fff` fisso sopra quei fondi). L'etichetta prezzo `.tag-price`
+  resta di carta CHIARA anche al buio (valori fissi, il token
+  `--paper` non esiste più: un cartellino vero non cambia colore di
+  notte, e il prezzo deve staccare). Restano fissi di proposito: il
   finto QR del paySheet (che NON è un QR vero: pattern decorativo CSS
   ink-su-bianco, e chiaro deve restare), i `#fff` sui fondi arancio
   pieni, gli accenti pesca e oro. Scelta utente: cassetto «🌗 Aspetto»
@@ -659,7 +674,11 @@ dark mode «mercatino di sera» (lug 2026: token scuri su fondo bruno
 caldo, toggle Auto/Chiaro/Scuro nel cassetto «🌗 Aspetto» del Profilo,
 tg.colorScheme dentro Telegram, vedi Architettura — collaudata in
 locale con contrasti AA misurati; da provare dal vivo dentro Telegram
-col tema scuro e il cambio tema a app aperta).
+col tema scuro e il cambio tema a app aperta); tre completamenti del
+redesign (lug 2026: etichetta prezzo sempre di carta chiara anche in
+dark, medagliette di fiducia del venditore nella scheda annuncio via
+`venditore_distintivi`, pillola-contatore «🏅 N/M» accanto al lockup
+per gli autenticati, vedi Architettura).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
