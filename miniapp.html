@@ -1895,7 +1895,6 @@ function ridimensiona(file){
            server non puo' (Pillow assente, rete...), resta l'originale
            col segnaposto e ci riprova la pubblicazione. */
         if (!DEMO && !VETRINA) {
-          toast('📷 Converto la foto…');
           try {
             const r = await fetch(`${API_BASE}/foto/anteprima`, {
               method:'POST',
