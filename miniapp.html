@@ -1915,8 +1915,15 @@ function ridimensiona(file){
 async function fotoScelte(ev){
   for (const file of ev.target.files){
     if (sellFoto.length >= 5) { toast('Massimo 5 foto'); break; }
+    /* Chip segnaposto SUBITO: le HEIC pesanti passano dal server e
+       costano qualche secondo — senza un segnale sembra bloccato */
+    const segn = 'caricando:' + Math.random();
+    sellFoto.push(segn);
+    renderFotoPreview();
     const f = await ridimensiona(file);
-    if (f) sellFoto.push(f);
+    const j = sellFoto.indexOf(segn);   // puo' essersi spostato (✕ su altre)
+    if (j >= 0) { if (f) sellFoto[j] = f; else sellFoto.splice(j, 1); }
+    renderFotoPreview();
   }
   ev.target.value = '';
   renderFotoPreview();
@@ -1931,23 +1938,32 @@ function renderFotoPreview(){
       + `<div style="width:100%;font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">Queste sono le foto attuali: restano così, oppure scegline di nuove per sostituirle tutte</div>`;
     return;
   }
-  /* Il canvas produce sempre data:image/jpeg: tutto il resto e' un
-     originale passato dal ripiego (HEIC & co.) che il browser non sa
-     mostrare — segnaposto chiaro invece dell'icona rotta */
+  /* Il canvas produce sempre data:image/jpeg: 'caricando:' e' il chip
+     d'attesa (conversione in corso, niente ✕: arriva tra poco), e ogni
+     altro non-jpeg e' un originale che il browser non sa mostrare —
+     segnaposto chiaro invece dell'icona rotta */
+  const chip = (testo, extra) => `
+    <div style="width:110px;height:64px;border-radius:10px;background:#EFE9E2;border:1.5px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box;${extra||''}">
+      <span style="font-size:17px">📷</span>
+      <span style="font-size:9px;color:var(--muted);font-weight:700;text-align:center;line-height:1.2">${testo}</span>
+    </div>`;
   el('photoPreview').innerHTML = sellFoto.map((f,i)=>`
-    <div class="th">${!f.startsWith('data:image/jpeg')
-      ? `<div style="width:110px;height:64px;border-radius:10px;background:#EFE9E2;border:1.5px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box">
-           <span style="font-size:17px">📷</span>
-           <span style="font-size:9px;color:var(--muted);font-weight:700;text-align:center;line-height:1.2">HEIC: verrà convertita<br>alla pubblicazione</span>
-         </div>`
+    <div class="th">${f.startsWith('caricando:')
+      ? chip('Carico la foto…', 'opacity:.55')
+      : !f.startsWith('data:image/jpeg')
+      ? chip('HEIC: verrà convertita<br>alla pubblicazione')
       : `<img src="${f}" alt="">`}
-      <span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>
+      ${f.startsWith('caricando:') ? ''
+        : `<span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>`}
     </div>`).join('');
 }
 
 async function publish(){
   const t = el('sellTitle').value.trim(), p = parseInt(el('sellPrice').value)||0;
   if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }
+  if (sellFoto.some(f=>f.startsWith('caricando:'))) {
+    toast('Un attimo: sto ancora caricando le foto'); return;
+  }
   if (editandoId) { await salvaModifica(t, p); return; }
   if (DEMO) {
     listings.unshift({id:Date.now(), emoji:'📦', title:t, price:p, cat:el('sellCat').value,
