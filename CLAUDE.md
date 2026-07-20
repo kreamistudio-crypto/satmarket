@@ -392,14 +392,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «+ Metti in vendita» (riusa `go('vendi')`) e conteggio «N oggetti»
   nel `section-label` (entrambi concordati). Restano fuori (logica
   nuova, respinta): filtri negli Affari e riga «Prossimo:» nei
-  distintivi. Dal mockup sono invece ENTRATI (lug 2026, dopo la dark
-  mode): la pillola-contatore «🏅 N/M» con barretta accanto al lockup
-  (`.badge-conta`, due istanze header/topbar, accesa da
-  `renderContaDistintivi` SOLO per gli autenticati — gate
-  `hintAttivi` — e al tocco apre il cassetto Distintivi) e le
-  medagliette di fiducia `.chip-fiducia` accanto al nome nella card
-  venditore del dettaglio (max 3, `nostrano` filtrato, dati da
-  `venditore_distintivi`, vedi distintivi). Festa dei sats: all'apertura di un
+  distintivi. Dal mockup sono invece ENTRATE (lug 2026, dopo la dark
+  mode) le medagliette di fiducia `.chip-fiducia` accanto al nome
+  nella card venditore del dettaglio (max 3, `nostrano` filtrato,
+  dati da `venditore_distintivi`, vedi distintivi). La
+  pillola-contatore «🏅 N/M» accanto al lockup è vissuta poco: i
+  tester l'hanno bocciata e al suo posto (lug 2026) c'è il tasto
+  Profilo `.avatar-btn` — un cerchio-TAPPO del barattolo in solo CSS
+  (metallo argentato a gradienti radiale+conico ripetuto mascherato
+  ad anello, scanalature sul bordo) con l'iniziale dell'utente in
+  Baloo scura; due istanze come la pillola di prima (testata mobile,
+  topbar desktop in coda alle voci), accese da `renderAvatar()`
+  ovunque tranne che in VETRINA anonima (in demo c'è: il Profilo
+  esiste). Micro-anello d'oro `.oro` col primo distintivo guadagnato,
+  anello arancione `.attivo` quando la vista è il Profilo (che non ha
+  più voce in nav: `go()` accende il tappo). Come l'etichetta prezzo,
+  il metallo del tappo resta chiaro anche col tema scuro. Con Profilo
+  in testata la nav è scesa a 3 voci (Esplora · Vendi+ · Affari, il +
+  al centro geometrico). Sempre dal feedback dei tester (lug 2026):
+  la searchbar è un `<form>` senza bottone «Cerca» — si cerca col
+  submit, cioè Invio/lente della tastiera (`enterkeyhint=search`),
+  placeholder «Cerca su Barattolo…», MAI rimettere un ascoltatore
+  keydown sull'Invio (doppia ricerca); il banner web arancione ha la
+  ✕ «ho capito» (`chiudiBarraWeb`, hint `barraweb` nel solito
+  `localStorage['barattolo_hint']` — chiuso una volta, mai più su
+  quel dispositivo; Esci resta nel banner finché visibile e comunque
+  nel Profilo). Festa dei sats: all'apertura di un
   ordine released, monete ₿ con fisica da confetti dal messaggio di
   chiusura (`festaSats`: 20 al venditore, 10 mini al compratore,
   ~1.5s, rAF legato al tempo + rete di sicurezza sull'overlay, spenta
@@ -482,16 +500,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
   danno ai venditori appena arrivati); dal lug 2026 le accende il
   sistema di feedback (vedi server.py).
-  Scheda Profilo 👤 (lug 2026): quarta voce di nav (`view-profilo`;
-  il ramo `profilo` in `go()` rilancia i render, e in VETRINA la tab
-  apre l'invito al bot come Vendi/Affari). Dal lug 2026 è a CASSETTI
+  Scheda Profilo 👤 (lug 2026): nata quarta voce di nav, dal lug 2026
+  ci si arriva dal tasto-tappo in testata (vedi redesign: la nav è a
+  3 voci; `view-profilo` e il ramo `profilo` in `go()` rilanciano i
+  render come sempre, e in VETRINA non c'è proprio il tasto). È a CASSETTI
   richiudibili stile Vinted (CSS `.acc`, header cliccabile con
   emoji+titolo+freccia, `toggleAcc()`; tutti chiusi di default): dopo
   la testata sempre visibile `renderProfilo()` (nome, badge,
   vendite/acquisti conclusi da `/api/me`, stelle solo se rating>0,
   link del negozio con condividi), in ordine: «📋 I tuoi annunci»,
-  «🆔 Identità e Nostr» (righe identità + campo npub + verifica,
-  riuniti nello stesso cassetto), «⚡ Incassi e pagamenti» (NWC +
+  «🆔 Identità» (righe identità + campo npub + verifica, riuniti
+  nello stesso cassetto; si chiamava «Identità e Nostr», accorciato
+  col feedback dei tester), «⚡ Incassi e pagamenti» (NWC +
   campo Lightning address `lnAddrProfilo`, che riusa
   `POST /api/me/ln-address`, + export CSV; il payoutPanel dentro
   l'ordine resta dov'è, e in DEMO l'intero cassetto — id
@@ -621,7 +641,7 @@ anti-XSS `esc()` su tutti i template; Compra subito col wallet NWC
 — il percorso felice va collaudato con un wallet vero a budget
 minuscolo: in locale è verificato il ripiego, non il pagamento);
 doppia cittadinanza completa (righe identità nel cassetto
-«🆔 Identità e Nostr» del Profilo,
+«🆔 Identità» del Profilo,
 badge verificato promuovibile a chiave d'accesso, webhook /start del
 bot e fusione atomica Nostr→Telegram, vedi Architettura — in
 produzione va provata una fusione vera con un account di test);
@@ -634,7 +654,7 @@ del venditore (form di Vendi riusato, moderazione completa,
 ripubblicazione Nostr, vedi Architettura); foto HEIC/HEIF e WebP
 accettate e convertite in JPEG (client via canvas quando può, server
 con Pillow altrimenti — sul VPS serve `pip install pillow
-pillow-heif`); scheda Profilo 👤 quarta voce di nav (tutto ciò che
+pillow-heif`); scheda Profilo 👤 (tutto ciò che
 riguarda l'utente trasloca lì da Vendi, che torna solo form di
 pubblicazione; Lightning address impostabile anche da lì; canale
 avvisi sempre in chiaro; dal lug 2026 riorganizzata a cassetti
@@ -678,7 +698,13 @@ col tema scuro e il cambio tema a app aperta); tre completamenti del
 redesign (lug 2026: etichetta prezzo sempre di carta chiara anche in
 dark, medagliette di fiducia del venditore nella scheda annuncio via
 `venditore_distintivi`, pillola-contatore «🏅 N/M» accanto al lockup
-per gli autenticati, vedi Architettura).
+per gli autenticati, vedi Architettura); cinque ritocchi dal feedback
+dei tester (lug 2026: via la pillola-contatore, al suo posto il
+tasto-tappo del Profilo in testata e nav a 3 voci; searchbar che
+cerca con Invio senza bottone; ✕ «ho capito» sul banner web; il
+cassetto «🆔 Identità» perde il «e Nostr» — vedi Architettura,
+redesign — collaudati in locale su mobile e desktop, chiaro e scuro,
+web/vetrina/demo).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
