@@ -238,6 +238,22 @@ def init_db():
         creato INTEGER,
         scade INTEGER
     );
+    CREATE TABLE IF NOT EXISTS feedback(
+        -- il giudizio reciproco a affare concluso: da qui nascono
+        -- rating e n_feedback dell'utente (sempre per RICALCOLO,
+        -- mai per incremento: cosi' rimozioni e fusioni si sistemano
+        -- da sole)
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine_id INTEGER NOT NULL,
+        da_tg_id INTEGER NOT NULL,   -- chi lo lascia
+        per_tg_id INTEGER NOT NULL,  -- chi lo riceve
+        voto INTEGER NOT NULL CHECK(voto BETWEEN 1 AND 5),
+        commento TEXT DEFAULT '',
+        creato INTEGER,
+        UNIQUE(ordine_id, da_tg_id)  -- uno per ordine per parte
+    );
+    CREATE INDEX IF NOT EXISTS idx_feedback_per
+        ON feedback(per_tg_id, creato DESC);
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -1021,6 +1037,17 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         vendite = con.execute(
             "UPDATE ordini SET venditore_id=? WHERE venditore_id=?",
             (id_telegram, id_nostr)).rowcount
+        # I feedback sugli auto-scambi tra le due meta' muoiono: dopo la
+        # migrazione quegli ordini avrebbero compratore = venditore, e
+        # il voto a se stessi non ha senso (previene anche la collisione
+        # UNIQUE quando entrambe le meta' avevano votato lo stesso ordine).
+        con.execute("DELETE FROM feedback WHERE ordine_id IN "
+                    "(SELECT id FROM ordini WHERE compratore_id=? "
+                    " AND venditore_id=?)", (id_telegram, id_telegram))
+        con.execute("UPDATE feedback SET da_tg_id=? WHERE da_tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE feedback SET per_tg_id=? WHERE per_tg_id=?",
+                    (id_telegram, id_nostr))
         # Il browser dell'utente Nostr resta loggato: le sue sessioni
         # migrano vive e al prossimo /api/me si risveglia qui.
         con.execute("UPDATE sessioni SET tg_id=? WHERE tg_id=?",
@@ -1033,13 +1060,13 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
             "UPDATE utenti SET npub=?, npub_verificata=1, npub_accesso=?, "
             "verifica_codice='', verifica_scade=0, "
             "ln_address=CASE WHEN ln_address!='' THEN ln_address ELSE ? END, "
-            "vendite_ok=vendite_ok+?, acquisti_ok=acquisti_ok+?, "
-            # rating: resta quello di P — le stelle non esistono ancora,
-            # quando arriveranno andra' deciso come pesare i due passati
-            "n_feedback=n_feedback+? WHERE tg_id=?",
+            "vendite_ok=vendite_ok+?, acquisti_ok=acquisti_ok+? "
+            "WHERE tg_id=?",
             (n["npub"], n["npub_accesso"], n["ln_address"],
-             n["vendite_ok"], n["acquisti_ok"], n["n_feedback"],
-             id_telegram))
+             n["vendite_ok"], n["acquisti_ok"], id_telegram))
+        # I due passati si pesano da soli: il ricalcolo sulle righe
+        # appena migrate fa media e conteggio in un colpo.
+        _ricalcola_rating(con, id_telegram)
         con.commit()
         return {"annunci": annunci, "ordini": acquisti + vendite,
                 "npub": n["npub"], "negozio": p["negozio"]}
@@ -1555,7 +1582,7 @@ def negozio(chi: str, x_tg_init_data: str = Header(""),
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
-                     "rating, vendite_ok, negozio FROM utenti ")
+                     "rating, n_feedback, vendite_ok, negozio FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
                     "AND username!='' LIMIT 1", (chi,)).fetchone()
     if not v:
@@ -1571,10 +1598,22 @@ def negozio(chi: str, x_tg_init_data: str = Header(""),
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
         (v["tg_id"],))]
+    # Gli ultimi feedback ricevuti: stelle + commento + data + ruolo di
+    # chi scrive («acquirente»/«venditore»), MAI il nome — su una pagina
+    # pubblica rivelerebbe gli acquisti di chi non ha scelto di apparire.
+    # f.id e' un numero opaco: serve solo al bottone rimuovi dell'admin.
+    feedback = [dict(r) for r in con.execute(
+        "SELECT f.id, f.voto, f.commento, f.creato, "
+        "CASE WHEN o.id IS NULL THEN 'utente' "
+        "WHEN f.da_tg_id=o.compratore_id THEN 'acquirente' "
+        "ELSE 'venditore' END AS ruolo "
+        "FROM feedback f LEFT JOIN ordini o ON o.id=f.ordine_id "
+        "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT 10",
+        (v["tg_id"],))]
     con.close()
     venditore = dict(v)
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
-    return {"venditore": venditore, "annunci": annunci}
+    return {"venditore": venditore, "annunci": annunci, "feedback": feedback}
 
 
 @app.post("/api/listings/{annuncio_id}/rimuovi")
@@ -2850,24 +2889,27 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                         (o["compratore_id"],))
             con.commit()
             con.close()
+            invito = ("⭐ Com'è andata? Apri l'ordine nella Mini App "
+                      "e lascia un feedback.")
             if automatico:
                 await notifica(o["venditore_id"],
                                f"🔓 <b>Sats sbloccati automaticamente!</b> Il tempo di "
                                f"conferma è scaduto senza problemi segnalati: "
-                               f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. ⚡")
+                               f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. ⚡ "
+                               f"{invito}")
                 await notifica(o["compratore_id"],
                                f"✅ <b>Affare concluso:</b> «{titolo}». Il tempo per "
                                f"confermare o aprire una disputa è scaduto e i sats "
                                f"sono stati sbloccati al venditore. Grazie per aver "
-                               f"usato Barattolo 🫙")
+                               f"usato Barattolo 🫙 {invito}")
             else:
                 await notifica(o["venditore_id"],
                                f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
                                f"ricezione: <b>{netto} sats</b> sono in arrivo nel tuo "
-                               f"wallet. Affare concluso! ⚡")
+                               f"wallet. Affare concluso! ⚡ {invito}")
                 await notifica(o["compratore_id"],
                                f"✅ <b>Affare concluso:</b> «{titolo}». "
-                               f"Grazie per aver usato Barattolo 🫙")
+                               f"Grazie per aver usato Barattolo 🫙 {invito}")
             return {"ok": True, "stato": "released"}
 
         # Niente pagamento riuscito: l'ordine resta/va in 'confirmed',
@@ -2925,11 +2967,14 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                                                   solo_aggiornamento=True))
             await notifica(o["compratore_id"],
                            f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
-                           f"<b>{importo} sats</b> è in arrivo nel tuo wallet.")
+                           f"<b>{importo} sats</b> è in arrivo nel tuo wallet. "
+                           f"⭐ Com'è andata? Apri l'ordine nella Mini App e "
+                           f"lascia un feedback.")
             await notifica(o["venditore_id"],
                            "⚖️ La disputa è stata risolta a favore dell'acquirente: "
                            "i sats gli sono stati rimborsati e l'annuncio è tornato "
-                           "in vetrina.")
+                           "in vetrina. ⭐ Puoi lasciare un feedback dall'ordine "
+                           "nella Mini App.")
             return {"ok": True, "stato": "refunded"}
 
         # Nessun metodo di rimborso disponibile: si mette in attesa
@@ -3118,12 +3163,22 @@ def miei_ordini(x_tg_init_data: str = Header(""),
     con.commit()
     q = ("SELECT o.*, a.titolo, a.zona, "
          "uc.username AS compratore_username, "
-         "uv.username AS venditore_username FROM ordini o "
+         "uv.username AS venditore_username, "
+         # il feedback che HO lasciato su quest'ordine e quello ricevuto
+         # (per l'admin che guarda le dispute restano NULL: innocuo)
+         "(SELECT voto FROM feedback WHERE ordine_id=o.id "
+         " AND da_tg_id=?) AS mio_voto, "
+         "(SELECT commento FROM feedback WHERE ordine_id=o.id "
+         " AND da_tg_id=?) AS mio_commento, "
+         "(SELECT voto FROM feedback WHERE ordine_id=o.id "
+         " AND per_tg_id=?) AS suo_voto, "
+         "(SELECT commento FROM feedback WHERE ordine_id=o.id "
+         " AND per_tg_id=?) AS suo_commento FROM ordini o "
          "JOIN annunci a ON a.id=o.annuncio_id "
          "JOIN utenti uc ON uc.tg_id=o.compratore_id "
          "JOIN utenti uv ON uv.tg_id=o.venditore_id "
          "WHERE o.compratore_id=? OR o.venditore_id=?")
-    par = [user["id"], user["id"]]
+    par = [user["id"]] * 4 + [user["id"], user["id"]]
     if e_admin(user["id"]):
         # I moderatori vedono dispute e resi in corso
         q += (" OR o.stato IN ('dispute','return_pending',"
@@ -3132,6 +3187,130 @@ def miei_ordini(x_tg_init_data: str = Header(""),
                                           par)]
     con.close()
     return righe
+
+
+# ----------------------- FEEDBACK E STELLE --------------------------
+# A affare concluso le due parti si giudicano a vicenda: voto 1-5 +
+# commento breve. Anche 'refunded' conta: e' una transazione vera, e
+# nascondere proprio quelle andate male gonfierebbe tutti i profili.
+
+STATI_FEEDBACK = ("released", "refunded")   # gli stati che ammettono il voto
+
+
+def _ricalcola_rating(con, tg_id: int):
+    """Rifa' i conti di rating e n_feedback dalla tabella feedback.
+    Nessun commit qui dentro: la transazione e' del chiamante."""
+    r = con.execute("SELECT COUNT(*) AS n, AVG(voto) AS media "
+                    "FROM feedback WHERE per_tg_id=?", (tg_id,)).fetchone()
+    con.execute("UPDATE utenti SET rating=?, n_feedback=? WHERE tg_id=?",
+                (round(r["media"] or 0, 1), r["n"], tg_id))
+
+
+@app.post("/api/orders/{ordine_id}/feedback")
+async def lascia_feedback(ordine_id: int, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Una delle due parti lascia il feedback sull'altra. Uno solo per
+    ordine per parte, definitivo (la valvola e' la rimozione admin):
+    il vincolo UNIQUE del database e' il giudice dei doppioni."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        voto = int(d.get("voto", 0))
+    except (TypeError, ValueError):
+        voto = 0
+    if not 1 <= voto <= 5:
+        raise HTTPException(400, "Il voto va da 1 a 5 stelle")
+    commento = str(d.get("commento", "")).strip()
+    if len(commento) > 200:
+        raise HTTPException(400, "Commento troppo lungo (max 200 caratteri)")
+    if commento:
+        categoria = controlla_vietato(commento, "")
+        if categoria:
+            await notifica_admin(
+                f"🚫 <b>Commento di feedback bloccato dal filtro</b> "
+                f"({categoria})\nOrdine #{ordine_id} — "
+                f"{user['first_name']} (id {user['id']})")
+            raise HTTPException(400, "Il commento contiene termini non "
+                                     "ammessi sul mercatino")
+
+    con = db()
+    try:
+        # Lock di scrittura subito: l'ordine va riletto DENTRO la
+        # transazione (una fusione account potrebbe spostarlo proprio ora)
+        con.execute("BEGIN IMMEDIATE")
+        o = con.execute("SELECT * FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+        if not o:
+            con.rollback()
+            raise HTTPException(404, "Ordine non trovato")
+        if user["id"] not in (o["compratore_id"], o["venditore_id"]):
+            con.rollback()
+            raise HTTPException(403, "Operazione non permessa")
+        if o["stato"] not in STATI_FEEDBACK:
+            con.rollback()
+            raise HTTPException(400, "Il feedback si lascia a affare concluso")
+        per = (o["venditore_id"] if user["id"] == o["compratore_id"]
+               else o["compratore_id"])
+        if per == user["id"]:
+            # auto-ordine (puo' nascere da una fusione): niente auto-voti
+            con.rollback()
+            raise HTTPException(400, "Operazione non permessa")
+        try:
+            con.execute("INSERT INTO feedback(ordine_id, da_tg_id, "
+                        "per_tg_id, voto, commento, creato) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (ordine_id, user["id"], per, voto, commento,
+                         int(time.time())))
+        except sqlite3.IntegrityError:
+            con.rollback()
+            raise HTTPException(400, "Hai già lasciato il feedback "
+                                     "per questo ordine")
+        _ricalcola_rating(con, per)
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    stelle = "★" * voto
+    await notifica(per,
+                   f"⭐ <b>Hai ricevuto un feedback:</b> {stelle} ({voto}/5) "
+                   f"per l'affare #{ordine_id}."
+                   + (f"\n«{commento}»" if commento else ""))
+    return {"ok": True, "voto": voto}
+
+
+@app.post("/api/admin/feedback/{feedback_id}/rimuovi")
+async def rimuovi_feedback_admin(feedback_id: int,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: rimuove un commento di feedback abusivo. Il rating
+    di chi lo riceveva si rifa' i conti da solo (ricalcolo)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        f = con.execute("SELECT * FROM feedback WHERE id=?",
+                        (feedback_id,)).fetchone()
+        if not f:
+            con.rollback()
+            raise HTTPException(404, "Feedback non trovato")
+        con.execute("DELETE FROM feedback WHERE id=?", (feedback_id,))
+        _ricalcola_rating(con, f["per_tg_id"])
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    await notifica(f["da_tg_id"],
+                   "🧹 Un moderatore ha rimosso il tuo feedback "
+                   f"sull'affare #{f['ordine_id']} perché non rispettava "
+                   "le regole del mercatino.")
+    return {"ok": True}
 
 
 # --------------------- L'OROLOGIO DEGLI SBLOCCHI --------------------

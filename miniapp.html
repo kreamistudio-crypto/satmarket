@@ -412,6 +412,7 @@
   <div class="view" id="view-negozio">
     <button class="back" onclick="tornaDalNegozio()">← Torna</button>
     <div id="negozioHeader"></div>
+    <div id="negozioFeedback"></div>
     <div class="section-label">In vetrina in questo negozio</div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
   </div>
@@ -660,6 +661,9 @@ function mapOrder(o){
     corriere:o.corriere||'', tracking:o.tracking||'',
     corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
     consegnato:o.consegnato||0, speditoIl:o.spedito_il||0,
+    /* il feedback che ho lasciato io e quello che ho ricevuto */
+    mioVoto:o.mio_voto||0, mioCommento:o.mio_commento||'',
+    suoVoto:o.suo_voto||0, suoCommento:o.suo_commento||'',
     /* stesso filtro-alfabeto di mapListing: vanno negli onclick */
     usernameCompratore:(o.compratore_username||'').replace(/[^A-Za-z0-9_]/g,''),
     usernameVenditore:(o.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
@@ -823,11 +827,11 @@ async function apriNegozio(chi){
     /* Gli annunci del negozio entrano anche nel catalogo in memoria:
        cosi' openDetail li trova pure arrivando dal link diretto */
     annunci.forEach(a=>{ if (!listings.find(x=>x.id===a.id)) listings.push(a); });
-    renderNegozio(d.venditore, annunci);
+    renderNegozio(d.venditore, annunci, d.feedback||[]);
   } catch(e) { toast('Negozio non trovato'); }
 }
 
-function renderNegozio(v, annunci){
+function renderNegozio(v, annunci, feedback=[]){
   negozioCorrente = v;
   const badge = v.npub
     ? (v.npub_verificata?' <span title="Venditore verificato su Nostr">🟣✓</span>'
@@ -836,7 +840,7 @@ function renderNegozio(v, annunci){
   /* Le stelle compaiono solo quando c'e' un rating vero: "0 ★" in
      vetrina farebbe solo danno a un venditore appena arrivato */
   const rep = (v.rating>0
-    ? `<span class="stars">${'★'.repeat(Math.round(v.rating))}</span> ${v.rating} · ` : '')
+    ? `<span class="stars">${'★'.repeat(Math.round(v.rating))}</span> ${v.rating}${v.n_feedback?` (${v.n_feedback})`:''} · ` : '')
     + `${v.vendite_ok||0} vendite concluse`;
   el('negozioHeader').innerHTML = `
     <div class="seller" style="margin-top:14px">
@@ -847,10 +851,35 @@ function renderNegozio(v, annunci){
       </div>
     </div>
     ${(v.username||v.negozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
+  /* Gli ultimi feedback ricevuti: stelle + commento + ruolo + data.
+     Mai nomi (il server non li manda proprio): su una pagina pubblica
+     rivelerebbero gli acquisti di chi non ha scelto di apparire. */
+  el('negozioFeedback').innerHTML = feedback.length ? `
+    <div class="section-label" style="margin-top:16px">Gli ultimi feedback</div>
+    ${feedback.map(f=>`
+      <div class="trust-note" style="align-items:flex-start">
+        <span class="stars">${'★'.repeat(f.voto)}</span>
+        <span>${f.commento?`${esc(f.commento)}<br>`:''}
+          <small style="opacity:.65">${f.ruolo==='acquirente'?'Un acquirente':f.ruolo==='venditore'?'Un venditore':'Un utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
+          ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
+        </span>
+      </div>`).join('')}` : '';
   el('negozioGrid').innerHTML = annunci.length
     ? annunci.map(cardHTML).join('')
     : `<div class="empty" style="grid-column:1/-1">Niente in vetrina al momento</div>`;
   go('negozio');
+}
+
+/* SOLO ADMIN: rimozione di un commento abusivo dal negozio.
+   Il rating del venditore si ricalcola da solo lato server. */
+async function rimuoviFeedback(fid){
+  if (!confirm('Rimuovere questo feedback? Il rating verrà ricalcolato.')) return;
+  const r = await fetch(`${API_BASE}/admin/feedback/${fid}/rimuovi`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+  toast('🧹 Feedback rimosso');
+  if (negozioCorrente) apriNegozio(negozioCorrente.negozio || negozioCorrente.username);
 }
 
 /* Il biglietto da visita del venditore: link pubblico, si apre anche
@@ -1118,6 +1147,7 @@ function renderOrders(){
 function openOrder(id){
   currentOrder = orders.find(o=>o.id===id);
   const o = currentOrder, s = o.state;
+  stellaScelta = 0;   // il voto non inviato non sopravvive al cambio d'ordine
   let steps, progress;
   if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
     /* Storia della disputa: la cassaforte racconta il congelamento */
@@ -1225,6 +1255,7 @@ function openOrder(id){
       ${o.role==='buyer' && ['shipped','delivered'].includes(s) ? `<button class="btn primary" onclick="confirmReceived(this)">✓ Ho ricevuto l'oggetto, sblocca i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
+      ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
       ${o.role==='admin'
         ? bottoneChat(o.usernameCompratore, "all'acquirente", "L'acquirente")
           + bottoneChat(o.usernameVenditore, 'al venditore', 'Il venditore')
@@ -1234,6 +1265,58 @@ function openOrder(id){
     </div>`;
   go('ordine');
 }
+/* ---- feedback reciproco a affare concluso ---- */
+let stellaScelta = 0;   // il voto scelto ma non ancora inviato
+
+function feedbackPanel(o){
+  const chi = o.role==='buyer' ? 'il venditore' : "l'acquirente";
+  if (o.mioVoto) return `
+    <div class="payout">
+      <h4>⭐ Feedback lasciato</h4>
+      <div class="hint"><span class="stars">${'★'.repeat(o.mioVoto)}</span>${o.mioCommento?` — ${esc(o.mioCommento)}`:''}</div>
+      ${o.suoVoto?`<div class="hint" style="margin-top:8px"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
+    </div>`;
+  return `
+    <div class="payout">
+      <h4>⭐ Lascia un feedback</h4>
+      <div class="hint">Com'è andata con ${chi}? Il voto è definitivo e resta legato a questo affare.</div>
+      <div style="font-size:30px;letter-spacing:6px;margin:10px 0;cursor:pointer;user-select:none">
+        ${[1,2,3,4,5].map(n=>`<span id="fbStella${n}" onclick="setStella(${n})">☆</span>`).join('')}
+      </div>
+      <textarea id="fbCommento" maxlength="200" style="min-height:52px" placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>
+      <button class="btn primary" style="margin-top:10px" onclick="inviaFeedback(this)">⭐ Invia il feedback</button>
+      ${o.suoVoto?`<div class="hint" style="margin-top:8px"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
+    </div>`;
+}
+
+function setStella(n){
+  haptic();
+  stellaScelta = n;
+  for (let i=1; i<=5; i++) el('fbStella'+i).textContent = i<=n ? '★' : '☆';
+}
+
+async function inviaFeedback(btn){
+  haptic();
+  if (!stellaScelta) { toast('Scegli da 1 a 5 stelle'); return; }
+  const commento = (el('fbCommento').value||'').trim();
+  if (!confirm('Inviare questo feedback?\n\nÈ definitivo: non potrà essere modificato.')) return;
+  if (DEMO) {
+    currentOrder.mioVoto = stellaScelta; currentOrder.mioCommento = commento;
+    stellaScelta = 0; toast('⭐ Feedback inviato!'); openOrder(currentOrder.id); return;
+  }
+  const ripristina = bottoneInAttesa(btn);
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/feedback`, {
+    method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({voto: stellaScelta, commento})});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail || 'Operazione non riuscita, riprova'); return; }
+  currentOrder.mioVoto = stellaScelta; currentOrder.mioCommento = commento;
+  stellaScelta = 0;
+  toast('⭐ Grazie per il feedback!');
+  openOrder(currentOrder.id);
+}
+
 /* ---- pannello incasso del venditore ---- */
 let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
 
@@ -1362,7 +1445,7 @@ async function salvaLnAddressProfilo(btn){
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
-let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNegozio = '';
+let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
 
 /* ---- la testata della scheda Profilo: chi sei, come vai, il link
    del tuo negozio da condividere. Stesso biglietto da visita della
@@ -1374,10 +1457,10 @@ function renderProfilo(){
     ? (myNpubVerified?' <span title="Npub verificata">🟣✓</span>'
                      :' <span title="Npub dichiarata (non verificata)">🟣</span>')
     : '';
-  /* Stelle solo con un rating vero: il feedback non esiste ancora e
-     "0 ★" farebbe solo danno (stessa regola della vista negozio) */
+  /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
+     (stessa regola della vista negozio) */
   const rep = (myRating>0
-    ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating} · ` : '')
+    ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${myNFeedback?` (${myNFeedback})`:''} · ` : '')
     + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`;
   const nome = myNome || 'Tu';
   box.innerHTML = `
@@ -2660,7 +2743,8 @@ async function avvia(){
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
-    myRating = me.rating || 0; myNegozio = me.negozio || '';
+    myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
+    myNegozio = me.negozio || '';
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();
