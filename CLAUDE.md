@@ -400,8 +400,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Il barattolo è favicon e iconcina del lockup (header e topbar); la
   mascotte fluttua (floaty, spenta con reduced-motion) negli stati
   vuoti — ripiego sull'emoji 🫙 via onerror+sibling CSS se l'immagine
-  non arriva, es. demo da file:// — e nella hero di Esplora, che
-  esiste SOLO ≥768px (dentro Telegram non c'è).
+  non arriva, es. demo da file://. La hero di Esplora (SOLO ≥768px,
+  dentro Telegram non c'è) usa invece `assets/barattolo-hero.png`:
+  PNG scontornato con alpha, niente tessera, drop-shadow sulla
+  sagoma, rotazione −6° e floaty.
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
@@ -531,8 +533,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg` e
-   `/assets/barattolo.jpeg` (file singoli, rotte esplicite) e `/api/*`.
+   `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg`,
+   `/assets/barattolo.jpeg` e `/assets/barattolo-hero.png`
+   (file singoli, rotte esplicite) e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
    diventerebbero pubblici — falla già successa e chiusa).
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
