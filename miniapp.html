@@ -43,11 +43,13 @@
     border:0;background:var(--ink);color:#fff;border-radius:12px;padding:0 16px;
     font-weight:700;font-size:14px;cursor:pointer;
   }
-  /* Il toggle ₿/€: come vuoi leggere i prezzi della vetrina */
-  .searchbar button.cur-toggle{
-    border:1px solid var(--line);background:var(--card);color:var(--ink);
-    padding:0 13px;font-size:15px;
-  }
+  /* Il selettore ₿/€: due pillole, quella accesa e' la valuta in cui
+     stai leggendo la vetrina — si vede subito che l'altra e' cliccabile */
+  .cur-seg{display:flex;border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;background:var(--card)}
+  .cur-seg button{border:0;background:none;padding:0 12px;font-weight:800;
+    font-size:14px;cursor:pointer;color:var(--muted)}
+  .cur-seg button.active{background:var(--ink);color:#fff}
   .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{
@@ -415,8 +417,10 @@
       <div class="searchbar">
         <input id="q" type="search" placeholder="Cerca: “tastiera meccanica sotto i 100k”…">
         <button onclick="doSearch()">Cerca</button>
-        <button class="cur-toggle" id="curToggle" onclick="toggleValuta()"
-          title="Mostra i prezzi in sats o in euro">₿</button>
+        <div class="cur-seg" id="curSeg" title="Mostra i prezzi in euro o in sats">
+          <button type="button" id="curEur" onclick="setValuta('eur')">€</button>
+          <button type="button" id="curSats" onclick="setValuta('sats')">₿</button>
+        </div>
       </div>
       <div class="chips" id="chips"></div>
     </header>
@@ -973,20 +977,21 @@ fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=e
    spettatore sceglie in quale valuta LEGGERE la vetrina. Il "≈" sta
    sempre e solo sul prezzo convertito, mai sul listino. */
 const VALUTA_CHIAVE = 'barattolo_valuta';
-let valutaVista = 'sats';
-try { if (localStorage.getItem(VALUTA_CHIAVE)==='eur') valutaVista = 'eur'; } catch(e){}
+let valutaVista = 'eur';   // default: l'euro parla a tutti; i sats si scelgono
+try { const v = localStorage.getItem(VALUTA_CHIAVE);
+      if (v==='sats' || v==='eur') valutaVista = v; } catch(e){}
 const fmtEur = e => e.toLocaleString('it-IT',
   {minimumFractionDigits:2, maximumFractionDigits:2});
-function toggleValuta(){
-  haptic();
-  valutaVista = valutaVista==='sats' ? 'eur' : 'sats';
-  try { localStorage.setItem(VALUTA_CHIAVE, valutaVista); } catch(e){}
+function setValuta(v){
+  if (v !== valutaVista) haptic();
+  valutaVista = v;
+  try { localStorage.setItem(VALUTA_CHIAVE, v); } catch(e){}
   aggiornaCurToggle();
   renderGrid();
 }
 function aggiornaCurToggle(){
-  const b = el('curToggle');
-  if (b) b.textContent = valutaVista==='sats' ? '₿' : '€';
+  el('curEur')?.classList.toggle('active', valutaVista==='eur');
+  el('curSats')?.classList.toggle('active', valutaVista==='sats');
 }
 /* I sats di un annuncio: per i listini EUR e' l'equivalente al cambio
    vivo (col cambio di pubblicazione, l.price, come ripiego). L'importo
