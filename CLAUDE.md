@@ -20,7 +20,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   normalizzato), parere AI opzionale (fail-open se la chiave manca o
   la chiamata fallisce), notifica agli admin di ogni annuncio +
   endpoint admin di rimozione e di statistiche (`/api/admin/stats`:
-  card 📊 + lista utenti in fondo a Vendi, solo moderatori;
+  card 📊 + lista utenti in fondo al Profilo, solo moderatori;
   `utenti.registrato` è la data del primo accesso, "—" per chi
   c'era prima della colonna). I casi ambigui (cannabis
   light, pistola sparachiodi...) NON vanno nella lista parole: li
@@ -189,8 +189,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'è. `spoglia_html` toglie i tag Telegram dal testo del DM. In
   collaudo il pacco si cifra davvero ma si stampa (`💌 [dm nostr
   simulato]`). Frontend: blocchetto 🔔 Avvisi sotto «Le tue
-  identità» in Vendi (`renderAvvisi`), pillole di scelta solo se
-  entrambi i canali sono disponibili, testo statico altrimenti.
+  identità» nel Profilo (`renderAvvisi`); il sottotitolo dice SEMPRE
+  il canale effettivo («Ricevi gli avvisi su: …», con «(automatico)»
+  quando è il default), pillole di scelta solo se entrambi i canali
+  sono disponibili, testo statico altrimenti.
 - `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
@@ -210,9 +212,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (chiave nella closure, azzerata dopo la firma: mai inviata, mai
   salvata, UI che la sconsiglia). Il bundle si carica pigro da
   `/vendor/nostr.js` solo per bunker/nsec. `barraWeb` con avviso
-  onesto per chi entra da Nostr (che indica «Collega Telegram» in
-  Vendi); foglio `#collegaSheet` per la proposta di collegamento.
-  Blocco «Le tue identità» in Vendi (`renderIdentita()`, dati già in
+  onesto per chi entra da Nostr (che indica «Collega Telegram» nel
+  Profilo); foglio `#collegaSheet` per la proposta di collegamento.
+  Blocco «Le tue identità» nel Profilo (`renderIdentita()`, dati già in
   `/api/me`): riga Telegram (nome+username, o «Collega Telegram» per
   i tg_id negativi → `collegaTelegram()` apre il deep-link col codice,
   mai mostrato in chiaro) e riga Nostr (npub nei 4 stati: assente /
@@ -226,7 +228,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   non basterebbe). Obbligo nato col cantiere NWC: in localStorage vive
   una credenziale di spesa.
   Compra subito (NWC): la stringa `nostr+walletconnect://` incollata
-  nel profilo (scheda Vendi) vive SOLO in `localStorage['barattolo_nwc']`
+  nel profilo (scheda Profilo) vive SOLO in `localStorage['barattolo_nwc']`
   del dispositivo, MAI trasmessa al server (stessa filosofia della nsec
   solo-in-pagina: il secret NWC può spendere, fino al budget scelto nel
   wallet — la UI consiglia di impostarlo). Al collegamento `infoNwc()`
@@ -253,6 +255,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   apre direttamente il negozio; bottone condividi = clipboard + toast.
   Le stelle del rating si mostrano solo se rating > 0 (il sistema
   feedback non esiste ancora: "0 ★" farebbe danno ai venditori).
+  Scheda Profilo 👤 (lug 2026): quarta voce di nav (`view-profilo`;
+  il ramo `profilo` in `go()` rilancia i render, e in VETRINA la tab
+  apre l'invito al bot come Vendi/Affari). In ordine: testata
+  `renderProfilo()` (nome, badge, vendite/acquisti conclusi da
+  `/api/me`, stelle solo se rating>0, link del negozio con
+  condividi), i tuoi annunci, «Le tue identità», 🔔 Avvisi,
+  «⚡ Wallet e incassi» (NWC + campo Lightning address
+  `lnAddrProfilo`, che riusa `POST /api/me/ln-address`; il
+  payoutPanel dentro l'ordine resta dov'è, e in DEMO l'intero blocco
+  wallet sparisce), npub+verifica, stats admin, bottone Esci solo in
+  modalità WEB. I blocchi sono traslocati TAL QUALI da Vendi (stessi
+  id, stesse funzioni): Vendi è tornato SOLO il form di
+  pubblicazione, e dopo pubblica/modifica si apre il dettaglio
+  dell'annuncio appena salvato (l'id arriva da `{ok,id}`, ripiego su
+  Esplora se non è in lista).
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
@@ -367,12 +384,12 @@ anti-XSS `esc()` su tutti i template; Compra subito col wallet NWC
 (NIP-47 lato client, secret solo in localStorage, vedi Architettura
 — il percorso felice va collaudato con un wallet vero a budget
 minuscolo: in locale è verificato il ripiego, non il pagamento);
-doppia cittadinanza completa (blocco «Le tue identità» in Vendi,
+doppia cittadinanza completa (blocco «Le tue identità» nel Profilo,
 badge verificato promuovibile a chiave d'accesso, webhook /start del
 bot e fusione atomica Nostr→Telegram, vedi Architettura — in
 produzione va provata una fusione vera con un account di test);
 notifiche via DM Nostr NIP-17 con scelta del canale (i nativi Nostr
-finalmente ricevono gli avvisi, blocchetto 🔔 Avvisi in Vendi, vedi
+finalmente ricevono gli avvisi, blocchetto 🔔 Avvisi nel Profilo, vedi
 Architettura — la cifratura è verificata contro nostr-tools, ma in
 produzione va provato un DM vero verso la propria npub su 0xchat o
 Amethyst; sul VPS serve `pip install cryptography`); modifica annuncio
@@ -380,7 +397,10 @@ del venditore (form di Vendi riusato, moderazione completa,
 ripubblicazione Nostr, vedi Architettura); foto HEIC/HEIF e WebP
 accettate e convertite in JPEG (client via canvas quando può, server
 con Pillow altrimenti — sul VPS serve `pip install pillow
-pillow-heif`).
+pillow-heif`); scheda Profilo 👤 quarta voce di nav (tutto ciò che
+riguarda l'utente trasloca lì da Vendi, che torna solo form di
+pubblicazione; Lightning address impostabile anche da lì; canale
+avvisi sempre in chiaro; vedi Architettura).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
