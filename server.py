@@ -33,6 +33,7 @@ import base64
 import hashlib
 import hmac
 import html
+import io
 import json
 import os
 import re
@@ -77,6 +78,20 @@ try:
 except ImportError:
     CifrarioDM = None
     ChaCha20DM = None
+# Pillow serve a convertire in JPEG le foto nei formati che i browser
+# non sanno leggere (HEIC degli iPhone, e i PNG/WebP arrivati grezzi);
+# pillow-heif e' il suo occhio per HEIC/HEIF. Se mancano, le foto
+# JPEG gia' pronte passano come sempre e le altre si saltano
+# (pip install pillow pillow-heif).
+try:
+    from PIL import Image as ImmaginePillow
+except ImportError:
+    ImmaginePillow = None
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    pillow_heif = None
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -1212,12 +1227,29 @@ FOTO_DIR = "foto"
 os.makedirs(FOTO_DIR, exist_ok=True)
 
 
-def salva_foto(annuncio_id: int, foto_lista: list) -> list:
-    """Salva le foto dell'annuncio (arrivano dalla Mini App gia'
-    ridimensionate, in formato base64). Ritorna i nomi dei file."""
+def converti_in_jpeg(raw: bytes):
+    """Riporta ai ranghi qualsiasi formato che Pillow sa leggere
+    (HEIC compreso, se c'e' pillow-heif): un JPEG max 1200px, come
+    quelli che il telefono prepara da solo. None se non si apre."""
+    try:
+        img = ImmaginePillow.open(io.BytesIO(raw))
+        img = img.convert("RGB")
+        img.thumbnail((1200, 1200))
+        out = io.BytesIO()
+        img.save(out, "JPEG", quality=82)
+        return out.getvalue()
+    except Exception:
+        return None
+
+
+def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
+    """Salva le foto dell'annuncio. Dalla Mini App di solito arrivano
+    gia' ridimensionate in JPEG (base64); quelle che il browser non ha
+    saputo leggere (le HEIC degli iPhone) arrivano grezze e le converte
+    Pillow qui, se e' installata. Ritorna i nomi dei file."""
     nomi = []
     for i, f in enumerate((foto_lista or [])[:5]):     # max 5 foto
-        m = re.match(r"data:image/(jpeg|jpg|png|webp);base64,(.+)",
+        m = re.match(r"data:image/(jpeg|jpg|png|webp|heic|heif);base64,(.+)",
                      f or "", re.S)
         if not m:
             continue
@@ -1225,9 +1257,23 @@ def salva_foto(annuncio_id: int, foto_lista: list) -> list:
             raw = base64.b64decode(m.group(2))
         except Exception:
             continue
-        if len(raw) > 2_500_000:                       # max ~2.5MB l'una
+        # I JPEG del telefono pesano poco; agli originali da convertire
+        # (mai ridimensionati dal browser) si concede qualche MB in piu'
+        if len(raw) > (6_000_000 if ImmaginePillow else 2_500_000):
             continue
-        nome = f"a{annuncio_id}_{i}.jpg"
+        if m.group(1) in ("heic", "heif"):
+            if not (ImmaginePillow and pillow_heif):
+                print(f"⚠️ Foto HEIC saltata (annuncio #{annuncio_id}): "
+                      f"servono i pacchetti pillow e pillow-heif")
+                continue
+            raw = converti_in_jpeg(raw)
+        elif m.group(1) not in ("jpeg", "jpg") and ImmaginePillow:
+            # PNG/WebP grezzi: gia' prima finivano in un file .jpg;
+            # con Pillow diventano JPEG per davvero
+            raw = converti_in_jpeg(raw) or raw
+        if not raw:
+            continue
+        nome = f"a{annuncio_id}_{i}{versione}.jpg"
         with open(os.path.join(FOTO_DIR, nome), "wb") as out:
             out.write(raw)
         nomi.append(nome)
@@ -1524,6 +1570,98 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     # Se era in piazza su Nostr, si chiede ai relay di toglierlo
     asyncio.create_task(ritira_da_nostr(annuncio_id))
     return {"ok": True}
+
+
+@app.post("/api/listings/{annuncio_id}/modifica")
+async def modifica_annuncio(annuncio_id: int, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il venditore ritocca un suo annuncio attivo. Regole:
+    - solo il proprietario, solo su annunci attivi
+    - mai con ordini in corso: chi ha pagato (o sta pagando) deve
+      trovare l'annuncio cosi' com'era, non uno diverso sotto i piedi
+    - la modifica ripassa da TUTTI gli strati di moderazione, come
+      una pubblicazione nuova
+    - foto: se ne arrivano di nuove sostituiscono le vecchie in blocco,
+      se il campo manca restano quelle attuali"""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not d.get("titolo") or not int(d.get("prezzo_sats", 0)):
+        raise HTTPException(400, "Titolo e prezzo obbligatori")
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if a["contatto_nostr"]:
+        con.close()
+        raise HTTPException(400, "Questo annuncio è importato da Nostr: "
+                                 "modificalo dal tuo client Nostr, qui si "
+                                 "aggiorna da solo entro un'ora")
+    in_corso = con.execute(
+        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato "
+        "NOT IN ('released','refunded','annullato')",
+        (annuncio_id,)).fetchone()["n"]
+    con.close()
+    if in_corso:
+        raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
+                                 "potrai modificarlo quando sarà concluso "
+                                 "(chi compra deve trovare l'annuncio così "
+                                 "com'era quando ha deciso di pagare)")
+
+    # --- Stessa moderazione di una pubblicazione nuova ---
+    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+    if categoria:
+        await notifica_admin(
+            f"🚫 <b>Modifica bloccata dal filtro</b> ({categoria})\n"
+            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
+            f"{user['first_name']} (id {user['id']})")
+        raise HTTPException(400, MSG_RIFIUTO)
+    motivo = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    if motivo:
+        await notifica_admin(
+            f"🚫 <b>Modifica bloccata dall'AI</b> ({motivo})\n"
+            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
+            f"{user['first_name']} (id {user['id']})")
+        raise HTTPException(400, MSG_RIFIUTO)
+
+    con = db()
+    con.execute(
+        "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
+        "prezzo_sats=?, zona=? WHERE id=?",
+        (d["titolo"], d.get("descrizione", ""), d.get("categoria", "Altro"),
+         int(d["prezzo_sats"]), d.get("zona", ""), annuncio_id))
+    if isinstance(d.get("foto"), list):
+        # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
+        # puo' mostrare per sbaglio la foto vecchia dalla sua cache
+        nomi = salva_foto(annuncio_id, d["foto"],
+                          versione=f"_{int(time.time())}")
+        try:
+            vecchie = json.loads(a["foto"]) if a["foto"] else []
+        except Exception:
+            vecchie = []
+        for v in vecchie:
+            if v.startswith("http") or v in nomi:
+                continue
+            try:
+                os.remove(os.path.join(FOTO_DIR, v))
+            except OSError:
+                pass
+        con.execute("UPDATE annunci SET foto=? WHERE id=?",
+                    (json.dumps(nomi) if nomi else "", annuncio_id))
+    con.commit()
+    con.close()
+    # --- Strato 3: i moderatori vedono anche cio' che cambia ---
+    await notifica_admin(
+        f"✏️ <b>Annuncio #{annuncio_id} modificato</b>\n"
+        f"«{d['titolo'][:80]}» — {int(d['prezzo_sats'])} sats\n"
+        f"Venditore: {user['first_name']} (id {user['id']})")
+    # Se era in piazza su Nostr, l'evento riparte aggiornato: il tag d
+    # stabile fa si' che sostituisca il precedente da solo
+    asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
+                                          solo_aggiornamento=True))
+    return {"ok": True, "id": annuncio_id}
 
 
 @app.post("/api/admin/listings/{annuncio_id}/rimuovi")

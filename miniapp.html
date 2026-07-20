@@ -421,8 +421,9 @@
     <div class="form">
       <h2>Metti in vendita</h2>
       <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Paghi zero: la piattaforma trattiene l'1% solo a vendita conclusa.</div>
+      <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:#FFF4E3;border:1.5px solid #F2C063;border-radius:12px;font-size:13px;font-weight:700"></div>
       <div class="field">
-        <input type="file" id="sellPhotos" accept="image/*" multiple style="display:none" onchange="fotoScelte(event)">
+        <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
         <div class="photo-drop" onclick="el('sellPhotos').click()">
           <span class="big">📸</span>Aggiungi foto (fino a 5)
         </div>
@@ -438,7 +439,7 @@
         <input id="sellZone" placeholder="Es. Pavia — spedisco in tutta Italia"></div>
       <div class="field"><label>Descrizione</label>
         <textarea id="sellDesc" placeholder="Condizioni, difetti, motivo della vendita…"></textarea></div>
-      <button class="btn orange" onclick="publish()">⚡ Pubblica annuncio</button>
+      <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
       <div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
@@ -898,7 +899,8 @@ function openDetail(id){
       <div class="desc">${esc(l.desc)}</div>
       <div class="trust-note">🔒 <span>I tuoi sats restano <b>bloccati in escrow</b> e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
       ${mio
-        ? `<button class="btn danger-ghost" style="margin-top:0" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
+        ? `<button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
+           <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `${(!DEMO && !VETRINA && walletNwc())
             ? `<button class="btn orange" onclick="compraSubito()">⚡ Compra subito — ${fmt(l.price)} sats</button>` : ''}
            <button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${fmt(l.price)} sats</button>`}
@@ -1736,7 +1738,10 @@ function renderMyListings(){
     <div class="order">
       <div class="row">
         <b onclick="openDetail(${l.id})" style="cursor:pointer">${l.photos&&l.photos[0]?'📷':l.emoji} ${esc(l.title)}</b>
-        <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#F9E8E6;color:var(--danger)">🗑 Elimina</span>
+        <span style="white-space:nowrap">
+          <span class="badge" onclick="editListing(${l.id})" style="cursor:pointer">✏️ Modifica</span>
+          <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#F9E8E6;color:var(--danger)">🗑 Elimina</span>
+        </span>
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats)">${fmt(l.price)}</span> sats · 📍 ${esc(l.zone)}</div>
     </div>`).join('')
@@ -1813,10 +1818,53 @@ async function rimuoviModerazione(id){
 }
 
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
+let editandoId = null, editandoTitolo = '', fotoAttuali = [];
+
+/* Porta un annuncio nel form di Vendi per ritoccarlo: stessi campi,
+   stessa moderazione, submit sull'endpoint di modifica. */
+function editListing(id){
+  const l = myListings.find(x=>x.id===id) || listings.find(x=>x.id===id);
+  if (!l) { toast('Annuncio non trovato'); return; }
+  haptic();
+  editandoId = id; editandoTitolo = l.title;
+  el('sellTitle').value = l.title;
+  el('sellPrice').value = l.price;
+  el('sellCat').value = l.cat;
+  el('sellZone').value = l.zone==='—' ? '' : l.zone;
+  el('sellDesc').value = l.desc==='—' ? '' : l.desc;
+  sellFoto = []; fotoAttuali = (l.photos||[]).slice();
+  renderFotoPreview(); aggiornaFormVendi();
+  go('vendi'); window.scrollTo(0, 0);
+}
+
+function annullaModifica(){
+  editandoId = null; editandoTitolo = ''; fotoAttuali = [];
+  ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
+  sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
+}
+
+/* Il form di Vendi ha due facce: "pubblica" (di default) e "modifica"
+   (banner giallo + bottone che salva invece di pubblicare) */
+function aggiornaFormVendi(){
+  const b = el('editBanner'), btn = el('sellSubmit');
+  if (!b || !btn) return;
+  if (editandoId){
+    b.style.display = 'block';
+    b.innerHTML = `✏️ Stai modificando «${esc(editandoTitolo)}» — `
+      + `<a href="#" onclick="annullaModifica();return false">annulla</a>`;
+    btn.textContent = '✏️ Salva le modifiche';
+  } else {
+    b.style.display = 'none';
+    btn.textContent = '⚡ Pubblica annuncio';
+  }
+}
 
 function ridimensiona(file){
   /* Riduce la foto a max 1200px lato lungo, JPEG leggero: cosi'
-     l'upload e' veloce anche dal telefone e il server resta snello */
+     l'upload e' veloce anche dal telefone e il server resta snello.
+     Se il browser non sa leggere il formato (le HEIC degli iPhone su
+     Android e desktop), la foto parte com'e' in base64 e la converte
+     il server con Pillow — max 6MB, il suo limite. */
   return new Promise(res=>{
     const img = new Image();
     img.onload = ()=>{
@@ -1827,7 +1875,22 @@ function ridimensiona(file){
       URL.revokeObjectURL(img.src);
       res(c.toDataURL('image/jpeg', .82));
     };
-    img.onerror = ()=>res(null);
+    img.onerror = ()=>{
+      URL.revokeObjectURL(img.src);
+      if (file.size > 6_000_000) { toast('Foto troppo grande (max 6MB)'); res(null); return; }
+      const fr = new FileReader();
+      fr.onload = ()=>{
+        let uri = fr.result;
+        /* Alcuni sistemi non dichiarano il MIME delle HEIC: si rimedia
+           guardando l'estensione, cosi' il server sa cosa gli arriva */
+        const heic = /\.heic$/i.test(file.name), heif = /\.heif$/i.test(file.name);
+        if ((heic || heif) && !/^data:image\/hei[cf]/.test(uri))
+          uri = uri.replace(/^data:[^;]*/, `data:image/${heic?'heic':'heif'}`);
+        res(uri);
+      };
+      fr.onerror = ()=>res(null);
+      fr.readAsDataURL(file);
+    };
     img.src = URL.createObjectURL(file);
   });
 }
@@ -1843,8 +1906,18 @@ async function fotoScelte(ev){
 }
 
 function renderFotoPreview(){
+  if (editandoId && !sellFoto.length && fotoAttuali.length){
+    /* In modifica: si vedono le foto attuali; appena se ne scelgono
+       di nuove, il set si sostituisce per intero */
+    el('photoPreview').innerHTML = fotoAttuali.map(f=>`
+      <div class="th"><img src="${esc(f)}" alt=""></div>`).join('')
+      + `<div style="width:100%;font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">Queste sono le foto attuali: restano così, oppure scegline di nuove per sostituirle tutte</div>`;
+    return;
+  }
   el('photoPreview').innerHTML = sellFoto.map((f,i)=>`
-    <div class="th"><img src="${f}" alt="">
+    <div class="th">${f.startsWith('data:image/hei')
+      ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#EFE9E2;font-size:22px" title="Anteprima non disponibile: la converte il server">🖼️</div>`
+      : `<img src="${f}" alt="">`}
       <span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>
     </div>`).join('');
 }
@@ -1852,6 +1925,7 @@ function renderFotoPreview(){
 async function publish(){
   const t = el('sellTitle').value.trim(), p = parseInt(el('sellPrice').value)||0;
   if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }
+  if (editandoId) { await salvaModifica(t, p); return; }
   if (DEMO) {
     listings.unshift({id:Date.now(), emoji:'📦', title:t, price:p, cat:el('sellCat').value,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
@@ -1869,6 +1943,34 @@ async function publish(){
   ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
   sellFoto = []; renderFotoPreview();
   toast('⚡ Annuncio pubblicato!'); setCat('Tutto'); go('esplora');
+}
+
+/* Il submit del form quando si sta modificando un annuncio: le foto
+   partono solo se l'utente ne ha scelte di nuove (sostituzione in
+   blocco), altrimenti restano quelle attuali. */
+async function salvaModifica(t, p){
+  const id = editandoId;
+  if (DEMO) {
+    const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
+    if (l){
+      Object.assign(l, {title:t, price:p, cat:el('sellCat').value,
+        zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
+      if (sellFoto.length) l.photos = sellFoto.slice();
+    }
+  } else {
+    const body = {titolo:t, prezzo_sats:p, categoria:el('sellCat').value,
+      zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
+    if (sellFoto.length) body.foto = sellFoto;
+    const r = await fetch(`${API_BASE}/listings/${id}/modifica`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(body)});
+    if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Errore nella modifica', 6000); return; }
+    await loadListings();
+  }
+  await loadMyListings(); renderMyListings();
+  annullaModifica();
+  toast('✏️ Annuncio aggiornato!'); setCat('Tutto'); go('esplora');
 }
 
 /* ---------------- avvio ---------------- */
@@ -2414,6 +2516,7 @@ async function avvia(){
     await loadListings();
     await loadOrders();
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
+    if (editandoId) annullaModifica();   // una modifica a metà non segue l'identità nuova
     renderGrid(); renderOrders();
     /* Se eri dentro un ordine o una scheda annuncio (es. cambiando
        identità nel collaudo), la pagina si aggiorna con i dati freschi
