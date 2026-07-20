@@ -216,9 +216,9 @@
   .detail-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
     font-size:84px;background:linear-gradient(160deg,#F2F1EC,#E9E7DF)}
   .detail-body{padding:18px var(--pad)}
-  .detail-body h2{font-size:20px;font-weight:800;line-height:1.25}
-  .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats);
-    font-weight:700;font-size:26px;margin:10px 0 2px}
+  .detail-body h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;line-height:1.15}
+  .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
+    font-weight:700;font-size:28px;margin:10px 0 2px}
   .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
   .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
   .seller{
@@ -237,6 +237,26 @@
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
     padding:12px 14px;font-size:13px;color:var(--trust);font-weight:600;margin-bottom:16px;
   }
+  /* Pillole informative del dettaglio: zona, categoria, badge Nostr */
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+  .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
+    padding:6px 12px;font-size:13px;font-weight:700}
+  .pill.nostr{background:var(--nostr-soft);border-color:var(--nostr-soft);
+    color:var(--nostr-text);font-weight:800}
+  /* La zona escrow: il recinto verde tratteggiato — il "sigillo" del
+     barattolo, l'unico tratteggio del sistema insieme alla cassaforte */
+  .escrow-zone{position:relative;background:var(--trust-soft);border:2px dashed var(--trust);
+    border-radius:20px;padding:16px 16px 14px;margin:16px 0}
+  .escrow-flag{position:absolute;top:-14px;left:16px;background:var(--trust);color:#fff;
+    font-weight:800;font-size:12px;border-radius:999px;padding:5px 14px;
+    box-shadow:0 2px 0 var(--trust-deep)}
+  .escrow-zone .trust-note{background:none;padding:6px 0 0;margin-bottom:10px;color:#14532D}
+  .escrow-note{text-align:center;font-size:12px;color:#4B7C5E;font-weight:700;margin-top:6px}
+  /* Se «Compra subito» manca, il primo bottone del recinto (l'escrow)
+     eredita da solo il ruolo di CTA primaria: zero JS */
+  .escrow-zone .btn:first-of-type{background:var(--sats);color:#fff;border:0;
+    box-shadow:0 3px 0 var(--sats-deep);margin-top:4px}
+  .escrow-zone .btn:first-of-type:active{transform:translateY(2px);box-shadow:0 1px 0 var(--sats-deep)}
   /* Bottoni-oggetto: pillola con l'ombra piena 3px sotto, come una
      cosa fisica appoggiata sul banco. Su :active si abbassa. */
   .btn{
@@ -379,8 +399,8 @@
     transform:translateY(100%);transition:transform .22s ease;
   }
   .sheet.open{transform:none}
-  .sheet .grab{width:38px;height:4px;border-radius:4px;background:var(--line);margin:0 auto 16px}
-  .sheet h3{font-size:17px;font-weight:800;margin-bottom:4px}
+  .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--field-line);margin:0 auto 14px}
+  .sheet h3{font-family:'Baloo 2',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
   .qr{
     aspect-ratio:1/1;max-width:230px;margin:16px auto;border-radius:var(--radius);
     background:repeating-conic-gradient(var(--ink) 0 25%, #fff 0 50%) 0 0/16px 16px;
@@ -1201,16 +1221,21 @@ function openDetail(id){
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
   const contatto = mio ? ''            /* il venditore non contatta se stesso */
     : l.nostr
-    ? `<button class="btn ghost" onclick="window.open('https://njump.me/${l.nostr}','_blank')">💬 Contatta ${esc(l.seller.split(' ')[0])} su Nostr 🟣</button>`
+    ? `<button class="btn link" onclick="window.open('https://njump.me/${l.nostr}','_blank')">💬 Contatta ${esc(l.seller.split(' ')[0])} su Nostr 🟣</button>`
     : (l.username
-      ? `<button class="btn ghost" onclick="window.open('https://t.me/${l.username}','_blank')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`
-      : `<button class="btn ghost" onclick="toast('Questo venditore non ha un contatto pubblico')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`);
+      ? `<button class="btn link" onclick="window.open('https://t.me/${l.username}','_blank')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`
+      : `<button class="btn link" onclick="toast('Questo venditore non ha un contatto pubblico')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`);
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
       <h2>${esc(l.title)}</h2>
       <div class="detail-price">${prezzoParte(l).big}</div>
-      <div class="eur-hint">${prezzoParte(l).small} · 📍 ${esc(l.zone)}</div>
+      <div class="eur-hint">${prezzoParte(l).small}</div>
+      <div class="pills">
+        <span class="pill">📍 ${esc(l.zone)}</span>
+        ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
+        ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
+      </div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${esc(l.seller[0])}</div>
         <div class="who"><b>${esc(l.seller)}${l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}</b>
@@ -1220,13 +1245,20 @@ function openDetail(id){
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
       <div class="desc">${esc(l.desc)}</div>
-      <div class="trust-note">🔒 <span>I tuoi sats restano <b>bloccati in escrow</b> e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
       ${mio
-        ? `<button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
+        ? `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati in escrow</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
+           <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
-        : `${(!DEMO && !VETRINA && walletNwc())
-            ? `<button class="btn orange" onclick="compraSubito()">⚡ Compra subito — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>` : ''}
-           <button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>`}
+        : `<div class="escrow-zone">
+             <span class="escrow-flag">🔒 pagamento protetto</span>
+             <div class="trust-note">🔒 <span>I tuoi sats restano <b>chiusi nel barattolo</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
+             ${(!DEMO && !VETRINA && walletNwc())
+               ? `<button class="btn orange" onclick="compraSubito()">⚡ Compra subito — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>
+                  <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
+             <button class="btn ghost" onclick="startBuy()">🔒 Compra con escrow — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>
+             <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
+             <div class="escrow-note" style="margin-top:10px">Commissione 1% · solo a vendita conclusa</div>
+           </div>`}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
       ${contatto}
