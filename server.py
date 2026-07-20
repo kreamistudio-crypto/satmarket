@@ -3441,8 +3441,12 @@ def miei_ordini(x_tg_init_data: str = Header(""),
 # ----------------------- EXPORT DATI (CSV) --------------------------
 # Gli affari CONCLUSI dell'utente (released e refunded, da entrambe le
 # parti) in un CSV per la propria contabilita'. Due passi: un biglietto
-# monouso (dentro Telegram il download non puo' portare l'header di
-# autenticazione), poi il GET che lo brucia e serve il file.
+# a scadenza (dentro Telegram il download non puo' portare l'header di
+# autenticazione), poi il GET che lo controlla e serve il file.
+# ATTENZIONE: il biglietto NON e' monouso. Il downloader di Telegram
+# fa piu' richieste sullo stesso link (una HEAD di sonda prima del
+# popup, poi il GET vero, a volte a range): bruciarlo alla prima
+# gli farebbe scaricare un 410. Vale 5 minuti, poi la purga.
 
 BIGLIETTI_EXPORT: dict[str, tuple[int, float]] = {}  # biglietto -> (tg_id, scadenza)
 
@@ -3462,9 +3466,11 @@ def export_biglietto(x_tg_init_data: str = Header(""),
 
 
 @app.get("/api/export/{biglietto}")
+@app.head("/api/export/{biglietto}")   # la sonda di Telegram, prima del popup
 def scarica_export(biglietto: str):
-    dati = BIGLIETTI_EXPORT.pop(biglietto, None)      # monouso
+    dati = BIGLIETTI_EXPORT.get(biglietto)
     if not dati or dati[1] < time.time():
+        BIGLIETTI_EXPORT.pop(biglietto, None)
         raise HTTPException(410, "Link scaduto: riprova dal Profilo")
     tg_id = dati[0]
     con = db()

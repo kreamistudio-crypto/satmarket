@@ -2729,7 +2729,14 @@ async function esportaDati(){
       : `${location.origin}${API_BASE}/export/${biglietto}`;
     if (tg?.initData && tg.isVersionAtLeast?.('8.0')) {
       /* dentro Telegram (recente) il download si chiede alla app */
-      tg.downloadFile({url, file_name: 'barattolo-affari.csv'}, ()=>{});
+      try {
+        tg.downloadFile({url, file_name: 'barattolo-affari.csv'}, ok => {
+          if (ok) toast('📄 CSV in download: lo trovi tra i file scaricati');
+        });
+      } catch(e) {
+        /* downloadFile storto: il browser esterno scarica in modo nativo */
+        tg.openLink(url);
+      }
     } else {
       const a = document.createElement('a');
       a.href = url; a.download = 'barattolo-affari.csv';

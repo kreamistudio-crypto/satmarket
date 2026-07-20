@@ -263,18 +263,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   — il ≈€ della vetrina resta lato client — cache 15 min, fail-open:
   0 = sconosciuto, e gli ordini storici restano onestamente vuoti nel
   CSV). `POST /api/me/export-biglietto` (autenticato) emette un
-  biglietto monouso TTL 5 min (`BIGLIETTI_EXPORT` in memoria, stile
+  biglietto TTL 5 min (`BIGLIETTI_EXPORT` in memoria, stile
   SFIDE_LOGIN: dentro Telegram il download non può portare l'header
-  di auth); `GET /api/export/{biglietto}` lo brucia e serve il CSV
-  degli affari released/refunded dell'utente, da entrambe le parti
+  di auth); `GET /api/export/{biglietto}` (anche HEAD: la sonda di
+  Telegram prima del popup) serve il CSV
+  degli affari released/refunded dell'utente, da entrambe le parti.
+  ATTENZIONE: il biglietto NON è monouso — il downloader di Telegram
+  fa più richieste sullo stesso link (HEAD di sonda + GET, a volte a
+  range) e bruciarlo alla prima gli farebbe scaricare un 410 (bug
+  vero, successo su Android): vale i suoi 5 minuti, poi la purga
   (data, ruolo, annuncio, sats, esito, controvalore_eur) —
   separatore `;`, decimali con virgola e BOM UTF-8 per l'Excel
   italiano, quoting del titolo via csv.writer. Frontend: bottone
   «📄 Esporta i tuoi dati» in fondo a «⚡ Wallet e incassi» nel
   Profilo (`esportaDati()`: `tg.downloadFile` SOLO con initData vero
   e `isVersionAtLeast('8.0')` — nel browser lo stub di Telegram
-  esiste comunque e mentirebbe — altrimenti `<a download>`; in DEMO
-  sparisce col blocco wallet).
+  esiste comunque e mentirebbe — con ripiego `tg.openLink` se lancia;
+  altrimenti `<a download>`; in DEMO sparisce col blocco wallet).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
   `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
