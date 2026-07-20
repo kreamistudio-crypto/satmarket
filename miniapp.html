@@ -39,52 +39,75 @@
     padding:14px var(--pad) 10px;
   }
   .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
-  .brand h1{font-family:'Unbounded',sans-serif;font-weight:700;font-size:17px;letter-spacing:-.02em}
-  .brand h1 .bolt{color:var(--sats)}
-  .brand small{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  /* Il lockup: Baloo 2 con la B che diventa ₿ — quattro trattini
+     disegnati da due pseudo-elementi (ognuno sdoppiato via box-shadow) */
+  .lockup{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:22px;line-height:1;letter-spacing:0}
+  .lockup .bolt{color:var(--sats)}
+  .bmark{position:relative;display:inline-block;line-height:1;color:var(--sats)}
+  .bmark::before,.bmark::after{content:'';position:absolute;left:.20em;width:.09em;height:.20em;
+    background:currentColor;border-radius:.04em;box-shadow:.18em 0 0 currentColor}
+  .bmark::before{top:-.02em}
+  .bmark::after{bottom:.09em}
+  .brand small{color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
   .searchbar{display:flex;gap:8px}
   /* il campo Cerca vive in un wrapper relativo: il selettore valuta
      gli sta DENTRO, ancorato al bordo destro */
   .q-wrap{position:relative;flex:1;display:flex}
   .searchbar input{
     flex:1;width:100%;
-    border:1px solid var(--line);background:var(--card);border-radius:12px;
-    padding:11px 84px 11px 14px;font:inherit;font-weight:500;outline:none;
+    border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
+    padding:11px 84px 11px 16px;font:inherit;font-weight:600;outline:none;
   }
   .searchbar input:focus{border-color:var(--ink)}
   .searchbar button{
-    border:0;background:var(--ink);color:#fff;border-radius:12px;padding:0 16px;
-    font-weight:700;font-size:14px;cursor:pointer;
+    border:0;background:var(--ink);color:#fff;border-radius:999px;padding:0 18px;
+    font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 3px 0 #000;
   }
+  .searchbar button:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
   /* Il selettore ₿/€: due pillole compatte dentro il campo Cerca,
      quella accesa e' la valuta in cui stai leggendo la vetrina — si
      vede subito che l'altra e' cliccabile */
   .cur-seg{position:absolute;right:6px;top:50%;transform:translateY(-50%);
-    display:flex;border:1px solid var(--line);border-radius:9px;
-    overflow:hidden;background:var(--bg)}
-  .cur-seg button{border:0;background:none;padding:5px 10px;font-weight:800;
-    font-size:13px;cursor:pointer;color:var(--muted)}
+    display:flex;border:0;border-radius:999px;padding:2px;
+    overflow:hidden;background:var(--chip-bg)}
+  .cur-seg button{border:0;background:none;padding:4px 10px;font-weight:800;
+    font-size:13px;cursor:pointer;color:var(--muted);border-radius:999px}
   .cur-seg button.active{background:var(--ink);color:#fff}
   .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{
-    flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;
-    padding:6px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;
+    flex:0 0 auto;border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
+    padding:7px 15px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;
   }
-  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:800}
+  /* La riga di fiducia sotto la ricerca: una sola, per tutta la vetrina */
+  .trust-line{display:flex;align-items:center;justify-content:center;gap:6px;
+    padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text)}
 
   /* ---------- griglia annunci ---------- */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
   .card{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    background:var(--card);border-radius:18px;box-shadow:0 1px 4px rgba(60,45,10,.08);
     overflow:hidden;cursor:pointer;transition:transform .12s ease;
   }
   .card:active{transform:scale(.97)}
+  /* La foto vive in un wrapper relativo: l'etichetta del prezzo le
+     sta a cavallo del bordo inferiore, storta come al mercatino */
+  .ph-wrap{position:relative}
   .card .ph{
     aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
-    font-size:44px;background:linear-gradient(160deg,#F2F1EC,#E9E7DF);overflow:hidden;
+    font-size:44px;background:repeating-linear-gradient(45deg,#F3ECDA 0 10px,#ECE3CE 10px 20px);
+    overflow:hidden;
   }
   .card .ph img{width:100%;height:100%;object-fit:cover}
+  .tag-price{
+    position:absolute;left:10px;bottom:-26px;z-index:2;
+    background:var(--paper);border:2px solid var(--ink);border-radius:10px;
+    padding:5px 10px;transform:rotate(-2deg);box-shadow:0 2px 0 var(--ink);
+  }
+  .tag-price .price{margin-top:0;font-size:14.5px;color:var(--sats-deep)}
+  .tag-price .price-sub{margin-top:0}
+  .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
     scrollbar-width:none;background:#EDECE6}
   .detail-photos::-webkit-scrollbar{display:none}
@@ -99,24 +122,34 @@
   #photoPreview .x{position:absolute;top:-6px;right:-6px;background:var(--ink);
     color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
     justify-content:center;font-size:11px;cursor:pointer}
-  .card .info{padding:10px 12px 12px}
-  .card .title{font-weight:700;font-size:13.5px;line-height:1.3;display:-webkit-box;
-    -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:35px}
+  .card .info{padding:32px 12px 12px}
+  .card .title{font-family:'Baloo 2',sans-serif;font-weight:700;font-size:15px;line-height:1.2;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}
   .price{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700;font-size:14px;margin-top:6px}
   .price .unit{font-size:10.5px;font-weight:500;color:var(--muted)}
   .price-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
     font-weight:600;margin-top:1px}
   .card .meta{display:flex;justify-content:space-between;align-items:center;margin-top:5px;
     font-size:11.5px;color:var(--muted);font-weight:600}
-  .escrow-dot{display:inline-flex;align-items:center;gap:4px;color:var(--trust);font-weight:700}
 
+  /* Etichetta di sezione con la linea puntinata che riempie fino al
+     conteggio (quando c'e'): IN VETRINA ······· 42 oggetti */
   .section-label{
+    display:flex;align-items:center;gap:10px;
     padding:16px var(--pad) 0;font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.1em;color:var(--muted);
   }
-  .empty{padding:48px var(--pad);text-align:center;color:var(--muted)}
-  .empty .big{font-size:40px;margin-bottom:10px}
+  .section-label::after{content:'';flex:1;border-bottom:2px dotted var(--field-line);order:1}
+  .section-label .conta{order:2;color:var(--sats-deep);font-weight:800;
+    font-size:12px;text-transform:none;letter-spacing:0}
+  .empty{margin:20px var(--pad);padding:36px 24px;text-align:center;color:var(--muted);
+    background:var(--card);border:1px solid var(--line-soft);border-radius:24px;
+    font-weight:600;font-size:14px;line-height:1.5}
+  .empty .big{font-size:44px;margin-bottom:10px}
   .empty b{color:var(--ink)}
+  .empty .empty-title{display:block;font-family:'Baloo 2',sans-serif;font-weight:800;
+    font-size:20px;color:var(--ink);margin-bottom:6px}
+  .empty .btn{width:auto;margin:18px auto 0}
 
   /* ---------- distintivi (gamification) ----------
      ".badge" e' gia' degli stati ordine: qui si chiama .distintivo.
@@ -159,16 +192,25 @@
     padding:8px 6px calc(8px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;
   }
   nav button{
-    flex:1;border:0;background:none;font:inherit;font-size:10.5px;font-weight:700;
+    flex:1;border:0;background:none;font:inherit;font-size:10.5px;font-weight:800;
     color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;
   }
-  nav button.active{color:var(--ink)}
-  nav button .ic{font-size:20px}
+  /* La voce attiva accende l'emoji in una pillola color pesca */
+  nav button.active{color:var(--sats-deep)}
+  nav button .ic{font-size:20px;line-height:1;padding:3px 14px;border-radius:999px}
+  nav button.active .ic{background:var(--sats-soft);box-shadow:inset 0 0 0 1.5px #F7C87F}
+  /* Il "+" di Vendi: bottone-oggetto rialzato sopra la barra */
   nav button.sell .ic{
-    width:44px;height:44px;border-radius:14px;background:var(--sats);color:#fff;
-    display:flex;align-items:center;justify-content:center;font-size:24px;margin-top:-16px;
-    box-shadow:0 4px 14px rgba(247,147,26,.4);
+    width:54px;height:54px;border-radius:18px;background:var(--sats);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:26px;padding:0;
+    font-family:'Baloo 2',sans-serif;font-weight:800;margin-top:-30px;
+    box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35);
   }
+  nav button.sell{color:#5B5648}
+  nav button.sell.active{color:var(--sats-deep)}
+  nav button.sell.active .ic{background:var(--sats);box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35)}
+  /* Il lockup nella barra: esiste solo da desktop in su */
+  .nav-logo{display:none}
 
   /* ---------- dettaglio annuncio ---------- */
   .detail-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
@@ -394,20 +436,22 @@
       border-top:0;border-bottom:1px solid var(--line);
       padding:0 max(var(--pad), calc((100% - 960px)/2));
     }
-    nav::before{
-      content:'Barattolo ⚡';font-family:'Unbounded',sans-serif;
-      font-weight:700;font-size:18px;letter-spacing:-.02em;
-      color:var(--ink);margin-right:auto;
-    }
+    /* il logo in topbar e' markup vero (.nav-logo): la B col ₿ vive
+       di pseudo-elementi suoi, impossibili dentro un content: */
+    .nav-logo{display:flex;align-items:center;margin-right:auto;font-size:24px}
     nav button{
       flex:0 0 auto;flex-direction:row;gap:7px;font-size:14px;
-      padding:8px 14px;border-radius:10px;
+      padding:9px 16px;border-radius:999px;
     }
-    nav button .ic{font-size:17px}
-    nav button.sell{background:var(--sats);color:#fff;border-radius:12px}
-    nav button.sell .ic{
+    nav button .ic{font-size:17px;padding:0;border-radius:0}
+    nav button.active{background:var(--sats-soft)}
+    nav button.active .ic{background:none;box-shadow:none}
+    nav button.sell{background:var(--sats);color:#fff;border-radius:999px;
+      box-shadow:0 3px 0 var(--sats-deep);margin-left:8px}
+    nav button.sell.active{color:#fff}
+    nav button.sell .ic,nav button.sell.active .ic{
       width:auto;height:auto;border-radius:0;background:none;
-      font-size:17px;margin-top:0;box-shadow:none;
+      font-size:17px;margin-top:0;box-shadow:none;font-family:inherit;
     }
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
@@ -465,8 +509,8 @@
   <div class="view active" id="view-esplora">
     <header>
       <div class="brand">
-        <h1>Barattolo<span class="bolt">⚡</span></h1>
-        <small>compra e vendi in sats</small>
+        <h1 class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></h1>
+        <small>il mercatino in sats</small>
       </div>
       <div class="searchbar">
         <div class="q-wrap">
@@ -479,13 +523,16 @@
         <button onclick="doSearch()">Cerca</button>
       </div>
       <div class="chips" id="chips"></div>
+      <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
     </header>
     <div class="section-label" id="gridLabel">In vetrina</div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
-      <div class="big">🔍</div>
+      <div class="big">🫙</div>
+      <b class="empty-title">Il barattolo qui è vuoto</b>
       Nessun oggetto trovato per <b id="emptyQ"></b>.<br>
-      Prova con altre parole — o metti in vendita il tuo!
+      Hai qualcosa da vendere? 3 minuti e sei in vetrina.
+      <button class="btn orange" onclick="go('vendi')">+ Metti in vendita</button>
     </div>
   </div>
 
@@ -500,6 +547,7 @@
     <button class="back" onclick="tornaDalNegozio()">← Torna</button>
     <div id="negozioHeader"></div>
     <div id="negozioFeedback"></div>
+    <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
     <div class="section-label">In vetrina in questo negozio</div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
   </div>
@@ -618,6 +666,7 @@
 
   <!-- ============ NAV ============ -->
   <nav>
+    <div class="nav-logo" aria-hidden="true"><span class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
@@ -877,21 +926,27 @@ function renderGrid(items){
   let data = items || listings.filter(l =>
     (activeCat==='Tutto' || l.cat===activeCat) &&
     (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));
-  el('gridLabel').textContent = items ? 'Risultati della ricerca' : (q||activeCat!=='Tutto' ? 'Risultati' : 'In vetrina');
+  /* Il conteggio arancione in fondo alla linea puntinata: data.length
+     e' un numero, mai testo utente */
+  el('gridLabel').innerHTML = (items ? 'Risultati della ricerca' : (q||activeCat!=='Tutto' ? 'Risultati' : 'In vetrina'))
+    + `<span class="conta">${data.length} oggett${data.length===1?'o':'i'}</span>`;
   el('gridEmpty').style.display = data.length ? 'none':'block';
   el('emptyQ').textContent = q || activeCat;
   el('grid').innerHTML = data.map(cardHTML).join('');
 }
 
-/* La card di un annuncio: la stessa in vetrina e nella vista negozio */
+/* La card di un annuncio, stile "Etichetta": foto pulita e il prezzo
+   su un cartellino storto a cavallo del bordo, come al mercatino.
+   La stessa card serve vetrina e vista negozio. */
 const cardHTML = l => { const p = prezzoParte(l); return `
     <div class="card" onclick="openDetail(${l.id})">
-      <div class="ph">${l.photos && l.photos[0] ? `<img src="${esc(l.photos[0])}" loading="lazy" alt="">` : l.emoji}</div>
+      <div class="ph-wrap">
+        <div class="ph">${l.photos && l.photos[0] ? `<img src="${esc(l.photos[0])}" loading="lazy" alt="">` : l.emoji}</div>
+        <div class="tag-price"><div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+      </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="price">${p.big}</div>
-        <div class="price-sub">${p.small}</div>
-        <div class="meta"><span>📍 ${esc(l.zone)}</span>${l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣</span>':''}<span class="escrow-dot">🔒 escrow</span></div>
+        <div class="meta"><span>📍 ${esc(l.zone)}</span>${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
       </div>
     </div>`; };
 
