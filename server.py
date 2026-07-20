@@ -3882,6 +3882,14 @@ def pagina_negozio(chi: str):
     return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
 
 
+@app.get("/annuncio/{aid}")
+def pagina_annuncio(aid: int):
+    """Link condivisibile di un annuncio (bottone condividi del
+    dettaglio): stessa Mini App, il JS legge /annuncio/{id} dall'URL
+    e apre il dettaglio — in vetrina anonima per chi non e' entrato."""
+    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
+
+
 @app.get("/vendor/nostr.js")
 def vendor_nostr():
     """La libreria nostr-tools, servita da casa nostra e mai da una CDN:
