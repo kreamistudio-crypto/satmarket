@@ -808,7 +808,7 @@
       </div>
 
       <div class="acc" id="accIdentita">
-        <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità e Nostr<span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità<span class="fr">▾</span></button>
         <div class="acc-b">
           <div id="identitaBlocco"></div>
           <div class="field" style="margin-top:10px"><label>Il tuo profilo Nostr (facoltativo)</label>
@@ -2112,7 +2112,7 @@ function renderProfilo(){
      quello spento non esiste proprio */
   const badge = myNpub
     ? (myNpubVerified?' <span title="Npub verificata">🟣</span>'
-                     :' <span title="Npub da verificare: solo tu vedi questo badge, verificala dalla sezione 🆔 Identità e Nostr" style="opacity:.45">🟣</span>')
+                     :' <span title="Npub da verificare: solo tu vedi questo badge, verificala dalla sezione 🆔 Identità" style="opacity:.45">🟣</span>')
     : '';
   /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
      (stessa regola della vista negozio) */
@@ -2288,7 +2288,7 @@ function renderAvvisi(){
   } else if (tgOk) {
     dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
       Arrivano nella chat del bot Telegram. Verifica una npub nella
-      sezione 🆔 Identità e Nostr e potrai riceverli anche come DM
+      sezione 🆔 Identità e potrai riceverli anche come DM
       Nostr cifrati.</div>`;
   } else {
     dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
@@ -3028,7 +3028,7 @@ function barraWeb(nome){
   b.style.display = 'block';
   const avvisi = myTgId < 0
     ? `sei entrato con Nostr: per gli avvisi in chat collega Telegram`
-      + ` dalla scheda Profilo (sezione «🆔 Identità e Nostr»), oppure ricontrolla`
+      + ` dalla scheda Profilo (sezione «🆔 Identità»), oppure ricontrolla`
       + ` i tuoi Affari di tanto in tanto`
     : `Per ricevere gli avvisi sugli ordini apri una volta `
       + `<a href="https://t.me/ilbarattolobot" target="_blank"`
