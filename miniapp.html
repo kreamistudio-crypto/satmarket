@@ -554,7 +554,11 @@
   .demo-banner.demo-vera{
     background:var(--sats);color:#fff;font-size:13px;
     padding:12px var(--pad);line-height:1.5;letter-spacing:0;
+    position:relative;   /* ancora per la ✕ del banner web */
   }
+  .demo-x{position:absolute;top:6px;right:8px;border:0;background:none;
+    color:#fff;font-size:14px;font-weight:800;cursor:pointer;
+    padding:6px;line-height:1;opacity:.85}
   .demo-cta{
     display:inline-block;margin-top:8px;background:#fff;color:var(--sats-text);
     text-decoration:none;border-radius:999px;padding:6px 15px;
@@ -3017,6 +3021,9 @@ const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — entra con Telegram
    arrivino. */
 function barraWeb(nome){
   const b = el('demoBanner');
+  /* Chiuso una volta con la ✕, non ricompare su questo dispositivo
+     (pattern barattolo_hint). Il bottone Esci vive comunque nel Profilo. */
+  if (hintDismesso('barraweb')) { b.style.display = 'none'; return; }
   b.className = 'demo-banner demo-vera';
   b.style.display = 'block';
   const avvisi = myTgId < 0
@@ -3027,9 +3034,16 @@ function barraWeb(nome){
       + `<a href="https://t.me/ilbarattolobot" target="_blank"`
       + ` rel="noopener">@ilbarattolobot</a>`;
   b.innerHTML =
-    `<div>👋 Ciao ${esc(nome)} — sei su Barattolo dal browser. ${avvisi}</div>`
+    `<button class="demo-x" onclick="chiudiBarraWeb()" title="Ho capito, non mostrarlo più">✕</button>`
+    + `<div style="padding:0 18px">👋 Ciao ${esc(nome)} — sei su Barattolo dal browser. ${avvisi}</div>`
     + `<button class="demo-cta" onclick="esciWeb()"`
     + ` style="border:none;cursor:pointer">Esci</button>`;
+}
+/* La ✕ del banner: memoria nel solito localStorage degli hint */
+function chiudiBarraWeb(){
+  const h = hintLetti(); h.barraweb = Date.now();
+  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  el('demoBanner').style.display = 'none';
 }
 async function esciWeb(){
   try { await fetch(`${API_BASE}/logout`, {method:'POST'}); } catch(e){}
