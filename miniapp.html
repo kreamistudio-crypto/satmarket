@@ -1864,7 +1864,7 @@ function ridimensiona(file){
      l'upload e' veloce anche dal telefone e il server resta snello.
      Se il browser non sa leggere il formato (le HEIC degli iPhone su
      Android e desktop), la foto parte com'e' in base64 e la converte
-     il server con Pillow — max 6MB, il suo limite. */
+     il server con Pillow — max 15MB, il suo limite. */
   return new Promise(res=>{
     const img = new Image();
     img.onload = ()=>{
@@ -1877,15 +1877,18 @@ function ridimensiona(file){
     };
     img.onerror = ()=>{
       URL.revokeObjectURL(img.src);
-      if (file.size > 6_000_000) { toast('Foto troppo grande (max 6MB)'); res(null); return; }
+      if (file.size > 15_000_000) { toast('Foto troppo grande (max 15MB)'); res(null); return; }
       const fr = new FileReader();
       fr.onload = ()=>{
         let uri = fr.result;
-        /* Alcuni sistemi non dichiarano il MIME delle HEIC: si rimedia
-           guardando l'estensione, cosi' il server sa cosa gli arriva */
-        const heic = /\.heic$/i.test(file.name), heif = /\.heif$/i.test(file.name);
-        if ((heic || heif) && !/^data:image\/hei[cf]/.test(uri))
-          uri = uri.replace(/^data:[^;]*/, `data:image/${heic?'heic':'heif'}`);
+        /* Il server accetta solo MIME image/…: se il sistema non lo
+           dichiara (capita su Android con le HEIC), si scommette su
+           heic — tanto Pillow riconosce il formato dai byte veri,
+           non dall'etichetta */
+        if (!/^data:image\/(jpeg|jpg|png|webp|heic|heif);/.test(uri)) {
+          const heif = /\.heif$/i.test(file.name);
+          uri = uri.replace(/^data:[^;,]*/, `data:image/${heif?'heif':'heic'}`);
+        }
         res(uri);
       };
       fr.onerror = ()=>res(null);
@@ -1914,9 +1917,15 @@ function renderFotoPreview(){
       + `<div style="width:100%;font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">Queste sono le foto attuali: restano così, oppure scegline di nuove per sostituirle tutte</div>`;
     return;
   }
+  /* Il canvas produce sempre data:image/jpeg: tutto il resto e' un
+     originale passato dal ripiego (HEIC & co.) che il browser non sa
+     mostrare — segnaposto chiaro invece dell'icona rotta */
   el('photoPreview').innerHTML = sellFoto.map((f,i)=>`
-    <div class="th">${f.startsWith('data:image/hei')
-      ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#EFE9E2;font-size:22px" title="Anteprima non disponibile: la converte il server">🖼️</div>`
+    <div class="th">${!f.startsWith('data:image/jpeg')
+      ? `<div style="width:110px;height:64px;border-radius:10px;background:#EFE9E2;border:1.5px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box">
+           <span style="font-size:17px">📷</span>
+           <span style="font-size:9px;color:var(--muted);font-weight:700;text-align:center;line-height:1.2">HEIC: verrà convertita<br>alla pubblicazione</span>
+         </div>`
       : `<img src="${f}" alt="">`}
       <span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>
     </div>`).join('');

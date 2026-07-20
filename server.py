@@ -1258,8 +1258,10 @@ def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
         except Exception:
             continue
         # I JPEG del telefono pesano poco; agli originali da convertire
-        # (mai ridimensionati dal browser) si concede qualche MB in piu'
-        if len(raw) > (6_000_000 if ImmaginePillow else 2_500_000):
+        # (mai ridimensionati dal browser: gli iPhone moderni superano
+        # i 6MB senza sforzo) si concede piu' spazio, tanto Pillow li
+        # riporta comunque a un JPEG da 1200px
+        if len(raw) > (15_000_000 if ImmaginePillow else 2_500_000):
             continue
         if m.group(1) in ("heic", "heif"):
             if not (ImmaginePillow and pillow_heif):
@@ -1469,12 +1471,18 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         (user["id"], d["titolo"], d.get("descrizione", ""), d.get("categoria", "Altro"),
          int(d["prezzo_sats"]), d.get("zona", ""), int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
-    nomi = salva_foto(annuncio_id, d.get("foto"))
-    if nomi:
-        con.execute("UPDATE annunci SET foto=? WHERE id=?",
-                    (json.dumps(nomi), annuncio_id))
     con.commit()
     con.close()
+    # Le foto in un thread: convertire una HEIC da 15MB costa secondi
+    # di CPU e non deve congelare il server (che e' mono-processo).
+    # Il commit e' gia' fatto: niente lock del database nel frattempo.
+    nomi = await asyncio.to_thread(salva_foto, annuncio_id, d.get("foto"))
+    if nomi:
+        con = db()
+        con.execute("UPDATE annunci SET foto=? WHERE id=?",
+                    (json.dumps(nomi), annuncio_id))
+        con.commit()
+        con.close()
     # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina ---
     await notifica_admin(
         f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
@@ -1632,11 +1640,15 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "prezzo_sats=?, zona=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), d.get("categoria", "Altro"),
          int(d["prezzo_sats"]), d.get("zona", ""), annuncio_id))
+    con.commit()
+    con.close()
     if isinstance(d.get("foto"), list):
         # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
-        # puo' mostrare per sbaglio la foto vecchia dalla sua cache
-        nomi = salva_foto(annuncio_id, d["foto"],
-                          versione=f"_{int(time.time())}")
+        # puo' mostrare per sbaglio la foto vecchia dalla sua cache.
+        # E in un thread, come in pubblica(): la conversione HEIC non
+        # deve congelare il server.
+        nomi = await asyncio.to_thread(salva_foto, annuncio_id, d["foto"],
+                                       versione=f"_{int(time.time())}")
         try:
             vecchie = json.loads(a["foto"]) if a["foto"] else []
         except Exception:
@@ -1648,10 +1660,11 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                 os.remove(os.path.join(FOTO_DIR, v))
             except OSError:
                 pass
+        con = db()
         con.execute("UPDATE annunci SET foto=? WHERE id=?",
                     (json.dumps(nomi) if nomi else "", annuncio_id))
-    con.commit()
-    con.close()
+        con.commit()
+        con.close()
     # --- Strato 3: i moderatori vedono anche cio' che cambia ---
     await notifica_admin(
         f"✏️ <b>Annuncio #{annuncio_id} modificato</b>\n"
