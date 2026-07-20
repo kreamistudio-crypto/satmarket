@@ -1137,7 +1137,11 @@ function renderNegozio(v, annunci, feedback=[]){
       </div>`).join('')}` : '';
   el('negozioGrid').innerHTML = annunci.length
     ? annunci.map(cardHTML).join('')
-    : `<div class="empty" style="grid-column:1/-1">Niente in vetrina al momento</div>`;
+    : `<div class="empty" style="grid-column:1/-1">
+         <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
+         <div class="big">🫙</div>
+         <b class="empty-title">Il barattolo qui è vuoto</b>
+         Niente in vetrina al momento</div>`;
   go('negozio');
 }
 
