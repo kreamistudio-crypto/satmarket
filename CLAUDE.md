@@ -362,6 +362,36 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (ln_address, npub verificata, wallet NWC «su questo dispositivo»,
   + Telegram per i tg_id negativi), niente dismiss, a profilo
   completo sparisce del tutto.
+  Redesign «mercatino di paese» (lug 2026, da Claude Design, solo
+  CSS/markup): palette in `:root` — crema #FAF4E4, inchiostro #23282C,
+  arancio ₿ #F7931A con i toni `--sats-deep/-text`, verde escrow
+  #1B8B54, viola Nostr, oro distintivi; font Baloo 2 (titoli e logo) +
+  Nunito (testi) + JetBrains Mono (numeri). Linguaggio: bottoni-pillola
+  con ombra piena 0 3px 0 che si abbassano su :active (terziari =
+  testo sottolineato, `.btn.link`/`.danger-ghost`); card annuncio
+  «Etichetta» (cartellino prezzo ruotato −2° a cavallo della foto,
+  `.tag-price` dentro `.ph-wrap`); il tratteggio verde è il SIGILLO
+  dell'escrow e compare solo lì: `.escrow-zone` nel dettaglio (badge
+  flottante «🔒 pagamento protetto»; trucco `:first-of-type` che
+  promuove il bottone escrow a CTA arancione quando «Compra subito»
+  manca — la condizione walletNwc() non si tocca) e `.vault` del
+  dettaglio ordine (step corrente = cerchio tratteggiato). Il «🔒
+  escrow» è USCITO dalle card: la rassicurazione è la riga
+  `.trust-line` sotto la searchbar e sopra la griglia del negozio.
+  Logo = lockup `.bmark` (B che diventa ₿ con due pseudo-elementi);
+  in topbar desktop è markup vero `.nav-logo` (il vecchio
+  `nav::before` testuale non esiste più). Badge stati: `refunded` ha
+  la SUA classe grigia (non più il verde di released). Distintivi:
+  tessere d'oro per i guadagnati, 2 colonne (non le 3 del mockup:
+  le descrizioni sono contenuto vero). Stato vuoto con CTA
+  «+ Metti in vendita» (riusa `go('vendi')`) e conteggio «N oggetti»
+  nel `section-label` (entrambi concordati). Restano fuori (logica
+  nuova, respinta): filtri negli Affari, contatore 🏅 in testata,
+  riga «Prossimo:» nei distintivi. IN SOSPESO: immagini mascotte/
+  barattolo da Claude Design (superano il tetto 256KiB di DesignSync:
+  vanno salvate a mano in `assets/`) + route esplicite stile /vendor
+  in server.py + favicon + hero desktop — solo dopo, aggiornare la
+  regola 3.
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
@@ -578,7 +608,13 @@ suggerimenti discreti al momento del bisogno — wallet NWC nel
 paySheet, Lightning address e verifica npub dopo la pubblicazione —
 più la checklist «Completa il profilo (N di M)» nel Profilo; «Non
 ora» memorizzato in localStorage, mai in demo/vetrina, vedi
-Architettura).
+Architettura); redesign «mercatino di paese» (lug 2026: palette crema/
+arancio/verde sigillo, Baloo 2+Nunito, card «Etichetta», bottoni con
+ombra piena, recinto escrow tratteggiato, vedi Architettura — solo
+CSS/markup, collaudato in locale su tutte le viste e i tre viewport;
+IN SOSPESO le immagini mascotte/barattolo con la loro route /assets,
+il favicon e la hero desktop: servono i file salvati a mano da
+Claude Design in `assets/`).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
