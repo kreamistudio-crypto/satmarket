@@ -109,7 +109,7 @@
   .tag-price .price-sub{margin-top:0}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
-    scrollbar-width:none;background:#EDECE6}
+    scrollbar-width:none;background:#ECE3CE}
   .detail-photos::-webkit-scrollbar{display:none}
   .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:4/3;object-fit:cover;
     scroll-snap-align:center}
@@ -220,7 +220,7 @@
 
   /* ---------- dettaglio annuncio ---------- */
   .detail-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
-    font-size:84px;background:linear-gradient(160deg,#F2F1EC,#E9E7DF)}
+    font-size:84px;background:repeating-linear-gradient(45deg,#F3ECDA 0 12px,#ECE3CE 12px 24px)}
   .detail-body{padding:18px var(--pad)}
   .detail-body h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;line-height:1.15}
   .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
@@ -442,7 +442,7 @@
     padding:7px 15px;font:inherit;font-weight:800;font-size:13px;cursor:pointer;margin:14px 0 0 var(--pad);
   }
   .demo-banner{
-    background:var(--sats-soft);color:#B26A0A;font-size:12px;font-weight:700;
+    background:var(--sats-soft);color:var(--sats-text);font-size:12px;font-weight:700;
     text-align:center;padding:7px;letter-spacing:.02em;
   }
   /* Aperta dal browser: qui i dati sono finti, quindi il banner deve
@@ -452,9 +452,9 @@
     padding:12px var(--pad);line-height:1.5;letter-spacing:0;
   }
   .demo-cta{
-    display:inline-block;margin-top:8px;background:#fff;color:#B26A0A;
-    text-decoration:none;border-radius:9px;padding:6px 14px;
-    font-weight:800;font-size:13px;
+    display:inline-block;margin-top:8px;background:#fff;color:var(--sats-text);
+    text-decoration:none;border-radius:999px;padding:6px 15px;
+    font-weight:800;font-size:13px;box-shadow:0 2px 0 var(--sats-deep);
   }
 
   /* ==================== DESKTOP (≥768px) ====================
@@ -2597,7 +2597,7 @@ function renderFotoPreview(){
      altro non-jpeg e' un originale che il browser non sa mostrare —
      segnaposto chiaro invece dell'icona rotta */
   const chip = (testo, extra) => `
-    <div style="width:110px;height:64px;border-radius:10px;background:#EFE9E2;border:1.5px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box;${extra||''}">
+    <div style="width:110px;height:64px;border-radius:10px;background:var(--chip-bg);border:1.5px dashed var(--field-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box;${extra||''}">
       <span style="font-size:17px">📷</span>
       <span style="font-size:9px;color:var(--muted);font-weight:700;text-align:center;line-height:1.2">${testo}</span>
     </div>`;
@@ -3260,12 +3260,12 @@ async function avvia(){
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
-      const btn = (id,nome)=>`<button onclick="setCollaudo(${id},'${nome}')" style="font:inherit;border:1px solid #B26A0A;background:${collaudoId===id?'#B26A0A':'transparent'};color:${collaudoId===id?'#fff':'#B26A0A'};border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">${nome}</button>`;
+      const btn = (id,nome)=>`<button onclick="setCollaudo(${id},'${nome}')" style="font:inherit;border:1px solid var(--sats-text);background:${collaudoId===id?'var(--sats-text)':'transparent'};color:${collaudoId===id?'#fff':'var(--sats-text)'};border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">${nome}</button>`;
       b.style.display = 'block';
       b.innerHTML = `🧪 COLLAUDO con sats veri — sei: `
         + btn(111,'Compratore') + btn(222,'Venditore') + btn(999,'Admin')
-        + `<button onclick="provaLoginWeb()" title="Prova il login web: cookie di sessione al posto dell'header" style="font:inherit;border:1px dashed #B26A0A;background:transparent;color:#B26A0A;border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🍪 web</button>`
-        + `<button onclick="apriNostrSheet()" title="Prova il login Nostr: qui la crittografia vera funziona anche in locale" style="font:inherit;border:1px dashed #B26A0A;background:transparent;color:#B26A0A;border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🟣 nostr</button>`;
+        + `<button onclick="provaLoginWeb()" title="Prova il login web: cookie di sessione al posto dell'header" style="font:inherit;border:1px dashed var(--sats-text);background:transparent;color:var(--sats-text);border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🍪 web</button>`
+        + `<button onclick="apriNostrSheet()" title="Prova il login Nostr: qui la crittografia vera funziona anche in locale" style="font:inherit;border:1px dashed var(--sats-text);background:transparent;color:var(--sats-text);border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">🟣 nostr</button>`;
     } else if (WEB) barraWeb(me.nome || 'amico');
     else b.style.display = 'none';
     await loadListings();
