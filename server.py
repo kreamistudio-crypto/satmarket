@@ -3892,4 +3892,12 @@ def asset_barattolo():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/barattolo-hero.png")
+def asset_barattolo_hero():
+    """Il barattolo scontornato (PNG con trasparenza) per la hero
+    desktop: fluttua senza tessera, come nel mockup."""
+    return FileResponse("assets/barattolo-hero.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")

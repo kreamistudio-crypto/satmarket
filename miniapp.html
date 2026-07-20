@@ -505,8 +505,10 @@
     .hero-title{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:38px;line-height:1.1}
     .hero-title span{color:var(--sats)}
     .hero-sub{font-size:16px;color:#5B5648;font-weight:600;margin-top:8px;max-width:520px}
-    .hero img{width:200px;height:200px;border-radius:36px;margin-left:auto;flex:0 0 auto;
-      transform:rotate(-6deg);box-shadow:0 14px 22px rgba(60,45,10,.20);
+    /* Il barattolo scontornato fluttua libero: niente tessera,
+       l'ombra e' un drop-shadow che segue la sagoma */
+    .hero img{width:220px;height:220px;margin-left:auto;flex:0 0 auto;
+      transform:rotate(-6deg);filter:drop-shadow(0 14px 22px rgba(60,45,10,.25));
       animation:floaty 4s ease-in-out infinite}
     nav button{
       flex:0 0 auto;flex-direction:row;gap:7px;font-size:14px;
@@ -609,7 +611,7 @@
         <div class="hero-sub">Compra e vendi in Lightning, con l'escrow che protegge
           tutti. Zero costi fissi: 1% solo a vendita conclusa.</div>
       </div>
-      <img src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
+      <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
     <div class="section-label" id="gridLabel">In vetrina</div>
     <div class="grid" id="grid"></div>
