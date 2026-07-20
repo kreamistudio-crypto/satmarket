@@ -25,6 +25,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'era prima della colonna). I casi ambigui (cannabis
   light, pistola sparachiodi...) NON vanno nella lista parole: li
   valuta l'AI.
+  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py —
+  Elettronica · Casa e giardino · Abbigliamento · Sport e hobby ·
+  Motori · Bambini · Animali · Libri e media · Altro ("Tutto" è solo
+  la vista del frontend, non una categoria). `categoria_valida`
+  normalizza i payload (sconosciuta → Altro: il client non decide il
+  catalogo); migrazione idempotente in `init_db` rinomina le tre voci
+  vecchie (Sport/Casa/Libri) con COLLATE NOCASE, che raddrizza anche
+  le maiuscole storte dei vecchi import ('casa'). La lista entra nel
+  prompt della ricerca AI; nel NIP-99 il tag `t` è la prima parola
+  minuscola ("Casa e giardino" → "casa": un hashtag non ha spazi).
+  `categoria_automatica` di importa_nostr.py parla il set nuovo
+  (Bambini prima di Motori: "seggiolino auto" è roba da bimbi).
+  Frontend: pillole ordinate per numero di annunci ATTIVI
+  (decrescente), "Tutto" sempre prima, le vuote non compaiono proprio
+  (Tutto e la ricerca coprono la scoperta); conteggi dai listings
+  caricati, rifatti a ogni giro in `renderChips()` (chiamata da
+  `loadListings` e `avviaVetrina`); se la categoria attiva resta
+  senza annunci si torna su Tutto. Vale per vetrina autenticata,
+  anonima e DEMO (dati finti già rimappati).
   Modifica annuncio (lug 2026): `POST /api/listings/{id}/modifica` —
   solo il proprietario su annunci attivi, 400 se esiste un ordine NON
   terminale (anche `creato`: chi sta pagando deve trovare l'annuncio
@@ -732,7 +751,11 @@ tasto-tappo del Profilo in testata e nav a 3 voci; searchbar che
 cerca con Invio senza bottone; ✕ «ho capito» sul banner web; il
 cassetto «🆔 Identità» perde il «e Nostr» — vedi Architettura,
 redesign — collaudati in locale su mobile e desktop, chiaro e scuro,
-web/vetrina/demo).
+web/vetrina/demo); categorie nuove a 9 voci con pillole ordinate per
+contenuto (lug 2026: catalogo `CATEGORIE`, migrazione idempotente,
+vuote nascoste, vedi Architettura — collaudate in locale con
+migrazione sui dati veri; la ricerca AI col set nuovo va provata in
+produzione, dove la chiave Anthropic è vera).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
