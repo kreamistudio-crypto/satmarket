@@ -398,10 +398,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dati da `venditore_distintivi`, vedi distintivi). La
   pillola-contatore «🏅 N/M» accanto al lockup è vissuta poco: i
   tester l'hanno bocciata e al suo posto (lug 2026) c'è il tasto
-  Profilo `.avatar-btn` — un cerchio-TAPPO del barattolo in solo CSS
-  (metallo argentato a gradienti radiale+conico ripetuto mascherato
-  ad anello, scanalature sul bordo) con l'iniziale dell'utente in
-  Baloo scura; due istanze come la pillola di prima (testata mobile,
+  Profilo `.avatar-btn` — il TAPPO del barattolo: `assets/tappo.jpeg`
+  (128px, ritagliato con Pillow sul diametro così il cerchio
+  inscritto di border-radius coincide col bordo e l'arancione del
+  fondo sparisce negli angoli; rotta esplicita, regola 3) reso tondo
+  da border-radius+cover, con sotto il tappo disegnato in CSS
+  (gradienti radiale+conico mascherato ad anello) come ripiego
+  onerror, e sopra l'iniziale dell'utente in Baloo scura con alone
+  chiaro (spread sul nome: le emoji iniziali non si spezzano);
+  due istanze come la pillola di prima (testata mobile,
   topbar desktop in coda alle voci), accese da `renderAvatar()`
   ovunque tranne che in VETRINA anonima (in demo c'è: il Profilo
   esiste). Micro-anello d'oro `.oro` col primo distintivo guadagnato,
@@ -413,7 +418,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la searchbar è un `<form>` senza bottone «Cerca» — si cerca col
   submit, cioè Invio/lente della tastiera (`enterkeyhint=search`),
   placeholder «Cerca su Barattolo…», MAI rimettere un ascoltatore
-  keydown sull'Invio (doppia ricerca); il banner web arancione ha la
+  keydown sull'Invio (doppia ricerca), e dentro il campo a sinistra
+  c'è la lente decorativa `.q-lente` (emoji sbiadita con
+  grayscale+opacity, grigia in entrambi i temi); il banner web arancione ha la
   ✕ «ho capito» (`chiudiBarraWeb`, hint `barraweb` nel solito
   `localStorage['barattolo_hint']` — chiuso una volta, mai più su
   quel dispositivo; Esci resta nel banner finché visibile e comunque
@@ -596,8 +603,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
    `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg`,
-   `/assets/barattolo.jpeg` e `/assets/barattolo-hero.png`
-   (file singoli, rotte esplicite) e `/api/*`.
+   `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png` e
+   `/assets/tappo.jpeg` (file singoli, rotte esplicite) e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
    diventerebbero pubblici — falla già successa e chiusa).
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
