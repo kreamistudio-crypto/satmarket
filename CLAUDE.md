@@ -154,10 +154,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   from.id: il codice è un bearer token, se il link trapela serve
   comunque il tocco giusto), e `esegui_fusione` fonde l'account
   nativo in quello Telegram in UNA transazione `BEGIN IMMEDIATE`:
-  annunci+ordini+sessioni migrano (il browser Nostr resta loggato),
-  la riga negativa MUORE PRIMA che `npub_accesso` si accenda sulla
-  positiva (indice unico), contatori sommati, rating di P (le stelle
-  non esistono ancora). `_guardie_fusione` (ricontrollate DENTRO la
+  annunci+ordini+sessioni+feedback migrano (il browser Nostr resta
+  loggato), la riga negativa MUORE PRIMA che `npub_accesso` si accenda
+  sulla positiva (indice unico), contatori sommati, rating ricalcolato
+  dai feedback migrati. `_guardie_fusione` (ricontrollate DENTRO la
   transazione) rifiutano: P già collegato, P con badge verificato
   DIVERSO, affari ancora aperti tra i due (auto-ordine in escrow).
   `bot_api()` è il gemello completo di `notifica()` ma in collaudo
@@ -193,7 +193,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il canale effettivo («Ricevi gli avvisi su: …», con «(automatico)»
   quando è il default), pillole di scelta solo se entrambi i canali
   sono disponibili, testo statico altrimenti.
-- `miniapp.html` — frontend intero in un file (HTML+CSS+JS, zero framework).
+  Feedback e stelle (lug 2026): tabella `feedback(ordine_id, da_tg_id,
+  per_tg_id, voto 1-5, commento ≤200, creato)` con
+  `UNIQUE(ordine_id, da_tg_id)` come giudice dei doppioni.
+  `POST /api/orders/{id}/feedback`: solo le due parti, solo su
+  `STATI_FEEDBACK = (released, refunded)` — anche gli affari finiti
+  male sono affari veri, escluderli gonfierebbe i profili —
+  definitivo (niente modifica: chiude il ricatto «cambia il
+  feedback o…»; la valvola è `POST /api/admin/feedback/{id}/rimuovi`).
+  Commento sotto `controlla_vietato` (niente AI: 200 caratteri legati
+  a una transazione pagata). `utenti.rating` e `n_feedback` si
+  aggiornano SEMPRE per RICALCOLO (`_ricalcola_rating`: AVG/COUNT
+  dalla tabella, `round(…,1)`, dentro `BEGIN IMMEDIATE`): così
+  rimozione admin e fusione si sistemano da sole. `esegui_fusione`
+  migra i feedback (prima però cancella quelli sugli auto-scambi tra
+  le due metà: eviterebbero la UNIQUE e sarebbero auto-voti) e
+  ricalcola. `/api/orders` espone `mio_voto/mio_commento` e
+  `suo_voto/suo_commento`; `/api/negozio/{chi}` aggiunge
+  `n_feedback` al profilo e `feedback` = ultimi 10 ricevuti (voto,
+  commento, data, ruolo «acquirente/venditore» — MAI nomi: su una
+  pagina pubblica rivelerebbero gli acquisti altrui; `f.id` è opaco
+  e serve al bottone rimuovi dell'admin). Invito ⭐ in coda alle
+  notifiche di chiusura (sblocco manuale/automatico e rimborso).
+  Frontend: `feedbackPanel(o)` nel dettaglio ordine (5 stelle
+  cliccabili + textarea, `confirm` prima dell'invio, gira in
+  «Feedback lasciato» + eventuale «ricevuto»), lista nel negozio
+  (`#negozioFeedback`), conteggio `(N)` accanto alle stelle in
+  negozio e profilo, commenti sempre sotto `esc()`.
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
   `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
@@ -253,8 +279,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   profilo + griglia dei suoi annunci (card riusate via `cardHTML`);
   all'avvio `avvia()` legge `/negozio/...` da `location.pathname` e
   apre direttamente il negozio; bottone condividi = clipboard + toast.
-  Le stelle del rating si mostrano solo se rating > 0 (il sistema
-  feedback non esiste ancora: "0 ★" farebbe danno ai venditori).
+  Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
+  danno ai venditori appena arrivati); dal lug 2026 le accende il
+  sistema di feedback (vedi server.py).
   Scheda Profilo 👤 (lug 2026): quarta voce di nav (`view-profilo`;
   il ramo `profilo` in `go()` rilancia i render, e in VETRINA la tab
   apre l'invito al bot come Vendi/Affari). In ordine: testata
@@ -400,11 +427,14 @@ con Pillow altrimenti — sul VPS serve `pip install pillow
 pillow-heif`); scheda Profilo 👤 quarta voce di nav (tutto ciò che
 riguarda l'utente trasloca lì da Vendi, che torna solo form di
 pubblicazione; Lightning address impostabile anche da lì; canale
-avvisi sempre in chiaro; vedi Architettura).
+avvisi sempre in chiaro; vedi Architettura); feedback e stelle
+(voto 1-5 + commento a affare concluso, rating per ricalcolo,
+ultimi feedback anonimi nel negozio, rimozione admin, vedi
+Architettura — parte 1 della gamification, badge/sfide rimandati).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
 la sua chiave — rimandata: il match sui titoli fa falsi positivi e un
 NIP-09 sbagliato cancella presenza legittima); poi post-lancio: tracking
-verificato via API corrieri, feedback/stelle, escrow on-chain
-2-di-3, parere legale MiCA prima di crescere.
+verificato via API corrieri, badge/sfide (parte 2 della gamification),
+escrow on-chain 2-di-3, parere legale MiCA prima di crescere.
