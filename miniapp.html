@@ -2195,12 +2195,13 @@ function renderDistintivi(){
    anonima; l'iniziale e' quella dell'utente e l'anello d'oro spunta
    col primo distintivo guadagnato. */
 function renderAvatar(){
-  const nome = myNome || myUsername || 'Tu';
+  /* lo spread non spezza le emoji: c'e' chi si chiama 🔥Marco */
+  const ini = [...(myNome || myUsername || 'Tu')][0].toUpperCase();
   const oro = myDistintivi.some(d=>d.ottenuto);
   document.querySelectorAll('.avatar-btn').forEach(a=>{
     a.classList.toggle('on', !VETRINA);
     a.classList.toggle('oro', oro);
-    a.querySelector('.av-ini').textContent = nome[0].toUpperCase();
+    a.querySelector('.av-ini').textContent = ini;
   });
 }
 
