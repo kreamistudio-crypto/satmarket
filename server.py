@@ -3920,4 +3920,12 @@ def asset_barattolo_hero():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/tappo.jpeg")
+def asset_tappo():
+    """Il tappo del barattolo (128px, ritagliato sul diametro): e' il
+    tasto-avatar del Profilo, reso tondo dal CSS della pagina."""
+    return FileResponse("assets/tappo.jpeg", media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")

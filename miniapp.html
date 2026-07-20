@@ -100,14 +100,17 @@
   .bmark::before{top:-.02em}
   .bmark::after{bottom:.09em}
   .brand small{color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
-  /* Il tasto Profilo in alto a destra: un cerchio che riproduce il
-     TAPPO del barattolo — metallo argentato a gradienti, scanalature
-     sul bordo con un repeating-conic-gradient mascherato ad anello —
-     con l'iniziale dell'utente sopra, in Baloo scura. Lo accende il
-     JS (classe .on) ovunque tranne che in vetrina anonima; col primo
-     distintivo guadagnato spunta il micro-anello d'oro (.oro). Come
-     l'etichetta prezzo, il metallo resta uguale anche col tema scuro:
-     un tappo vero non cambia colore di notte. */
+  /* Il tasto Profilo in alto a destra: il TAPPO del barattolo
+     (assets/tappo.jpeg, 128px ritagliato sul diametro) reso tondo da
+     border-radius+cover — il fondo arancione del JPEG vive solo
+     negli angoli e sparisce nel cerchio — con l'iniziale dell'utente
+     sopra, in Baloo scura. Sotto l'immagine resta il tappo
+     disegnato in CSS (gradienti+scanalature): e' il ripiego se il
+     JPEG non arriva (onerror toglie l'img, il patto della mascotte).
+     Lo accende il JS (classe .on) ovunque tranne che in vetrina
+     anonima; col primo distintivo guadagnato spunta il micro-anello
+     d'oro (.oro). Come l'etichetta prezzo, il tappo resta di metallo
+     chiaro anche col tema scuro. */
   .avatar-btn{display:none;position:relative;width:38px;height:38px;
     margin-left:auto;flex:0 0 auto;border:0;padding:0;cursor:pointer;
     border-radius:50%;align-items:center;justify-content:center;
@@ -118,8 +121,13 @@
     background:repeating-conic-gradient(rgba(255,255,255,.7) 0 5deg,rgba(110,116,124,.55) 5deg 10deg);
     -webkit-mask:radial-gradient(circle,transparent 60%,#000 62%);
     mask:radial-gradient(circle,transparent 60%,#000 62%)}
+  .avatar-btn .av-tappo{position:absolute;inset:0;width:100%;height:100%;
+    border-radius:50%;object-fit:cover}
+  /* l'alone chiaro dietro la lettera: sul metallo del tappo l'iniziale
+     scura resta leggibile anche dove l'immagine e' piu' carica */
   .avatar-btn .av-ini{position:relative;font-family:'Baloo 2',sans-serif;
-    font-weight:800;font-size:17px;line-height:1;color:#23282C}
+    font-weight:800;font-size:17px;line-height:1;color:#23282C;
+    text-shadow:0 1px 0 rgba(255,255,255,.6),0 0 5px rgba(255,255,255,.55)}
   .avatar-btn.oro{box-shadow:0 0 0 2px var(--gold-line),0 2px 0 rgba(35,40,44,.25)}
   /* Sulla vista Profilo nessuna voce di nav e' attiva: si accende
      il tappo, con l'anello arancione */
@@ -694,7 +702,7 @@
           <h1 class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></h1>
           <small>il mercatino in sats</small>
         </div>
-        <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><span class="av-ini"></span></button>
+        <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
       </div>
       <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
            tastiera mobile), cioe' col submit del form -->
@@ -880,7 +888,7 @@
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
-    <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><span class="av-ini"></span></button>
+    <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
   </nav>
 
   <!-- ============ SHEET PAGAMENTO ============ -->
