@@ -257,6 +257,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   grigio con la descrizione come molla), chip fiducia accanto al nome
   in `renderNegozio` (filtrando `nostrano`: il 🟣 c'è già), sezione
   nascosta in DEMO come il wallet.
+  Export dati contabili (lug 2026): colonna `ordini.cambio_eur` = EUR
+  per BTC al momento della chiusura, scritta da `_sblocca_sats` e
+  `_rimborsa_compratore` via `cambio_btc_eur()` (CoinGecko lato server
+  — il ≈€ della vetrina resta lato client — cache 15 min, fail-open:
+  0 = sconosciuto, e gli ordini storici restano onestamente vuoti nel
+  CSV). `POST /api/me/export-biglietto` (autenticato) emette un
+  biglietto monouso TTL 5 min (`BIGLIETTI_EXPORT` in memoria, stile
+  SFIDE_LOGIN: dentro Telegram il download non può portare l'header
+  di auth); `GET /api/export/{biglietto}` lo brucia e serve il CSV
+  degli affari released/refunded dell'utente, da entrambe le parti
+  (data, ruolo, annuncio, sats, esito, controvalore_eur) —
+  separatore `;`, decimali con virgola e BOM UTF-8 per l'Excel
+  italiano, quoting del titolo via csv.writer. Frontend: bottone
+  «📄 Esporta i tuoi dati» in fondo a «⚡ Wallet e incassi» nel
+  Profilo (`esportaDati()`: `tg.downloadFile` SOLO con initData vero
+  e `isVersionAtLeast('8.0')` — nel browser lo stub di Telegram
+  esiste comunque e mentirebbe — altrimenti `<a download>`; in DEMO
+  sparisce col blocco wallet).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
   `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
@@ -473,7 +491,9 @@ Architettura — parte 1 della gamification); distintivi 🏅 (parte 2:
 nel Profilo, chip di fiducia nel negozio pubblico, retroattivi a ogni
 avvio, vedi Architettura); badge 🟣 pubblico semplificato (solo da
 npub verificata, senza ✓; il non verificato lo vede solo il
-proprietario col suo invito a verificare).
+proprietario col suo invito a verificare); export CSV contabile
+degli affari conclusi (bottone nel Profilo, controvalore EUR
+valorizzato alla chiusura da ora in poi, vedi Architettura).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
