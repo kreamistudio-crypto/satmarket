@@ -185,6 +185,123 @@ def nuovo_codice_negozio(con) -> str:
             return codice
 
 
+# --------------------------- DISTINTIVI -----------------------------
+# Si guadagnano USANDO il mercatino e non si perdono mai (append-only:
+# se l'admin rimuove un feedback e la media scende, il distintivo gia'
+# dato resta — un premio che sparisce ferisce piu' di un raro
+# immeritato). Ogni criterio si RICALCOLA dai dati veri, mai contatori
+# incrementali: cosi' fusioni e rimozioni si sistemano da sole. I
+# criteri "pesanti" contano solo ordini released = sats veri passati
+# dall'escrow con la sua commissione: gonfiarli costa piu' del premio.
+# "fiducia" = si mostra anche nel negozio pubblico, accanto al nome.
+
+DISTINTIVI = [
+    dict(id="nostrano", emoji="🟣", nome="Nostrano", fiducia=True,
+         descrizione="Npub Nostr verificata con nota pubblica",
+         criterio=lambda d: d["npub_verificata"]),
+    dict(id="doppia_cittadinanza", emoji="🔗", nome="Doppia cittadinanza",
+         fiducia=True,
+         descrizione="Telegram e Nostr collegati allo stesso account",
+         criterio=lambda d: d["tg_id"] > 0 and d["npub_accesso"]),
+    dict(id="specchiato", emoji="🛡️", nome="Specchiato", fiducia=True,
+         descrizione="Almeno 10 affari conclusi senza mai perdere "
+                     "una disputa",
+         criterio=lambda d: d["vendite"] + d["acquisti"] >= 10
+                            and d["dispute_perse"] == 0),
+    dict(id="pioniere", emoji="🫙", nome="Pioniere", fiducia=False,
+         descrizione="Tra i primi 100 iscritti del Barattolo",
+         criterio=lambda d: d["posizione"] <= 100),
+    dict(id="primo_acquisto", emoji="⚡", nome="Primo acquisto",
+         fiducia=False,
+         descrizione="Il primo acquisto concluso via escrow",
+         criterio=lambda d: d["acquisti"] >= 1),
+    dict(id="primo_baratto", emoji="🤝", nome="Primo baratto",
+         fiducia=False,
+         descrizione="La prima vendita conclusa via escrow",
+         criterio=lambda d: d["vendite"] >= 1),
+    dict(id="bottega_avviata", emoji="📦", nome="Bottega avviata",
+         fiducia=False,
+         descrizione="Almeno 5 annunci pubblicati in vetrina",
+         criterio=lambda d: d["annunci"] >= 5),
+    dict(id="stimato", emoji="⭐", nome="Stimato", fiducia=False,
+         descrizione="Almeno 5 feedback ricevuti con media da 4.5 in su",
+         criterio=lambda d: d["fb_ricevuti"] >= 5 and d["fb_media"] >= 4.5),
+    dict(id="venditore_rodato", emoji="🏪", nome="Venditore rodato",
+         fiducia=False,
+         descrizione="Almeno 10 vendite concluse",
+         criterio=lambda d: d["vendite"] >= 10),
+    dict(id="buon_vicino", emoji="💌", nome="Buon vicino", fiducia=False,
+         descrizione="Almeno 5 feedback lasciati agli altri",
+         criterio=lambda d: d["fb_lasciati"] >= 5),
+    dict(id="fulmine", emoji="🚀", nome="Fulmine", fiducia=False,
+         descrizione="3 spedizioni partite entro un giorno dal pagamento",
+         criterio=lambda d: d["lampo"] >= 3),
+]
+
+
+def _dati_distintivi(con, tg_id: int) -> dict | None:
+    """I numeri veri su cui si giudicano i criteri, ricalcolati sempre
+    dalle tabelle (mai da contatori)."""
+    u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    if not u:
+        return None
+    q = lambda sql, *p: con.execute(sql, p).fetchone()[0]
+    fb = con.execute("SELECT COUNT(*) AS n, AVG(voto) AS media "
+                     "FROM feedback WHERE per_tg_id=?", (tg_id,)).fetchone()
+    return dict(
+        tg_id=tg_id,
+        npub_verificata=u["npub_verificata"],
+        npub_accesso=u["npub_accesso"],
+        # posizione d'iscrizione: registrato=0 (chi c'era prima della
+        # colonna) = i piu' vecchi di tutti; i nuovi arrivano sempre
+        # dopo, quindi la posizione di chi c'e' non peggiora mai
+        posizione=q("SELECT COUNT(*) FROM utenti WHERE registrato<? "
+                    "OR (registrato=? AND tg_id<=?)",
+                    u["registrato"], u["registrato"], tg_id),
+        vendite=q("SELECT COUNT(*) FROM ordini WHERE venditore_id=? "
+                  "AND stato='released'", tg_id),
+        acquisti=q("SELECT COUNT(*) FROM ordini WHERE compratore_id=? "
+                   "AND stato='released'", tg_id),
+        # disputa persa: il venditore se fini' in rimborso, il
+        # compratore se i sats andarono comunque al venditore
+        dispute_perse=q("SELECT COUNT(*) FROM ordini WHERE disputata=1 "
+                        "AND ((venditore_id=? AND stato='refunded') OR "
+                        "(compratore_id=? AND stato='released'))",
+                        tg_id, tg_id),
+        annunci=q("SELECT COUNT(*) FROM annunci WHERE venditore_id=? "
+                  "AND stato!='rimosso'", tg_id),
+        fb_ricevuti=fb["n"], fb_media=fb["media"] or 0,
+        fb_lasciati=q("SELECT COUNT(*) FROM feedback WHERE da_tg_id=?",
+                      tg_id),
+        # pagato_il non esiste, ma un ordine mai pagato muore in 30
+        # minuti (pulisci_ordini_fantasma): creato+30min e' il tetto
+        # fisico del pagamento. Margine a favore del venditore.
+        lampo=q("SELECT COUNT(*) FROM ordini WHERE venditore_id=? "
+                "AND stato='released' AND spedito_il>0 "
+                "AND spedito_il-creato <= ?", tg_id, 86400 + 1800))
+
+
+def controlla_distintivi(con, tg_id: int) -> list[str]:
+    """Il giudice unico: valuta TUTTI i criteri e assegna cio' che
+    manca (INSERT OR IGNORE: idempotente, mai doppioni). Niente
+    commit, e' del chiamante. Ritorna gli id appena guadagnati,
+    per le notifiche 🏅 dei ganci dal vivo."""
+    d = _dati_distintivi(con, tg_id)
+    if not d:
+        return []
+    nuovi = []
+    for dd in DISTINTIVI:
+        if dd["criterio"](d):
+            r = con.execute(
+                "INSERT OR IGNORE INTO badge_utente"
+                "(tg_id, badge_id, ottenuto_il) VALUES(?,?,?)",
+                (tg_id, dd["id"], int(time.time())))
+            if r.rowcount:
+                nuovi.append(dd["id"])
+    return nuovi
+
+
 def init_db():
     con = db()
     con.executescript("""
@@ -254,6 +371,15 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_per
         ON feedback(per_tg_id, creato DESC);
+    CREATE TABLE IF NOT EXISTS badge_utente(
+        -- i distintivi guadagnati; le definizioni (nome, emoji,
+        -- criterio) vivono nel codice, in DISTINTIVI: qui solo
+        -- chi, cosa, quando
+        tg_id INTEGER NOT NULL,
+        badge_id TEXT NOT NULL,
+        ottenuto_il INTEGER,
+        PRIMARY KEY(tg_id, badge_id)
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -313,11 +439,29 @@ def init_db():
                     "tracking_reso TEXT DEFAULT ''",
                     "spedito_il INTEGER DEFAULT 0",
                     "consegnato INTEGER DEFAULT 0",
-                    "sollecito_il INTEGER DEFAULT 0"):
+                    "sollecito_il INTEGER DEFAULT 0",
+                    # disputata: 1 se sull'ordine e' stata aperta una
+                    # disputa, anche se poi risolta (lo stato viene
+                    # sovrascritto: senza questa traccia il distintivo
+                    # Specchiato non saprebbe chi ha perso una disputa)
+                    "disputata INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # Backfill di disputata: questi stati esistono SOLO a valle di una
+    # disputa, quindi gli ordini storici che ci si trovano sono marcabili
+    # a colpo sicuro. I released passati da una disputa prima della
+    # colonna sono irrecuperabili: si perdona, a favore dell'utente.
+    con.execute("UPDATE ordini SET disputata=1 WHERE disputata=0 AND stato "
+                "IN ('dispute','return_pending','return_shipped',"
+                "'refund','refunded')")
+    # Distintivi: passata silenziosa su TUTTI gli utenti, a ogni avvio.
+    # E' idempotente (INSERT OR IGNORE) e auto-riparante: fusioni,
+    # rimozioni e criteri nuovi si sistemano al riavvio successivo.
+    # Le notifiche 🏅 spettano solo ai ganci dal vivo, mai a questa.
+    for r in con.execute("SELECT tg_id FROM utenti").fetchall():
+        controlla_distintivi(con, r["tg_id"])
     con.commit()
     con.close()
 
@@ -678,7 +822,7 @@ def login_nostr_sfida():
 async def login_nostr(req: Request, response: Response):
     """Secondo passo: arriva l'evento firmato. Tre strade, in ordine:
     1) npub_accesso conosciuta -> si entra nel suo account;
-    2) npub gia' VERIFICATA (badge 🟣✓) su UN account Telegram non
+    2) npub gia' VERIFICATA (badge 🟣) su UN account Telegram non
        ancora collegato -> proponiamo di usare quello (la firma
        dimostra il possesso: collegare e' legittimo), con un
        biglietto monouso e NESSUNA sessione finche' non accetta;
@@ -717,6 +861,9 @@ async def login_nostr(req: Request, response: Response):
                             "biglietto": biglietto}}
     tg_id = crea_utente_nostr(pubkey, npub)
     imposta_cookie_sessione(response, crea_sessione(tg_id))
+    # Il nativo nasce gia' verificato (la firma dimostra il possesso):
+    # Nostrano e Pioniere possono scattare subito, avvisati via DM
+    await premia_distintivi(tg_id)
     return {"ok": True, "nuovo": True}
 
 
@@ -743,6 +890,7 @@ async def login_nostr_collega(req: Request, response: Response):
         raise HTTPException(401, "Riprova il login")
     con.close()
     imposta_cookie_sessione(response, crea_sessione(tg_id))
+    await premia_distintivi(tg_id)   # doppia cittadinanza appena nata
     return {"ok": True, "collegato": True}
 
 
@@ -903,6 +1051,26 @@ async def notifica_admin(testo: str):
         await notifica(tg_id, testo)
 
 
+async def premia_distintivi(tg_id: int):
+    """Il gancio standard dei distintivi: valuta, committa e POI avvisa
+    (mai una notifica dentro una transazione). Fail-open totale: un
+    errore qui non deve mai fermare il flusso che stava premiando."""
+    try:
+        con = db()
+        nuovi = controlla_distintivi(con, tg_id)
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Distintivi saltati per {tg_id}: {e}")
+        return
+    for did in nuovi:
+        dd = next(d for d in DISTINTIVI if d["id"] == did)
+        await notifica(tg_id,
+                       f"🏅 <b>Nuovo distintivo: {dd['emoji']} "
+                       f"{dd['nome']}!</b>\n{dd['descrizione']}. "
+                       f"Lo trovi nel tuo Profilo. 🫙")
+
+
 # ---------------- IL CAMPANELLO DEL BOT (webhook) --------------------
 # Per la prima volta il bot non solo parla: ASCOLTA. Telegram consegna
 # ogni messaggio a POST /api/telegram/aggiornamenti (webhook con
@@ -1052,6 +1220,12 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # migrano vive e al prossimo /api/me si risveglia qui.
         con.execute("UPDATE sessioni SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # I distintivi migrano in unione: se entrambe le meta' avevano
+        # lo stesso, la PK lo tiene una volta sola (resta quello
+        # dell'account Telegram, il doppione Nostr muore sotto)
+        con.execute("UPDATE OR IGNORE badge_utente SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM badge_utente WHERE tg_id=?", (id_nostr,))
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -1067,6 +1241,10 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # I due passati si pesano da soli: il ricalcolo sulle righe
         # appena migrate fa media e conteggio in un colpo.
         _ricalcola_rating(con, id_telegram)
+        # I contatori sommati possono far scattare distintivi nuovi
+        # (Specchiato, rodato...): valutazione silenziosa, li vedra'
+        # al prossimo giro di Profilo.
+        controlla_distintivi(con, id_telegram)
         con.commit()
         return {"annunci": annunci, "ordini": acquisti + vendite,
                 "npub": n["npub"], "negozio": p["negozio"]}
@@ -1518,6 +1696,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # E parte anche verso la piazza Nostr, in sottofondo: se i relay
     # tacciono, chi pubblica non se ne accorge nemmeno.
     asyncio.create_task(annuncio_su_nostr(annuncio_id, "active"))
+    await premia_distintivi(user["id"])   # bottega avviata?
     return {"ok": True, "id": annuncio_id}
 
 
@@ -1610,8 +1789,16 @@ def negozio(chi: str, x_tg_init_data: str = Header(""),
         "FROM feedback f LEFT JOIN ordini o ON o.id=f.ordine_id "
         "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT 10",
         (v["tg_id"],))]
+    # Sul profilo pubblico solo i distintivi "di fiducia": gli altri
+    # affollerebbero e raccontano piu' del percorso che dell'affidabilita'
+    presi = {r["badge_id"] for r in con.execute(
+        "SELECT badge_id FROM badge_utente WHERE tg_id=?", (v["tg_id"],))}
     con.close()
     venditore = dict(v)
+    venditore["distintivi"] = [
+        dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
+             descrizione=d["descrizione"])
+        for d in DISTINTIVI if d["fiducia"] and d["id"] in presi]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     return {"venditore": venditore, "annunci": annunci, "feedback": feedback}
 
@@ -2046,9 +2233,27 @@ def mio_profilo(x_tg_init_data: str = Header(""),
     con = db()
     u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
+    if u:
+        # Passata silenziosa dei distintivi: cosi' Pioniere e compagni
+        # compaiono al primo sguardo al Profilo, senza aspettare un
+        # gancio. Scrittura su GET ma idempotente (INSERT OR IGNORE):
+        # e' cio' che rende il sistema auto-riparante. Niente notifiche
+        # qui: quelle spettano ai ganci dal vivo.
+        controlla_distintivi(con, user["id"])
+        con.commit()
+    presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
+        "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
+        (user["id"],))}
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
+    # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
+    # altri: il frontend non deve mai conoscere la lista a memoria.
+    profilo["distintivi"] = [
+        dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
+             descrizione=d["descrizione"], fiducia=d["fiducia"],
+             ottenuto=presi.get(d["id"]))
+        for d in DISTINTIVI]
     return profilo
 
 
@@ -2356,9 +2561,10 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
     con.commit()
     con.close()
     await notifica(user["id"],
-                   "🟣✓ <b>npub verificata!</b> Da adesso i tuoi annunci "
+                   "🟣 <b>npub verificata!</b> Da adesso i tuoi annunci "
                    "portano il badge dei venditori verificati su Nostr. 🎉 "
                    "(La nota col codice ora puoi anche cancellarla.)")
+    await premia_distintivi(user["id"])
     return {"ok": True, "verificata": True}
 
 
@@ -2369,8 +2575,8 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
 # potrebbe essere la dichiarazione (falsa) di una chiave altrui.
 
 @app.post("/api/me/npub/abilita-accesso")
-def abilita_accesso_nostr(x_tg_init_data: str = Header(""),
-                          barattolo_sessione: str = Cookie("")):
+async def abilita_accesso_nostr(x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     u = con.execute(
@@ -2378,7 +2584,7 @@ def abilita_accesso_nostr(x_tg_init_data: str = Header(""),
         "WHERE tg_id=?", (user["id"],)).fetchone()
     if not u or not u["npub"] or not u["npub_verificata"]:
         con.close()
-        raise HTTPException(400, "Prima verifica la tua npub (badge 🟣✓): "
+        raise HTTPException(400, "Prima verifica la tua npub (badge 🟣): "
                                  "solo un badge verificato puo' aprire l'account")
     if u["npub_accesso"]:
         con.close()
@@ -2399,6 +2605,7 @@ def abilita_accesso_nostr(x_tg_init_data: str = Header(""),
             "Questa chiave apre gia' un altro account: se e' il tuo "
             "account Nostr, entra dal web con Nostr e usa «Collega Telegram»")
     con.close()
+    await premia_distintivi(user["id"])
     return {"ok": True, "npub_accesso": True}
 
 
@@ -2910,6 +3117,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 await notifica(o["compratore_id"],
                                f"✅ <b>Affare concluso:</b> «{titolo}». "
                                f"Grazie per aver usato Barattolo 🫙 {invito}")
+            # Un affare concluso puo' far scattare distintivi a
+            # ENTRAMBE le parti (primo baratto, primo acquisto...)
+            await premia_distintivi(o["venditore_id"])
+            await premia_distintivi(o["compratore_id"])
             return {"ok": True, "stato": "released"}
 
         # Niente pagamento riuscito: l'ordine resta/va in 'confirmed',
@@ -3115,7 +3326,10 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                     (ordine_id, user["id"])).fetchone()
     if not o:
         raise HTTPException(400, "Operazione non permessa")
-    con.execute("UPDATE ordini SET stato='dispute', aggiornato=? WHERE id=?",
+    # disputata resta 1 per sempre, anche a disputa risolta: e' la
+    # memoria su cui si giudica il distintivo Specchiato
+    con.execute("UPDATE ordini SET stato='dispute', disputata=1, "
+                "aggiornato=? WHERE id=?",
                 (int(time.time()), ordine_id))
     con.commit()
     con.close()
@@ -3278,6 +3492,10 @@ async def lascia_feedback(ordine_id: int, req: Request,
                    f"⭐ <b>Hai ricevuto un feedback:</b> {stelle} ({voto}/5) "
                    f"per l'affare #{ordine_id}."
                    + (f"\n«{commento}»" if commento else ""))
+    # Un feedback puo' premiare entrambi: chi lo lascia (buon vicino)
+    # e chi lo riceve (stimato)
+    await premia_distintivi(user["id"])
+    await premia_distintivi(per)
     return {"ok": True, "voto": voto}
 
 

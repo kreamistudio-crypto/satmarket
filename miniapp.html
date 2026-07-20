@@ -94,6 +94,19 @@
   .empty .big{font-size:40px;margin-bottom:10px}
   .empty b{color:var(--ink)}
 
+  /* ---------- distintivi (gamification) ----------
+     ".badge" e' gia' degli stati ordine: qui si chiama .distintivo.
+     Guadagnati a colori con la data; mancanti in grigio con la
+     strada per sbloccarli — la molla che invita a usare Barattolo. */
+  .distintivi{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .distintivo{background:var(--card);border:1px solid var(--line);
+    border-radius:12px;padding:10px 12px}
+  .distintivo .em{font-size:22px;line-height:1}
+  .distintivo b{display:block;font-size:13px;margin-top:4px}
+  .distintivo small{display:block;font-size:11.5px;color:var(--muted);
+    font-weight:600;line-height:1.35;margin-top:2px}
+  .distintivo.off{opacity:.55;filter:grayscale(1)}
+
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
   .view.active{display:block;animation:fadein .18s ease}
@@ -473,6 +486,7 @@
       <div class="section-label" style="padding:26px 0 0">Le tue identità</div>
       <div id="identitaBlocco" style="margin-top:12px"></div>
       <div id="avvisiBlocco"></div>
+      <div id="distintiviBlocco"></div>
       <div id="walletBlocco">
         <div class="section-label" style="padding:26px 0 0">⚡ Wallet e incassi</div>
         <div id="lnAddrBlocco"></div>
@@ -494,9 +508,10 @@
         <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
       <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
       <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        La npub aggiunge il badge 🟣 ai tuoi annunci; con la verifica qui
-        sotto diventa 🟣✓. Non incollare MAI la nsec: quella è la tua
-        chiave privata e nessuno deve chiedertela, noi per primi.</div>
+        Con la npub <b>verificata</b> (qui sotto) i tuoi annunci portano
+        il badge 🟣 dei venditori presenti su Nostr; finché non la
+        verifichi la vedi solo tu. Non incollare MAI la nsec: quella è la
+        tua chiave privata e nessuno deve chiedertela, noi per primi.</div>
       <div id="npubVerifica"></div>
       <div id="adminStats"></div>
       <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
@@ -769,7 +784,7 @@ const cardHTML = l => `
       <div class="info">
         <div class="title">${esc(l.title)}</div>
         <div class="price">${fmt(l.price)} <span class="unit">sats</span></div>
-        <div class="meta"><span>📍 ${esc(l.zone)}</span>${l.sellerNpub?(l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣✓</span>':'<span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}<span class="escrow-dot">🔒 escrow</span></div>
+        <div class="meta"><span>📍 ${esc(l.zone)}</span>${l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣</span>':''}<span class="escrow-dot">🔒 escrow</span></div>
       </div>
     </div>`;
 
@@ -833,10 +848,15 @@ async function apriNegozio(chi){
 
 function renderNegozio(v, annunci, feedback=[]){
   negozioCorrente = v;
-  const badge = v.npub
-    ? (v.npub_verificata?' <span title="Venditore verificato su Nostr">🟣✓</span>'
-                        :' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>')
-    : '';
+  /* Il badge pubblico esiste SOLO con la npub verificata (e quindi
+     senza ✓: il non-verificato qui non compare proprio) */
+  const badge = v.npub_verificata
+    ? ' <span title="Venditore verificato su Nostr">🟣</span>' : '';
+  /* I distintivi di fiducia accanto al nome (dal server arrivano solo
+     quelli): il tooltip racconta come si guadagnano. "nostrano" si
+     salta perche' il 🟣 accanto al nome dice gia' la stessa cosa. */
+  const fiducia = (v.distintivi||[]).filter(d=>d.id!=='nostrano')
+    .map(d=>` <span title="${esc(d.nome)}: ${esc(d.descrizione)}">${esc(d.emoji)}</span>`).join('');
   /* Le stelle compaiono solo quando c'e' un rating vero: "0 ★" in
      vetrina farebbe solo danno a un venditore appena arrivato */
   const rep = (v.rating>0
@@ -845,9 +865,9 @@ function renderNegozio(v, annunci, feedback=[]){
   el('negozioHeader').innerHTML = `
     <div class="seller" style="margin-top:14px">
       <div class="avatar">${esc((v.nome||'?')[0])}</div>
-      <div class="who"><b>${esc(v.nome||'—')}${badge}</b>
+      <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
         <div class="rep">${rep}</div>
-        ${v.npub?`<div class="rep">${v.npub_verificata?'🟣✓':'🟣'} <a href="https://njump.me/${esc(v.npub)}" target="_blank" style="color:inherit">Profilo Nostr completo</a></div>`:''}
+        ${v.npub_verificata&&v.npub?`<div class="rep">🟣 <a href="https://njump.me/${esc(v.npub)}" target="_blank" style="color:inherit">Profilo Nostr completo</a> · npub verificata</div>`:''}
       </div>
     </div>
     ${(v.username||v.negozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
@@ -938,9 +958,9 @@ function openDetail(id){
       <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${esc(l.zone)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${esc(l.seller[0])}</div>
-        <div class="who"><b>${esc(l.seller)}${l.sellerNpub?(l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣✓</span>':' <span title="Venditore presente su Nostr (npub non verificata)">🟣</span>'):''}</b>
+        <div class="who"><b>${esc(l.seller)}${l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}</b>
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
-          ${l.sellerNpub?`<div class="rep">${l.sellerNpubOk?'🟣✓':'🟣'} <a href="https://njump.me/${esc(l.sellerNpub)}" target="_blank" style="color:inherit" onclick="event.stopPropagation()">Presente su Nostr</a> · ${l.sellerNpubOk?'npub verificata ✓':'npub auto-dichiarata, non verificata'}</div>`:''}
+          ${l.sellerNpubOk&&l.sellerNpub?`<div class="rep">🟣 <a href="https://njump.me/${esc(l.sellerNpub)}" target="_blank" style="color:inherit" onclick="event.stopPropagation()">Presente su Nostr</a> · npub verificata</div>`:''}
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
@@ -1446,6 +1466,7 @@ async function salvaLnAddressProfilo(btn){
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
+let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 
 /* ---- la testata della scheda Profilo: chi sei, come vai, il link
    del tuo negozio da condividere. Stesso biglietto da visita della
@@ -1453,9 +1474,12 @@ let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio 
 function renderProfilo(){
   const box = el('profiloTestata');
   if (!box) return;
+  /* Al proprietario il 🟣 si mostra sempre: pieno se verificata,
+     spento (e con l'invito) se ancora da verificare — in pubblico
+     quello spento non esiste proprio */
   const badge = myNpub
-    ? (myNpubVerified?' <span title="Npub verificata">🟣✓</span>'
-                     :' <span title="Npub dichiarata (non verificata)">🟣</span>')
+    ? (myNpubVerified?' <span title="Npub verificata">🟣</span>'
+                     :' <span title="Npub da verificare: solo tu vedi questo badge, verificala dal blocco qui sotto" style="opacity:.45">🟣</span>')
     : '';
   /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
      (stessa regola della vista negozio) */
@@ -1473,6 +1497,27 @@ function renderProfilo(){
     ${(myUsername||myNegozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}`;
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
   renderLnAddress();
+  renderDistintivi();
+}
+
+/* ---- 🏅 I distintivi: guadagnati a colori con la data, mancanti in
+   grigio con la strada per sbloccarli. Il catalogo arriva TUTTO da
+   /api/me (mai una lista a memoria qui); in DEMO non c'e' nulla di
+   vero da mostrare e la sezione sparisce, come il wallet. ---- */
+function renderDistintivi(){
+  const box = el('distintiviBlocco');
+  if (!box) return;
+  if (DEMO || !myDistintivi.length) { box.innerHTML = ''; return; }
+  const presi = myDistintivi.filter(d=>d.ottenuto).length;
+  box.innerHTML = `
+    <div class="section-label" style="padding:26px 0 0">🏅 Distintivi (${presi} di ${myDistintivi.length})</div>
+    <div class="distintivi">${myDistintivi.map(d=>`
+      <div class="distintivo ${d.ottenuto?'':'off'}">
+        <span class="em">${esc(d.emoji)}</span><b>${esc(d.nome)}</b>
+        <small>${d.ottenuto
+          ? 'Ottenuto il '+new Date(d.ottenuto*1000).toLocaleDateString('it-IT')
+          : esc(d.descrizione)}</small>
+      </div>`).join('')}</div>`;
 }
 
 function condividiMioNegozio(){
@@ -1511,15 +1556,15 @@ function renderIdentita(){
     nsRiga = riga('🟣','Nostr','Nessuna npub nel profilo: puoi dichiararla qui sotto.');
   } else if (!myNpubVerified) {
     nsRiga = riga('🟣','Nostr',
-      `${npubBreve} — da verificare. Verificala per il badge 🟣✓ e per poterla usare come chiave d'accesso.`);
+      `${npubBreve} — da verificare. Verificala per il badge 🟣 sugli annunci e per poterla usare come chiave d'accesso.`);
   } else if (!myNpubAccesso) {
-    nsRiga = riga('🟣','Nostr',`${npubBreve} — badge 🟣✓ verificato.`,
+    nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata, badge 🟣 attivo.`,
       `<button class="btn ghost" style="margin:0 0 8px" onclick="abilitaAccessoNostr()">🔑 Abilita l'accesso con Nostr</button>
        <div style="margin:-2px 0 8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
          Con l'accesso attivo entri in questo stesso account anche dal
          browser, firmando con la tua chiave Nostr.</div>`);
   } else {
-    nsRiga = riga('🟣','Nostr',`${npubBreve} — 🟣✓ 🔑 puoi entrare dal web con Nostr.`,
+    nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata 🔑 puoi entrare dal web con Nostr.`,
       myTgId > 0 ? `<button class="btn ghost" style="margin:0 0 8px" onclick="disabilitaAccessoNostr()">Disabilita l'accesso con Nostr</button>` : '');
   }
   box.innerHTML = tgRiga + nsRiga;
@@ -1627,7 +1672,7 @@ function renderNpubVerifica(){
   if (!box) return;
   if (!myNpub) { box.innerHTML = ''; return; }
   if (myNpubVerified) {
-    box.innerHTML = `<div style="margin-top:10px;font-size:13px;font-weight:800;color:var(--trust)">🟣✓ npub verificata</div>`;
+    box.innerHTML = `<div style="margin-top:10px;font-size:13px;font-weight:800;color:var(--trust)">✓ npub verificata: badge 🟣 attivo</div>`;
     return;
   }
   if (npubCodice) {
@@ -1642,7 +1687,7 @@ function renderNpubVerifica(){
     return;
   }
   box.innerHTML = `
-    <div style="margin-top:10px;font-size:13px;font-weight:800">🟣 npub non verificata</div>
+    <div style="margin-top:10px;font-size:13px;font-weight:800">🟣 npub non verificata: il badge sugli annunci arriva con la verifica</div>
     <button class="btn ghost" style="margin-top:8px" onclick="npubAvvia()">✓ Verifica ora</button>`;
 }
 
@@ -1677,7 +1722,7 @@ async function npubControlla(){
   }
   if (d.verificata) {
     myNpubVerified = true; npubCodice = '';
-    toast('🎉 npub verificata! Badge 🟣✓ attivo sui tuoi annunci');
+    toast('🎉 npub verificata! Badge 🟣 attivo sui tuoi annunci');
     renderNpubVerifica();
     renderIdentita();
     await loadListings(); renderGrid();
@@ -1698,7 +1743,7 @@ async function saveNpub(){
   if (DEMO) {
     if (npub !== myNpub) { myNpubVerified = false; npubCodice = ''; }
     myNpub = npub; renderNpubVerifica();
-    toast(npub?'🟣 Badge Nostr attivo!':'npub rimossa'); return;
+    toast(npub?'🟣 npub salvata: verificala per il badge sugli annunci':'npub rimossa'); return;
   }
   const r = await fetch(`${API_BASE}/me/npub`, {
     method:'POST',
@@ -1714,7 +1759,10 @@ async function saveNpub(){
   }
   renderNpubVerifica();
   renderIdentita();
-  toast(myNpub ? '🟣 Badge Nostr attivo sui tuoi annunci!' : 'npub rimossa dal profilo');
+  toast(myNpub
+    ? (myNpubVerified ? '🟣 npub salvata: badge attivo sui tuoi annunci'
+                      : '🟣 npub salvata: verificala qui sotto per il badge sugli annunci')
+    : 'npub rimossa dal profilo');
   await loadListings(); renderGrid();
 }
 
@@ -2454,7 +2502,7 @@ async function loginNostrNsec(){
   catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
 }
 
-/* La npub è già verificata (🟣✓) su un account Telegram: la firma
+/* La npub è già verificata (badge 🟣) su un account Telegram: la firma
    dimostra il possesso, quindi proponiamo di entrare COL SUO account.
    Rifiutando, il login si annulla e basta: mai account doppi. */
 let bigliettoCollega = null;
@@ -2744,7 +2792,7 @@ async function avvia(){
     myCanaleNotifiche = me.canale_notifiche || '';
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
-    myNegozio = me.negozio || '';
+    myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();
