@@ -506,9 +506,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   apre direttamente il negozio; bottone condividi = clipboard + toast.
   Dettaglio annuncio (lug 2026, feedback tester): bottone condividi
   `.share-btn` sulla foto (cerchietto di carta, anche sul segnaposto
-  emoji, MAI in DEMO) → `condividiAnnuncio()`: `navigator.share`
-  nativo col ripiego clipboard+toast e ultimo ripiego link nel
-  toast; il link è `GET /annuncio/{id}` (rotta gemella di /negozio,
+  emoji, MAI in DEMO) → `condividiAnnuncio()`, ripieghi a scalare:
+  con initData vero prima il canale di Telegram (la WebView NON ha
+  navigator.share) — `tg.shareURL` se il client lo offre, poi
+  `tg.openTelegramLink` su t.me/share/url (selettore chat) — e fuori
+  da Telegram `navigator.share`, clipboard+toast, link nel toast
+  (anche senza clipboard: mai il silenzio);
+  il link è `GET /annuncio/{id}` (rotta gemella di /negozio,
   serve miniapp.html no-cache; regola 3 aggiornata), il JS legge
   l'URL con `apriAnnuncioDaUrl()` (pattern di apriNegozioDaUrl,
   chiamata in avvia E avviaVetrina: per gli anonimi apre il
