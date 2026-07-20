@@ -430,6 +430,15 @@
     border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;
     color:var(--muted);margin-bottom:14px;
   }
+  /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
+  .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
+  .festa-coin{position:absolute;left:0;top:0;width:22px;height:22px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,var(--gold-a),var(--gold-b) 60%,var(--gold-line));
+    border:1.5px solid #C8871B;color:var(--gold-text);font-family:'Baloo 2',sans-serif;
+    font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;
+    will-change:transform,opacity}
+  .festa-coin.mini{width:15px;height:15px;font-size:9px}
+
   .toast{
     position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);
     background:var(--ink);color:#fff;font-weight:700;font-size:13.5px;padding:12px 20px;
@@ -1469,6 +1478,58 @@ function simulatePaid(){
   setTimeout(()=>openOrder(o.id), 500);
 }
 
+/* ---------------- festa: le monete quando i sats si sbloccano ----------------
+   Coriandoli di monete ₿ dal messaggio di chiusura: pioggia piena per
+   chi incassa, versione discreta per chi ha comprato. Una sola volta
+   per ordine e per dispositivo (stesso patto degli hint: localStorage,
+   frontend puro); con prefers-reduced-motion la festa non parte. */
+const FESTA_CHIAVE = 'barattolo_festa';
+function festaGiaFatta(id){
+  try { return !!(JSON.parse(localStorage.getItem(FESTA_CHIAVE))||{})[id]; }
+  catch(e) { return false; }
+}
+function ricordaFesta(id){
+  try { const f = JSON.parse(localStorage.getItem(FESTA_CHIAVE))||{};
+        f[id] = Date.now(); localStorage.setItem(FESTA_CHIAVE, JSON.stringify(f)); }
+  catch(e){}
+}
+function festaSats(ancora, mini){
+  if (!ancora || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = ancora.getBoundingClientRect();
+  const box = document.createElement('div');
+  box.className = 'festa-box';
+  document.body.appendChild(box);
+  const monete = [];
+  for (let i = 0; i < (mini ? 10 : 20); i++){
+    const c = document.createElement('span');
+    c.className = 'festa-coin' + (mini ? ' mini' : '');
+    c.textContent = '₿';
+    box.appendChild(c);
+    monete.push({el:c,
+      x: r.left + r.width/2, y: r.top + r.height/2,
+      vx: (Math.random()-.5) * (mini ? 7 : 10),      /* spinta laterale */
+      vy: -(4 + Math.random() * (mini ? 6 : 9)),     /* lancio verso l'alto */
+      giro: (Math.random()-.5)*40, ang: Math.random()*360});
+  }
+  const t0 = performance.now(), DURATA = 1500;
+  let prima = t0;
+  function passo(t){
+    const via = t - t0;
+    const dt = Math.min(3, (t - prima) / 16.7);   /* fisica legata al tempo, non ai frame */
+    prima = t;
+    for (const m of monete){
+      m.x += m.vx*dt; m.y += m.vy*dt; m.vy += .45*dt; m.ang += m.giro*dt;  /* gravita' */
+      m.el.style.transform = `translate(${m.x}px,${m.y}px) rotate(${m.ang}deg)`;
+      m.el.style.opacity = Math.max(0, 1 - via/DURATA);
+    }
+    if (via < DURATA) requestAnimationFrame(passo); else box.remove();
+  }
+  requestAnimationFrame(passo);
+  /* Rete di sicurezza: se i frame non arrivano (scheda nascosta),
+     la scatola se ne va comunque */
+  setTimeout(()=>box.remove(), DURATA + 400);
+}
+
 const STATES = {
   creato:   {label:'Da pagare',       badge:'locked'},
   locked:   {label:'Sats in escrow',  badge:'locked'},
@@ -1622,6 +1683,15 @@ function openOrder(id){
           : bottoneChat(o.usernameCompratore, "all'acquirente", "L'acquirente")}
     </div>`;
   go('ordine');
+  /* Le monete partono dal messaggio di chiusura («Hai incassato…» /
+     «Escrow completato»), solo la prima volta che questo dispositivo
+     vede l'affare concluso. Il ritardo lascia finire il cambio vista. */
+  if (s==='released' && o.role!=='admin' && !festaGiaFatta(o.id)) {
+    ricordaFesta(o.id);
+    setTimeout(()=>festaSats(
+      document.querySelector('#orderContent .vault-head'),
+      o.role!=='seller'), 250);
+  }
 }
 /* ---- feedback reciproco a affare concluso ---- */
 let stellaScelta = 0;   // il voto scelto ma non ancora inviato
