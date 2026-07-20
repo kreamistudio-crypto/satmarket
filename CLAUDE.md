@@ -392,11 +392,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chiusura (`festaSats`: 20 al venditore, 10 mini al compratore,
   ~1.5s, rAF legato al tempo + rete di sicurezza sull'overlay, spenta
   con prefers-reduced-motion; una volta per ordine e dispositivo in
-  localStorage['barattolo_festa'], il patto degli hint). IN SOSPESO: immagini mascotte/
-  barattolo da Claude Design (superano il tetto 256KiB di DesignSync:
-  vanno salvate a mano in `assets/`) + route esplicite stile /vendor
-  in server.py + favicon + hero desktop — solo dopo, aggiornare la
-  regola 3.
+  localStorage['barattolo_festa'], il patto degli hint). Asset del
+  brand (lug 2026): `assets/mascotte.jpeg` (480px) e
+  `assets/barattolo.jpeg` (256px), JPEG su fondo arancione ₿ pieno
+  resi a tessere arrotondate (niente scontorno), serviti da rotte
+  esplicite stile /vendor con cache 1 giorno (regola 3 aggiornata).
+  Il barattolo è favicon e iconcina del lockup (header e topbar); la
+  mascotte fluttua (floaty, spenta con reduced-motion) negli stati
+  vuoti — ripiego sull'emoji 🫙 via onerror+sibling CSS se l'immagine
+  non arriva, es. demo da file:// — e nella hero di Esplora, che
+  esiste SOLO ≥768px (dentro Telegram non c'è).
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
@@ -526,7 +531,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/foto/*`, `/vendor/nostr.js` (file singolo) e `/api/*`.
+   `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg` e
+   `/assets/barattolo.jpeg` (file singoli, rotte esplicite) e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
    diventerebbero pubblici — falla già successa e chiusa).
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
@@ -615,11 +621,10 @@ più la checklist «Completa il profilo (N di M)» nel Profilo; «Non
 ora» memorizzato in localStorage, mai in demo/vetrina, vedi
 Architettura); redesign «mercatino di paese» (lug 2026: palette crema/
 arancio/verde sigillo, Baloo 2+Nunito, card «Etichetta», bottoni con
-ombra piena, recinto escrow tratteggiato, vedi Architettura — solo
-CSS/markup, collaudato in locale su tutte le viste e i tre viewport;
-IN SOSPESO le immagini mascotte/barattolo con la loro route /assets,
-il favicon e la hero desktop: servono i file salvati a mano da
-Claude Design in `assets/`).
+ombra piena, recinto escrow tratteggiato, festa dei sats, mascotte e
+barattolo con route /assets, favicon e hero desktop, vedi
+Architettura — collaudato in locale su tutte le viste e i tre
+viewport; da rivedere dal vivo dentro Telegram dopo il deploy).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
