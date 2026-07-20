@@ -201,8 +201,15 @@
   .detail-photos::-webkit-scrollbar{display:none}
   .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:4/3;object-fit:cover;
     scroll-snap-align:center}
-  .photo-count{position:absolute;right:10px;bottom:10px;background:rgba(20,20,22,.65);
-    color:#fff;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px}
+  /* I pallini della galleria, stile Vinted: uno per foto, in basso al
+     centro, l'attivo pieno e gli altri velati. Vivono SULLA foto,
+     quindi bianchi con un filo d'ombra in entrambi i temi. Con una
+     foto sola non esistono proprio. */
+  .foto-dots{position:absolute;bottom:10px;left:0;right:0;z-index:2;
+    display:flex;justify-content:center;gap:6px;pointer-events:none}
+  .foto-dots i{width:7px;height:7px;border-radius:50%;
+    background:rgba(255,255,255,.45);box-shadow:0 0 3px rgba(0,0,0,.4)}
+  .foto-dots i.on{background:#fff}
   #photoPreview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   #photoPreview .th{position:relative}
   #photoPreview img{width:64px;height:64px;object-fit:cover;border-radius:10px;
@@ -1470,7 +1477,7 @@ function openDetail(id){
   const l = currentListing;
   const foto = (l.photos && l.photos.length)
     ? `<div style="position:relative"><div class="detail-photos">${l.photos.map(p=>`<img src="${esc(p)}" alt="">`).join('')}</div>
-       ${l.photos.length>1?`<span class="photo-count">📷 ${l.photos.length}</span>`:''}</div>`
+       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}</div>`
     : `<div class="detail-ph">${l.emoji}</div>`;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
   const contatto = mio ? ''            /* il venditore non contatta se stesso */
@@ -1537,6 +1544,16 @@ function openDetail(id){
     }
     hintPubblicazione = null;   // consumato in ogni caso: one-shot
   }
+  /* I pallini seguono lo swipe: l'indice e' la pagina di scroll-snap
+     (ogni foto e' larga quanto la striscia). Il listener vive sul
+     nodo appena creato da innerHTML, quindi muore col dettaglio
+     precedente: niente accumulo. */
+  const striscia = document.querySelector('#detailContent .detail-photos');
+  const pallini = document.querySelector('#detailContent .foto-dots');
+  if (striscia && pallini) striscia.addEventListener('scroll', () => {
+    const i = Math.round(striscia.scrollLeft / striscia.clientWidth);
+    [...pallini.children].forEach((p, j) => p.classList.toggle('on', j === i));
+  }, {passive: true});
   go('dettaglio');
 }
 
