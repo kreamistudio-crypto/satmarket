@@ -1879,7 +1879,7 @@ function ridimensiona(file){
       URL.revokeObjectURL(img.src);
       if (file.size > 15_000_000) { toast('Foto troppo grande (max 15MB)'); res(null); return; }
       const fr = new FileReader();
-      fr.onload = ()=>{
+      fr.onload = async ()=>{
         let uri = fr.result;
         /* Il server accetta solo MIME image/…: se il sistema non lo
            dichiara (capita su Android con le HEIC), si scommette su
@@ -1888,6 +1888,21 @@ function ridimensiona(file){
         if (!/^data:image\/(jpeg|jpg|png|webp|heic|heif);/.test(uri)) {
           const heif = /\.heif$/i.test(file.name);
           uri = uri.replace(/^data:[^;,]*/, `data:image/${heif?'heif':'heic'}`);
+        }
+        /* Anteprima vera: il server la converte al volo (stateless,
+           niente disco) e il JPEG che torna e' lo stesso che verra'
+           salvato — e alla pubblicazione viaggia gia' leggero. Se il
+           server non puo' (Pillow assente, rete...), resta l'originale
+           col segnaposto e ci riprova la pubblicazione. */
+        if (!DEMO && !VETRINA) {
+          toast('📷 Converto la foto…');
+          try {
+            const r = await fetch(`${API_BASE}/foto/anteprima`, {
+              method:'POST',
+              headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+              body: JSON.stringify({foto: uri})});
+            if (r.ok) { const d = await r.json(); if (d.foto) uri = d.foto; }
+          } catch(e){}
         }
         res(uri);
       };

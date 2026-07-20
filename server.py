@@ -1494,6 +1494,38 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True, "id": annuncio_id}
 
 
+@app.post("/api/foto/anteprima")
+async def anteprima_foto(req: Request, x_tg_init_data: str = Header(""),
+                                       barattolo_sessione: str = Cookie("")):
+    """Conversione STATELESS per l'anteprima: il browser non sa
+    mostrare le HEIC, quindi le manda qui appena scelte e riceve
+    indietro il JPEG — lo stesso identico che poi verra' salvato
+    alla pubblicazione, che a quel punto viaggia gia' leggero.
+    Non scrive NULLA, ne' su disco ne' nel database: prima della
+    pubblicazione non deve esistere niente di definitivo."""
+    verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not ImmaginePillow:
+        raise HTTPException(503, "Conversione non disponibile sul server")
+    d = await leggi_json(req)
+    m = re.match(r"data:image/(jpeg|jpg|png|webp|heic|heif);base64,(.+)",
+                 d.get("foto") or "", re.S)
+    if not m:
+        raise HTTPException(400, "Formato non riconosciuto")
+    if m.group(1) in ("heic", "heif") and not pillow_heif:
+        raise HTTPException(503, "Conversione HEIC non disponibile sul server")
+    try:
+        raw = base64.b64decode(m.group(2))
+    except Exception:
+        raise HTTPException(400, "Foto illeggibile")
+    if len(raw) > 15_000_000:
+        raise HTTPException(400, "Foto troppo grande (max 15MB)")
+    jpeg = await asyncio.to_thread(converti_in_jpeg, raw)
+    if not jpeg:
+        raise HTTPException(400, "Non riesco a leggere questa foto")
+    return {"foto": "data:image/jpeg;base64,"
+                    + base64.b64encode(jpeg).decode()}
+
+
 @app.get("/api/listings/miei")
 def miei_annunci(x_tg_init_data: str = Header(""),
                  barattolo_sessione: str = Cookie("")):
