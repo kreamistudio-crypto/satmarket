@@ -404,6 +404,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dentro Telegram non c'è) usa invece `assets/barattolo-hero.png`:
   PNG scontornato con alpha, niente tessera, drop-shadow sulla
   sagoma, rotazione −6° e floaty.
+  Dark mode «mercatino di sera» (lug 2026, solo miniapp.html): UN solo
+  blocco `html[data-tema="scuro"]` in testa al CSS rimappa i token —
+  niente doppioni sotto media query, perché è il JS a risolvere SEMPRE
+  il tema effettivo (la media query non vede il tema di Telegram).
+  Fondo bruno caldo #211A10/card #2C2517 (mai nero piatto), `--ink`
+  diventa crema, arancio ₿ e oro invariati (protagonisti), verde/viola
+  ricalibrati, contrasti AA verificati. I vecchi colori fissi sono
+  token con doppio valore: `--header-bg`, `--nav-bg`, `--ph-a/b`
+  (placeholder foto), `--ship/warn/off-bg` (badge stati),
+  `--trust-note/sub`, `--step-line`, `--tile-off`, `--toast-bg/text`
+  (il toast si INVERTE: crema su fondo scuro), `--ink-soft`, `--desc`,
+  `--shadow-card/hover`; `--on-ink`/`--on-trust` sono il testo sopra
+  i fondi `--ink`/`--trust` pieni (bianco in chiaro, scuro al buio:
+  MAI `#fff` fisso sopra quei fondi). Restano fissi di proposito: il
+  finto QR del paySheet (che NON è un QR vero: pattern decorativo CSS
+  ink-su-bianco, e chiaro deve restare), i `#fff` sui fondi arancio
+  pieni, gli accenti pesca e oro. Scelta utente: cassetto «🌗 Aspetto»
+  nel Profilo (pillole Auto/Chiaro/Scuro, `.tema-pill`), preferenza in
+  `localStorage['barattolo_tema']` (pattern del toggle valuta, default
+  auto); «auto» = `tg.colorScheme` SOLO con initData vero (nel browser
+  lo stub di Telegram mentirebbe, il patto di esportaDati), altrimenti
+  `prefers-color-scheme`, con ascoltatori `themeChanged` e matchMedia
+  (MQL tenuta in costante: certi WebKit la buttavano col GC). Snippet
+  anti-flash inline nell'head prima del paint; `applicaTema()` aggiorna
+  anche `<meta name="theme-color">` e `tg.setHeaderColor/
+  setBackgroundColor`. In VETRINA il toggle non si raggiunge (il
+  Profilo lì apre l'invito al bot): vale «auto», accettato.
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
@@ -627,7 +654,12 @@ arancio/verde sigillo, Baloo 2+Nunito, card «Etichetta», bottoni con
 ombra piena, recinto escrow tratteggiato, festa dei sats, mascotte e
 barattolo con route /assets, favicon e hero desktop, vedi
 Architettura — collaudato in locale su tutte le viste e i tre
-viewport; da rivedere dal vivo dentro Telegram dopo il deploy).
+viewport; da rivedere dal vivo dentro Telegram dopo il deploy);
+dark mode «mercatino di sera» (lug 2026: token scuri su fondo bruno
+caldo, toggle Auto/Chiaro/Scuro nel cassetto «🌗 Aspetto» del Profilo,
+tg.colorScheme dentro Telegram, vedi Architettura — collaudata in
+locale con contrasti AA misurati; da provare dal vivo dentro Telegram
+col tema scuro e il cambio tema a app aperta).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
