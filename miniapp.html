@@ -8,8 +8,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/jpeg" href="/assets/barattolo.jpeg">
+<meta name="theme-color" id="metaTema" content="#FAF4E4">
 <style>
   :root{
+    color-scheme:light;
     --bg:#FAF4E4; --card:#FFFFFF; --ink:#23282C; --muted:#8A8271;
     --line:#E8DFC8; --sats:#F7931A; --sats-soft:#FDEBD3;
     --trust:#1B8B54; --trust-soft:#E7F5EC; --danger:#C2410C;
@@ -22,7 +24,51 @@
     --paper:#FFF8EA; --chip-bg:#F3ECDA;
     --field-line:#E0D7C0; --line-soft:#EEE7D6;
     --gold-a:#FFE08A; --gold-b:#F7B32B; --gold-line:#E29B12; --gold-text:#7A4B06;
+    /* i colori "di servizio" che prima erano fissi nelle regole:
+       tokenizzati per la dark mode, in chiaro identici a prima */
+    --header-bg:rgba(250,244,228,.92); --nav-bg:rgba(255,255,255,.96);
+    --ph-a:#F3ECDA; --ph-b:#ECE3CE;
+    --ship-bg:#E3F0FB; --ship-text:#2A6FB0; --warn-bg:#FDE8E4; --off-bg:#EFE9DA;
+    --trust-note:#14532D; --trust-sub:#4B7C5E; --step-line:#BADCC8;
+    --tile-off:#F3EFE3; --toast-bg:#23282C; --toast-text:#fff;
+    --ink-soft:#5B5648; --desc:#3A3C42;
+    /* on-ink/on-trust: il testo sopra un fondo --ink o --trust pieno
+       (in chiaro bianco; al buio quei fondi si schiariscono e il
+       testo deve tornare scuro) */
+    --on-ink:#fff; --on-trust:#fff;
+    --shadow-card:0 1px 4px rgba(60,45,10,.08);
+    --shadow-hover:0 8px 24px rgba(0,0,0,.07);
   }
+  /* ---------- tema scuro: «mercatino di sera» ----------
+     Stessa personalita', fondo bruno caldo (mai nero piatto): arancio
+     e oro restano i protagonisti. Il JS risolve la scelta dell'utente
+     (auto/chiaro/scuro) e accende data-tema="scuro" su <html>:
+     un solo blocco di token, niente doppioni sotto media query. */
+  html[data-tema="scuro"]{
+    color-scheme:dark;
+    --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87;
+    --line:#3E3623; --sats-soft:#3E2B12;
+    --trust:#34B47A; --trust-soft:#1B2C20; --danger:#F07A47;
+    --sats-text:#FFB25C;
+    --trust-deep:#0C4A2C; --trust-text:#63CB96;
+    --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
+    --paper:#322A19; --chip-bg:#37301F;
+    --field-line:#4A4029; --line-soft:#362E1E;
+    --header-bg:rgba(33,26,16,.92); --nav-bg:rgba(44,37,23,.96);
+    --ph-a:#332B1A; --ph-b:#2B2415;
+    --ship-bg:#1E2C3C; --ship-text:#85B8E8; --warn-bg:#3C221A; --off-bg:#363126;
+    --trust-note:#B9E4CC; --trust-sub:#93BEA6; --step-line:#3C5B49;
+    --tile-off:#2E2A1E; --toast-bg:#F1E8D5; --toast-text:#23282C;
+    --ink-soft:#CFC4AD; --desc:#E2D9C6;
+    --on-ink:#211A10; --on-trust:#0B2417;
+    --shadow-card:0 1px 4px rgba(0,0,0,.35);
+    --shadow-hover:0 8px 24px rgba(0,0,0,.5);
+  }
+  /* i ritocchi scuri che non passano dai token: foto un filo meno
+     abbaglianti, l'ombra della hero da bruna a nera */
+  html[data-tema="scuro"] .card .ph img,
+  html[data-tema="scuro"] .detail-photos img{filter:brightness(.92)}
+  html[data-tema="scuro"] .hero img{filter:drop-shadow(0 14px 22px rgba(0,0,0,.5))}
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{
@@ -35,7 +81,7 @@
 
   /* ---------- header ---------- */
   header{
-    position:sticky;top:0;z-index:20;background:rgba(250,244,228,.92);
+    position:sticky;top:0;z-index:20;background:var(--header-bg);
     backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
     padding:14px var(--pad) 10px;
   }
@@ -65,7 +111,7 @@
   }
   .searchbar input:focus{border-color:var(--ink)}
   .searchbar button{
-    border:0;background:var(--ink);color:#fff;border-radius:999px;padding:0 18px;
+    border:0;background:var(--ink);color:var(--on-ink);border-radius:999px;padding:0 18px;
     font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 3px 0 #000;
   }
   .searchbar button:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
@@ -77,14 +123,14 @@
     overflow:hidden;background:var(--chip-bg)}
   .cur-seg button{border:0;background:none;padding:4px 10px;font-weight:800;
     font-size:13px;cursor:pointer;color:var(--muted);border-radius:999px}
-  .cur-seg button.active{background:var(--ink);color:#fff}
+  .cur-seg button.active{background:var(--ink);color:var(--on-ink)}
   .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{
     flex:0 0 auto;border:1.5px solid var(--field-line);background:var(--card);border-radius:999px;
     padding:7px 15px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;
   }
-  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:800}
+  .chip.active{background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:800}
   /* La riga di fiducia sotto la ricerca: una sola, per tutta la vetrina */
   .trust-line{display:flex;align-items:center;justify-content:center;gap:6px;
     padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text)}
@@ -92,7 +138,7 @@
   /* ---------- griglia annunci ---------- */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
   .card{
-    background:var(--card);border-radius:18px;box-shadow:0 1px 4px rgba(60,45,10,.08);
+    background:var(--card);border-radius:18px;box-shadow:var(--shadow-card);
     overflow:hidden;cursor:pointer;transition:transform .12s ease;
   }
   .card:active{transform:scale(.97)}
@@ -101,7 +147,7 @@
   .ph-wrap{position:relative}
   .card .ph{
     aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
-    font-size:44px;background:repeating-linear-gradient(45deg,#F3ECDA 0 10px,#ECE3CE 10px 20px);
+    font-size:44px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 10px,var(--ph-b) 10px 20px);
     overflow:hidden;
   }
   .card .ph img{width:100%;height:100%;object-fit:cover}
@@ -114,7 +160,7 @@
   .tag-price .price-sub{margin-top:0}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
-    scrollbar-width:none;background:#ECE3CE}
+    scrollbar-width:none;background:var(--ph-b)}
   .detail-photos::-webkit-scrollbar{display:none}
   .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:4/3;object-fit:cover;
     scroll-snap-align:center}
@@ -125,7 +171,7 @@
   #photoPreview img{width:64px;height:64px;object-fit:cover;border-radius:10px;
     border:1px solid var(--line)}
   #photoPreview .x{position:absolute;top:-6px;right:-6px;background:var(--ink);
-    color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
+    color:var(--on-ink);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
     justify-content:center;font-size:11px;cursor:pointer}
   .card .info{padding:32px 12px 12px}
   .card .title{font-family:'Baloo 2',sans-serif;font-weight:700;font-size:15px;line-height:1.2;
@@ -179,7 +225,7 @@
   .distintivo small{display:block;font-size:11.5px;color:var(--gold-text);
     font-weight:700;line-height:1.35;margin-top:2px;opacity:.85}
   .distintivo .em{font-size:22px;line-height:1}
-  .distintivo.off{background:#F3EFE3;border-color:var(--line-soft);filter:none;opacity:1}
+  .distintivo.off{background:var(--tile-off);border-color:var(--line-soft);filter:none;opacity:1}
   .distintivo.off .em{filter:grayscale(1);opacity:.5}
   .distintivo.off b{color:var(--ink)}
   .distintivo.off small{color:var(--muted);font-weight:600;opacity:1}
@@ -199,6 +245,11 @@
   .acc.open .acc-h .fr{transform:rotate(180deg)}
   .acc-b{display:none;padding:0 14px 14px}
   .acc.open .acc-b{display:block}
+  /* le pillole del tema nel cassetto Aspetto: gemelle di quelle del
+     canale avvisi, ma statiche nel markup (il tema e' solo client) */
+  .tema-pill{font:inherit;font-size:12.5px;font-weight:700;border:1px solid var(--line);
+    background:transparent;color:var(--muted);border-radius:99px;padding:5px 12px;cursor:pointer}
+  .tema-pill.active{border-color:var(--sats);background:var(--sats);color:#fff}
 
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
@@ -207,7 +258,7 @@
 
   nav{
     position:fixed;bottom:0;left:0;right:0;z-index:30;
-    background:rgba(255,255,255,.96);backdrop-filter:blur(10px);
+    background:var(--nav-bg);backdrop-filter:blur(10px);
     border-top:1px solid var(--line);display:flex;justify-content:space-around;
     padding:8px 6px calc(8px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;
   }
@@ -226,7 +277,7 @@
     font-family:'Baloo 2',sans-serif;font-weight:800;margin-top:-30px;
     box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35);
   }
-  nav button.sell{color:#5B5648}
+  nav button.sell{color:var(--ink-soft)}
   nav button.sell.active{color:var(--sats-deep)}
   nav button.sell.active .ic{background:var(--sats);box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35)}
   /* Il lockup nella barra: esiste solo da desktop in su */
@@ -234,7 +285,7 @@
 
   /* ---------- dettaglio annuncio ---------- */
   .detail-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
-    font-size:84px;background:repeating-linear-gradient(45deg,#F3ECDA 0 12px,#ECE3CE 12px 24px)}
+    font-size:84px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 12px,var(--ph-b) 12px 24px)}
   .detail-body{padding:18px var(--pad)}
   .detail-body h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;line-height:1.15}
   .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
@@ -245,13 +296,13 @@
     display:flex;align-items:center;gap:12px;background:var(--card);
     border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin:14px 0;
   }
-  .avatar{width:42px;height:42px;border-radius:50%;background:var(--ink);color:#fff;
+  .avatar{width:42px;height:42px;border-radius:50%;background:var(--ink);color:var(--on-ink);
     display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
   .seller .who{flex:1}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
   .stars{color:var(--sats);letter-spacing:1px}
-  .desc{color:#3A3C42;font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
+  .desc{color:var(--desc);font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
 
   .trust-note{
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
@@ -267,11 +318,11 @@
      barattolo, l'unico tratteggio del sistema insieme alla cassaforte */
   .escrow-zone{position:relative;background:var(--trust-soft);border:2px dashed var(--trust);
     border-radius:20px;padding:16px 16px 14px;margin:16px 0}
-  .escrow-flag{position:absolute;top:-14px;left:16px;background:var(--trust);color:#fff;
+  .escrow-flag{position:absolute;top:-14px;left:16px;background:var(--trust);color:var(--on-trust);
     font-weight:800;font-size:12px;border-radius:999px;padding:5px 14px;
     box-shadow:0 2px 0 var(--trust-deep)}
-  .escrow-zone .trust-note{background:none;padding:6px 0 0;margin-bottom:10px;color:#14532D}
-  .escrow-note{text-align:center;font-size:12px;color:#4B7C5E;font-weight:700;margin-top:6px}
+  .escrow-zone .trust-note{background:none;padding:6px 0 0;margin-bottom:10px;color:var(--trust-note)}
+  .escrow-note{text-align:center;font-size:12px;color:var(--trust-sub);font-weight:700;margin-top:6px}
   /* Se «Compra subito» manca, il primo bottone del recinto (l'escrow)
      eredita da solo il ruolo di CTA primaria: zero JS */
   .escrow-zone .btn:first-of-type{background:var(--sats);color:#fff;border:0;
@@ -293,7 +344,7 @@
     display:flex;align-items:center;gap:10px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
   .attesa-clessidra{font-size:22px;animation:gira 1.6s linear infinite}
   @keyframes gira{to{transform:rotate(360deg)}}
-  .btn.primary{background:var(--trust);color:#fff;box-shadow:0 3px 0 var(--trust-deep)}
+  .btn.primary{background:var(--trust);color:var(--on-trust);box-shadow:0 3px 0 var(--trust-deep)}
   .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
@@ -323,13 +374,13 @@
   .vault .vault-head b{font-size:14.5px}
   .vault .vault-head small{display:block;color:var(--muted);font-weight:600;font-size:12px}
   .steps{position:relative;margin-left:7px}
-  .steps::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:#BADCC8}
+  .steps::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--step-line)}
   .step{position:relative;padding:0 0 18px 32px}
   .step:last-child{padding-bottom:0}
   .step .dot{
     position:absolute;left:0;top:2px;width:18px;height:18px;border-radius:50%;
-    background:var(--card);border:2px solid #BADCC8;z-index:1;
-    display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;
+    background:var(--card);border:2px solid var(--step-line);z-index:1;
+    display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--on-trust);
   }
   .step.done .dot{background:var(--trust);border-color:var(--trust)}
   .step.done .dot::after{content:'✓'}
@@ -359,7 +410,7 @@
   /* Quando il suffisso e' un bottone, si vede che si puo' toccare:
      e' la scelta della valuta del listino (sats o €) */
   .sats-input button.suffix{right:8px;border:0;background:var(--chip-bg);
-    border-radius:999px;padding:5px 11px;cursor:pointer;color:#5B5648;font:inherit;
+    border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--ink-soft);font:inherit;
     font-size:12px;font-weight:800}
   .photo-drop{
     border:2px dashed var(--field-line);border-radius:20px;background:var(--card);
@@ -383,12 +434,12 @@
   .csv-line{text-align:center;font-size:12px;color:var(--muted);font-weight:700;padding:6px var(--pad) 2px}
   .badge{font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;white-space:nowrap}
   .badge.locked{background:var(--sats-soft);color:var(--sats-text)}
-  .badge.shipped{background:#E3F0FB;color:#2A6FB0}
+  .badge.shipped{background:var(--ship-bg);color:var(--ship-text)}
   .badge.released{background:var(--trust-soft);color:var(--trust-text)}
-  .badge.dispute{background:#FDE8E4;color:var(--danger)}
+  .badge.dispute{background:var(--warn-bg);color:var(--danger)}
   .badge.confirmed{background:var(--nostr-soft);color:var(--nostr-text)}
-  .badge.refunded{background:#EFE9DA;color:var(--muted)}
-  .badge.annullato{background:#EFE9DA;color:var(--muted)}
+  .badge.refunded{background:var(--off-bg);color:var(--muted)}
+  .badge.annullato{background:var(--off-bg);color:var(--muted)}
 
   /* ---------- pannello incasso venditore ---------- */
   .payout{
@@ -433,7 +484,7 @@
   .sheet h3{font-family:'Baloo 2',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
   .qr{
     aspect-ratio:1/1;max-width:230px;margin:16px auto;border-radius:var(--radius);
-    background:repeating-conic-gradient(var(--ink) 0 25%, #fff 0 50%) 0 0/16px 16px;
+    background:repeating-conic-gradient(#23282C 0 25%, #fff 0 50%) 0 0/16px 16px;
     display:flex;align-items:center;justify-content:center;position:relative;
   }
   .qr::after{content:'⚡';position:absolute;font-size:30px;background:#fff;
@@ -455,7 +506,7 @@
 
   .toast{
     position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);
-    background:var(--ink);color:#fff;font-weight:700;font-size:13.5px;padding:12px 20px;
+    background:var(--toast-bg);color:var(--toast-text);font-weight:700;font-size:13.5px;padding:12px 20px;
     border-radius:16px;opacity:0;transition:.25s;z-index:60;pointer-events:none;white-space:nowrap;
     box-shadow:0 8px 20px rgba(0,0,0,.18);
   }
@@ -504,7 +555,7 @@
     .hero{display:flex;align-items:center;gap:40px;padding:28px var(--pad) 0}
     .hero-title{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:38px;line-height:1.1}
     .hero-title span{color:var(--sats)}
-    .hero-sub{font-size:16px;color:#5B5648;font-weight:600;margin-top:8px;max-width:520px}
+    .hero-sub{font-size:16px;color:var(--ink-soft);font-weight:600;margin-top:8px;max-width:520px}
     /* Il barattolo scontornato fluttua libero: niente tessera,
        l'ombra e' un drop-shadow che segue la sagoma */
     .hero img{width:220px;height:220px;margin-left:auto;flex:0 0 auto;
@@ -559,7 +610,7 @@
   /* col mouse le card rispondono al passaggio */
   @media (hover:hover) and (min-width:768px){
     .card{transition:transform .12s ease,box-shadow .12s ease}
-    .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.07)}
+    .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-hover)}
   }
 
   /* ==================== DESKTOP LARGO (≥1024px) ==================== */
@@ -574,6 +625,22 @@
     .empty-mascotte,.hero img{animation:none}
   }
 </style>
+<script>
+/* Anti-flash: il tema giusto PRIMA del primo paint. La logica completa
+   vive in applicaTema() in fondo alla pagina; qui solo il minimo.
+   tg.colorScheme conta solo con initData vero: nel browser lo stub di
+   Telegram esiste comunque e mentirebbe (il patto di esportaDati). */
+(function(){
+  let t = 'auto';
+  try { const v = localStorage.getItem('barattolo_tema');
+        if (v==='chiaro' || v==='scuro') t = v; } catch(e){}
+  const tw = window.Telegram && window.Telegram.WebApp;
+  const scuro = t==='scuro' || (t==='auto' && (
+    (tw && tw.initData) ? tw.colorScheme==='dark'
+    : matchMedia('(prefers-color-scheme: dark)').matches));
+  if (scuro) document.documentElement.dataset.tema = 'scuro';
+})();
+</script>
 </head>
 <body>
 <div id="app">
@@ -741,6 +808,19 @@
       <div class="acc" id="accAvvisi">
         <button class="acc-h" onclick="toggleAcc('accAvvisi')"><span class="em">🔔</span>Avvisi<span class="fr">▾</span></button>
         <div class="acc-b"><div id="avvisiBlocco"></div></div>
+      </div>
+
+      <div class="acc" id="accAspetto">
+        <button class="acc-h" onclick="toggleAcc('accAspetto')"><span class="em">🌗</span>Aspetto<span class="fr">▾</span></button>
+        <div class="acc-b">
+          <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">
+            Chiaro o scuro? Con <b style="color:var(--ink)">Auto</b> segue <span id="temaSegnale">il sistema</span>.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+            <button class="tema-pill" id="temaAuto" onclick="setTema('auto')">Auto</button>
+            <button class="tema-pill" id="temaChiaro" onclick="setTema('chiaro')">☀️ Chiaro</button>
+            <button class="tema-pill" id="temaScuro" onclick="setTema('scuro')">🌙 Scuro</button>
+          </div>
+        </div>
       </div>
 
       <div class="acc" id="accDistintivi">
@@ -1237,6 +1317,49 @@ function prezzoParte(l){
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
+/* ---------------- tema: chiaro / scuro / auto ----------------
+   Il gemello del toggle valuta: preferenza in localStorage, il JS
+   risolve «auto» (tg.colorScheme dentro Telegram, il sistema fuori)
+   e accende data-tema="scuro" su <html> — e' quell'attributo che
+   attiva il blocco di token scuri in testa al CSS. Lo snippet
+   anti-flash nell'head ha gia' fatto il primo giro prima del paint. */
+const TEMA_CHIAVE = 'barattolo_tema';
+let temaScelto = 'auto';
+try { const t = localStorage.getItem(TEMA_CHIAVE);
+      if (t==='chiaro' || t==='scuro') temaScelto = t; } catch(e){}
+function temaEffettivo(){
+  if (temaScelto !== 'auto') return temaScelto;
+  if (tg?.initData) return tg.colorScheme==='dark' ? 'scuro' : 'chiaro';
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'scuro' : 'chiaro';
+}
+function applicaTema(){
+  const scuro = temaEffettivo()==='scuro';
+  if (scuro) document.documentElement.dataset.tema = 'scuro';
+  else delete document.documentElement.dataset.tema;
+  /* la barra del browser e l'header di Telegram seguono il fondo */
+  const sfondo = scuro ? '#211A10' : '#FAF4E4';
+  document.getElementById('metaTema')?.setAttribute('content', sfondo);
+  try { tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo); } catch(e){}
+  el('temaAuto')?.classList.toggle('active', temaScelto==='auto');
+  el('temaChiaro')?.classList.toggle('active', temaScelto==='chiaro');
+  el('temaScuro')?.classList.toggle('active', temaScelto==='scuro');
+}
+function setTema(v){
+  if (v !== temaScelto) haptic();
+  temaScelto = v;
+  try { localStorage.setItem(TEMA_CHIAVE, v); } catch(e){}
+  applicaTema();
+}
+/* con «auto» il tema segue i cambi dal vivo: il sistema nel browser,
+   il tema di Telegram dentro la Mini App. La MediaQueryList resta in
+   una costante: certi WebKit vecchi la buttavano via col garbage
+   collector, e con lei l'ascoltatore. */
+const mqScuro = matchMedia('(prefers-color-scheme: dark)');
+try { mqScuro.addEventListener('change', ()=>{ if (temaScelto==='auto') applicaTema(); }); } catch(e){}
+tg?.onEvent?.('themeChanged', ()=>{ if (temaScelto==='auto') applicaTema(); });
+if (tg?.initData) el('temaSegnale').textContent = 'il tema di Telegram';
+applicaTema();   // pillole e meta allineati alla preferenza salvata
+
 /* ---------------- onboarding contestuale ----------------
    Suggerimenti a una riga, mai bloccanti. Tre regole ferree:
    compaiono solo se la funzione manca davvero, un "Non ora" li
@@ -1678,7 +1801,7 @@ function openOrder(id){
             </div>`).join('')}
         </div>
       </div>
-      ${s==='dispute' ? `<div class="trust-note" style="background:#FDE8E4;color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
+      ${s==='dispute' ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
       ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a></span></div>`:''}
       ${isAdmin && s==='dispute' ? `
         <div class="payout" style="border-color:var(--danger)">
@@ -2486,7 +2609,7 @@ function renderMyListings(){
           : `<span style="font-size:22px">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
           <span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>
-          <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#FDE8E4;color:var(--danger)">🗑 Elimina</span>
+          <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>
         </span>
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
@@ -2505,7 +2628,7 @@ async function loadAdminStats(){
     if (!r.ok) { box.innerHTML = ''; return; }
     const s = await r.json();
     const card = (emoji, valore, nome) => `
-      <div style="background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
+      <div style="background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
         <div style="font-size:20px">${emoji}</div>
         <div class="mono" style="font-size:20px;font-weight:800;color:var(--sats-deep)">${fmt(valore)}</div>
         <div style="font-size:12px;color:var(--muted);font-weight:700">${nome}</div>
@@ -2518,7 +2641,7 @@ async function loadAdminStats(){
         ${card('🤝', s.affari_conclusi, 'affari conclusi')}
         ${card('⚡', s.volume_sats, 'sats di volume')}
       </div>
-      <div style="max-height:280px;overflow-y:auto;margin-top:10px;background:#fff;border:1.5px solid var(--line);border-radius:14px">
+      <div style="max-height:280px;overflow-y:auto;margin-top:10px;background:var(--card);border:1.5px solid var(--line);border-radius:14px">
         ${(s.lista_utenti||[]).map(u => `
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px">
             <div style="min-width:0">
@@ -3378,7 +3501,7 @@ async function avvia(){
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
-      const btn = (id,nome)=>`<button onclick="setCollaudo(${id},'${nome}')" style="font:inherit;border:1px solid var(--sats-text);background:${collaudoId===id?'var(--sats-text)':'transparent'};color:${collaudoId===id?'#fff':'var(--sats-text)'};border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">${nome}</button>`;
+      const btn = (id,nome)=>`<button onclick="setCollaudo(${id},'${nome}')" style="font:inherit;border:1px solid var(--sats-text);background:${collaudoId===id?'var(--sats-text)':'transparent'};color:${collaudoId===id?'var(--sats-soft)':'var(--sats-text)'};border-radius:8px;padding:2px 10px;cursor:pointer;margin:0 3px">${nome}</button>`;
       b.style.display = 'block';
       b.innerHTML = `🧪 COLLAUDO con sats veri — sei: `
         + btn(111,'Compratore') + btn(222,'Venditore') + btn(999,'Admin')
