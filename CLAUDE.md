@@ -65,7 +65,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   pubblica in una nota kind-1 dal SUO client, `verifica-controlla`
   interroga 4 relay (websocket-client è sincrono: gira dentro
   `asyncio.to_thread`, relay in parallelo) → `utenti.npub_verificata`,
-  badge 🟣✓. Cambiare o rimuovere la npub azzera la verifica.
+  badge 🟣. Dal lug 2026 il badge pubblico (card, dettaglio, negozio)
+  esiste SOLO con la npub verificata, come 🟣 semplice senza ✓ (il
+  non-verificato non compare in pubblico, quindi la spunta non
+  distingue più nulla); la npub dichiarata ma non verificata la vede
+  solo il proprietario nel suo Profilo, con l'invito a verificarla.
+  Cambiare o rimuovere la npub azzera la verifica.
   `venditore_npub` e `venditore_npub_verificata` sono in `CAMPI_VETRINA`
   (pubblici per natura) e nelle SELECT di `/api/search` e
   `/api/listings/miei`.
@@ -126,7 +131,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   libero (proposta di collegamento con biglietto monouso,
   `POST /api/login/nostr/collega`; rifiuto = login annullato, mai
   doppioni) → account nativo nuovo (nome = npub abbreviata, badge
-  🟣✓ da subito: la firma Schnorr dimostra il possesso). Un badge
+  🟣 da subito: la firma Schnorr dimostra il possesso). Un badge
   NON verificato non dà MAI accesso all'account che lo dichiara.
   `hex_to_npub` (bech32 con checksum vero) è il gemello speculare di
   `npub_to_hex`. `vendor/nostr.bundle.js` = nostr-tools 2.23.12
@@ -220,6 +225,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Feedback lasciato» + eventuale «ricevuto»), lista nel negozio
   (`#negozioFeedback`), conteggio `(N)` accanto alle stelle in
   negozio e profilo, commenti sempre sotto `esc()`.
+  Distintivi 🏅 (lug 2026, gamification parte 2): catalogo `DISTINTIVI`
+  nel codice (11 badge: id, emoji, nome, descrizione, `fiducia`,
+  criterio-lambda) + tabella `badge_utente(tg_id, badge_id,
+  ottenuto_il, PK(tg_id,badge_id))`. Append-only: non si revocano mai.
+  `controlla_distintivi(con, tg_id)` è il giudice unico: RICALCOLA i
+  criteri dai dati veri (stile `_ricalcola_rating`) e assegna con
+  INSERT OR IGNORE; `premia_distintivi(tg_id)` (connessione propria,
+  fail-open, notifica «🏅» DOPO il commit) è il gancio dal vivo in:
+  `_sblocca_sats` (entrambe le parti), `verifica_npub_controlla`,
+  `abilita_accesso_nostr`, `login_nostr` (nativo nuovo),
+  `login_nostr_collega`, `pubblica`, `lascia_feedback` (entrambe).
+  Passata retroattiva SILENZIOSA su tutti gli utenti a ogni avvio in
+  `init_db` + catch-all silenzioso in `/api/me` (scrittura su GET ma
+  idempotente: è ciò che rende il sistema auto-riparante). I criteri
+  pesanti contano solo ordini `released` (sats veri dall'escrow:
+  gonfiarli costa la commissione); `ordini.disputata` (nuova colonna,
+  settata in `apri_disputa`, backfill sugli stati post-disputa) fa da
+  memoria per Specchiato («10 affari senza dispute perse»: venditore
+  perde se refunded+disputata, compratore se released+disputata).
+  Fulmine usa `spedito_il-creato ≤ 24h+30min` (il reaper dei 30 min è
+  il tetto fisico del pagamento: niente colonna `pagato_il`).
+  Pioniere = posizione ≤100 per `(registrato ASC, tg_id)`, gli 0
+  pre-migrazione contano come i più vecchi. `esegui_fusione` migra i
+  badge in unione (UPDATE OR IGNORE + DELETE) e rivaluta. API:
+  `/api/me.distintivi` = catalogo COMPLETO con `ottenuto` (ts o null,
+  il frontend non hardcoda mai la lista); `/api/negozio` →
+  `venditore.distintivi` = solo i `fiducia` guadagnati. Frontend:
+  griglia `renderDistintivi()` nel Profilo («🏅 Distintivi (N di M)»,
+  classe `.distintivo` — `.badge` è degli stati ordine — mancanti in
+  grigio con la descrizione come molla), chip fiducia accanto al nome
+  in `renderNegozio` (filtrando `nostrano`: il 🟣 c'è già), sezione
+  nascosta in DEMO come il wallet.
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
   `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
@@ -244,7 +281,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `/api/me`): riga Telegram (nome+username, o «Collega Telegram» per
   i tg_id negativi → `collegaTelegram()` apre il deep-link col codice,
   mai mostrato in chiaro) e riga Nostr (npub nei 4 stati: assente /
-  da verificare / 🟣✓ con «Abilita l'accesso» / 🔑 attiva con
+  da verificare / verificata con «Abilita l'accesso» / 🔑 attiva con
   «Disabilita» solo su tg_id positivi).
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
@@ -305,7 +342,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'orologio del server, che rilancia l'import OGNI ORA in
   `asyncio.to_thread` (fail-open totale: segnaposto in config =
   spento, errori = una riga in console). Al primo giro scrive il
-  badge 🟣✓ sul profilo del venditore (npub canonica bech32 via
+  badge 🟣 verificato sul profilo del venditore (npub canonica bech32 via
   `hex_to_npub`, gemella di quella di server.py; mai sovrascrivere
   una npub diversa già dichiarata): così il login Nostr lo riconosce
   invece di creargli un account nuovo. ATTENZIONE: scrive
@@ -398,7 +435,8 @@ Fatti (lug 2026): banner sulla demo browser; vetrina pubblica in sola
 lettura (annunci veri dal browser, azioni → invito al bot); moderazione
 contenuti a tre strati (parole + AI + admin); badge npub auto-dichiarato
 nel profilo e sugli annunci; verifica della npub via nota pubblica
-(badge 🟣✓, vedi Architettura); pubblicazione degli annunci verso
+(badge 🟣, dal lug 2026 pubblico SOLO da verificata e senza ✓, vedi
+Architettura); pubblicazione degli annunci verso
 Nostr con la chiave della piattaforma (NIP-99 + NIP-09, vedi
 Architettura); pagina negozio del venditore, interna e pubblica
 (`/negozio/{username|codice}`, vedi Architettura); login web col
@@ -430,11 +468,16 @@ pubblicazione; Lightning address impostabile anche da lì; canale
 avvisi sempre in chiaro; vedi Architettura); feedback e stelle
 (voto 1-5 + commento a affare concluso, rating per ricalcolo,
 ultimi feedback anonimi nel negozio, rimozione admin, vedi
-Architettura — parte 1 della gamification, badge/sfide rimandati).
+Architettura — parte 1 della gamification); distintivi 🏅 (parte 2:
+11 badge auto-assegnati per ricalcolo dai dati veri, griglia «N di M»
+nel Profilo, chip di fiducia nel negozio pubblico, retroattivi a ogni
+avvio, vedi Architettura); badge 🟣 pubblico semplificato (solo da
+npub verificata, senza ✓; il non verificato lo vede solo il
+proprietario col suo invito a verificare).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
 la sua chiave — rimandata: il match sui titoli fa falsi positivi e un
 NIP-09 sbagliato cancella presenza legittima); poi post-lancio: tracking
-verificato via API corrieri, badge/sfide (parte 2 della gamification),
-escrow on-chain 2-di-3, parere legale MiCA prima di crescere.
+verificato via API corrieri, escrow on-chain 2-di-3, parere legale
+MiCA prima di crescere.
