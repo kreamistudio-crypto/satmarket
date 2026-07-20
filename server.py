@@ -3875,4 +3875,21 @@ def vendor_nostr():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+# Le due immagini del brand (redesign lug 2026): mascotte per hero e
+# stati vuoti, barattolo per favicon e iconcina del logo. Stesso patto
+# di /vendor: rotte esplicite per singolo file, MAI StaticFiles su una
+# directory (regola ferrea 3), cache lunga perche' cambiano solo
+# quando le cambiamo apposta.
+@app.get("/assets/mascotte.jpeg")
+def asset_mascotte():
+    return FileResponse("assets/mascotte.jpeg", media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/barattolo.jpeg")
+def asset_barattolo():
+    return FileResponse("assets/barattolo.jpeg", media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")

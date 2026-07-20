@@ -7,6 +7,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/jpeg" href="/assets/barattolo.jpeg">
 <style>
   :root{
     --bg:#FAF4E4; --card:#FFFFFF; --ink:#23282C; --muted:#8A8271;
@@ -38,7 +39,11 @@
     backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
     padding:14px var(--pad) 10px;
   }
-  .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  /* Il barattolo accanto al lockup: JPEG su fondo arancione pieno,
+     arrotondato a tessera come nel mockup (niente scontorno) */
+  .brand-jar{width:38px;height:38px;border-radius:12px;flex:0 0 auto}
+  .brand small{display:block;margin-top:2px}
   /* Il lockup: Baloo 2 con la B che diventa ₿ — quattro trattini
      disegnati da due pseudo-elementi (ognuno sdoppiato via box-shadow) */
   .lockup{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:22px;line-height:1;letter-spacing:0}
@@ -150,6 +155,15 @@
   .empty .empty-title{display:block;font-family:'Baloo 2',sans-serif;font-weight:800;
     font-size:20px;color:var(--ink);margin-bottom:6px}
   .empty .btn{width:auto;margin:18px auto 0}
+  /* La mascotte fluttua negli stati vuoti; se l'immagine non arriva
+     (demo da file://), sparisce e torna l'emoji qui sotto */
+  .empty-mascotte{width:110px;height:110px;border-radius:28px;margin-bottom:12px;
+    animation:floaty 3s ease-in-out infinite}
+  .empty .empty-mascotte + .big{display:none}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+
+  /* ---------- hero di Esplora: esiste solo da desktop in su ---------- */
+  .hero{display:none}
 
   /* ---------- distintivi (gamification) ----------
      ".badge" e' gia' degli stati ordine: qui si chiama .distintivo.
@@ -483,7 +497,17 @@
     }
     /* il logo in topbar e' markup vero (.nav-logo): la B col ₿ vive
        di pseudo-elementi suoi, impossibili dentro un content: */
-    .nav-logo{display:flex;align-items:center;margin-right:auto;font-size:24px}
+    .nav-logo{display:flex;align-items:center;gap:9px;margin-right:auto;font-size:24px}
+    .nav-logo .brand-jar{width:30px;height:30px;border-radius:9px}
+
+    /* la hero: titolo grande e mascotte fluttuante, solo qui */
+    .hero{display:flex;align-items:center;gap:40px;padding:28px var(--pad) 0}
+    .hero-title{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:38px;line-height:1.1}
+    .hero-title span{color:var(--sats)}
+    .hero-sub{font-size:16px;color:#5B5648;font-weight:600;margin-top:8px;max-width:520px}
+    .hero img{width:200px;height:200px;border-radius:36px;margin-left:auto;flex:0 0 auto;
+      transform:rotate(-6deg);box-shadow:0 14px 22px rgba(60,45,10,.20);
+      animation:floaty 4s ease-in-out infinite}
     nav button{
       flex:0 0 auto;flex-direction:row;gap:7px;font-size:14px;
       padding:9px 16px;border-radius:999px;
@@ -542,6 +566,11 @@
     .grid{grid-template-columns:repeat(4,1fr);gap:16px}
     nav{padding:0 max(var(--pad), calc((100% - 1160px)/2))}
   }
+
+  /* Chi preferisce meno movimento non vede fluttuare nulla */
+  @media (prefers-reduced-motion: reduce){
+    .empty-mascotte,.hero img{animation:none}
+  }
 </style>
 </head>
 <body>
@@ -554,8 +583,11 @@
   <div class="view active" id="view-esplora">
     <header>
       <div class="brand">
-        <h1 class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></h1>
-        <small>il mercatino in sats</small>
+        <img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()">
+        <div>
+          <h1 class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></h1>
+          <small>il mercatino in sats</small>
+        </div>
       </div>
       <div class="searchbar">
         <div class="q-wrap">
@@ -570,9 +602,19 @@
       <div class="chips" id="chips"></div>
       <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
     </header>
+    <!-- La hero vive solo da desktop in su (CSS): dentro Telegram non esiste -->
+    <div class="hero" aria-hidden="true">
+      <div>
+        <div class="hero-title">Il mercatino dell'usato,<br>in <span>sats</span>.</div>
+        <div class="hero-sub">Compra e vendi in Lightning, con l'escrow che protegge
+          tutti. Zero costi fissi: 1% solo a vendita conclusa.</div>
+      </div>
+      <img src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
+    </div>
     <div class="section-label" id="gridLabel">In vetrina</div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
+      <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
       <div class="big">🫙</div>
       <b class="empty-title">Il barattolo qui è vuoto</b>
       Nessun oggetto trovato per <b id="emptyQ"></b>.<br>
@@ -711,7 +753,7 @@
 
   <!-- ============ NAV ============ -->
   <nav>
-    <div class="nav-logo" aria-hidden="true"><span class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
+    <div class="nav-logo" aria-hidden="true"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
