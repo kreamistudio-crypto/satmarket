@@ -306,6 +306,12 @@
   .seller .who{flex:1}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
+  /* Il chip di fiducia accanto al nome del venditore: una medaglietta
+     d'oro come le tessere dei distintivi (l'oro non cambia col tema) */
+  .chip-fiducia{display:inline-block;vertical-align:1px;margin-left:6px;
+    background:linear-gradient(180deg,var(--gold-a),var(--gold-b));
+    border:1px solid var(--gold-line);border-radius:999px;padding:1px 8px;
+    font-size:11px;font-weight:800;color:var(--gold-text);white-space:nowrap}
   .stars{color:var(--sats);letter-spacing:1px}
   .desc{color:var(--desc);font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
 
@@ -989,7 +995,8 @@ function mapListing(a){
     photos, username:(a.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
     nostr:(a.contatto_nostr||'').replace(/[^a-z0-9]/g,''),
     sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata,
-    negozio:a.venditore_negozio||''};
+    negozio:a.venditore_negozio||'',
+    distintivi:a.venditore_distintivi||[]};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -1439,7 +1446,11 @@ function openDetail(id){
       </div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${esc(l.seller[0])}</div>
-        <div class="who"><b>${esc(l.seller)}${l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}</b>
+        <div class="who"><b>${esc(l.seller)}${l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}</b>${
+          /* le medagliette di fiducia (max 3): "nostrano" si salta,
+             il 🟣 accanto al nome dice gia' la stessa cosa */
+          (l.distintivi||[]).filter(d=>d.id!=='nostrano').slice(0,3)
+            .map(d=>`<span class="chip-fiducia" title="${esc(d.nome)}: ${esc(d.descrizione)}">${esc(d.emoji)} ${esc(d.nome)}</span>`).join('')}
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
           ${l.sellerNpubOk&&l.sellerNpub?`<div class="rep">🟣 <a href="https://njump.me/${esc(l.sellerNpub)}" target="_blank" style="color:inherit" onclick="event.stopPropagation()">Presente su Nostr</a> · npub verificata</div>`:''}
         </div>

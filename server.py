@@ -1728,7 +1728,23 @@ CAMPI_VETRINA = (
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, "
+    "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
+    " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
     "u.rating, u.vendite_ok")
+
+
+def espandi_distintivi_vetrina(righe):
+    """Il GROUP_CONCAT dei badge diventa la lista di chip di FIDUCIA
+    {id, emoji, nome, descrizione} — gli stessi del negozio pubblico:
+    la Mini App non hardcoda mai il catalogo, e i distintivi non di
+    fiducia verso la vetrina non escono proprio."""
+    for r in righe:
+        presi = set((r.pop("venditore_distintivi", "") or "").split(","))
+        r["venditore_distintivi"] = [
+            dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
+                 descrizione=d["descrizione"])
+            for d in DISTINTIVI if d["fiducia"] and d["id"] in presi]
+    return righe
 
 
 @app.get("/api/listings")
@@ -1746,7 +1762,7 @@ def lista_annunci(cat: str = "", x_tg_init_data: str = Header(""),
         par.append(cat)
     righe = [dict(r) for r in con.execute(q + " ORDER BY a.creato DESC", par)]
     con.close()
-    return righe
+    return espandi_distintivi_vetrina(righe)
 
 
 @app.post("/api/listings")
@@ -1846,12 +1862,14 @@ def miei_annunci(x_tg_init_data: str = Header(""),
         "u.npub AS venditore_npub, "
         "u.npub_verificata AS venditore_npub_verificata, "
         "u.negozio AS venditore_negozio, "
+        "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
+        " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
         "u.rating, u.vendite_ok FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
         (user["id"],))]
     con.close()
-    return righe
+    return espandi_distintivi_vetrina(righe)
 
 
 @app.get("/api/negozio/{chi}")
@@ -1875,11 +1893,11 @@ def negozio(chi: str, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Negozio non trovato")
     # venditore_id in piu' solo agli autenticati ("questo annuncio e' tuo")
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
-    annunci = [dict(r) for r in con.execute(
+    annunci = espandi_distintivi_vetrina([dict(r) for r in con.execute(
         f"SELECT {campi} FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
-        (v["tg_id"],))]
+        (v["tg_id"],))])
     # Gli ultimi feedback ricevuti: stelle + commento + data + ruolo di
     # chi scrive («acquirente»/«venditore»), MAI il nome — su una pagina
     # pubblica rivelerebbe gli acquisti di chi non ha scelto di apparire.
@@ -2117,13 +2135,15 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
     ("tastiera sotto i 100k vicino Milano") e seleziona gli annunci."""
     verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    annunci = [dict(r) for r in con.execute(
+    annunci = espandi_distintivi_vetrina([dict(r) for r in con.execute(
         "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
         "u.npub AS venditore_npub, "
         "u.npub_verificata AS venditore_npub_verificata, "
         "u.negozio AS venditore_negozio, "
+        "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
+        " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
         "u.rating FROM annunci a "
-        "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")]
+        "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")])
     con.close()
     if not annunci:
         return []
