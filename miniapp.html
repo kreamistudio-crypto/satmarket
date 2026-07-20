@@ -156,21 +156,27 @@
      Guadagnati a colori con la data; mancanti in grigio con la
      strada per sbloccarli — la molla che invita a usare Barattolo. */
   .distintivi{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-  .distintivo{background:var(--card);border:1px solid var(--line);
-    border-radius:12px;padding:10px 12px}
+  /* Guadagnato = tessera d'oro; mancante = grigio con la descrizione
+     come molla. Due colonne (non le tre del mockup): le descrizioni
+     sono contenuto vero e hanno bisogno di respiro. */
+  .distintivo{background:linear-gradient(180deg,var(--gold-a),var(--gold-b));
+    border:1px solid var(--gold-line);border-radius:14px;padding:10px 12px}
+  .distintivo b{display:block;font-size:13px;margin-top:4px;color:var(--gold-text)}
+  .distintivo small{display:block;font-size:11.5px;color:var(--gold-text);
+    font-weight:700;line-height:1.35;margin-top:2px;opacity:.85}
   .distintivo .em{font-size:22px;line-height:1}
-  .distintivo b{display:block;font-size:13px;margin-top:4px}
-  .distintivo small{display:block;font-size:11.5px;color:var(--muted);
-    font-weight:600;line-height:1.35;margin-top:2px}
-  .distintivo.off{opacity:.55;filter:grayscale(1)}
+  .distintivo.off{background:#F3EFE3;border-color:var(--line-soft);filter:none;opacity:1}
+  .distintivo.off .em{filter:grayscale(1);opacity:.5}
+  .distintivo.off b{color:var(--ink)}
+  .distintivo.off small{color:var(--muted);font-weight:600;opacity:1}
 
   /* ---------- profilo: sezioni richiudibili ----------
      La scheda era un lenzuolo: ora ogni voce e' un cassetto chiuso
      (stile Vinted), si apre col tocco sull'header e la freccia ruota. */
-  .acc{margin-top:10px;background:var(--card);border:1px solid var(--line);
-    border-radius:14px;overflow:hidden}
-  .acc-h{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;
-    background:none;border:0;font:inherit;font-weight:800;font-size:14px;
+  .acc{margin-top:10px;background:var(--card);border:1px solid var(--line-soft);
+    border-radius:16px;overflow:hidden}
+  .acc-h{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;
+    background:none;border:0;font:inherit;font-weight:800;font-size:15px;
     color:var(--ink);cursor:pointer;text-align:left}
   .acc-h .em{font-size:18px;line-height:1}
   .acc-h .conta{font-weight:700;font-size:12.5px;color:var(--muted)}
@@ -321,7 +327,7 @@
 
   /* ---------- vendi (form) ---------- */
   .form{padding:18px var(--pad)}
-  .form h2{font-size:20px;font-weight:800;margin-bottom:4px}
+  .form h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;margin-bottom:4px}
   .form .sub{color:var(--muted);font-weight:600;font-size:13.5px;margin-bottom:18px}
   .field{margin-bottom:14px}
   .field label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;
@@ -338,12 +344,12 @@
     font-size:12px;color:var(--muted);font-weight:700}
   /* Quando il suffisso e' un bottone, si vede che si puo' toccare:
      e' la scelta della valuta del listino (sats o €) */
-  .sats-input button.suffix{right:8px;border:1px solid var(--line);background:var(--bg);
-    border-radius:8px;padding:4px 9px;cursor:pointer;color:var(--ink);font:inherit;
+  .sats-input button.suffix{right:8px;border:0;background:var(--chip-bg);
+    border-radius:999px;padding:5px 11px;cursor:pointer;color:#5B5648;font:inherit;
     font-size:12px;font-weight:800}
   .photo-drop{
-    border:1.5px dashed var(--line);border-radius:var(--radius);background:var(--card);
-    padding:26px;text-align:center;color:var(--muted);font-weight:600;font-size:13.5px;cursor:pointer;
+    border:2px dashed var(--field-line);border-radius:20px;background:var(--card);
+    padding:26px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;cursor:pointer;
   }
   .photo-drop .big{font-size:30px;display:block;margin-bottom:6px}
 
@@ -587,7 +593,7 @@
     <div class="form">
       <h2>Metti in vendita</h2>
       <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Paghi zero: la piattaforma trattiene l'1% solo a vendita conclusa.</div>
-      <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:#FFF4E3;border:1.5px solid #F2C063;border-radius:12px;font-size:13px;font-weight:700"></div>
+      <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
       <div class="field">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
         <div class="photo-drop" onclick="el('sellPhotos').click()">
@@ -2361,11 +2367,11 @@ function renderMyListings(){
           ? `<img src="${esc(l.photos[0])}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none">`
           : `<span style="font-size:22px">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
-          <span class="badge" onclick="editListing(${l.id})" style="cursor:pointer">✏️ Modifica</span>
-          <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#F9E8E6;color:var(--danger)">🗑 Elimina</span>
+          <span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>
+          <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#FDE8E4;color:var(--danger)">🗑 Elimina</span>
         </span>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
     </div>`).join('')
     : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo dalla scheda Vendi ＋ ⚡</div>`;
 }
@@ -2383,7 +2389,7 @@ async function loadAdminStats(){
     const card = (emoji, valore, nome) => `
       <div style="background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
         <div style="font-size:20px">${emoji}</div>
-        <div class="mono" style="font-size:20px;font-weight:800;color:var(--sats)">${fmt(valore)}</div>
+        <div class="mono" style="font-size:20px;font-weight:800;color:var(--sats-deep)">${fmt(valore)}</div>
         <div style="font-size:12px;color:var(--muted);font-weight:700">${nome}</div>
       </div>`;
     box.innerHTML = `
