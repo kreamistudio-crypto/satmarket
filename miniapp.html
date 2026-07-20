@@ -793,7 +793,7 @@
       <div class="field"><label>Titolo</label>
         <input id="sellTitle" placeholder="Es. Tastiera meccanica Keychron K2"></div>
       <div class="field"><label>Categoria</label>
-        <select id="sellCat"><option>Elettronica</option><option>Casa</option><option>Sport</option><option>Libri</option><option>Abbigliamento</option><option>Altro</option></select></div>
+        <select id="sellCat"><option>Elettronica</option><option>Casa e giardino</option><option>Abbigliamento</option><option>Sport e hobby</option><option>Motori</option><option>Bambini</option><option>Animali</option><option>Libri e media</option><option>Altro</option></select></div>
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
@@ -1035,7 +1035,9 @@ function setCollaudo(id, nome){
 }
 
 /* ---- mappatura dati backend -> formato della Mini App ---- */
-const EMOJI_CAT = {Elettronica:'🔌', Casa:'🪑', Sport:'🚲', Libri:'📚', Abbigliamento:'👕', Altro:'📦'};
+const EMOJI_CAT = {'Elettronica':'🔌', 'Casa e giardino':'🪑', 'Abbigliamento':'👕',
+  'Sport e hobby':'🚲', 'Motori':'🛵', 'Bambini':'🧸', 'Animali':'🐾',
+  'Libri e media':'📚', 'Altro':'📦'};
 const FOTO_BASE = API_BASE.replace(/\/api$/, '');   // dove stanno le foto sul server
 function fotoUrl(f){
   if (!f) return '';
@@ -1079,6 +1081,7 @@ function mapOrder(o){
 async function loadListings(){
   const r = await fetch(`${API_BASE}/listings`, {headers:{'X-Tg-Init-Data': authHdr()}});
   listings = (await r.json()).map(mapListing);
+  renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
 async function loadOrders(){
   const r = await fetch(`${API_BASE}/orders`, {headers:{'X-Tg-Init-Data': authHdr()}});
@@ -1086,21 +1089,22 @@ async function loadOrders(){
 }
 
 /* ---------------- dati demo ---------------- */
-const CATS = ["Tutto","Elettronica","Casa","Sport","Libri","Abbigliamento","Altro"];
+const CATS = ["Tutto","Elettronica","Casa e giardino","Abbigliamento","Sport e hobby",
+              "Motori","Bambini","Animali","Libri e media","Altro"];
 let listings = [
   {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
    zone:"Pavia", seller:"Massimo R.", rating:4.9, sales:12,
    desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
-  {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport",
+  {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport e hobby",
    zone:"Milano", seller:"Giulia T.", rating:5.0, sales:7,
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
-  {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri",
+  {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
    zone:"Torino", seller:"Andrea B.", rating:4.8, sales:31,
    desc:"Copia nuova, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
    zone:"Roma", seller:"Luca P.", rating:4.7, sales:9,
    desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
-  {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa",
+  {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e giardino",
    zone:"Bologna", seller:"Sara M.", rating:4.9, sales:15,
    desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
   {id:6, emoji:"⚡", title:"Nodo Lightning: Raspberry Pi 4 8GB kit", price:190000, cat:"Elettronica",
@@ -1158,8 +1162,19 @@ function go(view){
 }
 
 /* ---------------- esplora ---------------- */
+/* Le pillole si ordinano per contenuto: "Tutto" sempre prima, poi le
+   categorie con piu' annunci attivi; quelle vuote non compaiono
+   proprio ("Tutto" e la ricerca coprono la scoperta). I conteggi
+   vengono dai listings caricati, quindi si rifanno a ogni giro. */
 function renderChips(){
-  el('chips').innerHTML = CATS.map(c=>
+  const conta = {};
+  listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
+  const cats = CATS.slice(1).filter(c=>conta[c])
+    .sort((a,b)=>conta[b]-conta[a]);   // sort stabile: pari merito in ordine di catalogo
+  /* Se la categoria attiva e' rimasta senza annunci (dati nuovi),
+     la sua pillola sparisce: si torna su Tutto, mai su un filtro fantasma */
+  if (activeCat!=='Tutto' && !conta[activeCat]) activeCat='Tutto';
+  el('chips').innerHTML = ['Tutto',...cats].map(c=>
     `<div class="chip ${c===activeCat?'active':''}" onclick="setCat('${c}')">${c}</div>`).join('');
 }
 function setCat(c){ activeCat=c; renderChips(); renderGrid(); haptic(); }
@@ -3609,6 +3624,7 @@ async function avviaVetrina(){
     const r = await fetch(`${API_BASE}/listings`);
     if (!r.ok) throw new Error('vetrina non disponibile');
     listings = (await r.json()).map(mapListing);
+    renderChips();             // anche in vetrina le pillole seguono i dati
     VETRINA = true; DEMO = false; orders = [];
     renderAvatar();            // in vetrina anonima il tappo non compare
     mostraBanner(BANNER_VETRINA);

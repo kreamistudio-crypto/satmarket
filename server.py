@@ -444,6 +444,21 @@ def init_db():
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # Migrazione categorie (lug 2026): il set nuovo rinomina tre voci
+    # vecchie, le altre restano com'erano. COLLATE NOCASE raddrizza
+    # anche le maiuscole storte dei vecchi import ('casa' minuscola,
+    # vista nei dati veri). Idempotente: su un database gia' migrato
+    # questi UPDATE non trovano piu' nulla.
+    for vecchia, nuova in (
+            ("Sport", "Sport e hobby"), ("Casa", "Casa e giardino"),
+            ("Libri", "Libri e media"), ("Elettronica", "Elettronica"),
+            ("Abbigliamento", "Abbigliamento"), ("Motori", "Motori"),
+            ("Bambini", "Bambini"), ("Animali", "Animali"),
+            ("Altro", "Altro")):
+        con.execute(
+            "UPDATE annunci SET categoria=? "
+            "WHERE categoria=? COLLATE NOCASE AND categoria!=?",
+            (nuova, vecchia, nuova))
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
@@ -1717,6 +1732,19 @@ async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
         return None
 
 
+# Le categorie del mercatino: UNICA lista lato server, la stessa del
+# form di Vendi e delle pillole della vetrina ("Tutto" e' solo una
+# vista del frontend, non una categoria). Una categoria sconosciuta
+# nel payload finisce in "Altro": il client non decide il catalogo.
+CATEGORIE = ("Elettronica", "Casa e giardino", "Abbigliamento",
+             "Sport e hobby", "Motori", "Bambini", "Animali",
+             "Libri e media", "Altro")
+
+
+def categoria_valida(c) -> str:
+    return c if c in CATEGORIE else "Altro"
+
+
 # La vetrina e' PUBBLICA (si guarda anche dal browser, senza Telegram):
 # questi sono gli UNICI campi che escono verso gli anonimi. Niente
 # venditore_id: l'ID Telegram del venditore non appare mai in vetrina.
@@ -1792,7 +1820,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,creato) VALUES(?,?,?,?,?,?,?,?,?)",
-        (user["id"], d["titolo"], d.get("descrizione", ""), d.get("categoria", "Altro"),
+        (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur, int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
@@ -2018,7 +2046,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=? WHERE id=?",
-        (d["titolo"], d.get("descrizione", ""), d.get("categoria", "Altro"),
+        (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur, annuncio_id))
     con.commit()
     con.close()
@@ -2161,6 +2189,9 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
                     "dell'utente e il catalogo, rispondi SOLO con un array JSON "
                     "degli ID pertinenti, dal piu' rilevante. Capisci sinonimi "
                     "(bici=mtb=bicicletta) e vincoli di prezzo/zona. "
+                    "Le categorie del catalogo sono: "
+                    + ", ".join(CATEGORIE) + ". Se la richiesta indica una "
+                    "categoria (es. 'giochi per bambini'), privilegiala. "
                     "Nessun risultato pertinente = []"),
             messages=[{"role": "user",
                        "content": f"RICHIESTA: {q}\n\nCATALOGO:\n{catalogo}"}])
@@ -2896,7 +2927,10 @@ def evento_annuncio(a: dict, status: str) -> dict:
             ["published_at", str(a["creato"])],
             ["r", URL_PUBBLICO]]
     if a.get("categoria"):
-        tags.append(["t", a["categoria"].lower()])
+        # Il tag "t" e' un hashtag: niente spazi. Delle categorie
+        # composte in piazza va la prima parola ("Casa e giardino"
+        # diventa "casa"), che e' anche quella che si cerca davvero.
+        tags.append(["t", a["categoria"].lower().split()[0]])
     if a.get("zona"):
         tags.append(["location", a["zona"]])
     for url in _foto_url_nostr(a.get("foto", "")):
