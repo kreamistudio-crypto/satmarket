@@ -341,6 +341,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   mai mostrato in chiaro) e riga Nostr (npub nei 4 stati: assente /
   da verificare / verificata con «Abilita l'accesso» / 🔑 attiva con
   «Disabilita» solo su tg_id positivi).
+  Onboarding contestuale (lug 2026): niente wizard iniziale, righe
+  `.hintline` che compaiono al momento del bisogno e SOLO se la
+  funzione manca davvero; «Non ora» le spegne per sempre in
+  `localStorage['barattolo_hint']` = {id: timestamp} (frontend puro,
+  zero colonne DB: il dismiss del wallet NWC DEVE essere
+  per-dispositivo perché il wallet stesso vive in localStorage), e
+  con `hintAttivi()` (=!DEMO && !VETRINA) non esistono in demo e
+  vetrina. Tre hint-evento: `nwc` nel paySheet (in fondo, sotto
+  Annulla — il percorso di pagamento non si allunga; nel ripiego
+  Compra subito la riga resta vuota: lì il wallet c'è), `lnaddr` e
+  `npubverifica` sulla scheda dell'annuncio appena pubblicato
+  (passamano `hintPubblicazione={id,annuncio}` consumato da
+  `openDetail` solo su QUEL annuncio; max UN hint per evento,
+  precedenza agli incassi). Il CTA positivo NON dismette (se
+  l'azione si completa la condizione cade da sola) e porta al
+  Profilo col cassetto giusto aperto (`apriCassettoProfilo`). Più
+  la checklist «Completa il profilo (N di M)» sotto la testata del
+  Profilo (`renderChecklist`, `#profiloChecklist`): M dinamico
+  (ln_address, npub verificata, wallet NWC «su questo dispositivo»,
+  + Telegram per i tg_id negativi), niente dismiss, a profilo
+  completo sparisce del tutto.
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
@@ -552,7 +573,12 @@ Architettura — collaudato in locale da cima a fondo; la riga EUR
 nella ricerca AI va provata in produzione, dove la chiave Anthropic
 è vera; la leva del tetto `TETTO_SATS_ANNUNCIO` esiste nel codice
 ma è SPENTA di default: nessun annuncio viene limitato finché non
-la si accende dal config).
+la si accende dal config); onboarding contestuale (lug 2026:
+suggerimenti discreti al momento del bisogno — wallet NWC nel
+paySheet, Lightning address e verifica npub dopo la pubblicazione —
+più la checklist «Completa il profilo (N di M)» nel Profilo; «Non
+ora» memorizzato in localStorage, mai in demo/vetrina, vedi
+Architettura).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
