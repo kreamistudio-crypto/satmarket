@@ -504,6 +504,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   profilo + griglia dei suoi annunci (card riusate via `cardHTML`);
   all'avvio `avvia()` legge `/negozio/...` da `location.pathname` e
   apre direttamente il negozio; bottone condividi = clipboard + toast.
+  Dettaglio annuncio (lug 2026, feedback tester): bottone condividi
+  `.share-btn` sulla foto (cerchietto di carta, anche sul segnaposto
+  emoji, MAI in DEMO) → `condividiAnnuncio()`: `navigator.share`
+  nativo col ripiego clipboard+toast e ultimo ripiego link nel
+  toast; il link è `GET /annuncio/{id}` (rotta gemella di /negozio,
+  serve miniapp.html no-cache; regola 3 aggiornata), il JS legge
+  l'URL con `apriAnnuncioDaUrl()` (pattern di apriNegozioDaUrl,
+  chiamata in avvia E avviaVetrina: per gli anonimi apre il
+  dettaglio in vetrina con l'invito; annuncio sparito = toast e si
+  resta in Esplora). Il link t.me/startapp è rimandato: servirebbe
+  la Mini App nominata su BotFather e il link web copre già tutti.
+  Galleria del dettaglio coi pallini stile Vinted (`.foto-dots`,
+  via il vecchio badge 📷 N): uno per foto in basso al centro,
+  l'attivo pieno, aggiornati sull'evento scroll della striscia
+  scroll-snap già esistente; con una foto sola non esistono.
+  Pallini e bottone condividi vivono SULLA foto: colori fissi
+  (bianco/carta+inchiostro), identici in chiaro e scuro.
   Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
   danno ai venditori appena arrivati); dal lug 2026 le accende il
   sistema di feedback (vedi server.py).
@@ -602,7 +619,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg`,
+   `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png` e
    `/assets/tappo.jpeg` (file singoli, rotte esplicite) e `/api/*`.
    Non montare mai StaticFiles sull'intera directory (config e .git
