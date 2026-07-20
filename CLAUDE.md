@@ -193,11 +193,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nell'orologio) con ripiego Telegram se il DM non parte e la chat
   c'è. `spoglia_html` toglie i tag Telegram dal testo del DM. In
   collaudo il pacco si cifra davvero ma si stampa (`💌 [dm nostr
-  simulato]`). Frontend: blocchetto 🔔 Avvisi sotto «Le tue
-  identità» nel Profilo (`renderAvvisi`); il sottotitolo dice SEMPRE
-  il canale effettivo («Ricevi gli avvisi su: …», con «(automatico)»
-  quando è il default), pillole di scelta solo se entrambi i canali
-  sono disponibili, testo statico altrimenti.
+  simulato]`). Frontend: cassetto «🔔 Avvisi» nel Profilo
+  (`renderAvvisi`); il sottotitolo dice SEMPRE il canale effettivo
+  («Ricevi gli avvisi su: …», con «(automatico)» quando è il
+  default), pillole di scelta solo se entrambi i canali sono
+  disponibili, testo statico altrimenti; senza canali raggiungibili
+  sparisce l'intero cassetto.
   Feedback e stelle (lug 2026): tabella `feedback(ordine_id, da_tg_id,
   per_tg_id, voto 1-5, commento ≤200, creato)` con
   `UNIQUE(ordine_id, da_tg_id)` come giudice dei doppioni.
@@ -252,11 +253,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `/api/me.distintivi` = catalogo COMPLETO con `ottenuto` (ts o null,
   il frontend non hardcoda mai la lista); `/api/negozio` →
   `venditore.distintivi` = solo i `fiducia` guadagnati. Frontend:
-  griglia `renderDistintivi()` nel Profilo («🏅 Distintivi (N di M)»,
-  classe `.distintivo` — `.badge` è degli stati ordine — mancanti in
-  grigio con la descrizione come molla), chip fiducia accanto al nome
-  in `renderNegozio` (filtrando `nostrano`: il 🟣 c'è già), sezione
-  nascosta in DEMO come il wallet.
+  griglia `renderDistintivi()` nel cassetto «🏅 Distintivi» del
+  Profilo (il conteggio «(N di M)» vive nell'header del cassetto,
+  `#distintiviConta`; classe `.distintivo` — `.badge` è degli stati
+  ordine — mancanti in grigio con la descrizione come molla), chip
+  fiducia accanto al nome in `renderNegozio` (filtrando `nostrano`:
+  il 🟣 c'è già), cassetto nascosto in DEMO come il wallet.
   Export dati contabili (lug 2026): colonna `ordini.cambio_eur` = EUR
   per BTC al momento della chiusura, scritta da `_sblocca_sats` e
   `_rimborsa_compratore` via `cambio_btc_eur()` (CoinGecko lato server
@@ -377,19 +379,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sistema di feedback (vedi server.py).
   Scheda Profilo 👤 (lug 2026): quarta voce di nav (`view-profilo`;
   il ramo `profilo` in `go()` rilancia i render, e in VETRINA la tab
-  apre l'invito al bot come Vendi/Affari). In ordine: testata
-  `renderProfilo()` (nome, badge, vendite/acquisti conclusi da
-  `/api/me`, stelle solo se rating>0, link del negozio con
-  condividi), i tuoi annunci, «Le tue identità», 🔔 Avvisi,
-  «⚡ Wallet e incassi» (NWC + campo Lightning address
-  `lnAddrProfilo`, che riusa `POST /api/me/ln-address`; il
-  payoutPanel dentro l'ordine resta dov'è, e in DEMO l'intero blocco
-  wallet sparisce), npub+verifica, stats admin, bottone Esci solo in
-  modalità WEB. I blocchi sono traslocati TAL QUALI da Vendi (stessi
-  id, stesse funzioni): Vendi è tornato SOLO il form di
-  pubblicazione, e dopo pubblica/modifica si apre il dettaglio
-  dell'annuncio appena salvato (l'id arriva da `{ok,id}`, ripiego su
-  Esplora se non è in lista).
+  apre l'invito al bot come Vendi/Affari). Dal lug 2026 è a CASSETTI
+  richiudibili stile Vinted (CSS `.acc`, header cliccabile con
+  emoji+titolo+freccia, `toggleAcc()`; tutti chiusi di default): dopo
+  la testata sempre visibile `renderProfilo()` (nome, badge,
+  vendite/acquisti conclusi da `/api/me`, stelle solo se rating>0,
+  link del negozio con condividi), in ordine: «📋 I tuoi annunci»,
+  «🆔 Identità e Nostr» (righe identità + campo npub + verifica,
+  riuniti nello stesso cassetto), «⚡ Incassi e pagamenti» (NWC +
+  campo Lightning address `lnAddrProfilo`, che riusa
+  `POST /api/me/ln-address`, + export CSV; il payoutPanel dentro
+  l'ordine resta dov'è, e in DEMO l'intero cassetto — id
+  `walletBlocco` — sparisce), «🔔 Avvisi», «🏅 Distintivi», stats
+  admin, bottone Esci solo in modalità WEB. I cassetti senza nulla da
+  mostrare spariscono interi; gli id interni dei blocchi sono gli
+  stessi di sempre (arrivano da Vendi, traslocati TAL QUALI): Vendi è
+  tornato SOLO il form di pubblicazione, e dopo pubblica/modifica si
+  apre il dettaglio dell'annuncio appena salvato (l'id arriva da
+  `{ok,id}`, ripiego su Esplora se non è in lista).
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
@@ -506,12 +513,13 @@ anti-XSS `esc()` su tutti i template; Compra subito col wallet NWC
 (NIP-47 lato client, secret solo in localStorage, vedi Architettura
 — il percorso felice va collaudato con un wallet vero a budget
 minuscolo: in locale è verificato il ripiego, non il pagamento);
-doppia cittadinanza completa (blocco «Le tue identità» nel Profilo,
+doppia cittadinanza completa (righe identità nel cassetto
+«🆔 Identità e Nostr» del Profilo,
 badge verificato promuovibile a chiave d'accesso, webhook /start del
 bot e fusione atomica Nostr→Telegram, vedi Architettura — in
 produzione va provata una fusione vera con un account di test);
 notifiche via DM Nostr NIP-17 con scelta del canale (i nativi Nostr
-finalmente ricevono gli avvisi, blocchetto 🔔 Avvisi nel Profilo, vedi
+finalmente ricevono gli avvisi, cassetto «🔔 Avvisi» nel Profilo, vedi
 Architettura — la cifratura è verificata contro nostr-tools, ma in
 produzione va provato un DM vero verso la propria npub su 0xchat o
 Amethyst; sul VPS serve `pip install cryptography`); modifica annuncio
@@ -522,12 +530,15 @@ con Pillow altrimenti — sul VPS serve `pip install pillow
 pillow-heif`); scheda Profilo 👤 quarta voce di nav (tutto ciò che
 riguarda l'utente trasloca lì da Vendi, che torna solo form di
 pubblicazione; Lightning address impostabile anche da lì; canale
-avvisi sempre in chiaro; vedi Architettura); feedback e stelle
+avvisi sempre in chiaro; dal lug 2026 riorganizzata a cassetti
+richiudibili stile Vinted, testata sempre visibile e npub+verifica
+riuniti nel cassetto identità; vedi Architettura); feedback e stelle
 (voto 1-5 + commento a affare concluso, rating per ricalcolo,
 ultimi feedback anonimi nel negozio, rimozione admin, vedi
 Architettura — parte 1 della gamification); distintivi 🏅 (parte 2:
-11 badge auto-assegnati per ricalcolo dai dati veri, griglia «N di M»
-nel Profilo, chip di fiducia nel negozio pubblico, retroattivi a ogni
+11 badge auto-assegnati per ricalcolo dai dati veri, cassetto con
+griglia e conteggio «N di M» nel Profilo, chip di fiducia nel negozio
+pubblico, retroattivi a ogni
 avvio, vedi Architettura); badge 🟣 pubblico semplificato (solo da
 npub verificata, senza ✓; il non verificato lo vede solo il
 proprietario col suo invito a verificare); export CSV contabile
