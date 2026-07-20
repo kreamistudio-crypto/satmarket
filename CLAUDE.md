@@ -25,6 +25,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'era prima della colonna). I casi ambigui (cannabis
   light, pistola sparachiodi...) NON vanno nella lista parole: li
   valuta l'AI.
+  Modifica annuncio (lug 2026): `POST /api/listings/{id}/modifica` —
+  solo il proprietario su annunci attivi, 400 se esiste un ordine NON
+  terminale (anche `creato`: chi sta pagando deve trovare l'annuncio
+  com'era) e per gli annunci importati da Nostr (contatto_nostr pieno:
+  l'import orario li sovrascriverebbe). Ripassa TUTTI gli strati di
+  moderazione come una pubblicazione nuova (notifiche admin «✏️»);
+  foto sostituite in blocco solo se il campo `foto` arriva (nomi
+  versionati col timestamp anti-cache del browser, file vecchi
+  cancellati dal disco), altrimenti restano; ripubblica su Nostr con
+  `solo_aggiornamento=True` (il tag `d` stabile sostituisce l'evento).
+  Frontend: form di Vendi riusato e precompilato (banner «Stai
+  modificando» + bottone che diventa «Salva le modifiche»), bottone
+  ✏️ nel dettaglio e badge nei tuoi annunci; le foto attuali si
+  tengono o si sostituiscono tutte, mai a pezzi.
+  Formati foto: la miniapp converte in JPEG 1200px via canvas tutto
+  ciò che il browser decodifica (WebP ovunque, HEIC su iPhone); ciò
+  che non sa leggere (HEIC su Android/desktop) parte grezzo in base64
+  (max 6MB, MIME corretto anche via estensione) e lo converte
+  `salva_foto` con Pillow+pillow-heif in JPEG 1200px. Import
+  fail-open: senza `pillow` tutto come prima (JPEG passano, limite
+  2.5MB), senza `pillow-heif` le HEIC si saltano con una riga in
+  console. Con Pillow anche i PNG/WebP grezzi diventano JPEG veri.
   Badge Nostr: colonna `utenti.npub` auto-dichiarata via `/api/me/npub`
   (formato bech32, rifiuta le nsec) + verifica con NOTA PUBBLICA:
   `/api/me/npub/verifica-avvia` genera un codice (vale 1h), l'utente lo
@@ -266,6 +288,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   per NIP-44): `pip install cryptography` nell'ambiente del servizio,
   PRIMA del restart. Se manca, il canale DM si spegne da solo (riga
   in console) e le notifiche Telegram vivono come sempre.
+- Le foto HEIC degli iPhone (caricate da Android/desktop) richiedono
+  `pip install pillow pillow-heif` nell'ambiente del servizio
+  (entrambe hanno wheel, niente compilazioni). Se mancano, i JPEG
+  vivono come sempre e solo le HEIC non convertibili si saltano.
 
 ## Regole ferree
 
@@ -337,7 +363,12 @@ notifiche via DM Nostr NIP-17 con scelta del canale (i nativi Nostr
 finalmente ricevono gli avvisi, blocchetto 🔔 Avvisi in Vendi, vedi
 Architettura — la cifratura è verificata contro nostr-tools, ma in
 produzione va provato un DM vero verso la propria npub su 0xchat o
-Amethyst; sul VPS serve `pip install cryptography`).
+Amethyst; sul VPS serve `pip install cryptography`); modifica annuncio
+del venditore (form di Vendi riusato, moderazione completa,
+ripubblicazione Nostr, vedi Architettura); foto HEIC/HEIF e WebP
+accettate e convertite in JPEG (client via canvas quando può, server
+con Pillow altrimenti — sul VPS serve `pip install pillow
+pillow-heif`).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
