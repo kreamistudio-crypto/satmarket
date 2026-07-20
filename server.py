@@ -138,6 +138,17 @@ try:
 except ImportError:
     TELEGRAM_WEBHOOK_SEGRETO = ""
 
+# La leva del tetto per annuncio: nata col cantiere doppia valuta ma
+# SPENTA di serie (0 = nessun limite). Si accende dal config in un
+# minuto, se un giorno servisse. Per gli annunci in EUR varrebbe
+# l'equivalente in sats al cambio di pubblicazione (con +20% di
+# tolleranza al momento dell'acquisto). NON copre importa_nostr.py,
+# che scrive dritto nel database.
+try:
+    from config import TETTO_SATS_ANNUNCIO
+except ImportError:
+    TETTO_SATS_ANNUNCIO = 0   # 0 = spento; es. 100_000 per accenderlo
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -421,10 +432,14 @@ def init_db():
             "SELECT tg_id FROM utenti WHERE negozio=''").fetchall():
         con.execute("UPDATE utenti SET negozio=? WHERE tg_id=?",
                     (nuovo_codice_negozio(con), r["tg_id"]))
-    # Migrazioni annunci: foto, contatto Nostr e l'evento NIP-99
-    # pubblicato dalla piattaforma
+    # Migrazioni annunci: foto, contatto Nostr, l'evento NIP-99
+    # pubblicato dalla piattaforma e la doppia valuta (il venditore
+    # sceglie se il listino e' in sats o in EUR; per gli annunci EUR
+    # prezzo_sats resta l'equivalente al cambio di pubblicazione)
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
-                    "nostr_event_id TEXT DEFAULT ''"):
+                    "nostr_event_id TEXT DEFAULT ''",
+                    "valuta TEXT DEFAULT 'sats'",
+                    "prezzo_eur REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -449,7 +464,12 @@ def init_db():
                     # cambio_eur: EUR per BTC al momento della chiusura
                     # (released/refunded). 0 = sconosciuto: gli ordini
                     # storici restano cosi', e nel CSV il campo e' vuoto.
-                    "cambio_eur REAL DEFAULT 0"):
+                    "cambio_eur REAL DEFAULT 0",
+                    # cambio_ordine: EUR per BTC al momento della
+                    # CREAZIONE della invoice (solo annunci in EUR:
+                    # e' il cambio che ha fissato i sats dell'ordine).
+                    # 0 = annuncio in sats, nessuna conversione.
+                    "cambio_ordine REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -996,6 +1016,58 @@ async def cambio_btc_eur() -> float:
     except Exception:
         pass          # fail-open: meglio un cambio vecchio che un errore
     return _cambio_eur_cache["valore"]
+
+
+async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
+    """Legge il prezzo dal form di pubblicazione/modifica e restituisce
+    (valuta, prezzo_sats, prezzo_eur), gia' validati e col tetto di
+    rodaggio applicato.
+
+    - 'sats' (default, i client di ieri non sanno di valute): il
+      prezzo intero com'e' sempre stato, prezzo_eur resta 0.
+    - 'eur': il listino e' prezzo_eur (2 decimali) e prezzo_sats
+      diventa l'equivalente al cambio di ADESSO — serve al tetto,
+      alla ricerca AI e come ripiego quando il browser non ha il
+      cambio. Senza cambio (CoinGecko mai risposto dal boot) non si
+      puo' ne' fissare l'equivalente ne' applicare il tetto: 503
+      onesto, con l'alternativa di pubblicare in sats."""
+    valuta = d.get("valuta", "sats")
+    if valuta not in ("sats", "eur"):
+        raise HTTPException(400, "Valuta non riconosciuta")
+    if valuta == "eur":
+        try:
+            prezzo_eur = round(float(d.get("prezzo_eur", 0)), 2)
+        except (TypeError, ValueError):
+            prezzo_eur = 0.0
+        if not d.get("titolo") or prezzo_eur <= 0:
+            raise HTTPException(400, "Titolo e prezzo obbligatori")
+        cambio = await cambio_btc_eur()
+        if cambio <= 0:
+            raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                     "questo momento: riprova tra qualche "
+                                     "minuto, oppure pubblica il prezzo "
+                                     "in sats")
+        prezzo_sats = max(1, round(prezzo_eur / cambio * 100_000_000))
+    else:
+        prezzo_eur = 0.0
+        try:
+            prezzo_sats = int(d.get("prezzo_sats", 0))
+        except (TypeError, ValueError):
+            prezzo_sats = 0
+        if not d.get("titolo") or prezzo_sats <= 0:
+            raise HTTPException(400, "Titolo e prezzo obbligatori")
+    if TETTO_SATS_ANNUNCIO and prezzo_sats > TETTO_SATS_ANNUNCIO:
+        raise HTTPException(400, f"Nel rodaggio il prezzo massimo è "
+                                 f"{TETTO_SATS_ANNUNCIO:,} sats per annuncio"
+                                 .replace(",", " "))
+    return valuta, prezzo_sats, prezzo_eur
+
+
+def testo_prezzo(valuta: str, prezzo_sats: int, prezzo_eur: float) -> str:
+    """Il prezzo come lo leggono i moderatori nelle notifiche."""
+    if valuta == "eur":
+        return f"{prezzo_eur:.2f} EUR (≈ {prezzo_sats} sats)"
+    return f"{prezzo_sats} sats"
 
 
 def spoglia_html(testo: str) -> str:
@@ -1651,6 +1723,7 @@ async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
 # La npub invece e' pubblica per natura: e' fatta per essere condivisa.
 CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
+    "a.valuta, a.prezzo_eur, "
     "a.foto, a.contatto_nostr, a.creato, "
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
@@ -1681,8 +1754,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                                  barattolo_sessione: str = Cookie("")):
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    if not d.get("titolo") or not int(d.get("prezzo_sats", 0)):
-        raise HTTPException(400, "Titolo e prezzo obbligatori")
+    valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -1703,9 +1775,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     con = db()
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-        "prezzo_sats,zona,creato) VALUES(?,?,?,?,?,?,?)",
+        "prezzo_sats,zona,valuta,prezzo_eur,creato) VALUES(?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), d.get("categoria", "Altro"),
-         int(d["prezzo_sats"]), d.get("zona", ""), int(time.time())))
+         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur, int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -1722,7 +1794,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina ---
     await notifica_admin(
         f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
-        f"«{d['titolo'][:80]}» — {int(d['prezzo_sats'])} sats\n"
+        f"«{d['titolo'][:80]}» — {testo_prezzo(valuta, prezzo_sats, prezzo_eur)}\n"
         f"Venditore: {user['first_name']} (id {user['id']})")
     # E parte anche verso la piazza Nostr, in sottofondo: se i relay
     # tacciono, chi pubblica non se ne accorge nemmeno.
@@ -1883,8 +1955,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
       se il campo manca restano quelle attuali"""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    if not d.get("titolo") or not int(d.get("prezzo_sats", 0)):
-        raise HTTPException(400, "Titolo e prezzo obbligatori")
+    valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
                     "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
@@ -1924,11 +1995,13 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         raise HTTPException(400, MSG_RIFIUTO)
 
     con = db()
+    # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
+    # torna in sats deve azzerare l'euro, o resterebbero residui.
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
-        "prezzo_sats=?, zona=? WHERE id=?",
+        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), d.get("categoria", "Altro"),
-         int(d["prezzo_sats"]), d.get("zona", ""), annuncio_id))
+         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur, annuncio_id))
     con.commit()
     con.close()
     if isinstance(d.get("foto"), list):
@@ -1957,7 +2030,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # --- Strato 3: i moderatori vedono anche cio' che cambia ---
     await notifica_admin(
         f"✏️ <b>Annuncio #{annuncio_id} modificato</b>\n"
-        f"«{d['titolo'][:80]}» — {int(d['prezzo_sats'])} sats\n"
+        f"«{d['titolo'][:80]}» — {testo_prezzo(valuta, prezzo_sats, prezzo_eur)}\n"
         f"Venditore: {user['first_name']} (id {user['id']})")
     # Se era in piazza su Nostr, l'evento riparte aggiornato: il tag d
     # stabile fa si' che sostituisca il precedente da solo
@@ -2057,7 +2130,9 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
 
     catalogo = "\n".join(
         f"ID {a['id']}: {a['titolo']} | {a['categoria']} | "
-        f"{a['prezzo_sats']} sats | {a['zona']} | {a['descrizione'][:120]}"
+        f"{a['prezzo_sats']} sats"
+        + (f" ({a['prezzo_eur']:.2f} EUR)" if a["valuta"] == "eur" else "")
+        + f" | {a['zona']} | {a['descrizione'][:120]}"
         for a in annunci)
     try:
         r = ai.messages.create(
@@ -2095,18 +2170,47 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     if a["venditore_id"] == user["id"]:
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
 
+    # Per gli annunci in EUR i sats si decidono ADESSO, al cambio
+    # corrente: la invoice vive 15 minuti, e quella e' la durata del
+    # prezzo bloccato. Se scade, il prossimo tentativo riconverte.
+    sats, cambio_ordine = a["prezzo_sats"], 0.0
+    if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+        cambio_ordine = await cambio_btc_eur()
+        if cambio_ordine <= 0:
+            con.close()
+            raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                     "questo momento: riprova tra qualche "
+                                     "minuto")
+        sats = max(1, round(a["prezzo_eur"] / cambio_ordine * 100_000_000))
+        # Il tetto di rodaggio con +20% di tolleranza: la volatilita'
+        # ordinaria passa, un crollo del cambio no — e il venditore
+        # si ripara da solo ritoccando il prezzo (la modifica
+        # riconvalida al cambio di oggi).
+        if TETTO_SATS_ANNUNCIO and sats > TETTO_SATS_ANNUNCIO * 1.2:
+            con.close()
+            await notifica(a["venditore_id"],
+                f"📈 Il cambio si è mosso troppo: il tuo annuncio "
+                f"«{a['titolo'][:60]}» ({a['prezzo_eur']:.2f} EUR) supera "
+                f"ora il tetto di {TETTO_SATS_ANNUNCIO} sats e gli acquisti "
+                f"sono in pausa. Ritocca il prezzo per riaprirli.")
+            raise HTTPException(409, "Il cambio è cambiato troppo da quando "
+                                     "l'annuncio è stato pubblicato: il "
+                                     "venditore deve ritoccare il prezzo")
+
     inv = await crea_invoice_escrow(
-        a["prezzo_sats"], f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
+        sats, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
-        "stato,payment_hash,creato,aggiornato) VALUES(?,?,?,?,?,?,?,?)",
-        (a["id"], user["id"], a["venditore_id"], a["prezzo_sats"],
-         "creato", inv["payment_hash"], int(time.time()), int(time.time())))
+        "stato,payment_hash,creato,aggiornato,cambio_ordine) "
+        "VALUES(?,?,?,?,?,?,?,?,?)",
+        (a["id"], user["id"], a["venditore_id"], sats,
+         "creato", inv["payment_hash"], int(time.time()), int(time.time()),
+         cambio_ordine))
     con.commit()
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.close()
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
-            "payment_hash": inv["payment_hash"]}
+            "payment_hash": inv["payment_hash"], "prezzo_sats": sats}
 
 
 @app.post("/api/orders/{ordine_id}/verifica-pagamento")
@@ -2755,10 +2859,19 @@ def evento_annuncio(a: dict, status: str) -> dict:
     """Costruisce l'evento NIP-99 (kind 30402) di un annuncio. Il tag
     "d" stabile rende l'evento sostituibile: ripubblicare con lo stesso
     "d" aggiorna lo stato sui relay (e' il meccanismo NIP-99)."""
+    # Il tag price parla la valuta scelta dal venditore (la spec NIP-99
+    # supporta il codice valuta): per gli annunci EUR il listino resta
+    # in euro anche in piazza, e importa_nostr.py sa gia' rileggerlo.
+    if a.get("valuta") == "eur" and a.get("prezzo_eur"):
+        prezzo_tag = ["price", f"{a['prezzo_eur']:.2f}", "EUR"]
+        prezzo_txt = f"{a['prezzo_eur']:.2f} EUR"
+    else:
+        prezzo_tag = ["price", str(a["prezzo_sats"]), "sats"]
+        prezzo_txt = f"{a['prezzo_sats']} sats"
     tags = [["d", f"barattolo-{a['id']}"],
             ["title", a["titolo"]],
             ["summary", (a["descrizione"] or a["titolo"])[:200]],
-            ["price", str(a["prezzo_sats"]), "sats"],
+            prezzo_tag,
             ["status", status],
             ["published_at", str(a["creato"])],
             ["r", URL_PUBBLICO]]
@@ -2769,7 +2882,7 @@ def evento_annuncio(a: dict, status: str) -> dict:
     for url in _foto_url_nostr(a.get("foto", "")):
         tags.append(["image", url])
     content = ((a["descrizione"] or a["titolo"]).strip() +
-               f"\n\nPrezzo: {a['prezzo_sats']} sats — zona: "
+               f"\n\nPrezzo: {prezzo_txt} — zona: "
                f"{a.get('zona') or 'Italia'}"
                f"\n\n🫙⚡ In vendita su Barattolo, il mercatino in sats "
                f"con escrow Lightning: {URL_PUBBLICO} · {LINK_BOT}")

@@ -38,6 +38,11 @@ LNBITS_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY"       # per pagare (SEGRETA!)
 COMMISSIONE_PERCENTO = 1.0   # trattenuta a vendita conclusa
 ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna
 GIORNI_AUTO_SBLOCCO = 10     # sblocco d'ufficio dopo la spedizione
+TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
+                             # limite (default). Mettici es. 100_000 per
+                             # accendere il tetto; per gli annunci in EUR
+                             # vale l'equivalente al cambio corrente
+
 DB = "satmarket.db"
 
 # --- Import da Nostr (usato da importa_nostr.py) ---------------------

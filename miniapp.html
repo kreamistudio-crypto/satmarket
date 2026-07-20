@@ -43,6 +43,11 @@
     border:0;background:var(--ink);color:#fff;border-radius:12px;padding:0 16px;
     font-weight:700;font-size:14px;cursor:pointer;
   }
+  /* Il toggle ₿/€: come vuoi leggere i prezzi della vetrina */
+  .searchbar button.cur-toggle{
+    border:1px solid var(--line);background:var(--card);color:var(--ink);
+    padding:0 13px;font-size:15px;
+  }
   .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{
@@ -82,6 +87,8 @@
     -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:35px}
   .price{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700;font-size:14px;margin-top:6px}
   .price .unit{font-size:10.5px;font-weight:500;color:var(--muted)}
+  .price-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
+    font-weight:600;margin-top:1px}
   .card .meta{display:flex;justify-content:space-between;align-items:center;margin-top:5px;
     font-size:11.5px;color:var(--muted);font-weight:600}
   .escrow-dot{display:inline-flex;align-items:center;gap:4px;color:var(--trust);font-weight:700}
@@ -219,9 +226,14 @@
   .field input:focus,.field textarea:focus{border-color:var(--ink)}
   .field textarea{min-height:90px;resize:vertical}
   .sats-input{position:relative}
-  .sats-input input{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--sats);padding-right:56px}
+  .sats-input input{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--sats);padding-right:70px}
   .sats-input .suffix{position:absolute;right:14px;top:50%;transform:translateY(-50%);
     font-size:12px;color:var(--muted);font-weight:700}
+  /* Quando il suffisso e' un bottone, si vede che si puo' toccare:
+     e' la scelta della valuta del listino (sats o €) */
+  .sats-input button.suffix{right:8px;border:1px solid var(--line);background:var(--bg);
+    border-radius:8px;padding:4px 9px;cursor:pointer;color:var(--ink);font:inherit;
+    font-size:12px;font-weight:800}
   .photo-drop{
     border:1.5px dashed var(--line);border-radius:var(--radius);background:var(--card);
     padding:26px;text-align:center;color:var(--muted);font-weight:600;font-size:13.5px;cursor:pointer;
@@ -403,6 +415,8 @@
       <div class="searchbar">
         <input id="q" type="search" placeholder="Cerca: “tastiera meccanica sotto i 100k”…">
         <button onclick="doSearch()">Cerca</button>
+        <button class="cur-toggle" id="curToggle" onclick="toggleValuta()"
+          title="Mostra i prezzi in sats o in euro">₿</button>
       </div>
       <div class="chips" id="chips"></div>
     </header>
@@ -448,7 +462,8 @@
       <div class="field"><label>Categoria</label>
         <select id="sellCat"><option>Elettronica</option><option>Casa</option><option>Sport</option><option>Libri</option><option>Abbigliamento</option><option>Altro</option></select></div>
       <div class="field"><label>Prezzo</label>
-        <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><span class="suffix">sats</span></div></div>
+        <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
+        <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
       <div class="field"><label>Zona</label>
         <input id="sellZone" placeholder="Es. Pavia — spedisco in tutta Italia"></div>
       <div class="field"><label>Descrizione</label>
@@ -536,6 +551,7 @@
   <div class="sheet" id="paySheet">
     <div class="grab"></div>
     <h3>Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> in escrow</h3>
+    <div id="payEurNota" style="display:none;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px"></div>
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Paga con qualsiasi wallet Lightning. I sats restano <b style="color:var(--trust)">bloccati e al sicuro</b> finché non confermi di aver ricevuto l'oggetto.
     </div>
@@ -661,7 +677,8 @@ function mapListing(a){
   let photos = [];
   try { photos = (a.foto ? JSON.parse(a.foto) : []).map(fotoUrl); } catch(e) {}
   return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
-    price:a.prezzo_sats, cat:a.categoria, zone:a.zona||'—',
+    price:a.prezzo_sats, valuta:a.valuta||'sats', priceEur:a.prezzo_eur||0,
+    cat:a.categoria, zone:a.zona||'—',
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
     /* username e npub finiscono dentro stringhe JS negli onclick:
@@ -720,6 +737,11 @@ let listings = [
   {id:6, emoji:"⚡", title:"Nodo Lightning: Raspberry Pi 4 8GB kit", price:190000, cat:"Elettronica",
    zone:"Firenze", seller:"Marco V.", rating:5.0, sales:22,
    desc:"Kit completo: Pi 4, SSD 1TB, case alluminio. Ex nodo, resettato. Not your node… 😉"},
+  /* listino in EUR: il prezzo in euro resta fisso, i sats ballano col
+     cambio (price = equivalente indicativo, come farebbe il server) */
+  {id:7, emoji:"🎲", title:"Catan gioco da tavolo, come nuovo", price:27000, valuta:'eur', priceEur:25, cat:"Altro",
+   zone:"Verona", seller:"Elisa D.", rating:4.9, sales:11,
+   desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
 ];
 let orders = [
   {id:101, listing:listings[2], state:"locked",   role:"buyer",  when:"oggi, 14:02"},
@@ -783,15 +805,16 @@ function renderGrid(items){
 }
 
 /* La card di un annuncio: la stessa in vetrina e nella vista negozio */
-const cardHTML = l => `
+const cardHTML = l => { const p = prezzoParte(l); return `
     <div class="card" onclick="openDetail(${l.id})">
       <div class="ph">${l.photos && l.photos[0] ? `<img src="${esc(l.photos[0])}" loading="lazy" alt="">` : l.emoji}</div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="price">${fmt(l.price)} <span class="unit">sats</span></div>
+        <div class="price">${p.big}</div>
+        <div class="price-sub">${p.small}</div>
         <div class="meta"><span>📍 ${esc(l.zone)}</span>${l.sellerNpubOk?'<span title="Venditore verificato su Nostr">🟣</span>':''}<span class="escrow-dot">🔒 escrow</span></div>
       </div>
-    </div>`;
+    </div>`; };
 
 async function doSearch(){
   haptic();
@@ -935,10 +958,56 @@ function bottoneChat(username, chi, soggetto){
 
 /* Cambio BTC/EUR aggiornato all'avvio (per il "≈ X €" sotto i prezzi) */
 let eurPerSat = 0.00092;   // valore di riserva se la rete non risponde
+let cambioVivo = false;    // true solo quando CoinGecko ha davvero risposto
 function eur(sats){ return (sats * eurPerSat).toFixed(0); }
 fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur')
-  .then(r=>r.json()).then(d=>{ if (d?.bitcoin?.eur) eurPerSat = d.bitcoin.eur / 100000000; })
-  .catch(()=>{});
+  .then(r=>r.json()).then(d=>{ if (d?.bitcoin?.eur) {
+    eurPerSat = d.bitcoin.eur / 100000000; cambioVivo = true;
+    /* le card gia' disegnate portano il cambio di riserva: un giro di
+       render le aggiorna (mai sopra i risultati di una ricerca) */
+    if (!el('q').value.trim()) renderGrid();
+  }}).catch(()=>{});
+
+/* ---------------- doppia valuta: la vista ₿/€ ----------------
+   Il venditore sceglie la valuta del SUO listino (l.valuta); lo
+   spettatore sceglie in quale valuta LEGGERE la vetrina. Il "≈" sta
+   sempre e solo sul prezzo convertito, mai sul listino. */
+const VALUTA_CHIAVE = 'barattolo_valuta';
+let valutaVista = 'sats';
+try { if (localStorage.getItem(VALUTA_CHIAVE)==='eur') valutaVista = 'eur'; } catch(e){}
+const fmtEur = e => e.toLocaleString('it-IT',
+  {minimumFractionDigits:2, maximumFractionDigits:2});
+function toggleValuta(){
+  haptic();
+  valutaVista = valutaVista==='sats' ? 'eur' : 'sats';
+  try { localStorage.setItem(VALUTA_CHIAVE, valutaVista); } catch(e){}
+  aggiornaCurToggle();
+  renderGrid();
+}
+function aggiornaCurToggle(){
+  const b = el('curToggle');
+  if (b) b.textContent = valutaVista==='sats' ? '₿' : '€';
+}
+/* I sats di un annuncio: per i listini EUR e' l'equivalente al cambio
+   vivo (col cambio di pubblicazione, l.price, come ripiego). L'importo
+   VERO della invoice lo decide comunque il server all'acquisto. */
+function satsAnnuncio(l){
+  if (l.valuta==='eur' && l.priceEur>0 && cambioVivo)
+    return Math.round(l.priceEur / eurPerSat);
+  return l.price;
+}
+function prezzoParte(l){
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  const sats = satsAnnuncio(l);
+  const eurTesto = inEur ? fmtEur(l.priceEur) : eur(l.price);
+  if (valutaVista==='eur') return {
+    big: (inEur?'':'≈ ') + eurTesto + ' <span class="unit">€</span>',
+    small: (inEur?'≈ ':'') + fmt(sats) + ' sats' };
+  return {
+    big: (inEur?'≈ ':'') + fmt(sats) + ' <span class="unit">sats</span>',
+    small: (inEur?'':'≈ ') + eurTesto + ' €' };
+}
+aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
 function openDetail(id){
   currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
@@ -959,8 +1028,8 @@ function openDetail(id){
     ${foto}
     <div class="detail-body">
       <h2>${esc(l.title)}</h2>
-      <div class="detail-price">${fmt(l.price)} <span class="unit">sats</span></div>
-      <div class="eur-hint">≈ ${eur(l.price)} € · 📍 ${esc(l.zone)}</div>
+      <div class="detail-price">${prezzoParte(l).big}</div>
+      <div class="eur-hint">${prezzoParte(l).small} · 📍 ${esc(l.zone)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${esc(l.seller[0])}</div>
         <div class="who"><b>${esc(l.seller)}${l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}</b>
@@ -975,8 +1044,8 @@ function openDetail(id){
         ? `<button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `${(!DEMO && !VETRINA && walletNwc())
-            ? `<button class="btn orange" onclick="compraSubito()">⚡ Compra subito — ${fmt(l.price)} sats</button>` : ''}
-           <button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${fmt(l.price)} sats</button>`}
+            ? `<button class="btn orange" onclick="compraSubito()">⚡ Compra subito — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>` : ''}
+           <button class="btn primary" onclick="startBuy()">🔒 Compra con escrow — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>`}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
       ${contatto}
@@ -994,7 +1063,13 @@ async function startBuy(){
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
-  el('payAmount').textContent = fmt(currentListing.price);
+  /* Per i listini EUR i sats esatti li decide il server tra un attimo:
+     intanto una stima onesta, poi l'importo vero dalla risposta */
+  const inEur = currentListing.valuta==='eur' && currentListing.priceEur>0;
+  el('payAmount').textContent = (inEur?'≈ ':'') + fmt(satsAnnuncio(currentListing));
+  el('payEurNota').style.display = inEur ? 'block' : 'none';
+  if (inEur) el('payEurNota').textContent =
+    `Listino ${fmtEur(currentListing.priceEur)} € — convertito ora in sats: la invoice vale 15 minuti`;
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
   if (DEMO) {
@@ -1010,6 +1085,7 @@ async function startBuy(){
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
   currentOrderId = d.ordine_id;
+  if (d.prezzo_sats) el('payAmount').textContent = fmt(d.prezzo_sats);
   el('payInvoice').textContent = d.invoice;
   /* Controllo automatico ogni 4 secondi: appena paghi, se ne accorge */
   if (pollTimer) clearInterval(pollTimer);   /* mai due controlli accavallati */
@@ -1049,7 +1125,9 @@ function compraSubito(){
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
   if (!walletNwc()) { startBuy(); return; }
-  el('nwcConfermaSats').textContent = fmt(currentListing.price);
+  /* per i listini EUR e' una stima: i sats veri li fissa il server */
+  el('nwcConfermaSats').textContent =
+    (currentListing.valuta==='eur'?'≈ ':'') + fmt(satsAnnuncio(currentListing));
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -1064,7 +1142,7 @@ async function confermaCompraSubito(btn){
      parte tra poco deve sopravvivere) */
   el('nwcConfermaSheet').classList.remove('open');
   el('sheetBg').classList.remove('open');
-  let invoice = null, cliente = null;
+  let invoice = null, cliente = null, satsOrdine = null;
   try {
     /* 1) ordine + invoice: identico in tutto al flusso manuale */
     const r = await fetch(`${API_BASE}/orders`, {
@@ -1075,6 +1153,7 @@ async function confermaCompraSubito(btn){
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
     currentOrderId = d.ordine_id;
     invoice = d.invoice;
+    satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);
@@ -1094,7 +1173,8 @@ async function confermaCompraSubito(btn){
     else if (invoice) {
       /* Ripiego: la STESSA invoice nel foglio di sempre. L'ordine
          c'è già e il poll è vivo: mai un secondo ordine. */
-      el('payAmount').textContent = fmt(currentListing.price);
+      el('payAmount').textContent = fmt(satsOrdine || satsAnnuncio(currentListing));
+      el('payEurNota').style.display = 'none';
       el('payInvoice').textContent = invoice;
       el('sheetBg').classList.add('open');
       el('paySheet').classList.add('open');
@@ -1992,7 +2072,7 @@ function renderMyListings(){
           <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#F9E8E6;color:var(--danger)">🗑 Elimina</span>
         </span>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats)">${fmt(l.price)}</span> sats · 📍 ${esc(l.zone)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
     </div>`).join('')
     : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo dalla scheda Vendi ＋ ⚡</div>`;
 }
@@ -2069,6 +2149,30 @@ async function rimuoviModerazione(id){
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
 let editandoId = null, editandoTitolo = '', fotoAttuali = [];
 
+/* La valuta del listino nel form di Vendi: sats (com'e' sempre stato)
+   oppure EUR — il prezzo in euro resta fisso e chi compra paga sempre
+   in sats, convertiti dal server al cambio del momento. */
+let sellValuta = 'sats';
+function toggleSellCur(){ haptic(); impostaSellValuta(sellValuta==='sats' ? 'eur' : 'sats'); }
+function impostaSellValuta(v){
+  sellValuta = v;
+  const inp = el('sellPrice'), btn = el('sellCur'), hint = el('sellCurHint');
+  if (!inp || !btn) return;
+  if (v==='eur'){
+    btn.textContent = '€ ⇄'; inp.step = '0.01';
+    inp.inputMode = 'decimal'; inp.placeholder = '25,00';
+    if (hint) hint.textContent = 'Listino fisso in euro: chi compra paga '
+      + 'sempre in sats, al cambio del momento dell’acquisto.';
+  } else {
+    btn.textContent = 'sats ⇄'; inp.step = '1';
+    inp.inputMode = 'numeric'; inp.placeholder = '80 000';
+    if (hint) hint.textContent = '';
+  }
+}
+/* parseFloat non capisce la virgola italiana: gliela traduciamo */
+const prezzoEurForm = () =>
+  Math.round((parseFloat(String(el('sellPrice').value).replace(',','.'))||0)*100)/100;
+
 /* Porta un annuncio nel form di Vendi per ritoccarlo: stessi campi,
    stessa moderazione, submit sull'endpoint di modifica. */
 function editListing(id){
@@ -2077,7 +2181,8 @@ function editListing(id){
   haptic();
   editandoId = id; editandoTitolo = l.title;
   el('sellTitle').value = l.title;
-  el('sellPrice').value = l.price;
+  impostaSellValuta(l.valuta==='eur' && l.priceEur>0 ? 'eur' : 'sats');
+  el('sellPrice').value = sellValuta==='eur' ? l.priceEur : l.price;
   el('sellCat').value = l.cat;
   el('sellZone').value = l.zone==='—' ? '' : l.zone;
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
@@ -2089,6 +2194,7 @@ function editListing(id){
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
+  impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
 }
 
@@ -2208,23 +2314,29 @@ function renderFotoPreview(){
 }
 
 async function publish(){
-  const t = el('sellTitle').value.trim(), p = parseInt(el('sellPrice').value)||0;
+  const t = el('sellTitle').value.trim();
+  const p = sellValuta==='eur' ? prezzoEurForm() : (parseInt(el('sellPrice').value)||0);
   if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }
   if (sellFoto.some(f=>f.startsWith('caricando:'))) {
     toast('Un attimo: sto ancora caricando le foto'); return;
   }
   if (editandoId) { await salvaModifica(t, p); return; }
+  /* il prezzo nel payload parla la valuta scelta dal venditore */
+  const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId;
   if (DEMO) {
     nuovoId = Date.now();
-    listings.unshift({id:nuovoId, emoji:'📦', title:t, price:p, cat:el('sellCat').value,
+    listings.unshift({id:nuovoId, emoji:'📦', title:t,
+      price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
+      valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
+      cat:el('sellCat').value,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
     const r = await fetch(`${API_BASE}/listings`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({titolo:t, prezzo_sats:p, categoria:el('sellCat').value,
+      body: JSON.stringify({titolo:t, ...prezzo, categoria:el('sellCat').value,
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
@@ -2233,6 +2345,7 @@ async function publish(){
     await loadListings();
   }
   ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
+  impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
   toast('⚡ Annuncio pubblicato!'); setCat('Tutto');
   /* L'annuncio appena nato ti si apre davanti: la soddisfazione di
@@ -2248,12 +2361,16 @@ async function salvaModifica(t, p){
   if (DEMO) {
     const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
     if (l){
-      Object.assign(l, {title:t, price:p, cat:el('sellCat').value,
+      Object.assign(l, {title:t,
+        price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
+        valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
+        cat:el('sellCat').value,
         zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
   } else {
-    const body = {titolo:t, prezzo_sats:p, categoria:el('sellCat').value,
+    const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
+    const body = {titolo:t, ...prezzo, categoria:el('sellCat').value,
       zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
     if (sellFoto.length) body.foto = sellFoto;
     const r = await fetch(`${API_BASE}/listings/${id}/modifica`, {
