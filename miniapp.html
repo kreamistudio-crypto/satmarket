@@ -2260,14 +2260,29 @@ async function condividiAnnuncio(){
   const link = `${location.origin}/annuncio/${l.id}`;
   const prezzo = (l.valuta==='eur' && l.priceEur>0)
     ? `${fmtEur(l.priceEur)} €` : `${fmt(l.price)} sats`;
+  const testo = `${l.title} — ${prezzo} su Barattolo 🫙`;
+  /* Dentro Telegram (initData vero: nel browser lo stub mentirebbe)
+     la WebView NON ha navigator.share — si usa il canale di
+     Telegram, a scalare: shareURL se il client lo offre, altrimenti
+     il selettore chat via t.me/share/url. */
+  if (tg?.initData) {
+    if (typeof tg.shareURL === 'function') { tg.shareURL(link, testo); return; }
+    if (typeof tg.openTelegramLink === 'function') {
+      tg.openTelegramLink('https://t.me/share/url?url='
+        + encodeURIComponent(link) + '&text=' + encodeURIComponent(testo));
+      return;
+    }
+  }
   if (navigator.share) {
-    try { await navigator.share({title: l.title,
-      text: `${l.title} — ${prezzo} su Barattolo 🫙`, url: link}); return; }
+    try { await navigator.share({title: l.title, text: testo, url: link}); return; }
     catch(e) { if (e.name === 'AbortError') return; }  // ripensamento: fine
   }
-  navigator.clipboard?.writeText(link)
+  /* niente clipboard (contesti non sicuri): almeno il link nel toast,
+     mai il silenzio */
+  if (navigator.clipboard) navigator.clipboard.writeText(link)
     .then(()=>toast('Link copiato 🔗'))
     .catch(()=>toast(link, 5000));
+  else toast(link, 5000);
 }
 
 function condividiMioNegozio(){
