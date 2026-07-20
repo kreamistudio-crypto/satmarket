@@ -346,7 +346,7 @@
     .detail-body{padding:0}
 
     /* le viste "di lettura" stanno meglio in colonna stretta */
-    #view-vendi,#view-affari,#view-ordine{max-width:680px;margin:0 auto}
+    #view-vendi,#view-affari,#view-ordine,#view-profilo{max-width:680px;margin:0 auto}
     #negozioHeader{max-width:680px;padding:0 var(--pad)}
 
     /* i fogli dal basso diventano modali centrati */
@@ -444,33 +444,6 @@
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
         protetti. Gli annunci vengono moderati.</div>
-      <div class="section-label" style="padding:26px 0 0">Le tue identità</div>
-      <div id="identitaBlocco" style="margin-top:12px"></div>
-      <div id="avvisiBlocco"></div>
-      <div class="field" style="margin-top:16px"><label>Il tuo profilo Nostr (facoltativo)</label>
-        <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
-      <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
-      <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        La npub aggiunge il badge 🟣 ai tuoi annunci; con la verifica qui
-        sotto diventa 🟣✓. Non incollare MAI la nsec: quella è la tua
-        chiave privata e nessuno deve chiedertela, noi per primi.</div>
-      <div id="npubVerifica"></div>
-      <div id="nwcBlocco">
-        <div class="field" style="margin-top:24px" id="nwcCampo"><label>⚡ Wallet Lightning (facoltativo)</label>
-          <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
-        <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
-        <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-          Col wallet collegato gli annunci mostrano «⚡ Compra subito»:
-          l'escrow si paga in un tocco. La stringa resta <b>solo nel tuo
-          browser</b>, su questo dispositivo: Barattolo non la vede e non
-          la salva mai sui suoi server. Nella app del wallet imposta un
-          <b>limite di spesa</b> per questa connessione: può pagare da
-          sola, il tetto lo decidi tu.</div>
-        <div id="nwcStato"></div>
-      </div>
-      <div class="section-label" style="padding:26px 0 0">I tuoi annunci in vetrina</div>
-      <div id="myListings" style="margin-top:12px"></div>
-      <div id="adminStats"></div>
     </div>
   </div>
 
@@ -486,11 +459,55 @@
     <div id="orderContent"></div>
   </div>
 
+  <!-- ============ VISTA: PROFILO ============ -->
+  <!-- Il camerino dell'utente: testata, annunci, identità, avvisi,
+       wallet e incassi, npub. I blocchi arrivano dalla scheda Vendi,
+       traslocati tal quali: stessa logica, solo casa nuova. -->
+  <div class="view" id="view-profilo">
+    <div class="form">
+      <div class="section-label" style="padding-top:22px">Il tuo profilo</div>
+      <div id="profiloTestata"></div>
+      <div class="section-label" style="padding:26px 0 0">📋 I tuoi annunci</div>
+      <div id="myListings" style="margin-top:12px"></div>
+      <div class="section-label" style="padding:26px 0 0">Le tue identità</div>
+      <div id="identitaBlocco" style="margin-top:12px"></div>
+      <div id="avvisiBlocco"></div>
+      <div id="walletBlocco">
+        <div class="section-label" style="padding:26px 0 0">⚡ Wallet e incassi</div>
+        <div id="lnAddrBlocco"></div>
+        <div id="nwcBlocco">
+          <div class="field" style="margin-top:16px" id="nwcCampo"><label>⚡ Wallet Lightning (facoltativo)</label>
+            <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
+          <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
+          <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+            Col wallet collegato gli annunci mostrano «⚡ Compra subito»:
+            l'escrow si paga in un tocco. La stringa resta <b>solo nel tuo
+            browser</b>, su questo dispositivo: Barattolo non la vede e non
+            la salva mai sui suoi server. Nella app del wallet imposta un
+            <b>limite di spesa</b> per questa connessione: può pagare da
+            sola, il tetto lo decidi tu.</div>
+          <div id="nwcStato"></div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:16px"><label>Il tuo profilo Nostr (facoltativo)</label>
+        <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
+      <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
+      <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+        La npub aggiunge il badge 🟣 ai tuoi annunci; con la verifica qui
+        sotto diventa 🟣✓. Non incollare MAI la nsec: quella è la tua
+        chiave privata e nessuno deve chiedertela, noi per primi.</div>
+      <div id="npubVerifica"></div>
+      <div id="adminStats"></div>
+      <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
+    </div>
+  </div>
+
   <!-- ============ NAV ============ -->
   <nav>
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
+    <button id="nav-profilo" onclick="go('profilo')"><span class="ic">👤</span>Profilo</button>
   </nav>
 
   <!-- ============ SHEET PAGAMENTO ============ -->
@@ -704,11 +721,13 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 /* ---------------- navigazione ---------------- */
 function go(view){
   haptic();
-  /* In vetrina Vendi e Affari non esistono: si fanno su Telegram */
-  if (VETRINA && (view==='vendi' || view==='affari')) {
+  /* In vetrina Vendi, Affari e Profilo non esistono: si fanno su Telegram */
+  if (VETRINA && (view==='vendi' || view==='affari' || view==='profilo')) {
     invitoTelegram(view==='vendi'
       ? 'Qui in vetrina si guarda soltanto: per mettere in vendita i tuoi oggetti apri Barattolo dentro Telegram.'
-      : 'I tuoi affari vivono su Telegram: apri Barattolo per seguirli.');
+      : view==='affari'
+      ? 'I tuoi affari vivono su Telegram: apri Barattolo per seguirli.'
+      : 'Il tuo profilo vive su Telegram: apri Barattolo per gestire annunci, incassi e identità.');
     return;
   }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -717,7 +736,7 @@ function go(view){
   el('nav-'+(['dettaglio','negozio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
     ?.classList.add('active');
   if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
-  if (view==='vendi') { loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita(); }
+  if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita(); }
   window.scrollTo(0,0);
 }
 
@@ -1289,11 +1308,96 @@ async function saveLnAddress(btn){
   openOrder(currentOrder.id);
 }
 
+/* ---- Lightning address nel Profilo: il gemello "da fermo" del
+   pannello incassi dentro l'ordine. Stesso endpoint, nessun ordine
+   di mezzo. In demo l'intero blocco wallet sparisce. ---- */
+let lnAddrModifica = false;   // true = mostra il campo anche se l'indirizzo c'è già
+function renderLnAddress(){
+  const box = el('lnAddrBlocco');
+  if (!box) return;
+  if (DEMO) { el('walletBlocco').style.display = 'none'; return; }
+  el('walletBlocco').style.display = '';
+  if (myLnAddress && !lnAddrModifica) {
+    box.innerHTML = `
+      <div style="margin-top:12px;font-size:13px;font-weight:800;color:var(--trust)">
+        ⚡ Incassi automatici su <span class="mono">${esc(myLnAddress)}</span></div>
+      <div style="margin-top:4px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+        Ogni vendita conclusa arriva da sola qui (prezzo − 1% di commissione).</div>
+      <button class="btn ghost" style="margin-top:8px" onclick="lnAddrModifica=true;renderLnAddress()">↻ Cambia indirizzo</button>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="field" style="margin-top:12px"><label>Lightning address (incassi automatici)</label>
+      <input id="lnAddrProfilo" placeholder="nome@walletofsatoshi.com" value="${esc(myLnAddress)}"></div>
+    <button class="btn ghost" style="margin-top:0" onclick="salvaLnAddressProfilo(this)">⚡ Attiva incassi automatici</button>
+    <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      Lo trovi nella app del tuo wallet: lo imposti una volta sola e
+      tutti gli incassi, di ogni vendita, arrivano da soli.</div>`;
+}
+
+async function salvaLnAddressProfilo(btn){
+  haptic();
+  const addr = el('lnAddrProfilo').value.trim().toLowerCase();
+  if (!addr.includes('@') || !addr.split('@')[1]?.includes('.')) {
+    toast('Formato non valido: dev\'essere tipo nome@wallet.com'); return;
+  }
+  const ripristina = bottoneInAttesa(btn);
+  const r = await fetch(`${API_BASE}/me/ln-address`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({ln_address: addr})});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail || 'Indirizzo non accettato, ricontrolla'); return; }
+  myLnAddress = d.ln_address;
+  lnAddrModifica = false;
+  renderLnAddress();
+  toast(d.incassi_sbloccati > 0
+    ? '⚡ Attivato! E gli incassi in attesa sono partiti da soli 🔓'
+    : '⚡ Incassi automatici attivati!');
+}
+
 /* ---- badge Nostr del profilo: npub auto-dichiarata + verifica con
    nota pubblica (l'utente pubblica un codice dal SUO client: nessuna
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
+let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNegozio = '';
+
+/* ---- la testata della scheda Profilo: chi sei, come vai, il link
+   del tuo negozio da condividere. Stesso biglietto da visita della
+   vista negozio, ma per te stesso. ---- */
+function renderProfilo(){
+  const box = el('profiloTestata');
+  if (!box) return;
+  const badge = myNpub
+    ? (myNpubVerified?' <span title="Npub verificata">🟣✓</span>'
+                     :' <span title="Npub dichiarata (non verificata)">🟣</span>')
+    : '';
+  /* Stelle solo con un rating vero: il feedback non esiste ancora e
+     "0 ★" farebbe solo danno (stessa regola della vista negozio) */
+  const rep = (myRating>0
+    ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating} · ` : '')
+    + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`;
+  const nome = myNome || 'Tu';
+  box.innerHTML = `
+    <div class="seller" style="margin-top:14px">
+      <div class="avatar">${esc(nome[0])}</div>
+      <div class="who"><b>${esc(nome)}${badge}</b>
+        <div class="rep">${rep}</div>
+      </div>
+    </div>
+    ${(myUsername||myNegozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}`;
+  if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
+  renderLnAddress();
+}
+
+function condividiMioNegozio(){
+  const link = `${location.origin}/negozio/${encodeURIComponent(myUsername || myNegozio)}`;
+  navigator.clipboard?.writeText(link)
+    .then(()=>toast('📋 Link del tuo negozio copiato'))
+    .catch(()=>toast(link, 5000));
+}
 
 /* ---- "Le tue identità": la doppia cittadinanza a colpo d'occhio.
    Telegram e Nostr, cosa è collegato e cosa manca, con il bottone
@@ -1351,6 +1455,13 @@ function renderAvvisi(){
   const nostrOk = !!(myNpubAccesso || (myNpub && myNpubVerified));
   if (!tgOk && !nostrOk) { box.innerHTML = ''; return; }
   const attivo = myCanaleNotifiche || (tgOk ? 'telegram' : 'nostr');
+  /* Lo stato effettivo sempre in chiaro: anche col default automatico
+     l'utente deve leggere DOVE arrivano gli avvisi, non dedurlo dal
+     tipo di login. */
+  const nomeCanale = {telegram:'✈️ Telegram', nostr:'🟣 DM Nostr',
+                      entrambi:'✈️ Telegram e 🟣 DM Nostr'}[attivo];
+  const stato = `Ricevi gli avvisi su: <b style="color:var(--ink)">${nomeCanale}</b>`
+    + (myCanaleNotifiche ? '' : ' (automatico)');
   let dentro;
   if (tgOk && nostrOk) {
     const pill = (val, nome) =>
@@ -1371,7 +1482,7 @@ function renderAvvisi(){
       <div style="font-size:20px">🔔</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:800;font-size:13.5px">Avvisi</div>
-        <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">Dove ricevi gli aggiornamenti sui tuoi affari</div>
+        <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>
       </div></div>${dentro}</div>`;
 }
 
@@ -1737,7 +1848,9 @@ function renderMyListings(){
   box.innerHTML = myListings.length ? myListings.map(l=>`
     <div class="order">
       <div class="row">
-        <b onclick="openDetail(${l.id})" style="cursor:pointer">${l.photos&&l.photos[0]?'📷':l.emoji} ${esc(l.title)}</b>
+        <b onclick="openDetail(${l.id})" style="cursor:pointer;display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
+          ? `<img src="${esc(l.photos[0])}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none">`
+          : `<span style="font-size:22px">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
           <span class="badge" onclick="editListing(${l.id})" style="cursor:pointer">✏️ Modifica</span>
           <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:#F9E8E6;color:var(--danger)">🗑 Elimina</span>
@@ -1745,7 +1858,7 @@ function renderMyListings(){
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats)">${fmt(l.price)}</span> sats · 📍 ${esc(l.zone)}</div>
     </div>`).join('')
-    : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo qui sopra! ⚡</div>`;
+    : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo dalla scheda Vendi ＋ ⚡</div>`;
 }
 
 /* ---- statistiche del mercatino (solo moderatori) ---- */
@@ -1802,7 +1915,7 @@ async function deleteListing(id, dalDettaglio){
   await loadMyListings();
   renderMyListings(); renderGrid();
   toast('🗑 Annuncio eliminato');
-  if (dalDettaglio) go('vendi');
+  if (dalDettaglio) go('profilo');   /* la lista dei tuoi annunci ora vive lì */
 }
 
 /* Moderazione (solo admin): rimuove dal mercatino un annuncio altrui */
@@ -1965,8 +2078,10 @@ async function publish(){
     toast('Un attimo: sto ancora caricando le foto'); return;
   }
   if (editandoId) { await salvaModifica(t, p); return; }
+  let nuovoId;
   if (DEMO) {
-    listings.unshift({id:Date.now(), emoji:'📦', title:t, price:p, cat:el('sellCat').value,
+    nuovoId = Date.now();
+    listings.unshift({id:nuovoId, emoji:'📦', title:t, price:p, cat:el('sellCat').value,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
@@ -1976,12 +2091,17 @@ async function publish(){
       body: JSON.stringify({titolo:t, prezzo_sats:p, categoria:el('sellCat').value,
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
-    if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Errore nella pubblicazione', 6000); return; }
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Errore nella pubblicazione', 6000); return; }
+    nuovoId = d.id;
     await loadListings();
   }
   ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
   sellFoto = []; renderFotoPreview();
-  toast('⚡ Annuncio pubblicato!'); setCat('Tutto'); go('esplora');
+  toast('⚡ Annuncio pubblicato!'); setCat('Tutto');
+  /* L'annuncio appena nato ti si apre davanti: la soddisfazione di
+     vederlo in vetrina. Se non è in lista, si torna a Esplora. */
+  if (listings.find(x=>x.id===nuovoId)) openDetail(nuovoId); else go('esplora');
 }
 
 /* Il submit del form quando si sta modificando un annuncio: le foto
@@ -2009,7 +2129,10 @@ async function salvaModifica(t, p){
   }
   await loadMyListings(); renderMyListings();
   annullaModifica();
-  toast('✏️ Annuncio aggiornato!'); setCat('Tutto'); go('esplora');
+  toast('✏️ Annuncio aggiornato!'); setCat('Tutto');
+  /* Come per la pubblicazione: l'annuncio aggiornato si apre subito */
+  if (listings.find(x=>x.id===id) || myListings.find(x=>x.id===id)) openDetail(id);
+  else go('esplora');
 }
 
 /* ---------------- avvio ---------------- */
@@ -2039,7 +2162,7 @@ function barraWeb(nome){
   b.style.display = 'block';
   const avvisi = myTgId < 0
     ? `sei entrato con Nostr: per gli avvisi in chat collega Telegram`
-      + ` dalla scheda Vendi («Le tue identità»), oppure ricontrolla`
+      + ` dalla scheda Profilo («Le tue identità»), oppure ricontrolla`
       + ` i tuoi Affari di tanto in tanto`
     : `Per ricevere gli avvisi sugli ordini apri una volta `
       + `<a href="https://t.me/ilbarattolobot" target="_blank"`
@@ -2536,7 +2659,9 @@ async function avvia(){
     myNome = me.nome || ''; myUsername = me.username || '';
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
-    npubCodice = '';
+    myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
+    myRating = me.rating || 0; myNegozio = me.negozio || '';
+    npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();
     renderIdentita();
@@ -2566,8 +2691,9 @@ async function avvia(){
     } else if (el('view-dettaglio').classList.contains('active')) {
       if (currentListing && listings.find(x=>x.id===currentListing.id)) openDetail(currentListing.id);
       else go('esplora');
-    } else if (el('view-vendi').classList.contains('active')) {
-      loadMyListings().then(renderMyListings).catch(()=>{});
+    } else if (el('view-profilo').classList.contains('active')) {
+      renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{});
+      loadAdminStats(); renderWallet();
     }
     apriNegozioDaUrl();
   } catch (e) {
