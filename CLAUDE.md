@@ -280,6 +280,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e `isVersionAtLeast('8.0')` — nel browser lo stub di Telegram
   esiste comunque e mentirebbe — con ripiego `tg.openLink` se lancia;
   altrimenti `<a download>`; in DEMO sparisce col blocco wallet).
+  Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
+  in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
+  sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
+  `prezzo_sats` resta l'EQUIVALENTE al cambio di pubblicazione (serve
+  al tetto, alla ricerca AI e come ripiego display). Il pagamento è
+  SEMPRE in sats: `compra()` converte al cambio corrente alla
+  creazione della invoice (la vita della invoice, 15 min, È il lock
+  del prezzo: scaduta, si riconverte; 503 se il cambio non è mai
+  arrivato) e salva `ordini.prezzo_sats` = sats effettivi +
+  `ordini.cambio_ordine` = cambio usato (colonna nuova: `cambio_eur`
+  mantiene la semantica di CHIUSURA e il CSV non cambia). La risposta
+  di POST /api/orders ora include `prezzo_sats`. `prezzo_da_payload`
+  è il giudice unico di pubblica/modifica: valida, converte e applica
+  `TETTO_SATS_ANNUNCIO` — leva SPENTA di serie (default 0 = nessun
+  limite; si accende dal config, es. 100_000; NON copre
+  importa_nostr.py che scrive dritto nel DB); la modifica
+  scrive SEMPRE valuta+prezzo_eur (eur→sats azzera l'euro). Drift del
+  cambio tra pubblicazione e acquisto: tolleranza +20% alla creazione
+  della invoice, oltre 409 + notifica al venditore (che si ripara
+  ri-salvando il prezzo: la modifica riconvalida al cambio di oggi).
+  NIP-99: tag `price` nella valuta del listino (es.
+  ["price","40.00","EUR"]) e content coerente — importa_nostr sa già
+  rileggere quel formato. Ricerca AI: la riga di catalogo porta
+  entrambe le valute. Frontend: toggle ₿/€ nella searchbar di
+  Esplora (`valutaVista` in localStorage['barattolo_valuta']),
+  `prezzoParte(l)` rende la valuta dello spettatore grande e l'altra
+  piccola sotto — il «≈» sta SEMPRE e solo sul prezzo convertito, mai
+  sul listino; `cambioVivo` + re-render della griglia all'arrivo del
+  cambio CoinGecko; form Vendi col suffisso-bottone sats/€
+  (`sellValuta`, virgola decimale tradotta); paySheet e conferma NWC
+  mostrano la stima «≈» e poi i sats VERI da `prezzo_sats` della
+  risposta di POST /orders (MAI da `l.price`, che per i listini EUR
+  è solo l'equivalente di pubblicazione).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
   `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
@@ -453,7 +486,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 
 ## Stato (lug 2026) e prossimi lavori
 
-Lanciando in rodaggio su community italiana, limite ~100k sats/annuncio.
+Lanciando in rodaggio su community italiana, senza limiti di prezzo
+attivi (la leva `TETTO_SATS_ANNUNCIO` esiste ma è spenta, vedi sotto).
 Fatti (lug 2026): banner sulla demo browser; vetrina pubblica in sola
 lettura (annunci veri dal browser, azioni → invito al bot); moderazione
 contenuti a tre strati (parole + AI + admin); badge npub auto-dichiarato
@@ -498,7 +532,16 @@ avvio, vedi Architettura); badge 🟣 pubblico semplificato (solo da
 npub verificata, senza ✓; il non verificato lo vede solo il
 proprietario col suo invito a verificare); export CSV contabile
 degli affari conclusi (bottone nel Profilo, controvalore EUR
-valorizzato alla chiusura da ora in poi, vedi Architettura).
+valorizzato alla chiusura da ora in poi, vedi Architettura);
+doppia valuta (lug 2026: listino in sats o in EUR a scelta del
+venditore, toggle ₿/€ per chi guarda, pagamento sempre in sats col
+cambio bloccato dalla vita della invoice, e la leva del tetto per
+annuncio con tolleranza +20% sul drift, vedi
+Architettura — collaudato in locale da cima a fondo; la riga EUR
+nella ricerca AI va provata in produzione, dove la chiave Anthropic
+è vera; la leva del tetto `TETTO_SATS_ANNUNCIO` esiste nel codice
+ma è SPENTA di default: nessun annuncio viene limitato finché non
+la si accende dal config).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
