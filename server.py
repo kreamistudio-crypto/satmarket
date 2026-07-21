@@ -5370,6 +5370,27 @@ async def importa_nostr_periodico():
           f"{saltati} saltati")
 
 
+def pulisci_import():
+    """La scopa dell'import in blocco: via i lavori scaduti (mai
+    quelli in corsa), gli ZIP orfani rimasti in import_tmp da piu'
+    di un'ora (un crash a meta' upload li lascerebbe li' per sempre)
+    e le quote dei giorni passati."""
+    _purga_lavori()
+    adesso = time.time()
+    try:
+        for nome in os.listdir(IMPORT_DIR):
+            percorso = os.path.join(IMPORT_DIR, nome)
+            if os.path.isfile(percorso) and \
+                    adesso - os.path.getmtime(percorso) > 3600:
+                _cancella_zip(percorso)
+    except OSError:
+        pass
+    oggi = time.strftime("%Y-%m-%d")
+    for tg_id in [t for t, (giorno, _) in IMPORT_QUOTA.items()
+                  if giorno != oggi]:
+        IMPORT_QUOTA.pop(tg_id, None)
+
+
 async def orologio():
     while True:
         try:
@@ -5381,6 +5402,10 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Import Nostr periodico saltato (riprovo tra "
                   f"un'ora): {e}")
+        try:
+            pulisci_import()
+        except Exception as e:
+            print(f"⚠️ Pulizia import in blocco saltata: {e}")
         await asyncio.sleep(600)
 
 
