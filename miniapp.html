@@ -3679,13 +3679,16 @@ async function firmatarioBunker(uri){
     let msg;
     try { msg = JSON.parse(NT.nip44.decrypt(ev.content, chiave)); }
     catch(e){ return; }               // non era per noi (o cifrario vecchio)
-    const at = attese[msg.id];
-    if (!at) { console.log(`🟪 [bunker] ← risposta per una richiesta che non aspetto più (id ${msg.id})`); return; }
     if (msg.result === 'auth_url') {  // il bunker vuole il tuo permesso
-      console.log(`🟪 [bunker] ← auth_url per id ${msg.id}: serve l'autorizzazione`);
+      /* PRIMA del lookup in attese: un'auth_url che arriva tardi
+         (l'umano è lento, la richiesta magari è già scaduta) va
+         mostrata LO STESSO — buttarla lasciava il flusso muto. */
+      console.log(`🟪 [bunker] ← auth_url (id ${msg.id}): serve l'autorizzazione`);
       apriAutorizzazioneBunker(msg.error);
       return;                         // la vera risposta arriverà dopo
     }
+    const at = attese[msg.id];
+    if (!at) { console.log(`🟪 [bunker] ← risposta per una richiesta che non aspetto più (id ${msg.id})`); return; }
     console.log(`🟪 [bunker] ← risposta per id ${msg.id}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
     delete attese[msg.id];
     if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
@@ -3711,10 +3714,23 @@ async function firmatarioBunker(uri){
   /* Il terzo parametro della connect sono i PERMESSI richiesti: senza,
      certi bunker (nsec.app…) trattano ogni firma come non autorizzata
      e chiedono un'approvazione via auth_url che magari non arriva mai
-     sul telefono. Chiederli qui = un'autorizzazione sola, chiara. */
-  await chiama('connect', [bunkerPub, par.get('secret') || '',
-                           'sign_event:22242,sign_event:30402']);
-  console.log('🟪 [bunker] connect: ack, firmatario pronto');
+     sul telefono. Chiederli qui = un'autorizzazione sola, chiara.
+     Timeout umano (120s): la prima connect può voler dire aprire
+     l'app del bunker e approvare, in 30s non ci si sta. */
+  try {
+    await chiama('connect', [bunkerPub, par.get('secret') || '',
+                             'sign_event:22242,sign_event:30402'], 120000);
+  } catch(e){
+    if (!/already connected/i.test(e.message || '')) {
+      try { relay.close(); } catch(_){}   // niente websocket orfane
+      throw e;
+    }
+    /* "already connected" NON è un errore: nsec.app risponde così
+       quando questo secret è già stato approvato (es. al login).
+       Vuol dire solo "sei già dentro": avanti con la firma. */
+    console.log('🟪 [bunker] connect: already connected — va benissimo, avanti');
+  }
+  console.log('🟪 [bunker] firmatario pronto');
   return {
     pubkey: () => chiama('get_public_key', []),
     firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], 120000)),
@@ -3722,23 +3738,27 @@ async function firmatarioBunker(uri){
   };
 }
 
-/* auth_url del bunker: la finestra va aperta, ma window.open fuori da
-   un click viene spesso BLOCCATO dal browser (la risposta del bunker
-   arriva secondi dopo il tocco). Se succede, il link si offre su un
-   bottone: il tocco dell'utente e' il gesto che il browser esige. */
+/* auth_url del bunker: MAI window.open automatico — fuori dal gesto
+   utente i browser lo bloccano (Brave su Android anche in silenzio,
+   senza ritornare null) e il flusso muore muto. Il link si mostra
+   SEMPRE come bottone nel foglio: il tocco dell'utente e' il gesto
+   che nessun browser blocca. E con l'app del bunker (nsec.app…)
+   spesso basta aprirla: la richiesta e' gia' in coda anche li'. */
 function apriAutorizzazioneBunker(url){
-  let w = null;
-  try { w = window.open(url, '_blank'); } catch(e){}
-  if (w) { toast('🔗 Autorizza Barattolo nella finestra del bunker…', 6000); return; }
-  console.log('🟪 [bunker] popup bloccato: offro il link su un bottone');
+  if (!/^https?:\/\//i.test(url || '')) {   // mai href javascript: & co.
+    console.log('🟪 [bunker] auth_url non http, la ignoro');
+    return;
+  }
+  console.log('🟪 [bunker] mostro il bottone di autorizzazione');
   el('sheetBg').classList.add('open');
   el('nostrSheet').classList.add('open');
   el('nostrSheetSub').innerHTML =
-    'Il bunker chiede la tua autorizzazione. Il browser ha bloccato la '
-    + 'finestra: aprila tu da qui, poi torna su questa pagina.<br>'
-    + `<a class="btn primary" style="display:inline-block;margin-top:10px" `
+    'Il bunker chiede la tua autorizzazione: aprila dal bottone, '
+    + 'approva e torna qui — resto in ascolto. Se sul telefono hai '
+    + 'l\'app del bunker, la richiesta ti sta già aspettando anche lì.'
+    + `<br><a class="btn primary" style="display:inline-block;margin-top:10px" `
     + `href="${url.replace(/"/g,'&quot;')}" target="_blank" rel="noopener">`
-    + `🔗 Apri l'autorizzazione del bunker</a>`;
+    + `🔗 Autorizza sul bunker</a>`;
 }
 
 /* 3) nsec incollata: firma IN QUESTA PAGINA e basta. La chiave vive
