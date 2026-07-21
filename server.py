@@ -466,6 +466,15 @@ def init_db():
         creato INTEGER,
         PRIMARY KEY(tg_id, annuncio_id)
     );
+    CREATE TABLE IF NOT EXISTS preferiti(
+        -- «nel tuo barattolo»: gli annunci messi da parte col 🫙.
+        -- Privati per natura: nessun conteggio pubblico, il
+        -- venditore non sa chi ne' quanti (v1)
+        tg_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        creato INTEGER,
+        PRIMARY KEY(tg_id, annuncio_id)
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -1470,6 +1479,12 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM avvisi_notificati WHERE tg_id=?",
                     (id_nostr,))
+        # Il barattolo dei preferiti segue l'utente, in unione come i
+        # distintivi (stesso annuncio salvato da entrambe le meta':
+        # una riga basta)
+        con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -2621,6 +2636,56 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     if not r:
         raise HTTPException(404, "Annuncio non trovato")
     return espandi_distintivi_vetrina([dict(r)])[0]
+
+
+# ---- Preferiti: «nel tuo barattolo» 🫙 -------------------------------
+# Un tocco sul barattolino mette da parte l'annuncio, un altro lo
+# toglie. Il toggle vive sul server: lo stesso barattolo da ogni
+# dispositivo. Privato per natura: nessun conteggio pubblico, il
+# venditore non vede chi ne' quanti (v1).
+@app.post("/api/listings/{annuncio_id}/preferito")
+def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    # Prima si prova a togliere: cosi' il barattolo si svuota anche
+    # se nel frattempo l'annuncio e' sparito del tutto.
+    tolto = con.execute(
+        "DELETE FROM preferiti WHERE tg_id=? AND annuncio_id=?",
+        (user["id"], annuncio_id)).rowcount
+    if not tolto:
+        a = con.execute("SELECT id FROM annunci WHERE id=?",
+                        (annuncio_id,)).fetchone()
+        if not a:
+            con.close()
+            raise HTTPException(404, "Annuncio non trovato")
+        con.execute("INSERT INTO preferiti(tg_id, annuncio_id, creato) "
+                    "VALUES(?,?,?)",
+                    (user["id"], annuncio_id, int(time.time())))
+    con.commit()
+    con.close()
+    return {"ok": True, "salvato": not tolto}
+
+
+@app.get("/api/me/preferiti")
+def miei_preferiti(x_tg_init_data: str = Header(""),
+                   barattolo_sessione: str = Cookie("")):
+    """Il contenuto del barattolo, dal salvato piu' di recente.
+    Escono anche i non piu' attivi (venduti/rimossi), con lo stato:
+    il cassetto li mostra onesti come «non piu' disponibili» —
+    sparire in silenzio sarebbe peggio. Tetto 100: e' un barattolo,
+    non un magazzino."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        f"SELECT {CAMPI_VETRINA}, a.stato, a.venditore_id "
+        "FROM preferiti p "
+        "JOIN annunci a ON a.id = p.annuncio_id "
+        "JOIN utenti u ON u.tg_id = a.venditore_id "
+        "WHERE p.tg_id=? ORDER BY p.creato DESC LIMIT 100",
+        (user["id"],))]
+    con.close()
+    return espandi_distintivi_vetrina(righe)
 
 
 @app.get("/api/negozio/{chi}")

@@ -249,6 +249,21 @@
      ma in alto a sinistra: senza bottone sopra, la foto sale a filo
      dello schermo e il dettaglio diventa una hero immersiva */
   .back-float{left:10px;right:auto}
+  /* Il barattolino dei preferiti: cerchietto gemello del condividi,
+     alla sua sinistra. Da salvato si accende d'arancio e ondeggia
+     (jarPop). Solo per chi e' dentro: in DEMO e VETRINA non esiste. */
+  .jar-btn{right:56px;font-size:17px;line-height:1}
+  .jar-btn.salvato{background:var(--sats);
+    box-shadow:0 2px 6px rgba(0,0,0,.25),0 0 0 2px rgba(255,255,255,.5)}
+  .jar-btn.pop{animation:jarPop .55s ease}
+  @keyframes jarPop{
+    0%{transform:scale(1) rotate(0)}
+    30%{transform:scale(1.25) rotate(-12deg)}
+    55%{transform:scale(1.12) rotate(9deg)}
+    78%{transform:scale(1.05) rotate(-5deg)}
+    100%{transform:scale(1) rotate(0)}
+  }
+  @media (prefers-reduced-motion:reduce){.jar-btn.pop{animation:none}}
   /* ---------- lightbox: la foto a tutto schermo ----------
      Un tocco sulla foto del dettaglio la apre intera (mai ritagliata)
      su fondo scuro: pinch e trascinamento su touch, rotella e doppio
@@ -924,6 +939,14 @@
       <div id="profiloTestata"></div>
       <div id="profiloChecklist"></div>
 
+      <!-- I preferiti, primo cassetto: cio' che hai messo da parte
+           col barattolino. In demo e vetrina non esiste (il patto
+           del wallet). -->
+      <div class="acc" id="accPreferiti">
+        <button class="acc-h" onclick="toggleAcc('accPreferiti')"><span class="em">🫙</span>Nel tuo barattolo <span class="conta" id="preferitiConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="preferitiBlocco"></div></div>
+      </div>
+
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
         <div class="acc-b"><div id="myListings"></div><div id="mieiSentinella" style="height:1px"></div></div>
@@ -1195,6 +1218,9 @@ function mapListing(a){
   return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
     price:a.prezzo_sats, valuta:a.valuta||'sats', priceEur:a.prezzo_eur||0,
     cat:a.categoria, zone:a.zona||'—',
+    /* lo stato viaggia solo dove serve (i preferiti): la vetrina
+       serve comunque solo gli attivi */
+    stato:a.stato||'attivo',
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
     /* username e npub finiscono dentro stringhe JS negli onclick:
@@ -1438,7 +1464,10 @@ function go(view){
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
   document.querySelectorAll('.avatar-btn').forEach(a=>a.classList.toggle('attivo', view==='profilo'));
   if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
-  if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita(); }
+  if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
+    /* il barattolo si rilegge dal server: un annuncio salvato puo'
+       essere stato venduto nel frattempo, e il cassetto deve dirlo */
+    caricaPreferiti().then(renderPreferiti); }
   window.scrollTo(0,0);
 }
 
@@ -1883,10 +1912,14 @@ function openDetail(id){
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>`;
   const condividi = DEMO ? '' : `<button class="share-btn" onclick="condividiAnnuncio()" title="Condividi questo annuncio" aria-label="Condividi">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/></svg></button>`;
+  /* Il barattolino dei preferiti: solo per chi e' dentro davvero
+     (mai in DEMO/VETRINA) e mai sui propri annunci */
+  const barattolino = (DEMO || VETRINA || mio) ? ''
+    : `<button class="share-btn jar-btn${preferiti.has(l.id)?' salvato':''}" id="jarBtn" onclick="togglePreferito(${l.id})" title="${preferiti.has(l.id)?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">🫙</button>`;
   const foto = (l.photos && l.photos.length)
     ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
-       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${indietro}${condividi}</div>`
-    : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${indietro}${condividi}</div>`;
+       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${indietro}${barattolino}${condividi}</div>`
+    : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
   /* Il ponte Nostr: per gli importati la npub del contatto dichiarato
      nell'evento, per i nativi e i doppi cittadini il badge verificato
      (filtro bech32: finisce in un onclick) */
@@ -2700,6 +2733,7 @@ function renderProfilo(){
   renderLnAddress();
   renderDistintivi();
   renderDoppioni();
+  renderPreferiti();
   renderChecklist();
 }
 
@@ -3640,6 +3674,99 @@ function renderMyListings(){
   if (!box) return;
   box.innerHTML = myListings.length ? myListings.map(rigaMioAnnuncio).join('')
     : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo dalla scheda Vendi ＋ ⚡</div>`;
+}
+
+/* ---------------- 🫙 preferiti: «nel tuo barattolo» ----------------
+   Metti da parte un annuncio col barattolino sulla foto e lo ritrovi
+   nel primo cassetto del Profilo. Lo stato vive sul server (stesso
+   barattolo da ogni dispositivo); qui un Set degli id per accendere
+   il bottone al volo. In DEMO e VETRINA la funzione non esiste. */
+let preferiti = new Set(), myPreferiti = [];
+
+async function caricaPreferiti(){
+  if (DEMO || VETRINA) return;
+  try {
+    const r = await fetch(`${API_BASE}/me/preferiti`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok) return;
+    myPreferiti = (await r.json()).map(mapListing);
+    preferiti = new Set(myPreferiti.map(l=>l.id));
+    /* gli attivi entrano nel catalogo: openDetail li trova anche
+       oltre le pagine caricate della vetrina */
+    inCatalogo(myPreferiti.filter(l=>l.stato==='attivo'));
+  } catch(e) {}
+}
+
+async function togglePreferito(id){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/listings/${id}/preferito`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+    /* il bottone sulla foto e' di currentListing: si tocca solo se
+       il toggle riguarda proprio lui (dal cassetto puo' arrivare
+       l'id di un altro annuncio) */
+    const b = (currentListing && currentListing.id === id) ? el('jarBtn') : null;
+    if (d.salvato) {
+      preferiti.add(id);
+      const l = listings.find(x=>x.id===id)
+        || (currentListing && currentListing.id === id ? currentListing : null);
+      if (l && !myPreferiti.find(x=>x.id===id)) myPreferiti.unshift(l);
+      if (b) {
+        b.classList.add('salvato','pop'); b.title = 'Togli dal barattolo';
+        setTimeout(()=>b.classList.remove('pop'), 600);
+      }
+      tg?.HapticFeedback?.notificationOccurred?.('success');
+      toast('Messo nel barattolo! 🫙');
+    } else {
+      preferiti.delete(id);
+      myPreferiti = myPreferiti.filter(x=>x.id!==id);
+      if (b) { b.classList.remove('salvato'); b.title = 'Metti nel barattolo'; }
+      toast('Tolto dal barattolo');
+    }
+    renderPreferiti();
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+/* Righe compatte come «I tuoi annunci»; i non piu' disponibili
+   restano, onesti e spenti, finche' non li togli tu — sparire in
+   silenzio sarebbe peggio. Il loro dettaglio non si apre: mostrano
+   solo lo stato. */
+function renderPreferiti(){
+  const box = el('preferitiBlocco');
+  if (!box) return;
+  const sez = el('accPreferiti');
+  if (DEMO || VETRINA) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const conta = el('preferitiConta');
+  if (conta) conta.textContent = myPreferiti.length ? `(${myPreferiti.length})` : '';
+  if (!myPreferiti.length) {
+    box.innerHTML = `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">
+      Il tuo barattolo è vuoto: metti da parte gli annunci che ti piacciono col 🫙 sulla loro foto.</div>`;
+    return;
+  }
+  box.innerHTML = myPreferiti.map(l => {
+    const vivo = l.stato === 'attivo';
+    const spento = vivo ? '' : ';filter:grayscale(1);opacity:.6';
+    const th = l.photos && l.photos[0]
+      ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento}">`
+      : `<span style="font-size:22px${spento}">${l.emoji}</span>`;
+    return `
+    <div class="order">
+      <div class="row">
+        <b ${vivo?`onclick="openDetail(${l.id})" style="cursor:pointer;`:'style="'}display:flex;align-items:center;gap:8px;min-width:0">${th}<span style="overflow:hidden;text-overflow:ellipsis${vivo?'':';color:var(--muted)'}">${esc(l.title)}</span></b>
+        <span style="white-space:nowrap">
+          ${vivo?'':'<span class="badge" style="background:var(--off-bg);color:var(--muted)">non più disponibile</span>'}
+          <span class="badge" onclick="togglePreferito(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Togli dal barattolo">🫙 Togli</span>
+        </span>
+      </div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
+    </div>`;
+  }).join('');
 }
 
 /* ---- statistiche del mercatino (solo moderatori) ---- */
@@ -5012,6 +5139,10 @@ async function avvia(){
     else b.style.display = 'none';
     await loadListings();
     await loadOrders();
+    /* il barattolo dei preferiti segue l'identita': si azzera e si
+       rilegge (fail-open: senza risposta resta vuoto) */
+    preferiti = new Set(); myPreferiti = [];
+    await caricaPreferiti();
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
     if (editandoId) annullaModifica();   // una modifica a metà non segue l'identità nuova
     renderGrid(); renderOrders();
