@@ -133,10 +133,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   content = descrizione PURA (MAI il footer promozionale: rientrerebbe
   in descrizione al giro d'import); biglietto in
   `BIGLIETTI_MODIFICA_NOSTR` (TTL 10 min: l'auth_url del bunker è
-  lento). Il client: firmatario del login ri-evocato (sheet
-  parametrizzato `apriNostrSheet(scopo)` / `scopoFirmatario`,
-  titolo «Firma con la tua chiave»), pubkey controllata PRIMA di
-  firmare (la nsec si azzera dopo UNA firma), id ricontrollato in
+  lento). Il client: firma SENZA rituale quando può (lug 2026) —
+  ordine: sessione bunker conservata → estensione `window.nostr` →
+  foglio (`apriNostrSheet(scopo)` / `scopoFirmatario`, titolo «Firma
+  con la tua chiave») solo come ultima porta o quando la strada
+  automatica è morta/ha un'altra chiave (mismatch in auto = si
+  ripassa dal foglio, non è un errore dell'utente). La sessione
+  NIP-46 (URI bunker + chiave del CLIENT) vive in
+  `localStorage['barattolo_bunker']` (`ricordaBunker`/`bunkerSalvato`/
+  `scordaBunker`, salvata a ogni connect riuscito, scordata se il
+  bunker non risponde): EQUIVALENZA DICHIARATA col secret NWC già
+  conservato — pari grado, può chiedere firme al bunker (che può
+  sempre negarle o revocare la sessione), MAI derivare la chiave
+  dell'utente, mai sul server. La nsec incollata resta il rito di
+  sempre (mai conservata, by design; il foglio suggerisce il bunker).
+  I passi comuni vivono in `firmaEConsegna`: pubkey controllata PRIMA
+  di firmare (la nsec si azzera dopo UNA firma), id ricontrollato in
   pagina (firmatario che altera = stop), pubblicazione dal browser
   (`pubblicaEventoSuRelay`, serve ≥1 OK, relay = quelli dell'IMPORT
   col relay personale del venditore, non RELAYS_VERIFICA) e SOLO poi
@@ -866,7 +878,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    piattaforma il custode dei wallet di tutti: da respingere) →
    DM di notifica NIP-17 (lug 2026: si CIFRA verso la chiave
    PUBBLICA dell'utente e si firma con la chiave della piattaforma,
-   nessun segreto altrui coinvolto) →
+   nessun segreto altrui coinvolto) → sessione bunker NIP-46
+   conservata (lug 2026: URI + chiave del CLIENT in localStorage del
+   dispositivo, pari grado del secret NWC — chiede firme al bunker,
+   che può negarle o revocare; NON contiene né può derivare la chiave
+   dell'utente, mai sul server) →
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
