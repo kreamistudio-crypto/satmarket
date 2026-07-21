@@ -459,6 +459,17 @@ def init_db():
             "UPDATE annunci SET categoria=? "
             "WHERE categoria=? COLLATE NOCASE AND categoria!=?",
             (nuova, vecchia, nuova))
+    # Indici per la vetrina a volume (lug 2026): con centinaia di
+    # annunci le liste ordinate per data non devono piu' scandire
+    # tutta la tabella. Coprono le tre strade calde: vetrina per
+    # stato, filtro per categoria, negozio del venditore. Il DESC
+    # combacia con l'ORDER BY delle query (e col cursore keyset).
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_vetrina "
+                "ON annunci(stato, creato DESC, id DESC)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_categoria "
+                "ON annunci(categoria, stato, creato DESC, id DESC)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_venditore "
+                "ON annunci(venditore_id, stato, creato DESC, id DESC)")
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
