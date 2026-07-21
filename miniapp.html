@@ -249,6 +249,33 @@
      ma in alto a sinistra: senza bottone sopra, la foto sale a filo
      dello schermo e il dettaglio diventa una hero immersiva */
   .back-float{left:10px;right:auto}
+  /* ---------- lightbox: la foto a tutto schermo ----------
+     Un tocco sulla foto del dettaglio la apre intera (mai ritagliata)
+     su fondo scuro: pinch e trascinamento su touch, rotella e doppio
+     click da desktop, swipe tra le foto coi pallini. Tutto vanilla:
+     pointer events + touch-action:none, nessuna libreria. Colori
+     fissi come tutto cio' che vive sulla foto. */
+  #lightbox{position:fixed;inset:0;z-index:70;background:rgba(12,10,6,.94);
+    display:none}
+  #lightbox.open{display:block}
+  #lbStage{position:absolute;inset:0;overflow:hidden;touch-action:none;
+    display:flex;align-items:center;justify-content:center}
+  #lbImg{max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none;
+    will-change:transform}
+  #lbImg.snap{transition:transform .18s ease}
+  #lightbox .lb-x{position:absolute;top:calc(10px + env(safe-area-inset-top));
+    right:10px;z-index:2;width:38px;height:38px;border-radius:50%;border:0;
+    background:rgba(255,248,234,.94);color:#23282C;cursor:pointer;
+    font:800 16px/1 Nunito,sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.35)}
+  #lightbox .lb-x:active{transform:scale(.94)}
+  #lbDots{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));
+    left:0;right:0;display:flex;justify-content:center;gap:6px;
+    pointer-events:none}
+  #lbDots i{width:7px;height:7px;border-radius:50%;
+    background:rgba(255,255,255,.45);box-shadow:0 0 3px rgba(0,0,0,.4)}
+  #lbDots i.on{background:#fff}
   #photoPreview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   #photoPreview .th{position:relative}
   #photoPreview img{width:64px;height:64px;object-fit:cover;border-radius:10px;
@@ -1001,6 +1028,13 @@
       <div id="adminStats"></div>
       <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
     </div>
+  </div>
+
+  <!-- ============ LIGHTBOX: la foto a tutto schermo ============ -->
+  <div id="lightbox" role="dialog" aria-label="Foto a tutto schermo">
+    <div id="lbStage"><img id="lbImg" alt="" draggable="false"></div>
+    <button class="lb-x" onclick="chiudiLightbox()" title="Chiudi" aria-label="Chiudi">✕</button>
+    <div id="lbDots"></div>
   </div>
 
   <!-- ============ NAV ============ -->
@@ -1850,7 +1884,7 @@ function openDetail(id){
   const condividi = DEMO ? '' : `<button class="share-btn" onclick="condividiAnnuncio()" title="Condividi questo annuncio" aria-label="Condividi">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/></svg></button>`;
   const foto = (l.photos && l.photos.length)
-    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="">`).join('')}</div>
+    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
        ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${indietro}${condividi}</div>`
     : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${indietro}${condividi}</div>`;
   /* Il ponte Nostr: per gli importati la npub del contatto dichiarato
@@ -1932,6 +1966,129 @@ function openDetail(id){
   }, {passive: true});
   go('dettaglio');
 }
+
+/* ---------------- lightbox: foto a tutto schermo con zoom ----------------
+   Un tocco sulla foto del dettaglio apre la galleria intera su fondo
+   scuro. Tutto vanilla: pointer events (il pinch sono due dita nella
+   Map), touch-action:none sul palco, rotella e doppio click da
+   desktop. La trasformazione e' translate+scale sul centro del palco:
+   lo zoom tiene fermo il punto toccato. Lo swipe tra le foto vive
+   solo a zoom 1: ingrandito, il dito serve a muoversi nella foto. */
+let lbFoto = [], lbIdx = 0, lbS = 1, lbTx = 0, lbTy = 0;
+const lbPtr = new Map();
+let lbPinch0 = null, lbMid = null, lbMoved = false, lbSwipeX = 0;
+
+function apriLightbox(i){
+  const l = currentListing;
+  if (!l || !l.photos || !l.photos.length) return;
+  haptic();
+  lbFoto = l.photos;
+  el('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';   // sotto non si scorre
+  lbMostra(i || 0);
+}
+function chiudiLightbox(){
+  el('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+  el('lbImg').removeAttribute('src');   // niente foto fantasma alla prossima
+}
+function lbMostra(i){
+  lbIdx = (i + lbFoto.length) % lbFoto.length;
+  lbS = 1; lbTx = 0; lbTy = 0; lbApplica();
+  el('lbImg').src = lbFoto[lbIdx];
+  el('lbDots').innerHTML = lbFoto.length > 1
+    ? lbFoto.map((_,j)=>`<i${j===lbIdx?' class="on"':''}></i>`).join('') : '';
+}
+function lbApplica(){
+  /* La foto non deve mai perdersi fuori schermo: il bordo puo'
+     sconfinare di poco (40px), che e' anche il gioco del feedback
+     dello swipe a zoom 1 */
+  const img = el('lbImg'), st = el('lbStage');
+  const mx = Math.max(0, (img.clientWidth*lbS - st.clientWidth)/2) + 40;
+  const my = Math.max(0, (img.clientHeight*lbS - st.clientHeight)/2) + 40;
+  lbTx = Math.max(-mx, Math.min(mx, lbTx));
+  lbTy = Math.max(-my, Math.min(my, lbTy));
+  img.style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbS})`;
+  img.style.cursor = lbS > 1 ? 'grab' : 'zoom-in';
+}
+function lbZoomA(px, py, s2){
+  /* zoom tenendo fermo il punto (px,py) dello schermo */
+  const st = el('lbStage').getBoundingClientRect();
+  const cx = st.left + st.width/2, cy = st.top + st.height/2;
+  s2 = Math.min(4, Math.max(1, s2));
+  lbTx = px - cx - (s2/lbS) * (px - cx - lbTx);
+  lbTy = py - cy - (s2/lbS) * (py - cy - lbTy);
+  lbS = s2;
+  if (lbS <= 1.02) { lbS = 1; lbTx = 0; lbTy = 0; }
+  lbApplica();
+}
+(() => {
+  const st = el('lbStage'), img = el('lbImg');
+  st.addEventListener('pointerdown', e => {
+    /* la capture tiene il dito anche se scivola fuori dal palco; se
+       il browser la nega (capita), il lightbox vive lo stesso */
+    try { st.setPointerCapture(e.pointerId); } catch(_) {}
+    lbPtr.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    lbMoved = false;
+    if (lbPtr.size === 2) {
+      const [a,b] = [...lbPtr.values()];
+      lbPinch0 = {d: Math.hypot(a.x-b.x, a.y-b.y) || 1, s: lbS};
+      lbMid = null; lbSwipeX = 0;
+    }
+  });
+  st.addEventListener('pointermove', e => {
+    const p = lbPtr.get(e.pointerId);
+    if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (Math.abs(dx) + Math.abs(dy) > 6) lbMoved = true;
+    lbPtr.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if (lbPtr.size === 2 && lbPinch0) {
+      /* pinch: lo zoom segue la distanza tra le dita, la foto segue
+         il punto di mezzo (cosi' pinch e trascinamento convivono) */
+      const [a,b] = [...lbPtr.values()];
+      const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      if (lbMid) { lbTx += mx - lbMid.x; lbTy += my - lbMid.y; }
+      lbMid = {x:mx, y:my};
+      lbZoomA(mx, my, lbPinch0.s * (Math.hypot(a.x-b.x, a.y-b.y) / lbPinch0.d));
+    } else if (lbPtr.size === 1) {
+      if (lbS > 1) { lbTx += dx; lbTy += dy; lbApplica(); }
+      else { lbSwipeX += dx; lbTx = lbSwipeX; lbApplica(); }
+    }
+  });
+  const su = e => {
+    lbPtr.delete(e.pointerId);
+    if (lbPtr.size < 2) { lbPinch0 = null; lbMid = null; }
+    if (lbPtr.size === 0 && lbS === 1) {
+      if (Math.abs(lbSwipeX) > 60 && lbFoto.length > 1) {
+        lbMostra(lbIdx + (lbSwipeX < 0 ? 1 : -1));
+      } else if (lbSwipeX) {   // sotto soglia: rientro morbido
+        img.classList.add('snap'); lbTx = 0; lbApplica();
+        setTimeout(()=>img.classList.remove('snap'), 200);
+      }
+      lbSwipeX = 0;
+    }
+  };
+  st.addEventListener('pointerup', su);
+  st.addEventListener('pointercancel', su);
+  st.addEventListener('dblclick', e =>
+    lbZoomA(e.clientX, e.clientY, lbS > 1 ? 1 : 2.5));
+  st.addEventListener('wheel', e => {
+    e.preventDefault();
+    lbZoomA(e.clientX, e.clientY, lbS * Math.exp(-e.deltaY/400));
+  }, {passive:false});
+  /* tap FUORI dalla foto = chiudi; dopo un trascinamento il click
+     residuo non conta */
+  el('lightbox').addEventListener('click', e => {
+    if (lbMoved) { lbMoved = false; return; }
+    if (e.target === st || e.target === el('lightbox')) chiudiLightbox();
+  });
+  document.addEventListener('keydown', e => {
+    if (!el('lightbox').classList.contains('open')) return;
+    if (e.key === 'Escape') chiudiLightbox();
+    if (e.key === 'ArrowRight' && lbFoto.length > 1) lbMostra(lbIdx + 1);
+    if (e.key === 'ArrowLeft'  && lbFoto.length > 1) lbMostra(lbIdx - 1);
+  });
+})();
 
 /* ---------------- acquisto / escrow ---------------- */
 let pollTimer = null, currentOrderId = null;
