@@ -60,6 +60,20 @@ VENDITORE_ID = 222   # a chi intestare gli annunci importati:
 # su GitHub. Finche' resta il segnaposto, la funzione e' spenta.
 NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
 
+# --- Post automatici (la piattaforma racconta i fatti) ----------------
+# Ogni nuovo annuncio in vetrina viene annunciato dai canali di
+# Barattolo: una nota Nostr (con la chiave piattaforma qui sopra) e un
+# post nel canale Telegram. Attivo di default; False per spegnere tutto.
+POST_AUTOMATICI = True
+# Il canale Telegram di Barattolo: "@nomecanale" oppure l'id numerico
+# (-100...). Il bot deve esserne AMMINISTRATORE. Vuoto = niente post
+# sul canale (la nota Nostr vive comunque).
+TELEGRAM_CANALE_ID = ""
+# Anti-spam: quanti post SINGOLI al massimo in un'ora. Oltre (o per le
+# raffiche, es. un import CSV) esce un solo post aggregato
+# ("N nuovi annunci nel barattolo").
+POST_MAX_ORA = 6
+
 # --- Collaudo ---------------------------------------------------------
 # True  = test locale con utenti finti (Compratore/Venditore/Admin)
 # False = OBBLIGATORIO prima di andare online!

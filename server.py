@@ -155,6 +155,24 @@ try:
 except ImportError:
     TETTO_SATS_ANNUNCIO = 0   # 0 = spento; es. 100_000 per accenderlo
 
+# I post automatici (la piattaforma che racconta i fatti) sono nati
+# dopo: i config.py gia' compilati possono non avere le chiavi. I
+# default valgono da soli: post ACCESI (i canali sono giovani, il
+# collaudo avviene sul campo), canale Telegram spento finche' non c'e'
+# l'id, tetto anti-spam a 6 post singoli l'ora.
+try:
+    from config import POST_AUTOMATICI
+except ImportError:
+    POST_AUTOMATICI = True
+try:
+    from config import TELEGRAM_CANALE_ID
+except ImportError:
+    TELEGRAM_CANALE_ID = ""
+try:
+    from config import POST_MAX_ORA
+except ImportError:
+    POST_MAX_ORA = 6
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -467,12 +485,18 @@ def init_db():
     # nostr_origine_d/foto: le coordinate dell'evento importato (tag d
     # e URL foto originali), scritte dall'import — servono alla
     # modifica firmata per ricostruire l'evento da sostituire sui relay
+    # post_canale_id/post_nostr_id: i riferimenti dei post automatici
+    # (message_id nel canale Telegram, event id della nota kind-1),
+    # scritti solo dai post singoli — servono al ciclo di vita
+    # (✏️ "Venduto" sul canale, cancellazione alla rimozione)
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
                     "nostr_event_id TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
                     "prezzo_eur REAL DEFAULT 0",
                     "nostr_origine_d TEXT DEFAULT ''",
-                    "nostr_origine_foto TEXT DEFAULT ''"):
+                    "nostr_origine_foto TEXT DEFAULT ''",
+                    "post_canale_id INTEGER DEFAULT 0",
+                    "post_nostr_id TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -1253,22 +1277,32 @@ def webhook_attivo() -> bool:
                 and not TELEGRAM_WEBHOOK_SEGRETO.startswith("INCOLLA"))
 
 
+_finto_msg_id = 0   # contatore dei message_id simulati in collaudo
+
+
 async def bot_api(metodo: str, dati: dict):
     """Chiama l'API del bot (sendMessage con tastiere,
-    answerCallbackQuery, editMessageText...). In collaudo stampa e
-    basta, SEMPRE — a differenza di notifica(), che simula solo gli
-    id piccoli degli utenti finti."""
+    answerCallbackQuery, editMessageText...) e ne restituisce la
+    risposta JSON (None su errore: chi non la usa non se ne accorge).
+    In collaudo stampa e basta, SEMPRE — a differenza di notifica(),
+    che simula solo gli id piccoli degli utenti finti — ma restituisce
+    un message_id finto (negativo), cosi' anche il ciclo di vita dei
+    post sul canale si collauda in console."""
+    global _finto_msg_id
     if MODALITA_COLLAUDO:
         print(f"🤖 [telegram simulato] {metodo} "
               f"{json.dumps(dati, ensure_ascii=False)}")
-        return
+        _finto_msg_id -= 1
+        return {"ok": True, "result": {"message_id": _finto_msg_id}}
     try:
         async with httpx.AsyncClient(timeout=20) as c:
-            await c.post(
+            r = await c.post(
                 f"https://api.telegram.org/bot{BOT_TOKEN}/{metodo}",
                 json=dati)
+            return r.json()
     except Exception as e:
         print(f"⚠️ Bot Telegram, {metodo} non consegnato: {e}")
+        return None
 
 
 # I lasciapassare della fusione, monouso e a vita breve (in memoria,
@@ -2303,6 +2337,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # E parte anche verso la piazza Nostr, in sottofondo: se i relay
     # tacciono, chi pubblica non se ne accorge nemmeno.
     asyncio.create_task(annuncio_su_nostr(annuncio_id, "active"))
+    # I canali di Barattolo lo annunceranno da soli (coda anti-spam:
+    # il drenatore decide tra post singolo e aggregato).
+    accoda_promo(annuncio_id)
     await premia_distintivi(user["id"])   # bottega avviata?
     return {"ok": True, "id": annuncio_id}
 
@@ -2502,6 +2539,8 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con.close()
     # Se era in piazza su Nostr, si chiede ai relay di toglierlo
     asyncio.create_task(ritira_da_nostr(annuncio_id))
+    # E anche i post automatici dei canali si ritirano da soli
+    asyncio.create_task(promo_rimuovi(annuncio_id))
     return {"ok": True}
 
 
@@ -2856,6 +2895,8 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
     con.close()
     # Se era in piazza su Nostr, si chiede ai relay di toglierlo
     asyncio.create_task(ritira_da_nostr(annuncio_id))
+    # E anche i post automatici dei canali si ritirano da soli
+    asyncio.create_task(promo_rimuovi(annuncio_id))
     await notifica(a["venditore_id"],
                    f"🚫 <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
                    f"rimosso</b> perché viola le regole del mercatino. "
@@ -3063,6 +3104,8 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
         # Anche la piazza Nostr deve sapere che l'oggetto e' andato
         asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "sold",
                                               solo_aggiornamento=True))
+        # ...e il post nel canale si aggiorna col ✅ Venduto
+        asyncio.create_task(promo_venduto(o["annuncio_id"]))
         msg = ("🔒 <b>Hai venduto!</b> I sats dell'acquirente sono in escrow. "
                "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
         if a and a["contatto_nostr"]:
@@ -4154,6 +4197,249 @@ async def ritira_da_nostr(annuncio_id: int, esigi_ok: bool = False) -> int:
         return 0
 
 
+# ---------- I POST AUTOMATICI: la piattaforma racconta i fatti -------
+# Quando un annuncio nuovo entra in vetrina, Barattolo lo annuncia da
+# solo sui suoi canali: una nota Nostr kind-1 (firmata dalla chiave
+# piattaforma) e un post nel canale Telegram (TELEGRAM_CANALE_ID, il
+# bot deve esserne amministratore). Zero AI, zero editoriale: solo
+# fatti veri, formattati bene.
+# L'anti-spam e' una coda con drenatore a finestra: chi pubblica si
+# limita ad accodare, il drenatore dorme ATTESA_RAGGRUPPO secondi e
+# poi decide — pochi annunci e budget orario capiente = post singoli,
+# una raffica (l'import CSV da 500 righe) = UN solo post aggregato.
+# Fail-open totale: post fallito = riga in console, mai un errore per
+# chi pubblica. In collaudo si simula tutto in console (bot_api e
+# _spedisci_ai_relay lo fanno gia' da soli).
+
+CODA_PROMO: list[int] = []              # annunci in attesa di annuncio
+_drenatore_promo_avviato = False
+_post_promo_recenti: list[float] = []   # timestamp dei post singoli
+ATTESA_RAGGRUPPO = 5 if MODALITA_COLLAUDO else 90   # finestra (secondi)
+SOGLIA_AGGREGA = 3         # piu' di cosi' in una finestra = aggregato
+PAUSA_TRA_PROMO = 2        # secondi tra un post singolo e l'altro
+
+
+def _fmt_sats(n: int) -> str:
+    """80000 -> '80.000': i puntini delle migliaia all'italiana."""
+    return f"{n:,}".replace(",", ".")
+
+
+def _prezzo_promo(a: dict, cambio: float) -> str:
+    """Il prezzo del post: la valuta del listino per prima, l'altra
+    col ≈. Se il cambio non c'e' (CoinGecko muto) il ≈ si omette."""
+    if a.get("valuta") == "eur" and a.get("prezzo_eur"):
+        return (f"{a['prezzo_eur']:.2f} € "
+                f"(≈ {_fmt_sats(a['prezzo_sats'])} sats)")
+    prezzo = f"{_fmt_sats(a['prezzo_sats'])} sats"
+    if cambio > 0:
+        eur = a["prezzo_sats"] / 100_000_000 * cambio
+        prezzo += f" (≈ {eur:.2f} €)"
+    return prezzo
+
+
+def _dettagli_promo(a: dict) -> str:
+    """Categoria e zona, se ci sono, gia' cucite col puntino."""
+    return " · ".join(p for p in (a.get("categoria"), a.get("zona")) if p)
+
+
+def _nota_promo(a: dict, cambio: float) -> str:
+    """Il testo della nota Nostr kind-1: una riga di fatto, l'immagine
+    come URL su una riga sua (i client la mostrano inline), il link."""
+    testo = f"🫙 Nuovo nel barattolo: {a['titolo']} — {_prezzo_promo(a, cambio)}"
+    dettagli = _dettagli_promo(a)
+    if dettagli:
+        testo += f" · {dettagli}"
+    foto = _foto_url_nostr(a.get("foto", ""))
+    if foto:
+        testo += f"\n\n{foto[0]}"
+    testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    return testo
+
+
+def _caption_canale(a: dict, cambio: float, venduto: bool = False) -> str:
+    """La caption HTML del post nel canale Telegram (usata anche per
+    RICOSTRUIRE il testo quando si edita col ✅ Venduto: cosi' non
+    serve salvarlo da nessuna parte)."""
+    testo = f"🫙 <b>{html.escape(a['titolo'])}</b>\n{_prezzo_promo(a, cambio)}"
+    dettagli = _dettagli_promo(a)
+    if dettagli:
+        testo += f" · {html.escape(dettagli)}"
+    testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    if venduto:
+        testo += "\n\n✅ Venduto"
+    return testo
+
+
+def accoda_promo(annuncio_id: int):
+    """Mette l'annuncio in coda per i post automatici e, se dorme,
+    sveglia il drenatore. Leggera e sincrona: si chiama DOPO il commit,
+    mai dentro una transazione."""
+    global _drenatore_promo_avviato
+    if not POST_AUTOMATICI:
+        return
+    CODA_PROMO.append(annuncio_id)
+    if not _drenatore_promo_avviato:
+        _drenatore_promo_avviato = True
+        asyncio.create_task(_drena_promo())
+
+
+async def _drena_promo():
+    """Il drenatore: dorme la finestra di raggruppamento, prende TUTTO
+    quel che si e' accumulato e applica la regola unica — post singoli
+    se sono pochi e il budget orario regge, un solo aggregato
+    altrimenti. Rilegge ogni annuncio dal database: chi e' stato
+    venduto o rimosso durante l'attesa non viene mai annunciato."""
+    global _drenatore_promo_avviato
+    await asyncio.sleep(ATTESA_RAGGRUPPO)
+    ids = list(dict.fromkeys(CODA_PROMO))   # senza doppioni, in ordine
+    CODA_PROMO.clear()
+    _drenatore_promo_avviato = False   # chi arriva ora fa un giro nuovo
+    try:
+        annunci = []
+        con = db()
+        for i in ids:
+            a = con.execute("SELECT * FROM annunci WHERE id=?",
+                            (i,)).fetchone()
+            if a and a["stato"] == "attivo" and not a["contatto_nostr"]:
+                annunci.append(dict(a))
+        con.close()
+        if not annunci:
+            return
+        adesso = time.time()
+        _post_promo_recenti[:] = [t for t in _post_promo_recenti
+                                  if adesso - t < 3600]
+        if (len(annunci) <= SOGLIA_AGGREGA and
+                len(_post_promo_recenti) + len(annunci) <= POST_MAX_ORA):
+            for a in annunci:
+                await _posta_promo_singolo(a)
+                _post_promo_recenti.append(time.time())
+                await asyncio.sleep(PAUSA_TRA_PROMO)
+        else:
+            # La valvola anti-spam: un solo post, passa sempre (non
+            # puo' spammare — al massimo uno a finestra, e solo se
+            # qualcuno pubblica davvero).
+            await _posta_promo_aggregato(len(annunci))
+    except Exception as e:
+        print(f"⚠️ Post automatici saltati: {e}")
+
+
+async def _posta_promo_singolo(a: dict):
+    """Un annuncio, un post per canale. Ogni canale fallisce per conto
+    suo; i riferimenti (message_id, event id) si salvano per il ciclo
+    di vita (✅ Venduto, cancellazione)."""
+    cambio = await cambio_btc_eur()
+    post_nostr_id, post_canale_id = "", 0
+    if _NOSTR:
+        try:
+            evento = firma_evento(1, [["t", "barattolo"]],
+                                  _nota_promo(a, cambio))
+            if await _spedisci_ai_relay(evento):
+                post_nostr_id = evento["id"]
+        except Exception as e:
+            print(f"⚠️ Nota promo Nostr #{a['id']} saltata: {e}")
+    if TELEGRAM_CANALE_ID:
+        caption = _caption_canale(a, cambio)
+        foto = _foto_url_nostr(a.get("foto", ""))
+        r = None
+        if foto:
+            r = await bot_api("sendPhoto", {
+                "chat_id": TELEGRAM_CANALE_ID, "photo": foto[0],
+                "caption": caption, "parse_mode": "HTML"})
+        if not (r and r.get("ok")):
+            r = await bot_api("sendMessage", {
+                "chat_id": TELEGRAM_CANALE_ID, "text": caption,
+                "parse_mode": "HTML"})
+        if r and r.get("ok"):
+            post_canale_id = r["result"]["message_id"]
+    if post_nostr_id or post_canale_id:
+        con = db()
+        con.execute(
+            "UPDATE annunci SET post_nostr_id=?, post_canale_id=? "
+            "WHERE id=?", (post_nostr_id, post_canale_id, a["id"]))
+        con.commit()
+        con.close()
+
+
+async def _posta_promo_aggregato(n: int):
+    """Il post valvola delle raffiche: niente nomi, solo il conto e il
+    link alla vetrina. Nessun ciclo di vita (non nomina nessuno)."""
+    conto = "1 nuovo annuncio" if n == 1 else f"{n} nuovi annunci"
+    testo = f"📦 {conto} nel barattolo → {URL_PUBBLICO}"
+    if _NOSTR:
+        try:
+            await _spedisci_ai_relay(
+                firma_evento(1, [["t", "barattolo"]], testo))
+        except Exception as e:
+            print(f"⚠️ Nota promo aggregata saltata: {e}")
+    if TELEGRAM_CANALE_ID:
+        await bot_api("sendMessage",
+                      {"chat_id": TELEGRAM_CANALE_ID, "text": testo})
+
+
+# Il ciclo di vita agisce solo su post GIA' fatti (le colonne piene):
+# per questo non guarda la leva POST_AUTOMATICI — un post esistente va
+# tenuto vero (o tolto) anche se nel frattempo la leva e' stata spenta.
+
+async def promo_venduto(annuncio_id: int, venduto: bool = True):
+    """L'annuncio e' stato venduto: il post nel canale si aggiorna col
+    ✅ Venduto. La nota Nostr resta com'e': e' storia vera. Con
+    venduto=False fa il viaggio inverso (rimborso: l'oggetto torna in
+    vetrina e il post non deve mentire)."""
+    try:
+        con = db()
+        a = con.execute("SELECT * FROM annunci WHERE id=?",
+                        (annuncio_id,)).fetchone()
+        con.close()
+        if not a or not a["post_canale_id"] or not TELEGRAM_CANALE_ID:
+            return
+        caption = _caption_canale(dict(a), await cambio_btc_eur(),
+                                  venduto=venduto)
+        dati = {"chat_id": TELEGRAM_CANALE_ID,
+                "message_id": a["post_canale_id"], "parse_mode": "HTML"}
+        # Con la foto il testo vive nella caption, senza nel body — ma
+        # il ripiego sendMessage di _posta_promo_singolo rende il tipo
+        # ambiguo: si tenta il piu' probabile e poi l'altro.
+        campo = {"editMessageCaption": "caption", "editMessageText": "text"}
+        tentativi = (["editMessageCaption", "editMessageText"]
+                     if _foto_url_nostr(a["foto"])
+                     else ["editMessageText", "editMessageCaption"])
+        for metodo in tentativi:
+            r = await bot_api(metodo, {**dati, campo[metodo]: caption})
+            if r and r.get("ok"):
+                break
+    except Exception as e:
+        print(f"⚠️ Aggiornamento post venduto #{annuncio_id} saltato: {e}")
+
+
+async def promo_rimuovi(annuncio_id: int):
+    """L'annuncio e' sparito dalla vetrina: il post nel canale si
+    cancella e la nota Nostr riceve la sua NIP-09 (fail-open: se un
+    relay la ignora, pazienza — la nota non mente, l'annuncio c'era)."""
+    try:
+        con = db()
+        a = con.execute(
+            "SELECT post_canale_id, post_nostr_id, foto FROM annunci "
+            "WHERE id=?", (annuncio_id,)).fetchone()
+        con.close()
+        if not a or not (a["post_canale_id"] or a["post_nostr_id"]):
+            return
+        if a["post_canale_id"] and TELEGRAM_CANALE_ID:
+            await bot_api("deleteMessage",
+                          {"chat_id": TELEGRAM_CANALE_ID,
+                           "message_id": a["post_canale_id"]})
+        if a["post_nostr_id"] and _NOSTR:
+            await _spedisci_ai_relay(
+                firma_evento(5, [["e", a["post_nostr_id"]], ["k", "1"]],
+                             "Annuncio rimosso da Barattolo"))
+        con = db()
+        con.execute("UPDATE annunci SET post_canale_id=0, "
+                    "post_nostr_id='' WHERE id=?", (annuncio_id,))
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Ritiro post automatici #{annuncio_id} saltato: {e}")
+
+
 @app.post("/api/orders/{ordine_id}/invoice")
 async def deposita_invoice(ordine_id: int, req: Request,
                            x_tg_init_data: str = Header(""),
@@ -4337,6 +4623,10 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # ...e torna disponibile anche sulla piazza Nostr
             asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "active",
                                                   solo_aggiornamento=True))
+            # ...e il post nel canale toglie il ✅ Venduto: l'oggetto
+            # e' di nuovo in vetrina, il post non deve mentire
+            asyncio.create_task(promo_venduto(o["annuncio_id"],
+                                              venduto=False))
             await notifica(o["compratore_id"],
                            f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
                            f"<b>{importo} sats</b> è in arrivo nel tuo wallet. "
@@ -5073,6 +5363,11 @@ async def _lavoro_import(biglietto: str):
                        for i in range(0, len(approvate), 4)]:
             await asyncio.gather(*[_crea_riga_con_guardia(lavoro, r)
                                    for r in gruppo])
+        # I canali di Barattolo: tutti in coda INSIEME a foto finite,
+        # cosi' la finestra del drenatore li vede in un colpo solo e
+        # un import fa sempre UN solo post aggregato, mai una raffica.
+        for annuncio_id in lavoro["ok"]:
+            accoda_promo(annuncio_id)
 
         # --- Fase 3: la piazza Nostr, senza fretta ---
         if lavoro["nostr"] and lavoro["ok"] and _NOSTR:
