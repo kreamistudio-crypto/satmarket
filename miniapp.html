@@ -797,6 +797,7 @@
       Nessun oggetto trovato per <b id="emptyQ"></b>.<br>
       Hai qualcosa da vendere? 3 minuti e sei in vetrina.
       <button class="btn orange" onclick="go('vendi')">+ Metti in vendita</button>
+      <button class="btn ghost" id="btnAvvisami" style="display:none" onclick="avvisamiDaRicerca()">🔔 Avvisami se arriva</button>
     </div>
     <!-- La sentinella dello scroll infinito: quando si avvicina allo
          schermo si carica la pagina di annunci successiva -->
@@ -953,6 +954,11 @@
       <div class="acc" id="accAvvisi">
         <button class="acc-h" onclick="toggleAcc('accAvvisi')"><span class="em">🔔</span>Avvisi<span class="fr">▾</span></button>
         <div class="acc-b"><div id="avvisiBlocco"></div></div>
+      </div>
+
+      <div class="acc" id="accRicerche" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accRicerche')"><span class="em">🔎</span>Avvisi di ricerca <span class="conta" id="ricercheConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="ricercheBlocco"></div></div>
       </div>
 
       <div class="acc" id="accAspetto">
@@ -1441,6 +1447,10 @@ function renderGrid(items){
     + `<span class="conta">${nTot} oggett${nTot===1?'o':'i'}</span>`;
   el('gridEmpty').style.display = data.length ? 'none':'block';
   el('emptyQ').textContent = q || activeCat;
+  /* «Avvisami se arriva»: solo per chi ha un account vero (in demo e
+     vetrina non ci sono avvisi da salvare) */
+  const ba = el('btnAvvisami');
+  if (ba) ba.style.display = (!data.length && !DEMO && !VETRINA) ? '' : 'none';
   el('grid').innerHTML = data.map(cardHTML).join('');
 }
 
@@ -2738,6 +2748,7 @@ function renderIdentita(){
   }
   box.innerHTML = tgRiga + nsRiga;
   renderAvvisi();
+  renderRicerche();
 }
 
 /* ---- Avvisi: dove ricevere le notifiche sugli affari. Le scelte si
@@ -2799,6 +2810,203 @@ async function setCanale(canale){
   toast(canale==='nostr' ? '💌 Avvisi via DM Nostr'
       : canale==='entrambi' ? '🔔 Avvisi su Telegram e Nostr'
       : '✈️ Avvisi su Telegram');
+}
+
+/* ---- Avvisi di ricerca: «dimmi quando esce quello che cerco».
+   L'utente salva fino a 5 ricerche (categorie, comune+raggio, prezzo
+   max, parole chiave) e il server lo avvisa alla pubblicazione di un
+   annuncio che matcha, sul canale scelto qui sopra. Il cassetto
+   sparisce in DEMO e VETRINA come il wallet. ---- */
+let myRicerche = null;          // cache di GET /me/avvisi-ricerca
+let ricercaInModifica = null;   // id dell'avviso nel form (null = nuovo)
+let ricercaPrecompila = null;   // passamano dal CTA di Esplora
+let ricercaCats = new Set();    // pillole categoria selezionate
+let ricercaValuta = 'sats';     // valuta del prezzo max nel form
+
+async function renderRicerche(){
+  const box = el('ricercheBlocco');
+  if (!box) return;
+  const sez = el('accRicerche');
+  if (DEMO || VETRINA) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  if (!myRicerche) {
+    try {
+      const r = await fetch(`${API_BASE}/me/avvisi-ricerca`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (!r.ok) throw 0;
+      myRicerche = await r.json();
+    } catch {
+      box.innerHTML = '<div style="font-size:12.5px;color:var(--muted);font-weight:600">Non riesco a leggere i tuoi avvisi: riprova tra un momento.</div>';
+      return;
+    }
+  }
+  const avvisi = myRicerche.avvisi || [];
+  const conta = el('ricercheConta');
+  if (conta) conta.textContent = avvisi.length ? `(${avvisi.length} di ${myRicerche.max})` : '';
+
+  /* il riepilogo leggibile di un avviso: solo i criteri impostati */
+  const rec = a => {
+    const pezzi = [a.categorie.length ? a.categorie.join(' · ') : 'Tutte le categorie'];
+    if (a.comune) pezzi.push(`entro ${a.raggio_km} km da ${a.comune}`);
+    if (a.prezzo_max_sats) pezzi.push(`max ${fmt(a.prezzo_max_sats)} sats`);
+    if (a.prezzo_max_eur) pezzi.push(`max ${fmtEur(a.prezzo_max_eur)} €`);
+    if (a.parole) pezzi.push(`«${a.parole}»`);
+    return esc(pezzi.join(' · '));
+  };
+  const az = 'font:inherit;background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px';
+  const lista = avvisi.map(a => `
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px dashed var(--line)">
+      <div style="flex:1;font-size:12.5px;font-weight:700;line-height:1.4;color:${a.attivo?'var(--ink)':'var(--muted)'}">
+        ${a.attivo?'':'⏸ '}${rec(a)}</div>
+      <button style="${az}" title="Modifica" onclick="modificaRicerca(${a.id})">✏️</button>
+      <button style="${az}" title="${a.attivo?'Metti in pausa':'Riattiva'}" onclick="pausaRicerca(${a.id})">${a.attivo?'⏸':'▶️'}</button>
+      <button style="${az}" title="Elimina" onclick="eliminaRicerca(${a.id})">🗑</button>
+    </div>`).join('');
+
+  /* i valori del form: vuoti, dall'avviso in modifica, o dal CTA
+     «Avvisami» di Esplora (il passamano si consuma qui) */
+  let vals = {comune:'', raggio:25, prezzo:'', parole:''};
+  if (ricercaInModifica) {
+    const a = avvisi.find(x => x.id === ricercaInModifica);
+    if (a) {
+      vals = {comune: a.comune, raggio: a.raggio_km || 25,
+              prezzo: a.prezzo_max_sats ? String(a.prezzo_max_sats)
+                    : a.prezzo_max_eur ? String(a.prezzo_max_eur).replace('.',',') : '',
+              parole: a.parole};
+      ricercaCats = new Set(a.categorie);
+      ricercaValuta = a.prezzo_max_eur ? 'eur' : 'sats';
+    } else ricercaInModifica = null;
+  } else if (ricercaPrecompila) {
+    vals.parole = ricercaPrecompila.parole || '';
+    ricercaCats = new Set(ricercaPrecompila.categoria ? [ricercaPrecompila.categoria] : []);
+    ricercaPrecompila = null;
+  }
+
+  let form;
+  if (!ricercaInModifica && avvisi.length >= myRicerche.max) {
+    form = `<div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      Hai già ${myRicerche.max} avvisi: eliminane uno per farne di nuovi.</div>`;
+  } else {
+    /* le categorie del catalogo: stringhe fisse, sicure negli onclick */
+    const chips = CATS.slice(1).map(c =>
+      `<div class="chip ${ricercaCats.has(c)?'active':''}" onclick="toggleRicercaCat('${c}', this)">${c}</div>`).join('');
+    form = `
+    <div style="margin-top:12px;font-size:13px;font-weight:800">${ricercaInModifica ? '✏️ Stai modificando un avviso' : 'Nuovo avviso'}</div>
+    <div style="margin-top:6px;font-size:12.5px;color:var(--muted);font-weight:600">Categorie (nessuna = tutte)</div>
+    <div class="chips" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+    <div class="field" style="margin-top:10px"><label>Comune (facoltativo)</label>
+      <input id="ricComune" list="comuniList" value="${esc(vals.comune)}" placeholder="Es. Pavia" oninput="suggerisciComuni(this.value)" autocomplete="off">
+      <datalist id="comuniList"></datalist></div>
+    <div class="field"><label>Raggio</label>
+      <select id="ricRaggio">${[10,25,50,100].map(k =>
+        `<option value="${k}" ${k===vals.raggio?'selected':''}>entro ${k} km</option>`).join('')}</select></div>
+    <div class="field"><label>Prezzo massimo (facoltativo)</label>
+      <div style="display:flex;gap:6px">
+        <input id="ricPrezzo" inputmode="decimal" value="${esc(vals.prezzo)}" placeholder="Es. 50 000" style="flex:1">
+        <button type="button" id="ricValuta" class="btn ghost" style="margin:0;min-width:64px" onclick="toggleRicercaValuta(this)">${ricercaValuta==='eur'?'€':'sats'}</button>
+      </div></div>
+    <div class="field"><label>Parole chiave (facoltative)</label>
+      <input id="ricParole" value="${esc(vals.parole)}" placeholder="Es. bici corsa"></div>
+    <button class="btn orange" style="margin-top:4px" onclick="salvaRicerca()">${ricercaInModifica ? '💾 Salva le modifiche' : '🔔 Crea l\'avviso'}</button>
+    ${ricercaInModifica ? '<button class="btn link" onclick="annullaModificaRicerca()">Annulla la modifica</button>' : ''}`;
+  }
+
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      Ti avviso io quando esce quello che cerchi: scegli i criteri e
+      ci pensa il barattolo a guardare la vetrina per te.</div>
+    ${lista}${form}`;
+}
+
+function toggleRicercaCat(c, nodo){
+  haptic();
+  if (ricercaCats.has(c)) ricercaCats.delete(c); else ricercaCats.add(c);
+  nodo.classList.toggle('active');
+}
+
+function toggleRicercaValuta(nodo){
+  haptic();
+  ricercaValuta = ricercaValuta === 'sats' ? 'eur' : 'sats';
+  nodo.textContent = ricercaValuta === 'eur' ? '€' : 'sats';
+}
+
+/* l'autocomplete del comune: suggerimenti dal server, con calma */
+let comuniTimer = 0;
+function suggerisciComuni(q){
+  clearTimeout(comuniTimer);
+  if ((q || '').trim().length < 2) return;
+  comuniTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/comuni?q=${encodeURIComponent(q)}`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json();
+      const dl = el('comuniList');
+      if (dl) dl.innerHTML = (d.comuni || []).map(c =>
+        `<option value="${esc(c.nome)}">${esc(c.provincia)}</option>`).join('');
+    } catch {}
+  }, 250);
+}
+
+async function salvaRicerca(){
+  haptic();
+  const body = {
+    categorie: [...ricercaCats],
+    comune: el('ricComune') ? el('ricComune').value.trim() : '',
+    raggio_km: el('ricRaggio') ? parseInt(el('ricRaggio').value, 10) : 0,
+    prezzo_max: el('ricPrezzo') ? el('ricPrezzo').value.trim().replace(/\s/g,'') : 0,
+    valuta: ricercaValuta,
+    parole: el('ricParole') ? el('ricParole').value.trim() : ''
+  };
+  if (ricercaInModifica) body.id = ricercaInModifica;
+  const r = await fetch(`${API_BASE}/me/avvisi-ricerca`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+     body: JSON.stringify(body)});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  const eraModifica = !!ricercaInModifica;
+  ricercaInModifica = null; ricercaCats = new Set(); ricercaValuta = 'sats';
+  myRicerche = null;
+  renderRicerche();
+  toast(eraModifica ? '💾 Avviso aggiornato' : '🔔 Avviso creato: ti dico io quando arriva');
+}
+
+function modificaRicerca(id){ haptic(); ricercaInModifica = id; renderRicerche(); }
+function annullaModificaRicerca(){
+  ricercaInModifica = null; ricercaCats = new Set(); ricercaValuta = 'sats';
+  renderRicerche();
+}
+
+async function pausaRicerca(id){
+  haptic();
+  const r = await fetch(`${API_BASE}/me/avvisi-ricerca/${id}/pausa`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  myRicerche = null; renderRicerche();
+  toast(d.attivo ? '▶️ Avviso riattivato' : '⏸ Avviso in pausa');
+}
+
+async function eliminaRicerca(id){
+  if (!confirm('Elimino questo avviso di ricerca?')) return;
+  const r = await fetch(`${API_BASE}/me/avvisi-ricerca/${id}/elimina`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  if (!r.ok) { toast('Non ci sono riuscito, riprova', 6000); return; }
+  myRicerche = null; renderRicerche();
+  toast('🗑 Avviso eliminato');
+}
+
+/* il CTA di Esplora dopo una ricerca a vuoto: precompila un avviso
+   con la query e la categoria attiva e porta al cassetto giusto */
+function avvisamiDaRicerca(){
+  haptic();
+  ricercaPrecompila = {parole: el('q').value.trim(),
+                       categoria: activeCat !== 'Tutto' ? activeCat : ''};
+  ricercaInModifica = null;
+  myRicerche = null;                 // dati freschi quando si apre
+  apriCassettoProfilo('accRicerche');
 }
 
 async function abilitaAccessoNostr(){

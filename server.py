@@ -37,6 +37,7 @@ import html
 import io
 import ipaddress
 import json
+import math
 import os
 import re
 import secrets
@@ -438,6 +439,33 @@ def init_db():
         creato INTEGER,
         PRIMARY KEY(id_importato, id_nativo)
     );
+    CREATE TABLE IF NOT EXISTS avvisi_ricerca(
+        -- «dimmi quando esce quello che cerco»: i criteri salvati
+        -- dall'utente. Il matching gira alla pubblicazione (coda +
+        -- drenatore, gemello dei post automatici)
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        categorie TEXT DEFAULT '',    -- '|Elettronica|Motori|' ('' = tutte)
+        comune TEXT DEFAULT '',       -- nome dal dataset ('' = tutta Italia)
+        lat REAL DEFAULT 0, lon REAL DEFAULT 0,
+        raggio_km INTEGER DEFAULT 0,  -- 0 = tutta Italia
+        prezzo_max_sats INTEGER DEFAULT 0,  -- tetto in sats (0 = nessuno)
+        prezzo_max_eur REAL DEFAULT 0,      -- OPPURE in EUR (mai entrambi)
+        parole TEXT DEFAULT '',       -- gia' normalizzate, spazio-separate
+        attivo INTEGER DEFAULT 1,     -- 0 = in pausa
+        creato INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_avvisi_ricerca_tg
+        ON avvisi_ricerca(tg_id);
+    CREATE TABLE IF NOT EXISTS avvisi_notificati(
+        -- dedup: lo stesso annuncio non suona MAI due volte per lo
+        -- stesso utente (modifiche, re-import). Nel DB e non in
+        -- memoria: un riavvio non deve far risuonare nulla.
+        tg_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        creato INTEGER,
+        PRIMARY KEY(tg_id, annuncio_id)
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -496,7 +524,14 @@ def init_db():
                     "nostr_origine_d TEXT DEFAULT ''",
                     "nostr_origine_foto TEXT DEFAULT ''",
                     "post_canale_id INTEGER DEFAULT 0",
-                    "post_nostr_id TEXT DEFAULT ''"):
+                    "post_nostr_id TEXT DEFAULT ''",
+                    # lat/lon: coordinate del comune riconosciuto nella
+                    # zona (0,0 = non riconosciuta). Scritte una volta
+                    # alla pubblicazione/modifica, mai a ogni match; il
+                    # backfill vive in backfill_coordinate(), che gira
+                    # dopo carica_comuni()
+                    "lat REAL DEFAULT 0",
+                    "lon REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -1426,6 +1461,15 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE badge_utente SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM badge_utente WHERE tg_id=?", (id_nostr,))
+        # Gli avvisi di ricerca seguono l'utente; il dedup delle
+        # notifiche migra in unione come i distintivi (se entrambe le
+        # meta' erano gia' state avvisate di un annuncio, una riga basta)
+        con.execute("UPDATE avvisi_ricerca SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE OR IGNORE avvisi_notificati SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM avvisi_notificati WHERE tg_id=?",
+                    (id_nostr,))
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -1965,6 +2009,145 @@ def controlla_vietato(titolo: str, descrizione: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------
+# GEOGRAFIA — la mappa dei comuni per gli avvisi di ricerca.
+# Un CSV committato (dati/comuni.csv, ~7.900 comuni con lat/lon dal
+# centro del comune) letto in memoria all'avvio: zero rete, zero
+# latenza. Niente Nominatim nel percorso caldo di pubblica().
+# La zona degli annunci resta testo libero: se non ci riconosciamo
+# un comune, l'annuncio semplicemente non ha coordinate e matcha
+# solo i criteri non geografici degli avvisi (imperfezione dichiarata).
+
+COMUNI: dict[str, tuple[float, float]] = {}   # chiave normalizzata -> (lat, lon)
+COMUNI_LISTA: list[dict] = []                  # per l'autocomplete del form
+
+# Comuni che sono anche parole comuni: dentro una zona tipo "vendo in
+# paese" non devono diventare Paese (TV). Matchano solo se la zona e'
+# ESATTAMENTE quel nome. Meglio nessuna coordinata che una sbagliata.
+COMUNI_PAROLA = {"paese", "vita", "sale", "calcio", "none", "parete",
+                 "ora", "bella", "dolce"}
+
+# Preposizioni e articoli dei nomi ufficiali: 'Reggio nell'Emilia' deve
+# rispondere anche a 'reggio emilia', e viceversa la zona scritta
+# 'Cassano allo Ionio' deve trovare 'Cassano all'Ionio'.
+PREPOSIZIONI_COMUNI = {"di", "del", "della", "dell", "delle", "dei",
+                       "degli", "nel", "nell", "nella", "nello",
+                       "sul", "sull", "sulla", "sullo", "in",
+                       "al", "all", "allo", "alla", "agli", "alle",
+                       "la", "lo", "l", "de", "d"}
+
+
+def carica_comuni():
+    """Legge dati/comuni.csv (nome;provincia;lat;lon) e riempie il
+    dizionario. Fail-open: file assente o storto = dict vuoto, la
+    funzione geografica si spegne e tutto il resto vive. I ~7 nomi
+    duplicati d'Italia (Castro, Peglio, Livo...) entrano solo con la
+    provincia ('castro bg'): la chiave nuda ambigua si scarta."""
+    global COMUNI, COMUNI_LISTA
+    try:
+        visti: dict[str, tuple[float, float] | None] = {}
+        alias: dict[str, tuple[float, float] | None] = {}
+        lista = []
+        with open(os.path.join("dati", "comuni.csv"), encoding="utf-8") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                nome, prov = r["nome"].strip(), r["provincia"].strip()
+                coord = (float(r["lat"]), float(r["lon"]))
+                chiave = normalizza(nome)
+                # None = nome conteso tra piu' province: via dal dict
+                visti[chiave] = None if chiave in visti else coord
+                visti[normalizza(f"{nome} {prov}")] = coord
+                # alias senza preposizioni: 'Reggio nell'Emilia' deve
+                # rispondere anche a 'reggio emilia' (e' come lo
+                # scrivono tutti). Collisioni tra alias = via.
+                corto = " ".join(p for p in chiave.split()
+                                 if p not in PREPOSIZIONI_COMUNI)
+                if corto and corto != chiave:
+                    alias[corto] = None if corto in alias else coord
+                lista.append({"nome": nome, "provincia": prov})
+        COMUNI = {k: v for k, v in visti.items() if v is not None}
+        # i nomi veri vincono sempre: un alias non li tocca ne' li
+        # resuscita (se 'castro' e' conteso, resta fuori e basta)
+        for k, v in alias.items():
+            if v is not None and k not in visti:
+                COMUNI[k] = v
+        COMUNI_LISTA = lista
+        print(f"🗺️ Comuni caricati: {len(lista)}")
+    except Exception as e:
+        COMUNI, COMUNI_LISTA = {}, []
+        print(f"🗺️ Comuni non caricati ({e}): avvisi solo non-geografici")
+
+
+def coordinate_da_zona(zona: str) -> tuple[float, float]:
+    """Estrae le coordinate dal testo libero della zona. Scansione
+    degli n-grammi dal piu' lungo al piu' corto ('San Valentino in
+    Abruzzo Citeriore' prima di 'Abruzzo'), a parita' vince il primo
+    nel testo (la gente scrive prima il proprio paese: 'tra Pavia e
+    Milano' -> Pavia). 'vicino Milano' -> Milano: il raggio
+    dell'avviso assorbe il 'vicino'. (0,0) = non riconosciuta."""
+    token = normalizza(zona).split()
+    if not token or not COMUNI:
+        return (0.0, 0.0)
+    intera = " ".join(token)
+    if intera in COMUNI:            # zona = esattamente un comune,
+        return COMUNI[intera]       # vale anche per i COMUNI_PAROLA
+
+    def scandisci(parole):
+        for lung in range(min(6, len(parole)), 0, -1):
+            for i in range(len(parole) - lung + 1):
+                chiave = " ".join(parole[i:i + lung])
+                if lung == 1 and chiave in COMUNI_PAROLA:
+                    continue
+                if chiave in COMUNI:
+                    return COMUNI[chiave]
+        return None
+
+    trovato = scandisci(token)
+    if trovato is None:             # secondo giro senza preposizioni:
+        asciutti = [p for p in token if p not in PREPOSIZIONI_COMUNI]
+        if asciutti and asciutti != token:
+            trovato = scandisci(asciutti)
+    return trovato or (0.0, 0.0)
+
+
+def distanza_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Haversine: chilometri in linea d'aria tra due punti."""
+    rlat1, rlat2 = math.radians(lat1), math.radians(lat2)
+    dlat = rlat2 - rlat1
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) ** 2
+         + math.cos(rlat1) * math.cos(rlat2) * math.sin(dlon / 2) ** 2)
+    return 6371.0 * 2 * math.asin(math.sqrt(a))
+
+
+def backfill_coordinate():
+    """Da' le coordinate agli annunci nati prima delle colonne lat/lon.
+    Idempotente e leggero: riprova solo le righe ancora a (0,0) con una
+    zona scritta — quelle irriconoscibili si riscandiscono a ogni avvio,
+    costo di pochi millisecondi (e un domani un dataset piu' ricco le
+    puo' ripescare)."""
+    try:
+        con = db()
+        righe = con.execute("SELECT id, zona FROM annunci "
+                            "WHERE lat=0 AND lon=0 AND zona!=''").fetchall()
+        trovate = 0
+        for r in righe:
+            lat, lon = coordinate_da_zona(r["zona"])
+            if lat or lon:
+                con.execute("UPDATE annunci SET lat=?, lon=? WHERE id=?",
+                            (lat, lon, r["id"]))
+                trovate += 1
+        con.commit()
+        con.close()
+        if trovate:
+            print(f"🗺️ Coordinate date a {trovate} annunci esistenti")
+    except Exception as e:
+        print(f"🗺️ Backfill coordinate saltato: {e}")
+
+
+carica_comuni()
+backfill_coordinate()
+
+
 PROMPT_MODERAZIONE = (
     "Sei il moderatore di un mercatino dell'usato italiano. Valuta se "
     "l'annuncio e' lecito. E' VIETATO vendere: armi da fuoco VERE e "
@@ -2311,11 +2494,14 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, MSG_RIFIUTO)
 
     con = db()
+    lat, lon = coordinate_da_zona(d.get("zona", ""))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-        "prezzo_sats,zona,valuta,prezzo_eur,creato) VALUES(?,?,?,?,?,?,?,?,?)",
+        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
-         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur, int(time.time())))
+         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
+         lat, lon, int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -2340,6 +2526,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # I canali di Barattolo lo annunceranno da soli (coda anti-spam:
     # il drenatore decide tra post singolo e aggregato).
     accoda_promo(annuncio_id)
+    # ...e chi ha un avviso di ricerca che matcha ricevera' il suo
+    # «e' arrivato» (stessa coda-e-finestra, notifiche aggregate).
+    accoda_match(annuncio_id)
     await premia_distintivi(user["id"])   # bottega avviata?
     return {"ok": True, "id": annuncio_id}
 
@@ -2600,11 +2789,15 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
     # torna in sats deve azzerare l'euro, o resterebbero residui.
+    # Le coordinate seguono la zona: se cambia, cambiano con lei.
+    lat, lon = coordinate_da_zona(d.get("zona", ""))
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
-        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=? WHERE id=?",
+        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=? "
+        "WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
-         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur, annuncio_id))
+         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
+         lat, lon, annuncio_id))
     con.commit()
     con.close()
     if isinstance(d.get("foto"), list):
@@ -2839,11 +3032,13 @@ async def modifica_firmata(annuncio_id: int, req: Request,
     # Copia locale allineata SUBITO dal payload gia' validato e
     # moderato in fase 1 (mai ri-parsare l'evento: sarebbe un giro
     # con perdita). Le foto non si toccano: v1, restano le sue.
+    lat, lon = coordinate_da_zona(b["zona"])
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
-        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=? WHERE id=?",
+        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=? "
+        "WHERE id=?",
         (b["titolo"], b["descrizione"], b["categoria"], b["prezzo_sats"],
-         b["zona"], b["valuta"], b["prezzo_eur"], annuncio_id))
+         b["zona"], b["valuta"], b["prezzo_eur"], lat, lon, annuncio_id))
     con.commit()
     con.close()
     # Backstop: l'evento firmato riparte anche da qui verso i relay
@@ -3524,6 +3719,183 @@ async def scegli_canale_notifiche(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "canale": canale}
+
+
+# --- Avvisi di ricerca: «dimmi quando esce quello che cerco» ---------
+# L'utente salva fino a 5 ricerche (categorie, comune+raggio, prezzo
+# max, parole chiave) e il matching alla pubblicazione lo avvisa via
+# notifica() multi-canale. Il motore vive accanto ai post automatici.
+
+MAX_AVVISI_UTENTE = 5
+RAGGI_AMMESSI = (10, 25, 50, 100)
+
+
+def _avviso_pubblico(r) -> dict:
+    """La riga del DB come la vede il frontend: categorie da
+    '|A|B|' a lista, il resto com'e'."""
+    return {"id": r["id"],
+            "categorie": [c for c in r["categorie"].split("|") if c],
+            "comune": r["comune"], "raggio_km": r["raggio_km"],
+            "prezzo_max_sats": r["prezzo_max_sats"],
+            "prezzo_max_eur": r["prezzo_max_eur"],
+            "parole": r["parole"], "attivo": r["attivo"]}
+
+
+@app.get("/api/comuni")
+async def cerca_comuni(q: str = "",
+                       x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Suggerimenti per il campo comune del form avvisi: primi 10
+    comuni per prefisso. Autenticato come tutto cio' che non e'
+    vetrina."""
+    verifica_utente(x_tg_init_data, barattolo_sessione)
+    prefisso = normalizza(q)
+    if len(prefisso) < 2:
+        return {"comuni": []}
+    trovati = [c for c in COMUNI_LISTA
+               if normalizza(c["nome"]).startswith(prefisso)][:10]
+    return {"comuni": trovati}
+
+
+@app.get("/api/me/avvisi-ricerca")
+async def lista_avvisi_ricerca(x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    righe = con.execute("SELECT * FROM avvisi_ricerca WHERE tg_id=? "
+                        "ORDER BY creato DESC, id DESC",
+                        (user["id"],)).fetchall()
+    con.close()
+    return {"avvisi": [_avviso_pubblico(r) for r in righe],
+            "max": MAX_AVVISI_UTENTE,
+            "comuni_attivi": bool(COMUNI)}
+
+
+@app.post("/api/me/avvisi-ricerca")
+async def salva_avviso_ricerca(req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Crea un avviso di ricerca, o lo aggiorna se il payload porta
+    un id (solo il proprietario). Ogni criterio e' facoltativo, ma
+    almeno uno ci vuole: un avviso vuoto sarebbe tutta la vetrina
+    in chat."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+
+    # categorie: si tengono solo quelle del catalogo, senza doppioni
+    grezze = d.get("categorie") or []
+    if not isinstance(grezze, list):
+        raise HTTPException(400, "Categorie in formato sbagliato")
+    scelte = [c for c in CATEGORIE if c in grezze]
+    categorie = ("|" + "|".join(scelte) + "|") if scelte else ""
+
+    # comune + raggio: il comune deve venire dal dataset, cosi'
+    # l'avviso ha SEMPRE coordinate buone (il testo libero resta
+    # solo dal lato annunci, dov'e' dichiarato)
+    comune = (d.get("comune") or "").strip()
+    raggio = d.get("raggio_km") or 0
+    lat = lon = 0.0
+    if comune:
+        if not COMUNI:
+            raise HTTPException(400, "La ricerca per zona ora non e' "
+                                     "disponibile: riprova senza comune")
+        coord = COMUNI.get(normalizza(comune))
+        if not coord:
+            raise HTTPException(400, f"Non conosco il comune «{comune[:40]}»: "
+                                     "scegli un nome dai suggerimenti")
+        lat, lon = coord
+        if raggio not in RAGGI_AMMESSI:
+            raise HTTPException(400, "Scegli un raggio tra 10, 25, 50 "
+                                     "o 100 km")
+    else:
+        comune, raggio = "", 0
+
+    # prezzo massimo nella valuta scelta (mai entrambe)
+    prezzo_max_sats, prezzo_max_eur = 0, 0.0
+    try:
+        prezzo_max = float(str(d.get("prezzo_max") or 0).replace(",", "."))
+    except ValueError:
+        raise HTTPException(400, "Prezzo massimo non valido")
+    if prezzo_max < 0:
+        raise HTTPException(400, "Prezzo massimo non valido")
+    if prezzo_max:
+        if (d.get("valuta") or "sats") == "eur":
+            prezzo_max_eur = round(prezzo_max, 2)
+        else:
+            prezzo_max_sats = int(prezzo_max)
+
+    # parole chiave: normalizzate ORA, mai a ogni match
+    parole = [p for p in normalizza(d.get("parole") or "").split()
+              if len(p) >= 2][:6]
+    parole_txt = " ".join(parole)
+
+    if not (categorie or comune or prezzo_max_sats or prezzo_max_eur
+            or parole_txt):
+        raise HTTPException(400, "Dimmi almeno un criterio: categoria, "
+                                 "comune, prezzo o parole chiave")
+
+    con = db()
+    avviso_id = d.get("id")
+    if avviso_id:
+        mio = con.execute("SELECT id FROM avvisi_ricerca WHERE id=? "
+                          "AND tg_id=?", (avviso_id, user["id"])).fetchone()
+        if not mio:
+            con.close()
+            raise HTTPException(404, "Avviso non trovato")
+        con.execute("UPDATE avvisi_ricerca SET categorie=?, comune=?, "
+                    "lat=?, lon=?, raggio_km=?, prezzo_max_sats=?, "
+                    "prezzo_max_eur=?, parole=? WHERE id=?",
+                    (categorie, comune, lat, lon, raggio,
+                     prezzo_max_sats, prezzo_max_eur, parole_txt,
+                     avviso_id))
+    else:
+        quanti = con.execute("SELECT COUNT(*) AS n FROM avvisi_ricerca "
+                             "WHERE tg_id=?", (user["id"],)).fetchone()["n"]
+        if quanti >= MAX_AVVISI_UTENTE:
+            con.close()
+            raise HTTPException(400, f"Hai gia' {MAX_AVVISI_UTENTE} avvisi: "
+                                     "eliminane uno per farne di nuovi")
+        con.execute("INSERT INTO avvisi_ricerca(tg_id, categorie, comune, "
+                    "lat, lon, raggio_km, prezzo_max_sats, prezzo_max_eur, "
+                    "parole, attivo, creato) VALUES(?,?,?,?,?,?,?,?,?,1,?)",
+                    (user["id"], categorie, comune, lat, lon, raggio,
+                     prezzo_max_sats, prezzo_max_eur, parole_txt,
+                     int(time.time())))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
+@app.post("/api/me/avvisi-ricerca/{avviso_id}/pausa")
+async def pausa_avviso_ricerca(avviso_id: int,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    r = con.execute("SELECT attivo FROM avvisi_ricerca WHERE id=? AND "
+                    "tg_id=?", (avviso_id, user["id"])).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "Avviso non trovato")
+    nuovo = 0 if r["attivo"] else 1
+    con.execute("UPDATE avvisi_ricerca SET attivo=? WHERE id=?",
+                (nuovo, avviso_id))
+    con.commit()
+    con.close()
+    return {"ok": True, "attivo": nuovo}
+
+
+@app.post("/api/me/avvisi-ricerca/{avviso_id}/elimina")
+async def elimina_avviso_ricerca(avviso_id: int,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    con.execute("DELETE FROM avvisi_ricerca WHERE id=? AND tg_id=?",
+                (avviso_id, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True}
 
 
 # --- Verifica della npub con una nota pubblica -----------------------
@@ -4385,6 +4757,175 @@ async def _posta_promo_aggregato(n: int):
     if TELEGRAM_CANALE_ID:
         await bot_api("sendMessage",
                       {"chat_id": TELEGRAM_CANALE_ID, "text": testo})
+
+
+# --- Il motore degli avvisi di ricerca -------------------------------
+# Gemello della coda promo qui sopra: chi pubblica accoda e basta, il
+# drenatore dorme la stessa finestra e poi confronta gli annunci nuovi
+# coi criteri salvati. Anti-molestia a tre strati: dedup persistente
+# (avvisi_notificati: lo stesso annuncio non suona mai due volte per lo
+# stesso utente, nemmeno dopo un riavvio), aggregazione (2+ match in
+# finestra = UN solo messaggio: l'import da 500 righe non mitraglia
+# nessuno) e tetto giornaliero di messaggi per utente (in memoria: un
+# riavvio lo azzera, al peggio qualche messaggio in piu' una tantum —
+# le raffiche vere le ferma l'aggregazione, che e' strutturale).
+# A differenza dei promo, gli annunci IMPORTATI restano dentro: per
+# chi cerca, un annuncio e' un annuncio.
+
+CODA_MATCH: list[int] = []
+_drenatore_match_avviato = False
+TETTO_AVVISI_GIORNO = 3 if MODALITA_COLLAUDO else 5   # messaggi/giorno
+AVVISI_QUOTA: dict[int, list] = {}    # tg_id -> [giorno, messaggi]
+
+
+def accoda_match(annuncio_id: int):
+    """Mette l'annuncio in coda per il matching degli avvisi e, se
+    dorme, sveglia il drenatore. Come accoda_promo: leggera e
+    sincrona, DOPO il commit, mai dentro una transazione."""
+    global _drenatore_match_avviato
+    CODA_MATCH.append(annuncio_id)
+    if not _drenatore_match_avviato:
+        _drenatore_match_avviato = True
+        asyncio.create_task(_drena_match())
+
+
+def _match_avviso(avviso, a: dict, token_annuncio: list,
+                  cambio: float) -> bool:
+    """La verifica fine, dopo il prefiltro SQL (categoria e prezzo in
+    sats sono gia' passati): parole chiave, prezzo in EUR, distanza.
+    Ogni criterio non impostato lascia passare."""
+    # parole chiave: TUTTE (e' un AND), a prefisso di parola — 'bici'
+    # prende 'bicicletta', ma 'ram' non affoga in 'ceramica'
+    for parola in avviso["parole"].split():
+        if not any(t.startswith(parola) for t in token_annuncio):
+            return False
+    # prezzo massimo in EUR: il listino EUR si confronta com'e', il
+    # listino sats si converte col cambio di adesso; cambio mai
+    # arrivato = criterio non valutabile = niente avviso (meglio un
+    # match perso che uno sbagliato)
+    if avviso["prezzo_max_eur"]:
+        if a.get("valuta") == "eur" and a.get("prezzo_eur"):
+            eur = a["prezzo_eur"]
+        elif cambio > 0:
+            eur = a["prezzo_sats"] / 100_000_000 * cambio
+        else:
+            return False
+        if eur > avviso["prezzo_max_eur"]:
+            return False
+    # raggio: un annuncio senza coordinate (zona non riconosciuta)
+    # non matcha mai i criteri geografici — imperfezione dichiarata
+    if avviso["raggio_km"]:
+        if not (a.get("lat") or a.get("lon")):
+            return False
+        if distanza_km(avviso["lat"], avviso["lon"],
+                       a["lat"], a["lon"]) > avviso["raggio_km"]:
+            return False
+    return True
+
+
+async def _drena_match():
+    """Il drenatore del matching: dorme la finestra, rilegge gli
+    annunci accumulati dal database (chi e' sparito nel frattempo non
+    suona) e confronta ciascuno coi criteri salvati — prefiltro SQL
+    sulla tabella minuscola degli avvisi, verifica fine in Python.
+    Fail-open totale: un errore qui non tocca mai la pubblicazione."""
+    global _drenatore_match_avviato
+    await asyncio.sleep(ATTESA_RAGGRUPPO)
+    ids = list(dict.fromkeys(CODA_MATCH))
+    CODA_MATCH.clear()
+    _drenatore_match_avviato = False
+    try:
+        cambio = await cambio_btc_eur()
+        per_utente: dict[int, list] = {}
+        con = db()
+        for i in ids:
+            a = con.execute("SELECT * FROM annunci WHERE id=?",
+                            (i,)).fetchone()
+            if not a or a["stato"] != "attivo":
+                continue
+            a = dict(a)
+            token = normalizza(f"{a['titolo']} {a['descrizione']}").split()
+            candidati = con.execute(
+                "SELECT * FROM avvisi_ricerca WHERE attivo=1 "
+                "AND tg_id != ? "
+                "AND (categorie='' OR categorie LIKE '%|' || ? || '|%') "
+                "AND (prezzo_max_sats=0 OR prezzo_max_sats >= ?)",
+                (a["venditore_id"], a["categoria"],
+                 a["prezzo_sats"])).fetchall()
+            gia_suoi = set()
+            for avviso in candidati:
+                if avviso["tg_id"] in gia_suoi:   # un utente, una voce
+                    continue
+                if _match_avviso(avviso, a, token, cambio):
+                    gia_suoi.add(avviso["tg_id"])
+                    per_utente.setdefault(avviso["tg_id"], []).append(a)
+        # dedup persistente: conta solo chi entra DAVVERO adesso
+        adesso = int(time.time())
+        da_avvisare: dict[int, list] = {}
+        for tg_id, annunci in per_utente.items():
+            nuovi = []
+            for a in annunci:
+                cur = con.execute(
+                    "INSERT OR IGNORE INTO avvisi_notificati"
+                    "(tg_id, annuncio_id, creato) VALUES(?,?,?)",
+                    (tg_id, a["id"], adesso))
+                if cur.rowcount:
+                    nuovi.append(a)
+            if nuovi:
+                da_avvisare[tg_id] = nuovi
+        con.commit()
+        con.close()
+        for tg_id, annunci in da_avvisare.items():
+            await _notifica_match(tg_id, annunci, cambio)
+            await asyncio.sleep(0.2)   # mai raffiche sull'API Telegram
+    except Exception as e:
+        print(f"⚠️ Matching avvisi saltato: {e}")
+
+
+async def _notifica_match(tg_id: int, annunci: list, cambio: float):
+    """Il messaggio all'utente: uno solo per finestra — ricco se il
+    match e' singolo, il conto e basta se sono di piu'. Il tetto
+    giornaliero chiude con onesta', mai in silenzio muto."""
+    oggi = time.strftime("%Y-%m-%d")
+    voce = AVVISI_QUOTA.get(tg_id)
+    if not voce or voce[0] != oggi:
+        voce = [oggi, 0]
+        AVVISI_QUOTA[tg_id] = voce
+    if voce[1] >= TETTO_AVVISI_GIORNO:
+        return
+    if len(annunci) == 1:
+        a = annunci[0]
+        testo = (f"🔎 Un annuncio fa per te!\n"
+                 f"<b>{html.escape(a['titolo'])}</b> — "
+                 f"{_prezzo_promo(a, cambio)}")
+        if a.get("zona"):
+            testo += f"\n📍 {html.escape(a['zona'])}"
+        testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    else:
+        testo = (f"📬 {len(annunci)} nuovi annunci corrispondono ai "
+                 f"tuoi avvisi di ricerca → {URL_PUBBLICO}")
+    voce[1] += 1
+    if voce[1] >= TETTO_AVVISI_GIORNO:
+        testo += ("\n\n(per oggi mi fermo qui 🤫: il resto lo "
+                  "trovi nel mercatino)")
+    await notifica(tg_id, testo)
+
+
+def pulisci_avvisi():
+    """La scopa degli avvisi, chiamata dall'orologio: via le righe di
+    dedup piu' vecchie di 30 giorni (un annuncio non rinasce dopo un
+    mese) e i contatori dei giorni passati."""
+    try:
+        con = db()
+        con.execute("DELETE FROM avvisi_notificati WHERE creato < ?",
+                    (int(time.time()) - 30 * 86400,))
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Pulizia avvisi saltata: {e}")
+    oggi = time.strftime("%Y-%m-%d")
+    for tg_id in [t for t, v in AVVISI_QUOTA.items() if v[0] != oggi]:
+        AVVISI_QUOTA.pop(tg_id, None)
 
 
 # Il ciclo di vita agisce solo su post GIA' fatti (le colonne piene):
@@ -5298,12 +5839,14 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
     completi), poi le foto in un thread fuori dalla transazione,
     come sempre."""
     con = db()
+    lat, lon = coordinate_da_zona(riga["zona"])
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-        "prezzo_sats,zona,valuta,prezzo_eur,creato) VALUES(?,?,?,?,?,?,?,?,?)",
+        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga["prezzo_sats"], riga["zona"],
-         riga["valuta"], riga["prezzo_eur"], int(time.time())))
+         riga["valuta"], riga["prezzo_eur"], lat, lon, int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -5377,8 +5920,11 @@ async def _lavoro_import(biglietto: str):
         # I canali di Barattolo: tutti in coda INSIEME a foto finite,
         # cosi' la finestra del drenatore li vede in un colpo solo e
         # un import fa sempre UN solo post aggregato, mai una raffica.
+        # Stessa cosa per gli avvisi di ricerca: chi matcha 12 righe
+        # dell'import riceve UN «12 nuovi annunci», mai 12 messaggi.
         for annuncio_id in lavoro["ok"]:
             accoda_promo(annuncio_id)
+            accoda_match(annuncio_id)
 
         # --- Fase 3: la piazza Nostr, senza fretta ---
         if lavoro["nostr"] and lavoro["ok"] and _NOSTR:
@@ -5670,10 +6216,34 @@ async def importa_nostr_periodico():
     _prossimo_import_nostr = time.time() + SECONDI_IMPORT_NOSTR
     import importa_nostr         # qui e non in cima: se manca
     #                              websocket-client il server vive lo stesso
+    t0 = int(time.time())
     importati, aggiornati, saltati = await asyncio.to_thread(
         importa_nostr.importa_venditore, NPUB_VENDITORE, VENDITORE_ID, DB)
     print(f"🔄 Import Nostr: {importati} nuovi, {aggiornati} aggiornati, "
           f"{saltati} saltati")
+    # Il dopo-import, senza toccare importa_nostr.py (che scrive
+    # dritto nel DB): le coordinate seguono le zone arrivate dai relay
+    # (anche quelle cambiate su righe vecchie) e i soli annunci NUOVI
+    # (creato>=t0: gli UPDATE non lo cambiano) vanno al matching degli
+    # avvisi — per chi cerca, un annuncio e' un annuncio.
+    try:
+        con = db()
+        for r in con.execute("SELECT id, zona, lat, lon FROM annunci "
+                             "WHERE contatto_nostr!='' AND stato='attivo'"
+                             ).fetchall():
+            lat, lon = coordinate_da_zona(r["zona"])
+            if (lat, lon) != (r["lat"], r["lon"]):
+                con.execute("UPDATE annunci SET lat=?, lon=? WHERE id=?",
+                            (lat, lon, r["id"]))
+        con.commit()
+        nuovi = con.execute("SELECT id FROM annunci WHERE creato>=? "
+                            "AND contatto_nostr!='' AND stato='attivo'",
+                            (t0,)).fetchall()
+        con.close()
+        for r in nuovi:
+            accoda_match(r["id"])
+    except Exception as e:
+        print(f"⚠️ Dopo-import (coordinate/avvisi) saltato: {e}")
 
 
 def pulisci_import():
@@ -5712,6 +6282,10 @@ async def orologio():
             pulisci_import()
         except Exception as e:
             print(f"⚠️ Pulizia import in blocco saltata: {e}")
+        try:
+            pulisci_avvisi()
+        except Exception as e:
+            print(f"⚠️ Pulizia avvisi saltata: {e}")
         await asyncio.sleep(600)
 
 
