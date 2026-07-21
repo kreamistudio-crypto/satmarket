@@ -400,6 +400,76 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   default), pillole di scelta solo se entrambi i canali sono
   disponibili, testo statico altrimenti; senza canali raggiungibili
   sparisce l'intero cassetto.
+  Avvisi di ricerca (lug 2026): «dimmi quando esce quello che cerco» —
+  tabella `avvisi_ricerca` (max 5 per utente, `MAX_AVVISI_UTENTE`:
+  categorie serializzate '|A|B|' coi pipe ai bordi per il LIKE,
+  comune+raggio 10/25/50/100 km, prezzo max in sats O in eur mai
+  entrambi, parole normalizzate al salvataggio, `attivo` per la
+  pausa) + `avvisi_notificati` (dedup PERSISTENTE: lo stesso annuncio
+  non suona mai due volte per lo stesso utente, nemmeno dopo un
+  riavvio o una modifica; purga a 30gg nell'orologio,
+  `pulisci_avvisi`). GEOGRAFIA: `dati/comuni.csv` committato (~7.900
+  comuni ISTAT con lat/lon del centro, 258KB; fonte opendatasicilia,
+  una tantum) letto in RAM da `carica_comuni()` — MAI Nominatim:
+  zero rete nel percorso caldo di pubblica(), file assente =
+  funzione geografica spenta e tutto il resto vive. Chiavi via
+  `normalizza()`; i ~7 nomi contesi d'Italia (Castro, Peglio...)
+  entrano solo come 'castro bg' (la chiave nuda ambigua si scarta);
+  alias senza PREPOSIZIONI_COMUNI ('reggio emilia' ≡ «Reggio
+  nell'Emilia», i nomi veri vincono sempre sugli alias); stoplist
+  COMUNI_PAROLA (Paese, Vita, Sale, Calcio...) = matchano solo se la
+  zona è ESATTAMENTE quel nome. `coordinate_da_zona` scandisce gli
+  n-grammi del testo libero dal più lungo al più corto, a parità
+  vince il primo nel testo («tra Pavia e Milano» → Pavia; «vicino
+  Milano» → Milano, il raggio assorbe il vicino), secondo giro senza
+  preposizioni («Cassano allo Ionio» trova «Cassano all'Ionio»).
+  Colonne `annunci.lat/lon` ((0,0) = zona non riconosciuta: matcha
+  solo i criteri non geografici, imperfezione dichiarata) scritte UNA
+  volta in pubblica/modifica/modifica firmata/import CSV, ricalcolate
+  per gli importati a ogni giro orario (le zone possono cambiare sui
+  relay); `backfill_coordinate()` a ogni avvio (idempotente, solo
+  righe a (0,0)); `distanza_km` = haversine. Il comune dell'UTENTE
+  viene SEMPRE dal dataset (`GET /api/comuni` autocomplete + 400 sul
+  nome sconosciuto: l'avviso ha sempre coordinate buone, il testo
+  libero resta solo dal lato annunci). MOTORE: gemello della coda
+  promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
+  loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
+  dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
+  annuncio è un annuncio»; importa_nostr.py resta intonso);
+  `_drena_match` dorme ATTESA_RAGGRUPPO, rilegge dal DB (spariti nel
+  frattempo = muti), prefiltro SQL sugli avvisi attivi (`tg_id !=
+  venditore`: mai avvisato del proprio annuncio; categoria e prezzo
+  sats in SQL) + verifica fine in Python: parole TUTTE in AND a
+  prefisso di parola ('bici' prende 'bicicletta', 'ram' non affoga in
+  'ceramica'), prezzo EUR col cambio corrente (cambio mai arrivato =
+  l'avviso EUR NON scatta: meglio un match perso che uno sbagliato),
+  haversine ≤ raggio. ANTI-MOLESTIA a tre strati: 1) dedup DB sopra;
+  2) aggregazione per finestra — match singolo = messaggio ricco
+  (titolo, prezzo via `_prezzo_promo`, 📍 zona, link /annuncio/{id}),
+  2+ = UN solo «📬 N nuovi annunci corrispondono ai tuoi avvisi»;
+  3) `TETTO_AVVISI_GIORNO` (5 in prod, 3 in collaudo) MESSAGGI al
+  giorno per utente in `AVVISI_QUOTA` (memoria, pattern IMPORT_QUOTA:
+  un riavvio azzera il conteggio, accettato — le raffiche vere le
+  ferma l'aggregazione, che è strutturale); l'ultimo messaggio del
+  giorno chiude con «per oggi mi fermo qui 🤫», onestà e non silenzio.
+  Uscita SEMPRE via `notifica()`: multi-canale e DM NIP-17 gratis,
+  nativi Nostr inclusi; 0.2s tra un utente e l'altro, fail-open
+  totale (un errore nel matching non tocca mai la pubblicazione).
+  `esegui_fusione` migra avvisi e dedup (UPDATE OR IGNORE).
+  Endpoint (pattern canale-notifiche): GET/POST /api/me/avvisi-ricerca
+  (POST con `id` = modifica del proprietario; ALMENO un criterio, un
+  avviso vuoto sarebbe tutta la vetrina in chat; 400 oltre il tetto
+  di 5), POST .../{id}/pausa e .../{id}/elimina, GET /api/comuni
+  (autenticato, primi 10 per prefisso). Frontend: cassetto «🔎 Avvisi
+  di ricerca» nel Profilo (`renderRicerche`, sparisce in
+  DEMO/VETRINA; pillole categoria toggle senza re-render — il
+  re-render pieno perderebbe i campi digitati —, comune con
+  `<datalist>` e debounce 250ms su /api/comuni, select raggio, prezzo
+  col toggle sats/€, riepiloghi sotto `esc()`, ✏️ precompila il form,
+  conteggio «(N di 5)» nell'header) e CTA «🔔 Avvisami se arriva» in
+  #gridEmpty dopo una ricerca a vuoto (mai in DEMO/VETRINA;
+  passamano `ricercaPrecompila` con query e categoria attiva,
+  consumato da renderRicerche, pattern hintPubblicazione).
   Feedback e stelle (lug 2026): tabella `feedback(ordine_id, da_tg_id,
   per_tg_id, voto 1-5, commento ≤200, creato)` con
   `UNIQUE(ordine_id, da_tg_id)` come giudice dei doppioni.
@@ -1040,7 +1110,18 @@ aggregato per le raffiche, ciclo di vita ✅ Venduto/cancellazione,
 vedi Architettura — collaudato in locale con 13 verifiche simulate;
 in produzione serve creare il canale, mettere il bot come admin e
 `TELEGRAM_CANALE_ID` nel config del VPS, poi verificare un post vero
-su canale e relay).
+su canale e relay); avvisi di ricerca personalizzati (lug 2026:
+criteri salvati nel cassetto «🔎» del Profilo — categorie, comune con
+raggio km sul dataset comuni committato, prezzo max, parole chiave —
+matching alla pubblicazione col gemello della coda promo,
+anti-molestia a tre strati (dedup persistente, aggregato per le
+raffiche, tetto giornaliero) e CTA «Avvisami se arriva» dopo la
+ricerca a vuoto, vedi Architettura — collaudato in locale da cima a
+fondo: matching positivo e negativi per ogni criterio, distanze
+Milano/Monza/Pavia/Napoli, dedup sulla modifica, aggregato da
+raffica, tetto col messaggio onesto, form/pausa/elimina/precompila
+nel browser; in produzione va provato un avviso vero con notifica
+Telegram reale).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
