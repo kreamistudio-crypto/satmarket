@@ -1670,14 +1670,29 @@ function renderNegozio(v, annunci, feedback=[]){
   const rep = (v.rating>0
     ? `<span class="stars">${'★'.repeat(Math.round(v.rating))}</span> ${v.rating}${v.n_feedback?` (${v.n_feedback})`:''} · ` : '')
     + `${v.vendite_ok||0} vendite concluse`;
+  /* Il PONTE verso il venditore, come nel dettaglio annuncio:
+     Telegram se c'e' lo username pubblico, Nostr SOLO con la npub
+     verificata (possesso dimostrato — e' anche cio' che accende il
+     badge qui sopra). La vecchia riga «Profilo Nostr completo · npub
+     verificata» era la terza ripetizione del 🟣: via. Sul PROPRIO
+     negozio niente ponti: non ci si scrive da soli. Il solito
+     filtro-alfabeto: username e npub finiscono negli onclick. */
+  const mio = !DEMO && ((myNegozio && v.negozio === myNegozio)
+    || (myUsername && v.username
+        && v.username.toLowerCase() === myUsername.toLowerCase()));
+  const chi = (v.nome||'').split(' ')[0];
+  const ponti = mio ? '' : pontiContatto(
+    (v.username||'').replace(/[^A-Za-z0-9_]/g,''),
+    (v.npub_verificata && v.npub ? v.npub : '').replace(/[^a-z0-9]/g,''),
+    chi ? `a ${esc(chi)}` : 'al venditore');
   el('negozioHeader').innerHTML = `
     <div class="seller" style="margin-top:14px">
       <div class="avatar">${esc((v.nome||'?')[0])}</div>
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
         <div class="rep">${rep}</div>
-        ${v.npub_verificata&&v.npub?`<div class="rep">🟣 <a href="https://njump.me/${esc(v.npub)}" target="_blank" style="color:inherit">Profilo Nostr completo</a> · npub verificata</div>`:''}
       </div>
     </div>
+    ${ponti}
     ${(v.username||v.negozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
   /* Gli ultimi feedback ricevuti: stelle + commento + ruolo + data.
      Mai nomi (il server non li manda proprio): su una pagina pubblica
