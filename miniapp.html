@@ -167,6 +167,24 @@
   .trust-line{display:flex;align-items:center;justify-content:center;gap:6px;
     padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text)}
 
+  /* ---------- strumenti di vetrina (ordina + filtri) ---------- */
+  .strumenti{display:flex;gap:8px;align-items:center;justify-content:flex-end;
+    padding:8px var(--pad) 0}
+  .strumenti select,.strumenti button{
+    font:700 12.5px/1.2 Nunito,sans-serif;color:var(--muted);
+    background:var(--card);border:1.5px solid var(--line);
+    border-radius:999px;padding:6px 12px;cursor:pointer}
+  /* Il bottone si accende quando un filtro e' applicato */
+  .strumenti button.attivo{color:var(--sats-text);border-color:var(--sats-text)}
+  #filtriBox{margin:10px var(--pad) 0;padding:12px;background:var(--card);
+    border:1.5px solid var(--line);border-radius:14px}
+  .filtri-riga{display:flex;gap:8px}
+  .filtri-riga+.filtri-riga{margin-top:8px}
+  .filtri-riga input{flex:1;min-width:0;font:700 14px Nunito,sans-serif;
+    color:var(--ink);background:var(--bg);border:1.5px solid var(--line);
+    border-radius:10px;padding:8px 10px}
+  .filtri-riga .btn{margin-top:0;flex:1}
+
   /* ---------- griglia annunci ---------- */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
   .card{
@@ -750,6 +768,27 @@
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
     <div class="section-label" id="gridLabel">In vetrina</div>
+    <!-- Strumenti di navigazione: ordinamento discreto + filtro
+         prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
+         euro") resta com'e': questi servono a chi sfoglia. -->
+    <div class="strumenti">
+      <select id="ordinaSel" onchange="setOrdina(this.value)" title="Ordina la vetrina">
+        <option value="">Più recenti</option>
+        <option value="prezzo_su">Prezzo: dal più basso</option>
+        <option value="prezzo_giu">Prezzo: dal più alto</option>
+      </select>
+      <button id="filtriBtn" type="button" onclick="toggleFiltri()">Filtri</button>
+    </div>
+    <div id="filtriBox" style="display:none">
+      <div class="filtri-riga">
+        <input id="filtroMinInp" inputmode="decimal" placeholder="Prezzo min">
+        <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
+      </div>
+      <div class="filtri-riga">
+        <button class="btn orange" onclick="applicaFiltri()">Applica</button>
+        <button class="btn ghost" onclick="azzeraFiltri()">Azzera</button>
+      </div>
+    </div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -1118,13 +1157,78 @@ function inCatalogo(arr){
   });
 }
 
+/* Ordinamento e filtro prezzo della vetrina: vivono per la sessione
+   (niente localStorage) e sopravvivono al cambio di categoria, come
+   nelle app di mercatino note; "Azzera" pulisce il filtro. Il filtro
+   si scrive nella valuta del toggle attivo al momento di Applica:
+   se guardi in euro scrivi euro, la conversione la fa il server. */
+let ordinaVista = '';        // '' = piu' recenti | prezzo_su | prezzo_giu
+let filtroPrezzo = null;     // {min, max, valuta} applicato, o null
+
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
   if (activeCat !== 'Tutto') p.set('cat', activeCat);
   /* La ricerca semplice lato server e' della vetrina anonima:
      dentro Telegram il campo Cerca parla con l'AI */
   if (VETRINA) { const q = el('q').value.trim(); if (q) p.set('q', q); }
+  if (ordinaVista) p.set('ordina', ordinaVista);
+  if (filtroPrezzo) {
+    if (filtroPrezzo.min) p.set('prezzo_min', filtroPrezzo.min);
+    if (filtroPrezzo.max) p.set('prezzo_max', filtroPrezzo.max);
+    p.set('valuta_filtro', filtroPrezzo.valuta);
+  }
   return p;
+}
+
+function setOrdina(v){
+  ordinaVista = v; haptic();
+  if (el('ordinaSel')) el('ordinaSel').value = v;   // sincrono anche da codice
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+}
+
+function toggleFiltri(){
+  haptic();
+  const box = el('filtriBox');
+  const apre = box.style.display === 'none';
+  box.style.display = apre ? 'block' : 'none';
+  if (apre) {
+    /* I campi parlano la valuta del toggle e mostrano il filtro vivo */
+    const suff = valutaVista === 'eur' ? '€' : 'sats';
+    el('filtroMinInp').placeholder = `Prezzo min (${suff})`;
+    el('filtroMaxInp').placeholder = `Prezzo max (${suff})`;
+    el('filtroMinInp').value = filtroPrezzo?.min || '';
+    el('filtroMaxInp').value = filtroPrezzo?.max || '';
+  }
+}
+
+/* "12,50" va bene quanto "12.50": la virgola e' di casa (patto di Vendi) */
+const numeroFiltro = v => {
+  const n = parseFloat(String(v).trim().replace(',', '.'));
+  return (isFinite(n) && n > 0) ? n : '';
+};
+
+function applicaFiltri(){
+  haptic();
+  const min = numeroFiltro(el('filtroMinInp').value);
+  const max = numeroFiltro(el('filtroMaxInp').value);
+  filtroPrezzo = (min || max) ? {min, max, valuta: valutaVista} : null;
+  el('filtriBtn').classList.toggle('attivo', !!filtroPrezzo);
+  el('filtriBox').style.display = 'none';
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+}
+
+function azzeraFiltri(){
+  haptic();
+  el('filtroMinInp').value = ''; el('filtroMaxInp').value = '';
+  const cera = !!filtroPrezzo;
+  filtroPrezzo = null;
+  el('filtriBtn').classList.remove('attivo');
+  el('filtriBox').style.display = 'none';
+  if (!cera) return;
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
 
 async function loadListings(anonimo){
@@ -1276,6 +1380,19 @@ function renderGrid(items){
   let data = items || vetrina.filter(l =>
     (activeCat==='Tutto' || l.cat===activeCat) &&
     (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));
+  /* In DEMO ordinamento e filtro prezzo vivono qui, sui dati finti
+     (coi dati vivi li applica il server, riapplicarli mentirebbe:
+     il suo cambio euro puo' differire di un pelo dal nostro) */
+  if (!items && DEMO) {
+    if (filtroPrezzo) {
+      const inSats = v => filtroPrezzo.valuta==='eur' ? Math.round(v/eurPerSat) : v;
+      data = data.filter(l =>
+        (!filtroPrezzo.min || l.price >= inSats(filtroPrezzo.min)) &&
+        (!filtroPrezzo.max || l.price <= inSats(filtroPrezzo.max)));
+    }
+    if (ordinaVista)
+      data.sort((a,b) => ordinaVista==='prezzo_su' ? a.price-b.price : b.price-a.price);
+  }
   /* Il conteggio arancione in fondo alla linea puntinata: data.length
      e' un numero, mai testo utente. Coi dati vivi dice il totale VERO
      della vista (dal server), non solo le pagine gia' caricate. */

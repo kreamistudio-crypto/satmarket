@@ -1911,34 +1911,51 @@ LIMITE_PAGINA_MAX = 100   # nessun client onesto chiede di piu'
 TETTO_LEGACY = 500        # rete di sicurezza per chi chiama senza limit
 
 
-def pagina_annunci(con, campi, dove, par, limit, cursore):
-    """Una pagina di annunci in ordine di vetrina (nuovi prima).
-    Chiede una riga in piu' del limite: se arriva, c'e' un'altra
-    pagina e l'ultima riga tenuta diventa il prossimo segnalibro.
-    Un cursore storto vale come nessun cursore: prima pagina,
-    mai un errore (fail-safe verso client vecchi o link rotti)."""
+# Gli ordinamenti della vetrina: chiave del keyset + verso. Il
+# default sono i piu' recenti; per prezzo si ordina su prezzo_sats,
+# che per i listini EUR e' l'equivalente al cambio di PUBBLICAZIONE
+# (compromesso dichiarato: il drift del cambio puo' spostare di
+# qualche posizione un annuncio in euro, mai di molto).
+ORDINAMENTI = {
+    "":           ("creato",      "DESC", "<"),
+    "prezzo_su":  ("prezzo_sats", "ASC",  ">"),
+    "prezzo_giu": ("prezzo_sats", "DESC", "<"),
+}
+
+
+def pagina_annunci(con, campi, dove, par, limit, cursore, ordina=""):
+    """Una pagina di annunci nell'ordine chiesto (default: nuovi
+    prima). Chiede una riga in piu' del limite: se arriva, c'e'
+    un'altra pagina e l'ultima riga tenuta diventa il prossimo
+    segnalibro '{chiave}_{id}'. Un cursore storto (o un ordinamento
+    sconosciuto) vale come il default: mai un errore (fail-safe
+    verso client vecchi o link rotti)."""
+    chiave, verso, op = ORDINAMENTI.get(ordina, ORDINAMENTI[""])
     q = (f"SELECT {campi} FROM annunci a "
          f"JOIN utenti u ON u.tg_id = a.venditore_id WHERE {dove}")
     if cursore:
         try:
             c, i = cursore.split("_")
             par = par + [int(c), int(i)]
-            q += " AND (a.creato, a.id) < (?, ?)"
+            q += f" AND (a.{chiave}, a.id) {op} (?, ?)"
         except (ValueError, AttributeError):
             pass
-    q += " ORDER BY a.creato DESC, a.id DESC LIMIT ?"
+    q += f" ORDER BY a.{chiave} {verso}, a.id {verso} LIMIT ?"
     righe = [dict(r) for r in con.execute(q, par + [limit + 1])]
     prossimo = None
     if len(righe) > limit:
         righe = righe[:limit]
-        prossimo = f"{righe[-1]['creato']}_{righe[-1]['id']}"
+        prossimo = f"{righe[-1][chiave]}_{righe[-1]['id']}"
     return righe, prossimo
 
 
 @app.get("/api/listings")
-def lista_annunci(cat: str = "", q: str = "", limit: int = 0, cursore: str = "",
-                  x_tg_init_data: str = Header(""),
-                  barattolo_sessione: str = Cookie("")):
+async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
+                        cursore: str = "", ordina: str = "",
+                        prezzo_min: float = 0, prezzo_max: float = 0,
+                        valuta_filtro: str = "sats",
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     # venditore_id serve alla Mini App per "questo annuncio e' tuo"
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
@@ -1952,6 +1969,26 @@ def lista_annunci(cat: str = "", q: str = "", limit: int = 0, cursore: str = "",
         # agli autenticati): LIKE su titolo, descrizione e zona.
         dove += " AND (a.titolo LIKE ? OR a.descrizione LIKE ? OR a.zona LIKE ?)"
         par += [f"%{q.strip()}%"] * 3
+    # Filtro prezzo min/max: chi guarda in euro scrive euro, e la
+    # conversione la fa il server col cambio corrente (la stessa
+    # fonte del pagamento). Il confronto e' sempre su prezzo_sats:
+    # per i listini EUR e' l'equivalente al cambio di pubblicazione.
+    if (prezzo_min > 0 or prezzo_max > 0) and valuta_filtro == "eur":
+        cambio = await cambio_btc_eur()
+        if cambio <= 0:
+            raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                     "questo momento: riprova tra qualche "
+                                     "minuto")
+        if prezzo_min > 0:
+            prezzo_min = round(prezzo_min / cambio * 100_000_000)
+        if prezzo_max > 0:
+            prezzo_max = round(prezzo_max / cambio * 100_000_000)
+    if prezzo_min > 0:
+        dove += " AND a.prezzo_sats >= ?"
+        par.append(int(prezzo_min))
+    if prezzo_max > 0:
+        dove += " AND a.prezzo_sats <= ?"
+        par.append(int(prezzo_max))
     con = db()
     if not limit:
         # Client senza paginazione (JS vecchio in cache): l'array puro
@@ -1965,7 +2002,8 @@ def lista_annunci(cat: str = "", q: str = "", limit: int = 0, cursore: str = "",
         con.close()
         return espandi_distintivi_vetrina(righe)
     limit = min(limit, LIMITE_PAGINA_MAX)
-    righe, prossimo = pagina_annunci(con, campi, dove, par, limit, cursore)
+    righe, prossimo = pagina_annunci(con, campi, dove, par, limit, cursore,
+                                     ordina)
     risposta = {"annunci": espandi_distintivi_vetrina(righe),
                 "cursore": prossimo}
     if not cursore:
