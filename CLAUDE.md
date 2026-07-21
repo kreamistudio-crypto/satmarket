@@ -400,6 +400,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   default), pillole di scelta solo se entrambi i canali sono
   disponibili, testo statico altrimenti; senza canali raggiungibili
   sparisce l'intero cassetto.
+  Ponti di contatto tra le parti (lug 2026): NON una chat — bottoni
+  verso i canali che esistono. Dettaglio annuncio e dettaglio ordine
+  mostrano «✈️ Scrivi su Telegram» (t.me/username) e/o «🟣 Scrivi su
+  Nostr» (profilo su njump.me: il DM parte dal client dell'utente)
+  secondo l'identità della controparte; il doppio cittadino li ha
+  entrambi, senza canali resta la riga onesta «le trattative non sono
+  necessarie: l'escrow protegge». La npub del ponte è SOLO dal
+  possesso dimostrato — npub_accesso o badge verificato, la regola di
+  `notifica()`: per l'annuncio il client usa `contatto_nostr`
+  (importati) con ripiego su `venditore_npub` verificata (già in
+  CAMPI_VETRINA); per l'ordine `/api/orders` aggiunge
+  `compratore_nostr`/`venditore_nostr` (CASE in SQL, escono solo alle
+  parti e all'admin come il resto dell'ordine). Helper frontend
+  `pontiContatto`/`pontiOrdine` (il vecchio `bottoneChat` non esiste
+  più); username e npub negli onclick passano dal solito
+  filtro-alfabeto.
   Avvisi di ricerca (lug 2026): «dimmi quando esce quello che cerco» —
   tabella `avvisi_ricerca` (max 5 per utente, `MAX_AVVISI_UTENTE`:
   categorie serializzate '|A|B|' coi pipe ai bordi per il LIKE,
