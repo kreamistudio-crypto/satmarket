@@ -4244,7 +4244,8 @@ async function importPrepara(btn){
   if (fCsv.size > 2_000_000) { toast('CSV troppo grande (massimo 2MB)'); return; }
   const fZip = el('importZip').files[0];
   if (fZip && fZip.size > 50_000_000) { toast('ZIP troppo grande (massimo 50MB)'); return; }
-  const ripristina = bottoneInAttesa(btn);
+  /* il testo dell'overlay: qui nessun sat viaggia, si controlla un file */
+  const ripristina = bottoneInAttesa(btn, '📥 Controllo il file…');
   try{
     let zipToken = '';
     if (fZip) {
@@ -4282,7 +4283,7 @@ async function importAvvia(btn){
   haptic();
   if (!importBiglietto) return;
   if (!confirm(`Confermi la pubblicazione di ${importValide} annunci?`)) return;
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, '📥 Avvio l\'import…');
   try{
     const r = await fetch(`${API_BASE}/import/avvia`, {method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
