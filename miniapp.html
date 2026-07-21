@@ -156,6 +156,10 @@
   .cur-seg button{border:0;background:none;padding:4px 10px;font-weight:800;
     font-size:13px;cursor:pointer;color:var(--muted);border-radius:999px}
   .cur-seg button.active{background:var(--ink);color:var(--on-ink)}
+  /* La variante "in riga" del selettore valuta: stesse due pillole
+     compatte, ma dentro il flusso accanto a un campo (form avvisi)
+     invece che assoluta dentro la searchbar */
+  .cur-seg.inriga{position:static;transform:none;flex:0 0 auto}
   .chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{
@@ -3149,9 +3153,16 @@ async function renderRicerche(){
       <select id="ricRaggio">${[10,25,50,100].map(k =>
         `<option value="${k}" ${k===vals.raggio?'selected':''}>entro ${k} km</option>`).join('')}</select></div>
     <div class="field"><label>Prezzo massimo (facoltativo)</label>
-      <div style="display:flex;gap:6px">
-        <input id="ricPrezzo" inputmode="decimal" value="${esc(vals.prezzo)}" placeholder="Es. 50 000" style="flex:1">
-        <button type="button" id="ricValuta" class="btn ghost" style="margin:0;min-width:64px" onclick="toggleRicercaValuta(this)">${ricercaValuta==='eur'?'€':'sats'}</button>
+      <!-- Il campo LARGO e il toggle compatto (le due pillole della
+           searchbar): il vecchio bottone .btn qui dentro aveva
+           width:100% e schiacciava il campo a una fettina non
+           toccabile — su mobile il prezzo non si riusciva a scrivere -->
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="ricPrezzo" type="text" inputmode="decimal" value="${esc(vals.prezzo)}" placeholder="${ricercaValuta==='eur'?'Es. 50':'Es. 50 000'}" style="flex:1;min-width:0">
+        <div class="cur-seg inriga">
+          <button type="button" id="ricValSats" class="${ricercaValuta==='sats'?'active':''}" onclick="setRicercaValuta('sats')">sats</button>
+          <button type="button" id="ricValEur" class="${ricercaValuta==='eur'?'active':''}" onclick="setRicercaValuta('eur')">€</button>
+        </div>
       </div></div>
     <div class="field"><label>Parole chiave (facoltative)</label>
       <input id="ricParole" value="${esc(vals.parole)}" placeholder="Es. bici corsa"></div>
@@ -3172,10 +3183,16 @@ function toggleRicercaCat(c, nodo){
   nodo.classList.toggle('active');
 }
 
-function toggleRicercaValuta(nodo){
-  haptic();
-  ricercaValuta = ricercaValuta === 'sats' ? 'eur' : 'sats';
-  nodo.textContent = ricercaValuta === 'eur' ? '€' : 'sats';
+/* Le due pillole della valuta: si aggiornano SENZA re-render del
+   form (il pattern delle categorie: un render pieno perderebbe i
+   campi gia' digitati) */
+function setRicercaValuta(v){
+  if (v !== ricercaValuta) haptic();
+  ricercaValuta = v;
+  el('ricValSats')?.classList.toggle('active', v === 'sats');
+  el('ricValEur')?.classList.toggle('active', v === 'eur');
+  const inp = el('ricPrezzo');
+  if (inp) inp.placeholder = v === 'eur' ? 'Es. 50' : 'Es. 50 000';
 }
 
 /* l'autocomplete del comune: suggerimenti dal server, con calma */
