@@ -477,8 +477,15 @@
   #attesaOverlay.on{display:flex}
   .attesa-card{background:var(--bg);border-radius:16px;padding:20px 26px;font-weight:800;font-size:15.5px;
     display:flex;align-items:center;gap:10px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  /* Lo spinner di casa: il barattolino che ondeggia, come scosso per
+     far entrare le monete. La clessidra resta come ripiego se
+     l'immagine non arriva (onerror la toglie e il sibling appare). */
+  .attesa-jar{width:34px;height:34px;border-radius:10px;flex:none;
+    animation:scuoti 1.1s ease-in-out infinite}
+  .attesa-jar + .attesa-clessidra{display:none}
   .attesa-clessidra{font-size:22px;animation:gira 1.6s linear infinite}
   @keyframes gira{to{transform:rotate(360deg)}}
+  @keyframes scuoti{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
   .btn.primary{background:var(--trust);color:var(--on-trust);box-shadow:0 3px 0 var(--trust-deep)}
   .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
@@ -769,7 +776,7 @@
 
   /* Chi preferisce meno movimento non vede fluttuare nulla */
   @media (prefers-reduced-motion: reduce){
-    .empty-mascotte,.hero img{animation:none}
+    .empty-mascotte,.hero img,.attesa-jar,.attesa-clessidra{animation:none}
   }
 </style>
 <script>
@@ -1157,7 +1164,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <div id="attesaOverlay"><div class="attesa-card"><span class="attesa-clessidra">⏳</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
+  <div id="attesaOverlay"><div class="attesa-card"><img class="attesa-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="attesa-clessidra">⏳</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
 
 <script>
