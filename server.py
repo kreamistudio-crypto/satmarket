@@ -4628,6 +4628,331 @@ def scarica_export(biglietto: str):
                              f'attachment; filename="{nome}"'})
 
 
+# --------------------- IMPORT IN BLOCCO (CSV) -----------------------
+# I commercianti coi cataloghi grandi caricano un CSV (piu' eventuale
+# ZIP di foto) e l'app crea gli annunci in blocco. Due fasi col
+# pattern del biglietto: prepara (validazione riga per riga +
+# anteprima, sotto i 2 secondi) e avvia (job asincrono: moderazione
+# AI a lotti -> creazione con commit per riga -> Nostr a lotti lenti).
+# La moderazione e' la STESSA delle pubblicazioni normali, con una
+# deroga dichiarata: gli admin ricevono UNA notifica riassuntiva
+# (con l'intervallo di id e i titoli bocciati), non una per annuncio.
+# Tutto lo stato vive in memoria (uvicorn mono-processo, come
+# SFIDE_LOGIN): un riavvio a meta' lascia nel database solo annunci
+# COMPLETI (commit per riga) e il frontend lo dice con onesta'.
+
+IMPORT_DIR = "import_tmp"          # gli ZIP in attesa, purgati dall'orologio
+os.makedirs(IMPORT_DIR, exist_ok=True)
+
+TETTO_RIGHE_IMPORT = 500           # righe dati per file
+TETTO_RIGHE_GIORNO = 1000          # per utente al giorno (in memoria)
+TETTO_CSV_BYTES = 2_000_000
+TETTO_ZIP_BYTES = 50_000_000
+TETTO_ZIP_SCOMPATTATO = 200_000_000   # somma dei file dichiarati (anti-bomba)
+TETTO_ZIP_VOCI = 2000
+LOTTO_MODERAZIONE = 20             # annunci per chiamata Haiku
+PARALLELI_MODERAZIONE = 3          # chiamate AI in volo
+LOTTO_NOSTR = 5                    # eventi per lotto verso i relay
+PAUSA_NOSTR = 1.5                  # secondi di respiro tra i lotti
+
+IMPORT_LAVORI: dict[str, dict] = {}       # biglietto -> lavoro
+IMPORT_ZIP: dict[str, tuple[int, float]] = {}   # token -> (tg_id, scadenza)
+IMPORT_QUOTA: dict[int, tuple[str, int]] = {}   # tg_id -> (giorno, righe)
+
+
+def _quota_usata(tg_id: int) -> int:
+    giorno, usate = IMPORT_QUOTA.get(tg_id, ("", 0))
+    return usate if giorno == time.strftime("%Y-%m-%d") else 0
+
+
+def _percorso_zip(token: str) -> str:
+    return os.path.join(IMPORT_DIR, f"{token}.zip")
+
+
+def _cancella_zip(percorso: str):
+    try:
+        if percorso and os.path.exists(percorso):
+            os.remove(percorso)
+    except OSError:
+        pass
+
+
+def _purga_lavori():
+    """Via i lavori scaduti (mai quelli in corso) coi loro ZIP, e un
+    tetto totale che nessun uso onesto raggiunge."""
+    adesso = time.time()
+    for b in [b for b, l in IMPORT_LAVORI.items()
+              if l["scade"] < adesso and l["stato"] != "in_corso"]:
+        _cancella_zip(IMPORT_LAVORI[b].get("zip_path", ""))
+        IMPORT_LAVORI.pop(b, None)
+    while len(IMPORT_LAVORI) >= 20:
+        vecchi = [b for b, l in IMPORT_LAVORI.items()
+                  if l["stato"] != "in_corso"]
+        if not vecchi:
+            break
+        _cancella_zip(IMPORT_LAVORI[vecchi[0]].get("zip_path", ""))
+        IMPORT_LAVORI.pop(vecchi[0], None)
+    for t in [t for t, (_, scade) in IMPORT_ZIP.items() if scade < adesso]:
+        IMPORT_ZIP.pop(t, None)
+
+
+MODELLO_IMPORT = (
+    "titolo;descrizione;prezzo;valuta;categoria;zona;foto\n"
+    "Tastiera meccanica 60%;Come nuova, switch rossi, scatola "
+    "originale;35000;sats;Elettronica;Milano;\n"
+    "Giacca in pelle vintage;Taglia M, vera pelle anni 90;45,00;eur;"
+    "Abbigliamento;Roma;https://esempio.it/giacca-fronte.jpg|"
+    "https://esempio.it/giacca-retro.jpg\n"
+    "Trapano avvitatore Bosch;Con due batterie e valigetta;80000;sats;"
+    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg\n")
+
+
+@app.get("/api/import/modello")
+def modello_import():
+    """Il CSV modello da compilare: separatore ; (l'Excel italiano),
+    BOM per l'UTF-8, tre righe d'esempio che mostrano le tre vie
+    delle foto (nessuna, URL separati da |, nomi file nello ZIP).
+    Pubblico come il download dell'export: dentro Telegram il
+    download non porta l'header di autenticazione, e qui non c'e'
+    nulla di segreto."""
+    return Response(content="\ufeff" + MODELLO_IMPORT,
+                    media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition":
+                             'attachment; filename="modello-import-barattolo.csv"'})
+
+
+@app.post("/api/import/zip")
+async def import_zip(req: Request, x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """Riceve lo ZIP delle foto come corpo BINARIO puro (niente
+    multipart, niente base64 che gonfia di un terzo): il browser fa
+    fetch del file com'e'. Letto a pezzi col tetto applicato DURANTE
+    la lettura: un corpo oltre misura si ferma li', non dopo averlo
+    tenuto tutto in pancia. Risponde un token da passare a prepara."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _purga_lavori()
+    token = secrets.token_urlsafe(16)
+    percorso = _percorso_zip(token)
+    letti = 0
+    try:
+        with open(percorso, "wb") as out:
+            async for pezzo in req.stream():
+                letti += len(pezzo)
+                if letti > TETTO_ZIP_BYTES:
+                    raise HTTPException(
+                        413, "ZIP troppo grande (massimo 50MB): dividi "
+                             "l'import in piu' file")
+                out.write(pezzo)
+    except HTTPException:
+        _cancella_zip(percorso)
+        raise
+    except Exception:
+        _cancella_zip(percorso)
+        raise HTTPException(400, "Caricamento interrotto: riprova")
+
+    def _controlla_zip():
+        if not zipfile.is_zipfile(percorso):
+            return "Il file non \u00e8 uno ZIP valido"
+        with zipfile.ZipFile(percorso) as zf:
+            voci = zf.infolist()
+            if len(voci) > TETTO_ZIP_VOCI:
+                return f"Troppi file nello ZIP (massimo {TETTO_ZIP_VOCI})"
+            totale = 0
+            for v in voci:
+                nome = v.filename.replace("\\", "/")
+                if nome.startswith("/") or ".." in nome.split("/"):
+                    return "Lo ZIP contiene percorsi non ammessi"
+                totale += v.file_size
+                if v.file_size > 15_000_000:
+                    return (f"Il file {os.path.basename(nome)[:40]} "
+                            f"supera i 15MB")
+            if totale > TETTO_ZIP_SCOMPATTATO:
+                return "Il contenuto dello ZIP supera i 200MB"
+        return None
+
+    errore = await asyncio.to_thread(_controlla_zip)
+    if errore:
+        _cancella_zip(percorso)
+        raise HTTPException(400, errore)
+    IMPORT_ZIP[token] = (user["id"], time.time() + 900)
+    return {"zip": token}
+
+
+def _indice_zip(percorso: str) -> dict:
+    """L'indice {nome_file_minuscolo: voce_interna} dello ZIP, cosi'
+    'Trapano.JPG' nel CSV trova 'foto/trapano.jpg' nell'archivio.
+    Sui doppioni vince la prima voce."""
+    indice = {}
+    with zipfile.ZipFile(percorso) as zf:
+        for nome in zf.namelist():
+            if nome.endswith("/"):
+                continue
+            base = os.path.basename(nome.replace("\\", "/")).lower()
+            if base and base not in indice:
+                indice[base] = nome
+    return indice
+
+
+@app.post("/api/import/prepara")
+async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Fase 1: il CSV si valida riga per riga e si risponde con
+    l'anteprima onesta (valide, scarti col numero di riga e il
+    motivo, avvisi non bloccanti). Il filtro parole gira QUI su
+    tutte le righe; la moderazione AI aspetta il job, cosi'
+    l'anteprima arriva in un paio di secondi. Nessun annuncio viene
+    creato prima della conferma esplicita."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _purga_lavori()
+    if any(l["stato"] == "in_corso" and l["tg_id"] == user["id"]
+           for l in IMPORT_LAVORI.values()):
+        raise HTTPException(409, "Hai gi\u00e0 un import in corso: aspetta "
+                                 "che finisca")
+    d = await leggi_json(req)
+    testo = str(d.get("csv", ""))
+    if len(testo.encode("utf-8", "ignore")) > TETTO_CSV_BYTES:
+        raise HTTPException(400, "CSV troppo grande (massimo 2MB)")
+    testo = testo.lstrip("\ufeff")
+    if not testo.strip():
+        raise HTTPException(400, "Il file \u00e8 vuoto")
+
+    # Lo ZIP, se c'e': deve essere dell'utente e ancora in vita
+    zip_token = str(d.get("zip", "") or "")
+    zip_path, indice_zip = "", {}
+    if zip_token:
+        voce = IMPORT_ZIP.get(zip_token)
+        if not voce or voce[0] != user["id"] or voce[1] < time.time():
+            raise HTTPException(410, "ZIP scaduto o non trovato: "
+                                     "ricaricalo")
+        zip_path = _percorso_zip(zip_token)
+        try:
+            indice_zip = await asyncio.to_thread(_indice_zip, zip_path)
+        except Exception:
+            raise HTTPException(400, "Il file non \u00e8 uno ZIP valido")
+
+    righe_csv = list(csv.reader(io.StringIO(testo), delimiter=";"))
+    if not righe_csv:
+        raise HTTPException(400, "Il file \u00e8 vuoto")
+    intestazione = [c.strip().lstrip("\ufeff").lower()
+                    for c in righe_csv[0]]
+    if "titolo" not in intestazione or "prezzo" not in intestazione:
+        raise HTTPException(400, "Manca l'intestazione (titolo;"
+                                 "descrizione;prezzo;valuta;categoria;"
+                                 "zona;foto): scarica il modello dal "
+                                 "Profilo e riparti da quello")
+    colonna = {nome: i for i, nome in enumerate(intestazione)}
+    dati = [(n, r) for n, r in enumerate(righe_csv[1:], start=2)
+            if any(c.strip() for c in r)]      # le righe vuote non contano
+    if len(dati) > TETTO_RIGHE_IMPORT:
+        raise HTTPException(400, f"Massimo {TETTO_RIGHE_IMPORT} righe "
+                                 f"per import: il tuo file ne ha "
+                                 f"{len(dati)}. Dividilo in pi\u00f9 file")
+
+    def cella(riga, nome):
+        i = colonna.get(nome)
+        return riga[i].strip() if i is not None and i < len(riga) else ""
+
+    righe, scarti, avvisi = [], [], []
+    for numero, r in dati:
+        titolo = neutralizza_formula(cella(r, "titolo"))
+        descrizione = neutralizza_formula(cella(r, "descrizione"))
+        zona = neutralizza_formula(cella(r, "zona"))
+        if not titolo:
+            scarti.append({"riga": numero, "motivo": "titolo mancante"})
+            continue
+
+        # Prezzo e valuta: il giudice e' lo stesso di pubblica()
+        valuta = (cella(r, "valuta") or "sats").lower()
+        prezzo_testo = cella(r, "prezzo").replace(" ", "")
+        payload = {"titolo": titolo, "valuta": valuta}
+        if valuta == "eur":
+            payload["prezzo_eur"] = prezzo_testo.replace(",", ".")
+        else:
+            payload["prezzo_sats"] = prezzo_testo
+        try:
+            valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(payload)
+        except HTTPException as e:
+            scarti.append({"riga": numero, "motivo": str(e.detail)})
+            continue
+
+        # Le foto, tre vie: URL, nome nello ZIP, oppure niente
+        foto = []
+        voci_foto = [v.strip() for v in cella(r, "foto").split("|")
+                     if v.strip()]
+        if len(voci_foto) > 5:
+            avvisi.append({"riga": numero,
+                           "motivo": "pi\u00f9 di 5 foto: tengo le prime 5"})
+            voci_foto = voci_foto[:5]
+        for v in voci_foto:
+            if v.lower().startswith(("http://", "https://")):
+                if url_foto_ammesso(v):
+                    foto.append(("url", v))
+                else:
+                    avvisi.append({"riga": numero,
+                                   "motivo": f"URL foto non ammesso: "
+                                             f"{v[:60]}"})
+            elif not zip_path:
+                avvisi.append({"riga": numero,
+                               "motivo": f"foto \u00ab{v[:40]}\u00bb indicata ma "
+                                         f"nessuno ZIP caricato"})
+            elif os.path.basename(v.replace("\\", "/")).lower() \
+                    not in indice_zip:
+                avvisi.append({"riga": numero,
+                               "motivo": f"foto \u00ab{v[:40]}\u00bb non trovata "
+                                         f"nello ZIP"})
+            else:
+                foto.append(
+                    ("zip",
+                     indice_zip[os.path.basename(v.replace("\\", "/"))
+                                .lower()]))
+
+        # Moderazione strato 1, su TUTTE le righe, prima della conferma
+        violata = controlla_vietato(titolo, descrizione)
+        if violata:
+            scarti.append({"riga": numero,
+                           "motivo": f"filtro contenuti ({violata})"})
+            continue
+
+        righe.append({"riga": numero, "titolo": titolo,
+                      "descrizione": descrizione,
+                      "categoria": categoria_tollerante(cella(r, "categoria")),
+                      "zona": zona, "valuta": valuta,
+                      "prezzo_sats": prezzo_sats, "prezzo_eur": prezzo_eur,
+                      "foto": foto})
+
+    if not righe:
+        return {"valide": 0, "totale": len(dati),
+                "scarti": scarti, "avvisi": avvisi}
+
+    usate = _quota_usata(user["id"])
+    if usate + len(righe) > TETTO_RIGHE_GIORNO:
+        raise HTTPException(400, f"Superato il limite giornaliero di "
+                                 f"{TETTO_RIGHE_GIORNO} annunci importati "
+                                 f"(ne hai gi\u00e0 caricati {usate} oggi)")
+
+    # Un nuovo prepara dello stesso utente sostituisce il suo lavoro
+    # in attesa (e il vecchio ZIP se ne va con lui)
+    for b in [b for b, l in IMPORT_LAVORI.items()
+              if l["tg_id"] == user["id"] and l["stato"] == "pronto"]:
+        if IMPORT_LAVORI[b].get("zip_path") != zip_path:
+            _cancella_zip(IMPORT_LAVORI[b].get("zip_path", ""))
+        IMPORT_LAVORI.pop(b, None)
+
+    biglietto = secrets.token_urlsafe(32)
+    IMPORT_LAVORI[biglietto] = {
+        "tg_id": user["id"], "nome": user["first_name"],
+        "creato": time.time(), "scade": time.time() + 900,
+        "stato": "pronto", "fase": "",
+        "nostr": bool(d.get("nostr", True)),
+        "zip_path": zip_path, "righe": righe,
+        "scarti": scarti, "avvisi": avvisi,
+        "totale": len(righe), "fatte": 0, "ok": [],
+        "falliti": [], "nostr_fatti": 0,
+    }
+    return {"biglietto": biglietto, "valide": len(righe),
+            "totale": len(dati), "scarti": scarti, "avvisi": avvisi}
+
+
 # ----------------------- FEEDBACK E STELLE --------------------------
 # A affare concluso le due parti si giudicano a vicenda: voto 1-5 +
 # commento breve. Anche 'refunded' conta: e' una transazione vera, e
