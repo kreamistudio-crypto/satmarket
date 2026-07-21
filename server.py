@@ -2289,22 +2289,50 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
 
 # ---------------------- API: RICERCA AI -----------------------------
 
+# Con centinaia di annunci il catalogo intero non entra piu' nel
+# prompt: all'AI arriva una SHORTLIST — prima i match letterali sulle
+# parole della richiesta, poi i piu' recenti a riempire. Compromesso
+# dichiarato: un annuncio che combacia SOLO per sinonimo e non e' tra
+# i piu' freschi puo' sfuggire. L'AI continua a fare la parte fine
+# (sinonimi, prezzo, zona) dentro la rosa.
+TETTO_CATALOGO_AI = 300
+
+
 @app.get("/api/search")
 def cerca(q: str, x_tg_init_data: str = Header(""),
                   barattolo_sessione: str = Cookie("")):
     """Ricerca in linguaggio naturale: l'AI legge la richiesta
     ("tastiera sotto i 100k vicino Milano") e seleziona gli annunci."""
     verifica_utente(x_tg_init_data, barattolo_sessione)
+    base = ("SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
+            "u.npub AS venditore_npub, "
+            "u.npub_verificata AS venditore_npub_verificata, "
+            "u.negozio AS venditore_negozio, "
+            "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
+            " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
+            "u.rating FROM annunci a "
+            "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")
     con = db()
-    annunci = espandi_distintivi_vetrina([dict(r) for r in con.execute(
-        "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-        "u.npub AS venditore_npub, "
-        "u.npub_verificata AS venditore_npub_verificata, "
-        "u.negozio AS venditore_negozio, "
-        "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
-        " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
-        "u.rating FROM annunci a "
-        "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")])
+    # Le parole "sostanziose" della richiesta (>=3 lettere, max 6)
+    parole = [p for p in re.findall(r"\w+", q.lower()) if len(p) >= 3][:6]
+    annunci = []
+    if parole:
+        cond = " OR ".join("(a.titolo LIKE ? OR a.descrizione LIKE ? "
+                           "OR a.categoria LIKE ? OR a.zona LIKE ?)"
+                           for _ in parole)
+        par = [f"%{p}%" for p in parole for _ in range(4)]
+        annunci = [dict(r) for r in con.execute(
+            base + f" AND ({cond}) ORDER BY a.creato DESC LIMIT ?",
+            par + [TETTO_CATALOGO_AI])]
+    if len(annunci) < TETTO_CATALOGO_AI:
+        # Si riempie la rosa coi piu' freschi: l'AI vede sempre un
+        # catalogo pieno e puo' pescare i sinonimi che il LIKE non sa.
+        ids = tuple(a["id"] for a in annunci) or (0,)
+        annunci += [dict(r) for r in con.execute(
+            base + f" AND a.id NOT IN ({','.join('?' * len(ids))}) "
+            "ORDER BY a.creato DESC LIMIT ?",
+            list(ids) + [TETTO_CATALOGO_AI - len(annunci)])]
+    annunci = espandi_distintivi_vetrina(annunci)
     con.close()
     if not annunci:
         return []
