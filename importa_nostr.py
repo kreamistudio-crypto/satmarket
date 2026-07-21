@@ -194,8 +194,34 @@ def scarica_foto(url: str, annuncio_id: int, indice: int):
         est = {"image/png": "png", "image/webp": "webp",
                "image/gif": "gif"}.get(ctype, "jpg")
         nome = f"a{annuncio_id}_{indice}.{est}"
-        with open(os.path.join(FOTO_DIR, nome), "wb") as out:
+        percorso = os.path.join(FOTO_DIR, nome)
+        # Sentinella qualita' (lug 2026): se stiamo SOSTITUENDO un file
+        # locale con uno molto piu' leggero, quasi sempre e' il client
+        # del venditore che ha ricompresso le foto ripubblicando
+        # (successo con Primal: originali nitidi rimpiazzati da
+        # 1024px a bassa qualita'). I relay restano la fonte di
+        # verita', quindi non blocchiamo — ma non deve MAI succedere
+        # in silenzio: una riga forte nel journal.
+        try:
+            vecchio = os.path.getsize(percorso)
+            if len(raw) < vecchio * 0.6:
+                print(f"    📉 ATTENZIONE {nome}: la nuova foto pesa "
+                      f"{len(raw)//1024}KB contro i {vecchio//1024}KB di "
+                      f"quella locale — il client del venditore l'ha "
+                      f"ricompressa? La vecchia versione viene sovrascritta.")
+        except OSError:
+            pass
+        with open(percorso, "wb") as out:
             out.write(raw)
+        # La miniatura gemella ora e' VECCHIA: via, cosi' la card
+        # ripiega sul file pieno e il backfill del server ne fara'
+        # una fresca al prossimo avvio (senza questo, card e
+        # dettaglio mostrerebbero due foto diverse).
+        try:
+            os.remove(os.path.join(FOTO_DIR,
+                                   nome[:nome.rfind(".")] + "_min.jpg"))
+        except OSError:
+            pass
         return nome
     except Exception as err:
         print(f"    ⚠️  foto non scaricata ({err}), tengo l'URL: {url[:60]}")

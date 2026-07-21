@@ -699,6 +699,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `pubblica()`, e le firme degli eventi non vengono verificate
   (fiducia nei 4 relay). Limite accettato per venditori fidati
   scelti in config; da chiudere se mai si aprirà ad altri.
+  LEZIONE foto importate (lug 2026): il download è VERBATIM (mai
+  ricompresso da noi), ma i relay sono la fonte di verità — quando
+  il venditore ripubblica da un client che gli ricomprime le foto
+  (successo con Primal: originali nitidi → 1024px qualità ~60 su
+  blossom, content-addressed: l'originale non esiste proprio online)
+  l'import sovrascrive i pieni locali con quelli, e i vecchi nitidi
+  sono persi. Da allora `scarica_foto` ha la SENTINELLA: se il nuovo
+  file pesa <60% del locale, riga «📉» nel journal (mai in silenzio),
+  e cancella la `_min` gemella ormai stantia (la card ripiega sul
+  pieno, il backfill la rifà al riavvio). Riparazione possibile solo
+  dal venditore (ri-upload degli originali da un host che non
+  ricomprime, o file consegnati a mano: un file rimesso sotto lo
+  stesso nome è stabile finché gli URL dell'evento non cambiano —
+  ricordarsi di cancellare anche la `_min`).
 
 ## Produzione
 
