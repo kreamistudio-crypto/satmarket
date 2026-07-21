@@ -4073,6 +4073,12 @@ async function publish(){
     toast('Un attimo: sto ancora caricando le foto'); return;
   }
   if (editandoId) { await salvaModifica(t, p); return; }
+  /* Scudo anti-doppione: il bottone si spegne al primo tocco e
+     l'overlay blocca tutto finche' il server non risponde — un fetch
+     lento (foto in base64 + moderazione AI) col dito che ritocca
+     diventava N annunci identici. */
+  const ripristina = bottoneInAttesa(el('sellSubmit'), '⚡ Pubblico l\'annuncio…');
+  try {
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId;
@@ -4111,6 +4117,7 @@ async function publish(){
   /* L'annuncio appena nato ti si apre davanti: la soddisfazione di
      vederlo in vetrina. Se non è in lista, si torna a Esplora. */
   if (listings.find(x=>x.id===nuovoId)) openDetail(nuovoId); else go('esplora');
+  } finally { ripristina(); }
 }
 
 /* Il submit del form quando si sta modificando un annuncio: le foto

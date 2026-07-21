@@ -2485,6 +2485,12 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
     return risposta
 
 
+# La finestra dello scudo anti-doppione: stesso venditore, stesso
+# titolo e stesso prezzo entro questi secondi = quasi certamente un
+# retry (doppio tocco sul bottone, rete che riprova), non un annuncio
+# nuovo. Chi ha davvero due oggetti identici aspetta mezzo minuto.
+FINESTRA_ANTIDOPPIONE = 30
+
 @app.post("/api/listings")
 async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                                  barattolo_sessione: str = Cookie("")):
@@ -2509,6 +2515,21 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, MSG_RIFIUTO)
 
     con = db()
+    # --- Scudo anti-doppione: se lo stesso venditore ha gia' un
+    # annuncio ATTIVO identico (titolo+prezzo) nato da pochi secondi,
+    # questo submit e' un retry — si risponde con l'annuncio gia' nato
+    # invece di crearne un gemello (idempotente: per il client e'
+    # indistinguibile). Nessun await tra controllo e INSERT: nel
+    # server mono-processo il blocco resta atomico. ---
+    gemello = con.execute(
+        "SELECT id FROM annunci WHERE venditore_id=? AND titolo=? "
+        "AND prezzo_sats=? AND stato='attivo' AND creato>=? "
+        "ORDER BY id DESC LIMIT 1",
+        (user["id"], d["titolo"], prezzo_sats,
+         int(time.time()) - FINESTRA_ANTIDOPPIONE)).fetchone()
+    if gemello:
+        con.close()
+        return {"ok": True, "id": gemello["id"]}
     lat, lon = coordinate_da_zona(d.get("zona", ""))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
