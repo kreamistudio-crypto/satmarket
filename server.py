@@ -86,8 +86,10 @@ except ImportError:
 # (pip install pillow pillow-heif).
 try:
     from PIL import Image as ImmaginePillow
+    from PIL import ImageOps
 except ImportError:
     ImmaginePillow = None
+    ImageOps = None
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
@@ -487,6 +489,10 @@ def init_db():
                 "ON annunci(categoria, stato, creato DESC, id DESC)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_venditore "
                 "ON annunci(venditore_id, stato, creato DESC, id DESC)")
+    # L'ordinamento per prezzo della vetrina (lug 2026): stesso
+    # keyset, chiavi (prezzo_sats, id). L'indice serve i due versi.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_prezzo "
+                "ON annunci(stato, prezzo_sats, id)")
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
@@ -1585,7 +1591,8 @@ def converti_in_jpeg(raw: bytes):
     try:
         img = ImmaginePillow.open(io.BytesIO(raw))
         img = img.convert("RGB")
-        img.thumbnail((1200, 1200))
+        # LANCZOS anche qui: il filtro di default e' piu' morbido
+        img.thumbnail((1200, 1200), ImmaginePillow.Resampling.LANCZOS)
         out = io.BytesIO()
         img.save(out, "JPEG", quality=82)
         return out.getvalue()
@@ -1593,13 +1600,18 @@ def converti_in_jpeg(raw: bytes):
         return None
 
 
-# La ricetta delle miniature. 480px q84 (alzata dal 320/78 iniziale:
-# troppo morbida sugli schermi grandi — le card arrivano a ~300px CSS,
-# e col retina servono piu' pixel veri): ~30-40KB, sempre ~10× meno
-# del JPEG pieno. Se si ritocca ancora, il backfill rigenera da solo
-# le miniature piu' piccole del lato nuovo.
-MINIATURA_LATO = 480
-MINIATURA_QUALITA = 84
+# La ricetta delle miniature: QUADRATE, ritagliate al centro come la
+# card le mostra (aspect-ratio 1:1 + object-fit:cover). La lezione
+# della sgranatura (lug 2026): thumbnail() limita il lato LUNGO, cosi'
+# una 1200x900 diventava 480x360 e il cover della card quadrata
+# ingrandiva il lato corto del 60-70% sugli schermi retina. Col
+# ritaglio quadrato il lato corto E' il lato della ricetta. 640 q87
+# LANCZOS (il filtro fine, non il BICUBIC frettoloso di default):
+# ~60-90KB, nitida anche a 300px CSS per 2x di densita', e sempre
+# molto meno del JPEG pieno. Se si ritocca ancora, il backfill
+# rigenera da solo le miniature piu' piccole del lato nuovo.
+MINIATURA_LATO = 640
+MINIATURA_QUALITA = 87
 
 
 def miniatura_jpeg(raw: bytes):
@@ -1611,9 +1623,13 @@ def miniatura_jpeg(raw: bytes):
     try:
         img = ImmaginePillow.open(io.BytesIO(raw))
         img = img.convert("RGB")
-        img.thumbnail((MINIATURA_LATO, MINIATURA_LATO))
+        # Quadrata senza mai ingrandire: se la foto e' piccola, il
+        # quadrato si adatta al suo lato corto
+        lato = min(MINIATURA_LATO, min(img.size))
+        img = ImageOps.fit(img, (lato, lato),
+                           ImmaginePillow.Resampling.LANCZOS)
         out = io.BytesIO()
-        img.save(out, "JPEG", quality=MINIATURA_QUALITA)
+        img.save(out, "JPEG", quality=MINIATURA_QUALITA, optimize=True)
         return out.getvalue()
     except Exception:
         return None
@@ -1671,14 +1687,15 @@ def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
 def _miniatura_da_rifare(percorso_min, percorso_pieno) -> bool:
     """Una miniatura di una ricetta vecchia (lato piu' corto del
     catalogo attuale) va rifatta: si leggono solo le intestazioni
-    dei file, non costa niente. Il confronto tiene conto degli
-    originali gia' piccoli (mai piu' grandi della loro fonte, o si
-    rifarebbero a ogni avvio). In dubbio si tiene quella che c'e'."""
+    dei file, non costa niente. Il metro e' il lato CORTO della foto
+    piena: e' quello che governa il ritaglio quadrato, e cosi' gli
+    originali gia' piccoli non si rifanno a ogni avvio. In dubbio
+    si tiene quella che c'e'."""
     try:
         with ImmaginePillow.open(percorso_min) as img:
             lato_min = max(img.size)
         with ImmaginePillow.open(percorso_pieno) as img:
-            lato_pieno = max(img.size)
+            lato_pieno = min(img.size)
         return lato_min < min(MINIATURA_LATO, lato_pieno)
     except Exception:
         return False
