@@ -35,15 +35,19 @@ import hashlib
 import hmac
 import html
 import io
+import ipaddress
 import json
 import os
 import re
 import secrets
+import socket
 import sqlite3
 import ssl
 import sys
 import time
 import unicodedata
+import urllib.request
+import zipfile
 from collections import defaultdict
 from urllib.parse import parse_qsl, urlparse
 
@@ -1770,6 +1774,83 @@ def genera_miniature_mancanti():
         print(f"🖼️ Miniature generate o aggiornate: {fatte}")
 
 
+# Le foto dell'import in blocco (da URL o da ZIP) non arrivano dal
+# canvas della Mini App: nessuno le ha gia' ridimensionate. Questi
+# helper le portano nella filiera buona rispettando il patto della
+# SOLA compressione: un JPEG gia' in formato da telefono passa
+# verbatim, tutto il resto subisce l'unica conversione di
+# converti_in_jpeg. Senza Pillow si accettano solo JPEG piccoli.
+
+def url_foto_ammesso(url: str) -> bool:
+    """Guardiano anti-SSRF: gli URL delle foto li scrive l'utente nel
+    suo CSV, non un venditore fidato scelto in config come per
+    l'import Nostr. Solo http/https, e l'host non deve risolvere a
+    indirizzi privati, loopback o link-local: senza questo controllo
+    un CSV ostile farebbe bussare il server alla sua stessa rete
+    (LNbits, il DB admin del vicino di VPS...). Il DNS-rebinding tra
+    controllo e download resta un rischio residuo accettato."""
+    try:
+        p = urlparse(url)
+        if p.scheme not in ("http", "https") or not p.hostname:
+            return False
+        for info in socket.getaddrinfo(p.hostname, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_multicast or ip.is_reserved
+                    or ip.is_unspecified):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def scarica_foto_import(url: str) -> bytes | None:
+    """Scarica una foto per l'import (timeout 10s, tetto 8MB sul file
+    grezzo: tanto poi lo ridimensiona la filiera). Ritorna i bytes o
+    None, mai eccezioni: una foto morta e' un avviso nel report, non
+    un annuncio perso. Sincrona: va chiamata in asyncio.to_thread."""
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "Barattolo/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            raw = r.read(8_000_001)
+        if len(raw) > 8_000_000:
+            print(f"⚠️ Foto import troppo pesante (> 8MB): {url[:80]}")
+            return None
+        return raw or None
+    except Exception as e:
+        print(f"⚠️ Foto import non scaricata ({url[:80]}): {e}")
+        return None
+
+
+def normalizza_foto_import(raw: bytes) -> bytes | None:
+    """Porta i bytes grezzi (ZIP o URL) al JPEG definitivo della
+    filiera. Un JPEG gia' in misura da telefono (<=1600px sul lato
+    lungo) passa VERBATIM: ricomprimerlo sarebbe il passaggio
+    JPEG->JPEG vietato dal patto della filiera. Tutto il resto passa
+    da converti_in_jpeg, la sua UNICA compressione. Senza Pillow non
+    si puo' ne' riconoscere ne' convertire: si accettano solo file
+    coi magici del JPEG entro 2.5MB, gli altri si saltano."""
+    if not raw:
+        return None
+    e_jpeg = raw[:3] == b"\xff\xd8\xff"
+    if not ImmaginePillow:
+        return raw if e_jpeg and len(raw) <= 2_500_000 else None
+    if e_jpeg:
+        try:
+            with ImmaginePillow.open(io.BytesIO(raw)) as img:
+                # Verbatim solo se anche DRITTO (orientamento EXIF
+                # assente o normale): miniatura_jpeg non ruota, e una
+                # foto di macchina fotografica passata verbatim avrebbe
+                # la _min sdraiata. Le altre le raddrizza la conversione.
+                dritto = img.getexif().get(0x0112, 1) == 1
+                if max(img.size) <= 1600 and dritto:
+                    return raw
+        except Exception:
+            return None
+    return converti_in_jpeg(raw)
+
+
 # ------------------- MODERAZIONE CONTENUTI --------------------------
 # Tre strati, dal piu' economico al piu' fine:
 #   1. filtro parole (qui sotto): gratis, istantaneo, alta precisione
@@ -1908,6 +1989,59 @@ CATEGORIE = ("Elettronica", "Casa e giardino", "Abbigliamento",
 
 def categoria_valida(c) -> str:
     return c if c in CATEGORIE else "Altro"
+
+
+def neutralizza_formula(testo: str) -> str:
+    """Anti CSV-injection per i testi che arrivano dall'import: una
+    cella che inizia con =, + o @ diventerebbe una formula viva se il
+    CSV venisse riesportato e aperto in Excel. Si strappano in ciclo i
+    caratteri d'innesco iniziali (tab e CR compresi). Il trattino si
+    lascia stare: troppi titoli legittimi iniziano con '-', e l'export
+    passa comunque dal quoting di csv.writer."""
+    t = (testo or "").strip()
+    while t and t[0] in "=+@\t\r":
+        t = t[1:].lstrip()
+    return t
+
+
+# Il CSV dell'import lo scrivono commercianti, non il form: la
+# categoria va presa con tolleranza. Prima il match esatto, poi il
+# case-insensitive sul catalogo, poi i sinonimi ovvi (sulla prima
+# parola), e chi resta fuori finisce in Altro: il client non decide
+# il catalogo, come sempre.
+SINONIMI_CATEGORIA = {
+    "elettronica": "Elettronica", "electronics": "Elettronica",
+    "tech": "Elettronica", "informatica": "Elettronica",
+    "telefonia": "Elettronica",
+    "casa": "Casa e giardino", "giardino": "Casa e giardino",
+    "arredamento": "Casa e giardino", "cucina": "Casa e giardino",
+    "abbigliamento": "Abbigliamento", "vestiti": "Abbigliamento",
+    "moda": "Abbigliamento", "scarpe": "Abbigliamento",
+    "sport": "Sport e hobby", "hobby": "Sport e hobby",
+    "collezionismo": "Sport e hobby",
+    "motori": "Motori", "auto": "Motori", "moto": "Motori",
+    "ricambi": "Motori",
+    "bambini": "Bambini", "bimbi": "Bambini", "infanzia": "Bambini",
+    "giocattoli": "Bambini",
+    "animali": "Animali", "pet": "Animali",
+    "libri": "Libri e media", "media": "Libri e media",
+    "musica": "Libri e media", "film": "Libri e media",
+    "fumetti": "Libri e media",
+    "altro": "Altro", "varie": "Altro",
+}
+
+
+def categoria_tollerante(c: str) -> str:
+    c = (c or "").strip()
+    if c in CATEGORIE:
+        return c
+    basso = c.lower()
+    for cat in CATEGORIE:
+        if basso == cat.lower():
+            return cat
+    prima = basso.split()[0] if basso.split() else ""
+    return SINONIMI_CATEGORIA.get(basso) or \
+        SINONIMI_CATEGORIA.get(prima, "Altro")
 
 
 # La vetrina e' PUBBLICA (si guarda anche dal browser, senza Telegram):
