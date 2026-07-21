@@ -759,6 +759,9 @@
       Hai qualcosa da vendere? 3 minuti e sei in vetrina.
       <button class="btn orange" onclick="go('vendi')">+ Metti in vendita</button>
     </div>
+    <!-- La sentinella dello scroll infinito: quando si avvicina allo
+         schermo si carica la pagina di annunci successiva -->
+    <div id="gridSentinella" style="height:1px"></div>
   </div>
 
   <!-- ============ VISTA: DETTAGLIO ============ -->
@@ -775,6 +778,7 @@
     <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
     <div class="section-label">In vetrina in questo negozio</div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
+    <div id="negozioSentinella" style="height:1px"></div>
   </div>
 
   <!-- ============ VISTA: VENDI ============ -->
@@ -834,7 +838,7 @@
 
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="myListings"></div></div>
+        <div class="acc-b"><div id="myListings"></div><div id="mieiSentinella" style="height:1px"></div></div>
       </div>
 
       <div class="acc" id="accIdentita">
@@ -1043,9 +1047,20 @@ function fotoUrl(f){
   if (!f) return '';
   return (f.startsWith('http') || f.startsWith('data:')) ? f : `${FOTO_BASE}/foto/${f}`;
 }
+/* La miniatura e' una convenzione di nome: accanto a a123_0.jpg il
+   server salva a123_0_min.jpg (320px, un decimo del peso). Gli URL
+   esterni (import Nostr) e i data: passano invariati. */
+function fotoMini(nome){
+  if (!nome || nome.startsWith('http') || nome.startsWith('data:')) return nome;
+  return nome.replace(/\.jpg$/i, '_min.jpg');
+}
 function mapListing(a){
-  let photos = [];
-  try { photos = (a.foto ? JSON.parse(a.foto) : []).map(fotoUrl); } catch(e) {}
+  let photos = [], thumbs = [];
+  try {
+    const nomi = a.foto ? JSON.parse(a.foto) : [];
+    photos = nomi.map(fotoUrl);
+    thumbs = nomi.map(n => fotoUrl(fotoMini(n)));
+  } catch(e) {}
   return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
     price:a.prezzo_sats, valuta:a.valuta||'sats', priceEur:a.prezzo_eur||0,
     cat:a.categoria, zone:a.zona||'—',
@@ -1054,7 +1069,7 @@ function mapListing(a){
     /* username e npub finiscono dentro stringhe JS negli onclick:
        li' l'escaping HTML non basta, quindi si tiene SOLO il loro
        alfabeto naturale (Telegram: lettere/cifre/_ ; bech32: a-z0-9) */
-    photos, username:(a.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
+    photos, thumbs, username:(a.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
     nostr:(a.contatto_nostr||'').replace(/[^a-z0-9]/g,''),
     sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata,
     negozio:a.venditore_negozio||'',
@@ -1078,10 +1093,74 @@ function mapOrder(o){
     when:new Date(o.aggiornato*1000).toLocaleString('it-IT',
       {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})};
 }
-async function loadListings(){
-  const r = await fetch(`${API_BASE}/listings`, {headers:{'X-Tg-Init-Data': authHdr()}});
-  listings = (await r.json()).map(mapListing);
+/* Vetrina a pagine (lug 2026): la prima pagina arriva subito, le
+   altre allo scroll. Due contenitori DISTINTI:
+   - `vetrina`  = le pagine accumulate, cioe' cio' che la griglia
+     disegna (nell'ordine del server);
+   - `listings` = il CATALOGO in memoria per openDetail: ci entrano
+     anche gli annunci arrivati da negozio, ricerca AI e link
+     condivisi, senza mai finire in griglia.
+   In DEMO sono lo stesso array: tutto funziona come sempre. */
+const LIMITE_PAGINA = 30;
+let vetrinaCursore = null, vetrinaCaricando = false, vetrinaTotale = 0;
+let conteggiServer = null, ultimaRicercaAI = false;
+let datiVivi = false;   // al primo carico vero il seme demo si butta
+
+/* Un server vecchio risponde con l'array nudo: lo si legge come
+   pagina unica senza cursore (fail-safe nei due sensi) */
+const leggiPagina = j => Array.isArray(j) ? {annunci: j, cursore: null} : j;
+
+/* Update-or-push nel catalogo: i dati freschi vincono sui vecchi */
+function inCatalogo(arr){
+  arr.forEach(a => {
+    const i = listings.findIndex(x => x.id === a.id);
+    if (i >= 0) listings[i] = a; else listings.push(a);
+  });
+}
+
+function paramsVetrina(){
+  const p = new URLSearchParams({limit: LIMITE_PAGINA});
+  if (activeCat !== 'Tutto') p.set('cat', activeCat);
+  /* La ricerca semplice lato server e' della vetrina anonima:
+     dentro Telegram il campo Cerca parla con l'AI */
+  if (VETRINA) { const q = el('q').value.trim(); if (q) p.set('q', q); }
+  return p;
+}
+
+async function loadListings(anonimo){
+  const opz = (VETRINA || anonimo) ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+  const r = await fetch(`${API_BASE}/listings?${paramsVetrina()}`, opz);
+  if (!r.ok) throw new Error('vetrina non disponibile');
+  const j = leggiPagina(await r.json());
+  if (!datiVivi) { datiVivi = true; listings = []; }   // via il seme demo
+  vetrina = (j.annunci || []).map(mapListing);
+  inCatalogo(vetrina);
+  vetrinaCursore = j.cursore || null;
+  if (j.totale !== undefined) vetrinaTotale = j.totale;
+  if (j.conteggi) conteggiServer = j.conteggi;
+  ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
+}
+
+/* La pagina dopo, agganciata in fondo alla griglia senza ridisegnare
+   quello che c'e' gia' (niente flicker ne' foto ricaricate) */
+async function caricaAltri(){
+  if (DEMO || ultimaRicercaAI || !vetrinaCursore || vetrinaCaricando) return;
+  vetrinaCaricando = true;
+  try {
+    const p = paramsVetrina();
+    p.set('cursore', vetrinaCursore);
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(`${API_BASE}/listings?${p}`, opz);
+    const j = leggiPagina(await r.json());
+    const nuovi = (j.annunci || []).map(mapListing);
+    vetrinaCursore = j.cursore || null;
+    vetrina = vetrina.concat(nuovi);
+    inCatalogo(nuovi);
+    if (nuovi.length)
+      el('grid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+  } catch(e) {}
+  vetrinaCaricando = false;
 }
 async function loadOrders(){
   const r = await fetch(`${API_BASE}/orders`, {headers:{'X-Tg-Init-Data': authHdr()}});
@@ -1123,6 +1202,8 @@ let orders = [
   {id:103, listing:listings[4], state:"released", role:"seller", when:"3 giorni fa"},
 ];
 let activeCat = "Tutto", currentListing = null, currentOrder = null;
+/* In DEMO griglia e catalogo sono lo stesso array (vedi loadListings) */
+let vetrina = listings;
 
 /* ---------------- helpers ---------------- */
 const fmt = n => n.toLocaleString('it-IT').replace(/\./g,' ');
@@ -1167,8 +1248,12 @@ function go(view){
    proprio ("Tutto" e la ricerca coprono la scoperta). I conteggi
    vengono dai listings caricati, quindi si rifanno a ogni giro. */
 function renderChips(){
+  /* Coi dati vivi contano i numeri GLOBALI del server: la griglia
+     tiene solo le pagine caricate e conterebbe il falso. In demo
+     (o se il server non li ha mandati) si conta dal locale. */
   const conta = {};
-  listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
+  if (!DEMO && conteggiServer) Object.assign(conta, conteggiServer);
+  else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
   const cats = CATS.slice(1).filter(c=>conta[c])
     .sort((a,b)=>conta[b]-conta[a]);   // sort stabile: pari merito in ordine di catalogo
   /* Se la categoria attiva e' rimasta senza annunci (dati nuovi),
@@ -1177,17 +1262,29 @@ function renderChips(){
   el('chips').innerHTML = ['Tutto',...cats].map(c=>
     `<div class="chip ${c===activeCat?'active':''}" onclick="setCat('${c}')">${c}</div>`).join('');
 }
-function setCat(c){ activeCat=c; renderChips(); renderGrid(); haptic(); }
+function setCat(c){
+  activeCat=c; renderChips(); haptic();
+  /* Coi dati vivi la categoria filtra il server (la griglia ha solo
+     le pagine caricate): si riparte dalla prima pagina della vista */
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+}
 
 function renderGrid(items){
+  ultimaRicercaAI = !!items;   // coi risultati AI lo scroll non pagina
   const q = el('q').value.trim().toLowerCase();
-  let data = items || listings.filter(l =>
+  let data = items || vetrina.filter(l =>
     (activeCat==='Tutto' || l.cat===activeCat) &&
     (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));
   /* Il conteggio arancione in fondo alla linea puntinata: data.length
-     e' un numero, mai testo utente */
+     e' un numero, mai testo utente. Coi dati vivi dice il totale VERO
+     della vista (dal server), non solo le pagine gia' caricate. */
+  /* (dentro Telegram un testo digitato ma non cercato filtra in
+     locale: li' vale il conteggio locale, non il totale del server) */
+  const nTot = (!items && !DEMO && (VETRINA || !q) && vetrinaTotale > data.length)
+    ? vetrinaTotale : data.length;
   el('gridLabel').innerHTML = (items ? 'Risultati della ricerca' : (q||activeCat!=='Tutto' ? 'Risultati' : 'In vetrina'))
-    + `<span class="conta">${data.length} oggett${data.length===1?'o':'i'}</span>`;
+    + `<span class="conta">${nTot} oggett${nTot===1?'o':'i'}</span>`;
   el('gridEmpty').style.display = data.length ? 'none':'block';
   el('emptyQ').textContent = q || activeCat;
   el('grid').innerHTML = data.map(cardHTML).join('');
@@ -1199,7 +1296,9 @@ function renderGrid(items){
 const cardHTML = l => { const p = prezzoParte(l); return `
     <div class="card" onclick="openDetail(${l.id})">
       <div class="ph-wrap">
-        <div class="ph">${l.photos && l.photos[0] ? `<img src="${esc(l.photos[0])}" loading="lazy" alt="">` : l.emoji}</div>
+        <div class="ph">${l.photos && l.photos[0]
+          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
+          : l.emoji}</div>
         <div class="tag-price"><div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
       </div>
       <div class="info">
@@ -1211,20 +1310,33 @@ const cardHTML = l => { const p = prezzoParte(l); return `
 async function doSearch(){
   haptic();
   const q = el('q').value.trim();
-  if (!q) { renderGrid(); return; }
+  if (!q) {
+    /* Campo svuotato: coi dati vivi si riparte dalla prima pagina
+       della vista (il server dimentica la q), in demo basta ridisegnare */
+    if (DEMO) { renderGrid(); return; }
+    loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+    return;
+  }
   if (DEMO) {
     /* In demo: filtro semplice. Col backend attivo qui parte la
        ricerca AI in linguaggio naturale (capisce "sotto i 100k" ecc.) */
     renderGrid();
     toast('Col backend attivo qui cerca l\'AI 🧠');
   } else if (VETRINA) {
-    /* Anonimi: filtro locale sui dati veri. La ricerca AI resta a chi
-       e' dentro Telegram (pubblica, sarebbe credito API regalato ai bot) */
-    renderGrid();
+    /* Anonimi: ricerca semplice LATO SERVER (LIKE su titolo,
+       descrizione e zona), paginata come la vetrina: si cerca su
+       TUTTI gli annunci, non solo sulle pagine gia' caricate. La
+       ricerca AI resta a chi e' dentro Telegram (pubblica, sarebbe
+       credito API regalato ai bot) */
+    loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
   } else {
     const r = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`,
       {headers:{'X-Tg-Init-Data': authHdr()}});
-    renderGrid((await r.json()).map(mapListing));
+    const ris = (await r.json()).map(mapListing);
+    /* Anche i risultati AI entrano nel catalogo: openDetail deve
+       trovarli pure se vengono da oltre le pagine caricate */
+    inCatalogo(ris);
+    renderGrid(ris);
   }
 }
 
@@ -1242,7 +1354,9 @@ function apriNegozioDaAnnuncio(){
   const l = currentListing;
   if (!l) return;
   if (DEMO) {
-    /* Demo: il "negozio" si ricostruisce dai dati finti in locale */
+    /* Demo: il "negozio" si ricostruisce dai dati finti in locale
+       (niente cursore: la sentinella resta muta) */
+    negozioPag = {chi:null, cursore:null, caricando:false};
     renderNegozio({nome:l.seller, username:'', npub:'', npub_verificata:0,
                    rating:l.rating, vendite_ok:l.sales, negozio:''},
                   listings.filter(x=>x.seller===l.seller));
@@ -1251,19 +1365,43 @@ function apriNegozioDaAnnuncio(){
   apriNegozio(l.negozio || l.username);
 }
 
+/* Anche il negozio va a pagine: un commerciante con 300 annunci non
+   deve farli scaricare tutti a chi passa solo a guardare */
+let negozioPag = {chi:null, cursore:null, caricando:false};
+
 async function apriNegozio(chi){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
-    const r = await fetch(`${API_BASE}/negozio/${encodeURIComponent(chi)}`, opz);
+    const r = await fetch(
+      `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`, opz);
     if (!r.ok) throw new Error('negozio non trovato');
     const d = await r.json();
-    const annunci = d.annunci.map(mapListing);
+    const annunci = (d.annunci||[]).map(mapListing);
+    negozioPag = {chi, cursore: d.cursore||null, caricando:false};
     /* Gli annunci del negozio entrano anche nel catalogo in memoria:
        cosi' openDetail li trova pure arrivando dal link diretto */
-    annunci.forEach(a=>{ if (!listings.find(x=>x.id===a.id)) listings.push(a); });
+    inCatalogo(annunci);
     renderNegozio(d.venditore, annunci, d.feedback||[]);
   } catch(e) { toast('Negozio non trovato'); }
+}
+
+async function caricaAltriNegozio(){
+  if (DEMO || !negozioPag.cursore || negozioPag.caricando) return;
+  negozioPag.caricando = true;
+  try {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(
+      `${API_BASE}/negozio/${encodeURIComponent(negozioPag.chi)}`
+      + `?limit=${LIMITE_PAGINA}&cursore=${encodeURIComponent(negozioPag.cursore)}`, opz);
+    const d = await r.json();
+    const nuovi = (d.annunci||[]).map(mapListing);
+    negozioPag.cursore = d.cursore || null;
+    inCatalogo(nuovi);
+    if (nuovi.length)
+      el('negozioGrid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+  } catch(e) {}
+  negozioPag.caricando = false;
 }
 
 function renderNegozio(v, annunci, feedback=[]){
@@ -1504,7 +1642,7 @@ function openDetail(id){
   const condividi = DEMO ? '' : `<button class="share-btn" onclick="condividiAnnuncio()" title="Condividi questo annuncio" aria-label="Condividi">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/></svg></button>`;
   const foto = (l.photos && l.photos.length)
-    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map(p=>`<img src="${esc(p)}" alt="">`).join('')}</div>
+    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="">`).join('')}</div>
        ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${condividi}</div>`
     : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${condividi}</div>`;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
@@ -2748,22 +2886,41 @@ async function openDispute(){
 
 /* ---------------- vendi ---------------- */
 let myListings = [];
+let mieiCursore = null, mieiCaricando = false;
 
 async function loadMyListings(){
-  if (DEMO) { myListings = listings.filter(l=>l.seller==='Tu'); return; }
-  const r = await fetch(`${API_BASE}/listings/miei`,
+  if (DEMO) { myListings = listings.filter(l=>l.seller==='Tu'); mieiCursore = null; return; }
+  /* Pagine larghe (100): quasi nessuno le riempie, ma un negozio da
+     300 annunci non congela piu' il Profilo */
+  const r = await fetch(`${API_BASE}/listings/miei?limit=100`,
     {headers:{'X-Tg-Init-Data':authHdr()}});
-  myListings = (await r.json()).map(mapListing);
+  const j = leggiPagina(await r.json());
+  myListings = (j.annunci||[]).map(mapListing);
+  mieiCursore = j.cursore || null;
 }
 
-function renderMyListings(){
-  const box = el('myListings');
-  if (!box) return;
-  box.innerHTML = myListings.length ? myListings.map(l=>`
+async function caricaAltriMiei(){
+  if (DEMO || !mieiCursore || mieiCaricando) return;
+  mieiCaricando = true;
+  try {
+    const r = await fetch(
+      `${API_BASE}/listings/miei?limit=100&cursore=${encodeURIComponent(mieiCursore)}`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const j = leggiPagina(await r.json());
+    const nuovi = (j.annunci||[]).map(mapListing);
+    mieiCursore = j.cursore || null;
+    myListings = myListings.concat(nuovi);
+    if (nuovi.length && el('myListings'))
+      el('myListings').insertAdjacentHTML('beforeend', nuovi.map(rigaMioAnnuncio).join(''));
+  } catch(e) {}
+  mieiCaricando = false;
+}
+
+const rigaMioAnnuncio = l => `
     <div class="order">
       <div class="row">
         <b onclick="openDetail(${l.id})" style="cursor:pointer;display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
-          ? `<img src="${esc(l.photos[0])}" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none">`
+          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none">`
           : `<span style="font-size:22px">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
           <span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>
@@ -2771,7 +2928,12 @@ function renderMyListings(){
         </span>
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
-    </div>`).join('')
+    </div>`;
+
+function renderMyListings(){
+  const box = el('myListings');
+  if (!box) return;
+  box.innerHTML = myListings.length ? myListings.map(rigaMioAnnuncio).join('')
     : `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">Nessun annuncio attivo: pubblica il primo dalla scheda Vendi ＋ ⚡</div>`;
 }
 
@@ -2819,6 +2981,7 @@ async function deleteListing(id, dalDettaglio){
   if (!confirm('Eliminare questo annuncio dal mercatino?')) return;
   if (DEMO) {
     listings = listings.filter(l=>l.id!==id);
+    vetrina = listings;   // in demo restano lo stesso array
   } else {
     const r = await fetch(`${API_BASE}/listings/${id}/rimuovi`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
@@ -3606,14 +3769,24 @@ function apriNegozioDaUrl(){
   apriNegozio(decodeURIComponent(NEGOZIO_URL[1]));
 }
 /* Stesso patto per il link condiviso di un annuncio: /annuncio/{id}
-   apre il dettaglio appena la vetrina e' carica. Se l'annuncio non
-   c'e' piu', openDetail avvisa col toast e si resta in Esplora. */
+   apre il dettaglio appena la vetrina e' carica. Con la vetrina a
+   pagine l'annuncio puo' essere oltre le pagine caricate: se manca
+   dal catalogo lo si chiede al server, uno solo. Se non c'e' piu',
+   openDetail avvisa col toast e si resta in Esplora. */
 const ANNUNCIO_URL = location.pathname.match(/^\/annuncio\/(\d+)/);
 let annuncioAperto = false;
-function apriAnnuncioDaUrl(){
+async function apriAnnuncioDaUrl(){
   if (!ANNUNCIO_URL || annuncioAperto) return;
   annuncioAperto = true;
-  openDetail(Number(ANNUNCIO_URL[1]));
+  const id = Number(ANNUNCIO_URL[1]);
+  if (!DEMO && !listings.find(x=>x.id===id)) {
+    try {
+      const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+      const r = await fetch(`${API_BASE}/listings/${id}`, opz);
+      if (r.ok) inCatalogo([mapListing(await r.json())]);
+    } catch(e) {}
+  }
+  openDetail(id);
 }
 
 /* Browser senza identità Telegram: si prova la vetrina vera, cioè gli
@@ -3621,10 +3794,7 @@ function apriAnnuncioDaUrl(){
    siamo anonimi e il backend non deve sapere nulla di noi. */
 async function avviaVetrina(){
   try {
-    const r = await fetch(`${API_BASE}/listings`);
-    if (!r.ok) throw new Error('vetrina non disponibile');
-    listings = (await r.json()).map(mapListing);
-    renderChips();             // anche in vetrina le pillole seguono i dati
+    await loadListings(true);  // anonimo: nessun header, prima pagina
     VETRINA = true; DEMO = false; orders = [];
     renderAvatar();            // in vetrina anonima il tappo non compare
     mostraBanner(BANNER_VETRINA);
@@ -3718,6 +3888,23 @@ async function avvia(){
     await avviaVetrina();
   }
 }
+/* Le sentinelle dello scroll infinito: un osservatore per griglia,
+   armato una volta per sempre. Le guardie (demo, ricerca AI, fine
+   lista, caricamento in corso) vivono DENTRO le callback: qui non
+   serve sapere in che modalita' siamo. Una vista nascosta non
+   interseca mai: le sentinelle degli altri pannelli tacciono da sole.
+   600px di anticipo: la pagina dopo arriva prima che si veda il fondo. */
+function osservaSentinella(id, cb){
+  const s = el(id);
+  if (!s || !('IntersectionObserver' in window)) return;
+  new IntersectionObserver(voci => {
+    if (voci.some(v => v.isIntersecting)) cb();
+  }, {rootMargin: '600px'}).observe(s);
+}
+osservaSentinella('gridSentinella', caricaAltri);
+osservaSentinella('negozioSentinella', caricaAltriNegozio);
+osservaSentinella('mieiSentinella', caricaAltriMiei);
+
 avvia();
 /* Invio nel campo Cerca = submit del form .searchbar: niente doppio
    ascoltatore keydown, o la ricerca partirebbe due volte */
