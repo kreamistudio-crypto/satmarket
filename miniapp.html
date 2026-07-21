@@ -176,6 +176,12 @@
     border-radius:999px;padding:6px 12px;cursor:pointer}
   /* Il bottone si accende quando un filtro e' applicato */
   .strumenti button.attivo{color:var(--sats-text);border-color:var(--sats-text)}
+  /* L'etichetta di vetrina condivide la riga con gli strumenti: a
+     375px lo spazio e' poco, quindi niente linea puntinata e testo
+     compatto («831 oggetti»), col numero arancione davanti */
+  .strumenti .section-label{flex:1;min-width:0;padding:0;gap:6px;white-space:nowrap}
+  .strumenti .section-label::after{display:none}
+  .strumenti .section-label .conta{order:0}
   #filtriBox{margin:10px var(--pad) 0;padding:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:14px}
   .filtri-riga{display:flex;gap:8px}
@@ -217,7 +223,9 @@
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
     scrollbar-width:none;background:var(--ph-b)}
   .detail-photos::-webkit-scrollbar{display:none}
-  .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:4/3;object-fit:cover;
+  /* Quadrata come le card e le miniature: le foto di oggetti sono
+     spesso verticali, il taglio panoramico le decapitava */
+  .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:1/1;object-fit:cover;
     scroll-snap-align:center}
   /* I pallini della galleria, stile Vinted: uno per foto, in basso al
      centro, l'attivo pieno e gli altri velati. Vivono SULLA foto,
@@ -355,7 +363,7 @@
   .nav-logo{display:none}
 
   /* ---------- dettaglio annuncio ---------- */
-  .detail-ph{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;
+  .detail-ph{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
     font-size:84px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 12px,var(--ph-b) 12px 24px)}
   .detail-body{padding:18px var(--pad)}
   .detail-body h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;line-height:1.15}
@@ -427,6 +435,11 @@
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
   .btn.primary:active,.btn.orange:active,.btn.ghost:active{
     transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  /* CTA d'acquisto su due righe: azione sopra, cifra intera sotto —
+     cosi' i prezzi a 7 cifre non si tagliano mai */
+  .btn.compra{flex-direction:column;gap:1px;padding:10px 20px 11px}
+  .btn.compra .cifra{font-family:'JetBrains Mono',monospace;font-size:14px;
+    font-weight:700;opacity:.95}
   /* Azioni terziarie: solo testo sottolineato, niente peso visivo.
      .link per le neutre, .danger-ghost per le distruttive. */
   .btn.link,.btn.danger-ghost{background:none;border:0;box-shadow:none;
@@ -767,11 +780,13 @@
       </div>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
-    <div class="section-label" id="gridLabel">In vetrina</div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
-         euro") resta com'e': questi servono a chi sfoglia. -->
+         euro") resta com'e': questi servono a chi sfoglia.
+         L'etichetta di sezione vive QUI, sulla stessa riga: una
+         fascia sola tra le pillole e le foto. -->
     <div class="strumenti">
+      <div class="section-label" id="gridLabel">In vetrina</div>
       <select id="ordinaSel" onchange="setOrdina(this.value)" title="Ordina la vetrina">
         <option value="">Più recenti</option>
         <option value="prezzo_su">Prezzo: dal più basso</option>
@@ -1441,8 +1456,12 @@ function renderGrid(items){
      locale: li' vale il conteggio locale, non il totale del server) */
   const nTot = (!items && !DEMO && (VETRINA || !q) && vetrinaTotale > data.length)
     ? vetrinaTotale : data.length;
-  el('gridLabel').innerHTML = (items ? 'Risultati della ricerca' : (q||activeCat!=='Tutto' ? 'Risultati' : 'In vetrina'))
-    + `<span class="conta">${nTot} oggett${nTot===1?'o':'i'}</span>`;
+  /* etichetta compatta: divide la riga con ordina+filtri, quindi
+     dice solo il conteggio — «oggetti» in vetrina piena, «risultati»
+     quando c'e' una ricerca o una categoria attiva */
+  el('gridLabel').innerHTML = `<span class="conta">${nTot}</span> `
+    + (items||q||activeCat!=='Tutto' ? `risultat${nTot===1?'o':'i'}`
+                                     : `oggett${nTot===1?'o':'i'}`);
   el('gridEmpty').style.display = data.length ? 'none':'block';
   el('emptyQ').textContent = q || activeCat;
   /* «Avvisami se arriva»: solo per chi ha un account vero (in demo e
@@ -1845,13 +1864,13 @@ function openDetail(id){
       </div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${esc(l.seller[0])}</div>
-        <div class="who"><b>${esc(l.seller)}${l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}</b>${
+        <div class="who"><b>${esc(l.seller)}</b>${
           /* le medagliette di fiducia (max 3): "nostrano" si salta,
-             il 🟣 accanto al nome dice gia' la stessa cosa */
+             la pillola 🟣 tra i chip dice gia' la stessa cosa —
+             l'identita' Nostr nel dettaglio si dice UNA volta sola */
           (l.distintivi||[]).filter(d=>d.id!=='nostrano').slice(0,3)
             .map(d=>`<span class="chip-fiducia" title="${esc(d.nome)}: ${esc(d.descrizione)}">${esc(d.emoji)} ${esc(d.nome)}</span>`).join('')}
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
-          ${l.sellerNpubOk&&l.sellerNpub?`<div class="rep">🟣 <a href="https://njump.me/${esc(l.sellerNpub)}" target="_blank" style="color:inherit" onclick="event.stopPropagation()">Presente su Nostr</a> · npub verificata</div>`:''}
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
@@ -1864,9 +1883,9 @@ function openDetail(id){
              <span class="escrow-flag">🔒 pagamento protetto</span>
              <div class="trust-note">🔒 <span>I tuoi sats restano <b>chiusi nel barattolo</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${(!DEMO && !VETRINA && walletNwc())
-               ? `<button class="btn orange" onclick="compraSubito()">⚡ Compra subito — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>
+               ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <button class="btn ghost" onclick="startBuy()">🔒 Compra con escrow — ${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</button>
+             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra con escrow<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
              <div class="escrow-note" style="margin-top:10px">Commissione 1% · solo a vendita conclusa</div>
            </div>`}
