@@ -1786,22 +1786,86 @@ def espandi_distintivi_vetrina(righe):
     return righe
 
 
+# Paginazione della vetrina (lug 2026): con centinaia di annunci non
+# si serve piu' tutto in un colpo. Il cursore e' un segnalibro
+# "riparti da qui": '{creato}_{id}' dell'ultima riga vista. Meglio
+# dell'OFFSET perche' un annuncio pubblicato mentre l'utente scorre
+# non fa slittare le pagine (niente doppioni ne' buchi), e l'indice
+# idx_annunci_* lo serve dritto senza contare righe da saltare.
+LIMITE_PAGINA_MAX = 100   # nessun client onesto chiede di piu'
+TETTO_LEGACY = 500        # rete di sicurezza per chi chiama senza limit
+
+
+def pagina_annunci(con, campi, dove, par, limit, cursore):
+    """Una pagina di annunci in ordine di vetrina (nuovi prima).
+    Chiede una riga in piu' del limite: se arriva, c'e' un'altra
+    pagina e l'ultima riga tenuta diventa il prossimo segnalibro.
+    Un cursore storto vale come nessun cursore: prima pagina,
+    mai un errore (fail-safe verso client vecchi o link rotti)."""
+    q = (f"SELECT {campi} FROM annunci a "
+         f"JOIN utenti u ON u.tg_id = a.venditore_id WHERE {dove}")
+    if cursore:
+        try:
+            c, i = cursore.split("_")
+            par = par + [int(c), int(i)]
+            q += " AND (a.creato, a.id) < (?, ?)"
+        except (ValueError, AttributeError):
+            pass
+    q += " ORDER BY a.creato DESC, a.id DESC LIMIT ?"
+    righe = [dict(r) for r in con.execute(q, par + [limit + 1])]
+    prossimo = None
+    if len(righe) > limit:
+        righe = righe[:limit]
+        prossimo = f"{righe[-1]['creato']}_{righe[-1]['id']}"
+    return righe, prossimo
+
+
 @app.get("/api/listings")
-def lista_annunci(cat: str = "", x_tg_init_data: str = Header(""),
-                                 barattolo_sessione: str = Cookie("")):
+def lista_annunci(cat: str = "", q: str = "", limit: int = 0, cursore: str = "",
+                  x_tg_init_data: str = Header(""),
+                  barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     # venditore_id serve alla Mini App per "questo annuncio e' tuo"
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
-    con = db()
-    q = (f"SELECT {campi} FROM annunci a "
-         "JOIN utenti u ON u.tg_id = a.venditore_id WHERE a.stato='attivo'")
+    dove = "a.stato='attivo'"
     par = []
     if cat and cat != "Tutto":
-        q += " AND a.categoria=?"
+        dove += " AND a.categoria=?"
         par.append(cat)
-    righe = [dict(r) for r in con.execute(q + " ORDER BY a.creato DESC", par)]
+    if q.strip():
+        # Ricerca semplice per la vetrina anonima (l'AI resta riservata
+        # agli autenticati): LIKE su titolo, descrizione e zona.
+        dove += " AND (a.titolo LIKE ? OR a.descrizione LIKE ? OR a.zona LIKE ?)"
+        par += [f"%{q.strip()}%"] * 3
+    con = db()
+    if not limit:
+        # Client senza paginazione (JS vecchio in cache): l'array puro
+        # di sempre, col tetto di sicurezza. Sotto i 500 annunci la
+        # risposta e' IDENTICA a prima.
+        righe = [dict(r) for r in con.execute(
+            f"SELECT {campi} FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
+            par + [TETTO_LEGACY])]
+        con.close()
+        return espandi_distintivi_vetrina(righe)
+    limit = min(limit, LIMITE_PAGINA_MAX)
+    righe, prossimo = pagina_annunci(con, campi, dove, par, limit, cursore)
+    risposta = {"annunci": espandi_distintivi_vetrina(righe),
+                "cursore": prossimo}
+    if not cursore:
+        # Solo in prima pagina: il totale della vista corrente (per
+        # l'etichetta "N oggetti") e i conteggi GLOBALI per categoria
+        # (le pillole devono dire la verita' anche a pagine parziali).
+        risposta["totale"] = con.execute(
+            f"SELECT COUNT(*) AS n FROM annunci a WHERE {dove}",
+            par).fetchone()["n"]
+        risposta["conteggi"] = {
+            r["categoria"]: r["n"] for r in con.execute(
+                "SELECT categoria, COUNT(*) AS n FROM annunci "
+                "WHERE stato='attivo' GROUP BY categoria")}
     con.close()
-    return espandi_distintivi_vetrina(righe)
+    return risposta
 
 
 @app.post("/api/listings")
@@ -1909,6 +1973,26 @@ def miei_annunci(x_tg_init_data: str = Header(""),
         (user["id"],))]
     con.close()
     return espandi_distintivi_vetrina(righe)
+
+
+# ATTENZIONE all'ordine di registrazione: questa rotta col parametro
+# nel percorso DEVE stare dopo /api/listings/miei, altrimenti "miei"
+# verrebbe letto come id. Serve al link condiviso /annuncio/{id}:
+# con la vetrina a pagine l'annuncio puo' non essere tra i caricati.
+@app.get("/api/listings/{annuncio_id}")
+def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
+                barattolo_sessione: str = Cookie("")):
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
+    con = db()
+    r = con.execute(f"SELECT {campi} FROM annunci a "
+                    "JOIN utenti u ON u.tg_id = a.venditore_id "
+                    "WHERE a.id=? AND a.stato='attivo'",
+                    (annuncio_id,)).fetchone()
+    con.close()
+    if not r:
+        raise HTTPException(404, "Annuncio non trovato")
+    return espandi_distintivi_vetrina([dict(r)])[0]
 
 
 @app.get("/api/negozio/{chi}")
