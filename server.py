@@ -4953,6 +4953,230 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
             "totale": len(dati), "scarti": scarti, "avvisi": avvisi}
 
 
+def _foto_riga_import(annuncio_id: int, foto: list, zip_path: str):
+    """Le foto di UNA riga: pesca dallo ZIP o scarica dall'URL, porta
+    tutto nella filiera buona e scrive pieno + miniatura. Sincrona
+    (gira in un thread). Ritorna (nomi, problemi): una foto morta e'
+    un avviso, mai un annuncio perso."""
+    nomi, problemi = [], []
+    zf = None
+    try:
+        for indice, (tipo, voce) in enumerate(foto[:5]):
+            raw = None
+            if tipo == "zip" and zip_path:
+                try:
+                    if zf is None:
+                        zf = zipfile.ZipFile(zip_path)
+                    raw = zf.read(voce)
+                except Exception:
+                    problemi.append(f"foto «{os.path.basename(voce)[:40]}» "
+                                    f"illeggibile nello ZIP")
+            elif tipo == "url":
+                raw = scarica_foto_import(voce)
+                if raw is None:
+                    problemi.append(f"foto non scaricata: {voce[:60]}")
+            if not raw:
+                continue
+            pronto = normalizza_foto_import(raw)
+            if not pronto:
+                problemi.append(f"foto {indice + 1} non riconosciuta "
+                                f"come immagine")
+                continue
+            nome = _salva_una_foto(annuncio_id, indice, pronto)
+            if nome:
+                nomi.append(nome)
+    finally:
+        if zf:
+            zf.close()
+    return nomi, problemi
+
+
+async def _crea_riga_import(lavoro: dict, riga: dict):
+    """UNA riga diventa un annuncio: INSERT identico a pubblica(),
+    commit subito (un crash a meta' import lascia solo annunci
+    completi), poi le foto in un thread fuori dalla transazione,
+    come sempre."""
+    con = db()
+    con.execute(
+        "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
+        "prezzo_sats,zona,valuta,prezzo_eur,creato) VALUES(?,?,?,?,?,?,?,?,?)",
+        (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
+         riga["categoria"], riga["prezzo_sats"], riga["zona"],
+         riga["valuta"], riga["prezzo_eur"], int(time.time())))
+    annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    if riga["foto"]:
+        nomi, problemi = await asyncio.to_thread(
+            _foto_riga_import, annuncio_id, riga["foto"], lavoro["zip_path"])
+        if nomi:
+            con = db()
+            con.execute("UPDATE annunci SET foto=? WHERE id=?",
+                        (json.dumps(nomi), annuncio_id))
+            con.commit()
+            con.close()
+        for p in problemi:
+            lavoro["avvisi"].append({"riga": riga["riga"], "motivo": p})
+    lavoro["ok"].append(annuncio_id)
+
+
+async def _crea_riga_con_guardia(lavoro: dict, riga: dict):
+    try:
+        await _crea_riga_import(lavoro, riga)
+    except Exception as e:
+        lavoro["falliti"].append({"riga": riga["riga"],
+                                  "titolo": riga["titolo"],
+                                  "motivo": f"errore interno: {str(e)[:80]}"})
+    finally:
+        lavoro["fatte"] += 1
+
+
+async def _lavoro_import(biglietto: str):
+    """Il job in sottofondo, tre fasi: moderazione AI a lotti,
+    creazione a gruppetti (il grosso del tempo sono foto e download,
+    che vivono nei thread), pubblicazione Nostr a lotti LENTI in
+    coda quando gli annunci sono gia' in vetrina. Qualsiasi
+    eccezione = stato 'errore' e una riga in console: mai un task
+    che muore muto."""
+    lavoro = IMPORT_LAVORI.get(biglietto)
+    if not lavoro:
+        return
+    try:
+        # --- Fase 1: moderazione AI, stessa copertura di pubblica() ---
+        lavoro["fase"] = "moderazione"
+        voci = [(r["riga"], r["titolo"], r["descrizione"])
+                for r in lavoro["righe"]]
+        lotti = [voci[i:i + LOTTO_MODERAZIONE]
+                 for i in range(0, len(voci), LOTTO_MODERAZIONE)]
+        respiro = asyncio.Semaphore(PARALLELI_MODERAZIONE)
+
+        async def _un_lotto(lotto):
+            async with respiro:
+                return await moderazione_ai_lotto(lotto)
+
+        bocciati = {}
+        for esito in await asyncio.gather(*[_un_lotto(l) for l in lotti]):
+            bocciati.update(esito)
+        approvate = []
+        for r in lavoro["righe"]:
+            if r["riga"] in bocciati:
+                lavoro["falliti"].append(
+                    {"riga": r["riga"], "titolo": r["titolo"],
+                     "motivo": f"moderazione AI: {bocciati[r['riga']]}"})
+                lavoro["fatte"] += 1
+            else:
+                approvate.append(r)
+
+        # --- Fase 2: creazione, a gruppetti di 4 ---
+        lavoro["fase"] = "creazione"
+        for gruppo in [approvate[i:i + 4]
+                       for i in range(0, len(approvate), 4)]:
+            await asyncio.gather(*[_crea_riga_con_guardia(lavoro, r)
+                                   for r in gruppo])
+
+        # --- Fase 3: la piazza Nostr, senza fretta ---
+        if lavoro["nostr"] and lavoro["ok"] and _NOSTR:
+            lavoro["fase"] = "nostr"
+            for gruppo in [lavoro["ok"][i:i + LOTTO_NOSTR]
+                           for i in range(0, len(lavoro["ok"]),
+                                          LOTTO_NOSTR)]:
+                await asyncio.gather(*[annuncio_su_nostr(a, "active")
+                                       for a in gruppo])
+                lavoro["nostr_fatti"] += len(gruppo)
+                await asyncio.sleep(PAUSA_NOSTR)
+        lavoro["stato"] = "finito"
+    except Exception as e:
+        lavoro["stato"] = "errore"
+        print(f"⚠️ Import in blocco fallito (biglietto …{biglietto[-6:]},"
+              f" utente {lavoro['tg_id']}): {e}")
+    finally:
+        lavoro["fase"] = ""
+        lavoro["scade"] = time.time() + 3600   # il report resta leggibile 1h
+        _cancella_zip(lavoro.get("zip_path", ""))
+        lavoro["zip_path"] = ""
+
+    # Le notifiche di chiusura, fail-open: il report nel Profilo c'e'
+    # comunque
+    try:
+        creati, ko = len(lavoro["ok"]), len(lavoro["falliti"])
+        if lavoro["stato"] == "finito":
+            testo = f"📥 Import completato: <b>{creati}</b> annunci pubblicati"
+            if ko:
+                testo += f", {ko} non passati (il dettaglio è nel report)"
+            await notifica(lavoro["tg_id"], testo + ".")
+        else:
+            await notifica(lavoro["tg_id"],
+                           f"📥 L'import si è interrotto: {creati} annunci "
+                           f"erano già entrati, controlla i tuoi annunci "
+                           f"e ricarica le righe mancanti.")
+        await premia_distintivi(lavoro["tg_id"])
+        # Strato 3 in versione riassunto: UNA notifica ai moderatori
+        # con l'intervallo di id (per le stats e le rimozioni) e i
+        # titoli bocciati dall'AI
+        riassunto = (f"📥 <b>Import in blocco</b> di {lavoro['nome']} "
+                     f"(id {lavoro['tg_id']})\n"
+                     f"✅ {creati} annunci creati")
+        if lavoro["ok"]:
+            riassunto += f" (#{min(lavoro['ok'])}–#{max(lavoro['ok'])})"
+        bocciati_ai = [f for f in lavoro["falliti"]
+                       if f["motivo"].startswith("moderazione AI")]
+        if bocciati_ai:
+            riassunto += f"\n🚫 {len(bocciati_ai)} bloccati dall'AI: " + \
+                "; ".join(f"«{f['titolo'][:40]}»" for f in bocciati_ai[:10])
+        if lavoro["scarti"]:
+            riassunto += (f"\n⚠️ {len(lavoro['scarti'])} righe scartate "
+                          f"in anteprima")
+        await notifica_admin(riassunto)
+    except Exception as e:
+        print(f"⚠️ Notifiche di fine import saltate: {e}")
+
+
+@app.post("/api/import/avvia")
+async def import_avvia(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Fase 2: la conferma esplicita. Da qui in poi il lavoro va da
+    solo e il frontend lo segue col polling di /stato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    lavoro = IMPORT_LAVORI.get(str(d.get("biglietto", "")))
+    if not lavoro or lavoro["scade"] < time.time():
+        raise HTTPException(404, "Anteprima scaduta: ricarica il file")
+    if lavoro["tg_id"] != user["id"]:
+        raise HTTPException(403, "Operazione non permessa")
+    if lavoro["stato"] != "pronto":
+        raise HTTPException(409, "Questo import è già partito")
+    # Un solo import in corso in TUTTO il server: siamo mono-processo
+    # su una macchina piccola, e un job dura pochi minuti
+    if any(l["stato"] == "in_corso" for l in IMPORT_LAVORI.values()):
+        raise HTTPException(409, "C'è già un import in corso sul "
+                                 "mercatino: riprova tra qualche minuto")
+    oggi = time.strftime("%Y-%m-%d")
+    IMPORT_QUOTA[user["id"]] = (oggi,
+                                _quota_usata(user["id"]) + lavoro["totale"])
+    lavoro["stato"] = "in_corso"
+    lavoro["scade"] = time.time() + 7200   # mai scaduto a meta' corsa
+    lavoro["_task"] = asyncio.create_task(
+        _lavoro_import(str(d.get("biglietto"))))
+    return {"ok": True}
+
+
+@app.get("/api/import/stato/{biglietto}")
+def import_stato(biglietto: str, x_tg_init_data: str = Header(""),
+                 barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    lavoro = IMPORT_LAVORI.get(biglietto)
+    if not lavoro or lavoro["scade"] < time.time():
+        raise HTTPException(404, "Import non trovato (forse il server "
+                                 "è ripartito): controlla i tuoi annunci")
+    if lavoro["tg_id"] != user["id"]:
+        raise HTTPException(403, "Operazione non permessa")
+    return {"stato": lavoro["stato"], "fase": lavoro["fase"],
+            "totale": lavoro["totale"], "fatte": lavoro["fatte"],
+            "ok_n": len(lavoro["ok"]), "nostr": lavoro["nostr"],
+            "nostr_fatti": lavoro["nostr_fatti"],
+            "falliti": lavoro["falliti"], "avvisi": lavoro["avvisi"]}
+
+
 # ----------------------- FEEDBACK E STELLE --------------------------
 # A affare concluso le due parti si giudicano a vicenda: voto 1-5 +
 # commento breve. Anche 'refunded' conta: e' una transazione vera, e
