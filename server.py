@@ -4237,22 +4237,31 @@ def _prezzo_promo(a: dict, cambio: float) -> str:
     return prezzo
 
 
-def _dettagli_promo(a: dict) -> str:
-    """Categoria e zona, se ci sono, gia' cucite col puntino."""
-    return " · ".join(p for p in (a.get("categoria"), a.get("zona")) if p)
+def _slug_categoria(a: dict) -> str:
+    """La categoria come hashtag: minuscola e senza spazi
+    ("Casa e giardino" -> "casaegiardino")."""
+    return (a.get("categoria") or "").lower().replace(" ", "")
+
+
+def _hashtag_promo(a: dict) -> str:
+    """Gli hashtag in coda al post: la categoria (se c'e') e sempre
+    #barattolo."""
+    slug = _slug_categoria(a)
+    return (f"#{slug} " if slug else "") + "#barattolo"
 
 
 def _nota_promo(a: dict, cambio: float) -> str:
-    """Il testo della nota Nostr kind-1: una riga di fatto, l'immagine
-    come URL su una riga sua (i client la mostrano inline), il link."""
+    """Il testo della nota Nostr kind-1: una riga di fatto, la zona
+    col 📍, l'immagine come URL su una riga sua (i client la mostrano
+    inline), il link e gli hashtag in coda."""
     testo = f"🫙 Nuovo nel barattolo: {a['titolo']} — {_prezzo_promo(a, cambio)}"
-    dettagli = _dettagli_promo(a)
-    if dettagli:
-        testo += f" · {dettagli}"
+    if a.get("zona"):
+        testo += f"\n📍 {a['zona']}"
     foto = _foto_url_nostr(a.get("foto", ""))
     if foto:
         testo += f"\n\n{foto[0]}"
     testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    testo += f"\n\n{_hashtag_promo(a)}"
     return testo
 
 
@@ -4261,10 +4270,10 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False) -> str:
     RICOSTRUIRE il testo quando si edita col ✅ Venduto: cosi' non
     serve salvarlo da nessuna parte)."""
     testo = f"🫙 <b>{html.escape(a['titolo'])}</b>\n{_prezzo_promo(a, cambio)}"
-    dettagli = _dettagli_promo(a)
-    if dettagli:
-        testo += f" · {html.escape(dettagli)}"
+    if a.get("zona"):
+        testo += f"\n📍 {html.escape(a['zona'])}"
     testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    testo += f"\n\n{_hashtag_promo(a)}"
     if venduto:
         testo += "\n\n✅ Venduto"
     return testo
@@ -4331,8 +4340,10 @@ async def _posta_promo_singolo(a: dict):
     post_nostr_id, post_canale_id = "", 0
     if _NOSTR:
         try:
-            evento = firma_evento(1, [["t", "barattolo"]],
-                                  _nota_promo(a, cambio))
+            tags = [["t", "barattolo"]]
+            if _slug_categoria(a):
+                tags.append(["t", _slug_categoria(a)])
+            evento = firma_evento(1, tags, _nota_promo(a, cambio))
             if await _spedisci_ai_relay(evento):
                 post_nostr_id = evento["id"]
         except Exception as e:
