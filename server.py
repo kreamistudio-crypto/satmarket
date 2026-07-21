@@ -1587,14 +1587,21 @@ os.makedirs(FOTO_DIR, exist_ok=True)
 def converti_in_jpeg(raw: bytes):
     """Riporta ai ranghi qualsiasi formato che Pillow sa leggere
     (HEIC compreso, se c'e' pillow-heif): un JPEG max 1200px, come
-    quelli che il telefono prepara da solo. None se non si apre."""
+    quelli che il telefono prepara da solo. None se non si apre.
+    Questa e' l'UNICA compressione della filiera per i formati che
+    passano dal server (il file che esce e' definitivo, mai
+    riconvertito): quindi qualita' alta, 88."""
     try:
         img = ImmaginePillow.open(io.BytesIO(raw))
+        # L'orientamento EXIF va applicato QUI: il canvas del browser
+        # lo fa da solo, Pillow no — senza, le foto verticali degli
+        # iPhone arriverebbero sdraiate
+        img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
         # LANCZOS anche qui: il filtro di default e' piu' morbido
         img.thumbnail((1200, 1200), ImmaginePillow.Resampling.LANCZOS)
         out = io.BytesIO()
-        img.save(out, "JPEG", quality=82)
+        img.save(out, "JPEG", quality=88)
         return out.getvalue()
     except Exception:
         return None

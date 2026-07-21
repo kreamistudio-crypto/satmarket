@@ -3207,20 +3207,26 @@ function aggiornaFormVendi(){
 }
 
 function ridimensiona(file){
-  /* Riduce la foto a max 1200px lato lungo, JPEG leggero: cosi'
-     l'upload e' veloce anche dal telefone e il server resta snello.
-     Se il browser non sa leggere il formato (le HEIC degli iPhone su
-     Android e desktop), la foto parte com'e' in base64 e la converte
-     il server con Pillow — max 15MB, il suo limite. */
+  /* Riduce la foto a max 1200px lato lungo, JPEG di qualita': questa
+     e' l'UNICA compressione della filiera (il server salva il JPEG
+     cosi' com'e', mai riconvertito), quindi si fa bene una volta —
+     filtro 'high' (senza, il canvas usa quello veloce e sgranato) e
+     qualita' 0.9. Se il browser non sa leggere il formato (le HEIC
+     degli iPhone su Android e desktop), la foto parte com'e' in
+     base64 e la converte il server con Pillow — max 15MB, il suo
+     limite — e anche li' la compressione e' una sola. */
   return new Promise(res=>{
     const img = new Image();
     img.onload = ()=>{
       const MAX = 1200, k = Math.min(1, MAX/Math.max(img.width, img.height));
       const c = document.createElement('canvas');
       c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';   // Safari lo ignora: pazienza, il suo default e' onesto
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(img.src);
-      res(c.toDataURL('image/jpeg', .82));
+      res(c.toDataURL('image/jpeg', .9));
     };
     img.onerror = ()=>{
       URL.revokeObjectURL(img.src);
