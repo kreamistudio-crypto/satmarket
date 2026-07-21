@@ -880,6 +880,14 @@
         <div class="acc-b"><div id="myListings"></div><div id="mieiSentinella" style="height:1px"></div></div>
       </div>
 
+      <!-- Doppioni su Nostr: compare SOLO se /api/me trova coppie
+           sospette (doppio cittadino con lo stesso oggetto due volte
+           sui relay). Per tutti gli altri il cassetto non esiste. -->
+      <div class="acc" id="accDoppioni" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accDoppioni')"><span class="em">🔁</span>Doppioni su Nostr <span class="conta" id="doppioniConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="doppioniBlocco"></div></div>
+      </div>
+
       <div class="acc" id="accIdentita">
         <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità<span class="fr">▾</span></button>
         <div class="acc-b">
@@ -2408,6 +2416,7 @@ let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
+let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
 /* ---- i cassetti del Profilo: un tocco sull'header apre e chiude ---- */
 function toggleAcc(id){
@@ -2445,6 +2454,7 @@ function renderProfilo(){
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
   renderLnAddress();
   renderDistintivi();
+  renderDoppioni();
   renderChecklist();
 }
 
@@ -2502,6 +2512,80 @@ function renderDistintivi(){
           ? 'Ottenuto il '+new Date(d.ottenuto*1000).toLocaleDateString('it-IT')
           : esc(d.descrizione)}</small>
       </div>`).join('')}</div>`;
+}
+
+/* ---- 🔁 Doppioni su Nostr: lo stesso oggetto due volte sui relay,
+   l'importato firmato dal venditore e il nativo ripubblicato dalla
+   piattaforma. Le coppie arrivano gia' filtrate da /api/me; qui si
+   PROPONE soltanto — il ritiro (SOLO della copia di Barattolo, mai
+   dell'originale dell'utente) parte con un click esplicito e la sua
+   conferma. Senza coppie il cassetto non esiste proprio. ---- */
+function renderDoppioni(){
+  const box = el('doppioniBlocco');
+  if (!box) return;
+  const sez = el('accDoppioni');
+  if (DEMO || VETRINA || !myDoppioni.length) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const conta = el('doppioniConta');
+  if (conta) conta.textContent = `(${myDoppioni.length})`;
+  const riga = (a, tag) => `
+    <div class="row" style="margin-top:6px">
+      <b style="display:flex;align-items:center;gap:8px;min-width:0">${a.foto0
+        ? `<img src="${esc(fotoUrl(fotoMini(a.foto0)))}" data-full="${esc(fotoUrl(a.foto0))}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:9px;flex:none">`
+        : `<span style="font-size:20px">📦</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(a.titolo)}</span></b>
+      <span class="badge" style="background:var(--chip-bg);color:var(--ink);white-space:nowrap">${tag}</span>
+    </div>
+    <div class="sub"><span class="mono" style="color:var(--sats-deep)">${a.valuta==='eur'&&a.prezzo_eur>0 ? fmtEur(a.prezzo_eur)+' €' : fmt(a.prezzo_sats)+' sats'}</span></div>`;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:4px">
+      Questi annunci sembrano lo <b>stesso oggetto</b> pubblicato due
+      volte su Nostr: una volta da te, una da Barattolo. Se vuoi,
+      ritiriamo la <b>nostra</b> copia — la tua originale non si tocca mai.</div>
+    ${myDoppioni.map(c => `
+      <div class="order">
+        ${riga(c.importato, '🟣 dal tuo profilo Nostr')}
+        ${riga(c.nativo, '🫙 pubblicato da Barattolo')}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+          <button class="btn ghost" style="margin:0;flex:1" onclick="ritiraDoppione(${c.nativo.id})">Ritira il doppione di Barattolo</button>
+          <button class="btn link" style="margin:0" onclick="ignoraDoppione(${c.importato.id},${c.nativo.id})">Non è un doppione</button>
+        </div>
+      </div>`).join('')}`;
+}
+
+async function ritiraDoppione(idNativo){
+  haptic();
+  if (!confirm('Ritira dai relay Nostr la copia firmata da Barattolo.\n\n'
+    + 'Il tuo annuncio originale resta tuo e non si tocca. L\'annuncio '
+    + 'qui su Barattolo resta attivo: solo, non sarà più ripubblicato '
+    + 'su Nostr.\n\nProcedere?')) return;
+  try {
+    const r = await fetch(`${API_BASE}/me/doppioni/${idNativo}/ritira`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Ritiro non riuscito, riprova'); return; }
+    myDoppioni = myDoppioni.filter(c => c.nativo.id !== idNativo);
+    renderDoppioni();
+    toast('🟣 Doppione ritirato dai relay');
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+async function ignoraDoppione(idImportato, idNativo){
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/me/doppioni/ignora`,
+      {method:'POST',
+       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify({id_importato:idImportato, id_nativo:idNativo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+    myDoppioni = myDoppioni.filter(c =>
+      !(c.importato.id===idImportato && c.nativo.id===idNativo));
+    renderDoppioni();
+    toast('👌 Non te lo riproporremo');
+  } catch(e) { toast('Rete assente: riprova'); }
 }
 
 /* Il tasto-tappo del Profilo (testata mobile e topbar desktop: due
@@ -4192,6 +4276,7 @@ async function avvia(){
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
+    myDoppioni = me.doppioni_nostr || [];
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();

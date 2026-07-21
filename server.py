@@ -406,6 +406,16 @@ def init_db():
         ottenuto_il INTEGER,
         PRIMARY KEY(tg_id, badge_id)
     );
+    CREATE TABLE IF NOT EXISTS doppioni_ignorati(
+        -- «non e' un doppione»: la coppia archiviata non si ripropone
+        -- mai piu', su nessun dispositivo (per questo vive nel DB e
+        -- non in localStorage)
+        id_importato INTEGER NOT NULL,  -- riga con contatto_nostr pieno
+        id_nativo INTEGER NOT NULL,     -- riga ripubblicata dalla piattaforma
+        tg_id INTEGER,
+        creato INTEGER,
+        PRIMARY KEY(id_importato, id_nativo)
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -1470,14 +1480,27 @@ async def gestisci_callback(cb: dict):
     esito = esegui_fusione(dati[0], dati[1])
     if isinstance(esito, str):
         return await modifica(esito)
+    # Con i due account fusi possiamo finalmente CONTARE i doppioni
+    # invece di limitarci al sospetto generico: se il match stretto
+    # ne trova, l'avviso diventa un invito concreto.
+    con = db()
+    doppioni = len(trova_doppioni_nostr(con, dati[0]))
+    con.close()
+    coda = ("ℹ️ Se pubblicavi gli stessi oggetti anche dal tuo profilo "
+            "Nostr, ora potresti avere qualche doppione sui relay.")
+    if doppioni:
+        quanti = ("un possibile doppione" if doppioni == 1
+                  else f"{doppioni} possibili doppioni")
+        coda = (f"🔁 Ho trovato {quanti} sui relay (lo stesso oggetto "
+                "pubblicato due volte): aprili dal Profilo su Barattolo "
+                "per sistemarli con un tocco.")
     await modifica(
         "🎉 <b>Fatto! I tuoi due account ora sono uno.</b>\n"
         f"Sono passati di qua {esito['annunci']} annunci e "
         f"{esito['ordini']} affari. Il link del tuo negozio ora e' "
         f"{URL_PUBBLICO}/negozio/{esito['negozio']} e gli avvisi "
         "Telegram arrivano anche per gli affari nati su Nostr.\n"
-        "ℹ️ Se pubblicavi gli stessi oggetti anche dal tuo profilo "
-        "Nostr, ora potresti avere qualche doppione sui relay.")
+        + coda)
     await notifica_admin(f"🔗 Doppia cittadinanza: "
                          f"{_npub_breve(esito['npub'])} → tg {dati[0]}")
 
@@ -2952,6 +2975,75 @@ def e_admin(tg_id: int) -> bool:
 
 # ---------------------- API: PROFILO / INCASSI ----------------------
 
+# ------------------- DOPPIONI SU NOSTR ------------------------------
+# Il doppio cittadino puo' avere lo stesso oggetto due volte sui
+# relay: l'annuncio importato (evento firmato da LUI) e quello nativo
+# ripubblicato dalla piattaforma. Qui si RILEVANO le coppie sospette;
+# il ritiro — sempre e solo della copia della piattaforma, mai
+# dell'originale dell'utente — lo decide l'utente con un click
+# esplicito, mai il codice da solo.
+
+def _impronta_titolo(titolo: str) -> str:
+    """Le parole del titolo normalizzato, in ordine alfabetico:
+    'iPhone 13 Pro usato' e 'Usato iphone 13 pro' hanno la stessa
+    impronta. Niente fuzzy: meglio pochi match certi che tanti dubbi."""
+    return " ".join(sorted(normalizza(titolo).split()))
+
+
+def _prezzi_compatibili(a, b) -> bool:
+    """La conferma sul prezzo (il criterio primario e' il titolo).
+    EUR contro EUR e' un confronto tra numeri stabili (scarto <=10%);
+    sui sats si tollera di piu' (<=30%) perche' l'import riconverte
+    il prezzo dell'importato al cambio di ogni ora mentre il nativo
+    resta fissato al cambio di pubblicazione."""
+    if a["prezzo_eur"] and b["prezzo_eur"]:
+        x, y, tolleranza = a["prezzo_eur"], b["prezzo_eur"], 0.10
+    else:
+        x, y, tolleranza = a["prezzo_sats"], b["prezzo_sats"], 0.30
+    return abs(x - y) <= max(x, y) * tolleranza
+
+
+def trova_doppioni_nostr(con, tg_id: int) -> list:
+    """Le coppie (importato, nativo) dello stesso venditore che
+    sembrano lo stesso oggetto. Restano fuori le coppie archiviate
+    con «non e' un doppione». Guardia d'ingresso: chi non ha annunci
+    importati — la quasi totalita' degli utenti — esce subito."""
+    campi = "id, titolo, prezzo_sats, valuta, prezzo_eur, foto"
+    importati = con.execute(
+        f"SELECT {campi} FROM annunci WHERE venditore_id=? "
+        "AND stato='attivo' AND contatto_nostr!=''", (tg_id,)).fetchall()
+    if not importati:
+        return []
+    nativi = con.execute(
+        f"SELECT {campi} FROM annunci WHERE venditore_id=? "
+        "AND stato='attivo' AND contatto_nostr='' AND nostr_event_id!=''",
+        (tg_id,)).fetchall()
+    if not nativi:
+        return []
+    ignorate = {(r["id_importato"], r["id_nativo"]) for r in con.execute(
+        "SELECT id_importato, id_nativo FROM doppioni_ignorati")}
+
+    def scheda(r):
+        try:
+            foto0 = (json.loads(r["foto"]) or [""])[0]
+        except Exception:
+            foto0 = ""
+        return dict(id=r["id"], titolo=r["titolo"],
+                    prezzo_sats=r["prezzo_sats"], valuta=r["valuta"],
+                    prezzo_eur=r["prezzo_eur"], foto0=foto0)
+
+    coppie = []
+    for imp in importati:
+        for nat in nativi:
+            if ((imp["id"], nat["id"]) in ignorate
+                    or _impronta_titolo(imp["titolo"])
+                    != _impronta_titolo(nat["titolo"])
+                    or not _prezzi_compatibili(imp, nat)):
+                continue
+            coppie.append({"importato": scheda(imp), "nativo": scheda(nat)})
+    return coppie
+
+
 @app.get("/api/me")
 def mio_profilo(x_tg_init_data: str = Header(""),
                 barattolo_sessione: str = Cookie("")):
@@ -2970,9 +3062,14 @@ def mio_profilo(x_tg_init_data: str = Header(""),
     presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
         "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
         (user["id"],))}
+    # Doppioni su Nostr: coppie importato/nativo che sembrano lo
+    # stesso oggetto (vedi trova_doppioni_nostr). Per quasi tutti
+    # la guardia interna esce subito con la lista vuota.
+    doppioni = trova_doppioni_nostr(con, user["id"])
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
+    profilo["doppioni_nostr"] = doppioni
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [
@@ -2981,6 +3078,70 @@ def mio_profilo(x_tg_init_data: str = Header(""),
              ottenuto=presi.get(d["id"]))
         for d in DISTINTIVI]
     return profilo
+
+
+@app.post("/api/me/doppioni/{annuncio_id}/ritira")
+async def ritira_doppione(annuncio_id: int,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Ritira dai relay la copia del doppione firmata dalla
+    PIATTAFORMA (mai l'originale dell'utente, che non si tocca).
+    L'annuncio su Barattolo resta com'e': diventa solo-locale, e con
+    nostr_event_id vuoto nessun gancio lo ripubblichera' piu'.
+    Lo stato non conta: ritirare l'evento di un nativo nel frattempo
+    venduto o rimosso e' innocuo e deduplica comunque."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _NOSTR:
+        raise HTTPException(503, "La funzione Nostr non e' attiva sul server")
+    con = db()
+    a = con.execute(
+        "SELECT venditore_id, contatto_nostr, nostr_event_id "
+        "FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
+    con.close()
+    if not a or a["venditore_id"] != user["id"]:
+        raise HTTPException(404, "Annuncio non trovato")
+    if a["contatto_nostr"]:
+        raise HTTPException(400, "Questo e' l'annuncio importato: "
+                                 "l'originale non si tocca mai")
+    if not a["nostr_event_id"]:
+        raise HTTPException(400, "Gia' sistemato: questo annuncio non "
+                                 "e' piu' pubblicato su Nostr")
+    # Qui si ASPETTA il risultato dei relay (niente create_task):
+    # l'utente ha chiesto un'azione e merita una risposta onesta.
+    ok = await ritira_da_nostr(annuncio_id, esigi_ok=True)
+    if not ok:
+        raise HTTPException(502, "I relay non rispondono: non e' "
+                                 "cambiato nulla, riprova tra poco")
+    return {"ok": True, "relay": ok}
+
+
+@app.post("/api/me/doppioni/ignora")
+async def ignora_doppione(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """«Non e' un doppione»: la coppia si archivia per sempre, su
+    ogni dispositivo (per questo sta nel DB e non in localStorage)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        id_imp = int(d.get("id_importato") or 0)
+        id_nat = int(d.get("id_nativo") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Coppia non valida")
+    if id_imp <= 0 or id_nat <= 0 or id_imp == id_nat:
+        raise HTTPException(400, "Coppia non valida")
+    con = db()
+    miei = {r["id"] for r in con.execute(
+        "SELECT id FROM annunci WHERE venditore_id=? AND id IN (?,?)",
+        (user["id"], id_imp, id_nat))}
+    if miei != {id_imp, id_nat}:
+        con.close()
+        raise HTTPException(404, "Annuncio non trovato")
+    con.execute("INSERT OR IGNORE INTO doppioni_ignorati"
+                "(id_importato, id_nativo, tg_id, creato) VALUES(?,?,?,?)",
+                (id_imp, id_nat, user["id"], int(time.time())))
+    con.commit()
+    con.close()
+    return {"ok": True}
 
 
 @app.post("/api/me/ln-address")
@@ -3750,24 +3911,34 @@ async def annuncio_su_nostr(annuncio_id: int, status: str,
               f"#{annuncio_id}: {e}")
 
 
-async def ritira_da_nostr(annuncio_id: int):
-    """Chiede ai relay di cancellare l'evento di un annuncio rimosso
-    (NIP-09, kind 5). Come sopra: sottofondo, mai errori all'utente."""
+async def ritira_da_nostr(annuncio_id: int, esigi_ok: bool = False) -> int:
+    """Chiede ai relay di cancellare l'evento di un annuncio
+    (NIP-09, kind 5). Di serie e' fire-and-forget come sopra
+    (sottofondo, mai errori all'utente) e azzera comunque
+    nostr_event_id; con esigi_ok=True — il ritiro di un doppione,
+    chiesto esplicitamente dall'utente — serve almeno un relay che
+    accetti, altrimenti non cambia NULLA e si puo' riprovare (il
+    patto della modifica firmata: relay muti, messaggio onesto).
+    Ritorna quanti relay hanno accettato."""
     if not _NOSTR:
-        return
+        return 0
     try:
         con = db()
         a = con.execute("SELECT nostr_event_id FROM annunci WHERE id=?",
                         (annuncio_id,)).fetchone()
         con.close()
         if not a or not a["nostr_event_id"]:
-            return
+            return 0
         evento = firma_evento(5, [
             ["e", a["nostr_event_id"]],
             ["a", f"30402:{_NOSTR[1]}:barattolo-{annuncio_id}"],
             ["k", "30402"]],
             "Annuncio rimosso da Barattolo")
         ok = await _spedisci_ai_relay(evento)
+        if esigi_ok and not ok:
+            print(f"⚠️ Ritiro #{annuncio_id}: nessun relay ha accettato, "
+                  "non e' cambiato nulla")
+            return 0
         con = db()
         con.execute("UPDATE annunci SET nostr_event_id='' WHERE id=?",
                     (annuncio_id,))
@@ -3775,8 +3946,10 @@ async def ritira_da_nostr(annuncio_id: int):
         con.close()
         print(f"🟣 Annuncio #{annuncio_id} ritirato da Nostr "
               f"({ok}/{len(RELAYS_VERIFICA)} relay)")
+        return ok
     except Exception as e:
         print(f"⚠️ Ritiro Nostr saltato per l'annuncio #{annuncio_id}: {e}")
+        return 0
 
 
 @app.post("/api/orders/{ordine_id}/invoice")
