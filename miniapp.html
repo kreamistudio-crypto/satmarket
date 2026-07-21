@@ -3139,8 +3139,8 @@ async function rimuoviNpub(){
     return;
   }
   let msg = 'Vuoi rimuovere la npub dal profilo?\n\n' +
-    'Badge 🟣, ponte «Scrivi su Nostr» e verifica spariranno ovunque. ' +
-    'Se la reinserirai (anche la stessa), andrà verificata di nuovo.';
+    'Perderai il badge 🟣 e gli altri utenti non potranno più ' +
+    'contattarti su Nostr. Se la reinserirai, dovrai verificarla di nuovo.';
   if (myNpubAccesso && myNpubAccesso === myNpub)
     msg += '\n\n⚠️ Questa chiave apre anche l\'account dal web: perderai pure l\'accesso con Nostr.';
   if (!confirm(msg)) return;
