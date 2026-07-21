@@ -3426,7 +3426,11 @@ async function pubblicaEventoSuRelay(relays, evento){
     new Promise((_, no)=>setTimeout(()=>no(new Error('timeout')), ms))]);
   const esiti = await Promise.allSettled(relays.map(async r=>{
     const relay = await conTimeout(NT.Relay.connect(r), 6000);
-    try { await conTimeout(relay.publish(evento), 6000); }
+    try {
+      await conTimeout(relay.publish(evento), 6000);
+      console.log(`🟪 [firma] relay ok: ${r}`);
+    }
+    catch(e){ console.log(`🟪 [firma] relay no: ${r} (${e.message||e})`); throw e; }
     finally { try { relay.close(); } catch(e){} }
   }));
   return esiti.filter(e=>e.status==='fulfilled').length;
@@ -3447,6 +3451,7 @@ async function salvaModificaFirmata(t, p){
   if (!r.ok) { toast(d.detail||'Errore nella modifica', 7000); return; }
   toast('🟣 Ora serve la tua firma…', 4000);
   apriNostrSheet(async (f)=>{
+    console.log('🟪 [firma] passo 2: firmatario ricevuto, controllo la chiave');
     el('nostrSheet').classList.remove('open');
     el('sheetBg').classList.remove('open');
     await caricaNostrTools();
@@ -3456,20 +3461,33 @@ async function salvaModificaFirmata(t, p){
       ? NT.nip19.decode(myNpubAccesso).data : myNpubAccesso.toLowerCase();
     let pub;
     try { pub = String(await f.pubkey() || '').toLowerCase(); }
-    catch(e){ toast(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return; }
+    catch(e){
+      console.log(`🟪 [firma] pubkey non ottenuta: ${e.message||e}`);
+      toast(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return;
+    }
     if (pub !== attesa) {
+      console.log(`🟪 [firma] chiave sbagliata: ${pub.slice(0,8)}… invece di ${attesa.slice(0,8)}…`);
       toast('Questa non è la tua chiave d\'accesso Nostr: serve quella '
         + 'che ha pubblicato l\'annuncio', 8000);
       return;
     }
+    console.log('🟪 [firma] passo 3: chiave giusta, chiedo la firma');
     /* Passo 3: la firma, con l'id ricontrollato in pagina */
     let firmato;
     try { firmato = await f.firma(d.evento); }
-    catch(e){ toast(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return; }
+    catch(e){
+      console.log(`🟪 [firma] firma non ottenuta: ${e.message||e}`);
+      toast(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return;
+    }
     if (!firmato || firmato.id !== NT.getEventHash({...d.evento, pubkey: pub})) {
+      console.log('🟪 [firma] id diverso dal previsto: il firmatario ha alterato l\'evento');
       toast('Il firmatario ha cambiato l\'evento: modifica annullata', 8000);
       return;
     }
+    console.log('🟪 [firma] passo 4: firmato, pubblico sui relay');
+    /* se il ripiego auth_url aveva riaperto il foglio, ora si richiude */
+    el('nostrSheet').classList.remove('open');
+    el('sheetBg').classList.remove('open');
     /* Passo 4: prima i relay. Zero OK = non e' cambiato nulla.
        In collaudo la pubblicazione si SIMULA anche qui nel browser
        (come il 🟣 del server): niente eventi di prova in giro. */
@@ -3646,12 +3664,14 @@ async function firmatarioBunker(uri){
   const par = new URLSearchParams(m[2]);
   const relays = par.getAll('relay');
   if (!relays.length) throw new Error('la URI non indica nessun relay');
+  console.log(`🟪 [bunker] URI ok (${bunkerPub.slice(0,8)}…), relay: ${relays.join(' ')}`);
   const skLocale = NT.generateSecretKey();
   const pubLocale = NT.getPublicKey(skLocale);
   const chiave = NT.nip44.getConversationKey(skLocale, bunkerPub);
   let relay = null;
   for (const r of relays) {
-    try { relay = await NT.Relay.connect(r); break; } catch(e){}
+    try { relay = await NT.Relay.connect(r); console.log(`🟪 [bunker] relay connesso: ${r}`); break; }
+    catch(e){ console.log(`🟪 [bunker] relay non raggiungibile: ${r} (${e.message||e})`); }
   }
   if (!relay) throw new Error('nessun relay del bunker raggiungibile');
   const attese = {};   // id richiesta -> {ok, no} della Promise in corso
@@ -3660,16 +3680,17 @@ async function firmatarioBunker(uri){
     try { msg = JSON.parse(NT.nip44.decrypt(ev.content, chiave)); }
     catch(e){ return; }               // non era per noi (o cifrario vecchio)
     const at = attese[msg.id];
-    if (!at) return;
+    if (!at) { console.log(`🟪 [bunker] ← risposta per una richiesta che non aspetto più (id ${msg.id})`); return; }
     if (msg.result === 'auth_url') {  // il bunker vuole il tuo permesso
-      window.open(msg.error, '_blank');
-      toast('🔗 Autorizza Barattolo nella finestra del bunker…', 6000);
+      console.log(`🟪 [bunker] ← auth_url per id ${msg.id}: serve l'autorizzazione`);
+      apriAutorizzazioneBunker(msg.error);
       return;                         // la vera risposta arriverà dopo
     }
+    console.log(`🟪 [bunker] ← risposta per id ${msg.id}: ${msg.error ? 'ERRORE ' + msg.error : 'ok'}`);
     delete attese[msg.id];
     if (msg.error) at.no(new Error(msg.error)); else at.ok(msg.result);
   }});
-  function chiama(metodo, params){
+  function chiama(metodo, params, timeoutMs){
     return new Promise((ok, no)=>{
       const id = Math.random().toString(36).slice(2);
       attese[id] = {ok, no};
@@ -3677,17 +3698,47 @@ async function firmatarioBunker(uri){
         created_at: Math.floor(Date.now()/1000), tags:[['p', bunkerPub]],
         content: NT.nip44.encrypt(JSON.stringify({id, method:metodo, params}), chiave)},
         skLocale);
-      relay.publish(ev).catch(()=>{});
+      console.log(`🟪 [bunker] → ${metodo} (id ${id})`);
+      relay.publish(ev).catch(e=>console.log(`🟪 [bunker] publish fallito: ${e.message||e}`));
+      /* La firma aspetta un ESSERE UMANO che approva su un altro
+         dispositivo: 2 minuti. Le chiamate di servizio restano a 30s. */
+      const ms = timeoutMs || 30000;
       setTimeout(()=>{ if (attese[id]) { delete attese[id];
-        no(new Error('il bunker non risponde')); } }, 30000);
+        console.log(`🟪 [bunker] ⏱ ${metodo} senza risposta dopo ${ms/1000}s`);
+        no(new Error('il bunker non risponde')); } }, ms);
     });
   }
-  await chiama('connect', [bunkerPub, par.get('secret') || '']);
+  /* Il terzo parametro della connect sono i PERMESSI richiesti: senza,
+     certi bunker (nsec.app…) trattano ogni firma come non autorizzata
+     e chiedono un'approvazione via auth_url che magari non arriva mai
+     sul telefono. Chiederli qui = un'autorizzazione sola, chiara. */
+  await chiama('connect', [bunkerPub, par.get('secret') || '',
+                           'sign_event:22242,sign_event:30402']);
+  console.log('🟪 [bunker] connect: ack, firmatario pronto');
   return {
     pubkey: () => chiama('get_public_key', []),
-    firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)])),
+    firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], 120000)),
     chiudi: () => { try { relay.close(); } catch(e){} },
   };
+}
+
+/* auth_url del bunker: la finestra va aperta, ma window.open fuori da
+   un click viene spesso BLOCCATO dal browser (la risposta del bunker
+   arriva secondi dopo il tocco). Se succede, il link si offre su un
+   bottone: il tocco dell'utente e' il gesto che il browser esige. */
+function apriAutorizzazioneBunker(url){
+  let w = null;
+  try { w = window.open(url, '_blank'); } catch(e){}
+  if (w) { toast('🔗 Autorizza Barattolo nella finestra del bunker…', 6000); return; }
+  console.log('🟪 [bunker] popup bloccato: offro il link su un bottone');
+  el('sheetBg').classList.add('open');
+  el('nostrSheet').classList.add('open');
+  el('nostrSheetSub').innerHTML =
+    'Il bunker chiede la tua autorizzazione. Il browser ha bloccato la '
+    + 'finestra: aprila tu da qui, poi torna su questa pagina.<br>'
+    + `<a class="btn primary" style="display:inline-block;margin-top:10px" `
+    + `href="${url.replace(/"/g,'&quot;')}" target="_blank" rel="noopener">`
+    + `🔗 Apri l'autorizzazione del bunker</a>`;
 }
 
 /* 3) nsec incollata: firma IN QUESTA PAGINA e basta. La chiave vive
@@ -3734,6 +3785,7 @@ async function entraConNostr(firmatario){
    le tre porte qui sotto consegnano a lui e non sanno altro. */
 let scopoFirmatario = null;
 function consegnaFirmatario(f){
+  console.log(`🟪 [firmatario] consegna a: ${scopoFirmatario ? 'firma-annuncio' : 'login'}`);
   return (scopoFirmatario || entraConNostr)(f);
 }
 
