@@ -880,6 +880,31 @@
         <div class="acc-b"><div id="myListings"></div><div id="mieiSentinella" style="height:1px"></div></div>
       </div>
 
+      <!-- Import in blocco da CSV: per i commercianti coi cataloghi
+           grandi. In demo il cassetto sparisce (come il wallet). -->
+      <div class="acc" id="accImport">
+        <button class="acc-h" onclick="toggleAcc('accImport')"><span class="em">📥</span>Importa in blocco<span class="fr">▾</span></button>
+        <div class="acc-b">
+          <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+            Hai un catalogo grande? Compila il modello CSV (una riga = un
+            annuncio, massimo 500 per volta) e caricalo qui. Le foto in
+            tre modi: URL nella colonna <b>foto</b> (più d'uno separati
+            da <b>|</b>), nomi di file dentro uno ZIP, oppure niente —
+            le aggiungi poi con Modifica.</div>
+          <button class="btn ghost" style="margin-top:10px" onclick="scaricaModelloImport()">📄 Scarica il modello CSV</button>
+          <div class="field" style="margin-top:12px"><label>Il tuo file CSV</label>
+            <input id="importCsv" type="file" accept=".csv,text/csv"></div>
+          <div class="field"><label>ZIP delle foto (facoltativo)</label>
+            <input id="importZip" type="file" accept=".zip,application/zip"></div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-top:4px;cursor:pointer">
+            <input type="checkbox" id="importNostr" checked> Pubblica gli annunci anche su Nostr</label>
+          <button class="btn ghost" style="margin-top:12px" onclick="importPrepara(this)">🔎 Controlla il file</button>
+          <div id="importEsito"></div>
+          <div id="importProgresso"></div>
+          <div id="importReport"></div>
+        </div>
+      </div>
+
       <!-- Doppioni su Nostr: compare SOLO se /api/me trova coppie
            sospette (doppio cittadino con lo stesso oggetto due volte
            sui relay). Per tutti gli altri il cassetto non esiste. -->
@@ -2430,6 +2455,9 @@ function toggleAcc(id){
 function renderProfilo(){
   const box = el('profiloTestata');
   if (!box) return;
+  /* L'import in blocco parla col server vero: in demo non esiste
+     (il patto del blocco wallet) */
+  if (el('accImport')) el('accImport').style.display = DEMO ? 'none' : '';
   /* Al proprietario il 🟣 si mostra sempre: pieno se verificata,
      spento (e con l'invito) se ancora da verificare — in pubblico
      quello spento non esiste proprio */
@@ -4170,6 +4198,147 @@ async function esportaDati(){
       document.body.appendChild(a); a.click(); a.remove();
     }
   } catch(e){ toast('❌ Export non riuscito, riprova'); }
+}
+
+/* ---- import in blocco da CSV: per i cataloghi grandi. Due fasi
+   come sul server: prepara (anteprima onesta) e avvia (job in
+   sottofondo seguito col polling). Tutti i testi che arrivano dal
+   file passano da esc(): sono input dell'utente. ---- */
+let importBiglietto = null, importTimer = null, importValide = 0;
+
+function scaricaModelloImport(){
+  haptic();
+  const url = API_BASE.startsWith('http')
+    ? `${API_BASE}/import/modello`
+    : `${location.origin}${API_BASE}/import/modello`;
+  if (tg?.initData && tg.isVersionAtLeast?.('8.0')) {
+    try {
+      tg.downloadFile({url, file_name: 'modello-import-barattolo.csv'}, ok => {
+        if (ok) toast('📄 Modello in download: lo trovi tra i file scaricati');
+      });
+    } catch(e) { tg.openLink(url); }
+  } else {
+    const a = document.createElement('a');
+    a.href = url; a.download = 'modello-import-barattolo.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+}
+
+/* La lista di problemi (scarti bloccanti o avvisi) resa leggibile:
+   numero di riga DEL FILE + motivo, tetto a 30 voci per non
+   affogare la pagina. */
+function importProblemiHTML(voci, colore){
+  if (!voci?.length) return '';
+  const righe = voci.slice(0, 30).map(v =>
+    `<div style="margin-top:3px">riga ${v.riga}${v.titolo ? ` «${esc(v.titolo)}»` : ''}: ${esc(v.motivo)}</div>`).join('');
+  const oltre = voci.length > 30
+    ? `<div style="margin-top:3px">… e altre ${voci.length - 30}</div>` : '';
+  return `<div style="margin-top:8px;font-size:12.5px;font-weight:600;line-height:1.45;color:${colore}">${righe}${oltre}</div>`;
+}
+
+async function importPrepara(btn){
+  haptic();
+  if (DEMO) { toast('Nel demo l\'import non c\'è: prova nell\'app vera 📥'); return; }
+  const fCsv = el('importCsv').files[0];
+  if (!fCsv) { toast('Scegli prima il file CSV'); return; }
+  if (fCsv.size > 2_000_000) { toast('CSV troppo grande (massimo 2MB)'); return; }
+  const fZip = el('importZip').files[0];
+  if (fZip && fZip.size > 50_000_000) { toast('ZIP troppo grande (massimo 50MB)'); return; }
+  const ripristina = bottoneInAttesa(btn);
+  try{
+    let zipToken = '';
+    if (fZip) {
+      /* lo ZIP viaggia com'e', corpo binario puro: niente base64 */
+      const rz = await fetch(`${API_BASE}/import/zip`, {method:'POST',
+        headers:{'Content-Type':'application/zip','X-Tg-Init-Data':authHdr()},
+        body: fZip});
+      const dz = await rz.json().catch(()=>({}));
+      if (!rz.ok) { ripristina(); toast(dz.detail || 'ZIP non accettato'); return; }
+      zipToken = dz.zip;
+    }
+    const r = await fetch(`${API_BASE}/import/prepara`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({csv: await fCsv.text(), zip: zipToken,
+                            nostr: el('importNostr').checked})});
+    const d = await r.json().catch(()=>({}));
+    ripristina();
+    if (!r.ok) { toast(d.detail || 'File non accettato'); return; }
+    importBiglietto = d.biglietto || null;
+    importValide = d.valide;
+    el('importProgresso').innerHTML = '';
+    el('importReport').innerHTML = '';
+    el('importEsito').innerHTML = `
+      <div style="margin-top:14px;font-weight:800">${d.valide} annunci pronti su ${d.totale} righe</div>
+      ${importProblemiHTML(d.scarti, 'var(--danger)')}
+      ${importProblemiHTML(d.avvisi, 'var(--muted)')}
+      ${d.valide
+        ? `<button class="btn" style="margin-top:12px" onclick="importAvvia(this)">✅ Importa ${d.valide} annunci</button>
+           <div style="margin-top:6px;font-size:12.5px;color:var(--muted);font-weight:600">L'anteprima vale 15 minuti. Le righe con problemi si possono correggere e ricaricare anche dopo.</div>`
+        : `<div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600">Nessuna riga valida: correggi il file e ricontrolla.</div>`}`;
+  } catch(e){ ripristina(); toast('❌ Caricamento non riuscito, riprova'); }
+}
+
+async function importAvvia(btn){
+  haptic();
+  if (!importBiglietto) return;
+  if (!confirm(`Confermi la pubblicazione di ${importValide} annunci?`)) return;
+  const ripristina = bottoneInAttesa(btn);
+  try{
+    const r = await fetch(`${API_BASE}/import/avvia`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({biglietto: importBiglietto})});
+    const d = await r.json().catch(()=>({}));
+    ripristina();
+    if (!r.ok) { toast(d.detail || 'Import non partito, riprova'); return; }
+    el('importEsito').innerHTML = '';
+    if (importTimer) clearInterval(importTimer);
+    importTimer = setInterval(importPoll, 2000);
+    importPoll();
+  } catch(e){ ripristina(); toast('❌ Import non partito, riprova'); }
+}
+
+async function importPoll(){
+  try{
+    const r = await fetch(`${API_BASE}/import/stato/${importBiglietto}`,
+      {headers:{'X-Tg-Init-Data': authHdr()}});
+    if (r.status === 404) {
+      /* il server e' ripartito a meta': onesta' prima di tutto */
+      clearInterval(importTimer); importTimer = null;
+      el('importProgresso').innerHTML = '';
+      el('importReport').innerHTML = `
+        <div style="margin-top:14px;font-size:13px;font-weight:700;line-height:1.5">
+          Il server è ripartito durante l'import: controlla nei tuoi
+          annunci cosa è già entrato, le righe mancanti puoi
+          reimportarle.</div>`;
+      return;
+    }
+    if (!r.ok) return;    // intoppo passeggero: si ritenta al giro dopo
+    const s = await r.json();
+    const percento = s.totale ? Math.round(100 * s.fatte / s.totale) : 0;
+    const etichetta =
+      s.fase === 'moderazione' ? 'Controllo i contenuti con l\'AI…' :
+      s.fase === 'creazione'   ? `Creo gli annunci… ${s.fatte}/${s.totale}` :
+      s.fase === 'nostr'       ? `Pubblico su Nostr… ${s.nostr_fatti}/${s.ok_n}` :
+      'Un attimo…';
+    el('importProgresso').innerHTML = s.stato === 'in_corso' ? `
+      <div style="margin-top:14px;font-size:13px;font-weight:700">${etichetta}</div>
+      <div style="margin-top:6px;height:10px;border-radius:999px;background:var(--tile-off);overflow:hidden">
+        <div style="height:100%;width:${percento}%;background:var(--sats);transition:width .4s"></div>
+      </div>` : '';
+    if (s.stato === 'finito' || s.stato === 'errore') {
+      clearInterval(importTimer); importTimer = null;
+      el('importReport').innerHTML = `
+        <div style="margin-top:14px;font-weight:800;color:${s.stato === 'finito' ? 'var(--trust)' : 'var(--danger)'}">
+          ${s.stato === 'finito'
+            ? `✅ ${s.ok_n} annunci pubblicati`
+            : `⚠️ Import interrotto: ${s.ok_n} annunci erano già entrati`}</div>
+        ${importProblemiHTML(s.falliti, 'var(--danger)')}
+        ${importProblemiHTML(s.avvisi, 'var(--muted)')}`;
+      importBiglietto = null;
+      loadMyListings().then(renderMyListings);
+      loadListings();
+    }
+  } catch(e){ /* rete assente: il prossimo giro riprova */ }
 }
 
 /* Mostra lo stato nel profilo: collegato (con Scollega) o il campo
