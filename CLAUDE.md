@@ -43,7 +43,50 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   caricati, rifatti a ogni giro in `renderChips()` (chiamata da
   `loadListings` e `avviaVetrina`); se la categoria attiva resta
   senza annunci si torna su Tutto. Vale per vetrina autenticata,
-  anonima e DEMO (dati finti già rimappati).
+  anonima e DEMO (dati finti già rimappati). Dal cantiere «tenuta al
+  volume» (sotto) i conteggi delle pillole coi dati vivi vengono dal
+  server (`conteggi` in prima pagina), il locale resta per la demo.
+  Tenuta al volume (lug 2026): la vetrina va a PAGINE col cursore
+  keyset. `/api/listings`, `/api/negozio/{chi}` e `/api/listings/miei`
+  accettano `limit` (clampato a 100) e `cursore` = '{creato}_{id}'
+  dell'ultima riga (ordine `creato DESC, id DESC`; cursore storto =
+  prima pagina, mai 400; helper unico `pagina_annunci`). Il
+  discriminatore è retro-compatibile nei DUE sensi: SENZA `limit` la
+  risposta è l'array di sempre col tetto di sicurezza 500 (un JS
+  vecchio in cache vive felice), CON `limit` è la busta
+  `{annunci, cursore}` + SOLO in prima pagina `totale` (della vista:
+  rispetta cat/q) e `conteggi` (globali per categoria); il negozio
+  AGGIUNGE le chiavi al dict di sempre; un server vecchio col JS
+  nuovo = array letto come pagina unica (`leggiPagina`). Indici
+  `idx_annunci_vetrina/categoria/venditore` in `init_db`. Param `q`
+  su /api/listings = ricerca semplice LIKE (titolo/descrizione/zona)
+  per la vetrina ANONIMA, componibile con cat+cursore. Nasce
+  `GET /api/listings/{id}` (registrato DOPO /miei: l'ordine delle
+  rotte conta) per il deep-link /annuncio/{id} oltre le pagine
+  caricate. La ricerca AI legge una SHORTLIST (`TETTO_CATALOGO_AI`
+  300): match LIKE sulle parole della query + i più recenti a
+  riempire — compromesso dichiarato: il sinonimo puro fuori dai 300
+  più freschi può sfuggire. FOTO: accanto a ogni JPEG pieno nasce
+  `a{id}_{i}{ver}_min.jpg` (320px q78, ~un decimo del peso) — nel DB
+  restano SOLO i nomi pieni, `_min` è convenzione che il frontend
+  deriva (`fotoMini`); backfill idempotente all'avvio
+  (`genera_miniature_mancanti`), la modifica cancella anche la
+  gemella, Cache-Control di 1 giorno su /foto (i nomi sono
+  versionati). Frontend: prima pagina da 30 (`LIMITE_PAGINA`) e
+  scroll infinito con sentinelle + IntersectionObserver (vetrina,
+  negozio, tuoi annunci; guardie DENTRO le callback: demo, ricerca
+  AI, fine lista). ATTENZIONE alla separazione: `vetrina` = pagine
+  accumulate, ciò che la griglia disegna; `listings` = CATALOGO per
+  openDetail, ci confluiscono negozio/risultati AI/deep-link SENZA
+  sversare in griglia (`inCatalogo` update-or-push; in DEMO stesso
+  array, e chi riassegna `listings` in demo deve riallineare
+  `vetrina`). Append con insertAdjacentHTML (niente flicker); i
+  rebuild pieni di valuta/cambio ridisegnano l'accumulato; categoria
+  e ricerca ripartono dalla prima pagina (setCat/doSearch rifanno
+  `loadListings`). Le card montano la `_min` con ripiego `data-full`
+  sull'originale via onerror + dataset (MAI l'URL dentro una stringa
+  JS interpolata: è il patto anti-XSS del filtro-alfabeto); galleria
+  del dettaglio lazy dopo la prima foto.
   Modifica annuncio (lug 2026): `POST /api/listings/{id}/modifica` —
   solo il proprietario su annunci attivi, 400 se esiste un ordine NON
   terminale (anche `creato`: chi sta pagando deve trovare l'annuncio
@@ -755,7 +798,16 @@ web/vetrina/demo); categorie nuove a 9 voci con pillole ordinate per
 contenuto (lug 2026: catalogo `CATEGORIE`, migrazione idempotente,
 vuote nascoste, vedi Architettura — collaudate in locale con
 migrazione sui dati veri; la ricerca AI col set nuovo va provata in
-produzione, dove la chiave Anthropic è vera).
+produzione, dove la chiave Anthropic è vera); tenuta al volume
+(lug 2026: paginazione keyset su vetrina/negozio/miei con scroll
+infinito, indici su annunci, miniature `_min` per le card con
+backfill all'avvio, cache di un giorno su /foto, shortlist a 300
+della ricerca AI, ricerca semplice anonima lato server e GET del
+singolo annuncio per i link condivisi, vedi Architettura — misurato
+in locale con 814 annunci seminati: pagina 25× più leggera di prima
+[17KB vs 436KB], query tutte sugli indici, card da ~8-25KB invece
+del JPEG pieno; da rivedere dal vivo dentro Telegram dopo il deploy,
+e la shortlist AI va provata in produzione con la chiave vera).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
