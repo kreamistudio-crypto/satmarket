@@ -25,6 +25,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'era prima della colonna). I casi ambigui (cannabis
   light, pistola sparachiodi...) NON vanno nella lista parole: li
   valuta l'AI.
+  Scudo anti-doppione (lug 2026, nato da un bug vero: 5 annunci
+  identici da un solo utente): `pubblica()` risponde in modo
+  IDEMPOTENTE — stesso venditore + stesso titolo + stesso
+  prezzo_sats su un annuncio ATTIVO nato entro
+  `FINESTRA_ANTIDOPPIONE` (30s) = retry, si ritorna l'id già
+  esistente senza creare nulla (niente await tra controllo e INSERT:
+  nel server mono-processo il blocco è atomico, para anche i submit
+  concorrenti). Nel client `publish()` passa da `bottoneInAttesa`
+  (bottone spento + overlay fino alla risposta): la causa prima era
+  il fetch lento (foto base64 + moderazione AI) col dito che ritocca.
   Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py —
   Elettronica · Casa e giardino · Abbigliamento · Sport e hobby ·
   Motori · Bambini · Animali · Libri e media · Altro ("Tutto" è solo
