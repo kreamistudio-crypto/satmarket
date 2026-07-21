@@ -88,7 +88,9 @@
   .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   /* Il barattolo accanto al lockup: JPEG su fondo arancione pieno,
      arrotondato a tessera come nel mockup (niente scontorno) */
-  .brand-jar{width:38px;height:38px;border-radius:12px;flex:0 0 auto}
+  /* 42px ma col margine negativo la riga resta alta come la colonna
+     di testo (~38px): la testata non cresce di un pixel */
+  .brand-jar{width:42px;height:42px;border-radius:13px;flex:0 0 auto;margin:-2px 0}
   .brand small{display:block;margin-top:2px}
   /* Il lockup: Baloo 2 con la B che diventa ₿ — quattro trattini
      disegnati da due pseudo-elementi (ognuno sdoppiato via box-shadow) */
@@ -700,7 +702,9 @@
     /* il logo in topbar e' markup vero (.nav-logo): la B col ₿ vive
        di pseudo-elementi suoi, impossibili dentro un content: */
     .nav-logo{display:flex;align-items:center;gap:9px;margin-right:auto;font-size:24px}
-    .nav-logo .brand-jar{width:30px;height:30px;border-radius:9px}
+    /* la topbar e' alta 60px fissi: 42px ci stanno centrati senza
+       toccare nulla (e il margine negativo mobile qui non serve) */
+    .nav-logo .brand-jar{width:42px;height:42px;border-radius:13px;margin:0}
     /* il tappo-Profilo in coda alla topbar (quello in testata sparisce
        col resto della .brand) */
     nav .avatar-btn.on{display:inline-flex;margin-left:10px;width:36px;height:36px}
