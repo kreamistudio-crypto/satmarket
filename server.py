@@ -1588,18 +1588,27 @@ def converti_in_jpeg(raw: bytes):
         return None
 
 
+# La ricetta delle miniature. 480px q84 (alzata dal 320/78 iniziale:
+# troppo morbida sugli schermi grandi — le card arrivano a ~300px CSS,
+# e col retina servono piu' pixel veri): ~30-40KB, sempre ~10× meno
+# del JPEG pieno. Se si ritocca ancora, il backfill rigenera da solo
+# le miniature piu' piccole del lato nuovo.
+MINIATURA_LATO = 480
+MINIATURA_QUALITA = 84
+
+
 def miniatura_jpeg(raw: bytes):
-    """La versione francobollo per le card della vetrina: 320px q78,
-    un decimo del peso del JPEG pieno. None senza Pillow o su errore:
-    la card ripiega da sola sulla foto grande (fail-open)."""
+    """La versione francobollo per le card della vetrina (vedi ricetta
+    qui sopra). None senza Pillow o su errore: la card ripiega da
+    sola sulla foto grande (fail-open)."""
     if not ImmaginePillow:
         return None
     try:
         img = ImmaginePillow.open(io.BytesIO(raw))
         img = img.convert("RGB")
-        img.thumbnail((320, 320))
+        img.thumbnail((MINIATURA_LATO, MINIATURA_LATO))
         out = io.BytesIO()
-        img.save(out, "JPEG", quality=78)
+        img.save(out, "JPEG", quality=MINIATURA_QUALITA)
         return out.getvalue()
     except Exception:
         return None
@@ -1654,22 +1663,41 @@ def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
     return nomi
 
 
+def _miniatura_da_rifare(percorso_min, percorso_pieno) -> bool:
+    """Una miniatura di una ricetta vecchia (lato piu' corto del
+    catalogo attuale) va rifatta: si leggono solo le intestazioni
+    dei file, non costa niente. Il confronto tiene conto degli
+    originali gia' piccoli (mai piu' grandi della loro fonte, o si
+    rifarebbero a ogni avvio). In dubbio si tiene quella che c'e'."""
+    try:
+        with ImmaginePillow.open(percorso_min) as img:
+            lato_min = max(img.size)
+        with ImmaginePillow.open(percorso_pieno) as img:
+            lato_pieno = max(img.size)
+        return lato_min < min(MINIATURA_LATO, lato_pieno)
+    except Exception:
+        return False
+
+
 def genera_miniature_mancanti():
     """Passata di recupero all'avvio (in un thread): le foto nate
-    prima delle miniature ne ricevono una. Idempotente e fail-open:
-    salta le _min, salta le gia' fatte, un errore = una riga in
-    console e si va avanti."""
+    prima delle miniature ne ricevono una, e quelle fatte con una
+    ricetta vecchia (piu' piccole di oggi) si rifanno da sole.
+    Idempotente e fail-open: un errore = una riga in console e si
+    va avanti."""
     if not ImmaginePillow:
         return
     fatte = 0
     for nome in os.listdir(FOTO_DIR):
         if not nome.endswith(".jpg") or nome.endswith("_min.jpg"):
             continue
+        percorso_pieno = os.path.join(FOTO_DIR, nome)
         percorso_min = os.path.join(FOTO_DIR, nome[:-4] + "_min.jpg")
-        if os.path.exists(percorso_min):
+        if (os.path.exists(percorso_min)
+                and not _miniatura_da_rifare(percorso_min, percorso_pieno)):
             continue
         try:
-            with open(os.path.join(FOTO_DIR, nome), "rb") as f:
+            with open(percorso_pieno, "rb") as f:
                 mini = miniatura_jpeg(f.read())
             if mini:
                 with open(percorso_min, "wb") as out:
@@ -1678,7 +1706,7 @@ def genera_miniature_mancanti():
         except OSError as e:
             print(f"⚠️ Miniatura saltata per {nome}: {e}")
     if fatte:
-        print(f"🖼️ Miniature di recupero generate: {fatte}")
+        print(f"🖼️ Miniature generate o aggiornate: {fatte}")
 
 
 # ------------------- MODERAZIONE CONTENUTI --------------------------
