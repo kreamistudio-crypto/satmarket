@@ -178,6 +178,18 @@ async def guardia_csrf(request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def cache_foto(request, call_next):
+    """Le foto degli annunci si possono tenere in tasca un giorno,
+    come gli asset: i nomi sono versionati (alla modifica cambia il
+    timestamp nel nome), quindi un file non cambia mai sotto lo
+    stesso nome e il browser puo' fidarsi della sua copia."""
+    risposta = await call_next(request)
+    if request.url.path.startswith("/foto/") and risposta.status_code == 200:
+        risposta.headers["Cache-Control"] = "public, max-age=86400"
+    return risposta
+
+
 # ------------------------- DATABASE --------------------------------
 
 def db():
@@ -1576,6 +1588,23 @@ def converti_in_jpeg(raw: bytes):
         return None
 
 
+def miniatura_jpeg(raw: bytes):
+    """La versione francobollo per le card della vetrina: 320px q78,
+    un decimo del peso del JPEG pieno. None senza Pillow o su errore:
+    la card ripiega da sola sulla foto grande (fail-open)."""
+    if not ImmaginePillow:
+        return None
+    try:
+        img = ImmaginePillow.open(io.BytesIO(raw))
+        img = img.convert("RGB")
+        img.thumbnail((320, 320))
+        out = io.BytesIO()
+        img.save(out, "JPEG", quality=78)
+        return out.getvalue()
+    except Exception:
+        return None
+
+
 def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
     """Salva le foto dell'annuncio. Dalla Mini App di solito arrivano
     gia' ridimensionate in JPEG (base64); quelle che il browser non ha
@@ -1612,8 +1641,44 @@ def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
         nome = f"a{annuncio_id}_{i}{versione}.jpg"
         with open(os.path.join(FOTO_DIR, nome), "wb") as out:
             out.write(raw)
+        # Accanto al file pieno nasce la miniatura per le card.
+        # Nel database resta SOLO il nome pieno: il suffisso _min e'
+        # una convenzione di nome che il frontend deriva da solo.
+        mini = miniatura_jpeg(raw)
+        if mini:
+            with open(os.path.join(FOTO_DIR,
+                                   f"a{annuncio_id}_{i}{versione}_min.jpg"),
+                      "wb") as out:
+                out.write(mini)
         nomi.append(nome)
     return nomi
+
+
+def genera_miniature_mancanti():
+    """Passata di recupero all'avvio (in un thread): le foto nate
+    prima delle miniature ne ricevono una. Idempotente e fail-open:
+    salta le _min, salta le gia' fatte, un errore = una riga in
+    console e si va avanti."""
+    if not ImmaginePillow:
+        return
+    fatte = 0
+    for nome in os.listdir(FOTO_DIR):
+        if not nome.endswith(".jpg") or nome.endswith("_min.jpg"):
+            continue
+        percorso_min = os.path.join(FOTO_DIR, nome[:-4] + "_min.jpg")
+        if os.path.exists(percorso_min):
+            continue
+        try:
+            with open(os.path.join(FOTO_DIR, nome), "rb") as f:
+                mini = miniatura_jpeg(f.read())
+            if mini:
+                with open(percorso_min, "wb") as out:
+                    out.write(mini)
+                fatte += 1
+        except OSError as e:
+            print(f"⚠️ Miniatura saltata per {nome}: {e}")
+    if fatte:
+        print(f"🖼️ Miniature di recupero generate: {fatte}")
 
 
 # ------------------- MODERAZIONE CONTENUTI --------------------------
@@ -2197,10 +2262,12 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         for v in vecchie:
             if v.startswith("http") or v in nomi:
                 continue
-            try:
-                os.remove(os.path.join(FOTO_DIR, v))
-            except OSError:
-                pass
+            # Con la foto piena se ne va anche la miniatura gemella
+            for da_togliere in (v, v[:-4] + "_min.jpg"):
+                try:
+                    os.remove(os.path.join(FOTO_DIR, da_togliere))
+                except OSError:
+                    pass
         con = db()
         con.execute("UPDATE annunci SET foto=? WHERE id=?",
                     (json.dumps(nomi) if nomi else "", annuncio_id))
@@ -4040,6 +4107,9 @@ async def orologio():
 @app.on_event("startup")
 async def avvia_orologio():
     asyncio.create_task(orologio())
+    # Le foto nate prima delle miniature ne ricevono una, in un
+    # thread: l'avvio non aspetta nessuno (oggi i file sono pochi)
+    asyncio.create_task(asyncio.to_thread(genera_miniature_mancanti))
 
 
 # ------------------- FILE SERVITI AL PUBBLICO -----------------------
