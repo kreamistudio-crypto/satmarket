@@ -961,8 +961,8 @@
   <!-- ============ SHEET LOGIN NOSTR ============ -->
   <div class="sheet" id="nostrSheet">
     <div class="grab"></div>
-    <h3>🟣 Entra con Nostr</h3>
-    <div style="font-size:13px;color:var(--muted);font-weight:600">
+    <h3 id="nostrSheetTitolo">🟣 Entra con Nostr</h3>
+    <div id="nostrSheetSub" style="font-size:13px;color:var(--muted);font-weight:600">
       Dimostri di possedere la tua chiave firmando una sfida.
       La chiave privata <b>non viene mai inviata</b> a nessuno.
     </div>
@@ -3009,6 +3009,7 @@ async function rimuoviModerazione(id){
 
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
 let editandoId = null, editandoTitolo = '', fotoAttuali = [];
+let editandoNostr = false;   // modifica FIRMATA di un annuncio importato
 
 /* La valuta del listino nel form di Vendi: sats (com'e' sempre stato)
    oppure EUR — il prezzo in euro resta fisso e chi compra paga sempre
@@ -3041,6 +3042,11 @@ function editListing(id){
   if (!l) { toast('Annuncio non trovato'); return; }
   haptic();
   editandoId = id; editandoTitolo = l.title;
+  /* Un annuncio importato da Nostr si puo' modificare solo FIRMANDO
+     con la propria chiave (doppio cittadino): il form lo dice e il
+     salvataggio prende la strada firmata. Senza chiave d'accesso il
+     server risponde col suo messaggio di sempre. */
+  editandoNostr = !DEMO && !!l.nostr && !!myNpubAccesso;
   el('sellTitle').value = l.title;
   impostaSellValuta(l.valuta==='eur' && l.priceEur>0 ? 'eur' : 'sats');
   el('sellPrice').value = sellValuta==='eur' ? l.priceEur : l.price;
@@ -3054,6 +3060,7 @@ function editListing(id){
 
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
+  editandoNostr = false;
   ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
@@ -3064,15 +3071,22 @@ function annullaModifica(){
 function aggiornaFormVendi(){
   const b = el('editBanner'), btn = el('sellSubmit');
   if (!b || !btn) return;
+  const drop = document.querySelector('#view-vendi .photo-drop');
   if (editandoId){
     b.style.display = 'block';
-    b.innerHTML = `✏️ Stai modificando «${esc(editandoTitolo)}» — `
+    b.innerHTML = (editandoNostr
+      ? `🟣 Stai modificando «${esc(editandoTitolo)}», importato da Nostr: `
+        + `al salvataggio la modifica si <b>firma con la tua chiave</b> e `
+        + `aggiorna anche i relay. `
+      : `✏️ Stai modificando «${esc(editandoTitolo)}» — `)
       + `<a href="#" onclick="annullaModifica();return false">annulla</a>`;
-    btn.textContent = '✏️ Salva le modifiche';
+    btn.textContent = editandoNostr ? '🟣 Firma e salva' : '✏️ Salva le modifiche';
   } else {
     b.style.display = 'none';
     btn.textContent = '⚡ Pubblica annuncio';
   }
+  /* Le foto degli importati vivono sui relay: qui non si cambiano */
+  if (drop) drop.style.display = editandoNostr ? 'none' : '';
 }
 
 function ridimensiona(file){
@@ -3129,6 +3143,10 @@ function ridimensiona(file){
 }
 
 async function fotoScelte(ev){
+  if (editandoNostr) {
+    toast('Le foto degli annunci importati si cambiano dal tuo client Nostr', 6000);
+    return;
+  }
   for (const file of ev.target.files){
     if (sellFoto.length >= 5) { toast('Massimo 5 foto'); break; }
     /* Chip segnaposto SUBITO: le HEIC pesanti passano dal server e
@@ -3148,10 +3166,13 @@ async function fotoScelte(ev){
 function renderFotoPreview(){
   if (editandoId && !sellFoto.length && fotoAttuali.length){
     /* In modifica: si vedono le foto attuali; appena se ne scelgono
-       di nuove, il set si sostituisce per intero */
+       di nuove, il set si sostituisce per intero. Per gli importati
+       da Nostr invece le foto non si toccano proprio (v1). */
     el('photoPreview').innerHTML = fotoAttuali.map(f=>`
       <div class="th"><img src="${esc(f)}" alt=""></div>`).join('')
-      + `<div style="width:100%;font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">Queste sono le foto attuali: restano così, oppure scegline di nuove per sostituirle tutte</div>`;
+      + `<div style="width:100%;font-size:12px;color:var(--muted);font-weight:600;margin-top:6px">${editandoNostr
+        ? 'Le foto degli annunci importati si cambiano dal tuo client Nostr'
+        : 'Queste sono le foto attuali: restano così, oppure scegline di nuove per sostituirle tutte'}</div>`;
     return;
   }
   /* Il canvas produce sempre data:image/jpeg: 'caricando:' e' il chip
@@ -3227,6 +3248,7 @@ async function publish(){
    blocco), altrimenti restano quelle attuali. */
 async function salvaModifica(t, p){
   const id = editandoId;
+  if (editandoNostr) { await salvaModificaFirmata(t, p); return; }
   if (DEMO) {
     const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
     if (l){
@@ -3255,6 +3277,112 @@ async function salvaModifica(t, p){
   /* Come per la pubblicazione: l'annuncio aggiornato si apre subito */
   if (listings.find(x=>x.id===id) || myListings.find(x=>x.id===id)) openDetail(id);
   else go('esplora');
+}
+
+/* ------- Modifica FIRMATA di un annuncio importato da Nostr -------
+   Il doppio cittadino e' l'AUTORE dell'evento importato: la sua firma
+   puo' aggiornare i relay, e Barattolo qui fa da client Nostr. Cinque
+   passi: (1) il server valida e MODERA e prepara l'evento non firmato
+   con un biglietto a scadenza; (2) si ri-evoca il firmatario del login
+   (estensione/bunker/nsec) e si controlla che sia la chiave giusta
+   PRIMA di firmare (la nsec si azzera dopo UNA firma); (3) firma, con
+   l'id ricontrollato in pagina (un firmatario che altera l'evento non
+   passa); (4) pubblicazione sui relay DAL BROWSER — se nessuno riceve,
+   non e' cambiato niente da nessuna parte; (5) al server tornano solo
+   {biglietto, pubkey, sig} e la copia locale si allinea subito. Se il
+   passo 5 fallisce dopo i relay, l'import orario riconcilia entro
+   un'ora: per gli importati i relay sono la fonte di verita'. */
+
+async function pubblicaEventoSuRelay(relays, evento){
+  /* Consegna l'evento firmato ai relay, uno per uno in parallelo,
+     e conta quanti hanno detto OK. Timeout corto per relay: un relay
+     morto non deve tenere in ostaggio la modifica. */
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const conTimeout = (p, ms)=>Promise.race([p,
+    new Promise((_, no)=>setTimeout(()=>no(new Error('timeout')), ms))]);
+  const esiti = await Promise.allSettled(relays.map(async r=>{
+    const relay = await conTimeout(NT.Relay.connect(r), 6000);
+    try { await conTimeout(relay.publish(evento), 6000); }
+    finally { try { relay.close(); } catch(e){} }
+  }));
+  return esiti.filter(e=>e.status==='fulfilled').length;
+}
+
+async function salvaModificaFirmata(t, p){
+  const id = editandoId;
+  const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
+  const body = {titolo:t, ...prezzo, categoria:el('sellCat').value,
+    zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
+  /* Passo 1: guardie e moderazione PRIMA della firma (un rifiuto dopo
+     la pubblicazione sui relay sarebbe teatro) */
+  const r = await fetch(`${API_BASE}/listings/${id}/modifica-firmata/prepara`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify(body)});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Errore nella modifica', 7000); return; }
+  toast('🟣 Ora serve la tua firma…', 4000);
+  apriNostrSheet(async (f)=>{
+    el('nostrSheet').classList.remove('open');
+    el('sheetBg').classList.remove('open');
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    /* Passo 2: e' la chiave giusta? Da controllare PRIMA di firmare */
+    const attesa = myNpubAccesso.startsWith('npub1')
+      ? NT.nip19.decode(myNpubAccesso).data : myNpubAccesso.toLowerCase();
+    let pub;
+    try { pub = String(await f.pubkey() || '').toLowerCase(); }
+    catch(e){ toast(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return; }
+    if (pub !== attesa) {
+      toast('Questa non è la tua chiave d\'accesso Nostr: serve quella '
+        + 'che ha pubblicato l\'annuncio', 8000);
+      return;
+    }
+    /* Passo 3: la firma, con l'id ricontrollato in pagina */
+    let firmato;
+    try { firmato = await f.firma(d.evento); }
+    catch(e){ toast(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return; }
+    if (!firmato || firmato.id !== NT.getEventHash({...d.evento, pubkey: pub})) {
+      toast('Il firmatario ha cambiato l\'evento: modifica annullata', 8000);
+      return;
+    }
+    /* Passo 4: prima i relay. Zero OK = non e' cambiato nulla.
+       In collaudo la pubblicazione si SIMULA anche qui nel browser
+       (come il 🟣 del server): niente eventi di prova in giro. */
+    toast('📡 Pubblico l\'aggiornamento sui relay…', 4000);
+    let ok;
+    if (d.collaudo) {
+      console.log('🟣 [nostr simulato dal browser]', firmato);
+      ok = 1;
+    } else {
+      ok = await pubblicaEventoSuRelay(d.relays||[], firmato);
+    }
+    if (!ok) {
+      toast('Nessun relay ha risposto: riprova tra poco '
+        + '(non è cambiato nulla)', 8000);
+      return;
+    }
+    /* Passo 5: la copia locale si allinea subito */
+    const r2 = await fetch(`${API_BASE}/listings/${id}/modifica-firmata`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({biglietto:d.biglietto, pubkey:firmato.pubkey,
+        sig:firmato.sig})});
+    if (!r2.ok) {
+      const d2 = await r2.json().catch(()=>({}));
+      toast(d2.detail || 'L\'aggiornamento è partito su Nostr: la copia '
+        + 'qui si allinea da sola entro un\'ora', 9000);
+      return;
+    }
+    await loadListings();
+    await loadMyListings(); renderMyListings();
+    annullaModifica();
+    toast('🟣 Annuncio aggiornato e firmato su Nostr!');
+    setCat('Tutto');
+    if (listings.find(x=>x.id===id) || myListings.find(x=>x.id===id)) openDetail(id);
+    else go('esplora');
+  });
 }
 
 /* ---------------- avvio ---------------- */
@@ -3352,7 +3480,9 @@ async function provaLoginWeb(){
    Un firmatario è { pubkey: async () => hex, firma: async (evento) =>
    eventoFirmato }: il resto del codice chiama solo firmatario.firma()
    senza sapere se dietro c'è l'estensione, il bunker o la chiave
-   incollata. Serve SOLO durante il login: dopo, comanda il cookie.
+   incollata. Si evoca al momento del bisogno e si butta subito: al
+   login (dopo comanda il cookie) e per la modifica firmata degli
+   annunci importati (vedi salvaModificaFirmata).
    REGOLA FERREA: la nsec non lascia mai questa pagina. */
 
 /* La libreria nostr-tools (bech32, secp256k1, cifratura NIP-44) si
@@ -3475,12 +3605,21 @@ async function entraConNostr(firmatario){
   location.reload();
 }
 
+/* Il foglio del firmatario serve a DUE cose: entrare (login, il
+   default) e FIRMARE un evento (la modifica degli annunci importati).
+   Lo "scopo" e' la funzione che riceve il firmatario appena evocato:
+   le tre porte qui sotto consegnano a lui e non sanno altro. */
+let scopoFirmatario = null;
+function consegnaFirmatario(f){
+  return (scopoFirmatario || entraConNostr)(f);
+}
+
 async function loginNostrEstensione(){
   if (!window.nostr) {
     toast('Nessuna estensione Nostr trovata (es. Alby, nos2x)', 6000);
     return;
   }
-  try { await entraConNostr(firmatarioEstensione()); }
+  try { await consegnaFirmatario(firmatarioEstensione()); }
   catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
 }
 async function loginNostrBunker(){
@@ -3488,9 +3627,9 @@ async function loginNostrBunker(){
   try {
     toast('🔗 Chiamo il bunker…');
     f = await firmatarioBunker(el('bunkerUri').value);
-    await entraConNostr(f);
+    await consegnaFirmatario(f);
   } catch(e){ toast(`Bunker: ${e.message || 'non risponde'}`, 6000); }
-  finally { if (f) f.chiudi(); }
+  finally { if (f) f.chiudi(); }   // la websocket si chiude comunque
 }
 async function loginNostrNsec(){
   const nsec = el('nsecInput').value;
@@ -3499,7 +3638,7 @@ async function loginNostrNsec(){
     toast('Serve la chiave privata (inizia con nsec1)', 5000);
     return;
   }
-  try { await entraConNostr(await firmatarioNsec(nsec)); }
+  try { await consegnaFirmatario(await firmatarioNsec(nsec)); }
   catch(e){ toast(`Accesso non riuscito: ${e.message || 'riprova'}`, 6000); }
 }
 
@@ -3530,7 +3669,20 @@ async function accettaCollega(){
   location.reload();
 }
 
-function apriNostrSheet(){
+function apriNostrSheet(scopo){
+  /* Senza argomenti (o come onclick, che passa l'evento) il foglio fa
+     il login; con una funzione, quella riceve il firmatario. Il testo
+     del foglio racconta lo scopo giusto. */
+  scopoFirmatario = (typeof scopo === 'function') ? scopo : null;
+  const firma = !!scopoFirmatario;
+  el('nostrSheetTitolo').textContent =
+    firma ? '🟣 Firma con la tua chiave Nostr' : '🟣 Entra con Nostr';
+  el('nostrSheetSub').innerHTML = firma
+    ? 'Questa modifica aggiorna anche l\'annuncio su Nostr: serve la '
+      + 'firma della tua chiave. La chiave privata <b>non viene mai '
+      + 'inviata</b> a nessuno.'
+    : 'Dimostri di possedere la tua chiave firmando una sfida. '
+      + 'La chiave privata <b>non viene mai inviata</b> a nessuno.';
   el('sheetBg').classList.add('open');
   el('nostrSheet').classList.add('open');
 }

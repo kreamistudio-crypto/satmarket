@@ -448,10 +448,15 @@ def init_db():
     # pubblicato dalla piattaforma e la doppia valuta (il venditore
     # sceglie se il listino e' in sats o in EUR; per gli annunci EUR
     # prezzo_sats resta l'equivalente al cambio di pubblicazione)
+    # nostr_origine_d/foto: le coordinate dell'evento importato (tag d
+    # e URL foto originali), scritte dall'import — servono alla
+    # modifica firmata per ricostruire l'evento da sostituire sui relay
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
                     "nostr_event_id TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
-                    "prezzo_eur REAL DEFAULT 0"):
+                    "prezzo_eur REAL DEFAULT 0",
+                    "nostr_origine_d TEXT DEFAULT ''",
+                    "nostr_origine_foto TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -2313,6 +2318,223 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     return {"ok": True, "id": annuncio_id}
 
 
+# --- Modifica FIRMATA degli annunci importati da Nostr ---------------
+# Il doppio cittadino con la chiave d'accesso Nostr E' l'autore degli
+# eventi importati: puo' aggiornarli sui relay con la SUA firma. La
+# firma pero' avviene SOLO nel suo browser (regola ferrea 2: la nsec
+# non arriva mai qui — e l'evento firmato in transito e' pubblico per
+# natura, finira' sui relay). Due fasi:
+#   1) "prepara" valida e MODERA il contenuto (prima della firma: se
+#      moderassimo dopo, un rifiuto sarebbe teatro — il client avrebbe
+#      gia' pubblicato e l'import orario riporterebbe tutto dentro) e
+#      restituisce l'evento NON firmato con un biglietto a scadenza;
+#   2) il client firma, pubblica sui relay e riconsegna SOLO
+#      {biglietto, pubkey, sig}: l'evento si RICOSTRUISCE dai dati del
+#      biglietto e la firma si verifica su quello, cosi' un contenuto
+#      diverso da cio' che la moderazione ha visto non puo' esistere.
+# TTL 10 minuti (non 5: il giro auth_url del bunker puo' essere lento).
+# Se i relay accettano ma la fase 2 non arriva, la copia locale resta
+# indietro al massimo un'ora: per gli importati i relay SONO la fonte
+# di verita' e l'import orario e' la riconciliazione.
+
+BIGLIETTI_MODIFICA_NOSTR: dict[str, dict] = {}
+
+
+def _relays_import() -> list:
+    """La lista relay dell'import, che include il relay personale del
+    venditore: e' li' che l'evento aggiornato deve arrivare, o il
+    resto di Nostr continuerebbe a leggere la versione vecchia."""
+    try:
+        from importa_nostr import RELAYS
+        return RELAYS
+    except Exception:
+        return RELAYS_VERIFICA
+
+
+@app.post("/api/listings/{annuncio_id}/modifica-firmata/prepara")
+async def modifica_firmata_prepara(annuncio_id: int, req: Request,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """Fase 1: valida, modera e prepara l'evento NIP-99 da firmare."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if not a["contatto_nostr"]:
+        con.close()
+        raise HTTPException(400, "Questo annuncio non è importato da Nostr: "
+                                 "usa la modifica normale")
+    if not a["nostr_origine_d"]:
+        con.close()
+        raise HTTPException(400, "L'import non ha ancora registrato le "
+                                 "coordinate Nostr di questo annuncio: "
+                                 "riprova tra un'ora")
+    in_corso = con.execute(
+        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato "
+        "NOT IN ('released','refunded','annullato')",
+        (annuncio_id,)).fetchone()["n"]
+    u = con.execute("SELECT npub_accesso FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    con.close()
+    if in_corso:
+        raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
+                                 "potrai modificarlo quando sarà concluso "
+                                 "(chi compra deve trovare l'annuncio così "
+                                 "com'era quando ha deciso di pagare)")
+    # La chiave: sempre normalizzata in esadecimale su ENTRAMBI i lati
+    # (contatto_nostr arriva dal config cosi' com'e', npub o hex).
+    try:
+        hex_evento = npub_to_hex(a["contatto_nostr"])
+    except ValueError:
+        raise HTTPException(400, "La chiave Nostr di questo annuncio non è "
+                                 "leggibile: contatta un admin")
+    npub_acc = (u["npub_accesso"] or "").strip() if u else ""
+    try:
+        hex_utente = npub_to_hex(npub_acc) if npub_acc else ""
+    except ValueError:
+        hex_utente = ""
+    if not hex_utente or hex_utente != hex_evento:
+        raise HTTPException(400, "Per modificare un annuncio importato serve "
+                                 "l'accesso Nostr con la STESSA chiave che "
+                                 "l'ha pubblicato: abilitalo dal Profilo "
+                                 "(cassetto 🆔 Identità)")
+    if ChiavePubblicaNostr is None:
+        raise HTTPException(503, "Firma Nostr non disponibile: sul server "
+                                 "manca il pacchetto coincurve")
+
+    # --- Stessa moderazione di una pubblicazione nuova ---
+    cat_vietata = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+    if cat_vietata:
+        await notifica_admin(
+            f"🚫 <b>Modifica firmata bloccata dal filtro</b> ({cat_vietata})\n"
+            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
+            f"{user['first_name']} (id {user['id']})")
+        raise HTTPException(400, MSG_RIFIUTO)
+    motivo = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    if motivo:
+        await notifica_admin(
+            f"🚫 <b>Modifica firmata bloccata dall'AI</b> ({motivo})\n"
+            f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
+            f"{user['first_name']} (id {user['id']})")
+        raise HTTPException(400, MSG_RIFIUTO)
+
+    categoria = categoria_valida(d.get("categoria"))
+    evento = evento_annuncio_importato(
+        a, d["titolo"], d.get("descrizione", ""), categoria,
+        d.get("zona", ""), valuta, prezzo_sats, prezzo_eur,
+        int(time.time()))
+    adesso = time.time()
+    for b in [b for b, v in BIGLIETTI_MODIFICA_NOSTR.items()
+              if v["scade"] < adesso]:
+        BIGLIETTI_MODIFICA_NOSTR.pop(b, None)
+    while len(BIGLIETTI_MODIFICA_NOSTR) >= 1000:
+        BIGLIETTI_MODIFICA_NOSTR.pop(next(iter(BIGLIETTI_MODIFICA_NOSTR)))
+    biglietto = secrets.token_urlsafe(32)
+    BIGLIETTI_MODIFICA_NOSTR[biglietto] = {
+        "annuncio_id": annuncio_id, "tg_id": user["id"],
+        "titolo": d["titolo"], "descrizione": d.get("descrizione", ""),
+        "categoria": categoria, "zona": d.get("zona", ""),
+        "valuta": valuta, "prezzo_sats": prezzo_sats,
+        "prezzo_eur": prezzo_eur, "created_at": evento["created_at"],
+        "tags": evento["tags"], "content": evento["content"],
+        "scade": adesso + 600}
+    # In collaudo anche il BROWSER deve simulare: senza questo flag
+    # pubblicherebbe l'evento di prova sui relay veri (successo al
+    # primo collaudo, mai piu': "si firma ma si stampa" vale ovunque).
+    return {"biglietto": biglietto, "evento": evento,
+            "relays": _relays_import(), "collaudo": MODALITA_COLLAUDO}
+
+
+@app.post("/api/listings/{annuncio_id}/modifica-firmata")
+async def modifica_firmata(annuncio_id: int, req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Fase 2: il client ha firmato e pubblicato sui relay; qui arriva
+    {biglietto, pubkey, sig}, si verifica la firma sull'evento
+    RICOSTRUITO dal biglietto e si allinea subito la copia locale."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    # Monouso: si brucia SUBITO, anche se il tentativo poi fallisce
+    # (chi sbaglia riparte dalla fase 1) — pattern SFIDE_LOGIN.
+    b = BIGLIETTI_MODIFICA_NOSTR.pop(str(d.get("biglietto") or ""), None)
+    if (not b or b["scade"] < time.time()
+            or b["annuncio_id"] != annuncio_id or b["tg_id"] != user["id"]):
+        raise HTTPException(400, "La firma ha aspettato troppo: "
+                                 "ricomincia la modifica")
+    pubkey = str(d.get("pubkey") or "").lower()
+    sig = str(d.get("sig") or "").lower()
+    if not RE_HEX_64.fullmatch(pubkey) or not RE_HEX_128.fullmatch(sig):
+        raise HTTPException(400, "Firma malformata")
+    if ChiavePubblicaNostr is None:
+        raise HTTPException(503, "Firma Nostr non disponibile: sul server "
+                                 "manca il pacchetto coincurve")
+    # Ri-guardie economiche (tra le due fasi puo' succedere di tutto:
+    # un ordine che si apre, l'annuncio che si vende). La moderazione
+    # invece NO: il contenuto e' congelato nel biglietto.
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
+    if not a or not a["contatto_nostr"]:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    in_corso = con.execute(
+        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato "
+        "NOT IN ('released','refunded','annullato')",
+        (annuncio_id,)).fetchone()["n"]
+    if in_corso:
+        con.close()
+        raise HTTPException(400, "Nel frattempo si è aperto un affare su "
+                                 "questo annuncio: la modifica locale "
+                                 "aspetta, i relay si allineano da soli")
+    # L'autorizzazione VERA: la firma Schnorr della chiave che ha
+    # pubblicato l'evento originale (riletta fresca dalla riga).
+    try:
+        if pubkey != npub_to_hex(a["contatto_nostr"]):
+            raise ValueError
+    except ValueError:
+        con.close()
+        raise HTTPException(400, "La firma non è della chiave che ha "
+                                 "pubblicato questo annuncio")
+    ev = evento_non_firmato(pubkey, 30402, b["tags"], b["content"],
+                            b["created_at"])
+    try:
+        firma_buona = ChiavePubblicaNostr(bytes.fromhex(pubkey)).verify(
+            bytes.fromhex(sig), bytes.fromhex(ev["id"]))
+    except Exception:
+        firma_buona = False
+    if not firma_buona:
+        con.close()
+        raise HTTPException(400, "Firma non valida")
+    # Copia locale allineata SUBITO dal payload gia' validato e
+    # moderato in fase 1 (mai ri-parsare l'evento: sarebbe un giro
+    # con perdita). Le foto non si toccano: v1, restano le sue.
+    con.execute(
+        "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
+        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=? WHERE id=?",
+        (b["titolo"], b["descrizione"], b["categoria"], b["prezzo_sats"],
+         b["zona"], b["valuta"], b["prezzo_eur"], annuncio_id))
+    con.commit()
+    con.close()
+    # Backstop: l'evento firmato riparte anche da qui verso i relay
+    # dell'import (fail-open, mai attese per l'utente). Il client lo
+    # ha gia' pubblicato dal browser: doppia consegna innocua, i relay
+    # deduplicano per id.
+    ev["sig"] = sig
+    asyncio.create_task(_spedisci_ai_relay(ev, _relays_import()))
+    await notifica_admin(
+        f"✏️🟣 <b>Annuncio importato #{annuncio_id} modificato</b> "
+        f"(firmato dal venditore su Nostr)\n"
+        f"«{b['titolo'][:80]}» — "
+        f"{testo_prezzo(b['valuta'], b['prezzo_sats'], b['prezzo_eur'])}\n"
+        f"Venditore: {user['first_name']} (id {user['id']})")
+    return {"ok": True, "id": annuncio_id}
+
+
 @app.post("/api/admin/listings/{annuncio_id}/rimuovi")
 async def rimuovi_annuncio_admin(annuncio_id: int,
                                  x_tg_init_data: str = Header(""),
@@ -3199,6 +3421,47 @@ def evento_annuncio(a: dict, status: str) -> dict:
     return firma_evento(30402, tags, content)
 
 
+def evento_annuncio_importato(a: dict, titolo: str, descrizione: str,
+                              categoria: str, zona: str, valuta: str,
+                              prezzo_sats: int, prezzo_eur: float,
+                              creato: int) -> dict:
+    """L'evento NIP-99 aggiornato di un annuncio IMPORTATO, pronto per
+    la firma del suo AUTORE (il doppio cittadino, nel suo browser):
+    senza pubkey ne' id (li mette il firmatario) e col tag "d"
+    ORIGINALE dell'evento — ripubblicare con lo stesso d sostituisce
+    il vecchio sui relay (NIP-99). Diversamente da evento_annuncio,
+    il content e' la descrizione PURA: niente footer promozionale ne'
+    riga prezzo — non si scrive pubblicita' dentro un evento che firma
+    un altro, e il footer rientrerebbe in descrizione al giro d'import
+    successivo (estrai_annuncio legge il content)."""
+    if valuta == "eur" and prezzo_eur:
+        prezzo_tag = ["price", f"{prezzo_eur:.2f}", "EUR"]
+    else:
+        prezzo_tag = ["price", str(prezzo_sats), "sats"]
+    tags = [["d", a["nostr_origine_d"]],
+            ["title", titolo],
+            ["summary", (descrizione or titolo)[:200]],
+            prezzo_tag,
+            ["status", "active"]]
+    if categoria:
+        tags.append(["t", categoria.lower().split()[0]])
+    if zona:
+        tags.append(["location", zona])
+    # Le foto ripartono con gli URL ORIGINALI del venditore (v1: nella
+    # modifica firmata non si cambiano). Se la colonna origine e' vuota
+    # ma le foto ci sono (riga battezzata prima della colonna), ripiego
+    # sugli URL nostri: mai un evento SENZA tag image per un annuncio
+    # che le foto le ha, o l'import successivo le toglierebbe anche qui.
+    try:
+        originali = json.loads(a["nostr_origine_foto"] or "[]")
+    except Exception:
+        originali = []
+    for url in (originali or _foto_url_nostr(a["foto"] or "")):
+        tags.append(["image", url])
+    return {"kind": 30402, "created_at": creato, "tags": tags,
+            "content": (descrizione or titolo).strip()}
+
+
 def invia_evento_relay(relay: str, evento: dict) -> bool:
     """Consegna un evento firmato a UN relay e aspetta il suo "OK".
     E' SINCRONA (websocket-client): va chiamata in asyncio.to_thread."""
@@ -3218,17 +3481,20 @@ def invia_evento_relay(relay: str, evento: dict) -> bool:
     return False
 
 
-async def _spedisci_ai_relay(evento: dict) -> int:
+async def _spedisci_ai_relay(evento: dict, relays: list = None) -> int:
     """Manda l'evento a tutti i relay in parallelo (ognuno nel suo
     thread) e ritorna quanti l'hanno accettato. Nel collaudo non esce
-    nulla dal computer: l'evento si stampa e basta."""
+    nulla dal computer: l'evento si stampa e basta. La lista relay di
+    serie e' la nostra; la modifica firmata passa quella dell'import
+    (che include il relay personale del venditore)."""
+    relays = relays or RELAYS_VERIFICA
     if MODALITA_COLLAUDO:
         print(f"🟣 [nostr simulato] "
               f"{json.dumps(evento, ensure_ascii=False)[:400]}…")
-        return len(RELAYS_VERIFICA)
+        return len(relays)
     esiti = await asyncio.gather(*[
         asyncio.to_thread(invia_evento_relay, r, evento)
-        for r in RELAYS_VERIFICA])
+        for r in relays])
     return sum(esiti)
 
 

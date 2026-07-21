@@ -266,9 +266,17 @@ def estrai_annuncio(e, valute_stall, cambio):
         p = tag(e, "price")
         if not p or len(p) < 3:
             return None
-        sats = in_sats(float(p[1]), p[2], cambio)
+        importo, valuta = float(p[1]), p[2]
+        sats = in_sats(importo, valuta, cambio)
         foto = [t[1] for t in e.get("tags", [])
                 if t and t[0] == "image" and len(t) > 1][:5]
+        # Le coordinate dell'evento origine: il tag "d" (serve alla
+        # modifica firmata da Barattolo per SOSTITUIRE l'evento sui
+        # relay) e gli URL originali delle foto (per non riscriverli
+        # con URL nostri quando l'evento si ricostruisce).
+        d = tag(e, "d")
+        origine_d = d[1] if d else ""
+        origine_foto = json.dumps(foto) if foto else ""
     else:                                      # NIP-15 prodotto (30018)
         try:
             c = json.loads(e.get("content", "{}"))
@@ -280,8 +288,11 @@ def estrai_annuncio(e, valute_stall, cambio):
         valuta = c.get("currency") or valute_stall.get(c.get("stall_id"), "")
         if c.get("price") is None:
             return None
-        sats = in_sats(float(c["price"]), valuta, cambio)
+        importo = float(c["price"])
+        sats = in_sats(importo, valuta, cambio)
         foto = [u for u in (c.get("images") or []) if isinstance(u, str)][:5]
+        origine_d, origine_foto = "", ""       # la modifica firmata (v1)
+                                               # parla solo NIP-99
 
     if not titolo or not sats or sats <= 0:
         return None
@@ -290,7 +301,13 @@ def estrai_annuncio(e, valute_stall, cambio):
             "zona": zona.strip()[:60],
             "prezzo_sats": sats,
             "foto": json.dumps(foto) if foto else "",
-            "categoria": categoria_automatica(titolo + " " + desc)}
+            "categoria": categoria_automatica(titolo + " " + desc),
+            "origine_d": origine_d,
+            "origine_foto": origine_foto,
+            # la coppia del tag price: se il listino nasce in EUR la
+            # vetrina deve dirlo (valuta/prezzo_eur), non solo i sats
+            "valuta_orig": (valuta or "").upper(),
+            "importo_orig": importo}
 
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
@@ -333,8 +350,14 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     cambio = cambio_btc()
     # timeout generoso: quando gira dal server il database e' conteso
     con = sqlite3.connect(db, timeout=15)
-    # Assicura che il database abbia le colonne nuove (foto, nostr)
-    for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''"):
+    # Assicura che il database abbia le colonne nuove (foto, nostr).
+    # Le due "origine" ricordano le coordinate dell'evento Nostr
+    # (tag d e URL foto originali): servono alla modifica firmata.
+    for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
+                    "nostr_origine_d TEXT DEFAULT ''",
+                    "nostr_origine_foto TEXT DEFAULT ''",
+                    "valuta TEXT DEFAULT 'sats'",
+                    "prezzo_eur REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -374,27 +397,62 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
         if not a:
             saltati += 1
             continue
-        gia = con.execute(
-            "SELECT id FROM annunci WHERE titolo=? AND stato='attivo' "
-            "AND (venditore_id=? OR contatto_nostr=?)",
-            (a["titolo"], venditore_id, npub)).fetchone()
+        # Se il listino Nostr parla EUR la vetrina lo dice (doppia
+        # valuta); tutte le altre valute restano un listino in sats.
+        if a["valuta_orig"] == "EUR":
+            valuta, prezzo_eur = "eur", round(a["importo_orig"], 2)
+        else:
+            valuta, prezzo_eur = "sats", 0
+        # Ritrova l'annuncio: PRIMA per tag "d" (la coordinata stabile
+        # dell'evento: sopravvive a un cambio di titolo), poi per
+        # titolo come una volta — ma senza toccare le righe gia'
+        # "battezzate" con un d diverso, che appartengono a un ALTRO
+        # evento omonimo.
+        gia = None
+        if a["origine_d"]:
+            gia = con.execute(
+                "SELECT id, foto, nostr_origine_foto FROM annunci "
+                "WHERE nostr_origine_d=? AND stato='attivo' "
+                "AND (venditore_id=? OR contatto_nostr=?)",
+                (a["origine_d"], venditore_id, npub)).fetchone()
+        if not gia:
+            gia = con.execute(
+                "SELECT id, foto, nostr_origine_foto FROM annunci "
+                "WHERE titolo=? AND stato='attivo' "
+                "AND (venditore_id=? OR contatto_nostr=?) "
+                "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
+                "     OR nostr_origine_d=?)",
+                (a["titolo"], venditore_id, npub, a["origine_d"])).fetchone()
         if gia:
-            # Gia' presente: aggiorna foto (scaricandole in locale),
-            # contatto, prezzo e PROPRIETARIO (utile al lancio)
-            foto_loc = localizza_foto(gia[0], a["foto"])
+            # Gia' presente: aggiorna TUTTO il contenuto (l'evento sui
+            # relay e' la fonte di verita', anche dopo una modifica
+            # firmata da Barattolo) e il PROPRIETARIO (utile al lancio).
+            # La categoria invece resta: categoria_automatica
+            # ricoprirebbe ogni ora una scelta fatta a mano dal form.
+            if a["origine_foto"] and a["origine_foto"] == gia[2]:
+                foto_loc = gia[1]      # stesse foto: niente ri-download
+            else:
+                foto_loc = localizza_foto(gia[0], a["foto"])
             con.execute(
-                "UPDATE annunci SET foto=?, contatto_nostr=?, prezzo_sats=?, "
-                "venditore_id=? WHERE id=?",
-                (foto_loc, npub, a["prezzo_sats"], venditore_id, gia[0]))
+                "UPDATE annunci SET titolo=?, descrizione=?, zona=?, "
+                "foto=?, contatto_nostr=?, prezzo_sats=?, valuta=?, "
+                "prezzo_eur=?, venditore_id=?, nostr_origine_d=?, "
+                "nostr_origine_foto=? WHERE id=?",
+                (a["titolo"], a["descrizione"], a["zona"], foto_loc, npub,
+                 a["prezzo_sats"], valuta, prezzo_eur, venditore_id,
+                 a["origine_d"], a["origine_foto"], gia[0]))
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
             continue
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-            "prezzo_sats,zona,foto,contatto_nostr,creato) "
-            "VALUES(?,?,?,?,?,?,?,?,?)",
+            "prezzo_sats,zona,foto,contatto_nostr,valuta,prezzo_eur,"
+            "nostr_origine_d,nostr_origine_foto,creato) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (venditore_id, a["titolo"], a["descrizione"], a["categoria"],
-             a["prezzo_sats"], a["zona"], a["foto"], npub, int(time.time())))
+             a["prezzo_sats"], a["zona"], a["foto"], npub, valuta,
+             prezzo_eur, a["origine_d"], a["origine_foto"],
+             int(time.time())))
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
         foto_loc = localizza_foto(cur.lastrowid, a["foto"])
         if foto_loc != a["foto"]:
