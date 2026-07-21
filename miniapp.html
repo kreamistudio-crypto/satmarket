@@ -1881,7 +1881,8 @@ function openDetail(id){
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `<div class="escrow-zone">
              <span class="escrow-flag">🔒 pagamento protetto</span>
-             <div class="trust-note">🔒 <span>I tuoi sats restano <b>chiusi nel barattolo</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
+             <!-- niente 🔒 qui: lo dicono gia' la pillola e il bottone -->
+             <div class="trust-note"><span>I tuoi sats restano <b>chiusi nel barattolo</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
