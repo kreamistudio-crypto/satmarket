@@ -1162,6 +1162,10 @@ function mapOrder(o){
     /* stesso filtro-alfabeto di mapListing: vanno negli onclick */
     usernameCompratore:(o.compratore_username||'').replace(/[^A-Za-z0-9_]/g,''),
     usernameVenditore:(o.venditore_username||'').replace(/[^A-Za-z0-9_]/g,''),
+    /* il ponte Nostr della controparte (npub dal possesso dimostrato,
+       la decide il server); bech32: a-z0-9 e basta */
+    nostrCompratore:(o.compratore_nostr||'').replace(/[^a-z0-9]/g,''),
+    nostrVenditore:(o.venditore_nostr||'').replace(/[^a-z0-9]/g,''),
     when:new Date(o.aggiornato*1000).toLocaleString('it-IT',
       {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})};
 }
@@ -1633,11 +1637,27 @@ function apriChat(username){
   window.open(`https://t.me/${username}`, '_blank');
 }
 
-/* Bottone chat solo se lo username esiste: senza, il link t.me
-   porterebbe a "questo account non ha uno username" */
-function bottoneChat(username, chi, soggetto){
-  if (username) return `<button class="btn ghost" onclick="apriChat('${username}')">💬 Scrivi ${chi}</button>`;
-  return `<div class="trust-note">💬 <span>${soggetto} non ha uno username Telegram pubblico, quindi la chat diretta non è disponibile. Per problemi con l'ordine c'è la disputa: interviene un moderatore.</span></div>`;
+/* ---- i ponti di contatto tra le parti ----
+   Non è una chat: solo bottoni verso i canali che ESISTONO davvero.
+   Telegram se c'è lo username pubblico, Nostr se la npub è dal
+   possesso dimostrato (chiave d'accesso o badge verificato); il
+   doppio cittadino li ha entrambi. Senza canali, una riga onesta. */
+function apriNostrProfilo(npub){
+  if (!npub) return;
+  if (DEMO || collaudo) { toast(`🟣 In produzione apre il profilo Nostr: gli scrivi dal tuo client`); return; }
+  window.open(`https://njump.me/${npub}`, '_blank');
+}
+function pontiContatto(username, npub, chi, cls){
+  const b = [];
+  if (username) b.push(`<button class="${cls||'btn link'}" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
+  if (npub) b.push(`<button class="${cls||'btn link'}" onclick="apriNostrProfilo('${npub}')">🟣 Scrivi ${chi} su Nostr</button>`);
+  return b.join('');
+}
+/* Il ponte dentro l'ordine: come sopra, ma senza canali la riga
+   ricorda che l'escrow protegge comunque l'affare */
+function pontiOrdine(username, npub, chi, soggetto){
+  return pontiContatto(username, npub, chi, 'btn ghost')
+    || `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: l'escrow protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`;
 }
 
 /* Cambio BTC/EUR aggiornato all'avvio (per il "≈ X €" sotto i prezzi) */
@@ -1796,12 +1816,14 @@ function openDetail(id){
        ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${condividi}</div>`
     : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${condividi}</div>`;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
+  /* Il ponte Nostr: per gli importati la npub del contatto dichiarato
+     nell'evento, per i nativi e i doppi cittadini il badge verificato
+     (filtro bech32: finisce in un onclick) */
+  const npubPonte = (l.nostr || (l.sellerNpubOk && l.sellerNpub) || '')
+    .replace(/[^a-z0-9]/g,'');
   const contatto = mio ? ''            /* il venditore non contatta se stesso */
-    : l.nostr
-    ? `<button class="btn link" onclick="window.open('https://njump.me/${l.nostr}','_blank')">💬 Contatta ${esc(l.seller.split(' ')[0])} su Nostr 🟣</button>`
-    : (l.username
-      ? `<button class="btn link" onclick="window.open('https://t.me/${l.username}','_blank')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`
-      : `<button class="btn link" onclick="toast('Questo venditore non ha un contatto pubblico')">💬 Fai una domanda a ${esc(l.seller.split(' ')[0])}</button>`);
+    : (pontiContatto(l.username, npubPonte, `a ${esc(l.seller.split(' ')[0])}`)
+       || `<div class="trust-note">💬 <span>Questo venditore non ha contatti pubblici, ma le trattative non sono necessarie: l'escrow protegge l'acquisto dall'inizio alla fine.</span></div>`);
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
@@ -2242,11 +2264,11 @@ function openOrder(id){
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
       ${o.role==='admin'
-        ? bottoneChat(o.usernameCompratore, "all'acquirente", "L'acquirente")
-          + bottoneChat(o.usernameVenditore, 'al venditore', 'Il venditore')
+        ? pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")
+          + pontiOrdine(o.usernameVenditore, o.nostrVenditore, 'al venditore', 'Il venditore')
         : o.role==='buyer'
-          ? bottoneChat(o.usernameVenditore, 'al venditore', 'Il venditore')
-          : bottoneChat(o.usernameCompratore, "all'acquirente", "L'acquirente")}
+          ? pontiOrdine(o.usernameVenditore, o.nostrVenditore, 'al venditore', 'Il venditore')
+          : pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")}
     </div>`;
   go('ordine');
   /* Le monete partono dal messaggio di chiusura («Hai incassato…» /
@@ -3561,9 +3583,42 @@ async function salvaModificaFirmata(t, p){
     body: JSON.stringify(body)});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella modifica', 7000); return; }
+  /* Come si firma? Senza rituale, quando si puo': prima la sessione
+     bunker conservata sul dispositivo, poi l'estensione. Il foglio
+     compare solo se non c'e' una strada automatica o se e' morta. */
+  const salvata = bunkerSalvato();
+  if (salvata) {
+    let f = null;
+    try {
+      toast('🔗 Richiamo il tuo bunker…', 4000);
+      f = await firmatarioBunker(salvata.uri, salvata.sk);
+    } catch(e){
+      console.log(`🟪 [firma] sessione bunker morta (${e.message||e}): si ripassa dal rituale`);
+      scordaBunker();
+      toast('La connessione col bunker non risponde più: ricollegalo', 5000);
+      apriNostrSheet((f2)=>firmaEConsegna(d, id, f2, null));
+      return;
+    }
+    try { await firmaEConsegna(d, id, f, 'bunker'); }
+    finally { f.chiudi(); }
+    return;
+  }
+  if (window.nostr) {
+    console.log('🟪 [firma] estensione presente: firmo senza foglio');
+    await firmaEConsegna(d, id, firmatarioEstensione(), 'estensione');
+    return;
+  }
   toast('🟣 Ora serve la tua firma…', 4000);
-  apriNostrSheet(async (f)=>{
-    console.log('🟪 [firma] passo 2: firmatario ricevuto, controllo la chiave');
+  apriNostrSheet((f)=>firmaEConsegna(d, id, f, null));
+}
+
+/* I passi 2-5 della modifica firmata, uguali da qualunque porta arrivi
+   il firmatario. "auto" dice se e' arrivato SENZA foglio ('bunker' o
+   'estensione'): li' una chiave diversa non e' un errore dell'utente,
+   si ripassa dal foglio e sceglie lui. */
+async function firmaEConsegna(d, id, f, auto){
+  console.log('🟪 [firma] passo 2: firmatario ricevuto, controllo la chiave'
+    + (auto ? ` (via ${auto}, senza foglio)` : ''));
     el('nostrSheet').classList.remove('open');
     el('sheetBg').classList.remove('open');
     await caricaNostrTools();
@@ -3578,6 +3633,13 @@ async function salvaModificaFirmata(t, p){
       toast(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return;
     }
     if (pub !== attesa) {
+      if (auto) {
+        console.log(`🟪 [firma] ${auto} con un'altra chiave `
+          + `(${pub.slice(0,8)}…): si ripassa dal foglio`);
+        if (auto === 'bunker') scordaBunker();
+        apriNostrSheet((f2)=>firmaEConsegna(d, id, f2, null));
+        return;
+      }
       console.log(`🟪 [firma] chiave sbagliata: ${pub.slice(0,8)}… invece di ${attesa.slice(0,8)}…`);
       toast('Questa non è la tua chiave d\'accesso Nostr: serve quella '
         + 'che ha pubblicato l\'annuncio', 8000);
@@ -3635,7 +3697,6 @@ async function salvaModificaFirmata(t, p){
     setCat('Tutto');
     if (listings.find(x=>x.id===id) || myListings.find(x=>x.id===id)) openDetail(id);
     else go('esplora');
-  });
 }
 
 /* ---------------- avvio ---------------- */
@@ -3763,11 +3824,14 @@ function firmatarioEstensione(){
 }
 
 /* 2) Bunker NIP-46: le firme le fa un signer remoto. Il protocollo è
-   una chat cifrata su un relay: noi (chiave locale EFFIMERA, vive solo
-   in questa pagina) mandiamo richieste kind-24133 cifrate NIP-44, il
-   bunker risponde. Il bundle non include nip46, quindi il giro di
-   telefonate lo facciamo a mano coi suoi mattoni: sono tre chiamate. */
-async function firmatarioBunker(uri){
+   una chat cifrata su un relay: noi (chiave locale del CLIENT, mai
+   quella dell'utente) mandiamo richieste kind-24133 cifrate NIP-44,
+   il bunker risponde. Il bundle non include nip46, quindi il giro di
+   telefonate lo facciamo a mano coi suoi mattoni: sono tre chiamate.
+   Con skHex si RIUSA la chiave client di una sessione già approvata
+   (conservata in localStorage, vedi ricordaBunker): il bunker ci
+   riconosce e non rifà il rito dell'autorizzazione. */
+async function firmatarioBunker(uri, skHex){
   await caricaNostrTools();
   const NT = window.NostrTools;
   const m = uri.trim().match(/^bunker:\/\/([0-9a-f]{64})\??(.*)$/i);
@@ -3776,8 +3840,9 @@ async function firmatarioBunker(uri){
   const par = new URLSearchParams(m[2]);
   const relays = par.getAll('relay');
   if (!relays.length) throw new Error('la URI non indica nessun relay');
-  console.log(`🟪 [bunker] URI ok (${bunkerPub.slice(0,8)}…), relay: ${relays.join(' ')}`);
-  const skLocale = NT.generateSecretKey();
+  console.log(`🟪 [bunker] URI ok (${bunkerPub.slice(0,8)}…), relay: ${relays.join(' ')}`
+    + (skHex ? ' — riuso la sessione conservata' : ''));
+  const skLocale = skHex ? NT.utils.hexToBytes(skHex) : NT.generateSecretKey();
   const pubLocale = NT.getPublicKey(skLocale);
   const chiave = NT.nip44.getConversationKey(skLocale, bunkerPub);
   let relay = null;
@@ -3847,7 +3912,30 @@ async function firmatarioBunker(uri){
     pubkey: () => chiama('get_public_key', []),
     firma:  async (evento) => JSON.parse(await chiama('sign_event', [JSON.stringify(evento)], 120000)),
     chiudi: () => { try { relay.close(); } catch(e){} },
+    /* per ricordaBunker: uri + chiave client = la sessione riusabile */
+    sessione: {uri: uri.trim(), sk: NT.utils.bytesToHex(skLocale)},
   };
+}
+
+/* La sessione bunker si CONSERVA sul dispositivo (pattern del wallet
+   NWC: localStorage, mai sul server): alle firme successive niente
+   rituale, al massimo la conferma sull'app del bunker. La chiave qui
+   dentro e' quella del CLIENT NIP-46 — pari grado del secret NWC gia'
+   conservato: puo' chiedere firme al bunker (che puo' sempre negarle),
+   MAI derivare la chiave dell'utente. */
+const BUNKER_CHIAVE = 'barattolo_bunker';
+function bunkerSalvato(){
+  try {
+    const d = JSON.parse(localStorage.getItem(BUNKER_CHIAVE)) || null;
+    return (d && d.uri && d.sk) ? d : null;
+  } catch(e){ return null; }         // dato corrotto = nessuna sessione
+}
+function ricordaBunker(sessione){
+  try { localStorage.setItem(BUNKER_CHIAVE, JSON.stringify(sessione)); }
+  catch(e){}
+}
+function scordaBunker(){
+  try { localStorage.removeItem(BUNKER_CHIAVE); } catch(e){}
 }
 
 /* auth_url del bunker: MAI window.open automatico — fuori dal gesto
@@ -3934,6 +4022,9 @@ async function loginNostrBunker(){
   try {
     toast('🔗 Chiamo il bunker…');
     f = await firmatarioBunker(el('bunkerUri').value);
+    /* connessione riuscita: la sessione si conserva sul dispositivo,
+       le prossime firme non rifaranno il rituale */
+    ricordaBunker(f.sessione);
     await consegnaFirmatario(f);
   } catch(e){ toast(`Bunker: ${e.message || 'non risponde'}`, 6000); }
   finally { if (f) f.chiudi(); }   // la websocket si chiude comunque
@@ -3987,7 +4078,8 @@ function apriNostrSheet(scopo){
   el('nostrSheetSub').innerHTML = firma
     ? 'Questa modifica aggiorna anche l\'annuncio su Nostr: serve la '
       + 'firma della tua chiave. La chiave privata <b>non viene mai '
-      + 'inviata</b> a nessuno.'
+      + 'inviata</b> a nessuno. Suggerimento: col bunker la connessione '
+      + 'si ricorda e le prossime firme partono al volo.'
     : 'Dimostri di possedere la tua chiave firmando una sfida. '
       + 'La chiave privata <b>non viene mai inviata</b> a nessuno.';
   el('sheetBg').classList.add('open');
