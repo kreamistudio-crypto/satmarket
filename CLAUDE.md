@@ -877,6 +877,43 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scroll-snap già esistente; con una foto sola non esistono.
   Pallini e bottone condividi vivono SULLA foto: colori fissi
   (bianco/carta+inchiostro), identici in chiaro e scuro.
+  Dettaglio immersivo (lug 2026): via il bottone statico sopra la
+  foto — il «Torna al mercatino» è il cerchietto di carta
+  `.back-float` in alto a sinistra sulla foto (gemello del condividi,
+  c'è SEMPRE, anche in DEMO e sul segnaposto emoji) e la foto 1:1
+  sale a filo dello schermo. Un tocco sulla foto apre il LIGHTBOX
+  `#lightbox`: foto intera mai ritagliata su fondo scuro, pinch e
+  trascinamento coi pointer events (le dita in una Map,
+  touch-action:none sul palco, capture sotto try/catch), rotella e
+  doppio click da desktop, swipe tra le foto coi pallini SOLO a zoom
+  1 (ingrandito il dito muove la foto), ✕/tap fuori/Escape per
+  chiudere. Vanilla puro, zero librerie; lo zoom (clamp 1–4) tiene
+  fermo il punto toccato e la clamp del translate non fa mai perdere
+  la foto; body senza scroll a lightbox aperto.
+  Preferiti «Nel tuo barattolo» (lug 2026): il simbolo è il
+  BARATTOLINO 🫙 — MAI il cuore, MAI il fulmine (su Nostr è lo zap).
+  Tabella `preferiti(tg_id, annuncio_id, creato, PK)`; toggle
+  `POST /api/listings/{id}/preferito` (prima prova a togliere: il
+  barattolo si svuota anche se l'annuncio è sparito del tutto);
+  `GET /api/me/preferiti` = CAMPI_VETRINA + `a.stato` +
+  venditore_id, dal salvato più recente, tetto 100 — escono ANCHE
+  venduti/rimossi e il cassetto li mostra onesti «non più
+  disponibile» (spenti, dettaglio non apribile, il 🫙 Togli resta)
+  finché l'utente non li toglie lui. Nessun conteggio pubblico: il
+  venditore non vede chi né quanti (v1). `esegui_fusione` migra in
+  unione (UPDATE OR IGNORE + DELETE, il pattern degli avvisi).
+  Frontend: cerchietto `.jar-btn` sulla foto accanto al condividi —
+  solo autenticati veri (mai DEMO/VETRINA) e mai sui propri annunci —
+  da salvato si accende d'arancio e ondeggia (`jarPop`, spenta con
+  reduced-motion), haptic + toast; Set `preferiti` e lista
+  `myPreferiti` da `caricaPreferiti()` (in avvia() e a ogni apertura
+  del Profilo: un salvato può essere stato venduto nel frattempo, e
+  gli attivi entrano in `listings` via inCatalogo per openDetail);
+  PRIMO cassetto del Profilo «🫙 Nel tuo barattolo»
+  (`renderPreferiti`, conteggio nell'header, stato vuoto che
+  invita). Il 🫙 sulle card della vetrina è stato valutato e
+  RIMANDATO: affollerebbe la card «Etichetta», in v1 vive solo nel
+  dettaglio.
   Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
   danno ai venditori appena arrivati); dal lug 2026 le accende il
   sistema di feedback (vedi server.py).
@@ -1164,7 +1201,14 @@ nativo Nostr che ne sarebbe chiuso fuori, canale avvisi riportato
 all'automatico quando la destinazione Nostr sparisce, sottotesti che
 distinguono le due leve Disabilita/Rimuovi, vedi Architettura, badge
 Nostr — collaudato in locale con TestClient [31 verifiche] e nel
-browser su tutti gli stati della riga Nostr).
+browser su tutti gli stati della riga Nostr); dettaglio annuncio
+immersivo e preferiti col barattolino (lug 2026: foto a filo con
+ritorno flottante, lightbox a tutto schermo con pinch/rotella/swipe
+in vanilla JS, cassetto «🫙 Nel tuo barattolo» primo nel Profilo con
+gli stati onesti dei non più disponibili, vedi Architettura —
+collaudato in locale su mobile e desktop, chiaro e scuro, con
+venduto nel mezzo e DEMO/vetrina senza barattolino; il pinch va
+riprovato dal vivo su un telefono vero dentro Telegram).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
