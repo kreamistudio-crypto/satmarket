@@ -3656,8 +3656,19 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header(""),
     attuale = con.execute(
         "SELECT npub, npub_verificata, npub_accesso FROM utenti WHERE tg_id=?",
         (user["id"],)).fetchone()
+    # REGOLA nativo Nostr: se questa npub e' anche la SUA chiave
+    # d'ingresso e non c'e' una chat Telegram (tg_id<0), rimuoverla
+    # lo chiuderebbe fuori per sempre. Prima si collega Telegram.
+    if not npub and attuale and user["id"] < 0 \
+            and attuale["npub"] \
+            and attuale["npub"] == attuale["npub_accesso"]:
+        con.close()
+        raise HTTPException(400,
+            "Questa npub e' il tuo unico modo di entrare: collega prima "
+            "Telegram dal blocco «Identita'», poi potrai rimuoverla")
     verificata = bool(attuale and attuale["npub_verificata"])
     accesso_revocato = False
+    canale_azzerato = False
     if not attuale or npub != attuale["npub"]:
         # npub nuova, cambiata o rimossa: la verifica riparte da zero.
         # E se quel badge era anche la chiave d'accesso web, la revoca
@@ -3675,10 +3686,20 @@ async def salva_npub(req: Request, x_tg_init_data: str = Header(""),
             "npub_accesso=CASE WHEN tg_id>0 AND npub_accesso=? "
             "THEN '' ELSE npub_accesso END WHERE tg_id=?",
             (npub, attuale["npub"] if attuale else "", user["id"]))
+        # Se il canale avvisi scelto era Nostr ma la destinazione non
+        # esiste piu' (niente chiave d'accesso ne' badge verificato),
+        # si torna all'automatico: il cassetto Avvisi non deve mentire.
+        cur = con.execute(
+            "UPDATE utenti SET canale_notifiche='' WHERE tg_id=? "
+            "AND canale_notifiche IN ('nostr','entrambi') "
+            "AND npub_accesso='' AND (npub='' OR npub_verificata=0)",
+            (user["id"],))
+        canale_azzerato = cur.rowcount > 0
     con.commit()
     con.close()
     return {"ok": True, "npub": npub, "npub_verificata": verificata,
-            "accesso_revocato": accesso_revocato}
+            "accesso_revocato": accesso_revocato,
+            "canale_azzerato": canale_azzerato}
 
 
 @app.post("/api/me/canale-notifiche")
