@@ -163,7 +163,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invariate (stessi URL di `nostr_origine_foto`) = niente ri-download
   orario.
   Formati foto: la miniapp converte in JPEG 1200px via canvas tutto
-  ciò che il browser decodifica (WebP ovunque, HEIC su iPhone); ciò
+  ciò che il browser decodifica (WebP ovunque, HEIC su iPhone).
+  FILIERA A UNA SOLA COMPRESSIONE (lug 2026): il JPEG del canvas
+  (imageSmoothingQuality 'high' + qualità 0.9 — senza il filtro
+  'high' il resize mangiava ~1/4 del dettaglio) viene salvato da
+  `salva_foto` COSÌ COM'È, mai riconvertito; i formati che passano
+  dal server (`converti_in_jpeg`: LANCZOS, quality 88 +
+  `ImageOps.exif_transpose`, che il canvas fa da solo e Pillow no)
+  subiscono anche loro UNA sola compressione. Chi tocca la filiera
+  non deve MAI aggiungere un passaggio JPEG→JPEG sul file pieno
+  (~-2dB a giro); la `_min` deriva dal pieno salvato ed è l'unica
+  seconda generazione ammessa (è un francobollo). Ciò
   che non sa leggere (HEIC su Android/desktop) parte grezzo in base64
   (max 15MB; MIME normalizzato a image/heic se il sistema non lo
   dichiara — Pillow riconosce comunque i byte) e va SUBITO a
