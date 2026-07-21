@@ -245,6 +245,10 @@
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 2px 6px rgba(0,0,0,.25)}
   .share-btn:active{transform:scale(.94)}
+  /* Il ritorno al mercatino fluttua SULLA foto, gemello del condividi
+     ma in alto a sinistra: senza bottone sopra, la foto sale a filo
+     dello schermo e il dettaglio diventa una hero immersiva */
+  .back-float{left:10px;right:auto}
   #photoPreview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   #photoPreview .th{position:relative}
   #photoPreview img{width:64px;height:64px;object-fit:cover;border-radius:10px;
@@ -820,8 +824,10 @@
   </div>
 
   <!-- ============ VISTA: DETTAGLIO ============ -->
+  <!-- Niente bottone sopra la foto: il ritorno al mercatino fluttua
+       SULLA foto (cerchietto di carta, vedi openDetail) e la foto
+       sale a filo dello schermo, da hero immersiva -->
   <div class="view" id="view-dettaglio">
-    <button class="back" onclick="go('esplora')">← Torna al mercatino</button>
     <div id="detailContent"></div>
   </div>
 
@@ -1834,15 +1840,19 @@ function openDetail(id){
   currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
   if (!currentListing) { toast('Annuncio non trovato'); return; }
   const l = currentListing;
-  /* Il bottone condividi sta sulla foto (o sul segnaposto emoji), in
-     alto a destra. In DEMO non c'e': il link punterebbe al nulla. */
+  const mio = !DEMO && myTgId && l.sellerId===myTgId;
+  /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
+     carta: il ritorno al mercatino a sinistra — c'e' SEMPRE, anche in
+     DEMO — e il condividi a destra (in DEMO no: il link punterebbe
+     al nulla). */
+  const indietro = `<button class="share-btn back-float" onclick="go('esplora')" title="Torna al mercatino" aria-label="Torna al mercatino">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>`;
   const condividi = DEMO ? '' : `<button class="share-btn" onclick="condividiAnnuncio()" title="Condividi questo annuncio" aria-label="Condividi">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/></svg></button>`;
   const foto = (l.photos && l.photos.length)
     ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="">`).join('')}</div>
-       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${condividi}</div>`
-    : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${condividi}</div>`;
-  const mio = !DEMO && myTgId && l.sellerId===myTgId;
+       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${indietro}${condividi}</div>`
+    : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${indietro}${condividi}</div>`;
   /* Il ponte Nostr: per gli importati la npub del contatto dichiarato
      nell'evento, per i nativi e i doppi cittadini il badge verificato
      (filtro bech32: finisce in un onclick) */
