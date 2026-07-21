@@ -4077,7 +4077,7 @@ async function publish(){
      l'overlay blocca tutto finche' il server non risponde — un fetch
      lento (foto in base64 + moderazione AI) col dito che ritocca
      diventava N annunci identici. */
-  const ripristina = bottoneInAttesa(el('sellSubmit'), '⚡ Pubblico l\'annuncio…');
+  const ripristina = bottoneInAttesa(el('sellSubmit'), 'Pubblico l\'annuncio…');
   try {
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
