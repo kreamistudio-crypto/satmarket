@@ -5381,6 +5381,15 @@ def miei_ordini(x_tg_init_data: str = Header(""),
     q = ("SELECT o.*, a.titolo, a.zona, "
          "uc.username AS compratore_username, "
          "uv.username AS venditore_username, "
+         # il ponte Nostr verso la controparte: solo chiavi dal
+         # possesso DIMOSTRATO (chiave d'accesso o badge verificato),
+         # la stessa regola di notifica(). Esce solo alle parti.
+         "CASE WHEN uc.npub_accesso!='' THEN uc.npub_accesso "
+         "     WHEN uc.npub_verificata=1 THEN uc.npub "
+         "     ELSE '' END AS compratore_nostr, "
+         "CASE WHEN uv.npub_accesso!='' THEN uv.npub_accesso "
+         "     WHEN uv.npub_verificata=1 THEN uv.npub "
+         "     ELSE '' END AS venditore_nostr, "
          # il feedback che HO lasciato su quest'ordine e quello ricevuto
          # (per l'admin che guarda le dispute restano NULL: innocuo)
          "(SELECT voto FROM feedback WHERE ordine_id=o.id "
