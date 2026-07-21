@@ -101,6 +101,48 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   modificando» + bottone che diventa «Salva le modifiche»), bottone
   ✏️ nel dettaglio e badge nei tuoi annunci; le foto attuali si
   tengono o si sostituiscono tutte, mai a pezzi.
+  Modifica FIRMATA degli importati (lug 2026): il doppio cittadino con
+  `npub_accesso` ≡ `contatto_nostr` modifica anche gli annunci
+  importati — Barattolo fa da client Nostr, la nsec resta nel browser
+  (regola 2). Due fasi: `POST /api/listings/{id}/modifica-firmata/
+  prepara` (stesse guardie di modifica + moderazione COMPLETA prima
+  della firma — dopo sarebbe teatro, l'import riporterebbe dentro —
+  chiavi sempre confrontate via `npub_to_hex` sui due lati) risponde
+  `{biglietto, evento, relays, collaudo}`: evento NIP-99 NON firmato,
+  senza pubkey, `d` = `annunci.nostr_origine_d` (sostituzione NIP-99),
+  `image` verbatim da `nostr_origine_foto` (ripiego `_foto_url_nostr`),
+  content = descrizione PURA (MAI il footer promozionale: rientrerebbe
+  in descrizione al giro d'import); biglietto in
+  `BIGLIETTI_MODIFICA_NOSTR` (TTL 10 min: l'auth_url del bunker è
+  lento). Il client: firmatario del login ri-evocato (sheet
+  parametrizzato `apriNostrSheet(scopo)` / `scopoFirmatario`,
+  titolo «Firma con la tua chiave»), pubkey controllata PRIMA di
+  firmare (la nsec si azzera dopo UNA firma), id ricontrollato in
+  pagina (firmatario che altera = stop), pubblicazione dal browser
+  (`pubblicaEventoSuRelay`, serve ≥1 OK, relay = quelli dell'IMPORT
+  col relay personale del venditore, non RELAYS_VERIFICA) e SOLO poi
+  `POST …/modifica-firmata` con `{biglietto, pubkey, sig}`: il server
+  RICOSTRUISCE l'evento dal biglietto (divergenza impossibile),
+  verifica Schnorr, ri-esegue le guardie economiche (TOCTOU) ma non la
+  moderazione, aggiorna la copia locale dal payload del biglietto e
+  rispedisce l'evento come backstop. Relay muti → niente POST, nulla
+  cambia; POST fallito dopo i relay → messaggio onesto, l'import
+  orario riconcilia entro un'ora (per gli importati i relay SONO la
+  fonte di verità). Foto immutabili (v1, il form lo dice), solo kind
+  30402, Telegram-only senza chiave → 400 di sempre. In collaudo anche
+  il BROWSER simula la pubblicazione (flag `collaudo` da prepara:
+  imparato quando il primo collaudo ha pubblicato sui relay veri).
+  L'import (importa_nostr.py) per questo RICORDA le coordinate:
+  colonne `annunci.nostr_origine_d` e `nostr_origine_foto` (URL image
+  originali) scritte su INSERT e UPDATE, e il match verso il DB è
+  PRIMA per tag `d` (sopravvive ai titoli cambiati: prima duplicava),
+  poi per titolo ma solo su righe non ancora battezzate
+  (`nostr_origine_d=''`); sul match aggiorna anche
+  titolo/descrizione/zona e valuta/prezzo_eur dal tag price (EUR →
+  doppia valuta anche per gli importati), MAI la categoria
+  (categoria_automatica ricoprirebbe la scelta del form); foto
+  invariate (stessi URL di `nostr_origine_foto`) = niente ri-download
+  orario.
   Formati foto: la miniapp converte in JPEG 1200px via canvas tutto
   ciò che il browser decodifica (WebP ovunque, HEIC su iPhone); ciò
   che non sa leggere (HEIC su Android/desktop) parte grezzo in base64
@@ -807,7 +849,16 @@ singolo annuncio per i link condivisi, vedi Architettura — misurato
 in locale con 814 annunci seminati: pagina 25× più leggera di prima
 [17KB vs 436KB], query tutte sugli indici, card da ~8-25KB invece
 del JPEG pieno; da rivedere dal vivo dentro Telegram dopo il deploy,
-e la shortlist AI va provata in produzione con la chiave vera).
+e la shortlist AI va provata in produzione con la chiave vera);
+modifica firmata degli annunci importati (lug 2026: il doppio
+cittadino aggiorna i suoi eventi NIP-99 da Barattolo — due fasi con
+moderazione prima della firma, firma nel browser col firmatario del
+login, pubblicazione sui relay dal client e copia locale allineata
+subito; l'import impara il match per tag `d` e le colonne origine,
+vedi Architettura — collaudato in locale da cima a fondo, casi
+negativi compresi; in produzione va provata una modifica vera con la
+chiave del venditore consenziente, verificando su njump che l'evento
+sostituisca il vecchio anche sul suo relay personale).
 Backlog concordato: commissione minima fissa; deduplica annunci Nostr
 al collegamento (proporre il ritiro del doppione pubblicato dalla
 piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
