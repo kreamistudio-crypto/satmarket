@@ -250,6 +250,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `asyncio.create_task`: mai errori né attese per l'utente. In
   collaudo gli eventi si firmano ma si stampano soltanto
   (`🟣 [nostr simulato]`).
+  Post automatici (lug 2026): la piattaforma racconta i fatti — ogni
+  nuovo annuncio in vetrina esce da solo come nota Nostr kind-1
+  (chiave piattaforma, tag `t=barattolo`, foto come URL nel content)
+  e post nel canale Telegram (`TELEGRAM_CANALE_ID` in config, il bot
+  deve esserne ADMIN; vuoto = solo Nostr). Leve in config:
+  `POST_AUTOMATICI` (default TRUE, deciso: canali giovani, collaudo
+  in produzione) e `POST_MAX_ORA` (6). Anti-spam: `accoda_promo` +
+  drenatore a finestra (`_drena_promo`: 90s, 5s in collaudo) — fino a
+  3 annunci con budget orario capiente = post singoli (pausa 2s),
+  altrimenti UN solo aggregato «📦 N nuovi annunci» (la valvola:
+  passa sempre, non nomina nessuno, niente ciclo di vita). Il
+  drenatore RILEGGE dal DB: rimossi/venduti in finestra e importati
+  (`contatto_nostr` pieno) non escono mai; l'import CSV accoda tutto
+  INSIEME a fine creazione = sempre un aggregato solo. NON si
+  annunciano: ordini e vendite (privacy delle parti), annunci
+  importati (l'originale è già sui relay), modifiche. Ciclo di vita
+  dei post singoli (colonne `annunci.post_canale_id`/`post_nostr_id`):
+  venduto = edit del post Telegram col «✅ Venduto» (caption
+  RICOSTRUITA da `_caption_canale`, mai salvata; al rimborso il ✅
+  sparisce — il post non deve mentire), la nota Nostr resta (è storia
+  vera); rimosso = deleteMessage + NIP-09 kind-5 sulla nota e colonne
+  azzerate. Il ciclo di vita ignora la leva: agisce solo su post già
+  fatti. `bot_api` ora RESTITUISCE il JSON della risposta (serve il
+  message_id; in collaudo un finto id negativo da contatore, così
+  anche edit e delete si collaudano). Fail-open totale, ganci DOPO i
+  commit, coda in memoria (un riavvio la perde, accettato).
   Negozio del venditore: colonna `utenti.negozio` = codice pubblico
   casuale di 8 caratteri (migrazione per chi c'era, `verifica_utente`
   per i nuovi; stabile per sempre, NON deriva dal tg_id).
@@ -991,7 +1017,14 @@ COMPLETA con AI a lotti, anteprima e conferma esplicita, job
 asincrono con avanzamento e report, Nostr a lotti lenti con opt-out,
 vedi Architettura — collaudato in locale da cima a fondo, TestClient
 e browser; in produzione va provato un import vero con la chiave AI
-e un catalogo reale, e il download del modello da dentro Telegram).
+e un catalogo reale, e il download del modello da dentro Telegram);
+post automatici dei fatti (lug 2026: nota Nostr kind-1 + post nel
+canale Telegram per ogni nuovo annuncio, anti-spam a drenatore con
+aggregato per le raffiche, ciclo di vita ✅ Venduto/cancellazione,
+vedi Architettura — collaudato in locale con 13 verifiche simulate;
+in produzione serve creare il canale, mettere il bot come admin e
+`TELEGRAM_CANALE_ID` nel config del VPS, poi verificare un post vero
+su canale e relay).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
