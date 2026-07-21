@@ -60,14 +60,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nuovo = array letto come pagina unica (`leggiPagina`). Indici
   `idx_annunci_vetrina/categoria/venditore` in `init_db`. Param `q`
   su /api/listings = ricerca semplice LIKE (titolo/descrizione/zona)
-  per la vetrina ANONIMA, componibile con cat+cursore. Nasce
+  per la vetrina ANONIMA, componibile con cat+cursore. Ordinamento e
+  filtro prezzo (lug 2026): param `ordina` (vuoto = più recenti |
+  prezzo_su | prezzo_giu; catalogo `ORDINAMENTI`, keyset su
+  (prezzo_sats, id) con `idx_annunci_prezzo`; sconosciuto = default,
+  mai errore) e `prezzo_min`/`prezzo_max` + `valuta_filtro` (eur =
+  conversione LATO SERVER con `cambio_btc_eur`, 503 se il cambio
+  manca; il confronto è sempre su prezzo_sats, che per i listini EUR
+  è l'equivalente al cambio di pubblicazione — dichiarato). Frontend:
+  select discreto + pannello «Filtri» sotto l'etichetta della griglia
+  (`.strumenti`, `setOrdina`/`applicaFiltri`/`azzeraFiltri`), filtro
+  nella valuta del toggle attivo al momento di Applica, stato per
+  SESSIONE (mai localStorage) che sopravvive al cambio categoria
+  (patto delle app di mercatino), in DEMO client-side sui dati finti.
+  La ricerca AI coi vincoli scritti resta separata da questi filtri
+  di navigazione. Le MINIATURE dal lug 2026 sono QUADRATE
+  (ImageOps.fit al centro, 640 q87 LANCZOS, `MINIATURA_LATO/QUALITA`):
+  la card 1:1 col cover ingrandiva il lato corto delle vecchie
+  rettangolari (la sgranatura); il backfill rifà da solo quelle di
+  ricette vecchie confrontando le intestazioni col lato CORTO della
+  foto piena. Nasce
   `GET /api/listings/{id}` (registrato DOPO /miei: l'ordine delle
   rotte conta) per il deep-link /annuncio/{id} oltre le pagine
   caricate. La ricerca AI legge una SHORTLIST (`TETTO_CATALOGO_AI`
   300): match LIKE sulle parole della query + i più recenti a
   riempire — compromesso dichiarato: il sinonimo puro fuori dai 300
   più freschi può sfuggire. FOTO: accanto a ogni JPEG pieno nasce
-  `a{id}_{i}{ver}_min.jpg` (320px q78, ~un decimo del peso) — nel DB
+  `a{id}_{i}{ver}_min.jpg` (vedi ricetta miniature più sotto) — nel DB
   restano SOLO i nomi pieni, `_min` è convenzione che il frontend
   deriva (`fotoMini`); backfill idempotente all'avvio
   (`genera_miniature_mancanti`), la modifica cancella anche la
