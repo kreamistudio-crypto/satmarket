@@ -450,6 +450,50 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e `isVersionAtLeast('8.0')` — nel browser lo stub di Telegram
   esiste comunque e mentirebbe — con ripiego `tg.openLink` se lancia;
   altrimenti `<a download>`; in DEMO sparisce col blocco wallet).
+  Import in blocco da CSV (lug 2026): cassetto «📥 Importa in blocco»
+  nel Profilo (in DEMO sparisce, il patto del wallet), per i
+  commercianti coi cataloghi grandi. Due fasi col pattern biglietto:
+  `POST /api/import/zip` (le foto in uno ZIP come CORPO BINARIO puro
+  letto a chunk col tetto 50MB applicato DURANTE la lettura; controlli
+  sulle sole intestazioni — ≤2000 voci, somma ≤200MB, ≤15MB/voce,
+  niente path storti — e MAI extract: si legge per nome con zf.read)
+  → `POST /api/import/prepara` (CSV come testo in JSON, ≤2MB, header
+  per NOME quindi colonne riordinabili, ≤500 righe; ogni riga:
+  `neutralizza_formula` anti CSV-injection su titolo/descrizione/zona
+  — strappa =, +, @ iniziali, il `-` resta —, prezzo dal giudice
+  unico `prezzo_da_payload` (stessi 400/503 di pubblica, EUR con
+  virgola tradotta), `categoria_tollerante` coi `SINONIMI_CATEGORIA`
+  e ripiego Altro, foto via URL (`url_foto_ammesso` = anti-SSRF: gli
+  URL li scrive l'utente, host risolto e IP privati rifiutati) o nomi
+  nello ZIP (match case-insensitive sul basename), filtro parole su
+  TUTTE le righe; anteprima {biglietto, valide, scarti, avvisi}
+  numerata come nel file — intestazione = riga 1 — TTL 15 min) →
+  `POST /api/import/avvia` (quota 1000 righe/giorno per utente e UN
+  solo job in corso in TUTTO il server, 409 onesto: mono-processo su
+  VPS piccolo) → `GET /api/import/stato/{biglietto}` (polling 2s del
+  frontend). Il job `_lavoro_import`, tre fasi: moderazione AI
+  COMPLETA ma a LOTTI (`moderazione_ai_lotto`: ~20 annunci per
+  chiamata Haiku, semaforo a 3, verdetto per riga `<n>: OK|VIETATO:
+  motivo` con parsing robusto — righe storte o numeri allucinati =
+  fail-open per voce, errore = fail-open per lotto, ~0,13$ e ~1 min
+  per 500 righe); creazione a gruppetti di 4 con COMMIT PER RIGA (un
+  crash a metà lascia solo annunci COMPLETI; lo stato è in memoria
+  come SFIDE_LOGIN: dopo un riavvio il polling prende 404 e il
+  frontend dice la verità); foto nei thread con la filiera buona
+  (`normalizza_foto_import`: JPEG già dritto e ≤1600px VERBATIM,
+  tutto il resto UNA sola `converti_in_jpeg` — il patto della
+  compressione unica vale anche qui; `scarica_foto_import` timeout
+  10s tetto 8MB, foto morta = avviso, mai un annuncio perso); Nostr
+  in coda a lotti di 5 eventi con pausa 1,5s (checkbox nel form,
+  default acceso) quando gli annunci sono GIÀ in vetrina. DEROGA
+  dichiarata allo strato 3 della moderazione: UNA notifica admin
+  riassuntiva (intervallo id creati + titoli bocciati dall'AI, max
+  10) invece di una per annuncio. `GET /api/import/modello` = CSV
+  modello scaricabile (pubblico: BOM, `;`, tre righe demo).
+  `pulisci_import` nell'orologio: lavori scaduti coi loro ZIP, file
+  orfani >1h in `import_tmp/` (in .gitignore), quote dei giorni
+  passati. `_salva_una_foto` è il nucleo di scrittura (pieno + `_min`)
+  estratto da `salva_foto` e riusato dall'import.
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -940,7 +984,14 @@ conferma esplicita, «non è un doppione» persistente in
 Architettura — collaudata in locale da cima a fondo, casi negativi e
 soglie comprese; in produzione va provato un ritiro vero verificando
 su njump che sparisca SOLO l'evento della piattaforma e che
-l'originale del venditore resti).
+l'originale del venditore resti); import in blocco da CSV (lug 2026:
+cassetto nel Profilo per i commercianti — 70 negozi in arrivo al
+lancio — con modello scaricabile, foto da URL o ZIP, moderazione
+COMPLETA con AI a lotti, anteprima e conferma esplicita, job
+asincrono con avanzamento e report, Nostr a lotti lenti con opt-out,
+vedi Architettura — collaudato in locale da cima a fondo, TestClient
+e browser; in produzione va provato un import vero con la chiave AI
+e un catalogo reale, e il download del modello da dentro Telegram).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.

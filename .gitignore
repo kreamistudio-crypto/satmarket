@@ -1,9 +1,10 @@
 # SEGRETI — mai su GitHub!
 config.py
 
-# Dati locali (database, foto degli annunci)
+# Dati locali (database, foto degli annunci, ZIP dell'import in corso)
 *.db
 foto/
+import_tmp/
 
 # Python
 __pycache__/
