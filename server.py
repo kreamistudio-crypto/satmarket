@@ -1954,23 +1954,40 @@ async def anteprima_foto(req: Request, x_tg_init_data: str = Header(""),
                     + base64.b64encode(jpeg).decode()}
 
 
+# I campi degli annunci "di proprieta'" (miei): tutto l'annuncio, non
+# la whitelist di vetrina — il proprietario vede casa sua per intero.
+CAMPI_MIEI = (
+    "a.*, u.nome AS venditore, u.username AS venditore_username, "
+    "u.npub AS venditore_npub, "
+    "u.npub_verificata AS venditore_npub_verificata, "
+    "u.negozio AS venditore_negozio, "
+    "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
+    " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
+    "u.rating, u.vendite_ok")
+
+
 @app.get("/api/listings/miei")
-def miei_annunci(x_tg_init_data: str = Header(""),
+def miei_annunci(limit: int = 0, cursore: str = "",
+                 x_tg_init_data: str = Header(""),
                  barattolo_sessione: str = Cookie("")):
-    """Gli annunci attivi dell'utente che chiede (per gestirli)."""
+    """Gli annunci attivi dell'utente che chiede (per gestirli).
+    Con limit risponde a pagine come la vetrina; senza, l'array di
+    sempre (tetto di sicurezza per i client vecchi)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    dove = "a.venditore_id=? AND a.stato='attivo'"
     con = db()
+    if limit:
+        righe, prossimo = pagina_annunci(
+            con, CAMPI_MIEI, dove, [user["id"]],
+            min(limit, LIMITE_PAGINA_MAX), cursore)
+        con.close()
+        return {"annunci": espandi_distintivi_vetrina(righe),
+                "cursore": prossimo}
     righe = [dict(r) for r in con.execute(
-        "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-        "u.npub AS venditore_npub, "
-        "u.npub_verificata AS venditore_npub_verificata, "
-        "u.negozio AS venditore_negozio, "
-        "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
-        " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
-        "u.rating, u.vendite_ok FROM annunci a "
+        f"SELECT {CAMPI_MIEI} FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
-        "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
-        (user["id"],))]
+        f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
+        (user["id"], TETTO_LEGACY))]
     con.close()
     return espandi_distintivi_vetrina(righe)
 
@@ -1996,12 +2013,15 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
 
 
 @app.get("/api/negozio/{chi}")
-def negozio(chi: str, x_tg_init_data: str = Header(""),
-                      barattolo_sessione: str = Cookie("")):
+def negozio(chi: str, limit: int = 0, cursore: str = "",
+            x_tg_init_data: str = Header(""),
+            barattolo_sessione: str = Cookie("")):
     """La pagina-negozio di un venditore: profilo pubblico + i suoi
     annunci attivi. Si arriva con lo username Telegram (se ce l'ha) o
     col codice pubblico del negozio: mai col tg_id, che agli anonimi
-    resta invisibile come in tutta la vetrina."""
+    resta invisibile come in tutta la vetrina. Con limit gli annunci
+    arrivano a pagine (chiavi cursore/totale IN PIU' nella risposta:
+    i client vecchi le ignorano e vivono felici)."""
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -2016,11 +2036,23 @@ def negozio(chi: str, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Negozio non trovato")
     # venditore_id in piu' solo agli autenticati ("questo annuncio e' tuo")
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
-    annunci = espandi_distintivi_vetrina([dict(r) for r in con.execute(
-        f"SELECT {campi} FROM annunci a "
-        "JOIN utenti u ON u.tg_id=a.venditore_id "
-        "WHERE a.venditore_id=? AND a.stato='attivo' ORDER BY a.creato DESC",
-        (v["tg_id"],))])
+    dove = "a.venditore_id=? AND a.stato='attivo'"
+    prossimo, totale = None, None
+    if limit:
+        righe, prossimo = pagina_annunci(
+            con, campi, dove, [v["tg_id"]],
+            min(limit, LIMITE_PAGINA_MAX), cursore)
+        if not cursore:
+            totale = con.execute(
+                f"SELECT COUNT(*) AS n FROM annunci a WHERE {dove}",
+                (v["tg_id"],)).fetchone()["n"]
+    else:
+        righe = [dict(r) for r in con.execute(
+            f"SELECT {campi} FROM annunci a "
+            "JOIN utenti u ON u.tg_id=a.venditore_id "
+            f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
+            (v["tg_id"], TETTO_LEGACY))]
+    annunci = espandi_distintivi_vetrina(righe)
     # Gli ultimi feedback ricevuti: stelle + commento + data + ruolo di
     # chi scrive («acquirente»/«venditore»), MAI il nome — su una pagina
     # pubblica rivelerebbe gli acquisti di chi non ha scelto di apparire.
@@ -2044,7 +2076,13 @@ def negozio(chi: str, x_tg_init_data: str = Header(""),
              descrizione=d["descrizione"])
         for d in DISTINTIVI if d["fiducia"] and d["id"] in presi]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
-    return {"venditore": venditore, "annunci": annunci, "feedback": feedback}
+    risposta = {"venditore": venditore, "annunci": annunci,
+                "feedback": feedback}
+    if limit:
+        risposta["cursore"] = prossimo
+        if totale is not None:
+            risposta["totale"] = totale
+    return risposta
 
 
 @app.post("/api/listings/{annuncio_id}/rimuovi")
