@@ -921,11 +921,9 @@
           <div class="field" style="margin-top:10px"><label>Il tuo profilo Nostr (facoltativo)</label>
             <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
           <button class="btn ghost" style="margin-top:0" onclick="saveNpub()">🟣 Salva la npub nel profilo</button>
-          <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-            Con la npub <b>verificata</b> i tuoi annunci portano il badge 🟣:
-            appena la salvi, qui compare il bottone per verificarla. Non
-            incollare MAI la nsec: quella è la tua chiave privata e nessuno
-            deve chiedertela, noi per primi.</div>
+          <!-- La nota sotto il bottone e' DINAMICA (renderNpubVerifica):
+               ogni stato mostra solo cio' che gli serve, il resto lo
+               dicono confirm e toast al momento giusto. -->
           <div id="npubVerifica"></div>
         </div>
       </div>
@@ -2738,29 +2736,24 @@ function renderIdentita(){
     `<div style="margin:-2px 0 8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">${t}</div>`;
   const btnRimuovi =
     `<button class="btn danger-ghost" style="margin:0 0 2px" onclick="rimuoviNpub()">🗑 Rimuovi la npub dal profilo</button>` +
-    sub(`Toglie npub, verifica, badge 🟣 e ponte «Scrivi su Nostr» da
-         ovunque${myNpubAccesso && myNpubAccesso===myNpub ? ', e spegne anche l’accesso dal web' : ''}.
-         Se la reinserirai, andrà verificata di nuovo.`);
+    sub(`Toglie npub, badge e verifica ovunque.`);
   let nsRiga;
   if (!myNpub) {
     nsRiga = riga('🟣','Nostr','Nessuna npub nel profilo: puoi dichiararla qui sotto.');
   } else if (!myNpubVerified) {
     nsRiga = riga('🟣','Nostr',
-      `${npubBreve} — da verificare. Verificala per il badge 🟣 sugli annunci e per poterla usare come chiave d'accesso.`,
+      `${npubBreve} — salvata, da verificare qui sotto.`,
       btnRimuovi);
   } else if (!myNpubAccesso) {
     nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata, badge 🟣 attivo.`,
       `<button class="btn ghost" style="margin:0 0 8px" onclick="abilitaAccessoNostr()">🔑 Abilita l'accesso con Nostr</button>
-       ${sub(`Con l'accesso attivo entri in questo stesso account anche dal
-         browser, firmando con la tua chiave Nostr.`)}${btnRimuovi}`);
+       ${sub(`Per entrare in questo account anche dal browser, con la tua firma Nostr.`)}${btnRimuovi}`);
   } else {
     nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata 🔑 puoi entrare dal web con Nostr.`,
       (myTgId > 0
         ? `<button class="btn ghost" style="margin:0 0 8px" onclick="disabilitaAccessoNostr()">Disabilita l'accesso con Nostr</button>
-           ${sub(`Chiude solo la porta del login dal web: npub, badge 🟣
-             e ponte «Scrivi su Nostr» restano nel profilo.`)}`
-        : sub(`Questa npub è il tuo modo di entrare: per rimuoverla o
-             spegnerla, collega prima Telegram qui sopra.`)) + btnRimuovi);
+           ${sub(`Chiude solo l'ingresso via Nostr: la npub nel profilo resta.`)}`
+        : sub(`È il tuo unico ingresso: per rimuoverla collega prima Telegram.`)) + btnRimuovi);
   }
   box.innerHTML = tgRiga + nsRiga;
   renderAvvisi();
@@ -3066,9 +3059,16 @@ async function collegaTelegram(){
 function renderNpubVerifica(){
   const box = el('npubVerifica');
   if (!box) return;
-  if (!myNpub) { box.innerHTML = ''; return; }
+  if (!myNpub) {
+    /* campo vuoto: l'unica nota che serve PRIMA di salvare */
+    box.innerHTML = `<div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      Con la npub <b>verificata</b> i tuoi annunci portano il badge 🟣.
+      Mai la nsec: è la tua chiave privata.</div>`;
+    return;
+  }
   if (myNpubVerified) {
-    box.innerHTML = `<div style="margin-top:10px;font-size:13px;font-weight:800;color:var(--trust)">✓ npub verificata: badge 🟣 attivo</div>`;
+    /* niente doppione: lo dice gia' la riga Nostr qui sopra */
+    box.innerHTML = '';
     return;
   }
   if (npubCodice) {
