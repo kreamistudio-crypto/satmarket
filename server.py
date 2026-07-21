@@ -1665,6 +1665,27 @@ def miniatura_jpeg(raw: bytes):
         return None
 
 
+def _salva_una_foto(annuncio_id: int, indice: int, raw: bytes,
+                    versione: str = "") -> str | None:
+    """Il nucleo della filiera: scrive il JPEG pieno (gia' pronto,
+    QUI non si converte ne' si ricomprime mai) e accanto la gemella
+    _min per le card. Nel database resta SOLO il nome pieno: il
+    suffisso _min e' una convenzione di nome che il frontend deriva
+    da solo. Ritorna il nome del file, o None se non c'era nulla."""
+    if not raw:
+        return None
+    nome = f"a{annuncio_id}_{indice}{versione}.jpg"
+    with open(os.path.join(FOTO_DIR, nome), "wb") as out:
+        out.write(raw)
+    mini = miniatura_jpeg(raw)
+    if mini:
+        with open(os.path.join(FOTO_DIR,
+                               f"a{annuncio_id}_{indice}{versione}_min.jpg"),
+                  "wb") as out:
+            out.write(mini)
+    return nome
+
+
 def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
     """Salva le foto dell'annuncio. Dalla Mini App di solito arrivano
     gia' ridimensionate in JPEG (base64); quelle che il browser non ha
@@ -1696,21 +1717,9 @@ def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
             # PNG/WebP grezzi: gia' prima finivano in un file .jpg;
             # con Pillow diventano JPEG per davvero
             raw = converti_in_jpeg(raw) or raw
-        if not raw:
-            continue
-        nome = f"a{annuncio_id}_{i}{versione}.jpg"
-        with open(os.path.join(FOTO_DIR, nome), "wb") as out:
-            out.write(raw)
-        # Accanto al file pieno nasce la miniatura per le card.
-        # Nel database resta SOLO il nome pieno: il suffisso _min e'
-        # una convenzione di nome che il frontend deriva da solo.
-        mini = miniatura_jpeg(raw)
-        if mini:
-            with open(os.path.join(FOTO_DIR,
-                                   f"a{annuncio_id}_{i}{versione}_min.jpg"),
-                      "wb") as out:
-                out.write(mini)
-        nomi.append(nome)
+        nome = _salva_una_foto(annuncio_id, i, raw, versione)
+        if nome:
+            nomi.append(nome)
     return nomi
 
 
