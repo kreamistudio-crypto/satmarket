@@ -246,6 +246,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   distingue più nulla); la npub dichiarata ma non verificata la vede
   solo il proprietario nel suo Profilo, con l'invito a verificarla.
   Cambiare o rimuovere la npub azzera la verifica.
+  Rimozione della npub (lug 2026): `salva_npub` con stringa vuota è
+  l'unica strada; nel cassetto Identità c'è il bottone esplicito
+  «🗑 Rimuovi la npub dal profilo» (confirm SEMPRE, con l'avviso in
+  più se la chiave era anche npub_accesso; il campo svuotato + Salva
+  delega lì). La rimozione toglie npub, verifica e — se coincideva —
+  npub_accesso (solo tg_id>0, com'era già); il NATIVO Nostr (tg_id<0)
+  con badge ≡ npub_accesso è BLOCCATO con 400 «è il tuo unico modo di
+  entrare: collega prima Telegram» (guardia doppia frontend+server);
+  se il badge del nativo è DIVERSO dalla chiave d'ingresso, la
+  rimozione del badge è lecita e l'accesso resta. Dopo ogni
+  cambio/rimozione che lascia l'utente senza destinazione Nostr (né
+  accesso né badge verificato), `canale_notifiche` in
+  ('nostr','entrambi') torna '' automatico — il cassetto Avvisi non
+  deve mentire — e la risposta porta `canale_azzerato` (il 'telegram'
+  esplicito non si tocca). Reinserire una npub, anche la stessa,
+  riparte SEMPRE da non verificata. Le due leve del cassetto hanno il
+  sottotesto che le distingue: «Disabilita l'accesso» chiude solo la
+  porta del login (npub, badge 🟣 e ponte restano), «Rimuovi la npub»
+  toglie tutto da ovunque; NIENTE terzo bottone «Scollega tutto» —
+  Rimuovi fa già entrambe quando l'accesso è attivo, un doppione
+  rimetterebbe la confusione che i sottotesti tolgono.
   `venditore_npub` e `venditore_npub_verificata` sono in `CAMPI_VETRINA`
   (pubblici per natura) e nelle SELECT di `/api/search` e
   `/api/listings/miei`.
@@ -1137,7 +1158,13 @@ fondo: matching positivo e negativi per ogni criterio, distanze
 Milano/Monza/Pavia/Napoli, dedup sulla modifica, aggregato da
 raffica, tetto col messaggio onesto, form/pausa/elimina/precompila
 nel browser; in produzione va provato un avviso vero con notifica
-Telegram reale).
+Telegram reale); gestione completa della npub nel Profilo (lug 2026:
+bottone «Rimuovi la npub dal profilo» con conferma, guardia per il
+nativo Nostr che ne sarebbe chiuso fuori, canale avvisi riportato
+all'automatico quando la destinazione Nostr sparisce, sottotesti che
+distinguono le due leve Disabilita/Rimuovi, vedi Architettura, badge
+Nostr — collaudato in locale con TestClient [31 verifiche] e nel
+browser su tutti gli stati della riga Nostr).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
