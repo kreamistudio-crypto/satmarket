@@ -1978,6 +1978,65 @@ async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
         return None
 
 
+# L'import in blocco porterebbe 200-500 chiamate di moderazione una in
+# fila all'altra: minuti di attesa per spiccioli di testo. A LOTTI
+# (~20 annunci per chiamata) la stessa copertura completa costa un
+# decimo di dollaro e un minuto per 500 righe. Il prompt e' lo stesso
+# del singolo, con l'appendice sul formato a piu' righe.
+APPENDICE_LOTTO = (
+    " ORA VALUTERAI PIU' ANNUNCI IN UN COLPO SOLO. Rispondi con UNA "
+    "riga per ciascun annuncio, nel formato esatto:\n"
+    "<numero>: OK\n"
+    "oppure\n"
+    "<numero>: VIETATO: <motivo in poche parole>\n"
+    "dove <numero> e' quello indicato dopo la parola ANNUNCIO. "
+    "Nessun altro testo prima o dopo le righe dei verdetti.")
+
+_RIGA_VERDETTO = re.compile(
+    r"^\s*(?:ANNUNCIO\s+)?(\d+)\s*[:.\)\-]\s*(OK|VIETATO.*)$",
+    re.IGNORECASE)
+
+
+async def moderazione_ai_lotto(voci: list) -> dict:
+    """Strato 2 per l'import in blocco. voci = [(numero, titolo,
+    descrizione)]; ritorna {numero: motivo} SOLO per i VIETATO.
+    Fail-open come la sorella singola: chiave assente, errore,
+    timeout o risposta interamente storta = dict vuoto (il lotto
+    passa, lo strato 1 ha gia' fatto la sua parte) e una riga in
+    console. Una riga di verdetto malformata o mancante = quella
+    voce passa; i numeri che non appartengono al lotto (allucinati)
+    si ignorano."""
+    if not voci:
+        return {}
+    if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
+        return {}
+    corpo = "\n\n".join(
+        f"ANNUNCIO {n}\nTITOLO: {(t or '')[:200]}\n"
+        f"DESCRIZIONE: {(d or '')[:400]}"
+        for n, t, d in voci)
+    try:
+        r = await asyncio.to_thread(
+            ai.messages.create,
+            model=MODELLO_RICERCA, max_tokens=800, timeout=30,
+            system=PROMPT_MODERAZIONE + APPENDICE_LOTTO,
+            messages=[{"role": "user", "content": corpo}])
+        testo = "".join(b.text for b in r.content if b.type == "text")
+        nel_lotto = {n for n, _, _ in voci}
+        bocciati = {}
+        for riga in testo.splitlines():
+            m = _RIGA_VERDETTO.match(riga)
+            if not m or int(m.group(1)) not in nel_lotto:
+                continue
+            verdetto = m.group(2)
+            if verdetto.upper().startswith("VIETATO"):
+                motivo = verdetto.split(":", 1)[-1].strip()
+                bocciati[int(m.group(1))] = motivo or "contenuto vietato"
+        return bocciati
+    except Exception as e:
+        print(f"⚠️ Moderazione AI a lotti saltata (nessun blocco): {e}")
+        return {}
+
+
 # Le categorie del mercatino: UNICA lista lato server, la stessa del
 # form di Vendi e delle pillole della vetrina ("Tutto" e' solo una
 # vista del frontend, non una categoria). Una categoria sconosciuta
