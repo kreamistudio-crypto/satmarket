@@ -162,6 +162,36 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (categoria_automatica ricoprirebbe la scelta del form); foto
   invariate (stessi URL di `nostr_origine_foto`) = niente ri-download
   orario.
+  Deduplica dei doppioni su Nostr (lug 2026): il doppio cittadino può
+  avere lo stesso oggetto DUE volte sui relay — l'importato firmato da
+  LUI e il nativo ripubblicato dalla piattaforma (invariante:
+  `contatto_nostr` e `nostr_event_id` mai sulla stessa riga).
+  `trova_doppioni_nostr` (guardia EXISTS: chi non ha importati esce
+  subito, e quasi nessuno li ha) rileva le coppie con match STRETTO,
+  mai fuzzy: impronta del titolo identica (token di `normalizza`
+  ordinati alfabeticamente: maiuscole, accenti e ordine parole non
+  contano) + prezzo compatibile (EUR vs EUR scarto ≤10%; altrimenti
+  sats ≤30%, largo perché l'import riconverte l'importato a ogni giro
+  mentre il nativo resta al cambio di pubblicazione). Pochi match
+  certi: il falso positivo residuo (due esemplari genuini identici) è
+  coperto dalla conferma esplicita e dall'archivio. Le coppie escono
+  in `/api/me.doppioni_nostr` → cassetto «🔁 Doppioni su Nostr» nel
+  Profilo (`renderDoppioni`, sparisce se vuoto/DEMO/VETRINA); dopo la
+  fusione il messaggio del bot CONTA i doppioni trovati invece del
+  sospetto generico. «Non è un doppione» = riga in
+  `doppioni_ignorati` (server-side: mai riproporlo vale su ogni
+  dispositivo, non è roba da localStorage). Il ritiro
+  (`POST /api/me/doppioni/{id_nativo}/ritira`, conferma esplicita,
+  MAI automatico) manda la NIP-09 della PIATTAFORMA sul SUO evento —
+  gli eventi dell'utente non si toccano mai — via
+  `ritira_da_nostr(esigi_ok=True)`: senza ≥1 relay OK non cambia
+  NULLA (502 onesto, si riprova); col successo `nostr_event_id` si
+  svuota, il che spegne ogni ripubblicazione (i ganci sono tutti
+  `solo_aggiornamento=True`) e fa sparire la coppia da sola
+  (derivata dai dati veri, niente stato sul successo). L'annuncio su
+  Barattolo resta attivo, solo-locale. Il ritiro fire-and-forget di
+  rimozione/admin usa la stessa funzione col default di sempre
+  (azzera comunque).
   Formati foto: la miniapp converte in JPEG 1200px via canvas tutto
   ciò che il browser decodifica (WebP ovunque, HEIC su iPhone).
   FILIERA A UNA SOLA COMPRESSIONE (lug 2026): il JPEG del canvas
@@ -901,11 +931,16 @@ subito; l'import impara il match per tag `d` e le colonne origine,
 vedi Architettura — collaudato in locale da cima a fondo, casi
 negativi compresi; in produzione va provata una modifica vera con la
 chiave del venditore consenziente, verificando su njump che l'evento
-sostituisca il vecchio anche sul suo relay personale).
-Backlog concordato: commissione minima fissa; deduplica annunci Nostr
-al collegamento (proporre il ritiro del doppione pubblicato dalla
-piattaforma quando l'utente fuso ha gli stessi oggetti sui relay con
-la sua chiave — rimandata: il match sui titoli fa falsi positivi e un
-NIP-09 sbagliato cancella presenza legittima); poi post-lancio: tracking
+sostituisca il vecchio anche sul suo relay personale); deduplica dei
+doppioni su Nostr (lug 2026: era nel backlog, sbloccata dal match a
+impronta stretta — cassetto «🔁 Doppioni su Nostr» nel Profilo con le
+coppie sospette, ritiro NIP-09 solo della copia della piattaforma con
+conferma esplicita, «non è un doppione» persistente in
+`doppioni_ignorati`, messaggio mirato del bot dopo la fusione, vedi
+Architettura — collaudata in locale da cima a fondo, casi negativi e
+soglie comprese; in produzione va provato un ritiro vero verificando
+su njump che sparisca SOLO l'evento della piattaforma e che
+l'originale del venditore resti).
+Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
