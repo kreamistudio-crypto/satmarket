@@ -4405,11 +4405,12 @@ async function esciWeb(){
 /* Solo web MOBILE fuori da Telegram, mai se l'app e' gia' installata,
    mai in DEMO (invitare a installare una demo sarebbe una bugia). Il
    «Non ora» e' un RINVIO, non un addio: memoria solo in pagina
-   (installaRimandata), alla visita successiva il banner torna —
-   finche' l'app non e' installata davvero. Il per-sempre esiste solo
-   via appinstalled (chiave pwa_installata nel solito barattolo_hint;
-   la vecchia chiave installa_pwa non si legge piu': chi rimando'
-   allora deve rivedere l'invito).
+   (installaRimandata), alla visita successiva il banner torna. Anche
+   appinstalled nasconde SOLO per la sessione: niente memoria
+   persistente, cosi' dopo una disinstallazione il banner puo'
+   tornare — il caso «app installata» lo coprono gia' le guardie
+   standalone (e su Chrome l'assenza di beforeinstallprompt ad app
+   installata).
    Android/Chromium: si intercetta beforeinstallprompt e il bottone
    chiama il prompt vero. iOS: l'evento non esiste, il bottone apre il
    foglietto coi passi di Safari. */
@@ -4421,7 +4422,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
   bannerInstallaPwa();           // l'evento puo' arrivare dopo avvia()
 });
 window.addEventListener('appinstalled', () => {
-  dismettiHint('pwa_installata');   // installata: ora si' che sparisce per sempre
+  installaRimandata = true;      // appena installata: zitto per questa pagina, e basta
   const b = el('installBanner'); if (b) b.style.display = 'none';
 });
 function rimandaInstalla(nodo){
@@ -4446,7 +4447,7 @@ function bannerInstallaPwa(){
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS si traveste da Mac
   const mobile = ios || /Android/i.test(navigator.userAgent);
   if (tg?.initData || pwaStandalone() || !mobile || DEMO
-      || installaRimandata || hintDismesso('pwa_installata')
+      || installaRimandata
       || (!ios && !firefoxAndroid() && !eventoInstalla)) return;  // su Chrome/Edge solo con l'evento vero in mano
   const cta = (ios || firefoxAndroid())
     ? `<a onclick="apriInstallSheet()">Come si fa</a>`
