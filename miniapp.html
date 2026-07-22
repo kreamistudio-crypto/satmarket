@@ -26,6 +26,8 @@
     --chip-bg:#F3ECDA;
     --field-line:#E0D7C0; --line-soft:#EEE7D6;
     --gold-a:#FFE08A; --gold-b:#F7B32B; --gold-line:#E29B12; --gold-text:#7A4B06;
+    /* il riflesso del vetro sul barattolino (jarSVG): celeste tenue */
+    --jar-riflesso:#BFE3F0;
     /* i colori "di servizio" che prima erano fissi nelle regole:
        tokenizzati per la dark mode, in chiaro identici a prima */
     --header-bg:rgba(250,244,228,.92); --nav-bg:rgba(255,255,255,.96);
@@ -55,6 +57,7 @@
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
     --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
     --chip-bg:#37301F;
+    --jar-riflesso:#7FA3B5;   /* il vetro di sera riflette piu' piano */
     --field-line:#4A4029; --line-soft:#362E1E;
     --header-bg:rgba(33,26,16,.92); --nav-bg:rgba(44,37,23,.96);
     --ph-a:#332B1A; --ph-b:#2B2415;
@@ -308,6 +311,26 @@
   .jar-ico.lv4 .jar-liq{transform:translateY(0)}
   /* sul cerchietto salvato il fondo e' gia' arancio: liquido crema */
   .jar-btn.salvato{--jar-liquido:#FAF4E4}
+  /* Il riflesso del vetro: due pennellate celesti sul fianco sinistro
+     (token --jar-riflesso, piu' tenue di sera). Un dettaglio, non un
+     protagonista: sottile, non copre la lettura del livello. */
+  .jar-ico .jar-lux{stroke:var(--jar-riflesso,#BFE3F0)}
+  /* Il barattolino sulle card (stile cuoricino Vinted): cerchietto di
+     carta discreto in alto a destra sulla foto — il cartellino del
+     prezzo sta in basso a sinistra, non si pestano mai. Colori fissi
+     come tutto cio' che vive sulla foto (share-btn, pallini). Da
+     salvato si accende d'arancio col liquido crema, ben visibile.
+     L'area di tocco e' piu' larga del cerchietto (::after, ~46px):
+     il dito non deve mirare. */
+  .card-jar{position:absolute;top:8px;right:8px;z-index:2;
+    width:34px;height:34px;border-radius:50%;border:0;cursor:pointer;
+    background:rgba(255,248,234,.75);color:#23282C;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 4px rgba(0,0,0,.18)}
+  .card-jar::after{content:'';position:absolute;inset:-6px;border-radius:50%}
+  .card-jar:active{transform:scale(.92)}
+  .card-jar.salvato{background:var(--sats);--jar-liquido:#FAF4E4;
+    box-shadow:0 2px 6px rgba(0,0,0,.25),0 0 0 2px rgba(255,255,255,.5)}
   /* La scossellina di festa quando un annuncio ENTRA nel barattolo:
      riusa i keyframe scuoti dello spinner (-8/+8), due giri in 0.4s.
      Solo all'aggiunta, mai alla rimozione; il cerchietto del dettaglio
@@ -997,13 +1020,13 @@
 
   <!-- ============ VISTA: AFFARI ============ -->
   <div class="view" id="view-affari">
-    <div class="section-label" style="padding-top:22px">I tuoi affari</div>
+    <div class="section-label" style="padding-top:22px">I tuoi ordini</div>
     <div id="ordersList" style="margin-top:12px"></div>
   </div>
 
   <!-- ============ VISTA: ESCROW / ORDINE ============ -->
   <div class="view" id="view-ordine">
-    <button class="back" onclick="go('affari')">← I tuoi affari</button>
+    <button class="back" onclick="go('affari')">← I tuoi ordini</button>
     <div id="orderContent"></div>
   </div>
 
@@ -1146,7 +1169,7 @@
     <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
-    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
+    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini</button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
   </nav>
@@ -1536,12 +1559,12 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 /* ---------------- navigazione ---------------- */
 function go(view){
   haptic();
-  /* In vetrina Vendi, Affari e Profilo non esistono: si fanno su Telegram */
+  /* In vetrina Vendi, Ordini e Profilo non esistono: si fanno su Telegram */
   if (VETRINA && (view==='vendi' || view==='affari' || view==='profilo')) {
     invitoTelegram(view==='vendi'
       ? 'Qui in vetrina si guarda soltanto: per mettere in vendita i tuoi oggetti apri Barattolo dentro Telegram.'
       : view==='affari'
-      ? 'I tuoi affari vivono su Telegram: apri Barattolo per seguirli.'
+      ? 'I tuoi ordini vivono su Telegram: apri Barattolo per seguirli.'
       : 'Il tuo profilo vive su Telegram: apri Barattolo per gestire annunci, incassi e identità.');
     return;
   }
@@ -1632,13 +1655,24 @@ function renderGrid(items){
 /* La card di un annuncio, stile "Etichetta": foto pulita e il prezzo
    su un cartellino storto a cavallo del bordo, come al mercatino.
    La stessa card serve vetrina e vista negozio. */
-const cardHTML = l => { const p = prezzoParte(l); return `
+const cardHTML = l => { const p = prezzoParte(l);
+  /* Il barattolino in card: stesse guardie del cerchietto nel
+     dettaglio (mai in DEMO/VETRINA, mai sui propri annunci). Qui pero'
+     il livello e' dell'ANNUNCIO, non del barattolo intero: vetro vuoto
+     da salvare, pieno d'arancio da salvato — sulla griglia deve dire
+     al volo "questo l'hai gia' messo via". stopPropagation: il tocco
+     sul barattolino non apre il dettaglio. */
+  const sal = preferiti.has(l.id);
+  const jar = (DEMO || VETRINA || !myTgId || l.sellerId===myTgId) ? ''
+    : `<button class="card-jar${sal?' salvato':''}" data-id="${l.id}" onclick="event.stopPropagation();togglePreferito(${l.id})" title="${sal?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">${jarSVG(sal?4:0, 16)}</button>`;
+  return `
     <div class="card" onclick="openDetail(${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
         <div class="tag-price"><div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        ${jar}
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
@@ -3833,8 +3867,9 @@ const livelloBarattolo = n =>
 
 /* L'icona del barattolo che si riempie: vetro a currentColor,
    liquido nella clip dell'interno (id univoco per istanza: piu'
-   barattoli in pagina non si rubano la clip). Il livello e' la
-   classe lv0-4, la regia e' aggiornaBarattolo(). */
+   barattoli in pagina non si rubano la clip), riflesso celeste
+   sul fianco (--jar-riflesso: e' vetro, non plastica). Il livello
+   e' la classe lv0-4, la regia e' aggiornaBarattolo(). */
 let jarClipN = 0;
 function jarSVG(livello, misura){
   const clip = 'jarClip' + (++jarClipN);
@@ -3843,6 +3878,8 @@ function jarSVG(livello, misura){
     <g clip-path="url(#${clip})"><rect class="jar-liq" x="7" y="6.5" width="10" height="14"/></g>
     <rect x="5.5" y="5" width="13" height="16.5" rx="4.5" fill="none" stroke="currentColor" stroke-width="2"/>
     <rect x="8" y="2" width="8" height="3" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path class="jar-lux" d="M9.4 9.4c-.55 1.15-.55 2.85 0 4" fill="none" stroke-width="1.3" stroke-linecap="round"/>
+    <path class="jar-lux" d="M9.45 15.6c-.12.65-.05 1.25.15 1.8" fill="none" stroke-width="1.3" stroke-linecap="round"/>
   </svg>`;
 }
 
@@ -3854,6 +3891,9 @@ function aggiornaBarattolo(n){
   if (typeof n !== 'number') n = contaBarattolo();
   const lv = 'lv' + livelloBarattolo(n);
   document.querySelectorAll('.jar-ico').forEach(s=>{
+    /* i barattolini sulle card raccontano l'annuncio (vuoto/pieno),
+       non il barattolo intero: il loro livello lo fa aggiornaJarCards */
+    if (s.closest('.card-jar')) return;
     s.classList.remove('lv0','lv1','lv2','lv3','lv4');
     s.classList.add(lv);
   });
@@ -3874,7 +3914,24 @@ async function caricaPreferiti(){
        oltre le pagine caricate della vetrina */
     inCatalogo(myPreferiti.filter(l=>l.stato==='attivo'));
     aggiornaBarattolo();
+    aggiornaJarCards();   /* le card possono essere nate prima del Set */
   } catch(e) {}
+}
+
+/* I barattolini sulle card: stato per-annuncio (vuoto/pieno) dal Set.
+   Regia unica richiamata dopo il caricamento dei preferiti e dopo
+   ogni toggle: vetrina, negozio, dettaglio e cassetto non divergono
+   mai, qualunque sia il punto da cui si e' toccato. */
+function aggiornaJarCards(){
+  document.querySelectorAll('.card-jar').forEach(b=>{
+    const sal = preferiti.has(+b.dataset.id);
+    b.classList.toggle('salvato', sal);
+    b.title = sal ? 'Togli dal barattolo' : 'Metti nel barattolo';
+    const s = b.querySelector('.jar-ico');
+    if (!s) return;
+    s.classList.remove('lv0','lv1','lv2','lv3','lv4');
+    s.classList.add(sal ? 'lv4' : 'lv0');
+  });
 }
 
 async function togglePreferito(id){
@@ -3927,6 +3984,7 @@ async function togglePreferito(id){
     }
     renderPreferiti();
     aggiornaBarattolo(d.conteggio);
+    aggiornaJarCards();
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
@@ -4522,7 +4580,7 @@ function barraWeb(nome){
   const avvisi = myTgId < 0
     ? `sei entrato con Nostr: per gli avvisi in chat collega Telegram`
       + ` dalla scheda Profilo (sezione «🆔 Identità»), oppure ricontrolla`
-      + ` i tuoi Affari di tanto in tanto`
+      + ` i tuoi Ordini di tanto in tanto`
     : `Per ricevere gli avvisi sugli ordini apri una volta `
       + `<a href="https://t.me/ilbarattolobot" target="_blank"`
       + ` rel="noopener">@ilbarattolobot</a>`;
