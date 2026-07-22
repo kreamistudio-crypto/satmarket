@@ -962,9 +962,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore; le
   Fasi 2-3 solo con l'ok esplicito di Andrea): `manifest.json` (id/
   start_url/scope "/", standalone, crema+arancio, 4 icone any+maskable
-  generate da `genera_icone.py` — barattolo-hero su tessera arancio,
-  maskable al 62% del lato per i ritagli Android; si rilancia quando
-  la grafica cambia) + `sw.js` PRUDENTE servito dalla RADICE, sempre
+  generate da `genera_icone.py` — dal lug 2026 ritagliate da
+  `assets/barattolo-icona-sorgente.jpeg` (2048px, barattolo già
+  composto sul suo arancione: fondo CAMPIONATO dagli angoli, bbox a
+  soglia con l'ombra dentro, mai upscale), any al 90% e maskable al
+  67% del lato (intero nel cerchio di sicurezza 80%, verificato con
+  l'anteprima); si rilancia quando la grafica cambia, e chi la
+  rilancia alza VERSIONE in sw.js: le icone sono in dispensa) +
+  `sw.js` PRUDENTE servito dalla RADICE, sempre
   no-cache. Il SW: dispensa `statica-{VERSIONE}` con addAll atomico
   (asset di casa + `/vendor/nostr.js` + `offline.html`), cache-first
   runtime SOLO per i Google Fonts (`font-{VERSIONE}`), navigazioni
