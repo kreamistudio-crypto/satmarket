@@ -914,14 +914,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   BARATTOLINO 🫙 — MAI il cuore, MAI il fulmine (su Nostr è lo zap).
   Tabella `preferiti(tg_id, annuncio_id, creato, PK)`; toggle
   `POST /api/listings/{id}/preferito` (prima prova a togliere: il
-  barattolo si svuota anche se l'annuncio è sparito del tutto);
-  `GET /api/me/preferiti` = CAMPI_VETRINA + `a.stato` +
-  venditore_id, dal salvato più recente, tetto 100 — escono ANCHE
-  venduti/rimossi e il cassetto li mostra onesti «non più
-  disponibile» (spenti, dettaglio non apribile, il 🫙 Togli resta)
-  finché l'utente non li toglie lui. Nessun conteggio pubblico: il
-  venditore non vede chi né quanti (v1). `esegui_fusione` migra in
-  unione (UPDATE OR IGNORE + DELETE, il pattern degli avvisi).
+  barattolo si svuota anche se l'annuncio è sparito del tutto, e
+  anche da pieno); `GET /api/me/preferiti` = CAMPI_VETRINA +
+  `a.stato` + venditore_id, dal salvato più recente, tetto 100 —
+  escono ANCHE venduti/rimossi e il cassetto li mostra onesti «non
+  più disponibile» (spenti, dettaglio non apribile, il 🫙 Togli
+  resta) finché l'utente non li toglie lui. LIMITE 20
+  (`MAX_PREFERITI`, lug 2026): la guardia vive nel SERVER, nel ramo
+  INSERT del toggle — `_conta_barattolo` conta solo gli annunci
+  ATTIVI (venduti/rimossi non occupano posto: comprare qualcosa che
+  c'è dentro libera spazio da solo), oltre = 400 «Il barattolo è
+  pieno!...»; niente await tra COUNT e INSERT (il patto
+  anti-doppione). La risposta del POST porta anche `conteggio`
+  (attivi dopo l'operazione: il frontend aggiorna il livello col
+  numero del server). La fusione può superare i 20 in unione,
+  accettato: il limite blocca solo le aggiunte nuove. Nessun
+  conteggio pubblico: il venditore non vede chi né quanti (v1).
+  `esegui_fusione` migra in unione (UPDATE OR IGNORE + DELETE, il
+  pattern degli avvisi).
   Frontend: cerchietto `.jar-btn` sulla foto accanto al condividi —
   solo autenticati veri (mai DEMO/VETRINA) e mai sui propri annunci —
   da salvato si accende d'arancio e ondeggia (`jarPop`, spenta con
@@ -929,8 +939,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `myPreferiti` da `caricaPreferiti()` (in avvia() e a ogni apertura
   del Profilo: un salvato può essere stato venduto nel frattempo, e
   gli attivi entrano in `listings` via inCatalogo per openDetail);
-  PRIMO cassetto del Profilo «🫙 Nel tuo barattolo»
-  (`renderPreferiti`, conteggio nell'header, stato vuoto che
+  bottone gemello `#jarCta` «🫙 Metti nel barattolo / Già nel
+  barattolo» nel dettaglio, `.btn.ghost` FUORI dal recinto escrow
+  (il tratteggio è il sigillo del pagamento, e dentro c'è il trucco
+  `:first-of-type`), stesse guardie e stesso `togglePreferito` del
+  cerchietto (che aggiorna entrambi); guardia di cortesia client
+  (toast senza richiesta a barattolo pieno, la verità resta il 400).
+  IL BARATTOLO SI RIEMPIE (lug 2026): le icone (cerchietto del
+  dettaglio + header del cassetto `#preferitiJar`) sono l'SVG inline
+  di `jarSVG()` — vetro a stroke:currentColor, liquido = un rect
+  arancione (`--jar-liquido`, default `--sats`; crema sul cerchietto
+  `.salvato` per non sparire nel fondo) dentro la clipPath
+  dell'interno (id univoco per istanza) — con 5 livelli a scatti
+  `lv0-4` via translateY (0→0, 1-5→1, 6-10→2, 11-19→3, 20→4, da
+  `livelloBarattolo` sui soli attivi di `contaBarattolo`);
+  transizione morbida spenta con prefers-reduced-motion. Regia unica
+  `aggiornaBarattolo(n)`: porta ogni `.jar-ico` in pagina al livello
+  giusto e scrive «(N/20)» in `#preferitiConta` (N = attivi; usa il
+  `conteggio` del server quando c'è). PRIMO cassetto del Profilo
+  «🫙 Nel tuo barattolo» (`renderPreferiti`, stato vuoto che
   invita). Il 🫙 sulle card della vetrina è stato valutato e
   RIMANDATO: affollerebbe la card «Etichetta», in v1 vive solo nel
   dettaglio.
