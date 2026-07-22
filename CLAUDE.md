@@ -977,9 +977,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `barattolo_hint['pwa_installata']` (la vecchia chiave installa_pwa
   è inerte; NON hintAttivi(), che escluderebbe la vetrina — casa
   sua; su iOS appinstalled non esiste: chi installa da Safari
-  rivedrà il banner nel browser, accettato); Android =
-  beforeinstallprompt intercettato + prompt vero, iOS = foglietto
-  `#installSheet` coi passi di Safari. Login in standalone
+  rivedrà il banner nel browser, accettato); Android Chrome/Edge =
+  beforeinstallprompt intercettato + prompt vero, iOS e Firefox
+  Android (che beforeinstallprompt non ce l'ha) = foglietto
+  `#installSheet` coi passi scritti da apriInstallSheet() secondo il
+  browser (Safari: Condividi ⬆️; Firefox: menu ⋮ → Installa). Login
+  in standalone
   (dichiarato): anonimo = vetrina completa con gli inviti di sempre;
   Nostr bunker/nsec = strada maestra (tutto in pagina, niente popup;
   su iOS lo storage è separato da Safari: login da rifare una volta);
