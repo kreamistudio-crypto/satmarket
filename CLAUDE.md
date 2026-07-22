@@ -1041,7 +1041,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   versionCode) → `python genera_icone_apk.py` → `bubblewrap build`
   (le password del keystore le batte Andrea nel SUO terminale) —
   l'update cancella e riscrive proprio i file patchati, lo script va
-  SEMPRE rilanciato dopo. Verificato sulla 1.2 aprendo l'APK firmato
+  SEMPRE rilanciato dopo. ATTENZIONE: anche l'«apply» del web manifest
+  (la domanda che `bubblewrap build` fa quando vede il manifest del
+  sito cambiato) sovrascrive gli splash — se lo script è già stato
+  applicato rispondere `n`; se si risponde `y`, rilanciare lo script
+  PRIMA di rifare il build. Verificato sulla 1.2 aprendo l'APK firmato
   con aapt2: tre livelli, alpha vera, adattiva per tutte le densità;
   il medaglione residuo sul telefono è lo stile icone del launcher
   Oppo, non l'APK.
