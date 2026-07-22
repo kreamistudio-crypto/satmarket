@@ -698,7 +698,11 @@
   .toast{
     position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);
     background:var(--toast-bg);color:var(--toast-text);font-weight:700;font-size:13.5px;padding:12px 20px;
-    border-radius:16px;opacity:0;transition:.25s;z-index:60;pointer-events:none;white-space:nowrap;
+    border-radius:16px;opacity:0;transition:.25s;z-index:60;pointer-events:none;
+    /* i toast corti restano compatti su una riga (width:max-content),
+       i lunghi («Il barattolo è pieno!...») vanno a capo DENTRO lo
+       schermo invece di uscirne tagliati: niente nowrap secco */
+    width:max-content;max-width:min(92vw,420px);text-align:center;
     box-shadow:0 8px 20px rgba(0,0,0,.18);
   }
   .toast.show{opacity:1;transform:translateX(-50%)}
@@ -3876,7 +3880,8 @@ async function togglePreferito(id){
     const r = await fetch(`${API_BASE}/listings/${id}/preferito`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
     const d = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+    /* il 400 del barattolo pieno e' un messaggio lungo: tempo di leggerlo */
+    if (!r.ok) { toast(d.detail || 'Operazione non riuscita', 3200); return; }
     /* bottoni del dettaglio (cerchietto + CTA): sono di
        currentListing, si toccano solo se il toggle riguarda proprio
        lui (dal cassetto puo' arrivare l'id di un altro annuncio) */
