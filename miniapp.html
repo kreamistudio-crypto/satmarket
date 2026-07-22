@@ -1136,18 +1136,12 @@
     <button class="btn ghost" onclick="closeSheet()">Continua a guardare</button>
   </div>
 
-  <!-- ============ SHEET ISTRUZIONI INSTALLA (iOS) ============ -->
+  <!-- ============ SHEET ISTRUZIONI INSTALLA (iOS / Firefox Android) ============ -->
   <div class="sheet" id="installSheet">
     <div class="grab"></div>
     <h3>🫙 Porta Barattolo in tasca</h3>
-    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.7">
-      Su iPhone e iPad l'app si installa da Safari:<br>
-      1. Tocca <b>Condividi</b> ⬆️ nella barra in basso<br>
-      2. Scegli <b>«Aggiungi alla schermata Home»</b><br>
-      3. Conferma: il barattolo appare tra le tue app 🫙<br>
-      <span style="font-size:12px">Da altri browser il tasto può mancare:
-      in quel caso apri barattolo.store con Safari.</span>
-    </div>
+    <!-- I passi li scrive apriInstallSheet() secondo il browser -->
+    <div id="installPassi" style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.7"></div>
     <button class="btn ghost" onclick="closeSheet()">Chiudi</button>
   </div>
 
@@ -4438,6 +4432,13 @@ function rimandaInstalla(nodo){
 function pwaStandalone(){
   return matchMedia('(display-mode: standalone)').matches || !!navigator.standalone;
 }
+/* Firefox su Android non conosce beforeinstallprompt: si installa a
+   mano dal menu, quindi per lui il CTA e' il foglietto di istruzioni,
+   come su iPhone (su iOS Firefox si presenta come FxiOS: qui non
+   matcha, e va bene cosi' — la' i passi sono quelli di Safari). */
+function firefoxAndroid(){
+  return /Android/i.test(navigator.userAgent) && /Firefox\//.test(navigator.userAgent);
+}
 function bannerInstallaPwa(){
   const b = el('installBanner');
   if (!b) return;
@@ -4446,8 +4447,8 @@ function bannerInstallaPwa(){
   const mobile = ios || /Android/i.test(navigator.userAgent);
   if (tg?.initData || pwaStandalone() || !mobile || DEMO
       || installaRimandata || hintDismesso('pwa_installata')
-      || (!ios && !eventoInstalla)) return;  // su Android solo con l'evento vero in mano
-  const cta = ios
+      || (!ios && !firefoxAndroid() && !eventoInstalla)) return;  // su Chrome/Edge solo con l'evento vero in mano
+  const cta = (ios || firefoxAndroid())
     ? `<a onclick="apriInstallSheet()">Come si fa</a>`
     : `<a onclick="installaPwa()">Installa</a>`;
   b.style.display = 'block';
@@ -4464,6 +4465,17 @@ async function installaPwa(){
   try { await ev.prompt(); } catch(e){}   // rifiutare e' lecito: niente insistenza
 }
 function apriInstallSheet(){
+  el('installPassi').innerHTML = firefoxAndroid()
+    ? `Su Firefox l'app si installa dal menu:<br>
+       1. Tocca il menu <b>⋮</b> in alto a destra<br>
+       2. Scegli <b>«Installa»</b> (o <b>«Aggiungi a schermata Home»</b>)<br>
+       3. Conferma: il barattolo appare tra le tue app 🫙`
+    : `Su iPhone e iPad l'app si installa da Safari:<br>
+       1. Tocca <b>Condividi</b> ⬆️ nella barra in basso<br>
+       2. Scegli <b>«Aggiungi alla schermata Home»</b><br>
+       3. Conferma: il barattolo appare tra le tue app 🫙<br>
+       <span style="font-size:12px">Da altri browser il tasto può mancare:
+       in quel caso apri barattolo.store con Safari.</span>`;
   el('sheetBg').classList.add('open');
   el('installSheet').classList.add('open');
 }
