@@ -949,6 +949,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tornato SOLO il form di pubblicazione, e dopo pubblica/modifica si
   apre il dettaglio dell'annuncio appena salvato (l'id arriva da
   `{ok,id}`, ripiego su Esplora se non è in lista).
+  PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore; le
+  Fasi 2-3 solo con l'ok esplicito di Andrea): `manifest.json` (id/
+  start_url/scope "/", standalone, crema+arancio, 4 icone any+maskable
+  generate da `genera_icone.py` — barattolo-hero su tessera arancio,
+  maskable al 62% del lato per i ritagli Android; si rilancia quando
+  la grafica cambia) + `sw.js` PRUDENTE servito dalla RADICE, sempre
+  no-cache. Il SW: dispensa `statica-{VERSIONE}` con addAll atomico
+  (asset di casa + `/vendor/nostr.js` + `offline.html`), cache-first
+  runtime SOLO per i Google Fonts (`font-{VERSIONE}`), navigazioni
+  network-first con ripiego su `/offline.html` (mascotte dalla
+  dispensa) a rete morta — gli header anti-cache di `/` restano
+  sovrani. MAI toccate (nemmeno respondWith): `/api/*`, `/foto/*`
+  (cache HTTP propria), telegram.org (script che gestiscono l'auth),
+  metodi non-GET. Niente skipWaiting: la versione nuova aspetta la
+  visita successiva; REGOLA: chi cambia un file in PRECACHE alza
+  `VERSIONE`. VINCOLO DI FERRO: dentro la WebView di Telegram tutto
+  identico — il SW si registra solo con `!tg?.initData` (e protocollo
+  http: la DEMO da file:// non esplode); la WebView ha comunque
+  storage separato dal browser, niente unregister (sarebbe esso
+  stesso comportamento nuovo). Banner «🫙 Porta Barattolo in tasca»
+  (`#installBanner` sotto l'header di Esplora, `bannerInstallaPwa()`):
+  solo web MOBILE fuori da Telegram, mai se già standalone, mai in
+  DEMO, guardia PROPRIA su `barattolo_hint['installa_pwa']` (NON
+  hintAttivi(), che escluderebbe la vetrina — casa sua); Android =
+  beforeinstallprompt intercettato + prompt vero, iOS = foglietto
+  `#installSheet` coi passi di Safari. Login in standalone
+  (dichiarato): anonimo = vetrina completa con gli inviti di sempre;
+  Nostr bunker/nsec = strada maestra (tutto in pagina, niente popup;
+  su iOS lo storage è separato da Safari: login da rifare una volta);
+  widget Telegram = da verificare in produzione (Android eredita il
+  cookie dal profilo Chrome, il popup callback è fragile; su iOS
+  probabilmente resta solo Nostr). Piano di riserva dichiarato e NON
+  costruito: widget in modalità redirect (`data-auth-url` + endpoint
+  GET che riusa `verifica_login_widget`), solo se il collaudo vero lo
+  esige. Lighthouse: dalla v12 la categoria PWA non esiste più — il
+  criterio è «installabile senza avvisi» nel pannello Application.
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
@@ -1041,10 +1077,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
    `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg`,
-   `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png` e
-   `/assets/tappo.jpeg` (file singoli, rotte esplicite) e `/api/*`.
-   Non montare mai StaticFiles sull'intera directory (config e .git
-   diventerebbero pubblici — falla già successa e chiusa).
+   `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
+   `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
+   `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
+   `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
+   `/assets/apple-touch-icon.png`) — tutti file singoli, rotte
+   esplicite — e `/api/*`. Non montare mai StaticFiles sull'intera
+   directory (config e .git diventerebbero pubblici — falla già
+   successa e chiusa).
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
    released | dispute | return_pending | return_shipped | refund |
    refunded | annullato. Non inventarne di nuovi senza aggiornare
@@ -1218,7 +1258,17 @@ in vanilla JS, cassetto «🫙 Nel tuo barattolo» primo nel Profilo con
 gli stati onesti dei non più disponibili, vedi Architettura —
 collaudato in locale su mobile e desktop, chiaro e scuro, con
 venduto nel mezzo e DEMO/vetrina senza barattolino; il pinch va
-riprovato dal vivo su un telefono vero dentro Telegram).
+riprovato dal vivo su un telefono vero dentro Telegram); PWA
+installabile — Fase 1 (lug 2026: manifest con le icone del barattolo
+su tessera arancio, service worker prudente con pagina offline e
+mascotte, banner «installa» discreto solo su web mobile, dentro
+Telegram tutto identico per costruzione, vedi Architettura —
+collaudato in locale: dispensa completa senza /api, offline vero a
+server spento, guardie del banner esercitate una a una, demo file://
+pulita; in produzione vanno provate l'installazione vera su Android
+e iPhone e la verifica del widget Telegram in standalone, il cui
+esito decide l'eventuale piano di riserva redirect; Fasi 2 APK e 3
+Zapstore SOLO dopo l'ok di Andrea).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
