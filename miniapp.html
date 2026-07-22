@@ -308,7 +308,16 @@
   .jar-ico.lv4 .jar-liq{transform:translateY(0)}
   /* sul cerchietto salvato il fondo e' gia' arancio: liquido crema */
   .jar-btn.salvato{--jar-liquido:#FAF4E4}
-  @media (prefers-reduced-motion:reduce){.jar-ico .jar-liq{transition:none}}
+  /* La scossellina di festa quando un annuncio ENTRA nel barattolo:
+     riusa i keyframe scuoti dello spinner (-8/+8), due giri in 0.4s.
+     Solo all'aggiunta, mai alla rimozione; il cerchietto del dettaglio
+     ha gia' la SUA festa (jarPop sul bottone intero: due scosse
+     sovrapposte sarebbero troppe, quindi li' non si somma). */
+  .jar-ico.scossa{animation:scuoti .2s ease-in-out 2;transform-origin:center}
+  @media (prefers-reduced-motion:reduce){
+    .jar-ico .jar-liq{transition:none}
+    .jar-ico.scossa{animation:none}   /* il liquido scatta e basta */
+  }
   /* ---------- lightbox: la foto a tutto schermo ----------
      Un tocco sulla foto del dettaglio la apre intera (mai ritagliata)
      su fondo scuro: pinch e trascinamento su touch, rotella e doppio
@@ -3897,6 +3906,15 @@ async function togglePreferito(id){
         b.classList.add('salvato','pop'); b.title = 'Togli dal barattolo';
         setTimeout(()=>b.classList.remove('pop'), 600);
       }
+      /* piccola festa: la scossellina su ogni barattolino in pagina,
+         oltre al liquido che sale — tranne quello dentro il cerchietto
+         appena partito con jarPop (due scosse insieme sarebbero troppe).
+         Solo qui, nel ramo dell'aggiunta: alla rimozione niente festa. */
+      document.querySelectorAll('.jar-ico').forEach(s=>{
+        if (b && b.contains(s)) return;
+        s.classList.add('scossa');
+        setTimeout(()=>s.classList.remove('scossa'), 450);
+      });
       if (cta) { cta.textContent = '🫙 Già nel barattolo'; }
       tg?.HapticFeedback?.notificationOccurred?.('success');
       toast('Messo nel barattolo! 🫙');
