@@ -136,6 +136,27 @@
   /* Sulla vista Profilo nessuna voce di nav e' attiva: si accende
      il tappo, con l'anello arancione */
   .avatar-btn.attivo{box-shadow:0 0 0 2.5px var(--sats),0 2px 0 rgba(35,40,44,.25)}
+  /* La levetta del tema accanto al tappo: 🌙 col tema chiaro (tocca →
+     scuro), ☀️ col tema scuro (tocca → chiaro). E' solo una leva in
+     piu' su setTema(): stessa memoria e stesse pillole del Profilo
+     (che passano su Chiaro o Scuro; Auto resta solo la'). C'e' sempre,
+     anche in vetrina anonima: il tema e' di chi guarda. */
+  .tema-btn{flex:0 0 auto;width:34px;height:34px;margin-left:auto;
+    border:1.5px solid var(--line);border-radius:50%;background:var(--card);
+    cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+    font-size:15px;line-height:1;padding:0;box-shadow:0 2px 0 rgba(35,40,44,.12)}
+  .tema-btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(35,40,44,.12)}
+  /* quando il tappo e' acceso accanto, l'auto-margine ce l'ha la levetta */
+  .tema-btn + .avatar-btn{margin-left:8px}
+  /* in nav vive solo da desktop (come il tappo): su mobile la nav e'
+     la tab bar in basso e la levetta sta gia' in testata */
+  nav .tema-btn{display:none}
+  /* la giratina dell'icona al cambio: solo per chi gradisce il movimento */
+  @media (prefers-reduced-motion: no-preference){
+    .tema-btn .tema-ico{display:inline-block}
+    .tema-btn.gira .tema-ico{animation:temaGira .35s ease}
+    @keyframes temaGira{from{transform:rotate(-90deg);opacity:0}to{transform:rotate(0);opacity:1}}
+  }
   .searchbar{display:flex;gap:8px}
   /* il campo Cerca vive in un wrapper relativo: la lente a sinistra
      e il selettore valuta a destra gli stanno DENTRO */
@@ -713,6 +734,10 @@
     /* il tappo-Profilo in coda alla topbar (quello in testata sparisce
        col resto della .brand) */
     nav .avatar-btn.on{display:inline-flex;margin-left:10px;width:36px;height:36px}
+    /* la levetta del tema in topbar: niente auto-margine (ci pensa
+       gia' il margin-right del logo), spaziata come il tappo */
+    nav .tema-btn{display:inline-flex;margin-left:10px;width:32px;height:32px}
+    nav .tema-btn + .avatar-btn{margin-left:10px}
 
     /* la hero: titolo grande e mascotte fluttuante, solo qui */
     .hero{display:flex;align-items:center;gap:40px;padding:28px var(--pad) 0}
@@ -820,6 +845,7 @@
           <h1 class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></h1>
           <small>il mercatino in sats</small>
         </div>
+        <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
         <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
       </div>
       <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
@@ -1092,6 +1118,7 @@
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Affari</button>
+    <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
   </nav>
 
@@ -1884,6 +1911,23 @@ function applicaTema(){
   el('temaAuto')?.classList.toggle('active', temaScelto==='auto');
   el('temaChiaro')?.classList.toggle('active', temaScelto==='chiaro');
   el('temaScuro')?.classList.toggle('active', temaScelto==='scuro');
+  /* la levetta in testata mostra la destinazione: 🌙 quando il
+     tocco porta al buio, ☀️ quando riporta alla luce */
+  document.querySelectorAll('.tema-btn').forEach(b=>{
+    const ico = b.querySelector('.tema-ico');
+    if (ico) ico.textContent = scuro ? '☀️' : '🌙';
+    const dove = scuro ? 'Passa al tema chiaro' : 'Passa al tema scuro';
+    b.title = dove; b.setAttribute('aria-label', dove);
+  });
+}
+/* Un tocco sulla levetta alterna chiaro/scuro. Se la preferenza era
+   «auto», il primo tocco parte dal tema effettivo di quel momento;
+   Auto si riprende solo dalle pillole del Profilo. */
+function alternaTema(){
+  setTema(temaEffettivo()==='scuro' ? 'chiaro' : 'scuro');
+  document.querySelectorAll('.tema-btn').forEach(b=>{
+    b.classList.remove('gira'); void b.offsetWidth; b.classList.add('gira');
+  });
 }
 function setTema(v){
   if (v !== temaScelto) haptic();
