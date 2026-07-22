@@ -6502,4 +6502,54 @@ def asset_tappo():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+# --- PWA (lug 2026): Barattolo installabile dal browser -------------------
+# Stesso patto di /vendor e /assets: rotte esplicite per singolo file,
+# MAI StaticFiles su una directory (regola ferrea 3). Dentro la WebView
+# di Telegram tutto questo e' inerte: il manifest non attiva nulla da
+# solo e il service worker si registra SOLO fuori (guardia in pagina).
+
+
+@app.get("/manifest.json")
+def pwa_manifest():
+    """La carta d'identita' dell'app installabile: nome, icone, colori.
+    Cache di un'ora: un ritocco si propaga in giornata."""
+    return FileResponse("manifest.json",
+                        media_type="application/manifest+json",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
+# Le icone dell'app: generate da genera_icone.py (barattolo su tessera
+# arancio; le -maskable hanno il margine per i ritagli di Android).
+@app.get("/assets/icona-192.png")
+def icona_192():
+    return FileResponse("assets/icona-192.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/icona-512.png")
+def icona_512():
+    return FileResponse("assets/icona-512.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/icona-192-maskable.png")
+def icona_192_maskable():
+    return FileResponse("assets/icona-192-maskable.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/icona-512-maskable.png")
+def icona_512_maskable():
+    return FileResponse("assets/icona-512-maskable.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/apple-touch-icon.png")
+def icona_apple():
+    """L'icona per «Aggiungi alla schermata Home» di iOS (180px, fondo
+    pieno: iOS non gestisce la trasparenza e arrotonda da solo)."""
+    return FileResponse("assets/apple-touch-icon.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")
