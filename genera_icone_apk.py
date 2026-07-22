@@ -23,7 +23,11 @@
 #      (icone a tema di Android 13+, il launcher la tinge lui);
 #   4. riscrive res/mipmap-anydpi-v26/ic_launcher.xml come adaptive-icon
 #      vera a tre livelli (richiede compileSdk >= 33 per <monochrome>);
-#   5. rimette org.gradle.jvmargs=-Xmx1024m in gradle.properties
+#   5. allinea il fondo dello SPLASH allo stesso arancio campionato
+#      (twa-manifest.json backgroundColor + la copia in app/build.gradle):
+#      lo splash mostra la tessera quadrata dell'icona, e su un fondo
+#      diverso fa l'effetto francobollo — stesso campione, si fonde;
+#   6. rimette org.gradle.jvmargs=-Xmx1024m in gradle.properties
 #      (bubblewrap update lo toglie, e il VPS-di-casa di Andrea ne
 #      ha bisogno per non affogare il build).
 #
@@ -131,6 +135,26 @@ def patch_colors(res, esadecimale):
     percorso.write_text(testo, encoding="utf-8")
 
 
+def patch_splash(progetto, esadecimale):
+    # il fondo dello splash deve essere LO STESSO arancio campionato
+    # della tessera, o il quadrato dell'icona ci galleggia sopra come
+    # un francobollo. twa-manifest.json e' la fonte di verita' (l'update
+    # la ricopia in build.gradle), ma si patcha anche la copia: cosi'
+    # il colore giusto entra nel build anche senza un nuovo update.
+    ritocchi = [
+        (progetto / "twa-manifest.json",
+         r'("backgroundColor":\s*")#[0-9A-Fa-f]{6}(")'),
+        (progetto / "app" / "build.gradle",
+         r"(backgroundColor:\s*')#[0-9A-Fa-f]{6}(')"),
+    ]
+    for percorso, schema in ritocchi:
+        testo = percorso.read_text(encoding="utf-8")
+        nuovo = re.sub(schema, rf"\g<1>{esadecimale}\g<2>", testo)
+        if nuovo != testo:
+            percorso.write_text(nuovo, encoding="utf-8")
+            print(f"🌅 {percorso.name}: fondo splash = {esadecimale}")
+
+
 def patch_gradle(progetto):
     percorso = progetto / "gradle.properties"
     testo = percorso.read_text(encoding="utf-8")
@@ -164,6 +188,7 @@ def genera():
     (res / "mipmap-anydpi-v26" / "ic_launcher.xml").write_text(
         IC_LAUNCHER_XML, encoding="utf-8")
     patch_colors(res, esadecimale)
+    patch_splash(progetto, esadecimale)
     patch_gradle(progetto)
     print(f"🎨 sfondo iconBackground = {esadecimale} (campionato dagli angoli)")
     print("✅ Icona adattiva a due livelli pronta: ora `bubblewrap build`.")
