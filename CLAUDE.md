@@ -986,8 +986,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tornato SOLO il form di pubblicazione, e dopo pubblica/modifica si
   apre il dettaglio dell'annuncio appena salvato (l'id arriva da
   `{ok,id}`, ripiego su Esplora se non è in lista).
-  PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore; le
-  Fasi 2-3 solo con l'ok esplicito di Andrea): `manifest.json` (id/
+  PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore;
+  percorso ormai completo: Fase 2 = icona adattiva, Fase 3 =
+  «Distribuzione dell'APK», più sotto): `manifest.json` (id/
   start_url/scope "/", standalone, crema+arancio, 4 icone any+maskable
   generate da `genera_icone.py` — dal lug 2026 ritagliate da
   `assets/barattolo-icona-sorgente.jpeg` (2048px, barattolo già
@@ -1076,6 +1077,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con aapt2: tre livelli, alpha vera, adattiva per tutte le densità;
   il medaglione residuo sul telefono è lo stile icone del launcher
   Oppo, non l'APK.
+  Distribuzione dell'APK (lug 2026, Fase 3 del percorso PWA→APK→
+  Zapstore): due canali, la release GitHub è la FONTE UNICA di verità.
+  Repo pubblico `kreamistudio-crypto/barattolo-releases` (satmarket
+  resta privato: Obtainium e Zapstore esigono download anonimi) con
+  README per gli utenti e `zapstore.yaml` nella root; le release hanno
+  tag `vX.Y`, UN solo APK per release (`barattolo-X.Y.apk`, copia
+  rinominata di app-release-signed.apk) + `.sha256` + note scritte a
+  mano con l'hash. Obtainium segue il repo da solo; Zapstore ci pesca
+  l'APK. CLI `zsp` (github.com/zapstore/zsp, SOLO Linux/macOS → vive
+  in WSL Ubuntu, `~/bin/zsp`; il progetto corre, ricontrollare il
+  README a ogni uso) pubblica gli eventi NIP-82 (32267 app, 30063
+  release, 3063 asset) su `relay.zapstore.dev` e carica i file sul suo
+  Blossom. CHIAVE NOSTR DEDICATA E FREDDA (scelta deliberata: NON
+  quella della piattaforma, per separarne i destini): vive SOLO su
+  foglietti + Bitwarden («Barattolo release Nostr»), MAI su
+  VPS/disco/repo/chat; si usa in WSL con `read -rs SIGN_WITH &&
+  export SIGN_WITH` (prompt nascosto) e `unset SIGN_WITH` a fine rito;
+  perderla = gli utenti Zapstore reinstallano (GitHub non è toccato);
+  la npub sta in `zapstore.yaml` (campo `pubkey`, whitelisting del
+  relay). Il certificato Android è legato alla chiave con la prova
+  NIP-C1 (kind 30509, `zsp identity --link-key`): esige la CHIAVE
+  PRIVATA del keystore (verificato nel sorgente: firma una prova di
+  possesso) e zsp non legge i JKS → rito del p12 TEMPORANEO: `keytool
+  -importkeystore` (il keytool è nel JDK di Bubblewrap) →
+  `barattolo.p12` accanto al keystore → link-key → `Remove-Item`
+  SUBITO. La prova SCADE DOPO UN ANNO: rito da ripetere (ma è
+  facoltativo: scaduta, le release escono lo stesso). LITURGIA
+  release completa, dopo il `bubblewrap build` di sempre: 1) sha256 e
+  `gh release create vX.Y` su barattolo-releases con APK + .sha256;
+  2) in WSL `SIGN_WITH` col prompt nascosto → `zsp publish` → unset.
+  Prima GitHub, poi Zapstore, sempre. Gli script del rito
+  (`genera_chiave_release.py`, `profilo_release.py`) vivono in
+  `..\..\barattolo-twa` col keystore, fuori dal repo; nessuno dei due
+  scrive segreti su disco.
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
@@ -1358,8 +1393,14 @@ collaudato in locale: dispensa completa senza /api, offline vero a
 server spento, guardie del banner esercitate una a una, demo file://
 pulita; in produzione vanno provate l'installazione vera su Android
 e iPhone e la verifica del widget Telegram in standalone, il cui
-esito decide l'eventuale piano di riserva redirect; Fasi 2 APK e 3
-Zapstore SOLO dopo l'ok di Andrea).
+esito decide l'eventuale piano di riserva redirect); APK distribuito
+sui due canali pubblici (lug 2026, Fase 3: release v1.3 su
+github.com/kreamistudio-crypto/barattolo-releases per Obtainium e
+download diretto, e su Zapstore con chiave Nostr dedicata fredda e
+certificato legato via NIP-C1 — eventi verificati sul relay, hash e
+certificato coincidenti; vedi «Distribuzione dell'APK» — restano da
+fare: screenshot nella scheda Zapstore, profilo kind-0 dell'identità
+release, e la prova d'installazione dallo store sul telefono).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
