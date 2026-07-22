@@ -5237,6 +5237,19 @@ osservaSentinella('negozioSentinella', caricaAltriNegozio);
 osservaSentinella('mieiSentinella', caricaAltriMiei);
 
 avvia();
+
+/* PWA: il service worker si registra SOLO fuori da Telegram — dentro
+   la Mini App nulla deve cambiare, nemmeno di un byte (vincolo di
+   ferro del cantiere PWA). La guardia e' lo stesso segnale di avvia():
+   tg.initData pieno = siamo nella WebView vera. Il controllo sul
+   protocollo tiene in piedi la DEMO aperta da file://, dove register
+   non esiste o rigetta. */
+if ('serviceWorker' in navigator && !tg?.initData
+    && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () =>
+    navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+
 /* Invio nel campo Cerca = submit del form .searchbar: niente doppio
    ascoltatore keydown, o la ricerca partirebbe due volte */
 </script>

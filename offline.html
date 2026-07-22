@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barattolo — sei senza rete</title>
+<meta name="theme-color" content="#FAF4E4">
+<style>
+  /* Pagina di cortesia servita dal service worker a rete morta.
+     Autonoma per scelta: font di sistema (i Google Fonts offline
+     potrebbero mancare), la mascotte arriva dalla dispensa del SW. */
+  body{margin:0;min-height:100vh;display:flex;align-items:center;
+       justify-content:center;background:#FAF4E4;color:#23282C;
+       font-family:system-ui,-apple-system,'Segoe UI',sans-serif;
+       text-align:center;padding:24px;box-sizing:border-box}
+  img{width:160px;height:160px;border-radius:24px;display:block;
+      margin:0 auto 18px}
+  h1{font-size:1.4rem;margin:0 0 8px}
+  p{margin:0 0 22px;opacity:.75}
+  button{font:inherit;font-weight:700;color:#fff;background:#F7931A;
+         border:none;border-radius:999px;padding:12px 28px;
+         box-shadow:0 3px 0 #c9760f;cursor:pointer}
+  button:active{transform:translateY(3px);box-shadow:none}
+  @media (prefers-reduced-motion: no-preference){
+    img{animation:fluttua 3s ease-in-out infinite}
+    @keyframes fluttua{50%{transform:translateY(-8px)}}
+  }
+  @media (prefers-color-scheme: dark){
+    body{background:#211A10;color:#FAF4E4}
+  }
+</style>
+</head>
+<body>
+<main>
+  <img src="/assets/mascotte.jpeg" alt="La mascotte di Barattolo"
+       onerror="this.style.display='none'">
+  <h1>🫙 Sei senza rete</h1>
+  <p>Il barattolo ti aspetta: appena torni online, il mercatino è lì.</p>
+  <button onclick="location.reload()">Riprova</button>
+</main>
+</body>
+</html>

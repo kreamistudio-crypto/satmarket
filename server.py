@@ -6518,6 +6518,23 @@ def pwa_manifest():
                         headers={"Cache-Control": "public, max-age=3600"})
 
 
+@app.get("/sw.js")
+def pwa_service_worker():
+    """Il service worker, servito dalla RADICE (cosi' il suo raggio
+    d'azione copre tutta l'origine). SEMPRE fresco: e' il file che
+    governa le cache degli altri, ogni deploy deve vederlo subito."""
+    return FileResponse("sw.js", media_type="application/javascript",
+                        headers=HEADER_NO_CACHE)
+
+
+@app.get("/offline.html")
+def pwa_offline():
+    """La pagina di cortesia a rete morta: la scarica solo il service
+    worker quando fa la dispensa, la freschezza non costa nulla."""
+    return FileResponse("offline.html", media_type="text/html",
+                        headers=HEADER_NO_CACHE)
+
+
 # Le icone dell'app: generate da genera_icone.py (barattolo su tessera
 # arancio; le -maskable hanno il margine per i ritagli di Android).
 @app.get("/assets/icona-192.png")
