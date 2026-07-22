@@ -1010,6 +1010,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   GET che riusa `verifica_login_widget`), solo se il collaudo vero lo
   esige. Lighthouse: dalla v12 la categoria PWA non esiste più — il
   criterio è «installabile senza avvisi» nel pannello Application.
+  Icona adattiva dell'APK (lug 2026, TWA): Bubblewrap (1.24.1) NON sa
+  fare i due livelli — il suo ic_launcher.xml mette l'INTERA maskable
+  nel background su bianco, foreground trasparente: niente parallasse
+  e ai bordi il confine tra arancioni; il monochromeIconUrl del
+  twa-manifest serve solo a notifiche e shortcut. `genera_icone_apk.py`
+  patcha il progetto TWA generato (fuori dal repo, `..\..\barattolo-twa`,
+  coi keystore: MAI portarlo dentro): campiona l'arancio con LA STESSA
+  ricetta importata da genera_icone.py → `iconBackground` in colors.xml
+  (#F78F19: sfondo e barattolo dalla stessa foto, il confine non può
+  esistere); scontorna il barattolo (alpha a rampa dalla distanza dal
+  fondo, fori interni richiusi col floodfill dall'esterno a 1/4 di
+  risoluzione) → ic_launcher_foreground.png nei 5 mipmap (canvas
+  108dp, barattolo ~51%: la presenza della maskable riportata al
+  cerchio sicuro 66dp); silhouette bianca con la stessa alpha →
+  ic_launcher_monochrome.png (temi Android 13+, esige compileSdk ≥33);
+  riscrive ic_launcher.xml a tre livelli e rimette da solo -Xmx1024m
+  in gradle.properties. LITURGIA di ogni release APK, sempre in
+  quest'ordine: `bubblewrap update --appVersionName=X.Y` (alza lui il
+  versionCode) → `python genera_icone_apk.py` → `bubblewrap build`
+  (le password del keystore le batte Andrea nel SUO terminale) —
+  l'update cancella e riscrive proprio i file patchati, lo script va
+  SEMPRE rilanciato dopo. Verificato sulla 1.2 aprendo l'APK firmato
+  con aapt2: tre livelli, alpha vera, adattiva per tutte le densità;
+  il medaglione residuo sul telefono è lo stile icone del launcher
+  Oppo, non l'APK.
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
