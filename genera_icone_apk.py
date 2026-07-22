@@ -27,7 +27,15 @@
 #      (twa-manifest.json backgroundColor + la copia in app/build.gradle):
 #      lo splash mostra la tessera quadrata dell'icona, e su un fondo
 #      diverso fa l'effetto francobollo — stesso campione, si fonde;
-#   6. rimette org.gradle.jvmargs=-Xmx1024m in gradle.properties
+#   6. ridisegna drawable-*/splash.png: Bubblewrap ci mette la tessera
+#      intera a 300dp (3/4 dello schermo, un macigno) e la disegna
+#      centrata a dimensione intrinseca — non esiste NESSUNA leva di
+#      scala nel twa-manifest (splashScreenFadeOutDuration e' solo la
+#      dissolvenza), l'unica e' la misura in pixel dei PNG. Qui:
+#      barattolo scontornato su fondo trasparente a SPLASH_DP (160dp
+#      ~= 40% del lato corto di un telefono da 360-411dp), l'arancio
+#      sotto ce lo mette gia' backgroundColor;
+#   7. rimette org.gradle.jvmargs=-Xmx1024m in gradle.properties
 #      (bubblewrap update lo toglie, e il VPS-di-casa di Andrea ne
 #      ha bisogno per non affogare il build).
 #
@@ -54,6 +62,12 @@ SCALA_FOREGROUND = 0.67 * (66 / 108) / 0.80          # ~0.512
 
 MIPMAP = [("mdpi", 108), ("hdpi", 162), ("xhdpi", 216),
           ("xxhdpi", 324), ("xxxhdpi", 432)]
+
+# lo splash e' disegnato centrato alla dimensione intrinseca del PNG
+# (px / densita' = dp): 160dp ~= 40% del lato corto dei telefoni comuni
+SPLASH_DP = 160
+SPLASH_DENSITA = [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0),
+                  ("xxhdpi", 3.0), ("xxxhdpi", 4.0)]
 
 IC_LAUNCHER_XML = """<!--
     Riscritto da genera_icone_apk.py (repo satmarket): icona adattiva
@@ -135,6 +149,22 @@ def patch_colors(res, esadecimale):
     percorso.write_text(testo, encoding="utf-8")
 
 
+def genera_splash(res, barattolo):
+    # il barattolo nudo su trasparente: l'arancio sotto e' backgroundColor,
+    # che e' lo stesso campione — la sagoma affiora dal fondo senza bordi
+    for dpi, scala in SPLASH_DENSITA:
+        px = round(SPLASH_DP * scala)
+        rapporto = px / max(barattolo.size)
+        misure = (round(barattolo.width * rapporto),
+                  round(barattolo.height * rapporto))
+        cartella = res / f"drawable-{dpi}"
+        cartella.mkdir(exist_ok=True)
+        barattolo.resize(misure, Image.LANCZOS).save(
+            cartella / "splash.png", "PNG", optimize=True)
+        print(f"🌄 drawable-{dpi}: splash {misure[0]}x{misure[1]}px "
+              f"({SPLASH_DP}dp)")
+
+
 def patch_splash(progetto, esadecimale):
     # il fondo dello splash deve essere LO STESSO arancio campionato
     # della tessera, o il quadrato dell'icona ci galleggia sopra come
@@ -189,6 +219,7 @@ def genera():
         IC_LAUNCHER_XML, encoding="utf-8")
     patch_colors(res, esadecimale)
     patch_splash(progetto, esadecimale)
+    genera_splash(res, barattolo)
     patch_gradle(progetto)
     print(f"🎨 sfondo iconBackground = {esadecimale} (campionato dagli angoli)")
     print("✅ Icona adattiva a due livelli pronta: ora `bubblewrap build`.")
