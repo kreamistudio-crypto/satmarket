@@ -4409,23 +4409,32 @@ async function esciWeb(){
 
 /* ---------- PWA: banner «installa Barattolo» ---------- */
 /* Solo web MOBILE fuori da Telegram, mai se l'app e' gia' installata,
-   mai in DEMO (invitare a installare una demo sarebbe una bugia); il
-   «Non ora» vale per sempre sul dispositivo (il solito barattolo_hint,
-   con guardia PROPRIA: hintAttivi() escluderebbe la vetrina, che
-   invece e' proprio la casa di questo banner).
+   mai in DEMO (invitare a installare una demo sarebbe una bugia). Il
+   «Non ora» e' un RINVIO, non un addio: memoria solo in pagina
+   (installaRimandata), alla visita successiva il banner torna —
+   finche' l'app non e' installata davvero. Il per-sempre esiste solo
+   via appinstalled (chiave pwa_installata nel solito barattolo_hint;
+   la vecchia chiave installa_pwa non si legge piu': chi rimando'
+   allora deve rivedere l'invito).
    Android/Chromium: si intercetta beforeinstallprompt e il bottone
    chiama il prompt vero. iOS: l'evento non esiste, il bottone apre il
    foglietto coi passi di Safari. */
 let eventoInstalla = null;
+let installaRimandata = false;   // «Non ora» vale per QUESTA pagina, non per sempre
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();            // niente barretta di Chrome: decidiamo noi quando
   eventoInstalla = e;
   bannerInstallaPwa();           // l'evento puo' arrivare dopo avvia()
 });
 window.addEventListener('appinstalled', () => {
-  dismettiHint('installa_pwa');
+  dismettiHint('pwa_installata');   // installata: ora si' che sparisce per sempre
   const b = el('installBanner'); if (b) b.style.display = 'none';
 });
+function rimandaInstalla(nodo){
+  installaRimandata = true;
+  nodo?.closest('.hintline')?.remove();
+  el('installBanner').style.display = 'none';
+}
 function pwaStandalone(){
   return matchMedia('(display-mode: standalone)').matches || !!navigator.standalone;
 }
@@ -4436,7 +4445,7 @@ function bannerInstallaPwa(){
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS si traveste da Mac
   const mobile = ios || /Android/i.test(navigator.userAgent);
   if (tg?.initData || pwaStandalone() || !mobile || DEMO
-      || hintDismesso('installa_pwa')
+      || installaRimandata || hintDismesso('pwa_installata')
       || (!ios && !eventoInstalla)) return;  // su Android solo con l'evento vero in mano
   const cta = ios
     ? `<a onclick="apriInstallSheet()">Come si fa</a>`
@@ -4445,7 +4454,7 @@ function bannerInstallaPwa(){
   b.innerHTML = `<div class="hintline hint-installa">🫙 <span><b>Porta Barattolo
     in tasca</b> — installalo come app, anche fuori da Telegram</span>
     <span class="hl-az">${cta}
-      <a onclick="dismettiHint('installa_pwa', this)" style="color:var(--muted)">Non ora</a>
+      <a onclick="rimandaInstalla(this)" style="color:var(--muted)">Non ora</a>
     </span></div>`;
 }
 async function installaPwa(){
