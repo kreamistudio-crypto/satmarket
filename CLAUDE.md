@@ -958,9 +958,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   giusto e scrive «(N/20)» in `#preferitiConta` (N = attivi; usa il
   `conteggio` del server quando c'è). PRIMO cassetto del Profilo
   «🫙 Nel tuo barattolo» (`renderPreferiti`, stato vuoto che
-  invita). Il 🫙 sulle card della vetrina è stato valutato e
-  RIMANDATO: affollerebbe la card «Etichetta», in v1 vive solo nel
-  dettaglio.
+  invita). Il 🫙 sulle card della vetrina, prima rimandato, dal
+  lug 2026 c'è (stile cuoricino Vinted): cerchietto `.card-jar` in
+  alto a destra sulla foto in `cardHTML` (quindi vetrina, negozio e
+  risultati) — carta semi-trasparente da salvare, arancio pieno da
+  salvato, colori fissi come tutto ciò che vive sulla foto; il
+  cartellino prezzo sta in basso a sinistra, non si pestano. Il
+  livello del barattolino in card è PER-ANNUNCIO (lv0 vuoto / lv4
+  pieno: dice «questo l'hai già messo via»), NON quello globale:
+  `aggiornaBarattolo` salta i `.jar-ico` dentro `.card-jar`, la
+  regia per-card è `aggiornaJarCards()` (chiamata dopo
+  caricaPreferiti — le card possono nascere prima del Set — e dopo
+  ogni toggle: card, dettaglio e cassetto mai divergenti). Tocco con
+  stopPropagation (non apre il dettaglio), scossellina all'aggiunta
+  (il loop esistente copre anche le card), stesse guardie del
+  cerchietto (mai DEMO/VETRINA/annunci propri; per gli anonimi
+  NIENTE icona, coerente col dettaglio dove il cerchietto in VETRINA
+  non esiste), tap target ~46px via `::after` sul cerchietto da 34.
+  RIFLESSO DEL VETRO (lug 2026): jarSVG ha due pennellate celesti
+  `.jar-lux` sul fianco sinistro, colore dal token `--jar-riflesso`
+  (#BFE3F0, di sera più tenue #7FA3B5) — ovunque il barattolino
+  compare (card, cerchietto del dettaglio, cassetto); dettaglio, non
+  protagonista: non copre la lettura del livello.
   Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
   danno ai venditori appena arrivati); dal lug 2026 le accende il
   sistema di feedback (vedi server.py).
