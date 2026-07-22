@@ -293,6 +293,22 @@
     100%{transform:scale(1) rotate(0)}
   }
   @media (prefers-reduced-motion:reduce){.jar-btn.pop{animation:none}}
+  /* Il barattolo che si riempie: SVG inline (jarSVG) col vetro a
+     stroke:currentColor e il liquido arancione — un rect dentro la
+     clip a forma di interno — che sale a scatti di livello (lv0-4,
+     dal conteggio dei preferiti ATTIVI su 20). La transizione rende
+     morbida la salita; senza motion il livello scatta e basta. */
+  .jar-ico{display:inline-block;vertical-align:middle}
+  .jar-ico .jar-liq{fill:var(--jar-liquido,var(--sats));
+    transform:translateY(100%);transform-box:fill-box;
+    transition:transform .5s ease}
+  .jar-ico.lv1 .jar-liq{transform:translateY(75%)}
+  .jar-ico.lv2 .jar-liq{transform:translateY(50%)}
+  .jar-ico.lv3 .jar-liq{transform:translateY(25%)}
+  .jar-ico.lv4 .jar-liq{transform:translateY(0)}
+  /* sul cerchietto salvato il fondo e' gia' arancio: liquido crema */
+  .jar-btn.salvato{--jar-liquido:#FAF4E4}
+  @media (prefers-reduced-motion:reduce){.jar-ico .jar-liq{transition:none}}
   /* ---------- lightbox: la foto a tutto schermo ----------
      Un tocco sulla foto del dettaglio la apre intera (mai ritagliata)
      su fondo scuro: pinch e trascinamento su touch, rotella e doppio
@@ -993,7 +1009,7 @@
            col barattolino. In demo e vetrina non esiste (il patto
            del wallet). -->
       <div class="acc" id="accPreferiti">
-        <button class="acc-h" onclick="toggleAcc('accPreferiti')"><span class="em">🫙</span>Nel tuo barattolo <span class="conta" id="preferitiConta"></span><span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accPreferiti')"><span class="em" id="preferitiJar">🫙</span>Nel tuo barattolo <span class="conta" id="preferitiConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="preferitiBlocco"></div></div>
       </div>
 
@@ -2005,9 +2021,14 @@ function openDetail(id){
   const condividi = DEMO ? '' : `<button class="share-btn" onclick="condividiAnnuncio()" title="Condividi questo annuncio" aria-label="Condividi">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/></svg></button>`;
   /* Il barattolino dei preferiti: solo per chi e' dentro davvero
-     (mai in DEMO/VETRINA) e mai sui propri annunci */
+     (mai in DEMO/VETRINA) e mai sui propri annunci. L'icona e' il
+     barattolo che si riempie col conteggio degli attivi. */
   const barattolino = (DEMO || VETRINA || mio) ? ''
-    : `<button class="share-btn jar-btn${preferiti.has(l.id)?' salvato':''}" id="jarBtn" onclick="togglePreferito(${l.id})" title="${preferiti.has(l.id)?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">🫙</button>`;
+    : `<button class="share-btn jar-btn${preferiti.has(l.id)?' salvato':''}" id="jarBtn" onclick="togglePreferito(${l.id})" title="${preferiti.has(l.id)?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">${jarSVG(livelloBarattolo(contaBarattolo()), 20)}</button>`;
+  /* Il gemello testuale del cerchietto, sotto il recinto escrow:
+     stesso endpoint, stesso Set, mai divergenti */
+  const jarCta = (DEMO || VETRINA || mio) ? ''
+    : `<button class="btn ghost" id="jarCta" onclick="togglePreferito(${l.id})">${preferiti.has(l.id)?'🫙 Già nel barattolo':'🫙 Metti nel barattolo'}</button>`;
   const foto = (l.photos && l.photos.length)
     ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
        ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${indietro}${barattolino}${condividi}</div>`
@@ -2059,6 +2080,7 @@ function openDetail(id){
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
              <div class="escrow-note" style="margin-top:10px">Commissione 1% · solo a vendita conclusa</div>
            </div>`}
+      ${jarCta}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
       ${contatto}
@@ -3788,6 +3810,44 @@ function renderMyListings(){
    barattolo da ogni dispositivo); qui un Set degli id per accendere
    il bottone al volo. In DEMO e VETRINA la funzione non esiste. */
 let preferiti = new Set(), myPreferiti = [];
+const MAX_PREFERITI = 20;   /* il gemello della costante in server.py */
+
+/* Quanti nel barattolo DAVVERO: contano solo gli attivi, i venduti e
+   i rimossi non occupano posto (comprare libera spazio da solo) */
+const contaBarattolo = () => myPreferiti.filter(l=>l.stato==='attivo').length;
+const livelloBarattolo = n =>
+  n<=0 ? 0 : n>=MAX_PREFERITI ? 4 : n<=5 ? 1 : n<=10 ? 2 : 3;
+
+/* L'icona del barattolo che si riempie: vetro a currentColor,
+   liquido nella clip dell'interno (id univoco per istanza: piu'
+   barattoli in pagina non si rubano la clip). Il livello e' la
+   classe lv0-4, la regia e' aggiornaBarattolo(). */
+let jarClipN = 0;
+function jarSVG(livello, misura){
+  const clip = 'jarClip' + (++jarClipN);
+  return `<svg class="jar-ico lv${livello}" width="${misura||18}" height="${misura||18}" viewBox="0 0 24 24" aria-hidden="true">
+    <defs><clipPath id="${clip}"><rect x="7" y="6.5" width="10" height="14" rx="3"/></clipPath></defs>
+    <g clip-path="url(#${clip})"><rect class="jar-liq" x="7" y="6.5" width="10" height="14"/></g>
+    <rect x="5.5" y="5" width="13" height="16.5" rx="4.5" fill="none" stroke="currentColor" stroke-width="2"/>
+    <rect x="8" y="2" width="8" height="3" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/>
+  </svg>`;
+}
+
+/* La regia unica del riempimento: porta ogni barattolo in pagina al
+   livello giusto e aggiorna il conteggio (N/20) nell'header del
+   cassetto. n = conteggio del server quando c'e' (la verita'),
+   altrimenti si conta in casa. */
+function aggiornaBarattolo(n){
+  if (typeof n !== 'number') n = contaBarattolo();
+  const lv = 'lv' + livelloBarattolo(n);
+  document.querySelectorAll('.jar-ico').forEach(s=>{
+    s.classList.remove('lv0','lv1','lv2','lv3','lv4');
+    s.classList.add(lv);
+  });
+  const conta = el('preferitiConta');
+  if (conta) conta.textContent =
+    myPreferiti.length ? `(${n}/${MAX_PREFERITI})` : '';
+}
 
 async function caricaPreferiti(){
   if (DEMO || VETRINA) return;
@@ -3800,20 +3860,29 @@ async function caricaPreferiti(){
     /* gli attivi entrano nel catalogo: openDetail li trova anche
        oltre le pagine caricate della vetrina */
     inCatalogo(myPreferiti.filter(l=>l.stato==='attivo'));
+    aggiornaBarattolo();
   } catch(e) {}
 }
 
 async function togglePreferito(id){
   haptic();
+  /* guardia di cortesia: da pieno non si parte nemmeno (la verita'
+     resta la guardia del server, che copre gli altri dispositivi) */
+  if (!preferiti.has(id) && contaBarattolo() >= MAX_PREFERITI) {
+    toast("Il barattolo è pieno! Svuotalo un po' o compra qualcosa che c'è dentro 🫙", 3200);
+    return;
+  }
   try {
     const r = await fetch(`${API_BASE}/listings/${id}/preferito`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
-    /* il bottone sulla foto e' di currentListing: si tocca solo se
-       il toggle riguarda proprio lui (dal cassetto puo' arrivare
-       l'id di un altro annuncio) */
-    const b = (currentListing && currentListing.id === id) ? el('jarBtn') : null;
+    /* bottoni del dettaglio (cerchietto + CTA): sono di
+       currentListing, si toccano solo se il toggle riguarda proprio
+       lui (dal cassetto puo' arrivare l'id di un altro annuncio) */
+    const suo = currentListing && currentListing.id === id;
+    const b = suo ? el('jarBtn') : null;
+    const cta = suo ? el('jarCta') : null;
     if (d.salvato) {
       preferiti.add(id);
       const l = listings.find(x=>x.id===id)
@@ -3823,15 +3892,18 @@ async function togglePreferito(id){
         b.classList.add('salvato','pop'); b.title = 'Togli dal barattolo';
         setTimeout(()=>b.classList.remove('pop'), 600);
       }
+      if (cta) { cta.textContent = '🫙 Già nel barattolo'; }
       tg?.HapticFeedback?.notificationOccurred?.('success');
       toast('Messo nel barattolo! 🫙');
     } else {
       preferiti.delete(id);
       myPreferiti = myPreferiti.filter(x=>x.id!==id);
       if (b) { b.classList.remove('salvato'); b.title = 'Metti nel barattolo'; }
+      if (cta) { cta.textContent = '🫙 Metti nel barattolo'; }
       toast('Tolto dal barattolo');
     }
     renderPreferiti();
+    aggiornaBarattolo(d.conteggio);
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
@@ -3848,8 +3920,11 @@ function renderPreferiti(){
     box.innerHTML = ''; return;
   }
   if (sez) sez.style.display = '';
-  const conta = el('preferitiConta');
-  if (conta) conta.textContent = myPreferiti.length ? `(${myPreferiti.length})` : '';
+  /* l'emoji dell'header diventa il barattolo che si riempie (una
+     volta sola); conteggio e livello li mette aggiornaBarattolo */
+  const jarEm = el('preferitiJar');
+  if (jarEm && !jarEm.querySelector('svg')) jarEm.innerHTML = jarSVG(0, 20);
+  aggiornaBarattolo();
   if (!myPreferiti.length) {
     box.innerHTML = `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">
       Il tuo barattolo è vuoto: metti da parte gli annunci che ti piacciono col 🫙 sulla loro foto.</div>`;

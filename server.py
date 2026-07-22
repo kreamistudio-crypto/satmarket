@@ -2664,13 +2664,23 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
 # toglie. Il toggle vive sul server: lo stesso barattolo da ogni
 # dispositivo. Privato per natura: nessun conteggio pubblico, il
 # venditore non vede chi ne' quanti (v1).
+MAX_PREFERITI = 20   # il barattolo e' piccolo apposta: contano solo gli attivi
+
+def _conta_barattolo(con, tg_id):
+    """Quanti annunci ATTIVI nel barattolo: i venduti/rimossi non
+    occupano posto (comprare qualcosa che c'e' dentro libera spazio)."""
+    return con.execute(
+        "SELECT COUNT(*) FROM preferiti p "
+        "JOIN annunci a ON a.id = p.annuncio_id AND a.stato='attivo' "
+        "WHERE p.tg_id=?", (tg_id,)).fetchone()[0]
+
 @app.post("/api/listings/{annuncio_id}/preferito")
 def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
                      barattolo_sessione: str = Cookie("")):
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     # Prima si prova a togliere: cosi' il barattolo si svuota anche
-    # se nel frattempo l'annuncio e' sparito del tutto.
+    # se nel frattempo l'annuncio e' sparito del tutto (e anche da pieno).
     tolto = con.execute(
         "DELETE FROM preferiti WHERE tg_id=? AND annuncio_id=?",
         (user["id"], annuncio_id)).rowcount
@@ -2680,12 +2690,21 @@ def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
         if not a:
             con.close()
             raise HTTPException(404, "Annuncio non trovato")
+        # Limite: niente await tra COUNT e INSERT, nel server
+        # mono-processo il blocco e' atomico (il patto anti-doppione).
+        if _conta_barattolo(con, user["id"]) >= MAX_PREFERITI:
+            con.close()
+            raise HTTPException(400, "Il barattolo è pieno! Svuotalo un po' "
+                                     "o compra qualcosa che c'è dentro 🫙")
         con.execute("INSERT INTO preferiti(tg_id, annuncio_id, creato) "
                     "VALUES(?,?,?)",
                     (user["id"], annuncio_id, int(time.time())))
     con.commit()
+    # Il conteggio fresco viaggia nella risposta: il frontend aggiorna
+    # il livello di riempimento col numero del server, non con una stima.
+    conteggio = _conta_barattolo(con, user["id"])
     con.close()
-    return {"ok": True, "salvato": not tolto}
+    return {"ok": True, "salvato": not tolto, "conteggio": conteggio}
 
 
 @app.get("/api/me/preferiti")
