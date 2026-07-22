@@ -10,6 +10,14 @@ import_tmp/
 __pycache__/
 *.pyc
 
+# Chiavi di firma Android e pacchetti APK — la chiave e' SACRA, mai su git
+# (il progetto TWA vive comunque FUORI dal repo, in Documents\barattolo-twa:
+# questa e' solo la cintura di sicurezza in piu')
+*.keystore
+*.jks
+*.apk
+*.aab
+
 # Varie
 .DS_Store
 Thumbs.db

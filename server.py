@@ -6569,4 +6569,19 @@ def icona_apple():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+# --- TWA (lug 2026): l'APK Android che incarta il sito --------------------
+@app.get("/.well-known/assetlinks.json")
+def twa_assetlinks():
+    """La stretta di mano tra il dominio e l'APK (Fase 2 della PWA):
+    dice ad Android che l'app firmata con la NOSTRA chiave puo' aprire
+    barattolo.store a tutto schermo, senza barra del browser. Dentro
+    c'e' solo l'impronta PUBBLICA del certificato di firma (la chiave
+    vera vive fuori dal repo, coi suoi backup). Stesso patto di sempre:
+    rotta esplicita per file singolo (regola ferrea 3). Cache di
+    un'ora come il manifest: un cambio d'impronta si propaga presto."""
+    return FileResponse(".well-known/assetlinks.json",
+                        media_type="application/json",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
 app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")
