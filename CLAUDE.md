@@ -831,8 +831,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (MQL tenuta in costante: certi WebKit la buttavano col GC). Snippet
   anti-flash inline nell'head prima del paint; `applicaTema()` aggiorna
   anche `<meta name="theme-color">` e `tg.setHeaderColor/
-  setBackgroundColor`. In VETRINA il toggle non si raggiunge (il
-  Profilo lì apre l'invito al bot): vale «auto», accettato.
+  setBackgroundColor`. Levetta in testata (lug 2026): cerchietto
+  `.tema-btn` accanto al tappo (testata mobile + topbar desktop, il
+  pattern delle due istanze del tappo; nella tab bar mobile è
+  nascosto) — 🌙 col tema chiaro, ☀️ con lo scuro, un tocco alterna
+  via `alternaTema()` = una riga su `setTema(temaEffettivo()…)`:
+  stessa memoria e stesse pillole del Profilo, che passano su
+  Chiaro/Scuro (Auto resta selezionabile solo dal Profilo; da Auto
+  il primo tocco parte dal tema effettivo del momento). Icona e
+  tooltip li aggiorna `applicaTema()` (mai divergenti dalle
+  pillole); giratina dell'icona solo con prefers-reduced-motion
+  assente. C'è SEMPRE, anche in VETRINA anonima (il tema è di chi
+  guarda): il vecchio «in vetrina vale auto e basta» non è più vero.
   Scudo anti-XSS: helper `esc()` (vicino a `fmt`) — OGNI testo scritto
   da un utente che entra in un template `innerHTML` DEVE passarci
   (titoli, descrizioni, zone, nomi, corrieri, tracking…); username e
