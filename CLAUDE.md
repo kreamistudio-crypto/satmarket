@@ -971,8 +971,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   stesso comportamento nuovo). Banner «🫙 Porta Barattolo in tasca»
   (`#installBanner` sotto l'header di Esplora, `bannerInstallaPwa()`):
   solo web MOBILE fuori da Telegram, mai se già standalone, mai in
-  DEMO, guardia PROPRIA su `barattolo_hint['installa_pwa']` (NON
-  hintAttivi(), che escluderebbe la vetrina — casa sua); Android =
+  DEMO; il «Non ora» è un RINVIO di pagina (variabile in memoria,
+  mai localStorage: alla visita successiva il banner torna), il
+  per-sempre esiste solo via appinstalled →
+  `barattolo_hint['pwa_installata']` (la vecchia chiave installa_pwa
+  è inerte; NON hintAttivi(), che escluderebbe la vetrina — casa
+  sua; su iOS appinstalled non esiste: chi installa da Safari
+  rivedrà il banner nel browser, accettato); Android =
   beforeinstallprompt intercettato + prompt vero, iOS = foglietto
   `#installSheet` coi passi di Safari. Login in standalone
   (dichiarato): anonimo = vetrina completa con gli inviti di sempre;
