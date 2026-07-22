@@ -1027,11 +1027,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ic_launcher_monochrome.png (temi Android 13+, esige compileSdk ≥33);
   riscrive ic_launcher.xml a tre livelli, allinea il fondo dello SPLASH
   allo stesso arancio campionato (twa-manifest `backgroundColor` + la
-  copia in app/build.gradle: lo splash mostra la tessera quadrata
-  dell'icona, e sul crema del manifest faceva l'effetto francobollo —
-  il crema resta giusto per la PWA, dove background_color è anche il
-  fondo pagina pre-paint) e rimette da solo -Xmx1024m
-  in gradle.properties. LITURGIA di ogni release APK, sempre in
+  copia in app/build.gradle: lo splash mostra l'immagine dell'icona, e
+  sul crema del manifest faceva l'effetto francobollo — il crema resta
+  giusto per la PWA, dove background_color è anche il fondo pagina
+  pre-paint), ridisegna i drawable-*/splash.png col barattolo
+  scontornato su trasparente a 160dp di lato massimo (~40% del lato
+  corto; Bubblewrap ci metteva la tessera INTERA a 300dp fissi, un
+  macigno, e nel twa-manifest NON esiste una leva di scala:
+  splashScreenFadeOutDuration è solo la dissolvenza, l'immagine è
+  disegnata centrata a dimensione intrinseca — l'unica leva sono i
+  pixel dei PNG) e rimette da solo -Xmx1024m in gradle.properties. LITURGIA di ogni release APK, sempre in
   quest'ordine: `bubblewrap update --appVersionName=X.Y` (alza lui il
   versionCode) → `python genera_icone_apk.py` → `bubblewrap build`
   (le password del keystore le batte Andrea nel SUO terminale) —
