@@ -971,13 +971,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   stesso comportamento nuovo). Banner «🫙 Porta Barattolo in tasca»
   (`#installBanner` sotto l'header di Esplora, `bannerInstallaPwa()`):
   solo web MOBILE fuori da Telegram, mai se già standalone, mai in
-  DEMO; il «Non ora» è un RINVIO di pagina (variabile in memoria,
-  mai localStorage: alla visita successiva il banner torna), il
-  per-sempre esiste solo via appinstalled →
-  `barattolo_hint['pwa_installata']` (la vecchia chiave installa_pwa
-  è inerte; NON hintAttivi(), che escluderebbe la vetrina — casa
-  sua; su iOS appinstalled non esiste: chi installa da Safari
-  rivedrà il banner nel browser, accettato); Android Chrome/Edge =
+  DEMO; NESSUNA dismissione persistente (le chiavi storiche
+  installa_pwa e pwa_installata in barattolo_hint sono inerti): sia
+  il «Non ora» sia appinstalled sono RINVII di pagina (variabile in
+  memoria, mai localStorage) — alla visita successiva il banner
+  torna, così dopo una disinstallazione ricompare da solo; il caso
+  «app installata» lo coprono le guardie standalone, più il fatto
+  che Chrome non rilancia beforeinstallprompt ad app installata (su
+  iOS e Firefox, senza appinstalled né evento, chi ha installato
+  rivedrà il banner nel browser: accettato); Android Chrome/Edge =
   beforeinstallprompt intercettato + prompt vero, iOS e Firefox
   Android (che beforeinstallprompt non ce l'ha) = foglietto
   `#installSheet` coi passi scritti da apriInstallSheet() secondo il
