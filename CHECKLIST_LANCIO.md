@@ -48,7 +48,8 @@ Finché c'è anche una sola casella vuota, NON condividere il link.
 ## 5. Il giro di prova finale (con l'app online, prima di condividere)
 
 - [ ] Pubblicato un annuncio di prova con foto
-- [ ] Comprato da un secondo account/persona: sats in escrow
+- [ ] Comprato da un secondo account/persona: sats bloccati nel
+      deposito di garanzia
 - [ ] Segnato spedito, confermato: sats arrivati al venditore
 - [ ] Aperta una disputa di prova su un secondo ordine e decisa
       da admin (sia il rimborso che il pagamento al venditore)

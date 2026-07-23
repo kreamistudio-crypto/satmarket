@@ -920,7 +920,7 @@
         </div>
       </form>
       <div class="chips" id="chips"></div>
-      <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
+      <div class="trust-line">🔒 Ogni acquisto è protetto dal deposito di garanzia</div>
     </header>
     <!-- Benvenuto one-shot: riempito da hintBenvenuto() alla prima
          visita di un utente autenticato, poi mai piu'. -->
@@ -933,8 +933,8 @@
     <div class="hero" aria-hidden="true">
       <div>
         <div class="hero-title">Il mercatino dell'usato,<br>in <span>sats</span>.</div>
-        <div class="hero-sub">Compra e vendi in Lightning, con l'escrow che protegge
-          tutti. Pubblicare non costa nulla.</div>
+        <div class="hero-sub">Compra e vendi in Lightning, col deposito di garanzia
+          che protegge tutti. Pubblicare non costa nulla.</div>
       </div>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
@@ -990,7 +990,7 @@
     <button class="back" onclick="tornaDalNegozio()">← Torna</button>
     <div id="negozioHeader"></div>
     <div id="negozioFeedback"></div>
-    <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
+    <div class="trust-line">🔒 Ogni acquisto è protetto dal deposito di garanzia</div>
     <div class="section-label">In vetrina in questo negozio</div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
     <div id="negozioSentinella" style="height:1px"></div>
@@ -1000,7 +1000,7 @@
   <div class="view" id="view-vendi">
     <div class="form">
       <h2>Metti in vendita</h2>
-      <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: l'escrow protegge ogni vendita.</div>
+      <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.</div>
       <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
       <div class="field">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
@@ -1120,7 +1120,7 @@
               <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
             <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
             <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-              Col wallet collegato paghi l'escrow in un tocco («⚡ Compra
+              Col wallet collegato paghi in un tocco («⚡ Compra
               subito»). La stringa resta <b>solo nel tuo browser</b>:
               Barattolo non la vede mai. Nella app del wallet imposta un
               <b>limite di spesa</b> per questa connessione.</div>
@@ -1188,7 +1188,7 @@
   <div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
   <div class="sheet" id="paySheet">
     <div class="grab"></div>
-    <h3>Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> in escrow</h3>
+    <h3>Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> a garanzia</h3>
     <div id="payEurNota" style="display:none;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px"></div>
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Paga con qualsiasi wallet Lightning. I sats restano <b style="color:var(--trust)">bloccati e al sicuro</b> finché non confermi di aver ricevuto l'oggetto.
@@ -1208,7 +1208,7 @@
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Stai per pagare <b class="mono" style="color:var(--sats)"><span id="nwcConfermaSats"></span> sats</b>
       dal tuo wallet collegato. I sats finiscono <b style="color:var(--trust)">bloccati
-      in escrow</b>, come sempre: al venditore arrivano solo quando
+      nel deposito di garanzia</b>, come sempre: al venditore arrivano solo quando
       confermi di aver ricevuto l'oggetto.
     </div>
     <button class="btn orange" style="margin-top:14px" onclick="confermaCompraSubito(this)">⚡ Conferma e paga</button>
@@ -1901,7 +1901,7 @@ function pontiContatto(username, npub, chi, cls){
    ricorda che l'escrow protegge comunque l'affare */
 function pontiOrdine(username, npub, chi, soggetto){
   return pontiContatto(username, npub, chi, 'btn ghost')
-    || `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: l'escrow protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`;
+    || `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`;
 }
 
 /* Cambio BTC/EUR aggiornato all'avvio (per il "≈ X €" sotto i prezzi) */
@@ -2059,7 +2059,7 @@ let benvenutoInVista = false;   // finche' c'e' lui, il banner installa aspetta
 function hintBenvenuto(){
   const box = el('benvenutoHint');
   if (!box || !hintAttivi() || hintDismesso('benvenuto')) return;
-  box.innerHTML = `<div class="hintline hint-benvenuto">🫙 <span><b>Benvenuto su Barattolo!</b> Sfoglia con calma — quando trovi qualcosa, l'escrow protegge ogni acquisto</span>
+  box.innerHTML = `<div class="hintline hint-benvenuto">🫙 <span><b>Benvenuto su Barattolo!</b> Sfoglia con calma — quando trovi qualcosa, ogni acquisto è protetto dal deposito di garanzia</span>
     <span class="hl-az"><a onclick="dismettiHint('benvenuto', this)" style="color:var(--muted)">Non ora</a></span></div>`;
   box.style.display = 'block';
   /* precedenza alla prima visita: il banner installa si fa da parte
@@ -2115,7 +2115,7 @@ function openDetail(id){
     .replace(/[^a-z0-9]/g,'');
   const contatto = mio ? ''            /* il venditore non contatta se stesso */
     : (pontiContatto(l.username, npubPonte, `a ${esc(l.seller.split(' ')[0])}`)
-       || `<div class="trust-note">💬 <span>Questo venditore non ha contatti pubblici, ma le trattative non sono necessarie: l'escrow protegge l'acquisto dall'inizio alla fine.</span></div>`);
+       || `<div class="trust-note">💬 <span>Questo venditore non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'acquisto dall'inizio alla fine.</span></div>`);
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
@@ -2141,17 +2141,17 @@ function openDetail(id){
       </div>
       <div class="desc">${esc(l.desc)}</div>
       ${mio
-        ? `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati in escrow</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
+        ? `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
            <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `<div class="escrow-zone">
              <span class="escrow-flag">🔒 pagamento protetto</span>
              <!-- niente 🔒 qui: lo dicono gia' la pillola e il bottone -->
-             <div class="trust-note"><span>I tuoi sats restano <b>chiusi nel barattolo</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
+             <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra con escrow<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
+             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra protetto<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
            </div>`}
       ${jarCta}
@@ -2317,7 +2317,7 @@ let pollTimer = null, currentOrderId = null;
 async function startBuy(){
   haptic();
   if (VETRINA) {
-    invitoTelegram('Per comprare con l\'escrow serve l\'app vera dentro '
+    invitoTelegram('Per comprare protetto serve l\'app vera dentro '
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
@@ -2361,7 +2361,7 @@ async function verificaOrdine(oid){
          poll su LNbits a decretare il successo, mai il wallet */
       if (nwcRipristina) { nwcRipristina(); nwcRipristina = null; }
       closeSheet();
-      toast('⚡ Sats bloccati in escrow!');
+      toast('⚡ Sats al sicuro nel deposito!');
       await loadOrders(); renderOrders();
       setTimeout(()=>openOrder(oid), 400);
     }
@@ -2378,7 +2378,7 @@ function compraSubito(){
   haptic();
   /* cinture: il bottone non compare in vetrina/demo, ma non si sa mai */
   if (VETRINA) {
-    invitoTelegram('Per comprare con l\'escrow serve l\'app vera dentro '
+    invitoTelegram('Per comprare protetto serve l\'app vera dentro '
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
@@ -2479,7 +2479,7 @@ function simulatePaid(){
   closeSheet();
   const o = {id: 100+orders.length+1, listing: currentListing, state:'locked', role:'buyer', when:'adesso'};
   orders.unshift(o);
-  toast('⚡ Sats bloccati in escrow!');
+  toast('⚡ Sats al sicuro nel deposito!');
   setTimeout(()=>openOrder(o.id), 500);
 }
 
@@ -2537,7 +2537,7 @@ function festaSats(ancora, mini){
 
 const STATES = {
   creato:   {label:'Da pagare',       badge:'locked'},
-  locked:   {label:'Sats in escrow',  badge:'locked'},
+  locked:   {label:'Sats in deposito', badge:'locked'},
   shipped:  {label:'Spedito',         badge:'shipped'},
   delivered:{label:'Consegnato',      badge:'confirmed'},
   confirmed:{label:'Da incassare',    badge:'confirmed'},
@@ -2577,7 +2577,7 @@ function openOrder(id){
     /* Storia della disputa: la cassaforte racconta il congelamento */
     const conReso = ['return_pending','return_shipped'].includes(s);
     steps = [
-      {t:'Sats bloccati in escrow', d:'Il pagamento è custodito dalla piattaforma'},
+      {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
       {t:'Disputa aperta',          d:'I sats sono congelati: nessuno può toccarli'},
       conReso
         ? {t:'Restituzione dell\'oggetto', d:s==='return_pending'?'L\'acquirente deve rispedire l\'oggetto al venditore':'Il reso è in viaggio verso il venditore'}
@@ -2591,7 +2591,7 @@ function openOrder(id){
     const oreRestanti = o.consegnato
       ? Math.max(0, Math.ceil((o.consegnato + 72*3600 - Date.now()/1000)/3600)) : 0;
     steps = [
-      {t:'Sats bloccati in escrow', d:'Il pagamento è custodito dalla piattaforma'},
+      {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
       {t:'Oggetto spedito',         d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`:'Il venditore ha consegnato al corriere'},
       {t:s==='delivered'?'Consegnato: in attesa di conferma':'Ricevuto e confermato',
        d:s==='delivered'?`Restano ~${oreRestanti} ore per confermare o aprire disputa`:(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
@@ -2603,10 +2603,10 @@ function openOrder(id){
   }
   /* Le frasi di chiusura parlano a CHI legge: il venditore incassa,
      l'acquirente viene rimborsato, gli altri osservano */
-  const testa = s==='released'  ? {ic:'🔓', b:'Escrow completato',
+  const testa = s==='released'  ? {ic:'🔓', b:'Deposito sbloccato',
       d:o.role==='seller' ? `Hai incassato ${fmt(o.listing.price)} sats`
                           : 'I sats sono stati consegnati al venditore'}
-    : s==='refunded'            ? {ic:'↩️', b:'Escrow rimborsato',
+    : s==='refunded'            ? {ic:'↩️', b:'Deposito rimborsato',
       d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${fmt(o.listing.price)} sats (integrale)`
                           : 'I sats sono tornati all\'acquirente'}
     : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',
@@ -2614,9 +2614,9 @@ function openOrder(id){
                           : 'Disputa decisa: i sats tornano all\'acquirente'}
     : ['return_pending','return_shipped'].includes(s)
                                 ? {ic:'↩️', b:'Reso in corso',      d:'Rimborso alla restituzione: i sats restano congelati'}
-    : s==='dispute'             ? {ic:'⚖️', b:'Escrow congelato',   d:'Disputa in corso: i sats restano fermi fino alla decisione'}
+    : s==='dispute'             ? {ic:'⚖️', b:'Deposito congelato', d:'Disputa in corso: i sats restano fermi fino alla decisione'}
     : s==='annullato'           ? {ic:'✖️', b:'Ordine annullato',   d:'Nessun pagamento è stato trattenuto'}
-    :                             {ic:'🔒', b:'Cassaforte escrow',  d:'I sats sono al sicuro, nessuno può toccarli'};
+    :                             {ic:'🔒', b:'Sats nel deposito di garanzia', d:'I sats sono al sicuro, nessuno può toccarli'};
   el('orderContent').innerHTML = `
     <div class="detail-body">
       <h2 style="font-size:17px">${o.listing.emoji} ${esc(o.listing.title)}</h2>
@@ -2640,7 +2640,7 @@ function openOrder(id){
       ${isAdmin && s==='dispute' ? `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
-          <div class="hint">I sats sono congelati in escrow. Ascolta le due parti, poi decidi: la scelta è definitiva.</div>
+          <div class="hint">I sats sono congelati nel deposito di garanzia. Ascolta le due parti, poi decidi: la scelta è definitiva.</div>
           <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>
           <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
           <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore</button>
@@ -2689,7 +2689,7 @@ function openOrder(id){
     </div>`;
   go('ordine');
   /* Le monete partono dal messaggio di chiusura («Hai incassato…» /
-     «Escrow completato»), solo la prima volta che questo dispositivo
+     «Deposito sbloccato»), solo la prima volta che questo dispositivo
      vede l'affare concluso. Il ritardo lascia finire il cambio vista. */
   if (s==='released' && o.role!=='admin' && !festaGiaFatta(o.id)) {
     ricordaFesta(o.id);

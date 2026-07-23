@@ -262,11 +262,11 @@ DISTINTIVI = [
          criterio=lambda d: d["posizione"] <= 100),
     dict(id="primo_acquisto", emoji="⚡", nome="Primo acquisto",
          fiducia=False,
-         descrizione="Il primo acquisto concluso via escrow",
+         descrizione="Il primo acquisto concluso col deposito di garanzia",
          criterio=lambda d: d["acquisti"] >= 1),
     dict(id="primo_baratto", emoji="🤝", nome="Primo baratto",
          fiducia=False,
-         descrizione="La prima vendita conclusa via escrow",
+         descrizione="La prima vendita conclusa col deposito di garanzia",
          criterio=lambda d: d["vendite"] >= 1),
     dict(id="bottega_avviata", emoji="📦", nome="Bottega avviata",
          fiducia=False,
@@ -3406,7 +3406,8 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
                                               solo_aggiornamento=True))
         # ...e il post nel canale si aggiorna col ✅ Venduto
         asyncio.create_task(promo_venduto(o["annuncio_id"]))
-        msg = ("🔒 <b>Hai venduto!</b> I sats dell'acquirente sono in escrow. "
+        msg = ("🔒 <b>Hai venduto!</b> I sats dell'acquirente sono bloccati "
+               "nel deposito di garanzia. "
                "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
         if a and a["contatto_nostr"]:
             msg += ("\n\n🟣 Questo annuncio è pubblicato anche su <b>Nostr</b>: "
@@ -5255,7 +5256,8 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         if o["invoice_venditore"] or (v and v["ln_address"]):
             msg = ("⚠️ Il pagamento automatico dei tuoi sats e' <b>fallito</b> "
                    "(invoice scaduta o wallet non raggiungibile). I sats sono al "
-                   "sicuro in escrow: apri l'ordine nella Mini App per riprovare "
+                   "sicuro nel deposito di garanzia: apri l'ordine nella Mini App "
+                   "per riprovare "
                    f"con una invoice da <b>{netto} sats</b>.")
         else:
             msg = (f"✅ <b>L'acquirente ha confermato la ricezione!</b> Per incassare "
@@ -5467,7 +5469,8 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                               "I sats restano bloccati in attesa della tua decisione.")
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
-                   "vi contattera' entrambi. I sats restano in escrow.")
+                   "vi contattera' entrambi. I sats restano nel deposito "
+                   "di garanzia.")
     return {"ok": True}
 
 

@@ -1,7 +1,7 @@
 {
   "name": "Barattolo — il mercatino in sats",
   "short_name": "Barattolo",
-  "description": "Compra e vendi in satoshi con l'escrow Lightning",
+  "description": "Compra e vendi in satoshi col deposito di garanzia Lightning",
   "id": "/",
   "start_url": "/",
   "scope": "/",

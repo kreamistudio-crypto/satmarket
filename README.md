@@ -1,10 +1,10 @@
 # SatMarket ⚡
 
-**Il mercatino in sats con escrow** — una Mini App Telegram tipo
-Subito.it, ma con pagamenti solo in satoshi (Bitcoin Lightning) e una
-cassaforte escrow che protegge acquirente e venditore.
+**Il mercatino in sats col deposito di garanzia (escrow)** — una Mini
+App Telegram tipo Subito.it, ma con pagamenti solo in satoshi (Bitcoin
+Lightning) e una cassaforte che protegge acquirente e venditore.
 
-## Come funziona l'escrow
+## Come funziona il deposito di garanzia (escrow)
 
 1. 🔒 L'acquirente compra → i sats finiscono **bloccati** nel wallet
    della piattaforma (LNbits)
