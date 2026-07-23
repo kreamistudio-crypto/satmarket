@@ -635,7 +635,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `#distintiviConta`; classe `.distintivo` — `.badge` è degli stati
   ordine — mancanti in grigio con la descrizione come molla), e in
   pubblico la SFILZA `sfilzaDistintivi(lista, max, tocca)`: emoji
-  nude `.sfilza .medaglia` a 19px con un piccolo gap (niente
+  nude `.sfilza .medaglia` a 14.5px — la taglia del nome accanto,
+  provata anche piu' grossa (19px) e tornata indietro — con un
+  piccolo gap (niente
   cerchietti d'oro: nude e sovrapposte si impasterebbero — l'oro
   resta alle tessere del foglietto; `nostrano`
   sempre fuori: il 🟣 accanto al nome c'è già) — nel dettaglio
