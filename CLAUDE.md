@@ -283,6 +283,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `venditore_npub` e `venditore_npub_verificata` sono in `CAMPI_VETRINA`
   (pubblici per natura) e nelle SELECT di `/api/search` e
   `/api/listings/miei`.
+  Avatar dal social di provenienza (lug 2026): colonne `utenti.avatar`
+  (nome file, '' = iniziale), `avatar_aggiornato` e `avatar_visibile`
+  (levetta, default 1). MAI link agli originali (gli URL del Bot API
+  portano il TOKEN e scadono in un'ora; quelli Nostr regalerebbero
+  l'IP di ogni visitatore a host terzi): si scarica la NOSTRA copia —
+  francobollo 128px q85 (`_salva_avatar`, seconda generazione ammessa
+  dal patto della filiera come le `_min`) in foto/ come
+  `av_{negozio}_{ts}.jpg` (chiave = codice negozio pubblico, MAI il
+  tg_id; nome versionato → la cache 1g di /foto lavora gratis, il
+  file vecchio si spazza in `_scrivi_avatar`). Catena doppi cittadini
+  in `aggiorna_avatar`: prima la foto Telegram
+  (getUserProfilePhotos→getFile; chi la nasconde ai non-contatti
+  resta con l'iniziale, ed è il suo modo di dire no), poi la picture
+  del kind-0 dai 4 relay ma SOLO da chiave dal possesso dimostrato
+  (npub_accesso o badge verificato: la regola di `notifica()`),
+  scaricata con `url_foto_ammesso` + tetto 8MB; senza nulla la
+  colonna si svuota e torna l'iniziale (foto sparita dal social =
+  sparita anche da noi). Rinfresco opportunistico in `/api/me`
+  (diventato async per questo): al più ogni `GIORNI_AVATAR` (7), in
+  create_task fail-open con anti-valanga `_AVATAR_IN_CORSO`; in
+  collaudo la gamba Telegram esce None da bot_api simulato, quella
+  Nostr legge i relay veri. Levetta «Mostra la mia foto» nel cassetto
+  Identità (`POST /api/me/avatar-visibile`): governa SOLO l'uscita
+  pubblica — `venditore_avatar` in CAMPI_VETRINA/CAMPI_MIEI/search e
+  `avatar` nel profilo di /api/negozio escono col CASE sulla levetta,
+  spenta il nome file non lascia il server — mentre tappo e testata
+  del Profilo mostrano sempre la PROPRIA foto (vista privata,
+  `avatar` da /api/me). Riaccesa senza foto in dispensa = fetch
+  subito. Frontend: `avatarImg()` (filtro-alfabeto sul nome file)
+  posa l'<img> sopra l'iniziale nei cerchi `.avatar` di dettaglio,
+  negozio e Profilo (onerror la toglie: mai un'immagine rotta);
+  `renderAvatar()` mette la faccia nel tappo (`.con-foto` spegne
+  l'iniziale, onerror ripiega sul tappo di sempre e poi
+  sull'iniziale). Ordini e card della griglia SENZA avatar (deciso);
+  in DEMO iniziali e basta.
   Presenza Nostr della piattaforma: `NOSTR_NSEC_PIATTAFORMA` in config
   (segnaposto = funzione spenta, fail-open). Alla pubblicazione il
   server firma un evento NIP-99 (kind 30402, tag `d` stabile
@@ -1482,7 +1517,15 @@ download diretto, e su Zapstore con chiave Nostr dedicata fredda e
 certificato legato via NIP-C1 — eventi verificati sul relay, hash e
 certificato coincidenti; vedi «Distribuzione dell'APK» — restano da
 fare: screenshot nella scheda Zapstore, profilo kind-0 dell'identità
-release, e la prova d'installazione dallo store sul telefono).
+release, e la prova d'installazione dallo store sul telefono); avatar
+dal social di provenienza (lug 2026, richiesta di Alan: la foto
+profilo Telegram o la picture del kind-0 Nostr come francobollo 128px
+servito da foto/, catena Telegram→Nostr→iniziale per i doppi
+cittadini, levetta «Mostra la mia foto» nel cassetto Identità accesa
+di default, vedi Architettura — collaudato in locale: 12 verifiche
+server comprese la gamba Nostr sui relay veri, rendering e ripieghi
+nel browser, levetta avanti e indietro; in produzione va vista una
+foto Telegram vera, che in collaudo il bot simulato non può dare).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
