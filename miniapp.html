@@ -934,7 +934,7 @@
       <div>
         <div class="hero-title">Il mercatino dell'usato,<br>in <span>sats</span>.</div>
         <div class="hero-sub">Compra e vendi in Lightning, con l'escrow che protegge
-          tutti. Zero costi fissi: 1% solo a vendita conclusa.</div>
+          tutti. Pubblicare non costa nulla.</div>
       </div>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
@@ -1000,7 +1000,7 @@
   <div class="view" id="view-vendi">
     <div class="form">
       <h2>Metti in vendita</h2>
-      <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Paghi zero: la piattaforma trattiene l'1% solo a vendita conclusa.</div>
+      <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: l'escrow protegge ogni vendita.</div>
       <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
       <div class="field">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
@@ -2153,7 +2153,6 @@ function openDetail(id){
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
              <button class="btn ghost compra" onclick="startBuy()">🔒 Compra con escrow<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
-             <div class="escrow-note" style="margin-top:10px">Commissione 1% · solo a vendita conclusa</div>
            </div>`}
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)
@@ -2597,7 +2596,7 @@ function openOrder(id){
       {t:s==='delivered'?'Consegnato: in attesa di conferma':'Ricevuto e confermato',
        d:s==='delivered'?`Restano ~${oreRestanti} ore per confermare o aprire disputa`:(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
       o.role==='seller'
-        ? {t:'Hai incassato i tuoi sats', d:'Affare concluso: il netto (prezzo − 1%) è nel tuo wallet'}
+        ? {t:'Hai incassato i tuoi sats', d:'Affare concluso: i sats sono nel tuo wallet'}
         : {t:'Sats sbloccati al venditore', d:'Affare concluso, feedback reciproco'},
     ];
     progress = {creato:0, locked:1, shipped:2, delivered:2, confirmed:3, released:4, annullato:-1}[s];
@@ -2605,7 +2604,7 @@ function openOrder(id){
   /* Le frasi di chiusura parlano a CHI legge: il venditore incassa,
      l'acquirente viene rimborsato, gli altri osservano */
   const testa = s==='released'  ? {ic:'🔓', b:'Escrow completato',
-      d:o.role==='seller' ? `Hai incassato ${fmt(Math.floor(o.listing.price*0.99))} sats (prezzo − 1%)`
+      d:o.role==='seller' ? `Hai incassato ${fmt(o.listing.price)} sats`
                           : 'I sats sono stati consegnati al venditore'}
     : s==='refunded'            ? {ic:'↩️', b:'Escrow rimborsato',
       d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${fmt(o.listing.price)} sats (integrale)`
@@ -2644,7 +2643,7 @@ function openOrder(id){
           <div class="hint">I sats sono congelati in escrow. Ascolta le due parti, poi decidi: la scelta è definitiva.</div>
           <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>
           <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
-          <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore (−1%)</button>
+          <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore</button>
         </div>`:''}
       ${o.role==='buyer' && s==='refund' ? refundPanel(o) : ''}
       ${o.role==='buyer' && s==='refunded' ? `<div class="trust-note">↩️ <span>Disputa risolta a tuo favore: il <b>rimborso integrale</b> è stato inviato al tuo wallet.</span></div>`:''}
@@ -2755,7 +2754,7 @@ async function inviaFeedback(btn){
 let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
 
 function payoutPanel(o){
-  const net = Math.floor(o.listing.price * 0.99);   // prezzo − 1% commissione
+  const net = o.listing.price;   // commissione sospesa (a 0): incasso = prezzo pieno
 
   /* Incasso automatico già attivo */
   if (myLnAddress && o.state!=='confirmed') return `
@@ -2783,7 +2782,7 @@ function payoutPanel(o){
       <h4>💰 ${o.state==='confirmed'?'Incassa subito i tuoi sats':'Come vuoi incassare?'}</h4>
       <div class="hint">${o.state==='confirmed'
         ? `L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)} sats</b> in cassaforte.`
-        : `Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)} sats</b> (prezzo − 1% di commissione).`}
+        : `Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)} sats</b>.`}
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address (lo trovi nel tuo wallet,
         tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
         lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
@@ -2839,7 +2838,7 @@ function renderLnAddress(){
       <div style="margin-top:12px;font-size:13px;font-weight:800;color:var(--trust)">
         ⚡ Incassi automatici su <span class="mono">${esc(myLnAddress)}</span></div>
       <div style="margin-top:4px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        Ogni vendita conclusa arriva da sola qui (prezzo − 1% di commissione).</div>
+        Ogni vendita conclusa arriva da sola qui.</div>
       <button class="btn ghost" style="margin-top:8px" onclick="lnAddrModifica=true;renderLnAddress()">↻ Cambia indirizzo</button>`;
     return;
   }
@@ -3685,7 +3684,7 @@ async function adminResolve(esito, btn){
     ? 'Rimborsare SUBITO tutti i sats all\'acquirente?\n\nL\'annuncio tornerà in vetrina. La decisione è definitiva.'
     : esito==='reso'
     ? 'Rimborso PREVIA RESTITUZIONE?\n\nL\'acquirente dovrà rispedire l\'oggetto (con tracciamento); il rimborso partirà solo quando il venditore conferma di averlo ricevuto.'
-    : 'Consegnare i sats al venditore (meno l\'1%)?\n\nLa decisione è definitiva.';
+    : 'Consegnare i sats al venditore?\n\nLa decisione è definitiva.';
   if (!confirm(msg)) return;
   if (DEMO) { toast('Le dispute si decidono col backend attivo'); return; }
   const ripristina = bottoneInAttesa(btn);

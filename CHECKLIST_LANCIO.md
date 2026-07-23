@@ -67,7 +67,8 @@ Finché c'è anche una sola casella vuota, NON condividere il link.
 - Pubblicazione degli annunci VERSO Nostr (+ "sold" automatico)
 - Sblocco automatico dopo X giorni dalla consegna
 - Notifiche "trovato l'oggetto che cercavi"
-- Commissione con minimo fisso (l'1% sui piccoli importi è
-  mangiato dalle fee di rete)
+- Commissione: cifra da decidere (oggi è a 0 nel config); valutare
+  un minimo fisso, perché una percentuale piccola sui piccoli
+  importi è mangiata dalle fee di rete
 - Escrow on-chain multisig 2-di-3 per gli oggetti di valore
 - Collegamento wallet via NWC (acquisto in un tap)

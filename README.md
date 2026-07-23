@@ -13,8 +13,8 @@ cassaforte escrow che protegge acquirente e venditore.
 3. 📬 Alla consegna l'acquirente ha **72 ore** per controllare
    l'oggetto: conferma, oppure apre disputa
 4. 🔓 Alla conferma (o allo scadere del tempo) i sats vengono
-   **sbloccati automaticamente** al venditore — sul suo Lightning
-   address, meno l'1% di commissione
+   **sbloccati automaticamente** al venditore, sul suo Lightning
+   address
 5. ⚖️ In caso di disputa decide un moderatore: rimborso immediato,
    rimborso **previa restituzione** dell'oggetto (con tracking del
    reso), o pagamento al venditore

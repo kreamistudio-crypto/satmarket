@@ -5140,7 +5140,7 @@ async def deposita_invoice(ordine_id: int, req: Request,
             and o["stato"] in ("locked", "shipped", "confirmed"):
         ruolo, atteso, colonna = "venditore", netto_venditore(o["prezzo_sats"]), \
             "invoice_venditore"
-        spiegazione = f"{atteso} sats (prezzo meno l'1%)"
+        spiegazione = f"{atteso} sats (il tuo incasso)"
     elif o and o["compratore_id"] == user["id"] and o["stato"] == "refund":
         ruolo, atteso, colonna = "compratore", o["prezzo_sats"], "invoice_rimborso"
         spiegazione = f"{atteso} sats (rimborso integrale)"

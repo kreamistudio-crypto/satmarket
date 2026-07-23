@@ -35,7 +35,7 @@ LNBITS_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY"   # per incassare
 LNBITS_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY"       # per pagare (SEGRETA!)
 
 # --- Regole del mercatino --------------------------------------------
-COMMISSIONE_PERCENTO = 1.0   # trattenuta a vendita conclusa
+COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)
 ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna
 GIORNI_AUTO_SBLOCCO = 10     # sblocco d'ufficio dopo la spedizione
 TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
