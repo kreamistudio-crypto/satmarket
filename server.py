@@ -1623,7 +1623,7 @@ async def gestisci_update(update: dict):
             return await avvia_fusione(mittente["id"], parti[1].strip())
         return await bot_api("sendMessage", {"chat_id": mittente["id"],
             "text": "🫙 Ciao! Sono il campanello del Barattolo: ti "
-                    "avviso quando succede qualcosa nei tuoi affari. "
+                    "avviso quando succede qualcosa nei tuoi ordini. "
                     "Il mercatino vero e' nella Mini App: aprila dal "
                     f"bottone del menu qui sotto, o su {URL_PUBBLICO}"})
     await bot_api("sendMessage", {"chat_id": mittente["id"],
