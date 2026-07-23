@@ -634,8 +634,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Profilo (il conteggio «(N di M)» vive nell'header del cassetto,
   `#distintiviConta`; classe `.distintivo` — `.badge` è degli stati
   ordine — mancanti in grigio con la descrizione come molla), e in
-  pubblico la SFILZA `sfilzaDistintivi(lista, max, tocca)`:
-  cerchietti d'oro `.sfilza .medaglia` con la sola emoji (`nostrano`
+  pubblico la SFILZA `sfilzaDistintivi(lista, max, tocca)`: emoji
+  nude `.sfilza .medaglia` a 19px con un piccolo gap (niente
+  cerchietti d'oro: nude e sovrapposte si impasterebbero — l'oro
+  resta alle tessere del foglietto; `nostrano`
   sempre fuori: il 🟣 accanto al nome c'è già) — nel dettaglio
   annuncio prime 4 + «+N» dentro la card venditore che resta tutta
   cliccabile (nessun tocco sulla sfilza: un bersaglio solo), in
