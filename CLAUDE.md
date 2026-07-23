@@ -621,18 +621,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   badge in unione (UPDATE OR IGNORE + DELETE) e rivaluta. API:
   `/api/me.distintivi` = catalogo COMPLETO con `ottenuto` (ts o null,
   il frontend non hardcoda mai la lista); `/api/negozio` →
-  `venditore.distintivi` = solo i `fiducia` guadagnati; dal lug 2026
-  anche gli annunci portano `venditore_distintivi` (subselect
-  GROUP_CONCAT in `CAMPI_VETRINA` + SELECT di search e miei, espanso
-  in chip fiducia {id, emoji, nome, descrizione} da
-  `espandi_distintivi_vetrina`: i non-fiducia verso la vetrina non
-  escono proprio). Frontend:
+  `venditore.distintivi` e `venditore_distintivi` sugli annunci
+  (subselect GROUP_CONCAT in `CAMPI_VETRINA` + SELECT di search e
+  miei, espanso in {id, emoji, nome, descrizione} da
+  `espandi_distintivi_vetrina`) = dal lug 2026 TUTTI i guadagnati
+  (bacheca stile Vinted, deciso con Andrea: ⚡ Primo acquisto
+  pubblico compreso — aggregati senza segreti); il flag `fiducia`
+  non filtra più, decide solo la PRECEDENZA (i fiducia in testa al
+  catalogo → in testa alla sfilza: il «+N» taglia i badge di
+  percorso, mai quelli di affidabilità). Frontend:
   griglia `renderDistintivi()` nel cassetto «🏅 Distintivi» del
   Profilo (il conteggio «(N di M)» vive nell'header del cassetto,
   `#distintiviConta`; classe `.distintivo` — `.badge` è degli stati
-  ordine — mancanti in grigio con la descrizione come molla), chip
-  fiducia accanto al nome in `renderNegozio` (filtrando `nostrano`:
-  il 🟣 c'è già), cassetto nascosto in DEMO come il wallet.
+  ordine — mancanti in grigio con la descrizione come molla), e in
+  pubblico la SFILZA `sfilzaDistintivi(lista, max, tocca)`:
+  cerchietti d'oro `.sfilza .medaglia` con la sola emoji (`nostrano`
+  sempre fuori: il 🟣 accanto al nome c'è già) — nel dettaglio
+  annuncio prime 4 + «+N» dentro la card venditore che resta tutta
+  cliccabile (nessun tocco sulla sfilza: un bersaglio solo), in
+  testata negozio COMPLETA (flex-wrap, mai «+N»: è la bacheca) e
+  toccabile → foglietto `#distintiviSheet` (pattern sheet, registrato
+  in `closeSheet`, dati da `negozioCorrente`) con le tessere
+  `.distintivo` di TUTTI i guadagnati, nome e descrizione — qui
+  `nostrano` c'è, ed è il posto che spiega il pallino viola; i
+  mancanti mai in pubblico. Cassetto nascosto in DEMO come il wallet.
   Export dati contabili (lug 2026): colonna `ordini.cambio_eur` = EUR
   per BTC al momento della chiusura, scritta da `_sblocca_sats` e
   `_rimborsa_compratore` via `cambio_btc_eur()` (CoinGecko lato server
@@ -843,9 +855,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nel `section-label` (entrambi concordati). Restano fuori (logica
   nuova, respinta): filtri negli Affari e riga «Prossimo:» nei
   distintivi. Dal mockup sono invece ENTRATE (lug 2026, dopo la dark
-  mode) le medagliette di fiducia `.chip-fiducia` accanto al nome
-  nella card venditore del dettaglio (max 3, `nostrano` filtrato,
-  dati da `venditore_distintivi`, vedi distintivi). La
+  mode) le medagliette accanto al nome nella card venditore del
+  dettaglio (oggi la sfilza `.sfilza`, dati da `venditore_distintivi`,
+  vedi distintivi; la vecchia `.chip-fiducia` non esiste più). La
   pillola-contatore «🏅 N/M» accanto al lockup è vissuta poco: i
   tester l'hanno bocciata e al suo posto (lug 2026) c'è il tasto
   Profilo `.avatar-btn` — il TAPPO del barattolo: `assets/tappo.jpeg`
