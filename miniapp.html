@@ -2275,7 +2275,7 @@ function openDetail(id){
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra protetto<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
+             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
            </div>`}
       ${jarCta}
@@ -2441,7 +2441,7 @@ let pollTimer = null, currentOrderId = null;
 async function startBuy(){
   haptic();
   if (VETRINA) {
-    invitoTelegram('Per comprare protetto serve l\'app vera dentro '
+    invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
@@ -2502,7 +2502,7 @@ function compraSubito(){
   haptic();
   /* cinture: il bottone non compare in vetrina/demo, ma non si sa mai */
   if (VETRINA) {
-    invitoTelegram('Per comprare protetto serve l\'app vera dentro '
+    invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
