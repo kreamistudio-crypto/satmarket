@@ -693,6 +693,13 @@
   /* la variante del banner «installa Barattolo»: vive da sola sotto
      l'header di Esplora, le serve il respiro laterale della vista */
   .hint-installa{margin:10px var(--pad) 0}
+  /* la riga di benvenuto: stesso respiro, con una comparsa gentile
+     (solo per chi non ha chiesto meno animazioni) */
+  .hint-benvenuto{margin:10px var(--pad) 0}
+  @media (prefers-reduced-motion: no-preference){
+    .hint-benvenuto{animation:hintcomparsa .35s ease-out}
+  }
+  @keyframes hintcomparsa{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 
   /* ---------- modale pagamento ---------- */
   .sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;display:none}
@@ -915,6 +922,9 @@
       <div class="chips" id="chips"></div>
       <div class="trust-line">🔒 Ogni acquisto è protetto da escrow</div>
     </header>
+    <!-- Benvenuto one-shot: riempito da hintBenvenuto() alla prima
+         visita di un utente autenticato, poi mai piu'. -->
+    <div id="benvenutoHint" style="display:none"></div>
     <!-- Banner «installa Barattolo» (PWA): riempito da
          bannerInstallaPwa() solo su web mobile fuori da Telegram.
          Dentro la Mini App non compare mai. -->
@@ -2041,6 +2051,24 @@ function apriCassettoProfilo(idAcc){
   if (c && !c.classList.contains('open')) c.classList.add('open');
   setTimeout(()=>c?.scrollIntoView({behavior:'smooth', block:'start'}), 80);
 }
+/* Il benvenuto one-shot su Esplora: una riga alla prima visita di un
+   utente autenticato, mai piu'. Si segna come vista APPENA compare:
+   anche ignorata, alla visita successiva non torna (one-shot vero,
+   non un tormentone). Il «Non ora» la toglie subito e basta. */
+let benvenutoInVista = false;   // finche' c'e' lui, il banner installa aspetta
+function hintBenvenuto(){
+  const box = el('benvenutoHint');
+  if (!box || !hintAttivi() || hintDismesso('benvenuto')) return;
+  box.innerHTML = `<div class="hintline hint-benvenuto">🫙 <span><b>Benvenuto su Barattolo!</b> Sfoglia con calma — quando trovi qualcosa, l'escrow protegge ogni acquisto</span>
+    <span class="hl-az"><a onclick="dismettiHint('benvenuto', this)" style="color:var(--muted)">Non ora</a></span></div>`;
+  box.style.display = 'block';
+  /* precedenza alla prima visita: il banner installa si fa da parte
+     (torna alla pagina dopo, quando il benvenuto non ci sara' piu') */
+  benvenutoInVista = true;
+  const ib = el('installBanner'); if (ib) ib.style.display = 'none';
+  const h = hintLetti(); h.benvenuto = Date.now();
+  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+}
 /* Riga nel foglio di pagamento: solo senza wallet NWC collegato */
 function aggiornaPayHint(){
   const box = el('payHint'); if (!box) return;
@@ -2903,6 +2931,7 @@ function renderProfilo(){
    Niente dismiss: e' derivato dai dati veri e quando il profilo e'
    completo sparisce da solo — sparire E' il premio. ---- */
 let checklistAperta = false;
+let checklistPrimoSguardo = true;   // valutato una volta per pagina
 function renderChecklist(){
   const box = el('profiloChecklist');
   if (!box) return;
@@ -2916,6 +2945,18 @@ function renderChecklist(){
     voci.push({ok:false, txt:'✈️ Telegram collegato: gli avvisi in chat', acc:'accIdentita'});
   const fatte = voci.filter(v=>v.ok).length;
   if (fatte === voci.length) { box.innerHTML = ''; return; }
+  /* Alla PRIMA visita in assoluto del Profilo (per dispositivo) con
+     un profilo incompleto le voci si mostrano gia' aperte: l'utente
+     vede subito cosa manca senza dover toccare. Dalla seconda in poi
+     torna chiusa com'e' sempre stata; la logica delle voci non cambia. */
+  if (checklistPrimoSguardo) {
+    checklistPrimoSguardo = false;
+    if (!hintDismesso('checklistvista')) {
+      checklistAperta = true;
+      const h = hintLetti(); h.checklistvista = Date.now();
+      try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+    }
+  }
   const righe = voci.filter(v=>!v.ok).map(v=>
     `<div class="hintline" style="margin-top:6px;cursor:pointer"
        onclick="apriCassettoProfilo('${v.acc}')"><span>${v.txt}</span>
@@ -4066,8 +4107,28 @@ async function loadAdminStats(){
               🏷️ ${u.annunci_attivi} · 🤝 ${u.affari_conclusi}
             </div>
           </div>`).join('')}
-      </div>`;
+      </div>
+      <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
+        title="Azzera le dismissioni degli hint su questo dispositivo: benvenuto e checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
+}
+
+/* «Trattami da nuovo»: il pulsante del collaudo dal vivo, solo per
+   gli admin. Gli hint vivono SOLO in localStorage del dispositivo
+   (barattolo_hint): non c'e' nulla da chiedere al server — si azzera
+   la memoria locale e si riarmano benvenuto e checklist, subito.
+   Annunci, ordini e profilo restano intatti. */
+function trattamiDaNuovo(){
+  if (!isAdmin) return;
+  try { localStorage.removeItem(HINT_CHIAVE); } catch(e){}
+  benvenutoInVista = false;
+  const bv = el('benvenutoHint');
+  if (bv) { bv.innerHTML = ''; bv.style.display = 'none'; }
+  hintBenvenuto();                 // il benvenuto torna in cima a Esplora
+  checklistPrimoSguardo = true;    // e la checklist si riapre da sola
+  checklistAperta = false;
+  renderChecklist();
+  toast('🧽 Fatto: per gli hint sei di nuovo un nuovo arrivato');
 }
 
 async function deleteListing(id, dalDettaglio){
@@ -4647,7 +4708,7 @@ function bannerInstallaPwa(){
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS si traveste da Mac
   const mobile = ios || /Android/i.test(navigator.userAgent);
   if (tg?.initData || pwaStandalone() || !mobile || DEMO
-      || installaRimandata
+      || installaRimandata || benvenutoInVista
       || (!ios && !firefoxAndroid() && !eventoInstalla)) return;  // su Chrome/Edge solo con l'evento vero in mano
   const cta = (ios || firefoxAndroid())
     ? `<a onclick="apriInstallSheet()">Come si fa</a>`
@@ -5511,6 +5572,7 @@ async function avvia(){
     }
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
+    hintBenvenuto();           // il benvenuto one-shot, prima del banner installa
     bannerInstallaPwa();       // web mobile loggato: le guardie decidono
   } catch (e) {
     /* Browser fuori da Telegram: vetrina vera in sola lettura
