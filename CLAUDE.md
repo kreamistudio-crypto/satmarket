@@ -8,7 +8,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 ## Architettura
 
 - `server.py` — backend FastAPI + SQLite (`satmarket.db`), un solo file.
-  Escrow LNbits (invoice key incassa, admin key paga), commissione 1%,
+  Escrow LNbits (invoice key incassa, admin key paga), commissione
+  SOSPESA (COMMISSIONE_PERCENTO=0 nel config, cifra da decidere:
+  quando si accenderà vanno rimessi i testi con la cifra — l'elenco
+  dei punti è nel commit del lug 2026 che l'ha azzerata),
   notifiche via bot Telegram, ricerca AI (Haiku), orologio asyncio per gli
   sblocchi automatici (72h dalla consegna, 10gg dalla spedizione).
   `/api/listings` è PUBBLICA (vetrina anche senza Telegram) ma serve solo
