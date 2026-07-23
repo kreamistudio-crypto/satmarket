@@ -512,21 +512,18 @@
   .seller .who{flex:1}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
-  /* La sfilza dei distintivi accanto al nome del venditore:
-     cerchietti d'oro con la sola iconcina, leggermente sovrapposti
-     stile Vinted. L'oro e' quello delle tessere e non cambia col
-     tema. Nel dettaglio annuncio e' troncata a «+N», nella testata
-     del negozio esce completa (flex-wrap: a capo da sola). */
-  .sfilza{display:inline-flex;flex-wrap:wrap;row-gap:3px;
-    vertical-align:-5px;margin-left:6px}
-  .sfilza .medaglia{width:22px;height:22px;border-radius:50%;
-    background:linear-gradient(180deg,var(--gold-a),var(--gold-b));
-    border:1px solid var(--gold-line);display:inline-flex;
-    align-items:center;justify-content:center;font-size:12px;
-    line-height:1;margin-left:-4px;flex:none}
-  .sfilza .medaglia:first-child{margin-left:0}
+  /* La sfilza dei distintivi accanto al nome del venditore: emoji
+     nude in fila con un piccolo respiro (niente cerchietti d'oro:
+     nude e sovrapposte si impasterebbero — l'oro resta alle tessere
+     del foglietto). Le emoji sono glifi a colori propri: leggibili
+     uguali in chiaro e scuro; il «+N» usa --muted, che segue il
+     tema. Nel dettaglio annuncio la sfilza e' troncata a «+N»,
+     nella testata del negozio esce completa (flex-wrap: a capo). */
+  .sfilza{display:inline-flex;flex-wrap:wrap;align-items:center;
+    gap:4px;row-gap:3px;vertical-align:-3px;margin-left:6px}
+  .sfilza .medaglia{font-size:19px;line-height:1;flex:none}
   .sfilza .medaglia.piu{font-family:'JetBrains Mono',monospace;
-    font-size:10px;font-weight:800;color:var(--gold-text)}
+    font-size:11px;font-weight:800;color:var(--muted)}
   .sfilza.tocca{cursor:pointer}
   .stars{color:var(--sats);letter-spacing:1px}
   .desc{color:var(--desc);font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
