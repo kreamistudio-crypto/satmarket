@@ -1146,6 +1146,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`genera_chiave_release.py`, `profilo_release.py`) vivono in
   `..\..\barattolo-twa` col keystore, fuori dal repo; nessuno dei due
   scrive segreti su disco.
+  LEZIONE publisher nuovo (lug 2026, da un bug vissuto): il popup
+  «Trust this app?» di Zapstore resta APPESO per sempre se la npub
+  del publisher non ha un profilo kind-0 — il client cerca il profilo
+  solo in cache locale, senza timeout né ramo d'errore (verificato
+  nel sorgente, relevant_who_follow_container.dart), e la precarica
+  dai relay "social" damus/primal/nos.lol. Quindi: per OGNI npub
+  nuova che firma release, PRIMA il kind-0 su quei relay, POI lo
+  `zsp publish`. Il campo pubkey in zapstore.yaml non c'entra (è il
+  whitelisting lato relay, il client non lo guarda). Senza follower
+  il secondo stadio (web-of-trust via DVM Vertex) dice solo «No
+  reputation information found» ma NON blocca: un follow kind-3 dalla
+  piattaforma e la nota di presentazione lo popolano —
+  `presenta_release.py` nel repo fa entrambi (una tantum, idempotente,
+  legge e ESTENDE la lista follow esistente senza mai sovrascriverla,
+  gira sul VPS con la chiave della piattaforma dal config).
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
 - `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
