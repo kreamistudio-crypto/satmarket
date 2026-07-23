@@ -512,12 +512,22 @@
   .seller .who{flex:1}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
-  /* Il chip di fiducia accanto al nome del venditore: una medaglietta
-     d'oro come le tessere dei distintivi (l'oro non cambia col tema) */
-  .chip-fiducia{display:inline-block;vertical-align:1px;margin-left:6px;
+  /* La sfilza dei distintivi accanto al nome del venditore:
+     cerchietti d'oro con la sola iconcina, leggermente sovrapposti
+     stile Vinted. L'oro e' quello delle tessere e non cambia col
+     tema. Nel dettaglio annuncio e' troncata a «+N», nella testata
+     del negozio esce completa (flex-wrap: a capo da sola). */
+  .sfilza{display:inline-flex;flex-wrap:wrap;row-gap:3px;
+    vertical-align:-5px;margin-left:6px}
+  .sfilza .medaglia{width:22px;height:22px;border-radius:50%;
     background:linear-gradient(180deg,var(--gold-a),var(--gold-b));
-    border:1px solid var(--gold-line);border-radius:999px;padding:1px 8px;
-    font-size:11px;font-weight:800;color:var(--gold-text);white-space:nowrap}
+    border:1px solid var(--gold-line);display:inline-flex;
+    align-items:center;justify-content:center;font-size:12px;
+    line-height:1;margin-left:-4px;flex:none}
+  .sfilza .medaglia:first-child{margin-left:0}
+  .sfilza .medaglia.piu{font-family:'JetBrains Mono',monospace;
+    font-size:10px;font-weight:800;color:var(--gold-text)}
+  .sfilza.tocca{cursor:pointer}
   .stars{color:var(--sats);letter-spacing:1px}
   .desc{color:var(--desc);font-size:14.5px;margin:6px 0 16px;white-space:pre-line}
 
@@ -1310,6 +1320,17 @@
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET DISTINTIVI DEL VENDITORE ============ -->
+  <div class="sheet" id="distintiviSheet">
+    <div class="grab"></div>
+    <h3>🏅 Distintivi guadagnati</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600">
+      Si guadagnano usando Barattolo: affari conclusi, feedback, identità verificate.
+    </div>
+    <div id="distintiviSheetLista" style="max-height:60vh;overflow-y:auto"></div>
+    <button class="btn ghost" onclick="closeSheet()">Chiudi</button>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div id="attesaOverlay"><div class="attesa-card"><img class="attesa-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="attesa-clessidra">⏳</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
@@ -1835,17 +1856,52 @@ async function caricaAltriNegozio(){
   negozioPag.caricando = false;
 }
 
+/* La sfilza delle medagliette: sole iconcine nei cerchietti d'oro,
+   "nostrano" sempre fuori (il 🟣 accanto al nome dice gia' la stessa
+   cosa; nel foglietto invece c'e', ed e' il posto che lo spiega).
+   Con `max` si tronca a «+N» (dettaglio annuncio); senza, esce
+   completa. Con `tocca` un tocco apre il foglietto del negozio.
+   I fiducia arrivano per primi dal server: sotto il «+N» finiscono
+   solo i badge di percorso. */
+function sfilzaDistintivi(lista, max, tocca){
+  const d = (lista||[]).filter(x=>x.id!=='nostrano');
+  if (!d.length) return '';
+  const visibili = max ? d.slice(0, max) : d;
+  const resto = d.length - visibili.length;
+  return `<span class="sfilza${tocca?' tocca':''}"${tocca
+      ? ` onclick="apriDistintiviSheet()" title="Tocca per scoprirli tutti"`:''}>`
+    + visibili.map(x=>`<span class="medaglia" title="${esc(x.nome)}: ${esc(x.descrizione)}">${esc(x.emoji)}</span>`).join('')
+    + (resto>0?`<span class="medaglia piu">+${resto}</span>`:'')
+    + `</span>`;
+}
+
+/* Il foglietto della bacheca: TUTTI i distintivi guadagnati dal
+   venditore del negozio aperto, tessere d'oro con nome e descrizione
+   (le stesse del cassetto del Profilo). Solo i guadagnati: i
+   mancanti sono una molla per il proprietario, non per il pubblico. */
+function apriDistintiviSheet(){
+  const lista = (negozioCorrente && negozioCorrente.distintivi) || [];
+  if (!lista.length) return;
+  el('distintiviSheetLista').innerHTML = `
+    <div class="distintivi">${lista.map(d=>`
+      <div class="distintivo">
+        <span class="em">${esc(d.emoji)}</span><b>${esc(d.nome)}</b>
+        <small>${esc(d.descrizione)}</small>
+      </div>`).join('')}</div>`;
+  el('sheetBg').classList.add('open');
+  el('distintiviSheet').classList.add('open');
+}
+
 function renderNegozio(v, annunci, feedback=[]){
   negozioCorrente = v;
   /* Il badge pubblico esiste SOLO con la npub verificata (e quindi
      senza ✓: il non-verificato qui non compare proprio) */
   const badge = v.npub_verificata
     ? ' <span title="Venditore verificato su Nostr">🟣</span>' : '';
-  /* I distintivi di fiducia accanto al nome (dal server arrivano solo
-     quelli): il tooltip racconta come si guadagnano. "nostrano" si
-     salta perche' il 🟣 accanto al nome dice gia' la stessa cosa. */
-  const fiducia = (v.distintivi||[]).filter(d=>d.id!=='nostrano')
-    .map(d=>` <span title="${esc(d.nome)}: ${esc(d.descrizione)}">${esc(d.emoji)}</span>`).join('');
+  /* La bacheca completa dei distintivi (tutte le iconcine, a capo se
+     serve, mai il «+N»: e' la vetrina del venditore) — un tocco apre
+     il foglietto che li racconta uno a uno. */
+  const fiducia = sfilzaDistintivi(v.distintivi, 0, true);
   /* Le stelle compaiono solo quando c'e' un rating vero: "0 ★" in
      vetrina farebbe solo danno a un venditore appena arrivato */
   const rep = (v.rating>0
@@ -2275,11 +2331,10 @@ function openDetail(id){
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${avatarImg(l.avatar)}${esc(l.seller[0])}</div>
         <div class="who"><b>${esc(l.seller)}</b>${
-          /* le medagliette di fiducia (max 3): "nostrano" si salta,
-             la pillola 🟣 tra i chip dice gia' la stessa cosa —
-             l'identita' Nostr nel dettaglio si dice UNA volta sola */
-          (l.distintivi||[]).filter(d=>d.id!=='nostrano').slice(0,3)
-            .map(d=>`<span class="chip-fiducia" title="${esc(d.nome)}: ${esc(d.descrizione)}">${esc(d.emoji)} ${esc(d.nome)}</span>`).join('')}
+          /* la sfilza compatta (prime 4 + «+N»): il resto si scopre
+             nel negozio, dove porta gia' tutta la card. Niente tocco
+             qui dentro: il bersaglio resta uno solo. */
+          sfilzaDistintivi(l.distintivi, 4)}
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
@@ -2611,6 +2666,7 @@ function closeSheet(){
   el('collegaSheet').classList.remove('open');
   el('nwcConfermaSheet').classList.remove('open');
   el('installSheet').classList.remove('open');
+  el('distintiviSheet').classList.remove('open');
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 

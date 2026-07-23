@@ -242,7 +242,10 @@ def nuovo_codice_negozio(con) -> str:
 # incrementali: cosi' fusioni e rimozioni si sistemano da sole. I
 # criteri "pesanti" contano solo ordini released = sats veri passati
 # dall'escrow con la sua commissione: gonfiarli costa piu' del premio.
-# "fiducia" = si mostra anche nel negozio pubblico, accanto al nome.
+# "fiducia" = parla di affidabilita' (non di percorso); dal lug 2026
+# in pubblico escono TUTTI i guadagnati, e il flag decide solo la
+# precedenza: i fiducia stanno in testa al catalogo, quindi in testa
+# alla sfilza — quando il dettaglio annuncio tronca a «+N», restano.
 
 DISTINTIVI = [
     dict(id="nostrano", emoji="🟣", nome="Nostrano", fiducia=True,
@@ -2376,16 +2379,19 @@ CAMPI_VETRINA = (
 
 
 def espandi_distintivi_vetrina(righe):
-    """Il GROUP_CONCAT dei badge diventa la lista di chip di FIDUCIA
+    """Il GROUP_CONCAT dei badge diventa la lista di chip
     {id, emoji, nome, descrizione} — gli stessi del negozio pubblico:
-    la Mini App non hardcoda mai il catalogo, e i distintivi non di
-    fiducia verso la vetrina non escono proprio."""
+    la Mini App non hardcoda mai il catalogo. Dal lug 2026 escono
+    TUTTI i guadagnati (bacheca stile Vinted, deciso con Andrea);
+    l'ordine e' quello del catalogo, che mette i fiducia per primi —
+    quando il frontend tronca a «+N», a sparire sono i badge di
+    percorso, mai quelli di affidabilita'."""
     for r in righe:
         presi = set((r.pop("venditore_distintivi", "") or "").split(","))
         r["venditore_distintivi"] = [
             dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
                  descrizione=d["descrizione"])
-            for d in DISTINTIVI if d["fiducia"] and d["id"] in presi]
+            for d in DISTINTIVI if d["id"] in presi]
     return righe
 
 
@@ -2809,8 +2815,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
         "FROM feedback f LEFT JOIN ordini o ON o.id=f.ordine_id "
         "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT 10",
         (v["tg_id"],))]
-    # Sul profilo pubblico solo i distintivi "di fiducia": gli altri
-    # affollerebbero e raccontano piu' del percorso che dell'affidabilita'
+    # Sul profilo pubblico TUTTI i distintivi guadagnati (lug 2026,
+    # bacheca stile Vinted): sono aggregati senza segreti, e il
+    # foglietto del negozio li racconta uno a uno. L'ordine del
+    # catalogo mette i fiducia per primi.
     presi = {r["badge_id"] for r in con.execute(
         "SELECT badge_id FROM badge_utente WHERE tg_id=?", (v["tg_id"],))}
     con.close()
@@ -2818,7 +2826,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     venditore["distintivi"] = [
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
-        for d in DISTINTIVI if d["fiducia"] and d["id"] in presi]
+        for d in DISTINTIVI if d["id"] in presi]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     risposta = {"venditore": venditore, "annunci": annunci,
                 "feedback": feedback}
