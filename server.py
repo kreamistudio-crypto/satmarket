@@ -504,15 +504,26 @@ def init_db():
                     # profilo, preso dal social di provenienza (foto
                     # Telegram, o picture del kind-0 Nostr). Nome file
                     # in foto/ ('' = niente foto, resta l'iniziale);
-                    # avatar_visibile e' la levetta «Mostra la mia
-                    # foto» del cassetto Identita', accesa di default.
+                    # avatar_scelta e' il selettore «La tua foto» del
+                    # cassetto Identita': '' = automatico (la catena
+                    # Telegram → Nostr → iniziale), oppure la scelta
+                    # esplicita 'telegram' | 'nostr' | 'nessuna'
                     "avatar TEXT DEFAULT ''",
                     "avatar_aggiornato INTEGER DEFAULT 0",
-                    "avatar_visibile INTEGER DEFAULT 1"):
+                    "avatar_scelta TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # La levetta binaria avatar_visibile e' vissuta solo nei DB di
+    # collaudo (mai deployata): chi l'aveva spenta passa a 'nessuna'
+    # nel selettore che l'ha sostituita, la colonna vecchia resta
+    # inerte dov'era
+    try:
+        con.execute("UPDATE utenti SET avatar_scelta='nessuna' "
+                    "WHERE avatar_visibile=0 AND avatar_scelta=''")
+    except sqlite3.OperationalError:
+        pass   # DB nato dopo la levetta: la colonna vecchia non c'e'
     # Due account non possono condividere la stessa chiave di accesso:
     # lo garantisce il database stesso, non solo il codice.
     con.execute(
@@ -2357,7 +2368,7 @@ CAMPI_VETRINA = (
     "u.negozio AS venditore_negozio, "
     # il francobollo esce solo con la levetta «Mostra la mia foto»
     # accesa: spenta, il nome file non lascia proprio il server
-    "(CASE WHEN u.avatar_visibile=1 THEN u.avatar ELSE '' END) "
+    "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
     " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
@@ -2621,7 +2632,7 @@ CAMPI_MIEI = (
     "u.npub AS venditore_npub, "
     "u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, "
-    "(CASE WHEN u.avatar_visibile=1 THEN u.avatar ELSE '' END) "
+    "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
     " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
@@ -2757,8 +2768,8 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
                      "rating, n_feedback, vendite_ok, negozio, "
-                     "(CASE WHEN avatar_visibile=1 THEN avatar ELSE '' END) "
-                     "AS avatar FROM utenti ")
+                     "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
+                     "END) AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
                     "AND username!='' LIMIT 1", (chi,)).fetchone()
     if not v:
@@ -3270,7 +3281,7 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
             "u.npub AS venditore_npub, "
             "u.npub_verificata AS venditore_npub_verificata, "
             "u.negozio AS venditore_negozio, "
-            "(CASE WHEN u.avatar_visibile=1 THEN u.avatar ELSE '' END) "
+            "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
             "AS venditore_avatar, "
             "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
             " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
@@ -3735,27 +3746,32 @@ async def _foto_profilo_nostr(npub: str) -> bytes | None:
 
 
 async def aggiorna_avatar(tg_id: int):
-    """Rinfresca il francobollo dal social di provenienza. Catena dei
-    doppi cittadini: prima la foto Telegram (l'anagrafica comanda:
-    dopo la fusione nome e username vengono da li'), poi la picture
-    Nostr — SOLO da chiave dal possesso dimostrato, la regola di
-    notifica(): mai pescare la foto di Caio perche' Tizio ne ha
-    dichiarato la npub — e senza nulla resta l'iniziale."""
+    """Rinfresca il francobollo dal social scelto in avatar_scelta:
+    '' = automatico, la catena dei doppi cittadini — prima la foto
+    Telegram (l'anagrafica comanda: dopo la fusione nome e username
+    vengono da li'), poi la picture Nostr, e senza nulla l'iniziale;
+    'telegram' | 'nostr' = solo quella gamba, senza ripiego (la
+    scelta esplicita si rispetta: il social senza foto = iniziale);
+    'nessuna' = non si scarica proprio. La gamba Nostr SOLO da chiave
+    dal possesso dimostrato, la regola di notifica(): mai pescare la
+    foto di Caio perche' Tizio ne ha dichiarato la npub."""
     if tg_id in _AVATAR_IN_CORSO:
         return
     _AVATAR_IN_CORSO.add(tg_id)
     try:
         con = db()
         u = con.execute(
-            "SELECT negozio, npub, npub_verificata, npub_accesso "
-            "FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+            "SELECT negozio, npub, npub_verificata, npub_accesso, "
+            "avatar_scelta FROM utenti WHERE tg_id=?",
+            (tg_id,)).fetchone()
         con.close()
-        if not u or not u["negozio"]:
+        if not u or not u["negozio"] or u["avatar_scelta"] == "nessuna":
             return
+        scelta = u["avatar_scelta"]
         raw = None
-        if tg_id > 0:
+        if tg_id > 0 and scelta in ("", "telegram"):
             raw = await _foto_profilo_telegram(tg_id)
-        if not raw:
+        if not raw and scelta in ("", "nostr"):
             npub = u["npub_accesso"] or \
                 (u["npub"] if u["npub_verificata"] else "")
             if npub:
@@ -3778,9 +3794,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
                     (user["id"],)).fetchone()
     # Rinfresco opportunistico del francobollo: alla prima apertura e
     # poi al piu' una volta a settimana, in sottofondo (fail-open:
-    # questa risposta non lo aspetta, la foto compare al giro dopo)
-    if u and (int(time.time()) - (u["avatar_aggiornato"] or 0)
-              > GIORNI_AVATAR * 86400):
+    # questa risposta non lo aspetta, la foto compare al giro dopo).
+    # Con 'nessuna' non si scarica nulla: la scelta si rispetta.
+    if u and u["avatar_scelta"] != "nessuna" \
+            and (int(time.time()) - (u["avatar_aggiornato"] or 0)
+                 > GIORNI_AVATAR * 86400):
         asyncio.create_task(aggiorna_avatar(user["id"]))
     if u:
         # Passata silenziosa dei distintivi: cosi' Pioniere e compagni
@@ -4033,32 +4051,51 @@ async def scegli_canale_notifiche(req: Request,
     return {"ok": True, "canale": canale}
 
 
-@app.post("/api/me/avatar-visibile")
-async def scegli_avatar_visibile(req: Request,
-                                 x_tg_init_data: str = Header(""),
-                                 barattolo_sessione: str = Cookie("")):
-    """La levetta «Mostra la mia foto» del cassetto Identita': governa
-    l'uscita PUBBLICA del francobollo (vetrina, negozio, dettaglio —
-    il CASE nelle SELECT). Spenta, ovunque torna l'iniziale; il file
-    resta in dispensa, riaccenderla non ricomincia da zero."""
+@app.post("/api/me/avatar-scelta")
+async def scegli_avatar(req: Request,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Il selettore «La tua foto» del cassetto Identita': da quale
+    social prendere il francobollo — '' = automatico (la catena
+    Telegram → Nostr → iniziale), 'telegram' | 'nostr' espliciti per
+    chi ha entrambe le sorgenti, 'nessuna' = iniziale ovunque per il
+    pubblico (reversibile: il file resta in dispensa e il CASE nelle
+    SELECT lo tiene in casa). Si accetta solo una sorgente che esiste
+    davvero — il pattern di canale-notifiche."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    visibile = 1 if d.get("visibile") else 0
+    scelta = (d.get("scelta") or "").strip().lower()
+    if scelta not in ("", "telegram", "nostr", "nessuna"):
+        raise HTTPException(400, "Scelta sconosciuta: telegram, nostr, "
+                                 "nessuna o vuoto (automatico)")
     con = db()
-    r = con.execute("SELECT avatar FROM utenti WHERE tg_id=?",
-                    (user["id"],)).fetchone()
-    if not r:
+    u = con.execute(
+        "SELECT npub, npub_verificata, npub_accesso FROM utenti "
+        "WHERE tg_id=?", (user["id"],)).fetchone()
+    if not u:
         con.close()
         raise HTTPException(404, "Profilo non trovato")
-    con.execute("UPDATE utenti SET avatar_visibile=? WHERE tg_id=?",
-                (visibile, user["id"]))
+    if scelta == "telegram" and user["id"] < 0:
+        con.close()
+        raise HTTPException(400,
+            "Questo account non ha una chat Telegram: collegala dal "
+            "blocco «Le tue identita'»")
+    ha_nostr = bool(u["npub_accesso"] or
+                    (u["npub"] and u["npub_verificata"]))
+    if scelta == "nostr" and not ha_nostr:
+        con.close()
+        raise HTTPException(400,
+            "Prima verifica la tua npub (o entra con Nostr): la foto si "
+            "prende solo da una chiave di cui hai dimostrato il possesso")
+    con.execute("UPDATE utenti SET avatar_scelta=? WHERE tg_id=?",
+                (scelta, user["id"]))
     con.commit()
     con.close()
-    # Riaccesa senza foto in dispensa: proviamo subito a procurarla
-    # (solo allora — sull'interruttore non si rifanno download inutili)
-    if visibile and not r["avatar"]:
+    # La sorgente e' cambiata: il francobollo in dispensa puo' venire
+    # dall'altro social, si rifa' subito (con 'nessuna' non si scarica)
+    if scelta != "nessuna":
         asyncio.create_task(aggiorna_avatar(user["id"]))
-    return {"ok": True, "visibile": bool(visibile)}
+    return {"ok": True, "scelta": scelta}
 
 
 # --- Avvisi di ricerca: «dimmi quando esce quello che cerco» ---------

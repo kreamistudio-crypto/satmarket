@@ -3024,10 +3024,12 @@ async function salvaLnAddressProfilo(btn){
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
-/* il francobollo della propria foto profilo e la sua levetta: il
-   Profilo e il tappo mostrano sempre la PROPRIA foto (vista privata),
-   la levetta governa solo l'uscita pubblica decisa dal server */
-let myAvatar = '', myAvatarVisibile = true;
+/* il francobollo della propria foto profilo e il suo selettore
+   ('' = automatico, la catena Telegram → Nostr → iniziale; oppure
+   telegram | nostr | nessuna): il Profilo e il tappo mostrano sempre
+   la PROPRIA foto (vista privata), il selettore governa la sorgente
+   e l'uscita pubblica decise dal server */
+let myAvatar = '', myAvatarScelta = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
@@ -3343,37 +3345,51 @@ function renderIdentita(){
            ${sub(`Chiude solo l'ingresso via Nostr: la npub nel profilo resta.`)}`
         : sub(`È il tuo unico ingresso: per rimuoverla collega prima Telegram.`)) + btnRimuovi);
   }
-  /* — riga foto profilo (avatar lug 2026) — la levetta «Mostra la mia
-     foto»: governa solo l'uscita PUBBLICA (vetrina, negozio,
-     dettaglio), il tappo e il Profilo restano roba privata. Accesa di
-     default: chi non vuole la faccia in giro la spegne qui. */
-  const fotoRiga = riga('📷', 'La tua foto',
-    myAvatarVisibile
-      ? (myAvatar
-          ? `Presa dal tuo profilo ${myTgId > 0 ? 'Telegram' : 'Nostr'}, compare accanto al tuo nome in vetrina e nel negozio.`
-          : `Appena il tuo profilo ${myTgId > 0 ? 'Telegram' : 'Nostr'} ne avrà una, comparirà accanto al tuo nome in vetrina e nel negozio.`)
-      : `Nascosta: accanto al tuo nome compare la tua iniziale.`,
-    `<button class="btn ghost" style="margin:0 0 8px" onclick="toggleFotoProfilo()">${myAvatarVisibile ? 'Nascondi la mia foto' : '📷 Mostra la mia foto'}</button>`);
+  /* — riga foto profilo (avatar lug 2026) — il selettore «La tua
+     foto»: da quale social prendere il francobollo. Le voci compaiono
+     solo se la sorgente esiste davvero (mono-canale = la sua +
+     «Nessuna», il selettore pieno e' dei doppi cittadini); senza
+     scelta vale la catena automatica Telegram → Nostr → iniziale, e
+     la pillola accesa e' la sorgente EFFETTIVA (il pattern del
+     cassetto Avvisi). «Nessuna» = iniziale ovunque per il pubblico,
+     reversibile. */
+  const tgFotoOk = myTgId != null && myTgId > 0;
+  const nostrFotoOk = !!(myNpubAccesso || (myNpub && myNpubVerified));
+  const attivaFoto = myAvatarScelta || (tgFotoOk ? 'telegram' : 'nostr');
+  const pillFoto = (val, nome) =>
+    `<button onclick="setFotoScelta('${val}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${attivaFoto===val?'var(--sats)':'var(--line)'};background:${attivaFoto===val?'var(--sats)':'transparent'};color:${attivaFoto===val?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${nome}</button>`;
+  const statoFoto = attivaFoto === 'nessuna'
+    ? 'Nessuna: accanto al tuo nome compare la tua iniziale.'
+    : `Viene dal tuo profilo <b style="color:var(--ink)">${attivaFoto==='telegram'?'✈️ Telegram':'🟣 Nostr'}</b>`
+      + (myAvatarScelta ? '' : ' (automatico)')
+      + ` e compare accanto al tuo nome in vetrina e nel negozio.`;
+  const fotoRiga = riga('📷', 'La tua foto', statoFoto)
+    + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px">
+        ${tgFotoOk ? pillFoto('telegram','✈️ Telegram') : ''}
+        ${nostrFotoOk ? pillFoto('nostr','🟣 Nostr') : ''}
+        ${pillFoto('nessuna','Nessuna')}</div>`;
   box.innerHTML = tgRiga + nsRiga + fotoRiga;
   renderAvvisi();
   renderRicerche();
 }
 
-/* La levetta della foto: il server la scrive e, riaccesa senza foto
-   in dispensa, prova subito a procurarla dal social di provenienza */
-async function toggleFotoProfilo(){
+/* Il selettore della foto: il server valida la sorgente (esiste
+   davvero?) e, se non e' «nessuna», rifa' subito il francobollo dal
+   social scelto */
+async function setFotoScelta(scelta){
   haptic();
   if (DEMO) { toast('In demo non ci sono foto vere 🙂'); return; }
   try {
-    const r = await fetch(`${API_BASE}/me/avatar-visibile`,
+    const r = await fetch(`${API_BASE}/me/avatar-scelta`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({visibile: !myAvatarVisibile})});
+       body: JSON.stringify({scelta})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
-    myAvatarVisibile = !!d.visibile;
+    myAvatarScelta = d.scelta;
     renderIdentita();
-    toast(myAvatarVisibile ? '📷 La tua foto è visibile'
-                           : '👤 Nascosta: torna l\'iniziale');
+    toast(scelta==='nessuna' ? '👤 Solo l\'iniziale, ovunque'
+        : scelta==='nostr'   ? '📷 Foto dal profilo Nostr'
+        : '📷 Foto dal profilo Telegram');
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
@@ -5722,7 +5738,7 @@ async function avvia(){
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
-    myAvatar = me.avatar || ''; myAvatarVisibile = me.avatar_visibile !== 0;
+    myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
     myDoppioni = me.doppioni_nostr || [];
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
