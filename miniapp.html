@@ -135,6 +135,10 @@
   .avatar-btn .av-ini{position:relative;font-family:'Baloo 2',sans-serif;
     font-weight:800;font-size:17px;line-height:1;color:#23282C;
     text-shadow:0 1px 0 rgba(255,255,255,.6),0 0 5px rgba(255,255,255,.55)}
+  /* Con la foto profilo caricata (avatar lug 2026) la faccia prende
+     il posto del metallo e l'iniziale si spegne; se la foto non
+     arriva il JS ripiega sul tappo e l'iniziale torna */
+  .avatar-btn.con-foto .av-ini{display:none}
   .avatar-btn.oro{box-shadow:0 0 0 2px var(--gold-line),0 2px 0 rgba(35,40,44,.25)}
   /* Sulla vista Profilo nessuna voce di nav e' attiva: si accende
      il tappo, con l'anello arancione */
@@ -499,7 +503,12 @@
     border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin:14px 0;
   }
   .avatar{width:42px;height:42px;border-radius:50%;background:var(--ink);color:var(--on-ink);
-    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;
+    position:relative;overflow:hidden;flex:0 0 auto}
+  /* La foto profilo sopra l'iniziale (avatar lug 2026): copre il
+     cerchio, e se non arriva l'onerror la toglie e resta l'iniziale
+     — mai un'immagine rotta, il patto della mascotte */
+  .avatar .av-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .seller .who{flex:1}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
@@ -1357,6 +1366,15 @@ function fotoMini(nome){
   if (!nome || nome.startsWith('http') || nome.startsWith('data:')) return nome;
   return nome.replace(/\.jpg$/i, '_min.jpg');
 }
+/* Il francobollo della foto profilo (avatar lug 2026): un <img> da
+   posare DENTRO un cerchio .avatar, sopra l'iniziale — se la foto
+   non arriva l'onerror lo toglie e resta l'iniziale, mai un'immagine
+   rotta. Il nome file lo genera il server (av_{negozio}_{ts}.jpg) ma
+   passa comunque dal filtro-alfabeto: finisce in un template HTML. */
+function avatarImg(nome){
+  const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
+  return n ? `<img class="av-foto" src="${fotoUrl(n)}" alt="" onerror="this.remove()">` : '';
+}
 function mapListing(a){
   let photos = [], thumbs = [];
   try {
@@ -1379,6 +1397,9 @@ function mapListing(a){
     nostr:(a.contatto_nostr||'').replace(/[^a-z0-9]/g,''),
     sellerNpub:a.venditore_npub||'', sellerNpubOk:!!a.venditore_npub_verificata,
     negozio:a.venditore_negozio||'',
+    /* il francobollo del venditore: nome file, gia' vuoto se la sua
+       levetta «Mostra la mia foto» e' spenta (decide il server) */
+    avatar:(a.venditore_avatar||'').replace(/[^A-Za-z0-9_.-]/g,''),
     distintivi:a.venditore_distintivi||[]};
 }
 function mapOrder(o){
@@ -1847,7 +1868,7 @@ function renderNegozio(v, annunci, feedback=[]){
     chi ? `a ${esc(chi)}` : 'al venditore');
   el('negozioHeader').innerHTML = `
     <div class="seller" style="margin-top:14px">
-      <div class="avatar">${esc((v.nome||'?')[0])}</div>
+      <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
         <div class="rep">${rep}</div>
       </div>
@@ -2252,7 +2273,7 @@ function openDetail(id){
         ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
       </div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
-        <div class="avatar">${esc(l.seller[0])}</div>
+        <div class="avatar">${avatarImg(l.avatar)}${esc(l.seller[0])}</div>
         <div class="who"><b>${esc(l.seller)}</b>${
           /* le medagliette di fiducia (max 3): "nostrano" si salta,
              la pillola 🟣 tra i chip dice gia' la stessa cosa —
@@ -3003,6 +3024,10 @@ async function salvaLnAddressProfilo(btn){
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
+/* il francobollo della propria foto profilo e la sua levetta: il
+   Profilo e il tappo mostrano sempre la PROPRIA foto (vista privata),
+   la levetta governa solo l'uscita pubblica decisa dal server */
+let myAvatar = '', myAvatarVisibile = true;
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
@@ -3036,7 +3061,7 @@ function renderProfilo(){
   const nome = myNome || 'Tu';
   box.innerHTML = `
     <div class="seller" style="margin-top:14px">
-      <div class="avatar">${esc(nome[0])}</div>
+      <div class="avatar">${avatarImg(myAvatar)}${esc(nome[0])}</div>
       <div class="who"><b>${esc(nome)}${badge}</b>
         <div class="rep">${rep}</div>
       </div>
@@ -3196,15 +3221,31 @@ async function ignoraDoppione(idImportato, idNativo){
 /* Il tasto-tappo del Profilo (testata mobile e topbar desktop: due
    istanze, stessa classe). C'e' ovunque tranne che in vetrina
    anonima; l'iniziale e' quella dell'utente e l'anello d'oro spunta
-   col primo distintivo guadagnato. */
+   col primo distintivo guadagnato. Con la foto profilo in dispensa
+   (avatar lug 2026) la faccia prende il posto del metallo: onload
+   accende .con-foto (che spegne l'iniziale), onerror ripiega sul
+   tappo di sempre — e se pure quello manca, this.remove() e resta
+   l'iniziale sul tappo disegnato in CSS, il patto della mascotte. */
 function renderAvatar(){
   /* lo spread non spezza le emoji: c'e' chi si chiama 🔥Marco */
   const ini = [...(myNome || myUsername || 'Tu')][0].toUpperCase();
   const oro = myDistintivi.some(d=>d.ottenuto);
+  const foto = (myAvatar || '').replace(/[^A-Za-z0-9_.-]/g, '');
   document.querySelectorAll('.avatar-btn').forEach(a=>{
     a.classList.toggle('on', !VETRINA);
     a.classList.toggle('oro', oro);
     a.querySelector('.av-ini').textContent = ini;
+    const img = a.querySelector('.av-tappo');
+    if (!img) return;             // gia' rimosso da un onerror passato
+    const src = foto ? fotoUrl(foto) : '/assets/tappo.jpeg';
+    if (img.getAttribute('src') === src) return;
+    a.classList.remove('con-foto');
+    img.onload  = foto ? ()=>a.classList.add('con-foto') : null;
+    img.onerror = ()=>{ img.onerror = ()=>img.remove();
+                        img.onload = null;
+                        a.classList.remove('con-foto');
+                        img.src = '/assets/tappo.jpeg'; };
+    img.src = src;
   });
 }
 
@@ -3302,9 +3343,38 @@ function renderIdentita(){
            ${sub(`Chiude solo l'ingresso via Nostr: la npub nel profilo resta.`)}`
         : sub(`È il tuo unico ingresso: per rimuoverla collega prima Telegram.`)) + btnRimuovi);
   }
-  box.innerHTML = tgRiga + nsRiga;
+  /* — riga foto profilo (avatar lug 2026) — la levetta «Mostra la mia
+     foto»: governa solo l'uscita PUBBLICA (vetrina, negozio,
+     dettaglio), il tappo e il Profilo restano roba privata. Accesa di
+     default: chi non vuole la faccia in giro la spegne qui. */
+  const fotoRiga = riga('📷', 'La tua foto',
+    myAvatarVisibile
+      ? (myAvatar
+          ? `Presa dal tuo profilo ${myTgId > 0 ? 'Telegram' : 'Nostr'}, compare accanto al tuo nome in vetrina e nel negozio.`
+          : `Appena il tuo profilo ${myTgId > 0 ? 'Telegram' : 'Nostr'} ne avrà una, comparirà accanto al tuo nome in vetrina e nel negozio.`)
+      : `Nascosta: accanto al tuo nome compare la tua iniziale.`,
+    `<button class="btn ghost" style="margin:0 0 8px" onclick="toggleFotoProfilo()">${myAvatarVisibile ? 'Nascondi la mia foto' : '📷 Mostra la mia foto'}</button>`);
+  box.innerHTML = tgRiga + nsRiga + fotoRiga;
   renderAvvisi();
   renderRicerche();
+}
+
+/* La levetta della foto: il server la scrive e, riaccesa senza foto
+   in dispensa, prova subito a procurarla dal social di provenienza */
+async function toggleFotoProfilo(){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono foto vere 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/avatar-visibile`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({visibile: !myAvatarVisibile})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myAvatarVisibile = !!d.visibile;
+    renderIdentita();
+    toast(myAvatarVisibile ? '📷 La tua foto è visibile'
+                           : '👤 Nascosta: torna l\'iniziale');
+  } catch(e) { toast('Rete assente: riprova'); }
 }
 
 /* ---- Avvisi: dove ricevere le notifiche sugli affari. Le scelte si
@@ -5612,6 +5682,7 @@ async function avviaVetrina(){
   } catch (e) {
     /* Backend non raggiungibile: demo coi dati finti */
     DEMO = true;
+    myAvatar = '';             // dati finti, facce vere no: iniziale
     mostraBanner(BANNER_DEMO);
     renderAvatar();            // in demo il Profilo c'e': il tappo pure
     renderGrid(); renderOrders();
@@ -5651,6 +5722,7 @@ async function avvia(){
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
+    myAvatar = me.avatar || ''; myAvatarVisibile = me.avatar_visibile !== 0;
     myDoppioni = me.doppioni_nostr || [];
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;

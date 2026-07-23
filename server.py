@@ -499,7 +499,16 @@ def init_db():
                     # canale_notifiche: '' = automatico (Telegram se
                     # tg_id>0, DM Nostr per i nativi), oppure la scelta
                     # esplicita 'telegram' | 'nostr' | 'entrambi'
-                    "canale_notifiche TEXT DEFAULT ''"):
+                    "canale_notifiche TEXT DEFAULT ''",
+                    # avatar (lug 2026): il francobollo della foto
+                    # profilo, preso dal social di provenienza (foto
+                    # Telegram, o picture del kind-0 Nostr). Nome file
+                    # in foto/ ('' = niente foto, resta l'iniziale);
+                    # avatar_visibile e' la levetta «Mostra la mia
+                    # foto» del cassetto Identita', accesa di default.
+                    "avatar TEXT DEFAULT ''",
+                    "avatar_aggiornato INTEGER DEFAULT 0",
+                    "avatar_visibile INTEGER DEFAULT 1"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -2346,6 +2355,10 @@ CAMPI_VETRINA = (
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, "
+    # il francobollo esce solo con la levetta «Mostra la mia foto»
+    # accesa: spenta, il nome file non lascia proprio il server
+    "(CASE WHEN u.avatar_visibile=1 THEN u.avatar ELSE '' END) "
+    "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
     " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
     "u.rating, u.vendite_ok")
@@ -2608,6 +2621,8 @@ CAMPI_MIEI = (
     "u.npub AS venditore_npub, "
     "u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, "
+    "(CASE WHEN u.avatar_visibile=1 THEN u.avatar ELSE '' END) "
+    "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
     " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
     "u.rating, u.vendite_ok")
@@ -2741,7 +2756,9 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
-                     "rating, n_feedback, vendite_ok, negozio FROM utenti ")
+                     "rating, n_feedback, vendite_ok, negozio, "
+                     "(CASE WHEN avatar_visibile=1 THEN avatar ELSE '' END) "
+                     "AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
                     "AND username!='' LIMIT 1", (chi,)).fetchone()
     if not v:
@@ -3253,6 +3270,8 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
             "u.npub AS venditore_npub, "
             "u.npub_verificata AS venditore_npub_verificata, "
             "u.negozio AS venditore_negozio, "
+            "(CASE WHEN u.avatar_visibile=1 THEN u.avatar ELSE '' END) "
+            "AS venditore_avatar, "
             "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
             " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
             "u.rating FROM annunci a "
@@ -3590,13 +3609,179 @@ def trova_doppioni_nostr(con, tg_id: int) -> list:
     return coppie
 
 
+# ------------------- AVATAR DEL PROFILO (lug 2026) ------------------
+# La foto accanto al nome, presa dal social di provenienza: la foto
+# profilo Telegram per chi entra da Telegram, la picture del kind-0
+# per chi entra con Nostr. MAI un link agli originali: gli URL delle
+# foto via Bot API contengono il TOKEN del bot e scadono in un'ora,
+# quelli Nostr sono host esterni arbitrari (e ogni visitatore della
+# vetrina gli regalerebbe il suo IP). Quindi: si scarica, si riduce a
+# un francobollo 128px e si serve la NOSTRA copia da foto/ col nome
+# 'av_{negozio}_{ts}.jpg' — chiave = codice negozio pubblico (mai il
+# tg_id, che non deve uscire), timestamp = versione anti-cache: la
+# cache di 1 giorno su /foto lavora gratis come per le _min. Il
+# francobollo e' seconda generazione ammessa dal patto della filiera,
+# come le miniature. Fail-open totale: tutto gira in create_task e
+# senza foto resta l'iniziale di sempre.
+AVATAR_LATO = 128
+AVATAR_QUALITA = 85
+GIORNI_AVATAR = 7                    # rinfresco opportunistico
+_AVATAR_IN_CORSO: set[int] = set()   # anti-valanga: un fetch per utente
+
+
+def _salva_avatar(negozio: str, raw: bytes | None) -> str:
+    """Il francobollo: quadrato ritagliato al centro come le _min
+    (il CSS poi lo fa tondo). '' = niente foto."""
+    if not ImmaginePillow or not raw or not negozio:
+        return ""
+    try:
+        img = ImmaginePillow.open(io.BytesIO(raw))
+        img = ImageOps.exif_transpose(img).convert("RGB")
+        img = ImageOps.fit(img, (AVATAR_LATO, AVATAR_LATO),
+                           ImmaginePillow.Resampling.LANCZOS)
+        nome = f"av_{negozio}_{int(time.time())}.jpg"
+        img.save(os.path.join(FOTO_DIR, nome), "JPEG",
+                 quality=AVATAR_QUALITA)
+        return nome
+    except Exception:
+        return ""
+
+
+def _scrivi_avatar(tg_id: int, nome_nuovo: str):
+    """Aggiorna la colonna e spazza il file vecchio (i nomi sono
+    versionati: il vecchio non serve piu' a nessuno). Si scrive anche
+    il '' — la foto rimossa dal social sparisce anche da noi — e
+    avatar_aggiornato si segna comunque: niente ritentativi a raffica
+    per chi una foto non ce l'ha proprio."""
+    con = db()
+    r = con.execute("SELECT avatar FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    vecchio = r["avatar"] if r else ""
+    con.execute("UPDATE utenti SET avatar=?, avatar_aggiornato=? "
+                "WHERE tg_id=?", (nome_nuovo, int(time.time()), tg_id))
+    con.commit()
+    con.close()
+    if vecchio and vecchio != nome_nuovo:
+        try:
+            os.remove(os.path.join(FOTO_DIR, vecchio))
+        except OSError:
+            pass
+
+
+async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
+    """La foto profilo che il bot vede (se l'utente la nasconde ai
+    non-contatti, il bot non vede nulla: e' il suo modo di dire no).
+    L'URL del file va scaricato subito e mai esposto: porta il token.
+    In collaudo bot_api simula e qui esce None, come deve."""
+    r = await bot_api("getUserProfilePhotos",
+                      {"user_id": tg_id, "limit": 1})
+    try:
+        taglie = r["result"]["photos"][0]
+        # le misure arrivano in ordine crescente: la prima che copre
+        # il francobollo basta, e pesa meno
+        t = next((t for t in taglie
+                  if t.get("width", 0) >= AVATAR_LATO), taglie[-1])
+        f = await bot_api("getFile", {"file_id": t["file_id"]})
+        percorso = f["result"]["file_path"]
+        async with httpx.AsyncClient(timeout=15) as c:
+            resp = await c.get("https://api.telegram.org/file/"
+                               f"bot{BOT_TOKEN}/{percorso}")
+            resp.raise_for_status()
+            return resp.content
+    except Exception:
+        return None    # niente foto, privacy o rete che manca: pari sono
+
+
+def _kind0_picture(relay: str, hexkey: str):
+    """Chiede a UN relay il profilo kind-0 e ne estrae 'picture'.
+    Sincrona: va in asyncio.to_thread (pattern chiedi_relay_dm)."""
+    try:
+        ws = create_connection(relay, timeout=5,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "av", {
+            "kinds": [0], "authors": [hexkey], "limit": 1}]))
+        url, inizio = None, time.time()
+        while time.time() - inizio < 6:
+            msg = json.loads(ws.recv())
+            if msg[0] == "EVENT" and msg[1] == "av":
+                trovata = (json.loads(msg[2].get("content") or "{}")
+                           .get("picture") or "").strip()
+                url = trovata or url
+            elif msg[0] == "EOSE":
+                break
+        ws.close()
+        return url
+    except Exception:
+        return None
+
+
+async def _foto_profilo_nostr(npub: str) -> bytes | None:
+    """La picture del kind-0 dai 4 relay, scaricata con le stesse
+    guardie delle foto da URL dell'import (anti-SSRF + tetto 8MB):
+    l'URL lo scrive l'utente nel suo profilo, non un fidato."""
+    if not create_connection:
+        return None
+    try:
+        hexkey = npub_to_hex(npub)
+    except Exception:
+        return None
+    risposte = await asyncio.gather(*[
+        asyncio.to_thread(_kind0_picture, r, hexkey)
+        for r in RELAYS_VERIFICA])
+    url = next((u for u in risposte if u), None)
+    if not url or not url_foto_ammesso(url):
+        return None
+    return await asyncio.to_thread(scarica_foto_import, url)
+
+
+async def aggiorna_avatar(tg_id: int):
+    """Rinfresca il francobollo dal social di provenienza. Catena dei
+    doppi cittadini: prima la foto Telegram (l'anagrafica comanda:
+    dopo la fusione nome e username vengono da li'), poi la picture
+    Nostr — SOLO da chiave dal possesso dimostrato, la regola di
+    notifica(): mai pescare la foto di Caio perche' Tizio ne ha
+    dichiarato la npub — e senza nulla resta l'iniziale."""
+    if tg_id in _AVATAR_IN_CORSO:
+        return
+    _AVATAR_IN_CORSO.add(tg_id)
+    try:
+        con = db()
+        u = con.execute(
+            "SELECT negozio, npub, npub_verificata, npub_accesso "
+            "FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+        con.close()
+        if not u or not u["negozio"]:
+            return
+        raw = None
+        if tg_id > 0:
+            raw = await _foto_profilo_telegram(tg_id)
+        if not raw:
+            npub = u["npub_accesso"] or \
+                (u["npub"] if u["npub_verificata"] else "")
+            if npub:
+                raw = await _foto_profilo_nostr(npub)
+        _scrivi_avatar(tg_id, _salva_avatar(u["negozio"], raw))
+    except Exception as e:
+        print(f"⚠️ Avatar non aggiornato ({tg_id}): {e}")
+    finally:
+        _AVATAR_IN_CORSO.discard(tg_id)
+
+
 @app.get("/api/me")
-def mio_profilo(x_tg_init_data: str = Header(""),
-                barattolo_sessione: str = Cookie("")):
+async def mio_profilo(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    # async (era def) per il rinfresco dell'avatar in create_task:
+    # il resto e' identico, sqlite qui e' questione di millisecondi
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
+    # Rinfresco opportunistico del francobollo: alla prima apertura e
+    # poi al piu' una volta a settimana, in sottofondo (fail-open:
+    # questa risposta non lo aspetta, la foto compare al giro dopo)
+    if u and (int(time.time()) - (u["avatar_aggiornato"] or 0)
+              > GIORNI_AVATAR * 86400):
+        asyncio.create_task(aggiorna_avatar(user["id"]))
     if u:
         # Passata silenziosa dei distintivi: cosi' Pioniere e compagni
         # compaiono al primo sguardo al Profilo, senza aspettare un
@@ -3846,6 +4031,34 @@ async def scegli_canale_notifiche(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "canale": canale}
+
+
+@app.post("/api/me/avatar-visibile")
+async def scegli_avatar_visibile(req: Request,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """La levetta «Mostra la mia foto» del cassetto Identita': governa
+    l'uscita PUBBLICA del francobollo (vetrina, negozio, dettaglio —
+    il CASE nelle SELECT). Spenta, ovunque torna l'iniziale; il file
+    resta in dispensa, riaccenderla non ricomincia da zero."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    visibile = 1 if d.get("visibile") else 0
+    con = db()
+    r = con.execute("SELECT avatar FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "Profilo non trovato")
+    con.execute("UPDATE utenti SET avatar_visibile=? WHERE tg_id=?",
+                (visibile, user["id"]))
+    con.commit()
+    con.close()
+    # Riaccesa senza foto in dispensa: proviamo subito a procurarla
+    # (solo allora — sull'interruttore non si rifanno download inutili)
+    if visibile and not r["avatar"]:
+        asyncio.create_task(aggiorna_avatar(user["id"]))
+    return {"ok": True, "visibile": bool(visibile)}
 
 
 # --- Avvisi di ricerca: «dimmi quando esce quello che cerco» ---------
