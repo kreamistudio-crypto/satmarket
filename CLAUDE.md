@@ -732,22 +732,43 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (ln_address, npub verificata, wallet NWC «su questo dispositivo»,
   + Telegram per i tg_id negativi), niente dismiss, a profilo
   completo sparisce del tutto.
-  Benvenuto one-shot (lug 2026): riga `hintBenvenuto()` in
-  `#benvenutoHint` sotto l'header di Esplora alla PRIMA visita
-  autenticata (mai DEMO/VETRINA) — si segna vista in barattolo_hint
-  APPENA compare, quindi non torna nemmeno se ignorata (one-shot
-  vero, il «Non ora» la toglie solo subito); ha la precedenza sul
-  banner installa PWA (`benvenutoInVista`: quel giro il banner si fa
-  da parte, torna alla visita dopo); comparsa animata solo senza
-  prefers-reduced-motion. La checklist si apre da sola alla PRIMA
-  visita del Profilo con profilo incompleto (`checklistvista` in
-  barattolo_hint + `checklistPrimoSguardo` per pagina; a profilo
-  completo la prima visita NON si consuma), dalla seconda torna
-  chiusa com'era. Collaudo dal vivo: bottone admin «🧽 Trattami da
-  nuovo» in fondo alle statistiche (`trattamiDaNuovo()`) — azzera
-  barattolo_hint e riarma benvenuto e checklist SUL DISPOSITIVO:
-  gli hint sono localStorage puro, il server non c'entra (per questo
-  non è un comando bot) e annunci/ordini/profilo non si toccano.
+  Tour di benvenuto (lug 2026, ha SOSTITUITO la riga one-shot
+  `hintBenvenuto`): quattro tappe col riflettore alla PRIMA visita
+  autenticata (mai DEMO/VETRINA), zero librerie. Meccanica: velo
+  `#tour` (z-index 80, sopra lightbox 70; cattura ogni tocco e blocca
+  wheel/touchmove) + riflettore `#tourLuce` (il buio è la SUA ombra:
+  `box-shadow 0 0 0 9999px` — ritaglio con angoli morbidi gratis,
+  passaggio di tappa = transition su top/left/width/height, classe
+  `.tondo` per barattolino e tappo, anello `outline` arancio) +
+  fumetto `#tourFumetto` sui token (dark gratis), sotto il bersaglio
+  se c'è posto, sopra altrimenti, clampato ai bordi. Tappe
+  (`TAPPE_TOUR`: `trova()` + testo): prima `.card` della griglia →
+  primo `.card-jar` (NON per forza sulla prima card) → `.trust-line`
+  di Esplora (il deposito di garanzia, con «(escrow)» da prima
+  spiegazione) → `.avatar-btn.on` visibile (istanza header su mobile,
+  topbar da desktop, filtro `offsetParent`). Le tappe si fotografano
+  all'avvio (`tourTappe`): bersaglio assente = la tappa non entra nel
+  giro (contatore «N di M» onesto), NESSUNA tappa viva (vista
+  sbagliata, vetrina vuota) = non parte e NON consuma. Si consuma in
+  `barattolo_hint.tour` APPENA parte (one-shot vero: Salta/Escape
+  chiudono e basta); parte in `avvia()` dopo renderGrid, precedenza
+  sul banner installa PWA (`tourInCorso` al posto del vecchio
+  `benvenutoInVista`; alla chiusura si richiama `bannerInstallaPwa()`
+  che riottiene la sua occasione nella stessa visita).
+  Reduced-motion: niente transizioni né smooth scroll (`tourRidotto`).
+  ATTENZIONE ai rAF: `posizionaTour()` va chiamata anche in SINCRONO
+  (pagina in secondo piano = rAF fermi, il tour deve trovarsi
+  posizionato comunque); classe `.subito` sul primo posizionamento
+  per non far scivolare il riflettore dall'angolo. La checklist si
+  apre da sola alla PRIMA visita del Profilo con profilo incompleto
+  (`checklistvista` in barattolo_hint + `checklistPrimoSguardo` per
+  pagina; a profilo completo la prima visita NON si consuma), dalla
+  seconda torna chiusa com'era. Collaudo dal vivo: bottone admin
+  «🧽 Trattami da nuovo» in fondo alle statistiche
+  (`trattamiDaNuovo()`) — azzera barattolo_hint, va su Esplora (il
+  tour vive lì) e riarma tour e checklist SUL DISPOSITIVO: gli hint
+  sono localStorage puro, il server non c'entra (per questo non è un
+  comando bot) e annunci/ordini/profilo non si toccano.
   Redesign «mercatino di paese» (lug 2026, da Claude Design, solo
   CSS/markup): palette in `:root` — crema #FAF4E4, inchiostro #23282C,
   arancio ₿ #F7931A con i toni `--sats-deep/-text`, verde escrow
