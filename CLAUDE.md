@@ -1304,7 +1304,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    tarature, fix) non lo richiedono.
 9. Lessico dell'escrow (lug 2026): nei testi per gli utenti si dice
    sempre «deposito di garanzia» — «(escrow)» solo nella prima
-   spiegazione lunga di ogni contesto; azione = «🔒 Compra protetto»;
+   spiegazione lunga di ogni contesto; azione = «🔒 Compra in
+   sicurezza» (era «Compra protetto», cambiata lug 2026);
    MAI «assicurato». «Escrow» resta solo dove il pubblico è bitcoiner:
    memo della invoice LNbits e testi verso Nostr (footer NIP-99,
    presenta_release). Il barattolo 🫙 è dei preferiti, mai metafora
