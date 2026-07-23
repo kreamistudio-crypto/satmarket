@@ -693,13 +693,37 @@
   /* la variante del banner «installa Barattolo»: vive da sola sotto
      l'header di Esplora, le serve il respiro laterale della vista */
   .hint-installa{margin:10px var(--pad) 0}
-  /* la riga di benvenuto: stesso respiro, con una comparsa gentile
-     (solo per chi non ha chiesto meno animazioni) */
-  .hint-benvenuto{margin:10px var(--pad) 0}
+  /* ---------- tour di benvenuto: velo, riflettore e fumetto ----------
+     Il buio e' l'ombra gigante del riflettore (box-shadow 9999px): il
+     ritaglio ha gli angoli morbidi gratis e il passaggio di tappa e'
+     una semplice transizione su posizione e misure. Il velo #tour
+     cattura ogni tocco: il tour si guarda, sotto non si clicca. */
+  #tour{position:fixed;inset:0;z-index:80;display:none;touch-action:none}
+  #tour.open{display:block}
+  #tourLuce{position:fixed;pointer-events:none;z-index:81;border-radius:14px;
+    box-shadow:0 0 0 9999px rgba(15,12,6,.62);
+    outline:3px solid var(--sats);outline-offset:2px}
+  #tourLuce.tondo{border-radius:50%}
+  #tourFumetto{position:fixed;z-index:82;max-width:min(340px,calc(100vw - 24px));
+    background:var(--card);color:var(--ink);border:1px solid var(--line);
+    border-radius:16px;padding:14px 16px;box-shadow:var(--shadow-hover);
+    font-size:13.5px;font-weight:600;line-height:1.5}
+  .tour-az{display:flex;align-items:center;gap:14px;margin-top:12px;flex-wrap:wrap}
+  .tour-passo{font-size:11.5px;font-weight:800;color:var(--muted);letter-spacing:.02em}
+  .tour-salta{margin-left:auto;border:0;background:none;font:inherit;cursor:pointer;
+    color:var(--muted);font-weight:800;font-size:12.5px;text-decoration:underline}
+  .tour-avanti{border:0;border-radius:999px;padding:9px 22px;font:inherit;
+    font-weight:800;font-size:13.5px;cursor:pointer;background:var(--sats);
+    color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
+  .tour-avanti:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  /* la prima comparsa non scivola dall'angolo: .subito spegne le
+     transizioni per il primo posizionamento */
+  #tour.subito #tourLuce,#tour.subito #tourFumetto{transition:none}
   @media (prefers-reduced-motion: no-preference){
-    .hint-benvenuto{animation:hintcomparsa .35s ease-out}
+    #tourLuce{transition:top .3s ease,left .3s ease,width .3s ease,
+      height .3s ease,border-radius .3s ease}
+    #tourFumetto{transition:top .3s ease,left .3s ease}
   }
-  @keyframes hintcomparsa{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 
   /* ---------- modale pagamento ---------- */
   .sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;display:none}
@@ -922,9 +946,6 @@
       <div class="chips" id="chips"></div>
       <div class="trust-line">🔒 Ogni acquisto è protetto dal deposito di garanzia</div>
     </header>
-    <!-- Benvenuto one-shot: riempito da hintBenvenuto() alla prima
-         visita di un utente autenticato, poi mai piu'. -->
-    <div id="benvenutoHint" style="display:none"></div>
     <!-- Banner «installa Barattolo» (PWA): riempito da
          bannerInstallaPwa() solo su web mobile fuori da Telegram.
          Dentro la Mini App non compare mai. -->
@@ -1170,6 +1191,12 @@
     <div id="lbStage"><img id="lbImg" alt="" draggable="false"></div>
     <button class="lb-x" onclick="chiudiLightbox()" title="Chiudi" aria-label="Chiudi">✕</button>
     <div id="lbDots"></div>
+  </div>
+
+  <!-- ============ TOUR DI BENVENUTO: velo + riflettore + fumetto ============ -->
+  <div id="tour" role="dialog" aria-label="Tour di benvenuto">
+    <div id="tourLuce"></div>
+    <div id="tourFumetto" aria-live="polite"></div>
   </div>
 
   <!-- ============ NAV ============ -->
@@ -2051,23 +2078,120 @@ function apriCassettoProfilo(idAcc){
   if (c && !c.classList.contains('open')) c.classList.add('open');
   setTimeout(()=>c?.scrollIntoView({behavior:'smooth', block:'start'}), 80);
 }
-/* Il benvenuto one-shot su Esplora: una riga alla prima visita di un
-   utente autenticato, mai piu'. Si segna come vista APPENA compare:
-   anche ignorata, alla visita successiva non torna (one-shot vero,
-   non un tormentone). Il «Non ora» la toglie subito e basta. */
-let benvenutoInVista = false;   // finche' c'e' lui, il banner installa aspetta
-function hintBenvenuto(){
-  const box = el('benvenutoHint');
-  if (!box || !hintAttivi() || hintDismesso('benvenuto')) return;
-  box.innerHTML = `<div class="hintline hint-benvenuto">🫙 <span><b>Benvenuto su Barattolo!</b> Sfoglia con calma — quando trovi qualcosa, ogni acquisto è protetto dal deposito di garanzia</span>
-    <span class="hl-az"><a onclick="dismettiHint('benvenuto', this)" style="color:var(--muted)">Non ora</a></span></div>`;
-  box.style.display = 'block';
-  /* precedenza alla prima visita: il banner installa si fa da parte
-     (torna alla pagina dopo, quando il benvenuto non ci sara' piu') */
-  benvenutoInVista = true;
-  const ib = el('installBanner'); if (ib) ib.style.display = 'none';
-  const h = hintLetti(); h.benvenuto = Date.now();
+/* ---------------- tour di benvenuto ----------------
+   Ha preso il posto della vecchia riga one-shot: alla prima visita di
+   un utente autenticato, quattro tappe col riflettore — velo scuro,
+   ritaglio evidenziato e fumetto con Avanti/Salta. Si consuma APPENA
+   parte, come il benvenuto di prima: anche chi salta subito non lo
+   rivede (one-shot vero, non un tormentone). Si riarma con
+   «Trattami da nuovo». */
+let tourInCorso = false;   // finche' c'e' lui, il banner installa aspetta
+let tourTappe = [];        // le tappe col bersaglio presente, all'avvio
+let tourTappa = 0;
+/* Ogni tappa: come trovare il bersaglio + il testo. Se il bersaglio
+   manca (griglia vuota, in prima pagina solo annunci propri...) la
+   tappa non entra proprio nel giro: il tour non si blocca mai. */
+const TAPPE_TOUR = [
+  { trova: () => document.querySelector('#grid .card'),
+    testo: `🫙 <b>Benvenuto su Barattolo!</b> Questo è il mercatino: sfoglia le offerte, cerca e filtra con calma.` },
+  { trova: () => document.querySelector('#grid .card-jar'), tondo: true,
+    testo: `Ti piace qualcosa? Tocca il <b>barattolino</b> per metterla via tra i preferiti.` },
+  { trova: () => document.querySelector('#view-esplora .trust-line'),
+    testo: `🔒 Ogni acquisto è protetto da un <b>deposito di garanzia</b> (escrow): i sats restano al sicuro e si sbloccano al venditore solo quando confermi la consegna.` },
+  { trova: () => [...document.querySelectorAll('.avatar-btn.on')].find(a => a.offsetParent !== null), tondo: true,
+    testo: `Questo è il tuo <b>tappo</b>: da qui completi il profilo, colleghi il wallet e trovi i tuoi annunci. Buon mercatino! 🎉` },
+];
+const tourRidotto = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function tourBenvenuto(){
+  if (tourInCorso || !hintAttivi() || hintDismesso('tour')) return;
+  /* la foto delle tappe vive: se non c'e' nulla da illuminare (vista
+     sbagliata, vetrina vuota) non si consuma niente e si riprova
+     alla visita dopo */
+  tourTappe = TAPPE_TOUR.filter(t => { const b = t.trova(); return b && b.offsetParent !== null; });
+  if (!tourTappe.length) return;
+  /* consumato alla comparsa: anche ignorato, non torna (il patto
+     one-shot del vecchio benvenuto) */
+  const h = hintLetti(); h.tour = Date.now();
   try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  tourInCorso = true;
+  const ib = el('installBanner'); if (ib) ib.style.display = 'none';
+  window.scrollTo(0, 0);          // le quattro tappe vivono tutte in alto
+  const tv = el('tour');
+  tv.classList.add('open', 'subito');   // il primo posizionamento non scivola
+  window.addEventListener('resize', posizionaTour);
+  window.addEventListener('scroll', posizionaTour, {passive: true});
+  tv.addEventListener('wheel', bloccaTourTocco, {passive: false});
+  tv.addEventListener('touchmove', bloccaTourTocco, {passive: false});
+  document.addEventListener('keydown', tastoTour);
+  tourTappa = -1;
+  tourAvanti();
+  requestAnimationFrame(() => requestAnimationFrame(() => tv.classList.remove('subito')));
+}
+function bloccaTourTocco(e){ e.preventDefault(); }
+function tastoTour(e){ if (e.key === 'Escape') chiudiTour(); }
+function tourAvanti(){
+  tourTappa++;
+  if (tourTappa >= tourTappe.length) { chiudiTour(); return; }
+  mostraTappa();
+}
+function mostraTappa(){
+  const t = tourTappe[tourTappa];
+  const b = t && t.trova();
+  if (!b || b.offsetParent === null) { tourAvanti(); return; }  // sparito nel frattempo
+  const ultima = tourTappa === tourTappe.length - 1;
+  el('tourFumetto').innerHTML = `<span>${t.testo}</span>
+    <div class="tour-az">
+      <span class="tour-passo">${tourTappa + 1} di ${tourTappe.length}</span>
+      <button class="tour-salta" onclick="chiudiTour()">Salta</button>
+      <button class="tour-avanti" onclick="tourAvanti()">${ultima ? 'Fine 🎉' : 'Avanti'}</button>
+    </div>`;
+  /* se il bersaglio non e' tutto in vista lo si porta al centro; il
+     riflettore lo segue durante lo scroll (l'ascoltatore scroll
+     chiama posizionaTour a ogni passo) */
+  const r = b.getBoundingClientRect();
+  if (r.top < 0 || r.bottom > innerHeight)
+    b.scrollIntoView({block: 'center', behavior: tourRidotto() ? 'auto' : 'smooth'});
+  /* posizionamento SUBITO, in sincrono: i rAF non battono nelle
+     pagine in secondo piano, e il tour deve trovarsi pronto anche
+     li'. Il doppio rAF resta come assestamento dopo lo scroll. */
+  posizionaTour();
+  requestAnimationFrame(() => requestAnimationFrame(posizionaTour));
+}
+function posizionaTour(){
+  if (!tourInCorso) return;
+  const t = tourTappe[tourTappa]; if (!t) return;
+  const b = t.trova(); if (!b) return;
+  const r = b.getBoundingClientRect();
+  const R = 6;   // il respiro attorno al bersaglio
+  const luce = el('tourLuce');
+  luce.classList.toggle('tondo', !!t.tondo);
+  luce.style.top = (r.top - R) + 'px';
+  luce.style.left = (r.left - R) + 'px';
+  luce.style.width = (r.width + R * 2) + 'px';
+  luce.style.height = (r.height + R * 2) + 'px';
+  /* il fumetto: sotto il riflettore se c'e' posto, sopra altrimenti,
+     e come ultima spiaggia in fondo allo schermo; sempre dentro i
+     bordi, anche sugli schermi piccoli */
+  const f = el('tourFumetto');
+  const fw = f.offsetWidth, fh = f.offsetHeight;
+  let top = r.bottom + R + 14;
+  if (top + fh > innerHeight - 12) top = r.top - R - fh - 14;
+  if (top < 12) top = Math.max(12, innerHeight - fh - 12);
+  let left = r.left + r.width / 2 - fw / 2;
+  left = Math.max(12, Math.min(left, innerWidth - fw - 12));
+  f.style.top = top + 'px';
+  f.style.left = left + 'px';
+}
+function chiudiTour(){
+  if (!tourInCorso) return;
+  tourInCorso = false;
+  el('tour').classList.remove('open');
+  window.removeEventListener('resize', posizionaTour);
+  window.removeEventListener('scroll', posizionaTour);
+  el('tour').removeEventListener('wheel', bloccaTourTocco);
+  el('tour').removeEventListener('touchmove', bloccaTourTocco);
+  document.removeEventListener('keydown', tastoTour);
+  bannerInstallaPwa();   // il banner installa riottiene la sua occasione
 }
 /* Riga nel foglio di pagamento: solo senza wallet NWC collegato */
 function aggiornaPayHint(){
@@ -4108,22 +4232,20 @@ async function loadAdminStats(){
           </div>`).join('')}
       </div>
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
-        title="Azzera le dismissioni degli hint su questo dispositivo: benvenuto e checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
+        title="Azzera le dismissioni degli hint su questo dispositivo: il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
 }
 
 /* «Trattami da nuovo»: il pulsante del collaudo dal vivo, solo per
    gli admin. Gli hint vivono SOLO in localStorage del dispositivo
    (barattolo_hint): non c'e' nulla da chiedere al server — si azzera
-   la memoria locale e si riarmano benvenuto e checklist, subito.
+   la memoria locale e si riarmano tour e checklist, subito.
    Annunci, ordini e profilo restano intatti. */
 function trattamiDaNuovo(){
   if (!isAdmin) return;
   try { localStorage.removeItem(HINT_CHIAVE); } catch(e){}
-  benvenutoInVista = false;
-  const bv = el('benvenutoHint');
-  if (bv) { bv.innerHTML = ''; bv.style.display = 'none'; }
-  hintBenvenuto();                 // il benvenuto torna in cima a Esplora
+  go('esplora');                   // il tour vive in vetrina: ci si va
+  tourBenvenuto();                 // e riparte subito, dalla prima tappa
   checklistPrimoSguardo = true;    // e la checklist si riapre da sola
   checklistAperta = false;
   renderChecklist();
@@ -4707,7 +4829,7 @@ function bannerInstallaPwa(){
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS si traveste da Mac
   const mobile = ios || /Android/i.test(navigator.userAgent);
   if (tg?.initData || pwaStandalone() || !mobile || DEMO
-      || installaRimandata || benvenutoInVista
+      || installaRimandata || tourInCorso
       || (!ios && !firefoxAndroid() && !eventoInstalla)) return;  // su Chrome/Edge solo con l'evento vero in mano
   const cta = (ios || firefoxAndroid())
     ? `<a onclick="apriInstallSheet()">Come si fa</a>`
@@ -5571,7 +5693,7 @@ async function avvia(){
     }
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
-    hintBenvenuto();           // il benvenuto one-shot, prima del banner installa
+    tourBenvenuto();           // il tour one-shot, prima del banner installa
     bannerInstallaPwa();       // web mobile loggato: le guardie decidono
   } catch (e) {
     /* Browser fuori da Telegram: vetrina vera in sola lettura
