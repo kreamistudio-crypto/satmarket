@@ -868,22 +868,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   d'acquisto, che non devono avere rivali. La risposta del server la
   legge `caricaBannerTest()` UNA volta per apertura e la tengono in
   comune cartello e fascia.
-  Contatore dei pionieri (lug 2026): «830 oggetti» divide la riga con
-  ordina+filtri, «👥 24 pionieri» sta incolonnato subito sotto (resa
-  compatta `.section-label.riga-conta`: numero arancione davanti,
+  Contatore dei pionieri (lug 2026): «830 oggetti» e «24 pionieri»
+  sono un BLOCCO in colonna (`.conta-blocco`) DENTRO la riga di
+  ordina+filtri, accanto ai controlli — il select è alto il triplo di
+  una riga di testo, quindi la seconda riga non costa un pixel
+  d'altezza alla vetrina (con o senza pionieri la prima card sta allo
+  stesso posto: 371 a 360px). Il blocco a due righe SOPRA i controlli
+  è stato provato e scartato, e così pure i conteggi appoggiati in
+  fondo alla riga (`align-self:flex-end`): lasciavano un vuoto sopra.
+  Interlinea 1.15 + gap 3px = blocco alto 31px contro i 33px del
+  select, con ~9px di bianco fra le maiuscole delle due righe. Resa
+  compatta `.section-label.riga-conta` (numero arancione davanti,
   `::after` puntinato spento; la regola sta DOPO `.section-label`, che
-  a pari specificità vincerebbe). Il blocco a due righe sopra i
-  controlli è stato provato e SCARTATO: rubava altezza alle foto.
-  Perché ci stia tutto a 360px: niente emoji sulla riga oggetti (📦
-  provato e tolto, valeva 22px), il conteggio non si stringe mai
-  (`flex:1 0 auto`) e a cedere è il SELECT (`min-width:0`) perché
-  l'etichetta cresce — «830 RISULTATI» è più larga di «14 OGGETTI» — e
-  non deve mai finire sotto ai controlli. Il conteggio sta in fondo
-  alla riga (`align-self:flex-end`) e non al centro: il select è alto
-  il triplo del testo e quel vuoto teneva i pionieri a 10px invece di
-  3. Sotto la riga dei pionieri la griglia si stringe a 8px
-  (`.grid.con-pionieri`, classe messa da `renderPionieri()`: senza
-  quella riga la griglia resta com'era, e il negozio non si tocca).
+  a pari specificità vincerebbe). Perché ci stia tutto a 360px: NIENTE
+  emoji sui conteggi (📦 e 👥 provati e tolti, ~22px l'uno) e il
+  blocco non si stringe mai (`flex:1 0 auto`) mentre a cedere è il
+  SELECT (`min-width:0`) — l'etichetta cresce, «830 RISULTATI» è più
+  larga di «14 OGGETTI», e non deve mai finire sotto ai controlli.
   «Pionieri» e non «utenti»: in rodaggio è un club. Il numero è `COUNT(*)` sugli
   utenti con cache di 60s (`conta_pionieri`) e viaggia nella busta
   della PRIMA pagina di `/api/listings` accanto a `totale` e
@@ -891,9 +892,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   è GLOBALE, non segue categoria né ricerca. Interruttore
   `CONTATORE_UTENTI` nel config (acceso di serie): spento, in DEMO o
   con un server vecchio la chiave non arriva e `renderPionieri()` non
-  disegna la riga. Sulla riga degli oggetti niente emoji: il 🫙 è dei
-  preferiti (regola 9) e il 📦 che l'aveva sostituito è stato tolto
-  per far stare tutto a 360px.
+  disegna la riga (e il blocco torna a una riga sola, com'era prima
+  che i pionieri esistessero).
   Campanello dei nuovi iscritti (lug 2026): `avvisa_nuovi_iscritti()`
   avvisa i MODERATORI di ogni arrivo — mai il canale pubblico (il nome
   di chi si iscrive non si annuncia in piazza; i traguardi li racconta
