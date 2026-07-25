@@ -868,13 +868,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   d'acquisto, che non devono avere rivali. La risposta del server la
   legge `caricaBannerTest()` UNA volta per apertura e la tengono in
   comune cartello e fascia.
-  Contatore dei pionieri (lug 2026): in vetrina, riga TUTTA SUA sotto
-  quella degli strumenti — «📦 830 oggetti» / «👥 24 pionieri»
-  incolonnati (di fianco agli oggetti c'è già ordina+filtri, due numeri
-  appaiati si pesterebbero), stessa resa dell'altro contatore
-  (`.section-label.riga-conta`: numero arancione, parola in
-  maiuscoletto, `::after` puntinato spento; la regola sta DOPO
-  `.section-label`, che a pari specificità vincerebbe). «Pionieri» e
+  Contatore dei pionieri (lug 2026): in vetrina i due contatori
+  «📦 830 oggetti» / «👥 24 pionieri» stanno incolonnati in un blocco
+  `.contatori` tutto loro SOPRA la barra ordina+filtri, che è scesa
+  sulla sua riga a destra — l'etichetta divideva la riga con gli
+  strumenti e a 360px si toccavano (le regole
+  `.strumenti .section-label` che la comprimevano non esistono più).
+  Respiro: 16px dalle pillole, 3px fra le due righe, 12px ai controlli.
+  Resa compatta `.section-label.riga-conta` (numero arancione davanti,
+  `::after` puntinato spento; la regola sta DOPO `.section-label`, che
+  a pari specificità vincerebbe). «Pionieri» e
   non «utenti»: in rodaggio è un club. Il numero è `COUNT(*)` sugli
   utenti con cache di 60s (`conta_pionieri`) e viaggia nella busta
   della PRIMA pagina di `/api/listings` accanto a `totale` e
