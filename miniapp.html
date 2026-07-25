@@ -203,21 +203,19 @@
   .trust-line{display:flex;align-items:center;justify-content:center;gap:6px;
     padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text)}
 
-  /* ---------- strumenti di vetrina (ordina + filtri) ---------- */
+  /* ---------- strumenti di vetrina (ordina + filtri) ----------
+     I contatori hanno una riga loro qui sopra (.contatori): gli
+     strumenti stanno da soli, allineati a destra. Il padding in cima
+     e' il respiro fra le due righe — a 360px, quando si dividevano la
+     riga, «14 OGGETTI» e «Piu' recenti» si toccavano. */
   .strumenti{display:flex;gap:8px;align-items:center;justify-content:flex-end;
-    padding:8px var(--pad) 0}
+    padding:12px var(--pad) 0}
   .strumenti select,.strumenti button{
     font:700 12.5px/1.2 Nunito,sans-serif;color:var(--muted);
     background:var(--card);border:1.5px solid var(--line);
     border-radius:999px;padding:6px 12px;cursor:pointer}
   /* Il bottone si accende quando un filtro e' applicato */
   .strumenti button.attivo{color:var(--sats-text);border-color:var(--sats-text)}
-  /* L'etichetta di vetrina condivide la riga con gli strumenti: a
-     375px lo spazio e' poco, quindi niente linea puntinata e testo
-     compatto («831 oggetti»), col numero arancione davanti */
-  .strumenti .section-label{flex:1;min-width:0;padding:0;gap:6px;white-space:nowrap}
-  .strumenti .section-label::after{display:none}
-  .strumenti .section-label .conta{order:0}
   #filtriBox{margin:10px var(--pad) 0;padding:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:14px}
   .filtri-riga{display:flex;gap:8px}
@@ -399,12 +397,13 @@
   .section-label::after{content:'';flex:1;border-bottom:2px dotted var(--field-line);order:1}
   .section-label .conta{order:2;color:var(--sats-deep);font-weight:800;
     font-size:12px;text-transform:none;letter-spacing:0}
-  /* Il contatore dei pionieri sta su una riga TUTTA SUA, sotto quella
-     degli strumenti: di fianco agli oggetti c'e' gia' ordina+filtri, e
-     due numeri appaiati si pesterebbero. Stessa resa dell'altro
-     contatore (numero arancione, parola in maiuscoletto, niente linea
-     puntinata), incolonnata a filo con lui. */
-  .riga-conta{padding:3px var(--pad) 0;gap:6px;white-space:nowrap}
+  /* I due contatori (oggetti e pionieri) vivono in colonna su una riga
+     tutta loro, SOPRA ordina+filtri: appaiati ai controlli, a 360px si
+     toccavano. Stessa resa dell'etichetta di sezione ma compatta —
+     numero arancione davanti, niente linea puntinata. */
+  .contatori{padding:16px var(--pad) 0}
+  .riga-conta{padding:0;gap:6px;white-space:nowrap}
+  .riga-conta+.riga-conta{padding-top:3px}
   .riga-conta::after{display:none}
   .riga-conta .conta{order:0}
   .empty{margin:20px var(--pad);padding:36px 24px;text-align:center;color:var(--muted);
@@ -1036,13 +1035,19 @@
       </div>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
+    <!-- I due contatori, incolonnati, su una riga tutta loro:
+         «📦 14 oggetti» e «👥 54 pionieri». Stavano a fianco degli
+         strumenti e a 360px si toccavano. La riga dei pionieri
+         compare solo se il server manda il numero: interruttore
+         spento nel config, demo o server vecchio = niente riga. -->
+    <div class="contatori">
+      <div class="section-label riga-conta" id="gridLabel">In vetrina</div>
+      <div class="section-label riga-conta" id="pionieriRiga" style="display:none"></div>
+    </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
-         euro") resta com'e': questi servono a chi sfoglia.
-         L'etichetta di sezione vive QUI, sulla stessa riga: una
-         fascia sola tra le pillole e le foto. -->
+         euro") resta com'e': questi servono a chi sfoglia. -->
     <div class="strumenti">
-      <div class="section-label" id="gridLabel">In vetrina</div>
       <select id="ordinaSel" onchange="setOrdina(this.value)" title="Ordina la vetrina">
         <option value="">Più recenti</option>
         <option value="prezzo_su">Prezzo: dal più basso</option>
@@ -1060,11 +1065,6 @@
         <button class="btn ghost" onclick="azzeraFiltri()">Azzera</button>
       </div>
     </div>
-    <!-- «👥 54 pionieri»: il conteggio di chi è già entrato nel
-         mercatino, incolonnato sotto quello degli oggetti. Il numero
-         arriva col resto della prima pagina; interruttore spento nel
-         config, demo o server vecchio = la riga non compare. -->
-    <div class="section-label riga-conta" id="pionieriRiga" style="display:none"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
