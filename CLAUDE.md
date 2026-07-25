@@ -884,6 +884,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con un server vecchio la chiave non arriva e `renderPionieri()` non
   disegna la riga. Il 🫙 accanto agli oggetti è stato scartato (resta
   dei preferiti, vedi regola 9): lì c'è 📦.
+  Campanello dei nuovi iscritti (lug 2026): `avvisa_nuovi_iscritti()`
+  avvisa i MODERATORI di ogni arrivo — mai il canale pubblico (il nome
+  di chi si iscrive non si annuncia in piazza; i traguardi li racconta
+  Andrea a mano). NIENTE coda in memoria come i post: il filo
+  dell'acqua è la colonna `registrato` e a ogni giro d'orologio (10
+  min, che è anche la finestra di raggruppamento) si legge chi è
+  arrivato da `_ultimo_giro_iscritti` in poi — così copre da sola tutte
+  e quattro le porte (Mini App, login web, nativo Nostr, /start del
+  bot) e quelle di domani, senza ganci dentro l'autenticazione; il
+  primo giro dopo l'avvio ARMA soltanto (un riavvio salta un battito,
+  mai raffiche di recupero) e i confronti sono a secondi interi sui due
+  estremi, quindi nessuno si perde né si ripete. Regola del drenatore
+  promo, stessa `SOGLIA_AGGREGA`: fino a 3 un messaggio ciascuno (nome
+  + @username + porta d'ingresso, `html.escape` che le notifiche sono
+  HTML), oltre UN aggregato che non nomina nessuno; tetto
+  `AVVISI_ISCRITTI_MAX_ORA` (6) sui SINGOLI, l'aggregato passa sempre.
+  `TRAGUARDI_PIONIERI` (50/100/250/500/1000) dedotti dai dati senza
+  stato: scattano solo nel giro in cui `prima < soglia <= totale`. Il
+  conto del messaggio NON usa `conta_pionieri` (la sua cache di 60s
+  direbbe «siamo in 24» mentre presenti il 25°). Interruttore
+  `AVVISI_ISCRITTI`.
   Redesign «mercatino di paese» (lug 2026, da Claude Design, solo
   CSS/markup): palette in `:root` — crema #FAF4E4, inchiostro #23282C,
   arancio ₿ #F7931A con i toni `--sats-deep/-text`, verde escrow
