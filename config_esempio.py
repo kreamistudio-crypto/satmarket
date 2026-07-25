@@ -94,6 +94,12 @@ Per ora esplora liberamente e contribuisci allo sviluppo: un feedback, un'opinio
 # Dove porta il bottone "Entra nel canale". Vuoto = niente bottone.
 BANNER_TEST_LINK = ""
 
+# --- Contatore dei pionieri (in vetrina, sotto gli oggetti) ----------
+# "👥 54 pionieri": quante persone sono già entrate nel mercatino.
+# In rodaggio è un invito ad esserci; False lo spegne, e la riga
+# sparisce dalla vetrina senza altro da toccare.
+CONTATORE_UTENTI = True
+
 # --- Collaudo ---------------------------------------------------------
 # True  = test locale con utenti finti (Compratore/Venditore/Admin)
 # False = OBBLIGATORIO prima di andare online!

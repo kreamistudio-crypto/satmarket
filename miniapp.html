@@ -399,6 +399,14 @@
   .section-label::after{content:'';flex:1;border-bottom:2px dotted var(--field-line);order:1}
   .section-label .conta{order:2;color:var(--sats-deep);font-weight:800;
     font-size:12px;text-transform:none;letter-spacing:0}
+  /* Il contatore dei pionieri sta su una riga TUTTA SUA, sotto quella
+     degli strumenti: di fianco agli oggetti c'e' gia' ordina+filtri, e
+     due numeri appaiati si pesterebbero. Stessa resa dell'altro
+     contatore (numero arancione, parola in maiuscoletto, niente linea
+     puntinata), incolonnata a filo con lui. */
+  .riga-conta{padding:3px var(--pad) 0;gap:6px;white-space:nowrap}
+  .riga-conta::after{display:none}
+  .riga-conta .conta{order:0}
   .empty{margin:20px var(--pad);padding:36px 24px;text-align:center;color:var(--muted);
     background:var(--card);border:1px solid var(--line-soft);border-radius:24px;
     font-weight:600;font-size:14px;line-height:1.5}
@@ -1052,6 +1060,11 @@
         <button class="btn ghost" onclick="azzeraFiltri()">Azzera</button>
       </div>
     </div>
+    <!-- «👥 54 pionieri»: il conteggio di chi è già entrato nel
+         mercatino, incolonnato sotto quello degli oggetti. Il numero
+         arriva col resto della prima pagina; interruttore spento nel
+         config, demo o server vecchio = la riga non compare. -->
+    <div class="section-label riga-conta" id="pionieriRiga" style="display:none"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -1516,6 +1529,7 @@ function mapOrder(o){
 const LIMITE_PAGINA = 30;
 let vetrinaCursore = null, vetrinaCaricando = false, vetrinaTotale = 0;
 let conteggiServer = null, ultimaRicercaAI = false;
+let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
 let datiVivi = false;   // al primo carico vero il seme demo si butta
 
 /* Un server vecchio risponde con l'array nudo: lo si legge come
@@ -1615,6 +1629,7 @@ async function loadListings(anonimo){
   vetrinaCursore = j.cursore || null;
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
+  if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
@@ -1779,9 +1794,10 @@ function renderGrid(items){
   /* etichetta compatta: divide la riga con ordina+filtri, quindi
      dice solo il conteggio — «oggetti» in vetrina piena, «risultati»
      quando c'e' una ricerca o una categoria attiva */
-  el('gridLabel').innerHTML = `<span class="conta">${nTot}</span> `
+  el('gridLabel').innerHTML = `📦 <span class="conta">${nTot}</span> `
     + (items||q||activeCat!=='Tutto' ? `risultat${nTot===1?'o':'i'}`
                                      : `oggett${nTot===1?'o':'i'}`);
+  renderPionieri();
   el('gridEmpty').style.display = data.length ? 'none':'block';
   el('emptyQ').textContent = q || activeCat;
   /* «Avvisami se arriva»: solo per chi ha un account vero (in demo e
@@ -1789,6 +1805,20 @@ function renderGrid(items){
   const ba = el('btnAvvisami');
   if (ba) ba.style.display = (!data.length && !DEMO && !VETRINA) ? '' : 'none';
   el('grid').innerHTML = data.map(cardHTML).join('');
+}
+
+/* «👥 54 pionieri»: la gente che è già entrata nel mercatino, sotto il
+   conteggio degli oggetti. È un numero GLOBALE: non segue la categoria
+   né la ricerca, quindi resta lì fermo mentre la griglia cambia.
+   Niente in demo (i dati sono finti) e niente se il server non lo
+   manda — interruttore spento nel config o server di ieri. */
+function renderPionieri(){
+  const r = el('pionieriRiga');
+  if (!r) return;
+  if (DEMO || !pionieri) { r.style.display = 'none'; return; }
+  r.style.display = '';
+  r.innerHTML = `👥 <span class="conta">${pionieri}</span> `
+    + `pionier${pionieri===1?'e':'i'}`;
 }
 
 /* La card di un annuncio, stile "Etichetta": foto pulita e il prezzo

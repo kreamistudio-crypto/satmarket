@@ -191,6 +191,15 @@ try:
 except ImportError:
     BANNER_TEST_LINK = ""
 
+# Il contatore dei «pionieri» in vetrina: quante persone sono gia'
+# entrate nel mercatino. Acceso di serie (in rodaggio il numero e' un
+# invito, non una statistica); un False nel config lo spegne quando
+# non servira' piu', senza cantieri.
+try:
+    from config import CONTATORE_UTENTI
+except ImportError:
+    CONTATORE_UTENTI = True
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -2460,6 +2469,25 @@ def pagina_annunci(con, campi, dove, par, limit, cursore, ordina=""):
     return righe, prossimo
 
 
+# --------------------- CONTATORE PIONIERI ---------------------------
+# Quante persone sono entrate nel mercatino: il numero che la vetrina
+# mostra sotto il conteggio degli oggetti. In fase di rodaggio si
+# chiamano «pionieri» — suona come un club, e lo sono. Cache breve: il
+# numero cresce piano e la prima pagina della vetrina si chiede di
+# continuo (categorie, filtri, ogni riapertura dell'app).
+_pionieri_cache = {"quanti": 0, "quando": 0.0}
+CACHE_PIONIERI = 60          # secondi
+
+
+def conta_pionieri(con) -> int:
+    adesso = time.time()
+    if adesso - _pionieri_cache["quando"] < CACHE_PIONIERI:
+        return _pionieri_cache["quanti"]
+    quanti = con.execute("SELECT COUNT(*) AS n FROM utenti").fetchone()["n"]
+    _pionieri_cache.update(quanti=quanti, quando=adesso)
+    return quanti
+
+
 @app.get("/api/banner-test")
 def banner_test():
     """Il cartello «Barattolo e' in fase di test» che la Mini App mostra
@@ -2541,6 +2569,11 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             r["categoria"]: r["n"] for r in con.execute(
                 "SELECT categoria, COUNT(*) AS n FROM annunci "
                 "WHERE stato='attivo' GROUP BY categoria")}
+        # I pionieri viaggiano insieme (niente giro di rete in piu');
+        # a interruttore spento la chiave non c'e' e il frontend non
+        # disegna la riga.
+        if CONTATORE_UTENTI:
+            risposta["pionieri"] = conta_pionieri(con)
     con.close()
     return risposta
 
