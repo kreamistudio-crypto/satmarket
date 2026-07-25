@@ -1083,6 +1083,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scroll-snap già esistente; con una foto sola non esistono.
   Pallini e bottone condividi vivono SULLA foto: colori fissi
   (bianco/carta+inchiostro), identici in chiaro e scuro.
+  Il TIMONE della galleria (lug 2026, da un bug vero: da desktop la
+  striscia si sfogliava solo aprendo il lightbox) vive tutto in
+  `montaGalleria()`, chiamata in coda a `openDetail`: frecce `‹ ›`
+  `.foto-nav` ai lati (cerchietti di carta gemelli del condividi —
+  colori FISSI come tutto ciò che sta sulla foto, i token li
+  renderebbero scuri su una foto scura), pallini `<button>` veri che
+  portano alla foto N (il contenitore resta `pointer-events:none`, il
+  singolo pallino no, col bersaglio allargato a ~23px via `::after`;
+  toccabili anche col dito, deciso) e trascinamento col MOUSE. Le
+  frecce esistono solo dentro `@media (hover:hover) and
+  (pointer:fine)` — fuori di lì la regola base è `display:none`, così
+  sul telefono non esistono proprio — e al capolinea si spengono
+  (`[disabled]{display:none}`). Il trascinamento è solo
+  `pointerType==='mouse'` (allo scorrimento nativo del dito non si
+  tocca nulla): soglia 5px, `.trascina` toglie lo snap durante e lo
+  rimette al rilascio riagganciando la foto più vicina, e il click
+  che segue NON apre il lightbox (finestra di 300ms su un ascoltatore
+  in CATTURA, non una bandierina da spegnere: se il click non arriva
+  mai scade da sola). `aggiorna(i)` accetta l'indice di destinazione
+  e risponde SUBITO, senza aspettare la fine dello scorrimento
+  morbido (che rispetta `tourRidotto()`). La rotella verticale NON
+  viene dirottata di proposito: la foto è alta mezzo schermo e
+  sarebbe una trappola per chi scorre la pagina; quella orizzontale
+  (trackpad a due dita, Shift+rotella) scorre già la striscia da sola
+  e lo snap la incolla alla foto giusta.
   Dettaglio immersivo (lug 2026): via il bottone statico sopra la
   foto — il «Torna al mercatino» è il cerchietto di carta
   `.back-float` in alto a sinistra sulla foto (gemello del condividi,
