@@ -1081,58 +1081,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   via il vecchio badge 📷 N): uno per foto in basso al centro,
   l'attivo pieno, aggiornati sull'evento scroll della striscia
   scroll-snap già esistente; con una foto sola non esistono.
-  UNO SWIPE, UNA FOTO (lug 2026, il patto di Vinted): lo fa
-  `scroll-snap-stop:always` sulle foto della striscia — una riga di
-  CSS, quindi tutto sul compositor, nessun ascoltatore in mezzo al
-  dito e nessuno scatto in cambio (la strada JS «intercetto il gesto
-  e scorro io» non serve proprio). Nel lightbox il patto valeva già:
-  lo swipe lì è a mano e muove sempre di ±1 oltre i 60px. Attenzione
-  al rovescio: lo snap-stop vale anche per le scorse morbide fatte da
-  noi, quindi `vaiA` usa `smooth` solo per il passo corto (non ha
-  nulla da scavalcare) e `auto` per i salti lunghi dei pallini, che
-  altrimenti rischiano di fermarsi per strada.
   Pallini e bottone condividi vivono SULLA foto: colori fissi
   (bianco/carta+inchiostro), identici in chiaro e scuro.
-  Il TIMONE della galleria (lug 2026, da un bug vero: da desktop la
-  striscia si sfogliava solo aprendo il lightbox) vive tutto in
-  `montaGalleria()`, chiamata in coda a `openDetail`: frecce `‹ ›`
-  `.foto-nav` ai lati (cerchietti di carta gemelli del condividi —
-  colori FISSI come tutto ciò che sta sulla foto, i token li
-  renderebbero scuri su una foto scura), pallini `<button>` veri che
-  portano alla foto N (bersaglio allargato a ~23px via `::after`) e
-  trascinamento col MOUSE. Sono tutti e tre roba DA MOUSE: frecce e
-  pallini si accendono solo dentro `@media (hover:hover) and
-  (pointer:fine)` — fuori di lì la regola base è `display:none` per
-  le frecce e `pointer-events:none` per i pallini, che col dito
-  restano l'indicatore muto di sempre e lasciano passare il tocco
-  alla foto sotto, cioè al lightbox (col dito si sfoglia con lo
-  swipe, e basta: i pallini toccabili sono stati provati e RITIRATI
-  — cambiavano il gesto di prima senza aggiungere nulla). I listener
-  dei pallini restano appesi anche sul telefono, muti. Al capolinea
-  le frecce si spengono (`[disabled]{display:none}`). Il blocco del
-  trascinamento NON SI MONTA AFFATTO senza mouse (`matchMedia` sulla
-  stessa condizione, `return` in mezzo a `montaGalleria`) — lezione
-  da una regressione vera, lo swipe diventato scattoso: un
-  ascoltatore `pointerdown`/`pointermove` non passivo su una striscia
-  che scorre la marchia come zona da main thread e il dito paga in
-  fluidità anche quando la guardia `pointerType` lo scarta subito,
-  perché il conto si paga alla REGISTRAZIONE, non alla chiamata. Per
-  la stessa ragione, anche col mouse quegli ascoltatori sono
-  `{passive:true}` (dentro non si chiama mai `preventDefault`), che
-  è quel che salva i portatili col touchscreen — mouse E dito, quindi
-  passano la condizione. Il trascinamento è comunque solo
-  `pointerType==='mouse'` (allo scorrimento nativo del dito non si
-  tocca nulla): soglia 5px, `.trascina` toglie lo snap durante e lo
-  rimette al rilascio riagganciando la foto più vicina, e il click
-  che segue NON apre il lightbox (finestra di 300ms su un ascoltatore
-  in CATTURA, non una bandierina da spegnere: se il click non arriva
-  mai scade da sola). `aggiorna(i)` accetta l'indice di destinazione
-  e risponde SUBITO, senza aspettare la fine dello scorrimento
-  morbido (che rispetta `tourRidotto()`). La rotella verticale NON
-  viene dirottata di proposito: la foto è alta mezzo schermo e
-  sarebbe una trappola per chi scorre la pagina; quella orizzontale
-  (trackpad a due dita, Shift+rotella) scorre già la striscia da sola
-  e lo snap la incolla alla foto giusta.
   Dettaglio immersivo (lug 2026): via il bottone statico sopra la
   foto — il «Torna al mercatino» è il cerchietto di carta
   `.back-float` in alto a sinistra sulla foto (gemello del condividi,
@@ -1146,23 +1096,6 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chiudere. Vanilla puro, zero librerie; lo zoom (clamp 1–4) tiene
   fermo il punto toccato e la clamp del translate non fa mai perdere
   la foto; body senza scroll a lightbox aperto.
-  FLUIDITÀ del lightbox (lug 2026, era scattoso dal giorno uno): la
-  regola è che il percorso del dito non deve MAI leggere il layout.
-  `lbApplica` non tocca più `clientWidth`/`clientHeight` e `lbZoomA`
-  non chiama più `getBoundingClientRect` (il pinch ci passa a ogni
-  movimento): le misure stanno in `lbDim`, prese quando la foto
-  arriva (`img.onload`), a ogni `pointerdown` e sul `resize`. La
-  scrittura della trasformazione va in UN `requestAnimationFrame`
-  (`lbScrivi`) — il dito manda più eventi che fotogrammi — mentre
-  `lbApplica(true)` scrive dritto ed è la strada dei cambi di foto,
-  dove la posa dev'essere già azzerata quando la nuova immagine
-  compare; `chiudiLightbox` annulla il rAF pendente. Il cursore si
-  scrive solo quando cambia davvero. Gli ascoltatori pointer sono
-  `{passive:true}` (dentro non si chiama mai preventDefault: a tenere
-  fermo lo schermo pensa `touch-action:none`); il `wheel` resta
-  bloccante perché lì il preventDefault serve allo zoom. E le foto
-  vicine si precaricano in `lbMostra` (`new Image()`): lo scatto più
-  grosso era la decodifica di un JPEG intero al cambio di foto.
   Preferiti «Nel tuo barattolo» (lug 2026): il simbolo è il
   BARATTOLINO 🫙 — MAI il cuore, MAI il fulmine (su Nostr è lo zap).
   Tabella `preferiti(tg_id, annuncio_id, creato, PK)`; toggle

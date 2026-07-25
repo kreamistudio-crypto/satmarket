@@ -262,66 +262,22 @@
   .tag-price .price-sub,.tag-price .price .unit{color:#8A8271}
   .tag-price .price-sub{margin-top:0}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
-  /* Il palco della galleria: tutto cio' che fluttua sulla foto
-     (cerchietti, pallini, frecce) si appende qui */
-  .detail-foto{position:relative}
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
     scrollbar-width:none;background:var(--ph-b)}
   .detail-photos::-webkit-scrollbar{display:none}
   /* Quadrata come le card e le miniature: le foto di oggetti sono
      spesso verticali, il taglio panoramico le decapitava */
-  /* scroll-snap-stop:always = UNO SWIPE, UNA FOTO (il patto di
-     Vinted): lo slancio di una scorsa decisa non puo' scavalcare una
-     foto, si ferma alla prima. E' CSS puro, quindi resta tutto sul
-     compositor: nessun ascoltatore in mezzo al dito, nessuno scatto
-     da pagare in cambio. */
   .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:1/1;object-fit:cover;
-    scroll-snap-align:center;scroll-snap-stop:always;
-    cursor:zoom-in;-webkit-user-drag:none}
-  /* Durante il trascinamento col mouse lo snap si toglie di mezzo
-     (altrimenti rimbalzerebbe a ogni pixel) e torna al rilascio */
-  .detail-photos.trascina{scroll-snap-type:none;user-select:none}
-  .detail-photos.trascina img{cursor:grabbing}
+    scroll-snap-align:center}
   /* I pallini della galleria, stile Vinted: uno per foto, in basso al
      centro, l'attivo pieno e gli altri velati. Vivono SULLA foto,
      quindi bianchi con un filo d'ombra in entrambi i temi. Con una
-     foto sola non esistono proprio. Sono <button> veri, ma il tocco
-     li attraversa: col dito restano l'indicatore muto di sempre e il
-     tocco arriva alla foto sotto, che apre il lightbox — sfogliare e'
-     lo swipe. Diventano timone (un click porta alla foto N) SOLO dove
-     c'e' un mouse, la stessa condizione delle frecce, con un
-     bersaglio piu' largo del pallino (::after): 7px non si mirano. */
+     foto sola non esistono proprio. */
   .foto-dots{position:absolute;bottom:10px;left:0;right:0;z-index:2;
     display:flex;justify-content:center;gap:6px;pointer-events:none}
-  .foto-dots button{width:7px;height:7px;padding:0;border:0;border-radius:50%;
-    position:relative;pointer-events:none;
+  .foto-dots i{width:7px;height:7px;border-radius:50%;
     background:rgba(255,255,255,.45);box-shadow:0 0 3px rgba(0,0,0,.4)}
-  .foto-dots button::after{content:'';position:absolute;inset:-8px}
-  .foto-dots button.on{background:#fff}
-  /* Le frecce del carosello: gemelle dei cerchietti di carta, a meta'
-     altezza ai due lati. Esistono SOLO dove c'e' un puntatore vero:
-     sul telefono lo swipe basta e coprirebbero la foto per niente.
-     Discrete a riposo, piene quando il mouse e' sulla foto; al
-     capolinea spariscono, che una freccia che non porta da nessuna
-     parte e' una bugia. */
-  .foto-nav{display:none}
-  @media (hover:hover) and (pointer:fine){
-    /* col mouse i pallini si accendono e diventano cliccabili */
-    .foto-dots button{pointer-events:auto;cursor:pointer}
-    .foto-nav{position:absolute;top:50%;margin-top:-17px;z-index:3;
-      width:34px;height:34px;border-radius:50%;border:0;padding:0;
-      display:flex;align-items:center;justify-content:center;
-      background:rgba(255,248,234,.82);color:#23282C;cursor:pointer;
-      box-shadow:0 2px 6px rgba(0,0,0,.22);
-      opacity:.55;transition:opacity .18s ease}
-    .foto-nav.prev{left:10px}
-    .foto-nav.next{right:10px}
-    .detail-foto:hover .foto-nav{opacity:.95}
-    .foto-nav:hover,.foto-nav:focus-visible{opacity:1}
-    .foto-nav:active{transform:scale(.94)}
-    .foto-nav[disabled]{display:none}
-  }
-  @media (prefers-reduced-motion:reduce){.foto-nav{transition:none}}
+  .foto-dots i.on{background:#fff}
   /* Il bottone condividi sulla foto del dettaglio: cerchietto di
      carta chiara con l'icona a inchiostro, uguale in entrambi i temi
      (vive sulla foto, come i pallini) */
@@ -2547,18 +2503,10 @@ function openDetail(id){
      stesso endpoint, stesso Set, mai divergenti */
   const jarCta = (DEMO || VETRINA || mio) ? ''
     : `<button class="btn ghost" id="jarCta" onclick="togglePreferito(${l.id})">${preferiti.has(l.id)?'🫙 Già nel barattolo':'🫙 Metti nel barattolo'}</button>`;
-  /* Le frecce e i pallini: il timone della galleria da desktop (dove
-     lo swipe non esiste). Nascono solo con piu' di una foto, e le
-     frecce solo dove c'e' un puntatore vero (ci pensa il CSS). */
-  const frecce = (l.photos && l.photos.length > 1)
-    ? `<button class="foto-nav prev" aria-label="Foto precedente" title="Foto precedente">
-         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-       <button class="foto-nav next" aria-label="Foto successiva" title="Foto successiva">
-         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>` : '';
   const foto = (l.photos && l.photos.length)
-    ? `<div class="detail-foto"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" draggable="false" onclick="apriLightbox(${i})">`).join('')}</div>
-       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<button${i?'':' class="on"'} aria-label="Vai alla foto ${i+1}"></button>`).join('')}</div>`:''}${frecce}${indietro}${barattolino}${condividi}</div>`
-    : `<div class="detail-foto"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
+    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
+       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${indietro}${barattolino}${condividi}</div>`
+    : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
   /* Il ponte Nostr: per gli importati la npub del contatto dichiarato
      nell'evento, per i nativi e i doppi cittadini il badge verificato
      (filtro bech32: finisce in un onclick) */
@@ -2625,119 +2573,17 @@ function openDetail(id){
     }
     hintPubblicazione = null;   // consumato in ogni caso: one-shot
   }
-  montaGalleria();
-  go('dettaglio');
-}
-
-/* ---------------- il timone della galleria del dettaglio ----------------
-   Su mobile lo swipe basta e avanza. Da desktop no: il mouse non ha
-   swipe, e la striscia restava sfogliabile solo aprendo il lightbox.
-   Qui si montano tre comandi sulla stessa striscia di sempre —
-   frecce ai lati, pallini cliccabili, trascinamento — e sono TUTTI
-   e tre roba da mouse: le frecce e i pallini si accendono solo
-   dentro @media (hover:hover) and (pointer:fine) (ci pensa il CSS,
-   e senza mouse il tocco attraversa i pallini e apre il lightbox
-   come sempre), il trascinamento guarda il pointerType. Col dito
-   non cambia nulla: si sfoglia con lo swipe. I listener sui pallini
-   restano appesi anche sul telefono, muti — non li raggiunge nessun
-   evento. Tutti i listener vivono sui nodi
-   appena creati da innerHTML, quindi muoiono col dettaglio
-   precedente: niente accumulo.
-   La rotella NON viene dirottata: la verticale deve continuare a
-   scorrere la pagina (la foto e' alta quanto mezzo schermo, sarebbe
-   una trappola), mentre quella orizzontale — trackpad a due dita e
-   Shift+rotella — scorre gia' la striscia da sola, e lo snap la
-   incolla alla foto giusta. */
-function montaGalleria(){
+  /* I pallini seguono lo swipe: l'indice e' la pagina di scroll-snap
+     (ogni foto e' larga quanto la striscia). Il listener vive sul
+     nodo appena creato da innerHTML, quindi muore col dettaglio
+     precedente: niente accumulo. */
   const striscia = document.querySelector('#detailContent .detail-photos');
-  if (!striscia) return;                    // annuncio senza foto: solo emoji
   const pallini = document.querySelector('#detailContent .foto-dots');
-  const prev = document.querySelector('#detailContent .foto-nav.prev');
-  const next = document.querySelector('#detailContent .foto-nav.next');
-  const quante = striscia.children.length;
-  const indice = () => Math.round(striscia.scrollLeft / (striscia.clientWidth || 1));
-  /* Pallini e frecce dicono dove siamo. Con un indice esplicito
-     rispondono SUBITO (chi tocca una freccia non aspetta la fine
-     dello scorrimento morbido); senza, lo chiedono alla striscia —
-     ed e' la strada dello swipe e del trascinamento. */
-  const aggiorna = (i = indice()) => {
-    if (pallini) [...pallini.children].forEach((p, j) => p.classList.toggle('on', j === i));
-    if (prev) prev.disabled = i <= 0;
-    if (next) next.disabled = i >= quante - 1;
-  };
-  const vaiA = i => {
-    i = Math.max(0, Math.min(quante - 1, i));
-    /* Lo `scroll-snap-stop:always` che dà «uno swipe, una foto» vale
-       anche per le scorse morbide che facciamo noi: un salto lungo
-       (dal pallino 1 al 4) rischierebbe di fermarsi per strada. Il
-       passo corto resta morbido — non ha nulla da scavalcare —, il
-       salto lungo è netto, che poi è il gesto giusto per un indice. */
-    const passo = Math.abs(i - indice()) <= 1 && !tourRidotto();
-    striscia.scrollTo({left: i * striscia.clientWidth,
-                       behavior: passo ? 'smooth' : 'auto'});
-    aggiorna(i);
-  };
-  striscia.addEventListener('scroll', () => aggiorna(), {passive: true});
-  if (pallini) [...pallini.children].forEach((p, j) =>
-    p.addEventListener('click', () => vaiA(j)));
-  if (prev) prev.addEventListener('click', () => vaiA(indice() - 1));
-  if (next) next.addEventListener('click', () => vaiA(indice() + 1));
-  aggiorna();                               // frecce di partenza: la ‹ e' gia' spenta
-
-  /* Trascinamento col mouse: il gesto naturale di chi non ha il dito.
-     NON si monta nemmeno dove un mouse non c'e', ed e' una cura, non
-     un'eleganza: un ascoltatore pointerdown/pointermove non passivo
-     su una striscia che scorre la marchia come zona da main thread
-     (Blink li registra come i touchstart/touchmove bloccanti), e il
-     dito paga in fluidita' anche quando la guardia pointerType li
-     scarta subito — il conto si paga alla REGISTRAZIONE, non alla
-     chiamata. Da qui in giu' e' tutta roba da mouse: stessa
-     condizione delle frecce, sul telefono questo codice non esiste e
-     lo scorrimento e' quello nativo di sempre. */
-  if (!matchMedia('(hover:hover) and (pointer:fine)').matches) return;
-  /* E anche col mouse gli ascoltatori sono passivi: qui dentro non si
-     chiama mai preventDefault, e sui portatili col touchscreen (che
-     il mouse ce l'hanno, quindi passano la condizione qui sopra) il
-     dito non deve pagare pedaggio. */
-  let giu = null, fineTrascinamento = -Infinity;
-  striscia.addEventListener('pointerdown', e => {
-    if (e.pointerType !== 'mouse' || e.button !== 0 || quante < 2) return;
-    giu = {x: e.clientX, left: striscia.scrollLeft, mosso: false};
+  if (striscia && pallini) striscia.addEventListener('scroll', () => {
+    const i = Math.round(striscia.scrollLeft / striscia.clientWidth);
+    [...pallini.children].forEach((p, j) => p.classList.toggle('on', j === i));
   }, {passive: true});
-  striscia.addEventListener('pointermove', e => {
-    if (!giu) return;
-    /* bottone gia' lasciato (rilasciato fuori dalla striscia prima
-       della soglia): il gesto e' finito, non deve restare armato */
-    if (!e.buttons) { rilascia(); return; }
-    const dx = e.clientX - giu.x;
-    if (!giu.mosso && Math.abs(dx) > 5) {
-      giu.mosso = true;
-      striscia.classList.add('trascina');
-      try { striscia.setPointerCapture(e.pointerId); } catch(_) {}
-    }
-    if (giu.mosso) striscia.scrollLeft = giu.left - dx;
-  }, {passive: true});
-  const rilascia = () => {
-    if (!giu) return;
-    const mosso = giu.mosso;
-    giu = null;
-    if (!mosso) return;
-    striscia.classList.remove('trascina');  // lo snap torna in servizio
-    fineTrascinamento = performance.now();
-    vaiA(indice());                         // riaggancia la foto piu' vicina
-  };
-  striscia.addEventListener('pointerup', rilascia, {passive: true});
-  striscia.addEventListener('pointercancel', rilascia, {passive: true});
-  /* Il click che segue il rilascio non e' un click: e' la coda del
-     trascinamento, e non deve aprire il lightbox. Una finestrella di
-     tempo invece di una bandierina da spegnere: se il click non
-     arriva mai (rilascio fuori dalla striscia) scade da sola, e il
-     tocco buono dopo non ne paga il prezzo. */
-  striscia.addEventListener('click', e => {
-    if (performance.now() - fineTrascinamento < 300) {
-      e.stopPropagation(); e.preventDefault();
-    }
-  }, true);
+  go('dettaglio');
 }
 
 /* ---------------- lightbox: foto a tutto schermo con zoom ----------------
@@ -2750,18 +2596,6 @@ function montaGalleria(){
 let lbFoto = [], lbIdx = 0, lbS = 1, lbTx = 0, lbTy = 0;
 const lbPtr = new Map();
 let lbPinch0 = null, lbMid = null, lbMoved = false, lbSwipeX = 0;
-/* Le misure del palco e della foto si prendono una volta e si
-   tengono: leggerle a ogni pointermove (com'era) costringeva il
-   browser a rifare i conti del layout in mezzo al dito, che e' il
-   modo piu' sicuro di scattare. Si rinfrescano quando la foto
-   arriva, quando la finestra cambia taglia e all'inizio di ogni
-   gesto — cioe' nei soli momenti in cui possono essere cambiate. */
-let lbDim = null, lbRaf = 0, lbCur = '';
-function lbMisura(){
-  const img = el('lbImg'), r = el('lbStage').getBoundingClientRect();
-  lbDim = {iw: img.clientWidth, ih: img.clientHeight, sw: r.width, sh: r.height,
-           cx: r.left + r.width/2, cy: r.top + r.height/2};
-}
 
 function apriLightbox(i){
   const l = currentListing;
@@ -2775,59 +2609,31 @@ function apriLightbox(i){
 function chiudiLightbox(){
   el('lightbox').classList.remove('open');
   document.body.style.overflow = '';
-  if (lbRaf) { cancelAnimationFrame(lbRaf); lbRaf = 0; }
   el('lbImg').removeAttribute('src');   // niente foto fantasma alla prossima
 }
 function lbMostra(i){
   lbIdx = (i + lbFoto.length) % lbFoto.length;
-  lbS = 1; lbTx = 0; lbTy = 0; lbApplica(true);   // la posa si azzera SUBITO
-  const img = el('lbImg');
-  img.onload = lbMisura;                 // le misure vere arrivano con la foto
-  img.src = lbFoto[lbIdx];
+  lbS = 1; lbTx = 0; lbTy = 0; lbApplica();
+  el('lbImg').src = lbFoto[lbIdx];
   el('lbDots').innerHTML = lbFoto.length > 1
     ? lbFoto.map((_,j)=>`<i${j===lbIdx?' class="on"':''}></i>`).join('') : '';
-  /* Le vicine si scaldano in silenzio: cambiare foto non deve
-     aspettare la decodifica di un JPEG intero (era quello, lo
-     scatto piu' grosso del lightbox) */
-  if (lbFoto.length > 1) [lbIdx + 1, lbIdx - 1].forEach(k => {
-    const u = lbFoto[(k + lbFoto.length) % lbFoto.length];
-    if (u) { const pre = new Image(); pre.decoding = 'async'; pre.src = u; }
-  });
 }
-function lbScrivi(){
-  lbRaf = 0;
-  el('lbImg').style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbS})`;
-}
-function lbApplica(subito){
+function lbApplica(){
   /* La foto non deve mai perdersi fuori schermo: il bordo puo'
      sconfinare di poco (40px), che e' anche il gioco del feedback
-     dello swipe a zoom 1. Qui dentro NON si legge piu' il layout —
-     solo conti sulle misure gia' prese — e la scrittura sul nodo va
-     in un fotogramma: il dito puo' mandare piu' eventi di quanti
-     schermi ce ne siano, ma la trasformazione si scrive una volta
-     sola. `subito` e' per i cambi di foto, dove la posa deve essere
-     gia' azzerata quando la nuova immagine compare.
-     Sul rAF vale la lezione del tour al contrario: a pagina nascosta
-     i fotogrammi si fermano, ma un lightbox si tocca solo quando e'
-     davanti agli occhi — e il cambio foto, che e' l'unica cosa che
-     puo' capitare senza un dito, passa comunque da `subito`. */
-  if (!lbDim) lbMisura();
-  const mx = Math.max(0, (lbDim.iw*lbS - lbDim.sw)/2) + 40;
-  const my = Math.max(0, (lbDim.ih*lbS - lbDim.sh)/2) + 40;
+     dello swipe a zoom 1 */
+  const img = el('lbImg'), st = el('lbStage');
+  const mx = Math.max(0, (img.clientWidth*lbS - st.clientWidth)/2) + 40;
+  const my = Math.max(0, (img.clientHeight*lbS - st.clientHeight)/2) + 40;
   lbTx = Math.max(-mx, Math.min(mx, lbTx));
   lbTy = Math.max(-my, Math.min(my, lbTy));
-  const cur = lbS > 1 ? 'grab' : 'zoom-in';
-  if (cur !== lbCur) { lbCur = cur; el('lbImg').style.cursor = cur; }
-  if (subito) { if (lbRaf) cancelAnimationFrame(lbRaf); lbScrivi(); return; }
-  if (!lbRaf) lbRaf = requestAnimationFrame(lbScrivi);
+  img.style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbS})`;
+  img.style.cursor = lbS > 1 ? 'grab' : 'zoom-in';
 }
 function lbZoomA(px, py, s2){
-  /* zoom tenendo fermo il punto (px,py) dello schermo. Il centro del
-     palco viene dalle misure tenute da parte: il pinch chiama di qui
-     a ogni movimento, e un getBoundingClientRect a ogni dito mosso
-     era l'altra meta' degli scatti. */
-  if (!lbDim) lbMisura();
-  const cx = lbDim.cx, cy = lbDim.cy;
+  /* zoom tenendo fermo il punto (px,py) dello schermo */
+  const st = el('lbStage').getBoundingClientRect();
+  const cx = st.left + st.width/2, cy = st.top + st.height/2;
   s2 = Math.min(4, Math.max(1, s2));
   lbTx = px - cx - (s2/lbS) * (px - cx - lbTx);
   lbTy = py - cy - (s2/lbS) * (py - cy - lbTy);
@@ -2837,15 +2643,10 @@ function lbZoomA(px, py, s2){
 }
 (() => {
   const st = el('lbStage'), img = el('lbImg');
-  /* Gli ascoltatori del gesto sono passivi: qui dentro non si chiama
-     mai preventDefault (a tenere fermo lo schermo ci pensa gia'
-     touch-action:none sul palco), e un ascoltatore bloccante sul
-     percorso del dito e' un pedaggio che non serve a nessuno. */
   st.addEventListener('pointerdown', e => {
     /* la capture tiene il dito anche se scivola fuori dal palco; se
        il browser la nega (capita), il lightbox vive lo stesso */
     try { st.setPointerCapture(e.pointerId); } catch(_) {}
-    lbMisura();                 // le misure del gesto si prendono qui, una volta
     lbPtr.set(e.pointerId, {x:e.clientX, y:e.clientY});
     lbMoved = false;
     if (lbPtr.size === 2) {
@@ -2853,7 +2654,7 @@ function lbZoomA(px, py, s2){
       lbPinch0 = {d: Math.hypot(a.x-b.x, a.y-b.y) || 1, s: lbS};
       lbMid = null; lbSwipeX = 0;
     }
-  }, {passive: true});
+  });
   st.addEventListener('pointermove', e => {
     const p = lbPtr.get(e.pointerId);
     if (!p) return;
@@ -2872,7 +2673,7 @@ function lbZoomA(px, py, s2){
       if (lbS > 1) { lbTx += dx; lbTy += dy; lbApplica(); }
       else { lbSwipeX += dx; lbTx = lbSwipeX; lbApplica(); }
     }
-  }, {passive: true});
+  });
   const su = e => {
     lbPtr.delete(e.pointerId);
     if (lbPtr.size < 2) { lbPinch0 = null; lbMid = null; }
@@ -2886,13 +2687,8 @@ function lbZoomA(px, py, s2){
       lbSwipeX = 0;
     }
   };
-  st.addEventListener('pointerup', su, {passive: true});
-  st.addEventListener('pointercancel', su, {passive: true});
-  /* la finestra che cambia taglia (o il telefono che ruota) e' l'unico
-     altro momento in cui le misure invecchiano */
-  addEventListener('resize', () => {
-    if (el('lightbox').classList.contains('open')) lbMisura();
-  }, {passive: true});
+  st.addEventListener('pointerup', su);
+  st.addEventListener('pointercancel', su);
   st.addEventListener('dblclick', e =>
     lbZoomA(e.clientX, e.clientY, lbS > 1 ? 1 : 2.5));
   st.addEventListener('wheel', e => {
