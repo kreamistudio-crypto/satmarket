@@ -398,9 +398,19 @@
      click da desktop, swipe tra le foto coi pallini. Tutto vanilla:
      pointer events + touch-action:none, nessuna libreria. Colori
      fissi come tutto cio' che vive sulla foto. */
-  #lightbox{position:fixed;inset:0;z-index:70;background:rgba(12,10,6,.94);
+  /* Il velo e' OPACO, e non e' un dettaglio estetico: con un filo di
+     trasparenza il browser non puo' saltare nulla di cio' che sta
+     sotto, e sotto ci sono header e nav col loro backdrop-filter, che
+     si ricalcola a ogni fotogramma mentre il dito muove la foto. Il
+     6% che si perde non lo vedeva nessuno. */
+  #lightbox{position:fixed;inset:0;z-index:70;background:#0C0A06;
     display:none}
   #lightbox.open{display:block}
+  /* E gia' che il velo copre tutto, le due barre si spengono del
+     tutto. `visibility` e non `display`: l'header e' sticky, cioe'
+     sta nel flusso, e toglierlo di li' farebbe saltare la pagina
+     sotto — invisibile ora, ma ben visibile alla chiusura. */
+  body.lb-aperto header, body.lb-aperto nav{visibility:hidden}
   #lbStage{position:absolute;inset:0;overflow:hidden;touch-action:none;
     display:flex;align-items:center;justify-content:center}
   #lbImg{max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none;
@@ -2699,11 +2709,13 @@ function apriLightbox(i){
   lbFoto = l.photos;
   el('lightbox').classList.add('open');
   document.body.style.overflow = 'hidden';   // sotto non si scorre
+  document.body.classList.add('lb-aperto');  // e le barre si spengono
   lbMostra(i || 0);
 }
 function chiudiLightbox(){
   el('lightbox').classList.remove('open');
   document.body.style.overflow = '';
+  document.body.classList.remove('lb-aperto');
   if (lbRaf) { cancelAnimationFrame(lbRaf); lbRaf = 0; }
   el('lbImg').removeAttribute('src');   // niente foto fantasma alla prossima
 }
