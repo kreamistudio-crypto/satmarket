@@ -413,9 +413,18 @@
   body.lb-aperto header, body.lb-aperto nav{visibility:hidden}
   #lbStage{position:absolute;inset:0;overflow:hidden;touch-action:none;
     display:flex;align-items:center;justify-content:center}
-  #lbImg{max-width:100%;max-height:100%;user-select:none;-webkit-user-drag:none;
-    will-change:transform}
-  #lbImg.snap{transition:transform .18s ease}
+  /* La pista: le foto in fila, una per schermo. Scorre in orizzontale
+     col dito (translate3d, mai `left`) e si aggancia al rilascio con
+     una transizione breve — la classe `scorre` c'e' solo in quel
+     momento, che durante il trascinamento la foto deve stare INCOLLATA
+     al dito, non inseguirlo. */
+  #lbPista{flex:0 0 100%;height:100%;display:flex;will-change:transform}
+  #lbPista.scorre{transition:transform .24s cubic-bezier(.22,.61,.36,1)}
+  .lb-slide{flex:0 0 100%;height:100%;
+    display:flex;align-items:center;justify-content:center}
+  .lb-slide img{max-width:100%;max-height:100%;
+    user-select:none;-webkit-user-drag:none}
+  #lbImg{will-change:transform}
   #lightbox .lb-x{position:absolute;top:calc(10px + env(safe-area-inset-top));
     right:10px;z-index:2;width:38px;height:38px;border-radius:50%;border:0;
     background:rgba(255,248,234,.94);color:#23282C;cursor:pointer;
@@ -1338,7 +1347,7 @@
 
   <!-- ============ LIGHTBOX: la foto a tutto schermo ============ -->
   <div id="lightbox" role="dialog" aria-label="Foto a tutto schermo">
-    <div id="lbStage"><img id="lbImg" alt="" draggable="false"></div>
+    <div id="lbStage"><div id="lbPista"></div></div>
     <button class="lb-x" onclick="chiudiLightbox()" title="Chiudi" aria-label="Chiudi">✕</button>
     <!-- Le frecce del lightbox: gemelle di quelle del carosello, stessa
          condizione (solo col mouse, ci pensa il CSS). Sono SORELLE del
@@ -2708,6 +2717,17 @@ function openDetail(id){
 let lbFoto = [], lbIdx = 0, lbS = 1, lbTx = 0, lbTy = 0;
 const lbPtr = new Map();
 let lbPinch0 = null, lbMid = null, lbMoved = false, lbSwipeX = 0;
+/* Due trasformazioni distinte, e non vanno confuse:
+   — la PISTA (#lbPista) scorre in orizzontale e fa le pagine: la
+     tiene `lbPosX`, che e' lo scostamento dal suo posto di riposo
+     (-lbIdx * larghezza dello schermo);
+   — la FOTO ATTIVA (#lbImg) porta zoom e spostamento dentro la foto:
+     li tengono lbS/lbTx/lbTy, come sempre.
+   A zoom 1 il dito muove la pista, ingrandito muove la foto. Prima
+   il dito muoveva SEMPRE la foto, che a zoom 1 e' larga quanto lo
+   schermo e quindi si fermava dopo 40px contro il suo stesso
+   guinzaglio: era il muro. */
+let lbPosX = 0, lbVel = 0, lbUltimo = 0, lbSlide = [];
 /* Le misure del palco e della foto si prendono una volta e si
    tengono: leggerle a ogni pointermove (com'era) costringeva il
    browser a rifare i conti del layout in mezzo al dito, che e' il
@@ -2717,7 +2737,8 @@ let lbPinch0 = null, lbMid = null, lbMoved = false, lbSwipeX = 0;
 let lbDim = null, lbRaf = 0, lbCur = '';
 function lbMisura(){
   const img = el('lbImg'), r = el('lbStage').getBoundingClientRect();
-  lbDim = {iw: img.clientWidth, ih: img.clientHeight, sw: r.width, sh: r.height,
+  lbDim = {iw: img ? img.clientWidth : 0, ih: img ? img.clientHeight : 0,
+           sw: r.width, sh: r.height,
            cx: r.left + r.width/2, cy: r.top + r.height/2};
 }
 
@@ -2731,33 +2752,71 @@ function apriLightbox(i){
   el('lightbox').classList.toggle('sola', lbFoto.length < 2);
   document.body.style.overflow = 'hidden';   // sotto non si scorre
   document.body.classList.add('lb-aperto');  // e le barre si spengono
-  lbMostra(i || 0);
+  /* La pista: una casella per foto, ma il `src` lo prendono solo la
+     foto attiva e le due vicine (vedi lbAllestisci) — le altre
+     restano caselle vuote, che un JPEG pieno per ognuna sarebbe
+     memoria buttata. */
+  el('lbPista').innerHTML = lbFoto
+    .map(() => '<div class="lb-slide"><img alt="" draggable="false"></div>').join('');
+  lbSlide = [...el('lbPista').children];
+  el('lbDots').innerHTML = lbFoto.length > 1
+    ? lbFoto.map(() => '<i></i>').join('') : '';
+  lbIdx = Math.max(0, Math.min(lbFoto.length - 1, i || 0));
+  lbPosX = 0; lbS = 1; lbTx = 0; lbTy = 0;
+  lbMisura();                            // la larghezza dello schermo serve subito
+  lbAllestisci();
+  lbApplica(true);
 }
 function chiudiLightbox(){
   el('lightbox').classList.remove('open');
   document.body.style.overflow = '';
   document.body.classList.remove('lb-aperto');
   if (lbRaf) { cancelAnimationFrame(lbRaf); lbRaf = 0; }
-  el('lbImg').removeAttribute('src');   // niente foto fantasma alla prossima
+  el('lbPista').innerHTML = '';   // niente foto fantasma (ne' in memoria)
+  lbSlide = [];
 }
-function lbMostra(i){
-  lbIdx = (i + lbFoto.length) % lbFoto.length;
-  lbS = 1; lbTx = 0; lbTy = 0; lbApplica(true);   // la posa si azzera SUBITO
-  const img = el('lbImg');
-  img.onload = lbMisura;                 // le misure vere arrivano con la foto
-  img.src = lbFoto[lbIdx];
-  el('lbDots').innerHTML = lbFoto.length > 1
-    ? lbFoto.map((_,j)=>`<i${j===lbIdx?' class="on"':''}></i>`).join('') : '';
-  /* Le vicine si scaldano in silenzio: cambiare foto non deve
-     aspettare la decodifica di un JPEG intero */
-  if (lbFoto.length > 1) [lbIdx + 1, lbIdx - 1].forEach(k => {
-    const u = lbFoto[(k + lbFoto.length) % lbFoto.length];
-    if (u) { const pre = new Image(); pre.decoding = 'async'; pre.src = u; }
+/* Chi porta il `src` e chi porta l'id `lbImg`: la foto attiva e le
+   due vicine sono cariche (cambiare foto non deve aspettare la
+   decodifica di un JPEG intero), e l'id segue l'attiva — cosi' tutto
+   il codice dello zoom continua a parlare con `el('lbImg')` senza
+   sapere nulla della pista. */
+function lbAllestisci(){
+  lbSlide.forEach(s => s.firstElementChild.removeAttribute('id'));
+  lbSlide.forEach((s, j) => {
+    const im = s.firstElementChild;
+    if (Math.abs(j - lbIdx) <= 1 && !im.getAttribute('src')) {
+      im.decoding = 'async';
+      im.onload = () => { if (im.id === 'lbImg') lbMisura(); };
+      im.src = lbFoto[j];
+    }
+    if (j === lbIdx) im.id = 'lbImg';
   });
+  [...el('lbDots').children].forEach((p, j) => p.classList.toggle('on', j === lbIdx));
+  const n = lbFoto.length;
+  document.querySelectorAll('#lightbox .lb-nav').forEach(b =>
+    b.disabled = b.classList.contains('prev') ? lbIdx <= 0 : lbIdx >= n - 1);
 }
+/* L'unico modo di cambiare foto: frecce, pallini, tastiera e rilascio
+   dello swipe passano tutti di qui. `morbido` accende la transizione
+   della pista — ed e' anche la molla di ritorno dell'elastico, che e'
+   un cambio foto verso se stessi. */
+function lbVaiA(i, morbido){
+  lbIdx = Math.max(0, Math.min(lbFoto.length - 1, i));
+  lbPosX = 0; lbS = 1; lbTx = 0; lbTy = 0;
+  const pista = el('lbPista');
+  pista.classList.toggle('scorre', !!morbido && !tourRidotto());
+  lbAllestisci();
+  lbApplica(true);
+  if (morbido) setTimeout(() => pista.classList.remove('scorre'), 260);
+}
+const lbMostra = i => lbVaiA(i, true);   // il vecchio nome, per chi lo chiama
 function lbScrivi(){
   lbRaf = 0;
-  el('lbImg').style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbS})`;
+  const pista = el('lbPista');
+  if (pista) pista.style.transform =
+    `translate3d(${-lbIdx * (lbDim ? lbDim.sw : 0) + lbPosX}px,0,0)`;
+  const im = el('lbImg');
+  if (im) im.style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbS})`;
 }
 function lbApplica(subito){
   /* La foto non deve mai perdersi fuori schermo: il bordo puo'
@@ -2778,7 +2837,8 @@ function lbApplica(subito){
   lbTx = Math.max(-mx, Math.min(mx, lbTx));
   lbTy = Math.max(-my, Math.min(my, lbTy));
   const cur = lbS > 1 ? 'grab' : 'zoom-in';
-  if (cur !== lbCur) { lbCur = cur; el('lbImg').style.cursor = cur; }
+  const im = el('lbImg');
+  if (im && cur !== lbCur) { lbCur = cur; im.style.cursor = cur; }
   if (subito) { if (lbRaf) cancelAnimationFrame(lbRaf); lbScrivi(); return; }
   if (!lbRaf) lbRaf = requestAnimationFrame(lbScrivi);
 }
@@ -2797,7 +2857,8 @@ function lbZoomA(px, py, s2){
   lbApplica();
 }
 (() => {
-  const st = el('lbStage'), img = el('lbImg');
+  const st = el('lbStage');   // la foto attiva si chiede di volta in volta:
+                              // la pista si rifa' a ogni apertura
   /* Gli ascoltatori del gesto sono passivi: qui dentro non si chiama
      mai preventDefault (a tenere fermo lo schermo ci pensa gia'
      touch-action:none sul palco), e un ascoltatore bloccante sul
@@ -2809,10 +2870,14 @@ function lbZoomA(px, py, s2){
     lbMisura();                 // le misure del gesto si prendono qui, una volta
     lbPtr.set(e.pointerId, {x:e.clientX, y:e.clientY});
     lbMoved = false;
+    lbUltimo = performance.now(); lbVel = 0;
+    el('lbPista').classList.remove('scorre');   // il dito prende in mano la pista
     if (lbPtr.size === 2) {
       const [a,b] = [...lbPtr.values()];
       lbPinch0 = {d: Math.hypot(a.x-b.x, a.y-b.y) || 1, s: lbS};
-      lbMid = null; lbSwipeX = 0;
+      /* due dita = si zooma, non si sfoglia: la pista torna al suo
+         posto e la corsa accumulata non conta piu' */
+      lbMid = null; lbSwipeX = 0; lbPosX = 0; lbApplica(true);
     }
   }, {passive: true});
   st.addEventListener('pointermove', e => {
@@ -2831,20 +2896,36 @@ function lbZoomA(px, py, s2){
       lbZoomA(mx, my, lbPinch0.s * (Math.hypot(a.x-b.x, a.y-b.y) / lbPinch0.d));
     } else if (lbPtr.size === 1) {
       if (lbS > 1) { lbTx += dx; lbTy += dy; lbApplica(); }
-      else { lbSwipeX += dx; lbTx = lbSwipeX; lbApplica(); }
+      else {
+        /* A zoom 1 il dito muove la PISTA, 1:1 per tutta la corsa: la
+           foto accanto entra dal lato mentre trascini. */
+        lbSwipeX += dx;
+        const ora = performance.now();
+        lbVel = dx / Math.max(1, ora - lbUltimo);   // px/ms, serve al rilascio
+        lbUltimo = ora;
+        /* ELASTICO ai capolinea: se di la' non c'e' piu' niente la
+           corsa vale un terzo — la foto si muove, ma la resistenza si
+           sente, e si capisce che la fila e' finita. */
+        const capolinea = (lbIdx === 0 && lbSwipeX > 0) ||
+                          (lbIdx === lbFoto.length - 1 && lbSwipeX < 0);
+        lbPosX = capolinea ? lbSwipeX / 3 : lbSwipeX;
+        lbApplica();
+      }
     }
   }, {passive: true});
   const su = e => {
     lbPtr.delete(e.pointerId);
     if (lbPtr.size < 2) { lbPinch0 = null; lbMid = null; }
-    if (lbPtr.size === 0 && lbS === 1) {
-      if (Math.abs(lbSwipeX) > 60 && lbFoto.length > 1) {
-        lbMostra(lbIdx + (lbSwipeX < 0 ? 1 : -1));
-      } else if (lbSwipeX) {   // sotto soglia: rientro morbido
-        img.classList.add('snap'); lbTx = 0; lbApplica();
-        setTimeout(()=>img.classList.remove('snap'), 200);
-      }
-      lbSwipeX = 0;
+    if (lbPtr.size === 0 && lbS === 1 && lbSwipeX) {
+      /* Gesto DECISO: oltre un quarto di schermo, oppure un colpo
+         veloce anche se corto — a dire «la prossima» e' il polso,
+         non solo la distanza. Altrimenti si torna a quella di
+         partenza, e ai capolinea questa e' la molla dell'elastico:
+         un cambio foto verso se stessi. */
+      const largo = (lbDim && lbDim.sw) || 1;
+      const deciso = Math.abs(lbSwipeX) > largo * .25 || Math.abs(lbVel) > .4;
+      lbVaiA(deciso ? lbIdx + (lbSwipeX < 0 ? 1 : -1) : lbIdx, true);
+      lbSwipeX = 0; lbVel = 0;
     }
   };
   st.addEventListener('pointerup', su, {passive: true});
@@ -2852,7 +2933,9 @@ function lbZoomA(px, py, s2){
   /* la finestra che cambia taglia (o il telefono che ruota) e' l'unico
      altro momento in cui le misure invecchiano */
   addEventListener('resize', () => {
-    if (el('lightbox').classList.contains('open')) lbMisura();
+    /* la larghezza dello schermo e' anche il passo della pista: se
+       cambia, il posto di riposo va rifatto subito */
+    if (el('lightbox').classList.contains('open')) { lbMisura(); lbApplica(true); }
   }, {passive: true});
   st.addEventListener('dblclick', e =>
     lbZoomA(e.clientX, e.clientY, lbS > 1 ? 1 : 2.5));
