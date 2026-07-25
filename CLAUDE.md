@@ -1081,6 +1081,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   via il vecchio badge 📷 N): uno per foto in basso al centro,
   l'attivo pieno, aggiornati sull'evento scroll della striscia
   scroll-snap già esistente; con una foto sola non esistono.
+  UNO SWIPE, UNA FOTO (lug 2026, il patto di Vinted): lo fa
+  `scroll-snap-stop:always` sulle foto della striscia — una riga di
+  CSS, quindi tutto sul compositor, nessun ascoltatore in mezzo al
+  dito e nessuno scatto in cambio (la strada JS «intercetto il gesto
+  e scorro io» non serve proprio). Nel lightbox il patto valeva già:
+  lo swipe lì è a mano e muove sempre di ±1 oltre i 60px. Attenzione
+  al rovescio: lo snap-stop vale anche per le scorse morbide fatte da
+  noi, quindi `vaiA` usa `smooth` solo per il passo corto (non ha
+  nulla da scavalcare) e `auto` per i salti lunghi dei pallini, che
+  altrimenti rischiano di fermarsi per strada.
   Pallini e bottone condividi vivono SULLA foto: colori fissi
   (bianco/carta+inchiostro), identici in chiaro e scuro.
   Il TIMONE della galleria (lug 2026, da un bug vero: da desktop la
@@ -1136,6 +1146,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chiudere. Vanilla puro, zero librerie; lo zoom (clamp 1–4) tiene
   fermo il punto toccato e la clamp del translate non fa mai perdere
   la foto; body senza scroll a lightbox aperto.
+  FLUIDITÀ del lightbox (lug 2026, era scattoso dal giorno uno): la
+  regola è che il percorso del dito non deve MAI leggere il layout.
+  `lbApplica` non tocca più `clientWidth`/`clientHeight` e `lbZoomA`
+  non chiama più `getBoundingClientRect` (il pinch ci passa a ogni
+  movimento): le misure stanno in `lbDim`, prese quando la foto
+  arriva (`img.onload`), a ogni `pointerdown` e sul `resize`. La
+  scrittura della trasformazione va in UN `requestAnimationFrame`
+  (`lbScrivi`) — il dito manda più eventi che fotogrammi — mentre
+  `lbApplica(true)` scrive dritto ed è la strada dei cambi di foto,
+  dove la posa dev'essere già azzerata quando la nuova immagine
+  compare; `chiudiLightbox` annulla il rAF pendente. Il cursore si
+  scrive solo quando cambia davvero. Gli ascoltatori pointer sono
+  `{passive:true}` (dentro non si chiama mai preventDefault: a tenere
+  fermo lo schermo pensa `touch-action:none`); il `wheel` resta
+  bloccante perché lì il preventDefault serve allo zoom. E le foto
+  vicine si precaricano in `lbMostra` (`new Image()`): lo scatto più
+  grosso era la decodifica di un JPEG intero al cambio di foto.
   Preferiti «Nel tuo barattolo» (lug 2026): il simbolo è il
   BARATTOLINO 🫙 — MAI il cuore, MAI il fulmine (su Nostr è lo zap).
   Tabella `preferiti(tg_id, annuncio_id, creato, PK)`; toggle
