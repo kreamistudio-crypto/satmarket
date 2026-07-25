@@ -429,6 +429,17 @@
   #lbDots i{width:7px;height:7px;border-radius:50%;
     background:rgba(255,255,255,.45);box-shadow:0 0 3px rgba(0,0,0,.4)}
   #lbDots i.on{background:#fff}
+  /* Le frecce del lightbox riusano `.foto-nav` del carosello — stessa
+     resa e stessa media query, quindi sul telefono non esistono — e
+     si ancorano al velo, che e' fisso a tutto schermo. Sul fondo
+     scuro stanno un filo piu' vive che sulla foto della scheda.
+     Con una foto sola spariscono: la regola vince per specificita',
+     dovunque stia. */
+  /* (l'id batte la classe: il :hover va ripetuto qui, sennò lo
+     schiaccerebbe la riga sopra) */
+  #lightbox .foto-nav{opacity:.7}
+  #lightbox .foto-nav:hover,#lightbox .foto-nav:focus-visible{opacity:1}
+  #lightbox.sola .lb-nav{display:none}
   #photoPreview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   #photoPreview .th{position:relative}
   #photoPreview img{width:64px;height:64px;object-fit:cover;border-radius:10px;
@@ -1329,6 +1340,14 @@
   <div id="lightbox" role="dialog" aria-label="Foto a tutto schermo">
     <div id="lbStage"><img id="lbImg" alt="" draggable="false"></div>
     <button class="lb-x" onclick="chiudiLightbox()" title="Chiudi" aria-label="Chiudi">✕</button>
+    <!-- Le frecce del lightbox: gemelle di quelle del carosello, stessa
+         condizione (solo col mouse, ci pensa il CSS). Sono SORELLE del
+         palco, non figlie: cosi' un click su di esse non arriva ne'
+         allo swipe ne' allo zoom, che vivono su #lbStage. -->
+    <button class="foto-nav lb-nav prev" aria-label="Foto precedente" title="Foto precedente">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="foto-nav lb-nav next" aria-label="Foto successiva" title="Foto successiva">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     <div id="lbDots"></div>
   </div>
 
@@ -2708,6 +2727,8 @@ function apriLightbox(i){
   haptic();
   lbFoto = l.photos;
   el('lightbox').classList.add('open');
+  /* con una foto sola le frecce non hanno dove portare */
+  el('lightbox').classList.toggle('sola', lbFoto.length < 2);
   document.body.style.overflow = 'hidden';   // sotto non si scorre
   document.body.classList.add('lb-aperto');  // e le barre si spengono
   lbMostra(i || 0);
@@ -2835,6 +2856,13 @@ function lbZoomA(px, py, s2){
   }, {passive: true});
   st.addEventListener('dblclick', e =>
     lbZoomA(e.clientX, e.clientY, lbS > 1 ? 1 : 2.5));
+  /* Le frecce: nodi fissi del lightbox, quindi si agganciano una
+     volta sola qui. Girano in tondo come le frecce della tastiera, e
+     `lbMostra` azzera lo zoom — la foto nuova arriva sempre intera. */
+  document.querySelectorAll('#lightbox .lb-nav').forEach(b =>
+    b.addEventListener('click', () => {
+      if (lbFoto.length > 1) lbMostra(lbIdx + (b.classList.contains('prev') ? -1 : 1));
+    }));
   st.addEventListener('wheel', e => {
     e.preventDefault();
     lbZoomA(e.clientX, e.clientY, lbS * Math.exp(-e.deltaY/400));
