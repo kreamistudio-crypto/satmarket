@@ -14,7 +14,12 @@ PRIMA VOLTA:
 # --- Telegram -------------------------------------------------------
 BOT_TOKEN = "INCOLLA_QUI_IL_TOKEN_DEL_BOT"      # da @BotFather
 ADMIN_IDS = [123456789]      # il TUO user id Telegram (da @userinfobot):
-                             # decide le dispute e riceve gli avvisi
+                             # decide le dispute e riceve gli avvisi.
+                             # Piu' moderatori? Elenca gli id separati da
+                             # virgola: [123456789, 987654321]. Sono tutti
+                             # pari grado (nessun super-admin) e la lista
+                             # si cambia SOLO qui, sul server: nessun
+                             # comando dell'app o del bot la tocca.
 
 # --- Bot Telegram in ricezione (doppia cittadinanza) -----------------
 # Il segreto che Telegram ci rimanda in ogni update (header
