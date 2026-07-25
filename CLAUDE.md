@@ -832,7 +832,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`trattamiDaNuovo()`) — azzera barattolo_hint, va su Esplora (il
   tour vive lì) e riarma tour e checklist SUL DISPOSITIVO: gli hint
   sono localStorage puro, il server non c'entra (per questo non è un
-  comando bot) e annunci/ordini/profilo non si toccano.
+  comando bot) e annunci/ordini/profilo non si toccano (azzera anche
+  `barattolo_test`, la memoria del cartello qui sotto).
+  Cartello «fase di test» (lug 2026): l'avviso di rodaggio
+  all'apertura — modale a tutto schermo col velo SFOCATO
+  (`#testModale`, z-index 90: sopra i fogli e sopra il tour), si
+  chiude SOLO col bottone o con la ✕ (niente tocco fuori, niente
+  Escape: deve essere letto). Interruttore, testo e link vivono nel
+  CONFIG (`BANNER_TEST`, `BANNER_TEST_TESTO`, `BANNER_TEST_LINK`) e
+  arrivano al client da `GET /api/banner-test`, endpoint PUBBLICO come
+  /api/listings (lo legge anche l'anonimo in vetrina; spento o testo
+  vuoto = `{attivo:false}` e non si disegna nulla): a rodaggio finito
+  basta un False nel config del VPS, senza cantieri. La PRIMA riga del
+  testo è il titolo, il resto il messaggio (`white-space:pre-line` e
+  `textContent` puro: nessun innerHTML sul testo); il bottone del
+  canale compare solo con un link http(s) — la stringa vive in
+  `linkCanaleTest`, mai dentro un onclick — e dentro Telegram passa da
+  `tg.openTelegramLink`. Frequenza: UNA VOLTA AL GIORNO per
+  dispositivo (`localStorage['barattolo_test']` = giorno LOCALE,
+  consumato alla comparsa come il tour: i tester aprono l'app di
+  continuo), mai in DEMO, sempre in vetrina anonima. PRECEDENZA:
+  `modaleTest(dopo)` prende in carico ciò che veniva dopo — alla
+  chiusura partono tour e banner installa, e `testModaleInCorso` è
+  nelle guardie di `bannerInstallaPwa()`; server muto o interruttore
+  spento = il giorno NON si consuma e il seguito parte comunque.
   Redesign «mercatino di paese» (lug 2026, da Claude Design, solo
   CSS/markup): palette in `:root` — crema #FAF4E4, inchiostro #23282C,
   arancio ₿ #F7931A con i toni `--sats-deep/-text`, verde escrow
@@ -1556,7 +1579,14 @@ la catena automatica — vedi Architettura — collaudato in locale: 12
 verifiche server comprese la gamba Nostr sui relay veri, rendering e
 ripieghi nel browser, selettore avanti e indietro con la validazione
 delle sorgenti; in produzione va vista una foto Telegram vera, che
-in collaudo il bot simulato non può dare).
+in collaudo il bot simulato non può dare); cartello «fase di test»
+all'apertura (lug 2026: modale col velo sfocato, testo e link del
+canale scritti nel config, una volta al giorno per dispositivo,
+precedenza sul tour di benvenuto, vedi Architettura — collaudato in
+locale in tutti gli stati [acceso, spento, link vuoto o storto,
+server muto, stesso giorno, giorno nuovo], chiaro e scuro, mobile e
+desktop, demo e vetrina; a rodaggio finito si spegne con
+`BANNER_TEST = False` nel config del VPS e un riavvio).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
