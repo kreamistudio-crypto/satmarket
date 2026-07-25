@@ -200,6 +200,18 @@ try:
 except ImportError:
     CONTATORE_UTENTI = True
 
+# Il campanello dei nuovi iscritti: i moderatori sanno chi entra.
+# Acceso di serie; il tetto vale sui messaggi SINGOLI, oltre resta
+# l'aggregato che non nomina nessuno.
+try:
+    from config import AVVISI_ISCRITTI
+except ImportError:
+    AVVISI_ISCRITTI = True
+try:
+    from config import AVVISI_ISCRITTI_MAX_ORA
+except ImportError:
+    AVVISI_ISCRITTI_MAX_ORA = 6
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -2480,6 +2492,8 @@ CACHE_PIONIERI = 60          # secondi
 
 
 def conta_pionieri(con) -> int:
+    # (il campanello che avvisa i moderatori di ogni nuovo iscritto sta
+    #  piu' sotto, in compagnia del drenatore dei post automatici)
     adesso = time.time()
     if adesso - _pionieri_cache["quando"] < CACHE_PIONIERI:
         return _pionieri_cache["quanti"]
@@ -5207,6 +5221,92 @@ async def _posta_promo_aggregato(n: int):
                       {"chat_id": TELEGRAM_CANALE_ID, "text": testo})
 
 
+# ---------- IL CAMPANELLO DEI NUOVI ISCRITTI (solo moderatori) -------
+# In rodaggio ogni persona che entra e' una notizia. La ricevono i
+# moderatori nel loro Telegram e SOLO loro: il nome di chi si iscrive
+# non si annuncia in piazza, e anche i traguardi (100 pionieri!) sono
+# roba da annunciare a mano, quando e come si vuole.
+# Niente coda in memoria come i post: qui il filo dell'acqua e' la
+# colonna `registrato`, e a ogni giro d'orologio si guarda chi e'
+# arrivato da quando abbiamo guardato l'ultima volta. Cosi' il
+# campanello copre da solo TUTTE le porte d'ingresso — Mini App, login
+# web, nativo Nostr, /start del bot — comprese quelle di domani, senza
+# un gancio dentro l'autenticazione. Un riavvio salta un battito e
+# riparte da adesso: mai una raffica di recuperi all'avvio.
+# La finestra di raggruppamento e' il giro dell'orologio (10 minuti).
+
+_ultimo_giro_iscritti = 0.0             # filo dell'acqua (0 = da armare)
+_iscritti_annunciati: list[float] = []  # timestamp dei messaggi singoli
+TRAGUARDI_PIONIERI = (50, 100, 250, 500, 1000)
+
+
+def _riga_pioniere(u: dict) -> str:
+    """Chi e' arrivato, in una riga: il nome, l'eventuale @username e
+    la porta da cui e' entrato (i tg_id negativi sono i nativi Nostr).
+    Il nome lo scrive l'utente: passa da html.escape, che le notifiche
+    viaggiano in parse_mode HTML."""
+    nome = html.escape(u["nome"] or "senza nome")
+    if u["tg_id"] < 0:
+        return f"{nome} — da Nostr"
+    if u["username"]:
+        return f"{nome} (@{html.escape(u['username'])}) — da Telegram"
+    return f"{nome} — da Telegram"
+
+
+async def avvisa_nuovi_iscritti():
+    """Un giro d'orologio: pochi arrivi = un messaggio ciascuno, con
+    nome e provenienza; una raffica (il link finito in un gruppo) = UN
+    messaggio solo col conto, che non nomina nessuno — la valvola del
+    drenatore promo, stessa soglia. Fail-open: la chiama l'orologio, e
+    un campanello muto non deve mai fermare gli sblocchi."""
+    global _ultimo_giro_iscritti
+    if not AVVISI_ISCRITTI:
+        return
+    adesso = time.time()
+    if not _ultimo_giro_iscritti:
+        _ultimo_giro_iscritti = adesso     # primo giro: si arma e basta
+        return
+    con = db()
+    nuovi = [dict(r) for r in con.execute(
+        "SELECT tg_id, nome, username FROM utenti "
+        "WHERE registrato >= ? AND registrato < ? "
+        "ORDER BY registrato, tg_id",
+        (int(_ultimo_giro_iscritti), int(adesso)))]
+    # Il conto lo rifacciamo qui e non con conta_pionieri(): la sua
+    # cache di un minuto potrebbe non vedere ancora chi stiamo
+    # annunciando, e «siamo in 24» mentre presenti il 25° e' una bugia.
+    totale = con.execute("SELECT COUNT(*) AS n FROM utenti").fetchone()["n"]
+    con.close()
+    _ultimo_giro_iscritti = adesso
+    if not nuovi:
+        return
+    # I traguardi scattano solo nel giro in cui il numero li supera: si
+    # deducono dai dati, nessuno stato da tenere (e se una fusione
+    # cancella una riga proprio in quel giro, il traguardo salta — pace,
+    # il numero vero resta quello del contatore in vetrina).
+    prima = totale - len(nuovi)
+    for soglia in TRAGUARDI_PIONIERI:
+        if prima < soglia <= totale:
+            await notifica_admin(f"🎉 <b>Traguardo: {soglia} pionieri!</b>\n"
+                                 f"Il barattolo si riempie. 🫙")
+    # Il tetto orario vale sui messaggi SINGOLI; oltre resta
+    # l'aggregato, che passa sempre (al massimo uno per giro, e solo se
+    # qualcuno e' davvero arrivato).
+    _iscritti_annunciati[:] = [t for t in _iscritti_annunciati
+                               if adesso - t < 3600]
+    if (len(nuovi) <= SOGLIA_AGGREGA
+            and len(_iscritti_annunciati) + len(nuovi) <= AVVISI_ISCRITTI_MAX_ORA):
+        for u in nuovi:
+            await notifica_admin(f"👥 <b>Nuovo pioniere:</b> {_riga_pioniere(u)}\n"
+                                 f"Siamo in {totale}.")
+            _iscritti_annunciati.append(time.time())
+    else:
+        conto = ("1 nuovo pioniere" if len(nuovi) == 1
+                 else f"{len(nuovi)} nuovi pionieri")
+        await notifica_admin(f"👥 <b>{conto}</b> negli ultimi minuti.\n"
+                             f"Siamo in {totale}.")
+
+
 # --- Il motore degli avvisi di ricerca -------------------------------
 # Gemello della coda promo qui sopra: chi pubblica accoda e basta, il
 # drenatore dorme la stessa finestra e poi confronta gli annunci nuovi
@@ -6745,6 +6845,10 @@ async def orologio():
             pulisci_avvisi()
         except Exception as e:
             print(f"⚠️ Pulizia avvisi saltata: {e}")
+        try:
+            await avvisa_nuovi_iscritti()
+        except Exception as e:
+            print(f"⚠️ Campanello dei nuovi iscritti saltato: {e}")
         await asyncio.sleep(600)
 
 

@@ -100,6 +100,17 @@ BANNER_TEST_LINK = ""
 # sparisce dalla vetrina senza altro da toccare.
 CONTATORE_UTENTI = True
 
+# --- Campanello dei nuovi iscritti (solo ai moderatori) --------------
+# «👥 Nuovo pioniere: Marco (@marco_b) — da Telegram. Siamo in 25.»
+# Arriva SOLO agli ADMIN_IDS, mai sul canale pubblico. Ogni 10 minuti
+# il server guarda chi è entrato: pochi = un messaggio ciascuno, una
+# raffica = un solo messaggio col conto, senza nomi. In più un avviso
+# ai traguardi (50, 100, 250, 500, 1000 pionieri).
+AVVISI_ISCRITTI = True
+# Quanti messaggi SINGOLI al massimo in un'ora: oltre questo tetto
+# restano solo gli aggregati (che non nominano nessuno).
+AVVISI_ISCRITTI_MAX_ORA = 6
+
 # --- Collaudo ---------------------------------------------------------
 # True  = test locale con utenti finti (Compratore/Venditore/Admin)
 # False = OBBLIGATORIO prima di andare online!
