@@ -1099,8 +1099,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   swipe, e basta: i pallini toccabili sono stati provati e RITIRATI
   — cambiavano il gesto di prima senza aggiungere nulla). I listener
   dei pallini restano appesi anche sul telefono, muti. Al capolinea
-  le frecce si spengono (`[disabled]{display:none}`). Il
-  trascinamento è solo
+  le frecce si spengono (`[disabled]{display:none}`). Il blocco del
+  trascinamento NON SI MONTA AFFATTO senza mouse (`matchMedia` sulla
+  stessa condizione, `return` in mezzo a `montaGalleria`) — lezione
+  da una regressione vera, lo swipe diventato scattoso: un
+  ascoltatore `pointerdown`/`pointermove` non passivo su una striscia
+  che scorre la marchia come zona da main thread e il dito paga in
+  fluidità anche quando la guardia `pointerType` lo scarta subito,
+  perché il conto si paga alla REGISTRAZIONE, non alla chiamata. Per
+  la stessa ragione, anche col mouse quegli ascoltatori sono
+  `{passive:true}` (dentro non si chiama mai `preventDefault`), che
+  è quel che salva i portatili col touchscreen — mouse E dito, quindi
+  passano la condizione. Il trascinamento è comunque solo
   `pointerType==='mouse'` (allo scorrimento nativo del dito non si
   tocca nulla): soglia 5px, `.trascina` toglie lo snap durante e lo
   rimette al rilascio riagganciando la foto più vicina, e il click
