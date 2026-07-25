@@ -262,6 +262,9 @@
   .tag-price .price-sub,.tag-price .price .unit{color:#8A8271}
   .tag-price .price-sub{margin-top:0}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
+  /* Il palco della galleria: tutto cio' che fluttua sulla foto
+     (cerchietti, pallini, frecce) si appende qui */
+  .detail-foto{position:relative}
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
     scrollbar-width:none;background:var(--ph-b)}
   .detail-photos::-webkit-scrollbar{display:none}
@@ -278,6 +281,29 @@
   .foto-dots i{width:7px;height:7px;border-radius:50%;
     background:rgba(255,255,255,.45);box-shadow:0 0 3px rgba(0,0,0,.4)}
   .foto-dots i.on{background:#fff}
+  /* Le frecce del carosello: gemelle dei cerchietti di carta, a meta'
+     altezza ai due lati. Esistono SOLO dove c'e' un puntatore vero:
+     sul telefono lo swipe basta e coprirebbero la foto per niente.
+     Discrete a riposo, piene quando il mouse e' sulla foto; al
+     capolinea spariscono, che una freccia che non porta da nessuna
+     parte e' una bugia. Colori fissi come tutto cio' che vive sulla
+     foto: coi token diventerebbero scure su una foto scura. */
+  .foto-nav{display:none}
+  @media (hover:hover) and (pointer:fine){
+    .foto-nav{position:absolute;top:50%;margin-top:-17px;z-index:3;
+      width:34px;height:34px;border-radius:50%;border:0;padding:0;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(255,248,234,.82);color:#23282C;cursor:pointer;
+      box-shadow:0 2px 6px rgba(0,0,0,.22);
+      opacity:.55;transition:opacity .18s ease}
+    .foto-nav.prev{left:10px}
+    .foto-nav.next{right:10px}
+    .detail-foto:hover .foto-nav{opacity:.95}
+    .foto-nav:hover,.foto-nav:focus-visible{opacity:1}
+    .foto-nav:active{transform:scale(.94)}
+    .foto-nav[disabled]{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){.foto-nav{transition:none}}
   /* Il bottone condividi sulla foto del dettaglio: cerchietto di
      carta chiara con l'icona a inchiostro, uguale in entrambi i temi
      (vive sulla foto, come i pallini) */
@@ -2503,10 +2529,19 @@ function openDetail(id){
      stesso endpoint, stesso Set, mai divergenti */
   const jarCta = (DEMO || VETRINA || mio) ? ''
     : `<button class="btn ghost" id="jarCta" onclick="togglePreferito(${l.id})">${preferiti.has(l.id)?'🫙 Già nel barattolo':'🫙 Metti nel barattolo'}</button>`;
+  /* Le frecce del carosello: da desktop lo swipe non esiste e la
+     striscia restava sfogliabile solo aprendo il lightbox. Nascono
+     solo con piu' di una foto, e si vedono solo dove c'e' un mouse
+     (ci pensa il CSS). */
+  const frecce = (l.photos && l.photos.length > 1)
+    ? `<button class="foto-nav prev" aria-label="Foto precedente" title="Foto precedente">
+         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+       <button class="foto-nav next" aria-label="Foto successiva" title="Foto successiva">
+         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>` : '';
   const foto = (l.photos && l.photos.length)
-    ? `<div style="position:relative"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
-       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${indietro}${barattolino}${condividi}</div>`
-    : `<div style="position:relative"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
+    ? `<div class="detail-foto"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
+       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<i${i?'':' class="on"'}></i>`).join('')}</div>`:''}${frecce}${indietro}${barattolino}${condividi}</div>`
+    : `<div class="detail-foto"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
   /* Il ponte Nostr: per gli importati la npub del contatto dichiarato
      nell'evento, per i nativi e i doppi cittadini il badge verificato
      (filtro bech32: finisce in un onclick) */
@@ -2573,16 +2608,37 @@ function openDetail(id){
     }
     hintPubblicazione = null;   // consumato in ogni caso: one-shot
   }
-  /* I pallini seguono lo swipe: l'indice e' la pagina di scroll-snap
-     (ogni foto e' larga quanto la striscia). Il listener vive sul
-     nodo appena creato da innerHTML, quindi muore col dettaglio
-     precedente: niente accumulo. */
+  /* I pallini seguono lo swipe e le frecce portano alla foto
+     accanto: l'indice e' la pagina di scroll-snap (ogni foto e'
+     larga quanto la striscia). I listener vivono sui nodi appena
+     creati da innerHTML, quindi muoiono col dettaglio precedente:
+     niente accumulo. Le frecce esistono solo col mouse, ma il
+     codice qui non lo sa: se il CSS non le mostra, nessuno le
+     clicca. */
   const striscia = document.querySelector('#detailContent .detail-photos');
   const pallini = document.querySelector('#detailContent .foto-dots');
-  if (striscia && pallini) striscia.addEventListener('scroll', () => {
-    const i = Math.round(striscia.scrollLeft / striscia.clientWidth);
-    [...pallini.children].forEach((p, j) => p.classList.toggle('on', j === i));
-  }, {passive: true});
+  const frecceNav = [...document.querySelectorAll('#detailContent .foto-nav')];
+  if (striscia) {
+    const quante = striscia.children.length;
+    const indice = () => Math.round(striscia.scrollLeft / (striscia.clientWidth || 1));
+    /* Con un indice esplicito la risposta e' immediata (chi tocca una
+       freccia non aspetta la fine dello scorrimento morbido); senza,
+       lo si chiede alla striscia — ed e' la strada dello swipe. */
+    const aggiorna = (i = indice()) => {
+      if (pallini) [...pallini.children].forEach((p, j) => p.classList.toggle('on', j === i));
+      frecceNav.forEach(b => b.disabled =
+        b.classList.contains('prev') ? i <= 0 : i >= quante - 1);
+    };
+    striscia.addEventListener('scroll', () => aggiorna(), {passive: true});
+    frecceNav.forEach(b => b.addEventListener('click', () => {
+      const i = Math.max(0, Math.min(quante - 1,
+        indice() + (b.classList.contains('prev') ? -1 : 1)));
+      striscia.scrollTo({left: i * striscia.clientWidth,
+                         behavior: tourRidotto() ? 'auto' : 'smooth'});
+      aggiorna(i);
+    }));
+    aggiorna();                       // al primo sguardo la ‹ e' gia' spenta
+  }
   go('dettaglio');
 }
 
