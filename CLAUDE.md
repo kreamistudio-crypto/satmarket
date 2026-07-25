@@ -868,25 +868,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   d'acquisto, che non devono avere rivali. La risposta del server la
   legge `caricaBannerTest()` UNA volta per apertura e la tengono in
   comune cartello e fascia.
-  Contatore dei pionieri (lug 2026): in vetrina i due contatori
-  «📦 830 oggetti» / «👥 24 pionieri» stanno incolonnati in un blocco
-  `.contatori` tutto loro SOPRA la barra ordina+filtri, che è scesa
-  sulla sua riga a destra — l'etichetta divideva la riga con gli
-  strumenti e a 360px si toccavano (le regole
-  `.strumenti .section-label` che la comprimevano non esistono più).
-  Respiro: 16px dalle pillole, 3px fra le due righe, 12px ai controlli.
-  Resa compatta `.section-label.riga-conta` (numero arancione davanti,
+  Contatore dei pionieri (lug 2026): «830 oggetti» divide la riga con
+  ordina+filtri, «👥 24 pionieri» sta incolonnato subito sotto (resa
+  compatta `.section-label.riga-conta`: numero arancione davanti,
   `::after` puntinato spento; la regola sta DOPO `.section-label`, che
-  a pari specificità vincerebbe). «Pionieri» e
-  non «utenti»: in rodaggio è un club. Il numero è `COUNT(*)` sugli
+  a pari specificità vincerebbe). Il blocco a due righe sopra i
+  controlli è stato provato e SCARTATO: rubava altezza alle foto.
+  Perché ci stia tutto a 360px: niente emoji sulla riga oggetti (📦
+  provato e tolto, valeva 22px), il conteggio non si stringe mai
+  (`flex:1 0 auto`) e a cedere è il SELECT (`min-width:0`) perché
+  l'etichetta cresce — «830 RISULTATI» è più larga di «14 OGGETTI» — e
+  non deve mai finire sotto ai controlli. Il conteggio sta in fondo
+  alla riga (`align-self:flex-end`) e non al centro: il select è alto
+  il triplo del testo e quel vuoto teneva i pionieri a 10px invece di
+  3. Sotto la riga dei pionieri la griglia si stringe a 8px
+  (`.grid.con-pionieri`, classe messa da `renderPionieri()`: senza
+  quella riga la griglia resta com'era, e il negozio non si tocca).
+  «Pionieri» e non «utenti»: in rodaggio è un club. Il numero è `COUNT(*)` sugli
   utenti con cache di 60s (`conta_pionieri`) e viaggia nella busta
   della PRIMA pagina di `/api/listings` accanto a `totale` e
   `conteggi` (nessun giro di rete in più, lo vede anche l'anonimo);
   è GLOBALE, non segue categoria né ricerca. Interruttore
   `CONTATORE_UTENTI` nel config (acceso di serie): spento, in DEMO o
   con un server vecchio la chiave non arriva e `renderPionieri()` non
-  disegna la riga. Il 🫙 accanto agli oggetti è stato scartato (resta
-  dei preferiti, vedi regola 9): lì c'è 📦.
+  disegna la riga. Sulla riga degli oggetti niente emoji: il 🫙 è dei
+  preferiti (regola 9) e il 📦 che l'aveva sostituito è stato tolto
+  per far stare tutto a 360px.
   Campanello dei nuovi iscritti (lug 2026): `avvisa_nuovi_iscritti()`
   avvisa i MODERATORI di ogni arrivo — mai il canale pubblico (il nome
   di chi si iscrive non si annuncia in piazza; i traguardi li racconta
