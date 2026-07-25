@@ -1089,13 +1089,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `.foto-nav` ai lati (cerchietti di carta gemelli del condividi —
   colori FISSI come tutto ciò che sta sulla foto, i token li
   renderebbero scuri su una foto scura), pallini `<button>` veri che
-  portano alla foto N (il contenitore resta `pointer-events:none`, il
-  singolo pallino no, col bersaglio allargato a ~23px via `::after`;
-  toccabili anche col dito, deciso) e trascinamento col MOUSE. Le
-  frecce esistono solo dentro `@media (hover:hover) and
-  (pointer:fine)` — fuori di lì la regola base è `display:none`, così
-  sul telefono non esistono proprio — e al capolinea si spengono
-  (`[disabled]{display:none}`). Il trascinamento è solo
+  portano alla foto N (bersaglio allargato a ~23px via `::after`) e
+  trascinamento col MOUSE. Sono tutti e tre roba DA MOUSE: frecce e
+  pallini si accendono solo dentro `@media (hover:hover) and
+  (pointer:fine)` — fuori di lì la regola base è `display:none` per
+  le frecce e `pointer-events:none` per i pallini, che col dito
+  restano l'indicatore muto di sempre e lasciano passare il tocco
+  alla foto sotto, cioè al lightbox (col dito si sfoglia con lo
+  swipe, e basta: i pallini toccabili sono stati provati e RITIRATI
+  — cambiavano il gesto di prima senza aggiungere nulla). I listener
+  dei pallini restano appesi anche sul telefono, muti. Al capolinea
+  le frecce si spengono (`[disabled]{display:none}`). Il
+  trascinamento è solo
   `pointerType==='mouse'` (allo scorrimento nativo del dito non si
   tocca nulla): soglia 5px, `.trascina` toglie lo snap durante e lo
   rimette al rilascio riagganciando la foto più vicina, e il click
