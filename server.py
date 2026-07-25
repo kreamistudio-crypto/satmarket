@@ -174,6 +174,23 @@ try:
 except ImportError:
     POST_MAX_ORA = 6
 
+# Il cartello «siamo in fase di test»: interruttore, testo e link del
+# canale vivono nel config, cosi' si cambiano senza cantieri e a
+# rodaggio finito basta un False. Se le chiavi mancano, il cartello e'
+# semplicemente spento (fail-open come tutto il resto).
+try:
+    from config import BANNER_TEST
+except ImportError:
+    BANNER_TEST = False
+try:
+    from config import BANNER_TEST_TESTO
+except ImportError:
+    BANNER_TEST_TESTO = ""
+try:
+    from config import BANNER_TEST_LINK
+except ImportError:
+    BANNER_TEST_LINK = ""
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -2441,6 +2458,19 @@ def pagina_annunci(con, campi, dove, par, limit, cursore, ordina=""):
         righe = righe[:limit]
         prossimo = f"{righe[-1][chiave]}_{righe[-1]['id']}"
     return righe, prossimo
+
+
+@app.get("/api/banner-test")
+def banner_test():
+    """Il cartello «Barattolo e' in fase di test» che la Mini App mostra
+    all'apertura. PUBBLICA come /api/listings: lo deve vedere anche chi
+    guarda la vetrina da anonimo, senza Telegram. Interruttore spento o
+    testo vuoto = {"attivo": False} e il frontend non disegna nulla."""
+    testo = (BANNER_TEST_TESTO or "").strip()
+    if not BANNER_TEST or not testo:
+        return {"attivo": False}
+    return {"attivo": True, "testo": testo,
+            "link": (BANNER_TEST_LINK or "").strip()}
 
 
 @app.get("/api/listings")

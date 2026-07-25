@@ -741,6 +741,38 @@
     #tourFumetto{transition:top .3s ease,left .3s ease}
   }
 
+  /* ---------- cartello «fase di test» ----------
+     L'avviso di rodaggio all'apertura: velo scuro SFOCATO a tutto
+     schermo, si chiude solo col bottone o con la ✕ (niente tocco
+     fuori). Sta sopra tutti — anche sopra il tour, che aspetta la sua
+     chiusura per partire. */
+  #testModale{
+    position:fixed;inset:0;z-index:90;display:none;
+    align-items:center;justify-content:center;padding:18px;
+    background:rgba(15,12,6,.55);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  }
+  #testModale.open{display:flex}
+  @media (prefers-reduced-motion: no-preference){
+    #testModale.open{animation:fadein .18s}
+  }
+  .test-card{
+    position:relative;background:var(--card);color:var(--ink);
+    border:1px solid var(--line);border-radius:22px;
+    padding:22px 20px 20px;width:min(460px,100%);
+    max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-hover);
+  }
+  .test-card h3{font-family:'Baloo 2',sans-serif;font-size:19px;
+    font-weight:800;line-height:1.3;margin:0 26px 10px 0}
+  /* qui il testo si legge davvero (cinque righe che contano): --ink-soft
+     e non il --muted dei sottotitoli */
+  .test-testo{font-size:14px;font-weight:600;line-height:1.6;
+    color:var(--ink-soft);white-space:pre-line}
+  .test-x{position:absolute;top:8px;right:10px;border:0;background:none;
+    color:var(--muted);font-size:15px;font-weight:800;cursor:pointer;
+    padding:8px;line-height:1}
+  .test-card .btn{margin-top:14px}
+
   /* ---------- modale pagamento ---------- */
   .sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;display:none}
   .sheet-bg.open{display:block;animation:fadein .15s}
@@ -1213,6 +1245,16 @@
   <div id="tour" role="dialog" aria-label="Tour di benvenuto">
     <div id="tourLuce"></div>
     <div id="tourFumetto" aria-live="polite"></div>
+  </div>
+
+  <!-- ============ CARTELLO «FASE DI TEST» (testo e link dal config) ============ -->
+  <div id="testModale" role="dialog" aria-modal="true" aria-label="Barattolo è in fase di test">
+    <div class="test-card">
+      <button class="test-x" onclick="chiudiModaleTest()" title="Chiudi" aria-label="Chiudi">✕</button>
+      <h3 id="testTitolo"></h3>
+      <div class="test-testo" id="testTesto"></div>
+      <div id="testAzioni"></div>
+    </div>
   </div>
 
   <!-- ============ NAV ============ -->
@@ -2267,6 +2309,77 @@ function chiudiTour(){
   document.removeEventListener('keydown', tastoTour);
   bannerInstallaPwa();   // il banner installa riottiene la sua occasione
 }
+/* ---------------- cartello «fase di test» ----------------
+   L'avviso di rodaggio all'apertura. Interruttore, testo e link del
+   canale vivono nel CONFIG del server (BANNER_TEST): si cambiano — o
+   si spengono — senza toccare una riga di codice. Lo vede CHIUNQUE
+   apra l'app, autenticati e anonimi in vetrina; mai la demo coi dati
+   finti. E lo vede UNA VOLTA AL GIORNO per dispositivo: i tester
+   aprono l'app di continuo, un cartello a ogni apertura lo
+   odierebbero. La memoria e' in localStorage come gli hint — il
+   server non c'entra, e ogni dispositivo ha il suo giorno. */
+const TEST_CHIAVE = 'barattolo_test';
+let testModaleInCorso = false;
+let dopoModaleTest = null;    // chi aspetta il suo turno: il tour
+let linkCanaleTest = '';
+function giornoOggi(){
+  const d = new Date();       // giorno LOCALE, non UTC: le 2 di notte
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;   // sono ancora ieri sera
+}
+function finiscoModaleTest(){
+  const poi = dopoModaleTest; dopoModaleTest = null;
+  if (poi) poi();
+}
+async function modaleTest(dopo){
+  dopoModaleTest = dopo || null;
+  if (DEMO || !API_BASE) return finiscoModaleTest();
+  let visto = '';
+  try { visto = localStorage.getItem(TEST_CHIAVE) || ''; } catch(e){}
+  if (visto === giornoOggi()) return finiscoModaleTest();
+  let d = null;
+  try {
+    /* endpoint pubblico: nessun header, lo legge anche l'anonimo */
+    const r = await fetch(`${API_BASE}/banner-test`);
+    if (r.ok) d = await r.json();
+  } catch(e){}
+  if (!d || !d.attivo || !d.testo) return finiscoModaleTest();
+  /* consumato alla comparsa, come il tour: un ricaricamento della
+     pagina non lo ripropone lo stesso giorno */
+  try { localStorage.setItem(TEST_CHIAVE, giornoOggi()); } catch(e){}
+  /* la PRIMA riga del testo e' il titolo, il resto il messaggio:
+     tutto scritto nel config, niente da indovinare qui */
+  const righe = String(d.testo).split('\n');
+  el('testTitolo').textContent = righe[0];
+  el('testTesto').textContent = righe.slice(1).join('\n').trim();
+  linkCanaleTest = /^https?:\/\//.test(d.link || '') ? d.link : '';
+  el('testAzioni').innerHTML =
+    (linkCanaleTest
+      ? `<button class="btn orange" onclick="apriCanaleTest()">💬 Entra nel canale e dicci la tua</button>`
+      : '')
+    + `<button class="btn ghost" onclick="chiudiModaleTest()">Esplora l'app</button>`;
+  testModaleInCorso = true;
+  el('testModale').classList.add('open');
+  document.body.style.overflow = 'hidden';   // sotto non si scorre
+}
+/* Dentro Telegram il link al canale passa dal client (che sa aprire
+   gli inviti t.me/+…); nel browser e' una scheda nuova. */
+function apriCanaleTest(){
+  const url = linkCanaleTest;
+  chiudiModaleTest();
+  if (!url) return;
+  if (tg?.initData && tg.openTelegramLink) {
+    try { tg.openTelegramLink(url); return; } catch(e){}
+  }
+  window.open(url, '_blank', 'noopener');
+}
+function chiudiModaleTest(){
+  if (!testModaleInCorso) return;
+  testModaleInCorso = false;
+  el('testModale').classList.remove('open');
+  document.body.style.overflow = '';
+  finiscoModaleTest();          // ora tocca al tour (e al banner installa)
+}
+
 /* Riga nel foglio di pagamento: solo senza wallet NWC collegato */
 function aggiornaPayHint(){
   const box = el('payHint'); if (!box) return;
@@ -4371,7 +4484,7 @@ async function loadAdminStats(){
           </div>`).join('')}
       </div>
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
-        title="Azzera le dismissioni degli hint su questo dispositivo: il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
+        title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
 }
 
@@ -4382,9 +4495,9 @@ async function loadAdminStats(){
    Annunci, ordini e profilo restano intatti. */
 function trattamiDaNuovo(){
   if (!isAdmin) return;
-  try { localStorage.removeItem(HINT_CHIAVE); } catch(e){}
+  try { localStorage.removeItem(HINT_CHIAVE); localStorage.removeItem(TEST_CHIAVE); } catch(e){}
   go('esplora');                   // il tour vive in vetrina: ci si va
-  tourBenvenuto();                 // e riparte subito, dalla prima tappa
+  modaleTest(tourBenvenuto);       // il cartello del rodaggio, poi il tour
   checklistPrimoSguardo = true;    // e la checklist si riapre da sola
   checklistAperta = false;
   renderChecklist();
@@ -4968,7 +5081,7 @@ function bannerInstallaPwa(){
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS si traveste da Mac
   const mobile = ios || /Android/i.test(navigator.userAgent);
   if (tg?.initData || pwaStandalone() || !mobile || DEMO
-      || installaRimandata || tourInCorso
+      || installaRimandata || tourInCorso || testModaleInCorso
       || (!ios && !firefoxAndroid() && !eventoInstalla)) return;  // su Chrome/Edge solo con l'evento vero in mano
   const cta = (ios || firefoxAndroid())
     ? `<a onclick="apriInstallSheet()">Come si fa</a>`
@@ -5747,7 +5860,9 @@ async function avviaVetrina(){
     renderGrid();
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
-    bannerInstallaPwa();       // le guardie interne decidono se comparire
+    /* prima il cartello del rodaggio, poi il banner installa: le
+       guardie interne decidono comunque se comparire */
+    modaleTest(bannerInstallaPwa);
   } catch (e) {
     /* Backend non raggiungibile: demo coi dati finti */
     DEMO = true;
@@ -5834,8 +5949,9 @@ async function avvia(){
     }
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
-    tourBenvenuto();           // il tour one-shot, prima del banner installa
-    bannerInstallaPwa();       // web mobile loggato: le guardie decidono
+    /* Il cartello del rodaggio ha la precedenza su tutti: il tour
+       one-shot (e poi il banner installa) partono alla sua chiusura */
+    modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });
   } catch (e) {
     /* Browser fuori da Telegram: vetrina vera in sola lettura
        (con la demo finta come rete di sicurezza se il backend tace) */

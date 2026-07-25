@@ -74,6 +74,21 @@ TELEGRAM_CANALE_ID = ""
 # ("N nuovi annunci nel barattolo").
 POST_MAX_ORA = 6
 
+# --- Avviso "fase di test" (il cartello all'apertura) ----------------
+# Il cartello che accoglie chi apre l'app durante il rodaggio: si
+# mostra UNA VOLTA AL GIORNO per dispositivo, a tutti (anche a chi
+# guarda la vetrina da anonimo), mai nella demo coi dati finti.
+# A rodaggio finito basta rimettere False: nessun cantiere.
+BANNER_TEST = False
+# La PRIMA riga diventa il titolo del cartello, il resto il messaggio.
+BANNER_TEST_TESTO = """🚧 Barattolo è in fase di test.
+Nei prossimi giorni integriamo il fornitore per le spedizioni (nel rispetto della privacy di ognuno) e sveleremo tutte le meccaniche d'acquisto.
+Per ora esplora liberamente e contribuisci allo sviluppo: un feedback, un'opinione, una funzione che vorresti.
+🎁 Un vantaggio dedicato ai primi 100 pionieri che ci aiuteranno a migliorarlo.
+👉 Entra nel canale: dentro trovi il post fissato 📋 dove lasciare i tuoi feedback."""
+# Dove porta il bottone "Entra nel canale". Vuoto = niente bottone.
+BANNER_TEST_LINK = ""
+
 # --- Collaudo ---------------------------------------------------------
 # True  = test locale con utenti finti (Compratore/Venditore/Admin)
 # False = OBBLIGATORIO prima di andare online!
