@@ -279,15 +279,16 @@
   /* I pallini della galleria, stile Vinted: uno per foto, in basso al
      centro, l'attivo pieno e gli altri velati. Vivono SULLA foto,
      quindi bianchi con un filo d'ombra in entrambi i temi. Con una
-     foto sola non esistono proprio. Sono anche il timone: un tocco
-     porta alla foto N, quindi sono <button> veri — la striscia resta
-     trasparente ai tocchi (la foto sotto deve restare apribile) e i
-     pallini no, con un bersaglio piu' largo del pallino (::after):
-     7px non si mirano col dito ne' col mouse. */
+     foto sola non esistono proprio. Sono <button> veri, ma il tocco
+     li attraversa: col dito restano l'indicatore muto di sempre e il
+     tocco arriva alla foto sotto, che apre il lightbox — sfogliare e'
+     lo swipe. Diventano timone (un click porta alla foto N) SOLO dove
+     c'e' un mouse, la stessa condizione delle frecce, con un
+     bersaglio piu' largo del pallino (::after): 7px non si mirano. */
   .foto-dots{position:absolute;bottom:10px;left:0;right:0;z-index:2;
     display:flex;justify-content:center;gap:6px;pointer-events:none}
   .foto-dots button{width:7px;height:7px;padding:0;border:0;border-radius:50%;
-    position:relative;cursor:pointer;pointer-events:auto;
+    position:relative;pointer-events:none;
     background:rgba(255,255,255,.45);box-shadow:0 0 3px rgba(0,0,0,.4)}
   .foto-dots button::after{content:'';position:absolute;inset:-8px}
   .foto-dots button.on{background:#fff}
@@ -299,6 +300,8 @@
      parte e' una bugia. */
   .foto-nav{display:none}
   @media (hover:hover) and (pointer:fine){
+    /* col mouse i pallini si accendono e diventano cliccabili */
+    .foto-dots button{pointer-events:auto;cursor:pointer}
     .foto-nav{position:absolute;top:50%;margin-top:-17px;z-index:3;
       width:34px;height:34px;border-radius:50%;border:0;padding:0;
       display:flex;align-items:center;justify-content:center;
@@ -2624,9 +2627,14 @@ function openDetail(id){
    Su mobile lo swipe basta e avanza. Da desktop no: il mouse non ha
    swipe, e la striscia restava sfogliabile solo aprendo il lightbox.
    Qui si montano tre comandi sulla stessa striscia di sempre —
-   frecce ai lati (solo con un puntatore vero, ci pensa il CSS),
-   pallini cliccabili, trascinamento col mouse — senza toccare in
-   nulla il comportamento del dito. Tutti i listener vivono sui nodi
+   frecce ai lati, pallini cliccabili, trascinamento — e sono TUTTI
+   e tre roba da mouse: le frecce e i pallini si accendono solo
+   dentro @media (hover:hover) and (pointer:fine) (ci pensa il CSS,
+   e senza mouse il tocco attraversa i pallini e apre il lightbox
+   come sempre), il trascinamento guarda il pointerType. Col dito
+   non cambia nulla: si sfoglia con lo swipe. I listener sui pallini
+   restano appesi anche sul telefono, muti — non li raggiunge nessun
+   evento. Tutti i listener vivono sui nodi
    appena creati da innerHTML, quindi muoiono col dettaglio
    precedente: niente accumulo.
    La rotella NON viene dirottata: la verticale deve continuare a
