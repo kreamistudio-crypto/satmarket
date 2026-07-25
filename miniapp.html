@@ -270,8 +270,13 @@
   .detail-photos::-webkit-scrollbar{display:none}
   /* Quadrata come le card e le miniature: le foto di oggetti sono
      spesso verticali, il taglio panoramico le decapitava */
+  /* scroll-snap-stop:always = UNO SWIPE, UNA FOTO (il patto di
+     Vinted): lo slancio di una scorsa decisa non puo' scavalcare una
+     foto, si ferma alla prima. E' CSS puro, quindi resta tutto sul
+     compositor: nessun ascoltatore in mezzo al dito, nessuno scatto
+     da pagare in cambio. */
   .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:1/1;object-fit:cover;
-    scroll-snap-align:center}
+    scroll-snap-align:center;scroll-snap-stop:always}
   /* I pallini della galleria, stile Vinted: uno per foto, in basso al
      centro, l'attivo pieno e gli altri velati. Vivono SULLA foto,
      quindi bianchi con un filo d'ombra in entrambi i temi. Con una
@@ -2641,8 +2646,15 @@ function openDetail(id){
     };
     const vaiA = i => {
       i = Math.max(0, Math.min(quante - 1, i));
+      /* Lo `scroll-snap-stop:always` che da' «uno swipe, una foto»
+         vale anche per le scorse morbide che facciamo noi: un salto
+         lungo (dal pallino 1 al 4) rischierebbe di fermarsi per
+         strada. Il passo corto resta morbido — non ha nulla da
+         scavalcare —, il salto lungo e' netto, che poi e' il gesto
+         giusto per un indice. */
+      const corto = Math.abs(i - indice()) <= 1 && !tourRidotto();
       striscia.scrollTo({left: i * striscia.clientWidth,
-                         behavior: tourRidotto() ? 'auto' : 'smooth'});
+                         behavior: corto ? 'smooth' : 'auto'});
       aggiorna(i);
     };
     striscia.addEventListener('scroll', () => aggiorna(), {passive: true});
