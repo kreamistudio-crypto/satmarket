@@ -270,8 +270,14 @@
   .detail-photos::-webkit-scrollbar{display:none}
   /* Quadrata come le card e le miniature: le foto di oggetti sono
      spesso verticali, il taglio panoramico le decapitava */
+  /* scroll-snap-stop:always = UNO SWIPE, UNA FOTO (il patto di
+     Vinted): lo slancio di una scorsa decisa non puo' scavalcare una
+     foto, si ferma alla prima. E' CSS puro, quindi resta tutto sul
+     compositor: nessun ascoltatore in mezzo al dito, nessuno scatto
+     da pagare in cambio. */
   .detail-photos img{width:100%;flex:0 0 100%;aspect-ratio:1/1;object-fit:cover;
-    scroll-snap-align:center;cursor:zoom-in;-webkit-user-drag:none}
+    scroll-snap-align:center;scroll-snap-stop:always;
+    cursor:zoom-in;-webkit-user-drag:none}
   /* Durante il trascinamento col mouse lo snap si toglie di mezzo
      (altrimenti rimbalzerebbe a ogni pixel) e torna al rilascio */
   .detail-photos.trascina{scroll-snap-type:none;user-select:none}
@@ -2661,8 +2667,14 @@ function montaGalleria(){
   };
   const vaiA = i => {
     i = Math.max(0, Math.min(quante - 1, i));
+    /* Lo `scroll-snap-stop:always` che dà «uno swipe, una foto» vale
+       anche per le scorse morbide che facciamo noi: un salto lungo
+       (dal pallino 1 al 4) rischierebbe di fermarsi per strada. Il
+       passo corto resta morbido — non ha nulla da scavalcare —, il
+       salto lungo è netto, che poi è il gesto giusto per un indice. */
+    const passo = Math.abs(i - indice()) <= 1 && !tourRidotto();
     striscia.scrollTo({left: i * striscia.clientWidth,
-                       behavior: tourRidotto() ? 'auto' : 'smooth'});
+                       behavior: passo ? 'smooth' : 'auto'});
     aggiorna(i);
   };
   striscia.addEventListener('scroll', () => aggiorna(), {passive: true});
@@ -2738,6 +2750,18 @@ function montaGalleria(){
 let lbFoto = [], lbIdx = 0, lbS = 1, lbTx = 0, lbTy = 0;
 const lbPtr = new Map();
 let lbPinch0 = null, lbMid = null, lbMoved = false, lbSwipeX = 0;
+/* Le misure del palco e della foto si prendono una volta e si
+   tengono: leggerle a ogni pointermove (com'era) costringeva il
+   browser a rifare i conti del layout in mezzo al dito, che e' il
+   modo piu' sicuro di scattare. Si rinfrescano quando la foto
+   arriva, quando la finestra cambia taglia e all'inizio di ogni
+   gesto — cioe' nei soli momenti in cui possono essere cambiate. */
+let lbDim = null, lbRaf = 0, lbCur = '';
+function lbMisura(){
+  const img = el('lbImg'), r = el('lbStage').getBoundingClientRect();
+  lbDim = {iw: img.clientWidth, ih: img.clientHeight, sw: r.width, sh: r.height,
+           cx: r.left + r.width/2, cy: r.top + r.height/2};
+}
 
 function apriLightbox(i){
   const l = currentListing;
@@ -2751,31 +2775,59 @@ function apriLightbox(i){
 function chiudiLightbox(){
   el('lightbox').classList.remove('open');
   document.body.style.overflow = '';
+  if (lbRaf) { cancelAnimationFrame(lbRaf); lbRaf = 0; }
   el('lbImg').removeAttribute('src');   // niente foto fantasma alla prossima
 }
 function lbMostra(i){
   lbIdx = (i + lbFoto.length) % lbFoto.length;
-  lbS = 1; lbTx = 0; lbTy = 0; lbApplica();
-  el('lbImg').src = lbFoto[lbIdx];
+  lbS = 1; lbTx = 0; lbTy = 0; lbApplica(true);   // la posa si azzera SUBITO
+  const img = el('lbImg');
+  img.onload = lbMisura;                 // le misure vere arrivano con la foto
+  img.src = lbFoto[lbIdx];
   el('lbDots').innerHTML = lbFoto.length > 1
     ? lbFoto.map((_,j)=>`<i${j===lbIdx?' class="on"':''}></i>`).join('') : '';
+  /* Le vicine si scaldano in silenzio: cambiare foto non deve
+     aspettare la decodifica di un JPEG intero (era quello, lo
+     scatto piu' grosso del lightbox) */
+  if (lbFoto.length > 1) [lbIdx + 1, lbIdx - 1].forEach(k => {
+    const u = lbFoto[(k + lbFoto.length) % lbFoto.length];
+    if (u) { const pre = new Image(); pre.decoding = 'async'; pre.src = u; }
+  });
 }
-function lbApplica(){
+function lbScrivi(){
+  lbRaf = 0;
+  el('lbImg').style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbS})`;
+}
+function lbApplica(subito){
   /* La foto non deve mai perdersi fuori schermo: il bordo puo'
      sconfinare di poco (40px), che e' anche il gioco del feedback
-     dello swipe a zoom 1 */
-  const img = el('lbImg'), st = el('lbStage');
-  const mx = Math.max(0, (img.clientWidth*lbS - st.clientWidth)/2) + 40;
-  const my = Math.max(0, (img.clientHeight*lbS - st.clientHeight)/2) + 40;
+     dello swipe a zoom 1. Qui dentro NON si legge piu' il layout —
+     solo conti sulle misure gia' prese — e la scrittura sul nodo va
+     in un fotogramma: il dito puo' mandare piu' eventi di quanti
+     schermi ce ne siano, ma la trasformazione si scrive una volta
+     sola. `subito` e' per i cambi di foto, dove la posa deve essere
+     gia' azzerata quando la nuova immagine compare.
+     Sul rAF vale la lezione del tour al contrario: a pagina nascosta
+     i fotogrammi si fermano, ma un lightbox si tocca solo quando e'
+     davanti agli occhi — e il cambio foto, che e' l'unica cosa che
+     puo' capitare senza un dito, passa comunque da `subito`. */
+  if (!lbDim) lbMisura();
+  const mx = Math.max(0, (lbDim.iw*lbS - lbDim.sw)/2) + 40;
+  const my = Math.max(0, (lbDim.ih*lbS - lbDim.sh)/2) + 40;
   lbTx = Math.max(-mx, Math.min(mx, lbTx));
   lbTy = Math.max(-my, Math.min(my, lbTy));
-  img.style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbS})`;
-  img.style.cursor = lbS > 1 ? 'grab' : 'zoom-in';
+  const cur = lbS > 1 ? 'grab' : 'zoom-in';
+  if (cur !== lbCur) { lbCur = cur; el('lbImg').style.cursor = cur; }
+  if (subito) { if (lbRaf) cancelAnimationFrame(lbRaf); lbScrivi(); return; }
+  if (!lbRaf) lbRaf = requestAnimationFrame(lbScrivi);
 }
 function lbZoomA(px, py, s2){
-  /* zoom tenendo fermo il punto (px,py) dello schermo */
-  const st = el('lbStage').getBoundingClientRect();
-  const cx = st.left + st.width/2, cy = st.top + st.height/2;
+  /* zoom tenendo fermo il punto (px,py) dello schermo. Il centro del
+     palco viene dalle misure tenute da parte: il pinch chiama di qui
+     a ogni movimento, e un getBoundingClientRect a ogni dito mosso
+     era l'altra meta' degli scatti. */
+  if (!lbDim) lbMisura();
+  const cx = lbDim.cx, cy = lbDim.cy;
   s2 = Math.min(4, Math.max(1, s2));
   lbTx = px - cx - (s2/lbS) * (px - cx - lbTx);
   lbTy = py - cy - (s2/lbS) * (py - cy - lbTy);
@@ -2785,10 +2837,15 @@ function lbZoomA(px, py, s2){
 }
 (() => {
   const st = el('lbStage'), img = el('lbImg');
+  /* Gli ascoltatori del gesto sono passivi: qui dentro non si chiama
+     mai preventDefault (a tenere fermo lo schermo ci pensa gia'
+     touch-action:none sul palco), e un ascoltatore bloccante sul
+     percorso del dito e' un pedaggio che non serve a nessuno. */
   st.addEventListener('pointerdown', e => {
     /* la capture tiene il dito anche se scivola fuori dal palco; se
        il browser la nega (capita), il lightbox vive lo stesso */
     try { st.setPointerCapture(e.pointerId); } catch(_) {}
+    lbMisura();                 // le misure del gesto si prendono qui, una volta
     lbPtr.set(e.pointerId, {x:e.clientX, y:e.clientY});
     lbMoved = false;
     if (lbPtr.size === 2) {
@@ -2796,7 +2853,7 @@ function lbZoomA(px, py, s2){
       lbPinch0 = {d: Math.hypot(a.x-b.x, a.y-b.y) || 1, s: lbS};
       lbMid = null; lbSwipeX = 0;
     }
-  });
+  }, {passive: true});
   st.addEventListener('pointermove', e => {
     const p = lbPtr.get(e.pointerId);
     if (!p) return;
@@ -2815,7 +2872,7 @@ function lbZoomA(px, py, s2){
       if (lbS > 1) { lbTx += dx; lbTy += dy; lbApplica(); }
       else { lbSwipeX += dx; lbTx = lbSwipeX; lbApplica(); }
     }
-  });
+  }, {passive: true});
   const su = e => {
     lbPtr.delete(e.pointerId);
     if (lbPtr.size < 2) { lbPinch0 = null; lbMid = null; }
@@ -2829,8 +2886,13 @@ function lbZoomA(px, py, s2){
       lbSwipeX = 0;
     }
   };
-  st.addEventListener('pointerup', su);
-  st.addEventListener('pointercancel', su);
+  st.addEventListener('pointerup', su, {passive: true});
+  st.addEventListener('pointercancel', su, {passive: true});
+  /* la finestra che cambia taglia (o il telefono che ruota) e' l'unico
+     altro momento in cui le misure invecchiano */
+  addEventListener('resize', () => {
+    if (el('lightbox').classList.contains('open')) lbMisura();
+  }, {passive: true});
   st.addEventListener('dblclick', e =>
     lbZoomA(e.clientX, e.clientY, lbS > 1 ? 1 : 2.5));
   st.addEventListener('wheel', e => {
