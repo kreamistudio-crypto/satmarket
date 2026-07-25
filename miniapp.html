@@ -212,16 +212,17 @@
     border-radius:999px;padding:6px 12px;cursor:pointer}
   /* Il bottone si accende quando un filtro e' applicato */
   .strumenti button.attivo{color:var(--sats-text);border-color:var(--sats-text)}
-  /* Il conteggio divide la riga con ordina+filtri. CHI CEDE E' IL
-     SELECT: il conteggio cresce (830 RISULTATI e' piu' largo di 14
-     OGGETTI) e non deve mai finire sotto ai controlli, quindi si
-     prende lo spazio che gli serve (flex-shrink 0) e spinge il resto a
-     destra; il select ha min-width:0 e assorbe lui la stretta a 360px,
-     dove al massimo si accorcia la voce piu' lunga del menu.
-     Il conteggio si posa poi in FONDO alla riga (align-self) invece
-     che al centro: il select e' alto il triplo del testo, e quello
-     spazio vuoto sotto allontanava i pionieri di 10px buoni. */
-  .strumenti .riga-conta{flex:1 0 auto;align-self:flex-end;padding-bottom:3px}
+  /* I due conteggi sono un BLOCCO in colonna dentro la riga, accanto a
+     ordina+filtri: il select e' alto il triplo di una riga di testo,
+     quindi le due righe ci stanno dentro senza rubare un pixel
+     d'altezza alla vetrina (le foto sono la cosa piu' importante).
+     CHI CEDE E' IL SELECT: il conteggio cresce (830 RISULTATI e' piu'
+     largo di 14 OGGETTI) e non deve mai finire sotto ai controlli,
+     quindi si prende lo spazio che gli serve (flex-shrink 0) e spinge
+     il resto a destra; il select ha min-width:0 e assorbe lui la
+     stretta a 360px, dove al massimo si accorcia la voce piu' lunga
+     del menu. */
+  .conta-blocco{flex:1 0 auto;display:flex;flex-direction:column;gap:3px}
   .strumenti select{min-width:0}
   #filtriBox{margin:10px var(--pad) 0;padding:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:14px}
@@ -234,11 +235,6 @@
 
   /* ---------- griglia annunci ---------- */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
-  /* Con la riga dei pionieri sopra, la griglia si stringe in cima: il
-     respiro l'ha gia' dato quella riga, e le foto risalgono. La classe
-     la mette renderPionieri() quando la riga c'e' davvero — mai un
-     ritocco a occhio sulla griglia del negozio o della demo. */
-  .grid.con-pionieri{padding-top:8px}
   .card{
     background:var(--card);border-radius:18px;box-shadow:var(--shadow-card);
     overflow:hidden;cursor:pointer;transition:transform .12s ease;
@@ -410,17 +406,13 @@
   .section-label .conta{order:2;color:var(--sats-deep);font-weight:800;
     font-size:12px;text-transform:none;letter-spacing:0}
   /* I contatori: resa compatta dell'etichetta di sezione — numero
-     arancione davanti, niente linea puntinata. Quello degli oggetti
-     divide la riga con ordina+filtri, quello dei pionieri sta subito
-     sotto, incolonnato. */
-  .riga-conta{padding:0;gap:6px;white-space:nowrap}
+     arancione davanti, niente linea puntinata. L'interlinea stretta
+     (1.15) tiene le due righe come un blocco solo; l'aria che le
+     distingue e' il gap di 3px del .conta-blocco, non il vuoto delle
+     righe di testo. */
+  .riga-conta{padding:0;gap:6px;white-space:nowrap;line-height:1.15}
   .riga-conta::after{display:none}
   .riga-conta .conta{order:0}
-  /* La riga dei pionieri stretta al minimo leggibile, sopra e sotto:
-     l'altezza che si prende qui e' altezza rubata alle foto delle
-     card, che sono la cosa piu' importante della vetrina (il «sotto»
-     e' la .con-pionieri sulla griglia, qui accanto). */
-  #pionieriRiga{padding:0 var(--pad)}
   .empty{margin:20px var(--pad);padding:36px 24px;text-align:center;color:var(--muted);
     background:var(--card);border:1px solid var(--line-soft);border-radius:24px;
     font-weight:600;font-size:14px;line-height:1.5}
@@ -1053,10 +1045,15 @@
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
          euro") resta com'e': questi servono a chi sfoglia.
-         Il conteggio degli oggetti vive QUI, sulla stessa riga: una
-         fascia sola tra le pillole e le foto. -->
+         I conteggi vivono QUI, incolonnati accanto ai controlli: una
+         fascia sola tra le pillole e le foto. La riga dei pionieri
+         compare solo se il server manda il numero (interruttore spento
+         nel config, demo o server vecchio = niente riga). -->
     <div class="strumenti">
-      <div class="section-label riga-conta" id="gridLabel">In vetrina</div>
+      <div class="conta-blocco">
+        <div class="section-label riga-conta" id="gridLabel">In vetrina</div>
+        <div class="section-label riga-conta" id="pionieriRiga" style="display:none"></div>
+      </div>
       <select id="ordinaSel" onchange="setOrdina(this.value)" title="Ordina la vetrina">
         <option value="">Più recenti</option>
         <option value="prezzo_su">Prezzo: dal più basso</option>
@@ -1074,11 +1071,6 @@
         <button class="btn ghost" onclick="azzeraFiltri()">Azzera</button>
       </div>
     </div>
-    <!-- «👥 54 pionieri»: chi è già entrato nel mercatino, incolonnato
-         sotto il conteggio degli oggetti e stretto al minimo. Compare
-         solo se il server manda il numero: interruttore spento nel
-         config, demo o server vecchio = niente riga. -->
-    <div class="section-label riga-conta" id="pionieriRiga" style="display:none"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -1831,11 +1823,8 @@ function renderPionieri(){
   if (!r) return;
   const mostra = !DEMO && !!pionieri;
   r.style.display = mostra ? '' : 'none';
-  /* con la riga in mezzo la griglia si stringe in cima: il respiro
-     sopra le foto l'ha gia' dato lei */
-  el('grid').classList.toggle('con-pionieri', mostra);
   if (!mostra) return;
-  r.innerHTML = `👥 <span class="conta">${pionieri}</span> `
+  r.innerHTML = `<span class="conta">${pionieri}</span> `
     + `pionier${pionieri===1?'e':'i'}`;
 }
 
