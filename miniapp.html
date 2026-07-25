@@ -2673,15 +2673,25 @@ function montaGalleria(){
   aggiorna();                               // frecce di partenza: la ‹ e' gia' spenta
 
   /* Trascinamento col mouse: il gesto naturale di chi non ha il dito.
-     SOLO puntatore mouse — al touch lo scorrimento nativo non si
-     tocca — e oltre la soglia il click che segue non deve aprire il
-     lightbox (l'ascoltatore in cattura lo mangia prima che arrivi
-     all'immagine). */
-  let giu = null, fineTrascinamento = 0;
+     NON si monta nemmeno dove un mouse non c'e', ed e' una cura, non
+     un'eleganza: un ascoltatore pointerdown/pointermove non passivo
+     su una striscia che scorre la marchia come zona da main thread
+     (Blink li registra come i touchstart/touchmove bloccanti), e il
+     dito paga in fluidita' anche quando la guardia pointerType li
+     scarta subito — il conto si paga alla REGISTRAZIONE, non alla
+     chiamata. Da qui in giu' e' tutta roba da mouse: stessa
+     condizione delle frecce, sul telefono questo codice non esiste e
+     lo scorrimento e' quello nativo di sempre. */
+  if (!matchMedia('(hover:hover) and (pointer:fine)').matches) return;
+  /* E anche col mouse gli ascoltatori sono passivi: qui dentro non si
+     chiama mai preventDefault, e sui portatili col touchscreen (che
+     il mouse ce l'hanno, quindi passano la condizione qui sopra) il
+     dito non deve pagare pedaggio. */
+  let giu = null, fineTrascinamento = -Infinity;
   striscia.addEventListener('pointerdown', e => {
     if (e.pointerType !== 'mouse' || e.button !== 0 || quante < 2) return;
     giu = {x: e.clientX, left: striscia.scrollLeft, mosso: false};
-  });
+  }, {passive: true});
   striscia.addEventListener('pointermove', e => {
     if (!giu) return;
     /* bottone gia' lasciato (rilasciato fuori dalla striscia prima
@@ -2694,7 +2704,7 @@ function montaGalleria(){
       try { striscia.setPointerCapture(e.pointerId); } catch(_) {}
     }
     if (giu.mosso) striscia.scrollLeft = giu.left - dx;
-  });
+  }, {passive: true});
   const rilascia = () => {
     if (!giu) return;
     const mosso = giu.mosso;
@@ -2704,8 +2714,8 @@ function montaGalleria(){
     fineTrascinamento = performance.now();
     vaiA(indice());                         // riaggancia la foto piu' vicina
   };
-  striscia.addEventListener('pointerup', rilascia);
-  striscia.addEventListener('pointercancel', rilascia);
+  striscia.addEventListener('pointerup', rilascia, {passive: true});
+  striscia.addEventListener('pointercancel', rilascia, {passive: true});
   /* Il click che segue il rilascio non e' un click: e' la coda del
      trascinamento, e non deve aprire il lightbox. Una finestrella di
      tempo invece di una bandierina da spegnere: se il click non
