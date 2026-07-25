@@ -741,6 +741,24 @@
     #tourFumetto{transition:top .3s ease,left .3s ease}
   }
 
+  /* ---------- fascia «fase di test»: la porta fissa al canale ----------
+     Il cartello passa una volta al giorno, questa resta. Volutamente
+     NON un CTA pieno: l'arancione pieno e' del «+ Vendi» e dei bottoni
+     d'acquisto — qui basta un cartellino col fondo tenue e il bordo ₿,
+     che si vede da lontano senza rubare il gesto principale. */
+  #fasciaTest{padding:12px var(--pad) 0}
+  .fascia-test{
+    display:flex;align-items:center;justify-content:center;gap:6px 10px;
+    flex-wrap:wrap;width:100%;text-align:center;
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    border-radius:16px;padding:11px 14px;
+    font:inherit;font-weight:800;font-size:13px;line-height:1.35;
+    color:var(--sats-text);
+  }
+  button.fascia-test{cursor:pointer}
+  button.fascia-test:active{transform:translateY(1px)}
+  .fascia-test .ft-cta{text-decoration:underline;text-underline-offset:2px}
+
   /* ---------- cartello «fase di test» ----------
      L'avviso di rodaggio all'apertura: velo scuro SFOCATO a tutto
      schermo, si chiude solo col bottone o con la ✕ (niente tocco
@@ -994,6 +1012,9 @@
       <div class="chips" id="chips"></div>
       <div class="trust-line">🔒 Ogni acquisto è protetto dal deposito di garanzia</div>
     </header>
+    <!-- La porta fissa al canale durante il rodaggio: la riempie
+         renderFasciaTest(), solo se BANNER_TEST è acceso e mai in DEMO -->
+    <div id="fasciaTest" style="display:none"></div>
     <!-- Banner «installa Barattolo» (PWA): riempito da
          bannerInstallaPwa() solo su web mobile fuori da Telegram.
          Dentro la Mini App non compare mai. -->
@@ -2321,10 +2342,32 @@ function chiudiTour(){
 const TEST_CHIAVE = 'barattolo_test';
 let testModaleInCorso = false;
 let dopoModaleTest = null;    // chi aspetta il suo turno: il tour
-let linkCanaleTest = '';
+let bannerTest = null;        // la risposta del server: null = niente rodaggio
+let bannerTestLetto = false;  // si chiede UNA volta per apertura dell'app
 function giornoOggi(){
   const d = new Date();       // giorno LOCALE, non UTC: le 2 di notte
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;   // sono ancora ieri sera
+}
+/* L'interruttore, il testo e il link arrivano tutti da qui: li usano
+   sia il cartello (una volta al giorno) sia la fascia fissa in
+   vetrina (sempre). Un solo giro di rete per apertura. */
+async function caricaBannerTest(){
+  if (bannerTestLetto) return bannerTest;
+  bannerTestLetto = true;
+  if (DEMO || !API_BASE) return bannerTest;    // nella demo non esiste
+  try {
+    /* endpoint pubblico: nessun header, lo legge anche l'anonimo */
+    const r = await fetch(`${API_BASE}/banner-test`);
+    if (r.ok) {
+      const d = await r.json();
+      if (d && d.attivo && d.testo) bannerTest = {
+        testo: String(d.testo),
+        /* solo http(s): il link e' nostro, ma non deve poter aprire
+           schemi strani */
+        link: /^https?:\/\//.test(d.link || '') ? d.link : ''};
+    }
+  } catch(e){}
+  return bannerTest;
 }
 function finiscoModaleTest(){
   const poi = dopoModaleTest; dopoModaleTest = null;
@@ -2332,28 +2375,22 @@ function finiscoModaleTest(){
 }
 async function modaleTest(dopo){
   dopoModaleTest = dopo || null;
-  if (DEMO || !API_BASE) return finiscoModaleTest();
+  const d = await caricaBannerTest();
+  renderFasciaTest();          // la fascia vive anche quando il cartello tace
+  if (!d) return finiscoModaleTest();
   let visto = '';
   try { visto = localStorage.getItem(TEST_CHIAVE) || ''; } catch(e){}
   if (visto === giornoOggi()) return finiscoModaleTest();
-  let d = null;
-  try {
-    /* endpoint pubblico: nessun header, lo legge anche l'anonimo */
-    const r = await fetch(`${API_BASE}/banner-test`);
-    if (r.ok) d = await r.json();
-  } catch(e){}
-  if (!d || !d.attivo || !d.testo) return finiscoModaleTest();
   /* consumato alla comparsa, come il tour: un ricaricamento della
      pagina non lo ripropone lo stesso giorno */
   try { localStorage.setItem(TEST_CHIAVE, giornoOggi()); } catch(e){}
   /* la PRIMA riga del testo e' il titolo, il resto il messaggio:
      tutto scritto nel config, niente da indovinare qui */
-  const righe = String(d.testo).split('\n');
+  const righe = d.testo.split('\n');
   el('testTitolo').textContent = righe[0];
   el('testTesto').textContent = righe.slice(1).join('\n').trim();
-  linkCanaleTest = /^https?:\/\//.test(d.link || '') ? d.link : '';
   el('testAzioni').innerHTML =
-    (linkCanaleTest
+    (d.link
       ? `<button class="btn orange" onclick="apriCanaleTest()">💬 Entra nel canale e dicci la tua</button>`
       : '')
     + `<button class="btn ghost" onclick="chiudiModaleTest()">Esplora l'app</button>`;
@@ -2361,11 +2398,25 @@ async function modaleTest(dopo){
   el('testModale').classList.add('open');
   document.body.style.overflow = 'hidden';   // sotto non si scorre
 }
+/* La fascia sotto la trust-line di Esplora: la porta al canale che
+   resta anche quando il cartello ha gia' fatto il suo giro. Stesso
+   interruttore del cartello, mai in DEMO, anche per gli anonimi. */
+function renderFasciaTest(){
+  const f = el('fasciaTest'); if (!f) return;
+  if (!bannerTest || DEMO) { f.style.display = 'none'; f.innerHTML = ''; return; }
+  f.style.display = '';
+  /* senza link nel config resta l'avviso, senza fingersi toccabile */
+  f.innerHTML = bannerTest.link
+    ? `<button class="fascia-test" onclick="apriCanaleTest()">
+         <span>🚧 Barattolo è in fase di test</span>
+         <span class="ft-cta">💬 Dicci la tua ›</span></button>`
+    : `<div class="fascia-test"><span>🚧 Barattolo è in fase di test</span></div>`;
+}
 /* Dentro Telegram il link al canale passa dal client (che sa aprire
    gli inviti t.me/+…); nel browser e' una scheda nuova. */
 function apriCanaleTest(){
-  const url = linkCanaleTest;
-  chiudiModaleTest();
+  const url = bannerTest?.link;
+  chiudiModaleTest();          // se e' partito dal cartello, si chiude
   if (!url) return;
   if (tg?.initData && tg.openTelegramLink) {
     try { tg.openTelegramLink(url); return; } catch(e){}
