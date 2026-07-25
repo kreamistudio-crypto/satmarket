@@ -856,6 +856,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chiusura partono tour e banner installa, e `testModaleInCorso` è
   nelle guardie di `bannerInstallaPwa()`; server muto o interruttore
   spento = il giorno NON si consuma e il seguito parte comunque.
+  Il cartello passa una volta al giorno, ma la porta al canale resta:
+  fascia `#fasciaTest` sotto la trust-line di Esplora
+  (`renderFasciaTest`, chiamata da `modaleTest`) — «🚧 Barattolo è in
+  fase di test — 💬 Dicci la tua ›», stesso interruttore e stesso
+  link, anche per gli anonimi, mai in DEMO, e senza link nel config
+  resta un `<div>` che non finge di essere toccabile. Volutamente NON
+  un CTA pieno: fondo `--sats-soft` col bordo ₿ da 1.5px e testo
+  `--sats-text` (token, quindi chiaro e scuro gratis), niente ombra
+  piena — l'arancione pieno resta del «+ Vendi» e dei bottoni
+  d'acquisto, che non devono avere rivali. La risposta del server la
+  legge `caricaBannerTest()` UNA volta per apertura e la tengono in
+  comune cartello e fascia.
   Redesign «mercatino di paese» (lug 2026, da Claude Design, solo
   CSS/markup): palette in `:root` — crema #FAF4E4, inchiostro #23282C,
   arancio ₿ #F7931A con i toni `--sats-deep/-text`, verde escrow
