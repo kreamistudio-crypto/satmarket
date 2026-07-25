@@ -868,6 +868,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   d'acquisto, che non devono avere rivali. La risposta del server la
   legge `caricaBannerTest()` UNA volta per apertura e la tengono in
   comune cartello e fascia.
+  Contatore dei pionieri (lug 2026): in vetrina, riga TUTTA SUA sotto
+  quella degli strumenti — «📦 830 oggetti» / «👥 24 pionieri»
+  incolonnati (di fianco agli oggetti c'è già ordina+filtri, due numeri
+  appaiati si pesterebbero), stessa resa dell'altro contatore
+  (`.section-label.riga-conta`: numero arancione, parola in
+  maiuscoletto, `::after` puntinato spento; la regola sta DOPO
+  `.section-label`, che a pari specificità vincerebbe). «Pionieri» e
+  non «utenti»: in rodaggio è un club. Il numero è `COUNT(*)` sugli
+  utenti con cache di 60s (`conta_pionieri`) e viaggia nella busta
+  della PRIMA pagina di `/api/listings` accanto a `totale` e
+  `conteggi` (nessun giro di rete in più, lo vede anche l'anonimo);
+  è GLOBALE, non segue categoria né ricerca. Interruttore
+  `CONTATORE_UTENTI` nel config (acceso di serie): spento, in DEMO o
+  con un server vecchio la chiave non arriva e `renderPionieri()` non
+  disegna la riga. Il 🫙 accanto agli oggetti è stato scartato (resta
+  dei preferiti, vedi regola 9): lì c'è 📦.
   Redesign «mercatino di paese» (lug 2026, da Claude Design, solo
   CSS/markup): palette in `:root` — crema #FAF4E4, inchiostro #23282C,
   arancio ₿ #F7931A con i toni `--sats-deep/-text`, verde escrow
