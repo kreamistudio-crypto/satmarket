@@ -556,10 +556,15 @@
   nav button{
     flex:1;border:0;background:none;font:inherit;font-size:10.5px;font-weight:800;
     color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;
+    position:relative;
   }
   /* La voce attiva accende l'emoji in una pillola color pesca */
   nav button.active{color:var(--sats-deep)}
   nav button .ic{font-size:20px;line-height:1;padding:3px 14px;border-radius:999px}
+  /* Il pallino sul tasto Ordini: c'e' un'offerta che aspetta una TUA mossa */
+  .off-dot{display:none;position:absolute;top:4px;right:26%;width:9px;height:9px;
+    border-radius:50%;background:var(--sats);box-shadow:0 0 0 2px var(--nav-bg)}
+  .off-dot.on{display:block}
   nav button.active .ic{background:var(--sats-soft);box-shadow:inset 0 0 0 1.5px #F7C87F}
   /* Il "+" di Vendi: bottone-oggetto rialzato sopra la barra */
   nav button.sell .ic{
@@ -1245,8 +1250,14 @@
     </div>
   </div>
 
-  <!-- ============ VISTA: AFFARI ============ -->
+  <!-- ============ VISTA: AFFARI (per gli utenti: «Ordini») ============ -->
   <div class="view" id="view-affari">
+    <!-- Le trattative in corso, sopra gli ordini: compaiono solo se
+         ce n'e' almeno una viva (renderOfferte) -->
+    <div id="offerteBlocco" style="display:none">
+      <div class="section-label" style="padding-top:22px">💰 Offerte</div>
+      <div id="offerteList" style="margin-top:12px"></div>
+    </div>
     <div class="section-label" style="padding-top:22px">I tuoi ordini</div>
     <div id="ordersList" style="margin-top:12px"></div>
   </div>
@@ -1420,7 +1431,7 @@
     <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
-    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini</button>
+    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
   </nav>
@@ -1457,6 +1468,25 @@
     </div>
     <div class="conto-scomposto" id="nwcScomposto"></div>
     <button class="btn orange" style="margin-top:14px" onclick="confermaCompraSubito(this)">⚡ Conferma e paga</button>
+    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET OFFERTA (contrattazione sul prezzo) ============ -->
+  <div class="sheet" id="offertaSheet">
+    <div class="grab"></div>
+    <h3>💰 Fai un'offerta</h3>
+    <!-- La testata (miniatura + titolo + listino) la scrive apriOfferta() -->
+    <div id="offTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <!-- Le scorciatoie ancorano su sconti ragionevoli; il campo libero
+         parla la valuta del listino -->
+    <div class="consegna-scelta" id="offChips" style="margin:0 0 10px"></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="offImporto" autocomplete="off" placeholder="La tua cifra" style="flex:1" oninput="offertaDigitata()">
+      <span id="offSuffisso" style="font-weight:800;color:var(--muted)">sats</span>
+    </div>
+    <div id="offMinimo" style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px"></div>
+    <div id="offStima" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaOfferta(this)">💰 Offri</button>
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
   </div>
 
@@ -1770,6 +1800,8 @@ async function loadListings(anonimo){
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   if (j.protezione_percento !== undefined)
     protPercento = Number(j.protezione_percento) || 0;
+  if (j.offerta_minima_percento !== undefined)
+    offertaMinPercento = Number(j.offerta_minima_percento) || 0;
   ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
@@ -1875,7 +1907,12 @@ function go(view){
     ?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
   document.querySelectorAll('.avatar-btn').forEach(a=>a.classList.toggle('attivo', view==='profilo'));
-  if (view==='affari') { if (!DEMO) loadOrders().then(renderOrders).catch(()=>renderOrders()); else renderOrders(); }
+  if (view==='affari') {
+    if (!DEMO) {
+      loadOrders().then(renderOrders).catch(()=>renderOrders());
+      loadOfferte().then(renderOfferte).catch(()=>{});
+    } else { renderOrders(); renderOfferte(); }
+  }
   if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
     /* il barattolo si rilegge dal server: un annuncio salvato puo'
        essere stato venduto nel frattempo, e il cassetto deve dirlo */
@@ -2335,12 +2372,29 @@ function sceltaConsegna(l){
   return l.consegna==='entrambe' ? consegnaScelta : l.consegna;
 }
 /* La STIMA del totale da pagare (articolo + spedizione se scelta +
-   protezione): i sats veri li dice la risposta di POST /orders. */
+   protezione): i sats veri li dice la risposta di POST /orders.
+   Se ho un'offerta ACCETTATA su questo annuncio, l'articolo della
+   stima e' la cifra pattuita (artStima). */
 function totaleStima(l){
-  const art = satsAnnuncio(l);
+  const art = artStima(l);
   const sped = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0;
   return art + sped + Math.floor(art * protPercento / 100);
 }
+/* L'articolo per le stime dei bottoni compra: la cifra pattuita
+   dell'offerta accettata, se c'e'; altrimenti il listino. Per gli
+   accordi in EUR vale il cambio vivo, con la proporzione sul cambio
+   di pubblicazione come ripiego onesto. */
+function artStima(l){
+  const off = offertaAccettataPer(l.id);
+  if (!off) return satsAnnuncio(l);
+  const a = accordoDi(off);
+  if (off.valuta !== 'eur') return a.sats;
+  if (cambioVivo) return Math.round(a.eur / eurPerSat);
+  return l.priceEur > 0 ? Math.round(l.price * a.eur / l.priceEur) : l.price;
+}
+/* La soglia minima delle offerte: arriva col server nella prima
+   pagina, come protPercento (mai hardcodata qui). */
+let offertaMinPercento = 0;
 /* Le righe del conto scomposto per i fogli di pagamento: compaiono
    solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
 function contoScomposto(art, sped, prot, tot){
@@ -2701,6 +2755,9 @@ function openDetail(id){
   if (!currentListing) { toast('Annuncio non trovato'); return; }
   const l = currentListing;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
+  /* l'offerta accettata dell'utente su QUESTO annuncio: banner e
+     totali dei bottoni compra parlano la cifra pattuita */
+  const offAcc = offertaAccettataPer(l.id);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
      carta: il ritorno al mercatino a sinistra — c'e' SEMPRE, anche in
@@ -2773,6 +2830,7 @@ function openDetail(id){
              <span class="escrow-flag">🔒 pagamento protetto</span>
              <!-- niente 🔒 qui: lo dicono gia' la pillola e il bottone -->
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
+             ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${l.consegna==='entrambe' ? `
              <div class="consegna-scelta">
                <button class="consegna-pill attiva" data-v="spedizione" onclick="setConsegnaScelta('spedizione')">🚚 Spedizione${(l.sped>0||l.spedEur>0)?'':' gratuita'}</button>
@@ -2783,6 +2841,7 @@ function openDetail(id){
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
              <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
+             ${(l.nostr || offAcc) ? '' : `<button class="btn ghost" onclick="apriOfferta()">💰 Fai un'offerta</button>`}
            </div>`}
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)
@@ -3122,7 +3181,10 @@ async function startBuy(){
      intanto una stima onesta (col conto scomposto), poi i valori veri
      dalla risposta */
   const l = currentListing, inEur = l.valuta==='eur' && l.priceEur>0;
-  const artS = satsAnnuncio(l),
+  /* con un'offerta accettata l'articolo e' la cifra pattuita, e
+     l'ordine viaggia con offerta_id: il server fa i conti su quella */
+  const offAcc = offertaAccettataPer(l.id);
+  const artS = artStima(l),
         spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
         protS = Math.floor(artS * protPercento / 100);
   el('payAmount').textContent = stimaCirca(l) + fmt(totaleStima(l));
@@ -3130,7 +3192,7 @@ async function startBuy(){
                                                 artS + spedS + protS);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
-    `Listino ${fmtEur(l.priceEur)} € — convertito ora in sats: la invoice vale 15 minuti`;
+    `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale 15 minuti`;
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
   aggiornaPayHint();
@@ -3143,7 +3205,8 @@ async function startBuy(){
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({annuncio_id: l.id, consegna: sceltaConsegna(l)})});
+    body: JSON.stringify({annuncio_id: l.id, consegna: sceltaConsegna(l),
+                          offerta_id: offAcc ? offAcc.id : 0})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
   currentOrderId = d.ordine_id;
@@ -3193,7 +3256,7 @@ function compraSubito(){
   /* per i listini EUR e' una stima: i sats veri li fissa il server */
   const l = currentListing;
   el('nwcConfermaSats').textContent = stimaCirca(l) + fmt(totaleStima(l));
-  const artS = satsAnnuncio(l),
+  const artS = artStima(l),
         spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
         protS = Math.floor(artS * protPercento / 100);
   el('nwcScomposto').innerHTML = contoScomposto(artS, spedS, protS,
@@ -3219,7 +3282,8 @@ async function confermaCompraSubito(btn){
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({annuncio_id: currentListing.id,
-                            consegna: sceltaConsegna(currentListing)})});
+                            consegna: sceltaConsegna(currentListing),
+                            offerta_id: offertaAccettataPer(currentListing.id)?.id || 0})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
     currentOrderId = d.ordine_id;
@@ -3282,6 +3346,7 @@ function closeSheet(){
   el('nwcConfermaSheet').classList.remove('open');
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
+  el('offertaSheet').classList.remove('open');
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
@@ -3349,6 +3414,260 @@ function festaSats(ancora, mini){
   /* Rete di sicurezza: se i frame non arrivano (scheda nascosta),
      la scatola se ne va comunque */
   setTimeout(()=>box.remove(), DURATA + 400);
+}
+
+/* ---------------- Offerte: la contrattazione sul prezzo ----------------
+   NON e' una chat: proposta -> risposta (accetta / rifiuta / UNA
+   controproposta) -> acquisto alla cifra pattuita col flusso di
+   sempre. L'annuncio non si blocca mai: vince chi paga per primo. */
+let offerteMie = [], offerteDati = null;
+
+async function loadOfferte(){
+  if (DEMO || VETRINA) { offerteMie = []; return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/offerte`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok) return;
+    offerteDati = await r.json();
+    offerteMie = offerteDati.offerte || [];
+  } catch(e) {}
+}
+/* la cifra nella valuta del listino: qui niente «≈», non e' una conversione */
+function cifraOff(valuta, sats, eur){
+  return valuta==='eur' ? fmtEur(eur)+' €' : fmt(sats)+' sats';
+}
+/* l'accordo: la controproposta se c'e' (solo il compratore puo'
+   accettarla, quindi se esiste l'accordo e' quello), altrimenti la proposta */
+function accordoDi(o){
+  const c = o.contro_sats>0 || o.contro_eur>0;
+  return {sats: c?o.contro_sats:o.importo_sats, eur: c?o.contro_eur:o.importo_eur};
+}
+function cifraAccordo(o){ const a = accordoDi(o); return cifraOff(o.valuta, a.sats, a.eur); }
+function offertaAccettataPer(annuncioId){
+  if (DEMO || VETRINA) return null;
+  return offerteMie.find(o => o.annuncio_id===annuncioId
+    && o.stato==='accettata' && o.compratore_id===myTgId) || null;
+}
+
+/* Il foglio: scorciatoie -10%/-20%, campo libero nella valuta del
+   listino, stima live del totale. Le guardie dentro, come startBuy. */
+function apriOfferta(){
+  haptic();
+  if (VETRINA) {
+    invitoTelegram('Per fare un\'offerta serve l\'app vera dentro Telegram: '
+      + 'è lì che il venditore ti risponde.');
+    return;
+  }
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const l = currentListing; if (!l) return;
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  el('offTestata').innerHTML = `
+    ${l.thumbs && l.thumbs[0]
+      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
+      : `<span style="font-size:28px">${l.emoji}</span>`}
+    <div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
+    <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${inEur ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span></div>`;
+  el('offChips').innerHTML = [10,20].map(p => {
+    const v = offertaSconto(l, p);
+    return `<button class="consegna-pill" data-p="${p}" onclick="offertaChip(${p})">−${p}% · ${inEur ? fmtEur(v) : fmt(v)}</button>`;
+  }).join('');
+  const campo = el('offImporto');
+  campo.value = '';
+  campo.inputMode = inEur ? 'decimal' : 'numeric';
+  campo.placeholder = inEur ? '15,50' : fmt(offertaSconto(l, 15));
+  el('offSuffisso').textContent = inEur ? '€' : 'sats';
+  el('offMinimo').textContent = offertaMinPercento > 0
+    ? `Le offerte partono da ${inEur
+        ? fmtEur(Math.round(l.priceEur*offertaMinPercento)/100)+' €'
+        : fmt(Math.ceil(l.price*offertaMinPercento/100))+' sats'} `
+      + `(${offertaMinPercento}% del listino)` : '';
+  offertaDigitata();
+  el('sheetBg').classList.add('open');
+  el('offertaSheet').classList.add('open');
+}
+/* il listino meno p%: EUR a 2 decimali, sats interi */
+function offertaSconto(l, p){
+  return (l.valuta==='eur' && l.priceEur>0)
+    ? Math.round(l.priceEur*(100-p))/100
+    : Math.round(l.price*(100-p)/100);
+}
+function offertaChip(p){
+  haptic();
+  const l = currentListing; if (!l) return;
+  const v = offertaSconto(l, p);
+  el('offImporto').value = (l.valuta==='eur' && l.priceEur>0)
+    ? String(v.toFixed(2)).replace('.', ',') : String(v);
+  offertaDigitata();
+}
+/* La stima live sotto il campo: la matematica di totaleStima con
+   l'articolo offerto. Cambio assente sui listini EUR = onesta' e basta. */
+function offertaDigitata(){
+  const l = currentListing; if (!l) return;
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  const grezzo = String(el('offImporto').value||'').trim();
+  const v = inEur ? (parseFloat(grezzo.replace(',','.'))||0)
+                  : (parseInt(grezzo.replace(/[.\s]/g,''),10)||0);
+  document.querySelectorAll('#offChips .consegna-pill').forEach(b => {
+    const vChip = offertaSconto(l, Number(b.dataset.p));
+    b.classList.toggle('attiva', v>0 && Math.abs(v-vChip)<0.005);
+  });
+  const st = el('offStima');
+  if (v<=0) { st.textContent = ''; return; }
+  if (inEur && !cambioVivo) {
+    st.textContent = `Offri ${fmtEur(v)} € — l'equivalente in sats si vedrà al pagamento`;
+    return;
+  }
+  const artS = inEur ? Math.round(v/eurPerSat) : v;
+  const spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0;
+  const protS = Math.floor(artS * protPercento / 100);
+  st.innerHTML = `Se accettata pagheresti ≈ <b class="mono" style="color:var(--sats-deep)">${fmt(artS+spedS+protS)}</b> sats totali`
+    + ((spedS>0||protS>0) ? ' (con spedizione e protezione)' : '');
+}
+async function inviaOfferta(btn){
+  haptic();
+  const l = currentListing; if (!l) return;
+  const grezzo = String(el('offImporto').value||'').trim();
+  if (!grezzo) { toast('Scrivi la tua cifra'); return; }
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  const importo = inEur ? grezzo : grezzo.replace(/[.\s]/g,'');
+  const ripristina = bottoneInAttesa(btn, '💰 Invio offerta…');
+  try {
+    const r = await fetch(`${API_BASE}/listings/${l.id}/offerta`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({importo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Offerta non inviata', 5000); return; }
+    closeSheet();
+    toast('💰 Offerta inviata! Ti avvisiamo appena il venditore risponde', 5000);
+    loadOfferte().then(renderOfferte).catch(()=>{});
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+
+/* La sezione in testa alla scheda Ordini: solo le trattative VIVE
+   (le chiuse le raccontano le notifiche). Compare solo se non e' vuota. */
+function renderOfferte(){
+  const blocco = el('offerteBlocco'); if (!blocco) return;
+  const vive = (DEMO||VETRINA) ? []
+    : offerteMie.filter(o => ['proposta','controproposta','accettata'].includes(o.stato));
+  if (!vive.length) {
+    blocco.style.display='none';
+    el('offDot')?.classList.remove('on');
+    return;
+  }
+  blocco.style.display='';
+  let daAgire = 0;
+  el('offerteList').innerHTML = vive.map(o => {
+    const compro = o.compratore_id===myTgId;
+    const ore = Math.max(1, Math.ceil((o.scadenza - Date.now()/1000)/3600));
+    let thumb = '';
+    try { const nomi = o.foto ? JSON.parse(o.foto) : [];
+          if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
+    const ic = thumb
+      ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
+      : '💰';
+    let stato = '', azioni = '';
+    if (o.stato==='proposta') {
+      if (compro) stato = `Hai offerto <b>${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}</b> · risposta entro ~${ore}h`;
+      else {
+        daAgire++;
+        stato = `Ti offre <b>${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}</b> · rispondi entro ~${ore}h`;
+        azioni = `
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn primary" style="flex:1;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
+            <button class="btn ghost" style="flex:1;margin:0" onclick="toggleContro(${o.id})">↔ Controproponi</button>
+            <button class="btn danger-ghost" style="margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
+          </div>
+          <div id="controBox_${o.id}" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:10px;align-items:center">
+              <input id="contro_${o.id}" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra" style="flex:1;min-width:0">
+              <span style="font-weight:800;color:var(--muted)">${o.valuta==='eur'?'€':'sats'}</span>
+              <button class="btn primary" style="margin:0" onclick="rispondiOfferta(${o.id},'contro')">Invia</button>
+            </div>
+          </div>`;
+      }
+    } else if (o.stato==='controproposta') {
+      if (compro) {
+        daAgire++;
+        stato = `Il venditore propone <b>${cifraOff(o.valuta,o.contro_sats,o.contro_eur)}</b> (avevi offerto ${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}) · entro ~${ore}h`;
+        azioni = `
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn primary" style="flex:1;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
+            <button class="btn danger-ghost" style="margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
+          </div>`;
+      } else stato = `Hai controproposto <b>${cifraOff(o.valuta,o.contro_sats,o.contro_eur)}</b> · in attesa dell'acquirente (~${ore}h)`;
+    } else {   /* accettata: si aspetta solo il pagamento */
+      if (compro) {
+        daAgire++;
+        stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · paga entro ~${ore}h`;
+        azioni = `<button class="btn orange" style="margin-top:10px" onclick="pagaOfferta(${o.annuncio_id})">⚡ Paga ora</button>`;
+      } else stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · in attesa del pagamento (~${ore}h)`;
+    }
+    return `<div class="order" style="cursor:default">
+      <div class="row">
+        <div class="order-left">
+          <span class="order-ic">${ic}</span>
+          <div class="order-main">
+            <b>${esc(o.titolo)}</b>
+            <div class="sub">${compro?'Stai comprando':'Stai vendendo'} · listino ${cifraOff(o.valuta,o.listino_sats,o.listino_eur)}</div>
+            <div class="sub">${stato}</div>
+          </div>
+        </div>
+      </div>${azioni}</div>`;
+  }).join('');
+  el('offDot')?.classList.toggle('on', daAgire>0);
+}
+function toggleContro(id){
+  haptic();
+  const box = el('controBox_'+id);
+  if (box) box.style.display = box.style.display==='none' ? '' : 'none';
+}
+async function rispondiOfferta(id, azione){
+  haptic();
+  const o = offerteMie.find(x=>x.id===id); if (!o) return;
+  let importo = '';
+  if (azione==='contro') {
+    importo = String(el('contro_'+id)?.value||'').trim();
+    if (!importo) { toast('Scrivi la tua controproposta'); return; }
+    if (o.valuta!=='eur') importo = importo.replace(/[.\s]/g,'');
+  }
+  if (azione==='accetta' && !confirm(o.venditore_id===myTgId
+      ? 'Accettare non riserva l\'oggetto: l\'annuncio resta in vetrina '
+        + 'e vince chi paga per primo.\n\nAccetti l\'offerta?'
+      : 'Accetti la controproposta? Avrai un tempo limitato per pagare.'))
+    return;
+  if (azione==='rifiuta' && !confirm('Vuoi rifiutare? La decisione è definitiva.'))
+    return;
+  try {
+    const r = await fetch(`${API_BASE}/offerte/${id}/rispondi`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({azione, importo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) toast(d.detail||'Operazione non riuscita', 5000);
+    else toast(azione==='accetta' ? '🤝 Accordo fatto!'
+             : azione==='rifiuta' ? 'Offerta rifiutata'
+             : '↔ Controproposta inviata');
+  } catch(e) { toast('Rete assente: riprova'); }
+  loadOfferte().then(renderOfferte).catch(()=>{});
+}
+/* «Paga ora»: si riapre il dettaglio, che con l'offerta accettata
+   mostra il banner e i totali pattuiti — pillole consegna, NWC e
+   nota EUR ereditati gratis dal flusso di sempre. */
+async function pagaOfferta(aid){
+  haptic();
+  if (!listings.find(x=>x.id===aid)) {
+    try {
+      const r = await fetch(`${API_BASE}/listings/${aid}`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (r.ok) inCatalogo([mapListing(await r.json())]);
+    } catch(e) {}
+  }
+  if (!listings.find(x=>x.id===aid)) {
+    toast('Questo annuncio non è più disponibile'); return;
+  }
+  openDetail(aid);
 }
 
 const STATES = {
@@ -6567,6 +6886,10 @@ async function avvia(){
        rilegge (fail-open: senza risposta resta vuoto) */
     preferiti = new Set(); myPreferiti = [];
     await caricaPreferiti();
+    /* le offerte seguono l'identita' come i preferiti: si rileggono
+       (servono anche a openDetail per il banner dell'accordo) */
+    offerteMie = [];
+    await loadOfferte(); renderOfferte();
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
     if (editandoId) annullaModifica();   // una modifica a metà non segue l'identità nuova
     renderGrid(); renderOrders();
