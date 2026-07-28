@@ -2750,6 +2750,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # La percentuale della protezione acquisti: cosi' la stima del
         # conto nel client non hardcoda mai la cifra (oggi 0).
         risposta["protezione_percento"] = PROTEZIONE_PERCENTO
+        # La soglia minima delle offerte, per l'hint del foglio
+        # (stesso patto: mai cifre hardcodate nel client).
+        risposta["offerta_minima_percento"] = OFFERTA_MINIMA_PERCENTO
     con.close()
     return risposta
 
@@ -3596,6 +3599,164 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
         return [a for a in annunci if ql in (a["titolo"] + a["descrizione"]).lower()]
 
 
+# ------------------------- API: OFFERTE -----------------------------
+# La contrattazione sul prezzo (lug 2026, modello Vinted): proposta ->
+# risposta -> acquisto alla cifra pattuita. NON e' una chat: e' una
+# macchina a stati con al massimo UNA controproposta del venditore.
+# L'annuncio non si blocca mai durante la trattativa: vince chi paga
+# per primo, e le offerte rimaste vive decadono con garbo. L'accordo
+# riguarda il SOLO articolo: spedizione e protezione si sommano sopra
+# al momento dell'acquisto, come per ogni altro ordine.
+
+STATI_OFFERTA_VIVI = ("proposta", "controproposta", "accettata")
+
+
+def _importo_accordo(off) -> tuple[int, float]:
+    """La cifra pattuita: la controproposta se c'e' (solo il compratore
+    puo' accettarla, quindi se c'e' l'accordo e' quello), altrimenti la
+    proposta. In (sats, eur): uno dei due e' sempre 0, come in colonna."""
+    if off["contro_sats"] > 0 or off["contro_eur"] > 0:
+        return off["contro_sats"], off["contro_eur"]
+    return off["importo_sats"], off["importo_eur"]
+
+
+def _cifra_offerta(valuta: str, sats: int, eur: float) -> str:
+    """«80.000 sats» oppure «15.50 €»: la valuta del listino."""
+    return f"{eur:.2f} €" if valuta == "eur" else f"{_fmt_sats(sats)} sats"
+
+
+@app.post("/api/listings/{annuncio_id}/offerta")
+async def fai_offerta(annuncio_id: int, req: Request,
+                      x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """Il compratore propone la sua cifra, nella valuta del listino.
+    Qui il cambio non serve mai: offerta e listino si confrontano
+    nella stessa valuta (la conversione, per i listini EUR, avviene
+    solo alla creazione della invoice, come sempre)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
+                    (annuncio_id,)).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(404, "Annuncio non disponibile")
+    if a["venditore_id"] == user["id"]:
+        con.close()
+        raise HTTPException(400, "Non puoi fare un'offerta sul tuo "
+                                 "stesso annuncio")
+    if a["contatto_nostr"]:
+        # Il venditore-import non riceve notifiche e non risponderebbe
+        # mai: la trattativa vive dove vive lui.
+        con.close()
+        raise HTTPException(400, "Questo annuncio arriva da Nostr: usa i "
+                                 "contatti del venditore per trattare")
+    # La cifra, nella valuta del listino (EUR con la virgola tradotta)
+    grezzo = str(d.get("importo", "")).strip()
+    imp_sats, imp_eur = 0, 0.0
+    if a["valuta"] == "eur":
+        try:
+            imp_eur = round(float(grezzo.replace(",", ".")), 2)
+        except ValueError:
+            imp_eur = 0.0
+        importo, listino = imp_eur, a["prezzo_eur"]
+    else:
+        try:
+            imp_sats = int(float(grezzo))
+        except ValueError:
+            imp_sats = 0
+        importo, listino = imp_sats, a["prezzo_sats"]
+    if importo <= 0:
+        con.close()
+        raise HTTPException(400, "Importo non valido")
+    if importo >= listino:
+        con.close()
+        raise HTTPException(400, "La tua offerta è pari o superiore al "
+                                 "prezzo dell'annuncio: puoi comprare "
+                                 "direttamente 🙂")
+    # Il paletto anti-offerte-insulto: sotto la soglia non si parte.
+    # Sui sats il minimo si arrotonda per ECCESSO (mai un'offerta
+    # ammessa sotto la percentuale promessa al venditore).
+    if a["valuta"] == "eur":
+        minimo = round(listino * OFFERTA_MINIMA_PERCENTO / 100, 2)
+    else:
+        minimo = (listino * OFFERTA_MINIMA_PERCENTO + 99) // 100
+    if importo < minimo:
+        con.close()
+        raise HTTPException(400, "Le offerte per questo annuncio partono "
+                                 f"da {_cifra_offerta(a['valuta'], minimo, minimo)}")
+    # Le due guardie di conteggio: una offerta attiva alla volta, e un
+    # numero chiuso di tentativi totali. Niente await tra i COUNT e
+    # l'INSERT: nel server mono-processo il blocco e' atomico (il
+    # patto anti-doppione di pubblica e del barattolo).
+    attive = con.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=? AND "
+        "compratore_id=? AND stato IN ('proposta','controproposta',"
+        "'accettata')", (annuncio_id, user["id"])).fetchone()["n"]
+    if attive:
+        con.close()
+        raise HTTPException(400, "Hai già un'offerta in corso su questo "
+                                 "annuncio: aspetta la risposta del "
+                                 "venditore")
+    totali = con.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=? AND "
+        "compratore_id=?", (annuncio_id, user["id"])).fetchone()["n"]
+    if totali >= MAX_OFFERTE_ANNUNCIO:
+        con.close()
+        raise HTTPException(400, f"Hai già fatto {MAX_OFFERTE_ANNUNCIO} "
+                                 "offerte su questo annuncio: è il "
+                                 "momento del prezzo pieno 🙂")
+    adesso = int(time.time())
+    scadenza = adesso + ORE_RISPOSTA_OFFERTA * 3600
+    con.execute(
+        "INSERT INTO offerte(annuncio_id,compratore_id,venditore_id,"
+        "valuta,importo_sats,importo_eur,stato,scadenza,creato,aggiornato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (annuncio_id, user["id"], a["venditore_id"], a["valuta"],
+         imp_sats, imp_eur, "proposta", scadenza, adesso, adesso))
+    con.commit()
+    offerta_id = con.execute(
+        "SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.close()
+    # La notifica DOPO il commit, come sempre
+    await notifica(a["venditore_id"],
+        f"💰 <b>Hai ricevuto un'offerta!</b> Qualcuno ti offre "
+        f"{_cifra_offerta(a['valuta'], imp_sats, imp_eur)} per "
+        f"«{a['titolo'][:60]}» (listino "
+        f"{_cifra_offerta(a['valuta'], a['prezzo_sats'], a['prezzo_eur'])}). "
+        f"Rispondi dalla scheda Ordini: puoi accettare, rifiutare o fare "
+        f"una controproposta. Senza risposta entro "
+        f"{ORE_RISPOSTA_OFFERTA} ore l'offerta scade da sola."
+        f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
+    return {"ok": True, "offerta_id": offerta_id, "scadenza": scadenza}
+
+
+@app.get("/api/me/offerte")
+def mie_offerte(x_tg_init_data: str = Header(""),
+                barattolo_sessione: str = Cookie("")):
+    """Le offerte in cui sono una delle parti, dalle piu' fresche.
+    La busta porta anche le leve: il client non hardcoda mai le cifre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    righe = con.execute(
+        "SELECT o.*, a.titolo, a.foto, a.stato AS stato_annuncio, "
+        "a.prezzo_sats AS listino_sats, a.prezzo_eur AS listino_eur, "
+        "a.consegna, uc.nome AS compratore_nome, uv.nome AS venditore_nome "
+        "FROM offerte o "
+        "JOIN annunci a ON a.id = o.annuncio_id "
+        "LEFT JOIN utenti uc ON uc.tg_id = o.compratore_id "
+        "LEFT JOIN utenti uv ON uv.tg_id = o.venditore_id "
+        "WHERE o.compratore_id=? OR o.venditore_id=? "
+        "ORDER BY o.aggiornato DESC LIMIT 30",
+        (user["id"], user["id"])).fetchall()
+    con.close()
+    return {"offerte": [dict(r) for r in righe],
+            "minima_percento": OFFERTA_MINIMA_PERCENTO,
+            "ore_risposta": ORE_RISPOSTA_OFFERTA,
+            "ore_pagamento": ORE_PAGAMENTO_OFFERTA,
+            "max_offerte": MAX_OFFERTE_ANNUNCIO}
+
+
 # ---------------------- API: ORDINI / ESCROW ------------------------
 
 @app.post("/api/orders")
@@ -4133,10 +4294,19 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # stesso oggetto (vedi trova_doppioni_nostr). Per quasi tutti
     # la guardia interna esce subito con la lista vuota.
     doppioni = trova_doppioni_nostr(con, user["id"])
+    # Le offerte che aspettano una MIA mossa: da venditore una proposta
+    # da valutare, da compratore una controproposta o un'accettata da
+    # pagare. Un numero solo, per il pallino sulla scheda Ordini.
+    da_agire = con.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE "
+        "(venditore_id=? AND stato='proposta') OR "
+        "(compratore_id=? AND stato IN ('controproposta','accettata'))",
+        (user["id"], user["id"])).fetchone()["n"]
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
     profilo["doppioni_nostr"] = doppioni
+    profilo["offerte_da_agire"] = da_agire
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [
