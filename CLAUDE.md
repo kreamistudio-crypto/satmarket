@@ -716,6 +716,62 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   orfani >1h in `import_tmp/` (in .gitignore), quote dei giorni
   passati. `_salva_una_foto` è il nucleo di scrittura (pieno + `_min`)
   estratto da `salva_foto` e riusato dall'import.
+  Spedizione e protezione acquisti (lug 2026, modello Vinted): a
+  carico del COMPRATORE, il venditore incassa netto articolo +
+  spedizione. Sull'annuncio: colonne `consegna` ('' = non specificata,
+  cioè annunci storici e importati col flusso di sempre | spedizione |
+  ritiro | entrambe — catalogo `MODALITA_CONSEGNA`),
+  `spedizione_sats`/`spedizione_eur` (costo nella VALUTA del listino
+  con l'equivalente sats al cambio di pubblicazione, il patto di
+  prezzo_sats; 0 con modalità che spedisce = gratis) e `taglia_pacco`
+  (`TAGLIE_PACCO` busta/piccolo/medio/grande/ingombrante, con gli
+  esempi concreti nel form: servirà alle etichette corriere future);
+  giudice unico `consegna_da_payload` (sconosciuto → '', mai 400 —
+  in pubblica() si chiama PRIMA dello scudo anti-doppione: può
+  attendere il cambio, e tra controllo e INSERT niente await).
+  Sull'ordine: `ordini.prezzo_sats` RESTA il TOTALE in cassaforte
+  (invoice, rimborso integrale e CSV non cambiano semantica); le
+  quote `ordini.spedizione_sats`/`protezione_sats` si FISSANO alla
+  creazione (il config può cambiare, l'ordine no) e l'articolo si
+  deriva per sottrazione; `consegna_scelta` = spedizione|ritiro|''.
+  compra(): body `consegna` validato contro la modalità (incompatibile
+  = 400; annuncio '' la ignora; 'entrambe' senza scelta = spedizione,
+  il client vecchio vede comunque i sats veri della risposta); EUR
+  converte articolo+spedizione INSIEME al cambio corrente (un annuncio
+  tutto-sats non dipende mai dal cambio); protezione =
+  `PROTEZIONE_PERCENTO` (config, 0 = spenta) sul SOLO articolo, per
+  difetto (floor), anche sul ritiro; drift/tetto sul solo articolo;
+  risposta con `articolo_sats/spedizione_sats/protezione_sats/
+  consegna` in più. Chiusure: incasso venditore =
+  `netto_venditore(prezzo_sats - protezione_sats)` in _sblocca_sats e
+  deposita_invoice (COMMISSIONE_PERCENTO resta leva DISTINTA e
+  sottrattiva: compongono senza doppio conteggio); rimborso = totale
+  (la protezione torna al compratore). Ritiro in zona SENZA stati
+  nuovi: corriere-sentinella 'Ritiro in zona' (gemello di 'Consegna a
+  mano', esente tracking, notifica sua) su segna_spedito;
+  l'auto-sblocco a 10gg resta ancorato a spedito_il = momento della
+  consegna a mano. Vetrina: i 4 campi in CAMPI_VETRINA; param
+  `solo_spedizione` su /api/listings (gli storici '' restano fuori:
+  il filtro promette un costo dichiarato); `protezione_percento`
+  nella busta di prima pagina (la stima del client non hardcoda mai
+  la cifra). NIP-99: la spedizione è una riga del CONTENT, nessun tag
+  nuovo. Import CSV: colonne facoltative `consegna;spedizione;taglia`
+  nel modello e nel parser. La modifica FIRMATA degli importati non
+  offre i campi (v1: l'evento non li porta, il form li nasconde).
+  Frontend: form Vendi con select consegna + costo (stessa valuta del
+  listino, `consegnaPayload`) + taglia; dettaglio con riga «🚚 + X
+  spedizione · protezione acquisti inclusa» (`rigaConsegna`, importo
+  nella valuta della vista via `spedTesto`) e pillola taglia; per
+  'entrambe' due pillole spedizione/ritiro DENTRO l'escrow-zone
+  (`consegnaScelta`, si riparte da spedizione a ogni dettaglio; la
+  cifra dei bottoni è `totaleStima`); conto scomposto
+  (`contoScomposto`) nel paySheet e nella conferma NWC — stima
+  subito, valori VERI dalla risposta di /orders; ordine con riga
+  consegna+quote, pannello «🤝 Consegna in zona» con
+  `markConsegnaMano` al posto di corriere/tracking, `payoutPanel` e
+  testa released = totale − protezione; checkbox «🚚 Solo con
+  spedizione» nei filtri (in DEMO client-side in renderGrid); 🚚
+  discreto nella meta della card — il prezzo in griglia resta pulito.
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -1645,7 +1701,19 @@ precedenza sul tour di benvenuto, vedi Architettura — collaudato in
 locale in tutti gli stati [acceso, spento, link vuoto o storto,
 server muto, stesso giorno, giorno nuovo], chiaro e scuro, mobile e
 desktop, demo e vetrina; a rodaggio finito si spegne con
-`BANNER_TEST = False` nel config del VPS e un riavvio).
+`BANNER_TEST = False` nel config del VPS e un riavvio); spedizione e
+protezione acquisti modello Vinted (lug 2026: modalità di consegna,
+costo spedizione nella valuta del listino e taglia del pacco
+sull'annuncio, conto scomposto a carico del compratore col totale in
+cassaforte, ritiro in zona senza stati nuovi, filtro «solo con
+spedizione», leva `PROTEZIONE_PERCENTO` SPENTA di serie, vedi
+Architettura — collaudato in locale: 72 verifiche TestClient sui
+quattro strati compreso il giro completo a tre identità con
+spedizione EUR, ritiro con auto-sblocco a 72h/10gg e annuncio
+storico, più il giro visivo in Chrome headless su chiaro e scuro; in
+produzione va rivisto dal vivo dentro Telegram, e quando la
+protezione si accenderà dal config vanno decisi i testi con la
+cifra).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
