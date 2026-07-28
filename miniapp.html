@@ -2292,8 +2292,13 @@ fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=e
   .then(r=>r.json()).then(d=>{ if (d?.bitcoin?.eur) {
     eurPerSat = d.bitcoin.eur / 100000000; cambioVivo = true;
     /* le card gia' disegnate portano il cambio di riserva: un giro di
-       render le aggiorna (mai sopra i risultati di una ricerca) */
-    if (!el('q').value.trim()) renderGrid();
+       render le aggiorna (mai sopra i risultati di una ricerca).
+       MA solo se c'e' gia' qualcosa di VERO da ridisegnare: CoinGecko
+       puo' rispondere prima di avvia()/loadListings(), e senza questa
+       guardia ridisegnerebbe il seme demo (Keychron/MTB) spacciandolo
+       per vetrina vera finche' i dati non arrivano. In DEMO il seme e'
+       legittimo; coi dati vivi lo dice datiVivi. */
+    if (!el('q').value.trim() && (DEMO || datiVivi)) renderGrid();
   }}).catch(()=>{});
 
 /* ---------------- doppia valuta: la vista ₿/€ ----------------
