@@ -41,6 +41,10 @@ LNBITS_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY"       # per pagare (SEGRETA!)
 
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)
+PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE
+                             # (modello Vinted): % sul solo prezzo articolo,
+                             # si aggiunge al conto e resta alla piattaforma.
+                             # 0 = spenta
 ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna
 GIORNI_AUTO_SBLOCCO = 10     # sblocco d'ufficio dopo la spedizione
 TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun

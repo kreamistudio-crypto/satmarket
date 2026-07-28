@@ -156,6 +156,16 @@ try:
 except ImportError:
     TETTO_SATS_ANNUNCIO = 0   # 0 = spento; es. 100_000 per accenderlo
 
+# La protezione acquisti (lug 2026, modello Vinted): percentuale a
+# carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
+# e resta alla piattaforma quando l'affare si chiude bene. Distinta da
+# COMMISSIONE_PERCENTO (che si SOTTRAE dal netto del venditore): leve
+# su lati diversi del banco, compongono senza doppio conteggio.
+try:
+    from config import PROTEZIONE_PERCENTO
+except ImportError:
+    PROTEZIONE_PERCENTO = 0   # 0 = spenta
+
 # I post automatici (la piattaforma che racconta i fatti) sono nati
 # dopo: i config.py gia' compilati possono non avere le chiavi. I
 # default valgono da soli: post ACCESI (i canali sono giovani, il
@@ -601,7 +611,19 @@ def init_db():
                     # backfill vive in backfill_coordinate(), che gira
                     # dopo carica_comuni()
                     "lat REAL DEFAULT 0",
-                    "lon REAL DEFAULT 0"):
+                    "lon REAL DEFAULT 0",
+                    # consegna e spedizione (lug 2026, modello Vinted):
+                    # la modalita' la sceglie il venditore ('' = non
+                    # specificata: annunci storici e importati, per loro
+                    # tutto resta come prima che la spedizione esistesse);
+                    # il costo e' nella valuta del listino, con
+                    # l'equivalente sats al cambio di pubblicazione (lo
+                    # stesso patto di prezzo_sats); la taglia del pacco
+                    # servira' alle etichette automatiche di domani
+                    "consegna TEXT DEFAULT ''",
+                    "spedizione_sats INTEGER DEFAULT 0",
+                    "spedizione_eur REAL DEFAULT 0",
+                    "taglia_pacco TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -661,7 +683,17 @@ def init_db():
                     # CREAZIONE della invoice (solo annunci in EUR:
                     # e' il cambio che ha fissato i sats dell'ordine).
                     # 0 = annuncio in sats, nessuna conversione.
-                    "cambio_ordine REAL DEFAULT 0"):
+                    "cambio_ordine REAL DEFAULT 0",
+                    # il conto scomposto (lug 2026, modello Vinted):
+                    # prezzo_sats resta il TOTALE in cassaforte (invoice
+                    # e rimborso non cambiano semantica), le due quote si
+                    # FISSANO alla creazione — il config puo' cambiare,
+                    # l'ordine no. L'articolo si deriva per sottrazione.
+                    # consegna_scelta: spedizione | ritiro | '' (ordini
+                    # storici e annunci senza modalita')
+                    "consegna_scelta TEXT DEFAULT ''",
+                    "spedizione_sats INTEGER DEFAULT 0",
+                    "protezione_sats INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -1253,6 +1285,49 @@ async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
                                  f"{TETTO_SATS_ANNUNCIO:,} sats per annuncio"
                                  .replace(",", " "))
     return valuta, prezzo_sats, prezzo_eur
+
+
+async def consegna_da_payload(d: dict, valuta: str):
+    """Il giudice unico dei campi di consegna (lug 2026): legge il
+    payload di pubblica/modifica e ritorna la quaterna
+    (consegna, spedizione_sats, spedizione_eur, taglia_pacco), gia'
+    normalizzata. Pattern categoria: i valori sconosciuti si
+    normalizzano a '' (mai un 400 — i client di ieri non sanno di
+    consegne, e non devono rompersi).
+
+    Il costo di spedizione vive nella STESSA valuta del listino:
+    - listino sats: spedizione_sats intera, spedizione_eur resta 0
+    - listino eur: spedizione_eur (2 decimali) e l'equivalente sats
+      al cambio di ADESSO, il patto di prezzo_sats
+    Con modalita' che non spedisce ('' o ritiro) il costo e' 0 per
+    forza; costo 0 con modalita' che spedisce = spedizione gratuita."""
+    consegna = d.get("consegna", "")
+    if consegna not in MODALITA_CONSEGNA:
+        consegna = ""
+    taglia = d.get("taglia_pacco", "")
+    if taglia not in TAGLIE_PACCO:
+        taglia = ""
+    sped_sats, sped_eur = 0, 0.0
+    if consegna in ("spedizione", "entrambe"):
+        if valuta == "eur":
+            try:
+                sped_eur = max(0.0, round(float(d.get("spedizione_eur", 0)), 2))
+            except (TypeError, ValueError):
+                sped_eur = 0.0
+            if sped_eur > 0:
+                # Il cambio c'e' di sicuro: prezzo_da_payload e' appena
+                # passato di qui (503 altrimenti). La guardia resta per
+                # prudenza: senza cambio l'equivalente resta 0 e ci
+                # pensera' compra() a convertire al momento vero.
+                cambio = await cambio_btc_eur()
+                if cambio > 0:
+                    sped_sats = round(sped_eur / cambio * 100_000_000)
+        else:
+            try:
+                sped_sats = max(0, int(d.get("spedizione_sats", 0)))
+            except (TypeError, ValueError):
+                sped_sats = 0
+    return consegna, sped_sats, sped_eur, taglia
 
 
 def testo_prezzo(valuta: str, prezzo_sats: int, prezzo_eur: float) -> str:
@@ -2343,6 +2418,15 @@ def categoria_valida(c) -> str:
     return c if c in CATEGORIE else "Altro"
 
 
+# --- Consegna e taglia del pacco (lug 2026, modello Vinted) ----------
+# La modalita' di consegna la dichiara il venditore sull'annuncio;
+# '' = non specificata (annunci storici e importati da Nostr): per
+# loro il flusso resta quello di sempre. I cataloghi sono del server,
+# come CATEGORIE: il client non li decide mai.
+MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe")
+TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
+
+
 def neutralizza_formula(testo: str) -> str:
     """Anti CSV-injection per i testi che arrivano dall'import: una
     cella che inizia con =, + o @ diventerebbe una formula viva se il
@@ -2604,6 +2688,10 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
+    # Qui e non piu' in basso: consegna_da_payload puo' attendere il
+    # cambio, e tra lo scudo anti-doppione e l'INSERT non deve esserci
+    # nessun await (il patto del server mono-processo).
+    consegna, sped_sats, sped_eur, taglia = await consegna_da_payload(d, valuta)
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -2640,11 +2728,12 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     lat, lon = coordinate_da_zona(d.get("zona", ""))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
+        "consegna,spedizione_sats,spedizione_eur,taglia_pacco,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
-         lat, lon, int(time.time())))
+         lat, lon, consegna, sped_sats, sped_eur, taglia, int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -2966,6 +3055,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
+    consegna, sped_sats, sped_eur, taglia = await consegna_da_payload(d, valuta)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
                     "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
@@ -3007,15 +3097,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
     # torna in sats deve azzerare l'euro, o resterebbero residui.
+    # Stesso patto per i campi di consegna (gia' normalizzati sopra).
     # Le coordinate seguono la zona: se cambia, cambiano con lei.
     lat, lon = coordinate_da_zona(d.get("zona", ""))
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
-        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=? "
+        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
+        "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=? "
         "WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
-         lat, lon, annuncio_id))
+         lat, lon, consegna, sped_sats, sped_eur, taglia, annuncio_id))
     con.commit()
     con.close()
     if isinstance(d.get("foto"), list):
