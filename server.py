@@ -1689,6 +1689,15 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
+        # Le offerte seguono l'utente da entrambi i lati del banco;
+        # le trattative tra le due meta' (auto-offerte, dopo la
+        # fusione) muoiono qui, come i feedback degli auto-scambi.
+        con.execute("UPDATE offerte SET compratore_id=? WHERE compratore_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE offerte SET venditore_id=? WHERE venditore_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM offerte WHERE compratore_id=? AND "
+                    "venditore_id=?", (id_telegram, id_telegram))
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -3189,8 +3198,30 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, annuncio_id))
+    # Il prezzo cambiato fa decadere le trattative APERTE: erano una
+    # percentuale di un prezzo che non esiste piu'. Le offerte gia'
+    # ACCETTATE sopravvivono — l'accordo e' stretto.
+    decadute_prezzo = []
+    if (valuta != a["valuta"] or prezzo_sats != a["prezzo_sats"]
+            or prezzo_eur != a["prezzo_eur"]):
+        decadute_prezzo = con.execute(
+            "SELECT compratore_id FROM offerte WHERE annuncio_id=? AND "
+            "stato IN ('proposta','controproposta')",
+            (annuncio_id,)).fetchall()
+        if decadute_prezzo:
+            con.execute("UPDATE offerte SET stato='decaduta', aggiornato=? "
+                        "WHERE annuncio_id=? AND stato IN "
+                        "('proposta','controproposta')",
+                        (int(time.time()), annuncio_id))
     con.commit()
     con.close()
+    # La notifica DOPO il commit, come sempre
+    for riga in decadute_prezzo:
+        await notifica(riga["compratore_id"],
+            f"✏️ Il venditore ha ritoccato il prezzo di "
+            f"«{d['titolo'][:60]}»: la tua offerta decade. Se ti "
+            f"interessa ancora, riproponi sul prezzo nuovo."
+            f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
     if isinstance(d.get("foto"), list):
         # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
         # puo' mostrare per sbaglio la foto vecchia dalla sua cache.
@@ -7499,12 +7530,70 @@ def pulisci_import():
         IMPORT_QUOTA.pop(tg_id, None)
 
 
+async def scadenze_offerte():
+    """Il giro delle offerte: quelle su annunci spariti dalla vetrina
+    decadono, quelle rimaste senza risposta (o senza pagamento nella
+    finestra) scadono. Le notifiche partono DOPO il commit; le vendite
+    hanno gia' il loro gancio in verifica-pagamento, qui arrivano solo
+    le code (rimozioni e scadenze vere)."""
+    con = db()
+    adesso = int(time.time())
+    righe = con.execute(
+        "SELECT o.*, a.titolo, a.stato AS stato_annuncio "
+        "FROM offerte o JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.stato IN ('proposta','controproposta','accettata') AND "
+        "(a.stato != 'attivo' OR (o.scadenza > 0 AND o.scadenza < ?))",
+        (adesso,)).fetchall()
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        nuovo = "decaduta" if r["stato_annuncio"] != "attivo" else "scaduta"
+        con.execute("UPDATE offerte SET stato=?, aggiornato=? WHERE id=?",
+                    (nuovo, adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        titolo = r["titolo"][:60]
+        try:
+            if r["stato_annuncio"] != "attivo":
+                await notifica(r["compratore_id"],
+                    f"«{titolo}» non è più disponibile: la tua offerta "
+                    f"decade.")
+            elif r["stato"] == "proposta":
+                cifra = _cifra_offerta(r["valuta"], r["importo_sats"],
+                                       r["importo_eur"])
+                await notifica(r["compratore_id"],
+                    f"⏳ La tua offerta di {cifra} per «{titolo}» è "
+                    f"scaduta senza risposta. L'annuncio è ancora in "
+                    f"vetrina, se vuoi riprovare.")
+            elif r["stato"] == "controproposta":
+                await notifica(r["venditore_id"],
+                    f"⏳ La tua controproposta per «{titolo}» è scaduta "
+                    f"senza risposta dell'acquirente.")
+            else:  # accettata, ma il pagamento non e' mai arrivato
+                cifra = _cifra_offerta(r["valuta"], *_importo_accordo(r))
+                await notifica(r["compratore_id"],
+                    f"⏳ Il tempo per comprare «{titolo}» a {cifra} è "
+                    f"finito: l'offerta è scaduta.")
+                await notifica(r["venditore_id"],
+                    f"L'acquirente non ha completato il pagamento in "
+                    f"tempo: l'offerta su «{titolo}» è scaduta e "
+                    f"l'annuncio resta in vetrina.")
+        except Exception as e:
+            print(f"⚠️ Notifica di scadenza offerta saltata: {e}")
+
+
 async def orologio():
     while True:
         try:
             await controlla_scadenze()
         except Exception as e:
             print(f"Orologio sblocchi, errore (riprovo tra 10 min): {e}")
+        try:
+            await scadenze_offerte()
+        except Exception as e:
+            print(f"⚠️ Scadenze offerte saltate: {e}")
         try:
             await importa_nostr_periodico()
         except Exception as e:
