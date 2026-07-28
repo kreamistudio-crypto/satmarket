@@ -1138,6 +1138,11 @@
         <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
       </div>
       <div class="filtri-riga">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer">
+          <input type="checkbox" id="filtroSpedInp" style="width:auto;accent-color:var(--sats)">
+          🚚 Solo con spedizione</label>
+      </div>
+      <div class="filtri-riga">
         <button class="btn orange" onclick="applicaFiltri()">Applica</button>
         <button class="btn ghost" onclick="azzeraFiltri()">Azzera</button>
       </div>
@@ -1196,6 +1201,25 @@
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
+      <div class="field" id="sellConsegnaField"><label>Consegna</label>
+        <select id="sellConsegna" onchange="aggiornaConsegnaForm()">
+          <option value="">Come consegni? (scegli)</option>
+          <option value="spedizione">📦 Spedizione</option>
+          <option value="ritiro">🤝 Solo ritiro in zona</option>
+          <option value="entrambe">📦🤝 Spedizione o ritiro in zona</option>
+        </select></div>
+      <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
+        <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0"><button type="button" class="suffix" id="sellSpedCur" tabindex="-1" style="pointer-events:none">sats</button></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. 0&nbsp;= spedizione gratuita, inclusa nel prezzo.</div></div>
+      <div class="field" id="sellTagliaField" style="display:none"><label>Taglia del pacco</label>
+        <select id="sellTaglia">
+          <option value="">Scegli la taglia…</option>
+          <option value="busta">✉️ Busta — sta in una busta imbottita</option>
+          <option value="piccolo">📦 Piccolo — come una scatola di scarpe</option>
+          <option value="medio">📦 Medio — come una cassetta d'acqua</option>
+          <option value="grande">📦 Grande — come un forno a microonde</option>
+          <option value="ingombrante">🛋 Ingombrante — serve un furgone</option>
+        </select></div>
       <div class="field"><label>Zona</label>
         <input id="sellZone" placeholder="Es. Pavia — spedisco in tutta Italia"></div>
       <div class="field"><label>Descrizione</label>
@@ -1564,6 +1588,10 @@ function mapListing(a){
   return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
     price:a.prezzo_sats, valuta:a.valuta||'sats', priceEur:a.prezzo_eur||0,
     cat:a.categoria, zone:a.zona||'—',
+    /* la consegna del venditore: '' = annuncio di prima che esistesse,
+       nessuna promessa nuova (il dettaglio non mostra la riga) */
+    consegna:a.consegna||'', sped:a.spedizione_sats||0,
+    spedEur:a.spedizione_eur||0, taglia:a.taglia_pacco||'',
     /* lo stato viaggia solo dove serve (i preferiti): la vetrina
        serve comunque solo gli attivi */
     stato:a.stato||'attivo',
@@ -1636,6 +1664,7 @@ function inCatalogo(arr){
    se guardi in euro scrivi euro, la conversione la fa il server. */
 let ordinaVista = '';        // '' = piu' recenti | prezzo_su | prezzo_giu
 let filtroPrezzo = null;     // {min, max, valuta} applicato, o null
+let filtroSped = false;      // «solo con spedizione» (stato di sessione)
 
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
@@ -1649,6 +1678,7 @@ function paramsVetrina(){
     if (filtroPrezzo.max) p.set('prezzo_max', filtroPrezzo.max);
     p.set('valuta_filtro', filtroPrezzo.valuta);
   }
+  if (filtroSped) p.set('solo_spedizione', '1');
   return p;
 }
 
@@ -1685,7 +1715,8 @@ function applicaFiltri(){
   const min = numeroFiltro(el('filtroMinInp').value);
   const max = numeroFiltro(el('filtroMaxInp').value);
   filtroPrezzo = (min || max) ? {min, max, valuta: valutaVista} : null;
-  el('filtriBtn').classList.toggle('attivo', !!filtroPrezzo);
+  filtroSped = !!el('filtroSpedInp').checked;
+  el('filtriBtn').classList.toggle('attivo', !!filtroPrezzo || filtroSped);
   el('filtriBox').style.display = 'none';
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
@@ -1694,8 +1725,9 @@ function applicaFiltri(){
 function azzeraFiltri(){
   haptic();
   el('filtroMinInp').value = ''; el('filtroMaxInp').value = '';
-  const cera = !!filtroPrezzo;
-  filtroPrezzo = null;
+  el('filtroSpedInp').checked = false;
+  const cera = !!filtroPrezzo || filtroSped;
+  filtroPrezzo = null; filtroSped = false;
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
   if (!cera) return;
@@ -1715,6 +1747,8 @@ async function loadListings(anonimo){
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
+  if (j.protezione_percento !== undefined)
+    protPercento = Number(j.protezione_percento) || 0;
   ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
@@ -1748,11 +1782,15 @@ async function loadOrders(){
 const CATS = ["Tutto","Elettronica","Casa e giardino","Abbigliamento","Sport e hobby",
               "Motori","Bambini","Animali","Libri e media","Altro"];
 let listings = [
+  /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
+     con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
   {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
    zone:"Pavia", seller:"Massimo R.", rating:4.9, sales:12,
+   consegna:"spedizione", sped:7000, taglia:"piccolo",
    desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
   {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport e hobby",
    zone:"Milano", seller:"Giulia T.", rating:5.0, sales:7,
+   consegna:"ritiro",
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
   {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
    zone:"Torino", seller:"Andrea B.", rating:4.8, sales:31,
@@ -1770,6 +1808,7 @@ let listings = [
      cambio (price = equivalente indicativo, come farebbe il server) */
   {id:7, emoji:"🎲", title:"Catan gioco da tavolo, come nuovo", price:27000, valuta:'eur', priceEur:25, cat:"Altro",
    zone:"Verona", seller:"Elisa D.", rating:4.9, sales:11,
+   consegna:"entrambe", spedEur:5, taglia:"piccolo",
    desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
 ];
 let orders = [
@@ -1866,6 +1905,8 @@ function renderGrid(items){
         (!filtroPrezzo.min || l.price >= inSats(filtroPrezzo.min)) &&
         (!filtroPrezzo.max || l.price <= inSats(filtroPrezzo.max)));
     }
+    if (filtroSped)
+      data = data.filter(l => l.consegna==='spedizione' || l.consegna==='entrambe');
     if (ordinaVista)
       data.sort((a,b) => ordinaVista==='prezzo_su' ? a.price-b.price : b.price-a.price);
   }
@@ -1931,7 +1972,7 @@ const cardHTML = l => { const p = prezzoParte(l);
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span>📍 ${esc(l.zone)}</span>${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
+        <div class="meta"><span>📍 ${esc(l.zone)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
       </div>
     </div>`; };
 
@@ -2235,6 +2276,38 @@ function prezzoParte(l){
   return {
     big: (inEur?'≈ ':'') + fmt(sats) + ' <span class="unit">sats</span>',
     small: (inEur?'':'≈ ') + eurTesto + ' €' };
+}
+/* La percentuale della protezione acquisti: arriva col server nella
+   prima pagina della vetrina (oggi 0), mai hardcodata qui. */
+let protPercento = 0;
+/* I sats di spedizione: stesso patto di satsAnnuncio (listino EUR =
+   equivalente al cambio vivo, ripiego sull'equivalente di
+   pubblicazione). Il costo VERO lo decide il server all'acquisto. */
+function satsSpedizione(l){
+  if (l.valuta==='eur' && l.spedEur>0 && cambioVivo)
+    return Math.round(l.spedEur / eurPerSat);
+  return l.sped||0;
+}
+/* Il costo di spedizione nella valuta di chi guarda, per la riga
+   sotto il prezzo: il «≈» sta solo sul convertito, come prezzoParte */
+function spedTesto(l){
+  const inEur = l.valuta==='eur' && l.spedEur>0;
+  if (valutaVista==='eur')
+    return (inEur?'':'≈ ') + (inEur ? fmtEur(l.spedEur) : eur(l.sped||0)) + ' €';
+  return (inEur?'≈ ':'') + fmt(satsSpedizione(l)) + ' sats';
+}
+/* La riga della consegna nel dettaglio: esiste solo se il venditore
+   l'ha dichiarata — gli annunci di prima non promettono nulla. */
+function rigaConsegna(l){
+  if (!l.consegna) return '';
+  let t;
+  if (l.consegna==='ritiro') t = '🤝 solo ritiro in zona';
+  else {
+    t = (l.sped>0 || l.spedEur>0)
+      ? `🚚 + ${spedTesto(l)} spedizione` : '🚚 spedizione gratuita';
+    if (l.consegna==='entrambe') t += ' o ritiro in zona';
+  }
+  return `<div class="eur-hint" style="margin-top:-8px">${t} · protezione acquisti inclusa</div>`;
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
@@ -2609,9 +2682,11 @@ function openDetail(id){
       <h2>${esc(l.title)}</h2>
       <div class="detail-price">${prezzoParte(l).big}</div>
       <div class="eur-hint">${prezzoParte(l).small}</div>
+      ${rigaConsegna(l)}
       <div class="pills">
         <span class="pill">📍 ${esc(l.zone)}</span>
         ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
+        ${l.taglia?`<span class="pill">📦 pacco ${esc(l.taglia)}</span>`:''}
         ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
       </div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
@@ -4901,10 +4976,37 @@ function impostaSellValuta(v){
     inp.inputMode = 'numeric'; inp.placeholder = '80 000';
     if (hint) hint.textContent = '';
   }
+  /* il costo di spedizione parla la stessa valuta del listino */
+  const sped = el('sellSped'), spedCur = el('sellSpedCur');
+  if (sped && spedCur){
+    spedCur.textContent = v==='eur' ? '€' : 'sats';
+    sped.step = v==='eur' ? '0.01' : '1';
+    sped.inputMode = v==='eur' ? 'decimal' : 'numeric';
+    sped.placeholder = v==='eur' ? '0,00' : '0';
+  }
 }
 /* parseFloat non capisce la virgola italiana: gliela traduciamo */
-const prezzoEurForm = () =>
-  Math.round((parseFloat(String(el('sellPrice').value).replace(',','.'))||0)*100)/100;
+const eurCampo = id =>
+  Math.round((parseFloat(String(el(id).value).replace(',','.'))||0)*100)/100;
+const prezzoEurForm = () => eurCampo('sellPrice');
+
+/* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce */
+function aggiornaConsegnaForm(){
+  const c = el('sellConsegna').value;
+  const spedisce = c==='spedizione' || c==='entrambe';
+  el('sellSpedField').style.display = spedisce ? '' : 'none';
+  el('sellTagliaField').style.display = spedisce ? '' : 'none';
+}
+/* I campi di consegna del payload, gia' nella valuta del listino */
+function consegnaPayload(){
+  const c = el('sellConsegna').value;
+  const out = {consegna:c, taglia_pacco:el('sellTaglia').value};
+  if (c==='spedizione' || c==='entrambe'){
+    if (sellValuta==='eur') out.spedizione_eur = eurCampo('sellSped');
+    else out.spedizione_sats = parseInt(el('sellSped').value)||0;
+  }
+  return out;
+}
 
 /* Porta un annuncio nel form di Vendi per ritoccarlo: stessi campi,
    stessa moderazione, submit sull'endpoint di modifica. */
@@ -4924,6 +5026,11 @@ function editListing(id){
   el('sellCat').value = l.cat;
   el('sellZone').value = l.zone==='—' ? '' : l.zone;
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
+  el('sellConsegna').value = l.consegna||'';
+  el('sellTaglia').value = l.taglia||'';
+  el('sellSped').value = (l.consegna==='spedizione'||l.consegna==='entrambe')
+    ? (sellValuta==='eur' ? (l.spedEur||0) : (l.sped||0)) : '';
+  aggiornaConsegnaForm();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
   renderFotoPreview(); aggiornaFormVendi();
   go('vendi'); window.scrollTo(0, 0);
@@ -4932,7 +5039,9 @@ function editListing(id){
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
-  ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
+  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
+  el('sellConsegna').value = ''; el('sellTaglia').value = '';
+  aggiornaConsegnaForm();
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
 }
@@ -4956,8 +5065,17 @@ function aggiornaFormVendi(){
     b.style.display = 'none';
     btn.textContent = '⚡ Pubblica annuncio';
   }
-  /* Le foto degli importati vivono sui relay: qui non si cambiano */
+  /* Le foto degli importati vivono sui relay: qui non si cambiano.
+     E la consegna nemmeno: la modifica firmata rispecchia l'evento
+     NIP-99, che non la porta — il form non deve fingere. */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
+  if (el('sellConsegnaField')){
+    el('sellConsegnaField').style.display = editandoNostr ? 'none' : '';
+    if (editandoNostr){
+      el('sellSpedField').style.display = 'none';
+      el('sellTagliaField').style.display = 'none';
+    } else aggiornaConsegnaForm();
+  }
 }
 
 function ridimensiona(file){
@@ -5089,19 +5207,23 @@ async function publish(){
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId;
+  const cns = consegnaPayload();
   if (DEMO) {
     nuovoId = Date.now();
     listings.unshift({id:nuovoId, emoji:'📦', title:t,
       price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
       valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
       cat:el('sellCat').value,
+      consegna:cns.consegna, sped:cns.spedizione_sats||0,
+      spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
     const r = await fetch(`${API_BASE}/listings`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({titolo:t, ...prezzo, categoria:el('sellCat').value,
+      body: JSON.stringify({titolo:t, ...prezzo, ...cns,
+        categoria:el('sellCat').value,
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
@@ -5117,7 +5239,9 @@ async function publish(){
         hintPubblicazione = {id:'npubverifica', annuncio:nuovoId};
     }
   }
-  ['sellTitle','sellPrice','sellZone','sellDesc'].forEach(i=>el(i).value='');
+  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
+  el('sellConsegna').value = ''; el('sellTaglia').value = '';
+  aggiornaConsegnaForm();
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
   toast('⚡ Annuncio pubblicato!'); setCat('Tutto');
@@ -5133,6 +5257,7 @@ async function publish(){
 async function salvaModifica(t, p){
   const id = editandoId;
   if (editandoNostr) { await salvaModificaFirmata(t, p); return; }
+  const cns = consegnaPayload();
   if (DEMO) {
     const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
     if (l){
@@ -5140,12 +5265,14 @@ async function salvaModifica(t, p){
         price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
         valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
         cat:el('sellCat').value,
+        consegna:cns.consegna, sped:cns.spedizione_sats||0,
+        spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
         zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
   } else {
     const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
-    const body = {titolo:t, ...prezzo, categoria:el('sellCat').value,
+    const body = {titolo:t, ...prezzo, ...cns, categoria:el('sellCat').value,
       zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
     if (sellFoto.length) body.foto = sellFoto;
     const r = await fetch(`${API_BASE}/listings/${id}/modifica`, {
