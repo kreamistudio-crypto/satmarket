@@ -723,7 +723,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ritiro | entrambe — catalogo `MODALITA_CONSEGNA`),
   `spedizione_sats`/`spedizione_eur` (costo nella VALUTA del listino
   con l'equivalente sats al cambio di pubblicazione, il patto di
-  prezzo_sats; 0 con modalità che spedisce = gratis) e `taglia_pacco`
+  prezzo_sats; 0 con modalità che spedisce = gratis; sul listino sats
+  il form accetta anche l'INSERIMENTO in euro — toggle `spedValuta`
+  sul campo + stima live «3,80 € ≈ 7 000 sats» — e il server converte
+  alla pubblicazione salvando SOLO sats, spedizione_eur resta 0: 503
+  onesto se il cambio manca, con l'invito a scrivere sats;
+  l'invariante niente-cambio-all'acquisto non si tocca) e `taglia_pacco`
   (`TAGLIE_PACCO` busta/piccolo/medio/grande/ingombrante, con gli
   esempi concreti nel form: servirà alle etichette corriere future);
   giudice unico `consegna_da_payload` (sconosciuto → '', mai 400 —
