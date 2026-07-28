@@ -1053,6 +1053,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   conto del messaggio NON usa `conta_pionieri` (la sua cache di 60s
   direbbe «siamo in 24» mentre presenti il 25°). Interruttore
   `AVVISI_ISCRITTI`.
+  Sollecito degli incassi fermi (lug 2026): un ordine 'confirmed'
+  senza metodo d'incasso riceveva UNA sola notifica — ignorata, i
+  sats restavano congelati nel silenzio. Ora l'orologio
+  (`sollecita_incassi`) bussa al venditore ogni
+  SOLLECITO_INCASSO_GIORNI (7; 0 = spento) con importo e strade
+  (address o invoice); l'attesa riparte da MAX(aggiornato,
+  sollecito_incasso_il). Dopo SOLLECITO_INCASSO_MAX (4) solleciti
+  ignorati, UNA segnalazione 🧊 ai moderatori e poi silenzio: il caso
+  e' in mani umane (contatore oltre il tetto = mai piu' riproposto).
+  Colonne `ordini.sollecito_incasso_il`/`solleciti_incasso`
+  (migrazione idempotente). Qui i sats non si muovono mai, solo
+  parole; notifiche DOPO il commit, fail-open nell'orologio.
+  Polso degli ordini per i moderatori (lug 2026):
+  `polso_ordini_admin(riga)` manda una riga quando un ordine nasce
+  (🛒 in verifica_pagamento, sats appena in cassaforte) o si chiude
+  (✅ released, ⚖️ disputa vinta dal venditore — `ordini.disputata`
+  decide la faccia —, ↩️ rimborso al compratore), sempre col conto
+  degli ordini ancora aperti = stati fuori da
+  creato/annullato/released/refunded. Il segnaposto {aperti} si
+  riempie con replace, MAI format (i titoli possono avere graffe).
+  Solo titolo e importi, mai nomi. Interruttore AVVISI_ORDINI_ADMIN,
+  fail-open totale; a ~60 utenti il tempo reale basta, col volume si
+  aggreghera' (pattern del drenatore promo).
   Redesign «mercatino di paese» (lug 2026, da Claude Design, solo
   CSS/markup): palette in `:root` — crema #FAF4E4, inchiostro #23282C,
   arancio ₿ #F7931A con i toni `--sats-deep/-text`, verde escrow
