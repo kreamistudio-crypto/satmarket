@@ -243,6 +243,41 @@ try:
 except ImportError:
     MAX_OFFERTE_ANNUNCIO = 3       # tentativi totali per compratore per annuncio
 
+# L'offerta lampo (lug 2026, modello Vinted «sconto ai follower»): il
+# venditore sconta a tempo TUTTO l'annuncio; chi l'ha nel barattolo
+# viene avvisato in modo anonimo. Lo sconto e' PUBBLICO (vale per
+# chiunque compri nella finestra) e a PERCENTUALE (neutro rispetto
+# alla valuta del listino, come le offerte). Non tocca mai il prezzo
+# del listino: il NIP-99 resta col prezzo pieno, per costruzione.
+try:
+    from config import LAMPO_ATTIVE
+except ImportError:
+    LAMPO_ATTIVE = True            # interruttore generale (spento = tutto come prima)
+try:
+    from config import LAMPO_SCONTI
+except ImportError:
+    LAMPO_SCONTI = [10, 20, 30]    # le percentuali proposte come chip
+try:
+    from config import LAMPO_MIN_PERCENTO
+except ImportError:
+    LAMPO_MIN_PERCENTO = 5         # sotto: uno sconto che non si nota
+try:
+    from config import LAMPO_MAX_PERCENTO
+except ImportError:
+    LAMPO_MAX_PERCENTO = 70        # sopra: si svende (freno di sicurezza)
+try:
+    from config import ORE_LAMPO_OPZIONI
+except ImportError:
+    ORE_LAMPO_OPZIONI = [6, 24, 48]   # le durate proposte
+try:
+    from config import MAX_LAMPO_SETTIMANA
+except ImportError:
+    MAX_LAMPO_SETTIMANA = 2        # lanci per annuncio in 7 giorni (freno)
+try:
+    from config import GIORNI_COLPO
+except ImportError:
+    GIORNI_COLPO = 7              # cooldown dell'avviso «ha fatto colpo» per annuncio
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -578,6 +613,18 @@ def init_db():
         ON offerte(compratore_id);
     CREATE INDEX IF NOT EXISTS idx_offerte_venditore
         ON offerte(venditore_id);
+    CREATE TABLE IF NOT EXISTS offerte_lampo(
+        -- lo STORICO dei lanci: la lampo attiva vive sulle colonne
+        -- annunci.lampo_* (una sola per annuncio, lettura pubblica
+        -- veloce), ma quelle si sovrascrivono e non contano il
+        -- passato — questo registro serve al tetto settimanale.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        annuncio_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        percento INTEGER, scadenza INTEGER, creato INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_lampo_annuncio
+        ON offerte_lampo(annuncio_id, creato);
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -675,7 +722,18 @@ def init_db():
                     "consegna TEXT DEFAULT ''",
                     "spedizione_sats INTEGER DEFAULT 0",
                     "spedizione_eur REAL DEFAULT 0",
-                    "taglia_pacco TEXT DEFAULT ''"):
+                    "taglia_pacco TEXT DEFAULT ''",
+                    # offerta lampo (lug 2026): lo sconto a tempo su
+                    # tutto l'annuncio. percento>0 e scadenza nel futuro
+                    # = attiva; oltre la scadenza torna prezzo pieno da
+                    # solo (la lettura gatea su scadenza, l'orologio
+                    # ripulisce). Non tocca mai prezzo_sats/prezzo_eur.
+                    # colpo_avvisato: memoria del cooldown dell'avviso
+                    # anonimo «ha fatto colpo» al venditore.
+                    "lampo_percento INTEGER DEFAULT 0",
+                    "lampo_scadenza INTEGER DEFAULT 0",
+                    "lampo_creato INTEGER DEFAULT 0",
+                    "lampo_colpo_avvisato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -710,6 +768,10 @@ def init_db():
     # keyset, chiavi (prezzo_sats, id). L'indice serve i due versi.
     con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_prezzo "
                 "ON annunci(stato, prezzo_sats, id)")
+    # Il filtro/ordinamento «⚡ In offerta» (lug 2026): keyset su
+    # (lampo_scadenza, id) per le lampo vive.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_lampo "
+                "ON annunci(stato, lampo_scadenza, id)")
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")

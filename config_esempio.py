@@ -63,6 +63,19 @@ ORE_PAGAMENTO_OFFERTA = 24   # tempo per pagare dopo l'accettazione
 MAX_OFFERTE_ANNUNCIO = 3     # tentativi totali per compratore per
                              # annuncio (una offerta attiva alla volta)
 
+# --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
+# Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
+# nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare
+# uno sconto a tempo. E' PUBBLICO (chiunque compra nella finestra paga
+# scontato) e a PERCENTUALE (non tocca mai il prezzo del listino).
+LAMPO_ATTIVE = True          # interruttore generale (False = spento)
+LAMPO_SCONTI = [10, 20, 30]  # le percentuali proposte come chip
+LAMPO_MIN_PERCENTO = 5       # sconto minimo consentito
+LAMPO_MAX_PERCENTO = 70      # sconto massimo consentito (anti-svendita)
+ORE_LAMPO_OPZIONI = [6, 24, 48]  # le durate proposte
+MAX_LAMPO_SETTIMANA = 2      # lanci per annuncio in 7 giorni
+GIORNI_COLPO = 7             # cooldown dell'avviso «ha fatto colpo»
+
 DB = "satmarket.db"
 
 # --- Import da Nostr (usato da importa_nostr.py) ---------------------
