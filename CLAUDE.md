@@ -790,6 +790,70 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   testa released = totale − protezione; checkbox «🚚 Solo con
   spedizione» nei filtri (in DEMO client-side in renderGrid); 🚚
   discreto nella meta della card — il prezzo in griglia resta pulito.
+  Offerte / contrattazione sul prezzo (lug 2026, modello Vinted; sara'
+  la base del futuro «Lotto», fase 3): NON una chat — macchina a stati
+  con al massimo UNA controproposta. Tabella `offerte` (annuncio,
+  parti, `valuta` fotografata dal listino, importo_sats/importo_eur
+  della proposta e contro_sats/contro_eur della controproposta — uno
+  dei due campi sempre 0; UN solo campo `scadenza` riscritto a ogni
+  transizione; `ordine_id` = ponte verso l'ordine). Stati: proposta →
+  controproposta → accettata → conclusa, più rifiutata / scaduta /
+  decaduta. REGOLA CARDINE: l'annuncio non si blocca mai — vince chi
+  paga per primo, le offerte rimaste vive decadono con la notifica di
+  garbo 🕊 (MAI al compratore vincente). L'accordo riguarda il SOLO
+  articolo: spedizione e protezione si sommano sopra come per ogni
+  ordine (protezione sull'articolo concordato). Leve config (pattern
+  try/except): OFFERTA_MINIMA_PERCENTO (50, minimo per ECCESSO sui
+  sats), ORE_RISPOSTA_OFFERTA (48), ORE_PAGAMENTO_OFFERTA (24),
+  MAX_OFFERTE_ANNUNCIO (3 tentativi totali per compratore per
+  annuncio, UNA attiva alla volta — count-guard senza await, patto
+  anti-doppione). Endpoint: `POST /api/listings/{id}/offerta` (importo
+  nella valuta del listino, virgola ammessa; ≥ listino = 400 «puoi
+  comprare direttamente»; qui il cambio non serve MAI: mai 503),
+  `POST /api/offerte/{id}/rispondi` (azione accetta|rifiuta|contro;
+  gate di ruolo per stato: proposta = venditore, controproposta =
+  compratore e il ping-pong finisce li'; contro > offerta e
+  ≤ listino; scadenza controllata anche inline), `GET
+  /api/me/offerte` (busta con le leve: il client non hardcoda cifre),
+  `offerte_da_agire` in /api/me e `offerta_minima_percento` nella
+  busta di prima pagina. L'acquisto: `compra()` con `offerta_id` =
+  stessa strada di sempre ma articolo alla cifra pattuita
+  (`_importo_accordo`: la contro se c'e', senno' la proposta; EUR
+  convertito alla invoice col cambio_ordine, drift/tetto/protezione
+  invariati); il legame `offerte.ordine_id` si scrive NELLA stessa
+  transazione dell'INSERT; invoice viva gia' in corso = 400 (pagare
+  la vecchia lascerebbe l'offerta orfana). `verifica_pagamento`:
+  l'offerta dell'ordine pagato → 'conclusa', TUTTE le altre vive
+  sull'annuncio → 'decaduta' (notifiche dopo il commit). Reaper e
+  annulla_ordine azzerano `ordine_id` (l'offerta resta accettata fino
+  alla SUA scadenza: si ripaga con invoice nuova). `scadenze_offerte`
+  nell'orologio: scadenza passata → 'scaduta', annuncio non piu'
+  attivo → 'decaduta' (copre le rimozioni senza ganci nei delete).
+  `modifica()` col prezzo cambiato fa decadere le PENDENTI (erano una
+  % di un prezzo che non esiste piu'); le ACCETTATE sopravvivono
+  (l'accordo e' stretto). Importati Nostr esclusi (contatto_nostr
+  pieno: il venditore-import non risponderebbe mai). `esegui_fusione`
+  migra le offerte e cancella le auto-trattative tra le due meta'.
+  Piu' offerte accettate possono coesistere: lecito, il confirm del
+  venditore lo dichiara («accettare non riserva l'oggetto»). Frontend:
+  «💰 Fai un'offerta» ULTIMO nella escrow-zone (non disturba il trucco
+  :first-of-type; nascosto su importati e con accordo gia' fatto),
+  foglio `#offertaSheet` (registrato in closeSheet) con miniatura+
+  titolo+listino, chip −10%/−20% precalcolati, campo nella valuta del
+  listino (virgola per EUR) e stima live «≈ N sats totali» (matematica
+  di totaleStima con l'articolo offerto, onesta senza cambio); sezione
+  «💰 Offerte» sopra gli ordini nella scheda Ordini (`renderOfferte`,
+  solo trattative VIVE, azioni inline Accetta/Controproponi/Rifiuta
+  con input che non si perde nei re-render, «⚡ Paga ora» per
+  l'accettata) + pallino `.off-dot` sul tasto Ordini quando una
+  offerta aspetta una MIA mossa; «Paga ora» RIAPRE il dettaglio, che
+  con l'accordo mostra il banner 🤝 e i totali pattuiti (`artStima`
+  dentro totaleStima) — pillole consegna, NWC, nota EUR ereditati
+  gratis; startBuy e compraSubito mandano `offerta_id` (0 = ignorato).
+  LESSICO (deciso lug 2026): la scheda per gli utenti si chiama
+  «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
+  confirm); gli id interni (go('affari'), #nav-affari, view-affari)
+  restano.
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -1731,7 +1795,18 @@ spedizione EUR, ritiro con auto-sblocco a 72h/10gg e annuncio
 storico, più il giro visivo in Chrome headless su chiaro e scuro; in
 produzione va rivisto dal vivo dentro Telegram, e quando la
 protezione si accenderà dal config vanno decisi i testi con la
-cifra).
+cifra); offerte e contrattazione sul prezzo (lug 2026, modello
+Vinted: foglio con chip −10%/−20% e stima live, una sola
+controproposta, accettazione = 24h per pagare col flusso di sempre
+alla cifra pattuita, l'annuncio non si blocca mai e vince chi paga,
+sezione «💰 Offerte» in testa alla scheda Ordini col pallino sul nav,
+leve config 50%/48h/24h/3, vedi Architettura — collaudato in locale
+con 51 verifiche TestClient sui quattro strati: giro pieno sats con
+controproposta, giro EUR con virgola e cambio_ordine, anti-abuso
+completo, decadenza per vendita, sweep delle scadenze, reaper con
+ripagamento, modifica prezzo, regressione dell'acquisto normale; in
+produzione va provato un giro vero dentro Telegram con le notifiche
+reali).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
