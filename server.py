@@ -3534,10 +3534,32 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     if a["venditore_id"] == user["id"]:
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
 
+    # La scelta della consegna, validata contro la modalita'
+    # dell'annuncio: il compratore non puo' chiedere cio' che il
+    # venditore non offre. Annuncio senza modalita' ('') = flusso
+    # storico, la scelta si ignora; 'entrambe' senza scelta (client
+    # vecchio in cache) = spedizione — e nessuna sorpresa, perche' il
+    # client mostra comunque i sats veri della risposta.
+    scelta = d.get("consegna", "")
+    if not a["consegna"]:
+        scelta = ""
+    elif a["consegna"] == "entrambe":
+        if scelta not in ("spedizione", "ritiro"):
+            scelta = "spedizione"
+    elif scelta and scelta != a["consegna"]:
+        con.close()
+        raise HTTPException(400, "Questo annuncio non prevede questa "
+                                 "modalità di consegna")
+    else:
+        scelta = a["consegna"]
+
     # Per gli annunci in EUR i sats si decidono ADESSO, al cambio
     # corrente: la invoice vive 15 minuti, e quella e' la durata del
     # prezzo bloccato. Se scade, il prossimo tentativo riconverte.
-    sats, cambio_ordine = a["prezzo_sats"], 0.0
+    # Articolo e spedizione si convertono INSIEME, allo stesso cambio;
+    # un annuncio tutto-sats non dipende mai dal cambio.
+    articolo, cambio_ordine = a["prezzo_sats"], 0.0
+    sped = a["spedizione_sats"] if scelta == "spedizione" else 0
     if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
         cambio_ordine = await cambio_btc_eur()
         if cambio_ordine <= 0:
@@ -3545,12 +3567,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             raise HTTPException(503, "Il cambio euro non è disponibile in "
                                      "questo momento: riprova tra qualche "
                                      "minuto")
-        sats = max(1, round(a["prezzo_eur"] / cambio_ordine * 100_000_000))
+        articolo = max(1, round(a["prezzo_eur"] / cambio_ordine * 100_000_000))
+        if scelta == "spedizione":
+            sped = round(a["spedizione_eur"] / cambio_ordine * 100_000_000)
         # Il tetto di rodaggio con +20% di tolleranza: la volatilita'
         # ordinaria passa, un crollo del cambio no — e il venditore
         # si ripara da solo ritoccando il prezzo (la modifica
-        # riconvalida al cambio di oggi).
-        if TETTO_SATS_ANNUNCIO and sats > TETTO_SATS_ANNUNCIO * 1.2:
+        # riconvalida al cambio di oggi). Il tetto guarda il solo
+        # articolo, come alla pubblicazione.
+        if TETTO_SATS_ANNUNCIO and articolo > TETTO_SATS_ANNUNCIO * 1.2:
             con.close()
             await notifica(a["venditore_id"],
                 f"📈 Il cambio si è mosso troppo: il tuo annuncio "
@@ -3561,20 +3586,34 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                      "l'annuncio è stato pubblicato: il "
                                      "venditore deve ritoccare il prezzo")
 
+    # La protezione acquisti: percentuale sul SOLO articolo, per
+    # difetto (mai un sat piu' del promesso), anche sul ritiro in zona
+    # (copre il deposito di garanzia, non il trasporto). Oggi la leva
+    # e' a 0: il ramo esiste ma non scatta. Il compratore paga il
+    # TOTALE nel deposito; al rilascio il venditore riceve
+    # articolo+spedizione e la protezione resta alla piattaforma.
+    prot = articolo * PROTEZIONE_PERCENTO // 100
+    totale = articolo + sped + prot
+
     inv = await crea_invoice_escrow(
-        sats, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
+        totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
-        "stato,payment_hash,creato,aggiornato,cambio_ordine) "
-        "VALUES(?,?,?,?,?,?,?,?,?)",
-        (a["id"], user["id"], a["venditore_id"], sats,
+        "stato,payment_hash,creato,aggiornato,cambio_ordine,"
+        "consegna_scelta,spedizione_sats,protezione_sats) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], int(time.time()), int(time.time()),
-         cambio_ordine))
+         cambio_ordine, scelta, sped, prot))
     con.commit()
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.close()
+    # prezzo_sats resta il TOTALE (i client di ieri leggono quello);
+    # le quote scomposte sono in piu', per il conto in chiaro.
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
-            "payment_hash": inv["payment_hash"], "prezzo_sats": sats}
+            "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
+            "articolo_sats": articolo, "spedizione_sats": sped,
+            "protezione_sats": prot, "consegna": scelta}
 
 
 @app.post("/api/orders/{ordine_id}/verifica-pagamento")
@@ -3639,7 +3678,10 @@ async def segna_spedito(ordine_id: int, req: Request,
     d = await leggi_json(req)
     corriere = (d.get("corriere") or "").strip()[:40]
     tracking = (d.get("tracking") or "").strip()[:60]
-    if corriere != "Consegna a mano" and not tracking:
+    # 'Ritiro in zona' e' il gemello di 'Consegna a mano' per gli
+    # ordini col ritiro scelto dal compratore: niente pacco, niente
+    # tracciamento — ma il timer di sblocco d'ufficio parte uguale.
+    if corriere not in ("Consegna a mano", "Ritiro in zona") and not tracking:
         raise HTTPException(400, "Inserisci il numero di tracciamento "
                                  "(o scegli 'Consegna a mano')")
     con = db()
@@ -3654,6 +3696,12 @@ async def segna_spedito(ordine_id: int, req: Request,
                  ordine_id))
     con.commit()
     con.close()
+    if corriere == "Ritiro in zona":
+        await notifica(o["compratore_id"],
+                       f"🤝 <b>Il venditore ha segnato la consegna a mano</b>. "
+                       f"Se hai ritirato l'oggetto, confermalo nella Mini App "
+                       f"per sbloccare i sats al venditore.")
+        return {"ok": True}
     dettaglio = (f"con <b>{corriere}</b>, tracciamento <b>{tracking}</b>"
                  if tracking else "in consegna a mano")
     await notifica(o["compratore_id"],
@@ -5652,7 +5700,10 @@ async def deposita_invoice(ordine_id: int, req: Request,
     o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
     if o and o["venditore_id"] == user["id"] \
             and o["stato"] in ("locked", "shipped", "confirmed"):
-        ruolo, atteso, colonna = "venditore", netto_venditore(o["prezzo_sats"]), \
+        # L'incasso del venditore: il totale meno la protezione (che
+        # resta alla piattaforma), cioe' articolo + spedizione.
+        ruolo, atteso, colonna = "venditore", \
+            netto_venditore(o["prezzo_sats"] - o["protezione_sats"]), \
             "invoice_venditore"
         spiegazione = f"{atteso} sats (il tuo incasso)"
     elif o and o["compratore_id"] == user["id"] and o["stato"] == "refund":
@@ -5713,7 +5764,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             return {"ok": o["stato"] == "released", "stato": o["stato"]}
         v = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                         (o["venditore_id"],)).fetchone()
-        netto = netto_venditore(o["prezzo_sats"])
+        # Al venditore va articolo + spedizione: la protezione del
+        # compratore resta in cassaforte, alla piattaforma. Sugli
+        # ordini di ieri la quota e' 0 e non cambia nulla.
+        netto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
 
         bolt11 = o["invoice_venditore"]
         if not bolt11 and v and v["ln_address"]:
@@ -5798,7 +5852,10 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             return {"ok": o["stato"] == "refunded", "stato": o["stato"]}
         c_utente = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                                (o["compratore_id"],)).fetchone()
-        importo = o["prezzo_sats"]      # rimborso integrale, zero commissioni
+        # Rimborso integrale: articolo, spedizione e protezione tornano
+        # tutti al compratore (l'affare e' saltato, la protezione non
+        # si e' consumata) — e' il totale, zero commissioni.
+        importo = o["prezzo_sats"]
 
         bolt11 = o["invoice_rimborso"]
         if not bolt11 and c_utente and c_utente["ln_address"]:
