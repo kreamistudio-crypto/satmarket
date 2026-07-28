@@ -222,6 +222,21 @@ try:
 except ImportError:
     AVVISI_ISCRITTI_MAX_ORA = 6
 
+# Il sollecito degli incassi fermi (lug 2026): un ordine 'confirmed'
+# senza metodo d'incasso tiene i sats in cassaforte, e la notifica
+# della conferma parte una volta sola. Ogni SOLLECITO_INCASSO_GIORNI
+# l'orologio ricorda al venditore importo e strade per incassare;
+# dopo SOLLECITO_INCASSO_MAX solleciti ignorati, UNA segnalazione ai
+# moderatori e poi silenzio: il caso e' in mani umane.
+try:
+    from config import SOLLECITO_INCASSO_GIORNI
+except ImportError:
+    SOLLECITO_INCASSO_GIORNI = 7   # 0 = solleciti spenti
+try:
+    from config import SOLLECITO_INCASSO_MAX
+except ImportError:
+    SOLLECITO_INCASSO_MAX = 4      # poi la palla passa ai moderatori
+
 # Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
 # propone una cifra, il venditore accetta/rifiuta/contropropone UNA
 # volta, l'accordo da' il diritto di comprare a quel prezzo entro la
@@ -501,6 +516,8 @@ def init_db():
         spedito_il INTEGER DEFAULT 0,      -- per l'auto-sblocco a 10 giorni
         consegnato INTEGER DEFAULT 0,      -- per la finestra delle 72 ore
         sollecito_il INTEGER DEFAULT 0,    -- ultimo promemoria del venditore
+        sollecito_incasso_il INTEGER DEFAULT 0, -- ultimo promemoria «incassa!»
+        solleciti_incasso INTEGER DEFAULT 0,    -- quanti ne ha ignorati
         creato INTEGER, aggiornato INTEGER
     );
     CREATE TABLE IF NOT EXISTS sessioni(
@@ -784,6 +801,11 @@ def init_db():
                     "spedito_il INTEGER DEFAULT 0",
                     "consegnato INTEGER DEFAULT 0",
                     "sollecito_il INTEGER DEFAULT 0",
+                    # il sollecito degli incassi fermi (lug 2026):
+                    # quando e' partito l'ultimo e quanti ne sono
+                    # gia' partiti (al tetto la palla va ai moderatori)
+                    "sollecito_incasso_il INTEGER DEFAULT 0",
+                    "solleciti_incasso INTEGER DEFAULT 0",
                     # disputata: 1 se sull'ordine e' stata aperta una
                     # disputa, anche se poi risolta (lo stato viene
                     # sovrascritto: senza questa traccia il distintivo
@@ -7511,6 +7533,65 @@ async def controlla_scadenze():
         await _sblocca_sats(oid, automatico=True)
 
 
+async def sollecita_incassi():
+    """Il promemoria degli incassi fermi: un ordine 'confirmed' senza
+    metodo d'incasso non fa rumore da solo — la notifica della
+    conferma parte una volta sola, e se il venditore la ignora i sats
+    restano congelati nel silenzio. Ogni SOLLECITO_INCASSO_GIORNI gli
+    si ricorda importo e strade (Lightning address o invoice); dopo
+    SOLLECITO_INCASSO_MAX solleciti ignorati parte UNA segnalazione ai
+    moderatori, poi silenzio: il caso e' in mani umane. Qui i sats non
+    si muovono mai, solo parole; le notifiche partono DOPO il commit."""
+    if SOLLECITO_INCASSO_GIORNI <= 0:
+        return                       # leva a zero = funzione spenta
+    adesso = int(time.time())
+    passo = SOLLECITO_INCASSO_GIORNI * 86400
+    con = db()
+    # L'attesa riparte dall'ultimo segno di vita: l'ingresso in
+    # 'confirmed' (aggiornato) o il sollecito precedente. Chi ha gia'
+    # passato la segnalazione ai moderatori (contatore oltre il tetto)
+    # non compare piu'.
+    righe = con.execute(
+        "SELECT o.id, o.venditore_id, o.prezzo_sats, o.protezione_sats, "
+        "o.solleciti_incasso, a.titolo FROM ordini o "
+        "JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.stato='confirmed' AND o.solleciti_incasso <= ? "
+        "AND MAX(o.aggiornato, o.sollecito_incasso_il) < ?",
+        (SOLLECITO_INCASSO_MAX, adesso - passo)).fetchall()
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        con.execute("UPDATE ordini SET sollecito_incasso_il=?, "
+                    "solleciti_incasso=solleciti_incasso+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        netto = netto_venditore(r["prezzo_sats"] - r["protezione_sats"])
+        titolo = r["titolo"][:60]
+        try:
+            if r["solleciti_incasso"] < SOLLECITO_INCASSO_MAX:
+                await notifica(r["venditore_id"],
+                    f"💰 <b>Hai sats da incassare!</b> L'affare «{titolo}» "
+                    f"è concluso e i tuoi <b>{netto} sats</b> ti aspettano "
+                    f"nel deposito di garanzia. Per riceverli apri l'ordine "
+                    f"nella Mini App e imposta il tuo Lightning address "
+                    f"(incassi automatici, per sempre) oppure incolla una "
+                    f"invoice di esattamente quell'importo. ⚡")
+            else:
+                # Il tetto e' passato da un altro giro di attesa:
+                # M solleciti ignorati, tocca a un umano.
+                await notifica_admin(
+                    f"🧊 <b>Incasso fermo:</b> ordine #{r['id']} "
+                    f"(«{titolo}»), <b>{netto} sats</b> in cassaforte. "
+                    f"Il venditore ha ignorato {SOLLECITO_INCASSO_MAX} "
+                    f"solleciti in ~{(SOLLECITO_INCASSO_MAX + 1) * SOLLECITO_INCASSO_GIORNI} "
+                    f"giorni: serve un occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Sollecito incasso saltato (#{r['id']}): {e}")
+
+
 # --- L'import periodico da Nostr ------------------------------------
 # Ogni ora l'orologio riusa la logica di importa_nostr.py per tenere
 # freschi gli annunci dei venditori consenzienti (per ora uno solo:
@@ -7652,6 +7733,10 @@ async def orologio():
             await controlla_scadenze()
         except Exception as e:
             print(f"Orologio sblocchi, errore (riprovo tra 10 min): {e}")
+        try:
+            await sollecita_incassi()
+        except Exception as e:
+            print(f"⚠️ Solleciti incasso saltati: {e}")
         try:
             await scadenze_offerte()
         except Exception as e:

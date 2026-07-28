@@ -47,6 +47,11 @@ PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE
                              # 0 = spenta
 ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna
 GIORNI_AUTO_SBLOCCO = 10     # sblocco d'ufficio dopo la spedizione
+SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot
+                             # giorni un promemoria al venditore
+                             # (0 = solleciti spenti)
+SOLLECITO_INCASSO_MAX = 4    # solleciti ignorati prima che il caso
+                             # venga segnalato ai moderatori
 TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
                              # limite (default). Mettici es. 100_000 per
                              # accendere il tetto; per gli annunci in EUR
