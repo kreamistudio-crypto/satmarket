@@ -3580,10 +3580,15 @@ function renderOfferte(){
             <button class="btn danger-ghost" style="margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
           </div>
           <div id="controBox_${o.id}" style="display:none;margin-top:8px">
-            <div style="display:flex;gap:10px;align-items:center">
-              <input id="contro_${o.id}" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra" style="flex:1;min-width:0">
-              <span style="font-weight:800;color:var(--muted)">${o.valuta==='eur'?'€':'sats'}</span>
-              <button class="btn primary" style="margin:0" onclick="rispondiOfferta(${o.id},'contro')">Invia</button>
+            <!-- Il campo LARGO e usabile, il bottone proporzionato: il
+                 .btn ha width:100% e senza flex:none schiacciava il campo
+                 (basis 0) a una fettina non toccabile — stessa cura del
+                 prezzo negli avvisi di ricerca -->
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="contro_${o.id}" type="text" inputmode="${o.valuta==='eur'?'decimal':'numeric'}" autocomplete="off" placeholder="La tua cifra"
+                     style="flex:1;min-width:0;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;padding:12px 14px;font:inherit;font-weight:600;outline:none">
+              <span style="font-weight:800;color:var(--muted);flex:none">${o.valuta==='eur'?'€':'sats'}</span>
+              <button class="btn primary" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="rispondiOfferta(${o.id},'contro')">Invia</button>
             </div>
           </div>`;
       }
