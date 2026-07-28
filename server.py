@@ -4082,8 +4082,26 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
             return {"stato": "locked"}
         con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
                     (o["annuncio_id"],))
-        a = con.execute("SELECT contatto_nostr FROM annunci WHERE id=?",
-                        (o["annuncio_id"],)).fetchone()
+        a = con.execute("SELECT contatto_nostr, titolo FROM annunci "
+                        "WHERE id=?", (o["annuncio_id"],)).fetchone()
+        # Le offerte su questo annuncio si chiudono col pagamento:
+        # quella che ha generato l'ordine si conclude, tutte le altre
+        # ancora vive decadono — l'annuncio non si e' mai bloccato,
+        # e ha vinto chi ha pagato per primo.
+        adesso = int(time.time())
+        con.execute("UPDATE offerte SET stato='conclusa', aggiornato=? "
+                    "WHERE ordine_id=? AND stato='accettata'",
+                    (adesso, ordine_id))
+        decadute = con.execute(
+            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
+            "AND stato IN ('proposta','controproposta','accettata')",
+            (o["annuncio_id"],)).fetchall()
+        if decadute:
+            con.execute(
+                "UPDATE offerte SET stato='decaduta', aggiornato=? "
+                "WHERE annuncio_id=? AND stato IN "
+                "('proposta','controproposta','accettata')",
+                (adesso, o["annuncio_id"]))
         con.commit()
         # Anche la piazza Nostr deve sapere che l'oggetto e' andato
         asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "sold",
@@ -4098,6 +4116,17 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
                     "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
                     "client, così nessun altro proverà a comprarlo lì.")
         await notifica(o["venditore_id"], msg)
+        # Il garbo verso chi restava in trattativa: l'oggetto e' andato.
+        # MAI al compratore che ha appena pagato: se aveva un'altra
+        # offerta sua, decade in silenzio (dirgli «venduto a qualcun
+        # altro» sarebbe falso).
+        for riga in decadute:
+            if riga["compratore_id"] == o["compratore_id"]:
+                continue
+            await notifica(riga["compratore_id"],
+                f"🕊 «{a['titolo'][:60]}» è appena stato venduto a "
+                f"qualcun altro: la tua offerta decade. In vetrina ci "
+                f"sono altre occasioni che aspettano!")
         con.close()
         return {"stato": "locked"}
     con.close()
