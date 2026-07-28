@@ -721,14 +721,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   spedizione. Sull'annuncio: colonne `consegna` ('' = non specificata,
   cioè annunci storici e importati col flusso di sempre | spedizione |
   ritiro | entrambe — catalogo `MODALITA_CONSEGNA`),
-  `spedizione_sats`/`spedizione_eur` (costo nella VALUTA del listino
-  con l'equivalente sats al cambio di pubblicazione, il patto di
-  prezzo_sats; 0 con modalità che spedisce = gratis; sul listino sats
-  il form accetta anche l'INSERIMENTO in euro — toggle `spedValuta`
-  sul campo + stima live «3,80 € ≈ 7 000 sats» — e il server converte
-  alla pubblicazione salvando SOLO sats, spedizione_eur resta 0: 503
-  onesto se il cambio manca, con l'invito a scrivere sats;
-  l'invariante niente-cambio-all'acquisto non si tocca) e `taglia_pacco`
+  `spedizione_sats`/`spedizione_eur` (0 con modalità che spedisce =
+  gratis). TRE semantiche del costo, decise dal venditore (lug 2026,
+  l'ancora all'euro ha SUPERATO la conversione alla pubblicazione):
+  1) listino sats + costo in sats = FISSO, qualunque cosa faccia il
+  cambio; 2) listino sats + costo scritto in EURO (toggle `spedValuta`
+  sul campo, che decide la SEMANTICA e non la comodità: l'hint lo
+  dice) = ANCORATO — si salva spedizione_eur così com'è (sped_sats
+  resta 0, niente cambio alla pubblicazione) e diventa sats SOLO in
+  compra() col cambio corrente, registrato in `cambio_ordine`: i
+  «5 €» del venditore valgono sempre 5 €; senza cambio all'acquisto
+  503 onesto SOLO per la scelta spedizione, il ritiro resta sempre
+  acquistabile e l'articolo sats non dipende mai dal cambio; i sats
+  espliciti battono l'ancora; 3) listino EUR = tutto ancorato per
+  natura, articolo e spedizione convertiti INSIEME all'acquisto.
+  In vetrina/dettaglio il controvalore sats dell'ancorato è una STIMA
+  live («≈», `satsSpedizione`/`spedTesto` keyed su spedEur>0, ripiego
+  onesto in € se il cambio del client manca; prefisso ≈ dei bottoni
+  via `stimaCirca`); il valore vero si fissa alla creazione
+  dell'ordine. Nel NIP-99 spedizione_eur piena parla euro. Gli annunci
+  del breve periodo «convertito alla pubblicazione» hanno
+  spedizione_eur=0 e restano fissi (caso 1). E `taglia_pacco`
   (`TAGLIE_PACCO` busta/piccolo/medio/grande/ingombrante, con gli
   esempi concreti nel form: servirà alle etichette corriere future);
   giudice unico `consegna_da_payload` (sconosciuto → '', mai 400 —
