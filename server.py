@@ -2487,6 +2487,7 @@ def categoria_tollerante(c: str) -> str:
 CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
     "a.valuta, a.prezzo_eur, "
+    "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
     "a.foto, a.contatto_nostr, a.creato, "
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
@@ -2604,6 +2605,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         cursore: str = "", ordina: str = "",
                         prezzo_min: float = 0, prezzo_max: float = 0,
                         valuta_filtro: str = "sats",
+                        solo_spedizione: int = 0,
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -2614,6 +2616,11 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
     if cat and cat != "Tutto":
         dove += " AND a.categoria=?"
         par.append(cat)
+    if solo_spedizione:
+        # Il filtro promette un costo di spedizione DICHIARATO: gli
+        # annunci storici ('') restano fuori finche' il venditore non
+        # si dichiara con una modifica.
+        dove += " AND a.consegna IN ('spedizione','entrambe')"
     if q.strip():
         # Ricerca semplice per la vetrina anonima (l'AI resta riservata
         # agli autenticati): LIKE su titolo, descrizione e zona.
@@ -2672,6 +2679,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # disegna la riga.
         if CONTATORE_UTENTI:
             risposta["pionieri"] = conta_pionieri(con)
+        # La percentuale della protezione acquisti: cosi' la stima del
+        # conto nel client non hardcoda mai la cifra (oggi 0).
+        risposta["protezione_percento"] = PROTEZIONE_PERCENTO
     con.close()
     return risposta
 
@@ -4855,9 +4865,24 @@ def evento_annuncio(a: dict, status: str) -> dict:
         tags.append(["location", a["zona"]])
     for url in _foto_url_nostr(a.get("foto", "")):
         tags.append(["image", url])
+    # La consegna nel content, non nei tag: nessun tag nuovo da far
+    # digerire a importa_nostr.py o ai client altrui.
+    if a.get("consegna") in ("spedizione", "entrambe"):
+        if a.get("valuta") == "eur" and a.get("spedizione_eur"):
+            consegna_txt = f" — spedizione: {a['spedizione_eur']:.2f} EUR"
+        elif a.get("spedizione_sats"):
+            consegna_txt = f" — spedizione: {a['spedizione_sats']} sats"
+        else:
+            consegna_txt = " — spedizione gratuita"
+        if a.get("consegna") == "entrambe":
+            consegna_txt += " o ritiro in zona"
+    elif a.get("consegna") == "ritiro":
+        consegna_txt = " — solo ritiro in zona"
+    else:
+        consegna_txt = ""
     content = ((a["descrizione"] or a["titolo"]).strip() +
                f"\n\nPrezzo: {prezzo_txt} — zona: "
-               f"{a.get('zona') or 'Italia'}"
+               f"{a.get('zona') or 'Italia'}{consegna_txt}"
                f"\n\n🫙⚡ In vendita su Barattolo, il mercatino in sats "
                f"con escrow Lightning: {URL_PUBBLICO} · {LINK_BOT}")
     return firma_evento(30402, tags, content)
@@ -6247,14 +6272,15 @@ def _purga_lavori():
 
 
 MODELLO_IMPORT = (
-    "titolo;descrizione;prezzo;valuta;categoria;zona;foto\n"
+    "titolo;descrizione;prezzo;valuta;categoria;zona;foto;"
+    "consegna;spedizione;taglia\n"
     "Tastiera meccanica 60%;Come nuova, switch rossi, scatola "
-    "originale;35000;sats;Elettronica;Milano;\n"
+    "originale;35000;sats;Elettronica;Milano;;spedizione;450;piccolo\n"
     "Giacca in pelle vintage;Taglia M, vera pelle anni 90;45,00;eur;"
     "Abbigliamento;Roma;https://esempio.it/giacca-fronte.jpg|"
-    "https://esempio.it/giacca-retro.jpg\n"
+    "https://esempio.it/giacca-retro.jpg;entrambe;5,50;busta\n"
     "Trapano avvitatore Bosch;Con due batterie e valigetta;80000;sats;"
-    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg\n")
+    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio\n")
 
 
 @app.get("/api/import/modello")
@@ -6456,6 +6482,19 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                      indice_zip[os.path.basename(v.replace("\\", "/"))
                                 .lower()]))
 
+        # Consegna, spedizione e taglia: colonne facoltative, giudice
+        # unico di pubblica() — i valori sconosciuti diventano annuncio
+        # senza modalita', mai uno scarto (i CSV di ieri non le hanno)
+        sped_testo = cella(r, "spedizione").replace(" ", "").replace(",", ".")
+        payload_consegna = {"consegna": cella(r, "consegna").lower(),
+                            "taglia_pacco": cella(r, "taglia").lower()}
+        if valuta == "eur":
+            payload_consegna["spedizione_eur"] = sped_testo or 0
+        else:
+            payload_consegna["spedizione_sats"] = sped_testo or 0
+        consegna, sped_sats, sped_eur, taglia = \
+            await consegna_da_payload(payload_consegna, valuta)
+
         # Moderazione strato 1, su TUTTE le righe, prima della conferma
         violata = controlla_vietato(titolo, descrizione)
         if violata:
@@ -6468,6 +6507,8 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                       "categoria": categoria_tollerante(cella(r, "categoria")),
                       "zona": zona, "valuta": valuta,
                       "prezzo_sats": prezzo_sats, "prezzo_eur": prezzo_eur,
+                      "consegna": consegna, "spedizione_sats": sped_sats,
+                      "spedizione_eur": sped_eur, "taglia_pacco": taglia,
                       "foto": foto})
 
     if not righe:
@@ -6550,11 +6591,15 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
     lat, lon = coordinate_da_zona(riga["zona"])
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
+        "consegna,spedizione_sats,spedizione_eur,taglia_pacco,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga["prezzo_sats"], riga["zona"],
-         riga["valuta"], riga["prezzo_eur"], lat, lon, int(time.time())))
+         riga["valuta"], riga["prezzo_eur"], lat, lon,
+         riga.get("consegna", ""), riga.get("spedizione_sats", 0),
+         riga.get("spedizione_eur", 0), riga.get("taglia_pacco", ""),
+         int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
