@@ -3757,6 +3757,145 @@ def mie_offerte(x_tg_init_data: str = Header(""),
             "max_offerte": MAX_OFFERTE_ANNUNCIO}
 
 
+@app.post("/api/offerte/{offerta_id}/rispondi")
+async def rispondi_offerta(offerta_id: int, req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """La mossa sull'offerta. Su una proposta muove il VENDITORE
+    (accetta, rifiuta o fa la sua UNICA controproposta); su una
+    controproposta muove il COMPRATORE (accetta o rifiuta, il
+    ping-pong finisce qui). Accettare apre la finestra di pagamento —
+    ma non riserva l'oggetto: l'annuncio resta in vetrina."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    azione = d.get("azione", "")
+    con = db()
+    off = con.execute(
+        "SELECT o.*, a.stato AS stato_annuncio, a.titolo, "
+        "a.prezzo_sats AS listino_sats, a.prezzo_eur AS listino_eur "
+        "FROM offerte o JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.id=?", (offerta_id,)).fetchone()
+    if not off:
+        con.close()
+        raise HTTPException(404, "Offerta non trovata")
+    adesso = int(time.time())
+    # La scadenza si controlla anche qui, non solo nell'orologio: chi
+    # risponde a un'offerta gia' morta merita un no onesto subito.
+    if off["stato"] in STATI_OFFERTA_VIVI and 0 < off["scadenza"] < adesso:
+        con.execute("UPDATE offerte SET stato='scaduta', aggiornato=? "
+                    "WHERE id=?", (adesso, offerta_id))
+        con.commit()
+        con.close()
+        raise HTTPException(400, "Questa offerta è scaduta")
+    # Chi puo' fare cosa dipende dallo stato: il protocollo e' rigido
+    # apposta (non e' una chat).
+    if off["stato"] == "proposta":
+        chi_muove, ammesse = off["venditore_id"], ("accetta", "rifiuta",
+                                                   "contro")
+    elif off["stato"] == "controproposta":
+        chi_muove, ammesse = off["compratore_id"], ("accetta", "rifiuta")
+    else:
+        con.close()
+        raise HTTPException(400, "Questa offerta è già chiusa")
+    if user["id"] != chi_muove or azione not in ammesse:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+
+    titolo = off["titolo"][:60]
+    link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
+    cifra_proposta = _cifra_offerta(off["valuta"], off["importo_sats"],
+                                    off["importo_eur"])
+
+    if azione == "accetta":
+        # L'annuncio deve essere ancora in vetrina: su uno gia' venduto
+        # o rimosso l'accordo non ha piu' oggetto.
+        if off["stato_annuncio"] != "attivo":
+            con.execute("UPDATE offerte SET stato='decaduta', aggiornato=? "
+                        "WHERE id=?", (adesso, offerta_id))
+            con.commit()
+            con.close()
+            raise HTTPException(400, "L'annuncio non è più disponibile")
+        con.execute("UPDATE offerte SET stato='accettata', scadenza=?, "
+                    "aggiornato=? WHERE id=?",
+                    (adesso + ORE_PAGAMENTO_OFFERTA * 3600, adesso,
+                     offerta_id))
+        con.commit()
+        con.close()
+        if off["stato"] == "proposta":
+            await notifica(off["compratore_id"],
+                f"🎉 <b>Offerta accettata!</b> Puoi comprare «{titolo}» a "
+                f"{cifra_proposta}: hai {ORE_PAGAMENTO_OFFERTA} ore per "
+                f"pagare dalla scheda Ordini. I tuoi sats finiscono nel "
+                f"deposito di garanzia, come sempre. Occhio: l'annuncio "
+                f"resta in vetrina, se qualcuno paga il prezzo pieno prima "
+                f"di te l'offerta decade.{link}")
+        else:
+            contro = _cifra_offerta(off["valuta"], off["contro_sats"],
+                                    off["contro_eur"])
+            await notifica(off["venditore_id"],
+                f"🤝 La tua controproposta di {contro} per «{titolo}» è "
+                f"stata accettata: l'acquirente ha "
+                f"{ORE_PAGAMENTO_OFFERTA} ore per pagare. Ti avvisiamo "
+                f"appena i sats sono nel deposito di garanzia.")
+        return {"ok": True, "stato": "accettata"}
+
+    if azione == "rifiuta":
+        con.execute("UPDATE offerte SET stato='rifiutata', scadenza=0, "
+                    "aggiornato=? WHERE id=?", (adesso, offerta_id))
+        con.commit()
+        con.close()
+        if off["stato"] == "proposta":
+            await notifica(off["compratore_id"],
+                f"Il venditore ha rifiutato la tua offerta di "
+                f"{cifra_proposta} per «{titolo}». Se vuoi puoi riprovare "
+                f"con una cifra diversa, o comprare a prezzo pieno.{link}")
+        else:
+            await notifica(off["venditore_id"],
+                f"L'acquirente ha rifiutato la tua controproposta per "
+                f"«{titolo}». L'annuncio resta in vetrina come sempre.")
+        return {"ok": True, "stato": "rifiutata"}
+
+    # Controproposta: la cifra del venditore, sopra l'offerta ricevuta
+    # e mai sopra il listino (a quel punto tanto vale il prezzo pieno).
+    grezzo = str(d.get("importo", "")).strip()
+    contro_sats, contro_eur = 0, 0.0
+    if off["valuta"] == "eur":
+        try:
+            contro_eur = round(float(grezzo.replace(",", ".")), 2)
+        except ValueError:
+            contro_eur = 0.0
+        contro, offerto, listino = (contro_eur, off["importo_eur"],
+                                    off["listino_eur"])
+    else:
+        try:
+            contro_sats = int(float(grezzo))
+        except ValueError:
+            contro_sats = 0
+        contro, offerto, listino = (contro_sats, off["importo_sats"],
+                                    off["listino_sats"])
+    if contro <= offerto:
+        con.close()
+        raise HTTPException(400, "La controproposta deve superare "
+                                 "l'offerta ricevuta — altrimenti "
+                                 "accettala 🙂")
+    if contro > listino:
+        con.close()
+        raise HTTPException(400, "La controproposta non può superare il "
+                                 "prezzo dell'annuncio")
+    con.execute("UPDATE offerte SET stato='controproposta', contro_sats=?, "
+                "contro_eur=?, scadenza=?, aggiornato=? WHERE id=?",
+                (contro_sats, contro_eur,
+                 adesso + ORE_RISPOSTA_OFFERTA * 3600, adesso, offerta_id))
+    con.commit()
+    con.close()
+    await notifica(off["compratore_id"],
+        f"🤝 <b>Controproposta!</b> Per «{titolo}» il venditore ti propone "
+        f"{_cifra_offerta(off['valuta'], contro_sats, contro_eur)} (avevi "
+        f"offerto {cifra_proposta}). Accetta o rifiuta dalla scheda Ordini "
+        f"entro {ORE_RISPOSTA_OFFERTA} ore.{link}")
+    return {"ok": True, "stato": "controproposta"}
+
+
 # ---------------------- API: ORDINI / ESCROW ------------------------
 
 @app.post("/api/orders")
