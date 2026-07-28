@@ -1221,7 +1221,8 @@
           <option value="entrambe">📦🤝 Spedizione o ritiro in zona</option>
         </select></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
-        <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0"><button type="button" class="suffix" id="sellSpedCur" tabindex="-1" style="pointer-events:none">sats</button></div>
+        <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
+        <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. 0&nbsp;= spedizione gratuita, inclusa nel prezzo.</div></div>
       <div class="field" id="sellTagliaField" style="display:none"><label>Taglia del pacco</label>
         <select id="sellTaglia">
@@ -5087,14 +5088,48 @@ function impostaSellValuta(v){
     inp.inputMode = 'numeric'; inp.placeholder = '80 000';
     if (hint) hint.textContent = '';
   }
-  /* il costo di spedizione parla la stessa valuta del listino */
-  const sped = el('sellSped'), spedCur = el('sellSpedCur');
-  if (sped && spedCur){
-    spedCur.textContent = v==='eur' ? '€' : 'sats';
-    sped.step = v==='eur' ? '0.01' : '1';
-    sped.inputMode = v==='eur' ? 'decimal' : 'numeric';
-    sped.placeholder = v==='eur' ? '0,00' : '0';
-  }
+  /* il costo di spedizione segue il listino; cambiare listino
+     riporta il campo alla sua valuta di default */
+  spedValuta = v==='eur' ? 'eur' : 'sats';
+  aggiornaSpedCampo();
+}
+/* Sul listino sats il costo di spedizione si puo' SCRIVERE in euro
+   (i corrieri fatturano in euro): il salvato resta SEMPRE sats,
+   convertiti dal server alla pubblicazione — il patto del prezzo,
+   mai una conversione all'acquisto. Col listino in euro non c'e'
+   scelta: il campo e' in euro per natura. */
+let spedValuta = 'sats';
+function toggleSpedCur(){
+  if (sellValuta !== 'sats') return;
+  haptic();
+  spedValuta = spedValuta==='sats' ? 'eur' : 'sats';
+  el('sellSped').value = '';
+  aggiornaSpedCampo();
+}
+function aggiornaSpedCampo(){
+  const inp = el('sellSped'), btn = el('sellSpedCur');
+  if (!inp || !btn) return;
+  const inEur = spedValuta==='eur';
+  /* col listino sats il suffisso e' un toggle vero, col listino
+     in euro e' solo un'etichetta */
+  btn.textContent = sellValuta==='sats' ? (inEur ? '€ ⇄' : 'sats ⇄') : '€';
+  btn.style.pointerEvents = sellValuta==='sats' ? '' : 'none';
+  inp.step = inEur ? '0.01' : '1';
+  inp.inputMode = inEur ? 'decimal' : 'numeric';
+  inp.placeholder = inEur ? '0,00' : '0';
+  aggiornaSpedHint();
+}
+/* La stima live «3,80 € ≈ 7 000 sats» mentre il venditore scrive:
+   il numero vero lo fissa il server alla pubblicazione. */
+function aggiornaSpedHint(){
+  const h = el('sellSpedHint');
+  if (!h) return;
+  if (sellValuta==='sats' && spedValuta==='eur'){
+    const e = eurCampo('sellSped');
+    h.textContent = (e>0 && cambioVivo)
+      ? `${fmtEur(e)} € ≈ ${fmt(Math.round(e/eurPerSat))} sats — si salva in sats, al cambio della pubblicazione`
+      : 'Scrivi il costo in euro: alla pubblicazione diventa sats, al cambio del momento';
+  } else h.textContent = '';
 }
 /* parseFloat non capisce la virgola italiana: gliela traduciamo */
 const eurCampo = id =>
@@ -5108,12 +5143,15 @@ function aggiornaConsegnaForm(){
   el('sellSpedField').style.display = spedisce ? '' : 'none';
   el('sellTagliaField').style.display = spedisce ? '' : 'none';
 }
-/* I campi di consegna del payload, gia' nella valuta del listino */
+/* I campi di consegna del payload: la valuta del listino comanda,
+   ma sul listino sats il costo scritto in euro parte come
+   spedizione_eur e il server lo salva in sats */
 function consegnaPayload(){
   const c = el('sellConsegna').value;
   const out = {consegna:c, taglia_pacco:el('sellTaglia').value};
   if (c==='spedizione' || c==='entrambe'){
-    if (sellValuta==='eur') out.spedizione_eur = eurCampo('sellSped');
+    if (sellValuta==='eur' || spedValuta==='eur')
+      out.spedizione_eur = eurCampo('sellSped');
     else out.spedizione_sats = parseInt(el('sellSped').value)||0;
   }
   return out;
@@ -5325,8 +5363,12 @@ async function publish(){
       price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
       valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
       cat:el('sellCat').value,
-      consegna:cns.consegna, sped:cns.spedizione_sats||0,
-      spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
+      /* come il server: input in € sul listino sats = salvato in sats */
+      consegna:cns.consegna,
+      sped:cns.spedizione_sats || (sellValuta==='sats' && cns.spedizione_eur
+        ? Math.round(cns.spedizione_eur/eurPerSat) : 0),
+      spedEur:sellValuta==='eur' ? (cns.spedizione_eur||0) : 0,
+      taglia:cns.taglia_pacco,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
@@ -5376,8 +5418,11 @@ async function salvaModifica(t, p){
         price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
         valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
         cat:el('sellCat').value,
-        consegna:cns.consegna, sped:cns.spedizione_sats||0,
-        spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
+        consegna:cns.consegna,
+        sped:cns.spedizione_sats || (sellValuta==='sats' && cns.spedizione_eur
+          ? Math.round(cns.spedizione_eur/eurPerSat) : 0),
+        spedEur:sellValuta==='eur' ? (cns.spedizione_eur||0) : 0,
+        taglia:cns.taglia_pacco,
         zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }

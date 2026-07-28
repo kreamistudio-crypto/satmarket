@@ -1327,6 +1327,25 @@ async def consegna_da_payload(d: dict, valuta: str):
                 sped_sats = max(0, int(d.get("spedizione_sats", 0)))
             except (TypeError, ValueError):
                 sped_sats = 0
+            # Anche sul listino sats il venditore puo' SCRIVERE il
+            # costo in euro (i corrieri fatturano in euro): si
+            # converte ADESSO e si salva in sats — il patto del
+            # prezzo, cambio fissato alla pubblicazione, mai
+            # all'acquisto. spedizione_eur resta 0: il listino sats
+            # non ha un prezzo fisso in euro.
+            if not sped_sats:
+                try:
+                    eur = max(0.0, round(float(d.get("spedizione_eur", 0)), 2))
+                except (TypeError, ValueError):
+                    eur = 0.0
+                if eur > 0:
+                    cambio = await cambio_btc_eur()
+                    if cambio <= 0:
+                        raise HTTPException(503,
+                            "Il cambio euro non è disponibile in questo "
+                            "momento: riprova tra qualche minuto, oppure "
+                            "scrivi il costo di spedizione in sats")
+                    sped_sats = round(eur / cambio * 100_000_000)
     return consegna, sped_sats, sped_eur, taglia
 
 
