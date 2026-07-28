@@ -583,6 +583,18 @@
     font-weight:700;font-size:28px;margin:10px 0 2px}
   .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
   .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
+  /* Le due pillole spedizione/ritiro quando l'annuncio offre entrambe */
+  .consegna-scelta{display:flex;gap:8px;margin:2px 0 10px}
+  .consegna-scelta .consegna-pill{flex:1;padding:9px 10px;border-radius:12px;
+    border:1.5px solid var(--line);background:var(--card);font-weight:700;
+    font-size:13px;cursor:pointer;color:var(--ink)}
+  .consegna-scelta .consegna-pill.attiva{border-color:var(--sats);
+    background:var(--sats-soft);color:var(--sats-text)}
+  /* Il conto scomposto nei fogli di pagamento */
+  .conto-scomposto{margin:10px auto 0;max-width:280px;text-align:left;
+    font-size:13px;font-weight:600;color:var(--ink);
+    background:var(--card);border:1px solid var(--line);
+    border-radius:12px;padding:10px 12px}
   .seller{
     display:flex;align-items:center;gap:12px;background:var(--card);
     border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin:14px 0;
@@ -1417,6 +1429,9 @@
   <div class="sheet" id="paySheet">
     <div class="grab"></div>
     <h3>Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> a garanzia</h3>
+    <!-- Il conto scomposto (articolo/spedizione/protezione): compare
+         solo quando c'e' qualcosa oltre all'articolo -->
+    <div class="conto-scomposto" id="payScomposto" style="margin-bottom:8px"></div>
     <div id="payEurNota" style="display:none;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px"></div>
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Paga con qualsiasi wallet Lightning. I sats restano <b style="color:var(--trust)">bloccati e al sicuro</b> finché non confermi di aver ricevuto l'oggetto.
@@ -1439,6 +1454,7 @@
       nel deposito di garanzia</b>, come sempre: al venditore arrivano solo quando
       confermi di aver ricevuto l'oggetto.
     </div>
+    <div class="conto-scomposto" id="nwcScomposto"></div>
     <button class="btn orange" style="margin-top:14px" onclick="confermaCompraSubito(this)">⚡ Conferma e paga</button>
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
   </div>
@@ -1618,6 +1634,10 @@ function mapOrder(o){
     corriere:o.corriere||'', tracking:o.tracking||'',
     corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
     consegnato:o.consegnato||0, speditoIl:o.spedito_il||0,
+    /* il conto scomposto (lug 2026): listing.price resta il TOTALE
+       in cassaforte, le quote dicono com'e' fatto */
+    consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
+    protSats:o.protezione_sats||0,
     /* il feedback che ho lasciato io e quello che ho ricevuto */
     mioVoto:o.mio_voto||0, mioCommento:o.mio_commento||'',
     suoVoto:o.suo_voto||0, suoCommento:o.suo_commento||'',
@@ -1812,7 +1832,8 @@ let listings = [
    desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
 ];
 let orders = [
-  {id:101, listing:listings[2], state:"locked",   role:"buyer",  when:"oggi, 14:02"},
+  /* il 101 e' col ritiro in zona: fa vedere stepper e testi del caso */
+  {id:101, listing:listings[2], state:"locked",   role:"buyer",  when:"oggi, 14:02", consegnaScelta:"ritiro"},
   {id:104, listing:listings[5], state:"confirmed",role:"seller", when:"oggi, 09:40"},
   {id:102, listing:listings[0], state:"shipped",  role:"buyer",  when:"ieri"},
   {id:103, listing:listings[4], state:"released", role:"seller", when:"3 giorni fa"},
@@ -2296,6 +2317,38 @@ function spedTesto(l){
     return (inEur?'':'≈ ') + (inEur ? fmtEur(l.spedEur) : eur(l.sped||0)) + ' €';
   return (inEur?'≈ ':'') + fmt(satsSpedizione(l)) + ' sats';
 }
+/* La scelta del compratore quando l'annuncio offre 'entrambe':
+   vive qui, si riparte da 'spedizione' a ogni dettaglio aperto. */
+let consegnaScelta = 'spedizione';
+function sceltaConsegna(l){
+  if (!l || !l.consegna) return '';
+  return l.consegna==='entrambe' ? consegnaScelta : l.consegna;
+}
+/* La STIMA del totale da pagare (articolo + spedizione se scelta +
+   protezione): i sats veri li dice la risposta di POST /orders. */
+function totaleStima(l){
+  const art = satsAnnuncio(l);
+  const sped = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0;
+  return art + sped + Math.floor(art * protPercento / 100);
+}
+/* Le righe del conto scomposto per i fogli di pagamento: compaiono
+   solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
+function contoScomposto(art, sped, prot, tot){
+  if (!(sped > 0 || prot > 0)) return '';
+  const r = (n, t, b) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${fmt(n)} sats</span></div>`;
+  return r(art, 'Articolo') + (sped>0 ? r(sped, 'Spedizione') : '')
+       + (prot>0 ? r(prot, 'Protezione acquisti') : '') + r(tot, 'Totale', 1);
+}
+/* Il tocco sulle pillole spedizione/ritiro: aggiorna la scelta e le
+   cifre sui bottoni compra, senza ridisegnare il dettaglio. */
+function setConsegnaScelta(v){
+  consegnaScelta = v; haptic();
+  document.querySelectorAll('#detailContent .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', b.dataset.v === v));
+  const l = currentListing;
+  if (l) document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
+    s.textContent = `${l.valuta==='eur'?'≈ ':''}${fmt(totaleStima(l))} sats`);
+}
 /* La riga della consegna nel dettaglio: esiste solo se il venditore
    l'ha dichiarata — gli annunci di prima non promettono nulla. */
 function rigaConsegna(l){
@@ -2638,6 +2691,7 @@ function openDetail(id){
   if (!currentListing) { toast('Annuncio non trovato'); return; }
   const l = currentListing;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
+  consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
      carta: il ritorno al mercatino a sinistra — c'e' SEMPRE, anche in
      DEMO — e il condividi a destra (in DEMO no: il link punterebbe
@@ -2709,10 +2763,15 @@ function openDetail(id){
              <span class="escrow-flag">🔒 pagamento protetto</span>
              <!-- niente 🔒 qui: lo dicono gia' la pillola e il bottone -->
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
+             ${l.consegna==='entrambe' ? `
+             <div class="consegna-scelta">
+               <button class="consegna-pill attiva" data-v="spedizione" onclick="setConsegnaScelta('spedizione')">🚚 Spedizione${(l.sped>0||l.spedEur>0)?'':' gratuita'}</button>
+               <button class="consegna-pill" data-v="ritiro" onclick="setConsegnaScelta('ritiro')">🤝 Ritiro in zona</button>
+             </div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
-               ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
+               ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(satsAnnuncio(l))} sats</span></button>
+             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(totaleStima(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
            </div>`}
       ${jarCta}
@@ -3050,29 +3109,38 @@ async function startBuy(){
     return;
   }
   /* Per i listini EUR i sats esatti li decide il server tra un attimo:
-     intanto una stima onesta, poi l'importo vero dalla risposta */
-  const inEur = currentListing.valuta==='eur' && currentListing.priceEur>0;
-  el('payAmount').textContent = (inEur?'≈ ':'') + fmt(satsAnnuncio(currentListing));
+     intanto una stima onesta (col conto scomposto), poi i valori veri
+     dalla risposta */
+  const l = currentListing, inEur = l.valuta==='eur' && l.priceEur>0;
+  const artS = satsAnnuncio(l),
+        spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
+        protS = Math.floor(artS * protPercento / 100);
+  el('payAmount').textContent = (inEur?'≈ ':'') + fmt(totaleStima(l));
+  el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS,
+                                                artS + spedS + protS);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
-    `Listino ${fmtEur(currentListing.priceEur)} € — convertito ora in sats: la invoice vale 15 minuti`;
+    `Listino ${fmtEur(l.priceEur)} € — convertito ora in sats: la invoice vale 15 minuti`;
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
   aggiornaPayHint();
   if (DEMO) {
     el('payInvoice').textContent =
-      'lnbc'+currentListing.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
+      'lnbc'+l.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
     return;
   }
   el('payInvoice').textContent = 'creazione invoice…';
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({annuncio_id: currentListing.id})});
+    body: JSON.stringify({annuncio_id: l.id, consegna: sceltaConsegna(l)})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
   currentOrderId = d.ordine_id;
   if (d.prezzo_sats) el('payAmount').textContent = fmt(d.prezzo_sats);
+  if (d.prezzo_sats !== undefined)
+    el('payScomposto').innerHTML = contoScomposto(d.articolo_sats||d.prezzo_sats,
+      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats);
   el('payInvoice').textContent = d.invoice;
   /* Controllo automatico ogni 4 secondi: appena paghi, se ne accorge */
   if (pollTimer) clearInterval(pollTimer);   /* mai due controlli accavallati */
@@ -3113,8 +3181,14 @@ function compraSubito(){
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
   if (!walletNwc()) { startBuy(); return; }
   /* per i listini EUR e' una stima: i sats veri li fissa il server */
+  const l = currentListing;
   el('nwcConfermaSats').textContent =
-    (currentListing.valuta==='eur'?'≈ ':'') + fmt(satsAnnuncio(currentListing));
+    (l.valuta==='eur'?'≈ ':'') + fmt(totaleStima(l));
+  const artS = satsAnnuncio(l),
+        spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
+        protS = Math.floor(artS * protPercento / 100);
+  el('nwcScomposto').innerHTML = contoScomposto(artS, spedS, protS,
+                                                artS + spedS + protS);
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -3129,18 +3203,21 @@ async function confermaCompraSubito(btn){
      parte tra poco deve sopravvivere) */
   el('nwcConfermaSheet').classList.remove('open');
   el('sheetBg').classList.remove('open');
-  let invoice = null, cliente = null, satsOrdine = null;
+  let invoice = null, cliente = null, satsOrdine = null, scompOrdine = '';
   try {
     /* 1) ordine + invoice: identico in tutto al flusso manuale */
     const r = await fetch(`${API_BASE}/orders`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({annuncio_id: currentListing.id})});
+      body: JSON.stringify({annuncio_id: currentListing.id,
+                            consegna: sceltaConsegna(currentListing)})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
     currentOrderId = d.ordine_id;
     invoice = d.invoice;
     satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
+    scompOrdine = d.prezzo_sats ? contoScomposto(d.articolo_sats||d.prezzo_sats,
+      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats) : '';
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);
@@ -3161,6 +3238,7 @@ async function confermaCompraSubito(btn){
       /* Ripiego: la STESSA invoice nel foglio di sempre. L'ordine
          c'è già e il poll è vivo: mai un secondo ordine. */
       el('payAmount').textContent = fmt(satsOrdine || satsAnnuncio(currentListing));
+      el('payScomposto').innerHTML = scompOrdine;
       el('payEurNota').style.display = 'none';
       el('payInvoice').textContent = invoice;
       el('sheetBg').classList.add('open');
@@ -3319,9 +3397,12 @@ function openOrder(id){
   } else {
     const oreRestanti = o.consegnato
       ? Math.max(0, Math.ceil((o.consegnato + 72*3600 - Date.now()/1000)/3600)) : 0;
+    const ritiro = o.consegnaScelta==='ritiro';
     steps = [
       {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
-      {t:'Oggetto spedito',         d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`:'Il venditore ha consegnato al corriere'},
+      ritiro
+        ? {t:'Consegna a mano',     d:'Vi incontrate e l\'oggetto passa di mano'}
+        : {t:'Oggetto spedito',     d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`:'Il venditore ha consegnato al corriere'},
       {t:s==='delivered'?'Consegnato: in attesa di conferma':'Ricevuto e confermato',
        d:s==='delivered'?`Restano ~${oreRestanti} ore per confermare o aprire disputa`:(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
       o.role==='seller'
@@ -3332,8 +3413,9 @@ function openOrder(id){
   }
   /* Le frasi di chiusura parlano a CHI legge: il venditore incassa,
      l'acquirente viene rimborsato, gli altri osservano */
+  /* al venditore va il totale meno la protezione (della piattaforma) */
   const testa = s==='released'  ? {ic:'🔓', b:'Deposito sbloccato',
-      d:o.role==='seller' ? `Hai incassato ${fmt(o.listing.price)} sats`
+      d:o.role==='seller' ? `Hai incassato ${fmt(o.listing.price-(o.protSats||0))} sats`
                           : 'I sats sono stati consegnati al venditore'}
     : s==='refunded'            ? {ic:'↩️', b:'Deposito rimborsato',
       d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${fmt(o.listing.price)} sats (integrale)`
@@ -3350,6 +3432,13 @@ function openOrder(id){
     <div class="detail-body">
       <h2 style="font-size:17px">${o.listing.emoji} ${esc(o.listing.title)}</h2>
       <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span></div>
+      ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0) ? `<div class="eur-hint" style="margin-top:-6px">${
+        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : '🚚 con spedizione') : ''}${
+        (o.consegnaScelta && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
+        (o.spedSats>0||o.protSats>0) ? 'di cui ' + [
+          o.spedSats>0 ? fmt(o.spedSats)+' sats di spedizione' : '',
+          o.protSats>0 ? fmt(o.protSats)+' sats di protezione acquisti' : ''
+        ].filter(Boolean).join(' e ') : ''}</div>` : ''}
 
       <div class="vault">
         <div class="vault-head">
@@ -3392,17 +3481,22 @@ function openOrder(id){
         </div>`:''}
       ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
       ${o.role==='seller' && ['locked','shipped','delivered','confirmed'].includes(s) ? payoutPanel(o) : ''}
-      ${o.role==='seller' && s==='locked' ? `
+      ${o.role==='seller' && s==='locked' ? (o.consegnaScelta==='ritiro' ? `
+        <div class="payout">
+          <h4>🤝 Consegna in zona</h4>
+          <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì partono le 72 ore di conferma.</div>
+          <button class="btn orange" onclick="markConsegnaMano()">🤝 Ho consegnato l'oggetto a mano</button>
+        </div>` : `
         <div class="payout">
           <h4>📦 Spedisci l'oggetto</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Spedisci e inserisci il tracciamento (l'acquirente lo vedrà e potrà seguire il pacco). Per la consegna di persona scegli "Consegna a mano".</div>
           ${selettoreCorriere('shipCorriere')}
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
-        </div>`:''}
+        </div>`):''}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
-      ${o.role==='buyer' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">📬 È arrivato — mi prendo 72h per controllarlo</button>`:''}
+      ${o.role==='buyer' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?'📬 L\'ho ritirato — mi prendo 72h per controllarlo':'📬 È arrivato — mi prendo 72h per controllarlo'}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>Pacco consegnato!</b> Controlla l'oggetto: conferma qui sotto, o apri una disputa se c'è un problema. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
       ${o.role==='buyer' && ['shipped','delivered'].includes(s) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ Ho ricevuto l'oggetto — libera i sats</button>`:''}
@@ -3483,7 +3577,9 @@ async function inviaFeedback(btn){
 let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
 
 function payoutPanel(o){
-  const net = o.listing.price;   // commissione sospesa (a 0): incasso = prezzo pieno
+  // il totale in cassaforte meno la protezione (della piattaforma):
+  // articolo + spedizione — la commissione resta sospesa (a 0)
+  const net = o.listing.price - (o.protSats||0);
 
   /* Incasso automatico già attivo */
   if (myLnAddress && o.state!=='confirmed') return `
@@ -4569,6 +4665,21 @@ async function markShipped(){
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking;
   toast('📦 Segnato come spedito'); openOrder(currentOrder.id);
+}
+
+/* Il gemello di markShipped per il ritiro in zona: niente corriere,
+   niente tracking — il corriere-sentinella lo capisce il server. */
+async function markConsegnaMano(){
+  haptic();
+  if (!confirm('Confermi di aver consegnato l\'oggetto a mano?\n\nDa adesso l\'acquirente può confermare la ricezione; se nessuno si fa vivo, i sats si sbloccano d\'ufficio dopo 10 giorni.')) return;
+  if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona'; toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({corriere:'Ritiro in zona', tracking:''})});
+  if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona';
+  toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id);
 }
 
 async function markDelivered(){
