@@ -222,6 +222,27 @@ try:
 except ImportError:
     AVVISI_ISCRITTI_MAX_ORA = 6
 
+# Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
+# propone una cifra, il venditore accetta/rifiuta/contropropone UNA
+# volta, l'accordo da' il diritto di comprare a quel prezzo entro la
+# scadenza. L'annuncio non si blocca mai: vince chi paga per primo.
+try:
+    from config import OFFERTA_MINIMA_PERCENTO
+except ImportError:
+    OFFERTA_MINIMA_PERCENTO = 50   # sotto questa % del listino non si parte
+try:
+    from config import ORE_RISPOSTA_OFFERTA
+except ImportError:
+    ORE_RISPOSTA_OFFERTA = 48      # proposta/controproposta senza risposta -> scaduta
+try:
+    from config import ORE_PAGAMENTO_OFFERTA
+except ImportError:
+    ORE_PAGAMENTO_OFFERTA = 24     # accettata ma non pagata -> scaduta
+try:
+    from config import MAX_OFFERTE_ANNUNCIO
+except ImportError:
+    MAX_OFFERTE_ANNUNCIO = 3       # tentativi totali per compratore per annuncio
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -526,6 +547,37 @@ def init_db():
         creato INTEGER,
         PRIMARY KEY(tg_id, annuncio_id)
     );
+    CREATE TABLE IF NOT EXISTS offerte(
+        -- la contrattazione strutturata (MAI una chat): proposta del
+        -- compratore, al massimo UNA controproposta del venditore,
+        -- accettazione = diritto di comprare al prezzo concordato
+        -- entro la scadenza. L'annuncio NON si blocca mai: vince chi
+        -- paga per primo. L'accordo riguarda il SOLO articolo:
+        -- spedizione e protezione si sommano sopra come sempre.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        annuncio_id INTEGER NOT NULL,
+        compratore_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        valuta TEXT DEFAULT 'sats',      -- fotografia della valuta del listino
+        importo_sats INTEGER DEFAULT 0,  -- la proposta (l'altro campo resta 0)
+        importo_eur REAL DEFAULT 0,
+        contro_sats INTEGER DEFAULT 0,   -- la controproposta (0 = nessuna)
+        contro_eur REAL DEFAULT 0,
+        stato TEXT DEFAULT 'proposta',   -- proposta | controproposta | accettata |
+                                         -- rifiutata | scaduta | decaduta | conclusa
+        scadenza INTEGER DEFAULT 0,      -- il prossimo appuntamento:
+                                         -- risposta oppure pagamento
+        ordine_id INTEGER DEFAULT 0,     -- l'ordine nato dall'offerta
+        creato INTEGER, aggiornato INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_offerte_annuncio
+        ON offerte(annuncio_id, stato);
+    CREATE INDEX IF NOT EXISTS idx_offerte_scadenza
+        ON offerte(stato, scadenza);
+    CREATE INDEX IF NOT EXISTS idx_offerte_compratore
+        ON offerte(compratore_id);
+    CREATE INDEX IF NOT EXISTS idx_offerte_venditore
+        ON offerte(venditore_id);
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.

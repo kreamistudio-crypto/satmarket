@@ -52,6 +52,17 @@ TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
                              # accendere il tetto; per gli annunci in EUR
                              # vale l'equivalente al cambio corrente
 
+# --- Offerte (contrattazione sul prezzo) -----------------------------
+# Il compratore propone una cifra, il venditore accetta, rifiuta o fa
+# UNA controproposta. Accettare = diritto di comprare a quel prezzo
+# entro la scadenza; l'annuncio resta in vetrina e vince chi paga.
+OFFERTA_MINIMA_PERCENTO = 50 # sotto questa % del listino l'offerta
+                             # non parte proprio (anti-offerte-insulto)
+ORE_RISPOSTA_OFFERTA = 48    # senza risposta l'offerta scade da sola
+ORE_PAGAMENTO_OFFERTA = 24   # tempo per pagare dopo l'accettazione
+MAX_OFFERTE_ANNUNCIO = 3     # tentativi totali per compratore per
+                             # annuncio (una offerta attiva alla volta)
+
 DB = "satmarket.db"
 
 # --- Import da Nostr (usato da importa_nostr.py) ---------------------
