@@ -2302,22 +2302,31 @@ function prezzoParte(l){
 /* La percentuale della protezione acquisti: arriva col server nella
    prima pagina della vetrina (oggi 0), mai hardcodata qui. */
 let protPercento = 0;
-/* I sats di spedizione: stesso patto di satsAnnuncio (listino EUR =
-   equivalente al cambio vivo, ripiego sull'equivalente di
-   pubblicazione). Il costo VERO lo decide il server all'acquisto. */
+/* I sats di spedizione: spedEur pieno = costo IN EURO (listino EUR,
+   oppure l'ancora all'euro dei listini sats) e i sats sono una STIMA
+   al cambio vivo — il valore vero si fissa alla creazione
+   dell'ordine. spedEur vuoto = sats fissi. */
 function satsSpedizione(l){
-  if (l.valuta==='eur' && l.spedEur>0 && cambioVivo)
+  if (l.spedEur>0 && cambioVivo)
     return Math.round(l.spedEur / eurPerSat);
   return l.sped||0;
 }
-/* Il costo di spedizione nella valuta di chi guarda, per la riga
-   sotto il prezzo: il «≈» sta solo sul convertito, come prezzoParte */
+/* Il costo di spedizione nella valuta di chi guarda: il «≈» sta solo
+   sul convertito (patto di prezzoParte); se il cambio non e' ancora
+   arrivato, il costo ancorato si mostra onestamente in euro. */
 function spedTesto(l){
-  const inEur = l.valuta==='eur' && l.spedEur>0;
+  const ancorata = l.spedEur>0;
   if (valutaVista==='eur')
-    return (inEur?'':'≈ ') + (inEur ? fmtEur(l.spedEur) : eur(l.sped||0)) + ' €';
-  return (inEur?'≈ ':'') + fmt(satsSpedizione(l)) + ' sats';
+    return ancorata ? fmtEur(l.spedEur) + ' €' : '≈ ' + eur(l.sped||0) + ' €';
+  if (ancorata)
+    return cambioVivo ? '≈ ' + fmt(satsSpedizione(l)) + ' sats'
+                      : fmtEur(l.spedEur) + ' €';
+  return fmt(l.sped||0) + ' sats';
 }
+/* Il prefisso «≈» dei bottoni compra: la cifra e' una stima quando
+   l'articolo e' in euro O la spedizione scelta e' ancorata all'euro */
+const stimaCirca = l => (l.valuta==='eur'
+  || (sceltaConsegna(l)==='spedizione' && l.spedEur>0)) ? '≈ ' : '';
 /* La scelta del compratore quando l'annuncio offre 'entrambe':
    vive qui, si riparte da 'spedizione' a ogni dettaglio aperto. */
 let consegnaScelta = 'spedizione';
@@ -2348,7 +2357,7 @@ function setConsegnaScelta(v){
     b.classList.toggle('attiva', b.dataset.v === v));
   const l = currentListing;
   if (l) document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
-    s.textContent = `${l.valuta==='eur'?'≈ ':''}${fmt(totaleStima(l))} sats`);
+    s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
 }
 /* La riga della consegna nel dettaglio: esiste solo se il venditore
    l'ha dichiarata — gli annunci di prima non promettono nulla. */
@@ -2770,9 +2779,9 @@ function openDetail(id){
                <button class="consegna-pill" data-v="ritiro" onclick="setConsegnaScelta('ritiro')">🤝 Ritiro in zona</button>
              </div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
-               ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(totaleStima(l))} sats</span></button>
+               ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${l.valuta==='eur'?'≈ ':''}${fmt(totaleStima(l))} sats</span></button>
+             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
            </div>`}
       ${jarCta}
@@ -3116,7 +3125,7 @@ async function startBuy(){
   const artS = satsAnnuncio(l),
         spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
         protS = Math.floor(artS * protPercento / 100);
-  el('payAmount').textContent = (inEur?'≈ ':'') + fmt(totaleStima(l));
+  el('payAmount').textContent = stimaCirca(l) + fmt(totaleStima(l));
   el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS,
                                                 artS + spedS + protS);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
@@ -3183,8 +3192,7 @@ function compraSubito(){
   if (!walletNwc()) { startBuy(); return; }
   /* per i listini EUR e' una stima: i sats veri li fissa il server */
   const l = currentListing;
-  el('nwcConfermaSats').textContent =
-    (l.valuta==='eur'?'≈ ':'') + fmt(totaleStima(l));
+  el('nwcConfermaSats').textContent = stimaCirca(l) + fmt(totaleStima(l));
   const artS = satsAnnuncio(l),
         spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
         protS = Math.floor(artS * protPercento / 100);
@@ -5093,11 +5101,12 @@ function impostaSellValuta(v){
   spedValuta = v==='eur' ? 'eur' : 'sats';
   aggiornaSpedCampo();
 }
-/* Sul listino sats il costo di spedizione si puo' SCRIVERE in euro
-   (i corrieri fatturano in euro): il salvato resta SEMPRE sats,
-   convertiti dal server alla pubblicazione — il patto del prezzo,
-   mai una conversione all'acquisto. Col listino in euro non c'e'
-   scelta: il campo e' in euro per natura. */
+/* Sul listino sats il toggle del costo decide la SEMANTICA (deciso
+   lug 2026): sats = costo FISSO, qualunque cosa faccia il cambio;
+   euro = costo ANCORATO all'euro, salvato in spedizione_eur e
+   convertito in sats solo al momento dell'acquisto — i «5 €» del
+   venditore valgono sempre 5 €. Col listino in euro non c'e'
+   scelta: e' tutto ancorato per natura. */
 let spedValuta = 'sats';
 function toggleSpedCur(){
   if (sellValuta !== 'sats') return;
@@ -5119,16 +5128,18 @@ function aggiornaSpedCampo(){
   inp.placeholder = inEur ? '0,00' : '0';
   aggiornaSpedHint();
 }
-/* La stima live «3,80 € ≈ 7 000 sats» mentre il venditore scrive:
-   il numero vero lo fissa il server alla pubblicazione. */
+/* L'hint dice la SEMANTICA del toggle, con la stima live quando il
+   costo e' ancorato: il numero vero si fissa all'acquisto. */
 function aggiornaSpedHint(){
   const h = el('sellSpedHint');
   if (!h) return;
   if (sellValuta==='sats' && spedValuta==='eur'){
     const e = eurCampo('sellSped');
-    h.textContent = (e>0 && cambioVivo)
-      ? `${fmtEur(e)} € ≈ ${fmt(Math.round(e/eurPerSat))} sats — si salva in sats, al cambio della pubblicazione`
-      : 'Scrivi il costo in euro: alla pubblicazione diventa sats, al cambio del momento';
+    h.textContent = ((e>0 && cambioVivo)
+      ? `${fmtEur(e)} € ≈ ${fmt(Math.round(e/eurPerSat))} sats oggi — ` : '')
+      + 'ancorato all\'euro: diventa sats al cambio del momento dell\'acquisto';
+  } else if (sellValuta==='sats' && el('sellConsegna')?.value){
+    h.textContent = 'Costo fisso in sats, qualunque cosa faccia il cambio';
   } else h.textContent = '';
 }
 /* parseFloat non capisce la virgola italiana: gliela traduciamo */
@@ -5142,6 +5153,7 @@ function aggiornaConsegnaForm(){
   const spedisce = c==='spedizione' || c==='entrambe';
   el('sellSpedField').style.display = spedisce ? '' : 'none';
   el('sellTagliaField').style.display = spedisce ? '' : 'none';
+  aggiornaSpedHint();
 }
 /* I campi di consegna del payload: la valuta del listino comanda,
    ma sul listino sats il costo scritto in euro parte come
@@ -5177,8 +5189,12 @@ function editListing(id){
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
   el('sellConsegna').value = l.consegna||'';
   el('sellTaglia').value = l.taglia||'';
+  /* spedEur pieno = costo ancorato all'euro: si rientra in euro
+     anche sul listino sats (il toggle segue la semantica salvata) */
+  spedValuta = l.spedEur>0 ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
   el('sellSped').value = (l.consegna==='spedizione'||l.consegna==='entrambe')
-    ? (sellValuta==='eur' ? (l.spedEur||0) : (l.sped||0)) : '';
+    ? (l.spedEur>0 ? l.spedEur : (l.sped||0)) : '';
+  aggiornaSpedCampo();
   aggiornaConsegnaForm();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
   renderFotoPreview(); aggiornaFormVendi();
@@ -5363,12 +5379,9 @@ async function publish(){
       price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
       valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
       cat:el('sellCat').value,
-      /* come il server: input in € sul listino sats = salvato in sats */
-      consegna:cns.consegna,
-      sped:cns.spedizione_sats || (sellValuta==='sats' && cns.spedizione_eur
-        ? Math.round(cns.spedizione_eur/eurPerSat) : 0),
-      spedEur:sellValuta==='eur' ? (cns.spedizione_eur||0) : 0,
-      taglia:cns.taglia_pacco,
+      /* come il server: spedEur pieno = costo ancorato all'euro */
+      consegna:cns.consegna, sped:cns.spedizione_sats||0,
+      spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
@@ -5418,11 +5431,8 @@ async function salvaModifica(t, p){
         price: sellValuta==='eur' ? Math.round(p/eurPerSat) : p,
         valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
         cat:el('sellCat').value,
-        consegna:cns.consegna,
-        sped:cns.spedizione_sats || (sellValuta==='sats' && cns.spedizione_eur
-          ? Math.round(cns.spedizione_eur/eurPerSat) : 0),
-        spedEur:sellValuta==='eur' ? (cns.spedizione_eur||0) : 0,
-        taglia:cns.taglia_pacco,
+        consegna:cns.consegna, sped:cns.spedizione_sats||0,
+        spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
         zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }

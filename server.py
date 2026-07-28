@@ -680,9 +680,10 @@ def init_db():
                     # storici restano cosi', e nel CSV il campo e' vuoto.
                     "cambio_eur REAL DEFAULT 0",
                     # cambio_ordine: EUR per BTC al momento della
-                    # CREAZIONE della invoice (solo annunci in EUR:
-                    # e' il cambio che ha fissato i sats dell'ordine).
-                    # 0 = annuncio in sats, nessuna conversione.
+                    # CREAZIONE della invoice — annunci in EUR, e dal
+                    # lug 2026 anche i listini sats con la spedizione
+                    # ancorata all'euro (e' il cambio che ha fissato i
+                    # sats dell'ordine). 0 = nessuna conversione.
                     "cambio_ordine REAL DEFAULT 0",
                     # il conto scomposto (lug 2026, modello Vinted):
                     # prezzo_sats resta il TOTALE in cassaforte (invoice
@@ -1327,25 +1328,21 @@ async def consegna_da_payload(d: dict, valuta: str):
                 sped_sats = max(0, int(d.get("spedizione_sats", 0)))
             except (TypeError, ValueError):
                 sped_sats = 0
-            # Anche sul listino sats il venditore puo' SCRIVERE il
-            # costo in euro (i corrieri fatturano in euro): si
-            # converte ADESSO e si salva in sats — il patto del
-            # prezzo, cambio fissato alla pubblicazione, mai
-            # all'acquisto. spedizione_eur resta 0: il listino sats
-            # non ha un prezzo fisso in euro.
+            # Sul listino sats il costo scritto in euro resta ANCORATO
+            # all'euro (deciso lug 2026, supera la conversione alla
+            # pubblicazione): spedizione_eur si salva cosi' com'e' e
+            # diventa sats SOLO all'acquisto, col cambio del momento —
+            # i «5 €» del venditore valgono sempre 5 €. Qui niente
+            # cambio e niente 503: la dipendenza si paga in compra(),
+            # e solo per chi sceglie la spedizione. I sats espliciti
+            # vincono: fisso batte ancorato. Gli annunci gia'
+            # pubblicati col vecchio comportamento (convertiti in
+            # sats) hanno spedizione_eur=0 e restano fissi.
             if not sped_sats:
                 try:
-                    eur = max(0.0, round(float(d.get("spedizione_eur", 0)), 2))
+                    sped_eur = max(0.0, round(float(d.get("spedizione_eur", 0)), 2))
                 except (TypeError, ValueError):
-                    eur = 0.0
-                if eur > 0:
-                    cambio = await cambio_btc_eur()
-                    if cambio <= 0:
-                        raise HTTPException(503,
-                            "Il cambio euro non è disponibile in questo "
-                            "momento: riprova tra qualche minuto, oppure "
-                            "scrivi il costo di spedizione in sats")
-                    sped_sats = round(eur / cambio * 100_000_000)
+                    sped_eur = 0.0
     return consegna, sped_sats, sped_eur, taglia
 
 
@@ -3589,6 +3586,21 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # un annuncio tutto-sats non dipende mai dal cambio.
     articolo, cambio_ordine = a["prezzo_sats"], 0.0
     sped = a["spedizione_sats"] if scelta == "spedizione" else 0
+    # Spedizione ANCORATA all'euro su listino sats (spedizione_eur
+    # piena): i sats si decidono ADESSO, col cambio corrente. Senza
+    # cambio l'ordine con spedizione non puo' partire — 503 onesto,
+    # SOLO per questa scelta: il ritiro resta sempre acquistabile e
+    # l'articolo in sats non dipende mai dal cambio.
+    if (scelta == "spedizione" and a["valuta"] != "eur"
+            and a["spedizione_eur"] > 0):
+        cambio_ordine = await cambio_btc_eur()
+        if cambio_ordine <= 0:
+            con.close()
+            raise HTTPException(503, "La spedizione di questo annuncio ha "
+                                     "il prezzo in euro e il cambio non è "
+                                     "disponibile in questo momento: "
+                                     "riprova tra poco")
+        sped = round(a["spedizione_eur"] / cambio_ordine * 100_000_000)
     if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
         cambio_ordine = await cambio_btc_eur()
         if cambio_ordine <= 0:
@@ -4887,7 +4899,9 @@ def evento_annuncio(a: dict, status: str) -> dict:
     # La consegna nel content, non nei tag: nessun tag nuovo da far
     # digerire a importa_nostr.py o ai client altrui.
     if a.get("consegna") in ("spedizione", "entrambe"):
-        if a.get("valuta") == "eur" and a.get("spedizione_eur"):
+        # spedizione_eur piena = costo in euro (listino EUR, oppure
+        # l'ancora all'euro dei listini sats): in piazza parla euro
+        if a.get("spedizione_eur"):
             consegna_txt = f" — spedizione: {a['spedizione_eur']:.2f} EUR"
         elif a.get("spedizione_sats"):
             consegna_txt = f" — spedizione: {a['spedizione_sats']} sats"
