@@ -3912,6 +3912,40 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     if a["venditore_id"] == user["id"]:
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
 
+    # L'acquisto alla cifra pattuita: con offerta_id nel body il prezzo
+    # dell'articolo diventa quello dell'accordo. L'offerta deve essere
+    # MIA, su QUESTO annuncio, accettata e ancora nei tempi.
+    off = None
+    if d.get("offerta_id"):
+        off = con.execute(
+            "SELECT * FROM offerte WHERE id=? AND compratore_id=? AND "
+            "annuncio_id=? AND stato='accettata'",
+            (d["offerta_id"], user["id"], a["id"])).fetchone()
+        if not off:
+            con.close()
+            raise HTTPException(404, "Offerta non trovata o non più valida")
+        adesso = int(time.time())
+        if 0 < off["scadenza"] < adesso:
+            con.execute("UPDATE offerte SET stato='scaduta', aggiornato=? "
+                        "WHERE id=?", (adesso, off["id"]))
+            con.commit()
+            con.close()
+            raise HTTPException(400, "Il tempo per pagare questa offerta "
+                                     "è finito: l'offerta è scaduta")
+        if off["ordine_id"]:
+            # Una invoice viva c'e' gia'? Pagare quella VECCHIA
+            # bloccherebbe un ordine che nessun gancio riconduce piu'
+            # all'offerta: meglio un no adesso.
+            viva = con.execute(
+                "SELECT id FROM ordini WHERE id=? AND stato='creato'",
+                (off["ordine_id"],)).fetchone()
+            if viva:
+                con.close()
+                raise HTTPException(400, "C'è già una invoice in corso "
+                                         "per questa offerta: pagala, "
+                                         "oppure annulla quell'ordine e "
+                                         "riprova")
+
     # La scelta della consegna, validata contro la modalita'
     # dell'annuncio: il compratore non puo' chiedere cio' che il
     # venditore non offre. Annuncio senza modalita' ('') = flusso
@@ -3936,7 +3970,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # prezzo bloccato. Se scade, il prossimo tentativo riconverte.
     # Articolo e spedizione si convertono INSIEME, allo stesso cambio;
     # un annuncio tutto-sats non dipende mai dal cambio.
-    articolo, cambio_ordine = a["prezzo_sats"], 0.0
+    prezzo_sats_eff, prezzo_eur_eff = a["prezzo_sats"], a["prezzo_eur"]
+    if off:
+        # La cifra pattuita sostituisce il listino — SOLO l'articolo:
+        # spedizione e protezione si calcolano come per ogni ordine.
+        prezzo_sats_eff, prezzo_eur_eff = _importo_accordo(off)
+    articolo, cambio_ordine = prezzo_sats_eff, 0.0
     sped = a["spedizione_sats"] if scelta == "spedizione" else 0
     # Spedizione ANCORATA all'euro su listino sats (spedizione_eur
     # piena): i sats si decidono ADESSO, col cambio corrente. Senza
@@ -3960,7 +3999,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             raise HTTPException(503, "Il cambio euro non è disponibile in "
                                      "questo momento: riprova tra qualche "
                                      "minuto")
-        articolo = max(1, round(a["prezzo_eur"] / cambio_ordine * 100_000_000))
+        articolo = max(1, round(prezzo_eur_eff / cambio_ordine * 100_000_000))
         if scelta == "spedizione":
             sped = round(a["spedizione_eur"] / cambio_ordine * 100_000_000)
         # Il tetto di rodaggio con +20% di tolleranza: la volatilita'
@@ -3998,15 +4037,21 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], int(time.time()), int(time.time()),
          cambio_ordine, scelta, sped, prot))
-    con.commit()
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    if off:
+        # Il legame ordine-offerta nella STESSA transazione: nessuna
+        # finestra in cui l'uno esiste senza l'altro.
+        con.execute("UPDATE offerte SET ordine_id=?, aggiornato=? "
+                    "WHERE id=?", (ordine_id, int(time.time()), off["id"]))
+    con.commit()
     con.close()
     # prezzo_sats resta il TOTALE (i client di ieri leggono quello);
     # le quote scomposte sono in piu', per il conto in chiaro.
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
-            "protezione_sats": prot, "consegna": scelta}
+            "protezione_sats": prot, "consegna": scelta,
+            "offerta_id": off["id"] if off else 0}
 
 
 @app.post("/api/orders/{ordine_id}/verifica-pagamento")
@@ -6467,8 +6512,15 @@ def pulisci_ordini_fantasma(con):
     """Elimina gli ordini MAI PAGATI piu' vecchi di 30 minuti: la loro
     invoice e' scaduta (15 min), quindi non possono piu' progredire.
     Nessun sat e' coinvolto, e' solo pulizia."""
+    soglia = int(time.time()) - 1800
+    # L'offerta che aveva generato l'ordine si scioglie dal legame e
+    # resta 'accettata' fino alla SUA scadenza: il compratore puo'
+    # riprovare a pagare con una invoice nuova.
+    con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id IN "
+                "(SELECT id FROM ordini WHERE stato='creato' AND creato < ?)",
+                (soglia,))
     con.execute("DELETE FROM ordini WHERE stato='creato' AND creato < ?",
-                (int(time.time()) - 1800,))
+                (soglia,))
 
 
 @app.post("/api/orders/{ordine_id}/annulla")
@@ -6483,6 +6535,10 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     if not o:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
+    # Se l'ordine veniva da un'offerta, l'offerta torna libera (resta
+    # 'accettata' fino alla sua scadenza: si puo' ripagare)
+    con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id=?",
+                (ordine_id,))
     con.execute("DELETE FROM ordini WHERE id=?", (ordine_id,))
     con.commit()
     con.close()
