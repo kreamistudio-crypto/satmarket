@@ -6441,6 +6441,17 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                                f"confermare o aprire una disputa è scaduto e i sats "
                                f"sono stati sbloccati al venditore. Grazie per aver "
                                f"usato Barattolo 🫙 {invito}")
+            elif o["disputata"]:
+                # Lo sblocco arriva da una disputa decisa al venditore:
+                # il messaggio dice la verita', non «ha confermato».
+                await notifica(o["venditore_id"],
+                               f"⚖️ <b>La disputa è stata decisa a tuo favore:</b> "
+                               f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. "
+                               f"Affare concluso! ⚡ {invito}")
+                await notifica(o["compratore_id"],
+                               f"⚖️ <b>La disputa su «{titolo}» è stata decisa a "
+                               f"favore del venditore:</b> i sats gli sono stati "
+                               f"sbloccati. {invito}")
             else:
                 await notifica(o["venditore_id"],
                                f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
@@ -6478,7 +6489,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                    "per riprovare "
                    f"con una invoice da <b>{netto} sats</b>.")
         else:
-            msg = (f"✅ <b>L'acquirente ha confermato la ricezione!</b> Per incassare "
+            testa = ("⚖️ <b>La disputa è stata decisa a tuo favore!</b>"
+                     if o["disputata"] else
+                     "✅ <b>L'acquirente ha confermato la ricezione!</b>")
+            msg = (f"{testa} Per incassare "
                    f"i tuoi <b>{netto} sats</b>: apri l'ordine nella Mini App e "
                    f"imposta il tuo Lightning address (incassi automatici, per "
                    f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
