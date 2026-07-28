@@ -237,6 +237,15 @@ try:
 except ImportError:
     SOLLECITO_INCASSO_MAX = 4      # poi la palla passa ai moderatori
 
+# Il polso degli ordini (lug 2026): i moderatori sentono nascere e
+# chiudersi ogni ordine, col conto di quanti hanno ancora sats in
+# cassaforte. A ~60 utenti il tempo reale va bene; se il volume
+# crescera', qui si aggreghera' (pattern del drenatore promo).
+try:
+    from config import AVVISI_ORDINI_ADMIN
+except ImportError:
+    AVVISI_ORDINI_ADMIN = True     # interruttore: False = silenzio
+
 # Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
 # propone una cifra, il venditore accetta/rifiuta/contropropone UNA
 # volta, l'accordo da' il diritto di comprare a quel prezzo entro la
@@ -1571,6 +1580,26 @@ async def notifica_admin(testo: str):
         destinatari.add(999)
     for tg_id in destinatari:
         await notifica(tg_id, testo)
+
+
+async def polso_ordini_admin(riga: str):
+    """Il polso degli ordini per i moderatori (leva AVVISI_ORDINI_ADMIN):
+    una riga quando un ordine nasce o si chiude, col conto di quelli
+    che hanno ancora sats in cassaforte. Il segnaposto {aperti} si
+    riempie qui con un replace (mai format: i titoli possono avere
+    graffe). Solo titolo e importi, mai nomi. Fail-open totale: una
+    notifica di cortesia non deve mai toccare il flusso dei soldi."""
+    if not AVVISI_ORDINI_ADMIN:
+        return
+    try:
+        con = db()
+        aperti = con.execute(
+            "SELECT COUNT(*) FROM ordini WHERE stato NOT IN "
+            "('creato','annullato','released','refunded')").fetchone()[0]
+        con.close()
+        await notifica_admin(riga.replace("{aperti}", str(aperti)))
+    except Exception as e:
+        print(f"⚠️ Polso ordini admin saltato: {e}")
 
 
 async def premia_distintivi(tg_id: int):
@@ -4231,6 +4260,10 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
                     "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
                     "client, così nessun altro proverà a comprarlo lì.")
         await notifica(o["venditore_id"], msg)
+        # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
+        await polso_ordini_admin(
+            f"🛒 <b>Nuovo ordine:</b> «{(a['titolo'] if a else '?')[:60]}» — "
+            f"{o['prezzo_sats']} sats. Ordini aperti: {{aperti}}")
         # Il garbo verso chi restava in trattativa: l'oggetto e' andato.
         # MAI al compratore che ha appena pagato: se aveva un'altra
         # offerta sua, decade in silenzio (dirgli «venduto a qualcun
@@ -6420,6 +6453,16 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             # ENTRAMBE le parti (primo baratto, primo acquisto...)
             await premia_distintivi(o["venditore_id"])
             await premia_distintivi(o["compratore_id"])
+            # Il polso dei moderatori: ordine chiuso, sats consegnati
+            if o["disputata"]:
+                await polso_ordini_admin(
+                    f"⚖️ <b>Disputa chiusa a favore del venditore:</b> "
+                    f"«{titolo[:60]}» — {netto} sats sbloccati. "
+                    f"Restano {{aperti}} ordini aperti.")
+            else:
+                await polso_ordini_admin(
+                    f"✅ <b>Ordine concluso:</b> «{titolo[:60]}» — {netto} "
+                    f"sats al venditore. Restano {{aperti}} ordini aperti.")
             return {"ok": True, "stato": "released"}
 
         # Niente pagamento riuscito: l'ordine resta/va in 'confirmed',
@@ -6477,6 +6520,9 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             con.execute("UPDATE annunci SET stato='attivo' WHERE id=?",
                         (o["annuncio_id"],))      # l'oggetto torna in vetrina
             con.commit()
+            t = con.execute("SELECT titolo FROM annunci WHERE id=?",
+                            (o["annuncio_id"],)).fetchone()
+            titolo = (t["titolo"] if t else "?")[:60]
             con.close()
             # ...e torna disponibile anche sulla piazza Nostr
             asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "active",
@@ -6495,6 +6541,10 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                            "i sats gli sono stati rimborsati e l'annuncio è tornato "
                            "in vetrina. ⭐ Puoi lasciare un feedback dall'ordine "
                            "nella Mini App.")
+            # Il polso dei moderatori: anche gli esiti storti contano
+            await polso_ordini_admin(
+                f"↩️ <b>Ordine rimborsato al compratore:</b> «{titolo}» — "
+                f"{importo} sats. Restano {{aperti}} ordini aperti.")
             return {"ok": True, "stato": "refunded"}
 
         # Nessun metodo di rimborso disponibile: si mette in attesa

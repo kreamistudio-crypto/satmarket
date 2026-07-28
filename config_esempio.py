@@ -144,6 +144,11 @@ AVVISI_ISCRITTI = True
 # restano solo gli aggregati (che non nominano nessuno).
 AVVISI_ISCRITTI_MAX_ORA = 6
 
+# Il polso degli ordini: una riga ai moderatori quando un ordine nasce
+# (sats in cassaforte) o si chiude (released/rimborso/disputa), col
+# conto di quelli ancora aperti. Solo titolo e importi, mai nomi.
+AVVISI_ORDINI_ADMIN = True
+
 # --- Collaudo ---------------------------------------------------------
 # True  = test locale con utenti finti (Compratore/Venditore/Admin)
 # False = OBBLIGATORIO prima di andare online!
