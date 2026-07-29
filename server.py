@@ -2714,6 +2714,65 @@ def suggerisci_comune(testo: str) -> str:
     return ""
 
 
+def arricchisci_zona(zona: str) -> str:
+    """«Torino» -> «Torino (TO)» (lug 2026): la sigla della provincia
+    in vetrina c'e' SEMPRE — se il testo contiene un comune
+    riconosciuto senza ambiguita' e la sigla manca, si aggiunge
+    accanto al comune DENTRO il testo («Frazione Salsasio, Carmagnola»
+    -> «Frazione Salsasio, Carmagnola (TO)»). Mai inventare: gli
+    omonimi contesi (Castro nudo) non matchano per costruzione e
+    restano com'erano; chi la sigla ce l'ha gia' («Torino (TO)»)
+    matcha la chiave nome+sigla e non si tocca; gli alias («Reggio
+    Emilia») restano senza — imperfezione dichiarata. Idempotente,
+    e senza dataset restituisce il testo tal quale."""
+    zona = (zona or "").strip()
+    if not zona or not COMUNI:
+        return zona
+    # I token dell'ORIGINALE con le loro posizioni: normalizzati uno
+    # a uno devono ricombaciare con normalizza(zona), o si lascia
+    # perdere (un carattere esotico che si spacca non vale il rischio)
+    grezzi = [(m.start(), m.end()) for m in re.finditer(r"\w+", zona)]
+    token = [normalizza(zona[i:j]) for i, j in grezzi]
+    if any(not t for t in token) or token != normalizza(zona).split():
+        return zona
+    n = len(token)
+    match = None                      # (indice, lunghezza) del comune
+    if " ".join(token) in COMUNI:
+        match = (0, n)
+    else:
+        # stessa scansione di coordinate_da_zona: n-grammi dal piu'
+        # lungo, a parita' vince il primo nel testo
+        for lung in range(min(6, n), 0, -1):
+            for i in range(n - lung + 1):
+                chiave = " ".join(token[i:i + lung])
+                if lung == 1 and chiave in COMUNI_PAROLA:
+                    continue
+                if chiave in COMUNI:
+                    match = (i, lung)
+                    break
+            if match:
+                break
+    if not match:
+        return zona                   # secondo giro senza preposizioni:
+                                      # niente arricchimento (lo span
+                                      # nel testo non sarebbe piu' suo)
+    i, lung = match
+    chiave = " ".join(token[i:i + lung])
+    bello = _comuni_fuzzy().get(chiave)
+    if not bello:
+        # chiave nome+sigla (la sigla e' gia' nel testo) o alias:
+        # niente da aggiungere
+        return zona
+    m = re.search(r"\(([A-Z]{2})\)$", bello)
+    if not m:
+        return zona
+    sigla = m.group(1)
+    fine = grezzi[i + lung - 1][1]    # dove finisce il comune nel testo
+    if re.match(rf"\s*\(\s*{sigla}\s*\)", zona[fine:], re.IGNORECASE):
+        return zona                   # la sigla c'e' gia'
+    return f"{zona[:fine]} ({sigla}){zona[fine:]}"
+
+
 def distanza_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Haversine: chilometri in linea d'aria tra due punti."""
     rlat1, rlat2 = math.radians(lat1), math.radians(lat2)
@@ -2749,8 +2808,35 @@ def backfill_coordinate():
         print(f"🗺️ Backfill coordinate saltato: {e}")
 
 
+def arricchisci_zone_esistenti():
+    """Migrazione morbida (lug 2026): la sigla entra anche nelle zone
+    degli annunci gia' in vetrina — solo dove il comune e' riconosciuto
+    senza ambiguita' (arricchisci_zona non inventa mai) e MAI sugli
+    importati da Nostr: l'import orario riscrive la loro zona dai
+    relay, che restano la fonte di verita'. Idempotente come il
+    backfill delle coordinate: al secondo avvio non tocca piu' nulla."""
+    try:
+        con = db()
+        righe = con.execute("SELECT id, zona FROM annunci "
+                            "WHERE zona!='' AND contatto_nostr=''").fetchall()
+        toccate = 0
+        for r in righe:
+            nuova = arricchisci_zona(r["zona"])
+            if nuova != r["zona"]:
+                con.execute("UPDATE annunci SET zona=? WHERE id=?",
+                            (nuova, r["id"]))
+                toccate += 1
+        con.commit()
+        con.close()
+        if toccate:
+            print(f"🗺️ Sigla della provincia aggiunta a {toccate} zone")
+    except Exception as e:
+        print(f"🗺️ Arricchimento zone saltato: {e}")
+
+
 carica_comuni()
 backfill_coordinate()
+arricchisci_zone_esistenti()
 
 
 PROMPT_MODERAZIONE = (
@@ -3351,7 +3437,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
             # stessa verita' del primo giro
             risposta.update(revisione=True, attesa_ore=REVISIONE_ATTESA_ORE)
         return risposta
-    lat, lon = coordinate_da_zona(d.get("zona", ""))
+    # La zona si salva ARRICCHITA della sigla («Torino» -> «Torino
+    # (TO)»): cosi' il dato e' pulito ovunque — vetrina, dettaglio,
+    # NIP-99, avvisi — senza rimedi in visualizzazione.
+    zona = arricchisci_zona(d.get("zona", ""))
+    lat, lon = coordinate_da_zona(zona)
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
@@ -3359,7 +3449,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "anche_digitale,condizione,stato,creato) "
         "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
-         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
+         prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, "revisione" if in_revisione else "attivo",
          int(time.time())))
@@ -3785,14 +3875,16 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # torna in sats deve azzerare l'euro, o resterebbero residui.
     # Stesso patto per i campi di consegna (gia' normalizzati sopra).
     # Le coordinate seguono la zona: se cambia, cambiano con lei.
-    lat, lon = coordinate_da_zona(d.get("zona", ""))
+    # E la zona si salva con la sigla, come in pubblica().
+    zona = arricchisci_zona(d.get("zona", ""))
+    lat, lon = coordinate_da_zona(zona)
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
         "anche_digitale=?, condizione=?, stato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
-         prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
+         prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, "revisione" if in_revisione else "attivo",
          annuncio_id))
@@ -8351,6 +8443,8 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                                      "(es. Pavia (PV)): la cella zona è "
                                      "vuota"})
             continue
+        # anche dal CSV la zona entra con la sigla, come da Vendi
+        zona = arricchisci_zona(zona)
         if consegna == "digitale" or anche_dig:
             # La leva anti-frode del venditore vale anche qui: riga
             # scartata (mai un 400 sull'intero file), stessa guardia
