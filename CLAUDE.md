@@ -654,7 +654,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Import CSV: righe col ritiro e zona vuota o irriconoscibile =
   SCARTO in anteprima («forse Pavia (PV)?»), senza ritiro resta
   l'AVVISO morbido. Dataset assente = tutto riconosciuto, la funzione
-  si spegne in silenzio come il resto della geografia. MOTORE: gemello della coda
+  si spegne in silenzio come il resto della geografia.
+  La sigla in vetrina c'è SEMPRE (lug 2026): `arricchisci_zona`
+  normalizza AL SALVATAGGIO (pubblica/modifica/import CSV) — se il
+  testo contiene un comune riconosciuto senza ambiguità e la sigla
+  manca, la aggiunge accanto al comune DENTRO il testo («Frazione
+  Salsasio, Carmagnola» → «…, Carmagnola (TO)»), così il dato è pulito
+  ovunque (vetrina, dettaglio, NIP-99, avvisi) senza rimedi in
+  visualizzazione. MAI inventare: contesi nudi (Castro) e alias
+  (Reggio Emilia) restano com'erano, chi ha la sigla non si tocca
+  (idempotente), e il match che passerebbe solo dal secondo giro
+  senza preposizioni («Cassano allo Ionio») non si arricchisce — lo
+  span nel testo non sarebbe più suo, imperfezione dichiarata.
+  Migrazione morbida `arricchisci_zone_esistenti` a ogni avvio
+  (gemella del backfill coordinate, idempotente): solo i
+  riconoscibili, MAI gli importati da Nostr (contatto_nostr pieno:
+  la loro zona la riscrive l'import orario dai relay). MOTORE: gemello della coda
   promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
   loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
   dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
