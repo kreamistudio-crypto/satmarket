@@ -84,6 +84,14 @@ try:
 except ImportError:
     CifrarioDM = None
     ChaCha20DM = None
+# Fernet (stesso pacchetto cryptography) cifra a riposo i contenuti
+# della consegna digitale (buoni, codici, licenze). Se manca, o se la
+# chiave resta vuota nel config, i contenuti vivono in chiaro nel DB:
+# tutto funziona uguale, protegge meno un backup rubato.
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None
 # Pillow serve a convertire in JPEG le foto nei formati che i browser
 # non sanno leggere (HEIC degli iPhone, e i PNG/WebP arrivati grezzi);
 # pillow-heif e' il suo occhio per HEIC/HEIF. Se mancano, le foto
@@ -245,6 +253,33 @@ try:
     from config import AVVISI_ORDINI_ADMIN
 except ImportError:
     AVVISI_ORDINI_ADMIN = True     # interruttore: False = silenzio
+
+# La consegna digitale (lug 2026): buoni regalo, codici, licenze. Il
+# codice passa DENTRO Barattolo (campo dedicato dell'ordine, rivelato
+# dal compratore con un tocco che fa da ricevuta di lettura) e le
+# finestre sono corte: un codice si prova subito, non viaggia in
+# furgone. Le leve anti-frode nascono SPENTE (0 = nessun limite),
+# come TETTO_SATS_ANNUNCIO: si accendono dal config quando serve.
+try:
+    from config import ORE_CONFERMA_DIGITALE
+except ImportError:
+    ORE_CONFERMA_DIGITALE = 24     # dopo la rivelazione: poi sblocco
+try:
+    from config import ORE_SILENZIO_DIGITALE
+except ImportError:
+    ORE_SILENZIO_DIGITALE = 48     # consegnato ma mai rivelato: poi sblocco
+try:
+    from config import CHIAVE_CONTENUTI_DIGITALI
+except ImportError:
+    CHIAVE_CONTENUTI_DIGITALI = ""  # vuota = contenuti in chiaro nel DB
+try:
+    from config import TETTO_DIGITALE_NUOVI
+except ImportError:
+    TETTO_DIGITALE_NUOVI = 0       # 0 = spento (sats, sul solo articolo)
+try:
+    from config import DIGITALE_MIN_VENDITE
+except ImportError:
+    DIGITALE_MIN_VENDITE = 0       # 0 = spento (vendite concluse minime)
 
 # Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
 # propone una cifra, il venditore accetta/rifiuta/contropropone UNA
@@ -835,11 +870,18 @@ def init_db():
                     # e rimborso non cambiano semantica), le due quote si
                     # FISSANO alla creazione — il config puo' cambiare,
                     # l'ordine no. L'articolo si deriva per sottrazione.
-                    # consegna_scelta: spedizione | ritiro | '' (ordini
-                    # storici e annunci senza modalita')
+                    # consegna_scelta: spedizione | ritiro | digitale
+                    # | '' (ordini storici e annunci senza modalita')
                     "consegna_scelta TEXT DEFAULT ''",
                     "spedizione_sats INTEGER DEFAULT 0",
-                    "protezione_sats INTEGER DEFAULT 0"):
+                    "protezione_sats INTEGER DEFAULT 0",
+                    # contenuto_digitale (lug 2026): il bene della
+                    # consegna digitale (buono, codice, licenza),
+                    # cifrato a riposo se la chiave e' in config
+                    # (prefisso 'f:') o in chiaro ('plain:').
+                    # MAI in /api/orders: si legge solo dall'endpoint
+                    # /contenuto, che fa da ricevuta di lettura.
+                    "contenuto_digitale TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -1433,6 +1475,48 @@ async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
     return valuta, prezzo_sats, prezzo_eur
 
 
+# --- Cifratura a riposo dei contenuti digitali (lug 2026) ------------
+# Il codice del buono/licenza vive nel database dell'ordine: cifrarlo
+# protegge un backup rubato, non di piu' (il server resta il custode
+# per costruzione, come per l'escrow). Fail-open dichiarato: senza
+# chiave in config o senza il pacchetto cryptography il contenuto
+# resta in chiaro col prefisso 'plain:' — e un DB nato in chiaro
+# resta leggibile anche dopo che la chiave arriva (i due formati
+# convivono, riconosciuti dal prefisso).
+
+def _chiave_fernet():
+    """La chiave Fernet derivata dal segreto di config (32 byte
+    urlsafe via SHA-256: qualunque stringa va bene come segreto)."""
+    return base64.urlsafe_b64encode(
+        hashlib.sha256(CHIAVE_CONTENUTI_DIGITALI.encode()).digest())
+
+
+def _cifra_contenuto(testo: str) -> str:
+    if CHIAVE_CONTENUTI_DIGITALI and Fernet is not None:
+        return "f:" + Fernet(_chiave_fernet()).encrypt(
+            testo.encode("utf-8")).decode()
+    return "plain:" + testo
+
+
+def _decifra_contenuto(blob: str) -> str:
+    """Il gemello inverso. Mai un'eccezione al chiamante: se la
+    chiave manca o e' cambiata, una riga onesta al posto del codice
+    (il venditore ce l'ha comunque, e' lui che l'ha scritto)."""
+    if blob.startswith("plain:"):
+        return blob[len("plain:"):]
+    if blob.startswith("f:"):
+        if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
+            return ("(contenuto cifrato: la chiave di lettura non è "
+                    "disponibile sul server, contatta un moderatore)")
+        try:
+            return Fernet(_chiave_fernet()).decrypt(
+                blob[len("f:"):].encode()).decode("utf-8")
+        except Exception:
+            return ("(contenuto cifrato con una chiave diversa: "
+                    "contatta un moderatore)")
+    return blob
+
+
 async def consegna_da_payload(d: dict, valuta: str):
     """Il giudice unico dei campi di consegna (lug 2026): legge il
     payload di pubblica/modifica e ritorna la quaterna
@@ -1452,6 +1536,9 @@ async def consegna_da_payload(d: dict, valuta: str):
         consegna = ""
     taglia = d.get("taglia_pacco", "")
     if taglia not in TAGLIE_PACCO:
+        taglia = ""
+    if consegna == "digitale":
+        # Niente pacco: una taglia arrivata per sbaglio non resta.
         taglia = ""
     sped_sats, sped_eur = 0, 0.0
     if consegna in ("spedizione", "entrambe"):
@@ -1489,6 +1576,25 @@ async def consegna_da_payload(d: dict, valuta: str):
                 except (TypeError, ValueError):
                     sped_eur = 0.0
     return consegna, sped_sats, sped_eur, taglia
+
+
+def guardia_venditore_digitale(tg_id: int, consegna: str):
+    """La leva anti-frode lato venditore (SPENTA di serie): per
+    pubblicare beni in consegna digitale servono vendite concluse.
+    Il venditore appena nato che vende «codici» e' il profilo tipico
+    della truffa a consegna immediata; con la leva a 0 non blocca
+    nessuno, si accende dal config quando servira'."""
+    if consegna != "digitale" or not DIGITALE_MIN_VENDITE:
+        return
+    con = db()
+    r = con.execute("SELECT vendite_ok FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    con.close()
+    if not r or r["vendite_ok"] < DIGITALE_MIN_VENDITE:
+        raise HTTPException(400,
+            f"Per vendere con consegna digitale servono almeno "
+            f"{DIGITALE_MIN_VENDITE} vendite concluse su Barattolo: "
+            f"inizia con una spedizione o un ritiro in zona")
 
 
 def testo_prezzo(valuta: str, prezzo_sats: int, prezzo_eur: float) -> str:
@@ -2337,6 +2443,28 @@ MSG_RIFIUTO = ("Questo annuncio non rispetta le regole del mercatino: "
                "sessuali, refurtiva, contraffazioni, documenti, dati "
                "personali, farmaci e animali protetti.")
 
+# Chi prova a vendere un servizio onesto (un logo, una riparazione,
+# una consulenza) non merita la lista dei divieti gravi: il no e'
+# di prodotto, non di condotta. Barattolo vende COSE che esistono,
+# fisiche o digitali; l'escrow a consegna singola non regge lavori
+# con tempi e revisioni.
+MSG_RIFIUTO_SERVIZI = ("I servizi e le prestazioni non sono ancora "
+                       "supportati su Barattolo: qui si vendono solo "
+                       "oggetti che esistono già, fisici o digitali "
+                       "(anche buoni regalo, codici e licenze). "
+                       "Grazie della comprensione!")
+
+
+def messaggio_rifiuto(motivo: str) -> str:
+    """Il messaggio giusto per il no dell'AI: ai servizi il garbo,
+    a tutto il resto la lista dei divieti. 'servizi sessuali' NON
+    e' un servizio da garbo: resta col messaggio di sempre."""
+    m = (motivo or "").lower()
+    if (("servizio" in m or "servizi" in m or "prestazion" in m)
+            and "sessual" not in m):
+        return MSG_RIFIUTO_SERVIZI
+    return MSG_RIFIUTO
+
 
 def controlla_vietato(titolo: str, descrizione: str) -> str | None:
     """Strato 1: il filtro parole. Ritorna la categoria violata,
@@ -2495,19 +2623,30 @@ PROMPT_MODERAZIONE = (
     "funzionanti, munizioni, armi bianche da offesa; droghe; servizi "
     "sessuali o prostituzione; refurtiva; contraffazioni; documenti "
     "falsi; dati personali o account; farmaci con obbligo di ricetta; "
-    "animali protetti. NON e' vietato l'uso legittimo: attrezzi da "
-    "lavoro (sparachiodi, pistole per silicone o vernice), giocattoli, "
-    "softair e repliche, fucili subacquei, coltelli da cucina, oggetti "
-    "da collezione disattivati, farmaci da banco citati di passaggio "
-    "nella descrizione di altro. Riconosci storpiature e mascheramenti "
+    "animali protetti. Sono VIETATI anche i SERVIZI e le prestazioni "
+    "(sviluppo software, grafica, riparazioni, consulenze, lezioni, "
+    "lavori su commissione): Barattolo vende solo COSE che esistono, "
+    "fisiche o digitali — se l'annuncio offre un lavoro da fare "
+    "rispondi VIETATO: servizio. NON e' vietato l'uso legittimo: "
+    "attrezzi da lavoro (sparachiodi, pistole per silicone o vernice), "
+    "giocattoli, softair e repliche, fucili subacquei, coltelli da "
+    "cucina, oggetti da collezione disattivati, farmaci da banco "
+    "citati di passaggio nella descrizione di altro. NON sono vietati "
+    "i PRODOTTI digitali leciti: buoni regalo e gift card (Amazon, "
+    "Zalando...), codici sconto, licenze software, chiavi di "
+    "attivazione, abbonamenti prepagati — la loro rivendita e' "
+    "permessa (restano vietati carte clonate e account rubati). "
+    "Riconosci storpiature e mascheramenti "
     "(numeri al posto di lettere, spazi o simboli in mezzo alle "
     "parole). Se l'annuncio e' ambiguo ma plausibilmente lecito "
     "rispondi OK: ogni annuncio pubblicato viene comunque notificato "
     "a un moderatore umano che puo' rimuoverlo. Riserva VIETATO ai "
     "casi chiari. Esempi: 'Pistola sparachiodi Bosch' -> OK. 'Pistola "
-    "softair a molla' -> OK. 'Revolver calibro 38 funzionante con "
-    "munizioni' -> VIETATO: arma da fuoco. 'Serata speciale con "
-    "tr0mb4mic1' -> VIETATO: servizi sessuali mascherati. Rispondi "
+    "softair a molla' -> OK. 'Buono regalo Zalando 50 euro' -> OK. "
+    "'Ti sviluppo un bot Telegram' -> VIETATO: servizio. 'Revolver "
+    "calibro 38 funzionante con munizioni' -> VIETATO: arma da fuoco. "
+    "'Serata speciale con tr0mb4mic1' -> VIETATO: servizi sessuali "
+    "mascherati. Rispondi "
     "con UNA sola riga: OK se l'annuncio va bene, oppure VIETATO: "
     "seguito dal motivo in poche parole. Nessun altro testo.")
 
@@ -2613,7 +2752,12 @@ def categoria_valida(c) -> str:
 # '' = non specificata (annunci storici e importati da Nostr): per
 # loro il flusso resta quello di sempre. I cataloghi sono del server,
 # come CATEGORIE: il client non li decide mai.
-MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe")
+# 'digitale' (lug 2026): il bene e' un testo (buono, codice, licenza)
+# che passa DENTRO Barattolo — niente spedizione, niente taglia. La
+# modalita' e' LIBERA dal tipo di oggetto: una gift card fisica si
+# spedisce, un codice si consegna digitale; le tutele seguono la
+# modalita' scelta, mai il tipo di bene.
+MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe", "digitale")
 TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 
 
@@ -2908,6 +3052,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # cambio, e tra lo scudo anti-doppione e l'INSERT non deve esserci
     # nessun await (il patto del server mono-processo).
     consegna, sped_sats, sped_eur, taglia = await consegna_da_payload(d, valuta)
+    guardia_venditore_digitale(user["id"], consegna)
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -2923,7 +3068,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         await notifica_admin(
             f"🚫 <b>Annuncio bloccato dall'AI</b> ({motivo})\n"
             f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
-        raise HTTPException(400, MSG_RIFIUTO)
+        raise HTTPException(400, messaggio_rifiuto(motivo))
 
     con = db()
     # --- Scudo anti-doppione: se lo stesso venditore ha gia' un
@@ -3284,6 +3429,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
     consegna, sped_sats, sped_eur, taglia = await consegna_da_payload(d, valuta)
+    guardia_venditore_digitale(user["id"], consegna)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
                     "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
@@ -3320,7 +3466,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"🚫 <b>Modifica bloccata dall'AI</b> ({motivo})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})")
-        raise HTTPException(400, MSG_RIFIUTO)
+        raise HTTPException(400, messaggio_rifiuto(motivo))
 
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
@@ -3500,7 +3646,7 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
             f"🚫 <b>Modifica firmata bloccata dall'AI</b> ({motivo})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})")
-        raise HTTPException(400, MSG_RIFIUTO)
+        raise HTTPException(400, messaggio_rifiuto(motivo))
 
     categoria = categoria_valida(d.get("categoria"))
     evento = evento_annuncio_importato(
@@ -4364,6 +4510,22 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     prot = articolo * PROTEZIONE_PERCENTO // 100
     totale = articolo + sped + prot
 
+    # La leva anti-frode del digitale (SPENTA di serie, come il tetto
+    # di rodaggio): un compratore senza acquisti conclusi non compra
+    # beni digitali sopra il tetto. Il caso del codice riscattato-e-
+    # negato non si risolve, si rende antieconomico: la prima truffa
+    # non puo' valere piu' del tetto. Vale sul solo articolo.
+    if (scelta == "digitale" and TETTO_DIGITALE_NUOVI
+            and articolo > TETTO_DIGITALE_NUOVI):
+        storia = con.execute("SELECT acquisti_ok FROM utenti WHERE tg_id=?",
+                             (user["id"],)).fetchone()
+        if not storia or not storia["acquisti_ok"]:
+            con.close()
+            raise HTTPException(400,
+                f"Per il tuo primo acquisto i beni digitali sopra "
+                f"{TETTO_DIGITALE_NUOVI:,} sats non sono disponibili: "
+                f"concludi prima un acquisto qualsiasi".replace(",", " "))
+
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
     con.execute(
@@ -4498,6 +4660,14 @@ async def segna_spedito(ordine_id: int, req: Request,
     if not o:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
+    if o["consegna_scelta"] == "digitale":
+        # Un ordine digitale non si «spedisce»: il timer partirebbe
+        # senza che il compratore abbia ricevuto NULLA. La strada e'
+        # una sola, la consegna del codice dentro Barattolo.
+        con.close()
+        raise HTTPException(400, "Questo ordine è a consegna digitale: "
+                                 "consegna il contenuto dal pannello "
+                                 "dedicato dell'ordine")
     con.execute("UPDATE ordini SET stato='shipped', corriere=?, tracking=?, "
                 "spedito_il=?, aggiornato=? WHERE id=?",
                 (corriere, tracking, int(time.time()), int(time.time()),
@@ -4547,6 +4717,111 @@ async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header(""),
                    f"ha {ORE_CONFERMA} ore per controllare l'oggetto, poi i "
                    f"sats si sbloccano automaticamente.")
     return {"ok": True, "stato": "delivered"}
+
+
+# ------------------- CONSEGNA DIGITALE (lug 2026) --------------------
+# Il principio cardine: il codice passa DENTRO Barattolo, mai fuori.
+# Il venditore lo consegna in un campo dedicato (locked -> shipped,
+# corriere-sentinella 'Consegna digitale'); il compratore lo RIVELA
+# con un tocco che fa da ricevuta di lettura (shipped -> delivered,
+# consegnato = il momento della rivelazione). Il journal registra
+# cosa e' stato consegnato (hash, mai il testo), quando, e quando e'
+# stato visualizzato. Da li' partono le finestre corte del digitale
+# (ORE_CONFERMA_DIGITALE / ORE_SILENZIO_DIGITALE nell'orologio).
+
+@app.post("/api/orders/{ordine_id}/consegna-digitale")
+async def consegna_digitale(ordine_id: int, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il venditore consegna il contenuto (buono, codice, licenza):
+    e' il gemello digitale di segna_spedito. Solo su ordini pagati
+    (locked) con consegna digitale scelta."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    contenuto = (d.get("contenuto") or "").strip()
+    if not contenuto:
+        raise HTTPException(400, "Scrivi il contenuto da consegnare "
+                                 "(codice, istruzioni, link di riscatto)")
+    if len(contenuto) > 4000:
+        raise HTTPException(400, "Il contenuto è troppo lungo "
+                                 "(massimo 4000 caratteri)")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["consegna_scelta"] != "digitale":
+        con.close()
+        raise HTTPException(400, "Questo ordine non è a consegna digitale")
+    adesso = int(time.time())
+    con.execute("UPDATE ordini SET stato='shipped', "
+                "corriere='Consegna digitale', tracking='', spedito_il=?, "
+                "contenuto_digitale=?, aggiornato=? WHERE id=?",
+                (adesso, _cifra_contenuto(contenuto), adesso, ordine_id))
+    con.commit()
+    con.close()
+    # La traccia nel journal: COSA e' stato consegnato (impronta, mai
+    # il testo: nel journal non entrano segreti) e quando. In disputa
+    # e' la prova che il contenuto rivelato e' quello consegnato.
+    impronta = hashlib.sha256(contenuto.encode("utf-8")).hexdigest()[:16]
+    print(f"💾 Ordine #{ordine_id}: contenuto digitale consegnato "
+          f"({len(contenuto)} caratteri, impronta {impronta})")
+    await notifica(o["compratore_id"],
+                   f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
+                   f"tuo acquisto digitale! Rivelalo nella Mini App: dalla "
+                   f"rivelazione hai {ORE_CONFERMA_DIGITALE} ore per "
+                   f"provarlo, poi i sats si sbloccano al venditore. "
+                   f"⚠️ I beni digitali non sono rimborsabili dopo la "
+                   f"rivelazione, salvo prove.")
+    return {"ok": True, "stato": "shipped"}
+
+
+@app.get("/api/orders/{ordine_id}/contenuto")
+async def leggi_contenuto_digitale(ordine_id: int,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """Il contenuto digitale si legge SOLO da qui, mai da /api/orders:
+    per il compratore la PRIMA lettura e' la rivelazione — la ricevuta
+    che apre la finestra di conferma (shipped -> delivered). Il
+    venditore rilegge cio' che ha consegnato senza far scattare nulla;
+    il moderatore legge negli stati di disputa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (ordine_id,)).fetchone()
+    if not o or not o["contenuto_digitale"]:
+        con.close()
+        raise HTTPException(404, "Nessun contenuto digitale su questo ordine")
+    admin_disputa = (e_admin(user["id"]) and o["stato"] in
+                     ("dispute", "return_pending", "return_shipped", "refund"))
+    if user["id"] not in (o["compratore_id"], o["venditore_id"]) \
+            and not admin_disputa:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    rivelato = o["consegnato"]
+    prima_volta = (user["id"] == o["compratore_id"]
+                   and o["stato"] == "shipped")
+    if prima_volta:
+        # La rivelazione: da qui la finestra di ORE_CONFERMA_DIGITALE.
+        # Le letture successive ri-servono il contenuto senza toccare
+        # nulla (idempotente: un refresh non e' una seconda ricevuta).
+        rivelato = int(time.time())
+        con.execute("UPDATE ordini SET stato='delivered', consegnato=?, "
+                    "aggiornato=? WHERE id=?",
+                    (rivelato, rivelato, ordine_id))
+        con.commit()
+    con.close()
+    if prima_volta:
+        print(f"👁 Ordine #{ordine_id}: contenuto digitale rivelato "
+              f"dal compratore")
+        await notifica(o["venditore_id"],
+                       f"👁 L'acquirente ha <b>rivelato il contenuto</b> "
+                       f"del suo acquisto digitale: ha "
+                       f"{ORE_CONFERMA_DIGITALE} ore per provarlo, poi i "
+                       f"sats si sbloccano automaticamente.")
+    return {"ok": True, "contenuto": _decifra_contenuto(o["contenuto_digitale"]),
+            "rivelato": rivelato}
 
 
 @app.post("/api/orders/{ordine_id}/sollecita")
@@ -5693,6 +5968,8 @@ def evento_annuncio(a: dict, status: str) -> dict:
             consegna_txt += " o ritiro in zona"
     elif a.get("consegna") == "ritiro":
         consegna_txt = " — solo ritiro in zona"
+    elif a.get("consegna") == "digitale":
+        consegna_txt = " — consegna digitale immediata"
     else:
         consegna_txt = ""
     content = ((a["descrizione"] or a["titolo"]).strip() +
@@ -6984,10 +7261,33 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                 "aggiornato=? WHERE id=?",
                 (int(time.time()), ordine_id))
     con.commit()
+    # La memoria che scoraggia le dispute-fotocopia: sui beni digitali
+    # il caso «riscattato e negato» e' irrisolvibile, quindi si rende
+    # antieconomico — il moderatore vede subito quante dispute ha gia'
+    # aperto questo compratore, e la regola dichiarata prima
+    # dell'acquisto: a zero prove vince chi ha consegnato in
+    # piattaforma. Puo' anche chiedere all'emittente quando e dove il
+    # codice e' stato riscattato.
+    nota_digitale = ""
+    if o["consegna_scelta"] == "digitale":
+        gia_aperte = con.execute(
+            "SELECT COUNT(*) AS n FROM ordini WHERE compratore_id=? "
+            "AND disputata=1", (o["compratore_id"],)).fetchone()["n"]
+        rivelato = ("contenuto RIVELATO" if o["consegnato"]
+                    else "contenuto non ancora rivelato")
+        nota_digitale = (
+            f"\n💾 Bene DIGITALE ({rivelato}; il contenuto si legge "
+            f"dal dettaglio ordine). Regola dichiarata all'acquisto: "
+            f"a zero prove vince il venditore che ha consegnato in "
+            f"piattaforma; puoi chiedere all'emittente quando/dove il "
+            f"codice è stato riscattato."
+            f"\n📊 Dispute aperte da questo compratore, in totale: "
+            f"{gia_aperte}.")
     con.close()
     for admin in ADMIN_IDS:
         await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
-                              "I sats restano bloccati in attesa della tua decisione.")
+                              "I sats restano bloccati in attesa della tua "
+                              "decisione." + nota_digitale)
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
                    "vi contattera' entrambi. I sats restano nel deposito "
@@ -7073,6 +7373,12 @@ def miei_ordini(x_tg_init_data: str = Header(""),
     righe = [dict(r) for r in con.execute(q + " ORDER BY o.aggiornato DESC",
                                           par)]
     con.close()
+    for r in righe:
+        # Il contenuto digitale NON esce mai da qui: si legge solo da
+        # /contenuto, dove la prima lettura del compratore fa da
+        # ricevuta. Resta il flag: il client sa se c'e' qualcosa da
+        # rivelare senza poterlo sbirciare.
+        r["contenuto_presente"] = bool(r.pop("contenuto_digitale", ""))
     return righe
 
 
@@ -7217,14 +7523,20 @@ MODELLO_IMPORT = (
     "Abbigliamento;Roma;https://esempio.it/giacca-fronte.jpg|"
     "https://esempio.it/giacca-retro.jpg;entrambe;5,50;busta\n"
     "Trapano avvitatore Bosch;Con due batterie e valigetta;80000;sats;"
-    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio\n")
+    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio\n"
+    # la quarta via: consegna digitale (buoni, codici, licenze) —
+    # niente spedizione ne' taglia, il codice si consegna dopo
+    # l'acquisto dal dettaglio ordine
+    "Buono regalo libreria 25 euro;Codice valido 12 mesi, consegna "
+    "immediata;25,00;eur;Libri e media;;;digitale;;\n")
 
 
 @app.get("/api/import/modello")
 def modello_import():
     """Il CSV modello da compilare: separatore ; (l'Excel italiano),
-    BOM per l'UTF-8, tre righe d'esempio che mostrano le tre vie
-    delle foto (nessuna, URL separati da |, nomi file nello ZIP).
+    BOM per l'UTF-8, quattro righe d'esempio che mostrano le tre vie
+    delle foto (nessuna, URL separati da |, nomi file nello ZIP) e
+    le quattro modalita' di consegna (digitale compresa).
     Pubblico come il download dell'export: dentro Telegram il
     download non porta l'header di autenticazione, e qui non c'e'
     nulla di segreto."""
@@ -7431,6 +7743,17 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
             payload_consegna["spedizione_sats"] = sped_testo or 0
         consegna, sped_sats, sped_eur, taglia = \
             await consegna_da_payload(payload_consegna, valuta)
+        if consegna == "digitale":
+            # La leva anti-frode del venditore vale anche qui: riga
+            # scartata (mai un 400 sull'intero file), stessa guardia
+            # di pubblica(). Con la leva a 0 non scarta nulla.
+            try:
+                guardia_venditore_digitale(user["id"], consegna)
+            except HTTPException:
+                scarti.append({"riga": numero,
+                               "motivo": "consegna digitale: servono "
+                                         "vendite concluse"})
+                continue
 
         # Moderazione strato 1, su TUTTE le righe, prima della conferma
         violata = controlla_vietato(titolo, descrizione)
@@ -7863,15 +8186,28 @@ async def controlla_scadenze():
     con = db()
     scaduti_consegna = [r["id"] for r in con.execute(
         "SELECT id FROM ordini WHERE stato='delivered' AND consegnato>0 "
-        "AND consegnato < ?", (adesso - ORE_CONFERMA * 3600,))]
+        "AND consegnato < ? AND consegna_scelta != 'digitale'",
+        (adesso - ORE_CONFERMA * 3600,))]
     scaduti_silenzio = [r["id"] for r in con.execute(
         "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
-        "AND spedito_il < ?", (adesso - GIORNI_AUTO_SBLOCCO * 86400,))]
+        "AND spedito_il < ? AND consegna_scelta != 'digitale'",
+        (adesso - GIORNI_AUTO_SBLOCCO * 86400,))]
+    # Il digitale ha le SUE finestre, corte: un codice si prova
+    # subito, non viaggia in furgone. consegnato = la rivelazione
+    # (la ricevuta di lettura), spedito_il = la consegna del codice.
+    scaduti_digitale = [r["id"] for r in con.execute(
+        "SELECT id FROM ordini WHERE stato='delivered' AND consegnato>0 "
+        "AND consegnato < ? AND consegna_scelta='digitale'",
+        (adesso - ORE_CONFERMA_DIGITALE * 3600,))]
+    scaduti_digitale += [r["id"] for r in con.execute(
+        "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
+        "AND spedito_il < ? AND consegna_scelta='digitale'",
+        (adesso - ORE_SILENZIO_DIGITALE * 3600,))]
     # Spazzatura: via le sessioni web ormai scadute
     con.execute("DELETE FROM sessioni WHERE scade < ?", (adesso,))
     con.commit()
     con.close()
-    for oid in scaduti_consegna + scaduti_silenzio:
+    for oid in scaduti_consegna + scaduti_silenzio + scaduti_digitale:
         print(f"⏰ Sblocco automatico dell'ordine #{oid}")
         await _sblocca_sats(oid, automatico=True)
 

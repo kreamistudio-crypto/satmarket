@@ -57,6 +57,25 @@ TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
                              # accendere il tetto; per gli annunci in EUR
                              # vale l'equivalente al cambio corrente
 
+# --- Consegna digitale (buoni regalo, codici, licenze) ---------------
+# Il codice passa DENTRO Barattolo: il venditore lo consegna in un
+# campo dedicato dell'ordine, il compratore lo rivela con un tocco
+# che fa da ricevuta di lettura. Finestre piu' corte del fisico:
+# un codice si prova subito.
+ORE_CONFERMA_DIGITALE = 24   # dopo la rivelazione: poi sblocco automatico
+ORE_SILENZIO_DIGITALE = 48   # consegnato ma mai rivelato: poi sblocco
+# Cifratura a riposo dei codici nel database: una stringa segreta
+# qualsiasi (generane una casuale e incollala SOLO nel config.py del
+# server). Vuota = i codici restano in chiaro nel DB: tutto funziona
+# uguale, protegge meno un backup rubato.
+CHIAVE_CONTENUTI_DIGITALI = ""
+# Leve anti-frode, SPENTE di serie (0 = nessun limite):
+TETTO_DIGITALE_NUOVI = 0     # es. 50_000: un compratore senza acquisti
+                             # conclusi non compra digitale sopra questa
+                             # cifra (sats, sul solo articolo)
+DIGITALE_MIN_VENDITE = 0     # es. 1: per pubblicare annunci digitali
+                             # servono almeno N vendite concluse
+
 # --- Offerte (contrattazione sul prezzo) -----------------------------
 # Il compratore propone una cifra, il venditore accetta, rifiuta o fa
 # UNA controproposta. Accettare = diritto di comprare a quel prezzo
