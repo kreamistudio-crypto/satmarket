@@ -31,6 +31,7 @@ AVVIO:      uvicorn server:app --host 0.0.0.0 --port 8080
 import asyncio
 import base64
 import csv
+import difflib
 import hashlib
 import hmac
 import html
@@ -2657,6 +2658,58 @@ def coordinate_da_zona(zona: str) -> tuple[float, float]:
         if asciutti and asciutti != token:
             trovato = scandisci(asciutti)
     return trovato or (0.0, 0.0)
+
+
+# Parole di zona che non sono MAI un comune storpiato: senza questa
+# stoplist «Spedisco in tutta Italia» suggerirebbe Sedico (BL) — il
+# fuzzy a 0.8 ci casca davvero, verificato.
+PAROLE_ZONA = {"spedisco", "spedizione", "spedizioni", "consegna",
+               "consegno", "ritiro", "ritira", "zona", "provincia",
+               "italia", "ovunque", "tutta", "tutto", "mano", "citta",
+               "centro", "dintorni", "vicino", "vicinanze", "solo"}
+
+
+def _comuni_fuzzy() -> dict:
+    """chiave normalizzata -> nome bello, SOLO per i nomi che
+    coordinate_da_zona sa poi riconoscere (un conteso come 'Castro'
+    resta fuori: suggerirlo rimetterebbe l'utente nel vicolo cieco).
+    Costruita pigra una volta: ~7.900 voci in RAM."""
+    global _COMUNI_FUZZY
+    if _COMUNI_FUZZY is None:
+        _COMUNI_FUZZY = {}
+        for c in COMUNI_LISTA:
+            chiave = normalizza(c["nome"])
+            if chiave in COMUNI and chiave not in _COMUNI_FUZZY:
+                _COMUNI_FUZZY[chiave] = c["nome"]
+    return _COMUNI_FUZZY
+
+
+_COMUNI_FUZZY = None
+
+
+def suggerisci_comune(testo: str) -> str:
+    """Il «intendevi Pavia?» della validazione morbida: quando la zona
+    non contiene NESSUN comune riconoscibile, cerca un quasi-comune
+    (difflib, soglia 0.8) negli n-grammi del testo — i piu' lunghi
+    prima, a parita' vince il primo nel testo, come in
+    coordinate_da_zona. Niente candidato = '' (caso legittimo:
+    frazioni, «spedisco in tutta Italia»), mai un errore."""
+    chiavi = _comuni_fuzzy()
+    if not chiavi:
+        return ""
+    token = [t for t in normalizza(testo).split()
+             if t not in PREPOSIZIONI_COMUNI and t not in PAROLE_ZONA]
+    candidati = []
+    for lung in range(min(3, len(token)), 0, -1):
+        for i in range(len(token) - lung + 1):
+            ng = " ".join(token[i:i + lung])
+            if len(ng) >= 4:
+                candidati.append(ng)
+    for ng in candidati:
+        m = difflib.get_close_matches(ng, chiavi.keys(), n=1, cutoff=0.8)
+        if m:
+            return chiavi[m[0]]
+    return ""
 
 
 def distanza_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -5903,6 +5956,27 @@ async def cerca_comuni(q: str = "",
     return {"comuni": trovati}
 
 
+@app.get("/api/zona-controlla")
+async def zona_controlla(testo: str = "",
+                         x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """La validazione MORBIDA della zona di Vendi (lug 2026): se nel
+    testo libero c'e' un comune riconoscibile (anche «provincia di
+    Pavia»: gli n-grammi lo pescano) va tutto bene; se non c'e' NULLA
+    ma un quasi-comune si' («Pvia» -> Pavia), il client mostra
+    «intendevi...?». Mai bloccante: e' solo un consiglio. Dataset
+    assente = sempre riconosciuto (la funzione si spegne in silenzio,
+    come tutta la geografia)."""
+    verifica_utente(x_tg_init_data, barattolo_sessione)
+    testo = (testo or "").strip()[:120]
+    if not testo or not COMUNI:
+        return {"riconosciuto": True, "suggerimento": ""}
+    lat, lon = coordinate_da_zona(testo)
+    if lat or lon:
+        return {"riconosciuto": True, "suggerimento": ""}
+    return {"riconosciuto": False, "suggerimento": suggerisci_comune(testo)}
+
+
 @app.get("/api/me/avvisi-ricerca")
 async def lista_avvisi_ricerca(x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
@@ -8151,6 +8225,15 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
         if not titolo:
             scarti.append({"riga": numero, "motivo": "titolo mancante"})
             continue
+        # Zona senza un comune riconoscibile: solo un AVVISO in
+        # anteprima (mai uno scarto), col «forse intendevi» quando
+        # il fuzzy trova un quasi-comune. Stessa morbidezza di Vendi.
+        if zona and COMUNI and coordinate_da_zona(zona) == (0.0, 0.0):
+            sugg = suggerisci_comune(zona)
+            avvisi.append({"riga": numero,
+                           "motivo": f"zona «{zona[:40]}» senza un comune "
+                                     f"riconoscibile"
+                                     + (f" — forse {sugg}?" if sugg else "")})
 
         # Prezzo e valuta: il giudice e' lo stesso di pubblica()
         valuta = (cella(r, "valuta") or "sats").lower()

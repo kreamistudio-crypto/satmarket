@@ -1304,7 +1304,9 @@
           <option value="ingombrante">🛋 Ingombrante — serve un furgone</option>
         </select></div>
       <div class="field"><label>Zona</label>
-        <input id="sellZone" placeholder="Es. Pavia — spedisco in tutta Italia"></div>
+        <input id="sellZone" list="zonaList" placeholder="Es. Pavia — spedisco in tutta Italia" oninput="suggerisciZona(this.value)" onblur="controllaZona()" autocomplete="off">
+        <datalist id="zonaList"></datalist>
+        <div id="zonaHint" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div></div>
       <div class="field"><label>Descrizione</label>
         <textarea id="sellDesc" placeholder="Condizioni, difetti, motivo della vendita…"></textarea></div>
       <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
@@ -4965,6 +4967,60 @@ function setRicercaValuta(v){
   el('ricValEur')?.classList.toggle('active', v === 'eur');
   const inp = el('ricPrezzo');
   if (inp) inp.placeholder = v === 'eur' ? 'Es. 50' : 'Es. 50 000';
+}
+
+/* ------- Citta' vere nel campo Zona di Vendi (lug 2026) -------
+   Autocomplete dal dataset comuni (stesso /api/comuni degli avvisi)
+   + validazione MORBIDA al blur: se il testo non contiene nessun
+   comune riconoscibile ma un quasi-comune si' («Pvia»), la riga
+   «intendevi Pavia?» — mai bloccante, «Lascia così» e si pubblica
+   com'e' (frazioni e «spedisco in tutta Italia» restano legittimi:
+   per loro il server tace). Niente in DEMO: non c'e' un server. */
+let zonaTimer = 0, zonaSuggerita = '';
+function suggerisciZona(q){
+  const h = el('zonaHint');
+  if (h) h.style.display = 'none';    // si ricontrolla al blur
+  clearTimeout(zonaTimer);
+  if (DEMO || VETRINA || (q || '').trim().length < 2) return;
+  zonaTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/comuni?q=${encodeURIComponent(q)}`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json();
+      const dl = el('zonaList');
+      if (dl) dl.innerHTML = (d.comuni || []).map(c =>
+        `<option value="${esc(c.nome)}">${esc(c.provincia)}</option>`).join('');
+    } catch {}
+  }, 250);
+}
+async function controllaZona(){
+  const box = el('zonaHint');
+  if (!box) return;
+  box.style.display = 'none'; box.innerHTML = '';
+  const testo = el('sellZone').value.trim();
+  if (!testo || DEMO || VETRINA) return;
+  try {
+    const r = await fetch(
+      `${API_BASE}/zona-controlla?testo=${encodeURIComponent(testo)}`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok) return;
+    const d = await r.json();
+    /* riconosciuta, o nessun quasi-comune (caso legittimo): silenzio */
+    if (d.riconosciuto || !d.suggerimento) return;
+    /* il nome del comune vive in una variabile, mai dentro l'onclick
+       (il patto anti-XSS: gli apostrofi di Sant'Angelo non si fidano) */
+    zonaSuggerita = d.suggerimento;
+    box.innerHTML = `📍 Non riconosco «${esc(testo.slice(0,40))}» — `
+      + `intendevi <b>${esc(d.suggerimento)}</b>? `
+      + `<a href="#" onclick="usaZonaSuggerita();return false">Usa «${esc(d.suggerimento)}»</a> · `
+      + `<a href="#" onclick="el('zonaHint').style.display='none';return false" style="color:var(--muted)">Lascia così</a>`;
+    box.style.display = 'block';
+  } catch(e) {}
+}
+function usaZonaSuggerita(){
+  haptic();
+  el('sellZone').value = zonaSuggerita;
+  el('zonaHint').style.display = 'none';
 }
 
 /* l'autocomplete del comune: suggerimenti dal server, con calma */
