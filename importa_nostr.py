@@ -134,8 +134,11 @@ def interroga(relay, hexkey):
     try:
         ws = create_connection(relay, timeout=10,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
+        # Anche i kind 5 (NIP-09): le cancellazioni del venditore
+        # vanno lette e rispettate, non solo i suoi annunci.
         ws.send(json.dumps(["REQ", "imp", {
-            "kinds": [30402, 30018, 30017], "authors": [hexkey], "limit": 200}]))
+            "kinds": [30402, 30018, 30017, 5], "authors": [hexkey],
+            "limit": 200}]))
         inizio = time.time()
         while time.time() - inizio < 20:
             try:
@@ -284,9 +287,8 @@ def estrai_annuncio(e, valute_stall, cambio):
         titolo = t[1] if t else ""
         s = tag(e, "summary")
         desc = e.get("content", "") or (s[1] if s else "")
-        st = tag(e, "status")
-        if st and st[1] == "sold":
-            return None
+        # (lo "status sold" non si salta piu' qui: lo gestisce il
+        # giro principale, che puo' spegnere la riga locale)
         loc = tag(e, "location")
         zona = loc[1] if loc else ""
         p = tag(e, "price")
@@ -330,10 +332,25 @@ def estrai_annuncio(e, valute_stall, cambio):
             "categoria": categoria_automatica(titolo + " " + desc),
             "origine_d": origine_d,
             "origine_foto": origine_foto,
+            # l'id dell'evento importato: serve alle cancellazioni
+            # NIP-09 che puntano per tag "e" invece che per coordinata
+            "origine_id": e.get("id", ""),
             # la coppia del tag price: se il listino nasce in EUR la
             # vetrina deve dirlo (valuta/prezzo_eur), non solo i sats
             "valuta_orig": (valuta or "").upper(),
             "importo_orig": importo}
+
+
+def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
+    """Spegne una riga locale (l'evento e' stato cancellato o segnato
+    venduto sui relay) e annulla gli ordini mai pagati, come fa la
+    rimozione dalla Mini App. I sats in escrow non c'entrano mai:
+    un annuncio con un affare in corso non e' piu' 'attivo'."""
+    con.execute("UPDATE annunci SET stato=? WHERE id=?",
+                (stato, annuncio_id))
+    con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                "WHERE annuncio_id=? AND stato='creato'",
+                (int(time.time()), annuncio_id))
 
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
@@ -366,14 +383,38 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             except Exception:
                 pass
 
+    # --- Cancellazioni NIP-09 (kind 5) del venditore ---
+    # Tag "a" = coordinata kind:pubkey:d (la via giusta per i
+    # replaceable, solo i kind che importiamo e solo la SUA chiave),
+    # tag "e" = id di un evento preciso. La fiducia e' quella di
+    # tutto l'import: si chiede authors=hexkey ai relay, le firme
+    # non si verificano (limite dichiarato in testa al file).
+    canc_coord, canc_id = set(), set()
+    for e in eventi:
+        if e.get("kind") != 5:
+            continue
+        for t in e.get("tags", []):
+            if not t or len(t) < 2 or not t[1]:
+                continue
+            if t[0] == "a":
+                parti = t[1].split(":", 2)
+                if (len(parti) == 3 and parti[0] in ("30402", "30018")
+                        and parti[1].lower() == hexkey):
+                    canc_coord.add(parti[2])       # il tag d
+            elif t[0] == "e":
+                canc_id.add(t[1])
+
     prodotti = [e for e in unici.values() if e["kind"] in (30402, 30018)]
     print(f"\nTrovati {len(prodotti)} annunci unici. Converto e importo…\n")
-    if not prodotti:
+    if not prodotti and not canc_coord and not canc_id:
         print("Nessun annuncio trovato: controlla la npub, o prova ad "
               "aggiungere ai RELAYS quello usato dal tuo amico.")
-        return 0, 0, 0
+        # NIENTE return secco: le lapidi dei giri passati vanno fatte
+        # rispettare comunque (un rimborso puo' aver riacceso una
+        # riga il cui evento non esiste piu' da nessuna parte).
 
-    cambio = cambio_btc()
+    # il cambio serve solo se c'e' qualcosa da importare
+    cambio = cambio_btc() if prodotti else {}
     # timeout generoso: quando gira dal server il database e' conteso
     con = sqlite3.connect(db, timeout=15)
     # Assicura che il database abbia le colonne nuove (foto, nostr).
@@ -382,6 +423,7 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
                     "nostr_origine_d TEXT DEFAULT ''",
                     "nostr_origine_foto TEXT DEFAULT ''",
+                    "nostr_origine_id TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
                     "prezzo_eur REAL DEFAULT 0"):
         try:
@@ -416,9 +458,107 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             print("  🟣 Profilo venditore: npub gia' dichiarata, "
                   "badge ora verificato")
 
-    importati, aggiornati, saltati = 0, 0, 0
     npub = npub_venditore.strip()
+
+    # LAPIDE PERSISTENTE (tappa 2 del cantiere cancellazioni): una
+    # cancellazione vista su QUALUNQUE relay si ricorda per sempre,
+    # perche' i relay possono scordare il kind 5 prima dell'evento —
+    # e senza memoria l'annuncio tornerebbe al giro dopo.
+    con.execute("CREATE TABLE IF NOT EXISTS nostr_lapidi("
+                "hexkey TEXT NOT NULL, d TEXT NOT NULL DEFAULT '', "
+                "event_id TEXT NOT NULL DEFAULT '', "
+                "visto INTEGER NOT NULL DEFAULT 0, "
+                "PRIMARY KEY(hexkey, d, event_id))")
+    adesso = int(time.time())
+    # Un tag "e" nudo punta a un id: se quell'evento e' tra i letti
+    # ne ricaviamo la coordinata d, che e' stabile nel tempo.
     for e in prodotti:
+        if e.get("id") in canc_id:
+            dt = tag(e, "d")
+            if dt:
+                canc_coord.add(dt[1])
+    for d in canc_coord:
+        con.execute("INSERT OR IGNORE INTO nostr_lapidi(hexkey, d, "
+                    "event_id, visto) VALUES(?, ?, '', ?)",
+                    (hexkey, d, adesso))
+    for eid in canc_id:
+        con.execute("INSERT OR IGNORE INTO nostr_lapidi(hexkey, d, "
+                    "event_id, visto) VALUES(?, '', ?, ?)",
+                    (hexkey, eid, adesso))
+    # ...e si rilegge TUTTA: contano anche le lapidi dei giri passati.
+    for r in con.execute("SELECT d, event_id FROM nostr_lapidi "
+                         "WHERE hexkey=?", (hexkey,)).fetchall():
+        if r[0]:
+            canc_coord.add(r[0])
+        if r[1]:
+            canc_id.add(r[1])
+
+    # Le righe locali sotto lapide si SPENGONO: prima restavano
+    # attive e COMPRABILI per sempre (il buco vero del cantiere).
+    da_spegnere = {}
+    for d in canc_coord:
+        for r in con.execute(
+                "SELECT id, titolo FROM annunci WHERE nostr_origine_d=? "
+                "AND stato='attivo' AND (venditore_id=? OR contatto_nostr=?)",
+                (d, venditore_id, npub)).fetchall():
+            da_spegnere[r[0]] = r[1]
+    for eid in canc_id:
+        for r in con.execute(
+                "SELECT id, titolo FROM annunci WHERE nostr_origine_id=? "
+                "AND stato='attivo' AND (venditore_id=? OR contatto_nostr=?)",
+                (eid, venditore_id, npub)).fetchall():
+            da_spegnere[r[0]] = r[1]
+    for aid, titolo in da_spegnere.items():
+        spegni_annuncio(con, aid)
+        print(f"  🪦 cancellato sui relay: spento «{titolo[:50]}»")
+
+    # E gli eventi sotto lapide non si importano MAI piu' — nemmeno
+    # se il venditore ripubblicasse con lo stesso d (imperfezione
+    # dichiarata: lapide e' lapide, per tornare serve un d nuovo).
+    vivi = []
+    for e in prodotti:
+        dt = tag(e, "d")
+        if e.get("id") in canc_id or (dt and dt[1] in canc_coord):
+            continue
+        vivi.append(e)
+    if len(vivi) < len(prodotti):
+        print(f"  🪦 {len(prodotti) - len(vivi)} eventi sotto lapide: "
+              f"ignorati")
+    prodotti = vivi
+
+    importati, aggiornati, saltati = 0, 0, 0
+    for e in prodotti:
+        # "status sold" sui relay: la riga locale si spegne come
+        # 'venduto' (tappa 3: prima l'evento si saltava e l'annuncio
+        # restava attivo e COMPRABILE qui). Niente lapide: venduto
+        # non e' cancellato — ma lo scudo anti-resurrezione lo tiene
+        # spento anche se lo status tornasse active (dichiarato:
+        # stesso rimedio, un tag d nuovo).
+        st = tag(e, "status") if e["kind"] == 30402 else None
+        if st and st[1] == "sold":
+            saltati += 1
+            dt = tag(e, "d")
+            tt = tag(e, "title")
+            morto = None
+            if dt:
+                morto = con.execute(
+                    "SELECT id, titolo FROM annunci "
+                    "WHERE nostr_origine_d=? AND stato='attivo' "
+                    "AND (venditore_id=? OR contatto_nostr=?)",
+                    (dt[1], venditore_id, npub)).fetchone()
+            if not morto and tt:
+                morto = con.execute(
+                    "SELECT id, titolo FROM annunci WHERE titolo=? "
+                    "AND stato='attivo' "
+                    "AND (venditore_id=? OR contatto_nostr=?) "
+                    "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
+                    "     OR nostr_origine_d=?)",
+                    (tt[1].strip()[:120], venditore_id, npub,
+                     dt[1] if dt else "")).fetchone()
+            if morto:
+                spegni_annuncio(con, morto[0], "venduto")
+                print(f"  🏷️ venduto sui relay: spento «{morto[1][:50]}»")
+            continue
         a = estrai_annuncio(e, valute_stall, cambio)
         if not a:
             saltati += 1
@@ -493,22 +633,23 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                 "UPDATE annunci SET titolo=?, descrizione=?, zona=?, "
                 "foto=?, contatto_nostr=?, prezzo_sats=?, valuta=?, "
                 "prezzo_eur=?, venditore_id=?, nostr_origine_d=?, "
-                "nostr_origine_foto=? WHERE id=?",
+                "nostr_origine_foto=?, nostr_origine_id=? WHERE id=?",
                 (a["titolo"], a["descrizione"], a["zona"], foto_loc, npub,
                  a["prezzo_sats"], valuta, prezzo_eur, venditore_id,
-                 a["origine_d"], a["origine_foto"], gia[0]))
+                 a["origine_d"], a["origine_foto"], a["origine_id"],
+                 gia[0]))
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
             continue
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
             "prezzo_sats,zona,foto,contatto_nostr,valuta,prezzo_eur,"
-            "nostr_origine_d,nostr_origine_foto,creato) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "nostr_origine_d,nostr_origine_foto,nostr_origine_id,creato) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (venditore_id, a["titolo"], a["descrizione"], a["categoria"],
              a["prezzo_sats"], a["zona"], a["foto"], npub, valuta,
              prezzo_eur, a["origine_d"], a["origine_foto"],
-             int(time.time())))
+             a["origine_id"], int(time.time())))
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
         foto_loc = localizza_foto(cur.lastrowid, a["foto"])
         if foto_loc != a["foto"]:
