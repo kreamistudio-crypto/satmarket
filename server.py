@@ -3076,8 +3076,12 @@ def _conta_barattolo(con, tg_id):
         "WHERE p.tg_id=?", (tg_id,)).fetchone()[0]
 
 @app.post("/api/listings/{annuncio_id}/preferito")
-def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
-                     barattolo_sessione: str = Cookie("")):
+async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    # Async dal lug 2026 (offerta lampo): accoda_colpo avvia il suo
+    # drenatore con create_task, che vuole il loop — il precedente e'
+    # /api/me, diventato async per l'avatar. Le query restano un lampo,
+    # e senza await tra COUNT e INSERT il blocco e' ancora atomico.
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     # Prima si prova a togliere: cosi' il barattolo si svuota anche
@@ -3085,9 +3089,10 @@ def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
     tolto = con.execute(
         "DELETE FROM preferiti WHERE tg_id=? AND annuncio_id=?",
         (user["id"], annuncio_id)).rowcount
+    salvato_attivo = False
     if not tolto:
-        a = con.execute("SELECT id FROM annunci WHERE id=?",
-                        (annuncio_id,)).fetchone()
+        a = con.execute("SELECT id, venditore_id, stato FROM annunci "
+                        "WHERE id=?", (annuncio_id,)).fetchone()
         if not a:
             con.close()
             raise HTTPException(404, "Annuncio non trovato")
@@ -3100,7 +3105,14 @@ def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
         con.execute("INSERT INTO preferiti(tg_id, annuncio_id, creato) "
                     "VALUES(?,?,?)",
                     (user["id"], annuncio_id, int(time.time())))
+        # L'avviso «ha fatto colpo» parte solo per i salvataggi veri:
+        # annuncio attivo e MAI il proprio (il venditore che si salva
+        # da solo non si applaude da solo).
+        salvato_attivo = (a["stato"] == "attivo"
+                          and a["venditore_id"] != user["id"])
     con.commit()
+    if salvato_attivo:
+        accoda_colpo(annuncio_id)   # dopo il commit, fail-open
     # Il conteggio fresco viaggia nella risposta: il frontend aggiorna
     # il livello di riempimento col numero del server, non con una stima.
     conteggio = _conta_barattolo(con, user["id"])
@@ -6255,6 +6267,86 @@ def pulisci_avvisi():
     oggi = time.strftime("%Y-%m-%d")
     for tg_id in [t for t, v in AVVISI_QUOTA.items() if v[0] != oggi]:
         AVVISI_QUOTA.pop(tg_id, None)
+
+
+# ------------------- offerta lampo: «ha fatto colpo» -----------------
+# Quando qualcuno mette un annuncio nel suo barattolo, il VENDITORE
+# riceve un avviso ANONIMO («qualcuno», mai chi ne' quanti: i preferiti
+# restano privati per natura) con l'invito a lanciare un'offerta lampo.
+# Stessa valvola dei post promo: finestra di raggruppamento, rilettura
+# dal DB, aggregato oltre la soglia. In piu' un cooldown PER ANNUNCIO
+# (GIORNI_COLPO, colonna lampo_colpo_avvisato): dieci salvataggi in una
+# settimana = un solo avviso, l'entusiasmo non deve diventare molestia.
+
+CODA_COLPO: list[int] = []       # annunci appena messi nel barattolo
+_drenatore_colpo_avviato = False
+
+
+def accoda_colpo(annuncio_id: int):
+    """Mette l'annuncio in coda per l'avviso «ha fatto colpo» e, se
+    dorme, sveglia il drenatore. Leggera e sincrona: si chiama DOPO il
+    commit del salvataggio, mai dentro la transazione."""
+    global _drenatore_colpo_avviato
+    if not LAMPO_ATTIVE:
+        return
+    CODA_COLPO.append(annuncio_id)
+    if not _drenatore_colpo_avviato:
+        _drenatore_colpo_avviato = True
+        asyncio.create_task(_drena_colpo())
+
+
+async def _drena_colpo():
+    """Il drenatore: dorme la finestra, rilegge ogni annuncio dal DB
+    (spariti, importati, in cooldown o gia' in lampo = muti), raggruppa
+    per venditore e applica la regola di sempre — un messaggio per
+    annuncio fino alla soglia, un solo aggregato oltre. Il timbro del
+    cooldown si scrive PRIMA di notificare (il pattern dei commit)."""
+    global _drenatore_colpo_avviato
+    await asyncio.sleep(ATTESA_RAGGRUPPO)
+    ids = list(dict.fromkeys(CODA_COLPO))
+    CODA_COLPO.clear()
+    _drenatore_colpo_avviato = False   # chi arriva ora fa un giro nuovo
+    try:
+        adesso = int(time.time())
+        per_venditore: dict[int, list] = {}
+        con = db()
+        for i in ids:
+            a = con.execute("SELECT * FROM annunci WHERE id=?",
+                            (i,)).fetchone()
+            if (not a or a["stato"] != "attivo" or a["contatto_nostr"]
+                    or a["lampo_scadenza"] > adesso   # lampo gia' in corso
+                    or adesso - a["lampo_colpo_avvisato"]
+                        < GIORNI_COLPO * 86400):
+                continue
+            per_venditore.setdefault(a["venditore_id"], []).append(dict(a))
+        # Il timbro del cooldown prima delle notifiche: se una notifica
+        # inciampa, meglio un avviso perso che uno ripetuto.
+        for annunci in per_venditore.values():
+            for a in annunci:
+                con.execute("UPDATE annunci SET lampo_colpo_avvisato=? "
+                            "WHERE id=?", (adesso, a["id"]))
+        con.commit()
+        con.close()
+        for venditore, annunci in per_venditore.items():
+            if len(annunci) <= SOGLIA_AGGREGA:
+                for a in annunci:
+                    await notifica(venditore, (
+                        f"🫙 Il tuo annuncio ha fatto colpo!\n"
+                        f"<b>{html.escape(a['titolo'])}</b>: qualcuno "
+                        f"l'ha appena messo nel suo barattolo.\n"
+                        f"💰 Se vuoi dargli una spinta, lancia "
+                        f"un'offerta lampo dalla scheda dell'annuncio:\n"
+                        f"{URL_PUBBLICO}/annuncio/{a['id']}"))
+            else:
+                # La valvola: un solo messaggio, non nomina nessuno.
+                await notifica(venditore, (
+                    f"🫙 {len(annunci)} tuoi annunci hanno fatto colpo: "
+                    f"qualcuno li ha messi nel suo barattolo.\n"
+                    f"💰 Dalle loro schede puoi lanciare un'offerta "
+                    f"lampo → {URL_PUBBLICO}"))
+            await asyncio.sleep(0.2)
+    except Exception as e:
+        print(f"⚠️ Avviso «ha fatto colpo» saltato: {e}")
 
 
 # Il ciclo di vita agisce solo su post GIA' fatti (le colonne piene):
