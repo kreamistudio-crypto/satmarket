@@ -784,6 +784,13 @@ def init_db():
                     "spedizione_sats INTEGER DEFAULT 0",
                     "spedizione_eur REAL DEFAULT 0",
                     "taglia_pacco TEXT DEFAULT ''",
+                    # anche_digitale (lug 2026): la gift card che si puo'
+                    # avere in due modi — la modalita' fisica in consegna
+                    # + il codice in piattaforma. Ortogonale di proposito:
+                    # consegna tiene la semantica di sempre e ogni check
+                    # esistente resta vero; lecito solo con una modalita'
+                    # fisica (con 'digitale' o '' si forza 0)
+                    "anche_digitale INTEGER DEFAULT 0",
                     # offerta lampo (lug 2026): lo sconto a tempo su
                     # tutto l'annuncio. percento>0 e scadenza nel futuro
                     # = attiva; oltre la scadenza torna prezzo pieno da
@@ -1519,11 +1526,13 @@ def _decifra_contenuto(blob: str) -> str:
 
 async def consegna_da_payload(d: dict, valuta: str):
     """Il giudice unico dei campi di consegna (lug 2026): legge il
-    payload di pubblica/modifica e ritorna la quaterna
-    (consegna, spedizione_sats, spedizione_eur, taglia_pacco), gia'
-    normalizzata. Pattern categoria: i valori sconosciuti si
-    normalizzano a '' (mai un 400 — i client di ieri non sanno di
-    consegne, e non devono rompersi).
+    payload di pubblica/modifica e ritorna la quintupla
+    (consegna, spedizione_sats, spedizione_eur, taglia_pacco,
+    anche_digitale), gia' normalizzata. Pattern categoria: i valori
+    sconosciuti si normalizzano a '' (mai un 400 — i client di ieri
+    non sanno di consegne, e non devono rompersi). anche_digitale e'
+    la combo della gift card («ti spedisco la tessera, oppure ti
+    mando il codice»): vive solo accanto a una modalita' fisica.
 
     Il costo di spedizione vive nella STESSA valuta del listino:
     - listino sats: spedizione_sats intera, spedizione_eur resta 0
@@ -1540,6 +1549,11 @@ async def consegna_da_payload(d: dict, valuta: str):
     if consegna == "digitale":
         # Niente pacco: una taglia arrivata per sbaglio non resta.
         taglia = ""
+    # La combo: solo con una modalita' fisica dichiarata (con
+    # 'digitale' e' gia' tutto digitale, con '' non si promette nulla)
+    anche_digitale = 1 if (d.get("anche_digitale")
+                           and consegna in ("spedizione", "ritiro",
+                                            "entrambe")) else 0
     sped_sats, sped_eur = 0, 0.0
     if consegna in ("spedizione", "entrambe"):
         if valuta == "eur":
@@ -1575,16 +1589,19 @@ async def consegna_da_payload(d: dict, valuta: str):
                     sped_eur = max(0.0, round(float(d.get("spedizione_eur", 0)), 2))
                 except (TypeError, ValueError):
                     sped_eur = 0.0
-    return consegna, sped_sats, sped_eur, taglia
+    return consegna, sped_sats, sped_eur, taglia, anche_digitale
 
 
-def guardia_venditore_digitale(tg_id: int, consegna: str):
+def guardia_venditore_digitale(tg_id: int, consegna: str,
+                               anche_digitale: int = 0):
     """La leva anti-frode lato venditore (SPENTA di serie): per
     pubblicare beni in consegna digitale servono vendite concluse.
     Il venditore appena nato che vende «codici» e' il profilo tipico
     della truffa a consegna immediata; con la leva a 0 non blocca
-    nessuno, si accende dal config quando servira'."""
-    if consegna != "digitale" or not DIGITALE_MIN_VENDITE:
+    nessuno, si accende dal config quando servira'. Vale per il
+    digitale in QUALUNQUE forma: esclusivo o combo."""
+    if (consegna != "digitale" and not anche_digitale) \
+            or not DIGITALE_MIN_VENDITE:
         return
     con = db()
     r = con.execute("SELECT vendite_ok FROM utenti WHERE tg_id=?",
@@ -2822,6 +2839,7 @@ CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
+    "a.anche_digitale, "
     "a.foto, a.contatto_nostr, a.creato, "
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
@@ -3051,8 +3069,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # Qui e non piu' in basso: consegna_da_payload puo' attendere il
     # cambio, e tra lo scudo anti-doppione e l'INSERT non deve esserci
     # nessun await (il patto del server mono-processo).
-    consegna, sped_sats, sped_eur, taglia = await consegna_da_payload(d, valuta)
-    guardia_venditore_digitale(user["id"], consegna)
+    consegna, sped_sats, sped_eur, taglia, anche_dig = \
+        await consegna_da_payload(d, valuta)
+    guardia_venditore_digitale(user["id"], consegna, anche_dig)
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -3090,11 +3109,13 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
-        "consegna,spedizione_sats,spedizione_eur,taglia_pacco,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
+        "anche_digitale,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
-         lat, lon, consegna, sped_sats, sped_eur, taglia, int(time.time())))
+         lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
+         int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -3428,8 +3449,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
-    consegna, sped_sats, sped_eur, taglia = await consegna_da_payload(d, valuta)
-    guardia_venditore_digitale(user["id"], consegna)
+    consegna, sped_sats, sped_eur, taglia, anche_dig = \
+        await consegna_da_payload(d, valuta)
+    guardia_venditore_digitale(user["id"], consegna, anche_dig)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
                     "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
@@ -3477,11 +3499,12 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
-        "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=? "
-        "WHERE id=?",
+        "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
+        "anche_digitale=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
-         lat, lon, consegna, sped_sats, sped_eur, taglia, annuncio_id))
+         lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
+         annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -4419,24 +4442,35 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                          "oppure annulla quell'ordine e "
                                          "riprova")
 
-    # La scelta della consegna, validata contro la modalita'
-    # dell'annuncio: il compratore non puo' chiedere cio' che il
-    # venditore non offre. Annuncio senza modalita' ('') = flusso
-    # storico, la scelta si ignora; 'entrambe' senza scelta (client
-    # vecchio in cache) = spedizione — e nessuna sorpresa, perche' il
-    # client mostra comunque i sats veri della risposta.
+    # La scelta della consegna, validata contro le STRADE che
+    # l'annuncio offre davvero (dal lug 2026 anche in combinazione:
+    # anche_digitale affianca il codice a una modalita' fisica). Il
+    # compratore non puo' chiedere cio' che il venditore non offre;
+    # le TUTELE dell'ordine seguono la scelta, non l'annuncio.
+    # Annuncio senza modalita' ('') = flusso storico, la scelta si
+    # ignora; scelta assente o sconosciuta (client vecchio in cache)
+    # = la strada FISICA — quella che quel client conosce, e nessuna
+    # sorpresa perche' mostra comunque i sats veri della risposta.
+    disponibili = set()
+    if a["consegna"] in ("spedizione", "entrambe"):
+        disponibili.add("spedizione")
+    if a["consegna"] in ("ritiro", "entrambe"):
+        disponibili.add("ritiro")
+    if a["consegna"] == "digitale" or a["anche_digitale"]:
+        disponibili.add("digitale")
     scelta = d.get("consegna", "")
-    if not a["consegna"]:
+    if not disponibili:
         scelta = ""
-    elif a["consegna"] == "entrambe":
-        if scelta not in ("spedizione", "ritiro"):
-            scelta = "spedizione"
-    elif scelta and scelta != a["consegna"]:
-        con.close()
-        raise HTTPException(400, "Questo annuncio non prevede questa "
-                                 "modalità di consegna")
-    else:
-        scelta = a["consegna"]
+    elif scelta not in disponibili:
+        if scelta:
+            con.close()
+            raise HTTPException(400, "Questo annuncio non prevede questa "
+                                     "modalità di consegna")
+        # default: prima la fisica ('spedizione' batte 'ritiro',
+        # com'era per 'entrambe'), il digitale solo se e' l'unica
+        scelta = ("spedizione" if "spedizione" in disponibili
+                  else "ritiro" if "ritiro" in disponibili
+                  else "digitale")
 
     # Per gli annunci in EUR i sats si decidono ADESSO, al cambio
     # corrente: la invoice vive 15 minuti, e quella e' la durata del
@@ -5967,11 +6001,15 @@ def evento_annuncio(a: dict, status: str) -> dict:
         if a.get("consegna") == "entrambe":
             consegna_txt += " o ritiro in zona"
     elif a.get("consegna") == "ritiro":
-        consegna_txt = " — solo ritiro in zona"
+        # col codice in combo il «solo» non e' piu' vero
+        consegna_txt = (" — ritiro in zona" if a.get("anche_digitale")
+                        else " — solo ritiro in zona")
     elif a.get("consegna") == "digitale":
         consegna_txt = " — consegna digitale immediata"
     else:
         consegna_txt = ""
+    if consegna_txt and a.get("anche_digitale"):
+        consegna_txt += " o consegna digitale immediata"
     content = ((a["descrizione"] or a["titolo"]).strip() +
                f"\n\nPrezzo: {prezzo_txt} — zona: "
                f"{a.get('zona') or 'Italia'}{consegna_txt}"
@@ -7528,7 +7566,11 @@ MODELLO_IMPORT = (
     # niente spedizione ne' taglia, il codice si consegna dopo
     # l'acquisto dal dettaglio ordine
     "Buono regalo libreria 25 euro;Codice valido 12 mesi, consegna "
-    "immediata;25,00;eur;Libri e media;;;digitale;;\n")
+    "immediata;25,00;eur;Libri e media;;;digitale;;\n"
+    # la combo col «+»: tessera spedita O codice in piattaforma,
+    # sceglie chi compra
+    "Gift card profumeria 50 euro;Tessera fisica spedita oppure codice "
+    "subito;50,00;eur;Altro;Milano;;spedizione+digitale;5,00;busta\n")
 
 
 @app.get("/api/import/modello")
@@ -7735,20 +7777,26 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
         # unico di pubblica() — i valori sconosciuti diventano annuncio
         # senza modalita', mai uno scarto (i CSV di ieri non le hanno)
         sped_testo = cella(r, "spedizione").replace(" ", "").replace(",", ".")
-        payload_consegna = {"consegna": cella(r, "consegna").lower(),
+        # La combo nel CSV parla col «+»: 'spedizione+digitale' =
+        # tessera spedita O codice in piattaforma, a scelta di chi
+        # compra. Il giudice unico valida entrambe le meta'.
+        cons_testo = cella(r, "consegna").lower().replace(" ", "")
+        cons_base, _, cons_extra = cons_testo.partition("+")
+        payload_consegna = {"consegna": cons_base,
+                            "anche_digitale": 1 if cons_extra == "digitale" else 0,
                             "taglia_pacco": cella(r, "taglia").lower()}
         if valuta == "eur":
             payload_consegna["spedizione_eur"] = sped_testo or 0
         else:
             payload_consegna["spedizione_sats"] = sped_testo or 0
-        consegna, sped_sats, sped_eur, taglia = \
+        consegna, sped_sats, sped_eur, taglia, anche_dig = \
             await consegna_da_payload(payload_consegna, valuta)
-        if consegna == "digitale":
+        if consegna == "digitale" or anche_dig:
             # La leva anti-frode del venditore vale anche qui: riga
             # scartata (mai un 400 sull'intero file), stessa guardia
             # di pubblica(). Con la leva a 0 non scarta nulla.
             try:
-                guardia_venditore_digitale(user["id"], consegna)
+                guardia_venditore_digitale(user["id"], consegna, anche_dig)
             except HTTPException:
                 scarti.append({"riga": numero,
                                "motivo": "consegna digitale: servono "
@@ -7769,7 +7817,7 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                       "prezzo_sats": prezzo_sats, "prezzo_eur": prezzo_eur,
                       "consegna": consegna, "spedizione_sats": sped_sats,
                       "spedizione_eur": sped_eur, "taglia_pacco": taglia,
-                      "foto": foto})
+                      "anche_digitale": anche_dig, "foto": foto})
 
     if not righe:
         return {"valide": 0, "totale": len(dati),
@@ -7852,14 +7900,15 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
-        "consegna,spedizione_sats,spedizione_eur,taglia_pacco,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
+        "anche_digitale,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga["prezzo_sats"], riga["zona"],
          riga["valuta"], riga["prezzo_eur"], lat, lon,
          riga.get("consegna", ""), riga.get("spedizione_sats", 0),
          riga.get("spedizione_eur", 0), riga.get("taglia_pacco", ""),
-         int(time.time())))
+         riga.get("anche_digitale", 0), int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()

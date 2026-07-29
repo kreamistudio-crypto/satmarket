@@ -1262,6 +1262,7 @@
           <option value="entrambe">📦🤝 Spedizione o ritiro in zona</option>
           <option value="digitale">💾 Consegna digitale (buono, codice, licenza)</option>
         </select>
+        <label id="sellAncheDigitaleRiga" style="display:none;margin-top:8px;font-size:13px;font-weight:700;color:var(--ink);align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sellAncheDigitale" onchange="aggiornaConsegnaForm()" style="width:auto;accent-color:var(--sats)"> 💾 Offro anche la consegna digitale (codice in piattaforma)</label>
         <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Consegnerai il contenuto dentro Barattolo dopo l'acquisto, dal dettaglio dell'ordine. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
@@ -1701,6 +1702,9 @@ function mapListing(a){
        nessuna promessa nuova (il dettaglio non mostra la riga) */
     consegna:a.consegna||'', sped:a.spedizione_sats||0,
     spedEur:a.spedizione_eur||0, taglia:a.taglia_pacco||'',
+    /* la combo della gift card: modalita' fisica + codice in
+       piattaforma, sceglie chi compra */
+    ancheDigitale:!!a.anche_digitale,
     /* lo stato viaggia solo dove serve (i preferiti): la vetrina
        serve comunque solo gli attivi */
     stato:a.stato||'attivo',
@@ -2119,7 +2123,7 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span>📍 ${esc(l.zone)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':l.consegna==='digitale'?'<span title="Consegna digitale immediata">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
+        <div class="meta"><span>📍 ${esc(l.zone)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Consegna digitale immediata">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
       </div>
     </div>`; };
 
@@ -2507,12 +2511,40 @@ function spedTesto(l){
    l'articolo e' in euro O la spedizione scelta e' ancorata all'euro */
 const stimaCirca = l => (l.valuta==='eur'
   || (sceltaConsegna(l)==='spedizione' && l.spedEur>0)) ? '≈ ' : '';
-/* La scelta del compratore quando l'annuncio offre 'entrambe':
-   vive qui, si riparte da 'spedizione' a ogni dettaglio aperto. */
+/* Le strade che l'annuncio offre davvero: la parte fisica dal
+   catalogo di sempre, il digitale anche in COMBO (ancheDigitale =
+   «ti spedisco la tessera, oppure ti mando il codice»). L'ordine
+   della lista e' anche la precedenza del default. */
+function stradeConsegna(l){
+  const s = [];
+  if (!l || !l.consegna) return s;
+  if (l.consegna==='spedizione' || l.consegna==='entrambe') s.push('spedizione');
+  if (l.consegna==='ritiro' || l.consegna==='entrambe') s.push('ritiro');
+  if (l.consegna==='digitale' || l.ancheDigitale) s.push('digitale');
+  return s;
+}
+/* La scelta del compratore quando le strade sono piu' d'una:
+   vive qui, si riparte da 'spedizione' a ogni dettaglio aperto;
+   se la scelta non e' tra le strade offerte vince la prima
+   (la fisica: stesso default del server). */
 let consegnaScelta = 'spedizione';
 function sceltaConsegna(l){
-  if (!l || !l.consegna) return '';
-  return l.consegna==='entrambe' ? consegnaScelta : l.consegna;
+  const s = stradeConsegna(l);
+  if (!s.length) return '';
+  return s.includes(consegnaScelta) ? consegnaScelta : s[0];
+}
+/* Le pillole di scelta: compaiono solo con almeno due strade
+   (l'erede del vecchio ramo 'entrambe', che ora e' un caso tra i tanti) */
+function pilloleConsegna(l){
+  const s = stradeConsegna(l);
+  if (s.length < 2) return '';
+  const nome = v => v==='spedizione'
+    ? '🚚 Spedizione' + ((l.sped>0||l.spedEur>0) ? '' : ' gratuita')
+    : v==='ritiro' ? '🤝 Ritiro in zona' : '💾 Digitale';
+  const att = sceltaConsegna(l);
+  return `<div class="consegna-scelta">` + s.map(v =>
+    `<button class="consegna-pill${v===att?' attiva':''}" data-v="${v}" onclick="setConsegnaScelta('${v}')">${nome(v)}</button>`
+  ).join('') + `</div>`;
 }
 /* La STIMA del totale da pagare (articolo + spedizione se scelta +
    protezione): i sats veri li dice la risposta di POST /orders.
@@ -2558,6 +2590,10 @@ function setConsegnaScelta(v){
   consegnaScelta = v; haptic();
   document.querySelectorAll('#detailContent .consegna-pill').forEach(b =>
     b.classList.toggle('attiva', b.dataset.v === v));
+  /* l'avviso asimmetrico segue la SCELTA: su una combo non deve
+     spaventare chi prende la strada fisica */
+  const nd = el('notaDigitale');
+  if (nd) nd.style.display = v==='digitale' ? '' : 'none';
   const l = currentListing;
   if (l) document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
     s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
@@ -2567,13 +2603,16 @@ function setConsegnaScelta(v){
 function rigaConsegna(l){
   if (!l.consegna) return '';
   let t;
-  if (l.consegna==='ritiro') t = '🤝 solo ritiro in zona';
+  if (l.consegna==='ritiro')
+    t = l.ancheDigitale ? '🤝 ritiro in zona' : '🤝 solo ritiro in zona';
   else if (l.consegna==='digitale') t = '💾 consegna digitale immediata';
   else {
     t = (l.sped>0 || l.spedEur>0)
       ? `🚚 + ${spedTesto(l)} spedizione` : '🚚 spedizione gratuita';
     if (l.consegna==='entrambe') t += ' o ritiro in zona';
   }
+  if (l.ancheDigitale && l.consegna!=='digitale')
+    t += ' o 💾 consegna digitale';
   return `<div class="eur-hint" style="margin-top:-8px">${t} · protezione acquisti inclusa</div>`;
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
@@ -2986,12 +3025,8 @@ function openDetail(id){
              <!-- niente 🔒 qui: lo dicono gia' la pillola e il bottone -->
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
-             ${l.consegna==='entrambe' ? `
-             <div class="consegna-scelta">
-               <button class="consegna-pill attiva" data-v="spedizione" onclick="setConsegnaScelta('spedizione')">🚚 Spedizione${(l.sped>0||l.spedEur>0)?'':' gratuita'}</button>
-               <button class="consegna-pill" data-v="ritiro" onclick="setConsegnaScelta('ritiro')">🤝 Ritiro in zona</button>
-             </div>` : ''}
-             ${l.consegna==='digitale' ? `<div class="trust-note">💾 <span><b>Bene digitale:</b> il venditore consegna il contenuto dentro Barattolo e tu lo riveli con un tocco. Dalla rivelazione hai un tempo breve per provarlo; <b>dopo la rivelazione non è rimborsabile</b>, salvo prove.</span></div>` : ''}
+             ${pilloleConsegna(l)}
+             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Bene digitale:</b> il venditore consegna il contenuto dentro Barattolo e tu lo riveli con un tocco. Dalla rivelazione hai un tempo breve per provarlo; <b>dopo la rivelazione non è rimborsabile</b>, salvo prove.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
@@ -5852,23 +5887,31 @@ const eurCampo = id =>
 const prezzoEurForm = () => eurCampo('sellPrice');
 
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
-   il digitale mostra il suo hint (consegna in piattaforma + screenshot) */
+   il digitale mostra il suo hint (consegna in piattaforma + screenshot).
+   Con una modalita' FISICA compare il checkbox della combo («ti
+   spedisco la tessera, oppure ti mando il codice»). */
 function aggiornaConsegnaForm(){
   const c = el('sellConsegna').value;
   const spedisce = c==='spedizione' || c==='entrambe';
+  const fisica = spedisce || c==='ritiro';
   el('sellSpedField').style.display = spedisce ? '' : 'none';
   el('sellTagliaField').style.display = spedisce ? '' : 'none';
-  el('sellDigitaleHint').style.display = c==='digitale' ? '' : 'none';
+  el('sellAncheDigitaleRiga').style.display = fisica ? 'flex' : 'none';
+  if (!fisica) el('sellAncheDigitale').checked = false;
+  el('sellDigitaleHint').style.display =
+    (c==='digitale' || (fisica && el('sellAncheDigitale').checked)) ? '' : 'none';
   aggiornaSpedHint();
 }
 /* I campi di consegna del payload: la valuta del listino comanda,
    ma sul listino sats il costo scritto in euro parte come
    spedizione_eur e il server lo salva in sats. Il digitale viaggia
-   nudo: niente costo, niente taglia. */
+   nudo: niente costo, niente taglia. La combo aggiunge il flag
+   anche_digitale accanto alla parte fisica. */
 function consegnaPayload(){
   const c = el('sellConsegna').value;
   if (c==='digitale') return {consegna:c};
   const out = {consegna:c, taglia_pacco:el('sellTaglia').value};
+  if (c && el('sellAncheDigitale').checked) out.anche_digitale = 1;
   if (c==='spedizione' || c==='entrambe'){
     if (sellValuta==='eur' || spedValuta==='eur')
       out.spedizione_eur = eurCampo('sellSped');
@@ -5896,6 +5939,7 @@ function editListing(id){
   el('sellZone').value = l.zone==='—' ? '' : l.zone;
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
   el('sellConsegna').value = l.consegna||'';
+  el('sellAncheDigitale').checked = !!l.ancheDigitale;
   el('sellTaglia').value = l.taglia||'';
   /* spedEur pieno = costo ancorato all'euro: si rientra in euro
      anche sul listino sats (il toggle segue la semantica salvata) */
@@ -5914,6 +5958,7 @@ function annullaModifica(){
   editandoNostr = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellConsegna').value = ''; el('sellTaglia').value = '';
+  el('sellAncheDigitale').checked = false;
   aggiornaConsegnaForm();
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
@@ -6090,6 +6135,7 @@ async function publish(){
       /* come il server: spedEur pieno = costo ancorato all'euro */
       consegna:cns.consegna, sped:cns.spedizione_sats||0,
       spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
+      ancheDigitale:!!cns.anche_digitale,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
@@ -6115,6 +6161,7 @@ async function publish(){
   }
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellConsegna').value = ''; el('sellTaglia').value = '';
+  el('sellAncheDigitale').checked = false;
   aggiornaConsegnaForm();
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
@@ -6141,6 +6188,7 @@ async function salvaModifica(t, p){
         cat:el('sellCat').value,
         consegna:cns.consegna, sped:cns.spedizione_sats||0,
         spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
+        ancheDigitale:!!cns.anche_digitale,
         zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
