@@ -854,6 +854,62 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
   confirm); gli id interni (go('affari'), #nav-affari, view-affari)
   restano.
+  Offerta lampo ⚡ (lug 2026, modello Vinted «sconto ai follower»):
+  sconto PUBBLICO a percentuale, a tempo, sul SOLO articolo —
+  spedizione e protezione si sommano sopra, e il listino NON si tocca
+  mai (prezzo_sats/prezzo_eur restano pieni, quindi il NIP-99 parla
+  il prezzo pieno PER COSTRUZIONE: lo sconto e' un vantaggio di chi
+  compra dentro Barattolo; importati esclusi). Colonne
+  `annunci.lampo_percento/lampo_scadenza/lampo_creato` (attiva =
+  percento>0 e scadenza futura: OGNI lettura gatea sulla scadenza, la
+  scopa `scadenze_lampo` nell'orologio azzera solo i numeri morti,
+  senza notifiche) + `lampo_colpo_avvisato` (cooldown dell'avviso) +
+  tabella `offerte_lampo` = storico dei lanci per il tetto
+  settimanale (le colonne si sovrascrivono, non contano il passato).
+  Leve config (try/except): LAMPO_ATTIVE (True), LAMPO_SCONTI
+  [10,20,30], LAMPO_MIN/MAX_PERCENTO (5/70), ORE_LAMPO_OPZIONI
+  [6,24,48], MAX_LAMPO_SETTIMANA (2), GIORNI_COLPO (7). «Ha fatto
+  colpo»: gancio nel ramo INSERT di `toggle_preferito` (DOPO il
+  commit, solo annunci attivi, mai i salvataggi propri; l'endpoint e'
+  diventato async per il create_task, precedente /api/me) → valvola
+  gemella dei promo `accoda_colpo`/`_drena_colpo` (rilettura dal DB:
+  spariti/importati/gia' in lampo/in cooldown = muti; cooldown
+  timbrato PRIMA delle notifiche; per venditore ≤SOGLIA_AGGREGA
+  messaggi singoli con link, oltre UN aggregato) — avviso ANONIMO:
+  «qualcuno», mai chi ne' quanti, i preferiti restano privati per
+  natura. Lancio: `POST /api/listings/{id}/lampo` (solo il
+  proprietario su attivi, percento/ore dalle leve, count-guard senza
+  await sul tetto; FRENO: offerta accettata viva = 400, la stretta di
+  mano non si cambia in tavola — le pendenti invece NON decadono)
+  scrive colonne+storico e avvisa i savers in create_task
+  (`_avvisa_savers_lampo`: barrato → scontato, «hai tempo fino
+  alle...» di `_quando_scade`, mai i nomi); `/lampo/annulla` = prezzo
+  pieno subito ma il lancio resta nello storico (annullare non
+  restituisce il gettone: lancia-e-annulla non dev'essere spam
+  gratis). `compra()`: lampo viva = articolo al prezzo di
+  `_prezzo_lampo` (giudice unico, valuta del listino; EUR converte
+  alla invoice come sempre) col MINIMO sull'eventuale accordo
+  individuale — chi paga paga sempre il meglio dei due. Superficie:
+  lampo_percento/scadenza in CAMPI_VETRINA (search e miei gratis via
+  a.*), param `solo_lampo`, ordinamento `lampo` in ORDINAMENTI
+  (keyset (lampo_scadenza,id) ASC = chi scade prima in testa, IMPLICA
+  il filtro; indice idx_annunci_lampo), leve in /api/me.lampo_leve.
+  Frontend: `lampoAttiva`/`conLampo` (vista scontata del listino,
+  gemello client di _prezzo_lampo)/`lampoResta`; badge «⚡ −20%
+  2h 14m» in alto a sinistra sulla foto (colori fissi nei due temi,
+  MAI animazioni: patto reduced-motion), cartellino e dettaglio col
+  listino barrato + riga countdown; UN solo setInterval per tutta
+  l'app aggiorna i `.lampo-count` in-place e allo zero fa
+  renderGrid + riapertura del dettaglio in sconto (tutto torna
+  normale da solo anche a pagina aperta); `artStima` passa da
+  conLampo col min sull'accordo (bottoni compra e conto scomposto
+  parlano da soli la cifra scontata); foglio `#lampoSheet` del
+  proprietario (chip dalle leve, durate a pillole, anteprima
+  barrato→scontato con l'ora di fine; nel dettaglio owner «⚡ Lancia
+  un'offerta lampo» che con la lampo viva diventa «annullala» con
+  confirm); filtro «⚡ Solo in offerta» + voce «⚡ In offerta» in
+  Ordina, in DEMO client-side col seme dimostrativo (Cuffie Sony,
+  scadenza calcolata al carico).
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -1829,7 +1885,19 @@ controproposta, giro EUR con virgola e cambio_ordine, anti-abuso
 completo, decadenza per vendita, sweep delle scadenze, reaper con
 ripagamento, modifica prezzo, regressione dell'acquisto normale; in
 produzione va provato un giro vero dentro Telegram con le notifiche
-reali).
+reali); offerta lampo ai barattoli (lug 2026, modello Vinted «sconto
+ai follower»: avviso anonimo «ha fatto colpo» al venditore quando
+qualcuno salva, sconto pubblico a percentuale e a tempo lanciato dal
+foglio del dettaglio, avviso mirato a chi ha l'annuncio nel barattolo,
+badge col countdown e prezzo barrato in vetrina e dettaglio, filtro e
+ordinamento «⚡ In offerta», minimo con l'accordo individuale in
+compra(), scadenza che ripristina tutto da sola anche a pagina
+aperta, leve nel config, vedi Architettura — collaudato in locale da
+cima a fondo: valvola e cooldown in console, guardie del lancio una a
+una, acquisto scontato sats ed EUR, min nei due versi, superficie
+pubblica con cursore, e il giro visivo nel browser vero via CDP da
+venditore e in demo; in produzione va provato un giro vero dentro
+Telegram con le notifiche reali).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
