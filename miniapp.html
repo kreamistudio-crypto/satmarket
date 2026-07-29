@@ -261,6 +261,28 @@
   .tag-price .price{margin-top:0;font-size:14.5px;color:var(--sats-deep)}
   .tag-price .price-sub,.tag-price .price .unit{color:#8A8271}
   .tag-price .price-sub{margin-top:0}
+  /* ---------- offerta lampo ---------- */
+  /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
+     cio' che sta sulla foto. Arancio ₿ pieno ma piccolo: si nota a
+     colpo d'occhio senza fare della vetrina un volantino. NIENTE
+     animazioni (patto reduced-motion): il countdown che scorre e'
+     gia' tutto il movimento che serve. */
+  .card-lampo{position:absolute;top:8px;left:8px;z-index:2;
+    background:var(--sats);color:#fff;border-radius:999px;
+    padding:3px 9px;font-size:11.5px;font-weight:800;
+    display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .card-lampo .lampo-count{font-family:'JetBrains Mono',monospace;
+    font-weight:700;font-size:10.5px;opacity:.92}
+  /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
+  .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
+  .tag-price .price-was .unit{font-size:10.5px}
+  /* Nel dettaglio: barrato + badge sopra il prezzo, riga countdown sotto */
+  .lampo-was{display:flex;align-items:center;gap:8px;color:var(--muted);
+    font-size:14.5px;margin-bottom:-6px}
+  .lampo-was .lampo-badge{background:var(--sats-soft);color:var(--sats-text);
+    border:1.5px solid var(--sats);border-radius:999px;padding:1px 8px;
+    font-size:12px;font-weight:800}
+  .lampo-riga{color:var(--sats-text);font-size:13.5px;font-weight:700;margin-top:2px}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
   /* Il palco della galleria: tutto cio' che fluttua sulla foto
      (cerchietti, pallini, frecce) si appende qui */
@@ -1654,6 +1676,9 @@ function mapListing(a){
     /* il francobollo del venditore: nome file, gia' vuoto se la sua
        levetta «Mostra la mia foto» e' spenta (decide il server) */
     avatar:(a.venditore_avatar||'').replace(/[^A-Za-z0-9_.-]/g,''),
+    /* l'offerta lampo: percento e scadenza (unix), il resto e'
+       matematica del client (lampoAttiva/conLampo) */
+    lampoPct:a.lampo_percento||0, lampoFine:a.lampo_scadenza||0,
     distintivi:a.venditore_distintivi||[]};
 }
 function mapOrder(o){
@@ -2010,7 +2035,14 @@ function renderPionieri(){
 /* La card di un annuncio, stile "Etichetta": foto pulita e il prezzo
    su un cartellino storto a cavallo del bordo, come al mercatino.
    La stessa card serve vetrina e vista negozio. */
-const cardHTML = l => { const p = prezzoParte(l);
+const cardHTML = l => {
+  /* con la lampo viva il cartellino parla il prezzo scontato e sopra
+     resta il listino barrato; il badge ⚡ col countdown vive sulla
+     foto in alto a sinistra (il barattolino sta a destra) */
+  const lampo = lampoAttiva(l);
+  const p = prezzoParte(conLampo(l));
+  const flash = lampo
+    ? `<div class="card-lampo">⚡ −${l.lampoPct}% <span class="lampo-count" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</span></div>` : '';
   /* Il barattolino in card: stesse guardie del cerchietto nel
      dettaglio (mai in DEMO/VETRINA, mai sui propri annunci). Qui pero'
      il livello e' dell'ANNUNCIO, non del barattolo intero: vetro vuoto
@@ -2026,8 +2058,8 @@ const cardHTML = l => { const p = prezzoParte(l);
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
-        <div class="tag-price"><div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
-        ${jar}
+        <div class="tag-price">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        ${flash}${jar}
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
@@ -2341,6 +2373,56 @@ function prezzoParte(l){
     big: (inEur?'≈ ':'') + fmt(sats) + ' <span class="unit">sats</span>',
     small: (inEur?'':'≈ ') + eurTesto + ' €' };
 }
+/* ---------------- offerta lampo: lo sconto a tempo ----------------
+   Viva se percento>0 e la scadenza e' nel futuro. Il giudice vero del
+   prezzo e' il server (_prezzo_lampo in compra()): qui la stessa
+   matematica, per stime e cartellini. */
+function lampoAttiva(l){
+  return (l.lampoPct||0) > 0 && (l.lampoFine||0)*1000 > Date.now();
+}
+/* La vista scontata del listino: stessa forma di l, prezzi ridotti
+   nella SUA valuta (floor sui sats e 2 decimali sull'euro, identici
+   al server). Senza lampo torna l cosi' com'e'. */
+function conLampo(l){
+  if (!lampoAttiva(l)) return l;
+  const k = (100 - l.lampoPct) / 100;
+  const s = Object.assign({}, l);
+  s.price = Math.max(1, Math.floor(l.price * k));
+  if (l.priceEur > 0)
+    s.priceEur = Math.max(0.01, Math.round(l.priceEur * k * 100) / 100);
+  return s;
+}
+/* Quanto manca, detto in breve: «2h 14m», «14m», «40s» */
+function lampoResta(fine){
+  const s = Math.max(0, Math.floor(fine - Date.now()/1000));
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m`;
+  return `${s}s`;
+}
+/* Il battito della lampo: UN solo interval per tutta l'app. Aggiorna
+   in-place i contatori (mai un re-render al secondo) e allo zero
+   rimette a posto la vista da sola: griglia ridisegnata e dettaglio
+   riaperto pulito se era quello in sconto. Il numero che scorre non
+   e' un'animazione — reduced-motion resta rispettato perche' il
+   badge non pulsa mai. Senza contatori in pagina il giro e' un
+   querySelectorAll a vuoto: gratis. */
+setInterval(() => {
+  const nodi = document.querySelectorAll('.lampo-count');
+  if (!nodi.length) return;
+  let morta = false;
+  nodi.forEach(n => {
+    const fine = +n.dataset.fine || 0;
+    n.textContent = lampoResta(fine);
+    if (fine * 1000 <= Date.now()) morta = true;
+  });
+  if (!morta) return;
+  renderGrid();
+  if (currentListing && !lampoAttiva(currentListing)
+      && el('view-dettaglio')?.classList.contains('active')
+      && document.querySelector('#detailContent .lampo-riga'))
+    openDetail(currentListing.id);
+}, 1000);
 /* La percentuale della protezione acquisti: arriva col server nella
    prima pagina della vetrina (oggi 0), mai hardcodata qui. */
 let protPercento = 0;
@@ -2390,12 +2472,18 @@ function totaleStima(l){
    accordi in EUR vale il cambio vivo, con la proporzione sul cambio
    di pubblicazione come ripiego onesto. */
 function artStima(l){
+  /* con la lampo viva il listino e' quello scontato; se coesiste un
+     accordo individuale vince il MINIMO — lo stesso patto di compra()
+     sul server: chi paga paga sempre il meglio dei due */
+  const base = satsAnnuncio(conLampo(l));
   const off = offertaAccettataPer(l.id);
-  if (!off) return satsAnnuncio(l);
+  if (!off) return base;
   const a = accordoDi(off);
-  if (off.valuta !== 'eur') return a.sats;
-  if (cambioVivo) return Math.round(a.eur / eurPerSat);
-  return l.priceEur > 0 ? Math.round(l.price * a.eur / l.priceEur) : l.price;
+  let acc;
+  if (off.valuta !== 'eur') acc = a.sats;
+  else if (cambioVivo) acc = Math.round(a.eur / eurPerSat);
+  else acc = l.priceEur > 0 ? Math.round(l.price * a.eur / l.priceEur) : l.price;
+  return lampoAttiva(l) ? Math.min(acc, base) : acc;
 }
 /* La soglia minima delle offerte: arriva col server nella prima
    pagina, come protPercento (mai hardcodata qui). */
@@ -2806,8 +2894,10 @@ function openDetail(id){
     ${foto}
     <div class="detail-body">
       <h2>${esc(l.title)}</h2>
-      <div class="detail-price">${prezzoParte(l).big}</div>
-      <div class="eur-hint">${prezzoParte(l).small}</div>
+      ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span></div>`:''}
+      <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
+      <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
+      ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
       ${rigaConsegna(l)}
       <div class="pills">
         <span class="pill">📍 ${esc(l.zone)}</span>
