@@ -118,8 +118,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `condizione_tollerante`, colonna facoltativa). In
   CAMPI_VETRINA (search e miei gratis via a.*); param `condizione` su
   /api/listings (dichiarata soltanto: gli storici '' restano fuori,
-  valore storto = nessun filtro) + select nel pannello Filtri (in DEMO
-  client-side; testo semplice, le <option> native non si stilano).
+  valore storto = nessun filtro) + scelta nel pannello Filtri (in DEMO
+  client-side; dal lug 2026 anche lei un foglio-picker, con le pillole
+  NUDE senza le descrizioni e la voce «Qualsiasi condizione»).
   IL SEGNO (lug 2026, dopo il feedback di Andrea): PILLOLA TESTUALE
   COLORATA `condPill()` — forma delle pillole di zona e categoria, la
   scala parla col COLORE (classi `.pill.cond-*`: verde pieno
@@ -139,28 +140,55 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   da_sistemare…, sconosciuta = non dichiarata, mai uno scarto).
   Foglio-picker al posto delle tendine native (lug 2026): la
   `<select>` del sistema operativo non si può vestire da Barattolo, e
-  le due del form Vendi (categoria e condizioni) sono passate al
-  nostro foglio. Il MOTIVO per cui non è una riscrittura: la select
-  resta in pagina come DEPOSITO del valore (attributo `hidden`), e
-  tutto il JS di prima continua a leggerla e scriverla
-  (`el('sellCond').value`) — publish, modifica, reset e validazioni
-  intonsi. A parlare col dito è il campo-bottone `.campo-scelta`
-  (`#sellCatBtn`/`#sellCondBtn`, veste da select con la freccia ▾) che
-  apre `#pickerSheet` col pattern dei fogli di sempre (registrato in
-  `closeSheet`): `PICKER` è il catalogo delle due liste (voci dal
-  select per la categoria, da `CONDIZIONI` per le condizioni: la
-  pillola colorata + la desc sotto), `apriPicker` disegna e mette a
-  fuoco la voce scelta, `scegliPicker` scrive nel select e chiude,
-  `aggiornaPicker(id)` riallinea il campo-bottone al valore — VA
-  RICHIAMATA da chiunque tocchi il select via JS (già in editListing,
-  annullaModifica, publish e una volta all'avvio). Accessibilità:
-  `role="dialog"`/`radiogroup`, Esc chiude, frecce ↑↓ scorrono, e
-  `pickerTrigger` riporta il focus al campo per OGNI strada di
-  chiusura (scelta, Annulla, Esc, tap fuori) perché passano tutte da
-  `closeSheet`. Dallo stesso cantiere: `prefers-reduced-motion` ora
+  TUTTE le tendine dell'app sono passate al nostro foglio — categoria,
+  condizioni e taglia del pacco nel form Vendi, condizioni nel
+  pannello Filtri, ordinamento della vetrina. Il MOTIVO per cui non è
+  una riscrittura: la select resta in pagina come DEPOSITO del valore
+  (attributo `hidden`), e tutto il JS di prima continua a leggerla e
+  scriverla (`el('sellCond').value`) — publish, modifica, reset,
+  filtri e validazioni intonsi. A parlare col dito è il campo-bottone
+  `.campo-scelta` (`#{id}Btn`, veste da select con la freccia ▾) che
+  apre `#pickerSheet` col pattern dei fogli di sempre: `PICKER` è il
+  catalogo, e ogni voce dichiara `titolo`, `voci()` (val + resa nel
+  foglio), `campo(v)` (resa nel campo-bottone) e un `poi` facoltativo
+  — l'azione che prima stava sull'`onchange`, indispensabile
+  all'ordinamento (`setOrdina`), che con la select nascosta non riceve
+  più l'evento. `apriPicker` disegna e mette a fuoco la voce scelta,
+  `scegliPicker` scrive nel select, chiude ed esegue `poi`;
+  `aggiornaPicker(id)` riallinea il campo al valore e VA RICHIAMATA da
+  chiunque tocchi il select via JS (`aggiornaPickerVendi()` fa i tre
+  del form in blocco, così non se ne dimentica uno: è in editListing,
+  annullaModifica e publish; più setOrdina, toggleFiltri e
+  azzeraFiltri per gli altri due). Le stesse condizioni si rendono in
+  DUE modi secondo il posto: col form la pillola + la descrizione (che
+  aiuta a scegliere), nel filtro le pillole NUDE (lì non si impara la
+  scala, si sceglie). Accessibilità: `role="dialog"`/`radiogroup`, Esc
+  chiude, frecce ↑↓ scorrono, e `pickerTrigger` riporta il focus al
+  campo per OGNI strada di chiusura — un campo-bottone `display:none`
+  però non può prenderlo (succede solo forzando il picker da codice su
+  un campo nascosto, come la taglia senza Spedizione spuntata).
+  CHIUSURA CHE NON FA CATENA (lezione del secondo giro): `scegliPicker`
+  chiamava `closeSheet()`, che spegne TUTTA la pila di fogli e azzera
+  il `pollTimer`. Invisibile finché il picker si apre da una vista o
+  dal pannello Filtri (che è markup in pagina, non un foglio: finisce
+  sotto il velo e resta aperto dopo la scelta), ma aperto da DENTRO un
+  foglio avrebbe chiuso anche quello sotto — e sopra il paySheet
+  avrebbe ucciso il polling del pagamento. Quindi `chiudiPicker()`
+  spegne solo il picker e tiene il velo se `altroFoglioAperto()`, e
+  `tapFuoriSheet()` sul velo chiude il foglio più in ALTO invece della
+  pila (`closeSheet` resta il catch-all). Il picker si può quindi
+  aprire dentro un foglio senza pensarci. Cintura in CSS:
+  `select[hidden]{display:none !important}`, perché le nostre select
+  si pescano per tag (`.field select`, `.strumenti select`) e una
+  futura regola col `display` farebbe ricomparire la tendina di
+  sistema. Tre vestiti per tre contesti, stesso markup:
+  `.campo-scelta` è la misura da campo di form, `.strumenti
+  .campo-scelta` la ritara a pillola come il bottone Filtri (con
+  l'etichetta che si accorcia coi puntini, vedi il contatore dei
+  pionieri più sotto), `.filtri-riga .campo-scelta` la veste come gli
+  input di accanto. Dal primo giro: `prefers-reduced-motion` ora
   ferma la scivolata di TUTTI i fogli (`.sheet{transition:none}`),
-  che mancava da sempre. Il filtro delle condizioni nel pannello
-  Filtri resta una select nativa: lì il testo semplice basta.
+  che mancava da sempre.
   Tenuta al volume (lug 2026): la vetrina va a PAGINE col cursore
   keyset. `/api/listings`, `/api/negozio/{chi}` e `/api/listings/miei`
   accettano `limit` (clampato a 100) e `cursore` = '{creato}_{id}'
@@ -919,7 +947,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   del breve periodo «convertito alla pubblicazione» hanno
   spedizione_eur=0 e restano fissi (caso 1). E `taglia_pacco`
   (`TAGLIE_PACCO` busta/piccolo/medio/grande/ingombrante, con gli
-  esempi concreti nel form: servirà alle etichette corriere future);
+  esempi concreti nel form: servirà alle etichette corriere future; il
+  gemello client è il catalogo `TAGLIE` — nome, esempio e `lato` del
+  disegno — vedi la scala disegnata qui sotto);
   giudice unico `consegna_da_payload` (sconosciuto → '', mai 400 —
   in pubblica() si chiama PRIMA dello scudo anti-doppione: può
   attendere il cambio, e tra controllo e INSERT niente await).
@@ -978,7 +1008,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   zona»; «💾 Codice online») e per questo `rigaConsegna` è rimasta la
   sola «🛡️ protezione acquisti inclusa»: la stessa cosa non si dice
   due volte (resta gatata su `l.consegna`, gli storici non promettono
-  nulla). Più la pillola taglia; per
+  nulla). Più la pillola della taglia, che dal lug 2026 porta la SCALA
+  DISEGNATA: `tagliaSVG(id, box)` invece delle emoji, perché 📦 era la
+  stessa per piccolo, medio e grande e la gradazione non si vedeva.
+  L'ingombro resta fisso (viewBox 22x22 per tutte le voci) e la
+  scatola CRESCE DAL BASSO — come una cosa appoggiata sul banco: le
+  voci del foglio restano incolonnate e il confronto si legge a colpo
+  d'occhio. Lati 8/12/16/20 (il primo tentativo 10/13/16/20 era troppo
+  timido) e SOLO quadro + riga del coperchio: il nastro verticale,
+  provato, a 8px si riduceva a un puntino di rumore. Tratto a
+  `currentColor` come `jarSVG` (chiaro e scuro gratis) con un velo
+  dello stesso colore che dà corpo; la busta è un oggetto suo — piatta
+  con la piega a V — non una scatola piccola, e nella pillola
+  `tagliaPill()` non si fa più chiamare «pacco busta» ma «busta
+  imbottita». Scartate le emoji scalate via CSS: cambiano forma da un
+  sistema all'altro, non seguono i token del tema e crescendo spostano
+  le righe. `box` è solo la misura resa (22 nel foglio-picker e nel
+  campo, 16 nella pillola: il viewBox non cambia, quindi il rapporto
+  fra le taglie resta identico). Per
   'entrambe' due pillole spedizione/ritiro DENTRO l'escrow-zone
   (`consegnaScelta`, si riparte da spedizione a ogni dettaglio; la
   cifra dei bottoni è `totaleStima`); conto scomposto
@@ -1383,14 +1430,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   è stato provato e scartato, e così pure i conteggi appoggiati in
   fondo alla riga (`align-self:flex-end`): lasciavano un vuoto sopra.
   Interlinea 1.15 + gap 3px = blocco alto 31px contro i 33px del
-  select, con ~9px di bianco fra le maiuscole delle due righe. Resa
+  controllo d'ordinamento, con ~9px di bianco fra le maiuscole delle
+  due righe. Resa
   compatta `.section-label.riga-conta` (numero arancione davanti,
   `::after` puntinato spento; la regola sta DOPO `.section-label`, che
   a pari specificità vincerebbe). Perché ci stia tutto a 360px: NIENTE
   emoji sui conteggi (📦 e 👥 provati e tolti, ~22px l'uno) e il
-  blocco non si stringe mai (`flex:1 0 auto`) mentre a cedere è il
-  SELECT (`min-width:0`) — l'etichetta cresce, «830 RISULTATI» è più
-  larga di «14 OGGETTI», e non deve mai finire sotto ai controlli.
+  blocco non si stringe mai (`flex:1 0 auto`) mentre a cedere è
+  L'ORDINAMENTO (`min-width:0`; dal lug 2026 è un campo-bottone e non
+  una select, quindi l'etichetta si accorcia coi puntini invece di
+  troncare la voce del menu) — l'etichetta cresce, «830 RISULTATI» è
+  più larga di «14 OGGETTI», e non deve mai finire sotto ai controlli.
   «Pionieri» e non «utenti»: in rodaggio è un club. Il numero è `COUNT(*)` sugli
   utenti con cache di 60s (`conta_pionieri`) e viaggia nella busta
   della PRIMA pagina di `/api/listings` accanto a `totale` e
