@@ -103,11 +103,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   server (`conteggi` in prima pagina), il locale resta per la demo.
   Condizioni dell'oggetto (lug 2026): scala a 5 livelli — catalogo
   `CONDIZIONI` in server.py (nuovo | come_nuovo | buono | accettabile |
-  da_sistemare, id → etichetta breve; le etichette lunghe con emoji
-  ✨🌟👍🆗🔧 vivono nelle <option> del form e nel catalogo JS
-  `CONDIZIONI` del client). Colonna `annunci.condizione` ('' = storici
-  e importati, nessun obbligo retroattivo), OBBLIGATORIA client E
-  SERVER (dal lug 2026, deciso: `guardia_zona_condizione` — giudice
+  da_sistemare, id → etichetta breve; il catalogo JS `CONDIZIONI` del
+  client porta anche la `desc` breve del foglio di scelta, e le
+  <option> del form — ormai un deposito nascosto, vedi il
+  foglio-picker — le etichette lunghe). Colonna `annunci.condizione`
+  ('' = storici e importati, nessun obbligo retroattivo), OBBLIGATORIA
+  client E SERVER (dal lug 2026, deciso: `guardia_zona_condizione` — giudice
   unico di pubblica e modifica — risponde 400 su assente o
   sconosciuta; gli storici si mettono in regola al primo ritocco; MAI
   nella modifica firmata degli importati, l'evento NIP-99 non la porta
@@ -118,13 +119,48 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   CAMPI_VETRINA (search e miei gratis via a.*); param `condizione` su
   /api/listings (dichiarata soltanto: gli storici '' restano fuori,
   valore storto = nessun filtro) + select nel pannello Filtri (in DEMO
-  client-side); pillola «🌟 Come nuovo» nel dettaglio, in card SOLO
-  l'emoji nella meta (il testo non ci sta a 360px); riga «— condizione:
+  client-side; testo semplice, le <option> native non si stilano).
+  IL SEGNO (lug 2026, dopo il feedback di Andrea): PILLOLA TESTUALE
+  COLORATA `condPill()` — forma delle pillole di zona e categoria, la
+  scala parla col COLORE (classi `.pill.cond-*`: verde pieno
+  `--trust-deep` → verde tenue `--trust-soft` → ambra oro → arancio
+  `--sats-soft` → grigio `--off-bg`, coppie della palette con
+  contrasto AA misurato nei due temi; l'oro resta chiaro di sera come
+  l'etichetta prezzo, e due override `html[data-tema="scuro"]` dove la
+  coppia chiara non regge al buio). Vive nel dettaglio e nel
+  foglio-picker del form, MAI in card: la vetrina resta pulita (le
+  emoji ✨🌟👍🆗🔧 non comunicavano una gradazione; i pallini graduati
+  ●●●○○ provati al loro posto si confondevano con le stelle delle
+  recensioni — bocciati, non riproporli). Riga «— condizione:
   …» nel content NIP-99 (nessun tag: la spec non ne ha uno, pattern
   della spedizione) e nel catalogo della ricerca AI; colonna
   facoltativa `condizione` nel CSV d'import con `condizione_tollerante`
   (SINONIMI_CONDIZIONE: «ottimo» → come_nuovo, «da riparare» →
   da_sistemare…, sconosciuta = non dichiarata, mai uno scarto).
+  Foglio-picker al posto delle tendine native (lug 2026): la
+  `<select>` del sistema operativo non si può vestire da Barattolo, e
+  le due del form Vendi (categoria e condizioni) sono passate al
+  nostro foglio. Il MOTIVO per cui non è una riscrittura: la select
+  resta in pagina come DEPOSITO del valore (attributo `hidden`), e
+  tutto il JS di prima continua a leggerla e scriverla
+  (`el('sellCond').value`) — publish, modifica, reset e validazioni
+  intonsi. A parlare col dito è il campo-bottone `.campo-scelta`
+  (`#sellCatBtn`/`#sellCondBtn`, veste da select con la freccia ▾) che
+  apre `#pickerSheet` col pattern dei fogli di sempre (registrato in
+  `closeSheet`): `PICKER` è il catalogo delle due liste (voci dal
+  select per la categoria, da `CONDIZIONI` per le condizioni: la
+  pillola colorata + la desc sotto), `apriPicker` disegna e mette a
+  fuoco la voce scelta, `scegliPicker` scrive nel select e chiude,
+  `aggiornaPicker(id)` riallinea il campo-bottone al valore — VA
+  RICHIAMATA da chiunque tocchi il select via JS (già in editListing,
+  annullaModifica, publish e una volta all'avvio). Accessibilità:
+  `role="dialog"`/`radiogroup`, Esc chiude, frecce ↑↓ scorrono, e
+  `pickerTrigger` riporta il focus al campo per OGNI strada di
+  chiusura (scelta, Annulla, Esc, tap fuori) perché passano tutte da
+  `closeSheet`. Dallo stesso cantiere: `prefers-reduced-motion` ora
+  ferma la scivolata di TUTTI i fogli (`.sheet{transition:none}`),
+  che mancava da sempre. Il filtro delle condizioni nel pannello
+  Filtri resta una select nativa: lì il testo semplice basta.
   Tenuta al volume (lug 2026): la vetrina va a PAGINE col cursore
   keyset. `/api/listings`, `/api/negozio/{chi}` e `/api/listings/miei`
   accettano `limit` (clampato a 100) e `cursore` = '{creato}_{id}'
@@ -934,9 +970,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   campo) vincerebbero sulla classe nuda; la firmata
   degli importati salta la validazione, il campo resta nascosto) +
   costo (stessa valuta del listino, `consegnaPayload`) + taglia;
-  dettaglio con riga «🚚 + X
-  spedizione · protezione acquisti inclusa» (`rigaConsegna`, importo
-  nella valuta della vista via `spedTesto`) e pillola taglia; per
+  dettaglio con le PILLOLE DELLE MODALITÀ (lug 2026, dopo il feedback
+  di Andrea: il 🚚 muto della card qui diventa parola) —
+  `pilloleModalita()` scrive una pillola per ogni strada offerta
+  («🚚 Spedizione + X» col costo DENTRO la pillola nella valuta della
+  vista via `spedTesto`, o «🚚 Spedizione gratuita»; «🤝 Ritiro in
+  zona»; «💾 Codice online») e per questo `rigaConsegna` è rimasta la
+  sola «🛡️ protezione acquisti inclusa»: la stessa cosa non si dice
+  due volte (resta gatata su `l.consegna`, gli storici non promettono
+  nulla). Più la pillola taglia; per
   'entrambe' due pillole spedizione/ritiro DENTRO l'escrow-zone
   (`consegnaScelta`, si riparte da spedizione a ogni dettaglio; la
   cifra dei bottoni è `totaleStima`); conto scomposto
@@ -981,8 +1023,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la pillola dice «💾 Codice online»);
   trust-note asimmetrica `#notaDigitale` visibile SOLO con la scelta
   digitale attiva (su una combo non deve spaventare chi sceglie la
-  spedizione, `setConsegnaScelta` la accende/spegne); `rigaConsegna`
-  con «o 💾 codice online»; in card 🚚 e 💾 possono convivere.
+  spedizione, `setConsegnaScelta` la accende/spegne); la pillola
+  «💾 Codice online» di `pilloleModalita` (che ha sostituito il vecchio
+  «o 💾 codice online» dentro `rigaConsegna`); in card 🚚 e 💾 possono
+  convivere. ATTENZIONE a non confonderle: le pillole di
+  `pilloleConsegna` stanno DENTRO l'escrow-zone e SI TOCCANO (il
+  compratore sceglie la strada), quelle di `pilloleModalita` stanno
+  nella fila informativa del dettaglio e raccontano soltanto.
   NIENTE stati nuovi: locked→shipped
   = `POST /api/orders/{id}/consegna-digitale` (solo venditore,
   contenuto 1-4000 caratteri, corriere-sentinella 'Consegna digitale',
