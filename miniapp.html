@@ -685,6 +685,19 @@
     padding:6px 12px;font-size:13px;font-weight:700}
   .pill.nostr{background:var(--nostr-soft);border-color:var(--nostr-soft);
     color:var(--nostr-text);font-weight:800}
+  /* Le condizioni come pillola colorata: la scala parla col colore —
+     verde pieno → verde tenue → ambra → arancio → grigio. Coppie
+     dalla palette di casa, contrasto AA nei due temi (dove la coppia
+     chiara non regge al buio c'e' l'override per-tema qui sotto). */
+  .pill[class*="cond-"]{font-weight:800}
+  .pill.cond-nuovo{background:var(--trust-deep);border-color:var(--trust-deep);color:#fff}
+  html[data-tema="scuro"] .pill.cond-nuovo{background:var(--trust);border-color:var(--trust);color:var(--on-trust)}
+  .pill.cond-come_nuovo{background:var(--trust-soft);border-color:var(--trust-soft);color:var(--trust-text)}
+  /* l'oro resta chiaro anche di sera, come l'etichetta prezzo */
+  .pill.cond-buono{background:var(--gold-a);border-color:var(--gold-line);color:var(--gold-text)}
+  .pill.cond-accettabile{background:var(--sats-soft);border-color:var(--sats-soft);color:var(--gold-text)}
+  html[data-tema="scuro"] .pill.cond-accettabile{color:var(--sats-text)}
+  .pill.cond-da_sistemare{background:var(--off-bg);border-color:var(--off-bg);color:var(--ink-soft)}
   /* La zona escrow: il recinto verde tratteggiato — il "sigillo" del
      barattolo, l'unico tratteggio del sistema insieme alla cassaforte */
   .escrow-zone{position:relative;background:var(--trust-soft);border:2px dashed var(--trust);
@@ -785,6 +798,16 @@
     padding:12px 14px;font:inherit;font-weight:600;outline:none;
   }
   .field input:focus,.field textarea:focus{border-color:var(--ink)}
+  /* Il campo-bottone che apre il foglio-picker (categoria e condizioni):
+     veste da select ma la tendina e' il nostro foglio */
+  .campo-scelta{width:100%;display:flex;align-items:center;justify-content:space-between;
+    gap:10px;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;
+    padding:8px 14px;min-height:47px;font:inherit;font-weight:600;color:var(--ink);
+    cursor:pointer;text-align:left}
+  .campo-scelta:focus-visible{outline:none;border-color:var(--ink)}
+  .campo-scelta .cs-val{display:flex;align-items:center;gap:8px;min-width:0}
+  .campo-scelta .cs-vuoto{color:var(--muted)}
+  .campo-scelta .cs-freccia{color:var(--muted);font-size:12px;flex:0 0 auto}
   .field textarea{min-height:90px;resize:vertical}
   .sats-input{position:relative}
   .sats-input input{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--sats);padding-right:70px}
@@ -951,6 +974,19 @@
   .sheet.open{transform:none}
   .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--field-line);margin:0 auto 14px}
   .sheet h3{font-family:'Baloo 2',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
+  /* il foglio-picker di categoria e condizioni */
+  .picker-lista{max-height:56vh;overflow-y:auto;margin:6px 0 4px}
+  .picker-voce{width:100%;display:flex;align-items:center;gap:12px;border:0;background:none;
+    padding:12px 10px;border-radius:12px;font:inherit;font-weight:700;font-size:14.5px;
+    color:var(--ink);cursor:pointer;text-align:left}
+  .picker-voce:hover{background:var(--chip-bg)}
+  .picker-voce.sel{background:var(--sats-soft)}
+  .picker-voce:focus-visible{outline:2px solid var(--sats);outline-offset:-2px}
+  .picker-voce .p-ico{font-size:18px;flex:0 0 auto}
+  .picker-voce .p-desc{display:block;font-size:12px;color:var(--muted);font-weight:600}
+  /* la colonna pillola-colorata + descrizione delle voci condizione */
+  .picker-voce .p-col{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+  .picker-voce .p-check{margin-left:auto;color:var(--sats-text);font-weight:800;flex:0 0 auto}
   .qr{
     aspect-ratio:1/1;max-width:230px;margin:16px auto;border-radius:var(--radius);
     background:repeating-conic-gradient(#23282C 0 25%, #fff 0 50%) 0 0/16px 16px;
@@ -1106,9 +1142,12 @@
     nav{padding:0 max(var(--pad), calc((100% - 1160px)/2))}
   }
 
-  /* Chi preferisce meno movimento non vede fluttuare nulla */
+  /* Chi preferisce meno movimento non vede fluttuare nulla,
+     e i fogli compaiono senza scivolare */
   @media (prefers-reduced-motion: reduce){
     .empty-mascotte,.hero img,.attesa-jar,.attesa-clessidra{animation:none}
+    .sheet{transition:none}
+    .sheet-bg.open{animation:none}
   }
 </style>
 <script>
@@ -1203,13 +1242,15 @@
         <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
       </div>
       <div class="filtri-riga">
+        <!-- qui le <option> sono native (non stilabili): niente pillole
+             colorate, il testo semplice basta -->
         <select id="filtroCondSel" title="Filtra per condizione">
           <option value="">Qualsiasi condizione</option>
-          <option value="nuovo">✨ Nuovo</option>
-          <option value="come_nuovo">🌟 Come nuovo</option>
-          <option value="buono">👍 In buono stato</option>
-          <option value="accettabile">🆗 Accettabile</option>
-          <option value="da_sistemare">🔧 Da sistemare</option>
+          <option value="nuovo">Nuovo</option>
+          <option value="come_nuovo">Come nuovo</option>
+          <option value="buono">In buono stato</option>
+          <option value="accettabile">Accettabile</option>
+          <option value="da_sistemare">Da sistemare</option>
         </select>
       </div>
       <div class="filtri-riga">
@@ -1276,17 +1317,24 @@
       </div>
       <div class="field"><label>Titolo</label>
         <input id="sellTitle" placeholder="Es. Tastiera meccanica Keychron K2"></div>
+      <!-- Categoria e condizioni (lug 2026): la tendina nativa non si
+           puo' vestire da Barattolo, quindi la select resta nascosta
+           come DEPOSITO del valore (tutto il JS continua a leggerla)
+           e a parlare col dito e' il campo-bottone che apre il
+           foglio-picker (apriPicker, pattern dei fogli esistenti). -->
       <div class="field"><label>Categoria</label>
-        <select id="sellCat"><option>Elettronica</option><option>Casa e giardino</option><option>Abbigliamento</option><option>Sport e hobby</option><option>Motori</option><option>Bambini</option><option>Animali</option><option>Libri e media</option><option>Altro</option></select></div>
+        <select id="sellCat" hidden><option>Elettronica</option><option>Casa e giardino</option><option>Abbigliamento</option><option>Sport e hobby</option><option>Motori</option><option>Bambini</option><option>Animali</option><option>Libri e media</option><option>Altro</option></select>
+        <button type="button" class="campo-scelta" id="sellCatBtn" onclick="apriPicker('sellCat')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field" id="sellCondField"><label>Condizioni dell'oggetto</label>
-        <select id="sellCond">
+        <select id="sellCond" hidden>
           <option value="">Scegli le condizioni…</option>
-          <option value="nuovo">✨ Nuovo — mai usato</option>
-          <option value="come_nuovo">🌟 Come nuovo — in perfette condizioni</option>
-          <option value="buono">👍 In buono stato — usato ma ben conservato</option>
-          <option value="accettabile">🆗 Accettabile — vissuto, segni d'uso evidenti</option>
-          <option value="da_sistemare">🔧 Da sistemare — non funzionante o da riparare</option>
-        </select></div>
+          <option value="nuovo">Nuovo — mai usato</option>
+          <option value="come_nuovo">Come nuovo — in perfette condizioni</option>
+          <option value="buono">In buono stato — usato ma ben conservato</option>
+          <option value="accettabile">Accettabile — vissuto, segni d'uso evidenti</option>
+          <option value="da_sistemare">Da sistemare — non funzionante o da riparare</option>
+        </select>
+        <button type="button" class="campo-scelta" id="sellCondBtn" onclick="apriPicker('sellCond')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
@@ -1583,6 +1631,17 @@
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET PICKER (categoria e condizioni del form Vendi) ============
+       Al posto della tendina nativa del sistema: titolo, voci toccabili
+       con la scelta evidenziata, Esc/tap fuori/Annulla per chiudere.
+       Le voci le scrive apriPicker() dal catalogo del select nascosto. -->
+  <div class="sheet" id="pickerSheet" role="dialog" aria-modal="true" aria-labelledby="pickerTitolo">
+    <div class="grab"></div>
+    <h3 id="pickerTitolo"></h3>
+    <div class="picker-lista" id="pickerLista" role="radiogroup"></div>
+    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+  </div>
+
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
   <div class="sheet" id="invitoSheet">
     <div class="grab"></div>
@@ -1721,17 +1780,25 @@ function avatarImg(nome){
   const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
   return n ? `<img class="av-foto" src="${fotoUrl(n)}" alt="" onerror="this.remove()">` : '';
 }
-/* Le condizioni dell'oggetto (lug 2026): catalogo id -> {emoji, nome},
-   la stessa scala delle <option> del form (li' vivono le etichette
-   lunghe). In card parla solo l'emoji (il testo non ci sta a 360px),
-   nel dettaglio la pillola completa. */
+/* Le condizioni dell'oggetto (lug 2026): catalogo id -> {nome, desc}.
+   Il segno e' la PILLOLA COLORATA di condPill() — la scala parla col
+   colore (verde pieno → verde tenue → ambra → arancio → grigio,
+   classi .pill.cond-* dalla palette di casa; le vecchie emoji
+   ✨🌟👍🆗🔧 non comunicavano una gradazione, e i pallini provati al
+   loro posto si confondevano con le stelle delle recensioni). Vive
+   nel dettaglio e nel foglio-picker del form: MAI in card — la
+   vetrina resta pulita. */
 const CONDIZIONI = {
-  nuovo:        {emoji:'✨', nome:'Nuovo'},
-  come_nuovo:   {emoji:'🌟', nome:'Come nuovo'},
-  buono:        {emoji:'👍', nome:'In buono stato'},
-  accettabile:  {emoji:'🆗', nome:'Accettabile'},
-  da_sistemare: {emoji:'🔧', nome:'Da sistemare'},
+  nuovo:        {nome:'Nuovo',          desc:'mai usato'},
+  come_nuovo:   {nome:'Come nuovo',     desc:'in perfette condizioni'},
+  buono:        {nome:'In buono stato', desc:'usato ma ben conservato'},
+  accettabile:  {nome:'Accettabile',    desc:'vissuto, segni d\'uso evidenti'},
+  da_sistemare: {nome:'Da sistemare',   desc:'non funzionante o da riparare'},
 };
+function condPill(id){
+  const c = CONDIZIONI[id]; if (!c) return '';
+  return `<span class="pill cond-${id}">${c.nome}</span>`;
+}
 /* Il luogo in card e dettaglio: la zona quando c'e' («Pavia (PV)»
    cosi' com'e'), altrimenti la strada di consegna — un annuncio
    solo-spedizione senza luogo e' legittimo (lug 2026: «spedisco in
@@ -2188,7 +2255,7 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span>${luogoMeta(l)}</span>${CONDIZIONI[l.condizione]?`<span title="${CONDIZIONI[l.condizione].nome}">${CONDIZIONI[l.condizione].emoji}</span>`:''}${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
+        <div class="meta"><span>${luogoMeta(l)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
       </div>
     </div>`; };
 
@@ -2663,22 +2730,29 @@ function setConsegnaScelta(v){
   if (l) document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
     s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
 }
-/* La riga della consegna nel dettaglio: esiste solo se il venditore
-   l'ha dichiarata — gli annunci di prima non promettono nulla. */
+/* La consegna nel dettaglio (lug 2026): le strade offerte diventano
+   pillole esplicite nella riga delle pillole («🚚 Spedizione + 4 €»,
+   «🤝 Ritiro in zona», «💾 Codice online») — il 🚚 muto della card
+   qui diventa parola. Il COSTO vive dentro la pillola della
+   spedizione, cosi' la riga sotto il prezzo resta alla sola
+   protezione: nessuna informazione detta due volte (le pillole di
+   SCELTA dentro l'escrow-zone sono un'altra cosa: li' si decide). */
+function pilloleModalita(l){
+  const p = [];
+  if (l.consegna==='spedizione' || l.consegna==='entrambe')
+    p.push(`<span class="pill">${(l.sped>0 || l.spedEur>0)
+      ? `🚚 Spedizione + ${spedTesto(l)}` : '🚚 Spedizione gratuita'}</span>`);
+  if (l.consegna==='ritiro' || l.consegna==='entrambe')
+    p.push('<span class="pill">🤝 Ritiro in zona</span>');
+  if (l.consegna==='digitale' || l.ancheDigitale)
+    p.push('<span class="pill">💾 Codice online</span>');
+  return p.join('');
+}
+/* La riga sotto il prezzo: esiste solo se il venditore ha dichiarato
+   la consegna — gli annunci di prima non promettono nulla. */
 function rigaConsegna(l){
   if (!l.consegna) return '';
-  let t;
-  if (l.consegna==='ritiro')
-    t = l.ancheDigitale ? '🤝 ritiro in zona' : '🤝 solo ritiro in zona';
-  else if (l.consegna==='digitale') t = '💾 codice inviato online, subito';
-  else {
-    t = (l.sped>0 || l.spedEur>0)
-      ? `🚚 + ${spedTesto(l)} spedizione` : '🚚 spedizione gratuita';
-    if (l.consegna==='entrambe') t += ' o ritiro in zona';
-  }
-  if (l.ancheDigitale && l.consegna!=='digitale')
-    t += ' o 💾 codice online';
-  return `<div class="eur-hint" style="margin-top:-8px">${t} · protezione acquisti inclusa</div>`;
+  return `<div class="eur-hint" style="margin-top:-8px">🛡️ protezione acquisti inclusa</div>`;
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
@@ -3062,7 +3136,8 @@ function openDetail(id){
       ${rigaConsegna(l)}
       <div class="pills">
         <span class="pill">${luogoMeta(l)}</span>
-        ${CONDIZIONI[l.condizione]?`<span class="pill">${CONDIZIONI[l.condizione].emoji} ${CONDIZIONI[l.condizione].nome}</span>`:''}
+        ${pilloleModalita(l)}
+        ${condPill(l.condizione)}
         ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
         ${l.taglia?`<span class="pill">📦 pacco ${esc(l.taglia)}</span>`:''}
         ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
@@ -3605,8 +3680,74 @@ function closeSheet(){
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
+  el('pickerSheet').classList.remove('open');
+  /* il focus torna al campo-bottone che ha aperto il picker (vale per
+     scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui) */
+  if (pickerTrigger) { pickerTrigger.focus(); pickerTrigger = null; }
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
+
+/* ---------------- foglio-picker di categoria e condizioni ----------------
+   La tendina nativa del form Vendi, rivestita da Barattolo: il select
+   nascosto resta il deposito del valore, il foglio e' solo la mano che
+   lo scrive. aggiornaPicker() tiene il campo-bottone allineato al
+   valore (va richiamata da chi tocca il select via JS). */
+const PICKER = {
+  sellCat: {titolo:'Categoria', voci: () =>
+    [...el('sellCat').options].map(o => ({val:o.value,
+      resa:`<span class="p-ico">${EMOJI_CAT[o.value]||'📦'}</span><span><b>${esc(o.value)}</b></span>`}))},
+  sellCond: {titolo:'Condizioni dell\'oggetto', voci: () =>
+    Object.entries(CONDIZIONI).map(([id,c]) => ({val:id,
+      resa:`<span class="p-col">${condPill(id)}<span class="p-desc">${c.desc}</span></span>`}))},
+};
+let pickerTrigger = null;      /* il campo-bottone da rimettere a fuoco */
+function aggiornaPicker(id){
+  const btn = el(id+'Btn'); if (!btn) return;
+  const v = el(id).value;
+  btn.querySelector('.cs-val').innerHTML =
+    id === 'sellCat'
+      ? `<span class="p-ico">${EMOJI_CAT[v]||'📦'}</span><span>${esc(v)}</span>`
+      : (CONDIZIONI[v]
+          ? condPill(v)
+          : '<span class="cs-vuoto">Scegli le condizioni…</span>');
+}
+function apriPicker(id){
+  const cfg = PICKER[id]; if (!cfg) return;
+  pickerTrigger = el(id+'Btn');
+  el('pickerTitolo').textContent = cfg.titolo;
+  const corrente = el(id).value;
+  /* i valori vengono dai cataloghi (niente testo utente): l'onclick
+     e' sicuro, esc() sulle etichette per abitudine */
+  el('pickerLista').innerHTML = cfg.voci().map(v =>
+    `<button type="button" role="radio" aria-checked="${v.val===corrente}"
+       class="picker-voce${v.val===corrente?' sel':''}"
+       onclick="scegliPicker('${id}','${v.val}')">${v.resa}${
+       v.val===corrente?'<span class="p-check">✓</span>':''}</button>`).join('');
+  el('sheetBg').classList.add('open');
+  el('pickerSheet').classList.add('open');
+  const sel = el('pickerLista').querySelector('.sel') || el('pickerLista').firstElementChild;
+  if (sel) sel.focus();
+}
+function scegliPicker(id, val){
+  el(id).value = val;
+  aggiornaPicker(id);
+  haptic();
+  closeSheet();
+}
+/* Esc chiude, le frecce scorrono le voci (solo a picker aperto) */
+document.addEventListener('keydown', e => {
+  if (!el('pickerSheet').classList.contains('open')) return;
+  if (e.key === 'Escape') { closeSheet(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+    e.preventDefault();
+    const voci = [...el('pickerLista').querySelectorAll('.picker-voce')];
+    const i = voci.indexOf(document.activeElement);
+    voci[e.key==='ArrowDown' ? Math.min(voci.length-1, i+1) : Math.max(0, i-1)]?.focus();
+  }
+});
+/* la prima etichetta dei campi-bottone (lo script vive in fondo alla
+   pagina: il DOM c'e' gia') */
+aggiornaPicker('sellCat'); aggiornaPicker('sellCond');
 
 function sheetPaid(){
   if (DEMO) return simulatePaid();
@@ -6180,6 +6321,7 @@ function editListing(id){
   /* uno storico senza condizione arriva vuoto: publish() la esige,
      ed e' cosi' che la modifica «la chiede» senza obblighi retroattivi */
   el('sellCond').value = l.condizione||'';
+  aggiornaPicker('sellCat'); aggiornaPicker('sellCond');
   /* spedEur pieno = costo ancorato all'euro: si rientra in euro
      anche sul listino sats (il toggle segue la semantica salvata) */
   spedValuta = l.spedEur>0 ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
@@ -6197,6 +6339,7 @@ function annullaModifica(){
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
+  aggiornaPicker('sellCond');
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
@@ -6424,6 +6567,7 @@ async function publish(){
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
+  aggiornaPicker('sellCond');
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
