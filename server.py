@@ -4293,6 +4293,16 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         # La cifra pattuita sostituisce il listino — SOLO l'articolo:
         # spedizione e protezione si calcolano come per ogni ordine.
         prezzo_sats_eff, prezzo_eur_eff = _importo_accordo(off)
+    if a["lampo_percento"] > 0 and a["lampo_scadenza"] > int(time.time()):
+        # L'offerta lampo e' PUBBLICA: vale per chiunque paghi nella
+        # finestra, anche senza barattolo. Se coesiste un accordo
+        # individuale vince il MINIMO: chi compra paga sempre il
+        # meglio dei due, mai una lampo che peggiora l'accordo.
+        l_sats, l_eur = _prezzo_lampo(a, a["lampo_percento"])
+        if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+            prezzo_eur_eff = min(prezzo_eur_eff, l_eur)
+        else:
+            prezzo_sats_eff = min(prezzo_sats_eff, l_sats)
     articolo, cambio_ordine = prezzo_sats_eff, 0.0
     sped = a["spedizione_sats"] if scelta == "spedizione" else 0
     # Spedizione ANCORATA all'euro su listino sats (spedizione_eur
@@ -8045,6 +8055,20 @@ async def scadenze_offerte():
             print(f"⚠️ Notifica di scadenza offerta saltata: {e}")
 
 
+def scadenze_lampo():
+    """La scopa delle offerte lampo: le colonne si azzerano quando la
+    scadenza e' passata. Non e' questione di correttezza (ogni lettura
+    gatea gia' sulla scadenza) ma di pulizia: la vetrina non porta in
+    giro numeri morti, e l'annuncio torna pronto per un lancio nuovo.
+    Nessuna notifica: lo sconto finito non e' una novita' per nessuno."""
+    con = db()
+    con.execute("UPDATE annunci SET lampo_percento=0, lampo_scadenza=0 "
+                "WHERE lampo_percento>0 AND lampo_scadenza<=?",
+                (int(time.time()),))
+    con.commit()
+    con.close()
+
+
 async def orologio():
     while True:
         try:
@@ -8059,6 +8083,10 @@ async def orologio():
             await scadenze_offerte()
         except Exception as e:
             print(f"⚠️ Scadenze offerte saltate: {e}")
+        try:
+            scadenze_lampo()
+        except Exception as e:
+            print(f"⚠️ Scadenze lampo saltate: {e}")
         try:
             await importa_nostr_periodico()
         except Exception as e:
