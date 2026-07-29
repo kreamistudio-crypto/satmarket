@@ -1262,7 +1262,7 @@
           <option value="entrambe">📦🤝 Spedizione o ritiro in zona</option>
           <option value="digitale">💾 Consegna digitale (buono, codice, licenza)</option>
         </select>
-        <label id="sellAncheDigitaleRiga" style="display:none;margin-top:8px;font-size:13px;font-weight:700;color:var(--ink);align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="sellAncheDigitale" onchange="aggiornaConsegnaForm()" style="width:auto;accent-color:var(--sats)"> 💾 Offro anche la consegna digitale (codice in piattaforma)</label>
+        <label id="sellAncheDigitaleRiga" style="display:none;margin-top:8px;font-size:13px;font-weight:700;color:var(--ink);align-items:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="sellAncheDigitale" onchange="aggiornaConsegnaForm()" style="width:auto;accent-color:var(--sats);margin-top:2px"> <span>💾 In alternativa, posso inviare il codice online<br><span style="font-size:12px;color:var(--muted);font-weight:600">Il compratore sceglie: riceve l'oggetto oppure il codice.</span></span></label>
         <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Consegnerai il contenuto dentro Barattolo dopo l'acquisto, dal dettaglio dell'ordine. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
@@ -3026,7 +3026,7 @@ function openDetail(id){
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${pilloleConsegna(l)}
-             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Bene digitale:</b> il venditore consegna il contenuto dentro Barattolo e tu lo riveli con un tocco. Dalla rivelazione hai un tempo breve per provarlo; <b>dopo la rivelazione non è rimborsabile</b>, salvo prove.</span></div>` : ''}
+             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Bene digitale:</b> il venditore consegna il contenuto dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai 24 ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
@@ -4149,7 +4149,7 @@ function openOrder(id){
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
       ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?'📬 L\'ho ritirato — mi prendo 72h per controllarlo':'📬 È arrivato — mi prendo 72h per controllarlo'}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
-      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona (le prove decidono).':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema.'} Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
+      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema.'} Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
@@ -5356,7 +5356,7 @@ function pannelloContenutoDigitale(o){
   if (o.role==='buyer' && o.state==='shipped') return `
     <div class="payout">
       <h4>🔓 Rivela il contenuto</h4>
-      <div class="hint">Il venditore ha consegnato il contenuto del tuo acquisto. <b>Rivelarlo fa da ricevuta</b>: da lì hai 24 ore per provarlo, e dopo la rivelazione non è rimborsabile salvo prove.</div>
+      <div class="hint">Il venditore ha consegnato il contenuto del tuo acquisto. <b>Rivelarlo fa da ricevuta</b>: un codice, una volta rivelato, non torna indietro. Provalo subito — hai 24 ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.</div>
       <div class="hint mono" style="letter-spacing:3px">••••-••••-••••</div>
       <button class="btn orange" style="margin-top:10px" onclick="rivelaContenuto(this)">🔓 Rivela — mi prendo 24h per provarlo</button>
     </div>`;
@@ -5382,7 +5382,7 @@ async function caricaContenutoDigitale(){
 
 async function rivelaContenuto(btn){
   haptic();
-  if (!confirm('Rivelare il contenuto?\n\nLa rivelazione fa da ricevuta di lettura: da lì parte la tua finestra di 24 ore per provarlo, e dopo non è rimborsabile salvo prove.')) return;
+  if (!confirm('Rivelare il contenuto?\n\nUn codice rivelato non torna indietro. Provalo subito: hai 24 ore per aprire una disputa se qualcosa non va, poi l\'acquisto è definitivo.')) return;
   const ripristina = bottoneInAttesa(btn);
   const d = await caricaContenutoDigitale();
   ripristina();

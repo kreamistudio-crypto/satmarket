@@ -4803,11 +4803,11 @@ async def consegna_digitale(ordine_id: int, req: Request,
           f"({len(contenuto)} caratteri, impronta {impronta})")
     await notifica(o["compratore_id"],
                    f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
-                   f"tuo acquisto digitale! Rivelalo nella Mini App: dalla "
-                   f"rivelazione hai {ORE_CONFERMA_DIGITALE} ore per "
-                   f"provarlo, poi i sats si sbloccano al venditore. "
-                   f"⚠️ I beni digitali non sono rimborsabili dopo la "
-                   f"rivelazione, salvo prove.")
+                   f"tuo acquisto digitale! Rivelalo nella Mini App e "
+                   f"provalo subito: dalla rivelazione hai "
+                   f"{ORE_CONFERMA_DIGITALE} ore per aprire una disputa "
+                   f"se qualcosa non va, poi l'acquisto è definitivo. "
+                   f"⚠️ Un codice, una volta rivelato, non torna indietro.")
     return {"ok": True, "stato": "shipped"}
 
 
@@ -7304,8 +7304,10 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
     # antieconomico — il moderatore vede subito quante dispute ha gia'
     # aperto questo compratore, e la regola dichiarata prima
     # dell'acquisto: a zero prove vince chi ha consegnato in
-    # piattaforma. Puo' anche chiedere all'emittente quando e dove il
-    # codice e' stato riscattato.
+    # piattaforma. La regola segue il BENE, non il canale: un buono
+    # spedito fisicamente e' riscattabile uguale. Barattolo non puo'
+    # verificare i riscatti; il moderatore invece PUO' chiedere
+    # all'emittente quando e dove il codice e' stato riscattato.
     nota_digitale = ""
     if o["consegna_scelta"] == "digitale":
         gia_aperte = con.execute(
@@ -7317,8 +7319,12 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             f"\n💾 Bene DIGITALE ({rivelato}; il contenuto si legge "
             f"dal dettaglio ordine). Regola dichiarata all'acquisto: "
             f"a zero prove vince il venditore che ha consegnato in "
-            f"piattaforma; puoi chiedere all'emittente quando/dove il "
-            f"codice è stato riscattato."
+            f"piattaforma — e per i beni RISCATTABILI (codici, buoni) "
+            f"vale qualunque sia la modalità di consegna, anche "
+            f"spediti fisicamente: il rischio sta nel bene, non nel "
+            f"canale. Barattolo non può verificare i riscatti, ma tu "
+            f"puoi chiedere all'emittente quando/dove il codice è "
+            f"stato riscattato."
             f"\n📊 Dispute aperte da questo compratore, in totale: "
             f"{gia_aperte}.")
     con.close()
