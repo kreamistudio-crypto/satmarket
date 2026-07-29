@@ -2987,7 +2987,7 @@ function openDetail(id){
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
              <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
-             ${(l.nostr || offAcc) ? '' : `<button class="btn ghost" onclick="apriOfferta()">💰 Fai un'offerta</button>`}
+             ${offAcc ? '' : `<button class="btn ghost" onclick="apriOfferta()">💰 Fai un'offerta</button>`}
            </div>`}
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)

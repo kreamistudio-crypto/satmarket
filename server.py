@@ -3814,12 +3814,9 @@ async def fai_offerta(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Non puoi fare un'offerta sul tuo "
                                  "stesso annuncio")
-    if a["contatto_nostr"]:
-        # Il venditore-import non riceve notifiche e non risponderebbe
-        # mai: la trattativa vive dove vive lui.
-        con.close()
-        raise HTTPException(400, "Questo annuncio arriva da Nostr: usa i "
-                                 "contatti del venditore per trattare")
+    # Gli importati da Nostr sono trattabili come tutti: il venditore
+    # solo-Nostr riceve l'offerta via DM NIP-17 col link all'annuncio,
+    # entra col login Nostr e risponde da qui.
     # La cifra, nella valuta del listino (EUR con la virgola tradotta)
     grezzo = str(d.get("importo", "")).strip()
     imp_sats, imp_eur = 0, 0.0
