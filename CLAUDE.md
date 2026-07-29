@@ -106,12 +106,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   da_sistemare, id → etichetta breve; le etichette lunghe con emoji
   ✨🌟👍🆗🔧 vivono nelle <option> del form e nel catalogo JS
   `CONDIZIONI` del client). Colonna `annunci.condizione` ('' = storici
-  e importati, nessun obbligo retroattivo), OBBLIGATORIA nel form
-  (validazione in publish(), anche in modifica: gli storici si mettono
-  in regola al primo ritocco; MAI nella modifica firmata degli
-  importati, l'evento NIP-99 non la porta e il campo si nasconde);
-  il server resta tollerante via `condizione_valida` (sconosciuta →
-  '', pattern categoria: i client di ieri non si rompono). In
+  e importati, nessun obbligo retroattivo), OBBLIGATORIA client E
+  SERVER (dal lug 2026, deciso: `guardia_zona_condizione` — giudice
+  unico di pubblica e modifica — risponde 400 su assente o
+  sconosciuta; gli storici si mettono in regola al primo ritocco; MAI
+  nella modifica firmata degli importati, l'evento NIP-99 non la porta
+  e il campo si nasconde, e la guardia in modifica scatta DOPO i
+  controlli di proprietà/stato: chi tocca un annuncio in revisione
+  deve sentirsi dire quello. L'import CSV resta tollerante:
+  `condizione_tollerante`, colonna facoltativa). In
   CAMPI_VETRINA (search e miei gratis via a.*); param `condizione` su
   /api/listings (dichiarata soltanto: gli storici '' restano fuori,
   valore storto = nessun filtro) + select nel pannello Filtri (in DEMO
@@ -618,24 +621,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nome sconosciuto: l'avviso ha sempre coordinate buone, il testo
   libero resta solo dal lato annunci).
   Città vere in Vendi (lug 2026): il campo Zona resta testo LIBERO ma
-  suggerisce i comuni mentre si digita (datalist `zonaList` su
-  /api/comuni, debounce 250ms, pattern avvisi) e al blur passa da
+  suggerisce i comuni mentre si digita — datalist `zonaList` su
+  /api/comuni (debounce 250ms, pattern avvisi) col valore nel formato
+  «Comune (SIGLA)» («Carmagnola (TO)»: distingue gli omonimi, e
+  normalizza('Pavia (PV)') = 'pavia pv' è una chiave GIÀ registrata
+  da carica_comuni, riconosciuta senza codice nuovo; il valore si
+  salva e si mostra così com'è). Al blur passa da
   `GET /api/zona-controlla` (autenticato): comune riconoscibile nel
   testo = silenzio; nulla di riconoscibile ma un QUASI-comune sì =
-  riga `#zonaHint` «intendevi Pavia?» con [Usa] / [Lascia così] — MAI
-  bloccante, il nome suggerito vive nella variabile `zonaSuggerita` e
-  mai dentro l'onclick (gli apostrofi di Sant'Angelo). Niente
-  candidato = niente riga: frazioni e «Spedisco in tutta Italia»
-  restano legittimi per costruzione. `suggerisci_comune` = difflib a
+  riga `#zonaHint` «intendevi Pavia (PV)?» con [Usa] / [Lascia così],
+  il nome suggerito vive nella variabile `zonaSuggerita` e mai dentro
+  l'onclick (gli apostrofi di Sant'Angelo). LA ZONA SEGUE LA CONSEGNA
+  (lug 2026): col RITIRO ('ritiro'/'entrambe') è OBBLIGATORIA e deve
+  CONTENERE un comune riconosciuto — frazioni ok per costruzione
+  («Frazione Salsasio, Carmagnola (TO)» passa: gli n-grammi trovano
+  il comune), «Pvia» no; la regola vive in `guardia_zona_condizione`
+  (400 col messaggio dei suggerimenti; senza dataset si spegne,
+  fail-open) e nel client (campo vuoto fermato in publish(), label
+  dinamica «obbligatorio per il ritiro» da aggiornaConsegnaForm, hint
+  fermo al blur). SENZA ritiro resta facoltativa e la validazione è
+  morbida (mai bloccante; niente candidato = niente riga). «Spedisco
+  in tutta Italia» non vive più nel campo Zona (è roba della
+  consegna): l'annuncio senza luogo mostra in card/dettaglio
+  «📦 Spedizione» o «💾 Online» via `luogoMeta` (storici = «📍 —»).
+  `suggerisci_comune` = difflib a
   soglia 0.8 sugli n-grammi (lunghi prima, primo nel testo a parità,
   come coordinate_da_zona), stoplist `PAROLE_ZONA` (senza, «spedisco»
   suggeriva Sedico BL — successo davvero), cache pigra `_comuni_fuzzy`
-  solo sui nomi che coordinate_da_zona sa poi riconoscere (i contesi
+  («Nome (SIGLA)») solo sui nomi che coordinate_da_zona sa poi
+  riconoscere (i contesi
   tipo Castro non si suggeriscono mai: sarebbe un vicolo cieco).
-  Stesso controllo nell'anteprima dell'import CSV come AVVISO («zona
-  senza un comune riconoscibile — forse Pavia?»), mai uno scarto.
-  Dataset assente = tutto riconosciuto, la funzione si spegne in
-  silenzio come il resto della geografia. MOTORE: gemello della coda
+  Import CSV: righe col ritiro e zona vuota o irriconoscibile =
+  SCARTO in anteprima («forse Pavia (PV)?»), senza ritiro resta
+  l'AVVISO morbido. Dataset assente = tutto riconosciuto, la funzione
+  si spegne in silenzio come il resto della geografia. MOTORE: gemello della coda
   promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
   loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
   dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
