@@ -924,8 +924,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   le spunte sulle strutture di sempre consegna+anche_digitale, che
   reggono tutte le 7 combinazioni senza colonne nuove, e
   `impostaConsegnaForm()` è il verso opposto per precompilazione e
-  reset; costo e taglia compaiono solo con Spedizione spuntata, hint
-  «il compratore sceglierà una sola strada» con ≥2 spunte; la firmata
+  reset; costo e taglia compaiono solo con Spedizione spuntata;
+  l'hint «una sola strada» con ≥2 spunte è vissuto un giorno e tolto
+  come rumore — l'hint del codice online invece è OPERATIVO, dice al
+  venditore cosa dovrà fare («lo consegnerai dentro Barattolo dopo il
+  pagamento: niente chat private»); allineamento caselle: servono i
+  selettori SPECIFICI `.field label.cons-riga`/`.field .cons-riga
+  input`, le regole generiche di .field (maiuscoletto, padding da
+  campo) vincerebbero sulla classe nuda; la firmata
   degli importati salta la validazione, il campo resta nascosto) +
   costo (stessa valuta del listino, `consegnaPayload`) + taglia;
   dettaglio con riga «🚚 + X
