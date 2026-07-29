@@ -337,6 +337,26 @@ try:
 except ImportError:
     GIORNI_COLPO = 7              # cooldown dell'avviso «ha fatto colpo» per annuncio
 
+# La terza via della moderazione (lug 2026, decisione di Andrea: basta
+# blocchi a priori sui casi ambigui — l'AI segnala, l'ADMIN decide).
+# Un verdetto DUBBIO dell'AI mette l'annuncio in stato 'revisione':
+# invisibile al pubblico, in attesa che un moderatore lo pubblichi o
+# lo rifiuti. A leva spenta il dubbio torna a valere come vietato
+# (il comportamento binario di prima).
+try:
+    from config import MODERAZIONE_REVISIONE
+except ImportError:
+    MODERAZIONE_REVISIONE = True   # False = binario di ieri
+try:
+    from config import REVISIONE_ATTESA_ORE
+except ImportError:
+    REVISIONE_ATTESA_ORE = 24      # solo per i TESTI onesti («di solito entro N ore»)
+try:
+    from config import REVISIONE_SOLLECITO_GIORNI
+except ImportError:
+    REVISIONE_SOLLECITO_GIORNI = 2  # sollecito ai moderatori (0 = mai); l'annuncio
+                                    # RESTA comunque in attesa: mai online da solo
+
 # ===================================================================
 
 app = FastAPI(title="Barattolo API")
@@ -484,8 +504,9 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
                         "AND ((venditore_id=? AND stato='refunded') OR "
                         "(compratore_id=? AND stato='released'))",
                         tg_id, tg_id),
+        # niente 'revisione': un annuncio mai approvato non apre bottega
         annunci=q("SELECT COUNT(*) FROM annunci WHERE venditore_id=? "
-                  "AND stato!='rimosso'", tg_id),
+                  "AND stato NOT IN ('rimosso','revisione')", tg_id),
         fb_ricevuti=fb["n"], fb_media=fb["media"] or 0,
         fb_lasciati=q("SELECT COUNT(*) FROM feedback WHERE da_tg_id=?",
                       tg_id),
@@ -686,6 +707,20 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_lampo_annuncio
         ON offerte_lampo(annuncio_id, creato);
+    CREATE TABLE IF NOT EXISTS moderazione_log(
+        -- il REGISTRO della moderazione (lug 2026): ogni esito, della
+        -- macchina e dell'umano, per correggere il prompt A MANO sui
+        -- dati veri. Append-only; la macchina raccoglie, mai decide.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        annuncio_id INTEGER DEFAULT 0,   -- 0 = bloccato prima di nascere
+        titolo TEXT DEFAULT '',
+        venditore_id INTEGER DEFAULT 0,
+        strato TEXT DEFAULT '',          -- parole | ai | ai_lotto | admin
+        esito TEXT DEFAULT '',           -- vietato | dubbio | pubblicato | rifiutato | rimosso
+        motivo TEXT DEFAULT '',
+        deciso_da INTEGER DEFAULT 0,     -- tg_id del moderatore (0 = la macchina)
+        creato INTEGER DEFAULT 0
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -2013,6 +2048,9 @@ async def gestisci_callback(cb: dict):
     Telegram a cui era destinato: il tocco di chiunque altro non conta."""
     await bot_api("answerCallbackQuery", {"callback_query_id": cb.get("id")})
     azione, _, token = (cb.get("data") or "").partition(":")
+    if azione == "rev":
+        # la tastiera ✅/❌ della revisione (solo moderatori)
+        return await callback_revisione(cb, token)
     if azione not in ("fondi", "annulla"):
         return
     msg = cb.get("message") or {}
@@ -2499,6 +2537,28 @@ def controlla_vietato(titolo: str, descrizione: str) -> str | None:
     return None
 
 
+def registra_moderazione(strato: str, esito: str, motivo: str,
+                         titolo: str = "", annuncio_id: int = 0,
+                         venditore_id: int = 0, deciso_da: int = 0):
+    """Il registro della moderazione (lug 2026): ogni esito — della
+    macchina (deciso_da=0) e dell'umano — in moderazione_log, per
+    correggere il prompt A MANO sui dati veri. Fail-open totale:
+    un log fallito non blocca mai una pubblicazione. Il prompt NON
+    si auto-modifica mai: la macchina raccoglie, l'umano decide."""
+    try:
+        con = db()
+        con.execute(
+            "INSERT INTO moderazione_log(annuncio_id, titolo, "
+            "venditore_id, strato, esito, motivo, deciso_da, creato) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (annuncio_id, (titolo or "")[:120], venditore_id, strato,
+             esito, (motivo or "")[:200], deciso_da, int(time.time())))
+        con.commit()
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Registro moderazione saltato: {e}")
+
+
 # ---------------------------------------------------------------
 # GEOGRAFIA — la mappa dei comuni per gli avvisi di ricerca.
 # Un CSV committato (dati/comuni.csv, ~7.900 comuni con lat/lon dal
@@ -2644,11 +2704,15 @@ PROMPT_MODERAZIONE = (
     "funzionanti, munizioni, armi bianche da offesa; droghe; servizi "
     "sessuali o prostituzione; refurtiva; contraffazioni; documenti "
     "falsi; dati personali o account; farmaci con obbligo di ricetta; "
-    "animali protetti. Sono VIETATI anche i SERVIZI e le prestazioni "
-    "(sviluppo software, grafica, riparazioni, consulenze, lezioni, "
-    "lavori su commissione): Barattolo vende solo COSE che esistono, "
-    "fisiche o digitali — se l'annuncio offre un lavoro da fare "
-    "rispondi VIETATO: servizio. NON e' vietato l'uso legittimo: "
+    "animali protetti. Riserva VIETATO a questi casi netti. I SERVIZI "
+    "e le prestazioni (sviluppo software, grafica, riparazioni, "
+    "consulenze, lezioni, lavori su commissione) non sono supportati: "
+    "Barattolo vende solo COSE che esistono, fisiche o digitali — ma "
+    "un servizio non palesemente vietato NON e' un caso netto: "
+    "rispondi DUBBIO, decidera' un moderatore umano. DUBBIO anche per "
+    "i buoni riscattabili presso il VENDITORE STESSO ('buono per una "
+    "lezione con me', 'buono per una mia consulenza'): sono a meta' "
+    "tra bene e prestazione. NON e' vietato l'uso legittimo: "
     "attrezzi da lavoro (sparachiodi, pistole per silicone o vernice), "
     "giocattoli, softair e repliche, fucili subacquei, coltelli da "
     "cucina, oggetti da collezione disattivati, farmaci da banco "
@@ -2668,23 +2732,44 @@ PROMPT_MODERAZIONE = (
     "(numeri al posto di lettere, spazi o simboli in mezzo alle "
     "parole). Se l'annuncio e' ambiguo ma plausibilmente lecito "
     "rispondi OK: ogni annuncio pubblicato viene comunque notificato "
-    "a un moderatore umano che puo' rimuoverlo. Riserva VIETATO ai "
-    "casi chiari. Esempi: 'Pistola sparachiodi Bosch' -> OK. 'Pistola "
+    "a un moderatore umano che puo' rimuoverlo. DUBBIO e' per cio' "
+    "che NON deve andare online da solo ma nemmeno merita il rifiuto "
+    "secco. Esempi: 'Pistola sparachiodi Bosch' -> OK. 'Pistola "
     "softair a molla' -> OK. 'Buono regalo Zalando 50 euro' -> OK. "
     "'Piadina digitale: buono con codice da riscattare' -> OK. "
-    "'Ti sviluppo un bot Telegram' -> VIETATO: servizio. 'Revolver "
+    "'Ti sviluppo un bot Telegram' -> DUBBIO: servizio. 'Buono per "
+    "una lezione di chitarra con me' -> DUBBIO: buono-prestazione. "
+    "'Revolver "
     "calibro 38 funzionante con munizioni' -> VIETATO: arma da fuoco. "
     "'Serata speciale con tr0mb4mic1' -> VIETATO: servizi sessuali "
     "mascherati. Rispondi "
-    "con UNA sola riga: OK se l'annuncio va bene, oppure VIETATO: "
-    "seguito dal motivo in poche parole. Nessun altro testo.")
+    "con UNA sola riga: OK se l'annuncio va bene, VIETATO: col motivo "
+    "per i casi netti, oppure DUBBIO: col motivo in poche parole per "
+    "cio' che deve decidere un umano. Nessun altro testo.")
 
 
-async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
-    """Strato 2: il secondo paio d'occhi. Ritorna il motivo se
-    VIETATO, None se ok. Se la chiave API non c'e' o la chiamata
-    fallisce si lascia passare senza bloccare nessuno: il filtro
-    parole ha gia' fatto la sua parte."""
+def _leggi_verdetto(verdetto: str):
+    """Da una riga di verdetto ai tre esiti: None (ok o risposta
+    strana), ('vietato', motivo) per i casi netti, ('dubbio', motivo)
+    per cio' che deve decidere un umano. A leva spenta il dubbio
+    torna vietato: e' il comportamento binario di prima, e i chiamanti
+    non devono conoscere la leva."""
+    v = verdetto.strip()
+    if v.upper().startswith("VIETATO"):
+        return ("vietato", v.split(":", 1)[-1].strip() or "contenuto vietato")
+    if v.upper().startswith("DUBBIO"):
+        motivo = v.split(":", 1)[-1].strip() or "caso ambiguo"
+        return (("dubbio" if MODERAZIONE_REVISIONE else "vietato"), motivo)
+    return None                        # "OK" o risposta strana: si passa
+
+
+async def moderazione_ai(titolo: str, descrizione: str):
+    """Strato 2: il secondo paio d'occhi. Ritorna None se ok, oppure
+    la coppia (esito, motivo) con esito 'vietato' (caso netto) o
+    'dubbio' (in revisione: l'AI segnala, l'admin decide). Se la
+    chiave API non c'e' o la chiamata fallisce si lascia passare
+    senza bloccare nessuno: il filtro parole ha gia' fatto la sua
+    parte."""
     if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
         return None
     try:
@@ -2696,9 +2781,7 @@ async def moderazione_ai(titolo: str, descrizione: str) -> str | None:
                        f"TITOLO: {titolo[:200]}\n"
                        f"DESCRIZIONE: {descrizione[:600]}"}])
         verdetto = "".join(b.text for b in r.content if b.type == "text").strip()
-        if verdetto.upper().startswith("VIETATO"):
-            return verdetto.split(":", 1)[-1].strip() or "contenuto vietato"
-        return None                    # "OK" o risposta strana: si passa
+        return _leggi_verdetto(verdetto)
     except Exception as e:
         print(f"⚠️ Moderazione AI saltata (nessun blocco): {e}")
         return None
@@ -2715,18 +2798,21 @@ APPENDICE_LOTTO = (
     "<numero>: OK\n"
     "oppure\n"
     "<numero>: VIETATO: <motivo in poche parole>\n"
+    "oppure\n"
+    "<numero>: DUBBIO: <motivo in poche parole>\n"
     "dove <numero> e' quello indicato dopo la parola ANNUNCIO. "
     "Nessun altro testo prima o dopo le righe dei verdetti.")
 
 _RIGA_VERDETTO = re.compile(
-    r"^\s*(?:ANNUNCIO\s+)?(\d+)\s*[:.\)\-]\s*(OK|VIETATO.*)$",
+    r"^\s*(?:ANNUNCIO\s+)?(\d+)\s*[:.\)\-]\s*(OK|VIETATO.*|DUBBIO.*)$",
     re.IGNORECASE)
 
 
 async def moderazione_ai_lotto(voci: list) -> dict:
     """Strato 2 per l'import in blocco. voci = [(numero, titolo,
-    descrizione)]; ritorna {numero: motivo} SOLO per i VIETATO.
-    Fail-open come la sorella singola: chiave assente, errore,
+    descrizione)]; ritorna {numero: (esito, motivo)} SOLO per i
+    VIETATO e i DUBBIO (a leva spenta il dubbio e' gia' vietato,
+    come nella sorella singola). Fail-open: chiave assente, errore,
     timeout o risposta interamente storta = dict vuoto (il lotto
     passa, lo strato 1 ha gia' fatto la sua parte) e una riga in
     console. Una riga di verdetto malformata o mancante = quella
@@ -2748,16 +2834,15 @@ async def moderazione_ai_lotto(voci: list) -> dict:
             messages=[{"role": "user", "content": corpo}])
         testo = "".join(b.text for b in r.content if b.type == "text")
         nel_lotto = {n for n, _, _ in voci}
-        bocciati = {}
+        esiti = {}
         for riga in testo.splitlines():
             m = _RIGA_VERDETTO.match(riga)
             if not m or int(m.group(1)) not in nel_lotto:
                 continue
-            verdetto = m.group(2)
-            if verdetto.upper().startswith("VIETATO"):
-                motivo = verdetto.split(":", 1)[-1].strip()
-                bocciati[int(m.group(1))] = motivo or "contenuto vietato"
-        return bocciati
+            letto = _leggi_verdetto(m.group(2))
+            if letto:
+                esiti[int(m.group(1))] = letto
+        return esiti
     except Exception as e:
         print(f"⚠️ Moderazione AI a lotti saltata (nessun blocco): {e}")
         return {}
@@ -3143,18 +3228,26 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
     if categoria:
+        registra_moderazione("parole", "vietato", categoria,
+                             d["titolo"], venditore_id=user["id"])
         await notifica_admin(
             f"🚫 <b>Annuncio bloccato dal filtro</b> ({categoria})\n"
             f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
         raise HTTPException(400, MSG_RIFIUTO)
 
-    # --- Strato 2: parere dell'AI (solo se la chiave e' configurata) ---
-    motivo = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
-    if motivo:
+    # --- Strato 2: parere dell'AI. Il vietato netto blocca come
+    # sempre; il DUBBIO non blocca piu' (lug 2026): l'annuncio nasce
+    # in stato 'revisione' e decide un moderatore umano. ---
+    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    if verdetto and verdetto[0] == "vietato":
+        registra_moderazione("ai", "vietato", verdetto[1],
+                             d["titolo"], venditore_id=user["id"])
         await notifica_admin(
-            f"🚫 <b>Annuncio bloccato dall'AI</b> ({motivo})\n"
+            f"🚫 <b>Annuncio bloccato dall'AI</b> ({verdetto[1]})\n"
             f"«{d['titolo'][:80]}» — {user['first_name']} (id {user['id']})")
-        raise HTTPException(400, messaggio_rifiuto(motivo))
+        raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
+    in_revisione = bool(verdetto and verdetto[0] == "dubbio")
+    motivo_dubbio = verdetto[1] if in_revisione else ""
 
     con = db()
     # --- Scudo anti-doppione: se lo stesso venditore ha gia' un
@@ -3164,25 +3257,31 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # indistinguibile). Nessun await tra controllo e INSERT: nel
     # server mono-processo il blocco resta atomico. ---
     gemello = con.execute(
-        "SELECT id FROM annunci WHERE venditore_id=? AND titolo=? "
-        "AND prezzo_sats=? AND stato='attivo' AND creato>=? "
-        "ORDER BY id DESC LIMIT 1",
+        "SELECT id, stato FROM annunci WHERE venditore_id=? AND titolo=? "
+        "AND prezzo_sats=? AND stato IN ('attivo','revisione') "
+        "AND creato>=? ORDER BY id DESC LIMIT 1",
         (user["id"], d["titolo"], prezzo_sats,
          int(time.time()) - FINESTRA_ANTIDOPPIONE)).fetchone()
     if gemello:
         con.close()
-        return {"ok": True, "id": gemello["id"]}
+        risposta = {"ok": True, "id": gemello["id"]}
+        if gemello["stato"] == "revisione":
+            # il retry di un submit finito in revisione deve dire la
+            # stessa verita' del primo giro
+            risposta.update(revisione=True, attesa_ore=REVISIONE_ATTESA_ORE)
+        return risposta
     lat, lon = coordinate_da_zona(d.get("zona", ""))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
-        "anche_digitale,condizione,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,stato,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         condizione_valida(d.get("condizione")), int(time.time())))
+         condizione_valida(d.get("condizione")),
+         "revisione" if in_revisione else "attivo", int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -3196,6 +3295,16 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                     (json.dumps(nomi), annuncio_id))
         con.commit()
         con.close()
+    if in_revisione:
+        # La terza via: l'annuncio esiste ma non e' online — niente
+        # Nostr, niente promo, niente avvisi di ricerca, niente
+        # distintivi. Partiranno tutti alla decisione ✅ dell'admin
+        # (decidi_revisione). Il venditore riceve la verita' subito.
+        registra_moderazione("ai", "dubbio", motivo_dubbio, d["titolo"],
+                             annuncio_id, user["id"])
+        await avvisa_revisione(annuncio_id, motivo_dubbio)
+        return {"ok": True, "id": annuncio_id, "revisione": True,
+                "attesa_ore": REVISIONE_ATTESA_ORE}
     # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina ---
     await notifica_admin(
         f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
@@ -3268,7 +3377,9 @@ def miei_annunci(limit: int = 0, cursore: str = "",
     Con limit risponde a pagine come la vetrina; senza, l'array di
     sempre (tetto di sicurezza per i client vecchi)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    dove = "a.venditore_id=? AND a.stato='attivo'"
+    # anche gli annunci in revisione: il proprietario DEVE vedere il
+    # suo annuncio in attesa (il badge onesto vive nel frontend)
+    dove = "a.venditore_id=? AND a.stato IN ('attivo','revisione')"
     con = db()
     if limit:
         righe, prossimo = pagina_annunci(
@@ -3475,8 +3586,11 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     - gli ordini creati ma mai pagati vengono annullati"""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
+    # anche 'revisione': il venditore puo' sempre ritirare cio' che
+    # aspetta una decisione (mai stato online: nessun ordine possibile)
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
-                    "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
+                    "AND stato IN ('attivo','revisione')",
+                    (annuncio_id, user["id"])).fetchone()
     if not a:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
@@ -3523,7 +3637,16 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
                     "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
     if not a:
+        # il messaggio giusto per chi prova a ritoccare un annuncio
+        # in attesa: la modifica riparte dopo la decisione
+        in_rev = con.execute(
+            "SELECT 1 FROM annunci WHERE id=? AND venditore_id=? "
+            "AND stato='revisione'", (annuncio_id, user["id"])).fetchone()
         con.close()
+        if in_rev:
+            raise HTTPException(400, "Questo annuncio è in revisione: "
+                                     "aspetta la decisione dei moderatori, "
+                                     "poi potrai modificarlo")
         raise HTTPException(400, "Operazione non permessa")
     if a["contatto_nostr"]:
         con.close()
@@ -3544,18 +3667,28 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # --- Stessa moderazione di una pubblicazione nuova ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
     if categoria:
+        registra_moderazione("parole", "vietato", categoria, d["titolo"],
+                             annuncio_id, user["id"])
         await notifica_admin(
             f"🚫 <b>Modifica bloccata dal filtro</b> ({categoria})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})")
         raise HTTPException(400, MSG_RIFIUTO)
-    motivo = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
-    if motivo:
+    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    if verdetto and verdetto[0] == "vietato":
+        registra_moderazione("ai", "vietato", verdetto[1], d["titolo"],
+                             annuncio_id, user["id"])
         await notifica_admin(
-            f"🚫 <b>Modifica bloccata dall'AI</b> ({motivo})\n"
+            f"🚫 <b>Modifica bloccata dall'AI</b> ({verdetto[1]})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})")
-        raise HTTPException(400, messaggio_rifiuto(motivo))
+        raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
+    # Il DUBBIO sulla modifica: le modifiche si applicano ma l'annuncio
+    # esce dalla vetrina finche' un moderatore non decide. Le offerte
+    # pendenti decadono via scadenze_offerte (il non-attivo e' «non
+    # piu' disponibile»): caso raro, dichiarato.
+    in_revisione = bool(verdetto and verdetto[0] == "dubbio")
+    motivo_dubbio = verdetto[1] if in_revisione else ""
 
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
@@ -3567,11 +3700,12 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
-        "anche_digitale=?, condizione=? WHERE id=?",
+        "anche_digitale=?, condizione=?, stato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         condizione_valida(d.get("condizione")), annuncio_id))
+         condizione_valida(d.get("condizione")),
+         "revisione" if in_revisione else "attivo", annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -3621,6 +3755,16 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                     (json.dumps(nomi) if nomi else "", annuncio_id))
         con.commit()
         con.close()
+    if in_revisione:
+        # Fuori dalla vetrina in attesa dell'umano: sui relay l'evento
+        # vecchio resta finche' non si decide (alla ✅ ripartira'
+        # l'aggiornamento; alla ❌ il ritiro lo fa la rimozione admin
+        # se serve — l'annuncio rifiutato e' comunque 'rimosso')
+        registra_moderazione("ai", "dubbio", motivo_dubbio, d["titolo"],
+                             annuncio_id, user["id"])
+        await avvisa_revisione(annuncio_id, motivo_dubbio)
+        return {"ok": True, "id": annuncio_id, "revisione": True,
+                "attesa_ore": REVISIONE_ATTESA_ORE}
     # --- Strato 3: i moderatori vedono anche cio' che cambia ---
     await notifica_admin(
         f"✏️ <b>Annuncio #{annuncio_id} modificato</b>\n"
@@ -3722,16 +3866,25 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         raise HTTPException(503, "Firma Nostr non disponibile: sul server "
                                  "manca il pacchetto coincurve")
 
-    # --- Stessa moderazione di una pubblicazione nuova ---
+    # --- Stessa moderazione di una pubblicazione nuova. Qui anche il
+    # DUBBIO blocca (imperfezione dichiarata): il contenuto degli
+    # importati vive sui relay e l'import orario riporterebbe dentro
+    # cio' che si mette in attesa — ma col messaggio gentile, e la
+    # riga nel registro dice ai moderatori cosa e' successo. ---
     cat_vietata = controlla_vietato(d["titolo"], d.get("descrizione", ""))
     if cat_vietata:
+        registra_moderazione("parole", "vietato", cat_vietata, d["titolo"],
+                             annuncio_id, user["id"])
         await notifica_admin(
             f"🚫 <b>Modifica firmata bloccata dal filtro</b> ({cat_vietata})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
             f"{user['first_name']} (id {user['id']})")
         raise HTTPException(400, MSG_RIFIUTO)
-    motivo = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
-    if motivo:
+    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    if verdetto:
+        esito, motivo = verdetto
+        registra_moderazione("ai", esito, motivo, d["titolo"],
+                             annuncio_id, user["id"])
         await notifica_admin(
             f"🚫 <b>Modifica firmata bloccata dall'AI</b> ({motivo})\n"
             f"Annuncio #{annuncio_id} «{d['titolo'][:80]}» — "
@@ -3864,7 +4017,10 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
     con = db()
-    a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
+    # anche 'revisione': il moderatore puo' rimuovere pure cio' che
+    # e' ancora in attesa (equivale a un rifiuto)
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND "
+                    "stato IN ('attivo','revisione')",
                     (annuncio_id,)).fetchone()
     if not a:
         con.close()
@@ -3888,11 +4044,170 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
     asyncio.create_task(ritira_da_nostr(annuncio_id))
     # E anche i post automatici dei canali si ritirano da soli
     asyncio.create_task(promo_rimuovi(annuncio_id))
+    registra_moderazione("admin", "rimosso", "", a["titolo"],
+                         annuncio_id, a["venditore_id"], user["id"])
     await notifica(a["venditore_id"],
                    f"🚫 <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
                    f"rimosso</b> perché viola le regole del mercatino. "
                    f"Se pensi sia un errore, scrivi ai moderatori.")
     return {"ok": True}
+
+
+# ------------- La terza via: il circuito di revisione ----------------
+# L'AI segnala (verdetto DUBBIO), l'annuncio nasce in stato 'revisione'
+# — invisibile al pubblico — e decide un moderatore umano: dalla
+# tastiera inline della notifica Telegram (pattern della conferma di
+# fusione) o dalla sezione admin del Profilo. Nessun automatismo
+# decide mai al posto dell'umano: il sollecito dell'orologio ricorda,
+# non pubblica.
+
+async def avvisa_revisione(annuncio_id: int, motivo: str):
+    """La notifica coi bottoni ✅/❌ ai moderatori. notifica() non
+    porta tastiere: si passa da bot_api diretto (in collaudo stampa).
+    callback_data = rev:ok:{id} / rev:no:{id} — niente token in
+    memoria: la decisione deve sopravvivere ai riavvii e alle attese
+    lunghe, e l'autorizzazione e' e_admin sul mittente del tocco."""
+    con = db()
+    a = con.execute(
+        "SELECT a.*, u.nome AS venditore FROM annunci a "
+        "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.id=?",
+        (annuncio_id,)).fetchone()
+    con.close()
+    if not a:
+        return
+    testo = (f"⏳ <b>Annuncio in revisione #{annuncio_id}</b>\n"
+             f"«{html.escape(a['titolo'][:80])}» — "
+             f"{testo_prezzo(a['valuta'], a['prezzo_sats'], a['prezzo_eur'])}\n"
+             f"Venditore: {html.escape(a['venditore'] or '')} "
+             f"(id {a['venditore_id']})\n"
+             f"Motivo AI: {html.escape(motivo or 'caso ambiguo')}\n"
+             f"<i>{html.escape((a['descrizione'] or '')[:300])}</i>")
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for admin in destinatari:
+        await bot_api("sendMessage", {
+            "chat_id": admin, "parse_mode": "HTML", "text": testo,
+            "reply_markup": {"inline_keyboard": [[
+                {"text": "✅ Pubblica", "callback_data": f"rev:ok:{annuncio_id}"},
+                {"text": "❌ Rifiuta", "callback_data": f"rev:no:{annuncio_id}"},
+            ]]}})
+
+
+async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
+    """Il cuore condiviso della decisione (tastiera E endpoint della
+    Mini App passano di qui). Ritorna (ok, testo per chi ha deciso).
+    ✅ pubblica = stato attivo + partono i ganci trattenuti alla
+    nascita; ❌ rifiuta = 'rimosso' (mai stato online: niente ritiri
+    Nostr/promo, nessun ordine possibile). L'UPDATE e' condizionato
+    sullo stato: il secondo moderatore che tocca trova il fatto
+    compiuto, mai un doppio gancio."""
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=?",
+                    (annuncio_id,)).fetchone()
+    if not a or a["stato"] != "revisione":
+        con.close()
+        return False, ("⏳ Già deciso da un altro moderatore (o annuncio "
+                       "non più in revisione)")
+    nuovo = "attivo" if esito == "pubblica" else "rimosso"
+    cur = con.execute(
+        "UPDATE annunci SET stato=? WHERE id=? AND stato='revisione'",
+        (nuovo, annuncio_id))
+    deciso = cur.rowcount == 1
+    con.commit()
+    con.close()
+    if not deciso:
+        return False, "⏳ Già deciso da un altro moderatore"
+    registra_moderazione("admin",
+                         "pubblicato" if esito == "pubblica" else "rifiutato",
+                         "", a["titolo"], annuncio_id, a["venditore_id"],
+                         admin_id)
+    if esito == "pubblica":
+        # I ganci trattenuti partono adesso. Un annuncio finito in
+        # revisione da una MODIFICA era gia' stato in vetrina: il suo
+        # evento Nostr si AGGIORNA (mai un doppione, il tag d e'
+        # stabile) e il post di canale non si rifa'; per il nato in
+        # revisione e' la prima uscita a tutti gli effetti. Il dedup
+        # persistente degli avvisi di ricerca rende accoda_match
+        # sempre innocuo.
+        asyncio.create_task(annuncio_su_nostr(
+            annuncio_id, "active",
+            solo_aggiornamento=bool(a["nostr_event_id"])))
+        if not a["post_canale_id"]:
+            accoda_promo(annuncio_id)
+        accoda_match(annuncio_id)
+        await premia_distintivi(a["venditore_id"])
+        await notifica(a["venditore_id"],
+                       f"✅ <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
+                       f"approvato</b> ed è in vetrina!\n"
+                       f"{URL_PUBBLICO}/annuncio/{annuncio_id}")
+        return True, f"✅ Pubblicato: «{html.escape(a['titolo'][:60])}»"
+    await notifica(a["venditore_id"],
+                   f"❌ <b>Il tuo annuncio «{a['titolo'][:60]}» non è stato "
+                   f"approvato</b> dai moderatori: al momento questo tipo "
+                   f"di annuncio non è supportato su Barattolo. Se pensi "
+                   f"sia un errore, scrivi ai moderatori.")
+    return True, f"❌ Rifiutato: «{html.escape(a['titolo'][:60])}»"
+
+
+async def callback_revisione(cb: dict, dati: str):
+    """Il tocco su ✅/❌ della tastiera di revisione. Solo i
+    moderatori: il tocco di chiunque altro non conta. Idempotente:
+    a decisione gia' presa il messaggio dice il fatto compiuto."""
+    if not e_admin((cb.get("from") or {}).get("id") or 0):
+        return
+    esito, _, sid = dati.partition(":")
+    if esito not in ("ok", "no") or not sid.isdigit():
+        return
+    ok, testo = await decidi_revisione(
+        int(sid), "pubblica" if esito == "ok" else "rifiuta",
+        cb["from"]["id"])
+    msg = cb.get("message") or {}
+    chat = (msg.get("chat") or {}).get("id")
+    if chat:
+        await bot_api("editMessageText", {
+            "chat_id": chat, "message_id": msg.get("message_id"),
+            "text": testo, "parse_mode": "HTML"})
+
+
+@app.get("/api/admin/revisione")
+def lista_revisione(x_tg_init_data: str = Header(""),
+                    barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: gli annunci in attesa di una decisione, dal piu'
+    vecchio (chi aspetta da piu' tempo si vede per primo), col motivo
+    del dubbio pescato dal registro."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
+        "  (SELECT m.motivo FROM moderazione_log m "
+        "     WHERE m.annuncio_id=a.id AND m.esito='dubbio' "
+        "     ORDER BY m.id DESC LIMIT 1) AS motivo "
+        "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+        "WHERE a.stato='revisione' ORDER BY a.creato ASC")]
+    con.close()
+    return righe
+
+
+@app.post("/api/admin/listings/{annuncio_id}/revisione")
+async def decidi_revisione_admin(annuncio_id: int, req: Request,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: la stessa decisione della tastiera, dalla Mini App
+    (il webhook puo' essere spento, e c'e' chi modera dal web)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    esito = d.get("esito", "")
+    if esito not in ("pubblica", "rifiuta"):
+        raise HTTPException(400, "Esito sconosciuto")
+    ok, testo = await decidi_revisione(annuncio_id, esito, user["id"])
+    if not ok:
+        raise HTTPException(409, testo)
+    return {"ok": True, "esito": esito}
 
 
 @app.get("/api/admin/stats")
@@ -3917,10 +4232,30 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
         "     ('released','refunded') AND (o.venditore_id=u.tg_id "
         "     OR o.compratore_id=u.tg_id)) AS affari_conclusi "
         "FROM utenti u ORDER BY u.registrato DESC")]
+    # Il polso della moderazione: quanti aspettano, e gli ultimi 30
+    # giorni del registro — e' con QUESTI numeri che il prompt si
+    # corregge a mano (mai da solo).
+    in_revisione = con.execute(
+        "SELECT COUNT(*) AS n FROM annunci "
+        "WHERE stato='revisione'").fetchone()["n"]
+    mese = int(time.time()) - 30 * 86400
+    riepilogo = {r["esito"]: r["n"] for r in con.execute(
+        "SELECT esito, COUNT(*) AS n FROM moderazione_log "
+        "WHERE creato>=? GROUP BY esito", (mese,))}
+    motivi = [dict(r) for r in con.execute(
+        "SELECT motivo, COUNT(*) AS n FROM moderazione_log "
+        "WHERE creato>=? AND motivo!='' "
+        "GROUP BY motivo ORDER BY n DESC LIMIT 5", (mese,))]
+    registro = [dict(r) for r in con.execute(
+        "SELECT annuncio_id, titolo, strato, esito, motivo, deciso_da, "
+        "creato FROM moderazione_log ORDER BY id DESC LIMIT 20")]
     con.close()
     return {"utenti": utenti, "annunci_attivi": annunci,
             "affari_conclusi": conclusi["n"], "volume_sats": conclusi["volume"],
-            "lista_utenti": lista}
+            "lista_utenti": lista, "in_revisione": in_revisione,
+            "moderazione": {"ultimi_30gg": riepilogo,
+                            "motivi_frequenti": motivi,
+                            "registro": registro}}
 
 
 # ---------------------- API: RICERCA AI -----------------------------
@@ -5234,9 +5569,17 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "(venditore_id=? AND stato='proposta') OR "
         "(compratore_id=? AND stato IN ('controproposta','accettata'))",
         (user["id"], user["id"])).fetchone()["n"]
+    # Il pallino dei moderatori: quanti annunci aspettano una
+    # decisione (solo per gli admin, gli altri non lo vedono mai)
+    da_moderare = 0
+    if e_admin(user["id"]):
+        da_moderare = con.execute(
+            "SELECT COUNT(*) AS n FROM annunci "
+            "WHERE stato='revisione'").fetchone()["n"]
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
+    profilo["in_revisione"] = da_moderare
     profilo["doppioni_nostr"] = doppioni
     profilo["offerte_da_agire"] = da_agire
     # Le leve dell'offerta lampo per il foglio di lancio (solo il
@@ -7932,7 +8275,7 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
         "zip_path": zip_path, "righe": righe,
         "scarti": scarti, "avvisi": avvisi,
         "totale": len(righe), "fatte": 0, "ok": [],
-        "falliti": [], "nostr_fatti": 0,
+        "in_revisione": [], "falliti": [], "nostr_fatti": 0,
     }
     return {"biglietto": biglietto, "valide": len(righe),
             "totale": len(dati), "scarti": scarti, "avvisi": avvisi}
@@ -7983,19 +8326,20 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
     come sempre."""
     con = db()
     lat, lon = coordinate_da_zona(riga["zona"])
+    in_revisione = bool(riga.get("revisione"))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
-        "anche_digitale,condizione,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,stato,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga["prezzo_sats"], riga["zona"],
          riga["valuta"], riga["prezzo_eur"], lat, lon,
          riga.get("consegna", ""), riga.get("spedizione_sats", 0),
          riga.get("spedizione_eur", 0), riga.get("taglia_pacco", ""),
          riga.get("anche_digitale", 0), riga.get("condizione", ""),
-         int(time.time())))
+         "revisione" if in_revisione else "attivo", int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -8010,7 +8354,14 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
             con.close()
         for p in problemi:
             lavoro["avvisi"].append({"riga": riga["riga"], "motivo": p})
-    lavoro["ok"].append(annuncio_id)
+    if in_revisione:
+        # in attesa dell'umano: fuori da ok (niente promo/match/Nostr),
+        # la decisione arrivera' dalla sezione admin del Profilo
+        registra_moderazione("ai_lotto", "dubbio", riga["revisione"],
+                             riga["titolo"], annuncio_id, lavoro["tg_id"])
+        lavoro["in_revisione"].append(annuncio_id)
+    else:
+        lavoro["ok"].append(annuncio_id)
 
 
 async def _crea_riga_con_guardia(lavoro: dict, riga: dict):
@@ -8047,17 +8398,25 @@ async def _lavoro_import(biglietto: str):
             async with respiro:
                 return await moderazione_ai_lotto(lotto)
 
-        bocciati = {}
+        verdetti = {}
         for esito in await asyncio.gather(*[_un_lotto(l) for l in lotti]):
-            bocciati.update(esito)
+            verdetti.update(esito)
         approvate = []
         for r in lavoro["righe"]:
-            if r["riga"] in bocciati:
+            v = verdetti.get(r["riga"])
+            if v and v[0] == "vietato":
+                registra_moderazione("ai_lotto", "vietato", v[1],
+                                     r["titolo"],
+                                     venditore_id=lavoro["tg_id"])
                 lavoro["falliti"].append(
                     {"riga": r["riga"], "titolo": r["titolo"],
-                     "motivo": f"moderazione AI: {bocciati[r['riga']]}"})
+                     "motivo": f"moderazione AI: {v[1]}"})
                 lavoro["fatte"] += 1
             else:
+                if v and v[0] == "dubbio":
+                    # la terza via anche qui: la riga si CREA, ma in
+                    # stato 'revisione' (fuori da vetrina/Nostr/promo)
+                    r["revisione"] = v[1]
                 approvate.append(r)
 
         # --- Fase 2: creazione, a gruppetti di 4 ---
@@ -8100,8 +8459,13 @@ async def _lavoro_import(biglietto: str):
     # comunque
     try:
         creati, ko = len(lavoro["ok"]), len(lavoro["falliti"])
+        in_rev = len(lavoro.get("in_revisione", []))
         if lavoro["stato"] == "finito":
             testo = f"📥 Import completato: <b>{creati}</b> annunci pubblicati"
+            if in_rev:
+                testo += (f", {in_rev} in revisione (un moderatore li "
+                          f"controllerà, di solito entro "
+                          f"{REVISIONE_ATTESA_ORE} ore)")
             if ko:
                 testo += f", {ko} non passati (il dettaglio è nel report)"
             await notifica(lavoro["tg_id"], testo + ".")
@@ -8124,6 +8488,11 @@ async def _lavoro_import(biglietto: str):
         if bocciati_ai:
             riassunto += f"\n🚫 {len(bocciati_ai)} bloccati dall'AI: " + \
                 "; ".join(f"«{f['titolo'][:40]}»" for f in bocciati_ai[:10])
+        if in_rev:
+            # niente tastiera per riga (sarebbe spam): si decide dalla
+            # sezione «In revisione» del Profilo
+            riassunto += (f"\n⏳ {in_rev} in revisione "
+                          f"(Profilo → Statistiche → In revisione)")
         if lavoro["scarti"]:
             riassunto += (f"\n⚠️ {len(lavoro['scarti'])} righe scartate "
                           f"in anteprima")
@@ -8175,6 +8544,7 @@ def import_stato(biglietto: str, x_tg_init_data: str = Header(""),
             "totale": lavoro["totale"], "fatte": lavoro["fatte"],
             "ok_n": len(lavoro["ok"]), "nostr": lavoro["nostr"],
             "nostr_fatti": lavoro["nostr_fatti"],
+            "in_revisione_n": len(lavoro.get("in_revisione", [])),
             "falliti": lavoro["falliti"], "avvisi": lavoro["avvisi"]}
 
 
@@ -8591,7 +8961,42 @@ async def orologio():
             await avvisa_nuovi_iscritti()
         except Exception as e:
             print(f"⚠️ Campanello dei nuovi iscritti saltato: {e}")
+        try:
+            await sollecita_revisioni()
+        except Exception as e:
+            print(f"⚠️ Sollecito revisioni saltato: {e}")
         await asyncio.sleep(600)
+
+
+_ultimo_sollecito_revisioni = 0.0
+
+
+async def sollecita_revisioni():
+    """Il promemoria della terza via: annunci in revisione da almeno
+    REVISIONE_SOLLECITO_GIORNI = UNA notifica aggregata ai moderatori,
+    al massimo una al giorno. L'attesa NON pubblica e NON rifiuta mai
+    da sola: la macchina ricorda, l'umano decide."""
+    global _ultimo_sollecito_revisioni
+    if not REVISIONE_SOLLECITO_GIORNI:
+        return
+    adesso = time.time()
+    if adesso - _ultimo_sollecito_revisioni < 86400:
+        return
+    soglia = int(adesso - REVISIONE_SOLLECITO_GIORNI * 86400)
+    con = db()
+    fermi = con.execute(
+        "SELECT COUNT(*) AS n FROM annunci "
+        "WHERE stato='revisione' AND creato<=?", (soglia,)).fetchone()["n"]
+    con.close()
+    if not fermi:
+        return
+    _ultimo_sollecito_revisioni = adesso
+    plurale = "annunci aspettano" if fermi > 1 else "annuncio aspetta"
+    await notifica_admin(
+        f"⏳ <b>{fermi} {plurale} una decisione</b> da almeno "
+        f"{REVISIONE_SOLLECITO_GIORNI} giorni (Profilo → Statistiche → "
+        f"In revisione). L'attesa non li pubblica né li rifiuta: "
+        f"serve un tocco umano.")
 
 
 @app.on_event("startup")

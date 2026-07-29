@@ -595,6 +595,8 @@
   .off-dot{display:none;position:absolute;top:4px;right:26%;width:9px;height:9px;
     border-radius:50%;background:var(--sats);box-shadow:0 0 0 2px var(--nav-bg)}
   .off-dot.on{display:block}
+  /* sul tappo del Profilo (annunci da moderare): angolo in alto a destra */
+  .avatar-btn .off-dot{top:-1px;right:-1px;box-shadow:0 0 0 2px var(--header-bg)}
   nav button.active .ic{background:var(--sats-soft);box-shadow:inset 0 0 0 1.5px #F7C87F}
   /* Il "+" di Vendi: bottone-oggetto rialzato sopra la barra */
   nav button.sell .ic{
@@ -814,6 +816,8 @@
   .badge.dispute{background:var(--warn-bg);color:var(--danger)}
   .badge.confirmed{background:var(--nostr-soft);color:var(--nostr-text)}
   .badge.refunded{background:var(--off-bg);color:var(--muted)}
+  /* l'annuncio in attesa dei moderatori (terza via della moderazione) */
+  .badge.revisione{background:var(--sats-soft);color:var(--sats-text)}
   .badge.annullato{background:var(--off-bg);color:var(--muted)}
 
   /* ---------- pannello incasso venditore ---------- */
@@ -1134,7 +1138,7 @@
           <small>il mercatino in sats</small>
         </div>
         <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-        <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
+        <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
       </div>
       <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
            tastiera mobile), cioe' col submit del form -->
@@ -1494,7 +1498,7 @@
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-    <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span></button>
+    <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
 
   <!-- ============ SHEET PAGAMENTO ============ -->
@@ -5567,19 +5571,24 @@ async function caricaAltriMiei(){
   mieiCaricando = false;
 }
 
-const rigaMioAnnuncio = l => `
+/* L'annuncio in revisione resta visibile al proprietario, onesto e
+   spento (pattern dei preferiti «non più disponibile»): badge ⏳, il
+   dettaglio non si apre, niente Modifica (riparte dopo la decisione),
+   resta 🗑 per ritirarlo. */
+const rigaMioAnnuncio = l => { const rev = l.stato==='revisione'; return `
     <div class="order">
       <div class="row">
-        <b onclick="openDetail(${l.id})" style="cursor:pointer;display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
-          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none">`
-          : `<span style="font-size:22px">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</span></b>
+        <b ${rev?'style="':'onclick="openDetail('+l.id+')" style="cursor:pointer;'}display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
+          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${rev?';filter:grayscale(1);opacity:.6':''}">`
+          : `<span style="font-size:22px${rev?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis${rev?';color:var(--muted)':''}">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
-          <span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>
+          ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
+              :`<span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
           <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>
         </span>
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
-    </div>`;
+    </div>`; };
 
 function renderMyListings(){
   const box = el('myListings');
@@ -5778,6 +5787,17 @@ async function loadAdminStats(){
       {headers:{'X-Tg-Init-Data':authHdr()}});
     if (!r.ok) { box.innerHTML = ''; return; }
     const s = await r.json();
+    aggiornaAdmDot(s.in_revisione||0);
+    /* gli annunci in attesa di una decisione: la lista arriva solo
+       se ce n'e' almeno uno (mai una fetch a vuoto) */
+    let rev = [];
+    if (s.in_revisione) {
+      try {
+        const rr = await fetch(`${API_BASE}/admin/revisione`,
+          {headers:{'X-Tg-Init-Data':authHdr()}});
+        if (rr.ok) rev = await rr.json();
+      } catch(e) {}
+    }
     const card = (emoji, valore, nome) => `
       <div style="background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
         <div style="font-size:20px">${emoji}</div>
@@ -5785,6 +5805,9 @@ async function loadAdminStats(){
         <div style="font-size:12px;color:var(--muted);font-weight:700">${nome}</div>
       </div>`;
     box.innerHTML = `
+      ${rev.length ? `
+      <div class="section-label" style="padding:26px 0 0">⏳ In revisione (${rev.length})</div>
+      <div style="margin-top:10px">${rev.map(rigaRevisione).join('')}</div>` : ''}
       <div class="section-label" style="padding:26px 0 0">📊 Statistiche (solo moderatori)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
         ${card('👥', s.utenti, 'utenti')}
@@ -5792,6 +5815,7 @@ async function loadAdminStats(){
         ${card('🤝', s.affari_conclusi, 'affari conclusi')}
         ${card('⚡', s.volume_sats, 'sats di volume')}
       </div>
+      ${registroModerazione(s.moderazione)}
       <div style="max-height:280px;overflow-y:auto;margin-top:10px;background:var(--card);border:1.5px solid var(--line);border-radius:14px">
         ${(s.lista_utenti||[]).map(u => `
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px">
@@ -5807,6 +5831,72 @@ async function loadAdminStats(){
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
+}
+
+/* La riga di un annuncio in attesa: titolo, prezzo, venditore, motivo
+   dell'AI e i due bottoni della decisione. Il testo passa da
+   mapListing: stessi filtri anti-XSS di tutto il resto. */
+const rigaRevisione = a => { const l = mapListing(a); return `
+    <div class="order">
+      <div class="row">
+        <b style="display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
+          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none">`
+          : `<span style="font-size:22px">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</span></b>
+        <span style="white-space:nowrap">
+          <span class="badge" onclick="decidiRevisione(${l.id},'pubblica')" style="cursor:pointer;background:var(--trust-soft);color:var(--trust-text)">✅ Pubblica</span>
+          <span class="badge" onclick="decidiRevisione(${l.id},'rifiuta')" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">❌ Rifiuta</span>
+        </span>
+      </div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · ${esc(l.seller)}</div>
+      <div class="sub">🤖 ${esc(a.motivo||'caso ambiguo')}</div>
+      ${l.desc && l.desc!=='—' ? `<div class="sub" style="font-weight:600">${esc(l.desc.slice(0,200))}${l.desc.length>200?'…':''}</div>` : ''}
+    </div>`; };
+
+/* Il registro della moderazione: riepilogo degli ultimi 30 giorni +
+   le ultime decisioni. E' con QUESTI dati che il prompt si corregge
+   a mano — mai da solo. */
+function registroModerazione(mod){
+  if (!mod) return '';
+  const c = mod.ultimi_30gg || {};
+  const totale = (c.vietato||0)+(c.dubbio||0)+(c.pubblicato||0)+(c.rifiutato||0)+(c.rimosso||0);
+  if (!totale && !(mod.registro||[]).length) return '';
+  const motivi = mod.motivi_frequenti || [];
+  const EMOJI_ESITO = {vietato:'🚫', dubbio:'⏳', pubblicato:'✅', rifiutato:'❌', rimosso:'🛡'};
+  return `
+    <div class="section-label" style="padding:22px 0 0">🛡 Registro moderazione</div>
+    <div class="sub" style="margin-top:8px;font-weight:700">Ultimi 30 giorni: ${c.pubblicato||0} sbloccati · ${c.rifiutato||0} rifiutati · ${c.vietato||0} bloccati · ${c.dubbio||0} in dubbio${motivi.length?` — motivo più frequente: «${esc(motivi[0].motivo)}» (${motivi[0].n})`:''}</div>
+    <div style="max-height:220px;overflow-y:auto;margin-top:8px;background:var(--card);border:1.5px solid var(--line);border-radius:14px">
+      ${(mod.registro||[]).map(v => `
+        <div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12px">
+          <b>${EMOJI_ESITO[v.esito]||'•'} ${esc(v.titolo||('#'+v.annuncio_id))}</b>
+          <span style="color:var(--muted);font-weight:600"> — ${esc(v.esito)}${v.motivo?` (${esc(v.motivo)})`:''} · ${v.strato}${v.deciso_da?` · admin ${v.deciso_da}`:''} · ${new Date(v.creato*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+/* La decisione dalla Mini App: stesso cuore della tastiera Telegram
+   (decidi_revisione sul server), qui per chi modera dal web o col
+   webhook spento. */
+async function decidiRevisione(id, esito){
+  haptic();
+  if (esito==='rifiuta' && !confirm('Rifiutare questo annuncio? Il venditore riceverà un messaggio gentile (e nessun annuncio andrà online).')) return;
+  try {
+    const r = await fetch(`${API_BASE}/admin/listings/${id}/revisione`,
+      {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+       body: JSON.stringify({esito})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Operazione non riuscita', 4000); }
+    else toast(esito==='pubblica' ? '✅ Pubblicato in vetrina' : '❌ Rifiutato, venditore avvisato');
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  await loadListings(); renderGrid();
+  loadAdminStats();
+}
+
+/* Il pallino sul tappo del Profilo: c'e' qualcosa da moderare.
+   Acceso da /api/me al login e da loadAdminStats a ogni giro. */
+function aggiornaAdmDot(n){
+  document.querySelectorAll('.avatar-btn .off-dot').forEach(d=>
+    d.classList.toggle('on', n>0));
 }
 
 /* «Trattami da nuovo»: il pulsante del collaudo dal vivo, solo per
@@ -6201,7 +6291,7 @@ async function publish(){
   try {
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
-  let nuovoId;
+  let nuovoId, inRevisione = false, attesaOre = 24;
   const cns = consegnaPayload();
   if (DEMO) {
     nuovoId = Date.now();
@@ -6227,10 +6317,12 @@ async function publish(){
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail||'Errore nella pubblicazione', 6000); return; }
     nuovoId = d.id;
+    inRevisione = !!d.revisione; attesaOre = d.attesa_ore || 24;
     await loadListings();
     /* Un suggerimento al massimo, sul momento giusto: prima gli
-       incassi (senza ln address restano appesi), poi il badge 🟣 */
-    if (hintAttivi()) {
+       incassi (senza ln address restano appesi), poi il badge 🟣.
+       In revisione niente hint: il dettaglio non si aprirà. */
+    if (hintAttivi() && !inRevisione) {
       if (!myLnAddress && !hintDismesso('lnaddr'))
         hintPubblicazione = {id:'lnaddr', annuncio:nuovoId};
       else if (myNpub && !myNpubVerified && !hintDismesso('npubverifica'))
@@ -6243,6 +6335,14 @@ async function publish(){
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
+  if (inRevisione) {
+    /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
+       verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */
+    toast(`⏳ Annuncio inviato: un moderatore lo controllerà (di solito entro ${attesaOre} ore). Lo trovi tra i tuoi annunci.`, 6000);
+    setCat('Tutto');
+    apriCassettoProfilo('accAnnunci');
+    return;
+  }
   toast('⚡ Annuncio pubblicato!'); setCat('Tutto');
   /* L'annuncio appena nato ti si apre davanti: la soddisfazione di
      vederlo in vetrina. Se non è in lista, si torna a Esplora. */
@@ -6281,7 +6381,18 @@ async function salvaModifica(t, p){
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify(body)});
-    if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Errore nella modifica', 6000); return; }
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Errore nella modifica', 6000); return; }
+    if (d.revisione) {
+      /* la modifica ha insospettito l'AI: l'annuncio esce dalla
+         vetrina finché un moderatore non decide — la verità subito */
+      await loadListings(); await loadMyListings(); renderMyListings();
+      annullaModifica();
+      toast(`⏳ Modifica salvata, ma l'annuncio è in revisione: un moderatore lo controllerà (di solito entro ${d.attesa_ore||24} ore).`, 6000);
+      setCat('Tutto');
+      apriCassettoProfilo('accAnnunci');
+      return;
+    }
     await loadListings();
   }
   await loadMyListings(); renderMyListings();
@@ -7261,6 +7372,7 @@ async function importPoll(){
           ${s.stato === 'finito'
             ? `✅ ${s.ok_n} annunci pubblicati`
             : `⚠️ Import interrotto: ${s.ok_n} annunci erano già entrati`}</div>
+        ${s.in_revisione_n ? `<div style="margin-top:6px;font-size:13px;font-weight:700;color:var(--sats-text)">⏳ ${s.in_revisione_n} in revisione: un moderatore li controllerà, li trovi tra i tuoi annunci</div>` : ''}
         ${importProblemiHTML(s.falliti, 'var(--danger)')}
         ${importProblemiHTML(s.avvisi, 'var(--muted)')}`;
       importBiglietto = null;
@@ -7371,6 +7483,7 @@ async function avvia(){
        (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.) */
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
+    aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori
     myNpub = me.npub || ''; myNpubVerified = !!me.npub_verificata;
     myNome = me.nome || ''; myUsername = me.username || '';
     myNpubAccesso = me.npub_accesso || '';
