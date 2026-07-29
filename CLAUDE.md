@@ -59,6 +59,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   anonima e DEMO (dati finti già rimappati). Dal cantiere «tenuta al
   volume» (sotto) i conteggi delle pillole coi dati vivi vengono dal
   server (`conteggi` in prima pagina), il locale resta per la demo.
+  Condizioni dell'oggetto (lug 2026): scala a 5 livelli — catalogo
+  `CONDIZIONI` in server.py (nuovo | come_nuovo | buono | accettabile |
+  da_sistemare, id → etichetta breve; le etichette lunghe con emoji
+  ✨🌟👍🆗🔧 vivono nelle <option> del form e nel catalogo JS
+  `CONDIZIONI` del client). Colonna `annunci.condizione` ('' = storici
+  e importati, nessun obbligo retroattivo), OBBLIGATORIA nel form
+  (validazione in publish(), anche in modifica: gli storici si mettono
+  in regola al primo ritocco; MAI nella modifica firmata degli
+  importati, l'evento NIP-99 non la porta e il campo si nasconde);
+  il server resta tollerante via `condizione_valida` (sconosciuta →
+  '', pattern categoria: i client di ieri non si rompono). In
+  CAMPI_VETRINA (search e miei gratis via a.*); param `condizione` su
+  /api/listings (dichiarata soltanto: gli storici '' restano fuori,
+  valore storto = nessun filtro) + select nel pannello Filtri (in DEMO
+  client-side); pillola «🌟 Come nuovo» nel dettaglio, in card SOLO
+  l'emoji nella meta (il testo non ci sta a 360px); riga «— condizione:
+  …» nel content NIP-99 (nessun tag: la spec non ne ha uno, pattern
+  della spedizione) e nel catalogo della ricerca AI; colonna
+  facoltativa `condizione` nel CSV d'import con `condizione_tollerante`
+  (SINONIMI_CONDIZIONE: «ottimo» → come_nuovo, «da riparare» →
+  da_sistemare…, sconosciuta = non dichiarata, mai uno scarto).
   Tenuta al volume (lug 2026): la vetrina va a PAGINE col cursore
   keyset. `/api/listings`, `/api/negozio/{chi}` e `/api/listings/miei`
   accettano `limit` (clampato a 100) e `cursore` = '{creato}_{id}'
