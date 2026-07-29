@@ -820,7 +820,34 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dal tipo di bene (una gift card fisica si spedisce, un codice si
   consegna digitale: le tutele seguono la modalità, mai il tipo);
   niente costo spedizione né taglia (consegna_da_payload azzera anche
-  la taglia arrivata per sbaglio). NIENTE stati nuovi: locked→shipped
+  la taglia arrivata per sbaglio). COMBO (lug 2026, la gift card in
+  due modi «ti spedisco la tessera, oppure ti mando il codice»):
+  colonna `annunci.anche_digitale`, ORTOGONALE di proposito —
+  `consegna` tiene la semantica fisica di sempre e ogni check
+  esistente resta vero; lecita solo accanto a una modalità fisica
+  (con 'digitale' o '' il giudice la forza a 0). Le TUTELE seguono la
+  SCELTA del compratore, non l'annuncio (già così per costruzione:
+  finestre, blocco di segna_spedito, endpoint contenuto, tetto
+  compratori e pannelli leggono `consegna_scelta`): compra() valida
+  contro il SET delle strade offerte (spedizione/ritiro dal catalogo
+  + digitale se esclusivo o anche_digitale), scelta sconosciuta non
+  vuota = 400, scelta assente = default FISICO (spedizione batte
+  ritiro, digitale solo se unica: il client vecchio in cache prende
+  la strada che conosce); `guardia_venditore_digitale(tg_id,
+  consegna, anche_digitale)` copre la combo, anche nell'import CSV
+  dove la cella consegna parla col «+» (`spedizione+digitale`,
+  riga d'esempio nel modello). `anche_digitale` è in CAMPI_VETRINA;
+  NIP-99 aggiunge «o consegna digitale immediata» (e il ritiro combo
+  perde il «solo»). Frontend: checkbox «💾 Offro anche la consegna
+  digitale» sotto il select di Vendi (solo con modalità fisica
+  scelta, il costo spedizione resta legato al solo ramo fisico);
+  pillole di scelta GENERALIZZATE (`stradeConsegna`/`pilloleConsegna`:
+  compaiono con ≥2 strade, l'erede del vecchio ramo 'entrambe');
+  trust-note asimmetrica `#notaDigitale` visibile SOLO con la scelta
+  digitale attiva (su una combo non deve spaventare chi sceglie la
+  spedizione, `setConsegnaScelta` la accende/spegne); `rigaConsegna`
+  con «o 💾 consegna digitale»; in card 🚚 e 💾 possono convivere.
+  NIENTE stati nuovi: locked→shipped
   = `POST /api/orders/{id}/consegna-digitale` (solo venditore,
   contenuto 1-4000 caratteri, corriere-sentinella 'Consegna digitale',
   riga journal con impronta sha256 troncata e MAI il testo);
@@ -2021,7 +2048,12 @@ nota admin, leve accese e spente, import CSV e NIP-99; in produzione
 va provato un giro vero dentro Telegram, la voce «buono
 regalo/servizio» della moderazione AI con la chiave vera, e sul VPS va
 scelta CHIAVE_CONTENUTI_DIGITALI nel config — senza, i codici restano
-in chiaro nel DB, dichiarato).
+in chiaro nel DB, dichiarato; dal lug 2026 anche in COMBO con una
+modalità fisica via `anche_digitale`: il compratore sceglie la strada
+con le pillole e le tutele seguono la sua scelta, vedi Architettura —
+collaudata con 32 verifiche TestClient: tutele digitali sul ramo
+digitale e fisiche sul ramo fisico dello STESSO annuncio, default
+fisico per i client vecchi, guardie, NIP-99 e CSV col «+»).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
