@@ -616,7 +616,26 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   righe a (0,0)); `distanza_km` = haversine. Il comune dell'UTENTE
   viene SEMPRE dal dataset (`GET /api/comuni` autocomplete + 400 sul
   nome sconosciuto: l'avviso ha sempre coordinate buone, il testo
-  libero resta solo dal lato annunci). MOTORE: gemello della coda
+  libero resta solo dal lato annunci).
+  Città vere in Vendi (lug 2026): il campo Zona resta testo LIBERO ma
+  suggerisce i comuni mentre si digita (datalist `zonaList` su
+  /api/comuni, debounce 250ms, pattern avvisi) e al blur passa da
+  `GET /api/zona-controlla` (autenticato): comune riconoscibile nel
+  testo = silenzio; nulla di riconoscibile ma un QUASI-comune sì =
+  riga `#zonaHint` «intendevi Pavia?» con [Usa] / [Lascia così] — MAI
+  bloccante, il nome suggerito vive nella variabile `zonaSuggerita` e
+  mai dentro l'onclick (gli apostrofi di Sant'Angelo). Niente
+  candidato = niente riga: frazioni e «Spedisco in tutta Italia»
+  restano legittimi per costruzione. `suggerisci_comune` = difflib a
+  soglia 0.8 sugli n-grammi (lunghi prima, primo nel testo a parità,
+  come coordinate_da_zona), stoplist `PAROLE_ZONA` (senza, «spedisco»
+  suggeriva Sedico BL — successo davvero), cache pigra `_comuni_fuzzy`
+  solo sui nomi che coordinate_da_zona sa poi riconoscere (i contesi
+  tipo Castro non si suggeriscono mai: sarebbe un vicolo cieco).
+  Stesso controllo nell'anteprima dell'import CSV come AVVISO («zona
+  senza un comune riconoscibile — forse Pavia?»), mai uno scarto.
+  Dataset assente = tutto riconosciuto, la funzione si spegne in
+  silenzio come il resto della geografia. MOTORE: gemello della coda
   promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
   loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
   dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
