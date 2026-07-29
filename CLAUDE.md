@@ -187,11 +187,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   NON si ricrea (skip con riga ⛔ nel journal): prima il match
   guardava solo gli attivi e l'evento ancora vivo sui relay rifaceva
   l'INSERT a ogni giro; un tag `d` diverso resta un annuncio nuovo.
-  È la prima tappa del cantiere cancellazioni: le NIP-09 (kind 5)
-  NON vengono ancora lette dai relay e lo status sold di un evento
-  aggiornato produce solo uno skip, mai una disattivazione — lapide
-  persistente e lettura dei kind 5 sono le tappe che seguono; sul
-  match aggiorna anche
+  Cantiere cancellazioni COMPLETO (lug 2026, tappe 2-3): `interroga`
+  chiede anche i kind 5 (NIP-09) del venditore e li rispetta —
+  cancellazione vista su QUALUNQUE relay = riga locale spenta
+  ('rimosso', ordini 'creato' annullati via `spegni_annuncio`,
+  gemello della rimozione Mini App, riga 🪦 nel journal) e LAPIDE
+  nella tabella `nostr_lapidi` (PK hexkey+d+event_id, creata
+  dall'import), riletta TUTTA a ogni giro: vale per sempre anche
+  quando i relay scordano il kind 5, e rispegne perfino una riga
+  riaccesa da un rimborso (per questo niente return secco a mani
+  vuote). Tag `a` per coordinata (solo 30402/30018 della SUA chiave),
+  tag `e` per id: risolto in coordinata se l'evento è tra i letti,
+  altrimenti matcha la colonna `annunci.nostr_origine_id` (scritta a
+  ogni INSERT/UPDATE). Sotto lapide non si re-importa MAI più,
+  nemmeno ripubblicando lo stesso `d` (imperfezione dichiarata: per
+  tornare serve un `d` nuovo). Lo status sold di un evento
+  aggiornato SPEGNE la riga come 'venduto' (riga 🏷️; prima restava
+  attiva e COMPRABILE) — niente lapide, ma lo scudo la tiene spenta
+  anche se lo status tornasse active (dichiarato, stesso rimedio);
+  sul match aggiorna anche
   titolo/descrizione/zona e valuta/prezzo_eur dal tag price (EUR →
   doppia valuta anche per gli importati), MAI la categoria
   (categoria_automatica ricoprirebbe la scelta del form); foto
