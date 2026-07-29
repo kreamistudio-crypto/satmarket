@@ -1512,6 +1512,27 @@
     <button class="btn ghost" onclick="closeSheet()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET OFFERTA LAMPO (solo il venditore) ============ -->
+  <div class="sheet" id="lampoSheet">
+    <div class="grab"></div>
+    <h3>⚡ Lancia un'offerta lampo</h3>
+    <!-- La testata (miniatura + titolo + listino) la scrive apriLampo() -->
+    <div id="lampoTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <!-- Chip percentuali dalle leve del server, campo libero entro i limiti -->
+    <div class="consegna-scelta" id="lampoChips" style="margin:0 0 10px"></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="lampoPercentoInp" type="text" inputmode="numeric" autocomplete="off" placeholder="Sconto" style="flex:1" oninput="lampoDigitata()">
+      <span style="font-weight:800;color:var(--muted)">%</span>
+    </div>
+    <div id="lampoLimiti" style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px"></div>
+    <!-- Le durate a pillole, dalle leve del server -->
+    <div class="consegna-scelta" id="lampoOreChips" style="margin:10px 0 0"></div>
+    <div id="lampoAnteprima" style="font-size:13px;font-weight:700;margin-top:10px;min-height:18px"></div>
+    <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:4px">Chi ha l'annuncio nel barattolo riceve l'avviso. Lo sconto vale per tutti finché dura; alla scadenza il prezzo torna pieno da solo.</div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaLampo(this)">⚡ Lancia</button>
+    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+  </div>
+
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
   <div class="sheet" id="invitoSheet">
     <div class="grab"></div>
@@ -2919,6 +2940,9 @@ function openDetail(id){
       <div class="desc">${esc(l.desc)}</div>
       ${mio
         ? `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
+           ${l.nostr || !(lampoLeve && lampoLeve.attive) ? '' : (lampoAttiva(l)
+             ? `<button class="btn ghost" style="margin-top:0" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
+             : `<button class="btn ghost" style="margin-top:0" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `<div class="escrow-zone">
@@ -3442,6 +3466,7 @@ function closeSheet(){
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
+  el('lampoSheet').classList.remove('open');
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
@@ -3638,6 +3663,118 @@ async function inviaOfferta(btn){
     loadOfferte().then(renderOfferte).catch(()=>{});
   } catch(e) { toast('Rete assente: riprova'); }
   finally { ripristina(); }
+}
+
+/* ---------------- offerta lampo: il foglio del venditore ----------------
+   Le leve arrivano da /api/me (lampo_leve: attive, sconti, minimo,
+   massimo, ore) — mai cifre hardcodate qui. L'anteprima parla il
+   listino barrato → scontato e l'ora di fine. */
+let lampoLeve = null;      // da /api/me
+let lampoOreScelte = 0;
+/* la durata detta come la direbbe una persona: «6 ore», «1 giorno», «2 giorni» */
+const durataLampo = h => h < 24 ? `${h} ore`
+  : h % 24 === 0 ? `${h/24} ${h === 24 ? 'giorno' : 'giorni'}` : `${h} ore`;
+/* il listino meno p%, nella valuta del listino: stessa matematica di
+   _prezzo_lampo sul server (floor sui sats, 2 decimali sull'euro) */
+function lampoSconto(l, p){
+  return (l.valuta==='eur' && l.priceEur>0)
+    ? {sats:0, eur: Math.max(0.01, Math.round(l.priceEur*(100-p))/100)}
+    : {sats: Math.max(1, Math.floor(l.price*(100-p)/100)), eur:0};
+}
+function apriLampo(){
+  haptic();
+  const l = currentListing; if (!l) return;
+  if (!lampoLeve || !lampoLeve.attive) {
+    toast('Le offerte lampo non sono attive'); return;
+  }
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  el('lampoTestata').innerHTML = `
+    ${l.thumbs && l.thumbs[0]
+      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
+      : `<span style="font-size:28px">${l.emoji}</span>`}
+    <div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
+    <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${inEur ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span></div>`;
+  el('lampoChips').innerHTML = (lampoLeve.sconti||[]).map(p => {
+    const v = lampoSconto(l, p);
+    return `<button class="consegna-pill" data-p="${p}" onclick="lampoChip(${p})">−${p}% · ${cifraOff(l.valuta, v.sats, v.eur)}</button>`;
+  }).join('');
+  lampoOreScelte = (lampoLeve.ore||[])[1] || (lampoLeve.ore||[])[0] || 24;
+  el('lampoOreChips').innerHTML = (lampoLeve.ore||[]).map(h =>
+    `<button class="consegna-pill${h===lampoOreScelte?' attiva':''}" data-h="${h}" onclick="lampoOre(${h})">⏳ ${durataLampo(h)}</button>`).join('');
+  el('lampoLimiti').textContent =
+    `Lo sconto va dal ${lampoLeve.minimo}% al ${lampoLeve.massimo}%`;
+  el('lampoPercentoInp').value = '';
+  lampoDigitata();
+  el('sheetBg').classList.add('open');
+  el('lampoSheet').classList.add('open');
+}
+function lampoChip(p){
+  haptic();
+  el('lampoPercentoInp').value = String(p);
+  lampoDigitata();
+}
+function lampoOre(h){
+  haptic();
+  lampoOreScelte = h;
+  document.querySelectorAll('#lampoOreChips .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', Number(b.dataset.h) === h));
+  lampoDigitata();
+}
+function lampoDigitata(){
+  const l = currentListing; if (!l || !lampoLeve) return;
+  const p = parseInt(String(el('lampoPercentoInp').value).replace(/\D/g,''), 10) || 0;
+  document.querySelectorAll('#lampoChips .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', p > 0 && Number(b.dataset.p) === p));
+  const ant = el('lampoAnteprima');
+  if (!p) { ant.textContent = ''; return; }
+  if (p < lampoLeve.minimo || p > lampoLeve.massimo) {
+    ant.textContent = `Lo sconto va dal ${lampoLeve.minimo}% al ${lampoLeve.massimo}%`;
+    return;
+  }
+  const v = lampoSconto(l, p);
+  const fine = new Date(Date.now() + lampoOreScelte*3600*1000);
+  const ora = fine.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+  const giorno = lampoOreScelte >= 24
+    ? ` del ${fine.toLocaleDateString('it-IT', {day:'numeric', month:'numeric'})}` : '';
+  ant.innerHTML = `<s style="color:var(--muted)">${cifraOff(l.valuta, l.price, l.priceEur)}</s>`
+    + ` → <b style="color:var(--sats-deep)">${cifraOff(l.valuta, v.sats, v.eur)}</b>`
+    + ` · fino alle ${ora}${giorno}`;
+}
+async function inviaLampo(btn){
+  haptic();
+  const l = currentListing; if (!l) return;
+  const p = parseInt(String(el('lampoPercentoInp').value).replace(/\D/g,''), 10) || 0;
+  if (!p) { toast('Scegli lo sconto'); return; }
+  const ripristina = bottoneInAttesa(btn, '⚡ Lancio…');
+  try {
+    const r = await fetch(`${API_BASE}/listings/${l.id}/lampo`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({percento: p, ore: lampoOreScelte})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Offerta lampo non lanciata', 5000); return; }
+    /* l e' lo stesso oggetto di listings/vetrina: la mutazione arriva
+       ovunque, e il redraw fa il resto */
+    l.lampoPct = d.percento; l.lampoFine = d.scadenza;
+    closeSheet();
+    toast('⚡ Offerta lampo lanciata! Chi ha l\'annuncio nel barattolo riceve l\'avviso', 5000);
+    renderGrid(); openDetail(l.id);
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+async function annullaLampo(){
+  haptic();
+  const l = currentListing; if (!l) return;
+  if (!confirm('Vuoi annullare l\'offerta lampo? Il prezzo torna subito pieno.')) return;
+  try {
+    const r = await fetch(`${API_BASE}/listings/${l.id}/lampo/annulla`, {
+      method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Annullo non riuscito', 5000); return; }
+    l.lampoPct = 0; l.lampoFine = 0;
+    toast('Offerta lampo annullata: prezzo pieno');
+    renderGrid(); openDetail(l.id);
+  } catch(e) { toast('Rete assente: riprova'); }
 }
 
 /* La sezione in testa alla scheda Ordini: solo le trattative VIVE
@@ -6963,6 +7100,7 @@ async function avvia(){
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
     myDoppioni = me.doppioni_nostr || [];
+    lampoLeve = me.lampo_leve || null;
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();
