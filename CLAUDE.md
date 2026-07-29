@@ -181,7 +181,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   originali) scritte su INSERT e UPDATE, e il match verso il DB è
   PRIMA per tag `d` (sopravvive ai titoli cambiati: prima duplicava),
   poi per titolo ma solo su righe non ancora battezzate
-  (`nostr_origine_d=''`); sul match aggiorna anche
+  (`nostr_origine_d=''`); scudo anti-resurrezione (lug 2026, da un
+  bug vissuto in produzione): se la coordinata (o il titolo) matcha
+  una riga NON attiva — rimossa o venduta su Barattolo — l'annuncio
+  NON si ricrea (skip con riga ⛔ nel journal): prima il match
+  guardava solo gli attivi e l'evento ancora vivo sui relay rifaceva
+  l'INSERT a ogni giro; un tag `d` diverso resta un annuncio nuovo.
+  È la prima tappa del cantiere cancellazioni: le NIP-09 (kind 5)
+  NON vengono ancora lette dai relay e lo status sold di un evento
+  aggiornato produce solo uno skip, mai una disattivazione — lapide
+  persistente e lettura dei kind 5 sono le tappe che seguono; sul
+  match aggiorna anche
   titolo/descrizione/zona e valuta/prezzo_eur dal tag price (EUR →
   doppia valuta anche per gli importati), MAI la categoria
   (categoria_automatica ricoprirebbe la scelta del form); foto
