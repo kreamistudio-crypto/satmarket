@@ -625,6 +625,13 @@
     font-size:13px;cursor:pointer;color:var(--ink)}
   .consegna-scelta .consegna-pill.attiva{border-color:var(--sats);
     background:var(--sats-soft);color:var(--sats-text)}
+  /* Le tre caselle di consegna nel form Vendi: strade indipendenti,
+     il venditore spunta tutte quelle che offre */
+  .cons-riga{display:flex;align-items:flex-start;gap:8px;margin-top:8px;
+    font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer}
+  .cons-riga input{width:auto;accent-color:var(--sats);margin-top:2px}
+  .cons-riga .cons-sub{display:block;font-size:12px;color:var(--muted);
+    font-weight:600}
   /* Il conto scomposto nei fogli di pagamento */
   .conto-scomposto{margin:10px auto 0;max-width:280px;text-align:left;
     font-size:13px;font-weight:600;color:var(--ink);
@@ -1254,16 +1261,12 @@
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
-      <div class="field" id="sellConsegnaField"><label>Consegna</label>
-        <select id="sellConsegna" onchange="aggiornaConsegnaForm()">
-          <option value="">Come consegni? (scegli)</option>
-          <option value="spedizione">📦 Spedizione</option>
-          <option value="ritiro">🤝 Solo ritiro in zona</option>
-          <option value="entrambe">📦🤝 Spedizione o ritiro in zona</option>
-          <option value="digitale">💾 Consegna digitale (buono, codice, licenza)</option>
-        </select>
-        <label id="sellAncheDigitaleRiga" style="display:none;margin-top:8px;font-size:13px;font-weight:700;color:var(--ink);align-items:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="sellAncheDigitale" onchange="aggiornaConsegnaForm()" style="width:auto;accent-color:var(--sats);margin-top:2px"> <span>💾 In alternativa, posso inviare il codice online<br><span style="font-size:12px;color:var(--muted);font-weight:600">Il compratore sceglie: riceve l'oggetto oppure il codice.</span></span></label>
-        <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Consegnerai il contenuto dentro Barattolo dopo l'acquisto, dal dettaglio dell'ordine. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
+      <div class="field" id="sellConsegnaField"><label>Consegna — spunta tutte le strade che offri</label>
+        <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span>📦 Spedizione</span></label>
+        <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span>🤝 Ritiro in zona</span></label>
+        <label class="cons-riga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span>💾 Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
+        <div id="sellConsegnaHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Il compratore sceglierà una sola di queste strade all'acquisto.</div>
+        <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Consegnerai il codice dentro Barattolo dopo l'acquisto, dal dettaglio dell'ordine. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
@@ -2123,7 +2126,7 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span>📍 ${esc(l.zone)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Consegna digitale immediata">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
+        <div class="meta"><span>📍 ${esc(l.zone)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
       </div>
     </div>`; };
 
@@ -2540,7 +2543,7 @@ function pilloleConsegna(l){
   if (s.length < 2) return '';
   const nome = v => v==='spedizione'
     ? '🚚 Spedizione' + ((l.sped>0||l.spedEur>0) ? '' : ' gratuita')
-    : v==='ritiro' ? '🤝 Ritiro in zona' : '💾 Digitale';
+    : v==='ritiro' ? '🤝 Ritiro in zona' : '💾 Codice online';
   const att = sceltaConsegna(l);
   return `<div class="consegna-scelta">` + s.map(v =>
     `<button class="consegna-pill${v===att?' attiva':''}" data-v="${v}" onclick="setConsegnaScelta('${v}')">${nome(v)}</button>`
@@ -2605,14 +2608,14 @@ function rigaConsegna(l){
   let t;
   if (l.consegna==='ritiro')
     t = l.ancheDigitale ? '🤝 ritiro in zona' : '🤝 solo ritiro in zona';
-  else if (l.consegna==='digitale') t = '💾 consegna digitale immediata';
+  else if (l.consegna==='digitale') t = '💾 codice inviato online, subito';
   else {
     t = (l.sped>0 || l.spedEur>0)
       ? `🚚 + ${spedTesto(l)} spedizione` : '🚚 spedizione gratuita';
     if (l.consegna==='entrambe') t += ' o ritiro in zona';
   }
   if (l.ancheDigitale && l.consegna!=='digitale')
-    t += ' o 💾 consegna digitale';
+    t += ' o 💾 codice online';
   return `<div class="eur-hint" style="margin-top:-8px">${t} · protezione acquisti inclusa</div>`;
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
@@ -3026,7 +3029,7 @@ function openDetail(id){
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${pilloleConsegna(l)}
-             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Bene digitale:</b> il venditore consegna il contenuto dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai 24 ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
+             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai 24 ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
@@ -4077,7 +4080,7 @@ function openOrder(id){
       <h2 style="font-size:17px">${o.listing.emoji} ${esc(o.listing.title)}</h2>
       <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span></div>
       ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0) ? `<div class="eur-hint" style="margin-top:-6px">${
-        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 consegna digitale' : '🚚 con spedizione') : ''}${
+        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : '🚚 con spedizione') : ''}${
         (o.consegnaScelta && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
         (o.spedSats>0||o.protSats>0) ? 'di cui ' + [
           o.spedSats>0 ? fmt(o.spedSats)+' sats di spedizione' : '',
@@ -5877,7 +5880,7 @@ function aggiornaSpedHint(){
     h.textContent = ((e>0 && cambioVivo)
       ? `${fmtEur(e)} € ≈ ${fmt(Math.round(e/eurPerSat))} sats oggi — ` : '')
       + 'ancorato all\'euro: diventa sats al cambio del momento dell\'acquisto';
-  } else if (sellValuta==='sats' && el('sellConsegna')?.value){
+  } else if (sellValuta==='sats' && el('sellConsSped')?.checked){
     h.textContent = 'Costo fisso in sats, qualunque cosa faccia il cambio';
   } else h.textContent = '';
 }
@@ -5886,33 +5889,50 @@ const eurCampo = id =>
   Math.round((parseFloat(String(el(id).value).replace(',','.'))||0)*100)/100;
 const prezzoEurForm = () => eurCampo('sellPrice');
 
+/* Le TRE caselle indipendenti (lug 2026, decisione di Andrea: basta
+   select + checkbox) si mappano sulle strutture di sempre — consegna
+   ('spedizione'/'ritiro'/'entrambe'/'digitale') + anche_digitale —
+   che reggono tutte le combinazioni: nessuna colonna nuova. */
+function consegnaForm(){
+  const sped = el('sellConsSped').checked,
+        rit  = el('sellConsRitiro').checked,
+        dig  = el('sellConsDig').checked;
+  const consegna = sped && rit ? 'entrambe' : sped ? 'spedizione'
+                 : rit ? 'ritiro' : dig ? 'digitale' : '';
+  return {consegna, anche_digitale: (dig && (sped || rit)) ? 1 : 0};
+}
+/* Il verso opposto: dai valori salvati alle caselle (precompilazione
+   della modifica e reset del form). */
+function impostaConsegnaForm(c, ancheDig){
+  el('sellConsSped').checked = c==='spedizione' || c==='entrambe';
+  el('sellConsRitiro').checked = c==='ritiro' || c==='entrambe';
+  el('sellConsDig').checked = c==='digitale' || !!ancheDig;
+  aggiornaConsegnaForm();
+}
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
-   il digitale mostra il suo hint (consegna in piattaforma + screenshot).
-   Con una modalita' FISICA compare il checkbox della combo («ti
-   spedisco la tessera, oppure ti mando il codice»). */
+   il codice online mostra il suo hint (consegna in piattaforma +
+   screenshot); con piu' strade spuntate la riga che ricorda che il
+   compratore ne sceglie una. */
 function aggiornaConsegnaForm(){
-  const c = el('sellConsegna').value;
-  const spedisce = c==='spedizione' || c==='entrambe';
-  const fisica = spedisce || c==='ritiro';
-  el('sellSpedField').style.display = spedisce ? '' : 'none';
-  el('sellTagliaField').style.display = spedisce ? '' : 'none';
-  el('sellAncheDigitaleRiga').style.display = fisica ? 'flex' : 'none';
-  if (!fisica) el('sellAncheDigitale').checked = false;
-  el('sellDigitaleHint').style.display =
-    (c==='digitale' || (fisica && el('sellAncheDigitale').checked)) ? '' : 'none';
+  const sped = el('sellConsSped').checked,
+        n = sped + el('sellConsRitiro').checked + el('sellConsDig').checked;
+  el('sellSpedField').style.display = sped ? '' : 'none';
+  el('sellTagliaField').style.display = sped ? '' : 'none';
+  el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
+  el('sellConsegnaHint').style.display = n > 1 ? '' : 'none';
   aggiornaSpedHint();
 }
 /* I campi di consegna del payload: la valuta del listino comanda,
    ma sul listino sats il costo scritto in euro parte come
-   spedizione_eur e il server lo salva in sats. Il digitale viaggia
-   nudo: niente costo, niente taglia. La combo aggiunge il flag
-   anche_digitale accanto alla parte fisica. */
+   spedizione_eur e il server lo salva in sats. Il solo-digitale
+   viaggia nudo: niente costo, niente taglia. La combo aggiunge il
+   flag anche_digitale accanto alla parte fisica. */
 function consegnaPayload(){
-  const c = el('sellConsegna').value;
-  if (c==='digitale') return {consegna:c};
-  const out = {consegna:c, taglia_pacco:el('sellTaglia').value};
-  if (c && el('sellAncheDigitale').checked) out.anche_digitale = 1;
-  if (c==='spedizione' || c==='entrambe'){
+  const {consegna, anche_digitale} = consegnaForm();
+  if (consegna==='digitale' || !consegna) return {consegna};
+  const out = {consegna, taglia_pacco:el('sellTaglia').value};
+  if (anche_digitale) out.anche_digitale = 1;
+  if (consegna==='spedizione' || consegna==='entrambe'){
     if (sellValuta==='eur' || spedValuta==='eur')
       out.spedizione_eur = eurCampo('sellSped');
     else out.spedizione_sats = parseInt(el('sellSped').value)||0;
@@ -5938,8 +5958,7 @@ function editListing(id){
   el('sellCat').value = l.cat;
   el('sellZone').value = l.zone==='—' ? '' : l.zone;
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
-  el('sellConsegna').value = l.consegna||'';
-  el('sellAncheDigitale').checked = !!l.ancheDigitale;
+  impostaConsegnaForm(l.consegna||'', l.ancheDigitale);
   el('sellTaglia').value = l.taglia||'';
   /* spedEur pieno = costo ancorato all'euro: si rientra in euro
      anche sul listino sats (il toggle segue la semantica salvata) */
@@ -5947,7 +5966,6 @@ function editListing(id){
   el('sellSped').value = (l.consegna==='spedizione'||l.consegna==='entrambe')
     ? (l.spedEur>0 ? l.spedEur : (l.sped||0)) : '';
   aggiornaSpedCampo();
-  aggiornaConsegnaForm();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
   renderFotoPreview(); aggiornaFormVendi();
   go('vendi'); window.scrollTo(0, 0);
@@ -5957,9 +5975,8 @@ function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
-  el('sellConsegna').value = ''; el('sellTaglia').value = '';
-  el('sellAncheDigitale').checked = false;
-  aggiornaConsegnaForm();
+  el('sellTaglia').value = '';
+  impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
 }
@@ -6112,6 +6129,11 @@ async function publish(){
   const t = el('sellTitle').value.trim();
   const p = sellValuta==='eur' ? prezzoEurForm() : (parseInt(el('sellPrice').value)||0);
   if (!t || !p) { toast('Titolo e prezzo sono obbligatori'); return; }
+  /* almeno una strada di consegna (la firmata degli importati non
+     offre il campo: li' la consegna resta '' per natura) */
+  if (!editandoNostr && !consegnaForm().consegna) {
+    toast('Spunta almeno una modalità di consegna'); return;
+  }
   if (sellFoto.some(f=>f.startsWith('caricando:'))) {
     toast('Un attimo: sto ancora caricando le foto'); return;
   }
@@ -6160,9 +6182,8 @@ async function publish(){
     }
   }
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
-  el('sellConsegna').value = ''; el('sellTaglia').value = '';
-  el('sellAncheDigitale').checked = false;
-  aggiornaConsegnaForm();
+  el('sellTaglia').value = '';
+  impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
   toast('⚡ Annuncio pubblicato!'); setCat('Tutto');
