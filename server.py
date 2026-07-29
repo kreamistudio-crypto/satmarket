@@ -4135,10 +4135,9 @@ async def lancia_lampo(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(403, "Solo il venditore può lanciare "
                                  "un'offerta lampo")
-    if a["contatto_nostr"]:
-        con.close()
-        raise HTTPException(400, "Questo annuncio arriva da Nostr: "
-                                 "il prezzo si cambia da lì")
+    # Vale anche per gli importati da Nostr: lo sconto e' locale (le
+    # colonne lampo_*, mai il listino), l'evento sui relay resta col
+    # prezzo pieno e l'import orario non tocca la lampo.
     try:
         percento = int(d.get("percento", 0))
         ore = int(d.get("ore", 0))
@@ -6501,7 +6500,7 @@ async def _drena_colpo():
         for i in ids:
             a = con.execute("SELECT * FROM annunci WHERE id=?",
                             (i,)).fetchone()
-            if (not a or a["stato"] != "attivo" or a["contatto_nostr"]
+            if (not a or a["stato"] != "attivo"
                     or a["lampo_scadenza"] > adesso   # lampo gia' in corso
                     or adesso - a["lampo_colpo_avvisato"]
                         < GIORNI_COLPO * 86400):

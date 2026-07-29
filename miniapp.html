@@ -2967,7 +2967,7 @@ function openDetail(id){
       <div class="desc">${esc(l.desc)}</div>
       ${mio
         ? `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
-           ${l.nostr || !(lampoLeve && lampoLeve.attive) ? '' : (lampoAttiva(l)
+           ${!(lampoLeve && lampoLeve.attive) ? '' : (lampoAttiva(l)
              ? `<button class="btn ghost" style="margin-top:0" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" style="margin-top:0" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
