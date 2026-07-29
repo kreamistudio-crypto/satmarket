@@ -628,10 +628,16 @@
   .consegna-scelta .consegna-pill.attiva{border-color:var(--sats);
     background:var(--sats-soft);color:var(--sats-text)}
   /* Le tre caselle di consegna nel form Vendi: strade indipendenti,
-     il venditore spunta tutte quelle che offre */
-  .cons-riga{display:flex;align-items:flex-start;gap:8px;margin-top:8px;
-    font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer}
-  .cons-riga input{width:auto;accent-color:var(--sats);margin-top:2px}
+     il venditore spunta tutte quelle che offre. Specificita' alta di
+     proposito: le regole generiche .field label/.field input (testo
+     maiuscolo, padding da campo) vincerebbero sulla classe nuda. */
+  .field label.cons-riga{display:flex;align-items:flex-start;gap:9px;
+    margin:8px 0 0;font-size:13.5px;font-weight:700;color:var(--ink);
+    text-transform:none;letter-spacing:normal;line-height:1.4;
+    cursor:pointer}
+  .field .cons-riga input{width:17px;height:17px;padding:0;
+    margin:1px 0 0;border-radius:5px;flex:0 0 auto;
+    accent-color:var(--sats)}
   .cons-riga .cons-sub{display:block;font-size:12px;color:var(--muted);
     font-weight:600}
   /* Il conto scomposto nei fogli di pagamento */
@@ -1284,12 +1290,11 @@
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
-      <div class="field" id="sellConsegnaField"><label>Consegna — spunta tutte le strade che offri</label>
+      <div class="field" id="sellConsegnaField"><label>Consegna — spunta le opzioni che offri</label>
         <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span>📦 Spedizione</span></label>
         <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span>🤝 Ritiro in zona</span></label>
         <label class="cons-riga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span>💾 Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
-        <div id="sellConsegnaHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Il compratore sceglierà una sola di queste strade all'acquisto.</div>
-        <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Consegnerai il codice dentro Barattolo dopo l'acquisto, dal dettaglio dell'ordine. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
+        <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Se l'acquirente sceglie il codice, lo consegnerai dentro Barattolo dopo il pagamento: niente chat private, tutto tracciato. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
@@ -6119,17 +6124,14 @@ function impostaConsegnaForm(c, ancheDig){
   aggiornaConsegnaForm();
 }
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
-   il codice online mostra il suo hint (consegna in piattaforma +
-   screenshot); con piu' strade spuntate la riga che ricorda che il
-   compratore ne sceglie una. */
+   il codice online mostra il suo hint operativo (consegna in
+   piattaforma + screenshot). */
 function aggiornaConsegnaForm(){
   const sped = el('sellConsSped').checked,
-        rit = el('sellConsRitiro').checked,
-        n = sped + rit + el('sellConsDig').checked;
+        rit = el('sellConsRitiro').checked;
   el('sellSpedField').style.display = sped ? '' : 'none';
   el('sellTagliaField').style.display = sped ? '' : 'none';
   el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
-  el('sellConsegnaHint').style.display = n > 1 ? '' : 'none';
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
      essere un comune vero, senza resta facoltativa */
   const zl = el('zonaLabel');
