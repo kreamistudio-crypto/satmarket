@@ -4052,6 +4052,168 @@ async def rispondi_offerta(offerta_id: int, req: Request,
     return {"ok": True, "stato": "controproposta"}
 
 
+# ------------------------ API: OFFERTA LAMPO ------------------------
+# Lo sconto a tempo su TUTTO l'annuncio (modello Vinted «sconto ai
+# follower»): pubblico — chiunque compri nella finestra paga scontato —
+# ma l'avviso arriva solo a chi ha l'annuncio nel barattolo, senza che
+# il venditore sappia mai chi ne' quanti. Non tocca mai il listino:
+# prezzo_sats/prezzo_eur restano pieni (e il NIP-99 con loro), lo
+# sconto vive nelle colonne lampo_* e si applica alla invoice.
+
+def _prezzo_lampo(a, percento: int):
+    """Il prezzo scontato nella valuta del listino: (sats, eur), uno
+    dei due a zero come nelle offerte. Mai sotto 1 sat / 0.01 €."""
+    if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+        return 0, max(0.01, round(a["prezzo_eur"] * (100 - percento) / 100, 2))
+    return max(1, a["prezzo_sats"] * (100 - percento) // 100), 0.0
+
+
+def _quando_scade(ts: int) -> str:
+    """«alle 18:30», «alle 18:30 di domani», «alle 18:30 del 02/08»:
+    l'ora della scadenza detta come la direbbe una persona."""
+    s = time.localtime(ts)
+    oggi = time.localtime()
+    ora = time.strftime("%H:%M", s)
+    if (s.tm_year, s.tm_yday) == (oggi.tm_year, oggi.tm_yday):
+        return f"alle {ora}"
+    domani = time.localtime(time.time() + 86400)
+    if (s.tm_year, s.tm_yday) == (domani.tm_year, domani.tm_yday):
+        return f"alle {ora} di domani"
+    return f"alle {ora} del {time.strftime('%d/%m', s)}"
+
+
+async def _avvisa_savers_lampo(a: dict, percento: int, scadenza: int,
+                               savers: list):
+    """L'avviso ai barattoli: uno per uno e con calma, mai i nomi —
+    nessuno sa chi altro ce l'ha nel barattolo. Fail-open: un errore
+    qui non tocca la lampo, che e' gia' in vetrina."""
+    try:
+        s_sats, s_eur = _prezzo_lampo(a, percento)
+        vecchio = _cifra_offerta(a["valuta"], a["prezzo_sats"],
+                                 a["prezzo_eur"])
+        nuovo = _cifra_offerta(a["valuta"], s_sats, s_eur)
+        for tg in savers:
+            await notifica(tg, (
+                f"⚡ <b>L'annuncio nel tuo barattolo è in sconto!</b>\n"
+                f"«{html.escape(a['titolo'][:60])}»: <s>{vecchio}</s> → "
+                f"<b>{nuovo}</b> (−{percento}%)\n"
+                f"Hai tempo fino {_quando_scade(scadenza)}.\n"
+                f"{URL_PUBBLICO}/annuncio/{a['id']}"))
+            await asyncio.sleep(0.2)
+    except Exception as e:
+        print(f"⚠️ Avvisi lampo saltati: {e}")
+
+
+@app.post("/api/listings/{annuncio_id}/lampo")
+async def lancia_lampo(annuncio_id: int, req: Request,
+                       x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Il venditore lancia lo sconto: percentuale e durata dalle
+    opzioni del config. L'annuncio non si blocca e il listino non
+    cambia; alla scadenza il prezzo torna pieno da solo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not LAMPO_ATTIVE:
+        raise HTTPException(400, "Le offerte lampo non sono attive")
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
+                    (annuncio_id,)).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(404, "Annuncio non disponibile")
+    if a["venditore_id"] != user["id"]:
+        con.close()
+        raise HTTPException(403, "Solo il venditore può lanciare "
+                                 "un'offerta lampo")
+    if a["contatto_nostr"]:
+        con.close()
+        raise HTTPException(400, "Questo annuncio arriva da Nostr: "
+                                 "il prezzo si cambia da lì")
+    try:
+        percento = int(d.get("percento", 0))
+        ore = int(d.get("ore", 0))
+    except (TypeError, ValueError):
+        percento, ore = 0, 0
+    if not (LAMPO_MIN_PERCENTO <= percento <= LAMPO_MAX_PERCENTO):
+        con.close()
+        raise HTTPException(400, f"Lo sconto va dal {LAMPO_MIN_PERCENTO}% "
+                                 f"al {LAMPO_MAX_PERCENTO}%")
+    if ore not in ORE_LAMPO_OPZIONI:
+        con.close()
+        raise HTTPException(400, "Durata non valida")
+    adesso = int(time.time())
+    if a["lampo_scadenza"] > adesso:
+        con.close()
+        raise HTTPException(400, "C'è già un'offerta lampo in corso su "
+                                 "questo annuncio")
+    # Il freno delle trattative: con un accordo gia' stretto (offerta
+    # accettata in attesa di pagamento) niente lampo — il compratore
+    # dell'accordo pagherebbe comunque il meglio dei due (compra() fa
+    # il minimo), ma il venditore non deve potersi rimangiare la
+    # stretta di mano cambiando le carte in tavola.
+    accordo = con.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=? AND "
+        "stato='accettata' AND scadenza>?", (annuncio_id, adesso)).fetchone()["n"]
+    if accordo:
+        con.close()
+        raise HTTPException(400, "C'è una trattativa accettata in corso: "
+                                 "aspetta che si concluda o scada")
+    # Il tetto settimanale: count-guard senza await (patto anti-doppione).
+    lanci = con.execute(
+        "SELECT COUNT(*) AS n FROM offerte_lampo WHERE annuncio_id=? AND "
+        "creato>=?", (annuncio_id, adesso - 7 * 86400)).fetchone()["n"]
+    if lanci >= MAX_LAMPO_SETTIMANA:
+        con.close()
+        raise HTTPException(400, f"Hai già lanciato {MAX_LAMPO_SETTIMANA} "
+                                 "offerte lampo su questo annuncio negli "
+                                 "ultimi 7 giorni: riprova più avanti")
+    scadenza = adesso + ore * 3600
+    con.execute("UPDATE annunci SET lampo_percento=?, lampo_scadenza=?, "
+                "lampo_creato=? WHERE id=?",
+                (percento, scadenza, adesso, annuncio_id))
+    con.execute("INSERT INTO offerte_lampo(annuncio_id,venditore_id,"
+                "percento,scadenza,creato) VALUES(?,?,?,?,?)",
+                (annuncio_id, user["id"], percento, scadenza, adesso))
+    con.commit()
+    # I destinatari si leggono ORA (la lista e' gia' vera), l'invio va
+    # in create_task: i relay Nostr sono lenti e la risposta no.
+    savers = [r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM preferiti WHERE annuncio_id=? AND tg_id!=?",
+        (annuncio_id, user["id"]))]
+    con.close()
+    if savers:
+        asyncio.create_task(
+            _avvisa_savers_lampo(dict(a), percento, scadenza, savers))
+    return {"ok": True, "percento": percento, "scadenza": scadenza}
+
+
+@app.post("/api/listings/{annuncio_id}/lampo/annulla")
+def annulla_lampo(annuncio_id: int, x_tg_init_data: str = Header(""),
+                  barattolo_sessione: str = Cookie("")):
+    """Il ripensamento del venditore: il prezzo torna pieno subito.
+    Nessun avviso ai barattoli (sarebbe solo rumore) e il lancio resta
+    nello storico: annullare non restituisce il gettone del tetto
+    settimanale, altrimenti lancia-e-annulla sarebbe spam gratis."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    a = con.execute("SELECT venditore_id, lampo_scadenza FROM annunci "
+                    "WHERE id=?", (annuncio_id,)).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(404, "Annuncio non trovato")
+    if a["venditore_id"] != user["id"]:
+        con.close()
+        raise HTTPException(403, "Solo il venditore può annullare")
+    if a["lampo_scadenza"] <= int(time.time()):
+        con.close()
+        raise HTTPException(400, "Non c'è nessuna offerta lampo in corso")
+    con.execute("UPDATE annunci SET lampo_percento=0, lampo_scadenza=0 "
+                "WHERE id=?", (annuncio_id,))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
 # ---------------------- API: ORDINI / ESCROW ------------------------
 
 @app.post("/api/orders")
