@@ -2670,17 +2670,19 @@ PAROLE_ZONA = {"spedisco", "spedizione", "spedizioni", "consegna",
 
 
 def _comuni_fuzzy() -> dict:
-    """chiave normalizzata -> nome bello, SOLO per i nomi che
+    """chiave normalizzata -> «Nome (SIGLA)», SOLO per i nomi che
     coordinate_da_zona sa poi riconoscere (un conteso come 'Castro'
     resta fuori: suggerirlo rimetterebbe l'utente nel vicolo cieco).
-    Costruita pigra una volta: ~7.900 voci in RAM."""
+    Il formato con la sigla e' quello dell'autocomplete di Vendi:
+    normalizza('Pavia (PV)') = 'pavia pv', chiave gia' registrata da
+    carica_comuni. Costruita pigra una volta: ~7.900 voci in RAM."""
     global _COMUNI_FUZZY
     if _COMUNI_FUZZY is None:
         _COMUNI_FUZZY = {}
         for c in COMUNI_LISTA:
             chiave = normalizza(c["nome"])
             if chiave in COMUNI and chiave not in _COMUNI_FUZZY:
-                _COMUNI_FUZZY[chiave] = c["nome"]
+                _COMUNI_FUZZY[chiave] = f"{c['nome']} ({c['provincia']})"
     return _COMUNI_FUZZY
 
 
@@ -2960,6 +2962,31 @@ def condizione_tollerante(c: str) -> str:
     if c.replace(" ", "_") in CONDIZIONI:
         return c.replace(" ", "_")
     return SINONIMI_CONDIZIONE.get(c, "")
+
+
+def guardia_zona_condizione(d: dict, consegna: str) -> str:
+    """Le due regole del form Vendi (lug 2026), giudice unico di
+    pubblica e modifica: la condizione e' OBBLIGATORIA (client E
+    server: senza, niente pubblica — gli storici restano com'erano,
+    ma alla prima modifica si mettono in regola), e chi offre il
+    RITIRO deve avere in zona un comune riconosciuto dei ~7.900 —
+    basta che il testo lo CONTENGA («Frazione Salsasio, Carmagnola
+    (TO)» passa: la scansione a n-grammi trova il comune). Senza
+    dataset la regola geografica si spegne da sola (fail-open, come
+    il resto della geografia). La modifica firmata degli importati
+    NON passa di qui: quei campi il form non li offre proprio.
+    Ritorna la condizione validata."""
+    condizione = condizione_valida(d.get("condizione"))
+    if not condizione:
+        raise HTTPException(400, "Indica le condizioni dell'oggetto")
+    if consegna in ("ritiro", "entrambe") and COMUNI:
+        zona = (d.get("zona") or "").strip()
+        if not zona or coordinate_da_zona(zona) == (0.0, 0.0):
+            raise HTTPException(400, "Per il ritiro in zona serve un "
+                                     "comune valido: scegli il tuo dai "
+                                     "suggerimenti del campo Zona "
+                                     "(es. «Pavia (PV)»)")
+    return condizione
 
 
 # --- Consegna e taglia del pacco (lug 2026, modello Vinted) ----------
@@ -3277,6 +3304,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     consegna, sped_sats, sped_eur, taglia, anche_dig = \
         await consegna_da_payload(d, valuta)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
+    condizione = guardia_zona_condizione(d, consegna)
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -3333,8 +3361,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         condizione_valida(d.get("condizione")),
-         "revisione" if in_revisione else "attivo", int(time.time())))
+         condizione, "revisione" if in_revisione else "attivo",
+         int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -3706,6 +3734,15 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         raise HTTPException(400, "Questo annuncio è importato da Nostr: "
                                  "modificalo dal tuo client Nostr, qui si "
                                  "aggiorna da solo entro un'ora")
+    # Anche in modifica: gli storici si mettono in regola al primo
+    # ritocco (condizione obbligatoria, comune vero col ritiro).
+    # DOPO le guardie di proprieta'/stato: chi tocca un annuncio in
+    # revisione deve sentirsi dire quello, non «manca la condizione».
+    try:
+        condizione = guardia_zona_condizione(d, consegna)
+    except HTTPException:
+        con.close()
+        raise
     in_corso = con.execute(
         "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato "
         "NOT IN ('released','refunded','annullato')",
@@ -3757,8 +3794,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         condizione_valida(d.get("condizione")),
-         "revisione" if in_revisione else "attivo", annuncio_id))
+         condizione, "revisione" if in_revisione else "attivo",
+         annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -8225,15 +8262,6 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
         if not titolo:
             scarti.append({"riga": numero, "motivo": "titolo mancante"})
             continue
-        # Zona senza un comune riconoscibile: solo un AVVISO in
-        # anteprima (mai uno scarto), col «forse intendevi» quando
-        # il fuzzy trova un quasi-comune. Stessa morbidezza di Vendi.
-        if zona and COMUNI and coordinate_da_zona(zona) == (0.0, 0.0):
-            sugg = suggerisci_comune(zona)
-            avvisi.append({"riga": numero,
-                           "motivo": f"zona «{zona[:40]}» senza un comune "
-                                     f"riconoscibile"
-                                     + (f" — forse {sugg}?" if sugg else "")})
 
         # Prezzo e valuta: il giudice e' lo stesso di pubblica()
         valuta = (cella(r, "valuta") or "sats").lower()
@@ -8298,6 +8326,31 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
             payload_consegna["spedizione_sats"] = sped_testo or 0
         consegna, sped_sats, sped_eur, taglia, anche_dig = \
             await consegna_da_payload(payload_consegna, valuta)
+        # La regola della zona segue la consegna, come in Vendi: col
+        # RITIRO il comune e' d'obbligo e dev'essere riconoscibile
+        # (SCARTO); senza ritiro resta la validazione morbida — solo
+        # un AVVISO col «forse intendevi» quando il fuzzy ha un
+        # candidato. Senza dataset, tutto passa (fail-open).
+        if COMUNI and zona and coordinate_da_zona(zona) == (0.0, 0.0):
+            sugg = suggerisci_comune(zona)
+            if consegna in ("ritiro", "entrambe"):
+                scarti.append({"riga": numero,
+                               "motivo": f"il ritiro in zona esige un "
+                                         f"comune valido, «{zona[:40]}» "
+                                         f"non lo è"
+                                         + (f" — forse {sugg}?" if sugg
+                                            else " (es. Pavia (PV))")})
+                continue
+            avvisi.append({"riga": numero,
+                           "motivo": f"zona «{zona[:40]}» senza un comune "
+                                     f"riconoscibile"
+                                     + (f" — forse {sugg}?" if sugg else "")})
+        elif COMUNI and not zona and consegna in ("ritiro", "entrambe"):
+            scarti.append({"riga": numero,
+                           "motivo": "il ritiro in zona esige il comune "
+                                     "(es. Pavia (PV)): la cella zona è "
+                                     "vuota"})
+            continue
         if consegna == "digitale" or anche_dig:
             # La leva anti-frode del venditore vale anche qui: riga
             # scartata (mai un 400 sull'intero file), stessa guardia

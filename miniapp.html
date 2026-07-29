@@ -1303,8 +1303,8 @@
           <option value="grande">📦 Grande — come un forno a microonde</option>
           <option value="ingombrante">🛋 Ingombrante — serve un furgone</option>
         </select></div>
-      <div class="field"><label>Zona</label>
-        <input id="sellZone" list="zonaList" placeholder="Es. Pavia — spedisco in tutta Italia" oninput="suggerisciZona(this.value)" onblur="controllaZona()" autocomplete="off">
+      <div class="field"><label id="zonaLabel">Zona (facoltativa)</label>
+        <input id="sellZone" list="zonaList" placeholder="Es. Pavia (PV)" oninput="suggerisciZona(this.value)" onblur="controllaZona()" autocomplete="off">
         <datalist id="zonaList"></datalist>
         <div id="zonaHint" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div></div>
       <div class="field"><label>Descrizione</label>
@@ -1727,6 +1727,17 @@ const CONDIZIONI = {
   accettabile:  {emoji:'🆗', nome:'Accettabile'},
   da_sistemare: {emoji:'🔧', nome:'Da sistemare'},
 };
+/* Il luogo in card e dettaglio: la zona quando c'e' («Pavia (PV)»
+   cosi' com'e'), altrimenti la strada di consegna — un annuncio
+   solo-spedizione senza luogo e' legittimo (lug 2026: «spedisco in
+   tutta Italia» non vive piu' nel campo Zona, lo dice la consegna). */
+function luogoMeta(l){
+  if (l.zone && l.zone !== '—') return `📍 ${esc(l.zone)}`;
+  if (l.consegna === 'spedizione' || l.consegna === 'entrambe')
+    return '📦 Spedizione';
+  if (l.consegna === 'digitale' || l.ancheDigitale) return '💾 Online';
+  return '📍 —';
+}
 function mapListing(a){
   let photos = [], thumbs = [];
   try {
@@ -2172,7 +2183,7 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span>📍 ${esc(l.zone)}</span>${CONDIZIONI[l.condizione]?`<span title="${CONDIZIONI[l.condizione].nome}">${CONDIZIONI[l.condizione].emoji}</span>`:''}${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
+        <div class="meta"><span>${luogoMeta(l)}</span>${CONDIZIONI[l.condizione]?`<span title="${CONDIZIONI[l.condizione].nome}">${CONDIZIONI[l.condizione].emoji}</span>`:''}${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
       </div>
     </div>`; };
 
@@ -3045,7 +3056,7 @@ function openDetail(id){
       ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
       ${rigaConsegna(l)}
       <div class="pills">
-        <span class="pill">📍 ${esc(l.zone)}</span>
+        <span class="pill">${luogoMeta(l)}</span>
         ${CONDIZIONI[l.condizione]?`<span class="pill">${CONDIZIONI[l.condizione].emoji} ${CONDIZIONI[l.condizione].nome}</span>`:''}
         ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
         ${l.taglia?`<span class="pill">📦 pacco ${esc(l.taglia)}</span>`:''}
@@ -4988,8 +4999,11 @@ function suggerisciZona(q){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       const d = await r.json();
       const dl = el('zonaList');
+      /* il valore salvato e' «Comune (SIGLA)»: distingue gli omonimi
+         (Castro BG e Castro LE) e coordinate_da_zona lo riconosce
+         gia' — 'pavia pv' e' una chiave registrata da carica_comuni */
       if (dl) dl.innerHTML = (d.comuni || []).map(c =>
-        `<option value="${esc(c.nome)}">${esc(c.provincia)}</option>`).join('');
+        `<option value="${esc(c.nome)} (${esc(c.provincia)})"></option>`).join('');
     } catch {}
   }, 250);
 }
@@ -5005,15 +5019,23 @@ async function controllaZona(){
       {headers:{'X-Tg-Init-Data':authHdr()}});
     if (!r.ok) return;
     const d = await r.json();
-    /* riconosciuta, o nessun quasi-comune (caso legittimo): silenzio */
-    if (d.riconosciuto || !d.suggerimento) return;
+    const ritiro = el('sellConsRitiro')?.checked;
+    /* riconosciuta: silenzio. Non riconosciuta: col ritiro la regola
+       e' ferma (il server non pubblichera'), senza ritiro e' solo un
+       consiglio — e senza nemmeno un quasi-comune, il consiglio tace
+       (frazioni e simili restano legittimi). */
+    if (d.riconosciuto || (!d.suggerimento && !ritiro)) return;
     /* il nome del comune vive in una variabile, mai dentro l'onclick
        (il patto anti-XSS: gli apostrofi di Sant'Angelo non si fidano) */
     zonaSuggerita = d.suggerimento;
-    box.innerHTML = `📍 Non riconosco «${esc(testo.slice(0,40))}» — `
-      + `intendevi <b>${esc(d.suggerimento)}</b>? `
-      + `<a href="#" onclick="usaZonaSuggerita();return false">Usa «${esc(d.suggerimento)}»</a> · `
-      + `<a href="#" onclick="el('zonaHint').style.display='none';return false" style="color:var(--muted)">Lascia così</a>`;
+    const usa = d.suggerimento
+      ? `intendevi <b>${esc(d.suggerimento)}</b>? <a href="#" onclick="usaZonaSuggerita();return false">Usa «${esc(d.suggerimento)}»</a>`
+      : '';
+    box.innerHTML = ritiro
+      ? `📍 Per il ritiro serve un comune valido: «${esc(testo.slice(0,40))}» non basta — `
+        + (usa || `scegli il tuo comune dall'elenco dei suggerimenti (puoi aggiungere la frazione accanto)`)
+      : `📍 Non riconosco «${esc(testo.slice(0,40))}» — ${usa} · `
+        + `<a href="#" onclick="el('zonaHint').style.display='none';return false" style="color:var(--muted)">Lascia così</a>`;
     box.style.display = 'block';
   } catch(e) {}
 }
@@ -6102,11 +6124,17 @@ function impostaConsegnaForm(c, ancheDig){
    compratore ne sceglie una. */
 function aggiornaConsegnaForm(){
   const sped = el('sellConsSped').checked,
-        n = sped + el('sellConsRitiro').checked + el('sellConsDig').checked;
+        rit = el('sellConsRitiro').checked,
+        n = sped + rit + el('sellConsDig').checked;
   el('sellSpedField').style.display = sped ? '' : 'none';
   el('sellTagliaField').style.display = sped ? '' : 'none';
   el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
   el('sellConsegnaHint').style.display = n > 1 ? '' : 'none';
+  /* la zona segue la consegna: col ritiro e' obbligatoria e deve
+     essere un comune vero, senza resta facoltativa */
+  const zl = el('zonaLabel');
+  if (zl) zl.textContent = rit ? 'Zona — il tuo comune, obbligatorio per il ritiro'
+                               : 'Zona (facoltativa)';
   aggiornaSpedHint();
 }
 /* I campi di consegna del payload: la valuta del listino comanda,
@@ -6335,6 +6363,12 @@ async function publish(){
   if (!editandoNostr && !el('sellCond').value) {
     toast('Indica le condizioni dell\'oggetto'); return;
   }
+  /* col ritiro la zona e' obbligatoria (che sia un comune VERO lo
+     giudica il server: qui si ferma solo il campo vuoto) */
+  if (!editandoNostr && el('sellConsRitiro').checked
+      && !el('sellZone').value.trim()) {
+    toast('Per il ritiro in zona serve il tuo comune: scegli dall\'elenco del campo Zona'); return;
+  }
   if (sellFoto.some(f=>f.startsWith('caricando:'))) {
     toast('Un attimo: sto ancora caricando le foto'); return;
   }
@@ -6360,7 +6394,7 @@ async function publish(){
       spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
       ancheDigitale:!!cns.anche_digitale,
       condizione:el('sellCond').value,
-      zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
+      zone:el('sellZone').value||'', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
     const r = await fetch(`${API_BASE}/listings`, {
@@ -6424,7 +6458,7 @@ async function salvaModifica(t, p){
         spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
         ancheDigitale:!!cns.anche_digitale,
         condizione:el('sellCond').value,
-        zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
+        zone:el('sellZone').value||'', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
   } else {
