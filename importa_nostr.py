@@ -449,6 +449,36 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                 "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
                 "     OR nostr_origine_d=?)",
                 (a["titolo"], venditore_id, npub, a["origine_d"])).fetchone()
+        if not gia:
+            # SCUDO ANTI-RESURREZIONE (lug 2026, da un bug vissuto):
+            # se la stessa coordinata (tag d) o lo stesso titolo esiste
+            # gia' nel database ma NON e' piu' attivo — rimosso dal
+            # venditore, da un admin, o venduto — l'annuncio NON si
+            # ricrea. Prima di questo scudo il match cercava solo tra
+            # gli attivi: un annuncio rimosso su Barattolo, col suo
+            # evento ancora vivo su un relay, tornava in vetrina a
+            # ogni giro d'import.
+            spento = None
+            if a["origine_d"]:
+                spento = con.execute(
+                    "SELECT id, stato FROM annunci "
+                    "WHERE nostr_origine_d=? AND stato!='attivo' "
+                    "AND (venditore_id=? OR contatto_nostr=?)",
+                    (a["origine_d"], venditore_id, npub)).fetchone()
+            if not spento:
+                spento = con.execute(
+                    "SELECT id, stato FROM annunci "
+                    "WHERE titolo=? AND stato!='attivo' "
+                    "AND (venditore_id=? OR contatto_nostr=?) "
+                    "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
+                    "     OR nostr_origine_d=?)",
+                    (a["titolo"], venditore_id, npub,
+                     a["origine_d"])).fetchone()
+            if spento:
+                saltati += 1
+                print(f"  ⛔ non risuscitato (qui e' '{spento[1]}'): "
+                      f"{a['titolo'][:50]}")
+                continue
         if gia:
             # Gia' presente: aggiorna TUTTO il contenuto (l'evento sui
             # relay e' la fonte di verita', anche dopo una modifica
