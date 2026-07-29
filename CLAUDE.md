@@ -838,9 +838,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dove la cella consegna parla col «+» (`spedizione+digitale`,
   riga d'esempio nel modello). `anche_digitale` è in CAMPI_VETRINA;
   NIP-99 aggiunge «o consegna digitale immediata» (e il ritiro combo
-  perde il «solo»). Frontend: checkbox «💾 Offro anche la consegna
-  digitale» sotto il select di Vendi (solo con modalità fisica
-  scelta, il costo spedizione resta legato al solo ramo fisico);
+  perde il «solo»). Frontend: checkbox «💾 In alternativa, posso
+  inviare il codice online» sotto il select di Vendi (riscritto
+  lug 2026: «Offro anche…» suonava come una copia in più, non come
+  una strada alternativa; sotto il testo la riga «Il compratore
+  sceglie: riceve l'oggetto oppure il codice»; solo con modalità
+  fisica scelta, il costo spedizione resta legato al solo ramo
+  fisico);
   pillole di scelta GENERALIZZATE (`stradeConsegna`/`pilloleConsegna`:
   compaiono con ≥2 strade, l'erede del vecchio ramo 'entrambe');
   trust-note asimmetrica `#notaDigitale` visibile SOLO con la scelta
@@ -868,12 +872,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   — i due rami fisici escludono il digitale. Il caso irriducibile
   (codice riscattato e poi negato) NON si risolve, si rende
   antieconomico: regola di default ASIMMETRICA dichiarata prima
-  dell'acquisto («i beni digitali non sono rimborsabili dopo la
-  rivelazione, salvo prove» — trust-note nel dettaglio, confirm della
-  rivelazione, notifica di consegna), nota al moderatore in
-  apri_disputa (conteggio dispute del compratore = le
-  dispute-fotocopia si vedono, + invito a chiedere all'emittente
-  quando/dove il codice è stato riscattato), e leve config SPENTE di
+  dell'acquisto («un codice rivelato non torna indietro: 24 ore per
+  aprire una disputa, poi l'acquisto è definitivo» — trust-note nel
+  dettaglio, confirm della rivelazione, notifica di consegna; dal
+  lug 2026 MAI «salvo prove» né promesse di rimborso verso il
+  compratore: Barattolo non può verificare i riscatti, deciso con
+  Andrea — i consigli-screenshot al VENDITORE restano, sono le prove
+  che porta lui), nota al moderatore in apri_disputa (conteggio
+  dispute del compratore = le dispute-fotocopia si vedono, + invito
+  a chiedere all'emittente quando/dove il codice è stato riscattato,
+  e la precisazione che la regola «a zero prove vince chi ha
+  consegnato» segue il BENE riscattabile, non il canale: vale anche
+  per un buono spedito fisicamente), e leve config SPENTE di
   serie (default 0, pattern TETTO_SATS_ANNUNCIO):
   TETTO_DIGITALE_NUOVI (compratore con acquisti_ok=0 oltre il tetto =
   400, sul solo articolo, in compra()) e DIGITALE_MIN_VENDITE
