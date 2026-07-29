@@ -831,8 +831,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   attivo → 'decaduta' (copre le rimozioni senza ganci nei delete).
   `modifica()` col prezzo cambiato fa decadere le PENDENTI (erano una
   % di un prezzo che non esiste piu'); le ACCETTATE sopravvivono
-  (l'accordo e' stretto). Importati Nostr esclusi (contatto_nostr
-  pieno: il venditore-import non risponderebbe mai). `esegui_fusione`
+  (l'accordo e' stretto). Dal lug 2026 valgono ANCHE per gli importati
+  da Nostr (il catalogo e' uno solo, cambia solo chi firma il NIP-99):
+  il venditore solo-Nostr riceve l'offerta via DM NIP-17 col link
+  /annuncio/{id}, entra col login npub e risponde da qui. ATTENZIONE
+  all'imperfezione dichiarata: l'import orario che riscrive il prezzo
+  NON fa decadere le offerte pendenti (a differenza di `modifica()`) —
+  la cifra e' assoluta, il venditore la giudica contro il nuovo listino
+  e comunque scade da sola. `esegui_fusione`
   migra le offerte e cancella le auto-trattative tra le due meta'.
   Piu' offerte accettate possono coesistere: lecito, il confirm del
   venditore lo dichiara («accettare non riserva l'oggetto»). Frontend:
@@ -859,7 +865,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   spedizione e protezione si sommano sopra, e il listino NON si tocca
   mai (prezzo_sats/prezzo_eur restano pieni, quindi il NIP-99 parla
   il prezzo pieno PER COSTRUZIONE: lo sconto e' un vantaggio di chi
-  compra dentro Barattolo; importati esclusi). Colonne
+  compra dentro Barattolo; dal lug 2026 vale anche per gli importati —
+  lo sconto e' locale, le colonne lampo_* non toccano il listino e
+  l'import orario non le riscrive: se il prezzo cambia sui relay la %
+  segue il prezzo nuovo, che e' la natura di uno sconto a percentuale).
+  Colonne
   `annunci.lampo_percento/lampo_scadenza/lampo_creato` (attiva =
   percento>0 e scadenza futura: OGNI lettura gatea sulla scadenza, la
   scopa `scadenze_lampo` nell'orologio azzera solo i numeri morti,
@@ -873,7 +883,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   commit, solo annunci attivi, mai i salvataggi propri; l'endpoint e'
   diventato async per il create_task, precedente /api/me) → valvola
   gemella dei promo `accoda_colpo`/`_drena_colpo` (rilettura dal DB:
-  spariti/importati/gia' in lampo/in cooldown = muti; cooldown
+  spariti/gia' in lampo/in cooldown = muti; cooldown
   timbrato PRIMA delle notifiche; per venditore ≤SOGLIA_AGGREGA
   messaggi singoli con link, oltre UN aggregato) — avviso ANONIMO:
   «qualcuno», mai chi ne' quanti, i preferiti restano privati per
@@ -951,7 +961,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   VETRINA pubblica in sola lettura dal browser (annunci veri, banner
   col widget "Entra con Telegram" — `data-request-access=write` chiede
   il permesso per gli avvisi — e ogni azione apre l'invito verso
-  @ilbarattolobot); demo coi dati finti come riserva se il backend tace.
+  @ilbarattolobot, che dal lug 2026 offre anche la porta «🟣 …o entra
+  con Nostr»: chi arriva dal link di un DM entra con la sua chiave e
+  il reload riapre /annuncio/{id} autenticato, azione a un tocco);
+  demo coi dati finti come riserva se il backend tace.
   Login Nostr nel foglio `#nostrSheet` (bottone 🟣 in vetrina e nella
   barra collaudo — a differenza del widget Telegram funziona anche in
   locale): astrazione `firmatario = {pubkey, firma}` con tre fabbriche
@@ -1897,7 +1910,22 @@ cima a fondo: valvola e cooldown in console, guardie del lancio una a
 una, acquisto scontato sats ed EUR, min nei due versi, superficie
 pubblica con cursore, e il giro visivo nel browser vero via CDP da
 venditore e in demo; in produzione va provato un giro vero dentro
-Telegram con le notifiche reali).
+Telegram con le notifiche reali); lampo e offerte anche sugli annunci
+importati da Nostr (lug 2026, decisione di prodotto: il catalogo e' uno
+solo, la differenza tra nato-qui e nato-su-Nostr e' SOLO chi firma
+l'evento NIP-99 — via le guardie contatto_nostr da fai_offerta,
+lancia_lampo e _drena_colpo e i due l.nostr dal dettaglio; porta
+«🟣 …o entra con Nostr» nel foglio invito della vetrina per il
+percorso DM → link → login npub → azione; la guardia di modifica_annuncio
+resta: il contenuto degli importati si cambia sui relay, la lampo e'
+un'altra strada che non lo tocca; vedi Architettura, offerte e lampo —
+collaudato in locale con 16 verifiche TestClient su DB usa-e-getta:
+giro offerta completo sull'importato con cifra pattuita nell'ordine,
+lampo lanciata/comprata scontata/annullata, «ha fatto colpo» arrivato
+al venditore dell'importato, regressioni su nativo e guardie
+sopravvissute; in produzione va provato il giro vero: DM NIP-17 con
+link a un venditore solo-Nostr, login npub dal foglio invito e
+risposta all'offerta).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
