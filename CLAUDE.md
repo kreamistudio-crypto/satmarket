@@ -800,8 +800,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nuovo. Import CSV: colonne facoltative `consegna;spedizione;taglia`
   nel modello e nel parser. La modifica FIRMATA degli importati non
   offre i campi (v1: l'evento non li porta, il form li nasconde).
-  Frontend: form Vendi con select consegna + costo (stessa valuta del
-  listino, `consegnaPayload`) + taglia; dettaglio con riga «🚚 + X
+  Frontend: form Vendi con le TRE CASELLE indipendenti (lug 2026,
+  decisione di Andrea, via il select + checkbox: 📦 Spedizione ·
+  🤝 Ritiro in zona · 💾 Invio del codice online, spunta tutte quelle
+  che offri, ALMENO una — la validazione vive in publish(), il server
+  resta tollerante con '' per i client vecchi; `consegnaForm()` mappa
+  le spunte sulle strutture di sempre consegna+anche_digitale, che
+  reggono tutte le 7 combinazioni senza colonne nuove, e
+  `impostaConsegnaForm()` è il verso opposto per precompilazione e
+  reset; costo e taglia compaiono solo con Spedizione spuntata, hint
+  «il compratore sceglierà una sola strada» con ≥2 spunte; la firmata
+  degli importati salta la validazione, il campo resta nascosto) +
+  costo (stessa valuta del listino, `consegnaPayload`) + taglia;
+  dettaglio con riga «🚚 + X
   spedizione · protezione acquisti inclusa» (`rigaConsegna`, importo
   nella valuta della vista via `spedTesto`) e pillola taglia; per
   'entrambe' due pillole spedizione/ritiro DENTRO l'escrow-zone
@@ -838,19 +849,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dove la cella consegna parla col «+» (`spedizione+digitale`,
   riga d'esempio nel modello). `anche_digitale` è in CAMPI_VETRINA;
   NIP-99 aggiunge «o consegna digitale immediata» (e il ritiro combo
-  perde il «solo»). Frontend: checkbox «💾 In alternativa, posso
-  inviare il codice online» sotto il select di Vendi (riscritto
-  lug 2026: «Offro anche…» suonava come una copia in più, non come
-  una strada alternativa; sotto il testo la riga «Il compratore
-  sceglie: riceve l'oggetto oppure il codice»; solo con modalità
-  fisica scelta, il costo spedizione resta legato al solo ramo
-  fisico);
+  perde il «solo»). Frontend: la combo nasce spuntando la casella
+  «💾 Invio del codice online» accanto a una fisica (vedi le tre
+  caselle nella sezione spedizione: il vecchio checkbox «Offro
+  anche…» e il select non esistono più, «consegna digitale» era
+  ambigua e i testi pubblici ora dicono «codice online»);
   pillole di scelta GENERALIZZATE (`stradeConsegna`/`pilloleConsegna`:
-  compaiono con ≥2 strade, l'erede del vecchio ramo 'entrambe');
+  compaiono con ≥2 strade, l'erede del vecchio ramo 'entrambe';
+  la pillola dice «💾 Codice online»);
   trust-note asimmetrica `#notaDigitale` visibile SOLO con la scelta
   digitale attiva (su una combo non deve spaventare chi sceglie la
   spedizione, `setConsegnaScelta` la accende/spegne); `rigaConsegna`
-  con «o 💾 consegna digitale»; in card 🚚 e 💾 possono convivere.
+  con «o 💾 codice online»; in card 🚚 e 💾 possono convivere.
   NIENTE stati nuovi: locked→shipped
   = `POST /api/orders/{id}/consegna-digitale` (solo venditore,
   contenuto 1-4000 caratteri, corriere-sentinella 'Consegna digitale',
@@ -895,11 +905,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   codici sconto, licenze — nato dal buono Zalando bloccato per
   errore); `messaggio_rifiuto(motivo)` mappa il no dell'AI sui servizi
   al gentile MSG_RIFIUTO_SERVIZI («non ancora supportati»), 'servizi
-  sessuali' resta col messaggio severo di sempre. Frontend: opzione
-  «💾 Consegna digitale» in Vendi con hint screenshot datato («in
-  disputa le prove decidono», ripetuto nel pannello di consegna);
-  dettaglio con riga «💾 consegna digitale immediata» + trust-note
-  asimmetrica; 💾 nella meta della card; ordine con stepper
+  sessuali' resta col messaggio severo di sempre. Frontend: casella
+  «💾 Invio del codice online» in Vendi con hint screenshot datato
+  («in disputa le prove decidono», ripetuto nel pannello di
+  consegna); dettaglio con riga «💾 codice inviato online, subito» +
+  trust-note asimmetrica; 💾 nella meta della card; ordine con stepper
   «Contenuto consegnato → Rivelato» (finestra 24h nel testo), pannello
   venditore con textarea (`consegnaContenuto`), box «🔓 Rivela» col
   confirm-ricevuta (`rivelaContenuto`), rilettura `mostraContenuto` e
