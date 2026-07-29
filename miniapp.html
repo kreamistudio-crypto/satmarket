@@ -1168,6 +1168,7 @@
         <option value="">Più recenti</option>
         <option value="prezzo_su">Prezzo: dal più basso</option>
         <option value="prezzo_giu">Prezzo: dal più alto</option>
+        <option value="lampo">⚡ In offerta</option>
       </select>
       <button id="filtriBtn" type="button" onclick="toggleFiltri()">Filtri</button>
     </div>
@@ -1180,6 +1181,11 @@
         <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer">
           <input type="checkbox" id="filtroSpedInp" style="width:auto;accent-color:var(--sats)">
           🚚 Solo con spedizione</label>
+      </div>
+      <div class="filtri-riga">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer">
+          <input type="checkbox" id="filtroLampoInp" style="width:auto;accent-color:var(--sats)">
+          ⚡ Solo in offerta</label>
       </div>
       <div class="filtri-riga">
         <button class="btn orange" onclick="applicaFiltri()">Applica</button>
@@ -1759,9 +1765,10 @@ function inCatalogo(arr){
    nelle app di mercatino note; "Azzera" pulisce il filtro. Il filtro
    si scrive nella valuta del toggle attivo al momento di Applica:
    se guardi in euro scrivi euro, la conversione la fa il server. */
-let ordinaVista = '';        // '' = piu' recenti | prezzo_su | prezzo_giu
+let ordinaVista = '';        // '' = piu' recenti | prezzo_su | prezzo_giu | lampo
 let filtroPrezzo = null;     // {min, max, valuta} applicato, o null
 let filtroSped = false;      // «solo con spedizione» (stato di sessione)
+let filtroLampo = false;     // «solo in offerta» (stesso patto)
 
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
@@ -1776,6 +1783,7 @@ function paramsVetrina(){
     p.set('valuta_filtro', filtroPrezzo.valuta);
   }
   if (filtroSped) p.set('solo_spedizione', '1');
+  if (filtroLampo) p.set('solo_lampo', '1');
   return p;
 }
 
@@ -1813,7 +1821,9 @@ function applicaFiltri(){
   const max = numeroFiltro(el('filtroMaxInp').value);
   filtroPrezzo = (min || max) ? {min, max, valuta: valutaVista} : null;
   filtroSped = !!el('filtroSpedInp').checked;
-  el('filtriBtn').classList.toggle('attivo', !!filtroPrezzo || filtroSped);
+  filtroLampo = !!el('filtroLampoInp').checked;
+  el('filtriBtn').classList.toggle('attivo',
+    !!filtroPrezzo || filtroSped || filtroLampo);
   el('filtriBox').style.display = 'none';
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
@@ -1823,8 +1833,9 @@ function azzeraFiltri(){
   haptic();
   el('filtroMinInp').value = ''; el('filtroMaxInp').value = '';
   el('filtroSpedInp').checked = false;
-  const cera = !!filtroPrezzo || filtroSped;
-  filtroPrezzo = null; filtroSped = false;
+  el('filtroLampoInp').checked = false;
+  const cera = !!filtroPrezzo || filtroSped || filtroLampo;
+  filtroPrezzo = null; filtroSped = false; filtroLampo = false;
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
   if (!cera) return;
@@ -1896,6 +1907,9 @@ let listings = [
    desc:"Copia nuova, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
    zone:"Roma", seller:"Luca P.", rating:4.7, sales:9,
+   /* la lampo dimostrativa: scadenza calcolata al carico, cosi' il
+      badge col countdown si vede anche nella demo coi dati finti */
+   lampoPct:20, lampoFine:Math.floor(Date.now()/1000)+5*3600+14*60,
    desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
   {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e giardino",
    zone:"Bologna", seller:"Sara M.", rating:4.9, sales:15,
@@ -2012,7 +2026,12 @@ function renderGrid(items){
     }
     if (filtroSped)
       data = data.filter(l => l.consegna==='spedizione' || l.consegna==='entrambe');
-    if (ordinaVista)
+    if (filtroLampo)
+      data = data.filter(lampoAttiva);
+    if (ordinaVista === 'lampo')
+      /* come sul server: solo le lampo vive, chi scade prima in testa */
+      data = data.filter(lampoAttiva).sort((a,b) => a.lampoFine - b.lampoFine);
+    else if (ordinaVista)
       data.sort((a,b) => ordinaVista==='prezzo_su' ? a.price-b.price : b.price-a.price);
   }
   /* Il conteggio arancione in fondo alla linea puntinata: data.length
