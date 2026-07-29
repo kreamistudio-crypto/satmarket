@@ -2679,6 +2679,9 @@ CAMPI_VETRINA = (
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
     "a.foto, a.contatto_nostr, a.creato, "
+    # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
+    # vedersi in vetrina): percento e scadenza, il resto lo fa il client
+    "a.lampo_percento, a.lampo_scadenza, "
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, "
@@ -2727,6 +2730,10 @@ ORDINAMENTI = {
     "":           ("creato",      "DESC", "<"),
     "prezzo_su":  ("prezzo_sats", "ASC",  ">"),
     "prezzo_giu": ("prezzo_sats", "DESC", "<"),
+    # «In offerta»: le lampo che scadono prima in testa (l'urgenza e'
+    # la notizia). Implica il filtro solo-lampo: senza, gli annunci a
+    # scadenza 0 affollerebbero la testa della lista.
+    "lampo":      ("lampo_scadenza", "ASC", ">"),
 }
 
 
@@ -2795,7 +2802,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         cursore: str = "", ordina: str = "",
                         prezzo_min: float = 0, prezzo_max: float = 0,
                         valuta_filtro: str = "sats",
-                        solo_spedizione: int = 0,
+                        solo_spedizione: int = 0, solo_lampo: int = 0,
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -2811,6 +2818,12 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # annunci storici ('') restano fuori finche' il venditore non
         # si dichiara con una modifica.
         dove += " AND a.consegna IN ('spedizione','entrambe')"
+    if solo_lampo or ordina == "lampo":
+        # Solo le offerte lampo VIVE: la scadenza si giudica adesso,
+        # senza aspettare la scopa dell'orologio. L'ordinamento
+        # «lampo» implica il filtro (vedi ORDINAMENTI).
+        dove += " AND a.lampo_percento>0 AND a.lampo_scadenza>?"
+        par.append(int(time.time()))
     if q.strip():
         # Ricerca semplice per la vetrina anonima (l'AI resta riservata
         # agli autenticati): LIKE su titolo, descrizione e zona.
@@ -4852,6 +4865,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["admin"] = e_admin(user["id"])
     profilo["doppioni_nostr"] = doppioni
     profilo["offerte_da_agire"] = da_agire
+    # Le leve dell'offerta lampo per il foglio di lancio (solo il
+    # proprietario lo apre): il client non hardcoda mai le cifre.
+    profilo["lampo_leve"] = {
+        "attive": bool(LAMPO_ATTIVE), "sconti": LAMPO_SCONTI,
+        "minimo": LAMPO_MIN_PERCENTO, "massimo": LAMPO_MAX_PERCENTO,
+        "ore": ORE_LAMPO_OPZIONI}
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [
