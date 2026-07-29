@@ -28,6 +28,48 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'era prima della colonna). I casi ambigui (cannabis
   light, pistola sparachiodi...) NON vanno nella lista parole: li
   valuta l'AI.
+  Terza via della moderazione (lug 2026, decisione di Andrea: basta
+  blocchi a priori — l'AI segnala, l'ADMIN decide): il prompt ha TRE
+  verdetti — VIETATO solo per i casi netti (armi, droghe, sesso...),
+  DUBBIO per i grigi (servizi non palesemente vietati, buoni
+  riscattabili presso il venditore stesso; l'«ambiguo ma
+  plausibilmente lecito» resta OK). `_leggi_verdetto` è il giudice
+  unico (singolo e lotto): a leva `MODERAZIONE_REVISIONE` spenta il
+  dubbio torna vietato (binario di ieri). Col dubbio l'annuncio nasce
+  (o la modifica lo manda) in `stato='revisione'`: invisibile al
+  pubblico per costruzione (i filtri stato='attivo' non si toccano),
+  visibile al proprietario in /miei col badge ⏳ (riga spenta, niente
+  Modifica, resta il ritiro), scudo anti-doppione allargato
+  ('attivo','revisione'), ganci TRATTENUTI (niente Nostr/promo/match/
+  distintivi — `_dati_distintivi` esclude la revisione). Risposta col
+  flag `{revisione:true, attesa_ore}` (leva REVISIONE_ATTESA_ORE, solo
+  testi onesti: «di solito entro N ore», mai un silenzio). Circuito:
+  `avvisa_revisione` manda ai moderatori la notifica con tastiera
+  inline ✅/❌ via bot_api (notifica() non porta reply_markup;
+  callback_data `rev:ok|no:{id}`, NIENTE token in memoria: deve
+  sopravvivere ai riavvii, autorizza `e_admin` sul mittente) +
+  sezione «⏳ In revisione» sopra le stats admin del Profilo
+  (`rigaRevisione`/`decidiRevisione`) + pallino `.off-dot` sul tappo
+  (conteggio `in_revisione` in /api/me solo admin). Il cuore unico è
+  `decidi_revisione` (UPDATE condizionato sullo stato: il secondo
+  moderatore trova il 409, mai doppi ganci): ✅ = attivo + partono i
+  ganci trattenuti (Nostr con `solo_aggiornamento` se l'evento
+  esisteva già — il caso modifica — e promo solo senza post_canale_id;
+  accoda_match è sempre innocuo per il dedup persistente); ❌ =
+  'rimosso' + messaggio gentile al venditore. La modifica firmata
+  degli importati resta bloccante anche sul dubbio (dichiarato:
+  l'import orario riporterebbe dentro). Import CSV: righe dubbie
+  CREATE in revisione (contatore `in_revisione_n` nel report, fuori
+  da Nostr/promo, niente tastiera per riga). Orologio
+  `sollecita_revisioni` (leva REVISIONE_SOLLECITO_GIORNI, 2): UNA
+  notifica aggregata al giorno, ma l'annuncio RESTA in attesa — mai
+  online da solo, gemello del «prompt mai auto-modificato». REGISTRO
+  `moderazione_log` (append-only, `registra_moderazione` fail-open):
+  ogni esito di parole/AI/lotto/admin con motivo e deciso_da;
+  `/api/admin/stats.moderazione` = in_revisione + riepilogo 30gg +
+  motivi frequenti + ultime 20 righe, sezione «🛡 Registro
+  moderazione» nel Profilo admin — è con QUESTI dati che il prompt si
+  corregge A MANO: la macchina raccoglie, l'umano decide.
   Scudo anti-doppione (lug 2026, nato da un bug vero: 5 annunci
   identici da un solo utente): `pubblica()` risponde in modo
   IDEMPOTENTE — stesso venditore + stesso titolo + stesso
