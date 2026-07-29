@@ -808,6 +808,11 @@ def init_db():
                     # dopo carica_comuni()
                     "lat REAL DEFAULT 0",
                     "lon REAL DEFAULT 0",
+                    # regione (lug 2026): DERIVATA dalla sigla della
+                    # provincia nella zona, mai chiesta al venditore
+                    # ('' = sigla assente o sconosciuta). Serve al filtro
+                    # della vetrina; il backfill vive in deriva_regioni()
+                    "regione TEXT DEFAULT ''",
                     # consegna e spedizione (lug 2026, modello Vinted):
                     # la modalita' la sceglie il venditore ('' = non
                     # specificata: annunci storici e importati, per loro
@@ -2773,6 +2778,57 @@ def arricchisci_zona(zona: str) -> str:
     return f"{zona[:fine]} ({sigla}){zona[fine:]}"
 
 
+# --- La regione, derivata (lug 2026) --------------------------------
+# La regione NON e' un campo che si chiede al venditore: il form resta
+# comune con l'autocomplete, e la regione si ricava dalla sigla della
+# provincia che arricchisci_zona ha gia' messo nella zona («Carmagnola
+# (TO)» -> Piemonte). Nessun dataset nuovo: le 107 sigle stanno in una
+# mappa fissa, scritta per regione (una sola fonte di verita', e
+# l'elenco si legge a occhio). Ordine geografico nord->sud: nel
+# pannello Filtri il client le ordina come vuole.
+REGIONI = {
+    "Piemonte":                ("TO", "VC", "NO", "CN", "AT", "AL", "BI", "VB"),
+    "Valle d'Aosta":           ("AO",),
+    "Lombardia":               ("VA", "CO", "SO", "MI", "BG", "BS", "PV", "CR",
+                                "MN", "LC", "LO", "MB"),
+    "Trentino-Alto Adige":     ("BZ", "TN"),
+    "Veneto":                  ("VR", "VI", "BL", "TV", "VE", "PD", "RO"),
+    "Friuli-Venezia Giulia":   ("UD", "GO", "TS", "PN"),
+    "Liguria":                 ("IM", "SV", "GE", "SP"),
+    "Emilia-Romagna":          ("PC", "PR", "RE", "MO", "BO", "FE", "RA",
+                                "FC", "RN"),
+    "Toscana":                 ("MS", "LU", "PT", "FI", "LI", "PI", "AR",
+                                "SI", "GR", "PO"),
+    "Umbria":                  ("PG", "TR"),
+    "Marche":                  ("PU", "AN", "MC", "AP", "FM"),
+    "Lazio":                   ("VT", "RI", "RM", "LT", "FR"),
+    "Abruzzo":                 ("AQ", "TE", "PE", "CH"),
+    "Molise":                  ("CB", "IS"),
+    "Campania":                ("CE", "BN", "NA", "AV", "SA"),
+    "Puglia":                  ("FG", "BA", "TA", "BR", "LE", "BT"),
+    "Basilicata":              ("PZ", "MT"),
+    "Calabria":                ("CS", "CZ", "RC", "KR", "VV"),
+    "Sicilia":                 ("TP", "PA", "ME", "AG", "CL", "EN", "CT",
+                                "RG", "SR"),
+    "Sardegna":                ("SS", "NU", "CA", "OR", "SU"),
+}
+SIGLE_REGIONE = {sigla: reg for reg, sigle in REGIONI.items() for sigla in sigle}
+
+
+def regione_da_zona(zona: str) -> str:
+    """«Carmagnola (TO)» -> «Piemonte». Sigla assente o sconosciuta
+    (annunci storici, alias tipo «Reggio Emilia», frazioni non
+    riconosciute) = '' e nessun blocco: il filtro per regione
+    semplicemente non li vede, come per condizione e spedizione.
+    Se il testo porta piu' sigle vince la PRIMA, la regola di
+    coordinate_da_zona («tra Pavia e Milano» -> Pavia)."""
+    for m in re.finditer(r"\(\s*([A-Za-z]{2})\s*\)", zona or ""):
+        regione = SIGLE_REGIONE.get(m.group(1).upper())
+        if regione:
+            return regione
+    return ""
+
+
 def distanza_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Haversine: chilometri in linea d'aria tra due punti."""
     rlat1, rlat2 = math.radians(lat1), math.radians(lat2)
@@ -2834,9 +2890,37 @@ def arricchisci_zone_esistenti():
         print(f"🗺️ Arricchimento zone saltato: {e}")
 
 
+def deriva_regioni():
+    """La regione degli annunci che c'erano prima della colonna,
+    gemella del backfill delle coordinate: si legge dalla sigla e si
+    scrive una volta. Gira DOPO arricchisci_zone_esistenti, che la
+    sigla l'ha appena messa nelle zone che la meritavano. Idempotente
+    (tocca solo le righe ancora vuote), e vale anche per gli importati
+    da Nostr: la loro regione la riallinea comunque il dopo-import
+    orario, insieme alle coordinate."""
+    try:
+        con = db()
+        righe = con.execute("SELECT id, zona FROM annunci "
+                            "WHERE regione='' AND zona!=''").fetchall()
+        date = 0
+        for r in righe:
+            regione = regione_da_zona(r["zona"])
+            if regione:
+                con.execute("UPDATE annunci SET regione=? WHERE id=?",
+                            (regione, r["id"]))
+                date += 1
+        con.commit()
+        con.close()
+        if date:
+            print(f"🗺️ Regione derivata per {date} annunci esistenti")
+    except Exception as e:
+        print(f"🗺️ Derivazione regioni saltata: {e}")
+
+
 carica_comuni()
 backfill_coordinate()
 arricchisci_zone_esistenti()
+deriva_regioni()
 
 
 PROMPT_MODERAZIONE = (
@@ -3150,7 +3234,7 @@ CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
-    "a.anche_digitale, a.condizione, "
+    "a.anche_digitale, a.condizione, a.regione, "
     "a.foto, a.contatto_nostr, a.creato, "
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
@@ -3276,7 +3360,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         prezzo_min: float = 0, prezzo_max: float = 0,
                         valuta_filtro: str = "sats",
                         solo_spedizione: int = 0, solo_lampo: int = 0,
-                        condizione: str = "",
+                        condizione: str = "", regione: str = "",
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -3298,6 +3382,13 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # Valore sconosciuto = nessun filtro, mai un 400.
         dove += " AND a.condizione=?"
         par.append(condizione)
+    if regione in REGIONI:
+        # La regione e' derivata dalla sigla: chi non ce l'ha ('' —
+        # storici, alias, frazioni non riconosciute) resta fuori, lo
+        # stesso patto di condizione e spedizione. Regione sconosciuta
+        # = nessun filtro, mai un 400.
+        dove += " AND a.regione=?"
+        par.append(regione)
     if solo_lampo or ordina == "lampo":
         # Solo le offerte lampo VIVE: la scadenza si giudica adesso,
         # senza aspettare la scopa dell'orologio. L'ordinamento
@@ -3357,6 +3448,15 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             r["categoria"]: r["n"] for r in con.execute(
                 "SELECT categoria, COUNT(*) AS n FROM annunci "
                 "WHERE stato='attivo' GROUP BY categoria")}
+        # Le regioni che hanno davvero annunci, col numero: il pannello
+        # Filtri mostra solo queste (le vuote non compaiono proprio, come
+        # le pillole delle categorie) e il client non hardcoda il
+        # catalogo. Conteggi GLOBALI come quelli per categoria: non
+        # seguono la categoria attiva ne' la ricerca.
+        risposta["regioni"] = {
+            r["regione"]: r["n"] for r in con.execute(
+                "SELECT regione, COUNT(*) AS n FROM annunci "
+                "WHERE stato='attivo' AND regione!='' GROUP BY regione")}
         # I pionieri viaggiano insieme (niente giro di rete in piu');
         # a interruttore spento la chiave non c'e' e il frontend non
         # disegna la riga.
@@ -3442,15 +3542,16 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # NIP-99, avvisi — senza rimedi in visualizzazione.
     zona = arricchisci_zona(d.get("zona", ""))
     lat, lon = coordinate_da_zona(zona)
+    regione = regione_da_zona(zona)   # derivata dalla sigla, mai chiesta
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
+        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
         "anche_digitale,condizione,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, zona, valuta, prezzo_eur,
-         lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
+         lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, "revisione" if in_revisione else "attivo",
          int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
@@ -3878,14 +3979,16 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # E la zona si salva con la sigla, come in pubblica().
     zona = arricchisci_zona(d.get("zona", ""))
     lat, lon = coordinate_da_zona(zona)
+    regione = regione_da_zona(zona)   # segue la zona, come le coordinate
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
+        "regione=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
         "anche_digitale=?, condizione=?, stato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, zona, valuta, prezzo_eur,
-         lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
+         lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, "revisione" if in_revisione else "attivo",
          annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
@@ -4166,10 +4269,11 @@ async def modifica_firmata(annuncio_id: int, req: Request,
     lat, lon = coordinate_da_zona(b["zona"])
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
-        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=? "
-        "WHERE id=?",
+        "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
+        "regione=? WHERE id=?",
         (b["titolo"], b["descrizione"], b["categoria"], b["prezzo_sats"],
-         b["zona"], b["valuta"], b["prezzo_eur"], lat, lon, annuncio_id))
+         b["zona"], b["valuta"], b["prezzo_eur"], lat, lon,
+         regione_da_zona(b["zona"]), annuncio_id))
     con.commit()
     con.close()
     # Backstop: l'evento firmato riparte anche da qui verso i relay
@@ -8559,13 +8663,14 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
     in_revisione = bool(riga.get("revisione"))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
-        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
+        "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
         "anche_digitale,condizione,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga["prezzo_sats"], riga["zona"],
          riga["valuta"], riga["prezzo_eur"], lat, lon,
+         regione_da_zona(riga["zona"]),
          riga.get("consegna", ""), riga.get("spedizione_sats", 0),
          riga.get("spedizione_eur", 0), riga.get("taglia_pacco", ""),
          riga.get("anche_digitale", 0), riga.get("condizione", ""),
@@ -9049,13 +9154,14 @@ async def importa_nostr_periodico():
     # avvisi — per chi cerca, un annuncio e' un annuncio.
     try:
         con = db()
-        for r in con.execute("SELECT id, zona, lat, lon FROM annunci "
+        for r in con.execute("SELECT id, zona, lat, lon, regione FROM annunci "
                              "WHERE contatto_nostr!='' AND stato='attivo'"
                              ).fetchall():
             lat, lon = coordinate_da_zona(r["zona"])
-            if (lat, lon) != (r["lat"], r["lon"]):
-                con.execute("UPDATE annunci SET lat=?, lon=? WHERE id=?",
-                            (lat, lon, r["id"]))
+            regione = regione_da_zona(r["zona"])
+            if (lat, lon, regione) != (r["lat"], r["lon"], r["regione"]):
+                con.execute("UPDATE annunci SET lat=?, lon=?, regione=? "
+                            "WHERE id=?", (lat, lon, regione, r["id"]))
         con.commit()
         nuovi = con.execute("SELECT id FROM annunci WHERE creato>=? "
                             "AND contatto_nostr!='' AND stato='attivo'",

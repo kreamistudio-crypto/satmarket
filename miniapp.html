@@ -240,7 +240,15 @@
   .filtri-riga input{flex:1;min-width:0;font:700 14px Nunito,sans-serif;
     color:var(--ink);background:var(--bg);border:1.5px solid var(--line);
     border-radius:10px;padding:8px 10px}
-  .filtri-riga .btn{margin-top:0;flex:1}
+  /* Applica e Azzera sono due gemelli: stessa altezza e stessa
+     larghezza. Serve il selettore SPECIFICO per la ghost, che a pari
+     specificita' vincerebbe col suo margin-top:10px ed essendo in flex
+     «stretch» farebbe crescere Applica di quei 10px (trovato dal vivo);
+     e la base al 50% invece di 0 perche' i 2px di bordo della ghost,
+     con flex-basis:0, si aggiungono FUORI dalla base e la facevano
+     larga 4px in piu'. */
+  .filtri-riga .btn{margin-top:0;flex:1 1 50%}
+  .filtri-riga .btn.ghost{margin-top:0}
   /* Il campo-bottone del filtro condizioni veste come gli input di
      accanto (fondo --bg, raggio 10): dentro ci sta una pillola vera,
      quindi il padding verticale e' piu' magro degli input per non
@@ -1272,6 +1280,16 @@
         <input id="filtroMinInp" inputmode="decimal" placeholder="Prezzo min">
         <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
       </div>
+      <div class="filtri-riga" id="filtroRegRiga" style="display:none">
+        <!-- La regione: deposito nascosto + campo-bottone come le altre
+             tendine. Le voci NON sono un catalogo del client: le riempie
+             renderFiltroRegioni() con le regioni che il server dice di
+             avere (e la riga sparisce se non ce n'è nessuna) -->
+        <select id="filtroRegSel" hidden>
+          <option value="">Tutta l'Italia</option>
+        </select>
+        <button type="button" class="campo-scelta" id="filtroRegSelBtn" onclick="apriPicker('filtroRegSel')" aria-haspopup="dialog" title="Filtra per regione"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
+      </div>
       <div class="filtri-riga">
         <!-- deposito nascosto + campo-bottone: qui il foglio-picker
              mostra le stesse pillole colorate del form, senza le
@@ -1908,6 +1926,8 @@ function mapListing(a){
   return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
     price:a.prezzo_sats, valuta:a.valuta||'sats', priceEur:a.prezzo_eur||0,
     cat:a.categoria, zone:a.zona||'—',
+    /* la regione: derivata dalla sigla lato server, '' se non c'e' */
+    regione:a.regione||'',
     /* la consegna del venditore: '' = annuncio di prima che esistesse,
        nessuna promessa nuova (il dettaglio non mostra la riga) */
     consegna:a.consegna||'', sped:a.spedizione_sats||0,
@@ -1977,6 +1997,7 @@ function mapOrder(o){
 const LIMITE_PAGINA = 30;
 let vetrinaCursore = null, vetrinaCaricando = false, vetrinaTotale = 0;
 let conteggiServer = null, ultimaRicercaAI = false;
+let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
 let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
 let datiVivi = false;   // al primo carico vero il seme demo si butta
 
@@ -2002,6 +2023,7 @@ let filtroPrezzo = null;     // {min, max, valuta} applicato, o null
 let filtroSped = false;      // «solo con spedizione» (stato di sessione)
 let filtroLampo = false;     // «solo in offerta» (stesso patto)
 let filtroCond = '';         // condizione dell'oggetto ('' = qualsiasi)
+let filtroReg = '';          // regione ('' = tutta l'Italia)
 
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
@@ -2018,6 +2040,7 @@ function paramsVetrina(){
   if (filtroSped) p.set('solo_spedizione', '1');
   if (filtroLampo) p.set('solo_lampo', '1');
   if (filtroCond) p.set('condizione', filtroCond);
+  if (filtroReg) p.set('regione', filtroReg);
   return p;
 }
 
@@ -2043,7 +2066,30 @@ function toggleFiltri(){
     el('filtroMaxInp').value = filtroPrezzo?.max || '';
     el('filtroCondSel').value = filtroCond;
     aggiornaPicker('filtroCondSel');
+    renderFiltroRegioni();
   }
+}
+
+/* Le regioni del pannello Filtri. Non sono un catalogo del client: sono
+   quelle che hanno DAVVERO annunci, col numero, come le pillole delle
+   categorie (conteggi globali della prima pagina; in DEMO si contano dai
+   dati finti). La regione scelta resta in elenco anche se e' rimasta
+   senza annunci, o il campo direbbe il falso. Nessuna regione — server
+   di ieri, vetrina vuota — e la riga non compare proprio. */
+function renderFiltroRegioni(){
+  const riga = el('filtroRegRiga'), sel = el('filtroRegSel');
+  if (!riga || !sel) return;
+  const conta = {};
+  if (DEMO) listings.forEach(l => {
+    if (l.regione) conta[l.regione] = (conta[l.regione]||0)+1; });
+  else Object.assign(conta, regioniServer || {});
+  if (filtroReg && !conta[filtroReg]) conta[filtroReg] = 0;
+  const nomi = Object.keys(conta).sort((a,b)=>a.localeCompare(b,'it'));
+  riga.style.display = nomi.length ? '' : 'none';
+  sel.innerHTML = `<option value="">Tutta l'Italia</option>` + nomi.map(n =>
+    `<option value="${esc(n)}">${esc(n)} · ${conta[n]}</option>`).join('');
+  sel.value = filtroReg;
+  aggiornaPicker('filtroRegSel');
 }
 
 /* "12,50" va bene quanto "12.50": la virgola e' di casa (patto di Vendi) */
@@ -2060,8 +2106,9 @@ function applicaFiltri(){
   filtroSped = !!el('filtroSpedInp').checked;
   filtroLampo = !!el('filtroLampoInp').checked;
   filtroCond = el('filtroCondSel').value;
+  filtroReg = el('filtroRegSel').value;
   el('filtriBtn').classList.toggle('attivo',
-    !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond);
+    !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond || !!filtroReg);
   el('filtriBox').style.display = 'none';
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
@@ -2074,9 +2121,12 @@ function azzeraFiltri(){
   el('filtroLampoInp').checked = false;
   el('filtroCondSel').value = '';
   aggiornaPicker('filtroCondSel');
-  const cera = !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond;
+  el('filtroRegSel').value = '';
+  aggiornaPicker('filtroRegSel');
+  const cera = !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond
+               || !!filtroReg;
   filtroPrezzo = null; filtroSped = false; filtroLampo = false;
-  filtroCond = '';
+  filtroCond = ''; filtroReg = '';
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
   if (!cera) return;
@@ -2095,6 +2145,7 @@ async function loadListings(anonimo){
   vetrinaCursore = j.cursore || null;
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
+  if (j.regioni) regioniServer = j.regioni;
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   if (j.protezione_percento !== undefined)
     protPercento = Number(j.protezione_percento) || 0;
@@ -2136,32 +2187,32 @@ let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
   {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
-   zone:"Pavia (PV)", seller:"Massimo R.", rating:4.9, sales:12,
+   zone:"Pavia (PV)", regione:"Lombardia", seller:"Massimo R.", rating:4.9, sales:12,
    consegna:"spedizione", sped:7000, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
   {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport e hobby",
-   zone:"Milano (MI)", seller:"Giulia T.", rating:5.0, sales:7,
+   zone:"Milano (MI)", regione:"Lombardia", seller:"Giulia T.", rating:5.0, sales:7,
    consegna:"ritiro", condizione:"buono",
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
   {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
-   zone:"Torino (TO)", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
+   zone:"Torino (TO)", regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
    desc:"Copia nuova, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
-   zone:"Roma (RM)", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
+   zone:"Roma (RM)", regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
    /* la lampo dimostrativa: scadenza calcolata al carico, cosi' il
       badge col countdown si vede anche nella demo coi dati finti */
    lampoPct:20, lampoFine:Math.floor(Date.now()/1000)+5*3600+14*60,
    desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
   {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e giardino",
-   zone:"Bologna (BO)", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
+   zone:"Bologna (BO)", regione:"Emilia-Romagna", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
    desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
   {id:6, emoji:"⚡", title:"Nodo Lightning: Raspberry Pi 4 8GB kit", price:190000, cat:"Elettronica",
-   zone:"Firenze (FI)", seller:"Marco V.", rating:5.0, sales:22,
+   zone:"Firenze (FI)", regione:"Toscana", seller:"Marco V.", rating:5.0, sales:22,
    desc:"Kit completo: Pi 4, SSD 1TB, case alluminio. Ex nodo, resettato. Not your node… 😉"},
   /* listino in EUR: il prezzo in euro resta fisso, i sats ballano col
      cambio (price = equivalente indicativo, come farebbe il server) */
   {id:7, emoji:"🎲", title:"Catan gioco da tavolo, come nuovo", price:27000, valuta:'eur', priceEur:25, cat:"Altro",
-   zone:"Verona (VR)", seller:"Elisa D.", rating:4.9, sales:11,
+   zone:"Verona (VR)", regione:"Veneto", seller:"Elisa D.", rating:4.9, sales:11,
    consegna:"entrambe", spedEur:5, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
 ];
@@ -2269,6 +2320,8 @@ function renderGrid(items){
       data = data.filter(l => l.consegna==='spedizione' || l.consegna==='entrambe');
     if (filtroCond)
       data = data.filter(l => l.condizione===filtroCond);
+    if (filtroReg)
+      data = data.filter(l => l.regione===filtroReg);
     if (filtroLampo)
       data = data.filter(lampoAttiva);
     if (ordinaVista === 'lampo')
@@ -3809,6 +3862,12 @@ const PICKER = {
     voci: () => [{val:'', resa:'<span>Qualsiasi condizione</span>'}].concat(
       Object.keys(CONDIZIONI).map(id => ({val:id, resa:condPill(id)}))),
     campo: v => condPill(v) || '<span>Qualsiasi condizione</span>'},
+  /* la regione: le voci le scrive renderFiltroRegioni() dai numeri del
+     server (col conteggio accanto), il campo dice solo il nome */
+  filtroRegSel: {titolo:'Regione',
+    voci: () => [...el('filtroRegSel').options].map(o => ({val:o.value,
+      resa:`<span>${esc(o.text)}</span>`})),
+    campo: v => `<span>${v ? esc(v) : 'Tutta l\'Italia'}</span>`},
   ordinaSel: {titolo:'Ordina la vetrina',
     voci: () => [...el('ordinaSel').options].map(o => ({val:o.value,
       resa:`<span>${esc(o.text)}</span>`})),
@@ -3827,12 +3886,15 @@ function apriPicker(id){
   pickerTrigger = el(id+'Btn');
   el('pickerTitolo').textContent = cfg.titolo;
   const corrente = el(id).value;
-  /* i valori vengono dai cataloghi (niente testo utente): l'onclick
-     e' sicuro, esc() sulle etichette per abitudine */
+  /* Il valore viaggia in data-val e NON dentro la stringa JS
+     dell'onclick: «Valle d'Aosta» spezzerebbe l'apice (le chiavi id
+     sono nostre e restano interpolate). esc() sulle etichette come
+     sempre. */
   el('pickerLista').innerHTML = cfg.voci().map(v =>
     `<button type="button" role="radio" aria-checked="${v.val===corrente}"
        class="picker-voce${v.val===corrente?' sel':''}"
-       onclick="scegliPicker('${id}','${v.val}')">${v.resa}${
+       data-val="${esc(v.val)}"
+       onclick="scegliPicker('${id}', this.dataset.val)">${v.resa}${
        v.val===corrente?'<span class="p-check">✓</span>':''}</button>`).join('');
   el('sheetBg').classList.add('open');
   el('pickerSheet').classList.add('open');
