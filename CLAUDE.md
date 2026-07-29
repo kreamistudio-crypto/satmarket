@@ -814,6 +814,65 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   testa released = totale − protezione; checkbox «🚚 Solo con
   spedizione» nei filtri (in DEMO client-side in renderGrid); 🚚
   discreto nella meta della card — il prezzo in griglia resta pulito.
+  Consegna digitale 💾 (lug 2026, quarta voce di MODALITA_CONSEGNA):
+  per buoni regalo, codici, licenze — il PRINCIPIO CARDINE è che il
+  contenuto passa DENTRO Barattolo, mai fuori. La modalità è LIBERA
+  dal tipo di bene (una gift card fisica si spedisce, un codice si
+  consegna digitale: le tutele seguono la modalità, mai il tipo);
+  niente costo spedizione né taglia (consegna_da_payload azzera anche
+  la taglia arrivata per sbaglio). NIENTE stati nuovi: locked→shipped
+  = `POST /api/orders/{id}/consegna-digitale` (solo venditore,
+  contenuto 1-4000 caratteri, corriere-sentinella 'Consegna digitale',
+  riga journal con impronta sha256 troncata e MAI il testo);
+  shipped→delivered = la RIVELAZIONE, `GET /api/orders/{id}/contenuto`
+  — la PRIMA lettura del compratore scrive `consegnato` (= ricevuta di
+  lettura) e fa la transizione, le successive sono idempotenti; il
+  venditore rilegge ciò che ha consegnato senza effetti, l'admin legge
+  solo negli stati di disputa. `ordini.contenuto_digitale` (colonna
+  nuova) è cifrata a riposo con Fernet — `CHIAVE_CONTENUTI_DIGITALI`
+  in config, prefisso 'f:'; chiave vuota o cryptography assente =
+  'plain:' in chiaro, fail-open, i due formati convivono per sempre
+  (_cifra_contenuto/_decifra_contenuto) — e NON esce MAI da
+  /api/orders (strip con flag `contenuto_presente`): si legge solo
+  dall'endpoint-ricevuta. `segna_spedito` su ordine digitale = 400
+  (il timer non deve partire senza contenuto consegnato). Finestre
+  CORTE in controlla_scadenze: ORE_CONFERMA_DIGITALE (24) dalla
+  rivelazione, ORE_SILENZIO_DIGITALE (48) dalla consegna mai rivelata
+  — i due rami fisici escludono il digitale. Il caso irriducibile
+  (codice riscattato e poi negato) NON si risolve, si rende
+  antieconomico: regola di default ASIMMETRICA dichiarata prima
+  dell'acquisto («i beni digitali non sono rimborsabili dopo la
+  rivelazione, salvo prove» — trust-note nel dettaglio, confirm della
+  rivelazione, notifica di consegna), nota al moderatore in
+  apri_disputa (conteggio dispute del compratore = le
+  dispute-fotocopia si vedono, + invito a chiedere all'emittente
+  quando/dove il codice è stato riscattato), e leve config SPENTE di
+  serie (default 0, pattern TETTO_SATS_ANNUNCIO):
+  TETTO_DIGITALE_NUOVI (compratore con acquisti_ok=0 oltre il tetto =
+  400, sul solo articolo, in compra()) e DIGITALE_MIN_VENDITE
+  (`guardia_venditore_digitale` in pubblica/modifica, riga scartata
+  nell'import CSV). SERVIZI ESCLUSI (decisione di prodotto, lug 2026):
+  Barattolo vende COSE che esistono, fisiche o digitali — il
+  PROMPT_MODERAZIONE vieta prestazioni e servizi («VIETATO: servizio»)
+  e whitelista i prodotti digitali leciti (buoni regalo, gift card,
+  codici sconto, licenze — nato dal buono Zalando bloccato per
+  errore); `messaggio_rifiuto(motivo)` mappa il no dell'AI sui servizi
+  al gentile MSG_RIFIUTO_SERVIZI («non ancora supportati»), 'servizi
+  sessuali' resta col messaggio severo di sempre. Frontend: opzione
+  «💾 Consegna digitale» in Vendi con hint screenshot datato («in
+  disputa le prove decidono», ripetuto nel pannello di consegna);
+  dettaglio con riga «💾 consegna digitale immediata» + trust-note
+  asimmetrica; 💾 nella meta della card; ordine con stepper
+  «Contenuto consegnato → Rivelato» (finestra 24h nel testo), pannello
+  venditore con textarea (`consegnaContenuto`), box «🔓 Rivela» col
+  confirm-ricevuta (`rivelaContenuto`), rilettura `mostraContenuto` e
+  copia di pagina `contenutoRivelato` (il testo non vive in orders:
+  arriva solo da /contenuto); per il compratore niente «è arrivato»
+  su shipped digitale (la strada è la rivelazione). NIP-99: riga
+  «consegna digitale immediata» nel content, nessun tag nuovo; gli
+  importati restano fuori per natura (consegna '': per consegnare il
+  codice il venditore deve essere in piattaforma). Modello CSV con la
+  riga d'esempio `digitale` (parser già coperto dal giudice unico).
   Offerte / contrattazione sul prezzo (lug 2026, modello Vinted; sara'
   la base del futuro «Lotto», fase 3): NON una chat — macchina a stati
   con al massimo UNA controproposta. Tabella `offerte` (annuncio,
@@ -1949,7 +2008,20 @@ lampo lanciata/comprata scontata/annullata, «ha fatto colpo» arrivato
 al venditore dell'importato, regressioni su nativo e guardie
 sopravvissute; in produzione va provato il giro vero: DM NIP-17 con
 link a un venditore solo-Nostr, login npub dal foglio invito e
-risposta all'offerta).
+risposta all'offerta); consegna digitale 💾 (lug 2026: quarta modalità
+per buoni regalo, codici e licenze — il contenuto passa dentro
+Barattolo con consegna tracciata e rivelazione-ricevuta, cifratura a
+riposo fail-open, finestre corte 24/48h, regola asimmetrica dichiarata
+e leve anti-frode spente di serie, servizi esclusi dalla moderazione
+col messaggio gentile e prodotti digitali leciti in whitelist, vedi
+Architettura — collaudato in locale con 58 verifiche TestClient su DB
+usa-e-getta: giro completo consegna→rivela→sblocco 24h, silenzio 48h,
+regressione dei rami fisici, cifratura nei due formati, disputa con
+nota admin, leve accese e spente, import CSV e NIP-99; in produzione
+va provato un giro vero dentro Telegram, la voce «buono
+regalo/servizio» della moderazione AI con la chiave vera, e sul VPS va
+scelta CHIAVE_CONTENUTI_DIGITALI nel config — senza, i codici restano
+in chiaro nel DB, dichiarato).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
