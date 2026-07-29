@@ -263,26 +263,34 @@
   .tag-price .price-sub{margin-top:0}
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
-     cio' che sta sulla foto. Arancio ₿ pieno ma piccolo: si nota a
-     colpo d'occhio senza fare della vetrina un volantino. NIENTE
-     animazioni (patto reduced-motion): il countdown che scorre e'
-     gia' tutto il movimento che serve. */
+     cio' che sta sulla foto. ROSSO caldo (#C0392B, bianco sopra =
+     contrasto 5:1 AA): deve dire urgenza e staccare dall'arancione ₿
+     di casa, che resta dei CTA. NIENTE animazioni (patto
+     reduced-motion): il countdown che scorre e' gia' tutto il
+     movimento che serve. */
   .card-lampo{position:absolute;top:8px;left:8px;z-index:2;
-    background:var(--sats);color:#fff;border-radius:999px;
+    background:#C0392B;color:#fff;border-radius:999px;
     padding:3px 9px;font-size:11.5px;font-weight:800;
     display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
   .card-lampo .lampo-count{font-family:'JetBrains Mono',monospace;
     font-weight:700;font-size:10.5px;opacity:.92}
+  /* La cornice della card in lampo: sottile, arancio ₿, dentro il
+     bordo (outline negativa: zero impatti sul layout, segue il
+     border-radius). Sparisce col re-render della scadenza. */
+  .card.in-lampo{outline:1.5px solid var(--sats);outline-offset:-1.5px}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
-  /* Nel dettaglio: barrato + badge sopra il prezzo, riga countdown sotto */
+  /* Nel dettaglio: barrato + badge sopra il prezzo, riga countdown
+     sotto. Il badge e' lo STESSO rosso della card (coerenza). Il
+     margine sotto la riga para il -8px inline di rigaConsegna
+     (i margini collassano: 12 + (-8) = 4px d'aria). */
   .lampo-was{display:flex;align-items:center;gap:8px;color:var(--muted);
     font-size:14.5px;margin-bottom:-6px}
-  .lampo-was .lampo-badge{background:var(--sats-soft);color:var(--sats-text);
-    border:1.5px solid var(--sats);border-radius:999px;padding:1px 8px;
-    font-size:12px;font-weight:800}
-  .lampo-riga{color:var(--sats-text);font-size:13.5px;font-weight:700;margin-top:2px}
+  .lampo-was .lampo-badge{background:#C0392B;color:#fff;
+    border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800}
+  .lampo-riga{color:var(--sats-text);font-size:13.5px;font-weight:700;
+    line-height:1.35;margin:2px 0 12px}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
   /* Il palco della galleria: tutto cio' che fluttua sulla foto
      (cerchietti, pallini, frecce) si appende qui */
@@ -2093,7 +2101,7 @@ const cardHTML = l => {
   const jar = (DEMO || VETRINA || !myTgId || l.sellerId===myTgId) ? ''
     : `<button class="card-jar${sal?' salvato':''}" data-id="${l.id}" onclick="event.stopPropagation();togglePreferito(${l.id})" title="${sal?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">${jarSVG(sal?4:0, 16)}</button>`;
   return `
-    <div class="card" onclick="openDetail(${l.id})">
+    <div class="card${lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
