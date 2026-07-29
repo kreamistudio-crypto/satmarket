@@ -213,17 +213,26 @@
   /* Il bottone si accende quando un filtro e' applicato */
   .strumenti button.attivo{color:var(--sats-text);border-color:var(--sats-text)}
   /* I due conteggi sono un BLOCCO in colonna dentro la riga, accanto a
-     ordina+filtri: il select e' alto il triplo di una riga di testo,
-     quindi le due righe ci stanno dentro senza rubare un pixel
-     d'altezza alla vetrina (le foto sono la cosa piu' importante).
-     CHI CEDE E' IL SELECT: il conteggio cresce (830 RISULTATI e' piu'
-     largo di 14 OGGETTI) e non deve mai finire sotto ai controlli,
-     quindi si prende lo spazio che gli serve (flex-shrink 0) e spinge
-     il resto a destra; il select ha min-width:0 e assorbe lui la
-     stretta a 360px, dove al massimo si accorcia la voce piu' lunga
-     del menu. */
+     ordina+filtri: il controllo dell'ordinamento e' alto il triplo di
+     una riga di testo, quindi le due righe ci stanno dentro senza
+     rubare un pixel d'altezza alla vetrina (le foto sono la cosa piu'
+     importante).
+     CHI CEDE E' L'ORDINAMENTO: il conteggio cresce (830 RISULTATI e'
+     piu' largo di 14 OGGETTI) e non deve mai finire sotto ai
+     controlli, quindi si prende lo spazio che gli serve (flex-shrink
+     0) e spinge il resto a destra; l'ordinamento ha min-width:0 e
+     assorbe lui la stretta a 360px, dove al massimo la voce piu'
+     lunga si accorcia coi puntini. */
   .conta-blocco{flex:1 0 auto;display:flex;flex-direction:column;gap:3px}
   .strumenti select{min-width:0}
+  /* L'ordinamento e' un campo-bottone (foglio-picker): qui veste da
+     pillola come il bottone Filtri, non da campo di form — la regola
+     `.strumenti button` gli da' gia' font, fondo e bordo, restano da
+     spegnere le misure da campo pieno di `.campo-scelta` */
+  .strumenti .campo-scelta{width:auto;min-width:0;min-height:0;gap:6px}
+  .strumenti .campo-scelta .cs-val{display:block;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .strumenti .campo-scelta .cs-freccia{font-size:11px}
   #filtriBox{margin:10px var(--pad) 0;padding:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:14px}
   .filtri-riga{display:flex;gap:8px}
@@ -232,6 +241,13 @@
     color:var(--ink);background:var(--bg);border:1.5px solid var(--line);
     border-radius:10px;padding:8px 10px}
   .filtri-riga .btn{margin-top:0;flex:1}
+  /* Il campo-bottone del filtro condizioni veste come gli input di
+     accanto (fondo --bg, raggio 10): dentro ci sta una pillola vera,
+     quindi il padding verticale e' piu' magro degli input per non
+     gonfiare la riga */
+  .filtri-riga .campo-scelta{flex:1;min-width:0;min-height:0;
+    font:700 14px Nunito,sans-serif;color:var(--ink);background:var(--bg);
+    border:1.5px solid var(--line);border-radius:10px;padding:5px 10px}
 
   /* ---------- griglia annunci ---------- */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
@@ -685,6 +701,8 @@
     padding:6px 12px;font-size:13px;font-weight:700}
   .pill.nostr{background:var(--nostr-soft);border-color:var(--nostr-soft);
     color:var(--nostr-text);font-weight:800}
+  /* la scatola graduata dentro la pillola, appoggiata sulla riga del testo */
+  .pill .taglia-ico{vertical-align:-3.5px;margin-right:1px}
   /* Le condizioni come pillola colorata: la scala parla col colore —
      verde pieno → verde tenue → ambra → arancio → grigio. Coppie
      dalla palette di casa, contrasto AA nei due temi (dove la coppia
@@ -798,8 +816,14 @@
     padding:12px 14px;font:inherit;font-weight:600;outline:none;
   }
   .field input:focus,.field textarea:focus{border-color:var(--ink)}
-  /* Il campo-bottone che apre il foglio-picker (categoria e condizioni):
-     veste da select ma la tendina e' il nostro foglio */
+  /* Le select del foglio-picker sono depositi nascosti: se un domani
+     una regola desse un `display` alle select (le nostre le pescano
+     per tag: `.field select`, `.strumenti select`) l'attributo hidden
+     verrebbe scavalcato e la tendina di sistema tornerebbe a vedersi */
+  select[hidden]{display:none !important}
+  /* Il campo-bottone che apre il foglio-picker: veste da select ma la
+     tendina e' il nostro foglio. Questa e' la misura da campo di form
+     (Vendi); toolbar e pannello Filtri la ritarano piu' sopra */
   .campo-scelta{width:100%;display:flex;align-items:center;justify-content:space-between;
     gap:10px;border:1.5px solid var(--field-line);background:var(--card);border-radius:14px;
     padding:8px 14px;min-height:47px;font:inherit;font-weight:600;color:var(--ink);
@@ -983,6 +1007,10 @@
   .picker-voce.sel{background:var(--sats-soft)}
   .picker-voce:focus-visible{outline:2px solid var(--sats);outline-offset:-2px}
   .picker-voce .p-ico{font-size:18px;flex:0 0 auto}
+  /* Le icone graduate delle taglie: dentro il tondo del box non
+     scendono mai sotto la riga di base, quindi le voci del foglio
+     restano incolonnate mentre la scatola cresce */
+  .p-ico .taglia-ico{display:block}
   .picker-voce .p-desc{display:block;font-size:12px;color:var(--muted);font-weight:600}
   /* la colonna pillola-colorata + descrizione delle voci condizione */
   .picker-voce .p-col{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
@@ -1228,12 +1256,15 @@
         <div class="section-label riga-conta" id="gridLabel">In vetrina</div>
         <div class="section-label riga-conta" id="pionieriRiga" style="display:none"></div>
       </div>
-      <select id="ordinaSel" onchange="setOrdina(this.value)" title="Ordina la vetrina">
+      <!-- come nel form Vendi: la select e' il deposito nascosto del
+           valore, a parlare col dito e' il campo-bottone (foglio-picker) -->
+      <select id="ordinaSel" hidden>
         <option value="">Più recenti</option>
         <option value="prezzo_su">Prezzo: dal più basso</option>
         <option value="prezzo_giu">Prezzo: dal più alto</option>
         <option value="lampo">⚡ In offerta</option>
       </select>
+      <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       <button id="filtriBtn" type="button" onclick="toggleFiltri()">Filtri</button>
     </div>
     <div id="filtriBox" style="display:none">
@@ -1242,9 +1273,10 @@
         <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
       </div>
       <div class="filtri-riga">
-        <!-- qui le <option> sono native (non stilabili): niente pillole
-             colorate, il testo semplice basta -->
-        <select id="filtroCondSel" title="Filtra per condizione">
+        <!-- deposito nascosto + campo-bottone: qui il foglio-picker
+             mostra le stesse pillole colorate del form, senza le
+             descrizioni (in un filtro basta il nome) -->
+        <select id="filtroCondSel" hidden>
           <option value="">Qualsiasi condizione</option>
           <option value="nuovo">Nuovo</option>
           <option value="come_nuovo">Come nuovo</option>
@@ -1252,6 +1284,7 @@
           <option value="accettabile">Accettabile</option>
           <option value="da_sistemare">Da sistemare</option>
         </select>
+        <button type="button" class="campo-scelta" id="filtroCondSelBtn" onclick="apriPicker('filtroCondSel')" aria-haspopup="dialog" title="Filtra per condizione"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       </div>
       <div class="filtri-riga">
         <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer">
@@ -1348,14 +1381,15 @@
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. 0&nbsp;= spedizione gratuita, inclusa nel prezzo.</div></div>
       <div class="field" id="sellTagliaField" style="display:none"><label>Taglia del pacco</label>
-        <select id="sellTaglia">
+        <select id="sellTaglia" hidden>
           <option value="">Scegli la taglia…</option>
-          <option value="busta">✉️ Busta — sta in una busta imbottita</option>
-          <option value="piccolo">📦 Piccolo — come una scatola di scarpe</option>
-          <option value="medio">📦 Medio — come una cassetta d'acqua</option>
-          <option value="grande">📦 Grande — come un forno a microonde</option>
-          <option value="ingombrante">🛋 Ingombrante — serve un furgone</option>
-        </select></div>
+          <option value="busta">Busta — sta in una busta imbottita</option>
+          <option value="piccolo">Piccolo — come una scatola di scarpe</option>
+          <option value="medio">Medio — come una cassetta d'acqua</option>
+          <option value="grande">Grande — come un forno a microonde</option>
+          <option value="ingombrante">Ingombrante — serve un furgone</option>
+        </select>
+        <button type="button" class="campo-scelta" id="sellTagliaBtn" onclick="apriPicker('sellTaglia')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field"><label id="zonaLabel">Zona (facoltativa)</label>
         <input id="sellZone" list="zonaList" placeholder="Es. Pavia (PV)" oninput="suggerisciZona(this.value)" onblur="controllaZona()" autocomplete="off">
         <datalist id="zonaList"></datalist>
@@ -1557,7 +1591,7 @@
   </nav>
 
   <!-- ============ SHEET PAGAMENTO ============ -->
-  <div class="sheet-bg" id="sheetBg" onclick="closeSheet()"></div>
+  <div class="sheet-bg" id="sheetBg" onclick="tapFuoriSheet()"></div>
   <div class="sheet" id="paySheet">
     <div class="grab"></div>
     <h3>Blocca <span class="mono" id="payAmount" style="color:var(--sats)"></span> <span style="font-size:12px;color:var(--muted)">sats</span> a garanzia</h3>
@@ -1639,7 +1673,7 @@
     <div class="grab"></div>
     <h3 id="pickerTitolo"></h3>
     <div class="picker-lista" id="pickerLista" role="radiogroup"></div>
-    <button class="btn ghost" onclick="closeSheet()">Annulla</button>
+    <button class="btn ghost" onclick="chiudiPicker()">Annulla</button>
   </div>
 
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
@@ -1799,6 +1833,60 @@ function condPill(id){
   const c = CONDIZIONI[id]; if (!c) return '';
   return `<span class="pill cond-${id}">${c.nome}</span>`;
 }
+/* Le taglie del pacco (lug 2026): gemello client di TAGLIE_PACCO del
+   server, con l'esempio concreto che nel form aiuta a scegliere («come
+   una scatola di scarpe») — le stesse parole che vivevano nelle
+   <option>, ora voci del foglio-picker. Il `lato` e' la misura del
+   disegno: e' LUI a raccontare la scala (vedi tagliaSVG). */
+const TAGLIE = {
+  busta:       {nome:'Busta',       desc:'sta in una busta imbottita', lato:0},
+  piccolo:     {nome:'Piccolo',     desc:'come una scatola di scarpe', lato:8},
+  medio:       {nome:'Medio',       desc:'come una cassetta d\'acqua', lato:12},
+  grande:      {nome:'Grande',      desc:'come un forno a microonde',  lato:16},
+  ingombrante: {nome:'Ingombrante', desc:'serve un furgone',           lato:20},
+};
+/* La scala delle taglie DISEGNATA (lug 2026): le emoji non andavano —
+   📦 era la stessa per piccolo, medio e grande, quindi la gradazione
+   non si vedeva, e scalare un'emoji via CSS porta guai (cambia forma
+   da un sistema all'altro, non segue i token del tema e crescendo
+   sposta le righe). Qui invece l'INGOMBRO resta fisso (viewBox 22x22,
+   una misura per tutte le voci) e la scatola CRESCE DAL BASSO, come
+   una cosa appoggiata sul banco: le icone restano incolonnate e la
+   scala si legge a colpo d'occhio. Tratto a currentColor (chiaro e
+   scuro gratis, il patto di jarSVG) con un velo dello stesso colore
+   che da' corpo; la busta e' un oggetto suo, non una scatola piccola.
+   `box` e' solo la misura resa: 22 nel foglio e nel campo, 16 nella
+   pillola del dettaglio (il viewBox non cambia, quindi la scala fra
+   le taglie resta identica). */
+function tagliaSVG(id, box){
+  const t = TAGLIE[id]; if (!t) return '';
+  const b = box || 22;
+  const apri = `<svg class="taglia-ico" width="${b}" height="${b}" viewBox="0 0 22 22"`
+    + ` fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"`
+    + ` stroke-linecap="round" aria-hidden="true">`;
+  if (!t.lato)      /* la busta: piatta e larga, con la piega a V */
+    return apri + `<rect x="2" y="10" width="18" height="11" rx="1.6" fill="currentColor" fill-opacity=".12"/>`
+      + `<path d="M2 10.6l9 6.4 9-6.4"/></svg>`;
+  /* Solo il quadro e la riga del coperchio: il nastro verticale, provato,
+     a 8px si riduceva a un puntino di rumore — la scala la fa il
+     contorno, che si legge a ogni misura */
+  const L = t.lato, x = (22 - L) / 2, y = 21 - L, coperchio = y + L * .30;
+  return apri
+    + `<rect x="${x}" y="${y}" width="${L}" height="${L}" rx="1.6" fill="currentColor" fill-opacity=".12"/>`
+    + `<path d="M${x} ${coperchio.toFixed(1)}h${L}"/>`
+    + `</svg>`;
+}
+/* La pillola della taglia nel dettaglio: l'icona graduata + le parole
+   del catalogo (una taglia che il client non conosce mostra comunque
+   il suo nome, senza icona). La busta NON e' un pacco, quindi non si
+   fa chiamare «pacco busta» come faceva la vecchia riga. */
+function tagliaPill(id){
+  if (!id) return '';
+  const t = TAGLIE[id];
+  const parole = !t ? esc(id)
+    : (t.lato ? 'pacco ' + t.nome.toLowerCase() : 'busta imbottita');
+  return `<span class="pill">${tagliaSVG(id, 16)} ${parole}</span>`;
+}
 /* Il luogo in card e dettaglio: la zona quando c'e' («Pavia (PV)»
    cosi' com'e'), altrimenti la strada di consegna — un annuncio
    solo-spedizione senza luogo e' legittimo (lug 2026: «spedisco in
@@ -1936,6 +2024,7 @@ function paramsVetrina(){
 function setOrdina(v){
   ordinaVista = v; haptic();
   if (el('ordinaSel')) el('ordinaSel').value = v;   // sincrono anche da codice
+  aggiornaPicker('ordinaSel');                      // e il campo-bottone lo dice
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
@@ -1953,6 +2042,7 @@ function toggleFiltri(){
     el('filtroMinInp').value = filtroPrezzo?.min || '';
     el('filtroMaxInp').value = filtroPrezzo?.max || '';
     el('filtroCondSel').value = filtroCond;
+    aggiornaPicker('filtroCondSel');
   }
 }
 
@@ -1983,6 +2073,7 @@ function azzeraFiltri(){
   el('filtroSpedInp').checked = false;
   el('filtroLampoInp').checked = false;
   el('filtroCondSel').value = '';
+  aggiornaPicker('filtroCondSel');
   const cera = !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond;
   filtroPrezzo = null; filtroSped = false; filtroLampo = false;
   filtroCond = '';
@@ -3139,7 +3230,7 @@ function openDetail(id){
         ${pilloleModalita(l)}
         ${condPill(l.condizione)}
         ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
-        ${l.taglia?`<span class="pill">📦 pacco ${esc(l.taglia)}</span>`:''}
+        ${tagliaPill(l.taglia)}
         ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
       </div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
@@ -3687,29 +3778,49 @@ function closeSheet(){
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
-/* ---------------- foglio-picker di categoria e condizioni ----------------
-   La tendina nativa del form Vendi, rivestita da Barattolo: il select
-   nascosto resta il deposito del valore, il foglio e' solo la mano che
-   lo scrive. aggiornaPicker() tiene il campo-bottone allineato al
-   valore (va richiamata da chi tocca il select via JS). */
+/* ---------------- foglio-picker: le tendine vestite da Barattolo ----------------
+   La <select> del sistema operativo non si puo' stilare, quindi resta
+   in pagina come DEPOSITO del valore (hidden) e a parlare col dito e'
+   il campo-bottone che apre #pickerSheet. Ogni voce del catalogo dice
+   tre cose: il `titolo` del foglio, le `voci()` (val + resa nel
+   foglio) e il `campo(v)` (resa nel campo-bottone); `poi` e' l'azione
+   facoltativa dopo la scelta, per i controlli che agivano sull'evento
+   change. aggiornaPicker() riallinea il campo al valore e VA
+   RICHIAMATA da chi tocca il select via JS. */
 const PICKER = {
-  sellCat: {titolo:'Categoria', voci: () =>
-    [...el('sellCat').options].map(o => ({val:o.value,
-      resa:`<span class="p-ico">${EMOJI_CAT[o.value]||'📦'}</span><span><b>${esc(o.value)}</b></span>`}))},
-  sellCond: {titolo:'Condizioni dell\'oggetto', voci: () =>
-    Object.entries(CONDIZIONI).map(([id,c]) => ({val:id,
-      resa:`<span class="p-col">${condPill(id)}<span class="p-desc">${c.desc}</span></span>`}))},
+  sellCat: {titolo:'Categoria',
+    voci: () => [...el('sellCat').options].map(o => ({val:o.value,
+      resa:`<span class="p-ico">${EMOJI_CAT[o.value]||'📦'}</span><span><b>${esc(o.value)}</b></span>`})),
+    campo: v => `<span class="p-ico">${EMOJI_CAT[v]||'📦'}</span><span>${esc(v)}</span>`},
+  /* nel form la condizione porta la descrizione: aiuta a scegliere */
+  sellCond: {titolo:'Condizioni dell\'oggetto',
+    voci: () => Object.entries(CONDIZIONI).map(([id,c]) => ({val:id,
+      resa:`<span class="p-col">${condPill(id)}<span class="p-desc">${c.desc}</span></span>`})),
+    campo: v => condPill(v) || '<span class="cs-vuoto">Scegli le condizioni…</span>'},
+  sellTaglia: {titolo:'Taglia del pacco',
+    voci: () => Object.entries(TAGLIE).map(([id,t]) => ({val:id,
+      resa:`<span class="p-ico">${tagliaSVG(id)}</span><span><b>${t.nome}</b><span class="p-desc">${t.desc}</span></span>`})),
+    campo: v => TAGLIE[v]
+      ? `<span class="p-ico">${tagliaSVG(v)}</span><span>${TAGLIE[v].nome}</span>`
+      : '<span class="cs-vuoto">Scegli la taglia…</span>'},
+  /* nel FILTRO le stesse pillole ma nude: qui non si impara la scala,
+     si sceglie — e la prima voce e' il «tutto va bene» */
+  filtroCondSel: {titolo:'Condizioni dell\'oggetto',
+    voci: () => [{val:'', resa:'<span>Qualsiasi condizione</span>'}].concat(
+      Object.keys(CONDIZIONI).map(id => ({val:id, resa:condPill(id)}))),
+    campo: v => condPill(v) || '<span>Qualsiasi condizione</span>'},
+  ordinaSel: {titolo:'Ordina la vetrina',
+    voci: () => [...el('ordinaSel').options].map(o => ({val:o.value,
+      resa:`<span>${esc(o.text)}</span>`})),
+    campo: v => `<span>${esc([...el('ordinaSel').options]
+      .find(o => o.value === v)?.text || '')}</span>`,
+    poi: v => setOrdina(v)},
 };
 let pickerTrigger = null;      /* il campo-bottone da rimettere a fuoco */
 function aggiornaPicker(id){
-  const btn = el(id+'Btn'); if (!btn) return;
-  const v = el(id).value;
-  btn.querySelector('.cs-val').innerHTML =
-    id === 'sellCat'
-      ? `<span class="p-ico">${EMOJI_CAT[v]||'📦'}</span><span>${esc(v)}</span>`
-      : (CONDIZIONI[v]
-          ? condPill(v)
-          : '<span class="cs-vuoto">Scegli le condizioni…</span>');
+  const btn = el(id+'Btn'), cfg = PICKER[id];
+  if (!btn || !cfg) return;
+  btn.querySelector('.cs-val').innerHTML = cfg.campo(el(id).value);
 }
 function apriPicker(id){
   const cfg = PICKER[id]; if (!cfg) return;
@@ -3732,12 +3843,31 @@ function scegliPicker(id, val){
   el(id).value = val;
   aggiornaPicker(id);
   haptic();
+  chiudiPicker();
+  PICKER[id]?.poi?.(val);   /* l'azione che prima stava sull'onchange */
+}
+/* Il picker si chiude DA SOLO, senza trascinarsi dietro chi sta sotto:
+   puo' aprirsi sopra un pannello (i Filtri, che sono in pagina) e un
+   domani sopra un altro foglio — e closeSheet() spegne TUTTA la pila e
+   azzera anche il pollTimer del pagamento. Il velo resta se sotto c'e'
+   ancora un foglio aperto. */
+function altroFoglioAperto(){
+  return [...document.querySelectorAll('.sheet.open')].some(s => s.id !== 'pickerSheet');
+}
+function chiudiPicker(){
+  el('pickerSheet').classList.remove('open');
+  if (!altroFoglioAperto()) el('sheetBg').classList.remove('open');
+  if (pickerTrigger) { pickerTrigger.focus(); pickerTrigger = null; }
+}
+/* Il tocco sul velo chiude il foglio piu' in ALTO, non tutta la pila */
+function tapFuoriSheet(){
+  if (el('pickerSheet').classList.contains('open')) return chiudiPicker();
   closeSheet();
 }
 /* Esc chiude, le frecce scorrono le voci (solo a picker aperto) */
 document.addEventListener('keydown', e => {
   if (!el('pickerSheet').classList.contains('open')) return;
-  if (e.key === 'Escape') { closeSheet(); return; }
+  if (e.key === 'Escape') { chiudiPicker(); return; }
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){
     e.preventDefault();
     const voci = [...el('pickerLista').querySelectorAll('.picker-voce')];
@@ -3745,9 +3875,14 @@ document.addEventListener('keydown', e => {
     voci[e.key==='ArrowDown' ? Math.min(voci.length-1, i+1) : Math.max(0, i-1)]?.focus();
   }
 });
-/* la prima etichetta dei campi-bottone (lo script vive in fondo alla
-   pagina: il DOM c'e' gia') */
-aggiornaPicker('sellCat'); aggiornaPicker('sellCond');
+/* I tre campi-bottone del form Vendi, riallineati in blocco: chi
+   precompila o azzera il form chiama QUESTA e non se ne dimentica uno */
+function aggiornaPickerVendi(){
+  ['sellCat','sellCond','sellTaglia'].forEach(aggiornaPicker);
+}
+/* la prima etichetta di ogni campo-bottone (lo script vive in fondo
+   alla pagina: il DOM c'e' gia') */
+Object.keys(PICKER).forEach(aggiornaPicker);
 
 function sheetPaid(){
   if (DEMO) return simulatePaid();
@@ -6321,7 +6456,7 @@ function editListing(id){
   /* uno storico senza condizione arriva vuoto: publish() la esige,
      ed e' cosi' che la modifica «la chiede» senza obblighi retroattivi */
   el('sellCond').value = l.condizione||'';
-  aggiornaPicker('sellCat'); aggiornaPicker('sellCond');
+  aggiornaPickerVendi();
   /* spedEur pieno = costo ancorato all'euro: si rientra in euro
      anche sul listino sats (il toggle segue la semantica salvata) */
   spedValuta = l.spedEur>0 ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
@@ -6339,7 +6474,7 @@ function annullaModifica(){
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
-  aggiornaPicker('sellCond');
+  aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
@@ -6567,7 +6702,7 @@ async function publish(){
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
-  aggiornaPicker('sellCond');
+  aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
