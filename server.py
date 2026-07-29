@@ -791,6 +791,10 @@ def init_db():
                     # esistente resta vero; lecito solo con una modalita'
                     # fisica (con 'digitale' o '' si forza 0)
                     "anche_digitale INTEGER DEFAULT 0",
+                    # condizione dell'oggetto (lug 2026): la scala a 5
+                    # livelli del form ('' = annunci storici e importati,
+                    # nessun obbligo retroattivo; la modifica la chiede)
+                    "condizione TEXT DEFAULT ''",
                     # offerta lampo (lug 2026): lo sconto a tempo su
                     # tutto l'annuncio. percento>0 e scadenza nel futuro
                     # = attiva; oltre la scadenza torna prezzo pieno da
@@ -2764,6 +2768,54 @@ def categoria_valida(c) -> str:
     return c if c in CATEGORIE else "Altro"
 
 
+# --- Condizione dell'oggetto (lug 2026): la scala a 5 livelli --------
+# Obbligatoria nel FORM (la validazione vive nel client, come per la
+# consegna): il server resta tollerante — '' = non dichiarata, cioe'
+# gli annunci storici e quelli importati da Nostr, nessun obbligo
+# retroattivo. Qui i nomi brevi che parlano nel NIP-99 e nel catalogo
+# della ricerca AI; le etichette lunghe con emoji vivono nel frontend.
+CONDIZIONI = {
+    "nuovo": "nuovo",
+    "come_nuovo": "come nuovo",
+    "buono": "in buono stato",
+    "accettabile": "accettabile",
+    "da_sistemare": "da sistemare",
+}
+
+
+def condizione_valida(c) -> str:
+    """Pattern categoria: sconosciuta o assente = '' (i client di ieri
+    non la mandano e non devono rompersi; l'obbligo vive nel form)."""
+    c = (c or "").strip()
+    return c if c in CONDIZIONI else ""
+
+
+# Il CSV dell'import parla come scrive un commerciante: sinonimi ovvi
+# verso la scala, chi resta fuori semplicemente non dichiara nulla
+# (colonna facoltativa, mai uno scarto).
+SINONIMI_CONDIZIONE = {
+    "nuovo": "nuovo", "nuovissimo": "nuovo", "sigillato": "nuovo",
+    "mai usato": "nuovo", "new": "nuovo",
+    "come nuovo": "come_nuovo", "pari al nuovo": "come_nuovo",
+    "perfetto": "come_nuovo", "ottimo": "come_nuovo",
+    "ottime condizioni": "come_nuovo", "like new": "come_nuovo",
+    "buono": "buono", "buone condizioni": "buono", "buon stato": "buono",
+    "in buono stato": "buono", "usato": "buono", "good": "buono",
+    "accettabile": "accettabile", "discreto": "accettabile",
+    "vissuto": "accettabile",
+    "da sistemare": "da_sistemare", "da riparare": "da_sistemare",
+    "guasto": "da_sistemare", "non funzionante": "da_sistemare",
+    "per ricambi": "da_sistemare",
+}
+
+
+def condizione_tollerante(c: str) -> str:
+    c = (c or "").strip().lower().replace("_", " ")
+    if c.replace(" ", "_") in CONDIZIONI:
+        return c.replace(" ", "_")
+    return SINONIMI_CONDIZIONE.get(c, "")
+
+
 # --- Consegna e taglia del pacco (lug 2026, modello Vinted) ----------
 # La modalita' di consegna la dichiara il venditore sull'annuncio;
 # '' = non specificata (annunci storici e importati da Nostr): per
@@ -2839,7 +2891,7 @@ CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
-    "a.anche_digitale, "
+    "a.anche_digitale, a.condizione, "
     "a.foto, a.contatto_nostr, a.creato, "
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
@@ -2965,6 +3017,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         prezzo_min: float = 0, prezzo_max: float = 0,
                         valuta_filtro: str = "sats",
                         solo_spedizione: int = 0, solo_lampo: int = 0,
+                        condizione: str = "",
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -2980,6 +3033,12 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # annunci storici ('') restano fuori finche' il venditore non
         # si dichiara con una modifica.
         dove += " AND a.consegna IN ('spedizione','entrambe')"
+    if condizione in CONDIZIONI:
+        # Stesso patto della spedizione: il filtro promette una
+        # condizione DICHIARATA, gli storici senza restano fuori.
+        # Valore sconosciuto = nessun filtro, mai un 400.
+        dove += " AND a.condizione=?"
+        par.append(condizione)
     if solo_lampo or ordina == "lampo":
         # Solo le offerte lampo VIVE: la scadenza si giudica adesso,
         # senza aspettare la scopa dell'orologio. L'ordinamento
@@ -3110,12 +3169,12 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
-        "anche_digitale,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         int(time.time())))
+         condizione_valida(d.get("condizione")), int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -3500,11 +3559,11 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
-        "anche_digitale=? WHERE id=?",
+        "anche_digitale=?, condizione=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, d.get("zona", ""), valuta, prezzo_eur,
          lat, lon, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         annuncio_id))
+         condizione_valida(d.get("condizione")), annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -3912,6 +3971,8 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
         f"ID {a['id']}: {a['titolo']} | {a['categoria']} | "
         f"{a['prezzo_sats']} sats"
         + (f" ({a['prezzo_eur']:.2f} EUR)" if a["valuta"] == "eur" else "")
+        + (f" | {CONDIZIONI[a['condizione']]}"
+           if a.get("condizione") in CONDIZIONI else "")
         + f" | {a['zona']} | {a['descrizione'][:120]}"
         for a in annunci)
     try:
@@ -6010,9 +6071,13 @@ def evento_annuncio(a: dict, status: str) -> dict:
         consegna_txt = ""
     if consegna_txt and a.get("anche_digitale"):
         consegna_txt += " o consegna digitale immediata"
+    # La condizione come la consegna: una riga del content, nessun tag
+    # nuovo (la spec NIP-99 non ne prevede uno).
+    condizione_txt = (f" — condizione: {CONDIZIONI[a['condizione']]}"
+                      if a.get("condizione") in CONDIZIONI else "")
     content = ((a["descrizione"] or a["titolo"]).strip() +
                f"\n\nPrezzo: {prezzo_txt} — zona: "
-               f"{a.get('zona') or 'Italia'}{consegna_txt}"
+               f"{a.get('zona') or 'Italia'}{condizione_txt}{consegna_txt}"
                f"\n\n🫙⚡ In vendita su Barattolo, il mercatino in sats "
                f"con escrow Lightning: {URL_PUBBLICO} · {LINK_BOT}")
     return firma_evento(30402, tags, content)
@@ -7560,23 +7625,25 @@ def _purga_lavori():
 
 MODELLO_IMPORT = (
     "titolo;descrizione;prezzo;valuta;categoria;zona;foto;"
-    "consegna;spedizione;taglia\n"
+    "consegna;spedizione;taglia;condizione\n"
     "Tastiera meccanica 60%;Come nuova, switch rossi, scatola "
-    "originale;35000;sats;Elettronica;Milano;;spedizione;450;piccolo\n"
+    "originale;35000;sats;Elettronica;Milano;;spedizione;450;piccolo;"
+    "come nuovo\n"
     "Giacca in pelle vintage;Taglia M, vera pelle anni 90;45,00;eur;"
     "Abbigliamento;Roma;https://esempio.it/giacca-fronte.jpg|"
-    "https://esempio.it/giacca-retro.jpg;entrambe;5,50;busta\n"
+    "https://esempio.it/giacca-retro.jpg;entrambe;5,50;busta;buono\n"
     "Trapano avvitatore Bosch;Con due batterie e valigetta;80000;sats;"
-    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio\n"
+    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio;\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
     # niente spedizione ne' taglia, il codice si consegna dopo
     # l'acquisto dal dettaglio ordine
     "Buono regalo libreria 25 euro;Codice valido 12 mesi, consegna "
-    "immediata;25,00;eur;Libri e media;;;digitale;;\n"
+    "immediata;25,00;eur;Libri e media;;;digitale;;;nuovo\n"
     # la combo col «+»: tessera spedita O codice in piattaforma,
     # sceglie chi compra
     "Gift card profumeria 50 euro;Tessera fisica spedita oppure codice "
-    "subito;50,00;eur;Altro;Milano;;spedizione+digitale;5,00;busta\n")
+    "subito;50,00;eur;Altro;Milano;;spedizione+digitale;5,00;busta;"
+    "nuovo\n")
 
 
 @app.get("/api/import/modello")
@@ -7823,7 +7890,12 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                       "prezzo_sats": prezzo_sats, "prezzo_eur": prezzo_eur,
                       "consegna": consegna, "spedizione_sats": sped_sats,
                       "spedizione_eur": sped_eur, "taglia_pacco": taglia,
-                      "anche_digitale": anche_dig, "foto": foto})
+                      "anche_digitale": anche_dig,
+                      # colonna facoltativa, sinonimi tollerati:
+                      # sconosciuta = non dichiarata, mai uno scarto
+                      "condizione": condizione_tollerante(
+                          cella(r, "condizione")),
+                      "foto": foto})
 
     if not righe:
         return {"valide": 0, "totale": len(dati),
@@ -7907,14 +7979,15 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
-        "anche_digitale,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga["prezzo_sats"], riga["zona"],
          riga["valuta"], riga["prezzo_eur"], lat, lon,
          riga.get("consegna", ""), riga.get("spedizione_sats", 0),
          riga.get("spedizione_eur", 0), riga.get("taglia_pacco", ""),
-         riga.get("anche_digitale", 0), int(time.time())))
+         riga.get("anche_digitale", 0), riga.get("condizione", ""),
+         int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()

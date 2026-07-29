@@ -1193,6 +1193,16 @@
         <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
       </div>
       <div class="filtri-riga">
+        <select id="filtroCondSel" title="Filtra per condizione">
+          <option value="">Qualsiasi condizione</option>
+          <option value="nuovo">✨ Nuovo</option>
+          <option value="come_nuovo">🌟 Come nuovo</option>
+          <option value="buono">👍 In buono stato</option>
+          <option value="accettabile">🆗 Accettabile</option>
+          <option value="da_sistemare">🔧 Da sistemare</option>
+        </select>
+      </div>
+      <div class="filtri-riga">
         <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer">
           <input type="checkbox" id="filtroSpedInp" style="width:auto;accent-color:var(--sats)">
           🚚 Solo con spedizione</label>
@@ -1258,6 +1268,15 @@
         <input id="sellTitle" placeholder="Es. Tastiera meccanica Keychron K2"></div>
       <div class="field"><label>Categoria</label>
         <select id="sellCat"><option>Elettronica</option><option>Casa e giardino</option><option>Abbigliamento</option><option>Sport e hobby</option><option>Motori</option><option>Bambini</option><option>Animali</option><option>Libri e media</option><option>Altro</option></select></div>
+      <div class="field" id="sellCondField"><label>Condizioni dell'oggetto</label>
+        <select id="sellCond">
+          <option value="">Scegli le condizioni…</option>
+          <option value="nuovo">✨ Nuovo — mai usato</option>
+          <option value="come_nuovo">🌟 Come nuovo — in perfette condizioni</option>
+          <option value="buono">👍 In buono stato — usato ma ben conservato</option>
+          <option value="accettabile">🆗 Accettabile — vissuto, segni d'uso evidenti</option>
+          <option value="da_sistemare">🔧 Da sistemare — non funzionante o da riparare</option>
+        </select></div>
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
@@ -1691,6 +1710,17 @@ function avatarImg(nome){
   const n = (nome || '').replace(/[^A-Za-z0-9_.-]/g, '');
   return n ? `<img class="av-foto" src="${fotoUrl(n)}" alt="" onerror="this.remove()">` : '';
 }
+/* Le condizioni dell'oggetto (lug 2026): catalogo id -> {emoji, nome},
+   la stessa scala delle <option> del form (li' vivono le etichette
+   lunghe). In card parla solo l'emoji (il testo non ci sta a 360px),
+   nel dettaglio la pillola completa. */
+const CONDIZIONI = {
+  nuovo:        {emoji:'✨', nome:'Nuovo'},
+  come_nuovo:   {emoji:'🌟', nome:'Come nuovo'},
+  buono:        {emoji:'👍', nome:'In buono stato'},
+  accettabile:  {emoji:'🆗', nome:'Accettabile'},
+  da_sistemare: {emoji:'🔧', nome:'Da sistemare'},
+};
 function mapListing(a){
   let photos = [], thumbs = [];
   try {
@@ -1708,6 +1738,8 @@ function mapListing(a){
     /* la combo della gift card: modalita' fisica + codice in
        piattaforma, sceglie chi compra */
     ancheDigitale:!!a.anche_digitale,
+    /* la condizione dell'oggetto: '' = mai dichiarata (storici) */
+    condizione:a.condizione||'',
     /* lo stato viaggia solo dove serve (i preferiti): la vetrina
        serve comunque solo gli attivi */
     stato:a.stato||'attivo',
@@ -1792,6 +1824,7 @@ let ordinaVista = '';        // '' = piu' recenti | prezzo_su | prezzo_giu | lam
 let filtroPrezzo = null;     // {min, max, valuta} applicato, o null
 let filtroSped = false;      // «solo con spedizione» (stato di sessione)
 let filtroLampo = false;     // «solo in offerta» (stesso patto)
+let filtroCond = '';         // condizione dell'oggetto ('' = qualsiasi)
 
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
@@ -1807,6 +1840,7 @@ function paramsVetrina(){
   }
   if (filtroSped) p.set('solo_spedizione', '1');
   if (filtroLampo) p.set('solo_lampo', '1');
+  if (filtroCond) p.set('condizione', filtroCond);
   return p;
 }
 
@@ -1829,6 +1863,7 @@ function toggleFiltri(){
     el('filtroMaxInp').placeholder = `Prezzo max (${suff})`;
     el('filtroMinInp').value = filtroPrezzo?.min || '';
     el('filtroMaxInp').value = filtroPrezzo?.max || '';
+    el('filtroCondSel').value = filtroCond;
   }
 }
 
@@ -1845,8 +1880,9 @@ function applicaFiltri(){
   filtroPrezzo = (min || max) ? {min, max, valuta: valutaVista} : null;
   filtroSped = !!el('filtroSpedInp').checked;
   filtroLampo = !!el('filtroLampoInp').checked;
+  filtroCond = el('filtroCondSel').value;
   el('filtriBtn').classList.toggle('attivo',
-    !!filtroPrezzo || filtroSped || filtroLampo);
+    !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond);
   el('filtriBox').style.display = 'none';
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
@@ -1857,8 +1893,10 @@ function azzeraFiltri(){
   el('filtroMinInp').value = ''; el('filtroMaxInp').value = '';
   el('filtroSpedInp').checked = false;
   el('filtroLampoInp').checked = false;
-  const cera = !!filtroPrezzo || filtroSped || filtroLampo;
+  el('filtroCondSel').value = '';
+  const cera = !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond;
   filtroPrezzo = null; filtroSped = false; filtroLampo = false;
+  filtroCond = '';
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
   if (!cera) return;
@@ -1919,23 +1957,23 @@ let listings = [
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
   {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
    zone:"Pavia", seller:"Massimo R.", rating:4.9, sales:12,
-   consegna:"spedizione", sped:7000, taglia:"piccolo",
+   consegna:"spedizione", sped:7000, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
   {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport e hobby",
    zone:"Milano", seller:"Giulia T.", rating:5.0, sales:7,
-   consegna:"ritiro",
+   consegna:"ritiro", condizione:"buono",
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
   {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
-   zone:"Torino", seller:"Andrea B.", rating:4.8, sales:31,
+   zone:"Torino", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
    desc:"Copia nuova, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
-   zone:"Roma", seller:"Luca P.", rating:4.7, sales:9,
+   zone:"Roma", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
    /* la lampo dimostrativa: scadenza calcolata al carico, cosi' il
       badge col countdown si vede anche nella demo coi dati finti */
    lampoPct:20, lampoFine:Math.floor(Date.now()/1000)+5*3600+14*60,
    desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
   {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e giardino",
-   zone:"Bologna", seller:"Sara M.", rating:4.9, sales:15,
+   zone:"Bologna", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
    desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
   {id:6, emoji:"⚡", title:"Nodo Lightning: Raspberry Pi 4 8GB kit", price:190000, cat:"Elettronica",
    zone:"Firenze", seller:"Marco V.", rating:5.0, sales:22,
@@ -1944,7 +1982,7 @@ let listings = [
      cambio (price = equivalente indicativo, come farebbe il server) */
   {id:7, emoji:"🎲", title:"Catan gioco da tavolo, come nuovo", price:27000, valuta:'eur', priceEur:25, cat:"Altro",
    zone:"Verona", seller:"Elisa D.", rating:4.9, sales:11,
-   consegna:"entrambe", spedEur:5, taglia:"piccolo",
+   consegna:"entrambe", spedEur:5, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
 ];
 let orders = [
@@ -2049,6 +2087,8 @@ function renderGrid(items){
     }
     if (filtroSped)
       data = data.filter(l => l.consegna==='spedizione' || l.consegna==='entrambe');
+    if (filtroCond)
+      data = data.filter(l => l.condizione===filtroCond);
     if (filtroLampo)
       data = data.filter(lampoAttiva);
     if (ordinaVista === 'lampo')
@@ -2126,7 +2166,7 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span>📍 ${esc(l.zone)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
+        <div class="meta"><span>📍 ${esc(l.zone)}</span>${CONDIZIONI[l.condizione]?`<span title="${CONDIZIONI[l.condizione].nome}">${CONDIZIONI[l.condizione].emoji}</span>`:''}${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
       </div>
     </div>`; };
 
@@ -3000,6 +3040,7 @@ function openDetail(id){
       ${rigaConsegna(l)}
       <div class="pills">
         <span class="pill">📍 ${esc(l.zone)}</span>
+        ${CONDIZIONI[l.condizione]?`<span class="pill">${CONDIZIONI[l.condizione].emoji} ${CONDIZIONI[l.condizione].nome}</span>`:''}
         ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
         ${l.taglia?`<span class="pill">📦 pacco ${esc(l.taglia)}</span>`:''}
         ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
@@ -5960,6 +6001,9 @@ function editListing(id){
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
   impostaConsegnaForm(l.consegna||'', l.ancheDigitale);
   el('sellTaglia').value = l.taglia||'';
+  /* uno storico senza condizione arriva vuoto: publish() la esige,
+     ed e' cosi' che la modifica «la chiede» senza obblighi retroattivi */
+  el('sellCond').value = l.condizione||'';
   /* spedEur pieno = costo ancorato all'euro: si rientra in euro
      anche sul listino sats (il toggle segue la semantica salvata) */
   spedValuta = l.spedEur>0 ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
@@ -5976,6 +6020,7 @@ function annullaModifica(){
   editandoNostr = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
+  el('sellCond').value = '';
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
@@ -6004,6 +6049,10 @@ function aggiornaFormVendi(){
      E la consegna nemmeno: la modifica firmata rispecchia l'evento
      NIP-99, che non la porta — il form non deve fingere. */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
+  /* la firmata rispecchia l'evento NIP-99, che la condizione non la
+     porta: il campo si nasconde come quelli di consegna */
+  if (el('sellCondField'))
+    el('sellCondField').style.display = editandoNostr ? 'none' : '';
   if (el('sellConsegnaField')){
     el('sellConsegnaField').style.display = editandoNostr ? 'none' : '';
     if (editandoNostr){
@@ -6134,6 +6183,12 @@ async function publish(){
   if (!editandoNostr && !consegnaForm().consegna) {
     toast('Spunta almeno una modalità di consegna'); return;
   }
+  /* condizioni obbligatorie (lug 2026): anche in modifica — gli
+     annunci storici si mettono in regola al primo ritocco. La firmata
+     degli importati non offre il campo, come per la consegna. */
+  if (!editandoNostr && !el('sellCond').value) {
+    toast('Indica le condizioni dell\'oggetto'); return;
+  }
   if (sellFoto.some(f=>f.startsWith('caricando:'))) {
     toast('Un attimo: sto ancora caricando le foto'); return;
   }
@@ -6158,6 +6213,7 @@ async function publish(){
       consegna:cns.consegna, sped:cns.spedizione_sats||0,
       spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
       ancheDigitale:!!cns.anche_digitale,
+      condizione:el('sellCond').value,
       zone:el('sellZone').value||'Italia', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
@@ -6165,7 +6221,7 @@ async function publish(){
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({titolo:t, ...prezzo, ...cns,
-        categoria:el('sellCat').value,
+        categoria:el('sellCat').value, condizione:el('sellCond').value,
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
@@ -6183,6 +6239,7 @@ async function publish(){
   }
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
+  el('sellCond').value = '';
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview();
@@ -6210,12 +6267,14 @@ async function salvaModifica(t, p){
         consegna:cns.consegna, sped:cns.spedizione_sats||0,
         spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
         ancheDigitale:!!cns.anche_digitale,
+        condizione:el('sellCond').value,
         zone:el('sellZone').value||'Italia', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
   } else {
     const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
     const body = {titolo:t, ...prezzo, ...cns, categoria:el('sellCat').value,
+      condizione:el('sellCond').value,
       zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
     if (sellFoto.length) body.foto = sellFoto;
     const r = await fetch(`${API_BASE}/listings/${id}/modifica`, {
