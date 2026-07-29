@@ -733,7 +733,47 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Migrazione morbida `arricchisci_zone_esistenti` a ogni avvio
   (gemella del backfill coordinate, idempotente): solo i
   riconoscibili, MAI gli importati da Nostr (contatto_nostr pieno:
-  la loro zona la riscrive l'import orario dai relay). MOTORE: gemello della coda
+  la loro zona la riscrive l'import orario dai relay).
+  La REGIONE è DERIVATA (lug 2026): non è un campo del form e non si
+  chiede MAI al venditore — si ricava dalla sigla che `arricchisci_zona`
+  ha già messo nella zona. `regione_da_zona` prende la PRIMA sigla
+  valida del testo (regola di coordinate_da_zona: «Roma (RM) o Milano
+  (MI)» → Lazio; un «(kg)» non è una sigla e si ignora) contro la mappa
+  fissa `REGIONI` (20 regioni → le 107 sigle, scritta per regione:
+  `SIGLE_REGIONE` si deriva da lei, una sola fonte di verità —
+  verificata contro dati/comuni.csv, zero buchi). Colonna
+  `annunci.regione` ('' = sigla assente o sconosciuta: storici, alias
+  tipo «Reggio Emilia», frazioni irriconoscibili — nessun blocco, il
+  filtro non li vede, lo stesso patto di condizione e spedizione),
+  scritta accanto a lat/lon in pubblica/modifica/modifica firmata/
+  import CSV, ricalcolata per gli importati a ogni giro orario nel
+  dopo-import (gemella delle coordinate) e data agli annunci di ieri
+  da `deriva_regioni()` all'avvio — DOPO `arricchisci_zone_esistenti`,
+  che l'ordine conta (prima la sigla nella zona, poi la regione);
+  idempotente, tocca solo le righe ancora vuote. In CAMPI_VETRINA;
+  param `regione` su /api/listings (sconosciuta = nessun filtro, mai un
+  400) componibile con categoria, prezzo, condizione, spedizione e col
+  cursore; `regioni` = {regione: quanti} nella busta di PRIMA pagina,
+  conteggi GLOBALI come `conteggi` (non seguono categoria né ricerca) e
+  senza le vuote. Frontend: foglio-picker `filtroRegSel` nel pannello
+  Filtri, voci dal SERVER («Lombardia · 137», alfabetico, «Tutta
+  l'Italia» prima) — la regione scelta resta in elenco anche a 0
+  annunci (il campo non deve mentire), nessuna regione (server di ieri,
+  vetrina vuota) = la riga sparisce del tutto, in DEMO si conta dai
+  dati finti (`renderFiltroRegioni`); stato di sessione `filtroReg`
+  come gli altri filtri. NON si mostra da nessuna parte in vetrina
+  (deciso: la sigla nella zona la dice già a un lettore italiano, e la
+  card resta pulita); se un giorno servisse, il posto è la fila di
+  pillole del dettaglio. Due lezioni dal cantiere: `apriPicker` passa
+  ora il valore in `data-val` invece che dentro la stringa JS
+  dell'onclick — «Valle d'Aosta» spezzava l'apice, e il commento «i
+  valori vengono dai cataloghi, l'onclick è sicuro» valeva finché nei
+  cataloghi non c'erano apostrofi; e Applica/Azzera del pannello sono
+  gemelli per `.filtri-riga .btn.ghost{margin-top:0}` (a pari
+  specificità vinceva il `margin-top:10px` della ghost e in flex
+  «stretch» stirava Applica di 10px) più la base flex al 50% (col
+  basis 0 i 2px di bordo della ghost si sommano FUORI dalla base e la
+  facevano larga 4px in più). MOTORE: gemello della coda
   promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
   loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
   dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
@@ -2292,7 +2332,17 @@ modalità fisica via `anche_digitale`: il compratore sceglie la strada
 con le pillole e le tutele seguono la sua scelta, vedi Architettura —
 collaudata con 32 verifiche TestClient: tutele digitali sul ramo
 digitale e fisiche sul ramo fisico dello STESSO annuncio, default
-fisico per i client vecchi, guardie, NIP-99 e CSV col «+»).
+fisico per i client vecchi, guardie, NIP-99 e CSV col «+»); regione
+derivata e cercabile (lug 2026: nessun campo nuovo nel form — la
+regione si ricava dalla sigla della provincia con una mappa fissa,
+colonna sua scritta accanto alle coordinate e backfill all'avvio, voce
+«Regione» nel pannello Filtri con le sole regioni che hanno annunci e
+il loro numero, vedi Architettura — collaudata in locale con 42
+verifiche TestClient su DB usa-e-getta [mappa, pubblicazione, modifica,
+import CSV, filtro combinato e paginato, risposta legacy, backfill
+idempotente] e il giro nel browser vero su chiaro e scuro, coi dati
+veri e in demo; in produzione basta il riavvio: la migrazione e il
+backfill girano da soli).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
