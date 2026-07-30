@@ -5121,6 +5121,22 @@ def annulla_lampo(annuncio_id: int, x_tg_init_data: str = Header(""),
 
 # ---------------------- API: ORDINI / ESCROW ------------------------
 
+def _riservati(con, annuncio_id: int) -> int:
+    """Pezzi prenotati: la somma degli ordini 'creato' freschi.
+
+    La prenotazione E' la riga stessa dell'ordine non ancora pagato:
+    niente contatore da tenere allineato (il DELETE del reaper o
+    dell'annullamento la libera per costruzione), e la finestra di 30
+    minuti — la stessa soglia di pulisci_ordini_fantasma — rende
+    innocue le righe stantie anche quando il reaper pigro non e' mai
+    girato. I 30 minuti coprono la vita della invoice (15): un
+    pagamento non puo' atterrare a prenotazione scaduta."""
+    return con.execute(
+        "SELECT COALESCE(SUM(quantita),0) AS n FROM ordini "
+        "WHERE annuncio_id=? AND stato='creato' AND creato>=?",
+        (annuncio_id, int(time.time()) - 1800)).fetchone()["n"]
+
+
 @app.post("/api/orders")
 async def compra(req: Request, x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
@@ -5134,6 +5150,19 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Annuncio non disponibile")
     if a["venditore_id"] == user["id"]:
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
+
+    # La prenotazione dello stock (lug 2026): i pezzi con una invoice
+    # viva in mano ad altri non si rivendono — prima di questa guardia
+    # due compratori potevano pagare ENTRAMBI lo stesso annuncio.
+    # Questo e' il fail-fast di cortesia (niente invoice inutile);
+    # quello che fa fede e' il ricontrollo dopo crea_invoice_escrow.
+    richiesti = 1
+    if richiesti > a["quantita"] - _riservati(con, a["id"]):
+        con.close()
+        raise HTTPException(409, "Qualcun altro sta già pagando questo "
+                                 "oggetto: se il suo pagamento non va in "
+                                 "porto tornerà disponibile tra pochi "
+                                 "minuti")
 
     # L'acquisto alla cifra pattuita: con offerta_id nel body il prezzo
     # dell'articolo diventa quello dell'accordo. L'offerta deve essere
@@ -5289,6 +5318,22 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
 
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
+    # Il ricontrollo che fa fede (patto mono-processo: da qui all'INSERT
+    # nessun await, il blocco e' atomico). Durante l'attesa della
+    # invoice un altro pagamento puo' aver preso l'ultimo pezzo, o il
+    # venditore aver ritoccato lo stock: si rilegge TUTTO — stato,
+    # quantita' e prenotazioni. Fallito = 409 e la invoice appena nata
+    # muore da sola in 15 minuti. VINCOLO da preservare: niente DML su
+    # questa connessione prima di questo punto (una transazione aperta
+    # congelerebbe la lettura; oggi l'unico DML sopra — l'offerta
+    # scaduta — committa e solleva subito).
+    fresco = con.execute("SELECT stato, quantita FROM annunci WHERE id=?",
+                         (a["id"],)).fetchone()
+    if (not fresco or fresco["stato"] != "attivo"
+            or richiesti > fresco["quantita"] - _riservati(con, a["id"])):
+        con.close()
+        raise HTTPException(409, "Qualcun altro ti ha preceduto su questo "
+                                 "annuncio: riprova tra qualche minuto")
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,creato,aggiornato,cambio_ordine,"
