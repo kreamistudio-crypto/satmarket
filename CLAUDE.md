@@ -1732,7 +1732,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   come in pagina. La cifra è `cifraBarra()` (la matematica di
   `totaleStima`, che già conosce lampo e accordo, con la ⚡ davanti
   quando lo sconto è vivo) e `setConsegnaScelta` la riscrive col tocco
-  sulle pillole spedizione/ritiro. Su MOBILE i due gemelli in pagina si
+  sulle pillole spedizione/ritiro.
+  IL VARCO (lug 2026, da una domanda di Andrea che ha trovato un buco
+  vero — la barra l'aveva aperto lei): la barra si raggiunge SENZA
+  scorrere, quindi chi la tocca può non aver mai incontrato le pillole
+  spedizione/ritiro, e l'acquisto partiva con la strada del default
+  senza che NULLA la nominasse prima del pagamento (a spedizione 0 il
+  conto scomposto esce vuoto, e la protezione oggi è spenta). Prima
+  della barra non poteva succedere: i bottoni stavano SOTTO le pillole.
+  Due pezzi. 1) La barra DICE la strada quando ce n'è più d'una — «🚚
+  Spedizione · 905 000 sats», catalogo `NOMI_VIA` — e la dice anche col
+  SOLO digitale (è la strada con la regola asimmetrica delle 24 ore:
+  mai sottintesa). La riga della cifra è un flex dove il NUMERO non si
+  stringe mai (`.bc-num`) e a cedere coi puntini è il nome della strada
+  (`.bc-via`): serve solo nell'estremo strada+lampo+EUR a 360px.
+  2) Il primo tocco con scelta ancora IMPLICITA non compra: apre il
+  foglio «Come vuoi riceverlo?». Stato `consegnaEsplicita` (falso a
+  ogni `openDetail`, vero solo al tocco dell'utente — pillola o voce
+  del foglio) e il bottone passa da `compraDaBarra()`.
+  `apriFoglioConsegna` RIUSA il markup di `#pickerSheet` (titolo,
+  frecce, Esc, tap fuori: gratis) ma NON passa dal catalogo `PICKER` —
+  qui il deposito non è una select, è `consegnaScelta`; ogni voce porta
+  il suo totale vero (`cifraVia`) e la voce del codice online porta la
+  regola asimmetrica GIÀ nel foglio (va detta prima dell'acquisto, e
+  chi arriva dalla barra può non aver visto la trust-note in pagina).
+  La scelta procede in UN gesto: `setConsegnaScelta` → chiusura MIRATA
+  `chiudiPicker()` (mai `closeSheet`: spegnerebbe la pila e azzererebbe
+  il `pollTimer` del pagamento che sta per partire) → `startBuy()`. Esc
+  e tap fuori chiudono e basta, nessun acquisto a sorpresa; in VETRINA
+  il varco non serve (startBuy apre l'invito). Il foglio di PAGAMENTO
+  resta fuori da questa storia di proposito: `startBuy` crea ordine E
+  invoice prima di aprirlo, con la consegna già cotta dentro
+  (`spedizione_sats` e `cambio_ordine` si fissano alla creazione) — una
+  scelta lì arriverebbe dopo la invoice.
+  Su MOBILE i due gemelli in pagina si
   spengono (`.escrow-zone .btn.ghost.compra` con la sua `.escrow-note`
   e `.off-cta`, classe nata per questo): il recinto resta il posto
   delle spiegazioni, della scelta di consegna e del «⚡ Compra subito»
@@ -2381,7 +2414,14 @@ due temi: altezza allineata, lampo −20% e cambio consegna sulla cifra,
 invito in vetrina, annuncio proprio con la tab bar intatta, fogli e
 lightbox che le passano sopra; in produzione va rivista dal vivo dentro
 Telegram, dove contano la gesture bar del telefono e il tema del
-client).
+client); il varco della barra (lug 2026, subito dopo: la barra si
+raggiunge senza scorrere e comprava con la consegna decisa in silenzio
+— ora la barra dice sempre la strada quando ce n'è più d'una, e il
+primo tocco a scelta implicita apre il foglio «Come vuoi riceverlo?»
+coi totali per strada, che scegliendo chiude e procede in un gesto
+solo, vedi Architettura — collaudato in locale col giro vero a 360px:
+foglio, scelta, paySheet coerente, secondo tocco diretto, Escape senza
+ordine, combo digitale, vetrina e regressione dei picker).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
