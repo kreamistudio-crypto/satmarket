@@ -9350,27 +9350,388 @@ async def sollecita_incassi():
 
 # --- L'import periodico da Nostr ------------------------------------
 # Ogni ora l'orologio riusa la logica di importa_nostr.py per tenere
-# freschi gli annunci dei venditori consenzienti (per ora uno solo:
-# NPUB_VENDITORE / VENDITORE_ID in config.py — quando serviranno di
-# piu', qui basta far diventare la coppia una lista). Fail-open
-# totale: se qualcosa va storto resta una riga in console e il
-# mercatino vive. Il lavoro e' sincrono (websocket-client, download
-# foto): gira dentro asyncio.to_thread come la verifica npub.
+# freschi gli annunci dei venditori Nostr. Fail-open totale: se
+# qualcosa va storto resta una riga in console e il mercatino vive.
+# Il lavoro e' sincrono (websocket-client, download foto): gira
+# dentro asyncio.to_thread come la verifica npub.
+#
+# IMPORT APERTO (lug 2026). Prima si importava UN venditore scelto a
+# mano in config; ora si importa chiunque pubblichi annunci NIP-99 in
+# italiano, e i filtri sono due soli: la lingua e la legge.
+#
+# ZERO modifiche allo schema, e non e' un risparmio furbo: e' la
+# conseguenza di come Barattolo guarda Nostr. Essere su Barattolo E'
+# essere su Nostr — non si sceglie di stare sull'uno e non sull'altro:
+# il mercatino e' una VISTA degli eventi NIP-99, non un archivio
+# separato che ne fa una copia. Percio':
+#   - il registro dei venditori non esiste, si deduce (chiunque abbia
+#     una chiave Nostr dimostrata e' un venditore possibile);
+#   - la data d'ingresso e' utenti.registrato, il proprietario e'
+#     utenti.tg_id, il legame e' annunci.contatto_nostr;
+#   - e soprattutto NON serve un flag «toglietemi da qui», perche'
+#     l'uscita esiste gia' ed e' nativa del protocollo: si manda una
+#     cancellazione NIP-09 (kind 5) sul proprio evento. Le lapidi di
+#     importa_nostr.py la rispettano gia', e per sempre.
+# Un flag nostro sarebbe stato una seconda verita' accanto a quella
+# dei relay, cioe' esattamente la cosa da non avere.
+#
+# Due mestieri distinti, e devono restarlo: la SCOPERTA setaccia i
+# relay senza filtro di autore per trovare npub nuove, l'IMPORT
+# chiede a testa. Non e' pignoleria: una spazzata sola non basta,
+# perche' i relay servono i piu' recenti e 500 eventi coprono poche
+# settimane di tutto Nostr — un venditore italiano che pubblica di
+# rado resta sotto la superficie (misurato: la spazzata globale non
+# vedeva NESSUNO dei 17 annunci di un venditore che la query mirata
+# sulla sua chiave trovava tutti).
 
+# NPUB_VENDITORE / VENDITORE_ID non si leggono piu' dal config: la
+# lista dei venditori si deduce dal database (venditori_nostr_attivi).
+# Il venditore storico non va travasato da nessuna parte — l'import
+# gli aveva gia' scritto badge npub + npub_verificata=1 sul profilo,
+# quindi la deduzione lo ritrova da se'. Per questo il cantiere non
+# ha bisogno di migrazioni: nessuna colonna nuova, nessun dato da
+# spostare. Le due righe restano in config per lo script manuale.
+
+# L'interruttore, come per ogni funzione che parla col mondo di fuori
+# (POST_AUTOMATICI, BANNER_TEST, AVVISI_ISCRITTI...): spento, il
+# mercatino vive esattamente come prima e nessun relay viene toccato.
 try:
-    from config import NPUB_VENDITORE, VENDITORE_ID
+    from config import IMPORT_NOSTR_APERTO
 except ImportError:
-    NPUB_VENDITORE, VENDITORE_ID = "", 0
+    IMPORT_NOSTR_APERTO = True
 
 SECONDI_IMPORT_NOSTR = 3600
 _prossimo_import_nostr = 0.0     # 0 = primo giro subito all'avvio
 
+# La scoperta costa una spazzata globale sui relay: piu' rada
+# dell'import, che invece tiene freschi i venditori gia' noti.
+SECONDI_SCOPERTA_NOSTR = 6 * 3600
+_prossima_scoperta_nostr = 0.0
+
+# Quanti venditori nuovi accettare per giro: se un giorno Nostr si
+# riempisse di annunci italiani, meglio digerirli in piu' tornate che
+# spendere l'intero credito AI in un colpo solo.
+MAX_VENDITORI_NUOVI_GIRO = 10
+
+# Il messaggio che accoglie chi scopriamo. Non e' una notifica di
+# servizio: e' la prima cosa che un estraneo legge di noi, ed e' il
+# motivo per cui l'import aperto non e' uno scippo — arriva PRIMA che
+# lui debba accorgersene da solo, e dice subito come uscirne.
+BENVENUTO_NOSTR = (
+    "🫙 Complimenti per il tuo primo articolo!\n\n"
+    "Il tuo articolo è ora disponibile anche su <b>Barattolo</b>, un "
+    "mercatino del tutto italiano con funzionalità extra: pagamenti in "
+    "sats con deposito di garanzia, offerte sul prezzo, spedizione e "
+    "molto altro.\n\n"
+    "Scoprilo su {url}\n\n"
+    "Entra con la <b>stessa chiave Nostr</b> con cui hai firmato "
+    "l'annuncio: lo ritrovi lì, già tuo, e da lì lo gestisci.\n\n"
+    "Barattolo mostra quello che pubblichi su Nostr, non ne tiene una "
+    "copia a parte: se cancelli l'annuncio dal tuo client sparisce "
+    "anche da qui. 🕊")
+
+
+def annuncio_italiano(evento) -> str:
+    """Il filtro lingua dell'import aperto. Ritorna il motivo (testo
+    non vuoto) se l'annuncio sembra italiano, '' altrimenti.
+
+    Tre prove, dalla piu' forte alla piu' debole. La zona passa dal
+    motore geografico che Barattolo usa gia' per gli avvisi di
+    ricerca: sa che «Como» e' un comune ma «como» dentro una frase
+    spagnola non lo e' (stoplist COMUNI_PAROLA), e conosce 7.900
+    comuni veri invece di una manciata di capoluoghi.
+
+    ATTENZIONE, il confronto e' sempre a PAROLE INTERE. Il filtro a
+    sottostringhe che avevamo (censimento_nostr.py) prendeva
+    «instal-LAZIO-ne», «a-ROMA-tico» e ogni frase spagnola con
+    «como»: su 1044 annunci veri ne dichiarava italiani 70, di cui
+    27 erano spagnoli, croati, tedeschi, portoghesi e sudafricani.
+    """
+    def testo_tag(nome):
+        for t in evento.get("tags", []):
+            if t and len(t) > 1 and t[0] == nome:
+                return str(t[1])
+        return ""
+
+    zona = testo_tag("location")
+    # 1) la zona E' un comune italiano vero
+    if zona and coordinate_da_zona(zona) != (0.0, 0.0):
+        return f"comune «{zona[:30]}»"
+    # 2) la zona nomina l'Italia (a parola intera: mai «italian» di
+    #    «Italian Language Lessons», che e' un corso venduto altrove)
+    if {"italia", "italy"} & set(normalizza(zona).split()):
+        return "zona Italia"
+    # 3) il testo e' scritto in italiano. Si contano le parole
+    #    FUNZIONE, che sono quelle che identificano una lingua: un
+    #    annuncio inglese puo' dire «vendo» per caso, ma non dice
+    #    «che», «per» e «con» tutte insieme.
+    parole = set(normalizza(" ".join(
+        [evento.get("content", "") or "", testo_tag("title"),
+         testo_tag("summary")])).split())
+    quante = len(parole & PAROLE_FUNZIONE_IT)
+    if quante >= 3:
+        return f"lingua ({quante} parole)"
+    return ""
+
+
+# Parole funzione italiane ad alta frequenza: e' cosi' che si
+# riconosce una lingua. Volutamente banali — «vendo» o «spedizione»
+# direbbero molto meno, perche' compaiono anche in annunci stranieri
+# che spediscono in Italia.
+PAROLE_FUNZIONE_IT = {
+    "di", "che", "non", "per", "con", "una", "uno", "sono", "anche",
+    "come", "questo", "questa", "molto", "tutto", "tutti", "della",
+    "delle", "dei", "degli", "alla", "allo", "nella", "nello", "gli",
+    "sul", "sulla", "piu", "meno", "ogni", "senza", "dopo", "prima",
+    "nuovo", "nuova", "usato", "usata", "perfette", "condizioni",
+    "spedizione", "spedisco", "consegna", "ritiro", "disponibile",
+    "vendo", "vendesi", "prezzo", "trattabile", "occasione"}
+
+
+def verifica_firma_nostr(evento) -> bool:
+    """Vero se l'evento e' davvero firmato dalla chiave che dichiara.
+
+    Con UN venditore fidato scelto a mano ci si poteva fidare del
+    campo `authors` dei relay (limite dichiarato in testa a
+    importa_nostr.py). Aperto a chiunque non piu': da queste chiavi
+    nascono ACCOUNT, e un relay bugiardo potrebbe attribuire annunci
+    a chi vuole. Stessa ricetta di verifica_evento_login — id
+    ricalcolato con la serializzazione canonica NIP-01, mai fidarsi
+    di quello ricevuto — ma senza le clausole del login (sfida,
+    relay, freschezza), che qui non c'entrano.
+
+    Senza coincurve ritorna False: meglio nessun import che un
+    import di cui non sappiamo dire la provenienza.
+    """
+    if ChiavePubblicaNostr is None:
+        return False
+    try:
+        pubkey, sig = evento.get("pubkey"), evento.get("sig")
+        ev_id, tags = evento.get("id"), evento.get("tags")
+        creato, kind = evento.get("created_at"), evento.get("kind")
+        contenuto = evento.get("content", "")
+        if not (isinstance(pubkey, str) and RE_HEX_64.fullmatch(pubkey)):
+            return False
+        if not (isinstance(sig, str) and RE_HEX_128.fullmatch(sig)):
+            return False
+        if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)):
+            return False
+        if not isinstance(creato, int) or not isinstance(kind, int):
+            return False
+        if not (isinstance(tags, list)
+                and all(isinstance(t, list)
+                        and all(isinstance(x, str) for x in t)
+                        for t in tags)):
+            return False
+        serial = json.dumps([0, pubkey, creato, kind, tags, contenuto],
+                            separators=(",", ":"), ensure_ascii=False)
+        if hashlib.sha256(serial.encode("utf-8")).hexdigest() != ev_id:
+            return False
+        return ChiavePubblicaNostr(bytes.fromhex(pubkey)).verify(
+            bytes.fromhex(sig), bytes.fromhex(ev_id))
+    except Exception:
+        return False
+
+
+async def _modera_eventi_nostr(prodotti: list) -> list:
+    """Strati 1 e 2 della moderazione su un mazzo di eventi Nostr,
+    PRIMA che diventino righe del database.
+
+    Fin qui l'import scriveva dritto nel DB e saltava del tutto
+    `pubblica()`: limite accettato quando il venditore era uno solo e
+    scelto a mano, e che CLAUDE.md prometteva di chiudere «se mai si
+    aprira' ad altri». E' quel momento.
+
+    Ritorna solo gli eventi ammessi. Strato 1 (parole vietate) e'
+    secco e locale; strato 2 (AI) e' a lotti come nell'import CSV ed
+    e' fail-open per costruzione — se la chiave manca o Anthropic
+    tace, passa e non blocca il mercatino. Ogni bocciatura finisce
+    nel registro della moderazione.
+    """
+    ammessi, voci, per_numero = [], [], {}
+    for e in prodotti:
+        def tg(nome):
+            for t in e.get("tags", []):
+                if t and len(t) > 1 and t[0] == nome:
+                    return str(t[1])
+            return ""
+        titolo = tg("title")
+        descrizione = e.get("content", "") or tg("summary")
+        vietato = controlla_vietato(titolo, descrizione)
+        if vietato:
+            registra_moderazione("parole", "vietato", vietato, titolo)
+            print(f"  🚫 parole vietate ({vietato}): {titolo[:44]}")
+            continue
+        numero = len(voci) + 1
+        voci.append((numero, titolo, descrizione))
+        per_numero[numero] = (e, titolo)
+        ammessi.append(e)
+    if not voci:
+        return []
+    bocciati = set()
+    # A lotti di ~20 come l'import CSV: una chiamata sola per venti
+    # annunci, e il verdetto arriva riga per riga.
+    for i in range(0, len(voci), 20):
+        lotto = voci[i:i + 20]
+        for numero, (esito, motivo) in (await moderazione_ai_lotto(lotto)).items():
+            evento, titolo = per_numero.get(numero, (None, ""))
+            if evento is None:
+                continue
+            bocciati.add(id(evento))
+            registra_moderazione("ai_lotto", esito, motivo, titolo)
+            print(f"  🚫 AI ({esito}): {titolo[:44]} — {motivo[:50]}")
+    return [e for e in ammessi if id(e) not in bocciati]
+
+
+def _vaglio_nostr(loop):
+    """Costruisce il filtro che `importa_venditore` chiama prima di
+    scrivere: firma verificata, lingua italiana, moderazione piena.
+
+    Gira DENTRO asyncio.to_thread (l'import e' sincrono), quindi la
+    moderazione — che e' async — si fa rieseguire sul loop vero con
+    run_coroutine_threadsafe. Il tetto di 120s evita che un'API
+    lenta tenga in ostaggio il giro d'import.
+    """
+    def vaglio(prodotti):
+        firmati = [e for e in prodotti if verifica_firma_nostr(e)]
+        if len(firmati) < len(prodotti):
+            print(f"  ✍️ {len(prodotti) - len(firmati)} eventi con firma "
+                  f"non verificabile: ignorati")
+        italiani = []
+        for e in firmati:
+            if annuncio_italiano(e):
+                italiani.append(e)
+        if len(italiani) < len(firmati):
+            print(f"  🌍 {len(firmati) - len(italiani)} eventi non "
+                  f"italiani: ignorati")
+        if not italiani:
+            return []
+        try:
+            return asyncio.run_coroutine_threadsafe(
+                _modera_eventi_nostr(italiani), loop).result(timeout=120)
+        except Exception as e:
+            # Fail-CLOSED, al contrario del resto: se la moderazione
+            # non ha potuto dire la sua, non si importa nulla. Il
+            # giro dopo ci riprova fra un'ora.
+            print(f"⚠️ Moderazione import Nostr non conclusa, "
+                  f"nessun annuncio importato: {e}")
+            return []
+    return vaglio
+
+
+async def _accogli_venditore_nostr(hexkey: str) -> int:
+    """Da chiave Nostr a utente di Barattolo. Se e' gia' dei nostri
+    ritorna il suo tg_id senza toccare nulla; se e' nuovo gli apre
+    l'account nativo (la macchina del login Nostr: tg_id negativo,
+    npub_accesso, badge 🟣 gia' verificato perche' la firma dimostra
+    il possesso) e gli manda il DM di benvenuto.
+
+    Il DM parte SOLO alla creazione, che e' un evento unico per
+    costruzione: per questo non serve una colonna «benvenuto_il».
+    """
+    npub = hex_to_npub(hexkey)
+    con = db()
+    riga = con.execute(
+        "SELECT tg_id FROM utenti WHERE npub_accesso=? "
+        "OR (npub=? AND npub_verificata=1)", (npub, npub)).fetchone()
+    con.close()
+    if riga:
+        return riga["tg_id"]
+    tg_id = crea_utente_nostr(hexkey, npub)
+    # Il benvenuto e' fail-open: un DM che non parte (relay muti,
+    # cryptography assente) non deve far saltare l'import.
+    try:
+        await notifica(tg_id, BENVENUTO_NOSTR.format(url=URL_PUBBLICO))
+    except Exception as e:
+        print(f"⚠️ Benvenuto Nostr non consegnato a {npub[:16]}…: {e}")
+    print(f"  🎉 Venditore nuovo accolto: {npub[:20]}… (id {tg_id})")
+    return tg_id
+
+
+async def scopri_venditori_nostr():
+    """La SCOPERTA: setaccia i relay senza filtro d'autore e trova
+    npub italiane che ancora non conosciamo. Non importa nulla — si
+    limita ad aprire l'account (e mandare il benvenuto), poi ci
+    pensa il giro d'import a testa, che e' l'unico modo di prendere
+    davvero TUTTI gli annunci di ognuno.
+    """
+    global _prossima_scoperta_nostr
+    if time.time() < _prossima_scoperta_nostr:
+        return
+    _prossima_scoperta_nostr = time.time() + SECONDI_SCOPERTA_NOSTR
+    import importa_nostr
+
+    def spazzata():
+        eventi = []
+        for relay in importa_nostr.RELAYS:
+            eventi += importa_nostr.interroga_aperto(relay)
+        return eventi
+
+    eventi = await asyncio.to_thread(spazzata)
+    # Chi conosciamo gia': la lista dei venditori sta nei dati veri.
+    con = db()
+    noti = {r["contatto_nostr"] for r in con.execute(
+        "SELECT DISTINCT contatto_nostr FROM annunci "
+        "WHERE contatto_nostr != ''").fetchall()}
+    con.close()
+    candidati = {}
+    for e in eventi:
+        pubkey = e.get("pubkey", "")
+        if not RE_HEX_64.fullmatch(pubkey or ""):
+            continue
+        try:
+            if hex_to_npub(pubkey) in noti:
+                continue
+        except Exception:
+            continue
+        if not annuncio_italiano(e):
+            continue
+        if not verifica_firma_nostr(e):
+            continue
+        candidati.setdefault(pubkey, 0)
+        candidati[pubkey] += 1
+    if not candidati:
+        print("🔎 Scoperta Nostr: nessun venditore italiano nuovo")
+        return
+    # I piu' prolifici per primi: se il tetto taglia, taglia le code
+    ordinati = sorted(candidati.items(), key=lambda x: -x[1])
+    print(f"🔎 Scoperta Nostr: {len(ordinati)} venditori italiani nuovi")
+    for pubkey, quanti in ordinati[:MAX_VENDITORI_NUOVI_GIRO]:
+        try:
+            await _accogli_venditore_nostr(pubkey)
+        except Exception as e:
+            print(f"⚠️ Venditore {pubkey[:16]}… non accolto: {e}")
+
+
+def venditori_nostr_attivi() -> list:
+    """La lista dei venditori da importare, DEDOTTA e non registrata:
+    chiunque abbia una chiave Nostr di cui ha dimostrato il possesso
+    — npub_accesso (ci entra) o badge npub VERIFICATO. E' la stessa
+    regola di `notifica()` e dei ponti di contatto: mai una npub
+    nuda, che potrebbe essere la dichiarazione falsa di un altro.
+
+    Comprende quindi tre popolazioni che non hanno bisogno di essere
+    distinte: il venditore storico scelto un tempo in config (badge
+    verificato scritto dall'import), chi la scoperta ha accolto
+    (npub_accesso alla creazione) e chi e' entrato da se' col login
+    Nostr — perche' essere su Barattolo e' essere su Nostr, e i suoi
+    annunci NIP-99 sono gia' suoi anche qui. Chi non ci vuole stare
+    manda un kind 5 e le lapidi fanno il resto.
+    """
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id, COALESCE(NULLIF(npub_accesso,''), npub) AS chiave "
+        "FROM utenti "
+        "WHERE npub_accesso != '' OR (npub != '' AND npub_verificata=1)"
+    ).fetchall()
+    con.close()
+    return [(r["chiave"], r["tg_id"]) for r in righe if r["chiave"]]
+
 
 async def importa_nostr_periodico():
     global _prossimo_import_nostr
-    if (not NPUB_VENDITORE or NPUB_VENDITORE.startswith("INCOLLA")
-            or not VENDITORE_ID):
-        return                   # segnaposto in config = funzione spenta
+    if not IMPORT_NOSTR_APERTO:
+        return
     if time.time() < _prossimo_import_nostr:
         return
     # L'appuntamento si fissa PRIMA di provare: anche un errore
@@ -9379,8 +9740,23 @@ async def importa_nostr_periodico():
     import importa_nostr         # qui e non in cima: se manca
     #                              websocket-client il server vive lo stesso
     t0 = int(time.time())
-    importati, aggiornati, saltati = await asyncio.to_thread(
-        importa_nostr.importa_venditore, NPUB_VENDITORE, VENDITORE_ID, DB)
+    # Prima si guarda se c'e' gente nuova, poi si importa: cosi' un
+    # venditore scoperto oggi entra in vetrina nello stesso giro.
+    try:
+        await scopri_venditori_nostr()
+    except Exception as e:
+        print(f"⚠️ Scoperta Nostr saltata: {e}")
+    vaglio = _vaglio_nostr(asyncio.get_running_loop())
+    importati = aggiornati = saltati = 0
+    for npub, venditore_id in venditori_nostr_attivi():
+        try:
+            i, a, s = await asyncio.to_thread(
+                importa_nostr.importa_venditore, npub, venditore_id, DB,
+                vaglio)
+            importati, aggiornati, saltati = (importati + i, aggiornati + a,
+                                              saltati + s)
+        except Exception as e:
+            print(f"⚠️ Import di {npub[:16]}… saltato: {e}")
     print(f"🔄 Import Nostr: {importati} nuovi, {aggiornati} aggiornati, "
           f"{saltati} saltati")
     # Il dopo-import, senza toccare importa_nostr.py (che scrive

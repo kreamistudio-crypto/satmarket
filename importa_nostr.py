@@ -182,6 +182,35 @@ def interroga(relay, hexkey):
     return eventi
 
 
+def interroga_aperto(relay, limite=500):
+    """La spazzata della SCOPERTA: gli annunci di CHIUNQUE, non di un
+    autore solo. Serve a trovare venditori nuovi, non a importarli —
+    quello che torna qui e' per forza un campione recente (i relay
+    servono i piu' nuovi), e infatti a prendere davvero tutti gli
+    annunci di uno e' poi interroga(), chiave per chiave."""
+    eventi = []
+    try:
+        ws = create_connection(relay, timeout=10,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "scoperta",
+                            {"kinds": [30402, 30018], "limit": limite}]))
+        inizio = time.time()
+        while time.time() - inizio < 25:
+            try:
+                msg = json.loads(ws.recv())
+            except Exception:
+                break
+            if msg[0] == "EVENT" and msg[1] == "scoperta":
+                eventi.append(msg[2])
+            elif msg[0] in ("EOSE", "CLOSED") and msg[1] == "scoperta":
+                break
+        ws.close()
+        print(f"  ✓ {relay}: {len(eventi)} eventi in spazzata")
+    except Exception as err:
+        print(f"  ✗ {relay}: non raggiungibile ({err})")
+    return eventi
+
+
 def cambio_btc():
     """Prezzo del Bitcoin in EUR e USD (per convertire i prezzi in sats)."""
     try:
@@ -380,10 +409,17 @@ def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
 
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
-                      db: str = DB):
+                      db: str = DB, vaglio=None):
     """Il cuore dell'import, in forma riusabile: lo chiama lo script
     manuale (main, qui sotto) e ogni ora l'orologio del server.
-    Ritorna la terna (importati, aggiornati, saltati)."""
+    Ritorna la terna (importati, aggiornati, saltati).
+
+    `vaglio` e' il filtro che il SERVER mette prima della scrittura:
+    riceve la lista degli eventi e restituisce quelli ammessi (firma
+    verificata, lingua italiana, moderazione superata). Vive li' e
+    non qui perche' ha bisogno dell'AI e delle chiavi, che stanno nel
+    server; senza (script manuale) l'import si comporta come sempre.
+    """
     hexkey = npub_to_hex(npub_venditore)
     os.makedirs(FOTO_DIR, exist_ok=True)
     print(f"Cerco gli annunci di {npub_venditore[:20]}… sui relay:\n")
@@ -551,6 +587,20 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
         print(f"  🪦 {len(prodotti) - len(vivi)} eventi sotto lapide: "
               f"ignorati")
     prodotti = vivi
+
+    # Il vaglio del server (firma, lingua, moderazione) decide cosa
+    # ENTRA, mai cosa si spegne: gli eventi con status 'sold' gli si
+    # fanno scavalcare apposta, altrimenti una vendita vista sui
+    # relay smetterebbe di spegnere la riga locale — che e' proprio
+    # il buco chiuso dal cantiere cancellazioni. Si vaglia dopo le
+    # lapidi: sugli eventi gia' morti l'AI non si paga.
+    if vaglio:
+        def e_venduto(e):
+            st = tag(e, "status") if e["kind"] == 30402 else None
+            return bool(st and st[1] == "sold")
+        venduti = [e for e in prodotti if e_venduto(e)]
+        prodotti = venduti + list(vaglio([e for e in prodotti
+                                          if not e_venduto(e)]))
 
     importati, aggiornati, saltati = 0, 0, 0
     for e in prodotti:

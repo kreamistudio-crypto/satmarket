@@ -120,6 +120,17 @@ VENDITORE_ID = 222   # a chi intestare gli annunci importati:
 # su GitHub. Finche' resta il segnaposto, la funzione e' spenta.
 NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
 
+# --- Import aperto da Nostr -------------------------------------------
+# Barattolo mostra gli annunci NIP-99 che stanno su Nostr: chiunque
+# pubblichi in italiano si ritrova in vetrina, e chi non ci vuole
+# stare manda una cancellazione (kind 5) dal suo client, che qui
+# viene rispettata per sempre. I filtri sono due: la lingua e la
+# legge (parole vietate + AI, la stessa moderazione di chi pubblica
+# da qui). NON serve elencare nessuna npub: i venditori si deducono
+# dal database e la scoperta trova i nuovi da sola.
+# False = nessun relay viene toccato e il mercatino vive come prima.
+IMPORT_NOSTR_APERTO = True
+
 # --- Post automatici (la piattaforma racconta i fatti) ----------------
 # Ogni nuovo annuncio in vetrina viene annunciato dai canali di
 # Barattolo: una nota Nostr (con la chiave piattaforma qui sopra) e un
