@@ -1,0 +1,61 @@
+# La rete di sicurezza di Barattolo, a ogni commit e a ogni PR.
+#
+# Gira SOLO cio' che non ha bisogno di segreti: niente config.py,
+# niente database, niente chiamate ai relay o ad Anthropic. Una CI
+# che dipende da un server altrui fallisce quando quello ha il
+# raffreddore, e a furia di rossi ingiusti si smette di guardarla.
+name: prove
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Solo le due che servono alle prove: websocket-client perche'
+      # importa_nostr la importa in cima, e basta. Pillow, coincurve,
+      # anthropic & co. non entrano — i pezzi che le usano sono
+      # fail-open per costruzione e qui non si esercitano.
+      - name: Installa il minimo indispensabile
+        run: pip install --quiet websocket-client
+
+      # Primo scalino: tutto compila. Banale e imbattibile — becca il
+      # refuso prima che arrivi sul VPS, che e' esattamente il modo
+      # in cui il mercatino potrebbe restare giu' per una virgola.
+      - name: Tutto compila
+        run: python -m compileall -q server.py importa_nostr.py prove.py
+             genera_icone.py genera_icone_apk.py censimento_nostr.py
+             presenta_release.py config_esempio.py
+
+      # Secondo scalino: il config d'esempio deve restare allineato,
+      # perche' e' quello da cui Andrea copia quando mette mano al VPS.
+      - name: Il config d'esempio e' leggibile
+        run: python -c "import ast,sys; ast.parse(open('config_esempio.py',
+             encoding='utf-8').read())"
+
+      # Terzo scalino: le prove vere.
+      - name: Le prove
+        run: python prove.py
+
+      # Quarto: la regola ferrea numero 1. Se un segreto entra nella
+      # repo il danno e' fatto nel momento in cui si pusha, quindi
+      # meglio urlare subito.
+      - name: Nessun segreto nella repo
+        run: |
+          if git ls-files | grep -E '^(config\.py|.*\.db|foto/)' ; then
+            echo "::error::File che non devono MAI stare nella repo"
+            exit 1
+          fi
+          if git ls-files -z | xargs -0 grep -lE 'nsec1[0-9a-z]{50,}' ; then
+            echo "::error::Sembra esserci una chiave privata Nostr"
+            exit 1
+          fi
+          echo "pulito"
