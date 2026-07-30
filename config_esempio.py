@@ -56,6 +56,9 @@ TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
                              # limite (default). Mettici es. 100_000 per
                              # accendere il tetto; per gli annunci in EUR
                              # vale l'equivalente al cambio corrente
+MAX_QUANTITA_ANNUNCIO = 100  # pezzi massimi per annuncio (quantita' in
+                             # stock): para gli errori di battitura senza
+                             # limitare i commercianti veri
 
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un

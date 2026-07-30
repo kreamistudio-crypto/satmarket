@@ -165,6 +165,15 @@ try:
 except ImportError:
     TETTO_SATS_ANNUNCIO = 0   # 0 = spento; es. 100_000 per accenderlo
 
+# Il tetto della quantita' per annuncio (lug 2026, cantiere stock):
+# un numero ragionevole che para il dito che sbaglia (10000 barattoli
+# di miele) senza limitare i commercianti veri. Vale nel form, nella
+# modifica, nella ricarica e nell'import CSV.
+try:
+    from config import MAX_QUANTITA_ANNUNCIO
+except ImportError:
+    MAX_QUANTITA_ANNUNCIO = 100
+
 # La protezione acquisti (lug 2026, modello Vinted): percentuale a
 # carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
 # e resta alla piattaforma quando l'affare si chiude bene. Distinta da
@@ -846,7 +855,16 @@ def init_db():
                     "lampo_percento INTEGER DEFAULT 0",
                     "lampo_scadenza INTEGER DEFAULT 0",
                     "lampo_creato INTEGER DEFAULT 0",
-                    "lampo_colpo_avvisato INTEGER DEFAULT 0"):
+                    "lampo_colpo_avvisato INTEGER DEFAULT 0",
+                    # quantita (lug 2026): i pezzi disponibili ADESSO,
+                    # non lo storico. Default 1 = ogni annuncio di ieri
+                    # resta un pezzo solo. INVARIANTE: stato='venduto'
+                    # <=> quantita=0 (l'esaurito RIUSA lo stato venduto,
+                    # nessuno stato nuovo: tutti i filtri di vetrina,
+                    # offerte e import valgono gratis). Scala in
+                    # verifica_pagamento, risale col rimborso e con la
+                    # ricarica del venditore.
+                    "quantita INTEGER DEFAULT 1"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -933,7 +951,14 @@ def init_db():
                     # (prefisso 'f:') o in chiaro ('plain:').
                     # MAI in /api/orders: si legge solo dall'endpoint
                     # /contenuto, che fa da ricevuta di lettura.
-                    "contenuto_digitale TEXT DEFAULT ''"):
+                    "contenuto_digitale TEXT DEFAULT ''",
+                    # quantita (lug 2026): i pezzi dell'ordine.
+                    # prezzo_sats resta il TOTALE in cassaforte (invoice,
+                    # rimborso integrale e CSV non cambiano semantica);
+                    # l'articolo unitario si deriva:
+                    # (prezzo_sats - spedizione_sats - protezione_sats)
+                    # / quantita, divisione esatta per costruzione.
+                    "quantita INTEGER DEFAULT 1"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -945,6 +970,18 @@ def init_db():
     con.execute("UPDATE ordini SET disputata=1 WHERE disputata=0 AND stato "
                 "IN ('dispute','return_pending','return_shipped',"
                 "'refund','refunded')")
+    # Riallineamento quantita (lug 2026, idempotente a ogni avvio):
+    # l'invariante venduto <=> quantita=0 vale anche sul pregresso
+    # (i venduti di ieri sono nati col DEFAULT 1) e ripara gli
+    # importati spenti come 'venduto' dall'import, che non conosce
+    # la colonna.
+    con.execute("UPDATE annunci SET quantita=0 "
+                "WHERE stato='venduto' AND quantita!=0")
+    # La prenotazione dello stock (lug 2026) conta gli ordini 'creato'
+    # per annuncio a ogni acquisto: e' la prima query calda su ordini
+    # (finora la tabella viveva senza indici).
+    con.execute("CREATE INDEX IF NOT EXISTS idx_ordini_annuncio "
+                "ON ordini(annuncio_id, stato)")
     # Distintivi: passata silenziosa su TUTTI gli utenti, a ogni avvio.
     # E' idempotente (INSERT OR IGNORE) e auto-riparante: fusioni,
     # rimozioni e criteri nuovi si sistemano al riavvio successivo.
