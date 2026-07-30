@@ -687,6 +687,14 @@
   .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
   .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
   /* Le due pillole spedizione/ritiro quando l'annuncio offre entrambe */
+  /* Lo stepper dei pezzi (cantiere stock): stessa carta delle pillole
+     di consegna, compare solo con piu' di un pezzo disponibile */
+  .qta-riga{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 10px}
+  .qta-riga .qta-lab{font-size:13px;font-weight:800;color:var(--ink-soft)}
+  .qta-step{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
+  .qta-step button{width:42px;height:38px;border:none;background:none;font-size:20px;font-weight:800;color:var(--sats-text);cursor:pointer;font-family:inherit}
+  .qta-step button:disabled{opacity:.35;cursor:default}
+  .qta-step .qta-num{min-width:34px;text-align:center;font-weight:800;font-size:15px}
   .consegna-scelta{display:flex;gap:8px;margin:2px 0 10px}
   .consegna-scelta .consegna-pill{flex:1;padding:9px 10px;border-radius:12px;
     border:1.5px solid var(--line);background:var(--card);font-weight:700;
@@ -1432,6 +1440,9 @@
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
+      <div class="field" id="sellQtaField"><label>Quantità disponibile</label>
+        <input id="sellQta" type="number" inputmode="numeric" min="1" placeholder="1">
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanti pezzi uguali hai? Vuoto o 1&nbsp;= un pezzo solo. All'esaurimento l'annuncio si mette in pausa: lo ricarichi dai tuoi annunci.</div></div>
       <div class="field" id="sellConsegnaField"><label>Consegna — spunta le opzioni che offri</label>
         <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span>📦 Spedizione</span></label>
         <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span>🤝 Ritiro in zona</span></label>
@@ -1991,6 +2002,8 @@ function mapListing(a){
     /* lo stato viaggia solo dove serve (i preferiti): la vetrina
        serve comunque solo gli attivi */
     stato:a.stato||'attivo',
+    /* i pezzi disponibili (cantiere stock): 1 per gli annunci di ieri */
+    quantita:a.quantita||1,
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
     /* username e npub finiscono dentro stringhe JS negli onclick:
@@ -2013,6 +2026,8 @@ function mapOrder(o){
              : o.venditore_id===myTgId ? 'seller' : 'admin';
   return {id:o.id, listing:{emoji:'📦', title:o.titolo, price:o.prezzo_sats},
     state:o.stato, role,
+    /* i pezzi dell'ordine: l'articolo unitario si ricava per divisione */
+    qta:o.quantita||1,
     sellerInvoice:o.invoice_venditore||'',
     corriere:o.corriere||'', tracking:o.tracking||'',
     corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
@@ -2247,7 +2262,9 @@ let listings = [
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
   {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
    zone:"Torino (TO)", regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
-   desc:"Copia nuova, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
+   /* il multi-pezzo dimostrativo: fa vedere stepper e conto × N */
+   quantita:3,
+   desc:"Tre copie nuove, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
    zone:"Roma (RM)", regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
    /* la lampo dimostrativa: scadenza calcolata al carico, cosi' il
@@ -2862,6 +2879,20 @@ let consegnaScelta = 'spedizione';
    delle strade): finche' la scelta e' implicita, la barra d'acquisto
    non compra in silenzio — apre il foglio «Come vuoi riceverlo?». */
 let consegnaEsplicita = false;
+/* I pezzi scelti dal compratore (cantiere stock): si riparte da 1 a
+   ogni dettaglio aperto; il massimo e' la quantita' dell'annuncio.
+   Lo stepper compare solo con piu' di un pezzo disponibile. */
+let qtaScelta = 1;
+function setQta(d){
+  const l = currentListing; if (!l) return;
+  qtaScelta = Math.min(l.quantita||1, Math.max(1, qtaScelta + d));
+  const n = el('qtaNum'); if (n) n.textContent = qtaScelta;
+  const meno = el('qtaMeno'), piu = el('qtaPiu');
+  if (meno) meno.disabled = qtaScelta <= 1;
+  if (piu) piu.disabled = qtaScelta >= (l.quantita||1);
+  haptic();
+  aggiornaCifreCompra(l);
+}
 function sceltaConsegna(l){
   const s = stradeConsegna(l);
   if (!s.length) return '';
@@ -2885,7 +2916,9 @@ function pilloleConsegna(l){
    Se ho un'offerta ACCETTATA su questo annuncio, l'articolo della
    stima e' la cifra pattuita (artStima). */
 function totaleStima(l){
-  const art = artStima(l);
+  /* l'articolo e' unitario x pezzi scelti; la spedizione resta UNA
+     volta sola e la protezione segue l'articolo intero (come compra) */
+  const art = artStima(l) * qtaScelta;
   const sped = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0;
   return art + sped + Math.floor(art * protPercento / 100);
 }
@@ -2912,10 +2945,12 @@ function artStima(l){
 let offertaMinPercento = 0;
 /* Le righe del conto scomposto per i fogli di pagamento: compaiono
    solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
-function contoScomposto(art, sped, prot, tot){
-  if (!(sped > 0 || prot > 0)) return '';
+function contoScomposto(art, sped, prot, tot, qta){
+  const pezzi = qta || 1;
+  if (!(sped > 0 || prot > 0 || pezzi > 1)) return '';
   const r = (n, t, b) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${fmt(n)} sats</span></div>`;
-  return r(art, 'Articolo') + (sped>0 ? r(sped, 'Spedizione') : '')
+  return r(art, pezzi > 1 ? `Articolo × ${pezzi}` : 'Articolo')
+       + (sped>0 ? r(sped, 'Spedizione') : '')
        + (prot>0 ? r(prot, 'Protezione acquisti') : '') + r(tot, 'Totale', 1);
 }
 /* Il tocco sulle pillole spedizione/ritiro: aggiorna la scelta e le
@@ -2928,16 +2963,17 @@ function setConsegnaScelta(v){
      spaventare chi prende la strada fisica */
   const nd = el('notaDigitale');
   if (nd) nd.style.display = v==='digitale' ? '' : 'none';
-  const l = currentListing;
-  if (l) {
-    document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
-      s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
-    /* anche la barra d'acquisto parla la cifra nuova (con la strada
-       e la sua ⚡: cifraBarra e' markup, quindi innerHTML — dentro ci
-       passano solo i nostri cataloghi, mai testo utente) */
-    const bc = document.querySelector('#bcCompra .cifra');
-    if (bc) bc.innerHTML = cifraBarra(l);
-  }
+  if (currentListing) aggiornaCifreCompra(currentListing);
+}
+/* Le cifre sui bottoni compra e sulla barra, riscritte a ogni tocco
+   su pillole e stepper senza ridisegnare il dettaglio (cifraBarra e'
+   markup, quindi innerHTML — dentro ci passano solo i nostri
+   cataloghi, mai testo utente). */
+function aggiornaCifreCompra(l){
+  document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
+    s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
+  const bc = document.querySelector('#bcCompra .cifra');
+  if (bc) bc.innerHTML = cifraBarra(l);
 }
 /* La consegna nel dettaglio (lug 2026): le strade offerte diventano
    pillole esplicite nella riga delle pillole («🚚 Spedizione + 4 €»,
@@ -3298,8 +3334,12 @@ let hintPubblicazione = null;
 const NOMI_VIA = {spedizione:'🚚 Spedizione', ritiro:'🤝 Ritiro', digitale:'💾 Codice'};
 const cifraBarra = l => {
   const att = sceltaConsegna(l);
+  /* coi pezzi scelti >1 la barra lo dice («× 2»): la cifra e' il
+     totale e non deve leggersi come prezzo del singolo */
+  const pz = qtaScelta > 1 ? ` × ${qtaScelta}` : '';
   const via = (stradeConsegna(l).length >= 2 || att === 'digitale')
-    ? `<span class="bc-via">${NOMI_VIA[att]} ·</span>` : '';
+    ? `<span class="bc-via">${NOMI_VIA[att]}${pz} ·</span>`
+    : (pz ? `<span class="bc-via">${qtaScelta} pezzi ·</span>` : '');
   return `${via}<span class="bc-num">${lampoAttiva(l) ? '⚡ ' : ''}${
     stimaCirca(l)}${fmt(totaleStima(l))} sats</span>`;
 };
@@ -3318,7 +3358,7 @@ function compraDaBarra(){
 /* Il totale stimato per UNA strada: la matematica di totaleStima ma
    con la via passata per argomento, per le voci del foglio. */
 function cifraVia(l, v){
-  const art = artStima(l);
+  const art = artStima(l) * qtaScelta;   /* i pezzi scelti, come totaleStima */
   const sped = v === 'spedizione' ? satsSpedizione(l) : 0;
   return `${stimaCirca(l)}${fmt(art + sped + Math.floor(art * protPercento / 100))} sats totali`;
 }
@@ -3386,6 +3426,7 @@ function openDetail(id){
   const offAcc = offertaAccettataPer(l.id);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
   consegnaEsplicita = false;       // e la scelta torna implicita
+  qtaScelta = 1;                   // e i pezzi ripartono da uno
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
      carta: il ritorno al mercatino a sinistra — c'e' SEMPRE, anche in
      DEMO — e il condividi a destra (in DEMO no: il link punterebbe
@@ -3439,6 +3480,7 @@ function openDetail(id){
         ${condPill(l.condizione)}
         ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
         ${tagliaPill(l.taglia)}
+        ${(l.quantita||1)>1?`<span class="pill">${l.quantita} disponibili</span>`:''}
         ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
       </div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
@@ -3466,6 +3508,7 @@ function openDetail(id){
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${pilloleConsegna(l)}
+             ${(l.quantita||1) > 1 ? `<div class="qta-riga"><span class="qta-lab">Quantità</span><div class="qta-step"><button type="button" id="qtaMeno" onclick="setQta(-1)" aria-label="Un pezzo in meno" disabled>−</button><span class="qta-num mono" id="qtaNum">1</span><button type="button" id="qtaPiu" onclick="setQta(1)" aria-label="Un pezzo in più">+</button></div></div>` : ''}
              ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai 24 ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
@@ -3815,12 +3858,13 @@ async function startBuy(){
   /* con un'offerta accettata l'articolo e' la cifra pattuita, e
      l'ordine viaggia con offerta_id: il server fa i conti su quella */
   const offAcc = offertaAccettataPer(l.id);
-  const artS = artStima(l),
+  const artS = artStima(l) * qtaScelta,
         spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
         protS = Math.floor(artS * protPercento / 100);
   el('payAmount').textContent = stimaCirca(l) + fmt(totaleStima(l));
   el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS,
-                                                artS + spedS + protS);
+                                                artS + spedS + protS,
+                                                qtaScelta);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
     `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale 15 minuti`;
@@ -3837,6 +3881,7 @@ async function startBuy(){
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({annuncio_id: l.id, consegna: sceltaConsegna(l),
+                          quantita: qtaScelta,
                           offerta_id: offAcc ? offAcc.id : 0})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
@@ -3844,7 +3889,8 @@ async function startBuy(){
   if (d.prezzo_sats) el('payAmount').textContent = fmt(d.prezzo_sats);
   if (d.prezzo_sats !== undefined)
     el('payScomposto').innerHTML = contoScomposto(d.articolo_sats||d.prezzo_sats,
-      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats);
+      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
+      d.quantita||1);
   el('payInvoice').textContent = d.invoice;
   /* Controllo automatico ogni 4 secondi: appena paghi, se ne accorge */
   if (pollTimer) clearInterval(pollTimer);   /* mai due controlli accavallati */
@@ -3887,11 +3933,12 @@ function compraSubito(){
   /* per i listini EUR e' una stima: i sats veri li fissa il server */
   const l = currentListing;
   el('nwcConfermaSats').textContent = stimaCirca(l) + fmt(totaleStima(l));
-  const artS = artStima(l),
+  const artS = artStima(l) * qtaScelta,
         spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
         protS = Math.floor(artS * protPercento / 100);
   el('nwcScomposto').innerHTML = contoScomposto(artS, spedS, protS,
-                                                artS + spedS + protS);
+                                                artS + spedS + protS,
+                                                qtaScelta);
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -3914,6 +3961,7 @@ async function confermaCompraSubito(btn){
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({annuncio_id: currentListing.id,
                             consegna: sceltaConsegna(currentListing),
+                            quantita: qtaScelta,
                             offerta_id: offertaAccettataPer(currentListing.id)?.id || 0})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
@@ -3921,7 +3969,8 @@ async function confermaCompraSubito(btn){
     invoice = d.invoice;
     satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
     scompOrdine = d.prezzo_sats ? contoScomposto(d.articolo_sats||d.prezzo_sats,
-      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats) : '';
+      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
+      d.quantita||1) : '';
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);
@@ -4502,7 +4551,9 @@ async function rispondiOfferta(id, azione){
   }
   if (azione==='accetta' && !confirm(o.venditore_id===myTgId
       ? 'Accettare non riserva l\'oggetto: l\'annuncio resta in vetrina '
-        + 'e vince chi paga per primo.\n\nAccetti l\'offerta?'
+        + 'e vince chi paga per primo. Se l\'annuncio ha più pezzi, la '
+        + 'cifra vale come prezzo AL PEZZO per la quantità che sceglierà.'
+        + '\n\nAccetti l\'offerta?'
       : 'Accetti la controproposta? Avrai un tempo limitato per pagare.'))
     return;
   if (azione==='rifiuta' && !confirm('Vuoi rifiutare? La decisione è definitiva.'))
@@ -4635,9 +4686,11 @@ function openOrder(id){
     <div class="detail-body">
       <h2 style="font-size:17px">${o.listing.emoji} ${esc(o.listing.title)}</h2>
       <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span></div>
-      ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0) ? `<div class="eur-hint" style="margin-top:-6px">${
+      ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0 || o.qta>1) ? `<div class="eur-hint" style="margin-top:-6px">${
+        o.qta>1 ? `${o.qta} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats` : ''}${
+        o.qta>1 && o.consegnaScelta ? ' — ' : ''}${
         o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : '🚚 con spedizione') : ''}${
-        (o.consegnaScelta && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
+        ((o.qta>1||o.consegnaScelta) && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
         (o.spedSats>0||o.protSats>0) ? 'di cui ' + [
           o.spedSats>0 ? fmt(o.spedSats)+' sats di spedizione' : '',
           o.protSats>0 ? fmt(o.protSats)+' sats di protezione acquisti' : ''
@@ -6151,20 +6204,48 @@ async function caricaAltriMiei(){
    spento (pattern dei preferiti «non più disponibile»): badge ⏳, il
    dettaglio non si apre, niente Modifica (riparte dopo la decisione),
    resta 🗑 per ritirarlo. */
-const rigaMioAnnuncio = l => { const rev = l.stato==='revisione'; return `
+const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
+  esa = l.stato==='venduto', spento = rev || esa; return `
     <div class="order">
       <div class="row">
-        <b ${rev?'style="':'onclick="openDetail('+l.id+')" style="cursor:pointer;'}display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
-          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${rev?';filter:grayscale(1);opacity:.6':''}">`
-          : `<span style="font-size:22px${rev?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis${rev?';color:var(--muted)':''}">${esc(l.title)}</span></b>
+        <b ${spento?'style="':'onclick="openDetail('+l.id+')" style="cursor:pointer;'}display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
+          ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento?';filter:grayscale(1);opacity:.6':''}">`
+          : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis${spento?';color:var(--muted)':''}">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
           ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
-              :`<span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
-          <span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>
+            :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge" onclick="ricaricaAnnuncio(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">↻ Rimetti in vendita</span>`
+            :`<span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
+          ${esa?'':`<span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
         </span>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${l.quantita} pezzi`:''} · 📍 ${esc(l.zone)}</div>
     </div>`; };
+
+/* La ricarica dello stock: un numero e via. Tocca SOLO la quantita'
+   (il server non aspetta gli affari in corso) e un esaurito torna in
+   vetrina da solo. Scrittura assoluta: quanti pezzi hai ORA. */
+async function ricaricaAnnuncio(id){
+  haptic();
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const l = myListings.find(x=>x.id===id);
+  const n = prompt('Quanti pezzi hai ora in vendita?',
+                   l && l.quantita > 1 ? l.quantita : '1');
+  if (n === null) return;
+  const q = parseInt(String(n).trim(), 10);
+  if (!q || q < 1) { toast('Serve un numero di pezzi (almeno 1)'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/listings/${id}/quantita`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({quantita: q})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Ricarica non riuscita', 5000); return; }
+    toast(d.riattivato ? '⚡ Annuncio di nuovo in vetrina!'
+                       : '✔ Quantità aggiornata');
+    await loadListings();
+    await loadMyListings(); renderMyListings();
+  } catch(e) { toast('Ricarica non riuscita: riprova'); }
+}
 
 function renderMyListings(){
   const box = el('myListings');
@@ -6650,6 +6731,10 @@ function consegnaPayload(){
   return out;
 }
 
+/* La quantita' dal form Vendi: vuota o storta = 1 pezzo (il giudice
+   vero, tetto compreso, vive sul server). */
+const qtaForm = () => Math.max(1, parseInt(el('sellQta').value, 10) || 1);
+
 /* Porta un annuncio nel form di Vendi per ritoccarlo: stessi campi,
    stessa moderazione, submit sull'endpoint di modifica. */
 function editListing(id){
@@ -6673,6 +6758,8 @@ function editListing(id){
   /* uno storico senza condizione arriva vuoto: publish() la esige,
      ed e' cosi' che la modifica «la chiede» senza obblighi retroattivi */
   el('sellCond').value = l.condizione||'';
+  /* la quantita': vuota per il pezzo singolo, il campo resta leggero */
+  el('sellQta').value = (l.quantita||1) > 1 ? l.quantita : '';
   aggiornaPickerVendi();
   /* spedEur pieno = costo ancorato all'euro: si rientra in euro
      anche sul listino sats (il toggle segue la semantica salvata) */
@@ -6688,7 +6775,7 @@ function editListing(id){
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
-  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
+  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped','sellQta'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   aggiornaPickerVendi();
@@ -6724,6 +6811,9 @@ function aggiornaFormVendi(){
      porta: il campo si nasconde come quelli di consegna */
   if (el('sellCondField'))
     el('sellCondField').style.display = editandoNostr ? 'none' : '';
+  /* e nemmeno la quantita' (gli importati restano un pezzo solo) */
+  if (el('sellQtaField'))
+    el('sellQtaField').style.display = editandoNostr ? 'none' : '';
   if (el('sellConsegnaField')){
     el('sellConsegnaField').style.display = editandoNostr ? 'none' : '';
     if (editandoNostr){
@@ -6890,7 +6980,7 @@ async function publish(){
       consegna:cns.consegna, sped:cns.spedizione_sats||0,
       spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
       ancheDigitale:!!cns.anche_digitale,
-      condizione:el('sellCond').value,
+      condizione:el('sellCond').value, quantita:qtaForm(),
       zone:el('sellZone').value||'', seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
@@ -6899,6 +6989,7 @@ async function publish(){
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({titolo:t, ...prezzo, ...cns,
         categoria:el('sellCat').value, condizione:el('sellCond').value,
+        quantita:qtaForm(),
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
@@ -6916,7 +7007,7 @@ async function publish(){
         hintPubblicazione = {id:'npubverifica', annuncio:nuovoId};
     }
   }
-  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped'].forEach(i=>el(i).value='');
+  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped','sellQta'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   aggiornaPickerVendi();
@@ -6955,14 +7046,14 @@ async function salvaModifica(t, p){
         consegna:cns.consegna, sped:cns.spedizione_sats||0,
         spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
         ancheDigitale:!!cns.anche_digitale,
-        condizione:el('sellCond').value,
+        condizione:el('sellCond').value, quantita:qtaForm(),
         zone:el('sellZone').value||'', desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
   } else {
     const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
     const body = {titolo:t, ...prezzo, ...cns, categoria:el('sellCat').value,
-      condizione:el('sellCond').value,
+      condizione:el('sellCond').value, quantita:qtaForm(),
       zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
     if (sellFoto.length) body.foto = sellFoto;
     const r = await fetch(`${API_BASE}/listings/${id}/modifica`, {
