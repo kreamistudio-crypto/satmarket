@@ -464,7 +464,7 @@
      tutto. `visibility` e non `display`: l'header e' sticky, cioe'
      sta nel flusso, e toglierlo di li' farebbe saltare la pagina
      sotto — invisibile ora, ma ben visibile alla chiusura. */
-  body.lb-aperto header, body.lb-aperto nav{visibility:hidden}
+  body.lb-aperto header, body.lb-aperto nav, body.lb-aperto #barraCompra{visibility:hidden}
   #lbStage{position:absolute;inset:0;overflow:hidden;touch-action:none;
     display:flex;align-items:center;justify-content:center}
   /* La pista: le foto in fila, una per schermo. Scorre in orizzontale
@@ -634,6 +634,40 @@
   nav button.sell.active .ic{background:var(--sats);box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35)}
   /* Il lockup nella barra: esiste solo da desktop in su */
   .nav-logo{display:none}
+
+  /* ---------- barra d'acquisto del dettaglio (solo mobile) ----------
+     Nel dettaglio di un annuncio comprabile la tab bar lascia il posto
+     alla barra d'acquisto (modello Vinted): stessa posizione fissa e
+     stessa carta della nav — niente salto di layout, cambia solo cosa
+     si fa da li'. Vive a z-index 30 come la nav: i fogli (41) e il
+     loro velo (40) le passano sopra senza che rubi tocchi. Da ≥768px
+     non esiste: la nav e' una topbar e il dettaglio a due colonne ha
+     gia' i bottoni sotto mano. */
+  #barraCompra{
+    position:fixed;bottom:0;left:0;right:0;z-index:30;
+    background:var(--nav-bg);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);display:none;gap:10px;align-items:stretch;
+    padding:5px var(--pad) calc(5px + env(safe-area-inset-bottom));
+    max-width:520px;margin:0 auto;
+  }
+  /* misure tirate: la barra deve essere alta quanto la nav che sostituisce */
+  #barraCompra .btn{margin-top:0;width:auto;line-height:1.25}
+  #bcCompra{flex:1;min-width:0;font-size:15px;padding:7px 10px 8px}
+  /* l'etichetta non va mai a capo: a 360px stringe coi puntini */
+  #bcCompra .bc-lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  #bcCompra .cifra{font-size:13px;white-space:nowrap}
+  #bcOfferta{flex:0 0 auto;font-size:14px;padding:8px 14px}
+  @media (max-width:767.98px){
+    body.con-barra nav{display:none}
+    body.con-barra #barraCompra{display:flex;animation:barraSu .18s ease}
+    /* i due gemelli in pagina si spengono: il recinto resta il posto
+       delle spiegazioni, della scelta di consegna e del Compra subito
+       NWC (che e' un'altra strada, non un doppione) */
+    body.con-barra .escrow-zone .btn.ghost.compra,
+    body.con-barra .escrow-zone .btn.ghost.compra + .escrow-note,
+    body.con-barra .escrow-zone .off-cta{display:none}
+  }
+  @keyframes barraSu{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
 
   /* ---------- dettaglio annuncio ---------- */
   .detail-ph{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
@@ -1184,6 +1218,7 @@
     .empty-mascotte,.hero img,.attesa-jar,.attesa-clessidra{animation:none}
     .sheet{transition:none}
     .sheet-bg.open{animation:none}
+    body.con-barra #barraCompra{animation:none}
   }
 </style>
 <script>
@@ -1597,6 +1632,14 @@
   </div>
 
   <!-- ============ NAV ============ -->
+  <!-- La barra d'acquisto del dettaglio: prende il posto della tab bar
+       (solo mobile, la regia e' aggiornaBarraCompra). I bottoni chiamano
+       le stesse strade dei gemelli in pagina, guardie comprese. -->
+  <div id="barraCompra">
+    <button class="btn orange compra" id="bcCompra" onclick="startBuy()"></button>
+    <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">💰 Offerta</button>
+  </div>
+
   <nav>
     <!-- Tre voci, col + di Vendi al centro. Il Profilo vive nel tasto
          tappo in testata (mobile) e qui in coda solo da desktop -->
@@ -2259,6 +2302,9 @@ function go(view){
     ?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
   document.querySelectorAll('.avatar-btn').forEach(a=>a.classList.toggle('attivo', view==='profilo'));
+  /* Nel dettaglio comprabile la tab bar lascia il posto alla barra
+     d'acquisto (solo mobile, ci pensa il CSS); su ogni altra vista torna */
+  aggiornaBarraCompra(view);
   if (view==='affari') {
     if (!DEMO) {
       loadOrders().then(renderOrders).catch(()=>renderOrders());
@@ -2871,8 +2917,13 @@ function setConsegnaScelta(v){
   const nd = el('notaDigitale');
   if (nd) nd.style.display = v==='digitale' ? '' : 'none';
   const l = currentListing;
-  if (l) document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
-    s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
+  if (l) {
+    document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
+      s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
+    /* anche la barra d'acquisto parla la cifra nuova (con la sua ⚡) */
+    const bc = document.querySelector('#bcCompra .cifra');
+    if (bc) bc.textContent = cifraBarra(l);
+  }
 }
 /* La consegna nel dettaglio (lug 2026): le strade offerte diventano
    pillole esplicite nella riga delle pillole («🚚 Spedizione + 4 €»,
@@ -3222,6 +3273,30 @@ function aggiornaPayHint(){
    appena nato: {id, annuncio}, consumato solo su quell'annuncio. */
 let hintPubblicazione = null;
 
+/* ---------------- barra d'acquisto del dettaglio ----------------
+   La cifra dei bottoni della barra: la stessa matematica dei gemelli
+   in pagina (totaleStima gia' passa da lampo e accordo), con la ⚡
+   davanti quando lo sconto lampo e' vivo. */
+const cifraBarra = l =>
+  `${lampoAttiva(l) ? '⚡ ' : ''}${stimaCirca(l)}${fmt(totaleStima(l))} sats`;
+/* La regia, chiamata da go() a ogni cambio vista: la barra esiste solo
+   nel dettaglio di un annuncio comprabile — mai sui propri annunci ne'
+   sui non attivi (li' resta la tab bar). In VETRINA c'e', e i bottoni
+   aprono il foglio-invito come i gemelli in pagina: la guardia e' gia'
+   dentro startBuy/apriOfferta. Il CSS la disegna solo su mobile: da
+   desktop la nav e' una topbar e non si tocca. */
+function aggiornaBarraCompra(view){
+  const l = currentListing;
+  const mio = !DEMO && myTgId && l && l.sellerId===myTgId;
+  const su = view==='dettaglio' && !!l && !mio && (l.stato||'attivo')==='attivo';
+  document.body.classList.toggle('con-barra', su);
+  if (!su) return;
+  el('bcCompra').innerHTML =
+    `<span class="bc-lab">🔒 Compra in sicurezza</span><span class="cifra">${cifraBarra(l)}</span>`;
+  /* con un accordo gia' stretto l'offerta non si rifa': come in pagina */
+  el('bcOfferta').style.display = offertaAccettataPer(l.id) ? 'none' : '';
+}
+
 function openDetail(id){
   currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
   if (!currentListing) { toast('Annuncio non trovato'); return; }
@@ -3317,7 +3392,7 @@ function openDetail(id){
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
              <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
-             ${offAcc ? '' : `<button class="btn ghost" onclick="apriOfferta()">💰 Fai un'offerta</button>`}
+             ${offAcc ? '' : `<button class="btn ghost off-cta" onclick="apriOfferta()">💰 Fai un'offerta</button>`}
            </div>`}
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)
