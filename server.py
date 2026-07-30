@@ -5181,13 +5181,21 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # due compratori potevano pagare ENTRAMBI lo stesso annuncio.
     # Questo e' il fail-fast di cortesia (niente invoice inutile);
     # quello che fa fede e' il ricontrollo dopo crea_invoice_escrow.
-    richiesti = 1
-    if richiesti > a["quantita"] - _riservati(con, a["id"]):
+    # La quantita' richiesta: assente o storta = 1 (i client di ieri).
+    try:
+        richiesti = max(1, int(d.get("quantita") or 1))
+    except (TypeError, ValueError):
+        richiesti = 1
+    disponibile = a["quantita"] - _riservati(con, a["id"])
+    if richiesti > disponibile:
         con.close()
-        raise HTTPException(409, "Qualcun altro sta già pagando questo "
-                                 "oggetto: se il suo pagamento non va in "
-                                 "porto tornerà disponibile tra pochi "
-                                 "minuti")
+        if disponibile < 1:
+            raise HTTPException(409, "Qualcun altro sta già pagando questo "
+                                     "oggetto: se il suo pagamento non va "
+                                     "in porto tornerà disponibile tra "
+                                     "pochi minuti")
+        raise HTTPException(400, f"Ne restano solo {disponibile}: scegli "
+                                 f"una quantità più piccola")
 
     # L'acquisto alla cifra pattuita: con offerta_id nel body il prezzo
     # dell'articolo diventa quello dell'accordo. L'offerta deve essere
@@ -5273,7 +5281,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             prezzo_eur_eff = min(prezzo_eur_eff, l_eur)
         else:
             prezzo_sats_eff = min(prezzo_sats_eff, l_sats)
-    articolo, cambio_ordine = prezzo_sats_eff, 0.0
+    # Il conto lavora sull'UNITARIO (offerte e lampo parlano il prezzo
+    # del singolo pezzo, come il listino) e moltiplica alla fine:
+    # arrotondare PRIMA di moltiplicare rende esatta la divisione a
+    # ritroso di chi legge l'ordine (unitario = articolo / quantita).
+    unitario, cambio_ordine = prezzo_sats_eff, 0.0
     sped = a["spedizione_sats"] if scelta == "spedizione" else 0
     # Spedizione ANCORATA all'euro su listino sats (spedizione_eur
     # piena): i sats si decidono ADESSO, col cambio corrente. Senza
@@ -5297,15 +5309,16 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             raise HTTPException(503, "Il cambio euro non è disponibile in "
                                      "questo momento: riprova tra qualche "
                                      "minuto")
-        articolo = max(1, round(prezzo_eur_eff / cambio_ordine * 100_000_000))
+        unitario = max(1, round(prezzo_eur_eff / cambio_ordine * 100_000_000))
         if scelta == "spedizione":
             sped = round(a["spedizione_eur"] / cambio_ordine * 100_000_000)
         # Il tetto di rodaggio con +20% di tolleranza: la volatilita'
         # ordinaria passa, un crollo del cambio no — e il venditore
         # si ripara da solo ritoccando il prezzo (la modifica
-        # riconvalida al cambio di oggi). Il tetto guarda il solo
-        # articolo, come alla pubblicazione.
-        if TETTO_SATS_ANNUNCIO and articolo > TETTO_SATS_ANNUNCIO * 1.2:
+        # riconvalida al cambio di oggi). Il tetto guarda l'UNITARIO:
+        # e' un vincolo del listino, come alla pubblicazione — tre
+        # pezzi regolari non devono dare 409.
+        if TETTO_SATS_ANNUNCIO and unitario > TETTO_SATS_ANNUNCIO * 1.2:
             con.close()
             await notifica(a["venditore_id"],
                 f"📈 Il cambio si è mosso troppo: il tuo annuncio "
@@ -5316,12 +5329,14 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                      "l'annuncio è stato pubblicato: il "
                                      "venditore deve ritoccare il prezzo")
 
+    articolo = unitario * richiesti
     # La protezione acquisti: percentuale sul SOLO articolo, per
     # difetto (mai un sat piu' del promesso), anche sul ritiro in zona
     # (copre il deposito di garanzia, non il trasporto). Oggi la leva
     # e' a 0: il ramo esiste ma non scatta. Il compratore paga il
     # TOTALE nel deposito; al rilascio il venditore riceve
     # articolo+spedizione e la protezione resta alla piattaforma.
+    # La spedizione resta UNA volta sola, qualunque sia la quantita'.
     prot = articolo * PROTEZIONE_PERCENTO // 100
     totale = articolo + sped + prot
 
@@ -5329,7 +5344,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # di rodaggio): un compratore senza acquisti conclusi non compra
     # beni digitali sopra il tetto. Il caso del codice riscattato-e-
     # negato non si risolve, si rende antieconomico: la prima truffa
-    # non puo' valere piu' del tetto. Vale sul solo articolo.
+    # non puo' valere piu' del tetto. Vale sull'articolo TOTALE
+    # (unitario x pezzi): il rischio e' la cifra, non il listino.
     if (scelta == "digitale" and TETTO_DIGITALE_NUOVI
             and articolo > TETTO_DIGITALE_NUOVI):
         storia = con.execute("SELECT acquisti_ok FROM utenti WHERE tg_id=?",
@@ -5362,11 +5378,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,spedizione_sats,protezione_sats) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        "consegna_scelta,spedizione_sats,protezione_sats,quantita) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], int(time.time()), int(time.time()),
-         cambio_ordine, scelta, sped, prot))
+         cambio_ordine, scelta, sped, prot, richiesti))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
@@ -5381,6 +5397,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
             "protezione_sats": prot, "consegna": scelta,
+            "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
 
 
@@ -5410,38 +5427,58 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
             con.commit()
             con.close()
             return {"stato": "locked"}
-        con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
-                    (o["annuncio_id"],))
-        a = con.execute("SELECT contatto_nostr, titolo FROM annunci "
-                        "WHERE id=?", (o["annuncio_id"],)).fetchone()
-        # Le offerte su questo annuncio si chiudono col pagamento:
-        # quella che ha generato l'ordine si conclude, tutte le altre
-        # ancora vive decadono — l'annuncio non si e' mai bloccato,
-        # e ha vinto chi ha pagato per primo.
+        # Lo stock scala dei pezzi dell'ordine. MAX para il corner raro
+        # dell'ordine pagato ma verificato dopo i 30 minuti della
+        # prenotazione: mai un numero negativo in vetrina.
+        pezzi = o["quantita"] or 1
+        con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
+                    "WHERE id=?", (pezzi, o["annuncio_id"]))
+        a = con.execute("SELECT contatto_nostr, titolo, quantita "
+                        "FROM annunci WHERE id=?",
+                        (o["annuncio_id"],)).fetchone()
+        # L'esaurimento: solo quando l'ULTIMO pezzo se ne va l'annuncio
+        # diventa 'venduto' (l'invariante venduto <=> quantita=0). Con
+        # pezzi ancora in vetrina niente sold, niente ✅ sul canale e le
+        # trattative altrui restano VIVE: c'e' ancora da comprare.
+        esaurito = not a or a["quantita"] <= 0
+        if esaurito:
+            con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
+                        (o["annuncio_id"],))
+        # L'offerta che ha generato l'ordine si conclude col pagamento;
+        # le ALTRE ancora vive decadono solo all'esaurimento —
+        # l'annuncio non si e' mai bloccato, e ha vinto chi ha pagato.
         adesso = int(time.time())
         con.execute("UPDATE offerte SET stato='conclusa', aggiornato=? "
                     "WHERE ordine_id=? AND stato='accettata'",
                     (adesso, ordine_id))
-        decadute = con.execute(
-            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
-            "AND stato IN ('proposta','controproposta','accettata')",
-            (o["annuncio_id"],)).fetchall()
-        if decadute:
-            con.execute(
-                "UPDATE offerte SET stato='decaduta', aggiornato=? "
-                "WHERE annuncio_id=? AND stato IN "
-                "('proposta','controproposta','accettata')",
-                (adesso, o["annuncio_id"]))
+        decadute = []
+        if esaurito:
+            decadute = con.execute(
+                "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
+                "AND stato IN ('proposta','controproposta','accettata')",
+                (o["annuncio_id"],)).fetchall()
+            if decadute:
+                con.execute(
+                    "UPDATE offerte SET stato='decaduta', aggiornato=? "
+                    "WHERE annuncio_id=? AND stato IN "
+                    "('proposta','controproposta','accettata')",
+                    (adesso, o["annuncio_id"]))
         con.commit()
-        # Anche la piazza Nostr deve sapere che l'oggetto e' andato
-        asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "sold",
-                                              solo_aggiornamento=True))
-        # ...e il post nel canale si aggiorna col ✅ Venduto
-        asyncio.create_task(promo_venduto(o["annuncio_id"]))
-        msg = ("🔒 <b>Hai venduto!</b> I sats dell'acquirente sono bloccati "
-               "nel deposito di garanzia. "
-               "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
-        if a and a["contatto_nostr"]:
+        if esaurito:
+            # Anche la piazza Nostr deve sapere che l'oggetto e' andato
+            asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "sold",
+                                                  solo_aggiornamento=True))
+            # ...e il post nel canale si aggiorna col ✅ Venduto
+            asyncio.create_task(promo_venduto(o["annuncio_id"]))
+        msg = ("🔒 <b>Hai venduto!</b> " if pezzi == 1 else
+               f"🔒 <b>Hai venduto {pezzi} pezzi!</b> ")
+        msg += ("I sats dell'acquirente sono bloccati nel deposito di "
+                "garanzia. "
+                "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
+        if not esaurito:
+            msg += (f"\n\n🏷 L'annuncio resta in vetrina: "
+                    f"{a['quantita']} ancora {'disponibile' if a['quantita'] == 1 else 'disponibili'}.")
+        if esaurito and a and a["contatto_nostr"]:
             msg += ("\n\n🟣 Questo annuncio è pubblicato anche su <b>Nostr</b>: "
                     "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
                     "client, così nessun altro proverà a comprarlo lì.")
