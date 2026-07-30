@@ -3709,8 +3709,12 @@ def miei_annunci(limit: int = 0, cursore: str = "",
     sempre (tetto di sicurezza per i client vecchi)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     # anche gli annunci in revisione: il proprietario DEVE vedere il
-    # suo annuncio in attesa (il badge onesto vive nel frontend)
-    dove = "a.venditore_id=? AND a.stato IN ('attivo','revisione')"
+    # suo annuncio in attesa (il badge onesto vive nel frontend).
+    # E dal cantiere stock anche i venduti/esauriti: la ricarica parte
+    # da qui, e la riga «Venduto» col bottone «Rimetti in vendita» e'
+    # il relist onesto anche per chi vendeva un pezzo solo.
+    dove = ("a.venditore_id=? AND a.stato IN "
+            "('attivo','revisione','venduto')")
     con = db()
     if limit:
         righe, prossimo = pagina_annunci(
@@ -3944,6 +3948,55 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     # E anche i post automatici dei canali si ritirano da soli
     asyncio.create_task(promo_rimuovi(annuncio_id))
     return {"ok": True}
+
+
+@app.post("/api/listings/{annuncio_id}/quantita")
+async def ricarica_quantita(annuncio_id: int, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """La ricarica dello stock (lug 2026): tocca SOLO il numero, e per
+    questo — a differenza della modifica — NON aspetta la chiusura
+    degli affari in corso: chi ha gia' pagato non conta sul numero in
+    vetrina, e il negozio con spedizioni sempre aperte deve poter
+    ricaricare il miele. Scrittura ASSOLUTA: il venditore dice quanti
+    pezzi ha ORA (il rimborso invece somma). Un esaurito con pezzi
+    nuovi torna in vetrina da solo, senza promo ne' match: ricaricare
+    non e' pubblicare."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    quantita = quantita_da_payload(d)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('attivo','venduto')",
+                    (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if a["contatto_nostr"]:
+        con.close()
+        raise HTTPException(400, "Questo annuncio è importato da Nostr: "
+                                 "la quantità non vive qui")
+    # Mai sotto i pezzi prenotati: un pagamento gia' in volo
+    # manderebbe lo stock sotto zero.
+    riservati = _riservati(con, annuncio_id)
+    if quantita < riservati:
+        con.close()
+        raise HTTPException(400, f"{riservati} "
+                            f"{'pezzo è' if riservati == 1 else 'pezzi sono'} "
+                            f"in pagamento proprio ora: riprova tra qualche "
+                            f"minuto o scegli un numero più alto")
+    riattivato = a["stato"] == "venduto"
+    con.execute("UPDATE annunci SET quantita=?, stato='attivo' WHERE id=?",
+                (quantita, annuncio_id))
+    con.commit()
+    con.close()
+    if riattivato:
+        # L'oggetto torna disponibile anche sulla piazza Nostr, e il
+        # post del canale perde la spunta: non deve mentire.
+        asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
+                                              solo_aggiornamento=True))
+        asyncio.create_task(promo_venduto(annuncio_id, venduto=False))
+    return {"ok": True, "quantita": quantita, "riattivato": riattivato}
 
 
 @app.post("/api/listings/{annuncio_id}/modifica")
@@ -7992,8 +8045,15 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             con.execute("UPDATE ordini SET stato='refunded', cambio_eur=?, "
                         "aggiornato=? WHERE id=?",
                         (cambio, int(time.time()), ordine_id))
-            con.execute("UPDATE annunci SET stato='attivo' WHERE id=?",
-                        (o["annuncio_id"],))      # l'oggetto torna in vetrina
+            # I pezzi rimborsati tornano nello stock e l'oggetto in
+            # vetrina (incremento RELATIVO: se il venditore li aveva
+            # gia' ricontati con la ricarica — che e' una scrittura
+            # ASSOLUTA — corregge con la stessa ricarica). Il rimborso
+            # e' sempre integrale, per l'ordine intero: il parziale
+            # per-pezzo richiederebbe due mosse Lightning coordinate.
+            con.execute("UPDATE annunci SET quantita=quantita+?, "
+                        "stato='attivo' WHERE id=?",
+                        (o["quantita"] or 1, o["annuncio_id"]))
             con.commit()
             t = con.execute("SELECT titolo FROM annunci WHERE id=?",
                             (o["annuncio_id"],)).fetchone()
