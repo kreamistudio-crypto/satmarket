@@ -3135,9 +3135,9 @@ async def moderazione_ai_lotto(voci: list) -> dict:
 # form di Vendi e delle pillole della vetrina ("Tutto" e' solo una
 # vista del frontend, non una categoria). Una categoria sconosciuta
 # nel payload finisce in "Altro": il client non decide il catalogo.
-CATEGORIE = ("Elettronica", "Casa e giardino", "Abbigliamento",
-             "Sport e hobby", "Motori", "Bambini", "Animali",
-             "Libri e media", "Altro")
+CATEGORIE = ("Elettronica", "Casa e giardino", "Alimenti e bevande",
+             "Abbigliamento", "Sport e hobby", "Motori", "Bambini",
+             "Animali", "Libri e media", "Altro")
 
 
 def categoria_valida(c) -> str:
@@ -3267,6 +3267,10 @@ SINONIMI_CATEGORIA = {
     "telefonia": "Elettronica",
     "casa": "Casa e giardino", "giardino": "Casa e giardino",
     "arredamento": "Casa e giardino", "cucina": "Casa e giardino",
+    "alimenti": "Alimenti e bevande", "alimentari": "Alimenti e bevande",
+    "bevande": "Alimenti e bevande", "cibo": "Alimenti e bevande",
+    "food": "Alimenti e bevande", "gastronomia": "Alimenti e bevande",
+    "vino": "Alimenti e bevande", "birra": "Alimenti e bevande",
     "abbigliamento": "Abbigliamento", "vestiti": "Abbigliamento",
     "moda": "Abbigliamento", "scarpe": "Abbigliamento",
     "sport": "Sport e hobby", "hobby": "Sport e hobby",

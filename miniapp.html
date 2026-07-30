@@ -1425,7 +1425,7 @@
            e a parlare col dito e' il campo-bottone che apre il
            foglio-picker (apriPicker, pattern dei fogli esistenti). -->
       <div class="field"><label>Categoria</label>
-        <select id="sellCat" hidden><option>Elettronica</option><option>Casa e giardino</option><option>Abbigliamento</option><option>Sport e hobby</option><option>Motori</option><option>Bambini</option><option>Animali</option><option>Libri e media</option><option>Altro</option></select>
+        <select id="sellCat" hidden><option>Elettronica</option><option>Casa e giardino</option><option>Alimenti e bevande</option><option>Abbigliamento</option><option>Sport e hobby</option><option>Motori</option><option>Bambini</option><option>Animali</option><option>Libri e media</option><option>Altro</option></select>
         <button type="button" class="campo-scelta" id="sellCatBtn" onclick="apriPicker('sellCat')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field" id="sellCondField"><label>Condizioni dell'oggetto</label>
         <select id="sellCond" hidden>
@@ -1870,7 +1870,8 @@ function setCollaudo(id, nome){
 }
 
 /* ---- mappatura dati backend -> formato della Mini App ---- */
-const EMOJI_CAT = {'Elettronica':'🔌', 'Casa e giardino':'🪑', 'Abbigliamento':'👕',
+const EMOJI_CAT = {'Elettronica':'🔌', 'Casa e giardino':'🪑',
+  'Alimenti e bevande':'🍯', 'Abbigliamento':'👕',
   'Sport e hobby':'🚲', 'Motori':'🛵', 'Bambini':'🧸', 'Animali':'🐾',
   'Libri e media':'📚', 'Altro':'📦'};
 const FOTO_BASE = API_BASE.replace(/\/api$/, '');   // dove stanno le foto sul server
@@ -2247,8 +2248,8 @@ async function loadOrders(){
 }
 
 /* ---------------- dati demo ---------------- */
-const CATS = ["Tutto","Elettronica","Casa e giardino","Abbigliamento","Sport e hobby",
-              "Motori","Bambini","Animali","Libri e media","Altro"];
+const CATS = ["Tutto","Elettronica","Casa e giardino","Alimenti e bevande","Abbigliamento",
+              "Sport e hobby","Motori","Bambini","Animali","Libri e media","Altro"];
 let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */

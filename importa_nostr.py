@@ -325,6 +325,21 @@ def categoria_automatica(testo: str) -> str:
                            "modellismo"]),
         ("Abbigliamento", ["shirt", "maglia", "felpa", "giacca", "scarpe",
                            "shoes", "cappello", "hat", "abbigliamento"]),
+        # Prima di «Casa e giardino», che pesca candele, saponi e
+        # cucina: senza questa precedenza un miele artigianale o una
+        # birra finirebbero fra gli arredi. Parole volutamente
+        # specifiche — niente "olio" nudo (c'e' quello motore) ne'
+        # "pasta" (c'e' quella termica): meglio Altro che una
+        # categoria sbagliata, che sugli importati il venditore non
+        # puo' correggere dal form.
+        ("Alimenti e bevande",
+                        ["vino", "birra", "birrific", "caffe", "caffè",
+                         "miele", "formagg", "salume", "cioccolat",
+                         "tisana", "liquore", "grappa", "sake", "shoyu",
+                         "marmellata", "conserve", "aceto", "spezie",
+                         "bevand", "farina", "legumi", "taralli",
+                         "olio extraverg", "olio evo", "olio di oliva",
+                         "wine", "beer", "coffee", "honey", "cheese"]),
         ("Casa e giardino", ["casa", "sedia", "tavolo", "lampada", "cucina",
                              "arredo", "furniture", "candle", "candela",
                              "soap", "sapone", "butter", "giardino"]),
