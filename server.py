@@ -3192,6 +3192,18 @@ def condizione_tollerante(c: str) -> str:
     return SINONIMI_CONDIZIONE.get(c, "")
 
 
+def quantita_tollerante(testo) -> int:
+    """Il gemello tollerante del giudice, per il CSV: cella vuota o
+    storta = 1 pezzo, oltre il tetto si LIMA al tetto — mai uno
+    scarto per un numero, il commerciante aggiusta poi con la
+    ricarica."""
+    try:
+        n = int(str(testo or "").strip() or 1)
+    except (TypeError, ValueError):
+        return 1
+    return max(1, min(n, MAX_QUANTITA_ANNUNCIO))
+
+
 def guardia_zona_condizione(d: dict, consegna: str) -> str:
     """Le due regole del form Vendi (lug 2026), giudice unico di
     pubblica e modifica: la condizione e' OBBLIGATORIA (client E
@@ -3293,6 +3305,10 @@ CAMPI_VETRINA = (
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
     "a.anche_digitale, a.condizione, a.regione, "
+    # la quantita' e' pubblica per natura: il selettore dei pezzi nel
+    # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
+    # quindi sempre >= 1)
+    "a.quantita, "
     "a.foto, a.contatto_nostr, a.creato, "
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
@@ -4717,6 +4733,8 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
         + (f" ({a['prezzo_eur']:.2f} EUR)" if a["valuta"] == "eur" else "")
         + (f" | {CONDIZIONI[a['condizione']]}"
            if a.get("condizione") in CONDIZIONI else "")
+        + (f" | ne restano {a['quantita']}"
+           if (a.get("quantita") or 1) > 1 else "")
         + f" | {a['zona']} | {a['descrizione'][:120]}"
         for a in annunci)
     try:
@@ -6930,9 +6948,14 @@ def evento_annuncio(a: dict, status: str) -> dict:
     # nuovo (la spec NIP-99 non ne prevede uno).
     condizione_txt = (f" — condizione: {CONDIZIONI[a['condizione']]}"
                       if a.get("condizione") in CONDIZIONI else "")
+    # E la quantita' allo stesso modo (verificato lug 2026: la spec
+    # non ha un tag stock). Solo se >1: il pezzo singolo resta pulito.
+    quantita_txt = (f" — disponibili: {a['quantita']}"
+                    if (a.get("quantita") or 1) > 1 else "")
     content = ((a["descrizione"] or a["titolo"]).strip() +
                f"\n\nPrezzo: {prezzo_txt} — zona: "
-               f"{a.get('zona') or 'Italia'}{condizione_txt}{consegna_txt}"
+               f"{a.get('zona') or 'Italia'}{condizione_txt}{quantita_txt}"
+               f"{consegna_txt}"
                f"\n\n🫙⚡ In vendita su Barattolo, il mercatino in sats "
                f"con escrow Lightning: {URL_PUBBLICO} · {LINK_BOT}")
     return firma_evento(30402, tags, content)
@@ -8487,25 +8510,30 @@ def _purga_lavori():
 
 MODELLO_IMPORT = (
     "titolo;descrizione;prezzo;valuta;categoria;zona;foto;"
-    "consegna;spedizione;taglia;condizione\n"
+    "consegna;spedizione;taglia;condizione;quantita\n"
     "Tastiera meccanica 60%;Come nuova, switch rossi, scatola "
     "originale;35000;sats;Elettronica;Milano;;spedizione;450;piccolo;"
-    "come nuovo\n"
+    "come nuovo;\n"
     "Giacca in pelle vintage;Taglia M, vera pelle anni 90;45,00;eur;"
     "Abbigliamento;Roma;https://esempio.it/giacca-fronte.jpg|"
-    "https://esempio.it/giacca-retro.jpg;entrambe;5,50;busta;buono\n"
+    "https://esempio.it/giacca-retro.jpg;entrambe;5,50;busta;buono;\n"
     "Trapano avvitatore Bosch;Con due batterie e valigetta;80000;sats;"
-    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio;\n"
+    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio;;\n"
+    # la quantita' in stock (lug 2026): colonna facoltativa, vuota = 1
+    # pezzo — qui il miele mostra come si vende a scorte
+    "Miele di castagno 500g;Produzione propria 2026, vasetto in "
+    "vetro;12,00;eur;Casa e giardino;Cuneo;;spedizione;6,00;piccolo;"
+    "nuovo;12\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
     # niente spedizione ne' taglia, il codice si consegna dopo
     # l'acquisto dal dettaglio ordine
     "Buono regalo libreria 25 euro;Codice valido 12 mesi, consegna "
-    "immediata;25,00;eur;Libri e media;;;digitale;;;nuovo\n"
+    "immediata;25,00;eur;Libri e media;;;digitale;;;nuovo;\n"
     # la combo col «+»: tessera spedita O codice in piattaforma,
     # sceglie chi compra
     "Gift card profumeria 50 euro;Tessera fisica spedita oppure codice "
     "subito;50,00;eur;Altro;Milano;;spedizione+digitale;5,00;busta;"
-    "nuovo\n")
+    "nuovo;\n")
 
 
 @app.get("/api/import/modello")
@@ -8784,6 +8812,9 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                       # sconosciuta = non dichiarata, mai uno scarto
                       "condizione": condizione_tollerante(
                           cella(r, "condizione")),
+                      # colonna facoltativa anche lei: vuota = 1 pezzo
+                      "quantita": quantita_tollerante(
+                          cella(r, "quantita")),
                       "foto": foto})
 
     if not righe:
@@ -8869,8 +8900,8 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
-        "anche_digitale,condizione,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,quantita,stato,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga["prezzo_sats"], riga["zona"],
          riga["valuta"], riga["prezzo_eur"], lat, lon,
@@ -8878,6 +8909,7 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
          riga.get("consegna", ""), riga.get("spedizione_sats", 0),
          riga.get("spedizione_eur", 0), riga.get("taglia_pacco", ""),
          riga.get("anche_digitale", 0), riga.get("condizione", ""),
+         riga.get("quantita", 1),
          "revisione" if in_revisione else "attivo", int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
