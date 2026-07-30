@@ -655,7 +655,15 @@
   #bcCompra{flex:1;min-width:0;font-size:15px;padding:7px 10px 8px}
   /* l'etichetta non va mai a capo: a 360px stringe coi puntini */
   #bcCompra .bc-lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  #bcCompra .cifra{font-size:13px;white-space:nowrap}
+  /* La riga della cifra e' un flex: il NUMERO non si stringe mai
+     (bc-num), a cedere coi puntini e' la strada (bc-via) — serve solo
+     nel caso estremo strada+lampo+EUR a 360px */
+  #bcCompra .cifra{font-size:13px;white-space:nowrap;display:flex;
+    align-items:baseline;justify-content:center;gap:4px;min-width:0;max-width:100%}
+  #bcCompra .bc-num{flex:none}
+  /* la strada parla Nunito (il mono resta ai numeri) */
+  #bcCompra .bc-via{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;
+    overflow:hidden;text-overflow:ellipsis;min-width:0}
   #bcOfferta{flex:0 0 auto;font-size:14px;padding:8px 14px}
   @media (max-width:767.98px){
     body.con-barra nav{display:none}
@@ -1636,7 +1644,7 @@
        (solo mobile, la regia e' aggiornaBarraCompra). I bottoni chiamano
        le stesse strade dei gemelli in pagina, guardie comprese. -->
   <div id="barraCompra">
-    <button class="btn orange compra" id="bcCompra" onclick="startBuy()"></button>
+    <button class="btn orange compra" id="bcCompra" onclick="compraDaBarra()"></button>
     <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">💰 Offerta</button>
   </div>
 
@@ -2850,6 +2858,10 @@ function stradeConsegna(l){
    se la scelta non e' tra le strade offerte vince la prima
    (la fisica: stesso default del server). */
 let consegnaScelta = 'spedizione';
+/* Vera solo dopo un tocco dell'utente (pillola in pagina o foglio
+   delle strade): finche' la scelta e' implicita, la barra d'acquisto
+   non compra in silenzio — apre il foglio «Come vuoi riceverlo?». */
+let consegnaEsplicita = false;
 function sceltaConsegna(l){
   const s = stradeConsegna(l);
   if (!s.length) return '';
@@ -2909,7 +2921,7 @@ function contoScomposto(art, sped, prot, tot){
 /* Il tocco sulle pillole spedizione/ritiro: aggiorna la scelta e le
    cifre sui bottoni compra, senza ridisegnare il dettaglio. */
 function setConsegnaScelta(v){
-  consegnaScelta = v; haptic();
+  consegnaScelta = v; consegnaEsplicita = true; haptic();
   document.querySelectorAll('#detailContent .consegna-pill').forEach(b =>
     b.classList.toggle('attiva', b.dataset.v === v));
   /* l'avviso asimmetrico segue la SCELTA: su una combo non deve
@@ -2920,9 +2932,11 @@ function setConsegnaScelta(v){
   if (l) {
     document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
       s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
-    /* anche la barra d'acquisto parla la cifra nuova (con la sua ⚡) */
+    /* anche la barra d'acquisto parla la cifra nuova (con la strada
+       e la sua ⚡: cifraBarra e' markup, quindi innerHTML — dentro ci
+       passano solo i nostri cataloghi, mai testo utente) */
     const bc = document.querySelector('#bcCompra .cifra');
-    if (bc) bc.textContent = cifraBarra(l);
+    if (bc) bc.innerHTML = cifraBarra(l);
   }
 }
 /* La consegna nel dettaglio (lug 2026): le strade offerte diventano
@@ -3276,9 +3290,74 @@ let hintPubblicazione = null;
 /* ---------------- barra d'acquisto del dettaglio ----------------
    La cifra dei bottoni della barra: la stessa matematica dei gemelli
    in pagina (totaleStima gia' passa da lampo e accordo), con la ⚡
-   davanti quando lo sconto lampo e' vivo. */
-const cifraBarra = l =>
-  `${lampoAttiva(l) ? '⚡ ' : ''}${stimaCirca(l)}${fmt(totaleStima(l))} sats`;
+   davanti quando lo sconto lampo e' vivo. Con piu' strade di consegna
+   — o col solo digitale, che ha la sua regola asimmetrica — la barra
+   dice anche COME: mai un acquisto con la consegna decisa in silenzio.
+   E' markup (la strada non e' mono), quindi va in innerHTML: dentro
+   ci passano solo i nostri cataloghi, mai testo utente. */
+const NOMI_VIA = {spedizione:'🚚 Spedizione', ritiro:'🤝 Ritiro', digitale:'💾 Codice'};
+const cifraBarra = l => {
+  const att = sceltaConsegna(l);
+  const via = (stradeConsegna(l).length >= 2 || att === 'digitale')
+    ? `<span class="bc-via">${NOMI_VIA[att]} ·</span>` : '';
+  return `${via}<span class="bc-num">${lampoAttiva(l) ? '⚡ ' : ''}${
+    stimaCirca(l)}${fmt(totaleStima(l))} sats</span>`;
+};
+/* Il varco della barra: chi tocca «Compra» dalla barra puo' non aver
+   mai incontrato le pillole spedizione/ritiro (la barra si raggiunge
+   senza scorrere). Con piu' strade e scelta ancora IMPLICITA si apre
+   il foglio «Come vuoi riceverlo?»; scelta fatta (pillola o foglio),
+   la barra paga in un tocco come sempre. In vetrina il varco non
+   serve: startBuy apre l'invito. */
+function compraDaBarra(){
+  const l = currentListing; if (!l) return;
+  if (!VETRINA && !consegnaEsplicita && stradeConsegna(l).length >= 2)
+    return apriFoglioConsegna();
+  startBuy();
+}
+/* Il totale stimato per UNA strada: la matematica di totaleStima ma
+   con la via passata per argomento, per le voci del foglio. */
+function cifraVia(l, v){
+  const art = artStima(l);
+  const sped = v === 'spedizione' ? satsSpedizione(l) : 0;
+  return `${stimaCirca(l)}${fmt(art + sped + Math.floor(art * protPercento / 100))} sats totali`;
+}
+/* Il foglio delle strade: riusa il pickerSheet (markup, frecce, Esc,
+   tap fuori) SENZA passare dal catalogo PICKER — qui il deposito non
+   e' una select ma consegnaScelta. La scelta chiude e procede
+   all'acquisto in un gesto solo; Esc e tap fuori chiudono e basta,
+   nessun acquisto a sorpresa. */
+function apriFoglioConsegna(){
+  const l = currentListing; if (!l) return;
+  const att = sceltaConsegna(l);
+  const nome = v => v==='spedizione'
+    ? '🚚 Spedizione' + ((l.sped>0 || l.spedEur>0) ? '' : ' gratuita')
+    : v==='ritiro' ? '🤝 Ritiro in zona' : '💾 Codice online';
+  /* il digitale porta la sua regola asimmetrica gia' qui: va detta
+     PRIMA dell'acquisto, e chi passa dal foglio puo' non aver visto
+     la trust-note in pagina */
+  const desc = v => v==='digitale'
+    ? `${cifraVia(l, v)} — un codice rivelato non torna indietro: 24 ore per la disputa`
+    : cifraVia(l, v);
+  pickerTrigger = el('bcCompra');
+  el('pickerTitolo').textContent = 'Come vuoi riceverlo?';
+  el('pickerLista').innerHTML = stradeConsegna(l).map(v =>
+    `<button type="button" role="radio" aria-checked="${v===att}"
+       class="picker-voce${v===att?' sel':''}" data-val="${v}"
+       onclick="scegliConsegnaFoglio(this.dataset.val)">
+       <span><b>${nome(v)}</b><span class="p-desc">${desc(v)}</span></span>${
+       v===att?'<span class="p-check">✓</span>':''}</button>`).join('');
+  el('sheetBg').classList.add('open');
+  el('pickerSheet').classList.add('open');
+  (el('pickerLista').querySelector('.sel') || el('pickerLista').firstElementChild)?.focus();
+}
+function scegliConsegnaFoglio(v){
+  setConsegnaScelta(v);   /* pillole, cifre, nota digitale e haptic: tutto li' */
+  /* chiusura MIRATA, mai closeSheet: spegnerebbe la pila intera e
+     azzererebbe il pollTimer del pagamento che sta per partire */
+  chiudiPicker();
+  startBuy();             /* si procede senza un secondo tocco */
+}
 /* La regia, chiamata da go() a ogni cambio vista: la barra esiste solo
    nel dettaglio di un annuncio comprabile — mai sui propri annunci ne'
    sui non attivi (li' resta la tab bar). In VETRINA c'e', e i bottoni
@@ -3306,6 +3385,7 @@ function openDetail(id){
      totali dei bottoni compra parlano la cifra pattuita */
   const offAcc = offertaAccettataPer(l.id);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
+  consegnaEsplicita = false;       // e la scelta torna implicita
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
      carta: il ritorno al mercatino a sinistra — c'e' SEMPRE, anche in
      DEMO — e il condividi a destra (in DEMO no: il link punterebbe
