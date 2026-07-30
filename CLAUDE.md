@@ -1306,6 +1306,72 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   confirm); filtro «⚡ Solo in offerta» + voce «⚡ In offerta» in
   Ordina, in DEMO client-side col seme dimostrativo (Cuffie Sony,
   scadenza calcolata al carico).
+  Quantità in stock (lug 2026, il mattone del futuro «set»): colonne
+  `annunci.quantita` (pezzi disponibili ADESSO, default 1: gli storici
+  restano un pezzo solo) e `ordini.quantita`. INVARIANTE: venduto <=>
+  quantita=0 — l'esaurito RIUSA lo stato 'venduto', zero stati nuovi
+  (filtri vetrina, decadenza offerte, anti-resurrezione dell'import e
+  preferiti «non più disponibile» valgono gratis); riallineamento
+  idempotente a ogni avvio in init_db. PRENOTAZIONE derivata, niente
+  contatore: riservati = SUM(quantita) degli ordini 'creato' freschi
+  (<30 min, la soglia del reaper, che copre la vita della invoice: 15)
+  via `_riservati` + `idx_ordini_annuncio` (il primo indice su ordini);
+  compra() fa il fail-fast di cortesia prima delle await e il
+  ricontrollo COMPLETO (stato+quantita+SUM) DOPO crea_invoice_escrow
+  senza await fino all'INSERT — chiude il buco storico del doppio
+  acquisto (prima N invoice vive sullo stesso annuncio si potevano
+  pagare TUTTE); VINCOLO: in compra() niente DML prima del ricontrollo
+  (una transazione aperta congelerebbe la lettura). Il conto lavora
+  sull'UNITARIO (offerte e lampo parlano il prezzo del singolo pezzo;
+  per l'EUR si arrotonda l'unitario PRIMA di moltiplicare, così la
+  divisione a ritroso di chi legge l'ordine è esatta) e moltiplica
+  alla fine: spedizione UNA volta sola, protezione e
+  TETTO_DIGITALE_NUOVI sull'articolo TOTALE, drift TETTO_SATS_ANNUNCIO
+  sull'unitario (tre pezzi regolari non devono dare 409).
+  `ordini.prezzo_sats` resta il TOTALE in cassaforte; l'unitario si
+  deriva: (prezzo_sats − spedizione_sats − protezione_sats)/quantita.
+  verifica_pagamento scala con MAX(quantita-?,0) nel ramo vincente del
+  CAS; SOLO all'esaurimento partono stato venduto, nostr sold, ✅ sul
+  canale e la decadenza delle ALTRE offerte — ATTENZIONE: quel blocco
+  vive DENTRO il ramo esaurito, la vendita parziale lascia le
+  trattative altrui VIVE e la notifica dice i pezzi rimasti. Il
+  rimborso somma i pezzi dell'ordine (incremento RELATIVO) e riattiva
+  come sempre. RICARICA: `POST /api/listings/{id}/quantita`
+  (scrittura ASSOLUTA: quanti pezzi ho ORA; solo proprietario, stato
+  attivo/venduto, mai importati né revisione, mai sotto i riservati) —
+  NON aspetta gli affari in corso, a differenza della modifica: tocca
+  solo il numero, e il negozio col miele sempre in spedizione deve
+  poter ricaricare; l'esaurito riattivato rifà nostr active e toglie
+  la spunta dal canale, niente promo/match (ricaricare non è
+  pubblicare). `/api/listings/miei` porta anche i venduti: riga spenta
+  «Venduto» + «↻ Rimetti in vendita» (`ricaricaAnnuncio`, prompt), il
+  relist onesto anche per chi vendeva un pezzo solo. Giudici:
+  `quantita_da_payload` (assente = default/conserva lo stock in
+  modifica; oltre `MAX_QUANTITA_ANNUNCIO` — leva config, 100 — = 400)
+  e `quantita_tollerante` per il CSV (vuota o storta = 1, oltre il
+  tetto si lima, mai uno scarto); colonna facoltativa `quantita` nel
+  modello CSV con la riga del miele. Superficie: `a.quantita` in
+  CAMPI_VETRINA (pubblica per natura), riga «— disponibili: N» nel
+  content NIP-99 solo se N>1 (verificato: la spec non ha un tag stock;
+  `evento_annuncio_importato` resta pulito e gli importati restano
+  quantita=1 per sempre), «ne restano N» nel catalogo della ricerca
+  AI. OFFERTE = prezzo UNITARIO (deciso da Andrea): minimo 50% e
+  contro invariati sul listino unitario, al pagamento pattuito ×
+  quantità scelta, e il confirm di accettazione del venditore lo
+  dichiara («la cifra vale AL PEZZO»); con la lampo vince il minimo
+  sull'unitario come sempre. Frontend: campo «Quantità disponibile»
+  sempre visibile in Vendi (vuoto = 1, `qtaForm`; nascosto nella
+  modifica firmata), pillola «N disponibili» + stepper `.qta-riga`
+  nell'escrow-zone — la scelta sta PRIMA di startBuy, il patto del
+  varco: la invoice nasce lì — con `qtaScelta` azzerata a 1 in
+  openDetail; totaleStima/cifraVia × pezzi, cifre riscritte in-place
+  da `aggiornaCifreCompra` (estratta da setConsegnaScelta), barra con
+  «× N», conto scomposto «Articolo × N» (compare anche senza
+  spedizione/protezione quando i pezzi sono >1), ordini con «N pezzi ×
+  unitario», demo col Bitcoin Standard in 3 copie. Corner dichiarato:
+  un ordine pagato ma verificato oltre i 30 minuti può superare lo
+  stock (il MAX para il negativo, il doppio-escrow resta caso da
+  moderatore — com'era il doppio acquisto di ieri, ma molto più raro).
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -2421,7 +2487,18 @@ primo tocco a scelta implicita apre il foglio «Come vuoi riceverlo?»
 coi totali per strada, che scegliendo chiude e procede in un gesto
 solo, vedi Architettura — collaudato in locale col giro vero a 360px:
 foglio, scelta, paySheet coerente, secondo tocco diretto, Escape senza
-ordine, combo digitale, vetrina e regressione dei picker).
+ordine, combo digitale, vetrina e regressione dei picker); quantità in
+stock per annuncio (lug 2026: campo quantità nel form Vendi, stepper e
+conto × N all'acquisto con spedizione una volta sola, esaurito = stato
+venduto con «Rimetti in vendita» dai tuoi annunci, prenotazione
+derivata dagli ordini 'creato' che chiude anche il buco storico del
+doppio acquisto — deployata per prima, da sola —, offerte a prezzo
+unitario, riga «disponibili» nel NIP-99 e colonna CSV, vedi
+Architettura — collaudata in locale con 60 verifiche TestClient su
+quattro script [prenotazione con rivale nell'await, parziale/
+esaurimento/decadenze, rimborso e ricarica, superficie e import] più
+il giro nel browser vero a 375px con invoice LNbits reale; è il
+mattone del futuro cantiere «set»).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
