@@ -61,6 +61,12 @@ RELAYS = [
     "wss://21milionidinostr.duckdns.org",   # il relay del nostro venditore
 ]
 
+# Quanti eventi chiedere a ogni relay, SEPARATAMENTE per gli annunci e
+# per le cancellazioni (vedi interroga: un tetto solo per tutti e due
+# affamava gli annunci). Molti relay non superano comunque i 500.
+LIMITE_ANNUNCI = 500
+LIMITE_CANCELLAZIONI = 500
+
 # ==============================================================
 
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"   # alfabeto bech32
@@ -130,25 +136,45 @@ def tag(e, nome):
 
 
 def interroga(relay, hexkey):
+    """Chiede a UN relay gli annunci del venditore e le sue
+    cancellazioni NIP-09, in DUE richieste separate.
+
+    Separate e non una sola, perche' il "limit" vale per l'intera
+    richiesta e i relay servono i piu' recenti per primi: un
+    venditore che cancella molte note si spingeva fuori dalla
+    finestra i propri annunci. Visto dal vivo su una chiave con 206
+    cancellazioni — dei 200 eventi che tornavano, 197 erano kind 5
+    e solo 3 erano annunci, su 17 che ne aveva.
+    """
     eventi = []
+    # Anche i kind 5 (NIP-09): le cancellazioni del venditore vanno
+    # lette e rispettate, non solo i suoi annunci.
+    richieste = {
+        "ann": {"kinds": [30402, 30018, 30017], "authors": [hexkey],
+                "limit": LIMITE_ANNUNCI},
+        "canc": {"kinds": [5], "authors": [hexkey],
+                 "limit": LIMITE_CANCELLAZIONI},
+    }
     try:
         ws = create_connection(relay, timeout=10,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
-        # Anche i kind 5 (NIP-09): le cancellazioni del venditore
-        # vanno lette e rispettate, non solo i suoi annunci.
-        ws.send(json.dumps(["REQ", "imp", {
-            "kinds": [30402, 30018, 30017, 5], "authors": [hexkey],
-            "limit": 200}]))
+        for sub, filtro in richieste.items():
+            ws.send(json.dumps(["REQ", sub, filtro]))
+        # Si aspettano ENTRAMBI gli EOSE, non il primo che arriva
+        # (col vecchio break sul primo si perdeva l'altra meta').
+        aperte = set(richieste)
         inizio = time.time()
-        while time.time() - inizio < 20:
+        while aperte and time.time() - inizio < 25:
             try:
                 msg = json.loads(ws.recv())
             except Exception:
                 break
-            if msg[0] == "EVENT" and msg[1] == "imp":
+            if msg[0] == "EVENT" and msg[1] in aperte:
                 eventi.append(msg[2])
-            elif msg[0] == "EOSE":
-                break
+            # CLOSED = il relay ha chiuso lui la sottoscrizione: senza
+            # questo ramo si resterebbe ad aspettare un EOSE mai dovuto
+            elif msg[0] in ("EOSE", "CLOSED") and msg[1] in aperte:
+                aperte.discard(msg[1])
         ws.close()
         print(f"  ✓ {relay}: {len(eventi)} eventi")
     except Exception as err:
