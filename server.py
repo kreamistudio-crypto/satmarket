@@ -6892,6 +6892,81 @@ def _foto_url_nostr(foto_json: str) -> list:
             for n in nomi if n and not n.startswith("data:")]
 
 
+# --- I metadati di commercio nei tag (lug 2026) ----------------------
+# NIP-99 standardizza titolo, prezzo, zona e poco altro: di
+# spedizione, condizione e quantita' non dice NULLA. Finora quelle
+# tre le scrivevamo solo in prosa dentro il content — leggibili da un
+# umano, invisibili a qualunque macchina, comprese le NOSTRE al giro
+# d'import successivo.
+#
+# Ora escono anche come tag. La spec lo permette in modo esplicito
+# («other tags may be added as necessary») e il disegno e' quello
+# della proposta in proposte/nip99-commerce-metadata.md:
+#
+#   ["delivery", "shipping", "5.00", "EUR"]   ripetibile
+#   ["delivery", "pickup"]                    (entrambe = due tag)
+#   ["delivery", "digital"]
+#   ["condition", "like-new"]
+#   ["stock", "3"]                            assente = 1 pezzo
+#
+# `delivery` e' RIPETIBILE apposta, invece dell'enum che usa il
+# vocabolario de facto di Shopstr: li' per dire «spedisco o ritiri»
+# serve il valore composto "Free/Pickup", e aggiungere un terzo modo
+# (il nostro digitale) vorrebbe dire enumerare tutti i sottoinsiemi.
+# Ripetere il tag non esplode mai.
+#
+# ATTENZIONE al costo assente, che NON e' zero: "0" vuol dire
+# spedizione gratuita, il tag senza importo vuol dire «spedisco, il
+# prezzo lo concordiamo». Chi legge non deve confonderli.
+#
+# Restano fuori peso e dimensioni: non li chiediamo nel form, e la
+# taglia del pacco che abbiamo (busta/piccolo/…) e' una categoria di
+# corriere italiana, non un fatto oggettivo — inventarci un peso da
+# quella sarebbe scrivere un dato falso su un protocollo pubblico.
+
+CONDIZIONE_NIP99 = {
+    "nuovo": "new",
+    "come_nuovo": "like-new",
+    "buono": "good",
+    "accettabile": "fair",
+    "da_sistemare": "poor",
+}
+
+
+def tag_commercio(a: dict) -> list:
+    """I tag di consegna, condizione e quantita' di un annuncio.
+    Lista vuota per gli annunci che non li dichiarano (gli storici e
+    gli importati da client che non li conoscono): un tag in meno e'
+    sempre meglio di un tag che mente."""
+    tags = []
+    consegna = a.get("consegna") or ""
+    if consegna in ("spedizione", "entrambe"):
+        # Stessa convenzione del tag price: l'euro quando il costo e'
+        # ancorato all'euro, i sats altrimenti. Lo 0 esplicito e'
+        # "gratis" e va detto; il costo mai dichiarato resta muto.
+        if a.get("spedizione_eur"):
+            tags.append(["delivery", "shipping",
+                         f"{a['spedizione_eur']:.2f}", "EUR"])
+        elif a.get("spedizione_sats"):
+            tags.append(["delivery", "shipping",
+                         str(a["spedizione_sats"]), "sats"])
+        else:
+            tags.append(["delivery", "shipping", "0",
+                         "EUR" if a.get("valuta") == "eur" else "sats"])
+    if consegna in ("ritiro", "entrambe"):
+        tags.append(["delivery", "pickup"])
+    if consegna == "digitale" or a.get("anche_digitale"):
+        tags.append(["delivery", "digital"])
+    condizione = CONDIZIONE_NIP99.get(a.get("condizione") or "")
+    if condizione:
+        tags.append(["condition", condizione])
+    # Assente = un pezzo solo, che e' il caso di quasi tutti gli
+    # annunci: dirlo ogni volta sarebbe rumore.
+    if (a.get("quantita") or 1) > 1:
+        tags.append(["stock", str(a["quantita"])])
+    return tags
+
+
 def evento_annuncio(a: dict, status: str) -> dict:
     """Costruisce l'evento NIP-99 (kind 30402) di un annuncio. Il tag
     "d" stabile rende l'evento sostituibile: ripubblicare con lo stesso
@@ -6919,6 +6994,10 @@ def evento_annuncio(a: dict, status: str) -> dict:
         tags.append(["t", a["categoria"].lower().split()[0]])
     if a.get("zona"):
         tags.append(["location", a["zona"]])
+    # Spedizione, condizione e quantita' anche come TAG, non piu' solo
+    # come prosa nel content (che resta, per gli umani e per i client
+    # che i tag non li conoscono).
+    tags += tag_commercio(a)
     for url in _foto_url_nostr(a.get("foto", "")):
         tags.append(["image", url])
     # La consegna nel content, non nei tag: nessun tag nuovo da far

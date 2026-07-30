@@ -335,6 +335,115 @@ def categoria_automatica(testo: str) -> str:
     return "Altro"
 
 
+# --- I metadati di commercio, dai tag ---------------------------------
+# Il gemello in lettura di tag_commercio (server.py). Si parlano DUE
+# dialetti, perche' la spec NIP-99 non dice nulla di spedizione,
+# condizione e quantita' e quindi ognuno se li e' inventati:
+#
+#   il nostro   ["delivery","shipping","5.00","EUR"] · ["condition",…]
+#               ["delivery","pickup"] · ["delivery","digital"] · ["stock",n]
+#   Shopstr     ["shipping","Added Cost","5.00","EUR"] (enum chiuso)
+#               ["condition",…] · ["quantity",n] · ["pickup_location",…]
+#
+# Leggere anche il loro non costa quasi nulla ed e' la differenza tra
+# capirsi col mercatino Nostr piu' grosso e ignorarlo.
+#
+# ATTENZIONE al tag "weight": NON si legge come peso. Per Shopstr e'
+# una VARIANTE di prodotto col suo prezzo (["weight","500g","12.00"]),
+# stessa arita' del peso di spedizione e significato opposto: chi lo
+# scambia scrive un peso che non esiste. Finche' non c'e' una regola
+# condivisa, meglio nessun dato che uno sbagliato.
+
+CONDIZIONE_DA_NIP99 = {
+    "new": "nuovo",
+    "like-new": "come_nuovo", "likenew": "come_nuovo",
+    "good": "buono",
+    "fair": "accettabile",
+    "poor": "da_sistemare", "for-parts": "da_sistemare",
+}
+
+# I valori dell'enum Shopstr che implicano una spedizione a pagamento
+# o gratuita, e quelli che implicano il ritiro.
+SHOPSTR_SPEDISCE = {"free", "added cost", "free/pickup"}
+SHOPSTR_RITIRA = {"pickup", "free/pickup"}
+
+
+def estrai_commercio(e):
+    """Legge consegna, costo, condizione e quantita' dai tag.
+    Ritorna un dict con le SOLE chiavi davvero presenti: cio' che il
+    venditore non dichiara non si inventa, e a valle un campo assente
+    lascia intatto quello che c'e' gia' su Barattolo."""
+    fuori = {}
+    spedisce = ritira = digitale = False
+    costo, valuta_costo = 0.0, ""
+    for t in e.get("tags", []):
+        if not t or len(t) < 2:
+            continue
+        nome, val = t[0], (t[1] or "").strip()
+        if nome == "delivery":
+            modo = val.lower()
+            if modo == "shipping":
+                spedisce = True
+                # 4 elementi = costo dichiarato; 2 = «spedisco, il
+                # prezzo lo concordiamo», che NON e' gratis
+                if len(t) >= 4:
+                    try:
+                        costo, valuta_costo = float(t[2]), (t[3] or "").upper()
+                    except ValueError:
+                        pass
+            elif modo == "pickup":
+                ritira = True
+            elif modo == "digital":
+                digitale = True
+        elif nome == "shipping" and len(t) == 4:      # dialetto Shopstr
+            modo = val.lower()
+            if modo in SHOPSTR_SPEDISCE:
+                spedisce = True
+                if modo != "free":
+                    try:
+                        costo, valuta_costo = float(t[2]), (t[3] or "").upper()
+                    except ValueError:
+                        pass
+            if modo in SHOPSTR_RITIRA:
+                ritira = True
+        elif nome == "pickup_location":
+            ritira = True
+        elif nome == "condition":
+            nostra = CONDIZIONE_DA_NIP99.get(val.lower())
+            if nostra:
+                fuori["condizione"] = nostra
+        elif nome in ("stock", "quantity"):
+            if val.lower() == "unlimited":
+                continue                  # non lo sappiamo rappresentare
+            try:
+                n = int(float(val))
+            except ValueError:
+                continue
+            if n > 0:
+                fuori["quantita"] = n
+    if spedisce or ritira or digitale:
+        if digitale and not (spedisce or ritira):
+            fuori["consegna"] = "digitale"
+        elif spedisce and ritira:
+            fuori["consegna"] = "entrambe"
+        elif spedisce:
+            fuori["consegna"] = "spedizione"
+        else:
+            fuori["consegna"] = "ritiro"
+        fuori["anche_digitale"] = 1 if (digitale and (spedisce or ritira)) else 0
+        if spedisce:
+            # L'euro resta ancorato all'euro (e' la semantica che
+            # Barattolo da' a spedizione_eur); ogni altra valuta
+            # diventa il numero in sats che ci hanno detto.
+            if valuta_costo == "EUR":
+                fuori["spedizione_eur"] = round(costo, 2)
+                fuori["spedizione_sats"] = 0
+            elif valuta_costo:
+                fuori["spedizione_sats"] = int(costo)
+                fuori["spedizione_eur"] = 0
+    return fuori
+
+
 def estrai_annuncio(e, valute_stall, cambio):
     """Trasforma un evento Nostr in un annuncio SatMarket (o None)."""
     if e["kind"] == 30402:                     # NIP-99 classified
@@ -393,7 +502,26 @@ def estrai_annuncio(e, valute_stall, cambio):
             # la coppia del tag price: se il listino nasce in EUR la
             # vetrina deve dirlo (valuta/prezzo_eur), non solo i sats
             "valuta_orig": (valuta or "").upper(),
-            "importo_orig": importo}
+            "importo_orig": importo,
+            # spedizione/condizione/quantita' dai tag, se ci sono:
+            # solo le chiavi davvero dichiarate (vedi estrai_commercio)
+            "commercio": estrai_commercio(e) if e["kind"] == 30402 else {}}
+
+
+def scrivi_commercio(con, annuncio_id: int, dati: dict):
+    """Scrive le SOLE colonne di commercio che l'evento dichiara.
+    Colonne che potrebbero non esistere (database di un Barattolo piu'
+    vecchio): l'UPDATE si prova e, se la colonna manca, si lascia
+    perdere in silenzio — questo file deve poter girare anche da solo,
+    senza le migrazioni del server."""
+    if not dati:
+        return
+    for colonna, valore in dati.items():
+        try:
+            con.execute(f"UPDATE annunci SET {colonna}=? WHERE id=?",
+                        (valore, annuncio_id))
+        except sqlite3.OperationalError:
+            pass
 
 
 def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
@@ -714,6 +842,12 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                  a["prezzo_sats"], valuta, prezzo_eur, venditore_id,
                  a["origine_d"], a["origine_foto"], a["origine_id"],
                  gia[0]))
+            # I metadati di commercio si scrivono SOLO se l'evento li
+            # dichiara: un tag assente lascia intatto quello che c'e'
+            # gia' qui. E' la regola della categoria — cio' che il
+            # venditore ha messo a mano su Barattolo non deve essere
+            # ricoperto ogni ora dal silenzio dei relay.
+            scrivi_commercio(con, gia[0], a["commercio"])
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
             continue
@@ -726,6 +860,7 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
              a["prezzo_sats"], a["zona"], a["foto"], npub, valuta,
              prezzo_eur, a["origine_d"], a["origine_foto"],
              a["origine_id"], int(time.time())))
+        scrivi_commercio(con, cur.lastrowid, a["commercio"])
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
         foto_loc = localizza_foto(cur.lastrowid, a["foto"])
         if foto_loc != a["foto"]:
