@@ -1715,6 +1715,34 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chiudere. Vanilla puro, zero librerie; lo zoom (clamp 1–4) tiene
   fermo il punto toccato e la clamp del translate non fa mai perdere
   la foto; body senza scroll a lightbox aperto.
+  Barra d'acquisto al posto della tab bar (lug 2026, modello Vinted):
+  nel dettaglio di un annuncio COMPRABILE la tab bar sparisce e al suo
+  posto compare `#barraCompra` — «🔒 Compra in sicurezza · ≈ N sats»
+  (primario largo) + «💰 Offerta» (compatto). Gemella della nav per
+  costruzione (position fixed, `--nav-bg`, blur, safe-area, z-index 30
+  e altezza allineata: 62px contro 61, nessun salto di layout). La
+  regia è `aggiornaBarraCompra(view)`, chiamata da `go()` a ogni cambio
+  vista — così copre gratis il ritorno dal negozio e la riapertura del
+  dettaglio quando una lampo scade, e uscendo la tab bar torna da sola
+  (la classe è `body.con-barra`, tutta la resa vive nel CSS). Nasce
+  SOLO su annuncio non proprio e `stato==='attivo'`: altrimenti resta
+  la tab bar. I bottoni chiamano `startBuy`/`apriOfferta` TAL QUALI —
+  le guardie stanno già lì, quindi in VETRINA la barra c'è e apre il
+  foglio-invito; con un accordo accettato il tasto Offerta si spegne
+  come in pagina. La cifra è `cifraBarra()` (la matematica di
+  `totaleStima`, che già conosce lampo e accordo, con la ⚡ davanti
+  quando lo sconto è vivo) e `setConsegnaScelta` la riscrive col tocco
+  sulle pillole spedizione/ritiro. Su MOBILE i due gemelli in pagina si
+  spengono (`.escrow-zone .btn.ghost.compra` con la sua `.escrow-note`
+  e `.off-cta`, classe nata per questo): il recinto resta il posto
+  delle spiegazioni, della scelta di consegna e del «⚡ Compra subito»
+  NWC, che è un'ALTRA strada e non un doppione — e il trucco
+  `:first-of-type` non si tocca. Da ≥768px la barra non esiste proprio:
+  la nav è una topbar e il dettaglio a due colonne ha già i bottoni
+  sotto mano. I fogli (41) e il velo (40) le passano sopra senza che
+  rubi tocchi; a lightbox aperto si nasconde con header e nav
+  (`body.lb-aperto`); la scivolatina d'ingresso tace con
+  prefers-reduced-motion.
   Preferiti «Nel tuo barattolo» (lug 2026): il simbolo è il
   BARATTOLINO 🫙 — MAI il cuore, MAI il fulmine (su Nostr è lo zap).
   Tabella `preferiti(tg_id, annuncio_id, creato, PK)`; toggle
@@ -2342,7 +2370,18 @@ verifiche TestClient su DB usa-e-getta [mappa, pubblicazione, modifica,
 import CSV, filtro combinato e paginato, risposta legacy, backfill
 idempotente] e il giro nel browser vero su chiaro e scuro, coi dati
 veri e in demo; in produzione basta il riavvio: la migrazione e il
-backfill girano da soli).
+backfill girano da soli); barra d'acquisto al posto della tab bar nel
+dettaglio (lug 2026, modello Vinted: aperto un annuncio comprabile la
+tab bar lascia il posto a «Compra in sicurezza» col totale e
+«Offerta», stessa altezza e stessa carta — niente salto di layout —
+con i gemelli in pagina spenti su mobile e il recinto escrow lasciato
+alle spiegazioni; guardie e cifre riusate tal quali, da desktop non
+esiste, vedi Architettura — collaudata in locale a 360/375/1280px e nei
+due temi: altezza allineata, lampo −20% e cambio consegna sulla cifra,
+invito in vetrina, annuncio proprio con la tab bar intatta, fogli e
+lightbox che le passano sopra; in produzione va rivista dal vivo dentro
+Telegram, dove contano la gesture bar del telefono e il tema del
+client).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
