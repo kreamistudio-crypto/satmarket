@@ -1564,6 +1564,27 @@ async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
     return valuta, prezzo_sats, prezzo_eur
 
 
+def quantita_da_payload(d, se_manca: int = 1) -> int:
+    """Il giudice unico della quantita' (pubblica, modifica, ricarica,
+    import CSV). Assente = se_manca (i client di ieri non la mandano,
+    e in modifica l'assenza deve conservare lo stock, mai azzerarlo);
+    storta o sotto l'1 = 1; oltre il tetto = 400 onesto, non un clamp
+    muto (chi scrive 10000 deve saperlo)."""
+    v = d.get("quantita")
+    if v in (None, ""):
+        return se_manca
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return 1
+    if n < 1:
+        n = 1
+    if n > MAX_QUANTITA_ANNUNCIO:
+        raise HTTPException(400, f"La quantità massima per annuncio è "
+                                 f"{MAX_QUANTITA_ANNUNCIO} pezzi")
+    return n
+
+
 # --- Cifratura a riposo dei contenuti digitali (lug 2026) ------------
 # Il codice del buono/licenza vive nel database dell'ordine: cifrarlo
 # protegge un backup rubato, non di piu' (il server resta il custode
@@ -3528,6 +3549,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         await consegna_da_payload(d, valuta)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     condizione = guardia_zona_condizione(d, consegna)
+    quantita = quantita_da_payload(d)
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -3584,12 +3606,12 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
-        "anche_digitale,condizione,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,quantita,stato,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         condizione, "revisione" if in_revisione else "attivo",
+         condizione, quantita, "revisione" if in_revisione else "attivo",
          int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
@@ -3968,6 +3990,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # revisione deve sentirsi dire quello, non «manca la condizione».
     try:
         condizione = guardia_zona_condizione(d, consegna)
+        # In modifica l'assenza CONSERVA lo stock: un client vecchio
+        # che ritocca il titolo non deve azzerare i pezzi a 1.
+        quantita = quantita_da_payload(d, se_manca=a["quantita"])
     except HTTPException:
         con.close()
         raise
@@ -4022,11 +4047,11 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
         "regione=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
-        "anche_digitale=?, condizione=?, stato=? WHERE id=?",
+        "anche_digitale=?, condizione=?, quantita=?, stato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
-         condizione, "revisione" if in_revisione else "attivo",
+         condizione, quantita, "revisione" if in_revisione else "attivo",
          annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
