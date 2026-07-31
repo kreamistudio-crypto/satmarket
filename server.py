@@ -174,6 +174,14 @@ try:
 except ImportError:
     MAX_QUANTITA_ANNUNCIO = 100
 
+# Il set «Riempi il barattolo» (lug 2026): quanti annunci DIVERSI
+# dello stesso venditore possono entrare in un ordine solo. Un numero
+# da mercatino: un pacco vero, non un camion.
+try:
+    from config import MAX_RIGHE_SET
+except ImportError:
+    MAX_RIGHE_SET = 8
+
 # La protezione acquisti (lug 2026, modello Vinted): percentuale a
 # carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
 # e resta alla piattaforma quando l'affare si chiude bene. Distinta da
@@ -5313,12 +5321,276 @@ def _riservati(con, annuncio_id: int) -> int:
     return mono + nei_set
 
 
+async def _compra_set(user: dict, d: dict) -> dict:
+    """Il ramo SET di compra() (lug 2026, «Riempi il barattolo»):
+    piu' annunci DIVERSI dello stesso venditore in UN ordine solo —
+    una invoice escrow, UNA spedizione (il MAX dei costi dichiarati:
+    il pacco e' uno solo), una conferma. Solo strade FISICHE:
+    il digitale ha la colonna unica del contenuto e le sue finestre
+    corte, resta fuori dal set per costruzione; gli annunci senza
+    modalita' ('' — storici e importati) non dichiarano un costo di
+    spedizione e restano fuori anche loro. Stessa liturgia del mono:
+    fail-fast di cortesia, poi la invoice, poi il ricontrollo che fa
+    fede — per OGNI riga — senza await fino all'INSERT."""
+    # --- Le righe richieste: 2..MAX, annunci distinti, quantita sane
+    grezze = d.get("righe") or []
+    if not isinstance(grezze, list) or len(grezze) < 2:
+        raise HTTPException(400, "Un set ha almeno due oggetti diversi: "
+                                 "per uno solo c'è l'acquisto di sempre")
+    if len(grezze) > MAX_RIGHE_SET:
+        raise HTTPException(400, f"Un set può avere al massimo "
+                                 f"{MAX_RIGHE_SET} oggetti diversi")
+    richieste = {}      # annuncio_id -> quantita (l'ordine di arrivo conta)
+    offerte_chieste = {}  # annuncio_id -> offerta_id
+    for r in grezze:
+        try:
+            aid = int(r.get("annuncio_id") or 0)
+            qta = max(1, int(r.get("quantita") or 1))
+            off_id = int(r.get("offerta_id") or 0)
+        except (TypeError, ValueError, AttributeError):
+            raise HTTPException(400, "Righe del set non leggibili")
+        if aid <= 0:
+            raise HTTPException(400, "Righe del set non leggibili")
+        if aid in richieste:
+            raise HTTPException(400, "Lo stesso oggetto compare due volte "
+                                     "nel set: alza la quantità invece")
+        richieste[aid] = qta
+        if off_id:
+            offerte_chieste[aid] = off_id
+
+    con = db()
+    seg = ",".join("?" * len(richieste))
+    tutti = {a["id"]: a for a in con.execute(
+        f"SELECT * FROM annunci WHERE id IN ({seg})",
+        tuple(richieste)).fetchall()}
+    for aid in richieste:
+        a = tutti.get(aid)
+        if not a or a["stato"] != "attivo":
+            con.close()
+            titolo = a["titolo"][:40] if a else "Uno degli oggetti"
+            raise HTTPException(404, f"«{titolo}» non è più disponibile: "
+                                     f"toglilo dal set e riprova")
+    venditori = {a["venditore_id"] for a in tutti.values()}
+    if len(venditori) > 1:
+        con.close()
+        raise HTTPException(400, "Un set contiene solo oggetti dello "
+                                 "stesso venditore")
+    venditore_id = venditori.pop()
+    if venditore_id == user["id"]:
+        con.close()
+        raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+
+    # --- Le strade del set: l'INTERSEZIONE delle strade fisiche.
+    # Un solo-ritiro e un solo-spedizione non viaggiano insieme.
+    strade = {"spedizione", "ritiro"}
+    for a in tutti.values():
+        sue = set()
+        if a["consegna"] in ("spedizione", "entrambe"):
+            sue.add("spedizione")
+        if a["consegna"] in ("ritiro", "entrambe"):
+            sue.add("ritiro")
+        if not sue:
+            con.close()
+            if a["consegna"] == "digitale":
+                raise HTTPException(400, f"«{a['titolo'][:40]}» si consegna "
+                    f"solo come codice online: si compra da solo, "
+                    f"fuori dal set")
+            raise HTTPException(400, f"«{a['titolo'][:40]}» non dichiara "
+                f"una modalità di consegna: si compra da solo, "
+                f"fuori dal set")
+        strade &= sue
+    if not strade:
+        con.close()
+        raise HTTPException(400, "Questi oggetti non viaggiano insieme: "
+                                 "uno si consegna solo a mano e un altro "
+                                 "solo con la spedizione")
+    scelta = d.get("consegna", "")
+    if scelta not in strade:
+        if scelta:
+            con.close()
+            raise HTTPException(400, "Il set non prevede questa modalità "
+                                     "di consegna")
+        scelta = "spedizione" if "spedizione" in strade else "ritiro"
+
+    # --- Fail-fast di cortesia sullo stock, riga per riga (quello
+    # che fa fede e' il ricontrollo dopo la invoice, come nel mono)
+    for aid, qta in richieste.items():
+        a = tutti[aid]
+        disponibile = a["quantita"] - _riservati(con, aid)
+        if qta > disponibile:
+            con.close()
+            if disponibile < 1:
+                raise HTTPException(409, f"Qualcun altro sta già pagando "
+                    f"«{a['titolo'][:40]}»: togli quel pezzo dal set o "
+                    f"riprova tra pochi minuti")
+            raise HTTPException(400, f"Di «{a['titolo'][:40]}» ne restano "
+                                     f"solo {disponibile}: scegli una "
+                                     f"quantità più piccola")
+
+    # --- Le offerte accettate entrano nel set riga per riga, con le
+    # stesse quattro guardie del mono (il DML dell'offerta scaduta
+    # committa e solleva SUBITO: il patto del ricontrollo resta vero)
+    offerte = {}    # annuncio_id -> riga offerta
+    for aid, off_id in offerte_chieste.items():
+        off = con.execute(
+            "SELECT * FROM offerte WHERE id=? AND compratore_id=? AND "
+            "annuncio_id=? AND stato='accettata'",
+            (off_id, user["id"], aid)).fetchone()
+        if not off:
+            con.close()
+            raise HTTPException(404, "Offerta non trovata o non più valida")
+        adesso = int(time.time())
+        if 0 < off["scadenza"] < adesso:
+            con.execute("UPDATE offerte SET stato='scaduta', aggiornato=? "
+                        "WHERE id=?", (adesso, off["id"]))
+            con.commit()
+            con.close()
+            raise HTTPException(400, f"Il tempo per pagare l'offerta su "
+                                     f"«{tutti[aid]['titolo'][:40]}» è "
+                                     f"finito: l'offerta è scaduta")
+        if off["ordine_id"]:
+            viva = con.execute(
+                "SELECT id FROM ordini WHERE id=? AND stato='creato'",
+                (off["ordine_id"],)).fetchone()
+            if viva:
+                con.close()
+                raise HTTPException(400, "C'è già una invoice in corso "
+                                         "per una di queste offerte: "
+                                         "pagala, oppure annulla "
+                                         "quell'ordine e riprova")
+        offerte[aid] = off
+
+    # --- Il cambio, UNA volta per tutto il set (prima della invoice:
+    # da li' in poi niente await). Serve se un listino e' in EUR o se
+    # una spedizione e' ancorata all'euro con la spedizione scelta.
+    serve_cambio = any(
+        (a["valuta"] == "eur" and a["prezzo_eur"] > 0)
+        or (scelta == "spedizione" and a["spedizione_eur"] > 0)
+        for a in tutti.values())
+    cambio_ordine = 0.0
+    if serve_cambio:
+        cambio_ordine = await cambio_btc_eur()
+        if cambio_ordine <= 0:
+            con.close()
+            raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                     "questo momento: riprova tra qualche "
+                                     "minuto")
+
+    # --- Il conto, riga per riga: unitario gia' col MIN tra lampo e
+    # accordo (il patto del mono: si arrotonda PRIMA di moltiplicare,
+    # cosi' la divisione a ritroso di chi legge l'ordine e' esatta).
+    # La spedizione e' il MAX dei costi dichiarati: il pacco e' uno —
+    # compromesso dichiarato del v1, mai a sfavore del compratore.
+    adesso = int(time.time())
+    righe, articolo, sped, pezzi = [], 0, 0, 0
+    for aid, qta in richieste.items():
+        a = tutti[aid]
+        p_sats, p_eur = a["prezzo_sats"], a["prezzo_eur"]
+        off = offerte.get(aid)
+        if off:
+            p_sats, p_eur = _importo_accordo(off)
+        if a["lampo_percento"] > 0 and a["lampo_scadenza"] > adesso:
+            l_sats, l_eur = _prezzo_lampo(a, a["lampo_percento"])
+            if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+                p_eur = min(p_eur, l_eur) if p_eur > 0 else l_eur
+            else:
+                p_sats = min(p_sats, l_sats)
+        if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
+            unitario = max(1, round(p_eur / cambio_ordine * 100_000_000))
+            # Il tetto di rodaggio con +20% di tolleranza, sull'unitario
+            # della riga (e' un vincolo del listino, come nel mono)
+            if TETTO_SATS_ANNUNCIO and unitario > TETTO_SATS_ANNUNCIO * 1.2:
+                con.close()
+                await notifica(a["venditore_id"],
+                    f"📈 Il cambio si è mosso troppo: il tuo annuncio "
+                    f"«{a['titolo'][:60]}» ({a['prezzo_eur']:.2f} EUR) "
+                    f"supera ora il tetto di {TETTO_SATS_ANNUNCIO} sats e "
+                    f"gli acquisti sono in pausa. Ritocca il prezzo per "
+                    f"riaprirli.")
+                raise HTTPException(409, f"Il cambio è cambiato troppo per "
+                                         f"«{a['titolo'][:40]}»: il "
+                                         f"venditore deve ritoccare il "
+                                         f"prezzo")
+        else:
+            unitario = p_sats
+        articolo += unitario * qta
+        pezzi += qta
+        righe.append({"annuncio_id": aid, "quantita": qta,
+                      "unitario_sats": unitario, "titolo": a["titolo"]})
+        if scelta == "spedizione":
+            if a["spedizione_eur"] > 0:
+                costo = round(a["spedizione_eur"] / cambio_ordine
+                              * 100_000_000)
+            else:
+                costo = a["spedizione_sats"]
+            sped = max(sped, costo)
+
+    prot = articolo * PROTEZIONE_PERCENTO // 100
+    totale = articolo + sped + prot
+
+    primo = righe[0]["titolo"]
+    inv = await crea_invoice_escrow(
+        totale, f"Barattolo escrow set: {primo[:25]} +{len(righe) - 1} "
+                f"({len(righe)} oggetti)")
+    # Il ricontrollo che fa fede, per OGNI riga (il patto del mono:
+    # da qui all'INSERT nessun await, e nessun DML prima — l'offerta
+    # scaduta qui sopra committa e solleva subito). Fallita una riga,
+    # fallisce il set: la invoice muore da sola in 15 minuti e il 409
+    # NOMINA il pezzo, cosi' il compratore sa cosa togliere.
+    for aid, qta in richieste.items():
+        fresco = con.execute("SELECT stato, quantita FROM annunci "
+                             "WHERE id=?", (aid,)).fetchone()
+        if (not fresco or fresco["stato"] != "attivo"
+                or qta > fresco["quantita"] - _riservati(con, aid)):
+            con.close()
+            raise HTTPException(409, f"«{tutti[aid]['titolo'][:40]}» ti è "
+                                     f"stato soffiato mentre componevi il "
+                                     f"set: toglilo e riprova")
+    adesso = int(time.time())
+    con.execute(
+        "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
+        "prezzo_sats,stato,payment_hash,creato,aggiornato,cambio_ordine,"
+        "consegna_scelta,spedizione_sats,protezione_sats,quantita) "
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
+         adesso, adesso, cambio_ordine, scelta, sped, prot, pezzi))
+    ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    for r in righe:
+        con.execute(
+            "INSERT INTO ordine_righe(ordine_id,annuncio_id,quantita,"
+            "unitario_sats,titolo) VALUES(?,?,?,?,?)",
+            (ordine_id, r["annuncio_id"], r["quantita"],
+             r["unitario_sats"], r["titolo"]))
+    for off in offerte.values():
+        # Il legame ordine-offerta nella STESSA transazione (il patto
+        # del mono): nessuna finestra in cui l'uno esiste senza l'altro
+        con.execute("UPDATE offerte SET ordine_id=?, aggiornato=? "
+                    "WHERE id=?", (ordine_id, adesso, off["id"]))
+    con.commit()
+    con.close()
+    # prezzo_sats resta il TOTALE, come sempre; le righe sono in piu'
+    # (i totali parlano anche ai client che il set non lo conoscono)
+    return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
+            "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
+            "articolo_sats": articolo, "spedizione_sats": sped,
+            "protezione_sats": prot, "consegna": scelta,
+            "quantita": pezzi, "set": True,
+            "righe": [{"annuncio_id": r["annuncio_id"],
+                       "titolo": r["titolo"], "quantita": r["quantita"],
+                       "unitario_sats": r["unitario_sats"]}
+                      for r in righe]}
+
+
 @app.post("/api/orders")
 async def compra(req: Request, x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
     """L'acquirente avvia l'acquisto: creiamo la invoice escrow."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
+    # Il SET (lug 2026): col body a righe si passa dal ramo dedicato;
+    # con annuncio_id tutto e' l'acquisto di sempre, byte per byte.
+    if not d.get("annuncio_id") and isinstance(d.get("righe"), list):
+        return await _compra_set(user, d)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
                     (d["annuncio_id"],)).fetchone()
@@ -5578,65 +5850,97 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
             con.commit()
             con.close()
             return {"stato": "locked"}
-        # Lo stock scala dei pezzi dell'ordine. MAX para il corner raro
-        # dell'ordine pagato ma verificato dopo i 30 minuti della
-        # prenotazione: mai un numero negativo in vetrina.
+        # Lo stock scala dei pezzi dell'ordine, RIGA per riga: il set
+        # ha piu' annunci, il mono e' una riga sintetizzata — stessa
+        # strada per entrambi. MAX para il corner raro dell'ordine
+        # pagato ma verificato dopo i 30 minuti della prenotazione:
+        # mai un numero negativo in vetrina.
         pezzi = o["quantita"] or 1
-        con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
-                    "WHERE id=?", (pezzi, o["annuncio_id"]))
-        a = con.execute("SELECT contatto_nostr, titolo, quantita "
-                        "FROM annunci WHERE id=?",
-                        (o["annuncio_id"],)).fetchone()
-        # L'esaurimento: solo quando l'ULTIMO pezzo se ne va l'annuncio
-        # diventa 'venduto' (l'invariante venduto <=> quantita=0). Con
-        # pezzi ancora in vetrina niente sold, niente ✅ sul canale e le
-        # trattative altrui restano VIVE: c'e' ancora da comprare.
-        esaurito = not a or a["quantita"] <= 0
-        if esaurito:
-            con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
-                        (o["annuncio_id"],))
+        righe = _righe_ordine(con, o)
+        e_set = not o["annuncio_id"]
+        a = None
+        esauriti = []
+        for r in righe:
+            con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
+                        "WHERE id=?", (r["quantita"], r["annuncio_id"]))
+            a = con.execute("SELECT contatto_nostr, titolo, quantita "
+                            "FROM annunci WHERE id=?",
+                            (r["annuncio_id"],)).fetchone()
+            # L'esaurimento: solo quando l'ULTIMO pezzo se ne va
+            # l'annuncio diventa 'venduto' (l'invariante venduto <=>
+            # quantita=0). Con pezzi ancora in vetrina niente sold,
+            # niente ✅ sul canale e le trattative altrui restano VIVE:
+            # c'e' ancora da comprare. Nel set si giudica riga per
+            # riga: la vendita di un pezzo non spegne gli altri.
+            if not a or a["quantita"] <= 0:
+                con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
+                            (r["annuncio_id"],))
+                esauriti.append({"annuncio_id": r["annuncio_id"],
+                                 "titolo": a["titolo"] if a else r["titolo"],
+                                 "nostr": bool(a and a["contatto_nostr"])})
         # L'offerta che ha generato l'ordine si conclude col pagamento;
-        # le ALTRE ancora vive decadono solo all'esaurimento —
-        # l'annuncio non si e' mai bloccato, e ha vinto chi ha pagato.
+        # le ALTRE ancora vive decadono solo all'esaurimento del LORO
+        # annuncio — l'annuncio non si e' mai bloccato, e ha vinto chi
+        # ha pagato. (La UPDATE su ordine_id copre in un colpo anche
+        # le offerte per-riga di un set.)
         adesso = int(time.time())
         con.execute("UPDATE offerte SET stato='conclusa', aggiornato=? "
                     "WHERE ordine_id=? AND stato='accettata'",
                     (adesso, ordine_id))
         decadute = []
-        if esaurito:
-            decadute = con.execute(
+        for e in esauriti:
+            vive = con.execute(
                 "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
                 "AND stato IN ('proposta','controproposta','accettata')",
-                (o["annuncio_id"],)).fetchall()
-            if decadute:
+                (e["annuncio_id"],)).fetchall()
+            if vive:
                 con.execute(
                     "UPDATE offerte SET stato='decaduta', aggiornato=? "
                     "WHERE annuncio_id=? AND stato IN "
                     "('proposta','controproposta','accettata')",
-                    (adesso, o["annuncio_id"]))
+                    (adesso, e["annuncio_id"]))
+                decadute += [{"compratore_id": v["compratore_id"],
+                              "titolo": e["titolo"]} for v in vive]
         con.commit()
-        if esaurito:
+        for e in esauriti:
             # Anche la piazza Nostr deve sapere che l'oggetto e' andato
-            asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "sold",
+            asyncio.create_task(annuncio_su_nostr(e["annuncio_id"], "sold",
                                                   solo_aggiornamento=True))
             # ...e il post nel canale si aggiorna col ✅ Venduto
-            asyncio.create_task(promo_venduto(o["annuncio_id"]))
-        msg = ("🔒 <b>Hai venduto!</b> " if pezzi == 1 else
-               f"🔒 <b>Hai venduto {pezzi} pezzi!</b> ")
-        msg += ("I sats dell'acquirente sono bloccati nel deposito di "
-                "garanzia. "
-                "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
-        if not esaurito:
-            msg += (f"\n\n🏷 L'annuncio resta in vetrina: "
-                    f"{a['quantita']} ancora {'disponibile' if a['quantita'] == 1 else 'disponibili'}.")
-        if esaurito and a and a["contatto_nostr"]:
-            msg += ("\n\n🟣 Questo annuncio è pubblicato anche su <b>Nostr</b>: "
-                    "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
-                    "client, così nessun altro proverà a comprarlo lì.")
+            asyncio.create_task(promo_venduto(e["annuncio_id"]))
+        if e_set:
+            msg = (f"🔒 <b>Hai venduto un set di {len(righe)} oggetti"
+                   + (f" ({pezzi} pezzi)" if pezzi > len(righe) else "")
+                   + "!</b> I sats dell'acquirente sono bloccati nel "
+                   "deposito di garanzia. Prepara un pacco solo e segna "
+                   "l'ordine come spedito nella Mini App. 📦\n")
+            for r in righe:
+                msg += (f"\n• {r['titolo'][:40]}"
+                        + (f" × {r['quantita']}" if r["quantita"] > 1
+                           else ""))
+            promemoria = [e["titolo"][:40] for e in esauriti if e["nostr"]]
+            if promemoria:
+                msg += ("\n\n🟣 Su <b>Nostr</b> ricordati di segnare come "
+                        "<b>venduto (sold)</b> dal tuo client: "
+                        + ", ".join(f"«{t}»" for t in promemoria))
+        else:
+            esaurito = bool(esauriti)
+            msg = ("🔒 <b>Hai venduto!</b> " if pezzi == 1 else
+                   f"🔒 <b>Hai venduto {pezzi} pezzi!</b> ")
+            msg += ("I sats dell'acquirente sono bloccati nel deposito di "
+                    "garanzia. "
+                    "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
+            if not esaurito:
+                msg += (f"\n\n🏷 L'annuncio resta in vetrina: "
+                        f"{a['quantita']} ancora {'disponibile' if a['quantita'] == 1 else 'disponibili'}.")
+            if esaurito and a and a["contatto_nostr"]:
+                msg += ("\n\n🟣 Questo annuncio è pubblicato anche su <b>Nostr</b>: "
+                        "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
+                        "client, così nessun altro proverà a comprarlo lì.")
         await notifica(o["venditore_id"], msg)
         # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
         await polso_ordini_admin(
-            f"🛒 <b>Nuovo ordine:</b> «{(a['titolo'] if a else '?')[:60]}» — "
+            f"🛒 <b>Nuovo ordine:</b> «{_titolo_ordine(righe)[:60]}» — "
             f"{o['prezzo_sats']} sats. Ordini aperti: {{aperti}}")
         # Il garbo verso chi restava in trattativa: l'oggetto e' andato.
         # MAI al compratore che ha appena pagato: se aveva un'altra
@@ -5646,7 +5950,7 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
             if riga["compratore_id"] == o["compratore_id"]:
                 continue
             await notifica(riga["compratore_id"],
-                f"🕊 «{a['titolo'][:60]}» è appena stato venduto a "
+                f"🕊 «{riga['titolo'][:60]}» è appena stato venduto a "
                 f"qualcun altro: la tua offerta decade. In vetrina ci "
                 f"sono altre occasioni che aspettano!")
         con.close()

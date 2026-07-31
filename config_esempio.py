@@ -59,6 +59,9 @@ TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
 MAX_QUANTITA_ANNUNCIO = 100  # pezzi massimi per annuncio (quantita' in
                              # stock): para gli errori di battitura senza
                              # limitare i commercianti veri
+MAX_RIGHE_SET = 8            # annunci DIVERSI massimi in un set
+                             # («Riempi il barattolo»): un pacco vero,
+                             # non un camion
 
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un
