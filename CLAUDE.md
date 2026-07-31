@@ -692,26 +692,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   da carica_comuni, riconosciuta senza codice nuovo; il valore si
   salva e si mostra così com'è). Al blur passa da
   `GET /api/zona-controlla` (autenticato): comune riconoscibile nel
-  testo = silenzio; nulla di riconoscibile ma un QUASI-comune sì =
-  riga `#zonaHint` «intendevi Pavia (PV)?» con [Usa] / [Lascia così],
-  il nome suggerito vive nella variabile `zonaSuggerita` e mai dentro
-  l'onclick (gli apostrofi di Sant'Angelo). LA ZONA SEGUE LA CONSEGNA
-  (lug 2026): col RITIRO ('ritiro'/'entrambe') è OBBLIGATORIA e deve
-  CONTENERE un comune riconosciuto — frazioni ok per costruzione
-  («Frazione Salsasio, Carmagnola (TO)» passa: gli n-grammi trovano
-  il comune), «Pvia» no; la regola vive in `guardia_zona_condizione`
-  (400 col messaggio dei suggerimenti; senza dataset si spegne,
-  fail-open) e nel client (campo vuoto fermato in publish(), label
-  dinamica «obbligatorio per il ritiro» da aggiornaConsegnaForm, hint
-  fermo al blur). SENZA ritiro resta facoltativa e la validazione è
-  morbida (mai bloccante; niente candidato = niente riga). «Spedisco
-  in tutta Italia» non vive più nel campo Zona (è roba della
-  consegna), ma i testi non-luogo CONTINUANO a entrare da tre porte
-  e nessuna si può chiudere: il form senza ritiro (testo libero per
-  scelta), il CSV senza ritiro (solo un avviso morbido, la riga si
-  crea), e soprattutto l'import Nostr, che prende il tag `location`
-  verbatim e lo riscrive DAI RELAY ogni ora — lì i relay sono la
-  fonte di verità, non possiamo imporgli niente. Per questo il
+  testo = silenzio; nulla di riconoscibile = riga `#zonaHint` col
+  «forse Pavia (PV)?» quando il fuzzy ha un candidato, e la via
+  d'uscita giusta secondo il caso ([Usa «Pavia (PV)»], oppure
+  [lascia il campo vuoto] senza ritiro); il nome suggerito vive nella
+  variabile `zonaSuggerita` e mai dentro l'onclick (gli apostrofi di
+  Sant'Angelo). LA ZONA DEV'ESSERE UN LUOGO (lug 2026): il campo
+  resta TESTO LIBERO, ma deve CONTENERE un comune riconosciuto —
+  frazioni ok per costruzione («Frazione Salsasio, Carmagnola (TO)»
+  passa: gli n-grammi trovano il comune), «Pvia» e «Spedisco in tutta
+  Italia» no. Due severità: col RITIRO ('ritiro'/'entrambe') la zona
+  è anche OBBLIGATORIA (chi viene a ritirare deve sapere dove);
+  SENZA ritiro resta FACOLTATIVA — chi spedisce e basta la lascia
+  vuota, e in card lo dice già il 🚚 — ma se la compila dev'essere
+  vera. Fino al lug 2026 qui c'era solo un avviso MORBIDO col
+  «Lascia così», e il campo Zona diventava un secondo posto dove
+  scrivere la spedizione: è da lì che nascono le zone non-luogo che
+  la vetrina deve poi nascondere. La regola vive in
+  `guardia_zona_condizione` (giudice unico di pubblica e modifica;
+  400 con `messaggio_zona_storta`, il messaggio UNICO che form,
+  import e client dicono uguale; senza dataset si spegne, fail-open),
+  nell'anteprima dell'import CSV (SCARTO con numero di riga e
+  suggerimento, non più un avviso) e nel client (campo vuoto col
+  ritiro fermato in publish(), che poi richiama `controllaZona()` e
+  guarda `zonaStorta` — così l'errore arriva PRIMA del viaggio con le
+  foto in base64; label dinamica «obbligatorio per il ritiro» da
+  aggiornaConsegnaForm). CONSEGUENZA DICHIARATA: un annuncio storico
+  con la zona storta viene fermato alla PRIMA MODIFICA finché non la
+  sistema — lo stesso patto della condizione obbligatoria. Le
+  migrazioni d'avvio invece non toccano nulla. Resta APERTA una sola
+  porta, e non si può chiudere: l'import Nostr, che prende il tag
+  `location` verbatim e lo riscrive DAI RELAY ogni ora — lì i relay
+  sono la fonte di verità. Per questo il
   filtro giusto sta in VISUALIZZAZIONE, vedi «La zona si mostra solo
   se è un luogo» qui sotto. `suggerisci_comune` = difflib a
   soglia 0.8 sugli n-grammi (lunghi prima, primo nel testo a parità,
@@ -739,41 +751,58 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (gemella del backfill coordinate, idempotente): solo i
   riconoscibili, MAI gli importati da Nostr (contatto_nostr pieno:
   la loro zona la riscrive l'import orario dai relay).
-  La zona si mostra solo se è un LUOGO (lug 2026): siccome i testi
-  non-luogo entrano comunque (le tre porte dette sopra), la CARD
-  mostra il 📍 solo quando la zona contiene davvero un comune —
-  «Spedisco in tutta Italia» e «Nord Italia» non lasciano NULLA al
-  loro posto (la strada di consegna la dicono già le icone accanto:
-  il vecchio ripiego `luogoMeta` «📦 Spedizione»/«💾 Online»/«📍 —»
-  non esiste più). Nel DETTAGLIO invece il valore resta visibile
-  com'è stato scritto: chi apre la scheda ha diritto a leggere tutto
-  quello che il venditore ha dichiarato. Le due rese sono
-  `luogoCard` e `luogoPill`.
-  IL CRITERIO SONO LE COORDINATE, NON LA SIGLA — e vale la pena
-  raccontare perché, che il prossimo cantiere non rifaccia il giro.
-  La sigla dentro il testo sembra la strada ovvia (`arricchisci_zona`
-  ce la mette apposta, e un `regione != ''` sarebbe stato gratis: la
-  regione È derivata dalla sigla). I dati veri l'hanno bocciata: in
-  produzione c'era un annuncio con zona `Parma` — un comune vero,
-  senza sigla — perché `arricchisci_zona` normalizza SOLO al
-  salvataggio da form/CSV, e la migrazione `arricchisci_zone_esistenti`
-  SALTA APPOSTA gli importati da Nostr. Col criterio-sigla sarebbe
-  sparito dalla vetrina il grosso del catalogo importato, che la
-  sigla non ce l'ha quasi mai, più gli alias («Reggio Emilia») e i
-  contesi («Castro»). Le coordinate invece dicono esattamente la
-  cosa giusta — «il testo contiene uno dei ~7.900 comuni» — si
-  scrivono a OGNI salvataggio, si ricalcolano ogni ora per gli
-  importati e hanno il backfill all'avvio. Quindi `CAMPI_VETRINA`
-  espone `zona_riconosciuta` = `CASE WHEN a.lat!=0 OR a.lon!=0`:
-  zero colonne nuove, zero migrazioni, e le coordinate NON escono
-  (sono il centro del comune, non un indirizzo, ma un 0/1 pesa meno
-  e dice tutto quello che serve). Le rotte che servono l'annuncio
-  INTERO (`/api/search`, `/api/listings/miei`) passano da `a.*` e
-  l'alias non ce l'hanno, ma hanno lat/lon: `mapListing` calcola
-  `zonaOk` dall'uno o dalle altre, ed è l'unico posto che lo sa. In
-  DEMO non c'è server che geocodifichi e l'approssimazione onesta è
-  `zonaOkDemo` (la sigla nel testo — lì il campo Zona suggerisce
-  «Comune (SIGLA)» e va benissimo).
+  In CARD si mostra SOLO IL COMUNE (lug 2026), mai il testo intero:
+  «Frazione Salsasio, Carmagnola (TO) — spedisco ovunque» in griglia
+  diventa «Carmagnola (TO)», «vicino Milano (MI)» diventa «Milano
+  (MI)», e i testi che un luogo non sono («Spedisco in tutta
+  Italia», «Nord Italia») non lasciano NULLA al loro posto — la
+  strada di consegna la dicono già le icone accanto, e il vecchio
+  ripiego `luogoMeta` «📦 Spedizione»/«💾 Online»/«📍 —» non esiste
+  più. Nel DETTAGLIO invece il testo INTERO com'è stato scritto. Il
+  perché della differenza: la card è un INDICE — una colonna di nomi
+  confrontabili a colpo d'occhio — mentre la scheda è la
+  DICHIARAZIONE del venditore, dove c'è spazio e «Frazione Salsasio»
+  serve davvero a chi va a ritirare. Le due rese sono `luogoCard`
+  (legge `l.comune`) e `luogoPill` (legge `l.zone`).
+  Il nome esce nella forma UFFICIALE del dataset, il che raddrizza
+  gratis le maiuscole storte («torino (TO)» → «Torino (TO)») e dà la
+  sigla anche agli alias che `arricchisci_zona` non sapeva servire
+  («Reggio Emilia» → «Reggio nell'Emilia (RE)»).
+  IL CUORE È UNO SOLO — `_chiave_comune` — e questo è il vincolo che
+  ha guidato il disegno: `coordinate_da_zona` (le coordinate) e
+  `comune_da_zona` (il nome per la vetrina) DEVONO dire la stessa
+  cosa, o la card mostrerebbe un luogo per cui il filtro geografico
+  degli avvisi non trova nulla, o viceversa. Un solo scanner a
+  n-grammi, quindi, e le due funzioni ci si appoggiano entrambe;
+  verificato sull'intero dataset (7.904 comuni × 3 forme, zero
+  divergenze). `arricchisci_zona` invece NON passa di lì e tiene il
+  suo giro: a lei serve la POSIZIONE del comune nel testo, che il
+  secondo passaggio senza preposizioni perde. Il nome lo dà
+  `_comuni_nome()`, gemello LARGO di `_comuni_fuzzy` (che tiene i
+  soli nomi nudi perché lì sono i candidati del difflib): qui
+  servono anche la chiave nome+sigla e gli alias, o il comune
+  riconosciuto resterebbe senza un nome da mostrare.
+  API: `CAMPI_VETRINA` espone `zona_comune` (il nome, '' = la zona
+  non è un luogo) — che è ANCHE il flag «mostro il 📍?», quindi UN
+  campo invece di due: il breve `zona_riconosciuta` (0/1 da
+  `a.lat!=0 OR a.lon!=0`) è vissuto un giorno solo ed è stato
+  assorbito da questo, che dice la stessa cosa e in più porta il
+  nome. Si calcola in Python dentro `arricchisci_righe_vetrina` e
+  non in SQL — il dizionario dei ~7.900 comuni vive in RAM, non nel
+  database — ed è per riga una manciata di lookup su un dict: nulla,
+  anche sulle 300 righe della shortlist AI.
+  ATTENZIONE, e vale per ogni campo derivato che verrà dopo:
+  `arricchisci_righe_vetrina` (si chiamava `espandi_distintivi_
+  vetrina` finché faceva una cosa sola) è il COLLO DI BOTTIGLIA da
+  cui passano tutte e sei le rotte che diventano card — vetrina,
+  negozio, singolo, miei, ricerca AI, preferiti. È lì che si
+  aggiungono i campi derivati, ed è per questo che `zona_comune` non
+  ha bisogno di nessun ripiego lato client: le rotte che servono
+  l'annuncio INTERO (`/api/search`, `/api/listings/miei`) passano da
+  `a.*` e non avrebbero un alias SQL, ma passano di lì anche loro.
+  In DEMO non c'è server che estragga il comune e l'approssimazione
+  onesta è `comuneDemo` (il pezzo di testo che porta la sigla, che
+  nel campo Zona è il formato suggerito).
   La REGIONE è DERIVATA (lug 2026): non è un campo del form e non si
   chiede MAI al venditore — si ricava dalla sigla che `arricchisci_zona`
   ha già messo nella zona. `regione_da_zona` prende la PRIMA sigla
@@ -908,7 +937,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `venditore.distintivi` e `venditore_distintivi` sugli annunci
   (subselect GROUP_CONCAT in `CAMPI_VETRINA` + SELECT di search e
   miei, espanso in {id, emoji, nome, descrizione} da
-  `espandi_distintivi_vetrina`) = dal lug 2026 TUTTI i guadagnati
+  `arricchisci_righe_vetrina`) = dal lug 2026 TUTTI i guadagnati
   (bacheca stile Vinted, deciso con Andrea: ⚡ Primo acquisto
   pubblico compreso — aggregati senza segreti); il flag `fiducia`
   non filtra più, decide solo la PRECEDENZA (i fiducia in testa al
@@ -1129,17 +1158,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   testa released = totale − protezione; checkbox «🚚 Solo con
   spedizione» nei filtri (in DEMO client-side in renderGrid); icone
   discrete nella meta della card — il prezzo in griglia resta pulito.
-  LA RIGA META DELLA CARD (lug 2026): la zona a sinistra, le icone
+  LA RIGA META DELLA CARD (lug 2026): il comune a sinistra, le icone
   in un GRUPPO stretto a destra (`iconeCard` → `<span class="ico">`,
-  ordine 🚚 🤝 💾 + pallino Nostr, lo stesso del dettaglio; il 🤝
-  del ritiro prima in card non c'era). Prima erano figli diretti di
-  un flex `space-between` e si sparpagliavano per tutta la riga; ora
-  a spartirsi lo spazio sono in due, e a cedere coi puntini è SEMPRE
-  la zona (`.luogo` con `flex:1 1 auto` + `min-width:0`) mentre il
-  gruppo non si stringe mai — a 360px con tutte e quattro le icone
-  insieme deve restare intero. `min-height:17px` sulla riga, che ora
-  può essere vuota del tutto (zona non riconosciuta e nessuna icona)
-  e le card resterebbero disallineate.
+  ordine 🚚 🤝 💾 come nel dettaglio; il 🤝 del ritiro prima in card
+  non c'era). SOLO le strade di consegna: il pallino Nostr è USCITO
+  dalle card (lug 2026) — in griglia lo spazio è poco, e la verifica
+  riguarda il VENDITORE, non l'oggetto: vive nel dettaglio, accanto
+  al suo profilo, che è dove uno se la chiede (il gruppo è passato da
+  66 a 53px, e il comune ne ha guadagnati altrettanti prima di
+  troncare). Prima le icone erano figli diretti di un flex
+  `space-between` e si sparpagliavano per tutta la riga; ora a
+  spartirsi lo spazio sono in due, e a cedere coi puntini è SEMPRE il
+  comune (`.luogo` con `flex:1 1 auto` + `min-width:0`) mentre il
+  gruppo non si stringe mai — a 360px con tutte e tre le icone
+  insieme deve restare intero. `min-height:17px` sulla riga, che può
+  essere vuota del tutto (zona non riconosciuta e nessuna icona) e le
+  card resterebbero disallineate.
   Consegna digitale 💾 (lug 2026, quarta voce di MODALITA_CONSEGNA):
   per buoni regalo, codici, licenze — il PRINCIPIO CARDINE è che il
   contenuto passa DENTRO Barattolo, mai fuori. La modalità è LIBERA
@@ -2659,18 +2693,32 @@ sono il cantierino successivo, deciso: la preparazione è
 l'invariante articolo = Σ unitario×qta, lo sconto sarà una voce di
 testata); card più stretta e dettaglio spogliato (lug 2026: in card
 le icone si raggruppano a destra e la zona si mostra solo se è un
-LUOGO vero — il criterio sono le coordinate, non la sigla, e il
-perché sta scritto in Architettura col caso «Parma», che serve al
-prossimo cantiere; nel dettaglio restano luogo, consegna,
-condizione, disponibilità e Nostr, mentre escono categoria, taglia
-del pacco, «protezione acquisti inclusa» e il costo dalla pillola
-della spedizione, che vive già nel foglio della consegna e nel conto
-scomposto; superficie API: `zona_riconosciuta` in CAMPI_VETRINA,
-derivata da lat/lon, zero colonne nuove — in produzione basta il
-riavvio, non c'è migrazione da aspettare — vedi Architettura;
-collaudato in locale a 360/375/390 e 1280px, chiaro e scuro, con sei
-annunci di prova per i casi di zona e le quattro superfici che
-servono le card).
+LUOGO vero; nel dettaglio restano luogo, consegna, condizione,
+disponibilità e Nostr, mentre escono categoria, taglia del pacco,
+«protezione acquisti inclusa» e il costo dalla pillola della
+spedizione, che vive già nel foglio della consegna e nel conto
+scomposto; collaudato a 360/375/390 e 1280px, chiaro e scuro);
+il luogo si fa pulito, dentro e fuori (lug 2026, subito dopo: il
+pallino Nostr esce dalle card — riguarda il venditore, non
+l'oggetto, e in griglia lo spazio è poco; in card si mostra il solo
+COMUNE estratto dal dizionario invece del testo intero, con la card
+che diventa un indice e il dettaglio che resta la dichiarazione del
+venditore; e in INGRESSO la zona, pur restando facoltativa senza
+ritiro, dev'essere un comune vero — l'avviso morbido del form e
+dell'import CSV è diventato bloccante, con un messaggio unico e il
+«forse Pavia (PV)?»: chi spedisce e basta lascia il campo vuoto,
+niente più «spedisco in tutta Italia» nel campo Zona. Superficie
+API: `zona_comune` in CAMPI_VETRINA, che ASSORBE il
+`zona_riconosciuta` del giorno prima — il nome è anche il flag —
+calcolato nel collo di bottiglia `arricchisci_righe_vetrina`; zero
+colonne nuove, in produzione basta il riavvio. Conseguenza
+dichiarata: gli annunci storici con la zona storta si mettono in
+regola alla prima modifica, come per la condizione. Vedi
+Architettura per il vincolo del cuore unico `_chiave_comune`, che
+serve al prossimo cantiere. Collaudato con 16 casi mirati più
+l'invariante su tutto il dataset [7.904 comuni × 3 forme], 9 casi
+TestClient sulla guardia, l'anteprima CSV, i 6 stati della riga di
+hint e il gate end-to-end contando le POST).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
