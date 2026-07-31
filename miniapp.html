@@ -664,24 +664,31 @@
   }
   /* Misure tirate: la barra resta alta quanto la nav che sostituisce
      (il bottone a una riga compensa il recinto attorno). Rettangolari
-     col raggio del riquadro venditore, per coerenza di carta. */
+     col raggio del riquadro venditore e PIATTI: dentro la cornice
+     tratteggiata l'ombra piena mangiava il respiro in basso e la
+     faceva sembrare scentrata — qui niente ombre, la stessa forma
+     per tutti e due. Offerta a SINISTRA, Acquista a DESTRA, meta'
+     e meta' (i due blocchi si equivalgono: il ghost stira all'altezza
+     del recinto, align-items:stretch). */
   #barraCompra .btn{margin-top:0;width:auto;line-height:1.25;
-    border-radius:var(--radius);white-space:nowrap}
+    border-radius:var(--radius);white-space:nowrap;box-shadow:none;
+    font-size:15px;padding:8px 10px 9px}
+  #barraCompra .btn:active{transform:translateY(1px);box-shadow:none}
+  #bcOfferta{flex:1;min-width:0}
   /* Il richiamo dell'escrow SOLO attorno ad Acquista: stesso verde e
-     stesso tratteggio del recinto in pagina, in formato francobollo.
-     Il lucchettino sta a cavallo del bordo in alto a sinistra, mai
-     sopra il testo (il bottone ha il suo padding). Il padding-top di
-     10px della barra e' la sua aria: cosi' non esce dalla barra. */
+     stesso tratteggio del recinto in pagina, in formato francobollo,
+     con la stessa aria (3px) su tutti i lati. Il lucchettino sta a
+     cavallo del bordo in alto a sinistra, mai sopra il testo (il
+     bottone ha il suo padding). Il padding-top di 10px della barra
+     e' la sua aria: cosi' non esce dalla barra. */
   .bc-recinto{position:relative;flex:1;min-width:0;display:flex;
-    border:2px dashed var(--trust);border-radius:calc(var(--radius) + 4px);
+    border:2px dashed var(--trust);border-radius:calc(var(--radius) + 5px);
     padding:3px}
   .bc-recinto .btn{flex:1;min-width:0}
   .bc-lucchetto{position:absolute;top:-9px;left:12px;z-index:1;
     width:19px;height:19px;border-radius:999px;background:var(--trust);
     color:var(--on-trust);display:flex;align-items:center;justify-content:center;
     font-size:10px;box-shadow:0 1px 0 var(--trust-deep)}
-  #bcCompra{font-size:15.5px;padding:8px 10px 9px}
-  #bcOfferta{flex:0 0 auto;font-size:14px;padding:8px 14px}
   @media (max-width:767.98px){
     body.con-barra nav{display:none}
     body.con-barra #barraCompra{display:flex;animation:barraSu .18s ease}
@@ -843,13 +850,16 @@
     box-shadow:0 2px 0 var(--trust-deep)}
   .escrow-zone .trust-note{background:none;padding:6px 0 0;margin-bottom:10px;color:var(--trust-note)}
   .escrow-note{text-align:center;font-size:12px;color:var(--trust-sub);font-weight:700;margin-top:6px}
-  /* La coppia d'acquisto nel recinto: «Acquista» arancio pieno +
-     «Fai un'offerta» neutro, affiancati — la stessa coppia della
-     barra fissa, che qui scorre con la pagina. Il vecchio trucco
+  /* Dentro il recinto SOLO Acquista (deciso: il tratteggio e' il
+     sigillo del pagamento, l'offerta e' una trattativa e sta fuori,
+     appena sotto): centrato, largo quanto serve alla scritta piu'
+     l'aria giusta — mai a tutta fascia. Il vecchio trucco
      :first-of-type (il ghost promosso a CTA quando il Compra subito
      NWC mancava) non serve piu': Acquista e' arancio per classe. */
-  .coppia-acquisto{display:flex;gap:10px;margin-top:10px}
-  .coppia-acquisto .btn{width:auto;flex:1;margin-top:0;white-space:nowrap}
+  /* specificita' doppia di proposito: .btn{width:100%} sta piu' in
+     basso nel foglio e a pari peso vincerebbe lui */
+  .escrow-zone .acquista-cta{width:auto;margin:12px auto 2px;
+    padding:12px 46px;white-space:nowrap}
   /* Bottoni-oggetto: pillola con l'ombra piena 3px sotto, come una
      cosa fisica appoggiata sul banco. Su :active si abbassa. */
   .btn{
@@ -1722,11 +1732,11 @@
          Attorno SOLO a lui il richiamo dell'escrow: contorno
          tratteggiato verde col lucchettino a cavallo del bordo, la
          firma del recinto che si ripete dove si compra. -->
+    <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">Fai un'offerta</button>
     <div class="bc-recinto">
       <span class="bc-lucchetto" aria-hidden="true">🔒</span>
       <button class="btn orange" id="bcCompra" onclick="compraDaBarra()">Acquista</button>
     </div>
-    <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">Fai un'offerta</button>
   </div>
 
   <nav>
@@ -4008,12 +4018,10 @@ function openDetail(id){
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <div class="coppia-acquisto">
-               <button class="btn orange" onclick="compraDaBarra()">Acquista</button>
-               ${offAcc ? '' : `<button class="btn ghost" onclick="apriOfferta()">Fai un'offerta</button>`}
-             </div>
+             <button class="btn orange acquista-cta" onclick="compraDaBarra()">Acquista</button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
-           </div>`}
+           </div>
+           ${offAcc ? '' : `<button class="btn ghost" onclick="apriOfferta()">Fai un'offerta</button>`}`}
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}

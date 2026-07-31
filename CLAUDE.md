@@ -1179,10 +1179,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la scritta «verificato su Nostr» e i ponti di contatto non stanno
   più qui: la verifica è dell'utente e si racconta nel negozio, dove
   i ponti già vivono), sfilza, stelle e freccia. Da lì in giù tutto
-  com'era (recinto — che dalle correzioni del lug 2026 ospita la
-  coppia «Acquista» arancio + «Fai un'offerta» e non ha più le
-  pillole di scelta —, altri oggetti, barra col richiamo escrow:
-  vedi barra d'acquisto). LA DATA: colonna `annunci.modificato` (0 = mai
+  com'era (recinto — che dalle correzioni del lug 2026 ospita il solo
+  «Acquista» arancio centrato, con «Fai un'offerta» fuori sotto e
+  senza più le pillole di scelta —, altri oggetti, barra col
+  richiamo escrow: vedi barra d'acquisto). LA DATA: colonna `annunci.modificato` (0 = mai
   toccato) scritta da modifica() e dalla modifica firmata; per gli
   IMPORTATI l'import ci mette la data dell'EVENTO Nostr
   (`evento_ts` = created_at, che per un replaceable è la
@@ -1390,8 +1390,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   migra le offerte e cancella le auto-trattative tra le due meta'.
   Piu' offerte accettate possono coesistere: lecito, il confirm del
   venditore lo dichiara («accettare non riserva l'oggetto»). Frontend:
-  «Fai un'offerta» accanto ad Acquista nella `.coppia-acquisto`
-  dell'escrow-zone e nella barra (nascosto con accordo gia' fatto),
+  «Fai un'offerta» subito FUORI dal recinto escrow (e a sinistra di
+  Acquista nella barra; nascosto con accordo gia' fatto),
   foglio `#offertaSheet` (registrato in closeSheet) con miniatura+
   titolo+listino, chip −10%/−20% precalcolati, campo nella valuta del
   listino (virgola per EUR) e stima live «≈ N sats totali» (matematica
@@ -2049,7 +2049,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   recinto in pagina) col lucchettino `.bc-lucchetto` a cavallo del
   bordo in alto a sinistra — per questo il bottone dice «Acquista»
   senza 🔒: il lucchetto sta sul bordo, come la flag del recinto,
-  mai due volte. Il padding-top 10px della barra è l'aria del
+  mai due volte. I due tasti della barra sono GEMELLI (metà e metà,
+  stessa forma e misura, offerta a sinistra) e PIATTI: dentro la
+  cornice tratteggiata l'ombra piena 0 3px 0 mangiava il respiro in
+  basso e la faceva sembrare scentrata — niente ombre nella barra,
+  la cornice ha 3px d'aria uguali su ogni lato. Il padding-top 10px
+  della barra è l'aria del
   lucchettino; il bottone a una riga compensa il recinto e l'altezza
   resta quella della nav.
   IL VARCO (lug 2026, da una domanda di Andrea che ha trovato un buco
@@ -2081,15 +2086,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invoice prima di aprirlo, con la consegna già cotta dentro
   (`spedizione_sats` e `cambio_ordine` si fissano alla creazione) — una
   scelta lì arriverebbe dopo la invoice.
-  LA COPPIA VIVE IN DUE POSTI (correzioni lug 2026): la stessa coppia
-  «Acquista» arancio ₿ + «Fai un'offerta» ghost sta DENTRO il recinto
-  escrow (`.coppia-acquisto`, scorre con la pagina) E nella barra
-  fissa — i gemelli non si spengono più a barra viva (le vecchie
-  regole `body.con-barra … .off-cta{display:none}` sono morte con la
-  classe `.off-cta`). Nel recinto restano anche stepper quantità,
-  note e il «⚡ Compra subito» NWC (un'ALTRA strada, con la sua
-  cifra); il trucco `:first-of-type` che promuoveva il ghost a CTA è
-  stato RIMOSSO: Acquista è arancio per classe, sempre. Le PILLOLE DI
+  ACQUISTA VIVE IN DUE POSTI (correzioni lug 2026, poi rifinite col
+  feedback di Andrea): dentro il recinto escrow sta SOLO «Acquista»
+  arancio ₿ — centrato, largo quanto la scritta più l'aria
+  (`.escrow-zone .acquista-cta`, specificità doppia perché
+  `.btn{width:100%}` sta più in basso nel foglio), mai a tutta
+  fascia; «Fai un'offerta» è una trattativa e sta FUORI dal
+  tratteggio, subito sotto (sopra Metti nel barattolo). Nella barra
+  fissa la stessa coppia, metà e metà: OFFERTA A SINISTRA, ACQUISTA
+  A DESTRA. I gemelli in pagina non si spengono più a barra viva
+  (le vecchie regole `body.con-barra … .off-cta{display:none}` sono
+  morte con la classe `.off-cta`). Nel recinto restano anche stepper
+  quantità, note e il «⚡ Compra subito» NWC (un'ALTRA strada, con la
+  sua cifra); il trucco `:first-of-type` che promuoveva il ghost a
+  CTA è stato RIMOSSO: Acquista è arancio per classe, sempre. Le PILLOLE DI
   SCELTA consegna (`pilloleConsegna`) non esistono più: in pagina
   restano solo le pillole INFORMATIVE (spedBadge + pilloleModalita),
   la scelta vive nel foglio del varco (e domani nella pagina
@@ -2819,9 +2829,10 @@ annuncio storico; in produzione basta il riavvio, la migrazione gira
 da sola; più le quattro rifiniture del giorno dopo: badge spedizione
 sulla stessa riga del prezzo, 🟣 solo icona in fila coi badge, via i
 ponti di contatto dal riquadro venditore; e le correzioni del giorno
-dopo ancora: «Acquista» arancio ₿ NUDO senza prezzo + «Fai
-un'offerta», la stessa coppia dentro il recinto escrow E nella barra
-fissa col richiamo tratteggiato verde e il lucchettino, via le
+dopo ancora: «Acquista» arancio ₿ NUDO senza prezzo — solo lui e
+centrato dentro il recinto escrow, «Fai un'offerta» fuori sotto — e
+nella barra fissa i due tasti gemelli piatti (offerta a sinistra)
+col richiamo tratteggiato verde e il lucchettino, via le
 pillole di scelta consegna dal dettaglio (la strada si sceglie nel
 foglio del varco, che diventerà la pagina dedicata del prossimo
 cantiere), forme rettangolari col raggio del riquadro su TUTTI i
