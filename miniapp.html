@@ -33,6 +33,18 @@
     --header-bg:rgba(250,244,228,.92); --nav-bg:rgba(255,255,255,.96);
     --ph-a:#F3ECDA; --ph-b:#ECE3CE;
     --ship-bg:#E3F0FB; --ship-text:#2A6FB0; --warn-bg:#FDE8E4; --off-bg:#EFE9DA;
+    /* la versione PIENA della coppia azzurra: fondo saturo + testo che
+       ci sta sopra. E' il grado ALTO della spedizione — «gratuita» —
+       contro il tenue del «disponibile»: stessa famiglia, gerarchia
+       chiara senza rubare l'arancio del prezzo ne' il verde dell'escrow
+       (un azzurro piu' acceso su fondo azzurro non si noterebbe). */
+    --ship-full:#2A6FB0; --ship-on:#fff;
+    /* Il marrone CARTONE del set «Riempi il pacco»: e' il colore della
+       scatola, non un accento nuovo del brand — sta accanto all'arancio
+       ₿ senza fargli concorrenza (piu' spento e piu' terroso, mai
+       confondibile col prezzo). --carton disegna il contorno, e' anche
+       il colore del testo. */
+    --carton:#9A6234; --carton-on:#fff;
     --trust-note:#14532D; --trust-sub:#4B7C5E; --step-line:#BADCC8;
     --tile-off:#F3EFE3; --toast-bg:#23282C; --toast-text:#fff;
     --ink-soft:#5B5648; --desc:#3A3C42;
@@ -62,6 +74,13 @@
     --header-bg:rgba(33,26,16,.92); --nav-bg:rgba(44,37,23,.96);
     --ph-a:#332B1A; --ph-b:#2B2415;
     --ship-bg:#1E2C3C; --ship-text:#85B8E8; --warn-bg:#3C221A; --off-bg:#363126;
+    /* di sera il pieno si inverte: fondo chiaro, testo scuro — come
+       l'etichetta prezzo e il toast, che al buio diventano di carta */
+    --ship-full:#85B8E8; --ship-on:#12202E;
+    /* di sera il cartone si schiarisce (il fondo dell'app e' gia'
+       bruno: un marrone scuro ci affonderebbe dentro) e resta piu'
+       terroso dell'arancio ₿, che li' accanto non deve avere sosia */
+    --carton:#C79A72; --carton-on:#241A0F;
     --trust-note:#B9E4CC; --trust-sub:#93BEA6; --step-line:#3C5B49;
     --tile-off:#2E2A1E; --toast-bg:#F1E8D5; --toast-text:#23282C;
     --ink-soft:#CFC4AD; --desc:#E2D9C6;
@@ -200,8 +219,13 @@
   }
   .chip.active{background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:800}
   /* La riga di fiducia sotto la ricerca: una sola, per tutta la vetrina */
+  /* E' un <button>: porta alla pagina «Il pagamento protetto». Il
+     reset serve perche' i default del bottone (font, bordo, fondo)
+     vincerebbero sull'ereditarieta'. */
   .trust-line{display:flex;align-items:center;justify-content:center;gap:6px;
-    padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text)}
+    padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text);
+    border:0;background:none;font-family:inherit;width:100%;cursor:pointer}
+  .trust-line .fr{font-size:15px;line-height:1;opacity:.75}
 
   /* ---------- strumenti di vetrina (ordina + filtri) ---------- */
   .strumenti{display:flex;gap:8px;align-items:center;justify-content:flex-end;
@@ -544,6 +568,15 @@
     text-overflow:ellipsis;white-space:nowrap}
   .card .meta .ico{flex:0 0 auto;display:flex;align-items:center;gap:3px;
     line-height:1}
+  /* La spedizione gratuita in card: la 🚚 di sempre dentro un
+     cerchietto pieno dell'azzurro del badge (token, quindi chiaro e
+     scuro gratis). Costa ~9px in piu' del solo camioncino, quindi a
+     360px con tutte e tre le strade il comune resta leggibile e la
+     regola di sempre — a cedere e' il luogo, mai il gruppo — non
+     viene messa alla prova. */
+  .card .meta .ico .gratis{display:inline-flex;align-items:center;
+    justify-content:center;background:var(--ship-full);
+    border-radius:999px;padding:2px 3px}
 
   /* Etichetta di sezione con la linea puntinata che riempie fino al
      conteggio (quando c'e'): IN VETRINA ······· 42 oggetti */
@@ -672,7 +705,7 @@
     position:fixed;bottom:0;left:0;right:0;z-index:30;
     background:var(--nav-bg);backdrop-filter:blur(10px);
     border-top:1px solid var(--line);display:none;gap:10px;align-items:stretch;
-    padding:10px var(--pad) calc(6px + env(safe-area-inset-bottom));
+    padding:12px var(--pad) calc(8px + env(safe-area-inset-bottom));
     max-width:520px;margin:0 auto;
   }
   /* Misure tirate: la barra resta alta quanto la nav che sostituisce
@@ -686,26 +719,58 @@
   #barraCompra .btn{margin-top:0;width:auto;line-height:1.25;
     border-radius:12px;white-space:nowrap;box-shadow:none;
     font-size:15px;padding:8px 10px 9px}
+  /* Acquista pesa piu' del vicino anche qui, ma un gradino sotto al
+     gemello del recinto (17): in barra i due tasti si dividono 360px
+     e con lo stepper dei pezzi accanto il posto e' contato. Il pixel
+     di padding in meno sopra tiene l'invariante che conta: la barra
+     resta alta quanto la nav che sostituisce (62 contro 61), che
+     altrimenti la riga di testo piu' alta la faceva crescere. */
+  #barraCompra #bcCompra{font-size:16px;padding-top:7px}
   #barraCompra .btn:active{transform:translateY(1px);box-shadow:none}
-  #bcOfferta{flex:1;min-width:0}
+  #bcOfferta{flex:1 1 50%;min-width:0}
   /* col multi-pezzo lo stepper allunga Acquista: il suo lato prende
-     piu' spazio, l'offerta cede — a 360px tutto intero */
-  #barraCompra.con-qta .bc-recinto{flex:1.5}
-  #barraCompra.con-qta #bcOfferta{font-size:14px;padding:8px 6px 9px}
-  #barraCompra .qta-mini{margin-left:8px}
+     piu' spazio, l'offerta cede — a 360px tutto intero. Si spostano le
+     BASI (60/40), che con basi uguali il grow non avrebbe voce: lo
+     spazio e' gia' tutto occupato e a decidere e' lo shrink, che segue
+     la base. */
+  #barraCompra.con-qta .bc-recinto{flex-basis:60%}
+  #barraCompra.con-qta #bcOfferta{flex-basis:40%;font-size:14px;padding:8px 6px 9px}
+  /* Nella barra lo stepper si accosta alla scritta (margine 0: resta
+     solo il gap di 8px del bottone). Col margine di 8 il gruppo era
+     largo 16px in piu' e, restando centrato, spingeva «Acquista» a 7px
+     dal bordo sinistro — appiccicata. Cosi' la scritta si sposta a
+     destra verso il «−» e prende 11px d'aria dal bordo. */
+  #barraCompra .qta-mini{margin-left:0}
   /* Il richiamo dell'escrow SOLO attorno ad Acquista: stesso verde e
      stesso tratteggio del recinto in pagina, in formato francobollo,
      con la stessa aria (3px) su tutti i lati. Il lucchettino sta a
      cavallo del bordo in alto a sinistra, mai sopra il testo (il
      bottone ha il suo padding). Il padding-top di 10px della barra
      e' la sua aria: cosi' non esce dalla barra. */
-  .bc-recinto{position:relative;flex:1;min-width:0;display:flex;
-    border:2px dashed var(--trust);border-radius:15px;   /* 12 del bottone + 3 d'aria */
-    padding:3px}
+  /* I DUE TASTI SONO GEMELLI DAVVERO (lug 2026, feedback di Andrea):
+     il tratteggio e' un OUTLINE, che non occupa spazio di layout, non
+     un border con padding — cosi' il bottone dentro il recinto e'
+     grande esattamente quanto «Fai un'offerta» accanto. Prima il
+     recinto si mangiava 5px per lato (2 di bordo + 3 di padding) e
+     l'arancio veniva fuori 24px piu' stretto e 10 piu' basso del
+     vicino: sembrava un tasto minore, e non lo e'.
+     Le basi flex sono al 50% e NON a 0 — e' la stessa lezione dei due
+     bottoni del pannello Filtri, gia' pagata una volta: con la base a
+     zero il padding (e il bordo del ghost) si sommano FUORI dalla
+     base, e «Fai un'offerta» veniva 24px piu' largo. Con
+     box-sizing:border-box globale la base al 50% E' la misura finale,
+     lo spazio del gap se lo tolgono in parti uguali, e i due tasti
+     restano gemelli. */
+  .bc-recinto{position:relative;flex:1 1 50%;min-width:0;display:flex;
+    border-radius:12px;                          /* lo stesso del bottone dentro */
+    outline:2px dashed var(--trust);outline-offset:3px}
   .bc-recinto .btn{flex:1;min-width:0}
-  /* esattamente sull'angolo: centrato sul vertice del tratteggio
-     (il gap di 10px tra i due tasti gli da' l'aria a sinistra) */
-  .bc-lucchetto{position:absolute;top:-9px;left:-9px;z-index:1;
+  /* Sul vertice del tratteggio, che ora corre 5px fuori dal bottone
+     (3 di offset + 2 di tratto): centrato li' uscirebbe dalla barra,
+     quindi sta un filo dentro — un francobollo a cavallo dell'angolo,
+     che e' l'effetto voluto. Il gap di 10px tra i due tasti gli da'
+     l'aria a sinistra. */
+  .bc-lucchetto{position:absolute;top:-12px;left:-12px;z-index:1;
     width:19px;height:19px;border-radius:999px;background:var(--trust);
     color:var(--on-trust);display:flex;align-items:center;justify-content:center;
     font-size:10px;box-shadow:0 1px 0 var(--trust-deep)}
@@ -826,9 +891,22 @@
      Forma da pillola come le vicine, colori dalla coppia azzurra dei
      badge «spedito» (AA nei due temi, non fa concorrenza all'arancio
      del prezzo ne' al verde dell'escrow). */
+  /* Due gradi della stessa famiglia azzurra (scelta di Andrea, lug
+     2026): «disponibile» e' l'azzurro TENUE e nudo, «gratuita» e'
+     PIENA. Il contorno pieno sul grado basso e' stato provato e tolto:
+     dava peso a quello che deve pesare meno, e con due badge in
+     colonna il tratto in piu' diventava rumore. */
   .sped-badge{background:var(--ship-bg);color:var(--ship-text);
     border-radius:999px;padding:6px 12px;font-size:13px;font-weight:800;
     white-space:nowrap}
+  /* Il grado ALTO: la spedizione GRATUITA e' un argomento di vendita e
+     deve staccare dal semplice «disponibile». Stessa forma e stessa
+     famiglia di colore, ma piena. */
+  .sped-badge.piena{background:var(--ship-full);color:var(--ship-on)}
+  /* Il gemello sotto il bottone Acquista, dentro il recinto: dice
+     QUANTO costa (sopra, accanto al prezzo, si dice solo SE spedisce).
+     Centrato sotto il bottone, con l'aria di una riga di nota. */
+  .sped-riga{text-align:center;margin-top:9px}
   .desc-tit{font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.1em;color:var(--muted);margin-top:14px}
   /* Le due pillole spedizione/ritiro quando l'annuncio offre entrambe */
@@ -937,8 +1015,68 @@
      ma mai a tutta fascia, e squadrato coi soli angoli tondi: qui il
      raggio scende a 12 (il 16 del riquadro su un bottone basso
      leggeva troppo tondo, feedback di Andrea). */
+  /* Il testo un filo piu' grande degli altri bottoni (15.5 → 17): e' il
+     CTA principale dell'app, e nel recinto ha tutto lo spazio che gli
+     serve. Nella barra fissa resta un gradino sotto (16), che li' due
+     tasti si dividono 360px. */
   .escrow-zone .acquista-cta{width:auto;min-width:76%;margin:12px auto 2px;
-    padding:11px 30px;white-space:nowrap;border-radius:12px}
+    padding:11px 30px;white-space:nowrap;border-radius:12px;font-size:17px}
+  /* «Scopri di piu'» in basso a sinistra: la porta alla pagina del
+     pagamento protetto. Testuale e discreto — il recinto spiega in una
+     riga, il resto si legge di la' per chi lo vuole. */
+  .escrow-piede{display:flex;justify-content:flex-start;margin-top:10px}
+  /* Inchiostro e non verde (feedback di Andrea): dentro il recinto il
+     verde e' gia' del bordo, della bandierina e del testo di fiducia —
+     un quarto verde faceva poltiglia. Nero (che al buio diventa crema,
+     e' un token) stacca e si legge come quello che e': un link. */
+  .escrow-piede button{border:0;background:none;padding:0;font:inherit;
+    font-weight:800;font-size:12.5px;color:var(--ink);
+    text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+  /* ---------- pagina «Il pagamento protetto» ----------
+     La spiegazione lunga che il recinto non puo' contenere. Testo e
+     basta: nessun dato utente, nessun bottone d'azione — si legge e si
+     torna indietro. Misure da lettura (16px, interlinea larga) invece
+     che da interfaccia. */
+  .sicu{padding:6px var(--pad) 30px;max-width:640px;margin:0 auto}
+  .sicu-hero{text-align:center;padding:10px 0 4px}
+  .sicu-hero img{width:132px;height:132px;object-fit:contain;
+    filter:drop-shadow(0 12px 18px rgba(60,45,10,.22));
+    animation:floaty 4s ease-in-out infinite}
+  /* se il PNG scontornato non arriva si ripiega sulla tessera, che
+     l'ombra sagomata la vuole solo la sagoma */
+  .sicu-hero img.tessera{border-radius:26px;filter:none;animation:none}
+  html[data-tema="scuro"] .sicu-hero img{filter:drop-shadow(0 12px 18px rgba(0,0,0,.5))}
+  .sicu-hero .lockup{display:block;margin-top:6px;font-size:20px}
+  .sicu-hero h2{font-family:'Baloo 2',sans-serif;font-size:27px;
+    line-height:1.15;margin:10px 0 0}
+  .sicu-hero .occhiello{color:var(--ink-soft);font-size:14px;
+    font-weight:600;margin:7px 0 0}
+  .sicu-apre{background:var(--trust-soft);border:2px dashed var(--trust);
+    border-radius:18px;padding:14px 16px;margin:20px 0 4px;
+    color:var(--trust-note);font-size:15px;line-height:1.55;font-weight:600}
+  .sicu h3{font-family:'Baloo 2',sans-serif;font-size:19px;
+    margin:26px 0 8px;line-height:1.2}
+  .sicu p{font-size:15px;line-height:1.6;color:var(--desc);
+    font-weight:500;margin:0 0 10px}
+  .sicu-nota{font-size:13.5px;color:var(--muted);font-weight:600}
+  .sicu ol,.sicu ul{margin:0;padding-left:0;list-style:none}
+  .sicu li{font-size:15px;line-height:1.55;color:var(--desc);
+    font-weight:500;margin-bottom:11px}
+  /* i quattro passi numerati: il pallino arancio e' il conteggio,
+     scritto in CSS cosi' il testo resta pulito nel markup */
+  .sicu-passi{counter-reset:passo}
+  .sicu-passi li{counter-increment:passo;position:relative;padding-left:34px}
+  .sicu-passi li::before{content:counter(passo);position:absolute;left:0;top:1px;
+    width:23px;height:23px;border-radius:999px;background:var(--sats);
+    color:#fff;font-family:'JetBrains Mono',monospace;font-size:12px;
+    font-weight:800;display:flex;align-items:center;justify-content:center}
+  .sicu-lista li{position:relative;padding-left:18px}
+  .sicu-lista li::before{content:'';position:absolute;left:2px;top:9px;
+    width:6px;height:6px;border-radius:999px;background:var(--trust)}
+  .sicu-piede{margin-top:26px;padding:12px 14px;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;
+    font-size:13.5px;font-weight:600;color:var(--ink-soft);text-align:center}
   /* Lo stepper dentro Acquista: chip traslucido sull'arancio, tocchi
      da 26px, mai un <button> annidato (sono span con role) */
   .qta-mini{display:inline-flex;align-items:center;gap:2px;margin-left:12px;
@@ -981,6 +1119,13 @@
   .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
+  /* «📦 Riempi il pacco»: il ghost vestito di cartone. Fondo NEUTRO —
+     resta un secondario, l'unico pieno del dettaglio e' Acquista — con
+     contorno, testo e ombra nel marrone della scatola. L'emoji 📦 e'
+     gia' di quel colore per conto suo: nessun glifo si puo' tingere. */
+  .btn.carton{background:var(--card);border:2px solid var(--carton);
+    color:var(--carton);box-shadow:0 3px 0 var(--carton);margin-top:10px}
+  .btn.carton:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   .btn.primary:active,.btn.orange:active,.btn.ghost:active{
     transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   /* CTA d'acquisto su due righe: azione sopra, cifra intera sotto —
@@ -1397,7 +1542,8 @@
   /* Chi preferisce meno movimento non vede fluttuare nulla,
      e i fogli compaiono senza scivolare */
   @media (prefers-reduced-motion: reduce){
-    .empty-mascotte,.hero img,.attesa-jar,.attesa-clessidra{animation:none}
+    .empty-mascotte,.hero img,.attesa-jar,.attesa-clessidra,
+    .sicu-hero img{animation:none}
     .sheet{transition:none}
     .sheet-bg.open{animation:none}
     body.con-barra #barraCompra{animation:none}
@@ -1451,7 +1597,10 @@
         </div>
       </form>
       <div class="chips" id="chips"></div>
-      <div class="trust-line">🔒 Ogni acquisto è protetto dal deposito di garanzia</div>
+      <!-- La riga di fiducia e' anche la porta alla pagina che la
+           spiega: stesso testo di sempre, col › che dice che si tocca
+           (il tour la cerca per classe, e la classe non cambia) -->
+      <button type="button" class="trust-line" onclick="apriSicurezza()">🔒 Ogni acquisto è protetto dal deposito di garanzia <span class="fr">›</span></button>
     </header>
     <!-- La porta fissa al canale durante il rodaggio: la riempie
          renderFasciaTest(), solo se BANNER_TEST è acceso e mai in DEMO -->
@@ -1564,10 +1713,73 @@
     <button class="back" onclick="tornaDalNegozio()">← Torna</button>
     <div id="negozioHeader"></div>
     <div id="negozioFeedback"></div>
-    <div class="trust-line">🔒 Ogni acquisto è protetto dal deposito di garanzia</div>
+    <button type="button" class="trust-line" onclick="apriSicurezza()">🔒 Ogni acquisto è protetto dal deposito di garanzia <span class="fr">›</span></button>
     <div class="section-label">In vetrina in questo negozio</div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
     <div id="negozioSentinella" style="height:1px"></div>
+  </div>
+
+  <!-- ============ VISTA: IL PAGAMENTO PROTETTO ============ -->
+  <!-- La pagina lunga del deposito di garanzia: ci si arriva dal
+       «Scopri di più» del recinto, dalla riga di fiducia in vetrina e
+       dal Profilo. Statica per intero (nessun dato utente dentro: mai
+       un esc() da ricordare) e raggiungibile anche dagli anonimi in
+       vetrina — la fiducia si spiega prima di chiedere di entrare. -->
+  <div class="view" id="view-sicurezza">
+    <button class="back" onclick="tornaDaSicurezza()">← Torna</button>
+    <div class="sicu">
+      <div class="sicu-hero">
+        <img src="/assets/barattolo-hero.png" alt=""
+             onerror="this.onerror=null;this.src='/assets/barattolo.jpeg';this.classList.add('tessera')">
+        <div class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></div>
+        <h2>Il pagamento protetto</h2>
+        <p class="occhiello">Come fa un mercatino fra sconosciuti a essere sicuro per tutti e due.</p>
+      </div>
+
+      <p class="sicu-apre">Quando compri su Barattolo i tuoi sats <b>non vanno subito al venditore</b>: si fermano in un <b>deposito di garanzia</b> (in gergo <i>escrow</i>) che custodisce Barattolo. Il venditore sa che i soldi ci sono e spedisce tranquillo; tu sai che non si muovono finché l'oggetto non è arrivato davvero.</p>
+
+      <h3>Cosa succede quando paghi</h3>
+      <ol class="sicu-passi">
+        <li><b>Paghi.</b> Ricevi una <b>invoice Lightning</b> e la paghi col wallet che preferisci — si apre, si incolla o si inquadra il codice. Se hai collegato un wallet con NWC, «⚡ Compra subito» fa tutto in un tocco.</li>
+        <li><b>I sats si fermano.</b> Appena il pagamento arriva, entrano nel deposito di garanzia. Il venditore riceve l'avviso e prepara l'oggetto: da quel momento sa di essere pagato, ma i sats non sono ancora suoi.</li>
+        <li><b>Il venditore consegna.</b> Spedisce e segna il corriere, oppure vi mettete d'accordo per il ritiro in zona, oppure — se è un codice o un buono — te lo consegna qui dentro, mai in chat private.</li>
+        <li><b>Ricevi e confermi.</b> Quando l'oggetto è arrivato ed è come promesso, lo confermi. <b>Solo in quel momento</b> i sats passano al venditore.</li>
+      </ol>
+
+      <h3>I tempi</h3>
+      <ul class="sicu-lista">
+        <!-- i numeri li scrive scriviTempi() da TEMPI: qui non se ne
+             batte nemmeno uno a mano (vedi il blocco dei tempi nel JS) -->
+        <li>Dopo la consegna hai <b><span data-tempo="conferma"></span> ore</b> per controllare l'oggetto e confermare. Se non dici nulla, allo scadere i sats vanno al venditore.</li>
+        <li>Se non segni mai la ricezione, i sats si sbloccano da soli <b><span data-tempo="autoSblocco"></span> giorni</b> dopo la spedizione: serve a proteggere il venditore da chi sparisce dopo aver ricevuto il pacco.</li>
+        <li>Il <b>codice online</b> ha finestre più corte: <b><span data-tempo="confermaDig"></span> ore</b> da quando lo riveli, e <b><span data-tempo="silenzioDig"></span> ore</b> se il venditore l'ha consegnato e tu non l'hai ancora aperto.</li>
+        <li>La invoice del pagamento vive <b><span data-tempo="invoice"></span> minuti</b>. Se scade non è successo niente: si rifà, e il prezzo si riconverte al cambio del momento.</li>
+      </ul>
+
+      <h3>Se qualcosa va storto</h3>
+      <p>Finché i sats sono nel deposito puoi <b>aprire una disputa</b> dalla pagina del tuo ordine. Il deposito si congela e interviene un <b>moderatore</b>: legge le due versioni, guarda quello che avete (foto, tracking, messaggi) e decide. Le strade sono due — i sats <b>tornano a te</b>, spedizione compresa, oppure vanno al venditore. Quando l'oggetto va restituito, il rimborso parte dopo che è tornato indietro.</p>
+      <p class="sicu-nota">Aprire una disputa non è un'accusa: nella gran parte dei casi è un malinteso che si chiarisce in mezza giornata.</p>
+
+      <h3>Dove il deposito non può proteggerti</h3>
+      <p>Meglio dirlo prima che scoprirlo dopo.</p>
+      <ul class="sicu-lista">
+        <li><b>Un codice rivelato non torna indietro.</b> Nessuno — nemmeno noi — può sapere se l'hai già riscattato. Per questo la finestra è di <span data-tempo="confermaDig"></span> ore: provalo <i>subito</i>. Se non ci sono prove da nessuna delle due parti, la regola di default dà ragione a chi ha consegnato.<br>Vale anche al contrario: <b>se il codice non funziona, hai <span data-tempo="confermaDig"></span> ore per aprire una disputa</b> — e in quel momento i sats sono ancora fermi.</li>
+        <li><b>Nel ritiro a mano, il controllo è il tuo.</b> Guarda e prova l'oggetto <i>prima</i> di segnare che l'hai ritirato: da lì partono le <span data-tempo="conferma"></span> ore.</li>
+        <li><b>Il deposito garantisce l'oggetto promesso, non i gusti.</b> «Non mi piace più» non è un difetto; un oggetto diverso da com'era descritto sì.</li>
+      </ul>
+
+      <h3>Il pagamento, in pratica</h3>
+      <p>Su Barattolo si paga <b>solo in bitcoin</b>, sulla rete <b>Lightning</b>: trasferimenti immediati e con commissioni di rete quasi nulle, anche per pochi euro di valore. Il prezzo lo puoi leggere in sats o in euro con l'interruttore <b>€ / ₿</b> — quello che viaggia sono sempre sats.</p>
+      <p>Ti serve un wallet Lightning: ne esistono tanti, gratuiti, e ne basta uno. Al pagamento Barattolo ti mostra una <b>invoice</b>: la copi, o inquadri il codice, e il wallet fa il resto. Se colleghi il wallet con <b>NWC</b> (Nostr Wallet Connect) dal tuo Profilo, il bottone «⚡ Compra subito» paga senza passaggi — la connessione resta <b>solo sul tuo dispositivo</b>, non arriva mai ai nostri server, e nel wallet puoi darle un tetto di spesa.</p>
+
+      <h3>Dove stanno i sats, e per quanto</h3>
+      <!-- Testo pesato con attenzione (deciso con Andrea): niente la
+           parola «custodia», che in ambito regolatorio ha un peso
+           specifico. Si dice dove stanno tecnicamente e per quanto. -->
+      <p>I sats restano bloccati in un <b>conto Lightning della piattaforma</b> per il tempo dell'affare, e non un minuto di più: dal pagamento alla conferma. Non è un conto tuo, non è un investimento, non li mettiamo a rendere da nessuna parte. Quando l'affare si chiude, escono — al venditore o a te.</p>
+
+      <div class="sicu-piede">🫙 Domande, dubbi, o qualcosa che non torna? Scrivici: durante il rodaggio leggiamo tutto.</div>
+    </div>
   </div>
 
   <!-- ============ VISTA: VENDI ============ -->
@@ -1781,6 +1993,11 @@
       </div>
 
       <div id="adminStats"></div>
+      <!-- La terza porta alla pagina del pagamento protetto (le altre
+           due sono il recinto del dettaglio e la riga di fiducia della
+           vetrina): qui la si cerca a mente fredda, non davanti a un
+           acquisto. Non e' un cassetto — non ha niente da aprire. -->
+      <button class="btn ghost" style="margin-top:20px" onclick="apriSicurezza()">🔒 Come funziona il pagamento protetto</button>
       <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
     </div>
   </div>
@@ -1936,7 +2153,7 @@
        pillole di consegna e conto scomposto di sempre. -->
   <div class="sheet" id="setSheet">
     <div class="grab"></div>
-    <h3>🫙 Riempi il barattolo</h3>
+    <h3>🫙 Riempi il barattolo — un pacco, una spedizione</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px">
       Più oggetti di questo venditore in un pacco solo: paghi <b>una spedizione</b>.</div>
     <div id="setLista"></div>
@@ -2244,7 +2461,16 @@ function comuneDemo(z){
 function iconeCard(l){
   let i = '';
   if (l.consegna === 'spedizione' || l.consegna === 'entrambe')
-    i += '<span title="Spedizione disponibile">🚚</span>';
+    /* La spedizione GRATUITA si vede anche in griglia, ma senza
+       aggiungere NIENTE alla riga (l'abbiamo appena ripulita): la
+       stessa icona 🚚, cerchiata di blu — la sorella minore del badge
+       pieno del dettaglio. Senza parole (deciso da Andrea, lug 2026):
+       il «gratis» scritto costava ~24px e nel caso peggiore lasciava
+       al comune i soli puntini. Chi apre la scheda ci trova il badge
+       che lo dice a parole, e il cerchietto si impara una volta. */
+    i += (!(l.sped > 0) && !(l.spedEur > 0))
+      ? '<span class="gratis" title="Spedizione gratuita">🚚</span>'
+      : '<span title="Spedizione disponibile">🚚</span>';
   if (l.consegna === 'ritiro' || l.consegna === 'entrambe')
     i += '<span title="Ritiro in zona">🤝</span>';
   if (l.consegna === 'digitale' || l.ancheDigitale)
@@ -2554,7 +2780,10 @@ let listings = [
    zone:"Torino (TO)", comune:"Torino (TO)", regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
    /* il multi-pezzo dimostrativo: fa vedere stepper e conto × N */
    quantita:3,
-   desc:"Tre copie nuove, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
+   /* e la spedizione GRATUITA dimostrativa: senza un costo dichiarato
+      si vedono il badge pieno e il 🚚 gratis in card */
+   consegna:"spedizione", taglia:"busta",
+   desc:"Tre copie nuove, ancora nel cellophane. Spedizione inclusa nel prezzo. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
    zone:"Roma (RM)", comune:"Roma (RM)", regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
    /* nato 10 giorni fa e ritoccato ieri: mostra l'«aggiornato» */
@@ -2626,7 +2855,7 @@ function go(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  el('nav-'+(['dettaglio','negozio'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
+  el('nav-'+(['dettaglio','negozio','sicurezza'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
     ?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
   document.querySelectorAll('.avatar-btn').forEach(a=>a.classList.toggle('attivo', view==='profilo'));
@@ -2822,6 +3051,28 @@ async function doSearch(){
 
 /* ---------------- negozio del venditore ---------------- */
 let negozioCorrente = null;   // il profilo pubblico mostrato nella vista
+
+/* ---------------- la pagina «Il pagamento protetto» ----------------
+   Tre porte ci portano: il «Scopri di più» del recinto, la riga di
+   fiducia della vetrina e del negozio, il bottone in fondo al Profilo.
+   Il ritorno deve ricordare da dove si veniva — il patto di
+   tornaDalNegozio. Nessun dato da caricare: la pagina e' markup fisso
+   e vale anche per gli anonimi in vetrina. */
+let sicurezzaRitorno = 'esplora';
+function apriSicurezza(){
+  const attiva = (document.querySelector('.view.active')?.id || '').replace('view-','');
+  if (attiva && attiva !== 'sicurezza') sicurezzaRitorno = attiva;
+  go('sicurezza');
+}
+function tornaDaSicurezza(){
+  /* la vista di partenza puo' essersi svuotata nel frattempo: mai
+     tornare su un dettaglio o un ordine che non c'e' piu' */
+  const d = sicurezzaRitorno;
+  const vuota = (d==='dettaglio' && !currentListing)
+             || (d==='ordine' && !currentOrder)
+             || (d==='negozio' && !negozioCorrente);
+  go(vuota ? 'esplora' : d);
+}
 
 function tornaDalNegozio(){
   if (currentListing && el('view-negozio').classList.contains('active')
@@ -3175,6 +3426,42 @@ setInterval(() => {
       && document.querySelector('#detailContent .lampo-was'))
     openDetail(currentListing.id);
 }, 1000);
+/* ============ I TEMPI DELL'ESCROW, IN UN POSTO SOLO ============
+   Le finestre dell'affare vivono nel CONFIG DEL SERVER e il client non
+   se le sente dire da nessuna risposta: qui sono scritte a mano. Prima
+   erano sparse in una decina di stringhe (notifiche, confirm, toast,
+   pannelli dell'ordine) e sarebbero divergute dalla realta' al primo
+   ritocco di una leva.
+
+   >>> SE CAMBI LA LEVA NEL CONFIG, CAMBIA ANCHE QUI. <<<
+   E, al contrario: da qui in giu' nessun numero di tempo si scrive
+   piu' a mano — si legge da TEMPI, sempre.
+
+   config.py            →  TEMPI
+   ORE_CONFERMA             conferma
+   GIORNI_AUTO_SBLOCCO      autoSblocco
+   ORE_CONFERMA_DIGITALE    confermaDig
+   ORE_SILENZIO_DIGITALE    silenzioDig
+   (la vita della invoice non e' una leva: e' `expiry: 900` dentro
+    crea_invoice_escrow in server.py — se cambia li', cambia invoice) */
+const TEMPI = {
+  conferma:    72,   // ore per controllare l'oggetto dopo la consegna
+  autoSblocco: 10,   // giorni dalla spedizione: sblocco d'ufficio
+  confermaDig: 24,   // ore dalla rivelazione del codice
+  silenzioDig: 48,   // ore dalla consegna digitale mai rivelata
+  invoice:     15,   // minuti di vita della invoice Lightning
+};
+/* Il markup fisso della pagina «Il pagamento protetto» porta segnaposto
+   vuoti invece dei numeri: li riempie questa, una volta all'avvio. Cosi'
+   anche li' i tempi vengono da TEMPI e non possono divergere. */
+function scriviTempi(){
+  document.querySelectorAll('[data-tempo]').forEach(s => {
+    const v = TEMPI[s.dataset.tempo];
+    if (v !== undefined) s.textContent = v;
+  });
+}
+scriviTempi();
+
 /* La percentuale della protezione acquisti: arriva col server nella
    prima pagina della vetrina (oggi 0), mai hardcodata qui. */
 let protPercento = 0;
@@ -3339,13 +3626,47 @@ function pilloleModalita(l){
     p.push('<span class="pill">💾 Codice online</span>');
   return p.join('');
 }
+/* Vero quando l'annuncio spedisce davvero (la strada fisica del
+   pacco: il ritiro e il codice online non sono spedizione). */
+const spedisce = l => l.consegna==='spedizione' || l.consegna==='entrambe';
+/* Vero quando quella spedizione non costa nulla: nessun costo in sats
+   e nessuna ancora all'euro. Il giudice unico dei due badge e
+   dell'icona in card — «gratis» si dice in un posto solo. */
+const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0);
+/* Il costo della spedizione nella valuta in cui il venditore l'ha
+   DICHIARATO: ancorata all'euro = euro (i suoi «5 €» valgono sempre
+   5 €), altrimenti i sats fissi. Non segue il toggle di lettura di
+   proposito — qui la valuta E' la semantica del costo, non una
+   preferenza, e cosi' non serve nessun «≈». */
+function spedCostoTesto(l){
+  if (l.spedEur > 0) return `${fmtEur(l.spedEur)} €`;
+  return `${fmt(l.sped || 0)} sats`;
+}
 /* Il badge della spedizione accanto al prezzo (lug 2026, stile
    Subito.it): sfondo evidenziato — la coppia azzurra --ship dei badge
    di stato «spedito», AA nei due temi — solo se la spedizione e'
-   davvero offerta. */
+   davvero offerta. Dice SE si spedisce, e quando la spedizione e'
+   GRATUITA lo dice subito, in versione piena: e' un argomento di
+   vendita e non puo' aspettare il fondo pagina. Il QUANTO, se un
+   costo c'e', lo dice il gemello sotto il bottone Acquista. */
 function spedBadge(l){
-  return (l.consegna==='spedizione' || l.consegna==='entrambe')
-    ? '<span class="sped-badge">🚚 Spedizione disponibile</span>' : '';
+  if (!spedisce(l)) return '';
+  return spedGratis(l)
+    ? '<span class="sped-badge piena">🚚 Spedizione gratuita</span>'
+    : '<span class="sped-badge">🚚 Spedizione disponibile</span>';
+}
+/* Il badge sotto il bottone Acquista, dentro il recinto: stessa forma
+   e stessi colori di quello in alto, ma col COSTO — nel momento in cui
+   si compra la cifra serve. Ritiro e codice online non compaiono mai:
+   sono gratuiti per natura e nominarli sarebbe rumore.
+   E NIENTE quando la spedizione e' gratuita (lug 2026, deciso da
+   Andrea dopo averlo visto): li' sotto non ci sarebbe una cifra da
+   dire, solo la stessa frase del badge in alto ripetuta a due dita di
+   distanza. Sopra si dice SE si spedisce — e se e' gratis lo si grida
+   subito; sotto, solo QUANTO costa. Se non costa, silenzio. */
+function spedBadgeCosto(l){
+  if (!spedisce(l) || spedGratis(l)) return '';
+  return `<div class="sped-riga"><span class="sped-badge">🚚 Spedizione + ${spedCostoTesto(l)}</span></div>`;
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
@@ -3716,7 +4037,7 @@ function apriFoglioConsegna(){
      PRIMA dell'acquisto, e chi passa dal foglio puo' non aver visto
      la trust-note in pagina */
   const desc = v => v==='digitale'
-    ? `${cifraVia(l, v)} — un codice rivelato non torna indietro: 24 ore per la disputa`
+    ? `${cifraVia(l, v)} — un codice rivelato non torna indietro: ${TEMPI.confermaDig} ore per la disputa`
     : cifraVia(l, v);
   pickerTrigger = el('bcCompra');
   el('pickerTitolo').textContent = 'Come vuoi riceverlo?';
@@ -3794,7 +4115,7 @@ async function sezioneAltriOggetti(l){
   corpo.insertAdjacentHTML('beforeend', `
     <div class="section-label" style="margin-top:16px">Altri oggetti di questo venditore</div>
     <div class="altri-strip">${altri.slice(0,6).map(cardHTML).join('')}</div>
-    ${DEMO ? '' : `<button class="btn ghost" style="margin-top:2px" onclick="avviaSet()">📦 Compra più oggetti in un pacco solo</button>`}`);
+    ${DEMO ? '' : `<button class="btn carton" style="margin-top:2px" onclick="avviaSet()">📦 Riempi il pacco</button>`}`);
 }
 
 /* ---------------- il SET: «Riempi il barattolo» (lug 2026) ----------------
@@ -4198,14 +4519,25 @@ function openDetail(id){
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `<div class="escrow-zone">
              <span class="escrow-flag">🔒 pagamento protetto</span>
-             <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
+             <!-- Una riga sola (lug 2026): il paragrafo intero e' andato
+                  nella pagina «Scopri di piu'», qui sotto. Chi compra
+                  deve capire il patto in un colpo d'occhio; disputa,
+                  tempi e Lightning si leggono di la' — e «(escrow)»
+                  con loro, che la prima spiegazione lunga ora vive li'. -->
+             <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto l'oggetto.</span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
-             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai 24 ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
+             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai ${TEMPI.confermaDig} ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
              <button class="btn orange acquista-cta" onclick="compraDaBarra()">Acquista${stepperAcquista(l)}</button>
-             <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
+             <!-- Sotto il bottone il QUANTO costa la spedizione (sopra,
+                  accanto al prezzo, si e' detto solo SE si spedisce).
+                  La riga «Ricevi una invoice Lightning...» e' uscita:
+                  troppo lunga, e chi ha un wallet lo sa gia' — invoice,
+                  wallet e NWC si raccontano nella pagina dedicata. -->
+             ${spedBadgeCosto(l)}
+             <div class="escrow-piede"><button type="button" onclick="apriSicurezza()">Scopri di più</button></div>
            </div>
            ${offAcc ? '' : `<button class="btn ghost offerta-pagina" onclick="apriOfferta()">Fai un'offerta</button>`}`}
       ${jarCta}
@@ -4559,7 +4891,7 @@ async function startBuy(){
                                                 qtaScelta);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
-    `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale 15 minuti`;
+    `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale ${TEMPI.invoice} minuti`;
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
   aggiornaPayHint();
@@ -5443,7 +5775,7 @@ function openOrder(id){
         </div>` : o.consegnaScelta==='ritiro' ? `
         <div class="payout">
           <h4>🤝 Consegna in zona</h4>
-          <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì partono le 72 ore di conferma.</div>
+          <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì partono le ${TEMPI.conferma} ore di conferma.</div>
           <button class="btn orange" onclick="markConsegnaMano()">🤝 Ho consegnato l'oggetto a mano</button>
         </div>` : `
         <div class="payout">
@@ -5457,7 +5789,7 @@ function openOrder(id){
       ${pannelloContenutoDigitale(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
-      ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?'📬 L\'ho ritirato — mi prendo 72h per controllarlo':'📬 È arrivato — mi prendo 72h per controllarlo'}</button>`:''}
+      ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — mi prendo ${TEMPI.conferma}h per controllarlo`:`📬 È arrivato — mi prendo ${TEMPI.conferma}h per controllarlo`}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema.'} Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
@@ -6714,7 +7046,7 @@ async function markShipped(){
    niente tracking — il corriere-sentinella lo capisce il server. */
 async function markConsegnaMano(){
   haptic();
-  if (!confirm('Confermi di aver consegnato l\'oggetto a mano?\n\nDa adesso l\'acquirente può confermare la ricezione; se nessuno si fa vivo, i sats si sbloccano d\'ufficio dopo 10 giorni.')) return;
+  if (!confirm(`Confermi di aver consegnato l'oggetto a mano?\n\nDa adesso l'acquirente può confermare la ricezione; se nessuno si fa vivo, i sats si sbloccano d'ufficio dopo ${TEMPI.autoSblocco} giorni.`)) return;
   if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona'; toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
     method:'POST',
@@ -6728,7 +7060,7 @@ async function markConsegnaMano(){
 /* ---- consegna digitale (lug 2026): il contenuto passa DENTRO
    Barattolo. Il testo NON viaggia mai in /api/orders: si carica solo
    da /contenuto, e per il compratore la PRIMA lettura e' la ricevuta
-   (shipped -> delivered, da li' le 24 ore). Qui vive la copia di
+   (shipped -> delivered, da li' TEMPI.confermaDig). Qui vive la copia di
    pagina per non richiedere il server a ogni re-render. ---- */
 let contenutoRivelato = {};   // ordineId -> testo gia' caricato
 
@@ -6748,7 +7080,7 @@ function pannelloContenutoDigitale(o){
   if (o.role==='buyer' && o.state==='shipped') return `
     <div class="payout">
       <h4>🔓 Rivela il contenuto</h4>
-      <div class="hint">Il venditore ha consegnato il contenuto del tuo acquisto. <b>Rivelarlo fa da ricevuta</b>: un codice, una volta rivelato, non torna indietro. Provalo subito — hai 24 ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.</div>
+      <div class="hint">Il venditore ha consegnato il contenuto del tuo acquisto. <b>Rivelarlo fa da ricevuta</b>: un codice, una volta rivelato, non torna indietro. Provalo subito — hai ${TEMPI.confermaDig} ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.</div>
       <div class="hint mono" style="letter-spacing:3px">••••-••••-••••</div>
       <button class="btn orange" style="margin-top:10px" onclick="rivelaContenuto(this)">🔓 Rivela — mi prendo 24h per provarlo</button>
     </div>`;
@@ -6774,7 +7106,7 @@ async function caricaContenutoDigitale(){
 
 async function rivelaContenuto(btn){
   haptic();
-  if (!confirm('Rivelare il contenuto?\n\nUn codice rivelato non torna indietro. Provalo subito: hai 24 ore per aprire una disputa se qualcosa non va, poi l\'acquisto è definitivo.')) return;
+  if (!confirm(`Rivelare il contenuto?\n\nUn codice rivelato non torna indietro. Provalo subito: hai ${TEMPI.confermaDig} ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.`)) return;
   const ripristina = bottoneInAttesa(btn);
   const d = await caricaContenutoDigitale();
   ripristina();
@@ -6782,7 +7114,7 @@ async function rivelaContenuto(btn){
   currentOrder.state = 'delivered';
   currentOrder.consegnato = d.rivelato || Math.floor(Date.now()/1000);
   openOrder(currentOrder.id);
-  toast('👁 Contenuto rivelato: hai 24 ore per provarlo');
+  toast(`👁 Contenuto rivelato: hai ${TEMPI.confermaDig} ore per provarlo`);
 }
 
 async function mostraContenuto(btn){
@@ -6824,13 +7156,13 @@ async function consegnaContenuto(btn){
 
 async function markDelivered(){
   haptic();
-  if (!confirm('Il pacco è arrivato?\n\nAvrai 72 ore per controllare l\'oggetto: se non confermi né apri disputa, allo scadere i sats andranno al venditore.')) return;
+  if (!confirm(`Il pacco è arrivato?\n\nAvrai ${TEMPI.conferma} ore per controllare l'oggetto: se non confermi né apri disputa, allo scadere i sats andranno al venditore.`)) return;
   if (DEMO) { currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000); toast('📬 Consegna registrata'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/consegnato`,
     {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000);
-  toast('📬 Consegna registrata: 72 ore per controllare'); openOrder(currentOrder.id);
+  toast(`📬 Consegna registrata: ${TEMPI.conferma} ore per controllare`); openOrder(currentOrder.id);
 }
 
 async function sollecita(){
