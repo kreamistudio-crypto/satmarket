@@ -1372,6 +1372,83 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   un ordine pagato ma verificato oltre i 30 minuti può superare lo
   stock (il MAX para il negativo, il doppio-escrow resta caso da
   moderatore — com'era il doppio acquisto di ieri, ma molto più raro).
+  Il SET «Riempi il barattolo» (lug 2026): più annunci DIVERSI dello
+  stesso venditore in UN ordine solo — una invoice escrow, UNA
+  spedizione, un tracking, una conferma. Modello «testata + righe»,
+  MAI padre+figli (gonfierebbe distintivi e rischierebbe doppi
+  sblocchi sullo stesso escrow): la testata resta in `ordini`
+  (`annuncio_id=0` e `quantita` = somma dei pezzi), la merce vive in
+  `ordine_righe(ordine_id, annuncio_id, quantita, unitario_sats,
+  titolo)` — unitario GIÀ scontato (lampo/accordo, invariante:
+  articolo = Σ unitario×qta, il futuro sconto-set sarà una voce di
+  TESTATA sottratta dal totale, deciso e preparato), titolo
+  FOTOGRAFATO all'acquisto (i tre JOIN caldi — /api/orders, CSV,
+  sollecita_incassi — sono diventati LEFT: con l'INNER un set
+  sparirebbe dalla lista, pagato e invisibile). I MONO non hanno
+  righe MAI: le sintetizza `_righe_ordine` dalla testata, e ogni
+  punto che cicla sugli oggetti dell'ordine passa da lì
+  (`_titolo_ordine` = «primo pezzo + N altri»). Guardie:
+  `_ordini_vivi_annuncio` è il giudice unico delle 5 guardie «affare
+  in corso» (testata O riga), `_riservati` somma due query (la
+  seconda sulle righe via idx_righe_annuncio: l'indice caldo non si
+  tocca), rimozione/spegni_annuncio annullano anche i set 'creato'
+  col pezzo dentro, reaper e annulla_ordine cancellano le righe
+  (niente FK cascade: PRAGMA foreign_keys mai acceso).
+  compra() col body `{righe:[{annuncio_id, quantita, offerta_id}]}`
+  passa da `_compra_set` (2..MAX_RIGHE_SET, leva config, 8): stesso
+  venditore, strade = INTERSEZIONE delle FISICHE (spedizione/ritiro;
+  il digitale ha la colonna unica del contenuto e le finestre corte,
+  gli annunci con consegna '' non dichiarano un costo: entrambi «si
+  comprano da soli», 400 col nome del pezzo), lampo e offerte
+  accettate PER RIGA sull'unitario, cambio UNO prima della invoice,
+  SPEDIZIONE = MAX dei costi dichiarati (il pacco è uno; compromesso
+  dichiarato del v1: 3 «medi» possono fare un «grande» e il
+  venditore rimette la differenza — mitigato dalla stima mostrata
+  prima di spedire; il tariffario per-taglia è la leva futura),
+  protezione sull'articolo totale, ricontrollo post-invoice su OGNI
+  riga nel blocco senza await e 409 che NOMINA il pezzo soffiato.
+  verifica_pagamento scala/esaurisce/decade RIGA per riga (la
+  vendita di un pezzo non spegne le trattative sugli altri; nostr
+  sold e ✅ canale per annuncio esaurito); il rimborso resta
+  INTEGRALE e riattiva TUTTI gli annunci del set. PER TESTATA (tutto
+  o niente, dichiarato): disputa/reso, feedback (uno per parte),
+  tracking, distintivi e contatori (1 set = 1 vendita/1 acquisto),
+  una riga di CSV. STIMA TAGLIA: `PUNTI_TAGLIA` (busta 1, piccolo 3,
+  medio 8, grande 18) + `stima_taglia_set` — somma×qta a soglie
+  tarate perché un pezzo solo ricada nella SUA taglia, ingombrante =
+  sempre ingombrante, taglia mancante = stima '' (mai una bugia);
+  SOLO informativa (risposta di compra, /api/orders — letta fresca
+  dagli annunci —, messaggio al venditore «verifica tu prima di
+  spedire»), non prezza nulla. /api/orders: i set escono con
+  `righe`, `taglia_stimata` e titolo sintetizzato; i mono non
+  portano la chiave (client vecchio in cache: titolo e totali di
+  sempre, il suo «N pezzi × unitario» mostrerebbe una media — per
+  questo il client nuovo lo spegne sui set e mostra l'ELENCO).
+  Frontend: `sezioneAltriOggetti` in coda a openDetail (striscia
+  `.altri-strip` di card dal negozio limit 7, inCatalogo
+  obbligatorio, guard anti-race, fail-open) + bottone «📦 Compra più
+  oggetti in un pacco solo» — MAI il 🫙 nell'etichetta: il barattolo
+  è dei preferiti, il nome del cantiere vive solo nel titolo del
+  foglio `#setSheet` (registrato in closeSheet). Composizione:
+  `setScelte` Map id→qta (parte dal pezzo aperto), righe con spunta
+  e stepper (i SELEZIONABILI prima: il tetto delle 8 righe non
+  taglia mai un compatibile per mostrare uno spento), righe spente
+  col motivo scritto, pillole consegna su `stradeSet()`
+  (intersezione), `totaleSet()` con la matematica di totaleStima
+  (artStima per riga × qta + MAX spedizioni + protezione),
+  `stimaTagliaSet` gemello client (il giudice resta il server),
+  `setCirca()` per il ≈. `startBuySet`/`confermaSetSubito` = gemelli
+  di startBuy/NWC: stesso paySheet e stesso pollTimer (chiusure
+  MIRATE, mai closeSheet col poll vivo), body a righe con
+  offertaAccettataPer per riga; sul 409/404 `rinfrescaSet` rilegge
+  il negozio (limit 100), spegne localmente gli spariti, pota
+  selezione e quantità e riapre il foglio: l'utente vede il buco,
+  non un vicolo cieco (il pezzo solo RISERVATO resta selezionabile:
+  il fail-fast lo ridirà, dichiarato). Ordine: elenco «titolo × qta
+  — sats» al posto della media, venditore con «📦 Spedisci il set
+  (un pacco solo)» + taglia stimata. In DEMO il set non esiste
+  (toast), in VETRINA apre l'invito. Gli importati da Nostr restano
+  fuori dai set per costruzione (consegna '').
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -2498,7 +2575,24 @@ Architettura — collaudata in locale con 60 verifiche TestClient su
 quattro script [prenotazione con rivale nell'await, parziale/
 esaurimento/decadenze, rimborso e ricarica, superficie e import] più
 il giro nel browser vero a 375px con invoice LNbits reale; è il
-mattone del futuro cantiere «set»).
+mattone del futuro cantiere «set»); il set «Riempi il barattolo»
+(lug 2026: più annunci diversi dello stesso venditore in un ordine
+solo — sezione «Altri oggetti di questo venditore» nel dettaglio,
+foglio di composizione con spunte e stepper, UNA spedizione al MAX
+dei costi dichiarati con la stima della taglia del pacco solo
+informativa, un escrow e una conferma con disputa/rimborso
+tutto-o-niente dichiarati, modello testata+ordine_righe coi mono
+intonsi byte per byte, vedi Architettura — collaudato in locale con
+97 verifiche TestClient su quattro script [fondamenta e guardie,
+compra a righe con EUR/offerte/lampo e 409 col nome del pezzo,
+ciclo di vita completo con rimborso che riattiva tutto, tabella dei
+casi della stima taglia] più il giro nel browser vero con invoice
+LNbits reale, vista compratore e venditore e il rivale che soffia
+il pezzo a metà composizione; in produzione va provato un set vero
+dentro Telegram con le notifiche reali; gli SCONTI SET alla Vinted
+sono il cantierino successivo, deciso: la preparazione è
+l'invariante articolo = Σ unitario×qta, lo sconto sarà una voce di
+testata).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
