@@ -351,6 +351,16 @@ def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
     con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
                 "WHERE annuncio_id=? AND stato='creato'",
                 (int(time.time()), annuncio_id))
+    try:
+        # Anche i SET 'creato' che contengono il pezzo (lug 2026).
+        # Fail-open sul DB di ieri senza la tabella: la crea il
+        # server al riavvio, e un set non ancora pagato scade da solo.
+        con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                    "WHERE stato='creato' AND id IN (SELECT ordine_id "
+                    "FROM ordine_righe WHERE annuncio_id=?)",
+                    (int(time.time()), annuncio_id))
+    except sqlite3.OperationalError:
+        pass
 
 
 def importa_venditore(npub_venditore: str, venditore_id: int,

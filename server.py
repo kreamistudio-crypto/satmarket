@@ -595,6 +595,29 @@ def init_db():
         solleciti_incasso INTEGER DEFAULT 0,    -- quanti ne ha ignorati
         creato INTEGER, aggiornato INTEGER
     );
+    CREATE TABLE IF NOT EXISTS ordine_righe(
+        -- Il set «Riempi il barattolo» (lug 2026): piu' annunci DIVERSI
+        -- dello stesso venditore in UN ordine solo. La testata resta in
+        -- ordini — un escrow, una invoice, un tracking: annuncio_id=0 e
+        -- quantita = somma dei pezzi — e qui vive la merce, una riga
+        -- per annuncio. Gli ordini MONO non hanno righe MAI: gliele
+        -- sintetizza _righe_ordine dalla testata. unitario_sats e' il
+        -- prezzo del singolo pezzo GIA' scontato (lampo/accordo);
+        -- invariante: articolo = somma di unitario x quantita. Il
+        -- titolo si fotografa all'acquisto — il patto delle quote
+        -- fissate: l'annuncio puo' cambiare o sparire, l'ordine e la
+        -- contabilita' no.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        quantita INTEGER NOT NULL DEFAULT 1,
+        unitario_sats INTEGER NOT NULL,
+        titolo TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_righe_ordine
+        ON ordine_righe(ordine_id);
+    CREATE INDEX IF NOT EXISTS idx_righe_annuncio
+        ON ordine_righe(annuncio_id);
     CREATE TABLE IF NOT EXISTS sessioni(
         -- login web dal browser: nel DB c'e' SOLO l'hash del token,
         -- il token vero vive nel cookie dell'utente e basta
@@ -3945,18 +3968,19 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     if not a:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
-    in_corso = con.execute(
-        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato IN "
-        "('locked','shipped','confirmed','dispute')",
-        (annuncio_id,)).fetchone()["n"]
+    in_corso = _ordini_vivi_annuncio(
+        con, annuncio_id, ("locked", "shipped", "confirmed", "dispute"))
     if in_corso:
         con.close()
         raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
                                  "va concluso prima di poterlo eliminare")
     con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?", (annuncio_id,))
+    # Anche i SET 'creato' che contengono il pezzo: una invoice viva
+    # non deve poter pagare un annuncio appena rimosso.
     con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
-                "WHERE annuncio_id=? AND stato='creato'",
-                (int(time.time()), annuncio_id))
+                "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                "(SELECT ordine_id FROM ordine_righe WHERE annuncio_id=?))",
+                (int(time.time()), annuncio_id, annuncio_id))
     con.commit()
     con.close()
     # Se era in piazza su Nostr, si chiede ai relay di toglierlo
@@ -4065,10 +4089,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     except HTTPException:
         con.close()
         raise
-    in_corso = con.execute(
-        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato "
-        "NOT IN ('released','refunded','annullato')",
-        (annuncio_id,)).fetchone()["n"]
+    in_corso = _ordini_vivi_annuncio(
+        con, annuncio_id, ("released", "refunded", "annullato"), esclusi=True)
     con.close()
     if in_corso:
         raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
@@ -4249,10 +4271,8 @@ async def modifica_firmata_prepara(annuncio_id: int, req: Request,
         raise HTTPException(400, "L'import non ha ancora registrato le "
                                  "coordinate Nostr di questo annuncio: "
                                  "riprova tra un'ora")
-    in_corso = con.execute(
-        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato "
-        "NOT IN ('released','refunded','annullato')",
-        (annuncio_id,)).fetchone()["n"]
+    in_corso = _ordini_vivi_annuncio(
+        con, annuncio_id, ("released", "refunded", "annullato"), esclusi=True)
     u = con.execute("SELECT npub_accesso FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
     con.close()
@@ -4366,10 +4386,8 @@ async def modifica_firmata(annuncio_id: int, req: Request,
     if not a or not a["contatto_nostr"]:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
-    in_corso = con.execute(
-        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato "
-        "NOT IN ('released','refunded','annullato')",
-        (annuncio_id,)).fetchone()["n"]
+    in_corso = _ordini_vivi_annuncio(
+        con, annuncio_id, ("released", "refunded", "annullato"), esclusi=True)
     if in_corso:
         con.close()
         raise HTTPException(400, "Nel frattempo si è aperto un affare su "
@@ -4442,19 +4460,20 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
     if not a:
         con.close()
         raise HTTPException(400, "Annuncio non trovato o già rimosso")
-    in_corso = con.execute(
-        "SELECT COUNT(*) AS n FROM ordini WHERE annuncio_id=? AND stato IN "
-        "('locked','shipped','confirmed','dispute')",
-        (annuncio_id,)).fetchone()["n"]
+    in_corso = _ordini_vivi_annuncio(
+        con, annuncio_id, ("locked", "shipped", "confirmed", "dispute"))
     if in_corso:
         con.close()
         raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
                                  "risolvi prima l'ordine (o la disputa), poi "
                                  "potrai rimuoverlo")
     con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?", (annuncio_id,))
+    # Anche i SET 'creato' che contengono il pezzo (v. rimozione
+    # del proprietario)
     con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
-                "WHERE annuncio_id=? AND stato='creato'",
-                (int(time.time()), annuncio_id))
+                "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                "(SELECT ordine_id FROM ordine_righe WHERE annuncio_id=?))",
+                (int(time.time()), annuncio_id, annuncio_id))
     con.commit()
     con.close()
     # Se era in piazza su Nostr, si chiede ai relay di toglierlo
@@ -5217,6 +5236,57 @@ def annulla_lampo(annuncio_id: int, x_tg_init_data: str = Header(""),
 
 # ---------------------- API: ORDINI / ESCROW ------------------------
 
+def _righe_ordine(con, o) -> list:
+    """Le righe merceologiche dell'ordine, in UNA forma sola:
+    [{annuncio_id, quantita, unitario_sats, titolo}]. Per i set
+    (annuncio_id=0 in testata) le righe vere dalla tabella; per i
+    mono UNA riga sintetizzata dalla testata — unitario =
+    (prezzo - spedizione - protezione) / quantita, divisione esatta
+    per costruzione (il patto della colonna quantita). Ogni punto che
+    deve ciclare sugli oggetti dell'ordine passa da qui: nessuno
+    puo' dimenticarsi dei set."""
+    if o["annuncio_id"]:
+        t = con.execute("SELECT titolo FROM annunci WHERE id=?",
+                        (o["annuncio_id"],)).fetchone()
+        qta = o["quantita"] or 1
+        unitario = (o["prezzo_sats"] - o["spedizione_sats"]
+                    - o["protezione_sats"]) // qta
+        return [{"annuncio_id": o["annuncio_id"], "quantita": qta,
+                 "unitario_sats": unitario,
+                 "titolo": t["titolo"] if t else "?"}]
+    return [dict(r) for r in con.execute(
+        "SELECT annuncio_id, quantita, unitario_sats, titolo "
+        "FROM ordine_righe WHERE ordine_id=? ORDER BY id",
+        (o["id"],)).fetchall()]
+
+
+def _titolo_ordine(righe: list) -> str:
+    """Il titolo di cortesia dell'ordine (notifiche, CSV, solleciti):
+    quello dell'annuncio per i mono, «primo pezzo + N altri» per i
+    set. Niente emoji: il 🫙 e' dei preferiti."""
+    if not righe:
+        return "?"
+    if len(righe) == 1:
+        return righe[0]["titolo"]
+    return f"{righe[0]['titolo'][:40]} + {len(righe) - 1} altri"
+
+
+def _ordini_vivi_annuncio(con, annuncio_id: int, stati: tuple,
+                          esclusi: bool = False) -> int:
+    """Il giudice unico delle guardie «affare in corso»: conta gli
+    ordini che toccano l'annuncio come testata mono O come riga di
+    un set — cosi' nessuna guardia puo' dimenticarsi delle righe.
+    Con esclusi=True la tupla elenca gli stati TERMINALI da ignorare
+    (la forma della guardia di modifica), altrimenti quelli vivi."""
+    segnaposto = ",".join("?" * len(stati))
+    verso = "NOT IN" if esclusi else "IN"
+    return con.execute(
+        f"SELECT COUNT(*) AS n FROM ordini WHERE stato {verso} "
+        f"({segnaposto}) AND (annuncio_id=? OR id IN "
+        f"(SELECT ordine_id FROM ordine_righe WHERE annuncio_id=?))",
+        (*stati, annuncio_id, annuncio_id)).fetchone()["n"]
+
+
 def _riservati(con, annuncio_id: int) -> int:
     """Pezzi prenotati: la somma degli ordini 'creato' freschi.
 
@@ -5226,11 +5296,21 @@ def _riservati(con, annuncio_id: int) -> int:
     minuti — la stessa soglia di pulisci_ordini_fantasma — rende
     innocue le righe stantie anche quando il reaper pigro non e' mai
     girato. I 30 minuti coprono la vita della invoice (15): un
-    pagamento non puo' atterrare a prenotazione scaduta."""
-    return con.execute(
+    pagamento non puo' atterrare a prenotazione scaduta.
+    I set (lug 2026) prenotano come i mono: la seconda somma pesca
+    le righe dei set 'creato' freschi — due query e non una UNION,
+    cosi' la prima resta sull'indice caldo idx_ordini_annuncio."""
+    soglia = int(time.time()) - 1800
+    mono = con.execute(
         "SELECT COALESCE(SUM(quantita),0) AS n FROM ordini "
         "WHERE annuncio_id=? AND stato='creato' AND creato>=?",
-        (annuncio_id, int(time.time()) - 1800)).fetchone()["n"]
+        (annuncio_id, soglia)).fetchone()["n"]
+    nei_set = con.execute(
+        "SELECT COALESCE(SUM(r.quantita),0) AS n FROM ordine_righe r "
+        "JOIN ordini o ON o.id=r.ordine_id "
+        "WHERE r.annuncio_id=? AND o.stato='creato' AND o.creato>=?",
+        (annuncio_id, soglia)).fetchone()["n"]
+    return mono + nei_set
 
 
 @app.post("/api/orders")
@@ -8300,6 +8380,11 @@ def pulisci_ordini_fantasma(con):
     con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id IN "
                 "(SELECT id FROM ordini WHERE stato='creato' AND creato < ?)",
                 (soglia,))
+    # Le righe dei set muoiono con la testata (niente FK cascade:
+    # il progetto non ha mai acceso PRAGMA foreign_keys)
+    con.execute("DELETE FROM ordine_righe WHERE ordine_id IN "
+                "(SELECT id FROM ordini WHERE stato='creato' AND creato < ?)",
+                (soglia,))
     con.execute("DELETE FROM ordini WHERE stato='creato' AND creato < ?",
                 (soglia,))
 
@@ -8320,6 +8405,7 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     # 'accettata' fino alla sua scadenza: si puo' ripagare)
     con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id=?",
                 (ordine_id,))
+    con.execute("DELETE FROM ordine_righe WHERE ordine_id=?", (ordine_id,))
     con.execute("DELETE FROM ordini WHERE id=?", (ordine_id,))
     con.commit()
     con.close()
