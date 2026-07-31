@@ -662,8 +662,11 @@
     padding:5px var(--pad) calc(5px + env(safe-area-inset-bottom));
     max-width:520px;margin:0 auto;
   }
-  /* misure tirate: la barra deve essere alta quanto la nav che sostituisce */
-  #barraCompra .btn{margin-top:0;width:auto;line-height:1.25}
+  /* misure tirate: la barra deve essere alta quanto la nav che
+     sostituisce. Qui i bottoni perdono la pillola: rettangolari col
+     raggio del riquadro venditore (--radius), per coerenza di carta */
+  #barraCompra .btn{margin-top:0;width:auto;line-height:1.25;
+    border-radius:var(--radius)}
   #bcCompra{flex:1;min-width:0;font-size:15px;padding:7px 10px 8px}
   /* l'etichetta non va mai a capo: a 360px stringe coi puntini */
   #bcCompra .bc-lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
@@ -730,12 +733,12 @@
   .pub-data{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
   .titolo-riga{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap}
   .luogo-riga{font-size:13px;color:var(--muted);font-weight:700;margin-top:4px}
-  /* il prezzo e il badge si spartiscono la riga; se non ci stanno
+  /* il prezzo e il badge sulla STESSA riga, centrati tra loro (la
+     riga ≈ dell'altra valuta sta FUORI, sotto); se non ci stanno
      (360px con l'EUR lungo) il badge scende a capo da solo */
   .prezzo-riga{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;
-    margin:10px 0 12px}
-  .prezzo-riga .detail-price{margin-top:0}
-  .prezzo-riga .eur-hint{margin-bottom:0}
+    margin-top:10px}
+  .prezzo-riga .detail-price{margin:0}
   /* la coppia azzurra dei badge di stato «spedito»: AA nei due temi,
      non fa concorrenza ne' all'arancio del prezzo ne' al verde escrow */
   .sped-badge{background:var(--ship-bg);color:var(--ship-text);
@@ -743,8 +746,6 @@
     white-space:nowrap}
   .desc-tit{font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.1em;color:var(--muted);margin-top:14px}
-  /* il 🟣 vive nel riquadro venditore: la verifica e' dell'utente */
-  .nostr-riga{color:var(--nostr-text)}
   /* Le due pillole spedizione/ritiro quando l'annuncio offre entrambe */
   /* Lo stepper dei pezzi (cantiere stock): stessa carta delle pillole
      di consegna, compare solo con piu' di un pezzo disponibile */
@@ -812,12 +813,10 @@
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
     padding:12px 14px;font-size:13px;color:var(--trust);font-weight:600;margin-bottom:16px;
   }
-  /* Pillole informative del dettaglio: zona, categoria, badge Nostr */
+  /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
     padding:6px 12px;font-size:13px;font-weight:700}
-  .pill.nostr{background:var(--nostr-soft);border-color:var(--nostr-soft);
-    color:var(--nostr-text);font-weight:800}
   /* la scatola graduata dentro la pillola, appoggiata sulla riga del testo */
   .pill .taglia-ico{vertical-align:-3.5px;margin-right:1px}
   /* Le condizioni come pillola colorata: la scala parla col colore —
@@ -1714,8 +1713,11 @@
        (solo mobile, la regia e' aggiornaBarraCompra). I bottoni chiamano
        le stesse strade dei gemelli in pagina, guardie comprese. -->
   <div id="barraCompra">
-    <button class="btn orange compra" id="bcCompra" onclick="compraDaBarra()"></button>
-    <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">💰 Offerta</button>
+    <!-- Verde trust (la palette dell'escrow, AA sui due temi) e forma
+         rettangolare col raggio del riquadro venditore: la veste e'
+         nel CSS della barra, le strade restano quelle dei gemelli -->
+    <button class="btn primary compra" id="bcCompra" onclick="compraDaBarra()"></button>
+    <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">Fai un'offerta</button>
   </div>
 
   <nav>
@@ -3571,7 +3573,7 @@ function aggiornaBarraCompra(view){
   document.body.classList.toggle('con-barra', su);
   if (!su) return;
   el('bcCompra').innerHTML =
-    `<span class="bc-lab">🔒 Compra in sicurezza</span><span class="cifra">${cifraBarra(l)}</span>`;
+    `<span class="bc-lab">🔒 Acquista</span><span class="cifra">${cifraBarra(l)}</span>`;
   /* con un accordo gia' stretto l'offerta non si rifa': come in pagina */
   el('bcOfferta').style.display = offertaAccettataPer(l.id) ? 'none' : '';
 }
@@ -3959,14 +3961,10 @@ function openDetail(id){
     ? `<div class="detail-foto"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
        ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<button${i?'':' class="on"'} aria-label="Vai alla foto ${i+1}"></button>`).join('')}</div>`:''}${frecce}${indietro}${barattolino}${condividi}</div>`
     : `<div class="detail-foto"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
-  /* Il ponte Nostr: per gli importati la npub del contatto dichiarato
-     nell'evento, per i nativi e i doppi cittadini il badge verificato
-     (filtro bech32: finisce in un onclick) */
-  const npubPonte = (l.nostr || (l.sellerNpubOk && l.sellerNpub) || '')
-    .replace(/[^a-z0-9]/g,'');
-  const contatto = mio ? ''            /* il venditore non contatta se stesso */
-    : (pontiContatto(l.username, npubPonte, `a ${esc(l.seller.split(' ')[0])}`)
-       || `<div class="trust-note">💬 <span>Questo venditore non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'acquisto dall'inizio alla fine.</span></div>`);
+  /* I ponti di contatto NON vivono piu' qui (lug 2026): si trovano
+     entrando nella scheda del venditore, dove gia' c'erano. Il
+     riquadro nel dettaglio resta solo anagrafica: avatar, nome,
+     badge, stelle e la freccia che porta al negozio. */
   /* Il nuovo ordine del dettaglio (lug 2026): data discreta sotto la
      foto → titolo con la condizione accanto → luogo come testo nudo →
      prezzo col badge spedizione evidenziato (l'informazione che
@@ -3981,12 +3979,10 @@ function openDetail(id){
       ${luogoRiga(l)}
       ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span></div>`:''}
       <div class="prezzo-riga">
-        <div class="prezzo-col">
-          <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
-          <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
-        </div>
+        <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
         ${spedBadge(l)}
       </div>
+      <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
       ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
       ${(p => p ? `<div class="pills">${p}</div>` : '')(
         pilloleModalita(l)
@@ -3996,12 +3992,14 @@ function openDetail(id){
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${avatarImg(l.avatar)}${esc(l.seller[0])}</div>
         <div class="who"><b>${esc(l.seller)}</b>${
+          /* il 🟣 in fila coi badge, come nella testata del negozio:
+             solo l'icona — la verifica si racconta di la' */
+          l.sellerNpubOk?' <span title="Venditore verificato su Nostr">🟣</span>':''}${
           /* la sfilza compatta (prime 4 + «+N»): il resto si scopre
              nel negozio, dove porta gia' tutta la card. Niente tocco
              qui dentro: il bersaglio resta uno solo. */
           sfilzaDistintivi(l.distintivi, 4)}
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
-          ${l.sellerNpubOk?'<div class="rep nostr-riga">🟣 verificato su Nostr</div>':''}
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
@@ -4030,7 +4028,6 @@ function openDetail(id){
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
-      ${contatto}
     </div>`;
   /* La riga di onboarding appesa alla scheda dell'annuncio appena
      pubblicato: una volta sola, e solo su QUEL annuncio */
