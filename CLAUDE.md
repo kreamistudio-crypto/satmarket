@@ -1179,10 +1179,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la scritta «verificato su Nostr» e i ponti di contatto non stanno
   più qui: la verifica è dell'utente e si racconta nel negozio, dove
   i ponti già vivono), sfilza, stelle e freccia. Da lì in giù tutto
-  com'era (recinto, altri
-  oggetti, barra — che dalle stesse rifiniture veste «🔒 Acquista»
-  verde + «Fai un'offerta» ghost, rettangolari, vedi barra
-  d'acquisto). LA DATA: colonna `annunci.modificato` (0 = mai
+  com'era (recinto — che dalle correzioni del lug 2026 ospita la
+  coppia «Acquista» arancio + «Fai un'offerta» e non ha più le
+  pillole di scelta —, altri oggetti, barra col richiamo escrow:
+  vedi barra d'acquisto). LA DATA: colonna `annunci.modificato` (0 = mai
   toccato) scritta da modifica() e dalla modifica firmata; per gli
   IMPORTATI l'import ci mette la data dell'EVENTO Nostr
   (`evento_ts` = created_at, che per un replaceable è la
@@ -1268,19 +1268,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   caselle nella sezione spedizione: il vecchio checkbox «Offro
   anche…» e il select non esistono più, «consegna digitale» era
   ambigua e i testi pubblici ora dicono «codice online»);
-  pillole di scelta GENERALIZZATE (`stradeConsegna`/`pilloleConsegna`:
-  compaiono con ≥2 strade, l'erede del vecchio ramo 'entrambe';
-  la pillola dice «💾 Codice online»);
+  la scelta della strada vive nel foglio «Come vuoi riceverlo?» del
+  varco (`stradeConsegna` resta il giudice delle strade offerte; le
+  vecchie pillole di scelta `pilloleConsegna` dentro l'escrow-zone
+  sono morte con le correzioni del lug 2026 — in pagina restano solo
+  le pillole INFORMATIVE, che raccontano e non si toccano);
   trust-note asimmetrica `#notaDigitale` visibile SOLO con la scelta
   digitale attiva (su una combo non deve spaventare chi sceglie la
   spedizione, `setConsegnaScelta` la accende/spegne); la pillola
   «💾 Codice online» di `pilloleModalita` (che ha sostituito il vecchio
   «o 💾 codice online» della riga sotto il prezzo, `rigaConsegna`,
-  poi sparita del tutto); in card 🚚, 🤝 e 💾 possono
-  convivere. ATTENZIONE a non confonderle: le pillole di
-  `pilloleConsegna` stanno DENTRO l'escrow-zone e SI TOCCANO (il
-  compratore sceglie la strada), quelle di `pilloleModalita` stanno
-  nella fila informativa del dettaglio e raccontano soltanto.
+  poi sparita del tutto); in card 🚚, 🤝 e 💾 possono convivere.
   NIENTE stati nuovi: locked→shipped
   = `POST /api/orders/{id}/consegna-digitale` (solo venditore,
   contenuto 1-4000 caratteri, corriere-sentinella 'Consegna digitale',
@@ -1392,8 +1390,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   migra le offerte e cancella le auto-trattative tra le due meta'.
   Piu' offerte accettate possono coesistere: lecito, il confirm del
   venditore lo dichiara («accettare non riserva l'oggetto»). Frontend:
-  «💰 Fai un'offerta» ULTIMO nella escrow-zone (non disturba il trucco
-  :first-of-type; nascosto su importati e con accordo gia' fatto),
+  «Fai un'offerta» accanto ad Acquista nella `.coppia-acquisto`
+  dell'escrow-zone e nella barra (nascosto con accordo gia' fatto),
   foglio `#offertaSheet` (registrato in closeSheet) con miniatura+
   titolo+listino, chip −10%/−20% precalcolati, campo nella valuta del
   listino (virgola per EUR) e stima live «≈ N sats totali» (matematica
@@ -1851,9 +1849,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Etichetta» (cartellino prezzo ruotato −2° a cavallo della foto,
   `.tag-price` dentro `.ph-wrap`); il tratteggio verde è il SIGILLO
   dell'escrow e compare solo lì: `.escrow-zone` nel dettaglio (badge
-  flottante «🔒 pagamento protetto»; trucco `:first-of-type` che
-  promuove il bottone escrow a CTA arancione quando «Compra subito»
-  manca — la condizione walletNwc() non si tocca) e `.vault` del
+  flottante «🔒 pagamento protetto»; il vecchio trucco
+  `:first-of-type` è morto con la coppia d'acquisto — Acquista è
+  arancio per classe), il richiamo `.bc-recinto` sulla barra
+  d'acquisto e `.vault` del
   dettaglio ordine (step corrente = cerchio tratteggiato). Il «🔒
   escrow» è USCITO dalle card: la rassicurazione è la riga
   `.trust-line` sotto la searchbar e sopra la griglia del negozio.
@@ -2024,10 +2023,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la foto; body senza scroll a lightbox aperto.
   Barra d'acquisto al posto della tab bar (lug 2026, modello Vinted):
   nel dettaglio di un annuncio COMPRABILE la tab bar sparisce e al suo
-  posto compare `#barraCompra` — «🔒 Acquista» col totale sotto
-  (VERDE `.btn.primary`, la coppia trust/on-trust dell'escrow, AA nei
-  due temi) + «Fai un'offerta» (ghost neutro, senza icona); dalle
-  rifiniture del lug 2026 i bottoni della barra sono RETTANGOLARI col
+  posto compare `#barraCompra` — «Acquista» NUDO (ARANCIO ₿
+  `.btn.orange`, il CTA di casa: il verde è del recinto tratteggiato
+  che lo avvolge, vedi il richiamo escrow più sotto) + «Fai
+  un'offerta» (ghost neutro, senza icona); i bottoni della barra sono
+  RETTANGOLARI col
   raggio del riquadro venditore (`border-radius:var(--radius)` in
   `#barraCompra .btn`), non più pillole. Gemella della nav per
   costruzione (position fixed, `--nav-bg`, blur, safe-area, z-index 30
@@ -2040,27 +2040,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la tab bar. I bottoni chiamano `startBuy`/`apriOfferta` TAL QUALI —
   le guardie stanno già lì, quindi in VETRINA la barra c'è e apre il
   foglio-invito; con un accordo accettato il tasto Offerta si spegne
-  come in pagina. La cifra è `cifraBarra()` (la matematica di
-  `totaleStima`, che già conosce lampo e accordo, con la ⚡ davanti
-  quando lo sconto è vivo) e `setConsegnaScelta` la riscrive col tocco
-  sulle pillole spedizione/ritiro.
+  come in pagina. Dalle correzioni del lug 2026 la barra è NUDA:
+  «Acquista» senza prezzo né strada (`cifraBarra` e `NOMI_VIA` non
+  esistono più — il conto vivrà nella pagina dedicata del cantiere
+  successivo, oggi lo dicono il foglio del varco e il paySheet), e
+  attorno al SOLO Acquista c'è il RICHIAMO DELL'ESCROW: contorno
+  tratteggiato verde `.bc-recinto` (stesso verde e tratteggio del
+  recinto in pagina) col lucchettino `.bc-lucchetto` a cavallo del
+  bordo in alto a sinistra — per questo il bottone dice «Acquista»
+  senza 🔒: il lucchetto sta sul bordo, come la flag del recinto,
+  mai due volte. Il padding-top 10px della barra è l'aria del
+  lucchettino; il bottone a una riga compensa il recinto e l'altezza
+  resta quella della nav.
   IL VARCO (lug 2026, da una domanda di Andrea che ha trovato un buco
-  vero — la barra l'aveva aperto lei): la barra si raggiunge SENZA
-  scorrere, quindi chi la tocca può non aver mai incontrato le pillole
-  spedizione/ritiro, e l'acquisto partiva con la strada del default
-  senza che NULLA la nominasse prima del pagamento (a spedizione 0 il
-  conto scomposto esce vuoto, e la protezione oggi è spenta). Prima
-  della barra non poteva succedere: i bottoni stavano SOTTO le pillole.
-  Due pezzi. 1) La barra DICE la strada quando ce n'è più d'una — «🚚
-  Spedizione · 905 000 sats», catalogo `NOMI_VIA` — e la dice anche col
-  SOLO digitale (è la strada con la regola asimmetrica delle 24 ore:
-  mai sottintesa). La riga della cifra è un flex dove il NUMERO non si
-  stringe mai (`.bc-num`) e a cedere coi puntini è il nome della strada
-  (`.bc-via`): serve solo nell'estremo strada+lampo+EUR a 360px.
-  2) Il primo tocco con scelta ancora IMPLICITA non compra: apre il
+  vero — la barra l'aveva aperto lei): chi tocca Acquista può non
+  sapere nulla della consegna, e l'acquisto partiva con la strada del
+  default senza che NULLA la nominasse prima del pagamento (a
+  spedizione 0 il conto scomposto esce vuoto, e la protezione oggi è
+  spenta). Il rimedio: il primo tocco con scelta ancora IMPLICITA non
+  compra — apre il
   foglio «Come vuoi riceverlo?». Stato `consegnaEsplicita` (falso a
-  ogni `openDetail`, vero solo al tocco dell'utente — pillola o voce
-  del foglio) e il bottone passa da `compraDaBarra()`.
+  ogni `openDetail`, vero solo alla voce
+  del foglio — le pillole di scelta in pagina non esistono più, vedi
+  sotto) e OGNI Acquista, barra e recinto, passa da `compraDaBarra()`:
+  con una strada sola si va dritti a `startBuy`. Il foglio diventerà
+  la pagina dedicata nel prossimo cantiere (transizione dichiarata:
+  fino ad allora vale il flusso di oggi).
   `apriFoglioConsegna` RIUSA il markup di `#pickerSheet` (titolo,
   frecce, Esc, tap fuori: gratis) ma NON passa dal catalogo `PICKER` —
   qui il deposito non è una select, è `consegnaScelta`; ogni voce porta
@@ -2076,12 +2081,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invoice prima di aprirlo, con la consegna già cotta dentro
   (`spedizione_sats` e `cambio_ordine` si fissano alla creazione) — una
   scelta lì arriverebbe dopo la invoice.
-  Su MOBILE i due gemelli in pagina si
-  spengono (`.escrow-zone .btn.ghost.compra` con la sua `.escrow-note`
-  e `.off-cta`, classe nata per questo): il recinto resta il posto
-  delle spiegazioni, della scelta di consegna e del «⚡ Compra subito»
-  NWC, che è un'ALTRA strada e non un doppione — e il trucco
-  `:first-of-type` non si tocca. Da ≥768px la barra non esiste proprio:
+  LA COPPIA VIVE IN DUE POSTI (correzioni lug 2026): la stessa coppia
+  «Acquista» arancio ₿ + «Fai un'offerta» ghost sta DENTRO il recinto
+  escrow (`.coppia-acquisto`, scorre con la pagina) E nella barra
+  fissa — i gemelli non si spengono più a barra viva (le vecchie
+  regole `body.con-barra … .off-cta{display:none}` sono morte con la
+  classe `.off-cta`). Nel recinto restano anche stepper quantità,
+  note e il «⚡ Compra subito» NWC (un'ALTRA strada, con la sua
+  cifra); il trucco `:first-of-type` che promuoveva il ghost a CTA è
+  stato RIMOSSO: Acquista è arancio per classe, sempre. Le PILLOLE DI
+  SCELTA consegna (`pilloleConsegna`) non esistono più: in pagina
+  restano solo le pillole INFORMATIVE (spedBadge + pilloleModalita),
+  la scelta vive nel foglio del varco (e domani nella pagina
+  dedicata). COERENZA DI FORME: `#detailContent .btn` e
+  `#barraCompra .btn` portano `border-radius:var(--radius)` — nel
+  dettaglio ogni bottone-oggetto è rettangolare col raggio del
+  riquadro venditore (coppia, NWC, Metti nel barattolo, tasti del
+  proprietario, set); i testuali link/danger-ghost non hanno forma.
+  Da ≥768px la barra non esiste proprio:
   la nav è una topbar e il dettaglio a due colonne ha già i bottoni
   sotto mano. I fogli (41) e il velo (40) le passano sopra senza che
   rubi tocchi; a lightbox aperto si nasconde con header e nav
@@ -2118,8 +2135,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   gli attivi entrano in `listings` via inCatalogo per openDetail);
   bottone gemello `#jarCta` «🫙 Metti nel barattolo / Già nel
   barattolo» nel dettaglio, `.btn.ghost` FUORI dal recinto escrow
-  (il tratteggio è il sigillo del pagamento, e dentro c'è il trucco
-  `:first-of-type`), stesse guardie e stesso `togglePreferito` del
+  (il tratteggio è il sigillo del pagamento: dentro ci sta solo chi
+  compra), stesse guardie e stesso `togglePreferito` del
   cerchietto (che aggiorna entrambi); guardia di cortesia client
   (toast senza richiesta a barattolo pieno, la verità resta il 400).
   IL BARATTOLO SI RIEMPIE (lug 2026): le icone (cerchietto del
@@ -2801,9 +2818,15 @@ senza luogo / senza spedizione / solo digitale / lampo attiva /
 annuncio storico; in produzione basta il riavvio, la migrazione gira
 da sola; più le quattro rifiniture del giorno dopo: badge spedizione
 sulla stessa riga del prezzo, 🟣 solo icona in fila coi badge, via i
-ponti di contatto dal riquadro venditore, e la barra d'acquisto con
-«Acquista» verde e «Fai un'offerta» rettangolari — riverificate a
-360/375/390 nei due temi, sats/EUR/lampo/ritiro).
+ponti di contatto dal riquadro venditore; e le correzioni del giorno
+dopo ancora: «Acquista» arancio ₿ NUDO senza prezzo + «Fai
+un'offerta», la stessa coppia dentro il recinto escrow E nella barra
+fissa col richiamo tratteggiato verde e il lucchettino, via le
+pillole di scelta consegna dal dettaglio (la strada si sceglie nel
+foglio del varco, che diventerà la pagina dedicata del prossimo
+cantiere), forme rettangolari col raggio del riquadro su TUTTI i
+bottoni del dettaglio — riverificate a 360/375/390 nei due temi,
+col varco esercitato dal vivo).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
