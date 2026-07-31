@@ -2017,25 +2017,34 @@ function tagliaSVG(id, box){
    che la sceglie nel form, e del futuro tariffario per-taglia. Il
    disegno graduato resta vivo nel foglio-picker di Vendi e nella
    stima del set. */
-/* Il luogo, con DUE rese secondo il posto (lug 2026).
-   In CARD solo il COMUNE, mai il testo intero: «Torino (TO) spedisco
-   in tutta Italia» diventa «Torino (TO)», «Frazione Salsasio,
-   Carmagnola (TO)» diventa «Carmagnola (TO)». Lo estrae il server
-   (`zona_comune`, dizionario dei ~7.900 comuni), quindi nessun
-   indovinello: esce solo cio' che il dizionario riconosce, e la
-   griglia diventa una colonna di nomi confrontabili a colpo d'occhio
-   invece che di frasi. Vuoto = la zona non e' un luogo («Spedisco in
-   tutta Italia», «Nord Italia»): niente 📍, e niente al suo posto —
-   la strada di consegna la dicono gia' le icone a destra.
-   Nel DETTAGLIO invece il testo INTERO com'e' stato scritto: li' c'e'
-   spazio, e «Frazione Salsasio» serve davvero a chi va a ritirare.
-   La card e' un indice, la scheda e' la dichiarazione del venditore. */
-function luogoPill(l){
-  return (l.zone && l.zone !== '—')
-    ? `<span class="pill">📍 ${esc(l.zone)}</span>` : '';
-}
-function luogoCard(l){
+/* Il luogo: UNA regola sola, in TUTTI i posti che lo mostrano
+   (lug 2026). Si mostra il solo COMUNE riconosciuto — «Torino (TO)
+   spedisco in tutta Italia» diventa «Torino (TO)», «Frazione
+   Salsasio, Carmagnola (TO)» diventa «Carmagnola (TO)» — e se un
+   comune non c'e' non si mostra NIENTE: le frasi che un luogo non
+   sono («Spedisco in tutta Italia», «Nord Italia») spariscono e non
+   lasciano nulla al loro posto. Lo estrae il server (`zona_comune`,
+   dizionario dei ~7.900 comuni): nessun indovinello, esce solo cio'
+   che il dizionario riconosce.
+   Il testo intero era rimasto nel DETTAGLIO per un giorno, per non
+   perdere le frazioni — ma il «resto» di quei testi e' proprio la
+   frase da nascondere («Torino (TO) spedisco in tutta Italia»), e
+   non c'e' modo di tenere l'uno senza l'altro: chi vuole dire la
+   frazione la scrive in descrizione, che nel dettaglio si legge
+   tutta due righe piu' sotto, e il punto d'incontro del ritiro si
+   concorda comunque tra le parti.
+   Tre vestiti, una sola verita': `luogoTesto` la dice, gli altri due
+   la vestono — cosi' non possono divergere. */
+function luogoTesto(l){
   return l.comune ? `📍 ${esc(l.comune)}` : '';
+}
+function luogoPill(l){                    // fila delle pillole del dettaglio
+  const t = luogoTesto(l);
+  return t ? `<span class="pill">${t}</span>` : '';
+}
+function luogoPunto(l){                   // code delle righe elenco: « · 📍 X»
+  const t = luogoTesto(l);
+  return t ? ` · ${t}` : '';
 }
 /* Solo per la DEMO, dove non c'e' server a estrarre il comune: si
    prende il pezzo di testo che porta la sigla — il formato che il
@@ -2569,7 +2578,7 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span class="luogo">${luogoCard(l)}</span>${iconeCard(l)}</div>
+        <div class="meta"><span class="luogo">${luogoTesto(l)}</span>${iconeCard(l)}</div>
       </div>
     </div>`; };
 
@@ -6667,7 +6676,7 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
           ${esa?'':`<span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
         </span>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${l.quantita} pezzi`:''} · 📍 ${esc(l.zone)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${l.quantita} pezzi`:''}${luogoPunto(l)}</div>
     </div>`; };
 
 /* La ricarica dello stock: un numero e via. Tocca SOLO la quantita'
@@ -6878,7 +6887,7 @@ function renderPreferiti(){
           <span class="badge" onclick="togglePreferito(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Togli dal barattolo">🫙 Togli</span>
         </span>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span> · 📍 ${esc(l.zone)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${luogoPunto(l)}</div>
     </div>`;
   }).join('');
 }
