@@ -18,6 +18,10 @@ __pycache__/
 *.apk
 *.aab
 
+# Referti dei censimenti lanciati a mano sul VPS (censimento.txt & co.):
+# roba di lavoro, e puo' contenere i testi degli annunci degli utenti
+censimento*.txt
+
 # Varie
 .DS_Store
 Thumbs.db
