@@ -778,33 +778,37 @@
      serve) e il toggle valuta ancorato a destra, che non si sposta
      mai — se a mandarlo a capo fosse lui, la prima riga resterebbe
      con un buco */
-  .prezzo-riga{display:flex;align-items:center;gap:12px;margin-top:10px}
-  /* I prezzi in COLONNA: il barrato della lampo sta SEMPRE sotto il
-     prezzo attuale, in euro come in sats — di lato, quando i numeri
-     erano corti, le due cifre si leggevano come una sola riga di
-     conto (deciso da Andrea) */
+  /* Il toggle si allinea alla PRIMA riga (il prezzo grande), mai a
+     mezz'aria fra le righe: `flex-start` invece del centro, che
+     centrava sul blocco intero */
+  .prezzo-riga{display:flex;align-items:flex-start;gap:12px;
+    margin:10px 0 14px}
+  /* I prezzi in COLONNA, in quest'ordine: la cifra grande, la stessa
+     cifra nell'altra valuta, e SOTTO A ENTRAMBE il listino barrato
+     della lampo — in mezzo alle due valute sembrava riferirsi solo a
+     quella sopra (deciso da Andrea) */
   .prezzo-col{display:flex;flex-direction:column;align-items:flex-start;
-    gap:2px;flex:1 1 auto;min-width:0}
+    gap:1px;flex:1 1 auto;min-width:0}
   .prezzo-col .detail-price{margin:0;min-width:0}
+  .prezzo-col .eur-hint{margin:0}
   .prezzo-riga .cur-seg{margin-left:auto;flex:none}
   /* Il listino barrato della lampo sta ACCANTO al prezzo scontato e
      quasi grande come lui: sopra, appeso al luogo, sembrava parlare
      del luogo (feedback di Andrea). Stesso mono del prezzo; se non ci
      sta — la vista sats fa numeri lunghi — va a capo da solo, ma
      resta attaccato al prezzo, non al luogo. */
-  .prezzo-col .lampo-was{margin:0;gap:7px;font-size:24px;font-weight:700;
-    font-family:'JetBrains Mono',monospace}
+  .prezzo-col .lampo-was{margin:5px 0 0;gap:7px;font-size:24px;
+    font-weight:700;font-family:'JetBrains Mono',monospace}
   /* nel barrato l'unita' segue la stessa regola del prezzo attuale:
      il simbolo € grande quasi quanto la cifra, la parola «sats»
      piccola e discreta (altrimenti barrata pesa piu' del numero) */
   .prezzo-col .lampo-was .unit{font-size:12px;font-weight:500}
   .prezzo-col .lampo-was .unit.eur{font-size:17px;font-weight:700}
-  /* La riga della barratura si taglia sulla cifra, non sulla parola:
-     su «sats» — che e' piccola — passava all'altezza della sua x e
-     sembrava una sottolineatura. L'inline-block ferma la decorazione
-     ereditata (dal figlio non si puo' togliere in altro modo); il
-     simbolo € invece resta barrato, che e' tutt'uno con la cifra. */
-  .prezzo-col .lampo-was .unit:not(.eur){display:inline-block}
+  /* Si barra SOLO IL NUMERO: ne' «sats» ne' «€». Sull'unita' la riga
+     passava all'altezza del suo carattere piccolo e sembrava una
+     sottolineatura. L'inline-block ferma la decorazione ereditata —
+     dal figlio non si puo' togliere in altro modo. */
+  .prezzo-col .lampo-was .unit{display:inline-block}
   /* La spedizione sta nella fila delle pillole, con le altre
      caratteristiche, ma EVIDENZIATA: e' l'informazione che converte.
      Forma da pillola come le vicine, colori dalla coppia azzurra dei
@@ -4123,6 +4127,7 @@ function openDetail(id){
       <div class="prezzo-riga">
         <div class="prezzo-col">
           <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
+          <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
           ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
@@ -4132,7 +4137,6 @@ function openDetail(id){
           <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
         </div>
       </div>
-      <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
       ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
       ${(p => p ? `<div class="pills">${p}</div>` : '')(
         spedBadge(l) + pilloleModalita(l)
