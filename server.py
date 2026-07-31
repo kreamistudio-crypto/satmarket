@@ -3273,6 +3273,42 @@ def guardia_zona_condizione(d: dict, consegna: str) -> str:
 MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe", "digitale")
 TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 
+# La stima della taglia del pacco di un SET (lug 2026): punti
+# ~volumetrici per taglia — i rapporti tra i riferimenti del form
+# (busta imbottita, scatola di scarpe, cassetta d'acqua, microonde).
+# SOLO informativa: si mostra a compratore e venditore («pacco
+# stimato: medio», cosi' il venditore verifica prima di spedire),
+# non prezza nulla — in v1 la spedizione del set e' il MAX dei costi
+# dichiarati, compromesso dichiarato.
+PUNTI_TAGLIA = {"busta": 1, "piccolo": 3, "medio": 8, "grande": 18}
+
+
+def stima_taglia_set(taglie_qta: list) -> str:
+    """[(taglia_pacco, quantita), ...] -> taglia stimata del pacco
+    unico, o '' se non stimabile. Regole:
+    - un 'ingombrante' QUALSIASI = 'ingombrante' (fuori scala: serve
+      un furgone, non si somma);
+    - una taglia mancante o sconosciuta ('' degli annunci storici) =
+      stima '' — meglio nessuna stima che una bugia;
+    - altrimenti somma dei punti x quantita, mappata a soglie tarate
+      perche' un pezzo solo ricada nella SUA taglia."""
+    punti = 0
+    for taglia, qta in taglie_qta:
+        if taglia == "ingombrante":
+            return "ingombrante"
+        if taglia not in PUNTI_TAGLIA:
+            return ""
+        punti += PUNTI_TAGLIA[taglia] * max(1, qta)
+    if punti <= 1:
+        return "busta"        # una busta sola
+    if punti <= 4:
+        return "piccolo"      # 2-4 buste, o busta+piccolo
+    if punti <= 12:
+        return "medio"        # fino a 4 piccoli, o piccolo+medio
+    if punti <= 26:
+        return "grande"       # medio+grande, o 3 medi
+    return "ingombrante"      # 2 grandi = 36: due microonde
+
 
 def neutralizza_formula(testo: str) -> str:
     """Anti CSV-injection per i testi che arrivano dall'import: una
@@ -5568,13 +5604,18 @@ async def _compra_set(user: dict, d: dict) -> dict:
                     "WHERE id=?", (ordine_id, adesso, off["id"]))
     con.commit()
     con.close()
+    # La taglia stimata del pacco unico: informativa, solo con la
+    # spedizione (il ritiro non fa pacchi)
+    stima = (stima_taglia_set([(tutti[aid]["taglia_pacco"], qta)
+                               for aid, qta in richieste.items()])
+             if scelta == "spedizione" else "")
     # prezzo_sats resta il TOTALE, come sempre; le righe sono in piu'
     # (i totali parlano anche ai client che il set non lo conoscono)
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
             "protezione_sats": prot, "consegna": scelta,
-            "quantita": pezzi, "set": True,
+            "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
                        "titolo": r["titolo"], "quantita": r["quantita"],
                        "unitario_sats": r["unitario_sats"]}
@@ -5859,13 +5900,14 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
         righe = _righe_ordine(con, o)
         e_set = not o["annuncio_id"]
         a = None
-        esauriti = []
+        esauriti, taglie = [], []
         for r in righe:
             con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
                         "WHERE id=?", (r["quantita"], r["annuncio_id"]))
-            a = con.execute("SELECT contatto_nostr, titolo, quantita "
-                            "FROM annunci WHERE id=?",
+            a = con.execute("SELECT contatto_nostr, titolo, quantita, "
+                            "taglia_pacco FROM annunci WHERE id=?",
                             (r["annuncio_id"],)).fetchone()
+            taglie.append((a["taglia_pacco"] if a else "", r["quantita"]))
             # L'esaurimento: solo quando l'ULTIMO pezzo se ne va
             # l'annuncio diventa 'venduto' (l'invariante venduto <=>
             # quantita=0). Con pezzi ancora in vetrina niente sold,
@@ -5918,6 +5960,13 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
                 msg += (f"\n• {r['titolo'][:40]}"
                         + (f" × {r['quantita']}" if r["quantita"] > 1
                            else ""))
+            # La taglia stimata del pacco unico: un aiuto, non una
+            # promessa — e' il venditore che prepara il pacco vero
+            stima = (stima_taglia_set(taglie)
+                     if o["consegna_scelta"] == "spedizione" else "")
+            if stima:
+                msg += (f"\n\n📦 Pacco stimato: <b>{stima}</b> — "
+                        f"verifica tu prima di spedire.")
             promemoria = [e["titolo"][:40] for e in esauriti if e["nostr"]]
             if promemoria:
                 msg += ("\n\n🟣 Su <b>Nostr</b> ricordati di segnare come "
@@ -8771,20 +8820,32 @@ def miei_ordini(x_tg_init_data: str = Header(""),
     if set_ids:
         seg = ",".join("?" * len(set_ids))
         per_ordine: dict[int, list] = {}
+        taglie_ordine: dict[int, list] = {}
         for x in con.execute(
-                f"SELECT ordine_id, annuncio_id, quantita, unitario_sats, "
-                f"titolo FROM ordine_righe WHERE ordine_id IN ({seg}) "
-                f"ORDER BY id", set_ids):
+                f"SELECT r.ordine_id, r.annuncio_id, r.quantita, "
+                f"r.unitario_sats, r.titolo, "
+                # la taglia si legge FRESCA dall'annuncio (non si
+                # fotografa: la stima puo' solo migliorare se il
+                # venditore la corregge)
+                f"COALESCE(a.taglia_pacco,'') AS taglia "
+                f"FROM ordine_righe r "
+                f"LEFT JOIN annunci a ON a.id=r.annuncio_id "
+                f"WHERE r.ordine_id IN ({seg}) ORDER BY r.id", set_ids):
             per_ordine.setdefault(x["ordine_id"], []).append(
                 {"annuncio_id": x["annuncio_id"],
                  "quantita": x["quantita"],
                  "unitario_sats": x["unitario_sats"],
                  "titolo": x["titolo"]})
+            taglie_ordine.setdefault(x["ordine_id"], []).append(
+                (x["taglia"], x["quantita"]))
         for r in righe:
             if not r["annuncio_id"]:
                 r["righe"] = per_ordine.get(r["id"], [])
                 r["titolo"] = _titolo_ordine(r["righe"])
                 r["zona"] = r["zona"] or ""
+                r["taglia_stimata"] = (
+                    stima_taglia_set(taglie_ordine.get(r["id"], []))
+                    if r["consegna_scelta"] == "spedizione" else "")
     con.close()
     for r in righe:
         # Il contenuto digitale NON esce mai da qui: si legge solo da
