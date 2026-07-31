@@ -682,6 +682,13 @@
     font-size:84px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 12px,var(--ph-b) 12px 24px)}
   .detail-body{padding:18px var(--pad)}
   .detail-body h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;line-height:1.15}
+  /* La striscia «altri oggetti di questo venditore» (lug 2026): le
+     stesse card della vetrina in fila orizzontale scorrevole — la
+     scoperta del set senza rifare nulla */
+  .altri-strip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .altri-strip::-webkit-scrollbar{display:none}
+  .altri-strip .card{flex:0 0 150px;min-width:150px}
   .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
     font-weight:700;font-size:28px;margin:10px 0 2px}
   .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
@@ -3416,6 +3423,44 @@ function aggiornaBarraCompra(view){
   el('bcOfferta').style.display = offertaAccettataPer(l.id) ? 'none' : '';
 }
 
+/* --------- «Altri oggetti di questo venditore» (lug 2026) ----------
+   La scoperta del set: in coda al dettaglio una striscia orizzontale
+   con le altre card del venditore. I dati arrivano dal negozio (limit
+   piccolo) e finiscono in catalogo con inCatalogo, cosi' openDetail
+   conosce gia' quegli id. Fail-open totale: senza nulla da mostrare
+   (o con la rete storta) la sezione non nasce e il dettaglio resta
+   quello di sempre. */
+async function sezioneAltriOggetti(l){
+  const mio = !DEMO && myTgId && l.sellerId===myTgId;
+  if (mio) return;
+  let altri = [];
+  if (DEMO) {
+    altri = listings.filter(x=>x.seller===l.seller && x.id!==l.id
+                              && x.stato==='attivo');
+  } else {
+    const chi = l.negozio || l.username;
+    if (!chi) return;
+    try {
+      const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+      const r = await fetch(
+        `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=7`, opz);
+      if (!r.ok) return;
+      const d = await r.json();
+      altri = (d.annunci||[]).map(mapListing).filter(x=>x.id!==l.id);
+      inCatalogo(altri);
+    } catch(e) { return; }
+  }
+  /* anti-race: la fetch e' lenta e il dettaglio puo' essere gia' un
+     altro (o la lampo puo' averlo ridisegnato: si ricontrolla anche
+     che la striscia non ci sia gia') */
+  if (!currentListing || currentListing.id!==l.id || !altri.length) return;
+  const corpo = document.querySelector('#detailContent .detail-body');
+  if (!corpo || corpo.querySelector('.altri-strip')) return;
+  corpo.insertAdjacentHTML('beforeend', `
+    <div class="section-label" style="margin-top:16px">Altri oggetti di questo venditore</div>
+    <div class="altri-strip">${altri.slice(0,6).map(cardHTML).join('')}</div>`);
+}
+
 function openDetail(id){
   currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
   if (!currentListing) { toast('Annuncio non trovato'); return; }
@@ -3582,6 +3627,7 @@ function openDetail(id){
     aggiorna();                       // al primo sguardo la ‹ e' gia' spenta
   }
   go('dettaglio');
+  sezioneAltriOggetti(l);             // in coda, fail-open: arriva quando arriva
 }
 
 /* ---------------- lightbox: foto a tutto schermo con zoom ----------------
