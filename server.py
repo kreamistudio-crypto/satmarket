@@ -8336,9 +8336,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
 
         if bolt11 and await paga_venditore(bolt11):
-            t = con.execute("SELECT titolo FROM annunci WHERE id=?",
-                            (o["annuncio_id"],)).fetchone()
-            titolo = t["titolo"] if t else "il tuo acquisto"
+            # Il titolo di cortesia copre anche i set («primo + N altri»)
+            titolo = _titolo_ordine(_righe_ordine(con, o))
+            if titolo == "?":
+                titolo = "il tuo acquisto"
             cambio = await cambio_btc_eur()
             con.execute("UPDATE ordini SET stato='released', cambio_eur=?, "
                         "aggiornato=? WHERE id=?",
@@ -8458,21 +8459,25 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # ASSOLUTA — corregge con la stessa ricarica). Il rimborso
             # e' sempre integrale, per l'ordine intero: il parziale
             # per-pezzo richiederebbe due mosse Lightning coordinate.
-            con.execute("UPDATE annunci SET quantita=quantita+?, "
-                        "stato='attivo' WHERE id=?",
-                        (o["quantita"] or 1, o["annuncio_id"]))
+            # Nel SET tornano in vetrina TUTTI gli annunci, riga per
+            # riga: il pacco e' tornato indietro intero.
+            righe = _righe_ordine(con, o)
+            for r in righe:
+                con.execute("UPDATE annunci SET quantita=quantita+?, "
+                            "stato='attivo' WHERE id=?",
+                            (r["quantita"], r["annuncio_id"]))
             con.commit()
-            t = con.execute("SELECT titolo FROM annunci WHERE id=?",
-                            (o["annuncio_id"],)).fetchone()
-            titolo = (t["titolo"] if t else "?")[:60]
+            titolo = _titolo_ordine(righe)[:60]
             con.close()
-            # ...e torna disponibile anche sulla piazza Nostr
-            asyncio.create_task(annuncio_su_nostr(o["annuncio_id"], "active",
-                                                  solo_aggiornamento=True))
-            # ...e il post nel canale toglie il ✅ Venduto: l'oggetto
-            # e' di nuovo in vetrina, il post non deve mentire
-            asyncio.create_task(promo_venduto(o["annuncio_id"],
-                                              venduto=False))
+            for r in righe:
+                # ...e torna disponibile anche sulla piazza Nostr
+                asyncio.create_task(annuncio_su_nostr(r["annuncio_id"],
+                                                      "active",
+                                                      solo_aggiornamento=True))
+                # ...e il post nel canale toglie il ✅ Venduto: l'oggetto
+                # e' di nuovo in vetrina, il post non deve mentire
+                asyncio.create_task(promo_venduto(r["annuncio_id"],
+                                                  venduto=False))
             await notifica(o["compratore_id"],
                            f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
                            f"<b>{importo} sats</b> è in arrivo nel tuo wallet. "
@@ -8745,7 +8750,9 @@ def miei_ordini(x_tg_init_data: str = Header(""),
          " AND per_tg_id=?) AS suo_voto, "
          "(SELECT commento FROM feedback WHERE ordine_id=o.id "
          " AND per_tg_id=?) AS suo_commento FROM ordini o "
-         "JOIN annunci a ON a.id=o.annuncio_id "
+         # LEFT: i SET hanno annuncio_id=0 e con l'INNER sparirebbero
+         # dalla lista (il compratore pagherebbe senza vedere l'ordine)
+         "LEFT JOIN annunci a ON a.id=o.annuncio_id "
          "JOIN utenti uc ON uc.tg_id=o.compratore_id "
          "JOIN utenti uv ON uv.tg_id=o.venditore_id "
          "WHERE o.compratore_id=? OR o.venditore_id=?")
@@ -8756,6 +8763,28 @@ def miei_ordini(x_tg_init_data: str = Header(""),
               "'return_shipped','refund')")
     righe = [dict(r) for r in con.execute(q + " ORDER BY o.aggiornato DESC",
                                           par)]
+    # I SET escono col titolo sintetizzato e l'elenco delle righe
+    # (UNA query per tutti); i mono non portano la chiave 'righe' e
+    # restano identici a ieri — il client vecchio in cache legge il
+    # titolo e i totali di sempre.
+    set_ids = [r["id"] for r in righe if not r["annuncio_id"]]
+    if set_ids:
+        seg = ",".join("?" * len(set_ids))
+        per_ordine: dict[int, list] = {}
+        for x in con.execute(
+                f"SELECT ordine_id, annuncio_id, quantita, unitario_sats, "
+                f"titolo FROM ordine_righe WHERE ordine_id IN ({seg}) "
+                f"ORDER BY id", set_ids):
+            per_ordine.setdefault(x["ordine_id"], []).append(
+                {"annuncio_id": x["annuncio_id"],
+                 "quantita": x["quantita"],
+                 "unitario_sats": x["unitario_sats"],
+                 "titolo": x["titolo"]})
+        for r in righe:
+            if not r["annuncio_id"]:
+                r["righe"] = per_ordine.get(r["id"], [])
+                r["titolo"] = _titolo_ordine(r["righe"])
+                r["zona"] = r["zona"] or ""
     con.close()
     for r in righe:
         # Il contenuto digitale NON esce mai da qui: si legge solo da
@@ -8803,12 +8832,21 @@ def scarica_export(biglietto: str):
     tg_id = dati[0]
     con = db()
     righe = con.execute(
-        "SELECT o.aggiornato, o.prezzo_sats, o.stato, o.cambio_eur, "
-        "o.venditore_id, a.titolo FROM ordini o "
-        "JOIN annunci a ON a.id=o.annuncio_id "
+        "SELECT o.id, o.annuncio_id, o.aggiornato, o.prezzo_sats, o.stato, "
+        "o.cambio_eur, o.venditore_id, a.titolo FROM ordini o "
+        # LEFT: i SET (annuncio_id=0) devono uscire in contabilita'
+        "LEFT JOIN annunci a ON a.id=o.annuncio_id "
         "WHERE (o.venditore_id=? OR o.compratore_id=?) "
         "AND o.stato IN ('released','refunded') "
         "ORDER BY o.aggiornato DESC", (tg_id, tg_id)).fetchall()
+    # Un set = UNA riga di CSV (un incasso = una riga di contabilita'),
+    # col titolo sintetizzato dalle righe fotografate all'acquisto
+    titoli_set = {}
+    for r in righe:
+        if not r["annuncio_id"]:
+            titoli_set[r["id"]] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
     con.close()
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")    # il ; e' il CSV che Excel italiano apre bene
@@ -8820,7 +8858,7 @@ def scarica_export(biglietto: str):
                    .replace(".", ","))
         w.writerow([time.strftime("%Y-%m-%d", time.localtime(r["aggiornato"])),
                     "vendita" if r["venditore_id"] == tg_id else "acquisto",
-                    r["titolo"], r["prezzo_sats"],
+                    titoli_set.get(r["id"], r["titolo"] or "?"), r["prezzo_sats"],
                     "concluso" if r["stato"] == "released" else "rimborsato",
                     eur])
     nome = time.strftime("barattolo-affari-%Y%m%d.csv")
@@ -9698,16 +9736,22 @@ async def sollecita_incassi():
     # passato la segnalazione ai moderatori (contatore oltre il tetto)
     # non compare piu'.
     righe = con.execute(
-        "SELECT o.id, o.venditore_id, o.prezzo_sats, o.protezione_sats, "
-        "o.solleciti_incasso, a.titolo FROM ordini o "
-        "JOIN annunci a ON a.id = o.annuncio_id "
+        "SELECT o.id, o.annuncio_id, o.venditore_id, o.prezzo_sats, "
+        "o.protezione_sats, o.solleciti_incasso, a.titolo FROM ordini o "
+        # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
+        "LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "WHERE o.stato='confirmed' AND o.solleciti_incasso <= ? "
         "AND MAX(o.aggiornato, o.sollecito_incasso_il) < ?",
         (SOLLECITO_INCASSO_MAX, adesso - passo)).fetchall()
     if not righe:
         con.close()
         return
+    righe = [dict(r) for r in righe]
     for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
         con.execute("UPDATE ordini SET sollecito_incasso_il=?, "
                     "solleciti_incasso=solleciti_incasso+1 WHERE id=?",
                     (adesso, r["id"]))
