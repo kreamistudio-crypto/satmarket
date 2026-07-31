@@ -751,19 +751,43 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (gemella del backfill coordinate, idempotente): solo i
   riconoscibili, MAI gli importati da Nostr (contatto_nostr pieno:
   la loro zona la riscrive l'import orario dai relay).
-  In CARD si mostra SOLO IL COMUNE (lug 2026), mai il testo intero:
-  «Frazione Salsasio, Carmagnola (TO) — spedisco ovunque» in griglia
-  diventa «Carmagnola (TO)», «vicino Milano (MI)» diventa «Milano
-  (MI)», e i testi che un luogo non sono («Spedisco in tutta
-  Italia», «Nord Italia») non lasciano NULLA al loro posto — la
-  strada di consegna la dicono già le icone accanto, e il vecchio
-  ripiego `luogoMeta` «📦 Spedizione»/«💾 Online»/«📍 —» non esiste
-  più. Nel DETTAGLIO invece il testo INTERO com'è stato scritto. Il
-  perché della differenza: la card è un INDICE — una colonna di nomi
-  confrontabili a colpo d'occhio — mentre la scheda è la
-  DICHIARAZIONE del venditore, dove c'è spazio e «Frazione Salsasio»
-  serve davvero a chi va a ritirare. Le due rese sono `luogoCard`
-  (legge `l.comune`) e `luogoPill` (legge `l.zone`).
+  Si mostra SOLO IL COMUNE riconosciuto (lug 2026), mai il testo
+  intero, e se un comune non c'è non si mostra NIENTE. Vale in TUTTI
+  i posti che il luogo lo mostrano: card, pillola del dettaglio,
+  righe di «📋 I tuoi annunci» e «🫙 Nel tuo barattolo». Quindi
+  «Frazione Salsasio, Carmagnola (TO) — spedisco ovunque» diventa
+  «Carmagnola (TO)», «vicino Milano (MI)» diventa «Milano (MI)», e
+  «Spedisco in tutta Italia» o «Nord Italia» non lasciano NULLA al
+  loro posto — la strada di consegna la dicono già le icone accanto,
+  e il vecchio ripiego `luogoMeta` «📦 Spedizione»/«💾 Online»/«📍 —»
+  non esiste più. `luogoTesto` dice la regola, `luogoPill` (pillola
+  del dettaglio) e `luogoPunto` (coda « · 📍 X» delle righe elenco,
+  col separatore che sparisce insieme al luogo: mai un puntino
+  orfano) la vestono — tre rese che non possono divergere, la stessa
+  idea del cuore unico qui sotto. Il dato NON si perde: la zona resta
+  intera nel database, il form di modifica la mostra per intero, e
+  continua a servire per le coordinate e gli avvisi.
+  IL TESTO INTERO NEL DETTAGLIO È DURATO UN GIORNO — e vale la pena
+  dire perché non era tenibile, che è utile quanto la regola. La
+  scelta di partenza era ragionevole: la card come INDICE (nomi
+  confrontabili a colpo d'occhio) e la scheda come DICHIARAZIONE del
+  venditore, col testo intero, per non perdere le frazioni —
+  «Frazione Salsasio» serve a chi va a ritirare. Non regge, perché
+  la frazione e la frase-spazzatura SONO LA STESSA COSA: testo
+  libero attorno a un comune. Il «resto» di «Torino (TO) spedisco in
+  tutta Italia» è esattamente ciò che si vuole nascondere, e non
+  esiste modo di tenere l'uno senza l'altro. La via di mezzo —
+  mostrare il testo intero solo con il RITIRO attivo, dove la
+  frazione serve davvero — è stata valutata e scartata due volte:
+  un annuncio col ritiro può avere lo stesso la frase-spazzatura
+  nella zona, e una regola condizionale sulla modalità di consegna
+  sarebbe impossibile da ricordare fra sei mesi. Chi ci tiene alla
+  frazione la scrive in DESCRIZIONE, che nel dettaglio si legge
+  tutta due righe più sotto e che il venditore controlla; e il punto
+  d'incontro di un ritiro si concorda comunque tra le parti (ponti
+  di contatto, poi il pannello dell'ordine): un indirizzo Barattolo
+  non l'ha mai pubblicato. Dal compratore, in vetrina, la domanda è
+  «è vicino a me?», non «in che via?».
   Il nome esce nella forma UFFICIALE del dataset, il che raddrizza
   gratis le maiuscole storte («torino (TO)» → «Torino (TO)») e dà la
   sigla anche agli alias che `arricchisci_zona` non sapeva servire
@@ -2700,10 +2724,12 @@ spedizione, che vive già nel foglio della consegna e nel conto
 scomposto; collaudato a 360/375/390 e 1280px, chiaro e scuro);
 il luogo si fa pulito, dentro e fuori (lug 2026, subito dopo: il
 pallino Nostr esce dalle card — riguarda il venditore, non
-l'oggetto, e in griglia lo spazio è poco; in card si mostra il solo
-COMUNE estratto dal dizionario invece del testo intero, con la card
-che diventa un indice e il dettaglio che resta la dichiarazione del
-venditore; e in INGRESSO la zona, pur restando facoltativa senza
+l'oggetto, e in griglia lo spazio è poco; si mostra il solo COMUNE
+estratto dal dizionario invece del testo intero — in card, e dal
+giorno dopo anche nella pillola del dettaglio e nelle righe-elenco
+del Profilo: una regola sola ovunque, vedi in Architettura perché
+tenere il testo intero nel dettaglio non era tenibile; e in INGRESSO
+la zona, pur restando facoltativa senza
 ritiro, dev'essere un comune vero — l'avviso morbido del form e
 dell'import CSV è diventato bloccante, con un messaggio unico e il
 «forse Pavia (PV)?»: chi spedisce e basta lascia il campo vuoto,
