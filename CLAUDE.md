@@ -1145,12 +1145,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   («🤝 Ritiro in zona», «💾 Codice online»); la SPEDIZIONE dal
   riordino del dettaglio (sotto) non sta più lì: è il badge
   evidenziato `spedBadge()` accanto al prezzo. SENZA il costo
-  (lug 2026): una cifra sciolta tra le
+  nella fila delle pillole (lug 2026): una cifra sciolta tra le
   pillole si legge come un prezzo e non dice di che totale fa parte
   — il posto del costo è il momento del pagamento, dove c'era già
   (foglio «Come vuoi riceverlo?» col totale per strada, riga
   «Spedizione» del `contoScomposto`, e il totale dei bottoni compra
-  che la spedizione l'ha sempre inclusa). Con lei se n'è andata
+  che la spedizione l'ha sempre inclusa).
+  DUE BADGE, DUE DOMANDE (lug 2026, decisione di Andrea): SOPRA, nella
+  fila delle pillole, si dice SE si spedisce — `spedBadge()` è
+  «🚚 Spedizione disponibile» in azzurro TENUE, e diventa
+  «🚚 Spedizione gratuita» in azzurro PIENO (`.sped-badge.piena`,
+  token nuovi `--ship-full`/`--ship-on`, contrasti AA misurati nei due
+  temi: 5,25 e 7,88) quando non c'è un costo dichiarato — la gratuità
+  è un argomento di vendita e non può aspettare il fondo pagina. Il
+  grado basso è NUDO: il contorno pieno provato addosso al
+  «disponibile» dava peso a ciò che deve pesarne meno. SOTTO il
+  bottone Acquista, dentro il recinto, `spedBadgeCosto()` dice solo
+  QUANTO costa («🚚 Spedizione + 5,00 €»), nella valuta in cui il
+  venditore l'ha DICHIARATA — lì la valuta è la semantica del costo,
+  non una preferenza di lettura, e così non serve nessun «≈». Se la
+  spedizione è gratuita quel badge NON compare: sarebbe la stessa
+  frase del badge di sopra a due dita di distanza (provato con
+  entrambi e tolto). Ritiro e codice online non si nominano mai in
+  nessuno dei due: sono gratuiti per natura. Giudici unici `spedisce`
+  e `spedGratis` — «gratis» si decide in un posto solo, e da lì lo
+  legge anche la card. Con la vecchia riga del costo se n'è andata
   `rigaConsegna` — la riga «🛡️ protezione acquisti inclusa» era
   rumore: la protezione c'è SEMPRE, quindi non è un'informazione, e
   a raccontarla è il recinto escrow. Il dettaglio
@@ -1190,11 +1209,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il prezzo IN PLACE senza riaprire la scheda — openDetail
   azzererebbe pezzi scelti e strada) · sotto, la riga ≈ dell'altra
   valuta · la fila delle pillole, che si apre col badge EVIDENZIATO
-  «🚚 Spedizione disponibile» (`spedBadge()`, coppia azzurra
-  --ship-bg/--ship-text dei badge di stato: AA nei due temi, non
+  della spedizione (`spedBadge()`, coppia azzurra
+  --ship-bg/--ship-text dei badge di stato più il pieno --ship-full
+  per la gratuita: AA nei due temi, non
   fa concorrenza né all'arancio del prezzo né al verde escrow;
   forma da pillola come le vicine — stava accanto al prezzo per un
-  giorno, ma il suo posto sono le caratteristiche) ·
+  giorno, ma il suo posto sono le caratteristiche; i due gradi e il
+  gemello col costo sotto Acquista sono spiegati sopra) ·
   le altre
   strade come pillole discrete · «DESCRIZIONE» col suo titolino
   `.desc-tit` · riquadro venditore SOLO anagrafica: avatar, nome col
@@ -1262,6 +1283,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   insieme deve restare intero. `min-height:17px` sulla riga, che può
   essere vuota del tutto (zona non riconosciuta e nessuna icona) e le
   card resterebbero disallineate.
+  La SPEDIZIONE GRATUITA si vede anche in griglia (lug 2026) senza
+  aggiungere NIENTE alla riga appena ripulita: è la 🚚 di sempre
+  dentro un cerchietto pieno (`.ico .gratis`, lo STESSO token
+  `--ship-full` del badge del dettaglio — di sera si schiarisce con
+  lui, che il legame da tenere è «uguale al badge», non «blu scuro»).
+  Costa 6px e il comune non ne risente. La versione col «gratis»
+  SCRITTO accanto è stata provata e tolta: costava ~24px e nel caso
+  peggiore (gratis + ritiro + codice online, comune lungo) lasciava al
+  luogo 28px, cioè i soli puntini. Il cerchietto da solo non spiega
+  nulla a chi guarda la prima volta — è dichiarato: lo impara aprendo
+  una scheda, dove il badge lo dice a parole.
   Consegna digitale 💾 (lug 2026, quarta voce di MODALITA_CONSEGNA):
   per buoni regalo, codici, licenze — il PRINCIPIO CARDINE è che il
   contenuto passa DENTRO Barattolo, mai fuori. La modalità è LIBERA
@@ -1626,10 +1658,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   questo il client nuovo lo spegne sui set e mostra l'ELENCO).
   Frontend: `sezioneAltriOggetti` in coda a openDetail (striscia
   `.altri-strip` di card dal negozio limit 7, inCatalogo
-  obbligatorio, guard anti-race, fail-open) + bottone «📦 Compra più
-  oggetti in un pacco solo» — MAI il 🫙 nell'etichetta: il barattolo
-  è dei preferiti, il nome del cantiere vive solo nel titolo del
-  foglio `#setSheet` (registrato in closeSheet). Composizione:
+  obbligatorio, guard anti-race, fail-open) + bottone «📦 Riempi il
+  pacco» (lug 2026: la frase lunga «Compra più oggetti in un pacco
+  solo» andava a capo a 360px) — MAI il 🫙 nell'etichetta: il
+  barattolo è dei preferiti, e il nome del cantiere vive solo nel
+  titolo del foglio `#setSheet` (registrato in closeSheet), che dice
+  «🫙 Riempi il barattolo — un pacco, una spedizione». Il bottone
+  porta l'ACCENTO CARTONE: classe `.btn.carton`, token `--carton`
+  (#9A6234 di giorno, #C79A72 di sera — di notte si SCHIARISCE, che
+  un marrone scuro affonderebbe nel fondo bruno dell'app; contrasti
+  5,04 e 5,99, AA in entrambi) su contorno, testo e ombra, con fondo
+  NEUTRO: resta un secondario, l'unico pieno del dettaglio è
+  Acquista. La variante a sfondo pieno è stata provata e scartata in
+  tutti e due i temi — diventava un blocco che gridava quanto il CTA.
+  L'emoji 📦 è già di quel colore per conto suo: nessun glifo si può
+  tingere. Composizione:
   `setScelte` Map id→qta (parte dal pezzo aperto), righe con spunta
   e stepper (i SELEZIONABILI prima: il tetto delle 8 righe non
   taglia mai un compatibile per mostrare uno spento), righe spente
@@ -2102,10 +2145,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   stessa forma e misura, offerta a sinistra) e PIATTI: dentro la
   cornice tratteggiata l'ombra piena 0 3px 0 mangiava il respiro in
   basso e la faceva sembrare scentrata — niente ombre nella barra,
-  la cornice ha 3px d'aria uguali su ogni lato. Il padding-top 10px
-  della barra è l'aria del
-  lucchettino; il bottone a una riga compensa il recinto e l'altezza
-  resta quella della nav.
+  la cornice ha 3px d'aria uguali su ogni lato.
+  GEMELLI DAVVERO (lug 2026, feedback di Andrea: l'arancio veniva
+  fuori 24px più stretto e 10 più basso, e sembrava un tasto minore).
+  Due cause, tutte e due da ricordare: 1) il tratteggio era un
+  `border` con `padding`, che si mangiava 5px per lato — ora è un
+  `outline` con `outline-offset:3px`, che NON occupa layout, quindi
+  il bottone dentro il recinto è grande esattamente quanto il vicino;
+  2) le basi flex erano a 0, e con la base a zero il padding (e il
+  bordo del ghost) si sommano FUORI dalla base — la stessa lezione
+  già pagata sui bottoni Applica/Azzera del pannello Filtri. Ora le
+  basi sono al 50% (con `box-sizing:border-box` globale la base È la
+  misura finale) e col multi-pezzo diventano 60/40 a favore
+  dell'arancio, che lo stepper vuole spazio: si spostano le BASI e
+  non il `grow`, perché a spazio già pieno decide lo shrink, che
+  segue la base. Il lucchettino sta un filo DENTRO l'angolo
+  (`top/left:-12px` contro il tratteggio a -5): centrato sul vertice
+  uscirebbe dalla barra. Il padding della barra (12px sopra, 8 sotto)
+  è l'aria del lucchettino e del tratteggio, e l'altezza resta quella
+  della nav — 61px esatti col pezzo singolo.
+  «Acquista» ha il testo un gradino più grande degli altri bottoni
+  (17px nel recinto, 16 in barra: è il CTA principale dell'app), e in
+  barra lo stepper non porta margine — con la scritta e il chip
+  centrati insieme, un margine in più spingeva «Acquista» a 7px dal
+  bordo sinistro.
   IL VARCO (lug 2026, da una domanda di Andrea che ha trovato un buco
   vero — la barra l'aveva aperto lei): chi tocca Acquista può non
   sapere nulla della consegna, e l'acquisto partiva con la strada del
@@ -2173,6 +2236,55 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   rubi tocchi; a lightbox aperto si nasconde con header e nav
   (`body.lb-aperto`); la scivolatina d'ingresso tace con
   prefers-reduced-motion.
+  IL RECINTO PARLA POCO (lug 2026): dentro l'escrow-zone resta UNA
+  riga — «I tuoi sats restano nel deposito di garanzia finché non
+  confermi di aver ricevuto l'oggetto» — e sotto Acquista il badge
+  col costo di spedizione, quando c'è. Sono uscite: il paragrafo su
+  disputa e moderatore, e la riga «Ricevi una invoice Lightning,
+  paghi con qualsiasi wallet» (troppo lunga, e chi ha un wallet lo sa
+  già). Il «(escrow)» della prima spiegazione lunga se n'è andato con
+  loro: la spiegazione lunga adesso vive nella pagina dedicata (regola
+  9 rispettata, cambia solo dove sta la prima volta). In basso a
+  sinistra il link «Scopri di più» (`.escrow-piede`) la apre: è in
+  INCHIOSTRO e non verde — dentro il recinto il verde era già del
+  bordo, della bandierina e del testo di fiducia, e un quarto verde
+  faceva poltiglia.
+  LA PAGINA «IL PAGAMENTO PROTETTO» (lug 2026, `view-sicurezza`): la
+  spiegazione lunga che il recinto non può contenere — hero col
+  barattolo, cosa succede quando paghi (4 passi), i tempi, la
+  disputa, DOVE IL DEPOSITO NON PUÒ PROTEGGERE (il codice rivelato,
+  nei due sensi: quello che non torna indietro e quello che non
+  funziona; il ritiro a mano; «l'oggetto promesso, non i gusti»), il
+  pagamento Lightning e dove stanno i sats. Markup FISSO e nessun
+  dato utente dentro: mai un `esc()` da ricordare. TRE PORTE —
+  «Scopri di più» nel recinto, la riga di fiducia di Esplora e del
+  negozio (ora un `<button class="trust-line">` col ›: il tour la
+  cerca per classe e la classe non è cambiata), un bottone in fondo
+  al Profilo — e `apriSicurezza()`/`tornaDaSicurezza()` ricordano da
+  dove si veniva (il patto di `tornaDalNegozio`, con la vista di
+  partenza che può essersi svuotata). Vale anche per gli anonimi in
+  vetrina: la fiducia si spiega prima di chiedere di entrare.
+  ATTENZIONE AL TESTO su dove stanno i sats: dice «restano bloccati
+  in un conto Lightning della piattaforma», MAI la parola
+  «custodia» — che in ambito regolatorio ha un peso specifico
+  (decisione di Andrea, da tenere se qualcuno riscrive quel
+  paragrafo; il parere legale MiCA è nel backlog).
+  I TEMPI DELL'ESCROW STANNO IN UN POSTO SOLO (lug 2026): la costante
+  `TEMPI` in cima al JS — `conferma` 72 ore, `autoSblocco` 10 giorni,
+  `confermaDig` 24 ore, `silenzioDig` 48 ore, `invoice` 15 minuti —
+  con accanto la tabella leva-del-config → chiave (ORE_CONFERMA,
+  GIORNI_AUTO_SBLOCCO, ORE_CONFERMA_DIGITALE, ORE_SILENZIO_DIGITALE;
+  la vita della invoice non è una leva, è `expiry: 900` in
+  `crea_invoice_escrow`). Il client NON riceve quei numeri dal
+  server: sono scritti a mano, ed erano sparsi in dodici stringhe
+  (notifiche del pannello ordine, i quattro `confirm`, i toast, la
+  nota digitale, il foglio del varco, la riga del cambio EUR).
+  CHI CAMBIA UNA LEVA NEL CONFIG DEVE CAMBIARE `TEMPI`, e da lì in
+  giù nessun numero di tempo si scrive più a mano. Il markup fisso
+  della pagina porta segnaposto `<span data-tempo="...">` vuoti che
+  riempie `scriviTempi()` all'avvio. (Fuori dal patto, di proposito:
+  «l'anteprima vale 15 minuti» dell'import CSV — è il TTL del
+  biglietto d'import, un'altra leva, che può cambiare da sola.)
   Preferiti «Nel tuo barattolo» (lug 2026): il simbolo è il
   BARATTOLINO 🫙 — MAI il cuore, MAI il fulmine (su Nostr è lo zap).
   Tabella `preferiti(tg_id, annuncio_id, creato, PK)`; toggle
@@ -2896,7 +3008,29 @@ pillole di scelta consegna dal dettaglio (la strada si sceglie nel
 foglio del varco, che diventerà la pagina dedicata del prossimo
 cantiere), forme rettangolari col raggio del riquadro su TUTTI i
 bottoni del dettaglio — riverificate a 360/375/390 nei due temi,
-col varco esercitato dal vivo).
+col varco esercitato dal vivo); il recinto parla poco e la spedizione
+si vede (lug 2026: «Acquista» un gradino più grande e i due tasti
+della barra finalmente gemelli — il tratteggio diventa un outline che
+non occupa layout e le basi flex vanno al 50%, la stessa lezione dei
+bottoni del pannello Filtri; la spedizione a due gradi dello stesso
+azzurro, sopra SE si spedisce [pieno quando è gratuita, che è un
+argomento di vendita] e sotto Acquista solo QUANTO costa, con la 🚚
+cerchiata in vetrina quando è gratis; il recinto ridotto a una riga,
+via la riga sulla invoice, e tutto il resto nella pagina nuova «Il
+pagamento protetto» raggiungibile da tre porte; i tempi dell'escrow
+raccolti nella costante `TEMPI` con la tabella delle leve accanto —
+erano sparsi in dodici stringhe; più «Riempi il pacco» col nuovo
+accento cartone e lo «Scopri di più» in inchiostro. Vedi Architettura
+— collaudato in locale via CDP a 360/375/390 e 1280px nei due temi,
+sui casi spedizione a pagamento / gratuita / ritiro / digitale /
+storico / lampo / multi-pezzo, in vetrina anonima, in DEMO e col
+wallet NWC collegato, con le tre porte e i loro ritorni, il tour
+ancora intero e zero errori JS; contrasti misurati AA su tutti i
+token nuovi. In produzione basta il deploy: nessuna colonna, nessuna
+leva nuova. RESTA DA DECIDERE A RODAGGIO: i testi della pagina sono
+scritti oggi con la commissione sospesa e la protezione spenta —
+quando si accenderanno vanno riletti, in particolare «Se qualcosa va
+storto» e «Dove stanno i sats»).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
