@@ -772,9 +772,22 @@
   .luogo-riga{font-size:13px;color:var(--muted);font-weight:700;margin-top:4px}
   /* il prezzo a sinistra e il toggle della valuta a destra, centrati
      fra loro; la riga ≈ dell'altra valuta sta FUORI, sotto */
-  .prezzo-riga{display:flex;align-items:center;gap:6px 12px;margin-top:10px}
-  .prezzo-riga .detail-price{margin:0;min-width:0}
+  /* Due blocchi: i PREZZI a sinistra (che vanno a capo fra loro se
+     serve) e il toggle valuta ancorato a destra, che non si sposta
+     mai — se a mandarlo a capo fosse lui, la prima riga resterebbe
+     con un buco */
+  .prezzo-riga{display:flex;align-items:center;gap:12px;margin-top:10px}
+  .prezzo-col{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;
+    flex:1 1 auto;min-width:0}
+  .prezzo-col .detail-price{margin:0;min-width:0}
   .prezzo-riga .cur-seg{margin-left:auto;flex:none}
+  /* Il listino barrato della lampo sta ACCANTO al prezzo scontato e
+     quasi grande come lui: sopra, appeso al luogo, sembrava parlare
+     del luogo (feedback di Andrea). Stesso mono del prezzo; se non ci
+     sta — la vista sats fa numeri lunghi — va a capo da solo, ma
+     resta attaccato al prezzo, non al luogo. */
+  .prezzo-col .lampo-was{margin:0;gap:7px;font-size:24px;font-weight:700;
+    font-family:'JetBrains Mono',monospace}
   /* La spedizione sta nella fila delle pillole, con le altre
      caratteristiche, ma EVIDENZIATA: e' l'informazione che converte.
      Forma da pillola come le vicine, colori dalla coppia azzurra dei
@@ -4071,9 +4084,11 @@ function openDetail(id){
       ${dataRiga(l)}
       <div class="titolo-riga"><h2>${esc(l.title)}</h2>${condPill(l.condizione)}</div>
       ${luogoRiga(l)}
-      ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span></div>`:''}
       <div class="prezzo-riga">
-        <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
+        <div class="prezzo-col">
+          <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
+          ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span></div>`:''}
+        </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
              valuta LEGGERE questo annuncio, e la scelta e' la stessa -->
         <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
