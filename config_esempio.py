@@ -45,6 +45,8 @@ PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE
                              # (modello Vinted): % sul solo prezzo articolo,
                              # si aggiunge al conto e resta alla piattaforma.
                              # 0 = spenta
+GIORNI_DATA_ANNUNCIO = 60    # «pubblicato N giorni fa» nel dettaglio:
+                             # oltre questi giorni la riga non si mostra
 ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna
 GIORNI_AUTO_SBLOCCO = 10     # sblocco d'ufficio dopo la spedizione
 SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot

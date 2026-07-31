@@ -338,7 +338,13 @@ def estrai_annuncio(e, valute_stall, cambio):
             # la coppia del tag price: se il listino nasce in EUR la
             # vetrina deve dirlo (valuta/prezzo_eur), non solo i sats
             "valuta_orig": (valuta or "").upper(),
-            "importo_orig": importo}
+            "importo_orig": importo,
+            # la data dell'EVENTO (created_at): per un replaceable e' la
+            # data di pubblicazione vera — finisce in annunci.modificato
+            # e il dettaglio la mostra come «pubblicato N giorni fa»
+            # (annunci.creato resta l'ora dell'import, che ordina la
+            # vetrina e non va toccata)
+            "evento_ts": e.get("created_at", 0)}
 
 
 def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
@@ -435,7 +441,8 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                     "nostr_origine_foto TEXT DEFAULT ''",
                     "nostr_origine_id TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
-                    "prezzo_eur REAL DEFAULT 0"):
+                    "prezzo_eur REAL DEFAULT 0",
+                    "modificato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -643,23 +650,24 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                 "UPDATE annunci SET titolo=?, descrizione=?, zona=?, "
                 "foto=?, contatto_nostr=?, prezzo_sats=?, valuta=?, "
                 "prezzo_eur=?, venditore_id=?, nostr_origine_d=?, "
-                "nostr_origine_foto=?, nostr_origine_id=? WHERE id=?",
+                "nostr_origine_foto=?, nostr_origine_id=?, modificato=? "
+                "WHERE id=?",
                 (a["titolo"], a["descrizione"], a["zona"], foto_loc, npub,
                  a["prezzo_sats"], valuta, prezzo_eur, venditore_id,
                  a["origine_d"], a["origine_foto"], a["origine_id"],
-                 gia[0]))
+                 a["evento_ts"], gia[0]))
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
             continue
         cur = con.execute(
             "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
             "prezzo_sats,zona,foto,contatto_nostr,valuta,prezzo_eur,"
-            "nostr_origine_d,nostr_origine_foto,nostr_origine_id,creato) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "nostr_origine_d,nostr_origine_foto,nostr_origine_id,creato,"
+            "modificato) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (venditore_id, a["titolo"], a["descrizione"], a["categoria"],
              a["prezzo_sats"], a["zona"], a["foto"], npub, valuta,
              prezzo_eur, a["origine_d"], a["origine_foto"],
-             a["origine_id"], int(time.time())))
+             a["origine_id"], int(time.time()), a["evento_ts"]))
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
         foto_loc = localizza_foto(cur.lastrowid, a["foto"])
         if foto_loc != a["foto"]:

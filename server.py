@@ -192,6 +192,14 @@ try:
 except ImportError:
     PROTEZIONE_PERCENTO = 0   # 0 = spenta
 
+# La data di pubblicazione nel dettaglio (lug 2026): «pubblicato 3
+# giorni fa» sotto la foto. Oltre questi giorni la riga sparisce —
+# un annuncio stagionato non deve auto-denunciarsi in vetrina.
+try:
+    from config import GIORNI_DATA_ANNUNCIO
+except ImportError:
+    GIORNI_DATA_ANNUNCIO = 60
+
 # I post automatici (la piattaforma che racconta i fatti) sono nati
 # dopo: i config.py gia' compilati possono non avere le chiavi. I
 # default valgono da soli: post ACCESI (i canali sono giovani, il
@@ -895,7 +903,15 @@ def init_db():
                     # offerte e import valgono gratis). Scala in
                     # verifica_pagamento, risale col rimborso e con la
                     # ricarica del venditore.
-                    "quantita INTEGER DEFAULT 1"):
+                    "quantita INTEGER DEFAULT 1",
+                    # modificato (lug 2026): quando il contenuto e'
+                    # cambiato l'ultima volta (0 = mai). Per i nativi lo
+                    # scrivono modifica() e la modifica firmata; per gli
+                    # importati l'import ci mette la data dell'EVENTO
+                    # Nostr (created_at), che per un replaceable e' la
+                    # data di pubblicazione vera. Serve alla riga
+                    # «pubblicato/aggiornato N giorni fa» del dettaglio.
+                    "modificato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -3452,7 +3468,7 @@ CAMPI_VETRINA = (
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
     # quindi sempre >= 1)
     "a.quantita, "
-    "a.foto, a.contatto_nostr, a.creato, "
+    "a.foto, a.contatto_nostr, a.creato, a.modificato, "
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
     "a.lampo_percento, a.lampo_scadenza, "
@@ -3701,6 +3717,9 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # La soglia minima delle offerte, per l'hint del foglio
         # (stesso patto: mai cifre hardcodate nel client).
         risposta["offerta_minima_percento"] = OFFERTA_MINIMA_PERCENTO
+        # La finestra della riga «pubblicato N giorni fa» del
+        # dettaglio: oltre, la data non si mostra (stesso patto).
+        risposta["giorni_data_annuncio"] = GIORNI_DATA_ANNUNCIO
     con.close()
     return risposta
 
@@ -4274,12 +4293,13 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
         "regione=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
-        "anche_digitale=?, condizione=?, quantita=?, stato=? WHERE id=?",
+        "anche_digitale=?, condizione=?, quantita=?, stato=?, "
+        "modificato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, quantita, "revisione" if in_revisione else "attivo",
-         annuncio_id))
+         int(time.time()), annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -4555,10 +4575,10 @@ async def modifica_firmata(annuncio_id: int, req: Request,
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
-        "regione=? WHERE id=?",
+        "regione=?, modificato=? WHERE id=?",
         (b["titolo"], b["descrizione"], b["categoria"], b["prezzo_sats"],
          b["zona"], b["valuta"], b["prezzo_eur"], lat, lon,
-         regione_da_zona(b["zona"]), annuncio_id))
+         regione_da_zona(b["zona"]), int(time.time()), annuncio_id))
     con.commit()
     con.close()
     # Backstop: l'evento firmato riparte anche da qui verso i relay

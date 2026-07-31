@@ -724,6 +724,27 @@
     font-weight:700;font-size:28px;margin:10px 0 2px}
   .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
   .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
+  /* Il nuovo ordine del dettaglio (lug 2026): data discreta sotto la
+     foto, titolo con la condizione accanto, luogo come testo nudo,
+     prezzo col badge spedizione evidenziato di fianco. */
+  .pub-data{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
+  .titolo-riga{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap}
+  .luogo-riga{font-size:13px;color:var(--muted);font-weight:700;margin-top:4px}
+  /* il prezzo e il badge si spartiscono la riga; se non ci stanno
+     (360px con l'EUR lungo) il badge scende a capo da solo */
+  .prezzo-riga{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;
+    margin:10px 0 12px}
+  .prezzo-riga .detail-price{margin-top:0}
+  .prezzo-riga .eur-hint{margin-bottom:0}
+  /* la coppia azzurra dei badge di stato «spedito»: AA nei due temi,
+     non fa concorrenza ne' all'arancio del prezzo ne' al verde escrow */
+  .sped-badge{background:var(--ship-bg);color:var(--ship-text);
+    border-radius:10px;padding:7px 11px;font-size:13px;font-weight:800;
+    white-space:nowrap}
+  .desc-tit{font-size:11px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.1em;color:var(--muted);margin-top:14px}
+  /* il 🟣 vive nel riquadro venditore: la verifica e' dell'utente */
+  .nostr-riga{color:var(--nostr-text)}
   /* Le due pillole spedizione/ritiro quando l'annuncio offre entrambe */
   /* Lo stepper dei pezzi (cantiere stock): stessa carta delle pillole
      di consegna, compare solo con piu' di un pezzo disponibile */
@@ -2038,13 +2059,31 @@ function tagliaSVG(id, box){
 function luogoTesto(l){
   return l.comune ? `📍 ${esc(l.comune)}` : '';
 }
-function luogoPill(l){                    // fila delle pillole del dettaglio
-  const t = luogoTesto(l);
-  return t ? `<span class="pill">${t}</span>` : '';
+function luogoRiga(l){                    // riga discreta del dettaglio,
+  const t = luogoTesto(l);                // sotto il titolo: testo e basta,
+  return t ? `<div class="luogo-riga">${t}</div>` : '';   // niente pillola
 }
 function luogoPunto(l){                   // code delle righe elenco: « · 📍 X»
   const t = luogoTesto(l);
   return t ? ` · ${t}` : '';
+}
+/* La riga della data sotto la foto del dettaglio (lug 2026): piccola
+   e grigia, in forma relativa. «pubblicato N giorni fa» dalla nascita,
+   «aggiornato N giorni fa» se il venditore l'ha ritoccato dopo; per
+   gli IMPORTATI da Nostr parla la data dell'EVENTO (che per un
+   replaceable e' la pubblicazione vera), sempre col verbo
+   «pubblicato»: di la' un update sostituisce l'evento intero. Oltre
+   `giorniData` giorni (leva dal server, 0 = spenta) non si mostra
+   nulla: un annuncio stagionato non deve auto-denunciarsi. */
+function dataRiga(l){
+  let ts = l.creato, verbo = 'pubblicato';
+  if (l.nostr) ts = l.modificato || l.creato;      // la data dell'evento
+  else if (l.modificato) { ts = l.modificato; verbo = 'aggiornato'; }
+  if (!ts || giorniData <= 0) return '';
+  const g = Math.floor((Date.now()/1000 - ts) / 86400);
+  if (g < 0 || g > giorniData) return '';
+  const quando = g === 0 ? 'oggi' : g === 1 ? 'ieri' : `${g} giorni fa`;
+  return `<div class="pub-data">${verbo} ${quando}</div>`;
 }
 /* Solo per la DEMO, dove non c'e' server a estrarre il comune: si
    prende il pezzo di testo che porta la sigla — il formato che il
@@ -2104,6 +2143,10 @@ function mapListing(a){
     stato:a.stato||'attivo',
     /* i pezzi disponibili (cantiere stock): 1 per gli annunci di ieri */
     quantita:a.quantita||1,
+    /* le date della riga «pubblicato/aggiornato N giorni fa» del
+       dettaglio: modificato = 0 se mai toccato (per gli importati
+       porta la data dell'EVENTO Nostr, che e' la pubblicazione vera) */
+    creato:a.creato||0, modificato:a.modificato||0,
     seller:a.venditore||'—', rating:a.rating||0, sales:a.vendite_ok||0,
     desc:a.descrizione||'—', sellerId:a.venditore_id,
     /* username e npub finiscono dentro stringhe JS negli onclick:
@@ -2319,6 +2362,8 @@ async function loadListings(anonimo){
     protPercento = Number(j.protezione_percento) || 0;
   if (j.offerta_minima_percento !== undefined)
     offertaMinPercento = Number(j.offerta_minima_percento) || 0;
+  if (j.giorni_data_annuncio !== undefined)
+    giorniData = Number(j.giorni_data_annuncio) || 0;
   ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
@@ -2355,9 +2400,12 @@ let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
   {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
-   /* la zona lunga: in card esce il solo comune, nel dettaglio il testo intero */
+   /* la zona lunga: ovunque esce il solo comune, il testo intero
+      resta al form di modifica */
    zone:"Frazione Cassine, Pavia (PV)", comune:"Pavia (PV)",
    regione:"Lombardia", seller:"Massimo R.", rating:4.9, sales:12,
+   /* la data dimostrativa: «pubblicato 3 giorni fa» sotto la foto */
+   creato:Math.floor(Date.now()/1000)-3*86400,
    consegna:"spedizione", sped:7000, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
   {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport e hobby",
@@ -2371,6 +2419,9 @@ let listings = [
    desc:"Tre copie nuove, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
    zone:"Roma (RM)", comune:"Roma (RM)", regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
+   /* nato 10 giorni fa e ritoccato ieri: mostra l'«aggiornato» */
+   creato:Math.floor(Date.now()/1000)-10*86400,
+   modificato:Math.floor(Date.now()/1000)-86400,
    /* la lampo dimostrativa: scadenza calcolata al carico, cosi' il
       badge col countdown si vede anche nella demo coi dati finti */
    lampoPct:20, lampoFine:Math.floor(Date.now()/1000)+5*3600+14*60,
@@ -2380,7 +2431,7 @@ let listings = [
    desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
   /* la zona che NON e' un luogo: nessuna sigla, quindi niente regione —
      in card la riga meta resta muta a sinistra (lo dice il 🚚 a
-     destra), nel dettaglio la pillola mostra il testo com'e' */
+     destra), e nel dettaglio la riga del luogo non c'e' proprio */
   {id:6, emoji:"⚡", title:"Nodo Lightning: Raspberry Pi 4 8GB kit", price:190000, cat:"Elettronica",
    zone:"Spedisco in tutta Italia", seller:"Marco V.", rating:5.0, sales:22,
    consegna:"spedizione", sped:9000, taglia:"piccolo", condizione:"buono",
@@ -2941,6 +2992,11 @@ setInterval(() => {
 /* La percentuale della protezione acquisti: arriva col server nella
    prima pagina della vetrina (oggi 0), mai hardcodata qui. */
 let protPercento = 0;
+/* La finestra della riga «pubblicato N giorni fa» del dettaglio:
+   oltre, la data non si mostra (un annuncio stagionato non deve
+   auto-denunciarsi). La leva vera arriva dal server con la prima
+   pagina; 60 e' solo il ripiego per un server di ieri, 0 = spenta. */
+let giorniData = 60;
 /* I sats di spedizione: spedEur pieno = costo IN EURO (listino EUR,
    oppure l'ancora all'euro dei listini sats) e i sats sono una STIMA
    al cambio vivo — il valore vero si fissa alla creazione
@@ -3085,14 +3141,23 @@ function aggiornaCifreCompra(l){
    il conto scomposto del paySheet, dove la riga «Spedizione» sta
    sopra il Totale. */
 function pilloleModalita(l){
+  /* SENZA la spedizione (lug 2026): quella e' promossa a badge
+     evidenziato accanto al prezzo (spedBadge) — e' l'informazione
+     che converte. Qui restano le strade DISCRETE. */
   const p = [];
-  if (l.consegna==='spedizione' || l.consegna==='entrambe')
-    p.push('<span class="pill">🚚 Spedizione disponibile</span>');
   if (l.consegna==='ritiro' || l.consegna==='entrambe')
     p.push('<span class="pill">🤝 Ritiro in zona</span>');
   if (l.consegna==='digitale' || l.ancheDigitale)
     p.push('<span class="pill">💾 Codice online</span>');
   return p.join('');
+}
+/* Il badge della spedizione accanto al prezzo (lug 2026, stile
+   Subito.it): sfondo evidenziato — la coppia azzurra --ship dei badge
+   di stato «spedito», AA nei due temi — solo se la spedizione e'
+   davvero offerta. */
+function spedBadge(l){
+  return (l.consegna==='spedizione' || l.consegna==='entrambe')
+    ? '<span class="sped-badge">🚚 Spedizione disponibile</span>' : '';
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
@@ -3902,21 +3967,32 @@ function openDetail(id){
   const contatto = mio ? ''            /* il venditore non contatta se stesso */
     : (pontiContatto(l.username, npubPonte, `a ${esc(l.seller.split(' ')[0])}`)
        || `<div class="trust-note">💬 <span>Questo venditore non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'acquisto dall'inizio alla fine.</span></div>`);
+  /* Il nuovo ordine del dettaglio (lug 2026): data discreta sotto la
+     foto → titolo con la condizione accanto → luogo come testo nudo →
+     prezzo col badge spedizione evidenziato (l'informazione che
+     converte) → le altre strade discrete → descrizione col suo titolo
+     → riquadro venditore (dove vive anche il 🟣: la verifica e'
+     dell'utente, non dell'oggetto). Da li' in giu' tutto com'era. */
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
-      <h2>${esc(l.title)}</h2>
+      ${dataRiga(l)}
+      <div class="titolo-riga"><h2>${esc(l.title)}</h2>${condPill(l.condizione)}</div>
+      ${luogoRiga(l)}
       ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span></div>`:''}
-      <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
-      <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
-      ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
-      <div class="pills">
-        ${luogoPill(l)}
-        ${pilloleModalita(l)}
-        ${condPill(l.condizione)}
-        ${(l.quantita||1)>1?`<span class="pill">${l.quantita} disponibili</span>`:''}
-        ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
+      <div class="prezzo-riga">
+        <div class="prezzo-col">
+          <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
+          <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
+        </div>
+        ${spedBadge(l)}
       </div>
+      ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
+      ${(p => p ? `<div class="pills">${p}</div>` : '')(
+        pilloleModalita(l)
+        + ((l.quantita||1)>1?`<span class="pill">${l.quantita} disponibili</span>`:''))}
+      <div class="desc-tit">Descrizione</div>
+      <div class="desc">${esc(l.desc)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         <div class="avatar">${avatarImg(l.avatar)}${esc(l.seller[0])}</div>
         <div class="who"><b>${esc(l.seller)}</b>${
@@ -3925,10 +4001,10 @@ function openDetail(id){
              qui dentro: il bersaglio resta uno solo. */
           sfilzaDistintivi(l.distintivi, 4)}
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
+          ${l.sellerNpubOk?'<div class="rep nostr-riga">🟣 verificato su Nostr</div>':''}
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
-      <div class="desc">${esc(l.desc)}</div>
       ${mio
         ? `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
            ${!(lampoLeve && lampoLeve.attive) ? '' : (lampoAttiva(l)
