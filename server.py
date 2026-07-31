@@ -3372,6 +3372,19 @@ CAMPI_VETRINA = (
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
     "a.anche_digitale, a.condizione, a.regione, "
+    # La zona e' un LUOGO? (lug 2026) — in card il luogo si mostra solo
+    # quando il testo contiene DAVVERO uno dei ~7.900 comuni, cioe'
+    # quando la geocodifica ha attaccato le coordinate. E' questo il
+    # giudice, non la sigla dentro il testo: «Parma» e «Reggio
+    # Emilia» sono luoghi veri anche senza «(PR)» — e gli importati
+    # da Nostr la sigla non ce l'hanno quasi mai, perche'
+    # arricchisci_zone_esistenti li salta apposta. Zero colonne nuove:
+    # lat/lon si scrivono a ogni salvataggio, si ricalcolano ogni ora
+    # per gli importati e hanno il backfill all'avvio. Le coordinate
+    # NON escono (sono il centro del comune, non un indirizzo, ma un
+    # 0/1 pesa meno e dice tutto quello che serve al client).
+    "(CASE WHEN a.lat!=0 OR a.lon!=0 THEN 1 ELSE 0 END) "
+    "AS zona_riconosciuta, "
     # la quantita' e' pubblica per natura: il selettore dei pezzi nel
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
     # quindi sempre >= 1)

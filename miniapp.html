@@ -307,8 +307,9 @@
   .tag-price .price-was .unit{font-size:10.5px}
   /* Nel dettaglio: barrato + badge sopra il prezzo, riga countdown
      sotto. Il badge e' lo STESSO rosso della card (coerenza). Il
-     margine sotto la riga para il -8px inline di rigaConsegna
-     (i margini collassano: 12 + (-8) = 4px d'aria). */
+     margine sotto la riga si scontra con quello delle pillole, che
+     ora la seguono subito: i margini collassano, vince il piu'
+     grande dei due. */
   .lampo-was{display:flex;align-items:center;gap:8px;color:var(--muted);
     font-size:14.5px;margin-bottom:-6px}
   .lampo-was .lampo-badge{background:#C0392B;color:#fff;
@@ -517,8 +518,19 @@
   .price .unit{font-size:10.5px;font-weight:500;color:var(--muted)}
   .price-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
     font-weight:600;margin-top:1px}
-  .card .meta{display:flex;justify-content:space-between;align-items:center;margin-top:5px;
+  /* La riga meta della card: la zona a sinistra, le icone in un
+     gruppo stretto a destra. Il min-height tiene le card allineate
+     anche quando la riga e' vuota del tutto (zona non riconosciuta e
+     nessuna icona); la zona si accorcia coi puntini, il gruppo di
+     icone non si stringe mai — a 360px con tutte e quattro insieme
+     e' lui che deve restare intero. */
+  .card .meta{display:flex;justify-content:space-between;align-items:center;gap:6px;
+    margin-top:5px;min-height:17px;
     font-size:11.5px;color:var(--muted);font-weight:600}
+  .card .meta .luogo{flex:1 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .card .meta .ico{flex:0 0 auto;display:flex;align-items:center;gap:3px;
+    line-height:1}
 
   /* Etichetta di sezione con la linea puntinata che riempie fino al
      conteggio (quando c'e'): IN VETRINA ······· 42 oggetti */
@@ -2000,27 +2012,52 @@ function tagliaSVG(id, box){
     + `<path d="M${x} ${coperchio.toFixed(1)}h${L}"/>`
     + `</svg>`;
 }
-/* La pillola della taglia nel dettaglio: l'icona graduata + le parole
-   del catalogo (una taglia che il client non conosce mostra comunque
-   il suo nome, senza icona). La busta NON e' un pacco, quindi non si
-   fa chiamare «pacco busta» come faceva la vecchia riga. */
-function tagliaPill(id){
-  if (!id) return '';
-  const t = TAGLIE[id];
-  const parole = !t ? esc(id)
-    : (t.lato ? 'pacco ' + t.nome.toLowerCase() : 'busta imbottita');
-  return `<span class="pill">${tagliaSVG(id, 16)} ${parole}</span>`;
+/* La taglia NON si mostra piu' nel dettaglio (lug 2026): al
+   compratore non dice nulla che gli serva — e' roba del venditore,
+   che la sceglie nel form, e del futuro tariffario per-taglia. Il
+   disegno graduato resta vivo nel foglio-picker di Vendi e nella
+   stima del set. */
+/* Il luogo, con DUE rese secondo il posto (lug 2026).
+   Nel DETTAGLIO il valore com'e' stato scritto, anche i testi
+   storici che un luogo non sono («Nord Italia»): chi apre la scheda
+   ha diritto a leggere tutto quello che il venditore ha dichiarato.
+   In CARD invece solo un luogo VERO: lo dice `zona_riconosciuta` del
+   server, cioe' «la geocodifica ci ha trovato dentro un comune dei
+   ~7.900». NON la sigla cercata a mano nel testo — «Parma» e
+   «Reggio Emilia» sono luoghi veri anche senza «(PR)», e gli
+   importati da Nostr la sigla non ce l'hanno quasi mai. I testi che
+   un luogo non sono («Spedisco in tutta Italia», «Nord Italia») in
+   griglia non lasciano nulla al loro posto: la strada di consegna la
+   dicono gia' le icone a destra della stessa riga. */
+function luogoPill(l){
+  return (l.zone && l.zone !== '—')
+    ? `<span class="pill">📍 ${esc(l.zone)}</span>` : '';
 }
-/* Il luogo in card e dettaglio: la zona quando c'e' («Pavia (PV)»
-   cosi' com'e'), altrimenti la strada di consegna — un annuncio
-   solo-spedizione senza luogo e' legittimo (lug 2026: «spedisco in
-   tutta Italia» non vive piu' nel campo Zona, lo dice la consegna). */
-function luogoMeta(l){
-  if (l.zone && l.zone !== '—') return `📍 ${esc(l.zone)}`;
+function luogoCard(l){
+  if (!l.zonaOk || !l.zone || l.zone === '—') return '';
+  return `📍 ${esc(l.zone)}`;
+}
+/* Solo per la DEMO, dove non c'e' server a geocodificare: la sigla
+   nel testo e' l'approssimazione onesta del flag vero (il campo Zona
+   suggerisce comuni nel formato «Comune (SIGLA)»). */
+const zonaOkDemo = z => /\([A-Za-z]{2}\)/.test(z || '') ? 1 : 0;
+/* Le icone della riga meta in card (lug 2026): un gruppo solo,
+   stretto, appoggiato a destra — prima le strade di consegna nello
+   stesso ordine del dettaglio, poi il pallino Nostr. Prima erano
+   figli diretti di un flex `space-between` e si sparpagliavano per
+   tutta la riga; ora a spartirsi lo spazio sono in due, la zona e
+   il gruppo, e a cedere coi puntini e' sempre la zona. */
+function iconeCard(l){
+  let i = '';
   if (l.consegna === 'spedizione' || l.consegna === 'entrambe')
-    return '📦 Spedizione';
-  if (l.consegna === 'digitale' || l.ancheDigitale) return '💾 Online';
-  return '📍 —';
+    i += '<span title="Spedizione disponibile">🚚</span>';
+  if (l.consegna === 'ritiro' || l.consegna === 'entrambe')
+    i += '<span title="Ritiro in zona">🤝</span>';
+  if (l.consegna === 'digitale' || l.ancheDigitale)
+    i += '<span title="Codice inviato online">💾</span>';
+  if (l.sellerNpubOk)
+    i += '<span class="nostr-dot" title="Venditore verificato su Nostr"></span>';
+  return i ? `<span class="ico">${i}</span>` : '';
 }
 function mapListing(a){
   let photos = [], thumbs = [];
@@ -2034,6 +2071,12 @@ function mapListing(a){
     cat:a.categoria, zone:a.zona||'—',
     /* la regione: derivata dalla sigla lato server, '' se non c'e' */
     regione:a.regione||'',
+    /* «la zona e' un luogo vero?» — il flag della vetrina; le rotte
+       che servono l'annuncio per intero (ricerca AI, i tuoi annunci)
+       passano da `a.*` e non hanno l'alias, ma hanno le coordinate,
+       che sono la stessa cosa detta per esteso */
+    zonaOk: a.zona_riconosciuta !== undefined ? !!a.zona_riconosciuta
+                                              : !!(a.lat || a.lon),
     /* la consegna del venditore: '' = annuncio di prima che esistesse,
        nessuna promessa nuova (il dettaglio non mostra la riga) */
     consegna:a.consegna||'', sped:a.spedizione_sats||0,
@@ -2299,34 +2342,38 @@ let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
   {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
-   zone:"Pavia (PV)", regione:"Lombardia", seller:"Massimo R.", rating:4.9, sales:12,
+   zone:"Pavia (PV)", zonaOk:1, regione:"Lombardia", seller:"Massimo R.", rating:4.9, sales:12,
    consegna:"spedizione", sped:7000, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
   {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport e hobby",
-   zone:"Milano (MI)", regione:"Lombardia", seller:"Giulia T.", rating:5.0, sales:7,
+   zone:"Milano (MI)", zonaOk:1, regione:"Lombardia", seller:"Giulia T.", rating:5.0, sales:7,
    consegna:"ritiro", condizione:"buono",
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
   {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
-   zone:"Torino (TO)", regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
+   zone:"Torino (TO)", zonaOk:1, regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
    /* il multi-pezzo dimostrativo: fa vedere stepper e conto × N */
    quantita:3,
    desc:"Tre copie nuove, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
-   zone:"Roma (RM)", regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
+   zone:"Roma (RM)", zonaOk:1, regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
    /* la lampo dimostrativa: scadenza calcolata al carico, cosi' il
       badge col countdown si vede anche nella demo coi dati finti */
    lampoPct:20, lampoFine:Math.floor(Date.now()/1000)+5*3600+14*60,
    desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
   {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e giardino",
-   zone:"Bologna (BO)", regione:"Emilia-Romagna", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
+   zone:"Bologna (BO)", zonaOk:1, regione:"Emilia-Romagna", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
    desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
+  /* la zona che NON e' un luogo: nessuna sigla, quindi niente regione —
+     in card la riga meta resta muta a sinistra (lo dice il 🚚 a
+     destra), nel dettaglio la pillola mostra il testo com'e' */
   {id:6, emoji:"⚡", title:"Nodo Lightning: Raspberry Pi 4 8GB kit", price:190000, cat:"Elettronica",
-   zone:"Firenze (FI)", regione:"Toscana", seller:"Marco V.", rating:5.0, sales:22,
+   zone:"Spedisco in tutta Italia", seller:"Marco V.", rating:5.0, sales:22,
+   consegna:"spedizione", sped:9000, taglia:"piccolo", condizione:"buono",
    desc:"Kit completo: Pi 4, SSD 1TB, case alluminio. Ex nodo, resettato. Not your node… 😉"},
   /* listino in EUR: il prezzo in euro resta fisso, i sats ballano col
      cambio (price = equivalente indicativo, come farebbe il server) */
   {id:7, emoji:"🎲", title:"Catan gioco da tavolo, come nuovo", price:27000, valuta:'eur', priceEur:25, cat:"Altro",
-   zone:"Verona (VR)", regione:"Veneto", seller:"Elisa D.", rating:4.9, sales:11,
+   zone:"Verona (VR)", zonaOk:1, regione:"Veneto", seller:"Elisa D.", rating:4.9, sales:11,
    consegna:"entrambe", spedEur:5, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
 ];
@@ -2516,7 +2563,7 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span>${luogoMeta(l)}</span>${(l.consegna==='spedizione'||l.consegna==='entrambe')?'<span title="Spedizione disponibile">🚚</span>':''}${(l.consegna==='digitale'||l.ancheDigitale)?'<span title="Codice inviato online">💾</span>':''}${l.sellerNpubOk?'<span class="nostr-dot" title="Venditore verificato su Nostr"></span>':''}</div>
+        <div class="meta"><span class="luogo">${luogoCard(l)}</span>${iconeCard(l)}</div>
       </div>
     </div>`; };
 
@@ -2888,18 +2935,9 @@ function satsSpedizione(l){
     return Math.round(l.spedEur / eurPerSat);
   return l.sped||0;
 }
-/* Il costo di spedizione nella valuta di chi guarda: il «≈» sta solo
-   sul convertito (patto di prezzoParte); se il cambio non e' ancora
-   arrivato, il costo ancorato si mostra onestamente in euro. */
-function spedTesto(l){
-  const ancorata = l.spedEur>0;
-  if (valutaVista==='eur')
-    return ancorata ? fmtEur(l.spedEur) + ' €' : '≈ ' + eur(l.sped||0) + ' €';
-  if (ancorata)
-    return cambioVivo ? '≈ ' + fmt(satsSpedizione(l)) + ' sats'
-                      : fmtEur(l.spedEur) + ' €';
-  return fmt(l.sped||0) + ' sats';
-}
+/* (Il costo di spedizione da solo, nella valuta di chi guarda, non
+   si mostra piu' da nessuna parte — lug 2026: la spedizione entra
+   nei conti come sats, dentro i totali e nel conto scomposto.) */
 /* Il prefisso «≈» dei bottoni compra: la cifra e' una stima quando
    l'articolo e' in euro O la spedizione scelta e' ancorata all'euro */
 const stimaCirca = l => (l.valuta==='eur'
@@ -3022,28 +3060,24 @@ function aggiornaCifreCompra(l){
   if (bc) bc.innerHTML = cifraBarra(l);
 }
 /* La consegna nel dettaglio (lug 2026): le strade offerte diventano
-   pillole esplicite nella riga delle pillole («🚚 Spedizione + 4 €»,
-   «🤝 Ritiro in zona», «💾 Codice online») — il 🚚 muto della card
-   qui diventa parola. Il COSTO vive dentro la pillola della
-   spedizione, cosi' la riga sotto il prezzo resta alla sola
-   protezione: nessuna informazione detta due volte (le pillole di
-   SCELTA dentro l'escrow-zone sono un'altra cosa: li' si decide). */
+   pillole esplicite nella riga delle pillole («🚚 Spedizione
+   disponibile», «🤝 Ritiro in zona», «💾 Codice online») — il 🚚
+   muto della card qui diventa parola. Il COSTO non sta piu' qui
+   (lug 2026): una cifra sciolta nella fila delle pillole si legge
+   come un prezzo e basta, senza dire di che totale fa parte. Il
+   posto del costo e' il momento in cui si paga — le pillole di
+   SCELTA dentro l'escrow-zone, che portano il totale per strada, e
+   il conto scomposto del paySheet, dove la riga «Spedizione» sta
+   sopra il Totale. */
 function pilloleModalita(l){
   const p = [];
   if (l.consegna==='spedizione' || l.consegna==='entrambe')
-    p.push(`<span class="pill">${(l.sped>0 || l.spedEur>0)
-      ? `🚚 Spedizione + ${spedTesto(l)}` : '🚚 Spedizione gratuita'}</span>`);
+    p.push('<span class="pill">🚚 Spedizione disponibile</span>');
   if (l.consegna==='ritiro' || l.consegna==='entrambe')
     p.push('<span class="pill">🤝 Ritiro in zona</span>');
   if (l.consegna==='digitale' || l.ancheDigitale)
     p.push('<span class="pill">💾 Codice online</span>');
   return p.join('');
-}
-/* La riga sotto il prezzo: esiste solo se il venditore ha dichiarato
-   la consegna — gli annunci di prima non promettono nulla. */
-function rigaConsegna(l){
-  if (!l.consegna) return '';
-  return `<div class="eur-hint" style="margin-top:-8px">🛡️ protezione acquisti inclusa</div>`;
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
@@ -3861,13 +3895,10 @@ function openDetail(id){
       <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
       <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
       ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
-      ${rigaConsegna(l)}
       <div class="pills">
-        <span class="pill">${luogoMeta(l)}</span>
+        ${luogoPill(l)}
         ${pilloleModalita(l)}
         ${condPill(l.condizione)}
-        ${l.cat?`<span class="pill">${esc(l.cat)}</span>`:''}
-        ${tagliaPill(l.taglia)}
         ${(l.quantita||1)>1?`<span class="pill">${l.quantita} disponibili</span>`:''}
         ${l.sellerNpubOk?'<span class="pill nostr">🟣 verificato su Nostr</span>':''}
       </div>
@@ -7376,7 +7407,8 @@ async function publish(){
       spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
       ancheDigitale:!!cns.anche_digitale,
       condizione:el('sellCond').value, quantita:qtaForm(),
-      zone:el('sellZone').value||'', seller:'Tu', rating:5, sales:0,
+      zone:el('sellZone').value||'', zonaOk:zonaOkDemo(el('sellZone').value),
+      seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
     const r = await fetch(`${API_BASE}/listings`, {
@@ -7442,7 +7474,8 @@ async function salvaModifica(t, p){
         spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
         ancheDigitale:!!cns.anche_digitale,
         condizione:el('sellCond').value, quantita:qtaForm(),
-        zone:el('sellZone').value||'', desc:el('sellDesc').value||'—'});
+        zone:el('sellZone').value||'', zonaOk:zonaOkDemo(el('sellZone').value),
+        desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
   } else {
