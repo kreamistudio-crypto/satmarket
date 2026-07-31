@@ -1482,8 +1482,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dal lug 2026 niente countdown lì — allungava il badge e chiedeva
   un aggiornamento al secondo per ogni card disegnata), cartellino
   col listino barrato; il TEMPO che resta vive solo nella scheda,
-  accanto al badge e fuori da lui: «rimangono 2h 14m»
-  (`.lampo-resta`, colore `--sats-text`) — la vecchia riga «⚡
+  sotto il badge e fuori da lui: «rimangono 2h 14m»
+  (`.lampo-resta`, colore `--sats-text`, `flex-basis:100%` = SEMPRE
+  una riga sua: in euro i tre pezzi ci stavano e in sats no — il
+  barrato «180 000 sats» è largo il doppio di «≈ 166 €» — e la riga
+  cambiava forma secondo la valuta; meglio una riga in più sempre
+  che due rese diverse per la stessa cosa) — la vecchia riga «⚡
   Offerta lampo: ancora…, poi il prezzo torna pieno» è sparita, che
   diceva la stessa cosa due righe sotto. UN solo setInterval per
   tutta l'app aggiorna i `.lampo-count` in-place (ormai uno solo, nel
