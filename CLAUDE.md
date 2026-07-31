@@ -706,9 +706,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   fermo al blur). SENZA ritiro resta facoltativa e la validazione è
   morbida (mai bloccante; niente candidato = niente riga). «Spedisco
   in tutta Italia» non vive più nel campo Zona (è roba della
-  consegna): l'annuncio senza luogo mostra in card/dettaglio
-  «📦 Spedizione» o «💾 Online» via `luogoMeta` (storici = «📍 —»).
-  `suggerisci_comune` = difflib a
+  consegna), ma i testi non-luogo CONTINUANO a entrare da tre porte
+  e nessuna si può chiudere: il form senza ritiro (testo libero per
+  scelta), il CSV senza ritiro (solo un avviso morbido, la riga si
+  crea), e soprattutto l'import Nostr, che prende il tag `location`
+  verbatim e lo riscrive DAI RELAY ogni ora — lì i relay sono la
+  fonte di verità, non possiamo imporgli niente. Per questo il
+  filtro giusto sta in VISUALIZZAZIONE, vedi «La zona si mostra solo
+  se è un luogo» qui sotto. `suggerisci_comune` = difflib a
   soglia 0.8 sugli n-grammi (lunghi prima, primo nel testo a parità,
   come coordinate_da_zona), stoplist `PAROLE_ZONA` (senza, «spedisco»
   suggeriva Sedico BL — successo davvero), cache pigra `_comuni_fuzzy`
@@ -734,6 +739,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (gemella del backfill coordinate, idempotente): solo i
   riconoscibili, MAI gli importati da Nostr (contatto_nostr pieno:
   la loro zona la riscrive l'import orario dai relay).
+  La zona si mostra solo se è un LUOGO (lug 2026): siccome i testi
+  non-luogo entrano comunque (le tre porte dette sopra), la CARD
+  mostra il 📍 solo quando la zona contiene davvero un comune —
+  «Spedisco in tutta Italia» e «Nord Italia» non lasciano NULLA al
+  loro posto (la strada di consegna la dicono già le icone accanto:
+  il vecchio ripiego `luogoMeta` «📦 Spedizione»/«💾 Online»/«📍 —»
+  non esiste più). Nel DETTAGLIO invece il valore resta visibile
+  com'è stato scritto: chi apre la scheda ha diritto a leggere tutto
+  quello che il venditore ha dichiarato. Le due rese sono
+  `luogoCard` e `luogoPill`.
+  IL CRITERIO SONO LE COORDINATE, NON LA SIGLA — e vale la pena
+  raccontare perché, che il prossimo cantiere non rifaccia il giro.
+  La sigla dentro il testo sembra la strada ovvia (`arricchisci_zona`
+  ce la mette apposta, e un `regione != ''` sarebbe stato gratis: la
+  regione È derivata dalla sigla). I dati veri l'hanno bocciata: in
+  produzione c'era un annuncio con zona `Parma` — un comune vero,
+  senza sigla — perché `arricchisci_zona` normalizza SOLO al
+  salvataggio da form/CSV, e la migrazione `arricchisci_zone_esistenti`
+  SALTA APPOSTA gli importati da Nostr. Col criterio-sigla sarebbe
+  sparito dalla vetrina il grosso del catalogo importato, che la
+  sigla non ce l'ha quasi mai, più gli alias («Reggio Emilia») e i
+  contesi («Castro»). Le coordinate invece dicono esattamente la
+  cosa giusta — «il testo contiene uno dei ~7.900 comuni» — si
+  scrivono a OGNI salvataggio, si ricalcolano ogni ora per gli
+  importati e hanno il backfill all'avvio. Quindi `CAMPI_VETRINA`
+  espone `zona_riconosciuta` = `CASE WHEN a.lat!=0 OR a.lon!=0`:
+  zero colonne nuove, zero migrazioni, e le coordinate NON escono
+  (sono il centro del comune, non un indirizzo, ma un 0/1 pesa meno
+  e dice tutto quello che serve). Le rotte che servono l'annuncio
+  INTERO (`/api/search`, `/api/listings/miei`) passano da `a.*` e
+  l'alias non ce l'hanno, ma hanno lat/lon: `mapListing` calcola
+  `zonaOk` dall'uno o dalle altre, ed è l'unico posto che lo sa. In
+  DEMO non c'è server che geocodifichi e l'approssimazione onesta è
+  `zonaOkDemo` (la sigla nel testo — lì il campo Zona suggerisce
+  «Comune (SIGLA)» e va benissimo).
   La REGIONE è DERIVATA (lug 2026): non è un campo del form e non si
   chiede MAI al venditore — si ricava dalla sigla che `arricchisci_zona`
   ha già messo nella zona. `regione_da_zona` prende la PRIMA sigla
@@ -979,10 +1019,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   acquistabile e l'articolo sats non dipende mai dal cambio; i sats
   espliciti battono l'ancora; 3) listino EUR = tutto ancorato per
   natura, articolo e spedizione convertiti INSIEME all'acquisto.
-  In vetrina/dettaglio il controvalore sats dell'ancorato è una STIMA
-  live («≈», `satsSpedizione`/`spedTesto` keyed su spedEur>0, ripiego
-  onesto in € se il cambio del client manca; prefisso ≈ dei bottoni
-  via `stimaCirca`); il valore vero si fissa alla creazione
+  Nei conti il controvalore sats dell'ancorato è una STIMA
+  live («≈», `satsSpedizione` keyed su spedEur>0; prefisso ≈ dei
+  bottoni via `stimaCirca`) — dal lug 2026 il costo di spedizione da
+  solo non si mostra più da nessuna parte, e con lui se n'è andato
+  `spedTesto`: la spedizione entra nei totali e nel conto scomposto,
+  sempre in sats; il valore vero si fissa alla creazione
   dell'ordine. Nel NIP-99 spedizione_eur piena parla euro. Gli annunci
   del breve periodo «convertito alla pubblicazione» hanno
   spedizione_eur=0 e restano fissi (caso 1). E `taglia_pacco`
@@ -1043,12 +1085,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dettaglio con le PILLOLE DELLE MODALITÀ (lug 2026, dopo il feedback
   di Andrea: il 🚚 muto della card qui diventa parola) —
   `pilloleModalita()` scrive una pillola per ogni strada offerta
-  («🚚 Spedizione + X» col costo DENTRO la pillola nella valuta della
-  vista via `spedTesto`, o «🚚 Spedizione gratuita»; «🤝 Ritiro in
-  zona»; «💾 Codice online») e per questo `rigaConsegna` è rimasta la
-  sola «🛡️ protezione acquisti inclusa»: la stessa cosa non si dice
-  due volte (resta gatata su `l.consegna`, gli storici non promettono
-  nulla). Più la pillola della taglia, che dal lug 2026 porta la SCALA
+  («🚚 Spedizione disponibile», «🤝 Ritiro in zona», «💾 Codice
+  online»). SENZA il costo (lug 2026): una cifra sciolta tra le
+  pillole si legge come un prezzo e non dice di che totale fa parte
+  — il posto del costo è il momento del pagamento, dove c'era già
+  (foglio «Come vuoi riceverlo?» col totale per strada, riga
+  «Spedizione» del `contoScomposto`, e il totale dei bottoni compra
+  che la spedizione l'ha sempre inclusa). Con lei se n'è andata
+  `rigaConsegna` — la riga «🛡️ protezione acquisti inclusa» era
+  rumore: la protezione c'è SEMPRE, quindi non è un'informazione, e
+  a raccontarla è il recinto escrow. Il dettaglio dal lug 2026
+  mostra SOLO: luogo (se c'è) · consegna · condizione ·
+  disponibilità (se >1) · verifica Nostr. NON la categoria (ci si
+  arriva dai filtri) e NON la taglia del pacco (è roba del
+  venditore e del futuro tariffario per-taglia, al compratore non
+  serve lì; via anche `tagliaPill`).
+  Il disegno della taglia — che vive ancora nel foglio-picker di
+  Vendi e nella stima del set — dal lug 2026 porta la SCALA
   DISEGNATA: `tagliaSVG(id, box)` invece delle emoji, perché 📦 era la
   stessa per piccolo, medio e grande e la gradazione non si vedeva.
   L'ingombro resta fisso (viewBox 22x22 per tutte le voci) e la
@@ -1060,12 +1113,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `currentColor` come `jarSVG` (chiaro e scuro gratis) con un velo
   dello stesso colore che dà corpo; la busta è un oggetto suo — piatta
   con la piega a V — non una scatola piccola, e nella pillola
-  `tagliaPill()` non si fa più chiamare «pacco busta» ma «busta
+  la busta, nei testi, non si fa chiamare «pacco busta» ma «busta
   imbottita». Scartate le emoji scalate via CSS: cambiano forma da un
   sistema all'altro, non seguono i token del tema e crescendo spostano
   le righe. `box` è solo la misura resa (22 nel foglio-picker e nel
-  campo, 16 nella pillola: il viewBox non cambia, quindi il rapporto
-  fra le taglie resta identico). Per
+  campo: il viewBox non cambia, quindi il rapporto fra le taglie
+  resta identico a ogni misura). Per
   'entrambe' due pillole spedizione/ritiro DENTRO l'escrow-zone
   (`consegnaScelta`, si riparte da spedizione a ogni dettaglio; la
   cifra dei bottoni è `totaleStima`); conto scomposto
@@ -1074,8 +1127,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   consegna+quote, pannello «🤝 Consegna in zona» con
   `markConsegnaMano` al posto di corriere/tracking, `payoutPanel` e
   testa released = totale − protezione; checkbox «🚚 Solo con
-  spedizione» nei filtri (in DEMO client-side in renderGrid); 🚚
-  discreto nella meta della card — il prezzo in griglia resta pulito.
+  spedizione» nei filtri (in DEMO client-side in renderGrid); icone
+  discrete nella meta della card — il prezzo in griglia resta pulito.
+  LA RIGA META DELLA CARD (lug 2026): la zona a sinistra, le icone
+  in un GRUPPO stretto a destra (`iconeCard` → `<span class="ico">`,
+  ordine 🚚 🤝 💾 + pallino Nostr, lo stesso del dettaglio; il 🤝
+  del ritiro prima in card non c'era). Prima erano figli diretti di
+  un flex `space-between` e si sparpagliavano per tutta la riga; ora
+  a spartirsi lo spazio sono in due, e a cedere coi puntini è SEMPRE
+  la zona (`.luogo` con `flex:1 1 auto` + `min-width:0`) mentre il
+  gruppo non si stringe mai — a 360px con tutte e quattro le icone
+  insieme deve restare intero. `min-height:17px` sulla riga, che ora
+  può essere vuota del tutto (zona non riconosciuta e nessuna icona)
+  e le card resterebbero disallineate.
   Consegna digitale 💾 (lug 2026, quarta voce di MODALITA_CONSEGNA):
   per buoni regalo, codici, licenze — il PRINCIPIO CARDINE è che il
   contenuto passa DENTRO Barattolo, mai fuori. La modalità è LIBERA
@@ -1112,7 +1176,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   digitale attiva (su una combo non deve spaventare chi sceglie la
   spedizione, `setConsegnaScelta` la accende/spegne); la pillola
   «💾 Codice online» di `pilloleModalita` (che ha sostituito il vecchio
-  «o 💾 codice online» dentro `rigaConsegna`); in card 🚚 e 💾 possono
+  «o 💾 codice online» della riga sotto il prezzo, `rigaConsegna`,
+  poi sparita del tutto); in card 🚚, 🤝 e 💾 possono
   convivere. ATTENZIONE a non confonderle: le pillole di
   `pilloleConsegna` stanno DENTRO l'escrow-zone e SI TOCCANO (il
   compratore sceglie la strada), quelle di `pilloleModalita` stanno
@@ -2592,7 +2657,20 @@ il pezzo a metà composizione; in produzione va provato un set vero
 dentro Telegram con le notifiche reali; gli SCONTI SET alla Vinted
 sono il cantierino successivo, deciso: la preparazione è
 l'invariante articolo = Σ unitario×qta, lo sconto sarà una voce di
-testata).
+testata); card più stretta e dettaglio spogliato (lug 2026: in card
+le icone si raggruppano a destra e la zona si mostra solo se è un
+LUOGO vero — il criterio sono le coordinate, non la sigla, e il
+perché sta scritto in Architettura col caso «Parma», che serve al
+prossimo cantiere; nel dettaglio restano luogo, consegna,
+condizione, disponibilità e Nostr, mentre escono categoria, taglia
+del pacco, «protezione acquisti inclusa» e il costo dalla pillola
+della spedizione, che vive già nel foglio della consegna e nel conto
+scomposto; superficie API: `zona_riconosciuta` in CAMPI_VETRINA,
+derivata da lat/lon, zero colonne nuove — in produzione basta il
+riavvio, non c'è migrazione da aspettare — vedi Architettura;
+collaudato in locale a 360/375/390 e 1280px, chiaro e scuro, con sei
+annunci di prova per i casi di zona e le quattro superfici che
+servono le card).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
