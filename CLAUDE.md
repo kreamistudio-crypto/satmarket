@@ -1476,13 +1476,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (keyset (lampo_scadenza,id) ASC = chi scade prima in testa, IMPLICA
   il filtro; indice idx_annunci_lampo), leve in /api/me.lampo_leve.
   Frontend: `lampoAttiva`/`conLampo` (vista scontata del listino,
-  gemello client di _prezzo_lampo)/`lampoResta`; badge «⚡ −20%
-  2h 14m» in alto a sinistra sulla foto (colori fissi nei due temi,
-  MAI animazioni: patto reduced-motion), cartellino e dettaglio col
-  listino barrato + riga countdown; UN solo setInterval per tutta
-  l'app aggiorna i `.lampo-count` in-place e allo zero fa
-  renderGrid + riapertura del dettaglio in sconto (tutto torna
-  normale da solo anche a pagina aperta); `artStima` passa da
+  gemello client di _prezzo_lampo)/`lampoResta`; in CARD il badge
+  dice la SOLA percentuale «⚡ −20%», in alto a sinistra sulla foto
+  (colori fissi nei due temi, MAI animazioni: patto reduced-motion;
+  dal lug 2026 niente countdown lì — allungava il badge e chiedeva
+  un aggiornamento al secondo per ogni card disegnata), cartellino
+  col listino barrato; il TEMPO che resta vive solo nella scheda,
+  accanto al badge e fuori da lui: «rimangono 2h 14m»
+  (`.lampo-resta`, colore `--sats-text`) — la vecchia riga «⚡
+  Offerta lampo: ancora…, poi il prezzo torna pieno» è sparita, che
+  diceva la stessa cosa due righe sotto. UN solo setInterval per
+  tutta l'app aggiorna i `.lampo-count` in-place (ormai uno solo, nel
+  dettaglio) e allo zero fa renderGrid + riapertura della scheda in
+  sconto — che riconosce dal BARRATO ancora in pagina (`.lampo-was`,
+  la sentinella era la riga sparita). La griglia non ha più contatori
+  da leggere ma deve comunque tornare a prezzo pieno da sola: ci
+  pensa `prossimaLampo`, la prima scadenza fra le card disegnate,
+  riscritta in fondo a `renderGrid` — un numero da confrontare invece
+  di frugare nel DOM ogni secondo; `artStima` passa da
   conLampo col min sull'accordo (bottoni compra e conto scomposto
   parlano da soli la cifra scontata); foglio `#lampoSheet` del
   proprietario (chip dalle leve, durate a pillole, anteprima
