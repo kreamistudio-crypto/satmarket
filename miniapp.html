@@ -659,40 +659,42 @@
     position:fixed;bottom:0;left:0;right:0;z-index:30;
     background:var(--nav-bg);backdrop-filter:blur(10px);
     border-top:1px solid var(--line);display:none;gap:10px;align-items:stretch;
-    padding:5px var(--pad) calc(5px + env(safe-area-inset-bottom));
+    padding:10px var(--pad) calc(6px + env(safe-area-inset-bottom));
     max-width:520px;margin:0 auto;
   }
-  /* misure tirate: la barra deve essere alta quanto la nav che
-     sostituisce. Qui i bottoni perdono la pillola: rettangolari col
-     raggio del riquadro venditore (--radius), per coerenza di carta */
+  /* Misure tirate: la barra resta alta quanto la nav che sostituisce
+     (il bottone a una riga compensa il recinto attorno). Rettangolari
+     col raggio del riquadro venditore, per coerenza di carta. */
   #barraCompra .btn{margin-top:0;width:auto;line-height:1.25;
-    border-radius:var(--radius)}
-  #bcCompra{flex:1;min-width:0;font-size:15px;padding:7px 10px 8px}
-  /* l'etichetta non va mai a capo: a 360px stringe coi puntini */
-  #bcCompra .bc-lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-  /* La riga della cifra e' un flex: il NUMERO non si stringe mai
-     (bc-num), a cedere coi puntini e' la strada (bc-via) — serve solo
-     nel caso estremo strada+lampo+EUR a 360px */
-  #bcCompra .cifra{font-size:13px;white-space:nowrap;display:flex;
-    align-items:baseline;justify-content:center;gap:4px;min-width:0;max-width:100%}
-  #bcCompra .bc-num{flex:none}
-  /* la strada parla Nunito (il mono resta ai numeri) */
-  #bcCompra .bc-via{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;
-    overflow:hidden;text-overflow:ellipsis;min-width:0}
+    border-radius:var(--radius);white-space:nowrap}
+  /* Il richiamo dell'escrow SOLO attorno ad Acquista: stesso verde e
+     stesso tratteggio del recinto in pagina, in formato francobollo.
+     Il lucchettino sta a cavallo del bordo in alto a sinistra, mai
+     sopra il testo (il bottone ha il suo padding). Il padding-top di
+     10px della barra e' la sua aria: cosi' non esce dalla barra. */
+  .bc-recinto{position:relative;flex:1;min-width:0;display:flex;
+    border:2px dashed var(--trust);border-radius:calc(var(--radius) + 4px);
+    padding:3px}
+  .bc-recinto .btn{flex:1;min-width:0}
+  .bc-lucchetto{position:absolute;top:-9px;left:12px;z-index:1;
+    width:19px;height:19px;border-radius:999px;background:var(--trust);
+    color:var(--on-trust);display:flex;align-items:center;justify-content:center;
+    font-size:10px;box-shadow:0 1px 0 var(--trust-deep)}
+  #bcCompra{font-size:15.5px;padding:8px 10px 9px}
   #bcOfferta{flex:0 0 auto;font-size:14px;padding:8px 14px}
   @media (max-width:767.98px){
     body.con-barra nav{display:none}
     body.con-barra #barraCompra{display:flex;animation:barraSu .18s ease}
-    /* i due gemelli in pagina si spengono: il recinto resta il posto
-       delle spiegazioni, della scelta di consegna e del Compra subito
-       NWC (che e' un'altra strada, non un doppione) */
-    body.con-barra .escrow-zone .btn.ghost.compra,
-    body.con-barra .escrow-zone .btn.ghost.compra + .escrow-note,
-    body.con-barra .escrow-zone .off-cta{display:none}
   }
   @keyframes barraSu{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
 
   /* ---------- dettaglio annuncio ---------- */
+  /* Coerenza di forme (lug 2026): nel dettaglio OGNI bottone-oggetto
+     e' rettangolare col raggio del riquadro venditore — Acquista,
+     Fai un'offerta, Compra subito NWC, Metti nel barattolo, i tasti
+     del proprietario e il set. I testuali (link/danger-ghost) non
+     hanno forma e non c'entrano. La barra ha la sua regola gemella. */
+  #detailContent .btn{border-radius:var(--radius)}
   .detail-ph{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
     font-size:84px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 12px,var(--ph-b) 12px 24px)}
   .detail-body{padding:18px var(--pad)}
@@ -841,11 +843,13 @@
     box-shadow:0 2px 0 var(--trust-deep)}
   .escrow-zone .trust-note{background:none;padding:6px 0 0;margin-bottom:10px;color:var(--trust-note)}
   .escrow-note{text-align:center;font-size:12px;color:var(--trust-sub);font-weight:700;margin-top:6px}
-  /* Se «Compra subito» manca, il primo bottone del recinto (l'escrow)
-     eredita da solo il ruolo di CTA primaria: zero JS */
-  .escrow-zone .btn:first-of-type{background:var(--sats);color:#fff;border:0;
-    box-shadow:0 3px 0 var(--sats-deep);margin-top:4px}
-  .escrow-zone .btn:first-of-type:active{transform:translateY(2px);box-shadow:0 1px 0 var(--sats-deep)}
+  /* La coppia d'acquisto nel recinto: «Acquista» arancio pieno +
+     «Fai un'offerta» neutro, affiancati — la stessa coppia della
+     barra fissa, che qui scorre con la pagina. Il vecchio trucco
+     :first-of-type (il ghost promosso a CTA quando il Compra subito
+     NWC mancava) non serve piu': Acquista e' arancio per classe. */
+  .coppia-acquisto{display:flex;gap:10px;margin-top:10px}
+  .coppia-acquisto .btn{width:auto;flex:1;margin-top:0;white-space:nowrap}
   /* Bottoni-oggetto: pillola con l'ombra piena 3px sotto, come una
      cosa fisica appoggiata sul banco. Su :active si abbassa. */
   .btn{
@@ -1713,10 +1717,15 @@
        (solo mobile, la regia e' aggiornaBarraCompra). I bottoni chiamano
        le stesse strade dei gemelli in pagina, guardie comprese. -->
   <div id="barraCompra">
-    <!-- Verde trust (la palette dell'escrow, AA sui due temi) e forma
-         rettangolare col raggio del riquadro venditore: la veste e'
-         nel CSS della barra, le strade restano quelle dei gemelli -->
-    <button class="btn primary compra" id="bcCompra" onclick="compraDaBarra()"></button>
+    <!-- «Acquista» arancio ₿ (il CTA di casa), nudo: niente prezzo —
+         il conto vivra' nella pagina dedicata del prossimo cantiere.
+         Attorno SOLO a lui il richiamo dell'escrow: contorno
+         tratteggiato verde col lucchettino a cavallo del bordo, la
+         firma del recinto che si ripete dove si compra. -->
+    <div class="bc-recinto">
+      <span class="bc-lucchetto" aria-hidden="true">🔒</span>
+      <button class="btn orange" id="bcCompra" onclick="compraDaBarra()">Acquista</button>
+    </div>
     <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">Fai un'offerta</button>
   </div>
 
@@ -3055,19 +3064,12 @@ function sceltaConsegna(l){
   if (!s.length) return '';
   return s.includes(consegnaScelta) ? consegnaScelta : s[0];
 }
-/* Le pillole di scelta: compaiono solo con almeno due strade
-   (l'erede del vecchio ramo 'entrambe', che ora e' un caso tra i tanti) */
-function pilloleConsegna(l){
-  const s = stradeConsegna(l);
-  if (s.length < 2) return '';
-  const nome = v => v==='spedizione'
-    ? '🚚 Spedizione' + ((l.sped>0||l.spedEur>0) ? '' : ' gratuita')
-    : v==='ritiro' ? '🤝 Ritiro in zona' : '💾 Codice online';
-  const att = sceltaConsegna(l);
-  return `<div class="consegna-scelta">` + s.map(v =>
-    `<button class="consegna-pill${v===att?' attiva':''}" data-v="${v}" onclick="setConsegnaScelta('${v}')">${nome(v)}</button>`
-  ).join('') + `</div>`;
-}
+/* Le pillole di SCELTA consegna non vivono piu' nel dettaglio
+   (lug 2026): la strada si sceglie nel foglio «Come vuoi riceverlo?»
+   che Acquista apre quando le strade sono almeno due — e domani
+   nella pagina dedicata. In pagina restano solo le pillole
+   INFORMATIVE (spedBadge + pilloleModalita): dicono cosa c'e',
+   non chiedono di scegliere. */
 /* La STIMA del totale da pagare (articolo + spedizione se scelta +
    protezione): i sats veri li dice la risposta di POST /orders.
    Se ho un'offerta ACCETTATA su questo annuncio, l'articolo della
@@ -3110,27 +3112,23 @@ function contoScomposto(art, sped, prot, tot, qta){
        + (sped>0 ? r(sped, 'Spedizione') : '')
        + (prot>0 ? r(prot, 'Protezione acquisti') : '') + r(tot, 'Totale', 1);
 }
-/* Il tocco sulle pillole spedizione/ritiro: aggiorna la scelta e le
-   cifre sui bottoni compra, senza ridisegnare il dettaglio. */
+/* La scelta della strada, oggi solo dal foglio «Come vuoi
+   riceverlo?»: aggiorna la nota digitale e le cifre del Compra
+   subito NWC senza ridisegnare il dettaglio. */
 function setConsegnaScelta(v){
   consegnaScelta = v; consegnaEsplicita = true; haptic();
-  document.querySelectorAll('#detailContent .consegna-pill').forEach(b =>
-    b.classList.toggle('attiva', b.dataset.v === v));
   /* l'avviso asimmetrico segue la SCELTA: su una combo non deve
      spaventare chi prende la strada fisica */
   const nd = el('notaDigitale');
   if (nd) nd.style.display = v==='digitale' ? '' : 'none';
   if (currentListing) aggiornaCifreCompra(currentListing);
 }
-/* Le cifre sui bottoni compra e sulla barra, riscritte a ogni tocco
-   su pillole e stepper senza ridisegnare il dettaglio (cifraBarra e'
-   markup, quindi innerHTML — dentro ci passano solo i nostri
-   cataloghi, mai testo utente). */
+/* Le cifre sui bottoni compra che ancora le portano (il solo Compra
+   subito NWC: Acquista e' nudo per scelta), riscritte a ogni tocco
+   su foglio e stepper senza ridisegnare il dettaglio. */
 function aggiornaCifreCompra(l){
   document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
     s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
-  const bc = document.querySelector('#bcCompra .cifra');
-  if (bc) bc.innerHTML = cifraBarra(l);
 }
 /* La consegna nel dettaglio (lug 2026): le strade offerte diventano
    pillole esplicite nella riga delle pillole («🚚 Spedizione
@@ -3493,18 +3491,9 @@ let hintPubblicazione = null;
    dice anche COME: mai un acquisto con la consegna decisa in silenzio.
    E' markup (la strada non e' mono), quindi va in innerHTML: dentro
    ci passano solo i nostri cataloghi, mai testo utente. */
-const NOMI_VIA = {spedizione:'🚚 Spedizione', ritiro:'🤝 Ritiro', digitale:'💾 Codice'};
-const cifraBarra = l => {
-  const att = sceltaConsegna(l);
-  /* coi pezzi scelti >1 la barra lo dice («× 2»): la cifra e' il
-     totale e non deve leggersi come prezzo del singolo */
-  const pz = qtaScelta > 1 ? ` × ${qtaScelta}` : '';
-  const via = (stradeConsegna(l).length >= 2 || att === 'digitale')
-    ? `<span class="bc-via">${NOMI_VIA[att]}${pz} ·</span>`
-    : (pz ? `<span class="bc-via">${qtaScelta} pezzi ·</span>` : '');
-  return `${via}<span class="bc-num">${lampoAttiva(l) ? '⚡ ' : ''}${
-    stimaCirca(l)}${fmt(totaleStima(l))} sats</span>`;
-};
+/* La barra non porta piu' cifre ne' strade (lug 2026): «Acquista» e'
+   nudo, il conto e la scelta vivono nel foglio di oggi e nella
+   pagina dedicata di domani. Il vecchio cifraBarra e' morto qui. */
 /* Il varco della barra: chi tocca «Compra» dalla barra puo' non aver
    mai incontrato le pillole spedizione/ritiro (la barra si raggiunge
    senza scorrere). Con piu' strade e scelta ancora IMPLICITA si apre
@@ -3554,7 +3543,7 @@ function apriFoglioConsegna(){
   (el('pickerLista').querySelector('.sel') || el('pickerLista').firstElementChild)?.focus();
 }
 function scegliConsegnaFoglio(v){
-  setConsegnaScelta(v);   /* pillole, cifre, nota digitale e haptic: tutto li' */
+  setConsegnaScelta(v);   /* cifre NWC, nota digitale e haptic: tutto li' */
   /* chiusura MIRATA, mai closeSheet: spegnerebbe la pila intera e
      azzererebbe il pollTimer del pagamento che sta per partire */
   chiudiPicker();
@@ -3572,9 +3561,9 @@ function aggiornaBarraCompra(view){
   const su = view==='dettaglio' && !!l && !mio && (l.stato||'attivo')==='attivo';
   document.body.classList.toggle('con-barra', su);
   if (!su) return;
-  el('bcCompra').innerHTML =
-    `<span class="bc-lab">🔒 Acquista</span><span class="cifra">${cifraBarra(l)}</span>`;
-  /* con un accordo gia' stretto l'offerta non si rifa': come in pagina */
+  /* «Acquista» e' testo statico nel markup: qui si decide solo se
+     l'offerta si puo' (ri)fare — con un accordo stretto no, come in
+     pagina */
   el('bcOfferta').style.display = offertaAccettataPer(l.id) ? 'none' : '';
 }
 
@@ -4012,18 +4001,18 @@ function openDetail(id){
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
         : `<div class="escrow-zone">
              <span class="escrow-flag">🔒 pagamento protetto</span>
-             <!-- niente 🔒 qui: lo dicono gia' la pillola e il bottone -->
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
-             ${pilloleConsegna(l)}
              ${(l.quantita||1) > 1 ? `<div class="qta-riga"><span class="qta-lab">Quantità</span><div class="qta-step"><button type="button" id="qtaMeno" onclick="setQta(-1)" aria-label="Un pezzo in meno" disabled>−</button><span class="qta-num mono" id="qtaNum">1</span><button type="button" id="qtaPiu" onclick="setQta(1)" aria-label="Un pezzo in più">+</button></div></div>` : ''}
              ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai 24 ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <button class="btn ghost compra" onclick="startBuy()">🔒 Compra in sicurezza<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
+             <div class="coppia-acquisto">
+               <button class="btn orange" onclick="compraDaBarra()">Acquista</button>
+               ${offAcc ? '' : `<button class="btn ghost" onclick="apriOfferta()">Fai un'offerta</button>`}
+             </div>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
-             ${offAcc ? '' : `<button class="btn ghost off-cta" onclick="apriOfferta()">💰 Fai un'offerta</button>`}
            </div>`}
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)
