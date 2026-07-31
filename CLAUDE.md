@@ -1161,17 +1161,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore e del futuro tariffario per-taglia, al compratore non
   serve lì; via anche `tagliaPill`).
   RIORDINO DEL DETTAGLIO (lug 2026, stile Subito.it): dall'alto —
-  foto · riga data `dataRiga()` («pubblicato/aggiornato N giorni
-  fa», piccola e grigia, `.pub-data`) · titolo con la pillola
-  condizione accanto (`.titolo-riga`, flex che a titolo lungo manda
-  la pillola a capo) · luogo come TESTO nudo `luogoRiga()` (niente
-  pillola) · prezzo con di fianco il badge EVIDENZIATO
+  foto · riga data `dataRiga()` (piccola e grigia, `.pub-data`): il
+  «quando» e basta, «3 giorni fa» — la pubblicazione NON si nomina
+  (a quel posto non può voler dire altro), il verbo resta solo
+  all'«aggiornato N giorni fa», che è un fatto diverso · titolo con
+  la pillola condizione ACCANTO (`.titolo-riga`: è il titolo a
+  stringersi e andare a capo per farle posto — `h2{flex:1 1 0;
+  min-width:min-content}`, perché con la base `auto` di serie il
+  flex-wrap mandava a capo la PILLOLA prima di stringere il titolo,
+  e finiva sempre sotto; scende sotto solo quando non ci sta
+  neanche accanto alla parola più lunga) · luogo come TESTO nudo
+  `luogoRiga()` (niente pillola) · prezzo, e a DESTRA sulla stessa
+  riga il toggle valuta €/₿ (`.prezzo-riga`, gemello di quello
+  della searchbar: stesso `setValuta`, stessa preferenza; i due si
+  accendono insieme perché `aggiornaCurToggle` li pesca per
+  `data-cur` e non più per id, e `aggiornaPrezzoDettaglio` riscrive
+  il prezzo IN PLACE senza riaprire la scheda — openDetail
+  azzererebbe pezzi scelti e strada) · sotto, la riga ≈ dell'altra
+  valuta · la fila delle pillole, che si apre col badge EVIDENZIATO
   «🚚 Spedizione disponibile» (`spedBadge()`, coppia azzurra
   --ship-bg/--ship-text dei badge di stato: AA nei due temi, non
   fa concorrenza né all'arancio del prezzo né al verde escrow;
-  `.prezzo-riga` = SOLO prezzo grande + badge, centrati tra loro —
-  la riga ≈ dell'altra valuta sta FUORI, sotto, o il badge finirebbe
-  a mezza via tra le due; flex-wrap: se non ci sta scende a capo) ·
+  forma da pillola come le vicine — stava accanto al prezzo per un
+  giorno, ma il suo posto sono le caratteristiche) ·
   le altre
   strade come pillole discrete · «DESCRIZIONE» col suo titolino
   `.desc-tit` · riquadro venditore SOLO anagrafica: avatar, nome col
@@ -1635,10 +1647,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ["price","40.00","EUR"]) e content coerente — importa_nostr sa già
   rileggere quel formato. Ricerca AI: la riga di catalogo porta
   entrambe le valute. Frontend: toggle ₿/€ nella searchbar di
-  Esplora (`valutaVista` in localStorage['barattolo_valuta']),
+  Esplora e — dal lug 2026 — un gemello nella riga del prezzo del
+  DETTAGLIO (`valutaVista` in localStorage['barattolo_valuta'], una
+  sola preferenza per tutti e due),
   `prezzoParte(l)` rende la valuta dello spettatore grande e l'altra
   piccola sotto — il «≈» sta SEMPRE e solo sul prezzo convertito, mai
-  sul listino; `cambioVivo` + re-render della griglia all'arrivo del
+  sul listino. L'unità non porta più uno spazio nel markup: l'aria la
+  dà `.unit{margin-left:4px}`, e il SIMBOLO € (`.unit.eur`) sta più
+  stretto e nel dettaglio quasi grande quanto la cifra — un simbolo
+  di valuta appartiene al numero, la parola «sats» no (feedback di
+  Andrea: il € pareva una nota a piè di pagina). Le migliaia si
+  separano con lo spazio stretto unificatore U+202F in `fmt`
+  (l'escape, mai il carattere: nel sorgente sarebbe invisibile): con
+  lo spazio normale il mono di casa spezzava «905 000» in due blocchi
+  lontani, e questo per giunta non va mai a capo a metà numero.
+  `cambioVivo` + re-render della griglia all'arrivo del
   cambio CoinGecko; form Vendi col suffisso-bottone sats/€
   (`sellValuta`, virgola decimale tradotta); paySheet e conferma NWC
   mostrano la stima «≈» e poi i sats VERI da `prezzo_sats` della

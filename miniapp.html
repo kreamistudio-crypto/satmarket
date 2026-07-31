@@ -516,6 +516,11 @@
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}
   .price{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700;font-size:14px;margin-top:6px}
   .price .unit{font-size:10.5px;font-weight:500;color:var(--muted)}
+  /* l'aria fra numero e unita' la da' il CSS, non uno spazio nel
+     markup: cosi' il simbolo € puo' stare piu' stretto della parola
+     «sats» (vedi .detail-price .unit.eur) */
+  .unit{margin-left:4px}
+  .unit.eur{margin-left:2px}
   .price-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
     font-weight:600;margin-top:1px}
   /* La riga meta della card: la zona a sinistra, le icone in un
@@ -742,23 +747,41 @@
   .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
     font-weight:700;font-size:28px;margin:10px 0 2px}
   .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
+  /* Il € e' un SIMBOLO, non una parola: sta attaccato alla cifra e
+     grande quasi quanto lei, o sembra una nota a pie' di pagina
+     (feedback di Andrea). «sats» resta piccolo e muted: quello e' un
+     nome, e ripeterlo grosso ruberebbe l'occhio al numero. */
+  .detail-price .unit.eur{font-size:20px;color:var(--sats-deep);
+    font-weight:700;margin-left:2px}
   .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
   /* Il nuovo ordine del dettaglio (lug 2026): data discreta sotto la
      foto, titolo con la condizione accanto, luogo come testo nudo,
      prezzo col badge spedizione evidenziato di fianco. */
   .pub-data{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
-  .titolo-riga{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap}
+  /* La condizione sta ACCANTO al titolo, allineata alla sua prima
+     riga: e' il TITOLO a stringersi e andare a capo per farle posto
+     (`flex:1 1 0` — con la base `auto` di serie il browser mandava a
+     capo la pillola PRIMA di stringere il titolo, e finiva sempre
+     sotto). Scende sotto solo quando neanche la parola piu' lunga
+     del titolo ci sta accanto (`min-width:min-content` + wrap). */
+  .titolo-riga{display:flex;flex-wrap:wrap;align-items:baseline;
+    gap:4px 10px}
+  .titolo-riga h2{flex:1 1 0;min-width:min-content}
+  .titolo-riga .pill{flex:none;font-size:12px;padding:4px 11px;
+    white-space:nowrap}
   .luogo-riga{font-size:13px;color:var(--muted);font-weight:700;margin-top:4px}
-  /* il prezzo e il badge sulla STESSA riga, centrati tra loro (la
-     riga ≈ dell'altra valuta sta FUORI, sotto); se non ci stanno
-     (360px con l'EUR lungo) il badge scende a capo da solo */
-  .prezzo-riga{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;
-    margin-top:10px}
-  .prezzo-riga .detail-price{margin:0}
-  /* la coppia azzurra dei badge di stato «spedito»: AA nei due temi,
-     non fa concorrenza ne' all'arancio del prezzo ne' al verde escrow */
+  /* il prezzo a sinistra e il toggle della valuta a destra, centrati
+     fra loro; la riga ≈ dell'altra valuta sta FUORI, sotto */
+  .prezzo-riga{display:flex;align-items:center;gap:6px 12px;margin-top:10px}
+  .prezzo-riga .detail-price{margin:0;min-width:0}
+  .prezzo-riga .cur-seg{margin-left:auto;flex:none}
+  /* La spedizione sta nella fila delle pillole, con le altre
+     caratteristiche, ma EVIDENZIATA: e' l'informazione che converte.
+     Forma da pillola come le vicine, colori dalla coppia azzurra dei
+     badge «spedito» (AA nei due temi, non fa concorrenza all'arancio
+     del prezzo ne' al verde dell'escrow). */
   .sped-badge{background:var(--ship-bg);color:var(--ship-text);
-    border-radius:10px;padding:7px 11px;font-size:13px;font-weight:800;
+    border-radius:999px;padding:6px 12px;font-size:13px;font-weight:800;
     white-space:nowrap}
   .desc-tit{font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.1em;color:var(--muted);margin-top:14px}
@@ -1376,8 +1399,8 @@
           <span class="q-lente" aria-hidden="true">🔍</span>
           <input id="q" type="search" enterkeyhint="search" placeholder="Cerca su Barattolo…">
           <div class="cur-seg" id="curSeg" title="Mostra i prezzi in euro o in sats">
-            <button type="button" id="curEur" onclick="setValuta('eur')">€</button>
-            <button type="button" id="curSats" onclick="setValuta('sats')">₿</button>
+            <button type="button" id="curEur" data-cur="eur" onclick="setValuta('eur')">€</button>
+            <button type="button" id="curSats" data-cur="sats" onclick="setValuta('sats')">₿</button>
           </div>
         </div>
       </form>
@@ -2122,14 +2145,18 @@ function luogoPunto(l){                   // code delle righe elenco: « · 📍
    `giorniData` giorni (leva dal server, 0 = spenta) non si mostra
    nulla: un annuncio stagionato non deve auto-denunciarsi. */
 function dataRiga(l){
-  let ts = l.creato, verbo = 'pubblicato';
+  /* La pubblicazione non si nomina (lug 2026): sotto la foto basta
+     il «quando», che a quel posto non puo' voler dire altro. Il
+     verbo resta SOLO all'aggiornamento, che e' un fatto diverso e
+     senza la parola si leggerebbe come una data di nascita falsa. */
+  let ts = l.creato, verbo = '';
   if (l.nostr) ts = l.modificato || l.creato;      // la data dell'evento
-  else if (l.modificato) { ts = l.modificato; verbo = 'aggiornato'; }
+  else if (l.modificato) { ts = l.modificato; verbo = 'aggiornato '; }
   if (!ts || giorniData <= 0) return '';
   const g = Math.floor((Date.now()/1000 - ts) / 86400);
   if (g < 0 || g > giorniData) return '';
   const quando = g === 0 ? 'oggi' : g === 1 ? 'ieri' : `${g} giorni fa`;
-  return `<div class="pub-data">${verbo} ${quando}</div>`;
+  return `<div class="pub-data">${verbo}${quando}</div>`;
 }
 /* Solo per la DEMO, dove non c'e' server a estrarre il comune: si
    prende il pezzo di testo che porta la sigla — il formato che il
@@ -2501,7 +2528,13 @@ let activeCat = "Tutto", currentListing = null, currentOrder = null;
 let vetrina = listings;
 
 /* ---------------- helpers ---------------- */
-const fmt = n => n.toLocaleString('it-IT').replace(/\./g,' ');
+/* Le migliaia si separano con lo spazio STRETTO unificatore (U+202F,
+   lug 2026): quello normale nel mono di casa e' largo un carattere
+   pieno e spezzava il numero in blocchi lontani («905 000»); questo
+   e' la meta' e per giunta non si spezza mai a fine riga. Il punto
+   dell'it-IT non si puo' tenere: accanto ai decimali con la virgola
+   («38,50 €») si leggerebbe come un separatore decimale. */
+const fmt = n => n.toLocaleString('it-IT').replace(/\./g,'\u202F');
 /* Scudo anti-XSS: OGNI testo scritto da un utente (titoli, nomi,
    descrizioni, tracking...) passa da qui prima di entrare in un
    template innerHTML. Trasforma i caratteri speciali in entita'
@@ -2961,10 +2994,27 @@ function setValuta(v){
   try { localStorage.setItem(VALUTA_CHIAVE, v); } catch(e){}
   aggiornaCurToggle();
   renderGrid();
+  aggiornaPrezzoDettaglio();   // se una scheda e' aperta, segue anche lei
 }
+/* I toggle valuta sono due (searchbar e dettaglio) e vanno accesi
+   insieme: si pescano per `data-cur`, non per id */
 function aggiornaCurToggle(){
-  el('curEur')?.classList.toggle('active', valutaVista==='eur');
-  el('curSats')?.classList.toggle('active', valutaVista==='sats');
+  document.querySelectorAll('.cur-seg button[data-cur]').forEach(b =>
+    b.classList.toggle('active', b.dataset.cur === valutaVista));
+}
+/* Il prezzo del dettaglio aperto, riscritto in place al cambio di
+   valuta: MAI riaprire la scheda (openDetail azzererebbe i pezzi
+   scelti e la strada di consegna). Solo nostro markup in innerHTML. */
+function aggiornaPrezzoDettaglio(){
+  const l = currentListing;
+  if (!l || !el('view-dettaglio')?.classList.contains('active')) return;
+  const p = prezzoParte(conLampo(l));
+  const grande = document.querySelector('#detailContent .detail-price');
+  if (grande) grande.innerHTML = p.big;
+  const piccolo = document.querySelector('#detailContent .eur-hint');
+  if (piccolo) piccolo.innerHTML = p.small;
+  const barrato = document.querySelector('#detailContent .lampo-was s');
+  if (barrato) barrato.innerHTML = prezzoParte(l).big;   // il listino pieno
 }
 /* I sats di un annuncio: per i listini EUR e' l'equivalente al cambio
    vivo (col cambio di pubblicazione, l.price, come ripiego). L'importo
@@ -2978,11 +3028,15 @@ function prezzoParte(l){
   const inEur = l.valuta==='eur' && l.priceEur>0;
   const sats = satsAnnuncio(l);
   const eurTesto = inEur ? fmtEur(l.priceEur) : eur(l.price);
+  /* niente spazio nel markup: l'aria fra numero e unita' la da' il
+     margine CSS, che per il simbolo € (classe `eur`) e' piu' stretto
+     — un simbolo di valuta sta attaccato alla cifra, la parola
+     «sats» no */
   if (valutaVista==='eur') return {
-    big: (inEur?'':'≈ ') + eurTesto + ' <span class="unit">€</span>',
+    big: (inEur?'':'≈ ') + eurTesto + '<span class="unit eur">€</span>',
     small: (inEur?'≈ ':'') + fmt(sats) + ' sats' };
   return {
-    big: (inEur?'≈ ':'') + fmt(sats) + ' <span class="unit">sats</span>',
+    big: (inEur?'≈ ':'') + fmt(sats) + '<span class="unit">sats</span>',
     small: (inEur?'':'≈ ') + eurTesto + ' €' };
 }
 /* ---------------- offerta lampo: lo sconto a tempo ----------------
@@ -4020,12 +4074,17 @@ function openDetail(id){
       ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span></div>`:''}
       <div class="prezzo-riga">
         <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
-        ${spedBadge(l)}
+        <!-- il gemello del toggle della vetrina: qui si sceglie in che
+             valuta LEGGERE questo annuncio, e la scelta e' la stessa -->
+        <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+          <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+          <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+        </div>
       </div>
       <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
       ${lampoAttiva(l)?`<div class="lampo-riga">⚡ <b>Offerta lampo</b>: ancora <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b>, poi il prezzo torna pieno</div>`:''}
       ${(p => p ? `<div class="pills">${p}</div>` : '')(
-        pilloleModalita(l)
+        spedBadge(l) + pilloleModalita(l)
         + ((l.quantita||1)>1?`<span class="pill">${l.quantita} disponibili</span>`:''))}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${esc(l.desc)}</div>
@@ -4066,6 +4125,7 @@ function openDetail(id){
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
     </div>`;
+  aggiornaCurToggle();   // il toggle valuta appena nato dice la verita'
   /* La riga di onboarding appesa alla scheda dell'annuncio appena
      pubblicato: una volta sola, e solo su QUEL annuncio */
   if (hintPubblicazione) {
