@@ -760,8 +760,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Spedisco in tutta Italia» o «Nord Italia» non lasciano NULLA al
   loro posto — la strada di consegna la dicono già le icone accanto,
   e il vecchio ripiego `luogoMeta` «📦 Spedizione»/«💾 Online»/«📍 —»
-  non esiste più. `luogoTesto` dice la regola, `luogoPill` (pillola
-  del dettaglio) e `luogoPunto` (coda « · 📍 X» delle righe elenco,
+  non esiste più. `luogoTesto` dice la regola, `luogoRiga` (riga
+  discreta sotto il titolo del dettaglio — era `luogoPill`, la
+  pillola è morta col riordino del dettaglio, vedi sotto) e
+  `luogoPunto` (coda « · 📍 X» delle righe elenco,
   col separatore che sparisce insieme al luogo: mai un puntino
   orfano) la vestono — tre rese che non possono divergere, la stessa
   idea del cuore unico qui sotto. Il dato NON si perde: la zona resta
@@ -1137,9 +1139,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   costo (stessa valuta del listino, `consegnaPayload`) + taglia;
   dettaglio con le PILLOLE DELLE MODALITÀ (lug 2026, dopo il feedback
   di Andrea: il 🚚 muto della card qui diventa parola) —
-  `pilloleModalita()` scrive una pillola per ogni strada offerta
-  («🚚 Spedizione disponibile», «🤝 Ritiro in zona», «💾 Codice
-  online»). SENZA il costo (lug 2026): una cifra sciolta tra le
+  `pilloleModalita()` scrive una pillola per le strade DISCRETE
+  («🤝 Ritiro in zona», «💾 Codice online»); la SPEDIZIONE dal
+  riordino del dettaglio (sotto) non sta più lì: è il badge
+  evidenziato `spedBadge()` accanto al prezzo. SENZA il costo
+  (lug 2026): una cifra sciolta tra le
   pillole si legge come un prezzo e non dice di che totale fa parte
   — il posto del costo è il momento del pagamento, dove c'era già
   (foglio «Come vuoi riceverlo?» col totale per strada, riga
@@ -1147,12 +1151,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che la spedizione l'ha sempre inclusa). Con lei se n'è andata
   `rigaConsegna` — la riga «🛡️ protezione acquisti inclusa» era
   rumore: la protezione c'è SEMPRE, quindi non è un'informazione, e
-  a raccontarla è il recinto escrow. Il dettaglio dal lug 2026
-  mostra SOLO: luogo (se c'è) · consegna · condizione ·
-  disponibilità (se >1) · verifica Nostr. NON la categoria (ci si
+  a raccontarla è il recinto escrow. Il dettaglio
+  mostra SOLO: data · luogo (se c'è) · consegna · condizione ·
+  disponibilità (se >1) · verifica Nostr (nel riquadro venditore).
+  NON la categoria (ci si
   arriva dai filtri) e NON la taglia del pacco (è roba del
   venditore e del futuro tariffario per-taglia, al compratore non
   serve lì; via anche `tagliaPill`).
+  RIORDINO DEL DETTAGLIO (lug 2026, stile Subito.it): dall'alto —
+  foto · riga data `dataRiga()` («pubblicato/aggiornato N giorni
+  fa», piccola e grigia, `.pub-data`) · titolo con la pillola
+  condizione accanto (`.titolo-riga`, flex che a titolo lungo manda
+  la pillola a capo) · luogo come TESTO nudo `luogoRiga()` (niente
+  pillola) · prezzo con di fianco il badge EVIDENZIATO
+  «🚚 Spedizione disponibile» (`spedBadge()`, coppia azzurra
+  --ship-bg/--ship-text dei badge di stato: AA nei due temi, non
+  fa concorrenza né all'arancio del prezzo né al verde escrow;
+  `.prezzo-riga` flex-wrap: se non ci sta scende a capo) · le altre
+  strade come pillole discrete · «DESCRIZIONE» col suo titolino
+  `.desc-tit` · riquadro venditore, dove vive la riga
+  «🟣 verificato su Nostr» (`.nostr-riga`: la verifica è
+  dell'utente, non dell'oggetto — via la pillola dalla fila
+  dell'annuncio). Da lì in giù tutto com'era (recinto, altri
+  oggetti, barra). LA DATA: colonna `annunci.modificato` (0 = mai
+  toccato) scritta da modifica() e dalla modifica firmata; per gli
+  IMPORTATI l'import ci mette la data dell'EVENTO Nostr
+  (`evento_ts` = created_at, che per un replaceable è la
+  pubblicazione vera) su INSERT e UPDATE, e il client la mostra
+  sempre come «pubblicato» (l'update di là sostituisce l'evento
+  intero; `creato` resta l'ora dell'import e ordina la vetrina,
+  NON va toccato: il cursore keyset ci vive sopra). Leva
+  `GIORNI_DATA_ANNUNCIO` (60, 0 = spenta) nella busta di PRIMA
+  pagina come protezione_percento: oltre, la riga sparisce — un
+  annuncio stagionato non deve auto-denunciarsi. `a.modificato` in
+  CAMPI_VETRINA (search e miei gratis via a.*).
   Il disegno della taglia — che vive ancora nel foglio-picker di
   Vendi e nella stima del set — dal lug 2026 porta la SCALA
   DISEGNATA: `tagliaSVG(id, box)` invece delle emoji, perché 📦 era la
@@ -2744,7 +2776,17 @@ Architettura per il vincolo del cuore unico `_chiave_comune`, che
 serve al prossimo cantiere. Collaudato con 16 casi mirati più
 l'invariante su tutto il dataset [7.904 comuni × 3 forme], 9 casi
 TestClient sulla guardia, l'anteprima CSV, i 6 stati della riga di
-hint e il gate end-to-end contando le POST).
+hint e il gate end-to-end contando le POST); riordino del dettaglio
+annuncio stile Subito.it (lug 2026: data relativa sotto la foto con la
+colonna `annunci.modificato` e la leva GIORNI_DATA_ANNUNCIO, titolo
+con la condizione accanto, luogo come testo nudo, badge azzurro
+«Spedizione disponibile» accanto al prezzo con le altre strade
+discrete, titolino «Descrizione», e il 🟣 dentro il riquadro
+venditore, vedi Architettura — collaudato in locale via CDP a
+360/375/390 e 1280px nei due temi e con reduced-motion, sui casi
+senza luogo / senza spedizione / solo digitale / lampo attiva /
+annuncio storico; in produzione basta il riavvio, la migrazione gira
+da sola).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
