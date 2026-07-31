@@ -2722,19 +2722,27 @@ def carica_comuni():
         print(f"🗺️ Comuni non caricati ({e}): avvisi solo non-geografici")
 
 
-def coordinate_da_zona(zona: str) -> tuple[float, float]:
-    """Estrae le coordinate dal testo libero della zona. Scansione
-    degli n-grammi dal piu' lungo al piu' corto ('San Valentino in
-    Abruzzo Citeriore' prima di 'Abruzzo'), a parita' vince il primo
-    nel testo (la gente scrive prima il proprio paese: 'tra Pavia e
-    Milano' -> Pavia). 'vicino Milano' -> Milano: il raggio
-    dell'avviso assorbe il 'vicino'. (0,0) = non riconosciuta."""
+def _chiave_comune(zona: str) -> str:
+    """Il comune riconosciuto dentro il testo libero della zona, reso
+    come CHIAVE normalizzata ('' = nessuno). Scansione degli n-grammi
+    dal piu' lungo al piu' corto ('San Valentino in Abruzzo
+    Citeriore' prima di 'Abruzzo'), a parita' vince il primo nel testo
+    (la gente scrive prima il proprio paese: 'tra Pavia e Milano' ->
+    Pavia). 'vicino Milano' -> Milano: il raggio dell'avviso assorbe
+    il 'vicino'.
+    E' il cuore CONDIVISO di coordinate_da_zona (che ne prende le
+    coordinate) e comune_da_zona (che ne prende il nome per la
+    vetrina): un solo scanner, quindi i due non possono divergere —
+    se la card mostra un luogo, quel luogo ha di sicuro le sue
+    coordinate, e viceversa. arricchisci_zona invece NON passa di qui
+    e tiene il suo giro: a lei serve la POSIZIONE del comune nel
+    testo, che il secondo passaggio senza preposizioni perde."""
     token = normalizza(zona).split()
     if not token or not COMUNI:
-        return (0.0, 0.0)
+        return ""
     intera = " ".join(token)
     if intera in COMUNI:            # zona = esattamente un comune,
-        return COMUNI[intera]       # vale anche per i COMUNI_PAROLA
+        return intera               # vale anche per i COMUNI_PAROLA
 
     def scandisci(parole):
         for lung in range(min(6, len(parole)), 0, -1):
@@ -2743,15 +2751,21 @@ def coordinate_da_zona(zona: str) -> tuple[float, float]:
                 if lung == 1 and chiave in COMUNI_PAROLA:
                     continue
                 if chiave in COMUNI:
-                    return COMUNI[chiave]
-        return None
+                    return chiave
+        return ""
 
-    trovato = scandisci(token)
-    if trovato is None:             # secondo giro senza preposizioni:
+    trovata = scandisci(token)
+    if not trovata:                 # secondo giro senza preposizioni:
         asciutti = [p for p in token if p not in PREPOSIZIONI_COMUNI]
         if asciutti and asciutti != token:
-            trovato = scandisci(asciutti)
-    return trovato or (0.0, 0.0)
+            trovata = scandisci(asciutti)
+    return trovata
+
+
+def coordinate_da_zona(zona: str) -> tuple[float, float]:
+    """Le coordinate del comune riconosciuto nella zona, (0,0) se non
+    ce n'e' uno."""
+    return COMUNI.get(_chiave_comune(zona), (0.0, 0.0))
 
 
 # Parole di zona che non sono MAI un comune storpiato: senza questa
@@ -2781,6 +2795,46 @@ def _comuni_fuzzy() -> dict:
 
 
 _COMUNI_FUZZY = None
+_COMUNI_NOME = None
+
+
+def _comuni_nome() -> dict:
+    """OGNI chiave che carica_comuni ha registrato -> «Nome (SIGLA)».
+    Il gemello largo di _comuni_fuzzy, che invece tiene i soli nomi
+    nudi perche' li' sono i CANDIDATI del difflib: qui servono anche
+    la chiave nome+sigla («torino to», quando la sigla e' gia' nel
+    testo) e gli alias senza preposizioni («reggio emilia»), o il
+    comune riconosciuto resterebbe senza un nome da mostrare.
+    Costruita pigra una volta."""
+    global _COMUNI_NOME
+    if _COMUNI_NOME is None:
+        _COMUNI_NOME = {}
+        for c in COMUNI_LISTA:
+            bello = f"{c['nome']} ({c['provincia']})"
+            chiave = normalizza(c["nome"])
+            chiavi = (chiave,
+                      normalizza(f"{c['nome']} {c['provincia']}"),
+                      " ".join(p for p in chiave.split()
+                               if p not in PREPOSIZIONI_COMUNI))
+            for k in chiavi:
+                # solo le chiavi vive in COMUNI (i contesi sono fuori)
+                # e il primo che arriva vince, come in _comuni_fuzzy
+                if k and k in COMUNI and k not in _COMUNI_NOME:
+                    _COMUNI_NOME[k] = bello
+    return _COMUNI_NOME
+
+
+def comune_da_zona(zona: str) -> str:
+    """Il comune riconosciuto nella zona, nella forma canonica del
+    dataset «Nome (SIGLA)» — '' se il testo non ne contiene nessuno.
+    E' quello che la CARD mostra al posto del testo intero: «Torino
+    (TO) spedisco in tutta Italia» -> «Torino (TO)», «Frazione
+    Salsasio, Carmagnola (TO)» -> «Carmagnola (TO)», «vicino Milano»
+    -> «Milano (MI)». Nessun indovinello: esce solo cio' che il
+    dizionario riconosce, e il nome e' quello UFFICIALE (un alias
+    come «Reggio Emilia» esce «Reggio nell'Emilia (RE)», e guadagna
+    la sigla che arricchisci_zona non aveva saputo aggiungere)."""
+    return _comuni_nome().get(_chiave_comune(zona), "")
 
 
 def suggerisci_comune(testo: str) -> str:
@@ -3235,28 +3289,50 @@ def quantita_tollerante(testo) -> int:
     return max(1, min(n, MAX_QUANTITA_ANNUNCIO))
 
 
+def messaggio_zona_storta(zona: str) -> str:
+    """Il «non ti ho capito» del campo Zona, col suggerimento quando
+    il fuzzy ne ha uno. Uno solo, cosi' form, import e client dicono
+    tutti la stessa cosa."""
+    sugg = suggerisci_comune(zona)
+    return ("Nel campo Zona ci vuole un comune italiano: scegline uno "
+            "dall'elenco che compare mentre scrivi, oppure lascialo "
+            "vuoto" + (f" — forse {sugg}?" if sugg else " (es. «Pavia (PV)»)"))
+
+
 def guardia_zona_condizione(d: dict, consegna: str) -> str:
     """Le due regole del form Vendi (lug 2026), giudice unico di
     pubblica e modifica: la condizione e' OBBLIGATORIA (client E
     server: senza, niente pubblica — gli storici restano com'erano,
-    ma alla prima modifica si mettono in regola), e chi offre il
-    RITIRO deve avere in zona un comune riconosciuto dei ~7.900 —
-    basta che il testo lo CONTENGA («Frazione Salsasio, Carmagnola
-    (TO)» passa: la scansione a n-grammi trova il comune). Senza
-    dataset la regola geografica si spegne da sola (fail-open, come
-    il resto della geografia). La modifica firmata degli importati
-    NON passa di qui: quei campi il form non li offre proprio.
+    ma alla prima modifica si mettono in regola), e la ZONA, se c'e',
+    dev'essere un LUOGO — basta che il testo CONTENGA uno dei ~7.900
+    comuni («Frazione Salsasio, Carmagnola (TO)» passa: la scansione
+    a n-grammi trova il comune), ma «spedisco in tutta Italia» no.
+    Due severita' diverse (lug 2026):
+      - col RITIRO la zona e' OBBLIGATORIA (chi viene a ritirare deve
+        sapere dove);
+      - senza ritiro resta FACOLTATIVA — chi spedisce e basta puo'
+        lasciarla vuota, e l'icona 🚚 in card lo dice gia' — ma se la
+        compila dev'essere vera. Prima qui passava tutto e il campo
+        diventava un secondo posto dove scrivere la spedizione: e' da
+        li' che nascono le zone non-luogo che la vetrina deve poi
+        nascondere.
+    Senza dataset la regola geografica si spegne da sola (fail-open,
+    come il resto della geografia). La modifica firmata degli
+    importati NON passa di qui: quei campi il form non li offre
+    proprio, e la loro zona la riscrivono i relay.
     Ritorna la condizione validata."""
     condizione = condizione_valida(d.get("condizione"))
     if not condizione:
         raise HTTPException(400, "Indica le condizioni dell'oggetto")
-    if consegna in ("ritiro", "entrambe") and COMUNI:
-        zona = (d.get("zona") or "").strip()
-        if not zona or coordinate_da_zona(zona) == (0.0, 0.0):
+    zona = (d.get("zona") or "").strip()
+    if COMUNI:
+        if consegna in ("ritiro", "entrambe") and not zona:
             raise HTTPException(400, "Per il ritiro in zona serve un "
                                      "comune valido: scegli il tuo dai "
                                      "suggerimenti del campo Zona "
                                      "(es. «Pavia (PV)»)")
+        if zona and coordinate_da_zona(zona) == (0.0, 0.0):
+            raise HTTPException(400, messaggio_zona_storta(zona))
     return condizione
 
 
@@ -3372,19 +3448,6 @@ CAMPI_VETRINA = (
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
     "a.anche_digitale, a.condizione, a.regione, "
-    # La zona e' un LUOGO? (lug 2026) — in card il luogo si mostra solo
-    # quando il testo contiene DAVVERO uno dei ~7.900 comuni, cioe'
-    # quando la geocodifica ha attaccato le coordinate. E' questo il
-    # giudice, non la sigla dentro il testo: «Parma» e «Reggio
-    # Emilia» sono luoghi veri anche senza «(PR)» — e gli importati
-    # da Nostr la sigla non ce l'hanno quasi mai, perche'
-    # arricchisci_zone_esistenti li salta apposta. Zero colonne nuove:
-    # lat/lon si scrivono a ogni salvataggio, si ricalcolano ogni ora
-    # per gli importati e hanno il backfill all'avvio. Le coordinate
-    # NON escono (sono il centro del comune, non un indirizzo, ma un
-    # 0/1 pesa meno e dice tutto quello che serve al client).
-    "(CASE WHEN a.lat!=0 OR a.lon!=0 THEN 1 ELSE 0 END) "
-    "AS zona_riconosciuta, "
     # la quantita' e' pubblica per natura: il selettore dei pezzi nel
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
     # quindi sempre >= 1)
@@ -3405,20 +3468,36 @@ CAMPI_VETRINA = (
     "u.rating, u.vendite_ok")
 
 
-def espandi_distintivi_vetrina(righe):
-    """Il GROUP_CONCAT dei badge diventa la lista di chip
+def arricchisci_righe_vetrina(righe):
+    """Il ritocco che ogni riga d'annuncio riceve prima di partire —
+    passa di qui TUTTO cio' che il client disegna come card (vetrina,
+    negozio, singolo, miei, ricerca AI, preferiti), ed e' l'unico
+    posto dove aggiungerne di nuovi.
+
+    1) Il GROUP_CONCAT dei badge diventa la lista di chip
     {id, emoji, nome, descrizione} — gli stessi del negozio pubblico:
     la Mini App non hardcoda mai il catalogo. Dal lug 2026 escono
     TUTTI i guadagnati (bacheca stile Vinted, deciso con Andrea);
     l'ordine e' quello del catalogo, che mette i fiducia per primi —
     quando il frontend tronca a «+N», a sparire sono i badge di
-    percorso, mai quelli di affidabilita'."""
+    percorso, mai quelli di affidabilita'.
+
+    2) `zona_comune` (lug 2026): il solo COMUNE riconosciuto dentro
+    la zona, «» se non ce n'e' uno. E' quello che la card mostra al
+    posto del testo intero, ed e' anche il flag «questa zona e' un
+    luogo vero» (vuoto = niente 📍 in griglia): un campo solo invece
+    dei due di ieri, perche' il nome porta gia' dentro la risposta
+    alla domanda. Si calcola qui e non in SQL — il dizionario dei
+    ~7.900 comuni vive in RAM, non nel database — ed e' per riga una
+    manciata di lookup su un dict: nulla, anche sulle 300 righe della
+    shortlist AI. Il testo INTERO resta in `zona` per il dettaglio."""
     for r in righe:
         presi = set((r.pop("venditore_distintivi", "") or "").split(","))
         r["venditore_distintivi"] = [
             dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
                  descrizione=d["descrizione"])
             for d in DISTINTIVI if d["id"] in presi]
+        r["zona_comune"] = comune_da_zona(r.get("zona") or "")
     return righe
 
 
@@ -3585,11 +3664,11 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
             f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
             par + [TETTO_LEGACY])]
         con.close()
-        return espandi_distintivi_vetrina(righe)
+        return arricchisci_righe_vetrina(righe)
     limit = min(limit, LIMITE_PAGINA_MAX)
     righe, prossimo = pagina_annunci(con, campi, dove, par, limit, cursore,
                                      ordina)
-    risposta = {"annunci": espandi_distintivi_vetrina(righe),
+    risposta = {"annunci": arricchisci_righe_vetrina(righe),
                 "cursore": prossimo}
     if not cursore:
         # Solo in prima pagina: il totale della vista corrente (per
@@ -3817,7 +3896,7 @@ def miei_annunci(limit: int = 0, cursore: str = "",
             con, CAMPI_MIEI, dove, [user["id"]],
             min(limit, LIMITE_PAGINA_MAX), cursore)
         con.close()
-        return {"annunci": espandi_distintivi_vetrina(righe),
+        return {"annunci": arricchisci_righe_vetrina(righe),
                 "cursore": prossimo}
     righe = [dict(r) for r in con.execute(
         f"SELECT {CAMPI_MIEI} FROM annunci a "
@@ -3825,7 +3904,7 @@ def miei_annunci(limit: int = 0, cursore: str = "",
         f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
         (user["id"], TETTO_LEGACY))]
     con.close()
-    return espandi_distintivi_vetrina(righe)
+    return arricchisci_righe_vetrina(righe)
 
 
 # ATTENZIONE all'ordine di registrazione: questa rotta col parametro
@@ -3845,7 +3924,7 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con.close()
     if not r:
         raise HTTPException(404, "Annuncio non trovato")
-    return espandi_distintivi_vetrina([dict(r)])[0]
+    return arricchisci_righe_vetrina([dict(r)])[0]
 
 
 # ---- Preferiti: «nel tuo barattolo» 🫙 -------------------------------
@@ -3926,7 +4005,7 @@ def miei_preferiti(x_tg_init_data: str = Header(""),
         "WHERE p.tg_id=? ORDER BY p.creato DESC LIMIT 100",
         (user["id"],))]
     con.close()
-    return espandi_distintivi_vetrina(righe)
+    return arricchisci_righe_vetrina(righe)
 
 
 @app.get("/api/negozio/{chi}")
@@ -3971,7 +4050,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
             "JOIN utenti u ON u.tg_id=a.venditore_id "
             f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
             (v["tg_id"], TETTO_LEGACY))]
-    annunci = espandi_distintivi_vetrina(righe)
+    annunci = arricchisci_righe_vetrina(righe)
     # Gli ultimi feedback ricevuti: stelle + commento + data + ruolo di
     # chi scrive («acquirente»/«venditore»), MAI il nome — su una pagina
     # pubblica rivelerebbe gli acquisti di chi non ha scelto di apparire.
@@ -4798,7 +4877,7 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
             base + f" AND a.id NOT IN ({','.join('?' * len(ids))}) "
             "ORDER BY a.creato DESC LIMIT ?",
             list(ids) + [TETTO_CATALOGO_AI - len(annunci)])]
-    annunci = espandi_distintivi_vetrina(annunci)
+    annunci = arricchisci_righe_vetrina(annunci)
     con.close()
     if not annunci:
         return []
@@ -9256,25 +9335,23 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
             payload_consegna["spedizione_sats"] = sped_testo or 0
         consegna, sped_sats, sped_eur, taglia, anche_dig = \
             await consegna_da_payload(payload_consegna, valuta)
-        # La regola della zona segue la consegna, come in Vendi: col
-        # RITIRO il comune e' d'obbligo e dev'essere riconoscibile
-        # (SCARTO); senza ritiro resta la validazione morbida — solo
-        # un AVVISO col «forse intendevi» quando il fuzzy ha un
-        # candidato. Senza dataset, tutto passa (fail-open).
+        # La regola della zona e' quella del form Vendi (lug 2026): col
+        # RITIRO il comune e' d'obbligo, e in ogni caso una zona
+        # COMPILATA dev'essere un luogo vero. Prima qui c'era un
+        # avviso morbido e la riga si creava lo stesso: e' cosi' che
+        # i cataloghi grandi riempivano il campo Zona di «spedisco in
+        # tutta Italia». Ora e' uno SCARTO col suggerimento, che
+        # nell'anteprima si legge riga per riga e si corregge nel
+        # file. Senza dataset, tutto passa (fail-open).
         if COMUNI and zona and coordinate_da_zona(zona) == (0.0, 0.0):
             sugg = suggerisci_comune(zona)
-            if consegna in ("ritiro", "entrambe"):
-                scarti.append({"riga": numero,
-                               "motivo": f"il ritiro in zona esige un "
-                                         f"comune valido, «{zona[:40]}» "
-                                         f"non lo è"
-                                         + (f" — forse {sugg}?" if sugg
-                                            else " (es. Pavia (PV))")})
-                continue
-            avvisi.append({"riga": numero,
-                           "motivo": f"zona «{zona[:40]}» senza un comune "
-                                     f"riconoscibile"
-                                     + (f" — forse {sugg}?" if sugg else "")})
+            scarti.append({"riga": numero,
+                           "motivo": f"zona «{zona[:40]}» non è un comune "
+                                     f"italiano"
+                                     + (f" — forse {sugg}?" if sugg
+                                        else " (es. Pavia (PV))")
+                                     + "; correggila o lascia la cella vuota"})
+            continue
         elif COMUNI and not zona and consegna in ("ritiro", "entrambe"):
             scarti.append({"riga": numero,
                            "motivo": "il ritiro in zona esige il comune "

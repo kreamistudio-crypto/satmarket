@@ -2018,35 +2018,43 @@ function tagliaSVG(id, box){
    disegno graduato resta vivo nel foglio-picker di Vendi e nella
    stima del set. */
 /* Il luogo, con DUE rese secondo il posto (lug 2026).
-   Nel DETTAGLIO il valore com'e' stato scritto, anche i testi
-   storici che un luogo non sono («Nord Italia»): chi apre la scheda
-   ha diritto a leggere tutto quello che il venditore ha dichiarato.
-   In CARD invece solo un luogo VERO: lo dice `zona_riconosciuta` del
-   server, cioe' «la geocodifica ci ha trovato dentro un comune dei
-   ~7.900». NON la sigla cercata a mano nel testo — «Parma» e
-   «Reggio Emilia» sono luoghi veri anche senza «(PR)», e gli
-   importati da Nostr la sigla non ce l'hanno quasi mai. I testi che
-   un luogo non sono («Spedisco in tutta Italia», «Nord Italia») in
-   griglia non lasciano nulla al loro posto: la strada di consegna la
-   dicono gia' le icone a destra della stessa riga. */
+   In CARD solo il COMUNE, mai il testo intero: «Torino (TO) spedisco
+   in tutta Italia» diventa «Torino (TO)», «Frazione Salsasio,
+   Carmagnola (TO)» diventa «Carmagnola (TO)». Lo estrae il server
+   (`zona_comune`, dizionario dei ~7.900 comuni), quindi nessun
+   indovinello: esce solo cio' che il dizionario riconosce, e la
+   griglia diventa una colonna di nomi confrontabili a colpo d'occhio
+   invece che di frasi. Vuoto = la zona non e' un luogo («Spedisco in
+   tutta Italia», «Nord Italia»): niente 📍, e niente al suo posto —
+   la strada di consegna la dicono gia' le icone a destra.
+   Nel DETTAGLIO invece il testo INTERO com'e' stato scritto: li' c'e'
+   spazio, e «Frazione Salsasio» serve davvero a chi va a ritirare.
+   La card e' un indice, la scheda e' la dichiarazione del venditore. */
 function luogoPill(l){
   return (l.zone && l.zone !== '—')
     ? `<span class="pill">📍 ${esc(l.zone)}</span>` : '';
 }
 function luogoCard(l){
-  if (!l.zonaOk || !l.zone || l.zone === '—') return '';
-  return `📍 ${esc(l.zone)}`;
+  return l.comune ? `📍 ${esc(l.comune)}` : '';
 }
-/* Solo per la DEMO, dove non c'e' server a geocodificare: la sigla
-   nel testo e' l'approssimazione onesta del flag vero (il campo Zona
-   suggerisce comuni nel formato «Comune (SIGLA)»). */
-const zonaOkDemo = z => /\([A-Za-z]{2}\)/.test(z || '') ? 1 : 0;
+/* Solo per la DEMO, dove non c'e' server a estrarre il comune: si
+   prende il pezzo di testo che porta la sigla — il formato che il
+   campo Zona suggerisce, «Comune (SIGLA)» — e lo si taglia dopo la
+   parentesi. Niente sigla = non e' un luogo. Approssimazione da
+   vetrina finta: il dizionario vero vive sul server. */
+function comuneDemo(z){
+  const pezzo = (z || '').split(/[,;—–]/).find(p => /\([A-Za-z]{2}\)/.test(p));
+  return pezzo ? pezzo.slice(0, pezzo.indexOf(')') + 1).trim() : '';
+}
 /* Le icone della riga meta in card (lug 2026): un gruppo solo,
-   stretto, appoggiato a destra — prima le strade di consegna nello
-   stesso ordine del dettaglio, poi il pallino Nostr. Prima erano
-   figli diretti di un flex `space-between` e si sparpagliavano per
-   tutta la riga; ora a spartirsi lo spazio sono in due, la zona e
-   il gruppo, e a cedere coi puntini e' sempre la zona. */
+   stretto, appoggiato a destra, nello stesso ordine del dettaglio.
+   Prima erano figli diretti di un flex `space-between` e si
+   sparpagliavano per tutta la riga; ora a spartirsi lo spazio sono
+   in due, la zona e il gruppo, e a cedere coi puntini e' sempre la
+   zona. Solo le strade di CONSEGNA: il pallino Nostr e' uscito
+   (lug 2026) — in card lo spazio e' poco, e la verifica riguarda il
+   VENDITORE, non l'oggetto; vive nel dettaglio, accanto al suo
+   profilo, che e' dove uno se la chiede. */
 function iconeCard(l){
   let i = '';
   if (l.consegna === 'spedizione' || l.consegna === 'entrambe')
@@ -2055,8 +2063,6 @@ function iconeCard(l){
     i += '<span title="Ritiro in zona">🤝</span>';
   if (l.consegna === 'digitale' || l.ancheDigitale)
     i += '<span title="Codice inviato online">💾</span>';
-  if (l.sellerNpubOk)
-    i += '<span class="nostr-dot" title="Venditore verificato su Nostr"></span>';
   return i ? `<span class="ico">${i}</span>` : '';
 }
 function mapListing(a){
@@ -2071,12 +2077,10 @@ function mapListing(a){
     cat:a.categoria, zone:a.zona||'—',
     /* la regione: derivata dalla sigla lato server, '' se non c'e' */
     regione:a.regione||'',
-    /* «la zona e' un luogo vero?» — il flag della vetrina; le rotte
-       che servono l'annuncio per intero (ricerca AI, i tuoi annunci)
-       passano da `a.*` e non hanno l'alias, ma hanno le coordinate,
-       che sono la stessa cosa detta per esteso */
-    zonaOk: a.zona_riconosciuta !== undefined ? !!a.zona_riconosciuta
-                                              : !!(a.lat || a.lon),
+    /* il solo comune estratto dalla zona, per la card ('' = la zona
+       non e' un luogo). Lo scrive il server su OGNI riga che diventa
+       una card, quindi non serve ripiego */
+    comune:a.zona_comune||'',
     /* la consegna del venditore: '' = annuncio di prima che esistesse,
        nessuna promessa nuova (il dettaglio non mostra la riga) */
     consegna:a.consegna||'', sped:a.spedizione_sats||0,
@@ -2342,26 +2346,28 @@ let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
   {id:1, emoji:"⌨️", title:"Tastiera meccanica Keychron K2 hot-swap", price:80000, cat:"Elettronica",
-   zone:"Pavia (PV)", zonaOk:1, regione:"Lombardia", seller:"Massimo R.", rating:4.9, sales:12,
+   /* la zona lunga: in card esce il solo comune, nel dettaglio il testo intero */
+   zone:"Frazione Cassine, Pavia (PV)", comune:"Pavia (PV)",
+   regione:"Lombardia", seller:"Massimo R.", rating:4.9, sales:12,
    consegna:"spedizione", sped:7000, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Usata 6 mesi, perfetta. Switch Gateron Brown, retroilluminazione RGB.\nSpedisco in 24h con corriere tracciato."},
   {id:2, emoji:"🚲", title:"MTB front 29\" taglia L, cambio Deore", price:520000, cat:"Sport e hobby",
-   zone:"Milano (MI)", zonaOk:1, regione:"Lombardia", seller:"Giulia T.", rating:5.0, sales:7,
+   zone:"Milano (MI)", comune:"Milano (MI)", regione:"Lombardia", seller:"Giulia T.", rating:5.0, sales:7,
    consegna:"ritiro", condizione:"buono",
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
   {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
-   zone:"Torino (TO)", zonaOk:1, regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
+   zone:"Torino (TO)", comune:"Torino (TO)", regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
    /* il multi-pezzo dimostrativo: fa vedere stepper e conto × N */
    quantita:3,
    desc:"Tre copie nuove, ancora nel cellophane. Il libro che ha portato molti di noi qui dentro. 🟠"},
   {id:4, emoji:"🎧", title:"Cuffie Sony WH-1000XM4 + custodia", price:145000, cat:"Elettronica",
-   zone:"Roma (RM)", zonaOk:1, regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
+   zone:"Roma (RM)", comune:"Roma (RM)", regione:"Lazio", seller:"Luca P.", rating:4.7, sales:9, condizione:"accettabile",
    /* la lampo dimostrativa: scadenza calcolata al carico, cosi' il
       badge col countdown si vede anche nella demo coi dati finti */
    lampoPct:20, lampoFine:Math.floor(Date.now()/1000)+5*3600+14*60,
    desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
   {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e giardino",
-   zone:"Bologna (BO)", zonaOk:1, regione:"Emilia-Romagna", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
+   zone:"Bologna (BO)", comune:"Bologna (BO)", regione:"Emilia-Romagna", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
    desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
   /* la zona che NON e' un luogo: nessuna sigla, quindi niente regione —
      in card la riga meta resta muta a sinistra (lo dice il 🚚 a
@@ -2373,7 +2379,7 @@ let listings = [
   /* listino in EUR: il prezzo in euro resta fisso, i sats ballano col
      cambio (price = equivalente indicativo, come farebbe il server) */
   {id:7, emoji:"🎲", title:"Catan gioco da tavolo, come nuovo", price:27000, valuta:'eur', priceEur:25, cat:"Altro",
-   zone:"Verona (VR)", zonaOk:1, regione:"Veneto", seller:"Elisa D.", rating:4.9, sales:11,
+   zone:"Verona (VR)", comune:"Verona (VR)", regione:"Veneto", seller:"Elisa D.", rating:4.9, sales:11,
    consegna:"entrambe", spedEur:5, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
 ];
@@ -5959,11 +5965,16 @@ function setRicercaValuta(v){
 
 /* ------- Citta' vere nel campo Zona di Vendi (lug 2026) -------
    Autocomplete dal dataset comuni (stesso /api/comuni degli avvisi)
-   + validazione MORBIDA al blur: se il testo non contiene nessun
-   comune riconoscibile ma un quasi-comune si' («Pvia»), la riga
-   «intendevi Pavia?» — mai bloccante, «Lascia così» e si pubblica
-   com'e' (frazioni e «spedisco in tutta Italia» restano legittimi:
-   per loro il server tace). Niente in DEMO: non c'e' un server. */
+   + controllo al blur, dal lug 2026 BLOCCANTE anche senza ritiro: il
+   campo resta FACOLTATIVO (chi spedisce e basta lo lascia vuoto, e
+   in card lo dice il 🚚), ma se lo si compila dev'essere un comune
+   vero. Prima l'avviso era un consiglio col «Lascia così», e il
+   campo Zona finiva per diventare un secondo posto dove scrivere la
+   spedizione — «spedisco in tutta Italia» — che poi la vetrina deve
+   nascondere. Le frazioni restano legittime: basta che il comune sia
+   nel testo («Frazione Salsasio, Carmagnola (TO)» passa). La verita'
+   resta il 400 del server (`guardia_zona_condizione`): qui si evita
+   solo il viaggio. Niente in DEMO: non c'e' un server. */
 let zonaTimer = 0, zonaSuggerita = '';
 function suggerisciZona(q){
   const h = el('zonaHint');
@@ -5984,10 +5995,16 @@ function suggerisciZona(q){
     } catch {}
   }, 250);
 }
+/* «la zona scritta e' buona?» — falso solo quando il server ha detto
+   che non ci riconosce nessun comune. Muta (= va bene) in DEMO,
+   in vetrina, a campo vuoto e se il server non risponde: il blocco
+   vero e' il suo 400, qui non si inventano rifiuti. */
+let zonaStorta = false;
 async function controllaZona(){
   const box = el('zonaHint');
   if (!box) return;
   box.style.display = 'none'; box.innerHTML = '';
+  zonaStorta = false;
   const testo = el('sellZone').value.trim();
   if (!testo || DEMO || VETRINA) return;
   try {
@@ -5996,30 +6013,36 @@ async function controllaZona(){
       {headers:{'X-Tg-Init-Data':authHdr()}});
     if (!r.ok) return;
     const d = await r.json();
-    const ritiro = el('sellConsRitiro')?.checked;
-    /* riconosciuta: silenzio. Non riconosciuta: col ritiro la regola
-       e' ferma (il server non pubblichera'), senza ritiro e' solo un
-       consiglio — e senza nemmeno un quasi-comune, il consiglio tace
-       (frazioni e simili restano legittimi). */
-    if (d.riconosciuto || (!d.suggerimento && !ritiro)) return;
+    if (d.riconosciuto) return;         // c'e' un comune: silenzio
+    zonaStorta = true;
     /* il nome del comune vive in una variabile, mai dentro l'onclick
        (il patto anti-XSS: gli apostrofi di Sant'Angelo non si fidano) */
     zonaSuggerita = d.suggerimento;
     const usa = d.suggerimento
-      ? `intendevi <b>${esc(d.suggerimento)}</b>? <a href="#" onclick="usaZonaSuggerita();return false">Usa «${esc(d.suggerimento)}»</a>`
+      ? ` — intendevi <b>${esc(d.suggerimento)}</b>? <a href="#" onclick="usaZonaSuggerita();return false">Usa «${esc(d.suggerimento)}»</a>`
       : '';
-    box.innerHTML = ritiro
-      ? `📍 Per il ritiro serve un comune valido: «${esc(testo.slice(0,40))}» non basta — `
-        + (usa || `scegli il tuo comune dall'elenco dei suggerimenti (puoi aggiungere la frazione accanto)`)
-      : `📍 Non riconosco «${esc(testo.slice(0,40))}» — ${usa} · `
-        + `<a href="#" onclick="el('zonaHint').style.display='none';return false" style="color:var(--muted)">Lascia così</a>`;
+    /* Col ritiro la zona ci vuole; senza, la via d'uscita e'
+       svuotare il campo — e la si dice, che nessuno resti fermo. */
+    box.innerHTML = `📍 «${esc(testo.slice(0,40))}» non è un comune italiano: `
+      + `scegline uno dall'elenco che compare mentre scrivi`
+      + (el('sellConsRitiro')?.checked
+         ? ` (puoi aggiungere la frazione accanto)`
+         : `, oppure <a href="#" onclick="svuotaZona();return false">lascia il campo vuoto</a>`)
+      + usa;
     box.style.display = 'block';
   } catch(e) {}
+}
+function svuotaZona(){
+  haptic();
+  el('sellZone').value = '';
+  el('zonaHint').style.display = 'none';
+  zonaStorta = false;
 }
 function usaZonaSuggerita(){
   haptic();
   el('sellZone').value = zonaSuggerita;
   el('zonaHint').style.display = 'none';
+  zonaStorta = false;
 }
 
 /* l'autocomplete del comune: suggerimenti dal server, con calma */
@@ -7376,11 +7399,24 @@ async function publish(){
   if (!editandoNostr && !el('sellCond').value) {
     toast('Indica le condizioni dell\'oggetto'); return;
   }
-  /* col ritiro la zona e' obbligatoria (che sia un comune VERO lo
-     giudica il server: qui si ferma solo il campo vuoto) */
+  /* La zona: col ritiro e' obbligatoria, e in ogni caso — se
+     compilata — dev'essere un comune vero (lug 2026). Il giudice
+     resta il server: qui si ferma il campo vuoto col ritiro e si
+     riusa il verdetto che il blur ha gia' chiesto, cosi' l'errore
+     arriva prima del viaggio (foto comprese) e la riga #zonaHint
+     resta sotto il campo a dire cosa fare. */
   if (!editandoNostr && el('sellConsRitiro').checked
       && !el('sellZone').value.trim()) {
     toast('Per il ritiro in zona serve il tuo comune: scegli dall\'elenco del campo Zona'); return;
+  }
+  if (!editandoNostr && el('sellZone').value.trim()) {
+    await controllaZona();              // il blur puo' non essere mai scattato
+    if (zonaStorta) {
+      el('sellZone').scrollIntoView({block:'center',
+        behavior: tourRidotto() ? 'auto' : 'smooth'});
+      toast('Controlla la zona: ci vuole un comune, oppure lascia il campo vuoto');
+      return;
+    }
   }
   if (sellFoto.some(f=>f.startsWith('caricando:'))) {
     toast('Un attimo: sto ancora caricando le foto'); return;
@@ -7407,7 +7443,7 @@ async function publish(){
       spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
       ancheDigitale:!!cns.anche_digitale,
       condizione:el('sellCond').value, quantita:qtaForm(),
-      zone:el('sellZone').value||'', zonaOk:zonaOkDemo(el('sellZone').value),
+      zone:el('sellZone').value||'', comune:comuneDemo(el('sellZone').value),
       seller:'Tu', rating:5, sales:0,
       desc:el('sellDesc').value||'—', photos:sellFoto.slice()});
   } else {
@@ -7474,7 +7510,7 @@ async function salvaModifica(t, p){
         spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
         ancheDigitale:!!cns.anche_digitale,
         condizione:el('sellCond').value, quantita:qtaForm(),
-        zone:el('sellZone').value||'', zonaOk:zonaOkDemo(el('sellZone').value),
+        zone:el('sellZone').value||'', comune:comuneDemo(el('sellZone').value),
         desc:el('sellDesc').value||'—'});
       if (sellFoto.length) l.photos = sellFoto.slice();
     }
