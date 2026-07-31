@@ -671,10 +671,15 @@
      e meta' (i due blocchi si equivalgono: il ghost stira all'altezza
      del recinto, align-items:stretch). */
   #barraCompra .btn{margin-top:0;width:auto;line-height:1.25;
-    border-radius:var(--radius);white-space:nowrap;box-shadow:none;
+    border-radius:12px;white-space:nowrap;box-shadow:none;
     font-size:15px;padding:8px 10px 9px}
   #barraCompra .btn:active{transform:translateY(1px);box-shadow:none}
   #bcOfferta{flex:1;min-width:0}
+  /* col multi-pezzo lo stepper allunga Acquista: il suo lato prende
+     piu' spazio, l'offerta cede — a 360px tutto intero */
+  #barraCompra.con-qta .bc-recinto{flex:1.5}
+  #barraCompra.con-qta #bcOfferta{font-size:14px;padding:8px 6px 9px}
+  #barraCompra .qta-mini{margin-left:8px}
   /* Il richiamo dell'escrow SOLO attorno ad Acquista: stesso verde e
      stesso tratteggio del recinto in pagina, in formato francobollo,
      con la stessa aria (3px) su tutti i lati. Il lucchettino sta a
@@ -682,7 +687,7 @@
      bottone ha il suo padding). Il padding-top di 10px della barra
      e' la sua aria: cosi' non esce dalla barra. */
   .bc-recinto{position:relative;flex:1;min-width:0;display:flex;
-    border:2px dashed var(--trust);border-radius:calc(var(--radius) + 5px);
+    border:2px dashed var(--trust);border-radius:15px;   /* 12 del bottone + 3 d'aria */
     padding:3px}
   .bc-recinto .btn{flex:1;min-width:0}
   .bc-lucchetto{position:absolute;top:-9px;left:12px;z-index:1;
@@ -857,9 +862,27 @@
      :first-of-type (il ghost promosso a CTA quando il Compra subito
      NWC mancava) non serve piu': Acquista e' arancio per classe. */
   /* specificita' doppia di proposito: .btn{width:100%} sta piu' in
-     basso nel foglio e a pari peso vincerebbe lui */
-  .escrow-zone .acquista-cta{width:auto;margin:12px auto 2px;
-    padding:12px 46px;white-space:nowrap}
+     basso nel foglio e a pari peso vincerebbe lui. Lungo (min-width)
+     ma mai a tutta fascia, e squadrato coi soli angoli tondi: qui il
+     raggio scende a 12 (il 16 del riquadro su un bottone basso
+     leggeva troppo tondo, feedback di Andrea). */
+  .escrow-zone .acquista-cta{width:auto;min-width:76%;margin:12px auto 2px;
+    padding:11px 30px;white-space:nowrap;border-radius:12px}
+  /* Lo stepper dentro Acquista: chip traslucido sull'arancio, tocchi
+     da 26px, mai un <button> annidato (sono span con role) */
+  .qta-mini{display:inline-flex;align-items:center;gap:2px;margin-left:12px;
+    background:rgba(255,255,255,.24);border-radius:8px;padding:2px 3px}
+  .qta-mini .qm-btn{width:26px;height:24px;display:flex;align-items:center;
+    justify-content:center;font-size:17px;font-weight:800;cursor:pointer;
+    border-radius:6px;user-select:none}
+  .qta-mini .qm-btn:active{background:rgba(255,255,255,.3)}
+  .qta-mini .qm-btn.off{opacity:.4;pointer-events:none}
+  .qta-mini .qm-num{min-width:18px;text-align:center;font-size:14px;font-weight:800}
+  /* «Fai un'offerta» in pagina vive SOLO da desktop, dove la barra
+     non esiste: su mobile sta in fondo, accanto ad Acquista.
+     Con l'ID davanti, che .btn{display:flex} sta piu' in basso e a
+     pari specificita' riaccenderebbe il bottone. */
+  @media (max-width:767.98px){ #detailContent .offerta-pagina{display:none} }
   /* Bottoni-oggetto: pillola con l'ombra piena 3px sotto, come una
      cosa fisica appoggiata sul banco. Su :active si abbassa. */
   .btn{
@@ -3059,13 +3082,26 @@ let consegnaEsplicita = false;
    ogni dettaglio aperto; il massimo e' la quantita' dell'annuncio.
    Lo stepper compare solo con piu' di un pezzo disponibile. */
 let qtaScelta = 1;
+/* Lo stepper DENTRO il bottone Acquista (lug 2026, deciso da Andrea):
+   coi pezzi >1 accanto alla scritta compaiono − N + — in pagina e
+   nella barra, due istanze gemelle aggiornate insieme per classe.
+   Sono <span role="button"> e non <button>: un button dentro un
+   button non e' HTML lecito, e il click si ferma sul gruppetto
+   (stopPropagation) senza mai comprare. */
+function stepperAcquista(l){
+  if ((l.quantita||1) <= 1) return '';
+  return `<span class="qta-mini" role="group" aria-label="Quantità" onclick="event.stopPropagation()">`
+    + `<span class="qm-btn qm-meno${qtaScelta<=1?' off':''}" role="button" tabindex="0" aria-label="Un pezzo in meno" onclick="setQta(-1)">−</span>`
+    + `<span class="qm-num mono">${qtaScelta}</span>`
+    + `<span class="qm-btn qm-piu${qtaScelta>=(l.quantita||1)?' off':''}" role="button" tabindex="0" aria-label="Un pezzo in più" onclick="setQta(1)">+</span>`
+    + `</span>`;
+}
 function setQta(d){
   const l = currentListing; if (!l) return;
   qtaScelta = Math.min(l.quantita||1, Math.max(1, qtaScelta + d));
-  const n = el('qtaNum'); if (n) n.textContent = qtaScelta;
-  const meno = el('qtaMeno'), piu = el('qtaPiu');
-  if (meno) meno.disabled = qtaScelta <= 1;
-  if (piu) piu.disabled = qtaScelta >= (l.quantita||1);
+  document.querySelectorAll('.qta-mini .qm-num').forEach(n => n.textContent = qtaScelta);
+  document.querySelectorAll('.qta-mini .qm-meno').forEach(b => b.classList.toggle('off', qtaScelta <= 1));
+  document.querySelectorAll('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= (l.quantita||1)));
   haptic();
   aggiornaCifreCompra(l);
 }
@@ -3571,9 +3607,12 @@ function aggiornaBarraCompra(view){
   const su = view==='dettaglio' && !!l && !mio && (l.stato||'attivo')==='attivo';
   document.body.classList.toggle('con-barra', su);
   if (!su) return;
-  /* «Acquista» e' testo statico nel markup: qui si decide solo se
-     l'offerta si puo' (ri)fare — con un accordo stretto no, come in
-     pagina */
+  /* Lo stepper dei pezzi vive anche qui dentro (gemello di quello in
+     pagina); col multi-pezzo il lato Acquista si allarga un filo,
+     che a 360px la scritta e i tasti devono starci interi */
+  el('bcCompra').innerHTML = `Acquista${stepperAcquista(l)}`;
+  el('barraCompra').classList.toggle('con-qta', (l.quantita||1) > 1);
+  /* con un accordo stretto l'offerta non si rifa': come in pagina */
   el('bcOfferta').style.display = offertaAccettataPer(l.id) ? 'none' : '';
 }
 
@@ -4013,15 +4052,14 @@ function openDetail(id){
              <span class="escrow-flag">🔒 pagamento protetto</span>
              <div class="trust-note"><span>I tuoi sats restano <b>chiusi in un deposito di garanzia</b> (escrow) e vengono sbloccati al venditore solo quando confermi di aver ricevuto l'oggetto. In caso di problemi, apri una disputa e interviene un moderatore.</span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
-             ${(l.quantita||1) > 1 ? `<div class="qta-riga"><span class="qta-lab">Quantità</span><div class="qta-step"><button type="button" id="qtaMeno" onclick="setQta(-1)" aria-label="Un pezzo in meno" disabled>−</button><span class="qta-num mono" id="qtaNum">1</span><button type="button" id="qtaPiu" onclick="setQta(1)" aria-label="Un pezzo in più">+</button></div></div>` : ''}
              ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai 24 ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-             <button class="btn orange acquista-cta" onclick="compraDaBarra()">Acquista</button>
+             <button class="btn orange acquista-cta" onclick="compraDaBarra()">Acquista${stepperAcquista(l)}</button>
              <div class="escrow-note">Ricevi una invoice Lightning, paghi con qualsiasi wallet</div>
            </div>
-           ${offAcc ? '' : `<button class="btn ghost" onclick="apriOfferta()">Fai un'offerta</button>`}`}
+           ${offAcc ? '' : `<button class="btn ghost offerta-pagina" onclick="apriOfferta()">Fai un'offerta</button>`}`}
       ${jarCta}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}

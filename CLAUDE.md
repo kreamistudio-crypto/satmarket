@@ -2088,17 +2088,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scelta lì arriverebbe dopo la invoice.
   ACQUISTA VIVE IN DUE POSTI (correzioni lug 2026, poi rifinite col
   feedback di Andrea): dentro il recinto escrow sta SOLO «Acquista»
-  arancio ₿ — centrato, largo quanto la scritta più l'aria
-  (`.escrow-zone .acquista-cta`, specificità doppia perché
-  `.btn{width:100%}` sta più in basso nel foglio), mai a tutta
-  fascia; «Fai un'offerta» è una trattativa e sta FUORI dal
-  tratteggio, subito sotto (sopra Metti nel barattolo). Nella barra
-  fissa la stessa coppia, metà e metà: OFFERTA A SINISTRA, ACQUISTA
-  A DESTRA. I gemelli in pagina non si spengono più a barra viva
-  (le vecchie regole `body.con-barra … .off-cta{display:none}` sono
-  morte con la classe `.off-cta`). Nel recinto restano anche stepper
-  quantità, note e il «⚡ Compra subito» NWC (un'ALTRA strada, con la
-  sua cifra); il trucco `:first-of-type` che promuoveva il ghost a
+  arancio ₿ — centrato, lungo (`min-width:76%`) ma mai a tutta
+  fascia (`.escrow-zone .acquista-cta`, specificità doppia perché
+  `.btn{width:100%}` sta più in basso nel foglio; raggio 12, più
+  squadrato del riquadro: il 16 su un bottone basso leggeva tondo).
+  Coi pezzi >1 lo STEPPER sta DENTRO il bottone: `stepperAcquista()`
+  = chip traslucido «− N +» accanto alla scritta, span con role
+  (mai <button> annidato) e stopPropagation sul gruppetto — il tocco
+  sui più/meno non compra mai; due istanze gemelle (pagina e barra)
+  aggiornate insieme da `setQta` per classe (`.qm-num/.qm-meno/
+  .qm-piu`, il vecchio stepper `.qta-riga` del recinto è morto —
+  `.qta-step` vive ancora nel foglio del set). «Fai un'offerta» è
+  una trattativa e sta fuori dal tratteggio: su MOBILE vive SOLO
+  nella barra (in pagina è nascosto, `#detailContent
+  .offerta-pagina{display:none}` sotto i 768 — con l'ID, che
+  `.btn{display:flex}` a pari peso lo riaccenderebbe), da desktop
+  resta in pagina sotto il recinto perché lì la barra non esiste.
+  Nella barra fissa: OFFERTA A SINISTRA, ACQUISTA A DESTRA, metà e
+  metà (col multi-pezzo il lato Acquista cresce, `#barraCompra
+  .con-qta`). Nel recinto restano anche note e il «⚡ Compra subito»
+  NWC (un'ALTRA strada, con la sua cifra); il trucco
+  `:first-of-type` che promuoveva il ghost a
   CTA è stato RIMOSSO: Acquista è arancio per classe, sempre. Le PILLOLE DI
   SCELTA consegna (`pilloleConsegna`) non esistono più: in pagina
   restano solo le pillole INFORMATIVE (spedBadge + pilloleModalita),
