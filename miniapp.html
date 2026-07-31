@@ -758,17 +758,19 @@
      foto, titolo con la condizione accanto, luogo come testo nudo,
      prezzo col badge spedizione evidenziato di fianco. */
   .pub-data{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
-  /* La condizione sta ACCANTO al titolo, allineata alla sua prima
-     riga: e' il TITOLO a stringersi e andare a capo per farle posto
-     (`flex:1 1 0` — con la base `auto` di serie il browser mandava a
-     capo la pillola PRIMA di stringere il titolo, e finiva sempre
-     sotto). Scende sotto solo quando neanche la parola piu' lunga
-     del titolo ci sta accanto (`min-width:min-content` + wrap). */
-  .titolo-riga{display:flex;flex-wrap:wrap;align-items:baseline;
-    gap:4px 10px}
-  .titolo-riga h2{flex:1 1 0;min-width:min-content}
-  .titolo-riga .pill{flex:none;font-size:12px;padding:4px 11px;
-    white-space:nowrap}
+  /* La condizione si scrive in CODA AL TITOLO, come fosse l'ultima
+     parola («Crema spalmabile NUOVO»): e' un inline DENTRO l'h2,
+     quindi entra nel flusso del testo — il titolo va a capo per
+     farle posto e lei segue l'ultima parola. Va sotto da sola solo
+     quando sull'ultima riga non c'e' spazio, ed e' l'unico caso
+     ammesso. Col flex non si poteva: mandava a capo la pillola
+     PRIMA di stringere il titolo, oppure la incollava a destra
+     lontano dalle parole. Un filo piu' piccola della pillola di
+     serie, per non gonfiare l'interlinea del titolo. */
+  .detail-body h2 .pill{font-size:12px;padding:3px 10px;
+    vertical-align:3px;white-space:nowrap}
+  /* l'ultima parola del titolo e la pillola non si separano mai */
+  .fine-titolo{white-space:nowrap}
   .luogo-riga{font-size:13px;color:var(--muted);font-weight:700;margin-top:4px}
   /* il prezzo a sinistra e il toggle della valuta a destra, centrati
      fra loro; la riga ≈ dell'altra valuta sta FUORI, sotto */
@@ -777,8 +779,12 @@
      mai — se a mandarlo a capo fosse lui, la prima riga resterebbe
      con un buco */
   .prezzo-riga{display:flex;align-items:center;gap:12px;margin-top:10px}
-  .prezzo-col{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;
-    flex:1 1 auto;min-width:0}
+  /* I prezzi in COLONNA: il barrato della lampo sta SEMPRE sotto il
+     prezzo attuale, in euro come in sats — di lato, quando i numeri
+     erano corti, le due cifre si leggevano come una sola riga di
+     conto (deciso da Andrea) */
+  .prezzo-col{display:flex;flex-direction:column;align-items:flex-start;
+    gap:2px;flex:1 1 auto;min-width:0}
   .prezzo-col .detail-price{margin:0;min-width:0}
   .prezzo-riga .cur-seg{margin-left:auto;flex:none}
   /* Il listino barrato della lampo sta ACCANTO al prezzo scontato e
@@ -788,6 +794,17 @@
      resta attaccato al prezzo, non al luogo. */
   .prezzo-col .lampo-was{margin:0;gap:7px;font-size:24px;font-weight:700;
     font-family:'JetBrains Mono',monospace}
+  /* nel barrato l'unita' segue la stessa regola del prezzo attuale:
+     il simbolo € grande quasi quanto la cifra, la parola «sats»
+     piccola e discreta (altrimenti barrata pesa piu' del numero) */
+  .prezzo-col .lampo-was .unit{font-size:12px;font-weight:500}
+  .prezzo-col .lampo-was .unit.eur{font-size:17px;font-weight:700}
+  /* La riga della barratura si taglia sulla cifra, non sulla parola:
+     su «sats» — che e' piccola — passava all'altezza della sua x e
+     sembrava una sottolineatura. L'inline-block ferma la decorazione
+     ereditata (dal figlio non si puo' togliere in altro modo); il
+     simbolo € invece resta barrato, che e' tutt'uno con la cifra. */
+  .prezzo-col .lampo-was .unit:not(.eur){display:inline-block}
   /* La spedizione sta nella fila delle pillole, con le altre
      caratteristiche, ma EVIDENZIATA: e' l'informazione che converte.
      Forma da pillola come le vicine, colori dalla coppia azzurra dei
@@ -2071,6 +2088,25 @@ const CONDIZIONI = {
 function condPill(id){
   const c = CONDIZIONI[id]; if (!c) return '';
   return `<span class="pill cond-${id}">${c.nome}</span>`;
+}
+/* Il titolo del dettaglio con la condizione in CODA, come fosse
+   l'ultima parola («Crema spalmabile NUOVO»). Il trucco e' legare la
+   pillola all'ULTIMA PAROLA con un nowrap: se sull'ultima riga non
+   c'e' posto per entrambe scendono INSIEME («Cuffie da studio AKG /
+   K371 Come nuovo»), invece di lasciare la pillola sola a capo — che
+   e' quello che fa un inline qualsiasi quando il titolo riempie la
+   riga. Se l'ultima parola e' lunghissima non si lega nulla: legate
+   traboccherebbero dallo schermo, e li' la riga in piu' e' il male
+   minore. Il titolo passa da esc(): le entita' (&amp;) non hanno
+   spazi dentro, quindi tagliare sull'ultimo spazio e' sicuro. */
+function titoloConCondizione(l){
+  const t = esc(l.title), p = condPill(l.condizione);
+  if (!p) return t;
+  const i = t.lastIndexOf(' ');
+  const ultima = i < 0 ? t : t.slice(i + 1);
+  if (ultima.length > 14) return `${t} ${p}`;
+  const prima = i < 0 ? '' : t.slice(0, i) + ' ';
+  return `${prima}<span class="fine-titolo">${ultima} ${p}</span>`;
 }
 /* Le taglie del pacco (lug 2026): gemello client di TAGLIE_PACCO del
    server, con l'esempio concreto che nel form aiuta a scegliere («come
@@ -4082,7 +4118,7 @@ function openDetail(id){
     ${foto}
     <div class="detail-body">
       ${dataRiga(l)}
-      <div class="titolo-riga"><h2>${esc(l.title)}</h2>${condPill(l.condizione)}</div>
+      <h2>${titoloConCondizione(l)}</h2>
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">

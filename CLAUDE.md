@@ -1165,13 +1165,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «quando» e basta, «3 giorni fa» — la pubblicazione NON si nomina
   (a quel posto non può voler dire altro), il verbo resta solo
   all'«aggiornato N giorni fa», che è un fatto diverso · titolo con
-  la pillola condizione ACCANTO (`.titolo-riga`: è il titolo a
-  stringersi e andare a capo per farle posto — `h2{flex:1 1 0;
-  min-width:min-content}`, perché con la base `auto` di serie il
-  flex-wrap mandava a capo la PILLOLA prima di stringere il titolo,
-  e finiva sempre sotto; scende sotto solo quando non ci sta
-  neanche accanto alla parola più lunga) · luogo come TESTO nudo
-  `luogoRiga()` (niente pillola) · prezzo, e a DESTRA sulla stessa
+  la pillola condizione IN CODA, come fosse l'ultima parola («Crema
+  spalmabile NUOVO»): `titoloConCondizione()` la mette DENTRO l'h2,
+  nel flusso del testo, e la lega all'ULTIMA PAROLA con un nowrap
+  (`.fine-titolo`) — così se sull'ultima riga non c'è posto scendono
+  INSIEME («Cuffie da studio AKG / K371 Come nuovo») invece di
+  lasciare la pillola sola a capo. Ultima parola oltre 14 caratteri
+  = non si lega (legate traboccherebbero). Il flex è stato provato
+  due volte e non regge: con la base `auto` manda a capo la pillola
+  PRIMA di stringere il titolo, con `flex:1 1 0` la incolla a destra
+  lontano dalle parole · luogo come TESTO nudo
+  `luogoRiga()` (niente pillola) · prezzo — col listino BARRATO
+  della lampo SEMPRE sotto di lui, in euro come in sats
+  (`.prezzo-col` è una colonna: di lato le due cifre si leggevano
+  come una riga di conto; stesso mono, 24px contro 28, e la
+  barratura taglia la cifra ma non la parola «sats», che è piccola e
+  sembrava sottolineata — la ferma un `display:inline-block`, che
+  dal figlio la decorazione ereditata non si toglie altrimenti) — e
+  a DESTRA sulla stessa
   riga il toggle valuta €/₿ (`.prezzo-riga`, gemello di quello
   della searchbar: stesso `setValuta`, stessa preferenza; i due si
   accendono insieme perché `aggiornaCurToggle` li pesca per
