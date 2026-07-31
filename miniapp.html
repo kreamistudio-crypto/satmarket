@@ -804,11 +804,14 @@
      piccola e discreta (altrimenti barrata pesa piu' del numero) */
   .prezzo-col .lampo-was .unit{font-size:12px;font-weight:500}
   .prezzo-col .lampo-was .unit.eur{font-size:17px;font-weight:700}
-  /* Si barra SOLO IL NUMERO: ne' «sats» ne' «€». Sull'unita' la riga
-     passava all'altezza del suo carattere piccolo e sembrava una
-     sottolineatura. L'inline-block ferma la decorazione ereditata —
-     dal figlio non si puo' togliere in altro modo. */
-  .prezzo-col .lampo-was .unit{display:inline-block}
+  /* Si barra SOLO IL NUMERO — mai «sats», mai «€», mai il «≈» — e
+     vale per OGNI prezzo barrato: la riga del dettaglio e il
+     cartellino in vetrina. Sull'unita' piccola la barratura passava
+     all'altezza del suo carattere e sembrava una sottolineatura.
+     L'inline-block ferma la decorazione ereditata: dal figlio non si
+     puo' togliere in altro modo. */
+  s .unit, s .circa{display:inline-block}
+  .circa{margin-right:5px}
   /* La spedizione sta nella fila delle pillole, con le altre
      caratteristiche, ma EVIDENZIATA: e' l'informazione che converte.
      Forma da pillola come le vicine, colori dalla coppia azzurra dei
@@ -3085,12 +3088,19 @@ function prezzoParte(l){
      margine CSS, che per il simbolo € (classe `eur`) e' piu' stretto
      — un simbolo di valuta sta attaccato alla cifra, la parola
      «sats» no */
+  /* il «circa» ha una classe sua: cosi' quando il prezzo e' barrato
+     (offerta lampo) la riga taglia il solo NUMERO e lo lascia fuori,
+     come l'unita' */
+  /* l'aria dopo il «circa» e' un margine e non uno spazio di testo:
+     lo spazio, stando fuori dallo span, verrebbe barrato e lascerebbe
+     un trattino appeso davanti alla cifra */
+  const circa = '<span class="circa">≈</span>';
   if (valutaVista==='eur') return {
-    big: (inEur?'':'≈ ') + eurTesto + '<span class="unit eur">€</span>',
-    small: (inEur?'≈ ':'') + fmt(sats) + ' sats' };
+    big: (inEur?'':circa) + eurTesto + '<span class="unit eur">€</span>',
+    small: (inEur?circa:'') + fmt(sats) + ' sats' };
   return {
-    big: (inEur?'≈ ':'') + fmt(sats) + '<span class="unit">sats</span>',
-    small: (inEur?'':'≈ ') + eurTesto + ' €' };
+    big: (inEur?circa:'') + fmt(sats) + '<span class="unit">sats</span>',
+    small: (inEur?'':circa) + eurTesto + ' €' };
 }
 /* ---------------- offerta lampo: lo sconto a tempo ----------------
    Viva se percento>0 e la scadenza e' nel futuro. Il giudice vero del
