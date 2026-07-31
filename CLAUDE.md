@@ -637,16 +637,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   disponibili, testo statico altrimenti; senza canali raggiungibili
   sparisce l'intero cassetto.
   Ponti di contatto tra le parti (lug 2026): NON una chat — bottoni
-  verso i canali che esistono. Dettaglio annuncio e dettaglio ordine
+  verso i canali che esistono. Pagina del NEGOZIO e dettaglio ordine
   mostrano «✈️ Scrivi su Telegram» (t.me/username) e/o «🟣 Scrivi su
   Nostr» (profilo su njump.me: il DM parte dal client dell'utente)
   secondo l'identità della controparte; il doppio cittadino li ha
   entrambi, senza canali resta la riga onesta «le trattative non sono
-  necessarie: l'escrow protegge». La npub del ponte è SOLO dal
+  necessarie: l'escrow protegge» (solo nell'ordine). Dal DETTAGLIO
+  ANNUNCIO i ponti sono USCITI con le rifiniture del riordino (lug
+  2026): ci si arriva entrando nella scheda del venditore, e il
+  riquadro nel dettaglio resta solo anagrafica. La npub del ponte è
+  SOLO dal
   possesso dimostrato — npub_accesso o badge verificato, la regola di
-  `notifica()`: per l'annuncio il client usa `contatto_nostr`
-  (importati) con ripiego su `venditore_npub` verificata (già in
-  CAMPI_VETRINA); per l'ordine `/api/orders` aggiunge
+  `notifica()`; per l'ordine `/api/orders` aggiunge
   `compratore_nostr`/`venditore_nostr` (CASE in SQL, escono solo alle
   parti e all'admin come il resto dell'ordine). Helper frontend
   `pontiContatto`/`pontiOrdine` (il vecchio `bottoneChat` non esiste
@@ -1167,13 +1169,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «🚚 Spedizione disponibile» (`spedBadge()`, coppia azzurra
   --ship-bg/--ship-text dei badge di stato: AA nei due temi, non
   fa concorrenza né all'arancio del prezzo né al verde escrow;
-  `.prezzo-riga` flex-wrap: se non ci sta scende a capo) · le altre
+  `.prezzo-riga` = SOLO prezzo grande + badge, centrati tra loro —
+  la riga ≈ dell'altra valuta sta FUORI, sotto, o il badge finirebbe
+  a mezza via tra le due; flex-wrap: se non ci sta scende a capo) ·
+  le altre
   strade come pillole discrete · «DESCRIZIONE» col suo titolino
-  `.desc-tit` · riquadro venditore, dove vive la riga
-  «🟣 verificato su Nostr» (`.nostr-riga`: la verifica è
-  dell'utente, non dell'oggetto — via la pillola dalla fila
-  dell'annuncio). Da lì in giù tutto com'era (recinto, altri
-  oggetti, barra). LA DATA: colonna `annunci.modificato` (0 = mai
+  `.desc-tit` · riquadro venditore SOLO anagrafica: avatar, nome col
+  🟣 in fila coi badge (icona nuda, pattern della testata negozio —
+  la scritta «verificato su Nostr» e i ponti di contatto non stanno
+  più qui: la verifica è dell'utente e si racconta nel negozio, dove
+  i ponti già vivono), sfilza, stelle e freccia. Da lì in giù tutto
+  com'era (recinto, altri
+  oggetti, barra — che dalle stesse rifiniture veste «🔒 Acquista»
+  verde + «Fai un'offerta» ghost, rettangolari, vedi barra
+  d'acquisto). LA DATA: colonna `annunci.modificato` (0 = mai
   toccato) scritta da modifica() e dalla modifica firmata; per gli
   IMPORTATI l'import ci mette la data dell'EVENTO Nostr
   (`evento_ts` = created_at, che per un replaceable è la
@@ -2015,8 +2024,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la foto; body senza scroll a lightbox aperto.
   Barra d'acquisto al posto della tab bar (lug 2026, modello Vinted):
   nel dettaglio di un annuncio COMPRABILE la tab bar sparisce e al suo
-  posto compare `#barraCompra` — «🔒 Compra in sicurezza · ≈ N sats»
-  (primario largo) + «💰 Offerta» (compatto). Gemella della nav per
+  posto compare `#barraCompra` — «🔒 Acquista» col totale sotto
+  (VERDE `.btn.primary`, la coppia trust/on-trust dell'escrow, AA nei
+  due temi) + «Fai un'offerta» (ghost neutro, senza icona); dalle
+  rifiniture del lug 2026 i bottoni della barra sono RETTANGOLARI col
+  raggio del riquadro venditore (`border-radius:var(--radius)` in
+  `#barraCompra .btn`), non più pillole. Gemella della nav per
   costruzione (position fixed, `--nav-bg`, blur, safe-area, z-index 30
   e altezza allineata: 62px contro 61, nessun salto di layout). La
   regia è `aggiornaBarraCompra(view)`, chiamata da `go()` a ogni cambio
@@ -2786,7 +2799,11 @@ venditore, vedi Architettura — collaudato in locale via CDP a
 360/375/390 e 1280px nei due temi e con reduced-motion, sui casi
 senza luogo / senza spedizione / solo digitale / lampo attiva /
 annuncio storico; in produzione basta il riavvio, la migrazione gira
-da sola).
+da sola; più le quattro rifiniture del giorno dopo: badge spedizione
+sulla stessa riga del prezzo, 🟣 solo icona in fila coi badge, via i
+ponti di contatto dal riquadro venditore, e la barra d'acquisto con
+«Acquista» verde e «Fai un'offerta» rettangolari — riverificate a
+360/375/390 nei due temi, sats/EUR/lampo/ritiro).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
