@@ -1162,27 +1162,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   meno. Ritiro e codice online non si nominano: sono gratuiti per
   natura. Giudici unici `spedisce` e `spedGratis` — «gratis» si decide
   in un posto solo, e da lì lo legge anche l'icona in card.
-  I DUE BADGE NON CAMBIANO COL TEMA (lug 2026, feedback di Andrea in
-  due passaggi): sono una COPPIA ROVESCIATA con gli stessi identici
-  valori di giorno e di sera —
-    «disponibile» = fondo azzurro CHIARO #D3E7FA + testo blu #12599E
+  I DUE BADGE NON CAMBIANO SEGNO COL TEMA (lug 2026, feedback di
+  Andrea in tre passaggi): sono una COPPIA ROVESCIATA, e la loro
+  IDENTITÀ è la stessa di giorno e di sera —
+    «disponibile» = fondo azzurro CHIARO + testo blu    (#D3E7FA/#12599E)
     «gratuita»    = fondo blu SCURO   #2A6FB0 + testo bianco
-  I quattro token (`--ship-soft`/`--ship-soft-on` e
-  `--ship-full`/`--ship-on`) vivono SOLO nel blocco `:root` e NON si
+  `--ship-full`/`--ship-on` vivono SOLO nel blocco `:root` e NON si
   ridichiarano in `html[data-tema="scuro"]`: è voluto, non una
   dimenticanza — chi passasse di lì e li «completasse» per simmetria
   romperebbe la regola. Il motivo: qui il colore È IL SEGNO («questa
   spedizione è gratis»), e un segno non può cambiare tinta fra il
   giorno e la sera, o chi l'ha imparato di giorno non lo riconosce
-  più. L'inversione al buio ha senso per una SUPERFICIE (l'etichetta
+  più. UNA SOLA taratura notturna è ammessa, e riguarda il tenue:
+  `--ship-soft`/`--ship-soft-on` scendono a #BAD2E8/#0E4A80 al buio
+  perché sul bruno lo stesso chiaro rendeva più che sul crema e
+  gridava più del pieno (contro il fondo 13,59 → 11,04; il testo
+  scende con lui e guadagna margine, 5,83). Attenzione alla
+  distinzione, che è tutta la regola: lì si abbassa la LUCE, qui non
+  si cambia il SEGNO — resta un chip azzurro chiaro con testo blu,
+  riconoscibile identico, solo un gradino meno acceso. L'inversione
+  chiaro↔scuro resta invece bocciata. L'inversione al buio ha senso
+  per una SUPERFICIE (l'etichetta
   prezzo, il toast, che di sera diventano di carta), mai per un codice
   colore. Due tentativi bocciati, da non rifare: il pieno che si
   invertiva (di sera diventava azzurro acceso, cioè un altro colore) e
   il tenue che seguiva il tema (di sera era un chip scuro su fondo
-  scuro e spariva — «si mescolava col fondo»). Contrasti, uguali in
-  entrambi i temi: testo/fondo 5,62 e 5,25; e nessuno dei due si perde
-  sulla pagina (il chiaro contro il bruno della sera fa 13,59, lo
-  scuro contro il crema del giorno 4,78).
+  scuro e spariva — «si mescolava col fondo»). Contrasti testo/fondo:
+  5,62 di giorno e 5,83 di sera per il tenue, 5,25 sempre per il
+  pieno; e nessuno dei due si perde sulla pagina (il chiaro contro il
+  bruno fa 11,04, lo scuro contro il crema 4,78).
+  Il badge è `display:inline-flex` con `align-items:center` e NON
+  block: `.pills` è un flex ad align-items stretch e le pillole
+  vicine sono 3px più alte (1,5px di bordo per lato, che il badge non
+  ha), quindi da block veniva stirato e il testo restava appeso in
+  alto — 6px sopra contro 8,8 sotto, uno scentramento visibile a
+  occhio. Ora sta a 7,0/7,8, gli stessi identici valori delle pillole
+  accanto: il residuo è l'asimmetria del font, uguale per tutte.
   ATTENZIONE a non riusare `--ship-bg`/`--ship-text` per questi badge:
   quelli restano dei badge di STATO dell'ordine («spedito»), che al
   buio DEVONO scurirsi come le sorelle locked/refunded — un chip

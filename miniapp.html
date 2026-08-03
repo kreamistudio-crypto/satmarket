@@ -88,11 +88,21 @@
     --ph-a:#332B1A; --ph-b:#2B2415;
     /* --ship-bg/--ship-text servono ai badge di STATO dell'ordine
        («spedito»): quelli si', al buio si scuriscono come le sorelle.
-       I quattro token dei badge della SPEDIZIONE (--ship-soft/-on e
-       --ship-full/-on) NON compaiono qui apposta: sono un codice
-       colore e valgono uguali nei due temi — la ragione lunga sta
-       accanto alla loro definizione, in cima. */
+       I token dei badge della SPEDIZIONE non seguono questa strada:
+       sono un codice colore, la ragione lunga sta in cima. */
     --ship-bg:#1E2C3C; --ship-text:#85B8E8; --warn-bg:#3C221A; --off-bg:#363126;
+    /* UNICA taratura notturna dei badge spedizione (lug 2026, feedback
+       di Andrea: «di sera è troppo evidente»). Il chiaro su fondo bruno
+       rendeva piu' di quanto rendesse sul crema — stesso colore, ma di
+       notte un chip chiaro grida — e il tenue finiva per pesare piu'
+       del pieno. Qui si abbassa la LUCE, non si cambia il SEGNO: resta
+       un chip azzurro chiaro con testo blu, identico a riconoscersi,
+       solo un gradino meno acceso (contro il bruno 13,59 → 11,04). Il
+       testo scende con lui per tenere il margine (5,83 contro il 4,57
+       che sarebbe rimasto lasciando #12599E). L'inversione chiaro↔scuro
+       resta BOCCIATA: quella cambiava il segno, questa lo calibra.
+       --ship-full/--ship-on NON si toccano, ne' qui ne' altrove. */
+    --ship-soft:#BAD2E8; --ship-soft-on:#0E4A80;
     /* di sera il cartone si schiarisce (il fondo dell'app e' gia'
        bruno: un marrone scuro ci affonderebbe dentro) e resta piu'
        terroso dell'arancio ₿, che li' accanto non deve avere sosia */
@@ -916,7 +926,14 @@
      scuro su fondo scuro e spariva. Il contorno pieno sul grado basso
      e' stato provato e tolto: dava peso a quello che deve pesarne
      meno. */
+  /* inline-flex e non block: `.pills` e' un flex ad align-items STRETCH,
+     e le pillole vicine sono piu' alte di 3px (hanno 1.5px di bordo per
+     lato, il badge no). Da block il badge veniva stirato a quell'altezza
+     e il testo restava appeso in alto — 6px sopra contro 8.8 sotto, che
+     e' lo scentramento che si vedeva. Cosi' la scatola si stira lo
+     stesso, ma il testo sta al centro di quel che diventa. */
   .sped-badge{background:var(--ship-soft);color:var(--ship-soft-on);
+    display:inline-flex;align-items:center;justify-content:center;
     border-radius:999px;padding:6px 12px;font-size:13px;font-weight:800;
     white-space:nowrap}
   /* Il grado ALTO: la spedizione GRATUITA e' un argomento di vendita e
