@@ -2912,6 +2912,216 @@ function go(view){
   window.scrollTo(0,0);
 }
 
+/* ---------------- il gesto indietro ----------------
+   Il tasto indietro di Android e lo swipe dal bordo prima CHIUDEVANO
+   l'app: da dentro un dettaglio, un foglio di pagamento o un ordine si
+   perdeva tutto. Ora tornano indietro di un passo, e si esce solo dalla
+   radice. La freccia ← in alto e la tab bar restano tutte: il gesto si
+   AGGIUNGE, non sostituisce niente.
+
+   Tre scelte da ricordare, che spiegano tutto il resto.
+
+   1) L'URL non si tocca MAI (pushState con location.href). Il server
+      serve solo le rotte esplicite (regola ferrea 3): un «/profilo»
+      inventato darebbe 404 al reload, e i deep link /annuncio/{id} e
+      /negozio/{chi} si leggono una volta sola al parse.
+
+   2) L'ascoltatore e' DICHIARATIVO. popstate non dice «indietro», dice
+      «il cursore si e' spostato»: si sposta anche in AVANTI, e puo'
+      saltare piu' entry in una volta (i browser marcano saltabili
+      quelle spinte fuori da un gesto dell'utente — e noi ne abbiamo:
+      il deep link dopo l'await, openOrder dentro il setTimeout del
+      pagamento, il tour che parte da solo). Chi «toglie un livello» a
+      ogni popstate si corrompe al primo salto doppio; chi RI-APPLICA
+      lo stato scritto nella entry no: degrada, non si rompe.
+
+   3) La pila si DERIVA dal DOM, non si tiene a mano, e a rilevarla e'
+      un MutationObserver sulle classi. E' cio' che tiene il diff
+      piccolo: i 18 siti che aprono un foglio, closeSheet() e le tre
+      chiusure mirate che esistono apposta per non uccidere il pollTimer
+      restano intonsi. Non e' un'idea nuova qui dentro: altroFoglioAperto
+      legge gia' `.sheet.open` e apriSicurezza leggeva gia' `.view.active`.
+
+   Chiudere uno strato passa SEMPRE dalla sua funzione dedicata, mai da
+   closeSheet(): quello spegne la pila intera e con lei il pollTimer del
+   pagamento. */
+
+/* I quattro tab della nav sono RADICI sorelle: fra loro si SOSTITUISCE
+   (girarli tutti non deve costare quattro indietro) e dalla radice
+   l'indietro esce dall'app, che e' il patto chiesto. Si spinge solo
+   entrando in una vista piu' interna. */
+const RADICI = new Set(['esplora','vendi','affari','profilo']);
+/* Su file:// (la DEMO aperta a mano) la storia non si puo' toccare: il
+   motore resta spento e tutto si comporta come ieri. Stessa guardia di
+   protocollo del service worker. */
+const STORIA = location.protocol.startsWith('http');
+let navUltimo = 0;        /* la serratura contro il doppio canale */
+
+function navVista(){
+  const v = (document.querySelector('.view.active')?.id || 'view-esplora').replace('view-','');
+  /* la chiave dice QUALE dettaglio, quale ordine, quale negozio: la
+     vista da sola non basta a ricostruirli */
+  return {t:'v', v, k: v==='dettaglio' ? (currentListing?.id || 0)
+                    : v==='ordine'    ? (currentOrder?.id || 0)
+                    : v==='negozio'   ? (negozioPag.chi || '')
+                    : 0};
+}
+/* La pila: la vista in fondo, sopra gli strati nell'ordine in cui si
+   coprono (che e' quello degli z-index: fogli 41, lightbox 70, tour 80,
+   cartello 90). Il picker va per ultimo fra i fogli — e' l'unico che si
+   apre SOPRA un altro, e nel markup non sta in coda. */
+function navPila(){
+  const p = [navVista()];
+  [...document.querySelectorAll('.sheet.open')].map(s => s.id)
+    .sort((a,b) => (a==='pickerSheet') - (b==='pickerSheet'))
+    .forEach(id => p.push({t:'f', k:id}));
+  if (el('lightbox')?.classList.contains('open')) p.push({t:'lb', k:''});
+  if (tourInCorso)       p.push({t:'tour', k:''});
+  if (testModaleInCorso) p.push({t:'test', k:''});
+  return p;
+}
+const navStesso = (x,y) => !!x && !!y && x.t===y.t && x.v===y.v && x.k===y.k;
+const navUguali = (a,b) => !!a && !!b && a.length===b.length
+                        && a.every((x,i) => navStesso(x, b[i]));
+
+/* Chiusura MIRATA di un solo strato, gemella di chiudiPicker: il velo
+   resta se sotto ne e' rimasto un altro, e il pollTimer si ferma SOLO
+   col foglio che lo possiede (closeSheet lo uccideva sempre). */
+function navChiudiStrato(s){
+  if (s.t==='lb')   return chiudiLightbox();
+  if (s.t==='tour') return chiudiTour();
+  if (s.t==='test') return chiudiModaleTest();
+  if (s.k==='pickerSheet') return chiudiPicker();
+  el(s.k)?.classList.remove('open');
+  if (!document.querySelector('.sheet.open')) el('sheetBg').classList.remove('open');
+  if (s.k==='paySheet' && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+/* Ricostruire una vista: il contenuto di dettaglio, ordine e negozio lo
+   fabbrica il suo opener, la classe .active da sola mostrerebbe la
+   scheda di PRIMA. E la vista puo' essersi svuotata nel frattempo
+   (annuncio venduto, identita' cambiata da un reload): mai ricostruire
+   il vuoto — openOrder non ha guardie e ci morirebbe dentro. E' lo
+   stesso patto di tornaDaSicurezza e della ri-idratazione di avvia(). */
+function navRendiVista(b){
+  if (b.v === 'dettaglio')
+    return (listings.find(x=>x.id===b.k) || myListings.find(x=>x.id===b.k))
+      ? openDetail(b.k) : go('esplora');
+  if (b.v === 'ordine')
+    return orders.find(x=>x.id===b.k) ? openOrder(b.k) : go('affari');
+  if (b.v === 'negozio') {
+    /* senza codice (il negozio finto della DEMO) il markup e' ancora
+       quello giusto: basta riaccendere la vista */
+    if (!b.k) return negozioCorrente ? go('negozio') : go('esplora');
+    return apriNegozio(b.k).then(() => {
+      if (!el('view-negozio').classList.contains('active')) go('esplora');
+    });
+  }
+  go(b.v);
+}
+
+/* Il DOM e' cambiato: la entry corrente si allinea. Qui NON si decide
+   nulla di navigazione, si fotografa soltanto — per questo funziona
+   anche con l'early-return della VETRINA (che non cambia vista ma apre
+   il foglio-invito: uno strato, e l'indietro chiude l'invito restando
+   in Esplora). */
+function navRiflette(){
+  if (!STORIA) return;
+  const ora = navPila(), st = history.state?.pila;
+  if (navUguali(ora, st)) { navFreccia(ora); return; }
+  const stato = {app:'brt', pila: ora};
+  try {
+    if (!st || ora.length < st.length) history.replaceState(stato, '', location.href);
+    else if (ora.length > st.length)   history.pushState(stato, '', location.href);
+    else {
+      /* Stessa profondita': o e' cambiata la vista, o un foglio ha preso
+         il posto di un altro (setSheet → paySheet). Si SPINGE solo
+         entrando in una vista piu' interna — dettaglio, negozio, ordine,
+         sicurezza —: li' l'indietro deve riportare indietro. Tornare a
+         una radice (i tab, e i ripieghi quando una vista si e' svuotata)
+         e il cambio foglio→foglio sostituiscono: nessun gradino nuovo da
+         smontare, e nessun foglio da riaprire all'indietro. */
+      const a = ora[ora.length - 1];
+      const spinge = a.t === 'v' && !RADICI.has(a.v);
+      history[spinge ? 'pushState' : 'replaceState'](stato, '', location.href);
+    }
+  } catch(e){}
+  navFreccia(ora);
+}
+
+/* Il cursore si e' spostato: si RI-APPLICA lo stato della entry
+   d'arrivo, qualunque salto abbia fatto. Gli strati in eccesso si
+   smontano dal piu' alto; quelli in DIFETTO (un avanti sopra un foglio)
+   non si riaprono — lightbox e tour vogliono dati che nella entry non
+   ci sono — e ci pensa il riflette successivo a rimettere la entry in
+   pari con la realta'. Sistema auto-guarente. */
+function navApplica(s){
+  const bersaglio = (s && s.app==='brt' && s.pila) ? s.pila : [{t:'v', v:'esplora', k:0}];
+  let ora = navPila(), giri = 0;
+  while (ora.length > 1 && !navUguali(ora, bersaglio.slice(0, ora.length)) && giri++ < 8) {
+    navChiudiStrato(ora[ora.length - 1]);
+    ora = navPila();
+  }
+  if (!navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
+  navFreccia(bersaglio);
+}
+
+/* L'unico modo di scendere di un gradino: lo chiamano la freccia ←, la
+   ✕ dei fogli, il tocco sul velo, Escape e il tasto indietro di
+   Telegram. Uno solo smonta i livelli — l'ascoltatore di popstate —
+   cosi' gesto e freccia non possono divergere. */
+function navIndietro(){
+  const t = Date.now();
+  if (t - navUltimo < 350) return;   /* due canali, un solo passo */
+  navUltimo = t;
+  if (STORIA) history.back();
+  else navApplica(null);             /* DEMO da file://: almeno si esce dallo strato */
+}
+
+/* La freccia di sistema di Telegram compare quando c'e' davvero dove
+   tornare. Alla radice resta nascosta: li' il gesto chiude la Mini App,
+   che e' il comportamento voluto.
+   Lo swipe verticale si spegne solo quando siamo dentro, ed e' il solo
+   trascinamento ACCIDENTALE della pagina (quello che chiude l'app
+   mentre si scorre una scheda lunga): la freccetta ⌄ della chrome di
+   Telegram non si tocca in nessun caso — quella chiude l'app sempre,
+   ovunque ci si trovi. */
+function navFreccia(pila){
+  const dentro = pila.length > 1 || !(pila[0].t==='v' && RADICI.has(pila[0].v));
+  if (!tg?.initData) return;
+  try {
+    if (tg.BackButton && tg.isVersionAtLeast?.('6.1'))
+      dentro ? tg.BackButton.show() : tg.BackButton.hide();
+    if (tg.isVersionAtLeast?.('7.7'))
+      dentro ? tg.disableVerticalSwipes?.() : tg.enableVerticalSwipes?.();
+  } catch(e){}
+}
+
+/* Si accende una volta sola, subito prima di avvia(): prima non si puo'
+   (le variabili degli strati sono dichiarate piu' in basso e sarebbero
+   in zona morta). La semina della radice serve perche' history.state
+   SOPRAVVIVE ai location.reload() del login e racconterebbe cose della
+   vecchia identita'. */
+function navMotore(){
+  if (!STORIA) return;
+  try { history.replaceState({app:'brt', pila: navPila()}, '', location.href); } catch(e){}
+  /* Il callback e' un microtask: gira ancora dentro il task del gesto
+     dell'utente (l'entry non viene marcata saltabile) e COALESCE i piu'
+     cambi dello stesso giro — per questo il passaggio foglio→foglio
+     risulta a saldo zero da solo, senza scriverlo da nessuna parte. */
+  const occhio = new MutationObserver(() => navRiflette());
+  [...document.querySelectorAll('.view, .sheet'),
+   el('lightbox'), el('tour'), el('testModale')].forEach(n =>
+    n && occhio.observe(n, {attributes:true, attributeFilter:['class']}));
+  addEventListener('popstate', e => navApplica(e.state));
+  /* Dentro Telegram il gesto lo intercetta il CLIENT, non la WebView:
+     con la freccia visibile lo instrada qui, con la freccia nascosta
+     chiude la Mini App. Un solo cammino: anche il tasto di Telegram
+     chiede una traversata, non smonta niente per conto suo. */
+  if (tg?.initData) tg.onEvent?.('backButtonClicked', navIndietro);
+  navFreccia(navPila());
+}
+
 /* ---------------- esplora ---------------- */
 /* Le pillole si ordinano per contenuto: "Tutto" sempre prima, poi le
    categorie con piu' annunci attivi; quelle vuote non compaiono
@@ -4627,6 +4837,12 @@ function openDetail(id){
     aggiorna();                       // al primo sguardo la ‹ e' gia' spenta
   }
   go('dettaglio');
+  /* Dettaglio → dettaglio non cambia nessuna classe, e succede davvero:
+     le card della striscia «Altri oggetti di questo venditore» aprono
+     un altro annuncio restando nella stessa vista. Senza questa riga
+     quel passo sparirebbe dalla cronologia. navRiflette e' idempotente:
+     se non e' cambiato nulla non fa nulla. */
+  navRiflette();
   sezioneAltriOggetti(l);             // in coda, fail-open: arriva quando arriva
 }
 
@@ -9328,6 +9544,7 @@ osservaSentinella('gridSentinella', caricaAltri);
 osservaSentinella('negozioSentinella', caricaAltriNegozio);
 osservaSentinella('mieiSentinella', caricaAltriMiei);
 
+navMotore();   /* il gesto indietro, prima che parta qualunque vista */
 avvia();
 
 /* PWA: il service worker si registra SOLO fuori da Telegram — dentro
