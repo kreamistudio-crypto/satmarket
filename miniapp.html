@@ -565,8 +565,20 @@
      (cerchietti, pallini, frecce) si appende qui */
   .detail-foto{position:relative}
   .detail-photos{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
-    scrollbar-width:none;background:var(--ph-b)}
+    scrollbar-width:none;background:var(--ph-b);
+    /* lo scorrimento della galleria non esce da qui: detto sulla
+       striscia e non solo sull'html, perche' e' una proprieta' SUA */
+    overscroll-behavior-x:contain}
   .detail-photos::-webkit-scrollbar{display:none}
+  /* CON UNA FOTO SOLA LA STRISCIA NON E' UNA STRISCIA (lug 2026, da un
+     bug vero: gli annunci a foto singola scorrevano di lato portandosi
+     dietro tutta la pagina). Restava un contenitore scorrevole con lo
+     snap acceso ma senza niente da scorrere, quindi il trascinamento
+     non lo consumava nessuno e si incatenava all'antenato. Niente
+     overflow e niente snap: non c'e' un secondo posto dove andare,
+     e la pagina non si muove piu' di lato. I pallini gia' non
+     esistevano, ora e' vero anche lo scorrimento. */
+  .detail-photos.una{overflow-x:hidden;scroll-snap-type:none}
   /* Quadrata come le card e le miniature: le foto di oggetti sono
      spesso verticali, il taglio panoramico le decapitava */
   /* scroll-snap-stop:always = UNO SWIPE, UNA FOTO (il patto di
@@ -5481,7 +5493,7 @@ function openDetail(id){
        <button class="foto-nav next" aria-label="Foto successiva" title="Foto successiva">
          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>` : '';
   const foto = (l.photos && l.photos.length)
-    ? `<div class="detail-foto"><div class="detail-photos">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
+    ? `<div class="detail-foto"><div class="detail-photos${l.photos.length>1?'':' una'}">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
        ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<button${i?'':' class="on"'} aria-label="Vai alla foto ${i+1}"></button>`).join('')}</div>`:''}${frecce}${indietro}${barattolino}${condividi}</div>`
     : `<div class="detail-foto"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
   /* I ponti di contatto NON vivono piu' qui (lug 2026): si trovano
