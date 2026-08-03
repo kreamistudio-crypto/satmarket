@@ -1155,14 +1155,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tempi): nella fila delle pillole si dice SE si spedisce —
   `spedBadge()` è «🚚 Spedizione disponibile» in azzurro TENUE, e
   diventa «🚚 Spedizione gratuita» in azzurro PIENO
-  (`.sped-badge.piena`, token nuovi `--ship-full`/`--ship-on`,
-  contrasti AA misurati nei due temi: 5,25 e 7,88) quando non c'è un
+  (`.sped-badge.piena`, token `--ship-full`/`--ship-on`) quando non c'è un
   costo dichiarato — la gratuità è un argomento di vendita e non può
   aspettare il fondo pagina. Il grado basso è NUDO: il contorno pieno
   provato addosso al «disponibile» dava peso a ciò che deve pesarne
   meno. Ritiro e codice online non si nominano: sono gratuiti per
   natura. Giudici unici `spedisce` e `spedGratis` — «gratis» si decide
   in un posto solo, e da lì lo legge anche l'icona in card.
+  IL PIENO NON CAMBIA COL TEMA (lug 2026, feedback di Andrea): il blu
+  scuro col testo bianco è lo STESSO di giorno e di sera —
+  `--ship-full`/`--ship-on` hanno gli stessi valori nei due blocchi di
+  token, ed è voluto, non una dimenticanza. Per un giorno il pieno si
+  era invertito al buio come fanno l'etichetta prezzo e il toast (fondo
+  chiaro, testo scuro), e di sera diventava un azzurro acceso: cioè un
+  colore DIVERSO da quello imparato di giorno. Qui però il colore È il
+  segno — «questa spedizione è gratis» — e un segno non può cambiare
+  tinta a metà giornata; l'inversione ha senso per una superficie
+  (un'etichetta, un toast), non per un codice colore. Bianco su
+  #2A6FB0 = 5,25 in entrambi i temi, e il chip stacca dal fondo (4,78
+  sul crema, 3,28 sul bruno): AA senza bisogno di invertire. Il
+  cerchietto della card eredita lo stesso token e al buio scende a
+  2,89 sul fondo della card — accettato: è una FORMA decorativa attorno
+  a un'emoji che resta luminosa, non un testo da leggere, e la tinta
+  blu su bruno si distingue comunque bene (verificato a schermo).
   IL GEMELLO COL COSTO SOTTO ACQUISTA È VISSUTO UN GIORNO: nato per
   dire il QUANTO nel momento in cui si compra («🚚 Spedizione +
   5,00 €», dentro il recinto), è stato tolto subito dopo averlo visto

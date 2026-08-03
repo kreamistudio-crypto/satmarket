@@ -74,9 +74,17 @@
     --header-bg:rgba(33,26,16,.92); --nav-bg:rgba(44,37,23,.96);
     --ph-a:#332B1A; --ph-b:#2B2415;
     --ship-bg:#1E2C3C; --ship-text:#85B8E8; --warn-bg:#3C221A; --off-bg:#363126;
-    /* di sera il pieno si inverte: fondo chiaro, testo scuro — come
-       l'etichetta prezzo e il toast, che al buio diventano di carta */
-    --ship-full:#85B8E8; --ship-on:#12202E;
+    /* Il pieno della spedizione gratuita NON cambia col tema (deciso da
+       Andrea, lug 2026): resta lo stesso blu scuro col testo bianco, di
+       giorno e di sera. Per un giro si era invertito come l'etichetta
+       prezzo e il toast — fondo chiaro e testo scuro — ma di sera
+       diventava un azzurro acceso, cioe' un colore DIVERSO da quello
+       che si era imparato di giorno. Qui il colore E' il segno («questa
+       spedizione e' gratis»), e un segno non puo' cambiare tinta a meta'
+       giornata: percio' i due valori sono gli stessi del tema chiaro.
+       Bianco su #2A6FB0 = 5,25 e il chip stacca dal fondo bruno (4,78):
+       AA in entrambi i temi senza bisogno di invertire. */
+    --ship-full:#2A6FB0; --ship-on:#fff;
     /* di sera il cartone si schiarisce (il fondo dell'app e' gia'
        bruno: un marrone scuro ci affonderebbe dentro) e resta piu'
        terroso dell'arancio ₿, che li' accanto non deve avere sosia */
