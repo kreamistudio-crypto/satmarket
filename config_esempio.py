@@ -146,6 +146,18 @@ NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
 # `python importa_nostr.py`, che usa NPUB_VENDITORE / VENDITORE_ID).
 IMPORT_NOSTR_APERTO = False
 
+# --- Categorie proposte da sola (la coda dei moderatori) --------------
+# Dopo ogni giro d'import l'AI guarda gli annunci arrivati dai relay (e
+# chiunque sia rimasto in "Altro") e propone dove starebbero meglio: le
+# proposte finiscono nella coda "Categorie da sistemare" del Profilo, e
+# un moderatore le approva a gruppi. In vetrina non cambia niente
+# finche' non le approvi tu.
+# Costa pochi centesimi al giorno perche' chiede solo per gli annunci
+# NUOVI o cambiati, e non ripropone mai uno spostamento gia' rifiutato.
+# False = coda ferma (restano ricategorizza.py e sposta_a_mano.py, che
+# si lanciano quando vuoi).
+RICATEGORIZZA_AUTO = True
+
 # --- Post automatici (la piattaforma racconta i fatti) ----------------
 # Ogni nuovo annuncio in vetrina viene annunciato dai canali di
 # Barattolo: una nota Nostr (con la chiave piattaforma qui sopra) e un

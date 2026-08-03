@@ -10641,6 +10641,30 @@ _prossima_scoperta_nostr = 0.0
 # spendere l'intero credito AI in un colpo solo.
 MAX_VENDITORI_NUOVI_GIRO = 10
 
+# --- Ricategorizzazione automatica (lug 2026) ------------------------
+# Lo stesso mestiere di ricategorizza.py, ma da sola dopo ogni giro
+# d'import: riempie la coda «🗂 Categorie da sistemare» e avvisa i
+# moderatori. L'approvazione resta a mano e raggruppata — qui non
+# cambia niente di cio' che si vede in vetrina, si prepara solo il
+# lavoro di chi decide.
+#
+# Il momento e' l'import e non un orario fisso perche' e' l'import a
+# creare il problema: gli annunci che arrivano dai relay nascono tutti
+# in «Altro». E costa nulla girare a vuoto: senza righe nuove la query
+# non trova niente e all'AI non si chiede un bel niente.
+#
+# CHI SI GUARDA: gli importati da Nostr e chiunque stia in «Altro». I
+# nativi in una categoria vera hanno avuto un umano che l'ha scelta dal
+# form, e la macchina non e' li' per correggere le persone.
+try:
+    from config import RICATEGORIZZA_AUTO
+except ImportError:
+    RICATEGORIZZA_AUTO = True        # False nel config = spenta
+
+# Il tetto di spesa per giro (5 chiamate a lotti da 20): un'ondata
+# grossa si digerisce in piu' tornate, un'ora alla volta.
+MAX_RICATEGORIZZA_GIRO = 100
+
 # Il messaggio che accoglie chi scopriamo. Non e' una notifica di
 # servizio: e' la prima cosa che un estraneo legge di noi, ed e' il
 # motivo per cui l'import aperto non e' uno scippo — arriva PRIMA che
@@ -11284,6 +11308,133 @@ async def importa_nostr_periodico():
             accoda_match(r["id"])
     except Exception as e:
         print(f"⚠️ Dopo-import (coordinate/avvisi) saltato: {e}")
+    # E in coda al giro, la coda delle categorie: gli annunci appena
+    # arrivati sono tutti in «Altro», ed e' adesso che vale la pena
+    # chiedere dove starebbero meglio.
+    await ricategorizza_automatico()
+
+
+async def _chiedi_categorie(voci: list) -> dict:
+    """UN lotto all'AI: voci = [(id, titolo, descrizione, categoria)],
+    ritorna {id: categoria_nuova} coi soli spostamenti veri.
+
+    Il prompt e il parsing vengono da ricategorizza.py — che e' dove
+    vivono da quando lo script esiste — perche' un prompt in due copie
+    e' un prompt che diverge: si corregge una, si dimentica l'altra, e
+    la coda si riempie di proposte diverse secondo chi le ha chieste.
+    Fail-open come tutta la moderazione: se la chiamata esplode, il
+    lotto passa e si riprova al giro dopo."""
+    import ricategorizza
+    corpo = "\n\n".join(
+        f"ANNUNCIO {i}\nTITOLO: {(t or '')[:160]}\n"
+        f"DESCRIZIONE: {(d or '')[:400]}\nORA STA IN: {c}"
+        for i, t, d, c in voci)
+    try:
+        r = await asyncio.to_thread(
+            ai.messages.create,
+            model=MODELLO_RICERCA, max_tokens=700, timeout=40,
+            system=ricategorizza.PROMPT.format(
+                cat="\n".join(f"- {c}" for c in CATEGORIE)),
+            messages=[{"role": "user", "content": corpo}])
+    except Exception as e:
+        print(f"⚠️ Lotto di ricategorizzazione saltato: {e}")
+        return {}
+    testo = "".join(b.text for b in r.content if b.type == "text")
+    ora = {i: c for i, _, _, c in voci}
+    fuori = {}
+    for riga in testo.splitlines():
+        m = ricategorizza.RIGA.match(riga)
+        if not m:
+            continue
+        ident, nuova = int(m.group(1)), m.group(2).strip().strip(".")
+        # NON SO, categoria inventata, id allucinato: resta dov'e'
+        if ident in ora and nuova in CATEGORIE and nuova != ora[ident]:
+            fuori[ident] = nuova
+    return fuori
+
+
+async def ricategorizza_automatico():
+    """La coda delle categorie che si riempie da sola, dopo l'import.
+
+    I TRE FRENI, che sono la ragione per cui questa macchina puo'
+    girare ogni ora senza diventare una spesa:
+      1. si guardano solo gli annunci di cui non esiste gia' una riga
+         in coda fatta sulla categoria che hanno ADESSO. Un annuncio
+         fermo non si ripaga mai due volte;
+      2. quella stessa riga e' anche il «no» del moderatore: uno
+         spostamento RIFIUTATO resta scritto con la categoria di
+         partenza, quindi l'annuncio non torna piu' a bussare finche'
+         qualcuno non lo sposta per altre vie. Il rifiuto non si
+         chiede due volte;
+      3. il tetto per giro, che un'ondata la digerisce in piu' ore.
+    Piu' la leva del config, che la spegne del tutto.
+
+    L'avviso ai moderatori e' UNO e aggregato — il patto del drenatore
+    dei post — e parte solo se questo giro ha prodotto qualcosa: una
+    coda ferma non deve suonare ogni ora."""
+    if not RICATEGORIZZA_AUTO:
+        return
+    if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
+        return
+    try:
+        con = db()
+        righe = con.execute(
+            "SELECT a.id, a.titolo, a.descrizione, a.categoria FROM annunci a "
+            "WHERE a.stato='attivo' "
+            # gli importati (nascono in «Altro») e chiunque sia in
+            # «Altro»: i nativi con una categoria vera l'ha scelta una
+            # persona, e non si corregge
+            "  AND (a.contatto_nostr!='' OR a.categoria='Altro') "
+            "  AND NOT EXISTS(SELECT 1 FROM categoria_proposta p "
+            "                 WHERE p.annuncio_id=a.id "
+            "                   AND p.categoria_ora=a.categoria) "
+            "ORDER BY a.id DESC LIMIT ?",
+            (MAX_RICATEGORIZZA_GIRO,)).fetchall()
+        con.close()
+        if not righe:
+            return
+        proposte = {}
+        for i in range(0, len(righe), 20):
+            lotto = righe[i:i + 20]
+            proposte.update(await _chiedi_categorie(
+                [(r["id"], r["titolo"], r["descrizione"], r["categoria"])
+                 for r in lotto]))
+        ora = {r["id"]: (r["categoria"], r["titolo"]) for r in righe}
+        if not proposte:
+            print(f"🗂 Ricategorizzazione: {len(righe)} guardati, "
+                  f"nessuno da spostare")
+            return
+        adesso = int(time.time())
+        con = db()
+        con.executemany(
+            "INSERT INTO categoria_proposta(annuncio_id, categoria_ora, "
+            "categoria_nuova, motivo, creato, stato, deciso_da, deciso_il) "
+            "VALUES(?,?,?,'',?,'proposta',0,0) "
+            "ON CONFLICT(annuncio_id) DO UPDATE SET "
+            "categoria_ora=excluded.categoria_ora, "
+            "categoria_nuova=excluded.categoria_nuova, "
+            "creato=excluded.creato, stato='proposta', deciso_da=0, "
+            "deciso_il=0",
+            [(i, ora[i][0], nuova, adesso) for i, nuova in proposte.items()])
+        con.commit()
+        con.close()
+        print(f"🗂 Ricategorizzazione: {len(righe)} guardati, "
+              f"{len(proposte)} proposte in coda")
+        # L'avviso: i gruppi, non i titoli. Chi modera decide sul
+        # gruppo, e un elenco di venti righe in chat non si legge.
+        gruppi = {}
+        for i, nuova in proposte.items():
+            gruppi[(ora[i][0], nuova)] = gruppi.get((ora[i][0], nuova), 0) + 1
+        righe_msg = "\n".join(
+            f"• {html.escape(da)} → {html.escape(a)}: {n}"
+            for (da, a), n in sorted(gruppi.items(), key=lambda g: -g[1])[:8])
+        await notifica_admin(
+            f"🗂 <b>{len(proposte)} nuove proposte di categoria</b>\n"
+            f"{righe_msg}\n\n"
+            f"Le trovi nel Profilo, in «🗂 Categorie da sistemare»: "
+            f"si approvano a gruppi.")
+    except Exception as e:
+        print(f"⚠️ Ricategorizzazione automatica saltata: {e}")
 
 
 def pulisci_import():
