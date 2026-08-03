@@ -67,6 +67,15 @@ RELAYS = [
 LIMITE_ANNUNCI = 500
 LIMITE_CANCELLAZIONI = 500
 
+# Il tetto sui pezzi in stock: la stessa leva del server, letta anche
+# qui perche' l'import scrive dritto nel database e non passa dai
+# giudici dei payload. Se il config non c'e' (script lanciato altrove)
+# vale il default di server.py.
+try:
+    from config import MAX_QUANTITA_ANNUNCIO
+except ImportError:
+    MAX_QUANTITA_ANNUNCIO = 100
+
 # ==============================================================
 
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"   # alfabeto bech32
@@ -393,17 +402,34 @@ def estrai_commercio(e):
             except ValueError:
                 continue
             if n > 0:
-                fuori["quantita"] = n
-    if spedisce or ritira or digitale:
-        if digitale and not (spedisce or ritira):
-            fuori["consegna"] = "digitale"
-        elif spedisce and ritira:
-            fuori["consegna"] = "entrambe"
-        elif spedisce:
-            fuori["consegna"] = "spedizione"
-        else:
-            fuori["consegna"] = "ritiro"
-        fuori["anche_digitale"] = 1 if (digitale and (spedisce or ritira)) else 0
+                # Il tetto vale anche qui. Le guardie di Barattolo
+                # stanno nel form e nel giudice del payload, ma questa
+                # strada scrive DRITTA nel database e le scavalcherebbe
+                # tutte: uno ["stock","999999"] su un relay non deve
+                # poter fare quello che il form non lascia fare. Si
+                # lima invece di scartare, come quantita_tollerante
+                # del CSV: la merce c'e' davvero, e' il numero a essere
+                # fuori scala.
+                fuori["quantita"] = min(n, MAX_QUANTITA_ANNUNCIO)
+    # LA CONSEGNA DIGITALE NON ARRIVA DAI RELAY (lug 2026). Il codice
+    # di un buono passa DENTRO Barattolo — c'e' l'endpoint che lo
+    # consegna, la rivelazione che fa da ricevuta, le finestre corte
+    # di 24/48 ore — e tutto questo chiede che il venditore sia QUI a
+    # premere un bottone. Un venditore che sta solo su Nostr non ce
+    # l'ha, quel bottone: promettere una consegna immediata che
+    # nessuno puo' fare sarebbe una bugia scritta in vetrina, e il
+    # compratore la scoprirebbe a sats gia' in cassaforte.
+    # Il tag non si ignora per sfiducia: se il venditore entra su
+    # Barattolo con la sua chiave, la consegna digitale la dichiara
+    # dal form come tutti — dove la guardia sulle vendite minime
+    # (DIGITALE_MIN_VENDITE) puo' dire la sua.
+    # (`digitale` si legge ma non si usa: serve a NON confonderlo con
+    # un tag sconosciuto, e il giorno che i codici si potranno
+    # consegnare da fuori bastera' rimettere in piedi il ramo.)
+    if spedisce or ritira:
+        fuori["consegna"] = ("entrambe" if (spedisce and ritira)
+                             else "spedizione" if spedisce else "ritiro")
+        fuori["anche_digitale"] = 0
         if spedisce:
             # L'euro resta ancorato all'euro (e' la semantica che
             # Barattolo da' a spedizione_eur); ogni altra valuta

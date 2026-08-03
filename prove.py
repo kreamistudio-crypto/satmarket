@@ -194,6 +194,21 @@ def prove_tag_commercio():
           leggi(ev([["quantity", "7"]])))
     prova("«unlimited» si ignora", {}, leggi(ev([["stock", "unlimited"]])))
 
+    # Le due guardie che i relay non devono poter scavalcare: l'import
+    # scrive dritto nel database, quindi qui non c'e' nessun giudice
+    # del payload a fermare un numero assurdo o una promessa che il
+    # venditore non puo' mantenere.
+    prova("lo stock fuori scala si lima al tetto",
+          imp.MAX_QUANTITA_ANNUNCIO,
+          leggi(ev([["stock", "999999"]])).get("quantita"))
+    prova("uno stock sano non si tocca", 7,
+          leggi(ev([["stock", "7"]])).get("quantita"))
+    prova("«delivery digital» da solo non fa una consegna digitale",
+          None, leggi(ev([["delivery", "digital"]])).get("consegna"))
+    prova("e in combo non accende nemmeno anche_digitale", 0,
+          leggi(ev([["delivery", "shipping", "0", "EUR"],
+                    ["delivery", "digital"]])).get("anche_digitale"))
+
     # il giro si chiude
     for nome, ann in [
             ("EUR + condizione + quantita",
