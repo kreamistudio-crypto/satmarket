@@ -5658,8 +5658,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
     il pacco e' uno solo), una conferma. Solo strade FISICHE:
     il digitale ha la colonna unica del contenuto e le sue finestre
     corte, resta fuori dal set per costruzione; gli annunci senza
-    modalita' ('' — storici e importati) non dichiarano un costo di
-    spedizione e restano fuori anche loro. Stessa liturgia del mono:
+    modalita' ('' — gli storici, e gli importati che non la
+    dichiarano) non dicono un costo di spedizione e restano fuori
+    anche loro. Dall'import aperto (lug 2026) un annuncio arrivato da
+    Nostr PUO' dichiararla, col tag `delivery`: in quel caso entra nei
+    set come tutti, ed e' giusto — il catalogo e' uno solo, cambia
+    solo chi firma l'evento. Stessa liturgia del mono:
     fail-fast di cortesia, poi la invoice, poi il ricontrollo che fa
     fede — per OGNI riga — senza await fino all'INSERT."""
     # --- Le righe richieste: 2..MAX, annunci distinti, quantita sane
@@ -7727,8 +7731,11 @@ def evento_annuncio(a: dict, status: str) -> dict:
     tags += tag_commercio(a)
     for url in _foto_url_nostr(a.get("foto", "")):
         tags.append(["image", url])
-    # La consegna nel content, non nei tag: nessun tag nuovo da far
-    # digerire a importa_nostr.py o ai client altrui.
+    # La consegna ANCHE nel content, non solo nei tag qui sopra: i tag
+    # li legge una macchina, questa riga la legge una persona — e i
+    # client che il nostro vocabolario non lo conoscono mostrano solo
+    # il content. Le due strade dicono la stessa cosa; se un giorno
+    # divergessero, quella giusta e' il tag.
     if a.get("consegna") in ("spedizione", "entrambe"):
         # spedizione_eur piena = costo in euro (listino EUR, oppure
         # l'ancora all'euro dei listini sats): in piazza parla euro
@@ -7750,12 +7757,13 @@ def evento_annuncio(a: dict, status: str) -> dict:
         consegna_txt = ""
     if consegna_txt and a.get("anche_digitale"):
         consegna_txt += " o consegna digitale immediata"
-    # La condizione come la consegna: una riga del content, nessun tag
-    # nuovo (la spec NIP-99 non ne prevede uno).
+    # La condizione come la consegna: riga nel content per gli umani,
+    # tag `condition` per le macchine.
     condizione_txt = (f" — condizione: {CONDIZIONI[a['condizione']]}"
                       if a.get("condizione") in CONDIZIONI else "")
-    # E la quantita' allo stesso modo (verificato lug 2026: la spec
-    # non ha un tag stock). Solo se >1: il pezzo singolo resta pulito.
+    # E la quantita' allo stesso modo (tag `stock`, che la spec NIP-99
+    # non ha: se lo inventiamo noi, lo scriviamo anche in chiaro).
+    # Solo se >1: il pezzo singolo resta pulito.
     quantita_txt = (f" — disponibili: {a['quantita']}"
                     if (a.get("quantita") or 1) > 1 else "")
     content = ((a["descrizione"] or a["titolo"]).strip() +

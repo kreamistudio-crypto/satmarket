@@ -20,6 +20,14 @@ Da lug 2026 il server rifa' questo import DA SOLO ogni ora (vedi
 l'orologio in server.py, che importa questo modulo): lo script
 manuale resta per il primo giro e per le prove.
 
+E DA LI' NON E' PIU' UN VENDITORE SOLO: col server, l'import gira su
+tutti i venditori Nostr conosciuti, e gli eventi passano prima dal
+VAGLIO (firma verificata davvero, lingua italiana, moderazione
+completa) — vedi `importa_venditore(..., vaglio)`. Lanciato a mano,
+questo file si comporta come e' sempre stato: nessun vaglio, e la
+fiducia sta tutta nella npub che scrivi nel config. Va bene per un
+amico, non per uno sconosciuto.
+
 REQUISITI: pip install websocket-client   (gia' installato)
 """
 
