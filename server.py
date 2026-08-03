@@ -911,7 +911,15 @@ def init_db():
                     # Nostr (created_at), che per un replaceable e' la
                     # data di pubblicazione vera. Serve alla riga
                     # «pubblicato/aggiornato N giorni fa» del dettaglio.
-                    "modificato INTEGER DEFAULT 0"):
+                    "modificato INTEGER DEFAULT 0",
+                    # completamento_avvisato (lug 2026, import aperto):
+                    # al venditore scoperto su Nostr si chiede UNA volta
+                    # sola di completare cio' che l'evento NIP-99 non
+                    # porta (consegna, condizione, categoria). Una
+                    # colonna e non una coda in memoria, perche' «gliel'ho
+                    # gia' chiesto» deve sopravvivere ai riavvii: e' la
+                    # differenza tra un invito e il ronzio di ogni ora.
+                    "completamento_avvisato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -10627,6 +10635,64 @@ async def _apri_revisioni(npub: str, venditore_id: int):
             print(f"⚠️ Avviso di revisione non partito per #{r['id']}: {e}")
 
 
+async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
+    """Il DM che chiede al venditore di finire il lavoro.
+
+    Un evento NIP-99 non dice come si consegna, in che condizioni e'
+    l'oggetto e in che categoria sta: sono cose che Barattolo ha e
+    Nostr no. Importati cosi', quegli annunci restano a meta' — e la
+    meta' che manca e' proprio quella su cui il compratore filtra.
+    Prima si poteva solo indovinare (la categoria) o lasciar perdere;
+    ora si CHIEDE alla persona che lo sa: il venditore.
+
+    Si chiede UNA volta sola per annuncio (colonna
+    completamento_avvisato) e mai nel giro in cui l'annuncio e'
+    apparso: chi e' appena stato scoperto ha gia' ricevuto il DM di
+    benvenuto, e due messaggi di fila dallo stesso sconosciuto sono
+    un altro tipo di cosa. Il giro dopo, un'ora piu' tardi, va bene.
+    """
+    con = db()
+    righe = con.execute(
+        "SELECT id, titolo, consegna, condizione, categoria FROM annunci "
+        "WHERE stato='attivo' AND contatto_nostr=? "
+        "AND completamento_avvisato=0 AND creato<? "
+        "AND (consegna='' OR condizione='')",
+        (npub, t0)).fetchall()
+    if not righe:
+        con.close()
+        return
+    con.execute(
+        "UPDATE annunci SET completamento_avvisato=1 WHERE id IN "
+        f"({','.join('?' * len(righe))})", tuple(r["id"] for r in righe))
+    con.commit()
+    con.close()
+    manca = set()
+    if any(not r["consegna"] for r in righe):
+        manca.add("come si consegna (spedizione o ritiro)")
+    if any(not r["condizione"] for r in righe):
+        manca.add("in che condizioni è l'oggetto")
+    if any(r["categoria"] == "Altro" for r in righe):
+        manca.add("la categoria giusta")
+    quanti = len(righe)
+    quali = ("«" + html.escape(righe[0]["titolo"][:60]) + "»" if quanti == 1
+             else f"<b>{quanti} dei tuoi annunci</b>")
+    testo = (f"🫙 Su <b>Barattolo</b> {quali} "
+             f"{'è' if quanti == 1 else 'sono'} in vetrina, ma manca "
+             f"qualcosa che su Nostr non si può scrivere:\n"
+             + "".join(f"\n• {m}" for m in sorted(manca)) +
+             f"\n\nSono proprio i campi su cui chi compra filtra: "
+             f"completarli prende un minuto e cambia quanto ti trovano. "
+             f"Entra con la stessa chiave Nostr con cui hai firmato "
+             f"l'annuncio e li trovi già tuoi:\n{URL_PUBBLICO}\n\n"
+             f"<i>Te lo chiedo una volta sola.</i> 🕊")
+    try:
+        await notifica(venditore_id, testo)
+        print(f"  ✉️ chiesto il completamento di {quanti} annunci a "
+              f"{npub[:16]}…")
+    except Exception as e:
+        print(f"⚠️ Richiesta di completamento non consegnata: {e}")
+
+
 async def _accogli_venditore_nostr(hexkey: str) -> int:
     """Da chiave Nostr a utente di Barattolo. Se e' gia' dei nostri
     ritorna il suo tg_id senza toccare nulla; se e' nuovo gli apre
@@ -10767,6 +10833,7 @@ async def importa_nostr_periodico():
             importati, aggiornati, saltati = (importati + i, aggiornati + a,
                                               saltati + s)
             await _apri_revisioni(npub, venditore_id)
+            await _chiedi_completamento(npub, venditore_id, t0)
         except Exception as e:
             print(f"⚠️ Import di {npub[:16]}… saltato: {e}")
     print(f"🔄 Import Nostr: {importati} nuovi, {aggiornati} aggiornati, "
