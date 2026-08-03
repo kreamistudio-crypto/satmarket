@@ -595,6 +595,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sull'originale via onerror + dataset (MAI l'URL dentro una stringa
   JS interpolata: è il patto anti-XSS del filtro-alfabeto); galleria
   del dettaglio lazy dopo la prima foto.
+  IL GIRO DELLA VETRINA (lug 2026, da un bug vero: entrando in una
+  categoria da Sfoglia ogni annuncio compariva DUE volte). Non era la
+  griglia disegnata due volte — `renderGrid` riscrive sempre
+  l'`innerHTML` — ma la PAGINA DOPO che arriva in ritardo e si
+  appiccica in fondo a una griglia già rifatta da un'altra vista:
+  `apriCategoria` svuota la griglia, quindi la sentinella si SCOPRE e
+  chiede la pagina successiva col cursore della vista PRECEDENTE mentre
+  la prima pagina della categoria è ancora per strada. E su una
+  categoria piccola quella «pagina dopo» è ESATTAMENTE la prima — il
+  cursore globale è più recente di tutti i suoi annunci, quindi il
+  `creato <` li prende tutti. Il rimedio è `vetrinaGiro`, un numero che
+  avanza a ogni ricarica di PRIMA pagina: `loadListings` lo fa avanzare
+  e azzera SUBITO `vetrinaCursore` (la sentinella scoperta non ha più
+  niente da chiedere e tace da sola), e tutte e due le funzioni buttano
+  la propria risposta se il giro è cambiato — il che para anche i due
+  tocchi svelti su due categorie: vince l'ultima, senza mescolare.
+  REGOLA: chi aggiunge una vista paginata (negozio, miei) e la svuota
+  prima di ricaricarla deve darle il suo giro, o si ricompra questo bug.
   Modifica annuncio (lug 2026): `POST /api/listings/{id}/modifica` —
   solo il proprietario su annunci attivi, 400 se esiste un ordine NON
   terminale (anche `creato`: chi sta pagando deve trovare l'annuncio
@@ -2267,11 +2285,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sa da dove si veniva meglio di loro. Restano programmatiche le
   chiusure che non sono un gesto (`closeSheet` dopo il pagamento, il
   foglio invito che lascia il posto a quello Nostr, `simulatePaid`).
+  DALLA RADICE SI ESCE, E USCIRE VA DETTO (lug 2026, da un bug vero
+  visto da Andrea sullo swipe da Sfoglia): `navIndietro` faceva
+  `history.back()` alla CIECA, e dentro Telegram — come nella PWA
+  installata — la nostra pagina è la PRIMA della sessione, quindi
+  «indietro» non ha dove andare e il gesto moriva in silenzio, lo
+  schermo fermo dov'era. Vale per OGNI radice; si notava su Sfoglia
+  perché è quella da cui uno si aspetta un passo. Ora il gradino su cui
+  si sta lo dice la cronologia stessa: `d` nello state (0 = sotto non
+  c'è NIENTE di nostro), scritto da `navRiflette` accanto alla pila —
+  +1 sul push, invariato sul replace — e seminato a 0 da `navMotore`.
+  A `d=0`, a strati chiusi e dentro Telegram, si chiama `tg.close()`:
+  fuori resta lo `history.back()` di sempre. NIENTE contatori di
+  debito: `d` viaggia nella entry, come la pila — è la stessa ragione
+  per cui l'ascoltatore è dichiarativo.
+  E SFOGLIA ESCE COME LE ALTRE, non ricade su Esplora (decisione di
+  Andrea, ed è la regola da non rovesciare): le radici sono SORELLE,
+  non parenti. Farla cadere su Esplora sarebbe una gerarchia che la
+  cronologia non registra — si tornerebbe a Esplora anche aprendo
+  l'app dritti su Sfoglia, dove non si è mai passati —, sarebbe
+  asimmetrica (e allora perché non Ordini → Esplora?), rimetterebbe il
+  gradino che il patto delle radici esiste apposta per togliere, e
+  sarebbe la SECONDA deroga per Sfoglia, che ne ha già una dichiarata
+  (la piastrella è una discesa): due eccezioni e la regola non è più
+  una regola.
   Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
   quando c'è dove tornare — alla radice resta nascosto, e lì il gesto
-  chiude la Mini App, che È il patto — e in coppia spegne
-  `disableVerticalSwipes` (7.7), cioè il solo trascinamento accidentale
-  della pagina: la chrome di Telegram non si tocca mai, lo dice la sua
+  chiude la Mini App, che È il patto. Lo swipe VERTICALE invece si
+  spegne SEMPRE con `disableVerticalSwipes` (7.7), anche alla radice, e
+  dal lug 2026: finché restava acceso lì, tirare giù per aggiornare
+  trascinava via la Mini App: un gesto che ovunque significa
+  «rinfresca» qui significava «vattene», e chi lo faceva lo leggeva
+  come un torna-indietro. Ora quel trascinamento è NOSTRO (vedi il
+  gesto di aggiornamento). Non si perde nessuna via d'uscita: la
+  chrome di Telegram non si tocca mai, lo dice la sua
   documentazione («the user will still be able to minimize and close
   the Mini App by swiping the Mini App's header»). Il tasto di Telegram
   chiama `history.back()` come tutti, con una serratura di 350ms contro
@@ -2292,6 +2339,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   successivo a rimettere la entry in pari — sistema auto-guarente; il
   pannello Filtri è fuori di proposito (è in pagina, usa `style.display`
   che l'osservatore delle classi non vede, e non intrappola nessuno).
+  IL GESTO DI AGGIORNAMENTO (lug 2026): tirare giù dalla cima rilegge la
+  vista e ci RESTA — pastiglia di carta `#ptr` che scende col dito
+  (z-index 25: sopra l'header, o dietro sparirebbe; sotto nav, barra
+  d'acquisto e fogli — è un segnale, non uno strato). Nasce perché quel
+  trascinamento non era di nessuno: dentro Telegram era la presa che
+  porta via la Mini App (vedi `disableVerticalSwipes` qui sopra), nel
+  browser il ricarica nativo — che già non parte, `overscroll-behavior:
+  none` sul body c'è da sempre, e comunque ripartirebbe da Esplora
+  perdendo dov'eri. `aggiornaVista` rilegge la vetrina da sé; Ordini e
+  Profilo li ricarica `go()`, che quelle viste le sa già caricare — un
+  secondo posto che elenca i loro render divergerebbe al primo cassetto
+  nuovo. Mezzo secondo minimo di pastiglia che gira, o su rete veloce
+  lampeggerebbe e sembrerebbe non essere successo niente; fail-open.
+  UN touchmove SU TUTTA LA PAGINA È UN ASCOLTATORE INVADENTE, quindi è
+  timido PER COSTRUZIONE, e sono i tre recinti da non togliere:
+  1) solo dalla CIMA (`scrollY<=0`) e a STRATI CHIUSI — lo dice
+  `navPila().length===1`, nessuna seconda lista da tenere allineata;
+  2) solo sulle viste che hanno davvero qualcosa da rileggere
+  (`VISTE_PTR`: esplora, affari, profilo). Così la GALLERIA a
+  scroll-snap del dettaglio resta fuori dal gesto senza doverla
+  nominare — lì la foto è in cima, quindi `scrollY` è 0 e una diagonale
+  avrebbe armato una tirata che poi non ricaricava niente: mezzo
+  secondo di pastiglia per nulla. Chi aggiunge una vista ad
+  `aggiornaVista` deve aggiungerla anche a `VISTE_PTR`, o il gesto gira
+  a vuoto proprio dove lo si chiede;
+  3) il gesto dev'essere VERTICALE: appena `dx > dy` la tirata si
+  annulla e non torna fino al tocco dopo — è il recinto delle strisce
+  che scorrono di fianco dentro le viste ammesse (pillole delle
+  categorie, «Altri oggetti»).
+  Ascoltatori PASSIVI, mai un `preventDefault`: lo scorrimento normale
+  non se ne accorge e dentro Telegram non si litiga col client.
+  Reduced-motion spegne transizione e giro. Il dettaglio NON si
+  aggiorna di proposito: riaprirlo da capo azzererebbe pezzi scelti e
+  strada di consegna, e non è quello che chiede un dito che tira giù.
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
   `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
@@ -4198,6 +4279,30 @@ taglia, e 78 prove verdi. In produzione basta il deploy: nessuna
 colonna, nessuna leva, nessun asset nuovo. Resta da vedere dal vivo
 dentro Telegram, dove contano la gesture bar del telefono e il tema
 del client.
+Tre difetti di navigazione nati con quei due cantieri (lug 2026, tutti
+e tre visti da Andrea sull'app vera). 1) I DOPPIONI entrando in una
+categoria da Sfoglia: non un doppio render ma la pagina-dopo che
+arriva in ritardo col cursore della vetrina di prima — rimedio
+`vetrinaGiro`, vedi «Tenuta al volume». 2) IL GESTO DI AGGIORNAMENTO,
+che non era di nessuno e dentro Telegram portava via la Mini App: ora
+`disableVerticalSwipes` vale anche alla radice e la tirata è nostra,
+coi tre recinti che tengono fuori la galleria a scroll-snap. 3) LO
+SWIPE INDIETRO che da Sfoglia non faceva niente: `history.back()` alla
+cieca su una sessione che ha una entry sola — ora il gradino lo dice
+`d` nello state e dalla radice si esce esplicitamente, con Sfoglia che
+esce come le altre e NON ricade su Esplora (il perché è in
+Architettura: due eccezioni e la regola non è più una regola).
+Vedi Architettura, «il gesto indietro» — riprodotti tutti e tre in
+locale prima di toccare niente (i doppioni misurati: 60 card di cui 14
+doppie, poi 30 su 30 uniche) e ricollaudati dopo: scroll infinito su
+tre pagine, due tocchi svelti su due categorie, le sei guardie del
+gesto di aggiornamento, `d` che conta giusto lungo tab → piastrella →
+dettaglio → i due indietro, e 78 prove verdi. In produzione basta il
+deploy: nessuna colonna, nessuna leva. RESTA DA VEDERE DENTRO
+TELEGRAM, ed è il pezzo che il browser non può dire: la convivenza del
+touchmove col client (tirata in Esplora, swipe orizzontale sulla
+galleria del dettaglio) e il ramo `tg.close()` dalla radice — in
+pagina lo stub di Telegram non si lascia fingere.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
