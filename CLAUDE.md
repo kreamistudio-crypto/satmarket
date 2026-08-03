@@ -1767,7 +1767,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (niente FK cascade: PRAGMA foreign_keys mai acceso).
   compra() col body `{righe:[{annuncio_id, quantita, offerta_id}]}`
   passa da `_compra_set` (2..MAX_RIGHE_SET, leva config, 8): stesso
-  venditore, strade = INTERSEZIONE delle FISICHE (spedizione/ritiro;
+  venditore E stessa ORIGINE (lug 2026, dopo l'anello: `venditore_id`
+  dice a chi vanno i sats ma non da dove arriva la merce, e un account
+  che raccogliesse roba di più persone passerebbe con un id solo —
+  l'origine è `contatto_nostr`, '' = nato qui, altrimenti la chiave
+  che l'ha firmato. ONESTÀ: NON avrebbe fermato il fantasma, che aveva
+  una chiave sola per tutte le copie; a quello risponde il tappo, e
+  questa è la cintura se un giorno il tappo salta),
+  strade = INTERSEZIONE delle FISICHE (spedizione/ritiro;
   il digitale ha la colonna unica del contenuto e le finestre corte,
   gli annunci con consegna '' non dichiarano un costo: entrambi «si
   comprano da soli», 400 col nome del pezzo), lampo e offerte
@@ -2848,6 +2855,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chiavi ora nascono ACCOUNT, e un relay bugiardo potrebbe attribuire
   annunci a chiunque. Ricetta di `verifica_evento_login` (id
   ricalcolato NIP-01, mai quello ricevuto), senza coincurve = False.
+  L'ANELLO CHE SI CHIUDEVA (lug 2026, bug vissuto al primo giro vero:
+  40 annunci fantasma — la sezione più importante di questa voce,
+  perché è l'errore che la struttura del cantiere invitava a fare).
+  La scoperta setaccia i relay SENZA filtro d'autore, e fra gli
+  annunci NIP-99 italiani con firma valida ci sono anche i NOSTRI —
+  quelli che la piattaforma firma per conto di chi pubblica da qui.
+  Nessuno la escludeva: è nato un account intestato alla nostra stessa
+  chiave, e l'import ha ricominciato a scaricare in casa ciò che
+  avevamo appena pubblicato. Ogni annuncio nativo si è ritrovato una
+  copia intestata a un venditore che non esiste, e il negozio di quel
+  venditore pieno di roba di persone diverse — che è anche perché
+  «Altri oggetti di questo venditore» mostrava oggetti di altri: la
+  striscia faceva bene il suo mestiere su un negozio che era una
+  discarica. Un solo bug, tre sintomi che sembravano tre bug.
+  Il rimedio è `chiave_di_casa(chiave)` (hex o npub, maiuscole
+  comprese), usata in DUE punti: `scopri_venditori_nostr`, che non ci
+  adotta più, e `venditori_nostr_attivi`, che salta la nostra chiave
+  ANCHE se in `utenti` la riga esiste già — ed è quella che ferma il
+  danno al primo riavvio, senza aspettare la pulizia. Il confronto è
+  sulla CHIAVE e non sul tag `d` ('barattolo-…') o sul tag `r`:
+  quelli li può scrivere chiunque, la firma no.
+  E IL BUCO VERO, che il fantasma ha solo reso visibile:
+  `importa_venditore` credeva sulla parola al filtro `authors` della
+  REQ. Ora confronta `e["pubkey"]` con la chiave chiesta e scarta il
+  resto. La firma si verificava già, ma risponde a un'ALTRA domanda —
+  «l'evento è firmato dalla chiave che DICHIARA?», non «quella chiave
+  è il venditore che ho CHIESTO?»: le due insieme chiudono, una sola
+  non chiude niente. L'autore di un evento decide A CHI VANNO I SATS
+  di chi lo compra. Vale anche per i kind 5: una cancellazione altrui
+  col tag `e` giusto avrebbe spento l'annuncio di un altro, perché il
+  tag `e` non nomina l'autore. `prove.py` ha una SENTINELLA che
+  verifica che quel confronto esista ancora dentro importa_venditore:
+  è il tipo di riga che sparisce in un refactor.
+  La pulizia delle copie già nate è `ripulisci_anello_nostr.py` (vedi
+  sotto).
   MODERAZIONE, e qui i due strati finiscono in modo DIVERSO:
   le PAROLE VIETATE restano uno scarto secco (deterministico: armi e
   droga non vogliono una coda ma una porta chiusa; resta nel registro,
@@ -2969,6 +3011,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   è uno solo, cambia solo chi firma l'evento.
   Il disegno è documentato in `proposte/` (la PR al repo dei NIP resta
   in backlog).
+- `ripulisci_anello_nostr.py` (lug 2026) — la pulizia una-tantum dopo
+  l'anello (vedi sopra). Riconosce le copie dal marchio che solo NOI
+  scriviamo — il tag `d` di un evento nostro è sempre `barattolo-{id}`,
+  e l'id lì dentro è l'annuncio VERO da cui la copia discende, quindi
+  ogni copia si lega al suo originale senza indovinare nulla. Di serie
+  NON scrive: stampa cosa farebbe; accetta un percorso di database, e
+  la prova generale si fa su una copia del file. Spegne le copie
+  ('rimosso'), annulla gli ordini mai pagati, e NEUTRALIZZA il
+  fantasma togliendogli le chiavi Nostr senza cancellarne la riga (una
+  riga di utenti cancellata lascerebbe riferimenti ciechi in annunci,
+  ordini e registro). MAI una NIP-09 verso i relay: quegli eventi sono
+  i nostri, quelli degli annunci VERI — ritirarli cancellerebbe dalla
+  piazza la merce buona. Tre guardie, e si ferma dicendolo: copia con
+  affare in corso, account che ha anche annunci suoi (è una persona
+  vera che ha raccolto copie per sbaglio), account con copie vive o
+  ordini APERTI — quelli chiusi invece non fermano niente, la storia è
+  storia e lasciargli la chiave vorrebbe dire tornare a importare per
+  sempre. Idempotente.
 - `prove.py` + `.github/workflows/prove.yml` (lug 2026) — la rete di
   sicurezza, a ogni push e ogni PR. Solo pezzi PURI: niente config,
   database, relay o Anthropic — una CI che dipende da un server altrui
@@ -2997,6 +3057,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   perché da lì partono account e DM verso persone che non ci
   conoscono. Rimettere False e riavviare è l'interruttore
   d'emergenza; gli annunci già importati restano dove sono.
+- Se dall'import aperto nascono copie doppie: la diagnosi si fa in
+  SOLA LETTURA prima di toccare (la query che decide è
+  `SELECT COUNT(*) FROM annunci WHERE contatto_nostr!='' AND
+  nostr_origine_d LIKE 'barattolo-%'`: se è >0 l'anello si è chiuso su
+  noi stessi), poi si spegne l'import, poi `ripulisci_anello_nostr.py`
+  — prima su una copia del database, poi su quello vero.
 - Il Login Widget esige il dominio registrato: BotFather → `/setdomain`
   su @ilbarattolobot → `barattolo.store` (senza, il bottone non compare;
   su localhost non compare mai: si collauda col bottone "cookie web").
@@ -3524,10 +3590,30 @@ colonne (`completamento_avvisato`, `suggerimenti_annunci`) e basta;
 l'import aperto si accende scrivendo la riga nel config del VPS, e
 quello è il momento da guardare col journal aperto. Se il config del
 VPS ha una riga `MAX_QUANTITA_ANNUNCIO` esplicita, va alzata anche lì.
-RESTA DA FARE: il primo giro vero con gli occhi addosso, e decidere se
-anche lo scarto per PAROLE VIETATE debba finire in coda come quelli
-dell'AI — oggi non ci va, resta uno scarto secco visibile solo nel
-registro).
+RESTA DA FARE: decidere se anche lo scarto per PAROLE VIETATE debba
+finire in coda come quelli dell'AI — oggi non ci va, resta uno scarto
+secco visibile solo nel registro);
+il primo giro vero, e l'anello che si chiudeva (lug 2026: acceso
+l'import in produzione sono comparsi 40 annunci doppi, articoli
+intestati al venditore sbagliato e «Altri oggetti di questo venditore»
+pieno di roba d'altri — TRE sintomi di UN bug solo, la scoperta che
+adottava la chiave della piattaforma come se fosse un venditore
+qualsiasi. Diagnosi fatta sui dati veri con query in sola lettura
+PRIMA di toccare qualunque cosa, import spento subito, e zero denaro
+coinvolto: nessun ordine aperto su annunci importati. Cura in due
+tempi — il TAPPO (`chiave_di_casa` + il confronto dell'autore
+nell'import, che è il buco vero: non ci si fida del filtro `authors`
+del relay) e la PULIZIA (`ripulisci_anello_nostr.py`), più la cintura
+sull'origine nella guardia del set. Vedi Architettura, «L'ANELLO CHE
+SI CHIUDEVA» — collaudato con 57 prove pure [9 nuove, compresa la
+sentinella sul confronto dell'autore] e 22 verifiche su DB
+usa-e-getta che RICOSTRUISCONO il bug daccapo: il negozio del fantasma
+con roba di due persone, il relay che risponde con eventi di un terzo,
+l'anteprima che non scrive, la copia con l'ordine aperto lasciata
+stare, il secondo giro che finisce il lavoro, il rilancio a vuoto.
+LEZIONE da non perdere: un cantiere che legge da una fonte pubblica
+deve chiedersi per prima cosa se in quella fonte c'è anche la propria
+voce).
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
