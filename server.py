@@ -5731,6 +5731,25 @@ async def _compra_set(user: dict, d: dict) -> dict:
     if venditore_id == user["id"]:
         con.close()
         raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+    # STESSO VENDITORE VERO, non solo stessa RIGA di utenti (lug 2026,
+    # dopo il caso dell'account fantasma). `venditore_id` dice a chi
+    # vanno i sats, ed e' giusto che il conto lo segua; ma non dice da
+    # DOVE arriva la merce, e un account che raccogliesse roba di piu'
+    # persone passerebbe la guardia con un id solo — come e' successo.
+    # L'origine di un annuncio e' `contatto_nostr`: '' = nato qui,
+    # altrimenti la chiave che l'ha firmato. Un set deve avere UNA
+    # origine sola, e non e' pignoleria da inventario: cio' che e'
+    # nato qui e cio' che vive su una chiave altrove non sta nello
+    # stesso scatolone nemmeno nella vita vera.
+    # ATTENZIONE a cosa NON fa: non avrebbe fermato il fantasma, che
+    # aveva una chiave sola. A fermare quello e' il tappo
+    # (chiave_di_casa + il controllo dell'autore nell'import); questa
+    # e' la cintura che regge se un giorno il tappo salta.
+    origini = {(a["contatto_nostr"] or "") for a in tutti.values()}
+    if len(origini) > 1:
+        con.close()
+        raise HTTPException(400, "Questi oggetti non arrivano tutti dallo "
+                                 "stesso posto: si comprano uno per volta")
 
     # --- Le strade del set: l'INTERSEZIONE delle strade fisiche.
     # Un solo-ritiro e un solo-spedizione non viaggiano insieme.
