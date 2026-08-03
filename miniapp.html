@@ -876,16 +876,51 @@
     color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;
     position:relative;
   }
-  /* La voce attiva accende l'emoji in una pillola color pesca */
+  /* LA VOCE ATTIVA SI ILLUMINA E BASTA (lug 2026, modello Vinted e
+     Subito): niente pillola pesca sotto l'icona, niente anello — il
+     colore passa dal grigio dell'inchiostro tenue all'arancio ₿, e
+     icona ed etichetta si accendono INSIEME perche' il colore lo da'
+     il bottone e l'icona lo eredita con currentColor. Di sera
+     l'arancio scende a --sats-text: e' la stessa taratura della luce
+     gia' usata altrove — il segno non cambia, cambia quanto rende su
+     un fondo bruno (#D97706 sul bruno fa 4,8, #FFB25C 8,5). */
   nav button.active{color:var(--sats-deep)}
-  nav button .ic{font-size:20px;line-height:1;padding:3px 14px;border-radius:999px}
+  html[data-tema="scuro"] nav button.active{color:var(--sats-text)}
+  nav button .ic{display:flex;line-height:0;padding:0}
+  /* LE ICONE DELLA NAV sono SVG di casa (lug 2026): le emoji 🛍️🗂️🤝
+     cambiavano forma da un telefono all'altro, non seguivano i token
+     del tema e nessuna era davvero nostra. Queste sono disegnate sulla
+     griglia da 24 con la mano di tagliaSVG e jarSVG — tratto a
+     currentColor, capi tondi, velo al 12% che da' corpo —, quindi si
+     accendono da sole senza un token nuovo. Il tratto e' volutamente
+     fuori squadra di un pelo: e' la personalita' delle illustrazioni
+     delle categorie, portata dove un'immagine non puo' arrivare (a
+     24px un disegno colorato diventa una macchia, e soprattutto non
+     puo' cambiare colore quando la voce si accende).
+     LA MISURA E' 26px, il massimo che la barra concede: e' quanto
+     occupavano le emoji col loro respiro (20 di glifo + 3+3 di
+     padding), quindi la nav resta alta 61px e l'invariante con
+     #barraCompra e' salva. Per crescere ancora servirebbe una barra
+     piu' alta, e quella non si tocca.
+     Il resto della presenza si guadagna dove non costa niente:
+     la CORNICE. Il viewBox e' "2 2 20 20" e non "0 0 24 24" — la
+     stessa griglia da 24 su cui sono disegnate, ritagliata sul
+     margine che avanzava attorno all'inchiostro (i tre disegni
+     stanno tutti dentro [2,22] col tratto compreso, verificato). Il
+     disegno cresce del 30% dentro la stessa scatola, e il tratto
+     scende a 1.5 perche' ingrandito insieme a lui torna a rendere
+     1,95px: lo stesso peso di prima, su una figura piu' grande. E'
+     il gemello del ritaglio che ritaglia_categorie.py fa alle
+     illustrazioni — il margine trasparente e' spazio buttato. */
+  .nav-ico{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round}
+  .nav-ico .velo{fill:currentColor;fill-opacity:.12}
   /* Il pallino sul tasto Ordini: c'e' un'offerta che aspetta una TUA mossa */
   .off-dot{display:none;position:absolute;top:4px;right:26%;width:9px;height:9px;
     border-radius:50%;background:var(--sats);box-shadow:0 0 0 2px var(--nav-bg)}
   .off-dot.on{display:block}
   /* sul tappo del Profilo (annunci da moderare): angolo in alto a destra */
   .avatar-btn .off-dot{top:-1px;right:-1px;box-shadow:0 0 0 2px var(--header-bg)}
-  nav button.active .ic{background:var(--sats-soft);box-shadow:inset 0 0 0 1.5px #F7C87F}
   /* Il "+" di Vendi: bottone-oggetto rialzato sopra la barra */
   nav button.sell .ic{
     width:54px;height:54px;border-radius:18px;background:var(--sats);color:#fff;
@@ -1732,9 +1767,12 @@
       flex:0 0 auto;flex-direction:row;gap:7px;font-size:14px;
       padding:9px 16px;border-radius:999px;
     }
-    nav button .ic{font-size:17px;padding:0;border-radius:0}
+    /* in topbar le icone scendono di un gradino (l'emoji faceva 17px)
+       e la voce attiva torna a essere una pillola: qui non e' una tab
+       bar da pollice ma una fila di linguette, e la pillola e' il suo
+       idioma */
+    nav button .nav-ico{width:22px;height:22px}
     nav button.active{background:var(--sats-soft)}
-    nav button.active .ic{background:none;box-shadow:none}
     nav button.sell{background:var(--sats);color:#fff;border-radius:999px;
       box-shadow:0 3px 0 var(--sats-deep);margin-left:8px}
     nav button.sell.active{color:#fff}
@@ -2343,11 +2381,28 @@
          Profilo vive nel tasto tappo in testata (mobile) e qui in coda
          solo da desktop -->
     <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
-    <button id="nav-esplora" class="active" onclick="vaiEsplora()"><span class="ic">🛍️</span>Esplora</button>
-    <button id="nav-sfoglia" onclick="go('sfoglia')"><span class="ic">🗂️</span>Sfoglia</button>
+    <!-- Esplora: la LENTE. Il cerchio e' disegnato a mano (quattro
+         curve leggermente diverse, non un <circle> perfetto): e' il
+         tratto fuori squadra delle illustrazioni. Scelta contro il
+         BANCHETTO col tendone e contro il BARATTOLO del logo — quello
+         nella stessa schermata farebbe tre mestieri (marchio in
+         testata, "l'ho messo via" sulle card, "dove sono" qui), la
+         lente invece non dice niente altrove: e' libera -->
+    <button id="nav-esplora" class="active" onclick="vaiEsplora()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg></span>Esplora</button>
+    <!-- Sfoglia: le PIASTRELLE, cioe' la sua pagina in miniatura —
+         due colonne di riquadri, la stessa griglia che si apre -->
+    <button id="nav-sfoglia" onclick="go('sfoglia')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M3.6 5.5c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.5 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.5-.7-1.5-1.6z"/><path d="M13.4 5.4c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.7-1.6-1.6z"/><path d="M3.5 14.9c0-.9.7-1.6 1.6-1.6H9c.9 0 1.6.7 1.6 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6z"/><path class="velo" d="M13.4 14.8c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.6-1.6-1.5z"/></svg></span>Sfoglia</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <span class="nav-vuoto" aria-hidden="true"></span>
-    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini<span class="off-dot" id="offDot"></span></button>
+    <!-- Ordini: il PACCO di tre quarti. La scatola PIATTA (quadro +
+         riga del coperchio, la famiglia di tagliaSVG) e' stata
+         disegnata e scartata: a 24px con la riga in mezzo si legge
+         come un portafoglio, e col nastro intero come una finestra a
+         quattro riquadri. Di tre quarti e' un pacco e basta.
+         Il 🤝 se n'e' andato di qui e resta al RITIRO IN ZONA degli
+         annunci: due mestieri diversi — in nav dice dove sei, li' dice
+         come arriva la roba -->
+    <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
