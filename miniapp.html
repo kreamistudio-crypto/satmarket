@@ -33,11 +33,24 @@
     --header-bg:rgba(250,244,228,.92); --nav-bg:rgba(255,255,255,.96);
     --ph-a:#F3ECDA; --ph-b:#ECE3CE;
     --ship-bg:#E3F0FB; --ship-text:#2A6FB0; --warn-bg:#FDE8E4; --off-bg:#EFE9DA;
-    /* la versione PIENA della coppia azzurra: fondo saturo + testo che
-       ci sta sopra. E' il grado ALTO della spedizione — «gratuita» —
-       contro il tenue del «disponibile»: stessa famiglia, gerarchia
-       chiara senza rubare l'arancio del prezzo ne' il verde dell'escrow
-       (un azzurro piu' acceso su fondo azzurro non si noterebbe). */
+    /* ---- I DUE BADGE DELLA SPEDIZIONE: NON CAMBIANO COL TEMA ----
+       Questi quattro token vivono SOLO qui, e nel blocco scuro non
+       vanno ridefiniti: e' voluto, non una dimenticanza. Sul badge il
+       colore E' il segno («questa spedizione e' gratis»), e un segno
+       non puo' cambiare tinta fra il giorno e la sera — chi l'ha
+       imparato di giorno non lo riconoscerebbe piu'. L'inversione al
+       buio ha senso per una SUPERFICIE (l'etichetta prezzo, il toast,
+       che di sera diventano di carta), non per un codice colore.
+       Sono una coppia rovesciata, cosi' la gerarchia si legge subito e
+       tutti e due staccano dal fondo in tutti e due i temi:
+         «disponibile» = fondo azzurro CHIARO + testo blu   (5,62)
+         «gratuita»    = fondo blu SCURO    + testo bianco  (5,25)
+       Il chiaro contro il bruno della sera fa 13,59, quindi non si
+       mescola col fondo; il blu scuro contro il crema del giorno 4,78.
+       NON si riusano --ship-bg/--ship-text (che restano dei badge di
+       stato dell'ordine, famiglia che al buio deve restare scura come
+       le sorelle: un chip chiaro in mezzo a loro griderebbe). */
+    --ship-soft:#D3E7FA; --ship-soft-on:#12599E;
     --ship-full:#2A6FB0; --ship-on:#fff;
     /* Il marrone CARTONE del set «Riempi il pacco»: e' il colore della
        scatola, non un accento nuovo del brand — sta accanto all'arancio
@@ -73,18 +86,13 @@
     --field-line:#4A4029; --line-soft:#362E1E;
     --header-bg:rgba(33,26,16,.92); --nav-bg:rgba(44,37,23,.96);
     --ph-a:#332B1A; --ph-b:#2B2415;
+    /* --ship-bg/--ship-text servono ai badge di STATO dell'ordine
+       («spedito»): quelli si', al buio si scuriscono come le sorelle.
+       I quattro token dei badge della SPEDIZIONE (--ship-soft/-on e
+       --ship-full/-on) NON compaiono qui apposta: sono un codice
+       colore e valgono uguali nei due temi — la ragione lunga sta
+       accanto alla loro definizione, in cima. */
     --ship-bg:#1E2C3C; --ship-text:#85B8E8; --warn-bg:#3C221A; --off-bg:#363126;
-    /* Il pieno della spedizione gratuita NON cambia col tema (deciso da
-       Andrea, lug 2026): resta lo stesso blu scuro col testo bianco, di
-       giorno e di sera. Per un giro si era invertito come l'etichetta
-       prezzo e il toast — fondo chiaro e testo scuro — ma di sera
-       diventava un azzurro acceso, cioe' un colore DIVERSO da quello
-       che si era imparato di giorno. Qui il colore E' il segno («questa
-       spedizione e' gratis»), e un segno non puo' cambiare tinta a meta'
-       giornata: percio' i due valori sono gli stessi del tema chiaro.
-       Bianco su #2A6FB0 = 5,25 e il chip stacca dal fondo bruno (4,78):
-       AA in entrambi i temi senza bisogno di invertire. */
-    --ship-full:#2A6FB0; --ship-on:#fff;
     /* di sera il cartone si schiarisce (il fondo dell'app e' gia'
        bruno: un marrone scuro ci affonderebbe dentro) e resta piu'
        terroso dell'arancio ₿, che li' accanto non deve avere sosia */
@@ -896,20 +904,24 @@
   .circa{margin-right:5px}
   /* La spedizione sta nella fila delle pillole, con le altre
      caratteristiche, ma EVIDENZIATA: e' l'informazione che converte.
-     Forma da pillola come le vicine, colori dalla coppia azzurra dei
-     badge «spedito» (AA nei due temi, non fa concorrenza all'arancio
-     del prezzo ne' al verde dell'escrow). */
-  /* Due gradi della stessa famiglia azzurra (scelta di Andrea, lug
-     2026): «disponibile» e' l'azzurro TENUE e nudo, «gratuita» e'
-     PIENA. Il contorno pieno sul grado basso e' stato provato e tolto:
-     dava peso a quello che deve pesare meno, e con due badge in
-     colonna il tratto in piu' diventava rumore. */
-  .sped-badge{background:var(--ship-bg);color:var(--ship-text);
+     Forma da pillola come le vicine, e una coppia azzurra tutta sua
+     (--ship-soft/--ship-full, uguale nei due temi: vedi il commento
+     lungo sui token, in cima) che non fa concorrenza all'arancio del
+     prezzo ne' al verde dell'escrow.
+     Due gradi ROVESCIATI (scelta di Andrea, lug 2026): «disponibile»
+     e' fondo azzurro CHIARO con testo blu, «gratuita» e' fondo blu
+     SCURO con testo bianco. Cosi' la gerarchia si legge subito e
+     nessuno dei due si mescola col fondo, ne' col crema del giorno ne'
+     col bruno della sera — il tenue di prima al buio era un chip
+     scuro su fondo scuro e spariva. Il contorno pieno sul grado basso
+     e' stato provato e tolto: dava peso a quello che deve pesarne
+     meno. */
+  .sped-badge{background:var(--ship-soft);color:var(--ship-soft-on);
     border-radius:999px;padding:6px 12px;font-size:13px;font-weight:800;
     white-space:nowrap}
   /* Il grado ALTO: la spedizione GRATUITA e' un argomento di vendita e
-     deve staccare dal semplice «disponibile». Stessa forma e stessa
-     famiglia di colore, ma piena. */
+     deve staccare dal semplice «disponibile». Stessa forma, colori
+     rovesciati. */
   .sped-badge.piena{background:var(--ship-full);color:var(--ship-on)}
   .desc-tit{font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.1em;color:var(--muted);margin-top:14px}

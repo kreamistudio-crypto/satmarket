@@ -1153,7 +1153,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che la spedizione l'ha sempre inclusa).
   UN BADGE SOLO, E STA SOPRA (lug 2026, decisione di Andrea in due
   tempi): nella fila delle pillole si dice SE si spedisce —
-  `spedBadge()` è «🚚 Spedizione disponibile» in azzurro TENUE, e
+  `spedBadge()` è «🚚 Spedizione disponibile» in azzurro CHIARO, e
   diventa «🚚 Spedizione gratuita» in azzurro PIENO
   (`.sped-badge.piena`, token `--ship-full`/`--ship-on`) quando non c'è un
   costo dichiarato — la gratuità è un argomento di vendita e non può
@@ -1162,22 +1162,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   meno. Ritiro e codice online non si nominano: sono gratuiti per
   natura. Giudici unici `spedisce` e `spedGratis` — «gratis» si decide
   in un posto solo, e da lì lo legge anche l'icona in card.
-  IL PIENO NON CAMBIA COL TEMA (lug 2026, feedback di Andrea): il blu
-  scuro col testo bianco è lo STESSO di giorno e di sera —
-  `--ship-full`/`--ship-on` hanno gli stessi valori nei due blocchi di
-  token, ed è voluto, non una dimenticanza. Per un giorno il pieno si
-  era invertito al buio come fanno l'etichetta prezzo e il toast (fondo
-  chiaro, testo scuro), e di sera diventava un azzurro acceso: cioè un
-  colore DIVERSO da quello imparato di giorno. Qui però il colore È il
-  segno — «questa spedizione è gratis» — e un segno non può cambiare
-  tinta a metà giornata; l'inversione ha senso per una superficie
-  (un'etichetta, un toast), non per un codice colore. Bianco su
-  #2A6FB0 = 5,25 in entrambi i temi, e il chip stacca dal fondo (4,78
-  sul crema, 3,28 sul bruno): AA senza bisogno di invertire. Il
-  cerchietto della card eredita lo stesso token e al buio scende a
-  2,89 sul fondo della card — accettato: è una FORMA decorativa attorno
-  a un'emoji che resta luminosa, non un testo da leggere, e la tinta
-  blu su bruno si distingue comunque bene (verificato a schermo).
+  I DUE BADGE NON CAMBIANO COL TEMA (lug 2026, feedback di Andrea in
+  due passaggi): sono una COPPIA ROVESCIATA con gli stessi identici
+  valori di giorno e di sera —
+    «disponibile» = fondo azzurro CHIARO #D3E7FA + testo blu #12599E
+    «gratuita»    = fondo blu SCURO   #2A6FB0 + testo bianco
+  I quattro token (`--ship-soft`/`--ship-soft-on` e
+  `--ship-full`/`--ship-on`) vivono SOLO nel blocco `:root` e NON si
+  ridichiarano in `html[data-tema="scuro"]`: è voluto, non una
+  dimenticanza — chi passasse di lì e li «completasse» per simmetria
+  romperebbe la regola. Il motivo: qui il colore È IL SEGNO («questa
+  spedizione è gratis»), e un segno non può cambiare tinta fra il
+  giorno e la sera, o chi l'ha imparato di giorno non lo riconosce
+  più. L'inversione al buio ha senso per una SUPERFICIE (l'etichetta
+  prezzo, il toast, che di sera diventano di carta), mai per un codice
+  colore. Due tentativi bocciati, da non rifare: il pieno che si
+  invertiva (di sera diventava azzurro acceso, cioè un altro colore) e
+  il tenue che seguiva il tema (di sera era un chip scuro su fondo
+  scuro e spariva — «si mescolava col fondo»). Contrasti, uguali in
+  entrambi i temi: testo/fondo 5,62 e 5,25; e nessuno dei due si perde
+  sulla pagina (il chiaro contro il bruno della sera fa 13,59, lo
+  scuro contro il crema del giorno 4,78).
+  ATTENZIONE a non riusare `--ship-bg`/`--ship-text` per questi badge:
+  quelli restano dei badge di STATO dell'ordine («spedito»), che al
+  buio DEVONO scurirsi come le sorelle locked/refunded — un chip
+  chiaro in mezzo a loro griderebbe. Erano condivisi fino al lug 2026,
+  ed è per questo che il tenue seguiva il tema.
+  Due cose accettate e dichiarate: il cerchietto della card eredita
+  `--ship-full` e al buio scende a 2,89 sul fondo della card — è una
+  FORMA attorno a un'emoji che resta luminosa, non un testo da
+  leggere, e il blu su bruno si distingue (verificato a schermo); e di
+  sera il chip chiaro «disponibile» pesa otticamente più dello scuro
+  «gratuita», il che sembrerebbe rovesciare la gerarchia — ma i due
+  non compaiono MAI insieme (un annuncio o spedisce gratis o no),
+  quindi la gerarchia falsa non si vede mai davvero.
   IL GEMELLO COL COSTO SOTTO ACQUISTA È VISSUTO UN GIORNO: nato per
   dire il QUANTO nel momento in cui si compra («🚚 Spedizione +
   5,00 €», dentro il recinto), è stato tolto subito dopo averlo visto
