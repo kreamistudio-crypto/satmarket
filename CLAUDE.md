@@ -1821,6 +1821,85 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   mostrano la stima «≈» e poi i sats VERI da `prezzo_sats` della
   risposta di POST /orders (MAI da `l.price`, che per i listini EUR
   è solo l'equivalente di pubblicazione).
+  IL GESTO INDIETRO (lug 2026): il tasto indietro di Android, lo swipe
+  dal bordo e il tasto del browser tornano indietro di un passo invece
+  di chiudere l'app — prima chiudono i fogli aperti, poi smontano le
+  viste; si esce solo dalla RADICE. La freccia ← e la tab bar restano
+  tutte: il gesto si aggiunge. Blocco `nav*` subito dopo `go()`, acceso
+  da `navMotore()` una riga prima di `avvia()` (prima non si può: le
+  variabili degli strati sono dichiarate più in basso e sarebbero in
+  zona morta). Tre scelte da NON rovesciare:
+  1) l'URL non si tocca MAI (`pushState` con `location.href`) — il
+  server serve solo rotte esplicite (regola 3), un `/profilo` inventato
+  darebbe 404 al reload, e le costanti deep-link `NEGOZIO_URL`/
+  `ANNUNCIO_URL` si leggono una volta al parse;
+  2) l'ascoltatore è DICHIARATIVO: `popstate` non dice «indietro», dice
+  «il cursore si è spostato» — si sposta anche in AVANTI e può saltare
+  più entry insieme (i browser marcano saltabili quelle spinte fuori da
+  un gesto: il deep link dopo l'await, `openOrder` nel setTimeout del
+  pagamento, il tour che parte da solo). `navApplica` RI-APPLICA la
+  pila scritta nella entry (`history.state.pila`), non «toglie un
+  livello»: degrada, non si rompe. Per la stessa ragione niente
+  `history.go(-n)` con un contatore di debito — asincrono e coalescente,
+  la fabbrica dei bug irriproducibili: le chiusure programmatiche usano
+  `replaceState`, che è sincrono;
+  3) la pila si DERIVA dal DOM (`navPila`: la vista in fondo, sopra gli
+  strati per z-index — fogli, lightbox, tour, cartello; il picker
+  forzato ultimo fra i fogli, è l'unico che si apre SOPRA un altro) e a
+  rilevarla è un `MutationObserver` sulle classi. È ciò che tiene il
+  diff piccolo: i 18 siti che aprono un foglio, `closeSheet()` e le tre
+  chiusure mirate anti-`pollTimer` sono rimasti INTONSI. Il callback è
+  un microtask (ancora dentro il task del gesto, e coalesce i cambi
+  dello stesso giro: per questo foglio→foglio — setSheet→paySheet — è a
+  saldo zero da solo).
+  Si SPINGE solo entrando in una vista più interna (dettaglio, negozio,
+  ordine, sicurezza); i quattro tab sono RADICI sorelle e si
+  SOSTITUISCONO (girarli non costa quattro indietro, e dalla radice il
+  gesto esce). `navChiudiStrato` chiude sempre con la funzione dedicata,
+  MAI `closeSheet()`: il `pollTimer` si ferma solo col `paySheet`, che è
+  più preciso di prima. `navRendiVista` ricostruisce col suo opener
+  (`openDetail`/`openOrder`/`apriNegozio`) e controlla PRIMA che la
+  vista non si sia svuotata — `openOrder` non ha guardie e ci morirebbe
+  dentro: è il ripiego che prima era scritto due volte (in
+  `tornaDaSicurezza` e nella ri-idratazione di `avvia()`) e ora vive in
+  un posto solo. `navRiflette()` è richiamata a mano SOLO in coda a
+  `openDetail`: dettaglio→dettaglio (le card della striscia «Altri
+  oggetti») non cambia nessuna classe e l'osservatore non la vedrebbe.
+  Ogni affordance di ritorno passa da `navIndietro()` = `history.back()`
+  (le due «← Torna», il «← I tuoi ordini», la freccia sulla foto, ✕ e
+  Annulla dei fogli, tocco sul velo, i tre Escape, «Salta» del tour):
+  UNO SOLO smonta i livelli — l'ascoltatore di popstate — così gesto e
+  freccia non possono divergere, e non restano gradini morti (un
+  indietro che non fa niente). Per questo sono spariti `sicurezzaRitorno`
+  e l'euristica di `tornaDalNegozio` su `currentListing`: la cronologia
+  sa da dove si veniva meglio di loro. Restano programmatiche le
+  chiusure che non sono un gesto (`closeSheet` dopo il pagamento, il
+  foglio invito che lascia il posto a quello Nostr, `simulatePaid`).
+  Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
+  quando c'è dove tornare — alla radice resta nascosto, e lì il gesto
+  chiude la Mini App, che È il patto — e in coppia spegne
+  `disableVerticalSwipes` (7.7), cioè il solo trascinamento accidentale
+  della pagina: la chrome di Telegram non si tocca mai, lo dice la sua
+  documentazione («the user will still be able to minimize and close
+  the Mini App by swiping the Mini App's header»). Il tasto di Telegram
+  chiama `history.back()` come tutti, con una serratura di 350ms contro
+  il doppio canale (certi client potrebbero emettere sia
+  `backButtonClicked` sia `popstate`). Deep link `/annuncio/{id}`:
+  l'apertura spinge SOPRA la radice, quindi il primo indietro atterra
+  sulla vetrina (deciso: un modello solo, e da un annuncio condiviso
+  l'indietro fa scoprire il catalogo invece di buttare fuori). La
+  semina della radice in `navMotore` serve perché `history.state`
+  SOPRAVVIVE ai `location.reload()` del login e racconterebbe cose
+  della vecchia identità. Su `file://` (la DEMO a mano) `STORIA` è
+  falsa e il motore resta spento: `navIndietro` smonta lo strato in
+  cima e, se non ce n'è, torna al mercatino. IMPERFEZIONI DICHIARATE:
+  dopo un pagamento riuscito resta un gradino morto (`closeSheet`
+  programmatico sostituisce, non cancella la entry gemella); l'avanti
+  del browser su uno strato non lo riapre (lightbox e tour vogliono
+  dati che nella entry non ci sono) e ci pensa il `navRiflette`
+  successivo a rimettere la entry in pari — sistema auto-guarente; il
+  pannello Filtri è fuori di proposito (è in pagina, usa `style.display`
+  che l'osservatore delle classi non vede, e non intrappola nessuno).
   Cinque modalità, decise in `avvia()`: app vera dentro Telegram (auth
   via initData); WEB dal browser (cookie di sessione, app completa:
   `authHdr()` manda header vuoto e comanda il cookie; il sondaggio
@@ -1912,8 +1991,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Cartello «fase di test» (lug 2026): l'avviso di rodaggio
   all'apertura — modale a tutto schermo col velo SFOCATO
   (`#testModale`, z-index 90: sopra i fogli e sopra il tour), si
-  chiude SOLO col bottone o con la ✕ (niente tocco fuori, niente
-  Escape: deve essere letto). Interruttore, testo e link vivono nel
+  chiude col bottone, con la ✕ o col GESTO INDIETRO — mai col tocco
+  fuori né con Escape: deve essere letto, ma non si può fingere che
+  l'indietro non esista (lug 2026, deciso con Andrea quando è nato il
+  motore di navigazione: su Android un indietro che non fa niente si
+  preme tre volte e la terza esce comunque dall'app, e alla prima
+  apertura il cartello sta sulla RADICE, dove dentro Telegram il gesto
+  chiude la Mini App e non c'è modo di intercettarlo — una regola
+  onesta batte una garanzia che non c'è). Interruttore, testo e link vivono nel
   CONFIG (`BANNER_TEST`, `BANNER_TEST_TESTO`, `BANNER_TEST_LINK`) e
   arrivano al client da `GET /api/banner-test`, endpoint PUBBLICO come
   /api/listings (lo legge anche l'anonimo in vetrina; spento o testo
@@ -3122,7 +3207,25 @@ token nuovi. In produzione basta il deploy: nessuna colonna, nessuna
 leva nuova. RESTA DA DECIDERE A RODAGGIO: i testi della pagina sono
 scritti oggi con la commissione sospesa e la protezione spenta —
 quando si accenderanno vanno riletti, in particolare «Se qualcosa va
-storto» e «Dove stanno i sats»).
+storto» e «Dove stanno i sats»); il gesto indietro torna indietro
+(lug 2026: dentro Telegram, nella PWA e nel browser il tasto/gesto
+indietro non chiude più l'app — prima chiude i fogli, poi smonta le
+viste, e si esce solo dalla radice; freccia ← e tab bar restano tutte
+e ora dicono la stessa cosa del gesto, che è come sono spariti
+`sicurezzaRitorno` e l'euristica di `tornaDalNegozio`. Vedi
+Architettura per le tre scelte da non rovesciare: URL mai toccato,
+ascoltatore dichiarativo, pila derivata dal DOM con un
+MutationObserver — che è come i 18 siti dei fogli, `closeSheet` e le
+tre chiusure mirate sono rimasti intonsi — collaudato in locale nel
+browser vero a 375px: catena viste con salti multipli e AVANTI del
+browser, dieci giri di tab senza far crescere la cronologia, deep link
+che atterra sulla vetrina, lightbox, tour, cartello e foglio-invito,
+nessun gradino morto dopo ✕/velo/Escape, e il caso a cui teneva
+Andrea — picker aperto SOPRA il paySheet con invoice LNbits vera: il
+primo indietro chiude solo il picker e il pollTimer resta VIVO, il
+secondo chiude il foglio e lo ferma. In produzione basta il deploy:
+nessuna rotta, nessuna colonna. Da provare dal vivo dentro Telegram,
+dove contano la freccia di sistema e il gesto del client).
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
