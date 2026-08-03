@@ -480,10 +480,15 @@
      estremi ogni disegno scende sui 57px e le piastrelle si svuotano
      — si perde su tutte per pareggiare due casi. */
   .cat-tile .cat-fig{flex:1 1 auto;min-height:0;position:relative;
-    width:57%;margin:4px 8px 7px auto}
+    width:54%;margin:5px 13px 10px auto}
+  /* CENTRATA nel suo riquadro, non incollata all'angolo: i file
+     pareggiati portano un bordo trasparente attorno (vedi
+     ritaglia_categorie.py), e ancorati in basso a destra si
+     sarebbero allontanati dall'angolo chi piu' chi meno. Centrati,
+     stanno tutti allo stesso modo — ed e' anche piu' arioso. */
   .cat-tile .cat-fig img{position:absolute;inset:0;
     width:100%;height:100%;display:block;
-    object-fit:contain;object-position:100% 100%}
+    object-fit:contain;object-position:50% 50%}
   /* Ripiego quando l'immagine non arriva (la DEMO da file://): c'e'
      l'emoji del catalogo, spenta finche' l'img le sta davanti nel
      markup — l'onerror la toglie e il fratello ricompare. E' lo stesso
@@ -2298,7 +2303,7 @@
          per qualcosa che arrivera'. Il Profilo vive nel tasto tappo in
          testata (mobile) e qui in coda solo da desktop -->
     <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
-    <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
+    <button id="nav-esplora" class="active" onclick="vaiEsplora()"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-sfoglia" onclick="go('sfoglia')"><span class="ic">🗂️</span>Sfoglia</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini<span class="off-dot" id="offDot"></span></button>
@@ -3495,7 +3500,25 @@ function renderSfoglia(){
    cambio di tab — l'indietro deve riportare a Sfoglia. */
 function apriCategoria(c){
   navSpingi = true;
+  /* La griglia si SVUOTA prima di partire: setCat ricarica dal server
+     e la risposta arriva mezzo secondo dopo, quindi senza questo si
+     atterra su Esplora vedendo per un attimo gli annunci di PRIMA —
+     che con una categoria appena scelta e' proprio la cosa sbagliata
+     da mostrare. Meglio un mezzo secondo di vuoto che mezzo secondo
+     di bugia. In DEMO setCat ridisegna subito e non si nota. */
+  el('grid').innerHTML = '';
+  el('gridEmpty').style.display = 'none';
   setCat(c);
+  go('esplora');
+}
+
+/* Il tasto Esplora della barra riporta SEMPRE alla vetrina intera.
+   Non e' la stessa cosa di go('esplora'), che serve anche a tornare
+   indietro da una scheda e li' il filtro deve restare: qui si tocca
+   il nome del tab, e chi lo tocca si aspetta tutto il mercatino, non
+   la categoria in cui era entrato da Sfoglia mezz'ora fa. */
+function vaiEsplora(){
+  if (activeCat !== 'Tutto') { setCat('Tutto'); }
   go('esplora');
 }
 

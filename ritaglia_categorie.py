@@ -1,23 +1,34 @@
-"""Ritaglia il vuoto attorno alle illustrazioni di Sfoglia.
+"""Prepara le illustrazioni della pagina Sfoglia: le ritaglia e le
+PAREGGIA, cosi' in griglia sembrano tutte della stessa taglia.
 
-PERCHE' ESISTE. Le illustrazioni arrivano come quadrati 512x512 con il
+PERCHE' ESISTE, in due tempi.
+
+1) IL RITAGLIO. Le illustrazioni arrivano come quadrati 512x512 col
 disegno al centro e circa il 30% di margine trasparente attorno. Quel
 margine e' spazio che la piastrella paga: il disegno puo' essere alto
-al massimo quanto la fascia libera sotto il nome, e se un terzo di
-quell'altezza e' vuoto, il disegno si vede piccolo. Ritagliando, la
-stessa fascia contiene un disegno grande un terzo di piu', senza
-togliere niente al nome.
+al massimo quanto la fascia sotto il nome, e se un terzo e' vuoto, il
+disegno si vede piccolo.
+L'alpha si guarda SOPRA UNA SOGLIA e non sopra lo zero: un file
+arrivava con una velatura quasi invisibile stesa su tutta la tela, e
+col confronto a zero risultava gia' tirato mentre il disegno vero ne
+occupava meno di meta'.
 
-E' anche l'INVARIANTE su cui poggia il CSS: la piastrella posa
-l'immagine in un riquadro in basso a destra con object-fit:contain, e
-quel riquadro e' tarato assumendo che l'immagine sia TUTTA disegno. Se
-un file torna ad avere margini, il disegno rimpicciolisce; se il
-ritaglio non venisse fatto affatto, si vedrebbe la differenza subito.
-`prove.py` controlla che i file siano tirati, quindi la CI se ne
-accorge prima della vetrina.
+2) IL PAREGGIO, che e' la parte meno ovvia. Ritagliate e basta, le
+illustrazioni sembrano ancora di taglie diverse — e non per colpa del
+loro rettangolo: un pallone e una chitarra possono occupare lo stesso
+rettangolo, ma il pallone e' pieno e la chitarra e' un filo, quindi il
+pallone «pesa» il triplo. A contare e' l'INCHIOSTRO, cioe' quanti
+pixel pieni il disegno copre davvero. Qui si misura quello e si mette
+un TETTO: chi lo supera riceve un bordo trasparente attorno, che in
+pagina lo rende piu' piccolo senza toccare il disegno.
+Non si puo' fare il contrario — ingrandire i piu' leggeri — perche'
+sono gia' al massimo che la piastrella concede: la chitarra resta la
+piu' leggera, ed e' un limite dichiarato.
 
-Idempotente: rilanciarlo su file gia' ritagliati non fa nulla. Va
-rilanciato quando si aggiunge o si rifa' un'illustrazione.
+Idempotente: rilanciarlo non riscrive nulla se i file sono gia' a
+posto (i WebP sono lossy, e la regola della compressione unica vale
+anche qui). Va rilanciato quando si aggiunge o si rifa'
+un'illustrazione; `prove.py` controlla che il tetto sia rispettato.
 
     python ritaglia_categorie.py            # dice cosa farebbe
     python ritaglia_categorie.py --scrivi   # lo fa
@@ -26,19 +37,36 @@ import os
 import sys
 
 CARTELLA = os.path.join("assets", "categorie")
-QUALITA = 92          # una sola ricompressione, su arte piatta e' invisibile
-# L'alpha si guarda SOPRA una soglia, non sopra lo zero: un file
-# arrivava con una velatura quasi invisibile stesa su tutta la tela, e
-# col confronto a zero il riquadro restava 512x512 — il ritaglio non
-# faceva nulla e quel disegno si vedeva molto piu' piccolo degli altri
-# (era 329x236 dentro il quadrato). Otto su 255 e' sotto il visibile e
-# non intacca l'antialiasing dei bordi: sugli altri 25 file il
-# riquadro cambia di 4px in tutto.
+QUALITA = 92
+# Sotto il visibile, ma sopra l'antialiasing dei bordi: e' la soglia
+# che smaschera la velatura invisibile senza mangiare i contorni.
 SOGLIA_ALPHA = 8
-# Sotto questo scarto non si riscrive: un ritaglio da due pixel non
-# vale una seconda compressione, e cosi' rilanciare lo script non
-# ricomprime ogni volta tutto quanto.
+# Il riquadro del CSS a 360px (.cat-fig: width 54% di 159, e l'altezza
+# che resta sotto il nome). Serve solo a sapere CHI e' limitato in
+# larghezza e chi in altezza — se quelle misure cambiassero di molto,
+# il pareggio andrebbe rifatto.
+BOX_W, BOX_H = 85.9, 69.0
+# Il tetto, in multipli dell'inchiostro MEDIANO: 1.05 lascia stare la
+# meta' piu' leggera e calma solo chi sporge.
+TETTO = 1.05
+# Sotto questo scarto non si riscrive: un ritocco da pochi pixel non
+# vale una seconda compressione.
 MINIMO = .02
+
+
+def _misura(im):
+    """riquadro del disegno, inchiostro e resa nel riquadro del CSS"""
+    from PIL import Image  # noqa: F401  (serve solo al chiamante)
+    a = im.getchannel("A")
+    bb = a.point(lambda v: 255 if v > SOGLIA_ALPHA else 0).getbbox()
+    if bb is None:
+        return None, 0, 0
+    disegno = im.crop(bb)
+    ad = disegno.getchannel("A")
+    inchiostro = sum(n * i for i, n in enumerate(ad.histogram())) / 255.0
+    w, h = disegno.size
+    s = min(BOX_W / w, BOX_H / h)
+    return bb, inchiostro, inchiostro * s * s
 
 
 def main():
@@ -52,35 +80,46 @@ def main():
         print(f"cartella {CARTELLA} assente")
         return 1
 
-    fatti = gia_a_posto = 0
-    for nome in sorted(os.listdir(CARTELLA)):
-        if not nome.endswith(".webp"):
-            continue
-        p = os.path.join(CARTELLA, nome)
-        im = Image.open(p).convert("RGBA")
-        sodo = im.getchannel("A").point(
-            lambda v: 255 if v > SOGLIA_ALPHA else 0)
-        bb = sodo.getbbox()
+    file = sorted(f for f in os.listdir(CARTELLA) if f.endswith(".webp"))
+    misure = {}
+    for nome in file:
+        im = Image.open(os.path.join(CARTELLA, nome)).convert("RGBA")
+        bb, ink, reso = _misura(im)
         if bb is None:
             print(f"  ⚠ {nome}: tutto trasparente, lasciato com'e'")
             continue
-        w, h = im.size
-        scarto = max(bb[0], bb[1], w - bb[2], h - bb[3])
-        if scarto <= MINIMO * max(w, h):
-            gia_a_posto += 1
+        misure[nome] = (im, bb, ink, reso)
+
+    if not misure:
+        return 1
+    resi = sorted(m[3] for m in misure.values())
+    mediana = resi[len(resi) // 2]
+    tetto = mediana * TETTO
+    print(f"inchiostro mediano {mediana:.0f}, tetto {tetto:.0f}\n")
+
+    fatti = fermi = 0
+    for nome, (im, bb, ink, reso) in misure.items():
+        disegno = im.crop(bb)
+        w, h = disegno.size
+        # quanto bordo serve perche' il reso scenda sotto il tetto
+        p = max(1.0, (reso / tetto) ** .5) if tetto else 1.0
+        nw, nh = round(w * p), round(h * p)
+        vecchio = im.size
+        if (abs(nw - vecchio[0]) <= MINIMO * nw
+                and abs(nh - vecchio[1]) <= MINIMO * nh):
+            fermi += 1
             continue
-        prima = os.path.getsize(p) / 1024
-        ritagliata = im.crop(bb)
-        larg = bb[2] - bb[0]
-        alt = bb[3] - bb[1]
-        print(f"  {nome[:-5]:26s} {w}x{h} → {larg}x{alt}"
-              f"   ({100*larg//w}% x {100*alt//h}%)")
+        tela = Image.new("RGBA", (nw, nh), (0, 0, 0, 0))
+        tela.alpha_composite(disegno, ((nw - w) // 2, (nh - h) // 2))
+        quanto = "" if p == 1.0 else f"  −{100*(1-1/p):.0f}% in pagina"
+        print(f"  {nome[:-5]:26s} {vecchio[0]}x{vecchio[1]} → {nw}x{nh}"
+              f"   inchiostro {reso/mediana:.2f}x{quanto}")
         if scrivi:
-            ritagliata.save(p, "WEBP", quality=QUALITA, method=6)
-            print(f"{'':30s}{prima:.0f}KB → {os.path.getsize(p)/1024:.0f}KB")
+            tela.save(os.path.join(CARTELLA, nome), "WEBP",
+                      quality=QUALITA, method=6)
         fatti += 1
 
-    print(f"\n{fatti} da ritagliare, {gia_a_posto} gia' a posto")
+    print(f"\n{fatti} da sistemare, {fermi} gia' a posto")
     if fatti and not scrivi:
         print("niente e' stato scritto: rilancia con --scrivi")
     return 0

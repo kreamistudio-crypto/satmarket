@@ -381,25 +381,33 @@ def prove_categorie():
     except ImportError:
         print("  · Pillow assente: salto il controllo del ritaglio")
     else:
-        # La soglia dell'alpha e' la stessa di ritaglia_categorie.py, e
-        # NON e' un dettaglio: un file arrivava con una velatura quasi
-        # invisibile su tutta la tela: col confronto a zero risultava
-        # gia' tirato mentre il disegno vero ne occupava meno di meta',
-        # e in vetrina si vedeva piccolo accanto agli altri. Guardare
-        # sopra lo zero qui vorrebbe dire lasciar passare proprio il
-        # caso che questa prova esiste per prendere.
-        larghi = []
+        # Le illustrazioni devono essere PAREGGIATE, cioe' nessuna deve
+        # coprire molto piu' inchiostro delle altre una volta resa in
+        # piastrella (ci pensa ritaglia_categorie.py). Si misura
+        # l'inchiostro e non il rettangolo perche' e' quello che
+        # l'occhio pesa: un pallone e una chitarra possono avere lo
+        # stesso rettangolo, ma il pallone e' pieno e sembra il triplo.
+        # Il tetto e' generoso apposta — qui non si insegue la
+        # perfezione, si prende il file rifatto che sfonda.
+        BOX_W, BOX_H, TETTO = 85.9, 69.0, 1.30
+        resi = {}
         for c in cat:
             p = f"assets/categorie/{slug(c)}.webp"
             if not os.path.exists(p):
                 continue
-            im = Image.open(p).convert("RGBA")
-            w, h = im.size
-            bb = im.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
-            if bb and max(bb[0], bb[1], w - bb[2], h - bb[3]) > .02 * max(w, h):
-                larghi.append(c)
-        prova("le illustrazioni sono tirate (niente vuoto attorno)",
-              [], larghi)
+            # il file si misura COM'E', bordo trasparente compreso: e'
+            # quello che scala il browser, ed e' proprio quel bordo a
+            # fare il pareggio. Ritagliarlo qui vorrebbe dire annullare
+            # la cosa che si sta verificando (successo per davvero).
+            a = Image.open(p).convert("RGBA").getchannel("A")
+            ink = sum(n * i for i, n in enumerate(a.histogram())) / 255.0
+            s = min(BOX_W / a.size[0], BOX_H / a.size[1])
+            resi[c] = ink * s * s
+        if resi:
+            ordinati = sorted(resi.values())
+            mediana = ordinati[len(ordinati) // 2]
+            prova("nessuna illustrazione pesa piu' delle altre in griglia",
+                  [], [c for c, v in resi.items() if v > mediana * TETTO])
 
 
 # ====================================================================
