@@ -1151,80 +1151,63 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (foglio «Come vuoi riceverlo?» col totale per strada, riga
   «Spedizione» del `contoScomposto`, e il totale dei bottoni compra
   che la spedizione l'ha sempre inclusa).
-  UN BADGE SOLO, E STA SOPRA (lug 2026, decisione di Andrea in due
-  tempi): nella fila delle pillole si dice SE si spedisce —
-  `spedBadge()` è «🚚 Spedizione disponibile» in azzurro CHIARO, e
-  diventa «🚚 Spedizione gratuita» in azzurro PIENO
-  (`.sped-badge.piena`, token `--ship-full`/`--ship-on`) quando non c'è un
-  costo dichiarato — la gratuità è un argomento di vendita e non può
-  aspettare il fondo pagina. Il grado basso è NUDO: il contorno pieno
-  provato addosso al «disponibile» dava peso a ciò che deve pesarne
-  meno. Ritiro e codice online non si nominano: sono gratuiti per
-  natura. Giudici unici `spedisce` e `spedGratis` — «gratis» si decide
-  in un posto solo, e da lì lo legge anche l'icona in card.
-  I DUE BADGE NON CAMBIANO SEGNO COL TEMA (lug 2026, feedback di
-  Andrea in tre passaggi): sono una COPPIA ROVESCIATA, e la loro
-  IDENTITÀ è la stessa di giorno e di sera —
-    «disponibile» = fondo azzurro CHIARO + testo blu    (#D3E7FA/#12599E)
-    «gratuita»    = fondo blu SCURO   #2A6FB0 + testo bianco
-  `--ship-full`/`--ship-on` vivono SOLO nel blocco `:root` e NON si
-  ridichiarano in `html[data-tema="scuro"]`: è voluto, non una
-  dimenticanza — chi passasse di lì e li «completasse» per simmetria
-  romperebbe la regola. Il motivo: qui il colore È IL SEGNO («questa
-  spedizione è gratis»), e un segno non può cambiare tinta fra il
-  giorno e la sera, o chi l'ha imparato di giorno non lo riconosce
-  più. UNA SOLA taratura notturna è ammessa, e riguarda il tenue:
-  `--ship-soft`/`--ship-soft-on` scendono a #AEC8E0/#0E4A80 al buio
-  perché sul bruno lo stesso chiaro rendeva più che sul crema e
-  gridava più del pieno (contro il fondo 13,59 → 11,04 → 9,95, in due
-  gradini, il secondo chiesto da Andrea dopo averlo visto a schermo;
-  il testo scende con lui e tiene il margine, 5,25). Attenzione alla
-  distinzione, che è tutta la regola: lì si abbassa la LUCE, qui non
-  si cambia il SEGNO — resta un chip azzurro chiaro con testo blu,
-  riconoscibile identico, solo un gradino meno acceso. L'inversione
-  chiaro↔scuro resta invece bocciata. L'inversione al buio ha senso
-  per una SUPERFICIE (l'etichetta
-  prezzo, il toast, che di sera diventano di carta), mai per un codice
-  colore. Due tentativi bocciati, da non rifare: il pieno che si
-  invertiva (di sera diventava azzurro acceso, cioè un altro colore) e
-  il tenue che seguiva il tema (di sera era un chip scuro su fondo
-  scuro e spariva — «si mescolava col fondo»). Contrasti testo/fondo:
-  5,62 di giorno e 5,25 di sera per il tenue, 5,25 sempre per il
-  pieno; e nessuno dei due si perde sulla pagina (il chiaro contro il
-  bruno fa 9,95, lo scuro contro il crema 4,78).
-  LO SCAMBIO FRA I DUE È STATO VALUTATO E SCARTATO (lug 2026, domanda
-  di Andrea: «il chiaro spicca di più, ha senso invertirli?»). Spicca
-  di più SOLO di sera: sul crema il chiaro fa 1,15 contro il fondo,
-  cioè è una velatura. Scambiandoli, nel tema di DEFAULT «gratuita»
-  diventerebbe la cosa più muta della fila e «disponibile» — che è
-  solo un dato di fatto — il chip più forte, in concorrenza col
-  prezzo. Si sposterebbe il problema dal tema scuro a quello chiaro.
-  Vale anche l'argomento di forma: pieno + testo bianco si legge come
-  «etichetta forte» e la velatura come «nota di contorno» (la stessa
-  convenzione dell'arancio pieno contro il ghost), e quella gerarchia
-  regge in tutti e due i temi a prescindere da chi sia otticamente
-  più brillante. La leva per calmare il tenue di sera è abbassarlo
-  ancora, mai scambiarlo.
-  Il badge è `display:inline-flex` con `align-items:center` e NON
-  block: `.pills` è un flex ad align-items stretch e le pillole
-  vicine sono 3px più alte (1,5px di bordo per lato, che il badge non
-  ha), quindi da block veniva stirato e il testo restava appeso in
-  alto — 6px sopra contro 8,8 sotto, uno scentramento visibile a
-  occhio. Ora sta a 7,0/7,8, gli stessi identici valori delle pillole
-  accanto: il residuo è l'asimmetria del font, uguale per tutte.
-  ATTENZIONE a non riusare `--ship-bg`/`--ship-text` per questi badge:
-  quelli restano dei badge di STATO dell'ordine («spedito»), che al
-  buio DEVONO scurirsi come le sorelle locked/refunded — un chip
-  chiaro in mezzo a loro griderebbe. Erano condivisi fino al lug 2026,
-  ed è per questo che il tenue seguiva il tema.
-  Due cose accettate e dichiarate: il cerchietto della card eredita
-  `--ship-full` e al buio scende a 2,89 sul fondo della card — è una
-  FORMA attorno a un'emoji che resta luminosa, non un testo da
-  leggere, e il blu su bruno si distingue (verificato a schermo); e di
-  sera il chip chiaro «disponibile» pesa otticamente più dello scuro
-  «gratuita», il che sembrerebbe rovesciare la gerarchia — ma i due
-  non compaiono MAI insieme (un annuncio o spedisce gratis o no),
-  quindi la gerarchia falsa non si vede mai davvero.
+  UN SOLO CHIP COLORATO, ED È «GRATIS» (lug 2026, decisione di Andrea
+  in quattro tempi — vale la pena tenere l'arrivo, non il percorso).
+  Il colore veste UNA cosa sola: che la spedizione non si paga.
+  «🚚 Spedizione disponibile», «🤝 Ritiro in zona» e «💾 Codice online»
+  sono dati di FATTO e stanno tutti e tre in `.pill` normali; solo
+  «🚚 Spedizione gratuita» è il chip azzurro `.sped-badge`. Il perché:
+  due chip colorati in fila si facevano concorrenza, e quello che
+  diceva meno era anche quello che compariva più spesso (quasi ogni
+  annuncio spedisce, pochi lo fanno gratis). La gratuità invece è un
+  argomento di vendita e non può aspettare il fondo pagina.
+  Giudici unici `spedisce` e `spedGratis` — «gratis» si decide in un
+  posto solo, e da lì lo legge anche la card.
+  IL COLORE È UNO E NON CAMBIA SEGNO COL TEMA. `--ship-soft` (fondo) e
+  `--ship-soft-on` (testo) vestono il chip del dettaglio: azzurro
+  chiaro con testo blu, 5,62. Un colore che SIGNIFICA qualcosa non può
+  cambiare tinta fra il giorno e la sera, o chi l'ha imparato di
+  giorno non lo riconosce più; l'inversione al buio ha senso per una
+  SUPERFICIE (l'etichetta prezzo, il toast, che di sera diventano di
+  carta), mai per un codice colore. L'UNICA cosa che si tara di notte
+  è la LUCE: al buio i due scendono a #AEC8E0/#0E4A80 perché sul bruno
+  lo stesso chiaro rendeva più che sul crema (contro il fondo 13,59 →
+  11,04 → 9,95, in due gradini, il secondo chiesto da Andrea dopo
+  averlo visto a schermo; il testo scende con lui e tiene 5,25).
+  Attenzione alla distinzione, che è tutta la regola: si abbassa la
+  luce, non si cambia il segno.
+  IN CARD la stessa idea si SCRIVE: «🚚 gratis» accanto alle altre
+  icone, in `--ship-card` — terzo token, e l'unico dei tre che SEGUE
+  IL TEMA (#12599E di giorno, #9FC9EA di sera). Non è un'eccezione: lì
+  «gratis» è TESTO NUDO sulla carta della card, e un testo deve
+  contrastare la superficie su cui sta — il blu scuro sulla card bruna
+  farebbe 1,67, cioè sparirebbe (8,68 così). Il segno è il chip,
+  questo è inchiostro, e l'inchiostro segue la carta come ovunque
+  nell'app; la famiglia (blu) resta la stessa. Si SCRIVE e non si
+  colora soltanto perché un cerchietto non insegna niente a chi guarda
+  la prima volta, e da quando il chip è l'azzurro chiaro non c'era più
+  nemmeno un colore forte da riecheggiare a 15px. Costa ~21px al
+  comune, che nel caso a tre strade scende da 69 a 47px e si tronca
+  prima («Carma…»): prezzo accettato e misurato — «gratis» fa cambiare
+  idea a chi compra, le ultime lettere di un paese no. La regola di
+  sempre non si tocca: a cedere è il luogo, mai il gruppo di icone.
+  TRE COSE PROVATE E SCARTATE, da non rifare (i motivi, non solo i
+  nomi): 1) il badge PIENO blu scuro per «gratuita» contro il tenue
+  per «disponibile» — due gradi della stessa famiglia si somigliavano
+  troppo, e al buio il tenue spariva nel fondo; 2) SCAMBIARE i due
+  colori perché «il chiaro spicca di più» — spicca di più SOLO di
+  sera: sul crema il chiaro fa 1,15 contro il fondo, cioè è una
+  velatura, quindi scambiandoli nel tema di DEFAULT «gratuita»
+  diventerebbe la cosa più muta della fila e «disponibile» la più
+  forte, in concorrenza col prezzo; 3) il cerchietto colorato attorno
+  alla 🚚 in card, sostituito dalla parola per la ragione qui sopra.
+  E una valutata e scartata a tavolino: colorare il RITIRO invece
+  della spedizione. Il ritiro vale solo per chi è vicino — colorarlo
+  significherebbe gridare a tutti gli altri una cosa che non possono
+  usare — mentre «gratis» è un risparmio che vale per chiunque guardi;
+  e la località la dice già il comune, lì accanto nella stessa riga.
+  Se un giorno si vorrà spingere lo scambio locale, la leva non è il
+  colore di un chip ma un filtro «vicino a me».
   IL GEMELLO COL COSTO SOTTO ACQUISTA È VISSUTO UN GIORNO: nato per
   dire il QUANTO nel momento in cui si compra («🚚 Spedizione +
   5,00 €», dentro il recinto), è stato tolto subito dopo averlo visto
@@ -1295,9 +1278,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   azzererebbe pezzi scelti e strada) · sotto, la riga ≈ dell'altra
   valuta · la fila delle pillole, che si apre col badge EVIDENZIATO
   della spedizione (`spedBadge()`, coppia azzurra
-  --ship-bg/--ship-text dei badge di stato più il pieno --ship-full
-  per la gratuita: AA nei due temi, non
-  fa concorrenza né all'arancio del prezzo né al verde escrow;
+  la coppia azzurra --ship-soft/--ship-soft-on, sua e solo sua: AA nei
+  due temi, non fa concorrenza né all'arancio del prezzo né al verde
+  escrow;
   forma da pillola come le vicine — stava accanto al prezzo per un
   giorno, ma il suo posto sono le caratteristiche; i due gradi e il
   gemello col costo sotto Acquista sono spiegati sopra) ·
@@ -1368,17 +1351,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   insieme deve restare intero. `min-height:17px` sulla riga, che può
   essere vuota del tutto (zona non riconosciuta e nessuna icona) e le
   card resterebbero disallineate.
-  La SPEDIZIONE GRATUITA si vede anche in griglia (lug 2026) senza
-  aggiungere NIENTE alla riga appena ripulita: è la 🚚 di sempre
-  dentro un cerchietto pieno (`.ico .gratis`, lo STESSO token
-  `--ship-full` del badge del dettaglio — di sera si schiarisce con
-  lui, che il legame da tenere è «uguale al badge», non «blu scuro»).
-  Costa 6px e il comune non ne risente. La versione col «gratis»
-  SCRITTO accanto è stata provata e tolta: costava ~24px e nel caso
-  peggiore (gratis + ritiro + codice online, comune lungo) lasciava al
-  luogo 28px, cioè i soli puntini. Il cerchietto da solo non spiega
-  nulla a chi guarda la prima volta — è dichiarato: lo impara aprendo
-  una scheda, dove il badge lo dice a parole.
+  La SPEDIZIONE GRATUITA si vede anche in griglia (lug 2026), e si
+  SCRIVE: «🚚 gratis» accanto alle altre icone, nel blu `--ship-card`.
+  Il perché della parola invece del solo colore, il costo misurato in
+  pixel e le rese scartate stanno nella sezione della spedizione, sotto
+  «UN SOLO CHIP COLORATO»: qui basti che a cedere resta il comune, mai
+  il gruppo di icone.
   Consegna digitale 💾 (lug 2026, quarta voce di MODALITA_CONSEGNA):
   per buoni regalo, codici, licenze — il PRINCIPIO CARDINE è che il
   contenuto passa DENTRO Barattolo, mai fuori. La modalità è LIBERA
@@ -3188,9 +3166,9 @@ si vede (lug 2026: «Acquista» un gradino più grande e i due tasti
 della barra finalmente gemelli — il tratteggio diventa un outline che
 non occupa layout e le basi flex vanno al 50%, la stessa lezione dei
 bottoni del pannello Filtri; la spedizione a due gradi dello stesso
-azzurro nel solo badge sopra il prezzo — «disponibile» tenue,
-«gratuita» pieno, che è un argomento di vendita — con la 🚚
-cerchiata in vetrina quando è gratis; il gemello col costo sotto
+azzurro nel solo chip «Spedizione gratuita» sopra il prezzo — le altre
+strade restano pillole normali, perché il colore veste solo ciò che è
+un vantaggio — con «🚚 gratis» scritto in vetrina; il gemello col costo sotto
 Acquista è nato e morto nello stesso cantiere: il recinto è il posto
 della fiducia, non del listino; il recinto ridotto a una riga,
 via la riga sulla invoice, e tutto il resto nella pagina nuova «Il
