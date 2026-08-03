@@ -164,10 +164,21 @@
   html[data-tema="scuro"] .detail-photos img{filter:brightness(.92)}
   html[data-tema="scuro"] .hero img{filter:drop-shadow(0 14px 22px rgba(0,0,0,.5))}
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%}
+  /* overscroll-behavior VA SULL'HTML, non solo sul body (lug 2026, da
+     due bug veri visti da Andrea nella PWA installata): alla viewport
+     arriva il valore dell'ELEMENTO RADICE, e finche' l'html restava
+     `auto` quel `none` sul body non spegneva niente. Costava due cose
+     insieme: il pull-to-refresh NATIVO di Chrome, che ricaricava la
+     pagina — e ricaricando si riparte da Esplora, quindi sembrava un
+     torna-indietro proprio mentre si chiedeva un aggiornamento —, e
+     l'incatenamento ORIZZONTALE, per cui un trascinamento non
+     consumato da una striscia faceva slittare di lato tutta la pagina.
+     Vale per i due assi, ed e' il motivo per cui qui non c'e' un
+     `-y`. */
+  html{height:100%; overscroll-behavior:none}
   body{
     font-family:'Nunito',system-ui,sans-serif; background:var(--bg); color:var(--ink);
-    font-size:15px; line-height:1.45; overscroll-behavior:none;
+    font-size:15px; line-height:1.45; height:100%; overscroll-behavior:none;
   }
   .mono{font-family:'JetBrains Mono',monospace}
   .font-brand{font-family:'Baloo 2',sans-serif}
@@ -3680,9 +3691,21 @@ function navMotore(){
       recinto delle strisce che scorrono di fianco e restano dentro le
       viste ammesse (le pillole delle categorie, «Altri oggetti»).
 
-   Gli ascoltatori sono PASSIVI: non annullano mai il tocco (niente
-   preventDefault), quindi lo scorrimento normale non se ne accorge, e
-   dentro Telegram non fanno a botte col client — li' il trascinamento
+   IL touchmove E' NON-PASSIVO, MA SOLO MENTRE LA TIRATA E' ARMATA
+   (lug 2026, da un bug vero nella PWA installata): un ascoltatore
+   passivo non puo' chiamare preventDefault, quindi non poteva togliere
+   il pull-to-refresh NATIVO di Chrome, che ricaricava la pagina — e
+   ricaricando si riparte da Esplora, cioe' il gesto sembrava un
+   torna-indietro proprio mentre si chiedeva un aggiornamento.
+   L'overscroll-behavior sull'html lo spegne (vedi il CSS), ma quello
+   che decide dev'essere il nostro gesto, non una proprieta' che un
+   domani qualcuno rimette a `auto`. Il costo si paga solo dove serve:
+   l'ascoltatore si APPENDE nel touchstart quando ptrPuo() dice di si'
+   — cioe' in cima a una vista aggiornabile — e si stacca al rilascio,
+   cosi' per tutto il resto dello scorrimento la strada veloce del
+   compositor resta intatta, che e' la ragione per cui non ce n'e' uno
+   permanente.
+   Dentro Telegram non si fa a botte col client: li' il trascinamento
    verticale non e' piu' suo (disableVerticalSwipes in navFreccia), ma
    la chrome e la freccetta ⌄ restano sue e noi non le tocchiamo. */
 const PTR_SOGLIA = 64;         /* i pixel di tirata che valgono un «sì» */
@@ -3713,13 +3736,7 @@ function ptrRientra(){
   p.style.transform = ''; p.style.opacity = '';
 }
 
-addEventListener('touchstart', e => {
-  const ok = e.touches.length === 1 && ptrPuo();
-  ptrDa  = ok ? e.touches[0].clientY : 0;
-  ptrDaX = ok ? e.touches[0].clientX : 0;
-}, {passive:true});
-
-addEventListener('touchmove', e => {
+function ptrMuove(e){
   if (!ptrDa || e.touches.length !== 1) return;
   const d  = e.touches[0].clientY - ptrDa;
   const dx = Math.abs(e.touches[0].clientX - ptrDaX);
@@ -3729,17 +3746,35 @@ addEventListener('touchmove', e => {
   if (d <= 0 || scrollY > 0 || dx > d) {
     ptrDa = 0; if (ptrTirato) ptrRientra(); return;
   }
+  /* da qui la tirata e' NOSTRA: si toglie di mezzo il ricarica nativo,
+     che altrimenti si prenderebbe lo stesso gesto e ripartirebbe da
+     Esplora buttando via la vista */
+  if (e.cancelable) e.preventDefault();
   ptrPosa(d);
+}
+const ptrStacca = () => removeEventListener('touchmove', ptrMuove, {passive:false});
+
+addEventListener('touchstart', e => {
+  const ok = e.touches.length === 1 && ptrPuo();
+  ptrDa  = ok ? e.touches[0].clientY : 0;
+  ptrDaX = ok ? e.touches[0].clientX : 0;
+  /* l'ascoltatore non-passivo vive solo per la durata del gesto, ed e'
+     appeso PRIMA del primo touchmove: e' quello che decide se lo
+     scorrimento oltre il bordo lo prende Chrome o lo prendiamo noi */
+  ptrStacca();
+  if (ok) addEventListener('touchmove', ptrMuove, {passive:false});
 }, {passive:true});
 
 addEventListener('touchend', () => {
+  ptrStacca();
   if (!ptrDa) return;
   const basta = ptrTirato >= PTR_SOGLIA;
   ptrDa = 0;
   basta ? ptrAggiorna() : ptrRientra();
 }, {passive:true});
-addEventListener('touchcancel', () => { ptrDa = 0; if (ptrTirato) ptrRientra(); },
-                 {passive:true});
+addEventListener('touchcancel', () => {
+  ptrStacca(); ptrDa = 0; if (ptrTirato) ptrRientra();
+}, {passive:true});
 
 /* La pastiglia gira finche' il lavoro non e' finito, con un minimo di
    mezzo secondo: senza, su rete veloce lampeggerebbe e sembrerebbe che
