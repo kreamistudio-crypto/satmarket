@@ -223,11 +223,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   («Console e videogiochi»: ne chiede 140 e ne ha 141, a 360px). Chi
   alza il corpo del testo rimette quelle voci su due righe, e quelle
   piastrelle avranno il disegno più piccolo delle altre.
-  Le LARGHEZZE invece restano diverse, ed è giusto: una bici è larga e
-  un telefono è stretto, quindi a pari altezza la bici copre 2,7 volte
-  l'area. Normalizzare l'AREA è stato provato e scartato — per far
-  stare gli estremi ogni disegno scende sui 55px e le piastrelle si
-  svuotano: si perde su tutte per pareggiare due casi.
+  Ma l'altezza uguale NON BASTA a far sembrare le icone uguali, ed è
+  la cosa che si scopre solo guardando tutte e 26 insieme: a pari
+  altezza sono le LARGHEZZE a scappare, e la scarpa (122×72) copriva
+  2,7 volte l'area dell'orologio (47×72) — in griglia gli oggetti
+  larghi schiacciavano i sottili. Il rimedio è il TETTO alla larghezza
+  del riquadro (57% della piastrella, ~90px): il rapporto scende a
+  1,97 e a cedere sono solo i quattro che scappavano — scarpa, auto,
+  bici, fotocamera, che diventano un po' più basse — mentre i sottili
+  non si toccano. Le altezze vanno quindi da 54 a 73, ed è voluto.
+  Normalizzare l'AREA è stato provato e scartato: per far stare gli
+  estremi ogni disegno scende sui 57px e le piastrelle si svuotano —
+  si perde su tutte per pareggiare due casi.
   `ritaglia_categorie.py` toglie il margine trasparente che le
   illustrazioni hanno di fabbrica (~30%): senza, un terzo dello spazio
   della piastrella sarebbe vuoto e il disegno si vedrebbe piccolo. È
