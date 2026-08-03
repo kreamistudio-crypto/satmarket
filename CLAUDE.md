@@ -2300,9 +2300,49 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   resta lo `history.back()` di sempre. NIENTE contatori di debito: `d`
   viaggia nella entry, come la pila — è la stessa ragione per cui
   l'ascoltatore è dichiarativo.
+  DUE CONTESTI, E VANNO TENUTI DISTINTI (lug 2026, ed è la lezione che
+  costa di più in questo cantiere — il primo giro di correzioni era
+  scritto per il contesto sbagliato): dentro la **Mini App** il gesto
+  lo intercetta il CLIENT Telegram, che ce lo gira come
+  `backButtonClicked` solo se il `BackButton` è visibile, altrimenti
+  chiude l'app; nella **PWA installata** (e nel browser, e nell'APK,
+  cioè dove Andrea prova) non esiste né `tg.BackButton` né
+  `tg.close()` né `disableVerticalSwipes`, e il gesto è quello di
+  SISTEMA: non passa MAI da `navIndietro`, parla direttamente con la
+  cronologia. Conseguenza da tenere sempre presente: quello che la
+  PWA fa non si può INTERCETTARE, si può solo PREPARARE — se un passo
+  indietro deve esistere, deve esistere come entry, prima che il gesto
+  arrivi. Ogni rimedio scritto come «quando arriva il gesto, deviamo»
+  funziona solo dentro Telegram.
   ESPLORA È LA RADICE MADRE (`RADICE_MADRE`, lug 2026, decisione di
   Andrea): da Sfoglia, Vendi, Ordini e Profilo l'indietro porta a
-  Esplora, e solo da Esplora si esce. La ragione che decide: su Subito
+  Esplora, e solo da Esplora si esce. Il MECCANISMO è la cronologia,
+  non un intercettatore: il PRIMO passo via da Esplora SPINGE
+  (`primoPassoViaDaCasa` in `navRiflette`, e solo il primo — `giu===0`),
+  così sotto ogni radice figlia c'è la madre e il gesto di sistema la
+  trova da sé, in tutti e due i contesti. Da una figlia all'altra si
+  sostituisce come sempre: girare tutti i tab costa UN indietro, mai
+  uno a testa — il patto delle sorelle regge dove serviva davvero.
+  Tornare alla madre col tab è un INDIETRO vero (`vaiEsplora` chiama
+  `navIndietro` quando è l'unico gradino), non una sostituzione: sotto
+  resterebbe una entry identica, cioè un indietro che non fa niente, e
+  il gesto dopo ne chiederebbe due per uscire.
+  LA ENTRY DELLA VETRINA DICE RAMO E CATEGORIA (`chiaveVetrina`): era
+  l'imperfezione dichiarata «l'avanti dentro un reparto ricostruisce la
+  vista ma non il filtro», e con la radice madre diventava una bugia —
+  si tornava a Esplora col mercatino intero e la nav accesa su Sfoglia.
+  Per tenerla onesta `setCat` chiama `navRiflette` (cambiare categoria
+  non tocca nessuna classe, l'osservatore non se ne accorgerebbe), e
+  siccome quella chiamata LEGGE-E-AZZERA `navSpingi`, in
+  `apriCategoria` la bandierina si alza subito prima del `go()` che la
+  usa e non in cima alla funzione — alzata prima se la mangiava quel
+  giro, e la discesa nel reparto tornava a essere un cambio di tab.
+  MENTRE SI RI-APPLICA UNA ENTRY NON SI SCRIVE (`navApplicando`): il
+  giro di ricostruzione chiama `setCat` e `go`, che riflettono a metà
+  strada — con la vista vecchia ancora attiva — e leggevano un cambio
+  di radice che nessuno aveva chiesto, spingendo un gradino nuovo
+  invece di consumarne uno. Si spegne in un `queueMicrotask`, dopo il
+  giro dell'osservatore. La ragione che decide: su Subito
   e Vinted funziona esattamente così — la home è la radice madre, dalle
   sezioni l'indietro ci passa, e di lì si chiude. È la convenzione che
   i nostri utenti hanno GIÀ NELLE DITA, e vale più della simmetria fra
@@ -2394,8 +2434,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   annulla e non torna fino al tocco dopo — è il recinto delle strisce
   che scorrono di fianco dentro le viste ammesse (pillole delle
   categorie, «Altri oggetti»).
-  Ascoltatori PASSIVI, mai un `preventDefault`: lo scorrimento normale
-  non se ne accorge e dentro Telegram non si litiga col client.
+  IL touchmove È NON-PASSIVO, MA SOLO MENTRE LA TIRATA È ARMATA (lug
+  2026, dalla PWA di Andrea): un ascoltatore passivo non può chiamare
+  `preventDefault`, quindi non poteva togliere di mezzo il
+  pull-to-refresh NATIVO di Chrome — che ricaricava la pagina, e
+  ricaricando si riparte da Esplora: il gesto sembrava un
+  torna-indietro proprio mentre si chiedeva un aggiornamento. Si
+  appende nel `touchstart` quando `ptrPuo()` dice di sì e si stacca al
+  rilascio, così per tutto il resto dello scorrimento la strada veloce
+  del compositor resta intatta — è la ragione per cui non ce n'è uno
+  permanente. `overscroll-behavior` sull'html lo spegne comunque (vedi
+  sotto), ma a decidere dev'essere il nostro gesto, non una proprietà
+  che un domani qualcuno rimette ad `auto`.
+  `OVERSCROLL-BEHAVIOR VA SULL'HTML`, non solo sul body: alla viewport
+  arriva il valore dell'ELEMENTO RADICE, e finché l'html restava `auto`
+  quel `none` sul body (che c'era da sempre) non spegneva NIENTE.
+  Costava due bug insieme, e vale per i due assi: il pull-to-refresh
+  nativo qui sopra, e l'incatenamento ORIZZONTALE della galleria a foto
+  singola (vedi il dettaglio annuncio).
   Reduced-motion spegne transizione e giro. Il dettaglio NON si
   aggiorna di proposito: riaprirlo da capo azzererebbe pezzi scelti e
   strada di consegna, e non è quello che chiede un dito che tira giù.
@@ -2767,6 +2823,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   via il vecchio badge 📷 N): uno per foto in basso al centro,
   l'attivo pieno, aggiornati sull'evento scroll della striscia
   scroll-snap già esistente; con una foto sola non esistono.
+  E CON UNA FOTO SOLA LA STRISCIA NON È UNA STRISCIA (classe `.una`,
+  lug 2026, da un bug vero: gli annunci a foto singola scorrevano di
+  lato portandosi dietro tutta la pagina, col testo che slittava come
+  in una vista desktop). Restava un contenitore scorrevole
+  (`overflow-x:auto`) con lo snap acceso ma senza niente da scorrere —
+  misurato, `scrollWidth == clientWidth` — quindi il trascinamento
+  orizzontale non lo consumava nessuno e si INCATENAVA all'antenato
+  fino alla viewport. NON era un overflow: la pagina non sborda in
+  nessuno dei due casi (verificato, 0px). Ora a una foto niente
+  overflow e niente snap, più `overscroll-behavior-x:contain` sulla
+  striscia — che è la stessa cosa detta dove appartiene, mentre il
+  `none` sull'html (vedi il gesto di aggiornamento) è la cintura.
   Pallini e bottone condividi vivono SULLA foto: colori fissi
   (bianco/carta+inchiostro), identici in chiaro e scuro.
   Dettaglio immersivo (lug 2026): via il bottone statico sopra la
@@ -4331,11 +4399,32 @@ doppie, poi 30 su 30 uniche) e ricollaudati dopo: scroll infinito su
 tre pagine, due tocchi svelti su due categorie, le sei guardie del
 gesto di aggiornamento, `d` che conta giusto lungo tab → piastrella →
 dettaglio → i due indietro, e 78 prove verdi. In produzione basta il
-deploy: nessuna colonna, nessuna leva. RESTA DA VEDERE DENTRO
-TELEGRAM, ed è il pezzo che il browser non può dire: la convivenza del
-touchmove col client (tirata in Esplora, swipe orizzontale sulla
-galleria del dettaglio) e il ramo `tg.close()` dalla radice — in
-pagina lo stub di Telegram non si lascia fingere.
+deploy: nessuna colonna, nessuna leva.
+E POI IL SECONDO GIRO, dalla PWA installata di Andrea (lug 2026), che
+è la lezione grossa del cantiere: i primi rimedi funzionavano dentro
+Telegram e NON nella PWA, che è il contesto in cui lui prova davvero.
+Tre correzioni. 1) La tirata non aggiornava: ricaricava la pagina, cioè
+riportava a Esplora — `overscroll-behavior` stava solo sul body e alla
+viewport arriva quello dell'HTML, quindi il pull-to-refresh nativo non
+era mai stato spento; e i nostri ascoltatori passivi non potevano
+chiamare `preventDefault`, ora il touchmove è non-passivo mentre la
+tirata è armata. 2) Da Sfoglia la PWA si chiudeva senza passare da
+Esplora: lì il gesto è di SISTEMA e non passa da `navIndietro`, quindi
+il passaggio dalla madre non si può intercettare — va PREPARATO, e ora
+il primo passo via da Esplora spinge una entry. 3) Gli annunci a foto
+SINGOLA scorrevano di lato trascinando la pagina: la striscia restava
+scorrevole senza niente da scorrere e l'incatenamento arrivava alla
+viewport (stessa causa del punto 1, sull'asse X). Vedi Architettura
+per la distinzione fra i due contesti, che è la cosa da non
+dimenticare: nella PWA non c'è niente da intercettare.
+Verificato in locale nel contesto PWA (senza `initData`, col gesto
+simulato come `history.back()` diretto): la catena piastrella →
+dettaglio risale a categoria, Sfoglia, Esplora-intera in tre gesti; i
+tab costano un indietro solo; la tirata in categoria annulla il gesto
+nativo, fa una chiamata e non si muove; la galleria a una foto non
+scorre e la pagina non sborda. RESTA DA VEDERE DENTRO TELEGRAM, che è
+il pezzo che il browser non può dire: la convivenza del touchmove col
+client e il ramo `tg.close()` dalla radice.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
