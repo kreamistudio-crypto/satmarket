@@ -103,6 +103,45 @@ def prove_filtro_italiano():
 
 
 # ====================================================================
+def prove_testo_evento():
+    """Il testo di un evento e' il cuore CONDIVISO fra chi scrive
+    l'annuncio e chi decide se la moderazione l'ha gia' giudicato: se
+    i due divergessero, un annuncio fermo sembrerebbe cambiare a ogni
+    giro e si ripagherebbe l'AI per nulla."""
+    print("\n[testo dell'evento]")
+    import importa_nostr as imp
+
+    nip99 = {"kind": 30402, "content": "Come nuova, spedisco",
+             "tags": [["title", " Tastiera "], ["summary", "riassunto"]]}
+    prova("NIP-99: titolo dal tag, ripulito", "Tastiera",
+          imp.testo_evento(nip99)[0])
+    prova("NIP-99: il content batte il summary", "Come nuova, spedisco",
+          imp.testo_evento(nip99)[1])
+    prova("NIP-99: senza content vale il summary", "riassunto",
+          imp.testo_evento({"kind": 30402, "content": "",
+                            "tags": [["title", "x"],
+                                     ["summary", "riassunto"]]})[1])
+    # Il caso che l'estrazione fatta a mano nel vaglio sbagliava: per
+    # un prodotto NIP-15 il titolo sta nel JSON, non nei tag — e un
+    # titolo vuoto vuol dire moderare un annuncio senza leggerlo.
+    prova("NIP-15: il titolo si pesca dentro il JSON", "Miele",
+          imp.testo_evento({"kind": 30018, "tags": [],
+                            "content": '{"name":"Miele","description":"buono"}'})[0])
+    prova("NIP-15: JSON storto non esplode", ("", ""),
+          imp.testo_evento({"kind": 30018, "tags": [], "content": "{{{"}))
+    prova("descrizione vuota diventa il trattino", "—",
+          imp.testo_evento({"kind": 30402, "content": "",
+                            "tags": [["title", "x"]]})[1])
+    # I troncamenti sono quelli con cui l'annuncio finisce nel
+    # database: se qui fossero piu' larghi, il confronto direbbe
+    # «cambiato» per sempre su ogni testo lungo.
+    lungo = {"kind": 30402, "content": "d" * 2000,
+             "tags": [["title", "t" * 200]]}
+    prova("titolo troncato a 120", 120, len(imp.testo_evento(lungo)[0]))
+    prova("descrizione troncata a 1500", 1500, len(imp.testo_evento(lungo)[1]))
+
+
+# ====================================================================
 def prove_tag_commercio():
     """I tag di spedizione/condizione/quantita': andata, ritorno, il
     dialetto Shopstr e le due trappole (costo assente, weight)."""
@@ -250,7 +289,8 @@ def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    for f in (prove_filtro_italiano, prove_tag_commercio, prove_categorie):
+    for f in (prove_filtro_italiano, prove_testo_evento,
+              prove_tag_commercio, prove_categorie):
         try:
             f()
         except Exception as e:

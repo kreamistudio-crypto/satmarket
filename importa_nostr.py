@@ -417,13 +417,32 @@ def estrai_commercio(e):
     return fuori
 
 
-def estrai_annuncio(e, valute_stall, cambio):
-    """Trasforma un evento Nostr in un annuncio SatMarket (o None)."""
-    if e["kind"] == 30402:                     # NIP-99 classified
+def testo_evento(e):
+    """Titolo e descrizione di un evento, TRONCATI esattamente come
+    finiranno nel database. Cuore condiviso: lo usa estrai_annuncio
+    per scrivere e il server per capire se l'evento e' cambiato
+    davvero da quando l'ha giudicato la moderazione. Se i due
+    divergessero, un annuncio identico sembrerebbe cambiato a ogni
+    giro (o, peggio, uno cambiato sembrerebbe fermo)."""
+    if e.get("kind") == 30402:                 # NIP-99 classified
         t = tag(e, "title")
         titolo = t[1] if t else ""
         s = tag(e, "summary")
         desc = e.get("content", "") or (s[1] if s else "")
+    else:                                      # NIP-15 prodotto (30018)
+        try:
+            c = json.loads(e.get("content", "{}"))
+        except Exception:
+            return "", ""
+        titolo = c.get("name", "") or ""
+        desc = c.get("description", "") or ""
+    return titolo.strip()[:120], (desc or "—").strip()[:1500]
+
+
+def estrai_annuncio(e, valute_stall, cambio):
+    """Trasforma un evento Nostr in un annuncio SatMarket (o None)."""
+    titolo, descrizione = testo_evento(e)
+    if e["kind"] == 30402:                     # NIP-99 classified
         # (lo "status sold" non si salta piu' qui: lo gestisce il
         # giro principale, che puo' spegnere la riga locale)
         loc = tag(e, "location")
@@ -447,8 +466,6 @@ def estrai_annuncio(e, valute_stall, cambio):
             c = json.loads(e.get("content", "{}"))
         except Exception:
             return None
-        titolo = c.get("name", "")
-        desc = c.get("description", "")
         zona = ""
         valuta = c.get("currency") or valute_stall.get(c.get("stall_id"), "")
         if c.get("price") is None:
@@ -461,8 +478,8 @@ def estrai_annuncio(e, valute_stall, cambio):
 
     if not titolo or not sats or sats <= 0:
         return None
-    return {"titolo": titolo.strip()[:120],
-            "descrizione": (desc or "—").strip()[:1500],
+    return {"titolo": titolo,
+            "descrizione": descrizione,
             "zona": zona.strip()[:60],
             "prezzo_sats": sats,
             "foto": json.dumps(foto) if foto else "",

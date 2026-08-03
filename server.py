@@ -10328,15 +10328,15 @@ async def _modera_eventi_nostr(prodotti: list) -> list:
     tace, passa e non blocca il mercatino. Ogni bocciatura finisce
     nel registro della moderazione.
     """
+    import importa_nostr
     ammessi, voci, per_numero = [], [], {}
     for e in prodotti:
-        def tg(nome):
-            for t in e.get("tags", []):
-                if t and len(t) > 1 and t[0] == nome:
-                    return str(t[1])
-            return ""
-        titolo = tg("title")
-        descrizione = e.get("content", "") or tg("summary")
+        # Titolo e descrizione dal cuore condiviso dell'import: sono
+        # ESATTAMENTE il testo che finira' nel database, quindi la
+        # moderazione giudica cio' che poi si legge in vetrina. (Con
+        # l'estrazione fatta a mano qui i prodotti NIP-15 restavano
+        # senza titolo — il loro sta dentro il JSON del content.)
+        titolo, descrizione = importa_nostr.testo_evento(e)
         vietato = controlla_vietato(titolo, descrizione)
         if vietato:
             registra_moderazione("parole", "vietato", vietato, titolo)
@@ -10363,7 +10363,67 @@ async def _modera_eventi_nostr(prodotti: list) -> list:
     return [e for e in ammessi if id(e) not in bocciati]
 
 
-def _vaglio_nostr(loop):
+def _tag_evento(e, nome: str) -> str:
+    """Il primo valore del tag `nome` di un evento ('' se non c'e')."""
+    for t in e.get("tags", []):
+        if t and len(t) > 1 and t[0] == nome:
+            return str(t[1])
+    return ""
+
+
+def _da_giudicare(prodotti: list, npub: str, venditore_id: int):
+    """Divide gli eventi in (da giudicare, gia' giudicati).
+
+    LA MODERAZIONE SI PAGA UNA VOLTA SOLA. Prima si vagliava tutto a
+    ogni giro: gli stessi annunci immutati ripassavano dall'AI ogni
+    ora, per dire ogni volta la stessa cosa. Con qualche decina di
+    venditori sono centinaia di chiamate al giorno buttate — e non e'
+    solo il conto: sono anche minuti di attesa dentro il giro
+    d'import.
+
+    Si ri-giudica quando il TESTO cambia, non quando cambia l'evento.
+    L'id di un evento e' l'impronta di TUTTO (prezzo, foto, data), ma
+    la moderazione guarda solo titolo e descrizione: un ritocco al
+    prezzo non puo' cambiare un verdetto, e non deve costare una
+    chiamata. Il confronto e' contro il testo gia' scritto nel
+    database, con lo stesso troncamento (testo_evento).
+
+    E non si ri-giudica MAI cio' che non e' piu' attivo: un annuncio
+    in revisione aspetta un umano, uno rimosso e' stato deciso, e in
+    entrambi i casi l'import lo salta comunque (lo scudo
+    anti-resurrezione). Ripagare l'AI per loro sarebbe spesa doppia.
+    """
+    import importa_nostr
+    con = db()
+    nuovi, noti = [], []
+    for e in prodotti:
+        titolo, descrizione = importa_nostr.testo_evento(e)
+        d = _tag_evento(e, "d")
+        riga = None
+        if d:
+            riga = con.execute(
+                "SELECT stato, titolo, descrizione FROM annunci "
+                "WHERE nostr_origine_d=? "
+                "AND (venditore_id=? OR contatto_nostr=?)",
+                (d, venditore_id, npub)).fetchone()
+        if riga is None and titolo:
+            riga = con.execute(
+                "SELECT stato, titolo, descrizione FROM annunci "
+                "WHERE titolo=? AND (venditore_id=? OR contatto_nostr=?)",
+                (titolo, venditore_id, npub)).fetchone()
+        if riga is None:
+            nuovi.append(e)                     # mai visto: si giudica
+        elif riga["stato"] != "attivo":
+            noti.append(e)                      # gia' deciso, o in attesa
+        elif (riga["titolo"], riga["descrizione"]) == (titolo, descrizione):
+            noti.append(e)                      # identico a ieri
+        else:
+            nuovi.append(e)                     # il testo e' cambiato
+    con.close()
+    return nuovi, noti
+
+
+def _vaglio_nostr(loop, npub: str, venditore_id: int):
     """Costruisce il filtro che `importa_venditore` chiama prima di
     scrivere: firma verificata, lingua italiana, moderazione piena.
 
@@ -10371,6 +10431,9 @@ def _vaglio_nostr(loop):
     moderazione — che e' async — si fa rieseguire sul loop vero con
     run_coroutine_threadsafe. Il tetto di 120s evita che un'API
     lenta tenga in ostaggio il giro d'import.
+
+    E' costruito per UN venditore: gli serve sapere di chi sono gli
+    annunci per ritrovare nel database cio' che ha gia' giudicato.
     """
     def vaglio(prodotti):
         firmati = [e for e in prodotti if verifica_firma_nostr(e)]
@@ -10386,16 +10449,30 @@ def _vaglio_nostr(loop):
                   f"italiani: ignorati")
         if not italiani:
             return []
+        nuovi, noti = _da_giudicare(italiani, npub, venditore_id)
+        if noti:
+            print(f"  ⏭️ {len(noti)} gia' giudicati (invariati): "
+                  f"nessuna chiamata all'AI")
+        if not nuovi:
+            return italiani
         try:
-            return asyncio.run_coroutine_threadsafe(
-                _modera_eventi_nostr(italiani), loop).result(timeout=120)
+            ammessi = asyncio.run_coroutine_threadsafe(
+                _modera_eventi_nostr(nuovi), loop).result(timeout=120)
         except Exception as e:
             # Fail-CLOSED, al contrario del resto: se la moderazione
-            # non ha potuto dire la sua, non si importa nulla. Il
-            # giro dopo ci riprova fra un'ora.
+            # non ha potuto dire la sua, cio' che non ha mai giudicato
+            # non entra. Il giro dopo ci riprova fra un'ora. Chi era
+            # gia' passato invece continua ad aggiornarsi: era stato
+            # giudicato ieri, e tenerlo fermo perche' oggi l'AI tace
+            # sarebbe un danno senza guadagno.
             print(f"⚠️ Moderazione import Nostr non conclusa, "
-                  f"nessun annuncio importato: {e}")
-            return []
+                  f"nessun annuncio NUOVO importato: {e}")
+            return noti
+        # Si ricompone l'ordine di partenza: i gia' giudicati passano
+        # sempre, i nuovi solo se ammessi.
+        vagliati, promossi = {id(e) for e in nuovi}, {id(e) for e in ammessi}
+        return [e for e in italiani
+                if id(e) not in vagliati or id(e) in promossi]
     return vaglio
 
 
@@ -10526,9 +10603,12 @@ async def importa_nostr_periodico():
         await scopri_venditori_nostr()
     except Exception as e:
         print(f"⚠️ Scoperta Nostr saltata: {e}")
-    vaglio = _vaglio_nostr(asyncio.get_running_loop())
+    loop = asyncio.get_running_loop()
     importati = aggiornati = saltati = 0
     for npub, venditore_id in venditori_nostr_attivi():
+        # Un vaglio per venditore: deve sapere di chi sono gli annunci
+        # per ritrovare nel database cio' che ha gia' giudicato.
+        vaglio = _vaglio_nostr(loop, npub, venditore_id)
         try:
             i, a, s = await asyncio.to_thread(
                 importa_nostr.importa_venditore, npub, venditore_id, DB,
