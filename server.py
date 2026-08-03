@@ -821,13 +821,15 @@ def init_db():
                     # riga del benvenuto, che e' anche l'unico
                     # messaggio che mandiamo senza permesso.
                     "suggerimenti_annunci INTEGER DEFAULT 0",
-                    # comune (lug 2026): «da dove cerchi», per il filtro
-                    # «📍 Vicino a me». Il NOME dal dataset nella forma
-                    # «Pavia (PV)» ('' = non l'ha mai detto), mai
-                    # coordinate: quelle si rileggono da COMUNI, che sta
-                    # in RAM — una fonte di verita' sola. NON e' un dato
-                    # pubblico: non entra in nessuna vista della
-                    # vetrina, serve solo a filtrare per chi guarda.
+                    # comune: COLONNA INERTE (lug 2026). Nata per il
+                    # filtro «📍 Vicino a me», tolto due giorni dopo
+                    # perche' si sovrapponeva al filtro per regione —
+                    # oggi nessuno la scrive e nessuno la legge. Resta
+                    # per non fare una migrazione distruttiva su chi
+                    # l'aveva gia' valorizzata in quei due giorni, come
+                    # avatar_visibile prima di lei. Chi la ritrova: non
+                    # e' un dato su cui contare, e se serve un comune
+                    # dell'utente va ripensato da capo.
                     "comune TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
@@ -3726,7 +3728,6 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         solo_spedizione: int = 0, solo_ritiro: int = 0,
                         solo_digitale: int = 0, solo_lampo: int = 0,
                         condizione: str = "", regione: str = "",
-                        vicino: str = "", raggio_km: int = 0,
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
@@ -3764,35 +3765,6 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # = nessun filtro, mai un 400.
         dove += " AND a.regione=?"
         par.append(regione)
-    # «📍 Vicino a me» (lug 2026): il comune di CHI GUARDA piu' un
-    # raggio. Non chiediamo mai la posizione al telefono, e non e' una
-    # rinuncia: gli annunci hanno le coordinate del CENTRO del comune,
-    # quindi sapere dov'e' l'utente a venti metri darebbe la stessa
-    # identica risposta, con in mano un dato molto piu' delicato.
-    # Comune sconosciuto o dataset spento = nessun filtro, mai un 400
-    # (la regola di condizione e regione: i parametri della vetrina non
-    # litigano col client).
-    centro = COMUNI.get(normalizza(vicino)) if vicino.strip() else None
-    if centro:
-        lat0, lon0 = centro
-        raggio = raggio_km if raggio_km in RAGGI_AMMESSI else RAGGIO_VICINO
-        # Prima il riquadro grezzo (aritmetica secca, che l'indice sa
-        # sfruttare), poi la distanza vera solo su chi ci casca dentro:
-        # un grado di latitudine sono ~111 km, uno di longitudine si
-        # accorcia col coseno salendo verso nord. Il riquadro e' LARGO
-        # per costruzione — prende qualche angolo di troppo, e quelli
-        # li scarta l'haversine.
-        dlat = raggio / 111.0
-        dlon = raggio / max(1.0, 111.320 * math.cos(math.radians(lat0)))
-        # (a.lat!=0 OR a.lon!=0): gli annunci la cui zona non e' un
-        # luogo riconosciuto restano fuori, come restano fuori dal
-        # filtro spedizione gli annunci senza consegna dichiarata —
-        # il filtro promette una distanza, e senza coordinate non c'e'.
-        dove += (" AND (a.lat!=0 OR a.lon!=0)"
-                 " AND a.lat BETWEEN ? AND ? AND a.lon BETWEEN ? AND ?"
-                 " AND distanza(a.lat, a.lon, ?, ?) <= ?")
-        par += [lat0 - dlat, lat0 + dlat, lon0 - dlon, lon0 + dlon,
-                lat0, lon0, raggio]
     if solo_lampo or ordina == "lampo":
         # Solo le offerte lampo VIVE: la scadenza si giudica adesso,
         # senza aspettare la scopa dell'orologio. L'ordinamento
@@ -3825,16 +3797,6 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         dove += " AND a.prezzo_sats <= ?"
         par.append(int(prezzo_max))
     con = db()
-    if centro:
-        # L'haversine di casa prestato a SQLite: la distanza si giudica
-        # DENTRO la query, o il cursore keyset, il «N oggetti» e i
-        # conteggi conterebbero anche i lontani. Si registra solo su
-        # questa connessione e solo quando serve davvero.
-        try:
-            con.create_function("distanza", 4, distanza_km,
-                                deterministic=True)
-        except TypeError:      # SQLite vecchio: senza l'ottimizzazione
-            con.create_function("distanza", 4, distanza_km)
     if not limit:
         # Client senza paginazione (JS vecchio in cache): l'array puro
         # di sempre, col tetto di sicurezza. Sotto i 500 annunci la
@@ -6903,23 +6865,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         da_moderare = con.execute(
             "SELECT COUNT(*) AS n FROM annunci "
             "WHERE stato='revisione'").fetchone()["n"]
-    # «Da dove cerchi» quando non l'ha ancora detto: lo si INDOVINA dai
-    # suoi annunci, che una zona ce l'hanno gia'. Non e' il comune
-    # dell'utente e non si scrive in colonna — e' solo la proposta che
-    # il foglio «Vicino a me» mette nel campo, cosi' il primo uso e' un
-    # tocco e non un modulo da riempire. Bastano le ultime righe: chi
-    # vende, vende quasi sempre da dove vive.
-    comune_suggerito = ""
-    if u and not (u["comune"] or "").strip():
-        for r in con.execute(
-                "SELECT zona FROM annunci WHERE venditore_id=? AND zona!='' "
-                "ORDER BY id DESC LIMIT 5", (user["id"],)):
-            comune_suggerito = comune_da_zona(r["zona"])
-            if comune_suggerito:
-                break
     con.close()
     profilo = dict(u) if u else {}
-    profilo["comune_suggerito"] = comune_suggerito
     profilo["admin"] = e_admin(user["id"])
     profilo["in_revisione"] = da_moderare
     profilo["doppioni_nostr"] = doppioni
@@ -7239,12 +7186,6 @@ async def scegli_avatar(req: Request,
 
 MAX_AVVISI_UTENTE = 5
 RAGGI_AMMESSI = (10, 25, 50, 100)
-# Il raggio di ripiego del filtro «📍 Vicino a me» quando il client non
-# ne manda uno buono. Stesso vocabolario degli avvisi di ricerca: due
-# elenchi di distanze diversi nella stessa app sarebbero due lingue.
-RAGGIO_VICINO = 25
-
-
 def _avviso_pubblico(r) -> dict:
     """La riga del DB come la vede il frontend: categorie da
     '|A|B|' a lista, il resto com'e'."""
@@ -7257,50 +7198,24 @@ def _avviso_pubblico(r) -> dict:
 
 
 @app.get("/api/comuni")
-async def cerca_comuni(q: str = ""):
-    """Suggerimenti per i campi comune: primi 10 comuni per prefisso.
-    PUBBLICA dal lug 2026 come /api/listings (auth facoltativa, che qui
-    non serve a nulla): serve al filtro «📍 Vicino a me», che vive
-    anche nella vetrina anonima. Si puo' aprire senza pensieri —
-    e' l'elenco ISTAT dei comuni italiani, un file committato in
-    chiaro: nessun dato di nessuno, nessuna chiamata a pagamento da
-    regalare ai bot (che e' invece la ragione per cui la ricerca AI
-    resta agli autenticati), e la ricerca gira su un dizionario in
-    RAM."""
+async def cerca_comuni(q: str = "",
+                       x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Suggerimenti per i campi comune (la Zona di Vendi e il comune
+    degli avvisi di ricerca): primi 10 comuni per prefisso.
+    Autenticato come tutto cio' che non e' vetrina. E' stata PUBBLICA
+    per due giorni, per il filtro «Vicino a me» che viveva anche nella
+    vetrina anonima: morto quello, e' tornata dov'era — non perche'
+    aprirla facesse danno (e' l'elenco ISTAT committato in chiaro), ma
+    perche' una superficie pubblica senza piu' un motivo e' solo
+    superficie."""
+    verifica_utente(x_tg_init_data, barattolo_sessione)
     prefisso = normalizza(q)
     if len(prefisso) < 2:
         return {"comuni": []}
     trovati = [c for c in COMUNI_LISTA
                if normalizza(c["nome"]).startswith(prefisso)][:10]
     return {"comuni": trovati}
-
-
-@app.post("/api/me/comune")
-async def salva_comune(d: dict, x_tg_init_data: str = Header(""),
-                       barattolo_sessione: str = Cookie("")):
-    """«Da dove cerchi»: il comune di chi guarda, per «📍 Vicino a me».
-    Pattern di canale-notifiche — si accetta solo un comune che il
-    dataset conosce davvero (400 col nome storto in chiaro, come fanno
-    gli avvisi di ricerca), stringa vuota = lo dimentichiamo.
-    Sta nel profilo e non nel localStorage perche' non e' un segreto
-    del dispositivo (quelli sono la nsec e il secret NWC): e' un fatto
-    tuo, e da un telefono nuovo non te lo deve richiedere."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    comune = (d.get("comune") or "").strip()[:60]
-    if comune:
-        if not COMUNI:
-            raise HTTPException(503, "L'elenco dei comuni non è "
-                                     "disponibile in questo momento")
-        if normalizza(comune) not in COMUNI:
-            raise HTTPException(400, f"Non conosco il comune "
-                                     f"«{comune[:40]}»: scegline uno "
-                                     f"dai suggerimenti")
-    con = db()
-    con.execute("UPDATE utenti SET comune=? WHERE tg_id=?",
-                (comune, user["id"]))
-    con.commit()
-    con.close()
-    return {"ok": True, "comune": comune}
 
 
 @app.get("/api/zona-controlla")
