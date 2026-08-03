@@ -2956,6 +2956,17 @@ function mapOrder(o){
    In DEMO sono lo stesso array: tutto funziona come sempre. */
 const LIMITE_PAGINA = 30;
 let vetrinaCursore = null, vetrinaCaricando = false, vetrinaTotale = 0;
+/* Il GIRO della vetrina: un numero che avanza a ogni ricarica di PRIMA
+   pagina (categoria, ricerca, filtri, ordinamento). Serve perche' la
+   prima pagina e la «pagina dopo» viaggiano in parallelo e la seconda
+   puo' arrivare in ritardo, quando la griglia e' gia' stata rifatta da
+   un'altra vista: la sua risposta va buttata, non appesa in fondo.
+   E' il bug dei DOPPIONI entrando in una categoria da Sfoglia —
+   apriCategoria svuota la griglia, la sentinella dello scroll infinito
+   si scopre e chiede la pagina dopo col cursore della vista PRECEDENTE:
+   in una categoria piccola quella pagina e' esattamente la prima, e
+   ogni annuncio finiva in griglia due volte. */
+let vetrinaGiro = 0;
 let conteggiServer = null, ultimaRicercaAI = false;
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
 let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
@@ -3117,10 +3128,19 @@ function azzeraFiltri(){
 }
 
 async function loadListings(anonimo){
+  /* Si riparte dalla prima pagina: il giro avanza e il cursore di
+     PRIMA muore SUBITO, prima ancora di partire. Cosi' una sentinella
+     che si scopre mentre la risposta e' per strada (la griglia svuotata
+     da apriCategoria) non ha piu' niente da chiedere e tace da sola. */
+  const giro = ++vetrinaGiro;
+  vetrinaCursore = null;
   const opz = (VETRINA || anonimo) ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
   const r = await fetch(`${API_BASE}/listings?${paramsVetrina()}`, opz);
   if (!r.ok) throw new Error('vetrina non disponibile');
   const j = leggiPagina(await r.json());
+  /* superati da una ricarica piu' recente (due tocchi svelti su due
+     categorie): questa risposta parla di una vetrina che non c'e' piu' */
+  if (giro !== vetrinaGiro) return;
   if (!datiVivi) { datiVivi = true; listings = []; }   // via il seme demo
   vetrina = (j.annunci || []).map(mapListing);
   inCatalogo(vetrina);
@@ -3144,20 +3164,23 @@ async function loadListings(anonimo){
 async function caricaAltri(){
   if (DEMO || ultimaRicercaAI || !vetrinaCursore || vetrinaCaricando) return;
   vetrinaCaricando = true;
+  /* il giro con cui si parte: se cambia mentre la pagina e' per strada
+     questa risposta appartiene a una vetrina che non esiste piu' */
+  const giro = vetrinaGiro;
   try {
     const p = paramsVetrina();
     p.set('cursore', vetrinaCursore);
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
     const r = await fetch(`${API_BASE}/listings?${p}`, opz);
     const j = leggiPagina(await r.json());
+    if (giro !== vetrinaGiro) return;   // superati: si butta, mai si appende
     const nuovi = (j.annunci || []).map(mapListing);
     vetrinaCursore = j.cursore || null;
     vetrina = vetrina.concat(nuovi);
     inCatalogo(nuovi);
     if (nuovi.length)
       el('grid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
-  } catch(e) {}
-  vetrinaCaricando = false;
+  } catch(e) {} finally { vetrinaCaricando = false; }
 }
 async function loadOrders(){
   const r = await fetch(`${API_BASE}/orders`, {headers:{'X-Tg-Init-Data': authHdr()}});
