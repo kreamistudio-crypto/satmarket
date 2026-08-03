@@ -366,6 +366,12 @@ def prove_categorie():
     prova("ogni categoria ha la sua illustrazione", [],
           [c for c in cat
            if not os.path.exists(f"assets/categorie/{slug(c)}.webp")])
+    # e il suo francobollo per il foglio-picker di Vendi: si dimentica
+    # facilmente, perche' manca solo la' dentro e il ripiego a emoji
+    # fa sembrare che vada tutto bene
+    prova("ogni categoria ha il suo francobollo -mini", [],
+          [c for c in cat
+           if not os.path.exists(f"assets/categorie/{slug(c)}-mini.webp")])
 
     # Le illustrazioni devono essere TIRATE, cioe' senza margine
     # trasparente attorno (ci pensa ritaglia_categorie.py). Non e' una

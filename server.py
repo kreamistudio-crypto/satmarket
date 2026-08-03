@@ -11745,7 +11745,10 @@ def asset_tappo():
 @app.get("/assets/categorie/{nome}")
 def asset_categoria(nome: str):
     slug = nome[:-5] if nome.endswith(".webp") else ""
-    if slug not in SLUG_CATEGORIE:
+    # il francobollo del foglio-picker: stesso slug col suffisso, e
+    # passa dalla stessa whitelist (che resta calcolata dal catalogo)
+    base = slug[:-5] if slug.endswith("-mini") else slug
+    if base not in SLUG_CATEGORIE:
         raise HTTPException(404, "immagine non trovata")
     percorso = os.path.join("assets", "categorie", slug + ".webp")
     if not os.path.exists(percorso):

@@ -45,13 +45,27 @@ SOGLIA_ALPHA = 8
 # che resta sotto il nome). Serve solo a sapere CHI e' limitato in
 # larghezza e chi in altezza — se quelle misure cambiassero di molto,
 # il pareggio andrebbe rifatto.
-BOX_W, BOX_H = 85.9, 69.0
+BOX_W, BOX_H = 85.9, 72.0
 # Il tetto, in multipli dell'inchiostro MEDIANO: 1.05 lascia stare la
 # meta' piu' leggera e calma solo chi sporge.
 TETTO = 1.05
+# I RITOCCHI A MANO, guardando la pagina vera: la misura
+# dell'inchiostro porta lontano ma non decide tutto — una ciotola vista
+# dall'alto «pesa» piu' di quanto dica il suo inchiostro. Qui il
+# moltiplicatore sul tetto per le singole voci: sotto 1 = piu' piccola.
+# Chi ne aggiunge una lo faccia dopo aver guardato la griglia intera,
+# non la singola piastrella.
+RITOCCHI = {"animali": .88}
 # Sotto questo scarto non si riscrive: un ritocco da pochi pixel non
 # vale una seconda compressione.
 MINIMO = .02
+# Il francobollo per il foglio-picker di Vendi, dove l'illustrazione
+# sta in una pastiglia da ~32px: il file pieno la' dentro sarebbe uno
+# spreco (26 file da 512px, 787 KB e 13 MB di bitmap da decodificare,
+# per un menu che si apre in due secondi). 128px danno margine anche
+# sugli schermi a 3x. Stessa idea delle miniature `_min` delle foto.
+LATO_MINI = 128
+SUFFISSO_MINI = "-mini"
 
 
 def _misura(im):
@@ -80,7 +94,9 @@ def main():
         print(f"cartella {CARTELLA} assente")
         return 1
 
-    file = sorted(f for f in os.listdir(CARTELLA) if f.endswith(".webp"))
+    file = sorted(f for f in os.listdir(CARTELLA)
+                  if f.endswith(".webp")
+                  and not f.endswith(SUFFISSO_MINI + ".webp"))
     misure = {}
     for nome in file:
         im = Image.open(os.path.join(CARTELLA, nome)).convert("RGBA")
@@ -102,7 +118,8 @@ def main():
         disegno = im.crop(bb)
         w, h = disegno.size
         # quanto bordo serve perche' il reso scenda sotto il tetto
-        p = max(1.0, (reso / tetto) ** .5) if tetto else 1.0
+        suo = tetto * RITOCCHI.get(nome[:-5], 1.0)
+        p = max(1.0, (reso / suo) ** .5) if suo else 1.0
         nw, nh = round(w * p), round(h * p)
         vecchio = im.size
         if (abs(nw - vecchio[0]) <= MINIMO * nw
@@ -120,7 +137,37 @@ def main():
         fatti += 1
 
     print(f"\n{fatti} da sistemare, {fermi} gia' a posto")
-    if fatti and not scrivi:
+
+    # I francobolli per il picker, rifatti SEMPRE dai file finali (cioe'
+    # dopo ritaglio e pareggio): cosi' nel menu le proporzioni sono le
+    # stesse della griglia, senza un secondo posto dove tararle.
+    mini_fatti = mini_fermi = 0
+    peso = 0.0
+    for nome in file:
+        pieno = os.path.join(CARTELLA, nome)
+        mini = os.path.join(CARTELLA, nome[:-5] + SUFFISSO_MINI + ".webp")
+        im = Image.open(pieno).convert("RGBA")
+        s = LATO_MINI / max(im.size)
+        atteso = (max(1, round(im.size[0] * s)), max(1, round(im.size[1] * s)))
+        if os.path.exists(mini) and Image.open(mini).size == atteso and not scrivi:
+            mini_fermi += 1
+            peso += os.path.getsize(mini) / 1024
+            continue
+        if scrivi:
+            im.resize(atteso, Image.LANCZOS).save(
+                mini, "WEBP", quality=QUALITA, method=6)
+            peso += os.path.getsize(mini) / 1024
+            if os.path.exists(mini):
+                mini_fatti += 1
+        else:
+            mini_fatti += 1
+    if scrivi:
+        print(f"{mini_fatti} francobolli da {LATO_MINI}px, "
+              f"{peso:.0f} KB in tutto")
+    else:
+        print(f"{mini_fatti} francobolli da rifare, {mini_fermi} a posto")
+
+    if (fatti or mini_fatti) and not scrivi:
         print("niente e' stato scritto: rilancia con --scrivi")
     return 0
 

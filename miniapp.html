@@ -480,7 +480,7 @@
      estremi ogni disegno scende sui 57px e le piastrelle si svuotano
      — si perde su tutte per pareggiare due casi. */
   .cat-tile .cat-fig{flex:1 1 auto;min-height:0;position:relative;
-    width:54%;margin:5px 13px 10px auto}
+    width:54%;margin:4px 13px 8px auto}
   /* CENTRATA nel suo riquadro, non incollata all'angolo: i file
      pareggiati portano un bordo trasparente attorno (vedi
      ritaglia_categorie.py), e ancorati in basso a destra si
@@ -1587,6 +1587,30 @@
   .picker-voce.sel{background:var(--sats-soft)}
   .picker-voce:focus-visible{outline:2px solid var(--sats);outline-offset:-2px}
   .picker-voce .p-ico{font-size:18px;flex:0 0 auto}
+  /* L'illustrazione della categoria nel foglio-picker e nel campo,
+     NUDA sul foglio (deciso lug 2026: la pastiglia scura, provata,
+     dava piu' contrasto ma trasformava una lista da scorrere in un
+     cassetto di app).
+     IMPERFEZIONE DICHIARATA, che e' il prezzo di quella scelta: questi
+     disegni usano il crema come colore del CORPO, non come dettaglio,
+     e il foglio in tema chiaro e' bianco — cosi' il barattolo di crema
+     ci perde il corpo e restano coperchio e contagocce a mezz'aria, e
+     il telefono e il ciak si assottigliano. Gli altri ventitre'
+     reggono, e in tema scuro reggono tutti. Se un domani si vorra'
+     chiudere quel buco, la strada NON e' ritoccare qui: e' rifare quei
+     tre disegni con un corpo che non sia quasi-bianco.
+     Il file e' il francobollo `-mini` da 128px, non quello pieno: 180
+     KB in tutto invece di 787, per un menu che si apre in due secondi
+     (li fa ritaglia_categorie.py). */
+  .cat-ico{flex:0 0 auto;position:relative;width:30px;height:30px}
+  .cat-ico img{position:absolute;inset:0;width:100%;height:100%;
+    object-fit:contain;display:block}
+  /* ripiego a emoji se l'immagine non arriva: lo stesso giro delle
+     piastrelle di Sfoglia, sibling scoperto dall'onerror */
+  .cat-ico .cat-ico-em{position:absolute;inset:0;display:flex;
+    align-items:center;justify-content:center;font-size:17px}
+  .cat-ico img + .cat-ico-em{display:none}
+  .campo-scelta .cat-ico{width:26px;height:26px}
   /* Le icone graduate delle taglie: dentro il tondo del box non
      scendono mai sotto la riga di base, quindi le voci del foglio
      restano incolonnate mentre la scatola cresce */
@@ -3476,6 +3500,16 @@ function setCat(c){
    anche quali file sono servibili — prove.py fallisce se divergono o
    se a una categoria manca la sua immagine. */
 const slugCat = c => c.toLowerCase().replace(/ /g,'-');
+
+/* L'illustrazione della categoria in piccolo: la usa il foglio-picker
+   di Vendi (voci e campo chiuso). Il file e' il francobollo `-mini`,
+   non quello pieno — un menu non deve scaricare 787 KB per aprirsi.
+   L'emoji resta sotto come ripiego, scoperta dall'onerror. */
+function icoCategoria(c){
+  return `<span class="cat-ico"><img src="/assets/categorie/${slugCat(c)}-mini.webp"
+      alt="" loading="lazy" decoding="async" onerror="this.remove()"
+    ><span class="cat-ico-em" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>`;
+}
 
 /* Le 26 piastrelle. I conteggi sono gli stessi di renderChips (globali
    dal server, dal locale in DEMO) ma qui NON si mostrano: servono solo
@@ -5682,8 +5716,8 @@ function closeSheet(){
 const PICKER = {
   sellCat: {titolo:'Categoria',
     voci: () => [...el('sellCat').options].map(o => ({val:o.value,
-      resa:`<span class="p-ico">${EMOJI_CAT[o.value]||'📦'}</span><span><b>${esc(o.value)}</b></span>`})),
-    campo: v => `<span class="p-ico">${EMOJI_CAT[v]||'📦'}</span><span>${esc(v)}</span>`,
+      resa:`${icoCategoria(o.value)}<span><b>${esc(o.value)}</b></span>`})),
+    campo: v => `${icoCategoria(v)}<span>${esc(v)}</span>`,
     /* certe categorie la condizione non la chiedono: il campo sotto
        compare o sparisce con la scelta */
     poi: aggiornaCondizioneForm},
