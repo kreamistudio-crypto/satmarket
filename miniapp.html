@@ -3168,6 +3168,17 @@ let orders = [
   {id:103, listing:listings[4], state:"released", role:"seller", when:"3 giorni fa"},
 ];
 let activeCat = "Tutto", currentListing = null, currentOrder = null;
+/* Da quale RADICE si sta guardando la vetrina. La vista e' una sola —
+   view-esplora, mai duplicata — ma ci si arriva da due porte, e la nav
+   deve dire da quale: col tab Esplora si guarda TUTTO il mercatino,
+   dalla piastrella di Sfoglia si e' scesi in un reparto. Senza questo
+   la nav mentiva: si accendeva «Esplora» su una vetrina filtrata con
+   pochi oggetti, e chi la guardava credeva fosse tutto il catalogo.
+   Il ramo si accende in apriCategoria e si spegne in setCat('Tutto')
+   — cioe' quando si torna al catalogo intero, da qualunque strada
+   (il tab Esplora, la pillola «Tutto», una pubblicazione): un posto
+   solo, e il ramo non puo' sopravvivere al filtro che lo giustifica. */
+let ramoVetrina = 'esplora';
 /* In DEMO griglia e catalogo sono lo stesso array (vedi loadListings) */
 let vetrina = listings;
 
@@ -3191,6 +3202,19 @@ function toast(msg, ms){ const t = el('toast'); t.textContent = msg; t.classList
 function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 
 /* ---------------- navigazione ---------------- */
+/* Quale voce della barra si accende per una vista. Le viste interne
+   rispondono alla radice da cui si scende (un dettaglio e' figlio
+   della vetrina, un ordine degli Ordini) — e la vetrina risponde al
+   RAMO da cui la si guarda: scesi da una piastrella resta acceso
+   «Sfoglia», che e' dove l'indietro riporta. Il dettaglio e il negozio
+   aperti da li' restano nel ramo per la stessa ragione: la nav dice
+   dove sei, e «dove sei» e' la strada che hai fatto. */
+function voceNav(view){
+  if (['dettaglio','negozio','sicurezza'].includes(view)) view = 'esplora';
+  else if (view === 'ordine') view = 'affari';
+  return (view === 'esplora' && ramoVetrina === 'sfoglia') ? 'sfoglia' : view;
+}
+
 function go(view){
   haptic();
   /* In vetrina Vendi, Ordini e Profilo non esistono: si fanno su Telegram */
@@ -3205,8 +3229,7 @@ function go(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  el('nav-'+(['dettaglio','negozio','sicurezza'].includes(view)?'esplora':['ordine'].includes(view)?'affari':view))
-    ?.classList.add('active');
+  el('nav-'+voceNav(view))?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
   document.querySelectorAll('.avatar-btn').forEach(a=>a.classList.toggle('attivo', view==='profilo'));
   /* Nel dettaglio comprabile la tab bar lascia il posto alla barra
@@ -3492,6 +3515,12 @@ function renderChips(){
 }
 function setCat(c){
   activeCat=c; renderChips(); haptic();
+  /* Tornare al catalogo intero chiude il ramo Sfoglia, da qualunque
+     strada arrivi (il tab Esplora, la pillola «Tutto», il ritorno dopo
+     una pubblicazione): il ramo esiste solo finche' esiste il filtro
+     che lo giustifica, o la nav resterebbe accesa su «Sfoglia» davanti
+     a tutto il mercatino — la stessa bugia al contrario. */
+  if (c === 'Tutto') ramoVetrina = 'esplora';
   /* col pannello aperto la riga della condizione compare o sparisce
      insieme alla categoria */
   if (el('filtroCondRiga') && el('filtriBox').style.display !== 'none')
@@ -3547,6 +3576,9 @@ function renderSfoglia(){
    cambio di tab — l'indietro deve riportare a Sfoglia. */
 function apriCategoria(c){
   navSpingi = true;
+  /* si scende in un reparto: la nav resta accesa su Sfoglia, che e'
+     lo scaffale da cui si viene e dove l'indietro riporta */
+  ramoVetrina = 'sfoglia';
   /* La griglia si SVUOTA prima di partire: setCat ricarica dal server
      e la risposta arriva mezzo secondo dopo, quindi senza questo si
      atterra su Esplora vedendo per un attimo gli annunci di PRIMA —
@@ -3566,6 +3598,10 @@ function apriCategoria(c){
    la categoria in cui era entrato da Sfoglia mezz'ora fa. */
 function vaiEsplora(){
   if (activeCat !== 'Tutto') { setCat('Tutto'); }
+  /* il ramo si chiude anche quando la categoria era gia' Tutto: il
+     tocco sul nome del tab e' sempre un ritorno alla radice, e non
+     deve dipendere dallo stato di un'altra variabile per esserlo */
+  ramoVetrina = 'esplora';
   go('esplora');
 }
 
