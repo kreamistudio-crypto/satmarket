@@ -322,6 +322,11 @@
   .filtri-riga .campo-scelta{flex:1;min-width:0;min-height:0;
     font:700 14px Nunito,sans-serif;color:var(--ink);background:var(--bg);
     border:1.5px solid var(--line);border-radius:10px;padding:5px 10px}
+  /* Le spunte del pannello (consegna e offerta lampo): erano quattro
+     copie dello stesso style= in linea, ora una classe sola */
+  .filtro-check{display:flex;align-items:center;gap:8px;
+    font-size:13.5px;font-weight:700;cursor:pointer}
+  .filtro-check input{width:auto;accent-color:var(--sats)}
 
   /* ---------- griglia annunci ---------- */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
@@ -1068,17 +1073,24 @@
      tasti si dividono 360px. */
   .escrow-zone .acquista-cta{width:auto;min-width:76%;margin:12px auto 2px;
     padding:11px 30px;white-space:nowrap;border-radius:12px;font-size:17px}
-  /* «Scopri di piu'» in basso a sinistra: la porta alla pagina del
-     pagamento protetto. Testuale e discreto — il recinto spiega in una
-     riga, il resto si legge di la' per chi lo vuole. */
-  .escrow-piede{display:flex;justify-content:flex-start;margin-top:10px}
-  /* Inchiostro e non verde (feedback di Andrea): dentro il recinto il
-     verde e' gia' del bordo, della bandierina e del testo di fiducia —
-     un quarto verde faceva poltiglia. Nero (che al buio diventa crema,
-     e' un token) stacca e si legge come quello che e': un link. */
-  .escrow-piede button{border:0;background:none;padding:0;font:inherit;
-    font-weight:800;font-size:12.5px;color:var(--ink);
-    text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+  /* «Scopri di piu'» IN LINEA, in coda alla frase (lug 2026, feedback
+     di Andrea): non piu' un piede staccato sotto il bottone. E' la
+     stessa frase che continua — «...di aver ricevuto l'oggetto. Scopri
+     di piu'» — quindi porta lo STESSO verde del testo di fiducia
+     (--trust-note) e a dire che e' un link e' la sola sottolineatura.
+     Il grassetto in piu' (800 contro 600) lo stacca dalla frase senza
+     cambiargli colore. nowrap: se non ci sta in fondo alla riga scende
+     INTERO a capo, mai spezzato in «Scopri di / piu'».
+     E come la pillola condizione in coda al titolo, il link e' legato
+     all'ULTIMA PAROLA della frase (.fine-frase): sotto i 390px non ci
+     sta e va a capo — legati scendono INSIEME («...di aver ricevuto /
+     l'oggetto. Scopri di piu'») invece di lasciare il link solo, in
+     fondo, che tornerebbe a somigliare al piede staccato di prima. */
+  .escrow-zone .fine-frase{white-space:nowrap}
+  .escrow-zone .scopri-link{border:0;background:none;padding:0;margin:0;
+    font:inherit;font-weight:800;color:var(--trust-note);
+    text-decoration:underline;text-underline-offset:3px;
+    white-space:nowrap;cursor:pointer}
 
   /* ---------- pagina «Il pagamento protetto» ----------
      La spiegazione lunga che il recinto non puo' contenere. Testo e
@@ -1693,6 +1705,13 @@
         <input id="filtroMinInp" inputmode="decimal" placeholder="Prezzo min">
         <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
       </div>
+      <!-- «📍 Vicino a me»: un campo-bottone come le altre tendine, ma
+           dietro non c'è una select — il foglio chiede comune e raggio.
+           In DEMO la riga sparisce: i sette annunci finti non hanno
+           coordinate, e un raggio su di loro non direbbe niente di vero. -->
+      <div class="filtri-riga" id="filtroVicinoRiga">
+        <button type="button" class="campo-scelta" id="filtroVicinoBtn" onclick="apriVicino()" aria-haspopup="dialog" title="Filtra per distanza"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
+      </div>
       <div class="filtri-riga" id="filtroRegRiga" style="display:none">
         <!-- La regione: deposito nascosto + campo-bottone come le altre
              tendine. Le voci NON sono un catalogo del client: le riempie
@@ -1717,14 +1736,28 @@
         </select>
         <button type="button" class="campo-scelta" id="filtroCondSelBtn" onclick="apriPicker('filtroCondSel')" aria-haspopup="dialog" title="Filtra per condizione"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       </div>
+      <!-- Le strade di consegna: una spunta per strada, e si sommano
+           (spedizione + ritiro = solo chi offre tutte e due). Gli
+           annunci storici senza consegna dichiarata restano fuori da
+           tutte, com'e' sempre stato per la spedizione. -->
       <div class="filtri-riga">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer">
-          <input type="checkbox" id="filtroSpedInp" style="width:auto;accent-color:var(--sats)">
+        <label class="filtro-check">
+          <input type="checkbox" id="filtroSpedInp">
           🚚 Solo con spedizione</label>
       </div>
       <div class="filtri-riga">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer">
-          <input type="checkbox" id="filtroLampoInp" style="width:auto;accent-color:var(--sats)">
+        <label class="filtro-check">
+          <input type="checkbox" id="filtroRitiroInp">
+          🤝 Ritiro in zona</label>
+      </div>
+      <div class="filtri-riga">
+        <label class="filtro-check">
+          <input type="checkbox" id="filtroDigInp">
+          💾 Codice online</label>
+      </div>
+      <div class="filtri-riga">
+        <label class="filtro-check">
+          <input type="checkbox" id="filtroLampoInp">
           ⚡ Solo in offerta</label>
       </div>
       <div class="filtri-riga">
@@ -1890,7 +1923,10 @@
       <div class="field"><label id="zonaLabel">Zona (facoltativa)</label>
         <input id="sellZone" list="zonaList" placeholder="Es. Pavia (PV)" oninput="suggerisciZona(this.value)" onblur="controllaZona()" autocomplete="off">
         <datalist id="zonaList"></datalist>
-        <div id="zonaHint" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div></div>
+        <div id="zonaHint" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div>
+        <!-- l'avviso «l'ho scritto io» quando la zona arriva dal
+             comune del profilo: una volta sola, vedi avvisoComune -->
+        <div id="zonaProfiloHint"></div></div>
       <div class="field"><label>Descrizione</label>
         <textarea id="sellDesc" placeholder="Condizioni, difetti, motivo della vendita…"></textarea></div>
       <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
@@ -2181,6 +2217,29 @@
     <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:4px">Chi ha l'annuncio nel barattolo riceve l'avviso. Lo sconto vale per tutti finché dura; alla scadenza il prezzo torna pieno da solo.</div>
     <button class="btn orange" style="margin-top:12px" onclick="inviaLampo(this)">⚡ Lancia</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET «VICINO A ME» (filtro della vetrina) ============
+       Da dove cerchi + entro quanto. NON chiediamo mai la posizione al
+       telefono: gli annunci hanno le coordinate del CENTRO del comune,
+       quindi il GPS darebbe la stessa risposta con in mano un dato piu'
+       delicato. Il comune si sceglie dai suggerimenti (dataset ISTAT) e
+       chi ha un account se lo ritrova scritto anche dal telefono nuovo. -->
+  <div class="sheet" id="vicinoSheet" role="dialog" aria-modal="true" aria-labelledby="vicinoTitolo">
+    <div class="grab"></div>
+    <h3 id="vicinoTitolo">📍 Vicino a me</h3>
+    <div class="field">
+      <label>Da dove cerchi</label>
+      <input id="vicinoComune" list="comuniVicinoList" placeholder="Es. Pavia" autocomplete="off"
+             oninput="suggerisciComuni(this.value, 'comuniVicinoList')" onkeydown="if(event.key==='Enter')applicaVicino()">
+      <datalist id="comuniVicinoList"></datalist>
+    </div>
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:-4px">Scegli un comune dai suggerimenti. Resta tuo: non finisce su nessun annuncio e nessuno lo vede.</div>
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:12px">Entro quanti chilometri</div>
+    <div class="consegna-scelta" id="vicinoRaggiChips" style="margin:6px 0 0"></div>
+    <div id="vicinoErrore" style="font-size:12.5px;font-weight:700;color:var(--danger);margin-top:8px;min-height:16px"></div>
+    <button class="btn orange" style="margin-top:6px" onclick="applicaVicino()">📍 Cerca qui intorno</button>
+    <button class="btn ghost" onclick="spegniVicino()">Cerca in tutta Italia</button>
   </div>
 
   <!-- ============ SHEET PICKER (categoria e condizioni del form Vendi) ============
@@ -2652,9 +2711,17 @@ function inCatalogo(arr){
 let ordinaVista = '';        // '' = piu' recenti | prezzo_su | prezzo_giu | lampo
 let filtroPrezzo = null;     // {min, max, valuta} applicato, o null
 let filtroSped = false;      // «solo con spedizione» (stato di sessione)
+let filtroRitiro = false;    // «ritiro in zona» (stesso patto)
+let filtroDig = false;       // «codice online» (stesso patto)
 let filtroLampo = false;     // «solo in offerta» (stesso patto)
 let filtroCond = '';         // condizione dell'oggetto ('' = qualsiasi)
 let filtroReg = '';          // regione ('' = tutta l'Italia)
+/* «📍 Vicino a me»: il comune di CHI GUARDA ('' = spento) e il raggio.
+   Il comune arriva dal profilo (myComune) e ci torna appena si sceglie,
+   così il telefono nuovo non lo richiede; il raggio invece resta della
+   sessione, che è una manopola e non un'anagrafica. */
+let filtroVicino = '', filtroRaggio = 25;
+const RAGGI_VICINO = [10, 25, 50, 100];   // lo stesso elenco degli avvisi
 
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
@@ -2669,9 +2736,15 @@ function paramsVetrina(){
     p.set('valuta_filtro', filtroPrezzo.valuta);
   }
   if (filtroSped) p.set('solo_spedizione', '1');
+  if (filtroRitiro) p.set('solo_ritiro', '1');
+  if (filtroDig) p.set('solo_digitale', '1');
   if (filtroLampo) p.set('solo_lampo', '1');
   if (filtroCond) p.set('condizione', filtroCond);
   if (filtroReg) p.set('regione', filtroReg);
+  if (filtroVicino) {
+    p.set('vicino', filtroVicino);
+    p.set('raggio_km', filtroRaggio);
+  }
   return p;
 }
 
@@ -2698,7 +2771,126 @@ function toggleFiltri(){
     el('filtroCondSel').value = filtroCond;
     aggiornaPicker('filtroCondSel');
     renderFiltroRegioni();
+    aggiornaVicinoBtn();
   }
+}
+
+/* ---------------- «📍 Vicino a me» ----------------
+   Il campo-bottone dice sempre lo stato: spento parla all'infinito
+   («Vicino a me»), acceso dice DOVE e QUANTO, che è l'unica cosa che
+   uno vuole rileggere prima di fidarsi del risultato. */
+function aggiornaVicinoBtn(){
+  const riga = el('filtroVicinoRiga'), b = el('filtroVicinoBtn');
+  if (!riga || !b) return;
+  /* in DEMO i dati finti non hanno coordinate: meglio nessuna riga che
+     una riga che promette una distanza e non la sa calcolare */
+  riga.style.display = DEMO ? 'none' : '';
+  b.querySelector('.cs-val').textContent = filtroVicino
+    ? `📍 ${filtroVicino} · ${filtroRaggio} km` : '📍 Vicino a me';
+}
+
+/* Gemella client di normalizza() del server: minuscole, via gli accenti,
+   tutto ciò che non è lettera o cifra diventa spazio — così «Pavia (PV)»
+   e «pavia pv» sono la stessa cosa da tutte e due le parti. */
+const normalizzaLite = s => (s || '').toLowerCase()
+  /* \p{M} = i segni diacritici staccati da NFKD, scritti col loro NOME
+     invece che come intervallo di caratteri: nel sorgente quei segni
+     sarebbero invisibili (la lezione dello spazio stretto in fmt). E
+     vanno tolti, non trasformati in spazio, o «Càlabra» diventerebbe
+     due parole. */
+  .normalize('NFKD').replace(/\p{M}/gu, '')
+  .replace(/[^a-z0-9]+/g, ' ').trim();
+
+function apriVicino(){
+  haptic();
+  el('vicinoComune').value = filtroVicino || myComune || '';
+  el('vicinoErrore').textContent = '';
+  disegnaRaggi();
+  el('sheetBg').classList.add('open');
+  el('vicinoSheet').classList.add('open');
+  setTimeout(()=>el('vicinoComune').focus(), 150);
+}
+
+function disegnaRaggi(){
+  el('vicinoRaggiChips').innerHTML = RAGGI_VICINO.map(k =>
+    /* «10 km» e non «entro 10 km»: a 360px le quattro pillole si
+       dividono 74px l'una e l'«entro» le mandava tutte a due righe —
+       lo dice già la riga sopra, una volta sola */
+    `<button class="consegna-pill${k===filtroRaggio?' attiva':''}" data-k="${k}" onclick="scegliRaggio(${k})">${k} km</button>`).join('');
+}
+function scegliRaggio(k){
+  haptic();
+  filtroRaggio = k;
+  document.querySelectorAll('#vicinoRaggiChips .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', Number(b.dataset.k) === k));
+}
+
+/* Il comune deve essere UNO VERO, e lo si scopre subito: se lo cerchiamo
+   e non esiste, il server non risponderebbe con un errore — per regola i
+   parametri della vetrina non litigano mai col client — e il filtro
+   resterebbe muto, cioè sembrerebbe rotto. Quindi si chiede all'elenco
+   PRIMA di filtrare, e si dice com'è andata. */
+async function applicaVicino(){
+  haptic();
+  const scritto = el('vicinoComune').value.trim();
+  if (!scritto) return spegniVicino();
+  const err = el('vicinoErrore');
+  err.textContent = '';
+  let nome = '';
+  /* All'elenco si chiede il nome NUDO: cerca per prefisso del nome, e
+     «Milano (MI)» — la forma che il campo si ritrova già scritta dopo
+     la prima volta — non comincia per «Milano (MI)». Senza questa
+     riga il filtro si riapriva e non si lasciava più riapplicare. */
+  const nudo = scritto.replace(/\s*\([A-Za-z]{2}\)\s*$/, '').trim() || scritto;
+  try {
+    const r = await fetch(`${API_BASE}/comuni?q=${encodeURIComponent(nudo)}`);
+    const d = await r.json();
+    /* il valore dei suggerimenti è già «Pavia (PV)»: la sigla non è un
+       vezzo, distingue i sette omonimi d'Italia (Castro, Peglio…) che
+       col nome nudo il server non saprebbe collocare */
+    const trovato = (d.comuni || []).find(c =>
+      normalizzaLite(`${c.nome} (${c.provincia})`) === normalizzaLite(scritto)
+      || normalizzaLite(c.nome) === normalizzaLite(scritto));
+    if (trovato) nome = `${trovato.nome} (${trovato.provincia})`;
+  } catch { err.textContent = 'Rete assente: riprova tra poco'; return; }
+  if (!nome) {
+    err.textContent = 'Non conosco questo comune: scegline uno dai suggerimenti';
+    return;
+  }
+  filtroVicino = nome;
+  ricordaComune(nome);          // fail-open: il filtro vive comunque
+  aggiornaVicinoBtn();          // il campo dice subito dove e quanto
+  chiudiVicino();
+  applicaFiltri();
+}
+
+function spegniVicino(){
+  haptic();
+  filtroVicino = '';
+  aggiornaVicinoBtn();
+  chiudiVicino();
+  applicaFiltri();
+}
+
+/* chiusura MIRATA come chiudiPicker: il velo resta se sotto c'è ancora
+   un foglio, e il pollTimer del pagamento non si tocca */
+function chiudiVicino(){
+  el('vicinoSheet').classList.remove('open');
+  if (!altroFoglioAperto()) el('sheetBg').classList.remove('open');
+}
+
+/* Il comune nel profilo: chi ha un account se lo ritrova dal telefono
+   nuovo. Fail-open totale — se il salvataggio non riesce (anonimo in
+   vetrina, rete storta) il filtro funziona lo stesso per la sessione. */
+let myComune = '';
+async function ricordaComune(nome){
+  myComune = nome;
+  if (DEMO || VETRINA) return;
+  try {
+    await fetch(`${API_BASE}/me/comune`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({comune: nome})});
+  } catch {}
 }
 
 /* Le regioni del pannello Filtri. Non sono un catalogo del client: sono
@@ -2729,17 +2921,26 @@ const numeroFiltro = v => {
   return (isFinite(n) && n > 0) ? n : '';
 };
 
+/* «C'e' almeno un filtro vivo?» in un posto solo: lo chiedono Applica
+   (per accendere il bottone Filtri) e Azzera (per non ricaricare la
+   vetrina quando non c'era niente da azzerare). Ogni filtro nuovo si
+   aggiunge QUI e i due lo sanno insieme. */
+const filtriVivi = () => !!filtroPrezzo || filtroSped || filtroRitiro
+  || filtroDig || filtroLampo || !!filtroCond || !!filtroReg
+  || !!filtroVicino;
+
 function applicaFiltri(){
   haptic();
   const min = numeroFiltro(el('filtroMinInp').value);
   const max = numeroFiltro(el('filtroMaxInp').value);
   filtroPrezzo = (min || max) ? {min, max, valuta: valutaVista} : null;
   filtroSped = !!el('filtroSpedInp').checked;
+  filtroRitiro = !!el('filtroRitiroInp').checked;
+  filtroDig = !!el('filtroDigInp').checked;
   filtroLampo = !!el('filtroLampoInp').checked;
   filtroCond = el('filtroCondSel').value;
   filtroReg = el('filtroRegSel').value;
-  el('filtriBtn').classList.toggle('attivo',
-    !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond || !!filtroReg);
+  el('filtriBtn').classList.toggle('attivo', filtriVivi());
   el('filtriBox').style.display = 'none';
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
@@ -2749,15 +2950,18 @@ function azzeraFiltri(){
   haptic();
   el('filtroMinInp').value = ''; el('filtroMaxInp').value = '';
   el('filtroSpedInp').checked = false;
+  el('filtroRitiroInp').checked = false;
+  el('filtroDigInp').checked = false;
   el('filtroLampoInp').checked = false;
   el('filtroCondSel').value = '';
   aggiornaPicker('filtroCondSel');
   el('filtroRegSel').value = '';
   aggiornaPicker('filtroRegSel');
-  const cera = !!filtroPrezzo || filtroSped || filtroLampo || !!filtroCond
-               || !!filtroReg;
-  filtroPrezzo = null; filtroSped = false; filtroLampo = false;
-  filtroCond = ''; filtroReg = '';
+  const cera = filtriVivi();
+  filtroPrezzo = null; filtroSped = false; filtroRitiro = false;
+  filtroDig = false; filtroLampo = false;
+  filtroCond = ''; filtroReg = ''; filtroVicino = '';
+  aggiornaVicinoBtn();   // il campo torna a dire «Vicino a me»
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
   if (!cera) return;
@@ -2871,6 +3075,13 @@ let listings = [
    zone:"Verona (VR)", comune:"Verona (VR)", regione:"Veneto", seller:"Elisa D.", rating:4.9, sales:11,
    consegna:"entrambe", spedEur:5, taglia:"piccolo", condizione:"come_nuovo",
    desc:"Giocato due volte, scatola perfetta. Listino fisso in euro: paghi in sats al cambio del momento."},
+  /* il codice online dimostrativo: senza, il filtro «💾 Codice online»
+     in demo non avrebbe mai niente da mostrare (e la nota asimmetrica
+     del dettaglio resterebbe invisibile) */
+  {id:8, emoji:"🎁", title:"Buono regalo libreria — 50 €", price:54000, cat:"Altro",
+   seller:"Elisa D.", rating:4.9, sales:11, condizione:"nuovo",
+   consegna:"digitale",
+   desc:"Buono valido in tutte le filiali e online. Ti mando il codice qui dentro appena il pagamento è nel deposito di garanzia."},
 ];
 let orders = [
   /* il 101 e' col ritiro in zona: fa vedere stepper e testi del caso */
@@ -2930,6 +3141,7 @@ function go(view){
       loadOfferte().then(renderOfferte).catch(()=>{});
     } else { renderOrders(); renderOfferte(); }
   }
+  if (view==='vendi') precompilaZonaDalProfilo();
   if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
     /* il barattolo si rilegge dal server: un annuncio salvato puo'
        essere stato venduto nel frattempo, e il cassetto deve dirlo */
@@ -3201,8 +3413,14 @@ function renderGrid(items){
         (!filtroPrezzo.min || l.price >= inSats(filtroPrezzo.min)) &&
         (!filtroPrezzo.max || l.price <= inSats(filtroPrezzo.max)));
     }
+    /* le strade di consegna: stesse regole del server, dette col
+       giudice di casa (stradeConsegna sa gia' della combo digitale) */
     if (filtroSped)
-      data = data.filter(l => l.consegna==='spedizione' || l.consegna==='entrambe');
+      data = data.filter(l => stradeConsegna(l).includes('spedizione'));
+    if (filtroRitiro)
+      data = data.filter(l => stradeConsegna(l).includes('ritiro'));
+    if (filtroDig)
+      data = data.filter(l => stradeConsegna(l).includes('digitale'));
     if (filtroCond)
       data = data.filter(l => l.condizione===filtroCond);
     if (filtroReg)
@@ -4013,6 +4231,26 @@ function hintHTML(id, testo, ctaLabel, ctaJs, dopoLabel){
       <a onclick="dismettiHint('${id}', this)" style="color:var(--muted)">${dopoLabel||'Non ora'}</a>
     </span></div>`;
 }
+/* ---- l'avviso «l'ho scritto io» (lug 2026, decisione di Andrea) ----
+   Il comune di «📍 Vicino a me» precompila anche la Zona di Vendi e il
+   comune degli avvisi di ricerca — ma MAI in silenzio: la prima volta
+   che succede il campo lo dice, e offre di svuotarsi. Poi il campo si
+   precompila e basta, che ormai da dove viene si e' capito.
+   Si consuma alla COMPARSA come il tour e il cartello di test: e' un
+   avviso e non un consiglio, quindi non ha un «Non ora» da rimandare —
+   ha «Svuota», che e' il rimedio, non il rinvio.
+   `consuma` a false lo mostra SENZA bruciarlo: serve dove il markup
+   nasce dentro un cassetto chiuso (gli avvisi di ricerca si disegnano
+   all'apertura del Profilo, non del cassetto) — un avviso consumato
+   da nessuno e' peggio di nessun avviso. */
+function avvisoComune(id, coda, azzeraJs, consuma = true){
+  if (!myComune || !hintAttivi() || hintDismesso(id)) return '';
+  if (consuma) dismettiHint(id);
+  return `<div class="hintline">📍 <span>Ho scritto <b>${esc(myComune)}</b>,
+    il comune da cui cerchi. ${coda}</span>
+    <span class="hl-az"><a onclick="${azzeraJs}">Svuota</a></span></div>`;
+}
+
 /* La destinazione dei CTA: il Profilo col cassetto giusto gia' aperto */
 function apriCassettoProfilo(idAcc){
   closeSheet();               // se un foglio era aperto, si chiude
@@ -4782,20 +5020,20 @@ function openDetail(id){
                   deve capire il patto in un colpo d'occhio; disputa,
                   tempi e Lightning si leggono di la' — e «(escrow)»
                   con loro, che la prima spiegazione lunga ora vive li'. -->
-             <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto l'oggetto.</span></div>
+             <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai ${TEMPI.confermaDig} ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              ${(!DEMO && !VETRINA && walletNwc())
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
              <button class="btn orange acquista-cta" onclick="compraDaBarra()">Acquista${stepperAcquista(l)}</button>
-             <!-- Sotto il bottone non c'e' piu' nulla da dire: la riga
+             <!-- Sotto il bottone non c'e' piu' nulla, davvero: la riga
                   «Ricevi una invoice Lightning...» e' uscita (troppo
-                  lunga, e chi ha un wallet lo sa gia') e con lei il
-                  badge col costo di spedizione — invoice, wallet, NWC e
-                  conti si raccontano nella pagina dedicata, che si apre
-                  proprio da qui sotto. -->
-             <div class="escrow-piede"><button type="button" onclick="apriSicurezza()">Scopri di più</button></div>
+                  lunga, e chi ha un wallet lo sa gia'), con lei il badge
+                  col costo di spedizione, e dal lug 2026 anche il piede
+                  col «Scopri di piu'», che ora sta in coda alla frase
+                  qui sopra. Invoice, wallet, NWC e conti si raccontano
+                  nella pagina dedicata. -->
            </div>
            ${offAcc ? '' : `<button class="btn ghost offerta-pagina" onclick="apriOfferta()">Fai un'offerta</button>`}`}
       ${jarCta}
@@ -5317,6 +5555,7 @@ function closeSheet(){
   el('offertaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('setSheet').classList.remove('open');
+  el('vicinoSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
      scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui) */
@@ -6785,7 +7024,11 @@ async function renderRicerche(){
 
   /* i valori del form: vuoti, dall'avviso in modifica, o dal CTA
      «Avvisami» di Esplora (il passamano si consuma qui) */
-  let vals = {comune:'', raggio:25, prezzo:'', parole:''};
+  /* l'avviso NUOVO parte dal comune del profilo, come la Zona di Vendi
+     (e con lo stesso avviso alla prima volta); quello in MODIFICA porta
+     il suo, che l'utente ha già scelto */
+  let vals = {comune: (hintAttivi() && myComune) || '', raggio:25,
+              prezzo:'', parole:''};
   if (ricercaInModifica) {
     const a = avvisi.find(x => x.id === ricercaInModifica);
     if (a) {
@@ -6816,7 +7059,13 @@ async function renderRicerche(){
     <div class="chips" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
     <div class="field" style="margin-top:10px"><label>Comune (facoltativo)</label>
       <input id="ricComune" list="comuniList" value="${esc(vals.comune)}" placeholder="Es. Pavia" oninput="suggerisciComuni(this.value)" autocomplete="off">
-      <datalist id="comuniList"></datalist></div>
+      <datalist id="comuniList"></datalist>
+      ${ricercaInModifica ? '' : avvisoComune('comuneavvisi',
+        "Cambialo se vuoi essere avvisato per un'altra zona.",
+        'svuotaComuneAvviso(this)',
+        /* si brucia solo se il cassetto è davvero aperto: qui il form
+           si disegna anche quando è chiuso, e nessuno lo leggerebbe */
+        !!el('accRicerche')?.classList.contains('open'))}</div>
     <div class="field"><label>Raggio</label>
       <select id="ricRaggio">${[10,25,50,100].map(k =>
         `<option value="${k}" ${k===vals.raggio?'selected':''}>entro ${k} km</option>`).join('')}</select></div>
@@ -6947,7 +7196,7 @@ function usaZonaSuggerita(){
 
 /* l'autocomplete del comune: suggerimenti dal server, con calma */
 let comuniTimer = 0;
-function suggerisciComuni(q){
+function suggerisciComuni(q, listaId){
   clearTimeout(comuniTimer);
   if ((q || '').trim().length < 2) return;
   comuniTimer = setTimeout(async () => {
@@ -6955,11 +7204,24 @@ function suggerisciComuni(q){
       const r = await fetch(`${API_BASE}/comuni?q=${encodeURIComponent(q)}`,
         {headers:{'X-Tg-Init-Data':authHdr()}});
       const d = await r.json();
-      const dl = el('comuniList');
-      if (dl) dl.innerHTML = (d.comuni || []).map(c =>
-        `<option value="${esc(c.nome)}">${esc(c.provincia)}</option>`).join('');
+      const dl = el(listaId || 'comuniList');
+      if (!dl) return;
+      /* Il filtro «vicino a me» vuole il nome COLLA SIGLA: i sette
+         omonimi d'Italia (Castro, Peglio…) col nome nudo non si
+         collocano, e il server li scarta. Il form degli avvisi resta
+         col nome semplice, che è come lo si scrive di solito. */
+      const conSigla = (listaId || '') === 'comuniVicinoList';
+      dl.innerHTML = (d.comuni || []).map(c => conSigla
+        ? `<option value="${esc(c.nome)} (${esc(c.provincia)})"></option>`
+        : `<option value="${esc(c.nome)}">${esc(c.provincia)}</option>`).join('');
     } catch {}
   }, 250);
+}
+
+function svuotaComuneAvviso(nodo){
+  haptic();
+  if (el('ricComune')) el('ricComune').value = '';
+  nodo?.closest('.hintline')?.remove();
 }
 
 async function salvaRicerca(){
@@ -8151,6 +8413,28 @@ function editListing(id){
   go('vendi'); window.scrollTo(0, 0);
 }
 
+/* La Zona di Vendi parte dal comune del profilo — quello di «📍 Vicino
+   a me» — perche' quasi sempre si vende da dove si vive. Tre guardie:
+   MAI in modifica (l'annuncio porta la SUA zona), mai sopra qualcosa
+   che l'utente ha gia' scritto, e la prima volta lo DICE (avvisoComune).
+   La zona resta di CHI PUBBLICA e non del profilo: e' un punto di
+   partenza, non una dichiarazione al posto suo. */
+function precompilaZonaDalProfilo(){
+  const z = el('sellZone'), avviso = el('zonaProfiloHint');
+  if (!z || !avviso || editandoId || editandoNostr) return;
+  if (!myComune || !hintAttivi() || z.value.trim()) return;
+  z.value = myComune;
+  avviso.innerHTML = avvisoComune('comunevendi',
+    'Cambialo se vendi da un altro posto.', 'svuotaZonaProfilo(this)');
+}
+function svuotaZonaProfilo(nodo){
+  haptic();
+  el('sellZone').value = '';
+  el('zonaHint').style.display = 'none';
+  zonaStorta = false;
+  nodo?.closest('.hintline')?.remove();
+}
+
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
@@ -8161,6 +8445,7 @@ function annullaModifica(){
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
+  precompilaZonaDalProfilo();   // torna il form di pubblicazione, vuoto
 }
 
 /* Il form di Vendi ha due facce: "pubblica" (di default) e "modifica"
@@ -9562,6 +9847,10 @@ async function avvia(){
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
     mySuggerimenti = !!me.suggerimenti_annunci;
+    /* «da dove cerchi»: precompila il foglio di «📍 Vicino a me», ma
+       NON accende il filtro da solo — la vetrina resta di tutti finché
+       non è l'utente a dire che vuole guardare qui intorno */
+    myComune = me.comune || '';
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
