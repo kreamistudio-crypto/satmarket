@@ -1181,6 +1181,18 @@
   .field .cons-riga input{width:17px;height:17px;padding:0;
     margin:1px 0 0;border-radius:5px;flex:0 0 auto;
     accent-color:var(--sats)}
+  /* L'icona della riga e' piu' grande del testo che accompagna: qui si
+     sceglie COME arriva la roba, e le tre strade si distinguono a
+     colpo d'occhio dal disegno, non dalla riga di testo. line-height:1
+     e inline-block, o un'emoji da 20px dentro una riga da 13,5
+     gonfierebbe la casella di quasi il doppio.
+     La spedizione parla col 🚚 in TUTTA l'app — icone della card,
+     badge del dettaglio, spunta dei filtri —, e qui era rimasto il
+     📦, che nel resto del progetto e' il pacco della taglia: due
+     disegni per la stessa strada, e quello sbagliato proprio nel
+     posto dove la strada si sceglie. */
+  .cons-riga .cons-ico{display:inline-block;font-size:20px;line-height:1;
+    margin-right:7px;vertical-align:-3px}
   .cons-riga .cons-sub{display:block;font-size:12px;color:var(--muted);
     font-weight:600}
   /* Il conto scomposto nei fogli di pagamento */
@@ -2142,9 +2154,9 @@
         <input id="sellQta" type="number" inputmode="numeric" min="1" placeholder="1">
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanti pezzi uguali hai? Vuoto o 1&nbsp;= un pezzo solo. All'esaurimento l'annuncio si mette in pausa: lo ricarichi dai tuoi annunci.</div></div>
       <div class="field" id="sellConsegnaField"><label>Consegna — spunta le opzioni che offri</label>
-        <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span>📦 Spedizione</span></label>
-        <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span>🤝 Ritiro in zona</span></label>
-        <label class="cons-riga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span>💾 Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
+        <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🚚</span>Spedizione</span></label>
+        <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🤝</span>Ritiro in zona</span></label>
+        <label class="cons-riga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">💾</span>Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
         <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Se l'acquirente sceglie il codice, lo consegnerai dentro Barattolo dopo il pagamento: niente chat private, tutto tracciato. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div></div>
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
