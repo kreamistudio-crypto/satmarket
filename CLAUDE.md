@@ -3170,13 +3170,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in «Altro»; i nativi in una categoria vera hanno avuto un umano che
   l'ha scelta dal form, e la macchina non è lì per correggere le
   persone. I TRE FRENI, che sono la ragione per cui può girare ogni
-  ora: 1) si chiede solo per gli annunci di cui non esiste già una riga
-  in coda fatta sulla categoria che hanno ADESSO (un annuncio fermo non
-  si ripaga mai due volte); 2) quella stessa riga è anche il NO del
-  moderatore — uno spostamento rifiutato resta scritto con la sua
-  categoria di partenza, quindi non torna più a bussare: il rifiuto non
-  si richiede; 3) `MAX_RICATEGORIZZA_GIRO` (100 = 5 chiamate), che
-  un'ondata la digerisce in più ore. Più la leva `RICATEGORIZZA_AUTO`
+  ora: 1) DECISO È DECISO — un annuncio su cui un moderatore si è già
+  pronunciato, approvando O rifiutando, non si ripropone mai più da
+  solo (`p.stato IN ('applicata','scartata')`, qualunque categoria
+  abbia adesso); 2) e non si ripaga due volte ciò che è già in coda:
+  niente chiamata se esiste già una proposta in attesa sulla categoria
+  di ADESSO; 3) `MAX_RICATEGORIZZA_GIRO` (100 = 5 chiamate), che
+  un'ondata la digerisce in più ore.
+  IL FRENO 1 È NATO DA UN BUG VERO (lug 2026, visto da Andrea, e vale
+  la pena tenerlo perché la trappola è sottile). Il freno di partenza
+  era il solo 2, cioè «esiste una riga fatta sulla categoria di
+  adesso»: copre il RIFIUTO — l'annuncio resta dov'era, la riga
+  combacia — ma NON l'APPROVAZIONE, perché appena l'annuncio si sposta
+  in «Sport e hobby» la riga vecchia dice «Altro» e non lo protegge
+  più. Così l'AI riproponeva altrove un annuncio che una persona aveva
+  appena sistemato, a ogni giro; e la nuova proposta SOVRASCRIVEVA la
+  riga, cancellando la traccia di chi aveva deciso — quindi il registro
+  si consumava da solo e il danno diventava anche invisibile. Il raggio
+  era ristretto ai soli IMPORTATI: un nativo approvato esce dal raggio
+  d'azione da sé (non è importato e non è più in «Altro»), un importato
+  ci resta per sempre. Cintura in più: l'INSERT della macchina ha un
+  `WHERE categoria_proposta.stato='proposta'` sul DO UPDATE, così una
+  riga decisa non si sovrascrive nemmeno se un domani la query se ne
+  dimenticasse. CONSEGUENZA DICHIARATA: un annuncio deciso resta deciso
+  anche se il venditore ne riscrive il titolo. Riaprirlo al cambio del
+  testo (una colonna con l'impronta, come `_da_giudicare` fa per la
+  moderazione) è stato valutato e scartato: per gli importati il testo
+  lo riscrivono i relay ogni ora, quindi sarebbe lo stesso giro, solo
+  più lento e più difficile da vedere. Per riconsiderare si chiede a
+  mano, `ricategorizza.py --rifai` — e la stessa regola vale ora anche
+  nel default dello script, dove `--rifai` è il modo di chiederlo
+  ESPLICITAMENTE. Più la leva `RICATEGORIZZA_AUTO`
   nel config (default **True**, al contrario di IMPORT_NOSTR_APERTO: qui
   non esce niente verso nessuno — si riempie una coda che un moderatore
   guarderà, e in vetrina non cambia nulla finché non approva). UNA
