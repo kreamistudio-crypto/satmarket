@@ -45,7 +45,7 @@ SOGLIA_ALPHA = 8
 # che resta sotto il nome). Serve solo a sapere CHI e' limitato in
 # larghezza e chi in altezza — se quelle misure cambiassero di molto,
 # il pareggio andrebbe rifatto.
-BOX_W, BOX_H = 85.9, 72.0
+BOX_W, BOX_H = 85.9, 75.0
 # Il tetto, in multipli dell'inchiostro MEDIANO: 1.05 lascia stare la
 # meta' piu' leggera e calma solo chi sporge.
 TETTO = 1.05
@@ -55,7 +55,7 @@ TETTO = 1.05
 # moltiplicatore sul tetto per le singole voci: sotto 1 = piu' piccola.
 # Chi ne aggiunge una lo faccia dopo aver guardato la griglia intera,
 # non la singola piastrella.
-RITOCCHI = {"animali": .88}
+RITOCCHI = {"animali": .68}
 # Sotto questo scarto non si riscrive: un ritocco da pochi pixel non
 # vale una seconda compressione.
 MINIMO = .02
