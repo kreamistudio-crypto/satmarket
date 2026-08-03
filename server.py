@@ -10829,6 +10829,12 @@ async def importa_nostr_periodico():
     except Exception as e:
         print(f"⚠️ Scoperta Nostr saltata: {e}")
     loop = asyncio.get_running_loop()
+    # Il ponte dei motivi vale per QUESTO giro: cio' che e' rimasto
+    # dal giro scorso riguarda eventi che non sono mai diventati una
+    # riga (saltati dallo scudo, o svaniti dai relay) e nessuno
+    # verra' piu' a ritirarlo. Senza questa riga il dizionario
+    # cresce per sempre, un titolo alla volta.
+    _MOTIVI_REVISIONE.clear()
     importati = aggiornati = saltati = 0
     for npub, venditore_id in venditori_nostr_attivi():
         # Un vaglio per venditore: deve sapere di chi sono gli annunci
