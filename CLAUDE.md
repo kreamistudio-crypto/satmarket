@@ -1151,25 +1151,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (foglio «Come vuoi riceverlo?» col totale per strada, riga
   «Spedizione» del `contoScomposto`, e il totale dei bottoni compra
   che la spedizione l'ha sempre inclusa).
-  DUE BADGE, DUE DOMANDE (lug 2026, decisione di Andrea): SOPRA, nella
-  fila delle pillole, si dice SE si spedisce — `spedBadge()` è
-  «🚚 Spedizione disponibile» in azzurro TENUE, e diventa
-  «🚚 Spedizione gratuita» in azzurro PIENO (`.sped-badge.piena`,
-  token nuovi `--ship-full`/`--ship-on`, contrasti AA misurati nei due
-  temi: 5,25 e 7,88) quando non c'è un costo dichiarato — la gratuità
-  è un argomento di vendita e non può aspettare il fondo pagina. Il
-  grado basso è NUDO: il contorno pieno provato addosso al
-  «disponibile» dava peso a ciò che deve pesarne meno. SOTTO il
-  bottone Acquista, dentro il recinto, `spedBadgeCosto()` dice solo
-  QUANTO costa («🚚 Spedizione + 5,00 €»), nella valuta in cui il
-  venditore l'ha DICHIARATA — lì la valuta è la semantica del costo,
-  non una preferenza di lettura, e così non serve nessun «≈». Se la
-  spedizione è gratuita quel badge NON compare: sarebbe la stessa
-  frase del badge di sopra a due dita di distanza (provato con
-  entrambi e tolto). Ritiro e codice online non si nominano mai in
-  nessuno dei due: sono gratuiti per natura. Giudici unici `spedisce`
-  e `spedGratis` — «gratis» si decide in un posto solo, e da lì lo
-  legge anche la card. Con la vecchia riga del costo se n'è andata
+  UN BADGE SOLO, E STA SOPRA (lug 2026, decisione di Andrea in due
+  tempi): nella fila delle pillole si dice SE si spedisce —
+  `spedBadge()` è «🚚 Spedizione disponibile» in azzurro TENUE, e
+  diventa «🚚 Spedizione gratuita» in azzurro PIENO
+  (`.sped-badge.piena`, token nuovi `--ship-full`/`--ship-on`,
+  contrasti AA misurati nei due temi: 5,25 e 7,88) quando non c'è un
+  costo dichiarato — la gratuità è un argomento di vendita e non può
+  aspettare il fondo pagina. Il grado basso è NUDO: il contorno pieno
+  provato addosso al «disponibile» dava peso a ciò che deve pesarne
+  meno. Ritiro e codice online non si nominano: sono gratuiti per
+  natura. Giudici unici `spedisce` e `spedGratis` — «gratis» si decide
+  in un posto solo, e da lì lo legge anche l'icona in card.
+  IL GEMELLO COL COSTO SOTTO ACQUISTA È VISSUTO UN GIORNO: nato per
+  dire il QUANTO nel momento in cui si compra («🚚 Spedizione +
+  5,00 €», dentro il recinto), è stato tolto subito dopo averlo visto
+  — e la ragione vale anche per chi volesse rimetterlo. Il recinto è
+  il posto della FIDUCIA, non del listino: una cifra là dentro fa
+  nascere la domanda «di che totale fa parte?» senza rispondere, e
+  spezza la riga sola che il recinto deve dire. Il QUANTO vive dove
+  c'è un totale VERO accanto: il foglio «Come vuoi riceverlo?» del
+  varco (`cifraVia`), la riga «Spedizione» del `contoScomposto` nel
+  paySheet, e i bottoni compra, che la spedizione l'hanno sempre
+  inclusa. Con lui se ne sono andati `spedBadgeCosto` e
+  `spedCostoTesto` (e la classe `.sped-riga`). Con la vecchia riga del
+  costo nella fila delle pillole se n'era andata
   `rigaConsegna` — la riga «🛡️ protezione acquisti inclusa» era
   rumore: la protezione c'è SEMPRE, quindi non è un'informazione, e
   a raccontarla è il recinto escrow. Il dettaglio
@@ -2238,8 +2244,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   prefers-reduced-motion.
   IL RECINTO PARLA POCO (lug 2026): dentro l'escrow-zone resta UNA
   riga — «I tuoi sats restano nel deposito di garanzia finché non
-  confermi di aver ricevuto l'oggetto» — e sotto Acquista il badge
-  col costo di spedizione, quando c'è. Sono uscite: il paragrafo su
+  confermi di aver ricevuto l'oggetto» — e sotto Acquista NIENTE, solo
+  il «Scopri di più». Sono uscite: il paragrafo su
   disputa e moderatore, e la riga «Ricevi una invoice Lightning,
   paghi con qualsiasi wallet» (troppo lunga, e chi ha un wallet lo sa
   già). Il «(escrow)» della prima spiegazione lunga se n'è andato con
@@ -3013,9 +3019,11 @@ si vede (lug 2026: «Acquista» un gradino più grande e i due tasti
 della barra finalmente gemelli — il tratteggio diventa un outline che
 non occupa layout e le basi flex vanno al 50%, la stessa lezione dei
 bottoni del pannello Filtri; la spedizione a due gradi dello stesso
-azzurro, sopra SE si spedisce [pieno quando è gratuita, che è un
-argomento di vendita] e sotto Acquista solo QUANTO costa, con la 🚚
-cerchiata in vetrina quando è gratis; il recinto ridotto a una riga,
+azzurro nel solo badge sopra il prezzo — «disponibile» tenue,
+«gratuita» pieno, che è un argomento di vendita — con la 🚚
+cerchiata in vetrina quando è gratis; il gemello col costo sotto
+Acquista è nato e morto nello stesso cantiere: il recinto è il posto
+della fiducia, non del listino; il recinto ridotto a una riga,
 via la riga sulla invoice, e tutto il resto nella pagina nuova «Il
 pagamento protetto» raggiungibile da tre porte; i tempi dell'escrow
 raccolti nella costante `TEMPI` con la tabella delle leve accanto —

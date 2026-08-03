@@ -903,10 +903,6 @@
      deve staccare dal semplice «disponibile». Stessa forma e stessa
      famiglia di colore, ma piena. */
   .sped-badge.piena{background:var(--ship-full);color:var(--ship-on)}
-  /* Il gemello sotto il bottone Acquista, dentro il recinto: dice
-     QUANTO costa (sopra, accanto al prezzo, si dice solo SE spedisce).
-     Centrato sotto il bottone, con l'aria di una riga di nota. */
-  .sped-riga{text-align:center;margin-top:9px}
   .desc-tit{font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.1em;color:var(--muted);margin-top:14px}
   /* Le due pillole spedizione/ritiro quando l'annuncio offre entrambe */
@@ -3633,40 +3629,25 @@ const spedisce = l => l.consegna==='spedizione' || l.consegna==='entrambe';
    e nessuna ancora all'euro. Il giudice unico dei due badge e
    dell'icona in card — «gratis» si dice in un posto solo. */
 const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0);
-/* Il costo della spedizione nella valuta in cui il venditore l'ha
-   DICHIARATO: ancorata all'euro = euro (i suoi «5 €» valgono sempre
-   5 €), altrimenti i sats fissi. Non segue il toggle di lettura di
-   proposito — qui la valuta E' la semantica del costo, non una
-   preferenza, e cosi' non serve nessun «≈». */
-function spedCostoTesto(l){
-  if (l.spedEur > 0) return `${fmtEur(l.spedEur)} €`;
-  return `${fmt(l.sped || 0)} sats`;
-}
 /* Il badge della spedizione accanto al prezzo (lug 2026, stile
    Subito.it): sfondo evidenziato — la coppia azzurra --ship dei badge
    di stato «spedito», AA nei due temi — solo se la spedizione e'
    davvero offerta. Dice SE si spedisce, e quando la spedizione e'
    GRATUITA lo dice subito, in versione piena: e' un argomento di
-   vendita e non puo' aspettare il fondo pagina. Il QUANTO, se un
-   costo c'e', lo dice il gemello sotto il bottone Acquista. */
+   vendita e non puo' aspettare il fondo pagina.
+   E' l'UNICO posto in cui la spedizione si nomina in pagina: il badge
+   gemello col costo, che per un giorno e' vissuto sotto il bottone
+   Acquista, e' stato tolto (lug 2026, deciso da Andrea). Il recinto e'
+   il posto della fiducia, non del listino, e una cifra li' dentro
+   chiedeva «di che totale fa parte?» senza rispondere; il QUANTO lo
+   dicono i posti che portano un totale vero — il foglio «Come vuoi
+   riceverlo?» del varco, la riga «Spedizione» del conto scomposto e i
+   bottoni compra, che la spedizione l'hanno sempre inclusa. */
 function spedBadge(l){
   if (!spedisce(l)) return '';
   return spedGratis(l)
     ? '<span class="sped-badge piena">🚚 Spedizione gratuita</span>'
     : '<span class="sped-badge">🚚 Spedizione disponibile</span>';
-}
-/* Il badge sotto il bottone Acquista, dentro il recinto: stessa forma
-   e stessi colori di quello in alto, ma col COSTO — nel momento in cui
-   si compra la cifra serve. Ritiro e codice online non compaiono mai:
-   sono gratuiti per natura e nominarli sarebbe rumore.
-   E NIENTE quando la spedizione e' gratuita (lug 2026, deciso da
-   Andrea dopo averlo visto): li' sotto non ci sarebbe una cifra da
-   dire, solo la stessa frase del badge in alto ripetuta a due dita di
-   distanza. Sopra si dice SE si spedisce — e se e' gratis lo si grida
-   subito; sotto, solo QUANTO costa. Se non costa, silenzio. */
-function spedBadgeCosto(l){
-  if (!spedisce(l) || spedGratis(l)) return '';
-  return `<div class="sped-riga"><span class="sped-badge">🚚 Spedizione + ${spedCostoTesto(l)}</span></div>`;
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
@@ -4531,12 +4512,12 @@ function openDetail(id){
                ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
                   <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
              <button class="btn orange acquista-cta" onclick="compraDaBarra()">Acquista${stepperAcquista(l)}</button>
-             <!-- Sotto il bottone il QUANTO costa la spedizione (sopra,
-                  accanto al prezzo, si e' detto solo SE si spedisce).
-                  La riga «Ricevi una invoice Lightning...» e' uscita:
-                  troppo lunga, e chi ha un wallet lo sa gia' — invoice,
-                  wallet e NWC si raccontano nella pagina dedicata. -->
-             ${spedBadgeCosto(l)}
+             <!-- Sotto il bottone non c'e' piu' nulla da dire: la riga
+                  «Ricevi una invoice Lightning...» e' uscita (troppo
+                  lunga, e chi ha un wallet lo sa gia') e con lei il
+                  badge col costo di spedizione — invoice, wallet, NWC e
+                  conti si raccontano nella pagina dedicata, che si apre
+                  proprio da qui sotto. -->
              <div class="escrow-piede"><button type="button" onclick="apriSicurezza()">Scopri di più</button></div>
            </div>
            ${offAcc ? '' : `<button class="btn ghost offerta-pagina" onclick="apriOfferta()">Fai un'offerta</button>`}`}
