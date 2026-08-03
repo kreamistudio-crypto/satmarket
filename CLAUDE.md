@@ -1174,10 +1174,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   spedizione è gratis»), e un segno non può cambiare tinta fra il
   giorno e la sera, o chi l'ha imparato di giorno non lo riconosce
   più. UNA SOLA taratura notturna è ammessa, e riguarda il tenue:
-  `--ship-soft`/`--ship-soft-on` scendono a #BAD2E8/#0E4A80 al buio
+  `--ship-soft`/`--ship-soft-on` scendono a #AEC8E0/#0E4A80 al buio
   perché sul bruno lo stesso chiaro rendeva più che sul crema e
-  gridava più del pieno (contro il fondo 13,59 → 11,04; il testo
-  scende con lui e guadagna margine, 5,83). Attenzione alla
+  gridava più del pieno (contro il fondo 13,59 → 11,04 → 9,95, in due
+  gradini, il secondo chiesto da Andrea dopo averlo visto a schermo;
+  il testo scende con lui e tiene il margine, 5,25). Attenzione alla
   distinzione, che è tutta la regola: lì si abbassa la LUCE, qui non
   si cambia il SEGNO — resta un chip azzurro chiaro con testo blu,
   riconoscibile identico, solo un gradino meno acceso. L'inversione
@@ -1188,9 +1189,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   invertiva (di sera diventava azzurro acceso, cioè un altro colore) e
   il tenue che seguiva il tema (di sera era un chip scuro su fondo
   scuro e spariva — «si mescolava col fondo»). Contrasti testo/fondo:
-  5,62 di giorno e 5,83 di sera per il tenue, 5,25 sempre per il
+  5,62 di giorno e 5,25 di sera per il tenue, 5,25 sempre per il
   pieno; e nessuno dei due si perde sulla pagina (il chiaro contro il
-  bruno fa 11,04, lo scuro contro il crema 4,78).
+  bruno fa 9,95, lo scuro contro il crema 4,78).
+  LO SCAMBIO FRA I DUE È STATO VALUTATO E SCARTATO (lug 2026, domanda
+  di Andrea: «il chiaro spicca di più, ha senso invertirli?»). Spicca
+  di più SOLO di sera: sul crema il chiaro fa 1,15 contro il fondo,
+  cioè è una velatura. Scambiandoli, nel tema di DEFAULT «gratuita»
+  diventerebbe la cosa più muta della fila e «disponibile» — che è
+  solo un dato di fatto — il chip più forte, in concorrenza col
+  prezzo. Si sposterebbe il problema dal tema scuro a quello chiaro.
+  Vale anche l'argomento di forma: pieno + testo bianco si legge come
+  «etichetta forte» e la velatura come «nota di contorno» (la stessa
+  convenzione dell'arancio pieno contro il ghost), e quella gerarchia
+  regge in tutti e due i temi a prescindere da chi sia otticamente
+  più brillante. La leva per calmare il tenue di sera è abbassarlo
+  ancora, mai scambiarlo.
   Il badge è `display:inline-flex` con `align-items:center` e NON
   block: `.pills` è un flex ad align-items stretch e le pillole
   vicine sono 3px più alte (1,5px di bordo per lato, che il badge non
