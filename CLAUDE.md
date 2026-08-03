@@ -155,15 +155,105 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Guardate e tenute come sono: 🏺 Collezionismo (tira
   sull'antiquariato, ma non c'e' di meglio) e 📦 Altro (e' anche il
   pacco della spedizione: convivono senza confondersi).
-  AGGIUNGERE UNA CATEGORIA TOCCA SEI POSTI: `CATEGORIE` e
+  AGGIUNGERE UNA CATEGORIA TOCCA SETTE POSTI: `CATEGORIE` e
   `SINONIMI_CATEGORIA` e `MODELLO_IMPORT` in server.py, `<select
-  id="sellCat">` e `EMOJI_CAT` e `CATS` in miniapp.html — più
-  `CATEGORIE_SENZA_CONDIZIONE` e il suo gemello `CAT_SENZA_COND`, se
-  la voce nuova è di quelle dove la condizione non vuol dire niente.
+  id="sellCat">` e `EMOJI_CAT` e `CATS` in miniapp.html, più
+  l'ILLUSTRAZIONE in `assets/categorie/{slug}.webp` (il settimo, lug
+  2026, nato con la pagina Sfoglia) — e `CATEGORIE_SENZA_CONDIZIONE`
+  col suo gemello `CAT_SENZA_COND`, se la voce nuova è di quelle dove
+  la condizione non vuol dire niente.
   Non serve
-  ricordarseli: `prove.py` li incrocia tutti e sei e fallisce se
+  ricordarseli: `prove.py` li incrocia tutti e sette e fallisce se
   divergono (il sesto, il modello CSV, è entrato dopo essersi fatto
   dimenticare per davvero).
+  LA PAGINA «SFOGLIA» (lug 2026): le categorie come vetrina, quarta
+  radice della nav — griglia a due colonne di piastrelle illustrate,
+  modello Vinted. Vista `view-sfoglia` (niente header, come Ordini e
+  Profilo; niente barra di ricerca, che vive in Esplora e duplicarla
+  sarebbe un secondo posto da tenere allineato per sempre).
+  `renderSfoglia` è la gemella di `renderChips` e beve dalla stessa
+  sorgente — `conteggiServer`, che arriva già nella busta di prima
+  pagina di /api/listings: ZERO endpoint nuovi. Ma il conteggio NON si
+  mostra: decide solo chi è spento. Ordine FISSO di catalogo, mai per
+  numero (una mappa che si riordina ogni giorno non si impara), tutte
+  e 26 sempre presenti, le vuote a `.vuota` (opacità .5) ma TOCCABILI:
+  si atterra sulla vetrina vuota, che ha già il suo «🔔 Avvisami se
+  arriva». Il nome va in `data-cat` e mai dentro la stringa JS
+  dell'onclick — la lezione di «Valle d'Aosta» sul picker.
+  CONSEGUENZA sul resto: `renderChips` non riporta più a «Tutto» la
+  categoria attiva rimasta senza annunci. Quella scorciatoia era nata
+  contro i filtri fantasma, ma con Sfoglia diventava una bugia — si
+  tocca «Informatica», che è vuota, e si finisce davanti alla vetrina
+  intera senza che nulla lo dica. Ora la categoria scelta resta in
+  elenco anche a zero annunci, in TESTA (la fila scorre di lato, e una
+  pillola accesa in fondo non la vedrebbe nessuno): è la regola della
+  regione nel pannello Filtri, «il campo non deve mentire».
+  NAV A CINQUE POSTI: il tondo del Vendi resta al centro ESATTO
+  (verificato: 180.0 su 180.0 a 360px) perché le voci sono quattro ma
+  gli slot cinque — `.nav-vuoto`, uno spaziatore elastico che tiene il
+  quinto posto, vuoto di proposito e già destinato a qualcos'altro. In
+  topbar desktop sparisce (lì i bottoni sono `flex:0 0 auto`).
+  IL GESTO INDIETRO ha qui la sua UNICA eccezione, ed è dichiarata: il
+  tocco su una piastrella porta a Esplora, che è una radice — ma non è
+  un cambio di tab, è una DISCESA, e l'indietro deve riportare allo
+  scaffale. `navSpingi` è una bandierina alzata da `apriCategoria` e
+  letta-e-azzerata in cima a `navRiflette` (prima di ogni via d'uscita,
+  o si scaricherebbe su una navigazione che non l'ha chiesta).
+  LE ILLUSTRAZIONI: 26 WebP in `assets/categorie/{slug}.webp`, nome
+  calcolato da `slug_categoria` (server) e `slugCat` (client) — nessun
+  elenco doppio. Sono SCONTORNATE su trasparenza, non su un fondo:
+  quindi il colore della piastrella è una scelta nostra, ed è un BRUNO
+  di casa (`--cat-fondo`), scuro perché i disegni sono in tinte calde e
+  sabbiose — misurato sui file veri: su un `--carton` chiaro
+  venticinque su ventisei scenderebbero sotto 3:1 (media 1,85), cioè
+  sparirebbero. Di sera sale di un gradino, che la pagina è già bruna e
+  la piastrella deve staccarsene; un gradino più chiaro di giorno è
+  stato provato a schermo e rimesso indietro (decisione di Andrea).
+  LA PIASTRELLA È UNA COLONNA FLEX, e questa è la parte che vale: nome
+  sopra a quota propria, illustrazione sotto che si prende TUTTO il
+  resto. Finché erano due strati sovrapposti, ogni pixel dato al
+  disegno andava misurato contro la riga di testo — e il tetto restava
+  56px, perché le illustrazioni hanno zone quasi bianche e il nome in
+  crema ci faceva 1,00:1, cioè spariva. Un velo scuro sfumato sotto il
+  nome, provato, salvava il testo ma spegneva il 55% dei disegni: cura
+  un male causandone un altro. Col flex non possono pestarsi PER
+  COSTRUZIONE e il disegno arriva a 73px. Perché siano TUTTI della
+  stessa altezza serve che nessun nome vada a capo: 14px col margine a
+  9 è la taratura che fa stare in una riga anche il più lungo
+  («Console e videogiochi»: ne chiede 140 e ne ha 141, a 360px). Chi
+  alza il corpo del testo rimette quelle voci su due righe, e quelle
+  piastrelle avranno il disegno più piccolo delle altre.
+  Le LARGHEZZE invece restano diverse, ed è giusto: una bici è larga e
+  un telefono è stretto, quindi a pari altezza la bici copre 2,7 volte
+  l'area. Normalizzare l'AREA è stato provato e scartato — per far
+  stare gli estremi ogni disegno scende sui 55px e le piastrelle si
+  svuotano: si perde su tutte per pareggiare due casi.
+  `ritaglia_categorie.py` toglie il margine trasparente che le
+  illustrazioni hanno di fabbrica (~30%): senza, un terzo dello spazio
+  della piastrella sarebbe vuoto e il disegno si vedrebbe piccolo. È
+  idempotente e va rilanciato quando si aggiunge o si rifà
+  un'illustrazione; `prove.py` verifica che i file siano tirati, che è
+  l'invariante su cui il CSS poggia.
+  L'ALPHA SI GUARDA SOPRA UNA SOGLIA (8 su 255), non sopra lo zero, e
+  la ragione è un caso vero: «Bellezza e benessere» arrivava con una
+  velatura quasi invisibile stesa su TUTTA la tela, quindi col
+  confronto a zero risultava già tirata — il ritaglio non la toccava e
+  il disegno vero, 329×236 dentro un quadrato da 512, si vedeva molto
+  più piccolo degli altri. Sugli altri 25 file la soglia sposta il
+  riquadro di 4px in tutto. La stessa soglia sta nella prova, o
+  lascerebbe passare proprio il caso che deve prendere. Lo script non
+  riscrive per scarti sotto il 2%: così rilanciarlo non ricomprime
+  ogni volta tutto (i file sono lossy, e la regola della compressione
+  unica vale anche qui).
+  MISURE tarate su QUANTE piastrelle stanno in una schermata: dieci,
+  come nel riferimento (decisione di Andrea). A 360×760 restano 630px
+  fra l'etichetta e la nav, cioè cinque righe da 120 — piastrella 110 e
+  gap 10, che con la larghezza 159 fa `aspect-ratio:1.445`. Per questo
+  l'etichetta non porta il `padding-top` maggiorato delle altre viste e
+  la griglia ha 8px di respiro invece di 12: sono i pixel della quinta
+  riga. 3 colonne da 768px, 4 da 1024.
+  NEL PICKER DI VENDI restano le EMOJI, non le illustrazioni (deciso):
+  lì serve una lista compatta da scorrere, non una vetrina.
   `categoria_automatica` di importa_nostr.py NON ESISTE PIÙ (lug
   2026): indovinare la categoria dal titolo sbagliava in silenzio — lo
   «Sparkling Sake» finiva fra gli arredi perché quella categoria
@@ -3335,7 +3425,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`, `/assets/mascotte.jpeg`,
+   `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`,
+   `/assets/categorie/{slug}.webp` (le 26 illustrazioni di Sfoglia:
+   unica rotta con un nome che arriva dal client, e per questo la sola
+   con una whitelist — `SLUG_CATEGORIE`, calcolata dal catalogo),
+   `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
@@ -3874,6 +3968,29 @@ admin con «mostra tutti» che non perde le spunte tolte a mano. In
 produzione basta il deploy — la tabella `categoria_proposta` la crea
 init_db —, e la coda resta vuota finché non si lancia
 `python ricategorizza.py --scrivi` sul VPS.
+La pagina «Sfoglia» (lug 2026): le 26 categorie diventano una vetrina —
+quarta radice della nav, griglia a due colonne di piastrelle
+illustrate, dieci in una schermata come nel riferimento. Il tondo del
+Vendi resta al centro esatto grazie al quinto posto vuoto, e l'indietro
+da una categoria torna a Sfoglia (l'unica eccezione al patto delle
+radici, con la sua bandierina). Vedi Architettura — collaudata in
+locale a 360/375/390 e 1280px nei due temi: nav misurata (Vendi a
+180.0 su 180.0, altezza invariata, nessuna etichetta troncata), catena
+del gesto indietro compresi i cinque cambi di tab che non lasciano
+gradini, categoria vuota che atterra sul suo «Avvisami se arriva», la
+rotta che serve solo le 26 vere (404 su nomi inventati e su
+`../../config.py`), il ripiego a emoji, e 77 prove verdi con le tre
+nuove sulle illustrazioni. Due problemi veri trovati e chiusi
+strada facendo: i nomi di una parola sola che sbordavano dove il
+browser non ha il dizionario di sillabazione, e la guardia di
+`renderChips` che rimangiava la categoria scelta quando era vuota.
+In produzione basta il deploy: nessuna colonna, nessuna leva —
+solo i 26 file in `assets/categorie/`, che viaggiano col commit.
+ATTENZIONE per il prossimo cantiere: le illustrazioni sono servite con
+cache di un giorno e nomi NON versionati, quindi una che venga rifatta
+resta vecchia nei browser per 24 ore (in locale è successo davvero, e
+falsava le misure). Se un giorno cambieranno spesso, la strada è
+quella delle foto: il nome col timbro.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
