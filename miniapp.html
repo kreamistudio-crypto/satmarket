@@ -2335,15 +2335,19 @@
   <nav>
     <!-- Quattro voci in CINQUE posti, col + di Vendi al centro esatto.
          Il quinto e' vuoto apposta: con quattro bottoni soli il Vendi
-         finirebbe al 62,5% invece che a meta'. Lo spazio libero e' li'
-         per qualcosa che arrivera'. Il Profilo vive nel tasto tappo in
-         testata (mobile) e qui in coda solo da desktop -->
+         finirebbe al 62,5% invece che a meta'. Lo spazio libero sta fra
+         Vendi e Ordini — non in coda — cosi' gli Ordini restano
+         all'ESTREMA destra, dove il pollice li trova senza guardare;
+         il posto vuoto e' li' per qualcosa che arrivera'. Da desktop
+         lo spaziatore sparisce e le quattro voci tornano appaiate. Il
+         Profilo vive nel tasto tappo in testata (mobile) e qui in coda
+         solo da desktop -->
     <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
     <button id="nav-esplora" class="active" onclick="vaiEsplora()"><span class="ic">🛍️</span>Esplora</button>
     <button id="nav-sfoglia" onclick="go('sfoglia')"><span class="ic">🗂️</span>Sfoglia</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
-    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini<span class="off-dot" id="offDot"></span></button>
     <span class="nav-vuoto" aria-hidden="true"></span>
+    <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
