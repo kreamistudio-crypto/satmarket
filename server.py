@@ -11358,16 +11358,33 @@ async def ricategorizza_automatico():
 
     I TRE FRENI, che sono la ragione per cui questa macchina puo'
     girare ogni ora senza diventare una spesa:
-      1. si guardano solo gli annunci di cui non esiste gia' una riga
-         in coda fatta sulla categoria che hanno ADESSO. Un annuncio
-         fermo non si ripaga mai due volte;
-      2. quella stessa riga e' anche il «no» del moderatore: uno
-         spostamento RIFIUTATO resta scritto con la categoria di
-         partenza, quindi l'annuncio non torna piu' a bussare finche'
-         qualcuno non lo sposta per altre vie. Il rifiuto non si
-         chiede due volte;
+      1. DECISO E' DECISO: un annuncio su cui un moderatore si e' gia'
+         pronunciato — approvando O rifiutando — non si ripropone mai
+         piu' da solo. E' la regola piu' importante delle tre, e ci si
+         e' arrivati per un bug vero (lug 2026, visto da Andrea): il
+         freno di prima guardava se esisteva una riga fatta sulla
+         categoria di ADESSO, che copre il rifiuto (l'annuncio resta
+         dov'era, la riga combacia) ma NON l'approvazione — spostato
+         in «Sport e hobby», la riga vecchia diceva «Altro» e non lo
+         proteggeva piu'. Cosi' l'AI riproponeva altrove un annuncio
+         che una persona aveva appena sistemato, a ogni giro, e per
+         giunta la nuova proposta SOVRASCRIVEVA la riga cancellando la
+         traccia di chi aveva deciso. Una macchina non rimette in
+         discussione una decisione umana: se serve rifarlo, si chiede
+         a mano con `ricategorizza.py --rifai`;
+      2. e non si ripaga due volte cio' che e' gia' in coda: niente
+         chiamata per gli annunci che hanno gia' una proposta in
+         attesa sulla categoria che hanno adesso;
       3. il tetto per giro, che un'ondata la digerisce in piu' ore.
     Piu' la leva del config, che la spegne del tutto.
+
+    CONSEGUENZA DICHIARATA del freno 1: un annuncio deciso resta
+    deciso anche se domani il venditore ne riscrive il titolo. Si e'
+    valutato di riaprirlo al cambio del testo (una colonna con
+    l'impronta di titolo+descrizione, come fa `_da_giudicare` per la
+    moderazione) e si e' scartato: per gli IMPORTATI il testo lo
+    riscrivono i relay a ogni ora, quindi sarebbe lo stesso identico
+    giro — solo piu' lento e piu' difficile da vedere.
 
     L'avviso ai moderatori e' UNO e aggregato — il patto del drenatore
     dei post — e parte solo se questo giro ha prodotto qualcosa: una
@@ -11385,9 +11402,12 @@ async def ricategorizza_automatico():
             # «Altro»: i nativi con una categoria vera l'ha scelta una
             # persona, e non si corregge
             "  AND (a.contatto_nostr!='' OR a.categoria='Altro') "
+            # deciso e' deciso (qualunque categoria abbia adesso), e
+            # cio' che e' gia' in coda non si richiede
             "  AND NOT EXISTS(SELECT 1 FROM categoria_proposta p "
             "                 WHERE p.annuncio_id=a.id "
-            "                   AND p.categoria_ora=a.categoria) "
+            "                   AND (p.stato IN ('applicata','scartata') "
+            "                        OR p.categoria_ora=a.categoria)) "
             "ORDER BY a.id DESC LIMIT ?",
             (MAX_RICATEGORIZZA_GIRO,)).fetchall()
         con.close()
@@ -11414,7 +11434,12 @@ async def ricategorizza_automatico():
             "categoria_ora=excluded.categoria_ora, "
             "categoria_nuova=excluded.categoria_nuova, "
             "creato=excluded.creato, stato='proposta', deciso_da=0, "
-            "deciso_il=0",
+            "deciso_il=0 "
+            # La cintura del freno 1: anche se un domani la query
+            # sopra se ne dimenticasse, una riga DECISA non si
+            # sovrascrive mai da qui. E' il registro di chi ha deciso
+            # cosa, e la macchina non lo cancella.
+            "WHERE categoria_proposta.stato='proposta'",
             [(i, ora[i][0], nuova, adesso) for i, nuova in proposte.items()])
         con.commit()
         con.close()

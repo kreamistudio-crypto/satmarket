@@ -31,11 +31,13 @@ USO (dalla cartella del progetto):
 Si puo' passare un percorso di database diverso da quello del config:
     python ricategorizza.py /tmp/prova.db
 
-Idempotente: di serie non richiede all'AI gli annunci per cui esiste
-gia' una proposta (o una decisione) fatta sulla categoria che hanno
-adesso — cosi' un rilancio dopo un'ondata di import costa solo i
-nuovi, e un annuncio che un moderatore ha gia' lasciato dov'era non
-torna a bussare ogni volta.
+Idempotente: di serie non richiede all'AI ne' gli annunci su cui un
+moderatore si e' gia' pronunciato (approvando o rifiutando: quella e'
+una decisione umana e la macchina non ci torna sopra), ne' quelli che
+hanno gia' una proposta in attesa sulla categoria che hanno adesso.
+Cosi' un rilancio dopo un'ondata di import costa solo i nuovi.
+Con --rifai si riconsidera tutto, decisioni comprese: e' il modo di
+chiederlo esplicitamente.
 
 COSTO INDICATIVO: ~0,005 $ a lotto di 20 annunci con Haiku, cioe'
 circa 20 centesimi per un catalogo di 800. Lo script lo stampa alla
@@ -172,12 +174,20 @@ def main():
         deciso_da INTEGER DEFAULT 0, deciso_il INTEGER DEFAULT 0)""")
     dove = "WHERE a.stato='attivo'"
     if not rifai:
-        # Gia' visto = c'e' una riga per questo annuncio fatta sulla
-        # categoria che ha ADESSO. Se la categoria e' cambiata nel
-        # frattempo (l'ha spostato il venditore, o un moderatore) la
-        # vecchia proposta non parla piu' di lui e si richiede.
+        # Due modi di essere «gia' visto», e il primo conta di piu':
+        #   - un MODERATORE si e' gia' pronunciato, approvando o
+        #     rifiutando. Li' non si torna: rifarlo vorrebbe dire
+        #     rimettere in discussione una decisione umana, ed e'
+        #     esattamente il bug che l'automatismo ha fatto una volta
+        #     (lug 2026). Per riconsiderarlo c'e' --rifai, che e' il
+        #     modo di chiederlo ESPLICITAMENTE;
+        #   - oppure c'e' gia' una proposta in attesa fatta sulla
+        #     categoria che l'annuncio ha ADESSO: e' la stessa domanda
+        #     con la stessa risposta, e si pagherebbe due volte.
         dove += (" AND NOT EXISTS(SELECT 1 FROM categoria_proposta p "
-                 "WHERE p.annuncio_id=a.id AND p.categoria_ora=a.categoria)")
+                 "WHERE p.annuncio_id=a.id "
+                 "AND (p.stato IN ('applicata','scartata') "
+                 "     OR p.categoria_ora=a.categoria))")
     righe = con.execute(
         f"SELECT a.id, a.titolo, a.descrizione, a.categoria FROM annunci a "
         f"{dove} ORDER BY a.id" + (f" LIMIT {limite}" if limite else "")
