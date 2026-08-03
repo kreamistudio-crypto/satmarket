@@ -148,6 +148,13 @@ def prove_tag_commercio():
     print("\n[tag di commercio]")
     import importa_nostr as imp
     amb = {}
+    # tag_commercio passa da condizione_da_mostrare, che sa dove la
+    # condizione non vuol dire niente: le sue dipendenze vanno nello
+    # stesso ambiente, o la prova esplode invece di fallire.
+    i = _SORGENTE.index("CATEGORIE_SENZA_CONDIZIONE = frozenset(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for f in ("senza_condizione", "condizione_da_mostrare"):
+        exec(pezzo(f), amb)
     i = _SORGENTE.index("CONDIZIONE_NIP99 = {")
     exec(_SORGENTE[i:_SORGENTE.index(
         "\n\n\n", _SORGENTE.index("def tag_commercio"))], amb)
@@ -346,12 +353,83 @@ def prove_categorie():
 
 
 # ====================================================================
+def prove_senza_condizione():
+    """Le categorie dove la condizione non vuol dire niente (lug 2026).
+    Server e frontend tengono lo stesso elenco — il catalogo si
+    hardcoda in tutti e due, come le categorie — quindi qui si
+    incrociano: se divergessero, il form chiederebbe una condizione che
+    il server butta via (o peggio, il contrario)."""
+    print("\n[categorie senza condizione]")
+    import re
+    amb = {}
+    i = _SORGENTE.index("CATEGORIE_SENZA_CONDIZIONE = frozenset(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    exec(pezzo("senza_condizione"), amb)
+    senza = amb["senza_condizione"]
+
+    html = open("miniapp.html", encoding="utf-8").read()
+    i = html.index("const CAT_SENZA_COND = [")
+    front = re.findall(r"'([^']+)'", html[i:html.index("]", i)])
+    prova("l'elenco del frontend combacia col server",
+          sorted(amb["CATEGORIE_SENZA_CONDIZIONE"]), sorted(front))
+
+    # e le categorie esenti devono ESISTERE nel catalogo, o l'elenco
+    # sarebbe una regola che non si applica mai a nessuno
+    j = _SORGENTE.index("CATEGORIE = (")
+    exec(_SORGENTE[j:_SORGENTE.index(")", j) + 1], amb)
+    prova("le categorie esenti esistono nel catalogo", [],
+          [c for c in amb["CATEGORIE_SENZA_CONDIZIONE"]
+           if c not in amb["CATEGORIE"]])
+
+    prova("la marmellata non ha condizione", True,
+          senza("Alimenti e bevande", "spedizione"))
+    prova("il portatile si', invece", False, senza("Informatica", "spedizione"))
+    # il secondo asse: il codice online e' nuovo per definizione, ma
+    # SOLO quando e' l'unica strada
+    prova("il codice online da solo non ha condizione", True,
+          senza("Altro", "digitale"))
+    prova("la combo fisica+codice la chiede lo stesso", False,
+          senza("Altro", "spedizione"))
+    prova("senza consegna dichiarata si chiede", False, senza("Altro", ""))
+    prova("la categoria vince anche senza consegna", True,
+          senza("Alimenti e bevande", ""))
+
+
+# ====================================================================
+def prove_ricategorizza():
+    """Lo script di ricategorizzazione legge il catalogo da server.py
+    (fonte unica) e non si fida delle risposte dell'AI: un «NON SO» o
+    una categoria inventata devono lasciare l'annuncio dov'e'."""
+    print("\n[ricategorizzazione]")
+    import ricategorizza as ric
+
+    cat = ric.catalogo()
+    j = _SORGENTE.index("CATEGORIE = (")
+    amb = {}
+    exec(_SORGENTE[j:_SORGENTE.index(")", j) + 1], amb)
+    prova("lo script legge il catalogo vero", list(amb["CATEGORIE"]), cat)
+
+    leggi = lambda riga: (ric.RIGA.match(riga).groups()
+                          if ric.RIGA.match(riga) else None)
+    prova("verdetto normale", ("3", "Informatica"), leggi("3: Informatica"))
+    prova("verdetto con la parentesi", ("12", "Alimenti e bevande"),
+          leggi(" 12) Alimenti e bevande "))
+    prova("«NON SO» non e' una categoria del catalogo", False,
+          leggi("7: NON SO")[1] in cat)
+    prova("una categoria inventata non e' nel catalogo", False,
+          leggi("7: Fantacategoria")[1] in cat)
+    prova("una riga di chiacchiere non e' un verdetto", None,
+          leggi("Ecco i risultati:"))
+
+
+# ====================================================================
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_testo_evento,
-              prove_tag_commercio, prove_anello, prove_categorie):
+              prove_tag_commercio, prove_anello, prove_categorie,
+              prove_senza_condizione, prove_ricategorizza):
         try:
             f()
         except Exception as e:

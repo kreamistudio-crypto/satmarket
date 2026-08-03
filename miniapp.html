@@ -1714,7 +1714,11 @@
         </select>
         <button type="button" class="campo-scelta" id="filtroRegSelBtn" onclick="apriPicker('filtroRegSel')" aria-haspopup="dialog" title="Filtra per regione"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       </div>
-      <div class="filtri-riga">
+      <!-- La riga sparisce del tutto sulle categorie dove la condizione
+           non vuol dire niente (alimenti): li' non c'e' niente da
+           filtrare, e un filtro che non filtra e' peggio di uno che
+           manca. -->
+      <div class="filtri-riga" id="filtroCondRiga">
         <!-- deposito nascosto + campo-bottone: qui il foglio-picker
              mostra le stesse pillole colorate del form, senza le
              descrizioni (in un filtro basta il nome) -->
@@ -2401,6 +2405,17 @@ function condPill(id){
   const c = CONDIZIONI[id]; if (!c) return '';
   return `<span class="pill cond-${id}">${c.nome}</span>`;
 }
+/* DOVE LA CONDIZIONE NON VUOL DIRE NIENTE (lug 2026): una marmellata e'
+   nuova per definizione, e un codice online pure — chiederlo e' una
+   domanda senza risposte sbagliate. Gemelli client di
+   CATEGORIE_SENZA_CONDIZIONE e senza_condizione() del server, e
+   prove.py fallisce se i due elenchi divergono. Il digitale vale solo
+   se e' ESCLUSIVO: sulla combo (tessera fisica O codice) la merce
+   fisica c'e' e una condizione ce l'ha, quindi si guarda `consegna` e
+   mai ancheDigitale. */
+const CAT_SENZA_COND = ['Alimenti e bevande'];
+const senzaCondizione = (cat, consegna) =>
+  CAT_SENZA_COND.includes(cat) || consegna === 'digitale';
 /* Il titolo del dettaglio con la condizione in CODA, come fosse
    l'ultima parola («Crema spalmabile NUOVO»). Il trucco e' legare la
    pillola all'ULTIMA PAROLA con un nowrap: se sull'ultima riga non
@@ -2412,7 +2427,11 @@ function condPill(id){
    minore. Il titolo passa da esc(): le entita' (&amp;) non hanno
    spazi dentro, quindi tagliare sull'ultimo spazio e' sicuro. */
 function titoloConCondizione(l){
-  const t = esc(l.title), p = condPill(l.condizione);
+  /* il giudice sta QUI, che e' l'unico posto dove la pillola di un
+     annuncio si disegna: cosi' vale anche per i dati finti della DEMO,
+     che non passano da mapListing */
+  const t = esc(l.title),
+        p = senzaCondizione(l.cat, l.consegna) ? '' : condPill(l.condizione);
   if (!p) return t;
   const i = t.lastIndexOf(' ');
   const ultima = i < 0 ? t : t.slice(i + 1);
@@ -2698,10 +2717,16 @@ function paramsVetrina(){
   if (filtroRitiro) p.set('solo_ritiro', '1');
   if (filtroDig) p.set('solo_digitale', '1');
   if (filtroLampo) p.set('solo_lampo', '1');
-  if (filtroCond) p.set('condizione', filtroCond);
+  if (filtroCond && condFiltrabile()) p.set('condizione', filtroCond);
   if (filtroReg) p.set('regione', filtroReg);
   return p;
 }
+/* Sulla categoria degli alimenti il filtro condizione DORME invece di
+   sparire: la vetrina non si svuota di colpo per un filtro che non si
+   vede piu' (la riga del pannello e' nascosta), e tornando su un'altra
+   categoria il filtro c'e' ancora — il patto dei filtri di sessione,
+   che sopravvivono al cambio categoria. */
+const condFiltrabile = () => !senzaCondizione(activeCat, '');
 
 function setOrdina(v){
   ordinaVista = v; haptic();
@@ -2725,6 +2750,9 @@ function toggleFiltri(){
     el('filtroMaxInp').value = filtroPrezzo?.max || '';
     el('filtroCondSel').value = filtroCond;
     aggiornaPicker('filtroCondSel');
+    /* dove la condizione non vuol dire niente la riga non c'e' */
+    if (el('filtroCondRiga'))
+      el('filtroCondRiga').style.display = condFiltrabile() ? '' : 'none';
     renderFiltroRegioni();
   }
 }
@@ -3223,6 +3251,10 @@ function renderChips(){
 }
 function setCat(c){
   activeCat=c; renderChips(); haptic();
+  /* col pannello aperto la riga della condizione compare o sparisce
+     insieme alla categoria */
+  if (el('filtroCondRiga') && el('filtriBox').style.display !== 'none')
+    el('filtroCondRiga').style.display = condFiltrabile() ? '' : 'none';
   /* Coi dati vivi la categoria filtra il server (la griglia ha solo
      le pagine caricate): si riparte dalla prima pagina della vista */
   if (DEMO) { renderGrid(); return; }
@@ -3254,8 +3286,9 @@ function renderGrid(items){
       data = data.filter(l => stradeConsegna(l).includes('ritiro'));
     if (filtroDig)
       data = data.filter(l => stradeConsegna(l).includes('digitale'));
-    if (filtroCond)
-      data = data.filter(l => l.condizione===filtroCond);
+    if (filtroCond && condFiltrabile())
+      data = data.filter(l => !senzaCondizione(l.cat, l.consegna)
+                           && l.condizione===filtroCond);
     if (filtroReg)
       data = data.filter(l => l.regione===filtroReg);
     if (filtroLampo)
@@ -5388,7 +5421,10 @@ const PICKER = {
   sellCat: {titolo:'Categoria',
     voci: () => [...el('sellCat').options].map(o => ({val:o.value,
       resa:`<span class="p-ico">${EMOJI_CAT[o.value]||'📦'}</span><span><b>${esc(o.value)}</b></span>`})),
-    campo: v => `<span class="p-ico">${EMOJI_CAT[v]||'📦'}</span><span>${esc(v)}</span>`},
+    campo: v => `<span class="p-ico">${EMOJI_CAT[v]||'📦'}</span><span>${esc(v)}</span>`,
+    /* certe categorie la condizione non la chiedono: il campo sotto
+       compare o sparisce con la scelta */
+    poi: aggiornaCondizioneForm},
   /* nel form la condizione porta la descrizione: aiuta a scegliere */
   sellCond: {titolo:'Condizioni dell\'oggetto',
     voci: () => Object.entries(CONDIZIONI).map(([id,c]) => ({val:id,
@@ -7864,6 +7900,14 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rd.ok) decisi = await rd.json();
     } catch(e) {}
+    /* le proposte di ricategorizzazione, raggruppate per spostamento */
+    gruppiCat = [];
+    try {
+      const rc = await fetch(`${API_BASE}/admin/categorie`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rc.ok) gruppiCat = (await rc.json()).gruppi || [];
+    } catch(e) {}
+    gruppiCat.forEach(g => { g.esclusi = new Set(); g.tutti = false; });
     const card = (emoji, valore, nome) => `
       <div style="background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
         <div style="font-size:20px">${emoji}</div>
@@ -7878,6 +7922,7 @@ async function loadAdminStats(){
       <div class="section-label" style="padding:26px 0 0">↩︎ Decisi di recente (${decisi.length})</div>
       <div class="sub" style="margin-top:6px">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
       <div style="margin-top:10px">${decisi.map(rigaDecisa).join('')}</div>` : ''}
+      ${boxCategorie()}
       <div class="section-label" style="padding:26px 0 0">📊 Statistiche (solo moderatori)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
         ${card('👥', s.utenti, 'utenti')}
@@ -7935,6 +7980,97 @@ const rigaDecisa = a => { const l = mapListing(a); return `
       </div>
       <div class="sub">${esc(a.deciso_esito||'')} · ${esc(l.seller)} · ${a.deciso_il?new Date(a.deciso_il*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):''}${a.motivo?` · 🤖 ${esc(a.motivo)}`:''}</div>
     </div>`; };
+
+/* ---- 🗂 Categorie da sistemare (lug 2026) ----
+   Le proposte dello script di ricategorizzazione, RAGGRUPPATE per
+   spostamento («Elettronica → Informatica: 23»). Il raggruppamento non
+   e' una comodita': trecento decisioni una per una sono una revisione
+   che nessuno finisce, e il vincolo di Andrea — nessuna categoria
+   cambia senza che un umano l'abbia vista — si rispetta facendo vedere
+   i TITOLI dentro il gruppo, con la spunta per togliere dal mucchio
+   quello che non convince. */
+let gruppiCat = [];
+const CAT_VISIBILI = 6;        // titoli mostrati prima del «mostra tutti»
+
+function boxCategorie(){
+  if (!gruppiCat.length) return '';
+  const totale = gruppiCat.reduce((n,g) => n + g.annunci.length, 0);
+  return `
+    <div class="section-label" style="padding:26px 0 0">🗂 Categorie da sistemare (${totale})</div>
+    <div class="sub" style="margin-top:6px">L'AI propone, tu decidi: guarda i titoli e sposta il gruppo. Togli la spunta a quelli che non convincono.</div>
+    <div style="margin-top:10px">${gruppiCat.map(gruppoCat).join('')}</div>`;
+}
+
+function gruppoCat(g, i){
+  const mostrati = g.tutti ? g.annunci : g.annunci.slice(0, CAT_VISIBILI);
+  const scelti = g.annunci.length - g.esclusi.size;
+  return `
+    <div class="order" id="gcat${i}">
+      <div class="row">
+        <b style="min-width:0">${EMOJI_CAT[g.da]||'📦'} ${esc(g.da)} → ${EMOJI_CAT[g.a]||'📦'} ${esc(g.a)}</b>
+        <span class="badge" style="background:var(--chip-bg);color:var(--ink)">${g.annunci.length}</span>
+      </div>
+      <div style="margin:8px 0 4px">
+        ${mostrati.map(a => `
+          <label style="display:flex;gap:8px;align-items:center;padding:3px 0;font-size:13px;font-weight:600;cursor:pointer">
+            <input type="checkbox" ${g.esclusi.has(a.id)?'':'checked'}
+              onchange="scegliCat(${i},${a.id},this.checked)">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.titolo)}</span>
+            ${a.importato?'<span style="color:var(--nostr)">🟣</span>':''}
+          </label>`).join('')}
+        ${g.annunci.length > CAT_VISIBILI && !g.tutti ? `
+          <a href="#" style="font-size:12.5px;font-weight:700"
+             onclick="apriTuttiCat(${i});return false">mostra tutti (${g.annunci.length})</a>` : ''}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1 1 50%;margin-top:0;background:var(--trust);color:var(--on-trust)"
+          onclick="decidiCategorie(${i},'applica')" id="gcatOk${i}"
+          ${scelti?'':'disabled'}>✅ Sposta ${scelti===g.annunci.length?'tutti':scelti}</button>
+        <button class="btn ghost" style="flex:1 1 50%;margin-top:0"
+          onclick="decidiCategorie(${i},'scarta')">✕ Lascia stare</button>
+      </div>
+    </div>`;
+}
+/* «Mostra tutti» ridisegna il SOLO gruppo: un loadAdminStats() qui
+   rifarebbe la fetch e azzererebbe le spunte tolte a mano. */
+function apriTuttiCat(i){
+  gruppiCat[i].tutti = true;
+  const n = el('gcat'+i);
+  if (n) n.outerHTML = gruppoCat(gruppiCat[i], i);
+}
+
+function scegliCat(i, id, dentro){
+  const g = gruppiCat[i]; if (!g) return;
+  dentro ? g.esclusi.delete(id) : g.esclusi.add(id);
+  const b = el('gcatOk'+i);
+  if (!b) return;
+  const scelti = g.annunci.length - g.esclusi.size;
+  b.disabled = !scelti;
+  b.textContent = `✅ Sposta ${scelti===g.annunci.length?'tutti':scelti}`;
+}
+
+async function decidiCategorie(i, esito){
+  const g = gruppiCat[i]; if (!g) return;
+  const ids = g.annunci.map(a => a.id).filter(id => !g.esclusi.has(id));
+  if (esito==='applica' && !ids.length) return;
+  const quanti = esito==='applica' ? ids.length : g.annunci.length;
+  if (!confirm(esito==='applica'
+      ? `Sposto ${quanti} annunci da «${g.da}» a «${g.a}»?`
+      : `Lascio dove sono i ${quanti} annunci di «${g.da}»? La proposta sparisce.`))
+    return;
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/admin/categorie/decidi`, {
+      method:'POST', headers:{'Content-Type':'application/json',
+        'X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({esito, da:g.da, a:g.a,
+        ids: esito==='applica' ? ids : []})});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(j.detail||'Non è andata'); loadAdminStats(); return; }
+    toast(esito==='applica' ? `🗂 Spostati ${j.quanti}` : 'Lasciati dov\'erano');
+  } catch(e) { toast('Rete assente'); }
+  loadAdminStats();
+}
 
 /* Il registro della moderazione: riepilogo degli ultimi 30 giorni +
    le ultime decisioni. E' con QUESTI dati che il prompt si corregge
@@ -8142,6 +8278,24 @@ function aggiornaConsegnaForm(){
   if (zl) zl.textContent = rit ? 'Zona — il tuo comune, obbligatorio per il ritiro'
                                : 'Zona (facoltativa)';
   aggiornaSpedHint();
+  aggiornaCondizioneForm();   /* il solo-codice-online non la chiede */
+}
+/* Il campo Condizioni si mostra solo dove la scala dice qualcosa: la
+   regola e' il giudice senzaCondizione(), e i due ingressi che la
+   cambiano sono la categoria (il `poi` del suo picker) e le caselle
+   della consegna (qui sopra). Nascosto, il valore si azzera: cosi' il
+   payload non porta mai una condizione che il server butterebbe. La
+   modifica firmata resta fuori come prima — l'evento NIP-99 la
+   condizione non la porta. */
+function aggiornaCondizioneForm(){
+  const f = el('sellCondField'); if (!f) return;
+  const fuori = editandoNostr
+             || senzaCondizione(el('sellCat').value, consegnaForm().consegna);
+  f.style.display = fuori ? 'none' : '';
+  if (fuori && el('sellCond').value){
+    el('sellCond').value = '';
+    aggiornaPicker('sellCond');
+  }
 }
 /* I campi di consegna del payload: la valuta del listino comanda,
    ma sul listino sats il costo scritto in euro parte come
@@ -8238,9 +8392,9 @@ function aggiornaFormVendi(){
      NIP-99, che non la porta — il form non deve fingere. */
   if (drop) drop.style.display = editandoNostr ? 'none' : '';
   /* la firmata rispecchia l'evento NIP-99, che la condizione non la
-     porta: il campo si nasconde come quelli di consegna */
-  if (el('sellCondField'))
-    el('sellCondField').style.display = editandoNostr ? 'none' : '';
+     porta: il campo si nasconde come quelli di consegna — e con lui
+     decide anche la categoria scelta (alimenti, codici online) */
+  aggiornaCondizioneForm();
   /* e nemmeno la quantita' (gli importati restano un pezzo solo) */
   if (el('sellQtaField'))
     el('sellQtaField').style.display = editandoNostr ? 'none' : '';
@@ -8376,8 +8530,11 @@ async function publish(){
   }
   /* condizioni obbligatorie (lug 2026): anche in modifica — gli
      annunci storici si mettono in regola al primo ritocco. La firmata
-     degli importati non offre il campo, come per la consegna. */
-  if (!editandoNostr && !el('sellCond').value) {
+     degli importati non offre il campo, come per la consegna, e
+     nemmeno le categorie dove la scala non dice niente. */
+  if (!editandoNostr
+      && !senzaCondizione(el('sellCat').value, consegnaForm().consegna)
+      && !el('sellCond').value) {
     toast('Indica le condizioni dell\'oggetto'); return;
   }
   /* La zona: col ritiro e' obbligatoria, e in ogni caso — se

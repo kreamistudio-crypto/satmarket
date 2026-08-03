@@ -775,6 +775,28 @@ def init_db():
         deciso_da INTEGER DEFAULT 0,     -- tg_id del moderatore (0 = la macchina)
         creato INTEGER DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS categoria_proposta(
+        -- La coda della RICATEGORIZZAZIONE (lug 2026): quando il
+        -- catalogo e' passato da 9 a 25 voci, gli annunci di ieri sono
+        -- rimasti nelle caselle di ieri (un portatile in «Elettronica»
+        -- invece che in «Informatica») e gli importati nascono tutti
+        -- in «Altro». Uno script chiede all'AI dove starebbero meglio
+        -- e scrive QUI: nella colonna `annunci.categoria` non ci
+        -- arriva mai da solo — un annuncio non cambia casella senza
+        -- che un umano l'abbia vista.
+        -- Una riga per annuncio (l'ultima proposta vince), e resta
+        -- dopo la decisione: e' anche il registro di cos'e' successo.
+        annuncio_id INTEGER PRIMARY KEY,
+        categoria_ora TEXT DEFAULT '',
+        categoria_nuova TEXT DEFAULT '',
+        motivo TEXT DEFAULT '',
+        creato INTEGER DEFAULT 0,
+        stato TEXT DEFAULT 'proposta',   -- proposta | applicata | scartata
+        deciso_da INTEGER DEFAULT 0,     -- tg_id del moderatore
+        deciso_il INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_categoria_proposta
+        ON categoria_proposta(stato, categoria_ora, categoria_nuova);
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -3351,6 +3373,45 @@ def condizione_valida(c) -> str:
     return c if c in CONDIZIONI else ""
 
 
+# --- Dove la condizione non vuol dire niente (lug 2026) --------------
+# Una marmellata e' nuova per definizione, e chiederlo e' una domanda
+# senza risposte sbagliate — cioe' una domanda inutile. La leva e'
+# questa riga: aggiungere o togliere una categoria e' una parola.
+# NON ci entrano «Arte e artigianato» (ci finisce anche l'arte usata,
+# e un quadro di seconda mano puo' essere rovinato) ne' «Bitcoin» (le
+# Jade di seconda mano sono merce vera).
+CATEGORIE_SENZA_CONDIZIONE = frozenset({"Alimenti e bevande"})
+
+
+def senza_condizione(categoria: str, consegna: str = "") -> bool:
+    """Il giudice unico: form, dettaglio, vetrina, NIP-99, ricerca AI
+    e import passano tutti di qui, o divergono.
+
+    Due assi, e il secondo e' il caso dei buoni (decisione di Andrea,
+    lug 2026): un codice Zalando e' nuovo per definizione esattamente
+    come la marmellata. Ma vale solo per il digitale ESCLUSIVO — sulla
+    combo (tessera fisica O codice online) la merce fisica c'e' e una
+    condizione ce l'ha, quindi si continua a chiedere. Per questo si
+    guarda la colonna `consegna` e mai `anche_digitale`: quella
+    colonna dice «digitale» solo quando non c'e' nient'altro."""
+    return (categoria in CATEGORIE_SENZA_CONDIZIONE
+            or consegna == "digitale")
+
+
+def condizione_da_mostrare(a: dict) -> str:
+    """La condizione di un annuncio COME SI RACCONTA fuori di qui: ''
+    dove la scala non dice niente. Il dato non si perde mai — resta
+    nella colonna, come la zona intera resta nel database mentre in
+    vetrina si mostra il solo comune — semplicemente smette di
+    comparire. Serve agli annunci di IERI: da oggi in scrittura la
+    condizione delle categorie esenti si azzera da sola, ma i vecchi
+    non si migrano (nessuna migrazione distruttiva per un campo che
+    ormai nessuno guarda)."""
+    if senza_condizione(a.get("categoria") or "", a.get("consegna") or ""):
+        return ""
+    return a.get("condizione") or ""
+
+
 # Il CSV dell'import parla come scrive un commerciante: sinonimi ovvi
 # verso la scala, chi resta fuori semplicemente non dichiara nulla
 # (colonna facoltativa, mai uno scarto).
@@ -3422,7 +3483,14 @@ def guardia_zona_condizione(d: dict, consegna: str) -> str:
     proprio, e la loro zona la riscrivono i relay.
     Ritorna la condizione validata."""
     condizione = condizione_valida(d.get("condizione"))
-    if not condizione:
+    # Dove la scala non dice niente (alimenti, codici online) non si
+    # chiede e non si conserva: si azzera in scrittura, cosi' il
+    # database si pulisce da solo un annuncio alla volta invece che
+    # con una migrazione. E se domani quell'annuncio cambia categoria,
+    # la condizione gliela chiederemo li', che e' quando serve.
+    if senza_condizione(categoria_valida(d.get("categoria")), consegna):
+        condizione = ""
+    elif not condizione:
         raise HTTPException(400, "Indica le condizioni dell'oggetto")
     zona = (d.get("zona") or "").strip()
     if COMUNI:
@@ -3758,6 +3826,16 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # Valore sconosciuto = nessun filtro, mai un 400.
         dove += " AND a.condizione=?"
         par.append(condizione)
+        # E restano fuori anche le categorie dove la condizione non
+        # vuol dire niente: da oggi nascono con la colonna vuota e ci
+        # cadrebbero da sole, ma un alimentare di IERI ha ancora il
+        # suo «nuovo» in colonna, e il filtro lo pescherebbe mostrando
+        # una condizione che la scheda non mostra piu'.
+        dove += " AND a.consegna!='digitale'"
+        if CATEGORIE_SENZA_CONDIZIONE:
+            dove += (" AND a.categoria NOT IN "
+                     f"({','.join('?' * len(CATEGORIE_SENZA_CONDIZIONE))})")
+            par += sorted(CATEGORIE_SENZA_CONDIZIONE)
     if regione in REGIONI:
         # La regione e' derivata dalla sigla: chi non ce l'ha ('' —
         # storici, alias, frazioni non riconosciute) resta fuori, lo
@@ -5022,6 +5100,131 @@ async def decidi_revisione_admin(annuncio_id: int, req: Request,
     return {"ok": True, "esito": esito}
 
 
+# --- La coda delle categorie (lug 2026) ------------------------------
+# Quando il catalogo e' passato da 9 voci a 25, gli annunci di ieri
+# sono rimasti nelle caselle di ieri e quelli che arrivano da Nostr
+# nascono tutti in «Altro». A proporre gli spostamenti e' uno script
+# (ricategorizza.py) che chiede all'AI e scrive SOLO nella tabella
+# categoria_proposta; a spostare davvero un annuncio e' un moderatore,
+# da qui. Nessuna categoria cambia senza che un umano l'abbia vista.
+#
+# Le proposte si guardano RAGGRUPPATE per spostamento («Elettronica →
+# Informatica: 23 annunci»): trecento tocchi uno per uno non sono una
+# revisione umana, sono una revisione che nessuno finisce. Il bottone
+# approva il GRUPPO che si sta guardando, coi titoli sotto gli occhi.
+#
+# Il venditore non riceve nessun avviso: la categoria e' metadato
+# NOSTRO (dai relay non arriva, l'import non la ricopre mai) e
+# spostare un annuncio nella casella giusta gli fa solo bene. Il
+# registro di cos'e' successo e' la tabella stessa, che tiene la riga
+# anche dopo la decisione.
+_SQL_PROPOSTE = (
+    "SELECT p.annuncio_id AS id, p.categoria_ora AS da, "
+    "  p.categoria_nuova AS a, p.creato, a.titolo, a.descrizione, "
+    "  a.foto, a.contatto_nostr, u.nome AS venditore "
+    "FROM categoria_proposta p "
+    "JOIN annunci a ON a.id=p.annuncio_id "
+    "JOIN utenti u ON u.tg_id=a.venditore_id "
+    # La proposta parla dell'annuncio com'era: se nel frattempo la
+    # categoria l'ha cambiata il venditore (o un altro moderatore),
+    # quella proposta non parla piu' di lui e sparisce dalla coda.
+    "WHERE p.stato='proposta' AND a.stato='attivo' "
+    "  AND a.categoria=p.categoria_ora "
+    "ORDER BY p.creato ASC, p.annuncio_id ASC")
+
+
+@app.get("/api/admin/categorie")
+def coda_categorie(x_tg_init_data: str = Header(""),
+                   barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le proposte di ricategorizzazione, raggruppate per
+    spostamento e col gruppo piu' numeroso in testa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    righe = [dict(r) for r in con.execute(_SQL_PROPOSTE)]
+    con.close()
+    gruppi = {}
+    for r in righe:
+        g = gruppi.setdefault((r["da"], r["a"]),
+                              {"da": r["da"], "a": r["a"], "annunci": []})
+        g["annunci"].append({
+            "id": r["id"], "titolo": r["titolo"],
+            "descrizione": (r["descrizione"] or "")[:160],
+            "foto": r["foto"], "venditore": r["venditore"],
+            "importato": bool(r["contatto_nostr"])})
+    fuori = sorted(gruppi.values(), key=lambda g: -len(g["annunci"]))
+    return {"gruppi": fuori,
+            "totale": sum(len(g["annunci"]) for g in fuori)}
+
+
+def _sposta_categoria(con, annuncio_id: int, da: str, a: str,
+                      admin_id: int) -> bool:
+    """Lo spostamento di UN annuncio, dentro la transazione del
+    chiamante. L'UPDATE e' condizionato sulla categoria di partenza:
+    il secondo moderatore che tocca lo stesso gruppo trova il fatto
+    compiuto, come per la revisione."""
+    fatto = con.execute(
+        "UPDATE annunci SET categoria=? WHERE id=? AND stato='attivo' "
+        "AND categoria=?", (a, annuncio_id, da)).rowcount == 1
+    con.execute("UPDATE categoria_proposta SET stato=?, deciso_da=?, "
+                "deciso_il=? WHERE annuncio_id=?",
+                ("applicata" if fatto else "scartata", admin_id,
+                 int(time.time()), annuncio_id))
+    return fatto
+
+
+@app.post("/api/admin/categorie/decidi")
+async def decidi_categorie(req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: applica (o scarta) un GRUPPO di proposte — quello
+    che il moderatore ha appena guardato. Il body dice lo spostamento
+    (`da`, `a`) e l'esito; con `ids` si restringe ai soli annunci
+    elencati, che e' come si toglie dal mucchio quello che non
+    convince."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    esito = d.get("esito", "")
+    da, a = d.get("da", ""), d.get("a", "")
+    if esito not in ("applica", "scarta"):
+        raise HTTPException(400, "Esito sconosciuto")
+    if a not in CATEGORIE or da not in CATEGORIE:
+        raise HTTPException(400, "Categoria sconosciuta")
+    ids = [int(i) for i in (d.get("ids") or []) if str(i).isdigit()]
+    con = db()
+    righe = [r for r in con.execute(_SQL_PROPOSTE)
+             if r["da"] == da and r["a"] == a
+             and (not ids or r["id"] in ids)]
+    if not righe:
+        con.close()
+        raise HTTPException(409, "Questo gruppo non c'è più: "
+                                 "qualcun altro l'ha già deciso")
+    adesso = int(time.time())
+    spostati = []
+    con.execute("BEGIN IMMEDIATE")
+    for r in righe:
+        if esito == "scarta":
+            con.execute("UPDATE categoria_proposta SET stato='scartata', "
+                        "deciso_da=?, deciso_il=? WHERE annuncio_id=?",
+                        (user["id"], adesso, r["id"]))
+        elif _sposta_categoria(con, r["id"], da, a, user["id"]):
+            spostati.append(dict(r))
+    con.commit()
+    con.close()
+    # La categoria e' il tag `t` del NIP-99: gli annunci NATI qui
+    # aggiornano il loro evento (tag `d` stabile, mai un doppione).
+    # Niente promo e niente match: ricategorizzare non e' pubblicare,
+    # la stessa regola della ricarica dello stock.
+    for r in spostati:
+        if not r["contatto_nostr"]:
+            asyncio.create_task(annuncio_su_nostr(r["id"], "active",
+                                                  solo_aggiornamento=True))
+    return {"ok": True, "esito": esito,
+            "quanti": len(spostati) if esito == "applica" else len(righe)}
+
+
 @app.get("/api/admin/stats")
 def statistiche_admin(x_tg_init_data: str = Header(""),
                       barattolo_sessione: str = Cookie("")):
@@ -5126,8 +5329,8 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
         f"ID {a['id']}: {a['titolo']} | {a['categoria']} | "
         f"{a['prezzo_sats']} sats"
         + (f" ({a['prezzo_eur']:.2f} EUR)" if a["valuta"] == "eur" else "")
-        + (f" | {CONDIZIONI[a['condizione']]}"
-           if a.get("condizione") in CONDIZIONI else "")
+        + (f" | {CONDIZIONI[condizione_da_mostrare(a)]}"
+           if condizione_da_mostrare(a) in CONDIZIONI else "")
         + (f" | ne restano {a['quantita']}"
            if (a.get("quantita") or 1) > 1 else "")
         + f" | {a['zona']} | {a['descrizione'][:120]}"
@@ -7800,7 +8003,7 @@ def tag_commercio(a: dict) -> list:
         tags.append(["delivery", "pickup"])
     if consegna == "digitale" or a.get("anche_digitale"):
         tags.append(["delivery", "digital"])
-    condizione = CONDIZIONE_NIP99.get(a.get("condizione") or "")
+    condizione = CONDIZIONE_NIP99.get(condizione_da_mostrare(a))
     if condizione:
         tags.append(["condition", condizione])
     # Assente = un pezzo solo, che e' il caso di quasi tutti gli
@@ -7871,8 +8074,8 @@ def evento_annuncio(a: dict, status: str) -> dict:
         consegna_txt += " o consegna digitale immediata"
     # La condizione come la consegna: riga nel content per gli umani,
     # tag `condition` per le macchine.
-    condizione_txt = (f" — condizione: {CONDIZIONI[a['condizione']]}"
-                      if a.get("condizione") in CONDIZIONI else "")
+    condizione_txt = (f" — condizione: {CONDIZIONI[condizione_da_mostrare(a)]}"
+                      if condizione_da_mostrare(a) in CONDIZIONI else "")
     # E la quantita' allo stesso modo (tag `stock`, che la spec NIP-99
     # non ha: se lo inventiamo noi, lo scriviamo anche in chiaro).
     # Solo se >1: il pezzo singolo resta pulito.
@@ -9784,18 +9987,22 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                            "motivo": f"filtro contenuti ({violata})"})
             continue
 
+        categoria = categoria_tollerante(cella(r, "categoria"))
         righe.append({"riga": numero, "titolo": titolo,
                       "descrizione": descrizione,
-                      "categoria": categoria_tollerante(cella(r, "categoria")),
+                      "categoria": categoria,
                       "zona": zona, "valuta": valuta,
                       "prezzo_sats": prezzo_sats, "prezzo_eur": prezzo_eur,
                       "consegna": consegna, "spedizione_sats": sped_sats,
                       "spedizione_eur": sped_eur, "taglia_pacco": taglia,
                       "anche_digitale": anche_dig,
                       # colonna facoltativa, sinonimi tollerati:
-                      # sconosciuta = non dichiarata, mai uno scarto
-                      "condizione": condizione_tollerante(
-                          cella(r, "condizione")),
+                      # sconosciuta = non dichiarata, mai uno scarto —
+                      # e dove la scala non dice niente (alimenti,
+                      # codici online) si azzera come nel form
+                      "condizione": ("" if senza_condizione(categoria, consegna)
+                                     else condizione_tollerante(
+                                         cella(r, "condizione"))),
                       # colonna facoltativa anche lei: vuota = 1 pezzo
                       "quantita": quantita_tollerante(
                           cella(r, "quantita")),
@@ -10815,7 +11022,13 @@ async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
         "SELECT id, titolo, consegna, condizione, categoria FROM annunci "
         "WHERE stato='attivo' AND contatto_nostr=? "
         "AND completamento_avvisato=0 AND creato<? "
-        "AND (consegna='' OR condizione='')",
+        # La categoria e' la terza cosa che manca, e fino al lug 2026
+        # non pescava nessuno: un annuncio che aveva consegna e
+        # condizione ma stava in «Altro» non entrava mai in questa
+        # lista, e la voce «la categoria giusta» del promemoria non
+        # partiva mai — l'unico rimedio restava lo script di
+        # ricategorizzazione, che pero' e' roba nostra e non sua.
+        "AND (consegna='' OR condizione='' OR categoria='Altro')",
         (npub, t0)).fetchall()
     if not righe:
         con.close()
@@ -10828,7 +11041,11 @@ async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
     manca = []
     if any(not r["consegna"] for r in righe):
         manca.append("consegna")
-    if any(not r["condizione"] for r in righe):
+    # ...e non si chiede dove la scala non dice niente: a chi vende
+    # marmellata «in che condizioni e'» suona come una presa in giro.
+    if any(not r["condizione"] and not senza_condizione(r["categoria"],
+                                                        r["consegna"])
+           for r in righe):
         manca.append("condizione")
     if any(r["categoria"] == "Altro" for r in righe):
         manca.append("categoria")
