@@ -3459,6 +3459,8 @@ const RADICE_MADRE = 'esplora';
    sapere da dove si viene: serve una bandierina, alzata da
    apriCategoria e consumata al primo giro di navRiflette. */
 let navSpingi = false;
+/* Acceso mentre navApplica ricostruisce: vedi navRiflette */
+let navApplicando = false;
 /* Su file:// (la DEMO aperta a mano) la storia non si puo' toccare: il
    motore resta spento e tutto si comporta come ieri. Stessa guardia di
    protocollo del service worker. */
@@ -3468,12 +3470,20 @@ let navUltimo = 0;        /* la serratura contro il doppio canale */
 function navVista(){
   const v = (document.querySelector('.view.active')?.id || 'view-esplora').replace('view-','');
   /* la chiave dice QUALE dettaglio, quale ordine, quale negozio: la
-     vista da sola non basta a ricostruirli */
+     vista da sola non basta a ricostruirli. Per la VETRINA dice il
+     ramo e la categoria — era un'imperfezione dichiarata («l'avanti
+     dentro un reparto ricostruisce la vista ma non il filtro») e con
+     la radice madre diventava una bugia: tornando a Esplora ci si
+     ritrovava il mercatino intero con la nav accesa su Sfoglia. */
   return {t:'v', v, k: v==='dettaglio' ? (currentListing?.id || 0)
                     : v==='ordine'    ? (currentOrder?.id || 0)
                     : v==='negozio'   ? (negozioPag.chi || '')
+                    : v==='esplora'   ? chiaveVetrina()
                     : 0};
 }
+/* Ramo + categoria in una stringa sola, che e' quanto basta a
+   ricostruire la vetrina e a distinguere due entry diverse. */
+const chiaveVetrina = () => ramoVetrina + '|' + activeCat;
 /* La pila: la vista in fondo, sopra gli strati nell'ordine in cui si
    coprono (che e' quello degli z-index: fogli 41, lightbox 70, tour 80,
    cartello 90). Il picker va per ultimo fra i fogli — e' l'unico che si
@@ -3512,6 +3522,15 @@ function navChiudiStrato(s){
    il vuoto — openOrder non ha guardie e ci morirebbe dentro. E' lo
    stesso patto di tornaDaSicurezza e della ri-idratazione di avvia(). */
 function navRendiVista(b){
+  if (b.v === 'esplora') {
+    /* la vetrina si rifa' col RAMO e la CATEGORIA scritti nella entry.
+       L'ordine conta: setCat su «Tutto» spegne il ramo, quindi il ramo
+       si scrive DOPO, e go() legge quello giusto per la nav. */
+    const [ramo, cat] = String(b.k ?? '').split('|');
+    if (activeCat !== (cat || 'Tutto')) setCat(cat || 'Tutto');
+    ramoVetrina = (ramo === 'sfoglia') ? 'sfoglia' : 'esplora';
+    return go('esplora');
+  }
   if (b.v === 'dettaglio')
     return (listings.find(x=>x.id===b.k) || myListings.find(x=>x.id===b.k))
       ? openDetail(b.k) : go('esplora');
@@ -3534,7 +3553,13 @@ function navRendiVista(b){
    il foglio-invito: uno strato, e l'indietro chiude l'invito restando
    in Esplora). */
 function navRiflette(){
-  if (!STORIA) return;
+  /* Mentre si RI-APPLICA una entry non si scrive: la cronologia la si
+     sta leggendo, non registrando. Senza, il giro di ricostruzione
+     (navRendiVista chiama setCat e go, che a loro volta riflettono)
+     scriveva a meta' strada — con la vista vecchia ancora attiva — e
+     leggeva un cambio di radice che nessuno aveva chiesto: tornando
+     indietro si spingeva un gradino nuovo invece di consumarne uno. */
+  if (!STORIA || navApplicando) return;
   /* letta e azzerata SUBITO, prima di ogni via d'uscita: una
      bandierina lasciata accesa perderebbe il suo giro e si
      scaricherebbe su una navigazione che non l'ha chiesta */
@@ -3562,7 +3587,20 @@ function navRiflette(){
        `forza` e' la sola deroga, e vale per un giro solo: la
        piastrella di Sfoglia, che porta a una radice ma scendendo. */
     const a = ora[ora.length - 1];
-    const spinge = a.t === 'v' && (!RADICI.has(a.v) || forza);
+    /* IL PRIMO PASSO VIA DALLA MADRE SPINGE (lug 2026, ed e' quello che
+       fa esistere la radice madre fuori da Telegram): nella PWA e nel
+       browser il gesto indietro e' di SISTEMA, non ci passa da
+       navIndietro — parla direttamente con la cronologia. Quindi il
+       passaggio da Esplora non si puo' inventare quando il gesto
+       arriva: dev'esserci gia', come entry sotto i piedi. Solo il
+       PRIMO (giu===0), pero': da una radice figlia all'altra si
+       sostituisce come sempre, quindi girare tutti i tab costa UN
+       indietro, mai uno a testa — il patto delle sorelle regge dove
+       conta. */
+    const primoPassoViaDaCasa = a.t === 'v' && RADICI.has(a.v)
+                             && a.v !== RADICE_MADRE && giu === 0;
+    const spinge = a.t === 'v'
+                && (!RADICI.has(a.v) || forza || primoPassoViaDaCasa);
     scrivi(spinge ? 'pushState' : 'replaceState', spinge ? giu + 1 : giu);
   }
   navFreccia(ora);
@@ -3575,13 +3613,22 @@ function navRiflette(){
    ci sono — e ci pensa il riflette successivo a rimettere la entry in
    pari con la realta'. Sistema auto-guarente. */
 function navApplica(s){
-  const bersaglio = (s && s.app==='brt' && s.pila) ? s.pila : [{t:'v', v:'esplora', k:0}];
-  let ora = navPila(), giri = 0;
-  while (ora.length > 1 && !navUguali(ora, bersaglio.slice(0, ora.length)) && giri++ < 8) {
-    navChiudiStrato(ora[ora.length - 1]);
-    ora = navPila();
+  const bersaglio = (s && s.app==='brt' && s.pila)
+                  ? s.pila : [{t:'v', v:'esplora', k:'esplora|Tutto'}];
+  navApplicando = true;
+  try {
+    let ora = navPila(), giri = 0;
+    while (ora.length > 1 && !navUguali(ora, bersaglio.slice(0, ora.length)) && giri++ < 8) {
+      navChiudiStrato(ora[ora.length - 1]);
+      ora = navPila();
+    }
+    if (!navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
+  } finally {
+    /* si spegne DOPO il microtask dell'osservatore, che e' stato messo
+       in coda dalle classi cambiate qui dentro: e' l'ultimo giro di
+       ricostruzione, e nemmeno lui deve scrivere */
+    queueMicrotask(() => { navApplicando = false; });
   }
-  if (!navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
   navFreccia(bersaglio);
 }
 
@@ -3873,6 +3920,13 @@ function setCat(c){
      insieme alla categoria */
   if (el('filtroCondRiga') && el('filtriBox').style.display !== 'none')
     el('filtroCondRiga').style.display = condFiltrabile() ? '' : 'none';
+  /* La entry dice anche la categoria (vedi chiaveVetrina), e cambiarla
+     non tocca nessuna classe: l'osservatore del motore non se ne
+     accorgerebbe e la cronologia resterebbe a raccontare il filtro di
+     prima. E' la stessa chiamata a mano che c'e' in coda a openDetail,
+     per la stessa ragione. Non aggiunge gradini: la vetrina e' una
+     radice, quindi si sostituisce. */
+  navRiflette();
   /* Coi dati vivi la categoria filtra il server (la griglia ha solo
      le pagine caricate): si riparte dalla prima pagina della vista */
   if (DEMO) { renderGrid(); return; }
@@ -3923,7 +3977,6 @@ function renderSfoglia(){
    dice al motore di navigazione che questa e' una discesa, non un
    cambio di tab — l'indietro deve riportare a Sfoglia. */
 function apriCategoria(c){
-  navSpingi = true;
   /* si scende in un reparto: la nav resta accesa su Sfoglia, che e'
      lo scaffale da cui si viene e dove l'indietro riporta */
   ramoVetrina = 'sfoglia';
@@ -3936,6 +3989,14 @@ function apriCategoria(c){
   el('grid').innerHTML = '';
   el('gridEmpty').style.display = 'none';
   setCat(c);
+  /* La bandierina si alza QUI, subito prima della navigazione che la
+     usa, e non in cima alla funzione: navRiflette la legge-e-azzera
+     prima di ogni sua via d'uscita, e setCat adesso lo chiama (deve:
+     la categoria vive nella entry). Alzata prima, se la mangiava quel
+     giro — che non cambia vista, quindi esce subito — e la discesa
+     nel reparto tornava a essere un cambio di tab: l'indietro saltava
+     Sfoglia e finiva dritto in Esplora. */
+  navSpingi = true;
   go('esplora');
 }
 
@@ -3950,6 +4011,16 @@ function vaiEsplora(){
      tocco sul nome del tab e' sempre un ritorno alla radice, e non
      deve dipendere dallo stato di un'altra variabile per esserlo */
   ramoVetrina = 'esplora';
+  /* TORNARE ALLA MADRE E' UN INDIETRO, non una destinazione nuova: se
+     sopra di lei c'e' solo il gradino di un'altra radice si torna
+     indietro DAVVERO, invece di sostituirlo. Sostituendolo resterebbe
+     sotto una entry identica, cioe' un indietro che non fa niente — e
+     il gesto dopo, che deve chiudere l'app, ne chiederebbe due.
+     Non e' un contatore di debito: e' un passo solo, sincrono, chiesto
+     da un tocco dell'utente, come ogni altra affordance di ritorno. */
+  const p = navPila();
+  if (STORIA && history.state?.d === 1 && p.length === 1
+      && p[0].t === 'v' && p[0].v !== RADICE_MADRE) { navIndietro(); return; }
   go('esplora');
 }
 
