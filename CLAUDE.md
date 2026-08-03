@@ -56,7 +56,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ganci trattenuti (Nostr con `solo_aggiornamento` se l'evento
   esisteva già — il caso modifica — e promo solo senza post_canale_id;
   accoda_match è sempre innocuo per il dedup persistente); ❌ =
-  'rimosso' + messaggio gentile al venditore. La modifica firmata
+  'rimosso' + messaggio gentile al venditore + ritiro da Nostr e dal
+  canale (serve da quando esiste il ripensamento: prima si poteva dare
+  per scontato che un annuncio in revisione non fosse MAI stato
+  online, e per un riaperto non è vero).
+  LA DECISIONE È REVERSIBILE (lug 2026, decisione di Andrea): terzo
+  esito `riapri` di `decidi_revisione` — da 'attivo' o 'rimosso' si
+  torna in 'revisione'. Senza, l'unico rimedio a un rifiuto sbagliato
+  sarebbe chiedere al venditore di ripubblicare. Riaprire vuol dire
+  fuori da OGNI vetrina, non solo dalla nostra: ritiro NIP-09 + post
+  di canale cancellato + ordini 'creato' annullati, e la guardia degli
+  affari in corso della rimozione admin (con sats in cassaforte prima
+  si chiude l'ordine). E perché il ripensamento esista davvero dev'essere
+  RITROVABILE: `GET /api/admin/revisione?decisi=1` dà le ultime 20
+  decisioni degli ultimi `GIORNI_RIPENSAMENTO` (7) — l'ULTIMA per
+  annuncio, via MAX(id) sul registro — e nel Profilo admin c'è la
+  sezione «↩︎ Decisi di recente» (`rigaDecisa`) col bottone. Si chiede
+  SEMPRE, anche a coda vuota: è quando la coda è vuota che uno si
+  accorge di aver sbagliato a svuotarla. La risposta resta un array in
+  entrambi i casi, così un client vecchio in cache vede la coda di
+  sempre. Il motivo mostrato pesca `esito IN ('dubbio','vietato')`:
+  dall'import aperto anche il «vietato» dell'AI mette in coda, e
+  guardare il solo dubbio lascerebbe metà coda senza spiegazione.
+  La modifica firmata
   degli importati resta bloccante anche sul dubbio (dichiarato:
   l'import orario riporterebbe dentro). Import CSV: righe dubbie
   CREATE in revisione (contatore `in_revisione_n` nel report, fuori
@@ -80,18 +102,53 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   concorrenti). Nel client `publish()` passa da `bottoneInAttesa`
   (bottone spento + overlay fino alla risposta): la causa prima era
   il fetch lento (foto base64 + moderazione AI) col dito che ritocca.
-  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py —
-  Elettronica · Casa e giardino · Abbigliamento · Sport e hobby ·
-  Motori · Bambini · Animali · Libri e media · Altro ("Tutto" è solo
-  la vista del frontend, non una categoria). `categoria_valida`
+  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 25
+  voci — le 9 di sempre (Elettronica · Casa e giardino ·
+  Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
+  media · Altro) più le 16 del catalogo largo (Informatica ·
+  Telefonia · Audio e video · Console e videogiochi · Foto e ottica ·
+  Bitcoin · Elettrodomestici · Fai da te e utensili · Alimenti e
+  bevande · Scarpe e accessori · Orologi e gioielli · Biciclette ·
+  Musica e film · Strumenti musicali · Collezionismo · Arte e
+  artigianato). "Tutto" è solo la vista del frontend, non una
+  categoria. «Bitcoin» è l'unica di casa nostra e non dei mercatini
+  generalisti: su un mercatino che incassa in sats, Jade e BitBox02
+  sono merce di casa. Resta PIATTO: le sottocategorie vorrebbero una
+  colonna e una gerarchia, si faranno quando le categorie saranno
+  troppo piene.
+  SI AGGIUNGE, NON SI RINOMINA (lug 2026, decisione di Andrea, ed è la
+  regola da non rovesciare): le voci esistenti restano tutte con lo
+  stesso nome. Il cantiere del catalogo largo proponeva di rinominarne
+  tre (Casa e arredamento, Sport, Libri e riviste) con la sua
+  migrazione; è stato scartato perché quei tre non erano voci nuove ma
+  nomi nuovi per voci esistenti, e due nomi per la stessa cosa non
+  sono più scelta ma un bivio senza risposta giusta davanti a chi
+  pubblica. Conseguenza: NESSUNA migrazione di categoria da scrivere —
+  nessun annuncio cambia casella, nessun venditore ritrova il suo
+  oggetto dove non l'ha messo. Per la stessa ragione il fai-da-te è
+  entrato come «Fai da te e utensili» e non «Giardino e fai da te»: il
+  giardino ce l'ha già Casa e giardino.
+  `categoria_valida`
   normalizza i payload (sconosciuta → Altro: il client non decide il
-  catalogo); migrazione idempotente in `init_db` rinomina le tre voci
-  vecchie (Sport/Casa/Libri) con COLLATE NOCASE, che raddrizza anche
-  le maiuscole storte dei vecchi import ('casa'). La lista entra nel
+  catalogo); resta solo la migrazione VECCHIA in `init_db` (Sport →
+  Sport e hobby ecc. con COLLATE NOCASE, che raddrizza le maiuscole
+  storte dei vecchi import, 'casa'). La lista entra nel
   prompt della ricerca AI; nel NIP-99 il tag `t` è la prima parola
   minuscola ("Casa e giardino" → "casa": un hashtag non ha spazi).
-  `categoria_automatica` di importa_nostr.py parla il set nuovo
-  (Bambini prima di Motori: "seggiolino auto" è roba da bimbi).
+  AGGIUNGERE UNA CATEGORIA TOCCA SEI POSTI: `CATEGORIE` e
+  `SINONIMI_CATEGORIA` e `MODELLO_IMPORT` in server.py, `<select
+  id="sellCat">` e `EMOJI_CAT` e `CATS` in miniapp.html. Non serve
+  ricordarseli: `prove.py` li incrocia tutti e sei e fallisce se
+  divergono (il sesto, il modello CSV, è entrato dopo essersi fatto
+  dimenticare per davvero).
+  `categoria_automatica` di importa_nostr.py NON ESISTE PIÙ (lug
+  2026): indovinare la categoria dal titolo sbagliava in silenzio — lo
+  «Sparkling Sake» finiva fra gli arredi perché quella categoria
+  pescava «cucina» — e sugli importati nessuno se ne accorgeva. Gli
+  annunci da Nostr nascono in «Altro» e a collocarli è il VENDITORE,
+  che è l'unico a saperlo; l'import non ricopre mai una categoria già
+  scelta, quindi la sua resta per sempre, e a chiederglielo c'è il DM
+  di completamento (vedi import aperto).
   Frontend: pillole ordinate per numero di annunci ATTIVI
   (decrescente), "Tutto" sempre prima, le vuote non compaiono proprio
   (Tutto e la ricerca coprono la scoperta); conteggi dai listings
@@ -2675,20 +2732,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   gira sul VPS con la chiave della piattaforma dal config).
 - `config.py` — TUTTE le chiavi e impostazioni. NON è nella repo
   (.gitignore) e NON deve MAI entrarci. `config_esempio.py` è il modello.
-- `importa_nostr.py` — importa annunci NIP-99/NIP-15 di un venditore
-  consenziente da Nostr (npub e VENDITORE_ID vengono da config.py).
+- `importa_nostr.py` — importa annunci NIP-99/NIP-15 da Nostr.
   Il cuore è `importa_venditore()`, importabile: lo usa anche
   l'orologio del server, che rilancia l'import OGNI ORA in
-  `asyncio.to_thread` (fail-open totale: segnaposto in config =
-  spento, errori = una riga in console). Al primo giro scrive il
+  `asyncio.to_thread` (fail-open totale: errori = una riga in
+  console). Al primo giro scrive il
   badge 🟣 verificato sul profilo del venditore (npub canonica bech32 via
   `hex_to_npub`, gemella di quella di server.py; mai sovrascrivere
   una npub diversa già dichiarata): così il login Nostr lo riconosce
-  invece di creargli un account nuovo. ATTENZIONE: scrive
-  direttamente nel database, quindi BYPASSA la moderazione di
-  `pubblica()`, e le firme degli eventi non vengono verificate
-  (fiducia nei 4 relay). Limite accettato per venditori fidati
-  scelti in config; da chiudere se mai si aprirà ad altri.
+  invece di creargli un account nuovo.
+  DUE VITE, e vanno tenute distinte: lanciato A MANO
+  (`python importa_nostr.py`, npub e VENDITORE_ID dal config) è com'è
+  sempre stato — scrive dritto nel database, bypassa `pubblica()` e
+  non verifica le firme: la fiducia sta tutta nella npub scritta nel
+  config, il che va bene per un amico e non per uno sconosciuto.
+  Chiamato dal SERVER riceve invece il `vaglio` (vedi «Import aperto»
+  più sotto), che è il pezzo che chiude quel buco.
+  `interroga()` fa DUE REQ separate sullo stesso websocket, annunci e
+  cancellazioni kind 5, con `limit` propri (`LIMITE_ANNUNCI` /
+  `LIMITE_CANCELLAZIONI`, 500) e aspetta ENTRAMBI gli EOSE — più il
+  ramo `CLOSED`, o si resterebbe ad aspettare un EOSE mai dovuto. Con
+  una REQ sola il tetto valeva per l'INTERA richiesta e i relay
+  servono i più recenti per primi: un venditore con molte
+  cancellazioni si spingeva fuori dalla finestra i propri annunci, in
+  silenzio (misurato su una chiave con 206 kind 5: dei 200 eventi che
+  tornavano, 197 erano cancellazioni e gli annunci letti erano 3 su
+  17). `interroga_aperto()` è invece la spazzata SENZA filtro
+  d'autore, e serve solo alla scoperta.
+  `testo_evento(e)` è il cuore condiviso che dà titolo e descrizione
+  GIÀ TRONCATI come finiranno nel database: lo usa `estrai_annuncio`
+  per scrivere e il server per capire se un evento è cambiato davvero.
+  Se i due divergessero, un annuncio fermo sembrerebbe cambiare a ogni
+  giro (o uno cambiato sembrerebbe fermo).
   LEZIONE foto importate (lug 2026): il download è VERBATIM (mai
   ricompresso da noi), ma i relay sono la fonte di verità — quando
   il venditore ripubblica da un client che gli ricomprime le foto
@@ -2703,6 +2778,165 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ricomprime, o file consegnati a mano: un file rimesso sotto lo
   stesso nome è stabile finché gli URL dell'evento non cambiano —
   ricordarsi di cancellare anche la `_min`).
+- IMPORT APERTO da Nostr (lug 2026, cantiere di Alan + le correzioni
+  decise da Andrea). Il codice sta in server.py, accanto all'orologio;
+  qui perché è la seconda vita di importa_nostr.py.
+  Non si importa più UN venditore scelto a mano: si importa chiunque
+  pubblichi annunci NIP-99 in italiano, e i filtri sono due — la
+  lingua e la legge.
+  L'INTERRUTTORE `IMPORT_NOSTR_APERTO` nasce a FALSE nel codice e nel
+  config d'esempio, al contrario di POST_AUTOMATICI e degli altri, ed
+  è deliberato: il config del VPS non ha la chiave, quindi con un
+  default True basterebbe un `git pull` e un riavvio perché la
+  scoperta cominci ad aprire account e a mandare DM a estranei. Un
+  salto così si fa con un gesto, non per distrazione — e quella riga
+  è anche l'interruttore d'emergenza se il primo giro va storto.
+  ZERO migrazioni di schema, e non è un risparmio furbo: essere su
+  Barattolo È essere su Nostr, il mercatino è una VISTA degli eventi e
+  non una copia. Quindi niente registro dei venditori (si deduce),
+  niente flag «toglietemi da qui» — l'uscita esiste già ed è nativa
+  del protocollo: un kind 5, che le lapidi rispettano per sempre. Un
+  flag nostro sarebbe una seconda verità accanto a quella dei relay.
+  DUE MESTIERI DISTINTI, e devono restarlo: la SCOPERTA
+  (`scopri_venditori_nostr`, ogni 6h) setaccia i relay senza filtro
+  d'autore per trovare npub nuove; l'IMPORT chiede chiave per chiave.
+  Una spazzata sola non basta: i relay servono i più recenti e 500
+  eventi coprono poche settimane di TUTTO Nostr — misurato, la
+  spazzata globale non vedeva nessuno dei 17 annunci che la query
+  mirata trovava tutti. Tetto `MAX_VENDITORI_NUOVI_GIRO` (10), i più
+  prolifici per primi.
+  CHI SI IMPORTA: `venditori_nostr_attivi()` = chiunque abbia una
+  chiave di cui ha dimostrato il possesso — `npub_accesso` o badge
+  `npub` VERIFICATO. È la regola di `notifica()` e dei ponti: mai una
+  npub nuda. SCELTA DICHIARATA (decisione di Andrea): ci sono dentro
+  anche gli utenti Telegram che avevano verificato la npub solo per il
+  badge 🟣, e i loro annunci NIP-99 compaiono qui senza che nessuno
+  glielo abbia chiesto. È corretto — se uno pubblica su Nostr è giusto
+  che compaia su Barattolo — e i doppioni li prende la deduplica che
+  esiste già.
+  FILTRO LINGUA `annuncio_italiano`: tre prove dalla più forte alla
+  più debole — la zona è un comune vero (passa dal motore geografico
+  di casa, che sa che «Como» è un comune ma «como» in una frase
+  spagnola no), la zona nomina l'Italia a PAROLA INTERA, oppure il
+  testo ha ≥3 PAROLE FUNZIONE italiane (`PAROLE_FUNZIONE_IT`: «di»,
+  «che», «per»… un annuncio inglese può dire «vendo» per caso, non
+  dice quelle tre insieme). Il confronto è SEMPRE a parole intere: il
+  vecchio filtro a sottostringhe prendeva «instal-LAZIO-ne» e
+  «a-ROMA-tico», e su 1044 annunci veri ne dichiarava italiani 70 di
+  cui 27 stranieri.
+  FIRME VERIFICATE DAVVERO (`verifica_firma_nostr`): con un venditore
+  fidato ci si poteva fidare del campo `authors` dei relay; da queste
+  chiavi ora nascono ACCOUNT, e un relay bugiardo potrebbe attribuire
+  annunci a chiunque. Ricetta di `verifica_evento_login` (id
+  ricalcolato NIP-01, mai quello ricevuto), senza coincurve = False.
+  MODERAZIONE, e qui i due strati finiscono in modo DIVERSO:
+  le PAROLE VIETATE restano uno scarto secco (deterministico: armi e
+  droga non vogliono una coda ma una porta chiusa; resta nel registro,
+  che i moderatori leggono); l'AI invece NON scarta più niente da sola
+  — ogni verdetto diverso da OK, dubbio E bocciatura, fa nascere
+  l'annuncio in `stato='revisione'`. È la terza via allargata al
+  giudizio più delicato che abbiamo: annunci di gente che non è qui a
+  difendersi, in un italiano che non abbiamo scelto noi, dove un'AI
+  che sbaglia in silenzio fa perdere un venditore onesto senza saperlo
+  mai. Meccanica: il vaglio MARCHIA l'evento (chiave `_revisione`) e
+  l'import legge il marchio (stato alla nascita, e un annuncio già in
+  vetrina il cui TESTO è cambiato e che non si sa più approvare torna
+  in attesa, come una modifica dal form); `_apri_revisioni` gira DOPO
+  l'import — quando l'id esiste, l'ordine di `pubblica()` — iscrive il
+  motivo nel registro e manda la tastiera ✅/❌, idempotente sul
+  registro (un annuncio fermo in coda una settimana non suona ogni
+  ora); da lì in poi lo scudo anti-resurrezione lo salta da solo.
+  Il ponte `_MOTIVI_REVISIONE` (titolo → motivo) sta in memoria: un
+  riavvio lo perde e l'annuncio resta in coda col motivo generico.
+  LA MODERAZIONE SI PAGA UNA VOLTA SOLA (`_da_giudicare`): prima si
+  vagliava tutto a ogni giro, cioè ogni ora, per farsi ridire la stessa
+  cosa sugli stessi testi. Si rigiudica quando cambia il TESTO, non
+  l'evento: l'id è l'impronta di tutto (prezzo, foto, data) ma la
+  moderazione legge solo titolo e descrizione, e un ritocco al prezzo
+  non può cambiare un verdetto. Mai su ciò che non è più attivo (in
+  revisione aspetta un umano, rimosso è deciso, e l'import li salta
+  comunque). Il fail-CLOSED resta ma preciso: se l'AI tace non entra
+  ciò che non è mai stato giudicato, mentre chi era già passato
+  continua ad aggiornarsi.
+  BENVENUTO E COMPLETAMENTO: chi viene scoperto riceve l'account
+  nativo (la macchina del login Nostr) e un DM che dice subito come
+  uscirne (un kind 5 dal suo client). Poi, siccome un evento NIP-99
+  non dice consegna, condizione e categoria — ed è proprio ciò su cui
+  il compratore filtra — `_chiedi_completamento` gli manda UN invito a
+  finire il lavoro: una volta sola per annuncio (colonna
+  `annunci.completamento_avvisato`, una colonna e non una coda in
+  memoria perché «gliel'ho già chiesto» deve sopravvivere ai riavvii),
+  mai nel giro in cui l'annuncio è apparso (`creato < t0`: chi è
+  appena stato scoperto ha già avuto il benvenuto, e due messaggi di
+  fila da uno sconosciuto sono un'altra cosa), un messaggio per
+  VENDITORE e non per annuncio.
+  RISCHIO DICHIARATO E ACCETTATO (decisione di Andrea): si può
+  comprare in escrow da un venditore che non sa di essere qui. Prima
+  valeva per un venditore consenziente, ora per chiunque venga
+  scoperto. È accettato perché è esattamente il problema che il
+  deposito di garanzia esiste per risolvere: i sats restano bloccati
+  finché il compratore non conferma, e se il venditore non si fa vivo
+  il rimborso è la via normale. Il DM di benvenuto arriva PRIMA che se
+  ne accorga da solo, ed è il motivo per cui questo non è uno scippo.
+  LIMITE NOTO: `venditori_nostr_attivi()` spende una query a vuoto
+  ogni ora per ogni utente con badge verificato che non vende su
+  Nostr. Irrilevante ai numeri di oggi; con migliaia di utenti servirà
+  un tetto per giro.
+  RESTANO FUORI dal cantiere, per scelta: il relay Barattolo
+  (infrastruttura, cantiere a parte), la PR al repo dei NIP, e il form
+  per completare i metadati direttamente sugli importati.
+- METADATI DI COMMERCIO NEI TAG NIP-99 (lug 2026): la spec non dice
+  nulla di spedizione, condizione e quantità, e finora le scrivevamo
+  solo in prosa nel `content` — leggibili da un umano, invisibili a
+  ogni macchina, comprese le NOSTRE al giro d'import successivo (è
+  letteralmente il motivo per cui un annuncio importato arrivava senza
+  consegna né condizione). In scrittura `tag_commercio` (server.py):
+  `["delivery","shipping","5.00","EUR"]` ripetibile ·
+  `["delivery","pickup"]` · `["delivery","digital"]` ·
+  `["condition", new|like-new|good|fair|poor]` · `["stock","3"]`
+  (assente = 1). `delivery` è RIPETIBILE apposta invece dell'enum
+  chiuso di Shopstr: lì per dire «spedisco o ritiri» serve il valore
+  composto "Free/Pickup", e un terzo modo vorrebbe enumerare tutti i
+  sottoinsiemi. Il content continua a dire le stesse cose a parole
+  (per le persone e per i client che il nostro vocabolario non lo
+  conoscono): se un giorno divergessero, quella giusta è il TAG.
+  In lettura `estrai_commercio` (importa_nostr.py) parla DUE dialetti,
+  il nostro e quello de facto di Shopstr (`shipping` con l'enum,
+  `quantity`, `pickup_location`). Due trappole collaudate: costo
+  assente ≠ gratis («0» è gratuito, il tag senza importo è «da
+  concordare»), e `weight` NON è un peso — per Shopstr è una VARIANTE
+  di prodotto col suo prezzo, stessa arità e significato opposto, chi
+  lo scambia scrive un dato falso. Restano fuori peso e dimensioni: la
+  nostra taglia del pacco è una categoria di corriere italiana, non un
+  fatto oggettivo, e ricavarne un peso sarebbe inventare.
+  DUE GUARDIE che i relay non scavalcano (decisione di Andrea): lo
+  stock si LIMA a `MAX_QUANTITA_ANNUNCIO` (l'import scrive dritto nel
+  DB e non passa dai giudici dei payload; si lima e non si scarta,
+  come `quantita_tollerante` del CSV — la merce c'è, è il numero a
+  essere fuori scala) e la CONSEGNA DIGITALE non arriva mai dai relay
+  (il codice passa DENTRO Barattolo, con endpoint, rivelazione-
+  ricevuta e finestre di 24/48h: chi sta solo su Nostr non ha quel
+  bottone, e promettere una consegna immediata che nessuno può fare
+  sarebbe una bugia scoperta a sats già in cassaforte. Chi entra con
+  la sua chiave la dichiara dal form, dove anche DIGITALE_MIN_VENDITE
+  può dire la sua). CONSEGUENZA da ricordare: un annuncio importato
+  che dichiara `delivery` ora ENTRA nei set — «gli importati restano
+  fuori per costruzione» non è più vero, ed è giusto così: il catalogo
+  è uno solo, cambia solo chi firma l'evento.
+  Il disegno è documentato in `proposte/` (la PR al repo dei NIP resta
+  in backlog).
+- `prove.py` + `.github/workflows/prove.yml` (lug 2026) — la rete di
+  sicurezza, a ogni push e ogni PR. Solo pezzi PURI: niente config,
+  database, relay o Anthropic — una CI che dipende da un server altrui
+  diventa rossa quando quello ha il raffreddore, e a furia di rossi
+  ingiusti si smette di guardarla. Le funzioni si estraggono da
+  server.py per TESTO (`pezzo()`), senza importarlo: chi rifattorizza
+  una funzione estratta deve aggiungere anche le sue dipendenze
+  all'ambiente (è già successo con `_chiave_comune`, che
+  `coordinate_da_zona` ha cominciato a usare). Il workflow fa anche
+  `compileall` di tutti gli script e cerca segreti nella repo (la
+  regola ferrea 1 in CI). Su Windows serve `PYTHONIOENCODING=utf-8`,
+  o la console cp1252 esplode sulle spunte.
 
 ## Produzione
 
@@ -2711,6 +2945,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 - Dominio: https://barattolo.store — Bot: @ilbarattolobot (BotFather URL
   con `?v=2`, innocuo). Header anti-cache già attivi su `/` e
   `/miniapp.html`: non rimuoverli.
+- L'import aperto da Nostr si accende SOLO scrivendo
+  `IMPORT_NOSTR_APERTO = True` nel config del VPS e riavviando: nel
+  codice il default è False apposta (vedi Architettura). Prima di
+  accenderlo vale la pena guardare il journal del primo giro — chi
+  viene scoperto, quanti annunci entrano, quanti vanno in revisione —
+  perché da lì partono account e DM verso persone che non ci
+  conoscono. Rimettere False e riavviare è l'interruttore
+  d'emergenza; gli annunci già importati restano dove sono.
 - Il Login Widget esige il dominio registrato: BotFather → `/setdomain`
   su @ilbarattolobot → `barattolo.store` (senza, il bottone non compare;
   su localhost non compare mai: si collauda col bottone "cookie web").
@@ -3203,7 +3445,37 @@ Andrea — picker aperto SOPRA il paySheet con invoice LNbits vera: il
 primo indietro chiude solo il picker e il pollTimer resta VIVO, il
 secondo chiude il foglio e lo ferma. In produzione basta il deploy:
 nessuna rotta, nessuna colonna. Da provare dal vivo dentro Telegram,
-dove contano la freccia di sistema e il gesto del client).
+dove contano la freccia di sistema e il gesto del client); Barattolo
+diventa una vetrina di Nostr (lug 2026, cantiere di Alan — PR #5 —
+merged con sette correzioni decise da Andrea: si importa chiunque
+pubblichi NIP-99 in italiano, con scoperta ogni 6h, firme verificate
+davvero, moderazione completa prima che un evento diventi una riga,
+metadati di commercio nei tag, catalogo a 25 categorie e la rete di
+prove in CI. Le correzioni, che sono la parte da ricordare:
+l'interruttore nasce SPENTO perché il salto non sia l'effetto di un
+deploy; le categorie SI AGGIUNGONO e non si rinominano, quindi zero
+migrazioni e nessun annuncio spostato; la moderazione si paga una
+volta sola e si rifà solo quando cambia il TESTO; dubbi E bocciature
+dell'AI vanno in una coda visibile agli admin invece di sparire, e la
+decisione è REVERSIBILE («↩︎ Ripensaci»); lo stock dai relay si lima
+al tetto e la consegna digitale dai relay non passa; chi arriva da
+Nostr riceve un invito a completare consegna, condizione e categoria,
+una volta sola e mai nel giro in cui è apparso. Vedi Architettura —
+collaudato in locale con 48 prove pure in `prove.py` [che ora coprono
+anche il modello CSV, il testo condiviso degli eventi e le due
+guardie] più 24 verifiche su DB usa-e-getta [`_da_giudicare` nei sei
+casi, il marchio che fa nascere in revisione, il registro legato
+all'annuncio e la sua idempotenza, il giro completo
+rifiuta→riapri→pubblica→riapri, la guardia degli affari in corso, la
+coda «decisi» e l'invito a completare nei suoi tre casi], e il foglio
+delle 25 categorie guardato nel browser. IN PRODUZIONE: il deploy da
+solo non cambia NIENTE — la migrazione della colonna
+`completamento_avvisato` gira e basta; l'import aperto si accende
+scrivendo la riga nel config del VPS, e quello è il momento da
+guardare col journal aperto. RESTA DA FARE: il primo giro vero con
+gli occhi addosso, e decidere se anche lo scarto per PAROLE VIETATE
+debba finire in coda come quelli dell'AI — oggi non ci va, resta uno
+scarto secco visibile solo nel registro).
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
