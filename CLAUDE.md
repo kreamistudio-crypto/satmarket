@@ -2295,23 +2295,47 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   si sta lo dice la cronologia stessa: `d` nello state (0 = sotto non
   c'è NIENTE di nostro), scritto da `navRiflette` accanto alla pila —
   +1 sul push, invariato sul replace — e seminato a 0 da `navMotore`.
-  A `d=0`, a strati chiusi e dentro Telegram, si chiama `tg.close()`:
-  fuori resta lo `history.back()` di sempre. NIENTE contatori di
-  debito: `d` viaggia nella entry, come la pila — è la stessa ragione
-  per cui l'ascoltatore è dichiarativo.
-  E SFOGLIA ESCE COME LE ALTRE, non ricade su Esplora (decisione di
-  Andrea, ed è la regola da non rovesciare): le radici sono SORELLE,
-  non parenti. Farla cadere su Esplora sarebbe una gerarchia che la
-  cronologia non registra — si tornerebbe a Esplora anche aprendo
-  l'app dritti su Sfoglia, dove non si è mai passati —, sarebbe
-  asimmetrica (e allora perché non Ordini → Esplora?), rimetterebbe il
-  gradino che il patto delle radici esiste apposta per togliere, e
-  sarebbe la SECONDA deroga per Sfoglia, che ne ha già una dichiarata
-  (la piastrella è una discesa): due eccezioni e la regola non è più
-  una regola.
+  A `d=0` e a strati chiusi decide il patto della RADICE MADRE (sotto);
+  su Esplora nuda, dentro Telegram, si chiama `tg.close()`, e fuori
+  resta lo `history.back()` di sempre. NIENTE contatori di debito: `d`
+  viaggia nella entry, come la pila — è la stessa ragione per cui
+  l'ascoltatore è dichiarativo.
+  ESPLORA È LA RADICE MADRE (`RADICE_MADRE`, lug 2026, decisione di
+  Andrea): da Sfoglia, Vendi, Ordini e Profilo l'indietro porta a
+  Esplora, e solo da Esplora si esce. La ragione che decide: su Subito
+  e Vinted funziona esattamente così — la home è la radice madre, dalle
+  sezioni l'indietro ci passa, e di lì si chiude. È la convenzione che
+  i nostri utenti hanno GIÀ NELLE DITA, e vale più della simmetria fra
+  radici sorelle: quella è una proprietà del nostro modello, questa
+  un'abitudine di chi lo usa.
+  L'ARGOMENTO PERDENTE sta qui perché fra sei mesi si sappia che è una
+  scelta e non una svista — per un giorno la regola è stata l'opposta
+  («ogni radice esce per conto suo»), e le ragioni erano: le radici
+  sono sorelle e non parenti, la discesa su Esplora è una gerarchia che
+  la cronologia non registra, e sarebbe la seconda deroga per Sfoglia,
+  che ne ha già una (la piastrella è una discesa). Restano vere: hanno
+  solo meno peso della convenzione. CONSEGUENZA ACCETTATA (era il caso
+  sollevato contro): chi apre l'app dritto su un'altra radice
+  all'indietro finisce in Esplora, dove non è mai passato — lo fanno
+  anche loro.
+  Il patto delle radici SORELLE resta intatto dove riguarda la
+  cronologia: fra tab si SOSTITUISCE sempre, girarli tutti non costa un
+  indietro a testa, e il passaggio da Esplora non spinge niente
+  (`vaiEsplora` è un ritorno a una radice, quindi replaceState, e `d`
+  resta 0). Ed è `vaiEsplora` e NON `go('esplora')` perché la madre è
+  il mercatino INTERO: senza il ritorno a «Tutto» si atterrerebbe su
+  una vetrina ancora filtrata con la nav accesa su Sfoglia, che è
+  esattamente la bugia che `ramoVetrina` esiste per non dire.
   Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
-  quando c'è dove tornare — alla radice resta nascosto, e lì il gesto
-  chiude la Mini App, che È il patto. Lo swipe VERTICALE invece si
+  quando c'è dove tornare — ed è la STESSA domanda di `navIndietro`,
+  quindi un giudice solo, o la freccia e il gesto divergono. Resta
+  nascosto SOLO su Esplora nuda (`d=0`, nessuno strato), e lì il gesto
+  chiude la Mini App, che È il patto. Sulle altre radici ora si vede,
+  ed è OBBLIGATORIO: con la freccia nascosta il gesto lo intercetta il
+  client, che chiuderebbe l'app per conto suo, e il passaggio da
+  Esplora non avverrebbe mai. E si vede anche a `d>0` su Esplora — una
+  categoria aperta da una piastrella è Esplora ma con Sfoglia sotto, e
+  lì l'indietro deve riportare allo scaffale. Lo swipe VERTICALE si
   spegne SEMPRE con `disableVerticalSwipes` (7.7), anche alla radice, e
   dal lug 2026: finché restava acceso lì, tirare giù per aggiornare
   trascinava via la Mini App: un gesto che ovunque significa
@@ -2331,7 +2355,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SOPRAVVIVE ai `location.reload()` del login e racconterebbe cose
   della vecchia identità. Su `file://` (la DEMO a mano) `STORIA` è
   falsa e il motore resta spento: `navIndietro` smonta lo strato in
-  cima e, se non ce n'è, torna al mercatino. IMPERFEZIONI DICHIARATE:
+  cima e, se non ce n'è, torna al mercatino — che è la stessa regola
+  della radice madre, detta a mano perché lì la cronologia non c'è.
+  IMPERFEZIONI DICHIARATE:
   dopo un pagamento riuscito resta un gradino morto (`closeSheet`
   programmatico sostituisce, non cancella la entry gemella); l'avanti
   del browser su uno strato non lo riapre (lightbox e tour vogliono
@@ -4289,9 +4315,16 @@ che non era di nessuno e dentro Telegram portava via la Mini App: ora
 coi tre recinti che tengono fuori la galleria a scroll-snap. 3) LO
 SWIPE INDIETRO che da Sfoglia non faceva niente: `history.back()` alla
 cieca su una sessione che ha una entry sola — ora il gradino lo dice
-`d` nello state e dalla radice si esce esplicitamente, con Sfoglia che
-esce come le altre e NON ricade su Esplora (il perché è in
-Architettura: due eccezioni e la regola non è più una regola).
+`d` nello state e l'ultimo passo è esplicito. E l'ultimo passo è che
+ESPLORA È LA RADICE MADRE: dalle altre radici l'indietro ci passa, e
+solo da Esplora si esce. Deciso in due tempi, ed è la parte da
+ricordare: per un giorno la regola è stata «ogni radice esce per conto
+suo» (le radici sono sorelle, non parenti), poi Andrea l'ha rovesciata
+perché su Subito e Vinted la home È la radice madre — la convenzione
+che gli utenti hanno già nelle dita vale più della simmetria del nostro
+modello. Tutte e due le ragioni stanno in Architettura, con la
+conseguenza accettata (chi apre l'app dritto su un'altra radice
+all'indietro finisce in Esplora senza esserci mai passato).
 Vedi Architettura, «il gesto indietro» — riprodotti tutti e tre in
 locale prima di toccare niente (i doppioni misurati: 60 card di cui 14
 doppie, poi 30 su 30 uniche) e ricollaudati dopo: scroll infinito su
