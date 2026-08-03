@@ -12,6 +12,12 @@ on:
 
 jobs:
   prove:
+    # La CI legge e basta: compila, prova, guarda. Non commenta, non
+    # committa, non pubblica niente. Dirlo qui vuol dire che il token
+    # del workflow resta in sola lettura anche se un domani il default
+    # del repo diventasse piu' largo.
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -55,8 +61,23 @@ jobs:
             echo "::error::File che non devono MAI stare nella repo"
             exit 1
           fi
-          if git ls-files -z | xargs -0 grep -lE 'nsec1[0-9a-z]{50,}' ; then
+          # Il -I salta i file binari: dentro le 52 illustrazioni un
+          # byte messo per caso puo' somigliare a qualunque cosa, e una
+          # CI che diventa rossa a caso non la guarda piu' nessuno.
+          if git ls-files -z | xargs -0 grep -lIE 'nsec1[0-9a-z]{50,}' ; then
             echo "::error::Sembra esserci una chiave privata Nostr"
+            exit 1
+          fi
+          # Il token del bot: <id>:<segreto>. Le lunghezze sono LARGHE
+          # apposta (Telegram ne ha cambiate nel tempo): meglio un falso
+          # allarme da guardare che un token vero che passa perche' era
+          # un carattere piu' corto del previsto.
+          if git ls-files -z | xargs -0 grep -lIE '[0-9]{8,12}:[A-Za-z0-9_-]{30,}' ; then
+            echo "::error::Sembra esserci un token del bot Telegram"
+            exit 1
+          fi
+          if git ls-files -z | xargs -0 grep -lIE 'sk-ant-[A-Za-z0-9_-]{20,}' ; then
+            echo "::error::Sembra esserci una chiave Anthropic"
             exit 1
           fi
           echo "pulito"
