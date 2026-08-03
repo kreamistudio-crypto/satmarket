@@ -2328,11 +2328,11 @@ function setCollaudo(id, nome){
 /* ---- mappatura dati backend -> formato della Mini App ---- */
 const EMOJI_CAT = {'Elettronica':'🔌', 'Informatica':'💻', 'Telefonia':'📱',
   'Audio e video':'🎧', 'Console e videogiochi':'🎮', 'Foto e ottica':'📷',
-  'Bitcoin':'₿', 'Casa e giardino':'🪑', 'Elettrodomestici':'🧺',
-  'Fai da te e utensili':'🔧', 'Alimenti e bevande':'🍯',
+  'Bitcoin':'₿', 'Casa e giardino':'🏡', 'Elettrodomestici':'🍳',
+  'Fai da te e utensili':'🔧', 'Alimenti e bevande':'🍎',
   'Abbigliamento':'👕', 'Scarpe e accessori':'👟',
   'Orologi e gioielli':'⌚', 'Bambini':'🧸', 'Sport e hobby':'⚽',
-  'Biciclette':'🚲', 'Motori':'🛵', 'Animali':'🐾',
+  'Biciclette':'🚲', 'Motori':'🚗', 'Animali':'🐾',
   'Libri e media':'📚', 'Musica e film':'🎬',
   'Strumenti musicali':'🎸', 'Collezionismo':'🏺',
   'Arte e artigianato':'🎨', 'Altro':'📦'};
@@ -3790,14 +3790,14 @@ function stepperAcquista(l){
   if ((l.quantita||1) <= 1) return '';
   return `<span class="qta-mini" role="group" aria-label="Quantità" onclick="event.stopPropagation()">`
     + `<span class="qm-btn qm-meno${qtaScelta<=1?' off':''}" role="button" tabindex="0" aria-label="Un pezzo in meno" onclick="setQta(-1)">−</span>`
-    + `<span class="qm-num mono">${qtaScelta}</span>`
+    + `<span class="qm-num mono">${fmt(qtaScelta)}</span>`
     + `<span class="qm-btn qm-piu${qtaScelta>=(l.quantita||1)?' off':''}" role="button" tabindex="0" aria-label="Un pezzo in più" onclick="setQta(1)">+</span>`
     + `</span>`;
 }
 function setQta(d){
   const l = currentListing; if (!l) return;
   qtaScelta = Math.min(l.quantita||1, Math.max(1, qtaScelta + d));
-  document.querySelectorAll('.qta-mini .qm-num').forEach(n => n.textContent = qtaScelta);
+  document.querySelectorAll('.qta-mini .qm-num').forEach(n => n.textContent = fmt(qtaScelta));
   document.querySelectorAll('.qta-mini .qm-meno').forEach(b => b.classList.toggle('off', qtaScelta <= 1));
   document.querySelectorAll('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= (l.quantita||1)));
   haptic();
@@ -3852,7 +3852,7 @@ function contoScomposto(art, sped, prot, tot, qta){
   const pezzi = qta || 1;
   if (!(sped > 0 || prot > 0 || pezzi > 1)) return '';
   const r = (n, t, b) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${fmt(n)} sats</span></div>`;
-  return r(art, pezzi > 1 ? `Articolo × ${pezzi}` : 'Articolo')
+  return r(art, pezzi > 1 ? `Articolo × ${fmt(pezzi)}` : 'Articolo')
        + (sped>0 ? r(sped, 'Spedizione') : '')
        + (prot>0 ? r(prot, 'Protezione acquisti') : '') + r(tot, 'Totale', 1);
 }
@@ -4479,9 +4479,9 @@ function rigaSet(x){
     <div class="set-mini">${thumb?`<img src="${esc(thumb)}" alt="">`:`<span>${x.emoji}</span>`}</div>
     <div class="set-info"><b>${esc(x.title)}</b>
       <span class="eur-hint">${dis ? esc(dis)
-        : `${stimaCirca(x)}${fmt(artStima(x))} sats${(x.quantita||1)>1?` · ${x.quantita} disponibili`:''}`}</span></div>
+        : `${stimaCirca(x)}${fmt(artStima(x))} sats${(x.quantita||1)>1?` · ${fmt(x.quantita)} disponibili`:''}`}</span></div>
     ${sel && (x.quantita||1)>1
-      ? `<div class="qta-step"><button type="button" onclick="setQtaSet(${x.id},-1)"${qta<=1?' disabled':''} aria-label="Un pezzo in meno">−</button><span class="qta-num mono">${qta}</span><button type="button" onclick="setQtaSet(${x.id},1)"${qta>=(x.quantita||1)?' disabled':''} aria-label="Un pezzo in più">+</button></div>`
+      ? `<div class="qta-step"><button type="button" onclick="setQtaSet(${x.id},-1)"${qta<=1?' disabled':''} aria-label="Un pezzo in meno">−</button><span class="qta-num mono">${fmt(qta)}</span><button type="button" onclick="setQtaSet(${x.id},1)"${qta>=(x.quantita||1)?' disabled':''} aria-label="Un pezzo in più">+</button></div>`
       : ''}
   </div>`;
 }
@@ -4751,7 +4751,7 @@ function openDetail(id){
       </div>
       ${(p => p ? `<div class="pills">${p}</div>` : '')(
         spedBadge(l) + pilloleModalita(l)
-        + ((l.quantita||1)>1?`<span class="pill">${l.quantita} disponibili</span>`:''))}
+        + ((l.quantita||1)>1?`<span class="pill">${fmt(l.quantita)} disponibili</span>`:''))}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${esc(l.desc)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
@@ -5978,9 +5978,9 @@ function openOrder(id){
       ${o.righe.length ? `<div class="eur-hint" style="margin-top:-6px">${
         /* il SET: l'elenco dei pezzi con gli unitari fotografati —
            qui la media «pezzi × unitario» mentirebbe */
-        o.righe.map(r=>`${esc(r.titolo)}${r.quantita>1?` × ${r.quantita}`:''} — ${fmt(r.unitario_sats*r.quantita)} sats`).join('<br>')}</div>` : ''}
+        o.righe.map(r=>`${esc(r.titolo)}${r.quantita>1?` × ${fmt(r.quantita)}`:''} — ${fmt(r.unitario_sats*r.quantita)} sats`).join('<br>')}</div>` : ''}
       ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0 || (o.qta>1 && !o.righe.length)) ? `<div class="eur-hint" style="margin-top:-6px">${
-        (o.qta>1 && !o.righe.length) ? `${o.qta} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats` : ''}${
+        (o.qta>1 && !o.righe.length) ? `${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats` : ''}${
         (o.qta>1 && !o.righe.length) && o.consegnaScelta ? ' — ' : ''}${
         o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : '🚚 con spedizione') : ''}${
         ((o.qta>1||o.consegnaScelta) && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
@@ -7529,7 +7529,7 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
           ${esa?'':`<span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
         </span>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${l.quantita} pezzi`:''}${luogoPunto(l)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}</div>
     </div>`; };
 
 /* La ricarica dello stock: un numero e via. Tocca SOLO la quantita'
