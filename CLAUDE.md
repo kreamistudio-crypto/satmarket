@@ -283,8 +283,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'etichetta non porta il `padding-top` maggiorato delle altre viste e
   la griglia ha 8px di respiro invece di 12: sono i pixel della quinta
   riga. 3 colonne da 768px, 4 da 1024.
-  NEL PICKER DI VENDI restano le EMOJI, non le illustrazioni (deciso):
-  lì serve una lista compatta da scorrere, non una vetrina.
+  NEL PICKER DI VENDI ci sono le ILLUSTRAZIONI (lug 2026: prima le
+  emoji, poi la prova a schermo ha convinto Andrea del contrario).
+  `icoCategoria()` le rende nude a 30px, nelle voci del foglio e nel
+  campo chiuso, e il file è il FRANCOBOLLO `{slug}-mini.webp` da 128px
+  — non quello pieno: 181 KB in tutto invece di 787, e 1,4 MB di
+  bitmap invece di 13, per un menu che si apre in due secondi. Li fa
+  `ritaglia_categorie.py` dai file già pareggiati, così le proporzioni
+  del menu sono quelle della griglia senza un secondo posto da tarare;
+  la rotta `/assets/categorie/{nome}` accetta il suffisso passando
+  dalla stessa whitelist, e `prove.py` controlla che ci siano tutti e
+  26 (manca solo lì dentro, e il ripiego a emoji fa sembrare che vada
+  tutto bene). Classe `.cat-ico` e non `.p-ico`, che è condivisa con
+  le taglie del pacco.
+  IMPERFEZIONE DICHIARATA, ed è il prezzo della resa nuda: il foglio
+  in tema chiaro è BIANCO, e questi disegni usano il crema come colore
+  del CORPO — così il barattolo di crema ci perde il corpo (restano
+  coperchio e contagocce a mezz'aria) e il telefono e il ciak si
+  assottigliano. Gli altri 23 reggono, e in tema scuro reggono tutti.
+  La pastiglia scura sotto l'icona è stata provata e SCARTA­TA: dava
+  contrasto a tutti e rendeva identici i due temi, ma trasformava una
+  lista da scorrere in un cassetto di app. Se un giorno si vorrà
+  chiudere quel buco, la strada non è il CSS: è rifare quei tre
+  disegni con un corpo che non sia quasi-bianco.
   `categoria_automatica` di importa_nostr.py NON ESISTE PIÙ (lug
   2026): indovinare la categoria dal titolo sbagliava in silenzio — lo
   «Sparkling Sake» finiva fra gli arredi perché quella categoria
