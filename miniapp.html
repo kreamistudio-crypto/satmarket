@@ -3503,25 +3503,30 @@ function navRiflette(){
   const forza = navSpingi; navSpingi = false;
   const ora = navPila(), st = history.state?.pila;
   if (navUguali(ora, st)) { navFreccia(ora); return; }
-  const stato = {app:'brt', pila: ora};
-  try {
-    if (!st || ora.length < st.length) history.replaceState(stato, '', location.href);
-    else if (ora.length > st.length)   history.pushState(stato, '', location.href);
-    else {
-      /* Stessa profondita': o e' cambiata la vista, o un foglio ha preso
-         il posto di un altro (setSheet → paySheet). Si SPINGE solo
-         entrando in una vista piu' interna — dettaglio, negozio, ordine,
-         sicurezza —: li' l'indietro deve riportare indietro. Tornare a
-         una radice (i tab, e i ripieghi quando una vista si e' svuotata)
-         e il cambio foglio→foglio sostituiscono: nessun gradino nuovo da
-         smontare, e nessun foglio da riaprire all'indietro.
-         `forza` e' la sola deroga, e vale per un giro solo: la
-         piastrella di Sfoglia, che porta a una radice ma scendendo. */
-      const a = ora[ora.length - 1];
-      const spinge = a.t === 'v' && (!RADICI.has(a.v) || forza);
-      history[spinge ? 'pushState' : 'replaceState'](stato, '', location.href);
-    }
-  } catch(e){}
+  /* Quanti gradini ci siamo scavati sotto i piedi: 0 = siamo sulla
+     nostra entry di partenza, cioe' sotto non c'e' NIENTE di nostro.
+     Serve a navIndietro per sapere se «indietro» ha davvero dove
+     andare — dentro Telegram la WebView nasce con una entry sola. */
+  const giu = history.state?.d || 0;
+  const scrivi = (come, d) => {
+    try { history[come]({app:'brt', pila: ora, d}, '', location.href); } catch(e){}
+  };
+  if (!st || ora.length < st.length) scrivi('replaceState', giu);
+  else if (ora.length > st.length)   scrivi('pushState', giu + 1);
+  else {
+    /* Stessa profondita': o e' cambiata la vista, o un foglio ha preso
+       il posto di un altro (setSheet → paySheet). Si SPINGE solo
+       entrando in una vista piu' interna — dettaglio, negozio, ordine,
+       sicurezza —: li' l'indietro deve riportare indietro. Tornare a
+       una radice (i tab, e i ripieghi quando una vista si e' svuotata)
+       e il cambio foglio→foglio sostituiscono: nessun gradino nuovo da
+       smontare, e nessun foglio da riaprire all'indietro.
+       `forza` e' la sola deroga, e vale per un giro solo: la
+       piastrella di Sfoglia, che porta a una radice ma scendendo. */
+    const a = ora[ora.length - 1];
+    const spinge = a.t === 'v' && (!RADICI.has(a.v) || forza);
+    scrivi(spinge ? 'pushState' : 'replaceState', spinge ? giu + 1 : giu);
+  }
   navFreccia(ora);
 }
 
@@ -3550,7 +3555,21 @@ function navIndietro(){
   const t = Date.now();
   if (t - navUltimo < 350) return;   /* due canali, un solo passo */
   navUltimo = t;
-  if (STORIA) { history.back(); return; }
+  if (STORIA) {
+    /* Alla RADICE il patto e' USCIRE — e uscire va DETTO. history.back()
+       da solo non basta: dentro Telegram (e nella PWA installata) la
+       nostra pagina e' la PRIMA della sessione, quindi «indietro» non ha
+       dove andare e il gesto moriva in silenzio. E' lo swipe che da
+       Sfoglia lasciava lo schermo dov'era: Sfoglia e' una radice come le
+       altre, non la figlia di Esplora, quindi di li' si esce — non si
+       passa da un'altra radice, che sarebbe un gradino inventato dove la
+       cronologia non ne ha nessuno. Il gradino su cui siamo lo dice la
+       cronologia stessa: d=0 = sotto non c'e' niente di nostro. */
+    if (!(history.state?.d) && navPila().length === 1 && tg?.initData) {
+      try { tg.close(); return; } catch(e){}
+    }
+    history.back(); return;
+  }
   /* DEMO da file://: senza cronologia si smonta lo strato in cima, e se
      non ce n'e' si torna al mercatino — il vecchio comportamento della
      freccia. Mai navApplica(null): chiudere un foglio porterebbe via
@@ -3591,7 +3610,7 @@ function navFreccia(pila){
    vecchia identita'. */
 function navMotore(){
   if (!STORIA) return;
-  try { history.replaceState({app:'brt', pila: navPila()}, '', location.href); } catch(e){}
+  try { history.replaceState({app:'brt', pila: navPila(), d:0}, '', location.href); } catch(e){}
   /* Il callback e' un microtask: gira ancora dentro il task del gesto
      dell'utente (l'entry non viene marcata saltabile) e COALESCE i piu'
      cambi dello stesso giro — per questo il passaggio foglio→foglio
