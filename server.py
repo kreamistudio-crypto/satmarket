@@ -810,7 +810,17 @@ def init_db():
                     # esplicita 'telegram' | 'nostr' | 'nessuna'
                     "avatar TEXT DEFAULT ''",
                     "avatar_aggiornato INTEGER DEFAULT 0",
-                    "avatar_scelta TEXT DEFAULT ''"):
+                    "avatar_scelta TEXT DEFAULT ''",
+                    # suggerimenti_annunci (lug 2026): l'interruttore
+                    # del singolo utente per «💡 Suggerimenti sui miei
+                    # annunci». SPENTO di serie, e il default 0 e'
+                    # tutta la regola: scrivere a chi non ha chiesto
+                    # niente e' spam, anche quando il consiglio e'
+                    # buono. Si accende dal Profilo; l'unico posto dove
+                    # lo nominiamo di nostra iniziativa e' l'ultima
+                    # riga del benvenuto, che e' anche l'unico
+                    # messaggio che mandiamo senza permesso.
+                    "suggerimenti_annunci INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -7060,6 +7070,29 @@ async def scegli_canale_notifiche(req: Request,
     return {"ok": True, "canale": canale}
 
 
+@app.post("/api/me/suggerimenti")
+async def scegli_suggerimenti(req: Request,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """«💡 Suggerimenti sui miei annunci»: l'utente autorizza (o
+    revoca) i messaggi che segnalano cosa manca ai suoi annunci —
+    consegna, condizioni, categoria, e il codice online per i buoni.
+
+    OPT-IN, spento di serie. Non c'e' nulla da validare: e' un si' o
+    un no, e il no e' il default. Nessun canale da controllare — se
+    l'utente non e' raggiungibile il messaggio semplicemente non
+    parte, come ogni altra notifica."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    attivi = 1 if d.get("attivi") else 0
+    con = db()
+    con.execute("UPDATE utenti SET suggerimenti_annunci=? WHERE tg_id=?",
+                (attivi, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "attivi": bool(attivi)}
+
+
 @app.post("/api/me/avatar-scelta")
 async def scegli_avatar(req: Request,
                         x_tg_init_data: str = Header(""),
@@ -10315,17 +10348,41 @@ MAX_VENDITORI_NUOVI_GIRO = 10
 # motivo per cui l'import aperto non e' uno scippo — arriva PRIMA che
 # lui debba accorgersene da solo, e dice subito come uscirne.
 BENVENUTO_NOSTR = (
-    "🫙 Complimenti per il tuo primo articolo!\n\n"
-    "Il tuo articolo è ora disponibile anche su <b>Barattolo</b>, un "
-    "mercatino del tutto italiano con funzionalità extra: pagamenti in "
-    "sats con deposito di garanzia, offerte sul prezzo, spedizione e "
-    "molto altro.\n\n"
-    "Scoprilo su {url}\n\n"
-    "Entra con la <b>stessa chiave Nostr</b> con cui hai firmato "
-    "l'annuncio: lo ritrovi lì, già tuo, e da lì lo gestisci.\n\n"
-    "Barattolo mostra quello che pubblichi su Nostr, non ne tiene una "
-    "copia a parte: se cancelli l'annuncio dal tuo client sparisce "
-    "anche da qui. 🕊")
+    "🫙 Ciao! I tuoi annunci si vedono anche su Barattolo\n\n"
+    "Barattolo è un mercatino italiano dove si compra e si vende solo "
+    "in satoshi, con acquisto protetto: i sats restano in un deposito "
+    "di garanzia finché il compratore non conferma di aver ricevuto."
+    "\n\n"
+    "Facciamo da vetrina a quello che pubblichi su Nostr.\n\n"
+    "Entra su Barattolo con Nostr e aggiungi le informazioni che fanno "
+    "vendere:\n\n"
+    "⚡ offerte lampo a tempo\n"
+    "📦 spedizione, col costo che decidi tu\n"
+    "🤝 ritiro in zona\n"
+    "💾 buoni e codici consegnati online\n"
+    "✨ condizioni, quantità e categoria giusta\n\n"
+    "E ogni vendita conclusa costruisce la tua reputazione: stelline e "
+    "feedback che ti fanno vendere di più.\n\n"
+    "👉 {url}\n\n"
+    "Progetto italiano indipendente, in fase di test coi primi utenti. "
+    "Ci trovi su barattolo.store e su Nostr:\n"
+    "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
+    "\n\n"
+    "💡 Se vuoi, dal tuo profilo puoi attivare i suggerimenti per "
+    "migliorare gli annunci — di serie non ti scriviamo più. 🕊")
+
+# Le voci del promemoria: ognuna dice anche A COSA SERVE. «Manca la
+# condizione» e' un rimprovero; «e' la prima cosa che guarda chi compra
+# usato» e' un motivo — e chi legge non ci deve niente.
+VOCI_COMPLETAMENTO = {
+    "consegna": "• <b>come si consegna</b>, spedizione o ritiro: senza, "
+                "resti fuori dai filtri di chi cerca «spedizione "
+                "disponibile»",
+    "condizione": "• <b>in che condizioni</b> è l'oggetto: è la prima "
+                  "cosa che guarda chi compra usato",
+    "categoria": "• <b>la categoria giusta</b>: dai relay arrivano tutti "
+                 "in «Altro», dove non li cerca nessuno",
+}
 
 
 def annuncio_italiano(evento) -> str:
@@ -10652,22 +10709,37 @@ async def _apri_revisioni(npub: str, venditore_id: int):
 
 
 async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
-    """Il DM che chiede al venditore di finire il lavoro.
+    """Il messaggio che segnala cosa manca a un annuncio importato.
 
     Un evento NIP-99 non dice come si consegna, in che condizioni e'
     l'oggetto e in che categoria sta: sono cose che Barattolo ha e
     Nostr no. Importati cosi', quegli annunci restano a meta' — e la
     meta' che manca e' proprio quella su cui il compratore filtra.
-    Prima si poteva solo indovinare (la categoria) o lasciar perdere;
-    ora si CHIEDE alla persona che lo sa: il venditore.
 
-    Si chiede UNA volta sola per annuncio (colonna
-    completamento_avvisato) e mai nel giro in cui l'annuncio e'
-    apparso: chi e' appena stato scoperto ha gia' ricevuto il DM di
-    benvenuto, e due messaggi di fila dallo stesso sconosciuto sono
-    un altro tipo di cosa. Il giro dopo, un'ora piu' tardi, va bene.
+    SI MANDA SOLO A CHI L'HA CHIESTO (lug 2026, decisione di Andrea).
+    Nasceva automatico: un consiglio utile, mandato a gente che non ci
+    aveva chiesto niente — cioe' spam, perche' a decidere se un
+    messaggio e' benvenuto non e' chi lo scrive. Ora e' governato da
+    `utenti.suggerimenti_annunci`, SPENTO di serie: chi non lo accende
+    non riceve mai nulla, e l'unico posto dove lo nominiamo di nostra
+    iniziativa e' l'ultima riga del benvenuto.
+    Il gate viene PRIMA di tutto: a interruttore spento non si legge
+    nulla e soprattutto non si timbra `completamento_avvisato`, o chi
+    lo accendesse domani troverebbe i suoi annunci gia' «avvisati» e
+    non riceverebbe mai il consiglio che ha appena chiesto.
+
+    Acceso, resta gentile com'era: UNA volta sola per annuncio
+    (`completamento_avvisato`) e mai nel giro in cui l'annuncio e'
+    apparso — chi e' appena stato scoperto ha gia' avuto il benvenuto,
+    e due messaggi di fila sono un'altra cosa. Il giro dopo va bene.
     """
     con = db()
+    acceso = con.execute(
+        "SELECT suggerimenti_annunci AS s FROM utenti WHERE tg_id=?",
+        (venditore_id,)).fetchone()
+    if not acceso or not acceso["s"]:
+        con.close()
+        return
     righe = con.execute(
         "SELECT id, titolo, consegna, condizione, categoria FROM annunci "
         "WHERE stato='attivo' AND contatto_nostr=? "
@@ -10682,25 +10754,34 @@ async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
         f"({','.join('?' * len(righe))})", tuple(r["id"] for r in righe))
     con.commit()
     con.close()
-    manca = set()
+    manca = []
     if any(not r["consegna"] for r in righe):
-        manca.add("come si consegna (spedizione o ritiro)")
+        manca.append("consegna")
     if any(not r["condizione"] for r in righe):
-        manca.add("in che condizioni è l'oggetto")
+        manca.append("condizione")
     if any(r["categoria"] == "Altro" for r in righe):
-        manca.add("la categoria giusta")
+        manca.append("categoria")
     quanti = len(righe)
-    quali = ("«" + html.escape(righe[0]["titolo"][:60]) + "»" if quanti == 1
-             else f"<b>{quanti} dei tuoi annunci</b>")
-    testo = (f"🫙 Su <b>Barattolo</b> {quali} "
-             f"{'è' if quanti == 1 else 'sono'} in vetrina, ma manca "
-             f"qualcosa che su Nostr non si può scrivere:\n"
-             + "".join(f"\n• {m}" for m in sorted(manca)) +
-             f"\n\nSono proprio i campi su cui chi compra filtra: "
-             f"completarli prende un minuto e cambia quanto ti trovano. "
-             f"Entra con la stessa chiave Nostr con cui hai firmato "
-             f"l'annuncio e li trovi già tuoi:\n{URL_PUBBLICO}\n\n"
-             f"<i>Te lo chiedo una volta sola.</i> 🕊")
+    quali = ("«" + html.escape(righe[0]["titolo"][:60]) + "» è"
+             if quanti == 1 else f"<b>{quanti} dei tuoi annunci</b> sono")
+    # Il codice online si nomina solo a chi non ha dichiarato NESSUNA
+    # consegna: è il caso di chi vende buoni e gift card, e dai relay
+    # arriva sempre a mani vuote perché quella strada di là non esiste.
+    # A chi vende una bici sarebbe rumore.
+    codice = ("\n\nE se quello che vendi è un buono, una gift card o un "
+              "codice: qui puoi consegnarlo <b>online dentro Barattolo</b>, "
+              "e il compratore che lo apre firma la ricevuta. Dai relay "
+              "quella strada non si può aprire."
+              if "consegna" in manca else "")
+    testo = (f"🫙 Un minuto per finire un annuncio?\n\n"
+             f"{quali} in vetrina su Barattolo, ma manca qualcosa che su "
+             f"Nostr non si può scrivere — ed è proprio quello su cui chi "
+             f"compra filtra:\n\n"
+             + "\n".join(VOCI_COMPLETAMENTO[m] for m in manca) + codice +
+             f"\n\nEntra con la stessa chiave con cui hai firmato e li "
+             f"trovi già tuoi: {URL_PUBBLICO}\n\n"
+             f"<i>Hai i suggerimenti accesi: te lo dico una volta sola "
+             f"per annuncio, e li spegni quando vuoi dal Profilo.</i> 🕊")
     try:
         await notifica(venditore_id, testo)
         print(f"  ✉️ chiesto il completamento di {quanti} annunci a "

@@ -6260,6 +6260,7 @@ async function salvaLnAddressProfilo(btn){
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
+let mySuggerimenti = false;   // «💡 Suggerimenti sui miei annunci»: opt-in, spento di serie
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
    ('' = automatico, la catena Telegram → Nostr → iniziale; oppure
@@ -6673,7 +6674,44 @@ function renderAvvisi(){
   /* Il titolo «🔔 Avvisi» sta nell'header del cassetto: qui dentro
      solo lo stato e le scelte */
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}`;
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}
+    ${rigaSuggerimenti()}`;
+}
+
+/* «💡 Suggerimenti sui miei annunci»: l'interruttore con cui l'utente
+   CI AUTORIZZA a segnalargli cosa manca a un annuncio (consegna,
+   condizioni, categoria, codice online per i buoni). Spento di serie,
+   e resta spento finche' non lo tocca lui: e' l'unica differenza tra
+   un consiglio e lo spam. */
+const rigaSuggerimenti = () => `
+  <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="min-width:0;flex:1">
+      <div style="font-size:13.5px;font-weight:800">💡 Suggerimenti sui miei annunci</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+        Ti segnaliamo cosa manca per vendere meglio: consegna, condizioni,
+        categoria, e il codice online per buoni e gift card. Una volta sola
+        per annuncio.</div>
+    </div>
+    <button onclick="setSuggerimenti(${mySuggerimenti ? 'false' : 'true'})"
+      aria-pressed="${mySuggerimenti ? 'true' : 'false'}"
+      style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${mySuggerimenti?'var(--sats)':'var(--line)'};background:${mySuggerimenti?'var(--sats)':'transparent'};color:${mySuggerimenti?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
+      ${mySuggerimenti ? 'Attivi' : 'Attiva'}</button>
+  </div>`;
+
+async function setSuggerimenti(attivi){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/suggerimenti`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({attivi})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    mySuggerimenti = !!d.attivi;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisi();
+  toast(mySuggerimenti ? '💡 Suggerimenti attivi'
+                       : 'Suggerimenti spenti: non ti scriviamo più');
 }
 
 async function setCanale(canale){
@@ -9523,6 +9561,7 @@ async function avvia(){
     myNome = me.nome || ''; myUsername = me.username || '';
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
+    mySuggerimenti = !!me.suggerimenti_annunci;
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
