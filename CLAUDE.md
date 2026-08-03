@@ -171,15 +171,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   modello Vinted. Vista `view-sfoglia` (niente header, come Ordini e
   Profilo; niente barra di ricerca, che vive in Esplora e duplicarla
   sarebbe un secondo posto da tenere allineato per sempre).
-  `renderSfoglia` è la gemella di `renderChips` e beve dalla stessa
-  sorgente — `conteggiServer`, che arriva già nella busta di prima
-  pagina di /api/listings: ZERO endpoint nuovi. Ma il conteggio NON si
-  mostra: decide solo chi è spento. Ordine FISSO di catalogo, mai per
-  numero (una mappa che si riordina ogni giorno non si impara), tutte
-  e 26 sempre presenti, le vuote a `.vuota` (opacità .5) ma TOCCABILI:
-  si atterra sulla vetrina vuota, che ha già il suo «🔔 Avvisami se
-  arriva». Il nome va in `data-cat` e mai dentro la stringa JS
-  dell'onclick — la lezione di «Valle d'Aosta» sul picker.
+  `renderSfoglia` disegna le 26 voci del catalogo in ordine FISSO, mai
+  per numero (una mappa che si riordina ogni giorno non si impara), e
+  la griglia è STATICA: si disegna UNA volta sola, e per questo non
+  serve nessun dato dal server — zero endpoint nuovi e nessun
+  conteggio da rileggere. Il nome va in `data-cat` e mai dentro la
+  stringa JS dell'onclick — la lezione di «Valle d'Aosta» sul picker.
+  LE CATEGORIE VUOTE SONO PIASTRELLE NORMALI (lug 2026, deciso da
+  Andrea guardando la pagina vera). Erano nate spente a metà opacità,
+  con i conteggi di `conteggiServer` a decidere chi lo fosse; ma in
+  rodaggio le vuote sono la maggioranza — 17 su 26 — e la griglia
+  sembrava mezza rotta. Chi ne apre una vuota trova la vetrina col suo
+  «🔔 Avvisami se arriva», che è il posto giusto per dirlo: meglio
+  dopo, con una via d'uscita in mano, che prima con un colore.
   DUE DETTAGLI DEL PASSAGGIO A ESPLORA, tutti e due nati da un tester
   che li ha visti: `apriCategoria` SVUOTA la griglia prima di partire
   (setCat ricarica dal server e la risposta arriva mezzo secondo dopo:
