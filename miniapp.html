@@ -496,9 +496,12 @@
   .cat-tile .cat-emoji{position:absolute;right:2px;bottom:0;
     font-size:30px;line-height:1}
   .cat-tile img + .cat-emoji{display:none}
-  /* Categoria senza annunci: spenta ma toccabile — si atterra sulla
-     vetrina vuota, che ha gia' il suo «Avvisami se arriva» */
-  .cat-tile.vuota{opacity:.5}
+  /* Le categorie senza annunci NON si spengono (deciso lug 2026,
+     guardando la pagina vera): erano rese a meta' opacita', ma in
+     rodaggio le vuote sono la maggioranza e la griglia sembrava
+     mezza rotta. Restano piastrelle normali, e chi ne apre una vuota
+     trova la vetrina col suo «Avvisami se arriva» — che e' il posto
+     giusto per dirlo, invece di dirlo prima con un colore. */
 
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
@@ -3176,9 +3179,10 @@ function go(view){
   /* Nel dettaglio comprabile la tab bar lascia il posto alla barra
      d'acquisto (solo mobile, ci pensa il CSS); su ogni altra vista torna */
   aggiornaBarraCompra(view);
-  /* le piastrelle si rifanno a ogni entrata: i conteggi decidono quali
-     sono spente, e nel frattempo qualcuno puo' aver pubblicato */
-  if (view==='sfoglia') renderSfoglia();
+  /* la griglia e' STATICA — le stesse 26 voci del catalogo, senza piu'
+     conteggi da rileggere — quindi si disegna una volta sola: rifarla
+     a ogni entrata ricreerebbe 26 <img> per nulla */
+  if (view==='sfoglia' && !el('sfogliaGriglia').children.length) renderSfoglia();
   if (view==='affari') {
     if (!DEMO) {
       loadOrders().then(renderOrders).catch(()=>renderOrders());
@@ -3478,13 +3482,10 @@ const slugCat = c => c.toLowerCase().replace(/ /g,'-');
    a decidere chi e' spento. E l'ordine e' quello del catalogo, non per
    numero — Sfoglia e' una mappa, e una mappa non si riordina da sola. */
 function renderSfoglia(){
-  const conta = {};
-  if (!DEMO && conteggiServer) Object.assign(conta, conteggiServer);
-  else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
   /* il nome va in data-cat e MAI dentro la stringa JS dell'onclick:
      e' la lezione gia' pagata sul picker con «Valle d'Aosta» */
   el('sfogliaGriglia').innerHTML = CATS.slice(1).map(c => `
-    <button class="cat-tile ${conta[c] ? '' : 'vuota'}" data-cat="${esc(c)}"
+    <button class="cat-tile" data-cat="${esc(c)}"
             onclick="apriCategoria(this.dataset.cat)">
       <span class="cat-nome" lang="it">${esc(c)}</span>
       <span class="cat-fig"><img src="/assets/categorie/${slugCat(c)}.webp"
