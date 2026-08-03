@@ -194,6 +194,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che serve anche a tornare da una scheda e lì il filtro deve restare.
   Chi tocca il nome del tab si aspetta tutto il mercatino, non la
   categoria in cui era entrato da Sfoglia mezz'ora prima.
+  MA LA NAV MENTIVA (lug 2026, bug vero visto da Andrea): entrando da
+  una piastrella si accendeva «Esplora», e quel che si vedeva era una
+  vetrina FILTRATA con pochi oggetti — chi guardava credeva fosse tutto
+  il mercatino, e lo trovava vuoto. La vetrina resta UNA (duplicarla
+  per Sfoglia sarebbe stato due posti da tenere allineati per sempre):
+  a cambiare è solo la RADICE da cui la si guarda, che ora ha un nome —
+  `ramoVetrina` ('esplora' | 'sfoglia'). Il giudice unico è `voceNav()`,
+  dove viveva già la mappa delle viste interne (dettaglio, negozio e
+  sicurezza rispondono alla vetrina; l'ordine agli Ordini) — e per la
+  stessa ragione una scheda aperta DENTRO un reparto resta nel ramo: la
+  nav dice dove sei, e «dove sei» è la strada che hai fatto, che è
+  anche quella che l'indietro ripercorre.
+  Il ramo si accende in `apriCategoria` e si spegne in `setCat('Tutto')`
+  — cioè quando si torna al catalogo intero da QUALUNQUE strada (il tab
+  Esplora, la pillola «Tutto», il ritorno dopo una pubblicazione): un
+  posto solo, e il ramo non può sopravvivere al filtro che lo
+  giustifica, o resterebbe acceso «Sfoglia» davanti a tutto il
+  mercatino — la stessa bugia al contrario. `vaiEsplora` lo chiude
+  comunque, anche a categoria già Tutto: il tocco sul nome del tab è
+  sempre un ritorno alla radice e non deve dipendere dallo stato di
+  un'altra variabile per esserlo. Il ramo NON vive nella cronologia (è
+  una variabile, non una entry): un «avanti» del browser dentro un
+  reparto ricostruisce la vista ma non il filtro — è la stessa
+  imperfezione dichiarata del motore di navigazione, non una nuova.
   CONSEGUENZA sul resto: `renderChips` non riporta più a «Tutto» la
   categoria attiva rimasta senza annunci. Quella scorciatoia era nata
   contro i filtri fantasma, ma con Sfoglia diventava una bugia — si
@@ -207,6 +231,66 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   gli slot cinque — `.nav-vuoto`, uno spaziatore elastico che tiene il
   quinto posto, vuoto di proposito e già destinato a qualcos'altro. In
   topbar desktop sparisce (lì i bottoni sono `flex:0 0 auto`).
+  L'ORDINE è [Esplora][Sfoglia](+)[vuoto][Ordini] (lug 2026): il posto
+  vuoto sta IN MEZZO, fra Vendi e Ordini, non in coda — così gli Ordini
+  restano all'estrema destra, dove il pollice li trova senza guardare.
+  Spostarlo è solo uno scambio di posto nel markup: voci e spaziatore
+  sono tutti `flex:1`, quindi il Vendi resta il terzo di cinque slot
+  uguali e nessuna regola CSS si tocca (misurato: centro invariato,
+  nav 61,2px, e da desktop lo spaziatore è già `display:none`).
+  LE ICONE SONO NOSTRE (lug 2026): tre SVG al posto delle emoji
+  🛍️🗂️🤝, che cambiavano forma da un telefono all'altro e non
+  seguivano i token del tema — LENTE per Esplora, PIASTRELLE per
+  Sfoglia (la sua pagina in miniatura), PACCO di tre quarti per gli
+  Ordini. Inline nel markup, non da JS: nessun lampo all'avvio e la
+  barra esiste prima che il primo script giri. Disegnate sulla griglia
+  da 24 con la mano di `tagliaSVG` e `jarSVG` — tratto a currentColor,
+  capi tondi, velo al 12% (classe `.velo`) che dà corpo — e fuori
+  squadra di un pelo, che è la personalità delle illustrazioni delle
+  categorie portata dove un'immagine non può arrivare.
+  LA VOCE ATTIVA SI ILLUMINA E BASTA (modello Vinted e Subito): via la
+  pillola pesca sotto l'icona e il suo anello, resta il colore —
+  `--sats-deep` di giorno, `--sats-text` di sera (sul bruno l'arancio
+  del giorno rende 4,8, quello della sera 8,5: si abbassa la LUCE, non
+  si cambia il segno — la regola della spedizione gratuita). Icona ed
+  etichetta si accendono INSIEME senza una riga di codice: il colore lo
+  dà il bottone, l'icona lo eredita con currentColor. È tutto ciò che
+  rende possibile l'accensione, ed è il motivo per cui qui non possono
+  esserci immagini. Niente transizioni, quindi
+  `prefers-reduced-motion` non ha nulla da spegnere.
+  MISURA 26px, ed è un TETTO: è quanto occupavano le emoji col loro
+  respiro (20 di glifo + 3+3 di padding), quindi la nav resta 61px e
+  l'invariante con `#barraCompra` è salva. Per crescere ancora
+  servirebbe una barra più alta, e quella non si tocca. Il resto della
+  presenza si prende dove non costa nulla: il viewBox è `2 2 20 20` e
+  non `0 0 24 24` — la stessa griglia RITAGLIATA sul margine che
+  avanzava attorno all'inchiostro (le tre stanno fra 2,65 e 21,35 col
+  tratto compreso: verificato, il ritaglio non taglia). Il disegno
+  cresce del 30% dentro la stessa scatola e il tratto scende a 1.5
+  perché ingrandito con lui torna a rendere 1,95px: stesso peso, figura
+  più grande. È il gemello del ritaglio che `ritaglia_categorie.py` fa
+  alle illustrazioni — il margine trasparente è spazio buttato. Chi
+  ridisegna un'icona tenga l'inchiostro dentro [2,22], o il ritaglio
+  gliela taglia. In topbar desktop stanno a 22px e la voce attiva torna
+  una pillola: lì non è una tab bar da pollice ma una fila di
+  linguette, e la pillola è il suo idioma.
+  TRE STRADE PROVATE E SCARTATE, coi motivi, che è la parte che serve
+  fra sei mesi: 1) il PACCO PIATTO — quadro più riga del coperchio, cioè
+  la famiglia di `tagliaSVG` — a 24px si legge come un portafoglio, e
+  col nastro verticale intero come una finestra a quattro riquadri; di
+  tre quarti è un pacco e basta, e la parentela con le taglie si perde
+  ma si guadagna un'icona che si riconosce. 2) IL BARATTOLO del logo,
+  chiesto da Andrea, disegnato e guardato acceso: funziona, ma nella
+  STESSA schermata quella forma farebbe tre mestieri — marchio in
+  testata, «l'ho messo via» sulle card (dove per giunta è pieno o vuoto
+  e racconta un livello), «dove sono» in barra — e i primi due si
+  vedono insieme, uno sopra l'altro, in ogni vetrina. La lente invece
+  non dice niente altrove: è libera. 3) LE ILLUSTRAZIONI delle
+  categorie rimpicciolite a 24px: a quella misura il disegno diventa
+  una macchia calda, e soprattutto un'immagine NON PUÒ ACCENDERSI — il
+  meglio che si può fare per spegnerla è sbiadirla (grigio più
+  opacità), che la fa sembrare rotta, non spenta. Guardate a schermo
+  tutte e tre prima di decidere; non riproporle senza un motivo nuovo.
   IL GESTO INDIETRO ha qui la sua UNICA eccezione, ed è dichiarata: il
   tocco su una piastrella porta a Esplora, che è una radice — ma non è
   un cambio di tab, è una DISCESA, e l'indietro deve riportare allo
@@ -1427,7 +1511,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nel modello e nel parser. La modifica FIRMATA degli importati non
   offre i campi (v1: l'evento non li porta, il form li nasconde).
   Frontend: form Vendi con le TRE CASELLE indipendenti (lug 2026,
-  decisione di Andrea, via il select + checkbox: 📦 Spedizione ·
+  decisione di Andrea, via il select + checkbox: 🚚 Spedizione ·
   🤝 Ritiro in zona · 💾 Invio del codice online, spunta tutte quelle
   che offri, ALMENO una — la validazione vive in publish(), il server
   resta tollerante con '' per i client vecchi; `consegnaForm()` mappa
@@ -1441,7 +1525,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   pagamento: niente chat private»); allineamento caselle: servono i
   selettori SPECIFICI `.field label.cons-riga`/`.field .cons-riga
   input`, le regole generiche di .field (maiuscoletto, padding da
-  campo) vincerebbero sulla classe nuda; la firmata
+  campo) vincerebbero sulla classe nuda; LE ICONE sono 20px contro i
+  13,5 del testo (`.cons-ico`, `display:inline-block` e
+  `line-height:1` o un'emoji da 20 dentro una riga da 13,5 raddoppia
+  la casella; la spunta resta 17px, è un controllo e non un disegno):
+  lì si sceglie COME arriva la roba, e le tre strade si distinguono
+  dal disegno, non dalla riga di testo. La spedizione parla col 🚚 e
+  non col 📦 (lug 2026): il camioncino è la spedizione in TUTTA l'app
+  — icone della card, badge del dettaglio, spunta dei filtri — mentre
+  il 📦 nel progetto è il pacco della TAGLIA, roba del corriere;
+  erano due disegni per la stessa strada, e quello sbagliato stava
+  proprio dove la strada si sceglie. La firmata
   degli importati salta la validazione, il campo resta nascosto) +
   costo (stessa valuta del listino, `consegnaPayload`) + taglia;
   dettaglio con le PILLOLE DELLE MODALITÀ (lug 2026, dopo il feedback
@@ -4043,6 +4137,31 @@ cache di un giorno e nomi NON versionati, quindi una che venga rifatta
 resta vecchia nei browser per 24 ore (in locale è successo davvero, e
 falsava le misure). Se un giorno cambieranno spesso, la strada è
 quella delle foto: il nome col timbro.
+Tre lavori sulla nav, in un cantiere solo (lug 2026): la nav non mente
+più entrando da Sfoglia — si accendeva «Esplora» su una vetrina
+filtrata, e chi guardava credeva fosse il mercatino intero e lo
+trovava vuoto (rimedio: `ramoVetrina`, una variabile e non una vetrina
+duplicata, letta dal giudice unico `voceNav()` e spenta da
+`setCat('Tutto')`, cioè dal filtro che la giustifica); gli Ordini
+passano all'ESTREMA destra col posto vuoto in mezzo, che è solo uno
+scambio nel markup perché i cinque slot sono tutti `flex:1`; e le tre
+emoji della barra diventano SVG di casa — lente, piastrelle, pacco di
+tre quarti — che si ACCENDONO invece di accendere una pillola sotto di
+sé. Più le icone della consegna in Vendi, che crescono a 20px e in cui
+la spedizione passa dal 📦 al 🚚, cioè al disegno che la spedizione ha
+in tutto il resto dell'app. Vedi Architettura, alla voce Sfoglia, per
+la taratura delle icone (26px come tetto, viewBox ritagliato a
+`2 2 20 20`) e soprattutto per le TRE STRADE SCARTATE col loro perché
+— pacco piatto, barattolo del logo, illustrazioni a 24px — che è la
+parte che serve fra sei mesi. Collaudato nel browser vero a 360px nei
+due temi: nav 61,2px invariata e Vendi a 180,0 su 180,0 dopo ogni
+ritocco, giro completo del ramo Sfoglia (piastrella → dettaglio →
+negozio → i due indietro → tab Esplora che rimette 837 oggetti con una
+richiesta senza `cat`), caselle di consegna che aprono ancora costo e
+taglia, e 78 prove verdi. In produzione basta il deploy: nessuna
+colonna, nessuna leva, nessun asset nuovo. Resta da vedere dal vivo
+dentro Telegram, dove contano la gesture bar del telefono e il tema
+del client.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
