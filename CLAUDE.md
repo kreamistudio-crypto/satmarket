@@ -135,6 +135,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   storte dei vecchi import, 'casa'). La lista entra nel
   prompt della ricerca AI; nel NIP-99 il tag `t` è la prima parola
   minuscola ("Casa e giardino" → "casa": un hashtag non ha spazi).
+  LE ICONE (`EMOJI_CAT` nel client) dicono il REPARTO, non un
+  prodotto: 🍳 Elettrodomestici (il cesto 🧺 e' dove finisce il bucato,
+  non un elettrodomestico), 🍎 Alimenti e bevande (il vasetto 🍯 diceva
+  un prodotto solo, e per giunta somiglia al 🫙 dei preferiti, che non
+  deve avere sosia), 🚗 Motori (lo scooter e' un pezzo del reparto),
+  🏡 Casa e giardino (la sedia ne diceva meta'). ₿ Bitcoin resta un
+  glifo di TESTO e non un'emoji a colori — nel foglio stona un po'
+  con le vicine, ed e' voluto: il simbolo vince sull'uniformita'.
+  Guardate e tenute come sono: 🏺 Collezionismo (tira
+  sull'antiquariato, ma non c'e' di meglio) e 📦 Altro (e' anche il
+  pacco della spedizione: convivono senza confondersi).
   AGGIUNGERE UNA CATEGORIA TOCCA SEI POSTI: `CATEGORIE` e
   `SINONIMI_CATEGORIA` e `MODELLO_IMPORT` in server.py, `<select
   id="sellCat">` e `EMOJI_CAT` e `CATS` in miniapp.html. Non serve
@@ -1699,7 +1710,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Venduto» + «↻ Rimetti in vendita» (`ricaricaAnnuncio`, prompt), il
   relist onesto anche per chi vendeva un pezzo solo. Giudici:
   `quantita_da_payload` (assente = default/conserva lo stock in
-  modifica; oltre `MAX_QUANTITA_ANNUNCIO` — leva config, 100 — = 400)
+  modifica; oltre `MAX_QUANTITA_ANNUNCIO` — leva config, **999999**
+  dal lug 2026: quanti pezzi ha in magazzino lo sa il venditore, non
+  noi, e cento diceva «non ti credo» a chi ne ha davvero tanti. Quel
+  che resta è un guardrail contro il numero incollato per sbaglio,
+  non un giudizio sul negozio — e vale anche su ciò che arriva dai
+  relay. ATTENZIONE: una riga esplicita nel config del VPS vince sul
+  default. Coi numeri grandi non si rompe nulla — colonna INTEGER,
+  conti interi Python — ma ogni posto che mostra una quantità passa da
+  `fmt()`, o «999999 disponibili» diventa un muro di cifre) = 400
   e `quantita_tollerante` per il CSV (vuota o storta = 1, oltre il
   tetto si lima, mai uno scarto); colonna facoltativa `quantita` nel
   modello CSV con la riga del miele. Superficie: `a.quantita` in
@@ -2858,18 +2877,43 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   comunque). Il fail-CLOSED resta ma preciso: se l'AI tace non entra
   ciò che non è mai stato giudicato, mentre chi era già passato
   continua ad aggiornarsi.
-  BENVENUTO E COMPLETAMENTO: chi viene scoperto riceve l'account
-  nativo (la macchina del login Nostr) e un DM che dice subito come
-  uscirne (un kind 5 dal suo client). Poi, siccome un evento NIP-99
-  non dice consegna, condizione e categoria — ed è proprio ciò su cui
-  il compratore filtra — `_chiedi_completamento` gli manda UN invito a
-  finire il lavoro: una volta sola per annuncio (colonna
-  `annunci.completamento_avvisato`, una colonna e non una coda in
-  memoria perché «gliel'ho già chiesto» deve sopravvivere ai riavvii),
-  mai nel giro in cui l'annuncio è apparso (`creato < t0`: chi è
-  appena stato scoperto ha già avuto il benvenuto, e due messaggi di
-  fila da uno sconosciuto sono un'altra cosa), un messaggio per
-  VENDITORE e non per annuncio.
+  IL BENVENUTO È L'UNICO MESSAGGIO CHE MANDIAMO SENZA PERMESSO, e
+  questa è la regola che governa tutto il resto. Chi viene scoperto
+  riceve l'account nativo (la macchina del login Nostr) e UN messaggio
+  (`BENVENUTO_NOSTR`, testo definitivo scritto da Andrea — chi lo
+  ritocca tenga l'ordine: cos'è Barattolo (sats + deposito di
+  garanzia), che facciamo da vetrina a Nostr, cosa si sblocca entrando
+  (lampo, spedizione col costo suo, ritiro, buoni e codici online,
+  condizioni/quantità/categoria), la reputazione che si costruisce
+  vendendo, il progetto in fase di test con la sua npub, e in fondo la
+  riga sui suggerimenti — «di serie non ti scriviamo più»).
+  I SUGGERIMENTI SUGLI ANNUNCI SONO OPT-IN (lug 2026, decisione di
+  Andrea). Un evento NIP-99 non dice consegna, condizione e categoria
+  — ed è proprio ciò su cui il compratore filtra — quindi
+  `_chiedi_completamento` sa cosa manca e potrebbe dirlo; ma nasceva
+  automatico, cioè un consiglio utile mandato a gente che non ci aveva
+  chiesto niente: spam, perché a decidere se un messaggio è benvenuto
+  non è chi lo scrive. Ora lo governa `utenti.suggerimenti_annunci`,
+  SPENTO di serie, acceso dalla voce «💡 Suggerimenti sui miei
+  annunci» nel cassetto «🔔 Avvisi» del Profilo
+  (`POST /api/me/suggerimenti`, pattern di canale-notifiche;
+  `rigaSuggerimenti`/`setSuggerimenti`, il flag esce da /api/me che fa
+  SELECT *). Chi non lo accende non riceve MAI nulla, e l'unico posto
+  dove lo nominiamo di nostra iniziativa è l'ultima riga del benvenuto.
+  ATTENZIONE, il gate sta PRIMA di ogni lettura e non è pignoleria: a
+  interruttore spento non si timbra `completamento_avvisato`, o chi lo
+  accendesse domani troverebbe i suoi annunci già «avvisati» e non
+  riceverebbe mai il consiglio appena chiesto.
+  Acceso, resta gentile: una volta sola per annuncio (la colonna, e non
+  una coda in memoria, perché «gliel'ho già chiesto» deve sopravvivere
+  ai riavvii), mai nel giro in cui l'annuncio è apparso (`creato < t0`:
+  chi è appena stato scoperto ha già avuto il benvenuto, e due messaggi
+  di fila sono un'altra cosa), un messaggio per VENDITORE e non per
+  annuncio, ogni voce dice A COSA SERVE (un motivo, non un rimprovero),
+  il paragrafo sul codice online compare solo a chi non ha dichiarato
+  nessuna consegna (è il caso di buoni e gift card; a chi vende una
+  bici sarebbe rumore), e la chiusa dice dov'è la maniglia per
+  spegnerli.
   RISCHIO DICHIARATO E ACCETTATO (decisione di Andrea): si può
   comprare in escrow da un venditore che non sa di essere qui. Prima
   valeva per un venditore consenziente, ora per chiunque venga
@@ -3458,24 +3502,32 @@ migrazioni e nessun annuncio spostato; la moderazione si paga una
 volta sola e si rifà solo quando cambia il TESTO; dubbi E bocciature
 dell'AI vanno in una coda visibile agli admin invece di sparire, e la
 decisione è REVERSIBILE («↩︎ Ripensaci»); lo stock dai relay si lima
-al tetto e la consegna digitale dai relay non passa; chi arriva da
-Nostr riceve un invito a completare consegna, condizione e categoria,
-una volta sola e mai nel giro in cui è apparso. Vedi Architettura —
+al tetto e la consegna digitale dai relay non passa; i suggerimenti su
+cosa manca a un annuncio sono OPT-IN e spenti di serie — il benvenuto
+resta l'unico messaggio che mandiamo senza permesso. Più i tre
+ritocchi del giorno dopo: quattro icone di categoria che dicevano un
+prodotto invece del reparto, il tetto della quantità a 999999 (con
+tutte le quantità che passano da `fmt()`), e i due testi definitivi.
+Vedi Architettura —
 collaudato in locale con 48 prove pure in `prove.py` [che ora coprono
 anche il modello CSV, il testo condiviso degli eventi e le due
-guardie] più 24 verifiche su DB usa-e-getta [`_da_giudicare` nei sei
+guardie] più 26 verifiche su DB usa-e-getta [`_da_giudicare` nei sei
 casi, il marchio che fa nascere in revisione, il registro legato
 all'annuncio e la sua idempotenza, il giro completo
 rifiuta→riapri→pubblica→riapri, la guardia degli affari in corso, la
-coda «decisi» e l'invito a completare nei suoi tre casi], e il foglio
-delle 25 categorie guardato nel browser. IN PRODUZIONE: il deploy da
-solo non cambia NIENTE — la migrazione della colonna
-`completamento_avvisato` gira e basta; l'import aperto si accende
-scrivendo la riga nel config del VPS, e quello è il momento da
-guardare col journal aperto. RESTA DA FARE: il primo giro vero con
-gli occhi addosso, e decidere se anche lo scarto per PAROLE VIETATE
-debba finire in coda come quelli dell'AI — oggi non ci va, resta uno
-scarto secco visibile solo nel registro).
+coda «decisi», e i suggerimenti nei loro cinque casi — spenti che non
+scrivono e NON timbrano, accesi che scrivono una volta sola e mai nel
+giro dell'apparizione], più il foglio delle 25 categorie e
+l'interruttore nei due stati guardati nel browser. IN PRODUZIONE: il
+deploy da solo non cambia NIENTE — girano le migrazioni delle due
+colonne (`completamento_avvisato`, `suggerimenti_annunci`) e basta;
+l'import aperto si accende scrivendo la riga nel config del VPS, e
+quello è il momento da guardare col journal aperto. Se il config del
+VPS ha una riga `MAX_QUANTITA_ANNUNCIO` esplicita, va alzata anche lì.
+RESTA DA FARE: il primo giro vero con gli occhi addosso, e decidere se
+anche lo scarto per PAROLE VIETATE debba finire in coda come quelli
+dell'AI — oggi non ci va, resta uno scarto secco visibile solo nel
+registro).
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
