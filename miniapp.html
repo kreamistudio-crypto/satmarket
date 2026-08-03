@@ -468,8 +468,19 @@
      contain ognuna riempie il riquadro per il suo verso: la bici in
      larghezza, il telefono in altezza — e nessuna esce dai bordi,
      che era il guaio degli scarti negativi di prima. */
+  /* IL TETTO ALLA LARGHEZZA (57% della piastrella, ~90px) e' quello
+     che rende la griglia omogenea. Con la sola altezza uguale per
+     tutti sono le LARGHEZZE a scappare: la scarpa veniva 122x72 e
+     l'orologio 47x72 — stessa altezza, ma 2,7 volte l'area, e in
+     griglia gli oggetti larghi schiacciavano i sottili. Col tetto il
+     rapporto scende a 1,97 e a cedere sono solo i quattro che
+     scappavano (scarpa, auto, bici, fotocamera), che diventano larghi
+     90 e un po' piu' bassi; tutti gli altri non si toccano.
+     Pareggiare le AREE, provato, non e' la strada: per far stare gli
+     estremi ogni disegno scende sui 57px e le piastrelle si svuotano
+     — si perde su tutte per pareggiare due casi. */
   .cat-tile .cat-fig{flex:1 1 auto;min-height:0;position:relative;
-    margin:4px 8px 7px 10px}
+    width:57%;margin:4px 8px 7px auto}
   .cat-tile .cat-fig img{position:absolute;inset:0;
     width:100%;height:100%;display:block;
     object-fit:contain;object-position:100% 100%}
