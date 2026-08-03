@@ -53,9 +53,26 @@ jobs:
       - name: Le prove
         run: python prove.py
 
-      # Quarto: la regola ferrea numero 1. Se un segreto entra nella
-      # repo il danno e' fatto nel momento in cui si pusha, quindi
-      # meglio urlare subito.
+  # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
+  # all'altro, ed e' il pezzo da non rimettere com'era.
+  #
+  # Da passo finale era l'ULTIMO della fila: qualunque cosa fallisse
+  # prima lo nascondeva, e non diceva "pulito" a torto — non parlava
+  # proprio. E' successo per davvero: le prove si sono rotte alle 13:20
+  # del 3 ago 2026 e per 13 push di fila i segreti non li ha guardati
+  # nessuno, mentre la pagina di GitHub diceva soltanto "rosso".
+  # Cosi' invece i due job partono insieme e si rispondono da soli: le
+  # prove possono rompersi quanto vogliono, il controllo dei segreti
+  # parla lo stesso. Non serve nemmeno Python — sono git e grep.
+  segreti:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Se un segreto entra nella repo il danno e' fatto nel momento in
+      # cui si pusha, quindi meglio urlare subito.
       - name: Nessun segreto nella repo
         run: |
           if git ls-files | grep -E '^(config\.py|.*\.db|foto/)' ; then
