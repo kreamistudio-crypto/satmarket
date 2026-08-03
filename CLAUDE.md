@@ -206,6 +206,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   facoltativa `condizione` nel CSV d'import con `condizione_tollerante`
   (SINONIMI_CONDIZIONE: «ottimo» → come_nuovo, «da riparare» →
   da_sistemare…, sconosciuta = non dichiarata, mai uno scarto).
+  DOVE LA CONDIZIONE NON VUOL DIRE NIENTE (lug 2026, decisione di
+  Andrea): una marmellata è nuova per definizione, e chiederlo è una
+  domanda senza risposte sbagliate — cioè una domanda inutile. La leva
+  è `CATEGORIE_SENZA_CONDIZIONE` (frozenset accanto a CATEGORIE:
+  oggi una voce sola, «Alimenti e bevande») e il giudice unico è
+  `senza_condizione(categoria, consegna)`, da cui passano form,
+  dettaglio, vetrina, NIP-99, ricerca AI e import — o divergono. Il
+  secondo asse è la CONSEGNA: un codice Zalando è nuovo per
+  definizione come la marmellata, ma vale solo per il digitale
+  ESCLUSIVO (`consegna=='digitale'`) — sulla combo la merce fisica c'è
+  e una condizione ce l'ha, quindi si guarda quella colonna e MAI
+  `anche_digitale`. NON ci entrano «Arte e artigianato» (ci finisce
+  anche l'arte usata, e un quadro di seconda mano può essere rovinato)
+  né «Bitcoin» (le Jade di seconda mano sono merce vera).
+  Tre conseguenze, e sono la parte da ricordare: 1) in SCRITTURA si
+  azzera — `guardia_zona_condizione` non la chiede più e butta quella
+  che arriva, così il database si pulisce da solo un annuncio alla
+  volta invece che con una migrazione (e se domani quell'annuncio
+  cambia categoria, la condizione gliela si chiede lì, che è quando
+  serve: lo stesso patto della zona storta); 2) gli alimentari di
+  IERI, che in colonna una condizione ce l'hanno, NON si migrano — il
+  dato non si perde mai, come la zona resta intera nel database mentre
+  in vetrina si mostra il solo comune — e a nasconderla è
+  `condizione_da_mostrare` in uscita (lato client il gate è
+  `titoloConCondizione`, l'unico posto dove la pillola si disegna:
+  così vale anche per la DEMO, che non passa da mapListing); 3) il
+  FILTRO condizione li lascia fuori (patto degli storici: il filtro
+  promette una condizione dichiarata), e il vecchio con la colonna
+  piena lo escludono le due clausole aggiunte alla query — o
+  pescherebbe una condizione che la scheda non mostra più. In vetrina
+  la riga «Condizione» del pannello Filtri sparisce sulle categorie
+  esenti e il filtro DORME (`condFiltrabile()` toglie il parametro):
+  non si azzera, o si romperebbe il patto dei filtri di sessione che
+  sopravvivono al cambio categoria. Gemello client `CAT_SENZA_COND` +
+  `senzaCondizione()`, e `prove.py` fallisce se i due elenchi
+  divergono. Nel form il campo compare e sparisce da
+  `aggiornaCondizioneForm()`, chiamata dal `poi` del picker categoria
+  e da `aggiornaConsegnaForm()` (i due soli ingressi che la cambiano).
   Foglio-picker al posto delle tendine native (lug 2026): la
   `<select>` del sistema operativo non si può vestire da Barattolo, e
   TUTTE le tendine dell'app sono passate al nostro foglio — categoria,
@@ -3061,6 +3099,54 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   è uno solo, cambia solo chi firma l'evento.
   Il disegno è documentato in `proposte/` (la PR al repo dei NIP resta
   in backlog).
+- `ricategorizza.py` (lug 2026) — l'AI PROPONE, l'admin decide. Quando
+  il catalogo è passato da 9 voci a 25, gli annunci di ieri sono
+  rimasti nelle caselle di ieri (un portatile in «Elettronica» invece
+  che in «Informatica», una Jade in «Elettronica» invece che in
+  «Bitcoin») e quelli che arrivano da Nostr nascono TUTTI in «Altro».
+  Lo script legge titolo e descrizione degli attivi, li manda a Haiku a
+  lotti da 20 e scrive SOLO nella tabella `categoria_proposta`
+  (annuncio_id PK, categoria_ora, categoria_nuova, stato
+  proposta|applicata|scartata, deciso_da/deciso_il = anche il registro
+  di cos'è successo). `annunci.categoria` non la tocca MAI: a spostare
+  è un moderatore, dalla coda. Il catalogo lo legge dal TESTO di
+  server.py (fonte unica) e non importando il modulo, che farebbe
+  partire init_db e le migrazioni su un database magari diverso da
+  quello passato a mano. Di serie non scrive (`--scrivi` riempie la
+  coda; `--limite N`, `--rifai`, e un percorso di database come per
+  ripulisci_anello). L'AI può rispondere NON SO ed è importante che
+  possa: un annuncio lasciato dov'è non fa danno, uno spostato male sì
+  — e una categoria inventata o un id fuori lotto si ignorano come nel
+  parsing della moderazione a lotti. Idempotente: non richiede gli
+  annunci che hanno già una riga fatta sulla categoria che hanno
+  ADESSO (se l'ha spostato il venditore, la vecchia proposta non parla
+  più di lui e si richiede). Costo misurato: ~0,005 $ a lotto, ~0,20 $
+  per 800 annunci, e lo stampa contando i token veri.
+  LA CODA (`GET /api/admin/categorie`, `POST
+  /api/admin/categorie/decidi`, sezione «🗂 Categorie da sistemare» nel
+  Profilo admin): le proposte escono RAGGRUPPATE per spostamento
+  («Elettronica → Informatica: 23»), col gruppo più numeroso in testa.
+  Il raggruppamento non è una comodità: trecento decisioni una per una
+  sono una revisione che nessuno finisce, e il vincolo di Andrea —
+  nessuna categoria cambia senza che un umano l'abbia vista — si
+  rispetta mostrando i TITOLI dentro il gruppo, con la spunta per
+  togliere dal mucchio quello che non convince (`ids` nel body).
+  L'UPDATE è condizionato sulla categoria di partenza (il secondo
+  moderatore trova il fatto compiuto, come per la revisione) e una
+  proposta stantia — categoria cambiata nel frattempo — sparisce da
+  sola dalla coda. Dopo lo spostamento gli annunci NATI qui aggiornano
+  il loro evento NIP-99 (la categoria è il tag `t`, `solo_aggiornamento`
+  sul `d` stabile); niente promo e niente match, che ricategorizzare
+  non è pubblicare — la regola della ricarica dello stock. Il
+  venditore NON riceve avvisi: la categoria è metadato NOSTRO (dai
+  relay non arriva, e l'import non la ricopre mai, che è anche ciò che
+  fa sopravvivere la decisione al giro orario). Il complemento è
+  l'invito OPT-IN che esisteva già: `_chiedi_completamento` aveva la
+  voce «la categoria giusta» ma la sua WHERE guardava solo
+  `consegna='' OR condizione=''`, quindi un annuncio completo fermo in
+  «Altro» non veniva pescato mai e quella voce non partiva mai —
+  aggiunto `OR categoria='Altro'`. La stessa funzione non chiede più
+  la condizione dove non vuol dire niente.
 - `ripulisci_anello_nostr.py` (lug 2026) — la pulizia una-tantum dopo
   l'anello (vedi sopra). Riconosce le copie dal marchio che solo NOI
   scriviamo — il tag `d` di un evento nostro è sempre `barattolo-{id}`,
@@ -3682,6 +3768,29 @@ motivo e cosa è rimasto in piedi stanno in Architettura, alla voce
 omonima. Con lui se n'è andata la precompilazione della Zona in Vendi:
 il campo nasce vuoto e lo scrive l'utente. Resta INERTE la colonna
 `utenti.comune`, che nessuno scrive e nessuno legge.
+Due migliorie prima di aprire la pagina «Sfoglia» (lug 2026, decisioni
+di Andrea): LA RICATEGORIZZAZIONE — l'AI propone leggendo titolo e
+descrizione, i moderatori confermano dalla coda «🗂 Categorie da
+sistemare» raggruppata per spostamento, e nessun annuncio cambia
+casella senza che un umano l'abbia visto (~0,20 $ per 800 annunci);
+più il fix all'invito opt-in, che la voce «la categoria giusta» non la
+faceva partire mai. E LA CONDIZIONE CHE NON SI CHIEDE dove non vuol
+dire niente: «Alimenti e bevande» e i codici online consegnati dentro
+Barattolo — il campo sparisce dal form, la pillola dal dettaglio, la
+riga dal pannello Filtri, e gli alimentari di ieri non si migrano ma
+smettono di mostrarla. Vedi Architettura per i due giudici unici
+(`senza_condizione`, `_sposta_categoria`) — collaudate in locale con
+20 prove pure nuove in `prove.py` (parità dei due elenchi
+server↔client compresa) e 26 verifiche TestClient su DB usa-e-getta
+(guardia nei quattro casi, alimentare storico fuori dal filtro ma in
+vetrina, modifica che torna a chiedere la condizione cambiando
+categoria, coda con spostamento parziale, proposta stantia, 409 e
+scarto), più il giro nel browser vero a 375px: campo che compare e
+sparisce sui quattro passaggi, filtro che dorme e si risveglia, coda
+admin con «mostra tutti» che non perde le spunte tolte a mano. In
+produzione basta il deploy — la tabella `categoria_proposta` la crea
+init_db —, e la coda resta vuota finché non si lancia
+`python ricategorizza.py --scrivi` sul VPS.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
