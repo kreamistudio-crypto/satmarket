@@ -327,6 +327,15 @@
   .filtro-check{display:flex;align-items:center;gap:8px;
     font-size:13.5px;font-weight:700;cursor:pointer}
   .filtro-check input{width:auto;accent-color:var(--sats)}
+  /* «cambia» accanto alla spunta di «Vicino a me»: la porta al foglio
+     per chi vuole un altro comune o un altro raggio. Spinto a destra e
+     discreto — la strada normale è la spunta, questa è la deviazione */
+  /* --sats-text e non --sats: l'arancio pieno è un colore da BOTTONE,
+     e come inchiostro sul crema fa 2,3 — si vede ma non si legge */
+  .filtri-riga .vicino-cambia{margin-left:auto;align-self:center;
+    color:var(--sats-text);font-weight:800;font-size:12.5px;
+    white-space:nowrap;cursor:pointer;text-decoration:underline;
+    text-underline-offset:3px}
 
   /* ---------- griglia annunci ---------- */
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px var(--pad)}
@@ -1705,13 +1714,13 @@
         <input id="filtroMinInp" inputmode="decimal" placeholder="Prezzo min">
         <input id="filtroMaxInp" inputmode="decimal" placeholder="Prezzo max">
       </div>
-      <!-- «📍 Vicino a me»: un campo-bottone come le altre tendine, ma
-           dietro non c'è una select — il foglio chiede comune e raggio.
-           In DEMO la riga sparisce: i sette annunci finti non hanno
+      <!-- «📍 Vicino a me»: la disegna renderVicinoRiga() e ha DUE
+           facce — campo-bottone finché il comune non lo sappiamo (apre
+           il foglio), spunta come gli altri filtri appena lo sappiamo,
+           che dalla seconda volta accendere è un tocco e non un modulo.
+           In DEMO la riga sparisce: gli annunci finti non hanno
            coordinate, e un raggio su di loro non direbbe niente di vero. -->
-      <div class="filtri-riga" id="filtroVicinoRiga">
-        <button type="button" class="campo-scelta" id="filtroVicinoBtn" onclick="apriVicino()" aria-haspopup="dialog" title="Filtra per distanza"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
-      </div>
+      <div class="filtri-riga" id="filtroVicinoRiga"></div>
       <div class="filtri-riga" id="filtroRegRiga" style="display:none">
         <!-- La regione: deposito nascosto + campo-bottone come le altre
              tendine. Le voci NON sono un catalogo del client: le riempie
@@ -1743,7 +1752,7 @@
       <div class="filtri-riga">
         <label class="filtro-check">
           <input type="checkbox" id="filtroSpedInp">
-          🚚 Solo con spedizione</label>
+          🚚 Spedizione</label>
       </div>
       <div class="filtri-riga">
         <label class="filtro-check">
@@ -1758,7 +1767,7 @@
       <div class="filtri-riga">
         <label class="filtro-check">
           <input type="checkbox" id="filtroLampoInp">
-          ⚡ Solo in offerta</label>
+          ⚡ In offerta</label>
       </div>
       <div class="filtri-riga">
         <button class="btn orange" onclick="applicaFiltri()">Applica</button>
@@ -2771,22 +2780,33 @@ function toggleFiltri(){
     el('filtroCondSel').value = filtroCond;
     aggiornaPicker('filtroCondSel');
     renderFiltroRegioni();
-    aggiornaVicinoBtn();
+    renderVicinoRiga();
   }
 }
 
 /* ---------------- «📍 Vicino a me» ----------------
-   Il campo-bottone dice sempre lo stato: spento parla all'infinito
-   («Vicino a me»), acceso dice DOVE e QUANTO, che è l'unica cosa che
-   uno vuole rileggere prima di fidarsi del risultato. */
-function aggiornaVicinoBtn(){
-  const riga = el('filtroVicinoRiga'), b = el('filtroVicinoBtn');
-  if (!riga || !b) return;
+   La riga ha DUE facce, e il perché è tutto qui: la prima volta non
+   sappiamo da dove cerchi e bisogna chiederlo (campo-bottone → foglio);
+   dalla seconda in poi lo sappiamo, e richiederlo sarebbe un modulo da
+   riempire per accendere un filtro. Quindi diventa una SPUNTA come le
+   altre — «📍 Vicino a Milano (MI) · 50 km», un tocco — col «cambia»
+   di lato per chi vuole un altro comune o un altro raggio.
+   Il comune non si dimentica mai da solo: Azzera spegne il filtro, non
+   la memoria. */
+function renderVicinoRiga(){
+  const riga = el('filtroVicinoRiga');
+  if (!riga) return;
   /* in DEMO i dati finti non hanno coordinate: meglio nessuna riga che
      una riga che promette una distanza e non la sa calcolare */
   riga.style.display = DEMO ? 'none' : '';
-  b.querySelector('.cs-val').textContent = filtroVicino
-    ? `📍 ${filtroVicino} · ${filtroRaggio} km` : '📍 Vicino a me';
+  if (DEMO) { riga.innerHTML = ''; return; }
+  const noto = filtroVicino || myComune;
+  riga.innerHTML = noto
+    ? `<label class="filtro-check">
+         <input type="checkbox" id="filtroVicinoInp"${filtroVicino ? ' checked' : ''}>
+         📍 Vicino a ${esc(noto)} · ${filtroRaggio} km</label>
+       <a class="vicino-cambia" onclick="apriVicino()">cambia</a>`
+    : `<button type="button" class="campo-scelta" id="filtroVicinoBtn" onclick="apriVicino()" aria-haspopup="dialog" title="Filtra per distanza"><span class="cs-val">📍 Vicino a me</span><span class="cs-freccia" aria-hidden="true">▾</span></button>`;
 }
 
 /* Gemella client di normalizza() del server: minuscole, via gli accenti,
@@ -2803,7 +2823,10 @@ const normalizzaLite = s => (s || '').toLowerCase()
 
 function apriVicino(){
   haptic();
-  el('vicinoComune').value = filtroVicino || myComune || '';
+  /* il campo parte già scritto: il comune del filtro, quello ricordato
+     nel profilo, o — la primissima volta — quello indovinato dai suoi
+     annunci. Un campo vuoto qui è un modulo, così è una conferma. */
+  el('vicinoComune').value = filtroVicino || myComune || myComuneSuggerito || '';
   el('vicinoErrore').textContent = '';
   disegnaRaggi();
   el('sheetBg').classList.add('open');
@@ -2859,7 +2882,7 @@ async function applicaVicino(){
   }
   filtroVicino = nome;
   ricordaComune(nome);          // fail-open: il filtro vive comunque
-  aggiornaVicinoBtn();          // il campo dice subito dove e quanto
+  renderVicinoRiga();           // la riga diventa la spunta, già accesa
   chiudiVicino();
   applicaFiltri();
 }
@@ -2867,7 +2890,7 @@ async function applicaVicino(){
 function spegniVicino(){
   haptic();
   filtroVicino = '';
-  aggiornaVicinoBtn();
+  renderVicinoRiga();
   chiudiVicino();
   applicaFiltri();
 }
@@ -2883,6 +2906,11 @@ function chiudiVicino(){
    nuovo. Fail-open totale — se il salvataggio non riesce (anonimo in
    vetrina, rete storta) il filtro funziona lo stesso per la sessione. */
 let myComune = '';
+/* La proposta del server quando il comune non l'abbiamo mai chiesto:
+   il comune dei SUOI annunci. Non è il suo comune — è solo ciò che il
+   foglio scrive nel campo la primissima volta, e resta una proposta
+   finché non la conferma lui. */
+let myComuneSuggerito = '';
 async function ricordaComune(nome){
   myComune = nome;
   if (DEMO || VETRINA) return;
@@ -2940,6 +2968,10 @@ function applicaFiltri(){
   filtroLampo = !!el('filtroLampoInp').checked;
   filtroCond = el('filtroCondSel').value;
   filtroReg = el('filtroRegSel').value;
+  /* la spunta dice solo SÌ o NO: il DOVE è il comune ricordato, che
+     applicaVicino tiene sempre allineato (anche in vetrina anonima,
+     dove non arriva al server ma resta in pagina) */
+  filtroVicino = (el('filtroVicinoInp')?.checked && myComune) ? myComune : '';
   el('filtriBtn').classList.toggle('attivo', filtriVivi());
   el('filtriBox').style.display = 'none';
   if (DEMO) { renderGrid(); return; }
@@ -2961,7 +2993,9 @@ function azzeraFiltri(){
   filtroPrezzo = null; filtroSped = false; filtroRitiro = false;
   filtroDig = false; filtroLampo = false;
   filtroCond = ''; filtroReg = ''; filtroVicino = '';
-  aggiornaVicinoBtn();   // il campo torna a dire «Vicino a me»
+  /* la spunta si spegne, ma il comune resta ricordato: Azzera è un
+     filtro che si toglie, non una memoria che si cancella */
+  renderVicinoRiga();
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
   if (!cera) return;
@@ -9851,6 +9885,7 @@ async function avvia(){
        NON accende il filtro da solo — la vetrina resta di tutti finché
        non è l'utente a dire che vuole guardare qui intorno */
     myComune = me.comune || '';
+    myComuneSuggerito = me.comune_suggerito || '';
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];

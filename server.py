@@ -6903,8 +6903,23 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         da_moderare = con.execute(
             "SELECT COUNT(*) AS n FROM annunci "
             "WHERE stato='revisione'").fetchone()["n"]
+    # «Da dove cerchi» quando non l'ha ancora detto: lo si INDOVINA dai
+    # suoi annunci, che una zona ce l'hanno gia'. Non e' il comune
+    # dell'utente e non si scrive in colonna — e' solo la proposta che
+    # il foglio «Vicino a me» mette nel campo, cosi' il primo uso e' un
+    # tocco e non un modulo da riempire. Bastano le ultime righe: chi
+    # vende, vende quasi sempre da dove vive.
+    comune_suggerito = ""
+    if u and not (u["comune"] or "").strip():
+        for r in con.execute(
+                "SELECT zona FROM annunci WHERE venditore_id=? AND zona!='' "
+                "ORDER BY id DESC LIMIT 5", (user["id"],)):
+            comune_suggerito = comune_da_zona(r["zona"])
+            if comune_suggerito:
+                break
     con.close()
     profilo = dict(u) if u else {}
+    profilo["comune_suggerito"] = comune_suggerito
     profilo["admin"] = e_admin(user["id"])
     profilo["in_revisione"] = da_moderare
     profilo["doppioni_nostr"] = doppioni
