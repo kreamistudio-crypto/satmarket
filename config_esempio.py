@@ -58,9 +58,11 @@ TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
                              # limite (default). Mettici es. 100_000 per
                              # accendere il tetto; per gli annunci in EUR
                              # vale l'equivalente al cambio corrente
-MAX_QUANTITA_ANNUNCIO = 100  # pezzi massimi per annuncio (quantita' in
-                             # stock): para gli errori di battitura senza
-                             # limitare i commercianti veri
+MAX_QUANTITA_ANNUNCIO = 999999  # pezzi massimi per annuncio (quantita'
+                             # in stock). Alto apposta: quanti pezzi ha
+                             # in magazzino lo sa il venditore, non noi.
+                             # E' un guardrail contro il numero incollato
+                             # per sbaglio, non un giudizio sul negozio
 MAX_RIGHE_SET = 8            # annunci DIVERSI massimi in un set
                              # («Riempi il barattolo»): un pacco vero,
                              # non un camion

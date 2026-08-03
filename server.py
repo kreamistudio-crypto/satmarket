@@ -165,14 +165,19 @@ try:
 except ImportError:
     TETTO_SATS_ANNUNCIO = 0   # 0 = spento; es. 100_000 per accenderlo
 
-# Il tetto della quantita' per annuncio (lug 2026, cantiere stock):
-# un numero ragionevole che para il dito che sbaglia (10000 barattoli
-# di miele) senza limitare i commercianti veri. Vale nel form, nella
-# modifica, nella ricarica e nell'import CSV.
+# Il tetto della quantita' per annuncio (lug 2026, cantiere stock).
+# Vale nel form, nella modifica, nella ricarica, nell'import CSV e su
+# cio' che arriva dai relay.
+# ALZATO A 999999 (lug 2026, decisione di Andrea): quanti pezzi ha in
+# magazzino lo sa il venditore, non noi — un tetto basso non protegge
+# nessuno, dice solo «non ti credo» a chi ne ha davvero tanti. Quello
+# che resta e' un GUARDRAIL contro il numero incollato per sbaglio,
+# non un giudizio sul negozio. La responsabilita' del numero e' di
+# chi lo scrive.
 try:
     from config import MAX_QUANTITA_ANNUNCIO
 except ImportError:
-    MAX_QUANTITA_ANNUNCIO = 100
+    MAX_QUANTITA_ANNUNCIO = 999999
 
 # Il set «Riempi il barattolo» (lug 2026): quanti annunci DIVERSI
 # dello stesso venditore possono entrare in un ordine solo. Un numero
@@ -1640,8 +1645,11 @@ def quantita_da_payload(d, se_manca: int = 1) -> int:
     if n < 1:
         n = 1
     if n > MAX_QUANTITA_ANNUNCIO:
+        # Col tetto alto il numero va scritto leggibile, o il messaggio
+        # d'errore diventa lui stesso un muro di cifre.
         raise HTTPException(400, f"La quantità massima per annuncio è "
-                                 f"{MAX_QUANTITA_ANNUNCIO} pezzi")
+                                 f"{MAX_QUANTITA_ANNUNCIO:,} pezzi"
+                                 .replace(",", "."))
     return n
 
 

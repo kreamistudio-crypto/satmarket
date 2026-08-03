@@ -82,7 +82,7 @@ LIMITE_CANCELLAZIONI = 500
 try:
     from config import MAX_QUANTITA_ANNUNCIO
 except ImportError:
-    MAX_QUANTITA_ANNUNCIO = 100
+    MAX_QUANTITA_ANNUNCIO = 999999
 
 # ==============================================================
 
