@@ -102,7 +102,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   concorrenti). Nel client `publish()` passa da `bottoneInAttesa`
   (bottone spento + overlay fino alla risposta): la causa prima era
   il fetch lento (foto base64 + moderazione AI) col dito che ritocca.
-  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 25
+  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 26
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
   Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
   media · Altro) più le 16 del catalogo largo (Informatica ·
@@ -110,8 +110,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Bitcoin · Elettrodomestici · Fai da te e utensili · Alimenti e
   bevande · Scarpe e accessori · Orologi e gioielli · Biciclette ·
   Musica e film · Strumenti musicali · Collezionismo · Arte e
-  artigianato). "Tutto" è solo la vista del frontend, non una
-  categoria. «Bitcoin» è l'unica di casa nostra e non dei mercatini
+  artigianato), più «Bellezza e benessere» (lug 2026, 🧴): cosmetici,
+  creme, profumi, saponi, oli essenziali, integratori e cura della
+  persona, che prima si spartivano fra «Alimenti e bevande» (le
+  tisane, gli integratori) e «Altro», e nessuna delle due era giusta.
+  È la seconda voce delle CATEGORIE_SENZA_CONDIZIONE, per la stessa
+  ragione degli alimenti (vedi sotto). "Tutto" è solo la vista del
+  frontend, non una categoria. «Bitcoin» è l'unica di casa nostra e non dei mercatini
   generalisti: su un mercatino che incassa in sats, Jade e BitBox02
   sono merce di casa. Resta PIATTO: le sottocategorie vorrebbero una
   colonna e una gerarchia, si faranno quando le categorie saranno
@@ -140,7 +145,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   non un elettrodomestico), 🍎 Alimenti e bevande (il vasetto 🍯 diceva
   un prodotto solo, e per giunta somiglia al 🫙 dei preferiti, che non
   deve avere sosia), 🚗 Motori (lo scooter e' un pezzo del reparto),
-  🏡 Casa e giardino (la sedia ne diceva meta'). ₿ Bitcoin resta un
+  🏡 Casa e giardino (la sedia ne diceva meta'), 🧴 Bellezza e
+  benessere (il flacone e' il ripiano intero — creme, oli, saponi,
+  shampoo —, mentre il rossetto 💄 direbbe il solo trucco e lascerebbe
+  fuori integratori e saponi, e il sapone 🧼 e' un prodotto solo).
+  ₿ Bitcoin resta un
   glifo di TESTO e non un'emoji a colori — nel foglio stona un po'
   con le vicine, ed e' voluto: il simbolo vince sull'uniformita'.
   Guardate e tenute come sono: 🏺 Collezionismo (tira
@@ -148,7 +157,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   pacco della spedizione: convivono senza confondersi).
   AGGIUNGERE UNA CATEGORIA TOCCA SEI POSTI: `CATEGORIE` e
   `SINONIMI_CATEGORIA` e `MODELLO_IMPORT` in server.py, `<select
-  id="sellCat">` e `EMOJI_CAT` e `CATS` in miniapp.html. Non serve
+  id="sellCat">` e `EMOJI_CAT` e `CATS` in miniapp.html — più
+  `CATEGORIE_SENZA_CONDIZIONE` e il suo gemello `CAT_SENZA_COND`, se
+  la voce nuova è di quelle dove la condizione non vuol dire niente.
+  Non serve
   ricordarseli: `prove.py` li incrocia tutti e sei e fallisce se
   divergono (il sesto, il modello CSV, è entrato dopo essersi fatto
   dimenticare per davvero).
@@ -210,7 +222,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Andrea): una marmellata è nuova per definizione, e chiederlo è una
   domanda senza risposte sbagliate — cioè una domanda inutile. La leva
   è `CATEGORIE_SENZA_CONDIZIONE` (frozenset accanto a CATEGORIE:
-  oggi una voce sola, «Alimenti e bevande») e il giudice unico è
+  «Alimenti e bevande» e «Bellezza e benessere» — creme, profumi e
+  integratori si vendono nuovi, e un cosmetico già usato non è merce
+  di seconda mano, è una cosa che non si vende) e il giudice unico è
   `senza_condizione(categoria, consegna)`, da cui passano form,
   dettaglio, vetrina, NIP-99, ricerca AI e import — o divergono. Il
   secondo asse è la CONSEGNA: un codice Zalando è nuovo per
