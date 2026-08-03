@@ -931,21 +931,11 @@ def init_db():
             "UPDATE annunci SET categoria=? "
             "WHERE categoria=? COLLATE NOCASE AND categoria!=?",
             (nuova, vecchia, nuova))
-    # Migrazione al catalogo largo (lug 2026). Tre voci del set
-    # precedente non esistono piu' con quel nome e vanno portate
-    # dentro la piu' vicina — MAI in «Altro», che equivarrebbe a
-    # buttare la scelta fatta dal venditore. Dove la vecchia voce si
-    # apre in due (Casa e giardino → arredamento + giardino, Libri e
-    # media → libri + musica) si tiene la META' PIU' PROBABILE: chi
-    # vuole l'altra la sposta dal form in un tocco, mentre nessuno
-    # potrebbe recuperare una categoria persa.
-    # Idempotente come la sorella qui sopra: a migrazione avvenuta
-    # questi UPDATE non trovano piu' niente.
-    for vecchia, nuova in (("Casa e giardino", "Casa e arredamento"),
-                           ("Sport e hobby", "Sport"),
-                           ("Libri e media", "Libri e riviste")):
-        con.execute("UPDATE annunci SET categoria=? WHERE categoria=?",
-                    (nuova, vecchia))
+    # Il catalogo largo (lug 2026) NON ha una sua migrazione, ed e' una
+    # scelta: le nove voci di ieri restano tutte, con lo stesso nome —
+    # le nuove si AGGIUNGONO accanto. Quindi non c'e' un solo annuncio
+    # da spostare, e la migrazione piu' sicura e' quella che non esiste
+    # (vedi CATEGORIE).
     # Indici per la vetrina a volume (lug 2026): con centinaia di
     # annunci le liste ordinate per data non devono piu' scandire
     # tutta la tabella. Coprono le tre strade calde: vetrina per
@@ -3275,13 +3265,27 @@ async def moderazione_ai_lotto(voci: list) -> dict:
 # solo in sats i portafogli hardware e i miner sono merce di casa —
 # nei primi dati veri visti sui relay c'erano Jade, BitBox02, Seed
 # Signer e Nerd Miner, tutti finiti in «Elettronica» o peggio.
+#
+# SI AGGIUNGE, NON SI RINOMINA (lug 2026, decisione di Andrea). Le nove
+# voci di ieri sono qui tutte, con lo stesso identico nome: nessun
+# annuncio cambia casella, nessuna migrazione da scrivere, e nessun
+# venditore ritrova domani il suo oggetto in una categoria che non ha
+# scelto. Le sedici nuove si affiancano.
+# Per questo il catalogo NON ha «Casa e arredamento», «Sport» e «Libri
+# e riviste» come li aveva proposti il cantiere: non erano voci nuove,
+# erano nomi nuovi per voci che c'erano gia' — e tenere due nomi per la
+# stessa cosa non e' piu' scelta, e' un bivio senza risposta giusta
+# davanti a chi pubblica.
+# Per la stessa ragione il «fai da te» entra come «Fai da te e
+# utensili» e non come «Giardino e fai da te»: il giardino ce l'ha gia'
+# «Casa e giardino», mentre bricolage e utensili non li aveva nessuno.
 CATEGORIE = ("Elettronica", "Informatica", "Telefonia", "Audio e video",
              "Console e videogiochi", "Foto e ottica", "Bitcoin",
-             "Casa e arredamento", "Elettrodomestici",
-             "Giardino e fai da te", "Alimenti e bevande",
+             "Casa e giardino", "Elettrodomestici",
+             "Fai da te e utensili", "Alimenti e bevande",
              "Abbigliamento", "Scarpe e accessori", "Orologi e gioielli",
-             "Bambini", "Sport", "Biciclette", "Motori", "Animali",
-             "Libri e riviste", "Musica e film", "Strumenti musicali",
+             "Bambini", "Sport e hobby", "Biciclette", "Motori", "Animali",
+             "Libri e media", "Musica e film", "Strumenti musicali",
              "Collezionismo", "Arte e artigianato", "Altro")
 
 
@@ -3480,13 +3484,13 @@ SINONIMI_CATEGORIA = {
     "bitcoin": "Bitcoin", "btc": "Bitcoin", "wallet": "Bitcoin",
     "hardware wallet": "Bitcoin", "mining": "Bitcoin", "miner": "Bitcoin",
     # casa
-    "casa": "Casa e arredamento", "arredamento": "Casa e arredamento",
-    "arredo": "Casa e arredamento", "mobili": "Casa e arredamento",
-    "cucina": "Casa e arredamento",
+    "casa": "Casa e giardino", "arredamento": "Casa e giardino",
+    "arredo": "Casa e giardino", "mobili": "Casa e giardino",
+    "cucina": "Casa e giardino",
+    "giardino": "Casa e giardino", "giardinaggio": "Casa e giardino",
     "elettrodomestici": "Elettrodomestici",
-    "giardino": "Giardino e fai da te", "giardinaggio": "Giardino e fai da te",
-    "utensili": "Giardino e fai da te", "bricolage": "Giardino e fai da te",
-    "fai da te": "Giardino e fai da te",
+    "utensili": "Fai da te e utensili", "bricolage": "Fai da te e utensili",
+    "fai da te": "Fai da te e utensili", "attrezzi": "Fai da te e utensili",
     # alimentari
     "alimenti": "Alimenti e bevande", "alimentari": "Alimenti e bevande",
     "bevande": "Alimenti e bevande", "cibo": "Alimenti e bevande",
@@ -3501,17 +3505,18 @@ SINONIMI_CATEGORIA = {
     "bambini": "Bambini", "bimbi": "Bambini", "infanzia": "Bambini",
     "giocattoli": "Bambini",
     # tempo libero
-    "sport": "Sport", "palestra": "Sport", "fitness": "Sport",
+    "sport": "Sport e hobby", "palestra": "Sport e hobby",
+    "fitness": "Sport e hobby", "hobby": "Sport e hobby",
     "bici": "Biciclette", "biciclette": "Biciclette", "bike": "Biciclette",
     "motori": "Motori", "auto": "Motori", "moto": "Motori",
     "ricambi": "Motori",
     "animali": "Animali", "pet": "Animali",
-    "libri": "Libri e riviste", "riviste": "Libri e riviste",
+    "libri": "Libri e media", "riviste": "Libri e media",
+    "fumetti": "Libri e media", "media": "Libri e media",
     "musica": "Musica e film", "film": "Musica e film",
-    "media": "Musica e film", "fumetti": "Libri e riviste",
     "strumenti": "Strumenti musicali",
     "strumenti musicali": "Strumenti musicali",
-    "collezionismo": "Collezionismo", "hobby": "Collezionismo",
+    "collezionismo": "Collezionismo", "fumetteria": "Collezionismo",
     "arte": "Arte e artigianato", "artigianato": "Arte e artigianato",
     "handmade": "Arte e artigianato",
     "altro": "Altro", "varie": "Altro",
@@ -9273,12 +9278,16 @@ MODELLO_IMPORT = (
     "Giacca in pelle vintage;Taglia M, vera pelle anni 90;45,00;eur;"
     "Abbigliamento;Roma;https://esempio.it/giacca-fronte.jpg|"
     "https://esempio.it/giacca-retro.jpg;entrambe;5,50;busta;buono;\n"
+    # le categorie del modello passano dalle voci NUOVE del catalogo
+    # largo (lug 2026): il trapano sta in «Fai da te e utensili» e il
+    # miele in «Alimenti e bevande», che prima non esistevano e li
+    # facevano finire tutti e due sotto «Casa e giardino»
     "Trapano avvitatore Bosch;Con due batterie e valigetta;80000;sats;"
-    "Casa e giardino;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio;;\n"
+    "Fai da te e utensili;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio;;\n"
     # la quantita' in stock (lug 2026): colonna facoltativa, vuota = 1
     # pezzo — qui il miele mostra come si vende a scorte
     "Miele di castagno 500g;Produzione propria 2026, vasetto in "
-    "vetro;12,00;eur;Casa e giardino;Cuneo;;spedizione;6,00;piccolo;"
+    "vetro;12,00;eur;Alimenti e bevande;Cuneo;;spedizione;6,00;piccolo;"
     "nuovo;12\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
     # niente spedizione ne' taglia, il codice si consegna dopo

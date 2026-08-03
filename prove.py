@@ -225,6 +225,18 @@ def prove_categorie():
           [], orfani)
     prova("il CSV che dice «bevande» viene capito", "Alimenti e bevande",
           amb["categoria_tollerante"]("bevande"))
+
+    # Il SESTO posto, che il cantiere aveva dimenticato: il modello CSV
+    # che scaricano i commercianti. Non rompe niente se resta indietro
+    # (categoria_tollerante ripiega sulla prima parola), ma insegna
+    # nomi che non esistono — ed e' il primo file che un negozio nuovo
+    # apre. La colonna della categoria e' la quinta.
+    i = _SORGENTE.index("MODELLO_IMPORT = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    righe = [r for r in amb["MODELLO_IMPORT"].strip().splitlines() if r]
+    del righe[0]                                   # l'intestazione
+    prova("le categorie del modello CSV esistono nel catalogo", [],
+          [r.split(";")[4] for r in righe if r.split(";")[4] not in cat])
     prova("una categoria inventata finisce in Altro", "Altro",
           amb["categoria_tollerante"]("fantacategoria"))
     for c in cat:

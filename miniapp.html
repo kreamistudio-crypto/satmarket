@@ -1850,7 +1850,7 @@
            e a parlare col dito e' il campo-bottone che apre il
            foglio-picker (apriPicker, pattern dei fogli esistenti). -->
       <div class="field"><label>Categoria</label>
-        <select id="sellCat" hidden><option>Elettronica</option><option>Informatica</option><option>Telefonia</option><option>Audio e video</option><option>Console e videogiochi</option><option>Foto e ottica</option><option>Bitcoin</option><option>Casa e arredamento</option><option>Elettrodomestici</option><option>Giardino e fai da te</option><option>Alimenti e bevande</option><option>Abbigliamento</option><option>Scarpe e accessori</option><option>Orologi e gioielli</option><option>Bambini</option><option>Sport</option><option>Biciclette</option><option>Motori</option><option>Animali</option><option>Libri e riviste</option><option>Musica e film</option><option>Strumenti musicali</option><option>Collezionismo</option><option>Arte e artigianato</option><option>Altro</option></select>
+        <select id="sellCat" hidden><option>Elettronica</option><option>Informatica</option><option>Telefonia</option><option>Audio e video</option><option>Console e videogiochi</option><option>Foto e ottica</option><option>Bitcoin</option><option>Casa e giardino</option><option>Elettrodomestici</option><option>Fai da te e utensili</option><option>Alimenti e bevande</option><option>Abbigliamento</option><option>Scarpe e accessori</option><option>Orologi e gioielli</option><option>Bambini</option><option>Sport e hobby</option><option>Biciclette</option><option>Motori</option><option>Animali</option><option>Libri e media</option><option>Musica e film</option><option>Strumenti musicali</option><option>Collezionismo</option><option>Arte e artigianato</option><option>Altro</option></select>
         <button type="button" class="campo-scelta" id="sellCatBtn" onclick="apriPicker('sellCat')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field" id="sellCondField"><label>Condizioni dell'oggetto</label>
         <select id="sellCond" hidden>
@@ -2328,12 +2328,12 @@ function setCollaudo(id, nome){
 /* ---- mappatura dati backend -> formato della Mini App ---- */
 const EMOJI_CAT = {'Elettronica':'🔌', 'Informatica':'💻', 'Telefonia':'📱',
   'Audio e video':'🎧', 'Console e videogiochi':'🎮', 'Foto e ottica':'📷',
-  'Bitcoin':'₿', 'Casa e arredamento':'🪑', 'Elettrodomestici':'🧺',
-  'Giardino e fai da te':'🌱', 'Alimenti e bevande':'🍯',
+  'Bitcoin':'₿', 'Casa e giardino':'🪑', 'Elettrodomestici':'🧺',
+  'Fai da te e utensili':'🔧', 'Alimenti e bevande':'🍯',
   'Abbigliamento':'👕', 'Scarpe e accessori':'👟',
-  'Orologi e gioielli':'⌚', 'Bambini':'🧸', 'Sport':'⚽',
+  'Orologi e gioielli':'⌚', 'Bambini':'🧸', 'Sport e hobby':'⚽',
   'Biciclette':'🚲', 'Motori':'🛵', 'Animali':'🐾',
-  'Libri e riviste':'📚', 'Musica e film':'🎬',
+  'Libri e media':'📚', 'Musica e film':'🎬',
   'Strumenti musicali':'🎸', 'Collezionismo':'🏺',
   'Arte e artigianato':'🎨', 'Altro':'📦'};
 const FOTO_BASE = API_BASE.replace(/\/api$/, '');   // dove stanno le foto sul server
@@ -2816,11 +2816,12 @@ async function loadOrders(){
 /* ---------------- dati demo ---------------- */
 const CATS = ["Tutto","Elettronica","Informatica","Telefonia","Audio e video",
               "Console e videogiochi","Foto e ottica","Bitcoin",
-              "Casa e arredamento","Elettrodomestici","Giardino e fai da te",
+              "Casa e giardino","Elettrodomestici","Fai da te e utensili",
               "Alimenti e bevande","Abbigliamento","Scarpe e accessori",
-              "Orologi e gioielli","Bambini","Sport","Biciclette","Motori",
-              "Animali","Libri e riviste","Musica e film","Strumenti musicali",
-              "Collezionismo","Arte e artigianato","Altro"];
+              "Orologi e gioielli","Bambini","Sport e hobby","Biciclette",
+              "Motori","Animali","Libri e media","Musica e film",
+              "Strumenti musicali","Collezionismo","Arte e artigianato",
+              "Altro"];
 let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
@@ -2837,7 +2838,7 @@ let listings = [
    zone:"Milano (MI)", comune:"Milano (MI)", regione:"Lombardia", seller:"Giulia T.", rating:5.0, sales:7,
    consegna:"ritiro", condizione:"buono",
    desc:"Tagliando appena fatto, gomme nuove. Solo ritiro a mano zona Navigli."},
-  {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e riviste",
+  {id:3, emoji:"📗", title:"Il Bitcoin Standard — S. Ammous (nuovo)", price:24000, cat:"Libri e media",
    zone:"Torino (TO)", comune:"Torino (TO)", regione:"Piemonte", seller:"Andrea B.", rating:4.8, sales:31, condizione:"nuovo",
    /* il multi-pezzo dimostrativo: fa vedere stepper e conto × N */
    quantita:3,
@@ -2854,7 +2855,7 @@ let listings = [
       badge col countdown si vede anche nella demo coi dati finti */
    lampoPct:20, lampoFine:Math.floor(Date.now()/1000)+5*3600+14*60,
    desc:"Qualche segno d'uso sull'archetto, audio impeccabile. Scontrino incluso."},
-  {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e arredamento",
+  {id:5, emoji:"🪑", title:"Sedia ergonomica da ufficio, rete", price:210000, cat:"Casa e giardino",
    zone:"Bologna (BO)", comune:"Bologna (BO)", regione:"Emilia-Romagna", seller:"Sara M.", rating:4.9, sales:15, condizione:"come_nuovo",
    desc:"Comprata durante lo smart working, praticamente nuova. Smontabile."},
   /* la zona che NON e' un luogo: nessuna sigla, quindi niente regione —
