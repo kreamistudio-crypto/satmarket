@@ -495,7 +495,14 @@
      giro della mascotte e del barattolo del lockup. */
   .cat-tile .cat-emoji{position:absolute;right:2px;bottom:0;
     font-size:30px;line-height:1}
-  .cat-tile img + .cat-emoji{display:none}
+  /* ATTENZIONE al `[data-ok]`: l'emoji tiene il posto finche' la
+     figura e' ARRIVATA, non finche' l'<img> esiste. La differenza si
+     vede solo su rete lenta, ed e' tutta — col semplice `img +` il
+     ripiego spariva alla nascita del tag e restavano riquadri vuoti
+     che si riempivano uno alla volta. Lo scrive l'onload; se la figura
+     non arriva affatto ci pensa l'onerror a togliere l'img, e l'emoji
+     resta per sempre (la DEMO da file://). */
+  .cat-tile img[data-ok] + .cat-emoji{display:none}
   /* Le categorie senza annunci NON si spengono (deciso lug 2026,
      guardando la pagina vera): erano rese a meta' opacita', ma in
      rodaggio le vuote sono la maggioranza e la griglia sembrava
@@ -1609,7 +1616,9 @@
      piastrelle di Sfoglia, sibling scoperto dall'onerror */
   .cat-ico .cat-ico-em{position:absolute;inset:0;display:flex;
     align-items:center;justify-content:center;font-size:17px}
-  .cat-ico img + .cat-ico-em{display:none}
+  /* stesso patto delle piastrelle: il cambio avviene quando la figura
+     e' arrivata, non quando il tag nasce — vedi la nota la' sopra */
+  .cat-ico img[data-ok] + .cat-ico-em{display:none}
   .campo-scelta .cat-ico{width:26px;height:26px}
   /* Le icone graduate delle taglie: dentro il tondo del box non
      scendono mai sotto la riga di base, quindi le voci del foglio
@@ -3504,10 +3513,12 @@ const slugCat = c => c.toLowerCase().replace(/ /g,'-');
 /* L'illustrazione della categoria in piccolo: la usa il foglio-picker
    di Vendi (voci e campo chiuso). Il file e' il francobollo `-mini`,
    non quello pieno — un menu non deve scaricare 787 KB per aprirsi.
-   L'emoji resta sotto come ripiego, scoperta dall'onerror. */
+   L'emoji tiene il posto finche' la figura non e' arrivata (data-ok
+   sull'onload), e resta per sempre se non arriva (onerror). */
 function icoCategoria(c){
   return `<span class="cat-ico"><img src="/assets/categorie/${slugCat(c)}-mini.webp"
-      alt="" loading="lazy" decoding="async" onerror="this.remove()"
+      alt="" loading="lazy" decoding="async"
+      onload="this.dataset.ok=1" onerror="this.remove()"
     ><span class="cat-ico-em" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>`;
 }
 
@@ -3523,7 +3534,8 @@ function renderSfoglia(){
             onclick="apriCategoria(this.dataset.cat)">
       <span class="cat-nome" lang="it">${esc(c)}</span>
       <span class="cat-fig"><img src="/assets/categorie/${slugCat(c)}.webp"
-           alt="" loading="lazy" decoding="async" onerror="this.remove()"
+           alt="" loading="lazy" decoding="async"
+           onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>
     </button>`).join('');
 }
