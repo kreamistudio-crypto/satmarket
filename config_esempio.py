@@ -133,8 +133,16 @@ NOSTR_NSEC_PIATTAFORMA = "INCOLLA_QUI_LA_NSEC_DELLA_PIATTAFORMA"
 # legge (parole vietate + AI, la stessa moderazione di chi pubblica
 # da qui). NON serve elencare nessuna npub: i venditori si deducono
 # dal database e la scoperta trova i nuovi da sola.
-# False = nessun relay viene toccato e il mercatino vive come prima.
-IMPORT_NOSTR_APERTO = True
+#
+# Nasce SPENTA, ed e' voluto: acceso, il server apre account per
+# venditori che non ci conoscono e manda loro un DM di benvenuto. Una
+# cosa cosi' si accende di proposito, mai per il solo fatto di aver
+# aggiornato il codice sul VPS. Questa riga e' anche l'interruttore
+# d'emergenza: rimettila False e riavvia.
+# False = nessun relay viene toccato e il mercatino vive come prima
+# (l'import dell'unico venditore di ieri si lancia comunque a mano con
+# `python importa_nostr.py`, che usa NPUB_VENDITORE / VENDITORE_ID).
+IMPORT_NOSTR_APERTO = False
 
 # --- Post automatici (la piattaforma racconta i fatti) ----------------
 # Ogni nuovo annuncio in vetrina viene annunciato dai canali di

@@ -10155,10 +10155,21 @@ async def sollecita_incassi():
 # L'interruttore, come per ogni funzione che parla col mondo di fuori
 # (POST_AUTOMATICI, BANNER_TEST, AVVISI_ISCRITTI...): spento, il
 # mercatino vive esattamente come prima e nessun relay viene toccato.
+#
+# Il default e' FALSE, e qui la scelta e' diversa da quella degli altri
+# interruttori (POST_AUTOMATICI nasce acceso). Il motivo: il salto «da
+# un venditore scelto a mano a tutto Nostr» non deve poter succedere
+# come EFFETTO COLLATERALE di un deploy. Il config del VPS non ha la
+# chiave, quindi con un default True basterebbe un `git pull` e un
+# riavvio perche' la scoperta cominci ad aprire account e a mandare DM
+# a estranei: una cosa cosi' si accende con un gesto, scrivendo una
+# riga nel config, non per distrazione.
+# Ed e' anche l'INTERRUTTORE D'EMERGENZA: se il primo giro va storto si
+# rimette False e si riavvia, senza toccare il codice.
 try:
     from config import IMPORT_NOSTR_APERTO
 except ImportError:
-    IMPORT_NOSTR_APERTO = True
+    IMPORT_NOSTR_APERTO = False
 
 SECONDI_IMPORT_NOSTR = 3600
 _prossimo_import_nostr = 0.0     # 0 = primo giro subito all'avvio
