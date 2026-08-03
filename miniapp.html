@@ -3413,6 +3413,21 @@ function go(view){
    l'indietro esce dall'app, che e' il patto chiesto. Si spinge solo
    entrando in una vista piu' interna. */
 const RADICI = new Set(['esplora','sfoglia','vendi','affari','profilo']);
+/* Ma una radice e' la MADRE (lug 2026, decisione di Andrea che rovescia
+   quella del giorno prima): da ogni altra radice l'indietro passa da
+   Esplora, e solo da Esplora si esce. E' come si comportano Subito e
+   Vinted — la home e' la radice madre, dalle sezioni l'indietro ci
+   passa, e di li' si chiude —, cioe' e' la convenzione che i nostri
+   utenti hanno gia' nelle dita, e vale piu' della simmetria fra radici
+   sorelle: quella e' una proprieta' del nostro modello, questa
+   un'abitudine di chi lo usa. Conseguenza ACCETTATA: chi apre l'app
+   dritto su un'altra radice (o ci arriva senza passare da Esplora)
+   all'indietro finisce in Esplora, dove non e' mai stato — anche loro
+   fanno cosi'. Il patto delle radici SORELLE resta intatto dove
+   riguarda la cronologia: fra tab si SOSTITUISCE sempre, girarli tutti
+   non costa un indietro a testa, e questo passaggio non spinge niente
+   (vaiEsplora e' un ritorno a una radice, quindi replaceState). */
+const RADICE_MADRE = 'esplora';
 /* L'UNICA eccezione al patto qui sopra, e va detta perche' e' la prima
    crepa: il tocco su una piastrella di Sfoglia porta a Esplora, che e'
    una radice — ma non e' un cambio di tab, e' una DISCESA (da uno
@@ -3556,32 +3571,40 @@ function navIndietro(){
   if (t - navUltimo < 350) return;   /* due canali, un solo passo */
   navUltimo = t;
   if (STORIA) {
-    /* Alla RADICE il patto e' USCIRE — e uscire va DETTO. history.back()
-       da solo non basta: dentro Telegram (e nella PWA installata) la
-       nostra pagina e' la PRIMA della sessione, quindi «indietro» non ha
-       dove andare e il gesto moriva in silenzio. E' lo swipe che da
-       Sfoglia lasciava lo schermo dov'era: Sfoglia e' una radice come le
-       altre, non la figlia di Esplora, quindi di li' si esce — non si
-       passa da un'altra radice, che sarebbe un gradino inventato dove la
-       cronologia non ne ha nessuno. Il gradino su cui siamo lo dice la
-       cronologia stessa: d=0 = sotto non c'e' niente di nostro. */
-    if (!(history.state?.d) && navPila().length === 1 && tg?.initData) {
-      try { tg.close(); return; } catch(e){}
+    const p = navPila();
+    /* Ultimo gradino NOSTRO (d=0 e nessuno strato): qui decide il patto
+       della radice madre — da una radice che non e' Esplora si passa da
+       Esplora, e solo da li' si esce. Uscire va DETTO: history.back()
+       da solo non basta, perche' dentro Telegram (e nella PWA
+       installata) la nostra pagina e' la PRIMA della sessione, quindi
+       «indietro» non ha dove andare e il gesto moriva in silenzio — era
+       lo swipe che da Sfoglia lasciava lo schermo fermo dov'era. */
+    if (!(history.state?.d) && p.length === 1) {
+      if (p[0].t === 'v' && p[0].v !== RADICE_MADRE) { vaiEsplora(); return; }
+      if (tg?.initData) { try { tg.close(); return; } catch(e){} }
     }
     history.back(); return;
   }
   /* DEMO da file://: senza cronologia si smonta lo strato in cima, e se
-     non ce n'e' si torna al mercatino — il vecchio comportamento della
-     freccia. Mai navApplica(null): chiudere un foglio porterebbe via
-     anche dalla vista, che non e' quello che la ✕ chiedeva. */
+     non ce n'e' si torna al mercatino — che e' la stessa regola della
+     radice madre, detta a mano perche' qui la cronologia non c'e'.
+     Mai navApplica(null): chiudere un foglio porterebbe via anche dalla
+     vista, che non e' quello che la ✕ chiedeva. */
   const p = navPila();
   if (p.length > 1) navChiudiStrato(p[p.length - 1]);
-  else if (p[0].v !== 'esplora') go('esplora');
+  else if (p[0].v !== RADICE_MADRE) vaiEsplora();
 }
 
 /* La freccia di sistema di Telegram compare quando c'e' davvero dove
-   tornare. Alla radice resta nascosta: li' il gesto chiude la Mini App,
-   che e' il comportamento voluto.
+   tornare, ed e' la STESSA domanda a cui risponde navIndietro: un
+   giudice solo, o la freccia e il gesto divergono. Resta nascosta
+   soltanto sulla RADICE MADRE nuda — li' il gesto chiude la Mini App,
+   che e' il comportamento voluto. Sulle ALTRE radici ora si vede,
+   ed e' obbligatorio: con la freccia nascosta il gesto lo intercetta
+   il client, che chiuderebbe l'app per conto suo, e il passaggio da
+   Esplora non avverrebbe mai. E si vede anche a d>0 su Esplora — una
+   categoria aperta da una piastrella e' Esplora ma con Sfoglia sotto,
+   e li' l'indietro deve riportare allo scaffale.
    Lo swipe verticale invece si spegne SEMPRE, anche alla radice, ed e'
    un cambio del lug 2026: finche' restava acceso li', tirare giu' per
    aggiornare trascinava via la Mini App invece di ricaricare — un gesto
@@ -3594,7 +3617,9 @@ function navIndietro(){
    by swiping the Mini App's header». La freccetta ⌄ chiude l'app
    sempre, ovunque ci si trovi. */
 function navFreccia(pila){
-  const dentro = pila.length > 1 || !(pila[0].t==='v' && RADICI.has(pila[0].v));
+  const dentro = pila.length > 1                       /* uno strato da chiudere */
+              || !!(history.state?.d)                  /* un gradino nostro sotto */
+              || !(pila[0].t==='v' && pila[0].v===RADICE_MADRE);  /* non e' la madre */
   if (!tg?.initData) return;
   try {
     if (tg.BackButton && tg.isVersionAtLeast?.('6.1'))
