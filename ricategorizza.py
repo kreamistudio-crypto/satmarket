@@ -53,12 +53,14 @@ import time
 
 QUI = os.path.dirname(os.path.abspath(__file__))
 
-try:
-    from config import DB, ANTHROPIC_API_KEY
-except ImportError:
-    print("✗ Manca config.py (o le sue chiavi): questo script gira "
-          "dalla cartella del progetto.")
-    sys.exit(1)
+# Il config si chiede dentro main(), non qui: `catalogo()`, `PROMPT` e
+# `RIGA` sono roba pura che il server e le prove importano da questo
+# file, e chi importa un modulo per una costante non deve ritrovarsi il
+# processo chiuso in faccia perche' manca una chiave che non gli serve.
+# (E' successo: la CI e' rimasta rossa per 13 push, e siccome il
+# controllo dei segreti gira dopo le prove, non girava piu' nemmeno
+# quello.) Stesso modo di sposta_a_mano.py, che il config lo chiede
+# con un ripiego.
 try:
     from config import MODELLO_RICERCA
 except ImportError:
@@ -145,6 +147,12 @@ def chiedi(ai, cat: list, voci: list):
 
 
 def main():
+    try:
+        from config import DB, ANTHROPIC_API_KEY
+    except ImportError:
+        print("✗ Manca config.py (o le sue chiavi): questo script gira "
+              "dalla cartella del progetto.")
+        return 1
     scrivi = "--scrivi" in sys.argv
     rifai = "--rifai" in sys.argv
     limite = 0
