@@ -1174,7 +1174,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   varco (`cifraVia`), la riga «Spedizione» del `contoScomposto` nel
   paySheet, e i bottoni compra, che la spedizione l'hanno sempre
   inclusa. Con lui se ne sono andati `spedBadgeCosto` e
-  `spedCostoTesto` (e la classe `.sped-riga`). Con la vecchia riga del
+  `spedCostoTesto` (e la classe `.sped-riga`).
+  LACUNA TEMPORANEA, DICHIARATA (lug 2026, e questo va letto insieme
+  al paragrafo qui sopra, o il paragrafo sembra dire che va tutto
+  bene): oggi il costo della spedizione NON si vede da nessuna parte
+  nella scheda. Chi ha due strade lo incontra al primo tocco su
+  Acquista, nel foglio del varco, che porta il totale per strada; ma
+  chi ha la SOLA spedizione il varco non lo apre proprio (serve da due
+  strade in su) e scopre il costo nel paySheet, alla riga
+  «Spedizione» del conto scomposto — cioè dopo che la invoice è già
+  nata. È tardi, ed è riconosciuto come tale. NON si rimedia
+  rimettendo una cifra nella scheda (la fila delle pillole e il
+  recinto sono stati provati, entrambi per ragioni diverse non
+  reggono, vedi sopra): il rimedio è LA PAGINA D'ACQUISTO DEDICATA
+  del prossimo cantiere — scelta della strada e conto scomposto in un
+  posto solo, prima della invoice — che è la destinazione già
+  dichiarata del foglio del varco (vedi IL VARCO). Chi arriva qui
+  prima di quel cantiere: la lacuna è nota e ha già la sua casa, non
+  aprirne una seconda. Con la vecchia riga del
   costo nella fila delle pillole se n'era andata
   `rigaConsegna` — la riga «🛡️ protezione acquisti inclusa» era
   rumore: la protezione c'è SEMPRE, quindi non è un'informazione, e
@@ -2188,7 +2205,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sotto) e OGNI Acquista, barra e recinto, passa da `compraDaBarra()`:
   con una strada sola si va dritti a `startBuy`. Il foglio diventerà
   la pagina dedicata nel prossimo cantiere (transizione dichiarata:
-  fino ad allora vale il flusso di oggi).
+  fino ad allora vale il flusso di oggi) — e quella pagina ha ORA un
+  secondo compito, oltre alla scelta della strada: mostrare il CONTO
+  SCOMPOSTO prima della invoice, che oggi arriva troppo tardi per chi
+  ha la sola spedizione. Vedi «LACUNA TEMPORANEA, DICHIARATA» nella
+  sezione della spedizione: le due cose si chiudono insieme, in un
+  posto solo.
   `apriFoglioConsegna` RIUSA il markup di `#pickerSheet` (titolo,
   frecce, Esc, tap fuori: gratis) ma NON passa dal catalogo `PICKER` —
   qui il deposito non è una select, è `consegnaScelta`; ogni voce porta
@@ -3039,6 +3061,15 @@ leva nuova. RESTA DA DECIDERE A RODAGGIO: i testi della pagina sono
 scritti oggi con la commissione sospesa e la protezione spenta —
 quando si accenderanno vanno riletti, in particolare «Se qualcosa va
 storto» e «Dove stanno i sats»).
+Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
+strada e conto scomposto in un posto solo, prima che nasca la invoice.
+Prende il posto del foglio del varco (transizione già dichiarata) e
+chiude la lacuna aperta oggi: col solo canale spedizione il costo si
+vede per la prima volta nel paySheet, a invoice già creata. È una
+lacuna TEMPORANEA con la soluzione già pianificata, non una scelta
+definitiva: non rimediarla rimettendo una cifra nella scheda (fila
+delle pillole e recinto sono già stati provati e scartati, i motivi
+sono in Architettura).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri, escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
