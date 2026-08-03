@@ -939,89 +939,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «stretch» stirava Applica di 10px) più la base flex al 50% (col
   basis 0 i 2px di bordo della ghost si sommano FUORI dalla base e la
   facevano larga 4px in più).
-  «📍 VICINO A ME» (lug 2026, decisione di Andrea dopo la proposta):
-  il filtro per distanza NON chiede MAI la posizione al telefono, e
-  non è una rinuncia — è la scelta giusta, e va tenuta. Gli annunci
-  hanno le coordinate del CENTRO del comune: sapere dov'è l'utente a
-  venti metri darebbe la STESSA identica risposta, con in mano un dato
-  molto più delicato; in più dentro la WebView di Telegram il permesso
-  di posizione su certi Android non arriva proprio, e un filtro che a
-  volte non risponde è peggio che non averlo. Chi volesse rimetterla
-  legga prima queste tre righe. Si dice invece DA DOVE si cerca:
-  colonna `utenti.comune` (il nome dal dataset nella forma «Pavia
-  (PV)», '' = mai detto) — nel profilo e non in localStorage perché
-  non è un segreto del dispositivo (quelli sono la nsec e il secret
-  NWC) ma un fatto tuo, e da un telefono nuovo non si deve richiedere;
-  MAI le coordinate in colonna, che si rileggono da `COMUNI` in RAM
-  (una fonte di verità sola, gemella di `_chiave_comune`).
-  `POST /api/me/comune` (pattern canale-notifiche: accetta solo un
-  comune che il dataset conosce, 400 col nome storto, vuoto =
-  dimenticato); param `vicino` + `raggio_km` su /api/listings
-  (raggi `RAGGI_AMMESSI` degli avvisi — un vocabolario solo di
-  distanze in tutta l'app —, ripiego `RAGGIO_VICINO` 25, comune
-  sconosciuto = nessun filtro e mai un 400, la regola di condizione e
-  regione). Il filtro vive DENTRO la query, mai in Python sulle righe
-  già lette: `distanza_km` si presta a SQLite con `create_function`
-  (registrata sulla sola connessione che serve, e solo quando serve —
-  non in `db()`, che gira anche prima che la funzione esista) dietro
-  un riquadro grezzo su lat/lon (~111 km al grado, la longitudine col
-  coseno) che l'indice sa sfruttare. In Python il cursore keyset, il
-  «N oggetti» e i conteggi conterebbero anche i lontani. Annunci senza
-  coordinate fuori, il patto di spedizione e condizione.
-  `GET /api/comuni` è diventata PUBBLICA (auth facoltativa): serve al
-  filtro anche nella vetrina anonima, ed è l'elenco ISTAT committato
-  in chiaro — nessun dato di nessuno e nessuna chiamata a pagamento da
-  regalare ai bot (che è invece la ragione per cui la ricerca AI resta
-  agli autenticati). Frontend: la riga `renderVicinoRiga()` ha DUE
-  FACCE, ed è la risposta all'attrito del primo uso (lug 2026,
-  feedback di Andrea): finché il comune non lo sappiamo è il
-  campo-bottone `#filtroVicinoBtn` che apre il foglio — bisogna pur
-  chiederlo —, appena lo sappiamo diventa una SPUNTA come gli altri
-  filtri, «📍 Vicino a Pavia (PV) · 25 km», che si accende con UN
-  tocco, col «cambia» di lato per un altro comune o un altro raggio.
-  Richiedere il comune ogni volta sarebbe un modulo da riempire per
-  accendere un filtro. La spunta dice solo sì/no: il DOVE è `myComune`,
-  che `applicaVicino` tiene allineato (in vetrina anonima resta in
-  pagina e basta), e `applicaFiltri` legge la casella. Azzera spegne il
-  filtro ma NON la memoria — il comune resta ricordato. E il primo uso
-  non parte da un campo vuoto: `comune_suggerito` in /api/me indovina
-  il comune dagli ULTIMI 5 annunci dell'utente (`comune_da_zona`, solo
-  quando `utenti.comune` è vuoto) e il foglio ci precompila il campo —
-  non è il suo comune e non si scrive in colonna, è una proposta
-  finché non la conferma lui, e con la conferma diventa memoria. Il
-  RAGGIO invece resta di sessione (default 25): è una manopola, non
-  un'anagrafica. Nel foglio `#vicinoSheet`:
-  comune con `<datalist>` e le pillole del raggio; il valore dei
-  suggerimenti porta la SIGLA («Pavia (PV)»), che i sette omonimi
-  d'Italia col nome nudo il server non sa collocare, ma all'elenco si
-  chiede il nome NUDO (cerca per prefisso del nome: «Milano (MI)» non
-  comincia per «Milano (MI)», ed è il bug che si ripresenta a chiunque
-  tocchi `applicaVicino`). Il comune si CONTROLLA prima di filtrare
-  (`normalizzaLite`, gemella client di `normalizza`: `\p{M}` scritto
-  col nome e mai come intervallo, che nel sorgente sarebbe invisibile)
-  — se non esiste il server non protesterebbe, per regola, e il filtro
-  resterebbe muto, cioè sembrerebbe rotto. `myComune` da /api/me
-  PRECOMPILA il foglio ma NON accende il filtro da solo: la vetrina
-  resta di tutti finché non è l'utente a dire che vuole guardare qui
-  intorno. In DEMO la riga non c'è (i dati finti non hanno
-  coordinate), in vetrina anonima il filtro vive per la sessione e il
-  salvataggio nel profilo non parte (fail-open).
-  IL COMUNE SI RIUSA, MA MAI IN SILENZIO (lug 2026, decisione di
-  Andrea): precompila la Zona di Vendi (`precompilaZonaDalProfilo` in
-  `go('vendi')` e in coda ad annullaModifica) e il comune di un avviso
-  di ricerca NUOVO — e la PRIMA volta che succede il campo lo DICE,
-  con `avvisoComune`: riga `.hintline` «Ho scritto Milano (MI), il
-  comune da cui cerchi…» col bottone «Svuota». Non «Non ora» ma
-  «Svuota», che è il rimedio e non il rinvio; si consuma alla
-  comparsa, come il tour e il cartello di test. Tre guardie che non si
-  tolgono: MAI in modifica (l'annuncio porta la SUA zona), mai sopra
-  qualcosa che l'utente ha già scritto, mai in DEMO/VETRINA — la zona
-  resta di CHI PUBBLICA, il profilo dà solo il punto di partenza.
-  ATTENZIONE al flag `consuma`: il form degli avvisi si disegna
-  all'apertura del PROFILO e non del cassetto, quindi lì l'avviso si
-  brucia solo se `accRicerche` è davvero aperto — un avviso consumato
-  da nessuno è peggio di nessun avviso, ed è il tranello di ogni
-  one-shot che vive dentro un cassetto chiuso. MOTORE: gemello della coda
+  «📍 VICINO A ME» È ESISTITO DUE GIORNI, ED È STATO TOLTO (lug 2026,
+  decisione di Andrea) — la voce resta qui perché il motivo vale più
+  della funzione, e perché è un'idea che torna in mente da sola.
+  Era: comune di chi guarda (colonna `utenti.comune`) più un raggio,
+  parametri `vicino`/`raggio_km` su /api/listings con l'haversine
+  prestato a SQLite, foglio «Da dove cerchi?», e il comune riusato per
+  precompilare la Zona di Vendi e gli avvisi di ricerca. Funzionava.
+  È stato tolto perché IL FILTRO PER REGIONE COPRE GIÀ QUEL BISOGNO, e
+  due strade per la stessa cosa non sono il doppio delle possibilità:
+  sono un bivio davanti a chi cerca, che deve capire in che cosa
+  differiscono prima di scegliere — e per un compratore italiano
+  «Lombardia» e «entro 50 km da Milano» rispondono alla stessa
+  domanda. Non era un problema di codice: era una voce di troppo nel
+  pannello. Chi volesse riprovarci si chieda prima cosa TOGLIE, non
+  cosa aggiunge.
+  Restano in piedi, e sono roba d'altri cantieri: `distanza_km` e
+  `RAGGI_AMMESSI` (li usano gli avvisi di ricerca), `comune_da_zona`
+  e tutto il motore geografico, `GET /api/comuni` — che era stata
+  aperta al pubblico per la vetrina anonima ed è tornata AUTENTICATA
+  con la rimozione: non perché aprirla facesse danno (è l'elenco ISTAT
+  committato in chiaro) ma perché una superficie pubblica senza più un
+  motivo è solo superficie.
+  COLONNA `utenti.comune`: INERTE. Nessuno la scrive, nessuno la
+  legge; è rimasta per non fare una migrazione distruttiva su chi
+  l'aveva valorizzata in quei due giorni, come `avatar_visibile` prima
+  di lei. Non è un dato su cui contare: se un domani servisse davvero
+  un comune dell'utente, va ripensato da capo.
+  E LA ZONA DI VENDI NON SI PRECOMPILA (stessa decisione): il campo
+  nasce vuoto e lo scrive l'utente con l'autocomplete. Con l'avviso
+  «Ho scritto Milano (MI)…» se n'è andata anche `avvisoComune`, e con
+  lei la proposta ricavata dagli ultimi annunci (`comune_suggerito` in
+  /api/me). Il posto dove si dice da dove si vende è uno solo, ed è
+  quel campo lì. MOTORE: gemello della coda
   promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
   loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
   dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
@@ -3714,28 +3664,24 @@ stare, il secondo giro che finisce il lavoro, il rilancio a vuoto.
 LEZIONE da non perdere: un cantiere che legge da una fonte pubblica
 deve chiedersi per prima cosa se in quella fonte c'è anche la propria
 voce).
-tre ritocchi ai filtri e al recinto (lug 2026: le due spunte di
-consegna che mancavano — «🤝 Ritiro in zona» e «💾 Codice online», col
-digitale che guarda il SET delle strade per prendere anche la combo —;
-«📍 Vicino a me» col COMUNE e non col GPS, che sugli annunci-al-centro-
-del-comune darebbe la stessa risposta con un dato più delicato in mano,
-haversine dentro la query per non far mentire cursore e conteggi; e lo
-«Scopri di più» che passa in coda alla frase del recinto, nel verde del
-testo di fiducia. Vedi Architettura — collaudato in locale coi dati
-veri: conteggi del filtro incrociati con le query sul database
-(Milano 10/25/50 km, Pavia, raggio storto che ripiega, comune inventato
-che non filtra, composizione con spedizione/condizione/regione),
-paginazione col filtro acceso — 5 pagine, 137 annunci distinti, zero
-doppioni —, risposta legacy senza `limit` ancora un array, giro
-completo del foglio nel browser vero a 360px compreso il gesto
-indietro, e il ritorno a capo del link misurato a 360/375/390/1280 nei
-due temi coi contrasti AA; più il riuso del comune in Vendi e negli
-avvisi — avviso alla prima volta e non alla seconda, «Svuota» che
-svuota, campo già scritto mai toccato, form in modifica intonso, e
-l'avviso degli avvisi che non si brucia col cassetto chiuso. IN PRODUZIONE basta il deploy: gira la
-migrazione di `utenti.comune` e nient'altro. Da guardare dal vivo
-dentro Telegram: la tastiera che copre il foglio del comune sui
-telefoni bassi).
+ritocchi ai filtri e al recinto (lug 2026: le due spunte di consegna
+che mancavano — «🤝 Ritiro in zona» e «💾 Codice online», col digitale
+che guarda il SET delle strade per prendere anche la combo — e le
+etichette senza «Solo con…», che dentro un pannello che si chiama
+Filtri il «solo» lo dice il posto; e lo «Scopri di più» che passa in
+coda alla frase del recinto, nel verde del testo di fiducia, legato
+all'ultima parola perché sotto i 390px scendano insieme. Collaudato
+coi dati veri: conteggi dei filtri incrociati con le query sul
+database, composizione con condizione e regione, paginazione, risposta
+legacy senza `limit` ancora un array, e il ritorno a capo del link
+misurato a 360/375/390/1280 nei due temi coi contrasti AA. In
+produzione basta il deploy).
+E in mezzo, «📍 Vicino a me»: nato, deployato e TOLTO nel giro di due
+giorni perché si sovrapponeva al filtro per regione — la storia, il
+motivo e cosa è rimasto in piedi stanno in Architettura, alla voce
+omonima. Con lui se n'è andata la precompilazione della Zona in Vendi:
+il campo nasce vuoto e lo scrive l'utente. Resta INERTE la colonna
+`utenti.comune`, che nessuno scrive e nessuno legge.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
