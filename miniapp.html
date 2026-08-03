@@ -3089,9 +3089,12 @@ function navIndietro(){
    che e' il comportamento voluto.
    Lo swipe verticale si spegne solo quando siamo dentro, ed e' il solo
    trascinamento ACCIDENTALE della pagina (quello che chiude l'app
-   mentre si scorre una scheda lunga): la freccetta ⌄ della chrome di
-   Telegram non si tocca in nessun caso — quella chiude l'app sempre,
-   ovunque ci si trovi. */
+   mentre si scorre una scheda lunga). La chrome di Telegram non si
+   tocca in nessun caso, e non e' una speranza: lo dice la
+   documentazione di disableVerticalSwipes (Bot API 7.7) — «In any
+   case, the user will still be able to minimize and close the Mini App
+   by swiping the Mini App's header». La freccetta ⌄ chiude l'app
+   sempre, ovunque ci si trovi. */
 function navFreccia(pila){
   const dentro = pila.length > 1 || !(pila[0].t==='v' && RADICI.has(pila[0].v));
   if (!tg?.initData) return;
