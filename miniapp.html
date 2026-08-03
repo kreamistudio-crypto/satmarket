@@ -1697,6 +1697,32 @@
     will-change:transform,opacity}
   .festa-coin.mini{width:15px;height:15px;font-size:9px}
 
+  /* Il gesto di aggiornamento: una pastiglia di carta che scende dalla
+     cima mentre il dito tira, gemella del cerchietto sulla foto. Vive
+     fuori da #app (position:fixed) e non tocca il layout: la pagina non
+     si sposta di un pixel, si sposta solo lei. Sta SOPRA l'header (z 20)
+     — scende da li' e dietro sparirebbe — ma sotto la nav, la barra
+     d'acquisto e i fogli: e' un segnale, non uno strato. */
+  .ptr{
+    position:fixed;left:50%;top:0;z-index:25;pointer-events:none;
+    width:34px;height:34px;margin-left:-17px;border-radius:50%;
+    background:rgba(255,248,234,.96);color:#23282C;
+    display:flex;align-items:center;justify-content:center;
+    font-size:16px;line-height:1;opacity:0;
+    box-shadow:0 2px 8px rgba(0,0,0,.22);
+    transform:translateY(-44px);
+  }
+  /* la risalita a dito alzato e' l'unica animazione: mentre si tira il
+     translate lo scrive il dito, e una transizione lo farebbe arrancare */
+  .ptr.molla{transition:transform .25s, opacity .25s}
+  .ptr.gira{opacity:1;transform:translateY(18px);
+            transition:transform .25s, opacity .25s}
+  .ptr.gira span{animation:ptrGiro .9s linear infinite}
+  @keyframes ptrGiro{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){
+    .ptr.molla,.ptr.gira{transition:none}
+    .ptr.gira span{animation:none}
+  }
   .toast{
     position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);
     background:var(--toast-bg);color:var(--toast-text);font-weight:700;font-size:13.5px;padding:12px 20px;
@@ -2596,6 +2622,8 @@
     <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
   </div>
 
+  <!-- La pastiglia del gesto «tira giù per aggiornare» -->
+  <div class="ptr" id="ptr" aria-hidden="true"><span>↻</span></div>
   <div class="toast" id="toast"></div>
   <div id="attesaOverlay"><div class="attesa-card"><img class="attesa-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="attesa-clessidra">⏳</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
@@ -3535,10 +3563,13 @@ function navIndietro(){
 /* La freccia di sistema di Telegram compare quando c'e' davvero dove
    tornare. Alla radice resta nascosta: li' il gesto chiude la Mini App,
    che e' il comportamento voluto.
-   Lo swipe verticale si spegne solo quando siamo dentro, ed e' il solo
-   trascinamento ACCIDENTALE della pagina (quello che chiude l'app
-   mentre si scorre una scheda lunga). La chrome di Telegram non si
-   tocca in nessun caso, e non e' una speranza: lo dice la
+   Lo swipe verticale invece si spegne SEMPRE, anche alla radice, ed e'
+   un cambio del lug 2026: finche' restava acceso li', tirare giu' per
+   aggiornare trascinava via la Mini App invece di ricaricare — un gesto
+   che ovunque significa «rinfresca» qui significava «vattene», e chi lo
+   faceva lo leggeva come un torna-indietro. Ora quel trascinamento e'
+   NOSTRO (vedi il gesto di aggiornamento qui sotto). Non si perde
+   nessuna via d'uscita, e non e' una speranza: lo dice la
    documentazione di disableVerticalSwipes (Bot API 7.7) — «In any
    case, the user will still be able to minimize and close the Mini App
    by swiping the Mini App's header». La freccetta ⌄ chiude l'app
@@ -3549,8 +3580,7 @@ function navFreccia(pila){
   try {
     if (tg.BackButton && tg.isVersionAtLeast?.('6.1'))
       dentro ? tg.BackButton.show() : tg.BackButton.hide();
-    if (tg.isVersionAtLeast?.('7.7'))
-      dentro ? tg.disableVerticalSwipes?.() : tg.enableVerticalSwipes?.();
+    if (tg.isVersionAtLeast?.('7.7')) tg.disableVerticalSwipes?.();
   } catch(e){}
 }
 
@@ -3577,6 +3607,139 @@ function navMotore(){
      chiede una traversata, non smonta niente per conto suo. */
   if (tg?.initData) tg.onEvent?.('backButtonClicked', navIndietro);
   navFreccia(navPila());
+}
+
+/* ---------------- il gesto di aggiornamento ----------------
+   Tirare giu' dalla cima AGGIORNA la vista e ci RESTA. Prima quel
+   trascinamento non era di nessuno: dentro Telegram era la presa che
+   porta via la Mini App — e chi tirava giu' per rinfrescare si ritrovava
+   fuori, cioe' leggeva un torna-indietro —, nel browser il ricarica
+   nativo, che riparte da Esplora e perde dov'eri. Ora e' NOSTRO: a
+   Telegram lo toglie disableVerticalSwipes (navFreccia), al browser lo
+   toglie l'overscroll-behavior:none che il body ha da sempre, e qui si
+   rilegge soltanto cio' che la vista mostra.
+
+   TRE recinti, e sono la parte che conta — un touchmove su tutta la
+   pagina e' un ascoltatore invadente, e va reso timido per costruzione:
+
+   1) solo dalla CIMA (scrollY 0) e solo a STRATI CHIUSI: dentro un
+      foglio, nel lightbox o nel tour il dito serve ad altro — e
+      navPila() lo sa gia' dire, senza una seconda lista da allineare;
+   2) solo sulle viste che hanno DAVVERO qualcosa da rileggere
+      (`VISTE_PTR`). Cosi' la galleria a scroll-snap del dettaglio resta
+      fuori dal gesto PER COSTRUZIONE, non per fortuna: nel dettaglio la
+      foto e' in cima, quindi scrollY e' 0 e un trascinamento in diagonale
+      sulla striscia avrebbe armato una tirata che poi non ricaricava
+      niente — mezzo secondo di pastiglia che gira per nulla;
+   3) il gesto dev'essere VERTICALE: appena il dito va piu' di lato che
+      in giu' la tirata si annulla e non torna fino al tocco dopo. E' il
+      recinto delle strisce che scorrono di fianco e restano dentro le
+      viste ammesse (le pillole delle categorie, «Altri oggetti»).
+
+   Gli ascoltatori sono PASSIVI: non annullano mai il tocco (niente
+   preventDefault), quindi lo scorrimento normale non se ne accorge, e
+   dentro Telegram non fanno a botte col client — li' il trascinamento
+   verticale non e' piu' suo (disableVerticalSwipes in navFreccia), ma
+   la chrome e la freccetta ⌄ restano sue e noi non le tocchiamo. */
+const PTR_SOGLIA = 64;         /* i pixel di tirata che valgono un «sì» */
+/* Le viste che aggiornaVista() sa davvero rileggere. Se un domani se ne
+   aggiunge una la' dentro, va aggiunta anche qui — o il gesto girera'
+   a vuoto proprio dove l'utente lo chiede. */
+const VISTE_PTR = new Set(['esplora','affari','profilo']);
+let ptrDa = 0, ptrDaX = 0, ptrTirato = 0, ptrInCorso = false;
+
+const ptrVista = () =>
+  (document.querySelector('.view.active')?.id || 'view-esplora').replace('view-','');
+const ptrPuo = () => !ptrInCorso && scrollY <= 0
+                  && navPila().length === 1 && VISTE_PTR.has(ptrVista());
+
+/* la pastiglia segue il dito a meta' strada: la tirata resta una
+   promessa finche' non si supera la soglia */
+function ptrPosa(y){
+  ptrTirato = y;
+  const p = el('ptr');
+  p.classList.remove('molla');
+  p.style.transform = `translateY(${Math.min(y, PTR_SOGLIA*2)/2 - 44}px)`;
+  p.style.opacity = Math.min(1, y / PTR_SOGLIA);
+}
+function ptrRientra(){
+  ptrTirato = 0;
+  const p = el('ptr');
+  p.classList.add('molla'); p.classList.remove('gira');
+  p.style.transform = ''; p.style.opacity = '';
+}
+
+addEventListener('touchstart', e => {
+  const ok = e.touches.length === 1 && ptrPuo();
+  ptrDa  = ok ? e.touches[0].clientY : 0;
+  ptrDaX = ok ? e.touches[0].clientX : 0;
+}, {passive:true});
+
+addEventListener('touchmove', e => {
+  if (!ptrDa || e.touches.length !== 1) return;
+  const d  = e.touches[0].clientY - ptrDa;
+  const dx = Math.abs(e.touches[0].clientX - ptrDaX);
+  /* si scorre all'insu', la pagina si e' mossa, o il dito va piu' di
+     lato che in giu' (una striscia che scorre di fianco): non e' roba
+     nostra — la pastiglia si ritira e non torna fino al tocco dopo */
+  if (d <= 0 || scrollY > 0 || dx > d) {
+    ptrDa = 0; if (ptrTirato) ptrRientra(); return;
+  }
+  ptrPosa(d);
+}, {passive:true});
+
+addEventListener('touchend', () => {
+  if (!ptrDa) return;
+  const basta = ptrTirato >= PTR_SOGLIA;
+  ptrDa = 0;
+  basta ? ptrAggiorna() : ptrRientra();
+}, {passive:true});
+addEventListener('touchcancel', () => { ptrDa = 0; if (ptrTirato) ptrRientra(); },
+                 {passive:true});
+
+/* La pastiglia gira finche' il lavoro non e' finito, con un minimo di
+   mezzo secondo: senza, su rete veloce lampeggerebbe e sembrerebbe che
+   non sia successo niente. Fail-open: se la ricarica va storta si
+   rientra in silenzio e in pagina resta quello che c'era. */
+async function ptrAggiorna(){
+  if (ptrInCorso) return;
+  ptrInCorso = true;
+  const p = el('ptr');
+  p.classList.remove('molla');
+  p.style.transform = ''; p.style.opacity = '';
+  p.classList.add('gira');
+  haptic();
+  try {
+    await Promise.all([
+      aggiornaVista().catch(()=>{}),
+      new Promise(r => setTimeout(r, 500))
+    ]);
+  } catch(e){}
+  ptrInCorso = false;
+  ptrRientra();
+}
+
+/* Cosa vuol dire «aggiorna» dipende da dove sei: si rilegge quello che
+   la vista mostra e si RESTA li'. Per Ordini e Profilo il giudice e'
+   go(), che quelle viste le sa gia' caricare — un secondo posto che
+   elenca i loro render divergerebbe al primo cassetto nuovo.
+   Le altre viste non sono qui, e nemmeno nel recinto VISTE_PTR: Sfoglia
+   ha una griglia fissa, Vendi e' un form che si sta compilando, e
+   riaprire un dettaglio da capo azzererebbe pezzi scelti e strada di
+   consegna — non e' quello che chiede un dito che tira giu'. Li' il
+   gesto non si arma proprio: meglio niente che una promessa vuota. */
+async function aggiornaVista(){
+  const v = ptrVista();
+  if (v === 'esplora') {
+    if (DEMO) { renderGrid(); return; }
+    /* la ricerca AI non si rifa' da sola (costerebbe credito a ogni
+       tirata): si torna alla vetrina, che e' cio' che il gesto chiede */
+    await loadListings();
+    renderGrid();
+    if (!VETRINA) { try { await caricaPreferiti(); aggiornaJarCards(); } catch(e){} }
+    return;
+  }
+  if (v === 'affari' || v === 'profilo') go(v);
 }
 
 /* ---------------- esplora ---------------- */
