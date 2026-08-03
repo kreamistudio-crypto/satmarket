@@ -938,7 +938,73 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   specificità vinceva il `margin-top:10px` della ghost e in flex
   «stretch» stirava Applica di 10px) più la base flex al 50% (col
   basis 0 i 2px di bordo della ghost si sommano FUORI dalla base e la
-  facevano larga 4px in più). MOTORE: gemello della coda
+  facevano larga 4px in più).
+  «📍 VICINO A ME» (lug 2026, decisione di Andrea dopo la proposta):
+  il filtro per distanza NON chiede MAI la posizione al telefono, e
+  non è una rinuncia — è la scelta giusta, e va tenuta. Gli annunci
+  hanno le coordinate del CENTRO del comune: sapere dov'è l'utente a
+  venti metri darebbe la STESSA identica risposta, con in mano un dato
+  molto più delicato; in più dentro la WebView di Telegram il permesso
+  di posizione su certi Android non arriva proprio, e un filtro che a
+  volte non risponde è peggio che non averlo. Chi volesse rimetterla
+  legga prima queste tre righe. Si dice invece DA DOVE si cerca:
+  colonna `utenti.comune` (il nome dal dataset nella forma «Pavia
+  (PV)», '' = mai detto) — nel profilo e non in localStorage perché
+  non è un segreto del dispositivo (quelli sono la nsec e il secret
+  NWC) ma un fatto tuo, e da un telefono nuovo non si deve richiedere;
+  MAI le coordinate in colonna, che si rileggono da `COMUNI` in RAM
+  (una fonte di verità sola, gemella di `_chiave_comune`).
+  `POST /api/me/comune` (pattern canale-notifiche: accetta solo un
+  comune che il dataset conosce, 400 col nome storto, vuoto =
+  dimenticato); param `vicino` + `raggio_km` su /api/listings
+  (raggi `RAGGI_AMMESSI` degli avvisi — un vocabolario solo di
+  distanze in tutta l'app —, ripiego `RAGGIO_VICINO` 25, comune
+  sconosciuto = nessun filtro e mai un 400, la regola di condizione e
+  regione). Il filtro vive DENTRO la query, mai in Python sulle righe
+  già lette: `distanza_km` si presta a SQLite con `create_function`
+  (registrata sulla sola connessione che serve, e solo quando serve —
+  non in `db()`, che gira anche prima che la funzione esista) dietro
+  un riquadro grezzo su lat/lon (~111 km al grado, la longitudine col
+  coseno) che l'indice sa sfruttare. In Python il cursore keyset, il
+  «N oggetti» e i conteggi conterebbero anche i lontani. Annunci senza
+  coordinate fuori, il patto di spedizione e condizione.
+  `GET /api/comuni` è diventata PUBBLICA (auth facoltativa): serve al
+  filtro anche nella vetrina anonima, ed è l'elenco ISTAT committato
+  in chiaro — nessun dato di nessuno e nessuna chiamata a pagamento da
+  regalare ai bot (che è invece la ragione per cui la ricerca AI resta
+  agli autenticati). Frontend: campo-bottone `#filtroVicinoBtn` nel
+  pannello (dice sempre dove e quanto) che apre `#vicinoSheet` —
+  comune con `<datalist>` e le pillole del raggio; il valore dei
+  suggerimenti porta la SIGLA («Pavia (PV)»), che i sette omonimi
+  d'Italia col nome nudo il server non sa collocare, ma all'elenco si
+  chiede il nome NUDO (cerca per prefisso del nome: «Milano (MI)» non
+  comincia per «Milano (MI)», ed è il bug che si ripresenta a chiunque
+  tocchi `applicaVicino`). Il comune si CONTROLLA prima di filtrare
+  (`normalizzaLite`, gemella client di `normalizza`: `\p{M}` scritto
+  col nome e mai come intervallo, che nel sorgente sarebbe invisibile)
+  — se non esiste il server non protesterebbe, per regola, e il filtro
+  resterebbe muto, cioè sembrerebbe rotto. `myComune` da /api/me
+  PRECOMPILA il foglio ma NON accende il filtro da solo: la vetrina
+  resta di tutti finché non è l'utente a dire che vuole guardare qui
+  intorno. In DEMO la riga non c'è (i dati finti non hanno
+  coordinate), in vetrina anonima il filtro vive per la sessione e il
+  salvataggio nel profilo non parte (fail-open).
+  IL COMUNE SI RIUSA, MA MAI IN SILENZIO (lug 2026, decisione di
+  Andrea): precompila la Zona di Vendi (`precompilaZonaDalProfilo` in
+  `go('vendi')` e in coda ad annullaModifica) e il comune di un avviso
+  di ricerca NUOVO — e la PRIMA volta che succede il campo lo DICE,
+  con `avvisoComune`: riga `.hintline` «Ho scritto Milano (MI), il
+  comune da cui cerchi…» col bottone «Svuota». Non «Non ora» ma
+  «Svuota», che è il rimedio e non il rinvio; si consuma alla
+  comparsa, come il tour e il cartello di test. Tre guardie che non si
+  tolgono: MAI in modifica (l'annuncio porta la SUA zona), mai sopra
+  qualcosa che l'utente ha già scritto, mai in DEMO/VETRINA — la zona
+  resta di CHI PUBBLICA, il profilo dà solo il punto di partenza.
+  ATTENZIONE al flag `consuma`: il form degli avvisi si disegna
+  all'apertura del PROFILO e non del cassetto, quindi lì l'avviso si
+  brucia solo se `accRicerche` è davvero aperto — un avviso consumato
+  da nessuno è peggio di nessun avviso, ed è il tranello di ogni
+  one-shot che vive dentro un cassetto chiuso. MOTORE: gemello della coda
   promo — `accoda_match` in pubblica() accanto ad accoda_promo, nel
   loop finale dell'import CSV (accodati insieme = UN aggregato) e nel
   dopo-import Nostr (`creato>=t0`: gli importati CONTANO, «un
@@ -1183,7 +1249,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'auto-sblocco a 10gg resta ancorato a spedito_il = momento della
   consegna a mano. Vetrina: i 4 campi in CAMPI_VETRINA; param
   `solo_spedizione` su /api/listings (gli storici '' restano fuori:
-  il filtro promette un costo dichiarato); `protezione_percento`
+  il filtro promette un costo dichiarato) — e dal lug 2026 i suoi due
+  gemelli `solo_ritiro` (consegna IN ritiro/entrambe) e
+  `solo_digitale`, che è l'unico a guardare il SET delle strade
+  (`consegna='digitale' OR anche_digitale=1`: la combo va presa, ed è
+  la regola di `stradeConsegna()` nel client, dove la DEMO chiede
+  proprio a lui invece di ripetere la condizione a mano). Tre spunte
+  che si SOMMANO: spedizione+ritiro = solo chi offre tutte e due;
+  `protezione_percento`
   nella busta di prima pagina (la stima del client non hardcoda mai
   la cifra). NIP-99: la spedizione è una riga del CONTENT, nessun tag
   nuovo. Import CSV: colonne facoltative `consegna;spedizione;taglia`
@@ -2480,11 +2553,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   paghi con qualsiasi wallet» (troppo lunga, e chi ha un wallet lo sa
   già). Il «(escrow)» della prima spiegazione lunga se n'è andato con
   loro: la spiegazione lunga adesso vive nella pagina dedicata (regola
-  9 rispettata, cambia solo dove sta la prima volta). In basso a
-  sinistra il link «Scopri di più» (`.escrow-piede`) la apre: è in
-  INCHIOSTRO e non verde — dentro il recinto il verde era già del
-  bordo, della bandierina e del testo di fiducia, e un quarto verde
-  faceva poltiglia.
+  9 rispettata, cambia solo dove sta la prima volta). Il link «Scopri
+  di più» (`.scopri-link`) la apre e sta IN LINEA, in coda alla frase
+  («…di aver ricevuto l'oggetto. Scopri di più»): non è più il piede
+  staccato sotto il bottone (`.escrow-piede`, morto lug 2026). Porta
+  lo STESSO verde `--trust-note` del testo di fiducia — è la stessa
+  frase che continua, e a dire che è un link bastano la sottolineatura
+  e il grassetto in più (800 contro 600); l'inchiostro del piede
+  serviva a staccarlo da un blocco che adesso non esiste. È legato
+  all'ULTIMA PAROLA con un nowrap (`.fine-frase`, il trucco della
+  pillola condizione in coda al titolo): sotto i 390px non ci sta in
+  riga e scendono INSIEME — da solo a capo tornerebbe a somigliare al
+  piede di prima.
   LA PAGINA «IL PAGAMENTO PROTETTO» (lug 2026, `view-sicurezza`): la
   spiegazione lunga che il recinto non può contenere — hero col
   barattolo, cosa succede quando paghi (4 passi), i tempi, la
@@ -3614,6 +3694,28 @@ stare, il secondo giro che finisce il lavoro, il rilancio a vuoto.
 LEZIONE da non perdere: un cantiere che legge da una fonte pubblica
 deve chiedersi per prima cosa se in quella fonte c'è anche la propria
 voce).
+tre ritocchi ai filtri e al recinto (lug 2026: le due spunte di
+consegna che mancavano — «🤝 Ritiro in zona» e «💾 Codice online», col
+digitale che guarda il SET delle strade per prendere anche la combo —;
+«📍 Vicino a me» col COMUNE e non col GPS, che sugli annunci-al-centro-
+del-comune darebbe la stessa risposta con un dato più delicato in mano,
+haversine dentro la query per non far mentire cursore e conteggi; e lo
+«Scopri di più» che passa in coda alla frase del recinto, nel verde del
+testo di fiducia. Vedi Architettura — collaudato in locale coi dati
+veri: conteggi del filtro incrociati con le query sul database
+(Milano 10/25/50 km, Pavia, raggio storto che ripiega, comune inventato
+che non filtra, composizione con spedizione/condizione/regione),
+paginazione col filtro acceso — 5 pagine, 137 annunci distinti, zero
+doppioni —, risposta legacy senza `limit` ancora un array, giro
+completo del foglio nel browser vero a 360px compreso il gesto
+indietro, e il ritorno a capo del link misurato a 360/375/390/1280 nei
+due temi coi contrasti AA; più il riuso del comune in Vendi e negli
+avvisi — avviso alla prima volta e non alla seconda, «Svuota» che
+svuota, campo già scritto mai toccato, form in modifica intonso, e
+l'avviso degli avvisi che non si brucia col cassetto chiuso. IN PRODUZIONE basta il deploy: gira la
+migrazione di `utenti.comune` e nient'altro. Da guardare dal vivo
+dentro Telegram: la tastiera che copre il foglio del comune sui
+telefoni bassi).
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
