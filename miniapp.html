@@ -768,8 +768,15 @@
     color:var(--on-ink);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
     justify-content:center;font-size:11px;cursor:pointer}
   .card .info{padding:32px 12px 12px}
+  /* overflow-wrap qui non salva la PAGINA — ci pensa gia' l'overflow
+     hidden del clamp, verificato: la griglia non sborda nemmeno con un
+     token da 60 caratteri — ma salva il TITOLO: senza, la parola viene
+     tagliata di netto a meta' della prima riga e la seconda resta
+     vuota, coi puntini che non compaiono. Con la rete va a capo, riempie
+     le due righe e i puntini tornano a fare il loro mestiere. */
   .card .title{font-family:'Baloo 2',sans-serif;font-weight:700;font-size:15px;line-height:1.2;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px;
+    overflow-wrap:break-word}
   .price{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700;font-size:14px;margin-top:6px}
   .price .unit{font-size:10.5px;font-weight:500;color:var(--muted)}
   /* l'aria fra numero e unita' la da' il CSS, non uno spazio nel
@@ -1058,7 +1065,22 @@
   #detailContent .btn{border-radius:var(--radius)}
   .detail-ph{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
     font-size:84px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 12px,var(--ph-b) 12px 24px)}
-  .detail-body{padding:18px var(--pad)}
+  /* IL TESTO DELL'UTENTE NON DEVE POTER ALLARGARE LA PAGINA (lug 2026,
+     da due annunci veri importati da Nostr): una parola lunga senza
+     spazi non ha nessun punto dove andare a capo, quindi esce dal suo
+     riquadro e allarga il DOCUMENTO — e la pagina diventa scorrevole di
+     lato, col testo che slitta e sembra una vista desktop. Non c'entra
+     la galleria (quello era un altro bug, chiuso): qui si trascina il
+     CORPO dell'annuncio.
+     Misurato a 375px con un token da 60 caratteri: titolo +324px,
+     riquadro venditore +129, descrizione +43. Un URL e una chiave
+     prodotto NON sbordano — hanno `/` e `-`, dove il browser sa
+     spezzare —, quindi la rete serve solo per il caso senza appigli.
+     Sta sul CONTENITORE e non sui tre figli perche' overflow-wrap si
+     EREDITA: cosi' copre anche il campo di testo che qualcuno
+     aggiungera' qui dentro fra sei mesi. E' la stessa rete dei nomi
+     delle categorie in Sfoglia, per la stessa ragione. */
+  .detail-body{padding:18px var(--pad);overflow-wrap:break-word}
   .detail-body h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;line-height:1.15}
   /* La striscia «altri oggetti di questo venditore» (lug 2026): le
      stesse card della vetrina in fila orizzontale scorrevole — la
@@ -1234,7 +1256,14 @@
      cerchio, e se non arriva l'onerror la toglie e resta l'iniziale
      — mai un'immagine rotta, il patto della mascotte */
   .avatar .av-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  .seller .who{flex:1}
+  /* min-width:0 e' quello che rende EFFICACE l'overflow-wrap ereditato
+     dal corpo: un figlio flex non scende mai sotto il proprio contenuto
+     (min-width:auto), quindi con un nome lungo senza spazi la parola
+     poteva anche spezzarsi ma la SCATOLA restava larga, e il riquadro
+     venditore continuava ad allargare la pagina (misurato: +129px con
+     il testo gia' sistemato dappertutto). E' lo stesso rimedio del
+     comune nella riga meta della card, per lo stesso identico motivo. */
+  .seller .who{flex:1;min-width:0}
   .seller .who b{font-size:14px}
   .seller .rep{font-size:12px;color:var(--muted);font-weight:600}
   /* La sfilza dei distintivi accanto al nome del venditore: emoji
