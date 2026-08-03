@@ -3161,6 +3161,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Altro» non veniva pescato mai e quella voce non partiva mai —
   aggiunto `OR categoria='Altro'`. La stessa funzione non chiede più
   la condizione dove non vuol dire niente.
+  DA SOLA, DOPO OGNI IMPORT (lug 2026, `ricategorizza_automatico` in
+  server.py, in coda a `giro_import_nostr`): lo stesso mestiere dello
+  script, ma senza che nessuno lo lanci. Il momento è l'import e non un
+  orario fisso perché è l'import a creare il problema — gli annunci dai
+  relay nascono tutti in «Altro» — e girare a vuoto non costa niente.
+  CHI SI GUARDA: gli importati (`contatto_nostr!=''`) e chiunque stia
+  in «Altro»; i nativi in una categoria vera hanno avuto un umano che
+  l'ha scelta dal form, e la macchina non è lì per correggere le
+  persone. I TRE FRENI, che sono la ragione per cui può girare ogni
+  ora: 1) si chiede solo per gli annunci di cui non esiste già una riga
+  in coda fatta sulla categoria che hanno ADESSO (un annuncio fermo non
+  si ripaga mai due volte); 2) quella stessa riga è anche il NO del
+  moderatore — uno spostamento rifiutato resta scritto con la sua
+  categoria di partenza, quindi non torna più a bussare: il rifiuto non
+  si richiede; 3) `MAX_RICATEGORIZZA_GIRO` (100 = 5 chiamate), che
+  un'ondata la digerisce in più ore. Più la leva `RICATEGORIZZA_AUTO`
+  nel config (default **True**, al contrario di IMPORT_NOSTR_APERTO: qui
+  non esce niente verso nessuno — si riempie una coda che un moderatore
+  guarderà, e in vetrina non cambia nulla finché non approva). UNA
+  notifica aggregata ai moderatori per giro, coi GRUPPI e non i titoli
+  (chi modera decide sul gruppo, e venti righe in chat non si leggono),
+  e solo se quel giro ha prodotto qualcosa: una coda ferma non suona
+  ogni ora. Il prompt e il parsing NON si riscrivono: `_chiedi_categorie`
+  importa `PROMPT` e `RIGA` da ricategorizza.py, perché un prompt in due
+  copie è un prompt che diverge — si corregge una, si dimentica l'altra,
+  e la coda si riempie di proposte diverse secondo chi le ha chieste.
+  Fail-open totale come la moderazione: lotto saltato = si riprova al
+  giro dopo.
+- `sposta_a_mano.py` (lug 2026) — gli spostamenti che decidi tu, quando
+  l'AI ha sbagliato o ha detto NON SO. Prende `pezzo di titolo=Categoria`
+  (o `id=Categoria`), pesca gli attivi e scrive le proposte in coda come
+  se le avesse fatte l'AI. NON tocca `annunci.categoria`, ed è il punto:
+  lo spostamento vero resta UNO — il bottone della coda — perché è lì
+  che vivono l'UPDATE condizionato, l'aggiornamento dell'evento NIP-99 e
+  il registro di chi ha deciso; riscriverlo qui vorrebbe dire tenere
+  allineati due posti che fanno la stessa cosa. Di serie non scrive
+  (stampa id, titolo, categoria di adesso e venditore, così un frammento
+  troppo largo si vede PRIMA); un frammento che pesca cinque poster li
+  mette in coda tutti e cinque, ed è voluto.
 - `ripulisci_anello_nostr.py` (lug 2026) — la pulizia una-tantum dopo
   l'anello (vedi sopra). Riconosce le copie dal marchio che solo NOI
   scriviamo — il tag `d` di un evento nostro è sempre `barattolo-{id}`,
@@ -3199,6 +3238,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 - Dominio: https://barattolo.store — Bot: @ilbarattolobot (BotFather URL
   con `?v=2`, innocuo). Header anti-cache già attivi su `/` e
   `/miniapp.html`: non rimuoverli.
+- La coda delle categorie si riempie da sola dopo ogni giro d'import
+  (leva `RICATEGORIZZA_AUTO`, accesa di serie): nel journal la riga
+  «🗂 Ricategorizzazione: N guardati, M proposte in coda», e ai
+  moderatori arriva una notifica sola coi gruppi. Non cambia niente in
+  vetrina finché un moderatore non approva. Per spegnerla, `False` nel
+  config del VPS e riavvio.
 - L'import aperto da Nostr si accende SOLO scrivendo
   `IMPORT_NOSTR_APERTO = True` nel config del VPS e riavviando: nel
   codice il default è False apposta (vedi Architettura). Prima di
