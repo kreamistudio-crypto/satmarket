@@ -226,6 +226,52 @@ def prove_tag_commercio():
 
 
 # ====================================================================
+def prove_anello():
+    """Il tappo del bug dell'anello (lug 2026): Barattolo non importa
+    Barattolo, e l'import non crede sulla parola al filtro `authors`
+    del relay. Sono due righe che un rifattorizzatore distratto
+    toglierebbe senza accorgersi, e costano 40 annunci fantasma."""
+    print("\n[l'anello non si richiude]")
+    import re
+    amb = {"npub_to_hex": None}
+    # npub_to_hex serve al confronto npub↔hex: si estrae con lui
+    for f in ("npub_to_hex", "chiave_di_casa"):
+        exec(pezzo(f), amb)
+    nostra = "ab" * 32
+    amb["_NOSTR"] = (None, nostra)
+    di_casa = amb["chiave_di_casa"]
+    prova("la nostra hex è di casa", True, di_casa(nostra))
+    prova("in maiuscolo lo è lo stesso", True, di_casa(nostra.upper()))
+    prova("quella di un altro no", False, di_casa("cd" * 32))
+    prova("il vuoto non è di casa", False, di_casa(""))
+    prova("una stringa storta non esplode", False, di_casa("npub1zzz"))
+    # anche in forma npub, che è come la scrive utenti.npub_accesso
+    i = _SORGENTE.index("CHARSET_BECH32 = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    exec(pezzo("_bech32_polymod"), amb)
+    exec(pezzo("hex_to_npub"), amb)
+    prova("la nostra npub è di casa", True,
+          di_casa(amb["hex_to_npub"](nostra)))
+    prova("la npub di un altro no", False,
+          di_casa(amb["hex_to_npub"]("cd" * 32)))
+    # a Nostr spento non deve dire di sì a tutto
+    amb["_NOSTR"] = None
+    prova("con Nostr spento nessuna chiave è «di casa»", False,
+          di_casa(nostra))
+
+    # La sentinella sull'autore: qui non c'è una funzione da chiamare
+    # (il filtro è dentro importa_venditore), quindi si guarda che ci
+    # sia. Grezza, ma è esattamente il pezzo che sparisce per sbaglio.
+    corpo = open("importa_nostr.py", encoding="utf-8").read()
+    i = corpo.index("def importa_venditore(")
+    corpo = corpo[i:corpo.index("\ndef ", i + 10)]
+    prova("l'import confronta l'autore dell'evento con la chiave chiesta",
+          True,
+          bool(re.search(r'\(e\.get\("pubkey"\)\s*or\s*""\)\.lower\(\)\s*'
+                         r'[!=]=\s*hexkey', corpo)))
+
+
+# ====================================================================
 def prove_categorie():
     """Il catalogo e' UNO: server, frontend e import devono dire le
     stesse categorie. Questa prova esiste perche' aggiungerne una
@@ -305,7 +351,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_testo_evento,
-              prove_tag_commercio, prove_categorie):
+              prove_tag_commercio, prove_anello, prove_categorie):
         try:
             f()
         except Exception as e:

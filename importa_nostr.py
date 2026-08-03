@@ -610,6 +610,28 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     for r in RELAYS:
         eventi += interroga(r, hexkey)
 
+    # CHI HA FIRMATO DAVVERO (lug 2026). Fin qui si e' creduto sulla
+    # parola al filtro `authors` della REQ: se il relay dice che sono
+    # suoi, sono suoi. Con UN venditore fidato era un rischio teorico;
+    # da quando l'import e' aperto no — l'autore di un evento decide
+    # A CHI VANNO I SATS di chi lo compra, e un relay distratto (o
+    # bugiardo) basterebbe a intestare la merce di uno alla cassa di
+    # un altro.
+    # La firma la si controlla gia' altrove (il vaglio del server), ma
+    # controlla una cosa DIVERSA: che l'evento sia firmato dalla
+    # chiave che DICHIARA — non che quella chiave sia il venditore che
+    # abbiamo chiesto. Le due domande insieme chiudono il buco; una
+    # sola, nessuna delle due.
+    # Vale anche per i kind 5: una cancellazione altrui, col tag `e`
+    # giusto, spegnerebbe l'annuncio di un altro.
+    estranei = [e for e in eventi
+                if (e.get("pubkey") or "").lower() != hexkey]
+    if estranei:
+        print(f"  ⚠️ {len(estranei)} eventi NON firmati da questa chiave: "
+              f"scartati (il relay ha ignorato il filtro authors)")
+        eventi = [e for e in eventi
+                  if (e.get("pubkey") or "").lower() == hexkey]
+
     # dedup: tieni la versione piu' recente di ogni annuncio
     unici = {}
     for e in eventi:
@@ -631,9 +653,10 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     # --- Cancellazioni NIP-09 (kind 5) del venditore ---
     # Tag "a" = coordinata kind:pubkey:d (la via giusta per i
     # replaceable, solo i kind che importiamo e solo la SUA chiave),
-    # tag "e" = id di un evento preciso. La fiducia e' quella di
-    # tutto l'import: si chiede authors=hexkey ai relay, le firme
-    # non si verificano (limite dichiarato in testa al file).
+    # tag "e" = id di un evento preciso. Qui arrivano solo eventi la
+    # cui `pubkey` E' questa chiave (il filtro qui sopra), quindi una
+    # cancellazione non puo' piu' spegnere l'annuncio di un altro —
+    # che col solo tag "e", che non nomina l'autore, sarebbe bastato.
     canc_coord, canc_id = set(), set()
     for e in eventi:
         if e.get("kind") != 5:

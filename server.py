@@ -7631,6 +7631,35 @@ def _prepara_nostr():
 _NOSTR = _prepara_nostr()
 
 
+def chiave_di_casa(chiave: str) -> bool:
+    """Vero se la chiave Nostr (hex o npub) e' una delle NOSTRE.
+
+    Nata da un bug vissuto (lug 2026), e il bug spiega la funzione
+    meglio di qualunque descrizione: la scoperta dell'import aperto
+    setaccia i relay SENZA filtro d'autore, e fra gli annunci NIP-99
+    italiani con firma valida ci sono anche i NOSTRI — quelli che la
+    piattaforma firma per conto di chi pubblica da qui. Nessuno la
+    escludeva, cosi' la scoperta ha aperto un account per la nostra
+    stessa chiave e l'import ha ricominciato a scaricare in casa cio'
+    che avevamo appena pubblicato: 40 copie, intestate a un venditore
+    che non esiste. Un anello chiuso su se' stesso.
+
+    La regola e' quindi una sola e va tenuta: Barattolo non importa
+    Barattolo. Il confronto e' sulla CHIAVE e non sul tag `d`
+    ('barattolo-…') o sul tag `r`, perche' quelli li puo' scrivere
+    chiunque: la firma no."""
+    if not chiave or _NOSTR is None:
+        return False
+    nostra = _NOSTR[1].lower()
+    c = chiave.strip().lower()
+    if c == nostra:
+        return True
+    try:
+        return npub_to_hex(chiave).lower() == nostra
+    except Exception:
+        return False
+
+
 def evento_non_firmato(pubkey: str, kind: int, tags: list, content: str,
                        creato: int) -> dict:
     """Costruisce un evento Nostr con l'id canonico NIP-01 ma SENZA
@@ -10850,6 +10879,12 @@ async def scopri_venditori_nostr():
         pubkey = e.get("pubkey", "")
         if not RE_HEX_64.fullmatch(pubkey or ""):
             continue
+        # BARATTOLO NON IMPORTA BARATTOLO (vedi chiave_di_casa): fra
+        # gli annunci italiani firmati che tornano dalla spazzata ci
+        # sono anche i nostri, e adottarli come «venditore nuovo»
+        # chiude l'anello su noi stessi.
+        if chiave_di_casa(pubkey):
+            continue
         try:
             if hex_to_npub(pubkey) in noti:
                 continue
@@ -10896,7 +10931,12 @@ def venditori_nostr_attivi() -> list:
         "WHERE npub_accesso != '' OR (npub != '' AND npub_verificata=1)"
     ).fetchall()
     con.close()
-    return [(r["chiave"], r["tg_id"]) for r in righe if r["chiave"]]
+    # La nostra chiave non si importa MAI, nemmeno se in utenti esiste
+    # gia' una riga che la dichiara (ed esiste: la scoperta l'ha aperta
+    # prima che ci fosse chiave_di_casa). Cosi' il tappo ferma il danno
+    # al primo riavvio, senza aspettare la pulizia.
+    return [(r["chiave"], r["tg_id"]) for r in righe
+            if r["chiave"] and not chiave_di_casa(r["chiave"])]
 
 
 async def importa_nostr_periodico():
