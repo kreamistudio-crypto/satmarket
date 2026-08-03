@@ -3487,8 +3487,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   una funzione estratta deve aggiungere anche le sue dipendenze
   all'ambiente (è già successo con `_chiave_comune`, che
   `coordinate_da_zona` ha cominciato a usare). Il workflow fa anche
-  `compileall` di tutti gli script e cerca segreti nella repo (la
-  regola ferrea 1 in CI). Su Windows serve `PYTHONIOENCODING=utf-8`,
+  `compileall` di tutti gli script (elenco a mano: chi ne aggiunge uno
+  lo mette lì, o non lo guarda nessuno — ai tre nati il 3 ago 2026 è
+  successo) e cerca segreti nella repo (la regola ferrea 1 in CI:
+  `config.py`/`*.db`/`foto/` tracciati, nsec, token del bot Telegram e
+  chiavi `sk-ant-`; lunghezze LARGHE apposta — meglio un falso allarme
+  da guardare che un token vero che passa perché era un carattere più
+  corto — e `grep -I` che salta i binari, o un byte messo per caso in
+  una delle 52 illustrazioni fa diventare rossa la CI a caso, e una CI
+  rossa a caso non la guarda più nessuno).
+  DUE JOB E NON UNO (lug 2026, e il perché vale più della struttura):
+  `prove` e `segreti` girano in PARALLELO, senza `needs`. Il controllo
+  dei segreti era l'ultimo passo in coda alle prove, e da lì qualunque
+  cosa fallisse prima lo nascondeva — non diceva «pulito» a torto: non
+  parlava proprio. È successo per davvero: le prove si sono rotte alle
+  13:20 del 3 ago 2026 e per 13 push di fila i segreti non li ha
+  guardati nessuno, mentre GitHub diceva soltanto «rosso» — un semaforo
+  solo per due domande diverse. Provato rompendo `prove.py` di
+  proposito su un ramo usa-e-getta: `prove` fallito, `segreti` riuscito
+  che dice «pulito». Entrambi `permissions: contents: read`.
+  GLI SCRIPT «PURI» NON CHIEDONO IL CONFIG ALL'IMPORT, ed è LA regola
+  che impedisce il bis. Chi importa un modulo per una costante non deve
+  ritrovarsi il processo chiuso in faccia per una chiave che non gli
+  serve: `ricategorizza.py` faceva `from config import DB,
+  ANTHROPIC_API_KEY` in cima al file con un `sys.exit(1)` sotto, e
+  `prove.py` lo importa per `catalogo()`, `PROMPT` e `RIGA` — roba pura
+  che di chiavi non sa niente. In CI `config.py` non c'è PER PROGETTO,
+  quindi le prove morivano sempre. Il config si chiede dentro `main()`
+  (il modo di `sposta_a_mano.py`, che ha pure il ripiego a
+  'satmarket.db'); il ripiego innocuo, tipo `MODELLO_RICERCA`, può
+  restare in cima perché non chiude niente ed è un nome globale che
+  serve alle funzioni. ATTENZIONE alla trappola che rende questa
+  famiglia di bug invisibile: IN LOCALE PASSA SEMPRE, perché il config
+  c'è — le 78 prove erano verdi sul portatile mentre la CI era rossa da
+  nove ore. Non è una cosa che si becca girando le prove prima del
+  push: si becca solo GUARDANDO la CI (`git push && sleep 4 && gh run
+  watch --exit-status`), o provando in un clone senza `config.py`, che
+  è la condizione vera.
+  Su Windows serve `PYTHONIOENCODING=utf-8`,
   o la console cp1252 esplode sulle spunte.
 
 ## Produzione
