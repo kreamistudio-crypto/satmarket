@@ -180,6 +180,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   si atterra sulla vetrina vuota, che ha già il suo «🔔 Avvisami se
   arriva». Il nome va in `data-cat` e mai dentro la stringa JS
   dell'onclick — la lezione di «Valle d'Aosta» sul picker.
+  DUE DETTAGLI DEL PASSAGGIO A ESPLORA, tutti e due nati da un tester
+  che li ha visti: `apriCategoria` SVUOTA la griglia prima di partire
+  (setCat ricarica dal server e la risposta arriva mezzo secondo dopo:
+  senza, si atterra vedendo per un attimo gli annunci della categoria
+  di prima, che è la cosa più sbagliata da mostrare a chi ne ha appena
+  scelta un'altra); e il tasto Esplora della barra passa da
+  `vaiEsplora()`, che riporta ad activeCat='Tutto' — NON è go('esplora'),
+  che serve anche a tornare da una scheda e lì il filtro deve restare.
+  Chi tocca il nome del tab si aspetta tutto il mercatino, non la
+  categoria in cui era entrato da Sfoglia mezz'ora prima.
   CONSEGUENZA sul resto: `renderChips` non riporta più a «Tutto» la
   categoria attiva rimasta senza annunci. Quella scorciatoia era nata
   contro i filtri fantasma, ma con Sfoglia diventava una bugia — si
@@ -223,18 +233,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   («Console e videogiochi»: ne chiede 140 e ne ha 141, a 360px). Chi
   alza il corpo del testo rimette quelle voci su due righe, e quelle
   piastrelle avranno il disegno più piccolo delle altre.
-  Ma l'altezza uguale NON BASTA a far sembrare le icone uguali, ed è
-  la cosa che si scopre solo guardando tutte e 26 insieme: a pari
-  altezza sono le LARGHEZZE a scappare, e la scarpa (122×72) copriva
-  2,7 volte l'area dell'orologio (47×72) — in griglia gli oggetti
-  larghi schiacciavano i sottili. Il rimedio è il TETTO alla larghezza
-  del riquadro (57% della piastrella, ~90px): il rapporto scende a
-  1,97 e a cedere sono solo i quattro che scappavano — scarpa, auto,
-  bici, fotocamera, che diventano un po' più basse — mentre i sottili
-  non si toccano. Le altezze vanno quindi da 54 a 73, ed è voluto.
-  Normalizzare l'AREA è stato provato e scartato: per far stare gli
-  estremi ogni disegno scende sui 57px e le piastrelle si svuotano —
-  si perde su tutte per pareggiare due casi.
+  MA L'ALTEZZA UGUALE NON BASTA, e questa è la lezione che si paga
+  guardando tutte e 26 insieme invece che una alla volta. Prima
+  scappano le LARGHEZZE (la scarpa faceva 122×72 contro l'orologio
+  47×72), e a quello risponde il TETTO alla larghezza del riquadro,
+  54% della piastrella. Ma anche a rettangoli pari le icone non
+  sembrano uguali: un pallone e una chitarra possono occupare lo
+  stesso rettangolo, ma il pallone è pieno e la chitarra è un filo —
+  a pesare è l'INCHIOSTRO, cioè quanti pixel pieni il disegno copre.
+  Misurato: le sei che Andrea ha indicato «troppo grosse» erano le
+  sei più cariche d'inchiostro, e la chitarra «troppo piccola» era la
+  più leggera. Il rettangolo non lo diceva; l'inchiostro sì.
+  Il pareggio lo fa `ritaglia_categorie.py`, che mette un TETTO
+  sull'inchiostro reso (1,05× la mediana) e dà un bordo trasparente a
+  chi lo supera — il disegno non si tocca, si rende più piccolo in
+  pagina. Il contrario non si può: i più leggeri sono già al massimo
+  che la piastrella concede, quindi la chitarra resta la più leggera,
+  ed è un limite dichiarato. Per questo l'immagine è CENTRATA nel suo
+  riquadro (`object-position:50% 50%`): coi bordi del pareggio,
+  ancorarla a un angolo l'avrebbe allontanata chi più chi meno.
+  Normalizzare l'AREA del rettangolo è stato provato e scartato: per
+  far stare gli estremi ogni disegno scende sui 57px e le piastrelle
+  si svuotano — si perde su tutte per pareggiare due casi.
   `ritaglia_categorie.py` toglie il margine trasparente che le
   illustrazioni hanno di fabbrica (~30%): senza, un terzo dello spazio
   della piastrella sarebbe vuoto e il disegno si vedrebbe piccolo. È
