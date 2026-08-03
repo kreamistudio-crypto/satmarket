@@ -4771,14 +4771,60 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
     """Il cuore condiviso della decisione (tastiera E endpoint della
     Mini App passano di qui). Ritorna (ok, testo per chi ha deciso).
     ✅ pubblica = stato attivo + partono i ganci trattenuti alla
-    nascita; ❌ rifiuta = 'rimosso' (mai stato online: niente ritiri
-    Nostr/promo, nessun ordine possibile). L'UPDATE e' condizionato
-    sullo stato: il secondo moderatore che tocca trova il fatto
-    compiuto, mai un doppio gancio."""
+    nascita; ❌ rifiuta = 'rimosso'; ↩︎ riapri = si torna in attesa,
+    perche' una decisione di moderazione dev'essere REVERSIBILE (lug
+    2026, decisione di Andrea): chi modera puo' accorgersi dopo di
+    aver sbagliato, e senza una strada indietro l'unico modo di
+    rimediare a un rifiuto sarebbe chiedere al venditore di
+    ripubblicare. L'UPDATE e' condizionato sullo stato: il secondo
+    moderatore che tocca trova il fatto compiuto, mai un doppio
+    gancio."""
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=?",
                     (annuncio_id,)).fetchone()
-    if not a or a["stato"] != "revisione":
+    if not a:
+        con.close()
+        return False, "Annuncio non trovato"
+    if esito == "riapri":
+        if a["stato"] not in ("attivo", "rimosso"):
+            con.close()
+            return False, ("↩︎ Si può ripensarci solo su un annuncio già "
+                           "deciso (questo non lo è)")
+        # Stessa guardia della rimozione admin: con sats in cassaforte
+        # prima si chiude l'ordine, poi si discute dell'annuncio.
+        if _ordini_vivi_annuncio(con, annuncio_id,
+                                 ("locked", "shipped", "confirmed",
+                                  "dispute")):
+            con.close()
+            return False, ("C'è un affare in corso su questo annuncio: "
+                           "risolvi prima l'ordine, poi potrai rimetterlo "
+                           "in attesa")
+        cur = con.execute(
+            "UPDATE annunci SET stato='revisione' WHERE id=? "
+            "AND stato IN ('attivo','rimosso')", (annuncio_id,))
+        riaperto = cur.rowcount == 1
+        # Gli ordini mai pagati decadono: l'annuncio esce di scena.
+        con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                    "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                    "(SELECT ordine_id FROM ordine_righe WHERE "
+                    "annuncio_id=?))",
+                    (int(time.time()), annuncio_id, annuncio_id))
+        con.commit()
+        con.close()
+        if not riaperto:
+            return False, "↩︎ Qualcun altro ci ha già messo mano"
+        registra_moderazione("admin", "riaperto", "", a["titolo"],
+                             annuncio_id, a["venditore_id"], admin_id)
+        # Rimesso in attesa vuol dire fuori da OGNI vetrina, non solo
+        # dalla nostra: se era in piazza, si ritira. Se poi verra'
+        # approvato di nuovo, il ramo «pubblica» lo rimette in piazza
+        # da se' (il tag d e' stabile: mai un doppione).
+        if a["stato"] == "attivo":
+            asyncio.create_task(ritira_da_nostr(annuncio_id))
+            asyncio.create_task(promo_rimuovi(annuncio_id))
+        return True, (f"↩︎ Rimesso in attesa: "
+                      f"«{html.escape(a['titolo'][:60])}»")
+    if a["stato"] != "revisione":
         con.close()
         return False, ("⏳ Già deciso da un altro moderatore (o annuncio "
                        "non più in revisione)")
@@ -4815,6 +4861,14 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
                        f"approvato</b> ed è in vetrina!\n"
                        f"{URL_PUBBLICO}/annuncio/{annuncio_id}")
         return True, f"✅ Pubblicato: «{html.escape(a['titolo'][:60])}»"
+    # Il rifiuto ritira anche dai canali. Prima si poteva dare per
+    # scontato che un annuncio in revisione non fosse MAI stato
+    # online; da quando una decisione si puo' riaprire, no: un
+    # annuncio riaperto in piazza c'era stato. I due ganci sono
+    # innocui su chi non c'e' mai andato (agiscono solo se le
+    # colonne sono valorizzate).
+    asyncio.create_task(ritira_da_nostr(annuncio_id))
+    asyncio.create_task(promo_rimuovi(annuncio_id))
     await notifica(a["venditore_id"],
                    f"❌ <b>Il tuo annuncio «{a['titolo'][:60]}» non è stato "
                    f"approvato</b> dai moderatori: al momento questo tipo "
@@ -4843,23 +4897,62 @@ async def callback_revisione(cb: dict, dati: str):
             "text": testo, "parse_mode": "HTML"})
 
 
+# Quanto indietro si puo' tornare su una decisione di moderazione.
+# Non e' un limite tecnico — il ripensamento vale sempre — ma la
+# finestra in cui la lista lo PROPONE da sola: piu' in la' l'annuncio
+# si ritrova dal registro, che tiene tutto.
+GIORNI_RIPENSAMENTO = 7
+
+# Il motivo di un annuncio in coda: l'ultima parola della macchina,
+# dubbio o bocciatura che sia (dall'import aperto anche il «vietato»
+# dell'AI mette in coda invece di scartare, quindi guardare il solo
+# 'dubbio' lascerebbe meta' della coda senza spiegazione).
+_SQL_MOTIVO = ("(SELECT m.motivo FROM moderazione_log m "
+               "   WHERE m.annuncio_id=a.id "
+               "     AND m.esito IN ('dubbio','vietato') "
+               "   ORDER BY m.id DESC LIMIT 1) AS motivo")
+
+
 @app.get("/api/admin/revisione")
-def lista_revisione(x_tg_init_data: str = Header(""),
+def lista_revisione(decisi: int = 0, x_tg_init_data: str = Header(""),
                     barattolo_sessione: str = Cookie("")):
-    """SOLO ADMIN: gli annunci in attesa di una decisione, dal piu'
-    vecchio (chi aspetta da piu' tempo si vede per primo), col motivo
-    del dubbio pescato dal registro."""
+    """SOLO ADMIN: la coda della moderazione.
+
+    Di serie gli annunci in ATTESA di una decisione, dal piu' vecchio
+    (chi aspetta da piu' tempo si vede per primo), col motivo pescato
+    dal registro. Con ?decisi=1 invece gli ultimi GIA' DECISI, per
+    ripensarci: la decisione dev'essere reversibile, e per esserlo
+    davvero deve anche essere RITROVABILE — un bottone «ripensaci»
+    che esiste solo in teoria non serve a nessuno.
+
+    La risposta resta un array in tutti e due i casi: un client vecchio
+    in cache continua a vedere la coda di sempre.
+    """
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
     con = db()
-    righe = [dict(r) for r in con.execute(
-        "SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-        "  (SELECT m.motivo FROM moderazione_log m "
-        "     WHERE m.annuncio_id=a.id AND m.esito='dubbio' "
-        "     ORDER BY m.id DESC LIMIT 1) AS motivo "
-        "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
-        "WHERE a.stato='revisione' ORDER BY a.creato ASC")]
+    if decisi:
+        soglia = int(time.time()) - GIORNI_RIPENSAMENTO * 86400
+        righe = [dict(r) for r in con.execute(
+            "SELECT a.*, u.nome AS venditore, "
+            "  u.username AS venditore_username, "
+            "  m.esito AS deciso_esito, m.creato AS deciso_il, "
+            "  m.deciso_da, " + _SQL_MOTIVO + " "
+            "FROM moderazione_log m "
+            "JOIN annunci a ON a.id=m.annuncio_id "
+            "JOIN utenti u ON u.tg_id=a.venditore_id "
+            "WHERE m.strato='admin' AND m.creato>=? "
+            "  AND a.stato IN ('attivo','rimosso') "
+            "  AND m.id=(SELECT MAX(m2.id) FROM moderazione_log m2 "
+            "            WHERE m2.annuncio_id=a.id AND m2.strato='admin') "
+            "ORDER BY m.id DESC LIMIT 20", (soglia,))]
+    else:
+        righe = [dict(r) for r in con.execute(
+            "SELECT a.*, u.nome AS venditore, "
+            "  u.username AS venditore_username, " + _SQL_MOTIVO + " "
+            "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+            "WHERE a.stato='revisione' ORDER BY a.creato ASC")]
     con.close()
     return righe
 
@@ -4875,7 +4968,7 @@ async def decidi_revisione_admin(annuncio_id: int, req: Request,
         raise HTTPException(403, "Riservato ai moderatori")
     d = await leggi_json(req)
     esito = d.get("esito", "")
-    if esito not in ("pubblica", "rifiuta"):
+    if esito not in ("pubblica", "rifiuta", "riapri"):
         raise HTTPException(400, "Esito sconosciuto")
     ok, testo = await decidi_revisione(annuncio_id, esito, user["id"])
     if not ok:
@@ -10313,6 +10406,14 @@ def verifica_firma_nostr(evento) -> bool:
         return False
 
 
+# Il ponte fra il vaglio (che conosce il motivo ma non l'id
+# dell'annuncio, che ancora non esiste) e _apri_revisioni (che ha
+# l'id ma non il motivo): titolo -> (esito, motivo). Sta in memoria
+# come le altre code del server, e perderlo a un riavvio non fa danno
+# — l'annuncio resta in revisione lo stesso, solo col motivo generico.
+_MOTIVI_REVISIONE: dict[str, tuple] = {}
+
+
 async def _modera_eventi_nostr(prodotti: list) -> list:
     """Strati 1 e 2 della moderazione su un mazzo di eventi Nostr,
     PRIMA che diventino righe del database.
@@ -10322,11 +10423,26 @@ async def _modera_eventi_nostr(prodotti: list) -> list:
     scelto a mano, e che CLAUDE.md prometteva di chiudere «se mai si
     aprira' ad altri». E' quel momento.
 
-    Ritorna solo gli eventi ammessi. Strato 1 (parole vietate) e'
-    secco e locale; strato 2 (AI) e' a lotti come nell'import CSV ed
-    e' fail-open per costruzione — se la chiave manca o Anthropic
-    tace, passa e non blocca il mercatino. Ogni bocciatura finisce
-    nel registro della moderazione.
+    I due strati non finiscono allo stesso modo, ed e' voluto:
+
+    - strato 1 (parole vietate) e' secco, locale e deterministico:
+      l'evento non entra proprio. Resta scritto nel registro della
+      moderazione, che i moderatori leggono dal Profilo, quindi non
+      sparisce nel nulla — ma armi e droga non hanno bisogno di una
+      coda: hanno bisogno di una porta chiusa.
+    - strato 2 (AI) NON scarta piu' niente da solo. Dubbi e bocciature
+      diventano una CODA: l'evento passa, ma marchiato, e nasce in
+      stato 'revisione' — invisibile in vetrina, in attesa di un
+      umano. E' la terza via che il mercatino usa gia' per chi
+      pubblica dal form, allargata al giudizio piu' delicato che
+      abbiamo: quello su annunci di gente che non e' qui a
+      difendersi, scritti in un italiano che non abbiamo scelto noi.
+      Un'AI che sbaglia in silenzio su uno sconosciuto e' il modo
+      piu' facile di perdere un venditore onesto senza saperlo mai.
+
+    Lo strato 2 resta fail-open per costruzione (chiave assente o
+    Anthropic muta = si passa): a chiudere la porta e' il chiamante,
+    che senza un verdetto non importa nulla di nuovo.
     """
     import importa_nostr
     ammessi, voci, per_numero = [], [], {}
@@ -10348,7 +10464,6 @@ async def _modera_eventi_nostr(prodotti: list) -> list:
         ammessi.append(e)
     if not voci:
         return []
-    bocciati = set()
     # A lotti di ~20 come l'import CSV: una chiamata sola per venti
     # annunci, e il verdetto arriva riga per riga.
     for i in range(0, len(voci), 20):
@@ -10357,10 +10472,14 @@ async def _modera_eventi_nostr(prodotti: list) -> list:
             evento, titolo = per_numero.get(numero, (None, ""))
             if evento is None:
                 continue
-            bocciati.add(id(evento))
-            registra_moderazione("ai_lotto", esito, motivo, titolo)
-            print(f"  🚫 AI ({esito}): {titolo[:44]} — {motivo[:50]}")
-    return [e for e in ammessi if id(e) not in bocciati]
+            # Il marchio che l'import legge per far nascere la riga in
+            # 'revisione' invece che in vetrina. Non si scarta: si
+            # mette in coda, e a decidere e' una persona.
+            evento["_revisione"] = (esito, motivo or "caso ambiguo")
+            _MOTIVI_REVISIONE[titolo] = evento["_revisione"]
+            print(f"  ⏳ in revisione ({esito}): {titolo[:44]} — "
+                  f"{motivo[:50]}")
+    return ammessi
 
 
 def _tag_evento(e, nome: str) -> str:
@@ -10474,6 +10593,38 @@ def _vaglio_nostr(loop, npub: str, venditore_id: int):
         return [e for e in italiani
                 if id(e) not in vagliati or id(e) in promossi]
     return vaglio
+
+
+async def _apri_revisioni(npub: str, venditore_id: int):
+    """Dopo l'import: gli annunci appena nati (o rimessi) in revisione
+    vengono iscritti nel registro della moderazione e annunciati ai
+    moderatori con la solita tastiera ✅/❌.
+
+    Si fa QUI e non dentro il vaglio perche' il motivo va legato
+    all'annuncio, e l'id dell'annuncio esiste solo dopo che l'import
+    l'ha scritto — e' lo stesso ordine che segue pubblica().
+
+    Idempotente: si avvisa solo per gli annunci che nel registro non
+    hanno ancora una riga loro. Un annuncio che resta in coda una
+    settimana non suona una volta all'ora; a ricordarlo c'e' il
+    sollecito dell'orologio, che per la revisione esiste gia'.
+    """
+    con = db()
+    righe = con.execute(
+        "SELECT id, titolo, venditore_id FROM annunci "
+        "WHERE stato='revisione' AND (venditore_id=? OR contatto_nostr=?) "
+        "AND NOT EXISTS (SELECT 1 FROM moderazione_log m "
+        "                WHERE m.annuncio_id=annunci.id)",
+        (venditore_id, npub)).fetchall()
+    con.close()
+    for r in righe:
+        esito, motivo = _MOTIVI_REVISIONE.pop(r["titolo"], ("dubbio", ""))
+        registra_moderazione("ai_lotto", esito, motivo, r["titolo"],
+                             r["id"], r["venditore_id"])
+        try:
+            await avvisa_revisione(r["id"], motivo)
+        except Exception as e:
+            print(f"⚠️ Avviso di revisione non partito per #{r['id']}: {e}")
 
 
 async def _accogli_venditore_nostr(hexkey: str) -> int:
@@ -10615,6 +10766,7 @@ async def importa_nostr_periodico():
                 vaglio)
             importati, aggiornati, saltati = (importati + i, aggiornati + a,
                                               saltati + s)
+            await _apri_revisioni(npub, venditore_id)
         except Exception as e:
             print(f"⚠️ Import di {npub[:16]}… saltato: {e}")
     print(f"🔄 Import Nostr: {importati} nuovi, {aggiornati} aggiornati, "

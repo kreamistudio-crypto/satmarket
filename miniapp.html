@@ -7766,6 +7766,15 @@ async function loadAdminStats(){
         if (rr.ok) rev = await rr.json();
       } catch(e) {}
     }
+    /* e le ultime decisioni prese, per poterci ripensare: questa si
+       chiede SEMPRE (la coda vuota e' proprio il momento in cui uno
+       si accorge di aver sbagliato a svuotarla) */
+    let decisi = [];
+    try {
+      const rd = await fetch(`${API_BASE}/admin/revisione?decisi=1`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rd.ok) decisi = await rd.json();
+    } catch(e) {}
     const card = (emoji, valore, nome) => `
       <div style="background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
         <div style="font-size:20px">${emoji}</div>
@@ -7776,6 +7785,10 @@ async function loadAdminStats(){
       ${rev.length ? `
       <div class="section-label" style="padding:26px 0 0">⏳ In revisione (${rev.length})</div>
       <div style="margin-top:10px">${rev.map(rigaRevisione).join('')}</div>` : ''}
+      ${decisi.length ? `
+      <div class="section-label" style="padding:26px 0 0">↩︎ Decisi di recente (${decisi.length})</div>
+      <div class="sub" style="margin-top:6px">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
+      <div style="margin-top:10px">${decisi.map(rigaDecisa).join('')}</div>` : ''}
       <div class="section-label" style="padding:26px 0 0">📊 Statistiche (solo moderatori)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
         ${card('👥', s.utenti, 'utenti')}
@@ -7820,6 +7833,20 @@ const rigaRevisione = a => { const l = mapListing(a); return `
       ${l.desc && l.desc!=='—' ? `<div class="sub" style="font-weight:600">${esc(l.desc.slice(0,200))}${l.desc.length>200?'…':''}</div>` : ''}
     </div>`; };
 
+/* La riga di un annuncio GIA' deciso, con la strada indietro. Stessa
+   forma della sorella in attesa, senza foto (qui conta la decisione,
+   non l'oggetto) e con un bottone solo. */
+const rigaDecisa = a => { const l = mapListing(a); return `
+    <div class="order">
+      <div class="row">
+        <b style="min-width:0;overflow:hidden;text-overflow:ellipsis">${a.deciso_esito==='pubblicato'?'✅':a.deciso_esito==='riaperto'?'↩︎':'❌'} ${esc(l.title)}</b>
+        <span style="white-space:nowrap">
+          <span class="badge" onclick="decidiRevisione(${l.id},'riapri')" style="cursor:pointer;background:var(--warn-bg);color:var(--ink)">↩︎ Ripensaci</span>
+        </span>
+      </div>
+      <div class="sub">${esc(a.deciso_esito||'')} · ${esc(l.seller)} · ${a.deciso_il?new Date(a.deciso_il*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):''}${a.motivo?` · 🤖 ${esc(a.motivo)}`:''}</div>
+    </div>`; };
+
 /* Il registro della moderazione: riepilogo degli ultimi 30 giorni +
    le ultime decisioni. E' con QUESTI dati che il prompt si corregge
    a mano — mai da solo. */
@@ -7829,7 +7856,7 @@ function registroModerazione(mod){
   const totale = (c.vietato||0)+(c.dubbio||0)+(c.pubblicato||0)+(c.rifiutato||0)+(c.rimosso||0);
   if (!totale && !(mod.registro||[]).length) return '';
   const motivi = mod.motivi_frequenti || [];
-  const EMOJI_ESITO = {vietato:'🚫', dubbio:'⏳', pubblicato:'✅', rifiutato:'❌', rimosso:'🛡'};
+  const EMOJI_ESITO = {vietato:'🚫', dubbio:'⏳', pubblicato:'✅', rifiutato:'❌', rimosso:'🛡', riaperto:'↩︎'};
   return `
     <div class="section-label" style="padding:22px 0 0">🛡 Registro moderazione</div>
     <div class="sub" style="margin-top:8px;font-weight:700">Ultimi 30 giorni: ${c.pubblicato||0} sbloccati · ${c.rifiutato||0} rifiutati · ${c.vietato||0} bloccati · ${c.dubbio||0} in dubbio${motivi.length?` — motivo più frequente: «${esc(motivi[0].motivo)}» (${motivi[0].n})`:''}</div>
@@ -7848,13 +7875,16 @@ function registroModerazione(mod){
 async function decidiRevisione(id, esito){
   haptic();
   if (esito==='rifiuta' && !confirm('Rifiutare questo annuncio? Il venditore riceverà un messaggio gentile (e nessun annuncio andrà online).')) return;
+  if (esito==='riapri' && !confirm('Rimettere questo annuncio in attesa di decisione? Esce dalla vetrina (e dai canali, se ci era andato) finché non decidi di nuovo.')) return;
   try {
     const r = await fetch(`${API_BASE}/admin/listings/${id}/revisione`,
       {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
        body: JSON.stringify({esito})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail||'Operazione non riuscita', 4000); }
-    else toast(esito==='pubblica' ? '✅ Pubblicato in vetrina' : '❌ Rifiutato, venditore avvisato');
+    else toast(esito==='pubblica' ? '✅ Pubblicato in vetrina'
+             : esito==='riapri' ? '↩︎ Rimesso in attesa di decisione'
+             : '❌ Rifiutato, venditore avvisato');
   } catch(e) { toast('Rete assente: riprova'); return; }
   await loadListings(); renderGrid();
   loadAdminStats();

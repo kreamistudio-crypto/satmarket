@@ -562,6 +562,12 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     verificata, lingua italiana, moderazione superata). Vive li' e
     non qui perche' ha bisogno dell'AI e delle chiavi, che stanno nel
     server; senza (script manuale) l'import si comporta come sempre.
+
+    Il vaglio puo' anche MARCHIARE un evento invece di scartarlo,
+    posandogli addosso la chiave `_revisione`: l'annuncio si scrive
+    lo stesso, ma nasce (o torna) in stato 'revisione', fuori dalla
+    vetrina, in attesa che un moderatore decida. Qui si legge solo il
+    marchio — il perche' lo sa il server.
     """
     hexkey = npub_to_hex(npub_venditore)
     os.makedirs(FOTO_DIR, exist_ok=True)
@@ -865,6 +871,15 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             # venditore ha messo a mano su Barattolo non deve essere
             # ricoperto ogni ora dal silenzio dei relay.
             scrivi_commercio(con, gia[0], a["commercio"])
+            # Il marchio del vaglio (v. importa_venditore): un annuncio
+            # gia' in vetrina il cui TESTO e' cambiato e che adesso il
+            # moderatore automatico non sa piu' approvare torna in
+            # attesa, come una modifica fatta dal form. Sparisce dalla
+            # vetrina finche' un umano non dice la sua.
+            if e.get("_revisione"):
+                con.execute("UPDATE annunci SET stato='revisione' "
+                            "WHERE id=? AND stato='attivo'", (gia[0],))
+                print(f"  ⏳ rimesso in revisione: {a['titolo'][:50]}")
             aggiornati += 1
             print(f"  ↻ aggiornato: {a['titolo'][:50]}")
             continue
@@ -872,11 +887,12 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
             "prezzo_sats,zona,foto,contatto_nostr,valuta,prezzo_eur,"
             "nostr_origine_d,nostr_origine_foto,nostr_origine_id,creato,"
-            "modificato) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "modificato,stato) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (venditore_id, a["titolo"], a["descrizione"], a["categoria"],
              a["prezzo_sats"], a["zona"], a["foto"], npub, valuta,
              prezzo_eur, a["origine_d"], a["origine_foto"],
-             a["origine_id"], int(time.time()), a["evento_ts"]))
+             a["origine_id"], int(time.time()), a["evento_ts"],
+             "revisione" if e.get("_revisione") else "attivo"))
         scrivi_commercio(con, cur.lastrowid, a["commercio"])
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
         foto_loc = localizza_foto(cur.lastrowid, a["foto"])
