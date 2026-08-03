@@ -2837,6 +2837,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `none` sull'html (vedi il gesto di aggiornamento) è la cintura.
   Pallini e bottone condividi vivono SULLA foto: colori fissi
   (bianco/carta+inchiostro), identici in chiaro e scuro.
+  IL TESTO DELL'UTENTE NON PUÒ ALLARGARE LA PAGINA (lug 2026, da due
+  annunci veri importati da Nostr che si trascinavano di lato col dito
+  sul CORPO dell'annuncio): una parola lunga senza spazi non ha nessun
+  punto dove andare a capo, esce dal suo riquadro e allarga il
+  DOCUMENTO. Misurato a 375px con un token da 60 caratteri: titolo
+  +324px, riquadro venditore +129, descrizione +43. Un URL e una
+  chiave prodotto NON sbordano — hanno `/` e `-`, dove il browser sa
+  spezzare —, quindi la rete serve solo per il token continuo.
+  `overflow-wrap:break-word` sta sul CONTENITORE `.detail-body` e non
+  sui tre figli, perché si EREDITA: copre anche il campo che qualcuno
+  aggiungerà lì dentro fra sei mesi (stessa rete dei nomi delle
+  categorie in Sfoglia). MA NON BASTA DOVE C'È UN FLEX, ed è la parte
+  che si dimentica: `.seller .who` è un figlio flex e un figlio flex
+  non scende mai sotto il proprio contenuto (`min-width:auto`) — la
+  parola si spezzava e la SCATOLA restava larga, +129px col testo già
+  sistemato dappertutto. `min-width:0`, lo stesso rimedio del comune
+  nella riga meta della card. In griglia la pagina non sbordava già
+  (l'`overflow:hidden` del clamp), ma il titolo veniva tagliato a metà
+  della prima riga con la seconda vuota e senza puntini.
   Dettaglio immersivo (lug 2026): via il bottone statico sopra la
   foto — il «Torna al mercatino» è il cerchietto di carta
   `.back-float` in alto a sinistra sulla foto (gemello del condividi,
@@ -4422,9 +4441,16 @@ simulato come `history.back()` diretto): la catena piastrella →
 dettaglio risale a categoria, Sfoglia, Esplora-intera in tre gesti; i
 tab costano un indietro solo; la tirata in categoria annulla il gesto
 nativo, fa una chiamata e non si muove; la galleria a una foto non
-scorre e la pagina non sborda. RESTA DA VEDERE DENTRO TELEGRAM, che è
-il pezzo che il browser non può dire: la convivenza del touchmove col
-client e il ramo `tg.close()` dalla radice.
+scorre e la pagina non sborda. E POI PROVATO DA ANDREA SUL TELEFONO,
+nei DUE contesti: tirata, galleria, radice madre e chiusura funzionano
+in entrambi, `tg.close()` compreso.
+Restava un terzo caso, che si presentava UGUALE nei due contesti — ed
+è il modo in cui si è capito che era contenuto e non contesto: due
+annunci importati si trascinavano di lato col dito sul corpo della
+scheda, per una parola lunga senza spazi che allargava il documento.
+Vedi «il testo dell'utente non può allargare la pagina» nel dettaglio
+annuncio, e in particolare il `min-width:0` sul figlio flex, che è la
+metà del rimedio che non viene in mente.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
