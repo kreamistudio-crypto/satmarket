@@ -931,6 +931,21 @@ def init_db():
             "UPDATE annunci SET categoria=? "
             "WHERE categoria=? COLLATE NOCASE AND categoria!=?",
             (nuova, vecchia, nuova))
+    # Migrazione al catalogo largo (lug 2026). Tre voci del set
+    # precedente non esistono piu' con quel nome e vanno portate
+    # dentro la piu' vicina — MAI in «Altro», che equivarrebbe a
+    # buttare la scelta fatta dal venditore. Dove la vecchia voce si
+    # apre in due (Casa e giardino → arredamento + giardino, Libri e
+    # media → libri + musica) si tiene la META' PIU' PROBABILE: chi
+    # vuole l'altra la sposta dal form in un tocco, mentre nessuno
+    # potrebbe recuperare una categoria persa.
+    # Idempotente come la sorella qui sopra: a migrazione avvenuta
+    # questi UPDATE non trovano piu' niente.
+    for vecchia, nuova in (("Casa e giardino", "Casa e arredamento"),
+                           ("Sport e hobby", "Sport"),
+                           ("Libri e media", "Libri e riviste")):
+        con.execute("UPDATE annunci SET categoria=? WHERE categoria=?",
+                    (nuova, vecchia))
     # Indici per la vetrina a volume (lug 2026): con centinaia di
     # annunci le liste ordinate per data non devono piu' scandire
     # tutta la tabella. Coprono le tre strade calde: vetrina per
@@ -3094,9 +3109,17 @@ PROMPT_MODERAZIONE = (
     "Barattolo vende solo COSE che esistono, fisiche o digitali — ma "
     "un servizio non palesemente vietato NON e' un caso netto: "
     "rispondi DUBBIO, decidera' un moderatore umano. DUBBIO anche per "
-    "i buoni riscattabili presso il VENDITORE STESSO ('buono per una "
-    "lezione con me', 'buono per una mia consulenza'): sono a meta' "
-    "tra bene e prestazione. NON e' vietato l'uso legittimo: "
+    "i buoni riscattabili presso il VENDITORE STESSO quando cio' che "
+    "si riscatta e' il suo TEMPO o un lavoro su misura ('buono per "
+    "una lezione con me', 'buono per una mia consulenza'): sono a "
+    "meta' tra bene e prestazione. E' invece un PRODOTTO, quindi OK, "
+    "cio' che il venditore offre gia' DEFINITO e a prezzo fisso, "
+    "anche se si gode presso di lui: un soggiorno o un pernottamento "
+    "(B&B, agriturismo, casa vacanze), un ingresso, una degustazione, "
+    "una consumazione, un posto a un evento. La differenza non e' chi "
+    "lo riscatta ma se cio' che si compra e' stabilito PRIMA: due "
+    "notti in una camera sono una cosa precisa, 'ti sviluppo quello "
+    "che ti serve' no. NON e' vietato l'uso legittimo: "
     "attrezzi da lavoro (sparachiodi, pistole per silicone o vernice), "
     "giocattoli, softair e repliche, fucili subacquei, coltelli da "
     "cucina, oggetti da collezione disattivati, farmaci da banco "
@@ -3121,6 +3144,8 @@ PROMPT_MODERAZIONE = (
     "secco. Esempi: 'Pistola sparachiodi Bosch' -> OK. 'Pistola "
     "softair a molla' -> OK. 'Buono regalo Zalando 50 euro' -> OK. "
     "'Piadina digitale: buono con codice da riscattare' -> OK. "
+    "'Pacchetto soggiorno 2 notti in B&B, colazione inclusa' -> OK: "
+    "e' un pernottamento definito, non una prestazione su misura. "
     "'Ti sviluppo un bot Telegram' -> DUBBIO: servizio. 'Buono per "
     "una lezione di chitarra con me' -> DUBBIO: buono-prestazione. "
     "'Revolver "
@@ -3236,9 +3261,28 @@ async def moderazione_ai_lotto(voci: list) -> dict:
 # form di Vendi e delle pillole della vetrina ("Tutto" e' solo una
 # vista del frontend, non una categoria). Una categoria sconosciuta
 # nel payload finisce in "Altro": il client non decide il catalogo.
-CATEGORIE = ("Elettronica", "Casa e giardino", "Abbigliamento",
-             "Sport e hobby", "Motori", "Bambini", "Animali",
-             "Libri e media", "Altro")
+# Il catalogo, sul modello dei mercatini generalisti (Subito e simili):
+# largo, perche' chi vende deve trovare la sua casella senza pensarci,
+# e le pillole vuote in vetrina non si mostrano proprio — un catalogo
+# largo non sporca la home di chi guarda.
+#
+# Resta PIATTO, senza sottocategorie: quelle vorrebbero una colonna
+# nuova e una gerarchia da mantenere, e con questo volume di annunci
+# non aggiungerebbero niente. Si faranno quando saranno le categorie a
+# diventare troppo piene, non prima.
+#
+# «Bitcoin» e' nostra e non di Subito: su un mercatino che incassa
+# solo in sats i portafogli hardware e i miner sono merce di casa —
+# nei primi dati veri visti sui relay c'erano Jade, BitBox02, Seed
+# Signer e Nerd Miner, tutti finiti in «Elettronica» o peggio.
+CATEGORIE = ("Elettronica", "Informatica", "Telefonia", "Audio e video",
+             "Console e videogiochi", "Foto e ottica", "Bitcoin",
+             "Casa e arredamento", "Elettrodomestici",
+             "Giardino e fai da te", "Alimenti e bevande",
+             "Abbigliamento", "Scarpe e accessori", "Orologi e gioielli",
+             "Bambini", "Sport", "Biciclette", "Motori", "Animali",
+             "Libri e riviste", "Musica e film", "Strumenti musicali",
+             "Collezionismo", "Arte e artigianato", "Altro")
 
 
 def categoria_valida(c) -> str:
@@ -3421,23 +3465,55 @@ def neutralizza_formula(testo: str) -> str:
 # parola), e chi resta fuori finisce in Altro: il client non decide
 # il catalogo, come sempre.
 SINONIMI_CATEGORIA = {
+    # elettronica e dintorni
     "elettronica": "Elettronica", "electronics": "Elettronica",
-    "tech": "Elettronica", "informatica": "Elettronica",
-    "telefonia": "Elettronica",
-    "casa": "Casa e giardino", "giardino": "Casa e giardino",
-    "arredamento": "Casa e giardino", "cucina": "Casa e giardino",
+    "tech": "Elettronica", "hifi": "Audio e video",
+    "informatica": "Informatica", "computer": "Informatica",
+    "pc": "Informatica", "notebook": "Informatica",
+    "telefonia": "Telefonia", "smartphone": "Telefonia",
+    "cellulari": "Telefonia", "audio": "Audio e video",
+    "video": "Audio e video", "tv": "Audio e video",
+    "console": "Console e videogiochi",
+    "videogiochi": "Console e videogiochi", "games": "Console e videogiochi",
+    "fotografia": "Foto e ottica", "foto": "Foto e ottica",
+    "ottica": "Foto e ottica",
+    "bitcoin": "Bitcoin", "btc": "Bitcoin", "wallet": "Bitcoin",
+    "hardware wallet": "Bitcoin", "mining": "Bitcoin", "miner": "Bitcoin",
+    # casa
+    "casa": "Casa e arredamento", "arredamento": "Casa e arredamento",
+    "arredo": "Casa e arredamento", "mobili": "Casa e arredamento",
+    "cucina": "Casa e arredamento",
+    "elettrodomestici": "Elettrodomestici",
+    "giardino": "Giardino e fai da te", "giardinaggio": "Giardino e fai da te",
+    "utensili": "Giardino e fai da te", "bricolage": "Giardino e fai da te",
+    "fai da te": "Giardino e fai da te",
+    # alimentari
+    "alimenti": "Alimenti e bevande", "alimentari": "Alimenti e bevande",
+    "bevande": "Alimenti e bevande", "cibo": "Alimenti e bevande",
+    "food": "Alimenti e bevande", "gastronomia": "Alimenti e bevande",
+    "vino": "Alimenti e bevande", "birra": "Alimenti e bevande",
+    # persona
     "abbigliamento": "Abbigliamento", "vestiti": "Abbigliamento",
-    "moda": "Abbigliamento", "scarpe": "Abbigliamento",
-    "sport": "Sport e hobby", "hobby": "Sport e hobby",
-    "collezionismo": "Sport e hobby",
-    "motori": "Motori", "auto": "Motori", "moto": "Motori",
-    "ricambi": "Motori",
+    "moda": "Abbigliamento",
+    "scarpe": "Scarpe e accessori", "accessori": "Scarpe e accessori",
+    "borse": "Scarpe e accessori",
+    "orologi": "Orologi e gioielli", "gioielli": "Orologi e gioielli",
     "bambini": "Bambini", "bimbi": "Bambini", "infanzia": "Bambini",
     "giocattoli": "Bambini",
+    # tempo libero
+    "sport": "Sport", "palestra": "Sport", "fitness": "Sport",
+    "bici": "Biciclette", "biciclette": "Biciclette", "bike": "Biciclette",
+    "motori": "Motori", "auto": "Motori", "moto": "Motori",
+    "ricambi": "Motori",
     "animali": "Animali", "pet": "Animali",
-    "libri": "Libri e media", "media": "Libri e media",
-    "musica": "Libri e media", "film": "Libri e media",
-    "fumetti": "Libri e media",
+    "libri": "Libri e riviste", "riviste": "Libri e riviste",
+    "musica": "Musica e film", "film": "Musica e film",
+    "media": "Musica e film", "fumetti": "Libri e riviste",
+    "strumenti": "Strumenti musicali",
+    "strumenti musicali": "Strumenti musicali",
+    "collezionismo": "Collezionismo", "hobby": "Collezionismo",
+    "arte": "Arte e artigianato", "artigianato": "Arte e artigianato",
+    "handmade": "Arte e artigianato",
     "altro": "Altro", "varie": "Altro",
 }
 
@@ -7437,6 +7513,81 @@ def _foto_url_nostr(foto_json: str) -> list:
             for n in nomi if n and not n.startswith("data:")]
 
 
+# --- I metadati di commercio nei tag (lug 2026) ----------------------
+# NIP-99 standardizza titolo, prezzo, zona e poco altro: di
+# spedizione, condizione e quantita' non dice NULLA. Finora quelle
+# tre le scrivevamo solo in prosa dentro il content — leggibili da un
+# umano, invisibili a qualunque macchina, comprese le NOSTRE al giro
+# d'import successivo.
+#
+# Ora escono anche come tag. La spec lo permette in modo esplicito
+# («other tags may be added as necessary») e il disegno e' quello
+# della proposta in proposte/nip99-commerce-metadata.md:
+#
+#   ["delivery", "shipping", "5.00", "EUR"]   ripetibile
+#   ["delivery", "pickup"]                    (entrambe = due tag)
+#   ["delivery", "digital"]
+#   ["condition", "like-new"]
+#   ["stock", "3"]                            assente = 1 pezzo
+#
+# `delivery` e' RIPETIBILE apposta, invece dell'enum che usa il
+# vocabolario de facto di Shopstr: li' per dire «spedisco o ritiri»
+# serve il valore composto "Free/Pickup", e aggiungere un terzo modo
+# (il nostro digitale) vorrebbe dire enumerare tutti i sottoinsiemi.
+# Ripetere il tag non esplode mai.
+#
+# ATTENZIONE al costo assente, che NON e' zero: "0" vuol dire
+# spedizione gratuita, il tag senza importo vuol dire «spedisco, il
+# prezzo lo concordiamo». Chi legge non deve confonderli.
+#
+# Restano fuori peso e dimensioni: non li chiediamo nel form, e la
+# taglia del pacco che abbiamo (busta/piccolo/…) e' una categoria di
+# corriere italiana, non un fatto oggettivo — inventarci un peso da
+# quella sarebbe scrivere un dato falso su un protocollo pubblico.
+
+CONDIZIONE_NIP99 = {
+    "nuovo": "new",
+    "come_nuovo": "like-new",
+    "buono": "good",
+    "accettabile": "fair",
+    "da_sistemare": "poor",
+}
+
+
+def tag_commercio(a: dict) -> list:
+    """I tag di consegna, condizione e quantita' di un annuncio.
+    Lista vuota per gli annunci che non li dichiarano (gli storici e
+    gli importati da client che non li conoscono): un tag in meno e'
+    sempre meglio di un tag che mente."""
+    tags = []
+    consegna = a.get("consegna") or ""
+    if consegna in ("spedizione", "entrambe"):
+        # Stessa convenzione del tag price: l'euro quando il costo e'
+        # ancorato all'euro, i sats altrimenti. Lo 0 esplicito e'
+        # "gratis" e va detto; il costo mai dichiarato resta muto.
+        if a.get("spedizione_eur"):
+            tags.append(["delivery", "shipping",
+                         f"{a['spedizione_eur']:.2f}", "EUR"])
+        elif a.get("spedizione_sats"):
+            tags.append(["delivery", "shipping",
+                         str(a["spedizione_sats"]), "sats"])
+        else:
+            tags.append(["delivery", "shipping", "0",
+                         "EUR" if a.get("valuta") == "eur" else "sats"])
+    if consegna in ("ritiro", "entrambe"):
+        tags.append(["delivery", "pickup"])
+    if consegna == "digitale" or a.get("anche_digitale"):
+        tags.append(["delivery", "digital"])
+    condizione = CONDIZIONE_NIP99.get(a.get("condizione") or "")
+    if condizione:
+        tags.append(["condition", condizione])
+    # Assente = un pezzo solo, che e' il caso di quasi tutti gli
+    # annunci: dirlo ogni volta sarebbe rumore.
+    if (a.get("quantita") or 1) > 1:
+        tags.append(["stock", str(a["quantita"])])
+    return tags
+
+
 def evento_annuncio(a: dict, status: str) -> dict:
     """Costruisce l'evento NIP-99 (kind 30402) di un annuncio. Il tag
     "d" stabile rende l'evento sostituibile: ripubblicare con lo stesso
@@ -7464,6 +7615,10 @@ def evento_annuncio(a: dict, status: str) -> dict:
         tags.append(["t", a["categoria"].lower().split()[0]])
     if a.get("zona"):
         tags.append(["location", a["zona"]])
+    # Spedizione, condizione e quantita' anche come TAG, non piu' solo
+    # come prosa nel content (che resta, per gli umani e per i client
+    # che i tag non li conoscono).
+    tags += tag_commercio(a)
     for url in _foto_url_nostr(a.get("foto", "")):
         tags.append(["image", url])
     # La consegna nel content, non nei tag: nessun tag nuovo da far
@@ -9955,27 +10110,388 @@ async def sollecita_incassi():
 
 # --- L'import periodico da Nostr ------------------------------------
 # Ogni ora l'orologio riusa la logica di importa_nostr.py per tenere
-# freschi gli annunci dei venditori consenzienti (per ora uno solo:
-# NPUB_VENDITORE / VENDITORE_ID in config.py — quando serviranno di
-# piu', qui basta far diventare la coppia una lista). Fail-open
-# totale: se qualcosa va storto resta una riga in console e il
-# mercatino vive. Il lavoro e' sincrono (websocket-client, download
-# foto): gira dentro asyncio.to_thread come la verifica npub.
+# freschi gli annunci dei venditori Nostr. Fail-open totale: se
+# qualcosa va storto resta una riga in console e il mercatino vive.
+# Il lavoro e' sincrono (websocket-client, download foto): gira
+# dentro asyncio.to_thread come la verifica npub.
+#
+# IMPORT APERTO (lug 2026). Prima si importava UN venditore scelto a
+# mano in config; ora si importa chiunque pubblichi annunci NIP-99 in
+# italiano, e i filtri sono due soli: la lingua e la legge.
+#
+# ZERO modifiche allo schema, e non e' un risparmio furbo: e' la
+# conseguenza di come Barattolo guarda Nostr. Essere su Barattolo E'
+# essere su Nostr — non si sceglie di stare sull'uno e non sull'altro:
+# il mercatino e' una VISTA degli eventi NIP-99, non un archivio
+# separato che ne fa una copia. Percio':
+#   - il registro dei venditori non esiste, si deduce (chiunque abbia
+#     una chiave Nostr dimostrata e' un venditore possibile);
+#   - la data d'ingresso e' utenti.registrato, il proprietario e'
+#     utenti.tg_id, il legame e' annunci.contatto_nostr;
+#   - e soprattutto NON serve un flag «toglietemi da qui», perche'
+#     l'uscita esiste gia' ed e' nativa del protocollo: si manda una
+#     cancellazione NIP-09 (kind 5) sul proprio evento. Le lapidi di
+#     importa_nostr.py la rispettano gia', e per sempre.
+# Un flag nostro sarebbe stato una seconda verita' accanto a quella
+# dei relay, cioe' esattamente la cosa da non avere.
+#
+# Due mestieri distinti, e devono restarlo: la SCOPERTA setaccia i
+# relay senza filtro di autore per trovare npub nuove, l'IMPORT
+# chiede a testa. Non e' pignoleria: una spazzata sola non basta,
+# perche' i relay servono i piu' recenti e 500 eventi coprono poche
+# settimane di tutto Nostr — un venditore italiano che pubblica di
+# rado resta sotto la superficie (misurato: la spazzata globale non
+# vedeva NESSUNO dei 17 annunci di un venditore che la query mirata
+# sulla sua chiave trovava tutti).
 
+# NPUB_VENDITORE / VENDITORE_ID non si leggono piu' dal config: la
+# lista dei venditori si deduce dal database (venditori_nostr_attivi).
+# Il venditore storico non va travasato da nessuna parte — l'import
+# gli aveva gia' scritto badge npub + npub_verificata=1 sul profilo,
+# quindi la deduzione lo ritrova da se'. Per questo il cantiere non
+# ha bisogno di migrazioni: nessuna colonna nuova, nessun dato da
+# spostare. Le due righe restano in config per lo script manuale.
+
+# L'interruttore, come per ogni funzione che parla col mondo di fuori
+# (POST_AUTOMATICI, BANNER_TEST, AVVISI_ISCRITTI...): spento, il
+# mercatino vive esattamente come prima e nessun relay viene toccato.
 try:
-    from config import NPUB_VENDITORE, VENDITORE_ID
+    from config import IMPORT_NOSTR_APERTO
 except ImportError:
-    NPUB_VENDITORE, VENDITORE_ID = "", 0
+    IMPORT_NOSTR_APERTO = True
 
 SECONDI_IMPORT_NOSTR = 3600
 _prossimo_import_nostr = 0.0     # 0 = primo giro subito all'avvio
 
+# La scoperta costa una spazzata globale sui relay: piu' rada
+# dell'import, che invece tiene freschi i venditori gia' noti.
+SECONDI_SCOPERTA_NOSTR = 6 * 3600
+_prossima_scoperta_nostr = 0.0
+
+# Quanti venditori nuovi accettare per giro: se un giorno Nostr si
+# riempisse di annunci italiani, meglio digerirli in piu' tornate che
+# spendere l'intero credito AI in un colpo solo.
+MAX_VENDITORI_NUOVI_GIRO = 10
+
+# Il messaggio che accoglie chi scopriamo. Non e' una notifica di
+# servizio: e' la prima cosa che un estraneo legge di noi, ed e' il
+# motivo per cui l'import aperto non e' uno scippo — arriva PRIMA che
+# lui debba accorgersene da solo, e dice subito come uscirne.
+BENVENUTO_NOSTR = (
+    "🫙 Complimenti per il tuo primo articolo!\n\n"
+    "Il tuo articolo è ora disponibile anche su <b>Barattolo</b>, un "
+    "mercatino del tutto italiano con funzionalità extra: pagamenti in "
+    "sats con deposito di garanzia, offerte sul prezzo, spedizione e "
+    "molto altro.\n\n"
+    "Scoprilo su {url}\n\n"
+    "Entra con la <b>stessa chiave Nostr</b> con cui hai firmato "
+    "l'annuncio: lo ritrovi lì, già tuo, e da lì lo gestisci.\n\n"
+    "Barattolo mostra quello che pubblichi su Nostr, non ne tiene una "
+    "copia a parte: se cancelli l'annuncio dal tuo client sparisce "
+    "anche da qui. 🕊")
+
+
+def annuncio_italiano(evento) -> str:
+    """Il filtro lingua dell'import aperto. Ritorna il motivo (testo
+    non vuoto) se l'annuncio sembra italiano, '' altrimenti.
+
+    Tre prove, dalla piu' forte alla piu' debole. La zona passa dal
+    motore geografico che Barattolo usa gia' per gli avvisi di
+    ricerca: sa che «Como» e' un comune ma «como» dentro una frase
+    spagnola non lo e' (stoplist COMUNI_PAROLA), e conosce 7.900
+    comuni veri invece di una manciata di capoluoghi.
+
+    ATTENZIONE, il confronto e' sempre a PAROLE INTERE. Il filtro a
+    sottostringhe che avevamo (censimento_nostr.py) prendeva
+    «instal-LAZIO-ne», «a-ROMA-tico» e ogni frase spagnola con
+    «como»: su 1044 annunci veri ne dichiarava italiani 70, di cui
+    27 erano spagnoli, croati, tedeschi, portoghesi e sudafricani.
+    """
+    def testo_tag(nome):
+        for t in evento.get("tags", []):
+            if t and len(t) > 1 and t[0] == nome:
+                return str(t[1])
+        return ""
+
+    zona = testo_tag("location")
+    # 1) la zona E' un comune italiano vero
+    if zona and coordinate_da_zona(zona) != (0.0, 0.0):
+        return f"comune «{zona[:30]}»"
+    # 2) la zona nomina l'Italia (a parola intera: mai «italian» di
+    #    «Italian Language Lessons», che e' un corso venduto altrove)
+    if {"italia", "italy"} & set(normalizza(zona).split()):
+        return "zona Italia"
+    # 3) il testo e' scritto in italiano. Si contano le parole
+    #    FUNZIONE, che sono quelle che identificano una lingua: un
+    #    annuncio inglese puo' dire «vendo» per caso, ma non dice
+    #    «che», «per» e «con» tutte insieme.
+    parole = set(normalizza(" ".join(
+        [evento.get("content", "") or "", testo_tag("title"),
+         testo_tag("summary")])).split())
+    quante = len(parole & PAROLE_FUNZIONE_IT)
+    if quante >= 3:
+        return f"lingua ({quante} parole)"
+    return ""
+
+
+# Parole funzione italiane ad alta frequenza: e' cosi' che si
+# riconosce una lingua. Volutamente banali — «vendo» o «spedizione»
+# direbbero molto meno, perche' compaiono anche in annunci stranieri
+# che spediscono in Italia.
+PAROLE_FUNZIONE_IT = {
+    "di", "che", "non", "per", "con", "una", "uno", "sono", "anche",
+    "come", "questo", "questa", "molto", "tutto", "tutti", "della",
+    "delle", "dei", "degli", "alla", "allo", "nella", "nello", "gli",
+    "sul", "sulla", "piu", "meno", "ogni", "senza", "dopo", "prima",
+    "nuovo", "nuova", "usato", "usata", "perfette", "condizioni",
+    "spedizione", "spedisco", "consegna", "ritiro", "disponibile",
+    "vendo", "vendesi", "prezzo", "trattabile", "occasione"}
+
+
+def verifica_firma_nostr(evento) -> bool:
+    """Vero se l'evento e' davvero firmato dalla chiave che dichiara.
+
+    Con UN venditore fidato scelto a mano ci si poteva fidare del
+    campo `authors` dei relay (limite dichiarato in testa a
+    importa_nostr.py). Aperto a chiunque non piu': da queste chiavi
+    nascono ACCOUNT, e un relay bugiardo potrebbe attribuire annunci
+    a chi vuole. Stessa ricetta di verifica_evento_login — id
+    ricalcolato con la serializzazione canonica NIP-01, mai fidarsi
+    di quello ricevuto — ma senza le clausole del login (sfida,
+    relay, freschezza), che qui non c'entrano.
+
+    Senza coincurve ritorna False: meglio nessun import che un
+    import di cui non sappiamo dire la provenienza.
+    """
+    if ChiavePubblicaNostr is None:
+        return False
+    try:
+        pubkey, sig = evento.get("pubkey"), evento.get("sig")
+        ev_id, tags = evento.get("id"), evento.get("tags")
+        creato, kind = evento.get("created_at"), evento.get("kind")
+        contenuto = evento.get("content", "")
+        if not (isinstance(pubkey, str) and RE_HEX_64.fullmatch(pubkey)):
+            return False
+        if not (isinstance(sig, str) and RE_HEX_128.fullmatch(sig)):
+            return False
+        if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)):
+            return False
+        if not isinstance(creato, int) or not isinstance(kind, int):
+            return False
+        if not (isinstance(tags, list)
+                and all(isinstance(t, list)
+                        and all(isinstance(x, str) for x in t)
+                        for t in tags)):
+            return False
+        serial = json.dumps([0, pubkey, creato, kind, tags, contenuto],
+                            separators=(",", ":"), ensure_ascii=False)
+        if hashlib.sha256(serial.encode("utf-8")).hexdigest() != ev_id:
+            return False
+        return ChiavePubblicaNostr(bytes.fromhex(pubkey)).verify(
+            bytes.fromhex(sig), bytes.fromhex(ev_id))
+    except Exception:
+        return False
+
+
+async def _modera_eventi_nostr(prodotti: list) -> list:
+    """Strati 1 e 2 della moderazione su un mazzo di eventi Nostr,
+    PRIMA che diventino righe del database.
+
+    Fin qui l'import scriveva dritto nel DB e saltava del tutto
+    `pubblica()`: limite accettato quando il venditore era uno solo e
+    scelto a mano, e che CLAUDE.md prometteva di chiudere «se mai si
+    aprira' ad altri». E' quel momento.
+
+    Ritorna solo gli eventi ammessi. Strato 1 (parole vietate) e'
+    secco e locale; strato 2 (AI) e' a lotti come nell'import CSV ed
+    e' fail-open per costruzione — se la chiave manca o Anthropic
+    tace, passa e non blocca il mercatino. Ogni bocciatura finisce
+    nel registro della moderazione.
+    """
+    ammessi, voci, per_numero = [], [], {}
+    for e in prodotti:
+        def tg(nome):
+            for t in e.get("tags", []):
+                if t and len(t) > 1 and t[0] == nome:
+                    return str(t[1])
+            return ""
+        titolo = tg("title")
+        descrizione = e.get("content", "") or tg("summary")
+        vietato = controlla_vietato(titolo, descrizione)
+        if vietato:
+            registra_moderazione("parole", "vietato", vietato, titolo)
+            print(f"  🚫 parole vietate ({vietato}): {titolo[:44]}")
+            continue
+        numero = len(voci) + 1
+        voci.append((numero, titolo, descrizione))
+        per_numero[numero] = (e, titolo)
+        ammessi.append(e)
+    if not voci:
+        return []
+    bocciati = set()
+    # A lotti di ~20 come l'import CSV: una chiamata sola per venti
+    # annunci, e il verdetto arriva riga per riga.
+    for i in range(0, len(voci), 20):
+        lotto = voci[i:i + 20]
+        for numero, (esito, motivo) in (await moderazione_ai_lotto(lotto)).items():
+            evento, titolo = per_numero.get(numero, (None, ""))
+            if evento is None:
+                continue
+            bocciati.add(id(evento))
+            registra_moderazione("ai_lotto", esito, motivo, titolo)
+            print(f"  🚫 AI ({esito}): {titolo[:44]} — {motivo[:50]}")
+    return [e for e in ammessi if id(e) not in bocciati]
+
+
+def _vaglio_nostr(loop):
+    """Costruisce il filtro che `importa_venditore` chiama prima di
+    scrivere: firma verificata, lingua italiana, moderazione piena.
+
+    Gira DENTRO asyncio.to_thread (l'import e' sincrono), quindi la
+    moderazione — che e' async — si fa rieseguire sul loop vero con
+    run_coroutine_threadsafe. Il tetto di 120s evita che un'API
+    lenta tenga in ostaggio il giro d'import.
+    """
+    def vaglio(prodotti):
+        firmati = [e for e in prodotti if verifica_firma_nostr(e)]
+        if len(firmati) < len(prodotti):
+            print(f"  ✍️ {len(prodotti) - len(firmati)} eventi con firma "
+                  f"non verificabile: ignorati")
+        italiani = []
+        for e in firmati:
+            if annuncio_italiano(e):
+                italiani.append(e)
+        if len(italiani) < len(firmati):
+            print(f"  🌍 {len(firmati) - len(italiani)} eventi non "
+                  f"italiani: ignorati")
+        if not italiani:
+            return []
+        try:
+            return asyncio.run_coroutine_threadsafe(
+                _modera_eventi_nostr(italiani), loop).result(timeout=120)
+        except Exception as e:
+            # Fail-CLOSED, al contrario del resto: se la moderazione
+            # non ha potuto dire la sua, non si importa nulla. Il
+            # giro dopo ci riprova fra un'ora.
+            print(f"⚠️ Moderazione import Nostr non conclusa, "
+                  f"nessun annuncio importato: {e}")
+            return []
+    return vaglio
+
+
+async def _accogli_venditore_nostr(hexkey: str) -> int:
+    """Da chiave Nostr a utente di Barattolo. Se e' gia' dei nostri
+    ritorna il suo tg_id senza toccare nulla; se e' nuovo gli apre
+    l'account nativo (la macchina del login Nostr: tg_id negativo,
+    npub_accesso, badge 🟣 gia' verificato perche' la firma dimostra
+    il possesso) e gli manda il DM di benvenuto.
+
+    Il DM parte SOLO alla creazione, che e' un evento unico per
+    costruzione: per questo non serve una colonna «benvenuto_il».
+    """
+    npub = hex_to_npub(hexkey)
+    con = db()
+    riga = con.execute(
+        "SELECT tg_id FROM utenti WHERE npub_accesso=? "
+        "OR (npub=? AND npub_verificata=1)", (npub, npub)).fetchone()
+    con.close()
+    if riga:
+        return riga["tg_id"]
+    tg_id = crea_utente_nostr(hexkey, npub)
+    # Il benvenuto e' fail-open: un DM che non parte (relay muti,
+    # cryptography assente) non deve far saltare l'import.
+    try:
+        await notifica(tg_id, BENVENUTO_NOSTR.format(url=URL_PUBBLICO))
+    except Exception as e:
+        print(f"⚠️ Benvenuto Nostr non consegnato a {npub[:16]}…: {e}")
+    print(f"  🎉 Venditore nuovo accolto: {npub[:20]}… (id {tg_id})")
+    return tg_id
+
+
+async def scopri_venditori_nostr():
+    """La SCOPERTA: setaccia i relay senza filtro d'autore e trova
+    npub italiane che ancora non conosciamo. Non importa nulla — si
+    limita ad aprire l'account (e mandare il benvenuto), poi ci
+    pensa il giro d'import a testa, che e' l'unico modo di prendere
+    davvero TUTTI gli annunci di ognuno.
+    """
+    global _prossima_scoperta_nostr
+    if time.time() < _prossima_scoperta_nostr:
+        return
+    _prossima_scoperta_nostr = time.time() + SECONDI_SCOPERTA_NOSTR
+    import importa_nostr
+
+    def spazzata():
+        eventi = []
+        for relay in importa_nostr.RELAYS:
+            eventi += importa_nostr.interroga_aperto(relay)
+        return eventi
+
+    eventi = await asyncio.to_thread(spazzata)
+    # Chi conosciamo gia': la lista dei venditori sta nei dati veri.
+    con = db()
+    noti = {r["contatto_nostr"] for r in con.execute(
+        "SELECT DISTINCT contatto_nostr FROM annunci "
+        "WHERE contatto_nostr != ''").fetchall()}
+    con.close()
+    candidati = {}
+    for e in eventi:
+        pubkey = e.get("pubkey", "")
+        if not RE_HEX_64.fullmatch(pubkey or ""):
+            continue
+        try:
+            if hex_to_npub(pubkey) in noti:
+                continue
+        except Exception:
+            continue
+        if not annuncio_italiano(e):
+            continue
+        if not verifica_firma_nostr(e):
+            continue
+        candidati.setdefault(pubkey, 0)
+        candidati[pubkey] += 1
+    if not candidati:
+        print("🔎 Scoperta Nostr: nessun venditore italiano nuovo")
+        return
+    # I piu' prolifici per primi: se il tetto taglia, taglia le code
+    ordinati = sorted(candidati.items(), key=lambda x: -x[1])
+    print(f"🔎 Scoperta Nostr: {len(ordinati)} venditori italiani nuovi")
+    for pubkey, quanti in ordinati[:MAX_VENDITORI_NUOVI_GIRO]:
+        try:
+            await _accogli_venditore_nostr(pubkey)
+        except Exception as e:
+            print(f"⚠️ Venditore {pubkey[:16]}… non accolto: {e}")
+
+
+def venditori_nostr_attivi() -> list:
+    """La lista dei venditori da importare, DEDOTTA e non registrata:
+    chiunque abbia una chiave Nostr di cui ha dimostrato il possesso
+    — npub_accesso (ci entra) o badge npub VERIFICATO. E' la stessa
+    regola di `notifica()` e dei ponti di contatto: mai una npub
+    nuda, che potrebbe essere la dichiarazione falsa di un altro.
+
+    Comprende quindi tre popolazioni che non hanno bisogno di essere
+    distinte: il venditore storico scelto un tempo in config (badge
+    verificato scritto dall'import), chi la scoperta ha accolto
+    (npub_accesso alla creazione) e chi e' entrato da se' col login
+    Nostr — perche' essere su Barattolo e' essere su Nostr, e i suoi
+    annunci NIP-99 sono gia' suoi anche qui. Chi non ci vuole stare
+    manda un kind 5 e le lapidi fanno il resto.
+    """
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id, COALESCE(NULLIF(npub_accesso,''), npub) AS chiave "
+        "FROM utenti "
+        "WHERE npub_accesso != '' OR (npub != '' AND npub_verificata=1)"
+    ).fetchall()
+    con.close()
+    return [(r["chiave"], r["tg_id"]) for r in righe if r["chiave"]]
+
 
 async def importa_nostr_periodico():
     global _prossimo_import_nostr
-    if (not NPUB_VENDITORE or NPUB_VENDITORE.startswith("INCOLLA")
-            or not VENDITORE_ID):
-        return                   # segnaposto in config = funzione spenta
+    if not IMPORT_NOSTR_APERTO:
+        return
     if time.time() < _prossimo_import_nostr:
         return
     # L'appuntamento si fissa PRIMA di provare: anche un errore
@@ -9984,8 +10500,23 @@ async def importa_nostr_periodico():
     import importa_nostr         # qui e non in cima: se manca
     #                              websocket-client il server vive lo stesso
     t0 = int(time.time())
-    importati, aggiornati, saltati = await asyncio.to_thread(
-        importa_nostr.importa_venditore, NPUB_VENDITORE, VENDITORE_ID, DB)
+    # Prima si guarda se c'e' gente nuova, poi si importa: cosi' un
+    # venditore scoperto oggi entra in vetrina nello stesso giro.
+    try:
+        await scopri_venditori_nostr()
+    except Exception as e:
+        print(f"⚠️ Scoperta Nostr saltata: {e}")
+    vaglio = _vaglio_nostr(asyncio.get_running_loop())
+    importati = aggiornati = saltati = 0
+    for npub, venditore_id in venditori_nostr_attivi():
+        try:
+            i, a, s = await asyncio.to_thread(
+                importa_nostr.importa_venditore, npub, venditore_id, DB,
+                vaglio)
+            importati, aggiornati, saltati = (importati + i, aggiornati + a,
+                                              saltati + s)
+        except Exception as e:
+            print(f"⚠️ Import di {npub[:16]}… saltato: {e}")
     print(f"🔄 Import Nostr: {importati} nuovi, {aggiornati} aggiornati, "
           f"{saltati} saltati")
     # Il dopo-import, senza toccare importa_nostr.py (che scrive
