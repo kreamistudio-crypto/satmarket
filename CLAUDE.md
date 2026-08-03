@@ -972,8 +972,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   filtro anche nella vetrina anonima, ed è l'elenco ISTAT committato
   in chiaro — nessun dato di nessuno e nessuna chiamata a pagamento da
   regalare ai bot (che è invece la ragione per cui la ricerca AI resta
-  agli autenticati). Frontend: campo-bottone `#filtroVicinoBtn` nel
-  pannello (dice sempre dove e quanto) che apre `#vicinoSheet` —
+  agli autenticati). Frontend: la riga `renderVicinoRiga()` ha DUE
+  FACCE, ed è la risposta all'attrito del primo uso (lug 2026,
+  feedback di Andrea): finché il comune non lo sappiamo è il
+  campo-bottone `#filtroVicinoBtn` che apre il foglio — bisogna pur
+  chiederlo —, appena lo sappiamo diventa una SPUNTA come gli altri
+  filtri, «📍 Vicino a Pavia (PV) · 25 km», che si accende con UN
+  tocco, col «cambia» di lato per un altro comune o un altro raggio.
+  Richiedere il comune ogni volta sarebbe un modulo da riempire per
+  accendere un filtro. La spunta dice solo sì/no: il DOVE è `myComune`,
+  che `applicaVicino` tiene allineato (in vetrina anonima resta in
+  pagina e basta), e `applicaFiltri` legge la casella. Azzera spegne il
+  filtro ma NON la memoria — il comune resta ricordato. E il primo uso
+  non parte da un campo vuoto: `comune_suggerito` in /api/me indovina
+  il comune dagli ULTIMI 5 annunci dell'utente (`comune_da_zona`, solo
+  quando `utenti.comune` è vuoto) e il foglio ci precompila il campo —
+  non è il suo comune e non si scrive in colonna, è una proposta
+  finché non la conferma lui, e con la conferma diventa memoria. Il
+  RAGGIO invece resta di sessione (default 25): è una manopola, non
+  un'anagrafica. Nel foglio `#vicinoSheet`:
   comune con `<datalist>` e le pillole del raggio; il valore dei
   suggerimenti porta la SIGLA («Pavia (PV)»), che i sette omonimi
   d'Italia col nome nudo il server non sa collocare, ma all'elenco si
@@ -1255,7 +1272,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`consegna='digitale' OR anche_digitale=1`: la combo va presa, ed è
   la regola di `stradeConsegna()` nel client, dove la DEMO chiede
   proprio a lui invece di ripetere la condizione a mano). Tre spunte
-  che si SOMMANO: spedizione+ritiro = solo chi offre tutte e due;
+  che si SOMMANO: spedizione+ritiro = solo chi offre tutte e due.
+  Le etichette non dicono «Solo con…» (lug 2026): «🚚 Spedizione ·
+  🤝 Ritiro in zona · 💾 Codice online · ⚡ In offerta» — sono spunte
+  dentro un pannello che si chiama Filtri, il «solo» lo dice il posto;
   `protezione_percento`
   nella busta di prima pagina (la stima del client non hardcoda mai
   la cifra). NIP-99: la spedizione è una riga del CONTENT, nessun tag
