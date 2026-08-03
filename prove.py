@@ -282,7 +282,7 @@ def prove_anello():
 def prove_categorie():
     """Il catalogo e' UNO: server, frontend e import devono dire le
     stesse categorie. Questa prova esiste perche' aggiungerne una
-    vuol dire toccare cinque posti, ed e' facile dimenticarne uno."""
+    vuol dire toccare SETTE posti, ed e' facile dimenticarne uno."""
     print("\n[categorie]")
     import re
     amb = {}
@@ -352,6 +352,54 @@ def prove_categorie():
         if amb["categoria_tollerante"](c) != c:
             prova(f"il catalogo passa da categoria_tollerante ({c})",
                   c, amb["categoria_tollerante"](c))
+
+    # Il SETTIMO posto (lug 2026, pagina Sfoglia): l'illustrazione. E'
+    # anche l'unico che non si vede finche' non si apre la pagina — una
+    # piastrella senza immagine mostra l'emoji di ripiego e sembra
+    # quasi giusta. Meglio che a dirlo sia la CI.
+    exec(pezzo("slug_categoria"), amb)
+    slug = amb["slug_categoria"]
+    prova("nessuno slug di categoria si sovrappone a un altro",
+          len(cat), len({slug(c) for c in cat}))
+    prova("il frontend calcola lo slug come il server", True,
+          "c.toLowerCase().replace(/ /g,'-')" in html)
+    prova("ogni categoria ha la sua illustrazione", [],
+          [c for c in cat
+           if not os.path.exists(f"assets/categorie/{slug(c)}.webp")])
+
+    # Le illustrazioni devono essere TIRATE, cioe' senza margine
+    # trasparente attorno (ci pensa ritaglia_categorie.py). Non e' una
+    # pignoleria: la piastrella le posa in un riquadro tarato al pixel
+    # sotto il nome, e un file con margini renderebbe il disegno
+    # piccolo dentro quel riquadro — la cosa che si e' appena
+    # sistemata. Peggio: il margine sposta il disegno verso l'alto e
+    # le sue zone quasi bianche possono tornare sotto le lettere, dove
+    # il nome in crema fa 1,00:1 e sparisce. Un testo invisibile non
+    # lo nota nessuno finche' non lo segnala un utente: meglio la CI.
+    try:
+        from PIL import Image
+    except ImportError:
+        print("  · Pillow assente: salto il controllo del ritaglio")
+    else:
+        # La soglia dell'alpha e' la stessa di ritaglia_categorie.py, e
+        # NON e' un dettaglio: un file arrivava con una velatura quasi
+        # invisibile su tutta la tela: col confronto a zero risultava
+        # gia' tirato mentre il disegno vero ne occupava meno di meta',
+        # e in vetrina si vedeva piccolo accanto agli altri. Guardare
+        # sopra lo zero qui vorrebbe dire lasciar passare proprio il
+        # caso che questa prova esiste per prendere.
+        larghi = []
+        for c in cat:
+            p = f"assets/categorie/{slug(c)}.webp"
+            if not os.path.exists(p):
+                continue
+            im = Image.open(p).convert("RGBA")
+            w, h = im.size
+            bb = im.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
+            if bb and max(bb[0], bb[1], w - bb[2], h - bb[3]) > .02 * max(w, h):
+                larghi.append(c)
+        prova("le illustrazioni sono tirate (niente vuoto attorno)",
+              [], larghi)
 
 
 # ====================================================================

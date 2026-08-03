@@ -3352,6 +3352,20 @@ def categoria_valida(c) -> str:
     return c if c in CATEGORIE else "Altro"
 
 
+def slug_categoria(c: str) -> str:
+    """Il nome del file dell'illustrazione della pagina Sfoglia.
+    Minuscolo, spazi in trattini: nessuna delle 26 voci ha accenti,
+    quindi basta questo. Il gemello e' slugCat in miniapp.html, e
+    prove.py fallisce se divergono."""
+    return c.lower().replace(" ", "-")
+
+
+# La whitelist CHIUSA dei file servibili da /assets/categorie: si
+# calcola dal catalogo, quindi non esiste un elenco da tenere allineato
+# e nessun nome che non sia una categoria puo' uscire dal server.
+SLUG_CATEGORIE = {slug_categoria(c) for c in CATEGORIE}
+
+
 # --- Condizione dell'oggetto (lug 2026): la scala a 5 livelli --------
 # Obbligatoria nel FORM (la validazione vive nel client, come per la
 # consegna): il server resta tollerante — '' = non dichiarata, cioe'
@@ -11718,6 +11732,25 @@ def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il
     tasto-avatar del Profilo, reso tondo dal CSS della pagina."""
     return FileResponse("assets/tappo.jpeg", media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# Le 26 illustrazioni della pagina Sfoglia (lug 2026), una per
+# categoria. Qui il nome ARRIVA dal client, quindi non basta la rotta
+# esplicita: si accetta solo se sta nella whitelist chiusa calcolata
+# dal catalogo (SLUG_CATEGORIE). Ventisei rotte a mano direbbero la
+# stessa cosa in ventisei modi; cosi' l'insieme dei file servibili
+# resta chiuso e derivato, e nessun percorso puo' uscire dalla
+# cartella — lo spirito della regola ferrea 3, senza StaticFiles.
+@app.get("/assets/categorie/{nome}")
+def asset_categoria(nome: str):
+    slug = nome[:-5] if nome.endswith(".webp") else ""
+    if slug not in SLUG_CATEGORIE:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "categorie", slug + ".webp")
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    return FileResponse(percorso, media_type="image/webp",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 

@@ -69,6 +69,24 @@
        confondibile col prezzo). --carton disegna il contorno, e' anche
        il colore del testo. */
     --carton:#9A6234; --carton-on:#fff;
+    /* Il fondo delle piastrelle di Sfoglia. E' un BRUNO di casa e non
+       un nero: le illustrazioni sono scontornate su trasparenza (non
+       hanno un fondo cotto dentro), quindi il colore e' una scelta
+       nostra, e un neutro freddo qui dentro stonava.
+       Perche' scuro, e non un marrone chiaro: i disegni sono in tinte
+       calde e sabbiose e vogliono un fondo scuro sotto. Misurato sui
+       26 file veri: su un --carton chiaro venticinque su ventisei
+       scenderebbero sotto 3:1 (media 1,85:1), cioe' sparirebbero.
+       UN GRADINO PIU' CHIARO (#3A2F1D) E' STATO PROVATO A SCHERMO E
+       RIMESSO INDIETRO, decisione di Andrea sulla pagina vera: le
+       illustrazioni reggevano, ma la piastrella perdeva il suo peso.
+       Se torna la tentazione, si guardi prima la pagina intera e non
+       la singola piastrella — e si sappia che il gradino DOPO
+       (#43361F) affonda per davvero, con Casa e giardino ed
+       Elettronica dal 30% al 70% di disegno sotto 3:1.
+       Di sera sale di un gradino (vedi il blocco scuro): li' la
+       pagina e' gia' bruna e la piastrella deve staccarsene. */
+    --cat-fondo:#332A19; --cat-ink:#F4F1EA;
     --trust-note:#14532D; --trust-sub:#4B7C5E; --step-line:#BADCC8;
     --tile-off:#F3EFE3; --toast-bg:#23282C; --toast-text:#fff;
     --ink-soft:#5B5648; --desc:#3A3C42;
@@ -123,6 +141,16 @@
        bruno: un marrone scuro ci affonderebbe dentro) e resta piu'
        terroso dell'arancio ₿, che li' accanto non deve avere sosia */
     --carton:#C79A72; --carton-on:#241A0F;
+    /* La piastrella di Sfoglia sale di un gradino, e la ragione e'
+       l'opposto di quella della spedizione: li' di notte si ABBASSA la
+       luce perche' il chiaro grida, qui la si ALZA perche' la pagina
+       e' gia' bruna e una piastrella dello stesso bruno ci si
+       scioglierebbe dentro. Non e' un colore nuovo, e' lo stesso di
+       giorno un passo piu' su: contro il fondo fa 1,32:1 — piu' della
+       carta delle card di sempre, che di sera si stacca con 1,13 — e
+       il nome ci tiene 11,6:1. Piu' chiaro di cosi' comincia a
+       mangiarsi le illustrazioni, che e' il conto scritto sopra. */
+    --cat-fondo:#3A2F1D;
     --trust-note:#B9E4CC; --trust-sub:#93BEA6; --step-line:#3C5B49;
     --tile-off:#2E2A1E; --toast-bg:#F1E8D5; --toast-text:#23282C;
     --ink-soft:#CFC4AD; --desc:#E2D9C6;
@@ -355,6 +383,107 @@
   .tag-price .price{margin-top:0;font-size:14.5px;color:var(--sats-deep)}
   .tag-price .price-sub,.tag-price .price .unit{color:#8A8271}
   .tag-price .price-sub{margin-top:0}
+
+  /* ---------- sfoglia: le categorie come vetrina ----------
+     Griglia di piastrelle illustrate, una per categoria. La piastrella
+     resta CHARCOAL nei due temi (token senza gemello nel blocco scuro),
+     ed e' la stessa regola del cartellino qui sopra e degli asset del
+     brand: le illustrazioni sono WebP col fondo charcoal cotto dentro,
+     «niente scontorno». Il fondo della piastrella e' quel fondo li',
+     campionato dai file: e' cosi' che la cucitura fra l'immagine e la
+     piastrella sparisce, e un fondo che cambiasse col tema la
+     rimetterebbe in mezzo alla griglia. */
+  /* Il respiro sopra la griglia e' 8px e non 12, e l'etichetta non
+     porta il padding-top maggiorato delle altre viste: sono i pixel
+     che fanno stare la QUINTA riga sopra la nav a 360x760. Chi li
+     rimette si riprende una riga intera. */
+  .sfoglia-griglia{display:grid;grid-template-columns:1fr 1fr;gap:10px;
+    padding:8px var(--pad) 0}
+  /* Il rapporto e' tarato su QUANTE PIASTRELLE si vedono in una
+     schermata: dieci, come nel riferimento (decisione di Andrea).
+     A 360x760 la griglia comincia a 101 e la nav a 699: cinque righe
+     da 120 — piastrella 110 e gap 10, che con la larghezza di 159 fa
+     1.445. Chi tocca questo numero cambia quel conto: piu' alta =
+     meno piastrelle in schermata, piu' bassa = il nome e il disegno
+     tornano a pestarsi (vedi la nota sull'immagine). */
+  /* La piastrella e' una COLONNA: sopra il nome, che prende l'altezza
+     che gli serve, sotto l'illustrazione, che si prende tutto il
+     resto. E' cio' che ha tolto di mezzo il problema invece di
+     rincorrerlo: finche' nome e disegno erano due strati sovrapposti,
+     ogni pixel dato al disegno andava misurato contro la riga di
+     testo — e a forza di misurare il tetto restava 56px. Cosi'
+     invece non possono pestarsi PER COSTRUZIONE, e dove il nome sta
+     su una riga sola il disegno si prende quasi 80px. Il prezzo,
+     accettato: i disegni non sono tutti della stessa taglia, perche'
+     un nome su due righe ne lascia meno. */
+  .cat-tile{
+    position:relative;aspect-ratio:1.445;text-align:left;
+    display:flex;flex-direction:column;
+    border:0;padding:0;cursor:pointer;overflow:hidden;
+    border-radius:16px;background:var(--cat-fondo);
+  }
+  .cat-tile:active{transform:translateY(1px)}
+  /* NIENTE VELO SOTTO IL NOME, e vale la pena dire perche' non c'e'.
+     Le illustrazioni hanno zone quasi bianche (#FBEFE1 e simili): con
+     la piastrella corta del riferimento otto di loro finivano sotto le
+     lettere, e crema su quasi-bianco fa 1,00:1 — la parola spariva. Un
+     velo scuro sfumato, provato, salvava il testo ma spegneva il 55%
+     dei disegni: cura un male causandone un altro. A risolvere e'
+     stata la GEOMETRIA — piastrella piu' alta e disegno piu' basso —
+     e ora nessun pixel di illustrazione arriva sotto il nome, che
+     resta a 12,5:1 (11,6 di sera) su tutte e 26. A tenere la regola
+     c'e' una prova in prove.py, che guarda l'angolo in alto a
+     sinistra dei file: se un'illustrazione rifatta ci mettera'
+     qualcosa, la CI lo dira' forte invece di lasciarlo scoprire a un
+     utente. */
+  /* Il nome in alto a sinistra, con la sillabazione: i nomi lunghi
+     («Console e videogiochi») vanno a capo col trattino invece di
+     stringersi. Sopra l'immagine per z-index, cosi' un nome a tre
+     righe le passa davanti invece di sparirci sotto.
+     ATTENZIONE a overflow-wrap: e' la RETE, e serve. hyphens:auto
+     lavora solo dove il browser ha il dizionario italiano, e dove non
+     ce l'ha una parola sola e lunga («Elettrodomestici», 115px in una
+     colonna da 87) non va a capo affatto — esce dalla sua zona e
+     finisce a cavallo dell'illustrazione. Col dizionario si spezza
+     col trattino, senza si spezza e basta: mai addosso al disegno. */
+  /* 14px e i margini a 9: sono i numeri che fanno stare TUTTI e 26 i
+     nomi su UNA riga a 360px — «Console e videogiochi», il piu' lungo,
+     ne chiede 140 e ne ha 141. E' quello che rende i disegni tutti
+     della stessa altezza: un nome su due righe si mangia 17px di
+     illustrazione, ed era l'unica ragione per cui due piastrelle
+     avevano il disegno piu' piccolo delle altre. Chi alza il corpo
+     del testo rimette quelle due a capo. */
+  .cat-tile .cat-nome{
+    flex:0 0 auto;margin:10px 9px 0;
+    font-family:'Baloo 2',sans-serif;font-weight:800;font-size:14px;
+    line-height:1.15;color:var(--cat-ink);
+    -webkit-hyphens:auto;hyphens:auto;overflow-wrap:break-word;
+  }
+  /* L'illustrazione riempie tutto lo spazio che il nome le lascia, e
+     ci sta dentro INTERA (contain, mai cover: un cover le taglierebbe
+     un pezzo). Sta in basso a destra, e i file sono TIRATI —
+     `ritaglia_categorie.py` toglie il margine trasparente che le
+     illustrazioni hanno di fabbrica, altrimenti un terzo di questo
+     spazio sarebbe vuoto e il disegno si vedrebbe piccolo. Con
+     contain ognuna riempie il riquadro per il suo verso: la bici in
+     larghezza, il telefono in altezza — e nessuna esce dai bordi,
+     che era il guaio degli scarti negativi di prima. */
+  .cat-tile .cat-fig{flex:1 1 auto;min-height:0;position:relative;
+    margin:4px 8px 7px 10px}
+  .cat-tile .cat-fig img{position:absolute;inset:0;
+    width:100%;height:100%;display:block;
+    object-fit:contain;object-position:100% 100%}
+  /* Ripiego quando l'immagine non arriva (la DEMO da file://): c'e'
+     l'emoji del catalogo, spenta finche' l'img le sta davanti nel
+     markup — l'onerror la toglie e il fratello ricompare. E' lo stesso
+     giro della mascotte e del barattolo del lockup. */
+  .cat-tile .cat-emoji{position:absolute;right:2px;bottom:0;
+    font-size:30px;line-height:1}
+  .cat-tile img + .cat-emoji{display:none}
+  /* Categoria senza annunci: spenta ma toccabile — si atterra sulla
+     vetrina vuota, che ha gia' il suo «Avvisami se arriva» */
+  .cat-tile.vuota{opacity:.5}
+
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
      cio' che sta sulla foto. ROSSO caldo (#C0392B, bianco sopra =
@@ -741,6 +870,11 @@
   nav button.sell{color:var(--ink-soft)}
   nav button.sell.active{color:var(--sats-deep)}
   nav button.sell.active .ic{background:var(--sats);box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35)}
+  /* Il quinto posto della barra: uno spaziatore elastico che tiene il
+     tondo del Vendi al centro esatto con quattro voci. Non e' un
+     bottone, quindi nav button non lo pesca: la flex-basis se la
+     prende da qui. */
+  .nav-vuoto{flex:1}
   /* Il lockup nella barra: esiste solo da desktop in su */
   .nav-logo{display:none}
 
@@ -1517,6 +1651,10 @@
     /* il logo in topbar e' markup vero (.nav-logo): la B col ₿ vive
        di pseudo-elementi suoi, impossibili dentro un content: */
     .nav-logo{display:flex;align-items:center;gap:9px;margin-right:auto;font-size:24px}
+    /* in topbar le voci sono pillole appaiate a destra (flex:0 0 auto)
+       e a spingerle ci pensa il margin-right del logo: uno spaziatore
+       elastico qui romperebbe l'allineamento */
+    .nav-vuoto{display:none}
     /* la topbar e' alta 60px fissi: 42px ci stanno centrati senza
        toccare nulla (e il margine negativo mobile qui non serve) */
     .nav-logo .brand-jar{width:42px;height:42px;border-radius:13px;margin:0}
@@ -1559,6 +1697,9 @@
 
     /* griglia a 3 colonne: vale per home, vetrina e negozio */
     .grid{grid-template-columns:repeat(3,1fr);gap:14px}
+    /* Sfoglia respira come la vetrina: niente colonna stretta, e' una
+       griglia e vuole la larghezza piena */
+    .sfoglia-griglia{grid-template-columns:repeat(3,1fr);gap:14px}
 
     /* dettaglio a due colonne: foto a sinistra, info a destra */
     #view-dettaglio{max-width:980px;margin:0 auto}
@@ -1594,6 +1735,7 @@
   @media (min-width:1024px){
     #app{max-width:1160px}
     .grid{grid-template-columns:repeat(4,1fr);gap:16px}
+    .sfoglia-griglia{grid-template-columns:repeat(4,1fr);gap:16px}
     nav{padding:0 max(var(--pad), calc((100% - 1160px)/2))}
   }
 
@@ -1774,6 +1916,18 @@
     <!-- La sentinella dello scroll infinito: quando si avvicina allo
          schermo si carica la pagina di annunci successiva -->
     <div id="gridSentinella" style="height:1px"></div>
+  </div>
+
+  <!-- ============ VISTA: SFOGLIA ============ -->
+  <!-- Le 26 categorie come vetrina: la MAPPA di cosa si vende su
+       Barattolo, non l'inventario di oggi — quindi ordine fisso di
+       catalogo (mai per numero: una mappa che si riordina ogni giorno
+       non si impara), tutte presenti, le vuote spente ma toccabili.
+       Niente barra di ricerca: quella vive in Esplora, a un tocco, e
+       duplicarla vorrebbe dire due posti da tenere allineati. -->
+  <div class="view" id="view-sfoglia">
+    <div class="section-label">Sfoglia per categoria</div>
+    <div class="sfoglia-griglia" id="sfogliaGriglia"></div>
   </div>
 
   <!-- ============ VISTA: DETTAGLIO ============ -->
@@ -2127,12 +2281,17 @@
   </div>
 
   <nav>
-    <!-- Tre voci, col + di Vendi al centro. Il Profilo vive nel tasto
-         tappo in testata (mobile) e qui in coda solo da desktop -->
+    <!-- Quattro voci in CINQUE posti, col + di Vendi al centro esatto.
+         Il quinto e' vuoto apposta: con quattro bottoni soli il Vendi
+         finirebbe al 62,5% invece che a meta'. Lo spazio libero e' li'
+         per qualcosa che arrivera'. Il Profilo vive nel tasto tappo in
+         testata (mobile) e qui in coda solo da desktop -->
     <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
     <button id="nav-esplora" class="active" onclick="go('esplora')"><span class="ic">🛍️</span>Esplora</button>
+    <button id="nav-sfoglia" onclick="go('sfoglia')"><span class="ic">🗂️</span>Sfoglia</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
     <button id="nav-affari" onclick="go('affari')"><span class="ic">🤝</span>Ordini<span class="off-dot" id="offDot"></span></button>
+    <span class="nav-vuoto" aria-hidden="true"></span>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
@@ -3001,6 +3160,9 @@ function go(view){
   /* Nel dettaglio comprabile la tab bar lascia il posto alla barra
      d'acquisto (solo mobile, ci pensa il CSS); su ogni altra vista torna */
   aggiornaBarraCompra(view);
+  /* le piastrelle si rifanno a ogni entrata: i conteggi decidono quali
+     sono spente, e nel frattempo qualcuno puo' aver pubblicato */
+  if (view==='sfoglia') renderSfoglia();
   if (view==='affari') {
     if (!DEMO) {
       loadOrders().then(renderOrders).catch(()=>renderOrders());
@@ -3048,11 +3210,19 @@ function go(view){
    closeSheet(): quello spegne la pila intera e con lei il pollTimer del
    pagamento. */
 
-/* I quattro tab della nav sono RADICI sorelle: fra loro si SOSTITUISCE
-   (girarli tutti non deve costare quattro indietro) e dalla radice
+/* I tab della nav sono RADICI sorelle: fra loro si SOSTITUISCE
+   (girarli tutti non deve costare un indietro a testa) e dalla radice
    l'indietro esce dall'app, che e' il patto chiesto. Si spinge solo
    entrando in una vista piu' interna. */
-const RADICI = new Set(['esplora','vendi','affari','profilo']);
+const RADICI = new Set(['esplora','sfoglia','vendi','affari','profilo']);
+/* L'UNICA eccezione al patto qui sopra, e va detta perche' e' la prima
+   crepa: il tocco su una piastrella di Sfoglia porta a Esplora, che e'
+   una radice — ma non e' un cambio di tab, e' una DISCESA (da uno
+   scaffale si entra in un reparto, e l'indietro deve riportare allo
+   scaffale). Il motore decide guardando la destinazione e non puo'
+   sapere da dove si viene: serve una bandierina, alzata da
+   apriCategoria e consumata al primo giro di navRiflette. */
+let navSpingi = false;
 /* Su file:// (la DEMO aperta a mano) la storia non si puo' toccare: il
    motore resta spento e tutto si comporta come ieri. Stessa guardia di
    protocollo del service worker. */
@@ -3129,6 +3299,10 @@ function navRendiVista(b){
    in Esplora). */
 function navRiflette(){
   if (!STORIA) return;
+  /* letta e azzerata SUBITO, prima di ogni via d'uscita: una
+     bandierina lasciata accesa perderebbe il suo giro e si
+     scaricherebbe su una navigazione che non l'ha chiesta */
+  const forza = navSpingi; navSpingi = false;
   const ora = navPila(), st = history.state?.pila;
   if (navUguali(ora, st)) { navFreccia(ora); return; }
   const stato = {app:'brt', pila: ora};
@@ -3142,9 +3316,11 @@ function navRiflette(){
          sicurezza —: li' l'indietro deve riportare indietro. Tornare a
          una radice (i tab, e i ripieghi quando una vista si e' svuotata)
          e il cambio foglio→foglio sostituiscono: nessun gradino nuovo da
-         smontare, e nessun foglio da riaprire all'indietro. */
+         smontare, e nessun foglio da riaprire all'indietro.
+         `forza` e' la sola deroga, e vale per un giro solo: la
+         piastrella di Sfoglia, che porta a una radice ma scendendo. */
       const a = ora[ora.length - 1];
-      const spinge = a.t === 'v' && !RADICI.has(a.v);
+      const spinge = a.t === 'v' && (!RADICI.has(a.v) || forza);
       history[spinge ? 'pushState' : 'replaceState'](stato, '', location.href);
     }
   } catch(e){}
@@ -3247,10 +3423,18 @@ function renderChips(){
   else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
   const cats = CATS.slice(1).filter(c=>conta[c])
     .sort((a,b)=>conta[b]-conta[a]);   // sort stabile: pari merito in ordine di catalogo
-  /* Se la categoria attiva e' rimasta senza annunci (dati nuovi),
-     la sua pillola sparisce: si torna su Tutto, mai su un filtro fantasma */
-  if (activeCat!=='Tutto' && !conta[activeCat]) activeCat='Tutto';
-  el('chips').innerHTML = ['Tutto',...cats].map(c=>
+  /* La categoria SCELTA resta in elenco anche a zero annunci, ed e' la
+     regola della regione nel pannello Filtri: il filtro non deve
+     mentire su cosa sta filtrando. Prima qui si tornava a «Tutto», e
+     con la pagina Sfoglia quella scorciatoia e' diventata una bugia —
+     si tocca «Informatica», che e' vuota, e ci si ritrova davanti la
+     vetrina intera senza che nulla lo dica. Meglio una griglia vuota
+     che dice la verita' (e offre «Avvisami se arriva») di una piena
+     che risponde a una domanda che nessuno ha fatto.
+     Sta in TESTA e non in coda: la fila scorre di lato, e una pillola
+     accesa in fondo non la vedrebbe nessuno. */
+  const scelta = (activeCat!=='Tutto' && !conta[activeCat]) ? [activeCat] : [];
+  el('chips').innerHTML = ['Tutto',...scelta,...cats].map(c=>
     `<div class="chip ${c===activeCat?'active':''}" onclick="setCat('${c}')">${c}</div>`).join('');
 }
 function setCat(c){
@@ -3263,6 +3447,45 @@ function setCat(c){
      le pagine caricate): si riparte dalla prima pagina della vista */
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+}
+
+/* ---------------- sfoglia ---------------- */
+/* Il nome del file dell'illustrazione si CALCOLA dalla categoria
+   (minuscolo, spazi in trattini): nessun elenco doppio da tenere
+   allineato. Il gemello e' slug_categoria() in server.py, che decide
+   anche quali file sono servibili — prove.py fallisce se divergono o
+   se a una categoria manca la sua immagine. */
+const slugCat = c => c.toLowerCase().replace(/ /g,'-');
+
+/* Le 26 piastrelle. I conteggi sono gli stessi di renderChips (globali
+   dal server, dal locale in DEMO) ma qui NON si mostrano: servono solo
+   a decidere chi e' spento. E l'ordine e' quello del catalogo, non per
+   numero — Sfoglia e' una mappa, e una mappa non si riordina da sola. */
+function renderSfoglia(){
+  const conta = {};
+  if (!DEMO && conteggiServer) Object.assign(conta, conteggiServer);
+  else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
+  /* il nome va in data-cat e MAI dentro la stringa JS dell'onclick:
+     e' la lezione gia' pagata sul picker con «Valle d'Aosta» */
+  el('sfogliaGriglia').innerHTML = CATS.slice(1).map(c => `
+    <button class="cat-tile ${conta[c] ? '' : 'vuota'}" data-cat="${esc(c)}"
+            onclick="apriCategoria(this.dataset.cat)">
+      <span class="cat-nome" lang="it">${esc(c)}</span>
+      <span class="cat-fig"><img src="/assets/categorie/${slugCat(c)}.webp"
+           alt="" loading="lazy" decoding="async" onerror="this.remove()"
+        ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>
+    </button>`).join('');
+}
+
+/* Dalla piastrella alla vetrina filtrata. setCat resta il giudice
+   unico del cambio categoria (ricarica la prima pagina, rifa' le
+   pillole, sa gia' della DEMO): qui si aggiunge solo la bandierina che
+   dice al motore di navigazione che questa e' una discesa, non un
+   cambio di tab — l'indietro deve riportare a Sfoglia. */
+function apriCategoria(c){
+  navSpingi = true;
+  setCat(c);
+  go('esplora');
 }
 
 let prossimaLampo = 0;   // unix della prima lampo che scade in griglia
