@@ -332,6 +332,8 @@ def prove_categorie():
           [], orfani)
     prova("il CSV che dice «bevande» viene capito", "Alimenti e bevande",
           amb["categoria_tollerante"]("bevande"))
+    prova("e chi scrive «profumi» finisce nella bellezza",
+          "Bellezza e benessere", amb["categoria_tollerante"]("profumi"))
 
     # Il SESTO posto, che il cantiere aveva dimenticato: il modello CSV
     # che scaricano i commercianti. Non rompe niente se resta indietro
@@ -383,6 +385,8 @@ def prove_senza_condizione():
 
     prova("la marmellata non ha condizione", True,
           senza("Alimenti e bevande", "spedizione"))
+    prova("e nemmeno la crema mani", True,
+          senza("Bellezza e benessere", "spedizione"))
     prova("il portatile si', invece", False, senza("Informatica", "spedizione"))
     # il secondo asse: il codice online e' nuovo per definizione, ma
     # SOLO quando e' l'unica strada

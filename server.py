@@ -3341,6 +3341,7 @@ CATEGORIE = ("Elettronica", "Informatica", "Telefonia", "Audio e video",
              "Console e videogiochi", "Foto e ottica", "Bitcoin",
              "Casa e giardino", "Elettrodomestici",
              "Fai da te e utensili", "Alimenti e bevande",
+             "Bellezza e benessere",
              "Abbigliamento", "Scarpe e accessori", "Orologi e gioielli",
              "Bambini", "Sport e hobby", "Biciclette", "Motori", "Animali",
              "Libri e media", "Musica e film", "Strumenti musicali",
@@ -3380,7 +3381,12 @@ def condizione_valida(c) -> str:
 # NON ci entrano «Arte e artigianato» (ci finisce anche l'arte usata,
 # e un quadro di seconda mano puo' essere rovinato) ne' «Bitcoin» (le
 # Jade di seconda mano sono merce vera).
-CATEGORIE_SENZA_CONDIZIONE = frozenset({"Alimenti e bevande"})
+# «Bellezza e benessere» invece si', e per la stessa ragione degli
+# alimenti: creme, profumi, saponi e integratori si vendono nuovi —
+# un cosmetico gia' usato non e' merce di seconda mano, e' una cosa
+# che non si vende.
+CATEGORIE_SENZA_CONDIZIONE = frozenset({"Alimenti e bevande",
+                                        "Bellezza e benessere"})
 
 
 def senza_condizione(categoria: str, consegna: str = "") -> bool:
@@ -3600,6 +3606,15 @@ SINONIMI_CATEGORIA = {
     "bevande": "Alimenti e bevande", "cibo": "Alimenti e bevande",
     "food": "Alimenti e bevande", "gastronomia": "Alimenti e bevande",
     "vino": "Alimenti e bevande", "birra": "Alimenti e bevande",
+    # bellezza e cura della persona: prima finiva meta' negli alimenti
+    # (le tisane, gli integratori) e meta' in «Altro»
+    "bellezza": "Bellezza e benessere", "benessere": "Bellezza e benessere",
+    "cosmetici": "Bellezza e benessere", "cosmetica": "Bellezza e benessere",
+    "profumi": "Bellezza e benessere", "profumeria": "Bellezza e benessere",
+    "creme": "Bellezza e benessere", "saponi": "Bellezza e benessere",
+    "integratori": "Bellezza e benessere", "igiene": "Bellezza e benessere",
+    "beauty": "Bellezza e benessere",
+    "cura della persona": "Bellezza e benessere",
     # persona
     "abbigliamento": "Abbigliamento", "vestiti": "Abbigliamento",
     "moda": "Abbigliamento",
@@ -9709,10 +9724,15 @@ MODELLO_IMPORT = (
     "Trapano avvitatore Bosch;Con due batterie e valigetta;80000;sats;"
     "Fai da te e utensili;Torino;trapano.jpg|valigetta.jpg;ritiro;;medio;;\n"
     # la quantita' in stock (lug 2026): colonna facoltativa, vuota = 1
-    # pezzo — qui il miele mostra come si vende a scorte
+    # pezzo — qui il miele mostra come si vende a scorte. La condizione
+    # invece resta VUOTA di proposito: negli alimenti (e in «Bellezza e
+    # benessere») non si chiede, e una cella che il server butta via
+    # insegnerebbe una cosa falsa a chi compila il file
     "Miele di castagno 500g;Produzione propria 2026, vasetto in "
     "vetro;12,00;eur;Alimenti e bevande;Cuneo;;spedizione;6,00;piccolo;"
-    "nuovo;12\n"
+    ";12\n"
+    "Crema mani alla calendula;Vasetto 50ml, produzione artigianale;"
+    "9,00;eur;Bellezza e benessere;Bergamo;;spedizione;4,00;busta;;30\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
     # niente spedizione ne' taglia, il codice si consegna dopo
     # l'acquisto dal dettaglio ordine

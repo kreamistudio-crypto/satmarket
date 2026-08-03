@@ -1879,7 +1879,7 @@
            e a parlare col dito e' il campo-bottone che apre il
            foglio-picker (apriPicker, pattern dei fogli esistenti). -->
       <div class="field"><label>Categoria</label>
-        <select id="sellCat" hidden><option>Elettronica</option><option>Informatica</option><option>Telefonia</option><option>Audio e video</option><option>Console e videogiochi</option><option>Foto e ottica</option><option>Bitcoin</option><option>Casa e giardino</option><option>Elettrodomestici</option><option>Fai da te e utensili</option><option>Alimenti e bevande</option><option>Abbigliamento</option><option>Scarpe e accessori</option><option>Orologi e gioielli</option><option>Bambini</option><option>Sport e hobby</option><option>Biciclette</option><option>Motori</option><option>Animali</option><option>Libri e media</option><option>Musica e film</option><option>Strumenti musicali</option><option>Collezionismo</option><option>Arte e artigianato</option><option>Altro</option></select>
+        <select id="sellCat" hidden><option>Elettronica</option><option>Informatica</option><option>Telefonia</option><option>Audio e video</option><option>Console e videogiochi</option><option>Foto e ottica</option><option>Bitcoin</option><option>Casa e giardino</option><option>Elettrodomestici</option><option>Fai da te e utensili</option><option>Alimenti e bevande</option><option>Bellezza e benessere</option><option>Abbigliamento</option><option>Scarpe e accessori</option><option>Orologi e gioielli</option><option>Bambini</option><option>Sport e hobby</option><option>Biciclette</option><option>Motori</option><option>Animali</option><option>Libri e media</option><option>Musica e film</option><option>Strumenti musicali</option><option>Collezionismo</option><option>Arte e artigianato</option><option>Altro</option></select>
         <button type="button" class="campo-scelta" id="sellCatBtn" onclick="apriPicker('sellCat')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field" id="sellCondField"><label>Condizioni dell'oggetto</label>
         <select id="sellCond" hidden>
@@ -2359,6 +2359,9 @@ const EMOJI_CAT = {'Elettronica':'🔌', 'Informatica':'💻', 'Telefonia':'📱
   'Audio e video':'🎧', 'Console e videogiochi':'🎮', 'Foto e ottica':'📷',
   'Bitcoin':'₿', 'Casa e giardino':'🏡', 'Elettrodomestici':'🍳',
   'Fai da te e utensili':'🔧', 'Alimenti e bevande':'🍎',
+  /* il flacone dice il reparto — creme, oli, saponi, shampoo — mentre
+     il rossetto direbbe il solo trucco e il sapone un prodotto solo */
+  'Bellezza e benessere':'🧴',
   'Abbigliamento':'👕', 'Scarpe e accessori':'👟',
   'Orologi e gioielli':'⌚', 'Bambini':'🧸', 'Sport e hobby':'⚽',
   'Biciclette':'🚲', 'Motori':'🚗', 'Animali':'🐾',
@@ -2413,7 +2416,7 @@ function condPill(id){
    se e' ESCLUSIVO: sulla combo (tessera fisica O codice) la merce
    fisica c'e' e una condizione ce l'ha, quindi si guarda `consegna` e
    mai ancheDigitale. */
-const CAT_SENZA_COND = ['Alimenti e bevande'];
+const CAT_SENZA_COND = ['Alimenti e bevande', 'Bellezza e benessere'];
 const senzaCondizione = (cat, consegna) =>
   CAT_SENZA_COND.includes(cat) || consegna === 'digitale';
 /* Il titolo del dettaglio con la condizione in CODA, come fosse
@@ -2883,7 +2886,8 @@ async function loadOrders(){
 const CATS = ["Tutto","Elettronica","Informatica","Telefonia","Audio e video",
               "Console e videogiochi","Foto e ottica","Bitcoin",
               "Casa e giardino","Elettrodomestici","Fai da te e utensili",
-              "Alimenti e bevande","Abbigliamento","Scarpe e accessori",
+              "Alimenti e bevande","Bellezza e benessere",
+              "Abbigliamento","Scarpe e accessori",
               "Orologi e gioielli","Bambini","Sport e hobby","Biciclette",
               "Motori","Animali","Libri e media","Musica e film",
               "Strumenti musicali","Collezionismo","Arte e artigianato",
