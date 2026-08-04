@@ -5374,7 +5374,7 @@ async function sezioneAltriOggetti(l){
   corpo.insertAdjacentHTML('beforeend', `
     <div class="section-label" style="margin-top:16px">Altri oggetti di questo venditore</div>
     <div class="altri-strip">${altri.slice(0,6).map(cardHTML).join('')}</div>
-    ${DEMO ? '' : `<button class="btn carton" style="margin-top:2px" onclick="avviaSet()">📦 Riempi il pacco</button>`}`);
+    ${DEMO || astaE(l) ? '' : `<button class="btn carton" style="margin-top:2px" onclick="avviaSet()">📦 Riempi il pacco</button>`}`);
 }
 
 /* ---------------- il SET: «Riempi il barattolo» (lug 2026) ----------------
