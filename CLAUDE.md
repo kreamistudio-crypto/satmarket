@@ -257,13 +257,74 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`segna_consegnato` e il testo al venditore di
   `sollecita_ritiri_fermi`). È lo stesso patto della commissione
   sospesa.
-  BUCHI PREESISTENTI, dichiarati e NON chiusi qui: 1) `locked` +
-  spedizione col venditore che non spedisce mai — nessun timer e
-  nessun promemoria, né prima né dopo; il compratore però NON è in un
-  vicolo cieco, `apri_disputa` accetta `locked` e il bottone «⚠️ C'è
-  un problema» è lì; 2) ordine d'asta con `consegna_scelta=''` mai
-  scelta (`sollecita_ritiri_fermi` filtra 'ritiro'); 3) ordini fermi
-  in 'refund', già noto nella docstring di
+  IL VENDITORE CHE NON FA PARTIRE LA MERCE (ago 2026, il buco 1 di
+  ieri, chiuso — col suo gemello digitale che non era nemmeno
+  dichiarato): un ordine `locked` non ha MAI avuto un timer, quindi il
+  venditore che non spedisce (o non consegna il codice) non sentiva
+  niente e il compratore non sapeva che `apri_disputa` accetta
+  `locked` e che il bottone «⚠️ C'è un problema» è lì. La cura è
+  `sollecita_venditori_fermi` nell'orologio, e le tre cose da sapere
+  sono queste.
+  1) È UNA SORELLA E NON UNA TERZA POPOLAZIONE di
+  `sollecita_conferme_ferme`, e la ragione è la guardia: quel buco è
+  PREESISTENTE al disarmo, non figlio suo, quindi qui NON si guarda
+  `AUTO_SBLOCCO_ATTIVO` — è un'AGGIUNTA, non il sostituto di uno
+  sblocco, e riaccendendo la leva col tracking verificato non deve
+  riaprirsi in silenzio. Con la sorella lo si ottiene senza toccare
+  una riga del codice dei soldi (e senza far ingiallire nessuna delle
+  22 sentinelle del disarmo). Poi ogni asse è diverso — stato, ancora,
+  colonne — e i destinatari sono INVERTITI: il VENDITORE a ogni
+  squillo (è lui che deve agire), il COMPRATORE solo al primo, per
+  dirgli che i sats sono fermi e che può aprire una disputa. Al tetto
+  il 🧊 ai moderatori col TOTALE e non col netto (qui non si sa ancora
+  chi lo prende, e l'esito probabile è il rimborso), poi silenzio.
+  2) DUE FINESTRE, UNA PER STRADA, leve proprie:
+  `PROMEMORIA_SPEDIZIONE_GIORNI` (5) e `PROMEMORIA_DIGITALE_ORE` (48),
+  ognuna a 0 spegne la SUA popolazione. I 5 giorni sono più lunghi di
+  qualunque ciclo spedisci-e-segna col weekend in mezzo (pagamento
+  venerdì → primo squillo mercoledì: un venditore onesto non lo sente
+  quasi mai, e serve anche a chi ha spedito e si è scordato di
+  segnarlo) e più corti dei 10 giorni che erano l'orizzonte della
+  protezione di ieri. Le 48 ore sono `ORE_SILENZIO_DIGITALE`, l'altra
+  finestra di silenzio di quella strada: un codice si manda in minuti.
+  Cadenza e tetto sono RIUSATI dalla gemella (`PROMEMORIA_CONFERMA_*`,
+  3×3 — è la stessa cadenza per decisione, e un posto solo da cambiare
+  batte due da tenere uguali): il 🧊 cade al giorno 14 e all'11.
+  Coupling dichiarato e coerente: `PROMEMORIA_CONFERMA_GIORNI = 0`
+  spegne TUTTI i promemoria — è la leva del passo, e senza passo non
+  si ribussa a nessuno.
+  3) L'ANCORA È `creato` E NON `aggiornato`, ed è la trappola da non
+  ricalcare: `deposita_invoice` accetta il venditore proprio su
+  `locked` e scrive `aggiornato`, quindi copiando il gemello dei
+  ritiri il venditore avrebbe potuto rimandare all'infinito il proprio
+  promemoria ri-salvando la sua invoice d'incasso — il gesto più a
+  portata di mano proprio a chi il promemoria vuole evitare. `creato`
+  invece è IMMUTABILE una volta che l'ordine è locked (gli unici
+  scrittori sono l'INSERT e la resurrezione di `controlla_annullati`,
+  che avviene prima) ed è il pagamento a meno di mezz'ora (vita della
+  invoice più la finestra del reaper). Niente colonna nuova per
+  questo, niente backfill. Colonne NUOVE invece per il contatore —
+  `sollecito_venditore_il`/`solleciti_venditore` —: dicono CHI
+  aspettiamo (`_conferma` il compratore, `_venditore` il venditore), e
+  un contatore ereditato manderebbe al tetto la popolazione 'shipped'
+  del compratore appena l'ordine viene spedito. Da non confondere con
+  `ordini.sollecito_il`, che è il contrario: quando il venditore ha
+  sollecitato il compratore col suo bottone.
+  Il ritiro non ci entra (ha già `sollecita_ritiri_fermi`) e la strada
+  non dichiarata nemmeno. LEFT JOIN su `annunci` per i set, la solita
+  lezione. IMPERFEZIONE DICHIARATA: il vincitore d'asta che sceglie la
+  strada tardi si mangia parte della finestra del suo venditore
+  (`scegli_consegna_ordine` muove `aggiornato`, che qui non si
+  guarda) — innocuo, è un promemoria e non una penale. Il titolo qui
+  passa da `html.escape`: le notifiche sono HTML e un «<» spegnerebbe
+  il promemoria in silenzio. I quattro solleciti fratelli non lo fanno
+  ancora — buco piccolo, dichiarato, non chiuso qui.
+  BUCHI PREESISTENTI, dichiarati e NON chiusi: 1) ordine d'asta con
+  `consegna_scelta=''` mai scelta — non squilla da nessuna parte
+  (`sollecita_ritiri_fermi` filtra 'ritiro',
+  `sollecita_venditori_fermi` filtra le due strade esplicite: lì il
+  venditore non può agire, e sarebbe un rimprovero a vuoto); 2) ordini
+  fermi in 'refund', già noto nella docstring di
   `sollecita_rimborsi_puntate`.
   Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 27
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
@@ -5035,6 +5096,30 @@ accesa. IN PRODUZIONE basta il deploy (le due colonne nascono da
 sole) — fatto, e verificato sul caso che ha aperto il cantiere:
 l'ordine #28, a 6,44 giorni su 10, è rimasto `shipped` con zero
 squilli invece di sbloccarsi tre giorni e mezzo dopo.
+Il venditore che non fa partire la merce (ago 2026, il giorno dopo, dopo
+una verifica indipendente del disarmo che ha confermato tutte e cinque
+le righe del censimento): chiuso il buco 1 — un ordine `locked` non
+aveva nessun timer e nessuna parola, e il compratore non sapeva di poter
+aprire una disputa — e con lui il gemello digitale che non era nemmeno
+dichiarato. `sollecita_venditori_fermi` è una FUNZIONE SORELLA di
+`sollecita_conferme_ferme` e non una sua popolazione, perché il buco è
+preesistente al disarmo e quindi non deve stare dietro
+`AUTO_SBLOCCO_ATTIVO`: così il diff sul codice dei soldi è ZERO, solo
+aggiunte. Vedi Architettura per le due finestre (5 giorni / 48 ore) coi
+loro perché, per le colonne che dicono CHI aspettiamo, e soprattutto per
+la trappola di `aggiornato` — che `deposita_invoice` scrive proprio su
+`locked`, cioè il venditore avrebbe potuto rimandare il proprio
+promemoria ri-salvando la sua invoice d'incasso. Collaudato con 9
+sentinelle nuove in prove.py (197 verdi) e un collaudo eseguibile su DB
+usa-e-getta, 27 verdi: le due finestre al giorno e all'ora giusti, la
+trappola dell'invoice ri-salvata provata sul serio, il set col titolo
+sintetizzato, la cadenza fino al 🧊 e poi il silenzio, il venditore che
+spedisce e il contatore del compratore che riparte da zero, le strade
+che non ci riguardano, e la regressione a leva riaccesa. IN PRODUZIONE
+basta il deploy (le due colonne nascono da sole, le due leve hanno un
+default nel codice): il primo giro da guardare è un ordine `locked` con
+più di 5 giorni sulle spalle — al primo battito dell'orologio arriva UNO
+squillo al venditore e UNO al compratore.
 
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
