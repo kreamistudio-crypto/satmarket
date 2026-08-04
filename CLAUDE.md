@@ -234,14 +234,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sparisce anche l'esitazione col laptop. NON rinominata: la regola
   «si aggiunge, non si rinomina» tiene, e lo scaffale dice il
   contenuto meglio di un nome nuovo.
+  IL GIUDICE SILENZIOSO (ago 2026, idea di Andrea): la colonna si
+  riempie DA SOLA, senza AI e senza che nessuno veda nulla — parole
+  chiave dentro la categoria GIÀ scelta, il pattern SINONIMI_CATEGORIA
+  un piano più in basso. Catalogo `SINONIMI_SOTTOCATEGORIA` +
+  `sottocategoria_indovina(categoria, titolo, descrizione)` in
+  server.py accanto all'albero: parole intere normalizzate, prefisso
+  solo da 5 lettere in su («auto» non prende «autoradio»), titolo pesa
+  2 e descrizione 1, assegna solo il vincitore UNICO — il pareggio è
+  un dubbio e il dubbio resta ''. MISURATO sui dati veri prima di
+  accenderlo: 45/46 giusti in produzione più il NON SO voluto del Telo
+  d'Amare, 12/15 fuori campione, ZERO sbagliati nei due giri — quando
+  non ce la fa SI ASTIENE, mai un'assegnazione tirata a indovinare, ed
+  è strutturale: dentro una categoria i vocabolari delle voci quasi
+  non si sovrappongono. Zero rete e zero await (il patto anti-doppione
+  di pubblica non si tocca). Si aggancia dove il payload non porta una
+  sottovoce valida: pubblica(), modifica() (che ci RIPROVA sui testi
+  nuovi quando la colonna è vuota — il ritocco può aver aggiunto la
+  parola che mancava — ma non rigiudica MAI un valore scritto),
+  l'import CSV, e il dopo-import Nostr (ogni giro, solo righe vuote:
+  così quando la coda delle categorie sposta un annuncio fuori da
+  «Altro», la sottovoce arriva da sola al giro dopo). Il dizionario è
+  UNO e vive in server.py — la proposta in proposte/ è morta lì
+  dentro, la lezione del prompt in due copie — e si arricchisce coi
+  dati veri: `python assegna_sottocategorie.py --conta` sul VPS dice
+  quante righe sono assegnate e DOVE il giudice si astiene di più, coi
+  titoli d'esempio; si impara dai NON SO, mai dagli sbagli. Lo stesso
+  script fa la passata sul pregresso (anteprima di serie, `--scrivi`
+  per farla, un percorso di database per la prova generale su una
+  copia — pattern ripulisci_anello): tocca solo righe VUOTE in stati
+  attivo/revisione/venduto, idempotente, e legge il giudice dal TESTO
+  di server.py senza importarlo (la lezione di ricategorizza: l'import
+  farebbe partire init_db, e in CI il config non esiste). NIENTE coda
+  admin per queste assegnazioni, ed è deciso: il dato non esce da
+  nessuna parte finché l'albero dorme, e correggere un'assegnazione il
+  giorno dell'accensione costerà un rilancio dello script.
   ALL'ACCENSIONE (documentato, non costruito): foglio-picker in Vendi
-  dipendente dalla categoria (pattern PICKER), param `sotto` su
+  dipendente dalla categoria (pattern PICKER) — che il giudice potrà
+  PRESELEZIONARE, con l'utente ultimo giudice —, param `sotto` su
   /api/listings ('' storici fuori dal filtro, il patto del dato
   dichiarato), chips dentro la vetrina di categoria in Sfoglia
-  (nessuna piastrella nuova), prompt AI con albero e confini,
-  eventuale secondo tag `t` NIP-99 — sarà solo frontend + un
-  parametro. `prove.py` difende il patto: chiavi ∈ CATEGORIE, id
-  unici e kebab, niente «altro», i giudici nei loro casi.
+  (nessuna piastrella nuova), prompt AI con albero e confini per il
+  residuo delle astensioni, eventuale secondo tag `t` NIP-99 — sarà
+  solo frontend + un parametro, e il catalogo sarà già catalogato
+  invece che vuoto. `prove.py` difende il patto: chiavi ∈ CATEGORIE,
+  id unici e kebab, niente «altro», i giudici nei loro casi, il
+  dizionario allineato all'albero voce per voce.
   LA PAGINA «SFOGLIA» (lug 2026): le categorie come vetrina, quarta
   radice della nav — griglia a due colonne di piastrelle illustrate,
   modello Vinted. Vista `view-sfoglia` (niente header, come Ordini e
@@ -4558,6 +4596,18 @@ spostamenti veri — B&B e Zalando verso la voce nuova (il casco moto
 citato nei primi appunti era merce del db di COLLAUDO, non di
 produzione) — si mettono in coda con `sposta_a_mano.py` sul VPS e si
 approvano dalla coda admin, che aggiorna anche il NIP-99.
+Il GIUDICE SILENZIOSO (ago 2026, il giorno dopo): la colonna si
+riempie da sola a parole chiave dentro la categoria scelta — misurato
+prima di accenderlo (45/46 in produzione, 12/15 fuori campione, zero
+sbagliati: si astiene, non sbaglia), agganciato a pubblica/modifica/
+CSV/dopo-import Nostr, con `assegna_sottocategorie.py` per la passata
+sul pregresso e il termometro `--conta` che dice dove arricchire il
+dizionario coi dati veri. Collaudato: 11 prove pure nuove (dizionario
+allineato all'albero voce per voce + il giudice nei suoi casi), 6
+verifiche TestClient dei ganci su DB usa-e-getta, e lo script nei tre
+modi su una copia del db locale (300 assegnate, idempotente al terzo
+giro). IN PRODUZIONE: deploy, poi `python assegna_sottocategorie.py`
+sul VPS per l'anteprima e `--scrivi` per la passata una tantum.
 L'ACCENSIONE dell'albero è un cantiere futuro, solo frontend + param.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
