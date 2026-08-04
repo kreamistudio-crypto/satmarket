@@ -537,6 +537,19 @@
      bordo (outline negativa: zero impatti sul layout, segue il
      border-radius). Sparisce col re-render della scadenza. */
   .card.in-lampo{outline:1.5px solid var(--sats);outline-offset:-1.5px}
+  /* Il badge dell'asta (ago 2026): stesso linguaggio del badge lampo
+     ma identita' propria — il rosso e' della lampo, il martello parla
+     inchiostro (e crema al buio, gratis coi token). In card il tempo
+     e' a grana grossa e STATICO: il countdown vivo e' roba da scheda. */
+  .card-asta{position:absolute;top:8px;left:8px;z-index:2;
+    background:var(--ink);color:var(--on-ink);border-radius:999px;
+    padding:3px 9px;font-size:11.5px;font-weight:800;
+    display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .card.in-asta{outline:1.5px solid var(--ink);outline-offset:-1.5px}
+  /* la riga dell'asta sotto il prezzo del dettaglio: stessa voce
+     discreta del tempo della lampo */
+  .asta-riga{font-size:13px;color:var(--sats-text);font-weight:700;
+    margin-top:4px;line-height:1.35}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
@@ -2017,6 +2030,7 @@
         <option value="prezzo_su">Prezzo: dal più basso</option>
         <option value="prezzo_giu">Prezzo: dal più alto</option>
         <option value="lampo">⚡ In offerta</option>
+        <option value="asta">🔨 All'asta</option>
       </select>
       <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       <button id="filtriBtn" type="button" onclick="toggleFiltri()">Filtri</button>
@@ -2077,6 +2091,11 @@
         <label class="filtro-check">
           <input type="checkbox" id="filtroLampoInp">
           ⚡ In offerta</label>
+      </div>
+      <div class="filtri-riga">
+        <label class="filtro-check">
+          <input type="checkbox" id="filtroAstaInp">
+          🔨 All'asta</label>
       </div>
       <div class="filtri-riga">
         <button class="btn orange" onclick="applicaFiltri()">Applica</button>
@@ -2228,6 +2247,12 @@
       <div class="field"><label>Prezzo</label>
         <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div></div>
+      <div class="field" id="sellAstaField" style="display:none"><label>Vendita</label>
+        <label class="cons-riga"><input type="checkbox" id="sellAsta" onchange="aggiornaAstaForm()"> <span><span class="cons-ico" aria-hidden="true">🔨</span>Vendi all'asta<span class="cons-sub">base + durata: vince la puntata più alta</span></span></label>
+        <div id="sellAstaOpzioni" style="display:none;margin-top:8px">
+          <div id="sellAstaDurate" style="display:flex;gap:8px" class="consegna-scelta"></div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Il prezzo qui sopra diventa la <b>base d'asta</b> (solo sats). Un pezzo solo; la consegna è senza costi extra — la spedizione, se la offri, è <b>inclusa nel prezzo</b>. Chi punta versa subito nel deposito di garanzia; chi non vince viene rimborsato.</div>
+        </div></div>
       <div class="field" id="sellQtaField"><label>Quantità disponibile</label>
         <input id="sellQta" type="number" inputmode="numeric" min="1" placeholder="1">
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanti pezzi uguali hai? Vuoto o 1&nbsp;= un pezzo solo. All'esaurimento l'annuncio si mette in pausa: lo ricarichi dai tuoi annunci.</div></div>
@@ -2266,6 +2291,12 @@
 
   <!-- ============ VISTA: AFFARI (per gli utenti: «Ordini») ============ -->
   <div class="view" id="view-affari">
+    <!-- Le gare d'asta dell'utente, in cima: puntate vive con lo
+         stato personale e i sats «Da riscuotere» (renderPuntate) -->
+    <div id="puntateBlocco" style="display:none">
+      <div class="section-label" style="padding-top:22px">🔨 Le tue puntate</div>
+      <div id="puntateList" style="margin-top:12px"></div>
+    </div>
     <!-- Le trattative in corso, sopra gli ordini: compaiono solo se
          ce n'e' almeno una viva (renderOfferte) -->
     <div id="offerteBlocco" style="display:none">
@@ -2548,6 +2579,25 @@
     <div id="offMinimo" style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px"></div>
     <div id="offStima" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <button class="btn orange" style="margin-top:12px" onclick="inviaOfferta(this)">💰 Offri</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET PUNTATA D'ASTA (ago 2026) ============ -->
+  <div class="sheet" id="puntaSheet">
+    <div class="grab"></div>
+    <h3>🔨 Fai la tua puntata</h3>
+    <!-- La testata (miniatura + titolo + testa/base) la scrive apriPunta() -->
+    <div id="puntaTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <div class="consegna-scelta" id="puntaChips" style="margin:0 0 10px"></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="puntaImporto" autocomplete="off" inputmode="numeric" placeholder="Il tuo totale" style="flex:1" oninput="puntaDigitata()">
+      <span style="font-weight:800;color:var(--muted)">sats</span>
+    </div>
+    <div id="puntaMinimo" style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px"></div>
+    <!-- Il conto chiaro: quanto si VERSA adesso (la sola differenza) -->
+    <div id="puntaConto" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px;line-height:1.4">Puntare = pagare: i sats vanno subito nel deposito di garanzia. Se vinci sono già il pagamento; se non vinci tornano indietro alla chiusura (o quando ti ritiri).</div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaPuntata(this)">🔨 Punta</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -2994,6 +3044,11 @@ function mapListing(a){
     /* l'offerta lampo: percento e scadenza (unix), il resto e'
        matematica del client (lampoAttiva/conLampo) */
     lampoPct:a.lampo_percento||0, lampoFine:a.lampo_scadenza||0,
+    /* l'asta (ago 2026): base>0 = quest'annuncio e' un'asta; viva =
+       scadenza nel futuro (giudica il client come per la lampo);
+       top e conteggio sono pubblici, gli offerenti mai */
+    astaBase:a.asta_base_sats||0, astaFine:a.asta_scadenza||0,
+    astaTop:a.asta_top_sats||0, astaPuntate:a.asta_puntate||0,
     distintivi:a.venditore_distintivi||[]};
 }
 function mapOrder(o){
@@ -3011,6 +3066,10 @@ function mapOrder(o){
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
     protSats:o.protezione_sats||0,
+    /* l'ordine nato da un'asta (ago 2026): con la scelta di consegna
+       ancora vuota il vincitore sceglie dal varco e il venditore
+       aspetta (niente bottoni di spedizione) */
+    asta:o.asta||0, annuncioId:o.annuncio_id||0,
     /* il SET (lug 2026): i mono non portano la chiave e restano [] */
     righe:o.righe||[], tagliaStimata:o.taglia_stimata||'',
     /* consegna digitale (lug 2026): il contenuto NON viaggia mai in
@@ -3078,6 +3137,7 @@ let filtroSped = false;      // «solo con spedizione» (stato di sessione)
 let filtroRitiro = false;    // «ritiro in zona» (stesso patto)
 let filtroDig = false;       // «codice online» (stesso patto)
 let filtroLampo = false;     // «solo in offerta» (stesso patto)
+let filtroAsta = false;      // «solo all'asta» (ago 2026, stesso patto)
 let filtroCond = '';         // condizione dell'oggetto ('' = qualsiasi)
 let filtroReg = '';          // regione ('' = tutta l'Italia)
 function paramsVetrina(){
@@ -3096,6 +3156,7 @@ function paramsVetrina(){
   if (filtroRitiro) p.set('solo_ritiro', '1');
   if (filtroDig) p.set('solo_digitale', '1');
   if (filtroLampo) p.set('solo_lampo', '1');
+  if (filtroAsta) p.set('solo_asta', '1');
   if (filtroCond && condFiltrabile()) p.set('condizione', filtroCond);
   if (filtroReg) p.set('regione', filtroReg);
   return p;
@@ -3169,7 +3230,7 @@ const numeroFiltro = v => {
    vetrina quando non c'era niente da azzerare). Ogni filtro nuovo si
    aggiunge QUI e i due lo sanno insieme. */
 const filtriVivi = () => !!filtroPrezzo || filtroSped || filtroRitiro
-  || filtroDig || filtroLampo || !!filtroCond || !!filtroReg;
+  || filtroDig || filtroLampo || filtroAsta || !!filtroCond || !!filtroReg;
 
 function applicaFiltri(){
   haptic();
@@ -3180,6 +3241,7 @@ function applicaFiltri(){
   filtroRitiro = !!el('filtroRitiroInp').checked;
   filtroDig = !!el('filtroDigInp').checked;
   filtroLampo = !!el('filtroLampoInp').checked;
+  filtroAsta = !!el('filtroAstaInp').checked;
   filtroCond = el('filtroCondSel').value;
   filtroReg = el('filtroRegSel').value;
   el('filtriBtn').classList.toggle('attivo', filtriVivi());
@@ -3195,13 +3257,14 @@ function azzeraFiltri(){
   el('filtroRitiroInp').checked = false;
   el('filtroDigInp').checked = false;
   el('filtroLampoInp').checked = false;
+  el('filtroAstaInp').checked = false;
   el('filtroCondSel').value = '';
   aggiornaPicker('filtroCondSel');
   el('filtroRegSel').value = '';
   aggiornaPicker('filtroRegSel');
   const cera = filtriVivi();
   filtroPrezzo = null; filtroSped = false; filtroRitiro = false;
-  filtroDig = false; filtroLampo = false;
+  filtroDig = false; filtroLampo = false; filtroAsta = false;
   filtroCond = ''; filtroReg = '';
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
@@ -3420,7 +3483,8 @@ function go(view){
     if (!DEMO) {
       loadOrders().then(renderOrders).catch(()=>renderOrders());
       loadOfferte().then(renderOfferte).catch(()=>{});
-    } else { renderOrders(); renderOfferte(); }
+    } else { renderOrders(); renderOfferte(); renderPuntate();
+             loadPuntate().then(renderPuntate); }
   }
   if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
     /* il barattolo si rilegge dal server: un annuncio salvato puo'
@@ -4095,9 +4159,13 @@ function renderGrid(items){
       data = data.filter(l => l.regione===filtroReg);
     if (filtroLampo)
       data = data.filter(lampoAttiva);
+    if (filtroAsta)
+      data = data.filter(astaViva);
     if (ordinaVista === 'lampo')
       /* come sul server: solo le lampo vive, chi scade prima in testa */
       data = data.filter(lampoAttiva).sort((a,b) => a.lampoFine - b.lampoFine);
+    else if (ordinaVista === 'asta')
+      data = data.filter(astaViva).sort((a,b) => a.astaFine - b.astaFine);
     else if (ordinaVista)
       data.sort((a,b) => ordinaVista==='prezzo_su' ? a.price-b.price : b.price-a.price);
   }
@@ -4156,9 +4224,18 @@ const cardHTML = l => {
      percentuale (lug 2026): il countdown al minuto e' roba da scheda,
      in griglia allungava il badge e chiedeva un aggiornamento al
      secondo per ogni card disegnata. */
-  const lampo = lampoAttiva(l);
-  const p = prezzoParte(conLampo(l));
-  const flash = lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>` : '';
+  /* L'asta in card (ago 2026): il cartellino dice la puntata in testa
+     (o la base), il badge 🔨 il tempo a grana grossa. Asta e lampo
+     non convivono per costruzione (esclusioni del server): il
+     giudizio qui e' solo una cintura. */
+  const asta = astaE(l);
+  const lampo = !asta && lampoAttiva(l);
+  const p = prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)})
+                             : conLampo(l));
+  const flash = asta
+    ? `<div class="card-asta">🔨 ${astaViva(l) ? astaResta(l.astaFine)
+                                               : 'conclusa'}</div>`
+    : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>` : '';
   /* Il barattolino in card: stesse guardie del cerchietto nel
      dettaglio (mai in DEMO/VETRINA, mai sui propri annunci). Qui pero'
      il livello e' dell'ANNUNCIO, non del barattolo intero: vetro vuoto
@@ -4169,7 +4246,7 @@ const cardHTML = l => {
   const jar = (DEMO || VETRINA || !myTgId || l.sellerId===myTgId) ? ''
     : `<button class="card-jar${sal?' salvato':''}" data-id="${l.id}" onclick="event.stopPropagation();togglePreferito(${l.id})" title="${sal?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">${jarSVG(sal?4:0, 16)}</button>`;
   return `
-    <div class="card${lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
+    <div class="card${asta?' in-asta':lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
@@ -4554,6 +4631,25 @@ function lampoResta(fine){
   if (m) return `${m}m`;
   return `${s}s`;
 }
+/* L'asta (ago 2026): viva se base>0 e scadenza nel futuro; deserta =
+   base>0 e scadenza 0, in mano al venditore. Il giudice vero e' il
+   server (read gate + chiusura): qui la stessa matematica, per badge
+   e bottoni. */
+function astaE(l){ return (l.astaBase||0) > 0; }
+function astaViva(l){
+  return (l.astaBase||0) > 0 && (l.astaFine||0)*1000 > Date.now();
+}
+/* Il tempo dell'asta: grana grossa da lontano (\u00AB2g 4h\u00BB), quella fine
+   di lampoResta sotto il giorno */
+function astaResta(fine){
+  const s = Math.max(0, Math.floor(fine - Date.now()/1000));
+  if (s >= 86400)
+    return `${Math.floor(s/86400)}g\u202F${Math.floor((s%86400)/3600)}h`;
+  return lampoResta(fine);
+}
+/* La cifra che l'asta mostra come prezzo: la puntata in testa, o la
+   base se nessuno ha ancora puntato */
+function astaCifra(l){ return l.astaTop > 0 ? l.astaTop : l.astaBase; }
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
    contatore «rimangono 2h 14m» vive SOLO nella scheda (in griglia il
    badge dice la sola percentuale), quindi qui si aggiorna in-place
@@ -4570,6 +4666,15 @@ setInterval(() => {
     const fine = +n.dataset.fine || 0;
     n.textContent = lampoResta(fine);
     if (fine * 1000 <= adesso) morta = true;
+  });
+  /* il countdown dell'asta vive SOLO nel dettaglio (in card il tempo
+     e' a grana grossa e statico): allo zero non si riapre niente —
+     l'aggiudicazione la fa l'orologio del server, qui si dice solo
+     la verita' */
+  document.querySelectorAll('.asta-count').forEach(n => {
+    const fine = +n.dataset.fine || 0;
+    n.textContent = fine * 1000 > adesso ? astaResta(fine)
+                                         : 'in aggiudicazione…';
   });
   if (prossimaLampo && prossimaLampo * 1000 <= adesso) morta = true;
   if (!morta) return;
@@ -5155,6 +5260,7 @@ let hintPubblicazione = null;
    serve: startBuy apre l'invito. */
 function compraDaBarra(){
   const l = currentListing; if (!l) return;
+  if (astaE(l)) { apriPunta(); return; }   /* l'asta si vince puntando */
   if (!VETRINA && !consegnaEsplicita && stradeConsegna(l).length >= 2)
     return apriFoglioConsegna();
   startBuy();
@@ -5217,6 +5323,15 @@ function aggiornaBarraCompra(view){
   /* Lo stepper dei pezzi vive anche qui dentro (gemello di quello in
      pagina); col multi-pezzo il lato Acquista si allarga un filo,
      che a 360px la scritta e i tasti devono starci interi */
+  /* l'asta: la barra dice «Punta» e l'offerta sparisce (l'asta E' la
+     trattativa). Chiusa o deserta, la barra non serve: resta la tab. */
+  if (astaE(l)){
+    if (!astaViva(l)){ document.body.classList.remove('con-barra'); return; }
+    el('bcCompra').innerHTML = '🔨 Punta';
+    el('barraCompra').classList.remove('con-qta');
+    el('bcOfferta').style.display = 'none';
+    return;
+  }
   el('bcCompra').innerHTML = `Acquista${stepperAcquista(l)}`;
   el('barraCompra').classList.toggle('con-qta', (l.quantita||1) > 1);
   /* con un accordo stretto l'offerta non si rifa': come in pagina */
@@ -5303,6 +5418,8 @@ function candidatiSet(l){
   return (l.stato==='attivo' ? [l] : []).concat(suoi).slice(0, 8);
 }
 function motivoEsclusione(x){
+  if (astaE(x))
+    return '🔨 è all\'asta: si aggiudica da solo, fuori dal set';
   if (!stradeFisiche(x).length)
     return x.consegna==='digitale'
       ? '💾 solo codice online: si compra da solo'
@@ -5573,6 +5690,10 @@ function openDetail(id){
   /* l'offerta accettata dell'utente su QUESTO annuncio: banner e
      totali dei bottoni compra parlano la cifra pattuita */
   const offAcc = offertaAccettataPer(l.id);
+  /* l'asta (ago 2026): la scheda cambia faccia — il prezzo e' la
+     puntata in testa, il recinto parla di puntate e lo stato
+     personale arriva da /api/aste/{id} (caricaAsta, in coda) */
+  const asta = astaE(l);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
   consegnaEsplicita = false;       // e la scelta torna implicita
   qtaScelta = 1;                   // e i pezzi ripartono da uno
@@ -5616,6 +5737,24 @@ function openDetail(id){
      converte) → le altre strade discrete → descrizione col suo titolo
      → riquadro venditore (dove vive anche il 🟣: la verifica e'
      dell'utente, non dell'oggetto). Da li' in giu' tutto com'era. */
+  /* I due recinti dell'asta (ago 2026): per chi guarda, il posto di
+     Acquista lo prende la puntata (lo stato personale lo riempie
+     caricaAsta); per il venditore, il riepilogo — con Rilancia e
+     Converti quando la deserta e' tornata in mano sua. */
+  const zonaAsta = `<div class="escrow-zone">
+             <span class="escrow-flag">🔒 asta protetta</span>
+             <div class="trust-note"><span>Punti versando i sats nel <b>deposito di garanzia</b>: se vinci sono già il pagamento, se non vinci tornano <span class="fine-frase">indietro. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
+             <div id="astaStato"></div>
+             <button class="btn orange acquista-cta" id="astaCta" onclick="apriPunta()">🔨 Punta</button>
+             <button class="btn ghost" id="astaRitiro" style="display:none;margin-top:0" onclick="ritiraPuntata()">🕊 Ritirati dall'asta (definitivo)</button>
+           </div>`;
+  const astaDeserta = asta && !astaViva(l) && (l.stato||'attivo')==='attivo';
+  const mioAstaBlocco = `<div class="trust-note">🔨 <span>${astaViva(l)
+        ? `<b>La tua asta è in corso</b> e si chiude da sola alla scadenza. Con puntate salde è vincolante: base, durata e testo restano bloccati.`
+        : `<b>L'asta si è chiusa senza offerte.</b> Puoi rilanciarla o convertirla a prezzo fisso alla base.`}</span></div>
+           ${astaDeserta ? `<button class="btn ghost" style="margin-top:0" onclick="rilanciaAsta(${l.id})">🔨 Rilancia l'asta</button>
+           <button class="btn ghost" style="margin-top:0" onclick="convertiAsta(${l.id})">🏷 Converti a prezzo fisso</button>` : ''}
+           <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`;
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
@@ -5624,9 +5763,10 @@ function openDetail(id){
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">
-          <div class="detail-price">${prezzoParte(conLampo(l)).big}</div>
-          <div class="eur-hint">${prezzoParte(conLampo(l)).small}</div>
-          ${lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">rimangono <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
+          <div class="detail-price">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
+          <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
+          ${asta?`<div class="lampo-resta asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
+          ${!asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">rimangono <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
              valuta LEGGERE questo annuncio, e la scelta e' la stessa -->
@@ -5655,12 +5795,15 @@ function openDetail(id){
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
       ${mio
-        ? `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
+        ? asta ? mioAstaBlocco
+        : `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
            ${!(lampoLeve && lampoLeve.attive) ? '' : (lampoAttiva(l)
              ? `<button class="btn ghost" style="margin-top:0" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" style="margin-top:0" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
+        : asta ? (astaViva(l) ? zonaAsta
+            : `<div class="trust-note">🔨 <span><b>Quest'asta si è chiusa.</b> ${l.astaTop>0?'È in aggiudicazione al miglior offerente.':'Il venditore deciderà se rilanciarla o metterla a prezzo fisso.'}</span></div>`)
         : `<div class="escrow-zone">
              <span class="escrow-flag">🔒 pagamento protetto</span>
              <!-- Una riga sola (lug 2026): il paragrafo intero e' andato
@@ -5689,6 +5832,9 @@ function openDetail(id){
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
     </div>`;
   aggiornaCurToggle();   // il toggle valuta appena nato dice la verita'
+  /* lo stato personale dell'asta arriva dopo, dal server: il recinto
+     intanto esiste gia' col bottone generico */
+  if (asta && !mio && !DEMO && !VETRINA) caricaAsta(l.id);
   /* La riga di onboarding appesa alla scheda dell'annuncio appena
      pubblicato: una volta sola, e solo su QUEL annuncio */
   if (hintPubblicazione) {
@@ -6018,8 +6164,212 @@ function lbZoomA(px, py, s2){
 /* ---------------- acquisto / escrow ---------------- */
 let pollTimer = null, currentOrderId = null;
 
+/* ================= ASTE: la scheda e la puntata =================
+   Puntare = PAGARE: il foglio chiede il TOTALE che si offre, il
+   server calcola la differenza e stacca una fattura da 10 minuti che
+   si paga nel paySheet di sempre (stesso poll, chiusure mirate, mai
+   closeSheet col poll vivo). Lo stato personale — sei in testa,
+   superato, ritirato — arriva da /api/aste/{id}; il giudice vero di
+   minimi e corse resta il server. */
+let astaInfo = null;         // la fotografia dell'asta aperta
+let rilancioCorrente = null; // la fattura di puntata in attesa di saldo
+
+function incrementoAsta(){
+  return (astaLeve && astaLeve.incremento_percento) || 5;
+}
+async function caricaAsta(id){
+  astaInfo = null;
+  try {
+    const r = await fetch(`${API_BASE}/aste/${id}`,
+      {headers:{'X-Tg-Init-Data': authHdr()}});
+    if (r.ok) astaInfo = await r.json();
+  } catch(e) {}
+  if (currentListing && currentListing.id === id) dipingiAsta();
+}
+function minimoAsta(l){
+  if (astaInfo) return astaInfo.minimo_sats;
+  const top = l.astaTop || 0;
+  return top > 0 ? top + Math.max(1, Math.floor(top * incrementoAsta() / 100))
+                 : l.astaBase;
+}
+function dipingiAsta(){
+  const l = currentListing, box = el('astaStato');
+  if (!l || !box) return;
+  const viva = astaViva(l), mia = astaInfo && astaInfo.mia;
+  const top = astaInfo ? astaInfo.top_sats : (l.astaTop || 0);
+  const minimo = minimoAsta(l);
+  let stato = '';
+  if (mia && mia.stato === 'attiva' && mia.in_testa)
+    stato = `<div class="trust-note">👑 <span><b>Sei in testa</b> con ${fmt(mia.offerto_sats)} sats. Se nessuno ti supera, l'oggetto è tuo.</span></div>`;
+  else if (mia && mia.stato === 'attiva' && mia.versato_sats > 0)
+    stato = `<div class="trust-note">🔨 <span><b>Ti hanno superato:</b> la testa è a <b>${fmt(top)}</b> sats. Rilanci da ${fmt(minimo)} — paghi solo la differenza, hai già versato ${fmt(mia.versato_sats)} — oppure puoi ritirarti.</span></div>`;
+  else if (mia && mia.stato === 'chiusa')
+    stato = `<div class="trust-note">🕊 <span>Ti sei ritirato da questa asta: il ritiro è definitivo, i tuoi sats sono in «Da riscuotere».</span></div>`;
+  box.innerHTML = stato;
+  const cta = el('astaCta'), rit = el('astaRitiro');
+  if (cta){
+    if (!viva || (mia && mia.stato === 'chiusa')) cta.style.display = 'none';
+    else if (mia && mia.in_testa){
+      cta.style.display = ''; cta.disabled = true;
+      cta.textContent = '👑 Sei in testa';
+    } else {
+      cta.style.display = ''; cta.disabled = false;
+      cta.innerHTML = mia && mia.versato_sats > 0
+        ? `🔨 Rilancia da ${fmt(minimo)} sats`
+        : top > 0 ? `🔨 Punta da ${fmt(minimo)} sats`
+                  : '🔨 Fai la prima puntata';
+    }
+  }
+  if (rit) rit.style.display =
+    (viva && mia && mia.stato === 'attiva' && mia.versato_sats > 0
+     && !mia.in_testa) ? '' : 'none';
+}
+function apriPunta(){
+  haptic();
+  const l = currentListing; if (!l) return;
+  if (VETRINA) {
+    invitoTelegram('Per puntare serve l\'app vera dentro Telegram: è lì '
+      + 'che i tuoi sats restano al sicuro fino alla fine dell\'asta.');
+    return;
+  }
+  if (DEMO) { toast('Nel demo si guarda soltanto 🔨'); return; }
+  if (!astaViva(l)) { toast('L\'asta è chiusa'); return; }
+  const mia = astaInfo && astaInfo.mia;
+  if (mia && mia.in_testa) { toast('Sei già in testa 👑'); return; }
+  if (mia && mia.stato === 'chiusa') {
+    toast('Ti sei ritirato: il ritiro è definitivo'); return;
+  }
+  const top = astaInfo ? astaInfo.top_sats : (l.astaTop || 0);
+  const minimo = minimoAsta(l);
+  el('puntaTestata').innerHTML = `
+    ${l.photos && l.photos[0] ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" style="width:44px;height:44px;object-fit:cover;border-radius:10px" alt="">` : `<span style="font-size:30px">${l.emoji}</span>`}
+    <div style="min-width:0"><b>${esc(l.title)}</b><div style="font-size:12px;color:var(--muted);font-weight:600">${top>0?`testa ${fmt(top)} sats`:`base ${fmt(l.astaBase)} sats`} · ${astaInfo?astaInfo.puntate_n:l.astaPuntate} offerenti</div></div>`;
+  const dieci = Math.max(minimo, Math.ceil((top || l.astaBase) * 1.1));
+  el('puntaChips').innerHTML = [['minimo', minimo], ['+10%', dieci]]
+    .map(([n, v]) => `<button type="button" class="consegna-pill" data-v="${v}" onclick="puntaChip(this.dataset.v)">${n} · ${fmt(v)}</button>`).join('');
+  el('puntaImporto').value = minimo;
+  puntaDigitata();
+  el('sheetBg').classList.add('open');
+  el('puntaSheet').classList.add('open');
+}
+function puntaChip(v){
+  haptic();
+  el('puntaImporto').value = parseInt(v, 10) || 0;
+  puntaDigitata();
+}
+function puntaDigitata(){
+  const l = currentListing; if (!l) return;
+  const v = parseInt(String(el('puntaImporto').value).replace(/\D/g, ''), 10) || 0;
+  const minimo = minimoAsta(l);
+  const mia = astaInfo && astaInfo.mia;
+  const versato = (mia && mia.versato_sats) || 0;
+  el('puntaMinimo').textContent = `Minimo per superare: ${fmt(minimo)} sats`;
+  document.querySelectorAll('#puntaChips .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', Number(b.dataset.v) === v));
+  const c = el('puntaConto');
+  if (!v) { c.textContent = ''; return; }
+  if (v < minimo) {
+    c.textContent = `Sotto il minimo: servono almeno ${fmt(minimo)} sats`;
+    return;
+  }
+  c.innerHTML = `Versi adesso: <b class="mono" style="color:var(--sats-text)">${fmt(Math.max(0, v - versato))}</b> sats`
+    + (versato ? ` — il totale ${fmt(v)} conta i ${fmt(versato)} già in cassaforte` : '');
+}
+async function inviaPuntata(btn){
+  const l = currentListing; if (!l) return;
+  const v = parseInt(String(el('puntaImporto').value).replace(/\D/g, ''), 10) || 0;
+  if (!v) { toast('Scrivi il totale che offri'); return; }
+  const ripristina = bottoneInAttesa(btn, '🔨 Preparo la fattura…');
+  try {
+    const r = await fetch(`${API_BASE}/aste/${l.id}/punta`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({totale_sats: v})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.detail || 'Puntata non riuscita', 6000); return; }
+    /* dal foglio puntata al paySheet in un gesto: chiusura MIRATA del
+       solo foglio (mai closeSheet: tra poco parte il pollTimer) */
+    el('puntaSheet').classList.remove('open');
+    rilancioCorrente = d.rilancio_id;
+    el('payAmount').textContent = fmt(d.delta_sats);
+    el('payScomposto').innerHTML =
+      `<div>🔨 Totale offerto <b class="mono">${fmt(d.totale_sats)}</b> sats — versi solo la differenza</div>`;
+    el('payEurNota').style.display = 'block';
+    el('payEurNota').textContent = 'La fattura della puntata vale 10 minuti';
+    el('payInvoice').textContent = d.invoice;
+    el('sheetBg').classList.add('open');
+    el('paySheet').classList.add('open');
+    aggiornaPayHint();
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => verificaPuntata(rilancioCorrente), 4000);
+  } finally { ripristina(); }
+}
+async function verificaPuntata(rid){
+  try {
+    const r = await fetch(`${API_BASE}/rilanci/${rid}/verifica`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json();
+    if (d.stato === 'in_attesa' || d.stato === 'creato') return;
+    rilancioCorrente = null;
+    closeSheet();
+    if (d.stato === 'saldato') {
+      toast(d.in_testa ? '👑 Sei in testa!'
+                       : '🔨 Puntata al sicuro — ma ti hanno già superato',
+            5000);
+      const l = currentListing;
+      if (l && l.astaBase) {
+        if (d.top_sats) l.astaTop = d.top_sats;
+        if (d.scadenza) l.astaFine = d.scadenza;
+        if (el('view-dettaglio')?.classList.contains('active'))
+          openDetail(l.id);
+      }
+    } else if (d.stato === 'tardivo') {
+      toast('⌛ Pagamento fuori tempo: i sats sono nel tuo «Da riscuotere»', 6000);
+    }
+  } catch(e) {}
+}
+async function ritiraPuntata(){
+  const l = currentListing; if (!l) return;
+  const mia = astaInfo && astaInfo.mia;
+  const v = (mia && mia.versato_sats) || 0;
+  if (!confirm(`Il ritiro è DEFINITIVO: non potrai rientrare in questa asta.\nI tuoi ${fmt(v)} sats tornano in «Da riscuotere». Confermi?`))
+    return;
+  const r = await fetch(`${API_BASE}/aste/${l.id}/ritirati`,
+    {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
+  toast(d.riscosso ? '↩️ Ritirato: rimborso in arrivo sul tuo wallet'
+                   : '💰 Ritirato: i sats sono in «Da riscuotere»', 6000);
+  caricaAsta(l.id);
+}
+async function rilanciaAsta(id){
+  const giorni = (astaLeve && astaLeve.durate_giorni) || [3, 7];
+  const g = parseInt(prompt(`Per quanti giorni? (${giorni.join(' o ')})`,
+                            String(giorni[0])) || '', 10);
+  if (!g) return;
+  const r = await fetch(`${API_BASE}/aste/${id}/rilancia`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({durata_giorni: g})});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(d.detail || 'Rilancio non riuscito', 6000); return; }
+  toast('🔨 L\'asta è ripartita!');
+  await loadListings(); openDetail(id);
+}
+async function convertiAsta(id){
+  if (!confirm('Converti a prezzo fisso alla base? L\'asta finisce qui.'))
+    return;
+  const r = await fetch(`${API_BASE}/aste/${id}/converti`,
+    {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(d.detail || 'Conversione non riuscita', 6000); return; }
+  toast('🏷 Ora è in vendita a prezzo fisso');
+  await loadListings(); openDetail(id);
+}
+
 async function startBuy(){
   haptic();
+  rilancioCorrente = null;   /* il paySheet torna al poll degli ordini */
   if (VETRINA) {
     invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
@@ -6201,6 +6551,7 @@ function closeSheet(){
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
+  el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('setSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
@@ -6331,7 +6682,10 @@ Object.keys(PICKER).forEach(aggiornaPicker);
 function sheetPaid(){
   if (DEMO) return simulatePaid();
   toast('Verifico il pagamento…');
-  verificaOrdine(currentOrderId);
+  /* il paySheet serve due pagamenti: l'ordine di sempre e la fattura
+     di puntata (rilancioCorrente pieno = e' lei) */
+  if (rilancioCorrente) verificaPuntata(rilancioCorrente);
+  else verificaOrdine(currentOrderId);
 }
 
 function simulatePaid(){
@@ -6635,6 +6989,77 @@ async function annullaLampo(){
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
+/* Le gare d'asta nella scheda Ordini: le puntate vive con lo stato
+   personale, piu' i rimborsi fermi in «Da riscuotere» col ripiego
+   della invoice incollata. Il pallino del tab si accende anche da
+   qui (renderOfferte puo' spegnerlo: si chiama DOPO di lei). */
+let puntateMie = null;   // la busta di /api/me/puntate
+async function loadPuntate(){
+  if (DEMO || VETRINA) { puntateMie = null; return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/puntate`,
+      {headers:{'X-Tg-Init-Data': authHdr()}});
+    puntateMie = r.ok ? await r.json() : null;
+  } catch(e) { puntateMie = null; }
+}
+function renderPuntate(){
+  const blocco = el('puntateBlocco'); if (!blocco) return;
+  const dati = puntateMie || {puntate: [], da_riscuotere: []};
+  const adesso = Date.now()/1000;
+  const vive = (dati.puntate||[]).filter(p =>
+    p.stato==='attiva' && p.stato_annuncio==='attivo' && p.scadenza>adesso);
+  const soldi = dati.da_riscuotere || [];
+  if (!vive.length && !soldi.length) { blocco.style.display='none'; return; }
+  blocco.style.display = '';
+  let daAgire = 0;
+  const righe = vive.map(p => {
+    if (!p.in_testa) daAgire++;
+    return `<div class="payout" style="margin-bottom:10px">
+      <b>${esc(p.titolo)}</b>
+      <div class="hint" style="margin-top:4px">${p.in_testa
+        ? `👑 Sei in testa con <b>${fmt(p.offerto_sats)}</b> sats`
+        : `🔨 Superato: la testa è a <b>${fmt(p.top_sats)}</b> sats — rilanci da ${fmt(p.minimo_sats)} (hai già versato ${fmt(p.versato_sats)})`}
+        · si chiude tra ${astaResta(p.scadenza)}</div>
+      <button class="btn ghost" style="margin-top:8px" onclick="apriAnnuncioPuntata(${p.annuncio_id})">${p.in_testa?'Guarda l\'asta':'🔨 Rilancia'}</button>
+    </div>`;
+  }).join('');
+  const righeSoldi = soldi.map(r => {
+    daAgire++;
+    return `<div class="payout" style="margin-bottom:10px">
+      <b>💰 ${fmt(r.importo_sats)} sats da riscuotere</b>
+      <div class="hint" style="margin-top:4px">da «${esc(r.titolo||"un'asta")}» — arrivano da soli col Lightning address nel Profilo, oppure incolla una invoice di esattamente quell'importo.</div>
+      <button class="btn ghost" style="margin-top:8px" onclick="riscuotiRimborso(${r.id}, ${r.importo_sats})">↩️ Incolla una invoice e riscuoti</button>
+    </div>`;
+  }).join('');
+  el('puntateList').innerHTML = righe + righeSoldi;
+  if (daAgire > 0) el('offDot')?.classList.add('on');
+}
+async function apriAnnuncioPuntata(aid){
+  let l = listings.find(x=>x.id===aid);
+  if (!l) {
+    try {
+      const r = await fetch(`${API_BASE}/listings/${aid}`,
+        {headers:{'X-Tg-Init-Data': authHdr()}});
+      if (r.ok) { l = mapListing(await r.json()); inCatalogo([l]); }
+    } catch(e) {}
+  }
+  if (!l) { toast('Annuncio non trovato'); return; }
+  openDetail(aid);
+}
+async function riscuotiRimborso(rid, sats){
+  const inv = prompt(`Incolla una invoice Lightning di ESATTAMENTE ${fmt(sats)} sats:`);
+  if (!inv) return;
+  const r = await fetch(`${API_BASE}/rimborsi/${rid}/invoice`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({invoice: inv.trim()})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Riscossione non riuscita', 6000); return; }
+  toast(d.stato==='riscosso' ? '↩️ Rimborso in arrivo sul tuo wallet!'
+                             : 'Il pagamento non è riuscito: riprova', 6000);
+  await loadPuntate(); renderPuntate();
+}
+
 /* La sezione in testa alla scheda Ordini: solo le trattative VIVE
    (le chiuse le raccontano le notifiche). Compare solo se non e' vuota. */
 function renderOfferte(){
@@ -6919,7 +7344,18 @@ function openOrder(id){
         </div>`:''}
       ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
       ${o.role==='seller' && ['locked','shipped','delivered','confirmed'].includes(s) ? payoutPanel(o) : ''}
-      ${o.role==='seller' && s==='locked' ? (o.consegnaScelta==='digitale' ? `
+      ${o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta ? `
+        <div class="payout">
+          <h4>🏆 Hai vinto: come vuoi riceverlo?</h4>
+          <div class="hint">I tuoi sats sono già nel deposito di garanzia. Scegli la strada — senza costi extra: la spedizione, se offerta, è <b>inclusa nel prezzo</b> — e da lì parte la consegna con le tutele di sempre.</div>
+          <div class="consegna-scelta" id="ordineStrade" style="margin-top:10px">…</div>
+        </div>`:''}
+      ${o.role==='seller' && s==='locked' && o.asta && !o.consegnaScelta ? `
+        <div class="payout">
+          <h4>🔨 In attesa della scelta del vincitore</h4>
+          <div class="hint">L'asta è conclusa e i sats sono al sicuro in cassaforte. Il vincitore sta scegliendo come riceverlo: ti avviso appena decide — fino ad allora non c'è nulla da spedire, e nessun timer parte.</div>
+        </div>`:''}
+      ${o.role==='seller' && s==='locked' && !(o.asta && !o.consegnaScelta) ? (o.consegnaScelta==='digitale' ? `
         <div class="payout">
           <h4>💾 Consegna il contenuto</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Scrivi qui il contenuto (codice, istruzioni, link di riscatto): l'acquirente lo rivelerà con un tocco, che fa da ricevuta. 💡 Tieni uno screenshot datato del saldo o della validità: in disputa, le prove decidono.</div>
@@ -6957,6 +7393,10 @@ function openOrder(id){
           : pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")}
     </div>`;
   go('ordine');
+  /* il varco del vincitore d'asta: le strade offerte arrivano dal
+     server (fail-open: senza rete la scritta invita a riaprire) */
+  if (o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta)
+    caricaStradeOrdine(o);
   /* Le monete partono dal messaggio di chiusura («Hai incassato…» /
      «Deposito sbloccato»), solo la prima volta che questo dispositivo
      vede l'affare concluso. Il ritardo lascia finire il cambio vista. */
@@ -8235,6 +8675,39 @@ async function markShipped(){
 
 /* Il gemello di markShipped per il ritiro in zona: niente corriere,
    niente tracking — il corriere-sentinella lo capisce il server. */
+/* Il varco del VINCITORE d'asta, dentro l'ordine: le strade offerte
+   le dice /api/aste/{id} (tutte a costo zero, regola del cantiere) e
+   la scelta e' definitiva — da li' il flusso e le tutele di sempre. */
+async function caricaStradeOrdine(o){
+  const NOMI = {spedizione:'🚚 Spedizione (inclusa nel prezzo)',
+                ritiro:'🤝 Ritiro in zona', digitale:'💾 Codice online'};
+  let strade = [];
+  try {
+    const r = await fetch(`${API_BASE}/aste/${o.annuncioId}`,
+      {headers:{'X-Tg-Init-Data': authHdr()}});
+    if (r.ok) strade = (await r.json()).strade || [];
+  } catch(e) {}
+  const box = el('ordineStrade');
+  if (!box) return;
+  if (!strade.length) { box.textContent = 'Riapri tra un attimo…'; return; }
+  box.innerHTML = strade.map(v =>
+    `<button type="button" class="consegna-pill" data-v="${v}" onclick="scegliConsegnaOrdine(this.dataset.v)">${NOMI[v]||esc(v)}</button>`).join('');
+}
+async function scegliConsegnaOrdine(v){
+  const o = currentOrder; if (!o) return;
+  const NOMI = {spedizione:'la spedizione', ritiro:'il ritiro in zona',
+                digitale:'il codice online'};
+  if (!confirm(`Confermi ${NOMI[v]||v}? La scelta è definitiva.`)) return;
+  const r = await fetch(`${API_BASE}/orders/${o.id}/consegna`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({consegna:v})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Scelta non riuscita', 6000); return; }
+  o.consegnaScelta = v;
+  toast('✔ Scelta fatta: il venditore prepara la consegna');
+  openOrder(o.id);
+}
 async function markConsegnaMano(){
   haptic();
   if (!confirm(`Confermi di aver consegnato l'oggetto a mano?\n\nDa adesso l'acquirente può confermare la ricezione; se nessuno si fa vivo, i sats si sbloccano d'ufficio dopo ${TEMPI.autoSblocco} giorni.`)) return;
@@ -8979,7 +9452,10 @@ let editandoNostr = false;   // modifica FIRMATA di un annuncio importato
    oppure EUR — il prezzo in euro resta fisso e chi compra paga sempre
    in sats, convertiti dal server al cambio del momento. */
 let sellValuta = 'sats';
-function toggleSellCur(){ haptic(); impostaSellValuta(sellValuta==='sats' ? 'eur' : 'sats'); }
+function toggleSellCur(){
+  if (astaAccesa()) { toast("Un'asta parla sats: base e rilanci vivono lì"); return; }
+  haptic(); impostaSellValuta(sellValuta==='sats' ? 'eur' : 'sats');
+}
 function impostaSellValuta(v){
   sellValuta = v;
   const inp = el('sellPrice'), btn = el('sellCur'), hint = el('sellCurHint');
@@ -9068,11 +9544,52 @@ function impostaConsegnaForm(c, ancheDig){
 /* Il campo costo (e la taglia) esistono solo se l'annuncio spedisce;
    il codice online mostra il suo hint operativo (consegna in
    piattaforma + screenshot). */
+/* --- Vendi all'asta (ago 2026) ------------------------------------
+   Il toggle vive tra Prezzo e Quantita': acceso, il prezzo diventa la
+   base d'asta (solo sats), la quantita' sparisce (pezzo unico) e il
+   costo di spedizione pure (le strade dell'asta sono a costo zero:
+   la spedizione, se offerta, e' inclusa nel prezzo). Le durate
+   arrivano da /api/me (asta_leve): il client non hardcoda cifre. */
+let astaLeve = null;        // da /api/me
+let sellAstaGiorni = 0;     // la durata scelta nel form
+function astaAccesa(){ return !!(el('sellAsta') && el('sellAsta').checked); }
+function aggiornaAstaForm(){
+  const on = astaAccesa();
+  el('sellAstaOpzioni').style.display = on ? '' : 'none';
+  if (on){
+    if (sellValuta === 'eur') impostaSellValuta('sats');
+    renderAstaDurate();
+  }
+  aggiornaConsegnaForm();   /* quantita' e costo seguono il toggle */
+}
+function renderAstaDurate(){
+  const box = el('sellAstaDurate'); if (!box) return;
+  const giorni = (astaLeve && astaLeve.durate_giorni) || [3, 7];
+  if (!sellAstaGiorni || !giorni.includes(sellAstaGiorni))
+    sellAstaGiorni = giorni[0];
+  box.innerHTML = giorni.map(g =>
+    `<button type="button" class="consegna-pill${g===sellAstaGiorni?' attiva':''}" onclick="setAstaGiorni(${g})">${g} giorni</button>`).join('');
+}
+function setAstaGiorni(g){ haptic(); sellAstaGiorni = g; renderAstaDurate(); }
+function astaForm(){
+  if (!astaAccesa()) return null;
+  return {durata_giorni: sellAstaGiorni || 3};
+}
+/* la visibilita' del toggle la decide la leva del server (e in
+   modifica sparisce: un annuncio esistente non diventa un'asta) */
+function aggiornaAstaVisibilita(){
+  const f = el('sellAstaField'); if (!f) return;
+  f.style.display = (astaLeve && astaLeve.abilitata && !editandoId
+                     && !editandoNostr) ? '' : 'none';
+}
 function aggiornaConsegnaForm(){
   const sped = el('sellConsSped').checked,
-        rit = el('sellConsRitiro').checked;
-  el('sellSpedField').style.display = sped ? '' : 'none';
+        rit = el('sellConsRitiro').checked,
+        asta = astaAccesa();
+  el('sellSpedField').style.display = (sped && !asta) ? '' : 'none';
   el('sellTagliaField').style.display = sped ? '' : 'none';
+  if (el('sellQtaField') && !editandoNostr)
+    el('sellQtaField').style.display = asta ? 'none' : '';
   el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
      essere un comune vero, senza resta facoltativa */
@@ -9164,6 +9681,7 @@ function annullaModifica(){
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped','sellQta'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
+  if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
@@ -9175,6 +9693,12 @@ function annullaModifica(){
 function aggiornaFormVendi(){
   const b = el('editBanner'), btn = el('sellSubmit');
   if (!b || !btn) return;
+  /* il toggle dell'asta segue la faccia del form: in modifica
+     sparisce (un annuncio esistente non diventa un'asta) */
+  if (editandoId && el('sellAsta') && el('sellAsta').checked){
+    el('sellAsta').checked = false; aggiornaAstaForm();
+  }
+  aggiornaAstaVisibilita();
   const drop = document.querySelector('#view-vendi .photo-drop');
   if (editandoId){
     b.style.display = 'block';
@@ -9372,6 +9896,7 @@ async function publish(){
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
   let nuovoId, inRevisione = false, attesaOre = 24;
   const cns = consegnaPayload();
+  const asta = astaForm();   /* null = vendita normale */
   if (DEMO) {
     nuovoId = Date.now();
     listings.unshift({id:nuovoId, emoji:'📦', title:t,
@@ -9393,6 +9918,7 @@ async function publish(){
       body: JSON.stringify({titolo:t, ...prezzo, ...cns,
         categoria:el('sellCat').value, condizione:el('sellCond').value,
         quantita:qtaForm(),
+        ...(asta ? {asta} : {}),
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
@@ -9413,6 +9939,7 @@ async function publish(){
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped','sellQta'].forEach(i=>el(i).value='');
   el('sellTaglia').value = '';
   el('sellCond').value = '';
+  if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
   aggiornaPickerVendi();
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
@@ -10578,6 +11105,8 @@ async function avvia(){
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
     myDoppioni = me.doppioni_nostr || [];
     lampoLeve = me.lampo_leve || null;
+    astaLeve = me.asta_leve || null;
+    aggiornaAstaVisibilita();
     npubCodice = ''; lnAddrModifica = false;
     if (el('npubInput')) el('npubInput').value = myNpub;
     renderNpubVerifica();
@@ -10605,6 +11134,7 @@ async function avvia(){
        (servono anche a openDetail per il banner dell'accordo) */
     offerteMie = [];
     await loadOfferte(); renderOfferte();
+    await loadPuntate(); renderPuntate();
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
     if (editandoId) annullaModifica();   // una modifica a metà non segue l'identità nuova
     renderGrid(); renderOrders();

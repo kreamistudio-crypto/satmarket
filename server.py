@@ -6787,6 +6787,9 @@ def stato_asta(annuncio_id: int, x_tg_init_data: str = Header(""),
              "scadenza": a["asta_scadenza"],
              "top_sats": testa["offerto_sats"] if testa else 0,
              "puntate_n": offerenti,
+             # le strade offerte: servono anche al varco del VINCITORE
+             # dentro l'ordine (la scelta avviene li')
+             "strade": sorted(_strade_asta(a)),
              "minimo_sats": minimo, "cronologia": cronologia,
              "incremento_percento": ASTA_INCREMENTO_PERCENTO,
              "proroga_minuti": ASTA_PROROGA_MINUTI, "mia": None}
