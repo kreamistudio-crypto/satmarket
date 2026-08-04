@@ -2267,14 +2267,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   filtro «🔨 All'asta», l'ordinamento «chi scade prima» su
   idx_annunci_asta, il badge in card col tempo a grana grossa e il
   countdown vivo solo nel dettaglio, sul battito unico).
-  L'ASTA PARLA BLU (ago 2026, ritocchi di Andrea): token `--asta`
-  #1D5FA8 (di sera si SCHIARISCE a #2B6CB8 — si alza la luce, non si
-  cambia il segno; misurati: bianco sopra 6,45/5,33, vs bruno 3,23),
-  `--asta-text` #14508F/#8FB4E8 (7,43 su crema, 8,08 su bruno,
-  distinto dal ghiaccio della spedizione), `--asta-tag` #14508F FISSO
-  (vive sul cartellino di carta, che non cambia di notte: 8,16) —
-  l'arancio è di Acquista, il rosso della lampo, il verde della
-  protezione, il viola di Nostr. UN token per tutto: bottoni
+  L'ASTA PARLA PETROLIO (ago 2026, ritocchi di Andrea: prima blu, poi
+  verde-blu scuro tenuto sul lato BLU della famiglia — tinta ~195°,
+  col verde della protezione a ~151°: si toccano nel punto più
+  delicato, il bottone dentro il recinto verde, e la prova del nove
+  sugli screenshot ingranditi li distingue al primo sguardo): token
+  `--asta` #0F6D8C (di sera si SCHIARISCE a #1D7FA0 — si alza la
+  luce, non si cambia il segno; misurati: bianco sopra 5,86/4,57, vs
+  crema 5,33, vs bruno 3,77), `--asta-text` #0B5570/#7FC4DC (7,51 su
+  crema, 8,88 su bruno, distinto dal ghiaccio della spedizione),
+  `--asta-tag` #0B5570 FISSO (vive sul cartellino di carta, che non
+  cambia di notte: 7,80) — l'arancio è di Acquista, il rosso della
+  lampo, il verde della protezione, il viola di Nostr. ATTENZIONE
+  alla trappola pagata qui: la riga d'asta del dettaglio NON deve
+  prendere in prestito classi della lampo (`.lampo-resta` vinceva a
+  pari specificità e la tingeva d'arancio). UN token per tutto: bottoni
   (`.btn.asta`, stessa forma dell'orange), chip del foglio, badge e
   cornice in card, riga/countdown del dettaglio, TARGHETTA prezzo in
   card (quel numero è la puntata in corso, non un prezzo). Il RECINTO
