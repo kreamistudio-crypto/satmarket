@@ -3518,6 +3518,10 @@ SOTTOCATEGORIE = {
     "Sport e hobby": (
         ("attrezzatura-sportiva", "Attrezzatura sportiva"),
         ("outdoor", "Campeggio e outdoor"),
+        # nata dal Telo d'Amare vero (ago 2026): un telo da MARE non
+        # aveva nessuna voce che lo accogliesse, e il giudice si
+        # asteneva su una categoria giusta
+        ("mare-piscina", "Mare e piscina"),
         ("giochi-tavolo", "Giochi da tavolo e puzzle"),
     ),
     "Biciclette": (
@@ -3765,6 +3769,14 @@ SINONIMI_SOTTOCATEGORIA = {
                                   "padel", "nuoto", "boxe", "tapis"),
         "outdoor": ("trekking", "zaino", "tenda", "campeggio", "montagna",
                     "sacco a pelo", "escursion"),
+        # ATTENZIONE al Telo d'Amare, il caso che ha fatto nascere la
+        # voce: normalizzato il titolo da' il token «amare», NON
+        # «mare» — a prenderlo e' «telo». E «mare» resta esatto
+        # (4 lettere, niente prefisso), quindi «amare» non lo accende
+        # mai per sbaglio.
+        "mare-piscina": ("telo", "mare", "piscina", "spiaggia", "maschera",
+                         "pinne", "boccaglio", "gonfiabile", "salvagente",
+                         "surf", "bodyboard", "muta", "costume"),
         "giochi-tavolo": ("gioco", "giochi", "puzzle", "tavolo",
                           "strategia", "scacchi", "dadi"),
     },

@@ -185,7 +185,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   divergono (il sesto, il modello CSV, è entrato dopo essersi fatto
   dimenticare per davvero).
   L'ALBERO DELLE SOTTOCATEGORIE (ago 2026): definito ora, mostrato
-  MAI — catalogo `SOTTOCATEGORIE` in server.py (85 sottovoci su 26
+  MAI — catalogo `SOTTOCATEGORIE` in server.py (86 sottovoci su 26
   categorie, disegnato sui 46 annunci veri di produzione), DORMIENTE:
   niente form, niente filtri, niente Sfoglia finché non si deciderà
   di accenderlo. Il patto, scritto anche nel commento del catalogo:
@@ -4583,7 +4583,8 @@ giorno): «Buoni ed esperienze» accesa subito — la merce vera che
 moriva in «Altro» (pacchetto B&B, buoni Zalando) ha una casa, coi
 sette posti, i gemelli SENZA_CONDIZIONE e le righe-voucher del
 modello CSV traslocate — e l'albero delle SOTTOCATEGORIE definito ma
-mostrato mai: 85 sottovoci su 26 categorie, disegnate sui 46 annunci
+mostrato mai: 86 sottovoci su 26 categorie (l'86esima, «Mare e
+piscina», nata dal Telo d'Amare vero), disegnate sui 46 annunci
 veri di produzione, colonna e payload silenzioso già vivi, UI zero
 (vedi Architettura per il patto, le regole di confine e la decisione
 su Elettronica, che resta col contenuto suo invece di chiudere).

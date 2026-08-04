@@ -555,6 +555,16 @@ def prove_sottocategorie():
           g("Altro", "Poster bellissimo", ""))
     prova("gli accenti non contano", "cucina-tavola",
           g("Casa e giardino", "Caffettièra anni 60", ""))
+    # il caso vero che ha fatto nascere «Mare e piscina» (ago 2026):
+    # un telo da MARE in una categoria giusta senza una voce che lo
+    # accogliesse. Il titolo normalizzato da' il token «amare», non
+    # «mare»: a prenderlo dev'essere «telo».
+    prova("il Telo d'Amare trova la sua voce", "mare-piscina",
+          g("Sport e hobby", "III° Telo d'Amare, del (primo) trittico "
+                            "2026", "canapa antica sulla spoletta di "
+                                    "tessitura"))
+    prova("e «amare» da solo non accende «mare»", "",
+          g("Sport e hobby", "Imparare ad amare", ""))
 
 
 # ====================================================================
