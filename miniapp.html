@@ -1122,6 +1122,11 @@
   .pacco-tit{display:flex;flex-direction:column;min-width:0;line-height:1.2}
   .pacco-tit b{font-family:'Baloo 2',sans-serif;font-size:20px}
   .pacco-tit .eur-hint{margin-bottom:0}
+  /* il toggle €/₿ in alto a destra: il sottotitolo accanto cede coi
+     puntini, il toggle non si stringe mai */
+  .pacco-testa .cur-seg{margin-left:auto;flex:0 0 auto}
+  .pacco-testa .pacco-tit .eur-hint{overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
   /* La cella: card di vetrina + bottone sotto. Il barattolino dei
      preferiti si spegne QUI (e solo qui): l'angolo in alto a destra
      della foto e' della spunta del pacco — lampo e asta stanno a
@@ -1146,15 +1151,18 @@
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
     margin-top:4px;line-height:1.3}
   /* IL TOTALE HA LA PRIORITA' (ago 2026, regressione dal campo: coi
-     sats a 6-7 cifre il numero finiva SOTTO il toggle). Tre pezzi:
+     sats a 6-7 cifre il numero finiva SOTTO il toggle — che da allora
+     e' salito in TESTA alla pagina, deciso da Andrea: nella barra
+     rubava spazio al numero). I tre ripari restano, e sono la rete:
      1) la colonna del totale non si strizza MAI (flex:0 0 auto — il
         min-width:0 di prima la lasciava scendere sotto il contenuto,
         e il nowrap dipingeva sopra il vicino);
-     2) la barra va A CAPO quando i tre non ci stanno (flex-wrap): a
+     2) la barra va A CAPO se i pezzi non ci stanno (flex-wrap): a
         scendere e' il BOTTONE, intero su una riga sua — mai la cifra
         troncata o coperta, e' denaro;
      3) sui numeri lunghi il corpo scala (classe .lungo da
-        aggiornaBarraPacco): cosi' il capo resta il caso estremo. */
+        aggiornaBarraPacco): senza il toggle in mezzo, anche a 320px
+        il 7 cifre sta su UNA riga col bottone pieno. */
   #barraPacco{position:fixed;bottom:0;left:0;right:0;z-index:30;
     background:var(--nav-bg);backdrop-filter:blur(10px);
     border-top:1px solid var(--line);display:none;flex-wrap:wrap;
@@ -1164,7 +1172,7 @@
   body.con-pacco #barraPacco{display:flex;animation:barraSu .18s ease}
   #barraPacco .btn{margin-top:0;width:auto;flex:0 0 auto;margin-left:auto;
     border-radius:12px;white-space:nowrap;box-shadow:none;
-    font-size:14px;padding:9px 11px 10px}
+    font-size:15px;padding:9px 14px 10px}
   #barraPacco .btn:active{transform:translateY(1px);box-shadow:none}
   .pacco-somma{display:flex;flex-direction:column;flex:0 0 auto;
     max-width:100%;line-height:1.2}
@@ -2322,6 +2330,13 @@
     <div class="pacco-testa">
       <button type="button" class="pacco-x" onclick="navIndietro()" title="Chiudi" aria-label="Chiudi il pacco">✕</button>
       <div class="pacco-tit"><b>📦 Il pacco</b><span class="eur-hint" id="paccoSub"></span></div>
+      <!-- il toggle €/₿ vive QUI, in alto a destra (deciso da Andrea:
+           nella barra in basso rubava spazio al totale) — e' lo stesso
+           di searchbar e dettaglio, si accendono insieme via data-cur -->
+      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+      </div>
     </div>
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
   </div>
@@ -2672,14 +2687,10 @@
   <!-- La barra della pagina del pacco (ago 2026): gemella di
        #barraCompra per posizione e carta, ma qui il conto e' dei SOLI
        articoli — niente consegna e niente spedizione, che entrano nel
-       riepilogo. Il toggle €/₿ e' lo stesso di searchbar e dettaglio
-       (si accendono insieme: si pescano per data-cur). -->
+       riepilogo. Solo totale e bottone: il toggle €/₿ sta in testa
+       alla pagina (deciso da Andrea, qui rubava spazio al numero). -->
   <div id="barraPacco">
     <div class="pacco-somma"><b class="mono" id="paccoTot"></b><span id="paccoConta"></span></div>
-    <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
-      <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
-      <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
-    </div>
     <button class="btn orange" id="paccoControlla" onclick="controllaPacco()">Controlla il pacco</button>
   </div>
 
