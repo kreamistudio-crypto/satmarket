@@ -130,7 +130,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   torna 'creato' (timbro fresco, il reaper non se la mangia) e passa
   da `_incassa_ordine` — chi paga ha comprato, la regola di
   verifica_pagamento (e un avviso ai moderatori); lapide-rilancio
-  pagata → binario del fuori-tempo («Da riscuotere»). La purga vive
+  pagata → binario del fuori-tempo («Da riscuotere»). CONFLITTO
+  DICHIARATO (provato in CI e su DB usa-e-getta): se nel frattempo
+  l'oggetto e' andato a un altro, il riacciuffo porta COMUNQUE
+  l'ordine a locked — lo stock non va mai negativo (il MAX del corner
+  del reaper, da cui passa per costruzione), l'annuncio resta
+  'venduto', e il doppio escrow e' il caso da moderatore di sempre:
+  l'avviso ⚠️ ai moderatori parte proprio per questo. La purga vive
   nel reaper: lapidi-ordine a 1h dall'annullo, lapidi-rilancio con la
   soglia dei rilanci — sempre DOPO che la fattura non può più essere
   pagata. `_incassa_ordine` è il ramo pagato di verifica_pagamento

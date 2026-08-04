@@ -776,6 +776,11 @@ def prove_annullo():
     prova("incasso: CAS 'creato' -> 'locked'", True,
           "SET stato='locked'" in inc
           and "WHERE id=? AND stato='creato'" in inc)
+    # il riacciuffo in CONFLITTO (oggetto andato a un altro nel
+    # frattempo): lo stock non va MAI negativo — e' il MAX del corner
+    # del reaper, e il riacciuffo ci passa dentro per costruzione
+    prova("incasso: lo stock non va mai negativo (MAX)", True,
+          "MAX(quantita-?,0)" in inc)
 
     # --- la ripresa del pentito in compra()
     cmp_ = corpo("compra")
