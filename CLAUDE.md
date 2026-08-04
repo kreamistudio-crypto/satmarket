@@ -11,9 +11,56 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Escrow LNbits (invoice key incassa, admin key paga), commissione
   SOSPESA (COMMISSIONE_PERCENTO=0 nel config, cifra da decidere:
   quando si accenderà vanno rimessi i testi con la cifra — l'elenco
-  dei punti è nel commit del lug 2026 che l'ha azzerata),
+  dei punti è nel commit del lug 2026 che l'ha azzerata — E va
+  ricordato che dal cantiere C-1 la cintura di `paga_venditore` è
+  RETROATTIVA: una invoice depositata col vecchio netto e pagata col
+  nuovo non combacia più e viene rifiutata, quindi il venditore dovrà
+  incollarne una nuova. È il comportamento corretto — non si paga la
+  cifra sbagliata — ma il giorno dell'accensione va guardata la coda
+  degli ordini `confirmed` con una invoice già depositata),
   notifiche via bot Telegram, ricerca AI (Haiku), orologio asyncio per gli
   sblocchi automatici (72h dalla consegna, 10gg dalla spedizione).
+  L'IMPORTO DI OGNI BOLT11 IN USCITA SI CONTROLLA CONTRO IL DOVUTO
+  (ago 2026, C-1 dell'audit, ed è la regola da non ammorbidire).
+  Giudice unico `importo_invoice`: l'aritmetica dei millisat vive lì e
+  in nessun altro posto — era in tre copie a mano — e ci passano il
+  deposito dell'invoice a mano (ordini e rimborsi d'asta), il
+  Lightning address e la cintura. Fail-closed: campo mancante → 0, che
+  non combacia mai col dovuto, quindi anche le invoice a importo
+  libero si rifiutano da sole. IL PERCHÉ, che è la parte da tenere:
+  nel LNURL-pay la fattura la fabbrica il wallet del BENEFICIARIO, e
+  il `ln_address` è auto-dichiarato — quindi può puntare a un dominio
+  dell'utente. Finché `invoice_da_ln_address` restituiva la `pr` senza
+  rileggerla e `paga_venditore` non passava `amount` a LNbits, usciva
+  la cifra scritta DENTRO la bolt11: bastava un diritto qualunque,
+  anche da 1 sat, e il tetto della perdita era il saldo della
+  cassaforte, cioè l'escrow di tutti (riprodotto sul codice di prima:
+  1 sat dovuto, 100 milioni usciti). Il controllo esisteva già sul
+  ramo dell'invoice incollata a mano e mancava solo su quello
+  AUTOMATICO — cioè quello che gira da solo senza che nessuno guardi,
+  ed è la lezione più larga di questo cantiere. L'uguaglianza ESATTA è
+  la specifica LUD-06, non una nostra severità. `paga_venditore` porta
+  `atteso_sats` OBBLIGATORIO E SENZA DEFAULT apposta: è ciò che fa
+  ereditare il controllo a ogni futura strada d'uscita, e chi lo
+  dimentica lo sente da Python. Il rifiuto non chiama LNbits nemmeno
+  una volta, e NON inventa un ramo nuovo — vale quello di sempre: il
+  diritto resta aperto (`confirmed`/`refund`/`da_riscuotere`), i sats
+  in cassaforte, l'utente invitato a incollare una invoice a mano — in
+  più i moderatori ricevono l'avviso (un importo storto è o un wallet
+  rotto o un tentativo di prelievo: mai dentro un `return False`;
+  l'avviso è sotto try/except, una notifica non deve mai rompere un
+  rifiuto). Gratis: `salva_ln_address` prova l'address alla
+  registrazione, quindi un endpoint bugiardo si ferma già alla porta.
+  IMPERFEZIONE DICHIARATA: un ln_address bugiardo ritenta a ogni giro
+  — non lo disattiviamo da soli, perché un wallet legittimo può avere
+  un singhiozzo e togliere l'address a un venditore onesto sarebbe una
+  cura peggiore del male; se in rodaggio si vedrà un caso vero la leva
+  è un contatore di rifiuti sull'utente. `prove.py` difende la FORMA
+  con cinque sentinelle (firma senza default, rifiuto prima
+  dell'admin key, nessuna chiamata a un argomento in tutto il file,
+  `amount_msat` una volta sola, la `pr` mai restituita nuda): questo
+  controllo sparisce in un riordino senza rompere nessuna prova
+  funzionale, ed è esattamente il tipo di riga che va sorvegliata.
   `/api/listings` è PUBBLICA (vetrina anche senza Telegram) ma serve solo
   la whitelist esplicita `CAMPI_VETRINA`: `venditore_id` esce solo alle
   richieste autenticate. La ricerca AI resta riservata agli autenticati
@@ -5120,6 +5167,45 @@ basta il deploy (le due colonne nascono da sole, le due leve hanno un
 default nel codice): il primo giro da guardare è un ordine `locked` con
 più di 5 giorni sulle spalle — al primo battito dell'orologio arriva UNO
 squillo al venditore e UNO al compratore.
+
+L'importo di ogni bolt11 in uscita si controlla contro il dovuto (ago
+2026, C-1 dell'audit di sicurezza — la prima voce chiusa, e l'unica
+critica). Nel LNURL-pay la fattura la scrive il wallet del
+beneficiario: il `ln_address` è auto-dichiarato, quindi un dominio
+proprio poteva rispondere con qualunque cifra e usciva quella scritta
+dentro la bolt11. Il controllo esisteva già sul ramo dell'invoice
+incollata a mano — mancava solo su quello automatico. Ora il giudice è
+uno (`importo_invoice`) e la cintura sta su `paga_venditore`, con
+`atteso_sats` obbligatorio senza default così ogni strada d'uscita
+futura la eredita. Vedi Architettura per il perché per esteso. Provato
+in due sensi: 212 prove verdi (erano 197), dove le sei della cintura
+asseriscono che la POST verso l'admin key **non è mai partita** — non
+che una funzione «torna False» — più cinque sentinelle anti-refactor;
+e un collaudo end-to-end su DB usa-e-getta sui tre chiamanti con
+eccesso/difetto/onesto, che tiene ferma anche la regressione (wallet
+onesto = tutto come prima). La falla è stata riprodotta sul codice di
+HEAD prima di toccarla: 1 sat dovuto, 100 milioni usciti. IN
+PRODUZIONE basta il deploy: nessuna colonna, nessuna leva, nessuna
+rotta, nessuna migrazione.
+DA RICORDARE QUANDO SI DECIDERÀ LA COMMISSIONE CON ALAN, ed è qui e
+non solo in Architettura perché è lì che ci si inciamperà: la cintura
+è RETROATTIVA sulle invoice già depositate. Oggi con
+COMMISSIONE_PERCENTO e PROTEZIONE_PERCENTO a 0 non cambia niente, ma
+il giorno che la percentuale si accende una invoice depositata col
+vecchio netto e pagata col nuovo non combacia più e viene rifiutata:
+il venditore riceve l'avviso e ne incolla una nuova, i sats restano in
+cassaforte, nessuno perde niente. È il comportamento corretto — non si
+paga la cifra sbagliata — ma va guardata la coda degli ordini
+`confirmed` con una invoice già depositata prima di girare la leva, o
+si scambieranno dei rifiuti giusti per un guasto.
+Restano aperte le altre voci dell'audit, da fare una alla volta e in
+quest'ordine: `MODALITA_COLLAUDO` che nasca `False` nel codice come
+IMPORT_NOSTR_APERTO; i due modi in cui i sats escono due volte o
+restano bloccati senza rimedio (timeout di `paga_venditore`, e il
+fallimento di uno sblocco che riscrive lo stato di una disputa
+chiudendo la strada al moderatore); la scadenza dell'initData in
+`verifica_utente`; l'IDOR su `verifica-pagamento`; lo scanner della CI
+cieco sulla cronologia.
 
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
