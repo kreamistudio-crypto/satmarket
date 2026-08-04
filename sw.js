@@ -8,7 +8,7 @@
    REGOLA OPERATIVA: se cambi un file dell'elenco PRECACHE (o il file
    stesso), alza VERSIONE — le dispense vecchie si svuotano da sole. */
 
-const VERSIONE = 'barattolo-v2';
+const VERSIONE = 'barattolo-v3';
 const CACHE_STATICA = `statica-${VERSIONE}`;
 const CACHE_FONT = `font-${VERSIONE}`;
 
@@ -27,6 +27,7 @@ const PRECACHE = [
   '/assets/icona-512-maskable.png',
   '/assets/apple-touch-icon.png',
   '/vendor/nostr.js',
+  '/vendor/qrcode.js',
 ];
 const IN_DISPENSA = new Set(PRECACHE);
 

@@ -1226,7 +1226,20 @@ def init_db():
                     # l'articolo unitario si deriva:
                     # (prezzo_sats - spedizione_sats - protezione_sats)
                     # / quantita, divisione esatta per costruzione.
-                    "quantita INTEGER DEFAULT 1"):
+                    "quantita INTEGER DEFAULT 1",
+                    # invoice (ago 2026, cantiere della ripresa): la
+                    # bolt11 dell'ordine, cosi' il compratore pentito
+                    # che ritenta si vede RIPRESENTARE la sua fattura
+                    # ancora viva invece di un «qualcun altro sta
+                    # pagando» che parla di lui. '' = ordini storici:
+                    # per loro la ripresa non scatta e si rinnova.
+                    "invoice TEXT DEFAULT ''",
+                    # il promemoria dei ritiri fermi (ago 2026):
+                    # colonne SUE e non quelle del sollecito incassi —
+                    # quelle vivono sullo stato 'confirmed', e un
+                    # contatore ereditato salterebbe dritto al tetto
+                    "sollecito_ritiro_il INTEGER DEFAULT 0",
+                    "solleciti_ritiro INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -6607,6 +6620,43 @@ async def fai_puntata(annuncio_id: int, req: Request,
             "scadenza_invoice": RILANCIO_EXPIRY}
 
 
+@app.post("/api/rilanci/{rilancio_id}/annulla")
+async def annulla_rilancio(rilancio_id: int,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Chi ha chiesto la fattura di puntata e ci ripensa (ago 2026):
+    la fattura 'creato' diventa la lapide 'annullato' — mai DELETE,
+    un saldo arrivato dopo deve avere una riga su cui atterrare, e
+    controlla_annullati lo manda nel binario del fuori-tempo («Da
+    riscuotere»). Libera subito la guardia «una fattura pendente alla
+    volta»: si puo' ripuntare senza aspettare il reaper. Il gemello di
+    annulla_ordine: pagamento controllato PRIMA, CAS sullo stato.
+    NON e' un ritiro: la puntata resta in gara col suo versato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    ril = con.execute("SELECT * FROM rilanci WHERE id=? AND tg_id=?",
+                      (rilancio_id, user["id"])).fetchone()
+    con.close()   # niente transazione aperta durante l'await
+    if not ril or ril["stato"] != "creato":
+        raise HTTPException(400, "Operazione non permessa")
+    if await invoice_pagata(ril["payment_hash"]):
+        raise HTTPException(409, "Questo pagamento risulta già arrivato: "
+                                 "niente da annullare — attendi un attimo "
+                                 "la verifica della puntata")
+    con = db()
+    cur = con.execute("UPDATE rilanci SET stato='annullato', aggiornato=? "
+                      "WHERE id=? AND stato='creato'",
+                      (int(time.time()), rilancio_id))
+    if cur.rowcount == 0:
+        con.commit()
+        con.close()
+        raise HTTPException(409, "Il pagamento è arrivato proprio adesso: "
+                                 "la puntata è andata avanti")
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
 @app.post("/api/rilanci/{rilancio_id}/verifica")
 async def verifica_rilancio(rilancio_id: int,
                             x_tg_init_data: str = Header(""),
@@ -8166,11 +8216,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
     adesso = int(time.time())
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
-        "prezzo_sats,stato,payment_hash,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,spedizione_sats,protezione_sats,quantita) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
+        "cambio_ordine,consegna_scelta,spedizione_sats,protezione_sats,"
+        "quantita) VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
-         adesso, adesso, cambio_ordine, scelta, sped, prot, pezzi))
+         inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
+         sped, prot, pezzi))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     for r in righe:
         con.execute(
@@ -8203,6 +8254,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
                       for r in righe]}
 
 
+# La soglia della ripresa (ago 2026): la invoice vive 900s, ma
+# ripresentarne una con pochi secondi di vita sarebbe una beffa —
+# sotto i ~3 minuti restanti si rinnova e basta.
+RIPRESA_INVOICE_S = 720
+
+
 @app.post("/api/orders")
 async def compra(req: Request, x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
@@ -8232,16 +8289,102 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                  "aggiudica puntando, non si compra a "
                                  "prezzo fisso")
 
-    # La prenotazione dello stock (lug 2026): i pezzi con una invoice
-    # viva in mano ad altri non si rivendono — prima di questa guardia
-    # due compratori potevano pagare ENTRAMBI lo stesso annuncio.
-    # Questo e' il fail-fast di cortesia (niente invoice inutile);
-    # quello che fa fede e' il ricontrollo dopo crea_invoice_escrow.
     # La quantita' richiesta: assente o storta = 1 (i client di ieri).
     try:
         richiesti = max(1, int(d.get("quantita") or 1))
     except (TypeError, ValueError):
         richiesti = 1
+
+    # La scelta della consegna, validata contro le STRADE che
+    # l'annuncio offre davvero (dal lug 2026 anche in combinazione:
+    # anche_digitale affianca il codice a una modalita' fisica). Il
+    # compratore non puo' chiedere cio' che il venditore non offre;
+    # le TUTELE dell'ordine seguono la scelta, non l'annuncio.
+    # Annuncio senza modalita' ('') = flusso storico, la scelta si
+    # ignora; scelta assente o sconosciuta (client vecchio in cache)
+    # = la strada FISICA — quella che quel client conosce, e nessuna
+    # sorpresa perche' mostra comunque i sats veri della risposta.
+    # (Il blocco sta PRIMA del fail-fast dello stock dal ago 2026:
+    # la ripresa qui sotto confronta la scelta con l'ordine pendente.)
+    disponibili = set()
+    if a["consegna"] in ("spedizione", "entrambe"):
+        disponibili.add("spedizione")
+    if a["consegna"] in ("ritiro", "entrambe"):
+        disponibili.add("ritiro")
+    if a["consegna"] == "digitale" or a["anche_digitale"]:
+        disponibili.add("digitale")
+    scelta = d.get("consegna", "")
+    if not disponibili:
+        scelta = ""
+    elif scelta not in disponibili:
+        if scelta:
+            con.close()
+            raise HTTPException(400, "Questo annuncio non prevede questa "
+                                     "modalità di consegna")
+        # default: prima la fisica ('spedizione' batte 'ritiro',
+        # com'era per 'entrambe'), il digitale solo se e' l'unica
+        scelta = ("spedizione" if "spedizione" in disponibili
+                  else "ritiro" if "ritiro" in disponibili
+                  else "digitale")
+
+    # LA RIPRESA (ago 2026): il compratore pentito che RITENTA non e'
+    # un rivale — il messaggio d'attesa resta SOLO per gli altri, che
+    # e' l'anti-doppio-acquisto e va bene cosi'. Se ha gia' un ordine
+    # 'creato' su questo annuncio: fattura ancora viva e richiesta
+    # identica = gli si RIPRESENTA la sua (mai ordini gemelli, mai due
+    # invoice vive dello stesso compratore sullo stesso oggetto — e la
+    # vita della fattura E' il lock del prezzo, la ripresa la rispetta);
+    # vecchia, o richiesta diversa = lapide sull'ordine di prima e
+    # flusso di sempre. La fattura gia' PAGATA non si annulla mai: si
+    # incassa qui, e il compratore scopre che l'oggetto e' gia' suo.
+    mio = con.execute(
+        "SELECT * FROM ordini WHERE annuncio_id=? AND compratore_id=? "
+        "AND stato='creato' ORDER BY id DESC LIMIT 1",
+        (a["id"], user["id"])).fetchone()
+    if mio:
+        legame = con.execute("SELECT id FROM offerte WHERE ordine_id=?",
+                             (mio["id"],)).fetchone()
+        stessa = (mio["quantita"] == richiesti
+                  and mio["consegna_scelta"] == scelta
+                  and (legame["id"] if legame else 0)
+                  == int(d.get("offerta_id") or 0))
+        viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
+        if stessa and viva and mio["invoice"]:
+            con.close()
+            art = (mio["prezzo_sats"] - mio["spedizione_sats"]
+                   - mio["protezione_sats"])
+            return {"ordine_id": mio["id"], "invoice": mio["invoice"],
+                    "payment_hash": mio["payment_hash"],
+                    "prezzo_sats": mio["prezzo_sats"],
+                    "articolo_sats": art,
+                    "spedizione_sats": mio["spedizione_sats"],
+                    "protezione_sats": mio["protezione_sats"],
+                    "consegna": mio["consegna_scelta"],
+                    "quantita": mio["quantita"],
+                    "articolo_unitario_sats": art // (mio["quantita"] or 1),
+                    "offerta_id": legame["id"] if legame else 0,
+                    "ripresa": True}
+        # Rinnovo: prima il controllo del pagamento — e l'await impone
+        # di chiudere la connessione (niente transazioni in attesa)
+        con.close()
+        if mio["payment_hash"] and await invoice_pagata(mio["payment_hash"]):
+            await _incassa_ordine(mio["id"])
+            raise HTTPException(409, "Il tuo pagamento precedente è appena "
+                                     "stato confermato: l'oggetto è già "
+                                     "tuo, lo trovi nei tuoi Ordini")
+        con = db()
+        con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                    "WHERE id=? AND stato='creato'",
+                    (int(time.time()), mio["id"]))
+        con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id=?",
+                    (mio["id"],))
+        con.commit()   # committa subito: il patto del ricontrollo tiene
+
+    # La prenotazione dello stock (lug 2026): i pezzi con una invoice
+    # viva in mano ad altri non si rivendono — prima di questa guardia
+    # due compratori potevano pagare ENTRAMBI lo stesso annuncio.
+    # Questo e' il fail-fast di cortesia (niente invoice inutile);
+    # quello che fa fede e' il ricontrollo dopo crea_invoice_escrow.
     disponibile = a["quantita"] - _riservati(con, a["id"])
     if richiesti > disponibile:
         con.close()
@@ -8276,7 +8419,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         if off["ordine_id"]:
             # Una invoice viva c'e' gia'? Pagare quella VECCHIA
             # bloccherebbe un ordine che nessun gancio riconduce piu'
-            # all'offerta: meglio un no adesso.
+            # all'offerta: meglio un no adesso. (Se l'ordine pendente
+            # era MIO su questo annuncio, la ripresa qui sopra l'ha
+            # gia' ripresentato o rinnovato: qui non ci si arriva.)
             viva = con.execute(
                 "SELECT id FROM ordini WHERE id=? AND stato='creato'",
                 (off["ordine_id"],)).fetchone()
@@ -8286,36 +8431,6 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                          "per questa offerta: pagala, "
                                          "oppure annulla quell'ordine e "
                                          "riprova")
-
-    # La scelta della consegna, validata contro le STRADE che
-    # l'annuncio offre davvero (dal lug 2026 anche in combinazione:
-    # anche_digitale affianca il codice a una modalita' fisica). Il
-    # compratore non puo' chiedere cio' che il venditore non offre;
-    # le TUTELE dell'ordine seguono la scelta, non l'annuncio.
-    # Annuncio senza modalita' ('') = flusso storico, la scelta si
-    # ignora; scelta assente o sconosciuta (client vecchio in cache)
-    # = la strada FISICA — quella che quel client conosce, e nessuna
-    # sorpresa perche' mostra comunque i sats veri della risposta.
-    disponibili = set()
-    if a["consegna"] in ("spedizione", "entrambe"):
-        disponibili.add("spedizione")
-    if a["consegna"] in ("ritiro", "entrambe"):
-        disponibili.add("ritiro")
-    if a["consegna"] == "digitale" or a["anche_digitale"]:
-        disponibili.add("digitale")
-    scelta = d.get("consegna", "")
-    if not disponibili:
-        scelta = ""
-    elif scelta not in disponibili:
-        if scelta:
-            con.close()
-            raise HTTPException(400, "Questo annuncio non prevede questa "
-                                     "modalità di consegna")
-        # default: prima la fisica ('spedizione' batte 'ritiro',
-        # com'era per 'entrambe'), il digitale solo se e' l'unica
-        scelta = ("spedizione" if "spedizione" in disponibili
-                  else "ritiro" if "ritiro" in disponibili
-                  else "digitale")
 
     # Per gli annunci in EUR i sats si decidono ADESSO, al cambio
     # corrente: la invoice vive 15 minuti, e quella e' la durata del
@@ -8433,11 +8548,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                  "annuncio: riprova tra qualche minuto")
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
-        "stato,payment_hash,creato,aggiornato,cambio_ordine,"
+        "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,spedizione_sats,protezione_sats,quantita) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
-         "creato", inv["payment_hash"], int(time.time()), int(time.time()),
+         "creato", inv["payment_hash"], inv["payment_request"],
+         int(time.time()), int(time.time()),
          cambio_ordine, scelta, sped, prot, richiesti))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     if off:
@@ -8486,143 +8602,163 @@ def crea_ordine_pagato(con, a, compratore_id: int, totale_sats: int,
 async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
                                              barattolo_sessione: str = Cookie("")):
     """La Mini App chiama questo endpoint dopo il pagamento:
-    se la invoice risulta pagata, i sats sono in cassaforte -> LOCKED."""
+    se la invoice risulta pagata, i sats sono in cassaforte -> LOCKED.
+    Il lavoro vero sta in _incassa_ordine (estratto ago 2026): da qui
+    ci passa il poll della Mini App, da controlla_annullati il saldo
+    arrivato su un ordine annullato nella corsa."""
     verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+    o = con.execute("SELECT stato, payment_hash FROM ordini WHERE id=?",
+                    (ordine_id,)).fetchone()
+    con.close()
     if not o:
         raise HTTPException(404, "Ordine non trovato")
     if o["stato"] != "creato":
         return {"stato": o["stato"]}
-    if await invoice_pagata(o["payment_hash"]):
-        # Passaggio ATOMICO: la Mini App chiama in polling e coi bottoni
-        # "ho pagato", quindi qui possono arrivare piu' chiamate insieme
-        # (la richiesta a LNbits qui sopra e' lenta). Vince solo chi
-        # flippa DAVVERO la riga da 'creato' a 'locked': gli altri escono
-        # senza rinotificare il venditore.
-        cur = con.execute(
-            "UPDATE ordini SET stato='locked', aggiornato=? "
-            "WHERE id=? AND stato='creato'",
-            (int(time.time()), ordine_id))
-        if cur.rowcount == 0:
-            con.commit()
-            con.close()
-            return {"stato": "locked"}
-        # Lo stock scala dei pezzi dell'ordine, RIGA per riga: il set
-        # ha piu' annunci, il mono e' una riga sintetizzata — stessa
-        # strada per entrambi. MAX para il corner raro dell'ordine
-        # pagato ma verificato dopo i 30 minuti della prenotazione:
-        # mai un numero negativo in vetrina.
-        pezzi = o["quantita"] or 1
-        righe = _righe_ordine(con, o)
-        e_set = not o["annuncio_id"]
-        a = None
-        esauriti, taglie = [], []
-        for r in righe:
-            con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
-                        "WHERE id=?", (r["quantita"], r["annuncio_id"]))
-            a = con.execute("SELECT contatto_nostr, titolo, quantita, "
-                            "taglia_pacco FROM annunci WHERE id=?",
-                            (r["annuncio_id"],)).fetchone()
-            taglie.append((a["taglia_pacco"] if a else "", r["quantita"]))
-            # L'esaurimento: solo quando l'ULTIMO pezzo se ne va
-            # l'annuncio diventa 'venduto' (l'invariante venduto <=>
-            # quantita=0). Con pezzi ancora in vetrina niente sold,
-            # niente ✅ sul canale e le trattative altrui restano VIVE:
-            # c'e' ancora da comprare. Nel set si giudica riga per
-            # riga: la vendita di un pezzo non spegne gli altri.
-            if not a or a["quantita"] <= 0:
-                con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
-                            (r["annuncio_id"],))
-                esauriti.append({"annuncio_id": r["annuncio_id"],
-                                 "titolo": a["titolo"] if a else r["titolo"],
-                                 "nostr": bool(a and a["contatto_nostr"])})
-        # L'offerta che ha generato l'ordine si conclude col pagamento;
-        # le ALTRE ancora vive decadono solo all'esaurimento del LORO
-        # annuncio — l'annuncio non si e' mai bloccato, e ha vinto chi
-        # ha pagato. (La UPDATE su ordine_id copre in un colpo anche
-        # le offerte per-riga di un set.)
-        adesso = int(time.time())
-        con.execute("UPDATE offerte SET stato='conclusa', aggiornato=? "
-                    "WHERE ordine_id=? AND stato='accettata'",
-                    (adesso, ordine_id))
-        decadute = []
-        for e in esauriti:
-            vive = con.execute(
-                "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
-                "AND stato IN ('proposta','controproposta','accettata')",
-                (e["annuncio_id"],)).fetchall()
-            if vive:
-                con.execute(
-                    "UPDATE offerte SET stato='decaduta', aggiornato=? "
-                    "WHERE annuncio_id=? AND stato IN "
-                    "('proposta','controproposta','accettata')",
-                    (adesso, e["annuncio_id"]))
-                decadute += [{"compratore_id": v["compratore_id"],
-                              "titolo": e["titolo"]} for v in vive]
+    if not await invoice_pagata(o["payment_hash"]):
+        return {"stato": "in_attesa"}
+    return await _incassa_ordine(ordine_id)
+
+
+async def _incassa_ordine(ordine_id: int) -> dict:
+    """I sats sono in cassaforte: l'ordine passa a LOCKED, lo stock
+    scala, le offerte si chiudono, le notifiche partono. Estratto da
+    verifica_pagamento (ago 2026) perche' ora ci passa anche il
+    riacciuffo dei pagamenti arrivati su un ordine annullato
+    (controlla_annullati). NON ricontrolla la invoice: il chiamante
+    l'ha appena fatto — e tra il CAS e il commit niente await.
+
+    Passaggio ATOMICO: la Mini App chiama in polling e coi bottoni
+    "ho pagato", quindi qui possono arrivare piu' chiamate insieme.
+    Vince solo chi flippa DAVVERO la riga da 'creato' a 'locked':
+    gli altri escono senza rinotificare il venditore."""
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+    if not o or o["stato"] != "creato":
+        stato = o["stato"] if o else "annullato"
+        con.close()
+        return {"stato": stato}
+    cur = con.execute(
+        "UPDATE ordini SET stato='locked', aggiornato=? "
+        "WHERE id=? AND stato='creato'",
+        (int(time.time()), ordine_id))
+    if cur.rowcount == 0:
         con.commit()
-        for e in esauriti:
-            # Anche la piazza Nostr deve sapere che l'oggetto e' andato
-            asyncio.create_task(annuncio_su_nostr(e["annuncio_id"], "sold",
-                                                  solo_aggiornamento=True))
-            # ...e il post nel canale si aggiorna col ✅ Venduto
-            asyncio.create_task(promo_venduto(e["annuncio_id"]))
-        if e_set:
-            msg = (f"🔒 <b>Hai venduto un set di {len(righe)} oggetti"
-                   + (f" ({pezzi} pezzi)" if pezzi > len(righe) else "")
-                   + "!</b> I sats dell'acquirente sono bloccati nel "
-                   "deposito di garanzia. Prepara un pacco solo e segna "
-                   "l'ordine come spedito nella Mini App. 📦\n")
-            for r in righe:
-                msg += (f"\n• {r['titolo'][:40]}"
-                        + (f" × {r['quantita']}" if r["quantita"] > 1
-                           else ""))
-            # La taglia stimata del pacco unico: un aiuto, non una
-            # promessa — e' il venditore che prepara il pacco vero
-            stima = (stima_taglia_set(taglie)
-                     if o["consegna_scelta"] == "spedizione" else "")
-            if stima:
-                msg += (f"\n\n📦 Pacco stimato: <b>{stima}</b> — "
-                        f"verifica tu prima di spedire.")
-            promemoria = [e["titolo"][:40] for e in esauriti if e["nostr"]]
-            if promemoria:
-                msg += ("\n\n🟣 Su <b>Nostr</b> ricordati di segnare come "
-                        "<b>venduto (sold)</b> dal tuo client: "
-                        + ", ".join(f"«{t}»" for t in promemoria))
-        else:
-            esaurito = bool(esauriti)
-            msg = ("🔒 <b>Hai venduto!</b> " if pezzi == 1 else
-                   f"🔒 <b>Hai venduto {pezzi} pezzi!</b> ")
-            msg += ("I sats dell'acquirente sono bloccati nel deposito di "
-                    "garanzia. "
-                    "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
-            if not esaurito:
-                msg += (f"\n\n🏷 L'annuncio resta in vetrina: "
-                        f"{a['quantita']} ancora {'disponibile' if a['quantita'] == 1 else 'disponibili'}.")
-            if esaurito and a and a["contatto_nostr"]:
-                msg += ("\n\n🟣 Questo annuncio è pubblicato anche su <b>Nostr</b>: "
-                        "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
-                        "client, così nessun altro proverà a comprarlo lì.")
-        await notifica(o["venditore_id"], msg)
-        # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
-        await polso_ordini_admin(
-            f"🛒 <b>Nuovo ordine:</b> «{_titolo_ordine(righe)[:60]}» — "
-            f"{o['prezzo_sats']} sats. Ordini aperti: {{aperti}}")
-        # Il garbo verso chi restava in trattativa: l'oggetto e' andato.
-        # MAI al compratore che ha appena pagato: se aveva un'altra
-        # offerta sua, decade in silenzio (dirgli «venduto a qualcun
-        # altro» sarebbe falso).
-        for riga in decadute:
-            if riga["compratore_id"] == o["compratore_id"]:
-                continue
-            await notifica(riga["compratore_id"],
-                f"🕊 «{riga['titolo'][:60]}» è appena stato venduto a "
-                f"qualcun altro: la tua offerta decade. In vetrina ci "
-                f"sono altre occasioni che aspettano!")
         con.close()
         return {"stato": "locked"}
+    # Lo stock scala dei pezzi dell'ordine, RIGA per riga: il set
+    # ha piu' annunci, il mono e' una riga sintetizzata — stessa
+    # strada per entrambi. MAX para il corner raro dell'ordine
+    # pagato ma verificato dopo i 30 minuti della prenotazione:
+    # mai un numero negativo in vetrina.
+    pezzi = o["quantita"] or 1
+    righe = _righe_ordine(con, o)
+    e_set = not o["annuncio_id"]
+    a = None
+    esauriti, taglie = [], []
+    for r in righe:
+        con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
+                    "WHERE id=?", (r["quantita"], r["annuncio_id"]))
+        a = con.execute("SELECT contatto_nostr, titolo, quantita, "
+                        "taglia_pacco FROM annunci WHERE id=?",
+                        (r["annuncio_id"],)).fetchone()
+        taglie.append((a["taglia_pacco"] if a else "", r["quantita"]))
+        # L'esaurimento: solo quando l'ULTIMO pezzo se ne va
+        # l'annuncio diventa 'venduto' (l'invariante venduto <=>
+        # quantita=0). Con pezzi ancora in vetrina niente sold,
+        # niente ✅ sul canale e le trattative altrui restano VIVE:
+        # c'e' ancora da comprare. Nel set si giudica riga per
+        # riga: la vendita di un pezzo non spegne gli altri.
+        if not a or a["quantita"] <= 0:
+            con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
+                        (r["annuncio_id"],))
+            esauriti.append({"annuncio_id": r["annuncio_id"],
+                             "titolo": a["titolo"] if a else r["titolo"],
+                             "nostr": bool(a and a["contatto_nostr"])})
+    # L'offerta che ha generato l'ordine si conclude col pagamento;
+    # le ALTRE ancora vive decadono solo all'esaurimento del LORO
+    # annuncio — l'annuncio non si e' mai bloccato, e ha vinto chi
+    # ha pagato. (La UPDATE su ordine_id copre in un colpo anche
+    # le offerte per-riga di un set.)
+    adesso = int(time.time())
+    con.execute("UPDATE offerte SET stato='conclusa', aggiornato=? "
+                "WHERE ordine_id=? AND stato='accettata'",
+                (adesso, ordine_id))
+    decadute = []
+    for e in esauriti:
+        vive = con.execute(
+            "SELECT id, compratore_id FROM offerte WHERE annuncio_id=? "
+            "AND stato IN ('proposta','controproposta','accettata')",
+            (e["annuncio_id"],)).fetchall()
+        if vive:
+            con.execute(
+                "UPDATE offerte SET stato='decaduta', aggiornato=? "
+                "WHERE annuncio_id=? AND stato IN "
+                "('proposta','controproposta','accettata')",
+                (adesso, e["annuncio_id"]))
+            decadute += [{"compratore_id": v["compratore_id"],
+                          "titolo": e["titolo"]} for v in vive]
+    con.commit()
+    for e in esauriti:
+        # Anche la piazza Nostr deve sapere che l'oggetto e' andato
+        asyncio.create_task(annuncio_su_nostr(e["annuncio_id"], "sold",
+                                              solo_aggiornamento=True))
+        # ...e il post nel canale si aggiorna col ✅ Venduto
+        asyncio.create_task(promo_venduto(e["annuncio_id"]))
+    if e_set:
+        msg = (f"🔒 <b>Hai venduto un set di {len(righe)} oggetti"
+               + (f" ({pezzi} pezzi)" if pezzi > len(righe) else "")
+               + "!</b> I sats dell'acquirente sono bloccati nel "
+               "deposito di garanzia. Prepara un pacco solo e segna "
+               "l'ordine come spedito nella Mini App. 📦\n")
+        for r in righe:
+            msg += (f"\n• {r['titolo'][:40]}"
+                    + (f" × {r['quantita']}" if r["quantita"] > 1
+                       else ""))
+        # La taglia stimata del pacco unico: un aiuto, non una
+        # promessa — e' il venditore che prepara il pacco vero
+        stima = (stima_taglia_set(taglie)
+                 if o["consegna_scelta"] == "spedizione" else "")
+        if stima:
+            msg += (f"\n\n📦 Pacco stimato: <b>{stima}</b> — "
+                    f"verifica tu prima di spedire.")
+        promemoria = [e["titolo"][:40] for e in esauriti if e["nostr"]]
+        if promemoria:
+            msg += ("\n\n🟣 Su <b>Nostr</b> ricordati di segnare come "
+                    "<b>venduto (sold)</b> dal tuo client: "
+                    + ", ".join(f"«{t}»" for t in promemoria))
+    else:
+        esaurito = bool(esauriti)
+        msg = ("🔒 <b>Hai venduto!</b> " if pezzi == 1 else
+               f"🔒 <b>Hai venduto {pezzi} pezzi!</b> ")
+        msg += ("I sats dell'acquirente sono bloccati nel deposito di "
+                "garanzia. "
+                "Spedisci l'oggetto e segna l'ordine come spedito nella Mini App. 📦")
+        if not esaurito:
+            msg += (f"\n\n🏷 L'annuncio resta in vetrina: "
+                    f"{a['quantita']} ancora {'disponibile' if a['quantita'] == 1 else 'disponibili'}.")
+        if esaurito and a and a["contatto_nostr"]:
+            msg += ("\n\n🟣 Questo annuncio è pubblicato anche su <b>Nostr</b>: "
+                    "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
+                    "client, così nessun altro proverà a comprarlo lì.")
+    await notifica(o["venditore_id"], msg)
+    # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
+    await polso_ordini_admin(
+        f"🛒 <b>Nuovo ordine:</b> «{_titolo_ordine(righe)[:60]}» — "
+        f"{o['prezzo_sats']} sats. Ordini aperti: {{aperti}}")
+    # Il garbo verso chi restava in trattativa: l'oggetto e' andato.
+    # MAI al compratore che ha appena pagato: se aveva un'altra
+    # offerta sua, decade in silenzio (dirgli «venduto a qualcun
+    # altro» sarebbe falso).
+    for riga in decadute:
+        if riga["compratore_id"] == o["compratore_id"]:
+            continue
+        await notifica(riga["compratore_id"],
+            f"🕊 «{riga['titolo'][:60]}» è appena stato venduto a "
+            f"qualcun altro: la tua offerta decade. In vetrina ci "
+            f"sono altre occasioni che aspettano!")
     con.close()
-    return {"stato": "in_attesa"}
+    return {"stato": "locked"}
 
 
 @app.post("/api/orders/{ordine_id}/spedito")
@@ -11552,36 +11688,162 @@ def pulisci_ordini_fantasma(con):
                 (soglia,))
     con.execute("DELETE FROM ordini WHERE stato='creato' AND creato < ?",
                 (soglia,))
+    # Le LAPIDI degli annulli espliciti (ago 2026): restano finche' un
+    # pagamento potrebbe ancora atterrarci sopra (la invoice vive 15
+    # minuti dalla NASCITA dell'ordine, quindi a un'ora dall'annullo il
+    # rischio e' zero da un pezzo — margine largo perche' a spazzarle
+    # prima del giro di controlla_annullati non si deve arrivare mai).
+    # Copre anche gli 'annullato' storici di aste e rimozioni: mai
+    # pagati per costruzione, stessa pulizia del reaper.
+    soglia_lapidi = int(time.time()) - 3600
+    con.execute("DELETE FROM ordine_righe WHERE ordine_id IN "
+                "(SELECT id FROM ordini WHERE stato='annullato' "
+                "AND aggiornato < ?)", (soglia_lapidi,))
+    con.execute("DELETE FROM ordini WHERE stato='annullato' "
+                "AND aggiornato < ?", (soglia_lapidi,))
     # E le fatture di puntata mai saldate (vita 10 min, soglia 2x come
     # per gli ordini): via la riga stantia, e via anche la puntata mai
     # partita (versato 0, nessun rilancio rimasto) — cosi' la riga
     # UNIQUE si libera e si puo' ripartire da capo. NON e' un ritiro:
     # nessun sat e' mai entrato.
-    con.execute("DELETE FROM rilanci WHERE stato='creato' AND creato < ?",
+    # ('annullato' spazzato con la stessa soglia: e' la lapide
+    # dell'annullo esplicito, utile solo finche' la fattura da 10
+    # minuti puo' ancora essere pagata — vedi controlla_annullati)
+    con.execute("DELETE FROM rilanci WHERE stato IN ('creato','annullato') "
+                "AND creato < ?",
                 (int(time.time()) - RILANCIO_STANTIO,))
     con.execute("DELETE FROM puntate WHERE stato='attiva' AND "
                 "versato_sats=0 AND NOT EXISTS "
                 "(SELECT 1 FROM rilanci r WHERE r.puntata_id=puntate.id)")
 
 
+async def controlla_annullati():
+    """Il riacciuffo (ago 2026): un pagamento arrivato su una fattura
+    ANNULLATA. Succede nella corsa annulla-vs-saldo (finestra di
+    secondi tra il controllo e il CAS) o quando la invoice era gia'
+    aperta nel wallet e l'utente la paga dopo l'annullo — l'annullo
+    esplicito, a differenza del reaper che aspetta la morte della
+    invoice, non puo' escluderlo. Per questo le lapidi esistono: un
+    saldo deve sempre avere una riga su cui atterrare.
+    ORDINI: la lapide torna 'creato' (timbro fresco, che il reaper
+    non se la mangi a meta' strada) e _incassa_ordine fa il flusso di
+    sempre — chi paga ha comprato, la regola di verifica_pagamento.
+    RILANCI: binario del fuori-tempo, i sats in «Da riscuotere» come
+    ogni saldo su puntata fuori gara. Gira nell'orologio, fail-open:
+    un errore = si riprova al giro dopo, la lapide aspetta."""
+    adesso = int(time.time())
+    con = db()
+    ordini = [dict(r) for r in con.execute(
+        "SELECT id, payment_hash FROM ordini WHERE stato='annullato' "
+        "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
+    rilanci = [dict(r) for r in con.execute(
+        "SELECT * FROM rilanci WHERE stato='annullato' AND creato >= ?",
+        (adesso - RILANCIO_STANTIO,))]
+    con.close()
+    for o in ordini:
+        try:
+            if not await invoice_pagata(o["payment_hash"]):
+                continue
+            con = db()
+            cur = con.execute(
+                "UPDATE ordini SET stato='creato', creato=?, aggiornato=? "
+                "WHERE id=? AND stato='annullato'",
+                (int(time.time()), int(time.time()), o["id"]))
+            con.commit()
+            con.close()
+            if cur.rowcount == 0:
+                continue
+            print(f"⚠️ Pagamento su ordine annullato #{o['id']}: riacciuffato")
+            await _incassa_ordine(o["id"])
+            await notifica_admin(
+                f"⚠️ Un pagamento è atterrato su un <b>ordine annullato</b> "
+                f"(#{o['id']}): riacciuffato e portato avanti come un "
+                f"ordine normale. Se l'annuncio nel frattempo era stato "
+                f"rimosso, serve un occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Riacciuffo ordine #{o['id']} saltato: {e}")
+    for ril in rilanci:
+        try:
+            if not await invoice_pagata(ril["payment_hash"]):
+                continue
+            con = db()
+            ora = int(time.time())
+            cur = con.execute(
+                "UPDATE rilanci SET stato='tardivo', aggiornato=? "
+                "WHERE id=? AND stato='annullato'", (ora, ril["id"]))
+            if cur.rowcount == 0:
+                con.commit()
+                con.close()
+                continue
+            # il gemello del ramo fuori-tempo di verifica_rilancio:
+            # cintura d'idempotenza sul rilancio_id, mai versato su
+            # una puntata fuori gara
+            con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,"
+                        "tg_id,puntata_id,rilancio_id,importo_sats,motivo,"
+                        "stato,creato,aggiornato) "
+                        "VALUES(?,?,?,?,?,'tardivo','da_riscuotere',?,?)",
+                        (ril["annuncio_id"], ril["tg_id"], ril["puntata_id"],
+                         ril["id"], ril["delta_sats"], ora, ora))
+            rid = con.execute("SELECT id FROM rimborsi_asta WHERE "
+                              "rilancio_id=?", (ril["id"],)).fetchone()["id"]
+            con.commit()
+            con.close()
+            await notifica(ril["tg_id"],
+                           "⌛ <b>Avevi annullato questa fattura di puntata, "
+                           "ma il pagamento è arrivato lo stesso</b>: i sats "
+                           "sono al sicuro nel tuo «Da riscuotere», nel "
+                           "Profilo.")
+            await _paga_rimborso(rid)
+        except Exception as e:
+            print(f"⚠️ Riacciuffo rilancio #{ril['id']} saltato: {e}")
+
+
 @app.post("/api/orders/{ordine_id}/annulla")
 async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
                                          barattolo_sessione: str = Cookie("")):
     """L'acquirente annulla un ordine non ancora pagato (nessun sat
-    e' stato mosso: l'ordine sparisce e basta)."""
+    e' stato mosso). Riscritto ago 2026, ed e' il punto delicato del
+    cantiere: a differenza del reaper — che agisce a invoice GIA'
+    morta — qui la invoice puo' essere ancora viva nel wallet, quindi
+    1) il PAGAMENTO si controlla PRIMA (se e' arrivato, niente
+       annullo: 409 onesto e il poll fara' il suo mestiere);
+    2) la riga NON si cancella: diventa la lapide 'annullato' —
+       cosi' un saldo atterrato nella finestra della corsa ha ancora
+       un ordine su cui posarsi, e controlla_annullati lo riacciuffa;
+    3. il passaggio e' un CAS sullo stato: se verifica_pagamento ha
+       flippato a 'locked' durante il nostro await, qui rowcount 0.
+    La prenotazione dello stock si libera da sola per costruzione
+    (_riservati conta solo i 'creato'); la lapide sparisce con la
+    purga del reaper quando la invoice non puo' piu' essere pagata."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
-                    "AND stato='creato'", (ordine_id, user["id"])).fetchone()
-    if not o:
-        con.close()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=?",
+                    (ordine_id, user["id"])).fetchone()
+    con.close()   # niente transazione aperta durante l'await qui sotto
+    if not o or o["stato"] != "creato":
         raise HTTPException(400, "Operazione non permessa")
+    if o["payment_hash"] and await invoice_pagata(o["payment_hash"]):
+        raise HTTPException(409, "Questo pagamento risulta già arrivato: "
+                                 "niente da annullare — attendi un attimo "
+                                 "la verifica, l'oggetto è tuo")
+    con = db()
+    cur = con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                      "WHERE id=? AND stato='creato'",
+                      (int(time.time()), ordine_id))
+    if cur.rowcount == 0:
+        # la corsa l'ha vinta il saldo: durante il controllo qui sopra
+        # verifica_pagamento ha portato l'ordine a 'locked'
+        con.commit()
+        con.close()
+        raise HTTPException(409, "Il pagamento è arrivato proprio adesso: "
+                                 "l'ordine è andato avanti, lo trovi nei "
+                                 "tuoi Ordini")
     # Se l'ordine veniva da un'offerta, l'offerta torna libera (resta
-    # 'accettata' fino alla sua scadenza: si puo' ripagare)
+    # 'accettata' fino alla sua scadenza: si puo' ripagare). Le righe
+    # dei set invece RESTANO: servono intatte se un saldo tardivo
+    # riacciuffa la lapide (le spazza la purga, insieme a lei).
     con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id=?",
                 (ordine_id,))
-    con.execute("DELETE FROM ordine_righe WHERE ordine_id=?", (ordine_id,))
-    con.execute("DELETE FROM ordini WHERE id=?", (ordine_id,))
     con.commit()
     con.close()
     return {"ok": True}
@@ -12620,6 +12882,67 @@ async def controlla_scadenze():
     for oid in scaduti_consegna + scaduti_silenzio + scaduti_digitale:
         print(f"⏰ Sblocco automatico dell'ordine #{oid}")
         await _sblocca_sats(oid, automatico=True)
+
+
+async def sollecita_ritiri_fermi():
+    """Il ritiro in zona mai concluso (ago 2026, riprodotto dal campo):
+    un ordine 'locked' col ritiro scelto NON ha nessun timer che corre
+    — l'auto-sblocco parte da una DICHIARAZIONE (spedito_il o la
+    conferma del compratore), e qui nessuno ha dichiarato niente. La
+    cura non e' un auto-sblocco (verso chi? senza dichiarazioni i sats
+    non si muovono MAI da soli): e' il promemoria alle due parti, che
+    ora hanno entrambe una leva — il compratore conferma da 'locked'
+    senza aspettare nessuno, il venditore segna la consegna a mano e
+    da li' parte la sua protezione (sblocco d'ufficio a
+    GIORNI_AUTO_SBLOCCO giorni). Stesse leve del sollecito incassi
+    (stesso binario); al tetto UNA segnalazione ai moderatori, poi
+    silenzio: il caso e' in mani umane."""
+    if SOLLECITO_INCASSO_GIORNI <= 0:
+        return                       # leva a zero = funzione spenta
+    adesso = int(time.time())
+    passo = SOLLECITO_INCASSO_GIORNI * 86400
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT o.id, o.compratore_id, o.venditore_id, o.prezzo_sats, "
+        "o.solleciti_ritiro, a.titolo FROM ordini o "
+        "LEFT JOIN annunci a ON a.id=o.annuncio_id "
+        "WHERE o.stato='locked' AND o.consegna_scelta='ritiro' "
+        "AND o.solleciti_ritiro <= ? "
+        "AND MAX(o.aggiornato, o.sollecito_ritiro_il) < ?",
+        (SOLLECITO_INCASSO_MAX, adesso - passo))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        con.execute("UPDATE ordini SET sollecito_ritiro_il=?, "
+                    "solleciti_ritiro=solleciti_ritiro+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        titolo = (r["titolo"] or "il vostro scambio")[:60]
+        try:
+            if r["solleciti_ritiro"] < SOLLECITO_INCASSO_MAX:
+                await notifica(r["compratore_id"],
+                    f"🤝 <b>Il ritiro di «{titolo}» risulta ancora da "
+                    f"concludere.</b> Se hai già l'oggetto in mano, apri "
+                    f"l'ordine e conferma la ricezione: i sats si "
+                    f"sbloccano al venditore. Se qualcosa è andato "
+                    f"storto, dall'ordine puoi aprire una disputa.")
+                await notifica(r["venditore_id"],
+                    f"🤝 <b>Il ritiro di «{titolo}» risulta ancora da "
+                    f"concludere.</b> Se hai già consegnato l'oggetto a "
+                    f"mano, segnalo nell'ordine: da lì parte la tua "
+                    f"protezione (sblocco automatico se l'acquirente "
+                    f"non risponde).")
+            else:
+                await notifica_admin(
+                    f"🧊 <b>Ritiro in zona fermo:</b> ordine #{r['id']} "
+                    f"(«{titolo}»), <b>{r['prezzo_sats']} sats</b> in "
+                    f"cassaforte da settimane e nessuna delle due parti "
+                    f"si muove. Serve un occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Sollecito ritiro saltato (#{r['id']}): {e}")
 
 
 async def sollecita_rimborsi_puntate():
@@ -13749,9 +14072,20 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Solleciti incasso saltati: {e}")
         try:
+            # il riacciuffo dei pagamenti su fatture annullate: DEVE
+            # girare prima che la purga del reaper spazzi le lapidi
+            # (finestre 1h/20min contro il battito da 10)
+            await controlla_annullati()
+        except Exception as e:
+            print(f"⚠️ Riacciuffo annullati saltato: {e}")
+        try:
             await sollecita_rimborsi_puntate()
         except Exception as e:
             print(f"⚠️ Solleciti rimborsi d'asta saltati: {e}")
+        try:
+            await sollecita_ritiri_fermi()
+        except Exception as e:
+            print(f"⚠️ Solleciti ritiri fermi saltati: {e}")
         try:
             await scadenze_offerte()
         except Exception as e:
@@ -13945,6 +14279,18 @@ def vendor_nostr():
     directory (regola ferrea 3). Si puo' tenere in cache: cambia solo
     quando aggiorniamo il file apposta (e col ?v= nel src si sveglia)."""
     return FileResponse("vendor/nostr.bundle.js",
+                        media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/vendor/qrcode.js")
+def vendor_qrcode():
+    """Il generatore di QR (qrcode-generator 1.5.2 di Kazuhiko Arase,
+    MIT), stesso patto di /vendor/nostr.js: file singolo committato a
+    versione bloccata, servito da casa nostra e mai da una CDN — il QR
+    del paySheet dice al wallet DOVE mandare i sats, e nessun terzo
+    deve poter cambiare quel codice. Cache lunga col ?v= nel src."""
+    return FileResponse("vendor/qrcode.js",
                         media_type="application/javascript",
                         headers={"Cache-Control": "public, max-age=86400"})
 

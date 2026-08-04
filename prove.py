@@ -722,6 +722,137 @@ def prove_asta():
           and "'tardivo'" in corpo_verifica)
 
 
+def prove_annullo():
+    """L'annullo vero e il QR vero (ago 2026). Quasi tutte sentinelle
+    testuali: sono le righe che un refactor perde in silenzio — il
+    controllo del pagamento PRIMA dell'annullo, il CAS sullo stato,
+    la lapide al posto del DELETE, il riacciuffo nell'orologio."""
+    print("\n[annullo e QR]")
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    # --- annulla_ordine: pagamento prima, CAS, lapide (mai DELETE)
+    ann = corpo("annulla_ordine")
+    prova("annullo ordine: il pagamento si controlla PRIMA", True,
+          "invoice_pagata" in ann
+          and ann.index("invoice_pagata") < ann.index("stato='annullato'"))
+    prova("annullo ordine: CAS sullo stato 'creato'", True,
+          "WHERE id=? AND stato='creato'" in ann
+          and "rowcount == 0" in ann)
+    prova("annullo ordine: lapide, mai DELETE", True,
+          "stato='annullato'" in ann and "DELETE FROM ordini" not in ann)
+    prova("annullo ordine: le righe dei set restano con la lapide",
+          True, "DELETE FROM ordine_righe" not in ann)
+
+    # --- il gemello dei rilanci
+    anr = corpo("annulla_rilancio")
+    prova("annullo rilancio: pagamento prima + CAS + lapide", True,
+          "invoice_pagata" in anr
+          and "WHERE id=? AND stato='creato'" in anr
+          and "stato='annullato'" in anr
+          and "DELETE FROM rilanci" not in anr)
+
+    # --- la corsa: il saldo su una lapide viene riacciuffato
+    sw = corpo("controlla_annullati")
+    prova("riacciuffo: l'ordine annullato-ma-pagato torna 'creato' e "
+          "passa da _incassa_ordine", True,
+          "stato='creato'" in sw and "_incassa_ordine" in sw
+          and "WHERE id=? AND stato='annullato'" in sw)
+    prova("riacciuffo: il rilancio annullato-ma-pagato va nel binario "
+          "del fuori-tempo", True,
+          "'tardivo'" in sw and "rimborsi_asta" in sw
+          and "_paga_rimborso" in sw)
+    orologio_corpo = corpo("orologio")
+    prova("riacciuffo: agganciato all'orologio", True,
+          "controlla_annullati()" in orologio_corpo)
+
+    # --- verifica_pagamento passa dal cuore estratto
+    ver = corpo("verifica_pagamento")
+    inc = corpo("_incassa_ordine")
+    prova("verifica: il cuore e' _incassa_ordine", True,
+          "_incassa_ordine" in ver)
+    prova("incasso: CAS 'creato' -> 'locked'", True,
+          "SET stato='locked'" in inc
+          and "WHERE id=? AND stato='creato'" in inc)
+
+    # --- la ripresa del pentito in compra()
+    cmp_ = corpo("compra")
+    prova("ripresa: l'ordine proprio pendente si ripresenta", True,
+          '"ripresa": True' in cmp_ and "RIPRESA_INVOICE_S" in cmp_)
+    prova("ripresa: la fattura gia' pagata si incassa, mai annullata",
+          True, "_incassa_ordine" in cmp_
+          and cmp_.index("invoice_pagata") < cmp_.index("stato='annullato'"))
+
+    # --- il reaper spazza le lapidi solo a fattura ormai morta
+    reaper = corpo("pulisci_ordini_fantasma")
+    prova("reaper: purga delle lapidi ordini (dopo la finestra)", True,
+          "stato='annullato'" in reaper and "3600" in reaper)
+    prova("reaper: purga delle lapidi rilanci", True,
+          "IN ('creato','annullato')" in reaper)
+    ris = corpo("_riservati")
+    prova("prenotazione: la lapide libera lo stock per costruzione",
+          True, "stato='annullato'" not in ris
+          and "stato='creato'" in ris)
+
+    # --- il QR: vero, e l'Annulla del foglio che annulla davvero
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # (il repeating-conic-gradient dell'anello del tappo e' legittimo:
+    # la sentinella guarda la scacchiera ink-su-bianco del QR finto)
+    prova("QR: la scacchiera decorativa non esiste piu'", False,
+          "repeating-conic-gradient(#23282C" in mini)
+    prova("QR: la resa vera esiste (lightning: maiuscolo, alfanumerico)",
+          True, "mostraQr" in mini and "'Alphanumeric'" in mini
+          and "'lightning:'" in mini and ".toUpperCase()" in mini)
+    prova("QR: la libreria e' vendorizzata e servita da casa", True,
+          os.path.exists("vendor/qrcode.js")
+          and '"/vendor/qrcode.js"' in _SORGENTE
+          and "/vendor/qrcode.js" in mini)
+    swjs = open("sw.js", encoding="utf-8").read()
+    prova("QR: in dispensa PWA con la VERSIONE alzata", True,
+          "/vendor/qrcode.js" in swjs
+          and "barattolo-v2" not in swjs)
+    prova("paySheet: l'Annulla annulla davvero (e la chiusura no)", True,
+          'onclick="annullaPagamento()">Annulla' in mini
+          and "annullaPagamento" in mini)
+    prova("paySheet: la conferma avverte chi ha gia' pagato", True,
+          "NON annullare" in mini)
+
+
+def prove_ritiro():
+    """Il ritiro a mano (ago 2026, dal campo): il compratore conferma
+    da 'locked' senza aspettare che il venditore segni nulla — rischia
+    solo lui, la semantica del deposito — e il ritiro mai concluso non
+    resta muto per sempre: il promemoria gira nell'orologio."""
+    print("\n[ritiro a mano]")
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    conf = corpo("conferma_ricezione")
+    prova("conferma: il server la accetta da 'locked'", True,
+          "'locked'" in conf)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("ordine: il bottone di conferma esiste anche a locked-ritiro",
+          True, "s==='locked' && o.consegnaScelta==='ritiro'" in mini
+          and "L\\'ho ritirato" in mini)
+    soll = corpo("sollecita_ritiri_fermi")
+    prova("ritiro fermo: il promemoria guarda locked+ritiro", True,
+          "stato='locked'" in soll and "consegna_scelta='ritiro'" in soll)
+    prova("ritiro fermo: mai sats mossi, solo parole", True,
+          "UPDATE ordini SET sollecito_ritiro_il" in soll
+          and "_sblocca_sats" not in soll and "released" not in soll)
+    prova("ritiro fermo: agganciato all'orologio", True,
+          "sollecita_ritiri_fermi()" in corpo("orologio"))
+    # l'auto-sblocco resta ancorato alle DICHIARAZIONI: controlla_scadenze
+    # non deve toccare i 'locked' (nessuno ha dichiarato niente)
+    scad = corpo("controlla_scadenze")
+    prova("auto-sblocco: mai dai 'locked' senza dichiarazioni", False,
+          "stato='locked'" in scad)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -729,7 +860,8 @@ def main():
     for f in (prove_filtro_italiano, prove_testo_evento,
               prove_tag_commercio, prove_anello, prove_categorie,
               prove_senza_condizione, prove_sottocategorie,
-              prove_ricategorizza, prove_asta):
+              prove_ricategorizza, prove_asta, prove_annullo,
+              prove_ritiro):
         try:
             f()
         except Exception as e:

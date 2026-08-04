@@ -1782,14 +1782,20 @@
   /* la colonna pillola-colorata + descrizione delle voci condizione */
   .picker-voce .p-col{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
   .picker-voce .p-check{margin-left:auto;color:var(--sats-text);font-weight:800;flex:0 0 auto}
+  /* Il QR della invoice: VERO dal ago 2026 (prima era un pattern
+     decorativo che non codificava niente). Scuro-su-bianco FISSO nei
+     due temi, come l'etichetta prezzo: un codice si legge col
+     contrasto, non col tema. La zona quieta e' doppia: il padding
+     bianco qui piu' i 4 moduli di margine disegnati nel canvas.
+     Nascosto finche' non c'e' una bolt11 vera da codificare (in demo
+     resta nascosto: la stringa e' finta). */
   .qr{
-    aspect-ratio:1/1;max-width:230px;margin:16px auto;border-radius:var(--radius);
-    background:repeating-conic-gradient(#23282C 0 25%, #fff 0 50%) 0 0/16px 16px;
-    display:flex;align-items:center;justify-content:center;position:relative;
+    display:none;background:#fff;border-radius:var(--radius);
+    padding:10px;max-width:250px;margin:16px auto;
+    box-shadow:0 0 0 1px rgba(0,0,0,.08);
   }
-  .qr::after{content:'⚡';position:absolute;font-size:30px;background:#fff;
-    width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-    box-shadow:0 0 0 4px #fff}
+  .qr.pronto{display:block}
+  .qr canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
   .invoice{
     font-family:'JetBrains Mono',monospace;font-size:10.5px;background:var(--bg);
     border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;
@@ -2592,11 +2598,11 @@
     <div style="font-size:13px;color:var(--muted);font-weight:600">
       Paga con qualsiasi wallet Lightning. I sats restano <b style="color:var(--trust)">bloccati e al sicuro</b> finché non confermi di aver ricevuto l'oggetto.
     </div>
-    <div class="qr"></div>
+    <div class="qr" id="payQr"></div>
     <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
-    <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">tocca la invoice per copiarla, poi pagala dal tuo wallet</div>
+    <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
     <button class="btn primary" onclick="sheetPaid()">✓ Ho pagato</button>
-    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+    <button class="btn ghost" onclick="annullaPagamento()">Annulla</button>
     <div id="payHint"></div>
   </div>
 
@@ -5690,6 +5696,9 @@ async function startBuySet(){
   haptic();
   if (VETRINA || DEMO) { closeSheet(); return; }
   if (setScelte.size < 2) { toast('Spunta almeno due oggetti'); return; }
+  rilancioCorrente = null;
+  currentOrderId = null;     /* il patto di startBuy: l'Annulla non deve
+                                mai colpire un ordine di un giro prima */
   const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
     quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}));
   const c = totaleSet();
@@ -5703,6 +5712,7 @@ async function startBuySet(){
   el('paySheet').classList.add('open');
   aggiornaPayHint();
   el('payInvoice').textContent = 'creazione invoice…';
+  mostraQr('');
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
@@ -5720,6 +5730,7 @@ async function startBuySet(){
   el('payScomposto').innerHTML = contoScomposto(d.articolo_sats||d.prezzo_sats,
     d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1);
   el('payInvoice').textContent = d.invoice;
+  mostraQr(d.invoice);
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
 }
@@ -5765,6 +5776,7 @@ async function confermaSetSubito(btn){
       el('payScomposto').innerHTML = scompOrdine;
       el('payEurNota').style.display = 'none';
       el('payInvoice').textContent = invoice;
+      mostraQr(invoice);
       el('sheetBg').classList.add('open');
       el('paySheet').classList.add('open');
       aggiornaPayHint();
@@ -6396,6 +6408,7 @@ async function inviaPuntata(btn){
     el('payEurNota').style.display = 'block';
     el('payEurNota').textContent = 'La fattura della puntata vale 10 minuti';
     el('payInvoice').textContent = d.invoice;
+    mostraQr(d.invoice);
     el('sheetBg').classList.add('open');
     el('paySheet').classList.add('open');
     aggiornaPayHint();
@@ -6469,6 +6482,8 @@ async function convertiAsta(id){
 async function startBuy(){
   haptic();
   rilancioCorrente = null;   /* il paySheet torna al poll degli ordini */
+  currentOrderId = null;     /* l'Annulla non deve mai colpire un ordine
+                                di un giro precedente */
   if (VETRINA) {
     invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
@@ -6497,9 +6512,11 @@ async function startBuy(){
   if (DEMO) {
     el('payInvoice').textContent =
       'lnbc'+l.price+'n1p_demo_invoice_'+Math.random().toString(36).slice(2,26)+'…';
+    mostraQr('');            /* stringa finta: niente QR bugiardo */
     return;
   }
   el('payInvoice').textContent = 'creazione invoice…';
+  mostraQr('');
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
@@ -6515,6 +6532,15 @@ async function startBuy(){
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
       d.quantita||1);
   el('payInvoice').textContent = d.invoice;
+  mostraQr(d.invoice);
+  /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
+     annuncio e il server ti ha ridato la TUA fattura ancora viva —
+     va detto, o i conti («convertito ora») sembrerebbero bugiardi */
+  if (d.ripresa) {
+    el('payEurNota').style.display = 'block';
+    el('payEurNota').textContent =
+      'Avevi già una fattura in attesa per questo oggetto: eccola di nuovo.';
+  }
   /* Controllo automatico ogni 4 secondi: appena paghi, se ne accorge */
   if (pollTimer) clearInterval(pollTimer);   /* mai due controlli accavallati */
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
@@ -6617,6 +6643,7 @@ async function confermaCompraSubito(btn){
       el('payScomposto').innerHTML = scompOrdine;
       el('payEurNota').style.display = 'none';
       el('payInvoice').textContent = invoice;
+      mostraQr(invoice);
       el('sheetBg').classList.add('open');
       el('paySheet').classList.add('open');
       aggiornaPayHint();   /* qui il wallet c'e': svuota solo eventuali righe stantie */
@@ -6632,6 +6659,101 @@ async function confermaCompraSubito(btn){
 function copiaInvoice(){
   const t = el('payInvoice').textContent;
   if (t.startsWith('ln')) { navigator.clipboard?.writeText(t); toast('📋 Invoice copiata'); }
+}
+
+/* ---------------- il QR vero della invoice (ago 2026) ----------------
+   Prima qui c'era un pattern decorativo in CSS: sembrava un QR e non
+   codificava NIENTE — chi inquadrava col wallet non trovava nulla.
+   La libreria (qrcode-generator 1.5.2, vendorizzata come nostr-tools:
+   mai da una CDN) si carica pigra alla prima invoice. La stringa e'
+   lightning:<bolt11> TUTTA MAIUSCOLA: cosi' entra nella modalita'
+   alfanumerica del QR (A-Z, 0-9 e i due punti ci stanno), che fa un
+   codice piu' rado e piu' facile da inquadrare — e' il formato che i
+   wallet Lightning scrivono e leggono da sempre. */
+let qrcodePromessa = null;
+function caricaQrcode(){
+  if (window.qrcode) return Promise.resolve();
+  if (!qrcodePromessa) qrcodePromessa = new Promise((ok, no)=>{
+    const s = document.createElement('script');
+    s.src = `${FOTO_BASE}/vendor/qrcode.js?v=1.5.2`;
+    s.onload = ok;
+    s.onerror = ()=>{ qrcodePromessa = null; no(new Error('qr non disponibile')); };
+    document.head.appendChild(s);
+  });
+  return qrcodePromessa;
+}
+let qrGiro = 0;   /* il caricamento e' async: un giro vecchio arrivato
+                     in ritardo non deve disegnare sopra quello nuovo */
+async function mostraQr(invoice){
+  const box = el('payQr'), giro = ++qrGiro;
+  /* si disegna solo una bolt11 vera: in demo (stringa finta) e negli
+     stati d'attesa il riquadro resta nascosto, mai un QR bugiardo */
+  if (DEMO || !/^ln(bc|tb|bcrt)[0-9a-z]+$/i.test((invoice||'').trim())) {
+    box.classList.remove('pronto'); box.innerHTML = ''; return;
+  }
+  try { await caricaQrcode(); } catch(e) {
+    box.classList.remove('pronto'); box.innerHTML = ''; return;
+  }
+  if (giro !== qrGiro) return;
+  const testo = ('lightning:' + invoice.trim()).toUpperCase();
+  let qr;
+  try {
+    qr = qrcode(0, 'M');            /* versione automatica, correzione M */
+    qr.addData(testo, 'Alphanumeric');
+    qr.make();
+  } catch(e) {
+    /* fuori misura o carattere imprevisto: meglio nessun QR che un QR
+       sbagliato — resta la invoice da copiare */
+    box.classList.remove('pronto'); box.innerHTML = ''; return;
+  }
+  /* moduli scuri su bianco con 4 moduli di zona quieta DENTRO il
+     canvas; la scala punta a ~500px veri, poi il CSS lo posa a 230
+     (pixelated: i bordi restano netti) */
+  const moduli = qr.getModuleCount(), quieto = 4;
+  const scala = Math.max(2, Math.round(500 / (moduli + quieto * 2)));
+  const lato = (moduli + quieto * 2) * scala;
+  const c = document.createElement('canvas');
+  c.width = c.height = lato;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, lato, lato);
+  g.fillStyle = '#111';
+  for (let r = 0; r < moduli; r++)
+    for (let col = 0; col < moduli; col++)
+      if (qr.isDark(r, col))
+        g.fillRect((quieto + col) * scala, (quieto + r) * scala, scala, scala);
+  box.innerHTML = ''; box.appendChild(c);
+  box.classList.add('pronto');
+}
+
+/* L'«Annulla» del foglio pagamento ANNULLA DAVVERO (ago 2026): prima
+   chiudeva e basta, e l'ordine 'creato' restava li' a prenotare il
+   pezzo per mezz'ora. Annullo e CHIUSURA restano distinti: chi
+   inquadra il QR esce verso il wallet e torna, e nessuna chiusura
+   (velo, Esc, gesto indietro) deve fargli perdere l'ordine — annulla
+   solo questo bottone, con la sua conferma. Il paySheet serve due
+   pagamenti: l'ordine di sempre e la fattura di puntata (rilancio). */
+async function annullaPagamento(){
+  if (DEMO || VETRINA) { navIndietro(); return; }
+  const ril = rilancioCorrente, oid = currentOrderId;
+  if (!ril && !oid) { navIndietro(); return; }
+  const cosa = ril ? 'questa fattura di puntata' : 'questo ordine';
+  if (!confirm(`Annullo ${cosa}.\n\nSe hai già pagato, NON annullare: chiudi il foglio e attendi la verifica.`))
+    return;
+  const url = ril ? `${API_BASE}/rilanci/${ril}/annulla`
+                  : `${API_BASE}/orders/${oid}/annulla`;
+  const r = await fetch(url, {method:'POST',
+                              headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) {
+    /* il caso tipico: il pagamento e' arrivato nella corsa — il
+       foglio resta aperto e il poll fara' il suo mestiere */
+    toast(d.detail || 'Annullo non riuscito', 6000);
+    return;
+  }
+  if (ril) rilancioCorrente = null;
+  navIndietro();
+  toast(ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
+  if (!ril) { await loadOrders(); renderOrders(); }
 }
 
 /* Il foglio-invito della vetrina: spiega e accompagna verso il bot */
@@ -7480,7 +7602,8 @@ function openOrder(id){
       ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — mi prendo ${TEMPI.conferma}h per controllarlo`:`📬 È arrivato — mi prendo ${TEMPI.conferma}h per controllarlo`}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema.'} Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
-      ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
+      ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
+      ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
@@ -8740,7 +8863,7 @@ async function confirmReceived(btn){
 }
 async function annullaOrdine(){
   haptic();
-  if (!confirm('Annullare questo ordine non pagato?\n\nNessun sat è stato mosso: sparirà e basta.')) return;
+  if (!confirm('Annullare questo ordine non pagato?\n\nSe hai già pagato, NON annullare: attendi la verifica.')) return;
   if (DEMO) { orders = orders.filter(x=>x.id!==currentOrder.id); renderOrders(); go('affari'); toast('✖️ Ordine annullato'); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/annulla`,
     {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
