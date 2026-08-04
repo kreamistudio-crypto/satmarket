@@ -21,15 +21,17 @@
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
        sono leggibili sui fondi tenui */
     --sats-deep:#D97706; --sats-text:#B45309;
-    /* L'ASTA parla BLU (ago 2026, deciso con Andrea): l'arancio e' di
-       «Acquista», il rosso della lampo, il verde della protezione, il
-       viola di Nostr. Misurati (chiaro): bianco su --asta 6,45; testo
-       --asta-text su crema 7,43; --asta-tag FISSO sulla carta del
-       cartellino 8,16 (la carta non cambia di notte). Un solo token
+    /* L'ASTA parla PETROLIO (ago 2026, deciso con Andrea — prima blu,
+       poi verde-blu scuro tenuto sul lato BLU della famiglia, ~195°:
+       il verde della protezione sta a ~151°, e si toccano nel punto
+       piu' delicato, il bottone dentro il recinto). Misurati
+       (chiaro): bianco su --asta 5,86 e --asta vs crema 5,33; testo
+       --asta-text su crema 7,51; --asta-tag FISSO sulla carta del
+       cartellino 7,80 (la carta non cambia di notte). Un solo token
        per bottoni, chip, badge, countdown e targhetta: l'identita'
        dell'asta e' una. */
-    --asta:#1D5FA8; --asta-on:#FFFFFF; --asta-deep:#14508F;
-    --asta-text:#14508F; --asta-tag:#14508F;
+    --asta:#0F6D8C; --asta-on:#FFFFFF; --asta-deep:#0B5570;
+    --asta-text:#0B5570; --asta-tag:#0B5570;
     --trust-deep:#10603A; --trust-text:#157347;
     --nostr:#8B5CF6; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
     --chip-bg:#F3ECDA;
@@ -118,10 +120,10 @@
     --trust:#34B47A; --trust-soft:#1B2C20; --danger:#F07A47;
     --sats-text:#FFB25C;
     /* l'asta di sera: si alza la LUCE, non si cambia il segno —
-       misurati: --asta vs bruno 3,23 (component ok) col bianco sopra
-       5,33; --asta-text su bruno 8,08. --asta-tag NON si tocca: vive
+       misurati: --asta vs bruno 3,77 (component ok) col bianco sopra
+       4,57; --asta-text su bruno 8,88. --asta-tag NON si tocca: vive
        sul cartellino di carta, che resta chiaro anche al buio. */
-    --asta:#2B6CB8; --asta-deep:#1D5FA8; --asta-text:#8FB4E8;
+    --asta:#1D7FA0; --asta-deep:#0F6D8C; --asta-text:#7FC4DC;
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
     --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
     --chip-bg:#37301F;
@@ -5845,7 +5847,7 @@ function openDetail(id){
         <div class="prezzo-col">
           <div class="detail-price">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
           <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
-          ${asta?`<div class="lampo-resta asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
+          ${asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
           ${!asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">rimangono <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
