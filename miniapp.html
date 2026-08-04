@@ -21,6 +21,15 @@
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
        sono leggibili sui fondi tenui */
     --sats-deep:#D97706; --sats-text:#B45309;
+    /* L'ASTA parla BLU (ago 2026, deciso con Andrea): l'arancio e' di
+       «Acquista», il rosso della lampo, il verde della protezione, il
+       viola di Nostr. Misurati (chiaro): bianco su --asta 6,45; testo
+       --asta-text su crema 7,43; --asta-tag FISSO sulla carta del
+       cartellino 8,16 (la carta non cambia di notte). Un solo token
+       per bottoni, chip, badge, countdown e targhetta: l'identita'
+       dell'asta e' una. */
+    --asta:#1D5FA8; --asta-on:#FFFFFF; --asta-deep:#14508F;
+    --asta-text:#14508F; --asta-tag:#14508F;
     --trust-deep:#10603A; --trust-text:#157347;
     --nostr:#8B5CF6; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
     --chip-bg:#F3ECDA;
@@ -108,6 +117,11 @@
     --line:#3E3623; --sats-soft:#3E2B12;
     --trust:#34B47A; --trust-soft:#1B2C20; --danger:#F07A47;
     --sats-text:#FFB25C;
+    /* l'asta di sera: si alza la LUCE, non si cambia il segno —
+       misurati: --asta vs bruno 3,23 (component ok) col bianco sopra
+       5,33; --asta-text su bruno 8,08. --asta-tag NON si tocca: vive
+       sul cartellino di carta, che resta chiaro anche al buio. */
+    --asta:#2B6CB8; --asta-deep:#1D5FA8; --asta-text:#8FB4E8;
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
     --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
     --chip-bg:#37301F;
@@ -542,13 +556,17 @@
      inchiostro (e crema al buio, gratis coi token). In card il tempo
      e' a grana grossa e STATICO: il countdown vivo e' roba da scheda. */
   .card-asta{position:absolute;top:8px;left:8px;z-index:2;
-    background:var(--ink);color:var(--on-ink);border-radius:999px;
+    background:var(--asta);color:var(--asta-on);border-radius:999px;
     padding:3px 9px;font-size:11.5px;font-weight:800;
     display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  .card.in-asta{outline:1.5px solid var(--ink);outline-offset:-1.5px}
+  .card.in-asta{outline:1.5px solid var(--asta);outline-offset:-1.5px}
+  /* la targhetta prezzo di un'asta: quel numero e' la puntata in
+     corso, non un prezzo — parla il blu FISSO del token tag (la
+     carta del cartellino non cambia di notte) */
+  .tag-price.asta .price{color:var(--asta-tag)}
   /* la riga dell'asta sotto il prezzo del dettaglio: stessa voce
-     discreta del tempo della lampo */
-  .asta-riga{font-size:13px;color:var(--sats-text);font-weight:700;
+     discreta del tempo della lampo, nel colore di casa dell'asta */
+  .asta-riga{font-size:13px;color:var(--asta-text);font-weight:700;
     margin-top:4px;line-height:1.35}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
@@ -1075,7 +1093,7 @@
      Fai un'offerta, Compra subito NWC, Metti nel barattolo, i tasti
      del proprietario e il set. I testuali (link/danger-ghost) non
      hanno forma e non c'entrano. La barra ha la sua regola gemella. */
-  #detailContent .btn{border-radius:var(--radius)}
+  #detailContent .btn,#puntaSheet .btn{border-radius:var(--radius)}
   .detail-ph{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
     font-size:84px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 12px,var(--ph-b) 12px 24px)}
   /* IL TESTO DELL'UTENTE NON DEVE POTER ALLARGARE LA PAGINA (lug 2026,
@@ -1228,6 +1246,9 @@
     font-size:13px;cursor:pointer;color:var(--ink)}
   .consegna-scelta .consegna-pill.attiva{border-color:var(--sats);
     background:var(--sats-soft);color:var(--sats-text)}
+  /* nel foglio puntata le chip vestono il blu dell'asta */
+  #puntaSheet .consegna-pill.attiva{border-color:var(--asta);
+    background:none;color:var(--asta-text)}
   /* Le tre caselle di consegna nel form Vendi: strade indipendenti,
      il venditore spunta tutte quelle che offre. Specificita' alta di
      proposito: le regole generiche .field label/.field input (testo
@@ -1447,6 +1468,8 @@
   @keyframes scuoti{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
   .btn.primary{background:var(--trust);color:var(--on-trust);box-shadow:0 3px 0 var(--trust-deep)}
   .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
+  /* il pieno dell'asta: stessa forma dell'orange, colore suo */
+  .btn.asta{background:var(--asta);color:var(--asta-on);box-shadow:0 3px 0 var(--asta-deep)}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
   /* «📦 Riempi il pacco»: il ghost vestito di cartone. Fondo NEUTRO —
@@ -2106,9 +2129,11 @@
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
       <div class="big">🫙</div>
-      <b class="empty-title">Il barattolo qui è vuoto</b>
-      Nessun oggetto trovato per <b id="emptyQ"></b>.<br>
-      Hai qualcosa da vendere? 3 minuti e sei in vetrina.
+      <b class="empty-title" id="emptyTitolo">Il barattolo qui è vuoto</b>
+      <span id="emptyStd">Nessun oggetto trovato per <b id="emptyQ"></b>.<br>
+      Hai qualcosa da vendere? 3 minuti e sei in vetrina.</span>
+      <span id="emptyAste" style="display:none">Nessun'asta in corso in questo momento.<br>
+      Metti tu qualcosa all'asta: base, durata, e vince chi offre di più.</span>
       <button class="btn orange" onclick="go('vendi')">+ Metti in vendita</button>
       <button class="btn ghost" id="btnAvvisami" style="display:none" onclick="avvisamiDaRicerca()">🔔 Avvisami se arriva</button>
     </div>
@@ -2514,6 +2539,14 @@
          due colonne di riquadri, la stessa griglia che si apre -->
     <button id="nav-sfoglia" onclick="go('sfoglia')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M3.6 5.5c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.5 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.5-.7-1.5-1.6z"/><path d="M13.4 5.4c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.7-1.6-1.6z"/><path d="M3.5 14.9c0-.9.7-1.6 1.6-1.6H9c.9 0 1.6.7 1.6 1.6v3.9c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6z"/><path class="velo" d="M13.4 14.8c0-.9.7-1.6 1.6-1.6h3.9c.9 0 1.6.7 1.6 1.6v4c0 .9-.7 1.5-1.6 1.5H15c-.9 0-1.6-.6-1.6-1.5z"/></svg></span>Sfoglia</button>
     <button id="nav-vendi" class="sell" onclick="go('vendi')"><span class="ic">＋</span>Vendi</button>
+    <!-- Aste: il MARTELLETTO (ago 2026), nello slot che aspettava
+         proprio lui. Compare SOLO a leva accesa (aggiornaAstaVisibilita
+         lo scambia con lo spaziatore, cosi' il Vendi resta al centro
+         esatto: gli slot sono sempre cinque). Monocromatico come le
+         sorelle: si accende in arancio con currentColor, la
+         convenzione della nav non cambia. Inchiostro dentro [2,22],
+         la mano di tagliaSVG. -->
+    <button id="nav-aste" style="display:none" onclick="vaiAste()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M4 7.8L7.8 4l4.4 4.4-3.8 3.8z"/><path d="M4 7.8L7.8 4l4.4 4.4-3.8 3.8z"/><path d="M10.4 10.4l7.4 7.4"/><path d="M12.4 20.3h7.4"/></svg></span>Aste</button>
     <span class="nav-vuoto" aria-hidden="true"></span>
     <!-- Ordini: il PACCO di tre quarti. La scatola PIATTA (quadro +
          riga del coperchio, la famiglia di tagliaSVG) e' stata
@@ -2597,7 +2630,7 @@
     <!-- Il conto chiaro: quanto si VERSA adesso (la sola differenza) -->
     <div id="puntaConto" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px;line-height:1.4">Puntare = pagare: i sats vanno subito nel deposito di garanzia. Se vinci sono già il pagamento; se non vinci tornano indietro alla chiusura (o quando ti ritiri).</div>
-    <button class="btn orange" style="margin-top:12px" onclick="inviaPuntata(this)">🔨 Punta</button>
+    <button class="btn asta" style="margin-top:12px" onclick="inviaPuntata(this)">🔨 Punta</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -3452,7 +3485,28 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 function voceNav(view){
   if (['dettaglio','negozio','sicurezza'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
-  return (view === 'esplora' && ramoVetrina === 'sfoglia') ? 'sfoglia' : view;
+  return (view === 'esplora' && ['sfoglia','aste'].includes(ramoVetrina))
+    ? ramoVetrina : view;
+}
+
+/* La pagina «Aste» (ago 2026): NON e' una seconda vetrina — e' LA
+   vetrina col filtro «solo aste vive» e l'ordinamento «chi scade
+   prima» (il patto di Sfoglia: la vetrina resta UNA, cambia la radice
+   da cui la si guarda). Il ramo si spegne tornando a Esplora, che
+   rimette anche filtro e ordinamento com'erano: il tab li aveva
+   accesi lui. Radice sorella: l'indietro passa da Esplora, la
+   convenzione di casa. */
+function vaiAste(){
+  haptic();
+  ramoVetrina = 'aste';
+  filtroAsta = true;
+  if (el('filtroAstaInp')) el('filtroAstaInp').checked = true;
+  ordinaVista = 'asta';
+  if (el('ordinaSel')) { el('ordinaSel').value = 'asta'; aggiornaPicker('ordinaSel'); }
+  go('esplora');
+  if (typeof navRiflette === 'function') navRiflette();
+  if (DEMO) { renderGrid(); return; }
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
 
 function go(view){
@@ -3483,8 +3537,8 @@ function go(view){
     if (!DEMO) {
       loadOrders().then(renderOrders).catch(()=>renderOrders());
       loadOfferte().then(renderOfferte).catch(()=>{});
-    } else { renderOrders(); renderOfferte(); renderPuntate();
-             loadPuntate().then(renderPuntate); }
+      loadPuntate().then(renderPuntate).catch(()=>{});
+    } else { renderOrders(); renderOfferte(); renderPuntate(); }
   }
   if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
     /* il barattolo si rilegge dal server: un annuncio salvato puo'
@@ -3624,7 +3678,7 @@ function navRendiVista(b){
        si scrive DOPO, e go() legge quello giusto per la nav. */
     const [ramo, cat] = String(b.k ?? '').split('|');
     if (activeCat !== (cat || 'Tutto')) setCat(cat || 'Tutto');
-    ramoVetrina = (ramo === 'sfoglia') ? 'sfoglia' : 'esplora';
+    ramoVetrina = ['sfoglia','aste'].includes(ramo) ? ramo : 'esplora';
     return go('esplora');
   }
   if (b.v === 'dettaglio')
@@ -4109,6 +4163,20 @@ function apriCategoria(c){
    il nome del tab, e chi lo tocca si aspetta tutto il mercatino, non
    la categoria in cui era entrato da Sfoglia mezz'ora fa. */
 function vaiEsplora(){
+  /* uscendo dal ramo Aste si spengono ANCHE il filtro e l'ordinamento
+     che il tab aveva acceso lui: senza, Esplora mostrerebbe la
+     vetrina intera filtrata sulle aste — la bugia di ramoVetrina
+     detta con un'altra voce */
+  if (ramoVetrina === 'aste') {
+    filtroAsta = false;
+    if (el('filtroAstaInp')) el('filtroAstaInp').checked = false;
+    if (ordinaVista === 'asta') {
+      ordinaVista = '';
+      if (el('ordinaSel')) { el('ordinaSel').value = ''; aggiornaPicker('ordinaSel'); }
+    }
+    if (!DEMO && activeCat === 'Tutto')
+      loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
+  }
   if (activeCat !== 'Tutto') { setCat('Tutto'); }
   /* il ramo si chiude anche quando la categoria era gia' Tutto: il
      tocco sul nome del tab e' sempre un ritorno alla radice, e non
@@ -4184,6 +4252,14 @@ function renderGrid(items){
                                      : `oggett${nTot===1?'o':'i'}`);
   renderPionieri();
   el('gridEmpty').style.display = data.length ? 'none':'block';
+  /* lo stato vuoto della radice Aste invita a metterci qualcosa: il
+     bottone «+ Metti in vendita» porta gia' al form, dove vive il
+     toggle dell'asta */
+  const vuotoAste = ramoVetrina === 'aste';
+  if (el('emptyStd')) el('emptyStd').style.display = vuotoAste ? 'none' : '';
+  if (el('emptyAste')) el('emptyAste').style.display = vuotoAste ? '' : 'none';
+  if (el('emptyTitolo')) el('emptyTitolo').textContent =
+    vuotoAste ? '🔨 Nessuna asta in corso' : 'Il barattolo qui è vuoto';
   el('emptyQ').textContent = q || activeCat;
   /* «Avvisami se arriva»: solo per chi ha un account vero (in demo e
      vetrina non ci sono avvisi da salvare) */
@@ -4251,7 +4327,7 @@ const cardHTML = l => {
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
-        <div class="tag-price">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        <div class="tag-price${asta?' asta':''}">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
         ${flash}${jar}
       </div>
       <div class="info">
@@ -5328,10 +5404,14 @@ function aggiornaBarraCompra(view){
   if (astaE(l)){
     if (!astaViva(l)){ document.body.classList.remove('con-barra'); return; }
     el('bcCompra').innerHTML = '🔨 Punta';
+    el('bcCompra').classList.add('asta');
+    el('bcCompra').classList.remove('orange');
     el('barraCompra').classList.remove('con-qta');
     el('bcOfferta').style.display = 'none';
     return;
   }
+  el('bcCompra').classList.add('orange');
+  el('bcCompra').classList.remove('asta');
   el('bcCompra').innerHTML = `Acquista${stepperAcquista(l)}`;
   el('barraCompra').classList.toggle('con-qta', (l.quantita||1) > 1);
   /* con un accordo stretto l'offerta non si rifa': come in pagina */
@@ -5745,7 +5825,7 @@ function openDetail(id){
              <span class="escrow-flag">🔒 asta protetta</span>
              <div class="trust-note"><span>Punti versando i sats nel <b>deposito di garanzia</b>: se vinci sono già il pagamento, se non vinci tornano <span class="fine-frase">indietro. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
              <div id="astaStato"></div>
-             <button class="btn orange acquista-cta" id="astaCta" onclick="apriPunta()">🔨 Punta</button>
+             <button class="btn asta acquista-cta" id="astaCta" onclick="apriPunta()">🔨 Punta</button>
              <button class="btn ghost" id="astaRitiro" style="display:none;margin-top:0" onclick="ritiraPuntata()">🕊 Ritirati dall'asta (definitivo)</button>
            </div>`;
   const astaDeserta = asta && !astaViva(l) && (l.stato||'attivo')==='attivo';
@@ -6272,7 +6352,7 @@ function puntaDigitata(){
     c.textContent = `Sotto il minimo: servono almeno ${fmt(minimo)} sats`;
     return;
   }
-  c.innerHTML = `Versi adesso: <b class="mono" style="color:var(--sats-text)">${fmt(Math.max(0, v - versato))}</b> sats`
+  c.innerHTML = `Versi adesso: <b class="mono" style="color:var(--asta-text)">${fmt(Math.max(0, v - versato))}</b> sats`
     + (versato ? ` — il totale ${fmt(v)} conta i ${fmt(versato)} già in cassaforte` : '');
 }
 async function inviaPuntata(btn){
@@ -9578,9 +9658,19 @@ function astaForm(){
 /* la visibilita' del toggle la decide la leva del server (e in
    modifica sparisce: un annuncio esistente non diventa un'asta) */
 function aggiornaAstaVisibilita(){
-  const f = el('sellAstaField'); if (!f) return;
-  f.style.display = (astaLeve && astaLeve.abilitata && !editandoId
-                     && !editandoNostr) ? '' : 'none';
+  const on = !!(astaLeve && astaLeve.abilitata);
+  const f = el('sellAstaField');
+  if (f) f.style.display = (on && !editandoId && !editandoNostr)
+    ? '' : 'none';
+  /* il tasto «Aste» prende lo slot vuoto della nav SOLO a leva
+     accesa; spento, torna lo spaziatore — gli slot restano cinque e
+     il Vendi al centro esatto. In vetrina anonima /api/me non c'e':
+     il tasto resta nascosto (imperfezione dichiarata — per dirlo
+     anche agli anonimi servirebbe la leva nella busta di prima
+     pagina, cioe' un tocco a server.py). */
+  const nb = el('nav-aste'), sp = document.querySelector('.nav-vuoto');
+  if (nb) nb.style.display = on ? '' : 'none';
+  if (sp) sp.style.display = on ? 'none' : '';
 }
 function aggiornaConsegnaForm(){
   const sped = el('sellConsSped').checked,
