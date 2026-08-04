@@ -56,6 +56,17 @@ TETTO = 1.05
 # Chi ne aggiunge una lo faccia dopo aver guardato la griglia intera,
 # non la singola piastrella.
 RITOCCHI = {"animali": .68}
+# La SOGLIA per-voce, seconda tabellina dei ritocchi (ago 2026, nata
+# col biglietto di «Buoni ed esperienze»): il file arrivava con un
+# alone tenue — alpha fra 8 e 32 — steso su TUTTA la tela, quindi con
+# la soglia globale risultava gia' tirato mentre il disegno vero
+# (378x268) stava appoggiato in ALTO, e in piastrella si vedeva
+# piccolo e alto. Alzare la soglia solo per lui ritaglia l'alone senza
+# toccare il disegno, che cresce e si ricentra; alzarla per TUTTI
+# mangerebbe l'antialiasing dei bordi delle altre 26. Chi aggiunge una
+# voce misuri prima il bbox a piu' soglie, come per la velatura di
+# Bellezza.
+SOGLIE = {"buoni-ed-esperienze": 32}
 # Sotto questo scarto non si riscrive: un ritocco da pochi pixel non
 # vale una seconda compressione.
 MINIMO = .02
@@ -68,11 +79,11 @@ LATO_MINI = 128
 SUFFISSO_MINI = "-mini"
 
 
-def _misura(im):
+def _misura(im, soglia=SOGLIA_ALPHA):
     """riquadro del disegno, inchiostro e resa nel riquadro del CSS"""
     from PIL import Image  # noqa: F401  (serve solo al chiamante)
     a = im.getchannel("A")
-    bb = a.point(lambda v: 255 if v > SOGLIA_ALPHA else 0).getbbox()
+    bb = a.point(lambda v: 255 if v > soglia else 0).getbbox()
     if bb is None:
         return None, 0, 0
     disegno = im.crop(bb)
@@ -100,7 +111,7 @@ def main():
     misure = {}
     for nome in file:
         im = Image.open(os.path.join(CARTELLA, nome)).convert("RGBA")
-        bb, ink, reso = _misura(im)
+        bb, ink, reso = _misura(im, SOGLIE.get(nome[:-5], SOGLIA_ALPHA))
         if bb is None:
             print(f"  ⚠ {nome}: tutto trasparente, lasciato com'e'")
             continue
