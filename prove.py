@@ -462,6 +462,62 @@ def prove_senza_condizione():
 
 
 # ====================================================================
+def prove_sottocategorie():
+    """L'albero DORMIENTE (ago 2026): definito nel catalogo, mostrato
+    da nessuna parte. Le prove difendono il patto scritto sopra
+    SOTTOCATEGORIE: id per sempre, unici in TUTTO l'albero (un domani
+    un filtro senza categoria non dev'essere ambiguo), niente voci
+    «Altro X», e un giudice che non lascia passare niente di storto."""
+    print("\n[sottocategorie]")
+    amb = {}
+    i = _SORGENTE.index("CATEGORIE = (")
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    i = _SORGENTE.index("SOTTOCATEGORIE = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n}", i) + 2], amb)
+    albero = amb["SOTTOCATEGORIE"]
+    cat = list(amb["CATEGORIE"])
+
+    prova("ogni chiave dell'albero e' una categoria vera", [],
+          [c for c in albero if c not in cat])
+    prova("«Altro» resta piatta per forza", False, "Altro" in albero)
+    tutti = [sid for voci in albero.values() for sid, _ in voci]
+    prova("id unici in TUTTO l'albero", len(tutti), len(set(tutti)))
+    import re
+    prova("id kebab-case, mai vuoti", [],
+          [s for s in tutti if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", s)])
+    prova("nessuna voce si chiama «altro»", [],
+          [(sid, nome) for voci in albero.values() for sid, nome in voci
+           if "altro" in sid or nome.strip().lower().startswith("altro")])
+    prova("nessuna etichetta vuota o doppia nella stessa categoria", [],
+          [c for c, voci in albero.items()
+           if len({n for _, n in voci}) != len(voci)
+           or any(not n.strip() for _, n in voci)])
+
+    for f in ("sottocategoria_valida", "sottocategoria_tollerante"):
+        exec(pezzo(f), amb)
+    valida = amb["sottocategoria_valida"]
+    prova("una voce valida passa", "mtb", valida("Biciclette", "mtb"))
+    prova("una voce di un'ALTRA categoria non passa", "",
+          valida("Biciclette", "gift-card"))
+    prova("una voce inventata non passa", "", valida("Biciclette", "carbonio"))
+    prova("il vuoto resta vuoto", "", valida("Biciclette", ""))
+    prova("None non esplode", "", valida("Biciclette", None))
+    prova("una categoria piatta non ha voci", "", valida("Altro", "mtb"))
+    prova("una categoria inventata non ha voci", "",
+          valida("Fantacategoria", "mtb"))
+
+    tollera = amb["sottocategoria_tollerante"]
+    prova("il CSV che dice l'id viene capito", "ebike",
+          tollera("Biciclette", "ebike"))
+    prova("il CSV che dice l'ETICHETTA viene capito", "ebike",
+          tollera("Biciclette", "E-BIKE"))
+    prova("l'etichetta con gli spazi viene capita", "olio-condimenti",
+          tollera("Alimenti e bevande", "Olio e condimenti"))
+    prova("una voce storta e' '' e mai uno scarto", "",
+          tollera("Biciclette", "bici volante"))
+
+
+# ====================================================================
 def prove_ricategorizza():
     """Lo script di ricategorizzazione legge il catalogo da server.py
     (fonte unica) e non si fida delle risposte dell'AI: un «NON SO» o
@@ -495,7 +551,8 @@ def main():
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_testo_evento,
               prove_tag_commercio, prove_anello, prove_categorie,
-              prove_senza_condizione, prove_ricategorizza):
+              prove_senza_condizione, prove_sottocategorie,
+              prove_ricategorizza):
         try:
             f()
         except Exception as e:

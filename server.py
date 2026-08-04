@@ -966,7 +966,13 @@ def init_db():
                     # colonna e non una coda in memoria, perche' «gliel'ho
                     # gia' chiesto» deve sopravvivere ai riavvii: e' la
                     # differenza tra un invito e il ronzio di ogni ora.
-                    "completamento_avvisato INTEGER DEFAULT 0"):
+                    "completamento_avvisato INTEGER DEFAULT 0",
+                    # sottocategoria (ago 2026): l'albero DORMIENTE —
+                    # il catalogo SOTTOCATEGORIE esiste, nessuna UI la
+                    # mostra ancora. '' = non dichiarata, per sempre
+                    # lecito; la scrivono solo i payload che la portano
+                    # gia' oggi (facoltativa e silenziosa)
+                    "sottocategoria TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -3378,6 +3384,219 @@ def slug_categoria(c: str) -> str:
 SLUG_CATEGORIE = {slug_categoria(c) for c in CATEGORIE}
 
 
+# --- L'albero delle sottocategorie (ago 2026) — DORMIENTE ------------
+# Definite ora, mostrate MAI: niente form, niente filtri, niente
+# Sfoglia finche' non si decidera' di accenderle. Il patto:
+#   - l'ID kebab-case e' PER SEMPRE, vive nella colonna, nei futuri
+#     filtri e nel CSV; l'etichetta si puo' ritoccare senza migrazioni
+#     — il pattern di CONDIZIONI;
+#   - id GLOBALMENTE unici, cosi' un domani un filtro senza categoria
+#     non e' ambiguo — prove.py li conta;
+#   - l'ordine delle tuple e' l'ordine di presentazione, fisso come la
+#     griglia di Sfoglia;
+#   - SI AGGIUNGE, NON SI RINOMINA, come per le categorie;
+#   - NIENTE voci «Altro X»: la sottocategoria assente, '', E' il
+#     fallback — un secondo cimitero per categoria sarebbe il vizio di
+#     «Altro» moltiplicato per ventisei;
+#   - chiave assente = categoria piatta. Oggi e' piatta solo «Altro»,
+#     per forza: «Altro» con sottovoci non e' piu' «Altro»;
+#   - le regole — senza_condizione e simili — si EREDITANO dalla
+#     categoria: la sottocategoria e' un'etichetta di scaffale, non un
+#     secondo asse di regole.
+#
+# REGOLE DI CONFINE, decise sui casi veri della vetrina — entreranno
+# nel prompt della ricategorizzazione AI quando l'albero si accende:
+#   - smartwatch -> Orologi e gioielli, il nome della sottovoce lo dice;
+#   - cuffie e auricolari -> Audio e video; Telefonia tiene cover,
+#     pellicole, caricatori e ricambi — «Cover e accessori» chiude il
+#     bivio;
+#   - stampanti da ufficio -> Informatica; stampa 3D -> Elettronica;
+#   - droni e modellismo RC -> Elettronica, non Foto e ottica; i
+#     radiocomandati-giocattolo da bimbi pero' sono giocattoli;
+#   - caschi e abbigliamento tecnico moto -> Motori;
+#   - roba da bimbi — vestiti, giocattoli, attrezzatura — sta in
+#     Bambini, regola d'oro; le bici VERE da bimbo in Biciclette; i
+#     giochi da tavolo per famiglie e adulti in Sport e hobby;
+#   - l'artigianale si classifica per FUNZIONE: le tazze al tornio in
+#     Cucina e tavola, i saponi in Bellezza, le composte negli
+#     Alimenti; Arte e artigianato e' l'oggetto d'arte o decorativo;
+#   - Collezionismo = valore da collezione, numerato raro o sealed,
+#     non il semplicemente vecchio: la caffettiera anni 60 sta in
+#     Casa, si usa;
+#   - si veste -> Abbigliamento o Scarpe; si usa per lo sport -> Sport;
+#   - per ASCOLTARE -> Audio e video; per SUONARE o registrare ->
+#     Strumenti musicali.
+SOTTOCATEGORIE = {
+    # il residuo tech ha un contenuto SUO — radio, GPS e powerbank
+    # restano nel '' della categoria, che e' lecito
+    "Elettronica": (
+        ("droni-modellismo", "Droni e modellismo RC"),
+        ("stampa-3d", "Stampa 3D"),
+        ("smart-home", "Smart home e domotica"),
+        ("componenti-maker", "Componenti ed elettronica fai da te"),
+        ("strumenti-misura", "Strumenti di misura"),
+    ),
+    "Informatica": (
+        ("computer", "Computer e portatili"),
+        ("tablet", "Tablet ed e-reader"),
+        ("componenti-periferiche", "Componenti e periferiche"),
+        ("software-licenze", "Software e licenze"),
+    ),
+    "Telefonia": (
+        ("smartphone", "Smartphone e cellulari"),
+        ("cover-accessori", "Cover e accessori"),
+    ),
+    "Audio e video": (
+        ("cuffie", "Cuffie e auricolari"),
+        ("casse-ampli", "Casse e amplificatori"),
+        ("hifi-giradischi", "Hi-fi e giradischi"),
+        ("tv-proiettori", "TV e proiettori"),
+    ),
+    "Console e videogiochi": (
+        ("console", "Console"),
+        ("videogiochi", "Videogiochi"),
+        ("controller-accessori", "Controller e accessori"),
+        ("retrogaming", "Retrogaming"),
+    ),
+    "Foto e ottica": (
+        ("fotocamere", "Fotocamere"),
+        ("obiettivi", "Obiettivi e ottiche"),
+        ("binocoli-telescopi", "Binocoli e telescopi"),
+        ("treppiedi-accessori", "Treppiedi e accessori"),
+    ),
+    # dieci dei tredici annunci veri sono poster: la merce comanda
+    "Bitcoin": (
+        ("hardware-wallet", "Hardware wallet e firma"),
+        ("nodi-mining", "Nodi e mining"),
+        ("poster-stampe", "Poster e stampe"),
+        ("merch", "Abbigliamento e gadget"),
+    ),
+    "Casa e giardino": (
+        ("mobili", "Mobili e arredamento"),
+        ("cucina-tavola", "Cucina e tavola"),
+        ("giardino", "Giardinaggio"),
+    ),
+    "Elettrodomestici": (
+        ("grandi-elettrodomestici", "Grandi elettrodomestici"),
+        ("piccoli-elettrodomestici", "Piccoli elettrodomestici e ricambi"),
+    ),
+    "Fai da te e utensili": (
+        ("elettroutensili", "Elettroutensili"),
+        ("utensili-mano", "Utensili a mano"),
+        ("ferramenta", "Ferramenta e materiali"),
+    ),
+    "Alimenti e bevande": (
+        ("olio-condimenti", "Olio e condimenti"),
+        ("dolci-conserve", "Dolci, creme e conserve"),
+        ("spezie-erbe", "Spezie ed erbe"),
+        ("bevande", "Vino, birra e bevande"),
+    ),
+    "Bellezza e benessere": (
+        ("creme-cosmetici", "Creme e cosmetici"),
+        ("profumi", "Profumi"),
+        ("integratori", "Integratori"),
+    ),
+    # adulti e basta: la roba da bimbi ha la sua casa, vedi Bambini
+    "Abbigliamento": (
+        ("donna", "Donna"),
+        ("uomo", "Uomo"),
+    ),
+    "Scarpe e accessori": (
+        ("scarpe", "Scarpe"),
+        ("borse-zaini", "Borse e zaini"),
+        ("piccoli-accessori", "Cinture, portafogli e occhiali"),
+    ),
+    "Orologi e gioielli": (
+        ("orologi-smartwatch", "Orologi e smartwatch"),
+        ("gioielli", "Gioielli e collane"),
+    ),
+    "Bambini": (
+        ("passeggini-attrezzatura", "Passeggini e attrezzatura"),
+        ("giocattoli", "Giocattoli e giochi"),
+        ("abbigliamento-bimbi", "Abbigliamento bimbi"),
+    ),
+    "Sport e hobby": (
+        ("attrezzatura-sportiva", "Attrezzatura sportiva"),
+        ("outdoor", "Campeggio e outdoor"),
+        ("giochi-tavolo", "Giochi da tavolo e puzzle"),
+    ),
+    "Biciclette": (
+        ("corsa-gravel", "Da corsa e gravel"),
+        ("mtb", "Mountain bike"),
+        ("ebike", "E-bike"),
+        ("citta-pieghevoli", "Da città e pieghevoli"),
+        ("bici-bimbi", "Per bambini"),
+        ("componenti-bici", "Componenti e accessori"),
+    ),
+    "Motori": (
+        ("veicoli", "Auto e moto"),
+        ("ricambi-motori", "Ricambi e accessori"),
+        ("caschi-abbigliamento", "Caschi e abbigliamento tecnico"),
+    ),
+    "Animali": (
+        ("cani", "Per cani"),
+        ("gatti", "Per gatti"),
+        ("acquari-terrari", "Acquari e terrari"),
+    ),
+    "Libri e media": (
+        ("libri", "Libri e saggi"),
+        ("fumetti-manga", "Fumetti e manga"),
+    ),
+    "Musica e film": (
+        ("vinili", "Vinili e dischi"),
+        ("cd-dvd", "CD, DVD e Blu-ray"),
+    ),
+    "Strumenti musicali": (
+        ("chitarre-bassi", "Chitarre e bassi"),
+        ("tastiere-piano", "Tastiere e pianoforti"),
+        ("batteria-percussioni", "Batteria e percussioni"),
+        ("fiati-archi", "Fiati e archi"),
+        ("ampli-studio", "Ampli, microfoni e studio"),
+    ),
+    "Collezionismo": (
+        ("carte-tcg", "Carte e giochi collezionabili"),
+        ("edizioni", "Libri ed edizioni da collezione"),
+        ("monete-banconote", "Monete e banconote"),
+    ),
+    "Arte e artigianato": (
+        ("quadri-stampe", "Quadri e stampe"),
+        ("sculture-ceramiche", "Sculture e ceramiche"),
+        ("tessuti-ricami", "Tessuti e ricami"),
+        ("materiali-creativi", "Materiali creativi"),
+    ),
+    "Buoni ed esperienze": (
+        ("gift-card", "Gift card e buoni acquisto"),
+        ("soggiorni-esperienze", "Soggiorni ed esperienze"),
+    ),
+}
+
+
+def sottocategoria_valida(categoria: str, s) -> str:
+    """Il giudice unico, gemello di condizione_valida: '' se la voce
+    non esiste o non appartiene alla categoria — il client non decide
+    il catalogo. '' = non dichiarata: gli storici non hanno obblighi
+    retroattivi, e il cambio categoria azzera da solo la sottovoce
+    che non appartiene piu'."""
+    s = (s or "").strip()
+    for sotto_id, _ in SOTTOCATEGORIE.get(categoria, ()):
+        if s == sotto_id:
+            return s
+    return ""
+
+
+def sottocategoria_tollerante(categoria: str, s) -> str:
+    """Per il CSV d'import (pattern condizione_tollerante): accetta
+    l'id o l'etichetta, maiuscole libere; sconosciuta = '' e mai uno
+    scarto — la merce c'e', e' l'etichetta a essere storta."""
+    s = (s or "").strip().lower()
+    if not s:
+        return ""
+    for sotto_id, nome in SOTTOCATEGORIE.get(categoria, ()):
+        if s in (sotto_id, nome.lower()):
+            return sotto_id
+    return ""
+
+
 # --- Condizione dell'oggetto (lug 2026): la scala a 5 livelli --------
 # Obbligatoria nel FORM (la validazione vive nel client, come per la
 # consegna): il server resta tollerante — '' = non dichiarata, cioe'
@@ -4051,14 +4270,19 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     zona = arricchisci_zona(d.get("zona", ""))
     lat, lon = coordinate_da_zona(zona)
     regione = regione_da_zona(zona)   # derivata dalla sigla, mai chiesta
+    # la sottocategoria e' DORMIENTE (ago 2026): il form non la offre
+    # ancora, ma un payload che la porta la scrive gia' — storta = ''
+    sotto = sottocategoria_valida(categoria_valida(d.get("categoria")),
+                                  d.get("sottocategoria"))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
+        "sottocategoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
         "anche_digitale,condizione,quantita,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
-         prezzo_sats, zona, valuta, prezzo_eur,
+         sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, quantita, "revisione" if in_revisione else "attivo",
          int(time.time())))
@@ -4543,15 +4767,25 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     zona = arricchisci_zona(d.get("zona", ""))
     lat, lon = coordinate_da_zona(zona)
     regione = regione_da_zona(zona)   # segue la zona, come le coordinate
+    # dormiente come in pubblica(), e l'assenza CONSERVA la sottovoce
+    # (il pattern dello stock qui sopra: il form di oggi non manda il
+    # campo e non deve azzerare quella scritta via payload) — ma sempre
+    # attraverso il giudice: se la categoria e' cambiata, la sottovoce
+    # che non le appartiene piu' si azzera da sola
+    sotto = sottocategoria_valida(
+        categoria_valida(d.get("categoria")),
+        d.get("sottocategoria") if "sottocategoria" in d
+        else a["sottocategoria"])
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
+        "sottocategoria=?, "
         "prezzo_sats=?, zona=?, valuta=?, prezzo_eur=?, lat=?, lon=?, "
         "regione=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, taglia_pacco=?, "
         "anche_digitale=?, condizione=?, quantita=?, stato=?, "
         "modificato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
-         prezzo_sats, zona, valuta, prezzo_eur,
+         sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, quantita, "revisione" if in_revisione else "attivo",
          int(time.time()), annuncio_id))
@@ -10063,6 +10297,11 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                       # colonna facoltativa anche lei: vuota = 1 pezzo
                       "quantita": quantita_tollerante(
                           cella(r, "quantita")),
+                      # sottocategoria (ago 2026): DORMIENTE — il
+                      # modello non la pubblicizza, ma chi la scrive
+                      # in colonna la trova salvata; storta = ''
+                      "sottocategoria": sottocategoria_tollerante(
+                          categoria, cella(r, "sottocategoria")),
                       "foto": foto})
 
     if not righe:
@@ -10146,12 +10385,14 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
     in_revisione = bool(riga.get("revisione"))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
+        "sottocategoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
         "anche_digitale,condizione,quantita,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
-         riga["categoria"], riga["prezzo_sats"], riga["zona"],
+         riga["categoria"], riga.get("sottocategoria", ""),
+         riga["prezzo_sats"], riga["zona"],
          riga["valuta"], riga["prezzo_eur"], lat, lon,
          regione_da_zona(riga["zona"]),
          riga.get("consegna", ""), riga.get("spedizione_sats", 0),
