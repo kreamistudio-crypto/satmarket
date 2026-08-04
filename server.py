@@ -2309,6 +2309,72 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM offerte WHERE compratore_id=? AND "
                     "venditore_id=?", (id_telegram, id_telegram))
+        # Le gare d'asta seguono l'utente. Fatture e registro col
+        # rimappo semplice; le puntate hanno UNIQUE(annuncio_id,
+        # tg_id): prima si risolvono le collisioni stessa-asta — la
+        # riga superstite e' quella in GARA (fra pari stato: offerta
+        # maggiore, poi chi ha saldato prima). SI SOMMANO SOLO LE
+        # ATTIVE (regola della lapide, decisione di Andrea): i sats di
+        # una puntata 'chiusa' sono GIA' al registro rimborsi, e
+        # sommarli sarebbe un doppio conteggio. Il superstite gareggia
+        # con TUTTO il versato — offerto = somma: una persona, una
+        # cassaforte — cosi' l'invariante versato==offerto tiene e
+        # l'ordine del vincitore dice sempre la cifra vera.
+        con.execute("UPDATE rilanci SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE rimborsi_asta SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        for cp in con.execute(
+                "SELECT a.id AS ia, b.id AS ib, a.versato_sats AS va, "
+                "b.versato_sats AS vb, a.offerto_sats AS oa, "
+                "b.offerto_sats AS ob, a.saldo_seq AS sa, "
+                "b.saldo_seq AS sb, a.stato AS sta, b.stato AS stb "
+                "FROM puntate a JOIN puntate b "
+                "ON a.annuncio_id=b.annuncio_id "
+                "WHERE a.tg_id=? AND b.tg_id=?",
+                (id_telegram, id_nostr)).fetchall():
+            somma = (cp["va"] if cp["sta"] == "attiva" else 0) \
+                  + (cp["vb"] if cp["stb"] == "attiva" else 0)
+            vive, muore, vive_stato = cp["ia"], cp["ib"], cp["sta"]
+            if ((cp["stb"] != "attiva", -cp["ob"], cp["sb"])
+                    < (cp["sta"] != "attiva", -cp["oa"], cp["sa"])):
+                vive, muore, vive_stato = cp["ib"], cp["ia"], cp["stb"]
+            # OR IGNORE: se entrambe le meta' avevano gia' un rimborso
+            # da chiusura, la riga dell'altra resta com'e' (il denaro
+            # non si tocca, il riferimento e' solo storico)
+            con.execute("UPDATE OR IGNORE rimborsi_asta SET puntata_id=? "
+                        "WHERE puntata_id=?", (vive, muore))
+            con.execute("UPDATE rilanci SET puntata_id=? WHERE "
+                        "puntata_id=?", (vive, muore))
+            con.execute("DELETE FROM puntate WHERE id=?", (muore,))
+            if vive_stato == "attiva" and somma > 0:
+                con.execute("UPDATE puntate SET versato_sats=?, "
+                            "offerto_sats=?, saldo_seq=? WHERE id=?",
+                            (somma, somma, max(cp["sa"], cp["sb"]),
+                             vive))
+        con.execute("UPDATE puntate SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        # L'auto-puntata nata dalla fusione (puntavo sulla MIA asta):
+        # NON si cancella come le auto-offerte — ci sono sats dentro.
+        # Si chiude e va nel registro; la riscossione la faranno lo
+        # scandaglio del ln-address e i solleciti (qui niente await:
+        # siamo in transazione).
+        adesso_fusione = int(time.time())
+        for r in con.execute(
+                "SELECT p.id, p.annuncio_id, p.versato_sats "
+                "FROM puntate p JOIN annunci a ON a.id=p.annuncio_id "
+                "WHERE p.tg_id=? AND a.venditore_id=? AND "
+                "p.stato='attiva' AND p.versato_sats>0",
+                (id_telegram, id_telegram)).fetchall():
+            con.execute("UPDATE puntate SET stato='chiusa', aggiornato=? "
+                        "WHERE id=?", (adesso_fusione, r["id"]))
+            con.execute("INSERT OR IGNORE INTO rimborsi_asta("
+                        "annuncio_id,tg_id,puntata_id,importo_sats,"
+                        "motivo,stato,creato,aggiornato) "
+                        "VALUES(?,?,?,?,'ritiro','da_riscuotere',?,?)",
+                        (r["annuncio_id"], id_telegram, r["id"],
+                         r["versato_sats"], adesso_fusione,
+                         adesso_fusione))
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -6920,6 +6986,410 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
     return await _paga_rimborso(rimborso_id)
 
 
+# ----------------------- ASTE: la chiusura ---------------------------
+# L'asta finisce esattamente dove oggi inizia un ordine: la puntata in
+# testa diventa un ordine GIA' pagato (crea_ordine_pagato), i perdenti
+# vanno nel registro «Da riscuotere», e da li' in poi e' il ciclo di
+# vita di sempre. La chiusura puo' morire a meta' ed essere rilanciata
+# senza doppioni: ogni asta e' UNA transazione, e il commit la porta
+# fuori dalla SELECT in un colpo.
+
+def _strade_asta(a) -> set:
+    """Le strade che l'asta offre al vincitore (tutte a costo zero,
+    per regola: la spedizione e' inclusa nel prezzo). La scelta
+    avviene DENTRO l'ordine, dal varco esistente."""
+    strade = set()
+    if a["consegna"] in ("spedizione", "entrambe"):
+        strade.add("spedizione")
+    if a["consegna"] in ("ritiro", "entrambe"):
+        strade.add("ritiro")
+    if a["consegna"] == "digitale" or a["anche_digitale"]:
+        strade.add("digitale")
+    return strade
+
+
+def _chiudi_una_asta(annuncio_id: int, cambio: float):
+    """La chiusura di UNA asta, in UNA transazione senza await.
+    Il RICONTROLLO della scadenza sta DENTRO (decisione di Andrea):
+    una proroga puo' arrivare tra la SELECT del giro e questa
+    lavorazione, e l'asta prorogata si salva — la riprendera' il giro
+    giusto. Idempotente: crash prima del commit = rollback e si rifa';
+    crash dopo = le righe 'da_riscuotere' le recuperano riscossioni,
+    scandaglio e solleciti (mai perse, non istantanee — dichiarato).
+    Ritorna il racconto per le notifiche, None = niente da fare."""
+    adesso = int(time.time())
+    con = db()
+    con.execute("BEGIN IMMEDIATE")
+    a = con.execute("SELECT * FROM annunci WHERE id=?",
+                    (annuncio_id,)).fetchone()
+    if (not a or a["stato"] != "attivo" or a["asta_base_sats"] <= 0
+            or a["asta_scadenza"] == 0 or a["asta_scadenza"] > adesso):
+        con.rollback()
+        con.close()
+        return None
+    puntate = [dict(r) for r in con.execute(
+        "SELECT * FROM puntate WHERE annuncio_id=?", (annuncio_id,))]
+    vincitrice, rimborsi = conto_chiusura(puntate)
+    if not vincitrice:
+        # DESERTA: torna in mano al venditore — scadenza azzerata,
+        # base intatta. Non comprabile finche' non decide (_asta()
+        # tiene spento l'acquisto): rilancia o converte a prezzo
+        # fisso, dalla sua scheda.
+        con.execute("UPDATE annunci SET asta_scadenza=0, "
+                    "asta_avvisata_1h=0 WHERE id=?", (annuncio_id,))
+        con.commit()
+        con.close()
+        return {"tipo": "deserta", "annuncio": dict(a)}
+    ultimo = con.execute(
+        "SELECT payment_hash FROM rilanci WHERE puntata_id=? AND "
+        "stato='saldato' ORDER BY saldato_il DESC, id DESC LIMIT 1",
+        (vincitrice["id"],)).fetchone()
+    payment_hash = ultimo["payment_hash"] if ultimo else \
+        f"asta-{annuncio_id}-{vincitrice['tg_id']}"
+    strade = _strade_asta(a)
+    scelta = strade.pop() if len(strade) == 1 else ""
+    ordine_id = crea_ordine_pagato(con, a, vincitrice["tg_id"],
+                                   vincitrice["versato_sats"],
+                                   payment_hash, scelta, cambio)
+    con.execute("UPDATE puntate SET stato='vincitrice', aggiornato=? "
+                "WHERE id=?", (adesso, vincitrice["id"]))
+    for rmb in rimborsi:
+        # INSERT OR IGNORE: la cintura d'idempotenza (indice parziale
+        # su puntata_id) para anche il doppio giro
+        con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,"
+                    "tg_id,puntata_id,importo_sats,motivo,stato,creato,"
+                    "aggiornato) VALUES(?,?,?,?,'perdente',"
+                    "'da_riscuotere',?,?)",
+                    (annuncio_id, rmb["tg_id"], rmb["puntata_id"],
+                     rmb["importo_sats"], adesso, adesso))
+    con.execute("UPDATE puntate SET stato='chiusa', aggiornato=? "
+                "WHERE annuncio_id=? AND stato='attiva' AND id!=?",
+                (adesso, annuncio_id, vincitrice["id"]))
+    # invariante di sempre: venduto <=> quantita 0. asta_scadenza
+    # resta com'e' (storico); lo stato 'venduto' toglie l'asta dalla
+    # SELECT della chiusura. Niente Nostr e niente canale: quest'asta
+    # non e' mai stata in piazza.
+    con.execute("UPDATE annunci SET stato='venduto', quantita=0, "
+                "asta_avvisata_1h=0 WHERE id=?", (annuncio_id,))
+    perdenti = [dict(r) for r in con.execute(
+        "SELECT id, tg_id FROM rimborsi_asta WHERE annuncio_id=? AND "
+        "motivo='perdente' AND stato='da_riscuotere'", (annuncio_id,))]
+    con.commit()
+    con.close()
+    return {"tipo": "vinta", "annuncio": dict(a), "ordine_id": ordine_id,
+            "vincitrice": dict(vincitrice), "perdenti": perdenti,
+            "scelta": scelta}
+
+
+async def _racconta_chiusura(esito: dict):
+    """Notifiche e riscossioni DOPO il commit, mai dentro."""
+    a = esito["annuncio"]
+    titolo = a["titolo"][:60]
+    if esito["tipo"] == "deserta":
+        await notifica(a["venditore_id"],
+            f"🔨 <b>L'asta «{titolo}» si è chiusa senza offerte.</b> "
+            f"L'annuncio è tornato a te: dalla sua scheda puoi "
+            f"rilanciare l'asta o convertirlo a prezzo fisso alla base "
+            f"({_fmt_sats(a['asta_base_sats'])} sats).")
+        return
+    v = esito["vincitrice"]
+    await notifica(v["tg_id"],
+        f"🏆 <b>Hai vinto l'asta!</b> «{titolo}» è tuo per "
+        f"{_fmt_sats(v['versato_sats'])} sats — già pagati, al sicuro "
+        f"nel deposito di garanzia. "
+        + ("Apri l'ordine e scegli come riceverlo."
+           if not esito["scelta"] else
+           "Il venditore prepara la consegna: segui l'ordine come "
+           "sempre."))
+    await notifica(a["venditore_id"],
+        f"🔨 <b>Asta conclusa!</b> «{titolo}» è stato aggiudicato a "
+        f"{_fmt_sats(v['versato_sats'])} sats "
+        f"(ordine #{esito['ordine_id']}). "
+        + ("Il vincitore sta scegliendo come riceverlo: ti avviso io "
+           "appena decide." if not esito["scelta"] else
+           "Prepara la consegna dal pannello dell'ordine."))
+    await polso_ordini_admin(
+        f"🔨 <b>Asta conclusa:</b> «{titolo}» — "
+        f"{_fmt_sats(v['versato_sats'])} sats in cassaforte "
+        f"(ordine #{esito['ordine_id']}). "
+        f"Restano {{aperti}} ordini aperti.")
+    for rmb in esito["perdenti"]:
+        try:
+            await notifica(rmb["tg_id"],
+                f"🔨 L'asta «{titolo}» si è conclusa a "
+                f"{_fmt_sats(v['versato_sats'])} sats: non hai vinto. "
+                f"Il tuo versato torna indietro adesso.")
+        except Exception:
+            pass
+        await _paga_rimborso(rmb["id"])   # racconta da solo l'esito
+
+
+async def chiudi_aste():
+    """Il lavoro pianificato della chiusura (stesso telaio dei timer
+    di auto-sblocco): trova le scadute e le chiude una a una, ognuna
+    nella SUA transazione. Gira ANCHE a leva spenta: le aste vive non
+    restano ostaggio di ASTA_ABILITATA. Il jitter del tick (10 min)
+    ritarda solo l'aggiudicazione: i rilanci tardivi li ferma il read
+    gate, mai l'orologio."""
+    adesso = int(time.time())
+    con = db()
+    scadute = [r["id"] for r in con.execute(
+        "SELECT id FROM annunci WHERE stato='attivo' AND "
+        "asta_base_sats>0 AND asta_scadenza>0 AND asta_scadenza<=?",
+        (adesso,))]
+    con.close()
+    if scadute:
+        # il cambio UNA volta, PRIMA delle transazioni (mai un await
+        # dentro): diventa il cambio_ordine dell'ordine gia' pagato
+        cambio = await cambio_btc_eur()
+        for aid in scadute:
+            esito = _chiudi_una_asta(aid, cambio)
+            if esito:
+                try:
+                    await _racconta_chiusura(esito)
+                except Exception as e:
+                    print(f"⚠️ Racconto chiusura asta #{aid} saltato: {e}")
+    await _avvisa_aste_in_scadenza()
+
+
+async def _avvisa_aste_in_scadenza():
+    """L'avviso «si chiude tra un'ora» ai partecipanti: il timbro
+    asta_avvisata_1h si scrive PRIMA delle notifiche (il pattern del
+    cooldown del colpo) e non si ripete mai; col tick da 10 minuti
+    arriva a 60±10 minuti dalla fine. Una proroga oltre l'ora NON
+    riarma l'avviso: dichiarato."""
+    adesso = int(time.time())
+    con = db()
+    aste = [dict(r) for r in con.execute(
+        "SELECT id, titolo, asta_scadenza FROM annunci WHERE "
+        "stato='attivo' AND asta_base_sats>0 AND asta_avvisata_1h=0 "
+        "AND asta_scadenza>? AND asta_scadenza<=?",
+        (adesso, adesso + 3600))]
+    if not aste:
+        con.close()
+        return
+    avvisi = []
+    for a in aste:
+        con.execute("UPDATE annunci SET asta_avvisata_1h=1 WHERE id=?",
+                    (a["id"],))
+        for p in con.execute("SELECT tg_id FROM puntate WHERE "
+                             "annuncio_id=? AND stato='attiva' AND "
+                             "versato_sats>0", (a["id"],)):
+            avvisi.append((p["tg_id"], a))
+    con.commit()
+    con.close()
+    for tg, a in avvisi:
+        try:
+            await notifica(tg,
+                f"⏳ <b>L'asta «{a['titolo'][:60]}» si chiude tra circa "
+                f"un'ora.</b> Controlla la tua posizione: un rilancio "
+                f"all'ultimo prolunga la gara di {ASTA_PROROGA_MINUTI} "
+                f"minuti.\n{URL_PUBBLICO}/annuncio/{a['id']}")
+        except Exception as e:
+            print(f"⚠️ Avviso scadenza asta saltato: {e}")
+
+
+@app.post("/api/aste/{annuncio_id}/rilancia")
+async def rilancia_asta_deserta(annuncio_id: int, req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """La deserta torna in gara: solo il venditore, solo su un'asta
+    ferma (base intatta, scadenza a zero), con le durate di sempre e
+    il tetto delle aste vive. Registro e puntate chiuse restano
+    storia."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    secondi = durata_asta_da_payload({"asta": d})
+    if not secondi:
+        raise HTTPException(400, "Indica la durata dell'asta")
+    con = db()
+    adesso = int(time.time())
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
+    if not a or a["asta_base_sats"] <= 0 or a["asta_scadenza"] != 0:
+        con.close()
+        raise HTTPException(400, "Si rilancia solo un'asta chiusa senza "
+                                 "offerte")
+    vive = con.execute(
+        "SELECT COUNT(*) AS n FROM annunci WHERE venditore_id=? "
+        "AND stato IN ('attivo','revisione') AND asta_base_sats>0 "
+        "AND asta_scadenza>?", (user["id"], adesso)).fetchone()["n"]
+    if vive >= ASTA_MAX_ATTIVE_VENDITORE:
+        con.close()
+        raise HTTPException(400, f"Hai già {ASTA_MAX_ATTIVE_VENDITORE} "
+                                 f"aste in corso: chiudine una prima di "
+                                 f"aprirne un'altra")
+    con.execute("UPDATE annunci SET asta_scadenza=?, asta_creato=?, "
+                "asta_avvisata_1h=0 WHERE id=?",
+                (adesso + secondi, adesso, annuncio_id))
+    con.commit()
+    con.close()
+    return {"ok": True, "asta_scadenza": adesso + secondi}
+
+
+@app.post("/api/aste/{annuncio_id}/converti")
+async def converti_asta(annuncio_id: int,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Da asta a prezzo fisso, alla base: la deserta sempre, l'asta
+    ancora viva solo SENZA puntate salde (regola del cantiere: senza
+    puntate il venditore puo' annullarla — convertirla e' l'annullo
+    che conserva l'annuncio). Con puntate salde: vincolante."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='attivo'", (annuncio_id, user["id"])).fetchone()
+    if not a or a["asta_base_sats"] <= 0:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if _puntate_attive_salde(con, annuncio_id):
+        con.close()
+        raise HTTPException(400, "L'asta ha già delle puntate ed è "
+                                 "vincolante: si chiude da sola alla "
+                                 "scadenza")
+    con.execute("UPDATE annunci SET asta_base_sats=0, asta_scadenza=0, "
+                "asta_creato=0, asta_avvisata_1h=0 WHERE id=?",
+                (annuncio_id,))
+    con.commit()
+    con.close()
+    return {"ok": True, "prezzo_sats": a["prezzo_sats"]}
+
+
+@app.post("/api/admin/aste/{annuncio_id}/annulla")
+async def annulla_asta_admin(annuncio_id: int,
+                             x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN (il caso moderazione): l'annullo d'asta scioglie la
+    gara — tutte le puntate salde finiscono in «Da riscuotere» — e
+    azzera le colonne asta; l'annuncio resta, e se va rimosso passa
+    dalla rimozione ordinaria (che ora non trova piu' puntate)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    con.execute("BEGIN IMMEDIATE")
+    adesso = int(time.time())
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND stato IN "
+                    "('attivo','revisione')", (annuncio_id,)).fetchone()
+    if not a or a["asta_base_sats"] <= 0:
+        con.rollback()
+        con.close()
+        raise HTTPException(400, "Asta non trovata (o già chiusa)")
+    salde = [dict(r) for r in con.execute(
+        "SELECT id, tg_id, versato_sats FROM puntate WHERE annuncio_id=? "
+        "AND stato='attiva' AND versato_sats>0", (annuncio_id,))]
+    for p in salde:
+        con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,"
+                    "tg_id,puntata_id,importo_sats,motivo,stato,creato,"
+                    "aggiornato) VALUES(?,?,?,?,'annullo_admin',"
+                    "'da_riscuotere',?,?)",
+                    (annuncio_id, p["tg_id"], p["id"], p["versato_sats"],
+                     adesso, adesso))
+    con.execute("UPDATE puntate SET stato='chiusa', aggiornato=? "
+                "WHERE annuncio_id=? AND stato='attiva'",
+                (adesso, annuncio_id))
+    con.execute("UPDATE annunci SET asta_base_sats=0, asta_scadenza=0, "
+                "asta_creato=0, asta_avvisata_1h=0 WHERE id=?",
+                (annuncio_id,))
+    rimborsi = [dict(r) for r in con.execute(
+        "SELECT id, tg_id, importo_sats FROM rimborsi_asta WHERE "
+        "annuncio_id=? AND motivo='annullo_admin' AND "
+        "stato='da_riscuotere'", (annuncio_id,))]
+    con.commit()
+    con.close()
+    registra_moderazione("admin", "asta_annullata", "", a["titolo"],
+                         annuncio_id, a["venditore_id"], user["id"])
+    titolo = a["titolo"][:60]
+    await notifica(a["venditore_id"],
+                   f"🛡 <b>L'asta «{titolo}» è stata annullata dai "
+                   f"moderatori.</b> I puntatori vengono rimborsati; "
+                   f"l'annuncio resta a prezzo fisso.")
+    for rmb in rimborsi:
+        try:
+            await notifica(rmb["tg_id"],
+                f"🛡 L'asta «{titolo}» è stata annullata dai "
+                f"moderatori: il tuo versato torna indietro adesso.")
+        except Exception:
+            pass
+        await _paga_rimborso(rmb["id"])
+    return {"ok": True, "rimborsati": len(rimborsi)}
+
+
+@app.post("/api/admin/aste/{annuncio_id}/chiudi-ora")
+async def chiudi_asta_ora(annuncio_id: int,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """SOLO COLLAUDO: chiude l'asta adesso, passando dalla STESSA
+    chiusura dell'orologio — per provare il ciclo intero senza
+    aspettare giorni."""
+    if not MODALITA_COLLAUDO:
+        raise HTTPException(404, "Non esiste")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    cur = con.execute("UPDATE annunci SET asta_scadenza=? WHERE id=? "
+                      "AND stato='attivo' AND asta_base_sats>0 AND "
+                      "asta_scadenza>0", (int(time.time()) - 1,
+                                          annuncio_id))
+    con.commit()
+    con.close()
+    if cur.rowcount == 0:
+        raise HTTPException(400, "Nessuna asta viva da chiudere qui")
+    cambio = await cambio_btc_eur()
+    esito = _chiudi_una_asta(annuncio_id, cambio)
+    if esito:
+        await _racconta_chiusura(esito)
+    return {"ok": True, "esito": esito["tipo"] if esito else "niente"}
+
+
+@app.post("/api/orders/{ordine_id}/consegna")
+async def scegli_consegna_ordine(ordine_id: int, req: Request,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """Il vincitore dell'asta sceglie la strada DENTRO l'ordine (dal
+    varco esistente): solo il compratore, solo su 'locked' con la
+    scelta ancora vuota, solo fra le strade che l'annuncio offre.
+    Finche' non sceglie, il venditore vede «in attesa della scelta»
+    e non puo' spedire ne' consegnare: nessuna finestra di tutela
+    parte prima della scelta (decisione di Andrea)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    scelta = (d.get("consegna") or "").strip()
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["consegna_scelta"]:
+        con.close()
+        raise HTTPException(400, "La strada di consegna è già scelta")
+    a = con.execute("SELECT * FROM annunci WHERE id=?",
+                    (o["annuncio_id"],)).fetchone()
+    if not a or a["asta_base_sats"] <= 0:
+        # gli ordini STORICI con consegna '' restano il flusso di
+        # sempre: questa porta e' solo del vincitore d'asta
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if scelta not in _strade_asta(a):
+        con.close()
+        raise HTTPException(400, "Questa strada non è offerta "
+                                 "dall'annuncio")
+    con.execute("UPDATE ordini SET consegna_scelta=?, aggiornato=? "
+                "WHERE id=?", (scelta, int(time.time()), ordine_id))
+    con.commit()
+    con.close()
+    NOMI = {"spedizione": "spedizione (inclusa nel prezzo)",
+            "ritiro": "ritiro in zona", "digitale": "codice online"}
+    await notifica(a["venditore_id"],
+                   f"📦 <b>Il vincitore ha scelto: "
+                   f"{NOMI.get(scelta, scelta)}.</b> «{a['titolo'][:60]}» "
+                   f"— prepara la consegna dal pannello dell'ordine "
+                   f"#{ordine_id}.")
+    return {"ok": True, "consegna": scelta}
+
+
 @app.post("/api/listings/{annuncio_id}/offerta")
 async def fai_offerta(annuncio_id: int, req: Request,
                       x_tg_init_data: str = Header(""),
@@ -7983,6 +8453,31 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "offerta_id": off["id"] if off else 0}
 
 
+def crea_ordine_pagato(con, a, compratore_id: int, totale_sats: int,
+                       payment_hash: str, consegna_scelta: str = "",
+                       cambio: float = 0) -> int:
+    """LA PRIMITIVA «ordine gia' pagato» (ago 2026, nata col cantiere
+    aste): i sats sono GIA' in cassaforte — oggi un'asta aggiudicata,
+    domani la pagina d'acquisto che incassa prima di creare — e
+    l'ordine nasce direttamente 'locked', senza invoice da attendere.
+    Scrive DENTRO la transazione del chiamante (nessun commit qui:
+    l'atomicita' la decide chi invoca). Da qui in poi e' un ordine
+    come tutti gli altri: spedizione, conferma, dispute, auto-sblocco,
+    feedback — il ciclo di vita non si tocca. consegna_scelta puo'
+    nascere vuota (il vincitore d'asta sceglie DENTRO l'ordine, dal
+    varco): finche' e' vuota il venditore non spedisce e nessuna
+    finestra di tutela parte."""
+    adesso = int(time.time())
+    con.execute(
+        "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
+        "prezzo_sats,stato,payment_hash,creato,aggiornato,cambio_ordine,"
+        "consegna_scelta,spedizione_sats,protezione_sats,quantita) "
+        "VALUES(?,?,?,?,'locked',?,?,?,?,?,0,0,1)",
+        (a["id"], compratore_id, a["venditore_id"], totale_sats,
+         payment_hash, adesso, adesso, cambio, consegna_scelta))
+    return con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+
+
 @app.post("/api/orders/{ordine_id}/verifica-pagamento")
 async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
                                              barattolo_sessione: str = Cookie("")):
@@ -8158,6 +8653,20 @@ async def segna_spedito(ordine_id: int, req: Request,
         raise HTTPException(400, "Questo ordine è a consegna digitale: "
                                  "consegna il contenuto dal pannello "
                                  "dedicato dell'ordine")
+    if not o["consegna_scelta"]:
+        # L'ordine nato da un'ASTA aspetta la scelta del vincitore:
+        # niente spedizione e nessuna finestra di tutela prima della
+        # scelta (decisione di Andrea). Gli ordini STORICI con
+        # consegna '' restano il flusso di sempre: la differenza la
+        # fa l'annuncio all'asta.
+        a_asta = con.execute("SELECT asta_base_sats FROM annunci "
+                             "WHERE id=?", (o["annuncio_id"],)).fetchone()
+        if a_asta and a_asta["asta_base_sats"] > 0:
+            con.close()
+            raise HTTPException(400, "Il vincitore dell'asta sta "
+                                     "scegliendo come riceverlo: "
+                                     "attendi la sua scelta prima di "
+                                     "spedire")
     con.execute("UPDATE ordini SET stato='shipped', corriere=?, tracking=?, "
                 "spedito_il=?, aggiornato=? WHERE id=?",
                 (corriere, tracking, int(time.time()), int(time.time()),
@@ -11082,6 +11591,10 @@ def miei_ordini(x_tg_init_data: str = Header(""),
     pulisci_ordini_fantasma(con)
     con.commit()
     q = ("SELECT o.*, a.titolo, a.zona, "
+         # l'ordine nato da un'asta si riconosce dall'annuncio: al
+         # client serve per lo stato «in attesa della scelta» del
+         # vincitore (i mono normali portano 0, i set NULL)
+         "a.asta_base_sats AS asta, "
          "uc.username AS compratore_username, "
          "uv.username AS venditore_username, "
          # il ponte Nostr verso la controparte: solo chiavi dal
@@ -13239,6 +13752,10 @@ async def orologio():
             await scadenze_offerte()
         except Exception as e:
             print(f"⚠️ Scadenze offerte saltate: {e}")
+        try:
+            await chiudi_aste()
+        except Exception as e:
+            print(f"⚠️ Chiusura aste saltata (riprovo tra 10 min): {e}")
         try:
             scadenze_lampo()
         except Exception as e:
