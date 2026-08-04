@@ -259,7 +259,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dentro, la lezione del prompt in due copie — e si arricchisce coi
   dati veri: `python assegna_sottocategorie.py --conta` sul VPS dice
   quante righe sono assegnate e DOVE il giudice si astiene di più, coi
-  titoli d'esempio; si impara dai NON SO, mai dagli sbagli. Lo stesso
+  titoli d'esempio (SOLO gli attivi: il conto a tre stati pescava i
+  venduti delle prove di rodaggio e misurava fantasmi — la passata
+  --scrivi invece tiene anche revisione e venduto, che possono tornare
+  in vetrina); si impara dai NON SO, mai dagli sbagli.
+  IL TERMOMETRO SUONA DA SOLO (ago 2026, «il --conta lo dimenticherò
+  di sicuro»): `termometro_sottocategorie` nell'orologio — il LUNEDÌ,
+  UNA notifica aggregata agli admin con totale e le 3 categorie più
+  scoperte, più il conto dei vuoti che il dizionario di OGGI
+  coprirebbe già (= serve solo un rilancio dello script: chiude anche
+  il secondo modo di dimenticarsene). L'ancora è il CALENDARIO e non
+  un conteggio in memoria, ed è deliberato: il gate in RAM muore a
+  ogni deploy e un «ogni 7 giorni» contato da lì suonerebbe a ogni
+  riavvio — col lunedì, un riavvio può al più far suonare due volte
+  quel lunedì. Conta come il --conta (soli attivi, «Altro» escluso:
+  è piatta per forza, non è «scoperta»); tace sotto
+  TERMOMETRO_SOTTOCATEGORIE_MINIMO (5), tace a vetrina piena, e la
+  leva TERMOMETRO_SOTTOCATEGORIE (True di serie) la spegne — una coda
+  ferma non suona, il patto dei solleciti. Lo stesso
   script fa la passata sul pregresso (anteprima di serie, `--scrivi`
   per farla, un percorso di database per la prova generale su una
   copia — pattern ripulisci_anello): tocca solo righe VUOTE in stati
