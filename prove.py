@@ -954,6 +954,50 @@ def prove_disarmo():
           and "ORE_CONFERMA_DIGITALE = 24" in cfg
           and "ORE_SILENZIO_DIGITALE = 48" in cfg)
 
+    # --- IL PROMEMORIA AL VENDITORE FERMO (ago 2026, buco 1 chiuso) ---
+    # Il gemello speculare: li' aspettiamo il compratore, qui il
+    # venditore. Buco PREESISTENTE al disarmo, quindi con regole sue.
+    ven = corpo("sollecita_venditori_fermi")
+    # 20-21: le due leve del primo squillo, gemelle server/config
+    prova("venditore fermo: leva spedizione gemella", True,
+          "PROMEMORIA_SPEDIZIONE_GIORNI = 5" in _SORGENTE
+          and "PROMEMORIA_SPEDIZIONE_GIORNI = 5" in cfg)
+    prova("venditore fermo: leva digitale gemella", True,
+          "PROMEMORIA_DIGITALE_ORE = 48" in _SORGENTE
+          and "PROMEMORIA_DIGITALE_ORE = 48" in cfg)
+    # 22: mai sats mossi, solo parole (la regola cardinale)
+    prova("venditore fermo: mai sats mossi, solo parole", True,
+          "UPDATE ordini SET sollecito_venditore_il" in ven
+          and not any(x in ven for x in
+                      ("_sblocca_sats", "_rimborsa_compratore",
+                       "_paga_rimborso", "paga_venditore", "released")))
+    # 23: E' UN'AGGIUNTA, NON UN SOSTITUTO — se un domani la leva torna
+    # accesa col tracking verificato, il buco non deve riaprirsi
+    # (si cerca la forma della GUARDIA, non il nome: la leva e' nominata
+    # apposta nella docstring, ed e' li' che si spiega perche' non c'e')
+    prova("venditore fermo: gira anche a leva riaccesa", False,
+          "if AUTO_SBLOCCO_ATTIVO" in ven)
+    # 24: l'ancora e' `creato`, immutabile — con `aggiornato` il
+    # venditore sposterebbe il proprio squillo da deposita_invoice
+    prova("venditore fermo: ancora immutabile, non `aggiornato`", True,
+          "o.creato + ?" in ven and "o.aggiornato" not in ven)
+    # 25: contatore SUO, o al primo giro dopo la spedizione il
+    # compratore si troverebbe la sua popolazione gia' al tetto
+    prova("venditore fermo: contatore suo, mai quello del compratore", True,
+          "solleciti_venditore" in ven and "solleciti_conferma" not in ven)
+    # 26-27: i set non restano fuori, il ritiro non squilla due volte
+    prova("venditore fermo: i set non restano fuori (LEFT JOIN)", True,
+          "LEFT JOIN annunci" in ven)
+    # le due strade sono voci di una tupla; il ritiro NON dev'esserci in
+    # nessuna forma di virgolette, o squillerebbe due volte
+    prova("venditore fermo: il ritiro ha gia' la sua funzione", True,
+          '"spedizione", PROMEMORIA_SPEDIZIONE_GIORNI' in ven
+          and '"digitale", PROMEMORIA_DIGITALE_ORE' in ven
+          and '"ritiro"' not in ven and "'ritiro'" not in ven)
+    # 28: agganciato all'orologio, o non suona mai
+    prova("venditore fermo: agganciato all'orologio", True,
+          "sollecita_venditori_fermi()" in oro)
+
 
 def main():
     print("=" * 58)

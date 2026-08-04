@@ -65,6 +65,13 @@ PROMEMORIA_CONFERMA_GIORNI = 3  # ogni quanto si ribussa al compratore
                              # spenti: i sats restano fermi in silenzio)
 PROMEMORIA_CONFERMA_MAX = 3  # promemoria ignorati prima che il caso
                              # venga segnalato ai moderatori, poi silenzio
+                             # (la cadenza e il tetto qui sopra valgono
+                             # anche per i due promemoria al VENDITORE)
+PROMEMORIA_SPEDIZIONE_GIORNI = 5  # ordine 'locked' col pacco mai partito:
+                             # dopo quanti giorni dal pagamento parte il
+                             # primo squillo al venditore (0 = spento)
+PROMEMORIA_DIGITALE_ORE = 48 # idem per il codice online mai consegnato:
+                             # ore, non giorni — un codice si manda subito
 SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot
                              # giorni un promemoria al venditore
                              # (0 = solleciti spenti)

@@ -340,6 +340,27 @@ try:
     from config import PROMEMORIA_CONFERMA_MAX
 except ImportError:
     PROMEMORIA_CONFERMA_MAX = 3     # poi la palla passa ai moderatori
+# E il promemoria al VENDITORE che non fa partire la merce (ago 2026):
+# un ordine 'locked' non ha MAI avuto un timer — il buco e' preesistente
+# al disarmo, non figlio suo — e senza promemoria restava fermo per
+# sempre, col compratore che non sa nemmeno di poter aprire una disputa.
+# Qui si dichiara solo il PRIMO squillo, una finestra per strada; la
+# cadenza e il tetto sono quelli di sopra (stessa cadenza per decisione:
+# un posto solo da cambiare batte due da tenere uguali). A 0 la
+# popolazione e' spenta.
+try:
+    from config import PROMEMORIA_SPEDIZIONE_GIORNI
+except ImportError:
+    PROMEMORIA_SPEDIZIONE_GIORNI = 5   # piu' lunga di uno spedisci-e-
+                                       # segna col weekend in mezzo, piu'
+                                       # corta dei 10 giorni di ieri
+try:
+    from config import PROMEMORIA_DIGITALE_ORE
+except ImportError:
+    PROMEMORIA_DIGITALE_ORE = 48       # un codice si manda in minuti:
+                                       # e' ORE_SILENZIO_DIGITALE, l'altra
+                                       # finestra di silenzio di quella
+                                       # strada
 
 # Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
 # propone una cifra, il venditore accetta/rifiuta/contropropone UNA
@@ -1274,7 +1295,19 @@ def init_db():
                     # i ritiri — un contatore ereditato salterebbe
                     # dritto al tetto
                     "sollecito_conferma_il INTEGER DEFAULT 0",
-                    "solleciti_conferma INTEGER DEFAULT 0"):
+                    "solleciti_conferma INTEGER DEFAULT 0",
+                    # il promemoria al venditore fermo (ago 2026): le
+                    # colonne dicono CHI aspettiamo — _conferma il
+                    # compratore, _venditore il venditore. Non si
+                    # riusano quelle di sopra: un ordine che prende i
+                    # suoi squilli da 'locked' e poi viene spedito
+                    # atterrerebbe nella popolazione 'shipped' gia' al
+                    # tetto, e il compratore non sentirebbe mai il suo.
+                    # (Da non confondere con `sollecito_il`, che e' il
+                    # contrario: quando il venditore ha sollecitato il
+                    # compratore col suo bottone.)
+                    "sollecito_venditore_il INTEGER DEFAULT 0",
+                    "solleciti_venditore INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -13089,6 +13122,120 @@ async def sollecita_conferme_ferme():
             print(f"⚠️ Promemoria conferma saltato (#{r['id']}): {e}")
 
 
+async def sollecita_venditori_fermi():
+    """IL PROMEMORIA AL VENDITORE CHE NON FA PARTIRE LA MERCE (ago 2026).
+    Il compratore ha pagato, i sats sono in cassaforte, l'ordine e'
+    'locked' — e li' poteva restare per sempre: da 'locked' non e' mai
+    partito nessun timer e non arrivava nessuna parola. Il venditore che
+    non spedisce (o non consegna il codice) non sentiva niente, e il
+    compratore non sapeva che apri_disputa accetta 'locked' e che il
+    bottone «C'e' un problema» e' gia' li'.
+    E' un buco PREESISTENTE al disarmo, non figlio suo: per questo la
+    guardia NON guarda AUTO_SBLOCCO_ATTIVO — questa e' un'AGGIUNTA e non
+    il sostituto di uno sblocco, e se un domani la leva torna accesa col
+    tracking verificato il buco non deve riaprirsi in silenzio.
+    Gemella speculare di sollecita_conferme_ferme: li' aspettiamo il
+    compratore, qui il venditore, e i destinatari sono INVERTITI — il
+    venditore a ogni squillo (e' lui che deve agire), il compratore solo
+    al primo, per dirgli che i sats sono fermi e che puo' aprire una
+    disputa. Al tetto UNA segnalazione ai moderatori, poi silenzio.
+    L'ANCORA E' `creato` E NON `aggiornato`, ed e' la trappola da non
+    ricadere: deposita_invoice accetta il venditore proprio su 'locked' e
+    scrive `aggiornato`, quindi col gemello dei ritiri il venditore
+    potrebbe rimandare all'infinito il proprio promemoria ri-salvando la
+    sua invoice d'incasso. `creato` invece e' immutabile una volta che
+    l'ordine e' locked, ed e' il momento del pagamento a meno di mezz'ora
+    (vita della invoice piu' la finestra del reaper).
+    Qui i sats non si muovono mai, solo parole; le notifiche partono
+    DOPO il commit."""
+    if PROMEMORIA_CONFERMA_GIORNI <= 0:
+        return                       # niente passo = niente promemoria
+    adesso = int(time.time())
+    passo = PROMEMORIA_CONFERMA_GIORNI * 86400
+    con = db()
+    # Due strade, due attese diverse: un pacco viaggia in giorni, un
+    # codice si manda in minuti. Il ritiro in zona ha gia' la sua
+    # sollecita_ritiri_fermi, e la strada non dichiarata ('' degli
+    # ordini d'asta mai scelti e degli storici) resta fuori: li' il
+    # venditore non puo' agire, e sarebbe un rimprovero a vuoto.
+    # I pezzi interpolati sono nostri, mai dal client.
+    righe = []
+    for strada, finestra in (
+            ("spedizione", PROMEMORIA_SPEDIZIONE_GIORNI * 86400),
+            ("digitale", PROMEMORIA_DIGITALE_ORE * 3600)):
+        if finestra <= 0:
+            continue                 # quella popolazione e' spenta
+        righe += [dict(r, strada=strada) for r in con.execute(
+            "SELECT o.id, o.compratore_id, o.venditore_id, o.annuncio_id, "
+            "o.prezzo_sats, o.solleciti_venditore, a.titolo FROM ordini o "
+            # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
+            "LEFT JOIN annunci a ON a.id = o.annuncio_id "
+            "WHERE o.stato='locked' AND o.consegna_scelta=? "
+            "AND o.solleciti_venditore <= ? "
+            "AND MAX(o.creato + ?, o.sollecito_venditore_il + ?) < ?",
+            (strada, PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+        con.execute("UPDATE ordini SET sollecito_venditore_il=?, "
+                    "solleciti_venditore=solleciti_venditore+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        # escape: le notifiche sono HTML e il titolo lo scrive un
+        # utente — un «<» spegnerebbe il promemoria in silenzio (finisce
+        # nell'except qui sotto). I quattro solleciti fratelli non lo
+        # fanno ancora: e' roba loro, non di questo cantiere.
+        titolo = html.escape((r["titolo"] or "il tuo affare")[:60])
+        digitale = r["strada"] == "digitale"
+        try:
+            if r["solleciti_venditore"] < PROMEMORIA_CONFERMA_MAX:
+                await notifica(r["venditore_id"],
+                    f"{'💾' if digitale else '📦'} <b>«{titolo}» aspetta "
+                    f"te.</b> L'acquirente ha pagato e i sats sono nel "
+                    f"deposito di garanzia: arrivano a te quando l'affare "
+                    f"si chiude. Apri l'ordine nella Mini App e "
+                    + ("<b>consegna il codice</b>."
+                       if digitale else
+                       "<b>segna la spedizione</b> col tracciamento.")
+                    + " Se non puoi più portarlo a termine, dillo "
+                      "all'acquirente: potrà farsi rimborsare.")
+                if r["solleciti_venditore"] == 0:
+                    # Una volta sola: al compratore non si chiede niente,
+                    # gli si dice come stanno le cose e dov'e' la maniglia.
+                    await notifica(r["compratore_id"],
+                        f"⏳ <b>«{titolo}» non è ancora partito.</b> Il "
+                        f"venditore non ha ancora "
+                        + ("consegnato il codice."
+                           if digitale else "segnato la spedizione.")
+                        + " I tuoi sats sono al sicuro nel deposito di "
+                          "garanzia e non si sbloccano da soli. Glielo "
+                          "stiamo ricordando; se preferisci non "
+                          "aspettare, dall'ordine puoi <b>aprire una "
+                          "disputa</b> e chiedere il rimborso.")
+            else:
+                # Il tetto e' passato: tocca a un umano, e da qui in poi
+                # silenzio. L'importo e' il TOTALE e non il netto: qui
+                # non si sa ancora chi lo prende, e l'esito piu'
+                # probabile e' che torni indietro.
+                await notifica_admin(
+                    f"🧊 <b>Merce mai partita:</b> ordine #{r['id']} "
+                    f"(«{titolo}», {r['strada']}), "
+                    f"<b>{_fmt_sats(r['prezzo_sats'])} sats</b> in "
+                    f"cassaforte. Il venditore ha ignorato "
+                    f"{PROMEMORIA_CONFERMA_MAX} promemoria in "
+                    f"~{PROMEMORIA_CONFERMA_MAX * PROMEMORIA_CONFERMA_GIORNI} "
+                    f"giorni: serve un occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Promemoria venditore saltato (#{r['id']}): {e}")
+
+
 async def sollecita_rimborsi_puntate():
     """Il gemello di sollecita_incassi sul registro d'asta: un
     rimborso fermo in «Da riscuotere» riceve un promemoria ogni
@@ -14236,6 +14383,13 @@ async def orologio():
             await sollecita_conferme_ferme()
         except Exception as e:
             print(f"⚠️ Promemoria conferme ferme saltati: {e}")
+        try:
+            # il gemello speculare: qui il fermo e' il VENDITORE che non
+            # fa partire la merce. Buco preesistente al disarmo, quindi
+            # gira sempre — anche a leva riaccesa — e non muove un sat
+            await sollecita_venditori_fermi()
+        except Exception as e:
+            print(f"⚠️ Promemoria venditori fermi saltati: {e}")
         try:
             await scadenze_offerte()
         except Exception as e:
