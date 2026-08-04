@@ -3979,16 +3979,23 @@ const slugCat = c => c.toLowerCase().replace(/ /g,'-');
    L'emoji tiene il posto finche' la figura non e' arrivata (data-ok
    sull'onload), e resta per sempre se non arriva (onerror). */
 function icoCategoria(c){
-  return `<span class="cat-ico"><img src="/assets/categorie/${slugCat(c)}-mini.webp"
+  return `<span class="cat-ico"><img src="/assets/categorie/${slugCat(c)}-mini.webp?b=2"
       alt="" loading="lazy" decoding="async"
       onload="this.dataset.ok=1" onerror="this.remove()"
     ><span class="cat-ico-em" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>`;
 }
 
-/* Le 26 piastrelle. I conteggi sono gli stessi di renderChips (globali
-   dal server, dal locale in DEMO) ma qui NON si mostrano: servono solo
-   a decidere chi e' spento. E l'ordine e' quello del catalogo, non per
-   numero — Sfoglia e' una mappa, e una mappa non si riordina da sola. */
+/* Le piastrelle del catalogo. I conteggi sono gli stessi di renderChips
+   (globali dal server, dal locale in DEMO) ma qui NON si mostrano:
+   servono solo a decidere chi e' spento. E l'ordine e' quello del
+   catalogo, non per numero — Sfoglia e' una mappa, e una mappa non si
+   riordina da sola.
+   Il ?b=2 sugli URL (qui e in icoCategoria) e' il timbro UNA TANTUM
+   che ha ripulito le cache scritte quando la rotta prometteva max-age
+   di un giorno: la PWA mostrava generazioni vecchie miste — il
+   biglietto con l'alone, Animali senza pareggio — e sembrava un render
+   diverso dalla Mini App. Da allora la rotta risponde no-cache e
+   comanda la revalidazione ETag: questo numero NON va piu' toccato. */
 function renderSfoglia(){
   /* il nome va in data-cat e MAI dentro la stringa JS dell'onclick:
      e' la lezione gia' pagata sul picker con «Valle d'Aosta» */
@@ -3996,7 +4003,7 @@ function renderSfoglia(){
     <button class="cat-tile" data-cat="${esc(c)}"
             onclick="apriCategoria(this.dataset.cat)">
       <span class="cat-nome" lang="it">${esc(c)}</span>
-      <span class="cat-fig"><img src="/assets/categorie/${slugCat(c)}.webp"
+      <span class="cat-fig"><img src="/assets/categorie/${slugCat(c)}.webp?b=2"
            alt="" loading="lazy" decoding="async"
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>

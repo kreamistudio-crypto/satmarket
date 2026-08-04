@@ -12007,7 +12007,7 @@ def asset_tappo():
 # resta chiuso e derivato, e nessun percorso puo' uscire dalla
 # cartella — lo spirito della regola ferrea 3, senza StaticFiles.
 @app.get("/assets/categorie/{nome}")
-def asset_categoria(nome: str):
+def asset_categoria(nome: str, if_none_match: str = Header("")):
     slug = nome[:-5] if nome.endswith(".webp") else ""
     # il francobollo del foglio-picker: stesso slug col suffisso, e
     # passa dalla stessa whitelist (che resta calcolata dal catalogo)
@@ -12017,8 +12017,33 @@ def asset_categoria(nome: str):
     percorso = os.path.join("assets", "categorie", slug + ".webp")
     if not os.path.exists(percorso):
         raise HTTPException(404, "immagine non trovata")
+    # REVALIDAZIONE, non max-age (ago 2026, da un caso vero: la PWA di
+    # Andrea mostrava DUE generazioni vecchie insieme — il biglietto
+    # con l'alone «attaccato al titolo» e Animali senza il pareggio —
+    # mentre la Mini App, che ha la SUA cache, era giusta. Sembrava un
+    # render diverso nei due contesti: era il max-age di un giorno su
+    # nomi NON versionati). Ed e' strutturale, non un incidente: ogni
+    # illustrazione nuova sposta la mediana dell'inchiostro e
+    # ritaglia_categorie.py riscrive delle sorelle, quindi i file
+    # cambiano A OGNI categoria aggiunta. no-cache = il browser tiene
+    # la copia ma la RICONTROLLA a ogni uso; il 304 pero' va fatto QUI
+    # (verificato: FileResponse manda l'ETag ma NON legge
+    # If-None-Match — quel pezzo vive in StaticFiles, che la regola 3
+    # ci vieta), con la STESSA formula di Starlette (md5 di
+    # mtime-size), o i due header divergerebbero. Finche' il file non
+    # cambia la revalidazione costa due spicci su h2/h3; il giorno che
+    # cambia arriva subito quello nuovo. Il timbro ?b= negli URL del
+    # client e' servito una tantum a ripulire le cache scritte quando
+    # qui c'era max-age=86400.
+    st = os.stat(percorso)
+    etag = '"' + hashlib.md5(
+        f"{st.st_mtime}-{st.st_size}".encode()).hexdigest() + '"'
+    if etag in if_none_match:
+        return Response(status_code=304,
+                        headers={"Cache-Control": "public, no-cache",
+                                 "ETag": etag})
     return FileResponse(percorso, media_type="image/webp",
-                        headers={"Cache-Control": "public, max-age=86400"})
+                        headers={"Cache-Control": "public, no-cache"})
 
 
 # --- PWA (lug 2026): Barattolo installabile dal browser -------------------

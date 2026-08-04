@@ -4440,11 +4440,22 @@ browser non ha il dizionario di sillabazione, e la guardia di
 `renderChips` che rimangiava la categoria scelta quando era vuota.
 In produzione basta il deploy: nessuna colonna, nessuna leva —
 solo i 26 file in `assets/categorie/`, che viaggiano col commit.
-ATTENZIONE per il prossimo cantiere: le illustrazioni sono servite con
-cache di un giorno e nomi NON versionati, quindi una che venga rifatta
-resta vecchia nei browser per 24 ore (in locale è successo davvero, e
-falsava le misure). Se un giorno cambieranno spesso, la strada è
-quella delle foto: il nome col timbro.
+L'avvertimento che stava qui — cache di un giorno su nomi NON
+versionati, «una rifatta resta vecchia nei browser per 24 ore» — si è
+incassato per davvero (ago 2026): la PWA di Andrea mostrava DUE
+generazioni vecchie insieme (il biglietto della 27ª con l'alone
+«attaccato al titolo», Animali senza il pareggio) mentre la Mini App,
+che ha la SUA cache WebView, era giusta — e sembrava in tutto un
+render diverso nei due contesti. Ed era STRUTTURALE, non un caso: ogni
+illustrazione nuova sposta la mediana dell'inchiostro e il pareggio
+riscrive delle sorelle, quindi i file cambiano a ogni categoria
+aggiunta. La cura, per tutte e 27: la rotta risponde
+`Cache-Control: public, no-cache` — il browser tiene la copia ma la
+RICONTROLLA a ogni uso, e l'ETag che FileResponse già manda fa 304
+finché il file non cambia — più il timbro una-tantum `?b=2` sugli URL
+del client (renderSfoglia e icoCategoria), che ha ripulito le cache
+scritte col regime vecchio e NON va più toccato. Il «nome col timbro»
+delle foto resta la strada se un giorno servisse rimettere il max-age.
 Tre lavori sulla nav, in un cantiere solo (lug 2026): la nav non mente
 più entrando da Sfoglia — si accendeva «Esplora» su una vetrina
 filtrata, e chi guardava credeva fosse il mercatino intero e lo
