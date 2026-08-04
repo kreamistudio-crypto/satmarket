@@ -853,7 +853,10 @@
      («Carma…»): la regola di sempre — a cedere e' il luogo, mai il
      gruppo — resta, e il prezzo lo paga solo il caso a tre strade. */
   .card .meta .ico .gratis{display:inline-flex;align-items:center;gap:2px;
-    color:var(--ship-card);font-weight:800;font-size:10px;
+    /* sfollamento colori (ago 2026): «gratis» parla l'inchiostro di
+       casa in grassetto — il token, non un nero fisso: di notte e'
+       crema. Il ghiaccio --ship-card non si usa piu' qui. */
+    color:var(--ink);font-weight:800;font-size:10px;
     letter-spacing:.01em}
 
   /* Etichetta di sezione con la linea puntinata che riempie fino al
@@ -4996,12 +4999,12 @@ const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0);
    bottoni compra, che la spedizione l'hanno sempre inclusa. */
 function spedBadge(l){
   if (!spedisce(l)) return '';
-  /* UN SOLO badge colorato (lug 2026, decisione di Andrea): «spedisco»
-     e' un dato di fatto come il ritiro e il codice online, e sta con
-     loro — pillola normale. Il colore resta a dire l'unica cosa che
-     e' un vantaggio: che non si paga. */
+  /* SFOLLAMENTO COLORI (ago 2026, decisione di Andrea): la gratuita'
+     si evidenzia col GRASSETTO, mai col colore — le pillole di
+     consegna sono TUTTE neutre, un solo cuore (.pill). Il chip
+     azzurro pieno e' morto qui. */
   return spedGratis(l)
-    ? '<span class="sped-badge">🚚 Spedizione gratuita</span>'
+    ? '<span class="pill">🚚 Spedizione <b>gratuita</b></span>'
     : '<span class="pill">🚚 Spedizione disponibile</span>';
 }
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
