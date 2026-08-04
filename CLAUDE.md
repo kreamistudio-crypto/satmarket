@@ -2152,7 +2152,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Ordina, in DEMO client-side col seme dimostrativo (Cuffie Sony,
   scadenza calcolata al carico).
   L'ASTA 🔨 (ago 2026, «vendita al miglior offerente»): base + durata
-  (3/7 giorni, in collaudo anche minuti), chi vuole comprare PUNTA
+  (1/3/7/14/30 giorni, in collaudo anche minuti), chi vuole comprare PUNTA
   versando sats nel deposito di garanzia, per superare chi è in testa
   si versa SOLO LA DIFFERENZA, alla scadenza la puntata più alta
   diventa un ordine normale GIÀ pagato e i perdenti vengono
@@ -2278,7 +2278,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   crema, 8,88 su bruno, distinto dal ghiaccio della spedizione),
   `--asta-tag` #0B5570 FISSO (vive sul cartellino di carta, che non
   cambia di notte: 7,80) — l'arancio è di Acquista, il rosso della
-  lampo, il verde della protezione, il viola di Nostr. ATTENZIONE
+  lampo, il verde della protezione, il viola di Nostr. Anche il NUMERO
+  GRANDE del dettaglio di un'asta parla il token (`.detail-price.asta`,
+  simbolo di valuta compreso: la regola `.unit` lo lascerebbe arancio,
+  mezzo numero per famiglia): l'identità non si spezza sulla soglia
+  card→dettaglio, l'arancio resta dei prezzi veri. ATTENZIONE
   alla trappola pagata qui: la riga d'asta del dettaglio NON deve
   prendere in prestito classi della lampo (`.lampo-resta` vinceva a
   pari specificità e la tingeva d'arancio). UN token per tutto: bottoni
@@ -2316,7 +2320,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IMPORT_NOSTR_APERTO (muove denaro in uscita: si accende dal VPS con
   un gesto, guardando il primo giro; spenta blocca creazione e
   puntate NUOVE, mai chiusure/ritiri/riscossioni),
-  ASTA_DURATE_GIORNI [3,7], ASTA_INCREMENTO_PERCENTO 5,
+  ASTA_DURATE_GIORNI [1,3,7,14,30] (nel form pillole compatte
+  «24h·3g·7g·14g·30g» con 7 PRESELEZIONATO; tutto passa dall'elenco —
+  validazione, avviso 1h, proroghe — mai un 3/7 assunto altrove, e la
+  guardia fuori-elenco=400 ha la sua prova pura), ASTA_INCREMENTO_PERCENTO 5,
   ASTA_PROROGA_MINUTI 10, ASTA_MAX_ATTIVE_VENDITORE 3. Superficie:
   asta_base/scadenza in CAMPI_VETRINA + top e conteggio da
   arricchisci_righe_vetrina (offerenti MAI nominati), `asta_leve` e
