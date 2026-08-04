@@ -999,6 +999,180 @@ def prove_disarmo():
           "sollecita_venditori_fermi()" in oro)
 
 
+def _finto_lnbits(uscite, codice=200):
+    """Un LNbits di cartone che REGISTRA ogni chiamata invece di
+    farla. L'asserzione che conta in questa sezione e' sempre la
+    stessa: la richiesta di pagamento non e' mai partita."""
+    import types
+
+    class R:
+        status_code = codice
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {}
+
+    class C:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, **kw):
+            uscite.append(url)
+            return R()
+
+    return types.SimpleNamespace(AsyncClient=C)
+
+
+def _finto_lnurl(meta, fattura):
+    """Il wallet del beneficiario, che nel LNURL-pay e' chi SCRIVE la
+    fattura — qui lo facciamo mentire a comando."""
+    import types
+
+    class R:
+        def __init__(self, dati):
+            self._d = dati
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._d
+
+    class C:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return R(meta if ".well-known" in url else {"pr": fattura})
+
+    return types.SimpleNamespace(AsyncClient=C)
+
+
+def prove_importo_uscita():
+    """C-1 (ago 2026): l'importo di ogni bolt11 in uscita si controlla
+    contro il DOVUTO. Nel LNURL-pay la fattura la fabbrica il wallet
+    del beneficiario: senza questo confronto un ln_address su dominio
+    proprio rispondeva con qualunque cifra e LNbits la pagava, col
+    saldo della cassaforte come unico tetto. Qui si prova che il
+    pagamento NON PARTE — non che 'torna False': che la POST verso
+    l'admin key non viene proprio fatta."""
+    print("\n[importo in uscita]")
+    import asyncio
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    def pezzo_async(nome):
+        """pezzo() cerca «def nome(» e su una funzione async lascia
+        fuori la parola: gliela si rimette, o l'await non ha casa."""
+        return "async " + pezzo(nome)
+
+    # --- LA CINTURA: paga_venditore ---------------------------------
+    def cintura(dice_la_fattura, dovuti, codice=200):
+        """Monta paga_venditore con un giudice dell'importo finto e un
+        LNbits di cartone. Torna (esito, quante POST, quanti avvisi)."""
+        uscite, avvisi = [], []
+
+        async def _importo(_b):
+            return dice_la_fattura
+
+        async def _admin(t):
+            avvisi.append(t)
+
+        amb = {"httpx": _finto_lnbits(uscite, codice),
+               "importo_invoice": _importo, "notifica_admin": _admin,
+               "print": lambda *a, **k: None,
+               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k"}
+        exec(pezzo_async("paga_venditore"), amb)
+        return gira(amb["paga_venditore"]("lnbc", dovuti)), len(uscite), len(avvisi)
+
+    # 1: il caso felice deve restare felice — e' meta' della prova
+    prova("cintura: importo esatto, il pagamento parte", (True, 1, 0),
+          cintura(50_000, 50_000))
+    # 2: LA FALLA. Un sat dovuto, cento milioni nella fattura.
+    prova("cintura: ECCESSO rifiutato, zero POST", (False, 0, 1),
+          cintura(100_000_000, 1))
+    # 3: pagare meno non e' un favore — e' un ordine chiuso con un
+    #    venditore non pagato, e i sats restano orfani in cassaforte
+    prova("cintura: DIFETTO rifiutato, zero POST", (False, 0, 1),
+          cintura(1, 100))
+    # 4: fattura illeggibile (LNbits muto): fail-closed
+    prova("cintura: invoice illeggibile rifiutata, zero POST", (False, 0, 1),
+          cintura(None, 100))
+    # 5: un'uscita a zero non ha un mittente legittimo
+    prova("cintura: dovuto zero rifiutato, zero POST", (False, 0, 1),
+          cintura(0, 0))
+    # 6: e i moderatori lo sanno sempre — mai dentro un return False
+    prova("cintura: il rifiuto avvisa i moderatori", 1, cintura(999, 1)[2])
+
+    # --- LA TOPPA: invoice_da_ln_address ----------------------------
+    def lnurl(fattura_vale, chiesti, pr="lnbc1"):
+        async def _importo(_b):
+            return fattura_vale
+
+        # il `callback` va messo davvero: senza, la funzione morirebbe
+        # di KeyError dentro il suo try e tornerebbe None per il motivo
+        # sbagliato — tre verdi che non provano niente
+        amb = {"httpx": _finto_lnurl(
+                   {"tag": "payRequest", "minSendable": 1,
+                    "maxSendable": 10 ** 12,
+                    "callback": "https://dominio.tld/cb"}, pr),
+               "importo_invoice": _importo,
+               "print": lambda *a, **k: None}
+        exec(pezzo_async("invoice_da_ln_address"), amb)
+        return gira(amb["invoice_da_ln_address"]("io@dominio.tld", chiesti))
+
+    prova("address: wallet onesto, la fattura passa", "lnbc1",
+          lnurl(50_000, 50_000))
+    prova("address: wallet che gonfia, scartata", None,
+          lnurl(100_000_000, 1))
+    prova("address: wallet che sgonfia, scartata", None, lnurl(1, 100))
+    prova("address: nessuna fattura, scartata", None,
+          lnurl(100, 100, pr=""))
+
+    # --- SENTINELLE: il controllo non deve sparire in un riordino ----
+    # Sono di quelle che se ne vanno in silenzio: nessuna prova
+    # funzionale si rompe, e la falla torna. Quindi si difende la
+    # FORMA, non solo il comportamento.
+    pv = pezzo("paga_venditore")
+    lna = pezzo("invoice_da_ln_address")
+    # 1: obbligatorio SENZA default, o chi scrive la prossima strada
+    #    d'uscita puo' dimenticarlo senza che Python fiati
+    prova("sentinella: atteso_sats obbligatorio, senza default", True,
+          "async def paga_venditore(invoice: str, atteso_sats: int)"
+          in _SORGENTE)
+    # 2: il rifiuto sta PRIMA della chiamata all'admin key
+    prova("sentinella: si rifiuta prima di toccare l'admin key", True,
+          "importo_invoice" in pv
+          and pv.index("return False") < pv.index("LNBITS_ADMIN_KEY"))
+    # 3: la chiamata a un argomento non deve esistere piu' da nessuna
+    #    parte — e' la sentinella che prende il refactor distratto
+    prova("sentinella: nessuna chiamata a un solo argomento", [],
+          re.findall(r"paga_venditore\([^,)]*\)", _SORGENTE))
+    # 4: il cuore e' UNO — se qualcuno ricopia l'aritmetica dei
+    #    millisat, le tre strade possono contare in modo diverso
+    prova("sentinella: l'aritmetica dei msat vive in un posto solo", 1,
+          _SORGENTE.count('int(dec.get("amount_msat"'))
+    # 5: la `pr` del callback non torna piu' nuda
+    prova("sentinella: la fattura del wallet si rilegge sempre", True,
+          "importo_invoice" in lna
+          and 'return r.json().get("pr")' not in lna)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -1007,7 +1181,7 @@ def main():
               prove_tag_commercio, prove_anello, prove_categorie,
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
-              prove_ritiro, prove_disarmo):
+              prove_ritiro, prove_disarmo, prove_importo_uscita):
         try:
             f()
         except Exception as e:

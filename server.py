@@ -1793,8 +1793,36 @@ async def invoice_pagata(payment_hash: str) -> bool:
         return r.status_code == 200 and r.json().get("paid", False)
 
 
-async def paga_venditore(invoice: str) -> bool:
-    """Sblocca i sats: paga la invoice fornita dal venditore."""
+async def paga_venditore(invoice: str, atteso_sats: int) -> bool:
+    """Sblocca i sats: paga la invoice fornita dal venditore.
+
+    LA CINTURA (ago 2026): l'importo si controlla QUI, sull'ultimo
+    tubo prima dell'admin key, contro quello DOVUTO. Nel LNURL-pay la
+    fattura la fabbrica il wallet del BENEFICIARIO, e un ln_address su
+    dominio proprio puo' rispondere con qualunque cifra: senza questo
+    confronto LNbits paga quella scritta dentro la bolt11, e il tetto
+    della perdita e' il saldo della cassaforte, cioe' l'escrow di
+    tutti. `atteso_sats` e' obbligatorio e SENZA DEFAULT apposta: chi
+    scrivera' la prossima strada d'uscita non puo' dimenticarlo,
+    glielo dice Python. Il rifiuto non chiama LNbits nemmeno una
+    volta, e i moderatori lo sanno subito: un importo storto e' o un
+    wallet rotto o un tentativo di prelievo, e in nessuno dei due casi
+    puo' restare dentro un `return False`."""
+    chiesto = await importo_invoice(invoice)
+    if chiesto is None or atteso_sats <= 0 or chiesto != atteso_sats:
+        print(f"⛔ Pagamento rifiutato: la invoice chiede {chiesto} sats, "
+              f"ne sono dovuti {atteso_sats}. Niente e' uscito.")
+        try:
+            await notifica_admin(
+                f"⛔ <b>Pagamento rifiutato:</b> una invoice chiedeva "
+                f"<b>{chiesto} sats</b> ma ne erano dovuti "
+                f"<b>{atteso_sats}</b>. Il pagamento NON è partito e i "
+                f"sats sono al sicuro nel deposito di garanzia. Se non è "
+                f"un wallet rotto, qualcuno ha provato a prelevare più "
+                f"del dovuto: vale un'occhiata.")
+        except Exception as e:   # un avviso non deve mai rompere il rifiuto
+            print(f"⚠️ Avviso ai moderatori non partito: {e}")
+        return False
     async with httpx.AsyncClient(timeout=60) as c:
         r = await c.post(f"{LNBITS_URL}/api/v1/payments",
                          headers={"X-Api-Key": LNBITS_ADMIN_KEY},
@@ -1820,6 +1848,22 @@ async def decodifica_invoice(bolt11: str) -> dict | None:
         return r.json()
 
 
+async def importo_invoice(bolt11: str) -> int | None:
+    """Quanti sats chiede questa invoice. None = illeggibile.
+
+    E' il GIUDICE UNICO dell'importo: ci passano il deposito a mano
+    (ordini e rimborsi d'asta), il Lightning address e la cintura di
+    paga_venditore — l'aritmetica dei millisat vive qui e in nessun
+    altro posto, o le tre strade potrebbero contare in modo diverso.
+    Fail-closed per costruzione: campo mancante -> 0, che non combacia
+    mai con un importo dovuto, quindi anche le invoice a importo
+    libero (senza cifra dentro) si rifiutano da sole."""
+    dec = await decodifica_invoice(bolt11)
+    if dec is None:
+        return None
+    return int(dec.get("amount_msat", 0)) // 1000
+
+
 async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
     """INCASSO AUTOMATICO: dato il Lightning address del venditore
     (es. mario@walletofsatoshi.com), chiede al suo wallet una invoice
@@ -1839,7 +1883,21 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
                 return None   # il wallet non accetta questo importo
             r = await c.get(meta["callback"], params={"amount": msat})
             r.raise_for_status()
-            return r.json().get("pr") or None
+            pr = r.json().get("pr") or None
+            if not pr:
+                return None
+            # LA FATTURA LA SCRIVE IL BENEFICIARIO, quindi si rilegge
+            # SEMPRE (ago 2026): LUD-06 dice che il callback deve
+            # tornare una invoice dell'importo richiesto, percio'
+            # l'uguaglianza esatta e' la specifica e non una nostra
+            # severita'. Un endpoint che risponde un'altra cifra e' la
+            # firma dell'attacco — mai in silenzio, mai restituito.
+            chiesto = await importo_invoice(pr)
+            if chiesto != sats:
+                print(f"⛔ Lightning address «{ln_address}»: chiesti {sats} "
+                      f"sats, la invoice ne vale {chiesto}. Scartata.")
+                return None
+            return pr
     except Exception:
         return None
 
@@ -6994,7 +7052,7 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         if not bolt11 and u and u["ln_address"]:
             bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
         titolo = (r["titolo"] or "un'asta")[:60]
-        if bolt11 and await paga_venditore(bolt11):
+        if bolt11 and await paga_venditore(bolt11, importo):
             con.execute("UPDATE rimborsi_asta SET stato='riscosso', "
                         "aggiornato=? WHERE id=?",
                         (int(time.time()), rimborso_id))
@@ -7089,11 +7147,10 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
     if not r or r["stato"] != "da_riscuotere":
         con.close()
         raise HTTPException(400, "Operazione non permessa")
-    dec = await decodifica_invoice(bolt11)
-    if dec is None:
+    importo_sats = await importo_invoice(bolt11)
+    if importo_sats is None:
         con.close()
         raise HTTPException(400, "Invoice non valida o illeggibile")
-    importo_sats = int(dec.get("amount_msat", 0)) // 1000
     if importo_sats != r["importo_sats"]:
         con.close()
         raise HTTPException(400,
@@ -11339,11 +11396,10 @@ async def deposita_invoice(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Operazione non permessa")
 
-    dec = await decodifica_invoice(bolt11)
-    if dec is None:
+    importo_sats = await importo_invoice(bolt11)
+    if importo_sats is None:
         con.close()
         raise HTTPException(400, "Invoice non valida o illeggibile")
-    importo_sats = int(dec.get("amount_msat", 0)) // 1000
     if importo_sats != atteso:
         con.close()
         raise HTTPException(400,
@@ -11399,7 +11455,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         if not bolt11 and v and v["ln_address"]:
             bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
 
-        if bolt11 and await paga_venditore(bolt11):
+        if bolt11 and await paga_venditore(bolt11, netto):
             # Il titolo di cortesia copre anche i set («primo + N altri»)
             titolo = _titolo_ordine(_righe_ordine(con, o))
             if titolo == "?":
@@ -11470,7 +11526,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         con.close()
         if o["invoice_venditore"] or (v and v["ln_address"]):
             msg = ("⚠️ Il pagamento automatico dei tuoi sats e' <b>fallito</b> "
-                   "(invoice scaduta o wallet non raggiungibile). I sats sono al "
+                   "(il tuo wallet non ha risposto come doveva). I sats sono al "
                    "sicuro nel deposito di garanzia: apri l'ordine nella Mini App "
                    "per riprovare "
                    f"con una invoice da <b>{netto} sats</b>.")
@@ -11512,7 +11568,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if not bolt11 and c_utente and c_utente["ln_address"]:
             bolt11 = await invoice_da_ln_address(c_utente["ln_address"], importo)
 
-        if bolt11 and await paga_venditore(bolt11):
+        if bolt11 and await paga_venditore(bolt11, importo):
             cambio = await cambio_btc_eur()
             con.execute("UPDATE ordini SET stato='refunded', cambio_eur=?, "
                         "aggiornato=? WHERE id=?",
