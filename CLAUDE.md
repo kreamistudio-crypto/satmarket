@@ -166,10 +166,105 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   si muovono MAI da soli): la cura è `sollecita_ritiri_fermi`
   nell'orologio — promemoria alle DUE parti (il compratore può
   confermare, il venditore può segnare la consegna e da lì parte la
-  sua protezione), colonne sue `sollecito_ritiro_il`/
+  finestra di conferma), colonne sue `sollecito_ritiro_il`/
   `solleciti_ritiro` (NON quelle del sollecito incassi: vivono su
   'confirmed' e un contatore ereditato salterebbe al tetto), stesse
   leve SOLLECITO_INCASSO_*, al tetto 🧊 ai moderatori e poi silenzio.
+  IL DISARMO DELL'AUTO-SBLOCCO (ago 2026, decisione di Andrea): in
+  questa fase **i sats non si muovono MAI senza un gesto umano**. La
+  regola precisa — quella da non ammorbidire — è che NESSUN TIMER
+  SPOSTA SATS DA UNA PARTE A UN'ALTRA. Leva `AUTO_SBLOCCO_ATTIVO`,
+  che nasce FALSE nel CODICE come IMPORT_NOSTR_APERTO e per la stessa
+  ragione (muove denaro: si riaccende dal VPS con un gesto, mai per
+  effetto di un deploy).
+  COSA SI DISARMA: i due rami fisici di `controlla_scadenze` — 72h da
+  `consegnato` (delivered) e GIORNI_AUTO_SBLOCCO giorni da
+  `spedito_il` (shipped), ritiro in zona compreso, che passa dallo
+  stesso ramo. Il caso che ha aperto il cantiere è il secondo:
+  l'ancora è la parola del venditore, che la piattaforma NON verifica
+  (niente tracking API) — un pacco mai partito e dieci giorni di
+  silenzio incassavano. Il primo si disarma per la regola cardinale e
+  non per l'asimmetria: `consegnato` lo scrive SOLO il compratore
+  (regola ferrea 5), quindi lì l'ancora è sua — ma UN SILENZIO NON È
+  UN CONSENSO, e chi tace può aver trovato il problema proprio
+  aprendo il pacco.
+  COSA RESTA ARMATO, e perché la regola tiene lo stesso: 1) LE
+  FINESTRE DEL DIGITALE (ORE_CONFERMA_DIGITALE 24h dalla rivelazione,
+  ORE_SILENZIO_DIGITALE 48h dalla consegna mai rivelata) — la prima è
+  ancorata a un'AZIONE DEL COMPRATORE registrata da noi, la seconda a
+  un FATTO CHE VERIFICHIAMO: il contenuto è nel nostro database,
+  consegnato e mai letto. Non è la parola di nessuno. Restano armate
+  ANCHE a leva spenta: la leva gatea i soli rami fisici, ed è la cosa
+  da ricordare quando si legge il suo nome. 2) I TIMER CHE
+  RESTITUISCONO: `chiudi_aste` (i sats erano già in cassaforte dalla
+  puntata — la chiusura non li muove, li ASSEGNA), `_paga_rimborso`
+  ai perdenti, e il riacciuffo `controlla_annullati` (che raccoglie
+  un pagamento già uscito dal wallet del compratore). Disarmarli
+  congelerebbe i sats di chi li ha versati e lascerebbe pagamenti
+  orfani: si curerebbe un male causandone uno peggiore.
+  AL POSTO DELLO SBLOCCO, `sollecita_conferme_ferme` nell'orologio —
+  gemella di `sollecita_incassi`, colonne SUE
+  (`sollecito_conferma_il`, `solleciti_conferma`: un contatore
+  ereditato salterebbe al tetto), gira SOLO a leva spenta perché è il
+  SOSTITUTO e non un'aggiunta (a leva accesa il primo squillo
+  cadrebbe nello stesso istante dello sblocco). `ORE_CONFERMA` e
+  `GIORNI_AUTO_SBLOCCO` non cambiano valore: da «quando partono i
+  sats» diventano «quando parte il primo squillo». Poi
+  PROMEMORIA_CONFERMA_GIORNI (3) di attesa fra uno e l'altro, e dopo
+  PROMEMORIA_CONFERMA_MAX (3) ignorati UNA segnalazione 🧊 ai
+  moderatori e poi silenzio — il patto dei solleciti. Leve proprie e
+  non SOLLECITO_INCASSO_* (7×4): lì aspetta una persona sola su sats
+  già suoi, qui due persone si aspettano a vicenda, e ~35 giorni
+  prima che un umano guardi sono troppi. Le ancore sono
+  `consegnato`/`spedito_il` e NON `aggiornato` come nei gemelli
+  (cambia a ogni transizione e sposterebbe il primo squillo). Il
+  promemoria è una NOTIFICA NORMALE che rimanda all'ordine, dove i
+  due bottoni (conferma / disputa) ci sono già col loro confirm:
+  niente tastiera inline — `notifica()` è multi-canale e non porta
+  reply_markup, e il gesto più consequenziale dell'app non deve poter
+  partire da un tocco in chat. Il compratore riceve ogni squillo, il
+  venditore SOLO IL PRIMO (non ha niente da fare, e ha già il suo
+  `sollecita_acquirente` col cap a 24h).
+  IL SET E L'ASTA non hanno un solo timer proprio, ed è la parte che
+  serve saperlo: le colonne dei tempi vivono SOLO in testata
+  (`ordini`), le SELECT di `controlla_scadenze` non toccano mai
+  `ordine_righe`, e l'ordine nato dall'asta (`crea_ordine_pagato`)
+  ricade nei rami fisici come tutti gli altri. Il disarmo li copre
+  per costruzione, senza una riga dedicata. L'unica accortezza è il
+  LEFT JOIN su `annunci` nel promemoria (con l'INNER i set,
+  annuncio_id=0, sparirebbero), già imparata in `sollecita_incassi`.
+  LA STRADA SCARTATA, e va tenuta perché è quella che torna in mente:
+  L'AUTO-SBLOCCO CIECO. Ha quasi sbloccato un ordine vero con un
+  pacco mai arrivato — l'ordine #28, a 6,4 giorni su 10 il giorno del
+  cantiere: mancavano tre giorni e mezzo. L'argomento a favore era
+  reale (protegge il venditore da chi sparisce dopo aver ricevuto),
+  ma protegge dalla parte sbagliata: senza tracking verificato, chi
+  «dichiara» ha sempre ragione. Non riproporlo senza il pezzo che
+  manca.
+  LA CONSEGUENZA ACCETTATA: un ordine il cui compratore sparisce non
+  si chiude più da solo — i sats restano in cassaforte finché un
+  moderatore non decide. È il caso che il 🧊 esiste per intercettare,
+  ed è il prezzo della regola.
+  IL PIANO DI RIENTRO: si rivaluta a volumi più alti, quando il
+  numero di casi fermi renderà insostenibile il lavoro dei
+  moderatori, e SOLO col tracking verificato via API corrieri (è già
+  in backlog) — cioè quando «ho spedito» smetterà di essere una
+  dichiarazione di parte e diventerà un fatto. Riaccendere è una riga
+  nel config del VPS, ma i TESTI sono scritti sul mondo disarmato e
+  vanno rimessi: i posti sono `TEMPI` e la sua tabella in
+  miniapp.html, le righe di `view-sicurezza` sui tempi, i pannelli e
+  i due confirm dell'ordine, e le due notifiche del server
+  (`segna_consegnato` e il testo al venditore di
+  `sollecita_ritiri_fermi`). È lo stesso patto della commissione
+  sospesa.
+  BUCHI PREESISTENTI, dichiarati e NON chiusi qui: 1) `locked` +
+  spedizione col venditore che non spedisce mai — nessun timer e
+  nessun promemoria, né prima né dopo; il compratore però NON è in un
+  vicolo cieco, `apri_disputa` accetta `locked` e il bottone «⚠️ C'è
+  un problema» è lì; 2) ordine d'asta con `consegna_scelta=''` mai
+  scelta (`sollecita_ritiri_fermi` filtra 'ritiro'); 3) ordini fermi
+  in 'refund', già noto nella docstring di
+  `sollecita_rimborsi_puntate`.
   Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 27
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
   Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
@@ -4921,6 +5016,25 @@ aperto, e il primo giro vero dentro Telegram (puntata, sorpasso,
 chiusura, riscossione con wallet reale a cifre minuscole) è il
 collaudo che manca. RESTA DA DECIDERE a rodaggio: se e quando dare
 alle aste la radice «🔨 Aste» nello slot vuoto della nav.
+Il disarmo dell'auto-sblocco (ago 2026, decisione di Andrea presa
+guardando un ordine vero): i sats non si muovono più senza un gesto
+umano — leva `AUTO_SBLOCCO_ATTIVO` che nasce False, i due rami fisici
+dell'orologio spenti, e al loro posto il promemoria al compratore coi
+suoi due bottoni, poi il 🧊 ai moderatori. Le finestre del digitale e
+i timer che RESTITUISCONO (chiusura d'asta, rimborsi, riacciuffo)
+restano armati, ed è la regola precisa: nessun timer sposta sats da
+una parte a un'altra. Vedi Architettura per il censimento completo,
+le eccezioni motivate e il piano di rientro. Collaudato con 22
+sentinelle nuove in prove.py (188 totali, una per riga del censimento
+— quelle che devono tacere e quelle che devono restare accese) più un
+collaudo eseguibile su DB usa-e-getta, 40 verdi: fisico/asta/set che
+non si sbloccano, i due digitali che si sbloccano ancora, la cadenza
+fino al tetto e poi il silenzio, il caso normale in cui il compratore
+conferma e il promemoria smette da solo, e la regressione a leva
+accesa. IN PRODUZIONE basta il deploy (le due colonne nascono da
+sole) — fatto, e verificato sul caso che ha aperto il cantiere:
+l'ordine #28, a 6,44 giorni su 10, è rimasto `shipped` con zero
+squilli invece di sbloccarsi tre giorni e mezzo dopo.
 
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
