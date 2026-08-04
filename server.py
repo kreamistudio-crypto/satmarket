@@ -3345,7 +3345,19 @@ CATEGORIE = ("Elettronica", "Informatica", "Telefonia", "Audio e video",
              "Abbigliamento", "Scarpe e accessori", "Orologi e gioielli",
              "Bambini", "Sport e hobby", "Biciclette", "Motori", "Animali",
              "Libri e media", "Musica e film", "Strumenti musicali",
-             "Collezionismo", "Arte e artigianato", "Altro")
+             "Collezionismo", "Arte e artigianato",
+             # «Buoni ed esperienze», ago 2026: gift card, buoni acquisto,
+             # voucher per soggiorni e cene. E' una famiglia di MERCE
+             # vera, non un modo di consegnare — il bene e' la notte in
+             # B&B, digitale e' solo come arriva il buono, e la tessera
+             # si puo' anche spedire. I SERVIZI restano fuori come
+             # sempre: un buono per una notte e' una cosa che esiste, una
+             # prestazione no; la moderazione non cambia — i buoni
+             # riscattabili presso il venditore stesso restano DUBBIO,
+             # decide un umano. ATTENZIONE: niente parentesi in questo
+             # commento — prove.py estrae la tupla per testo e taglia
+             # alla prima tonda chiusa.
+             "Buoni ed esperienze", "Altro")
 
 
 def categoria_valida(c) -> str:
@@ -3399,8 +3411,12 @@ def condizione_valida(c) -> str:
 # alimenti: creme, profumi, saponi e integratori si vendono nuovi —
 # un cosmetico gia' usato non e' merce di seconda mano, e' una cosa
 # che non si vende.
+# «Buoni ed esperienze» (ago 2026) idem: un buono e' nuovo per
+# definizione — vale anche per la tessera fisica spedita, perche' un
+# buono usato non e' merce di seconda mano, e' carta.
 CATEGORIE_SENZA_CONDIZIONE = frozenset({"Alimenti e bevande",
-                                        "Bellezza e benessere"})
+                                        "Bellezza e benessere",
+                                        "Buoni ed esperienze"})
 
 
 def senza_condizione(categoria: str, consegna: str = "") -> bool:
@@ -3652,6 +3668,11 @@ SINONIMI_CATEGORIA = {
     "collezionismo": "Collezionismo", "fumetteria": "Collezionismo",
     "arte": "Arte e artigianato", "artigianato": "Arte e artigianato",
     "handmade": "Arte e artigianato",
+    # buoni e voucher (ago 2026): la merce che prima moriva in «Altro»
+    "buono": "Buoni ed esperienze", "buoni": "Buoni ed esperienze",
+    "gift card": "Buoni ed esperienze", "gift": "Buoni ed esperienze",
+    "voucher": "Buoni ed esperienze", "coupon": "Buoni ed esperienze",
+    "esperienze": "Buoni ed esperienze",
     "altro": "Altro", "varie": "Altro",
 }
 
@@ -9749,14 +9770,16 @@ MODELLO_IMPORT = (
     "9,00;eur;Bellezza e benessere;Bergamo;;spedizione;4,00;busta;;30\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
     # niente spedizione ne' taglia, il codice si consegna dopo
-    # l'acquisto dal dettaglio ordine
+    # l'acquisto dal dettaglio ordine. Dal (ago 2026) i buoni hanno la
+    # loro casa, «Buoni ed esperienze», e la condizione resta VUOTA
+    # come per gli alimenti: un buono e' nuovo per definizione
     "Buono regalo libreria 25 euro;Codice valido 12 mesi, consegna "
-    "immediata;25,00;eur;Libri e media;;;digitale;;;nuovo;\n"
+    "immediata;25,00;eur;Buoni ed esperienze;;;digitale;;;;\n"
     # la combo col «+»: tessera spedita O codice in piattaforma,
     # sceglie chi compra
     "Gift card profumeria 50 euro;Tessera fisica spedita oppure codice "
-    "subito;50,00;eur;Altro;Milano;;spedizione+digitale;5,00;busta;"
-    "nuovo;\n")
+    "subito;50,00;eur;Buoni ed esperienze;Milano;;spedizione+digitale;"
+    "5,00;busta;;\n")
 
 
 @app.get("/api/import/modello")
