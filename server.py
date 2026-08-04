@@ -820,6 +820,11 @@ def init_db():
         etichetta TEXT DEFAULT '',
         versato_sats INTEGER DEFAULT 0,  -- somma dei delta SALDATI
         offerto_sats INTEGER DEFAULT 0,  -- il totale che gareggia
+        -- il numero d'ordine dell'ULTIMO saldo (progressivo globale):
+        -- e' il tie-break della testa — l'orario ha la risoluzione del
+        -- secondo, e due saldi nello stesso secondo sono gia' successi
+        -- in collaudo. «Fa fede l'orario di saldo» si giudica da qui.
+        saldo_seq INTEGER DEFAULT 0,
         stato TEXT DEFAULT 'attiva',     -- attiva | vincitrice | chiusa
         creato INTEGER, aggiornato INTEGER,
         UNIQUE(annuncio_id, tg_id)
@@ -1162,6 +1167,12 @@ def init_db():
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    # Migrazione per il tie-break dei saldi d'asta (nata col cantiere:
+    # copre i database creati tra il primo e il terzo passo)
+    try:
+        con.execute("ALTER TABLE puntate ADD COLUMN saldo_seq INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
     # Migrazioni per spedizione, consegna e resi
@@ -6306,16 +6317,18 @@ def conto_chiusura(puntate: list) -> tuple:
     """Il conto della chiusura: dalle puntate sceglie la vincitrice
     (offerto piu' alto; a parita' — possibile per la corsa di due
     fatture nate sulla stessa testa — vince chi ha SALDATO prima,
-    cioe' aggiornato minore, poi id) e mette tutte le altre nei
-    rimborsi, ognuna per il suo versato. INVARIANTE, provata in CI:
-    somma dei versati in ingresso = versato della vincitrice + somma
-    dei rimborsi. Pura: righe come dict, il database non lo vede."""
+    cioe' saldo_seq minore, poi id: lo stesso ordine di _leader_asta,
+    o il «sei in testa» di ieri e il vincitore di oggi divergono) e
+    mette tutte le altre nei rimborsi, ognuna per il suo versato.
+    INVARIANTE, provata in CI: somma dei versati in ingresso =
+    versato della vincitrice + somma dei rimborsi. Pura: righe come
+    dict, il database non lo vede."""
     in_gara = [p for p in puntate
                if p["stato"] == "attiva" and p["versato_sats"] > 0]
     if not in_gara:
         return None, []
     vincitrice = min(in_gara, key=lambda p: (-p["offerto_sats"],
-                                             p["aggiornato"], p["id"]))
+                                             p["saldo_seq"], p["id"]))
     rimborsi = [{"puntata_id": p["id"], "tg_id": p["tg_id"],
                  "importo_sats": p["versato_sats"]}
                 for p in in_gara if p["id"] != vincitrice["id"]]
@@ -6350,6 +6363,19 @@ def durata_asta_da_payload(d) -> int:
     return giorni * 86400
 
 
+def _leader_asta(con, annuncio_id: int):
+    """Il giudice unico della testa: l'offerta piu' alta fra le
+    puntate in gara; a parita' — possibile per la corsa di due fatture
+    nate sulla stessa testa — vince chi ha SALDATO prima. L'orario ha
+    la risoluzione del secondo e non basta: decide saldo_seq, il
+    numero d'ordine dei saldi. None = nessuna puntata salda."""
+    return con.execute(
+        "SELECT * FROM puntate WHERE annuncio_id=? AND stato='attiva' "
+        "AND versato_sats>0 "
+        "ORDER BY offerto_sats DESC, saldo_seq ASC, id ASC LIMIT 1",
+        (annuncio_id,)).fetchone()
+
+
 def _puntate_attive_salde(con, annuncio_id: int) -> int:
     """Quante puntate SALDE sono in gara: il giudice del VINCOLO
     (regola del cantiere): dalla prima puntata saldata l'asta e'
@@ -6359,6 +6385,379 @@ def _puntate_attive_salde(con, annuncio_id: int) -> int:
         "SELECT COUNT(*) AS n FROM puntate WHERE annuncio_id=? AND "
         "stato='attiva' AND versato_sats>0",
         (annuncio_id,)).fetchone()["n"]
+
+
+# ------------------- ASTE: il motore delle puntate -------------------
+# Puntare = PAGARE: la prima puntata versa l'intero importo, i rilanci
+# la sola differenza fino al nuovo totale, e una puntata esiste solo
+# quando la sua fattura e' SALDATA. Il client dichiara il totale che
+# offre, il server calcola la differenza da versare (mai fidarsi di
+# importi dal client). La corsa fra due fatture si decide al saldo —
+# fa fede l'orario del SERVER — e un pagamento non si respinge mai:
+# chi arriva secondo resta puntata valida non in testa.
+
+RILANCIO_EXPIRY = 600      # fatture corte: 10 minuti
+RILANCIO_STANTIO = 1200    # 2x la vita della fattura (pattern reaper)
+
+
+def _stesse_chiavi_nostr(con, tg_a: int, tg_b: int) -> bool:
+    """Il venditore non punta sulle proprie aste nemmeno col secondo
+    account collegato alla STESSA chiave Nostr (regola del cantiere:
+    controllo su tg_id E npub). Contano solo le chiavi dal possesso
+    dimostrato o dichiarato sulla riga utente."""
+    righe = {r["tg_id"]: r for r in con.execute(
+        "SELECT tg_id, npub, npub_accesso FROM utenti WHERE tg_id IN (?,?)",
+        (tg_a, tg_b))}
+    a, b = righe.get(tg_a), righe.get(tg_b)
+    if not a or not b:
+        return False
+    chiavi_a = {c for c in (a["npub"], a["npub_accesso"]) if c}
+    chiavi_b = {c for c in (b["npub"], b["npub_accesso"]) if c}
+    return bool(chiavi_a & chiavi_b)
+
+
+@app.post("/api/aste/{annuncio_id}/punta")
+async def fai_puntata(annuncio_id: int, req: Request,
+                      x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """La puntata: il compratore dichiara il TOTALE che offre e riceve
+    la fattura della sola differenza rispetto a quanto ha gia' in
+    cassaforte. La liturgia e' quella di compra(): guardie, UNICO
+    await sulla invoice, ricontrollo, poi zero await fino al commit."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not ASTA_ABILITATA:
+        # la leva spegne solo le puntate NUOVE: chiusure, ritiri e
+        # riscossioni delle aste vive continuano (vedi le leve)
+        raise HTTPException(400, "Le aste non sono attive")
+    try:
+        totale = int(d.get("totale_sats") or 0)
+    except (TypeError, ValueError):
+        totale = 0
+    if totale <= 0:
+        raise HTTPException(400, "Indica il totale che offri, in sats")
+    con = db()
+    adesso = int(time.time())
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
+                    (annuncio_id,)).fetchone()
+    if not a or not _asta(a):
+        con.close()
+        raise HTTPException(404, "Asta non trovata")
+    if not _asta_viva(a, adesso):
+        # il read gate: l'asta e' chiusa anche se l'orologio non e'
+        # ancora passato ad aggiudicarla
+        con.close()
+        raise HTTPException(409, "L'asta è chiusa: niente più puntate")
+    if a["venditore_id"] == user["id"] or \
+            _stesse_chiavi_nostr(con, a["venditore_id"], user["id"]):
+        con.close()
+        raise HTTPException(400, "Non puoi puntare sulla tua stessa asta")
+    b = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    if not b or not (b["ln_address"] or "").strip():
+        # il Lightning address e' il binario del rimborso: senza, un
+        # perdente resterebbe coi sats fermi in «Da riscuotere» —
+        # meglio chiederlo PRIMA che i sats partano
+        con.close()
+        raise HTTPException(400, "Per puntare serve il tuo Lightning "
+                                 "address (per l'eventuale rimborso): "
+                                 "lo imposti nel Profilo, sotto "
+                                 "«Incassi e pagamenti»")
+    mia = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND tg_id=?",
+                      (annuncio_id, user["id"])).fetchone()
+    if mia and mia["stato"] == "chiusa":
+        con.close()
+        raise HTTPException(409, "Ti sei ritirato da questa asta: il "
+                                 "ritiro è definitivo")
+    pendente = con.execute(
+        "SELECT 1 FROM rilanci WHERE annuncio_id=? AND tg_id=? AND "
+        "stato='creato' AND creato>=?",
+        (annuncio_id, user["id"], adesso - RILANCIO_STANTIO)).fetchone()
+    if pendente:
+        con.close()
+        raise HTTPException(400, "Hai già una fattura di puntata in "
+                                 "corso: pagala o lascia che scada "
+                                 "(vale 10 minuti)")
+    testa = _leader_asta(con, annuncio_id)
+    if testa and testa["tg_id"] == user["id"]:
+        con.close()
+        raise HTTPException(400, "Sei già in testa: rilanciare su te "
+                                 "stesso costerebbe sats senza motivo")
+    minimo = rilancio_minimo(testa["offerto_sats"],
+                             ASTA_INCREMENTO_PERCENTO) if testa \
+        else a["asta_base_sats"]
+    if totale < minimo:
+        con.close()
+        raise HTTPException(400, f"La puntata minima ora è "
+                                 f"{minimo:,} sats".replace(",", " "))
+    versato = mia["versato_sats"] if mia else 0
+    delta = totale - versato
+    if delta <= 0:
+        con.close()
+        raise HTTPException(400, "Hai già versato abbastanza per questo "
+                                 "totale: alza la cifra")
+    inv = await crea_invoice_escrow(
+        delta, f"Barattolo asta #{annuncio_id}: puntata {totale} sats",
+        expiry=RILANCIO_EXPIRY)
+    # Il ricontrollo che fa fede (patto mono-processo: da qui al
+    # commit nessun await). Durante l'attesa della invoice l'asta puo'
+    # essere scaduta o la testa salita oltre il mio totale: fallito =
+    # 409 e la fattura appena nata muore da sola in 10 minuti.
+    fresco = con.execute("SELECT * FROM annunci WHERE id=?",
+                         (annuncio_id,)).fetchone()
+    if (not fresco or fresco["stato"] != "attivo"
+            or not _asta_viva(fresco, int(time.time()))):
+        con.close()
+        raise HTTPException(409, "L'asta si è chiusa proprio adesso")
+    testa2 = _leader_asta(con, annuncio_id)
+    minimo2 = rilancio_minimo(testa2["offerto_sats"],
+                              ASTA_INCREMENTO_PERCENTO) if testa2 \
+        else a["asta_base_sats"]
+    if totale < minimo2:
+        con.close()
+        raise HTTPException(409, "Qualcuno ti ha superato mentre "
+                                 "preparavo la fattura: rilancia più in "
+                                 "alto")
+    if not mia:
+        con.execute("INSERT OR IGNORE INTO puntate(annuncio_id,tg_id,"
+                    "venditore_id,stato,creato,aggiornato) "
+                    "VALUES(?,?,?,'attiva',?,?)",
+                    (annuncio_id, user["id"], a["venditore_id"],
+                     adesso, adesso))
+        mia = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND "
+                          "tg_id=?", (annuncio_id, user["id"])).fetchone()
+    con.execute("INSERT INTO rilanci(puntata_id,annuncio_id,tg_id,"
+                "offerto_sats,delta_sats,payment_hash,stato,creato,"
+                "aggiornato) VALUES(?,?,?,?,?,?,'creato',?,?)",
+                (mia["id"], annuncio_id, user["id"], totale, delta,
+                 inv["payment_hash"], adesso, adesso))
+    rilancio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    return {"rilancio_id": rilancio_id, "invoice": inv["payment_request"],
+            "payment_hash": inv["payment_hash"], "delta_sats": delta,
+            "totale_sats": totale, "scadenza": fresco["asta_scadenza"],
+            "scadenza_invoice": RILANCIO_EXPIRY}
+
+
+@app.post("/api/rilanci/{rilancio_id}/verifica")
+async def verifica_rilancio(rilancio_id: int,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il poll del pagamento della puntata (gemello di
+    verifica_pagamento, con la guardia in piu': il rilancio e' MIO).
+    Il CAS sullo stato fa vincere una sola chiamata; da li' in poi
+    zero await fino al commit. Fa fede l'orario di SALDO: se nel
+    frattempo la testa e' salita il pagamento non si respinge — resto
+    puntata valida non in testa; se l'asta e' GIA' chiusa i sats vanno
+    dritti nel registro «Da riscuotere», nessun ordine, nessuna
+    eccezione."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    ril = con.execute("SELECT * FROM rilanci WHERE id=? AND tg_id=?",
+                      (rilancio_id, user["id"])).fetchone()
+    con.close()
+    if not ril:
+        raise HTTPException(404, "Puntata non trovata")
+    if ril["stato"] != "creato":
+        return {"stato": ril["stato"]}
+    if not await invoice_pagata(ril["payment_hash"]):
+        return {"stato": "in_attesa"}
+    con = db()
+    adesso = int(time.time())
+    cur = con.execute("UPDATE rilanci SET stato='saldato', saldato_il=?, "
+                      "aggiornato=? WHERE id=? AND stato='creato'",
+                      (adesso, adesso, rilancio_id))
+    if cur.rowcount == 0:
+        # un'altra chiamata (poll + «ho pagato») ha gia' fatto il lavoro
+        con.commit()
+        esito = con.execute("SELECT stato FROM rilanci WHERE id=?",
+                            (rilancio_id,)).fetchone()["stato"]
+        con.close()
+        return {"stato": esito}
+    # --- da qui ZERO await fino al commit ---
+    a = con.execute("SELECT * FROM annunci WHERE id=?",
+                    (ril["annuncio_id"],)).fetchone()
+    p = con.execute("SELECT * FROM puntate WHERE id=?",
+                    (ril["puntata_id"],)).fetchone()
+    if (not a or a["stato"] != "attivo" or not _asta_viva(a, adesso)
+            or not p or p["stato"] != "attiva"):
+        # SALDO TARDIVO: l'asta e' chiusa (o la puntata non e' piu' in
+        # gara). I sats appena entrati vanno nel registro, con la
+        # cintura d'idempotenza sul rilancio_id.
+        con.execute("UPDATE rilanci SET stato='tardivo', aggiornato=? "
+                    "WHERE id=?", (adesso, rilancio_id))
+        con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,"
+                    "tg_id,puntata_id,rilancio_id,importo_sats,motivo,"
+                    "stato,creato,aggiornato) "
+                    "VALUES(?,?,?,?,?,'tardivo','da_riscuotere',?,?)",
+                    (ril["annuncio_id"], user["id"], ril["puntata_id"],
+                     rilancio_id, ril["delta_sats"], adesso, adesso))
+        con.commit()
+        con.close()
+        await notifica(user["id"],
+                       "⌛ <b>L'asta si era già chiusa</b> quando il tuo "
+                       "pagamento è arrivato: i sats sono al sicuro nel "
+                       "tuo «Da riscuotere», nel Profilo.")
+        return {"stato": "tardivo", "importo_sats": ril["delta_sats"]}
+    testa_prima = _leader_asta(con, ril["annuncio_id"])
+    etichetta = p["etichetta"]
+    if not etichetta:
+        gia = con.execute("SELECT COUNT(*) AS n FROM puntate WHERE "
+                          "annuncio_id=? AND etichetta!=''",
+                          (ril["annuncio_id"],)).fetchone()["n"]
+        etichetta = etichetta_offerente(gia)
+    # il numero d'ordine del saldo: progressivo GLOBALE, assegnato nel
+    # blocco senza await — e' il tie-break della testa (l'orario da
+    # solo non basta, ha la risoluzione del secondo)
+    seq = con.execute("SELECT COALESCE(MAX(saldo_seq),0)+1 AS s "
+                      "FROM puntate").fetchone()["s"]
+    con.execute("UPDATE puntate SET versato_sats=versato_sats+?, "
+                "offerto_sats=?, etichetta=?, saldo_seq=?, aggiornato=? "
+                "WHERE id=?",
+                (ril["delta_sats"], ril["offerto_sats"], etichetta,
+                 seq, adesso, p["id"]))
+    # L'anti-cecchino, nel write path: la data di chiusura vive in UN
+    # posto solo (annunci.asta_scadenza) e la sposta solo un saldo
+    # negli ultimi minuti. Nessun tetto alle proroghe, per scelta.
+    scad = nuova_scadenza(a["asta_scadenza"], adesso,
+                          ASTA_PROROGA_MINUTI * 60)
+    if scad != a["asta_scadenza"]:
+        con.execute("UPDATE annunci SET asta_scadenza=? WHERE id=?",
+                    (scad, a["id"]))
+    testa_dopo = _leader_asta(con, ril["annuncio_id"])
+    n_offerenti = con.execute("SELECT COUNT(*) AS n FROM puntate WHERE "
+                              "annuncio_id=? AND stato='attiva' AND "
+                              "versato_sats>0",
+                              (ril["annuncio_id"],)).fetchone()["n"]
+    con.commit()
+    con.close()
+    in_testa = bool(testa_dopo and testa_dopo["tg_id"] == user["id"])
+    minimo = rilancio_minimo(testa_dopo["offerto_sats"],
+                             ASTA_INCREMENTO_PERCENTO) if testa_dopo else 0
+    # --- notifiche e cortesie, a soldi gia' al sicuro ---
+    try:
+        # puntare mette l'asta nel barattolo da solo: le proprie gare
+        # si ritrovano nei preferiti (privati come sempre; il limite
+        # dei 20 non blocca questa aggiunta di servizio, come non
+        # blocca la fusione)
+        con = db()
+        con.execute("INSERT OR IGNORE INTO preferiti(tg_id,annuncio_id,"
+                    "creato) VALUES(?,?,?)",
+                    (user["id"], ril["annuncio_id"], adesso))
+        con.commit()
+        con.close()
+    except Exception:
+        pass
+    titolo = a["titolo"][:60]
+    link = f"\n{URL_PUBBLICO}/annuncio/{ril['annuncio_id']}"
+    if in_testa and testa_prima and testa_prima["tg_id"] != user["id"]:
+        await notifica(testa_prima["tg_id"],
+                       f"🔨 <b>Ti hanno superato</b> su «{titolo}»: la "
+                       f"testa è a {_fmt_sats(testa_dopo['offerto_sats'])} "
+                       f"sats. Rilanci da "
+                       f"{_fmt_sats(minimo)} sats — paghi solo la "
+                       f"differenza — oppure puoi ritirarti.{link}")
+    if not in_testa:
+        await notifica(user["id"],
+                       f"🔨 La tua puntata su «{titolo}» è al sicuro, ma "
+                       f"nel frattempo ti hanno superato: la testa è a "
+                       f"{_fmt_sats(testa_dopo['offerto_sats'])} sats. "
+                       f"Per rilanciare servono almeno "
+                       f"{_fmt_sats(minimo)} sats — il tuo versato "
+                       f"conta già.{link}")
+    await notifica(a["venditore_id"],
+                   f"🔨 <b>Nuova puntata</b> su «{titolo}»: "
+                   f"{_fmt_sats(ril['offerto_sats'])} sats "
+                   f"({n_offerenti} offerent{'e' if n_offerenti == 1 else 'i'}).")
+    return {"stato": "saldato", "in_testa": in_testa,
+            "offerto_sats": ril["offerto_sats"],
+            "top_sats": testa_dopo["offerto_sats"] if testa_dopo else 0,
+            "minimo_sats": minimo, "scadenza": scad}
+
+
+@app.get("/api/aste/{annuncio_id}")
+def stato_asta(annuncio_id: int, x_tg_init_data: str = Header(""),
+               barattolo_sessione: str = Cookie("")):
+    """La fotografia dell'asta per il dettaglio e il foglio puntata:
+    testa, minimo, cronologia ANONIMA (etichette, mai nomi) e la MIA
+    posizione. Autenticato: la vetrina anonima ha gia' top e conteggio
+    dai campi pubblici."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=?",
+                    (annuncio_id,)).fetchone()
+    if not a or not _asta(a):
+        con.close()
+        raise HTTPException(404, "Asta non trovata")
+    testa = _leader_asta(con, annuncio_id)
+    cronologia = [
+        {"etichetta": r["etichetta"], "offerto_sats": r["offerto_sats"],
+         "quando": r["saldato_il"]}
+        for r in con.execute(
+            "SELECT p.etichetta, r.offerto_sats, r.saldato_il "
+            "FROM rilanci r JOIN puntate p ON p.id=r.puntata_id "
+            "WHERE r.annuncio_id=? AND r.stato='saldato' "
+            "ORDER BY r.saldato_il DESC, r.id DESC LIMIT 20",
+            (annuncio_id,))]
+    mia = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND "
+                      "tg_id=?", (annuncio_id, user["id"])).fetchone()
+    offerenti = _puntate_attive_salde(con, annuncio_id)
+    con.close()
+    minimo = rilancio_minimo(testa["offerto_sats"],
+                             ASTA_INCREMENTO_PERCENTO) if testa \
+        else a["asta_base_sats"]
+    fuori = {"base_sats": a["asta_base_sats"],
+             "scadenza": a["asta_scadenza"],
+             "top_sats": testa["offerto_sats"] if testa else 0,
+             "puntate_n": offerenti,
+             "minimo_sats": minimo, "cronologia": cronologia,
+             "incremento_percento": ASTA_INCREMENTO_PERCENTO,
+             "proroga_minuti": ASTA_PROROGA_MINUTI, "mia": None}
+    if mia:
+        fuori["mia"] = {
+            "stato": mia["stato"], "etichetta": mia["etichetta"],
+            "versato_sats": mia["versato_sats"],
+            "offerto_sats": mia["offerto_sats"],
+            "in_testa": bool(testa and testa["tg_id"] == user["id"])}
+    return fuori
+
+
+@app.get("/api/me/puntate")
+def mie_puntate(x_tg_init_data: str = Header(""),
+                barattolo_sessione: str = Cookie("")):
+    """Le mie gare, per la scheda Ordini (gemello di /api/me/offerte):
+    ogni puntata con la testa corrente e il minimo per rilanciare, piu'
+    i rimborsi in «Da riscuotere». La busta porta le leve: il client
+    non hardcoda mai le cifre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT p.id, p.annuncio_id, p.stato, p.etichetta, "
+        "p.versato_sats, p.offerto_sats, p.aggiornato, "
+        "a.titolo, a.foto, a.stato AS stato_annuncio, "
+        "a.asta_base_sats AS base_sats, a.asta_scadenza AS scadenza "
+        "FROM puntate p JOIN annunci a ON a.id=p.annuncio_id "
+        "WHERE p.tg_id=? ORDER BY p.aggiornato DESC LIMIT 30",
+        (user["id"],))]
+    for r in righe:
+        testa = _leader_asta(con, r["annuncio_id"])
+        r["top_sats"] = testa["offerto_sats"] if testa else 0
+        r["in_testa"] = bool(testa and testa["id"] == r["id"])
+        r["minimo_sats"] = rilancio_minimo(
+            testa["offerto_sats"], ASTA_INCREMENTO_PERCENTO) if testa \
+            else r["base_sats"]
+    rimborsi = [dict(r) for r in con.execute(
+        "SELECT r.id, r.annuncio_id, r.importo_sats, r.motivo, r.creato, "
+        "a.titolo FROM rimborsi_asta r "
+        "LEFT JOIN annunci a ON a.id=r.annuncio_id "
+        "WHERE r.tg_id=? AND r.stato='da_riscuotere' "
+        "ORDER BY r.creato DESC", (user["id"],))]
+    con.close()
+    return {"puntate": righe, "da_riscuotere": rimborsi,
+            "leve": {"incremento_percento": ASTA_INCREMENTO_PERCENTO,
+                     "proroga_minuti": ASTA_PROROGA_MINUTI,
+                     "abilitata": bool(ASTA_ABILITATA)}}
 
 
 @app.post("/api/listings/{annuncio_id}/offerta")
@@ -8081,6 +8480,26 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "attive": bool(LAMPO_ATTIVE), "sconti": LAMPO_SCONTI,
         "minimo": LAMPO_MIN_PERCENTO, "massimo": LAMPO_MAX_PERCENTO,
         "ore": ORE_LAMPO_OPZIONI}
+    # Il pallino delle aste: dove sono stato SUPERATO (tocca a me:
+    # rilancio o ritiro) piu' i rimborsi fermi in «Da riscuotere».
+    # Chi e' in testa lo dice SOLO _leader_asta — un MAX sulla cifra
+    # qui direbbe il contrario del giudice sul caso pari-cifra.
+    con2 = db()
+    superato = 0
+    for pz in con2.execute(
+            "SELECT p.id, p.annuncio_id FROM puntate p "
+            "JOIN annunci a ON a.id=p.annuncio_id "
+            "WHERE p.tg_id=? AND p.stato='attiva' AND p.versato_sats>0 "
+            "AND a.stato='attivo' AND a.asta_scadenza>?",
+            (user["id"], int(time.time()))).fetchall():
+        testa = _leader_asta(con2, pz["annuncio_id"])
+        if testa and testa["id"] != pz["id"]:
+            superato += 1
+    da_riscuotere = con2.execute(
+        "SELECT COUNT(*) AS n FROM rimborsi_asta WHERE tg_id=? AND "
+        "stato='da_riscuotere'", (user["id"],)).fetchone()["n"]
+    con2.close()
+    profilo["aste_da_agire"] = superato + da_riscuotere
     # E quelle dell'asta, per il form di vendita e il foglio puntata
     # (stesso patto: mai cifre hardcodate nel client).
     profilo["asta_leve"] = {
@@ -10450,6 +10869,16 @@ def pulisci_ordini_fantasma(con):
                 (soglia,))
     con.execute("DELETE FROM ordini WHERE stato='creato' AND creato < ?",
                 (soglia,))
+    # E le fatture di puntata mai saldate (vita 10 min, soglia 2x come
+    # per gli ordini): via la riga stantia, e via anche la puntata mai
+    # partita (versato 0, nessun rilancio rimasto) — cosi' la riga
+    # UNIQUE si libera e si puo' ripartire da capo. NON e' un ritiro:
+    # nessun sat e' mai entrato.
+    con.execute("DELETE FROM rilanci WHERE stato='creato' AND creato < ?",
+                (int(time.time()) - RILANCIO_STANTIO,))
+    con.execute("DELETE FROM puntate WHERE stato='attiva' AND "
+                "versato_sats=0 AND NOT EXISTS "
+                "(SELECT 1 FROM rilanci r WHERE r.puntata_id=puntate.id)")
 
 
 @app.post("/api/orders/{ordine_id}/annulla")

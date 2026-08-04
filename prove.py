@@ -595,6 +595,89 @@ def prove_ricategorizza():
 
 
 # ====================================================================
+# ====================================================================
+def prove_asta():
+    """La matematica pura dell'asta: minimo coi suoi arrotondamenti,
+    proroga anti-cecchino, etichette anonime e il conto della chiusura
+    con l'invariante dei totali. Il caso PARI-CIFRA e' la lezione del
+    collaudo del passo 3: due saldi nello stesso secondo esistono, a
+    parita' comanda chi ha saldato prima (saldo_seq) — per prendere la
+    testa bisogna SUPERARE."""
+    print("\n[asta]")
+    amb = {}
+    for f in ("rilancio_minimo", "nuova_scadenza", "etichetta_offerente",
+              "conto_chiusura"):
+        exec(pezzo(f), amb)
+
+    rm = amb["rilancio_minimo"]
+    prova("minimo: 5% di 100.000", 105_000, rm(100_000, 5))
+    prova("minimo: 5% di 19 fa 0 per difetto, vale il +1", 20, rm(19, 5))
+    prova("minimo: 5% di 10 sats fa 0, vale il +1", 11, rm(10, 5))
+    prova("minimo: mai un pareggio possibile", 2, rm(1, 5))
+
+    ns = amb["nuova_scadenza"]
+    prova("proroga: saldo negli ultimi minuti sposta a saldo+proroga",
+          1100, ns(1000, 500, 600))
+    prova("proroga: fuori finestra non sposta", 1000, ns(1000, 300, 600))
+    prova("proroga: al filo della scadenza niente (e' un tardivo)",
+          1000, ns(1000, 1000, 600))
+
+    et = amb["etichetta_offerente"]
+    prova("etichette: A..Z poi AA, AB", ["A", "B", "Z", "AA", "AB"],
+          [et(i) for i in (0, 1, 25, 26, 27)])
+
+    cc = amb["conto_chiusura"]
+
+    def p(i, off, ver, seq, stato="attiva"):
+        return {"id": i, "tg_id": 100 + i, "offerto_sats": off,
+                "versato_sats": ver, "saldo_seq": seq, "stato": stato}
+
+    v, r = cc([p(1, 100, 100, 1), p(2, 120, 120, 2),
+               p(3, 90, 90, 3, "chiusa")])
+    prova("chiusura: vince l'offerta piu' alta", 2, v["id"])
+    prova("chiusura: le chiuse non entrano nei rimborsi",
+          [1], [x["puntata_id"] for x in r])
+    prova("chiusura: invariante dei totali (vincitore + rimborsi)",
+          100 + 120, v["versato_sats"] + sum(x["importo_sats"] for x in r))
+    # Il caso PARI-CIFRA: la corsa di due fatture nate sulla stessa
+    # testa. Vince chi ha SALDATO prima, anche se la sua riga di
+    # puntata e' nata dopo (id piu' alto).
+    v, r = cc([p(1, 140, 140, 9), p(2, 140, 140, 8)])
+    prova("pari-cifra: vince chi ha saldato prima", 2, v["id"])
+    prova("pari-cifra: l'altro nei rimborsi per il suo versato",
+          [(1, 140)], [(x["puntata_id"], x["importo_sats"]) for x in r])
+    v, r = cc([p(1, 0, 0, 0)])
+    prova("deserta: nessuna vincitrice, nessun rimborso",
+          (None, []), (v, r))
+
+    # Il giudice SQL della testa, sul gemello in memoria (ermetico:
+    # niente file, niente config — solo la tabella che serve).
+    import sqlite3
+    exec(pezzo("_leader_asta"), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE puntate(id INTEGER PRIMARY KEY, "
+                "annuncio_id INT, tg_id INT, offerto_sats INT, "
+                "versato_sats INT, saldo_seq INT, stato TEXT)")
+    con.executemany("INSERT INTO puntate VALUES(?,?,?,?,?,?,?)", [
+        (1, 7, 111, 140, 140, 9, "attiva"),
+        (2, 7, 333, 140, 140, 8, "attiva"),   # pari-cifra, saldato prima
+        (3, 7, 444, 150, 150, 4, "chiusa"),   # ritirato: fuori gara
+        (4, 8, 111, 999, 999, 1, "attiva")])  # un'altra asta
+    testa = amb["_leader_asta"](con, 7)
+    prova("leader SQL: a pari-cifra comanda chi ha saldato prima",
+          2, testa["id"])
+    prova("leader SQL: il ritirato non conta anche se offre di piu'",
+          True, testa["offerto_sats"] == 140)
+    con.close()
+    # I due giudici devono restare GEMELLI: sentinelle sul testo (e'
+    # il tipo di parita' che un refactor spezza in silenzio).
+    prova("un solo ordine: _leader_asta ordina su saldo_seq", True,
+          "saldo_seq ASC" in pezzo("_leader_asta"))
+    prova("un solo ordine: conto_chiusura decide su saldo_seq", True,
+          '"saldo_seq"' in pezzo("conto_chiusura"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -602,7 +685,7 @@ def main():
     for f in (prove_filtro_italiano, prove_testo_evento,
               prove_tag_commercio, prove_anello, prove_categorie,
               prove_senza_condizione, prove_sottocategorie,
-              prove_ricategorizza):
+              prove_ricategorizza, prove_asta):
         try:
             f()
         except Exception as e:
