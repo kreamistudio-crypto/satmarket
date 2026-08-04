@@ -1731,10 +1731,20 @@
   /* ---------- modale pagamento ---------- */
   .sheet-bg{position:fixed;inset:0;background:rgba(20,20,22,.5);z-index:40;display:none}
   .sheet-bg.open{display:block;animation:fadein .15s}
+  /* Il foglio SCORRE quando il contenuto eccede (ago 2026, dal campo:
+     il QR vero aveva allungato il paySheet oltre la viewport e il
+     bordo ALTO — position fixed bottom — finiva tagliato senza scampo,
+     overflow visibile e scrollTop inchiodato a 0). max-height con
+     riserva d'aria, overscroll contain per non incatenarsi alla pagina
+     ne' al pull-to-refresh (che comunque a foglio aperto e' gia'
+     disarmato: navPila > 1). Vale per TUTTI i fogli: e' il male del
+     piu' alto, ma la cintura non costa niente agli altri. */
   .sheet{
     position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;
     background:var(--card);border-radius:22px 22px 0 0;padding:20px var(--pad) 28px;
     transform:translateY(100%);transition:transform .22s ease;
+    max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);
+    overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   }
   .sheet.open{transform:none}
   .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--field-line);margin:0 auto 14px}
@@ -1789,17 +1799,33 @@
      bianco qui piu' i 4 moduli di margine disegnati nel canvas.
      Nascosto finche' non c'e' una bolt11 vera da codificare (in demo
      resta nascosto: la stringa e' finta). */
+  /* La misura segue l'ALTEZZA disponibile (ago 2026): 250px e' il
+     tetto, ma su una viewport bassa (Mini App con la barra di
+     Telegram, telefoni piccoli) il QR si stringe fino al pavimento
+     dei 170px — sotto, la scansione non e' piu' affidabile e a quel
+     punto e' meglio far scorrere il foglio. La zona quieta (padding
+     + 4 moduli nel canvas) non si tocca: scala col resto. */
   .qr{
     display:none;background:#fff;border-radius:var(--radius);
-    padding:10px;max-width:250px;margin:16px auto;
+    padding:10px;margin:12px auto;
+    max-width:min(250px, max(170px, 30vh));
+    max-width:min(250px, max(170px, 30dvh));
     box-shadow:0 0 0 1px rgba(0,0,0,.08);
   }
   .qr.pronto{display:block}
   .qr canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+  /* Tre righe e basta (ago 2026): col QR in pagina la stringa intera
+     era solo centimetri di gibberish — il textContent resta COMPLETO
+     (copiaInvoice legge quello), si tronca solo la resa. */
   .invoice{
     font-family:'JetBrains Mono',monospace;font-size:10.5px;background:var(--bg);
-    border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;
+    border:1px solid var(--line);border-radius:10px;word-break:break-all;
     color:var(--muted);margin-bottom:14px;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+    overflow:hidden;
+    /* il padding-basso quasi a zero: l'overflow taglia al bordo del
+       padding, e con 10px li' sotto spuntava un filo di quarta riga */
+    padding:10px 10px 2px;
   }
   /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
   .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
@@ -1955,10 +1981,12 @@
     #view-vendi,#view-affari,#view-ordine,#view-profilo{max-width:680px;margin:0 auto}
     #negozioHeader{max-width:680px;padding:0 var(--pad)}
 
-    /* i fogli dal basso diventano modali centrati */
+    /* i fogli dal basso diventano modali centrati (il max-height
+       resta: anche una finestra desktop puo' essere bassa) */
     .sheet{
       left:50%;right:auto;top:50%;bottom:auto;width:min(560px,92vw);
       max-width:none;margin:0;border-radius:22px;
+      max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);
       transform:translate(-50%,-46%);opacity:0;visibility:hidden;
       transition:transform .22s ease,opacity .22s ease,visibility .22s;
     }

@@ -823,6 +823,14 @@ def prove_annullo():
           and "annullaPagamento" in mini)
     prova("paySheet: la conferma avverte chi ha gia' pagato", True,
           "NON annullare" in mini)
+    # la regressione del foglio tagliato (ago 2026): il QR aveva
+    # allungato il paySheet oltre la viewport e il bordo alto finiva
+    # tagliato senza scroll — queste due righe sono la cura
+    prova("foglio: scorre quando il contenuto eccede", True,
+          "overflow-y:auto;overscroll-behavior:contain" in mini
+          and "max-height:calc(100dvh - 16px)" in mini)
+    prova("QR: la misura segue l'altezza disponibile (mai sotto i "
+          "170px)", True, "max(170px, 30dvh)" in mini)
 
 
 def prove_ritiro():
