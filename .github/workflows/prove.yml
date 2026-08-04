@@ -42,6 +42,7 @@ jobs:
              censimento_spedizione.py ripulisci_anello_nostr.py
              ricategorizza.py sposta_a_mano.py ritaglia_categorie.py
              presenta_release.py config_esempio.py
+             assegna_sottocategorie.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
