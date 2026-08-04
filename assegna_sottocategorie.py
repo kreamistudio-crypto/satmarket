@@ -89,9 +89,15 @@ def main():
 
     if conta:
         # --- il termometro: com'e' messa la colonna ADESSO ----------
+        # SOLO gli attivi (ago 2026, da un caso vero: sul VPS il conto
+        # a tre stati pescava i venduti delle prove di rodaggio —
+        # «Test», «Prova» — e il termometro misurava fantasmi). La
+        # PASSATA invece tiene anche revisione e venduto: un venduto
+        # puo' tornare in vendita con la ricarica, e assegnarli non
+        # sporca nessuna misura.
         righe = con.execute(
-            f"SELECT categoria, sottocategoria, titolo FROM annunci "
-            f"WHERE stato IN ({segna})", STATI).fetchall()
+            "SELECT categoria, sottocategoria, titolo FROM annunci "
+            "WHERE stato='attivo'").fetchall()
         con.close()
         per_cat = {}
         for r in righe:
@@ -104,7 +110,7 @@ def main():
                 per_cat[r["categoria"]][2].append(r["titolo"])
         tot = sum(v[0] for v in per_cat.values())
         piene = sum(v[1] for v in per_cat.values())
-        print(f"{tot} annunci ({'/'.join(STATI)}): "
+        print(f"{tot} annunci ATTIVI (la vetrina vera): "
               f"{piene} con sottocategoria, {tot - piene} vuote"
               + (f" ({piene * 100 // tot}%)" if tot else ""))
         print("\nle astensioni, dalla categoria che ne ha di piu' — e' "
