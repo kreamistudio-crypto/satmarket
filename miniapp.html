@@ -1145,19 +1145,39 @@
   .pacco-cella .btn.pacco-btn[disabled]{opacity:.45;box-shadow:none}
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
     margin-top:4px;line-height:1.3}
+  /* IL TOTALE HA LA PRIORITA' (ago 2026, regressione dal campo: coi
+     sats a 6-7 cifre il numero finiva SOTTO il toggle). Tre pezzi:
+     1) la colonna del totale non si strizza MAI (flex:0 0 auto — il
+        min-width:0 di prima la lasciava scendere sotto il contenuto,
+        e il nowrap dipingeva sopra il vicino);
+     2) la barra va A CAPO quando i tre non ci stanno (flex-wrap): a
+        scendere e' il BOTTONE, intero su una riga sua — mai la cifra
+        troncata o coperta, e' denaro;
+     3) sui numeri lunghi il corpo scala (classe .lungo da
+        aggiornaBarraPacco): cosi' il capo resta il caso estremo. */
   #barraPacco{position:fixed;bottom:0;left:0;right:0;z-index:30;
     background:var(--nav-bg);backdrop-filter:blur(10px);
-    border-top:1px solid var(--line);display:none;gap:10px;align-items:center;
+    border-top:1px solid var(--line);display:none;flex-wrap:wrap;
+    gap:10px;row-gap:8px;align-items:center;
     padding:10px var(--pad) calc(8px + env(safe-area-inset-bottom));
     max-width:520px;margin:0 auto}
   body.con-pacco #barraPacco{display:flex;animation:barraSu .18s ease}
   #barraPacco .btn{margin-top:0;width:auto;flex:0 0 auto;margin-left:auto;
     border-radius:12px;white-space:nowrap;box-shadow:none;
-    font-size:15px;padding:9px 14px 10px}
+    font-size:14px;padding:9px 11px 10px}
   #barraPacco .btn:active{transform:translateY(1px);box-shadow:none}
-  .pacco-somma{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+  .pacco-somma{display:flex;flex-direction:column;flex:0 0 auto;
+    max-width:100%;line-height:1.2}
   #paccoTot{font-size:17px;font-weight:800;white-space:nowrap}
-  #paccoConta{font-size:11.5px;color:var(--muted);font-weight:600}
+  #paccoTot.lungo{font-size:14.5px}
+  /* la riga «N pezzi» non decide la larghezza della colonna (width:0 +
+     min-width:100% = larga quanto il totale) e coi puntini se non ci
+     sta: e' un conteggio, non denaro */
+  #paccoConta{font-size:11.5px;color:var(--muted);font-weight:600;
+    width:0;min-width:100%;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+  /* a barra alta (due righe) l'ultima cella non deve restare coperta */
+  body.con-pacco #app{padding-bottom:150px}
   @media (max-width:767.98px){
     body.con-pacco nav{display:none}
   }
@@ -5896,9 +5916,13 @@ function aggiornaBarraPacco(){
     tot += artStima(x) * qta; pezzi += qta;
     if (x.valuta==='eur') circa = '≈ ';
   }
-  el('paccoTot').textContent = valutaVista==='eur'
+  const t = el('paccoTot');
+  t.textContent = valutaVista==='eur'
     ? `≈ ${fmtEur(tot * eurPerSat)} €`
     : `${circa}${fmt(tot)} sats`;
+  /* sui numeri lunghi il corpo scala (vedi il CSS della barra): oltre
+     le 6 cifre in sats la riga piena non regge i 375px */
+  t.classList.toggle('lungo', t.textContent.length > 12);
   el('paccoConta').textContent = pezzi
     ? `${pezzi} pezz${pezzi===1?'o':'i'} nel pacco` : 'il pacco è vuoto';
 }
