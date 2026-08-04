@@ -516,6 +516,46 @@ def prove_sottocategorie():
     prova("una voce storta e' '' e mai uno scarto", "",
           tollera("Biciclette", "bici volante"))
 
+    # --- il giudice SILENZIOSO (ago 2026): parole chiave dentro la
+    # categoria gia' scelta. La proprieta' che le prove difendono e'
+    # l'ASTENSIONE: sul dubbio risponde '', mai un'assegnazione tirata
+    # a indovinare.
+    amb["re"], amb["unicodedata"] = __import__("re"), \
+        __import__("unicodedata")
+    i = _SORGENTE.index("SINONIMI_SOTTOCATEGORIA = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n}", i) + 2], amb)
+    for f in ("normalizza", "_parola_sottocategoria",
+              "sottocategoria_indovina"):
+        exec(pezzo(f), amb)
+    sin = amb["SINONIMI_SOTTOCATEGORIA"]
+    prova("il dizionario parla solo di categorie vere", [],
+          [c for c in sin if c not in albero])
+    prova("ogni voce del dizionario esiste nell'albero", [],
+          [(c, v) for c, voci in sin.items() for v in voci
+           if v not in {sid for sid, _ in albero[c]}])
+    prova("ogni voce dell'albero ha le sue parole", [],
+          [(c, sid) for c, voci in albero.items() for sid, _ in voci
+           if sid not in sin.get(c, {})])
+
+    g = amb["sottocategoria_indovina"]
+    prova("il poster si riconosce", "poster-stampe",
+          g("Bitcoin", 'Poster A1 "White Paper"', ""))
+    prova("il titolo pesa doppio (il Buono soggiorno)",
+          "soggiorni-esperienze",
+          g("Buoni ed esperienze", "Buono soggiorno due notti", ""))
+    prova("il pareggio e' un dubbio e il dubbio resta ''", "",
+          g("Bitcoin", "poster wallet", ""))
+    prova("'auto' non prende 'autoradio'", "",
+          g("Motori", "Autoradio Pioneer", ""))
+    prova("il prefisso lungo invece lavora", "outdoor",
+          g("Sport e hobby", "kit per escursioni", ""))
+    prova("senza parole si astiene", "",
+          g("Libri e media", "bitcoin standard", "nuovo"))
+    prova("una categoria piatta non giudica", "",
+          g("Altro", "Poster bellissimo", ""))
+    prova("gli accenti non contano", "cucina-tavola",
+          g("Casa e giardino", "Caffettièra anni 60", ""))
+
 
 # ====================================================================
 def prove_ricategorizza():

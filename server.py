@@ -3597,6 +3597,289 @@ def sottocategoria_tollerante(categoria: str, s) -> str:
     return ""
 
 
+# --- Il giudice SILENZIOSO delle sottocategorie (ago 2026) -----------
+# Idea di Andrea: parole chiave dentro la categoria GIA' scelta —
+# il pattern SINONIMI_CATEGORIA un piano piu' in basso. Il reparto e'
+# deciso da un umano (o dall'AI per gli importati), quindi gli errori
+# fra reparti non possono esistere per costruzione, e dentro una
+# categoria i vocabolari delle voci quasi non si sovrappongono.
+# MISURATO sui dati veri (4 ago 2026): 45/46 giusti in produzione piu'
+# il NON SO voluto del Telo d'Amare; 12/15 fuori campione; ZERO
+# sbagliati in tutti e due i giri — quando non ce la fa SI ASTIENE
+# ('' e la colonna resta vuota), mai un'assegnazione in dubbio.
+# Lavora in SILENZIO: riempie annunci.sottocategoria dove il payload
+# non la porta, e nessuno vede nulla finche' l'albero non si accende.
+# Zero rete, zero await: microsecondi in RAM, mai un blocco.
+# Il dizionario e' UNO e vive qui (la proposta in proposte/ e' morta
+# qui dentro: un dizionario in due copie diverge, la lezione del
+# prompt di ricategorizza). Si arricchisce coi dati veri: la misura
+# la fa `python assegna_sottocategorie.py --conta` sul VPS, che dice
+# dove il giudice si astiene di piu' — si impara dai NON SO, mai
+# dagli sbagli, che non ci sono stati.
+# Le categorie senza casi veri hanno le parole ovvie di catalogo, da
+# tarare quando la merce arrivera'.
+SINONIMI_SOTTOCATEGORIA = {
+    "Elettronica": {
+        "droni-modellismo": ("drone", "droni", "radiocomandat",
+                             "modellismo"),
+        "stampa-3d": ("stampante 3d", "stampa 3d", "filamento", "resina",
+                      "3d"),
+        "smart-home": ("domotica", "smart home", "alexa", "sensore",
+                       "telecamera"),
+        "componenti-maker": ("arduino", "raspberry", "saldatore",
+                             "breadboard", "componenti"),
+        "strumenti-misura": ("multimetro", "oscilloscopio", "tester",
+                             "calibro"),
+    },
+    "Informatica": {
+        "computer": ("computer", "portatile", "notebook", "laptop",
+                     "desktop", "macbook", "imac"),
+        "tablet": ("tablet", "ipad", "kindle", "ereader", "e reader"),
+        "componenti-periferiche": ("tastiera", "mouse", "monitor",
+                                   "stampante", "scheda", "ram", "ssd",
+                                   "cavo", "adattatore", "adapter", "hub",
+                                   "webcam", "periferica", "router"),
+        "software-licenze": ("licenza", "software", "office", "windows",
+                             "antivirus", "microsoft", "abbonamento"),
+    },
+    "Telefonia": {
+        "smartphone": ("smartphone", "cellulare", "telefono", "iphone",
+                       "xiaomi", "redmi"),
+        "cover-accessori": ("cover", "custodia", "pellicola", "caricatore",
+                            "caricabatterie", "auricolari", "cuffiette"),
+    },
+    "Audio e video": {
+        "cuffie": ("cuffie", "auricolari", "cuffia"),
+        "casse-ampli": ("cassa", "casse", "amplificatore", "speaker",
+                        "soundbar"),
+        "hifi-giradischi": ("giradischi", "hi fi", "hifi", "piastra",
+                            "vinile"),
+        "tv-proiettori": ("televisore", "proiettore", "smart tv",
+                          "schermo"),
+    },
+    "Console e videogiochi": {
+        "console": ("console", "playstation", "xbox", "switch",
+                    "nintendo"),
+        "videogiochi": ("videogioco", "videogiochi", "cartuccia"),
+        "controller-accessori": ("controller", "joystick", "joypad",
+                                 "volante"),
+        "retrogaming": ("retro", "retrogaming", "game boy", "amiga",
+                        "commodore", "sega"),
+    },
+    "Foto e ottica": {
+        "fotocamere": ("fotocamera", "reflex", "mirrorless", "polaroid",
+                       "compatta"),
+        "obiettivi": ("obiettivo", "obiettivi", "ottica", "zoom",
+                      "grandangolo", "teleobiettivo"),
+        "binocoli-telescopi": ("binocolo", "telescopio", "cannocchiale",
+                               "microscopio"),
+        "treppiedi-accessori": ("treppiede", "cavalletto", "flash",
+                                "gimbal", "zaino foto"),
+    },
+    "Bitcoin": {
+        "hardware-wallet": ("wallet", "jade", "bitbox", "ledger", "trezor",
+                            "seedsigner", "coldcard", "firma", "seed",
+                            "passphrase"),
+        "nodi-mining": ("nodo", "node", "miner", "mining", "asic",
+                        "antminer", "umbrel", "raspiblitz"),
+        "poster-stampe": ("poster", "stampa", "stampe", "quadro",
+                          "manifesto", "locandina"),
+        "merch": ("maglietta", "tshirt", "t shirt", "felpa", "cappello",
+                  "sacca", "borsa", "tazza", "adesiv", "portachiavi",
+                  "gadget", "sticker"),
+    },
+    "Casa e giardino": {
+        "mobili": ("divano", "tavolo", "sedia", "sgabello", "armadio",
+                   "libreria", "comodino", "scrivania", "poltrona",
+                   "lampada", "specchio"),
+        "cucina-tavola": ("caffettiera", "moka", "tazza", "tazze",
+                          "pentola", "padella", "piatti", "bicchieri",
+                          "posate", "tagliere", "macchina per la pasta"),
+        "giardino": ("pianta", "vaso", "semi", "rastrello", "tosaerba",
+                     "irrigazione", "barbecue"),
+    },
+    "Elettrodomestici": {
+        "grandi-elettrodomestici": ("frigo", "frigorifero", "lavatrice",
+                                    "lavastoviglie", "forno",
+                                    "congelatore", "asciugatrice"),
+        "piccoli-elettrodomestici": ("frullatore", "tostapane", "bollitore",
+                                     "aspirapolvere", "cappa", "ricambio",
+                                     "microonde", "ferro da stiro"),
+    },
+    "Fai da te e utensili": {
+        "elettroutensili": ("trapano", "avvitatore", "smerigliatrice",
+                            "levigatrice", "flessibile", "sega elettrica"),
+        "utensili-mano": ("martello", "cacciavite", "chiave inglese",
+                          "pinza", "scalpello"),
+        "ferramenta": ("viti", "bulloni", "tasselli", "ferramenta",
+                       "vernice", "silicone"),
+    },
+    "Alimenti e bevande": {
+        "olio-condimenti": ("olio", "aceto", "salsa", "condimento", "soia",
+                            "pesto", "sugo"),
+        "dolci-conserve": ("composta", "marmellata", "confettura", "crema",
+                           "spalmabile", "miele", "cioccolato", "dolce",
+                           "biscotti", "conserva"),
+        "spezie-erbe": ("zafferano", "spezie", "pepe", "peperoncino",
+                        "origano", "erbe", "curcuma"),
+        "bevande": ("vino", "birra", "caffe", "liquore", "amaro", "succo",
+                    "bevanda", "sidro", "kombucha"),
+    },
+    "Bellezza e benessere": {
+        "creme-cosmetici": ("crema", "sapone", "shampoo", "balsamo",
+                            "olio essenziale", "siero", "cosmetic",
+                            "lozione", "scrub"),
+        "profumi": ("profumo", "profumi", "fragranza", "colonia"),
+        "integratori": ("integratore", "vitamine", "proteine", "creatina",
+                        "omega"),
+    },
+    "Abbigliamento": {
+        "donna": ("donna", "femminile", "gonna", "camicetta", "tailleur"),
+        "uomo": ("uomo", "maschile", "cravatta", "completo uomo"),
+    },
+    "Scarpe e accessori": {
+        "scarpe": ("scarpe", "sneakers", "stivali", "sandali", "mocassini",
+                   "anfibi"),
+        "borse-zaini": ("borsa", "zaino", "tracolla", "valigia", "trolley",
+                        "marsupio"),
+        "piccoli-accessori": ("cintura", "portafoglio", "occhiali",
+                              "cappello", "sciarpa", "guanti"),
+    },
+    "Orologi e gioielli": {
+        "orologi-smartwatch": ("orologio", "orologi", "watch", "smartwatch",
+                               "cronografo", "quadrante", "cinturino"),
+        "gioielli": ("collana", "anello", "bracciale", "orecchini",
+                     "ciondolo", "gioiello", "mala", "perle", "spilla"),
+    },
+    "Bambini": {
+        "passeggini-attrezzatura": ("passeggino", "seggiolino", "culla",
+                                    "fasciatoio", "marsupio"),
+        "giocattoli": ("giocattolo", "gioco", "giochi", "costruzioni",
+                       "peluche", "bambola", "lego", "puzzle", "triciclo",
+                       "cavalcabile"),
+        "abbigliamento-bimbi": ("tutina", "body", "vestiti", "scarpine"),
+    },
+    "Sport e hobby": {
+        "attrezzatura-sportiva": ("pallone", "racchetta", "pesi", "manubri",
+                                  "bilanciere", "palestra", "tennis",
+                                  "padel", "nuoto", "boxe", "tapis"),
+        "outdoor": ("trekking", "zaino", "tenda", "campeggio", "montagna",
+                    "sacco a pelo", "escursion"),
+        "giochi-tavolo": ("gioco", "giochi", "puzzle", "tavolo",
+                          "strategia", "scacchi", "dadi"),
+    },
+    "Biciclette": {
+        "corsa-gravel": ("corsa", "gravel", "bdc"),
+        "mtb": ("mtb", "mountain bike", "front", "biammortizzata"),
+        "ebike": ("ebike", "e bike", "elettrica", "pedalata assistita"),
+        "citta-pieghevoli": ("citta", "city", "pieghevole", "graziella",
+                             "olanda"),
+        "bici-bimbi": ("bimbo", "bimba", "bambino", "bambina",
+                       "16 pollici", "20 pollici"),
+        "componenti-bici": ("sella", "manubrio", "cambio", "ruote",
+                            "copertoni", "casco bici", "borraccia",
+                            "pedali"),
+    },
+    "Motori": {
+        "veicoli": ("auto", "moto", "scooter", "vespa", "motorino"),
+        "ricambi-motori": ("faro", "ricambi", "ricambio", "paraurti",
+                           "centralina", "frizione", "marmitta", "gomme",
+                           "cerchi", "pastiglie", "filtro"),
+        "caschi-abbigliamento": ("casco", "tuta moto", "guanti moto"),
+    },
+    "Animali": {
+        "cani": ("cane", "cani", "guinzaglio", "cuccia", "museruola"),
+        "gatti": ("gatto", "gatti", "lettiera", "tiragraffi"),
+        "acquari-terrari": ("acquario", "terrario", "pesci", "rettili"),
+    },
+    "Libri e media": {
+        "libri": ("libro", "saggio", "romanzo", "manuale", "poesie"),
+        "fumetti-manga": ("fumetto", "manga", "comics"),
+    },
+    "Musica e film": {
+        "vinili": ("vinile", "vinili", "33 giri", "45 giri"),
+        "cd-dvd": ("cd", "dvd", "blu ray", "bluray"),
+    },
+    "Strumenti musicali": {
+        "chitarre-bassi": ("chitarra", "basso", "ukulele", "corde",
+                           "plettro"),
+        "tastiere-piano": ("pianoforte", "piano", "sintetizzatore",
+                           "synth", "organo", "tastiera musicale"),
+        "batteria-percussioni": ("batteria", "rullante", "cajon",
+                                 "bacchette"),
+        "fiati-archi": ("tromba", "sax", "clarinetto", "flauto", "violino",
+                        "violoncello"),
+        "ampli-studio": ("amplificatore", "ampli", "microfono", "mixer",
+                         "scheda audio", "pedale", "effetti"),
+    },
+    "Collezionismo": {
+        "carte-tcg": ("tcg", "carte", "pokemon", "magic", "yugioh",
+                      "sealed", "booster", "mazzo"),
+        "edizioni": ("edizione", "numerata", "volume", "tiratura",
+                     "cofanetto", "prima edizione"),
+        "monete-banconote": ("moneta", "monete", "banconota", "banconote",
+                             "numismatica", "lire", "conio"),
+    },
+    "Arte e artigianato": {
+        "quadri-stampe": ("quadro", "dipinto", "tela", "acquerello",
+                          "litografia", "stampa d arte"),
+        "sculture-ceramiche": ("scultura", "ceramica", "terracotta",
+                               "statua"),
+        "tessuti-ricami": ("tessuto", "ricamo", "arazzo", "telaio",
+                           "uncinetto", "tessitura"),
+        "materiali-creativi": ("colori", "tele", "pennelli", "lana",
+                               "filati", "perline"),
+    },
+    "Buoni ed esperienze": {
+        "gift-card": ("buono", "buoni", "gift", "card", "codice", "sconto",
+                      "voucher"),
+        "soggiorni-esperienze": ("soggiorno", "notte", "notti", "cena",
+                                 "degustazione", "esperienza", "weekend",
+                                 "spa", "b b"),
+    },
+}
+
+
+def _parola_sottocategoria(kw: str, tokens, testo: str) -> int:
+    """1 se la parola chiave compare: multiparola = sottostringa a
+    confini di parola; singola = token esatto, o prefisso solo da 5
+    lettere in su ('stampe' prende 'stampato', 'auto' NON prende
+    'autoradio' — la regola del matching degli avvisi)."""
+    if " " in kw:
+        return 1 if f" {kw} " in f" {testo} " else 0
+    for t in tokens:
+        if t == kw or (len(kw) >= 5 and t.startswith(kw)):
+            return 1
+    return 0
+
+
+def sottocategoria_indovina(categoria: str, titolo: str,
+                            descrizione: str) -> str:
+    """Il giudice: titolo pesa 2 e descrizione 1, assegna solo il
+    vincitore UNICO con punteggio sopra zero — il pareggio e' un
+    dubbio, e il dubbio resta '' (l'astensione e' la valvola che
+    tiene il giudice onesto: sui dati veri non ha mai sbagliato,
+    si e' solo astenuto). Il peso del titolo decide i casi come
+    «Buono soggiorno»: la parola del titolo vale piu' di quella
+    sperduta in descrizione."""
+    voci = SINONIMI_SOTTOCATEGORIA.get(categoria)
+    if not voci:
+        return ""
+    tt, td = normalizza(titolo), normalizza(descrizione)
+    ttok, dtok = tt.split(), td.split()
+    punti = {}
+    for voce, parole in voci.items():
+        s = sum(2 * _parola_sottocategoria(k, ttok, tt)
+                + _parola_sottocategoria(k, dtok, td) for k in parole)
+        if s:
+            punti[voce] = s
+    if not punti:
+        return ""
+    best = max(punti.values())
+    vincitori = [v for v, s in punti.items() if s == best]
+    return vincitori[0] if len(vincitori) == 1 else ""
+
+
 # --- Condizione dell'oggetto (lug 2026): la scala a 5 livelli --------
 # Obbligatoria nel FORM (la validazione vive nel client, come per la
 # consegna): il server resta tollerante — '' = non dichiarata, cioe'
@@ -4271,9 +4554,14 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     lat, lon = coordinate_da_zona(zona)
     regione = regione_da_zona(zona)   # derivata dalla sigla, mai chiesta
     # la sottocategoria e' DORMIENTE (ago 2026): il form non la offre
-    # ancora, ma un payload che la porta la scrive gia' — storta = ''
+    # ancora, ma un payload che la porta la scrive gia' — storta = ''.
+    # E dove il payload non dice niente decide il giudice SILENZIOSO
+    # (zero await: il patto anti-doppione non si tocca); se si astiene
+    # resta '', mai un errore ne' un blocco
     sotto = sottocategoria_valida(categoria_valida(d.get("categoria")),
-                                  d.get("sottocategoria"))
+                                  d.get("sottocategoria")) \
+        or sottocategoria_indovina(categoria_valida(d.get("categoria")),
+                                   d["titolo"], d.get("descrizione", ""))
     con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "sottocategoria,"
@@ -4770,12 +5058,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # dormiente come in pubblica(), e l'assenza CONSERVA la sottovoce
     # (il pattern dello stock qui sopra: il form di oggi non manda il
     # campo e non deve azzerare quella scritta via payload) — ma sempre
-    # attraverso il giudice: se la categoria e' cambiata, la sottovoce
-    # che non le appartiene piu' si azzera da sola
+    # attraverso il giudice della validita': se la categoria e'
+    # cambiata, la sottovoce che non le appartiene piu' si azzera da
+    # sola. E sul vuoto che resta prova il giudice silenzioso, sui
+    # testi NUOVI: il ritocco puo' aver aggiunto proprio la parola
+    # che mancava
     sotto = sottocategoria_valida(
         categoria_valida(d.get("categoria")),
         d.get("sottocategoria") if "sottocategoria" in d
-        else a["sottocategoria"])
+        else a["sottocategoria"]) \
+        or sottocategoria_indovina(categoria_valida(d.get("categoria")),
+                                   d["titolo"], d.get("descrizione", ""))
     con.execute(
         "UPDATE annunci SET titolo=?, descrizione=?, categoria=?, "
         "sottocategoria=?, "
@@ -10299,9 +10592,12 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                           cella(r, "quantita")),
                       # sottocategoria (ago 2026): DORMIENTE — il
                       # modello non la pubblicizza, ma chi la scrive
-                      # in colonna la trova salvata; storta = ''
-                      "sottocategoria": sottocategoria_tollerante(
-                          categoria, cella(r, "sottocategoria")),
+                      # in colonna la trova salvata; storta = '', e
+                      # sul vuoto decide il giudice silenzioso
+                      "sottocategoria": (sottocategoria_tollerante(
+                          categoria, cella(r, "sottocategoria"))
+                          or sottocategoria_indovina(
+                              categoria, titolo, descrizione)),
                       "foto": foto})
 
     if not righe:
@@ -11569,7 +11865,9 @@ async def importa_nostr_periodico():
     # avvisi — per chi cerca, un annuncio e' un annuncio.
     try:
         con = db()
-        for r in con.execute("SELECT id, zona, lat, lon, regione FROM annunci "
+        for r in con.execute("SELECT id, zona, lat, lon, regione, "
+                             "categoria, sottocategoria, titolo, "
+                             "descrizione FROM annunci "
                              "WHERE contatto_nostr!='' AND stato='attivo'"
                              ).fetchall():
             lat, lon = coordinate_da_zona(r["zona"])
@@ -11577,6 +11875,18 @@ async def importa_nostr_periodico():
             if (lat, lon, regione) != (r["lat"], r["lon"], r["regione"]):
                 con.execute("UPDATE annunci SET lat=?, lon=?, regione=? "
                             "WHERE id=?", (lat, lon, regione, r["id"]))
+            # il giudice silenzioso sugli importati: SOLO dove la
+            # colonna e' vuota (un valore scritto non si rigiudica
+            # mai), e ci ripassa a ogni giro — cosi' quando la coda
+            # delle categorie sposta un annuncio fuori da «Altro», la
+            # sottovoce arriva da sola al giro dopo
+            if not r["sottocategoria"]:
+                sotto = sottocategoria_indovina(
+                    r["categoria"], r["titolo"], r["descrizione"] or "")
+                if sotto:
+                    con.execute("UPDATE annunci SET sottocategoria=? "
+                                "WHERE id=? AND sottocategoria=''",
+                                (sotto, r["id"]))
         con.commit()
         nuovi = con.execute("SELECT id FROM annunci WHERE creato>=? "
                             "AND contatto_nostr!='' AND stato='attivo'",
