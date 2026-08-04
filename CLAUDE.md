@@ -4554,8 +4554,9 @@ TestClient su DB usa-e-getta (giudici in pubblica/modifica, conserva/
 azzera, la 27ª senza condizione, la vetrina che non mostra la
 colonna) più il filo del CSV. IN PRODUZIONE basta il deploy (la
 migrazione della colonna gira da sola); dopo il deploy gli
-spostamenti veri — B&B e Zalando verso la voce nuova, il casco moto
-verso Motori — si mettono in coda con `sposta_a_mano.py` sul VPS e si
+spostamenti veri — B&B e Zalando verso la voce nuova (il casco moto
+citato nei primi appunti era merce del db di COLLAUDO, non di
+produzione) — si mettono in coda con `sposta_a_mano.py` sul VPS e si
 approvano dalla coda admin, che aggiorna anche il NIP-99.
 L'ACCENSIONE dell'albero è un cantiere futuro, solo frontend + param.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
