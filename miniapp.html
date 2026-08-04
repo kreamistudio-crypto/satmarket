@@ -1131,21 +1131,47 @@
      preferiti si spegne QUI (e solo qui): l'angolo in alto a destra
      della foto e' della spunta del pacco — lampo e asta stanno a
      sinistra, il cartellino in basso: mai sovrapposti per costruzione. */
-  .pacco-cella{position:relative;display:flex;flex-direction:column}
+  /* IL min-width:0 NON E' DECORATIVO (ago 2026, trovato misurando a
+     320px: la pagina scorreva di lato di 53px). La cella e' il GRID
+     ITEM, e un grid item senza overflow non scende sotto il proprio
+     min-content: quello della card e' ~156px, quindi le colonne si
+     gonfiavano a 174 e due non ci stavano in 288. In vetrina non
+     succede perche' li' l'item E' la card, che ha overflow:hidden e
+     quindi minimo automatico zero. E' la terza volta che questa
+     lezione si paga (il comune nella riga meta, .seller .who): dove
+     il contenuto e' piu' largo della colonna, il minimo va detto. */
+  .pacco-cella{position:relative;display:flex;flex-direction:column;min-width:0}
   .pacco-cella .card-jar{display:none}
+  /* Il segno sulla foto: ✓ con un pezzo, il NUMERO da due in su (la
+     pastiglia cresce di lato, non si riempie di puntini: e' un
+     conteggio e si legge intero). */
   .pacco-spunta{position:absolute;top:8px;right:8px;z-index:3;
-    width:28px;height:28px;border-radius:50%;pointer-events:none;
-    background:var(--trust);color:var(--on-trust);
+    min-width:28px;height:28px;padding:0 7px;border-radius:999px;
+    pointer-events:none;background:var(--trust);color:var(--on-trust);
     display:flex;align-items:center;justify-content:center;
     font-size:14px;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .pacco-spunta.conta{font-family:'JetBrains Mono',monospace;font-size:13px}
   /* ancorati alla cella per SPECIFICITA': le regole di .btn/.btn.ghost
      stanno piu' in basso nel foglio e a pari peso vincerebbero loro —
      la stessa lezione di .acquista-cta nel recinto */
   .pacco-cella .btn.pacco-btn{margin-top:8px;padding:7px 8px 8px;
     font-size:14px;border-radius:10px;box-shadow:0 2px 0 var(--ink)}
   .pacco-cella .btn.pacco-btn:active{transform:translateY(1px);box-shadow:none}
-  .pacco-cella .btn.pacco-btn.togli{color:var(--danger);
-    border-color:var(--danger);box-shadow:0 2px 0 var(--danger)}
+  /* LO STATO-STEPPER (ago 2026): stesso guscio, dentro il chip − N +
+     al posto della parola. Non si abbassa al tocco — a rispondere
+     sono i due comandi dentro, non il guscio — e il chip si veste di
+     --chip-bg invece del traslucido di Acquista, che su una carta
+     chiara sparirebbe (il token c'e' nei due temi: un cuore solo di
+     markup, due vestiti). */
+  /* il padding e' tarato perche' i due stati siano ALTI UGUALI (39px):
+     il chip porta 28px di suo, e la cella non deve saltare di tre
+     pixel proprio nel momento in cui la si tocca */
+  .pacco-cella .btn.pacco-btn.dentro{padding:3px 8px 4px;cursor:default}
+  .pacco-cella .btn.pacco-btn.dentro:active{transform:none;
+    box-shadow:0 2px 0 var(--ink)}
+  .pacco-btn .qta-mini{margin-left:0;background:var(--chip-bg)}
+  .pacco-btn .qta-mini .qm-btn{color:var(--sats-text)}
+  .pacco-btn .qta-mini .qm-btn:active{background:var(--sats-soft)}
   /* spento col motivo scritto sotto: il perche' non sta mai nel bottone */
   .pacco-cella .btn.pacco-btn[disabled]{opacity:.45;box-shadow:none}
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
@@ -5041,26 +5067,43 @@ let consegnaEsplicita = false;
    ogni dettaglio aperto; il massimo e' la quantita' dell'annuncio.
    Lo stepper compare solo con piu' di un pezzo disponibile. */
 let qtaScelta = 1;
-/* Lo stepper DENTRO il bottone Acquista (lug 2026, deciso da Andrea):
-   coi pezzi >1 accanto alla scritta compaiono − N + — in pagina e
-   nella barra, due istanze gemelle aggiornate insieme per classe.
+/* IL CHIP − N + , UN CUORE SOLO (ago 2026): lo stesso markup serve
+   il bottone Acquista (dettaglio e barra) e il bottone della cella
+   nella pagina del pacco. Chi lo chiama passa il numero, le due
+   chiamate e gli estremi raggiunti; il vestito lo decide il posto
+   (CSS: traslucido sull'arancio, --chip-bg sul ghost del pacco).
    Sono <span role="button"> e non <button>: un button dentro un
    button non e' HTML lecito, e il click si ferma sul gruppetto
-   (stopPropagation) senza mai comprare. */
+   (stopPropagation) senza mai comprare — ne', in griglia, aprire il
+   dettaglio sotto. */
+function stepperMini(n, meno, piu, offMeno, offPiu, etMeno){
+  return `<span class="qta-mini" role="group" aria-label="Quantità" onclick="event.stopPropagation()">`
+    + `<span class="qm-btn qm-meno${offMeno?' off':''}" role="button" tabindex="0" aria-label="${etMeno||'Un pezzo in meno'}" onclick="${meno}">−</span>`
+    + `<span class="qm-num mono">${fmt(n)}</span>`
+    + `<span class="qm-btn qm-piu${offPiu?' off':''}" role="button" tabindex="0" aria-label="Un pezzo in più" onclick="${piu}">+</span>`
+    + `</span>`;
+}
+/* Lo stepper DENTRO il bottone Acquista (lug 2026, deciso da Andrea):
+   coi pezzi >1 accanto alla scritta compaiono − N + — in pagina e
+   nella barra, due istanze gemelle aggiornate insieme per classe. */
 function stepperAcquista(l){
   if ((l.quantita||1) <= 1) return '';
-  return `<span class="qta-mini" role="group" aria-label="Quantità" onclick="event.stopPropagation()">`
-    + `<span class="qm-btn qm-meno${qtaScelta<=1?' off':''}" role="button" tabindex="0" aria-label="Un pezzo in meno" onclick="setQta(-1)">−</span>`
-    + `<span class="qm-num mono">${fmt(qtaScelta)}</span>`
-    + `<span class="qm-btn qm-piu${qtaScelta>=(l.quantita||1)?' off':''}" role="button" tabindex="0" aria-label="Un pezzo in più" onclick="setQta(1)">+</span>`
-    + `</span>`;
+  return stepperMini(qtaScelta, 'setQta(-1)', 'setQta(1)',
+                     qtaScelta <= 1, qtaScelta >= (l.quantita||1));
 }
 function setQta(d){
   const l = currentListing; if (!l) return;
   qtaScelta = Math.min(l.quantita||1, Math.max(1, qtaScelta + d));
-  document.querySelectorAll('.qta-mini .qm-num').forEach(n => n.textContent = fmt(qtaScelta));
-  document.querySelectorAll('.qta-mini .qm-meno').forEach(b => b.classList.toggle('off', qtaScelta <= 1));
-  document.querySelectorAll('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= (l.quantita||1)));
+  /* SOLO i gemelli di Acquista (ago 2026, visto dal vivo appena il
+     chip e' diventato condiviso): un querySelectorAll nudo su
+     `.qta-mini` prendeva anche i conteggi delle celle del pacco, che
+     restano nel DOM dietro al dettaglio — stesso markup, stato
+     diverso — e li riscriveva coi pezzi di QUESTO annuncio. Chi
+     aggiunge un terzo posto al chip restringa anche questo elenco. */
+  const q = s => document.querySelectorAll(`#detailContent ${s}, #barraCompra ${s}`);
+  q('.qta-mini .qm-num').forEach(n => n.textContent = fmt(qtaScelta));
+  q('.qta-mini .qm-meno').forEach(b => b.classList.toggle('off', qtaScelta <= 1));
+  q('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= (l.quantita||1)));
   haptic();
   aggiornaCifreCompra(l);
 }
@@ -5665,10 +5708,13 @@ async function sezioneAltriOggetti(l){
    foglio. */
 let setScelte = new Map();          // annuncioId -> quantita scelta
 let consegnaSetScelta = 'spedizione';
-/* Il tetto delle righe: il gemello client di MAX_RIGHE_SET (8) del
-   server. Prima viveva implicito nello slice di candidatiSet; con la
-   pagina del pacco la selezione puo' arrivare da una griglia intera,
-   quindi il tetto va detto dove si aggiunge. */
+/* IL TETTO CONTA LE RIGHE, NON I PEZZI (gemello client di
+   MAX_RIGHE_SET del server, che limita le righe del body di
+   compra()): 8 annunci DIVERSI. Le quantita' dentro una riga non ci
+   entrano MAI — a limitarle e' lo stock del singolo annuncio — quindi
+   un pacco legittimo puo' essere 8 righe da dieci pezzi l'una. Chi
+   controlla il tetto guarda `setScelte.size`, mai `pezziSet()`, che
+   e' la somma dei pezzi e serve solo ai testi. */
 const MAX_PACCO = 8;
 /* La pagina del pacco (ago 2026): a chi appartiene il pacco in
    composizione. Sopravvive alla navigazione (si torna e lo si ritrova)
@@ -5827,6 +5873,7 @@ function toggleSetRiga(id){
     setScelte.set(id, 1);
   }
   disegnaFoglioSet();
+  specchiaGriglia();
 }
 function setQtaSet(id, delta){
   const x = listings.find(t=>t.id===id);
@@ -5834,6 +5881,15 @@ function setQtaSet(id, delta){
   const q = Math.max(1, Math.min(x.quantita||1, (setScelte.get(id)||1)+delta));
   setScelte.set(id, q); haptic();
   disegnaFoglioSet();
+  specchiaGriglia();
+}
+/* L'altro verso dello specchio: il foglio ha appena cambiato il
+   conteggio, e la pagina del pacco che gli sta SOTTO deve dire lo
+   stesso numero quando il foglio si chiude. Il dito e' sul foglio,
+   quindi la griglia si puo' riscrivere per intero senza disturbare
+   nessuno (la strada opposta — chip in cella — patcha in place). */
+function specchiaGriglia(){
+  if (el('view-pacco')?.classList.contains('active')) renderPacco();
 }
 function setConsegnaSet(v){
   consegnaSetScelta = v; haptic();
@@ -5893,17 +5949,34 @@ function annunciPacco(){
   return suoi;
 }
 /* La cella: la card di vetrina COSI' COM'E' (cardHTML, un solo cuore)
-   piu' la spunta verde sulla foto e Aggiungi/Rimuovi sotto. Il
-   barattolino dei preferiti lo spegne il CSS: l'angolo e' della
-   spunta. Il tocco sulla card apre il dettaglio come in vetrina. */
+   piu' il segno sulla foto e il bottone sotto. Il barattolino dei
+   preferiti lo spegne il CSS: l'angolo e' del segno. Il tocco sulla
+   card apre il dettaglio come in vetrina.
+   IL BOTTONE HA DUE FACCE (ago 2026): fuori dal pacco e' «Aggiungi»,
+   dentro diventa il chip − N + (stepperMini, lo stesso di Acquista).
+   Il «Rimuovi» separato non serve piu': a togliere e' il − che scende
+   sotto uno. Nello stato-stepper il guscio e' un <div class="btn"> e
+   non un <button>: dentro ci vivono due comandi, e un bottone che non
+   fa nulla se toccato in mezzo sarebbe una bugia — il div tiene forma
+   e altezza identiche, cosi' la cella non salta cambiando faccia. */
 function cellaPacco(x){
-  const dis = motivoEsclusione(x);
-  const dentro = setScelte.has(x.id);
+  const qta = setScelte.get(x.id) || 0;
+  /* col pacco pieno le righe NUOVE si spengono col perche' scritto:
+     meglio del tocco che risponde con un toast (il campo non mente) */
+  const dis = motivoEsclusione(x)
+    || (!qta && setScelte.size >= MAX_PACCO
+        ? `il pacco è pieno: ${MAX_PACCO} oggetti diversi` : '');
+  const segno = !qta ? ''
+    : `<span class="pacco-spunta${qta>1?' conta':''}" aria-hidden="true">${qta>1?fmt(qta):'✓'}</span>`;
+  const comando = qta
+    ? `<div class="btn ghost pacco-btn dentro">${stepperMini(qta,
+         `setQtaPacco(${x.id},-1)`, `setQtaPacco(${x.id},1)`,
+         false, qta >= (x.quantita||1),
+         qta>1 ? 'Un pezzo in meno' : 'Togli dal pacco')}</div>`
+    : `<button type="button" class="btn ghost pacco-btn"${dis?' disabled':''}
+        onclick="aggiungiAlPacco(${x.id})">Aggiungi</button>`;
   return `<div class="pacco-cella" data-id="${x.id}">
-    ${cardHTML(x)}
-    ${dentro ? '<span class="pacco-spunta" aria-hidden="true">✓</span>' : ''}
-    <button type="button" class="btn ghost pacco-btn${dentro?' togli':''}"${dis?' disabled':''}
-      onclick="togglePacco(${x.id})">${dentro?'Rimuovi':'Aggiungi'}</button>
+    ${cardHTML(x)}${segno}${comando}
     ${dis ? `<div class="pacco-motivo">${esc(dis)}</div>` : ''}
   </div>`;
 }
@@ -5937,20 +6010,61 @@ function aggiornaBarraPacco(){
   el('paccoConta').textContent = pezzi
     ? `${pezzi} pezz${pezzi===1?'o':'i'} nel pacco` : 'il pacco è vuoto';
 }
-function togglePacco(id){
-  haptic();
+/* GRIGLIA E RIEPILOGO SONO DUE VISTE DELLO STESSO STATO (`setScelte`,
+   che e' il conteggio UNICO): la quantita' toccata in una si vede
+   subito nell'altra, senza un secondo numero da tenere in pari. Chi
+   cambia il pacco chiama questa, che riallinea quello che e' a
+   schermo — la vista dove sta il dito compresa, quando a cambiare e'
+   la composizione e non un numero soltanto. */
+function rinfrescaViste(){
+  if (el('view-pacco')?.classList.contains('active')) renderPacco();
+  if (el('setSheet')?.classList.contains('open')) disegnaFoglioSet();
+}
+/* Il tocco su «Aggiungi»: la riga entra con UN pezzo. */
+function aggiungiAlPacco(id){
   const x = listings.find(t=>t.id===id);
-  if (!x) return;
-  if (setScelte.has(id)) setScelte.delete(id);
-  else {
-    if (motivoEsclusione(x)) return;   /* cintura: il bottone era spento */
-    if (setScelte.size >= MAX_PACCO)
-      { toast(`Il pacco è pieno: al massimo ${MAX_PACCO} oggetti diversi`); return; }
-    setScelte.set(id, 1);
-  }
+  if (!x || setScelte.has(id)) return;
+  if (motivoEsclusione(x)) return;      /* cintura: il bottone era spento */
+  if (setScelte.size >= MAX_PACCO)      /* il tetto conta le RIGHE, vedi MAX_PACCO */
+    { toast(`Il pacco è pieno: al massimo ${MAX_PACCO} oggetti diversi`); return; }
+  setScelte.set(id, 1); haptic();
   /* si ridisegna TUTTA la griglia, non la sola cella: l'intersezione
      delle strade puo' aver spento (o riacceso) altri candidati */
-  renderPacco();
+  rinfrescaViste();
+}
+/* Il chip − N + della cella. TOCCHI RAPIDI: il conteggio e' un
+   read-modify-write SINCRONO sulla mappa — niente await in mezzo,
+   quindi due tocchi ravvicinati fanno due passi giusti e mai un
+   doppio conteggio, senza bisogno di debounce (che anzi mangerebbe
+   il secondo tocco di chi sale in fretta). E finche' cambia il solo
+   NUMERO la griglia NON si riscrive: si patcha la cella in place
+   (aggiornaPezziCella), cosi' il bottone sotto il dito non viene
+   distrutto e ricreato a ogni tocco. La riscrittura piena resta
+   dove serve davvero: quando una riga entra o esce, che cambia
+   l'intersezione delle strade e quindi le altre celle. */
+function setQtaPacco(id, d){
+  const x = listings.find(t=>t.id===id);
+  if (!x || !setScelte.has(id)) return;
+  const q = (setScelte.get(id)||1) + d;
+  haptic();
+  if (q < 1) { setScelte.delete(id); rinfrescaViste(); return; }  /* il − a zero toglie */
+  if (q > (x.quantita||1)) return;      /* cintura: il + era gia' spento */
+  setScelte.set(id, q);
+  aggiornaPezziCella(id, x);
+  aggiornaBarraPacco();
+  if (el('setSheet')?.classList.contains('open')) disegnaFoglioSet();
+}
+/* La patch in place di UNA cella: numero, estremi del chip e segno
+   sulla foto. Solo nostro markup, nessun testo utente. */
+function aggiornaPezziCella(id, x){
+  const c = document.querySelector(`.pacco-cella[data-id="${id}"]`);
+  if (!c) return;
+  const q = setScelte.get(id) || 0;
+  const n = c.querySelector('.qm-num');
+  if (n) n.textContent = fmt(q);
+  c.querySelector('.qm-piu')?.classList.toggle('off', q >= (x.quantita||1));
+  const s = c.querySelector('.pacco-spunta');
+  if (s) { s.textContent = q>1 ? fmt(q) : '✓'; s.classList.toggle('conta', q>1); }
 }
 /* «Controlla il pacco» → il riepilogo di sempre. Il foglio pesca i
    candidati da currentListing, che qui si riallinea alla provenienza:
