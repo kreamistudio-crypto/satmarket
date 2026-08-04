@@ -576,9 +576,14 @@
      L'identita' non si spezza sulla soglia card→dettaglio.
      Misurati: 7,51 su crema e 8,88 su bruno (testo grande: AAA). */
   .detail-price.asta{color:var(--asta-text)}
-  /* anche il simbolo di valuta segue il token (la regola .unit
-     altrimenti lo lascerebbe arancio: mezzo numero per famiglia) */
-  .detail-price.asta .unit{color:var(--asta-text)}
+  /* anche il simbolo di valuta segue il token — e il € va nominato
+     APPOSTA: la regola `.detail-price .unit.eur` (piu' in basso nel
+     foglio, stessa specificita' del selettore a due classi) lo
+     tingerebbe di --sats-deep in entrambi i temi, mezzo numero per
+     famiglia. Con .asta e .eur insieme si vince per specificita',
+     non per ordine. */
+  .detail-price.asta .unit,
+  .detail-price.asta .unit.eur{color:var(--asta-text)}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
