@@ -4366,6 +4366,10 @@ CAMPI_VETRINA = (
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
     "a.lampo_percento, a.lampo_scadenza, "
+    # l'asta e' pubblica per natura (regola del cantiere: importo in
+    # testa e numero di puntate si vedono, gli offerenti no): base e
+    # scadenza qui, top e conteggio li aggiunge arricchisci_righe_vetrina
+    "a.asta_base_sats, a.asta_scadenza, "
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, "
@@ -4408,6 +4412,24 @@ def arricchisci_righe_vetrina(righe):
                  descrizione=d["descrizione"])
             for d in DISTINTIVI if d["id"] in presi]
         r["zona_comune"] = comune_da_zona(r.get("zona") or "")
+    # 3) L'asta (ago 2026): puntata in testa e numero di puntate,
+    # pubblici per regola — gli OFFERENTI restano anonimi, qui non
+    # esce nessun nome. UNA query per pagina, e solo se nella pagina
+    # c'e' almeno un'asta: le pagine senza aste non pagano nulla.
+    ids = [r["id"] for r in righe if r.get("asta_base_sats", 0)]
+    if ids:
+        con = db()
+        gare = {g["annuncio_id"]: g for g in con.execute(
+            "SELECT annuncio_id, MAX(offerto_sats) AS top, COUNT(*) AS n "
+            f"FROM puntate WHERE annuncio_id IN ({','.join('?' * len(ids))}) "
+            "AND stato='attiva' AND versato_sats>0 GROUP BY annuncio_id",
+            ids)}
+        con.close()
+        for r in righe:
+            if r.get("asta_base_sats", 0):
+                g = gare.get(r["id"])
+                r["asta_top_sats"] = g["top"] if g else 0
+                r["asta_puntate"] = g["n"] if g else 0
     return righe
 
 
@@ -4434,6 +4456,9 @@ ORDINAMENTI = {
     # la notizia). Implica il filtro solo-lampo: senza, gli annunci a
     # scadenza 0 affollerebbero la testa della lista.
     "lampo":      ("lampo_scadenza", "ASC", ">"),
+    # «All'asta»: chi scade prima in testa, stessa coppia
+    # filtro+ordinamento della lampo (e stessa ragione).
+    "asta":       ("asta_scadenza", "ASC", ">"),
 }
 
 
@@ -4504,6 +4529,7 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         valuta_filtro: str = "sats",
                         solo_spedizione: int = 0, solo_ritiro: int = 0,
                         solo_digitale: int = 0, solo_lampo: int = 0,
+                        solo_asta: int = 0,
                         condizione: str = "", regione: str = "",
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
@@ -4557,6 +4583,12 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # senza aspettare la scopa dell'orologio. L'ordinamento
         # «lampo» implica il filtro (vedi ORDINAMENTI).
         dove += " AND a.lampo_percento>0 AND a.lampo_scadenza>?"
+        par.append(int(time.time()))
+    if solo_asta or ordina == "asta":
+        # Solo le aste VIVE, giudicate adesso come le lampo: la
+        # deserta (scadenza 0) non e' in gara e resta fuori dal
+        # filtro. L'ordinamento «asta» implica il filtro.
+        dove += " AND a.asta_base_sats>0 AND a.asta_scadenza>?"
         par.append(int(time.time()))
     if q.strip():
         # Ricerca semplice per la vetrina anonima (l'AI resta riservata
@@ -4658,6 +4690,23 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     condizione = guardia_zona_condizione(d, consegna)
     quantita = quantita_da_payload(d)
+    asta_secondi = durata_asta_da_payload(d)
+    if asta_secondi:
+        # L'asta parla SOLO sats (v1, deciso): base, rilanci e minimi
+        # senza un cambio di mezzo. E chi vince non paga mai
+        # nient'altro: niente costi di consegna — la spedizione, se
+        # offerta, e' inclusa nel prezzo — ma almeno una strada
+        # dev'essere dichiarata (il vincitore la sceglie poi
+        # nell'ordine). Quantita' sempre 1: l'asta e' a pezzo unico.
+        if valuta != "sats":
+            raise HTTPException(400, "Un'asta si pubblica col prezzo in "
+                                     "sats: base e rilanci vivono lì")
+        if not consegna:
+            raise HTTPException(400, "Un'asta deve dire come arriva "
+                                     "l'oggetto: ritiro, codice online o "
+                                     "spedizione inclusa nel prezzo")
+        sped_sats, sped_eur = 0, 0.0
+        quantita = 1
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -4704,6 +4753,20 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
             # stessa verita' del primo giro
             risposta.update(revisione=True, attesa_ore=REVISIONE_ATTESA_ORE)
         return risposta
+    adesso = int(time.time())
+    if asta_secondi:
+        # Il tetto prudenziale delle aste vive per venditore:
+        # count-guard senza await (il patto anti-doppione). Contano
+        # anche quelle in revisione: approvate, tornano in gara.
+        vive = con.execute(
+            "SELECT COUNT(*) AS n FROM annunci WHERE venditore_id=? "
+            "AND stato IN ('attivo','revisione') AND asta_base_sats>0 "
+            "AND asta_scadenza>?", (user["id"], adesso)).fetchone()["n"]
+        if vive >= ASTA_MAX_ATTIVE_VENDITORE:
+            con.close()
+            raise HTTPException(400, f"Hai già {ASTA_MAX_ATTIVE_VENDITORE} "
+                                     f"aste in corso: chiudine una prima "
+                                     f"di aprirne un'altra")
     # La zona si salva ARRICCHITA della sigla («Torino» -> «Torino
     # (TO)»): cosi' il dato e' pulito ovunque — vetrina, dettaglio,
     # NIP-99, avvisi — senza rimedi in visualizzazione.
@@ -4724,13 +4787,21 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "sottocategoria,"
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,taglia_pacco,"
-        "anche_digitale,condizione,quantita,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,quantita,stato,creato,"
+        "asta_base_sats,asta_scadenza,asta_creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur, taglia, anche_dig,
          condizione, quantita, "revisione" if in_revisione else "attivo",
-         int(time.time())))
+         adesso,
+         # la base d'asta E' il prezzo del listino (un campo solo da
+         # tenere vero); il cronometro parte adesso — e se l'annuncio
+         # nasce in revisione, decidi_revisione lo rimette a nuovo
+         # alla pubblicazione: la coda non mangia la durata
+         prezzo_sats if asta_secondi else 0,
+         adesso + asta_secondi if asta_secondi else 0,
+         adesso if asta_secondi else 0))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -4755,21 +4826,32 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         return {"ok": True, "id": annuncio_id, "revisione": True,
                 "attesa_ore": REVISIONE_ATTESA_ORE}
     # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina ---
+    marca_asta = " · 🔨 all'asta" if asta_secondi else ""
     await notifica_admin(
         f"🆕 <b>Nuovo annuncio #{annuncio_id}</b>\n"
-        f"«{d['titolo'][:80]}» — {testo_prezzo(valuta, prezzo_sats, prezzo_eur)}\n"
+        f"«{d['titolo'][:80]}» — "
+        f"{testo_prezzo(valuta, prezzo_sats, prezzo_eur)}{marca_asta}\n"
         f"Venditore: {user['first_name']} (id {user['id']})")
-    # E parte anche verso la piazza Nostr, in sottofondo: se i relay
-    # tacciono, chi pubblica non se ne accorge nemmeno.
-    asyncio.create_task(annuncio_su_nostr(annuncio_id, "active"))
-    # I canali di Barattolo lo annunceranno da soli (coda anti-spam:
-    # il drenatore decide tra post singolo e aggregato).
-    accoda_promo(annuncio_id)
-    # ...e chi ha un avviso di ricerca che matcha ricevera' il suo
-    # «e' arrivato» (stessa coda-e-finestra, notifiche aggregate).
-    accoda_match(annuncio_id)
+    if not asta_secondi:
+        # E parte anche verso la piazza Nostr, in sottofondo: se i
+        # relay tacciono, chi pubblica non se ne accorge nemmeno.
+        # Le ASTE restano fuori da tutti e tre i canali, per scelta:
+        # il NIP-99 parla un prezzo fisso (regola del cantiere), e i
+        # testi di promo e avvisi di ricerca dicono un prezzo a cui
+        # NON si puo' comprare. La loro scoperta e' la vetrina, col
+        # filtro «All'asta» e il badge col countdown.
+        asyncio.create_task(annuncio_su_nostr(annuncio_id, "active"))
+        # I canali di Barattolo lo annunceranno da soli (coda
+        # anti-spam: il drenatore decide tra post singolo e aggregato).
+        accoda_promo(annuncio_id)
+        # ...e chi ha un avviso di ricerca che matcha ricevera' il suo
+        # «e' arrivato» (stessa coda-e-finestra, notifiche aggregate).
+        accoda_match(annuncio_id)
     await premia_distintivi(user["id"])   # bottega avviata?
-    return {"ok": True, "id": annuncio_id}
+    risposta = {"ok": True, "id": annuncio_id}
+    if asta_secondi:
+        risposta["asta_scadenza"] = adesso + asta_secondi
+    return risposta
 
 
 @app.post("/api/foto/anteprima")
@@ -5053,6 +5135,15 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
         con.close()
         raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
                                  "va concluso prima di poterlo eliminare")
+    # L'asta con puntate salde e' VINCOLANTE (regola del cantiere): il
+    # venditore non la annulla piu' — ritirare l'annuncio SAREBBE
+    # annullarla. Senza puntate salde, ritirarla E' l'annullo lecito.
+    if a["asta_base_sats"] > 0 and _puntate_attive_salde(con, annuncio_id):
+        con.close()
+        raise HTTPException(400, "L'asta ha già delle puntate ed è "
+                                 "vincolante: si chiude da sola alla "
+                                 "scadenza (per i casi seri c'è la "
+                                 "moderazione)")
     con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?", (annuncio_id,))
     # Anche i SET 'creato' che contengono il pezzo: una invoice viva
     # non deve poter pagare un annuncio appena rimosso.
@@ -5095,6 +5186,13 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo annuncio è importato da Nostr: "
                                  "la quantità non vive qui")
+    if a["asta_base_sats"] > 0:
+        # L'asta e' a pezzo unico, anche da venduta: il «rimetti in
+        # vendita» qui gonfierebbe lo stock di una gara gia' chiusa.
+        con.close()
+        raise HTTPException(400, "Questo oggetto è (o è stato) all'asta: "
+                                 "l'asta è a pezzo unico — per venderne "
+                                 "un altro pubblica un annuncio nuovo")
     # Mai sotto i pezzi prenotati: un pagamento gia' in volo
     # manderebbe lo stock sotto zero.
     riservati = _riservati(con, annuncio_id)
@@ -5156,6 +5254,14 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         raise HTTPException(400, "Questo annuncio è importato da Nostr: "
                                  "modificalo dal tuo client Nostr, qui si "
                                  "aggiorna da solo entro un'ora")
+    if a["asta_base_sats"] > 0:
+        # Un'asta non si modifica MAI (regola del cantiere: base,
+        # durata e testo si bloccano alla prima puntata; e senza
+        # puntate ritirarla e ripubblicarla costa un minuto).
+        con.close()
+        raise HTTPException(400, "Un'asta non si modifica: senza puntate "
+                                 "puoi ritirarla e ripubblicarla, con le "
+                                 "puntate è vincolante fino alla chiusura")
     # Anche in modifica: gli storici si mettono in regola al primo
     # ritocco (condizione obbligatoria, comune vero col ritiro).
     # DOPO le guardie di proprieta'/stato: chi tocca un annuncio in
@@ -5562,6 +5668,14 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
         raise HTTPException(400, "C'è un affare in corso su questo annuncio: "
                                  "risolvi prima l'ordine (o la disputa), poi "
                                  "potrai rimuoverlo")
+    # Con puntate salde nemmeno il moderatore rimuove al volo: prima
+    # l'ANNULLO D'ASTA della moderazione, che mette i sats di tutti
+    # nel «Da riscuotere» — poi, se serve, la rimozione.
+    if a["asta_base_sats"] > 0 and _puntate_attive_salde(con, annuncio_id):
+        con.close()
+        raise HTTPException(400, "L'asta ha puntate salde: prima "
+                                 "l'annullo d'asta (restituisce i sats "
+                                 "ai puntatori), poi la rimozione")
     con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?", (annuncio_id,))
     # Anche i SET 'creato' che contengono il pezzo (v. rimozione
     # del proprietario)
@@ -5657,6 +5771,15 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
             return False, ("C'è un affare in corso su questo annuncio: "
                            "risolvi prima l'ordine, poi potrai rimetterlo "
                            "in attesa")
+        # E con puntate salde nemmeno il ripensamento passa: prima
+        # l'annullo d'asta della moderazione (i sats tornano ai
+        # puntatori), poi si discute dell'annuncio.
+        if a["asta_base_sats"] > 0 and _puntate_attive_salde(con,
+                                                            annuncio_id):
+            con.close()
+            return False, ("L'asta ha puntate salde: va prima annullata "
+                           "con l'annullo d'asta, poi potrai rimetterla "
+                           "in attesa")
         cur = con.execute(
             "UPDATE annunci SET stato='revisione' WHERE id=? "
             "AND stato IN ('attivo','rimosso')", (annuncio_id,))
@@ -5691,6 +5814,15 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
         "UPDATE annunci SET stato=? WHERE id=? AND stato='revisione'",
         (nuovo, annuncio_id))
     deciso = cur.rowcount == 1
+    if (deciso and esito == "pubblica" and a["asta_base_sats"] > 0
+            and a["asta_scadenza"] > 0):
+        # L'asta nata (o tornata) in revisione non paga la coda: il
+        # cronometro riparte da adesso, per la durata scelta — senza,
+        # una revisione di due giorni si mangerebbe mezza asta da tre.
+        adesso = int(time.time())
+        durata = a["asta_scadenza"] - a["asta_creato"]
+        con.execute("UPDATE annunci SET asta_creato=?, asta_scadenza=? "
+                    "WHERE id=?", (adesso, adesso + durata, annuncio_id))
     con.commit()
     con.close()
     if not deciso:
@@ -5706,13 +5838,16 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
         # stabile) e il post di canale non si rifa'; per il nato in
         # revisione e' la prima uscita a tutti gli effetti. Il dedup
         # persistente degli avvisi di ricerca rende accoda_match
-        # sempre innocuo.
-        asyncio.create_task(annuncio_su_nostr(
-            annuncio_id, "active",
-            solo_aggiornamento=bool(a["nostr_event_id"])))
-        if not a["post_canale_id"]:
-            accoda_promo(annuncio_id)
-        accoda_match(annuncio_id)
+        # sempre innocuo. Le ASTE restano fuori dai tre canali anche
+        # da qui, come alla pubblicazione: i loro testi direbbero un
+        # prezzo a cui non si puo' comprare.
+        if not a["asta_base_sats"]:
+            asyncio.create_task(annuncio_su_nostr(
+                annuncio_id, "active",
+                solo_aggiornamento=bool(a["nostr_event_id"])))
+            if not a["post_canale_id"]:
+                accoda_promo(annuncio_id)
+            accoda_match(annuncio_id)
         await premia_distintivi(a["venditore_id"])
         await notifica(a["venditore_id"],
                        f"✅ <b>Il tuo annuncio «{a['titolo'][:60]}» è stato "
@@ -6187,6 +6322,45 @@ def conto_chiusura(puntate: list) -> tuple:
     return vincitrice, rimborsi
 
 
+def durata_asta_da_payload(d) -> int:
+    """La durata dell'asta in SECONDI; 0 = quest'annuncio non e'
+    un'asta. Giudice del payload {"asta": {"durata_giorni": N}}: qui
+    si mette in gioco il denaro altrui, quindi una durata fuori
+    dall'elenco e' un 400 e mai un default silenzioso. In collaudo si
+    accettano anche i minuti ({"durata_minuti": M}): il ciclo intero
+    si prova senza aspettare giorni."""
+    asta = d.get("asta")
+    if not isinstance(asta, dict):
+        return 0
+    if not ASTA_ABILITATA:
+        raise HTTPException(400, "Le aste non sono attive")
+    if MODALITA_COLLAUDO:
+        try:
+            minuti = int(asta.get("durata_minuti") or 0)
+        except (TypeError, ValueError):
+            minuti = 0
+        if minuti > 0:
+            return minuti * 60
+    try:
+        giorni = int(asta.get("durata_giorni") or 0)
+    except (TypeError, ValueError):
+        giorni = 0
+    if giorni not in ASTA_DURATE_GIORNI:
+        raise HTTPException(400, "Durata dell'asta non valida")
+    return giorni * 86400
+
+
+def _puntate_attive_salde(con, annuncio_id: int) -> int:
+    """Quante puntate SALDE sono in gara: il giudice del VINCOLO
+    (regola del cantiere): dalla prima puntata saldata l'asta e'
+    vincolante — il venditore non la annulla ne' la modifica piu',
+    solo un moderatore puo' scioglierla restituendo i sats."""
+    return con.execute(
+        "SELECT COUNT(*) AS n FROM puntate WHERE annuncio_id=? AND "
+        "stato='attiva' AND versato_sats>0",
+        (annuncio_id,)).fetchone()["n"]
+
+
 @app.post("/api/listings/{annuncio_id}/offerta")
 async def fai_offerta(annuncio_id: int, req: Request,
                       x_tg_init_data: str = Header(""),
@@ -6207,6 +6381,10 @@ async def fai_offerta(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Non puoi fare un'offerta sul tuo "
                                  "stesso annuncio")
+    if _asta(a):
+        con.close()
+        raise HTTPException(400, "Questo oggetto è all'asta: l'offerta "
+                                 "giusta è una puntata 🔨")
     # Gli importati da Nostr sono trattabili come tutti: il venditore
     # solo-Nostr riceve l'offerta via DM NIP-17 col link all'annuncio,
     # entra col login Nostr e risponde da qui.
@@ -6528,6 +6706,11 @@ async def lancia_lampo(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(403, "Solo il venditore può lanciare "
                                  "un'offerta lampo")
+    if _asta(a):
+        con.close()
+        raise HTTPException(400, "Questo annuncio è all'asta: il prezzo "
+                                 "lo fanno le puntate, niente sconti di "
+                                 "mezzo")
     # Vale anche per gli importati da Nostr: lo sconto e' locale (le
     # colonne lampo_*, mai il listino), l'evento sui relay resta col
     # prezzo pieno e l'import orario non tocca la lampo.
@@ -6748,6 +6931,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
             titolo = a["titolo"][:40] if a else "Uno degli oggetti"
             raise HTTPException(404, f"«{titolo}» non è più disponibile: "
                                      f"toglilo dal set e riprova")
+        if _asta(a):
+            con.close()
+            raise HTTPException(400, f"«{a['titolo'][:40]}» è all'asta: "
+                                     f"si aggiudica da solo, fuori dal set")
     venditori = {a["venditore_id"] for a in tutti.values()}
     if len(venditori) > 1:
         con.close()
@@ -7000,6 +7187,17 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Annuncio non disponibile")
     if a["venditore_id"] == user["id"]:
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
+    if _asta(a):
+        # Vale anche per la deserta (base>0, scadenza 0): finche' il
+        # venditore non la converte a prezzo fisso, l'acquisto diretto
+        # resta spento. Niente gemello nel ricontrollo post-invoice:
+        # un annuncio senza base non puo' DIVENTARE un'asta durante
+        # l'await — l'asta nasce solo alla pubblicazione, e il
+        # «Rilancia» della deserta esige una base gia' presente.
+        con.close()
+        raise HTTPException(400, "Questo oggetto è all'asta: si "
+                                 "aggiudica puntando, non si compra a "
+                                 "prezzo fisso")
 
     # La prenotazione dello stock (lug 2026): i pezzi con una invoice
     # viva in mano ad altri non si rivendono — prima di questa guardia
@@ -7883,6 +8081,14 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "attive": bool(LAMPO_ATTIVE), "sconti": LAMPO_SCONTI,
         "minimo": LAMPO_MIN_PERCENTO, "massimo": LAMPO_MAX_PERCENTO,
         "ore": ORE_LAMPO_OPZIONI}
+    # E quelle dell'asta, per il form di vendita e il foglio puntata
+    # (stesso patto: mai cifre hardcodate nel client).
+    profilo["asta_leve"] = {
+        "abilitata": bool(ASTA_ABILITATA),
+        "durate_giorni": ASTA_DURATE_GIORNI,
+        "incremento_percento": ASTA_INCREMENTO_PERCENTO,
+        "proroga_minuti": ASTA_PROROGA_MINUTI,
+        "max_attive": ASTA_MAX_ATTIVE_VENDITORE}
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [
