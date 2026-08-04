@@ -2151,6 +2151,158 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   confirm); filtro «⚡ Solo in offerta» + voce «⚡ In offerta» in
   Ordina, in DEMO client-side col seme dimostrativo (Cuffie Sony,
   scadenza calcolata al carico).
+  L'ASTA 🔨 (ago 2026, «vendita al miglior offerente»): base + durata
+  (3/7 giorni, in collaudo anche minuti), chi vuole comprare PUNTA
+  versando sats nel deposito di garanzia, per superare chi è in testa
+  si versa SOLO LA DIFFERENZA, alla scadenza la puntata più alta
+  diventa un ordine normale GIÀ pagato e i perdenti vengono
+  rimborsati. Il pregio che ha deciso il cantiere: il vincitore non
+  può sparire, ha già pagato. PRINCIPIO ARCHITETTURALE: l'asta
+  finisce esattamente dove inizia un ordine — il ciclo di vita degli
+  ordini non si tocca; la chiusura invoca `crea_ordine_pagato`, LA
+  PRIMITIVA «ordine già pagato» (nasce 'locked', scrive dentro la
+  transazione del chiamante) che la futura pagina d'acquisto riuserà.
+  SCHEMA: colonne `annunci.asta_base_sats/asta_scadenza/asta_creato/
+  asta_avvisata_1h` (patto lampo: gate in LETTURA; `prezzo_sats` È la
+  base e non si tocca mai; base>0 e scadenza=0 = DESERTA in mano al
+  venditore) + tre tavoli: `puntate` (UNA riga per offerente per
+  asta — versato, offerto, `saldo_seq`, etichetta anonima «Offerente
+  A,B,C…» per ordine di primo saldo, stati attiva|vincitrice|chiusa,
+  UNIQUE(annuncio_id,tg_id)), `rilanci` (una per FATTURA di
+  versamento: il client dichiara il TOTALE, il server calcola il
+  delta — mai fidarsi di importi dal client; fatture da 10 minuti,
+  expiry parametrico su crea_invoice_escrow; stati creato|saldato|
+  tardivo), `rimborsi_asta` (il REGISTRO «Da riscuotere» con le
+  cinture d'idempotenza a indici parziali; motivi ritiro|perdente|
+  tardivo|annullo_admin). INVARIANTI provati in CI: Σ delta saldati =
+  versato del vincitore + Σ registro; versato==offerto per ogni
+  puntata attiva.
+  SALDO_SEQ, la lezione del collaudo: «fa fede l'orario di saldo» a
+  risoluzione di secondo NON basta come tie-break (due saldi
+  pari-cifra nello stesso secondo sono usciti subito, e vinceva chi
+  aveva CREATO la fattura prima). È un progressivo GLOBALE assegnato
+  nel blocco senza await della verifica: a parità di cifra comanda
+  chi ha saldato prima — per prendere la testa bisogna SUPERARE.
+  `_leader_asta` è il giudice UNICO di «chi è in testa» (guardie di
+  punta, stato personale, notifiche, pallino, ritiro) e
+  `conto_chiusura` è il gemello puro con lo STESSO ordine: sentinelle
+  in prove.py, un MAX sulla cifra direbbe il contrario sul pari-cifra
+  (successo in /api/me, preso in revisione).
+  IL MOTORE: `POST /api/aste/{id}/punta` con la liturgia di compra()
+  (guardie → unico await sulla fattura → ricontrollo → zero await al
+  commit). Guardie: leva, asta viva (READ GATE: chiusa anche se
+  l'orologio non è passato), mai la propria (tg_id E npub condivisa),
+  LIGHTNING ADDRESS OBBLIGATORIO alla prima puntata (è il binario del
+  rimborso), ritiro definitivo (409), una fattura pendente alla
+  volta, minimo = `rilancio_minimo` (+5%, MAI meno di 1 sat: la
+  funzione unica di endpoint, foglio e CTA delle notifiche), «sei già
+  in testa» (rilanciare su sé stessi costerebbe senza motivo).
+  `POST /api/rilanci/{id}/verifica` = poll col CAS: saldo valido =
+  versato che si somma + etichetta al primo saldo + PROROGA
+  ANTI-CECCHINO nel write path (`nuova_scadenza`: saldo negli ultimi
+  ASTA_PROROGA_MINUTI → scadenza = saldo+proroga, NESSUN tetto: l'asta
+  finisce con 10 minuti di silenzio) + l'annuncio entra nei preferiti
+  da solo; la corsa non si respinge MAI — saldo con testa già più
+  alta = puntata valida non in testa, notifica onesta; saldo FUORI
+  TEMPO (asta chiusa O puntata ritirata: la fattura pagata nei suoi
+  10 minuti ma mai verificata sopravvive alla finestra del ritiro —
+  cintura con sentinella in CI) = dritto nel registro, mai versato su
+  una puntata fuori gara, mai un ordine.
+  IL RITIRO È DEFINITIVO (regola 6 emendata da Andrea): chi non è in
+  testa esce quando vuole (CAS + riga registro nella stessa
+  transazione, riscossione immediata, FUORI dal gate della leva), ma
+  non rientra — mette un tetto per costruzione ai rimborsi (uno a
+  offerente) e rende il gesto inequivocabile. Il leader non si ritira
+  MAI. Il reaper delle fatture mai saldate (soglia 1200s) libera la
+  riga UNIQUE di chi non ha mai pagato: quello non è un ritiro.
+  «DA RISCUOTERE» = IL BINARIO DEGLI INCASSI, nessun tubo nuovo:
+  `_paga_rimborso` (lock per rimborso, cascata invoice depositata →
+  ln_address → fermo, MAI retry), ripiego `POST /api/rimborsi/{id}/
+  invoice` a importo esatto, scandaglio di /api/me/ln-address ESTESO
+  al registro, `sollecita_rimborsi_puntate` nell'orologio con le
+  STESSE leve degli incassi (🧊 admin oltre il tetto, poi silenzio).
+  Rimborso INTEGRALE al sat: le fee di routing le paga la
+  piattaforma, come ogni uscita.
+  LA CHIUSURA: `chiudi_aste` nell'orologio (gira ANCHE a leva spenta:
+  i sats non sono ostaggio di ASTA_ABILITATA; il jitter dei 10 min
+  ritarda solo l'aggiudicazione, mai un rilancio). Ogni asta è UNA
+  transazione col RICONTROLLO DELLA SCADENZA DENTRO (la proroga
+  arrivata tra la SELECT e la lavorazione salva l'asta dal giro);
+  idempotente: il commit la porta fuori dalla SELECT in un colpo,
+  crash dopo il commit = le righe da_riscuotere le recuperano
+  solleciti/scandaglio/ripiego. Vincitrice → ordine 'locked'
+  (payment_hash dell'ultimo saldo, cambio fotografato, quote 0,
+  quantità 1) → annuncio 'venduto'+quantità 0; perdenti → registro +
+  riscossione post-commit. IL VINCITORE SCEGLIE LA STRADA DENTRO
+  L'ORDINE (`POST /api/orders/{id}/consegna`, dal varco; una strada
+  sola = fissata alla nascita): finché `consegna_scelta` è vuota il
+  venditore vede «in attesa della scelta» e segna_spedito rifiuta —
+  NESSUNA finestra di tutela parte prima della scelta; gli ordini
+  STORICI con consegna '' restano il flusso di sempre (la differenza
+  la fa l'annuncio all'asta, flag `asta` in /api/orders). Le strade
+  dell'asta sono SOLO a costo zero (ritiro, codice online, spedizione
+  INCLUSA nel prezzo: il costo è forzato a 0): chi vince non paga mai
+  nient'altro. Notifiche: vincitore 🏆, perdenti, venditore, avviso
+  «scade tra 1h» ai partecipanti (timbro una tantum; la proroga oltre
+  l'ora non lo riarma, dichiarato), polso ordini admin sull'ordine
+  nato — nessuna notifica admin nuova oltre al polso.
+  DESERTA: scadenza azzerata, base intatta, NON comprabile (compra()
+  rifiuta su base>0, anche deserta); il venditore Rilancia
+  (`/api/aste/{id}/rilancia`) o Converte a prezzo fisso alla base
+  (`/converti` — lecito anche su asta viva SENZA puntate salde: è
+  l'annullo del venditore che conserva l'annuncio). CON puntate salde
+  l'asta è VINCOLANTE (`_puntate_attive_salde`): niente modifica
+  (mai, nemmeno senza puntate: si ritira e si ripubblica), niente
+  rimozione, niente riapertura in revisione — solo l'ANNULLO ADMIN
+  (`/api/admin/aste/{id}/annulla`: tutte al registro, poi la
+  rimozione ordinaria passa). `chiudi-ora` solo in collaudo, dalla
+  STESSA chiusura. Un'asta nata in revisione riparte col CRONOMETRO A
+  NUOVO alla pubblicazione (decidi_revisione: la coda dei moderatori
+  non mangia la durata — regola di prodotto).
+  ESCLUSIONI (predicato `_asta`): niente compra diretto, offerte,
+  lampo, set (motivoEsclusione), quantità>1 (forzata 1), ricarica;
+  solo sats; solo annunci nativi (l'import orario riscrive il
+  prezzo); NIENTE NOSTR né promo né match (i loro testi direbbero un
+  prezzo a cui non si può comprare — la scoperta è la vetrina col
+  filtro «🔨 All'asta», l'ordinamento «chi scade prima» su
+  idx_annunci_asta, il badge in card col tempo a grana grossa e il
+  countdown vivo solo nel dettaglio, sul battito unico).
+  FUSIONE con la REGOLA DELLA LAPIDE (Andrea, in revisione — il
+  travaso cieco era un doppio conteggio): nelle collisioni
+  stessa-asta si sommano SOLO le puntate ATTIVE (i sats di una
+  ritirata sono GIÀ al registro) e il superstite gareggia con TUTTO
+  il versato (offerto = somma: una persona, una cassaforte,
+  versato==offerto sempre vero); l'auto-puntata post-fusione va nel
+  registro, mai cancellata (ci sono sats dentro).
+  LEVE (config, try/except): ASTA_ABILITATA nasce FALSE come
+  IMPORT_NOSTR_APERTO (muove denaro in uscita: si accende dal VPS con
+  un gesto, guardando il primo giro; spenta blocca creazione e
+  puntate NUOVE, mai chiusure/ritiri/riscossioni),
+  ASTA_DURATE_GIORNI [3,7], ASTA_INCREMENTO_PERCENTO 5,
+  ASTA_PROROGA_MINUTI 10, ASTA_MAX_ATTIVE_VENDITORE 3. Superficie:
+  asta_base/scadenza in CAMPI_VETRINA + top e conteggio da
+  arricchisci_righe_vetrina (offerenti MAI nominati), `asta_leve` e
+  `aste_da_agire` in /api/me, `GET /api/aste/{id}` (cronologia
+  anonima + mia posizione + strade), `GET /api/me/puntate` (sezione
+  «🔨 Le tue puntate» + «Da riscuotere» negli Ordini), foglio
+  #puntaSheet col conto «versi adesso: la differenza», barra «🔨
+  Punta», toggle «Vendi all'asta» in Vendi (visibile solo a leva
+  accesa). Lo SLOT VUOTO della nav resta destinato alla futura radice
+  «🔨 Aste» (solo frontend su solo_asta+ordina=asta, pattern Sfoglia).
+  STRADE SCARTATE, coi perché (non riproporle senza un motivo nuovo):
+  rimborso immediato a ogni sorpasso (ucciderebbe il rilancio a
+  differenza e moltiplicherebbe le transazioni); rimborso a tempo
+  dopo N ore da superato (timer coi casi limite, rischia di
+  rimborsare chi stava per rilanciare: il ritiro volontario ottiene
+  lo stesso con la scelta in mano all'utente); tetto di 3 rilanci a
+  testa (soffoca il rilancio a un tap e abbassa il prezzo finale — il
+  freno naturale è il prezzo; leva aggiungibile a posteriori);
+  rientro da zero dopo il ritiro (il definitivo mette un tetto per
+  costruzione ai rimborsi e rende il gesto inequivocabile); fee di
+  prelievo sull'uscita, es. 1% (la cassaforte restituisce sempre
+  intero: far pagare l'uscita scoraggia le puntate, il costo vero è
+  solo il routing); aste multi-pezzo e Compralo subito (fuori dalla
+  v1).
   Quantità in stock (lug 2026, il mattone del futuro «set»): colonne
   `annunci.quantita` (pezzi disponibili ADESSO, default 1: gli storici
   restano un pezzo solo) e `ordini.quantita`. INVARIANTE: venduto <=>
@@ -4627,6 +4779,25 @@ modi su una copia del db locale (300 assegnate, idempotente al terzo
 giro). IN PRODUZIONE: deploy, poi `python assegna_sottocategorie.py`
 sul VPS per l'anteprima e `--scrivi` per la passata una tantum.
 L'ACCENSIONE dell'albero è un cantiere futuro, solo frontend + param.
+L'asta 🔨 (ago 2026, cantiere in sette passi con revisione di Andrea
+sui passi dei soldi): vendita al miglior offerente con escrow
+incrementale — puntare è pagare, si versa solo la differenza, il
+vincitore diventa un ordine già pagato e i perdenti riscuotono dal
+binario degli incassi. Vedi Architettura per schema, motore, chiusura,
+regola della lapide e strade scartate. Collaudata in locale su DB
+usa-e-getta lungo tutti i passi (partita a tre offerenti con la corsa
+risolta al saldo, proroga anti-cecchino, tardivi nel registro, ritiro
+definitivo con la cintura del saldo postumo, chiusura idempotente con
+l'invariante dei totali, fusione con collisione e lapide, giro visivo
+della demo) e con 19 prove pure in prove.py (127 totali). IN
+PRODUZIONE: il deploy da solo non cambia niente (migrazioni additive);
+le aste si accendono SOLO scrivendo `ASTA_ABILITATA = True` nel config
+del VPS e riavviando — da fare guardando il primo giro col journal
+aperto, e il primo giro vero dentro Telegram (puntata, sorpasso,
+chiusura, riscossione con wallet reale a cifre minuscole) è il
+collaudo che manca. RESTA DA DECIDERE a rodaggio: se e quando dare
+alle aste la radice «🔨 Aste» nello slot vuoto della nav.
+
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
