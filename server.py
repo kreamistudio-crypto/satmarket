@@ -368,6 +368,40 @@ try:
 except ImportError:
     GIORNI_COLPO = 7              # cooldown dell'avviso «ha fatto colpo» per annuncio
 
+# L'asta a tempo (ago 2026, «vendita al miglior offerente»): base +
+# durata, chi vuole comprare PUNTA versando sats nel deposito di
+# garanzia, per superare chi e' in testa si versa solo la DIFFERENZA,
+# alla scadenza la puntata piu' alta diventa un ordine normale GIA'
+# pagato e i perdenti vengono rimborsati nel loro «Da riscuotere» (il
+# binario degli incassi venditore). L'interruttore nasce SPENTO come
+# IMPORT_NOSTR_APERTO, ed e' deliberato: le aste muovono denaro vero
+# in uscita, il salto si fa con un gesto nel config del VPS guardando
+# il primo giro — non per effetto di un deploy. ATTENZIONE: spegnerlo
+# blocca la creazione di aste e le puntate NUOVE, ma chiusure, ritiri
+# e riscossioni delle aste gia' vive continuano (i sats in cassaforte
+# non restano mai ostaggio della leva).
+try:
+    from config import ASTA_ABILITATA
+except ImportError:
+    ASTA_ABILITATA = False         # spenta di serie: si accende dal VPS
+try:
+    from config import ASTA_DURATE_GIORNI
+except ImportError:
+    ASTA_DURATE_GIORNI = [3, 7]    # le durate offerte al venditore
+try:
+    from config import ASTA_INCREMENTO_PERCENTO
+except ImportError:
+    ASTA_INCREMENTO_PERCENTO = 5   # rilancio minimo sopra la testa
+try:
+    from config import ASTA_PROROGA_MINUTI
+except ImportError:
+    ASTA_PROROGA_MINUTI = 10       # anti-cecchino: saldo negli ultimi
+                                   # N minuti = scadenza a saldo + N
+try:
+    from config import ASTA_MAX_ATTIVE_VENDITORE
+except ImportError:
+    ASTA_MAX_ATTIVE_VENDITORE = 3  # aste vive per venditore (prudenza)
+
 # La terza via della moderazione (lug 2026, decisione di Andrea: basta
 # blocchi a priori sui casi ambigui — l'AI segnala, l'ADMIN decide).
 # Un verdetto DUBBIO dell'AI mette l'annuncio in stato 'revisione':
@@ -770,6 +804,89 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_lampo_annuncio
         ON offerte_lampo(annuncio_id, creato);
+    CREATE TABLE IF NOT EXISTS puntate(
+        -- l'asta (ago 2026): UNA riga per offerente per asta — la sua
+        -- cassaforte in gara. 'chiusa' = ritirato o perdente: i suoi
+        -- sats vivono nel registro rimborsi_asta. IL RITIRO E'
+        -- DEFINITIVO: la riga 'chiusa' su un'asta viva E' il divieto
+        -- di rientro (mette un tetto per costruzione ai rimborsi, uno
+        -- a offerente, e rende il gesto inequivocabile). L'etichetta
+        -- anonima («Offerente A, B, C...») si assegna al primo saldo
+        -- ed e' stabile dentro l'asta.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        annuncio_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        etichetta TEXT DEFAULT '',
+        versato_sats INTEGER DEFAULT 0,  -- somma dei delta SALDATI
+        offerto_sats INTEGER DEFAULT 0,  -- il totale che gareggia
+        stato TEXT DEFAULT 'attiva',     -- attiva | vincitrice | chiusa
+        creato INTEGER, aggiornato INTEGER,
+        UNIQUE(annuncio_id, tg_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_puntate_annuncio
+        ON puntate(annuncio_id, stato);
+    CREATE INDEX IF NOT EXISTS idx_puntate_utente
+        ON puntate(tg_id, stato);
+    CREATE TABLE IF NOT EXISTS rilanci(
+        -- una riga per FATTURA di versamento: il client dichiara il
+        -- totale desiderato, il SERVER calcola la differenza da
+        -- versare (mai fidarsi di importi dal client). Fa fede
+        -- l'orario di SALDO: un pagamento non si respinge mai — se
+        -- nel frattempo la testa e' salita si resta puntata valida
+        -- non in testa; 'tardivo' = saldato ad asta gia' chiusa, i
+        -- sats vanno dritti nel registro rimborsi. Nessun ordine,
+        -- nessuna eccezione.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        puntata_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        offerto_sats INTEGER NOT NULL,   -- il totale dichiarato
+        delta_sats INTEGER NOT NULL,     -- la fattura (calcolo server)
+        payment_hash TEXT DEFAULT '',
+        stato TEXT DEFAULT 'creato',     -- creato | saldato | tardivo
+        creato INTEGER, saldato_il INTEGER DEFAULT 0,
+        aggiornato INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_rilanci_puntata
+        ON rilanci(puntata_id, stato);
+    CREATE INDEX IF NOT EXISTS idx_rilanci_annuncio
+        ON rilanci(annuncio_id, stato);
+    CREATE TABLE IF NOT EXISTS rimborsi_asta(
+        -- il REGISTRO dei rimborsi, con chiave d'idempotenza: la
+        -- chiusura deve poter morire a meta' ed essere rilanciata
+        -- senza rimborsi doppi ne' ordini doppi. «Da riscuotere» e'
+        -- lo stesso binario degli incassi venditore (cascata invoice
+        -- depositata -> LN address -> fermo col sollecito): NESSUN
+        -- tubo nuovo per i pagamenti in uscita. INVARIANTE: per ogni
+        -- asta finita, somma dei delta saldati = versato del
+        -- vincitore + somma degli importi qui dentro.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        annuncio_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        puntata_id INTEGER NOT NULL,
+        rilancio_id INTEGER DEFAULT 0,   -- >0 solo per i saldi tardivi
+        importo_sats INTEGER NOT NULL,
+        motivo TEXT DEFAULT '',          -- ritiro | perdente | tardivo
+                                         -- | annullo_admin
+        stato TEXT DEFAULT 'da_riscuotere',  -- da_riscuotere | riscosso
+        invoice_riscossione TEXT DEFAULT '',
+        solleciti INTEGER DEFAULT 0,
+        sollecito_il INTEGER DEFAULT 0,
+        creato INTEGER, aggiornato INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_rimborsi_utente
+        ON rimborsi_asta(tg_id, stato);
+    CREATE INDEX IF NOT EXISTS idx_rimborsi_annuncio
+        ON rimborsi_asta(annuncio_id);
+    -- le due cinture d'idempotenza (indici PARZIALI): un solo
+    -- rimborso da chiusura per puntata, un solo rimborso per saldo
+    -- tardivo — anche se un domani una query se ne dimenticasse
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_chiusura
+        ON rimborsi_asta(puntata_id)
+        WHERE motivo IN ('perdente', 'annullo_admin');
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_tardivo
+        ON rimborsi_asta(rilancio_id) WHERE rilancio_id > 0;
     CREATE TABLE IF NOT EXISTS moderazione_log(
         -- il REGISTRO della moderazione (lug 2026): ogni esito, della
         -- macchina e dell'umano, per correggere il prompt A MANO sui
@@ -981,7 +1098,20 @@ def init_db():
                     # mostra ancora. '' = non dichiarata, per sempre
                     # lecito; la scrivono solo i payload che la portano
                     # gia' oggi (facoltativa e silenziosa)
-                    "sottocategoria TEXT DEFAULT ''"):
+                    "sottocategoria TEXT DEFAULT ''",
+                    # asta a tempo (ago 2026): base>0 = quest'annuncio
+                    # e' un'asta; viva = scadenza nel futuro; base>0 e
+                    # scadenza=0 = deserta, in mano al venditore (che
+                    # la rilancia o converte a prezzo fisso). Il patto
+                    # e' quello di lampo_*: il gate e' in LETTURA,
+                    # l'orologio chiude e aggiudica. prezzo_sats RESTA
+                    # la base d'asta e non si tocca mai;
+                    # asta_avvisata_1h e' il timbro dell'avviso «scade
+                    # tra 1h» ai partecipanti (una volta sola).
+                    "asta_base_sats INTEGER DEFAULT 0",
+                    "asta_scadenza INTEGER DEFAULT 0",
+                    "asta_creato INTEGER DEFAULT 0",
+                    "asta_avvisata_1h INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -1025,6 +1155,10 @@ def init_db():
     # (lampo_scadenza, id) per le lampo vive.
     con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_lampo "
                 "ON annunci(stato, lampo_scadenza, id)")
+    # Il filtro/ordinamento «🔨 All'asta» (ago 2026): keyset su
+    # (asta_scadenza, id) per le aste vive — chi scade prima in testa.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_asta "
+                "ON annunci(stato, asta_scadenza, id)")
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
@@ -1544,15 +1678,17 @@ async def login_nostr_collega(req: Request, response: Response):
 
 # ------------------------- LNBITS (escrow) --------------------------
 
-async def crea_invoice_escrow(sats: int, memo: str) -> dict:
+async def crea_invoice_escrow(sats: int, memo: str,
+                              expiry: int = 900) -> dict:
     """Crea la invoice che l'acquirente paghera': i sats finiscono
-    nel wallet della piattaforma (la cassaforte). Scade in 15 minuti:
-    se non viene pagata, l'ordine si autodistrugge poco dopo."""
+    nel wallet della piattaforma (la cassaforte). Di serie scade in
+    15 minuti (se non viene pagata, l'ordine si autodistrugge poco
+    dopo); le puntate d'asta passano fatture piu' corte."""
     async with httpx.AsyncClient() as c:
         r = await c.post(f"{LNBITS_URL}/api/v1/payments",
                          headers={"X-Api-Key": LNBITS_INVOICE_KEY},
                          json={"out": False, "amount": sats, "memo": memo,
-                               "expiry": 900})
+                               "expiry": expiry})
         r.raise_for_status()
         return r.json()  # contiene payment_hash e payment_request (la invoice)
 
@@ -5980,6 +6116,75 @@ def _importo_accordo(off) -> tuple[int, float]:
 def _cifra_offerta(valuta: str, sats: int, eur: float) -> str:
     """«80.000 sats» oppure «15.50 €»: la valuta del listino."""
     return f"{eur:.2f} €" if valuta == "eur" else f"{_fmt_sats(sats)} sats"
+
+
+# ---------------------- ASTE: la matematica pura ---------------------
+# Il cuore dell'asta in funzioni PURE: niente config, niente database,
+# niente rete — le leve arrivano per parametro e il tempo dal
+# chiamante (che e' SEMPRE il server: il client mostra soltanto).
+# Sono il «modulo» che prove.py estrae con pezzo() e tortura in CI
+# senza chiavi: chi le rifattorizza le tenga autosufficienti.
+
+def _asta(a) -> bool:
+    """Quest'annuncio e' un'asta? (viva, gia' chiusa o deserta:
+    finche' la base c'e', l'acquisto diretto resta spento)."""
+    return a["asta_base_sats"] > 0
+
+
+def _asta_viva(a, adesso: int) -> bool:
+    """L'asta accetta puntate? Base fissata e scadenza nel futuro."""
+    return a["asta_base_sats"] > 0 and a["asta_scadenza"] > adesso
+
+
+def rilancio_minimo(testa_sats: int, incremento_percento: int) -> int:
+    """Il totale minimo per superare chi e' in testa: +N% arrotondato
+    per difetto, ma MAI meno di 1 sat sopra — i sats sono interi, il
+    5% di 10 sats fa 0 e senza il max si potrebbe pareggiare. E' LA
+    funzione unica del minimo: endpoint, foglio puntata e CTA delle
+    notifiche dicono tutti questo numero."""
+    return testa_sats + max(1, testa_sats * incremento_percento // 100)
+
+
+def nuova_scadenza(scadenza: int, saldo_ts: int, proroga_s: int) -> int:
+    """L'anti-cecchino in un posto solo: un saldo negli ultimi
+    proroga_s secondi sposta la scadenza a saldo+proroga. Nessun
+    tetto alle proroghe, per scelta: l'asta finisce quando ci sono
+    proroga_s di silenzio. Saldo a scadenza passata = tardivo, e non
+    passa di qui."""
+    if 0 < scadenza - saldo_ts < proroga_s:
+        return saldo_ts + proroga_s
+    return scadenza
+
+
+def etichetta_offerente(n: int) -> str:
+    """'A'..'Z', poi 'AA', 'AB'...: l'anonimato stabile degli
+    offerenti, per ordine di primo saldo (n parte da 0)."""
+    lettere = ""
+    n += 1
+    while n > 0:
+        n, resto = divmod(n - 1, 26)
+        lettere = chr(65 + resto) + lettere
+    return lettere
+
+
+def conto_chiusura(puntate: list) -> tuple:
+    """Il conto della chiusura: dalle puntate sceglie la vincitrice
+    (offerto piu' alto; a parita' — possibile per la corsa di due
+    fatture nate sulla stessa testa — vince chi ha SALDATO prima,
+    cioe' aggiornato minore, poi id) e mette tutte le altre nei
+    rimborsi, ognuna per il suo versato. INVARIANTE, provata in CI:
+    somma dei versati in ingresso = versato della vincitrice + somma
+    dei rimborsi. Pura: righe come dict, il database non lo vede."""
+    in_gara = [p for p in puntate
+               if p["stato"] == "attiva" and p["versato_sats"] > 0]
+    if not in_gara:
+        return None, []
+    vincitrice = min(in_gara, key=lambda p: (-p["offerto_sats"],
+                                             p["aggiornato"], p["id"]))
+    rimborsi = [{"puntata_id": p["id"], "tg_id": p["tg_id"],
+                 "importo_sats": p["versato_sats"]}
+                for p in in_gara if p["id"] != vincitrice["id"]]
+    return vincitrice, rimborsi
 
 
 @app.post("/api/listings/{annuncio_id}/offerta")

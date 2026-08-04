@@ -115,6 +115,20 @@ ORE_LAMPO_OPZIONI = [6, 24, 48]  # le durate proposte
 MAX_LAMPO_SETTIMANA = 2      # lanci per annuncio in 7 giorni
 GIORNI_COLPO = 7             # cooldown dell'avviso «ha fatto colpo»
 
+# --- Asta a tempo (vendita al miglior offerente) ---------------------
+# Chi vuole comprare punta versando sats nel deposito di garanzia; per
+# superare chi e' in testa si versa solo la differenza; alla scadenza
+# la puntata piu' alta diventa un ordine gia' pagato e i perdenti
+# vengono rimborsati nel loro «Da riscuotere». L'interruttore nasce
+# SPENTO: le aste muovono denaro vero in uscita, si accende qui con un
+# gesto consapevole guardando il primo giro (come l'import Nostr).
+ASTA_ABILITATA = False       # interruttore generale (False = spento)
+ASTA_DURATE_GIORNI = [3, 7]  # le durate offerte al venditore
+ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa
+ASTA_PROROGA_MINUTI = 10     # anti-cecchino: saldo negli ultimi N
+                             # minuti = scadenza spostata a saldo + N
+ASTA_MAX_ATTIVE_VENDITORE = 3  # aste vive per venditore (prudenza)
+
 DB = "satmarket.db"
 
 # --- Import da Nostr (usato da importa_nostr.py) ---------------------
