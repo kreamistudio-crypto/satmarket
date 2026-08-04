@@ -2267,6 +2267,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   filtro «🔨 All'asta», l'ordinamento «chi scade prima» su
   idx_annunci_asta, il badge in card col tempo a grana grossa e il
   countdown vivo solo nel dettaglio, sul battito unico).
+  L'ASTA PARLA BLU (ago 2026, ritocchi di Andrea): token `--asta`
+  #1D5FA8 (di sera si SCHIARISCE a #2B6CB8 — si alza la luce, non si
+  cambia il segno; misurati: bianco sopra 6,45/5,33, vs bruno 3,23),
+  `--asta-text` #14508F/#8FB4E8 (7,43 su crema, 8,08 su bruno,
+  distinto dal ghiaccio della spedizione), `--asta-tag` #14508F FISSO
+  (vive sul cartellino di carta, che non cambia di notte: 8,16) —
+  l'arancio è di Acquista, il rosso della lampo, il verde della
+  protezione, il viola di Nostr. UN token per tutto: bottoni
+  (`.btn.asta`, stessa forma dell'orange), chip del foglio, badge e
+  cornice in card, riga/countdown del dettaglio, TARGHETTA prezzo in
+  card (quel numero è la puntata in corso, non un prezzo). Il RECINTO
+  resta VERDE anche sull'asta (il verde è della protezione, non
+  dell'acquisto): dentro, il bottone è blu. I bottoni del foglio
+  puntata sono rettangolari COME Acquista per selettore condiviso
+  (`#detailContent .btn,#puntaSheet .btn` — un solo cuore, mai una
+  copia).
+  LA RADICE «🔨 ASTE» ESISTE (ago 2026): il martelletto SVG
+  monocromatico (mano di tagliaSVG, inchiostro in [2,22], si accende
+  in arancio con currentColor come le sorelle) prende lo SLOT VUOTO
+  della nav SOLO a leva accesa — `aggiornaAstaVisibilita` lo scambia
+  con lo spaziatore, gli slot restano cinque e il Vendi al centro
+  esatto. NON è una seconda vetrina (il patto di Sfoglia): `vaiAste`
+  accende ramoVetrina='aste' + filtro + ordinamento «scade prima»
+  sulla vetrina UNA; `voceNav` e la entry di navigazione conoscono il
+  ramo; `vaiEsplora` uscendo dal ramo spegne ANCHE filtro e
+  ordinamento che il tab aveva acceso lui (o Esplora mentirebbe).
+  Stato vuoto suo («Nessuna asta in corso», CTA verso Vendi).
+  IMPERFEZIONE DICHIARATA: in vetrina anonima /api/me non c'è e il
+  tasto resta nascosto — per mostrarlo agli anonimi servirebbe la
+  leva nella busta di prima pagina (un tocco a server.py, non fatto
+  di proposito: si decide con Andrea).
   FUSIONE con la REGOLA DELLA LAPIDE (Andrea, in revisione — il
   travaso cieco era un doppio conteggio): nelle collisioni
   stessa-asta si sommano SOLO le puntate ATTIVE (i sats di una
