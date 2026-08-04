@@ -676,6 +676,39 @@ def prove_asta():
           "saldo_seq ASC" in pezzo("_leader_asta"))
     prova("un solo ordine: conto_chiusura decide su saldo_seq", True,
           '"saldo_seq"' in pezzo("conto_chiusura"))
+
+    # La guardia delle DURATE (elenco allargato a [1,3,7,14,30], ago
+    # 2026): TUTTO passa dall'elenco — validazione, avviso 1h e
+    # proroghe non assumono mai 3/7 — e fuori elenco e' un 400, mai un
+    # default silenzioso: qui si mette in gioco il denaro altrui.
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code = code
+            super().__init__(detail)
+    amb2 = {"ASTA_ABILITATA": True, "MODALITA_COLLAUDO": False,
+            "ASTA_DURATE_GIORNI": [1, 3, 7, 14, 30],
+            "HTTPException": _H}
+    exec(pezzo("durata_asta_da_payload"), amb2)
+    dur = amb2["durata_asta_da_payload"]
+    prova("durata: 7 giorni in secondi", 7 * 86400,
+          dur({"asta": {"durata_giorni": 7}}))
+    prova("durata: anche il giorno singolo", 86400,
+          dur({"asta": {"durata_giorni": 1}}))
+    prova("durata: 30 giorni, il piu' lungo", 30 * 86400,
+          dur({"asta": {"durata_giorni": 30}}))
+    prova("durata: senza payload asta non e' un'asta", 0, dur({}))
+    for storta in (2, 5, 0, "x"):
+        try:
+            dur({"asta": {"durata_giorni": storta}})
+            esito = "passata (!)"
+        except _H:
+            esito = "400"
+        prova(f"durata fuori elenco = 400 ({storta!r})", "400", esito)
+    # ...e i due gemelli del config dicono le STESSE durate
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("durate: server e config_esempio gemelli", True,
+          "[1, 3, 7, 14, 30]" in _SORGENTE
+          and "[1, 3, 7, 14, 30]" in cfg)
     # La CINTURA del saldo su puntata ritirata (decisione di Andrea al
     # passo 4): una fattura pagata nei suoi 10 minuti ma mai
     # verificata sopravvive alla finestra del ritiro — quel saldo va

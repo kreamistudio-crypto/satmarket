@@ -387,7 +387,8 @@ except ImportError:
 try:
     from config import ASTA_DURATE_GIORNI
 except ImportError:
-    ASTA_DURATE_GIORNI = [3, 7]    # le durate offerte al venditore
+    ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]   # le durate offerte al
+                                   # venditore (nel form: 7 preselezionato)
 try:
     from config import ASTA_INCREMENTO_PERCENTO
 except ImportError:

@@ -123,7 +123,8 @@ GIORNI_COLPO = 7             # cooldown dell'avviso «ha fatto colpo»
 # SPENTO: le aste muovono denaro vero in uscita, si accende qui con un
 # gesto consapevole guardando il primo giro (come l'import Nostr).
 ASTA_ABILITATA = False       # interruttore generale (False = spento)
-ASTA_DURATE_GIORNI = [3, 7]  # le durate offerte al venditore
+ASTA_DURATE_GIORNI = [1, 3, 7, 14, 30]  # le durate offerte al venditore
+                             # (nel form: 7 giorni preselezionato)
 ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa
 ASTA_PROROGA_MINUTI = 10     # anti-cecchino: saldo negli ultimi N
                              # minuti = scadenza spostata a saldo + N

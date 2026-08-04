@@ -570,6 +570,15 @@
      discreta del tempo della lampo, nel colore di casa dell'asta */
   .asta-riga{font-size:13px;color:var(--asta-text);font-weight:700;
     margin-top:4px;line-height:1.35}
+  /* il numero GRANDE del dettaglio di un'asta parla il token, come la
+     targhetta in vetrina: quel numero e' la puntata in corso (o la
+     base), non un prezzo — l'arancio resta dei prezzi veri.
+     L'identita' non si spezza sulla soglia card→dettaglio.
+     Misurati: 7,51 su crema e 8,88 su bruno (testo grande: AAA). */
+  .detail-price.asta{color:var(--asta-text)}
+  /* anche il simbolo di valuta segue il token (la regola .unit
+     altrimenti lo lascerebbe arancio: mezzo numero per famiglia) */
+  .detail-price.asta .unit{color:var(--asta-text)}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
@@ -5845,7 +5854,7 @@ function openDetail(id){
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">
-          <div class="detail-price">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
+          <div class="detail-price${asta?' asta':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
           <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
           ${asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
           ${!asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">rimangono <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
@@ -6425,9 +6434,9 @@ async function ritiraPuntata(){
   caricaAsta(l.id);
 }
 async function rilanciaAsta(id){
-  const giorni = (astaLeve && astaLeve.durate_giorni) || [3, 7];
-  const g = parseInt(prompt(`Per quanti giorni? (${giorni.join(' o ')})`,
-                            String(giorni[0])) || '', 10);
+  const giorni = (astaLeve && astaLeve.durate_giorni) || [1, 3, 7, 14, 30];
+  const g = parseInt(prompt(`Per quanti giorni? (${giorni.join(' / ')})`,
+                            String(giorni.includes(7) ? 7 : giorni[0])) || '', 10);
   if (!g) return;
   const r = await fetch(`${API_BASE}/aste/${id}/rilancia`, {
     method: 'POST',
@@ -9646,11 +9655,13 @@ function aggiornaAstaForm(){
 }
 function renderAstaDurate(){
   const box = el('sellAstaDurate'); if (!box) return;
-  const giorni = (astaLeve && astaLeve.durate_giorni) || [3, 7];
+  const giorni = (astaLeve && astaLeve.durate_giorni) || [1, 3, 7, 14, 30];
+  /* preselezione sui 7 giorni (la durata di mezzo, decisa): il primo
+     dell'elenco e' solo il ripiego se il config non li avesse */
   if (!sellAstaGiorni || !giorni.includes(sellAstaGiorni))
-    sellAstaGiorni = giorni[0];
+    sellAstaGiorni = giorni.includes(7) ? 7 : giorni[0];
   box.innerHTML = giorni.map(g =>
-    `<button type="button" class="consegna-pill${g===sellAstaGiorni?' attiva':''}" onclick="setAstaGiorni(${g})">${g} giorni</button>`).join('');
+    `<button type="button" class="consegna-pill${g===sellAstaGiorni?' attiva':''}" onclick="setAstaGiorni(${g})">${g===1?'24h':g+'g'}</button>`).join('');
 }
 function setAstaGiorni(g){ haptic(); sellAstaGiorni = g; renderAstaDurate(); }
 function astaForm(){
