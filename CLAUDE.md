@@ -102,7 +102,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   concorrenti). Nel client `publish()` passa da `bottoneInAttesa`
   (bottone spento + overlay fino alla risposta): la causa prima era
   il fetch lento (foto base64 + moderazione AI) col dito che ritocca.
-  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 26
+  Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 27
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
   Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
   media · Altro) più le 16 del catalogo largo (Informatica ·
@@ -115,12 +115,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   persona, che prima si spartivano fra «Alimenti e bevande» (le
   tisane, gli integratori) e «Altro», e nessuna delle due era giusta.
   È la seconda voce delle CATEGORIE_SENZA_CONDIZIONE, per la stessa
-  ragione degli alimenti (vedi sotto). "Tutto" è solo la vista del
+  ragione degli alimenti (vedi sotto).
+  Più «Buoni ed esperienze» (ago 2026, 🎟️ — il biglietto dice il
+  reparto, il 🎁 direbbe un'occasione): gift card, buoni acquisto,
+  voucher per soggiorni e cene — i due annunci veri che morivano in
+  «Altro» (il pacchetto B&B, i buoni Zalando). È una famiglia di
+  MERCE, non un modo di consegnare: la strada «Prodotti digitali» è
+  stata valutata e scartata perché avrebbe detto il COME invece del
+  COSA — i buoni Zalando veri hanno consegna=entrambe, la tessera si
+  SPEDISCE, e una categoria «Digitale» con spedizione fisica è una
+  contraddizione in vetrina. Ortogonale per costruzione al filtro
+  «💾 Codice online»: la categoria dice cosa compri, il filtro come
+  arriva. I SERVIZI restano fuori (decisione presa: un buono per una
+  notte è una cosa che esiste, «ti sviluppo un bot» no) e la
+  moderazione non cambia — i buoni riscattabili presso il venditore
+  stesso restano DUBBIO. Terza voce delle CATEGORIE_SENZA_CONDIZIONE:
+  un buono è nuovo per definizione, anche la tessera fisica. Le due
+  righe-voucher del MODELLO_IMPORT traslocano lì e perdono la cella
+  condizione (insegnerebbe una cosa falsa, la regola del miele).
+  "Tutto" è solo la vista del
   frontend, non una categoria. «Bitcoin» è l'unica di casa nostra e non dei mercatini
   generalisti: su un mercatino che incassa in sats, Jade e BitBox02
-  sono merce di casa. Resta PIATTO: le sottocategorie vorrebbero una
-  colonna e una gerarchia, si faranno quando le categorie saranno
-  troppo piene.
+  sono merce di casa. In vetrina il catalogo resta PIATTO, ma dal
+  (ago 2026) l'albero delle SOTTOCATEGORIE esiste DORMIENTE nel
+  codice — vedi la voce sua, più sotto.
   SI AGGIUNGE, NON SI RINOMINA (lug 2026, decisione di Andrea, ed è la
   regola da non rovesciare): le voci esistenti restano tutte con lo
   stesso nome. Il cantiere del catalogo largo proponeva di rinominarne
@@ -166,12 +184,70 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ricordarseli: `prove.py` li incrocia tutti e sette e fallisce se
   divergono (il sesto, il modello CSV, è entrato dopo essersi fatto
   dimenticare per davvero).
+  L'ALBERO DELLE SOTTOCATEGORIE (ago 2026): definito ora, mostrato
+  MAI — catalogo `SOTTOCATEGORIE` in server.py (85 sottovoci su 26
+  categorie, disegnato sui 46 annunci veri di produzione), DORMIENTE:
+  niente form, niente filtri, niente Sfoglia finché non si deciderà
+  di accenderlo. Il patto, scritto anche nel commento del catalogo:
+  id kebab-case PER SEMPRE e unici in TUTTO l'albero (un filtro senza
+  categoria non dev'essere ambiguo), etichette ritoccabili senza
+  migrazioni (pattern CONDIZIONI), ordine delle tuple = ordine di
+  presentazione, SI AGGIUNGE NON SI RINOMINA anche qui, NIENTE voci
+  «Altro X» (il fallback è '', un secondo cimitero per categoria
+  sarebbe il vizio di «Altro» moltiplicato per ventisei), chiave
+  assente = categoria piatta (oggi solo «Altro», per forza: «Altro»
+  con sottovoci non è più «Altro»), e le regole — senza_condizione e
+  simili — si EREDITANO dalla categoria: la sottovoce è un'etichetta
+  di scaffale, non un secondo asse di regole. Giudici:
+  `sottocategoria_valida(categoria, s)` ('' su sconosciuta o fuori
+  categoria — il client non decide il catalogo) e
+  `sottocategoria_tollerante` per il CSV (accetta id O etichetta,
+  storta = '' mai uno scarto). La colonna `annunci.sottocategoria`
+  nasce già ('' = non dichiarata, lecito per sempre) e i payload che
+  la portano la scrivono: pubblica(), modifica() (assenza = CONSERVA,
+  il pattern dello stock; cambio categoria = il giudice azzera da
+  solo) e la cella facoltativa `sottocategoria` del CSV d'import. MAI
+  nella modifica firmata degli importati né dall'import Nostr
+  (l'evento non la porta), FUORI da CAMPI_VETRINA e dal modello CSV
+  scaricabile (pubblicizzarla sarebbe mostrarla — nelle rotte
+  autenticate con `a.*` esce gratis, innocuo e dichiarato).
+  LE REGOLE DI CONFINE, decise sui casi veri e scritte nel commento
+  del catalogo (entreranno nel prompt della ricategorizzazione AI
+  all'accensione): smartwatch → Orologi e gioielli (il nome della
+  sottovoce «Orologi e smartwatch» È la regola); cuffie e auricolari
+  → Audio e video, Telefonia tiene «Cover e accessori»; stampanti da
+  ufficio → Informatica, stampa 3D → Elettronica; droni e modellismo
+  RC → Elettronica (non Foto e ottica); caschi moto → Motori; la roba
+  da bimbi — vestiti, giocattoli, attrezzatura — sta in Bambini
+  (regola d'oro, decisione di Andrea: Abbigliamento è adulti,
+  Donna/Uomo), ma le bici VERE da bimbo in Biciclette e i giochi da
+  tavolo per famiglie in Sport e hobby; l'artigianale si classifica
+  per FUNZIONE (le tazze al tornio in Cucina e tavola, i saponi in
+  Bellezza), Arte e artigianato è l'oggetto d'arte; Collezionismo =
+  valore da collezione (numerato, raro, sealed), non il semplicemente
+  vecchio; per ASCOLTARE → Audio e video, per SUONARE → Strumenti.
+  ELETTRONICA È RESTATA con un contenuto SUO (decisione di Andrea: in
+  produzione aveva ZERO annunci dopo gli scorpori, ma chiuderla
+  avrebbe spostato il residuo in «Altro» e tolto LA parola che un
+  venditore normale cerca): droni/modellismo, stampa 3D, smart home,
+  componenti maker, strumenti di misura — con le sottovoci nitide
+  sparisce anche l'esitazione col laptop. NON rinominata: la regola
+  «si aggiunge, non si rinomina» tiene, e lo scaffale dice il
+  contenuto meglio di un nome nuovo.
+  ALL'ACCENSIONE (documentato, non costruito): foglio-picker in Vendi
+  dipendente dalla categoria (pattern PICKER), param `sotto` su
+  /api/listings ('' storici fuori dal filtro, il patto del dato
+  dichiarato), chips dentro la vetrina di categoria in Sfoglia
+  (nessuna piastrella nuova), prompt AI con albero e confini,
+  eventuale secondo tag `t` NIP-99 — sarà solo frontend + un
+  parametro. `prove.py` difende il patto: chiavi ∈ CATEGORIE, id
+  unici e kebab, niente «altro», i giudici nei loro casi.
   LA PAGINA «SFOGLIA» (lug 2026): le categorie come vetrina, quarta
   radice della nav — griglia a due colonne di piastrelle illustrate,
   modello Vinted. Vista `view-sfoglia` (niente header, come Ordini e
   Profilo; niente barra di ricerca, che vive in Esplora e duplicarla
   sarebbe un secondo posto da tenere allineato per sempre).
-  `renderSfoglia` disegna le 26 voci del catalogo in ordine FISSO, mai
+  `renderSfoglia` disegna le voci del catalogo (27 dall'ago 2026) in ordine FISSO, mai
   per numero (una mappa che si riordina ogni giorno non si impara), e
   la griglia è STATICA: si disegna UNA volta sola, e per questo non
   serve nessun dato dal server — zero endpoint nuovi e nessun
@@ -297,7 +373,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scaffale. `navSpingi` è una bandierina alzata da `apriCategoria` e
   letta-e-azzerata in cima a `navRiflette` (prima di ogni via d'uscita,
   o si scaricherebbe su una navigazione che non l'ha chiesta).
-  LE ILLUSTRAZIONI: 26 WebP in `assets/categorie/{slug}.webp`, nome
+  LE ILLUSTRAZIONI: 27 WebP in `assets/categorie/{slug}.webp`, nome
   calcolato da `slug_categoria` (server) e `slugCat` (client) — nessun
   elenco doppio. Sono SCONTORNATE su trasparenza, non su un fondo:
   quindi il colore della piastrella è una scelta nostra, ed è un BRUNO
@@ -450,7 +526,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   è `CATEGORIE_SENZA_CONDIZIONE` (frozenset accanto a CATEGORIE:
   «Alimenti e bevande» e «Bellezza e benessere» — creme, profumi e
   integratori si vendono nuovi, e un cosmetico già usato non è merce
-  di seconda mano, è una cosa che non si vende) e il giudice unico è
+  di seconda mano, è una cosa che non si vende — e dall'ago 2026
+  «Buoni ed esperienze»: un buono è nuovo per definizione, anche la
+  tessera fisica) e il giudice unico è
   `senza_condizione(categoria, consegna)`, da cui passano form,
   dettaglio, vetrina, NIP-99, ricerca AI e import — o divergono. Il
   secondo asse è la CONSEGNA: un codice Zalando è nuovo per
@@ -3802,7 +3880,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
    `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`,
-   `/assets/categorie/{slug}.webp` (le 26 illustrazioni di Sfoglia:
+   `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    unica rotta con un nome che arriva dal client, e per questo la sola
    con una whitelist — `SLUG_CATEGORIE`, calcolata dal catalogo),
    `/assets/mascotte.jpeg`,
@@ -4451,6 +4529,24 @@ scheda, per una parola lunga senza spazi che allargava il documento.
 Vedi «il testo dell'utente non può allargare la pagina» nel dettaglio
 annuncio, e in particolare il `min-width:0` sul figlio flex, che è la
 metà del rimedio che non viene in mente.
+La 27ª categoria e l'albero dormiente (ago 2026, due cantierini in un
+giorno): «Buoni ed esperienze» accesa subito — la merce vera che
+moriva in «Altro» (pacchetto B&B, buoni Zalando) ha una casa, coi
+sette posti, i gemelli SENZA_CONDIZIONE e le righe-voucher del
+modello CSV traslocate — e l'albero delle SOTTOCATEGORIE definito ma
+mostrato mai: 85 sottovoci su 26 categorie, disegnate sui 46 annunci
+veri di produzione, colonna e payload silenzioso già vivi, UI zero
+(vedi Architettura per il patto, le regole di confine e la decisione
+su Elettronica, che resta col contenuto suo invece di chiudere).
+Collaudato: 38 prove pure nuove/aggiornate in prove.py, 16 verifiche
+TestClient su DB usa-e-getta (giudici in pubblica/modifica, conserva/
+azzera, la 27ª senza condizione, la vetrina che non mostra la
+colonna) più il filo del CSV. IN PRODUZIONE basta il deploy (la
+migrazione della colonna gira da sola); dopo il deploy gli
+spostamenti veri — B&B e Zalando verso la voce nuova, il casco moto
+verso Motori — si mettono in coda con `sposta_a_mano.py` sul VPS e si
+approvano dalla coda admin, che aggiorna anche il NIP-99.
+L'ACCENSIONE dell'albero è un cantiere futuro, solo frontend + param.
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
 Prende il posto del foglio del varco (transizione già dichiarata) e
