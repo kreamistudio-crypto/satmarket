@@ -1701,6 +1701,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (foglio «Come vuoi riceverlo?» col totale per strada, riga
   «Spedizione» del `contoScomposto`, e il totale dei bottoni compra
   che la spedizione l'ha sempre inclusa).
+  [SUPERATA, ago 2026 — SFOLLAMENTO COLORI, decisione di Andrea: la
+  gratuità si evidenzia col GRASSETTO, mai col colore. Il chip azzurro
+  «Spedizione gratuita» è morto: le pillole di consegna sono TUTTE
+  neutre (.pill, un solo cuore) con «gratuita» in grassetto, e il
+  «🚚 gratis» in card parla l'inchiostro di casa (var(--ink), token:
+  di notte è crema) in grassetto. I token --ship-* restano definiti ma
+  senza più chi vestire. La storia sotto resta per i perché.
+  ATTENZIONE al € del dettaglio d'asta: `.detail-price .unit.eur` sta
+  PIÙ IN BASSO nel foglio a pari specificità — il token dell'asta lo
+  vince nominando `.asta` E `.unit.eur` insieme, per specificità e non
+  per ordine (bug visto da Andrea nei due temi).]
   UN SOLO CHIP COLORATO, ED È «GRATIS» (lug 2026, decisione di Andrea
   in quattro tempi — vale la pena tenere l'arrivo, non il percorso).
   Il colore veste UNA cosa sola: che la spedizione non si paga.
