@@ -676,6 +676,17 @@ def prove_asta():
           "saldo_seq ASC" in pezzo("_leader_asta"))
     prova("un solo ordine: conto_chiusura decide su saldo_seq", True,
           '"saldo_seq"' in pezzo("conto_chiusura"))
+    # La CINTURA del saldo su puntata ritirata (decisione di Andrea al
+    # passo 4): una fattura pagata nei suoi 10 minuti ma mai
+    # verificata sopravvive alla finestra del ritiro — quel saldo va
+    # nel registro, MAI versato su una puntata 'chiusa'. La sentinella
+    # controlla che il gate del ramo fuori-tempo guardi anche lo stato
+    # della puntata: e' la riga che un refactor perde in silenzio.
+    corpo_verifica = _SORGENTE[_SORGENTE.index("async def verifica_rilancio"):]
+    corpo_verifica = corpo_verifica[:corpo_verifica.index("\n\n\n")]
+    prova("cintura: il saldo su puntata non-attiva finisce nel registro",
+          True, 'p["stato"] != "attiva"' in corpo_verifica
+          and "'tardivo'" in corpo_verifica)
 
 
 def main():

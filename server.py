@@ -6582,9 +6582,14 @@ async def verifica_rilancio(rilancio_id: int,
                     (ril["puntata_id"],)).fetchone()
     if (not a or a["stato"] != "attivo" or not _asta_viva(a, adesso)
             or not p or p["stato"] != "attiva"):
-        # SALDO TARDIVO: l'asta e' chiusa (o la puntata non e' piu' in
-        # gara). I sats appena entrati vanno nel registro, con la
-        # cintura d'idempotenza sul rilancio_id.
+        # SALDO FUORI TEMPO: l'asta e' chiusa, OPPURE la puntata non
+        # e' piu' in gara (ritirata). Il secondo caso non e' teorico:
+        # il ritiro esige solo che non ci siano fatture FRESCHE
+        # (1200s), ma una fattura puo' essere stata PAGATA nei suoi
+        # 10 minuti e mai verificata — il saldo arriva dopo, su una
+        # puntata 'chiusa'. In entrambi i casi i sats vanno nel
+        # registro «Da riscuotere», MAI versati su una puntata fuori
+        # gara; la cintura d'idempotenza e' sul rilancio_id.
         con.execute("UPDATE rilanci SET stato='tardivo', aggiornato=? "
                     "WHERE id=?", (adesso, rilancio_id))
         con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,"
@@ -6593,12 +6598,17 @@ async def verifica_rilancio(rilancio_id: int,
                     "VALUES(?,?,?,?,?,'tardivo','da_riscuotere',?,?)",
                     (ril["annuncio_id"], user["id"], ril["puntata_id"],
                      rilancio_id, ril["delta_sats"], adesso, adesso))
+        rid = con.execute("SELECT id FROM rimborsi_asta WHERE "
+                          "rilancio_id=?", (rilancio_id,)).fetchone()["id"]
         con.commit()
         con.close()
         await notifica(user["id"],
-                       "⌛ <b>L'asta si era già chiusa</b> quando il tuo "
-                       "pagamento è arrivato: i sats sono al sicuro nel "
-                       "tuo «Da riscuotere», nel Profilo.")
+                       "⌛ <b>Questo pagamento è arrivato fuori tempo</b> "
+                       "(l'asta era chiusa, o ti eri già ritirato): i "
+                       "sats sono al sicuro nel tuo «Da riscuotere», "
+                       "nel Profilo.")
+        # e la riscossione parte subito, sul binario di sempre
+        await _paga_rimborso(rid)
         return {"stato": "tardivo", "importo_sats": ril["delta_sats"]}
     testa_prima = _leader_asta(con, ril["annuncio_id"])
     etichetta = p["etichetta"]
@@ -6758,6 +6768,156 @@ def mie_puntate(x_tg_init_data: str = Header(""),
             "leve": {"incremento_percento": ASTA_INCREMENTO_PERCENTO,
                      "proroga_minuti": ASTA_PROROGA_MINUTI,
                      "abilitata": bool(ASTA_ABILITATA)}}
+
+
+# ------------------ ASTE: il binario delle riscossioni ---------------
+# «Da riscuotere» e' lo STESSO binario degli incassi venditore:
+# cascata invoice depositata -> Lightning address -> fermo col
+# sollecito. Nessun tubo nuovo per i pagamenti in uscita; il rimborso
+# e' INTEGRALE al sat (le fee di routing le paga la piattaforma, come
+# per ogni uscita — la fee di prelievo e' stata valutata e scartata:
+# far pagare l'uscita scoraggia le puntate).
+
+_lucchetti_rimborso = defaultdict(asyncio.Lock)
+
+
+async def _paga_rimborso(rimborso_id: int) -> dict:
+    """La riscossione di un rimborso d'asta. Idempotente: lock per
+    rimborso + guardia sullo stato (chi arriva a cose fatte esce a
+    mani vuote); sul fallimento la invoice si azzera, lo stato RESTA
+    'da_riscuotere' e NON si riprova da soli — il patto di
+    _sblocca_sats: mai due pagamenti per lo stesso diritto."""
+    async with _lucchetti_rimborso[rimborso_id]:
+        con = db()
+        r = con.execute(
+            "SELECT r.*, a.titolo FROM rimborsi_asta r "
+            "LEFT JOIN annunci a ON a.id=r.annuncio_id WHERE r.id=?",
+            (rimborso_id,)).fetchone()
+        if not r:
+            con.close()
+            return {"ok": False, "stato": "?"}
+        if r["stato"] != "da_riscuotere":
+            con.close()
+            return {"ok": r["stato"] == "riscosso", "stato": r["stato"]}
+        u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
+                        (r["tg_id"],)).fetchone()
+        importo = r["importo_sats"]      # integrale, al sat
+        bolt11 = r["invoice_riscossione"]
+        if not bolt11 and u and u["ln_address"]:
+            bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
+        titolo = (r["titolo"] or "un'asta")[:60]
+        if bolt11 and await paga_venditore(bolt11):
+            con.execute("UPDATE rimborsi_asta SET stato='riscosso', "
+                        "aggiornato=? WHERE id=?",
+                        (int(time.time()), rimborso_id))
+            con.commit()
+            con.close()
+            await notifica(r["tg_id"],
+                           f"↩️ <b>Rimborso in arrivo:</b> "
+                           f"{_fmt_sats(importo)} sats da «{titolo}» "
+                           f"stanno tornando sul tuo wallet. ⚡")
+            return {"ok": True, "stato": "riscosso"}
+        con.execute("UPDATE rimborsi_asta SET invoice_riscossione='', "
+                    "aggiornato=? WHERE id=?",
+                    (int(time.time()), rimborso_id))
+        con.commit()
+        con.close()
+        await notifica(r["tg_id"],
+                       f"💰 <b>Hai {_fmt_sats(importo)} sats da "
+                       f"riscuotere</b> da «{titolo}»: il pagamento "
+                       f"automatico non è riuscito. Controlla il tuo "
+                       f"Lightning address nel Profilo, oppure incolla "
+                       f"una invoice di esattamente quell'importo nella "
+                       f"sezione «Da riscuotere».")
+        return {"ok": False, "stato": "da_riscuotere"}
+
+
+@app.post("/api/aste/{annuncio_id}/ritirati")
+async def ritira_puntata(annuncio_id: int,
+                         x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Il ritiro volontario, DEFINITIVO (regola del cantiere): chi non
+    e' in testa esce quando vuole — la puntata si chiude, il rimborso
+    nasce nel registro NELLA STESSA transazione (niente chiave
+    d'idempotenza da inventare) e in quest'asta non si rientra. Il
+    leader non si ritira MAI: la sua offerta tiene in piedi la gara.
+    Fuori dal gate di ASTA_ABILITATA, per scelta: uscire coi propri
+    sats non dipende da una leva."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    adesso = int(time.time())
+    p = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND tg_id=?",
+                    (annuncio_id, user["id"])).fetchone()
+    if not p or p["stato"] != "attiva" or p["versato_sats"] <= 0:
+        con.close()
+        raise HTTPException(400, "Non hai una puntata attiva su questa "
+                                 "asta")
+    testa = _leader_asta(con, annuncio_id)
+    if testa and testa["id"] == p["id"]:
+        con.close()
+        raise HTTPException(400, "Sei in testa: chi guida l'asta non "
+                                 "si ritira")
+    pendente = con.execute("SELECT 1 FROM rilanci WHERE puntata_id=? AND "
+                           "stato='creato' AND creato>=?",
+                           (p["id"], adesso - RILANCIO_STANTIO)).fetchone()
+    if pendente:
+        con.close()
+        raise HTTPException(400, "Hai una fattura di puntata in corso: "
+                                 "pagala o lascia che scada, poi potrai "
+                                 "ritirarti")
+    cur = con.execute("UPDATE puntate SET stato='chiusa', aggiornato=? "
+                      "WHERE id=? AND stato='attiva'", (adesso, p["id"]))
+    if cur.rowcount == 0:
+        con.close()
+        raise HTTPException(409, "La puntata è già stata chiusa")
+    con.execute("INSERT INTO rimborsi_asta(annuncio_id,tg_id,puntata_id,"
+                "importo_sats,motivo,stato,creato,aggiornato) "
+                "VALUES(?,?,?,?,'ritiro','da_riscuotere',?,?)",
+                (annuncio_id, user["id"], p["id"], p["versato_sats"],
+                 adesso, adesso))
+    rid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    esito = await _paga_rimborso(rid)
+    return {"ok": True, "importo_sats": p["versato_sats"],
+            "riscosso": bool(esito.get("ok"))}
+
+
+@app.post("/api/rimborsi/{rimborso_id}/invoice")
+async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
+                                    x_tg_init_data: str = Header(""),
+                                    barattolo_sessione: str = Cookie("")):
+    """Il ripiego del binario (gemello di deposita_invoice sugli
+    ordini): chi non ha — o non ha piu' — un Lightning address incolla
+    una invoice dell'importo ESATTO e la riscossione riparte subito."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    bolt11 = (d.get("invoice") or "").strip()
+    if not bolt11.lower().startswith("ln"):
+        raise HTTPException(400, "Questa non sembra una invoice Lightning")
+    con = db()
+    r = con.execute("SELECT * FROM rimborsi_asta WHERE id=? AND tg_id=?",
+                    (rimborso_id, user["id"])).fetchone()
+    if not r or r["stato"] != "da_riscuotere":
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    dec = await decodifica_invoice(bolt11)
+    if dec is None:
+        con.close()
+        raise HTTPException(400, "Invoice non valida o illeggibile")
+    importo_sats = int(dec.get("amount_msat", 0)) // 1000
+    if importo_sats != r["importo_sats"]:
+        con.close()
+        raise HTTPException(400,
+            f"Importo sbagliato: la invoice è di {importo_sats} sats, "
+            f"deve essere esattamente {r['importo_sats']} sats "
+            f"(rimborso integrale)")
+    con.execute("UPDATE rimborsi_asta SET invoice_riscossione=?, "
+                "aggiornato=? WHERE id=?",
+                (bolt11, int(time.time()), rimborso_id))
+    con.commit()
+    con.close()
+    return await _paga_rimborso(rimborso_id)
 
 
 @app.post("/api/listings/{annuncio_id}/offerta")
@@ -8613,6 +8773,12 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
     rimborsi = [r["id"] for r in con.execute(
         "SELECT id FROM ordini WHERE compratore_id=? AND stato='refund'",
         (user["id"],))] if addr else []
+    # ...e anche i rimborsi d'asta fermi in «Da riscuotere»: lo
+    # scandaglio e' il recupero universale del denaro orfano, e il
+    # registro delle aste viaggia sullo stesso binario.
+    rimborsi_asta = [r["id"] for r in con.execute(
+        "SELECT id FROM rimborsi_asta WHERE tg_id=? AND "
+        "stato='da_riscuotere'", (user["id"],))] if addr else []
     con.commit()
     con.close()
     sbloccati = 0
@@ -8622,6 +8788,10 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
             sbloccati += 1
     for oid in rimborsi:
         r = await _rimborsa_compratore(oid)
+        if r.get("ok"):
+            sbloccati += 1
+    for rid in rimborsi_asta:
+        r = await _paga_rimborso(rid)
         if r.get("ok"):
             sbloccati += 1
     return {"ok": True, "ln_address": addr, "incassi_sbloccati": sbloccati}
@@ -11935,6 +12105,57 @@ async def controlla_scadenze():
         await _sblocca_sats(oid, automatico=True)
 
 
+async def sollecita_rimborsi_puntate():
+    """Il gemello di sollecita_incassi sul registro d'asta: un
+    rimborso fermo in «Da riscuotere» riceve un promemoria ogni
+    SOLLECITO_INCASSO_GIORNI — le STESSE leve, perche' e' lo stesso
+    binario — e dopo SOLLECITO_INCASSO_MAX ignorati UNA segnalazione
+    ai moderatori, poi silenzio: il caso e' in mani umane. Qui i sats
+    non si muovono mai, solo parole; le notifiche partono DOPO il
+    commit. (Il gemello per gli ordini fermi in 'refund' resta un
+    buco noto, FUORI da questo cantiere.)"""
+    if SOLLECITO_INCASSO_GIORNI <= 0:
+        return                       # leva a zero = funzione spenta
+    adesso = int(time.time())
+    passo = SOLLECITO_INCASSO_GIORNI * 86400
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT r.id, r.tg_id, r.importo_sats, r.solleciti, a.titolo "
+        "FROM rimborsi_asta r LEFT JOIN annunci a ON a.id=r.annuncio_id "
+        "WHERE r.stato='da_riscuotere' AND r.solleciti <= ? "
+        "AND MAX(r.aggiornato, r.sollecito_il) < ?",
+        (SOLLECITO_INCASSO_MAX, adesso - passo))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        con.execute("UPDATE rimborsi_asta SET sollecito_il=?, "
+                    "solleciti=solleciti+1 WHERE id=?", (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        titolo = (r["titolo"] or "un'asta")[:60]
+        try:
+            if r["solleciti"] < SOLLECITO_INCASSO_MAX:
+                await notifica(r["tg_id"],
+                    f"💰 <b>Hai {_fmt_sats(r['importo_sats'])} sats da "
+                    f"riscuotere</b> da «{titolo}»: ti aspettano nel "
+                    f"deposito di garanzia. Imposta il tuo Lightning "
+                    f"address nel Profilo (riscossioni automatiche, per "
+                    f"sempre) oppure incolla una invoice di esattamente "
+                    f"quell'importo. ⚡")
+            else:
+                await notifica_admin(
+                    f"🧊 <b>Rimborso d'asta fermo:</b> #{r['id']} "
+                    f"(«{titolo}»), "
+                    f"<b>{_fmt_sats(r['importo_sats'])} sats</b> in "
+                    f"cassaforte. L'utente ha ignorato "
+                    f"{SOLLECITO_INCASSO_MAX} solleciti: serve un "
+                    f"occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Sollecito rimborso saltato (#{r['id']}): {e}")
+
+
 async def sollecita_incassi():
     """Il promemoria degli incassi fermi: un ordine 'confirmed' senza
     metodo d'incasso non fa rumore da solo — la notifica della
@@ -13010,6 +13231,10 @@ async def orologio():
             await sollecita_incassi()
         except Exception as e:
             print(f"⚠️ Solleciti incasso saltati: {e}")
+        try:
+            await sollecita_rimborsi_puntate()
+        except Exception as e:
+            print(f"⚠️ Solleciti rimborsi d'asta saltati: {e}")
         try:
             await scadenze_offerte()
         except Exception as e:
