@@ -54,6 +54,11 @@ SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot
                              # (0 = solleciti spenti)
 SOLLECITO_INCASSO_MAX = 4    # solleciti ignorati prima che il caso
                              # venga segnalato ai moderatori
+TERMOMETRO_SOTTOCATEGORIE = True  # il lunedi' UNA notifica agli admin
+                                  # con gli annunci senza sottocategoria
+                                  # (False = mai; tace comunque sotto il
+                                  # minimo e a vetrina piena)
+TERMOMETRO_SOTTOCATEGORIE_MINIMO = 5  # sotto questi vuoti non si disturba
 TETTO_SATS_ANNUNCIO = 0      # prezzo massimo per annuncio: 0 = nessun
                              # limite (default). Mettici es. 100_000 per
                              # accendere il tetto; per gli annunci in EUR

@@ -387,6 +387,15 @@ try:
 except ImportError:
     REVISIONE_SOLLECITO_GIORNI = 2  # sollecito ai moderatori (0 = mai); l'annuncio
                                     # RESTA comunque in attesa: mai online da solo
+try:
+    from config import TERMOMETRO_SOTTOCATEGORIE
+except ImportError:
+    TERMOMETRO_SOTTOCATEGORIE = True   # il --conta che non si dimentica:
+                                       # report settimanale agli admin
+try:
+    from config import TERMOMETRO_SOTTOCATEGORIE_MINIMO
+except ImportError:
+    TERMOMETRO_SOTTOCATEGORIE_MINIMO = 5  # sotto, non vale il disturbo
 
 # ===================================================================
 
@@ -12190,6 +12199,10 @@ async def orologio():
             await sollecita_revisioni()
         except Exception as e:
             print(f"⚠️ Sollecito revisioni saltato: {e}")
+        try:
+            await termometro_sottocategorie()
+        except Exception as e:
+            print(f"⚠️ Termometro sottocategorie saltato: {e}")
         await asyncio.sleep(600)
 
 
@@ -12222,6 +12235,68 @@ async def sollecita_revisioni():
         f"{REVISIONE_SOLLECITO_GIORNI} giorni (Profilo → Statistiche → "
         f"In revisione). L'attesa non li pubblica né li rifiuta: "
         f"serve un tocco umano.")
+
+
+def _termometro_conta(con):
+    """La misura del giudice silenzioso sui soli ATTIVI (la vetrina
+    vera, il patto del --conta): quante righe senza sottocategoria in
+    categorie che una sottovoce POTREBBERO averla — «Altro» e' piatta
+    per forza e non e' «scoperta» — e quante di quelle il dizionario
+    di OGGI saprebbe gia' riempire (dizionario arricchito dopo la
+    passata: serve solo un rilancio dello script)."""
+    per_cat, colmabili = {}, 0
+    for r in con.execute(
+            "SELECT categoria, titolo, descrizione FROM annunci "
+            "WHERE stato='attivo' AND sottocategoria=''").fetchall():
+        if r["categoria"] not in SOTTOCATEGORIE:
+            continue
+        per_cat[r["categoria"]] = per_cat.get(r["categoria"], 0) + 1
+        if sottocategoria_indovina(r["categoria"], r["titolo"],
+                                   r["descrizione"] or ""):
+            colmabili += 1
+    return sum(per_cat.values()), per_cat, colmabili
+
+
+_ultimo_termometro_sotto = ""            # il giorno dell'ultimo report
+
+
+async def termometro_sottocategorie():
+    """Il --conta che non si dimentica (ago 2026, chiesto da Andrea):
+    UNA notifica aggregata agli admin, il LUNEDI'. L'ancora e' il
+    calendario e non un conteggio di secondi in memoria, ed e' una
+    scelta: il gate in RAM muore a ogni deploy, e un «ogni 7 giorni»
+    contato da li' suonerebbe a ogni riavvio — ancorato al lunedi',
+    un riavvio puo' al piu' far suonare due volte QUEL lunedi', caso
+    raro e limitato. Una coda ferma non suona: sotto
+    TERMOMETRO_SOTTOCATEGORIE_MINIMO si tace, a vetrina piena si
+    tace, con la leva spenta si tace per sempre."""
+    global _ultimo_termometro_sotto
+    if not TERMOMETRO_SOTTOCATEGORIE:
+        return
+    oggi = time.strftime("%Y-%m-%d")
+    if time.localtime().tm_wday != 0 or _ultimo_termometro_sotto == oggi:
+        return
+    con = db()
+    totale, per_cat, colmabili = _termometro_conta(con)
+    con.close()
+    if totale < TERMOMETRO_SOTTOCATEGORIE_MINIMO:
+        return
+    _ultimo_termometro_sotto = oggi
+    scoperte = ", ".join(f"{c} ({n})" for c, n in sorted(
+        per_cat.items(), key=lambda kv: -kv[1])[:3])
+    plurale = "annunci" if totale > 1 else "annuncio"
+    riga_colmabili = ""
+    if colmabili == 1:
+        riga_colmabili = ("\n1 è già coperto dal dizionario di oggi: "
+                          "basta un rilancio con --scrivi.")
+    elif colmabili:
+        riga_colmabili = (f"\n{colmabili} sono già coperti dal dizionario "
+                          f"di oggi: basta un rilancio con --scrivi.")
+    await notifica_admin(
+        f"🗂 <b>{totale} {plurale} senza sottocategoria</b> — le "
+        f"categorie più scoperte: {scoperte}.{riga_colmabili}\n"
+        f"Sul VPS: <code>python assegna_sottocategorie.py --conta</code> "
+        f"per i titoli, parole nuove nel dizionario per il resto.")
 
 
 @app.on_event("startup")
