@@ -47,8 +47,24 @@ PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE
                              # 0 = spenta
 GIORNI_DATA_ANNUNCIO = 60    # «pubblicato N giorni fa» nel dettaglio:
                              # oltre questi giorni la riga non si mostra
-ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna
-GIORNI_AUTO_SBLOCCO = 10     # sblocco d'ufficio dopo la spedizione
+AUTO_SBLOCCO_ATTIVO = False  # IL DISARMO (ago 2026): False = i sats non
+                             # si muovono MAI senza un gesto umano. Gatea
+                             # i soli rami FISICI dell'orologio; le due
+                             # finestre del DIGITALE qui sotto restano
+                             # armate comunque. True = si torna allo
+                             # sblocco d'ufficio di ieri, e allora vanno
+                             # rimessi i testi (l'elenco dei posti e'
+                             # nella voce sua in CLAUDE.md)
+ORE_CONFERMA = 72            # finestra dell'acquirente dopo la consegna:
+                             # a leva spenta e' quando parte il PRIMO
+                             # promemoria, non piu' quando partono i sats
+GIORNI_AUTO_SBLOCCO = 10     # silenzio dopo la spedizione: idem, a leva
+                             # spenta e' il primo promemoria
+PROMEMORIA_CONFERMA_GIORNI = 3  # ogni quanto si ribussa al compratore
+                             # dopo il primo squillo (0 = promemoria
+                             # spenti: i sats restano fermi in silenzio)
+PROMEMORIA_CONFERMA_MAX = 3  # promemoria ignorati prima che il caso
+                             # venga segnalato ai moderatori, poi silenzio
 SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot
                              # giorni un promemoria al venditore
                              # (0 = solleciti spenti)

@@ -312,6 +312,35 @@ try:
 except ImportError:
     DIGITALE_MIN_VENDITE = 0       # 0 = spento (vendite concluse minime)
 
+# IL DISARMO DELL'AUTO-SBLOCCO (ago 2026, decisione di Andrea): in
+# questa fase i sats non si muovono MAI senza un gesto umano. La regola
+# precisa e' che nessun timer sposta sats DA una parte A un'altra.
+# La leva nasce False nel CODICE, come IMPORT_NOSTR_APERTO e per la
+# stessa ragione: muove denaro, e un git pull non deve poter rimettere
+# in moto i soldi per distrazione. Si riaccende dal VPS, con un gesto.
+# ATTENZIONE: gatea i soli rami FISICI di controlla_scadenze (72h da
+# 'consegnato', GIORNI_AUTO_SBLOCCO giorni da 'spedito_il'). Le
+# finestre del DIGITALE restano armate anche a leva spenta — la prima
+# e' ancorata a un'azione del compratore, la seconda a un fatto che
+# verifichiamo noi. E' la cosa da ricordare leggendo il nome della leva.
+try:
+    from config import AUTO_SBLOCCO_ATTIVO
+except ImportError:
+    AUTO_SBLOCCO_ATTIVO = False    # False = i sats aspettano un umano
+# Al posto dello sblocco: il promemoria al compratore, che ha in mano
+# le due leve (conferma / disputa), e al tetto UNA segnalazione ai
+# moderatori. Leve PROPRIE e non SOLLECITO_INCASSO_* (7x4): li' aspetta
+# una persona sola su sats gia' suoi, qui due persone si aspettano a
+# vicenda, e un mese prima che un umano guardi sono troppi.
+try:
+    from config import PROMEMORIA_CONFERMA_GIORNI
+except ImportError:
+    PROMEMORIA_CONFERMA_GIORNI = 3  # 0 = promemoria spenti
+try:
+    from config import PROMEMORIA_CONFERMA_MAX
+except ImportError:
+    PROMEMORIA_CONFERMA_MAX = 3     # poi la palla passa ai moderatori
+
 # Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
 # propone una cifra, il venditore accetta/rifiuta/contropropone UNA
 # volta, l'accordo da' il diritto di comprare a quel prezzo entro la
@@ -1239,7 +1268,13 @@ def init_db():
                     # quelle vivono sullo stato 'confirmed', e un
                     # contatore ereditato salterebbe dritto al tetto
                     "sollecito_ritiro_il INTEGER DEFAULT 0",
-                    "solleciti_ritiro INTEGER DEFAULT 0"):
+                    "solleciti_ritiro INTEGER DEFAULT 0",
+                    # il promemoria delle conferme ferme (ago 2026,
+                    # disarmo dell'auto-sblocco): colonne SUE come per
+                    # i ritiri — un contatore ereditato salterebbe
+                    # dritto al tetto
+                    "sollecito_conferma_il INTEGER DEFAULT 0",
+                    "solleciti_conferma INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -8832,12 +8867,14 @@ async def segna_spedito(ordine_id: int, req: Request,
 async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header(""),
                                            barattolo_sessione: str = Cookie("")):
     """SOLO L'ACQUIRENTE segnala l'arrivo del pacco: si apre la sua
-    finestra di ORE_CONFERMA ore per controllare l'oggetto; allo
-    scadere, sblocco automatico al venditore.
+    finestra di ORE_CONFERMA ore per controllare l'oggetto.
     (Il venditore NON puo' usarlo: potrebbe far partire il timer
-    prima della consegna reale. La sua protezione e' lo sblocco
-    d'ufficio a GIORNI_AUTO_SBLOCCO giorni. In futuro questo scatto
-    arrivera' in automatico dal tracking del corriere.)"""
+    prima della consegna reale. In futuro questo scatto arrivera' in
+    automatico dal tracking del corriere.)
+    ATTENZIONE, dal ago 2026: allo scadere della finestra NON c'e' piu'
+    nessuno sblocco automatico — i sats restano nel deposito e parte il
+    promemoria di sollecita_conferme_ferme, poi il moderatore. Vedi il
+    disarmo dell'auto-sblocco in CLAUDE.md."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND stato='shipped' "
@@ -8852,9 +8889,11 @@ async def segna_consegnato(ordine_id: int, x_tg_init_data: str = Header(""),
     con.commit()
     con.close()
     await notifica(o["venditore_id"],
-                   f"📬 L'acquirente ha segnalato la <b>consegna del pacco</b>: "
-                   f"ha {ORE_CONFERMA} ore per controllare l'oggetto, poi i "
-                   f"sats si sbloccano automaticamente.")
+                   f"📬 L'acquirente ha segnalato la <b>consegna del pacco</b> "
+                   f"e sta controllando l'oggetto: ha {ORE_CONFERMA} ore di "
+                   f"tempo. I sats restano nel deposito di garanzia finché "
+                   f"non conferma — se non si fa vivo gli mandiamo un "
+                   f"promemoria, e poi interviene un moderatore.")
     return {"ok": True, "stato": "delivered"}
 
 
@@ -12843,11 +12882,17 @@ async def rimuovi_feedback_admin(feedback_id: int,
 
 
 # --------------------- L'OROLOGIO DEGLI SBLOCCHI --------------------
-# Un compito in sottofondo controlla ogni 10 minuti le scadenze:
-#  - finestra di conferma scaduta (delivered da piu' di ORE_CONFERMA)
-#  - silenzio totale dopo la spedizione (shipped da piu' di
-#    GIORNI_AUTO_SBLOCCO giorni)
-# In entrambi i casi i sats vengono sbloccati d'ufficio al venditore.
+# Un compito in sottofondo controlla ogni 10 minuti le scadenze.
+# I due rami FISICI — finestra di conferma scaduta (delivered da piu'
+# di ORE_CONFERMA) e silenzio dopo la spedizione (shipped da piu' di
+# GIORNI_AUTO_SBLOCCO giorni) — sono DISARMATI dal ago 2026: girano
+# solo se AUTO_SBLOCCO_ATTIVO, che nasce False. In questa fase i sats
+# non si muovono senza un gesto umano, e al posto dello sblocco arriva
+# il promemoria di sollecita_conferme_ferme.
+# I due rami DIGITALI restano armati sempre: il primo e' ancorato alla
+# rivelazione (un'azione del compratore), il secondo a un fatto che
+# verifichiamo noi — il contenuto e' nel nostro database, consegnato e
+# mai letto. Non e' la parola di nessuno.
 # NOTA: funziona solo finche' il server e' acceso.
 
 import asyncio
@@ -12856,14 +12901,19 @@ import asyncio
 async def controlla_scadenze():
     adesso = int(time.time())
     con = db()
-    scaduti_consegna = [r["id"] for r in con.execute(
-        "SELECT id FROM ordini WHERE stato='delivered' AND consegnato>0 "
-        "AND consegnato < ? AND consegna_scelta != 'digitale'",
-        (adesso - ORE_CONFERMA * 3600,))]
-    scaduti_silenzio = [r["id"] for r in con.execute(
-        "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
-        "AND spedito_il < ? AND consegna_scelta != 'digitale'",
-        (adesso - GIORNI_AUTO_SBLOCCO * 86400,))]
+    scaduti_consegna, scaduti_silenzio = [], []
+    if AUTO_SBLOCCO_ATTIVO:
+        # I due rami della merce fisica, oggi disarmati: l'uno e'
+        # ancorato al «e' arrivato» del compratore, l'altro all'«ho
+        # spedito» del venditore, che nessuno verifica.
+        scaduti_consegna = [r["id"] for r in con.execute(
+            "SELECT id FROM ordini WHERE stato='delivered' AND consegnato>0 "
+            "AND consegnato < ? AND consegna_scelta != 'digitale'",
+            (adesso - ORE_CONFERMA * 3600,))]
+        scaduti_silenzio = [r["id"] for r in con.execute(
+            "SELECT id FROM ordini WHERE stato='shipped' AND spedito_il>0 "
+            "AND spedito_il < ? AND consegna_scelta != 'digitale'",
+            (adesso - GIORNI_AUTO_SBLOCCO * 86400,))]
     # Il digitale ha le SUE finestre, corte: un codice si prova
     # subito, non viaggia in furgone. consegnato = la rivelazione
     # (la ricevuta di lettura), spedito_il = la consegna del codice.
@@ -12893,8 +12943,9 @@ async def sollecita_ritiri_fermi():
     non si muovono MAI da soli): e' il promemoria alle due parti, che
     ora hanno entrambe una leva — il compratore conferma da 'locked'
     senza aspettare nessuno, il venditore segna la consegna a mano e
-    da li' parte la sua protezione (sblocco d'ufficio a
-    GIORNI_AUTO_SBLOCCO giorni). Stesse leve del sollecito incassi
+    da li' parte la finestra di conferma (che dal ago 2026 non sblocca
+    piu' da sola: chiama sollecita_conferme_ferme, poi il moderatore).
+    Stesse leve del sollecito incassi
     (stesso binario); al tetto UNA segnalazione ai moderatori, poi
     silenzio: il caso e' in mani umane."""
     if SOLLECITO_INCASSO_GIORNI <= 0:
@@ -12932,9 +12983,9 @@ async def sollecita_ritiri_fermi():
                 await notifica(r["venditore_id"],
                     f"🤝 <b>Il ritiro di «{titolo}» risulta ancora da "
                     f"concludere.</b> Se hai già consegnato l'oggetto a "
-                    f"mano, segnalo nell'ordine: da lì parte la tua "
-                    f"protezione (sblocco automatico se l'acquirente "
-                    f"non risponde).")
+                    f"mano, segnalo nell'ordine: da lì l'acquirente ha "
+                    f"una finestra per confermare, e se tace lo "
+                    f"solleciteremo noi.")
             else:
                 await notifica_admin(
                     f"🧊 <b>Ritiro in zona fermo:</b> ordine #{r['id']} "
@@ -12943,6 +12994,99 @@ async def sollecita_ritiri_fermi():
                     f"si muove. Serve un occhio umano.")
         except Exception as e:
             print(f"⚠️ Sollecito ritiro saltato (#{r['id']}): {e}")
+
+
+async def sollecita_conferme_ferme():
+    """IL PROMEMORIA AL POSTO DELLO SBLOCCO (ago 2026, disarmo
+    dell'auto-sblocco). Con AUTO_SBLOCCO_ATTIVO spenta i due rami
+    fisici di controlla_scadenze non consegnano piu' i sats da soli:
+    al loro posto si bussa al COMPRATORE, che ha in mano le due leve —
+    conferma la ricezione, oppure apre una disputa. Gira SOLO a leva
+    spenta: e' il SOSTITUTO dello sblocco, non un'aggiunta (con la leva
+    accesa il primo squillo cadrebbe nello stesso istante in cui i sats
+    partono, e i due meccanismi si darebbero fastidio).
+    Il primo squillo sta esattamente dove stava la scadenza —
+    ORE_CONFERMA dalla consegna dichiarata, GIORNI_AUTO_SBLOCCO dalla
+    spedizione: quei numeri non cambiano valore, cambia la CONSEGUENZA
+    (prima rilasciavano, ora suonano). Poi si ribussa ogni
+    PROMEMORIA_CONFERMA_GIORNI e dopo PROMEMORIA_CONFERMA_MAX
+    promemoria ignorati UNA segnalazione ai moderatori, poi silenzio:
+    il caso e' in mani umane. Il venditore lo sente solo al PRIMO
+    squillo — non ha niente da fare, e ha gia' il suo bottone
+    sollecita_acquirente col cap a 24h.
+    Qui i sats non si muovono mai, solo parole; le notifiche partono
+    DOPO il commit."""
+    if AUTO_SBLOCCO_ATTIVO or PROMEMORIA_CONFERMA_GIORNI <= 0:
+        return                       # leva accesa o promemoria spenti
+    adesso = int(time.time())
+    passo = PROMEMORIA_CONFERMA_GIORNI * 86400
+    con = db()
+    # Due popolazioni con ANCORE diverse: qui non si guarda
+    # `aggiornato` come nei gemelli (cambia a ogni transizione e
+    # sposterebbe il primo squillo), ma il momento dichiarato. Il MAX
+    # fa il resto: la prima volta sollecito_conferma_il e' 0, quindi
+    # comanda l'ancora; dalla seconda comanda il sollecito precedente.
+    # I pezzi interpolati sono nostri, mai dal client.
+    righe = []
+    for stato, ancora, finestra in (
+            ("delivered", "o.consegnato", ORE_CONFERMA * 3600),
+            ("shipped", "o.spedito_il", GIORNI_AUTO_SBLOCCO * 86400)):
+        righe += [dict(r) for r in con.execute(
+            "SELECT o.id, o.compratore_id, o.venditore_id, o.annuncio_id, "
+            "o.prezzo_sats, o.protezione_sats, o.solleciti_conferma, "
+            "a.titolo FROM ordini o "
+            # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
+            "LEFT JOIN annunci a ON a.id = o.annuncio_id "
+            f"WHERE o.stato='{stato}' AND {ancora} > 0 "
+            "AND o.consegna_scelta != 'digitale' "
+            "AND o.solleciti_conferma <= ? "
+            f"AND MAX({ancora} + ?, o.sollecito_conferma_il + ?) < ?",
+            (PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+        con.execute("UPDATE ordini SET sollecito_conferma_il=?, "
+                    "solleciti_conferma=solleciti_conferma+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        titolo = (r["titolo"] or "il tuo acquisto")[:60]
+        try:
+            if r["solleciti_conferma"] < PROMEMORIA_CONFERMA_MAX:
+                await notifica(r["compratore_id"],
+                    f"⏳ <b>L'affare «{titolo}» aspetta te.</b> I sats "
+                    f"sono ancora nel deposito di garanzia e ci restano "
+                    f"finché non decidi tu. Apri l'ordine nella Mini App "
+                    f"e <b>conferma la ricezione</b> se è tutto a posto, "
+                    f"oppure <b>apri una disputa</b> se qualcosa non va.")
+                if r["solleciti_conferma"] == 0:
+                    # Una volta sola: il venditore non ha niente da fare
+                    # qui, gli si dice solo come stanno le cose adesso.
+                    await notifica(r["venditore_id"],
+                        f"⏳ <b>L'acquirente di «{titolo}» non si è ancora "
+                        f"fatto vivo.</b> I suoi sats sono al sicuro nel "
+                        f"deposito di garanzia e ci restano: su Barattolo "
+                        f"non si sbloccano da soli. Gli stiamo ricordando "
+                        f"di confermare; se continua a tacere, interviene "
+                        f"un moderatore.")
+            else:
+                # Il tetto e' passato: N promemoria ignorati, tocca a un
+                # umano — e da qui in poi silenzio, il patto dei solleciti.
+                netto = netto_venditore(r["prezzo_sats"] - r["protezione_sats"])
+                await notifica_admin(
+                    f"🧊 <b>Conferma ferma:</b> ordine #{r['id']} "
+                    f"(«{titolo}»), <b>{netto} sats</b> in cassaforte. "
+                    f"Il compratore ha ignorato {PROMEMORIA_CONFERMA_MAX} "
+                    f"promemoria in ~{PROMEMORIA_CONFERMA_MAX * PROMEMORIA_CONFERMA_GIORNI} "
+                    f"giorni: serve un occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Promemoria conferma saltato (#{r['id']}): {e}")
 
 
 async def sollecita_rimborsi_puntate():
@@ -14086,6 +14230,12 @@ async def orologio():
             await sollecita_ritiri_fermi()
         except Exception as e:
             print(f"⚠️ Solleciti ritiri fermi saltati: {e}")
+        try:
+            # il sostituto dell'auto-sblocco disarmato: gira solo a
+            # leva spenta, e non muove mai un sat
+            await sollecita_conferme_ferme()
+        except Exception as e:
+            print(f"⚠️ Promemoria conferme ferme saltati: {e}")
         try:
             await scadenze_offerte()
         except Exception as e:

@@ -12,6 +12,7 @@ USO:  python prove.py          (esce 1 se qualcosa e' rotto)
 """
 
 import os
+import re
 import sys
 
 QUI = os.path.dirname(os.path.abspath(__file__))
@@ -866,6 +867,94 @@ def prove_ritiro():
           "stato='locked'" in scad)
 
 
+def prove_disarmo():
+    """IL DISARMO DELL'AUTO-SBLOCCO (ago 2026): in questa fase i sats
+    non si muovono senza un gesto umano. Una sentinella per ogni riga
+    del censimento — quelle che devono tacere e quelle che devono
+    restare accese: se un domani qualcuno riarma un ramo per sbaglio,
+    qui si accende un rosso."""
+    print("\n[disarmo dell'auto-sblocco]")
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    # 1-3: le tre leve nuove, col default sicuro e il gemello nel config
+    prova("leva: nasce False nel codice", True,
+          "AUTO_SBLOCCO_ATTIVO = False" in _SORGENTE)
+    prova("leva: gemella in config_esempio", True,
+          "AUTO_SBLOCCO_ATTIVO = False" in cfg)
+    prova("promemoria: leve gemelle server/config", True,
+          "PROMEMORIA_CONFERMA_GIORNI = 3" in _SORGENTE
+          and "PROMEMORIA_CONFERMA_GIORNI = 3" in cfg
+          and "PROMEMORIA_CONFERMA_MAX = 3" in _SORGENTE
+          and "PROMEMORIA_CONFERMA_MAX = 3" in cfg)
+
+    scad = corpo("controlla_scadenze")
+    gate = scad.index("if AUTO_SBLOCCO_ATTIVO:")
+    # 4-5: i due rami FISICI stanno DENTRO il gate (cioe' dopo di lui)
+    prova("ramo 72h: disarmato dalla leva", True,
+          scad.index("ORE_CONFERMA * 3600") > gate)
+    prova("ramo 10gg: disarmato dalla leva", True,
+          scad.index("GIORNI_AUTO_SBLOCCO * 86400") > gate)
+    # 6-7: i due rami DIGITALI restano fuori dal gate, sempre armati
+    prova("digitale 24h: resta armato (fuori dal gate)", True,
+          scad.index("ORE_CONFERMA_DIGITALE") > gate
+          and "if AUTO_SBLOCCO_ATTIVO" not in
+              scad[scad.index("scaduti_digitale"):])
+    prova("digitale 48h: resta armato", True,
+          "ORE_SILENZIO_DIGITALE" in scad)
+    # 8: la prova storica non deve ingiallire
+    prova("auto-sblocco: mai dai 'locked' senza dichiarazioni", False,
+          "stato='locked'" in scad)
+
+    prom = corpo("sollecita_conferme_ferme")
+    # 9-12: il sostituto non muove sats, e' agganciato, e non dimentica i set
+    prova("promemoria: mai sats mossi, solo parole", True,
+          "UPDATE ordini SET sollecito_conferma_il" in prom
+          and "_sblocca_sats" not in prom and "released" not in prom)
+    prova("promemoria: agganciato all'orologio", True,
+          "sollecita_conferme_ferme()" in corpo("orologio"))
+    prova("promemoria: e' il sostituto, non un'aggiunta", True,
+          "if AUTO_SBLOCCO_ATTIVO or PROMEMORIA_CONFERMA_GIORNI <= 0" in prom)
+    prova("promemoria: i set non restano fuori (LEFT JOIN)", True,
+          "LEFT JOIN annunci" in prom)
+    prova("promemoria: il digitale non lo riguarda", True,
+          "consegna_scelta != 'digitale'" in prom)
+    # 13-14: l'unico ponte timer->fondi, e i gemelli che restano muti
+    prova("sblocco automatico: un solo chiamante in tutto il file", True,
+          _SORGENTE.count("automatico=True") == 1)
+    for g in ("sollecita_incassi", "sollecita_ritiri_fermi",
+              "sollecita_rimborsi_puntate"):
+        prova(f"{g}: resta senza sblocchi", True,
+              "_sblocca_sats" not in corpo(g))
+    # 15-16: i timer che RESTITUISCONO restano agganciati (eccezione
+    # dichiarata: non spostano sats da una parte a un'altra)
+    oro = corpo("orologio")
+    prova("asta e riacciuffo: ancora agganciati", True,
+          "chiudi_aste()" in oro and "controlla_annullati()" in oro)
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # 17-19: il client non promette piu' lo sblocco sul FISICO
+    prova("client: niente sblocco promesso da soli", False,
+          "si sbloccano da soli" in mini or "d'ufficio" in mini)
+    prova("client: il countdown resta al solo digitale", True,
+          "TEMPI.confermaDig*3600" in mini
+          and "oreFinestra = digitale ? 24 : 72" not in mini)
+    prova("client: nessun tempo battuto a mano", False,
+          "mi prendo 24h" in mini)
+    # le voci di TEMPI sono incolonnate: il confronto salta gli spazi
+    prova("client: TEMPI e config restano gemelli", True,
+          all(re.search(rf"\b{k}:\s+{v},", mini) for k, v in
+              (("conferma", 72), ("autoSblocco", 10),
+               ("confermaDig", 24), ("silenzioDig", 48)))
+          and "ORE_CONFERMA = 72" in cfg
+          and "GIORNI_AUTO_SBLOCCO = 10" in cfg
+          and "ORE_CONFERMA_DIGITALE = 24" in cfg
+          and "ORE_SILENZIO_DIGITALE = 48" in cfg)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -874,7 +963,7 @@ def main():
               prove_tag_commercio, prove_anello, prove_categorie,
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
-              prove_ritiro):
+              prove_ritiro, prove_disarmo):
         try:
             f()
         except Exception as e:

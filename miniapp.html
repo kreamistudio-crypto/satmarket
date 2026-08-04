@@ -2398,8 +2398,8 @@
       <ul class="sicu-lista">
         <!-- i numeri li scrive scriviTempi() da TEMPI: qui non se ne
              batte nemmeno uno a mano (vedi il blocco dei tempi nel JS) -->
-        <li>Dopo la consegna hai <b><span data-tempo="conferma"></span> ore</b> per controllare l'oggetto e confermare. Se non dici nulla, allo scadere i sats vanno al venditore.</li>
-        <li>Se non segni mai la ricezione, i sats si sbloccano da soli <b><span data-tempo="autoSblocco"></span> giorni</b> dopo la spedizione: serve a proteggere il venditore da chi sparisce dopo aver ricevuto il pacco.</li>
+        <li>Dopo la consegna hai <b><span data-tempo="conferma"></span> ore</b> per controllare l'oggetto e confermare. <b>I sats non partono da soli:</b> se allo scadere non hai detto nulla ti mandiamo un promemoria, e se il silenzio continua interviene un moderatore.</li>
+        <li>Lo stesso vale se non segni mai la ricezione: dopo <b><span data-tempo="autoSblocco"></span> giorni</b> dalla spedizione ti scriviamo, ma il deposito resta fermo. Nessuno incassa mentre tu non hai confermato.</li>
         <li>Il <b>codice online</b> ha finestre più corte: <b><span data-tempo="confermaDig"></span> ore</b> da quando lo riveli, e <b><span data-tempo="silenzioDig"></span> ore</b> se il venditore l'ha consegnato e tu non l'hai ancora aperto.</li>
         <li>La invoice del pagamento vive <b><span data-tempo="invoice"></span> minuti</b>. Se scade non è successo niente: si rifà, e il prezzo si riconverte al cambio del momento.</li>
       </ul>
@@ -2412,7 +2412,7 @@
       <p>Meglio dirlo prima che scoprirlo dopo.</p>
       <ul class="sicu-lista">
         <li><b>Un codice rivelato non torna indietro.</b> Nessuno — nemmeno noi — può sapere se l'hai già riscattato. Per questo la finestra è di <span data-tempo="confermaDig"></span> ore: provalo <i>subito</i>. Se non ci sono prove da nessuna delle due parti, la regola di default dà ragione a chi ha consegnato.<br>Vale anche al contrario: <b>se il codice non funziona, hai <span data-tempo="confermaDig"></span> ore per aprire una disputa</b> — e in quel momento i sats sono ancora fermi.</li>
-        <li><b>Nel ritiro a mano, il controllo è il tuo.</b> Guarda e prova l'oggetto <i>prima</i> di segnare che l'hai ritirato: da lì partono le <span data-tempo="conferma"></span> ore.</li>
+        <li><b>Nel ritiro a mano, il controllo è il tuo.</b> Guarda e prova l'oggetto <i>prima</i> di confermare che l'hai ritirato: con la conferma i sats partono al venditore, e non tornano indietro.</li>
         <li><b>Il deposito garantisce l'oggetto promesso, non i gusti.</b> «Non mi piace più» non è un difetto; un oggetto diverso da com'era descritto sì.</li>
       </ul>
 
@@ -4999,10 +4999,18 @@ setInterval(() => {
    ORE_CONFERMA_DIGITALE    confermaDig
    ORE_SILENZIO_DIGITALE    silenzioDig
    (la vita della invoice non e' una leva: e' `expiry: 900` dentro
-    crea_invoice_escrow in server.py — se cambia li', cambia invoice) */
+    crea_invoice_escrow in server.py — se cambia li', cambia invoice)
+
+   ATTENZIONE (ago 2026, il disarmo dell'auto-sblocco): i due tempi
+   FISICI hanno cambiato CONSEGUENZA, non valore — con
+   AUTO_SBLOCCO_ATTIVO spenta non fanno piu' partire i sats, fanno
+   partire il primo PROMEMORIA al compratore. I testi da qui in giu'
+   sono scritti su quel mondo: se un giorno la leva torna accesa,
+   vanno rimessi (l'elenco dei posti e' nella voce sua in CLAUDE.md).
+   I due tempi del DIGITALE invece sbloccano ancora davvero. */
 const TEMPI = {
   conferma:    72,   // ore per controllare l'oggetto dopo la consegna
-  autoSblocco: 10,   // giorni dalla spedizione: sblocco d'ufficio
+  autoSblocco: 10,   // giorni dalla spedizione: primo promemoria
   confermaDig: 24,   // ore dalla rivelazione del codice
   silenzioDig: 48,   // ore dalla consegna digitale mai rivelata
   invoice:     15,   // minuti di vita della invoice Lightning
@@ -7903,11 +7911,15 @@ function openOrder(id){
     progress = {dispute:2, return_pending:2, return_shipped:2, refund:3, refunded:4}[s];
   } else {
     /* la finestra di conferma del digitale e' corta: il codice si
-       prova subito (24h, il gemello delle 72 del fisico) */
+       prova subito (il gemello delle 72 ore del fisico). I numeri
+       vengono da TEMPI, mai battuti a mano.
+       Il CONTO ALLA ROVESCIA vive solo sul digitale: li' allo scadere
+       i sats partono davvero. Sul fisico l'auto-sblocco e' disarmato
+       (ago 2026) e un countdown prometterebbe una cosa che non
+       succede — al suo posto si dice che il deposito aspetta. */
     const digitale = o.consegnaScelta==='digitale';
-    const oreFinestra = digitale ? 24 : 72;
-    const oreRestanti = o.consegnato
-      ? Math.max(0, Math.ceil((o.consegnato + oreFinestra*3600 - Date.now()/1000)/3600)) : 0;
+    const oreRestanti = (digitale && o.consegnato)
+      ? Math.max(0, Math.ceil((o.consegnato + TEMPI.confermaDig*3600 - Date.now()/1000)/3600)) : 0;
     const ritiro = o.consegnaScelta==='ritiro';
     steps = [
       {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
@@ -7918,7 +7930,9 @@ function openOrder(id){
         : {t:'Oggetto spedito',     d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`:'Il venditore ha consegnato al corriere'},
       {t:s==='delivered' ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
-       d:s==='delivered'?`Restano ~${oreRestanti} ore per confermare o aprire disputa`:(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
+       d:s==='delivered'?(digitale?`Restano ~${oreRestanti} ore per confermare o aprire disputa`
+                                  :'I sats restano nel deposito finché non confermi')
+                        :(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
       o.role==='seller'
         ? {t:'Hai incassato i tuoi sats', d:'Affare concluso: i sats sono nel tuo wallet'}
         : {t:'Sats sbloccati al venditore', d:'Affare concluso, feedback reciproco'},
@@ -8021,7 +8035,7 @@ function openOrder(id){
         </div>` : o.consegnaScelta==='ritiro' ? `
         <div class="payout">
           <h4>🤝 Consegna in zona</h4>
-          <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì partono le ${TEMPI.conferma} ore di conferma.</div>
+          <div class="hint">L'acquirente ha scelto il <b>ritiro in zona</b>: i sats sono al sicuro in cassaforte. Accordatevi per l'incontro e, quando l'oggetto è passato di mano, segnalo qui — da lì l'acquirente ha ${TEMPI.conferma} ore per confermare, e se tace lo sollecitiamo noi.</div>
           <button class="btn orange" onclick="markConsegnaMano()">🤝 Ho consegnato l'oggetto a mano</button>
         </div>` : `
         <div class="payout">
@@ -8037,7 +8051,7 @@ function openOrder(id){
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
       ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — mi prendo ${TEMPI.conferma}h per controllarlo`:`📬 È arrivato — mi prendo ${TEMPI.conferma}h per controllarlo`}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
-      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema.'} Allo scadere del tempo i sats si sbloccano automaticamente al venditore.</span></div>`:''}
+      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
@@ -9368,7 +9382,7 @@ async function scegliConsegnaOrdine(v){
 }
 async function markConsegnaMano(){
   haptic();
-  if (!confirm(`Confermi di aver consegnato l'oggetto a mano?\n\nDa adesso l'acquirente può confermare la ricezione; se nessuno si fa vivo, i sats si sbloccano d'ufficio dopo ${TEMPI.autoSblocco} giorni.`)) return;
+  if (!confirm(`Confermi di aver consegnato l'oggetto a mano?\n\nDa adesso l'acquirente può confermare la ricezione, e i sats ti arrivano con la sua conferma. Se non si fa vivo gli mandiamo un promemoria, poi interviene un moderatore.`)) return;
   if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere='Ritiro in zona'; toast('🤝 Consegna a mano registrata'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
     method:'POST',
@@ -9404,7 +9418,7 @@ function pannelloContenutoDigitale(o){
       <h4>🔓 Rivela il contenuto</h4>
       <div class="hint">Il venditore ha consegnato il contenuto del tuo acquisto. <b>Rivelarlo fa da ricevuta</b>: un codice, una volta rivelato, non torna indietro. Provalo subito — hai ${TEMPI.confermaDig} ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.</div>
       <div class="hint mono" style="letter-spacing:3px">••••-••••-••••</div>
-      <button class="btn orange" style="margin-top:10px" onclick="rivelaContenuto(this)">🔓 Rivela — mi prendo 24h per provarlo</button>
+      <button class="btn orange" style="margin-top:10px" onclick="rivelaContenuto(this)">🔓 Rivela — mi prendo ${TEMPI.confermaDig}h per provarlo</button>
     </div>`;
   /* venditore (rilettura senza effetti), compratore a rivelazione
      avvenuta su un altro dispositivo, moderatore in disputa */
@@ -9478,13 +9492,13 @@ async function consegnaContenuto(btn){
 
 async function markDelivered(){
   haptic();
-  if (!confirm(`Il pacco è arrivato?\n\nAvrai ${TEMPI.conferma} ore per controllare l'oggetto: se non confermi né apri disputa, allo scadere i sats andranno al venditore.`)) return;
+  if (!confirm(`Il pacco è arrivato?\n\nPrenditi il tempo di controllare l'oggetto: i sats restano nel deposito finché non confermi tu. Se qualcosa non va, apri una disputa.`)) return;
   if (DEMO) { currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000); toast('📬 Consegna registrata'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/consegnato`,
     {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000);
-  toast(`📬 Consegna registrata: ${TEMPI.conferma} ore per controllare`); openOrder(currentOrder.id);
+  toast('📬 Consegna registrata: controlla con calma, i sats ti aspettano'); openOrder(currentOrder.id);
 }
 
 async function sollecita(){
