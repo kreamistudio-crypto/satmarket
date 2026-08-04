@@ -102,6 +102,68 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   concorrenti). Nel client `publish()` passa da `bottoneInAttesa`
   (bottone spento + overlay fino alla risposta): la causa prima era
   il fetch lento (foto base64 + moderazione AI) col dito che ritocca.
+  L'ANNULLO VERO E LE LAPIDI (ago 2026, giro urgente dal campo — tre
+  problemi riprodotti prima di toccare). 1) IL QR DEL PAYSHEET ERA
+  FINTO: un pattern CSS decorativo che non codificava niente
+  (verificato con uno scanner). Ora `mostraQr()` disegna un QR VERO —
+  `lightning:<bolt11>` TUTTO MAIUSCOLO, che entra nella modalità
+  alfanumerica (codice più rado, più facile da inquadrare: il formato
+  dei wallet) — su canvas scuro-su-bianco FISSO nei due temi (il patto
+  dell'etichetta prezzo: un codice si legge col contrasto, non col
+  tema), zona quieta doppia (padding + 4 moduli nel canvas). Libreria
+  `vendor/qrcode.js` (qrcode-generator 1.5.2, MIT) committata a
+  versione bloccata e servita da rotta esplicita, MAI CDN — il patto
+  di nostr.bundle.js: il QR dice al wallet dove mandare i sats.
+  Caricamento pigro alla prima invoice; in DEMO niente QR (la stringa
+  è finta, mai un QR bugiardo); in dispensa PWA (sw.js VERSIONE v3).
+  Vale per ordini, set e puntate: il paySheet è uno.
+  2) L'ANNULLA DEL FOGLIO ANNULLA DAVVERO (`annullaPagamento()`, con
+  la conferma «se hai già pagato, NON annullare»); chiusura, velo,
+  Esc e gesto indietro NON annullano mai — chi inquadra il QR esce
+  verso il wallet e torna. La liturgia server (`annulla_ordine`,
+  gemello `annulla_rilancio`): pagamento controllato PRIMA (la
+  invoice può essere viva nel wallet, a differenza del reaper che
+  agisce a fattura morta), CAS sullo stato, e la riga diventa LAPIDE
+  'annullato' — MAI DELETE: un saldo atterrato nella corsa
+  annulla-vs-saldo deve avere una riga su cui posarsi. Il RIACCIUFFO
+  è `controlla_annullati` nell'orologio: lapide-ordine pagata →
+  torna 'creato' (timbro fresco, il reaper non se la mangia) e passa
+  da `_incassa_ordine` — chi paga ha comprato, la regola di
+  verifica_pagamento (e un avviso ai moderatori); lapide-rilancio
+  pagata → binario del fuori-tempo («Da riscuotere»). La purga vive
+  nel reaper: lapidi-ordine a 1h dall'annullo, lapidi-rilancio con la
+  soglia dei rilanci — sempre DOPO che la fattura non può più essere
+  pagata. `_incassa_ordine` è il ramo pagato di verifica_pagamento
+  ESTRATTO (serve al riacciuffo): CAS 'creato'→'locked', stock,
+  offerte, notifiche — non ricontrolla la invoice, il chiamante l'ha
+  appena fatto. 3) LA RIPRESA DEL PENTITO in compra(): lo stesso
+  compratore che ritenta sullo stesso annuncio NON è un rivale — se
+  ha un ordine 'creato' suo con fattura viva (colonna
+  `ordini.invoice`, nuova; soglia `RIPRESA_INVOICE_S` 720s) e
+  richiesta identica gli si RIPRESENTA la sua (flag `ripresa`, mai
+  ordini gemelli); vecchia o richiesta diversa = lapide e rinnovo;
+  già pagata = si incassa e 409 «l'oggetto è già tuo». Il messaggio
+  d'attesa «qualcun altro sta pagando» resta SOLO per gli altri: è
+  l'anti-doppio-acquisto, giusto così. (Il blocco della scelta
+  consegna in compra() sta ora PRIMA del fail-fast dello stock: la
+  ripresa confronta la scelta.) I set restano fuori dalla ripresa,
+  dichiarato.
+  IL RITIRO SI CONFERMA DA 'LOCKED' (ago 2026, dal campo: il
+  compratore non trovava il bottone). Il server accettava già la
+  conferma da locked — mancava nel CLIENT: ora a locked-ritiro il
+  compratore ha nota 🤝 e «✅ L'ho ritirato — libera i sats», senza
+  aspettare che il venditore segni nulla (rischia solo lui: la
+  semantica del deposito; per la spedizione il bottone resta da
+  shipped, dichiarato). E il ritiro mai concluso non ha NESSUN timer
+  che corre (riprodotto: l'auto-sblocco parte dalle DICHIARAZIONI,
+  e lì nessuno ha dichiarato niente — senza dichiarazioni i sats non
+  si muovono MAI da soli): la cura è `sollecita_ritiri_fermi`
+  nell'orologio — promemoria alle DUE parti (il compratore può
+  confermare, il venditore può segnare la consegna e da lì parte la
+  sua protezione), colonne sue `sollecito_ritiro_il`/
+  `solleciti_ritiro` (NON quelle del sollecito incassi: vivono su
+  'confirmed' e un contatore ereditato salterebbe al tetto), stesse
+  leve SOLLECITO_INCASSO_*, al tetto 🧊 ai moderatori e poi silenzio.
   Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 27
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
   Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
@@ -4142,7 +4204,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`,
+   `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    unica rotta con un nome che arriva dal client, e per questo la sola
    con una whitelist — `SLUG_CATEGORIE`, calcolata dal catalogo),
