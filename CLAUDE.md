@@ -3174,9 +3174,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (N = pezzi totali) coi FRANCOBOLLI degli scelti in striscia
   scorrevole (`.ctrl-mini`, ×N in mono sui multipli); CONSEGNA a
   pillole sull'intersezione di `stradeSet()` — una strada sola = UNA
-  pillola già accesa, l'altra non compare (il campo non mente) — con
-  la stima taglia sotto, solo con la spedizione scelta; IL CONTO in
-  righe (`contoControlla`/`cifraCtrl`, nella valuta del toggle: in
+  pillola già accesa, l'altra non compare (il campo non mente) —
+  SENZA la stima taglia (decisione di Andrea al primo sguardo: resta
+  nell'ordine, dove la scrive il server; `stimaTagliaSet` è il
+  gemello client che aspetta, il vestito appeso di .carton); IL CONTO
+  in righe (`contoControlla`/`cifraCtrl`, nella valuta del toggle: in
   euro sempre ≈, in sats il circa di `setCirca`, lo zero mai col ≈):
   Prezzo, «Commissione Barattolo — 0 sats» con la pillolina «in
   promo» (`.promo-tag`: la riga esiste per DIRE che oggi è gratis, ed
@@ -3184,13 +3186,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   accenderà), Spedizione (il MAX di sempre; col ritiro vale 0 e la
   riga RESTA, non sparisce), Protezione solo se >0, e TOTALE DA
   PAGARE evidenziato (`.ctrl-riga.tot`, numero in --sats-text, unità
-  sempre in `.unit`); la trust-note dell'ordine unico; in fondo
+  sempre in `.unit`); niente trust-note (stessa decisione della
+  taglia: la pagina dice il conto e basta); IN FONDO ALLO SCHERMO
   «Acquista» arancio (→ `startBuySet`, stesso paySheet sopra la
   pagina: la pagina post-acquisto è un cantiere futuro) e i due
   secondari gemelli (basi al 50%): «Chiedi info» → pagina del
   venditore (`ctrlChiediInfo` → apriNegozio), «Fai un'offerta» →
   `view-offertapresto`, il «presto disponibile» in stile astepresto
   (l'offerta sull'intero set è un cantiere futuro, NON costruita).
+  I bottoni stanno in FONDO per costruzione: `.ctrl-corpo` è una
+  colonna flex alta almeno uno schermo (dvh con ripiego vh) e
+  Acquista porta `margin-top:auto` — su schermi corti seguono il
+  contenuto, mai coperti, e il fiato minimo sopra Acquista lo dà il
+  margin-bottom del conto.
   Navigazione: vista interna (spinge) con la chiave del pacco
   (origineId); la ricostruzione esige paccoDati suo E setScelte non
   vuoto, o si ripiega sulla vetrina; `body.senza-nav` nasconde la tab
