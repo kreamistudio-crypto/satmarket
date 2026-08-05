@@ -8972,14 +8972,28 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
     se la invoice risulta pagata, i sats sono in cassaforte -> LOCKED.
     Il lavoro vero sta in _incassa_ordine (estratto ago 2026): da qui
     ci passa il poll della Mini App, da controlla_annullati il saldo
-    arrivato su un ordine annullato nella corsa."""
-    verifica_utente(x_tg_init_data, barattolo_sessione)
+    arrivato su un ordine annullato nella corsa.
+
+    L'ORDINE E' MIO (ago 2026, audit): era l'unica rotta
+    /api/orders/{id}/… che l'utente lo verificava e poi lo buttava
+    via, leggendo l'ordine per solo id — mentre il gemello dei
+    rilanci la guardia ce l'aveva, e il suo commento la nominava pure.
+    Non si rubavano sats (senza la invoice pagata non parte niente),
+    ma gli id sono progressivi: chiamando 1, 2, 3… si leggeva lo
+    STATO di ogni ordine del mercatino, e si poteva innescare in
+    anticipo il flusso di un altro — notifiche al suo venditore, ai
+    moderatori, agli offerenti che decadono, e il «venduto» su Nostr
+    e sul canale. Il 400 e' quello degli altri fratelli, ed e' anche
+    quello che non distingue «non e' tuo» da «stato sbagliato»: chi
+    enumera non impara niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    o = con.execute("SELECT stato, payment_hash FROM ordini WHERE id=?",
-                    (ordine_id,)).fetchone()
+    o = con.execute("SELECT stato, payment_hash FROM ordini "
+                    "WHERE id=? AND compratore_id=?",
+                    (ordine_id, user["id"])).fetchone()
     con.close()
     if not o:
-        raise HTTPException(404, "Ordine non trovato")
+        raise HTTPException(400, "Operazione non permessa")
     if o["stato"] != "creato":
         return {"stato": o["stato"]}
     if not await invoice_pagata(o["payment_hash"]):

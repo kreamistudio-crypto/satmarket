@@ -1426,6 +1426,82 @@ def prove_disputa_incagliata():
           _SORGENTE.count("primo_giro = o[\"stato\"] !="))
 
 
+def prove_idor_verifica():
+    """L'ordine e' MIO (ago 2026, audit). verifica-pagamento era
+    l'unica rotta /api/orders/{id}/… senza guardia di proprieta': gli
+    id sono progressivi, quindi chiamandoli in fila si leggeva lo
+    stato di ogni ordine del mercatino — e si poteva innescare in
+    anticipo il flusso di un altro. Qui si prova che un estraneo non
+    arriva nemmeno a chiedere a LNbits."""
+    print("\n[l'ordine è mio]")
+    import asyncio
+    import sqlite3
+
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                 "compratore_id INT, stato TEXT, payment_hash TEXT)")
+    vero.executemany("INSERT INTO ordini VALUES(?,?,?,?)", [
+        (1, 111, "creato", "hash1"),      # del compratore 111
+        (2, 333, "creato", "hash2"),      # di un altro
+        (3, 333, "shipped", "hash3")])    # di un altro, gia' avanti
+    vero.commit()
+
+    class Con:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def close(self):
+            pass
+
+    chiesto = []      # ogni riga = una domanda a LNbits
+
+    async def _pagata(h):
+        chiesto.append(h)
+        return False
+
+    async def _incassa(oid):
+        return {"stato": "locked"}
+
+    def guarda(ordine_id, chi):
+        # Header/Cookie servono perche' i default della firma si
+        # valutano quando la funzione si definisce, non quando si chiama
+        amb = {"db": Con, "HTTPException": _H, "invoice_pagata": _pagata,
+               "_incassa_ordine": _incassa,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi}}
+        exec("async " + pezzo("verifica_pagamento"), amb)
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb["verifica_pagamento"](ordine_id))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    prova("il compratore vero passa", {"stato": "in_attesa"},
+          guarda(1, 111))
+    prova("un estraneo sull'ordine altrui: 400",
+          "400 Operazione non permessa", guarda(2, 333 + 1))
+    prova("...e non chiede NIENTE a LNbits per conto suo", 1, len(chiesto))
+    # l'oracolo: prima si distingueva «non esiste» da «esiste, ed e'
+    # in questo stato». Ora le due risposte sono la stessa.
+    prova("ordine inesistente e ordine altrui rispondono uguale",
+          True, guarda(999, 111) == guarda(3, 111))
+    prova("il venditore non passa da qui: e' il compratore che paga",
+          "400 Operazione non permessa", guarda(3, 111))
+    vero.close()
+
+    # SENTINELLA: l'utente si legge e si USA. Buttarlo via era
+    # esattamente il difetto, ed e' una riga che si riperde in un
+    # riordino senza rompere nessuna prova funzionale.
+    vp = pezzo("verifica_pagamento")
+    prova("sentinella: l'utente non si butta via", True,
+          "user = verifica_utente(" in vp and "compratore_id=?" in vp)
+
+
 def prove_initdata():
     """La freschezza dell'initData (ago 2026, audit). La firma dice
     CHI, non QUANDO: finche' nessuno guardava `auth_date`, un initData
@@ -1715,7 +1791,8 @@ def main():
               prove_ricategorizza, prove_asta, prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
              prove_initdata, prove_foto, prove_avatar,
-             prove_pagamento_incerto, prove_disputa_incagliata):
+             prove_pagamento_incerto, prove_disputa_incagliata,
+             prove_idor_verifica):
         try:
             f()
         except Exception as e:
