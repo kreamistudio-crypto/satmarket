@@ -27,8 +27,12 @@ jobs:
           python-version: "3.12"
 
       # Solo quelle che servono ALLE PROVE: websocket-client perche'
-      # importa_nostr la importa in cima, e Pillow perche' il controllo
-      # del pareggio delle illustrazioni la vuole.
+      # importa_nostr la importa in cima, Pillow per il controllo del
+      # pareggio delle illustrazioni, e cryptography per la cifratura
+      # dei contenuti digitali (ago 2026 — e a dirlo e' stato
+      # PROVE_SEVERE: la prova nuova si e' saltata da sola e il job e'
+      # diventato rosso invece di passare con una prova in meno. E' il
+      # meccanismo del giro prima che prende il giro dopo).
       #
       # Pillow qui non c'e' mai stata, e questo commento diceva a
       # chiare lettere che era voluto: il risultato e' che quella prova
@@ -38,7 +42,7 @@ jobs:
       # per davvero: i pezzi che le usano sono fail-open per
       # costruzione e qui non si esercitano.
       - name: Installa il minimo indispensabile
-        run: pip install --quiet websocket-client pillow
+        run: pip install --quiet websocket-client pillow cryptography
 
       # Primo scalino: tutto compila. Banale e imbattibile — becca il
       # refuso prima che arrivi sul VPS, che e' esattamente il modo
