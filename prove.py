@@ -2210,6 +2210,251 @@ def prove_forma_tracking():
           2, src.count("${AVVISO_INTERMEDIARIO}"))
 
 
+# ====================================================================
+def prove_conto_acquisto():
+    """Le pure del conto (ago 2026, pagina d'acquisto): compra(),
+    _compra_set() e il preventivo dicono la stessa cifra perche'
+    passano TUTTI da queste quattro funzioni. Qui si torturano da
+    sole, senza server: e' il giudice unico che si prova, non i
+    chiamanti."""
+    print("\n[il conto d'acquisto]")
+    amb = {}
+    for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
+              "_tariffa_dichiarata", "_sped_in_sats", "_conto_ordine"):
+        exec(pezzo(f), amb)
+
+    def a(**kw):
+        base = {"prezzo_sats": 100_000, "prezzo_eur": 0.0,
+                "valuta": "sats", "lampo_percento": 0, "lampo_scadenza": 0,
+                "spedizione_sats": 500, "spedizione_eur": 0.0,
+                "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0,
+                "spedizione_punto_dichiarata": 0}
+        base.update(kw)
+        return base
+
+    unit = amb["_unitario_effettivo"]
+    tarif = amb["_tariffa_dichiarata"]
+    sped = amb["_sped_in_sats"]
+    conto = amb["_conto_ordine"]
+
+    # --- l'unitario: listino, EUR, lampo e accordo col MIN ----------
+    prova("listino sats: l'unitario e' il listino", 100_000,
+          unit(a(), None, 1000, 0.0))
+    prova("listino EUR al cambio: round(eur/cambio*1e8)", 50_000,
+          unit(a(valuta="eur", prezzo_eur=50.0), None, 1000, 100_000.0))
+    prova("EUR minuscolo: mai sotto 1 sat", 1,
+          unit(a(valuta="eur", prezzo_eur=0.0000004), None, 1000, 100_000.0))
+    off = {"contro_sats": 0, "contro_eur": 0.0,
+           "importo_sats": 90_000, "importo_eur": 0.0}
+    prova("accordo accettato: vale la cifra pattuita", 90_000,
+          unit(a(), off, 1000, 0.0))
+    prova("lampo viva vs accordo: vince il MINIMO", 80_000,
+          unit(a(lampo_percento=20, lampo_scadenza=2000), off, 1000, 0.0))
+    prova("lampo scaduta: torna l'accordo", 90_000,
+          unit(a(lampo_percento=20, lampo_scadenza=500), off, 1000, 0.0))
+
+    # --- la tariffa della via: il CUORE della retrocompat -----------
+    prova("via casa: la tariffa di sempre", (500, 0.0),
+          tarif(a(), "casa"))
+    prova("via punto NON dichiarata: vale la tariffa casa", (500, 0.0),
+          tarif(a(), "punto"))
+    prova("via punto dichiarata: la sua tariffa", (300, 0.0),
+          tarif(a(spedizione_punto_sats=300,
+                  spedizione_punto_dichiarata=1), "punto"))
+    # gratis dichiarato ≠ non dichiarato: (0,0) col flag acceso E'
+    # gratis, senza flag sarebbe il fallback a 500
+    prova("punto dichiarato a 0: GRATIS, non il fallback", (0, 0.0),
+          tarif(a(spedizione_punto_dichiarata=1), "punto"))
+    prova("punto ancorato all'euro: esce l'euro", (0, 4.5),
+          tarif(a(spedizione_punto_eur=4.5,
+                  spedizione_punto_dichiarata=1), "punto"))
+
+    # --- la tariffa in sats: l'ancora e il cambio assente -----------
+    prova("sats fissi: passano come sono", 500, sped(500, 0.0, 0.0))
+    prova("euro ancorato al cambio: round(eur/cambio*1e8)", 4_500,
+          sped(0, 4.5, 100_000.0))
+    prova("euro ancorato SENZA cambio: None, decide il chiamante",
+          None, sped(0, 4.5, 0.0))
+
+    # --- le righe del conto -----------------------------------------
+    prova("protezione col floor sul solo articolo", 0,
+          conto(33, 500, 3, 0)["protezione"])
+    prova("totale = articolo + spedizione + protezione", 100_500,
+          conto(100_000, 500, 0, 0)["totale"])
+    c = conto(100_000, 500, 5, 10)
+    prova("protezione 5%: floor(5000)", 5_000, c["protezione"])
+    prova("la commissione e' informativa: MAI nel totale",
+          105_500, c["totale"])
+    prova("...ma la riga la dice (10%)", 10_000, c["commissione"])
+
+    # --- il MAX del set, per via ------------------------------------
+    aa = [a(spedizione_sats=400),
+          a(spedizione_sats=700, spedizione_punto_sats=200,
+            spedizione_punto_dichiarata=1)]
+    prova("set via casa: il MAX dei costi casa", 700,
+          max(sped(*tarif(x, "casa"), 0.0) for x in aa))
+    # il secondo annuncio al punto costa 200, il primo NON dichiara e
+    # ripiega sulla sua casa (400): il MAX della via punto e' 400
+    prova("set via punto: il MAX segue la via (col fallback)", 400,
+          max(sped(*tarif(x, "punto"), 0.0) for x in aa))
+
+
+# ====================================================================
+def prove_consegna_payload_punto():
+    """Il giudice unico dei campi di consegna, sul ramo nuovo: la
+    dichiarazione della tariffa punto e' la PRESENZA di una chiave,
+    mai il suo valore — vuoto ≠ zero."""
+    print("\n[consegna_da_payload: la tariffa punto]")
+    import asyncio
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    amb = {"MODALITA_CONSEGNA": ("spedizione", "ritiro", "entrambe",
+                                 "digitale"),
+           "TAGLIE_PACCO": ("busta", "piccolo", "medio", "grande",
+                            "ingombrante")}
+
+    async def _cambio():
+        return 100_000.0
+    amb["cambio_btc_eur"] = _cambio
+    exec("async " + pezzo("consegna_da_payload"), amb)
+
+    def giudica(d, valuta="sats"):
+        (_, _, _, p_sats, p_eur, p_dich, _, _) = \
+            gira(amb["consegna_da_payload"](d, valuta))
+        return p_sats, p_eur, p_dich
+
+    prova("chiavi assenti: NON dichiarata (i client di ieri)",
+          (0, 0.0, 0), giudica({"consegna": "spedizione"}))
+    prova("valore pieno: dichiarata", (300, 0.0, 1),
+          giudica({"consegna": "spedizione",
+                   "spedizione_punto_sats": "300"}))
+    prova("zero ESPLICITO: dichiarata gratis (vuoto ≠ zero)",
+          (0, 0.0, 1),
+          giudica({"consegna": "spedizione",
+                   "spedizione_punto_sats": 0}))
+    prova("stringa vuota: come assente", (0, 0.0, 0),
+          giudica({"consegna": "spedizione",
+                   "spedizione_punto_sats": ""}))
+    prova("il flag esplicito del form (campo svuotato) NON dichiara",
+          (0, 0.0, 0),
+          giudica({"consegna": "spedizione",
+                   "spedizione_punto_dichiarata": 0}))
+    prova("il flag esplicito acceso dichiara", (0, 0.0, 1),
+          giudica({"consegna": "spedizione",
+                   "spedizione_punto_dichiarata": 1}))
+    prova("col ritiro il punto si azzera, chiavi o no", (0, 0.0, 0),
+          giudica({"consegna": "ritiro",
+                   "spedizione_punto_sats": "300"}))
+    prova("listino EUR: euro + equivalente al cambio", (4_500, 4.5, 1),
+          giudica({"consegna": "spedizione",
+                   "spedizione_punto_eur": "4.5"}, "eur"))
+    prova("listino sats, punto in euro: resta ANCORATO", (0, 4.5, 1),
+          giudica({"consegna": "spedizione",
+                   "spedizione_punto_eur": "4.5"}))
+    # la simmetria con la tariffa casa: stesso aiutante, stessi numeri
+    def entrambe(d, valuta="sats"):
+        (_, s_sats, s_eur, p_sats, p_eur, _, _, _) = \
+            gira(amb["consegna_da_payload"](d, valuta))
+        return (s_sats, s_eur) == (p_sats, p_eur)
+    prova("stessa cifra nei due campi = stessa lettura", True,
+          entrambe({"consegna": "spedizione", "spedizione_sats": "250",
+                    "spedizione_punto_sats": "250"}))
+
+
+# ====================================================================
+def prove_pagina_acquisto():
+    """Le sentinelle di FORMA del cantiere: righe che un riordino
+    farebbe sparire senza rompere nessuna prova funzionale."""
+    print("\n[pagina d'acquisto: le sentinelle]")
+    src = _SORGENTE
+
+    # 1. Il preventivo non crea NULLA: niente INSERT, niente invoice.
+    #    (la docstring si toglie, o le sue parole farebbero scattare
+    #    le sentinelle da sole — il trucco di prove_tracking_corretto)
+    for nome in ("preventivo_ordine", "_preventivo_set",
+                 "_strade_preventivo"):
+        corpo = pezzo(nome).split('"""')[-1]
+        prova(f"{nome}: nessun INSERT", False, "INSERT" in corpo)
+        prova(f"{nome}: nessuna invoice coniata", False,
+              "crea_invoice" in corpo)
+        prova(f"{nome}: nessun UPDATE", False, "UPDATE" in corpo)
+
+    # 2. Il patto del ricontrollo, ora difeso in CI: tra la invoice e
+    #    l'INSERT dell'ordine NESSUN await, nei due compratori.
+    inizio = 0
+    for chi in ("_compra_set", "compra"):
+        i = src.index("crea_invoice_escrow(", src.index(f"def {chi}("))
+        j = src.index("INSERT INTO ordini", i)
+        prova(f"{chi}: zero await tra invoice e INSERT", False,
+              "await " in src[i:j])
+
+    # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
+    #    imperfezione dichiarata): ne' il costo ne' il testo.
+    for nome in ("tag_commercio", "evento_annuncio"):
+        corpo = pezzo(nome)
+        prova(f"{nome}: cieco alla tariffa punto", False,
+              "spedizione_punto" in corpo)
+        prova(f"{nome}: cieco al punto dell'ordine", False,
+              "punto_ritiro" in corpo)
+
+    # 4. spedizione_via passa da una whitelist esplicita, nei due rami
+    corpo_compra = src[src.index("async def compra("):
+                       src.index("def crea_ordine_pagato(")]
+    prova("compra: whitelist ('casa', 'punto')", True,
+          '("casa", "punto")' in corpo_compra)
+    corpo_set = src[src.index("async def _compra_set("):
+                    src.index("RIPRESA_INVOICE_S")]
+    prova("_compra_set: whitelist ('casa', 'punto')", True,
+          '("casa", "punto")' in corpo_set)
+
+    # 5. L'asta resta fuori perimetro: il varco del vincitore non sa
+    #    niente di punti di ritiro
+    corpo = pezzo("scegli_consegna_ordine").split('"""')[-1]
+    prova("scegli_consegna_ordine: niente punto", False,
+          "punto" in corpo)
+
+    # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
+    #    Nostr non le porta: le azzererebbe a ogni sync). L'unico
+    #    UPDATE che le scrive e' quello di modifica().
+    prova("spedizione_punto_sats=? vive in UN solo UPDATE", 1,
+          src.count("spedizione_punto_sats=?"))
+
+    # 7. Il modello CSV: la colonna nuova sta IN CODA (i file di ieri
+    #    passano intonsi, le colonne si leggono per nome)
+    i = src.index("MODELLO_IMPORT = (")
+    intest = src[i:src.index("\\n", i)]
+    prova("il modello CSV chiude con spedizione_punto", True,
+          intest.rstrip().endswith("spedizione_punto"))
+
+    # --- il client ---------------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il foglio del varco non esiste piu'", False,
+          "function apriFoglioConsegna" in mini)
+    prova("...e nemmeno la sua scelta", False,
+          "function scegliConsegnaFoglio" in mini)
+    prova("consegnaEsplicita non si scrive piu'", False,
+          "consegnaEsplicita =" in mini)
+    # l'ordine nasce solo dai varchi noti: startBuy, startBuySet e
+    # confermaCompraSubito — piu' i due lettori del preventivo
+    prova("tre POST /orders (i varchi di sempre)", 3,
+          mini.count("fetch(`${API_BASE}/orders`"))
+    prova("due lettori del preventivo (pagina e pacco)", 2,
+          mini.count("fetch(`${API_BASE}/orders/preventivo`"))
+    prova("la vista nuova esiste", True, 'id="view-acquisto"' in mini)
+    prova("il varco-mappa e' dichiarato dove andra' la mappa", True,
+          "VARCO MAPPA" in mini)
+    prova("il punto passa da esc() alla resa", True,
+          "esc(o.puntoRitiro)" in mini)
+    # (CORRIERI del tracking resta legittimamente nel client: qui si
+    # guarda che il catalogo SPEDIZIONIERI arrivi dal server)
+    prova("il catalogo spedizionieri arriva da /api/me", True,
+          "me.spedizionieri" in mini)
+    prova("...e il client non lo riempie mai da solo", 1,
+          mini.count("spedizionieriCatalogo = ["))
+
+
 def _codice_rifiuto(funzione, init, errore):
     """Il codice HTTP del rifiuto (401), non il suo testo."""
     try:
@@ -2458,7 +2703,8 @@ def main():
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_forma_tracking, prove_conta_feedback,
-              prove_xp, prove_coorti_titoli):
+              prove_xp, prove_coorti_titoli, prove_conto_acquisto,
+              prove_consegna_payload_punto, prove_pagina_acquisto):
         try:
             f()
         except Exception as e:
