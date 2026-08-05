@@ -2812,17 +2812,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   FISSO (il prezzo sul CARTELLINO, che è di carta chiara nei due temi:
   6,48 su #FFF8EA — gemello esatto di `--asta-tag`, per la stessa
   ragione); `--lampo-text` INCHIOSTRO e quindi seguito dal tema
-  (#A6301F / #FF8A6B: il numero grande del dettaglio, la riga
-  «rimangono …» e la CORNICE della card — misurati 6,24 su crema,
-  7,46 su bruno; la cornice fa 6,85 sul bianco della card e 6,57 sul
-  bruno). ATTENZIONE all'asimmetria con l'asta, che la cornice la fa
-  col suo `--asta`: quello è un token che si schiarisce di sera, il
-  rosso della lampo no — qui l'inchiostro è la scelta giusta, e il
-  segno resta rosso in tutti e due i temi. Si abbassa la luce, non si
+  (#A6301F / #FF8A6B: il numero grande del dettaglio, la riga «Scade
+  tra …» e la CORNICE della card — misurati 6,24 su crema, 7,46 su
+  bruno; la cornice fa 6,85 sul bianco della card e 6,57 sul bruno).
+  ATTENZIONE all'asimmetria con l'asta, che la cornice la fa col suo
+  `--asta`: quello è un token che si schiarisce di sera, il rosso
+  della lampo no — qui l'inchiostro è la scelta giusta, e il segno
+  resta rosso in tutti e due i temi. Si abbassa la luce, non si
   cambia il segno. In card la regola è `.card.in-lampo .tag-price
-  .price` (unità compresa: mezzo numero per famiglia sarebbe la
-  trappola già pagata col € dell'asta), nel dettaglio la classe
-  `.detail-price.lampo` che `openDetail` mette accanto ad `.asta`.
+  .price`, nel dettaglio la classe `.detail-price.lampo` che
+  `openDetail` mette accanto ad `.asta` — e nessuna delle due nomina
+  `.unit`, vedi la regola qui sotto.
+  L'UNITÀ DI MISURA NON SI COLORA MAI (ago 2026, decisione di Andrea,
+  e SOSTITUISCE la regola opposta che stava scritta qui per l'asta).
+  A prendere il colore del suo stato è il NUMERO; il simbolo € e la
+  parola «sats» restano nel colore del testo — in vetrina e nel
+  dettaglio, e per TUTTI gli stati: normale, lampo, asta. Prima il €
+  era arancio perfino nello stato normale, e la correzione dell'asta
+  l'aveva portato sul token INSIEME alla cifra per non avere «mezzo
+  numero per famiglia»: l'argomento era vero ma guardava la simmetria
+  sbagliata — quella che conta non è fra il numero e la sua unità, è
+  fra le unità di tutti gli stati, che ora si somigliano tutte.
+  IL CUORE È IL SELETTORE NUDO `.unit{color:var(--muted)}`, e sta lì
+  apposta: così vale anche dove l'unità nasce DENTRO un elemento già
+  colorato (le cifre in grassetto dei pannelli, delle offerte e della
+  conferma NWC, che senza quella riga ereditavano l'arancio — erano il
+  residuo che l'audit del punto 4 ha trovato). Unica deroga: il
+  cartellino di carta, `.tag-price .price .unit`, col suo grigio fisso
+  #8A8271 — la carta non cambia di notte. `.detail-price .unit` e
+  `.price .unit` tengono solo la MISURA, non il colore.
+  REGOLA PER CHI SCRIVE: chi mette un numero con la sua unità la
+  avvolge in uno `<span class="unit">` e non ci pensa più; e nessuna
+  regola di stato deve mai nominare `.unit` — se ne aggiungi una,
+  falla finire sul solo `.price`. Verificato su 12 combinazioni
+  (3 stati × 2 valute × 2 temi) in vetrina e nel dettaglio.
   L'ASTA PARLA PETROLIO (ago 2026, ritocchi di Andrea: prima blu, poi
   verde-blu scuro tenuto sul lato BLU della famiglia — tinta ~195°,
   col verde della protezione a ~151°: si toccano nel punto più
@@ -2835,10 +2858,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `--asta-tag` #0B5570 FISSO (vive sul cartellino di carta, che non
   cambia di notte: 7,80) — l'arancio è di Acquista, il rosso della
   lampo, il verde della protezione, il viola di Nostr. Anche il NUMERO
-  GRANDE del dettaglio di un'asta parla il token (`.detail-price.asta`,
-  simbolo di valuta compreso: la regola `.unit` lo lascerebbe arancio,
-  mezzo numero per famiglia): l'identità non si spezza sulla soglia
-  card→dettaglio, l'arancio resta dei prezzi veri. ATTENZIONE
+  GRANDE del dettaglio di un'asta parla il token (`.detail-price.asta`)
+  — l'identità non si spezza sulla soglia card→dettaglio, l'arancio
+  resta dei prezzi veri. Il SIMBOLO DI VALUTA no, e dall'ago 2026 è la
+  regola generale: vedi «l'unità di misura non si colora mai», qui
+  sopra, che rovescia quel che stava scritto in questo punto. ATTENZIONE
   alla trappola pagata qui: la riga d'asta del dettaglio NON deve
   prendere in prestito classi della lampo (`.lampo-resta` vinceva a
   pari specificità e la tingeva d'arancio). UN token per tutto: bottoni
@@ -2866,7 +2890,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ogni caso e a leva spenta porta al COMING SOON (`view-astepresto`,
   markup fisso e nessun dato utente dentro — mai un esc() da
   ricordare; riusa lo stato vuoto di casa, `.empty` con la mascotte
-  che fluttua, quindi zero token nuovi e chiaro/scuro gratis): le aste
+  che fluttua, quindi zero token nuovi e chiaro/scuro gratis; il testo
+  è DUE RIGHE — il primo elencava base, durata e deposito e suonava
+  tradotto: qui basta dire che arrivano e qual è il bello, cioè che
+  chi vince ha già pagato — e il bottone porta la LENTE della nav, la
+  stessa icona di Esplora, che l'emoji 🛍️ cambiava forma da un
+  telefono all'altro): le aste
   si annunciano prima di esistere, invece di apparire un giorno dal
   nulla. È una RADICE SORELLA — sta in `RADICI`, si sostituisce come
   le altre e l'indietro passa da Esplora — e `voceNav` la mappa su
@@ -3966,8 +3995,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   E I DUE PONTI SONO BOTTONI, NON LINK (stessa decisione): nel negozio
   erano testo sottolineato («btn link») mentre gli stessi due dentro
   l'ordine erano già ghost — la stessa azione con due vestiti secondo
-  la pagina. Ora il default di `pontiContatto` è uno solo, il ghost di
-  casa; il parametro `cls` resta, ma nessuno lo passa più diverso.
+  la pagina. Ora il vestito è uno solo, e `pontiOrdine` non passa più
+  una classe sua.
+  E PORTANO IL COLORE DEL LORO MONDO (ago 2026, decisione di Andrea):
+  azzurro Telegram e viola Nostr, `.btn.ponte.tg` / `.ponte.nostr` —
+  la classe la compone `pontiContatto`, perché a dire di che mondo si
+  parla è il ponte, non la pagina. Stessa FORMA di ogni altro bottone
+  (rettangolo, ombra piena, stesso peso): cambia solo il colore, che
+  qui dice DOVE porta. Sono gli unici bottoni pieni che NON sono
+  un'azione dentro Barattolo, e per questo non parlano arancio, che
+  resta dell'acquisto. Token `--tg-btn` #1878B8 e `--nostr-btn`
+  #7C3AED, FISSI nei due temi come tutti i colori che SIGNIFICANO
+  qualcosa (il patto di `--ship-soft`: un marchio non cambia tinta di
+  notte). ATTENZIONE, ed è il motivo per cui non si riusa `var(--nostr)`
+  così com'è: quel token è TEMATICO (#8B5CF6 / #A78BFA) perché veste
+  pallini e accenti SUL fondo della pagina — su un bottone PIENO col
+  testo bianco, di sera scenderebbe a 2,72, cioè illeggibile.
+  `--nostr-btn` è lo stesso viola di casa (è esattamente
+  `--nostr-text` del tema chiaro) ma PINNATO. Misurati, bianco sopra:
+  Telegram 4,75 e Nostr 5,70 — AA pieno in entrambi i temi, e sopra la
+  linea del nostro stesso CTA arancio (2,30), che resta lo standard di
+  casa. Col colore è venuto fuori un difetto che il ghost bianco
+  nascondeva: `#negozioHeader` non aveva MARGINI su mobile (li metteva
+  solo la media query da 768 in su) e i due blocchi pieni arrivavano a
+  filo schermo — ora il rientro c'è, ed è lo stesso `--pad` del resto.
   Da ≥768px la barra non esiste proprio:
   la nav è una topbar e il dettaglio a due colonne ha già i bottoni
   sotto mano. I fogli (41) e il velo (40) le passano sopra senza che
