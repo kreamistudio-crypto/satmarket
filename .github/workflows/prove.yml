@@ -86,8 +86,31 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    env:
+      # Le forme dei segreti, scritte UNA volta: le guardano sia i file
+      # di oggi sia la cronologia, e due elenchi che divergono sarebbero
+      # peggio di uno solo.
+      #
+      # Le tre di sempre (nsec, token del bot, chiave Anthropic) hanno
+      # una forma loro. Le altre no — la invoice key di LNbits e' 32
+      # esadecimali, che da soli somigliano a mezzo mondo — quindi si
+      # ancorano al NOME della variabile, cioe' al nome seguito da un
+      # uguale e da una stringa non vuota. (L'esempio non si scrive per
+      # esteso qui dentro: la regola lo prenderebbe, e questo file lo
+      # legge anche lei.)
+      # E' anche una regola che si estende da sola, perche' vale per
+      # qualunque segreto futuro che rispetti la convenzione dei
+      # segnaposto INCOLLA_QUI di config_esempio.py.
+      FORME: >-
+        nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Serve la cronologia INTERA (di serie il checkout e' shallow
+          # e nel runner non c'e' proprio). Un segreto committato e poi
+          # tolto passava il controllo per sempre, pur restando dentro
+          # `git log -p` — cioe' pur restando estraibile da chiunque.
+          fetch-depth: 0
 
       # Se un segreto entra nella repo il danno e' fatto nel momento in
       # cui si pusha, quindi meglio urlare subito.
@@ -116,4 +139,45 @@ jobs:
             echo "::error::Sembra esserci una chiave Anthropic"
             exit 1
           fi
+          # Le chiavi LNbits (una delle quali PAGA), il segreto del
+          # webhook e la chiave dei contenuti digitali: fino a ieri
+          # nessuna delle quattro regole le guardava. Il grep -v toglie
+          # i segnaposto del config d'esempio, che sono l'unica cosa che
+          # deve combaciare qui dentro.
+          if git ls-files -z | xargs -0 grep -nIE "$FORME" \
+               | grep -v INCOLLA_QUI ; then
+            echo "::error::Sembra esserci una chiave vera in un file"
+            exit 1
+          fi
+          # La chiave Nostr in esadecimale nudo (64 caratteri). Fuori
+          # vendor/, dove nostr.bundle.js ne contiene per mestiere ed e'
+          # l'unico file del repo che lo fa.
+          if git ls-files -z -- . ':!vendor/' \
+               | xargs -0 grep -lIE '\b[0-9a-f]{64}\b' ; then
+            echo "::error::Sembra esserci una chiave privata in esadecimale"
+            exit 1
+          fi
           echo "pulito"
+
+      # E la stessa domanda fatta a TUTTA la cronologia, che e' la
+      # differenza fra «oggi non c'e'» e «non c'e' mai stato»: un
+      # segreto committato e poi rimosso resta estraibile da git per
+      # sempre, e va ruotato — saperlo il giorno stesso vale il paio di
+      # secondi che costa (misurato su questo repo: ~2s per 516
+      # commit). Si guardano le righe AGGIUNTE: cio' che e' esistito
+      # e' stato aggiunto una volta.
+      #
+      # IMPERFEZIONE DICHIARATA: `git log -p` non mostra i diff dei
+      # commit di MERGE, quindi un segreto introdotto risolvendo un
+      # conflitto sfuggirebbe. Il `-m` lo coprirebbe al prezzo di una
+      # passata molto piu' rumorosa; si e' scelto di lasciarlo fuori e
+      # di scriverlo qui invece di far finta che la copertura sia
+      # completa.
+      - name: E nemmeno nella cronologia
+        run: |
+          if git log --all -p --no-color | grep -a '^+' \
+               | grep -aE "$FORME" | grep -av INCOLLA_QUI ; then
+            echo "::error::Un segreto e' passato dalla repo in passato: va RUOTATO"
+            exit 1
+          fi
+          echo "cronologia pulita"
