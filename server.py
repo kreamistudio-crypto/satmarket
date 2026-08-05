@@ -1416,7 +1416,14 @@ def init_db():
                     # (avvisa_spedizioniere_mancante): UNA volta per
                     # venditore, mai un giro dopo — e' una colonna e
                     # non memoria, deve sopravvivere ai riavvii
-                    "avvisato_spedizioniere INTEGER DEFAULT 0"):
+                    "avvisato_spedizioniere INTEGER DEFAULT 0",
+                    # il timbro del venditore irraggiungibile (ago
+                    # 2026): chi pubblica senza username ne' npub
+                    # dimostrata riceve UN avviso dal bot, alla prima
+                    # pubblicazione e mai piu' (avvisa_contatto_
+                    # mancante) — colonna e non memoria, il patto del
+                    # gemello qui sopra
+                    "avvisato_contatto INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -5950,6 +5957,13 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # spazzatura — e la regola del tariffario dice il contrario.
     await premia_xp(user["id"], "annuncio", AZIONI_XP["annuncio"],
                     f"giorno:{oggi_locale()}")
+    # Il venditore irraggiungibile lo viene a sapere SUBITO, una volta
+    # sola (timbro): la riga del form gliel'ha appena detto, questo e'
+    # il richiamo in chat. Solo sul ramo attivo — il testo dice «in
+    # vetrina», e sul nato in revisione mentirebbe (imperfezione
+    # dichiarata: chi debutta in revisione ricevera' l'avviso alla
+    # prima pubblicazione diretta).
+    await avvisa_contatto_mancante(user["id"])
     risposta = {"ok": True, "id": annuncio_id}
     if asta_secondi:
         risposta["asta_scadenza"] = adesso + asta_secondi
@@ -16852,6 +16866,46 @@ def scadenze_lampo():
                 (int(time.time()),))
     con.commit()
     con.close()
+
+
+async def avvisa_contatto_mancante(tg_id: int):
+    """L'avviso UNA-TANTUM del venditore irraggiungibile (ago 2026,
+    figlio dello stesso caso dello strumento «Scrivi a un utente»):
+    chi pubblica senza username Telegram ne' npub dal possesso
+    dimostrato — la regola di nonContattabile nel client, che e'
+    quella dei ponti di contatto — riceve dal bot il perche' e il
+    rimedio, SUBITO alla pubblicazione: e' il momento in cui il
+    problema nasce, e la riga del form gliel'ha appena detto.
+    Il timbro `avvisato_contatto` si scrive PRIMA dell'invio (il
+    patto della campagna spedizioniere: un errore di rete puo' al
+    massimo far perdere un avviso di cortesia, mai raddoppiarlo) e
+    vale per sempre: due pubblicazioni = un messaggio solo. Chi poi
+    aggiunge lo username o verifica la npub non entra proprio nel
+    ramo. I nativi Nostr non ci entrano mai (npub_accesso per
+    costruzione). Fail-open totale: un avviso di cortesia non deve
+    mai toccare una pubblicazione."""
+    try:
+        con = db()
+        u = con.execute(
+            "SELECT username, npub, npub_verificata, npub_accesso, "
+            "avvisato_contatto FROM utenti WHERE tg_id=?",
+            (tg_id,)).fetchone()
+        if (not u or u["avvisato_contatto"] or u["username"]
+                or u["npub_accesso"]
+                or (u["npub"] and u["npub_verificata"])):
+            con.close()
+            return
+        con.execute("UPDATE utenti SET avvisato_contatto=1 "
+                    "WHERE tg_id=?", (tg_id,))
+        con.commit()
+        con.close()
+        await notifica(tg_id, (
+            "🔕 <b>Il tuo annuncio è in vetrina, ma nessuno può "
+            "scriverti:</b> il tuo account Telegram non ha uno "
+            "username pubblico. Aggiungine uno dalle impostazioni di "
+            "Telegram e i compratori potranno raggiungerti."))
+    except Exception as e:
+        print(f"⚠️ Avviso contatto mancante saltato per {tg_id}: {e}")
 
 
 async def avvisa_spedizioniere_mancante():

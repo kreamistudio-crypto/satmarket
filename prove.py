@@ -2302,6 +2302,88 @@ def prove_messaggio_admin():
           "myNpubAccesso || (myNpub && myNpubVerified)" in blocco)
 
 
+def prove_avviso_contatto():
+    """L'avviso una-tantum del venditore irraggiungibile (ago 2026):
+    chi pubblica senza username Telegram ne' npub dal possesso
+    dimostrato riceve UN messaggio dal bot, alla prima pubblicazione
+    e mai piu'. La prova regina e' il timbro: due pubblicazioni = un
+    messaggio solo."""
+    print("\n[l'avviso del venditore irraggiungibile]")
+    import asyncio
+    import sqlite3
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    def mondo(username="", npub="", verificata=0, accesso=""):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute("CREATE TABLE utenti(tg_id INT, username TEXT, "
+                     "npub TEXT, npub_verificata INT, "
+                     "npub_accesso TEXT, avvisato_contatto INT)")
+        vero.execute("INSERT INTO utenti VALUES(?,?,?,?,?,0)",
+                     (111, username, npub, verificata, accesso))
+        vero.commit()
+
+        class Con:
+            """close() non chiude davvero: il :memory: deve
+            sopravvivere fra una chiamata e l'altra."""
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        mandati = []
+
+        async def _notifica(tg, testo):
+            mandati.append((tg, testo))
+
+        amb = {"db": Con, "notifica": _notifica,
+               "print": lambda *a, **k: None}
+        exec("async " + pezzo("avvisa_contatto_mancante"), amb)
+        return amb["avvisa_contatto_mancante"], vero, mandati
+
+    # --- la prova del timbro --------------------------------------
+    f, vero, mandati = mondo()
+    gira(f(111))
+    gira(f(111))
+    prova("due pubblicazioni = un messaggio solo", 1, len(mandati))
+    prova("il timbro resta scritto", 1, vero.execute(
+        "SELECT avvisato_contatto FROM utenti").fetchone()[0])
+    prova("il messaggio dice il rimedio", True,
+          "username" in mandati[0][1])
+
+    # --- chi e' raggiungibile non riceve niente -------------------
+    for nome, m in (("con username", mondo(username="pia")),
+                    ("con npub verificata",
+                     mondo(npub="npub1x", verificata=1)),
+                    ("nativo Nostr (npub d'accesso)",
+                     mondo(accesso="npub1x"))):
+        f, _, mandati = m
+        gira(f(111))
+        prova(f"{nome}: nessun avviso", 0, len(mandati))
+    # ...e la npub NUDA (dichiarata, mai verificata) non basta: e'
+    # la regola dei ponti — una dichiarazione non e' una porta
+    f, _, mandati = mondo(npub="npub1x", verificata=0)
+    gira(f(111))
+    prova("npub nuda: l'avviso parte comunque", 1, len(mandati))
+
+    # --- la forma: il patto del gemello spedizioniere -------------
+    am = pezzo("avvisa_contatto_mancante")
+    prova("il timbro si scrive PRIMA dell'invio", True,
+          am.index("avvisato_contatto=1") < am.index("await notifica("))
+    pb = pezzo("pubblica")
+    prova("pubblica chiama l'avviso", True,
+          "avvisa_contatto_mancante(" in pb)
+    prova("...solo sul ramo attivo (dopo il return della revisione)",
+          True, pb.index('"revisione": True')
+          < pb.index("avvisa_contatto_mancante("))
+
+
 def prove_barattolo():
     """Il tetto del barattolo (ago 2026: da 20 a 10) e il conteggio
     pubblico dei salvataggi."""
@@ -3059,7 +3141,7 @@ def main():
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
-              prove_messaggio_admin,
+              prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_conta_feedback,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_consegna_payload_punto, prove_pagina_acquisto):
