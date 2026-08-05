@@ -285,6 +285,22 @@ try:
 except ImportError:
     AVVISI_ORDINI_ADMIN = True     # interruttore: False = silenzio
 
+# Quanto vale un initData di Telegram (ago 2026, audit): e' la
+# credenziale di OGNI chiamata dentro la Mini App e viaggia
+# nell'header a ogni fetch — senza una scadenza, uno catturato oggi
+# apre l'account fra un anno. Ventiquattro ore e non i cinque minuti
+# del Login Widget, e la differenza e' strutturale: il widget firma
+# UNA volta e poi vive di cookie, l'initData invece NON si rinfresca
+# finche' la WebView resta aperta (solo riaprire la Mini App ne conia
+# uno nuovo). Con una finestra corta chi tiene Barattolo minimizzato
+# verrebbe buttato fuori di continuo, e un pagamento a meta' si
+# spezzerebbe. ATTENZIONE: 0 = spenta, cioe' si riapre esattamente
+# questo buco — esiste come freno d'emergenza, non come scelta.
+try:
+    from config import ORE_INITDATA
+except ImportError:
+    ORE_INITDATA = 24
+
 # La consegna digitale (lug 2026): buoni regalo, codici, licenze. Il
 # codice passa DENTRO Barattolo (campo dedicato dell'ordine, rivelato
 # dal compratore con un tocco che fa da ricevuta di lettura) e le
@@ -1449,6 +1465,13 @@ def verifica_login_widget(dati: dict) -> dict:
         raise HTTPException(401, "Login Telegram non valido")
 
 
+# Il 401 della SCADENZA e' distinto da quello della firma storta, e
+# non e' pignoleria: e' cio' che permette alla Mini App di dire la
+# verita' («riaprimi») invece di degradare in silenzio a vetrina
+# anonima, dove ogni tocco offrirebbe di entrare a chi e' gia' dentro.
+MSG_INITDATA_SCADUTO = "Sessione scaduta: chiudi e riapri Barattolo"
+
+
 def verifica_utente(init_data: str, sessione: str = "") -> dict:
     # --- browser col cookie di sessione (login web): niente initData.
     #     Il fallback scatta SOLO a header vuoto: un initData presente
@@ -1482,6 +1505,22 @@ def verifica_utente(init_data: str, sessione: str = "") -> dict:
         if hash_calcolato != hash_ricevuto:
             raise ValueError("firma non valida")
         user = json.loads(dati["user"])
+        eta = int(time.time()) - int(dati.get("auth_date", 0))
+    except Exception:
+        raise HTTPException(401, "Autenticazione Telegram non valida")
+    # --- e poi la FRESCHEZZA (ago 2026, audit): la firma dice CHI, non
+    #     QUANDO. `auth_date` e' dentro la stringa firmata, quindi non
+    #     si puo' ritoccare senza il token del bot. Il controllo vive
+    #     FUORI dal try per due ragioni: qui dentro l'except si
+    #     mangerebbe l'HTTPException e la riscriverebbe col messaggio
+    #     generico, e una credenziale scaduta non deve scrivere sul
+    #     database — per questo sta anche PRIMA dell'INSERT. Fail-closed
+    #     per costruzione, come importo_invoice: auth_date assente o
+    #     illeggibile vale 0, cioe' vecchio di un'era, cioe' rifiutato,
+    #     senza un ramo apposta. ---
+    if ORE_INITDATA and eta > ORE_INITDATA * 3600:
+        raise HTTPException(401, MSG_INITDATA_SCADUTO)
+    try:
         con = db()
         con.execute(
             "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "

@@ -252,6 +252,17 @@ AVVISI_ISCRITTI_MAX_ORA = 6
 # conto di quelli ancora aperti. Solo titolo e importi, mai nomi.
 AVVISI_ORDINI_ADMIN = True
 
+# --- Sicurezza degli accessi ------------------------------------------
+# Quanto vale un initData di Telegram: e' la credenziale di OGNI
+# chiamata dentro la Mini App, quindi senza scadenza uno catturato
+# oggi apre quell'account per sempre. Ventiquattro ore e non cinque
+# minuti perche' l'initData NON si rinfresca finche' la Mini App resta
+# aperta: solo riaprirla ne conia uno nuovo, e una finestra corta
+# butterebbe fuori chi la tiene minimizzata.
+# 0 = spenta, cioe' si torna a un initData che non scade mai: e' un
+# freno d'emergenza, non una scelta.
+ORE_INITDATA = 24
+
 # --- Collaudo ---------------------------------------------------------
 # True  = test locale con utenti finti (Compratore/Venditore/Admin)
 # False = OBBLIGATORIO prima di andare online!

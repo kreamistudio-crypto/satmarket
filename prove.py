@@ -1173,6 +1173,139 @@ def prove_importo_uscita():
           and 'return r.json().get("pr")' not in lna)
 
 
+def prove_initdata():
+    """La freschezza dell'initData (ago 2026, audit). La firma dice
+    CHI, non QUANDO: finche' nessuno guardava `auth_date`, un initData
+    catturato apriva quell'account per sempre. Qui si firma per
+    davvero, con un token di prova, e si guarda cosa passa e cosa no."""
+    print("\n[freschezza dell'initData]")
+    import hashlib
+    import hmac
+    import json
+    import time
+    from urllib.parse import parse_qsl, urlencode
+
+    TOKEN = "123456:token-di-prova"
+
+    def initdata(quando=None, token=TOKEN):
+        """Un initData come lo firma Telegram. `quando=None` = senza
+        auth_date: e' il caso che deve fallire da solo."""
+        dati = {"query_id": "AAA", "user": '{"id":111,"first_name":"Ada"}'}
+        if quando is not None:
+            dati["auth_date"] = str(int(quando))
+        controllo = "\n".join(f"{k}={v}" for k, v in sorted(dati.items()))
+        chiave = hmac.new(b"WebAppData", token.encode(),
+                          hashlib.sha256).digest()
+        dati["hash"] = hmac.new(chiave, controllo.encode(),
+                                hashlib.sha256).hexdigest()
+        return urlencode(dati)
+
+    class FintoErrore(Exception):
+        def __init__(self, codice, testo=""):
+            self.codice, self.testo = codice, testo
+
+    class FintoDb:
+        """Un database di cartone: qui non si prova la scrittura, si
+        prova CHI ci arriva."""
+        def __init__(self, visite):
+            self.visite = visite
+
+        def execute(self, *a):
+            self.visite.append(a[0][:20])
+            return self
+
+        def fetchone(self):
+            return None
+
+        def commit(self):
+            pass
+
+        def close(self):
+            pass
+
+    def monta(ore, visite, in_sessione=None):
+        amb = {"parse_qsl": parse_qsl, "hmac": hmac, "hashlib": hashlib,
+               "json": json, "time": time, "BOT_TOKEN": TOKEN,
+               "MODALITA_COLLAUDO": False, "ORE_INITDATA": ore,
+               "MSG_INITDATA_SCADUTO": "scaduta",
+               "HTTPException": FintoErrore,
+               "db": lambda: FintoDb(visite),
+               "nuovo_codice_negozio": lambda con: "abcd1234",
+               "utente_da_sessione": lambda t: in_sessione}
+        exec(pezzo("verifica_utente"), amb)
+        return amb["verifica_utente"]
+
+    def entra(init, ore=24, sessione="", in_sessione=None):
+        """Torna l'id di chi entra, o il testo del rifiuto."""
+        try:
+            return monta(ore, [], in_sessione)(init, sessione)["id"]
+        except FintoErrore as e:
+            return e.testo
+
+    ora = time.time()
+    prova("initData appena firmato: si entra", 111, entra(initdata(ora)))
+    prova("di un'ora: si entra", 111, entra(initdata(ora - 3600)))
+    prova("di 23 ore e mezza: si entra ancora", 111,
+          entra(initdata(ora - 23.5 * 3600)))
+    prova("di 25 ore: rifiutato", "scaduta",
+          entra(initdata(ora - 25 * 3600)))
+    prova("di un anno: rifiutato", "scaduta",
+          entra(initdata(ora - 365 * 86400)))
+    # il rifiuto della scadenza DEVE essere distinguibile da quello
+    # della firma storta, o il client non puo' dire «riaprimi»
+    prova("firma storta: rifiutata, con l'ALTRO messaggio",
+          "Autenticazione Telegram non valida",
+          entra(initdata(ora, token="999:un-altro-token")))
+    # fail-closed per costruzione, come importo_invoice: il campo che
+    # manca vale 0, cioe' vecchio di un'era
+    prova("auth_date assente: rifiutato senza un ramo apposta",
+          "scaduta", entra(initdata(None)))
+    prova("il rifiuto e' un 401", 401,
+          _codice_rifiuto(monta(24, []), initdata(ora - 25 * 3600),
+                          FintoErrore))
+    # la leva spenta riapre esattamente il buco: e' dichiarato, e la
+    # prova lo dice invece di lasciarlo credere
+    prova("leva a 0: il vecchio ripassa (buco riaperto, dichiarato)",
+          111, entra(initdata(ora - 365 * 86400), ore=0))
+    # le altre due porte non sanno nulla di questa finestra
+    prova("il cookie di sessione non passa di qui", 222,
+          entra("", in_sessione={"id": 222}))
+
+    # una credenziale scaduta non deve nemmeno TOCCARE il database
+    visite = []
+    try:
+        monta(24, visite)(initdata(ora - 25 * 3600))
+    except FintoErrore:
+        pass
+    prova("chi e' scaduto non scrive sul database", [], visite)
+
+    # --- SENTINELLE: il controllo non deve sparire in un riordino ----
+    vu = pezzo("verifica_utente")
+    prova("sentinella: auth_date si legge davvero", True, "auth_date" in vu)
+    # l'INSERT del ramo vero e' l'ULTIMO del pezzo (il primo e' quello
+    # del collaudo): rindex, o si confronterebbe col ramo sbagliato
+    prova("sentinella: si controlla PRIMA di scrivere sul database",
+          True, vu.index("ORE_INITDATA") < vu.rindex("INSERT INTO utenti"))
+    # dentro il try l'except si mangerebbe l'HTTPException e la
+    # riscriverebbe col messaggio generico: il client perderebbe il
+    # solo segnale che gli dice di riaprirsi
+    prova("sentinella: il rifiuto della scadenza non e' inghiottito",
+          True, vu.index("except Exception") < vu.index("ORE_INITDATA"))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client distingue la scadenza dalla vetrina", True,
+          "r.status === 401 && !!tg?.initData" in mini
+          and "BANNER_SCADUTO" in mini)
+
+
+def _codice_rifiuto(funzione, init, errore):
+    """Il codice HTTP del rifiuto (401), non il suo testo."""
+    try:
+        funzione(init)
+    except errore as e:
+        return e.codice
+    return None
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -1181,7 +1314,8 @@ def main():
               prove_tag_commercio, prove_anello, prove_categorie,
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
-              prove_ritiro, prove_disarmo, prove_importo_uscita):
+              prove_ritiro, prove_disarmo, prove_importo_uscita,
+              prove_initdata):
         try:
             f()
         except Exception as e:

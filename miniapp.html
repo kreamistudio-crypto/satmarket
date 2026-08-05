@@ -10874,6 +10874,12 @@ function mostraBanner(testo){
 }
 const BANNER_DEMO = '🫙 Questa è solo la demo — il mercatino vero vive su Telegram';
 const BANNER_VETRINA = '🛍️ Stai guardando la vetrina — entra con Telegram per comprare e vendere anche da qui';
+/* L'initData di Telegram dura 24 ore (ago 2026) e NON si rinfresca
+   finché la Mini App resta aperta: solo riaprirla ne conia uno nuovo.
+   Senza questa riga chi scade si ritroverebbe nella vetrina anonima
+   senza capire perché, e il CTA verso il bot — che qui è già quello
+   giusto — sembrerebbe rivolto a un estraneo. */
+const BANNER_SCADUTO = '⏳ Sessione scaduta — riapri Barattolo per rientrare';
 
 /* ---------------- login web (browser + cookie) ---------------- */
 /* Barra di benvenuto del login web: saluto, invito ad aprire il bot
@@ -11756,6 +11762,7 @@ async function avvia(){
   if (!API_BASE) {                          // nessun backend configurato
     DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderGrid(); renderOrders(); return;
   }
+  let scaduta = false;
   try {
     /* Primo sondaggio: initData se siamo dentro Telegram, altrimenti
        header vuoto — così viaggia l'eventuale cookie del login web.
@@ -11774,7 +11781,11 @@ async function avvia(){
     /* Senza initData il backend ci riconosce solo col cookie o col
        collaudo acceso. Se ci dice di no siamo nel browser, fuori da
        Telegram: vetrina.
-       (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.) */
+       (Il 401 non fa fallire fetch da solo, quindi lo alziamo noi.)
+       Un 401 con l'initData IN MANO è un'altra cosa: siamo dentro
+       Telegram e la sessione è scaduta (24h). La vetrina resta —
+       il mercatino si sfoglia lo stesso — ma il banner lo dice. */
+    scaduta = (r.status === 401 && !!tg?.initData);
     if (!r.ok || !me.tg_id) throw new Error('niente auth Telegram');
     myTgId = me.tg_id; myLnAddress = me.ln_address || ''; isAdmin = !!me.admin;
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori
@@ -11844,6 +11855,7 @@ async function avvia(){
     /* Browser fuori da Telegram: vetrina vera in sola lettura
        (con la demo finta come rete di sicurezza se il backend tace) */
     await avviaVetrina();
+    if (scaduta) mostraBanner(BANNER_SCADUTO);   // dopo: l'ultima parola
   }
 }
 /* Le sentinelle dello scroll infinito: un osservatore per griglia,
