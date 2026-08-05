@@ -2220,6 +2220,7 @@ def prove_conto_acquisto():
     print("\n[il conto d'acquisto]")
     amb = {}
     for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
+              "_eur_effettivo",
               "_tariffa_dichiarata", "_sped_in_sats", "_conto_ordine"):
         exec(pezzo(f), amb)
 
@@ -2252,6 +2253,22 @@ def prove_conto_acquisto():
           unit(a(lampo_percento=20, lampo_scadenza=2000), off, 1000, 0.0))
     prova("lampo scaduta: torna l'accordo", 90_000,
           unit(a(lampo_percento=20, lampo_scadenza=500), off, 1000, 0.0))
+
+    # --- l'euro NATIVO (il dato del giudice del ≈): la cifra su cui
+    # il ≈ NON va — esiste solo dove il prezzo e' NATO in euro -------
+    eurn = amb["_eur_effettivo"]
+    prova("listino sats: nessun euro nativo (0.0)", 0.0,
+          eurn(a(), None, 1000))
+    prova("listino EUR: l'euro nativo e' il listino", 50.0,
+          eurn(a(valuta="eur", prezzo_eur=50.0), None, 1000))
+    prova("lampo viva sull'EUR: il nativo e' lo scontato", 40.0,
+          eurn(a(valuta="eur", prezzo_eur=50.0, lampo_percento=20,
+                 lampo_scadenza=2000), None, 1000))
+    off_eur = {"contro_sats": 0, "contro_eur": 45.0,
+               "importo_sats": 0, "importo_eur": 48.0}
+    prova("accordo EUR vs lampo: vince il MINIMO anche sul nativo",
+          40.0, eurn(a(valuta="eur", prezzo_eur=50.0, lampo_percento=20,
+                       lampo_scadenza=2000), off_eur, 1000))
 
     # --- la tariffa della via: il CUORE della retrocompat -----------
     prova("via casa: la tariffa di sempre", (500, 0.0),
@@ -2497,6 +2514,20 @@ def prove_pagina_acquisto():
     # guarda che il catalogo SPEDIZIONIERI arrivi dal server)
     prova("il bottone finale della pagina dice «Paga»", True,
           'id="acqCompra" onclick="ctaAcquisto()">Paga<' in mini)
+    # IL GIUDICE DEL ≈ (bug dal telefono: ≈ su ENTRAMBE le valute).
+    # La regola vive in UNA funzione: il ≈ solo sulla valuta
+    # convertita — l'euro nativo dal server la spegne in vista €, e
+    # la resa convertita esiste UNA volta sola, dentro il giudice.
+    prova("il giudice del ≈ e' UNO (cifraCtrl)", 1,
+          mini.count("function cifraCtrl"))
+    prova("...e conosce l'euro nativo", True,
+          "if (eurNativo > 0)" in mini)
+    prova("...e la conversione eur vive solo li' dentro", 1,
+          mini.count("fmtEur(sats * eurPerSat)"))
+    prova("il server dice l'euro nativo delle strade", True,
+          "totale_eur" in pezzo("_strade_preventivo"))
+    prova("...e dell'articolo", True,
+          "articolo_eur" in pezzo("preventivo_ordine"))
     prova("il catalogo spedizionieri arriva da /api/me", True,
           "me.spedizionieri" in mini)
     prova("...e il client non lo riempie mai da solo", 1,

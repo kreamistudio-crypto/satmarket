@@ -7426,6 +7426,23 @@ def _unitario_effettivo(a, off, adesso: int, cambio: float) -> int:
     return p_sats
 
 
+def _eur_effettivo(a, off, adesso: int) -> float:
+    """L'euro NATIVO effettivo dell'articolo (ago 2026, il giudice del
+    «≈»): per un listino EUR e' la cifra su cui il ≈ NON va — la
+    valuta in cui il prezzo e' nato — col MIN lampo/accordo calcolato
+    sull'euro, specchio di _unitario_effettivo. Listino sats = 0.0
+    (li' il nativo sono i sats, e l'euro e' sempre una conversione)."""
+    if a["valuta"] != "eur" or a["prezzo_eur"] <= 0:
+        return 0.0
+    p_eur = a["prezzo_eur"]
+    if off:
+        p_eur = _importo_accordo(off)[1] or p_eur
+    if a["lampo_percento"] > 0 and a["lampo_scadenza"] > adesso:
+        l_eur = _prezzo_lampo(a, a["lampo_percento"])[1]
+        p_eur = min(p_eur, l_eur) if p_eur > 0 else l_eur
+    return round(p_eur, 2)
+
+
 def _tariffa_dichiarata(a, via: str) -> tuple:
     """(sats, eur) della tariffa di spedizione per la via chiesta:
     'punto' con la dichiarazione accesa usa le colonne punto — anche
@@ -9418,7 +9435,7 @@ RIPRESA_INVOICE_S = 720
 
 
 def _strade_preventivo(annunci: list, articolo: int, cambio: float,
-                       disponibili: set) -> list:
+                       disponibili: set, articolo_eur: float = 0.0) -> list:
     """Le strade del preventivo coi loro totali, nell'ordine FISSO
     ritiro → casa → punto → digitale. `disponibili` le decide il
     CHIAMANTE — per il mono le strade dell'annuncio, per il set
@@ -9431,14 +9448,26 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
     dice il campo `spedizioniere` della risposta).
     Una tariffa ancorata all'euro senza cambio = strada che esce con
     `cambio_assente` e senza numeri: si spegne col motivo, le altre
-    restano comprabili — mai un 503 che spegne anche il ritiro."""
+    restano comprabili — mai un 503 che spegne anche il ritiro.
+    Ogni strada porta anche l'euro NATIVO dove esiste (`spedizione_
+    eur` = la tariffa com'e' nata, `totale_eur` = solo quando e'
+    ESATTO: articolo nato in euro, tariffa in euro o zero, protezione
+    zero) — e' il dato del giudice del ≈ nel client: il ≈ sta sulla
+    valuta convertita, mai su quella nativa, e un totale misto non
+    ha una valuta nativa e resta ≈ in tutte e due le viste."""
     fuori = []
 
-    def _entra(v, sped, stima_sped, extra=None):
+    def _entra(v, sped, stima_sped, sped_eur=0.0, extra=None):
         conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
                               COMMISSIONE_PERCENTO)
+        tot_eur = 0.0
+        if (articolo_eur > 0 and conto["protezione"] == 0
+                and (sped == 0 or sped_eur > 0)):
+            tot_eur = round(articolo_eur + (sped_eur if sped else 0.0), 2)
         e = {"via": v, "spedizione_sats": sped,
-             "totale_sats": conto["totale"], "stima": stima_sped}
+             "spedizione_eur": sped_eur if sped else 0.0,
+             "totale_sats": conto["totale"], "totale_eur": tot_eur,
+             "stima": stima_sped}
         if extra:
             e.update(extra)
         fuori.append(e)
@@ -9448,12 +9477,10 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
     if "spedizione" in disponibili:
         # la via punto c'e' SEMPRE dove c'e' la spedizione (secondo
         # giro, decisione di Andrea che SUPERA il gate dello
-        # spedizioniere: meglio l'accordo in chat che la porta
-        # chiusa) — senza spedizioniere il client mostra la riga
-        # onesta «accordatevi in chat», la tariffa e' il fallback
-        # casa di sempre
+        # spedizioniere) — senza rete il punto arriva dopo, dal campo
+        # dell'ordine (terzo giro); la tariffa e' il fallback casa
         for v in ("casa", "punto"):
-            sped, stima_sped = 0, False
+            sped, stima_sped, sped_eur = 0, False, 0.0
             for a in annunci:
                 t_sats, t_eur = _tariffa_dichiarata(a, v)
                 costo = _sped_in_sats(t_sats, t_eur, cambio)
@@ -9462,7 +9489,11 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
                     break
                 if t_eur > 0:
                     stima_sped = True
-                sped = max(sped, costo)
+                if costo > sped:
+                    # l'euro nativo segue la tariffa che VINCE il MAX
+                    # (0 se la vincente e' nata in sats: allora l'euro
+                    # e' una conversione e il ≈ e' suo)
+                    sped, sped_eur = costo, t_eur
             extra = ({"fallback_casa": not any(
                 a["spedizione_punto_dichiarata"] for a in annunci)}
                 if v == "punto" else None)
@@ -9472,7 +9503,7 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
                     e.update(extra)
                 fuori.append(e)
             else:
-                _entra(v, sped, stima_sped, extra)
+                _entra(v, sped, stima_sped, sped_eur, extra)
     if "digitale" in disponibili:
         _entra("digitale", 0, False)
     if not fuori:
@@ -9570,6 +9601,11 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                                  "l'annuncio è stato pubblicato: il "
                                  "venditore deve ritoccare il prezzo")
     articolo = unitario * richiesti
+    # l'euro NATIVO dell'articolo (0 = nato in sats): il giudice del ≈
+    # del client mostra LUI in vista €, esatto, invece della doppia
+    # conversione col suo falso ≈
+    unitario_eur = _eur_effettivo(a, off, adesso)
+    articolo_eur = round(unitario_eur * richiesti, 2) if unitario_eur else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO)
     disponibili = set()
@@ -9581,12 +9617,14 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
         disponibili.add("digitale")
     return {"set": False, "quantita": richiesti,
             "articolo_sats": articolo, "articolo_unitario_sats": unitario,
+            "articolo_eur": articolo_eur,
+            "articolo_unitario_eur": unitario_eur,
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
             "spedizioniere": spedizioniere,
-            "strade": _strade_preventivo([a], articolo,
-                                         cambio, disponibili)}
+            "strade": _strade_preventivo([a], articolo, cambio,
+                                         disponibili, articolo_eur)}
 
 
 async def _preventivo_set(user: dict, d: dict) -> dict:
@@ -9726,16 +9764,24 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         pezzi += qta
         righe.append({"annuncio_id": aid, "titolo": a["titolo"],
                       "quantita": qta, "unitario_sats": unitario})
+    # l'euro NATIVO del set esiste solo se OGNI riga e' nata in euro:
+    # un set misto non ha una valuta nativa e resta ≈ in tutte e due
+    # le viste (il giudice del ≈ nel client)
+    eur_righe = [_eur_effettivo(tutti[aid], offerte.get(aid), adesso)
+                 for aid in richieste]
+    articolo_eur = (round(sum(round(e * q, 2) for e, q
+                              in zip(eur_righe, richieste.values())), 2)
+                    if all(e > 0 for e in eur_righe) else 0.0)
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO)
     return {"set": True, "quantita": pezzi,
-            "articolo_sats": articolo,
+            "articolo_sats": articolo, "articolo_eur": articolo_eur,
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
             "spedizioniere": spedizioniere,
-            "strade": _strade_preventivo(list(tutti.values()),
-                                         articolo, cambio, strade),
+            "strade": _strade_preventivo(list(tutti.values()), articolo,
+                                         cambio, strade, articolo_eur),
             "righe": righe}
 
 

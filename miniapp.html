@@ -6441,6 +6441,9 @@ function renderControlla(){
     el('ctrlConto').innerHTML = contoRighe({
       art: p.articolo_sats, sped, prot: p.protezione_sats||0, tot,
       circa: (p.stima || (min && min.stima)) ? '≈ ' : '',
+      artEur: p.articolo_eur||0,
+      spedEur: min ? (min.spedizione_eur||0) : 0,
+      totEur: min ? (min.totale_eur||0) : 0,
       spedLabel: vive.length > 1 ? 'Spedizione (dalla più economica)'
                                  : 'Spedizione'});
   } else {
@@ -6471,25 +6474,35 @@ async function caricaPreventivoPacco(){
   if (el('view-controllapacco')?.classList.contains('active'))
     renderControlla();
 }
-/* Una cifra del conto nella valuta del toggle: in euro e' sempre una
-   conversione (≈), in sats il «circa» arriva col flag di stima. Lo
-   zero non porta mai il ≈: zero e' zero. */
-function cifraCtrl(sats, circa){
-  if (valutaVista==='eur')
+/* IL GIUDICE DEL «≈» (ago 2026, bug visto dal telefono: il ≈
+   compariva su ENTRAMBE le valute). La regola, in UNA funzione e non
+   in condizioni sparse — che sono il modo in cui il bug e' nato:
+   il ≈ sta SOLO sulla valuta convertita, mai su quella NATIVA del
+   prezzo, e mai sullo zero. eurNativo > 0 = la cifra e' NATA in
+   euro (lo dice il server, effettivo con lampo e accordo): in vista
+   € si mostra LEI, esatta; i sats restano la conversione e il ≈ ce
+   l'hanno loro (circa). eurNativo assente = la cifra e' nata in
+   sats: sats esatti, euro con ≈. */
+function cifraCtrl(sats, circa, eurNativo){
+  if (valutaVista==='eur'){
+    if (eurNativo > 0)
+      return `${fmtEur(eurNativo)}<span class="unit eur">€</span>`;
     return `${sats>0?'≈ ':''}${fmtEur(sats * eurPerSat)}<span class="unit eur">€</span>`;
+  }
   return `${sats>0 ? (circa||'') : ''}${fmt(sats)}<span class="unit">sats</span>`;
 }
 /* Le righe del conto — UN vestito per il riepilogo del pacco e la
    pagina d'acquisto: Prezzo, la commissione in promo, Spedizione
    (che a costo 0 resta, invece di sparire), la protezione solo
-   quando esiste, e il totale evidenziato. */
+   quando esiste, e il totale evidenziato. artEur/spedEur/totEur sono
+   gli euro NATIVI dal server (0 = quella cifra e' nata in sats). */
 function contoRighe(c){
   const r = (t, v, cls) => `<div class="ctrl-riga${cls?' '+cls:''}"><span>${t}</span><span class="mono">${v}</span></div>`;
-  return r('Prezzo', cifraCtrl(c.art, c.circa))
+  return r('Prezzo', cifraCtrl(c.art, c.circa, c.artEur))
     + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
-    + r(c.spedLabel || 'Spedizione', cifraCtrl(c.sped, c.circa))
-    + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot)) : '')
-    + r('Totale da pagare', cifraCtrl(c.tot, c.circa), 'tot');
+    + r(c.spedLabel || 'Spedizione', cifraCtrl(c.sped, c.circa, c.spedEur))
+    + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot, c.circa)) : '')
+    + r('Totale da pagare', cifraCtrl(c.tot, c.circa, c.totEur), 'tot');
 }
 /* «Chiedi info» → la pagina del venditore, coi ponti di contatto che
    vivono gia' la'. Il codice negozio arriva dagli annunci del pacco. */
@@ -6558,24 +6571,39 @@ function apriAcquistoSet(){
 function preventivoDemo(l){
   const art = artStima(l) * qtaScelta;
   const prot = Math.floor(art * protPercento / 100);
+  /* l'euro NATIVO anche in demo (il giudice del ≈ vale ovunque):
+     listino EUR = la cifra e' nata li', senza ≈ in vista € */
+  const artEur = (l.valuta==='eur' && l.priceEur>0)
+    ? Math.round(l.priceEur * qtaScelta * 100) / 100 : 0;
   const strade = [];
   for (const v of stradeConsegna(l)){
     const sped = v==='spedizione' ? satsSpedizione(l) : 0;
     const stima = v==='spedizione' && l.spedEur>0;
+    const spedEur = (v==='spedizione' && sped) ? (l.spedEur||0) : 0;
+    const totEur = (artEur>0 && !prot && (!sped || spedEur>0))
+      ? Math.round((artEur + spedEur) * 100) / 100 : 0;
     if (v==='spedizione'){
-      strade.push({via:'casa', spedizione_sats:sped,
-                   totale_sats:art+sped+prot, stima});
-      strade.push({via:'punto', spedizione_sats:sped,
-                   totale_sats:art+sped+prot, stima, fallback_casa:true});
+      strade.push({via:'casa', spedizione_sats:sped, spedizione_eur:spedEur,
+                   totale_sats:art+sped+prot, totale_eur:totEur, stima});
+      strade.push({via:'punto', spedizione_sats:sped, spedizione_eur:spedEur,
+                   totale_sats:art+sped+prot, totale_eur:totEur, stima,
+                   fallback_casa:true});
     } else {
-      strade.push({via:v, spedizione_sats:0, totale_sats:art+prot,
+      strade.push({via:v, spedizione_sats:0, spedizione_eur:0,
+                   totale_sats:art+prot,
+                   totale_eur:(artEur>0 && !prot) ? artEur : 0,
                    stima:false});
     }
   }
   if (!strade.length)
-    strade.push({via:'', spedizione_sats:0, totale_sats:art+prot, stima:false});
+    strade.push({via:'', spedizione_sats:0, spedizione_eur:0,
+                 totale_sats:art+prot,
+                 totale_eur:(artEur>0 && !prot) ? artEur : 0, stima:false});
   return {set:false, demo:true, quantita:qtaScelta, articolo_sats:art,
-          articolo_unitario_sats:artStima(l), protezione_sats:prot,
+          articolo_unitario_sats:artStima(l),
+          articolo_eur:artEur,
+          articolo_unitario_eur: artEur>0 ? Math.round(l.priceEur*100)/100 : 0,
+          protezione_sats:prot,
           commissione_sats:0, stima:l.valuta==='eur', spedizioniere:'',
           strade};
 }
@@ -6648,7 +6676,7 @@ function renderAcquisto(){
     articoli = `<div class="acq-art">
       <div class="ctrl-mini">${t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}</div>
       <div class="acq-tit">${esc(x ? x.title : '')}${(p.quantita||1)>1 ? ` <span class="mono">× ${fmt(p.quantita)}</span>` : ''}</div>
-      <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'')}</span>
+      <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}</span>
     </div>`;
   }
   /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
@@ -6669,7 +6697,7 @@ function renderAcquisto(){
         ? `<span class="via-sped">come a casa</span>` : '';
       const cifra = (s.via==='casa' || s.via==='punto')
         ? (s.spedizione_sats>0
-            ? `<span class="via-tot">${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'')}</span>`
+            ? `<span class="via-tot">${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'', s.spedizione_eur)}</span>`
             /* la gratuita' parla col grassetto, mai col colore */
             : `<span class="via-gratis">gratuita</span>`)
         : '';
@@ -6709,12 +6737,17 @@ function renderAcquisto(){
   if (p.demo)
     note += `<div class="acq-nota">🧪 Stima dimostrativa: in demo il conto del server non c'è.</div>`;
   /* --- il conto della strada scelta, riga per riga --- */
-  const sped = stradaSel && !stradaSel.cambio_assente ? (stradaSel.spedizione_sats||0) : 0;
-  const tot = stradaSel && !stradaSel.cambio_assente ? stradaSel.totale_sats
+  const viaOk = stradaSel && !stradaSel.cambio_assente;
+  const sped = viaOk ? (stradaSel.spedizione_sats||0) : 0;
+  const tot = viaOk ? stradaSel.totale_sats
             : p.articolo_sats + (p.protezione_sats||0);
   const circa = (p.stima || (stradaSel && stradaSel.stima)) ? '≈ ' : '';
   const conto = contoRighe({art: p.articolo_sats, sped, prot: p.protezione_sats||0,
-                            tot, circa, spedLabel: 'Spedizione'});
+                            tot, circa, spedLabel: 'Spedizione',
+                            artEur: p.articolo_eur||0,
+                            spedEur: viaOk ? (stradaSel.spedizione_eur||0) : 0,
+                            totEur: viaOk ? (stradaSel.totale_eur||0)
+                                  : ((p.protezione_sats||0) ? 0 : p.articolo_eur||0)});
   /* --- il fondo: ⚡ NWC (solo mono, col wallet) e Acquista --- */
   const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
