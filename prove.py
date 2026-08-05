@@ -3296,6 +3296,193 @@ def prove_pagina_acquisto():
 
 
 # ====================================================================
+def prove_libro_mastro():
+    """LA RONDA DEL LIBRO MASTRO (ago 2026): i controlli di integrita'
+    che l'orologio gira una volta al giorno. Si provano DAVVERO — su
+    un database gemello in memoria, ermetico: niente file, niente
+    config — perche' una query sbagliata qui non fallisce, TACE, ed e'
+    il peggior modo di fallire per un allarme.
+    Due giri: schema sano → nessuno deve trovare niente; poi una riga
+    rotta per ogni controllo → quel controllo, e solo quello, la
+    trova, col suo id."""
+    print("\n[la ronda del libro mastro]")
+    import sqlite3
+    src = open("server.py", encoding="utf-8").read()
+    amb = {}
+    i = src.index("CONTROLLI_LIBRO_MASTRO = (")
+    exec(src[i:src.index("\n_ultimo_libro_mastro", i)], amb)
+    controlli = amb["CONTROLLI_LIBRO_MASTRO"]
+
+    # --- la FORMA del catalogo --------------------------------------
+    prova("il catalogo non e' vuoto", True, len(controlli) >= 10)
+    prova("ogni voce e' (nome, perche', sql)", True,
+          all(len(c) == 3 and all(isinstance(x, str) for x in c)
+              for c in controlli))
+    prova("i nomi sono unici", len(controlli),
+          len({c[0] for c in controlli}))
+    # SOLA LETTURA: e' la regola del cantiere, e sparirebbe in
+    # silenzio se qualcuno «riparasse» al volo una riga storta
+    for nome, _, sql in controlli:
+        for vietato in ("INSERT", "UPDATE", "DELETE", "DROP", "CREATE",
+                        "REPLACE", "PRAGMA"):
+            prova(f"«{nome}»: nessun {vietato} (legge e basta)", False,
+                  vietato in sql.upper())
+        prova(f"«{nome}»: e' una SELECT", True,
+              sql.lstrip().upper().startswith("SELECT"))
+
+    # --- lo schema gemello: solo le colonne che i controlli toccano --
+    def db_sano():
+        con = sqlite3.connect(":memory:")
+        con.executescript("""
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+          prezzo_sats INT, sconto_sats INT DEFAULT 0,
+          sconto_percento INT DEFAULT 0, spedizione_sats INT DEFAULT 0,
+          protezione_sats INT DEFAULT 0, quantita INT DEFAULT 1,
+          stato TEXT DEFAULT 'locked', payout_stato TEXT DEFAULT '',
+          aggiornato INT DEFAULT 0);
+        CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+          annuncio_id INT, quantita INT, unitario_sats INT,
+          titolo TEXT DEFAULT '');
+        CREATE TABLE puntate(id INTEGER PRIMARY KEY, annuncio_id INT,
+          tg_id INT, offerto_sats INT, versato_sats INT, proxy INT
+          DEFAULT 0, stato TEXT);
+        CREATE TABLE rilanci(id INTEGER PRIMARY KEY, annuncio_id INT,
+          delta_sats INT, stato TEXT);
+        CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY,
+          annuncio_id INT, puntata_id INT, rilancio_id INT DEFAULT 0,
+          importo_sats INT, motivo TEXT, payout_stato TEXT DEFAULT '');
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
+          stato TEXT, contatto_nostr TEXT DEFAULT '',
+          nostr_event_id TEXT DEFAULT '');
+        CREATE UNIQUE INDEX idx_rimborso_chiusura ON rimborsi_asta(puntata_id)
+          WHERE motivo IN ('perdente','annullo_admin');
+        CREATE UNIQUE INDEX idx_rimborso_tardivo ON rimborsi_asta(rilancio_id)
+          WHERE rilancio_id > 0;
+        CREATE UNIQUE INDEX idx_rimborso_ecc_ritiro ON rimborsi_asta(puntata_id)
+          WHERE motivo = 'eccedenza_ritiro';
+        CREATE UNIQUE INDEX idx_rimborso_eccedenza ON rimborsi_asta(puntata_id)
+          WHERE motivo = 'eccedenza';
+        -- UN CARRELLO SANO: 3 pezzi, lordo 32.000, sconto 3.200,
+        -- spedizione 500 -> 29.300
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,sconto_sats,
+          sconto_percento,spedizione_sats,quantita)
+          VALUES(1, 0, 29300, 3200, 10, 500, 3);
+        INSERT INTO ordine_righe(ordine_id,annuncio_id,quantita,unitario_sats)
+          VALUES(1, 7, 2, 10000), (1, 8, 1, 12000);
+        -- UN MONO SANO: nessuna riga, nessuno sconto
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita)
+          VALUES(2, 9, 50000, 5);
+        -- UN'ASTA CHIUSA SANA: entrati 140, vincitrice espone 100,
+        -- registro 40 (un perdente rimborsato + l'eccedenza)
+        INSERT INTO puntate(id,annuncio_id,tg_id,offerto_sats,versato_sats,stato)
+          VALUES(1, 5, 111, 100, 120, 'vincitrice'),
+                (2, 5, 222, 20, 20, 'chiusa');
+        INSERT INTO rilanci(annuncio_id,delta_sats,stato)
+          VALUES(5, 120, 'saldato'), (5, 20, 'saldato'),
+                (5, 999, 'creato');      -- mai saldato: non conta
+        INSERT INTO rimborsi_asta(annuncio_id,puntata_id,importo_sats,motivo)
+          VALUES(5, 2, 20, 'perdente'), (5, 1, 20, 'eccedenza');
+        INSERT INTO annunci(id,venditore_id,stato,contatto_nostr)
+          VALUES(7, 222, 'attivo', 'npub1xxx');
+        INSERT INTO annunci(id,venditore_id,stato,nostr_event_id)
+          VALUES(8, 222, 'attivo', 'evento123');
+        """)
+        return con
+
+    def gira(con):
+        """{nome: [id trovati]} dei soli controlli che hanno trovato
+        qualcosa — cioe' esattamente cio' su cui l'orologio suona."""
+        fuori = {}
+        for nome, _, sql in controlli:
+            ids = [str(r[0]) for r in con.execute(sql).fetchall()]
+            if ids:
+                fuori[nome] = ids
+        return fuori
+
+    # --- GIRO 1: tutto sano, nessuno deve fiatare -------------------
+    con = db_sano()
+    trovati = gira(con)
+    prova("database sano: NESSUN controllo trova niente (silenzio)",
+          {}, trovati)
+    con.close()
+
+    # --- GIRO 2: una riga rotta alla volta --------------------------
+    # (sql da eseguire, nome del controllo che DEVE svegliarsi, id atteso)
+    casi = [
+        ("UPDATE ordini SET prezzo_sats=29299 WHERE id=1",
+         "aritmetica della testata", "1"),
+        ("UPDATE ordini SET sconto_sats=500, sconto_percento=10 WHERE id=2",
+         "mono scontato", "2"),
+        ("UPDATE ordini SET sconto_sats=99999 WHERE id=1",
+         "sconto fuori scala", "1"),
+        ("UPDATE ordini SET sconto_percento=0 WHERE id=1",
+         "sconto e percentuale scordati", "1"),
+        ("UPDATE ordini SET quantita=4 WHERE id=1",
+         "pezzi della testata", "1"),
+        ("INSERT INTO ordine_righe(ordine_id,annuncio_id,quantita,"
+         "unitario_sats) VALUES(2, 9, 1, 50000)",
+         "mono con righe", "2"),
+        ("INSERT INTO ordine_righe(id,ordine_id,annuncio_id,quantita,"
+         "unitario_sats) VALUES(77, 4242, 9, 1, 100)",
+         "righe orfane", "77"),
+        ("INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita) "
+         "VALUES(3, 0, 1000, 1)",
+         "carrello senza merce", "3"),
+        ("UPDATE puntate SET offerto_sats=101 WHERE id=1",
+         "cassa dell'asta chiusa", "5"),
+        ("DELETE FROM rimborsi_asta WHERE puntata_id=2",
+         "puntata chiusa senza rimborso", "2"),
+        ("UPDATE puntate SET versato_sats=50 WHERE id=1",
+         "esposto senza copertura", "1"),
+        ("INSERT INTO rimborsi_asta(annuncio_id,puntata_id,importo_sats,"
+         "motivo) VALUES(5, 2, 20, 'ritiro'), (5, 2, 20, 'ritiro')",
+         "doppio rimborso da ritiro", "2"),
+        ("DROP INDEX idx_rimborso_eccedenza",
+         "cinture d'idempotenza cadute", "idx_rimborso_eccedenza"),
+        ("UPDATE annunci SET nostr_event_id='ev999' WHERE id=7",
+         "annuncio a due teste", "7"),
+        ("UPDATE ordini SET payout_stato='boh' WHERE id=1",
+         "payout fuori contratto", "1"),
+    ]
+    for sql, atteso, id_atteso in casi:
+        con = db_sano()
+        con.executescript(sql)
+        trovati = gira(con)
+        con.close()
+        prova(f"rotto «{atteso}»: il controllo lo trova", True,
+              atteso in trovati)
+        prova(f"...con l'id giusto ({id_atteso})", True,
+              id_atteso in trovati.get(atteso, []))
+    prova("ogni controllo del catalogo ha il suo caso rotto",
+          {c[0] for c in controlli}, {c[1] for c in casi})
+
+    # --- il patto della RONDA: silenzio, timbro, sola lettura -------
+    corpo = pezzo("controlla_libro_mastro")
+    prova("a libro mastro sano esce senza dire niente", True,
+          "if not rotti:" in corpo and "return" in corpo)
+    prova("il timbro e' il GIORNO e si scrive PRIMA delle query", True,
+          corpo.index("_ultimo_libro_mastro = oggi")
+          < corpo.index("for nome, perche, sql"))
+    prova("la leva puo' spegnerla", True,
+          "if not CONTROLLO_LIBRO_MASTRO:" in corpo)
+    prova("una query che esplode conta come guasto", True,
+          "la query non gira" in corpo)
+    prova("non corregge NULLA", False,
+          any(v in corpo.split('"""')[-1].upper()
+              for v in ("UPDATE ", "INSERT ", "DELETE ")))
+    prova("il titolo dell'allarme e' il 🧊 dei moderatori", True,
+          "🧊" in corpo and "notifica_admin(" in corpo)
+    prova("gli id passano da html.escape (le notifiche sono HTML)",
+          True, "html.escape(elenco)" in corpo)
+    # lo strumento a mano resta nel repo, e l'allarme lo nomina
+    import os
+    prova("il file delle query a mano esiste", True,
+          os.path.exists("query_libro_mastro.sql"))
+    prova("...e l'avviso dice come lanciarlo", True,
+          "query_libro_mastro.sql" in corpo)
+
+
+# ====================================================================
 def prove_forma_sconto_pacco():
     """Le righe che un riordino farebbe sparire senza rompere nessuna
     prova funzionale — e che sono tutto cio' che tiene lo sconto
@@ -3666,6 +3853,7 @@ def main():
               prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_sconto_pacco, prove_forma_sconto_pacco,
+              prove_libro_mastro,
               prove_consegna_payload_punto, prove_pagina_acquisto):
         try:
             f()

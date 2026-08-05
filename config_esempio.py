@@ -148,6 +148,15 @@ FERIE_ATTIVE = True          # interruttore generale (False = spento)
 FERIE_MAX_GIORNI = 90        # quanto in la' puo' stare la data di rientro
 FERIE_PREAVVISO_ORE = 24     # «domani riapri» (0 = nessun promemoria)
 
+# --- La ronda del libro mastro ---------------------------------------
+# Una volta al giorno l'orologio ripassa gli INVARIANTI del database
+# (l'aritmetica degli ordini, la cassa delle aste chiuse, la forma di
+# ordine_righe...). Se torna tutto TACE — nemmeno una riga nel journal;
+# se qualcosa non torna manda il 🧊 ai moderatori con la query che ha
+# fallito e gli id. LEGGE E BASTA: non corregge mai niente.
+# Gli stessi controlli si lanciano a mano con query_libro_mastro.sql.
+CONTROLLO_LIBRO_MASTRO = True   # False = ronda spenta
+
 # --- Sconto carrello (chi prende piu' cose paga meno) ----------------
 # Il venditore premia chi compra piu' articoli in un ordine solo: UNA
 # regola per tutto il suo negozio — «da N articoli, −X%» — senza

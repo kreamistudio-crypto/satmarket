@@ -576,6 +576,11 @@ try:
     from config import TERMOMETRO_SOTTOCATEGORIE_MINIMO
 except ImportError:
     TERMOMETRO_SOTTOCATEGORIE_MINIMO = 5  # sotto, non vale il disturbo
+try:
+    from config import CONTROLLO_LIBRO_MASTRO
+except ImportError:
+    CONTROLLO_LIBRO_MASTRO = True   # la ronda quotidiana degli invarianti:
+                                    # legge e avvisa, non corregge mai nulla
 
 # ===================================================================
 
@@ -17728,6 +17733,12 @@ async def orologio():
             await avvisa_spedizioniere_mancante()
         except Exception as e:
             print(f"⚠️ Avviso spedizioniere saltato: {e}")
+        try:
+            # la ronda degli invarianti: legge e avvisa, non corregge
+            # mai niente — e a libro mastro sano non dice nulla
+            await controlla_libro_mastro()
+        except Exception as e:
+            print(f"⚠️ Ronda del libro mastro saltata: {e}")
         await asyncio.sleep(600)
 
 
@@ -17822,6 +17833,181 @@ async def termometro_sottocategorie():
         f"categorie più scoperte: {scoperte}.{riga_colmabili}\n"
         f"Sul VPS: <code>python assegna_sottocategorie.py --conta</code> "
         f"per i titoli, parole nuove nel dizionario per il resto.")
+
+
+# ============ LA RONDA DEL LIBRO MASTRO (ago 2026) ==================
+# Gli INVARIANTI del database, quelli gia' dichiarati in CLAUDE.md,
+# diventano una ronda quotidiana invece di query da lanciare a mano —
+# perche' un controllo che dipende da qualcuno che si ricorda di
+# lanciarlo e' un controllo che un giorno non gira (la lezione del
+# termometro delle sottocategorie).
+# LEGGE E BASTA: nessuna correzione automatica, mai. Un libro mastro
+# sbagliato lo guarda un umano — una macchina che «aggiusta» i conti
+# nasconde la causa e la seconda volta non se ne accorge nessuno.
+# OGNI query deve tornare VUOTA su un database sano, e la sua PRIMA
+# colonna e' l'identificativo da mostrare. Chi ne aggiunge una si
+# chieda prima la domanda che conta: esiste uno stato TRANSITORIO
+# LEGITTIMO in cui e' falsa? Se si', non entra qui — un allarme che
+# suona su un caso normale e' peggio di nessun allarme, perche' educa
+# a ignorarlo. Per questo restano FUORI, e va ricordato:
+#   · «venduto <=> quantita=0»: un venduto poi RIMOSSO resta a
+#     (rimosso, 0) legittimamente e suonerebbe per sempre;
+#   · payout_stato='incerto': non e' un guasto, e' la coda che aspetta
+#     un moderatore — cioe' il funzionamento previsto;
+#   · «una fattura pendente alla volta»: due rilanci 'creato' sono
+#     leciti finche' il reaper non passa (finestra mobile).
+CONTROLLI_LIBRO_MASTRO = (
+    # --- il conto degli ordini: qui una violazione costa sats -------
+    ("aritmetica della testata",
+     "il totale in cassaforte non combacia con la merce dell'ordine",
+     "SELECT o.id FROM ordini o JOIN ordine_righe r ON r.ordine_id=o.id "
+     "GROUP BY o.id HAVING o.prezzo_sats <> "
+     "SUM(r.unitario_sats*r.quantita) - o.sconto_sats "
+     "+ o.spedizione_sats + o.protezione_sats"),
+    ("mono scontato",
+     "lo sconto carrello e' del CARRELLO: su un ordine a un annuncio "
+     "solo rompe la divisione a ritroso dell'unitario",
+     "SELECT id FROM ordini WHERE annuncio_id<>0 "
+     "AND (sconto_sats<>0 OR sconto_percento<>0)"),
+    ("sconto fuori scala",
+     "sconto negativo, o piu' grande della merce che sconta",
+     "SELECT o.id FROM ordini o JOIN ordine_righe r ON r.ordine_id=o.id "
+     "GROUP BY o.id HAVING o.sconto_sats < 0 "
+     "OR o.sconto_sats >= SUM(r.unitario_sats*r.quantita)"),
+    ("sconto e percentuale scordati",
+     "la ricevuta dichiara uno sconto che non c'e', o tace su uno che c'e'",
+     "SELECT id FROM ordini "
+     "WHERE (sconto_percento>0) <> (sconto_sats>0)"),
+    ("pezzi della testata",
+     "ordini.quantita non e' la somma dei pezzi delle righe",
+     "SELECT o.id FROM ordini o JOIN ordine_righe r ON r.ordine_id=o.id "
+     "GROUP BY o.id HAVING o.quantita <> SUM(r.quantita)"),
+    # --- la forma di ordini/ordine_righe ----------------------------
+    ("mono con righe",
+     "i MONO non hanno righe MAI: _righe_ordine ne sintetizzerebbe una "
+     "seconda versione, e le due divergerebbero in CSV e disputa",
+     "SELECT DISTINCT o.id FROM ordini o "
+     "JOIN ordine_righe r ON r.ordine_id=o.id WHERE o.annuncio_id<>0"),
+    ("righe orfane",
+     "merce contabilizzata su un ordine che non esiste piu': stock "
+     "bloccato per sempre da _riservati",
+     "SELECT r.id FROM ordine_righe r WHERE NOT EXISTS "
+     "(SELECT 1 FROM ordini o WHERE o.id=r.ordine_id)"),
+    ("carrello senza merce",
+     "una testata di set senza nemmeno una riga",
+     "SELECT o.id FROM ordini o WHERE o.annuncio_id=0 AND NOT EXISTS "
+     "(SELECT 1 FROM ordine_righe r WHERE r.ordine_id=o.id)"),
+    # --- l'asta: la cassa deve tornare ------------------------------
+    ("cassa dell'asta chiusa",
+     "somma dei saldi <> esposto della vincitrice + registro dei "
+     "rimborsi: o l'ordine e' nato per la cifra sbagliata, o i sats "
+     "di un perdente sono spariti",
+     "SELECT p.annuncio_id FROM puntate p WHERE p.stato='vincitrice' "
+     "AND (SELECT COALESCE(SUM(r.delta_sats),0) FROM rilanci r "
+     "     WHERE r.annuncio_id=p.annuncio_id "
+     "     AND r.stato IN ('saldato','tardivo')) <> p.offerto_sats "
+     "  + (SELECT COALESCE(SUM(x.importo_sats),0) FROM rimborsi_asta x "
+     "     WHERE x.annuncio_id=p.annuncio_id)"),
+    ("puntata chiusa senza rimborso",
+     "sats versati e mai messi in coda al registro: fermi e invisibili",
+     "SELECT p.id FROM puntate p WHERE p.stato='chiusa' "
+     "AND p.versato_sats>0 AND NOT EXISTS "
+     "(SELECT 1 FROM rimborsi_asta x WHERE x.puntata_id=p.id)"),
+    ("esposto senza copertura",
+     "una puntata gareggia con piu' sats di quanti ne siano stati "
+     "versati (versato >= offerto, SEMPRE)",
+     "SELECT id FROM puntate WHERE versato_sats < offerto_sats"),
+    ("doppio rimborso da ritiro",
+     "il motivo 'ritiro' e' l'unico senza indice UNIQUE: lo tiene solo "
+     "il CAS sullo stato",
+     "SELECT puntata_id FROM rimborsi_asta WHERE motivo='ritiro' "
+     "GROUP BY puntata_id HAVING COUNT(*)>1"),
+    ("cinture d'idempotenza cadute",
+     "mancano indici UNIQUE parziali di rimborsi_asta: il prossimo "
+     "crash a meta' chiusura pagherebbe due volte",
+     "SELECT nome FROM (SELECT 'idx_rimborso_chiusura' AS nome "
+     "UNION ALL SELECT 'idx_rimborso_tardivo' "
+     "UNION ALL SELECT 'idx_rimborso_ecc_ritiro' "
+     "UNION ALL SELECT 'idx_rimborso_eccedenza') "
+     "WHERE nome NOT IN (SELECT name FROM sqlite_master WHERE type='index')"),
+    # --- le due colonne che non devono mai stare insieme ------------
+    ("annuncio a due teste",
+     "contatto_nostr e nostr_event_id sulla stessa riga: la deduplica "
+     "confronterebbe un annuncio con se' stesso",
+     "SELECT id FROM annunci "
+     "WHERE contatto_nostr<>'' AND nostr_event_id<>''"),
+    ("payout fuori contratto",
+     "payout_stato con un valore che non esiste ('' | incerto | uscito)",
+     "SELECT id FROM ordini "
+     "WHERE payout_stato NOT IN ('','incerto','uscito') "
+     "UNION ALL SELECT id FROM rimborsi_asta "
+     "WHERE payout_stato NOT IN ('','incerto','uscito')"),
+)
+
+_ultimo_libro_mastro = ""                # il giorno dell'ultima ronda
+
+
+async def controlla_libro_mastro():
+    """La ronda quotidiana degli invarianti (ago 2026): esegue i
+    controlli di CONTROLLI_LIBRO_MASTRO e, se UNO trova righe, manda
+    il 🧊 ai moderatori con la query che ha fallito e gli id. Se non
+    trova niente TACE — nemmeno una riga nel journal: un «tutto bene»
+    quotidiano e' rumore, e il rumore e' il modo in cui gli allarmi
+    muoiono.
+    NON CORREGGE NULLA, ed e' il punto: legge e basta.
+    Il timbro e' il GIORNO, in memoria, e si scrive PRIMA delle query
+    (il patto delle campagne). Qui la ragione e' sua: senza, l'allarme
+    tornerebbe a OGNI battito — 144 volte al giorno — e in una settimana
+    nessuno lo leggerebbe piu'. Il prezzo dichiarato e' che un riavvio
+    fa rifare la ronda (al piu' un avviso doppio nello stesso giorno,
+    e per un guasto al libro mastro e' il verso giusto in cui
+    sbagliare) e che un errore di rete costa un giorno di ritardo su
+    un allarme che comunque si ripete domani.
+    Una query che ESPLODE conta come un controllo fallito: se lo
+    schema e' cambiato sotto, e' esattamente una cosa da sapere."""
+    global _ultimo_libro_mastro
+    if not CONTROLLO_LIBRO_MASTRO:
+        return
+    oggi = time.strftime("%Y-%m-%d")
+    if _ultimo_libro_mastro == oggi:
+        return
+    _ultimo_libro_mastro = oggi
+    con = db()
+    rotti = []
+    for nome, perche, sql in CONTROLLI_LIBRO_MASTRO:
+        try:
+            ids = [str(r[0]) for r in con.execute(sql).fetchall()]
+        except Exception as e:
+            rotti.append((nome, f"la query non gira: {e}", []))
+            continue
+        if ids:
+            rotti.append((nome, perche, ids))
+    con.close()
+    if not rotti:
+        return                    # SILENZIO: e' la risposta normale
+    righe = []
+    for nome, perche, ids in rotti:
+        # un tetto agli id: l'allarme deve restare leggibile in chat,
+        # e per guardarli tutti c'e' lo strumento a mano
+        elenco = ", ".join(ids[:10])
+        if len(ids) > 10:
+            elenco += f" +{len(ids) - 10} altri"
+        # quote=False: nome e perche' sono testo NOSTRO, costante — il
+        # `quote` di serie scapperebbe anche gli apostrofi («dell&#x27;
+        # ordine»), che qui sono ovunque. Restano coperti < > & , che
+        # sono i soli che spegnerebbero l'HTML della notifica. Sugli
+        # id l'escape resta pieno: quelli vengono dal database.
+        righe.append(f"• <b>{html.escape(nome, False)}</b> — "
+                     f"{html.escape(perche, False)}"
+                     + (f"\n  <code>{html.escape(elenco)}</code>" if ids else ""))
+    quanti = len(rotti)
+    await notifica_admin(
+        f"🧊 <b>Libro mastro: {quanti} controll{'o' if quanti == 1 else 'i'} "
+        f"non torna{'' if quanti == 1 else 'no'}</b>\n"
+        + "\n".join(righe)
+        + "\n\nNessuna correzione automatica: questi numeri li guarda una "
+        "persona. Sul VPS: <code>sqlite3 satmarket.db &lt; "
+        "query_libro_mastro.sql</code>")
 
 
 @app.on_event("startup")
