@@ -3433,6 +3433,166 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nell'etichetta: il barattolo è dei preferiti (il foglio `#setSheet`
   che ne portava il nome non esiste più dall'ago 2026, vedi «LA
   PAGINA CONTROLLA IL PACCO» più sotto).
+  LO SCONTO CARRELLO 🎁 (ago 2026): il venditore premia chi compra più
+  cose in un ordine solo — UNA regola per tutto il negozio, «da N
+  articoli −X%», senza scaglioni: uno sconto che si spiega in mezza
+  riga è uno sconto che si usa. Vale SOLO sul prezzo degli articoli,
+  MAI sulla spedizione (il pacco costa quello che costa), e il conto è
+  del SERVER: l'escrow nasce già scontata.
+  LE QUATTRO DECISIONI DI ANDREA, che governano tutto il resto.
+  1) IL MONO NON SCONTA MAI: tre copie dello stesso annuncio comprate
+  dalla scheda non sono un carrello. Non è solo prodotto — è anche
+  strutturale: `_righe_ordine` sintetizza l'unitario del mono per
+  DIVISIONE A RITROSO (`(prezzo − spedizione − protezione) // qta`,
+  «esatta per costruzione»), e uno sconto di testata la romperebbe in
+  silenzio, sbagliando l'unitario nell'ordine, nelle notifiche e nel
+  CSV. CONSEGUENZA VINCOLANTE: il badge non compare MAI su una pagina
+  d'acquisto mono, o si promette ciò che il conto non mantiene. La
+  garanzia è che `_sconto_pacco` la chiamano SOLO i due rami set — la
+  decisione vive fuori dal conto apposta, così è strutturale e non un
+  «if» da ricordare. Se un giorno lo si volesse anche per il mono, la
+  ricetta è nel commento dentro `_righe_ordine`.
+  2) SI CUMULA con lampo e accordo accettato: è una promessa di
+  NEGOZIO scritta in vetrina, e un pezzo che non la mantenesse non
+  avrebbe un posto onesto dove dirlo — servirebbe una riga «questo no»
+  per riga, e la soglia diventerebbe ambigua (quei pezzi contano?). Le
+  vie d'uscita sono asimmetriche: il venditore ha due bottoni (non
+  accetta l'offerta, o spegne lo sconto), il compratore che lo scopre
+  alla cassa non ha niente. Non scappa di mano perché non è additivo —
+  `_unitario_effettivo` fa già il MIN, e il carrello è UNA
+  moltiplicazione sul totale che ne esce; il guardrail è il tetto
+  della leva, e una prova dice ad alta voce il FONDO (lampo 70% +
+  carrello 30% = il 21% del listino): chi alza il tetto la trova rossa.
+  3) SI DICE IN PUBBLICO in due posti soli — testata della pagina
+  negozio e sezione «Altri oggetti di questo venditore», che è il
+  momento in cui uno sta per comporre. MAI nelle card (riga meta
+  dichiarata satura, e la regola è del negozio: su otto card sarebbe
+  la stessa frase otto volte) e MAI nelle pillole del dettaglio, che
+  parlano di QUELL'oggetto — una percentuale lì si legge come sconto
+  su QUEL prezzo, la confusione per cui il costo di spedizione è stato
+  tolto da quella fila.
+  4) LA SOGLIA CONTA I PEZZI (Σ quantità), non gli oggetti diversi:
+  tre cose nella scatola sono tre cose, ed è già il significato di
+  `ordini.quantita`. Il carrello richiede comunque ≥2 righe, quindi la
+  soglia non si raggiunge mai con un pezzo solo.
+  IL MODELLO: `utenti.sconto_pacco_soglia`/`sconto_pacco_percento`
+  (0/0 = spento; nessun flag «dichiarata» come per la tariffa punto —
+  lì lo zero era ambiguo, qui uno sconto dello 0% e nessuno sconto
+  sono la stessa cosa) e, sull'ordine, `sconto_sats` + `sconto_percento`
+  come voce di TESTATA — `ordine_righe` resta INTATTA, gli unitari
+  LORDI. È la strada che questo file dichiarava già preparata: lo
+  sconto è una proprietà del CARRELLO, non della cosa, e limare gli
+  unitari vorrebbe dire distribuire un resto su N righe e poi
+  litigarci in disputa. L'invariante nuovo è della testata, ed è
+  scritto nel DDL: `prezzo_sats = Σ(unitario×qta) − sconto_sats +
+  spedizione_sats + protezione_sats`. Il `sconto_percento` è la
+  fotografia della REGOLA e non della cifra (dedurla da
+  sconto/articolo direbbe 9,99%), e si scrive SOLO se lo sconto è
+  scattato — altrimenti la ricevuta di un ordine sotto soglia
+  dichiarerebbe uno sconto che non c'è.
+  `ordini.sconto_sats` È UNA COLONNA TESTIMONE, NON UN MOTORE, ed è la
+  riga da leggere prima di toccare qualunque strada del denaro:
+  l'unico numero che comanda è `prezzo_sats`, che nasce già scontato —
+  incasso del venditore, rimborso, XP e CSV leggono LUI e solo lui,
+  quindi NESSUNA delle quattro va toccata (verificato: `_sblocca_sats`,
+  `_rimborsa_compratore`, `deposita_invoice` e l'export sono intonsi).
+  Chi qui leggesse «il venditore deve incassare il pieno» e ne facesse
+  un `netto_venditore(prezzo + sconto)` farebbe uscire dall'escrow DI
+  ALTRI ORDINI la differenza, e la cintura di `paga_venditore` non lo
+  vedrebbe: per lei dovuto e bolt11 combacerebbero. Sentinella apposta.
+  IL CONTO: due pure nuove accanto alle altre — `_sconto_pacco`
+  (la DECISIONE) e `_sconto_pacco_eur` — più `_conto_ordine(…,
+  sconto=0)`, che è dove la SOTTRAZIONE avviene e in nessun altro
+  posto: chi legge il conto usa `netto`, e nessun chiamante sottrae
+  per conto suo (due sottrazioni sono uno sconto doppio, e la invoice
+  nasce di là). Il default a 0 tiene il ramo mono identico byte per
+  byte. Protezione e commissione si calcolano sul NETTO: la
+  percentuale sta sul prezzo che si paga davvero, ed è la stessa
+  strada che già seguono lampo e accordo. ARROTONDAMENTO: il netto col
+  floor e lo sconto per DIFFERENZA, la regola di `_prezzo_lampo` —
+  così `articolo − sconto` È il netto per costruzione (mai un sat di
+  scarto fra la riga mostrata e il totale) e il sat di dubbio resta a
+  CHI PAGA (999 a −10% → sconto 100, non 99). `_regola_sconto(soglia,
+  percento)` è il lettore unico e prende due INT e non una riga — il
+  patto di `in_ferie`: così serve la riga di `utenti`, gli alias
+  `venditore_sconto_*` della vetrina e la prova in CI.
+  L'EURO SI SCONTA IN EURO e non convertendo i sats: un carrello nato
+  in euro con la protezione a zero ha oggi un `totale_eur` ESATTO, e
+  uno sconto non deve poter peggiorare la QUALITÀ di un numero — chi
+  mostra il ≈ dove non serve, prima o poi lo toglie dove serviva. La
+  clausola `and (sconto == 0 or sconto_eur > 0)` nel gate di
+  `_strade_preventivo` è LA RIGA PIÙ DELICATA del cantiere: è l'unico
+  punto dove la modifica potrebbe produrre una cifra precisa e FALSA
+  invece di un ≈.
+  `articolo_sats` DIVENTA IL NETTO nella risposta del preventivo e di
+  compra, col LORDO e lo sconto come chiavi in più (`articolo_lordo_
+  sats`, `sconto_sats`, e la REGOLA — `sconto_percento`/`sconto_soglia`/
+  `mancano_pezzi` — che esce anche quando non è scattata, perché serve
+  all'invito). È un cambio di contratto deciso: quella chiave ha
+  sempre voluto dire «quanto paghi per la merce» ed è ciò che con
+  spedizione e protezione FA il totale, quindi un client fermo a ieri
+  somma comunque giusto e gli manca solo la riga del risparmio — che
+  è un'assenza, non una bugia. `mancano_pezzi` lo conta il server
+  anche se il client potrebbe: è esattamente il numero dove vive un
+  off-by-one.
+  ENDPOINT `POST /api/me/sconto-pacco` (pattern spedizioniere).
+  `percento <= 0` è lo SPEGNIMENTO e non ha NESSUNA guardia (il patto
+  del rientro dalle ferie). NIENTE `_impegni_aperti`, e non è una
+  dimenticanza: le ferie ce l'hanno perché chiudere toglie una via
+  d'uscita a chi ha già pagato, qui non si toglie niente a nessuno —
+  gli ordini nati portano il loro sconto fotografato e la loro escrow
+  è già scontata, e l'unica cosa «aperta» è un carrello nella memoria
+  di un client, che non sta nel database, non ha scadenza e non ha
+  controparte. Vale il conto del momento dell'acquisto, come per il
+  prezzo e per la lampo. E niente `guardia_ferie_venditore`: lampo e
+  asta ce l'hanno perché sono atti di vendita, mentre sistemare il
+  listino mentre si è via è esattamente ciò che si fa in ferie.
+  LEVE: `SCONTO_PACCO_ATTIVO` nasce ACCESA (non muove denaro verso
+  l'esterno, abbassa soltanto un conto in entrata),
+  `SCONTO_PACCO_SOGLIE`/`SCONTO_PACCO_SCONTI` sono le pillole del
+  venditore (il patto di LAMPO_SCONTI), `MIN_SOGLIA` 2 e
+  `MAX_PERCENTO` 30 restano la cintura del server anche se le liste
+  cambiano. Superficie: i due alias in `CAMPI_VETRINA` a costo ZERO
+  (il JOIN su `u` c'era già) e nel profilo di `/api/negozio`, ENTRAMBI
+  normalizzati da `_regola_sconto` — così la leva spenta li spegne in
+  tutte le vetrine insieme e il client non deve ricordarsi i casi.
+  FRONTEND: la riga «Sconto carrello −10%» entra in `contoRighe` fra
+  Prezzo e Commissione, SOLO quando scatta (una riga a zero direbbe
+  «non hai avuto niente», che non è un'informazione); il valore arriva
+  POSITIVO e il meno lo mette `cifraCtrl`, che guadagna un quarto
+  argomento e resta il GIUDICE UNICO — un negativo spegnerebbe il ≈
+  (che guarda `sats>0`) proprio dove serve, e `fmt()` scriverebbe il
+  trattino ASCII invece del meno tipografico. Niente colore, solo il
+  grassetto sulla cifra: l'unico chip colorato del sistema resta il
+  «gratis» della spedizione. L'INVITO nella pagina del carrello
+  (`aggiornaInvitoSconto`, agganciato ad `aggiornaBarraPacco` perché è
+  LEI a girare a ogni ±) dice quanti pezzi mancano e poi SI TRASFORMA
+  in conferma invece di sparire — se sparisse, chi ha appena
+  guadagnato lo sconto non vedrebbe cambiare niente. Il dato viene
+  dall'ANNUNCIO e non dal preventivo (che ha una firma e arriva in
+  ritardo), e il patto resta intero perché nell'invito NON C'È UN SAT:
+  contare pezzi non è fare il conto. LA BARRA DEL CARRELLO RESTA AL
+  LORDO, dichiarato: non è già oggi il totale da pagare (non ha
+  spedizione né protezione), e le alternative sono peggio — una
+  chiamata a ogni tocco dello stepper (con un debounce che litiga
+  proprio con chi sale in fretta, e una sentinella che conta DUE
+  lettori del preventivo) o il primo calcolo di denaro nel client
+  fuori dalla DEMO. Cassetto «🎁 Sconto sul carrello» nel Profilo fra
+  spedizioniere e ferie (due politiche sempre accese, poi
+  l'interruzione): pillole dalle liste del server, e le pillole
+  SCELGONO mentre a salvare è un bottone solo — soglia e percentuale
+  sono UNA regola, e con un POST per tocco esisterebbe il mezzo
+  secondo in cui il negozio ne ha una a metà, e in quel mezzo secondo
+  qualcuno può comprare. La bozza si butta a ogni `/api/me` (o
+  resterebbe quella fissata da un render girato prima che la regola
+  vera arrivasse: bug visto dal vivo). Il 400 si rende DENTRO il
+  cassetto, la ricetta delle ferie. Più la riga nell'ORDINE, che non è
+  opzionale: le righe lì sono LORDE, e senza la cifra del risparmio il
+  compratore rifà la somma e conclude di essere stato derubato.
+  In DEMO non si simula nulla (il carrello lì non esiste) e il ramo
+  `totaleSet()` resta ASCIUTTO apposta: è l'unico posto dove un
+  calcolo client sul denaro potrebbe filtrare se un giorno il gate
+  della DEMO si spostasse.
   PER GLI UTENTI SI CHIAMA CARRELLO (ago 2026, decisione di Andrea):
   la parola «pacco» nei testi resta SOLO dove significa la spedizione
   fisica (taglia del pacco, «segui il pacco», «Spedisci il set (un
@@ -3445,7 +3605,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   INTERNI restano «pacco» (paccoDati, view-controllapacco, .pacco-*,
   le chiavi di navigazione…), dichiarato: rinominarli sarebbe un
   refactor di massa contro la regola dei diff piccoli, e il commento
-  in testa ad apriPacco lo dice. Il MODELLO si dichiara in una riga
+  in testa ad apriPacco lo dice. Vale anche per lo SCONTO CARRELLO
+  nato dopo (ago 2026): i testi verso gli utenti dicono tutti
+  «carrello» — cassetto, invito, riga del conto, riga dell'ordine — e
+  i nomi interni restano `sconto_pacco_*` (colonne, leve, endpoint,
+  funzioni), che è la stessa famiglia. Il MODELLO si dichiara in una riga
   corta nel sottotitolo della pagina («un venditore alla volta,
   spedizione unica» — SENZA il «di {venditore}» davanti: misurato a
   375px, col nome la riga si troncava proprio sulla parte che deve
@@ -6496,6 +6660,46 @@ il default nel codice — `FERIE_ATTIVE` è ACCESA, che qui non esce
 niente verso nessuno. DA GUARDARE al primo giro: il journal del
 promemoria di rientro, e il primo venditore vero che chiude (che
 l'elenco degli impegni gli dica cose sensate).
+Lo sconto carrello 🎁 (ago 2026): il venditore premia chi compra più
+cose in un ordine solo — UNA regola per negozio, «da N articoli −X%»,
+sul SOLO prezzo degli articoli e mai sulla spedizione. Le quattro
+decisioni di Andrea: il MONO non sconta mai (e c'è anche la ragione
+tecnica — la divisione a ritroso di `_righe_ordine` si romperebbe in
+silenzio), si CUMULA con lampo e accordo, si dice in pubblico in due
+posti soli (negozio e «Altri oggetti»), la soglia conta i PEZZI. Il
+modello è la voce di TESTATA che questo file dichiarava già preparata:
+`ordine_righe` resta intatta e gli unitari LORDI. Vedi Architettura,
+«LO SCONTO CARRELLO», per il perché di ognuna, per la colonna
+TESTIMONE (che è la riga da leggere prima di toccare una strada del
+denaro) e per la clausola dell'euro nativo, che è l'unico punto dove
+la modifica poteva produrre una cifra precisa e falsa.
+Collaudato: 99 prove nuove in `prove.py` (738 verdi, erano 640) — le
+pure del conto una per una (soglia esatta e soglia−1, arrotondamenti
+col resto a chi paga, i limiti, l'invariante, la cascata col FONDO
+detto ad alta voce) più 38 sentinelle di forma, fra cui quelle che
+tengono lo sconto fuori dal mono, fuori dal payload del compratore e
+fuori da ogni strada del denaro in uscita. Più un collaudo TestClient
+su DB usa-e-getta (71 verdi) con in testa LA PROVA REGINA aggiornata:
+preventivo == compra al sat su quattro combinazioni, e `prezzo_sats`
+== l'importo della bolt11 CONIATA — il confronto che lega il libro
+mastro al denaro vero — con l'identità di bilancio riletta dal
+database a ogni ordine; e i casi chiesti da Andrea: sconto cambiato
+fra preventivo e acquisto (nei due versi), cambiato a invoice viva
+(il prezzo non si ricalcola), il mono a ×5 che non sconta, il netto
+del venditore sul totale scontato, l'euro nativo che resta ESATTO, e
+la leva spenta che non lascia niente in piedi. Più il giro visivo via
+CDP a 320/375/750px nei due temi: il conto che quadra a mano nelle due
+valute, l'invito che conta e si trasforma alla soglia, il paySheet che
+dice la stessa cifra della pagina, la scheda ordine che torna, e il
+cassetto avanti e indietro (dove il giro dal vivo ha trovato un bug
+vero: la bozza si fissava prima che la regola arrivasse). IN
+PRODUZIONE basta il deploy — le quattro colonne nascono a 0, cioè
+regola spenta per tutti, e le leve hanno il default nel codice
+(`SCONTO_PACCO_ATTIVO` è ACCESA: qui non esce niente verso nessuno).
+DA GUARDARE al primo giro: il controllo del libro mastro in SQL (le
+query sono pronte, le lancia Andrea), il primo acquisto scontato vero
+dentro Telegram con la bolt11 su LNbits, e il primo payout di un
+ordine scontato — se `paga_venditore` avvisa i moderatori, ci si ferma.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
