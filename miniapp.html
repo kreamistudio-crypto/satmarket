@@ -4066,6 +4066,25 @@ const fmt = n => n.toLocaleString('it-IT').replace(/\./g,'\u202F');
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const el = id => document.getElementById(id);
+/* Quanti feedback, e da quante PERSONE diverse (ago 2026). I feedback
+   del negozio escono senza nomi, di proposito: mostrare chi ha
+   comprato rivelerebbe gli acquisti altrui. Ma senza questo numero un
+   venditore con 40 voti dallo stesso account si vede IDENTICO a uno
+   con 40 voti di 40 persone, e chi guarda non ha modo di accorgersene.
+   Un conteggio, non dei nomi: la privacy resta intera e il giudizio
+   torna a chi legge.
+   LA SECONDA CIFRA COMPARE SOLO QUANDO I DUE NUMERI DIFFERISCONO —
+   se ogni feedback e' di una persona diversa non aggiunge niente, e
+   una riga che ripete lo stesso numero due volte si smette di
+   leggere. E' tutta la soglia: nessuna taratura magica da ricordare.
+   Giudice unico dei due posti che lo mostrano (negozio e Profilo), o
+   diverrebbero due rese della stessa cosa. */
+function contaFeedback(n, persone){
+  if(!n) return '';
+  return (persone && persone < n)
+    ? ` (${n} da ${persone} ${persone===1?'persona':'persone'})`
+    : ` (${n})`;
+}
 function toast(msg, ms){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), ms||2200); }
 function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
@@ -5137,7 +5156,7 @@ function renderNegozio(v, annunci, feedback=[]){
   /* Le stelle compaiono solo quando c'e' un rating vero: "0 ★" in
      vetrina farebbe solo danno a un venditore appena arrivato */
   const rep = (v.rating>0
-    ? `<span class="stars">${'★'.repeat(Math.round(v.rating))}</span> ${v.rating}${v.n_feedback?` (${v.n_feedback})`:''} · ` : '')
+    ? `<span class="stars">${'★'.repeat(Math.round(v.rating))}</span> ${v.rating}${contaFeedback(v.n_feedback, v.n_recensori)} · ` : '')
     + `${v.vendite_ok||0} vendite concluse`;
   /* Il PONTE verso il venditore, come nel dettaglio annuncio:
      Telegram se c'e' lo username pubblico, Nostr SOLO con la npub
@@ -8691,7 +8710,7 @@ async function salvaLnAddressProfilo(btn){
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 let mySuggerimenti = false;   // «💡 Suggerimenti sui miei annunci»: opt-in, spento di serie
-let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNegozio = '';
+let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
    ('' = automatico, la catena Telegram → Nostr → iniziale; oppure
    telegram | nostr | nessuna): il Profilo e il tappo mostrano sempre
@@ -8726,7 +8745,7 @@ function renderProfilo(){
   /* Stelle solo con un rating vero: "0 ★" farebbe solo danno
      (stessa regola della vista negozio) */
   const rep = (myRating>0
-    ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${myNFeedback?` (${myNFeedback})`:''} · ` : '')
+    ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${contaFeedback(myNFeedback, myNRecensori)} · ` : '')
     + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`;
   const nome = myNome || 'Tu';
   box.innerHTML = `
@@ -12549,6 +12568,7 @@ async function avvia(){
     mySuggerimenti = !!me.suggerimenti_annunci;
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
+    myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
     myDoppioni = me.doppioni_nostr || [];

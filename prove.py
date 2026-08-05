@@ -2214,6 +2214,48 @@ def _codice_rifiuto(funzione, init, errore):
     return None
 
 
+def prove_conta_feedback():
+    """Da quante PERSONE arrivano i feedback (ago 2026). Il conteggio
+    esiste per una ragione sola: sul negozio pubblico i voti escono
+    senza nomi, quindi 40 feedback dallo stesso account si vedono
+    identici a 40 di 40 persone. Qui si guardano le tre righe che lo
+    tengono in piedi — e sono tre righe SENTINELLA, del tipo che
+    sparisce in un refactor senza che nessuno se ne accorga."""
+    print("\n[da quante persone]")
+    ric = pezzo("_ricalcola_rating")
+    prova("il ricalcolo conta le persone DISTINTE", True,
+          "COUNT(DISTINCT da_tg_id)" in ric)
+    prova("e le scrive in colonna", True, "n_recensori=?" in ric)
+    prova("il negozio pubblico la porta fuori", True,
+          "rating, n_feedback, n_recensori, vendite_ok" in _SORGENTE)
+
+    html = open("miniapp.html", encoding="utf-8").read()
+    prova("il client ha un giudice unico", True,
+          "function contaFeedback(" in html)
+    # Due soli posti la mostrano (negozio e Profilo) e devono passare
+    # entrambi da li', o diventano due rese diverse della stessa cosa
+    prova("i due posti lo usano tutti e due", 2,
+          html.count("contaFeedback(") - 1)   # -1 = la definizione
+
+    # La regola della soglia, rifatta qui: la seconda cifra parla SOLO
+    # quando i due numeri differiscono
+    def conta(n, persone):
+        if not n:
+            return ""
+        return (f" ({n} da {persone} "
+                f"{'persona' if persone == 1 else 'persone'})"
+                if persone and persone < n else f" ({n})")
+
+    prova("40 voti da 1 persona lo dicono", " (40 da 1 persona)",
+          conta(40, 1))
+    prova("40 voti da 38 persone lo dicono", " (40 da 38 persone)",
+          conta(40, 38))
+    prova("40 voti da 40 persone tacciono", " (40)", conta(40, 40))
+    prova("senza voti non c'e' riga", "", conta(0, 0))
+    prova("un server vecchio non rompe niente", " (5)", conta(5, 0))
+
+
+# ====================================================================
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -2229,7 +2271,7 @@ def main():
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
-              prove_forma_tracking):
+              prove_forma_tracking, prove_conta_feedback):
         try:
             f()
         except Exception as e:

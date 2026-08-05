@@ -1044,6 +1044,19 @@ def init_db():
                     # riga del benvenuto, che e' anche l'unico
                     # messaggio che mandiamo senza permesso.
                     "suggerimenti_annunci INTEGER DEFAULT 0",
+                    # n_recensori (ago 2026): quante PERSONE DIVERSE
+                    # hanno lasciato un feedback, accanto a quanti
+                    # feedback sono. Serve perche' i feedback del
+                    # negozio pubblico escono senza nomi (di
+                    # proposito: chi ha comprato non si annuncia), e
+                    # senza questo numero un venditore con 40 feedback
+                    # dallo stesso account si vede IDENTICO a uno con
+                    # 40 feedback di 40 persone. Non e' un giudizio:
+                    # e' il dato che permette a chi guarda di darne
+                    # uno. Ricalcolata da _ricalcola_rating come
+                    # rating e n_feedback, quindi rimozione admin e
+                    # fusione si sistemano da sole.
+                    "n_recensori INTEGER DEFAULT 0",
                     # comune: COLONNA INERTE (lug 2026). Nata per il
                     # filtro «📍 Vicino a me», tolto due giorni dopo
                     # perche' si sovrapponeva al filtro per regione —
@@ -1078,6 +1091,17 @@ def init_db():
             "SELECT tg_id FROM utenti WHERE negozio=''").fetchall():
         con.execute("UPDATE utenti SET negozio=? WHERE tg_id=?",
                     (nuovo_codice_negozio(con), r["tg_id"]))
+    # n_recensori per chi aveva gia' dei feedback: idempotente, tocca
+    # solo le righe ancora vuote (gemello di deriva_regioni). Da qui
+    # in poi ci pensa _ricalcola_rating a ogni voto.
+    try:
+        con.execute(
+            "UPDATE utenti SET n_recensori=("
+            "  SELECT COUNT(DISTINCT da_tg_id) FROM feedback "
+            "  WHERE per_tg_id=utenti.tg_id) "
+            "WHERE n_recensori=0 AND n_feedback>0")
+    except sqlite3.OperationalError:
+        pass   # la tabella feedback nasce piu' sotto: al primo avvio non c'e'
     # Migrazioni annunci: foto, contatto Nostr, l'evento NIP-99
     # pubblicato dalla piattaforma e la doppia valuta (il venditore
     # sceglie se il listino e' in sats o in EUR; per gli annunci EUR
@@ -5567,7 +5591,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
-                     "rating, n_feedback, vendite_ok, negozio, "
+                     "rating, n_feedback, n_recensori, vendite_ok, negozio, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
@@ -13637,12 +13661,14 @@ STATI_FEEDBACK = ("released", "refunded")   # gli stati che ammettono il voto
 
 
 def _ricalcola_rating(con, tg_id: int):
-    """Rifa' i conti di rating e n_feedback dalla tabella feedback.
-    Nessun commit qui dentro: la transazione e' del chiamante."""
-    r = con.execute("SELECT COUNT(*) AS n, AVG(voto) AS media "
+    """Rifa' i conti di rating, n_feedback e n_recensori dalla tabella
+    feedback. Nessun commit qui dentro: la transazione e' del chiamante."""
+    r = con.execute("SELECT COUNT(*) AS n, AVG(voto) AS media, "
+                    "COUNT(DISTINCT da_tg_id) AS persone "
                     "FROM feedback WHERE per_tg_id=?", (tg_id,)).fetchone()
-    con.execute("UPDATE utenti SET rating=?, n_feedback=? WHERE tg_id=?",
-                (round(r["media"] or 0, 1), r["n"], tg_id))
+    con.execute("UPDATE utenti SET rating=?, n_feedback=?, n_recensori=? "
+                "WHERE tg_id=?",
+                (round(r["media"] or 0, 1), r["n"], r["persone"], tg_id))
 
 
 @app.post("/api/orders/{ordine_id}/feedback")
