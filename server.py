@@ -91,8 +91,10 @@ except ImportError:
 # tutto funziona uguale, protegge meno un backup rubato.
 try:
     from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 except ImportError:
     Fernet = None
+    Scrypt = None
 # Pillow serve a convertire in JPEG le foto nei formati che i browser
 # non sanno leggere (HEIC degli iPhone, e i PNG/WebP arrivati grezzi);
 # pillow-heif e' il suo occhio per HEIC/HEIF. Se mancano, le foto
@@ -1381,6 +1383,19 @@ if MODALITA_COLLAUDO:
     print("   Metti MODALITA_COLLAUDO = False prima di andare online.")
     print("=" * 60)
 
+# Un fail-open DICHIARATO va anche detto (ago 2026, audit): finora i
+# codici dei buoni finivano in chiaro nel database senza una riga da
+# nessuna parte, e config_esempio.py nasce proprio con la chiave
+# vuota — cioe' il caso silenzioso era anche quello di serie.
+if not CHIAVE_CONTENUTI_DIGITALI:
+    print("ℹ️  I contenuti digitali (codici, buoni, licenze) si scrivono "
+          "IN CHIARO nel database:\n   metti CHIAVE_CONTENUTI_DIGITALI "
+          "nel config per cifrarli a riposo.")
+elif Fernet is None:
+    print("⚠️  CHIAVE_CONTENUTI_DIGITALI c'e' ma manca il pacchetto "
+          "cryptography:\n   i codici si scrivono IN CHIARO "
+          "(pip install cryptography).")
+
 
 # --------------- SICUREZZA: verifica initData Telegram --------------
 # Ogni richiesta della Mini App porta l'initData firmato da Telegram:
@@ -2134,16 +2149,43 @@ def quantita_da_payload(d, se_manca: int = 1) -> int:
 # resta leggibile anche dopo che la chiave arriva (i due formati
 # convivono, riconosciuti dal prefisso).
 
-def _chiave_fernet():
-    """La chiave Fernet derivata dal segreto di config (32 byte
-    urlsafe via SHA-256: qualunque stringa va bene come segreto)."""
-    return base64.urlsafe_b64encode(
-        hashlib.sha256(CHIAVE_CONTENUTI_DIGITALI.encode()).digest())
+# Il sale e' FISSO e sta qui in chiaro, ed e' voluto: Fernet non ha
+# dove mettere un sale per riga, e un sale non e' un segreto — serve a
+# rendere inutili le tabelle precalcolate, non a nascondere la chiave.
+# Il lavoro vero lo fa scrypt, che rende CARO ogni tentativo.
+_SALE_CONTENUTI = b"barattolo-contenuti-digitali"
+_chiave_scrypt = None      # derivarla costa: si fa una volta sola
+
+
+def _chiave_fernet(versione: str = "f2"):
+    """La chiave Fernet derivata dal segreto di config.
+
+    DUE RICETTE, e convivono per sempre — il prefisso del blob dice
+    quale usare:
+    - 'f'  = SHA-256 a passata singola, la prima. Si LEGGE ancora, o i
+             contenuti gia' scritti diventerebbero illeggibili.
+    - 'f2' = scrypt (ago 2026, audit). Con lo SHA-256 nudo indovinare
+             una passphrase debole costa un hash a tentativo, cioe'
+             miliardi al secondo; con scrypt ogni tentativo costa
+             memoria e tempo. Conta SOLO se la chiave e' debole — con
+             una casuale la prima ricetta bastava — ma il config dice
+             «una stringa segreta qualsiasi», e la promessa dev'essere
+             vera anche per chi la prende alla lettera."""
+    global _chiave_scrypt
+    if versione == "f":
+        return base64.urlsafe_b64encode(
+            hashlib.sha256(CHIAVE_CONTENUTI_DIGITALI.encode()).digest())
+    if _chiave_scrypt is None:
+        _chiave_scrypt = base64.urlsafe_b64encode(
+            Scrypt(salt=_SALE_CONTENUTI, length=32,
+                   n=2 ** 14, r=8, p=1).derive(
+                       CHIAVE_CONTENUTI_DIGITALI.encode()))
+    return _chiave_scrypt
 
 
 def _cifra_contenuto(testo: str) -> str:
     if CHIAVE_CONTENUTI_DIGITALI and Fernet is not None:
-        return "f:" + Fernet(_chiave_fernet()).encrypt(
+        return "f2:" + Fernet(_chiave_fernet()).encrypt(
             testo.encode("utf-8")).decode()
     return "plain:" + testo
 
@@ -2154,13 +2196,15 @@ def _decifra_contenuto(blob: str) -> str:
     (il venditore ce l'ha comunque, e' lui che l'ha scritto)."""
     if blob.startswith("plain:"):
         return blob[len("plain:"):]
-    if blob.startswith("f:"):
+    for prefisso, versione in (("f2:", "f2"), ("f:", "f")):
+        if not blob.startswith(prefisso):
+            continue
         if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
             return ("(contenuto cifrato: la chiave di lettura non è "
                     "disponibile sul server, contatta un moderatore)")
         try:
-            return Fernet(_chiave_fernet()).decrypt(
-                blob[len("f:"):].encode()).decode("utf-8")
+            return Fernet(_chiave_fernet(versione)).decrypt(
+                blob[len(prefisso):].encode()).decode("utf-8")
         except Exception:
             return ("(contenuto cifrato con una chiave diversa: "
                     "contatta un moderatore)")

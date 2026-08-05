@@ -105,7 +105,12 @@ ORE_SILENZIO_DIGITALE = 48   # consegnato ma mai rivelato: poi sblocco
 # Cifratura a riposo dei codici nel database: una stringa segreta
 # qualsiasi (generane una casuale e incollala SOLO nel config.py del
 # server). Vuota = i codici restano in chiaro nel DB: tutto funziona
-# uguale, protegge meno un backup rubato.
+# uguale, protegge meno un backup rubato — e il server lo dice con una
+# riga all'avvio, cosi' non e' un silenzio.
+# DUE COSE DA SAPERE PRIMA DI METTERLA: se la perdi, i contenuti gia'
+# cifrati non si leggono piu' (nessuno puo' recuperarli, nemmeno noi);
+# e accenderla non ricifra il passato — le righe gia' scritte in
+# chiaro restano in chiaro, e vanno bene cosi' finche' esistono.
 CHIAVE_CONTENUTI_DIGITALI = ""
 # Leve anti-frode, SPENTE di serie (0 = nessun limite):
 TETTO_DIGITALE_NUOVI = 0     # es. 50_000: un compratore senza acquisti

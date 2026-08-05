@@ -1502,6 +1502,69 @@ def prove_idor_verifica():
           "user = verifica_utente(" in vp and "compratore_id=?" in vp)
 
 
+def prove_contenuti_cifrati():
+    """La cifratura a riposo dei codici (ago 2026, audit). La chiave
+    si derivava con uno SHA-256 nudo: contro una passphrase debole
+    costa un hash a tentativo. Ora c'e' scrypt sotto il prefisso
+    'f2', e i due formati convivono per sempre — un database nato
+    con la ricetta vecchia deve restare leggibile."""
+    print("\n[i contenuti cifrati]")
+    try:
+        from cryptography.fernet import Fernet
+        from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+    except ImportError:
+        salta("la cifratura dei contenuti digitali",
+              "cryptography non e' installata")
+        return
+    import base64
+    import hashlib
+
+    def mondo(chiave):
+        amb = {"CHIAVE_CONTENUTI_DIGITALI": chiave, "Fernet": Fernet,
+               "Scrypt": Scrypt, "base64": base64, "hashlib": hashlib}
+        i = _SORGENTE.index("_SALE_CONTENUTI = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        exec(pezzo("_chiave_fernet"), amb)
+        exec(pezzo("_cifra_contenuto"), amb)
+        exec(pezzo("_decifra_contenuto"), amb)
+        return amb
+
+    a = mondo("una-chiave-segreta")
+    blob = a["_cifra_contenuto"]("BUONO-1234")
+    prova("si cifra con la ricetta nuova", True, blob.startswith("f2:"))
+    prova("il codice non si legge nel blob", False, "BUONO-1234" in blob)
+    prova("e si rilegge", "BUONO-1234", a["_decifra_contenuto"](blob))
+
+    # il formato VECCHIO deve restare leggibile per sempre: un database
+    # scritto ieri non puo' diventare illeggibile con un aggiornamento
+    vecchio = "f:" + Fernet(base64.urlsafe_b64encode(
+        hashlib.sha256(b"una-chiave-segreta").digest())).encrypt(
+            b"CODICE-VECCHIO").decode()
+    prova("il formato di ieri si rilegge ancora", "CODICE-VECCHIO",
+          a["_decifra_contenuto"](vecchio))
+    prova("e il 'plain:' di prima ancora", "in chiaro",
+          a["_decifra_contenuto"]("plain:in chiaro"))
+
+    # una chiave diversa non deve dare un'eccezione al chiamante, ma
+    # una riga onesta (il venditore il codice ce l'ha comunque)
+    altra = mondo("un'altra-chiave")
+    prova("chiave sbagliata: una riga onesta, mai un'eccezione", True,
+          altra["_decifra_contenuto"](blob).startswith("(contenuto cifrato"))
+
+    # senza chiave si scrive in chiaro, ed e' dichiarato — ma dev'essere
+    # DETTO all'avvio, che era la parte che mancava
+    spenta = mondo("")
+    prova("senza chiave si scrive in chiaro col suo prefisso", True,
+          spenta["_cifra_contenuto"]("X").startswith("plain:"))
+    prova("il fail-open non e' piu' muto: l'avvio lo dice", True,
+          "if not CHIAVE_CONTENUTI_DIGITALI:" in _SORGENTE
+          and "IN CHIARO" in _SORGENTE)
+    # e le due ricette non devono dare la stessa chiave, o scrypt
+    # sarebbe li' per niente
+    prova("scrypt e sha256 danno chiavi diverse", True,
+          a["_chiave_fernet"]("f2") != a["_chiave_fernet"]("f"))
+
+
 def prove_initdata():
     """La freschezza dell'initData (ago 2026, audit). La firma dice
     CHI, non QUANDO: finche' nessuno guardava `auth_date`, un initData
@@ -1792,7 +1855,7 @@ def main():
               prove_ritiro, prove_disarmo, prove_importo_uscita,
              prove_initdata, prove_foto, prove_avatar,
              prove_pagamento_incerto, prove_disputa_incagliata,
-             prove_idor_verifica):
+             prove_idor_verifica, prove_contenuti_cifrati):
         try:
             f()
         except Exception as e:
