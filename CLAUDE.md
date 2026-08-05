@@ -4100,7 +4100,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   riepilogo del pacco) · «PAGA» in fondo (secondo giro, decisione di
   Andrea: da quel bottone parte la fattura, e il nome lo dice —
   «Acquista» resta sui varchi che PORTANO alla pagina: barra, recinto
-  e il riepilogo del pacco). Toggle €/₿ in testata
+  e il riepilogo del pacco).
+  IL GIUDICE DEL «≈» È UNO, `cifraCtrl` (ago 2026, bug visto dal
+  telefono: il ≈ compariva su ENTRAMBE le valute — le condizioni
+  sparse sono il modo in cui è nato). La regola: il ≈ sta SOLO sulla
+  valuta convertita, mai su quella NATIVA del prezzo, mai sullo zero
+  — annuncio sats = sats esatti ed euro ≈, annuncio EUR = euro
+  esatto e sats ≈. L'euro nativo lo dice il SERVER (il client
+  mostra, mai calcola): `_eur_effettivo` (pura, il MIN lampo/accordo
+  sul lato euro) → `articolo_eur`/`articolo_unitario_eur` nel
+  preventivo e `spedizione_eur`/`totale_eur` per strada — il
+  `totale_eur` esce SOLO quando è esatto (articolo nato in euro,
+  tariffa in euro o zero, protezione zero: un totale misto non ha
+  una valuta nativa e resta ≈ in tutte e due le viste, e nel set
+  l'euro nativo esiste solo se OGNI riga è nata in euro). La doppia
+  conversione non solo mentiva col ≈: sbagliava di un centesimo
+  (38,49 per un listino da 38,50). Sentinelle: un solo
+  `function cifraCtrl`, la resa convertita vive solo lì dentro.
+  `prezzoParte` (vetrina/dettaglio) aveva già la regola giusta e
+  resta suo. Toggle €/₿ in testata
   (ridisegno dal preventivo in CACHE, mai un secondo fetch — e
   ATTENZIONE alla trappola pagata qui: l'edit di setValuta era
   atterrato su rinfrescaViste, due righe adiacenti identiche).
