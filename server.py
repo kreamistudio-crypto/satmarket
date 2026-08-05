@@ -9662,10 +9662,15 @@ def trova_doppioni_nostr(con, tg_id: int) -> list:
     return coppie
 
 
-# ------------------- AVATAR DEL PROFILO (lug 2026) ------------------
+# --------------- FACCIA E NOME DEL PROFILO (lug 2026) ---------------
 # La foto accanto al nome, presa dal social di provenienza: la foto
 # profilo Telegram per chi entra da Telegram, la picture del kind-0
-# per chi entra con Nostr. MAI un link agli originali: gli URL delle
+# per chi entra con Nostr. E dal kind-0 viene anche il NOME di chi e'
+# nato su Nostr: senza, resterebbe per sempre la npub abbreviata che
+# gli mette addosso crea_utente_nostr — un venditore chiamato
+# «npub1abcd…w3x9», che nessuno riconosce e nessuno cerca.
+#
+# MAI un link agli originali: gli URL delle
 # foto via Bot API contengono il TOKEN del bot e scadono in un'ora,
 # quelli Nostr sono host esterni arbitrari (e ogni visitatore della
 # vetrina gli regalerebbe il suo IP). Quindi: si scarica, si riduce a
@@ -9751,84 +9756,176 @@ async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
         return None    # niente foto, privacy o rete che manca: pari sono
 
 
-def _kind0_picture(relay: str, hexkey: str):
-    """Chiede a UN relay il profilo kind-0 e ne estrae 'picture'.
-    Sincrona: va in asyncio.to_thread (pattern chiedi_relay_dm)."""
+def _kind0_profilo(relay: str, hexkey: str):
+    """Chiede a UN relay il profilo kind-0 e ne restituisce il content
+    gia' letto (name, display_name, picture...). Sincrona: va in
+    asyncio.to_thread (pattern chiedi_relay_dm)."""
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
         ws.send(json.dumps(["REQ", "av", {
             "kinds": [0], "authors": [hexkey], "limit": 1}]))
-        url, inizio = None, time.time()
+        profilo, inizio = None, time.time()
         while time.time() - inizio < 6:
             msg = json.loads(ws.recv())
             if msg[0] == "EVENT" and msg[1] == "av":
-                trovata = (json.loads(msg[2].get("content") or "{}")
-                           .get("picture") or "").strip()
-                url = trovata or url
+                letto = json.loads(msg[2].get("content") or "{}")
+                if isinstance(letto, dict) and letto:
+                    profilo = letto
             elif msg[0] == "EOSE":
                 break
         ws.close()
-        return url
+        return profilo
     except Exception:
         return None
 
 
-async def _foto_profilo_nostr(npub: str) -> bytes | None:
-    """La picture del kind-0 dai 4 relay, scaricata con le stesse
-    guardie delle foto da URL dell'import (anti-SSRF + tetto 8MB):
-    l'URL lo scrive l'utente nel suo profilo, non un fidato."""
+async def _profilo_nostr(npub: str) -> dict:
+    """Il kind-0 dai 4 relay: si tiene il primo che risponde con
+    qualcosa. Un giro solo per tutto — la faccia e il nome stanno
+    nello stesso evento e non vale la pena chiederlo due volte."""
     if not create_connection:
-        return None
+        return {}
     try:
         hexkey = npub_to_hex(npub)
     except Exception:
-        return None
+        return {}
     risposte = await asyncio.gather(*[
-        asyncio.to_thread(_kind0_picture, r, hexkey)
+        asyncio.to_thread(_kind0_profilo, r, hexkey)
         for r in RELAYS_VERIFICA])
-    url = next((u for u in risposte if u), None)
+    return next((p for p in risposte if p), None) or {}
+
+
+async def _foto_profilo_nostr(profilo: dict) -> bytes | None:
+    """La picture del kind-0, scaricata con le stesse guardie delle
+    foto da URL dell'import (anti-SSRF + tetto 8MB): l'URL lo scrive
+    l'utente nel suo profilo, non un fidato."""
+    url = (profilo.get("picture") or "").strip()
     if not url or not url_foto_ammesso(url):
         return None
     return await asyncio.to_thread(scarica_foto_import, url)
 
 
-async def aggiorna_avatar(tg_id: int):
-    """Rinfresca il francobollo dal social scelto in avatar_scelta:
-    '' = automatico, la catena dei doppi cittadini — prima la foto
-    Telegram (l'anagrafica comanda: dopo la fusione nome e username
-    vengono da li'), poi la picture Nostr, e senza nulla l'iniziale;
-    'telegram' | 'nostr' = solo quella gamba, senza ripiego (la
-    scelta esplicita si rispetta: il social senza foto = iniziale);
-    'nessuna' = non si scarica proprio. La gamba Nostr SOLO da chiave
-    dal possesso dimostrato, la regola di notifica(): mai pescare la
-    foto di Caio perche' Tizio ne ha dichiarato la npub."""
+MAX_NOME_NOSTR = 40      # sta accanto agli annunci: una riga, corta
+
+
+def nome_da_profilo(profilo: dict) -> str:
+    """Il nome leggibile del kind-0: display_name se c'e', altrimenti
+    name. Arriva da un estraneo e finisce sotto i suoi annunci, quindi
+    una riga sola e corta (l'esc() del frontend fa il resto).
+    '' = il kind-0 non dice come si chiama."""
+    for chiave in ("display_name", "displayName", "name"):
+        v = profilo.get(chiave)
+        if isinstance(v, str):
+            v = " ".join(v.split())[:MAX_NOME_NOSTR].strip()
+            if v:
+                return v
+    return ""
+
+
+def _scrivi_nome_nostr(tg_id: int, nome: str):
+    """Il nome di un NATIVO Nostr (tg_id negativo) viene dal suo
+    kind-0: qui non c'e' altra anagrafica, e senza questa riga resta
+    per sempre la npub abbreviata di crea_utente_nostr. Mai sui tg_id
+    positivi: li' comanda Telegram (upsert_utente), che riscriverebbe
+    comunque al primo accesso. Un kind-0 muto non cancella nulla: si
+    tiene quello che c'e' gia'."""
+    if tg_id > 0 or not nome:
+        return
+    con = db()
+    con.execute("UPDATE utenti SET nome=? WHERE tg_id=? AND nome!=?",
+                (nome, tg_id, nome))
+    con.commit()
+    con.close()
+
+
+async def aggiorna_profilo_social(tg_id: int):
+    """Rinfresca dal social di provenienza cio' che e' suo: il
+    francobollo e — per chi e' nato da Nostr — il NOME.
+
+    La foto segue avatar_scelta: '' = automatico, la catena dei doppi
+    cittadini — prima la foto Telegram (l'anagrafica comanda: dopo la
+    fusione nome e username vengono da li'), poi la picture Nostr, e
+    senza nulla l'iniziale; 'telegram' | 'nostr' = solo quella gamba,
+    senza ripiego (la scelta esplicita si rispetta: il social senza
+    foto = iniziale); 'nessuna' = non si scarica proprio.
+
+    Il nome invece NON e' una preferenza estetica: e' come si chiama
+    quello che vende, e per un nativo Nostr esiste solo nel kind-0.
+    Per questo si chiede anche con 'nessuna' — chi non vuole la faccia
+    vuole comunque essere chiamato per nome.
+
+    La gamba Nostr SOLO da chiave dal possesso dimostrato, la regola
+    di notifica(): mai pescare la faccia (o il nome) di Caio perche'
+    Tizio ne ha dichiarato la npub."""
     if tg_id in _AVATAR_IN_CORSO:
         return
     _AVATAR_IN_CORSO.add(tg_id)
     try:
         con = db()
         u = con.execute(
-            "SELECT negozio, npub, npub_verificata, npub_accesso, "
+            "SELECT negozio, avatar, npub, npub_verificata, npub_accesso, "
             "avatar_scelta FROM utenti WHERE tg_id=?",
             (tg_id,)).fetchone()
         con.close()
-        if not u or not u["negozio"] or u["avatar_scelta"] == "nessuna":
+        if not u or not u["negozio"]:
             return
         scelta = u["avatar_scelta"]
+        npub = u["npub_accesso"] or \
+            (u["npub"] if u["npub_verificata"] else "")
+        # Un solo giro sui relay per il nome e per la faccia
+        profilo = {}
+        if npub and (tg_id < 0 or scelta in ("", "nostr")):
+            profilo = await _profilo_nostr(npub)
+        _scrivi_nome_nostr(tg_id, nome_da_profilo(profilo))
+        if scelta == "nessuna":
+            # niente da scaricare, ma il giro e' fatto: si timbra lo
+            # stesso, o il kind-0 si richiederebbe a ogni battito
+            _scrivi_avatar(tg_id, u["avatar"] or "")
+            return
         raw = None
         if tg_id > 0 and scelta in ("", "telegram"):
             raw = await _foto_profilo_telegram(tg_id)
-        if not raw and scelta in ("", "nostr"):
-            npub = u["npub_accesso"] or \
-                (u["npub"] if u["npub_verificata"] else "")
-            if npub:
-                raw = await _foto_profilo_nostr(npub)
+        if not raw and profilo and scelta in ("", "nostr"):
+            raw = await _foto_profilo_nostr(profilo)
         _scrivi_avatar(tg_id, _salva_avatar(u["negozio"], raw))
     except Exception as e:
-        print(f"⚠️ Avatar non aggiornato ({tg_id}): {e}")
+        print(f"⚠️ Profilo social non aggiornato ({tg_id}): {e}")
     finally:
         _AVATAR_IN_CORSO.discard(tg_id)
+
+
+SECONDI_RINFRESCO_NOSTR = 3600      # ogni ora si guarda chi e' scaduto
+MAX_RINFRESCHI_GIRO = 20            # ...e non piu' di venti per volta
+_prossimo_rinfresco_nostr = 0.0
+
+
+async def rinfresca_profili_nostr():
+    """Il giro che va a prendere nome e faccia di chi non passa mai da
+    /api/me. Serve perche' l'import aperto apre account da se': un
+    venditore scoperto sui relay non ha mai aperto la Mini App, quindi
+    il rinfresco opportunistico del profilo non scatta mai per lui —
+    e i suoi annunci resterebbero firmati da una npub abbreviata.
+
+    Non e' legato a IMPORT_NOSTR_APERTO: come si chiama un venditore e'
+    questione di vetrina, non d'importazione, e vale anche per chi e'
+    entrato da se' col login Nostr. Cadenza per utente GIORNI_AVATAR
+    come per tutti (il timbro e' avatar_aggiornato), tetto per giro
+    perche' ogni riga costa una domanda ai relay."""
+    global _prossimo_rinfresco_nostr
+    if time.time() < _prossimo_rinfresco_nostr:
+        return
+    _prossimo_rinfresco_nostr = time.time() + SECONDI_RINFRESCO_NOSTR
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id FROM utenti WHERE tg_id<0 AND negozio!='' "
+        "AND avatar_aggiornato < ? ORDER BY avatar_aggiornato LIMIT ?",
+        (int(time.time()) - GIORNI_AVATAR * 86400,
+         MAX_RINFRESCHI_GIRO)).fetchall()
+    con.close()
+    for r in righe:
+        # Uno alla volta: sono quattro relay a testa, non c'e' fretta
+        await aggiorna_profilo_social(r["tg_id"])
 
 
 @app.get("/api/me")
@@ -9840,14 +9937,14 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     con = db()
     u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
-    # Rinfresco opportunistico del francobollo: alla prima apertura e
-    # poi al piu' una volta a settimana, in sottofondo (fail-open:
-    # questa risposta non lo aspetta, la foto compare al giro dopo).
-    # Con 'nessuna' non si scarica nulla: la scelta si rispetta.
-    if u and u["avatar_scelta"] != "nessuna" \
-            and (int(time.time()) - (u["avatar_aggiornato"] or 0)
-                 > GIORNI_AVATAR * 86400):
-        asyncio.create_task(aggiorna_avatar(user["id"]))
+    # Rinfresco opportunistico del francobollo (e del nome, per i
+    # nativi Nostr): alla prima apertura e poi al piu' una volta a
+    # settimana, in sottofondo (fail-open: questa risposta non lo
+    # aspetta, la faccia compare al giro dopo). La scelta 'nessuna' la
+    # rispetta aggiorna_profilo_social, che non scarica nulla.
+    if u and (int(time.time()) - (u["avatar_aggiornato"] or 0)
+              > GIORNI_AVATAR * 86400):
+        asyncio.create_task(aggiorna_profilo_social(user["id"]))
     if u:
         # Passata silenziosa dei distintivi: cosi' Pioniere e compagni
         # compaiono al primo sguardo al Profilo, senza aspettare un
@@ -10229,7 +10326,7 @@ async def scegli_avatar(req: Request,
     # La sorgente e' cambiata: il francobollo in dispensa puo' venire
     # dall'altro social, si rifa' subito (con 'nessuna' non si scarica)
     if scelta != "nessuna":
-        asyncio.create_task(aggiorna_avatar(user["id"]))
+        asyncio.create_task(aggiorna_profilo_social(user["id"]))
     return {"ok": True, "scelta": scelta}
 
 
@@ -14673,6 +14770,10 @@ async def _accogli_venditore_nostr(hexkey: str) -> int:
     if riga:
         return riga["tg_id"]
     tg_id = crea_utente_nostr(hexkey, npub)
+    # Nome e faccia dal suo kind-0, subito: gli annunci di questo giro
+    # devono nascere gia' firmati da come si chiama, non dalla npub.
+    # In sottofondo — se i relay tacciono ci ripassa rinfresca_profili_nostr.
+    asyncio.create_task(aggiorna_profilo_social(tg_id))
     # Il benvenuto e' fail-open: un DM che non parte (relay muti,
     # cryptography assente) non deve far saltare l'import.
     try:
@@ -15155,6 +15256,10 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Import Nostr periodico saltato (riprovo tra "
                   f"un'ora): {e}")
+        try:
+            await rinfresca_profili_nostr()
+        except Exception as e:
+            print(f"⚠️ Rinfresco dei profili Nostr saltato: {e}")
         try:
             pulisci_import()
         except Exception as e:

@@ -436,6 +436,37 @@ def prove_categorie():
 
 
 # ====================================================================
+def prove_nome_nostr():
+    """Come si chiama chi arriva dai relay (lug 2026). Il kind-0 lo
+    scrive un estraneo: quel testo finisce sotto i suoi annunci, quindi
+    dev'essere una riga sola e corta — e senza nome si deve poter dire
+    «non lo so», che e' cio' che tiene la npub abbreviata al suo posto
+    invece di cancellarla."""
+    print("\n[nome dal kind-0 Nostr]")
+    amb = {}
+    i = _SORGENTE.index("MAX_NOME_NOSTR = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i) + 1], amb)
+    exec(pezzo("nome_da_profilo"), amb)
+    nome = amb["nome_da_profilo"]
+
+    prova("display_name batte name", "Anna dei Fiori",
+          nome({"name": "anna", "display_name": "Anna dei Fiori"}))
+    prova("senza display_name vale name", "anna", nome({"name": "anna"}))
+    prova("displayName in cammello (i client vecchi)", "Anna",
+          nome({"displayName": "Anna"}))
+    prova("display_name vuoto ripiega su name", "anna",
+          nome({"name": "anna", "display_name": "   "}))
+    prova("gli a capo diventano una riga sola", "Anna dei Fiori",
+          nome({"name": "Anna\n\ndei   Fiori"}))
+    prova("il nome lunghissimo si taglia", amb["MAX_NOME_NOSTR"],
+          len(nome({"name": "a" * 200})))
+    prova("kind-0 muto = nessun nome", "", nome({}))
+    prova("kind-0 senza nome = nessun nome", "",
+          nome({"about": "vendo miele", "picture": "http://x/y.jpg"}))
+    prova("un nome che non e' testo non conta", "", nome({"name": 42}))
+
+
+# ====================================================================
 def prove_senza_condizione():
     """Le categorie dove la condizione non vuol dire niente (lug 2026).
     Server e frontend tengono lo stesso elenco — il catalogo si
@@ -2189,6 +2220,7 @@ def main():
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_testo_evento,
               prove_tag_commercio, prove_anello, prove_categorie,
+              prove_nome_nostr,
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
