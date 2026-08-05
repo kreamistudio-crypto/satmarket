@@ -148,6 +148,23 @@ FERIE_ATTIVE = True          # interruttore generale (False = spento)
 FERIE_MAX_GIORNI = 90        # quanto in la' puo' stare la data di rientro
 FERIE_PREAVVISO_ORE = 24     # «domani riapri» (0 = nessun promemoria)
 
+# --- Sconto carrello (chi prende piu' cose paga meno) ----------------
+# Il venditore premia chi compra piu' articoli in un ordine solo: UNA
+# regola per tutto il suo negozio — «da N articoli, −X%» — senza
+# scaglioni. Vale SOLO sul prezzo degli articoli, MAI sulla spedizione,
+# e si conta a PEZZI. Non vale su un annuncio comprato da solo, per
+# quante copie se ne prendano: lo sconto e' del carrello.
+# Si cumula con la lampo e con le offerte accettate: e' una promessa di
+# negozio, e un pezzo che non la mantenesse non avrebbe un posto onesto
+# dove dirlo. Il tetto qui sotto e' il guardrail della cascata.
+SCONTO_PACCO_ATTIVO = True      # interruttore generale (False = spento)
+SCONTO_PACCO_SOGLIE = (2, 3, 4, 5)      # le soglie proposte al venditore
+SCONTO_PACCO_SCONTI = (5, 10, 15, 20)   # le percentuali proposte
+SCONTO_PACCO_MIN_SOGLIA = 2     # sotto non e' uno sconto carrello: e'
+                                # un ribasso di listino, e quello si fa
+                                # sul prezzo
+SCONTO_PACCO_MAX_PERCENTO = 30  # sconto massimo consentito
+
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
 # Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
 # nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare

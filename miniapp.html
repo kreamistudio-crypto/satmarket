@@ -1313,6 +1313,16 @@
   .pacco-testa .cur-seg{margin-left:auto;flex:0 0 auto}
   .pacco-testa .pacco-tit .eur-hint{overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap}
+  /* L'invito dello sconto: una riga sola allineata alla griglia (che
+     porta gia' il suo respiro sotto, qui non serve un secondo
+     margine). Vestiti di casa e nessun token nuovo: il muto di
+     .acq-nota mentre manca qualcosa, il verde di .trust-note quando
+     lo sconto e' scattato — lo stesso verde della spunta sulla foto,
+     che e' la conferma. A carrello vuoto il div e' vuoto e sparisce. */
+  #paccoSconto{padding:12px var(--pad) 0}
+  #paccoSconto:empty{display:none}
+  #paccoSconto .acq-nota{margin-top:0}
+  #paccoSconto .trust-note{margin-bottom:0}
   /* La cella: card di vetrina + bottone sotto. Il barattolino dei
      preferiti si spegne QUI (e solo qui): l'angolo in alto a destra
      della foto e' della spunta del pacco — lampo e asta stanno a
@@ -1476,6 +1486,13 @@
   .ctrl-riga+.ctrl-riga{border-top:1px dashed var(--line)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
+  /* Lo sconto del negozio: la sola cifra in grassetto oltre al totale.
+     NIENTE COLORE — la regola di casa e' il grassetto, e l'unico chip
+     colorato del sistema resta il «gratis» della spedizione. La riga
+     resta piu' piccola del totale (14 contro 16.5), quindi la
+     gerarchia e' salva; il tratteggio che la stacca dal Prezzo arriva
+     gia' da .ctrl-riga+.ctrl-riga. */
+  .ctrl-riga.sconto .mono{font-weight:800}
   /* «in promo»: la commissione esiste per dire che oggi e' gratis —
      pillolina nell'arancio tenue di casa, mai un colore nuovo */
   .promo-tag{display:inline-block;background:var(--sats-soft);
@@ -2769,6 +2786,13 @@
         <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
       </div>
     </div>
+    <!-- L'INVITO DELLO SCONTO (ago 2026): la REGOLA del negozio detta
+         in una riga, sotto la testata e sopra la griglia — e' qui che
+         il carrello si compone, ed e' qui che l'invito serve. Non
+         porta MAI una cifra in sats: dice pezzi e percentuale, cioe'
+         la regola e non il conto (che resta del server, nel
+         riepilogo). Lo riempie aggiornaInvitoSconto(), a ogni ±. -->
+    <div id="paccoSconto"></div>
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
   </div>
 
@@ -3144,6 +3168,19 @@
       <div class="acc" id="accSpedizioniere">
         <button class="acc-h" onclick="toggleAcc('accSpedizioniere')"><span class="em">📦</span>Come spedisci<span class="fr">▾</span></button>
         <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
+      </div>
+
+      <!-- Lo sconto sul carrello (ago 2026): UNA regola per tutto il
+           negozio — tanti pezzi, tanto sconto — che vale sui soli
+           ARTICOLI e mai sulla spedizione. Le soglie e le percentuali
+           possibili arrivano da /api/me, mai hardcodate qui (il patto
+           della lampo). Sta accanto allo spedizioniere perche' sono
+           due politiche di negozio sempre accese; le ferie, che sono
+           l'interruzione, chiudono il gruppo.
+           In DEMO il cassetto sparisce, il patto del wallet. -->
+      <div class="acc" id="accScontoPacco">
+        <button class="acc-h" onclick="toggleAcc('accScontoPacco')"><span class="em">🎁</span>Sconto sul carrello <span class="conta" id="scontoPaccoConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="scontoPaccoBlocco"></div></div>
       </div>
 
       <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
@@ -3857,6 +3894,13 @@ function mapListing(a){
        del rientro (unix, come lampoFine e astaFine). L'annuncio resta
        in vetrina: cambia solo che non si compra. */
     ferie:a.venditore_ferie||0,
+    /* lo sconto sul carrello del negozio (ago 2026): la REGOLA —
+       quanti pezzi, quanta percentuale — non il conto, che resta del
+       server. Vale per tutti gli annunci del venditore, quindi la
+       porta ognuno di loro; 0 = nessuna regola, o server di ieri, e
+       non se ne parla. */
+    scontoSoglia:a.venditore_sconto_soglia||0,
+    scontoPct:a.venditore_sconto_percento||0,
     distintivi:a.venditore_distintivi||[],
     /* il titolo arriva GIA' col suo nome dal server: qui e' testo */
     sellerTitolo:a.venditore_titolo||''};
@@ -3881,6 +3925,11 @@ function mapOrder(o){
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
     protSats:o.protezione_sats||0,
+    /* lo sconto carrello FOTOGRAFATO (ago 2026): serve perche' le
+       righe qui sotto sono LORDE — senza questa cifra il compratore
+       farebbe la somma a mano e concluderebbe di essere stato
+       derubato. Sui mono e' sempre 0 e la riga non nasce. */
+    scontoSats:o.sconto_sats||0, scontoPct:o.sconto_percento||0,
     /* il punto di ritiro scelto dal compratore (ago 2026): testo
        libero — alla resa passa SEMPRE da esc(). viaPunto dice la
        STRADA (terzo giro): puo' essere vera col punto ancora vuoto,
@@ -5420,6 +5469,18 @@ function renderNegozio(v, annunci, feedback=[]){
   const mio = !DEMO && ((myNegozio && v.negozio === myNegozio)
     || (myUsername && v.username
         && v.username.toLowerCase() === myUsername.toLowerCase()));
+  /* La promessa dello sconto sul carrello nella VETRINA del venditore:
+     e' il posto naturale di una politica di negozio, e si vede anche
+     dal link pubblico. I due numeri finiscono in innerHTML senza esc:
+     Number() e' la cintura, la stessa di v.rating. */
+  const scontoNegozioRiga = w => {
+    const s = Number(w.sconto_pacco_soglia)||0,
+          p = Number(w.sconto_pacco_percento)||0;
+    return (s > 0 && p > 0)
+      ? `<div class="trust-note" style="margin-top:12px">🎁 <span>Questo
+           negozio fa <b>−${p}%</b> da ${s} pezzi nello stesso
+           carrello.</span></div>` : '';
+  };
   const chi = (v.nome||'').split(' ')[0];
   const ponti = mio ? '' : pontiContatto(
     (v.username||'').replace(/[^A-Za-z0-9_]/g,''),
@@ -5434,6 +5495,7 @@ function renderNegozio(v, annunci, feedback=[]){
       </div>
     </div>
     ${ponti}
+    ${scontoNegozioRiga(v)}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
   /* Gli ultimi feedback ricevuti: stelle + commento + ruolo + data.
      Mai nomi (il server non li manda proprio): su una pagina pubblica
@@ -5893,11 +5955,17 @@ function artStima(l){
 let offertaMinPercento = 0;
 /* Le righe del conto scomposto per i fogli di pagamento: compaiono
    solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
-function contoScomposto(art, sped, prot, tot, qta){
+function contoScomposto(art, sped, prot, tot, qta, sconto){
   const pezzi = qta || 1;
-  if (!(sped > 0 || prot > 0 || pezzi > 1)) return '';
-  const r = (n, t, b) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${fmt(n)} sats</span></div>`;
+  if (!(sped > 0 || prot > 0 || pezzi > 1 || sconto > 0)) return '';
+  const r = (n, t, b, meno) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${meno?'−':''}${fmt(n)} sats</span></div>`;
   return r(art, pezzi > 1 ? `Articolo × ${fmt(pezzi)}` : 'Articolo')
+       /* lo sconto del negozio: e' l'ultimo schermo prima che i sats
+          escano, e un totale piu' basso della somma delle righe sopra
+          sarebbe un mistero. La cifra arriva POSITIVA e il meno lo
+          mette la riga: fmt() di un negativo scriverebbe il trattino
+          ASCII invece del meno tipografico. */
+       + (sconto>0 ? r(sconto, 'Sconto carrello', 0, 1) : '')
        + (sped>0 ? r(sped, 'Spedizione') : '')
        + (prot>0 ? r(prot, 'Protezione acquisti') : '') + r(tot, 'Totale', 1);
 }
@@ -6389,9 +6457,16 @@ async function sezioneAltriOggetti(l){
      settimo e' un caso raro, e al piu' si nasconde un bottone in piu'. */
   const tuttoDigitale = l.consegna==='digitale'
     && altri.every(x => x.consegna==='digitale');
+  /* La promessa del negozio, DOVE il carrello si comincia a comporre:
+     fra il titolo di sezione e il bottone — prima il perche', poi
+     l'azione. Stesse condizioni del bottone: mai una promessa dove il
+     carrello non esiste. */
+  const scOk = !(DEMO || astaE(l) || tuttoDigitale || inFerie(l))
+    && l.scontoSoglia > 0 && l.scontoPct > 0;
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
+      ${scOk ? `<div class="acq-nota" style="margin-top:6px">🎁 Questo negozio fa <b>−${l.scontoPct}%</b> da ${l.scontoSoglia} pezzi nello stesso carrello.</div>` : ''}
       ${DEMO || astaE(l) || tuttoDigitale || inFerie(l) ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>`}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
@@ -6556,9 +6631,15 @@ function renderControlla(){
     const tot = min ? min.totale_sats
               : p.articolo_sats + (p.protezione_sats||0);
     el('ctrlConto').innerHTML = contoRighe({
-      art: p.articolo_sats, sped, prot: p.protezione_sats||0, tot,
+      /* la riga «Prezzo» dice il LORDO e quella sotto lo sconto, cosi'
+         il conto torna a occhio; il ripiego copre il server di ieri,
+         che il lordo non lo manda */
+      art: p.articolo_lordo_sats || p.articolo_sats,
+      sped, prot: p.protezione_sats||0, tot,
       circa: (p.stima || (min && min.stima)) ? '≈ ' : '',
-      artEur: p.articolo_eur||0,
+      artEur: p.articolo_lordo_eur || p.articolo_eur || 0,
+      sconto: p.sconto_sats||0, scontoEur: p.sconto_eur||0,
+      scontoPct: p.sconto_percento||0,
       spedEur: min ? (min.spedizione_eur||0) : 0,
       totEur: min ? (min.totale_eur||0) : 0,
       spedLabel: vive.length > 1 ? 'Spedizione (dalla più economica)'
@@ -6605,14 +6686,21 @@ async function caricaPreventivoPacco(){
    euro (lo dice il server, effettivo con lampo e accordo): in vista
    € si mostra LEI, esatta; i sats restano la conversione e il ≈ ce
    l'hanno loro (circa). eurNativo assente = la cifra e' nata in
-   sats: sats esatti, euro con ≈. */
-function cifraCtrl(sats, circa, eurNativo){
+   sats: sats esatti, euro con ≈.
+   `meno` = questa cifra SI SOTTRAE (lo sconto del negozio): il segno
+   sta attaccato al numero e DOPO il «≈» — «≈ −1 500 sats» si legge
+   «circa meno millecinquecento», «−≈ 1 500» no. Il valore arriva
+   sempre POSITIVO dal server, e non e' un dettaglio: un negativo
+   spegnerebbe il ≈ (che guarda sats>0) proprio dove serve, e fmt()
+   lo scriverebbe col trattino ASCII invece del meno tipografico. */
+function cifraCtrl(sats, circa, eurNativo, meno){
+  const m = meno ? '−' : '';
   if (valutaVista==='eur'){
     if (eurNativo > 0)
-      return `${fmtEur(eurNativo)}<span class="unit eur">€</span>`;
-    return `${sats>0?'≈ ':''}${fmtEur(sats * eurPerSat)}<span class="unit eur">€</span>`;
+      return `${m}${fmtEur(eurNativo)}<span class="unit eur">€</span>`;
+    return `${sats>0?'≈ ':''}${m}${fmtEur(sats * eurPerSat)}<span class="unit eur">€</span>`;
   }
-  return `${sats>0 ? (circa||'') : ''}${fmt(sats)}<span class="unit">sats</span>`;
+  return `${sats>0 ? (circa||'') : ''}${m}${fmt(sats)}<span class="unit">sats</span>`;
 }
 /* Le righe del conto — UN vestito per il riepilogo del pacco e la
    pagina d'acquisto: Prezzo, la commissione in promo, Spedizione
@@ -6622,6 +6710,14 @@ function cifraCtrl(sats, circa, eurNativo){
 function contoRighe(c){
   const r = (t, v, cls) => `<div class="ctrl-riga${cls?' '+cls:''}"><span>${t}</span><span class="mono">${v}</span></div>`;
   return r('Prezzo', cifraCtrl(c.art, c.circa, c.artEur))
+    /* Lo sconto del negozio: c'e' SOLO quando scatta — una riga a zero
+       direbbe «non hai avuto niente», che non e' un'informazione. Sta
+       attaccata al Prezzo perche' e' del PREZZO che parla: la
+       spedizione resta intera, sempre. La cifra arriva POSITIVA e il
+       meno lo mette il giudice (l'ultimo argomento). */
+    + (c.sconto>0
+        ? r(`Sconto carrello${c.scontoPct?` −${c.scontoPct}%`:''}`,
+            cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
     + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
     + r(c.spedLabel || 'Spedizione', cifraCtrl(c.sped, c.circa, c.spedEur))
     + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot, c.circa)) : '')
@@ -6906,9 +7002,17 @@ function renderAcquisto(){
   const tot = viaOk ? stradaSel.totale_sats
             : p.articolo_sats + (p.protezione_sats||0);
   const circa = (p.stima || (stradaSel && stradaSel.stima)) ? '≈ ' : '';
-  const conto = contoRighe({art: p.articolo_sats, sped, prot: p.protezione_sats||0,
+  const conto = contoRighe({/* «Prezzo» e' il LORDO, lo sconto la riga
+                               sotto: il ripiego copre il server di
+                               ieri. Sul MONO lo sconto e' sempre 0 e
+                               la riga non nasce mai. */
+                            art: p.articolo_lordo_sats || p.articolo_sats,
+                            sped, prot: p.protezione_sats||0,
                             tot, circa, spedLabel: 'Spedizione',
-                            artEur: p.articolo_eur||0,
+                            artEur: p.articolo_lordo_eur || p.articolo_eur || 0,
+                            sconto: p.sconto_sats||0,
+                            scontoEur: p.sconto_eur||0,
+                            scontoPct: p.sconto_percento||0,
                             spedEur: viaOk ? (stradaSel.spedizione_eur||0) : 0,
                             totEur: viaOk ? (stradaSel.totale_eur||0)
                                   : ((p.protezione_sats||0) ? 0 : p.articolo_eur||0)});
@@ -7126,7 +7230,16 @@ function renderPacco(){
 }
 /* Il totale della barra: i SOLI articoli, in valuta dello spettatore.
    Niente consegna e niente spedizione qui — entrano nel riepilogo,
-   dove c'e' un totale vero da raccontare. Il «≈» sta sul convertito. */
+   dove c'e' un totale vero da raccontare. Il «≈» sta sul convertito.
+   E NEMMENO LO SCONTO CARRELLO, di proposito (ago 2026): questa non e'
+   gia' oggi il totale da pagare, e' la somma degli articoli in
+   vetrina — che non porti lo sconto e' coerente con quello che E'.
+   Le due alternative sono peggio: far arrivare qui il preventivo
+   vorrebbe dire una chiamata a ogni tocco dello stepper (la firma
+   cambia ogni volta, e un debounce litigherebbe proprio con chi sale
+   in fretta), e calcolarlo nel client sarebbe il primo conto sul
+   denaro fuori dalla DEMO, proprio sul numero piu' carico. La
+   notizia la porta l'invito qui sopra, che dice anche dove guardare. */
 function aggiornaBarraPacco(){
   let tot = 0, pezzi = 0, circa = '';
   for (const [id, qta] of setScelte){
@@ -7146,6 +7259,47 @@ function aggiornaBarraPacco(){
      titolo «Il carrello», e a 375px la coda si troncava coi puntini */
   el('paccoConta').textContent = pezzi
     ? `${pezzi} pezz${pezzi===1?'o':'i'}` : 'il carrello è vuoto';
+  aggiornaInvitoSconto();     /* l'invito parla dello stesso conteggio */
+}
+/* ---- L'INVITO DELLO SCONTO SUL CARRELLO (ago 2026) ----
+   La regola del negozio in una riga: quanti pezzi mancano e di quanto
+   scende il carrello. NON e' un conto — qui dentro non c'e' un sat —
+   quindi il patto resta intero: il client conta i PEZZI (lo fa gia') e
+   ripete una regola che il server gli ha scritto sull'annuncio.
+   Il dato viene dall'ANNUNCIO e non dal preventivo, che ha una firma e
+   arriva in ritardo: un invito che risponde mezzo secondo dopo — o che
+   dice la cosa vecchia — e' peggio di nessun invito.
+   Vive in aggiornaBarraPacco perche' e' LEI a girare a ogni ±:
+   renderPacco riscrive tutto solo quando una riga entra o esce. */
+function scontoNegozio(){
+  /* la regola e' del NEGOZIO, quindi la porta ogni suo annuncio:
+     basta guardare il primo che c'e' */
+  const x = listings.find(t => t.id===paccoDati?.origineId)
+         || annunciPacco()[0];
+  return (x && x.scontoSoglia > 0 && x.scontoPct > 0)
+    ? {soglia: x.scontoSoglia, pct: x.scontoPct} : null;
+}
+function aggiornaInvitoSconto(){
+  const box = el('paccoSconto');
+  if (!box) return;
+  const s = scontoNegozio(), pezzi = pezziSet();
+  /* a carrello vuoto la promessa non ha ancora un destinatario: la
+     riga nasce col primo pezzo, quando c'e' qualcosa da far crescere */
+  if (!s || !pezzi) { box.innerHTML = ''; return; }
+  if (pezzi >= s.soglia){
+    /* SCATTATO: la riga non sparisce, si TRASFORMA in conferma. Se
+       sparisse, chi ha appena guadagnato lo sconto non vedrebbe
+       cambiare niente — la barra qui sotto e' al lordo, di proposito —
+       e la promessa sembrerebbe evaporata. Percio' dice anche DOVE
+       sono finiti i sats. */
+    box.innerHTML = `<div class="trust-note">✅ <span>Sconto attivo:
+      <b>−${s.pct}%</b> su tutto il carrello, lo vedi nel conto.</span></div>`;
+    return;
+  }
+  const n = s.soglia - pezzi;
+  box.innerHTML = `<div class="acq-nota">🎁 Ancora ${fmt(n)}
+    articol${n===1?'o':'i'}: il negozio fa <b>−${s.pct}%</b>
+    su tutto il carrello.</div>`;
 }
 /* GRIGLIA E RIEPILOGO SONO DUE VISTE DELLO STESSO STATO (`setScelte`,
    che e' il conteggio UNICO): la quantita' toccata in una si vede
@@ -7278,7 +7432,8 @@ async function startBuySet(){
      (stessi numeri per costruzione), con la stima client di ripiego */
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
-  const c = p ? {art: p.articolo_sats,
+  const c = p ? {art: p.articolo_lordo_sats || p.articolo_sats,
+                 sconto: p.sconto_sats||0,
                  sped: via ? (via.spedizione_sats||0) : 0,
                  prot: p.protezione_sats||0,
                  tot: via ? via.totale_sats
@@ -7289,7 +7444,8 @@ async function startBuySet(){
   /* il foglio invoice si apre SOPRA la pagina, che resta sotto com'e'
      (niente chiusure: il velo fa il suo mestiere) */
   el('payAmount').textContent = circaS + fmt(c.tot);
-  el('payScomposto').innerHTML = contoScomposto(c.art, c.sped, c.prot, c.tot, 1);
+  el('payScomposto').innerHTML = contoScomposto(c.art, c.sped, c.prot, c.tot,
+                                                1, c.sconto||0);
   el('payEurNota').style.display = 'none';
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
@@ -7313,8 +7469,10 @@ async function startBuySet(){
   }
   currentOrderId = d.ordine_id;
   el('payAmount').textContent = fmt(d.prezzo_sats);
-  el('payScomposto').innerHTML = contoScomposto(d.articolo_sats||d.prezzo_sats,
-    d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1);
+  el('payScomposto').innerHTML = contoScomposto(
+    d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
+    d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1,
+    d.sconto_sats||0);
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   if (pollTimer) clearInterval(pollTimer);
@@ -9183,6 +9341,7 @@ function openOrder(id){
         /* il SET: l'elenco dei pezzi con gli unitari fotografati —
            qui la media «pezzi × unitario» mentirebbe */
         o.righe.map(r=>`${esc(r.titolo)}${r.quantita>1?` × ${fmt(r.quantita)}`:''} — ${fmt(r.unitario_sats*r.quantita)} sats`).join('<br>')}</div>` : ''}
+      ${o.scontoSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🎁 Sconto carrello${o.scontoPct?` −${o.scontoPct}%`:''}: <b>−${fmt(o.scontoSats)} sats</b> sul prezzo qui sopra</div>` : ''}
       ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0 || (o.qta>1 && !o.righe.length)) ? `<div class="eur-hint" style="margin-top:-6px">${
         (o.qta>1 && !o.righe.length) ? `${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats` : ''}${
         (o.qta>1 && !o.righe.length) && o.consegnaScelta ? ' — ' : ''}${
@@ -9509,6 +9668,13 @@ let mySpedizioniere = '', spedizionieriCatalogo = [];
    Le leve (attive, tetto in giorni) arrivano dal server come tutte le
    altre — il client non ne tiene una copia a memoria. */
 let myFerieFino = 0, ferieLeve = null;
+/* Lo sconto sul carrello: la regola attiva ({soglia, percento} o null)
+   e le leve del server. Come le ferie: chiave assente = server di ieri
+   = cassetto assente. La BOZZA e' la scelta in corso — le pillole
+   scrivono li', il POST parte solo col bottone: soglia e percentuale
+   sono UNA regola, e non deve esistere l'istante in cui il negozio ne
+   ha una a meta' (in quel mezzo secondo qualcuno puo' comprare). */
+let myScontoPacco = null, scontoPaccoLeve = null, scontoPaccoBozza = null;
 let mySuggerimenti = false;   // «💡 Suggerimenti sui miei annunci»: opt-in, spento di serie
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
@@ -9958,6 +10124,7 @@ function renderIdentita(){
   box.innerHTML = tgRiga + nsRiga + fotoRiga;
   renderAvvisi();
   renderSpedizioniere();
+  renderScontoPacco();
   renderFerie();
   renderRicerche();
 }
@@ -10123,6 +10290,95 @@ async function setSpedizioniere(v){
     : 'Spedizioniere tolto: chi sceglie il punto si accorderà in chat');
   /* la riga del form segue la dichiarazione appena fatta */
   if (el('view-vendi')) aggiornaConsegnaForm();
+}
+
+/* ---- «🎁 Sconto sul carrello» (ago 2026) ----
+   Il venditore premia chi prende piu' cose: UNA regola per tutto il
+   negozio — soglia di pezzi + percentuale — sui soli ARTICOLI, che la
+   spedizione non si tocca mai. I valori possibili li dice il server (il
+   pattern della lampo): qui non c'e' una cifra inventata.
+   Le pillole SCELGONO, non salvano: soglia e percentuale sono una
+   regola sola, e con un POST per tocco esisterebbe il mezzo secondo in
+   cui il negozio ha la soglia nuova e la percentuale vecchia — e in
+   quel mezzo secondo qualcuno puo' comprare.
+   Il 400 si rende DENTRO il cassetto (la ricetta delle ferie): e' li'
+   che si e' appena toccato. */
+function renderScontoPacco(){
+  const box = el('scontoPaccoBlocco');
+  if (!box) return;
+  const sez = el('accScontoPacco');
+  if (DEMO || !(scontoPaccoLeve && scontoPaccoLeve.attivo)){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const attivo = !!(myScontoPacco && myScontoPacco.percento > 0);
+  el('scontoPaccoConta').textContent = attivo
+    ? `−${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi` : '';
+  /* la bozza parte da cio' che c'e' gia' (o dalla prima voce utile per
+     chi non ha ancora niente): il cassetto si apre con una proposta */
+  if (!scontoPaccoBozza)
+    scontoPaccoBozza = attivo
+      ? {soglia: myScontoPacco.soglia, pct: myScontoPacco.percento}
+      : {soglia: (scontoPaccoLeve.soglie||[])[0] || 2,
+         pct: (scontoPaccoLeve.sconti||[])[0] || 5};
+  const b = scontoPaccoBozza;
+  const pill = (v, testo, campo) =>
+    `<button onclick="scontoPaccoPill('${campo}',${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      Premia chi prende più cose in una volta: da un certo numero di
+      pezzi nello stesso carrello, il prezzo degli
+      <b style="color:var(--ink)">articoli</b> scende della percentuale
+      che scegli. La <b style="color:var(--ink)">spedizione non si
+      tocca</b> — ed è già una sola per tutto il carrello.</div>
+    <div id="scontoPaccoErrore"></div>
+    <div class="section-label" style="margin-top:14px">Da quanti pezzi</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${(scontoPaccoLeve.soglie||[]).map(s => pill(s, `${s} pezzi`, 'soglia')).join('')}</div>
+    <div class="section-label" style="margin-top:12px">Quanto sconto</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${(scontoPaccoLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
+    <div class="acq-nota">🎁 <b>Da ${b.soglia} pezzi in su, −${b.pct}% su
+      tutto il carrello.</b> Chi ne prende ${b.soglia-1} paga pieno.</div>
+    <button class="btn orange" onclick="setScontoPacco()">
+      ${attivo ? '🎁 Aggiorna lo sconto' : '🎁 Attiva lo sconto'}</button>
+    ${attivo ? `<button class="btn ghost" onclick="setScontoPacco(true)">Spegni lo sconto</button>` : ''}`;
+}
+function scontoPaccoPill(campo, v){
+  haptic();
+  scontoPaccoBozza[campo] = v;
+  renderScontoPacco();   /* l'anteprima e' una frase: si riscrive intera */
+}
+async function setScontoPacco(spegni){
+  haptic();
+  if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  const b = scontoPaccoBozza || {};
+  const corpo = spegni ? {soglia: 0, percento: 0}
+                       : {soglia: b.soglia, percento: b.pct};
+  const box = el('scontoPaccoErrore');
+  if (box) box.innerHTML = '';
+  try {
+    const r = await fetch(`${API_BASE}/me/sconto-pacco`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify(corpo)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      const dove = el('scontoPaccoErrore');
+      if (dove) dove.innerHTML =
+        `<div class="trust-note" style="margin-top:10px">⚠️ <span style="white-space:pre-line">${
+          esc(d.detail || 'Non ci sono riuscito, riprova')}</span></div>`;
+      else toast(d.detail || 'Non ci sono riuscito, riprova', 6000);
+      return;
+    }
+    myScontoPacco = d.percento > 0
+      ? {soglia: d.soglia, percento: d.percento} : null;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  scontoPaccoBozza = null;     /* la bozza riparte da cio' che e' salvato */
+  renderScontoPacco();
+  toast(myScontoPacco
+    ? `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`
+    : 'Sconto spento: da adesso il prezzo è pieno per tutti');
 }
 
 /* ---- «🌴 Negozio in ferie» (ago 2026) ----
@@ -13761,6 +14017,15 @@ async function avvia(){
     spedizionieriCatalogo = me.spedizionieri || [];
     myFerieFino = me.ferie_fino || 0;
     ferieLeve = me.ferie_leve || null;   // server di ieri = cassetto assente
+    myScontoPacco = (me.sconto_pacco_percento > 0)
+      ? {soglia: me.sconto_pacco_soglia, percento: me.sconto_pacco_percento}
+      : null;
+    scontoPaccoLeve = me.sconto_pacco_leve || null;   // idem
+    /* la bozza si butta a ogni /api/me, o resterebbe quella fissata da
+       un render girato PRIMA che la regola vera arrivasse — e il
+       cassetto si aprirebbe proponendo i valori di partenza invece di
+       cio' che il negozio promette davvero */
+    scontoPaccoBozza = null;
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;

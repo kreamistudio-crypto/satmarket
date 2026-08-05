@@ -2898,6 +2898,186 @@ def prove_conto_acquisto():
 
 
 # ====================================================================
+def prove_sconto_pacco():
+    """LO SCONTO CARRELLO (ago 2026): il venditore premia chi compra
+    piu' cose — UNA regola per negozio, soglia di pezzi + percentuale,
+    sul SOLO articolo e mai sulla spedizione. La matematica si tortura
+    qui da sola, senza database e senza nodo: e' il posto dove un
+    errore costa sats veri."""
+    print("\n[lo sconto carrello]")
+    amb = {}
+    for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
+              "_sconto_pacco", "_sconto_pacco_eur", "_conto_ordine"):
+        exec(pezzo(f), amb)
+    sc, sceur = amb["_sconto_pacco"], amb["_sconto_pacco_eur"]
+    conto, unit = amb["_conto_ordine"], amb["_unitario_effettivo"]
+
+    # --- LA SOGLIA: e' una PORTA, non una scala ---------------------
+    prova("soglia esatta: a 3 pezzi su 3 lo sconto SCATTA", 10_000,
+          sc(100_000, 3, 3, 10))
+    prova("soglia meno uno: a 2 pezzi non scatta niente", 0,
+          sc(100_000, 2, 3, 10))
+    prova("un pezzo solo: nemmeno l'ombra", 0, sc(100_000, 1, 3, 10))
+    prova("ben oltre la soglia: lo sconto non cresce coi pezzi", 10_000,
+          sc(100_000, 9, 3, 10))
+    # se un domani qualcuno vorra' gli SCAGLIONI, dovra' rompere questa
+    prova("...e' una percentuale sull'articolo, non un premio a pezzo",
+          True, sc(100_000, 3, 3, 10) == sc(100_000, 30, 3, 10))
+    prova("zero pezzi (payload storto): 0, non un negativo", 0,
+          sc(100_000, 0, 3, 10))
+
+    # --- LA REGOLA SPENTA: chi non la usa non paga niente ------------
+    prova("percento 0: la regola e' spenta", 0, sc(100_000, 9, 3, 0))
+    prova("soglia 0: la regola e' spenta", 0, sc(100_000, 9, 0, 10))
+    prova("soglia 1 non e' uno sconto carrello: spenta", 0,
+          sc(100_000, 9, 1, 10))
+    prova("percento negativo (colonna sporca): spenta", 0,
+          sc(100_000, 9, 3, -10))
+    # LA REGRESSIONE CHE VALE MEZZO CANTIERE: col quinto argomento a 0
+    # il conto e' quello di ieri, riga per riga
+    prova("sconto spento: totale = articolo + spedizione + protezione",
+          100_500, conto(100_000, 500, 0, 0, 0)["totale"])
+    prova("sconto spento: protezione col floor sul solo articolo", 0,
+          conto(33, 500, 3, 0, 0)["protezione"])
+    c0 = conto(100_000, 500, 5, 10, 0)
+    prova("sconto spento: protezione 5% = floor(5000)", 5_000,
+          c0["protezione"])
+    prova("sconto spento: la commissione resta fuori dal totale",
+          105_500, c0["totale"])
+    prova("sconto spento: e la riga la dice (10%)", 10_000,
+          c0["commissione"])
+
+    # --- GLI ARROTONDAMENTI: il resto va a CHI PAGA ------------------
+    prova("999 a -10%: il resto va al COMPRATORE (100, non 99)", 100,
+          sc(999, 3, 3, 10))
+    prova("...e infatti l'articolo netto e' 899", 899, 999 - sc(999, 3, 3, 10))
+    prova("1001 a -10%: 101, e non 100", 101, sc(1001, 3, 3, 10))
+    prova("10 a -10%: un sat tondo", 1, sc(10, 3, 3, 10))
+    prova("7 a -15%: 1,05 diventa 2 (la regola della lampo)", 2,
+          sc(7, 3, 3, 15))
+    prova("33% su 100.000: divisione esatta, nessun resto", 33_000,
+          sc(100_000, 3, 3, 33))
+    # IL LEGAME con la regola vecchia: se un domani qualcuno cambia il
+    # verso dell'arrotondamento in UNO dei due posti, questa lo dice
+    lampo = amb["_prezzo_lampo"]({"valuta": "sats", "prezzo_sats": 999,
+                                  "prezzo_eur": 0.0}, 10)[0]
+    prova("lo stesso arrotondamento della lampo, sullo stesso numero",
+          lampo, 999 - sc(999, 3, 3, 10))
+
+    # --- I LIMITI: lo sconto non mangia mai l'articolo ---------------
+    prova("articolo da 1 sat: non si sconta", 0, sc(1, 5, 2, 10))
+    prova("articolo da 2 sat a -90%: si scende a 1, mai a 0", 1,
+          sc(2, 5, 2, 90))
+    prova("percento 100: l'articolo non e' MAI gratis", 99,
+          sc(100, 5, 2, 100))
+    prova("percento assurdo (150) si tappa a 100", 99, sc(100, 5, 2, 150))
+    prova("lo sconto non supera mai l'articolo", True,
+          all(sc(x, 9, 2, 99) < x for x in (1, 2, 3, 10, 999, 100_000)))
+
+    # --- IL CONTO: dove lo sconto entra e dove NON entra -------------
+    c = conto(100_000, 500, 0, 0, 10_000)
+    prova("il totale scende dello sconto", 90_500, c["totale"])
+    prova("...e la spedizione non si muove di un sat", 500, c["spedizione"])
+    prova("l'articolo LORDO resta in chiaro nel conto", 100_000,
+          c["articolo"])
+    prova("...e il netto e' quello che si paga", 90_000, c["netto"])
+    prova("lo sconto non tocca MAI la spedizione, a nessun percento",
+          500, conto(100_000, 500, 0, 0, 99_999)["spedizione"])
+    cp = conto(100_000, 500, 5, 10, 10_000)
+    prova("la protezione sta sull'articolo SCONTATO (4.500, non 5.000)",
+          4_500, cp["protezione"])
+    prova("...e il totale la segue", 95_000, cp["totale"])
+    prova("la commissione resta informativa: MAI nel totale", 95_000,
+          conto(100_000, 500, 5, 10, 10_000)["totale"])
+    prova("...e anche lei guarda lo scontato", 9_000, cp["commissione"])
+    # le cinture del chiamante distratto: _sconto_pacco non produce mai
+    # questi valori, ma il conto non deve inventare denaro
+    prova("sconto piu' grande dell'articolo: il totale non e' negativo",
+          500, conto(100, 500, 0, 0, 1000)["totale"])
+    prova("...e il netto si ferma a zero", 0,
+          conto(100, 500, 0, 0, 1000)["netto"])
+    prova("sconto negativo (chiamante distratto): non gonfia il totale",
+          100_500, conto(100_000, 500, 0, 0, -50_000)["totale"])
+
+    # --- L'INVARIANTE, come la legge un contabile -------------------
+    righe = [(33_333, 2), (12_000, 1)]      # due annunci, TRE pezzi
+    lordo = sum(u * q for u, q in righe)
+    pezzi = sum(q for _, q in righe)
+    s = sc(lordo, pezzi, 3, 10)
+    ci = conto(lordo, 700, 5, 0, s)
+    prova("l'articolo LORDO e' la somma di unitario x quantita", 78_666,
+          lordo)
+    prova("il conteggio e' di PEZZI, non di righe (3, non 2)", 3, pezzi)
+    prova("lo sconto del carrello a tre pezzi", 7_867, s)
+    prova("il netto e' il lordo meno lo sconto", 70_799, ci["netto"])
+    prova("la protezione sull'imponibile (5% col floor)", 3_539,
+          ci["protezione"])
+    prova("IL TOTALE DELLA INVOICE", 75_038, ci["totale"])
+    prova("invariante: lordo - sconto + spedizione + protezione = totale",
+          ci["totale"],
+          lordo - ci["sconto"] + ci["spedizione"] + ci["protezione"])
+    cs = conto(lordo, 700, 5, 0, 0)
+    prova("invariante: vale anche a sconto spento (gli ordini di ieri)",
+          cs["totale"], lordo - 0 + cs["spedizione"] + cs["protezione"])
+    prova("le righe restano LORDE: lo sconto non le sfiora", 78_666,
+          sum(u * q for u, q in righe))
+
+    # --- LA CASCATA con lampo e accordo (si CUMULA, deciso) ---------
+    def a(**kw):
+        base = {"prezzo_sats": 100_000, "prezzo_eur": 0.0,
+                "valuta": "sats", "lampo_percento": 0, "lampo_scadenza": 0}
+        base.update(kw)
+        return base
+    ul = unit(a(lampo_percento=20, lampo_scadenza=2000), None, 1000, 0.0)
+    prova("lampo -20%: l'unitario e' 80.000", 80_000, ul)
+    prova("...e sui tre pezzi il carrello sconta ancora (in cascata)",
+          24_000, sc(ul * 3, 3, 3, 10))
+    prova("...cioe' 216.000 invece di 300.000", 216_000,
+          ul * 3 - sc(ul * 3, 3, 3, 10))
+    # IL FONDO delle due leve al massimo, detto ad alta voce: chi
+    # alzera' SCONTO_PACCO_MAX_PERCENTO trovera' questa riga rossa e
+    # dovra' rifare il conto consapevolmente
+    fondo = 30_000 - sc(30_000, 3, 3, 30)
+    prova("lampo al 70% + carrello al 30%: il fondo e' il 21% del listino",
+          21_000, fondo)
+    prova("le leve hanno un default sano nel sorgente", True,
+          "SCONTO_PACCO_MAX_PERCENTO = 30" in _SORGENTE
+          and "SCONTO_PACCO_MIN_SOGLIA = 2" in _SORGENTE)
+
+    # --- L'EURO NATIVO: si sconta in euro, non convertendo i sats ----
+    prova("euro nativo: -10% su 100,00 fa 10,00", 10.0,
+          sceur(100.0, 3, 3, 10))
+    prova("listino in sats: nessuno sconto nativo (0.0)", 0.0,
+          sceur(0.0, 3, 3, 10))
+    prova("euro nativo sotto soglia: 0.0", 0.0, sceur(100.0, 2, 3, 10))
+    prova("euro nativo: due decimali, mai di piu'", 10.0,
+          sceur(99.99, 3, 3, 10))
+    prova("euro minuscolo: il netto non scende sotto un centesimo", 0.01,
+          sceur(0.02, 3, 2, 99))
+    prova("i due gemelli scattano SEMPRE insieme", True,
+          bool(sc(100_000, 3, 3, 10)) == bool(sceur(100.0, 3, 3, 10)))
+
+    # --- IL MONO non sconta mai: la divisione a ritroso resta esatta -
+    amb2 = {}
+    exec(pezzo("_righe_ordine"), amb2)
+
+    class _Fila:
+        def __init__(self, d): self.d = d
+        def __getitem__(self, k): return self.d[k]
+
+    class _Con:                      # un database di cartone
+        def execute(self, q, p):
+            self.r = _Fila({"titolo": "Tazza"})
+            return self
+        def fetchone(self): return self.r
+
+    o = {"annuncio_id": 7, "quantita": 3, "prezzo_sats": 90_500,
+         "spedizione_sats": 500, "protezione_sats": 0}
+    prova("mono: la divisione a ritroso resta esatta (30.000 a pezzo)",
+          30_000, amb2["_righe_ordine"](_Con(), o)[0]["unitario_sats"])
+
+
+# ====================================================================
 def prove_consegna_payload_punto():
     """Il giudice unico dei campi di consegna, sul ramo nuovo: la
     dichiarazione della tariffa punto e' la PRESENZA di una chiave,
@@ -3113,6 +3293,124 @@ def prove_pagina_acquisto():
           "me.spedizionieri" in mini)
     prova("...e il client non lo riempie mai da solo", 1,
           mini.count("spedizionieriCatalogo = ["))
+
+
+# ====================================================================
+def prove_forma_sconto_pacco():
+    """Le righe che un riordino farebbe sparire senza rompere nessuna
+    prova funzionale — e che sono tutto cio' che tiene lo sconto
+    carrello dove deve stare: fuori dal mono, fuori dal payload del
+    compratore, e fuori da ogni strada del denaro in USCITA."""
+    print("\n[lo sconto carrello: la forma]")
+    src = open("server.py", encoding="utf-8").read()
+
+    # 1) UN giudice solo, e due chiamanti soli (i due rami SET): il
+    # preventivo e la invoice devono dire la stessa cifra per
+    # costruzione, non per disciplina.
+    prova("lo sconto ha UN giudice solo", 1, src.count("def _sconto_pacco("))
+    # (si contano le CHIAMATE, non le occorrenze del nome: l'endpoint
+    # si chiama imposta_sconto_pacco e finirebbe nel conto)
+    prova("...e due chiamanti soli (compra set, preventivo set)", 2,
+          src.count("= _sconto_pacco("))
+    prova("il gemello in euro e' UNO", 1,
+          src.count("def _sconto_pacco_eur("))
+    prova("la regola si legge da UN lettore solo", 1,
+          src.count("def _regola_sconto("))
+
+    # 2) Le pure restano PURE: e' il patto scritto nel commento del
+    # blocco, e senza sentinella la prima SELECT infilata li' dentro fa
+    # esplodere la suite (e qualcuno la commenterebbe).
+    for nome in ("_sconto_pacco", "_sconto_pacco_eur"):
+        corpo = pezzo(nome).split('"""')[-1]
+        for vietato in ("INSERT", "UPDATE", "SELECT", "await", "con.",
+                        "SCONTO_PACCO"):
+            prova(f"{nome}: niente {vietato} (e' una pura)", False,
+                  vietato in corpo)
+
+    # 3) LO SCONTO NON ARRIVA MAI DAL COMPRATORE. E' la sentinella di
+    # sicurezza numero uno: uno sconto scelto da chi paga sarebbe un
+    # furto con la ricevuta.
+    corpo_set = src[src.index("async def _compra_set("):
+                    src.index("async def _preventivo_set(")]
+    prova("_compra_set: lo sconto non si legge dal payload", False,
+          any(k in corpo_set for k in ('d.get("sconto', 'd.get("soglia',
+                                       'd.get("percento', 'd.get("totale')))
+    prova("_compra_set: la regola arriva dalla riga del VENDITORE", True,
+          "_regola_sconto(" in corpo_set and "WHERE tg_id=?" in corpo_set)
+
+    # 4) IL MONO NON SCONTA MAI, in nessun ramo (decisione di Andrea).
+    # _righe_ordine e' il punto in cui si romperebbe in silenzio: la
+    # divisione a ritroso dell'unitario non tornerebbe piu'.
+    corpo_mono = src[src.index("async def compra("):
+                     src.index("def crea_ordine_pagato(")]
+    prova("compra (mono): la parola sconto non esiste", False,
+          "_sconto_pacco" in corpo_mono or "sconto_sats" in corpo_mono)
+    # (si guarda il CODICE e non i commenti: dentro _righe_ordine c'e'
+    # apposta la nota che dice cosa servirebbe SE un giorno il mono
+    # scontasse — quella riga deve poter restare)
+    codice_righe = "\n".join(
+        r for r in pezzo("_righe_ordine").splitlines()
+        if not r.strip().startswith("#"))
+    prova("_righe_ordine: la divisione a ritroso non sconta", False,
+          "sconto_sats" in codice_righe)
+    prova("crea_ordine_pagato (asta) non sconta", False,
+          "sconto" in pezzo("crea_ordine_pagato").split('"""')[-1])
+
+    # 5) LA CIFRA DELLA INVOICE E' LA CIFRA DELL'INSERT. E' il buco da
+    # cui uscirebbero i sats DI ALTRI ORDINI: se la bolt11 chiedesse il
+    # netto e prezzo_sats finisse col lordo, il payout pretenderebbe
+    # dalla cassaforte piu' di quanto quell'ordine ha versato — e la
+    # cintura di paga_venditore non lo vedrebbe.
+    i = corpo_set.index("crea_invoice_escrow(")
+    j = corpo_set.index("INSERT INTO ordini", i)
+    prova("_compra_set: zero await tra invoice e INSERT", False,
+          "await " in corpo_set[i:j])
+    prova("_compra_set: il totale non si riscrive li' in mezzo", 0,
+          corpo_set[i:j].count("totale ="))
+    prova("_compra_set: la invoice si conia sul TOTALE", True,
+          "crea_invoice_escrow(\n        totale," in corpo_set)
+
+    # 6) Il tetto di rodaggio giudica il LORDO, PRIMA dello sconto: e'
+    # un vincolo del listino, non del checkout — altrimenti si
+    # pubblicherebbe sopra il tetto rientrandoci con una regola.
+    for chi, corpo in (("_compra_set", corpo_set),
+                       ("_preventivo_set", pezzo("_preventivo_set"))):
+        prova(f"{chi}: il tetto giudica PRIMA dello sconto", True,
+              corpo.index("TETTO_SATS_ANNUNCIO") < corpo.index("_sconto_pacco("))
+
+    # 7) IL DOVUTO IN USCITA NON CONOSCE LO SCONTO. La colonna e' un
+    # TESTIMONE: chi ne facesse un netto_venditore(prezzo + sconto)
+    # farebbe uscire dall'escrow di altri ordini la differenza.
+    prova("netto_venditore non conosce lo sconto", False,
+          "sconto" in pezzo("netto_venditore"))
+    for nome in ("_sblocca_sats", "_rimborsa_compratore", "deposita_invoice"):
+        prova(f"{nome}: il dovuto NON riaggiunge lo sconto", False,
+              "sconto_sats" in pezzo(nome).split('"""')[-1])
+
+    # 8) Lo sconto e' un costrutto del checkout: non esce sui relay
+    # (il NIP-99 resta col prezzo pieno, come per lampo e tariffa
+    # punto) e non cambia la forma del CSV, che e' contabilita'.
+    for nome in ("tag_commercio", "evento_annuncio"):
+        prova(f"{nome}: cieco allo sconto carrello", False,
+              "sconto_pacco" in pezzo(nome))
+    prova("un solo UPDATE scrive la regola", 1,
+          src.count("sconto_pacco_soglia=?"))
+
+    # 9) IL CLIENT MOSTRA, NON CALCOLA: nessuna aritmetica della
+    # percentuale, e la cifra del conto viene sempre dal server.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    import re
+    prova("il client non moltiplica mai per la percentuale dello sconto",
+          0, len(re.findall(r"\(\s*100\s*-\s*[A-Za-z_.]*[Ss]conto", mini)))
+    prova("l'invito del carrello non porta cifre in sats", False,
+          "artStima" in mini[mini.index("function aggiornaInvitoSconto"):
+                             mini.index("function aggiornaInvitoSconto") + 1200])
+    prova("i lettori del preventivo restano due", 2,
+          mini.count("fetch(`${API_BASE}/orders/preventivo`"))
+    prova("il giudice del ≈ resta UNO anche col meno", 1,
+          mini.count("function cifraCtrl"))
+    prova("...e il meno sta DENTRO di lui", True,
+          "const m = meno ? '−' : '';" in mini)
 
 
 def _codice_rifiuto(funzione, init, errore):
@@ -3367,6 +3665,7 @@ def main():
               prove_forma_tracking, prove_bip353, prove_conta_feedback,
               prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
+              prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_consegna_payload_punto, prove_pagina_acquisto):
         try:
             f()

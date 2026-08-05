@@ -188,6 +188,44 @@ try:
 except ImportError:
     MAX_RIGHE_SET = 8
 
+# LO SCONTO CARRELLO (ago 2026): il venditore premia chi compra piu'
+# cose in un ordine solo — UNA regola per tutto il suo negozio, «da N
+# articoli, −X%», senza scaglioni: uno sconto che si spiega in mezza
+# riga e' uno sconto che si usa. Vale SOLO sul prezzo degli articoli,
+# mai sulla spedizione: il pacco costa quello che costa.
+# LESSICO (decisione di Andrea): per gli utenti si dice «sconto
+# carrello», che e' il nome dell'oggetto; i nomi INTERNI restano
+# sconto_pacco_* come tutta la famiglia del pacco — rinominarli sarebbe
+# un refactor di massa contro la regola dei diff piccoli.
+# Le due liste sono le pillole del venditore (il patto di LAMPO_SCONTI:
+# il client non hardcoda mai una cifra); il minimo e il tetto restano
+# come CINTURA del server anche se le liste cambiano.
+# ATTIVO nasce ACCESO al contrario di IMPORT_NOSTR_APERTO e
+# ASTA_ABILITATA: quelle muovono denaro verso l'esterno e vogliono un
+# gesto dal VPS, questa abbassa soltanto un conto in entrata.
+try:
+    from config import SCONTO_PACCO_ATTIVO
+except ImportError:
+    SCONTO_PACCO_ATTIVO = True
+try:
+    from config import SCONTO_PACCO_SOGLIE
+except ImportError:
+    SCONTO_PACCO_SOGLIE = (2, 3, 4, 5)
+try:
+    from config import SCONTO_PACCO_SCONTI
+except ImportError:
+    SCONTO_PACCO_SCONTI = (5, 10, 15, 20)
+try:
+    from config import SCONTO_PACCO_MIN_SOGLIA
+except ImportError:
+    # «da 1 articolo» non e' uno sconto carrello: e' un ribasso di
+    # listino, e quello si fa sul prezzo.
+    SCONTO_PACCO_MIN_SOGLIA = 2
+try:
+    from config import SCONTO_PACCO_MAX_PERCENTO
+except ImportError:
+    SCONTO_PACCO_MAX_PERCENTO = 30   # un guardrail, non un giudizio
+
 # La protezione acquisti (lug 2026, modello Vinted): percentuale a
 # carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
 # e resta alla piattaforma quando l'affare si chiude bene. Distinta da
@@ -996,9 +1034,16 @@ def init_db():
         -- quantita = somma dei pezzi — e qui vive la merce, una riga
         -- per annuncio. Gli ordini MONO non hanno righe MAI: gliele
         -- sintetizza _righe_ordine dalla testata. unitario_sats e' il
-        -- prezzo del singolo pezzo GIA' scontato (lampo/accordo);
-        -- invariante: articolo = somma di unitario x quantita. Il
-        -- titolo si fotografa all'acquisto — il patto delle quote
+        -- prezzo del singolo pezzo GIA' scontato (lampo/accordo).
+        -- LO SCONTO CARRELLO NON LE TOCCA (ago 2026): e' una voce di
+        -- TESTATA (ordini.sconto_sats), perche' e' una proprieta' del
+        -- CARRELLO e non della cosa — l'unitario resta la FOTOGRAFIA
+        -- del listino di quel giorno, e limarlo vorrebbe dire
+        -- distribuire un resto su N righe e poi litigarci in disputa.
+        -- L'invariante e' della testata:
+        --   prezzo_sats = somma(unitario x quantita) - sconto_sats
+        --                 + spedizione_sats + protezione_sats
+        -- Il titolo si fotografa all'acquisto — il patto delle quote
         -- fissate: l'annuncio puo' cambiare o sparire, l'ordine e la
         -- contabilita' no.
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1459,7 +1504,18 @@ def init_db():
                     # dell'invio — un errore di rete puo' perdere un
                     # avviso di cortesia, mai raddoppiarlo — e lo
                     # rimette a zero la scopa, per le ferie successive
-                    "ferie_avvisato INTEGER DEFAULT 0"):
+                    "ferie_avvisato INTEGER DEFAULT 0",
+                    # LO SCONTO CARRELLO (ago 2026): la regola del
+                    # negozio — «da N articoli, −X%» — che vale su
+                    # tutti i suoi annunci. 0/0 = spento, e non serve
+                    # una terza colonna «dichiarata» come per la
+                    # tariffa punto: li' lo zero era ambiguo (gratis o
+                    # non detto?), qui uno sconto dello 0% e nessuno
+                    # sconto sono la stessa cosa per chiunque guardi.
+                    # Prima la soglia e poi la percentuale, come si
+                    # legge la frase.
+                    "sconto_pacco_soglia INTEGER DEFAULT 0",
+                    "sconto_pacco_percento INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -1826,7 +1882,29 @@ def init_db():
                     # dell'ordine — e «via punto, punto vuoto» deve
                     # esistere: e' lo stato che blocca segna_spedito
                     # (dove spedirebbe?).
-                    "via_punto INTEGER DEFAULT 0"):
+                    "via_punto INTEGER DEFAULT 0",
+                    # LO SCONTO CARRELLO (ago 2026), voce di TESTATA.
+                    # ATTENZIONE, ed e' la riga da leggere prima di
+                    # toccare qualunque strada del denaro: questa e'
+                    # una colonna TESTIMONE, NON UN MOTORE. L'unico
+                    # numero che comanda e' prezzo_sats, che nasce gia'
+                    # scontato — l'incasso del venditore, il rimborso,
+                    # gli XP e il CSV leggono LUI e solo lui. Chi qui
+                    # leggesse «il venditore deve incassare il pieno» e
+                    # ne facesse un netto_venditore(prezzo + sconto)
+                    # farebbe uscire dall'escrow DI ALTRI ORDINI la
+                    # differenza, e la cintura di paga_venditore non lo
+                    # vedrebbe: per lei dovuto e bolt11 combacerebbero.
+                    # Serve al compratore, che nell'ordine vede le
+                    # righe LORDE e senza questa cifra farebbe la somma
+                    # a mano concludendo di essere stato derubato.
+                    "sconto_sats INTEGER DEFAULT 0",
+                    # la fotografia della REGOLA, non della cifra: il
+                    # venditore puo' cambiarla il minuto dopo e la
+                    # ricevuta deve continuare a dire «−10%» per sempre
+                    # (dedurla da sconto/articolo direbbe 9,99%). Si
+                    # scrive SOLO se lo sconto e' scattato davvero.
+                    "sconto_percento INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -5538,6 +5616,12 @@ CAMPI_VETRINA = (
     # arriva in un colpo solo a vetrina, negozio, singolo, miei,
     # ricerca AI e preferiti: il prezzo grigio si disegna ovunque
     "u.ferie_fino AS venditore_ferie, "
+    # lo sconto sul carrello (ago 2026): la promessa di negozio e'
+    # pubblica per natura, come il percento della lampo — e' scritta in
+    # vetrina. Costo ZERO, il JOIN su `u` c'era gia', e da qui arriva
+    # in un colpo alle sei rotte che diventano card.
+    "u.sconto_pacco_soglia AS venditore_sconto_soglia, "
+    "u.sconto_pacco_percento AS venditore_sconto_percento, "
     # il francobollo esce solo con la levetta «Mostra la mia foto»
     # accesa: spenta, il nome file non lascia proprio il server
     "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
@@ -5586,6 +5670,13 @@ def arricchisci_righe_vetrina(righe):
             r["venditore_titolo"] = NOMI_TITOLI.get(
                 r["venditore_titolo"] or "", "")
         r["zona_comune"] = comune_da_zona(r.get("zona") or "")
+        # 4) Lo sconto carrello del venditore passa dal suo giudice:
+        # cosi' la leva spenta lo spegne in TUTTE le vetrine insieme, e
+        # il client non deve ricordarsi i casi (mostra, non decide).
+        if "venditore_sconto_percento" in r:
+            r["venditore_sconto_soglia"], r["venditore_sconto_percento"] = \
+                _regola_sconto(r.get("venditore_sconto_soglia"),
+                               r.get("venditore_sconto_percento"))
     # 3) L'asta (ago 2026): puntata in testa e numero di puntate,
     # pubblici per regola — gli OFFERENTI restano anonimi, qui non
     # esce nessun nome. UNA query per pagina, e solo se nella pagina
@@ -6297,6 +6388,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
                      "rating, n_feedback, n_recensori, vendite_ok, negozio, "
                      "titolo, xp, acquisti_ok, ferie_fino, "
+                     "sconto_pacco_soglia, sconto_pacco_percento, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
@@ -6356,6 +6448,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     venditore["livello"] = livello_utente(
         v["xp"] or 0, (v["vendite_ok"] or 0) + (v["acquisti_ok"] or 0))["nome"]
     venditore["titolo"] = NOMI_TITOLI.get(v["titolo"] or "", "")
+    # lo sconto carrello dal suo giudice, come in vetrina: la leva
+    # spenta lo spegne anche qui, senza che il client lo sappia
+    venditore["sconto_pacco_soglia"], venditore["sconto_pacco_percento"] = \
+        _regola_sconto(v["sconto_pacco_soglia"], v["sconto_pacco_percento"])
     del venditore["xp"], venditore["acquisti_ok"]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     risposta = {"venditore": venditore, "annunci": annunci,
@@ -7714,7 +7810,10 @@ def _cifra_offerta(valuta: str, sats: int, eur: float) -> str:
 # (ago 2026, pagina d'acquisto). Il giudice UNICO del conto: lo usano
 # compra(), _compra_set() e il preventivo della pagina d'acquisto — se
 # il preventivo facesse i conti per conto suo, prima o poi direbbe una
-# cifra diversa dalla invoice. Funzioni PURE come quelle dell'asta:
+# cifra diversa dalla invoice. La SOTTRAZIONE dello sconto carrello sta
+# dentro _conto_ordine e in nessun altro posto (chi legge il conto usa
+# `netto`); la DECISIONE — scatta o no — sta in _sconto_pacco, che il
+# ramo mono non chiama mai. Funzioni PURE come quelle dell'asta:
 # niente config, niente database, niente rete — le percentuali arrivano
 # per parametro e il cambio dal chiamante, che decide anche cosa fare
 # quando manca (503 in compra, strada spenta con motivo nel
@@ -7784,19 +7883,96 @@ def _sped_in_sats(sped_sats: int, sped_eur: float, cambio: float):
     return sped_sats
 
 
+def _sconto_pacco(articolo: int, pezzi: int, soglia: int,
+                  percento: int) -> int:
+    """LO SCONTO CARRELLO in sats (ago 2026): la regola del negozio —
+    «da N articoli, −X%» — applicata alla somma degli articoli. Zero
+    quando la regola e' spenta, quando la soglia non e' seria (<2: «da
+    1 articolo» non e' uno sconto carrello, e' un ribasso di listino, e
+    quello si fa sul prezzo) o quando i pezzi non la raggiungono:
+    nessun ramo puo' far scattare uno sconto che il venditore non ha
+    promesso, nemmeno con una riga di database scritta a mano.
+    Si conta a PEZZI (decisione di Andrea): tre cose nella scatola sono
+    tre cose, ed e' quello che legge chi guarda il carrello.
+    L'arrotondamento e' quello di _prezzo_lampo: il NETTO col floor e
+    lo sconto per DIFFERENZA — cosi' `articolo - sconto` E' il netto
+    per costruzione (mai un sat di scarto fra la riga mostrata e il
+    totale) e il sat di dubbio resta a CHI PAGA, come la protezione col
+    suo floor. Il max(1) e' la cintura della lampo: mai gratis.
+    SI CUMULA con lampo e accordo accettato, deliberatamente: e' una
+    promessa di NEGOZIO scritta in vetrina, e un pezzo che non la
+    mantenesse non avrebbe un posto onesto dove dirlo — servirebbe una
+    riga «questo no» per riga. Il guardrail e' il tetto della leva.
+    NON la chiama MAI il ramo mono: la decisione vive qui fuori dal
+    conto apposta, cosi' e' una garanzia strutturale e non un «if» da
+    ricordare (vedi _righe_ordine)."""
+    if percento <= 0 or soglia < 2 or pezzi < soglia or articolo <= 1:
+        return 0
+    return articolo - max(1, articolo * (100 - min(percento, 100)) // 100)
+
+
+def _sconto_pacco_eur(articolo_eur: float, pezzi: int, soglia: int,
+                      percento: int) -> float:
+    """Lo sconto carrello in EURO NATIVO, gemello del precedente:
+    stessa regola, stesso arrotondamento per differenza. Si calcola in
+    EURO e non convertendo i sats — un carrello nato in euro con la
+    protezione a zero ha oggi un totale ESATTO, e uno sconto non deve
+    poter peggiorare la QUALITA' di un numero: chi mostra il ≈ dove non
+    serve, prima o poi lo toglie dove serviva. 0.0 quando l'euro nativo
+    non c'e' (listino in sats o carrello misto): li' il ≈ e' suo di
+    diritto. Scatta SEMPRE insieme al gemello in sats — stessi pezzi,
+    stessa soglia, stesso percento — e _strade_preventivo ha comunque
+    la sua cintura per il giorno in cui uno dei due cambiasse."""
+    if percento <= 0 or soglia < 2 or pezzi < soglia or articolo_eur <= 0:
+        return 0.0
+    netto = max(0.01, round(articolo_eur * (100 - min(percento, 100)) / 100, 2))
+    return round(articolo_eur - netto, 2)
+
+
 def _conto_ordine(articolo: int, sped: int, prot_percento: int,
-                  comm_percento: int) -> dict:
-    """Le righe del conto: protezione col floor (//100) sul SOLO
+                  comm_percento: int, sconto: int = 0) -> dict:
+    """Le righe del conto: protezione col floor (//100) sul solo
     articolo, mai un sat piu' del promesso. La commissione e' una riga
     INFORMATIVA e NON entra nel totale del compratore: oggi e' sospesa
     (leva a 0, la riga dice «in promo»), e anche accesa resta
     sottrattiva sull'incasso del venditore — il totale della invoice
-    e' articolo + spedizione + protezione, identico a compra()."""
-    prot = articolo * prot_percento // 100
-    return {"articolo": articolo, "spedizione": sped,
-            "protezione": prot,
-            "commissione": articolo * comm_percento // 100,
-            "totale": articolo + sped + prot}
+    e' netto + spedizione + protezione, identico a compra().
+    LO SCONTO CARRELLO (ago 2026) e' una voce di TESTATA che entra qui
+    e SOLO qui: chi legge il conto usa `netto`, e nessun chiamante
+    sottrae per conto suo — due sottrazioni sono uno sconto doppio, e
+    la invoice nasce di la'. Protezione e commissione si calcolano sul
+    NETTO: la percentuale sta sul prezzo che si paga davvero, ed e' la
+    stessa strada che gia' seguono lampo e accordo, che abbassano
+    l'articolo prima di arrivare qui. Il default a 0 tiene il ramo mono
+    identico a ieri, byte per byte."""
+    netto = max(0, articolo - max(0, sconto))
+    prot = netto * prot_percento // 100
+    return {"articolo": articolo, "sconto": sconto, "netto": netto,
+            "spedizione": sped, "protezione": prot,
+            "commissione": netto * comm_percento // 100,
+            "totale": netto + sped + prot}
+
+
+# Fuori dal blocco puro perche' guarda le LEVE: la regola dello sconto
+# carrello, normalizzata.
+def _regola_sconto(soglia, percento) -> tuple:
+    """(soglia, percento) validi dello sconto carrello, o (0, 0) se non
+    c'e' una regola vera. E' il lettore UNICO: la leva spenta, una
+    soglia non seria o una percentuale a zero danno tutte lo stesso
+    «niente sconto», cosi' nessun chiamante deve ricordarsi i casi.
+    Prende due INT e non una riga — il patto di in_ferie: cosi' lo
+    stesso giudice serve la riga di `utenti`, gli alias
+    `venditore_sconto_*` della vetrina e la prova in CI.
+    Il tappo sul percento e' una CINTURA contro una colonna scritta a
+    mano o da un import, non il varco: l'endpoint rifiuta con un 400
+    che dice la cifra (la lezione di quantita_da_payload), qui si
+    limita il danno in silenzio — un conto non e' il posto dove
+    protestare."""
+    soglia, percento = int(soglia or 0), int(percento or 0)
+    if not SCONTO_PACCO_ATTIVO or percento <= 0 \
+            or soglia < SCONTO_PACCO_MIN_SOGLIA:
+        return 0, 0
+    return soglia, min(percento, SCONTO_PACCO_MAX_PERCENTO)
 
 
 # ---------------------- ASTE: la matematica pura ---------------------
@@ -9641,6 +9817,12 @@ def _righe_ordine(con, o) -> list:
     per costruzione (il patto della colonna quantita). Ogni punto che
     deve ciclare sugli oggetti dell'ordine passa da qui: nessuno
     puo' dimenticarsi dei set."""
+    # Lo sconto carrello e' del SET e non passa MAI di qui: il mono non
+    # ne ha (decisione di Andrea), ed e' anche il motivo per cui non ne
+    # ha — uno sconto di testata romperebbe questa divisione in
+    # silenzio, sbagliando l'unitario nell'ordine, nelle notifiche e
+    # nel CSV. Se un giorno il mono lo avesse, qui va
+    # (prezzo - spedizione - protezione + sconto_sats) // qta.
     if o["annuncio_id"]:
         t = con.execute("SELECT titolo FROM annunci WHERE id=?",
                         (o["annuncio_id"],)).fetchone()
@@ -9977,6 +10159,17 @@ async def _compra_set(user: dict, d: dict) -> dict:
                                          "quell'ordine e riprova")
         offerte[aid] = off
 
+    # --- La regola dello sconto carrello del venditore, letta QUI:
+    # prima dell'unico await, cosi' il conto si fissa sull'istante in
+    # cui nasce la fattura. Cambiarla mentre qualcuno ha il carrello
+    # aperto e' lecito e non ha guardie — vale il conto del momento
+    # dell'acquisto, come per il prezzo e per la lampo — e da questo
+    # punto in poi la cifra e' congelata nell'ordine.
+    ven = con.execute("SELECT sconto_pacco_soglia, sconto_pacco_percento "
+                      "FROM utenti WHERE tg_id=?", (venditore_id,)).fetchone()
+    sog, pct = _regola_sconto(ven["sconto_pacco_soglia"] if ven else 0,
+                              ven["sconto_pacco_percento"] if ven else 0)
+
     # --- Il cambio, UNA volta per tutto il set (prima della invoice:
     # da li' in poi niente await). Serve se un listino e' in EUR o se
     # la tariffa DELLA VIA scelta e' ancorata all'euro.
@@ -10032,8 +10225,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
                                   cambio_ordine)
             sped = max(sped, costo)
 
+    # Lo sconto carrello, sulla somma degli articoli e mai sulla
+    # spedizione. Il tetto di rodaggio qui sopra ha gia' giudicato il
+    # LORDO, ed e' l'ordine giusto: e' un vincolo del listino, non del
+    # checkout — altrimenti si pubblicherebbe sopra il tetto e ci si
+    # rientrerebbe dietro una regola di sconto.
+    sconto = _sconto_pacco(articolo, pezzi, sog, pct)
     conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
-                          COMMISSIONE_PERCENTO)
+                          COMMISSIONE_PERCENTO, sconto)
     prot, totale = conto["protezione"], conto["totale"]
 
     primo = righe[0]["titolo"]
@@ -10059,11 +10258,16 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,"
-        "spedizione_sats,protezione_sats,quantita) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "spedizione_sats,protezione_sats,quantita,"
+        "sconto_sats,sconto_percento) "
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, sped, prot, pezzi))
+         punto, via_punto, sped, prot, pezzi,
+         # la percentuale si fotografa SOLO se lo sconto e' scattato,
+         # o la ricevuta di un ordine sotto soglia dichiarerebbe uno
+         # sconto che non c'e'
+         sconto, pct if sconto else 0))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     for r in righe:
         con.execute(
@@ -10087,7 +10291,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # (i totali parlano anche ai client che il set non lo conoscono)
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
-            "articolo_sats": articolo, "spedizione_sats": sped,
+            # articolo_sats e' il NETTO, come nel preventivo: lordo e
+            # sconto sono chiavi in piu' e si sommano da sole
+            "articolo_sats": conto["netto"],
+            "articolo_lordo_sats": articolo,
+            "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
+            "spedizione_sats": sped,
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
@@ -10104,7 +10313,8 @@ RIPRESA_INVOICE_S = 720
 
 
 def _strade_preventivo(annunci: list, articolo: int, cambio: float,
-                       disponibili: set, articolo_eur: float = 0.0) -> list:
+                       disponibili: set, articolo_eur: float = 0.0,
+                       sconto: int = 0, sconto_eur: float = 0.0) -> list:
     """Le strade del preventivo coi loro totali, nell'ordine FISSO
     ritiro → casa → punto → digitale. `disponibili` le decide il
     CHIAMANTE — per il mono le strade dell'annuncio, per il set
@@ -10121,18 +10331,30 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
     Ogni strada porta anche l'euro NATIVO dove esiste (`spedizione_
     eur` = la tariffa com'e' nata, `totale_eur` = solo quando e'
     ESATTO: articolo nato in euro, tariffa in euro o zero, protezione
-    zero) — e' il dato del giudice del ≈ nel client: il ≈ sta sulla
+    zero, e — dallo sconto carrello — sconto zero o scontato anche in
+    euro) — e' il dato del giudice del ≈ nel client: il ≈ sta sulla
     valuta convertita, mai su quella nativa, e un totale misto non
-    ha una valuta nativa e resta ≈ in tutte e due le viste."""
+    ha una valuta nativa e resta ≈ in tutte e due le viste.
+    `articolo` resta il LORDO e `sconto` gli viaggia accanto: la
+    sottrazione la fa _conto_ordine, una volta sola."""
     fuori = []
 
     def _entra(v, sped, stima_sped, sped_eur=0.0, extra=None):
         conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
-                              COMMISSIONE_PERCENTO)
+                              COMMISSIONE_PERCENTO, sconto)
         tot_eur = 0.0
+        # LA RIGA PIU' DELICATA DEL CANTIERE SCONTO: l'euro esatto
+        # vuole anche uno sconto NATIVO. Se i sats fossero scontati e
+        # l'euro no, questo numero direbbe una cifra piu' ALTA di
+        # quella che si paga — e senza il ≈ davanti, cioe' una
+        # precisione falsa. I due gemelli scattano insieme per
+        # costruzione: questa e' la cintura per il giorno in cui uno
+        # dei due cambiasse.
         if (articolo_eur > 0 and conto["protezione"] == 0
-                and (sped == 0 or sped_eur > 0)):
-            tot_eur = round(articolo_eur + (sped_eur if sped else 0.0), 2)
+                and (sped == 0 or sped_eur > 0)
+                and (sconto == 0 or sconto_eur > 0)):
+            tot_eur = round(articolo_eur - sconto_eur
+                            + (sped_eur if sped else 0.0), 2)
         e = {"via": v, "spedizione_sats": sped,
              "spedizione_eur": sped_eur if sped else 0.0,
              "totale_sats": conto["totale"], "totale_eur": tot_eur,
@@ -10406,9 +10628,14 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                                      f"«{tutti[aid]['titolo'][:40]}» è "
                                      f"finito: l'offerta è scaduta")
         offerte[aid] = off
-    sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
+    # la riga del venditore: lo spedizioniere e la regola dello sconto
+    # carrello, dalla SELECT che c'era gia' — zero query in piu'
+    sp = con.execute("SELECT spedizioniere, sconto_pacco_soglia, "
+                     "sconto_pacco_percento FROM utenti WHERE tg_id=?",
                      (venditore_id,)).fetchone()
     spedizioniere = sp["spedizioniere"] if sp else ""
+    sog, pct = _regola_sconto(sp["sconto_pacco_soglia"] if sp else 0,
+                              sp["sconto_pacco_percento"] if sp else 0)
     con.close()
     listino_eur = any(a["valuta"] == "eur" and a["prezzo_eur"] > 0
                       for a in tutti.values())
@@ -10446,16 +10673,38 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     articolo_eur = (round(sum(round(e * q, 2) for e, q
                               in zip(eur_righe, richieste.values())), 2)
                     if all(e > 0 for e in eur_righe) else 0.0)
+    sconto = _sconto_pacco(articolo, pezzi, sog, pct)
+    sconto_eur = _sconto_pacco_eur(articolo_eur, pezzi, sog, pct)
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
-                          COMMISSIONE_PERCENTO)
+                          COMMISSIONE_PERCENTO, sconto)
+    # `articolo_sats` e' il NETTO — ha sempre voluto dire «quanto paghi
+    # per la merce», ed e' la cifra che con spedizione e protezione FA
+    # il totale: cosi' un client fermo a ieri somma comunque giusto, e
+    # gli manca solo la riga del risparmio (un'assenza, non una bugia).
+    # Il lordo e lo sconto sono chiavi IN PIU', e le tre si sommano da
+    # sole: lordo − sconto = netto, senza fidarsi di nessuno.
     return {"set": True, "quantita": pezzi,
-            "articolo_sats": articolo, "articolo_eur": articolo_eur,
+            "articolo_sats": conto["netto"],
+            "articolo_lordo_sats": articolo,
+            "sconto_sats": sconto,
+            "articolo_eur": (round(articolo_eur - sconto_eur, 2)
+                             if articolo_eur else 0.0),
+            "articolo_lordo_eur": articolo_eur,
+            "sconto_eur": sconto_eur,
+            # la REGOLA esce anche quando non e' scattata: e' cosi' che
+            # il carrello puo' dire «aggiungine 1 e risparmi il 10%».
+            # `mancano_pezzi` lo conta il server anche se il client
+            # potrebbe: e' esattamente il numero dove vive un off-by-one
+            "sconto_percento": pct,
+            "sconto_soglia": sog,
+            "mancano_pezzi": max(0, sog - pezzi) if pct > 0 else 0,
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
             "spedizioniere": spedizioniere,
             "strade": _strade_preventivo(list(tutti.values()), articolo,
-                                         cambio, strade, articolo_eur),
+                                         cambio, strade, articolo_eur,
+                                         sconto, sconto_eur),
             "righe": righe}
 
 
@@ -11766,6 +12015,16 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["ferie_leve"] = {
         "attive": bool(FERIE_ATTIVE),
         "max_giorni": FERIE_MAX_GIORNI}
+    # Lo sconto sul carrello, per il cassetto «🎁»: le soglie e le
+    # percentuali proposte sono le PILLOLE del venditore (il patto di
+    # LAMPO_SCONTI), il minimo e il tetto servono ai messaggi. I due
+    # valori suoi escono gia' dal SELECT *.
+    profilo["sconto_pacco_leve"] = {
+        "attivo": bool(SCONTO_PACCO_ATTIVO),
+        "soglie": list(SCONTO_PACCO_SOGLIE),
+        "sconti": list(SCONTO_PACCO_SCONTI),
+        "min_soglia": SCONTO_PACCO_MIN_SOGLIA,
+        "max_percento": SCONTO_PACCO_MAX_PERCENTO}
     # E quelle dell'asta, per il form di vendita e il foglio puntata
     # (stesso patto: mai cifre hardcodate nel client).
     profilo["asta_leve"] = {
@@ -12078,6 +12337,62 @@ async def scegli_spedizioniere(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "spedizioniere": scelta}
+
+
+@app.post("/api/me/sconto-pacco")
+async def imposta_sconto_pacco(req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """«🎁 Sconto sul carrello»: «da 3 articoli, −10%» su tutto il
+    negozio. UNA regola sola, niente scaglioni — e' il pattern di
+    spedizioniere: una dichiarazione di negozio, non una credenziale.
+    Body {soglia, percento}. `percento <= 0` e' lo SPEGNIMENTO e non ha
+    NESSUNA guardia (il patto del rientro dalle ferie: togliere una
+    promessa non e' mai un problema).
+    NON c'e' un _impegni_aperti, e non e' una dimenticanza: le ferie lo
+    hanno perche' chiudere il negozio toglie una via d'uscita a chi ha
+    gia' pagato — qui non si toglie niente a nessuno. Gli ordini gia'
+    nati portano il loro sconto FOTOGRAFATO in testata e la loro escrow
+    e' gia' scontata; l'unica cosa «aperta» e' un carrello nella
+    memoria di un client, che non sta nel database, non ha scadenza e
+    non ha una controparte. Una guardia qui vorrebbe dire che un
+    venditore non puo' spegnere una promessa sul SUO negozio perche'
+    qualcuno, da qualche parte, sta guardando: un lucchetto senza fine.
+    E nemmeno una guardia_ferie_venditore: lampo e asta ce l'hanno
+    perche' sono atti di vendita, mentre sistemare il listino mentre si
+    e' via e' esattamente cio' che si fa in ferie.
+    Nessun avviso ai barattoli (il gemello della lampo): quella e' una
+    notizia a tempo su un annuncio, questa e' una regola ferma — un
+    ping a ogni ritocco sarebbe solo rumore."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not SCONTO_PACCO_ATTIVO:
+        raise HTTPException(400, "Lo sconto sul carrello non è attivo")
+    try:
+        soglia = int(d.get("soglia") or 0)
+        percento = int(d.get("percento") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Numeri dello sconto non leggibili")
+    if percento <= 0:
+        soglia, percento = 0, 0          # lo spegnimento, senza guardie
+    else:
+        if soglia < SCONTO_PACCO_MIN_SOGLIA:
+            raise HTTPException(400,
+                f"Lo sconto sul carrello parte da almeno "
+                f"{SCONTO_PACCO_MIN_SOGLIA} articoli: sotto non è uno "
+                f"sconto sul carrello, è un ribasso di listino — e quello "
+                f"si fa sul prezzo.")
+        if percento > SCONTO_PACCO_MAX_PERCENTO:
+            raise HTTPException(400,
+                f"Lo sconto sul carrello arriva al massimo al "
+                f"{SCONTO_PACCO_MAX_PERCENTO}%.")
+    con = db()
+    con.execute("UPDATE utenti SET sconto_pacco_soglia=?, "
+                "sconto_pacco_percento=? WHERE tg_id=?",
+                (soglia, percento, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "soglia": soglia, "percento": percento}
 
 
 @app.post("/api/me/ferie")
