@@ -11786,10 +11786,26 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
 
         # Niente pagamento riuscito: l'ordine resta/va in 'confirmed',
         # la invoice (se c'era) viene ripulita, il venditore avvisato.
+        # 'confirmed' vuol dire «i sats spettano al venditore, manca il
+        # modo di dargliglieli», che dopo una disputa decisa a suo
+        # favore e' la verita' — e da li' deposita_invoice funziona.
+        # Chi perdeva il controllo era il MODERATORE, e a rimetterlo in
+        # gioco e' la coda di risolvi_disputa, che ora guarda anche qui.
+        primo_giro = o["stato"] != "confirmed"
         con.execute("UPDATE ordini SET invoice_venditore='', stato='confirmed', "
                     "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
         con.commit()
         con.close()
+        # Chi ha perso la disputa ha diritto di saperlo, e UNA volta
+        # sola: solo nel giro in cui l'ordine cambia stato davvero, o
+        # ogni ritentativo fallito glielo ridirebbe.
+        if o["disputata"] and primo_giro:
+            await notifica(
+                o["compratore_id"],
+                "⚖️ <b>La disputa è stata decisa a favore del venditore.</b> "
+                "I sats gli spettano; appena ci dà un modo per riceverli "
+                "l'ordine si chiude. Se pensi che ci sia stato un errore, "
+                "scrivi ai moderatori.")
         if o["invoice_venditore"] or (v and v["ln_address"]):
             msg = ("⚠️ Il pagamento automatico dei tuoi sats e' <b>fallito</b> "
                    "(il tuo wallet non ha risposto come doveva). I sats sono al "
@@ -11896,6 +11912,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             return {"ok": True, "stato": "refunded"}
 
         # Nessun metodo di rimborso disponibile: si mette in attesa
+        primo_giro = o["stato"] != "refund"
         con.execute("UPDATE ordini SET invoice_rimborso='', stato='refund', "
                     "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
         con.commit()
@@ -11905,6 +11922,15 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                        f"rimborso di <b>{importo} sats</b>: apri l'ordine nella "
                        f"Mini App e imposta il tuo Lightning address, oppure "
                        f"incolla una invoice di esattamente quell'importo.")
+        # Il gemello del ramo di sopra: anche qui chi ha perso deve
+        # saperlo, e una volta sola
+        if o["disputata"] and primo_giro:
+            await notifica(
+                o["venditore_id"],
+                "⚖️ <b>La disputa è stata decisa a favore dell'acquirente.</b> "
+                "I sats gli verranno rimborsati appena ci dà un modo per "
+                "riceverli. Se pensi che ci sia stato un errore, scrivi ai "
+                "moderatori.")
         return {"ok": False, "stato": "refund"}
 
 
@@ -11920,24 +11946,53 @@ async def risolvi_disputa(ordine_id: int, req: Request,
       rispedire l'oggetto (con tracciamento); il rimborso parte solo
       quando il venditore conferma di averlo ricevuto.
     'venditore' e 'rimborso' funzionano anche come intervento d'ufficio
-    su un reso che si e' incagliato."""
+    su un reso che si e' incagliato.
+
+    LA CODA GUARDA ANCHE OLTRE (ago 2026, audit): quando lo sblocco o
+    il rimborso NON riescono a pagare, l'ordine passa in 'confirmed' o
+    in 'refund' — che e' giusto («i sats spettano a qualcuno, manca il
+    modo di dargliglieli») ma lo faceva sparire da questa query, e con
+    lui la possibilita' di RIPENSARCI: un moderatore che aveva deciso
+    male non poteva piu' rimborsare, e i sats restavano fermi senza
+    rimedio. Ora `disputata=1` li tiene decidibili. E' anche la
+    migrazione del pregresso: gli ordini gia' finiti in trappola
+    tornano in coda da soli, senza toccare il database."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
     d = await leggi_json(req)
     esito = d.get("esito", "")
+    if esito not in ("venditore", "rimborso", "reso"):
+        raise HTTPException(400, "Esito non valido")
     con = db()
-    o = con.execute("SELECT * FROM ordini WHERE id=? AND stato IN "
-                    "('dispute','return_pending','return_shipped')",
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND ("
+                    "  stato IN ('dispute','return_pending','return_shipped') "
+                    "  OR (disputata=1 AND stato IN ('confirmed','refund')))",
                     (ordine_id,)).fetchone()
     con.close()
     if not o:
         raise HTTPException(400, "Questa disputa non esiste o è già chiusa")
+    stato = o["stato"]
+    if stato in ("confirmed", "refund"):
+        # Il caso era gia' stato deciso e il pagamento non era riuscito:
+        # per cambiare strada lo si RIAPRE, invece di allentare le
+        # guardie delle due funzioni d'uscita — _sblocca_sats non parte
+        # da 'refund' e _rimborsa_compratore non parte da 'refunded',
+        # ed e' giusto che restino cosi'. Riaprire dice anche la
+        # verita': il caso torna in mano al moderatore, e da li' si
+        # decide come la prima volta.
+        con = db()
+        con.execute("UPDATE ordini SET stato='dispute', aggiornato=? "
+                    "WHERE id=? AND stato=?",
+                    (int(time.time()), ordine_id, stato))
+        con.commit()
+        con.close()
+        stato = "dispute"
     if esito == "venditore":
         return await _sblocca_sats(ordine_id)
     if esito == "rimborso":
         return await _rimborsa_compratore(ordine_id)
-    if esito == "reso" and o["stato"] == "dispute":
+    if esito == "reso" and stato == "dispute":
         con = db()
         con.execute("UPDATE ordini SET stato='return_pending', aggiornato=? "
                     "WHERE id=?", (int(time.time()), ordine_id))
@@ -11953,7 +12008,11 @@ async def risolvi_disputa(ordine_id: int, req: Request,
                        "rispedirà l'oggetto; quando lo ricevi, confermalo "
                        "nella Mini App e i sats gli verranno rimborsati.")
         return {"ok": True, "stato": "return_pending"}
-    raise HTTPException(400, "Esito non valido")
+    # Ci si arriva solo col 'reso' su un ordine che e' gia' oltre: il
+    # messaggio lo dice, invece del generico «esito non valido» che
+    # faceva pensare a un errore di battitura.
+    raise HTTPException(400, "Il reso si può chiedere solo su una disputa "
+                             "aperta: questo ordine è già in restituzione")
 
 
 @app.post("/api/orders/{ordine_id}/reso-spedito")

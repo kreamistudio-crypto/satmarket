@@ -1365,6 +1365,67 @@ def prove_pagamento_incerto():
           True, 'payout_verso"] == "compratore"' in pezzo("decidi_pagamento"))
 
 
+def prove_disputa_incagliata():
+    """Una disputa non si chiude da sola (ago 2026, audit). Quando lo
+    sblocco non riusciva a pagare, l'ordine passava a 'confirmed' —
+    che e' giusto — ma la coda di risolvi_disputa guardava solo gli
+    stati di disputa, e da li' il moderatore non poteva piu' decidere
+    NIENTE: in particolare non poteva piu' rimborsare il compratore, e
+    i sats restavano fermi senza rimedio."""
+    print("\n[la disputa incagliata]")
+    import sqlite3
+
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                "disputata INT)")
+    con.executemany("INSERT INTO ordini VALUES(?,?,?)", [
+        (1, "dispute", 1),          # la coda di sempre
+        (2, "return_shipped", 1),   # idem
+        (3, "confirmed", 1),        # incagliato: sblocco fallito
+        (4, "refund", 1),           # incagliato: rimborso fallito
+        (5, "confirmed", 0),        # un ordine normale: NON e' una disputa
+        (6, "released", 1),         # chiuso davvero: mai piu' in coda
+        (7, "refunded", 1)])        # idem
+    con.commit()
+
+    # la WHERE vera, estratta dal sorgente invece che riscritta a mano
+    i = _SORGENTE.index('o = con.execute("SELECT * FROM ordini WHERE id=? AND (')
+    where = _SORGENTE[i:_SORGENTE.index('(ordine_id,)', i)]
+    where = where[where.index('"SELECT'):]
+    sql = "".join(re.findall(r'"([^"]*)"', where))
+    visti = [r["id"] for r in con.execute(
+        sql.replace("id=?", "id=id") + " ORDER BY id", ())]
+    prova("la coda vede le dispute aperte e le due incagliate",
+          [1, 2, 3, 4], visti)
+    prova("un 'confirmed' normale non e' una disputa", True, 5 not in visti)
+    prova("un affare gia' chiuso non torna in coda", True,
+          6 not in visti and 7 not in visti)
+    con.close()
+
+    # --- SENTINELLE -------------------------------------------------
+    rd = pezzo("risolvi_disputa")
+    # riaprire e' cio' che permette di cambiare strada senza allentare
+    # le guardie: _sblocca_sats non parte da 'refund', e deve restare
+    # cosi' — se un domani qualcuno togliesse la riapertura, il
+    # ripensamento tornerebbe a essere un no-op silenzioso
+    prova("il caso incagliato si RIAPRE prima di ridecidere", True,
+          "stato='dispute'" in rd and 'stato in ("confirmed", "refund")' in rd)
+    prova("_sblocca_sats continua a non partire da 'refund'", True,
+          '"refund"' in pezzo("_sblocca_sats").split("bolt11")[0])
+    # l'esito si valida PRIMA di riaprire, o un esito storto lascerebbe
+    # il caso riaperto per niente
+    prova("l'esito si valida prima di toccare l'ordine", True,
+          rd.index('esito not in ("venditore"') < rd.index("stato='dispute'"))
+    # e chi perde una disputa lo viene a sapere, una volta sola
+    prova("chi perde lo sblocco viene avvisato", True,
+          'o["disputata"] and primo_giro' in pezzo("_sblocca_sats"))
+    prova("chi perde il rimborso viene avvisato", True,
+          'o["disputata"] and primo_giro' in pezzo("_rimborsa_compratore"))
+    prova("l'avviso non si ripete a ogni ritentativo", 2,
+          _SORGENTE.count("primo_giro = o[\"stato\"] !="))
+
+
 def prove_initdata():
     """La freschezza dell'initData (ago 2026, audit). La firma dice
     CHI, non QUANDO: finche' nessuno guardava `auth_date`, un initData
@@ -1654,7 +1715,7 @@ def main():
               prove_ricategorizza, prove_asta, prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
              prove_initdata, prove_foto, prove_avatar,
-             prove_pagamento_incerto):
+             prove_pagamento_incerto, prove_disputa_incagliata):
         try:
             f()
         except Exception as e:
