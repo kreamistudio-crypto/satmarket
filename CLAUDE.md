@@ -461,7 +461,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   rimediare (lo username si aggiunge da Telegram, la npub si verifica
   lì sotto). NIENTE dismiss, ed è deliberato: non è un consiglio ma
   uno stato del profilo, e sparisce da solo quando smette di essere
-  vero.
+  vero. E CHI PUBBLICA LO STESSO LO SENTE DAL BOT (ago 2026, il passo
+  dopo): `avvisa_contatto_mancante` in coda al ramo ATTIVO di
+  pubblica() — SUBITO, perché è il momento in cui il problema nasce;
+  sul nato in revisione tace, il testo dice «in vetrina» e mentirebbe
+  (imperfezione dichiarata: chi debutta in revisione lo riceve alla
+  prima pubblicazione diretta). Gemella della campagna spedizioniere:
+  timbro `utenti.avvisato_contatto` scritto PRIMA dell'invio (un
+  errore di rete può perdere un avviso di cortesia, mai raddoppiarlo),
+  UNA volta per utente per sempre — due pubblicazioni = un messaggio
+  solo, ed è la prova regina, ESEGUIBILE in prove.py sul pezzo vero
+  con sqlite in memoria. Chi poi aggiunge lo username o verifica la
+  npub non entra proprio nel ramo; la npub NUDA non basta (è una
+  dichiarazione, non una porta). ATTENZIONE al collaudo: le identità
+  finte hanno sempre uno username (l'upsert scrive nome.lower()),
+  quindi il ramo dal vivo non si innesca da lì — si prova con le
+  prove eseguibili, non truccando il database.
   IL VENDITORE CHE NON FA PARTIRE LA MERCE (ago 2026, il buco 1 di
   ieri, chiuso — col suo gemello digitale che non era nemmeno
   dichiarato): un ordine `locked` non ha MAI avuto un timer, quindi il
