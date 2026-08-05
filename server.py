@@ -110,7 +110,6 @@ try:
 except ImportError:
     pillow_heif = None
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 # Le stampe del server contengono emoji (⚠️ 📨 ⏰): sulle console
 # Windows in cp1252 manderebbero in crash l'avvio o il collaudo.
@@ -525,18 +524,6 @@ async def guardia_csrf(request, call_next):
             return JSONResponse({"detail": "Origine non consentita"},
                                 status_code=403)
     return await call_next(request)
-
-
-@app.middleware("http")
-async def cache_foto(request, call_next):
-    """Le foto degli annunci si possono tenere in tasca un giorno,
-    come gli asset: i nomi sono versionati (alla modifica cambia il
-    timestamp nel nome), quindi un file non cambia mai sotto lo
-    stesso nome e il browser puo' fidarsi della sua copia."""
-    risposta = await call_next(request)
-    if request.url.path.startswith("/foto/") and risposta.status_code == 200:
-        risposta.headers["Cache-Control"] = "public, max-age=86400"
-    return risposta
 
 
 # ------------------------- DATABASE --------------------------------
@@ -14727,6 +14714,24 @@ def asset_tappo():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+def _file_con_etag(percorso: str, media_type: str, cache: str,
+                   if_none_match: str):
+    """Serve un file col 304, che FileResponse da sola non fa:
+    l'ETag lo manda, ma If-None-Match non lo legge — quel pezzo vive
+    in StaticFiles, che la regola ferrea 3 ci vieta. La formula e'
+    quella di Starlette (md5 di mtime-size) e deve restare UNA SOLA:
+    se le due rotte la calcolassero in modo diverso, i due header
+    divergerebbero e il 304 non scatterebbe piu'."""
+    st = os.stat(percorso)
+    etag = '"' + hashlib.md5(
+        f"{st.st_mtime}-{st.st_size}".encode()).hexdigest() + '"'
+    if etag in if_none_match:
+        return Response(status_code=304,
+                        headers={"Cache-Control": cache, "ETag": etag})
+    return FileResponse(percorso, media_type=media_type,
+                        headers={"Cache-Control": cache})
+
+
 # Le 26 illustrazioni della pagina Sfoglia (lug 2026), una per
 # categoria. Qui il nome ARRIVA dal client, quindi non basta la rotta
 # esplicita: si accetta solo se sta nella whitelist chiusa calcolata
@@ -14763,15 +14768,58 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
     # cambia arriva subito quello nuovo. Il timbro ?b= negli URL del
     # client e' servito una tantum a ripulire le cache scritte quando
     # qui c'era max-age=86400.
-    st = os.stat(percorso)
-    etag = '"' + hashlib.md5(
-        f"{st.st_mtime}-{st.st_size}".encode()).hexdigest() + '"'
-    if etag in if_none_match:
-        return Response(status_code=304,
-                        headers={"Cache-Control": "public, no-cache",
-                                 "ETag": etag})
-    return FileResponse(percorso, media_type="image/webp",
-                        headers={"Cache-Control": "public, no-cache"})
+    return _file_con_etag(percorso, "image/webp", "public, no-cache",
+                          if_none_match)
+
+
+# Le foto degli annunci e i francobolli degli avatar (ago 2026: qui
+# c'era uno StaticFiles montato su /foto, l'unica directory servita in
+# blocco di tutto il progetto — contro la regola ferrea 3, che le
+# altre rotte pubbliche rispettano una per una). Come per le
+# illustrazioni il nome ARRIVA dal client, quindi la rotta esplicita
+# non basta da sola: si serve solo cio' che combacia con le forme che
+# i NOSTRI scrittori producono. Non e' una sanificazione del percorso
+# (quella difende da cio' che ci si immagina): e' una whitelist di
+# forme, derivata da chi scrive davvero in quella cartella —
+#   a{id}_{i}[_{ts}][_min].jpg    _salva_una_foto (annunci, import CSV)
+#   a{id}_{i}.{jpg|png|webp|gif}  scarica_foto    (import da Nostr:
+#                                                  l'estensione viene
+#                                                  dal Content-Type)
+#   av_{negozio}_{ts}[_min].jpg   _salva_avatar   (il _min lo aggiunge
+#                                                  genera_miniature_
+#                                                  mancanti, che passa
+#                                                  su OGNI .jpg della
+#                                                  cartella, avatar
+#                                                  compresi: 75 file
+#                                                  veri in produzione)
+# — cosi' un file lasciato li' dentro per sbaglio non e' pubblico, e
+# l'insieme di cio' che si serve resta chiuso e derivato.
+# CHI AGGIUNGE UNO SCRITTORE deve aggiungere la sua forma qui, o le
+# sue foto non si vedranno: e' il prezzo — voluto — di non montare
+# una directory.
+# (`\Z` e non `$`: in Python il dollaro combacia anche PRIMA di un
+# a-capo finale, e un nome che arriva da un URL puo' averlo)
+NOME_FOTO = re.compile(
+    r"^(a\d+_\d+(_\d+)?(_min)?\.(jpg|png|webp|gif)"
+    r"|av_[0-9a-f]+_\d+(_min)?\.jpg)\Z")
+TIPI_FOTO = {"jpg": "image/jpeg", "png": "image/png",
+             "webp": "image/webp", "gif": "image/gif"}
+
+
+@app.get("/foto/{nome}")
+def foto_annuncio(nome: str, if_none_match: str = Header("")):
+    if not NOME_FOTO.match(nome) or not os.path.exists(
+            os.path.join(FOTO_DIR, nome)):
+        raise HTTPException(404, "foto non trovata")
+    # Cache di un giorno, la stessa che metteva il middleware di
+    # prima: i nomi sono versionati (alla modifica cambia il timestamp
+    # dentro il nome), quindi un file non cambia mai sotto lo stesso
+    # nome e il browser puo' fidarsi della sua copia. Il 304 invece lo
+    # facciamo noi: lo faceva StaticFiles, e senza, ogni foto tornerebbe
+    # a scaricarsi INTERA a ogni scadenza della cache.
+    return _file_con_etag(os.path.join(FOTO_DIR, nome),
+                          TIPI_FOTO[nome.rsplit(".", 1)[1]],
+                          "public, max-age=86400", if_none_match)
 
 
 # --- PWA (lug 2026): Barattolo installabile dal browser -------------------
@@ -14854,6 +14902,3 @@ def twa_assetlinks():
     return FileResponse(".well-known/assetlinks.json",
                         media_type="application/json",
                         headers={"Cache-Control": "public, max-age=3600"})
-
-
-app.mount("/foto", StaticFiles(directory=FOTO_DIR), name="foto")

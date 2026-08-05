@@ -1297,6 +1297,65 @@ def prove_initdata():
           and "BANNER_SCADUTO" in mini)
 
 
+def prove_foto():
+    """La cartella foto/ non e' piu' montata (ago 2026, audit): era
+    l'unica directory servita in blocco di tutto il progetto, contro
+    la regola ferrea 3. Adesso c'e' una rotta con la whitelist delle
+    FORME che i nostri scrittori producono — e le forme vanno tenute
+    allineate a loro, o le foto vere spariscono dalla vetrina."""
+    print("\n[le foto senza StaticFiles]")
+    import re
+    amb = {"re": re}
+    i = _SORGENTE.index("NOME_FOTO = re.compile")
+    exec(_SORGENTE[i:_SORGENTE.index("TIPI_FOTO =", i)], amb)
+    ammesso = lambda n: bool(amb["NOME_FOTO"].match(n))
+
+    # I nomi VERI, uno per scrittore (gli av_ col _min sono i 75
+    # contati in produzione: li fa genera_miniature_mancanti, che
+    # passa su ogni .jpg della cartella e non solo sugli annunci —
+    # la forma che al primo giro era sfuggita alla tabella)
+    for nome in ("a12_0.jpg", "a12_0_min.jpg",
+                 "a12_0_1785852876.jpg", "a12_0_1785852876_min.jpg",
+                 "a7_1.png", "a7_1.webp", "a7_1.gif", "a7_1_min.jpg",
+                 "av_0236b74b_1784996031.jpg",
+                 "av_f29bcbf7_1785852876_min.jpg"):
+        prova(f"si serve la foto vera {nome}", True, ammesso(nome))
+
+    # e tutto cio' che in quella cartella non c'e' mai stato
+    for nome in ("../config.py", "..%2fconfig.py", "config.py",
+                 "satmarket.db", "a1_0.jpg.exe", "", "a1_0.jpg\n",
+                 "a1_0.jpg/../x", "av_../x_1.jpg", "a_0.jpg"):
+        prova(f"non si serve {nome!r}", False, ammesso(nome))
+
+    # --- SENTINELLE ---------------------------------------------------
+    # La regola ferrea 3 diventa verificabile invece che raccomandata:
+    # non si guardano le parole (i commenti la nominano apposta), si
+    # guarda il CODICE
+    prova("sentinella: nessuna directory montata, in tutto il server",
+          True, "app.mount(" not in _SORGENTE
+          and "from fastapi.staticfiles import" not in _SORGENTE)
+    # la formula dell'ETag e' UNA: due rotte che la calcolassero in
+    # modo diverso manderebbero header divergenti, e il 304 delle
+    # illustrazioni — che nacque da un caso vero — smetterebbe di
+    # scattare senza che nessuno se ne accorga
+    prova("sentinella: la formula dell'ETag vive in un posto solo", 1,
+          _SORGENTE.count('f"{st.st_mtime}-{st.st_size}"'))
+    prova("sentinella: le illustrazioni passano dallo stesso cuore",
+          True, "_file_con_etag" in pezzo("asset_categoria"))
+    # e la cache delle due resta quella di prima: revalidazione per le
+    # illustrazioni (nomi non versionati), un giorno per le foto
+    prova("le illustrazioni restano a revalidazione", True,
+          '"public, no-cache"' in pezzo("asset_categoria"))
+    prova("le foto restano a un giorno", True,
+          '"public, max-age=86400"' in pezzo("foto_annuncio"))
+    # la forma dell'avatar dice «esadecimale» perche' il codice negozio
+    # lo fa token_hex: se un domani cambiasse alfabeto, TUTTE le facce
+    # sparirebbero in silenzio (404) e nessuna prova funzionale se ne
+    # accorgerebbe. Qui il legame e' scritto.
+    prova("sentinella: il codice negozio e' ancora esadecimale", True,
+          "secrets.token_hex(" in pezzo("nuovo_codice_negozio"))
+
+
 def _codice_rifiuto(funzione, init, errore):
     """Il codice HTTP del rifiuto (401), non il suo testo."""
     try:
@@ -1315,7 +1374,7 @@ def main():
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata):
+              prove_initdata, prove_foto):
         try:
             f()
         except Exception as e:
