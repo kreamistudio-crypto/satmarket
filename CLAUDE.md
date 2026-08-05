@@ -2744,6 +2744,138 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
   confirm); gli id interni (go('affari'), #nav-affari, view-affari)
   restano.
+  IL NEGOZIO IN FERIE 🌴 (ago 2026): il venditore che parte chiude la
+  bottega con la data di rientro. Gli annunci RESTANO in vetrina —
+  prezzo in grigio, badge «🌴 In ferie» sulla card, la data nella
+  scheda — e non si compra, non si offre, non si riempie il carrello,
+  non si punta. Niente sparizioni: è tutta la differenza con la
+  rimozione, ed è il motivo per cui non si tocca una riga di `annunci`.
+  UNA COLONNA SOLA, `utenti.ferie_fino` (0 = aperto, altrimenti il
+  timestamp del rientro), e il GATE È IN LETTURA come per lampo e
+  asta: il negozio riapre DA SOLO alla data, senza che nessun orologio
+  debba passare a girare un interruttore — se il server resta spento
+  una settimana, al riavvio chi doveva riaprire è già aperto, e chi
+  compra non aspetta nessun giro. È la scelta che porta via tutto il
+  resto del lavoro; un booleano più una data avrebbe voluto un timer e
+  due verità da tenere allineate. `scadenze_ferie` è la gemella esatta
+  di `scadenze_lampo` e fa PULIZIA, NON è lei a riaprire (più il
+  reset del timbro per le ferie successive). Giudice unico e PURO
+  `in_ferie(ferie_fino, adesso)`, accanto a `_asta_viva`: prende un
+  INT e non una riga, così lo stesso giudice serve la riga `utenti`,
+  l'alias `venditore_ferie` della vetrina e la prova in CI; al filo
+  esatto il negozio è APERTO, come `_asta_viva`.
+  NON SI CHIUDE CON IMPEGNI APERTI, ed è la regola del cantiere:
+  `_impegni_aperti` restituisce RIGHE LEGGIBILI e non un booleano —
+  il messaggio deve dire COSA manca, e tutte insieme, o il venditore
+  le scoprirebbe a una a una riprovando. Le cinque, ognuna con la sua
+  via d'uscita: 1) ordini `locked` (merce pagata e mai partita: è il
+  caso più grave, i sats di qualcuno aspettano lui); 2) aste vive
+  (vincolanti: chi ha versato sta gareggiando); 3) offerte
+  `accettata` (una stretta di mano già data, e in ferie il compratore
+  non potrebbe pagare); 4) ordini `creato` freschi (<30 min, la
+  soglia di `_riservati`: `verifica_pagamento` NON passa dai gate di
+  `compra()`, quindi senza questa riga nascerebbe un `locked` proprio
+  durante le ferie); 5) lampo in corso (uno sconto pubblico a tempo è
+  una promessa in vetrina). Gli ordini GIÀ SPEDITI non trattengono: i
+  loro promemoria seguono il corso normale. NESSUN AUTOMATISMO — la
+  lampo non si annulla da sola, il venditore ha già il suo bottone.
+  IL LEFT JOIN sugli ordini NON è un dettaglio: i SET hanno
+  `annuncio_id=0` e con l'INNER sparirebbero in silenzio — un ordine
+  pagato che non blocca le ferie è esattamente il buco che la
+  funzione esiste per chiudere. È la lezione già pagata due volte
+  (`sollecita_incassi`, `sollecita_venditori_fermi`), qui alla terza,
+  col titolo sintetizzato da `_titolo_ordine` sulle righe.
+  I VARCHI sono dieci, e la guardia sta SEMPRE prima della invoice (un
+  rifiuto dopo `crea_invoice_escrow` lascerebbe una fattura orfana):
+  `guardia_ferie(con, venditore_id)` in compra, `_compra_set`,
+  `preventivo_ordine`, `_preventivo_set`, `fai_offerta`, più le due
+  CINTURE dichiarate (`fai_puntata`, `rispondi_offerta`: per
+  costruzione non ci si arriva — aste vive e accordi bloccano la
+  partenza — ma una guardia che oggi non scatta è quella che regge
+  domani se la regola cambia). Prende il `con` del chiamante come
+  `_ordini_vivi_annuncio` (in `compra()` una connessione è già aperta
+  e il vincolo è «nessun DML prima del ricontrollo»: una LETTURA è
+  ammessa) e sulla via del rifiuto lo CHIUDE, come le guardie
+  sorelle. 400 e NON 409, deliberatamente: nel progetto il 409 vuol
+  dire «rileggi e riprova», e sul ramo set il client al 409 rilegge il
+  negozio — qui non c'è niente da rileggere, c'è una data da
+  aspettare. Il gemello `guardia_ferie_venditore` ha il messaggio SUO
+  (è un'altra persona a leggerlo) e copre `lancia_lampo`, il ramo asta
+  di `pubblica()` e `rilancia_asta_deserta`.
+  PUBBLICARE un annuncio NORMALE resta lecito — si prepara il negozio
+  per il rientro — ma i GANCI RESTANO TRATTENUTI: `_drena_promo` e
+  `_drena_match` saltano i venditori in ferie (rileggono dal DB e ora
+  portano `ferie_fino` nel giro), perché un post di canale o un
+  avviso di ricerca su una cosa che non si compra è una promessa che
+  la vetrina non mantiene. IMPERFEZIONE DICHIARATA: al rientro quei
+  ganci non partono in differita.
+  LE OFFERTE PENDENTI DECADONO (decisione di Andrea) nella stessa
+  transazione della chiusura, col 🕊 di garbo che il meccanismo aveva
+  già: lasciarle vive sarebbe la trappola «il venditore accetta dalle
+  ferie e il compratore non può pagare». Notifiche DOPO il commit,
+  `html.escape` sul titolo.
+  IL PROMEMORIA del giorno prima (`avvisa_rientro_ferie`, leva
+  `FERIE_PREAVVISO_ORE` 24, 0 = muto) è gemello della campagna
+  spedizioniere: il TIMBRO `ferie_avvisato` si scrive PRIMA
+  dell'invio — un errore di rete può perdere un avviso di cortesia,
+  mai raddoppiarlo. Dice che si può prolungare.
+  SUPERFICIE: `u.ferie_fino AS venditore_ferie` in `CAMPI_VETRINA` a
+  costo ZERO (il JOIN su `u` c'era già), quindi arriva in un colpo
+  solo a vetrina, negozio, singolo, miei, ricerca AI e preferiti;
+  `ferie_fino` nel profilo di `/api/negozio`; `ferie_leve` in
+  `/api/me` (il client non hardcoda mai un tetto, il patto di
+  `max_barattolo`). Endpoint `POST /api/me/ferie` col pattern di
+  canale-notifiche; `{fino: 0}` è il RIENTRO e non ha NESSUNA guardia
+  — riaprire non è mai un problema.
+  LEVE: `FERIE_ATTIVE` nasce ACCESA, al contrario di
+  IMPORT_NOSTR_APERTO e ASTA_ABILITATA — quelle muovono denaro verso
+  l'esterno e vogliono un gesto dal VPS, questa non muove niente,
+  spegne soltanto; `FERIE_MAX_GIORNI` 90 (guardrail contro la data
+  incollata per sbaglio, non un giudizio su quanto può durare una
+  vacanza).
+  FRONTEND: giudici `inFerie(l)`/`ferieData(ts)` accanto a
+  lampoAttiva/astaViva, `ferie` in `mapListing` (unix come lampoFine e
+  astaFine); classe `.card.in-ferie` SENZA outline (lampo e asta sono
+  richiami, questo è il contrario di un richiamo) e badge `.card-ferie`
+  nella coppia `--off-bg`/`--muted`, che nell'app veste già gli stati
+  conclusi — nessun colore nuovo, le ferie non sono un'occasione da
+  annunciare. Nella scheda `.detail-price.ferie` + riga `.ferie-riga`
+  nella forma di `.asta-riga`, e al posto del recinto escrow la
+  trust-note (il ramo esiste già identico per l'asta chiusa); la barra
+  d'acquisto non nasce; cassetto «🌴 Negozio in ferie» nel Profilo col
+  calco di «📦 Come spedisci», dove il 400 con gli impegni si rende
+  DENTRO il cassetto e con `white-space:pre-line` — il server manda una
+  voce per riga e senza quello l'elenco collassa in un muro di testo
+  (misurato).
+  IL GRIGIO DEL CARTELLINO È UN VALORE FISSO (#8A8271) e mai
+  `var(--muted)`: `.tag-price` è di carta chiara nei DUE temi e il
+  token di notte si schiarirebbe fino a sparire. MISURATO, ed è la
+  parte da tenere: sulla carta rende 3,60 — e il prezzo ARANCIO di
+  sempre, lì sopra, rende 3,59. Cioè lo stato spento si legge
+  ESATTAMENTE quanto quello acceso, e a distinguerli è la TINTA e non
+  la luce; un grigio più scuro (4,8 e oltre, provati) renderebbe le
+  ferie più leggibili di un prezzo vero, il contrario di quel che deve
+  dire. Chi alzerà il contrasto del cartellino alzi PRIMA l'arancio.
+  Nella scheda invece `var(--muted)` è giusto: lì il prezzo sta sulla
+  pagina e l'inchiostro segue la carta. Nessuna delle due nomina
+  `.unit`, la regola dichiarata.
+  LA CARD DICE LO STATO, NON LA DATA (decisione di Andrea sui numeri):
+  «🌴 In ferie — torna il 17 ago» in una pillola sola fa 117px, ma a
+  360px — la larghezza di riferimento del progetto — la card ne
+  concede 108 prima del barattolino, che sta a destra e non si stringe
+  mai (misurato: sfora di 9px a 360 e di 29 a 320). Due strade provate
+  e scartate coi motivi: la pillola su DUE righe (104×35, nessuna
+  collisione) copre il 22% del lato della foto ed è il blocco più
+  grosso della card proprio per lo stato che deve farsi notare di
+  meno; e la data nella riga META, dove su una card con 🚚gratis+🤝
+  restano 65px contro i 76 che «torna il 17 ago» chiede — si tronca
+  coi puntini proprio sulla data, e CLAUDE.md quella riga la dichiara
+  già satura. La data completa vive nella scheda, due volte.
+  SU NOSTR NIENTE (decisione di Andrea): NIP-99 non ha uno stato «in
+  pausa» e `sold` sarebbe una bugia; ripubblicare ogni annuncio due
+  volte per ferie sarebbe una raffica verso i relay per
+  un'informazione che lì non cambia nulla — su Nostr non si compra
+  dentro Barattolo. Le ferie restano una regola di CASA.
   Offerta lampo ⚡ (lug 2026, modello Vinted «sconto ai follower»):
   sconto PUBBLICO a percentuale, a tempo, sul SOLO articolo —
   spedizione e protezione si sommano sopra, e il listino NON si tocca
@@ -6337,6 +6469,33 @@ GUARDARE dal vivo dentro Telegram: il giro completo su un telefono
 vero (pagina, punto, paySheet sopra la pagina), il primo ordine al
 punto visto dal venditore — nei due flussi, rete e non — e il testo
 della campagna nel journal del primo giro.
+Il negozio in ferie 🌴 (ago 2026): il venditore che parte chiude la
+bottega con la data di rientro, e gli annunci RESTANO in vetrina col
+prezzo in grigio — si guardano, non si comprano. Le decisioni di
+Andrea: cosa BLOCCA la chiusura (locked non spediti, aste vive,
+accordi già stretti, pagamenti in viaggio, lampo in corso — gli
+ordini già spediti no), le offerte pendenti che DECADONO col 🕊, il
+rientro AUTOMATICO alla data col promemoria il giorno prima, e su
+Nostr NIENTE. Il modello è una colonna sola col gate in LETTURA, lo
+stesso patto di lampo e asta: il negozio riapre da solo, senza
+orologio. Vedi Architettura per le cinque cose che trattengono coi
+loro perché, per il LEFT JOIN dei set (la lezione alla terza volta) e
+per le due strade scartate sul badge in card, misurate in pixel.
+Collaudato: 47 prove nuove in `prove.py` (640 verdi, erano 593) — fra
+cui gli impegni uno per uno su sqlite in memoria, il caso SET con
+`annuncio_id=0`, e le sentinelle che la guardia stia PRIMA della
+invoice in tutti e dieci i varchi — più un collaudo TestClient su DB
+usa-e-getta (31 verdi) che verifica le due cose che contano davvero:
+che a negozio chiuso non nasca NESSUNA invoice, e che il rientro sia
+IMMEDIATO senza che la scopa sia mai girata. Più il giro visivo via
+CDP a 320/360/750px nei due temi (badge che non tocca il barattolino,
+prezzo grigio misurato contro la carta, cassetto e elenco degli
+impegni che va a capo). IN PRODUZIONE basta il deploy: le due colonne
+(`ferie_fino`, `ferie_avvisato`) nascono da sole e le tre leve hanno
+il default nel codice — `FERIE_ATTIVE` è ACCESA, che qui non esce
+niente verso nessuno. DA GUARDARE al primo giro: il journal del
+promemoria di rientro, e il primo venditore vero che chiude (che
+l'elenco degli impegni gli dica cose sensate).
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
