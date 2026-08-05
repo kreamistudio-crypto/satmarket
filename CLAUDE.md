@@ -999,11 +999,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   CSV), `scarica_foto` di importa_nostr (estensione dal Content-Type:
   png/webp/gif esistono), `_salva_avatar`, e `genera_miniature_
   mancanti` — che è quello che si dimentica, perché passa su OGNI
-  `.jpg` della cartella e quindi fa la `_min` anche agli avatar (75
-  file veri in produzione: la forma è saltata fuori dai dati, non dal
-  codice letto, ed è la lezione del giro). CHI AGGIUNGE UNO
+  `.jpg` della cartella e quindi faceva la `_min` anche agli avatar
+  (75 file veri in produzione: la forma è saltata fuori dai dati, non
+  dal codice letto, ed è la lezione del giro). CHI AGGIUNGE UNO
   SCRITTORE deve aggiungere la sua forma lì, o le sue foto non si
   vedranno: è il prezzo — voluto — di non montare una directory.
+  QUEL QUARTO SCRITTORE NON SCRIVE PIÙ (ago 2026, trovato di striscio
+  proprio contando quei 75 file): la passata d'avvio salta i nomi
+  `av_`, e il motivo è che quella gemella non serviva a NESSUNO —
+  `_salva_avatar` scrive già a `AVATAR_LATO` (128px) e
+  `miniatura_jpeg` non ingrandisce mai, quindi la «miniatura» usciva
+  della STESSA misura, cioè una copia; e nessuno la chiedeva, perché
+  il `_min` lo deriva solo `fotoMini` per le foto degli annunci
+  mentre `avatarImg` usa il nome pieno. L'altra metà del guaio era
+  che `_scrivi_avatar` cancellava il francobollo vecchio ma non la
+  sua gemella: un orfano a ogni cambio di foto profilo, e ora se ne
+  vanno insieme (il pattern delle foto in `modifica()`). I file già
+  sul disco li toglie `ripulisci_avatar_min.py`. Finché non sarà
+  girato in produzione la forma `av_..._min` RESTA nella regex — è
+  roba pubblica che esiste davvero —; dopo, si toglie da lì e dal suo
+  caso in `prove_foto()`, che ci si appoggia. Non era un guasto
+  visibile: nessuna immagine era rotta, si sprecava spazio e basta.
   L'alfabeto esadecimale degli avatar è legato a `secrets.token_hex`
   da una sentinella: cambiando generatore, TUTTE le facce
   sparirebbero in silenzio. IL 304 lo faceva StaticFiles, e senza
@@ -4343,6 +4359,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ordini APERTI — quelli chiusi invece non fermano niente, la storia è
   storia e lasciargli la chiave vorrebbe dire tornare a importare per
   sempre. Idempotente.
+- `ripulisci_avatar_min.py` (ago 2026) — la spazzata una-tantum dei
+  francobolli gemelli degli avatar (il perché sta nella voce di
+  `/foto`, sopra). Cancella da `foto/` i soli
+  `av_{negozio}_{ts}_min.jpg`; NESSUNA riga di database si tocca — quei
+  nomi nel database non ci sono mai stati, ed è esattamente il punto.
+  LA GUARDIA è quella colonna: prima di cancellare legge
+  `utenti.avatar` e se uno di quei file è la faccia di qualcuno lo
+  lascia stare e lo DICE (vorrebbe dire che un `_min` ci è finito
+  davvero, e allora non è spazzatura ma un dato); chi non ha la forma
+  di `_salva_avatar` non si tocca e si nomina, mai una cancellazione
+  silenziosa. Anteprima di serie, `--scrivi` per farla, percorso di
+  database opzionale (il pattern di `ripulisci_anello_nostr.py`);
+  idempotente, e si può girare a server ACCESO — un file che non
+  chiede nessuno non manca a nessuno.
 - `prove.py` + `.github/workflows/prove.yml` (lug 2026) — la rete di
   sicurezza, a ogni push e ogni PR. Solo pezzi PURI: niente config,
   database, relay o Anthropic — una CI che dipende da un server altrui
