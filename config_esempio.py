@@ -94,6 +94,12 @@ MAX_QUANTITA_ANNUNCIO = 999999  # pezzi massimi per annuncio (quantita'
 MAX_RIGHE_SET = 8            # annunci DIVERSI massimi in un set
                              # («Riempi il barattolo»): un pacco vero,
                              # non un camion
+MAX_PREFERITI = 10           # quanti annunci ATTIVI stanno «nel tuo
+                             # barattolo». Piccolo apposta: e' una
+                             # selezione, non una lista dei desideri
+                             # infinita. Contano solo gli attivi —
+                             # comprare qualcosa che c'e' dentro
+                             # libera spazio da solo
 
 # --- Consegna digitale (buoni regalo, codici, licenze) ---------------
 # Il codice passa DENTRO Barattolo: il venditore lo consegna in un

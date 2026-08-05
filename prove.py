@@ -1975,6 +1975,205 @@ def prove_avatar():
               bool(ripulisci_avatar_min.AVATAR_MIN.match(nome)))
 
 
+def prove_tracking_corretto():
+    """La correzione del tracciamento (ago 2026, caso vero dal campo:
+    il codice dell'intermediario Packlink al posto di quello InPost).
+    Tre cose che devono restare vere: la corregge SOLO un moderatore,
+    NON tocca spedito_il ne' lo stato, e NON trasforma un ritiro (o
+    una consegna a mano, o un codice online) in una spedizione."""
+    print("\n[la correzione del tracciamento]")
+    intero = pezzo("correggi_tracking")
+    # il CODICE senza la prosa: la docstring parla di «stato='locked'»
+    # e farebbe scattare da sola la sentinella qui sotto
+    ct = intero.split('"""')[-1]
+
+    # --- 1) e' roba da moderatore, e si controlla PRIMA di tutto ----
+    prova("la correzione esige e_admin", True, "e_admin(user[" in ct)
+    prova("il 403 arriva prima di leggere il body", True,
+          ct.index("e_admin") < ct.index("leggi_json"))
+
+    # --- 2) NON si tocca cio' che fa da ancora ai promemoria -------
+    # spedito_il e' l'ancora di sollecita_conferme_ferme: riscriverla
+    # farebbe ripartire da capo l'attesa del compratore a ogni
+    # correzione (la trappola gia' pagata con `aggiornato` in
+    # sollecita_venditori_fermi). Nemmeno lo stato si tocca: la
+    # correzione e' un dato di servizio, non una transizione.
+    for colonna in ("spedito_il=", "stato=", "aggiornato=", "consegnato="):
+        prova(f"la UPDATE non scrive {colonna.rstrip('=')}",
+              False, colonna in ct)
+    # e scrive quel che deve
+    prova("la UPDATE timbra tracking_corretto_il", True,
+          "tracking_corretto_il=?" in ct)
+    prova("il reso ha la sua colonna", True,
+          "tracking_reso_corretto_il=?" in ct)
+
+    # --- 3) i corrieri-sentinella non sono corrieri ----------------
+    i = _SORGENTE.index("CORRIERI_SENTINELLA = (")
+    amb = {}
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
+    sent = amb["CORRIERI_SENTINELLA"]
+    for nome in ("Consegna a mano", "Ritiro in zona", "Consegna digitale"):
+        prova(f"«{nome}» e' una sentinella", True, nome in sent)
+    prova("un corriere vero non lo e'", False, "InPost" in sent)
+    # la guardia scatta nei DUE versi: sul corriere NUOVO (non si
+    # trasforma una spedizione in un ritiro) e su quello VECCHIO (non
+    # si da' un pacco a un ordine che non ne aveva)
+    prova("si rifiuta la sentinella in arrivo", True,
+          "corriere in CORRIERI_SENTINELLA" in ct)
+    prova("si rifiuta la sentinella gia' scritta", True,
+          "vecchio_c in CORRIERI_SENTINELLA" in ct)
+    prova("ritiro e digitale restano fuori", True,
+          '"ritiro", "digitale"' in ct or "'ritiro', 'digitale'" in ct)
+
+    # --- 4) gli stati: dove un pacco viaggia davvero ----------------
+    prova("la spedizione si corregge su shipped e delivered", True,
+          '("shipped", "delivered")' in ct)
+    prova("il reso sul suo stato", True, '("return_shipped",)' in ct)
+
+    # --- 5) resta scritto: il registro e la traccia -----------------
+    prova("la correzione finisce nel registro moderazione", True,
+          "registra_moderazione(" in ct)
+    prova("chi aspetta il pacco viene avvisato", True, "await notifica(" in ct)
+
+    # --- 6) il moderatore puo' ARRIVARCI ---------------------------
+    # un ordine 'shipped' fra estranei non compare in nessuna coda:
+    # senza il parametro `ordine` di miei_ordini il pannello sarebbe
+    # irraggiungibile (buco trovato provandolo dal vivo)
+    mo = pezzo("miei_ordini")
+    prova("il moderatore puo' aprire un ordine per numero", True,
+          "OR o.id=?" in mo)
+    prova("...ma solo lui", True,
+          mo.index("e_admin(user") < mo.index("OR o.id=?"))
+
+
+def prove_barattolo():
+    """Il tetto del barattolo (ago 2026: da 20 a 10) e il conteggio
+    pubblico dei salvataggi."""
+    print("\n[il barattolo]")
+    # il tetto e' una leva col default 10, non piu' un 20 murato
+    i = _SORGENTE.index("    from config import MAX_PREFERITI")
+    coda = _SORGENTE[i:i + 200]
+    prova("il tetto nasce a 10", True, "MAX_PREFERITI = 10" in coda)
+    tp = pezzo("toggle_preferito")
+    prova("il 400 del pieno dice il numero", True,
+          "{MAX_PREFERITI}" in tp)
+    prova("il tetto si legge senza await in mezzo", True,
+          "_conta_barattolo(con, user[\"id\"]) >= MAX_PREFERITI" in tp)
+    prova("la risposta porta il conteggio pubblico", True,
+          '"barattoli": barattoli' in tp)
+
+    # il conteggio pubblico e' ANONIMO: nessun tg_id esce mai
+    cs = pezzo("_conta_savers")
+    prova("il conteggio non seleziona nessun tg_id", True,
+          "tg_id" not in cs.split('"""')[-1])
+    arr = pezzo("arricchisci_righe_vetrina")
+    prova("la vetrina conta i salvataggi con UNA query", True,
+          'r["barattoli"] = salvati.get' in arr)
+    prova("...e non fa nemmeno quella su una pagina vuota", True,
+          "if tutti:" in arr)
+
+    # i cinque livelli del vetro, che ora sono in PROPORZIONE al tetto
+    # (con le vecchie soglie a mano e il tetto a 10 il livello 3 non
+    # sarebbe esistito mai: pieno a 10, ma «<=10» lo fermava a 2).
+    # La formula si LEGGE dal client e si esegue davvero: riscriverla
+    # qui vorrebbe dire collaudare la copia invece dell'originale.
+    src = open("miniapp.html", encoding="utf-8").read()
+    i = src.index("const livelloBarattolo = n =>")
+    corpo = src[i:src.index(";", src.index("Math.ceil", i))]
+    corpo = " ".join(corpo.split("=>", 1)[1].split())   # su una riga sola
+    # il ternario JS «a ? b : c» diventa quello di Python
+    py = re.sub(r"([^?]+)\?([^:]+):(.+)", r"(\2) if (\1) else (\3)", corpo)
+    while "?" in py:
+        py = re.sub(r"([^?()]+)\?([^:]+):(.+)", r"((\2) if (\1) else (\3))", py)
+    import math as _math
+
+    class _M:
+        min = staticmethod(min)
+        max = staticmethod(max)
+        ceil = staticmethod(lambda x: int(_math.ceil(x)))
+
+    def livello(n, tetto):
+        return eval(py.replace("MAX_PREFERITI", str(tetto)),
+                    {"Math": _M}, {"n": n})
+
+    for tetto in (10, 20, 6):
+        visti = [livello(n, tetto) for n in range(0, tetto + 1)]
+        prova(f"tetto {tetto}: vuoto a 0 e pieno al tetto",
+              (0, 4), (visti[0], visti[-1]))
+        prova(f"tetto {tetto}: tutti e cinque i livelli esistono",
+              [0, 1, 2, 3, 4], sorted(set(visti)))
+        prova(f"tetto {tetto}: il livello non scende mai",
+              visti, sorted(visti))
+
+
+def prove_forma_tracking():
+    """L'euristica sulla forma del codice (ago 2026): riconosce i
+    formati tipici dei corrieri in elenco e — soprattutto — NON blocca
+    mai. Si collauda sui casi veri, a partire da quello che ha aperto
+    il cantiere: il codice Packlink al posto di quello InPost."""
+    print("\n[la forma del tracciamento]")
+    import json
+    src = open("miniapp.html", encoding="utf-8").read()
+    i = src.index("const FORME_TRACKING = {")
+    blocco = src[i:src.index("\n};", i) + 3]
+    # le regex di questo catalogo sono compatibili con Python: si
+    # leggono dal client e si eseguono, invece di ricopiarle qui
+    forme = {}
+    for riga in re.finditer(r"'([^']+)':\s*\[(.+?)\],?\s*$", blocco, re.M):
+        forme[riga.group(1)] = [re.compile(x)
+                                for x in re.findall(r"/(.+?)/(?=,|\s*$)",
+                                                    riga.group(2))]
+    prova("il catalogo delle forme si e' letto tutto", 7, len(forme))
+
+    def storto(corriere, codice):
+        """True se la forma NON combacia (cioe' si chiede conferma)."""
+        f = forme.get(corriere)
+        if not f or not codice:
+            return False
+        nudo = re.sub(r"[\s-]", "", codice.upper())
+        return not any(x.fullmatch(nudo) for x in f)
+
+    # IL CASO VERO: Packlink dice IT2026COM…, InPost vuole 24 cifre
+    prova("il codice dell'intermediario su InPost fa alzare la mano",
+          True, storto("InPost", "IT2026COM8891"))
+    prova("le 24 cifre di InPost passano",
+          False, storto("InPost", "123456789012345678901234"))
+    # gli altri corrieri, sui formati che si incontrano davvero
+    buoni = [("Poste Italiane", "RR123456789IT"),
+             ("Poste Italiane", "123456789012"),
+             ("BRT", "0123456789012"),
+             ("GLS", "123456789012"),
+             ("SDA", "0123456789"),
+             ("DHL", "1234567890"),
+             ("DHL", "JJD0099887766554433"),
+             ("UPS", "1Z999AA10123456784"),
+             ("UPS", "123456789012")]
+    for corriere, codice in buoni:
+        prova(f"{corriere}: «{codice}» passa", False, storto(corriere, codice))
+    # spazi e trattini incollati insieme al codice non contano
+    prova("gli spazi incollati non contano", False,
+          storto("InPost", "1234 5678 9012 3456 7890 1234"))
+    prova("i trattini nemmeno", False, storto("UPS", "1Z-999AA1-0123456784"))
+    # 'Altro corriere' e le sentinelle non hanno forma: mai una domanda
+    for corriere in ("Altro corriere", "Consegna a mano", "Ritiro in zona"):
+        prova(f"«{corriere}» non si controlla mai", False,
+              storto(corriere, "qualunque-cosa"))
+    prova("il campo vuoto non fa domande", False, storto("BRT", ""))
+
+    # NON BLOCCA MAI, ed e' la parte che conta: il secondo tocco passa
+    ft = src[src.index("function trackingDaControllare"):]
+    ft = ft[:ft.index("\n}")]
+    prova("il secondo tocco sullo stesso codice procede", True,
+          "trackingForzato === tracking" in ft)
+    prova("il forzato vale per QUEL codice, non per sempre", True,
+          "trackingForzato = tracking" in ft)
+    # e la prevenzione c'e' in tutti e due i moduli di spedizione
+    prova("l'avviso sull'intermediario esiste", True,
+          "AVVISO_INTERMEDIARIO" in src)
+    prova("...ed e' nel form della spedizione e in quello del reso",
+          2, src.count("${AVVISO_INTERMEDIARIO}"))
+
+
 def _codice_rifiuto(funzione, init, errore):
     """Il codice HTTP del rifiuto (401), non il suo testo."""
     try:
@@ -1996,7 +2195,9 @@ def main():
               prove_initdata, prove_foto, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
-              prove_ssrf_redirect, prove_quota_ricerca):
+              prove_ssrf_redirect, prove_quota_ricerca,
+              prove_tracking_corretto, prove_barattolo,
+              prove_forma_tracking):
         try:
             f()
         except Exception as e:

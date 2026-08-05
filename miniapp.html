@@ -18,6 +18,9 @@
     --line:#E8DFC8; --sats:#F7931A; --sats-soft:#FDEBD3;
     --trust:#1B8B54; --trust-soft:#E7F5EC; --danger:#C2410C;
     --radius:16px; --pad:16px;
+    /* la curva dei bottoni-oggetto: quella di «Acquista» (vedi
+       l'elenco dei contesti accanto a .btn) */
+    --radius-btn:12px;
     /* i toni "profondi" fanno l'ombra piena dei bottoni, i "text"
        sono leggibili sui fondi tenui */
     --sats-deep:#D97706; --sats-text:#B45309;
@@ -32,6 +35,29 @@
        dell'asta e' una. */
     --asta:#0F6D8C; --asta-on:#FFFFFF; --asta-deep:#0B5570;
     --asta-text:#0B5570; --asta-tag:#0B5570;
+    /* LA LAMPO PARLA ROSSO, e da ora lo parla DAPPERTUTTO (ago 2026,
+       decisione di Andrea): prima il rosso era solo il badge ⚡ e la
+       cornice della card era arancio ₿ — cioe' il colore dei prezzi
+       normali e delle azioni, che diceva «offerta» con la voce di
+       «tutto il resto». Tre token perche' il rosso vive su tre
+       superfici diverse, ed e' la stessa famiglia dell'asta:
+       --lampo      FISSO: il badge sulla foto (bianco sopra, 5,44) e
+                    il chip del dettaglio. Cio' che sta sulla foto non
+                    cambia di notte, come share-btn e pallini.
+       --lampo-tag  FISSO: il prezzo sul CARTELLINO, che e' di carta
+                    chiara nei due temi (su #FFF8EA: 6,48). Gemello
+                    esatto di --asta-tag, e per la stessa ragione.
+       --lampo-text INCHIOSTRO, quindi segue il tema: il numero grande
+                    del dettaglio e la cornice della card, che stanno
+                    sulla pagina e sulla carta della card. Misurati:
+                    6,24 su crema e 7,46 su bruno (testo); la cornice
+                    fa 6,85 sul bianco e 6,57 sul bruno della card —
+                    l'asta la cornice la fa col suo --asta, ma quello
+                    e' un token che si schiarisce di sera e il rosso
+                    della lampo no: qui l'inchiostro e' la scelta
+                    giusta, e il segno resta rosso in tutti e due i
+                    temi. Si abbassa la luce, non si cambia il segno. */
+    --lampo:#C0392B; --lampo-tag:#A6301F; --lampo-text:#A6301F;
     --trust-deep:#10603A; --trust-text:#157347;
     --nostr:#8B5CF6; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
     --chip-bg:#F3ECDA;
@@ -124,6 +150,10 @@
        4,57; --asta-text su bruno 8,88. --asta-tag NON si tocca: vive
        sul cartellino di carta, che resta chiaro anche al buio. */
     --asta:#1D7FA0; --asta-deep:#0F6D8C; --asta-text:#7FC4DC;
+    /* la lampo di sera: si alza la LUCE dell'inchiostro, il segno
+       resta rosso. --lampo e --lampo-tag NON si toccano: vivono sulla
+       foto e sul cartellino di carta, che al buio non cambiano. */
+    --lampo-text:#FF8A6B;
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
     --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
     --chip-bg:#37301F;
@@ -546,13 +576,20 @@
      griglia basta la percentuale, il tempo che resta lo dice la
      scheda. */
   .card-lampo{position:absolute;top:8px;left:8px;z-index:2;
-    background:#C0392B;color:#fff;border-radius:999px;
+    background:var(--lampo);color:#fff;border-radius:999px;
     padding:3px 9px;font-size:11.5px;font-weight:800;
     display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  /* La cornice della card in lampo: sottile, arancio ₿, dentro il
-     bordo (outline negativa: zero impatti sul layout, segue il
-     border-radius). Sparisce col re-render della scadenza. */
-  .card.in-lampo{outline:1.5px solid var(--sats);outline-offset:-1.5px}
+  /* La cornice della card in lampo: sottile, dentro il bordo (outline
+     negativa: zero impatti sul layout, segue il border-radius).
+     ROSSA dall'ago 2026 — era arancio ₿, cioe' il colore dei prezzi
+     normali: una card in offerta si annunciava col colore di tutte le
+     altre. Sparisce col re-render della scadenza. */
+  .card.in-lampo{outline:1.5px solid var(--lampo-text);outline-offset:-1.5px}
+  /* e il cartellino parla la stessa lingua del badge: il prezzo
+     scontato e' rosso, non arancio. Il barrato sopra resta grigio —
+     e' il prezzo che NON si paga piu'. */
+  .card.in-lampo .tag-price .price,
+  .card.in-lampo .tag-price .price .unit{color:var(--lampo-tag)}
   /* Il badge dell'asta (ago 2026): stesso linguaggio del badge lampo
      ma identita' propria — il rosso e' della lampo, il martello parla
      inchiostro (e crema al buio, gratis coi token). In card il tempo
@@ -565,7 +602,8 @@
   /* la targhetta prezzo di un'asta: quel numero e' la puntata in
      corso, non un prezzo — parla il blu FISSO del token tag (la
      carta del cartellino non cambia di notte) */
-  .tag-price.asta .price{color:var(--asta-tag)}
+  .tag-price.asta .price,
+  .tag-price.asta .price .unit{color:var(--asta-tag)}
   /* la riga dell'asta sotto il prezzo del dettaglio: stessa voce
      discreta del tempo della lampo, nel colore di casa dell'asta */
   .asta-riga{font-size:13px;color:var(--asta-text);font-weight:700;
@@ -584,6 +622,15 @@
      non per ordine. */
   .detail-price.asta .unit,
   .detail-price.asta .unit.eur{color:var(--asta-text)}
+  /* e il gemello della lampo (ago 2026): il numero grande di un
+     annuncio scontato e' ROSSO come il suo badge e come la cornice
+     della sua card — l'identita' non si spezza sulla soglia
+     card→dettaglio, la stessa regola dell'asta. Il € va nominato
+     APPOSTA per la solita ragione (.detail-price .unit.eur sta piu' in
+     basso a pari specificita' e tingerebbe mezzo numero d'arancio). */
+  .detail-price.lampo,
+  .detail-price.lampo .unit,
+  .detail-price.lampo .unit.eur{color:var(--lampo-text)}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
@@ -594,7 +641,7 @@
      grande dei due. */
   .lampo-was{display:flex;align-items:center;gap:8px;color:var(--muted);
     font-size:14.5px;margin-bottom:-6px}
-  .lampo-was .lampo-badge{background:#C0392B;color:#fff;
+  .lampo-was .lampo-badge{background:var(--lampo);color:#fff;
     border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800}
   /* «rimangono 2h 14m» accanto al badge, FUORI da lui: stesso colore
      della vecchia riga lampo, che diceva la stessa cosa due righe
@@ -605,7 +652,7 @@
      e la taglia del prezzo. Meglio una riga in piu' sempre, che due
      rese diverse per la stessa cosa. */
   .lampo-resta{font-family:'Nunito',sans-serif;font-size:13px;
-    font-weight:700;color:var(--sats-text);flex-basis:100%}
+    font-weight:700;color:var(--lampo-text);flex-basis:100%}
   .lampo-resta .lampo-count{font-family:'JetBrains Mono',monospace}
   .nostr-dot{width:10px;height:10px;border-radius:50%;background:var(--nostr);flex:0 0 auto}
   /* Il palco della galleria: tutto cio' che fluttua sulla foto
@@ -690,12 +737,22 @@
      ma in alto a sinistra: senza bottone sopra, la foto sale a filo
      dello schermo e il dettaglio diventa una hero immersiva */
   .back-float{left:10px;right:auto}
-  /* Il barattolino dei preferiti: cerchietto gemello del condividi,
-     alla sua sinistra. Da salvato si accende d'arancio e ondeggia
-     (jarPop). Solo per chi e' dentro: in DEMO e VETRINA non esiste. */
-  .jar-btn{right:56px;font-size:17px;line-height:1}
-  .jar-btn.salvato{background:var(--sats);
-    box-shadow:0 2px 6px rgba(0,0,0,.25),0 0 0 2px rgba(255,255,255,.5)}
+  /* IL BARATTOLINO STA IN BASSO A DESTRA SULLA FOTO (ago 2026,
+     modello Vinted, decisione di Andrea): era in alto accanto al
+     condividi, e sotto il recinto c'era anche un bottone grande
+     «Metti nel barattolo» — che e' sparito. Un preferito non e'
+     un'azione dello stesso peso di un acquisto, e quel bottone
+     rubava spazio alla barra; adesso il gesto e' UNO, ed e' l'icona
+     sulla foto, la stessa delle card. In alto resta il solo
+     condividi (a sinistra l'indietro): la fila non e' sbilanciata,
+     e' tornata simmetrica.
+     Un filo piu' grande delle sorelle in griglia (40 contro 34) e con
+     l'ombra piu' decisa dei cerchietti di carta: sta sul bordo basso
+     della foto, dove capita di tutto — cielo bianco o notte. */
+  .jar-btn{top:auto;bottom:10px;right:10px;width:40px;height:40px;
+    line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  /* Col cartellino del prezzo il barattolino non si pesta mai: quello
+     sta a SINISTRA e sborda in basso, questo e' ancorato a destra. */
   .jar-btn.pop{animation:jarPop .55s ease}
   @keyframes jarPop{
     0%{transform:scale(1) rotate(0)}
@@ -718,8 +775,15 @@
   .jar-ico.lv2 .jar-liq{transform:translateY(50%)}
   .jar-ico.lv3 .jar-liq{transform:translateY(25%)}
   .jar-ico.lv4 .jar-liq{transform:translateY(0)}
-  /* sul cerchietto salvato il fondo e' gia' arancio: liquido crema */
-  .jar-btn.salvato{--jar-liquido:#FAF4E4}
+  /* L'ANIMAZIONE SI E' ROVESCIATA (ago 2026, decisione di Andrea):
+     prima al tocco si accendeva d'arancio il FONDO del cerchietto e
+     il liquido diventava crema — cioe' a riempirsi era lo sfondo, e
+     il barattolo si svuotava. Adesso lo sfondo non cambia mai: e' il
+     LIQUIDO ARANCIO che sale dentro il vetro, che e' esattamente
+     cio' che l'icona racconta. Una sola animazione, la stessa in
+     vetrina e nel dettaglio.
+     Per questo le due regole `.salvato{background:var(--sats)}` non
+     ci sono piu': il salvato lo dice il vetro pieno. */
   /* Il riflesso del vetro: due pennellate celesti sul fianco sinistro
      (token --jar-riflesso, piu' tenue di sera). Un dettaglio, non un
      protagonista: sottile, non copre la lettura del livello. */
@@ -738,8 +802,22 @@
     box-shadow:0 1px 4px rgba(0,0,0,.18)}
   .card-jar::after{content:'';position:absolute;inset:-6px;border-radius:50%}
   .card-jar:active{transform:scale(.92)}
-  .card-jar.salvato{background:var(--sats);--jar-liquido:#FAF4E4;
-    box-shadow:0 2px 6px rgba(0,0,0,.25),0 0 0 2px rgba(255,255,255,.5)}
+  /* da salvato il fondo di carta resta, e a parlare e' il vetro pieno
+     d'arancio (vedi il rovesciamento dell'animazione, sopra) */
+  .card-jar.salvato{box-shadow:0 2px 6px rgba(0,0,0,.28)}
+  /* ---- QUANTI L'HANNO MESSO NEL BARATTOLO (ago 2026) ----
+     Il numero vive DENTRO il cerchietto, che diventa una pastiglia:
+     un elemento solo, un bersaglio solo, e niente che possa
+     sovrapporsi al badge lampo/asta (a sinistra) o al cartellino (in
+     basso). Pubblico e ANONIMO: si dice quanti, mai chi — la stessa
+     regola dell'avviso «ha fatto colpo». Compare da DUE in su
+     (vedi contaSavers nel JS): «1» non e' una prova sociale, e' un
+     numero che non aggiunge niente. */
+  .card-jar.con-conta,.jar-btn.con-conta{width:auto;border-radius:999px;
+    gap:3px;padding:0 9px 0 6px}
+  .jar-conta{font:800 12px 'Nunito',sans-serif;color:#23282C;
+    line-height:1}
+  .jar-btn .jar-conta{font-size:13px}
   /* La scossellina di festa quando un annuncio ENTRA nel barattolo:
      riusa i keyframe scuoti dello spinner (-8/+8), due giri in 0.4s.
      Solo all'aggiunta, mai alla rimozione; il cerchietto del dettaglio
@@ -1043,7 +1121,7 @@
      e meta' (i due blocchi si equivalgono: il ghost stira all'altezza
      del recinto, align-items:stretch). */
   #barraCompra .btn{margin-top:0;width:auto;line-height:1.25;
-    border-radius:12px;white-space:nowrap;box-shadow:none;
+    white-space:nowrap;box-shadow:none;
     font-size:15px;padding:8px 10px 9px}
   /* Acquista pesa piu' del vicino anche qui, ma un gradino sotto al
      gemello del recinto (17): in barra i due tasti si dividono 360px
@@ -1114,11 +1192,19 @@
      #barraCompra ma esiste anche da desktop: e' l'unica strada verso
      il riepilogo, e la topbar di lassu' non la sostituisce. */
   .pacco-testa{display:flex;align-items:center;gap:12px;padding:14px var(--pad) 0}
-  .pacco-x{width:38px;height:38px;border-radius:50%;flex:0 0 auto;cursor:pointer;
-    border:2px solid var(--ink);background:var(--card);color:var(--ink);
-    font:inherit;font-size:16px;font-weight:800;box-shadow:0 2px 0 var(--ink);
+  /* La ✕ e' NUDA (ago 2026, decisione di Andrea): era un cerchietto
+     col bordo e l'ombra piena, cioe' aveva il peso di un bottone
+     d'azione — e il cerchio di carta e' il linguaggio di cio' che
+     fluttua SULLA foto (share-btn, back-float), non di una testata.
+     Qui e' una ✕ e basta, nell'inchiostro di casa. Il bersaglio resta
+     largo come prima (il ::after, che non occupa layout: senza,
+     stringendo il bottone si stringeva anche il posto dove mirare). */
+  .pacco-x{width:26px;height:38px;flex:0 0 auto;cursor:pointer;
+    border:0;background:none;color:var(--ink);position:relative;
+    font:inherit;font-size:24px;font-weight:700;line-height:1;
     display:flex;align-items:center;justify-content:center}
-  .pacco-x:active{transform:translateY(1px);box-shadow:none}
+  .pacco-x::after{content:'';position:absolute;inset:-8px -10px}
+  .pacco-x:active{transform:scale(.9)}
   .pacco-tit{display:flex;flex-direction:column;min-width:0;line-height:1.2}
   .pacco-tit b{font-family:'Baloo 2',sans-serif;font-size:20px}
   .pacco-tit .eur-hint{margin-bottom:0}
@@ -1155,7 +1241,7 @@
      stanno piu' in basso nel foglio e a pari peso vincerebbero loro —
      la stessa lezione di .acquista-cta nel recinto */
   .pacco-cella .btn.pacco-btn{margin-top:8px;padding:7px 8px 8px;
-    font-size:14px;border-radius:10px;box-shadow:0 2px 0 var(--ink)}
+    font-size:14px;border-radius:var(--radius-btn);box-shadow:0 2px 0 var(--ink)}
   .pacco-cella .btn.pacco-btn:active{transform:translateY(1px);box-shadow:none}
   /* LO STATO-STEPPER (ago 2026): stesso guscio, dentro il chip − N +
      al posto della parola. Non si abbassa al tocco — a rispondere
@@ -1197,7 +1283,7 @@
     max-width:520px;margin:0 auto}
   body.con-pacco #barraPacco{display:flex;animation:barraSu .18s ease}
   #barraPacco .btn{margin-top:0;width:auto;flex:0 0 auto;margin-left:auto;
-    border-radius:12px;white-space:nowrap;box-shadow:none;
+    white-space:nowrap;box-shadow:none;
     font-size:15px;padding:9px 14px 10px}
   #barraPacco .btn:active{transform:translateY(1px);box-shadow:none}
   .pacco-somma{display:flex;flex-direction:column;flex:0 0 auto;
@@ -1222,12 +1308,8 @@
   }
 
   /* ---------- dettaglio annuncio ---------- */
-  /* Coerenza di forme (lug 2026): nel dettaglio OGNI bottone-oggetto
-     e' rettangolare col raggio del riquadro venditore — Acquista,
-     Fai un'offerta, Compra subito NWC, Metti nel barattolo, i tasti
-     del proprietario e il set. I testuali (link/danger-ghost) non
-     hanno forma e non c'entrano. La barra ha la sua regola gemella. */
-  #detailContent .btn,#puntaSheet .btn{border-radius:var(--radius)}
+  /* (la forma rettangolare dei bottoni del dettaglio vive ora accanto
+     a .btn, con tutti gli altri contesti: un cuore solo) */
   .detail-ph{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
     font-size:84px;background:repeating-linear-gradient(45deg,var(--ph-a) 0 12px,var(--ph-b) 12px 24px)}
   /* IL TESTO DELL'UTENTE NON DEVE POTER ALLARGARE LA PAGINA (lug 2026,
@@ -1247,13 +1329,36 @@
      delle categorie in Sfoglia, per la stessa ragione. */
   .detail-body{padding:18px var(--pad);overflow-wrap:break-word}
   .detail-body h2{font-family:'Baloo 2',sans-serif;font-size:24px;font-weight:800;line-height:1.15}
-  /* La striscia «altri oggetti di questo venditore» (lug 2026): le
-     stesse card della vetrina in fila orizzontale scorrevole — la
-     scoperta del set senza rifare nulla */
-  .altri-strip{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;
-    -webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .altri-strip::-webkit-scrollbar{display:none}
-  .altri-strip .card{flex:0 0 150px;min-width:150px}
+  /* «ALTRI OGGETTI DI QUESTO VENDITORE»: DA STRISCIA A GRIGLIA
+     (ago 2026, decisione di Andrea). Era una fila che si scorreva di
+     LATO — un gesto che nessun'altra parte dell'app chiede, e che
+     nasconde tutto quello che non ci sta nei primi 150px. Adesso e'
+     la griglia della vetrina, stesse card e stesso passo (la classe
+     `.grid`, non una copia: il padding orizzontale lo toglie
+     `.altri-griglia`, che qui dentro lo mette gia' .detail-body).
+     IL BOTTONE SI INCOLLA IN CIMA (modello Vinted) mentre gli oggetti
+     scorrono sotto. E' `position:sticky` dentro `.altri-sez`, e la
+     scelta e' strutturale: un elemento sticky non esce MAI dal suo
+     contenitore, quindi non puo' arrivare a coprire la foto o il
+     titolo (che stanno fuori dalla sezione) e si stacca da solo,
+     senza scatti e senza un ascoltatore di scroll, quando la sezione
+     finisce. Il fondo pieno gli serve: le card ci passano sotto. */
+  .altri-sez{margin-top:16px}
+  .altri-azione{position:sticky;z-index:5;
+    /* top:0 e non «8px d'aria»: con uno stacco, sopra il bottone si
+       vedeva passare la fetta di card che gli scorreva dietro. L'aria
+       la da' il padding, che fa parte del fondo e quindi copre fino
+       al bordo (notch compreso). Da desktop la topbar occupa la cima:
+       il bottone si ferma sotto di lei, vedi la media query. */
+    top:0;
+    background:var(--bg);
+    padding:calc(10px + env(safe-area-inset-top)) 0 10px;
+    /* fino ai bordi della vista: .detail-body ha il suo padding
+       laterale, e senza questo le card si vedrebbero passare ai lati
+       del fondo. I margini negativi si annullano col padding gemello. */
+    margin:0 calc(-1 * var(--pad));padding-left:var(--pad);padding-right:var(--pad)}
+  .altri-azione .btn{margin-top:0}
+  .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
   /* Il foglio del set: una riga per oggetto — spunta, miniatura,
      titolo e stepper dei pezzi. Le righe spente dicono il perche'. */
   #setLista{max-height:min(38vh,340px);overflow-y:auto}
@@ -1498,7 +1603,7 @@
      serve. Nella barra fissa resta un gradino sotto (16), che li' due
      tasti si dividono 360px. */
   .escrow-zone .acquista-cta{width:auto;min-width:76%;margin:12px auto 2px;
-    padding:11px 30px;white-space:nowrap;border-radius:12px;font-size:17px}
+    padding:11px 30px;white-space:nowrap;font-size:17px}
   /* «Scopri di piu'» IN LINEA, in coda alla frase (lug 2026, feedback
      di Andrea): non piu' un piede staccato sotto il bottone. E' la
      stessa frase che continua — «...di aver ricevuto l'oggetto. Scopri
@@ -1581,9 +1686,23 @@
      cosa fisica appoggiata sul banco. Su :active si abbassa. */
   .btn{
     display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
-    border:0;border-radius:999px;padding:14px 20px;font:inherit;font-weight:800;font-size:15.5px;
+    border:0;border-radius:var(--radius-btn);padding:14px 20px;font:inherit;font-weight:800;font-size:15.5px;
     cursor:pointer;transition:transform .1s,box-shadow .1s;
   }
+  /* ---- LA FORMA DI «ACQUISTA» E' LA FORMA DI TUTTI (ago 2026) ----
+     `.btn` nasceva pillola (999px) e la forma rettangolare era una
+     DEROGA scritta a mano in quattro punti — con due valori diversi
+     per giunta (12px nel recinto e nelle due barre, 16 nel dettaglio
+     e nel foglio puntata). Risultato: il pannello Filtri, i fogli e
+     la pagina del negozio erano rimasti tondi, e nella stessa
+     schermata convivevano due forme per la stessa famiglia di
+     bottoni. Adesso il verso e' rovesciato — la regola sta nella
+     base, le deroghe non ci sono — ed e' un cuore solo davvero: chi
+     vuole un'altra curva tocca --radius-btn e tocca tutta l'app.
+     I testuali (.btn.link, .danger-ghost) non hanno fondo, quindi la
+     curva non li riguarda; le PILLOLE vere dell'app (.pill,
+     .tema-pill, .consegna-pill, .chip) sono classi loro e restano
+     tonde: quelle non sono bottoni-oggetto, sono etichette. */
   .btn:disabled{opacity:.55;pointer-events:none}
   /* overlay di attesa: blocca tutto mentre i sats viaggiano */
   #attesaOverlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
@@ -1606,10 +1725,13 @@
   .btn.asta{background:var(--asta);color:var(--asta-on);box-shadow:0 3px 0 var(--asta-deep)}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
-  /* «📦 Aggiungi al pacco»: il ghost vestito di cartone. Fondo NEUTRO —
-     resta un secondario, l'unico pieno del dettaglio e' Acquista — con
-     contorno, testo e ombra nel marrone della scatola. L'emoji 📦 e'
-     gia' di quel colore per conto suo: nessun glifo si puo' tingere. */
+  /* Il ghost vestito di cartone. NON LO PORTA PIU' NESSUNO dall'ago
+     2026 (decisione di Andrea): l'aveva «📦 Aggiungi al pacco», che
+     e' tornato al ghost di casa come ogni altro secondario — un
+     accento in piu' su un bottone secondario faceva concorrenza
+     all'unico pieno del dettaglio, che e' Acquista. La classe resta
+     definita (col token --carton) per chi la volesse riprendere: non
+     e' codice morto da cancellare, e' un vestito appeso. */
   .btn.carton{background:var(--card);border:2px solid var(--carton);
     color:var(--carton);box-shadow:0 3px 0 var(--carton);margin-top:10px}
   .btn.carton:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
@@ -1737,6 +1859,11 @@
   .payout h4{font-size:14.5px;margin-bottom:6px}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5}
+  /* la domanda sulla forma del codice: si vede, ma non e' un errore —
+     e' un «sei sicuro?», e il secondo tocco passa (vedi FORME_TRACKING) */
+  .payout .hint.avviso-tracking{color:var(--sats-text);
+    background:var(--sats-soft);border-radius:10px;padding:8px 10px;
+    margin-top:8px}
   .payout textarea{
     width:100%;border:1px solid var(--line);border-radius:10px;background:var(--bg);
     padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;min-height:64px;
@@ -1988,8 +2115,12 @@
     box-shadow:0 8px 20px rgba(0,0,0,.18);
   }
   .toast.show{opacity:1;transform:translateX(-50%)}
+  /* «← Torna» del negozio e della pagina sicurezza: rettangolo come
+     tutti gli altri bottoni dall'ago 2026 (era l'ultima pillola
+     rimasta su quelle due pagine) */
   .back{
-    border:0;background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
+    border:0;background:var(--card);border:1.5px solid var(--field-line);
+    border-radius:var(--radius-btn);
     padding:7px 15px;font:inherit;font-weight:800;font-size:13px;cursor:pointer;margin:14px 0 0 var(--pad);
   }
   .demo-banner{
@@ -2029,7 +2160,10 @@
     }
     /* il logo in topbar e' markup vero (.nav-logo): la B col ₿ vive
        di pseudo-elementi suoi, impossibili dentro un content: */
-    .nav-logo{display:flex;align-items:center;gap:9px;margin-right:auto;font-size:24px}
+    .nav-logo{display:flex;align-items:center;gap:9px;margin-right:auto;
+      font-size:24px;cursor:pointer;border-radius:12px}
+    .nav-logo:active{transform:translateY(1px)}
+    .nav-logo:focus-visible{outline:2px solid var(--sats);outline-offset:3px}
     /* in topbar le voci sono pillole appaiate a destra (flex:0 0 auto)
        e a spingerle ci pensa il margin-right del logo: uno spaziatore
        elastico qui romperebbe l'allineamento */
@@ -2082,6 +2216,13 @@
     /* Sfoglia respira come la vetrina: niente colonna stretta, e' una
        griglia e vuole la larghezza piena */
     .sfoglia-griglia{grid-template-columns:repeat(3,1fr);gap:14px}
+
+    /* la topbar e' fissa in cima e alta 60: il bottone sticky degli
+       «altri oggetti» si ferma sotto di lei, non sotto il bordo dello
+       schermo. E qui .detail-body non ha padding laterale, quindi i
+       margini negativi della sezione vanno annullati. */
+    .altri-azione{top:60px;margin:0;padding-left:0;padding-right:0;
+      padding-top:10px}
 
     /* dettaglio a due colonne: foto a sinistra, info a destra */
     #view-dettaglio{max-width:980px;margin:0 auto}
@@ -2342,6 +2483,28 @@
     <div id="negozioSentinella" style="height:1px"></div>
   </div>
 
+  <!-- ============ VISTA: ASTE, COMING SOON (ago 2026) ============
+       Il 🔨 in nav c'e' SEMPRE; a `ASTA_ABILITATA` spenta porta qui
+       invece che a una vetrina filtrata che non pesca niente. Markup
+       FISSO e nessun dato utente dentro: mai un esc() da ricordare.
+       Riusa lo stato vuoto di casa (.empty + la mascotte che fluttua,
+       gia' spenta da prefers-reduced-motion e col ripiego 🫙 se
+       l'immagine non arriva) — nessun token nuovo, quindi chiaro e
+       scuro vengono gratis. Vale anche in DEMO e in vetrina anonima:
+       la' la leva non arriva e questa e' la risposta onesta. -->
+  <div class="view" id="view-astepresto">
+    <div class="empty" style="padding-top:34px">
+      <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
+      <div class="big">🔨</div>
+      <b class="empty-title">Le aste stanno arrivando</b>
+      <span>Presto potrai mettere all'asta i tuoi oggetti: base, durata,
+        e vince chi offre di più — con i sats già nel deposito di
+        garanzia, così chi vince non può sparire.<br>
+        Intanto il mercatino è tutto qui sotto.</span>
+      <button class="btn orange" onclick="vaiEsplora()">🛍️ Torna al mercatino</button>
+    </div>
+  </div>
+
   <!-- ============ VISTA: LA PAGINA DEL PACCO (ago 2026) ============
        Il rifacimento di «Riempi il pacco»: una pagina a tutto schermo
        in stile vetrina — le card di sempre (cardHTML, un solo cuore)
@@ -2354,7 +2517,7 @@
        al MAX, stima taglia e conto scomposto vivono la'. -->
   <div class="view" id="view-pacco">
     <div class="pacco-testa">
-      <button type="button" class="pacco-x" onclick="navIndietro()" title="Chiudi" aria-label="Chiudi il pacco">✕</button>
+      <button type="button" class="pacco-x" onclick="chiudiPagPacco()" title="Chiudi" aria-label="Chiudi il pacco">✕</button>
       <div class="pacco-tit"><b>📦 Il pacco</b><span class="eur-hint" id="paccoSub"></span></div>
       <!-- il toggle €/₿ vive QUI, in alto a destra (deciso da Andrea:
            nella barra in basso rubava spazio al totale) — e' lo stesso
@@ -2730,7 +2893,22 @@
          lo spaziatore sparisce e le quattro voci tornano appaiate. Il
          Profilo vive nel tasto tappo in testata (mobile) e qui in coda
          solo da desktop -->
-    <div class="nav-logo"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
+    <!-- Il logo TORNA AL MERCATINO (ago 2026): da desktop e' la
+         convenzione di ogni sito, e qui la strada c'era gia' —
+         `vaiEsplora()`, la stessa del tab, che riporta alla radice
+         madre con la categoria a «Tutto» e il ramo spento (mai un
+         go('esplora') secco: si atterrerebbe su una vetrina ancora
+         filtrata con la nav accesa su Sfoglia).
+         Resta un <div> e non un <button>: `nav button` e' il
+         selettore delle VOCI — CSS e la spazzata di go() — e il logo
+         non e' una voce. Role, tabindex e tasti glielo danno lo
+         stesso. Sotto i 768px e' display:none: e' desktop per
+         costruzione, e in testata mobile il logo sta gia' su Esplora. -->
+    <div class="nav-logo" role="button" tabindex="0"
+         aria-label="Barattolo — torna al mercatino"
+         title="Torna al mercatino"
+         onclick="vaiEsplora()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();vaiEsplora()}"><img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></span></div>
     <!-- Esplora: la LENTE. Il cerchio e' disegnato a mano (quattro
          curve leggermente diverse, non un <circle> perfetto): e' il
          tratto fuori squadra delle illustrazioni. Scelta contro il
@@ -2797,6 +2975,24 @@
     </div>
     <div class="conto-scomposto" id="nwcScomposto"></div>
     <button class="btn orange" style="margin-top:14px" onclick="confermaCompraSubito(this)">⚡ Conferma e paga</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET: SVUOTA IL PACCO (ago 2026) ============
+       La ✕ della pagina del pacco non chiude e basta: BUTTA VIA la
+       composizione, e una cosa che non si puo' annullare si chiede
+       prima. Foglio nostro invece del confirm() di sistema perche' i
+       due bottoni sono il punto: rettangolari come «Acquista» (il
+       token --radius-btn, un cuore solo), quello che distrugge sopra
+       e il ripensamento sotto. -->
+  <div class="sheet" id="paccoSvuotaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="paccoSvuotaTit">
+    <div class="grab"></div>
+    <h3 id="paccoSvuotaTit">Vuoi ignorare le modifiche?</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;
+      line-height:1.5;margin-bottom:14px">Non potrai annullare questa
+      azione: il pacco si svuota e si ricomincia da capo.</div>
+    <button class="btn orange" onclick="svuotaPacco()">Sì, ignora le modifiche</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -3286,6 +3482,10 @@ function mapListing(a){
        top e conteggio sono pubblici, gli offerenti mai */
     astaBase:a.asta_base_sats||0, astaFine:a.asta_scadenza||0,
     astaTop:a.asta_top_sats||0, astaPuntate:a.asta_puntate||0,
+    /* quante persone l'hanno nel barattolo (ago 2026): numero
+       pubblico e anonimo, mai un nome. Un server di ieri non manda
+       la chiave e il conteggio semplicemente non si disegna. */
+    barattoli:a.barattoli||0,
     distintivi:a.venditore_distintivi||[]};
 }
 function mapOrder(o){
@@ -3298,6 +3498,11 @@ function mapOrder(o){
     sellerInvoice:o.invoice_venditore||'',
     corriere:o.corriere||'', tracking:o.tracking||'',
     corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
+    /* quando un moderatore ha corretto il tracciamento (0 = mai): la
+       traccia si mostra a ENTRAMBE le parti — un tracciamento
+       riscritto in silenzio varrebbe meno, non di piu' */
+    trackingCorretto:o.tracking_corretto_il||0,
+    trackingResoCorretto:o.tracking_reso_corretto_il||0,
     consegnato:o.consegnato||0, speditoIl:o.spedito_il||0,
     /* il conto scomposto (lug 2026): listing.price resta il TOTALE
        in cassaforte, le quote dicono com'e' fatto */
@@ -3538,6 +3743,12 @@ async function loadListings(anonimo){
     offertaMinPercento = Number(j.offerta_minima_percento) || 0;
   if (j.giorni_data_annuncio !== undefined)
     giorniData = Number(j.giorni_data_annuncio) || 0;
+  /* la leva delle aste per gli anonimi: decide se il 🔨 della nav
+     porta alla vetrina delle aste o al «coming soon» */
+  if (j.asta_abilitata !== undefined) {
+    astaLevaPubblica = !!j.asta_abilitata;
+    aggiornaAstaVisibilita();
+  }
   ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
@@ -3565,8 +3776,12 @@ async function caricaAltri(){
       el('grid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
   } catch(e) {} finally { vetrinaCaricando = false; }
 }
-async function loadOrders(){
-  const r = await fetch(`${API_BASE}/orders`, {headers:{'X-Tg-Init-Data': authHdr()}});
+/* `ordine` (solo ai moderatori) aggiunge alla lista quel numero anche
+   se non li riguarda: e' come si apre un ordine spedito fra estranei
+   per correggerne il tracciamento. Vedi miei_ordini in server.py. */
+async function loadOrders(ordine){
+  const r = await fetch(`${API_BASE}/orders${ordine?`?ordine=${+ordine}`:''}`,
+    {headers:{'X-Tg-Init-Data': authHdr()}});
   orders = (await r.json()).map(mapOrder);
 }
 
@@ -3689,6 +3904,9 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
 function voceNav(view){
   if (['dettaglio','negozio','sicurezza','pacco'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
+  /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
+     ci si e' arrivati da li' e la nav deve dirlo */
+  else if (view === 'astepresto') view = 'aste';
   return (view === 'esplora' && ['sfoglia','aste'].includes(ramoVetrina))
     ? ramoVetrina : view;
 }
@@ -3702,6 +3920,13 @@ function voceNav(view){
    convenzione di casa. */
 function vaiAste(){
   haptic();
+  /* A LEVA SPENTA IL TASTO NON MENTE: porta a una pagina che dice
+     «stanno arrivando», invece di una vetrina filtrata su un filtro
+     che non pesca niente. E' una radice sorella come le altre —
+     l'indietro passa da Esplora, la convenzione di casa — e non
+     tocca ne' filtro ne' ordinamento: non c'e' niente da accendere e
+     niente da spegnere uscendo. */
+  if (!asteAccese()) { go('astepresto'); return; }
   ramoVetrina = 'aste';
   filtroAsta = true;
   if (el('filtroAstaInp')) el('filtroAstaInp').checked = true;
@@ -3793,7 +4018,11 @@ function go(view){
    (girarli tutti non deve costare un indietro a testa) e dalla radice
    l'indietro esce dall'app, che e' il patto chiesto. Si spinge solo
    entrando in una vista piu' interna. */
-const RADICI = new Set(['esplora','sfoglia','vendi','affari','profilo']);
+const RADICI = new Set(['esplora','sfoglia','vendi','affari','profilo',
+  /* il «coming soon» delle aste: ci si arriva da un tab, quindi e' una
+     radice sorella — si SOSTITUISCE come le altre e l'indietro passa
+     da Esplora, mai un gradino che intrappola */
+  'astepresto']);
 /* Ma una radice e' la MADRE (lug 2026, decisione di Andrea che rovescia
    quella del giorno prima): da ogni altra radice l'indietro passa da
    Esplora, e solo da Esplora si esce. E' come si comportano Subito e
@@ -4530,15 +4759,11 @@ const cardHTML = l => {
     ? `<div class="card-asta">🔨 ${astaViva(l) ? astaResta(l.astaFine)
                                                : 'conclusa'}</div>`
     : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>` : '';
-  /* Il barattolino in card: stesse guardie del cerchietto nel
-     dettaglio (mai in DEMO/VETRINA, mai sui propri annunci). Qui pero'
-     il livello e' dell'ANNUNCIO, non del barattolo intero: vetro vuoto
-     da salvare, pieno d'arancio da salvato — sulla griglia deve dire
-     al volo "questo l'hai gia' messo via". stopPropagation: il tocco
-     sul barattolino non apre il dettaglio. */
-  const sal = preferiti.has(l.id);
-  const jar = (DEMO || VETRINA || !myTgId || l.sellerId===myTgId) ? ''
-    : `<button class="card-jar${sal?' salvato':''}" data-id="${l.id}" onclick="event.stopPropagation();togglePreferito(${l.id})" title="${sal?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">${jarSVG(sal?4:0, 16)}</button>`;
+  /* Il barattolino: UNA fabbrica sola per la griglia e per la scheda
+     (bottoneJar, ago 2026) — «stessa icona delle card, non una
+     copia». stopPropagation: il tocco sul barattolino non apre il
+     dettaglio. */
+  const jar = bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
   return `
     <div class="card${asta?' in-asta':lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
       <div class="ph-wrap">
@@ -4745,7 +4970,7 @@ function renderNegozio(v, annunci, feedback=[]){
       </div>
     </div>
     ${ponti}
-    ${(v.username||v.negozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
+    ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
   /* Gli ultimi feedback ricevuti: stelle + commento + ruolo + data.
      Mai nomi (il server non li manda proprio): su una pagina pubblica
      rivelerebbero gli acquisti di chi non ha scelto di apparire. */
@@ -4810,10 +5035,17 @@ function apriNostrProfilo(npub){
   if (DEMO || collaudo) { toast(`🟣 In produzione apre il profilo Nostr: gli scrivi dal tuo client`); return; }
   window.open(`https://njump.me/${npub}`, '_blank');
 }
+/* I DUE PONTI SONO BOTTONI, NON LINK (ago 2026, decisione di Andrea):
+   nel negozio erano testo sottolineato («btn link») mentre gli stessi
+   due dentro l'ordine erano gia' bottoni ghost — la stessa azione con
+   due vestiti secondo la pagina. Ora il default e' UNO, ed e' il
+   ghost di casa; il parametro `cls` resta perche' il chiamante possa
+   dire altro, ma nessuno lo fa piu' di diverso. */
 function pontiContatto(username, npub, chi, cls){
   const b = [];
-  if (username) b.push(`<button class="${cls||'btn link'}" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
-  if (npub) b.push(`<button class="${cls||'btn link'}" onclick="apriNostrProfilo('${npub}')">🟣 Scrivi ${chi} su Nostr</button>`);
+  const c = cls || 'btn ghost';
+  if (username) b.push(`<button class="${c}" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
+  if (npub) b.push(`<button class="${c}" onclick="apriNostrProfilo('${npub}')">🟣 Scrivi ${chi} su Nostr</button>`);
   return b.join('');
 }
 /* Il ponte dentro l'ordine: come sopra, ma senza canali la riga
@@ -5705,11 +5937,20 @@ async function sezioneAltriOggetti(l){
      che la striscia non ci sia gia') */
   if (!currentListing || currentListing.id!==l.id || !altri.length) return;
   const corpo = document.querySelector('#detailContent .detail-body');
-  if (!corpo || corpo.querySelector('.altri-strip')) return;
+  if (!corpo || corpo.querySelector('.altri-sez')) return;
+  /* Griglia, non piu' striscia (ago 2026): le stesse card della
+     vetrina, lo stesso `.grid`. Il bottone sta subito sotto il titolo
+     della sezione e da li' si incolla in cima mentre si scorre — e'
+     il CSS a farlo (.altri-azione), qui non serve nessun listener.
+     Niente piu' vestito di cartone: e' il ghost di casa come tutti
+     gli altri secondari. Il tetto passa da 6 a 8, che con due
+     colonne fanno quattro righe piene invece di tre. */
   corpo.insertAdjacentHTML('beforeend', `
-    <div class="section-label" style="margin-top:16px">Altri oggetti di questo venditore</div>
-    <div class="altri-strip">${altri.slice(0,6).map(cardHTML).join('')}</div>
-    ${DEMO || astaE(l) ? '' : `<button class="btn carton" style="margin-top:2px" onclick="apriPacco()">📦 Aggiungi al pacco</button>`}`);
+    <div class="altri-sez">
+      <div class="section-label">Altri oggetti di questo venditore</div>
+      ${DEMO || astaE(l) ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">📦 Aggiungi al pacco</button></div>`}
+      <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
+    </div>`);
 }
 
 /* ---------------- il SET: «Riempi il barattolo» (lug 2026) ----------------
@@ -5954,6 +6195,52 @@ function apriPacco(){
   rileggiVenditore(l).then(()=>{
     if (el('view-pacco').classList.contains('active')) renderPacco();
   });
+}
+/* ---- LA ✕ CHIUDE E BUTTA VIA (ago 2026, decisione di Andrea) ----
+   Il pacco e' STICKY per venditore: uscire e rientrare dal dettaglio
+   di un annuncio non svuota niente (lo dice apriPacco: stesso
+   venditore = ritrova il suo pacco com'era), e questo non cambia. Ma
+   allora serviva una strada per ricominciare da capo, e la ✕ e'
+   quella: chiude E svuota, con la conferma davanti perche' non si
+   torna indietro. A pacco gia' vuoto non si chiede nulla — una
+   domanda su una cosa che non esiste e' solo un ostacolo.
+
+   IL GESTO INDIETRO NON CHIEDE E NON SVUOTA, ed e' dichiarato: fa
+   quello che ha sempre fatto, torna al dettaglio col pacco intatto.
+   Due ragioni, e la seconda decide. Primo, «indietro» vuol dire
+   tornare, non buttare: chiedere una conferma distruttiva a chi
+   voleva solo fare un passo indietro e' la trappola classica.
+   Secondo, e piu' pratico: nella PWA installata il gesto e' di
+   SISTEMA e non passa da navIndietro — non lo si puo' intercettare,
+   solo preparare (vedi il motore di navigazione). Un ripensamento
+   agganciato al gesto funzionerebbe dentro Telegram e NON nella PWA,
+   cioe' la stessa ✕ farebbe due cose diverse sui due telefoni. Fra
+   una garanzia che c'e' solo a meta' e una regola onesta, la regola. */
+function chiudiPagPacco(){
+  haptic();
+  if (!setScelte.size) { navIndietro(); return; }   /* niente da buttare */
+  el('sheetBg').classList.add('open');
+  el('paccoSvuotaSheet').classList.add('open');
+}
+/* Il pacco si svuota DAVVERO: rientrando si ricomincia da capo
+   (paccoDati a null = il prossimo «Aggiungi al pacco» e' un pacco
+   nuovo, anche dallo stesso venditore). */
+function svuotaPacco(){
+  haptic();
+  setScelte = new Map();
+  consegnaSetScelta = 'spedizione';
+  paccoDati = null;
+  /* si chiude il foglio e si esce dalla pagina in un colpo solo: due
+     navIndietro di fila si mangerebbero anche il gradino sotto (la
+     serratura dei 350ms), e comunque la pagina del pacco senza
+     paccoDati non si puo' piu' ricostruire — navRendiVista ripiega
+     sulla vetrina, che e' esattamente dove si vuole atterrare. */
+  chiudiPicker();                    /* chiusura MIRATA, mai closeSheet */
+  el('paccoSvuotaSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open'))
+    el('sheetBg').classList.remove('open');
+  navIndietro();
+  toast('Pacco svuotato');
 }
 /* Gli annunci della pagina: i soli ATTIVI del venditore del pacco,
    provenienza in testa, poi i componibili prima degli esclusi.
@@ -6267,15 +6554,12 @@ function openDetail(id){
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>`;
   const condividi = DEMO ? '' : `<button class="share-btn" onclick="condividiAnnuncio()" title="Condividi questo annuncio" aria-label="Condividi">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/></svg></button>`;
-  /* Il barattolino dei preferiti: solo per chi e' dentro davvero
-     (mai in DEMO/VETRINA) e mai sui propri annunci. L'icona e' il
-     barattolo che si riempie col conteggio degli attivi. */
-  const barattolino = (DEMO || VETRINA || mio) ? ''
-    : `<button class="share-btn jar-btn${preferiti.has(l.id)?' salvato':''}" id="jarBtn" onclick="togglePreferito(${l.id})" title="${preferiti.has(l.id)?'Togli dal barattolo':'Metti nel barattolo'}" aria-label="Salva tra i preferiti">${jarSVG(livelloBarattolo(contaBarattolo()), 20)}</button>`;
-  /* Il gemello testuale del cerchietto, sotto il recinto escrow:
-     stesso endpoint, stesso Set, mai divergenti */
-  const jarCta = (DEMO || VETRINA || mio) ? ''
-    : `<button class="btn ghost" id="jarCta" onclick="togglePreferito(${l.id})">${preferiti.has(l.id)?'🫙 Già nel barattolo':'🫙 Metti nel barattolo'}</button>`;
+  /* Il barattolino dei preferiti (ago 2026): stessa fabbrica delle
+     card — stessa icona, stesso livello per-annuncio, stesso numero
+     accanto — e sta in BASSO a destra sulla foto, modello Vinted. Il
+     bottone grande «Metti nel barattolo» sotto il recinto non c'e'
+     piu': un preferito non pesa quanto un acquisto. */
+  const barattolino = bottoneJar(l, 'share-btn jar-btn', 20);
   /* Le frecce del carosello: da desktop lo swipe non esiste e la
      striscia restava sfogliabile solo aprendo il lightbox. Nascono
      solo con piu' di una foto, e si vedono solo dove c'e' un mouse
@@ -6325,7 +6609,7 @@ function openDetail(id){
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">
-          <div class="detail-price${asta?' asta':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
+          <div class="detail-price${asta?' asta':lampoAttiva(l)?' lampo':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
           <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
           ${asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
           ${!asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">rimangono <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
@@ -6389,7 +6673,6 @@ function openDetail(id){
                   nella pagina dedicata. -->
            </div>
            ${offAcc ? '' : `<button class="btn ghost offerta-pagina" onclick="apriOfferta()">Fai un'offerta</button>`}`}
-      ${jarCta}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
     </div>`;
@@ -7229,6 +7512,7 @@ function closeSheet(){
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('setSheet').classList.remove('open');
+  el('paccoSvuotaSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
      scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui) */
@@ -7998,7 +8282,8 @@ function openOrder(id){
         </div>
       </div>
       ${s==='dispute' ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
-      ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a></span></div>`:''}
+      ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a>${rigaCorretto(o.trackingCorretto)}</span></div>`:''}
+      ${pannelloTrackingAdmin(o, s)}
       ${isAdmin && s==='dispute' ? `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
@@ -8015,12 +8300,14 @@ function openOrder(id){
           <div class="hint">La disputa prevede il <b>rimborso previa restituzione</b>: accordati col venditore per l'indirizzo (chat), rispedisci l'oggetto e inserisci qui il tracciamento. Il rimborso di <b class="net">${fmt(o.listing.price)} sats</b> parte quando il venditore riceve il reso.</div>
           ${selettoreCorriere('resoCorriere')}
           <textarea id="resoTracking" style="min-height:38px" placeholder="Numero di tracciamento del reso"></textarea>
+          <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
+          <div class="hint avviso-tracking" id="resoAvviso" style="display:none"></div>
           <button class="btn orange" onclick="resoSpedito()">↩️ Ho rispedito l'oggetto</button>
         </div>`:''}
       ${o.role==='seller' && s==='return_shipped' ? `
         <div class="payout">
           <h4>↩️ Reso in arrivo</h4>
-          <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${esc(o.corriereReso)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.trackingReso)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
+          <div class="hint">${o.trackingReso?`Il reso viaggia con <b>${esc(o.corriereReso)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.trackingReso)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.trackingReso)}" target="_blank" style="color:var(--trust)">segui →</a>.${rigaCorretto(o.trackingResoCorretto)}`:'Il reso è in consegna a mano.'} Quando ricevi l'oggetto e verifichi che è tutto ok, conferma: l'acquirente verrà rimborsato.</div>
           <button class="btn primary" style="margin-top:12px" onclick="resoRicevuto(this)">✓ Ho ricevuto il reso — rimborsa l'acquirente</button>
         </div>`:''}
       ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
@@ -8054,6 +8341,8 @@ function openOrder(id){
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${selettoreCorriere('shipCorriere')}
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
+          <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
+          <div class="hint avviso-tracking" id="shipAvviso" style="display:none"></div>
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
         </div>`):''}
       ${pannelloContenutoDigitale(o)}
@@ -8061,6 +8350,7 @@ function openOrder(id){
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
       ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — mi prendo ${TEMPI.conferma}h per controllarlo`:`📬 È arrivato — mi prendo ${TEMPI.conferma}h per controllarlo`}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
+      ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
@@ -9332,10 +9622,84 @@ async function annullaOrdine(){
   toast('✖️ Ordine annullato'); go('affari');
 }
 
-function selettoreCorriere(id){
-  const CORRIERI = ['Poste Italiane','BRT','GLS','SDA','DHL','UPS','InPost','Altro corriere','Consegna a mano'];
+const CORRIERI = ['Poste Italiane','BRT','GLS','SDA','DHL','UPS','InPost',
+                  'Altro corriere','Consegna a mano'];
+/* `scelto` preseleziona un corriere: serve alla correzione del
+   moderatore, che parte da quello che c'e' gia' (nove volte su dieci
+   e' giusto il corriere e sbagliato il codice). */
+function selettoreCorriere(id, scelto){
   return `<select id="${id}" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-weight:600;background:var(--bg);margin:12px 0 8px;outline:none">
-    ${CORRIERI.map(c=>`<option>${c}</option>`).join('')}</select>`;
+    ${CORRIERI.map(c=>`<option${c===scelto?' selected':''}>${c}</option>`).join('')}</select>`;
+}
+
+/* ---- IL CODICE DELL'INTERMEDIARIO (ago 2026, caso vero dal campo) ----
+   Un venditore ha comprato la spedizione da Packlink e ha inserito il
+   codice dell'ORDINE dell'intermediario (IT2026COM…) invece di quello
+   InPost (24 cifre), che gli e' arrivato per email solo DOPO aver
+   consegnato il pacco al punto di ritiro. Il tracciamento si scrive
+   una volta sola — segna_spedito filtra su stato='locked' — quindi il
+   compratore restava con un codice che nessun corriere conosce.
+   La cura e' su tre gambe: qui la PREVENZIONE (la riga che lo dice
+   prima) e il CONTROLLO DI FORMA (sotto); la CORREZIONE la fa un
+   moderatore, mai il venditore — vedi il commento di
+   correggi_tracking in server.py. */
+const AVVISO_INTERMEDIARIO = 'Se hai comprato la spedizione da un '
+  + 'intermediario (Packlink, Sendcloud…), inserisci il codice del '
+  + '<b>corriere</b>, non quello dell\'ordine dell\'intermediario: '
+  + 'spesso arriva per email dopo la consegna al punto di ritiro.';
+
+/* LE FORME SONO UN'EURISTICA, NON UNA VERIFICA, e la differenza e'
+   tutta nel fatto che non blocca MAI: nessuno di questi codici lo
+   possiamo interrogare — la verifica vera arrivera' col tracking via
+   API dei corrieri, che e' in backlog. Qui si riconosce solo la
+   FORMA tipica, e a forma storta si chiede «sei sicuro?» e si lascia
+   passare al secondo tocco. Meglio una domanda in piu' che una
+   spedizione vera fermata da una regola nostra sbagliata: i corrieri
+   cambiano i formati senza avvisarci, e un venditore col pacco gia'
+   partito non deve restare in ostaggio del nostro elenco.
+   'Altro corriere' non ha forma per definizione e non si controlla. */
+const FORME_TRACKING = {
+  /* S10 universale (RR123456789IT) o i numerici di Poste Delivery */
+  'Poste Italiane': [/^[A-Z]{2}\d{9}[A-Z]{2}$/, /^\d{12,13}$/],
+  'BRT':            [/^\d{10,14}$/],
+  'GLS':            [/^\d{9,14}$/, /^[A-Z]{2}\d{9,12}$/],
+  'SDA':            [/^\d{9,14}$/, /^[A-Z]{2}\d{9}[A-Z]{2}$/],
+  /* DHL: 10-11 cifre (Express) oppure i JJD/JVGL di eCommerce */
+  'DHL':            [/^\d{10,11}$/, /^(JJD|JVGL)[0-9A-Z]{10,22}$/],
+  'UPS':            [/^1Z[0-9A-Z]{16}$/, /^\d{9,18}$/],
+  /* InPost Italia: 24 cifre — la forma del caso che ha aperto tutto */
+  'InPost':         [/^\d{24}$/],
+};
+/* '' se la forma va bene (o se non si controlla), altrimenti la
+   domanda da mostrare. Gli spazi e i trattini che la gente incolla
+   non contano: si guarda il codice nudo. */
+function formaTracking(corriere, tracking){
+  const forme = FORME_TRACKING[corriere];
+  if (!forme || !tracking) return '';
+  const nudo = tracking.toUpperCase().replace(/[\s-]/g, '');
+  if (forme.some(f => f.test(nudo))) return '';
+  return `Questo non sembra un codice <b>${esc(corriere)}</b> — hai messo `
+       + `per caso quello dell'intermediario? Controlla, oppure tocca di `
+       + `nuovo per procedere comunque.`;
+}
+/* Il forzato vale per QUEL codice: se lo si corregge, si ricontrolla.
+   Nessun localStorage — e' una domanda di questo momento, non una
+   preferenza. */
+let trackingForzato = '';
+/* Il giro completo: primo tocco a forma storta = avviso e basta,
+   secondo tocco sullo STESSO codice = si va avanti. Torna true se si
+   puo' procedere. */
+function trackingDaControllare(corriere, tracking, idAvviso){
+  const box = el(idAvviso);
+  const msg = formaTracking(corriere, tracking);
+  if (!msg || trackingForzato === tracking) {
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+    return true;
+  }
+  trackingForzato = tracking;
+  if (box) { box.style.display = ''; box.innerHTML = `⚠️ ${msg}`; }
+  haptic();
+  return false;
 }
 
 async function markShipped(){
@@ -9345,6 +9709,8 @@ async function markShipped(){
   if (corriere !== 'Consegna a mano' && !tracking) {
     toast('Inserisci il tracciamento (o scegli "Consegna a mano")'); return;
   }
+  /* la forma del codice: avvisa, non blocca (vedi FORME_TRACKING) */
+  if (!trackingDaControllare(corriere, tracking, 'shipAvviso')) return;
   if (DEMO) { currentOrder.state='shipped'; currentOrder.corriere=corriere; currentOrder.tracking=tracking; toast('📦 Segnato come spedito'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/spedito`, {
     method:'POST',
@@ -9521,6 +9887,92 @@ async function sollecita(){
   toast('🔔 Promemoria inviato all\'acquirente');
 }
 
+/* ---- LA CORREZIONE DEL TRACCIAMENTO (ago 2026) ----
+   La traccia che vedono ENTRAMBE le parti: un tracciamento corretto
+   di nascosto varrebbe meno come prova in disputa, non di piu'. */
+function rigaCorretto(ts){
+  return ts ? ` <small style="opacity:.7">(tracciamento corretto da un `
+    + `moderatore il ${new Date(ts*1000).toLocaleDateString('it-IT')})</small>`
+    : '';
+}
+/* LA STRADA DEL VENDITORE CHE HA SBAGLIATO (ago 2026): non un
+   bottone — quello e' il punto: se il tracciamento si riscrivesse da
+   soli non varrebbe piu' come prova in disputa — ma una riga che
+   spiega perche' e dove chiedere. Sta nell'ORDINE, sotto il
+   tracciamento, che e' il momento in cui uno se ne accorge: cercare
+   un contatto in fondo al Profilo quando hai in mano il codice
+   sbagliato e' la cosa che non si fa.
+   Il contatto e' quello che gia' esiste — il canale del rodaggio del
+   config (`BANNER_TEST_LINK`) —: nessun secondo indirizzo da tenere
+   aggiornato. Senza canale nel config resta la riga, che dice
+   comunque la cosa vera (chiedi a un moderatore), invece di un
+   bottone che non porta da nessuna parte. */
+function notaTrackingSbagliato(o, s){
+  if (o.role !== 'seller' || !o.tracking) return '';
+  if (!['shipped','delivered'].includes(s)) return '';
+  const dove = bannerTest?.link
+    ? `Scrivi ai moderatori col numero dell'ordine (<b>#${o.id}</b>) e lo correggono loro: <button type="button" class="btn link" style="display:inline;padding:0;margin:0;font-size:inherit" onclick="apriCanaleTest()">apri il canale ›</button>`
+    : `Scrivi ai moderatori col numero dell'ordine (<b>#${o.id}</b>) e lo correggono loro.`;
+  return `<div class="trust-note">🛠 <span>Hai inserito il codice sbagliato? `
+    + `Il tracciamento non si riscrive da soli — è la prova che conta se si `
+    + `apre una disputa. ${dove}</span></div>`;
+}
+/* Il pannello del MODERATORE, e solo suo: il venditore non ha nessun
+   bottone per riscrivere il proprio tracciamento (decisione di
+   Andrea — se si potesse riscrivere non sarebbe piu' una prova). Sta
+   sulla spedizione (shipped/delivered) e sul reso (return_shipped),
+   con lo stesso schema: stesso selettore, stesso controllo di forma,
+   stesso avviso. */
+function pannelloTrackingAdmin(o, s){
+  if (!isAdmin) return '';
+  const reso = s === 'return_shipped';
+  if (!reso && !['shipped','delivered'].includes(s)) return '';
+  /* niente pacco, niente tracciamento: sui corrieri-sentinella e sulle
+     strade senza spedizione la correzione non esiste proprio (la
+     rifiuta anche il server, questa e' la cortesia davanti) */
+  const c = reso ? o.corriereReso : o.corriere;
+  if (['Consegna a mano','Ritiro in zona','Consegna digitale'].includes(c)
+      || ['ritiro','digitale'].includes(o.consegnaScelta)) return '';
+  return `
+    <div class="payout" style="border-color:var(--danger)">
+      <h4>🛠 Correggi il tracciamento${reso?' del reso':''} (moderatore)</h4>
+      <div class="hint">Capita che il venditore inserisca il codice
+        dell'intermediario (Packlink, Sendcloud) invece di quello del
+        corriere. Qui si corregge — e resta scritto nell'ordine, per
+        tutti e due. Stato e data di spedizione non si toccano: sono
+        l'ancora dei promemoria.</div>
+      ${selettoreCorriere('admCorriere', c)}
+      <textarea id="admTracking" style="min-height:38px" placeholder="Numero di tracciamento corretto">${esc(reso ? o.trackingReso : o.tracking)}</textarea>
+      <div class="hint avviso-tracking" id="admAvviso" style="display:none"></div>
+      <button class="btn ghost" onclick="correggiTracking(${reso?1:0}, this)">🛠 Salva il tracciamento corretto</button>
+    </div>`;
+}
+async function correggiTracking(reso, btn){
+  haptic();
+  const corriere = el('admCorriere')?.value || '';
+  const tracking = el('admTracking')?.value.trim() || '';
+  if (!tracking) { toast('Inserisci il tracciamento corretto'); return; }
+  if (!trackingDaControllare(corriere, tracking, 'admAvviso')) return;
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const ripristina = bottoneInAttesa(btn);
+  try {
+    const r = await fetch(
+      `${API_BASE}/admin/orders/${currentOrder.id}/tracking`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({corriere, tracking, reso: !!reso})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Operazione non riuscita', 3200); return; }
+    trackingForzato = '';
+    /* si rilegge tenendo l'ordine in lista (puo' non riguardare il
+       moderatore: senza il numero sparirebbe e openOrder morirebbe) */
+    const id = currentOrder.id;
+    await loadOrders(id); renderOrders();
+    toast('🛠 Tracciamento corretto');
+    openOrder(id);
+  } finally { ripristina(); }
+}
+
 async function resoSpedito(){
   haptic();
   const corriere = el('resoCorriere')?.value || '';
@@ -9528,6 +9980,7 @@ async function resoSpedito(){
   if (corriere !== 'Consegna a mano' && !tracking) {
     toast('Inserisci il tracciamento del reso'); return;
   }
+  if (!trackingDaControllare(corriere, tracking, 'resoAvviso')) return;
   if (DEMO) { currentOrder.state='return_shipped'; toast('↩️ Reso registrato'); openOrder(currentOrder.id); return; }
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/reso-spedito`, {
     method:'POST',
@@ -9653,13 +10106,24 @@ function renderMyListings(){
    barattolo da ogni dispositivo); qui un Set degli id per accendere
    il bottone al volo. In DEMO e VETRINA la funzione non esiste. */
 let preferiti = new Set(), myPreferiti = [];
-const MAX_PREFERITI = 20;   /* il gemello della costante in server.py */
+/* Il tetto e' una LEVA del server (ago 2026: da 20 a 10, decisione di
+   Andrea). Questo e' solo il valore di partenza — quello VERO arriva
+   da /api/me (`max_barattolo`) e lo sovrascrive: cosi' girando la
+   leva nel config del VPS non resta un gemello hardcodato a dire
+   un'altra cifra nel «(N/…)» e nei messaggi. */
+let MAX_PREFERITI = 10;
 
 /* Quanti nel barattolo DAVVERO: contano solo gli attivi, i venduti e
    i rimossi non occupano posto (comprare libera spazio da solo) */
 const contaBarattolo = () => myPreferiti.filter(l=>l.stato==='attivo').length;
+/* I cinque livelli del vetro, in PROPORZIONE al tetto e non a
+   soglie scritte a mano: con le vecchie (≤5, ≤10, poi 3) e il tetto a
+   10 il livello 3 non sarebbe esistito mai — pieno a 10, ma «≤10» lo
+   fermava a 2. Cosi' invece la leva puo' valere 6 o 40 e il barattolo
+   si riempie lo stesso in quattro passi. */
 const livelloBarattolo = n =>
-  n<=0 ? 0 : n>=MAX_PREFERITI ? 4 : n<=5 ? 1 : n<=10 ? 2 : 3;
+  n<=0 ? 0 : n>=MAX_PREFERITI ? 4
+  : Math.min(3, Math.max(1, Math.ceil(n / MAX_PREFERITI * 4)));
 
 /* L'icona del barattolo che si riempie: vetro a currentColor,
    liquido nella clip dell'interno (id univoco per istanza: piu'
@@ -9679,17 +10143,51 @@ function jarSVG(livello, misura){
   </svg>`;
 }
 
+/* IL BOTTONE DEL BARATTOLINO, UNO SOLO PER TUTTI (ago 2026): lo
+   montano la card della griglia e la scheda del dettaglio, che prima
+   avevano due markup diversi — stesse guardie ma icona, livello e
+   titolo scritti due volte. Un cuore solo: chi cambia il barattolino
+   lo cambia qui e basta.
+   `classe` e' l'unica differenza vera (dove sta sulla foto e quanto e'
+   grande, roba di CSS); il LIVELLO e' sempre quello dell'ANNUNCIO —
+   vetro vuoto da salvare, pieno da salvato — e mai quello del
+   barattolo intero: il riempimento a scatti nel dettaglio non si
+   capiva, e adesso l'icona dice la stessa cosa dappertutto.
+   Guardie: mai in DEMO/VETRINA, mai sui propri annunci. */
+function bottoneJar(l, classe, misura, prima){
+  if (DEMO || VETRINA || !myTgId || l.sellerId===myTgId) return '';
+  const sal = preferiti.has(l.id);
+  const n = contaSavers(l.barattoli);
+  return `<button class="${classe}${sal?' salvato':''}${n?' con-conta':''}"`
+    + ` data-id="${l.id}" onclick="${prima||''}togglePreferito(${l.id})"`
+    + ` title="${sal?'Togli dal barattolo':'Metti nel barattolo'}"`
+    + ` aria-label="${sal?'Togli dai preferiti':'Salva tra i preferiti'}">`
+    + jarSVG(sal?4:0, misura)
+    + (n ? `<span class="jar-conta">${fmt(n)}</span>` : '')
+    + `</button>`;
+}
+/* Da quanti in su si mostra il numero: DA DUE (ago 2026, dichiarato).
+   Un «1» accanto all'icona non e' una prova sociale — e' un numero che
+   occupa spazio senza dire niente, e su una griglia si moltiplica per
+   trenta. Da due in su comincia a voler dire qualcosa. Il server
+   manda sempre la verita': la soglia e' una scelta di lettura, non di
+   privacy (chi ha salvato non esce da nessuna parte, mai). */
+const SOGLIA_SAVERS = 2;
+const contaSavers = n => (n|0) >= SOGLIA_SAVERS ? (n|0) : 0;
+
 /* La regia unica del riempimento: porta ogni barattolo in pagina al
-   livello giusto e aggiorna il conteggio (N/20) nell'header del
+   livello giusto e aggiorna il conteggio (N/tetto) nell'header del
    cassetto. n = conteggio del server quando c'e' (la verita'),
    altrimenti si conta in casa. */
 function aggiornaBarattolo(n){
   if (typeof n !== 'number') n = contaBarattolo();
   const lv = 'lv' + livelloBarattolo(n);
   document.querySelectorAll('.jar-ico').forEach(s=>{
-    /* i barattolini sulle card raccontano l'annuncio (vuoto/pieno),
-       non il barattolo intero: il loro livello lo fa aggiornaJarCards */
-    if (s.closest('.card-jar')) return;
+    /* i barattolini TOCCABILI (griglia e scheda) raccontano
+       l'ANNUNCIO — vuoto/pieno —, non il barattolo intero: il loro
+       livello lo fa aggiornaJarCards. Qui resta il solo 🫙
+       dell'header del cassetto, che il barattolo lo racconta davvero. */
+    if (s.closest('.card-jar,.jar-btn')) return;
     s.classList.remove('lv0','lv1','lv2','lv3','lv4');
     s.classList.add(lv);
   });
@@ -9719,7 +10217,7 @@ async function caricaPreferiti(){
    ogni toggle: vetrina, negozio, dettaglio e cassetto non divergono
    mai, qualunque sia il punto da cui si e' toccato. */
 function aggiornaJarCards(){
-  document.querySelectorAll('.card-jar').forEach(b=>{
+  document.querySelectorAll('.card-jar,.jar-btn').forEach(b=>{
     const sal = preferiti.has(+b.dataset.id);
     b.classList.toggle('salvato', sal);
     b.title = sal ? 'Togli dal barattolo' : 'Metti nel barattolo';
@@ -9729,13 +10227,35 @@ function aggiornaJarCards(){
     s.classList.add(sal ? 'lv4' : 'lv0');
   });
 }
+/* Il numero accanto al barattolino di UN annuncio, riscritto in place
+   dopo un toggle: la cifra la dice il server (d.barattoli), non una
+   somma a occhio. Tocca tutte le istanze di quell'id — la card in
+   griglia e il cerchietto della scheda dicono lo stesso numero. */
+function aggiornaContaSavers(id, n){
+  const mostra = contaSavers(n);
+  const l = listings.find(x=>x.id===id);
+  if (l) l.barattoli = n|0;               // il catalogo resta in pari
+  if (currentListing && currentListing.id===id) currentListing.barattoli = n|0;
+  document.querySelectorAll(
+    `.card-jar[data-id="${id}"],.jar-btn[data-id="${id}"]`).forEach(b=>{
+    b.classList.toggle('con-conta', !!mostra);
+    let c = b.querySelector('.jar-conta');
+    if (!mostra) { c?.remove(); return; }
+    if (!c) {
+      c = document.createElement('span');
+      c.className = 'jar-conta';
+      b.appendChild(c);
+    }
+    c.textContent = fmt(mostra);
+  });
+}
 
 async function togglePreferito(id){
   haptic();
   /* guardia di cortesia: da pieno non si parte nemmeno (la verita'
      resta la guardia del server, che copre gli altri dispositivi) */
   if (!preferiti.has(id) && contaBarattolo() >= MAX_PREFERITI) {
-    toast("Il barattolo è pieno! Svuotalo un po' o compra qualcosa che c'è dentro 🫙", 3200);
+    toast(`Il barattolo è pieno (${MAX_PREFERITI} oggetti)! Togline qualcuno o compra qualcosa che c'è dentro 🫙`, 3200);
     return;
   }
   try {
@@ -9744,12 +10264,13 @@ async function togglePreferito(id){
     const d = await r.json().catch(()=>({}));
     /* il 400 del barattolo pieno e' un messaggio lungo: tempo di leggerlo */
     if (!r.ok) { toast(d.detail || 'Operazione non riuscita', 3200); return; }
-    /* bottoni del dettaglio (cerchietto + CTA): sono di
-       currentListing, si toccano solo se il toggle riguarda proprio
-       lui (dal cassetto puo' arrivare l'id di un altro annuncio) */
+    /* il cerchietto del dettaglio: e' di currentListing, si tocca solo
+       se il toggle riguarda proprio lui (dal cassetto puo' arrivare
+       l'id di un altro annuncio). Il gemello testuale «Metti nel
+       barattolo» non esiste piu' dall'ago 2026: il gesto e' uno, ed e'
+       l'icona sulla foto. */
     const suo = currentListing && currentListing.id === id;
-    const b = suo ? el('jarBtn') : null;
-    const cta = suo ? el('jarCta') : null;
+    const b = suo ? document.querySelector('#detailContent .jar-btn') : null;
     if (d.salvato) {
       preferiti.add(id);
       const l = listings.find(x=>x.id===id)
@@ -9768,19 +10289,19 @@ async function togglePreferito(id){
         s.classList.add('scossa');
         setTimeout(()=>s.classList.remove('scossa'), 450);
       });
-      if (cta) { cta.textContent = '🫙 Già nel barattolo'; }
       tg?.HapticFeedback?.notificationOccurred?.('success');
       toast('Messo nel barattolo! 🫙');
     } else {
       preferiti.delete(id);
       myPreferiti = myPreferiti.filter(x=>x.id!==id);
       if (b) { b.classList.remove('salvato'); b.title = 'Metti nel barattolo'; }
-      if (cta) { cta.textContent = '🫙 Metti nel barattolo'; }
       toast('Tolto dal barattolo');
     }
     renderPreferiti();
     aggiornaBarattolo(d.conteggio);
     aggiornaJarCards();
+    /* e il numero pubblico accanto all'icona, col dato del server */
+    if (d.barattoli !== undefined) aggiornaContaSavers(id, d.barattoli);
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
@@ -9913,9 +10434,38 @@ async function loadAdminStats(){
             </div>
           </div>`).join('')}
       </div>
+      <!-- Come si arriva a un ordine SPEDITO fra estranei (ago 2026):
+           non compare in nessuna coda — e giustamente, non e' un caso
+           da moderare — quindi per correggerne il tracciamento serve
+           il NUMERO, che e' quello che il venditore scrive quando si
+           accorge di aver sbagliato. Da qui si apre l'ordine come
+           sempre, e la correzione vive li' dentro: un posto solo. -->
+      <div style="margin-top:14px">
+        <div class="section-label">🛠 Apri un ordine per numero</div>
+        <div class="filtri-riga" style="margin-top:8px">
+          <input id="admOrdineId" type="number" inputmode="numeric" placeholder="Numero dell'ordine">
+          <button class="btn ghost" onclick="apriOrdinePerId()">Apri</button>
+        </div>
+      </div>
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
+}
+
+/* Il moderatore apre un ordine di cui ha il numero (il venditore
+   glielo scrive quando ha sbagliato il tracciamento). Passa dalla
+   lista di sempre col parametro `ordine`: nessuna vista nuova,
+   nessuna seconda strada — si atterra sull'ordine e il pannello di
+   correzione e' li' dentro dove sta il contesto. */
+async function apriOrdinePerId(){
+  haptic();
+  const id = +(el('admOrdineId')?.value || 0);
+  if (!id) { toast('Scrivi il numero dell\'ordine'); return; }
+  try {
+    await loadOrders(id); renderOrders();
+    if (!orders.find(o=>o.id===id)) { toast(`L'ordine #${id} non esiste`); return; }
+    openOrder(id);
+  } catch(e) { toast('Rete assente: riprova'); }
 }
 
 /* La riga di un pagamento incerto: cos'era, quanto, e il payment_hash
@@ -10310,23 +10860,36 @@ function astaForm(){
   if (!astaAccesa()) return null;
   return {durata_giorni: sellAstaGiorni || 3};
 }
-/* la visibilita' del toggle la decide la leva del server (e in
-   modifica sparisce: un annuncio esistente non diventa un'asta) */
+/* IL TASTO 🔨 C'E' SEMPRE (ago 2026, decisione di Andrea): prima
+   compariva solo a leva accesa e lo slot restava allo spaziatore.
+   Adesso il martelletto prende quel posto in ogni caso e a leva
+   spenta porta al «coming soon» — le aste si annunciano prima di
+   esistere, invece di apparire un giorno dal nulla. Gli slot restano
+   cinque e il Vendi al centro esatto: cambia solo CHI occupa il
+   quinto, e lo spaziatore ora non serve mai (resta nel markup perche'
+   e' lui a tenere il posto se un domani il tasto tornasse
+   condizionato). Il TOGGLE del form invece segue la leva sul serio:
+   un'asta non si puo' creare finche' non e' accesa. */
 function aggiornaAstaVisibilita(){
-  const on = !!(astaLeve && astaLeve.abilitata);
+  const on = asteAccese();
   const f = el('sellAstaField');
   if (f) f.style.display = (on && !editandoId && !editandoNostr)
     ? '' : 'none';
-  /* il tasto «Aste» prende lo slot vuoto della nav SOLO a leva
-     accesa; spento, torna lo spaziatore — gli slot restano cinque e
-     il Vendi al centro esatto. In vetrina anonima /api/me non c'e':
-     il tasto resta nascosto (imperfezione dichiarata — per dirlo
-     anche agli anonimi servirebbe la leva nella busta di prima
-     pagina, cioe' un tocco a server.py). */
   const nb = el('nav-aste'), sp = document.querySelector('.nav-vuoto');
-  if (nb) nb.style.display = on ? '' : 'none';
-  if (sp) sp.style.display = on ? 'none' : '';
+  if (nb) nb.style.display = '';
+  if (sp) sp.style.display = 'none';
 }
+/* La leva delle aste da DUE fonti, che dicono la stessa cosa perche'
+   leggono lo stesso config: /api/me (`asta_leve.abilitata`) per chi e'
+   dentro, e la busta di prima pagina di /api/listings
+   (`asta_abilitata`) per gli ANONIMI in vetrina, che /api/me non ce
+   l'hanno. Senza la seconda l'anonimo vedrebbe il «coming soon» anche
+   ad aste accese — e sarebbe una bugia, non un'imperfezione.
+   In DEMO nessuna delle due arriva: resta il coming soon, ed e' la
+   verita' (nel seme finto le aste non ci sono). */
+let astaLevaPubblica = null;   // dalla busta di /api/listings
+const asteAccese = () => astaLeve ? !!astaLeve.abilitata
+                       : astaLevaPubblica === null ? false : astaLevaPubblica;
 function aggiornaConsegnaForm(){
   const sped = el('sellConsSped').checked,
         rit = el('sellConsRitiro').checked,
@@ -11861,6 +12424,10 @@ async function avvia(){
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
     myDoppioni = me.doppioni_nostr || [];
     lampoLeve = me.lampo_leve || null;
+    /* il tetto del barattolo lo decide il config del VPS: qui si
+       adotta, non si indovina (un server di ieri non manda la chiave
+       e resta il valore di partenza) */
+    if (me.max_barattolo > 0) MAX_PREFERITI = Number(me.max_barattolo);
     astaLeve = me.asta_leve || null;
     aggiornaAstaVisibilita();
     npubCodice = ''; lnAddrModifica = false;

@@ -818,13 +818,19 @@ def init_db():
     );
     CREATE TABLE IF NOT EXISTS preferiti(
         -- «nel tuo barattolo»: gli annunci messi da parte col 🫙.
-        -- Privati per natura: nessun conteggio pubblico, il
-        -- venditore non sa chi ne' quanti (v1)
+        -- CHI ha salvato non esce MAI (i preferiti restano privati);
+        -- QUANTI si', anonimo e pubblico dall'ago 2026 — il numero
+        -- accanto al barattolino in vetrina e nel dettaglio.
         tg_id INTEGER NOT NULL,
         annuncio_id INTEGER NOT NULL,
         creato INTEGER,
         PRIMARY KEY(tg_id, annuncio_id)
     );
+    -- La PK e' (tg_id, annuncio_id): senza questo indice il conteggio
+    -- per ANNUNCIO — che dall'ago 2026 gira su ogni pagina di vetrina
+    -- — sarebbe una scansione della tabella intera.
+    CREATE INDEX IF NOT EXISTS idx_preferiti_annuncio
+      ON preferiti(annuncio_id);
     CREATE TABLE IF NOT EXISTS offerte(
         -- la contrattazione strutturata (MAI una chat): proposta del
         -- compratore, al massimo UNA controproposta del venditore,
@@ -1243,6 +1249,16 @@ def init_db():
     for colonna in ("corriere TEXT DEFAULT ''", "tracking TEXT DEFAULT ''",
                     "corriere_reso TEXT DEFAULT ''",
                     "tracking_reso TEXT DEFAULT ''",
+                    # La correzione del tracciamento da parte di un
+                    # MODERATORE (ago 2026, dal campo: chi compra la
+                    # spedizione da un intermediario riceve il codice
+                    # vero del corriere solo DOPO aver consegnato il
+                    # pacco, e segna_spedito si scrive una volta sola).
+                    # 0 = mai corretto. La traccia si vede nell'ordine
+                    # da entrambe le parti: un tracciamento riscritto
+                    # in silenzio varrebbe meno, non di piu'.
+                    "tracking_corretto_il INTEGER DEFAULT 0",
+                    "tracking_reso_corretto_il INTEGER DEFAULT 0",
                     "spedito_il INTEGER DEFAULT 0",
                     "consegnato INTEGER DEFAULT 0",
                     "sollecito_il INTEGER DEFAULT 0",
@@ -4883,6 +4899,23 @@ def arricchisci_righe_vetrina(righe):
                 g = gare.get(r["id"])
                 r["asta_top_sats"] = g["top"] if g else 0
                 r["asta_puntate"] = g["n"] if g else 0
+    # 4) QUANTI l'hanno messo nel barattolo (ago 2026): numero
+    # pubblico e ANONIMO — nessun nome, nessun id, come l'avviso «ha
+    # fatto colpo» che dice «qualcuno». UNA query per pagina
+    # sull'indice idx_preferiti_annuncio; gli annunci che nessuno ha
+    # salvato non compaiono nel GROUP BY e restano a 0. La soglia da
+    # cui MOSTRARLO la decide il client (da 2 in su): qui si dice la
+    # verita' e basta.
+    tutti = [r["id"] for r in righe]
+    if tutti:
+        con = db()
+        salvati = {x["annuncio_id"]: x["n"] for x in con.execute(
+            "SELECT annuncio_id, COUNT(*) AS n FROM preferiti "
+            f"WHERE annuncio_id IN ({','.join('?' * len(tutti))}) "
+            "GROUP BY annuncio_id", tutti)}
+        con.close()
+        for r in righe:
+            r["barattoli"] = salvati.get(r["id"], 0)
     return righe
 
 
@@ -5119,6 +5152,13 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # La finestra della riga «pubblicato N giorni fa» del
         # dettaglio: oltre, la data non si mostra (stesso patto).
         risposta["giorni_data_annuncio"] = GIORNI_DATA_ANNUNCIO
+        # La leva delle aste anche agli ANONIMI (ago 2026): il tasto
+        # 🔨 in nav ora c'e' sempre, e a leva spenta apre il «coming
+        # soon». In vetrina /api/me non esiste, quindi senza questa
+        # riga l'anonimo vedrebbe il coming soon anche ad aste
+        # ACCESE — cioe' una bugia. Era l'imperfezione dichiarata di
+        # aggiornaAstaVisibilita, e questa e' la riga che la chiude.
+        risposta["asta_abilitata"] = bool(ASTA_ABILITATA)
     con.close()
     return risposta
 
@@ -5408,9 +5448,18 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
 # ---- Preferiti: «nel tuo barattolo» 🫙 -------------------------------
 # Un tocco sul barattolino mette da parte l'annuncio, un altro lo
 # toglie. Il toggle vive sul server: lo stesso barattolo da ogni
-# dispositivo. Privato per natura: nessun conteggio pubblico, il
-# venditore non vede chi ne' quanti (v1).
-MAX_PREFERITI = 20   # il barattolo e' piccolo apposta: contano solo gli attivi
+# dispositivo. CHI ha salvato resta privato per sempre — il nome non
+# esce da nessuna parte —, ma QUANTI e' pubblico e anonimo dall'ago
+# 2026 (vedi _conta_savers piu' sotto).
+# IL TETTO E' UNA LEVA (ago 2026, da 20 a 10 per decisione di Andrea):
+# il barattolo e' piccolo apposta, e il numero si tara dal config del
+# VPS senza un cantiere. Il client lo riceve da /api/me
+# (`max_barattolo`) invece di tenerne una copia a memoria: un gemello
+# hardcodato divergerebbe al primo ritocco della leva.
+try:
+    from config import MAX_PREFERITI
+except ImportError:
+    MAX_PREFERITI = 10
 
 def _conta_barattolo(con, tg_id):
     """Quanti annunci ATTIVI nel barattolo: i venduti/rimossi non
@@ -5419,6 +5468,18 @@ def _conta_barattolo(con, tg_id):
         "SELECT COUNT(*) FROM preferiti p "
         "JOIN annunci a ON a.id = p.annuncio_id AND a.stato='attivo' "
         "WHERE p.tg_id=?", (tg_id,)).fetchone()[0]
+
+
+def _conta_savers(con, annuncio_id: int) -> int:
+    """Quante persone hanno QUESTO annuncio nel barattolo (ago 2026).
+    Il numero e' pubblico, i nomi no — ed e' la stessa regola
+    dell'avviso «ha fatto colpo», che dice «qualcuno» e mai chi.
+    Serve al conteggio accanto al barattolino dopo un toggle: la
+    pagina intera lo prende da arricchisci_righe_vetrina, con una
+    query sola."""
+    return con.execute("SELECT COUNT(*) FROM preferiti WHERE annuncio_id=?",
+                       (annuncio_id,)).fetchone()[0]
+
 
 @app.post("/api/listings/{annuncio_id}/preferito")
 async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
@@ -5445,8 +5506,9 @@ async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
         # mono-processo il blocco e' atomico (il patto anti-doppione).
         if _conta_barattolo(con, user["id"]) >= MAX_PREFERITI:
             con.close()
-            raise HTTPException(400, "Il barattolo è pieno! Svuotalo un po' "
-                                     "o compra qualcosa che c'è dentro 🫙")
+            raise HTTPException(400, f"Il barattolo è pieno ({MAX_PREFERITI} "
+                                     f"oggetti)! Togline qualcuno o compra "
+                                     f"qualcosa che c'è dentro 🫙")
         con.execute("INSERT INTO preferiti(tg_id, annuncio_id, creato) "
                     "VALUES(?,?,?)",
                     (user["id"], annuncio_id, int(time.time())))
@@ -5461,8 +5523,14 @@ async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
     # Il conteggio fresco viaggia nella risposta: il frontend aggiorna
     # il livello di riempimento col numero del server, non con una stima.
     conteggio = _conta_barattolo(con, user["id"])
+    # E quanti hanno QUESTO annuncio nel barattolo: il numero accanto
+    # al barattolino si aggiorna col dato del server, non con una
+    # stima locale (±1 a occhio sbaglia appena due dispositivi
+    # toccano lo stesso annuncio).
+    barattoli = _conta_savers(con, annuncio_id)
     con.close()
-    return {"ok": True, "salvato": not tolto, "conteggio": conteggio}
+    return {"ok": True, "salvato": not tolto, "conteggio": conteggio,
+            "barattoli": barattoli}
 
 
 @app.get("/api/me/preferiti")
@@ -9842,6 +9910,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "stato='da_riscuotere'", (user["id"],)).fetchone()["n"]
     con2.close()
     profilo["aste_da_agire"] = superato + da_riscuotere
+    # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
+    # non ne tiene una copia a memoria (divergerebbe al primo ritocco).
+    profilo["max_barattolo"] = MAX_PREFERITI
     # E quelle dell'asta, per il form di vendita e il foglio puntata
     # (stesso patto: mai cifre hardcodate nel client).
     profilo["asta_leve"] = {
@@ -12177,6 +12248,108 @@ async def risolvi_disputa(ordine_id: int, req: Request,
                              "aperta: questo ordine è già in restituzione")
 
 
+# I corrieri-sentinella non sono corrieri: sono il modo di dire «qui
+# non c'e' nessun pacco» ('Consegna a mano', 'Ritiro in zona') o «il
+# bene e' passato dentro Barattolo» ('Consegna digitale'). Un
+# tracciamento non li riguarda, e trasformare un ritiro in una
+# spedizione — o viceversa — a sats gia' in cassaforte cambierebbe la
+# STORIA dell'ordine, non un dato di servizio.
+CORRIERI_SENTINELLA = ("Consegna a mano", "Ritiro in zona",
+                       "Consegna digitale")
+
+
+@app.post("/api/admin/orders/{ordine_id}/tracking")
+async def correggi_tracking(ordine_id: int, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: corregge corriere e numero di tracciamento di un
+    ordine gia' spedito (`reso=1` per quello del reso).
+
+    IL PERCHE' (ago 2026, caso vero dal campo): un venditore compra la
+    spedizione da un intermediario (Packlink, Sendcloud) e inserisce
+    il codice dell'ORDINE dell'intermediario invece di quello del
+    corriere — che spesso gli arriva per email solo DOPO aver
+    consegnato il pacco al punto di ritiro. `segna_spedito` filtra su
+    stato='locked', quindi il tracciamento si scrive una volta sola e
+    nessuno poteva piu' correggerlo: il compratore restava con un
+    codice che nessun corriere conosce.
+
+    PERCHE' NON LO PUO' FARE IL VENDITORE (decisione di Andrea): un
+    tracciamento riscrivibile a piacere non e' piu' una prova in
+    disputa. La correzione passa da un moderatore, e LASCIA TRACCIA —
+    `tracking_corretto_il`, che entrambe le parti vedono nell'ordine.
+
+    COSA NON SI TOCCA, ed e' il cuore della cosa: `spedito_il` e lo
+    `stato`. Il primo e' l'ANCORA del promemoria di
+    `sollecita_conferme_ferme`; riscriverlo farebbe ripartire da capo
+    l'attesa del compratore a ogni correzione — la stessa trappola
+    gia' pagata con `aggiornato` in `sollecita_venditori_fermi`. Per
+    la stessa ragione non si tocca nemmeno `aggiornato`, che e'
+    l'ancora dei solleciti fratelli su altri stati: qui non serve, e
+    il quando lo dice gia' la colonna della traccia."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    reso = bool(d.get("reso"))
+    corriere = (d.get("corriere") or "").strip()[:40]
+    tracking = (d.get("tracking") or "").strip()[:60]
+    if not corriere or not tracking:
+        raise HTTPException(400, "Servono corriere e numero di tracciamento")
+    if corriere in CORRIERI_SENTINELLA:
+        raise HTTPException(400, "«" + corriere + "» non è un corriere: "
+                                 "questa correzione cambierebbe la storia "
+                                 "dell'ordine, non il suo tracciamento")
+    # Gli stati sono quelli in cui un pacco e' DAVVERO in viaggio (o
+    # appena arrivato): la correzione serve li'. Il reso ha il suo.
+    stati = ("return_shipped",) if reso else ("shipped", "delivered")
+    con = db()
+    o = con.execute(
+        "SELECT * FROM ordini WHERE id=? AND stato IN "
+        f"({','.join('?' * len(stati))})", (ordine_id, *stati)).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Questo ordine non ha un tracciamento "
+                                 "correggibile in questo stato")
+    vecchio_c = o["corriere_reso"] if reso else o["corriere"]
+    vecchio_t = o["tracking_reso"] if reso else o["tracking"]
+    if vecchio_c in CORRIERI_SENTINELLA or o["consegna_scelta"] in (
+            "ritiro", "digitale"):
+        # L'altra direzione della stessa guardia: un ordine consegnato
+        # a mano (o un codice online) non ha un pacco da tracciare, e
+        # dargliene uno lo racconterebbe come una spedizione.
+        con.close()
+        raise HTTPException(400, "Questo ordine non è una spedizione: "
+                                 "non c'è un tracciamento da correggere")
+    ora = int(time.time())
+    if reso:
+        con.execute("UPDATE ordini SET corriere_reso=?, tracking_reso=?, "
+                    "tracking_reso_corretto_il=? WHERE id=?",
+                    (corriere, tracking, ora, ordine_id))
+    else:
+        con.execute("UPDATE ordini SET corriere=?, tracking=?, "
+                    "tracking_corretto_il=? WHERE id=?",
+                    (corriere, tracking, ora, ordine_id))
+    con.commit()
+    con.close()
+    registra_moderazione(
+        "ordine", "tracking_corretto",
+        f"#{ordine_id}{' (reso)' if reso else ''}: "
+        f"{vecchio_c} {vecchio_t} → {corriere} {tracking}",
+        titolo=f"ordine #{ordine_id}", deciso_da=user["id"])
+    # Avvisa CHI ASPETTA IL PACCO: il compratore sulla spedizione, il
+    # venditore sul reso (e' lui che sta aspettando indietro l'oggetto).
+    await notifica(
+        o["venditore_id"] if reso else o["compratore_id"],
+        f"📦 <b>Un moderatore ha corretto il tracciamento</b>"
+        f"{' del reso' if reso else ''} dell'ordine #{ordine_id}: ora è "
+        f"<b>{html.escape(corriere)}</b>, tracciamento "
+        f"<b>{html.escape(tracking)}</b>. Il codice di prima non era "
+        f"quello del corriere.")
+    return {"ok": True, "corriere": corriere, "tracking": tracking,
+            "corretto_il": ora}
+
+
 @app.post("/api/orders/{ordine_id}/reso-spedito")
 async def reso_spedito(ordine_id: int, req: Request,
                        x_tg_init_data: str = Header(""),
@@ -12480,8 +12653,16 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
 
 
 @app.get("/api/orders")
-def miei_ordini(x_tg_init_data: str = Header(""),
+def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                 barattolo_sessione: str = Cookie("")):
+    """`ordine` (solo ai MODERATORI) AGGIUNGE alla lista quel singolo
+    ordine, anche se non li riguarda: serve a correggere un
+    tracciamento sbagliato — vedi correggi_tracking — perche' un
+    ordine 'shipped' fra estranei non compare in nessuna coda e senza
+    questo il moderatore non lo puo' nemmeno aprire. NON allarga la
+    lista di sempre (che resta dispute e resi in corso): si vede
+    l'ordine di cui il venditore ha dato il NUMERO, uno alla volta.
+    A chi non e' moderatore il parametro non fa niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
     pulisci_ordini_fantasma(con)
@@ -12523,6 +12704,12 @@ def miei_ordini(x_tg_init_data: str = Header(""),
         # I moderatori vedono dispute e resi in corso
         q += (" OR o.stato IN ('dispute','return_pending',"
               "'return_shipped','refund')")
+        if ordine > 0:
+            # ...piu' il singolo ordine chiesto per numero (vedi la
+            # docstring): il ? va in coda alla stringa E in coda ai
+            # parametri, che qui sono posizionali
+            q += " OR o.id=?"
+            par.append(ordine)
     righe = [dict(r) for r in con.execute(q + " ORDER BY o.aggiornato DESC",
                                           par)]
     # I SET escono col titolo sintetizzato e l'elenco delle righe
