@@ -1353,15 +1353,27 @@
      francobolli degli articoli, scelta della consegna, il conto in
      righe col totale evidenziato, e in fondo Acquista coi due
      secondari. Nessun token nuovo: pillole, unit e mono di casa. */
-  /* il corpo e' una COLONNA alta almeno uno schermo: il conto sta in
-     alto e i bottoni scendono in fondo (margin-top:auto su Acquista),
-     dove il pollice li aspetta — su schermi corti seguono il
-     contenuto, mai coperti. dvh dove c'e' (le barre dei browser
-     mobili), vh come ripiego. */
-  .ctrl-corpo{padding:6px var(--pad) 26px;max-width:520px;margin:0 auto;
-    display:flex;flex-direction:column;
-    min-height:calc(100vh - 170px);min-height:calc(100dvh - 170px)}
+  /* I BOTTONI IN FONDO ALLA PAGINA, PER COSTRUZIONE (ago 2026, dal
+     feedback di Andrea: la prima versione sottraeva una costante
+     stimata dall'altezza e i bottoni restavano a mezz'aria). La
+     VISTA attiva e' una colonna alta quanto lo schermo — testata a
+     misura sua, corpo che si prende tutto il resto (flex:1) — e
+     dentro il corpo Acquista porta margin-top:auto: il fondo e'
+     quello VERO, qualunque altezza abbia la testata. dvh dove c'e'
+     (le barre dei browser mobili), vh come ripiego; il padding in
+     basso porta la safe-area della gesture bar. Su schermi corti i
+     bottoni seguono il contenuto, mai coperti. */
+  #view-controllapacco.active{display:flex;flex-direction:column;
+    min-height:100vh;min-height:100dvh}
+  .ctrl-corpo{padding:6px var(--pad) calc(26px + env(safe-area-inset-bottom));
+    max-width:520px;margin:0 auto;width:100%;
+    display:flex;flex-direction:column;flex:1 1 auto}
   .ctrl-corpo #ctrlAcquista{margin-top:auto}
+  @media (min-width:768px){
+    /* da desktop #app porta 76px di topbar sopra e 40 sotto: la
+       colonna li sconta, o la pagina scrollerebbe sempre di 116px */
+    #view-controllapacco.active{min-height:calc(100vh - 116px)}
+  }
   /* la testata: il conteggio a sinistra non si stringe mai, i
      francobolli scorrono di lato (overscroll contenuto: la lezione
      della galleria a foto singola, detta dove appartiene) */
@@ -1403,6 +1415,9 @@
      768 sparisce come nella pagina del pacco, ma senza barra propria */
   @media (max-width:767.98px){
     body.senza-nav nav{display:none}
+    /* senza la tab bar il fiato che #app le riservava (84px) e' solo
+       un buco sotto i bottoni: via, o il fondo non e' il fondo */
+    body.senza-nav #app{padding-bottom:0}
   }
 
   /* ---------- dettaglio annuncio ---------- */
