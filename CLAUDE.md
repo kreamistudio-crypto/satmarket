@@ -4095,7 +4095,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il ≈ dei listini EUR) · IL CONTO in righe (Prezzo · Commissione
   «in promo» · Spedizione della via scelta · Protezione se >0 ·
   Totale, la grammatica `.ctrl-riga`/`contoRighe` condivisa col
-  riepilogo del pacco) · Acquista in fondo. Toggle €/₿ in testata
+  riepilogo del pacco) · «PAGA» in fondo (secondo giro, decisione di
+  Andrea: da quel bottone parte la fattura, e il nome lo dice —
+  «Acquista» resta sui varchi che PORTANO alla pagina: barra, recinto
+  e il riepilogo del pacco). Toggle €/₿ in testata
   (ridisegno dal preventivo in CACHE, mai un secondo fetch — e
   ATTENZIONE alla trappola pagata qui: l'edit di setValuta era
   atterrato su rinfrescaViste, due righe adiacenti identiche).
@@ -4151,12 +4154,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `utenti.spedizioniere` ('' = non dichiarato), endpoint
   `POST /api/me/spedizioniere` (pattern canale-notifiche), cassetto
   «📦 Come spedisci» nel Profilo con le voci da /api/me (mai
-  hardcodate; in DEMO sparisce). LA VIA PUNTO ESISTE SOLO CON LO
-  SPEDIZIONIERE DICHIARATO — senza sapere la rete, il compratore
-  scriverebbe un punto inutilizzabile: la funzione si accende
-  venditore per venditore, e per gli importati resta spenta per
-  costruzione (non hanno lo spedizioniere). Il compratore lo vede in
-  pagina: «📦 Spedisce con InPost».
+  hardcodate; in DEMO sparisce). Il compratore lo vede in pagina:
+  «📦 Spedisce con InPost».
+  LA VIA PUNTO SI OFFRE SEMPRE dove c'è la spedizione (secondo giro,
+  ago 2026 — la decisione di Andrea che SUPERA quella del primo
+  giro, «punto solo con spedizioniere dichiarato»; il perché:
+  MEGLIO L'ACCORDO IN CHAT CHE LA PORTA CHIUSA). Senza rete
+  dichiarata la pillola c'è lo stesso: la pagina dice la riga onesta
+  «🤝 Il venditore non ha indicato il corriere: accordatevi in chat
+  sul punto di ritiro», il campo del punto resta, la tariffa è il
+  fallback casa di sempre, e il punto scritto arriva comunque al
+  venditore nell'ordine. Il gate di ieri (400 «non spedisce ai
+  punti» + filtro nel preventivo) è durato UN giro ed è morto con la
+  sua sentinella rovesciata in CI: non deve tornare di soppiatto.
+  Con la regola nuova la via punto vale anche per gli IMPORTATI (via
+  chat, come tutto il resto del loro flusso).
+  E LA NOTIFICA UNA-TANTUM (`avvisa_spedizioniere_mancante`,
+  nell'orologio): ai venditori con annunci attivi che spediscono e
+  senza spedizioniere — «da oggi i compratori possono scegliere il
+  punto (locker): dichiara la rete nel Profilo, eviti gli accordi in
+  chat». Il timbro è la colonna `utenti.avvisato_spedizioniere`
+  (sopravvive ai riavvii) e si scrive PRIMA degli invii, il patto
+  del cooldown della lampo: un errore di rete può perdere un avviso
+  di cortesia, mai raddoppiarlo. UNA volta per venditore, per
+  sempre; chi arriva dopo ha anche la riga discreta nel form Vendi
+  (`#sellSpedizioniereHint`, solo a chi spedisce senza rete
+  dichiarata).
   IL PUNTO NELL'ORDINE, SENZA UN VALORE NUOVO DI consegna_scelta (il
   precedente è anche_digitale, ortogonale): la strada punto è
   `consegna_scelta='spedizione'` + colonna `ordini.punto_ritiro`
@@ -4166,9 +4189,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sempre. Il body di compra porta `spedizione_via` ('casa' default |
   'punto', whitelist con sentinella) + `punto_ritiro` (testo libero
   del compratore: strip, spazi collassati, tetto 120 — obbligatorio
-  con la via punto, 400 senza; e le tre guardie: spedizione scelta,
-  spedizioniere dichiarato, SELECT PRIMA della invoice — il patto del
-  ricontrollo senza await ora ha la sua sentinella in CI). La RIPRESA
+  con la via punto, 400 senza; le due guardie sono spedizione scelta
+  e punto scritto — quella sullo spedizioniere è caduta col secondo
+  giro; il patto del ricontrollo senza await ha la sua sentinella in
+  CI). La RIPRESA
   confronta anche il punto: cambiarlo è una richiesta diversa =
   rinnovo (la tariffa può cambiare). Il testo attraversa la filiera
   INTERO ma mai nudo: `esc()` a ogni resa client (ordine, pannello
@@ -6068,7 +6092,9 @@ varco-mappa, il conto DEL SERVER prima della invoice; il venditore
 dichiara DUE costi di spedizione e lo spedizioniere del negozio, il
 compratore scrive il punto che il venditore ritrova nell'ordine. Le
 decisioni di Andrea: costo unico come fallback su entrambe le strade,
-punto solo con spedizioniere dichiarato, e il conto di «Controlla il
+la via punto SEMPRE offerta (dal secondo giro: senza spedizioniere
+dichiarato vale l'accordo in chat, detto in pagina — supera il gate
+del primo giro), e il conto di «Controlla il
 pacco» dallo stesso preventivo (mai due conti che divergono, anteprima
 sulla più economica dichiarandolo). Vedi Architettura, «LA PAGINA
 D'ACQUISTO», per il modello dati (punto in colonna, MAI un valore
@@ -6080,13 +6106,19 @@ REGINA: preventivo == compra a parità di via, al sat, mono e set — coi
 caratteri strani nel punto lungo tutta la filiera, e il giro visivo
 CDP chiaro/scuro a 375/1280 con zero errori JS (che ha anche trovato
 dal vivo il 409 dello stock con la sua pagina d'errore, e l'edit di
-setValuta finito su rinfrescaViste). IN PRODUZIONE il deploy fa
-girare quattro migrazioni additive (le tre colonne punto su annunci,
-punto_ritiro su ordini, spedizioniere su utenti) e niente altro: la
-via punto resta spenta finché i venditori non dichiarano lo
-spedizioniere dal Profilo. DA GUARDARE dal vivo dentro Telegram: il
-giro completo su un telefono vero (pagina, punto, paySheet sopra la
-pagina) e il primo ordine al punto visto dal venditore.
+setValuta finito su rinfrescaViste). Col SECONDO GIRO (feedback di
+Andrea sul primo): il bottone finale dice «Paga», le pillole della
+consegna il solo costo di spedizione, e la via punto si offre SEMPRE
+— senza spedizioniere vale l'accordo in chat, detto in pagina prima
+di pagare (la decisione che supera il gate del primo giro). IN
+PRODUZIONE il deploy fa girare le migrazioni additive (tre colonne
+punto su annunci, punto_ritiro su ordini, spedizioniere +
+avvisato_spedizioniere su utenti) e al primo battito dell'orologio
+parte la notifica UNA-TANTUM ai venditori che spediscono senza
+spedizioniere — col timbro, mai due volte. DA GUARDARE dal vivo
+dentro Telegram: il giro completo su un telefono vero (pagina,
+punto, paySheet sopra la pagina), il primo ordine al punto visto dal
+venditore, e il testo della campagna nel journal del primo giro.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
