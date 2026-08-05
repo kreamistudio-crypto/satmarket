@@ -58,6 +58,23 @@
                     giusta, e il segno resta rosso in tutti e due i
                     temi. Si abbassa la luce, non si cambia il segno. */
     --lampo:#C0392B; --lampo-tag:#A6301F; --lampo-text:#A6301F;
+    /* I DUE PONTI (ago 2026, decisione di Andrea): «Scrivi su
+       Telegram» e «Scrivi su Nostr» prendono il colore del loro
+       MONDO — è l'unico posto dell'app dove un bottone porta fuori,
+       e il colore dice dove. Sono FISSI nei due temi, come tutti i
+       colori che SIGNIFICANO qualcosa (il patto di --ship-soft): un
+       marchio non cambia tinta di notte, e il testo sopra è bianco
+       in tutti e due i casi.
+       ATTENZIONE, e per questo non si riusa `var(--nostr)` così
+       com'è: quel token è TEMATICO (#8B5CF6 di giorno, #A78BFA di
+       sera) perché veste pallini e accenti SUL fondo della pagina;
+       su un bottone PIENO col testo bianco, di sera scenderebbe a
+       2,72 — cioè illeggibile. `--nostr-btn` è lo stesso viola di
+       casa (è esattamente `--nostr-text` del tema chiaro) ma PINNATO.
+       Misurati, bianco sopra: Telegram 4,75 e Nostr 5,70 — AA pieno
+       in entrambi i temi, e sopra la linea del nostro stesso CTA
+       arancio (2,30), che resta lo standard di casa. */
+    --tg-btn:#1878B8; --nostr-btn:#7C3AED;
     --trust-deep:#10603A; --trust-text:#157347;
     --nostr:#8B5CF6; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
     --chip-bg:#F3ECDA;
@@ -438,6 +455,14 @@
     padding:5px 10px;transform:rotate(-2deg);box-shadow:0 2px 0 #23282C;
   }
   .tag-price .price{margin-top:0;font-size:14.5px;color:var(--sats-deep)}
+  /* L'UNITÀ NON SI COLORA MAI (ago 2026, decisione di Andrea, e vale
+     per TUTTI gli stati — normale, lampo, asta): a prendere il colore
+     del suo stato è il NUMERO, il simbolo € e la parola «sats»
+     restano nel colore del testo. Qui, sul cartellino di carta, è il
+     grigio fisso di sempre; nel dettaglio è --muted (vedi
+     .detail-price .unit). Due dichiarazioni in tutto, e nessuna
+     regola di stato deve mai nominare .unit: se ne aggiungi una,
+     falla finire sul solo .price. */
   .tag-price .price-sub,.tag-price .price .unit{color:#8A8271}
   .tag-price .price-sub{margin-top:0}
 
@@ -588,8 +613,7 @@
   /* e il cartellino parla la stessa lingua del badge: il prezzo
      scontato e' rosso, non arancio. Il barrato sopra resta grigio —
      e' il prezzo che NON si paga piu'. */
-  .card.in-lampo .tag-price .price,
-  .card.in-lampo .tag-price .price .unit{color:var(--lampo-tag)}
+  .card.in-lampo .tag-price .price{color:var(--lampo-tag)}
   /* Il badge dell'asta (ago 2026): stesso linguaggio del badge lampo
      ma identita' propria — il rosso e' della lampo, il martello parla
      inchiostro (e crema al buio, gratis coi token). In card il tempo
@@ -602,8 +626,7 @@
   /* la targhetta prezzo di un'asta: quel numero e' la puntata in
      corso, non un prezzo — parla il blu FISSO del token tag (la
      carta del cartellino non cambia di notte) */
-  .tag-price.asta .price,
-  .tag-price.asta .price .unit{color:var(--asta-tag)}
+  .tag-price.asta .price{color:var(--asta-tag)}
   /* la riga dell'asta sotto il prezzo del dettaglio: stessa voce
      discreta del tempo della lampo, nel colore di casa dell'asta */
   .asta-riga{font-size:13px;color:var(--asta-text);font-weight:700;
@@ -614,23 +637,20 @@
      L'identita' non si spezza sulla soglia card→dettaglio.
      Misurati: 7,51 su crema e 8,88 su bruno (testo grande: AAA). */
   .detail-price.asta{color:var(--asta-text)}
-  /* anche il simbolo di valuta segue il token — e il € va nominato
-     APPOSTA: la regola `.detail-price .unit.eur` (piu' in basso nel
-     foglio, stessa specificita' del selettore a due classi) lo
-     tingerebbe di --sats-deep in entrambi i temi, mezzo numero per
-     famiglia. Con .asta e .eur insieme si vince per specificita',
-     non per ordine. */
-  .detail-price.asta .unit,
-  .detail-price.asta .unit.eur{color:var(--asta-text)}
   /* e il gemello della lampo (ago 2026): il numero grande di un
      annuncio scontato e' ROSSO come il suo badge e come la cornice
      della sua card — l'identita' non si spezza sulla soglia
-     card→dettaglio, la stessa regola dell'asta. Il € va nominato
-     APPOSTA per la solita ragione (.detail-price .unit.eur sta piu' in
-     basso a pari specificita' e tingerebbe mezzo numero d'arancio). */
-  .detail-price.lampo,
-  .detail-price.lampo .unit,
-  .detail-price.lampo .unit.eur{color:var(--lampo-text)}
+     card→dettaglio, la stessa regola dell'asta. */
+  .detail-price.lampo{color:var(--lampo-text)}
+  /* NESSUNA DELLE DUE NOMINA .unit, ed e' la regola (ago 2026): il
+     colore dello stato veste il NUMERO e basta — il € e la parola
+     «sats» restano nel colore del testo, che qui lo mette
+     `.detail-price .unit` in un posto solo. Questo ROVESCIA la
+     correzione di prima sull'asta, dove il € era stato portato sul
+     token insieme alla cifra: quella nasceva per non avere «mezzo
+     numero per famiglia», ma la simmetria giusta non e' fra il
+     numero e la sua unita' — e' fra le unita' di tutti gli stati,
+     che ora si somigliano tutte. */
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
@@ -643,9 +663,13 @@
     font-size:14.5px;margin-bottom:-6px}
   .lampo-was .lampo-badge{background:var(--lampo);color:#fff;
     border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800}
-  /* «rimangono 2h 14m» accanto al badge, FUORI da lui: stesso colore
+  /* «Scade tra 2h 14m» accanto al badge, FUORI da lui: stesso colore
      della vecchia riga lampo, che diceva la stessa cosa due righe
-     piu' sotto (lug 2026: ripeterla era rumore) */
+     piu' sotto (lug 2026: ripeterla era rumore). Dall'ago 2026 dice
+     «Scade tra» e non piu' «rimangono» (decisione di Andrea): e' la
+     stessa voce dell'asta due righe sopra («si chiude tra»), e la
+     frase si legge in un colpo invece che a rovescio. Vive in un
+     posto solo — il dettaglio —: in card il tempo non c'e'. */
   /* SEMPRE su una riga sua (deciso da Andrea): in euro i tre pezzi
      ci stavano e in sats no — «180 000 sats» barrato e' largo il
      doppio di «≈ 166 €» — e la riga cambiava forma secondo la valuta
@@ -903,11 +927,22 @@
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px;
     overflow-wrap:break-word}
   .price{font-family:'JetBrains Mono',monospace;color:var(--sats);font-weight:700;font-size:14px;margin-top:6px}
-  .price .unit{font-size:10.5px;font-weight:500;color:var(--muted)}
+  .price .unit{font-size:10.5px;font-weight:500}
   /* l'aria fra numero e unita' la da' il CSS, non uno spazio nel
      markup: cosi' il simbolo € puo' stare piu' stretto della parola
      «sats» (vedi .detail-price .unit.eur) */
-  .unit{margin-left:4px}
+  /* ---- L'UNITÀ NON SI COLORA MAI, E QUESTO È IL CUORE (ago 2026,
+     decisione di Andrea) ---- Il colore dello stato veste il NUMERO;
+     il simbolo € e la parola «sats» restano nel colore del testo, in
+     OGNI stato (normale, lampo, asta) e in OGNI vista. Il default sta
+     qui, sul selettore nudo, così vale anche dove l'unità nasce
+     dentro un elemento già colorato (le cifre in grassetto dei
+     pannelli e delle offerte: senza questa riga ereditavano
+     l'arancio). L'UNICA deroga è il cartellino di carta, che ha il
+     suo grigio fisso — la carta non cambia di notte. Chi scrive un
+     numero con la sua unità metta l'unità in uno `<span class="unit">`
+     e non ci pensi più. */
+  .unit{margin-left:4px;color:var(--muted)}
   .unit.eur{margin-left:2px}
   .price-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
     font-weight:600;margin-top:1px}
@@ -1380,13 +1415,18 @@
     text-overflow:ellipsis;white-space:nowrap}
   .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
     font-weight:700;font-size:28px;margin:10px 0 2px}
-  .detail-price .unit{font-size:13px;color:var(--muted);font-weight:500}
+  /* qui solo la MISURA: il colore lo mette il `.unit` nudo, una
+     volta per tutta l'app */
+  .detail-price .unit{font-size:13px;font-weight:500}
   /* Il € e' un SIMBOLO, non una parola: sta attaccato alla cifra e
      grande quasi quanto lei, o sembra una nota a pie' di pagina
-     (feedback di Andrea). «sats» resta piccolo e muted: quello e' un
-     nome, e ripeterlo grosso ruberebbe l'occhio al numero. */
-  .detail-price .unit.eur{font-size:20px;color:var(--sats-deep);
-    font-weight:700;margin-left:2px}
+     (feedback di Andrea). «sats» resta piccolo: quello e' un nome, e
+     ripeterlo grosso ruberebbe l'occhio al numero. La MISURA e il
+     PESO restano suoi; il COLORE no — lo eredita dalla regola qui
+     sopra, che dall'ago 2026 e' l'unica a dirlo (prima qui c'era un
+     `color:var(--sats-deep)` che teneva il € arancio anche nello
+     stato normale). */
+  .detail-price .unit.eur{font-size:20px;font-weight:700;margin-left:2px}
   .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
   /* Il nuovo ordine del dettaglio (lug 2026): data discreta sotto la
      foto, titolo con la condizione accanto, luogo come testo nudo,
@@ -1725,6 +1765,27 @@
   .btn.asta{background:var(--asta);color:var(--asta-on);box-shadow:0 3px 0 var(--asta-deep)}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
+  /* I DUE PONTI verso l'esterno (ago 2026): stessa FORMA di ogni
+     altro bottone — rettangolo col raggio di casa, ombra piena,
+     stesso peso — e a cambiare e' solo il colore, che qui dice DOVE
+     porta. L'ombra e' il colore stesso al buio invece di --ink: su un
+     fondo saturo l'ombra nera del ghost sembrerebbe sporco.
+     Sono gli unici bottoni pieni che NON sono un'azione dentro
+     Barattolo: proprio per questo non parlano arancio, che resta
+     dell'acquisto. */
+  /* La testata del negozio non aveva MARGINI su mobile (li metteva
+     solo la media query da 768 in su): riquadro venditore e bottoni
+     arrivavano a filo schermo, e col ghost bianco non si notava. Coi
+     due ponti PIENI si vede eccome — due blocchi di colore incollati
+     ai bordi — quindi il rientro va messo, ed è lo stesso `--pad` del
+     resto (la `.back` sopra stava già a 16). Il dettaglio ce l'aveva
+     già, dal padding di `.detail-body`: ora le due pagine si
+     somigliano. */
+  #negozioHeader{padding:0 var(--pad)}
+  .btn.ponte{color:#fff;border:0}
+  .btn.ponte.tg{background:var(--tg-btn);box-shadow:0 3px 0 #125C8E}
+  .btn.ponte.nostr{background:var(--nostr-btn);box-shadow:0 3px 0 #5B21B6}
+  .btn.ponte:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   /* Il ghost vestito di cartone. NON LO PORTA PIU' NESSUNO dall'ago
      2026 (decisione di Andrea): l'aveva «📦 Aggiungi al pacco», che
      e' tornato al ghost di casa come ogni altro secondario — un
@@ -2497,11 +2558,18 @@
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
       <div class="big">🔨</div>
       <b class="empty-title">Le aste stanno arrivando</b>
-      <span>Presto potrai mettere all'asta i tuoi oggetti: base, durata,
-        e vince chi offre di più — con i sats già nel deposito di
-        garanzia, così chi vince non può sparire.<br>
-        Intanto il mercatino è tutto qui sotto.</span>
-      <button class="btn orange" onclick="vaiEsplora()">🛍️ Torna al mercatino</button>
+      <!-- Poche parole e il tono di casa (ago 2026, riscritto da capo:
+           il primo testo elencava il funzionamento — base, durata,
+           deposito — e suonava tradotto. Qui basta dire che arrivano e
+           qual è il bello: chi vince ha già pagato). -->
+      <span>Presto potrai vendere al miglior offerente.<br>
+        Chi punta versa subito i sats: chi vince non sparisce.</span>
+      <!-- la LENTE della nav, la stessa icona di Esplora: un cuore
+           solo per le icone, e l'emoji 🛍️ cambiava forma da un
+           telefono all'altro -->
+      <button class="btn orange" onclick="vaiEsplora()">
+        <svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>
+        Torna al mercatino</button>
     </div>
   </div>
 
@@ -2968,7 +3036,7 @@
     <div class="grab"></div>
     <h3>⚡ Compra subito</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600">
-      Stai per pagare <b class="mono" style="color:var(--sats)"><span id="nwcConfermaSats"></span> sats</b>
+      Stai per pagare <b class="mono" style="color:var(--sats)"><span id="nwcConfermaSats"></span><span class="unit">sats</span></b>
       dal tuo wallet collegato. I sats finiscono <b style="color:var(--trust)">bloccati
       nel deposito di garanzia</b>, come sempre: al venditore arrivano solo quando
       confermi di aver ricevuto l'oggetto.
@@ -5038,20 +5106,26 @@ function apriNostrProfilo(npub){
 /* I DUE PONTI SONO BOTTONI, NON LINK (ago 2026, decisione di Andrea):
    nel negozio erano testo sottolineato («btn link») mentre gli stessi
    due dentro l'ordine erano gia' bottoni ghost — la stessa azione con
-   due vestiti secondo la pagina. Ora il default e' UNO, ed e' il
-   ghost di casa; il parametro `cls` resta perche' il chiamante possa
-   dire altro, ma nessuno lo fa piu' di diverso. */
+   due vestiti secondo la pagina. Ora il vestito e' UNO.
+   E PORTA IL COLORE DEL SUO MONDO (stessa decisione, subito dopo):
+   azzurro Telegram e viola Nostr, `.btn.ponte.tg` / `.ponte.nostr`.
+   La classe si compone qui e non nel chiamante — `cls` esiste ancora
+   per chi volesse un'altra base, ma il `.tg` / `.nostr` lo mette
+   sempre questa funzione: sono il ponte, non la pagina, a decidere
+   di che mondo parlano. */
 function pontiContatto(username, npub, chi, cls){
   const b = [];
-  const c = cls || 'btn ghost';
-  if (username) b.push(`<button class="${c}" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
-  if (npub) b.push(`<button class="${c}" onclick="apriNostrProfilo('${npub}')">🟣 Scrivi ${chi} su Nostr</button>`);
+  const c = cls || 'btn ponte';
+  if (username) b.push(`<button class="${c} tg" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
+  if (npub) b.push(`<button class="${c} nostr" onclick="apriNostrProfilo('${npub}')">🟣 Scrivi ${chi} su Nostr</button>`);
   return b.join('');
 }
 /* Il ponte dentro l'ordine: come sopra, ma senza canali la riga
    ricorda che l'escrow protegge comunque l'affare */
 function pontiOrdine(username, npub, chi, soggetto){
-  return pontiContatto(username, npub, chi, 'btn ghost')
+  /* stesso vestito del negozio, e non piu' il ghost: la stessa azione
+     non puo' avere due colori secondo la pagina da cui la si tocca */
+  return pontiContatto(username, npub, chi)
     || `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`;
 }
 
@@ -5189,7 +5263,7 @@ function astaResta(fine){
    base se nessuno ha ancora puntato */
 function astaCifra(l){ return l.astaTop > 0 ? l.astaTop : l.astaBase; }
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
-   contatore «rimangono 2h 14m» vive SOLO nella scheda (in griglia il
+   contatore «Scade tra 2h 14m» vive SOLO nella scheda (in griglia il
    badge dice la sola percentuale), quindi qui si aggiorna in-place
    quello — mai un re-render al secondo — e allo zero si rimette a
    posto la vista da sola. Il numero che scorre non e' un'animazione:
@@ -6612,7 +6686,7 @@ function openDetail(id){
           <div class="detail-price${asta?' asta':lampoAttiva(l)?' lampo':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
           <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
           ${asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
-          ${!asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">rimangono <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
+          ${!asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
              valuta LEGGERE questo annuncio, e la scelta e' la stessa -->
@@ -7725,7 +7799,11 @@ async function loadOfferte(){
 }
 /* la cifra nella valuta del listino: qui niente «≈», non e' una conversione */
 function cifraOff(valuta, sats, eur){
-  return valuta==='eur' ? fmtEur(eur)+' €' : fmt(sats)+' sats';
+  /* l'unita' in uno span suo: questa cifra finisce dentro grassetti
+     COLORATI (il banner dell'accordo, l'anteprima della lampo) e senza
+     lo span erediterebbe il colore — vedi la regola di `.unit` */
+  return valuta==='eur' ? fmtEur(eur)+'<span class="unit eur">€</span>'
+                        : fmt(sats)+'<span class="unit">sats</span>';
 }
 /* l'accordo: la controproposta se c'e' (solo il compratore puo'
    accettarla, quindi se esiste l'accordo e' quello), altrimenti la proposta */
@@ -8297,7 +8375,7 @@ function openOrder(id){
       ${o.role==='buyer' && s==='return_pending' ? `
         <div class="payout">
           <h4>↩️ Rispedisci l'oggetto per il rimborso</h4>
-          <div class="hint">La disputa prevede il <b>rimborso previa restituzione</b>: accordati col venditore per l'indirizzo (chat), rispedisci l'oggetto e inserisci qui il tracciamento. Il rimborso di <b class="net">${fmt(o.listing.price)} sats</b> parte quando il venditore riceve il reso.</div>
+          <div class="hint">La disputa prevede il <b>rimborso previa restituzione</b>: accordati col venditore per l'indirizzo (chat), rispedisci l'oggetto e inserisci qui il tracciamento. Il rimborso di <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> parte quando il venditore riceve il reso.</div>
           ${selettoreCorriere('resoCorriere')}
           <textarea id="resoTracking" style="min-height:38px" placeholder="Numero di tracciamento del reso"></textarea>
           <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
@@ -8443,7 +8521,7 @@ function payoutPanel(o){
   if (myLnAddress && o.state!=='confirmed') return `
     <div class="payout">
       <h4>⚡ Incasso automatico attivo</h4>
-      <div class="hint">Appena l'acquirente conferma la ricezione, <b class="net">${fmt(net)} sats</b>
+      <div class="hint">Appena l'acquirente conferma la ricezione, <b class="net">${fmt(net)}<span class="unit">sats</span></b>
         arriveranno da soli su <b>${esc(myLnAddress)}</b>. Non devi fare nulla.</div>
       <div class="okline">✓ Lightning address impostato</div>
       <button class="btn ghost" onclick="myLnAddress='';openOrder(currentOrder.id)">↻ Cambia indirizzo</button>
@@ -8453,7 +8531,7 @@ function payoutPanel(o){
   if (o.sellerInvoice) return `
     <div class="payout">
       <h4>💰 Incasso pronto</h4>
-      <div class="hint">Hai depositato la tua invoice da <b class="net">${fmt(net)} sats</b>:
+      <div class="hint">Hai depositato la tua invoice da <b class="net">${fmt(net)}<span class="unit">sats</span></b>:
         verrà pagata <b>automaticamente</b> quando l'acquirente conferma la ricezione.</div>
       <div class="okline">✓ Invoice salvata in cassaforte</div>
       <button class="btn ghost" onclick="currentOrder.sellerInvoice='';openOrder(currentOrder.id)">↻ Sostituisci invoice</button>
@@ -8464,8 +8542,8 @@ function payoutPanel(o){
     <div class="payout">
       <h4>💰 ${o.state==='confirmed'?'Incassa subito i tuoi sats':'Come vuoi incassare?'}</h4>
       <div class="hint">${o.state==='confirmed'
-        ? `L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)} sats</b> in cassaforte.`
-        : `Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)} sats</b>.`}
+        ? `L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)}<span class="unit">sats</span></b> in cassaforte.`
+        : `Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)}<span class="unit">sats</span></b>.`}
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address (lo trovi nel tuo wallet,
         tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
         lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
@@ -9514,14 +9592,14 @@ function refundPanel(o){
   if (myLnAddress) return `
     <div class="payout">
       <h4>↩️ Rimborso in elaborazione</h4>
-      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)} sats</b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
+      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
       <button class="btn orange" onclick="saveSellerInvoice(this)">↩️ Ricevi il rimborso</button>
     </div>`;
   return `
     <div class="payout">
       <h4>↩️ Ricevi il tuo rimborso</h4>
-      <div class="hint">La disputa è stata risolta <b>a tuo favore</b>: ti aspettano <b class="net">${fmt(o.listing.price)} sats</b> (rimborso integrale).
+      <div class="hint">La disputa è stata risolta <b>a tuo favore</b>: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (rimborso integrale).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>
