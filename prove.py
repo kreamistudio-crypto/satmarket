@@ -2424,10 +2424,31 @@ def prove_pagina_acquisto():
           "non spedisce ai punti" in src)
     prova("_strade_preventivo non filtra piu' sullo spedizioniere",
           False, "not spedizioniere" in pezzo("_strade_preventivo"))
-    # ...e la riga onesta del client esiste, dove si sceglie
-    prova("il client dice «accordatevi in chat» sul punto senza rete",
-          True, "accordatevi in chat sul punto di ritiro"
-          in open("miniapp.html", encoding="utf-8").read())
+
+    # 5ter. IL TERZO GIRO (decisione di Andrea che supera il secondo):
+    #    il punto si fissa quando il corriere e' NOTO. Al pagamento e'
+    #    obbligatorio SOLO con la rete dichiarata (nei due compratori);
+    #    senza, si sceglie la strada (via_punto) e il punto arriva dal
+    #    campo dell'ordine — e il venditore non puo' segnare «spedito»
+    #    finche' il punto non c'e' (dove spedirebbe?).
+    prova("punto obbligatorio al pagamento SOLO con la rete (x2)", 2,
+          src.count('if sp and sp["spedizioniere"] and not punto:'))
+    corpo_sped = pezzo("segna_spedito").split('"""')[-1]
+    prova("segna_spedito: bloccato sulla via punto senza punto", True,
+          'o["via_punto"] and not o["punto_ritiro"]' in corpo_sped)
+    corpo_pr = pezzo("indica_punto_ritiro").split('"""')[-1]
+    prova("il campo dell'ordine e' del COMPRATORE, su 'locked'", True,
+          "compratore_id" in corpo_pr and "'locked'" in corpo_pr)
+    prova("...esige la via punto", True, 'o["via_punto"]' in corpo_pr)
+    prova("...e la notifica al venditore e' STATICA (mai il testo)",
+          False, "{punto" in corpo_pr)
+    mini3 = open("miniapp.html", encoding="utf-8").read()
+    prova("client: il campo al pagamento esiste solo con la rete",
+          True, "const campoPunto = !p.spedizioniere ? ''" in mini3)
+    prova("client: la riga «lo indicherai dopo l'acquisto» esiste",
+          True, "lo indicherai dopo l'acquisto" in mini3)
+    prova("client: il campo dentro l'ordine esiste", True,
+          "salvaPuntoRitiro" in mini3 and "puntoRitiroInp" in mini3)
 
     # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
     #    Nostr non le porta: le azzererebbe a ogni sync). L'unico

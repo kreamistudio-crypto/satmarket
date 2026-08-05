@@ -3812,8 +3812,10 @@ function mapOrder(o){
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
     protSats:o.protezione_sats||0,
     /* il punto di ritiro scelto dal compratore (ago 2026): testo
-       libero — alla resa passa SEMPRE da esc() */
-    puntoRitiro:o.punto_ritiro||'',
+       libero — alla resa passa SEMPRE da esc(). viaPunto dice la
+       STRADA (terzo giro): puo' essere vera col punto ancora vuoto,
+       ed e' lo stato che apre il campo nell'ordine */
+    puntoRitiro:o.punto_ritiro||'', viaPunto:!!o.via_punto,
     /* l'ordine nato da un'asta (ago 2026): con la scelta di consegna
        ancora vuota il vincitore sceglie dal varco e il venditore
        aspetta (niente bottoni di spedizione) */
@@ -6677,14 +6679,17 @@ function renderAcquisto(){
       </button>`;
     }).join('') + `</div>`;
   }
-  /* --- il campo del punto di ritiro --- */
+  /* --- il campo del punto di ritiro: SOLO con la rete dichiarata
+     (terzo giro, decisione di Andrea: il punto si fissa quando il
+     corriere e' noto — senza rete si sceglie la strada e il punto
+     si indica DOPO, dal campo dell'ordine) --- */
   /* VARCO MAPPA (futuro, API corriere): questo contenitore verra'
      sostituito dal selettore dei punti (ricerca/mappa) dello
      spedizioniere dichiarato. Il contratto non cambia: un testo in
      acqDati.punto che viaggia come punto_ritiro nel body. */
-  const campoPunto = `<div class="field" id="acqPuntoCampo"
+  const campoPunto = !p.spedizioniere ? '' : `<div class="field" id="acqPuntoCampo"
       style="margin-top:10px;display:${d.via==='punto'?'':'none'}">
-    <label>Indica il punto di ritiro (nome o indirizzo del punto${p.spedizioniere ? ' ' + esc(p.spedizioniere) : ''})</label>
+    <label>Indica il punto di ritiro (nome o indirizzo del punto ${esc(p.spedizioniere)})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
@@ -6693,12 +6698,10 @@ function renderAcquisto(){
   let note = '';
   if (p.spedizioniere && (d.via==='casa' || d.via==='punto'))
     note += `<div class="acq-nota">📦 Spedisce con <b>${esc(p.spedizioniere)}</b></div>`;
-  /* la via punto SENZA spedizioniere dichiarato (secondo giro,
-     decisione di Andrea: la pillola c'e' lo stesso — meglio
-     l'accordo in chat che la porta chiusa — e questa riga dice la
-     verita' PRIMA di pagare) */
+  /* la via punto SENZA rete dichiarata: la riga del terzo giro — il
+     punto arriva dopo, dall'ordine, quando il corriere e' noto */
   if (!p.spedizioniere && d.via==='punto')
-    note += `<div class="acq-nota">🤝 Il venditore non ha indicato il corriere: accordatevi in chat sul punto di ritiro.</div>`;
+    note += `<div class="acq-nota">📦 Il punto preciso lo indicherai dopo l'acquisto, quando il venditore sceglie il corriere.</div>`;
   if (d.via==='digitale')
     note += `<div class="acq-nota">💾 Un codice, una volta rivelato, non torna indietro: hai <b>${TEMPI.confermaDig} ore</b> per aprire una disputa, poi l'acquisto è definitivo.</div>`;
   if (p.stima || (stradaSel && stradaSel.stima))
@@ -6742,13 +6745,18 @@ function corpoConsegna(){
   if (v==='ritiro' || v==='digitale') return {consegna: v};
   const out = {consegna:'spedizione',
                spedizione_via: v==='punto' ? 'punto' : 'casa'};
-  if (v==='punto') out.punto_ritiro = acqDati.punto.trim().slice(0,120);
+  /* il testo viaggia solo se c'e': senza rete dichiarata il punto
+     si indica dopo, dal campo dell'ordine (terzo giro) */
+  if (v==='punto' && acqDati.punto.trim())
+    out.punto_ritiro = acqDati.punto.trim().slice(0,120);
   return out;
 }
 function ctaAcquisto(){
   haptic();
   const d = acqDati; if (!d || !d.preventivo) return;
-  if (d.via==='punto' && !d.punto.trim()){
+  /* il punto e' obbligatorio QUI solo con la rete dichiarata: senza,
+     si indica dopo dal campo dell'ordine (terzo giro) */
+  if (d.via==='punto' && d.preventivo.spedizioniere && !d.punto.trim()){
     toast('Indica il punto di ritiro: al venditore serve per spedire');
     el('acqPunto')?.focus(); return;
   }
@@ -7897,7 +7905,7 @@ function compraSubito(){
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
   if (!p || !via || via.cambio_assente) { startBuy(); return; }
-  if (acqDati.via==='punto' && !acqDati.punto.trim()){
+  if (acqDati.via==='punto' && p.spedizioniere && !acqDati.punto.trim()){
     toast('Indica il punto di ritiro: al venditore serve per spedire');
     el('acqPunto')?.focus(); return;
   }
@@ -8845,13 +8853,26 @@ function openOrder(id){
       ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0 || (o.qta>1 && !o.righe.length)) ? `<div class="eur-hint" style="margin-top:-6px">${
         (o.qta>1 && !o.righe.length) ? `${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats` : ''}${
         (o.qta>1 && !o.righe.length) && o.consegnaScelta ? ' — ' : ''}${
-        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : o.puntoRitiro ? '📦 spedizione a un punto di ritiro' : '🚚 con spedizione') : ''}${
+        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : (o.viaPunto || o.puntoRitiro) ? '📦 spedizione a un punto di ritiro' : '🚚 con spedizione') : ''}${
         ((o.qta>1||o.consegnaScelta) && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
         (o.spedSats>0||o.protSats>0) ? 'di cui ' + [
           o.spedSats>0 ? fmt(o.spedSats)+' sats di spedizione' : '',
           o.protSats>0 ? fmt(o.protSats)+' sats di protezione acquisti' : ''
         ].filter(Boolean).join(' e ') : ''}</div>` : ''}
-      ${o.puntoRitiro ? `<div class="eur-hint" style="margin-top:-2px">📦 Punto di ritiro indicato dall'acquirente: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
+      ${o.puntoRitiro ? `<div class="eur-hint" style="margin-top:-2px">📦 Punto di ritiro indicato dall'acquirente: <b>${esc(o.puntoRitiro)}</b></div>`
+        : (o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
+      ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
+      <!-- Il campo del punto DENTRO l'ordine (terzo giro): senza rete
+           dichiarata il punto si fissa qui, quando il corriere e'
+           noto — modificabile finche' il venditore non spedisce -->
+      <div class="payout">
+        <h4>📦 Il tuo punto di ritiro</h4>
+        <div class="hint">${o.puntoRitiro
+          ? 'Puoi correggerlo finché il venditore non spedisce.'
+          : 'Nome o indirizzo del punto (locker o negozio convenzionato): il venditore lo vedrà qui e potrà spedire. Se non sai la rete del corriere, chiediglielo in chat.'}</div>
+        <textarea id="puntoRitiroInp" style="min-height:38px" maxlength="120" placeholder="Es. Locker InPost — Via Roma 1">${esc(o.puntoRitiro)}</textarea>
+        <button class="btn orange" onclick="salvaPuntoRitiro()">${o.puntoRitiro ? 'Aggiorna il punto' : 'Salva il punto'}</button>
+      </div>` : ''}
 
       <div class="vault">
         <div class="vault-head">
@@ -8924,6 +8945,7 @@ function openOrder(id){
           <h4>📦 Spedisci ${o.righe.length ? 'il set (un pacco solo)' : 'l\'oggetto'}</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Spedisci e inserisci il tracciamento (l'acquirente lo vedrà e potrà seguire il pacco). Per la consegna di persona scegli "Consegna a mano".</div>
           ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
+          ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${selettoreCorriere('shipCorriere')}
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
@@ -10472,6 +10494,24 @@ async function scegliConsegnaOrdine(v){
   if (!r.ok) { toast(d.detail||'Scelta non riuscita', 6000); return; }
   o.consegnaScelta = v;
   toast('✔ Scelta fatta: il venditore prepara la consegna');
+  openOrder(o.id);
+}
+/* Il punto di ritiro dal campo dell'ordine (terzo giro): solo il
+   compratore, solo su 'locked' — il server e' il giudice, qui il
+   gesto. Il testo viaggia nudo nel JSON e torna sotto esc(). */
+async function salvaPuntoRitiro(){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  const punto = (el('puntoRitiroInp')?.value || '').trim();
+  if (!punto) { toast('Scrivi il punto di ritiro (nome o indirizzo)'); return; }
+  const r = await fetch(`${API_BASE}/orders/${o.id}/punto-ritiro`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({punto_ritiro: punto})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  o.puntoRitiro = d.punto_ritiro || punto;
+  toast('📦 Punto salvato: il venditore lo vede nell\'ordine');
   openOrder(o.id);
 }
 async function markConsegnaMano(){

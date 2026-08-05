@@ -1702,14 +1702,23 @@ def init_db():
                     "payout_verso TEXT DEFAULT ''",
                     # punto_ritiro (ago 2026, pagina d'acquisto): il
                     # punto scelto dal compratore per la spedizione a
-                    # un punto di ritiro (testo libero, ≤120). Non
-                    # vuoto ⟺ spedizione a un punto — MAI un valore
-                    # nuovo di consegna_scelta, che resta 'spedizione':
-                    # cosi' timer, solleciti e segna_spedito restano
+                    # un punto di ritiro (testo libero, ≤120) — MAI un
+                    # valore nuovo di consegna_scelta, che resta
+                    # 'spedizione': cosi' timer e solleciti restano
                     # veri per costruzione (il precedente e'
                     # anche_digitale). '' = casa/ritiro/digitale,
-                    # storici e aste.
-                    "punto_ritiro TEXT DEFAULT ''"):
+                    # storici e aste... OPPURE via punto col punto non
+                    # ancora indicato: dal terzo giro chi lo dice e'
+                    # la colonna qui sotto, non il testo.
+                    "punto_ritiro TEXT DEFAULT ''",
+                    # via_punto (ago 2026, terzo giro): 1 = il
+                    # compratore ha scelto la STRADA del punto di
+                    # ritiro. Serve perche' senza rete dichiarata il
+                    # punto si indica DOPO il pagamento, dal campo
+                    # dell'ordine — e «via punto, punto vuoto» deve
+                    # esistere: e' lo stato che blocca segna_spedito
+                    # (dove spedirebbe?).
+                    "via_punto INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -9218,17 +9227,21 @@ async def _compra_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
-        # NIENTE gate sullo spedizioniere (secondo giro, decisione di
-        # Andrea che supera quella del primo: meglio l'accordo in chat
-        # che la porta chiusa) — senza rete dichiarata il client l'ha
-        # gia' detto al compratore, e il punto arriva comunque al
-        # venditore nell'ordine
-        if not punto:
+        # TERZO giro (decisione di Andrea): il punto si fissa quando
+        # il corriere e' NOTO. Rete dichiarata = il punto si scrive
+        # al pagamento (obbligatorio, come sempre); senza rete la via
+        # si sceglie lo stesso ma il punto arriva DOPO, dal campo
+        # dell'ordine — la SELECT e' una lettura prima della invoice,
+        # il patto del ricontrollo non si tocca.
+        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
+                         (venditore_id,)).fetchone()
+        if sp and sp["spedizioniere"] and not punto:
             con.close()
             raise HTTPException(400, "Indica il punto di ritiro (nome o "
                                      "indirizzo del punto)")
     else:
         punto = ""
+    via_punto = 1 if via == "punto" else 0
 
     # --- Fail-fast di cortesia sullo stock, riga per riga (quello
     # che fa fede e' il ricontrollo dopo la invoice, come nel mono)
@@ -9359,11 +9372,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
-        "cambio_ordine,consegna_scelta,punto_ritiro,spedizione_sats,"
-        "protezione_sats,quantita) VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,"
+        "spedizione_sats,protezione_sats,quantita) "
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, sped, prot, pezzi))
+         punto, via_punto, sped, prot, pezzi))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     for r in righe:
         con.execute(
@@ -9389,7 +9403,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
             "protezione_sats": prot, "consegna": scelta,
-            "punto_ritiro": punto,
+            "punto_ritiro": punto, "via_punto": via_punto,
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
                        "titolo": r["titolo"], "quantita": r["quantita"],
@@ -9812,14 +9826,18 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
-        # niente gate sullo spedizioniere: il patto del mono (secondo
-        # giro — meglio l'accordo in chat che la porta chiusa)
-        if not punto:
+        # TERZO giro, il patto del set: punto obbligatorio al
+        # pagamento SOLO con la rete dichiarata — senza, si indica
+        # dopo, dal campo dell'ordine (lettura prima della invoice)
+        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
+                         (a["venditore_id"],)).fetchone()
+        if sp and sp["spedizioniere"] and not punto:
             con.close()
             raise HTTPException(400, "Indica il punto di ritiro (nome o "
                                      "indirizzo del punto)")
     else:
         punto = ""
+    via_punto = 1 if via == "punto" else 0
 
     # LA RIPRESA (ago 2026): il compratore pentito che RITENTA non e'
     # un rivale — il messaggio d'attesa resta SOLO per gli altri, che
@@ -9843,6 +9861,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                   # anche il punto: cambiarlo (o passare casa<->punto)
                   # e' una richiesta diversa — la tariffa puo' cambiare
                   and (mio["punto_ritiro"] or "") == punto
+                  and (mio["via_punto"] or 0) == via_punto
                   and (legame["id"] if legame else 0)
                   == int(d.get("offerta_id") or 0))
         viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
@@ -9858,6 +9877,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "protezione_sats": mio["protezione_sats"],
                     "consegna": mio["consegna_scelta"],
                     "punto_ritiro": mio["punto_ritiro"],
+                    "via_punto": mio["via_punto"] or 0,
                     "quantita": mio["quantita"],
                     "articolo_unitario_sats": art // (mio["quantita"] or 1),
                     "offerta_id": legame["id"] if legame else 0,
@@ -10040,12 +10060,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,punto_ritiro,spedizione_sats,protezione_sats,"
-        "quantita) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "consegna_scelta,punto_ritiro,via_punto,spedizione_sats,"
+        "protezione_sats,quantita) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
-         cambio_ordine, scelta, punto, sped, prot, richiesti))
+         cambio_ordine, scelta, punto, via_punto, sped, prot, richiesti))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
@@ -10060,7 +10080,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
             "protezione_sats": prot, "consegna": scelta,
-            "punto_ritiro": punto,
+            "punto_ritiro": punto, "via_punto": via_punto,
             "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
 
@@ -10253,6 +10273,13 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         # Il punto scritto si legge nell'ordine, dove passa da esc().
         msg += ("\n\n📦 Il compratore ha scelto la <b>spedizione a un "
                 "punto di ritiro</b>: trovi il punto nell'ordine.")
+    elif o["via_punto"]:
+        # Terzo giro: la via e' scelta ma il punto arriva dopo (il
+        # venditore non ha la rete dichiarata) — va detto SUBITO, e
+        # con la via d'uscita: la chat, se serve accordarsi.
+        msg += ("\n\n📦 Il compratore vuole la <b>spedizione a un punto "
+                "di ritiro</b>: indicherà il punto nell'ordine — se "
+                "serve, accordatevi in chat sul corriere.")
     await notifica(o["venditore_id"], msg)
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
@@ -10271,6 +10298,48 @@ async def _incassa_ordine(ordine_id: int) -> dict:
             f"sono altre occasioni che aspettano!")
     con.close()
     return {"stato": "locked"}
+
+
+@app.post("/api/orders/{ordine_id}/punto-ritiro")
+async def indica_punto_ritiro(ordine_id: int, req: Request,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Il COMPRATORE indica (o corregge) il punto di ritiro dentro
+    l'ordine (ago 2026, terzo giro: il punto si fissa quando il
+    corriere e' noto — senza rete dichiarata al pagamento si sceglie
+    solo la STRADA, e il punto arriva da qui). Solo il compratore,
+    solo su 'locked' e solo sulla via punto: dopo la spedizione il
+    pacco e' partito e il campo si chiude. Modificabile finche'
+    l'ordine e' 'locked' (un refuso si corregge); il venditore riceve
+    la notifica STATICA a ogni cambio — mai il testo del compratore
+    nell'HTML, si legge nell'ordine sotto esc()."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    punto = " ".join(str(d.get("punto_ritiro") or "").split())[:120]
+    if not punto:
+        raise HTTPException(400, "Scrivi il punto di ritiro (nome o "
+                                 "indirizzo del punto)")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["via_punto"]:
+        con.close()
+        raise HTTPException(400, "Questo ordine non è una spedizione a "
+                                 "un punto di ritiro")
+    cambiato = (o["punto_ritiro"] or "") != punto
+    con.execute("UPDATE ordini SET punto_ritiro=? WHERE id=?",
+                (punto, ordine_id))
+    con.commit()
+    con.close()
+    if cambiato:
+        await notifica(o["venditore_id"],
+                       "📦 <b>Il compratore ha indicato il punto di "
+                       "ritiro</b>: lo trovi nell'ordine, ora puoi "
+                       "spedire.")
+    return {"ok": True, "punto_ritiro": punto}
 
 
 @app.post("/api/orders/{ordine_id}/spedito")
@@ -10319,6 +10388,16 @@ async def segna_spedito(ordine_id: int, req: Request,
                                      "scegliendo come riceverlo: "
                                      "attendi la sua scelta prima di "
                                      "spedire")
+    if o["via_punto"] and not o["punto_ritiro"]:
+        # Via punto senza punto indicato: DOVE spedirebbe? (terzo
+        # giro, scelta dichiarata con Andrea). Il compratore ha il
+        # campo nell'ordine; se serve, la chat.
+        con.close()
+        raise HTTPException(400, "Il compratore non ha ancora indicato "
+                                 "il punto di ritiro: appena lo scrive "
+                                 "nell'ordine potrai segnare la "
+                                 "spedizione (se serve, ricordaglielo "
+                                 "in chat)")
     con.execute("UPDATE ordini SET stato='shipped', corriere=?, tracking=?, "
                 "spedito_il=?, aggiornato=? WHERE id=?",
                 (corriere, tracking, int(time.time()), int(time.time()),
