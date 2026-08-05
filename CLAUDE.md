@@ -433,6 +433,35 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tenere aggiornato). Ingresso nel Profilo admin, «🛠 Apri un ordine
   per numero»: da lì si apre l'ordine come sempre e la correzione vive
   DENTRO, dove sta il contesto — un posto solo.
+  IL MESSAGGIO AI SINGOLI UTENTI (ago 2026, caso vero dal campo: una
+  venditrice senza username Telegram né npub scrive «contattami per i
+  colori» — e nessuno può scriverle, moderatori compresi):
+  `POST /api/admin/utenti/{tg_id}/messaggio` (solo moderatori, 403
+  PRIMA di leggere il body) manda UN messaggio via `notifica()` — mai
+  il bot diretto: canale preferito e nativi Nostr col DM coperti
+  gratis — con l'HTML del testo scappato (la lezione dei promemoria)
+  e la riga nel registro moderazione (esito 'messaggio', deciso_da).
+  È A SENSO UNICO per costruzione, e va detto DUE volte: il confirm
+  del moderatore prima dell'invio e la coda del messaggio al
+  destinatario, che indica il canale del rodaggio (`BANNER_TEST_LINK`,
+  il contatto che c'è già) come strada per risponderci. UI: «💬 Scrivi
+  a un utente» nelle stats admin, sotto «Apri un ordine per numero» —
+  la ricerca filtra la lista utenti GIÀ caricata dalle statistiche
+  (id esatto, pezzo di nome o @username, codice negozio esatto:
+  `u.negozio` è entrato nella SELECT apposta), nessun endpoint di
+  ricerca nuovo; negli onclick viaggia SOLO il tg_id numerico, il
+  patto del filtro-alfabeto. E LA PREVENZIONE, che vale più dello
+  strumento: il giudice client `nonContattabile()` — niente username
+  E niente npub dal possesso dimostrato, la STESSA regola dei ponti
+  di contatto, quindi i nativi Nostr non lo sono mai — accende la
+  riga «🔕 nessuno può scriverti» in DUE posti: sopra Pubblica nel
+  form Vendi (il momento in cui ci si mette in vetrina, il pattern
+  degli hint contestuali; si rivaluta a ogni ingresso nella vista) e
+  nel cassetto Identità del Profilo, dove vivono le due maniglie per
+  rimediare (lo username si aggiunge da Telegram, la npub si verifica
+  lì sotto). NIENTE dismiss, ed è deliberato: non è un consiglio ma
+  uno stato del profilo, e sparisce da solo quando smette di essere
+  vero.
   IL VENDITORE CHE NON FA PARTIRE LA MERCE (ago 2026, il buco 1 di
   ieri, chiuso — col suo gemello digitale che non era nemmeno
   dichiarato): un ordine `locked` non ha MAI avuto un timer, quindi il
