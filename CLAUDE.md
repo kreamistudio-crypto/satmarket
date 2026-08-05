@@ -1015,10 +1015,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che `_scrivi_avatar` cancellava il francobollo vecchio ma non la
   sua gemella: un orfano a ogni cambio di foto profilo, e ora se ne
   vanno insieme (il pattern delle foto in `modifica()`). I file già
-  sul disco li toglie `ripulisci_avatar_min.py`. Finché non sarà
-  girato in produzione la forma `av_..._min` RESTA nella regex — è
-  roba pubblica che esiste davvero —; dopo, si toglie da lì e dal suo
-  caso in `prove_foto()`, che ci si appoggia. Non era un guasto
+  sul disco li ha tolti `ripulisci_avatar_min.py`, girato in
+  produzione: 0 gemelle rimaste, 613 file, avatar visibili — e il
+  conto torna al file (688 − 75). Solo DOPO quella conferma la forma
+  `av_..._min` è uscita da `NOME_FOTO`, ed è l'ordine da tenere se
+  ricapita: finché quei file esistono sul disco sono roba pubblica, e
+  toglierli dalla regex prima li farebbe sparire dalle facce di tutti.
+  In `prove_foto()` il caso non è stato cancellato ma ha CAMBIATO
+  LATO, da «si serve» a «non si serve»: è l'affermazione più forte
+  delle due, e se un domani una gemella ricomparisse non sarebbe
+  pubblica. Gli scrittori di `foto/` tornano tre. Non era un guasto
   visibile: nessuna immagine era rotta, si sprecava spazio e basta.
   L'alfabeto esadecimale degli avatar è legato a `secrets.token_hex`
   da una sentinella: cambiando generatore, TUTTE le facce
