@@ -2257,6 +2257,51 @@ def prove_tracking_corretto():
           mo.index("e_admin(user") < mo.index("OR o.id=?"))
 
 
+def prove_messaggio_admin():
+    """Lo strumento «scrivi a un utente» dei moderatori (ago 2026,
+    caso vero: la venditrice senza username ne' npub che nessuno
+    poteva contattare). Quattro cose da tenere: e' roba da moderatore
+    e il 403 arriva PRIMA di leggere il body; il testo si scappa (le
+    notifiche parlano HTML); l'invio passa da notifica() — canale
+    preferito, nativi Nostr compresi — mai dal bot diretto; e resta
+    nel registro moderazione. Piu' la prevenzione nel client: la
+    riga «nessuno puo' scriverti» in Vendi e nel cassetto Identita',
+    con la STESSA regola dei ponti di contatto."""
+    print("\n[messaggio ai singoli utenti]")
+    ma = pezzo("messaggio_utente_admin")
+    prova("l'invio esige e_admin", True, "e_admin(user[" in ma)
+    prova("il 403 arriva prima di leggere il body", True,
+          ma.index("e_admin") < ma.index("leggi_json"))
+    prova("il testo del moderatore si scappa", True,
+          "html.escape(testo)" in ma)
+    prova("si passa da notifica(), mai dal bot diretto", True,
+          "await notifica(" in ma)
+    prova("...davvero mai", False, "_manda_telegram" in ma)
+    prova("l'invio resta nel registro moderazione", True,
+          "registra_moderazione(" in ma)
+    prova("il destinatario deve esistere (404 sul fantasma)", True,
+          "404" in ma)
+    prova("il messaggio stesso dichiara il senso unico", True,
+          "senso unico" in ma)
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("l'interfaccia admin dichiara il senso unico", True,
+          "se l'utente risponde al bot" in mini)
+    prova("prima dell'invio si chiede conferma", True,
+          "Invii questo messaggio a" in mini)
+    # la prevenzione: chi non ha ne' username ne' npub dal possesso
+    # dimostrato deve saperlo, in Vendi e nel cassetto Identita'
+    prova("la riga di prevenzione esiste in Vendi", True,
+          'id="sellContattoHint"' in mini)
+    prova("...e nel cassetto Identita'", True,
+          "Sei senza username" in mini)
+    i = mini.index("const nonContattabile")
+    blocco = mini[i:i + 300]
+    prova("il giudice usa la regola dei ponti (username o npub "
+          "dimostrata)", True,
+          "myNpubAccesso || (myNpub && myNpubVerified)" in blocco)
+
+
 def prove_barattolo():
     """Il tetto del barattolo (ago 2026: da 20 a 10) e il conteggio
     pubblico dei salvataggi."""
@@ -3014,6 +3059,7 @@ def main():
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
+              prove_messaggio_admin,
               prove_forma_tracking, prove_bip353, prove_conta_feedback,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_consegna_payload_punto, prove_pagina_acquisto):

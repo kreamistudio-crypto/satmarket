@@ -7355,7 +7355,7 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
         "SELECT COUNT(*) AS n, COALESCE(SUM(prezzo_sats),0) AS volume "
         "FROM ordini WHERE stato IN ('released','refunded')").fetchone()
     lista = [dict(r) for r in con.execute(
-        "SELECT u.tg_id, u.nome, u.username, u.registrato, "
+        "SELECT u.tg_id, u.nome, u.username, u.negozio, u.registrato, "
         "  (SELECT COUNT(*) FROM annunci a WHERE a.venditore_id=u.tg_id "
         "     AND a.stato='attivo') AS annunci_attivi, "
         "  (SELECT COUNT(*) FROM ordini o WHERE o.stato IN "
@@ -7386,6 +7386,53 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
             "moderazione": {"ultimi_30gg": riepilogo,
                             "motivi_frequenti": motivi,
                             "registro": registro}}
+
+
+@app.post("/api/admin/utenti/{tg_id}/messaggio")
+async def messaggio_utente_admin(tg_id: int, req: Request,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: un messaggio a UN utente, dal bot. Nato da un caso
+    vero (ago 2026): una venditrice senza username Telegram ne' npub
+    scrive «contattami per i colori» — e nessuno puo' scriverle,
+    moderatori compresi. Passa da notifica(), che rispetta la
+    preferenza di canale e copre anche i nativi Nostr col DM cifrato.
+    E' A SENSO UNICO per costruzione — il bot non ci inoltra le
+    risposte — e lo dicono sia l'interfaccia del moderatore sia la
+    coda del messaggio, con la strada giusta per risponderci (il
+    canale del rodaggio, quello che c'e' gia': nessun secondo
+    contatto da tenere aggiornato). Ogni invio resta nel registro
+    moderazione con chi l'ha mandato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    testo = str(d.get("testo") or "").strip()
+    if not testo:
+        raise HTTPException(400, "Il messaggio è vuoto")
+    if len(testo) > 1500:
+        raise HTTPException(400, "Massimo 1500 caratteri")
+    con = db()
+    u = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    con.close()
+    if not u:
+        raise HTTPException(404, "Utente non trovato")
+    # Le notifiche parlano HTML: il testo del moderatore si scappa, o
+    # un «<» spegnerebbe il messaggio in silenzio (la lezione dei
+    # promemoria). La coda dice al destinatario COME risponderci:
+    # scrivere al bot non serve, quella strada non torna indietro.
+    coda = ("\n\n<i>Questo messaggio è a senso unico: se rispondi al "
+            "bot, la risposta non ci arriva.")
+    if (BANNER_TEST_LINK or "").startswith("http"):
+        coda += f" Per scriverci: {BANNER_TEST_LINK}"
+    coda += "</i>"
+    await notifica(tg_id,
+                   "🛡 <b>Messaggio dai moderatori di Barattolo</b>\n\n"
+                   + html.escape(testo) + coda)
+    registra_moderazione("admin", "messaggio", testo, "", 0, tg_id,
+                         user["id"])
+    return {"ok": True}
 
 
 # ---------------------- API: RICERCA AI -----------------------------

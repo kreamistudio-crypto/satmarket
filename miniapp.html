@@ -2966,6 +2966,13 @@
         <div id="zonaHint" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div></div>
       <div class="field"><label>Descrizione</label>
         <textarea id="sellDesc" placeholder="Condizioni, difetti, motivo della vendita…"></textarea></div>
+      <!-- La prevenzione del venditore irraggiungibile (ago 2026,
+           caso vero: «contattami per i colori» da chi non ha ne'
+           username ne' npub — nessuno poteva scriverle, moderatori
+           compresi). La riga compare SOLO a chi e' davvero senza
+           canali (nonContattabile), al momento in cui sta per
+           mettersi in vetrina: il pattern degli hint contestuali. -->
+      <div id="sellContattoHint" style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--sats-text);font-weight:700;line-height:1.45">🔕 Nessuno può scriverti: aggiungi uno <b>username</b> su Telegram (Impostazioni&nbsp;→&nbsp;Nome utente) per farti contattare da chi compra — o collega una npub nel Profilo.</div>
       <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
       <div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
@@ -4325,6 +4332,10 @@ function go(view){
      conteggi da rileggere — quindi si disegna una volta sola: rifarla
      a ogni entrata ricreerebbe 26 <img> per nulla */
   if (view==='sfoglia' && !el('sfogliaGriglia').children.length) renderSfoglia();
+  /* la riga «nessuno puo' scriverti» compare solo a chi e' davvero
+     senza canali: si rivaluta a ogni ingresso, perche' nel frattempo
+     l'utente puo' aver verificato la npub */
+  if (view==='vendi') aggiornaContattoHint();
   if (view==='affari') {
     if (!DEMO) {
       loadOrders().then(renderOrders).catch(()=>renderOrders());
@@ -9732,6 +9743,20 @@ function condividiMioNegozio(){
 /* ---- "Le tue identità": la doppia cittadinanza a colpo d'occhio.
    Telegram e Nostr, cosa è collegato e cosa manca, con il bottone
    giusto per il passo successivo. I dati arrivano tutti da /api/me. ---- */
+/* Chi non ha ne' username Telegram ne' npub dal possesso dimostrato
+   non e' contattabile da NESSUNO — compratori e moderatori compresi
+   (caso vero, ago 2026: «contattami per i colori», e nessun modo di
+   farlo). La regola e' la STESSA dei ponti di contatto: username, o
+   npub d'accesso/verificata. I nativi Nostr hanno la npub d'accesso
+   per costruzione, quindi la riga non li riguarda mai. */
+const nonContattabile = () =>
+  !DEMO && !VETRINA && myTgId != null && !myUsername
+  && !(myNpubAccesso || (myNpub && myNpubVerified));
+function aggiornaContattoHint(){
+  const h = el('sellContattoHint');
+  if (h) h.style.display = nonContattabile() ? '' : 'none';
+}
+
 function renderIdentita(){
   const box = el('identitaBlocco');
   if (!box) return;
@@ -9750,7 +9775,10 @@ function renderIdentita(){
       `<button class="btn ghost" style="margin:0 0 8px" onclick="collegaTelegram()">✈️ Collega Telegram</button>`);
   } else {
     tgRiga = riga('✈️','Telegram',
-      `${esc(myNome||'')}${myUsername?' · @'+esc(myUsername):''} — collegato`);
+      `${esc(myNome||'')}${myUsername?' · @'+esc(myUsername):''} — collegato`
+      + (nonContattabile()
+        ? `<br>🔕 <b style="color:var(--ink)">Sei senza username:</b> nessuno può scriverti. Aggiungilo da Telegram (Impostazioni&nbsp;→&nbsp;Nome utente), o verifica una npub qui sotto.`
+        : ''));
   }
   /* — riga Nostr — */
   /* Le due leve dicono ciascuna ESATTAMENTE cosa fa: «Disabilita
@@ -11309,6 +11337,12 @@ function renderPreferiti(){
 }
 
 /* ---- statistiche del mercatino (solo moderatori) ---- */
+/* La lista utenti delle statistiche, tenuta da parte per la ricerca
+   di «Scrivi a un utente» (niente endpoint nuovo: e' la stessa lista
+   gia' caricata), e il destinatario scelto — sempre e solo il tg_id
+   numerico, mai un nome dentro un onclick. */
+let admUtenti = [], admMsgDest = 0;
+
 async function loadAdminStats(){
   const box = el('adminStats');
   if (!box) return;
@@ -11318,6 +11352,7 @@ async function loadAdminStats(){
       {headers:{'X-Tg-Init-Data':authHdr()}});
     if (!r.ok) { box.innerHTML = ''; return; }
     const s = await r.json();
+    admUtenti = s.lista_utenti || []; admMsgDest = 0;
     aggiornaAdmDot(s.in_revisione||0);
     /* gli annunci in attesa di una decisione: la lista arriva solo
        se ce n'e' almeno uno (mai una fetch a vuoto) */
@@ -11407,6 +11442,21 @@ async function loadAdminStats(){
           <button class="btn ghost" onclick="apriOrdinePerId()">Apri</button>
         </div>
       </div>
+      <!-- Scrivere a UN utente dal bot (ago 2026, caso vero: la
+           venditrice senza username ne' npub che diceva «contattami
+           per i colori» — e nessuno poteva scriverle, moderatori
+           compresi). L'invio passa da notifica(): canale preferito,
+           nativi Nostr col DM compresi. A senso unico per
+           costruzione: il bot non ci inoltra le risposte, e va detto
+           PRIMA di scrivere, non dopo. -->
+      <div style="margin-top:14px">
+        <div class="section-label">💬 Scrivi a un utente</div>
+        <div class="sub" style="margin-top:6px">Parte dal bot, una volta sola, ed è <b>a senso unico</b>: se l'utente risponde al bot, la risposta non arriva a noi.</div>
+        <div class="filtri-riga" style="margin-top:8px">
+          <input id="admUtenteCerca" placeholder="Id, nome, @username o codice negozio" autocomplete="off" oninput="cercaUtenteAdmin()">
+        </div>
+        <div id="admUtenteEsiti"></div>
+      </div>
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
@@ -11425,6 +11475,73 @@ async function apriOrdinePerId(){
     await loadOrders(id); renderOrders();
     if (!orders.find(o=>o.id===id)) { toast(`L'ordine #${id} non esiste`); return; }
     openOrder(id);
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+/* --- Scrivi a un utente (ago 2026) ---------------------------------
+   La ricerca filtra la lista gia' caricata dalle statistiche — id
+   esatto, pezzo di nome o @username, codice negozio esatto — e il
+   tocco su una riga apre il campo del messaggio. Nomi e codici
+   passano da esc(); negli onclick viaggia SOLO il tg_id numerico
+   (il patto anti-XSS del filtro-alfabeto). */
+function cercaUtenteAdmin(){
+  admMsgDest = 0;
+  const box = el('admUtenteEsiti');
+  if (!box) return;
+  const q = (el('admUtenteCerca')?.value || '')
+    .trim().toLowerCase().replace(/^@/,'');
+  if (!q) { box.innerHTML = ''; return; }
+  const trovati = admUtenti.filter(u =>
+    String(u.tg_id) === q
+    || (u.nome||'').toLowerCase().includes(q)
+    || (u.username||'').toLowerCase().includes(q)
+    || (u.negozio||'').toLowerCase() === q).slice(0, 6);
+  box.innerHTML = trovati.length ? trovati.map(u => `
+    <div onclick="scegliUtenteAdmin(${u.tg_id})" style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;margin-top:8px;background:var(--card);border:1.5px solid var(--line);border-radius:12px;cursor:pointer;font-size:12.5px">
+      <div style="min-width:0;overflow:hidden;text-overflow:ellipsis"><b>${esc(u.nome||'—')}</b>${u.username?` <span style="color:var(--muted)">@${esc(u.username)}</span>`:''}</div>
+      <div class="mono" style="white-space:nowrap;color:var(--muted);font-weight:700">#${u.tg_id}${u.negozio?` · ${esc(u.negozio)}`:''}</div>
+    </div>`).join('')
+    : `<div class="sub" style="margin-top:8px">Nessun utente trovato.</div>`;
+}
+
+function scegliUtenteAdmin(id){
+  haptic();
+  const u = admUtenti.find(x => x.tg_id === id);
+  if (!u) return;
+  admMsgDest = id;
+  el('admUtenteEsiti').innerHTML = `
+    <div style="margin-top:8px;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:12px">
+      <div style="font-size:12.5px"><b>A:</b> ${esc(u.nome||'—')}${u.username?` <span style="color:var(--muted)">@${esc(u.username)}</span>`:''} <span class="mono" style="color:var(--muted)">#${u.tg_id}</span></div>
+      <div class="field" style="margin:8px 0 0">
+        <textarea id="admMsgTesto" maxlength="1500" placeholder="Il messaggio: arriva dal bot, firmato «moderatori di Barattolo»"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn ghost" style="margin:0;flex:1 1 50%" onclick="cercaUtenteAdmin()">Annulla</button>
+        <button class="btn orange" style="margin:0;flex:1 1 50%" onclick="inviaMessaggioAdmin()">📨 Invia dal bot</button>
+      </div>
+    </div>`;
+}
+
+/* E' un messaggio a una persona vera: si chiede sempre, e la domanda
+   ripete il patto del senso unico — il momento giusto per pentirsi
+   e' prima dell'invio, dopo non c'e' un richiamo. */
+async function inviaMessaggioAdmin(){
+  const u = admUtenti.find(x => x.tg_id === admMsgDest);
+  const testo = (el('admMsgTesto')?.value || '').trim();
+  if (!u) return;
+  if (!testo) { toast('Scrivi il messaggio'); return; }
+  if (!confirm(`Invii questo messaggio a ${u.nome||'#'+u.tg_id}?\n\nParte UNA volta, dal bot. È a senso unico: se risponde al bot, la risposta non arriva a noi.`)) return;
+  try {
+    const r = await fetch(`${API_BASE}/admin/utenti/${admMsgDest}/messaggio`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({testo})});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(j.detail || 'Non è partito'); return; }
+    toast('📨 Inviato');
+    admMsgDest = 0;
+    if (el('admUtenteCerca')) el('admUtenteCerca').value = '';
+    el('admUtenteEsiti').innerHTML = '';
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
