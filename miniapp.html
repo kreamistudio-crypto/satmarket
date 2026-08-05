@@ -1353,7 +1353,15 @@
      francobolli degli articoli, scelta della consegna, il conto in
      righe col totale evidenziato, e in fondo Acquista coi due
      secondari. Nessun token nuovo: pillole, unit e mono di casa. */
-  .ctrl-corpo{padding:6px var(--pad) 26px;max-width:520px;margin:0 auto}
+  /* il corpo e' una COLONNA alta almeno uno schermo: il conto sta in
+     alto e i bottoni scendono in fondo (margin-top:auto su Acquista),
+     dove il pollice li aspetta — su schermi corti seguono il
+     contenuto, mai coperti. dvh dove c'e' (le barre dei browser
+     mobili), vh come ripiego. */
+  .ctrl-corpo{padding:6px var(--pad) 26px;max-width:520px;margin:0 auto;
+    display:flex;flex-direction:column;
+    min-height:calc(100vh - 170px);min-height:calc(100dvh - 170px)}
+  .ctrl-corpo #ctrlAcquista{margin-top:auto}
   /* la testata: il conteggio a sinistra non si stringe mai, i
      francobolli scorrono di lato (overscroll contenuto: la lezione
      della galleria a foto singola, detta dove appartiene) */
@@ -1373,8 +1381,10 @@
   .ctrl-corpo .section-label{margin-top:16px}
   /* il conto: righe nome/cifra, il totale staccato dal tratteggio —
      la grammatica di contoScomposto, cresciuta a pagina */
+  /* il margin-bottom e' il fiato minimo sopra Acquista quando il
+     contenuto riempie lo schermo e il suo margin-top:auto scende a 0 */
   .ctrl-conto{background:var(--card);border:1.5px solid var(--line);
-    border-radius:var(--radius);padding:4px 14px;margin-top:8px}
+    border-radius:var(--radius);padding:4px 14px;margin:8px 0 22px}
   .ctrl-riga{display:flex;justify-content:space-between;align-items:baseline;
     gap:12px;padding:9px 0;font-size:14px;font-weight:600}
   .ctrl-riga+.ctrl-riga{border-top:1px dashed var(--line)}
@@ -2664,10 +2674,11 @@
       <div class="ctrl-articoli"><b id="ctrlConta"></b><div class="ctrl-strip" id="ctrlStrip"></div></div>
       <div class="section-label">Consegna</div>
       <div class="consegna-scelta" id="ctrlConsegna" style="margin-top:8px"></div>
-      <div id="ctrlTaglia" class="eur-hint" style="margin-bottom:0"></div>
       <div class="section-label">Il conto</div>
       <div class="ctrl-conto" id="ctrlConto"></div>
-      <div class="trust-note" style="margin-top:12px"><span>Il pacco viaggia e si tutela come un <b>ordine unico</b>: una conferma di ricezione, e in caso di problemi disputa e rimborso valgono sull'intero pacco.</span></div>
+      <!-- niente stima taglia e niente nota verde (decisione di
+           Andrea): la pagina dice il conto e basta, e i bottoni
+           scendono in fondo (margin-top:auto, vedi CSS) -->
       <button class="btn orange" id="ctrlAcquista" onclick="startBuySet()">Acquista</button>
       <div class="ctrl-secondari">
         <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
@@ -6266,9 +6277,9 @@ function renderControlla(){
     consegnaSetScelta = strade[0] || 'spedizione';
   el('ctrlConsegna').innerHTML = strade.map(v =>
     `<button type="button" class="consegna-pill${v===consegnaSetScelta?' attiva':''}" data-v="${v}" onclick="setConsegnaControlla(this.dataset.v)">${v==='spedizione'?'🚚 Spedizione':'🤝 Ritiro in zona'}</button>`).join('');
-  const st = consegnaSetScelta==='spedizione' ? stimaTagliaSet() : '';
-  el('ctrlTaglia').innerHTML = st
-    ? `📦 pacco stimato: <b>${st}</b> — è una stima, il pacco vero lo prepara il venditore` : '';
+  /* (la stima taglia qui non si mostra piu' — decisione di Andrea:
+     resta nell'ordine, dove la scrive il server; stimaTagliaSet e' il
+     gemello client che aspetta, come il vestito appeso di .carton) */
   el('ctrlConto').innerHTML = contoControlla(totaleSet());
 }
 /* Una cifra del conto nella valuta del toggle: in euro e' sempre una
