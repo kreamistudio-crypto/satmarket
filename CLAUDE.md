@@ -984,7 +984,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   deriva (`fotoMini`); backfill idempotente all'avvio
   (`genera_miniature_mancanti`), la modifica cancella anche la
   gemella, Cache-Control di 1 giorno su /foto (i nomi sono
-  versionati). Frontend: prima pagina da 30 (`LIMITE_PAGINA`) e
+  versionati).
+  `/foto` NON È PIÙ UNA DIRECTORY MONTATA (ago 2026, la prima voce
+  alta dell'audit): era l'ultimo StaticFiles del progetto, l'unica
+  cartella servita in blocco, mentre ogni altra rotta pubblica
+  rispetta la regola ferrea 3 una per una. Non era sfruttabile
+  (Starlette normalizza i `..` prima di arrivare a noi) ma la
+  superficie era quella sbagliata: chi lasciava un file lì dentro lo
+  pubblicava. Ora c'è `GET /foto/{nome}` con `NOME_FOTO`, e la cosa
+  da capire è COS'È quella regex: non una sanificazione del percorso
+  — quella difende da ciò che ci si immagina — ma una whitelist di
+  FORME derivata da chi scrive davvero in quella cartella, che sono
+  quattro punti e quattro soli: `_salva_una_foto` (annunci e import
+  CSV), `scarica_foto` di importa_nostr (estensione dal Content-Type:
+  png/webp/gif esistono), `_salva_avatar`, e `genera_miniature_
+  mancanti` — che è quello che si dimentica, perché passa su OGNI
+  `.jpg` della cartella e quindi fa la `_min` anche agli avatar (75
+  file veri in produzione: la forma è saltata fuori dai dati, non dal
+  codice letto, ed è la lezione del giro). CHI AGGIUNGE UNO
+  SCRITTORE deve aggiungere la sua forma lì, o le sue foto non si
+  vedranno: è il prezzo — voluto — di non montare una directory.
+  L'alfabeto esadecimale degli avatar è legato a `secrets.token_hex`
+  da una sentinella: cambiando generatore, TUTTE le facce
+  sparirebbero in silenzio. IL 304 lo faceva StaticFiles, e senza
+  rimpiazzo ogni foto sarebbe tornata a scaricarsi INTERA a ogni
+  scadenza della cache: la formula dell'ETag (md5 di mtime-size,
+  quella di Starlette) è ora `_file_con_etag` e la chiamano in due —
+  `/foto` e le illustrazioni di Sfoglia — con la sentinella che
+  verifica che resti UNA, o i due header divergerebbero e il 304
+  delle illustrazioni smetterebbe di scattare in silenzio (e quello
+  nacque da un caso vero). Le due cache restano diverse e giuste:
+  revalidazione per le illustrazioni (nomi NON versionati), un giorno
+  per le foto (versionati). Il middleware `cache_foto` è sparito:
+  esisteva solo per mettere quell'header.
+  Frontend: prima pagina da 30 (`LIMITE_PAGINA`) e
   scroll infinito con sentinelle + IntersectionObserver (vetrina,
   negozio, tuoi annunci; guardie DENTRO le callback: demo, ricerca
   AI, fine lista). ATTENZIONE alla separazione: `vetrina` = pagine
@@ -1310,6 +1343,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nell'orologio. ATTENZIONE, due derivazioni di chiave DIVERSE:
   widget = `SHA256(BOT_TOKEN)` (`verifica_login_widget`, auth_date
   entro 5 min), Mini App = `HMAC("WebAppData", BOT_TOKEN)`.
+  L'INITDATA SCADE (ago 2026, la seconda voce alta dell'audit): la
+  firma dice CHI, non QUANDO, e finché nessuno leggeva `auth_date`
+  un initData catturato apriva quell'account per sempre — ed è la
+  credenziale di OGNI chiamata dentro la Mini App, non di una sola.
+  Leva `ORE_INITDATA` (24; 0 = spenta, cioè il buco riaperto: freno
+  d'emergenza, non una scelta). VENTIQUATTRO ORE E NON I CINQUE
+  MINUTI DEL WIDGET, e la differenza è strutturale, non una
+  taratura: il widget firma UNA volta e poi vive di cookie, mentre
+  l'initData NON si rinfresca finché la WebView resta aperta — solo
+  riaprire la Mini App ne conia uno nuovo. Con una finestra corta chi
+  tiene Barattolo minimizzato verrebbe buttato fuori di continuo, e
+  un pagamento a metà si spezzerebbe (la invoice vive 15 minuti). Il
+  controllo sta FUORI dal `try` e PRIMA dell'INSERT, e sono due
+  ragioni distinte: là dentro l'`except Exception` si mangerebbe
+  l'HTTPException riscrivendola col messaggio generico, e una
+  credenziale scaduta non deve scrivere sul database. FAIL-CLOSED per
+  costruzione come `importo_invoice`: `auth_date` assente o
+  illeggibile vale 0, cioè vecchio di un'era, cioè rifiutato, senza
+  un ramo apposta. Il 401 della scadenza ha un messaggio SUO
+  (`MSG_INITDATA_SCADUTO`) e non è pignoleria: un 401 dentro Telegram
+  faceva cadere `avvia()` nella VETRINA anonima, dove ogni tocco
+  offre di entrare a chi è già dentro e nessuno dice che basta
+  riaprire — ora la vetrina resta (il mercatino si sfoglia lo stesso)
+  ma `BANNER_SCADUTO` dice la verità, e il suo CTA verso il bot È il
+  rimedio. Le sessioni cookie non c'entrano: hanno già la loro
+  scadenza a 30 giorni.
   `verifica_utente(init_data, sessione)` cade sul cookie SOLO a
   header vuoto (initData invalido resta 401); ogni endpoint dichiara
   `barattolo_sessione: str = Cookie("")` esplicitamente — niente
@@ -4330,6 +4389,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   push: si becca solo GUARDANDO la CI (`git push && sleep 4 && gh run
   watch --exit-status`), o provando in un clone senza `config.py`, che
   è la condizione vera.
+  UNA PROVA SALTATA SI CONTA (ago 2026): il controllo del pareggio
+  dell'inchiostro delle illustrazioni non era MAI girato in CI —
+  Pillow non si installava, la prova si saltava da sola, e a dirlo
+  c'era una riga discreta in mezzo a duecento spunte. In locale
+  passava (in locale Pillow c'è), quindi guardare il verde non
+  bastava: 211 prove invece di 212, e nessuno confronta i totali. La
+  cura è a due strati perché il primo si può togliere per sbaglio
+  come per sbaglio era stato omesso: `pillow` nel workflow, e
+  `salta()` accanto a `prova()` con le saltate nella riga finale
+  («252 passate, 0 fallite, 1 SALTATA») invece che nascoste nel
+  totale. Più `PROVE_SEVERE`, acceso SOLO nel workflow: in CI le
+  dipendenze si installano apposta, quindi lì una saltata vuol dire
+  che qualcosa si è rotto e il job diventa rosso; in locale chi non
+  ha Pillow gira le prove lo stesso e vede l'avviso contato. Chi
+  aggiunge una prova che dipende da un pacchetto usi `salta()`, mai
+  un `print` o un `return` muto: è quello il modo in cui una prova
+  smette di esistere senza che nessuno lo sappia.
   Su Windows serve `PYTHONIOENCODING=utf-8`,
   o la console cp1252 esplode sulle spunte.
 
@@ -4415,9 +4491,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
    `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
-   unica rotta con un nome che arriva dal client, e per questo la sola
-   con una whitelist — `SLUG_CATEGORIE`, calcolata dal catalogo),
-   `/assets/mascotte.jpeg`,
+   il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
+   calcolata dal catalogo), `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
@@ -4425,7 +4500,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    `/assets/apple-touch-icon.png`) — tutti file singoli, rotte
    esplicite — e `/api/*`. Non montare mai StaticFiles sull'intera
    directory (config e .git diventerebbero pubblici — falla già
-   successa e chiusa).
+   successa e chiusa). Dall'ago 2026 non ce n'è più NESSUNO: anche
+   `/foto/*`, che era l'ultimo montato, è una rotta esplicita con la
+   sua whitelist di FORME (`NOME_FOTO`) — vedi la voce sua in
+   Architettura. La regola è verificabile e non solo raccomandata:
+   una sentinella di `prove.py` fallisce se in server.py ricompare
+   `app.mount(` o l'import di StaticFiles.
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
    released | dispute | return_pending | return_shipped | refund |
    refunded | annullato. Non inventarne di nuovi senza aggiornare
@@ -5198,14 +5278,31 @@ cassaforte, nessuno perde niente. È il comportamento corretto — non si
 paga la cifra sbagliata — ma va guardata la coda degli ordini
 `confirmed` con una invoice già depositata prima di girare la leva, o
 si scambieranno dei rifiuti giusti per un guasto.
-Restano aperte le altre voci dell'audit, da fare una alla volta e in
-quest'ordine: `MODALITA_COLLAUDO` che nasca `False` nel codice come
-IMPORT_NOSTR_APERTO; i due modi in cui i sats escono due volte o
-restano bloccati senza rimedio (timeout di `paga_venditore`, e il
-fallimento di uno sblocco che riscrive lo stato di una disputa
-chiudendo la strada al moderatore); la scadenza dell'initData in
-`verifica_utente`; l'IDOR su `verifica-pagamento`; lo scanner della CI
-cieco sulla cronologia.
+Il secondo giro dell'audit (ago 2026) ha chiuso le due voci ALTE
+rimaste, più il buco della CI che le prove stesse non vedevano.
+1) L'INITDATA SCADE (24 ore, leva `ORE_INITDATA`): la firma dice CHI,
+non QUANDO, e uno catturato apriva quell'account per sempre — vedi
+Architettura, sotto il login web, per il perché delle 24 ore e non
+dei 5 minuti del widget. 2) `/foto` NON È PIÙ MONTATA: rotta
+esplicita con la whitelist delle forme, e la regola ferrea 3 diventa
+verificabile invece che raccomandata. 3) LA CI INSTALLA PILLOW, e una
+prova saltata si conta invece di sparire. 4) `MODALITA_COLLAUDO` nasce
+`False` in `config_esempio.py` (in produzione era già False,
+verificato: cambia da dove si parte, non cosa gira). Provate: 253
+verdi (erano 212), il buco dell'initData riprodotto sul codice di
+prima, il giro degli header fatto su un server vero — foto 200 e 304,
+illustrazioni invariate, 404 a `..%2Fconfig.py`, `%00` e `%0A`. In
+produzione basta il deploy: nessuna colonna, nessuna migrazione.
+DA GUARDARE al primo deploy: il cartello «Sessione scaduta» dentro
+Telegram vero — in locale si è verificato che il banner si disegna e
+sta su una riga, ma il ramo che lo accende ha bisogno di un initData
+vero, che solo Telegram conia.
+Restano aperte le voci MEDIE e BASSE, da fare una alla volta e in
+quest'ordine: i due modi in cui i sats escono due volte o restano
+bloccati senza rimedio (timeout di `paga_venditore`, e il fallimento
+di uno sblocco che riscrive lo stato di una disputa chiudendo la
+strada al moderatore); l'IDOR su `verifica-pagamento`; lo scanner
+della CI cieco sulla cronologia.
 
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
