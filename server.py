@@ -477,6 +477,19 @@ try:
     from config import ASTA_MAX_ATTIVE_VENDITORE
 except ImportError:
     ASTA_MAX_ATTIVE_VENDITORE = 3  # aste vive per venditore (prudenza)
+# Il proxy a budget depositato (ago 2026, nato dagli utenti): chi punta
+# puo' depositare il suo MASSIMO e lasciare che il sistema rilanci per
+# lui. Il budget e' GIA' in cassaforte (il versato): il proxy non versa
+# mai niente, ESPONE la cifra minima necessaria. Nasce SPENTO come
+# ASTA_ABILITATA e resta spento ANCHE quando le aste si accenderanno
+# (strategia decisa: il proxy parte solo a gara manuale rodata).
+# Spegnerlo blocca le sole puntate proxy NUOVE: il motore delle
+# esposizioni continua a girare per i proxy gia' vivi — i sats in
+# cassaforte non restano mai ostaggio di una leva.
+try:
+    from config import ASTA_PROXY_ATTIVO
+except ImportError:
+    ASTA_PROXY_ATTIVO = False      # spento di serie: si accende dal VPS
 
 # La terza via della moderazione (lug 2026, decisione di Andrea: basta
 # blocchi a priori sui casi ambigui — l'AI segnala, l'ADMIN decide).
@@ -1142,13 +1155,22 @@ def init_db():
         -- a offerente, e rende il gesto inequivocabile). L'etichetta
         -- anonima («Offerente A, B, C...») si assegna al primo saldo
         -- ed e' stabile dentro l'asta.
+        -- VERSATO vs ESPOSTO (il proxy, ago 2026): versato e' il
+        -- budget in cassaforte, offerto la puntata VISIBILE in gara.
+        -- INVARIANTE: versato >= offerto SEMPRE, uguali quando
+        -- proxy=0 (le manuali di sempre). La CAPACITA' che gareggia
+        -- e' il versato; il pubblico vede solo l'esposto, e chi vince
+        -- paga l'ESPOSTO — l'eccedenza torna dal registro.
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         annuncio_id INTEGER NOT NULL,
         tg_id INTEGER NOT NULL,
         venditore_id INTEGER NOT NULL,
         etichetta TEXT DEFAULT '',
         versato_sats INTEGER DEFAULT 0,  -- somma dei delta SALDATI
-        offerto_sats INTEGER DEFAULT 0,  -- il totale che gareggia
+                                         -- (= il budget, segreto)
+        offerto_sats INTEGER DEFAULT 0,  -- l'ESPOSTO che gareggia
+        proxy INTEGER DEFAULT 0,         -- 1 = «rilancia per me»: il
+                                         -- motore espone il minimo
         -- il numero d'ordine dell'ULTIMO saldo (progressivo globale):
         -- e' il tie-break della testa — l'orario ha la risoluzione del
         -- secondo, e due saldi nello stesso secondo sono gia' successi
@@ -1175,10 +1197,18 @@ def init_db():
         puntata_id INTEGER NOT NULL,
         annuncio_id INTEGER NOT NULL,
         tg_id INTEGER NOT NULL,
-        offerto_sats INTEGER NOT NULL,   -- il totale dichiarato
+        offerto_sats INTEGER NOT NULL,   -- il totale dichiarato (per
+                                         -- una fattura proxy e' il
+                                         -- MASSIMO segreto: mai in
+                                         -- cronologia — quella legge
+                                         -- esposto_sats)
         delta_sats INTEGER NOT NULL,     -- la fattura (calcolo server)
         payment_hash TEXT DEFAULT '',
         stato TEXT DEFAULT 'creato',     -- creato | saldato | tardivo
+                                         -- | annullato (la lapide)
+        proxy INTEGER DEFAULT 0,         -- l'intento dichiarato
+        esposto_sats INTEGER DEFAULT 0,  -- l'esposto al saldo (post
+                                         -- motore): la cifra pubblica
         creato INTEGER, saldato_il INTEGER DEFAULT 0,
         aggiornato INTEGER
     );
@@ -1192,9 +1222,11 @@ def init_db():
         -- senza rimborsi doppi ne' ordini doppi. «Da riscuotere» e'
         -- lo stesso binario degli incassi venditore (cascata invoice
         -- depositata -> LN address -> fermo col sollecito): NESSUN
-        -- tubo nuovo per i pagamenti in uscita. INVARIANTE: per ogni
-        -- asta finita, somma dei delta saldati = versato del
-        -- vincitore + somma degli importi qui dentro.
+        -- tubo nuovo per i pagamenti in uscita. INVARIANTE (aggiornata
+        -- col proxy): per ogni asta finita, somma dei delta saldati =
+        -- OFFERTO (esposto) della vincitrice + somma degli importi
+        -- qui dentro — perdenti col versato pieno, piu' l'eccedenza
+        -- della vincitrice quando il suo budget supera l'esposto.
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         annuncio_id INTEGER NOT NULL,
         tg_id INTEGER NOT NULL,
@@ -1203,6 +1235,17 @@ def init_db():
         importo_sats INTEGER NOT NULL,
         motivo TEXT DEFAULT '',          -- ritiro | perdente | tardivo
                                          -- | annullo_admin
+                                         -- | eccedenza_ritiro (gesto
+                                         --   del leader proxy, a gara
+                                         --   viva) | eccedenza (della
+                                         --   vincitrice, a chiusura)
+                                         -- DUE motivi APPOSTA: uno
+                                         -- solo, con la fusione che
+                                         -- riaccende il proxy, farebbe
+                                         -- ignorare la riga di
+                                         -- chiusura dall'indice
+                                         -- parziale = sats mai
+                                         -- rimborsati in silenzio
         stato TEXT DEFAULT 'da_riscuotere',  -- da_riscuotere | riscosso
         invoice_riscossione TEXT DEFAULT '',
         solleciti INTEGER DEFAULT 0,
@@ -1221,6 +1264,12 @@ def init_db():
         WHERE motivo IN ('perdente', 'annullo_admin');
     CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_tardivo
         ON rimborsi_asta(rilancio_id) WHERE rilancio_id > 0;
+    -- le cinture del proxy: l'eccedenza si ritira UNA volta per asta
+    -- («scesa non risale»), e la riga di chiusura non si raddoppia
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_ecc_ritiro
+        ON rimborsi_asta(puntata_id) WHERE motivo = 'eccedenza_ritiro';
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_eccedenza
+        ON rimborsi_asta(puntata_id) WHERE motivo = 'eccedenza';
     CREATE TABLE IF NOT EXISTS moderazione_log(
         -- il REGISTRO della moderazione (lug 2026): ogni esito, della
         -- macchina e dell'umano, per correggere il prompt A MANO sui
@@ -1591,6 +1640,22 @@ def init_db():
         con.execute("ALTER TABLE puntate ADD COLUMN saldo_seq INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # Migrazioni del proxy a budget depositato (ago 2026): il flag su
+    # puntate e fatture, e l'ESPOSTO sulla fattura — la cronologia non
+    # deve mai dire il totale dichiarato, che per un rilancio proxy e'
+    # il massimo segreto.
+    for tab_col in ("puntate ADD COLUMN proxy INTEGER DEFAULT 0",
+                    "rilanci ADD COLUMN proxy INTEGER DEFAULT 0",
+                    "rilanci ADD COLUMN esposto_sats INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE {tab_col}")
+        except sqlite3.OperationalError:
+            pass
+    # Backfill idempotente: le fatture saldate di ieri sono tutte
+    # manuali, l'esposto E' il totale dichiarato. Le nuove lo scrivono
+    # al saldo (mai 0: l'esposto parte dalla base, che e' > 0).
+    con.execute("UPDATE rilanci SET esposto_sats=offerto_sats "
+                "WHERE esposto_sats=0 AND stato='saldato'")
     # Migrazioni per spedizione, consegna e resi
     for colonna in ("corriere TEXT DEFAULT ''", "tracking TEXT DEFAULT ''",
                     "corriere_reso TEXT DEFAULT ''",
@@ -3112,24 +3177,42 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # ATTIVE (regola della lapide, decisione di Andrea): i sats di
         # una puntata 'chiusa' sono GIA' al registro rimborsi, e
         # sommarli sarebbe un doppio conteggio. Il superstite gareggia
-        # con TUTTO il versato — offerto = somma: una persona, una
-        # cassaforte — cosi' l'invariante versato==offerto tiene e
-        # l'ordine del vincitore dice sempre la cifra vera.
+        # con TUTTO il versato; l'ESPOSTO invece e' il max degli
+        # esposti delle meta' attive — MAI la somma, che col proxy
+        # sarebbe la fuga del massimo — e a rimetterlo in riga ci
+        # pensa il motore delle esposizioni, in coda al ramo. Il flag
+        # proxy e' l'OR delle meta' attive, ma un'eccedenza gia'
+        # ritirata su UNA delle due vince su tutto: «scesa non
+        # risale» sopravvive alla fusione (senza questo, l'indice
+        # parziale della riga di chiusura scarterebbe in silenzio
+        # l'eccedenza del vincitore).
         con.execute("UPDATE rilanci SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("UPDATE rimborsi_asta SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        aste_toccate = set()
         for cp in con.execute(
-                "SELECT a.id AS ia, b.id AS ib, a.versato_sats AS va, "
+                "SELECT a.annuncio_id AS aid, "
+                "a.id AS ia, b.id AS ib, a.versato_sats AS va, "
                 "b.versato_sats AS vb, a.offerto_sats AS oa, "
                 "b.offerto_sats AS ob, a.saldo_seq AS sa, "
-                "b.saldo_seq AS sb, a.stato AS sta, b.stato AS stb "
+                "b.saldo_seq AS sb, a.stato AS sta, b.stato AS stb, "
+                "a.proxy AS pa, b.proxy AS pb "
                 "FROM puntate a JOIN puntate b "
                 "ON a.annuncio_id=b.annuncio_id "
                 "WHERE a.tg_id=? AND b.tg_id=?",
                 (id_telegram, id_nostr)).fetchall():
             somma = (cp["va"] if cp["sta"] == "attiva" else 0) \
                   + (cp["vb"] if cp["stb"] == "attiva" else 0)
+            esposto = max(cp["oa"] if cp["sta"] == "attiva" else 0,
+                          cp["ob"] if cp["stb"] == "attiva" else 0)
+            ecc_fatta = con.execute(
+                "SELECT 1 FROM rimborsi_asta WHERE puntata_id IN (?,?) "
+                "AND motivo='eccedenza_ritiro'",
+                (cp["ia"], cp["ib"])).fetchone()
+            proxy_vivo = 0 if ecc_fatta else max(
+                cp["pa"] if cp["sta"] == "attiva" else 0,
+                cp["pb"] if cp["stb"] == "attiva" else 0)
             vive, muore, vive_stato = cp["ia"], cp["ib"], cp["sta"]
             if ((cp["stb"] != "attiva", -cp["ob"], cp["sb"])
                     < (cp["sta"] != "attiva", -cp["oa"], cp["sa"])):
@@ -3144,9 +3227,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
             con.execute("DELETE FROM puntate WHERE id=?", (muore,))
             if vive_stato == "attiva" and somma > 0:
                 con.execute("UPDATE puntate SET versato_sats=?, "
-                            "offerto_sats=?, saldo_seq=? WHERE id=?",
-                            (somma, somma, max(cp["sa"], cp["sb"]),
-                             vive))
+                            "offerto_sats=?, proxy=?, saldo_seq=? "
+                            "WHERE id=?",
+                            (somma, esposto, proxy_vivo,
+                             max(cp["sa"], cp["sb"]), vive))
+                aste_toccate.add(cp["aid"])
         con.execute("UPDATE puntate SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # L'auto-puntata nata dalla fusione (puntavo sulla MIA asta):
@@ -3170,6 +3255,27 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                         (r["annuncio_id"], id_telegram, r["id"],
                          r["versato_sats"], adesso_fusione,
                          adesso_fusione))
+        # Il motore delle esposizioni rigira sulle aste toccate dalle
+        # collisioni — e DOPO la chiusura delle auto-puntate qui
+        # sopra, che puo' aver tolto di mezzo il leader: il superstite
+        # fuso puo' essere diventato la capacita' piu' alta e va
+        # esposto quanto serve (il max degli esposti delle meta' non
+        # basta piu'). Sulle aste senza collisione non serve: il
+        # motore non abbassa mai, e togliere un rivale non alza
+        # nessuno — e' gia' un punto fisso.
+        for aid in aste_toccate:
+            asta_r = con.execute("SELECT asta_base_sats FROM annunci "
+                                 "WHERE id=?", (aid,)).fetchone()
+            if not asta_r or asta_r["asta_base_sats"] <= 0:
+                continue
+            campo = [dict(r) for r in con.execute(
+                "SELECT * FROM puntate WHERE annuncio_id=?", (aid,))]
+            for pid, esp in esposizioni_proxy(
+                    campo, asta_r["asta_base_sats"],
+                    ASTA_INCREMENTO_PERCENTO).items():
+                con.execute("UPDATE puntate SET offerto_sats=? "
+                            "WHERE id=? AND offerto_sats!=?",
+                            (esp, pid, esp))
         # Il registro degli XP segue l'utente: le due meta' erano la
         # stessa persona, e cio' che ha fatto con l'una non si perde
         # fondendo. In UNIONE come i distintivi — se entrambe hanno
@@ -7582,10 +7688,13 @@ def conto_chiusura(puntate: list) -> tuple:
     fatture nate sulla stessa testa — vince chi ha SALDATO prima,
     cioe' saldo_seq minore, poi id: lo stesso ordine di _leader_asta,
     o il «sei in testa» di ieri e il vincitore di oggi divergono) e
-    mette tutte le altre nei rimborsi, ognuna per il suo versato.
-    INVARIANTE, provata in CI: somma dei versati in ingresso =
-    versato della vincitrice + somma dei rimborsi. Pura: righe come
-    dict, il database non lo vede."""
+    mette tutte le altre nei rimborsi, ognuna per il suo versato e
+    ognuna col suo MOTIVO. Col proxy (ago 2026) la vincitrice paga
+    l'ESPOSTO, non il budget: se versato > offerto la differenza e'
+    la riga 'eccedenza' — torna a lei dal registro. INVARIANTE,
+    provata in CI: somma dei versati in ingresso = OFFERTO della
+    vincitrice + somma dei rimborsi. Pura: righe come dict, il
+    database non lo vede."""
     in_gara = [p for p in puntate
                if p["stato"] == "attiva" and p["versato_sats"] > 0]
     if not in_gara:
@@ -7593,9 +7702,55 @@ def conto_chiusura(puntate: list) -> tuple:
     vincitrice = min(in_gara, key=lambda p: (-p["offerto_sats"],
                                              p["saldo_seq"], p["id"]))
     rimborsi = [{"puntata_id": p["id"], "tg_id": p["tg_id"],
-                 "importo_sats": p["versato_sats"]}
+                 "importo_sats": p["versato_sats"], "motivo": "perdente"}
                 for p in in_gara if p["id"] != vincitrice["id"]]
+    eccedenza = vincitrice["versato_sats"] - vincitrice["offerto_sats"]
+    if eccedenza > 0:
+        rimborsi.append({"puntata_id": vincitrice["id"],
+                         "tg_id": vincitrice["tg_id"],
+                         "importo_sats": eccedenza,
+                         "motivo": "eccedenza"})
     return vincitrice, rimborsi
+
+
+def esposizioni_proxy(puntate: list, base_sats: int,
+                      incremento_percento: int) -> dict:
+    """Il motore delle ESPOSIZIONI (il proxy, ago 2026): dato il campo
+    di gara dice quanto ogni puntata deve mostrare. Le regole:
+    - la CAPACITA' che gareggia e' il versato (per le manuali coincide
+      con l'esposto); il ranking e' (versato, saldo_seq, id) — lo
+      stesso tie-break di _leader_asta;
+    - manuale: esposto = versato, sempre;
+    - proxy NON in testa: esposto = versato — il suo proxy ha provato
+      e perso, il budget e' esausto e da li' e' indistinguibile da una
+      manuale (ed e' la notifica «budget esaurito»);
+    - proxy in testa: il minimo necessario — min(versato, max(base,
+      rilancio_minimo(versato del secondo))); senza un secondo, la
+      base. E' cosi' che due proxy CONVERGONO in una passata sola:
+      il secondo viene esposto al suo massimo, il primo un incremento
+      sopra (o al proprio cap), niente rincorsa di eventi;
+    - NESSUN esposto scende MAI (max con l'attuale): l'esposto e'
+      storia pubblica — ed e' il motivo per cui il ritiro di un rivale
+      non richiede nessun ricalcolo (il motore e' gia' un punto fisso).
+    IDEMPOTENTE per costruzione: due passate = stessa risposta. Pura:
+    righe come dict, la proroga NON vive qui (decisione del cantiere:
+    i rialzi automatici non prorogano mai — la convergenza e' UN
+    evento contabile dentro il saldo che l'ha scatenata)."""
+    in_gara = [p for p in puntate
+               if p["stato"] == "attiva" and p["versato_sats"] > 0]
+    ordine = sorted(in_gara, key=lambda p: (-p["versato_sats"],
+                                            p["saldo_seq"], p["id"]))
+    fuori = {}
+    for i, p in enumerate(ordine):
+        if i == 0 and p.get("proxy"):
+            secondo = ordine[1]["versato_sats"] if len(ordine) > 1 else 0
+            serve = rilancio_minimo(secondo, incremento_percento) \
+                if secondo else base_sats
+            esposto = min(p["versato_sats"], max(base_sats, serve))
+        else:
+            esposto = p["versato_sats"]
+        fuori[p["id"]] = max(p["offerto_sats"], esposto)
+    return fuori
 
 
 def durata_asta_da_payload(d) -> int:
@@ -7685,14 +7840,21 @@ async def fai_puntata(annuncio_id: int, req: Request,
                       barattolo_sessione: str = Cookie("")):
     """La puntata: il compratore dichiara il TOTALE che offre e riceve
     la fattura della sola differenza rispetto a quanto ha gia' in
-    cassaforte. La liturgia e' quella di compra(): guardie, UNICO
-    await sulla invoice, ricontrollo, poi zero await fino al commit."""
+    cassaforte. Con proxy=1 (ago 2026) il totale e' il suo MASSIMO
+    segreto: in gara il motore espone solo il necessario. La liturgia
+    e' quella di compra(): guardie, UNICO await sulla invoice,
+    ricontrollo, poi zero await fino al commit."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     if not ASTA_ABILITATA:
         # la leva spegne solo le puntate NUOVE: chiusure, ritiri e
         # riscossioni delle aste vive continuano (vedi le leve)
         raise HTTPException(400, "Le aste non sono attive")
+    vuole_proxy = bool(d.get("proxy"))
+    if vuole_proxy and not ASTA_PROXY_ATTIVO:
+        # come sopra: la leva gatea le sole puntate proxy NUOVE, il
+        # motore continua per i proxy gia' in gara
+        raise HTTPException(400, "Il rilancio automatico non è attivo")
     try:
         totale = int(d.get("totale_sats") or 0)
     except (TypeError, ValueError):
@@ -7732,6 +7894,17 @@ async def fai_puntata(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(409, "Ti sei ritirato da questa asta: il "
                                  "ritiro è definitivo")
+    if vuole_proxy and mia and con.execute(
+            "SELECT 1 FROM rimborsi_asta WHERE puntata_id=? AND "
+            "motivo='eccedenza_ritiro'", (mia["id"],)).fetchone():
+        # «scesa l'eccedenza non risale»: chi ha ritirato l'eccedenza
+        # non ricostruisce un massimo nascosto su quest'asta — i
+        # rilanci normali, alla luce del sole, restano aperti
+        con.close()
+        raise HTTPException(400, "Hai già ritirato l'eccedenza su "
+                                 "questa asta: il rilancio automatico "
+                                 "qui è chiuso, restano le puntate "
+                                 "normali")
     pendente = con.execute(
         "SELECT 1 FROM rilanci WHERE annuncio_id=? AND tg_id=? AND "
         "stato='creato' AND creato>=?",
@@ -7742,17 +7915,27 @@ async def fai_puntata(annuncio_id: int, req: Request,
                                  "corso: pagala o lascia che scada "
                                  "(vale 10 minuti)")
     testa = _leader_asta(con, annuncio_id)
-    if testa and testa["tg_id"] == user["id"]:
+    sono_leader = bool(testa and testa["tg_id"] == user["id"])
+    if sono_leader and not vuole_proxy:
         con.close()
         raise HTTPException(400, "Sei già in testa: rilanciare su te "
                                  "stesso costerebbe sats senza motivo")
-    minimo = rilancio_minimo(testa["offerto_sats"],
-                             ASTA_INCREMENTO_PERCENTO) if testa \
-        else a["asta_base_sats"]
-    if totale < minimo:
-        con.close()
-        raise HTTPException(400, f"La puntata minima ora è "
-                                 f"{minimo:,} sats".replace(",", " "))
+    if not sono_leader:
+        # il minimo si calcola dal PUBBLICO (l'esposto della testa):
+        # il massimo di un proxy e' segreto anche qui — chi entra al
+        # minimo e viene subito ricoperto dal budget del leader sta
+        # usando l'asta come previsto, e la notifica onesta glielo dice
+        minimo = rilancio_minimo(testa["offerto_sats"],
+                                 ASTA_INCREMENTO_PERCENTO) if testa \
+            else a["asta_base_sats"]
+        if totale < minimo:
+            con.close()
+            raise HTTPException(400, f"La puntata minima ora è "
+                                     f"{minimo:,} sats".replace(",", " "))
+    # il leader proxy che AGGIUNGE budget salta il minimo: il suo
+    # esposto non cambia (il secondo non e' cambiato), sale solo il
+    # massimo segreto — basta che il totale superi il versato (la
+    # guardia del delta qui sotto)
     versato = mia["versato_sats"] if mia else 0
     delta = totale - versato
     if delta <= 0:
@@ -7773,14 +7956,24 @@ async def fai_puntata(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(409, "L'asta si è chiusa proprio adesso")
     testa2 = _leader_asta(con, annuncio_id)
-    minimo2 = rilancio_minimo(testa2["offerto_sats"],
-                              ASTA_INCREMENTO_PERCENTO) if testa2 \
-        else a["asta_base_sats"]
-    if totale < minimo2:
-        con.close()
-        raise HTTPException(409, "Qualcuno ti ha superato mentre "
-                                 "preparavo la fattura: rilancia più in "
-                                 "alto")
+    if testa2 and testa2["tg_id"] == user["id"]:
+        # sono (ancora, o diventato) leader: e' un top-up del budget,
+        # il minimo non si applica. Il delta e' gia' > 0; se la
+        # fusione ha toccato il versato durante l'await, i conti
+        # restano giusti per costruzione — il versato e' ADDITIVO,
+        # ogni delta pagato si somma e il motore espone dal versato
+        # vero, mai dal totale dichiarato.
+        pass
+    else:
+        minimo2 = rilancio_minimo(testa2["offerto_sats"],
+                                  ASTA_INCREMENTO_PERCENTO) if testa2 \
+            else a["asta_base_sats"]
+        if totale < minimo2:
+            con.close()
+            raise HTTPException(409, "Ti hanno superato mentre "
+                                     "preparavo la fattura: serve un "
+                                     + ("massimo" if vuole_proxy
+                                        else "totale") + " più alto")
     if not mia:
         con.execute("INSERT OR IGNORE INTO puntate(annuncio_id,tg_id,"
                     "venditore_id,stato,creato,aggiornato) "
@@ -7790,10 +7983,11 @@ async def fai_puntata(annuncio_id: int, req: Request,
         mia = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND "
                           "tg_id=?", (annuncio_id, user["id"])).fetchone()
     con.execute("INSERT INTO rilanci(puntata_id,annuncio_id,tg_id,"
-                "offerto_sats,delta_sats,payment_hash,stato,creato,"
-                "aggiornato) VALUES(?,?,?,?,?,?,'creato',?,?)",
+                "offerto_sats,delta_sats,payment_hash,proxy,stato,"
+                "creato,aggiornato) VALUES(?,?,?,?,?,?,?,'creato',?,?)",
                 (mia["id"], annuncio_id, user["id"], totale, delta,
-                 inv["payment_hash"], adesso, adesso))
+                 inv["payment_hash"], 1 if vuole_proxy else 0,
+                 adesso, adesso))
     rilancio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -7922,20 +8116,53 @@ async def verifica_rilancio(rilancio_id: int,
     # solo non basta, ha la risoluzione del secondo)
     seq = con.execute("SELECT COALESCE(MAX(saldo_seq),0)+1 AS s "
                       "FROM puntate").fetchone()["s"]
+    # il versato si SOMMA; l'esposto non si scrive piu' qui a secco —
+    # lo decide il motore, per TUTTE le puntate dell'asta. Il flag
+    # proxy si alza (MAX: mai downgrade), e SOLO in questo ramo — il
+    # tardivo non tocca ne' proxy ne' versato.
     con.execute("UPDATE puntate SET versato_sats=versato_sats+?, "
-                "offerto_sats=?, etichetta=?, saldo_seq=?, aggiornato=? "
-                "WHERE id=?",
-                (ril["delta_sats"], ril["offerto_sats"], etichetta,
-                 seq, adesso, p["id"]))
+                "etichetta=?, saldo_seq=?, proxy=MAX(proxy,?), "
+                "aggiornato=? WHERE id=?",
+                (ril["delta_sats"], etichetta, seq, ril["proxy"],
+                 adesso, p["id"]))
+    # IL MOTORE DELLE ESPOSIZIONI: una passata sola, dentro il blocco
+    # senza await — due proxy convergono QUI, come evento contabile,
+    # non come rincorsa di pagamenti. Per le manuali produce l'esposto
+    # di sempre (= versato).
+    campo = [dict(r) for r in con.execute(
+        "SELECT * FROM puntate WHERE annuncio_id=?",
+        (ril["annuncio_id"],))]
+    esposizioni = esposizioni_proxy(campo, a["asta_base_sats"],
+                                    ASTA_INCREMENTO_PERCENTO)
+    for pid, esp in esposizioni.items():
+        con.execute("UPDATE puntate SET offerto_sats=? "
+                    "WHERE id=? AND offerto_sats!=?", (esp, pid, esp))
+    # la cifra PUBBLICA di questa fattura (cronologia): l'esposto
+    # post-motore, MAI il totale dichiarato — per un rilancio proxy
+    # quello e' il massimo segreto
+    mio_esposto = esposizioni[p["id"]]
+    con.execute("UPDATE rilanci SET esposto_sats=? WHERE id=?",
+                (mio_esposto, rilancio_id))
+    testa_dopo = _leader_asta(con, ril["annuncio_id"])
+    era_leader = bool(testa_prima and testa_prima["tg_id"] == user["id"])
+    testa_cambiata = (not testa_prima or not testa_dopo
+                      or (testa_dopo["id"], testa_dopo["offerto_sats"])
+                      != (testa_prima["id"], testa_prima["offerto_sats"]))
     # L'anti-cecchino, nel write path: la data di chiusura vive in UN
     # posto solo (annunci.asta_scadenza) e la sposta solo un saldo
     # negli ultimi minuti. Nessun tetto alle proroghe, per scelta.
-    scad = nuova_scadenza(a["asta_scadenza"], adesso,
-                          ASTA_PROROGA_MINUTI * 60)
-    if scad != a["asta_scadenza"]:
-        con.execute("UPDATE annunci SET asta_scadenza=? WHERE id=?",
-                    (scad, a["id"]))
-    testa_dopo = _leader_asta(con, ril["annuncio_id"])
+    # CON UNA GUARDIA (il proxy, ago 2026): il top-up del leader che
+    # non cambia ne' testa ne' esposto NON proroga — la sua fattura e'
+    # rimborsabile per costruzione (eccedenza), quindi prorogare qui
+    # sarebbe un'asta eterna a costo zero. Ogni saldo di un NON leader
+    # proroga come ieri.
+    scad = a["asta_scadenza"]
+    if not era_leader or testa_cambiata:
+        scad = nuova_scadenza(a["asta_scadenza"], adesso,
+                              ASTA_PROROGA_MINUTI * 60)
+        if scad != a["asta_scadenza"]:
+            con.execute("UPDATE annunci SET asta_scadenza=? WHERE id=?",
+                        (scad, a["id"]))
     n_offerenti = con.execute("SELECT COUNT(*) AS n FROM puntate WHERE "
                               "annuncio_id=? AND stato='attiva' AND "
                               "versato_sats>0",
@@ -7962,26 +8189,41 @@ async def verifica_rilancio(rilancio_id: int,
     titolo = a["titolo"][:60]
     link = f"\n{URL_PUBBLICO}/annuncio/{ril['annuncio_id']}"
     if in_testa and testa_prima and testa_prima["tg_id"] != user["id"]:
+        # il «budget esaurito»: un proxy spodestato e' stato esposto
+        # al suo massimo per costruzione — e' l'unico squillo che il
+        # proxy riceve (i rialzi automatici sono silenziosi: il proxy
+        # esiste per non guardare l'asta)
+        esaurito = (f"Il tuo «rilancia per me» ha dato tutto: il "
+                    f"massimo di "
+                    f"{_fmt_sats(testa_prima['versato_sats'])} sats è "
+                    f"esaurito. " if testa_prima["proxy"] else "")
         await notifica(testa_prima["tg_id"],
                        f"🔨 <b>Ti hanno superato</b> su «{titolo}»: la "
                        f"testa è a {_fmt_sats(testa_dopo['offerto_sats'])} "
-                       f"sats. Rilanci da "
+                       f"sats. {esaurito}Rilanci da "
                        f"{_fmt_sats(minimo)} sats — paghi solo la "
                        f"differenza — oppure puoi ritirarti.{link}")
     if not in_testa:
+        mio_max = (" il tuo massimo è stato esposto per intero e "
+                   "non è bastato." if ril["proxy"] or p["proxy"]
+                   else " il tuo versato conta già.")
         await notifica(user["id"],
                        f"🔨 La tua puntata su «{titolo}» è al sicuro, ma "
                        f"nel frattempo ti hanno superato: la testa è a "
                        f"{_fmt_sats(testa_dopo['offerto_sats'])} sats. "
                        f"Per rilanciare servono almeno "
-                       f"{_fmt_sats(minimo)} sats — il tuo versato "
-                       f"conta già.{link}")
-    await notifica(a["venditore_id"],
-                   f"🔨 <b>Nuova puntata</b> su «{titolo}»: "
-                   f"{_fmt_sats(ril['offerto_sats'])} sats "
-                   f"({n_offerenti} offerent{'e' if n_offerenti == 1 else 'i'}).")
+                       f"{_fmt_sats(minimo)} sats —{mio_max}{link}")
+    if not (era_leader and not testa_cambiata):
+        # il venditore sente ogni puntata che cambia qualcosa, con la
+        # cifra ESPOSTA (mai il totale dichiarato: sarebbe il budget);
+        # il top-up del leader e' muto — per lui non e' successo niente
+        await notifica(a["venditore_id"],
+                       f"🔨 <b>Nuova puntata</b> su «{titolo}»: "
+                       f"{_fmt_sats(testa_dopo['offerto_sats'])} sats "
+                       f"({n_offerenti} offerent{'e' if n_offerenti == 1 else 'i'}).")
     return {"stato": "saldato", "in_testa": in_testa,
             "offerto_sats": ril["offerto_sats"],
+            "esposto_sats": mio_esposto, "proxy": bool(ril["proxy"]),
             "top_sats": testa_dopo["offerto_sats"] if testa_dopo else 0,
             "minimo_sats": minimo, "scadenza": scad}
 
@@ -8002,10 +8244,13 @@ def stato_asta(annuncio_id: int, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Asta non trovata")
     testa = _leader_asta(con, annuncio_id)
     cronologia = [
-        {"etichetta": r["etichetta"], "offerto_sats": r["offerto_sats"],
+        # la cifra pubblica e' l'ESPOSTO al saldo (esposto_sats), MAI
+        # r.offerto_sats: per una fattura proxy quello e' il massimo
+        # segreto, e stamparlo qui sarebbe la fuga del budget
+        {"etichetta": r["etichetta"], "offerto_sats": r["esposto_sats"],
          "quando": r["saldato_il"]}
         for r in con.execute(
-            "SELECT p.etichetta, r.offerto_sats, r.saldato_il "
+            "SELECT p.etichetta, r.esposto_sats, r.saldato_il "
             "FROM rilanci r JOIN puntate p ON p.id=r.puntata_id "
             "WHERE r.annuncio_id=? AND r.stato='saldato' "
             "ORDER BY r.saldato_il DESC, r.id DESC LIMIT 20",
@@ -8028,10 +8273,13 @@ def stato_asta(annuncio_id: int, x_tg_init_data: str = Header(""),
              "incremento_percento": ASTA_INCREMENTO_PERCENTO,
              "proroga_minuti": ASTA_PROROGA_MINUTI, "mia": None}
     if mia:
+        # proxy e versato (= budget) escono SOLO qui, al proprietario:
+        # il residuo lo fa il client (versato - offerto)
         fuori["mia"] = {
             "stato": mia["stato"], "etichetta": mia["etichetta"],
             "versato_sats": mia["versato_sats"],
             "offerto_sats": mia["offerto_sats"],
+            "proxy": bool(mia["proxy"]),
             "in_testa": bool(testa and testa["tg_id"] == user["id"])}
     return fuori
 
@@ -8047,7 +8295,7 @@ def mie_puntate(x_tg_init_data: str = Header(""),
     con = db()
     righe = [dict(r) for r in con.execute(
         "SELECT p.id, p.annuncio_id, p.stato, p.etichetta, "
-        "p.versato_sats, p.offerto_sats, p.aggiornato, "
+        "p.versato_sats, p.offerto_sats, p.proxy, p.aggiornato, "
         "a.titolo, a.foto, a.stato AS stato_annuncio, "
         "a.asta_base_sats AS base_sats, a.asta_scadenza AS scadenza "
         "FROM puntate p JOIN annunci a ON a.id=p.annuncio_id "
@@ -8070,7 +8318,8 @@ def mie_puntate(x_tg_init_data: str = Header(""),
     return {"puntate": righe, "da_riscuotere": rimborsi,
             "leve": {"incremento_percento": ASTA_INCREMENTO_PERCENTO,
                      "proroga_minuti": ASTA_PROROGA_MINUTI,
-                     "abilitata": bool(ASTA_ABILITATA)}}
+                     "abilitata": bool(ASTA_ABILITATA),
+                     "proxy_attivo": bool(ASTA_PROXY_ATTIVO)}}
 
 
 # ------------------ ASTE: il binario delle riscossioni ---------------
@@ -8201,6 +8450,91 @@ async def ritira_puntata(annuncio_id: int,
             "riscosso": bool(esito.get("ok"))}
 
 
+@app.post("/api/aste/{annuncio_id}/ritira-eccedenza")
+async def ritira_eccedenza(annuncio_id: int,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Il leader proxy ritira il budget NON esposto (ago 2026): la
+    puntata torna SECCA (proxy=0, versato=offerto) e su quest'asta il
+    massimo non si ricostruisce — «scesa l'eccedenza non risale», con
+    la stessa definitività del ritiro; i rilanci normali restano
+    aperti. UNA volta per asta: l'indice parziale su
+    (puntata_id, motivo='eccedenza_ritiro') e' insieme cintura
+    d'idempotenza e regola. Solo il leader: chi non e' in testa ha
+    l'esposto pari al versato per costruzione (il motore lo ha gia'
+    esposto tutto) e la sua strada e' il ritiro intero. Fuori dal gate
+    di ASTA_ABILITATA e di ASTA_PROXY_ATTIVO, per scelta: uscire coi
+    propri sats non dipende da una leva. Il gemello di ritira_puntata:
+    stesse guardie, stessa transazione, riscossione post-commit."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    adesso = int(time.time())
+    a = con.execute("SELECT * FROM annunci WHERE id=?",
+                    (annuncio_id,)).fetchone()
+    if (not a or a["stato"] != "attivo" or not _asta(a)
+            or not _asta_viva(a, adesso)):
+        # ad asta chiusa l'eccedenza torna da sola con la chiusura
+        # (la riga 'eccedenza' del conto): niente doppie strade
+        con.close()
+        raise HTTPException(409, "L'asta è chiusa: l'eventuale "
+                                 "eccedenza torna con la chiusura")
+    p = con.execute("SELECT * FROM puntate WHERE annuncio_id=? AND tg_id=?",
+                    (annuncio_id, user["id"])).fetchone()
+    if not p or p["stato"] != "attiva" or not p["proxy"]:
+        con.close()
+        raise HTTPException(400, "Non hai un rilancio automatico su "
+                                 "questa asta")
+    eccedenza = p["versato_sats"] - p["offerto_sats"]
+    if eccedenza <= 0:
+        con.close()
+        raise HTTPException(400, "Non c'è eccedenza da ritirare: il "
+                                 "tuo massimo è già tutto esposto")
+    testa = _leader_asta(con, annuncio_id)
+    if not (testa and testa["id"] == p["id"]):
+        con.close()
+        raise HTTPException(400, "Non sei in testa: chi non guida "
+                                 "l'asta si ritira per intero, col "
+                                 "bottone di sempre")
+    pendente = con.execute("SELECT 1 FROM rilanci WHERE puntata_id=? AND "
+                           "stato='creato' AND creato>=?",
+                           (p["id"], adesso - RILANCIO_STANTIO)).fetchone()
+    if pendente:
+        # un top-up in volo tra il conto dell'eccedenza e il commit
+        # sballerebbe i numeri: prima si chiude quella fattura
+        con.close()
+        raise HTTPException(400, "Hai una fattura di puntata in corso: "
+                                 "pagala o lascia che scada, poi potrai "
+                                 "ritirare l'eccedenza")
+    # il CAS sui VALORI oltre che sullo stato: mono-processo e zero
+    # await, ma la cintura non costa niente
+    cur = con.execute("UPDATE puntate SET versato_sats=offerto_sats, "
+                      "proxy=0, aggiornato=? WHERE id=? AND "
+                      "stato='attiva' AND versato_sats=? AND "
+                      "offerto_sats=?",
+                      (adesso, p["id"], p["versato_sats"],
+                       p["offerto_sats"]))
+    if cur.rowcount == 0:
+        con.close()
+        raise HTTPException(409, "La puntata è cambiata proprio "
+                                 "adesso: riprova")
+    con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,tg_id,"
+                "puntata_id,importo_sats,motivo,stato,creato,aggiornato) "
+                "VALUES(?,?,?,?,'eccedenza_ritiro','da_riscuotere',?,?)",
+                (annuncio_id, user["id"], p["id"], eccedenza,
+                 adesso, adesso))
+    if con.execute("SELECT changes() AS n").fetchone()["n"] == 0:
+        # l'indice parziale ha parlato: era gia' stata ritirata
+        con.rollback()
+        con.close()
+        raise HTTPException(409, "L'eccedenza si ritira una volta sola")
+    rid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    esito = await _paga_rimborso(rid)
+    return {"ok": True, "importo_sats": eccedenza,
+            "riscosso": bool(esito.get("ok"))}
+
+
 @app.post("/api/rimborsi/{rimborso_id}/invoice")
 async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
                                     x_tg_init_data: str = Header(""),
@@ -8299,20 +8633,22 @@ def _chiudi_una_asta(annuncio_id: int, cambio: float):
         f"asta-{annuncio_id}-{vincitrice['tg_id']}"
     strade = _strade_asta(a)
     scelta = strade.pop() if len(strade) == 1 else ""
+    # il vincitore paga l'ESPOSTO, mai il budget (il proxy, ago 2026):
+    # l'eventuale eccedenza e' una riga del conto e torna dal registro
     ordine_id = crea_ordine_pagato(con, a, vincitrice["tg_id"],
-                                   vincitrice["versato_sats"],
+                                   vincitrice["offerto_sats"],
                                    payment_hash, scelta, cambio)
     con.execute("UPDATE puntate SET stato='vincitrice', aggiornato=? "
                 "WHERE id=?", (adesso, vincitrice["id"]))
     for rmb in rimborsi:
-        # INSERT OR IGNORE: la cintura d'idempotenza (indice parziale
-        # su puntata_id) para anche il doppio giro
+        # INSERT OR IGNORE: la cintura d'idempotenza (indici parziali
+        # su puntata_id, uno per motivo) para anche il doppio giro
         con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,"
                     "tg_id,puntata_id,importo_sats,motivo,stato,creato,"
-                    "aggiornato) VALUES(?,?,?,?,'perdente',"
+                    "aggiornato) VALUES(?,?,?,?,?,"
                     "'da_riscuotere',?,?)",
                     (annuncio_id, rmb["tg_id"], rmb["puntata_id"],
-                     rmb["importo_sats"], adesso, adesso))
+                     rmb["importo_sats"], rmb["motivo"], adesso, adesso))
     con.execute("UPDATE puntate SET stato='chiusa', aggiornato=? "
                 "WHERE annuncio_id=? AND stato='attiva' AND id!=?",
                 (adesso, annuncio_id, vincitrice["id"]))
@@ -8325,11 +8661,17 @@ def _chiudi_una_asta(annuncio_id: int, cambio: float):
     perdenti = [dict(r) for r in con.execute(
         "SELECT id, tg_id FROM rimborsi_asta WHERE annuncio_id=? AND "
         "motivo='perdente' AND stato='da_riscuotere'", (annuncio_id,))]
+    # l'eccedenza della vincitrice (se il suo budget superava
+    # l'esposto): si racconta e si paga a parte — non e' una perdente
+    ecc = con.execute(
+        "SELECT id, tg_id, importo_sats FROM rimborsi_asta WHERE "
+        "puntata_id=? AND motivo='eccedenza' AND stato='da_riscuotere'",
+        (vincitrice["id"],)).fetchone()
     con.commit()
     con.close()
     return {"tipo": "vinta", "annuncio": dict(a), "ordine_id": ordine_id,
             "vincitrice": dict(vincitrice), "perdenti": perdenti,
-            "scelta": scelta}
+            "eccedenza": dict(ecc) if ecc else None, "scelta": scelta}
 
 
 async def _racconta_chiusura(esito: dict):
@@ -8344,35 +8686,45 @@ async def _racconta_chiusura(esito: dict):
             f"({_fmt_sats(a['asta_base_sats'])} sats).")
         return
     v = esito["vincitrice"]
+    # il prezzo raccontato e' l'ESPOSTO (= il prezzo dell'ordine), mai
+    # il versato: col proxy il versato e' il budget, e il racconto non
+    # deve contraddire l'ordine ne' dire il massimo di nessuno
+    ecc = esito.get("eccedenza")
     await notifica(v["tg_id"],
         f"🏆 <b>Hai vinto l'asta!</b> «{titolo}» è tuo per "
-        f"{_fmt_sats(v['versato_sats'])} sats — già pagati, al sicuro "
+        f"{_fmt_sats(v['offerto_sats'])} sats — già pagati, al sicuro "
         f"nel deposito di garanzia. "
+        + (f"I {_fmt_sats(ecc['importo_sats'])} sats non esposti del "
+           f"tuo budget tornano indietro adesso. " if ecc else "")
         + ("Apri l'ordine e scegli come riceverlo."
            if not esito["scelta"] else
            "Il venditore prepara la consegna: segui l'ordine come "
            "sempre."))
     await notifica(a["venditore_id"],
         f"🔨 <b>Asta conclusa!</b> «{titolo}» è stato aggiudicato a "
-        f"{_fmt_sats(v['versato_sats'])} sats "
+        f"{_fmt_sats(v['offerto_sats'])} sats "
         f"(ordine #{esito['ordine_id']}). "
         + ("Il vincitore sta scegliendo come riceverlo: ti avviso io "
            "appena decide." if not esito["scelta"] else
            "Prepara la consegna dal pannello dell'ordine."))
     await polso_ordini_admin(
         f"🔨 <b>Asta conclusa:</b> «{titolo}» — "
-        f"{_fmt_sats(v['versato_sats'])} sats in cassaforte "
+        f"{_fmt_sats(v['offerto_sats'])} sats in cassaforte "
         f"(ordine #{esito['ordine_id']}). "
         f"Restano {{aperti}} ordini aperti.")
     for rmb in esito["perdenti"]:
         try:
             await notifica(rmb["tg_id"],
                 f"🔨 L'asta «{titolo}» si è conclusa a "
-                f"{_fmt_sats(v['versato_sats'])} sats: non hai vinto. "
+                f"{_fmt_sats(v['offerto_sats'])} sats: non hai vinto. "
                 f"Il tuo versato torna indietro adesso.")
         except Exception:
             pass
         await _paga_rimborso(rmb["id"])   # racconta da solo l'esito
+    if ecc:
+        # la riscossione dell'eccedenza del vincitore: gia' annunciata
+        # nel suo 🏆, qui parte e basta
+        await _paga_rimborso(ecc["id"])
 
 
 async def chiudi_aste():
@@ -11134,7 +11486,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "durate_giorni": ASTA_DURATE_GIORNI,
         "incremento_percento": ASTA_INCREMENTO_PERCENTO,
         "proroga_minuti": ASTA_PROROGA_MINUTI,
-        "max_attive": ASTA_MAX_ATTIVE_VENDITORE}
+        "max_attive": ASTA_MAX_ATTIVE_VENDITORE,
+        "proxy_attivo": bool(ASTA_PROXY_ATTIVO)}
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [

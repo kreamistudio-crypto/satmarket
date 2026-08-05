@@ -772,6 +772,181 @@ def prove_asta():
           and "'tardivo'" in corpo_verifica)
 
 
+def prove_proxy_asta():
+    """Il proxy a budget depositato (ago 2026): VERSATO (il budget,
+    segreto) vs ESPOSTO (la puntata in gara). Il motore delle
+    esposizioni e' una pura IDEMPOTENTE e MONOTONA: due proxy
+    convergono in una passata sola, nessun esposto scende mai, e per
+    le manuali produce l'identita' di sempre (esposto = versato) —
+    che e' la prova di regressione: chi non usa il proxy non deve
+    accorgersi di niente."""
+    print("\n[proxy d'asta]")
+    amb = {}
+    for f in ("rilancio_minimo", "esposizioni_proxy", "conto_chiusura"):
+        exec(pezzo(f), amb)
+    mot = amb["esposizioni_proxy"]
+    cc = amb["conto_chiusura"]
+
+    def p(i, ver, off, seq, proxy=0, stato="attiva"):
+        return {"id": i, "tg_id": 100 + i, "versato_sats": ver,
+                "offerto_sats": off, "saldo_seq": seq, "proxy": proxy,
+                "stato": stato}
+
+    prova("solo in gara: il proxy espone la BASE", {1: 1000},
+          mot([p(1, 50_000, 0, 1, proxy=1)], 1000, 5))
+    prova("manuale: esposto = versato, sempre", {1: 2000},
+          mot([p(1, 2000, 2000, 1)], 1000, 5))
+    prova("manuale sotto il budget: il proxy si difende al minimo",
+          {1: 10_500, 2: 10_000},
+          mot([p(1, 50_000, 1000, 1, proxy=1),
+               p(2, 10_000, 10_000, 2)], 1000, 5))
+    prova("manuale sopra il budget: il proxy e' esausto, esposto tutto",
+          {1: 8000, 2: 10_000},
+          mot([p(1, 8000, 1000, 1, proxy=1),
+               p(2, 10_000, 10_000, 2)], 1000, 5))
+    r = mot([p(1, 100_000, 1000, 1, proxy=1),
+             p(2, 80_000, 0, 2, proxy=1)], 1000, 5)
+    prova("proxy vs proxy: il perdente esposto al suo massimo",
+          80_000, r[2])
+    prova("proxy vs proxy: il leader un incremento sopra (una passata)",
+          84_000, r[1])
+    prova("budget esattamente = testa+incremento: copre e prende la testa",
+          {1: 10_000, 2: 10_500},
+          mot([p(1, 10_000, 10_000, 1),
+               p(2, 10_500, 0, 2, proxy=1)], 1000, 5))
+    prova("cap: dentro l'incremento si espone il proprio massimo, mai oltre",
+          {1: 1000, 2: 999},
+          mot([p(1, 1000, 0, 1, proxy=1), p(2, 999, 999, 2)], 100, 5))
+    prova("pari-budget: entrambi esposti pieni (decide saldo_seq)",
+          {1: 5000, 2: 5000},
+          mot([p(1, 5000, 0, 9, proxy=1),
+               p(2, 5000, 0, 8, proxy=1)], 100, 5))
+    prova("monotonia: l'esposto non scende mai (rivale sparito)",
+          {1: 9000, 2: 5000},
+          mot([p(1, 20_000, 9000, 1, proxy=1),
+               p(2, 5000, 5000, 2)], 100, 5))
+    prova("fuori gara: chiuse e mai-salde non compaiono", {1: 1000},
+          mot([p(1, 1000, 1000, 1), p(2, 900, 900, 2, stato="chiusa"),
+               p(3, 0, 0, 0)], 100, 5))
+    campo = [p(1, 100_000, 1000, 1, proxy=1),
+             p(2, 80_000, 0, 2, proxy=1), p(3, 5000, 5000, 3)]
+    una = mot(campo, 1000, 5)
+    campo2 = [dict(x, offerto_sats=una[x["id"]]) for x in campo]
+    prova("idempotenza: il motore e' un punto fisso (niente convergenza "
+          "eterna)", una, mot(campo2, 1000, 5))
+    prova("invariante: versato >= offerto su ogni uscita", True,
+          all(una[x["id"]] <= x["versato_sats"] for x in campo))
+
+    # Il conto della chiusura col proxy: la vincitrice paga l'ESPOSTO,
+    # l'eccedenza e' una riga sua del registro.
+    v, r = cc([p(1, 50_000, 10_500, 1, proxy=1),
+               p(2, 10_000, 10_000, 2)])
+    prova("chiusura: vince l'esposto piu' alto", 1, v["id"])
+    prova("chiusura: perdente col versato pieno e motivo suo",
+          [(2, 10_000)],
+          [(x["puntata_id"], x["importo_sats"]) for x in r
+           if x["motivo"] == "perdente"])
+    prova("chiusura: l'eccedenza della vincitrice al registro",
+          [(1, 39_500)],
+          [(x["puntata_id"], x["importo_sats"]) for x in r
+           if x["motivo"] == "eccedenza"])
+    prova("chiusura: INVARIANTE nuova (esposto vincitrice + registro)",
+          50_000 + 10_000,
+          v["offerto_sats"] + sum(x["importo_sats"] for x in r))
+    v, r = cc([p(1, 100, 100, 1), p(2, 120, 120, 2)])
+    prova("regressione: manuali senza riga eccedenza", [],
+          [x for x in r if x["motivo"] == "eccedenza"])
+
+    # Coerenza dei due giudici: sul campo POST-motore il leader per
+    # esposto (_leader_asta) e' il leader per capacita' del motore —
+    # sul pari-budget decide lo stesso saldo_seq.
+    import sqlite3
+    exec(pezzo("_leader_asta"), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE puntate(id INTEGER PRIMARY KEY, "
+                "annuncio_id INT, tg_id INT, offerto_sats INT, "
+                "versato_sats INT, saldo_seq INT, stato TEXT)")
+    con.executemany("INSERT INTO puntate VALUES(?,?,?,?,?,?,?)", [
+        (1, 7, 101, 5000, 5000, 9, "attiva"),
+        (2, 7, 102, 5000, 5000, 8, "attiva")])
+    prova("coerenza: il giudice SQL concorda col motore sul pari-budget",
+          2, amb["_leader_asta"](con, 7)["id"])
+    con.close()
+
+    # Le due cinture dell'eccedenza: indici PARZIALI distinti — il
+    # ritiro volontario una volta sola, e la riga di CHIUSURA che
+    # convive sulla stessa puntata (un motivo unico, con la fusione
+    # che riaccende il proxy, la farebbe ignorare in silenzio).
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, "
+                "puntata_id INT, motivo TEXT)")
+    con.execute("CREATE UNIQUE INDEX ir ON rimborsi_asta(puntata_id) "
+                "WHERE motivo = 'eccedenza_ritiro'")
+    con.execute("CREATE UNIQUE INDEX ie ON rimborsi_asta(puntata_id) "
+                "WHERE motivo = 'eccedenza'")
+    for _ in (1, 2):
+        con.execute("INSERT OR IGNORE INTO rimborsi_asta(puntata_id,"
+                    "motivo) VALUES(7,'eccedenza_ritiro')")
+    prova("eccedenza_ritiro: una volta sola (indice parziale)", 1,
+          con.execute("SELECT COUNT(*) FROM rimborsi_asta").fetchone()[0])
+    con.execute("INSERT OR IGNORE INTO rimborsi_asta(puntata_id,motivo) "
+                "VALUES(7,'eccedenza')")
+    prova("la riga di chiusura convive col ritiro (motivi distinti)", 2,
+          con.execute("SELECT COUNT(*) FROM rimborsi_asta").fetchone()[0])
+    con.close()
+
+    # --- le sentinelle: le righe che un refactor perde in silenzio ---
+    corpo_mot = pezzo("esposizioni_proxy")
+    prova("la proroga NON vive nel motore", True,
+          "nuova_scadenza" not in corpo_mot
+          and "asta_scadenza" not in corpo_mot)
+    corpo_verifica = _SORGENTE[_SORGENTE.index(
+        "async def verifica_rilancio"):]
+    corpo_verifica = corpo_verifica[:corpo_verifica.index("\n\n\n")]
+    prova("il motore gira PRIMA del giudizio della testa", True,
+          corpo_verifica.index("esposizioni_proxy")
+          < corpo_verifica.index("testa_dopo ="))
+    prova("la proroga ha la guardia del top-up (asta eterna a costo "
+          "zero)", True,
+          "if not era_leader or testa_cambiata:" in corpo_verifica)
+    dopo_venditore = corpo_verifica[corpo_verifica.index("Nuova puntata"):]
+    prova("il venditore sente l'ESPOSTO, mai il totale dichiarato", True,
+          "ril['offerto_sats']" not in dopo_venditore)
+    ramo_tardivo = corpo_verifica[corpo_verifica.index("FUORI TEMPO"):
+                                  corpo_verifica.index("testa_prima =")]
+    prova("il tardivo non alza mai il flag proxy", True,
+          "proxy" not in ramo_tardivo)
+    corpo_punta = _SORGENTE[_SORGENTE.index("async def fai_puntata"):]
+    corpo_punta = corpo_punta[:corpo_punta.index("\n\n\n")]
+    prova("da leader si rilancia solo col proxy (top-up)", True,
+          "sono_leader and not vuole_proxy" in corpo_punta)
+    prova("proxy a leva spenta = porta chiusa", True,
+          "vuole_proxy and not ASTA_PROXY_ATTIVO" in corpo_punta)
+    prova("eccedenza ritirata = niente piu' proxy su quest'asta", True,
+          "eccedenza_ritiro" in corpo_punta)
+    corpo_chiusura = pezzo("_chiudi_una_asta")
+    prova("l'ordine del vincitore dice l'ESPOSTO", True,
+          'vincitrice["offerto_sats"]' in corpo_chiusura
+          and 'vincitrice["versato_sats"]' not in corpo_chiusura)
+    corpo_racconto = _SORGENTE[_SORGENTE.index(
+        "async def _racconta_chiusura"):]
+    corpo_racconto = corpo_racconto[:corpo_racconto.index("\n\n\n")]
+    prova("il racconto di chiusura non dice mai il versato", True,
+          "v['versato_sats']" not in corpo_racconto)
+    corpo_fusione = pezzo("esegui_fusione")
+    prova("fusione: il motore rimette in riga gli esposti", True,
+          "esposizioni_proxy" in corpo_fusione)
+    prova("fusione: l'esposto non e' mai la somma", True,
+          "somma, somma" not in corpo_fusione)
+    prova("cronologia: legge esposto_sats, mai il totale dichiarato",
+          True, "r.esposto_sats" in pezzo("stato_asta", "\n\n\n"))
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("leva proxy spenta di serie, nei due file", True,
+          "ASTA_PROXY_ATTIVO = False" in _SORGENTE
+          and "ASTA_PROXY_ATTIVO = False" in cfg)
+
+
 def prove_annullo():
     """L'annullo vero e il QR vero (ago 2026). Quasi tutte sentinelle
     testuali: sono le righe che un refactor perde in silenzio — il
@@ -2831,7 +3006,8 @@ def main():
               prove_tag_commercio, prove_anello, prove_categorie,
               prove_nome_nostr,
               prove_senza_condizione, prove_sottocategorie,
-              prove_ricategorizza, prove_asta, prove_annullo,
+              prove_ricategorizza, prove_asta, prove_proxy_asta,
+              prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_foto, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,

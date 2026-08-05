@@ -163,6 +163,12 @@ ASTA_INCREMENTO_PERCENTO = 5 # rilancio minimo sopra la puntata in testa
 ASTA_PROROGA_MINUTI = 10     # anti-cecchino: saldo negli ultimi N
                              # minuti = scadenza spostata a saldo + N
 ASTA_MAX_ATTIVE_VENDITORE = 3  # aste vive per venditore (prudenza)
+# Il proxy a budget depositato: chi punta deposita il suo MASSIMO e il
+# sistema espone per lui il minimo necessario (il massimo resta
+# segreto). Nasce SPENTO e resta spento anche quando ASTA_ABILITATA si
+# accendera': il proxy parte solo a gara manuale rodata. Spegnerlo
+# blocca le sole puntate proxy nuove, mai il motore dei proxy vivi.
+ASTA_PROXY_ATTIVO = False    # rilancio automatico (False = spento)
 
 DB = "satmarket.db"
 
