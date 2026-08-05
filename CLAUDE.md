@@ -3194,11 +3194,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore (`ctrlChiediInfo` → apriNegozio), «Fai un'offerta» →
   `view-offertapresto`, il «presto disponibile» in stile astepresto
   (l'offerta sull'intero set è un cantiere futuro, NON costruita).
-  I bottoni stanno in FONDO per costruzione: `.ctrl-corpo` è una
-  colonna flex alta almeno uno schermo (dvh con ripiego vh) e
-  Acquista porta `margin-top:auto` — su schermi corti seguono il
-  contenuto, mai coperti, e il fiato minimo sopra Acquista lo dà il
-  margin-bottom del conto.
+  I bottoni stanno in FONDO ALLA PAGINA per costruzione (secondo
+  giro, dal feedback di Andrea: la prima versione sottraeva una
+  costante stimata dall'altezza e restavano a mezz'aria): la VISTA
+  attiva è la colonna alta uno schermo (dvh con ripiego vh; da
+  desktop sconta i 116px di #app), il corpo prende il resto con
+  flex:1, Acquista porta `margin-top:auto`, e con la tab bar nascosta
+  `body.senza-nav #app` azzera anche il padding-bottom dei suoi 84px
+  — il fondo è quello VERO (misurato: 26px dal bordo, il padding del
+  corpo, che in basso porta anche la safe-area). Su schermi corti i
+  bottoni seguono il contenuto, mai coperti; il fiato minimo sopra
+  Acquista lo dà il margin-bottom del conto.
   Navigazione: vista interna (spinge) con la chiave del pacco
   (origineId); la ricostruzione esige paccoDati suo E setScelte non
   vuoto, o si ripiega sulla vetrina; `body.senza-nav` nasconde la tab
