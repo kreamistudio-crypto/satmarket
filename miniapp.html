@@ -3331,6 +3331,10 @@
     <h3>🔨 Fai la tua puntata</h3>
     <!-- La testata (miniatura + titolo + testa/base) la scrive apriPunta() -->
     <div id="puntaTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <!-- Il modo (solo a leva proxy accesa): secca o «rilancia per me».
+         Col proxy si deposita il MASSIMO, in gara compare il minimo. -->
+    <div class="consegna-scelta" id="puntaModo" style="display:none;margin:0 0 6px"></div>
+    <div id="puntaModoNota" style="display:none;font-size:12px;color:var(--muted);font-weight:600;margin:0 0 10px;line-height:1.4"></div>
     <div class="consegna-scelta" id="puntaChips" style="margin:0 0 10px"></div>
     <div class="field" style="display:flex;gap:10px;align-items:center">
       <input id="puntaImporto" autocomplete="off" inputmode="numeric" placeholder="Il tuo totale" style="flex:1" oninput="puntaDigitata()">
@@ -7622,9 +7626,13 @@ let pollTimer = null, currentOrderId = null;
    minimi e corse resta il server. */
 let astaInfo = null;         // la fotografia dell'asta aperta
 let rilancioCorrente = null; // la fattura di puntata in attesa di saldo
+let puntaProxy = false;      // il modo del foglio: secca o «rilancia per me»
 
 function incrementoAsta(){
   return (astaLeve && astaLeve.incremento_percento) || 5;
+}
+function proxyAttivo(){
+  return !!(astaLeve && astaLeve.proxy_attivo);
 }
 async function caricaAsta(id){
   astaInfo = null;
@@ -7647,9 +7655,20 @@ function dipingiAsta(){
   const viva = astaViva(l), mia = astaInfo && astaInfo.mia;
   const top = astaInfo ? astaInfo.top_sats : (l.astaTop || 0);
   const minimo = minimoAsta(l);
+  /* il residuo del proxy (versato - esposto) lo vede SOLO chi lo ha
+     depositato: il server lo manda dentro «mia» e in nessun altro posto */
+  const residuo = mia ? Math.max(0, mia.versato_sats - mia.offerto_sats) : 0;
   let stato = '';
-  if (mia && mia.stato === 'attiva' && mia.in_testa)
+  if (mia && mia.stato === 'attiva' && mia.in_testa && mia.proxy)
+    stato = `<div class="trust-note">👑 <span><b>Sei in testa</b>: in gara <b>${fmt(mia.offerto_sats)}</b> sats, budget residuo <b>${fmt(residuo)}</b> (lo vedi solo tu). Rilancio io per te finché il massimo copre.</span></div>`
+      + `<div style="display:flex;gap:8px;margin-top:8px">`
+      + `<button class="btn ghost" style="flex:1" onclick="apriPunta('proxy')">➕ Aggiungi budget</button>`
+      + (residuo > 0 ? `<button class="btn ghost" style="flex:1" onclick="ritiraEccedenza()">🕊 Ritira l'eccedenza</button>` : '')
+      + `</div>`;
+  else if (mia && mia.stato === 'attiva' && mia.in_testa)
     stato = `<div class="trust-note">👑 <span><b>Sei in testa</b> con ${fmt(mia.offerto_sats)} sats. Se nessuno ti supera, l'oggetto è tuo.</span></div>`;
+  else if (mia && mia.stato === 'attiva' && mia.versato_sats > 0 && mia.proxy)
+    stato = `<div class="trust-note">🔨 <span><b>Ti hanno superato:</b> il tuo «rilancia per me» ha dato tutto (${fmt(mia.versato_sats)} sats, ora tutti in gara) e la testa è a <b>${fmt(top)}</b>. Rilanci da ${fmt(minimo)} — paghi solo la differenza — oppure puoi ritirarti.</span></div>`;
   else if (mia && mia.stato === 'attiva' && mia.versato_sats > 0)
     stato = `<div class="trust-note">🔨 <span><b>Ti hanno superato:</b> la testa è a <b>${fmt(top)}</b> sats. Rilanci da ${fmt(minimo)} — paghi solo la differenza, hai già versato ${fmt(mia.versato_sats)} — oppure puoi ritirarti.</span></div>`;
   else if (mia && mia.stato === 'chiusa')
@@ -7673,7 +7692,7 @@ function dipingiAsta(){
     (viva && mia && mia.stato === 'attiva' && mia.versato_sats > 0
      && !mia.in_testa) ? '' : 'none';
 }
-function apriPunta(){
+function apriPunta(modo){
   haptic();
   const l = currentListing; if (!l) return;
   if (VETRINA) {
@@ -7684,22 +7703,57 @@ function apriPunta(){
   if (DEMO) { toast('Nel demo si guarda soltanto 🔨'); return; }
   if (!astaViva(l)) { toast('L\'asta è chiusa'); return; }
   const mia = astaInfo && astaInfo.mia;
-  if (mia && mia.in_testa) { toast('Sei già in testa 👑'); return; }
+  const topup = !!(mia && mia.in_testa && modo === 'proxy' && proxyAttivo());
+  if (mia && mia.in_testa && !topup) { toast('Sei già in testa 👑'); return; }
   if (mia && mia.stato === 'chiusa') {
     toast('Ti sei ritirato: il ritiro è definitivo'); return;
   }
+  puntaProxy = modo === 'proxy';
+  aggiornaModoPunta(topup);
   const top = astaInfo ? astaInfo.top_sats : (l.astaTop || 0);
   const minimo = minimoAsta(l);
   el('puntaTestata').innerHTML = `
     ${l.photos && l.photos[0] ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" style="width:44px;height:44px;object-fit:cover;border-radius:10px" alt="">` : `<span style="font-size:30px">${l.emoji}</span>`}
     <div style="min-width:0"><b>${esc(l.title)}</b><div style="font-size:12px;color:var(--muted);font-weight:600">${top>0?`testa ${fmt(top)} sats`:`base ${fmt(l.astaBase)} sats`} · ${astaInfo?astaInfo.puntate_n:l.astaPuntate} offerenti</div></div>`;
-  const dieci = Math.max(minimo, Math.ceil((top || l.astaBase) * 1.1));
-  el('puntaChips').innerHTML = [['minimo', minimo], ['+10%', dieci]]
-    .map(([n, v]) => `<button type="button" class="consegna-pill" data-v="${v}" onclick="puntaChip(this.dataset.v)">${n} · ${fmt(v)}</button>`).join('');
-  el('puntaImporto').value = minimo;
+  if (topup) {
+    /* il top-up del leader: nessun minimo da superare, si alza solo
+       il proprio massimo — niente chips, campo vuoto */
+    el('puntaChips').innerHTML = '';
+    el('puntaImporto').value = '';
+  } else {
+    const dieci = Math.max(minimo, Math.ceil((top || l.astaBase) * 1.1));
+    el('puntaChips').innerHTML = [['minimo', minimo], ['+10%', dieci]]
+      .map(([n, v]) => `<button type="button" class="consegna-pill" data-v="${v}" onclick="puntaChip(this.dataset.v)">${n} · ${fmt(v)}</button>`).join('');
+    el('puntaImporto').value = minimo;
+  }
   puntaDigitata();
   el('sheetBg').classList.add('open');
   el('puntaSheet').classList.add('open');
+}
+function setPuntaModo(p){
+  if (p && !proxyAttivo()) return;
+  puntaProxy = !!p;
+  aggiornaModoPunta();
+  puntaDigitata();
+}
+function aggiornaModoPunta(topup){
+  /* le due pillole del modo compaiono solo a leva accesa; sul TOP-UP
+     del leader il modo e' proxy per forza (sta alzando il massimo) */
+  const box = el('puntaModo'), nota = el('puntaModoNota');
+  if (!box || !nota) return;
+  const su = proxyAttivo();
+  if (!su) { puntaProxy = false; }
+  box.style.display = su && !topup ? '' : 'none';
+  nota.style.display = su ? '' : 'none';
+  if (su && !topup) box.innerHTML =
+    `<button type="button" class="consegna-pill${puntaProxy ? '' : ' attiva'}" onclick="setPuntaModo(0)">Puntata secca</button>`
+    + `<button type="button" class="consegna-pill${puntaProxy ? ' attiva' : ''}" onclick="setPuntaModo(1)">🤖 Rilancia per me fino a…</button>`;
+  nota.textContent = topup
+    ? 'Alzi il tuo massimo: l\'esposto in gara non cambia, e il nuovo massimo resta segreto.'
+    : puntaProxy
+      ? 'Depositi il tuo massimo e rilancio io per te: in gara compare solo il minimo necessario, il massimo resta segreto.'
+      : 'Offri esattamente questa cifra, ed è quella che si vede in gara.';
+  el('puntaImporto').placeholder = puntaProxy ? 'Il tuo massimo' : 'Il tuo totale';
 }
 function puntaChip(v){
   haptic();
@@ -7712,17 +7766,32 @@ function puntaDigitata(){
   const minimo = minimoAsta(l);
   const mia = astaInfo && astaInfo.mia;
   const versato = (mia && mia.versato_sats) || 0;
-  el('puntaMinimo').textContent = `Minimo per superare: ${fmt(minimo)} sats`;
+  const topup = !!(mia && mia.in_testa);
+  el('puntaMinimo').textContent = topup
+    ? `Il tuo massimo attuale: ${fmt(versato)} sats — scrivi il nuovo`
+    : `Minimo per superare: ${fmt(minimo)} sats`;
   document.querySelectorAll('#puntaChips .consegna-pill').forEach(b =>
     b.classList.toggle('attiva', Number(b.dataset.v) === v));
   const c = el('puntaConto');
   if (!v) { c.textContent = ''; return; }
+  if (topup) {
+    /* per il top-up il minimo non c'entra: basta salire sopra il
+       proprio massimo, l'esposto in gara non si muove */
+    if (v <= versato) {
+      c.textContent = `Serve più del massimo attuale (${fmt(versato)} sats)`;
+      return;
+    }
+    c.innerHTML = `Versi adesso: <b class="mono" style="color:var(--asta-text)">${fmt(v - versato)}</b> sats — l'esposto in gara non cambia`;
+    return;
+  }
   if (v < minimo) {
     c.textContent = `Sotto il minimo: servono almeno ${fmt(minimo)} sats`;
     return;
   }
   c.innerHTML = `Versi adesso: <b class="mono" style="color:var(--asta-text)">${fmt(Math.max(0, v - versato))}</b> sats`
-    + (versato ? ` — il totale ${fmt(v)} conta i ${fmt(versato)} già in cassaforte` : '');
+    + (puntaProxy
+       ? ` — in gara comparirà solo il minimo necessario`
+       : (versato ? ` — il totale ${fmt(v)} conta i ${fmt(versato)} già in cassaforte` : ''));
 }
 async function inviaPuntata(btn){
   const l = currentListing; if (!l) return;
@@ -7733,7 +7802,7 @@ async function inviaPuntata(btn){
     const r = await fetch(`${API_BASE}/aste/${l.id}/punta`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({totale_sats: v})});
+      body: JSON.stringify({totale_sats: v, proxy: puntaProxy ? 1 : 0})});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { toast(d.detail || 'Puntata non riuscita', 6000); return; }
     /* dal foglio puntata al paySheet in un gesto: chiusura MIRATA del
@@ -7741,8 +7810,9 @@ async function inviaPuntata(btn){
     el('puntaSheet').classList.remove('open');
     rilancioCorrente = d.rilancio_id;
     el('payAmount').textContent = fmt(d.delta_sats);
-    el('payScomposto').innerHTML =
-      `<div>🔨 Totale offerto <b class="mono">${fmt(d.totale_sats)}</b> sats — versi solo la differenza</div>`;
+    el('payScomposto').innerHTML = puntaProxy
+      ? `<div>🤖 Massimo depositato <b class="mono">${fmt(d.totale_sats)}</b> sats — resta segreto: in gara comparirà solo il necessario</div>`
+      : `<div>🔨 Totale offerto <b class="mono">${fmt(d.totale_sats)}</b> sats — versi solo la differenza</div>`;
     el('payEurNota').style.display = 'block';
     el('payEurNota').textContent = 'La fattura della puntata vale 10 minuti';
     el('payInvoice').textContent = d.invoice;
@@ -7763,8 +7833,10 @@ async function verificaPuntata(rid){
     rilancioCorrente = null;
     closeSheet();
     if (d.stato === 'saldato') {
-      toast(d.in_testa ? '👑 Sei in testa!'
-                       : '🔨 Puntata al sicuro — ma ti hanno già superato',
+      toast(d.in_testa
+              ? (d.proxy ? `👑 Sei in testa: in gara ${fmt(d.esposto_sats)} sats, il resto rilancia da solo`
+                         : '👑 Sei in testa!')
+              : '🔨 Puntata al sicuro — ma ti hanno già superato',
             5000);
       const l = currentListing;
       if (l && l.astaBase) {
@@ -7790,6 +7862,23 @@ async function ritiraPuntata(){
   if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
   toast(d.riscosso ? '↩️ Ritirato: rimborso in arrivo sul tuo wallet'
                    : '💰 Ritirato: i sats sono in «Da riscuotere»', 6000);
+  caricaAsta(l.id);
+}
+async function ritiraEccedenza(){
+  /* il leader proxy incassa il budget NON esposto: definitivo — la
+     puntata torna secca e su quest'asta il proxy non si riaccende */
+  const l = currentListing; if (!l) return;
+  const mia = astaInfo && astaInfo.mia; if (!mia) return;
+  const ecc = Math.max(0, mia.versato_sats - mia.offerto_sats);
+  if (!ecc) { toast('Non c\'è eccedenza da ritirare'); return; }
+  if (!confirm(`Ritiri l'eccedenza (${fmt(ecc)} sats)? È DEFINITIVO: la puntata torna secca a ${fmt(mia.offerto_sats)} sats e su quest'asta il rilancio automatico si chiude (le puntate normali restano).`))
+    return;
+  const r = await fetch(`${API_BASE}/aste/${l.id}/ritira-eccedenza`,
+    {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(d.detail || 'Ritiro non riuscito', 6000); return; }
+  toast(d.riscosso ? '↩️ Eccedenza in arrivo sul tuo wallet'
+                   : '💰 L\'eccedenza è in «Da riscuotere»', 6000);
   caricaAsta(l.id);
 }
 async function rilanciaAsta(id){
@@ -8601,8 +8690,12 @@ function renderPuntate(){
     return `<div class="payout" style="margin-bottom:10px">
       <b>${esc(p.titolo)}</b>
       <div class="hint" style="margin-top:4px">${p.in_testa
-        ? `👑 Sei in testa con <b>${fmt(p.offerto_sats)}</b> sats`
-        : `🔨 Superato: la testa è a <b>${fmt(p.top_sats)}</b> sats — rilanci da ${fmt(p.minimo_sats)} (hai già versato ${fmt(p.versato_sats)})`}
+        ? (p.proxy && p.versato_sats > p.offerto_sats
+           ? `👑 Sei in testa: in gara <b>${fmt(p.offerto_sats)}</b> sats, budget residuo ${fmt(p.versato_sats - p.offerto_sats)} (lo vedi solo tu)`
+           : `👑 Sei in testa con <b>${fmt(p.offerto_sats)}</b> sats`)
+        : (p.proxy
+           ? `🔨 Superato: il tuo massimo (${fmt(p.versato_sats)}) ha dato tutto — la testa è a <b>${fmt(p.top_sats)}</b> sats, rilanci da ${fmt(p.minimo_sats)}`
+           : `🔨 Superato: la testa è a <b>${fmt(p.top_sats)}</b> sats — rilanci da ${fmt(p.minimo_sats)} (hai già versato ${fmt(p.versato_sats)})`)}
         · si chiude tra ${astaResta(p.scadenza)}</div>
       <button class="btn ghost" style="margin-top:8px" onclick="apriAnnuncioPuntata(${p.annuncio_id})">${p.in_testa?'Guarda l\'asta':'🔨 Rilancia'}</button>
     </div>`;
