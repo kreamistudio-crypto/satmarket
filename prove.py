@@ -1993,10 +1993,10 @@ def main():
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-             prove_initdata, prove_foto, prove_avatar,
-             prove_pagamento_incerto, prove_disputa_incagliata,
-             prove_idor_verifica, prove_contenuti_cifrati,
-             prove_ssrf_redirect, prove_quota_ricerca):
+              prove_initdata, prove_foto, prove_avatar,
+              prove_pagamento_incerto, prove_disputa_incagliata,
+              prove_idor_verifica, prove_contenuti_cifrati,
+              prove_ssrf_redirect, prove_quota_ricerca):
         try:
             f()
         except Exception as e:

@@ -61,6 +61,76 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `amount_msat` una volta sola, la `pr` mai restituita nuda): questo
   controllo sparisce in un riordino senza rompere nessuna prova
   funzionale, ed è esattamente il tipo di riga che va sorvegliata.
+  E `paga_venditore` HA TRE ESITI, non due (ago 2026, la voce media
+  più grave dell'audit): PAGATO, NON_PAGATO e **INCERTO**. La POST
+  verso LNbits stava senza `try`: se il nodo pagava ma non riusciva a
+  rispondere entro i 60 secondi, l'eccezione risaliva, il database non
+  registrava NIENTE e l'ordine restava ritentabile — e i ritentativi
+  non sono ipotetici (lo scandaglio di `salva_ln_address`, la invoice
+  appena depositata, il compratore che riconferma). IL DOPPIO
+  PAGAMENTO È VERO SU UNA STRADA SOLA, ed è quella che si usa proprio
+  quando le cose vanno male: sul ramo dell'invoice incollata a mano ci
+  salverebbe Lightning (una fattura saldata non si paga due volte), ma
+  sul ramo del **Lightning address** ogni tentativo conia una fattura
+  NUOVA. Riprodotto sul codice di prima: due giri, due fatture
+  diverse, due richieste di pagamento per lo stesso ordine. Non è un
+  booleano APPOSTA — dentro un «if» l'incerto sembrerebbe un successo,
+  sotto un «not» un fallimento — e una sentinella verifica che nessuno
+  lo rimetta lì. Su INCERTO la riga si CONGELA (`payout_stato`:
+  '' | 'incerto' | 'uscito', più `payout_hash` e `payout_verso`, su
+  `ordini` e su `rimborsi_asta`): stato e invoice restano dov'erano e
+  le TRE funzioni d'uscita (`_sblocca_sats`, `_rimborsa_compratore`,
+  `_paga_rimborso`) escono a mani vuote. Ai moderatori arriva il
+  `payment_hash`, che è quello che si cerca su LNbits. Si scongela
+  dalla sezione «🧊 Pagamenti da verificare» del Profilo admin
+  (`/api/admin/pagamenti` + `/decidi`): «è uscito» NON riscrive il ramo
+  riuscito in copia — timbra 'uscito' e richiama la funzione di
+  sempre, che vede il timbro, non paga e va dritta alla chiusura, così
+  contatori, notifiche e stato finale restano in un posto solo; «non è
+  uscito» toglie il congelamento. UPDATE condizionato: il secondo
+  moderatore trova il 409. `payout_verso` dice CHI aspettava i sats e
+  NON si deduce dallo stato: un ordine in 'dispute' può essere sulla
+  strada del venditore o su quella del compratore, e indovinare
+  vorrebbe dire chiudere l'affare a favore della persona sbagliata.
+  UNA DISPUTA DECISA RESTA IN MANO AL MODERATORE (ago 2026): quando
+  lo sblocco non riesce a pagare, l'ordine passa a 'confirmed' — e
+  spariva dalla query di `risolvi_disputa`, che guardava i soli stati
+  di disputa. Da lì il moderatore non poteva più decidere niente, in
+  particolare non poteva più rimborsare, e i sats restavano fermi
+  senza rimedio (il gemello col rimborso finiva in 'refund', stessa
+  trappola). LA STRADA SCARTATA, e va tenuta perché è quella che torna
+  in mente: NON riscrivere lo stato quando l'ordine viene da una
+  disputa. 'confirmed' vuol dire «i sats spettano al venditore, manca
+  il modo di darglieli», che dopo una disputa decisa a suo favore è
+  la verità — e da lì `deposita_invoice` funziona e il sollecito degli
+  incassi lo insegue; tenere 'dispute' lo renderebbe AMBIGUO (la
+  stessa parola per «un moderatore deve guardarlo» e «è stato deciso,
+  aspetta un wallet»). La transizione era giusta: mancava solo il
+  ritorno in coda. Quindi `risolvi_disputa` accetta anche
+  'confirmed'/'refund' quando `disputata=1` — che è anche la
+  migrazione del pregresso, gli ordini già in trappola tornano
+  decidibili senza toccare il database — e per cambiare strada il caso
+  si RIAPRE ('dispute') prima di ridecidere, invece di allentare le
+  guardie delle funzioni d'uscita (`_sblocca_sats` non parte da
+  'refund' e deve restare così, o il ripensamento sarebbe un no-op
+  silenzioso). L'esito si valida PRIMA, o un refuso lascerebbe il caso
+  riaperto per niente. E chi PERDE una disputa ora lo viene a sapere:
+  nel ramo fallito veniva avvisata solo la parte che aspettava i sats.
+  Una volta sola, nel giro in cui l'ordine cambia stato davvero.
+  `verifica-pagamento` È DI CHI HA COMPRATO (ago 2026): chiamava
+  `verifica_utente` e ne buttava via il risultato, poi leggeva
+  l'ordine per solo id — l'unica rotta `/api/orders/{id}/…` senza
+  guardia di proprietà, mentre il gemello dei rilanci ce l'ha e il suo
+  commento la nomina pure. Non si rubavano sats (senza la invoice
+  pagata non parte niente) ma si otteneva un ORACOLO: gli id sono
+  progressivi, e le risposte distinguevano «non esiste» (404) da
+  «esiste, non pagato» da lo STATO REALE di un ordine altrui — cioè in
+  fila si leggeva il registro ordini dell'intero mercatino, più una
+  domanda a LNbits sul payment_hash di un altro e la possibilità di
+  innescare in anticipo il flusso altrui (notifiche, decadenza delle
+  offerte, «venduto» su Nostr e sul canale). Ora la guardia è dentro
+  la WHERE col 400 dei fratelli, che è anche la risposta che NON
+  distingue «non è tuo» da «non esiste»: chi enumera non impara nulla.
   `/api/listings` è PUBBLICA (vetrina anche senza Telegram) ma serve solo
   la whitelist esplicita `CAMPI_VETRINA`: `venditore_id` esce solo alle
   richieste autenticate. La ricerca AI resta riservata agli autenticati
@@ -975,7 +1045,35 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   foto piena. Nasce
   `GET /api/listings/{id}` (registrato DOPO /miei: l'ordine delle
   rotte conta) per il deep-link /annuncio/{id} oltre le pagine
-  caricate. La ricerca AI legge una SHORTLIST (`TETTO_CATALOGO_AI`
+  caricate.
+  LA RICERCA AI HA UN FRENO (ago 2026, audit): era l'unica rotta dove
+  UNA richiesta di un utente qualunque = UNA chiamata ad Anthropic, e
+  con un prompt di dimensione massima FISSA — la shortlist si riempie
+  fino a 300 annunci anche quando la domanda non trova niente, quindi
+  ogni ricerca costa uguale, tanto. L'unico recinto era
+  l'autenticazione, che la passa chiunque abbia un account.
+  `TETTO_RICERCHE_AI_ORA` (30, leva; 0 = nessun freno) col pattern di
+  `IMPORT_QUOTA` e l'ora al posto del giorno; purga in `pulisci_avvisi`.
+  A quota finita NON si sbatte la porta: si risponde col filtro per
+  parole — che esisteva già come ripiego dell'eccezione e non costa
+  niente — E LO SI DICE, invece di far sembrare che l'AI abbia capito
+  poco. Il discriminatore è `busta=1` → `{annunci, ai}`; senza il
+  parametro resta l'array di sempre, che è il patto della paginazione,
+  e il client regge tutt'e due le forme. Più il `timeout` sulla
+  chiamata, che era l'unica delle quattro del file a non averlo.
+  ANCHE LO SCARICATORE DI FOTO È UNO SOLO (ago 2026, audit):
+  `scarica_foto_url` in server.py, con `url_foto_ammesso` sulla
+  partenza E su ogni salto (`_RedirectControllato`), timeout e tetto
+  di byte. Prima urllib seguiva i redirect DA SOLO e in silenzio,
+  quindi il guardiano giudicava solo il PRIMO indirizzo: bastava un
+  «302 Location: http://127.0.0.1/…» per portare il server dentro la
+  sua stessa rete. E `importa_nostr.scarica_foto` non aveva guardie
+  AFFATTO — e non è solo lo script a mano, il server lo esegue ogni
+  ora: con IMPORT_NOSTR_APERTO acceso quegli URL li scrive chiunque su
+  Nostr. Ora l'import RICEVE lo scaricatore del server, ed è il patto
+  del `vaglio`: quel che ha bisogno delle guardie del server vive nel
+  server, e lo script lanciato a mano resta identico.
+  La ricerca AI legge una SHORTLIST (`TETTO_CATALOGO_AI`
   300): match LIKE sulle parole della query + i più recenti a
   riempire — compromesso dichiarato: il sinonimo puro fuori dai 300
   più freschi può sfuggire. FOTO: accanto a ogni JPEG pieno nasce
@@ -1909,7 +2007,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   unico `prezzo_da_payload` (stessi 400/503 di pubblica, EUR con
   virgola tradotta), `categoria_tollerante` coi `SINONIMI_CATEGORIA`
   e ripiego Altro, foto via URL (`url_foto_ammesso` = anti-SSRF: gli
-  URL li scrive l'utente, host risolto e IP privati rifiutati) o nomi
+  URL li scrive l'utente, host risolto e IP privati rifiutati — e dal
+  l'ago 2026 ANCHE OGNI SALTO DEL REDIRECT, vedi sotto) o nomi
   nello ZIP (match case-insensitive sul basename), filtro parole su
   TUTTE le righe; anteprima {biglietto, valide, scarti, avvisi}
   numerata come nel file — intestazione = riga 1 — TTL 15 min) →
@@ -2320,9 +2419,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore rilegge ciò che ha consegnato senza effetti, l'admin legge
   solo negli stati di disputa. `ordini.contenuto_digitale` (colonna
   nuova) è cifrata a riposo con Fernet — `CHIAVE_CONTENUTI_DIGITALI`
-  in config, prefisso 'f:'; chiave vuota o cryptography assente =
-  'plain:' in chiaro, fail-open, i due formati convivono per sempre
-  (_cifra_contenuto/_decifra_contenuto) — e NON esce MAI da
+  in config, prefisso **'f2:'** dall'ago 2026 (audit): la chiave si
+  derivava con uno SHA-256 a passata singola e senza sale, che contro
+  una passphrase debole costa un hash a tentativo; ora **scrypt**.
+  Conta solo se la chiave è debole — con una casuale la ricetta di
+  prima bastava — ma il config dice «una stringa segreta qualsiasi», e
+  la promessa dev'essere vera anche per chi la prende alla lettera.
+  Il sale è FISSO e in chiaro, ed è voluto: Fernet non ha dove
+  metterne uno per riga, e un sale non è un segreto — il lavoro lo fa
+  scrypt. Chiave vuota o cryptography assente =
+  'plain:' in chiaro, fail-open — che ora l'AVVIO DICE con una riga:
+  il caso silenzioso era anche quello di serie (`config_esempio.py`
+  nasce con la chiave vuota), e un fail-open dichiarato va anche detto
+  o è solo silenzio. I TRE formati convivono per sempre
+  (_cifra_contenuto/_decifra_contenuto): un database scritto ieri non
+  deve diventare illeggibile con un aggiornamento, e il meccanismo dei
+  prefissi esisteva già apposta — nessuna migrazione. E NON esce MAI da
   /api/orders (strip con flag `contenuto_presente`): si legge solo
   dall'endpoint-ricevuta. `segna_spedito` su ordine digitale = 400
   (il timer non deve partire senza contenuto consegnato). Finestre
@@ -4442,6 +4554,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   aggiunge una prova che dipende da un pacchetto usi `salta()`, mai
   un `print` o un `return` muto: è quello il modo in cui una prova
   smette di esistere senza che nessuno lo sappia.
+  LO SCANNER DEI SEGRETI GUARDA ANCHE INDIETRO (ago 2026, audit):
+  usava `git ls-files`, cioè i file tracciati ALLO STATO ATTUALE, e il
+  checkout era shallow — un segreto committato e poi tolto passava per
+  sempre, pur restando estraibile da `git log -p` da chiunque, che è
+  esattamente il caso in cui la chiave va RUOTATA. Ora `fetch-depth: 0`
+  e una passata sulle righe AGGIUNTE di tutta la cronologia (~2s per
+  516 commit). E tre forme che nessuna regola guardava: le due chiavi
+  LNbits (di cui una PAGA), il segreto del webhook e la chiave dei
+  contenuti. Non hanno una forma propria — una invoice key sono 32
+  esadecimali, che somigliano a mezzo mondo — quindi si ancorano al
+  NOME della variabile con un valore non vuoto, e i segnaposto
+  `INCOLLA_QUI` restano fuori: così la regola si estende da sola a
+  ogni segreto futuro che rispetti quella convenzione. Le forme
+  vivono in un posto solo (`env: FORME`), o i due passi
+  divergerebbero. IMPERFEZIONE DICHIARATA nel file: `git log -p` non
+  mostra i diff dei MERGE, quindi un segreto introdotto risolvendo un
+  conflitto sfuggirebbe.
   Su Windows serve `PYTHONIOENCODING=utf-8`,
   o la console cp1252 esplode sulle spunte.
 
@@ -5333,12 +5462,36 @@ DA GUARDARE al primo deploy: il cartello «Sessione scaduta» dentro
 Telegram vero — in locale si è verificato che il banner si disegna e
 sta su una riga, ma il ramo che lo accende ha bisogno di un initData
 vero, che solo Telegram conia.
-Restano aperte le voci MEDIE e BASSE, da fare una alla volta e in
-quest'ordine: i due modi in cui i sats escono due volte o restano
-bloccati senza rimedio (timeout di `paga_venditore`, e il fallimento
-di uno sblocco che riscrive lo stato di una disputa chiudendo la
-strada al moderatore); l'IDOR su `verifica-pagamento`; lo scanner
-della CI cieco sulla cronologia.
+Il terzo giro (ago 2026) ha chiuso le sette voci MEDIE, e la lista
+dell'audit adesso è vuota. In ordine di gravità: 1) il timeout di
+`paga_venditore`, che poteva far uscire i sats DUE volte — il caso
+riprodotto sul codice di prima: due giri, due fatture diverse, due
+richieste di pagamento per lo stesso ordine; 2) la disputa che
+usciva dalla coda dei moderatori quando il pagamento falliva;
+3) l'IDOR su `verifica-pagamento`, che era un oracolo sullo stato di
+ogni ordine del mercatino; 4) lo scanner della CI cieco sulla
+cronologia e su tre forme di segreto; 5) Fernet senza KDF e col
+fail-open muto; 6) il guardiano anti-SSRF aggirabile con un `302`, e
+l'import Nostr senza guardie affatto; 7) nessun freno su
+`/api/search`. Più i timeout espliciti sui due tubi LNbits in
+entrata. Tutte in Architettura, alle voci loro.
+Provate: 320 verdi (erano 253), e i tre difetti dei soldi riprodotti
+sul codice di prima prima di ripararli. Le prove nuove asseriscono
+il NON FATTO: nessun secondo pagamento, nessuna fattura nuova
+coniata, nessuno stato riscritto, zero domande a LNbits per conto
+d'altri.
+IN PRODUZIONE il deploy fa girare tre migrazioni additive
+(`payout_stato`, `payout_hash`, `payout_verso` su `ordini` e su
+`rimborsi_asta`) e niente altro. `TETTO_RICERCHE_AI_ORA` ha un
+default nel codice; se in rodaggio 30 ricerche l'ora stanno strette
+a qualcuno, è una riga nel config. DA GUARDARE al primo deploy: la
+riga d'avvio sui contenuti digitali — se dice che si scrivono IN
+CHIARO, sul VPS `CHIAVE_CONTENUTI_DIGITALI` è vuota.
+IMPERFEZIONI DICHIARATE che restano: il DNS-rebinding fra controllo
+e download (era già accettato), i commit di MERGE fuori dalla
+scansione della cronologia, e il fatto che uno sconosciuto possa
+ancora far bussare il nostro LNbits chiedendo la verifica dei PROPRI
+ordini.
 
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
