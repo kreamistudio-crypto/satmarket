@@ -3593,6 +3593,59 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `totaleSet()` resta ASCIUTTO apposta: è l'unico posto dove un
   calcolo client sul denaro potrebbe filtrare se un giorno il gate
   della DEMO si spostasse.
+  LA RONDA DEL LIBRO MASTRO (ago 2026): gli invarianti già dichiarati
+  in questo file diventano un controllo dell'orologio invece di query
+  da lanciare a mano — perché un controllo che dipende da qualcuno che
+  si ricorda di lanciarlo è un controllo che un giorno non gira (la
+  lezione del termometro delle sottocategorie). Catalogo
+  `CONTROLLI_LIBRO_MASTRO` (nome, perché, SQL) + `controlla_libro_
+  mastro()` in coda all'orologio.
+  LEGGE E BASTA, ed è la regola: nessuna correzione automatica, mai —
+  una macchina che «aggiusta» i conti nasconde la causa, e la seconda
+  volta non se ne accorge nessuno. Una prova asserisce che nel
+  catalogo non compaia un solo INSERT/UPDATE/DELETE.
+  A LIBRO MASTRO SANO NON DICE NIENTE, nemmeno una riga nel journal:
+  un «tutto bene» quotidiano è rumore, e il rumore è il modo in cui
+  gli allarmi muoiono. Quando qualcosa non torna manda il 🧊 ai
+  moderatori col nome del controllo, il perché e gli id (tetto di 10,
+  poi «+N altri»: in chat deve restare leggibile, e per guardarli
+  tutti c'è lo strumento a mano).
+  IL TIMBRO È IL GIORNO, in memoria, e si scrive PRIMA delle query (il
+  patto delle campagne, ma qui la ragione è sua): senza, l'allarme
+  tornerebbe a ogni battito — 144 volte al giorno — e in una settimana
+  nessuno lo leggerebbe più. Il prezzo dichiarato è che un riavvio fa
+  rifare la ronda, cioè al più un avviso doppio nello stesso giorno —
+  e per un guasto al libro mastro è il verso giusto in cui sbagliare.
+  Una query che ESPLODE conta come un controllo fallito: se lo schema
+  è cambiato sotto, è esattamente una cosa da sapere.
+  QUALI INVARIANTI CI SONO (15, tutti già dichiarati altrove in questo
+  file): l'aritmetica della testata col suo sconto e i suoi pezzi, il
+  mono che non sconta mai, gli sconti fuori scala e la coppia
+  sconto/percentuale; la forma di `ordine_righe` (mono con righe,
+  righe orfane, carrello senza merce); l'asta — la cassa della chiusa
+  (Σ saldi = esposto della vincitrice + registro), la puntata chiusa
+  senza rimborso, `versato >= offerto`, i doppi rimborsi da ritiro e
+  la PRESENZA dei quattro indici UNIQUE parziali (non è un dato
+  sbagliato: è la cintura caduta, e il prossimo crash a metà chiusura
+  pagherebbe due volte); più l'annuncio a due teste (`contatto_nostr`
+  e `nostr_event_id` insieme) e il dominio di `payout_stato`.
+  QUALI RESTANO FUORI, ed è la parte da non rovesciare: la domanda che
+  decide è «esiste uno stato TRANSITORIO LEGITTIMO in cui è falsa?»,
+  perché un allarme che suona su un caso normale è peggio di nessun
+  allarme — educa a ignorarlo. Quindi NON entrano: «venduto <=>
+  quantita=0» (un venduto poi RIMOSSO resta a (rimosso, 0)
+  legittimamente e suonerebbe per sempre), `payout_stato='incerto'`
+  (non è un guasto: è la coda che aspetta un moderatore, cioè il
+  funzionamento previsto), e «una fattura pendente alla volta» (due
+  rilanci 'creato' sono leciti finché il reaper non passa: finestra
+  mobile). La cassa dell'asta è ancorata a `stato='vincitrice'` per la
+  stessa ragione: aste vive, deserte e annullate non hanno una
+  vincitrice e restano fuori da sole.
+  Leva `CONTROLLO_LIBRO_MASTRO` (True di serie: non muove niente,
+  legge). Lo strumento a mano resta nel repo — `query_libro_mastro.sql`,
+  le stesse 15 query più il POLSO che l'orologio non racconta perché
+  non è un allarme (chi sconta, gli ordini scontati, i pagamenti
+  congelati e da quanto) — e l'avviso lo nomina.
   PER GLI UTENTI SI CHIAMA CARRELLO (ago 2026, decisione di Andrea):
   la parola «pacco» nei testi resta SOLO dove significa la spedizione
   fisica (taglia del pacco, «segui il pacco», «Spedisci il set (un
@@ -6700,6 +6753,31 @@ DA GUARDARE al primo giro: il controllo del libro mastro in SQL (le
 query sono pronte, le lancia Andrea), il primo acquisto scontato vero
 dentro Telegram con la bolt11 su LNbits, e il primo payout di un
 ordine scontato — se `paga_venditore` avvisa i moderatori, ci si ferma.
+La ronda del libro mastro (ago 2026, il giorno dopo): le query che
+sorvegliano gli invarianti non si lanciano più a mano — le gira
+l'orologio una volta al giorno. 15 controlli, tutti già dichiarati in
+questo file: l'aritmetica degli ordini col suo sconto, la forma di
+`ordine_righe`, la cassa delle aste chiuse, le cinture d'idempotenza
+dei rimborsi, l'annuncio a due teste. A libro mastro sano TACE — un
+«tutto bene» quotidiano è rumore; quando qualcosa non torna manda il
+🧊 coi nomi e gli id, una volta al giorno finché il problema esiste.
+LEGGE E BASTA: nessuna correzione automatica. Vedi Architettura, «LA
+RONDA DEL LIBRO MASTRO», soprattutto per quali invarianti sono stati
+lasciati FUORI e perché (hanno stati transitori legittimi: suonerebbero
+su casi normali, che è il modo in cui si impara a ignorare un allarme).
+Collaudato: 164 prove nuove in `prove.py` (902 verdi, erano 738) — le
+query girano DAVVERO su un database gemello in memoria, prima sano
+(nessuno deve fiatare) e poi con una riga rotta piantata per OGNI
+controllo, che deve trovarla col suo id: una query di controllo
+sbagliata non fallisce, TACE, ed è il peggior modo di fallire. Più 15
+verifiche dal vivo sul giro completo (silenzio a db sano, l'avviso
+all'id giusto, il gate che non ripete a ogni battito ma ribussa il
+giorno dopo, la riga rotta ancora rotta dopo la ronda, la leva che
+spegne) e le 15 query lanciate in sola lettura sul database vero.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione, e
+la leva ha il default nel codice. DA GUARDARE al primo giro: che nel
+journal non compaia NIENTE — se arriva un 🧊 il primo giorno, quello è
+il momento di guardare, non di sistemare la ronda.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
