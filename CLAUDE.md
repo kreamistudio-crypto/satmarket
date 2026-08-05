@@ -2389,23 +2389,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   paySheet, e i bottoni compra, che la spedizione l'hanno sempre
   inclusa. Con lui se ne sono andati `spedBadgeCosto` e
   `spedCostoTesto` (e la classe `.sped-riga`).
-  LACUNA TEMPORANEA, DICHIARATA (lug 2026, e questo va letto insieme
-  al paragrafo qui sopra, o il paragrafo sembra dire che va tutto
-  bene): oggi il costo della spedizione NON si vede da nessuna parte
-  nella scheda. Chi ha due strade lo incontra al primo tocco su
-  Acquista, nel foglio del varco, che porta il totale per strada; ma
-  chi ha la SOLA spedizione il varco non lo apre proprio (serve da due
-  strade in su) e scopre il costo nel paySheet, alla riga
-  «Spedizione» del conto scomposto — cioè dopo che la invoice è già
-  nata. È tardi, ed è riconosciuto come tale. NON si rimedia
-  rimettendo una cifra nella scheda (la fila delle pillole e il
-  recinto sono stati provati, entrambi per ragioni diverse non
-  reggono, vedi sopra): il rimedio è LA PAGINA D'ACQUISTO DEDICATA
-  del prossimo cantiere — scelta della strada e conto scomposto in un
-  posto solo, prima della invoice — che è la destinazione già
-  dichiarata del foglio del varco (vedi IL VARCO). Chi arriva qui
-  prima di quel cantiere: la lacuna è nota e ha già la sua casa, non
-  aprirne una seconda. Con la vecchia riga del
+  LACUNA CHIUSA (ago 2026 — era «TEMPORANEA, DICHIARATA» dal lug
+  2026): il costo della spedizione non si vedeva da nessuna parte
+  nella scheda, e chi aveva la sola spedizione lo scopriva nel
+  paySheet a invoice già nata. Il rimedio è arrivato com'era stato
+  dichiarato: LA PAGINA D'ACQUISTO (vedi la voce sua) — scelta della
+  strada e conto del server in un posto solo, PRIMA della invoice, e
+  Acquista ci porta SEMPRE, anche con una strada sola. Resta vero il
+  perché di allora: non si rimedia rimettendo una cifra nella scheda
+  (fila delle pillole e recinto provati e scartati, vedi sopra). Con la vecchia riga del
   costo nella fila delle pillole se n'era andata
   `rigaConsegna` — la riga «🛡️ protezione acquisti inclusa» era
   rumore: la protezione c'è SEMPRE, quindi non è un'informazione, e
@@ -4063,40 +4055,141 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   barra lo stepper non porta margine — con la scritta e il chip
   centrati insieme, un margine in più spingeva «Acquista» a 7px dal
   bordo sinistro.
-  IL VARCO (lug 2026, da una domanda di Andrea che ha trovato un buco
-  vero — la barra l'aveva aperto lei): chi tocca Acquista può non
-  sapere nulla della consegna, e l'acquisto partiva con la strada del
-  default senza che NULLA la nominasse prima del pagamento (a
-  spedizione 0 il conto scomposto esce vuoto, e la protezione oggi è
-  spenta). Il rimedio: il primo tocco con scelta ancora IMPLICITA non
-  compra — apre il
-  foglio «Come vuoi riceverlo?». Stato `consegnaEsplicita` (falso a
-  ogni `openDetail`, vero solo alla voce
-  del foglio — le pillole di scelta in pagina non esistono più, vedi
-  sotto) e OGNI Acquista, barra e recinto, passa da `compraDaBarra()`:
-  con una strada sola si va dritti a `startBuy`. Il foglio diventerà
-  la pagina dedicata nel prossimo cantiere (transizione dichiarata:
-  fino ad allora vale il flusso di oggi) — e quella pagina ha ORA un
-  secondo compito, oltre alla scelta della strada: mostrare il CONTO
-  SCOMPOSTO prima della invoice, che oggi arriva troppo tardi per chi
-  ha la sola spedizione. Vedi «LACUNA TEMPORANEA, DICHIARATA» nella
-  sezione della spedizione: le due cose si chiudono insieme, in un
-  posto solo.
-  `apriFoglioConsegna` RIUSA il markup di `#pickerSheet` (titolo,
-  frecce, Esc, tap fuori: gratis) ma NON passa dal catalogo `PICKER` —
-  qui il deposito non è una select, è `consegnaScelta`; ogni voce porta
-  il suo totale vero (`cifraVia`) e la voce del codice online porta la
-  regola asimmetrica GIÀ nel foglio (va detta prima dell'acquisto, e
-  chi arriva dalla barra può non aver visto la trust-note in pagina).
-  La scelta procede in UN gesto: `setConsegnaScelta` → chiusura MIRATA
-  `chiudiPicker()` (mai `closeSheet`: spegnerebbe la pila e azzererebbe
-  il `pollTimer` del pagamento che sta per partire) → `startBuy()`. Esc
-  e tap fuori chiudono e basta, nessun acquisto a sorpresa; in VETRINA
-  il varco non serve (startBuy apre l'invito). Il foglio di PAGAMENTO
-  resta fuori da questa storia di proposito: `startBuy` crea ordine E
-  invoice prima di aprirlo, con la consegna già cotta dentro
-  (`spedizione_sats` e `cambio_ordine` si fissano alla creazione) — una
-  scelta lì arriverebbe dopo la invoice.
+  IL VARCO È DIVENTATO LA PAGINA (ago 2026): il foglio «Come vuoi
+  riceverlo?» — nato lug 2026 da una domanda di Andrea, la barra
+  comprava con la strada decisa in silenzio — NON ESISTE PIÙ, e con
+  lui sono morti `apriFoglioConsegna`, `scegliConsegnaFoglio`,
+  `cifraVia`, `setConsegnaScelta` e `consegnaEsplicita` (nella pagina
+  la scelta è esplicita per costruzione). La transizione era
+  dichiarata fin dalla nascita del foglio; il flusso vivo è LA PAGINA
+  D'ACQUISTO qui sotto. Resta vero e va ricordato il patto del foglio
+  di PAGAMENTO: `startBuy` crea ordine E invoice con la consegna già
+  cotta dentro (`spedizione_sats` e `cambio_ordine` si fissano alla
+  creazione) — una scelta lì arriverebbe dopo la invoice, ed è per
+  questo che la scelta vive PRIMA, nella pagina.
+  LA PAGINA D'ACQUISTO (ago 2026, il cantiere che chiude la lacuna
+  del costo invisibile): `view-acquisto`, la cassa dell'app — senza
+  tab bar come il riepilogo del pacco, colonna 100dvh col fondo vero
+  (`.ctrl-fondo` col margin-top:auto: il primo bottone può anche non
+  esserci — il ⚡ senza wallet — e il fondo resta il fondo).
+  L'ORDINE NASCE SOLO DA QUI: `compraDaBarra` (barra e recinto) porta
+  SEMPRE alla pagina, anche con una strada sola — è lì che il costo
+  si vede PRIMA della invoice; il ⚡ «Compra subito» NWC è USCITO dal
+  recinto del dettaglio e vive in pagina (stesso body, stesse
+  cifre del preventivo). Le ECCEZIONI sono le aste (il vincitore ha
+  già pagato: `apriPunta`, `scegli_consegna_ordine` e
+  `crea_ordine_pagato` intonsi, sentinella in CI) e i client vecchi
+  in cache, per cui il server tiene il default silenzioso di sempre.
+  Dall'alto: gli articoli (card singola o strip del set) · la
+  CONSEGNA a vie-radio — 🤝 ritiro · 🏠 spedizione a casa ·
+  📦 spedizione a un punto di ritiro · 💾 codice online, SOLO le
+  offerte, ordine fisso = precedenza del default — dove la cifra a
+  destra è il SOLO COSTO DI SPEDIZIONE (decisione di Andrea, ago
+  2026: le pillole col totale si leggevano come «costo di
+  spedizione» con dentro l'oggetto — il totale lo dice IL CONTO, che
+  segue la via scelta: mai due totali in pagina; ritiro e codice
+  online non spediscono e non portano cifra, lo 0 di casa/punto dice
+  «gratuita» in grassetto, il patto della spedizione gratuita) · il
+  campo del punto (sotto, il VARCO MAPPA) · le note
+  oneste («Spedisce con InPost», la regola asimmetrica del digitale,
+  il ≈ dei listini EUR) · IL CONTO in righe (Prezzo · Commissione
+  «in promo» · Spedizione della via scelta · Protezione se >0 ·
+  Totale, la grammatica `.ctrl-riga`/`contoRighe` condivisa col
+  riepilogo del pacco) · Acquista in fondo. Toggle €/₿ in testata
+  (ridisegno dal preventivo in CACHE, mai un secondo fetch — e
+  ATTENZIONE alla trappola pagata qui: l'edit di setValuta era
+  atterrato su rinfrescaViste, due righe adiacenti identiche).
+  IL CONTO È DEL SERVER: `POST /api/orders/preventivo` (mono o set,
+  stesso body di compra) — le guardie di compra in SOLA lettura
+  (nessun INSERT, nessuna invoice, nemmeno il timbro dell'offerta
+  scaduta: sentinelle in CI) e il conto PER OGNI strada disponibile
+  in una chiamata, così cambiare pillola non rifà la rete. LA PROVA
+  REGINA del collaudo: preventivo == compra a parità di via, al sat,
+  perché passano ENTRAMBI dalle quattro pure del conto
+  (`_unitario_effettivo` col MIN lampo/accordo, `_tariffa_dichiarata`,
+  `_sped_in_sats`, `_conto_ordine` — accanto alle pure dell'asta,
+  stessa ragione: prove in CI senza chiavi). La commissione nel conto
+  è INFORMATIVA e mai nel totale (resta sottrattiva sull'incasso del
+  venditore); una tariffa ancorata all'euro senza cambio spegne la
+  SUA strada col motivo (`cambio_assente`), mai un 503 che spegne
+  anche il ritiro — quello resta solo per l'articolo EUR. Annuncio
+  storico (consegna '') = pseudo-via '' e il body non porta consegna.
+  Errore del preventivo = pagina col messaggio e «← Torna», mai muta;
+  in DEMO vale `preventivoDemo` (stima client, DICHIARATA in pagina);
+  in VETRINA l'invito di sempre. Navigazione da vista interna:
+  chiave = annuncio (mono) o 'set|origineId', ricostruzione con
+  guardia e ripiego su Esplora; `verificaOrdine` a pagamento riuscito
+  azzera `acqDati` e `ctrlPrev` col pacco.
+  LE DUE TARIFFE DI SPEDIZIONE (decisioni di Andrea): il venditore
+  dichiara il costo verso casa (le colonne di sempre) e quello verso
+  un PUNTO DI RITIRO — colonne `annunci.spedizione_punto_sats/_eur`
+  gemelle byte-per-byte delle prime (stessa semantica di valuta:
+  sats fisso, euro ancorato) più il FLAG
+  `spedizione_punto_dichiarata`, che distingue «non dichiarato» da
+  «dichiarato 0 = gratis» (una sentinella -1 avrebbe sparso guardie
+  >=0 ovunque). RETROCOMPAT: il costo unico già dichiarato vale per
+  ENTRAMBE le strade finché il venditore non rifinisce
+  (`_tariffa_dichiarata`, e il preventivo lo dice con
+  `fallback_casa`). La dichiarazione è la PRESENZA di una chiave nel
+  payload, mai il valore: vuoto ≠ zero — il form manda SEMPRE
+  `spedizione_punto_dichiarata` (0 = campo svuotato apposta), così in
+  modifica svuotare toglie la dichiarazione mentre il client vecchio,
+  che non manda nessuna chiave, la CONSERVA (il pattern dello stock).
+  Nel form Vendi il secondo campo sta sotto il primo e SEGUE il suo
+  toggle di valuta (un interruttore solo per i due costi); import CSV
+  con la colonna `spedizione_punto` IN CODA al modello (per nome: i
+  file di ieri intonsi); la modifica FIRMATA non tocca le colonne
+  punto per contratto (l'evento Nostr non le porta: le azzererebbe a
+  ogni sync — commento sull'UPDATE e sentinella «un solo UPDATE»).
+  IL PUNTO NON ESCE SU NOSTR: tariffa interna del checkout,
+  `tag_commercio` ed `evento_annuncio` ciechi per sentinella
+  (imperfezione dichiarata: un client Nostr vede la sola tariffa
+  casa).
+  LO SPEDIZIONIERE È DEL NEGOZIO (decisione di Andrea): catalogo
+  server `SPEDIZIONIERI` (InPost · Poste Italiane · Altro — NON è il
+  catalogo CORRIERI del tracking né le sentinelle), colonna
+  `utenti.spedizioniere` ('' = non dichiarato), endpoint
+  `POST /api/me/spedizioniere` (pattern canale-notifiche), cassetto
+  «📦 Come spedisci» nel Profilo con le voci da /api/me (mai
+  hardcodate; in DEMO sparisce). LA VIA PUNTO ESISTE SOLO CON LO
+  SPEDIZIONIERE DICHIARATO — senza sapere la rete, il compratore
+  scriverebbe un punto inutilizzabile: la funzione si accende
+  venditore per venditore, e per gli importati resta spenta per
+  costruzione (non hanno lo spedizioniere). Il compratore lo vede in
+  pagina: «📦 Spedisce con InPost».
+  IL PUNTO NELL'ORDINE, SENZA UN VALORE NUOVO DI consegna_scelta (il
+  precedente è anche_digitale, ortogonale): la strada punto è
+  `consegna_scelta='spedizione'` + colonna `ordini.punto_ritiro`
+  (non vuota ⟺ punto) — timer, solleciti, segna_spedito e la
+  derivazione dell'unitario per sottrazione restano veri PER
+  COSTRUZIONE, la tariffa scelta finisce in `spedizione_sats` come
+  sempre. Il body di compra porta `spedizione_via` ('casa' default |
+  'punto', whitelist con sentinella) + `punto_ritiro` (testo libero
+  del compratore: strip, spazi collassati, tetto 120 — obbligatorio
+  con la via punto, 400 senza; e le tre guardie: spedizione scelta,
+  spedizioniere dichiarato, SELECT PRIMA della invoice — il patto del
+  ricontrollo senza await ora ha la sua sentinella in CI). La RIPRESA
+  confronta anche il punto: cambiarlo è una richiesta diversa =
+  rinnovo (la tariffa può cambiare). Il testo attraversa la filiera
+  INTERO ma mai nudo: `esc()` a ogni resa client (ordine, pannello
+  del venditore), MAI interpolato nell'HTML delle notifiche server —
+  il venditore riceve la coda STATICA «trovi il punto nell'ordine»
+  (collaudato con virgolette, tag, emoji e a-capo dentro). Il campo
+  in pagina porta il commento-VARCO MAPPA: il selettore punti delle
+  API corriere sostituirà il contenitore, il contratto resta un testo
+  in `acqDati.punto`.
+  «CONTROLLA IL PACCO» HA PERSO LE PILLOLE DI SCELTA (decisione 3 di
+  Andrea, stile Vinted): la scelta vive nella pagina d'acquisto
+  (`#ctrlAcquista` → `apriAcquistoSet`), al loro posto la riga onesta
+  «la scegli al passo dopo». Il conto arriva dallo STESSO preventivo
+  (cache `ctrlPrev` per firma della composizione: mai due conti che
+  divergono) con l'anteprima sulla strada PIÙ ECONOMICA, e la riga lo
+  DICE («Spedizione (dalla più economica)»); in DEMO resta la stima
+  client di `totaleSet` (per questo `consegnaSetScelta` sopravvive
+  CONGELATA a 'spedizione'). `startBuy`/`startBuySet`/
+  `confermaCompraSubito` restano i soli varchi POST (sentinella sul
+  conteggio) e pescano le cifre del paySheet dal preventivo: foglio e
+  pagina dicono gli stessi numeri per costruzione.
   ACQUISTA VIVE IN DUE POSTI (correzioni lug 2026, poi rifinite col
   feedback di Andrea): dentro il recinto escrow sta SOLO «Acquista»
   arancio ₿ — centrato, lungo (`min-width:76%`) ma mai a tutta
@@ -4117,14 +4210,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   resta in pagina sotto il recinto perché lì la barra non esiste.
   Nella barra fissa: OFFERTA A SINISTRA, ACQUISTA A DESTRA, metà e
   metà (col multi-pezzo il lato Acquista cresce, `#barraCompra
-  .con-qta`). Nel recinto restano anche note e il «⚡ Compra subito»
-  NWC (un'ALTRA strada, con la sua cifra); il trucco
+  .con-qta`). Nel recinto restano le note — il «⚡ Compra subito» NWC
+  dall'ago 2026 NON vive più lì: l'ordine nasce solo dalla pagina
+  d'acquisto, e il wallet paga da là; il trucco
   `:first-of-type` che promuoveva il ghost a
   CTA è stato RIMOSSO: Acquista è arancio per classe, sempre. Le PILLOLE DI
   SCELTA consegna (`pilloleConsegna`) non esistono più: in pagina
   restano solo le pillole INFORMATIVE (spedBadge + pilloleModalita),
-  la scelta vive nel foglio del varco (e domani nella pagina
-  dedicata).
+  la scelta vive nella pagina d'acquisto.
   LA FORMA DI «ACQUISTA» È LA FORMA DI TUTTI (ago 2026, decisione di
   Andrea, ed è la regola da non rovesciare). `.btn` nasceva PILLOLA
   (999px) e il rettangolo era una DEROGA scritta a mano in quattro
@@ -5966,15 +6059,35 @@ barattolo: il default 10 vive nel CODICE, e una riga `MAX_PREFERITI`
 esplicita nel config del VPS vincerebbe su di lui — si verifica prima
 del deploy (vedi Produzione).
 
-Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
-strada e conto scomposto in un posto solo, prima che nasca la invoice.
-Prende il posto del foglio del varco (transizione già dichiarata) e
-chiude la lacuna aperta oggi: col solo canale spedizione il costo si
-vede per la prima volta nel paySheet, a invoice già creata. È una
-lacuna TEMPORANEA con la soluzione già pianificata, non una scelta
-definitiva: non rimediarla rimettendo una cifra nella scheda (fila
-delle pillole e recinto sono già stati provati e scartati, i motivi
-sono in Architettura).
+La pagina d'acquisto (ago 2026, il cantiere annunciato qui sotto come
+«prossimo», ora FATTO): il foglio del varco è morto e Acquista porta
+sempre a `view-acquisto` — articoli, le vie col solo costo di
+spedizione per pillola (ritiro / casa / punto di ritiro / codice
+online; il totale lo dice il conto), il campo del punto col
+varco-mappa, il conto DEL SERVER prima della invoice; il venditore
+dichiara DUE costi di spedizione e lo spedizioniere del negozio, il
+compratore scrive il punto che il venditore ritrova nell'ordine. Le
+decisioni di Andrea: costo unico come fallback su entrambe le strade,
+punto solo con spedizioniere dichiarato, e il conto di «Controlla il
+pacco» dallo stesso preventivo (mai due conti che divergono, anteprima
+sulla più economica dichiarandolo). Vedi Architettura, «LA PAGINA
+D'ACQUISTO», per il modello dati (punto in colonna, MAI un valore
+nuovo di consegna_scelta; il flag della tariffa; le quattro pure del
+conto) e i perché. Collaudato: 450 prove verdi in CI (61 nuove, con le
+sentinelle sul preventivo-che-non-crea e sul patto del ricontrollo
+senza await), 50 verifiche TestClient su DB usa-e-getta — LA PROVA
+REGINA: preventivo == compra a parità di via, al sat, mono e set — coi
+caratteri strani nel punto lungo tutta la filiera, e il giro visivo
+CDP chiaro/scuro a 375/1280 con zero errori JS (che ha anche trovato
+dal vivo il 409 dello stock con la sua pagina d'errore, e l'edit di
+setValuta finito su rinfrescaViste). IN PRODUZIONE il deploy fa
+girare quattro migrazioni additive (le tre colonne punto su annunci,
+punto_ritiro su ordini, spedizioniere su utenti) e niente altro: la
+via punto resta spenta finché i venditori non dichiarano lo
+spedizioniere dal Profilo. DA GUARDARE dal vivo dentro Telegram: il
+giro completo su un telefono vero (pagina, punto, paySheet sopra la
+pagina) e il primo ordine al punto visto dal venditore.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
-verificato via API corrieri, escrow on-chain 2-di-3, parere legale
+verificato via API corrieri (che porterà la MAPPA dei punti nel
+varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
