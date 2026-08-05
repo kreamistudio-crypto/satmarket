@@ -1348,6 +1348,53 @@
     #barraPacco{max-width:960px}
   }
 
+  /* ---------- la pagina «Controlla il pacco» (ago 2026) ----------
+     Il riepilogo del set, da foglio a pagina intera: testata coi
+     francobolli degli articoli, scelta della consegna, il conto in
+     righe col totale evidenziato, e in fondo Acquista coi due
+     secondari. Nessun token nuovo: pillole, unit e mono di casa. */
+  .ctrl-corpo{padding:6px var(--pad) 26px;max-width:520px;margin:0 auto}
+  /* la testata: il conteggio a sinistra non si stringe mai, i
+     francobolli scorrono di lato (overscroll contenuto: la lezione
+     della galleria a foto singola, detta dove appartiene) */
+  .ctrl-articoli{display:flex;align-items:center;gap:12px;margin:4px 0 6px}
+  .ctrl-articoli>b{flex:0 0 auto;font-size:15px}
+  .ctrl-strip{display:flex;gap:8px;overflow-x:auto;min-width:0;
+    padding:2px 0;overscroll-behavior-x:contain}
+  .ctrl-mini{position:relative;flex:0 0 auto;width:52px;height:52px;
+    border-radius:12px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;font-size:24px;
+    background:repeating-linear-gradient(45deg,var(--ph-a) 0 8px,var(--ph-b) 8px 16px)}
+  .ctrl-mini img{width:100%;height:100%;object-fit:cover}
+  /* il ×N sul francobollo: un conteggio, parla il mono come tutti */
+  .ctrl-mini-n{position:absolute;right:2px;bottom:2px;font-size:10.5px;
+    background:var(--ink);color:var(--on-ink);border-radius:999px;
+    padding:1px 5px;font-weight:800;font-family:'JetBrains Mono',monospace}
+  .ctrl-corpo .section-label{margin-top:16px}
+  /* il conto: righe nome/cifra, il totale staccato dal tratteggio —
+     la grammatica di contoScomposto, cresciuta a pagina */
+  .ctrl-conto{background:var(--card);border:1.5px solid var(--line);
+    border-radius:var(--radius);padding:4px 14px;margin-top:8px}
+  .ctrl-riga{display:flex;justify-content:space-between;align-items:baseline;
+    gap:12px;padding:9px 0;font-size:14px;font-weight:600}
+  .ctrl-riga+.ctrl-riga{border-top:1px dashed var(--line)}
+  .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
+  .ctrl-riga.tot .mono{color:var(--sats-text)}
+  /* «in promo»: la commissione esiste per dire che oggi e' gratis —
+     pillolina nell'arancio tenue di casa, mai un colore nuovo */
+  .promo-tag{display:inline-block;background:var(--sats-soft);
+    color:var(--sats-text);border-radius:999px;padding:1px 8px 2px;
+    font-size:11px;font-weight:800;margin-right:8px;vertical-align:1px}
+  /* i due secondari sotto Acquista: gemelli, basi al 50% (la lezione
+     di Applica/Azzera: col basis 0 i bordi si sommano fuori) */
+  .ctrl-secondari{display:flex;gap:10px;margin-top:10px}
+  .ctrl-secondari .btn{margin-top:0;flex:1 1 50%;font-size:14px}
+  /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
+     768 sparisce come nella pagina del pacco, ma senza barra propria */
+  @media (max-width:767.98px){
+    body.senza-nav nav{display:none}
+  }
+
   /* ---------- dettaglio annuncio ---------- */
   /* (la forma rettangolare dei bottoni del dettaglio vive ora accanto
      a .btn, con tutti gli altri contesti: un cuore solo) */
@@ -1400,25 +1447,9 @@
     margin:0 calc(-1 * var(--pad));padding-left:var(--pad);padding-right:var(--pad)}
   .altri-azione .btn{margin-top:0}
   .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
-  /* Il foglio del set: una riga per oggetto — spunta, miniatura,
-     titolo e stepper dei pezzi. Le righe spente dicono il perche'. */
-  #setLista{max-height:min(38vh,340px);overflow-y:auto}
-  .set-riga{display:flex;align-items:center;gap:10px;padding:8px 0;
-    border-bottom:1px dashed var(--line)}
-  .set-riga.spenta{opacity:.55}
-  .set-check{width:26px;height:26px;border-radius:8px;flex:0 0 26px;
-    border:2px solid var(--line);background:var(--card);cursor:pointer;
-    font-weight:800;font-size:15px;line-height:1;color:#fff;padding:0}
-  .set-check.on{background:var(--sats);border-color:var(--sats)}
-  .set-check:disabled{cursor:not-allowed}
-  .set-mini{width:42px;height:42px;border-radius:10px;overflow:hidden;
-    flex:0 0 42px;display:flex;align-items:center;justify-content:center;
-    font-size:22px;
-    background:repeating-linear-gradient(45deg,var(--ph-a) 0 8px,var(--ph-b) 8px 16px)}
-  .set-mini img{width:100%;height:100%;object-fit:cover}
-  .set-info{flex:1;min-width:0}
-  .set-info b{display:block;font-size:13.5px;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
+  /* (Il foglio del set — #setLista, .set-riga, .set-check — non esiste
+     piu': il riepilogo e' la PAGINA «Controlla il pacco», vedi il suo
+     blocco CSS accanto a quello della pagina del pacco.) */
   .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
     font-weight:700;font-size:28px;margin:10px 0 2px}
   /* qui solo la MISURA: il colore lo mette il `.unit` nudo, una
@@ -1521,10 +1552,8 @@
      di consegna, compare solo con piu' di un pezzo disponibile */
   .qta-riga{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 10px}
   .qta-riga .qta-lab{font-size:13px;font-weight:800;color:var(--ink-soft)}
-  .qta-step{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden}
-  .qta-step button{width:42px;height:38px;border:none;background:none;font-size:20px;font-weight:800;color:var(--sats-text);cursor:pointer;font-family:inherit}
-  .qta-step button:disabled{opacity:.35;cursor:default}
-  .qta-step .qta-num{min-width:34px;text-align:center;font-weight:800;font-size:15px}
+  /* (.qta-step e' morto col foglio del set: i pezzi si toccano nella
+     pagina del pacco, col chip − N + di stepperMini) */
   .consegna-scelta{display:flex;gap:8px;margin:2px 0 10px}
   .consegna-scelta .consegna-pill{flex:1;padding:9px 10px;border-radius:12px;
     border:1.5px solid var(--line);background:var(--card);font-weight:700;
@@ -2593,8 +2622,8 @@
        La ✕ e il gesto indietro riportano al dettaglio di provenienza;
        la barra fissa in basso (#barraPacco, gemella di #barraCompra)
        porta il totale dei soli articoli e «Controlla il pacco», che
-       apre il riepilogo di sempre (#setSheet): consegna, spedizione
-       al MAX, stima taglia e conto scomposto vivono la'. -->
+       dall'ago 2026 apre la PAGINA del riepilogo (view-controllapacco):
+       consegna, spedizione al MAX, stima taglia e conto vivono la'. -->
   <div class="view" id="view-pacco">
     <div class="pacco-testa">
       <button type="button" class="pacco-x" onclick="chiudiPagPacco()" title="Chiudi" aria-label="Chiudi il pacco">✕</button>
@@ -2608,6 +2637,61 @@
       </div>
     </div>
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
+  </div>
+
+  <!-- ============ VISTA: CONTROLLA IL PACCO (ago 2026) ============
+       Il riepilogo del set, da foglio a pagina intera (il vecchio
+       #setSheet non esiste piu'). Dall'alto: testata col conteggio e i
+       francobolli degli articoli scelti, la scelta della consegna
+       sull'intersezione delle strade del pacco, il conto in righe —
+       con la riga «Commissione Barattolo» che esiste per dire che
+       oggi e' in promo — e in fondo Acquista coi due secondari.
+       La composizione NON si tocca qui: si torna alla pagina del
+       pacco col gesto indietro, selezione intatta. Il contenuto lo
+       scrive renderControlla(); la ← e' navIndietro come ovunque. -->
+  <div class="view" id="view-controllapacco">
+    <div class="pacco-testa">
+      <button type="button" class="pacco-x" onclick="navIndietro()" title="Torna al pacco" aria-label="Torna al pacco">←</button>
+      <div class="pacco-tit"><b>Controlla il pacco</b><span class="eur-hint" id="ctrlSub"></span></div>
+      <!-- il toggle €/₿ in alto a destra, come nella pagina del pacco:
+           stessa preferenza, si accendono insieme via data-cur -->
+      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+      </div>
+    </div>
+    <div class="ctrl-corpo">
+      <div class="ctrl-articoli"><b id="ctrlConta"></b><div class="ctrl-strip" id="ctrlStrip"></div></div>
+      <div class="section-label">Consegna</div>
+      <div class="consegna-scelta" id="ctrlConsegna" style="margin-top:8px"></div>
+      <div id="ctrlTaglia" class="eur-hint" style="margin-bottom:0"></div>
+      <div class="section-label">Il conto</div>
+      <div class="ctrl-conto" id="ctrlConto"></div>
+      <div class="trust-note" style="margin-top:12px"><span>Il pacco viaggia e si tutela come un <b>ordine unico</b>: una conferma di ricezione, e in caso di problemi disputa e rimborso valgono sull'intero pacco.</span></div>
+      <button class="btn orange" id="ctrlAcquista" onclick="startBuySet()">Acquista</button>
+      <div class="ctrl-secondari">
+        <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
+        <button type="button" class="btn ghost" onclick="go('offertapresto')">Fai un'offerta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: L'OFFERTA SUL PACCO, PRESTO (ago 2026) ====
+       «Fai un'offerta» dal riepilogo porta qui: l'offerta sull'intero
+       set e' un cantiere futuro, e una pagina che lo dice e' piu'
+       onesta di un bottone che non c'e'. Lo stile e' quello del
+       coming soon delle aste: markup fisso, nessun dato utente,
+       .empty con la mascotte — chiaro e scuro gratis. Vista interna
+       (non radice): l'indietro riporta al riepilogo. -->
+  <div class="view" id="view-offertapresto">
+    <div class="empty" style="padding-top:34px">
+      <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
+      <div class="big">💰</div>
+      <b class="empty-title">L'offerta sul pacco sta arrivando</b>
+      <span>Presto potrai proporre il tuo prezzo per l'intero pacco.<br>
+        Sui singoli oggetti puoi già farlo, dalla loro scheda.</span>
+      <button class="btn orange" onclick="navIndietro()">← Torna al pacco</button>
+    </div>
   </div>
 
   <!-- ============ VISTA: IL PAGAMENTO PROTETTO ============ -->
@@ -2955,9 +3039,10 @@
 
   <!-- La barra della pagina del pacco (ago 2026): gemella di
        #barraCompra per posizione e carta, ma qui il conto e' dei SOLI
-       articoli — niente consegna e niente spedizione, che entrano nel
-       riepilogo. Solo totale e bottone: il toggle €/₿ sta in testa
-       alla pagina (deciso da Andrea, qui rubava spazio al numero). -->
+       articoli — niente consegna e niente spedizione, che entrano
+       nella pagina del riepilogo. Solo totale e bottone: il toggle
+       €/₿ sta in testa alla pagina (deciso da Andrea, qui rubava
+       spazio al numero). -->
   <div id="barraPacco">
     <div class="pacco-somma"><b class="mono" id="paccoTot"></b><span id="paccoConta"></span></div>
     <button class="btn orange" id="paccoControlla" onclick="controllaPacco()">Controlla il pacco</button>
@@ -3146,23 +3231,9 @@
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
-  <!-- ============ SHEET SET: «Riempi il barattolo» (lug 2026) ============
-       Piu' oggetti dello stesso venditore, un pacco solo: la lista con
-       le spunte la scrive disegnaFoglioSet(), che riusa stepper,
-       pillole di consegna e conto scomposto di sempre. -->
-  <div class="sheet" id="setSheet">
-    <div class="grab"></div>
-    <h3>🫙 Riempi il barattolo — un pacco, una spedizione</h3>
-    <div style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:8px">
-      Più oggetti di questo venditore in un pacco solo: paghi <b>una spedizione</b>.</div>
-    <div id="setLista"></div>
-    <div class="consegna-scelta" id="setConsegna" style="margin:10px 0 0"></div>
-    <div id="setTaglia" class="eur-hint" style="margin-top:8px"></div>
-    <div class="trust-note" style="margin-top:8px"><span>Il set viaggia e si tutela come un <b>ordine unico</b>: una conferma di ricezione, e in caso di problemi disputa e rimborso valgono sull'intero pacco.</span></div>
-    <div id="setScomposto" style="margin-top:10px;font-size:13px"></div>
-    <div id="setAzioni"></div>
-    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
-  </div>
+  <!-- (Il foglio #setSheet «Riempi il barattolo» non esiste piu' —
+       ago 2026: il riepilogo del set e' la pagina «Controlla il
+       pacco», view-controllapacco.) -->
 
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
   <div class="sheet" id="invitoSheet">
@@ -3982,7 +4053,8 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
    aperti da li' restano nel ramo per la stessa ragione: la nav dice
    dove sei, e «dove sei» e' la strada che hai fatto. */
 function voceNav(view){
-  if (['dettaglio','negozio','sicurezza','pacco'].includes(view)) view = 'esplora';
+  if (['dettaglio','negozio','sicurezza','pacco',
+       'controllapacco','offertapresto'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
@@ -4042,6 +4114,9 @@ function go(view){
      totale (il CSS decide dove: sotto i 768 sostituisce la nav, da
      desktop convive con la topbar) */
   document.body.classList.toggle('con-pacco', view==='pacco');
+  /* Nel riepilogo del pacco la tab bar sparisce e basta: e' una
+     cassa, non una vetrina, e Acquista vive in pagina */
+  document.body.classList.toggle('senza-nav', view==='controllapacco');
   /* la griglia e' STATICA — le stesse 26 voci del catalogo, senza piu'
      conteggi da rileggere — quindi si disegna una volta sola: rifarla
      a ogni entrata ricreerebbe 26 <img> per nulla */
@@ -4146,6 +4221,9 @@ function navVista(){
                     : v==='ordine'    ? (currentOrder?.id || 0)
                     : v==='negozio'   ? (negozioPag.chi || '')
                     : v==='pacco'     ? (paccoDati?.origineId || 0)
+                    /* il riepilogo appartiene allo stesso pacco: la
+                       chiave e' la sua, e con lei la ricostruzione */
+                    : v==='controllapacco' ? (paccoDati?.origineId || 0)
                     : v==='esplora'   ? chiaveVetrina()
                     : 0};
 }
@@ -4213,6 +4291,14 @@ function navRendiVista(b){
         && listings.some(x=>x.id===b.k)) { renderPacco(); return go('pacco'); }
     return go('esplora');
   }
+  if (b.v === 'controllapacco') {
+    /* stessa guardia del pacco, piu' una: senza almeno un articolo
+       scelto il conto non ha niente da dire */
+    if (paccoDati && paccoDati.origineId===b.k && setScelte.size
+        && listings.some(x=>x.id===b.k))
+      { renderControlla(); return go('controllapacco'); }
+    return go('esplora');
+  }
   if (b.v === 'negozio') {
     /* senza codice (il negozio finto della DEMO) il markup e' ancora
        quello giusto: basta riaccendere la vista */
@@ -4255,7 +4341,7 @@ function navRiflette(){
   else if (ora.length > st.length)   scrivi('pushState', giu + 1);
   else {
     /* Stessa profondita': o e' cambiata la vista, o un foglio ha preso
-       il posto di un altro (setSheet → paySheet). Si SPINGE solo
+       il posto di un altro (invitoSheet → nostrSheet). Si SPINGE solo
        entrando in una vista piu' interna — dettaglio, negozio, ordine,
        sicurezza —: li' l'indietro deve riportare indietro. Tornare a
        una radice (i tab, e i ripieghi quando una vista si e' svuotata)
@@ -5177,6 +5263,8 @@ function setValuta(v){
   aggiornaPrezzoDettaglio();   // se una scheda e' aperta, segue anche lei
   /* e la pagina del pacco: card e totale della barra parlano valutaVista */
   if (el('view-pacco')?.classList.contains('active')) renderPacco();
+  /* e il riepilogo del pacco: il conto segue il toggle */
+  if (el('view-controllapacco')?.classList.contains('active')) renderControlla();
 }
 /* I toggle valuta sono due (searchbar e dettaglio) e vanno accesi
    insieme: si pescano per `data-cur`, non per id */
@@ -6043,14 +6131,14 @@ async function sezioneAltriOggetti(l){
    Piu' annunci DIVERSI dello stesso venditore in un ordine solo: una
    invoice, UNA spedizione (il MAX dei costi dichiarati), una conferma.
    Dall'ago 2026 la COMPOSIZIONE vive nella pagina del pacco (vedi
-   apriPacco piu' sotto); il foglio #setSheet e' il RIEPILOGO: righe
-   con spunta e stepper, pillole di consegna sull'INTERSEZIONE delle
-   strade fisiche, totale vivo con la matematica di totaleStima estesa.
-   Il digitale e gli annunci senza modalita' restano fuori (riga o
-   cella spenta col perche'): e' il gemello client delle guardie di
-   _compra_set, che resta il giudice. Nomi non-barattolo sul bottone
-   d'ingresso: il 🫙 e' dei preferiti, qui vive solo nel titolo del
-   foglio. */
+   apriPacco piu' sotto) e il RIEPILOGO nella pagina «Controlla il
+   pacco» (renderControlla, il foglio #setSheet non esiste piu'):
+   pillole di consegna sull'INTERSEZIONE delle strade fisiche, conto
+   in righe col totale della matematica di totaleStima estesa. Il
+   digitale e gli annunci senza modalita' restano fuori (cella spenta
+   col perche'): e' il gemello client delle guardie di _compra_set,
+   che resta il giudice. Nomi non-barattolo sui bottoni: il 🫙 e' dei
+   preferiti. */
 let setScelte = new Map();          // annuncioId -> quantita scelta
 let consegnaSetScelta = 'spedizione';
 /* IL TETTO CONTA LE RIGHE, NON I PEZZI (gemello client di
@@ -6089,26 +6177,6 @@ function stradeSet(){
     if (x) strade = strade.filter(v => stradeFisiche(x).includes(v));
   }
   return strade;
-}
-function candidatiSet(l){
-  /* dal catalogo in memoria: il pezzo aperto prima, poi gli altri
-     dello stesso venditore (li ha gia' portati sezioneAltriOggetti).
-     I pezzi CON una strada fisica vengono prima: il tetto delle 8
-     righe non deve tagliare un compatibile per mostrare uno spento */
-  const suoi = listings.filter(x => x.sellerId===l.sellerId
-                                    && x.stato==='attivo' && x.id!==l.id);
-  suoi.sort((a, b) => componibileNatura(b) - componibileNatura(a));
-  const base = (l.stato==='attivo' ? [l] : []).concat(suoi).slice(0, MAX_PACCO);
-  /* dalla pagina del pacco la scelta puo' cadere OLTRE le prime
-     righe: i pezzi scelti si APPENDONO (mai riordinati in testa: le
-     righe non devono saltare a ogni spunta), cosi' il riepilogo
-     mostra sempre tutto cio' che c'e' nel pacco */
-  for (const id of setScelte.keys())
-    if (!base.some(x=>x.id===id)){
-      const x = listings.find(t=>t.id===id);
-      if (x) base.push(x);
-    }
-  return base;
 }
 function motivoEsclusione(x){
   if (astaE(x))
@@ -6164,88 +6232,85 @@ function stimaTagliaSet(){
   return punti<=1 ? 'busta' : punti<=4 ? 'piccolo'
        : punti<=12 ? 'medio' : punti<=26 ? 'grande' : 'ingombrante';
 }
-function rigaSet(x){
-  const sel = setScelte.has(x.id);
-  const qta = setScelte.get(x.id) || 1;
-  const dis = motivoEsclusione(x);
-  const thumb = (x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '';
-  return `<div class="set-riga${dis?' spenta':''}">
-    <button type="button" class="set-check${sel?' on':''}"${dis?' disabled':''}
-      onclick="toggleSetRiga(${x.id})" aria-label="${sel?'Togli dal set':'Aggiungi al set'}">${sel?'✓':''}</button>
-    <div class="set-mini">${thumb?`<img src="${esc(thumb)}" alt="">`:`<span>${x.emoji}</span>`}</div>
-    <div class="set-info"><b>${esc(x.title)}</b>
-      <span class="eur-hint">${dis ? esc(dis)
-        : `${stimaCirca(x)}${fmt(artStima(x))} sats${(x.quantita||1)>1?` · ${fmt(x.quantita)} disponibili`:''}`}</span></div>
-    ${sel && (x.quantita||1)>1
-      ? `<div class="qta-step"><button type="button" onclick="setQtaSet(${x.id},-1)"${qta<=1?' disabled':''} aria-label="Un pezzo in meno">−</button><span class="qta-num mono">${fmt(qta)}</span><button type="button" onclick="setQtaSet(${x.id},1)"${qta>=(x.quantita||1)?' disabled':''} aria-label="Un pezzo in più">+</button></div>`
-      : ''}
-  </div>`;
-}
-function disegnaFoglioSet(){
-  const l = currentListing;
-  if (!l) return;
-  el('setLista').innerHTML = candidatiSet(l).map(rigaSet).join('')
-    || '<div class="eur-hint">Questo venditore non ha altri oggetti attivi.</div>';
+/* ---------------- la pagina «Controlla il pacco» (ago 2026) --------
+   Il riepilogo del set, da foglio a pagina intera. La COMPOSIZIONE non
+   si tocca qui — spunte e stepper vivono nella pagina del pacco, e il
+   gesto indietro ci riporta con la selezione intatta — qui si sceglie
+   la strada, si legge il conto e si compra. La riga «Commissione
+   Barattolo» esiste per dire che oggi e' GRATIS (leva sospesa): il
+   giorno che la commissione si accendera', qui c'e' gia' il posto dove
+   scriverla. */
+function renderControlla(){
+  if (!paccoDati || !setScelte.size) return;
+  /* la testata: quanti articoli, e le loro facce in fila (il ×N sul
+     francobollo dice i pezzi della stessa riga) */
+  const pezzi = pezziSet();
+  el('ctrlConta').textContent = `${fmt(pezzi)} articol${pezzi===1?'o':'i'}`;
+  const strip = [];
+  for (const [id, qta] of setScelte){
+    const x = listings.find(t=>t.id===id);
+    if (!x) continue;
+    const t = (x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '';
+    strip.push(`<div class="ctrl-mini" title="${esc(x.title)}">${
+      t ? `<img src="${esc(t)}" alt="">` : `<span>${x.emoji}</span>`}${
+      qta>1 ? `<b class="ctrl-mini-n">×${fmt(qta)}</b>` : ''}</div>`);
+  }
+  el('ctrlStrip').innerHTML = strip.join('');
+  const primo = listings.find(x=>setScelte.has(x.id));
+  el('ctrlSub').textContent = primo ? `di ${primo.seller}` : '';
+  /* la consegna: le strade che l'INTERSEZIONE del pacco consente. Con
+     una sola non c'e' scelta: quella, gia' accesa, e l'altra non
+     compare — il campo non mente */
   const strade = stradeSet();
   if (!strade.includes(consegnaSetScelta))
     consegnaSetScelta = strade[0] || 'spedizione';
-  el('setConsegna').innerHTML = (strade.length>1 && setScelte.size)
-    ? strade.map(v => `<button type="button" class="consegna-pill${v===consegnaSetScelta?' attiva':''}" data-v="${v}" onclick="setConsegnaSet('${v}')">${v==='spedizione'?'🚚 Spedizione':'🤝 Ritiro in zona'}</button>`).join('')
-    : '';
-  const st = (consegnaSetScelta==='spedizione' && setScelte.size)
-    ? stimaTagliaSet() : '';
-  el('setTaglia').innerHTML = st
+  el('ctrlConsegna').innerHTML = strade.map(v =>
+    `<button type="button" class="consegna-pill${v===consegnaSetScelta?' attiva':''}" data-v="${v}" onclick="setConsegnaControlla(this.dataset.v)">${v==='spedizione'?'🚚 Spedizione':'🤝 Ritiro in zona'}</button>`).join('');
+  const st = consegnaSetScelta==='spedizione' ? stimaTagliaSet() : '';
+  el('ctrlTaglia').innerHTML = st
     ? `📦 pacco stimato: <b>${st}</b> — è una stima, il pacco vero lo prepara il venditore` : '';
-  const c = totaleSet();
-  el('setScomposto').innerHTML =
-    setScelte.size ? contoScomposto(c.art, c.sped, c.prot, c.tot, 1) : '';
-  const pronto = setScelte.size >= 2;
-  const cifra = `<span class="cifra">${setCirca()}${fmt(c.tot)} sats</span>`;
-  el('setAzioni').innerHTML = pronto
-    ? `${(!DEMO && !VETRINA && walletNwc())
-         ? `<button class="btn orange compra" onclick="confermaSetSubito(this)">⚡ Compra subito${cifra}</button>
-            <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
-       <button class="btn ${walletNwc()?'ghost':'orange'} compra" onclick="startBuySet()">🔒 Compra in sicurezza${cifra}</button>
-       <div class="escrow-note">${pezziSet()} pezzi, una spedizione sola</div>`
-    : `<div class="escrow-note" style="margin-top:8px">Spunta almeno due oggetti: per uno solo c'è l'acquisto di sempre</div>`;
+  el('ctrlConto').innerHTML = contoControlla(totaleSet());
 }
-function toggleSetRiga(id){
-  haptic();
-  if (setScelte.has(id)) setScelte.delete(id);
-  else {
-    if (setScelte.size >= MAX_PACCO)
-      { toast(`Il pacco è pieno: al massimo ${MAX_PACCO} oggetti diversi`); return; }
-    setScelte.set(id, 1);
-  }
-  disegnaFoglioSet();
-  specchiaGriglia();
+/* Una cifra del conto nella valuta del toggle: in euro e' sempre una
+   conversione (≈), in sats il «circa» arriva dai listini EUR del
+   pacco (setCirca). Lo zero non porta mai il ≈: zero e' zero. */
+function cifraCtrl(sats, circa){
+  if (valutaVista==='eur')
+    return `${sats>0?'≈ ':''}${fmtEur(sats * eurPerSat)}<span class="unit eur">€</span>`;
+  return `${sats>0 ? (circa||'') : ''}${fmt(sats)}<span class="unit">sats</span>`;
 }
-function setQtaSet(id, delta){
-  const x = listings.find(t=>t.id===id);
-  if (!x || !setScelte.has(id)) return;
-  const q = Math.max(1, Math.min(x.quantita||1, (setScelte.get(id)||1)+delta));
-  setScelte.set(id, q); haptic();
-  disegnaFoglioSet();
-  specchiaGriglia();
+/* Le righe del conto: Prezzo, la commissione in promo, Spedizione
+   (che col ritiro vale 0, e la riga lo dice invece di sparire), la
+   protezione solo quando esiste, e il totale evidenziato. */
+function contoControlla(c){
+  const circa = setCirca();
+  const r = (t, v, cls) => `<div class="ctrl-riga${cls?' '+cls:''}"><span>${t}</span><span class="mono">${v}</span></div>`;
+  return r('Prezzo', cifraCtrl(c.art, circa))
+    + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
+    + r('Spedizione', cifraCtrl(c.sped, circa))
+    + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot)) : '')
+    + r('Totale da pagare', cifraCtrl(c.tot, circa), 'tot');
 }
-/* L'altro verso dello specchio: il foglio ha appena cambiato il
-   conteggio, e la pagina del pacco che gli sta SOTTO deve dire lo
-   stesso numero quando il foglio si chiude. Il dito e' sul foglio,
-   quindi la griglia si puo' riscrivere per intero senza disturbare
-   nessuno (la strada opposta — chip in cella — patcha in place). */
-function specchiaGriglia(){
-  if (el('view-pacco')?.classList.contains('active')) renderPacco();
-}
-function setConsegnaSet(v){
+function setConsegnaControlla(v){
   consegnaSetScelta = v; haptic();
-  disegnaFoglioSet();
+  renderControlla();
+}
+/* «Chiedi info» → la pagina del venditore, coi ponti di contatto che
+   vivono gia' la'. Il codice negozio arriva dagli annunci del pacco. */
+function ctrlChiediInfo(){
+  haptic();
+  const x = listings.find(t=>t.id===paccoDati?.origineId)
+         || listings.find(t=>setScelte.has(t.id));
+  const chi = x && (x.negozio || x.username);
+  if (chi) apriNegozio(chi);
+  else toast('Questo venditore non ha una pagina pubblica');
 }
 /* ---------------- la pagina del pacco (ago 2026) ----------------
    «📦 Aggiungi al pacco» dal dettaglio apre una PAGINA in stile
    vetrina: il negozio del venditore, dove il pacco si compone toccando
-   Aggiungi sulle card. Il foglio #setSheet resta il RIEPILOGO («Controlla
-   il pacco»): consegna, spedizione al MAX, stima taglia, conto scomposto
-   e quantita' per riga vivono la', come sempre. Il pacco e' di UN
+   Aggiungi sulle card. Il RIEPILOGO e' la pagina «Controlla il pacco»
+   (renderControlla): consegna, spedizione al MAX, stima taglia e conto
+   in righe vivono la'. Il pacco e' di UN
    venditore solo (il suo pregio: una spedizione sola) e resta in piedi
    finche' non si paga: riaprirlo da un altro annuncio dello stesso
    venditore AGGIUNGE, non ricomincia. Il pull-to-refresh qui non
@@ -6405,11 +6470,10 @@ function aggiornaBarraPacco(){
    che e' il conteggio UNICO): la quantita' toccata in una si vede
    subito nell'altra, senza un secondo numero da tenere in pari. Chi
    cambia il pacco chiama questa, che riallinea quello che e' a
-   schermo — la vista dove sta il dito compresa, quando a cambiare e'
-   la composizione e non un numero soltanto. */
+   schermo (le due sono viste, una sola puo' essere attiva). */
 function rinfrescaViste(){
   if (el('view-pacco')?.classList.contains('active')) renderPacco();
-  if (el('setSheet')?.classList.contains('open')) disegnaFoglioSet();
+  if (el('view-controllapacco')?.classList.contains('active')) renderControlla();
 }
 /* Il tocco su «Aggiungi»: la riga entra con UN pezzo. */
 function aggiungiAlPacco(id){
@@ -6443,7 +6507,6 @@ function setQtaPacco(id, d){
   setScelte.set(id, q);
   aggiornaPezziCella(id, x);
   aggiornaBarraPacco();
-  if (el('setSheet')?.classList.contains('open')) disegnaFoglioSet();
 }
 /* La patch in place di UNA cella: numero, estremi del chip e segno
    sulla foto. Solo nostro markup, nessun testo utente. */
@@ -6457,19 +6520,18 @@ function aggiornaPezziCella(id, x){
   const s = c.querySelector('.pacco-spunta');
   if (s) { s.textContent = q>1 ? fmt(q) : '✓'; s.classList.toggle('conta', q>1); }
 }
-/* «Controlla il pacco» → il riepilogo di sempre. Il foglio pesca i
-   candidati da currentListing, che qui si riallinea alla provenienza:
-   girando per l'app puo' essere rimasto su un annuncio di un altro
-   venditore, e il riepilogo mostrerebbe la lista sbagliata. */
+/* «Controlla il pacco» → la pagina del riepilogo. currentListing si
+   riallinea alla provenienza: girando per l'app puo' essere rimasto su
+   un annuncio di un altro venditore, e la rilettura del negozio dopo
+   un 409 (rinfrescaSet) guarderebbe il venditore sbagliato. */
 function controllaPacco(){
   haptic();
   if (!setScelte.size)
     { toast('Il pacco è vuoto: tocca «Aggiungi» su qualche oggetto'); return; }
   const orig = listings.find(x=>x.id===paccoDati.origineId);
   if (orig) currentListing = orig;
-  disegnaFoglioSet();
-  el('sheetBg').classList.add('open');
-  el('setSheet').classList.add('open');
+  renderControlla();
+  go('controllapacco');
 }
 /* La rilettura del catalogo del venditore: aggiorna gli annunci in
    memoria dal negozio (limit 100), spegne chi non c'e' piu' e pota
@@ -6505,30 +6567,32 @@ async function rileggiVenditore(l){
   }
 }
 /* Dopo un 409/404 che nomina il pezzo: catalogo riletto, pacco potato,
-   e il foglio si ridisegna — l'utente vede il buco, non un vicolo
-   cieco. Se sotto il foglio c'e' la pagina del pacco, si aggiorna
-   anche lei: le celle non devono raccontare uno stock di prima. */
+   e la vista attiva si ridisegna — l'utente vede il buco, non un
+   vicolo cieco. Se la potatura ha svuotato il pacco, il riepilogo non
+   ha piu' niente da dire e si torna indietro da soli. */
 async function rinfrescaSet(){
   await rileggiVenditore(currentListing);
-  disegnaFoglioSet();
-  if (el('view-pacco')?.classList.contains('active')) renderPacco();
+  rinfrescaViste();
+  if (el('view-controllapacco')?.classList.contains('active') && !setScelte.size)
+    navIndietro();
 }
 /* Il gemello di startBuy: stesso paySheet, stesso poll, ma il body
-   viaggia a righe. Sul no del server (che NOMINA il pezzo) si torna
-   al foglio set rinfrescato. */
+   viaggia a righe. Lo chiama l'«Acquista» della pagina del riepilogo;
+   sul no del server (che NOMINA il pezzo) si resta sulla pagina
+   rinfrescata: l'utente vede il buco, non un vicolo cieco. */
 async function startBuySet(){
   haptic();
   if (VETRINA || DEMO) { closeSheet(); return; }
-  if (setScelte.size < 2) { toast('Spunta almeno due oggetti'); return; }
+  if (setScelte.size < 2)
+    { toast('Con un oggetto solo c\'è l\'acquisto di sempre: aprilo dalla sua scheda'); return; }
   rilancioCorrente = null;
   currentOrderId = null;     /* il patto di startBuy: l'Annulla non deve
                                 mai colpire un ordine di un giro prima */
   const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
     quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}));
   const c = totaleSet();
-  /* il foglio set lascia il posto al foglio invoice: chiusura MIRATA
-     (mai closeSheet: tra poco parte il pollTimer), il velo resta */
-  el('setSheet').classList.remove('open');
+  /* il foglio invoice si apre SOPRA la pagina del riepilogo, che
+     resta sotto com'e' (niente chiusure: il velo fa il suo mestiere) */
   el('payAmount').textContent = setCirca() + fmt(c.tot);
   el('payScomposto').innerHTML = contoScomposto(c.art, c.sped, c.prot, c.tot, 1);
   el('payEurNota').style.display = 'none';
@@ -6544,9 +6608,12 @@ async function startBuySet(){
   const d = await r.json().catch(()=>({}));
   if (!r.ok) {
     toast(d.detail || 'Errore nella creazione dell\'ordine', 6000);
+    /* chiusura MIRATA (mai closeSheet: e' il patto del pollTimer,
+       anche se qui non e' ancora partito) */
     el('paySheet').classList.remove('open');
+    if (!document.querySelector('.sheet.open'))
+      el('sheetBg').classList.remove('open');
     await rinfrescaSet();
-    el('setSheet').classList.add('open');
     return;
   }
   currentOrderId = d.ordine_id;
@@ -6558,64 +6625,11 @@ async function startBuySet(){
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
 }
-/* Il gemello NWC: il riepilogo l'utente l'ha appena visto nel foglio
-   stesso, quindi il tocco su «Compra subito» E' la conferma. Wallet
-   muto = ripiego sulla STESSA invoice nel paySheet, mai doppioni. */
-async function confermaSetSubito(btn){
-  haptic();
-  if (nwcInCorso) return;
-  if (setScelte.size < 2) { toast('Spunta almeno due oggetti'); return; }
-  nwcInCorso = true;
-  const ripristina = bottoneInAttesa(btn, '⚡ Il tuo wallet sta pagando…');
-  nwcRipristina = ripristina;
-  const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
-    quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}));
-  el('setSheet').classList.remove('open');
-  el('sheetBg').classList.remove('open');
-  let invoice = null, cliente = null, satsOrdine = null, scompOrdine = '';
-  try {
-    const r = await fetch(`${API_BASE}/orders`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({righe, consegna: consegnaSetScelta})});
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
-    currentOrderId = d.ordine_id;
-    invoice = d.invoice;
-    satsOrdine = d.prezzo_sats || null;
-    scompOrdine = contoScomposto(d.articolo_sats||d.prezzo_sats,
-      d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1);
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
-    cliente = await clientNwc(walletNwc());
-    await cliente.paga(invoice);
-    setTimeout(()=>{ if (nwcRipristina) { nwcRipristina(); nwcRipristina = null;
-      toast('Pagamento inviato: appena la rete conferma, l\'ordine si sblocca qui', 6000); } }, 60000);
-  } catch(e){
-    const giaPagato = !nwcRipristina;
-    if (nwcRipristina) { nwcRipristina(); nwcRipristina = null; }
-    if (giaPagato) { /* errore tardivo a pagamento avvenuto */ }
-    else if (invoice) {
-      el('payAmount').textContent = fmt(satsOrdine || totaleSet().tot);
-      el('payScomposto').innerHTML = scompOrdine;
-      el('payEurNota').style.display = 'none';
-      el('payInvoice').textContent = invoice;
-      mostraQr(invoice);
-      el('sheetBg').classList.add('open');
-      el('paySheet').classList.add('open');
-      aggiornaPayHint();
-      toast(`Il wallet non ha pagato (${e.message || 'non risponde'}): puoi pagare a mano da qui`, 6000);
-    } else {
-      toast(e.message || 'Compra subito non riuscito: riprova', 6000);
-      await rinfrescaSet();
-      el('sheetBg').classList.add('open');
-      el('setSheet').classList.add('open');
-    }
-  } finally {
-    if (cliente) cliente.chiudi();
-    nwcInCorso = false;
-  }
-}
+/* (Il «⚡ Compra subito» NWC del set — confermaSetSubito — e' morto
+   col foglio del riepilogo, che era il suo unico chiamante: dalla
+   pagina «Controlla il pacco» si passa dal paySheet, dove il wallet
+   paga la stessa invoice. Sul singolo annuncio l'NWC vive come
+   sempre.) */
 
 function openDetail(id){
   currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
@@ -7597,7 +7611,6 @@ function closeSheet(){
   el('offertaSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
-  el('setSheet').classList.remove('open');
   el('paccoSvuotaSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
