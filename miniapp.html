@@ -1430,6 +1430,15 @@
     border-radius:var(--radius);padding:4px 14px;margin:8px 0 22px}
   .ctrl-riga{display:flex;justify-content:space-between;align-items:baseline;
     gap:12px;padding:9px 0;font-size:14px;font-weight:600}
+  /* LA CIFRA NON SI SPEZZA MAI (ago 2026, bug visto in vista sats:
+     con l'etichetta lunga il «≈» andava a capo e finiva SOPRA il
+     numero). La cifra col suo ≈ e la sua unita' e' un gruppo
+     indivisibile; a cedere, coi puntini, e' l'ETICHETTA a sinistra.
+     Vale per ogni riga del conto, nel riepilogo e nella pagina Paga:
+     contoRighe e' il vestito unico di tutte e due. */
+  .ctrl-riga>span:first-child{flex:1 1 auto;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ctrl-riga .mono{white-space:nowrap;flex:0 0 auto}
   .ctrl-riga+.ctrl-riga{border-top:1px dashed var(--line)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
@@ -2711,13 +2720,13 @@
        Aggiungi/Rimuovi sotto ogni card e la spunta verde sulla foto.
        La ✕ e il gesto indietro riportano al dettaglio di provenienza;
        la barra fissa in basso (#barraPacco, gemella di #barraCompra)
-       porta il totale dei soli articoli e «Controlla il pacco», che
+       porta il totale dei soli articoli e «Controlla il carrello», che
        dall'ago 2026 apre la PAGINA del riepilogo (view-controllapacco):
        consegna, spedizione al MAX, stima taglia e conto vivono la'. -->
   <div class="view" id="view-pacco">
     <div class="pacco-testa">
-      <button type="button" class="pacco-x" onclick="chiudiPagPacco()" title="Chiudi" aria-label="Chiudi il pacco">✕</button>
-      <div class="pacco-tit"><b>📦 Il pacco</b><span class="eur-hint" id="paccoSub"></span></div>
+      <button type="button" class="pacco-x" onclick="chiudiPagPacco()" title="Chiudi" aria-label="Chiudi il carrello">✕</button>
+      <div class="pacco-tit"><b>🛒 Il carrello</b><span class="eur-hint" id="paccoSub"></span></div>
       <!-- il toggle €/₿ vive QUI, in alto a destra (deciso da Andrea:
            nella barra in basso rubava spazio al totale) — e' lo stesso
            di searchbar e dettaglio, si accendono insieme via data-cur -->
@@ -2741,8 +2750,8 @@
        scrive renderControlla(); la ← e' navIndietro come ovunque. -->
   <div class="view" id="view-controllapacco">
     <div class="pacco-testa">
-      <button type="button" class="pacco-x" onclick="navIndietro()" title="Torna al pacco" aria-label="Torna al pacco">←</button>
-      <div class="pacco-tit"><b>Controlla il pacco</b><span class="eur-hint" id="ctrlSub"></span></div>
+      <button type="button" class="pacco-x" onclick="navIndietro()" title="Torna al carrello" aria-label="Torna al carrello">←</button>
+      <div class="pacco-tit"><b>Controlla il carrello</b><span class="eur-hint" id="ctrlSub"></span></div>
       <!-- il toggle €/₿ in alto a destra, come nella pagina del pacco:
            stessa preferenza, si accendono insieme via data-cur -->
       <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
@@ -2804,10 +2813,10 @@
     <div class="empty" style="padding-top:34px">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
       <div class="big">💰</div>
-      <b class="empty-title">L'offerta sul pacco sta arrivando</b>
-      <span>Presto potrai proporre il tuo prezzo per l'intero pacco.<br>
+      <b class="empty-title">L'offerta sul carrello sta arrivando</b>
+      <span>Presto potrai proporre il tuo prezzo per l'intero carrello.<br>
         Sui singoli oggetti puoi già farlo, dalla loro scheda.</span>
-      <button class="btn orange" onclick="navIndietro()">← Torna al pacco</button>
+      <button class="btn orange" onclick="navIndietro()">← Torna al carrello</button>
     </div>
   </div>
 
@@ -3190,7 +3199,10 @@
        spazio al numero). -->
   <div id="barraPacco">
     <div class="pacco-somma"><b class="mono" id="paccoTot"></b><span id="paccoConta"></span></div>
-    <button class="btn orange" id="paccoControlla" onclick="controllaPacco()">Controlla il pacco</button>
+    <!-- «Controlla e paga» (ago 2026, decisione di Andrea): il bottone
+         porta al riepilogo PRIMA di pagare, e il nome dice la sequenza —
+         Aggiungi al carrello → Controlla e paga → Paga. -->
+    <button class="btn orange" id="paccoControlla" onclick="controllaPacco()">Controlla e paga</button>
   </div>
 
   <nav>
@@ -3301,7 +3313,7 @@
     <h3 id="paccoSvuotaTit">Vuoi ignorare le modifiche?</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600;
       line-height:1.5;margin-bottom:14px">Non potrai annullare questa
-      azione: il pacco si svuota e si ricomincia da capo.</div>
+      azione: il carrello si svuota e si ricomincia da capo.</div>
     <button class="btn orange" onclick="svuotaPacco()">Sì, ignora le modifiche</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
@@ -6276,10 +6288,17 @@ async function sezioneAltriOggetti(l){
      Niente piu' vestito di cartone: e' il ghost di casa come tutti
      gli altri secondari. Il tetto passa da 6 a 8, che con due
      colonne fanno quattro righe piene invece di tre. */
+  /* Se il venditore ha SOLO articoli digitali il carrello non esiste
+     per lui: i digitali si comprano singolarmente (la regola della
+     griglia del carrello), e la striscia non deve portarci. Il
+     giudizio guarda l e i 7 della striscia: un pezzo fisico oltre il
+     settimo e' un caso raro, e al piu' si nasconde un bottone in piu'. */
+  const tuttoDigitale = l.consegna==='digitale'
+    && altri.every(x => x.consegna==='digitale');
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
-      ${DEMO || astaE(l) ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">📦 Aggiungi al pacco</button></div>`}
+      ${DEMO || astaE(l) || tuttoDigitale ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>`}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
 }
@@ -6800,7 +6819,10 @@ function ctaAcquisto(){
   if (d.tipo==='set') startBuySet(); else startBuy();
 }
 /* ---------------- la pagina del pacco (ago 2026) ----------------
-   «📦 Aggiungi al pacco» dal dettaglio apre una PAGINA in stile
+   Per gli utenti si chiama CARRELLO (ago 2026, decisione di Andrea):
+   i nomi interni restano «pacco» — rinominarli sarebbe un refactor di
+   massa su CSS, viste e chiavi di navigazione, contro la regola dei
+   diff piccoli. «🛒 Aggiungi al carrello» dal dettaglio apre una PAGINA in stile
    vetrina: il negozio del venditore, dove il pacco si compone toccando
    Aggiungi sulle card. Il RIEPILOGO e' la pagina «Controlla il pacco»
    (renderControlla): consegna, spedizione al MAX, stima taglia e conto
@@ -6815,14 +6837,20 @@ function apriPacco(){
   const l = currentListing;
   if (!l) return;
   if (VETRINA) {
-    invitoTelegram('Per comporre un pacco serve l\'app vera dentro Telegram: '
+    invitoTelegram('Per riempire il carrello serve l\'app vera dentro Telegram: '
       + 'è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
   if (!paccoDati || paccoDati.sellerId !== l.sellerId) {
-    /* venditore nuovo = pacco nuovo; lo stesso venditore ritrova il
-       suo pacco com'era, con l'annuncio di provenienza in piu' */
+    /* venditore nuovo = carrello nuovo; lo stesso venditore ritrova
+       il suo carrello com'era, con l'annuncio di provenienza in piu'.
+       Se c'era una spesa in corso da un ALTRO venditore, il ricambio
+       si DICE (ago 2026): e' il modello — un venditore alla volta,
+       cosi' la spedizione e' una sola — non un errore, e in silenzio
+       sembrerebbe roba sparita. */
+    if (paccoDati && setScelte.size)
+      toast('Carrello nuovo: è di un venditore alla volta, così la spedizione è una sola');
     setScelte = new Map();
     consegnaSetScelta = 'spedizione';
     paccoDati = {sellerId: l.sellerId, origineId: l.id};
@@ -6885,7 +6913,7 @@ function svuotaPacco(){
   if (!document.querySelector('.sheet.open'))
     el('sheetBg').classList.remove('open');
   navIndietro();
-  toast('Pacco svuotato');
+  toast('Carrello svuotato');
 }
 /* Gli annunci della pagina: i soli ATTIVI del venditore del pacco,
    provenienza in testa, poi i componibili prima degli esclusi.
@@ -6911,18 +6939,18 @@ function annunciPacco(){
    e altezza identiche, cosi' la cella non salta cambiando faccia. */
 function cellaPacco(x){
   const qta = setScelte.get(x.id) || 0;
-  /* col pacco pieno le righe NUOVE si spengono col perche' scritto:
+  /* col carrello pieno le righe NUOVE si spengono col perche' scritto:
      meglio del tocco che risponde con un toast (il campo non mente) */
   const dis = motivoEsclusione(x)
     || (!qta && setScelte.size >= MAX_PACCO
-        ? `il pacco è pieno: ${MAX_PACCO} oggetti diversi` : '');
+        ? `il carrello è pieno: ${MAX_PACCO} oggetti diversi` : '');
   const segno = !qta ? ''
     : `<span class="pacco-spunta${qta>1?' conta':''}" aria-hidden="true">${qta>1?fmt(qta):'✓'}</span>`;
   const comando = qta
     ? `<div class="btn ghost pacco-btn dentro">${stepperMini(qta,
          `setQtaPacco(${x.id},-1)`, `setQtaPacco(${x.id},1)`,
          false, qta >= (x.quantita||1),
-         qta>1 ? 'Un pezzo in meno' : 'Togli dal pacco')}</div>`
+         qta>1 ? 'Un pezzo in meno' : 'Togli dal carrello')}</div>`
     : `<button type="button" class="btn ghost pacco-btn"${dis?' disabled':''}
         onclick="aggiungiAlPacco(${x.id})">Aggiungi</button>`;
   return `<div class="pacco-cella" data-id="${x.id}">
@@ -6933,10 +6961,26 @@ function cellaPacco(x){
 function renderPacco(){
   if (!paccoDati) return;
   const tutti = annunciPacco();
-  el('paccoGrid').innerHTML = tutti.map(cellaPacco).join('')
+  /* I SOLO-DIGITALI NON ENTRANO IN GRIGLIA (ago 2026, decisione di
+     Andrea): nel carrello non entreranno mai per regola, e una cella
+     spenta per sempre non e' un'informazione — e' rumore. Al loro
+     posto UNA riga in fondo che dice la regola. Gli esclusi
+     TEMPORANEI (asta, incompatibili, senza consegna dichiarata)
+     restano visibili e spenti col loro motivo, come sempre. */
+  const inGriglia = tutti.filter(x => x.consegna!=='digitale');
+  const digitali = tutti.length - inGriglia.length;
+  const rigaDigitali = digitali
+    ? '<div class="eur-hint" style="grid-column:1/-1">💾 Gli articoli digitali si comprano singolarmente, dalla loro scheda.</div>'
+    : '';
+  el('paccoGrid').innerHTML =
+    (inGriglia.map(cellaPacco).join('') + rigaDigitali)
     || '<div class="eur-hint" style="grid-column:1/-1">Questo venditore non ha oggetti attivi.</div>';
-  el('paccoSub').textContent = (tutti[0] ? `di ${tutti[0].seller} — ` : '')
-    + 'un pacco, una spedizione sola';
+  /* il sottotitolo dice il MODELLO, in una riga corta: un venditore
+     alla volta, ed e' quel che permette la spedizione unica. SENZA il
+     «di {venditore}» di prima: misurato a 375px, col nome davanti la
+     riga si tronca coi puntini proprio sulla parte che deve dire — e
+     il venditore e' gia' su ogni card e nel riepilogo. */
+  el('paccoSub').textContent = 'un venditore alla volta, spedizione unica';
   aggiornaBarraPacco();
 }
 /* Il totale della barra: i SOLI articoli, in valuta dello spettatore.
@@ -6957,8 +7001,10 @@ function aggiornaBarraPacco(){
   /* sui numeri lunghi il corpo scala (vedi il CSS della barra): oltre
      le 6 cifre in sats la riga piena non regge i 375px */
   t.classList.toggle('lungo', t.textContent.length > 12);
+  /* niente «nel carrello» dopo il numero: la barra vive sotto il
+     titolo «Il carrello», e a 375px la coda si troncava coi puntini */
   el('paccoConta').textContent = pezzi
-    ? `${pezzi} pezz${pezzi===1?'o':'i'} nel pacco` : 'il pacco è vuoto';
+    ? `${pezzi} pezz${pezzi===1?'o':'i'}` : 'il carrello è vuoto';
 }
 /* GRIGLIA E RIEPILOGO SONO DUE VISTE DELLO STESSO STATO (`setScelte`,
    che e' il conteggio UNICO): la quantita' toccata in una si vede
@@ -6978,7 +7024,7 @@ function aggiungiAlPacco(id){
   if (!x || setScelte.has(id)) return;
   if (motivoEsclusione(x)) return;      /* cintura: il bottone era spento */
   if (setScelte.size >= MAX_PACCO)      /* il tetto conta le RIGHE, vedi MAX_PACCO */
-    { toast(`Il pacco è pieno: al massimo ${MAX_PACCO} oggetti diversi`); return; }
+    { toast(`Il carrello è pieno: al massimo ${MAX_PACCO} oggetti diversi`); return; }
   setScelte.set(id, 1); haptic();
   /* si ridisegna TUTTA la griglia, non la sola cella: l'intersezione
      delle strade puo' aver spento (o riacceso) altri candidati */
@@ -7024,7 +7070,7 @@ function aggiornaPezziCella(id, x){
 function controllaPacco(){
   haptic();
   if (!setScelte.size)
-    { toast('Il pacco è vuoto: tocca «Aggiungi» su qualche oggetto'); return; }
+    { toast('Il carrello è vuoto: tocca «Aggiungi» su qualche oggetto'); return; }
   const orig = listings.find(x=>x.id===paccoDati.origineId);
   if (orig) currentListing = orig;
   renderControlla();
