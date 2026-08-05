@@ -3646,6 +3646,61 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   le stesse 15 query più il POLSO che l'orologio non racconta perché
   non è un allarme (chi sconta, gli ordini scontati, i pagamenti
   congelati e da quanto) — e l'avviso lo nomina.
+  IL PANNELLO ADMIN TIENE APERTO SOLO CIÒ CHE ASPETTA (ago 2026): le
+  voci GIÀ DECISE stavano mescolate alla coda della revisione, e il
+  registro di moderazione — che è storia per definizione — stava
+  aperto sempre. Ora `cassettoAdm` (il pattern `.acc` del Profilo,
+  `#adminStats .acc{margin-top:22px}` perché qui i cassetti stanno in
+  fila con dei section-label) tiene chiusi «↩︎ Decisi di recente» e
+  «🛡 Registro moderazione»; nel DATABASE non si tocca niente, cambia
+  la sola vista. Misurato a 375px: il pannello passa da 2600 a 1529px.
+  IL CENSIMENTO DELLE ALTRE CODE, che è la parte da non rifare: le
+  altre tre — 🧊 pagamenti incerti, ⏳ in revisione, 🗂 categorie —
+  sono TUTTE in attesa di una decisione e restano aperte; le dispute
+  non sono una coda di questo pannello (vivono negli Ordini); statistiche
+  e lista utenti non sono code ma il fondale su cui si decide, e la
+  lista è pure il motore della ricerca di «Scrivi a un utente».
+  I cassetti NASCONO CHIUSI ma RESTANO come li lasci (`accAdmAperti`,
+  un Set che parte vuoto — e quello È il «chiuso di serie»): il
+  pannello si ridisegna INTERO a ogni decisione, e senza memoria si
+  richiuderebbe sotto le dita di chi sta sistemando il secondo
+  sbaglio. La conta del registro dice «ultime 20 di N» e non «20
+  righe», che di un append-only sarebbe falso — per questo
+  `/api/admin/stats` porta `moderazione.registro_totale`.
+  LO STATO DELLE LEVE (ago 2026, nato da «è già successo di ricordare
+  male»): `GET /api/admin/leve` (solo moderatori) + cassetto
+  «⚙️ Stato delle leve» in fondo al pannello — 69 leve in 12 gruppi
+  col valore con cui il processo sta girando ADESSO. Si leggono i
+  GLOBALI del modulo, cioè il valore già risolto fra la riga del
+  config e il default del codice: un elenco dei default sarebbe una
+  seconda bugia da leggere, ed è la trappola di MAX_PREFERITI.
+  SI GUARDA E BASTA — nessuna rotta che scrive, e non è pigrizia:
+  ASTA_ABILITATA, IMPORT_NOSTR_APERTO e AUTO_SBLOCCO_ATTIVO nascono
+  spente nel codice perché accenderle costi un gesto, e una leva che
+  si accende da un telefono è una leva che si accende per sbaglio.
+  I SEGRETI NON ESCONO MAI (chiavi LNbits, token del bot, nsec,
+  segreto del webhook, id del canale, percorso del DB, id dei
+  moderatori — di cui esce il CONTEGGIO). Dove il segreto È
+  l'interruttore esce il solo FATTO, chiesto alla stessa guardia che
+  usa il server (`_NOSTR is not None`, `webhook_attivo()`): rispondono
+  «funziona?», che è la domanda giusta e non rivela niente. Il NOME
+  della chiave invece esce apposta — serve per andarla a cambiare, ed
+  è in chiaro in config_esempio.py. Fuori dal censimento, dichiarato:
+  i segreti di cui sopra, MODELLO_RICERCA (una stringa, non una leva)
+  e NPUB_VENDITORE/VENDITORE_ID, che sono di importa_nostr.py lanciato
+  a mano e non del server.
+  Due cose tengono la pagina leggibile invece che un muro: `_leva`
+  mostra la nota «cosa comporta» SOLO nello stato che la merita (11
+  righe su 69 oggi — settanta spiegazioni in fila non le legge
+  nessuno), e l'ALLARME è un'altra cosa dalla nota — il valore che fa
+  paura non è sempre lo stesso (MODALITA_COLLAUDO spaventa ACCESA,
+  ORE_INITDATA SPENTA), quindi lo decide il chiamante. La conta sull'header lo dice a cassetto CHIUSO
+  («⚠️ N da guardare»): un cartello che si vede solo aprendo un
+  cassetto non lo vede nessuno. `prove.py` gira il censimento due
+  volte — tutto acceso e tutto spento — con segreti riconoscibili in
+  un config finto e li cerca nel JSON: aggiungere una leva non
+  richiede di aggiornare la prova (le chiavi non dichiarate valgono 7;
+  se la leva nuova è una LISTA la prova esplode e va aggiunta a mano).
   PER GLI UTENTI SI CHIAMA CARRELLO (ago 2026, decisione di Andrea):
   la parola «pacco» nei testi resta SOLO dove significa la spedizione
   fisica (taglia del pacco, «segui il pacco», «Spedisci il set (un
