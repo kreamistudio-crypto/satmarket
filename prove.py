@@ -1339,6 +1339,11 @@ def prove_pagamento_incerto():
                "cambio_btc_eur": _niente, "notifica": _niente,
                "premia_distintivi": _niente, "polso_ordini_admin": _niente,
                "notifica_admin": _niente, "_payment_hash": _niente,
+               # Gli XP dell'affare concluso (ago 2026): qui non si
+               # misurano, ma _sblocca_sats li chiama — e senza questi
+               # due la prova ESPLODE invece di fallire, che e' la
+               # trappola scritta in CLAUDE.md sulle funzioni estratte.
+               "premia_xp": _niente, "xp_ordine": lambda *a: 0,
                "print": lambda *a, **k: None, **ESITI}
         exec(pezzo_async("_congela_pagamento"), amb)
         exec(pezzo_async("_sblocca_sats"), amb)
