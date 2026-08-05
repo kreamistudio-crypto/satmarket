@@ -6485,12 +6485,18 @@ async function caricaPreventivoPacco(){
   const f = firmaSet();
   if (!f || (ctrlPrev && ctrlPrev.firma === f)) return;
   ctrlPrev = {firma: f, dati: null};   /* prenota: mai due fetch gemelli */
+  /* con UNA riga il body e' quello MONO (ago 2026): il preventivo-set
+     sotto le due righe lo rifiuta il server per regola, e il riepilogo
+     deve dire comunque il conto del SERVER, mai la stima — le chiavi
+     della risposta sono le stesse e renderControlla non se ne accorge */
+  const righe = [...setScelte].map(([id, qta]) =>
+    ({annuncio_id:id, quantita:qta,
+      offerta_id: offertaAccettataPer(id)?.id || 0}));
+  const body = righe.length === 1 ? righe[0] : {righe};
   try {
     const r = await fetch(`${API_BASE}/orders/preventivo`, {method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({righe: [...setScelte].map(([id, qta]) =>
-        ({annuncio_id:id, quantita:qta,
-          offerta_id: offertaAccettataPer(id)?.id || 0}))})});
+      body: JSON.stringify(body)});
     const d = await r.json().catch(()=>({}));
     if (r.ok && ctrlPrev && ctrlPrev.firma === f) ctrlPrev.dati = d;
   } catch(e) {}
@@ -6578,8 +6584,26 @@ function apriAcquisto(l){
 function apriAcquistoSet(){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
-  if (setScelte.size < 2)
-    { toast('Con un oggetto solo c\'è l\'acquisto di sempre: aprilo dalla sua scheda'); return; }
+  if (!setScelte.size)
+    { toast('Il carrello è vuoto: tocca «Aggiungi» su qualche oggetto'); return; }
+  /* UNA RIGA SOLA = ACQUISTO SINGOLO DIETRO LE QUINTE (ago 2026,
+     decisione di Andrea): il set a una riga non esiste — il server lo
+     rifiuta per regola (2..MAX_RIGHE_SET) e la guardia dei soldi non
+     si ammorbidisce — ma l'utente col carrello da un articolo deve
+     solo poter andare avanti. Quindi da qui si imbocca il binario
+     MONO collaudato: stessa pagina Paga, stesso ordine di sempre
+     (offerte, lampo e ripresa gia' funzionano la'). qtaScelta e' la
+     variabile che apriAcquisto legge, lo stesso passamano dello
+     stepper del dettaglio. */
+  if (setScelte.size === 1) {
+    const [id, qta] = [...setScelte][0];
+    const l = listings.find(t=>t.id===id);
+    if (!l || l.stato!=='attivo')
+      { toast('Questo oggetto non è più disponibile'); rinfrescaSet(); return; }
+    qtaScelta = Math.min(qta, l.quantita||1);
+    apriAcquisto(l);
+    return;
+  }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
              preventivo:null, via:'', punto:'', errore:''};
   go('acquisto');
