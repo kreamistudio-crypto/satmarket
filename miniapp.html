@@ -6740,8 +6740,14 @@ function renderAcquisto(){
       if (s.cambio_assente)
         return `<div class="via-opzione off"><span class="via-nome">${nomeVia(s.via)}
           <span class="via-sped">il cambio euro non è disponibile: riprova tra poco</span></span></div>`;
-      const nota = (s.via==='punto' && s.fallback_casa)
-        ? `<span class="via-sped">come a casa</span>` : '';
+      /* «Consigliato» sulla via punto (ago 2026, decisione di Andrea):
+         la pillola CONSIGLIA la strada, non spiega la tariffa — il
+         «come a casa» del fallback e' sparito, e per chi compra la
+         verita' e' gia' la cifra mostrata (che con la tariffa unica
+         E' quella di casa). Il flag fallback_casa resta nel payload
+         del preventivo: e' un fatto del server, non piu' un testo. */
+      const nota = s.via==='punto'
+        ? `<span class="via-sped">Consigliato</span>` : '';
       const cifra = (s.via==='casa' || s.via==='punto')
         ? (s.spedizione_sats>0
             ? `<span class="via-tot">${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'', s.spedizione_eur)}</span>`
