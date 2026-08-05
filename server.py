@@ -7599,13 +7599,19 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
     registro = [dict(r) for r in con.execute(
         "SELECT annuncio_id, titolo, strato, esito, motivo, deciso_da, "
         "creato FROM moderazione_log ORDER BY id DESC LIMIT 20")]
+    # Quante righe ha il registro in tutto: da quando vive in un
+    # cassetto chiuso, il conteggio sull'header dice «ultime 20 di N»
+    # e non «20 righe», che di un registro append-only sarebbe falso.
+    registro_totale = con.execute(
+        "SELECT COUNT(*) AS n FROM moderazione_log").fetchone()["n"]
     con.close()
     return {"utenti": utenti, "annunci_attivi": annunci,
             "affari_conclusi": conclusi["n"], "volume_sats": conclusi["volume"],
             "lista_utenti": lista, "in_revisione": in_revisione,
             "moderazione": {"ultimi_30gg": riepilogo,
                             "motivi_frequenti": motivi,
-                            "registro": registro}}
+                            "registro": registro,
+                            "registro_totale": registro_totale}}
 
 
 @app.post("/api/admin/utenti/{tg_id}/messaggio")

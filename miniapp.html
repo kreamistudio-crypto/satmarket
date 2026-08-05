@@ -1087,6 +1087,13 @@
   .acc.open .acc-h .fr{transform:rotate(180deg)}
   .acc-b{display:none;padding:0 14px 14px}
   .acc.open .acc-b{display:block}
+  /* Nel pannello dei moderatori i cassetti tengono cio' che e' GIA'
+     successo — le decisioni prese, il registro: aperto resta solo cio'
+     che aspetta una decisione.
+     Il margine e' quello delle sezioni vicine, non i 10px
+     di serie: qui i cassetti stanno in fila con dei section-label. */
+  #adminStats .acc{margin-top:22px}
+
   /* le pillole del tema nel cassetto Aspetto: gemelle di quelle del
      canale avvisi, ma statiche nel markup (il tema e' solo client) */
   .tema-pill{font:inherit;font-size:12.5px;font-weight:700;border:1px solid var(--line);
@@ -11874,10 +11881,10 @@ async function loadAdminStats(){
       ${rev.length ? `
       <div class="section-label" style="padding:26px 0 0">⏳ In revisione (${rev.length})</div>
       <div style="margin-top:10px">${rev.map(rigaRevisione).join('')}</div>` : ''}
-      ${decisi.length ? `
-      <div class="section-label" style="padding:26px 0 0">↩︎ Decisi di recente (${decisi.length})</div>
-      <div class="sub" style="margin-top:6px">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
-      <div style="margin-top:10px">${decisi.map(rigaDecisa).join('')}</div>` : ''}
+      ${decisi.length ? cassettoAdm('accAdmDecisi', '↩︎',
+        'Decisi di recente', decisi.length, `
+        <div class="sub">Si può ancora ripensarci: rimette l'annuncio in attesa.</div>
+        <div style="margin-top:10px">${decisi.map(rigaDecisa).join('')}</div>`) : ''}
       ${boxCategorie()}
       <div class="section-label" style="padding:26px 0 0">📊 Statistiche (solo moderatori)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
@@ -12177,26 +12184,54 @@ async function decidiCategorie(i, esito){
   loadAdminStats();
 }
 
+/* ---- i cassetti del pannello dei moderatori (ago 2026) ----
+   Il pannello mostra APERTO solo cio' che aspetta una decisione. Quel
+   che e' gia' successo — le decisioni prese, il registro — sta in un
+   cassetto CHIUSO: lo storico non sparisce (serve a chi ha deciso per
+   sbaglio), ma smette di ingombrare la coda di chi decide adesso.
+   NASCONO CHIUSI e RESTANO come li lasci: il pannello si ridisegna
+   INTERO a ogni decisione, e senza memoria un cassetto aperto si
+   richiuderebbe sotto le dita di chi sta ancora sistemando. Il Set
+   parte vuoto, e quello e' il «chiuso di serie». */
+const accAdmAperti = new Set();
+function toggleAccAdm(id){
+  accAdmAperti.has(id) ? accAdmAperti.delete(id) : accAdmAperti.add(id);
+  toggleAcc(id);
+}
+/* id, emoji e titolo sono NOSTRI, mai testo di un utente: nell'onclick
+   viaggia solo l'id letterale (il patto del filtro-alfabeto). */
+const cassettoAdm = (id, em, titolo, conta, dentro) => `
+    <div class="acc${accAdmAperti.has(id)?' open':''}" id="${id}">
+      <button class="acc-h" onclick="toggleAccAdm('${id}')"><span class="em">${em}</span>${titolo} <span class="conta">${conta}</span><span class="fr">▾</span></button>
+      <div class="acc-b">${dentro}</div>
+    </div>`;
+
 /* Il registro della moderazione: riepilogo degli ultimi 30 giorni +
    le ultime decisioni. E' con QUESTI dati che il prompt si corregge
-   a mano — mai da solo. */
+   a mano — mai da solo. Sta in un cassetto perche' e' storia, non
+   coda: nel database non si tocca NIENTE, sparisce solo dalla vista
+   aperta. La conta dice «ultime 20 di N» e non «20 righe», che di un
+   registro append-only sarebbe falso. */
 function registroModerazione(mod){
   if (!mod) return '';
   const c = mod.ultimi_30gg || {};
   const totale = (c.vietato||0)+(c.dubbio||0)+(c.pubblicato||0)+(c.rifiutato||0)+(c.rimosso||0);
-  if (!totale && !(mod.registro||[]).length) return '';
+  const righe = mod.registro || [];
+  if (!totale && !righe.length) return '';
   const motivi = mod.motivi_frequenti || [];
+  const tutte = mod.registro_totale || righe.length;
   const EMOJI_ESITO = {vietato:'🚫', dubbio:'⏳', pubblicato:'✅', rifiutato:'❌', rimosso:'🛡', riaperto:'↩︎'};
-  return `
-    <div class="section-label" style="padding:22px 0 0">🛡 Registro moderazione</div>
-    <div class="sub" style="margin-top:8px;font-weight:700">Ultimi 30 giorni: ${c.pubblicato||0} sbloccati · ${c.rifiutato||0} rifiutati · ${c.vietato||0} bloccati · ${c.dubbio||0} in dubbio${motivi.length?` — motivo più frequente: «${esc(motivi[0].motivo)}» (${motivi[0].n})`:''}</div>
+  return cassettoAdm('accAdmRegistro', '🛡', 'Registro moderazione',
+    tutte > righe.length ? `ultime ${righe.length} di ${fmt(tutte)}`
+                         : `${fmt(tutte)} righe`, `
+    <div class="sub" style="font-weight:700">Ultimi 30 giorni: ${c.pubblicato||0} sbloccati · ${c.rifiutato||0} rifiutati · ${c.vietato||0} bloccati · ${c.dubbio||0} in dubbio${motivi.length?` — motivo più frequente: «${esc(motivi[0].motivo)}» (${motivi[0].n})`:''}</div>
     <div style="max-height:220px;overflow-y:auto;margin-top:8px;background:var(--card);border:1.5px solid var(--line);border-radius:14px">
-      ${(mod.registro||[]).map(v => `
+      ${righe.map(v => `
         <div style="padding:9px 14px;border-bottom:1px solid var(--line);font-size:12px">
           <b>${EMOJI_ESITO[v.esito]||'•'} ${esc(v.titolo||('#'+v.annuncio_id))}</b>
           <span style="color:var(--muted);font-weight:600"> — ${esc(v.esito)}${v.motivo?` (${esc(v.motivo)})`:''} · ${v.strato}${v.deciso_da?` · admin ${v.deciso_da}`:''} · ${new Date(v.creato*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>
         </div>`).join('')}
-    </div>`;
+    </div>`);
 }
 
 /* La decisione dalla Mini App: stesso cuore della tastiera Telegram
