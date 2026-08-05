@@ -19,7 +19,13 @@ QUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, QUI)
 os.chdir(QUI)                      # carica_comuni legge dati/comuni.csv
 
-PASSATE, FALLITE = 0, 0
+PASSATE, FALLITE, SALTATE = 0, 0, 0
+
+# In CI una prova saltata e' una prova ROTTA: li' le dipendenze si
+# installano apposta, quindi se una manca vuol dire che qualcosa e'
+# andato storto. In locale invece chi non ha Pillow deve poter girare
+# le prove lo stesso, e gli basta vederlo scritto.
+SEVERE = bool(os.environ.get("PROVE_SEVERE"))
 
 
 def prova(nome, atteso, avuto):
@@ -30,6 +36,17 @@ def prova(nome, atteso, avuto):
     else:
         FALLITE += 1
         print(f"  ✗ {nome}\n      atteso: {atteso!r}\n      avuto:  {avuto!r}")
+
+
+def salta(nome, perche):
+    """Una prova che non si puo' girare. Va CONTATA, non sussurrata:
+    per mesi il controllo dell'inchiostro delle illustrazioni non e'
+    mai girato in CI (Pillow non si installava) e a dirlo c'era una
+    riga discreta in mezzo a duecento spunte — dal di fuori sembrava
+    tutto verde perche' era tutto verde: quella prova non c'era."""
+    global SALTATE
+    SALTATE += 1
+    print(f"  · SALTATA: {nome} — {perche}")
 
 
 def pezzo(nome, fine="\n\n\n"):
@@ -386,7 +403,8 @@ def prove_categorie():
     try:
         from PIL import Image
     except ImportError:
-        print("  · Pillow assente: salto il controllo del ritaglio")
+        salta("il pareggio dell'inchiostro delle illustrazioni",
+              "Pillow non e' installata")
     else:
         # Le illustrazioni devono essere PAREGGIATE, cioe' nessuna deve
         # coprire molto piu' inchiostro delle altre una volta resa in
@@ -1382,9 +1400,15 @@ def main():
             FALLITE += 1
             print(f"  ✗ {f.__name__} è esplosa: {type(e).__name__}: {e}")
     print("\n" + "=" * 58)
-    print(f"  {PASSATE} passate, {FALLITE} fallite")
+    conto = f"  {PASSATE} passate, {FALLITE} fallite"
+    if SALTATE:
+        conto += f", {SALTATE} SALTATA" if SALTATE == 1 else \
+                 f", {SALTATE} SALTATE"
+    print(conto)
+    if SALTATE and SEVERE:
+        print("  (con PROVE_SEVERE una saltata vale una fallita)")
     print("=" * 58)
-    return 1 if FALLITE else 0
+    return 1 if FALLITE or (SALTATE and SEVERE) else 0
 
 
 if __name__ == "__main__":

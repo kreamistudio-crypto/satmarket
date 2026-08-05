@@ -26,12 +26,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Solo le due che servono alle prove: websocket-client perche'
-      # importa_nostr la importa in cima, e basta. Pillow, coincurve,
-      # anthropic & co. non entrano — i pezzi che le usano sono
-      # fail-open per costruzione e qui non si esercitano.
+      # Solo quelle che servono ALLE PROVE: websocket-client perche'
+      # importa_nostr la importa in cima, e Pillow perche' il controllo
+      # del pareggio delle illustrazioni la vuole.
+      #
+      # Pillow qui non c'e' mai stata, e questo commento diceva a
+      # chiare lettere che era voluto: il risultato e' che quella prova
+      # in CI non e' MAI girata — si saltava da sola, in silenzio, e in
+      # locale passava perche' in locale Pillow c'e'. Misurato: 211
+      # prove invece di 212. Coincurve, anthropic & co. restano fuori
+      # per davvero: i pezzi che le usano sono fail-open per
+      # costruzione e qui non si esercitano.
       - name: Installa il minimo indispensabile
-        run: pip install --quiet websocket-client
+        run: pip install --quiet websocket-client pillow
 
       # Primo scalino: tutto compila. Banale e imbattibile — becca il
       # refuso prima che arrivi sul VPS, che e' esattamente il modo
@@ -51,7 +58,17 @@ jobs:
              encoding='utf-8').read())"
 
       # Terzo scalino: le prove vere.
+      #
+      # PROVE_SEVERE e' la cintura del passo qui sopra: aggiungere
+      # Pillow ripara oggi, questa riga ripara il giorno che qualcuno
+      # la toglie. Qui le dipendenze si installano apposta, quindi una
+      # prova che si salta vuol dire che qualcosa e' andato storto e
+      # la CI deve diventare rossa. In locale, dove chi non ha Pillow
+      # deve poter girare le prove lo stesso, la variabile non c'e' e
+      # la saltata resta un avviso contato.
       - name: Le prove
+        env:
+          PROVE_SEVERE: "1"
         run: python prove.py
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
