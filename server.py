@@ -1354,12 +1354,20 @@ def init_db():
                     "comune TEXT DEFAULT ''",
                     # spedizioniere (ago 2026, pagina d'acquisto): con
                     # che rete di punti di ritiro spedisce il negozio
-                    # (catalogo SPEDIZIONIERI). '' = non dichiarato =
-                    # la strada «punto di ritiro» e' SPENTA sui suoi
-                    # annunci: senza sapere la rete, il compratore
-                    # scriverebbe un punto inutilizzabile. La funzione
-                    # si accende venditore per venditore, dal Profilo.
-                    "spedizioniere TEXT DEFAULT ''"):
+                    # (catalogo SPEDIZIONIERI). '' = non dichiarato —
+                    # dal secondo giro del cantiere la via punto resta
+                    # OFFERTA lo stesso (decisione di Andrea: meglio
+                    # l'accordo in chat che la porta chiusa), e il
+                    # dichiarato serve a dire al compratore la rete
+                    # («Spedisce con InPost») invece della riga
+                    # «accordatevi in chat».
+                    "spedizioniere TEXT DEFAULT ''",
+                    # il timbro della notifica una-tantum ai venditori
+                    # che spediscono senza spedizioniere dichiarato
+                    # (avvisa_spedizioniere_mancante): UNA volta per
+                    # venditore, mai un giro dopo — e' una colonna e
+                    # non memoria, deve sopravvivere ai riavvii
+                    "avvisato_spedizioniere INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -9210,12 +9218,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
-        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
-                         (venditore_id,)).fetchone()
-        if not sp or not sp["spedizioniere"]:
-            con.close()
-            raise HTTPException(400, "Questo venditore non spedisce ai "
-                                     "punti di ritiro")
+        # NIENTE gate sullo spedizioniere (secondo giro, decisione di
+        # Andrea che supera quella del primo: meglio l'accordo in chat
+        # che la porta chiusa) — senza rete dichiarata il client l'ha
+        # gia' detto al compratore, e il punto arriva comunque al
+        # venditore nell'ordine
         if not punto:
             con.close()
             raise HTTPException(400, "Indica il punto di ritiro (nome o "
@@ -9396,17 +9403,18 @@ async def _compra_set(user: dict, d: dict) -> dict:
 RIPRESA_INVOICE_S = 720
 
 
-def _strade_preventivo(annunci: list, spedizioniere: str,
-                       articolo: int, cambio: float,
+def _strade_preventivo(annunci: list, articolo: int, cambio: float,
                        disponibili: set) -> list:
     """Le strade del preventivo coi loro totali, nell'ordine FISSO
     ritiro → casa → punto → digitale. `disponibili` le decide il
     CHIAMANTE — per il mono le strade dell'annuncio, per il set
     l'INTERSEZIONE delle fisiche: rifarle qui dall'unione direbbe una
     strada che il set non offre. `annunci` sono le righe su cui fare
-    il MAX delle tariffe (una sola per il mono); la via 'punto'
-    esiste solo con lo spedizioniere dichiarato (decisione di Andrea:
-    senza rete il compratore scriverebbe un punto inutilizzabile).
+    il MAX delle tariffe (una sola per il mono); la via 'punto' c'e'
+    SEMPRE dove c'e' la spedizione — anche senza spedizioniere
+    dichiarato (secondo giro, la decisione che SUPERA il gate: meglio
+    l'accordo in chat che la porta chiusa; la rete, se dichiarata, la
+    dice il campo `spedizioniere` della risposta).
     Una tariffa ancorata all'euro senza cambio = strada che esce con
     `cambio_assente` e senza numeri: si spegne col motivo, le altre
     restano comprabili — mai un 503 che spegne anche il ritiro."""
@@ -9424,9 +9432,13 @@ def _strade_preventivo(annunci: list, spedizioniere: str,
     if "ritiro" in disponibili:
         _entra("ritiro", 0, False)
     if "spedizione" in disponibili:
+        # la via punto c'e' SEMPRE dove c'e' la spedizione (secondo
+        # giro, decisione di Andrea che SUPERA il gate dello
+        # spedizioniere: meglio l'accordo in chat che la porta
+        # chiusa) — senza spedizioniere il client mostra la riga
+        # onesta «accordatevi in chat», la tariffa e' il fallback
+        # casa di sempre
         for v in ("casa", "punto"):
-            if v == "punto" and not spedizioniere:
-                continue
             sped, stima_sped = 0, False
             for a in annunci:
                 t_sats, t_eur = _tariffa_dichiarata(a, v)
@@ -9559,7 +9571,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
             "spedizioniere": spedizioniere,
-            "strade": _strade_preventivo([a], spedizioniere, articolo,
+            "strade": _strade_preventivo([a], articolo,
                                          cambio, disponibili)}
 
 
@@ -9709,8 +9721,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             "stima": listino_eur,
             "spedizioniere": spedizioniere,
             "strade": _strade_preventivo(list(tutti.values()),
-                                         spedizioniere, articolo,
-                                         cambio, strade),
+                                         articolo, cambio, strade),
             "righe": righe}
 
 
@@ -9784,14 +9795,13 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # La VIA della spedizione (ago 2026, pagina d'acquisto): 'casa' e'
     # il default — i client di ieri non mandano il campo e per loro
     # nulla cambia — 'punto' e' la spedizione a un punto di ritiro,
-    # che esige TRE cose: la spedizione scelta, il venditore con lo
-    # spedizioniere dichiarato (senza rete il compratore scriverebbe
-    # un punto inutilizzabile) e il punto scritto. Il punto e' testo
-    # libero del compratore: strip, spazi collassati, tetto 120 — e
-    # NON va mai interpolato nell'HTML delle notifiche (si legge
-    # nell'ordine, dove il client lo passa da esc()). La SELECT dello
-    # spedizioniere sta QUI, prima della invoice: il patto del
-    # ricontrollo senza await non si tocca.
+    # che esige DUE cose: la spedizione scelta e il punto scritto.
+    # (Il gate sullo spedizioniere e' durato un giro: la decisione
+    # nuova di Andrea lo SUPERA — la via si offre sempre, senza rete
+    # dichiarata ci si accorda in chat.) Il punto e' testo libero del
+    # compratore: strip, spazi collassati, tetto 120 — e NON va mai
+    # interpolato nell'HTML delle notifiche (si legge nell'ordine,
+    # dove il client lo passa da esc()).
     via = (str(d.get("spedizione_via") or "casa")).strip().lower()
     if via not in ("casa", "punto"):
         con.close()
@@ -9802,12 +9812,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
-        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
-                         (a["venditore_id"],)).fetchone()
-        if not sp or not sp["spedizioniere"]:
-            con.close()
-            raise HTTPException(400, "Questo venditore non spedisce ai "
-                                     "punti di ritiro")
+        # niente gate sullo spedizioniere: il patto del mono (secondo
+        # giro — meglio l'accordo in chat che la porta chiusa)
         if not punto:
             con.close()
             raise HTTPException(400, "Indica il punto di ritiro (nome o "
@@ -16259,6 +16265,49 @@ def scadenze_lampo():
     con.close()
 
 
+async def avvisa_spedizioniere_mancante():
+    """La notifica UNA-TANTUM del punto di ritiro (ago 2026, chiesta
+    da Andrea col secondo giro della pagina d'acquisto): i venditori
+    con annunci ATTIVI che spediscono e senza spedizioniere dichiarato
+    vengono avvisati che i compratori ora possono scegliere il punto
+    (locker), e che dichiarare la rete nel Profilo evita gli accordi
+    in chat. Il timbro e' la colonna `avvisato_spedizioniere` — UNA
+    volta per venditore, sopravvive ai riavvii — e si scrive PRIMA
+    degli invii (il patto del cooldown della lampo): un errore di rete
+    puo' al massimo far perdere un avviso di cortesia, mai
+    raddoppiarlo. Chi dichiara lo spedizioniere non entra mai; chi
+    arriva DOPO e pubblica una spedizione senza dichiararlo riceve il
+    suo (sempre uno solo), e intanto glielo ricorda la riga del form."""
+    con = db()
+    da_avvisare = [r["tg_id"] for r in con.execute(
+        "SELECT DISTINCT u.tg_id FROM utenti u JOIN annunci a "
+        "ON a.venditore_id = u.tg_id "
+        "WHERE a.stato='attivo' AND a.consegna IN ('spedizione','entrambe') "
+        "AND u.spedizioniere='' AND u.avvisato_spedizioniere=0")]
+    if not da_avvisare:
+        con.close()
+        return
+    seg = ",".join("?" * len(da_avvisare))
+    con.execute(f"UPDATE utenti SET avvisato_spedizioniere=1 "
+                f"WHERE tg_id IN ({seg})", tuple(da_avvisare))
+    con.commit()
+    con.close()
+    for tg in da_avvisare:
+        try:
+            await notifica(tg, (
+                "📦 <b>Novità: il ritiro al punto (locker).</b> Da oggi "
+                "i compratori possono scegliere la spedizione a un "
+                "punto di ritiro sui tuoi annunci. Indica nel Profilo → "
+                "«📦 Come spedisci» se spedisci con InPost o Poste "
+                "Italiane: chi compra saprà di che rete cercare il "
+                "punto, ed eviti gli accordi in chat."))
+        except Exception as e:
+            print(f"⚠️ Avviso spedizioniere saltato per {tg}: {e}")
+        await asyncio.sleep(0.2)
+    print(f"📦 Avviso spedizioniere mandato a {len(da_avvisare)} "
+          f"venditori")
+
+
 async def orologio():
     while True:
         try:
@@ -16338,6 +16387,12 @@ async def orologio():
             await termometro_sottocategorie()
         except Exception as e:
             print(f"⚠️ Termometro sottocategorie saltato: {e}")
+        try:
+            # una-tantum col timbro: dopo il primo giro non trova
+            # piu' nessuno (e i nuovi ne ricevono uno solo)
+            await avvisa_spedizioniere_mancante()
+        except Exception as e:
+            print(f"⚠️ Avviso spedizioniere saltato: {e}")
         await asyncio.sleep(600)
 
 

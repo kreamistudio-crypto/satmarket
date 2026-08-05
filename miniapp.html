@@ -2935,7 +2935,12 @@
            0 scritto = gratis al punto. -->
       <div class="field" id="sellSpedPuntoField" style="display:none"><label>Costo verso un punto di ritiro (facoltativo)</label>
         <div class="sats-input"><input id="sellSpedPunto" type="number" inputmode="numeric" placeholder="come sopra"><span class="suffix" id="sellSpedPuntoCur" style="pointer-events:none">sats</span></div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a casa. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto. La consegna al punto si offre solo se dichiari lo spedizioniere nel Profilo (📦&nbsp;Come spedisci).</div></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a casa. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto.</div>
+        <!-- la riga discreta del secondo giro: la via punto si offre
+             comunque, ma senza rete dichiarata chi compra deve
+             accordarsi in chat — il promemoria vive dove il venditore
+             sta gia' pensando alla spedizione -->
+        <div id="sellSpedizioniereHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) se spedisci con InPost o Poste: chi compra saprà che punto scegliere, senza accordi in chat.</div></div>
       <div class="field" id="sellTagliaField" style="display:none"><label>Taglia del pacco</label>
         <select id="sellTaglia" hidden>
           <option value="">Scegli la taglia…</option>
@@ -6545,17 +6550,26 @@ function apriAcquistoSet(){
 }
 /* La stima della DEMO, DICHIARATA (in demo non c'e' un server che
    faccia il conto): la matematica di totaleStima, spacchettata nella
-   forma del preventivo. La strada punto in demo non esiste — vuole
-   lo spedizioniere, che e' roba del server. */
+   forma del preventivo. La via punto c'e' anche qui — dal secondo
+   giro si offre sempre dove c'e' la spedizione — con la tariffa del
+   fallback casa, che in demo e' l'unica che esista. */
 function preventivoDemo(l){
   const art = artStima(l) * qtaScelta;
   const prot = Math.floor(art * protPercento / 100);
-  const strade = stradeConsegna(l).map(v => {
+  const strade = [];
+  for (const v of stradeConsegna(l)){
     const sped = v==='spedizione' ? satsSpedizione(l) : 0;
-    return {via: v==='spedizione' ? 'casa' : v, spedizione_sats: sped,
-            totale_sats: art + sped + prot,
-            stima: v==='spedizione' && l.spedEur>0};
-  });
+    const stima = v==='spedizione' && l.spedEur>0;
+    if (v==='spedizione'){
+      strade.push({via:'casa', spedizione_sats:sped,
+                   totale_sats:art+sped+prot, stima});
+      strade.push({via:'punto', spedizione_sats:sped,
+                   totale_sats:art+sped+prot, stima, fallback_casa:true});
+    } else {
+      strade.push({via:v, spedizione_sats:0, totale_sats:art+prot,
+                   stima:false});
+    }
+  }
   if (!strade.length)
     strade.push({via:'', spedizione_sats:0, totale_sats:art+prot, stima:false});
   return {set:false, demo:true, quantita:qtaScelta, articolo_sats:art,
@@ -6665,12 +6679,12 @@ function renderAcquisto(){
   }
   /* --- il campo del punto di ritiro --- */
   /* VARCO MAPPA (futuro, API corriere): questo contenitore verra'
-     sostituito dal selettore dei punti (ricerca/mappa) DELLO
+     sostituito dal selettore dei punti (ricerca/mappa) dello
      spedizioniere dichiarato. Il contratto non cambia: un testo in
      acqDati.punto che viaggia come punto_ritiro nel body. */
   const campoPunto = `<div class="field" id="acqPuntoCampo"
       style="margin-top:10px;display:${d.via==='punto'?'':'none'}">
-    <label>Indica il punto di ritiro (nome o indirizzo del punto ${esc(p.spedizioniere||'')})</label>
+    <label>Indica il punto di ritiro (nome o indirizzo del punto${p.spedizioniere ? ' ' + esc(p.spedizioniere) : ''})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
@@ -6679,6 +6693,12 @@ function renderAcquisto(){
   let note = '';
   if (p.spedizioniere && (d.via==='casa' || d.via==='punto'))
     note += `<div class="acq-nota">📦 Spedisce con <b>${esc(p.spedizioniere)}</b></div>`;
+  /* la via punto SENZA spedizioniere dichiarato (secondo giro,
+     decisione di Andrea: la pillola c'e' lo stesso — meglio
+     l'accordo in chat che la porta chiusa — e questa riga dice la
+     verita' PRIMA di pagare) */
+  if (!p.spedizioniere && d.via==='punto')
+    note += `<div class="acq-nota">🤝 Il venditore non ha indicato il corriere: accordatevi in chat sul punto di ritiro.</div>`;
   if (d.via==='digitale')
     note += `<div class="acq-nota">💾 Un codice, una volta rivelato, non torna indietro: hai <b>${TEMPI.confermaDig} ore</b> per aprire una disputa, poi l'acquisto è definitivo.</div>`;
   if (p.stima || (stradaSel && stradaSel.stima))
@@ -6700,7 +6720,7 @@ function renderAcquisto(){
     <div class="section-label">Il conto</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
-      <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Acquista</button>
+      <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>
     </div>`;
   aggiornaCurToggle();   /* il toggle in testata dice la verita' */
 }
@@ -9702,9 +9722,9 @@ function renderSpedizioniere(){
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
       Con quale rete di punti di ritiro spedisci? Dichiarala e chi
-      compra potrà scegliere la <b style="color:var(--ink)">consegna a
-      un punto di ritiro</b> (locker o negozio convenzionato) sui tuoi
-      annunci. Senza, resta solo la spedizione a casa.</div>
+      sceglie la <b style="color:var(--ink)">consegna a un punto di
+      ritiro</b> (locker o negozio convenzionato) saprà di che rete
+      cercare il punto. Senza, dovrete accordarvi in chat sul punto.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
       ${pill('', 'Non dichiarato')}${spedizionieriCatalogo.map(s => pill(s, s)).join('')}</div>`;
 }
@@ -9722,8 +9742,10 @@ async function setSpedizioniere(v){
   } catch(e) { toast('Rete assente: riprova'); return; }
   renderSpedizioniere();
   toast(mySpedizioniere
-    ? `📦 Spedisci con ${mySpedizioniere}: la consegna al punto è accesa sui tuoi annunci`
-    : 'Spedizioniere tolto: i compratori vedranno solo la consegna a casa');
+    ? `📦 Spedisci con ${mySpedizioniere}: chi compra lo vedrà sulla pagina d'acquisto`
+    : 'Spedizioniere tolto: chi sceglie il punto si accorderà in chat');
+  /* la riga del form segue la dichiarazione appena fatta */
+  if (el('view-vendi')) aggiornaConsegnaForm();
 }
 
 /* ---- Avvisi di ricerca: «dimmi quando esce quello che cerco».
@@ -11604,6 +11626,12 @@ function aggiornaConsegnaForm(){
   el('sellSpedField').style.display = (sped && !asta) ? '' : 'none';
   if (el('sellSpedPuntoField'))
     el('sellSpedPuntoField').style.display = (sped && !asta) ? '' : 'none';
+  /* il promemoria dello spedizioniere: solo a chi spedisce e non
+     l'ha dichiarato (in DEMO il catalogo non arriva e la riga tace) */
+  if (el('sellSpedizioniereHint'))
+    el('sellSpedizioniereHint').style.display =
+      (sped && !asta && !DEMO && spedizionieriCatalogo.length
+       && !mySpedizioniere) ? '' : 'none';
   el('sellTagliaField').style.display = sped ? '' : 'none';
   if (el('sellQtaField') && !editandoNostr)
     el('sellQtaField').style.display = asta ? 'none' : '';

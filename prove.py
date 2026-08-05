@@ -2415,11 +2415,36 @@ def prove_pagina_acquisto():
     prova("scegli_consegna_ordine: niente punto", False,
           "punto" in corpo)
 
+    # 5bis. LA REGOLA ROVESCIATA (secondo giro, decisione di Andrea):
+    #    la via punto si offre SEMPRE dove c'e' la spedizione — il
+    #    gate sullo spedizioniere e' durato un giro e non deve
+    #    tornare di soppiatto (meglio l'accordo in chat che la porta
+    #    chiusa). Ne' il 400 di ieri, ne' un filtro nel preventivo.
+    prova("il 400 «non spedisce ai punti» non esiste piu'", False,
+          "non spedisce ai punti" in src)
+    prova("_strade_preventivo non filtra piu' sullo spedizioniere",
+          False, "not spedizioniere" in pezzo("_strade_preventivo"))
+    # ...e la riga onesta del client esiste, dove si sceglie
+    prova("il client dice «accordatevi in chat» sul punto senza rete",
+          True, "accordatevi in chat sul punto di ritiro"
+          in open("miniapp.html", encoding="utf-8").read())
+
     # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
     #    Nostr non le porta: le azzererebbe a ogni sync). L'unico
     #    UPDATE che le scrive e' quello di modifica().
     prova("spedizione_punto_sats=? vive in UN solo UPDATE", 1,
           src.count("spedizione_punto_sats=?"))
+
+    # 6bis. La notifica una-tantum dello spedizioniere: il timbro si
+    #    scrive PRIMA degli invii (il patto del cooldown della lampo:
+    #    un errore di rete perde un avviso di cortesia, mai lo
+    #    raddoppia) e la WHERE lo rispetta.
+    camp = pezzo("avvisa_spedizioniere_mancante").split('"""')[-1]
+    prova("campagna: la WHERE guarda il timbro", True,
+          "avvisato_spedizioniere=0" in camp)
+    prova("campagna: il timbro si scrive prima degli invii", True,
+          camp.index("avvisato_spedizioniere=1")
+          < camp.index("await notifica"))
 
     # 7. Il modello CSV: la colonna nuova sta IN CODA (i file di ieri
     #    passano intonsi, le colonne si leggono per nome)
@@ -2449,6 +2474,8 @@ def prove_pagina_acquisto():
           "esc(o.puntoRitiro)" in mini)
     # (CORRIERI del tracking resta legittimamente nel client: qui si
     # guarda che il catalogo SPEDIZIONIERI arrivi dal server)
+    prova("il bottone finale della pagina dice «Paga»", True,
+          'id="acqCompra" onclick="ctaAcquisto()">Paga<' in mini)
     prova("il catalogo spedizionieri arriva da /api/me", True,
           "me.spedizionieri" in mini)
     prova("...e il client non lo riempie mai da solo", 1,
