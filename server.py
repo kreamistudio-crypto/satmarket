@@ -676,6 +676,101 @@ def controlla_distintivi(con, tg_id: int) -> list[str]:
     return nuovi
 
 
+# ------------------------- GLI XP (ago 2026) -------------------------
+# La moneta dell'impegno. Il tariffario dice una cosa sola, ed e' la
+# REGOLA DA NON ROVESCIARE: nessuna azione ripetibile a costo zero
+# deve valere quanto una che muove sats. Pubblicare, salvare nel
+# barattolo, fare un'offerta — tutte a tetto giornaliero o a zero.
+# Altrimenti la scala premia chi fa rumore invece di chi commercia, e
+# a quel punto smette di descrivere il mercatino.
+FISSO_XP_ORDINE = 10        # ogni affare concluso conta, anche da 3 €
+XP_PER_EURO = 1             # un euro, un punto
+# NESSUN TETTO, ed e' una decisione esplicita di Andrea: un acquisto
+# da 4.000 € su un mercatino appena nato non e' un'anomalia da limare,
+# e' qualcuno che ha affidato quella cifra al deposito di garanzia.
+# Frequenza e importo valgono ENTRAMBI — sul volume ci guadagniamo le
+# fee a ogni transazione, sull'importo grosso ci guadagniamo la
+# fiducia — e il fisso+variabile li premia tutti e due senza doverli
+# pesare l'uno contro l'altro.
+# Il venditore prende piu' del compratore perche' VENDERE E' IL LATO
+# SCARSO: un mercatino muore per mancanza di merce, mai di curiosi.
+XP_RUOLO = {"venditore": 1.0, "compratore": 0.6}
+AZIONI_XP = {
+    "visita": 1,            # presenza, non merito
+    "annuncio": 5,          # UNO al giorno, o si pubblica spazzatura
+    "feedback": 10,         # uno per ordine, come il feedback stesso
+    "incassi": 20,          # Lightning address impostato, una volta sola
+    "identita": 15,         # npub verificata, Telegram collegato
+    "distintivo": 25,
+}
+
+
+def oggi_locale() -> str:
+    """Il giorno di oggi, ora del server ('2026-08-05'). Locale e non
+    UTC: chi apre l'app alle 23 di sera e alle 8 del mattino dopo deve
+    vedere due giorni, non uno — e' l'ora che ha lui sull'orologio."""
+    return time.strftime("%Y-%m-%d", time.localtime())
+
+
+def _ricalcola_xp(con, tg_id: int):
+    """Rifa' utenti.xp dal registro. Nessun commit: e' del chiamante.
+    E' cio' che rende la fusione un caso NON speciale — si migrano le
+    righe e si ricalcola, come per rating e feedback."""
+    n = con.execute("SELECT COALESCE(SUM(punti),0) AS s FROM xp_eventi "
+                    "WHERE tg_id=?", (tg_id,)).fetchone()["s"]
+    con.execute("UPDATE utenti SET xp=? WHERE tg_id=?", (n, tg_id))
+    return n
+
+
+def assegna_xp(con, tg_id: int, tipo: str, punti: int,
+               riferimento: str = "") -> int:
+    """Scrive una riga di registro e aggiorna la somma. Ritorna i punti
+    DAVVERO assegnati: 0 se erano gia' stati dati (la UNIQUE fa da
+    giudice, qui non si controlla niente a mano). Niente commit: la
+    transazione e' del chiamante, come in controlla_distintivi."""
+    if not tg_id or punti <= 0:
+        return 0
+    r = con.execute(
+        "INSERT OR IGNORE INTO xp_eventi"
+        "(tg_id, tipo, punti, riferimento, creato) VALUES(?,?,?,?,?)",
+        (tg_id, tipo, int(punti), riferimento, int(time.time())))
+    if not r.rowcount:
+        return 0            # gia' pagato: e' il retry, ed e' innocuo
+    con.execute("UPDATE utenti SET xp=xp+? WHERE tg_id=?",
+                (int(punti), tg_id))
+    return int(punti)
+
+
+async def premia_xp(tg_id: int, tipo: str, punti: int,
+                    riferimento: str = ""):
+    """Il gancio standard, gemello di premia_distintivi: connessione
+    propria, commit, fail-open totale. Un errore negli XP non deve MAI
+    poter toccare cio' che stava premiando — men che meno uno sblocco
+    di sats. Nessuna notifica: gli XP non si annunciano uno a uno, si
+    guardano nel Profilo."""
+    try:
+        con = db()
+        dati = assegna_xp(con, tg_id, tipo, punti, riferimento)
+        con.commit()
+        con.close()
+        return dati
+    except Exception as e:
+        print(f"⚠️ XP saltati per {tg_id} ({tipo}/{riferimento}): {e}")
+        return 0
+
+
+def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
+    """Gli XP di un affare concluso. La base e' il TOTALE in cassaforte
+    — articolo + spedizione + protezione — perche' chi paga 300 € di
+    spedizione ha speso 300 €, e si premia cio' che e' stato speso.
+    Cambio sconosciuto (ordine storico, CoinGecko muto) = resta il solo
+    fisso: meglio 10 punti invece di 310 che un numero inventato, la
+    stessa regola per cui un avviso in EUR non scatta senza cambio."""
+    euro = (prezzo_sats / 100_000_000 * cambio_eur) if cambio_eur > 0 else 0.0
+    return int((FISSO_XP_ORDINE + euro * XP_PER_EURO)
+               * XP_RUOLO.get(ruolo, 1.0))
+
+
 def init_db():
     con = db()
     con.executescript("""
@@ -779,6 +874,31 @@ def init_db():
         ottenuto_il INTEGER,
         PRIMARY KEY(tg_id, badge_id)
     );
+    CREATE TABLE IF NOT EXISTS xp_eventi(
+        -- IL REGISTRO DEGLI XP, ed e' append-only per una ragione che
+        -- vale la pena scrivere: distintivi e rating si RICALCOLANO
+        -- dai dati veri, quindi una passata retroattiva li rimette in
+        -- pari e un bug non lascia cicatrici. Gli XP no — una visita
+        -- giornaliera e' un evento, e se non lo scrivi quando succede
+        -- e' perso per sempre. Quindi qui la verita' e' la tabella, e
+        -- utenti.xp e' solo la sua somma (cache ricalcolabile, come
+        -- rating e n_feedback lo sono della tabella feedback).
+        -- riferimento = cosa ha guadagnato quei punti
+        -- ('ordine:42:venditore', 'giorno:2026-08-04', 'annuncio:7'):
+        -- con la UNIQUE qui sotto e' il GIUDICE dell'idempotenza. Non
+        -- si chiede a chi scrive un gancio di ricordarsi «gliel'ho
+        -- gia' dato?»: un retry, un doppio gancio, un riavvio a meta'
+        -- o un moderatore che rilancia una funzione sbattono tutti
+        -- contro il vincolo e non pagano due volte.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        tipo TEXT NOT NULL,
+        punti INTEGER NOT NULL,
+        riferimento TEXT NOT NULL DEFAULT '',
+        creato INTEGER,
+        UNIQUE(tg_id, tipo, riferimento)
+    );
+    CREATE INDEX IF NOT EXISTS idx_xp_utente ON xp_eventi(tg_id, creato DESC);
     CREATE TABLE IF NOT EXISTS doppioni_ignorati(
         -- «non e' un doppione»: la coppia archiviata non si ripropone
         -- mai piu', su nessun dispositivo (per questo vive nel DB e
@@ -1057,6 +1177,19 @@ def init_db():
                     # rating e n_feedback, quindi rimozione admin e
                     # fusione si sistemano da sole.
                     "n_recensori INTEGER DEFAULT 0",
+                    # xp (ago 2026): la SOMMA del registro xp_eventi,
+                    # tenuta qui perche' ogni card e ogni profilo la
+                    # legge e non si fa una SUM per riga. Cache, non
+                    # verita': si rifa' da capo con _ricalcola_xp, che
+                    # e' cio' che rende la fusione un caso non
+                    # speciale (si sommano i registri e si ricalcola).
+                    # xp_ultimo_giorno e' il giorno LOCALE dell'ultima
+                    # visita premiata: serve solo a non rifare la
+                    # scrittura mille volte al giorno — a impedire il
+                    # doppio punto ci pensa comunque la UNIQUE del
+                    # registro, questa e' cortesia verso il database.
+                    "xp INTEGER DEFAULT 0",
+                    "xp_ultimo_giorno TEXT DEFAULT ''",
                     # comune: COLONNA INERTE (lug 2026). Nata per il
                     # filtro «📍 Vicino a me», tolto due giorni dopo
                     # perche' si sovrapponeva al filtro per regione —
@@ -1857,6 +1990,11 @@ async def login_nostr(req: Request, response: Response):
     # Il nativo nasce gia' verificato (la firma dimostra il possesso):
     # Nostrano e Pioniere possono scattare subito, avvisati via DM
     await premia_distintivi(tg_id)
+    # La firma Schnorr ha appena dimostrato il possesso della chiave:
+    # per lui la npub e' verificata dalla nascita, e vale come per chi
+    # su Telegram ci passa dalla nota pubblica. Stesso riferimento, o
+    # un nativo che poi verifica di nuovo verrebbe pagato due volte.
+    await premia_xp(tg_id, "identita", AZIONI_XP["identita"], "npub")
     return {"ok": True, "nuovo": True}
 
 
@@ -2480,6 +2618,11 @@ async def premia_distintivi(tg_id: int):
         print(f"⚠️ Distintivi saltati per {tg_id}: {e}")
         return
     for did in nuovi:
+        # Un distintivo vale anche XP. Il riferimento e' il badge, che
+        # e' gia' unico per utente: se un giorno i distintivi si
+        # potessero riassegnare, questo non ripagherebbe comunque.
+        await premia_xp(tg_id, "distintivo", AZIONI_XP["distintivo"],
+                        f"badge:{did}")
         dd = next(d for d in DISTINTIVI if d["id"] == did)
         await notifica(tg_id,
                        f"🏅 <b>Nuovo distintivo: {dd['emoji']} "
@@ -2742,6 +2885,16 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                         (r["annuncio_id"], id_telegram, r["id"],
                          r["versato_sats"], adesso_fusione,
                          adesso_fusione))
+        # Il registro degli XP segue l'utente: le due meta' erano la
+        # stessa persona, e cio' che ha fatto con l'una non si perde
+        # fondendo. In UNIONE come i distintivi — se entrambe hanno
+        # una riga con lo stesso riferimento (la visita dello stesso
+        # giorno, fatta da tutt'e due i dispositivi) ne resta una, che
+        # e' esattamente cio' che la UNIQUE vuole dire. La somma la
+        # rifa' _ricalcola_xp piu' sotto, dalle righe rimaste.
+        con.execute("UPDATE OR IGNORE xp_eventi SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM xp_eventi WHERE tg_id=?", (id_nostr,))
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -2757,6 +2910,13 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # I due passati si pesano da soli: il ricalcolo sulle righe
         # appena migrate fa media e conteggio in un colpo.
         _ricalcola_rating(con, id_telegram)
+        # ...e gli XP si risommano dal registro appena migrato: e' il
+        # motivo per cui utenti.xp e' una cache e non la verita'.
+        _ricalcola_xp(con, id_telegram)
+        # Le due identita' sono adesso una sola, ed e' un traguardo:
+        # vale come la npub verificata, e una volta sola.
+        assegna_xp(con, id_telegram, "identita", AZIONI_XP["identita"],
+                   "telegram")
         # I contatori sommati possono far scattare distintivi nuovi
         # (Specchiato, rodato...): valutazione silenziosa, li vedra'
         # al prossimo giro di Profilo.
@@ -5365,6 +5525,13 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         # «e' arrivato» (stessa coda-e-finestra, notifiche aggregate).
         accoda_match(annuncio_id)
     await premia_distintivi(user["id"])   # bottega avviata?
+    # Pubblicare vale XP UNA volta al giorno, e il tetto non e' scritto
+    # da nessuna parte: e' il riferimento «giorno:...» che, con la
+    # UNIQUE del registro, lascia passare solo il primo annuncio.
+    # Senza, la strada piu' veloce per salire sarebbe pubblicare
+    # spazzatura — e la regola del tariffario dice il contrario.
+    await premia_xp(user["id"], "annuncio", AZIONI_XP["annuncio"],
+                    f"giorno:{oggi_locale()}")
     risposta = {"ok": True, "id": annuncio_id}
     if asta_secondi:
         risposta["asta_scadenza"] = adesso + asta_secondi
@@ -9976,6 +10143,23 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # e' cio' che rende il sistema auto-riparante. Niente notifiche
         # qui: quelle spettano ai ganci dal vivo.
         controlla_distintivi(con, user["id"])
+        # LA VISITA GIORNALIERA, timbrata qui perche' qui si passa
+        # comunque a ogni apertura — e il precedente c'e' gia': su
+        # questa GET si scrive da sempre (rinfresco avatar, passata
+        # dei distintivi). Il giorno LOCALE in colonna serve solo a
+        # non tentare la scrittura a ogni chiamata: a impedire il
+        # doppio punto ci pensa la UNIQUE del registro, che e' il vero
+        # giudice. NIENTE serie consecutiva, e non e' una svista: in
+        # un mercatino non c'e' nulla da fare ogni giorno, e una
+        # fiammella che si spegne punisce chi ha lavorato invece di
+        # aprire l'app. Se un giorno si vorra' premiare la costanza,
+        # si contano i giorni TOTALI, che salgono e basta.
+        giorno = oggi_locale()
+        if (u["xp_ultimo_giorno"] or "") != giorno:
+            assegna_xp(con, user["id"], "visita", AZIONI_XP["visita"],
+                       f"giorno:{giorno}")
+            con.execute("UPDATE utenti SET xp_ultimo_giorno=? WHERE tg_id=?",
+                        (giorno, user["id"]))
         con.commit()
     presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
         "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
@@ -10155,6 +10339,13 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
         "stato='da_riscuotere'", (user["id"],))] if addr else []
     con.commit()
     con.close()
+    # Un indirizzo che INCASSA vale XP, una volta sola. Solo se c'e'
+    # davvero: la stessa POST serve anche a cancellarlo, e togliere
+    # non e' un traguardo. Chi lo toglie tiene i punti — il registro
+    # e' append-only, e questo qui e' un fatto successo.
+    if addr:
+        await premia_xp(user["id"], "incassi", AZIONI_XP["incassi"],
+                        "ln_address")
     sbloccati = 0
     for oid in incassi:
         r = await _sblocca_sats(oid)
@@ -10726,6 +10917,7 @@ async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
                    "portano il badge dei venditori verificati su Nostr. 🎉 "
                    "(La nota col codice ora puoi anche cancellarla.)")
     await premia_distintivi(user["id"])
+    await premia_xp(user["id"], "identita", AZIONI_XP["identita"], "npub")
     return {"ok": True, "verificata": True}
 
 
@@ -12126,6 +12318,17 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             # ENTRAMBE le parti (primo baratto, primo acquisto...)
             await premia_distintivi(o["venditore_id"])
             await premia_distintivi(o["compratore_id"])
+            # ...e vale XP a tutti e due. Il cambio e' quello appena
+            # scritto in colonna per l'export contabile: qui non
+            # serve un secondo giro di rete. Il riferimento porta il
+            # RUOLO, o le due parti si pesterebbero sulla UNIQUE.
+            # SOLO su released: rimborsato vuol dire che la merce e'
+            # tornata indietro e lo scambio non c'e' stato.
+            for chi, ruolo in ((o["venditore_id"], "venditore"),
+                               (o["compratore_id"], "compratore")):
+                await premia_xp(chi, "ordine",
+                                xp_ordine(o["prezzo_sats"], cambio, ruolo),
+                                f"ordine:{ordine_id}:{ruolo}")
             # Il polso dei moderatori: ordine chiuso, sats consegnati
             if o["disputata"]:
                 await polso_ordini_admin(
@@ -13738,6 +13941,11 @@ async def lascia_feedback(ordine_id: int, req: Request,
         raise
     finally:
         con.close()
+    # Lasciare il feedback vale XP a CHI LO LASCIA: e' il gesto che
+    # tiene in piedi la reputazione di tutti, e senza un incentivo lo
+    # fa solo chi e' arrabbiato. Uno per ordine, come il feedback.
+    await premia_xp(user["id"], "feedback", AZIONI_XP["feedback"],
+                    f"ordine:{ordine_id}")
     stelle = "★" * voto
     await notifica(per,
                    f"⭐ <b>Hai ricevuto un feedback:</b> {stelle} ({voto}/5) "

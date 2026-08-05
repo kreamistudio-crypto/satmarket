@@ -2256,6 +2256,94 @@ def prove_conta_feedback():
 
 
 # ====================================================================
+def prove_xp():
+    """Gli XP (ago 2026). Due cose si guardano qui: la FORMULA, che
+    porta dentro tre decisioni di Andrea (nessun tetto, la spedizione
+    conta, il venditore prende piu' del compratore), e l'IDEMPOTENZA
+    del registro — che e' la sola parte di questo cantiere che non si
+    puo' riparare a posteriori, perche' gli XP non si ricalcolano dai
+    dati veri come i distintivi: un evento non scritto e' perso."""
+    print("\n[gli XP]")
+    import sqlite3
+    import tempfile
+    import time
+
+    amb = {"time": time}
+    i = _SORGENTE.index("FISSO_XP_ORDINE = ")
+    exec(_SORGENTE[i:_SORGENTE.index("AZIONI_XP = {", i)], amb)
+    for f in ("oggi_locale", "_ricalcola_xp", "assegna_xp", "xp_ordine"):
+        exec(pezzo(f), amb)
+    xp_ordine, assegna_xp = amb["xp_ordine"], amb["assegna_xp"]
+
+    # 100.000 € per BTC, cosi' 1 sat = 0,001 € e i conti si leggono
+    C = 100_000.0
+    prova("libro da 8 €, venditore", 18, xp_ordine(8_000, C, "venditore"))
+    prova("libro da 8 €, compratore", 10, xp_ordine(8_000, C, "compratore"))
+    prova("cuffie da 120 €, venditore", 130,
+          xp_ordine(120_000, C, "venditore"))
+    # NESSUN TETTO: chi affida 4.000 € al deposito di garanzia prende
+    # quello che vale. Se qualcuno rimettesse un limite, cade qui.
+    prova("4.000 € non si limano", 4010,
+          xp_ordine(4_000_000, C, "venditore"))
+    # La base e' il TOTALE: chi paga 300 € di spedizione ha speso 300 €
+    prova("la spedizione conta", 310, xp_ordine(300_000, C, "venditore"))
+    # Cambio mai arrivato: resta il fisso, mai un numero inventato
+    prova("senza cambio resta il fisso", 10,
+          xp_ordine(4_000_000, 0, "venditore"))
+
+    db = os.path.join(tempfile.mkdtemp(), "xp.db")
+    con = sqlite3.connect(db)
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, xp INTEGER DEFAULT 0);
+    CREATE TABLE xp_eventi(id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tg_id INTEGER NOT NULL, tipo TEXT NOT NULL, punti INTEGER NOT NULL,
+      riferimento TEXT NOT NULL DEFAULT '', creato INTEGER,
+      UNIQUE(tg_id, tipo, riferimento));
+    INSERT INTO utenti(tg_id) VALUES(900),(901);
+    """)
+
+    def somma(t):
+        return con.execute("SELECT xp FROM utenti WHERE tg_id=?",
+                           (t,)).fetchone()["xp"]
+
+    prova("il primo pagamento passa", 300,
+          assegna_xp(con, 900, "ordine", 300, "ordine:1:venditore"))
+    prova("IL RETRY NON PAGA", 0,
+          assegna_xp(con, 900, "ordine", 300, "ordine:1:venditore"))
+    prova("...e la somma non si muove", 300, somma(900))
+    # Il ruolo sta nel riferimento, o le due parti dello stesso ordine
+    # si pesterebbero sulla UNIQUE e una delle due resterebbe a zero
+    prova("l'altro ruolo dello stesso ordine paga", 180,
+          assegna_xp(con, 900, "ordine", 180, "ordine:1:compratore"))
+    prova("punti a zero non scrivono", 0,
+          assegna_xp(con, 900, "visita", 0, "x"))
+    # La visita: il tetto giornaliero non e' scritto da nessuna parte,
+    # lo fa il riferimento col giorno dentro
+    prova("la visita di oggi", 1,
+          assegna_xp(con, 901, "visita", 1, "giorno:2026-08-05"))
+    prova("la stessa visita non ripaga", 0,
+          assegna_xp(con, 901, "visita", 1, "giorno:2026-08-05"))
+    prova("quella di domani si'", 1,
+          assegna_xp(con, 901, "visita", 1, "giorno:2026-08-06"))
+
+    # Il ricalcolo e' la rete: la cache si puo' sporcare, il registro no
+    con.execute("UPDATE utenti SET xp=99999 WHERE tg_id=900")
+    prova("il ricalcolo rimette in pari", 480,
+          amb["_ricalcola_xp"](con, 900))
+
+    # FUSIONE: unione, non somma cieca — la visita dello stesso giorno
+    # fatta dalle due meta' resta UNA riga, ed e' cio' che la UNIQUE
+    # vuol dire
+    assegna_xp(con, 900, "visita", 1, "giorno:2026-08-06")
+    con.execute("UPDATE OR IGNORE xp_eventi SET tg_id=900 WHERE tg_id=901")
+    con.execute("DELETE FROM xp_eventi WHERE tg_id=901")
+    prova("fondendo, il giorno doppio conta una volta", 482,
+          amb["_ricalcola_xp"](con, 900))
+    con.close()
+
+
+# ====================================================================
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -2271,7 +2359,8 @@ def main():
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
-              prove_forma_tracking, prove_conta_feedback):
+              prove_forma_tracking, prove_conta_feedback,
+              prove_xp):
         try:
             f()
         except Exception as e:
