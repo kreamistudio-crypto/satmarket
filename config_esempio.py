@@ -264,6 +264,12 @@ AVVISI_ORDINI_ADMIN = True
 ORE_INITDATA = 24
 
 # --- Collaudo ---------------------------------------------------------
-# True  = test locale con utenti finti (Compratore/Venditore/Admin)
-# False = OBBLIGATORIO prima di andare online!
-MODALITA_COLLAUDO = True
+# False = com'e' giusto che sia online: nessuna identita' finta.
+# True  = test locale con gli utenti finti (Compratore/Venditore/Admin),
+#         e si mette A MANO quando si lavora sul portatile.
+# Nasce spento come IMPORT_NOSTR_APERTO e ASTA_ABILITATA, e per la
+# stessa ragione: acceso, l'header «collaudo:111» apre l'account di
+# chiunque senza una firma: chi copia questo modello per il server non
+# deve poterselo portare dietro per distrazione. Accenderlo dev'essere
+# un gesto, e in locale e' il primo che si fa.
+MODALITA_COLLAUDO = False
