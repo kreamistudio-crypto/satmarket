@@ -14802,24 +14802,25 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
 #   a{id}_{i}.{jpg|png|webp|gif}  scarica_foto    (import da Nostr:
 #                                                  l'estensione viene
 #                                                  dal Content-Type)
-#   av_{negozio}_{ts}[_min].jpg   _salva_avatar   (il _min e' RESIDUO,
-#                                                  vedi qui sotto)
+#   av_{negozio}_{ts}.jpg         _salva_avatar
 # — cosi' un file lasciato li' dentro per sbaglio non e' pubblico, e
 # l'insieme di cio' che si serve resta chiuso e derivato.
 # CHI AGGIUNGE UNO SCRITTORE deve aggiungere la sua forma qui, o le
 # sue foto non si vedranno: e' il prezzo — voluto — di non montare
 # una directory.
-# IL `_min` DEGLI AVATAR NON SI PRODUCE PIU' (ago 2026): la passata
-# d'avvio salta i francobolli, e ora quelli vecchi se ne vanno col
-# loro pieno. La forma resta qui solo per i 75 file gia' sul disco in
-# produzione: quando ripulisci_avatar_min.py sara' girato la' sopra,
-# `av_..._min` si puo' togliere dalla regex — insieme al suo caso in
-# prove_foto(), che ci si appoggia.
+# GLI SCRITTORI SONO TRE E NON PIU' QUATTRO (ago 2026): il quarto era
+# genera_miniature_mancanti, che passando su OGNI .jpg faceva la _min
+# anche ai francobolli — una copia della stessa misura che nessuno
+# chiedeva. Adesso salta i nomi av_, e i 75 file che aveva gia' fatto
+# sono stati tolti dal disco in produzione (613 rimasti, avatar
+# visibili): la forma `av_..._min` e' quindi USCITA da questa regex,
+# ed e' la direzione giusta — se un domani ne ricomparisse uno, non
+# sarebbe pubblico.
 # (`\Z` e non `$`: in Python il dollaro combacia anche PRIMA di un
 # a-capo finale, e un nome che arriva da un URL puo' averlo)
 NOME_FOTO = re.compile(
     r"^(a\d+_\d+(_\d+)?(_min)?\.(jpg|png|webp|gif)"
-    r"|av_[0-9a-f]+_\d+(_min)?\.jpg)\Z")
+    r"|av_[0-9a-f]+_\d+\.jpg)\Z")
 TIPI_FOTO = {"jpg": "image/jpeg", "png": "image/png",
              "webp": "image/webp", "gif": "image/gif"}
 

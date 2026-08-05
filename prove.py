@@ -1328,24 +1328,26 @@ def prove_foto():
     exec(_SORGENTE[i:_SORGENTE.index("TIPI_FOTO =", i)], amb)
     ammesso = lambda n: bool(amb["NOME_FOTO"].match(n))
 
-    # I nomi VERI, uno per scrittore. L'av_ col _min e' RESIDUO (ago
-    # 2026): li faceva genera_miniature_mancanti passando su ogni .jpg
-    # della cartella e non solo sugli annunci — la forma che al primo
-    # giro era sfuggita alla tabella —, ma non se ne producono piu' e
-    # i 75 di produzione se ne vanno con ripulisci_avatar_min.py.
-    # Quando sara' girato la' sopra, questa riga e la sua forma nella
-    # regex si tolgono insieme.
+    # I nomi VERI, uno per scrittore
     for nome in ("a12_0.jpg", "a12_0_min.jpg",
                  "a12_0_1785852876.jpg", "a12_0_1785852876_min.jpg",
                  "a7_1.png", "a7_1.webp", "a7_1.gif", "a7_1_min.jpg",
-                 "av_0236b74b_1784996031.jpg",
-                 "av_f29bcbf7_1785852876_min.jpg"):
+                 "av_0236b74b_1784996031.jpg"):
         prova(f"si serve la foto vera {nome}", True, ammesso(nome))
 
-    # e tutto cio' che in quella cartella non c'e' mai stato
+    # e tutto cio' che in quella cartella non c'e' mai stato — piu'
+    # (ago 2026) la gemella degli avatar, che c'era stata eccome: la
+    # faceva genera_miniature_mancanti passando su ogni .jpg e non
+    # solo sugli annunci, ed e' la forma che al primo giro era
+    # sfuggita alla tabella degli scrittori. Adesso non se ne producono
+    # piu' e i 75 di produzione sono stati tolti dal disco (613
+    # rimasti), quindi il caso ha cambiato lato: da «si serve» a «non
+    # si serve», che e' l'affermazione piu' forte delle due — se un
+    # domani ne ricomparisse una, la rotta non la pubblicherebbe.
     for nome in ("../config.py", "..%2fconfig.py", "config.py",
                  "satmarket.db", "a1_0.jpg.exe", "", "a1_0.jpg\n",
-                 "a1_0.jpg/../x", "av_../x_1.jpg", "a_0.jpg"):
+                 "a1_0.jpg/../x", "av_../x_1.jpg", "a_0.jpg",
+                 "av_f29bcbf7_1785852876_min.jpg"):
         prova(f"non si serve {nome!r}", False, ammesso(nome))
 
     # --- SENTINELLE ---------------------------------------------------
@@ -1383,7 +1385,9 @@ def prove_avatar():
     mai: la gemella usciva della STESSA misura, cioe' una copia — e per
     giunta una copia che nessuno chiede, visto che il nome _min lo deriva
     solo fotoMini per le foto degli annunci. 75 file inutili in
-    produzione, uno in piu' a ogni cambio di foto profilo."""
+    produzione, uno in piu' a ogni cambio di foto profilo — tolti dal
+    disco ad ago 2026 con ripulisci_avatar_min.py (613 file rimasti,
+    avatar visibili): da li' la forma e' uscita anche da NOME_FOTO."""
     print("\n[gli avatar non fanno miniature]")
     import io
     import tempfile
@@ -1428,22 +1432,30 @@ def prove_avatar():
     prova("sentinella: col francobollo vecchio se ne va la sua _min",
           True, "_min.jpg" in pezzo("_scrivi_avatar"))
 
-    # --- la spazzata e la rotta devono dire la stessa cosa -------------
-    # Lo script cancella cio' che la rotta servirebbe: se le due forme
-    # divergessero, resterebbe sul disco proprio la spazzatura pubblica.
+    # --- la spazzata resta ancorata alla forma del francobollo --------
+    # Qui si confrontava lo script con NOME_FOTO sullo STESSO nome, ma
+    # da quando la spazzata e' girata in produzione la rotta il _min
+    # non lo serve piu' e le due DEVONO divergere. L'invariante giusta
+    # e' di un passo di lato: lo script deve riconoscere la GEMELLA di
+    # un francobollo che la rotta serve. Cosi' resta legato alla forma
+    # di _salva_avatar — e quella, per la sentinella di prove_foto, a
+    # secrets.token_hex: se l'alfabeto cambiasse lo si saprebbe qui,
+    # invece che rilanciando lo script a vuoto.
     # (importarlo e' sicuro: il config lo chiede dentro main(), la
     # regola degli script puri)
     import ripulisci_avatar_min
     amb = {"re": re}
     i = _SORGENTE.index("NOME_FOTO = re.compile")
     exec(_SORGENTE[i:_SORGENTE.index("TIPI_FOTO =", i)], amb)
-    for nome in ("av_0236b74b_1784996031_min.jpg",
-                 "av_f29bcbf7_1785852876_min.jpg",
-                 "av_XYZ_1_min.jpg", "av__min.jpg", "avatar_min.jpg"):
-        prova(f"la spazzata e la rotta concordano su {nome}",
-              bool(amb["NOME_FOTO"].match(nome)),
-              bool(ripulisci_avatar_min.AVATAR_MIN.match(nome)))
-    # e non si tocca mai un file pieno: quello e' la faccia di qualcuno
+    for pieno in ("av_0236b74b_1784996031.jpg",
+                  "av_f29bcbf7_1785852876.jpg",
+                  "av_XYZ_1.jpg", "avatar.jpg"):
+        prova(f"la spazzata riconosce la gemella di {pieno}",
+              bool(amb["NOME_FOTO"].match(pieno)),
+              bool(ripulisci_avatar_min.AVATAR_MIN.match(
+                  pieno[:-4] + "_min.jpg")))
+    # e non si tocca mai un pieno (e' la faccia di qualcuno) ne' le
+    # miniature degli annunci, che invece servono
     for nome in ("av_0236b74b_1784996031.jpg", "a12_0_min.jpg"):
         prova(f"la spazzata lascia stare {nome}", False,
               bool(ripulisci_avatar_min.AVATAR_MIN.match(nome)))
