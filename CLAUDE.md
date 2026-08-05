@@ -3253,10 +3253,51 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   questo il client nuovo lo spegne sui set e mostra l'ELENCO).
   Frontend: `sezioneAltriOggetti` in coda a openDetail (card dal
   negozio limit 7, inCatalogo obbligatorio, guard anti-race,
-  fail-open) + bottone «📦 Aggiungi al pacco» — MAI il 🫙
+  fail-open) + bottone «🛒 Aggiungi al carrello» — MAI il 🫙
   nell'etichetta: il barattolo è dei preferiti (il foglio `#setSheet`
   che ne portava il nome non esiste più dall'ago 2026, vedi «LA
   PAGINA CONTROLLA IL PACCO» più sotto).
+  PER GLI UTENTI SI CHIAMA CARRELLO (ago 2026, decisione di Andrea):
+  la parola «pacco» nei testi resta SOLO dove significa la spedizione
+  fisica (taglia del pacco, «segui il pacco», «Spedisci il set (un
+  pacco solo)») — il concetto-composizione parla «carrello» con
+  l'icona 🛒 ovunque (che in card non compare mai: nessuna collisione
+  con 🚚 🤝 💾; l'unico altro 🛒 del progetto è la notifica admin del
+  bot, superficie diversa). La sequenza dei bottoni dice il flusso:
+  «🛒 Aggiungi al carrello» → «Controlla e paga» (la barra: porta al
+  riepilogo «Controlla il carrello» PRIMA di pagare) → «Paga». I NOMI
+  INTERNI restano «pacco» (paccoDati, view-controllapacco, .pacco-*,
+  le chiavi di navigazione…), dichiarato: rinominarli sarebbe un
+  refactor di massa contro la regola dei diff piccoli, e il commento
+  in testa ad apriPacco lo dice. Il MODELLO si dichiara in una riga
+  corta nel sottotitolo della pagina («un venditore alla volta,
+  spedizione unica» — SENZA il «di {venditore}» davanti: misurato a
+  375px, col nome la riga si troncava proprio sulla parte che deve
+  dire, e il venditore è già su ogni card e nel riepilogo), e il
+  CAMBIO VENDITORE si DICE: apriPacco da un altro venditore con una
+  spesa in corso svuota come sempre ma ora col toast «Carrello nuovo:
+  è di un venditore alla volta…» — è il modello, non un errore, e in
+  silenzio sembrava roba sparita.
+  I SOLO-DIGITALI SONO FUORI DALLA GRIGLIA di composizione (ago 2026):
+  non entreranno mai nel carrello per regola, e una cella spenta per
+  sempre non è un'informazione — è rumore. renderPacco li filtra
+  (`consegna==='digitale'`) e al loro posto c'è UNA riga in fondo,
+  «💾 Gli articoli digitali si comprano singolarmente»; gli esclusi
+  TEMPORANEI (asta, incompatibili, consegna '' degli storici) restano
+  visibili e spenti col motivo, come sempre — motivoEsclusione non
+  cambia e resta la cintura sul pezzo di partenza. E se il venditore
+  ha SOLO digitali la striscia non porta al carrello: `tuttoDigitale`
+  in sezioneAltriOggetti (giudica l + i 7 della striscia — un pezzo
+  fisico oltre il settimo al più nasconde un bottone in più,
+  dichiarato).
+  LE CIFRE DEL CONTO NON SI SPEZZANO MAI (ago 2026, bug visto in
+  vista sats: con l'etichetta «Spedizione (dalla più economica)» il ≈
+  andava a capo SOPRA il numero): nella grammatica `.ctrl-riga` la
+  cifra col suo ≈ e la sua unità è un gruppo indivisibile
+  (white-space:nowrap sul `.mono`) e a cedere, coi puntini, è
+  l'ETICHETTA a sinistra — vale per riepilogo E pagina Paga, che
+  vestono le stesse righe di contoRighe (verificato a 320/375/430
+  nelle due valute).
   DA STRISCIA A GRIGLIA (ago 2026, decisione di Andrea): era una fila
   che si scorreva di LATO (`.altri-strip`) — un gesto che nessun'altra
   parte dell'app chiede, e che nasconde tutto quello che non ci sta
