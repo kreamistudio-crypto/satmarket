@@ -374,6 +374,65 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`segna_consegnato` e il testo al venditore di
   `sollecita_ritiri_fermi`). È lo stesso patto della commissione
   sospesa.
+  IL TRACCIAMENTO SI CORREGGE, MA NON DAL VENDITORE (ago 2026, caso
+  vero dal campo): un venditore compra la spedizione da un
+  intermediario (Packlink, Sendcloud) e inserisce il codice
+  dell'ORDINE dell'intermediario invece di quello del corriere — che
+  spesso gli arriva per email solo DOPO aver consegnato il pacco al
+  punto di ritiro. `segna_spedito` filtra su stato='locked', quindi il
+  tracciamento si scrive una volta sola e nessuno poteva più
+  correggerlo: il compratore restava con un codice che nessun corriere
+  conosce. La cura ha TRE gambe, e la terza è quella che decide.
+  1) PREVENZIONE: una riga nel form della spedizione E in quello del
+  reso (`AVVISO_INTERMEDIARIO`, un posto solo) che lo dice PRIMA.
+  2) CONTROLLO DI FORMA, mai bloccante: `FORME_TRACKING` riconosce i
+  formati tipici dei corrieri in elenco (Poste S10 o 12-13 cifre, BRT
+  10-14, GLS/SDA 9-14, DHL 10-11 o JJD/JVGL, UPS 1Z+16 o 9-18, InPost
+  24 cifre; «Altro corriere» e le sentinelle non si controllano mai) e
+  a forma storta CHIEDE, non impedisce — primo tocco = avviso, secondo
+  tocco sullo STESSO codice = si passa (`trackingDaControllare`,
+  `trackingForzato` legato al valore, così correggendolo si
+  ricontrolla). È EURISTICA E NON VERIFICA, ed è scritto: nessuno di
+  questi codici lo possiamo interrogare, la verifica vera arriverà col
+  tracking via API dei corrieri (già in backlog). Meglio una domanda
+  in più che una spedizione vera fermata da una regola NOSTRA
+  sbagliata: i corrieri cambiano i formati senza avvisarci.
+  3) CORREZIONE, `POST /api/admin/orders/{id}/tracking` (`reso=1` per
+  quello del reso): SOLO moderatore — decisione di Andrea, un
+  tracciamento riscrivibile a piacere non è più una prova in disputa,
+  quindi il venditore NON ha nessun bottone. Stati shipped/delivered
+  (return_shipped per il reso). NON SI TOCCA `spedito_il`, che è
+  l'ANCORA del promemoria di `sollecita_conferme_ferme`: riscriverla
+  farebbe ripartire da capo l'attesa del compratore a ogni correzione,
+  la stessa trappola già pagata con `aggiornato` in
+  `sollecita_venditori_fermi` — e per la stessa ragione non si tocca
+  nemmeno lo stato né `aggiornato`, che qui non servono (il quando lo
+  dice `tracking_corretto_il`). I CORRIERI-SENTINELLA si rifiutano nei
+  DUE VERSI (`CORRIERI_SENTINELLA`: 'Consegna a mano', 'Ritiro in
+  zona', 'Consegna digitale', più consegna_scelta ritiro/digitale):
+  trasformare un ritiro in una spedizione — o viceversa — a sats già
+  in cassaforte cambia la STORIA dell'ordine, non un dato di servizio.
+  Colonne `tracking_corretto_il` / `tracking_reso_corretto_il`
+  (0 = mai), che escono gratis da `/api/orders` col `o.*` e diventano
+  la riga «(tracciamento corretto da un moderatore il …)» visibile a
+  ENTRAMBE le parti — in silenzio varrebbe meno, non di più — più
+  `registra_moderazione` e la notifica a CHI ASPETTA IL PACCO (il
+  compratore sulla spedizione, il VENDITORE sul reso: è lui che
+  aspetta indietro l'oggetto).
+  E IL MODERATORE DEVE POTERCI ARRIVARE (buco trovato provandolo dal
+  vivo, non leggendo il codice): un ordine 'shipped' fra estranei non
+  compare in NESSUNA coda — e giustamente, non è un caso da moderare —
+  quindi il pannello sarebbe stato irraggiungibile. `/api/orders`
+  accetta ora `ordine=N`, solo ai moderatori, che AGGIUNGE quel
+  singolo ordine alla lista di sempre senza allargarla (dispute e resi
+  restano quelli): si vede l'ordine di cui il venditore ha dato il
+  NUMERO, uno alla volta. Il numero glielo dà la riga
+  `notaTrackingSbagliato` nel suo ordine — non un bottone, ed è il
+  punto — che porta il numero già scritto e il canale del rodaggio
+  (`BANNER_TEST_LINK`, quello che c'è già: nessun secondo contatto da
+  tenere aggiornato). Ingresso nel Profilo admin, «🛠 Apri un ordine
+  per numero»: da lì si apre l'ordine come sempre e la correzione vive
+  DENTRO, dove sta il contesto — un posto solo.
   IL VENDITORE CHE NON FA PARTIRE LA MERCE (ago 2026, il buco 1 di
   ieri, chiuso — col suo gemello digitale che non era nemmeno
   dichiarato): un ordine `locked` non ha MAI avuto un timer, quindi il
@@ -2742,6 +2801,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   filtro «🔨 All'asta», l'ordinamento «chi scade prima» su
   idx_annunci_asta, il badge in card col tempo a grana grossa e il
   countdown vivo solo nel dettaglio, sul battito unico).
+  LA LAMPO PARLA ROSSO DAPPERTUTTO (ago 2026, decisione di Andrea):
+  prima il rosso era solo il badge ⚡ e la cornice della card era
+  arancio ₿ — cioè il colore dei prezzi normali e delle azioni, che
+  diceva «offerta» con la voce di «tutto il resto». Tre token, perché
+  il rosso vive su tre superfici diverse, ed è la stessa famiglia
+  dell'asta: `--lampo` #C0392B FISSO (il badge sulla foto, bianco
+  sopra 5,44, e il chip del dettaglio — ciò che sta sulla foto non
+  cambia di notte, come share-btn e pallini); `--lampo-tag` #A6301F
+  FISSO (il prezzo sul CARTELLINO, che è di carta chiara nei due temi:
+  6,48 su #FFF8EA — gemello esatto di `--asta-tag`, per la stessa
+  ragione); `--lampo-text` INCHIOSTRO e quindi seguito dal tema
+  (#A6301F / #FF8A6B: il numero grande del dettaglio, la riga
+  «rimangono …» e la CORNICE della card — misurati 6,24 su crema,
+  7,46 su bruno; la cornice fa 6,85 sul bianco della card e 6,57 sul
+  bruno). ATTENZIONE all'asimmetria con l'asta, che la cornice la fa
+  col suo `--asta`: quello è un token che si schiarisce di sera, il
+  rosso della lampo no — qui l'inchiostro è la scelta giusta, e il
+  segno resta rosso in tutti e due i temi. Si abbassa la luce, non si
+  cambia il segno. In card la regola è `.card.in-lampo .tag-price
+  .price` (unità compresa: mezzo numero per famiglia sarebbe la
+  trappola già pagata col € dell'asta), nel dettaglio la classe
+  `.detail-price.lampo` che `openDetail` mette accanto ad `.asta`.
   L'ASTA PARLA PETROLIO (ago 2026, ritocchi di Andrea: prima blu, poi
   verde-blu scuro tenuto sul lato BLU della famiglia — tinta ~195°,
   col verde della protezione a ~151°: si toccano nel punto più
@@ -2772,18 +2853,36 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   LA RADICE «🔨 ASTE» ESISTE (ago 2026): il martelletto SVG
   monocromatico (mano di tagliaSVG, inchiostro in [2,22], si accende
   in arancio con currentColor come le sorelle) prende lo SLOT VUOTO
-  della nav SOLO a leva accesa — `aggiornaAstaVisibilita` lo scambia
-  con lo spaziatore, gli slot restano cinque e il Vendi al centro
-  esatto. NON è una seconda vetrina (il patto di Sfoglia): `vaiAste`
-  accende ramoVetrina='aste' + filtro + ordinamento «scade prima»
-  sulla vetrina UNA; `voceNav` e la entry di navigazione conoscono il
-  ramo; `vaiEsplora` uscendo dal ramo spegne ANCHE filtro e
-  ordinamento che il tab aveva acceso lui (o Esplora mentirebbe).
-  Stato vuoto suo («Nessuna asta in corso», CTA verso Vendi).
-  IMPERFEZIONE DICHIARATA: in vetrina anonima /api/me non c'è e il
-  tasto resta nascosto — per mostrarlo agli anonimi servirebbe la
-  leva nella busta di prima pagina (un tocco a server.py, non fatto
-  di proposito: si decide con Andrea).
+  della nav. NON è una seconda vetrina (il patto di Sfoglia):
+  `vaiAste` accende ramoVetrina='aste' + filtro + ordinamento «scade
+  prima» sulla vetrina UNA; `voceNav` e la entry di navigazione
+  conoscono il ramo; `vaiEsplora` uscendo dal ramo spegne ANCHE
+  filtro e ordinamento che il tab aveva acceso lui (o Esplora
+  mentirebbe). Stato vuoto suo («Nessuna asta in corso», CTA verso
+  Vendi).
+  IL TASTO C'È SEMPRE, ANCHE A LEVA SPENTA (ago 2026, decisione di
+  Andrea): prima compariva solo ad `ASTA_ABILITATA` accesa e lo slot
+  restava allo spaziatore. Adesso il martelletto prende quel posto in
+  ogni caso e a leva spenta porta al COMING SOON (`view-astepresto`,
+  markup fisso e nessun dato utente dentro — mai un esc() da
+  ricordare; riusa lo stato vuoto di casa, `.empty` con la mascotte
+  che fluttua, quindi zero token nuovi e chiaro/scuro gratis): le aste
+  si annunciano prima di esistere, invece di apparire un giorno dal
+  nulla. È una RADICE SORELLA — sta in `RADICI`, si sostituisce come
+  le altre e l'indietro passa da Esplora — e `voceNav` la mappa su
+  'aste', che la nav deve dire dove sei. Non tocca né filtro né
+  ordinamento: non c'è niente da accendere e niente da spegnere
+  uscendo. Il TOGGLE del form invece segue la leva sul serio: un'asta
+  non si crea finché non è accesa.
+  LA LEVA ARRIVA DA DUE FONTI, e questo chiude l'imperfezione
+  dichiarata di ieri: `/api/me.asta_leve.abilitata` per chi è dentro,
+  e `asta_abilitata` nella busta di PRIMA PAGINA di `/api/listings`
+  per gli ANONIMI in vetrina, che /api/me non ce l'hanno. Senza la
+  seconda l'anonimo vedrebbe il coming soon anche ad aste ACCESE — e
+  sarebbe una bugia, non un'imperfezione. Il giudice unico è
+  `asteAccese()`. In DEMO non arriva nessuna delle due e resta il
+  coming soon, che lì è la verità (nel seme finto le aste non ci
+  sono).
   FUSIONE con la REGOLA DELLA LAPIDE (Andrea, in revisione — il
   travaso cieco era un doppio conteggio): nelle collisioni
   stessa-asta si sommano SOLO le puntate ATTIVE (i sats di una
@@ -2956,23 +3055,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   portano la chiave (client vecchio in cache: titolo e totali di
   sempre, il suo «N pezzi × unitario» mostrerebbe una media — per
   questo il client nuovo lo spegne sui set e mostra l'ELENCO).
-  Frontend: `sezioneAltriOggetti` in coda a openDetail (striscia
-  `.altri-strip` di card dal negozio limit 7, inCatalogo
-  obbligatorio, guard anti-race, fail-open) + bottone «📦 Riempi il
-  pacco» (lug 2026: la frase lunga «Compra più oggetti in un pacco
-  solo» andava a capo a 360px) — MAI il 🫙 nell'etichetta: il
-  barattolo è dei preferiti, e il nome del cantiere vive solo nel
-  titolo del foglio `#setSheet` (registrato in closeSheet), che dice
-  «🫙 Riempi il barattolo — un pacco, una spedizione». Il bottone
-  porta l'ACCENTO CARTONE: classe `.btn.carton`, token `--carton`
-  (#9A6234 di giorno, #C79A72 di sera — di notte si SCHIARISCE, che
-  un marrone scuro affonderebbe nel fondo bruno dell'app; contrasti
-  5,04 e 5,99, AA in entrambi) su contorno, testo e ombra, con fondo
-  NEUTRO: resta un secondario, l'unico pieno del dettaglio è
-  Acquista. La variante a sfondo pieno è stata provata e scartata in
-  tutti e due i temi — diventava un blocco che gridava quanto il CTA.
-  L'emoji 📦 è già di quel colore per conto suo: nessun glifo si può
-  tingere. Composizione:
+  Frontend: `sezioneAltriOggetti` in coda a openDetail (card dal
+  negozio limit 7, inCatalogo obbligatorio, guard anti-race,
+  fail-open) + bottone «📦 Aggiungi al pacco» — MAI il 🫙
+  nell'etichetta: il barattolo è dei preferiti, e il nome del
+  cantiere vive solo nel titolo del foglio `#setSheet` (registrato in
+  closeSheet), che dice «🫙 Riempi il barattolo — un pacco, una
+  spedizione».
+  DA STRISCIA A GRIGLIA (ago 2026, decisione di Andrea): era una fila
+  che si scorreva di LATO (`.altri-strip`) — un gesto che nessun'altra
+  parte dell'app chiede, e che nasconde tutto quello che non ci sta
+  nei primi 150px. Ora è la griglia della vetrina, stesse card e
+  stesso passo: la classe `.grid` così com'è, non una copia
+  (`.altri-griglia` toglie solo il padding orizzontale, che qui dentro
+  lo mette già `.detail-body`). Tetto da 6 a 8 card, che con due
+  colonne fanno quattro righe piene.
+  IL BOTTONE SI INCOLLA IN CIMA (modello Vinted) mentre gli oggetti
+  scorrono sotto, ed è `position:sticky` dentro `.altri-sez` — la
+  scelta è STRUTTURALE e vale più del comportamento: un elemento
+  sticky non esce MAI dal suo contenitore, quindi non può arrivare a
+  coprire la foto o il titolo (che stanno fuori dalla sezione) e si
+  stacca da solo, senza scatti e senza un ascoltatore di scroll,
+  quando la sezione finisce. `top:0` e non «un filo d'aria»: con uno
+  stacco, sopra il bottone si vedeva passare la fetta di card che gli
+  scorreva dietro — l'aria la dà il padding, che fa parte del fondo e
+  copre fino al bordo (notch compreso). Da desktop `top:60px`, sotto
+  la topbar. z-index 5, cioè sotto la barra d'acquisto (30) e sotto i
+  fogli: non le ruba mai un tocco.
+  NIENTE PIÙ VESTITO DI CARTONE (stessa decisione): il bottone è il
+  ghost di casa come ogni altro secondario — un accento in più su un
+  secondario faceva concorrenza all'unico pieno del dettaglio, che è
+  Acquista. La classe `.btn.carton` col token `--carton` resta
+  DEFINITA ma non la porta più nessuno: non è codice morto da
+  cancellare, è un vestito appeso. Composizione:
   `setScelte` Map id→qta (parte dal pezzo aperto), righe con spunta
   e stepper (i SELEZIONABILI prima: il tetto delle 8 righe non
   taglia mai un compatibile per mostrare uno spento), righe spente
@@ -2992,6 +3107,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (un pacco solo)» + taglia stimata. In DEMO il set non esiste
   (toast), in VETRINA apre l'invito. Gli importati da Nostr restano
   fuori dai set per costruzione (consegna '').
+  LA ✕ DELLA PAGINA DEL PACCO CHIUDE E BUTTA VIA (ago 2026, decisione
+  di Andrea). Il pacco è STICKY per venditore — uscire e rientrare dal
+  dettaglio non svuota niente, `apriPacco` lo dice: stesso venditore =
+  ritrova il suo pacco com'era — e questo non cambia; serviva però una
+  strada per ricominciare da capo, e la ✕ è quella. Conferma davanti
+  perché non si torna indietro (`#paccoSvuotaSheet`, registrato in
+  closeSheet: foglio nostro e non il `confirm()` di sistema perché i
+  due bottoni SONO il punto — rettangolari come «Acquista», quello che
+  distrugge sopra e il ripensamento sotto); `svuotaPacco` azzera
+  `setScelte` E `paccoDati`, quindi il prossimo «Aggiungi al pacco» è
+  un pacco nuovo anche dallo stesso venditore. A pacco già vuoto non
+  si chiede nulla: una domanda su una cosa che non esiste è solo un
+  ostacolo. La ✕ è NUDA e non più un cerchietto col bordo e l'ombra
+  piena: il cerchio di carta è il linguaggio di ciò che fluttua SULLA
+  foto (share-btn, back-float), non di una testata — il bersaglio
+  resta largo col `::after`, che non occupa layout.
+  IL GESTO INDIETRO NON CHIEDE E NON SVUOTA, ed è dichiarato: torna al
+  dettaglio col pacco intatto, come sempre. Due ragioni, e la seconda
+  decide. «Indietro» vuol dire tornare, non buttare — chiedere una
+  conferma distruttiva a chi voleva solo fare un passo indietro è la
+  trappola classica. E soprattutto: nella PWA installata il gesto è di
+  SISTEMA e non passa da `navIndietro`, quindi non si può
+  intercettare, solo preparare (vedi il motore di navigazione). Un
+  ripensamento agganciato al gesto funzionerebbe dentro Telegram e NON
+  nella PWA, cioè la stessa ✕ farebbe due cose diverse sui due
+  telefoni. Fra una garanzia che c'è solo a metà e una regola onesta,
+  la regola.
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -3480,7 +3622,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `.trust-line` sotto la searchbar e sopra la griglia del negozio.
   Logo = lockup `.bmark` (B che diventa ₿ con due pseudo-elementi);
   in topbar desktop è markup vero `.nav-logo` (il vecchio
-  `nav::before` testuale non esiste più). Badge stati: `refunded` ha
+  `nav::before` testuale non esiste più) e dall'ago 2026 TORNA AL
+  MERCATINO: da desktop è la convenzione di ogni sito, e la strada
+  c'era già — `vaiEsplora()`, la stessa del tab, che riporta alla
+  radice madre con la categoria a «Tutto» e il ramo spento (mai un
+  `go('esplora')` secco: si atterrerebbe su una vetrina ancora
+  filtrata con la nav accesa su Sfoglia). Resta un `<div>` con role e
+  tabindex e NON un `<button>`: `nav button` è il selettore delle
+  VOCI — CSS e la spazzata di `go()` — e il logo non è una voce.
+  Sotto i 768px è display:none, quindi è desktop per costruzione, e
+  in testata mobile il logo sta già su Esplora. Badge stati: `refunded` ha
   la SUA classe grigia (non più il verde di released). Distintivi:
   tessere d'oro per i guadagnati, 2 colonne (non le 3 del mockup:
   le descrizioni sono contenuto vero). Stato vuoto con CTA
@@ -3791,11 +3942,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SCELTA consegna (`pilloleConsegna`) non esistono più: in pagina
   restano solo le pillole INFORMATIVE (spedBadge + pilloleModalita),
   la scelta vive nel foglio del varco (e domani nella pagina
-  dedicata). COERENZA DI FORME: `#detailContent .btn` e
-  `#barraCompra .btn` portano `border-radius:var(--radius)` — nel
-  dettaglio ogni bottone-oggetto è rettangolare col raggio del
-  riquadro venditore (coppia, NWC, Metti nel barattolo, tasti del
-  proprietario, set); i testuali link/danger-ghost non hanno forma.
+  dedicata).
+  LA FORMA DI «ACQUISTA» È LA FORMA DI TUTTI (ago 2026, decisione di
+  Andrea, ed è la regola da non rovesciare). `.btn` nasceva PILLOLA
+  (999px) e il rettangolo era una DEROGA scritta a mano in quattro
+  punti — con due valori diversi per giunta: 12px nel recinto e nelle
+  due barre, 16 (`--radius`) nel dettaglio e nel foglio puntata.
+  Risultato: il pannello Filtri, tutti i fogli e la pagina del negozio
+  erano rimasti tondi, e nella stessa schermata convivevano due forme
+  per la stessa famiglia di bottoni. Adesso il verso è ROVESCIATO — la
+  regola sta nella base `.btn`, le deroghe non ci sono — e il token è
+  UNO, `--radius-btn` (12px): chi vuole un'altra curva lo tocca e
+  tocca tutta l'app. Con lo stesso giro sono passati al rettangolo il
+  pannello Filtri (Applica/Azzera), i bottoni del negozio, «← Torna»
+  (`.back`) e il bottone delle celle del pacco, che aveva un 10px suo.
+  RESTANO TONDI DI PROPOSITO, e sono classi loro, non `.btn`: `.pill`,
+  `.chip`, `.badge`, `.sped-badge`, `.escrow-flag`, i badge lampo/asta
+  in card, il toggle €/₿, la nav col tondo del Vendi, le pillole
+  «Ordina»/«Filtri» sopra la griglia (sono chip di filtro, famiglia
+  delle categorie), più `.tour-avanti` e `.demo-cta`. Quelle non sono
+  bottoni-oggetto, sono etichette e chrome. I testuali (`.btn.link`,
+  `.danger-ghost`) non hanno fondo, quindi la curva non li riguarda.
+  E I DUE PONTI SONO BOTTONI, NON LINK (stessa decisione): nel negozio
+  erano testo sottolineato («btn link») mentre gli stessi due dentro
+  l'ordine erano già ghost — la stessa azione con due vestiti secondo
+  la pagina. Ora il default di `pontiContatto` è uno solo, il ghost di
+  casa; il parametro `cls` resta, ma nessuno lo passa più diverso.
   Da ≥768px la barra non esiste proprio:
   la nav è una topbar e il dettaglio a due colonne ha già i bottoni
   sotto mano. I fogli (41) e il velo (40) le passano sopra senza che
@@ -3867,44 +4039,87 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `a.stato` + venditore_id, dal salvato più recente, tetto 100 —
   escono ANCHE venduti/rimossi e il cassetto li mostra onesti «non
   più disponibile» (spenti, dettaglio non apribile, il 🫙 Togli
-  resta) finché l'utente non li toglie lui. LIMITE 20
-  (`MAX_PREFERITI`, lug 2026): la guardia vive nel SERVER, nel ramo
-  INSERT del toggle — `_conta_barattolo` conta solo gli annunci
-  ATTIVI (venduti/rimossi non occupano posto: comprare qualcosa che
-  c'è dentro libera spazio da solo), oltre = 400 «Il barattolo è
-  pieno!...»; niente await tra COUNT e INSERT (il patto
+  resta) finché l'utente non li toglie lui. LIMITE 10
+  (`MAX_PREFERITI`, dall'ago 2026 una LEVA del config col default 10
+  nel codice — era 20 murato, decisione di Andrea: è una selezione,
+  non una lista dei desideri infinita; ATTENZIONE, una riga esplicita
+  nel config del VPS vince sul default): la guardia vive nel SERVER,
+  nel ramo INSERT del toggle — `_conta_barattolo` conta solo gli
+  annunci ATTIVI (venduti/rimossi non occupano posto: comprare
+  qualcosa che c'è dentro libera spazio da solo), oltre = 400 che DICE
+  il numero; niente await tra COUNT e INSERT (il patto
   anti-doppione). La risposta del POST porta anche `conteggio`
   (attivi dopo l'operazione: il frontend aggiorna il livello col
-  numero del server). La fusione può superare i 20 in unione,
-  accettato: il limite blocca solo le aggiunte nuove. Nessun
-  conteggio pubblico: il venditore non vede chi né quanti (v1).
+  numero del server). Il client NON tiene un gemello hardcodato del
+  tetto: lo riceve da `/api/me.max_barattolo` e lo adotta — una copia
+  a memoria divergerebbe al primo ritocco della leva, e il «(N/…)» e
+  i messaggi direbbero un'altra cifra. La fusione può superare il
+  tetto in unione, accettato: il limite blocca solo le aggiunte nuove.
   `esegui_fusione` migra in unione (UPDATE OR IGNORE + DELETE, il
   pattern degli avvisi).
-  Frontend: cerchietto `.jar-btn` sulla foto accanto al condividi —
-  solo autenticati veri (mai DEMO/VETRINA) e mai sui propri annunci —
-  da salvato si accende d'arancio e ondeggia (`jarPop`, spenta con
-  reduced-motion), haptic + toast; Set `preferiti` e lista
+  QUANTI, SÌ; CHI, MAI (ago 2026): il conteggio dei salvataggi di un
+  annuncio è PUBBLICO e anonimo — `_conta_savers` e il campo
+  `barattoli` aggiunto in `arricchisci_righe_vetrina` (UNA query per
+  pagina sull'indice nuovo `idx_preferiti_annuncio`: la PK è
+  (tg_id, annuncio_id) e senza quell'indice il conto per ANNUNCIO
+  sarebbe una scansione di tutta la tabella) più `barattoli` nella
+  risposta del toggle, così il numero accanto all'icona si aggiorna
+  col dato del server e non con un ±1 a occhio. È la stessa regola
+  dell'avviso «ha fatto colpo»: si dice quanti, mai chi — nessun
+  nome, nessun id, da nessuna parte. La SOGLIA da cui mostrarlo la
+  decide il CLIENT (`SOGLIA_SAVERS`, da 2 in su): il server dice
+  sempre la verità, la soglia è una scelta di lettura e non di
+  privacy — un «1» non è una prova sociale, è un numero che occupa
+  spazio, e in griglia si moltiplica per trenta. IMPERFEZIONE
+  DICHIARATA: il contatore vive attaccato al barattolino, quindi sui
+  PROPRI annunci non compare (lì l'icona non c'è) — al venditore lo
+  racconta già «ha fatto colpo»; per mostrarglielo servirebbe un
+  secondo posto dove disegnare quel numero.
+  Frontend: cerchietto `.jar-btn` sulla foto — dall'ago 2026 in BASSO
+  A DESTRA e non più in alto accanto al condividi (modello Vinted,
+  decisione di Andrea), un filo più grande (40 contro i 34 delle
+  card) e con l'ombra più decisa, che sul bordo basso della foto
+  capita di tutto. Solo autenticati veri (mai DEMO/VETRINA) e mai sui
+  propri annunci, haptic + toast; Set `preferiti` e lista
   `myPreferiti` da `caricaPreferiti()` (in avvia() e a ogni apertura
   del Profilo: un salvato può essere stato venduto nel frattempo, e
-  gli attivi entrano in `listings` via inCatalogo per openDetail);
-  bottone gemello `#jarCta` «🫙 Metti nel barattolo / Già nel
-  barattolo» nel dettaglio, `.btn.ghost` FUORI dal recinto escrow
-  (il tratteggio è il sigillo del pagamento: dentro ci sta solo chi
-  compra), stesse guardie e stesso `togglePreferito` del
-  cerchietto (che aggiorna entrambi); guardia di cortesia client
-  (toast senza richiesta a barattolo pieno, la verità resta il 400).
-  IL BARATTOLO SI RIEMPIE (lug 2026): le icone (cerchietto del
-  dettaglio + header del cassetto `#preferitiJar`) sono l'SVG inline
-  di `jarSVG()` — vetro a stroke:currentColor, liquido = un rect
-  arancione (`--jar-liquido`, default `--sats`; crema sul cerchietto
-  `.salvato` per non sparire nel fondo) dentro la clipPath
+  gli attivi entrano in `listings` via inCatalogo per openDetail).
+  IL BOTTONE GRANDE «🫙 Metti nel barattolo» sotto il recinto NON
+  ESISTE PIÙ (ago 2026, decisione di Andrea): un preferito non è
+  un'azione dello stesso peso di un acquisto, e rubava spazio alla
+  barra. Il gesto è UNO, ed è l'icona sulla foto — con lui se n'è
+  andato `#jarCta`. La fabbrica è UNA per griglia e scheda
+  (`bottoneJar`): stessa icona, stesso livello per-annuncio, stesso
+  numero accanto, e `aggiornaJarCards` li riallinea tutti e due.
+  Guardia di cortesia client (toast senza richiesta a barattolo
+  pieno, la verità resta il 400).
+  IL BARATTOLO SI RIEMPIE (lug 2026): le icone sono l'SVG inline di
+  `jarSVG()` — vetro a stroke:currentColor, liquido = un rect
+  arancione (`--jar-liquido`, default `--sats`) dentro la clipPath
   dell'interno (id univoco per istanza) — con 5 livelli a scatti
-  `lv0-4` via translateY (0→0, 1-5→1, 6-10→2, 11-19→3, 20→4, da
-  `livelloBarattolo` sui soli attivi di `contaBarattolo`);
-  transizione morbida spenta con prefers-reduced-motion. Regia unica
-  `aggiornaBarattolo(n)`: porta ogni `.jar-ico` in pagina al livello
-  giusto e scrive «(N/20)» in `#preferitiConta` (N = attivi; usa il
-  `conteggio` del server quando c'è). PRIMO cassetto del Profilo
+  `lv0-4` via translateY; transizione morbida spenta con
+  prefers-reduced-motion.
+  L'ANIMAZIONE SI È ROVESCIATA (ago 2026, decisione di Andrea): al
+  tocco si accendeva d'arancio il FONDO del cerchietto e il liquido
+  diventava crema — cioè a riempirsi era lo sfondo, e il barattolo si
+  svuotava. Ora lo sfondo non cambia mai ed è il LIQUIDO ARANCIO che
+  sale dentro il vetro, che è esattamente ciò che l'icona racconta;
+  le due regole `.salvato{background:var(--sats)}` sono sparite. Una
+  sola animazione, la stessa in vetrina e nel dettaglio — e il
+  riempimento a scatti dal conteggio GLOBALE nel dettaglio non c'è
+  più: lì non si capiva, e ora il livello è per-ANNUNCIO come in
+  griglia (vuoto/pieno). Il globale resta solo dove racconta davvero
+  il barattolo: il 🫙 dell'header del cassetto, `#preferitiJar`.
+  LE SOGLIE SONO IN PROPORZIONE AL TETTO e non più scritte a mano
+  (`livelloBarattolo`): con le vecchie (≤5→1, ≤10→2, poi 3) e il
+  tetto a 10 il livello 3 non sarebbe esistito MAI — pieno a 10, ma
+  «≤10» lo fermava a 2. Così la leva può valere 6 o 40 e il vetro si
+  riempie lo stesso in quattro passi; `prove.py` lo verifica su tre
+  tetti diversi leggendo la formula dal client, non ricopiandola.
+  Regia unica `aggiornaBarattolo(n)`: porta al livello giusto i soli
+  `.jar-ico` che NON stanno dentro un `.card-jar` o un `.jar-btn`
+  (quelli raccontano l'annuncio) e scrive «(N/tetto)» in
+  `#preferitiConta`. PRIMO cassetto del Profilo
   «🫙 Nel tuo barattolo» (`renderPreferiti`, stato vuoto che
   invita). Il 🫙 sulle card della vetrina, prima rimandato, dal
   lug 2026 c'è (stile cuoricino Vinted): cerchietto `.card-jar` in
@@ -3914,8 +4129,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   cartellino prezzo sta in basso a sinistra, non si pestano. Il
   livello del barattolino in card è PER-ANNUNCIO (lv0 vuoto / lv4
   pieno: dice «questo l'hai già messo via»), NON quello globale:
-  `aggiornaBarattolo` salta i `.jar-ico` dentro `.card-jar`, la
-  regia per-card è `aggiornaJarCards()` (chiamata dopo
+  `aggiornaBarattolo` salta i `.jar-ico` dentro `.card-jar` e
+  `.jar-btn`, la regia per-card è `aggiornaJarCards()` (chiamata dopo
   caricaPreferiti — le card possono nascere prima del Set — e dopo
   ogni toggle: card, dettaglio e cassetto mai divergenti). Tocco con
   stopPropagation (non apre il dettaglio), scossellina all'aggiunta
@@ -4604,6 +4819,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
 - Il Login Widget esige il dominio registrato: BotFather → `/setdomain`
   su @ilbarattolobot → `barattolo.store` (senza, il bottone non compare;
   su localhost non compare mai: si collauda col bottone "cookie web").
+- Il tetto del barattolo (`MAX_PREFERITI`) ha il default 10 nel CODICE
+  dall'ago 2026, ma una riga esplicita nel config del VPS vince su di
+  lui — e finché c'è, il tetto nuovo non entra in vigore. Si guarda
+  PRIMA del deploy, in sola lettura:
+  `grep -n "MAX_PREFERITI" ~/satmarket/config.py` — nessuna riga = vale
+  il default e non c'è niente da fare; una riga con 20 = va cambiata a
+  mano (o cancellata) e poi riavviato.
 - Deploy: commit+push su main → sul server `cd satmarket && git pull &&
   systemctl restart barattolo`. Config e database NON viaggiano mai.
 - Webhook del bot: `TELEGRAM_WEBHOOK_SEGRETO` nel config del server
@@ -5492,6 +5714,39 @@ e download (era già accettato), i commit di MERGE fuori dalla
 scansione della cronologia, e il fatto che uno sconosciuto possa
 ancora far bussare il nostro LNbits chiedendo la verifica dei PROPRI
 ordini.
+
+Giro di interfaccia (ago 2026, undici punti dal campo e dal feedback di
+Andrea). La ✕ della pagina del pacco svuota davvero, con la conferma
+davanti — il gesto indietro no, e il perché sta nella voce sua: nella
+PWA è di sistema e non si può intercettare. IL TRACCIAMENTO su tre
+gambe (prevenzione, forma euristica che non blocca mai, correzione solo
+da moderatore con traccia visibile a tutt'e due le parti), col buco
+trovato provandolo dal vivo: il moderatore non poteva nemmeno APRIRE un
+ordine spedito fra estranei, e senza il parametro `ordine` il pannello
+sarebbe rimasto irraggiungibile. Colori coerenti in vetrina (lampo
+rossa anche nella cornice e nel prezzo, asta petrolio). Tetto del
+barattolo da 20 a 10 ed è una LEVA; conteggio pubblico e anonimo dei
+salvataggi accanto all'icona (da 2 in su, dichiarato); il barattolino
+scende in basso a destra sulla foto, il liquido sale arancio invece di
+rovesciare lo sfondo, e il bottone grande sotto Acquista è sparito.
+«Altri oggetti» da striscia a griglia col bottone sticky. Il 🔨 in nav
+c'è sempre e a leva spenta dice che le aste stanno arrivando (con la
+leva nella busta di prima pagina, che chiude l'imperfezione degli
+anonimi). Il logo torna al mercatino. E la forma di «Acquista» è la
+forma di TUTTI: era una deroga scritta a mano in quattro punti con due
+valori diversi, ora è la base con un token solo — vedi la voce per
+l'elenco di cosa è passato al rettangolo e di cosa resta tondo di
+proposito. Collaudato: 389 prove verdi (erano 320, con le tre famiglie
+nuove — la correzione del tracciamento, il barattolo su tre tetti
+diversi, le forme dei codici sui casi veri) più il giro visivo via CDP
+a 375 e 1280px nei due temi, zero errori JS, e la catena del pacco
+esercitata dal vivo (conferma, indietro che NON svuota, svuota che
+azzera davvero). IN PRODUZIONE il deploy fa girare due migrazioni
+additive (`tracking_corretto_il`, `tracking_reso_corretto_il`) e crea
+`idx_preferiti_annuncio`; nient'altro. ATTENZIONE al tetto del
+barattolo: il default 10 vive nel CODICE, e una riga `MAX_PREFERITI`
+esplicita nel config del VPS vincerebbe su di lui — si verifica prima
+del deploy (vedi Produzione).
 
 Prossimo cantiere deciso: LA PAGINA D'ACQUISTO DEDICATA — scelta della
 strada e conto scomposto in un posto solo, prima che nasca la invoice.
