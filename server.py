@@ -1854,8 +1854,11 @@ async def crea_invoice_escrow(sats: int, memo: str,
     """Crea la invoice che l'acquirente paghera': i sats finiscono
     nel wallet della piattaforma (la cassaforte). Di serie scade in
     15 minuti (se non viene pagata, l'ordine si autodistrugge poco
-    dopo); le puntate d'asta passano fatture piu' corte."""
-    async with httpx.AsyncClient() as c:
+    dopo); le puntate d'asta passano fatture piu' corte.
+    Il timeout e' scritto (ago 2026): era l'unico dei quattro tubi a
+    fidarsi del default di httpx — che vale 5 secondi ed e' giusto,
+    ma un numero che si legge batte un numero che si ricorda."""
+    async with httpx.AsyncClient(timeout=15) as c:
         r = await c.post(f"{LNBITS_URL}/api/v1/payments",
                          headers={"X-Api-Key": LNBITS_INVOICE_KEY},
                          json={"out": False, "amount": sats, "memo": memo,
@@ -1865,7 +1868,11 @@ async def crea_invoice_escrow(sats: int, memo: str,
 
 
 async def invoice_pagata(payment_hash: str) -> bool:
-    async with httpx.AsyncClient() as c:
+    """Il poll del pagamento in ENTRATA. Qui un timeout e' innocuo —
+    non esce niente, si richiede fra quattro secondi — ma il numero
+    si scrive lo stesso: i quattro tubi verso LNbits devono dire
+    tutti quanto aspettano, o l'unico senza sembra una dimenticanza."""
+    async with httpx.AsyncClient(timeout=15) as c:
         r = await c.get(f"{LNBITS_URL}/api/v1/payments/{payment_hash}",
                         headers={"X-Api-Key": LNBITS_INVOICE_KEY})
         return r.status_code == 200 and r.json().get("paid", False)

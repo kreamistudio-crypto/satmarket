@@ -1176,6 +1176,13 @@ def prove_importo_uscita():
     # Sono di quelle che se ne vanno in silenzio: nessuna prova
     # funzionale si rompe, e la falla torna. Quindi si difende la
     # FORMA, non solo il comportamento.
+    # 0: tutti e quattro i tubi verso LNbits dicono quanto aspettano.
+    #    Su quelli in entrata un timeout e' innocuo, ma l'unico senza
+    #    numero sembra una dimenticanza — e un giorno lo sara'.
+    prova("i quattro tubi LNbits dicono quanto aspettano", [],
+          [n for n in ("crea_invoice_escrow", "invoice_pagata",
+                       "paga_venditore", "decodifica_invoice")
+           if "httpx.AsyncClient(timeout=" not in pezzo(n)])
     pv = pezzo("paga_venditore")
     lna = pezzo("invoice_da_ln_address")
     # 1: obbligatorio SENZA default, o chi scrive la prossima strada
