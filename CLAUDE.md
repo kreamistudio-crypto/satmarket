@@ -3087,10 +3087,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Frontend: `sezioneAltriOggetti` in coda a openDetail (card dal
   negozio limit 7, inCatalogo obbligatorio, guard anti-race,
   fail-open) + bottone «📦 Aggiungi al pacco» — MAI il 🫙
-  nell'etichetta: il barattolo è dei preferiti, e il nome del
-  cantiere vive solo nel titolo del foglio `#setSheet` (registrato in
-  closeSheet), che dice «🫙 Riempi il barattolo — un pacco, una
-  spedizione».
+  nell'etichetta: il barattolo è dei preferiti (il foglio `#setSheet`
+  che ne portava il nome non esiste più dall'ago 2026, vedi «LA
+  PAGINA CONTROLLA IL PACCO» più sotto).
   DA STRISCIA A GRIGLIA (ago 2026, decisione di Andrea): era una fila
   che si scorreva di LATO (`.altri-strip`) — un gesto che nessun'altra
   parte dell'app chiede, e che nasconde tutto quello che non ci sta
@@ -3117,19 +3116,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Acquista. La classe `.btn.carton` col token `--carton` resta
   DEFINITA ma non la porta più nessuno: non è codice morto da
   cancellare, è un vestito appeso. Composizione:
-  `setScelte` Map id→qta (parte dal pezzo aperto), righe con spunta
-  e stepper (i SELEZIONABILI prima: il tetto delle 8 righe non
-  taglia mai un compatibile per mostrare uno spento), righe spente
-  col motivo scritto, pillole consegna su `stradeSet()`
+  `setScelte` Map id→qta (parte dal pezzo aperto), celle con
+  Aggiungi/chip − N + nella pagina del pacco, spente col motivo
+  scritto, pillole consegna su `stradeSet()`
   (intersezione), `totaleSet()` con la matematica di totaleStima
   (artStima per riga × qta + MAX spedizioni + protezione),
   `stimaTagliaSet` gemello client (il giudice resta il server),
-  `setCirca()` per il ≈. `startBuySet`/`confermaSetSubito` = gemelli
-  di startBuy/NWC: stesso paySheet e stesso pollTimer (chiusure
+  `setCirca()` per il ≈. `startBuySet` = gemello
+  di startBuy: stesso paySheet e stesso pollTimer (chiusure
   MIRATE, mai closeSheet col poll vivo), body a righe con
   offertaAccettataPer per riga; sul 409/404 `rinfrescaSet` rilegge
   il negozio (limit 100), spegne localmente gli spariti, pota
-  selezione e quantità e riapre il foglio: l'utente vede il buco,
+  selezione e quantità e ridisegna la pagina: l'utente vede il buco,
   non un vicolo cieco (il pezzo solo RISERVATO resta selezionabile:
   il fail-fast lo ridirà, dichiarato). Ordine: elenco «titolo × qta
   — sats» al posto della media, venditore con «📦 Spedisci il set
@@ -3163,6 +3161,49 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nella PWA, cioè la stessa ✕ farebbe due cose diverse sui due
   telefoni. Fra una garanzia che c'è solo a metà e una regola onesta,
   la regola.
+  LA PAGINA «CONTROLLA IL PACCO» (ago 2026): il riepilogo del set da
+  foglio a pagina intera — il foglio `#setSheet` NON ESISTE PIÙ, e
+  con lui spunte e stepper del riepilogo: la composizione si tocca
+  SOLO nella pagina del pacco, e il gesto indietro ci riporta con la
+  selezione intatta. Vista `view-controllapacco`, contenuto da
+  `renderControlla()`, aperta da `controllaPacco()` (che riallinea
+  currentListing alla provenienza: serve alla rilettura del negozio
+  dopo un 409). Dall'alto: testata con ← (navIndietro), titolo, «di
+  {venditore}» e il toggle €/₿ in alto a destra (stessa preferenza di
+  sempre, `setValuta` ridisegna anche questa pagina); «N articoli»
+  (N = pezzi totali) coi FRANCOBOLLI degli scelti in striscia
+  scorrevole (`.ctrl-mini`, ×N in mono sui multipli); CONSEGNA a
+  pillole sull'intersezione di `stradeSet()` — una strada sola = UNA
+  pillola già accesa, l'altra non compare (il campo non mente) — con
+  la stima taglia sotto, solo con la spedizione scelta; IL CONTO in
+  righe (`contoControlla`/`cifraCtrl`, nella valuta del toggle: in
+  euro sempre ≈, in sats il circa di `setCirca`, lo zero mai col ≈):
+  Prezzo, «Commissione Barattolo — 0 sats» con la pillolina «in
+  promo» (`.promo-tag`: la riga esiste per DIRE che oggi è gratis, ed
+  è il posto già pronto per la cifra il giorno che la commissione si
+  accenderà), Spedizione (il MAX di sempre; col ritiro vale 0 e la
+  riga RESTA, non sparisce), Protezione solo se >0, e TOTALE DA
+  PAGARE evidenziato (`.ctrl-riga.tot`, numero in --sats-text, unità
+  sempre in `.unit`); la trust-note dell'ordine unico; in fondo
+  «Acquista» arancio (→ `startBuySet`, stesso paySheet sopra la
+  pagina: la pagina post-acquisto è un cantiere futuro) e i due
+  secondari gemelli (basi al 50%): «Chiedi info» → pagina del
+  venditore (`ctrlChiediInfo` → apriNegozio), «Fai un'offerta» →
+  `view-offertapresto`, il «presto disponibile» in stile astepresto
+  (l'offerta sull'intero set è un cantiere futuro, NON costruita).
+  Navigazione: vista interna (spinge) con la chiave del pacco
+  (origineId); la ricostruzione esige paccoDati suo E setScelte non
+  vuoto, o si ripiega sulla vetrina; `body.senza-nav` nasconde la tab
+  bar sotto i 768 (è una cassa, non una vetrina) senza barra propria.
+  Sull'errore di startBuySet si chiude il paySheet e si resta sulla
+  pagina rinfrescata; se la potatura ha svuotato il pacco,
+  `rinfrescaSet` torna indietro da solo. CONSEGUENZA DICHIARATA: col
+  foglio è morto anche il suo «⚡ Compra subito» NWC
+  (`confermaSetSubito`, che del foglio era l'unico chiamante) — dal
+  riepilogo si passa dal paySheet, dove il wallet paga la stessa
+  invoice; sul singolo annuncio l'NWC vive come sempre. Con meno di
+  due articoli Acquista risponde col toast onesto («per uno solo c'è
+  l'acquisto di sempre»), come il vecchio foglio.
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -3236,7 +3277,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   diff piccolo: i 18 siti che aprono un foglio, `closeSheet()` e le tre
   chiusure mirate anti-`pollTimer` sono rimasti INTONSI. Il callback è
   un microtask (ancora dentro il task del gesto, e coalesce i cambi
-  dello stesso giro: per questo foglio→foglio — setSheet→paySheet — è a
+  dello stesso giro: per questo foglio→foglio — invitoSheet→nostrSheet — è a
   saldo zero da solo).
   Si SPINGE solo entrando in una vista più interna (dettaglio, negozio,
   ordine, sicurezza); i quattro tab sono RADICI sorelle e si
