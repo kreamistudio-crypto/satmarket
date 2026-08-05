@@ -268,6 +268,13 @@ AVVISI_ORDINI_ADMIN = True
 # freno d'emergenza, non una scelta.
 ORE_INITDATA = 24
 
+# Quante ricerche AI puo' fare un utente in un'ora. E' l'unica rotta
+# dove una richiesta qualunque diventa una chiamata ad Anthropic, e il
+# prompt e' sempre grande uguale (fino a 300 annunci): senza freno, un
+# ciclo banale brucia il credito. Finita la quota si risponde col
+# filtro per parole, che non costa niente. 0 = nessun freno.
+TETTO_RICERCHE_AI_ORA = 30
+
 # --- Collaudo ---------------------------------------------------------
 # False = com'e' giusto che sia online: nessuna identita' finta.
 # True  = test locale con gli utenti finti (Compratore/Venditore/Admin),

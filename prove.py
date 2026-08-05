@@ -1646,6 +1646,58 @@ def prove_ssrf_redirect():
           "scarica=None)" in imp and "esito = scarica(url)" in imp)
 
 
+def prove_quota_ricerca():
+    """Il freno della ricerca AI (ago 2026, audit). Era l'unica rotta
+    dove UNA richiesta di un utente qualunque = UNA chiamata ad
+    Anthropic, con un prompt di dimensione massima fissa: il credito
+    si bruciava con un ciclo banale."""
+    print("\n[la quota delle ricerche]")
+    import time as _t
+
+    def monta(tetto):
+        amb = {"TETTO_RICERCHE_AI_ORA": tetto, "RICERCA_QUOTA": {},
+               "time": _t}
+        exec(pezzo("_ricerca_ai_concessa"), amb)
+        return amb["_ricerca_ai_concessa"], amb["RICERCA_QUOTA"]
+
+    concessa, quota = monta(3)
+    prova("le prime tre passano", [True, True, True],
+          [concessa(111) for _ in range(3)])
+    prova("la quarta no", False, concessa(111))
+    prova("...ma solo per lui", True, concessa(222))
+    prova("il contatore e' per utente", 2, len(quota))
+
+    concessa, _ = monta(0)
+    prova("tetto a 0 = nessun freno", [True] * 50,
+          [concessa(111) for _ in range(50)])
+
+    # il gettone si consuma solo quando si passa: chi e' gia' oltre il
+    # tetto non deve far crescere il contatore all'infinito
+    concessa, quota = monta(2)
+    for _ in range(10):
+        concessa(111)
+    prova("oltre il tetto il contatore si ferma", 2, quota[111][1])
+
+    # --- SENTINELLE -------------------------------------------------
+    c = pezzo("cerca")
+    prova("sentinella: l'utente della ricerca non si butta via", True,
+          "user = verifica_utente(" in c)
+    prova("sentinella: il freno sta PRIMA di impaginare il catalogo",
+          True, c.index("_ricerca_ai_concessa") < c.index("catalogo = "))
+    prova("sentinella: la chiamata AI ha un timeout", True,
+          "max_tokens=200, timeout=" in c)
+    # a quota finita si risponde lo stesso: il filtro per parole non
+    # costa niente, e un vicolo cieco non serve a nessuno
+    prova("a quota finita si risponde col filtro per parole", True,
+          "return risposta(filtro_semplice(), False)" in c)
+    # e la forma vecchia resta per i client in cache
+    prova("senza busta resta l'array di sempre", True,
+          '{"annunci": righe, "ai": ai_usata} if busta else righe' in c)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client regge tutte e due le forme", True,
+          "Array.isArray(d) ? d : (d.annunci || [])" in mini)
+
+
 def prove_initdata():
     """La freschezza dell'initData (ago 2026, audit). La firma dice
     CHI, non QUANDO: finche' nessuno guardava `auth_date`, un initData
@@ -1937,7 +1989,7 @@ def main():
              prove_initdata, prove_foto, prove_avatar,
              prove_pagamento_incerto, prove_disputa_incagliata,
              prove_idor_verifica, prove_contenuti_cifrati,
-             prove_ssrf_redirect):
+             prove_ssrf_redirect, prove_quota_ricerca):
         try:
             f()
         except Exception as e:

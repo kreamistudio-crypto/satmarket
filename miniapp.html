@@ -4577,13 +4577,23 @@ async function doSearch(){
        credito API regalato ai bot) */
     loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
   } else {
-    const r = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`,
+    /* busta=1: la risposta dice anche SE l'AI è stata usata. Un
+       server vecchio ignora il parametro e risponde con l'array di
+       sempre, quindi si accettano tutt'e due le forme. */
+    const r = await fetch(
+      `${API_BASE}/search?busta=1&q=${encodeURIComponent(q)}`,
       {headers:{'X-Tg-Init-Data': authHdr()}});
-    const ris = (await r.json()).map(mapListing);
+    const d = await r.json();
+    const ris = (Array.isArray(d) ? d : (d.annunci || [])).map(mapListing);
     /* Anche i risultati AI entrano nel catalogo: openDetail deve
        trovarli pure se vengono da oltre le pagine caricate */
     inCatalogo(ris);
     renderGrid(ris);
+    /* Quando l'AI non c'è (quota oraria finita, o chiamata fallita) i
+       risultati arrivano dal filtro per parole: si dice, invece di
+       far sembrare che l'AI abbia capito poco. */
+    if (!Array.isArray(d) && d.ai === false)
+      toast('🔎 Ricerca veloce per parole: l\'AI torna fra un\'ora', 5000);
   }
 }
 

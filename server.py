@@ -302,6 +302,14 @@ try:
 except ImportError:
     ORE_INITDATA = 24
 
+# Quante ricerche AI puo' fare un utente in un'ora (0 = nessun freno).
+# Trenta e' larghissima per una persona e stretta per uno script: e'
+# il numero che si tara quando ci sara' un dato d'uso vero.
+try:
+    from config import TETTO_RICERCHE_AI_ORA
+except ImportError:
+    TETTO_RICERCHE_AI_ORA = 30
+
 # La consegna digitale (lug 2026): buoni regalo, codici, licenze. Il
 # codice passa DENTRO Barattolo (campo dedicato dell'ordine, rivelato
 # dal compratore con un tocco che fa da ricevuta di lettura) e le
@@ -6678,13 +6686,47 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
 # (sinonimi, prezzo, zona) dentro la rosa.
 TETTO_CATALOGO_AI = 300
 
+# Il freno della ricerca AI (ago 2026, audit). Era l'unica rotta dove
+# UNA richiesta di un utente qualunque = UNA chiamata ad Anthropic, e
+# con un prompt di dimensione massima FISSA: il catalogo si riempie
+# fino a 300 annunci anche quando la domanda non trova niente, quindi
+# ogni ricerca costa uguale, tanto. L'unico recinto era
+# l'autenticazione — che lo passa chiunque abbia un account.
+# Pattern di IMPORT_QUOTA, con l'ora al posto del giorno: dizionario
+# in memoria, si azzera al riavvio e va bene cosi' (le raffiche vere
+# durano meno di un riavvio).
+RICERCA_QUOTA: dict[int, list] = {}     # tg_id -> [ora, ricerche]
+
+
+def _ricerca_ai_concessa(tg_id: int) -> bool:
+    """Consuma un gettone della quota oraria. False = si risponde col
+    filtro per parole, che non costa niente e qualche risultato lo
+    da' — meglio di un vicolo cieco."""
+    if not TETTO_RICERCHE_AI_ORA:       # 0 = nessun freno
+        return True
+    ora = time.strftime("%Y-%m-%d %H")
+    voce = RICERCA_QUOTA.get(tg_id)
+    if not voce or voce[0] != ora:
+        voce = [ora, 0]
+        RICERCA_QUOTA[tg_id] = voce
+    if voce[1] >= TETTO_RICERCHE_AI_ORA:
+        return False
+    voce[1] += 1
+    return True
+
 
 @app.get("/api/search")
-def cerca(q: str, x_tg_init_data: str = Header(""),
+def cerca(q: str, busta: int = 0, x_tg_init_data: str = Header(""),
                   barattolo_sessione: str = Cookie("")):
     """Ricerca in linguaggio naturale: l'AI legge la richiesta
-    ("tastiera sotto i 100k vicino Milano") e seleziona gli annunci."""
-    verifica_utente(x_tg_init_data, barattolo_sessione)
+    ("tastiera sotto i 100k vicino Milano") e seleziona gli annunci.
+
+    `busta=1` avvolge la risposta in {annunci, ai} per dire QUANDO
+    l'AI non e' stata usata (quota finita, o chiamata fallita): senza
+    il parametro resta l'array di sempre, e un client vecchio in cache
+    vede i risultati come li ha sempre visti — il patto della
+    paginazione."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
     base = ("SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
             "u.npub AS venditore_npub, "
             "u.npub_verificata AS venditore_npub_verificata, "
@@ -6717,8 +6759,20 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
             list(ids) + [TETTO_CATALOGO_AI - len(annunci)])]
     annunci = arricchisci_righe_vetrina(annunci)
     con.close()
+    def risposta(righe, ai_usata=True):
+        return {"annunci": righe, "ai": ai_usata} if busta else righe
+
+    def filtro_semplice():
+        ql = q.lower()
+        return [a for a in annunci
+                if ql in (a["titolo"] + a["descrizione"]).lower()]
+
     if not annunci:
-        return []
+        return risposta([])
+    # Il freno PRIMA di costruire il catalogo: a quota finita non si
+    # spende nemmeno il tempo di impaginare 300 annunci.
+    if not _ricerca_ai_concessa(user["id"]):
+        return risposta(filtro_semplice(), False)
 
     catalogo = "\n".join(
         f"ID {a['id']}: {a['titolo']} | {a['categoria']} | "
@@ -6732,7 +6786,7 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
         for a in annunci)
     try:
         r = ai.messages.create(
-            model=MODELLO_RICERCA, max_tokens=200,
+            model=MODELLO_RICERCA, max_tokens=200, timeout=20,
             system=("Sei il motore di ricerca di un mercatino. Data la richiesta "
                     "dell'utente e il catalogo, rispondi SOLO con un array JSON "
                     "degli ID pertinenti, dal piu' rilevante. Capisci sinonimi "
@@ -6746,11 +6800,10 @@ def cerca(q: str, x_tg_init_data: str = Header(""),
         ids = json.loads("".join(b.text for b in r.content if b.type == "text")
                          .replace("```json", "").replace("```", "").strip())
         per_id = {a["id"]: a for a in annunci}
-        return [per_id[i] for i in ids if i in per_id]
+        return risposta([per_id[i] for i in ids if i in per_id])
     except Exception as e:
         print(f"Ricerca AI fallita, uso filtro semplice: {e}")
-        ql = q.lower()
-        return [a for a in annunci if ql in (a["titolo"] + a["descrizione"]).lower()]
+        return risposta(filtro_semplice(), False)
 
 
 # ------------------------- API: OFFERTE -----------------------------
@@ -11561,6 +11614,12 @@ def pulisci_avvisi():
     oggi = time.strftime("%Y-%m-%d")
     for tg_id in [t for t, v in AVVISI_QUOTA.items() if v[0] != oggi]:
         AVVISI_QUOTA.pop(tg_id, None)
+    # e i gettoni delle ricerche AI delle ore passate: la scopa serve
+    # solo a non far crescere il dizionario per sempre — il rinnovo
+    # della quota e' implicito nella lettura, come per gli avvisi
+    ora = time.strftime("%Y-%m-%d %H")
+    for tg_id in [t for t, v in RICERCA_QUOTA.items() if v[0] != ora]:
+        RICERCA_QUOTA.pop(tg_id, None)
 
 
 # ------------------- offerta lampo: «ha fatto colpo» -----------------
