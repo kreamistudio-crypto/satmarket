@@ -2344,6 +2344,99 @@ def prove_xp():
 
 
 # ====================================================================
+def prove_coorti_titoli():
+    """Coorti, livelli e titoli (ago 2026). Il pezzo che vale di piu'
+    e' il LIVELLO A DUE CHIAVI: e' la conseguenza diretta del «nessun
+    tetto» sugli XP — senza il secondo requisito, una vendita da 4.000
+    € basterebbe a fare un maestro, e il grado direbbe «ha venduto una
+    cosa cara» invece di «commercia»."""
+    print("\n[coorti, livelli, titoli]")
+    import sqlite3
+    import tempfile
+    import time
+
+    amb = {"time": time}
+    for blocco in ("COORTI = [", "LIVELLI = [", "TITOLI = ("):
+        i = _SORGENTE.index(blocco)
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    for f in ("coorte_da_posizione", "assegna_coorte", "livello_utente",
+              "titoli_disponibili"):
+        exec(pezzo(f), amb)
+    coorte = amb["coorte_da_posizione"]
+    livello = amb["livello_utente"]
+
+    prova("il primo iscritto e' pioniere", "pioniere", coorte(1))
+    prova("il centesimo ancora pioniere", "pioniere", coorte(100))
+    prova("il 101esimo e' fondatore", "fondatore", coorte(101))
+    # Oltre l'ultima soglia NON c'e' coorte: e' un fatto, non un
+    # premio da dare a tutti — se ce l'hanno tutti non dice niente
+    prova("oltre l'ultima soglia nessuna coorte", "", coorte(10001))
+
+    prova("appena arrivato", "Nuovo arrivato", livello(0, 0)["nome"])
+    # LA REGOLA DELLE DUE CHIAVI, nei due sensi
+    prova("4010 XP con UN affare solo resta avviato", "Bottega avviata",
+          livello(4010, 1)["nome"])
+    prova("...con quindici affari e' esperto", "Mercante esperto",
+          livello(4010, 15)["nome"])
+    prova("venti affari da poco non bastano", "Bottega avviata",
+          livello(200, 20)["nome"])
+    prova("in cima non c'e' un prossimo", "",
+          livello(99999, 99)["nome_prossimo"])
+
+    db = os.path.join(tempfile.mkdtemp(), "t.db")
+    con = sqlite3.connect(db)
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, registrato INTEGER DEFAULT 0,
+      coorte TEXT DEFAULT '', xp INTEGER DEFAULT 0, titolo TEXT DEFAULT '',
+      vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0);
+    CREATE TABLE badge_utente(tg_id INTEGER, badge_id TEXT,
+      ottenuto_il INTEGER, PRIMARY KEY(tg_id,badge_id));
+    INSERT INTO utenti(tg_id,registrato) VALUES(1,1001),(5,1005);
+    """)
+    amb["assegna_coorte"](con, 1)
+    amb["assegna_coorte"](con, 5)
+    prova("il primo iscritto prende la coorte", "pioniere",
+          con.execute("SELECT coorte FROM utenti WHERE tg_id=1"
+                      ).fetchone()["coorte"])
+    # CONGELATA: arrivano mille utenti prima di lui e non cambia nulla
+    for i in range(100, 1200):
+        con.execute("INSERT INTO utenti(tg_id,registrato) VALUES(?,1)", (i,))
+    amb["assegna_coorte"](con, 5)
+    prova("la coorte scritta non si ricalcola mai piu'", "pioniere",
+          con.execute("SELECT coorte FROM utenti WHERE tg_id=5"
+                      ).fetchone()["coorte"])
+
+    t = amb["titoli_disponibili"](con, 1)
+    prova("il pioniere ha il suo titolo", True, "coorte_pioniere" in t)
+    prova("non quello di un'altra coorte", False, "coorte_fondatore" in t)
+    prova("senza distintivo niente titolo nostrano", False, "t_nostrano" in t)
+    con.execute("INSERT INTO badge_utente VALUES(1,'nostrano',0)")
+    con.execute("UPDATE utenti SET xp=3000, vendite_ok=10, acquisti_ok=6 "
+                "WHERE tg_id=1")
+    t = amb["titoli_disponibili"](con, 1)
+    prova("col distintivo arriva il titolo", True, "t_nostrano" in t)
+    prova("il livello raggiunto sblocca il suo", True, "t_esperto" in t)
+    # I livelli sono una SCALA: li ha attraversati tutti
+    prova("...e anche i gradini di sotto", True, "t_pratico" in t)
+    prova("ma non quello sopra", False, "t_maestro" in t)
+    con.close()
+
+    # Il client ripete le soglie XP per disegnare la barra DENTRO il
+    # gradino (senza, non saprebbe da dove parte il tratto). E' una
+    # copia, quindi si incrocia — la lezione delle categorie senza
+    # condizione: due cataloghi che divergono sono un catalogo solo
+    # scritto male, e qui la barra mentirebbe in silenzio.
+    import re
+    html = open("miniapp.html", encoding="utf-8").read()
+    i = html.index("const SOGLIE_LIV = [")
+    front = [int(n) for n in
+             re.findall(r"\d+", html[i:html.index("]", i)])]
+    prova("le soglie del client combaciano col server",
+          [l[0] for l in amb["LIVELLI"]], front)
+
+
+# ====================================================================
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -2360,7 +2453,7 @@ def main():
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_forma_tracking, prove_conta_feedback,
-              prove_xp):
+              prove_xp, prove_coorti_titoli):
         try:
             f()
         except Exception as e:

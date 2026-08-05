@@ -676,6 +676,55 @@ def controlla_distintivi(con, tg_id: int) -> list[str]:
     return nuovi
 
 
+# ---------------------- LE COORTI (ago 2026) -------------------------
+# «Pioniere» esisteva gia' come distintivo (posizione <= 100): qui la
+# stessa idea diventa una scala, perche' chi arriva dopo i primi cento
+# non deve trovare la porta chiusa — ha un'altra porta, che dice
+# un'altra cosa vera.
+# Chi entra oltre l'ultima soglia NON ha coorte, ed e' giusto: la
+# coorte e' un FATTO, non un premio da distribuire a tutti. Se ce
+# l'hanno tutti non dice piu' niente, e chi e' arrivato per primo se
+# ne accorge.
+COORTI = [(100, "pioniere", "🌱", "Pioniere",
+           "Tra i primi 100 iscritti del Barattolo"),
+          (500, "fondatore", "🧱", "Fondatore",
+           "Tra i primi 500 iscritti del Barattolo"),
+          (2000, "veterano", "🏺", "Dei primi giorni",
+           "Tra i primi 2.000 iscritti del Barattolo"),
+          (10000, "bottegaio", "🏪", "Bottegaio",
+           "Tra i primi 10.000 iscritti del Barattolo")]
+
+
+def coorte_da_posizione(posizione: int) -> str:
+    """La coorte di chi si e' iscritto in quella posizione ('' = e'
+    arrivato oltre l'ultima soglia)."""
+    for soglia, cid, _e, _n, _d in COORTI:
+        if posizione <= soglia:
+            return cid
+    return ""
+
+
+def assegna_coorte(con, tg_id: int) -> str:
+    """Scrive utenti.coorte UNA volta sola e poi la CONGELA. La
+    posizione in una fila non cambia mai piu': ricalcolarla a ogni
+    giro e' lavoro buttato, e a diecimila utenti sarebbe una scansione
+    per ogni chiamata. Niente commit: e' del chiamante."""
+    u = con.execute("SELECT registrato, coorte FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    if not u or u["coorte"]:
+        return u["coorte"] if u else ""
+    # Stessa posizione del distintivo Pioniere: registrato=0 (chi c'era
+    # prima della colonna) vale come i piu' vecchi di tutti
+    pos = con.execute(
+        "SELECT COUNT(*) FROM utenti WHERE registrato<? "
+        "OR (registrato=? AND tg_id<=?)",
+        (u["registrato"], u["registrato"], tg_id)).fetchone()[0]
+    c = coorte_da_posizione(pos)
+    if c:
+        con.execute("UPDATE utenti SET coorte=? WHERE tg_id=?", (c, tg_id))
+    return c
+
+
 # ------------------------- GLI XP (ago 2026) -------------------------
 # La moneta dell'impegno. Il tariffario dice una cosa sola, ed e' la
 # REGOLA DA NON ROVESCIARE: nessuna azione ripetibile a costo zero
@@ -769,6 +818,96 @@ def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
     euro = (prezzo_sats / 100_000_000 * cambio_eur) if cambio_eur > 0 else 0.0
     return int((FISSO_XP_ORDINE + euro * XP_PER_EURO)
                * XP_RUOLO.get(ruolo, 1.0))
+
+
+# ---------------------- I LIVELLI (ago 2026) -------------------------
+# DUE CHIAVI, e non e' un vezzo: e' la conseguenza diretta del «nessun
+# tetto» sugli XP. Senza tetto una vendita da 4.000 € vale piu' di
+# trecento piccole, quindi un livello sui SOLI XP direbbe «ha venduto
+# una cosa cara», non «commercia». Le soglie guardano gli XP E il
+# numero di affari conclusi, cosi' il grado dice tutte e due le cose —
+# la stessa idea per cui frequenza e importo valgono entrambi.
+# Derivati, mai in colonna: si ricalcolano da xp e dai contatori, come
+# i distintivi si ricalcolano dai dati veri.
+LIVELLI = [(0, 0, "nuovo", "Nuovo arrivato"),
+           (150, 1, "avviato", "Bottega avviata"),
+           (600, 5, "pratico", "Mercante pratico"),
+           (2500, 15, "esperto", "Mercante esperto"),
+           (9000, 40, "maestro", "Maestro del banco")]
+
+
+def livello_utente(xp: int, affari: int) -> dict:
+    """Il grado di chi ha quegli XP e quegli affari. Il piu' alto che
+    soddisfa ENTRAMBE le soglie: chi ha 5.000 XP da una vendita sola
+    non passa davanti a chi ne ha venti."""
+    vinto = LIVELLI[0]
+    for l in LIVELLI:
+        if xp >= l[0] and affari >= l[1]:
+            vinto = l
+    i = LIVELLI.index(vinto)
+    pross = LIVELLI[i + 1] if i + 1 < len(LIVELLI) else None
+    return {"id": vinto[2], "nome": vinto[3], "numero": i + 1,
+            "xp_prossimo": pross[0] if pross else 0,
+            "affari_prossimo": pross[1] if pross else 0,
+            "nome_prossimo": pross[3] if pross else ""}
+
+
+# ---------------------- I TITOLI (ago 2026) --------------------------
+# Il distintivo dice «ho fatto», il titolo dice «chi sono» — ed e' la
+# parte che si SCEGLIE. Il requisito e' sempre un fatto gia' calcolato
+# altrove (una coorte, un distintivo guadagnato, un livello raggiunto):
+# qui non si giudica niente di nuovo, si compone.
+# IL CATALOGO E' CHIUSO, e resta chiuso: un titolo scritto a mano
+# dall'utente sarebbe una superficie di abuso — «Moderatore»,
+# «Barattolo ufficiale» — che nessun esc() risolve, perche' il
+# problema non e' l'HTML ma il significato.
+TITOLI = (
+    [dict(id=f"coorte_{cid}", nome=f"{emo} {nome}", descrizione=desc,
+          serve=("coorte", cid)) for _s, cid, emo, nome, desc in COORTI]
+    + [dict(id="t_nostrano", nome="🟣 Nostrano",
+            descrizione="Serve la npub verificata con nota pubblica",
+            serve=("distintivo", "nostrano")),
+       dict(id="t_specchiato", nome="🪞 Specchiato",
+            descrizione="Serve il distintivo Specchiato",
+            serve=("distintivo", "specchiato")),
+       dict(id="t_fulmine", nome="⚡ Fulmine",
+            descrizione="Serve il distintivo Fulmine",
+            serve=("distintivo", "fulmine")),
+       dict(id="t_pratico", nome="🧺 Mercante pratico",
+            descrizione="Serve il livello «Mercante pratico»",
+            serve=("livello", "pratico")),
+       dict(id="t_esperto", nome="🏆 Mercante esperto",
+            descrizione="Serve il livello «Mercante esperto»",
+            serve=("livello", "esperto")),
+       dict(id="t_maestro", nome="👑 Maestro del banco",
+            descrizione="Serve il livello «Maestro del banco»",
+            serve=("livello", "maestro"))])
+
+
+NOMI_TITOLI = {t["id"]: t["nome"] for t in TITOLI}
+
+
+def titoli_disponibili(con, tg_id: int) -> list[str]:
+    """Gli id dei titoli che quell'utente ha davvero sbloccato. Giudice
+    unico: da qui passa sia l'elenco mostrato nel Profilo sia la
+    validazione della scelta — o si potrebbe indossare un titolo che
+    l'elenco non offre."""
+    u = con.execute("SELECT xp, coorte, vendite_ok, acquisti_ok "
+                    "FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    if not u:
+        return []
+    badge = {r["badge_id"] for r in con.execute(
+        "SELECT badge_id FROM badge_utente WHERE tg_id=?", (tg_id,))}
+    liv = livello_utente(u["xp"] or 0,
+                         (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0))
+    # I livelli sono una SCALA: chi e' maestro puo' portare anche i
+    # titoli dei gradini sotto (li ha attraversati tutti)
+    raggiunti = {l[2] for l in LIVELLI[:LIVELLI.index(
+        next(l for l in LIVELLI if l[2] == liv["id"])) + 1]}
+    fatto = {"coorte": lambda v: v == (u["coorte"] or ""),
+             "distintivo": lambda v: v in badge,
+             "livello": lambda v: v in raggiunti}
+    return [t["id"] for t in TITOLI if fatto[t["serve"][0]](t["serve"][1])]
 
 
 def init_db():
@@ -1190,6 +1329,19 @@ def init_db():
                     # registro, questa e' cortesia verso il database.
                     "xp INTEGER DEFAULT 0",
                     "xp_ultimo_giorno TEXT DEFAULT ''",
+                    # coorte (ago 2026): in che ondata e' arrivato.
+                    # CONGELATA al primo calcolo — la posizione in una
+                    # fila non cambia mai piu' —, '' = arrivato oltre
+                    # l'ultima soglia, e va bene cosi'.
+                    "coorte TEXT DEFAULT ''",
+                    # titolo (ago 2026): quale dei titoli SBLOCCATI
+                    # l'utente ha scelto di portare sotto il nome
+                    # ('' = nessuno). Il distintivo dice «ho fatto»,
+                    # il titolo dice «chi sono», ed e' la parte che si
+                    # sceglie. Catalogo CHIUSO: un titolo scritto a
+                    # mano sarebbe impersonazione («Moderatore»), che
+                    # non e' un problema di esc() ma di significato.
+                    "titolo TEXT DEFAULT ''",
                     # comune: COLONNA INERTE (lug 2026). Nata per il
                     # filtro «📍 Vicino a me», tolto due giorni dopo
                     # perche' si sovrapponeva al filtro per regione —
@@ -1224,6 +1376,16 @@ def init_db():
             "SELECT tg_id FROM utenti WHERE negozio=''").fetchall():
         con.execute("UPDATE utenti SET negozio=? WHERE tg_id=?",
                     (nuovo_codice_negozio(con), r["tg_id"]))
+    # Le coorti di chi c'era gia': idempotente, tocca solo chi non ce
+    # l'ha ancora (la colonna e' congelata al primo calcolo). Girato in
+    # ordine d'iscrizione, cosi' la posizione e' quella vera.
+    try:
+        for r in con.execute(
+                "SELECT tg_id FROM utenti WHERE coorte='' "
+                "ORDER BY registrato, tg_id").fetchall():
+            assegna_coorte(con, r["tg_id"])
+    except sqlite3.OperationalError:
+        pass
     # n_recensori per chi aveva gia' dei feedback: idempotente, tocca
     # solo le righe ancora vuote (gemello di deriva_regioni). Da qui
     # in poi ci pensa _ricalcola_rating a ogni voto.
@@ -5025,7 +5187,7 @@ CAMPI_VETRINA = (
     "a.asta_base_sats, a.asta_scadenza, "
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
-    "u.negozio AS venditore_negozio, "
+    "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
     # il francobollo esce solo con la levetta «Mostra la mia foto»
     # accesa: spenta, il nome file non lascia proprio il server
     "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
@@ -5064,6 +5226,15 @@ def arricchisci_righe_vetrina(righe):
             dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
                  descrizione=d["descrizione"])
             for d in DISTINTIVI if d["id"] in presi]
+        # 3) Il TITOLO esce col suo NOME, non con l'id: il catalogo
+        # sta qui e il client non ne tiene una copia (che divergerebbe
+        # al primo titolo nuovo, come sarebbe successo alle categorie
+        # senza il controllo incrociato). Un id sconosciuto — titolo
+        # tolto dal catalogo dopo che qualcuno l'aveva scelto — non
+        # mostra niente invece di mostrare una sigla.
+        if "venditore_titolo" in r:
+            r["venditore_titolo"] = NOMI_TITOLI.get(
+                r["venditore_titolo"] or "", "")
         r["zona_comune"] = comune_da_zona(r.get("zona") or "")
     # 3) L'asta (ago 2026): puntata in testa e numero di puntate,
     # pubblici per regola — gli OFFERENTI restano anonimi, qui non
@@ -5576,7 +5747,7 @@ CAMPI_MIEI = (
     "a.*, u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, "
     "u.npub_verificata AS venditore_npub_verificata, "
-    "u.negozio AS venditore_negozio, "
+    "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
     "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
@@ -5759,6 +5930,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
                      "rating, n_feedback, n_recensori, vendite_ok, negozio, "
+                     "titolo, xp, acquisti_ok, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
@@ -5812,6 +5984,13 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
         for d in DISTINTIVI if d["id"] in presi]
+    # Il grado, derivato come sempre (mai in colonna). In pubblico
+    # escono il nome e basta: gli XP sono roba di chi li ha, e un
+    # numero altrui non aiuta nessuno a decidere se fidarsi.
+    venditore["livello"] = livello_utente(
+        v["xp"] or 0, (v["vendite_ok"] or 0) + (v["acquisti_ok"] or 0))["nome"]
+    venditore["titolo"] = NOMI_TITOLI.get(v["titolo"] or "", "")
+    del venditore["xp"], venditore["acquisti_ok"]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     risposta = {"venditore": venditore, "annunci": annunci,
                 "feedback": feedback}
@@ -6996,7 +7175,7 @@ def cerca(q: str, busta: int = 0, x_tg_init_data: str = Header(""),
     base = ("SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
             "u.npub AS venditore_npub, "
             "u.npub_verificata AS venditore_npub_verificata, "
-            "u.negozio AS venditore_negozio, "
+            "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
             "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
             "AS venditore_avatar, "
             "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
@@ -10154,6 +10333,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # fiammella che si spegne punisce chi ha lavorato invece di
         # aprire l'app. Se un giorno si vorra' premiare la costanza,
         # si contano i giorni TOTALI, che salgono e basta.
+        # La coorte al primo sguardo, per chi e' entrato dopo l'avvio
+        # (il backfill di init_db copre solo chi c'era). Congelata.
+        if not u["coorte"]:
+            assegna_coorte(con, user["id"])
         giorno = oggi_locale()
         if (u["xp_ultimo_giorno"] or "") != giorno:
             assegna_xp(con, user["id"], "visita", AZIONI_XP["visita"],
@@ -10183,6 +10366,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         da_moderare = con.execute(
             "SELECT COUNT(*) AS n FROM annunci "
             "WHERE stato='revisione'").fetchone()["n"]
+    # I titoli sbloccati si chiedono con la connessione ancora aperta
+    sbloccati = set(titoli_disponibili(con, user["id"])) if u else set()
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
@@ -10233,6 +10418,18 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
              descrizione=d["descrizione"], fiducia=d["fiducia"],
              ottenuto=presi.get(d["id"]))
         for d in DISTINTIVI]
+    # Il grado, coi numeri del gradino successivo: la progressione la
+    # disegna il client, ma le soglie restano qui — sono catalogo, e
+    # il client non hardcoda mai un catalogo.
+    profilo["livello"] = livello_utente(
+        u["xp"] if u else 0,
+        ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0)
+    # Stessa regola dei distintivi: catalogo COMPLETO col flag, cosi'
+    # chi non ha ancora sbloccato un titolo vede comunque cosa c'e' e
+    # cosa serve — che e' la molla.
+    profilo["titoli"] = [
+        dict(id=t["id"], nome=t["nome"], descrizione=t["descrizione"],
+             sbloccato=t["id"] in sbloccati) for t in TITOLI]
     return profilo
 
 
@@ -10496,6 +10693,32 @@ async def scegli_suggerimenti(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "attivi": bool(attivi)}
+
+
+@app.post("/api/me/titolo")
+async def scegli_titolo(req: Request,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Il titolo che si porta sotto il nome. Si accetta SOLO un titolo
+    davvero sbloccato — il pattern di canale-notifiche e
+    avatar-scelta: si accetta solo una sorgente che esiste — e il
+    giudice e' titoli_disponibili, lo stesso che compila l'elenco nel
+    Profilo, o si potrebbe indossare qualcosa che l'elenco non offre.
+    Stringa vuota = nessun titolo, ed e' sempre lecita."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    scelto = (d.get("titolo") or "").strip()
+    con = db()
+    try:
+        if scelto and scelto not in titoli_disponibili(con, user["id"]):
+            raise HTTPException(400, "Questo titolo non l'hai ancora "
+                                     "sbloccato")
+        con.execute("UPDATE utenti SET titolo=? WHERE tg_id=?",
+                    (scelto, user["id"]))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "titolo": scelto}
 
 
 @app.post("/api/me/avatar-scelta")

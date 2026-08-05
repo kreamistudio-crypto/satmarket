@@ -1058,6 +1058,31 @@
   .tema-pill{font:inherit;font-size:12.5px;font-weight:700;border:1px solid var(--line);
     background:transparent;color:var(--muted);border-radius:99px;padding:5px 12px;cursor:pointer}
   .tema-pill.active{border-color:var(--sats);background:var(--sats);color:#fff}
+  /* Il grado e la sua progressione (ago 2026). La barra e' l'unico
+     pezzo di questa app che misura una cosa che sale: si fa piena
+     come il barattolo, con lo stesso arancio. */
+  .grado{font-family:var(--font-tit);font-size:19px;font-weight:700;
+    color:var(--ink);margin-bottom:2px}
+  .grado-xp{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .barra-xp{height:9px;border-radius:99px;background:var(--off-bg);
+    overflow:hidden;margin:10px 0 6px}
+  .barra-xp i{display:block;height:100%;border-radius:99px;
+    background:var(--sats);transition:width .4s ease}
+  @media (prefers-reduced-motion: reduce){.barra-xp i{transition:none}}
+  /* I titoli: pillole come il tema, ma quelle non ancora sbloccate
+     restano IN ELENCO e spente, col perche' scritto — e' la molla,
+     la stessa dei distintivi mancanti in grigio. */
+  .titoli{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+  .titolo-pill{font:inherit;font-size:12.5px;font-weight:700;
+    border:1px solid var(--line);background:transparent;color:var(--ink);
+    border-radius:99px;padding:5px 12px;cursor:pointer}
+  .titolo-pill.active{border-color:var(--sats);background:var(--sats);
+    color:#fff}
+  .titolo-pill.off{opacity:.45;cursor:default;color:var(--muted)}
+  /* Il titolo sotto il nome: e' un'insegna, non un dato — piccolo, nel
+     bruno di casa, e mai piu' forte del nome che gli sta sopra. */
+  .titolo-riga{font-family:var(--font-tit);font-size:12.5px;
+    font-weight:700;color:var(--carton);margin-top:1px}
 
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
@@ -3000,6 +3025,11 @@
         </div>
       </div>
 
+      <div class="acc" id="accLivello">
+        <button class="acc-h" onclick="toggleAcc('accLivello')"><span class="em">🎖</span>Livello e titolo <span class="conta" id="livelloConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="livelloBlocco"></div></div>
+      </div>
+
       <div class="acc" id="accDistintivi">
         <button class="acc-h" onclick="toggleAcc('accDistintivi')"><span class="em">🏅</span>Distintivi <span class="conta" id="distintiviConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="distintiviBlocco"></div></div>
@@ -3663,7 +3693,9 @@ function mapListing(a){
        pubblico e anonimo, mai un nome. Un server di ieri non manda
        la chiave e il conteggio semplicemente non si disegna. */
     barattoli:a.barattoli||0,
-    distintivi:a.venditore_distintivi||[]};
+    distintivi:a.venditore_distintivi||[],
+    /* il titolo arriva GIA' col suo nome dal server: qui e' testo */
+    sellerTitolo:a.venditore_titolo||''};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -4085,6 +4117,16 @@ function contaFeedback(n, persone){
     ? ` (${n} da ${persone} ${persone===1?'persona':'persone'})`
     : ` (${n})`;
 }
+/* Il titolo sotto il nome (ago 2026). Arriva GIA' col suo nome dal
+   server — il catalogo sta la', il client non ne tiene una copia che
+   divergerebbe al primo titolo nuovo. Vuoto = niente riga: chi non ne
+   porta uno non deve avere uno spazio bianco al suo posto. */
+const titoloRiga = nome =>
+  nome ? `<div class="titolo-riga">${esc(nome)}</div>` : '';
+/* Sul PROPRIO profilo il titolo si conosce per id (viene da
+   /api/me.titolo, che e' quello che si scrive scegliendolo): il nome
+   si pesca dal catalogo gia' in pagina, senza un secondo giro. */
+const nomeTitolo = id => (myTitoli.find(t=>t.id===id)||{}).nome || '';
 function toast(msg, ms){ const t = el('toast'); t.textContent = msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), ms||2200); }
 function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
@@ -5177,6 +5219,7 @@ function renderNegozio(v, annunci, feedback=[]){
     <div class="seller" style="margin-top:14px">
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
+        ${titoloRiga(v.titolo)}
         <div class="rep">${rep}</div>
       </div>
     </div>
@@ -6781,6 +6824,7 @@ function openDetail(id){
              nel negozio, dove porta gia' tutta la card. Niente tocco
              qui dentro: il bersaglio resta uno solo. */
           sfilzaDistintivi(l.distintivi, 4)}
+          ${titoloRiga(l.sellerTitolo)}
           <div class="rep"><span class="stars">${'★'.repeat(Math.round(l.rating))}</span> ${l.rating} · ${l.sales} vendite concluse</div>
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
@@ -8718,6 +8762,9 @@ let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecenso
    e l'uscita pubblica decise dal server */
 let myAvatar = '', myAvatarScelta = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
+let myXp = 0, myAffari = 0;      // punti e affari conclusi (vendite+acquisti)
+let myLivello = null;            // il grado DERIVATO dal server
+let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
 let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
 /* ---- i cassetti del Profilo: un tocco sull'header apre e chiude ---- */
@@ -8752,12 +8799,14 @@ function renderProfilo(){
     <div class="seller" style="margin-top:14px">
       <div class="avatar">${avatarImg(myAvatar)}${esc(nome[0])}</div>
       <div class="who"><b>${esc(nome)}${badge}</b>
+        ${titoloRiga(nomeTitolo(myTitolo))}
         <div class="rep">${rep}</div>
       </div>
     </div>
     ${(myUsername||myNegozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}`;
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
   renderLnAddress();
+  renderLivello();
   renderDistintivi();
   renderDoppioni();
   renderPreferiti();
@@ -8831,6 +8880,84 @@ function renderDistintivi(){
           ? 'Ottenuto il '+new Date(d.ottenuto*1000).toLocaleDateString('it-IT')
           : esc(d.descrizione)}</small>
       </div>`).join('')}</div>`;
+}
+
+/* ---- 🎖 Livello e titolo. Il livello e' DERIVATO dal server (XP +
+   affari conclusi: due chiavi, o una vendita grossa da sola farebbe
+   un maestro) e qui si disegna soltanto. Il titolo invece si SCEGLIE,
+   ed e' l'unica cosa di tutta la gamification che l'utente decide:
+   il distintivo dice «ho fatto», il titolo dice «chi sono».
+   Le pillole non sbloccate restano IN ELENCO e spente, col perche'
+   scritto sotto — la molla dei distintivi mancanti in grigio. ---- */
+function renderLivello(){
+  const box = el('livelloBlocco'), sez = el('accLivello');
+  if (!box) return;
+  if (DEMO || !myLivello) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const conta = el('livelloConta');
+  if (conta) conta.textContent = `(${esc(myLivello.nome)})`;
+  /* La barra misura il tratto DENTRO il gradino, non da zero: da 600 a
+     2500 XP si parte da vuota, o chi ha appena cambiato livello si
+     vedrebbe gia' a tre quarti e non capirebbe perche' non sale. */
+  const daQui = myLivello.xp_prossimo ? SOGLIE_LIV[myLivello.numero-1] : 0;
+  const q = myLivello.xp_prossimo
+    ? Math.max(0, Math.min(100, Math.round(
+        (myXp - daQui) / (myLivello.xp_prossimo - daQui) * 100)))
+    : 100;
+  const manca = myLivello.xp_prossimo
+    ? `Al prossimo grado (<b>${esc(myLivello.nome_prossimo)}</b>) mancano
+       ${fmt(Math.max(0, myLivello.xp_prossimo - myXp))} XP` +
+      (myLivello.affari_prossimo > myAffari
+        ? ` e ${fmt(myLivello.affari_prossimo - myAffari)} affari conclusi`
+        : '')
+    : 'Sei in cima alla scala. 🫙';
+  const scelti = (myTitoli||[]).filter(t=>t.sbloccato);
+  const spenti = (myTitoli||[]).filter(t=>!t.sbloccato);
+  box.innerHTML = `
+    <div class="grado">${esc(myLivello.nome)}</div>
+    <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
+    <div class="barra-xp"><i style="width:${q}%"></i></div>
+    <div class="hint">${manca}</div>
+    <div style="margin-top:16px"><b>Il tuo titolo</b></div>
+    <div class="hint">Compare sotto il tuo nome, dove ti vedono gli altri.</div>
+    <div class="titoli">
+      <button class="titolo-pill ${myTitolo?'':'active'}"
+              onclick="setTitolo('')">Nessuno</button>
+      ${scelti.map(t=>`
+        <button class="titolo-pill ${myTitolo===t.id?'active':''}"
+                data-tit="${esc(t.id)}"
+                onclick="setTitolo(this.dataset.tit)">${esc(t.nome)}</button>`
+      ).join('')}
+    </div>
+    ${spenti.length ? `
+      <div class="hint" style="margin-top:12px">Ancora da sbloccare:</div>
+      <div class="titoli">${spenti.map(t=>`
+        <span class="titolo-pill off" title="${esc(t.descrizione)}"
+          >${esc(t.nome)}</span>`).join('')}</div>` : ''}`;
+}
+
+/* Le soglie XP dei gradini, per disegnare la barra DENTRO il gradino.
+   Sono le stesse di LIVELLI in server.py — chi ne cambia una la
+   cambia in tutti e due i posti, o la barra mente. prove.py le
+   incrocia, come fa per le categorie senza condizione. */
+const SOGLIE_LIV = [0, 150, 600, 2500, 9000];
+
+async function setTitolo(id){
+  haptic();
+  if (id === myTitolo) return;
+  if (DEMO) { toast('In demo il titolo non si salva 🙂'); return; }
+  const r = await fetch(`${API_BASE}/me/titolo`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+     body: JSON.stringify({titolo: id})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  myTitolo = d.titolo;
+  renderLivello();
+  renderProfilo();          // il titolo vive sotto il nome, in testata
+  toast(id ? 'Titolo scelto ✅' : 'Titolo tolto');
 }
 
 /* ---- 🔁 Doppioni su Nostr: lo stesso oggetto due volte sui relay,
@@ -12570,6 +12697,9 @@ async function avvia(){
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
+    myXp = me.xp || 0; myLivello = me.livello || null;
+    myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
+    myTitoli = me.titoli || []; myTitolo = me.titolo || '';
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
     myDoppioni = me.doppioni_nostr || [];
     lampoLeve = me.lampo_leve || null;
