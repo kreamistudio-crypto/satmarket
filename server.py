@@ -408,6 +408,25 @@ try:
 except ImportError:
     MAX_OFFERTE_ANNUNCIO = 3       # tentativi totali per compratore per annuncio
 
+# IL NEGOZIO IN FERIE (ago 2026): il venditore che parte chiude la
+# bottega con la data di rientro. Gli annunci RESTANO in vetrina, col
+# prezzo in grigio e la data scritta sopra — si guarda, non si compra.
+# La leva nasce ACCESA, al contrario di IMPORT_NOSTR_APERTO e
+# ASTA_ABILITATA: quelle muovono denaro verso l'esterno e vogliono un
+# gesto dal VPS, questa non muove niente — spegne soltanto.
+try:
+    from config import FERIE_ATTIVE
+except ImportError:
+    FERIE_ATTIVE = True            # spenta = nessuno puo' chiudere il negozio
+try:
+    from config import FERIE_MAX_GIORNI
+except ImportError:
+    FERIE_MAX_GIORNI = 90          # guardrail contro la data incollata per sbaglio
+try:
+    from config import FERIE_PREAVVISO_ORE
+except ImportError:
+    FERIE_PREAVVISO_ORE = 24       # «domani riapri» (0 = nessun promemoria)
+
 # L'offerta lampo (lug 2026, modello Vinted «sconto ai follower»): il
 # venditore sconta a tempo TUTTO l'annuncio; chi l'ha nel barattolo
 # viene avvisato in modo anonimo. Lo sconto e' PUBBLICO (vale per
@@ -1423,7 +1442,24 @@ def init_db():
                     # pubblicazione e mai piu' (avvisa_contatto_
                     # mancante) — colonna e non memoria, il patto del
                     # gemello qui sopra
-                    "avvisato_contatto INTEGER DEFAULT 0"):
+                    "avvisato_contatto INTEGER DEFAULT 0",
+                    # IL NEGOZIO IN FERIE (ago 2026): 0 = aperto,
+                    # altrimenti il timestamp del rientro. UNA colonna
+                    # e non un booleano piu' una data, ed e' la scelta
+                    # che porta via tutto il resto del lavoro: come
+                    # lampo_scadenza e asta_scadenza il gate e' in
+                    # LETTURA, quindi il negozio riapre DA SOLO quando
+                    # la data passa — se il server resta spento una
+                    # settimana, al riavvio chi doveva riaprire e' gia'
+                    # aperto. Gli annunci non si toccano mai: restano
+                    # in vetrina, col prezzo in grigio.
+                    "ferie_fino INTEGER DEFAULT 0",
+                    # il timbro del promemoria del giorno prima
+                    # (avvisa_rientro_ferie): si scrive PRIMA
+                    # dell'invio — un errore di rete puo' perdere un
+                    # avviso di cortesia, mai raddoppiarlo — e lo
+                    # rimette a zero la scopa, per le ferie successive
+                    "ferie_avvisato INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -2849,6 +2885,65 @@ def guardia_venditore_digitale(tg_id: int, consegna: str,
             f"Per vendere con consegna digitale servono almeno "
             f"{DIGITALE_MIN_VENDITE} vendite concluse su Barattolo: "
             f"inizia con una spedizione o un ritiro in zona")
+
+
+MESI_IT = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+           "luglio", "agosto", "settembre", "ottobre", "novembre",
+           "dicembre")
+
+
+def data_ferie(ts: int) -> str:
+    """La data di rientro come la legge una persona: «12 settembre».
+    Niente anno — le ferie durano al massimo FERIE_MAX_GIORNI, quindi
+    l'anno non disambigua niente e allunga soltanto."""
+    t = time.localtime(ts)
+    return f"{t.tm_mday} {MESI_IT[t.tm_mon - 1]}"
+
+
+def guardia_ferie(con, venditore_id: int):
+    """IL NEGOZIO IN FERIE NON VENDE (ago 2026): acquisti, offerte,
+    set e puntate si fermano qui, con la data di rientro nel
+    messaggio. Gli annunci RESTANO in vetrina — chi guarda vede, chi
+    vuole comprare aspetta: e' tutta la differenza con la rimozione.
+    Prende il `con` del chiamante e non ne apre uno suo (il modo di
+    _ordini_vivi_annuncio): in compra() una connessione e' gia'
+    aperta, e il vincolo dichiarato li' e' «nessun DML prima del
+    ricontrollo» — una LETTURA in piu' e' ammessa, una connessione in
+    piu' sarebbe solo rumore.
+    400 e non 409, deliberatamente: nel progetto il 409 vuol dire
+    «qualcosa e' cambiato sotto di te, rileggi e riprova» — e sul ramo
+    set il client al 409 rilegge il negozio (rinfrescaSet). Qui non
+    c'e' niente da rileggere: c'e' una data da aspettare.
+    Sulla via del RIFIUTO chiude il `con` che le e' stato prestato,
+    come fanno le guardie sorelle prima del loro raise: la richiesta
+    finisce li' e nessun chiamante lo tocca piu' (e un close doppio,
+    se un domani qualcuno ne aggiungesse uno dopo, e' innocuo)."""
+    r = con.execute("SELECT ferie_fino FROM utenti WHERE tg_id=?",
+                    (venditore_id,)).fetchone()
+    if not r or not in_ferie(r["ferie_fino"], int(time.time())):
+        return
+    con.close()
+    raise HTTPException(400,
+        f"Il negozio è in ferie: riapre il {data_ferie(r['ferie_fino'])}. "
+        f"L'annuncio resta qui — mettilo nel barattolo 🫙 e lo ritrovi "
+        f"al rientro del venditore.")
+
+
+def guardia_ferie_venditore(con, tg_id: int, cosa: str):
+    """Il gemello rivolto al VENDITORE: a negozio chiuso non si
+    lanciano offerte lampo ne' si aprono aste nuove. Messaggio suo
+    perche' e' un'altra persona a leggerlo — li' si dice a un
+    compratore di aspettare, qui si ricorda a un venditore che la
+    bottega e' sua e la riapre quando vuole, dal Profilo."""
+    r = con.execute("SELECT ferie_fino FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    if not r or not in_ferie(r["ferie_fino"], int(time.time())):
+        return
+    con.close()
+    raise HTTPException(400,
+        f"Il tuo negozio è in ferie fino al {data_ferie(r['ferie_fino'])}: "
+        f"{cosa} quando riapri. Puoi rientrare quando vuoi dal Profilo, "
+        f"in «🌴 Negozio in ferie».")
 
 
 def testo_prezzo(valuta: str, prezzo_sats: int, prezzo_eur: float) -> str:
@@ -5438,6 +5533,11 @@ CAMPI_VETRINA = (
     "u.nome AS venditore, u.username AS venditore_username, "
     "u.npub AS venditore_npub, u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
+    # il negozio in ferie (ago 2026): 0 = aperto, altrimenti la data
+    # del rientro. Costo ZERO — il JOIN su `u` c'e' gia' — e da qui
+    # arriva in un colpo solo a vetrina, negozio, singolo, miei,
+    # ricerca AI e preferiti: il prezzo grigio si disegna ovunque
+    "u.ferie_fino AS venditore_ferie, "
     # il francobollo esce solo con la levetta «Mostra la mia foto»
     # accesa: spenta, il nome file non lascia proprio il server
     "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
@@ -5854,6 +5954,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         return risposta
     adesso = int(time.time())
     if asta_secondi:
+        # Niente ASTE NUOVE a negozio chiuso: una gara che si chiude
+        # mentre il venditore e' via lascerebbe un vincitore che ha
+        # gia' pagato e nessuno che spedisce. Pubblicare un annuncio
+        # NORMALE resta lecito — si prepara il negozio per il rientro.
+        guardia_ferie_venditore(con, user["id"], "aprirai un'asta")
         # Il tetto prudenziale delle aste vive per venditore:
         # count-guard senza await (il patto anti-doppione). Contano
         # anche quelle in revisione: approvate, tornano in gara.
@@ -6191,7 +6296,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
                      "rating, n_feedback, n_recensori, vendite_ok, negozio, "
-                     "titolo, xp, acquisti_ok, "
+                     "titolo, xp, acquisti_ok, ferie_fino, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
@@ -7712,6 +7817,20 @@ def _asta_viva(a, adesso: int) -> bool:
     return a["asta_base_sats"] > 0 and a["asta_scadenza"] > adesso
 
 
+def in_ferie(ferie_fino: int, adesso: int) -> bool:
+    """IL NEGOZIO E' CHIUSO? (ago 2026) Gate in LETTURA sulla data di
+    rientro — lo stesso patto di lampo e asta: alla scadenza il
+    negozio riapre DA SOLO, senza che nessun orologio debba passare a
+    girare un interruttore. La scopa scadenze_ferie e' pulizia, non
+    e' lei a riaprire: se il server resta spento una settimana, al
+    riavvio chi doveva riaprire e' gia' aperto.
+    Prende un INT e non una riga, apposta: lo stesso giudice serve la
+    riga utenti, l'alias venditore_ferie della vetrina e la prova in
+    CI, senza assumere la forma del contenitore. Al filo esatto
+    (ferie_fino == adesso) il negozio e' APERTO, come _asta_viva."""
+    return ferie_fino > adesso
+
+
 def rilancio_minimo(testa_sats: int, incremento_percento: int) -> int:
     """Il totale minimo per superare chi e' in testa: +N% arrotondato
     per difetto, ma MAI meno di 1 sat sopra — i sats sono interi, il
@@ -7938,6 +8057,11 @@ async def fai_puntata(annuncio_id: int, req: Request,
             _stesse_chiavi_nostr(con, a["venditore_id"], user["id"]):
         con.close()
         raise HTTPException(400, "Non puoi puntare sulla tua stessa asta")
+    # CINTURA: per costruzione non ci si arriva — un'asta viva blocca
+    # la partenza per le ferie, quindi in ferie non ce ne sono. Ci va
+    # lo stesso: una guardia che oggi non scatta e' quella che regge
+    # domani, se la regola degli impegni aperti cambia.
+    guardia_ferie(con, a["venditore_id"])
     b = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
     if not b or not (b["ln_address"] or "").strip():
@@ -8874,6 +8998,8 @@ async def rilancia_asta_deserta(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Si rilancia solo un'asta chiusa senza "
                                  "offerte")
+    # Rimettere in gara e' aprire un'asta nuova: stessa guardia.
+    guardia_ferie_venditore(con, user["id"], "rilancerai l'asta")
     vive = con.execute(
         "SELECT COUNT(*) AS n FROM annunci WHERE venditore_id=? "
         "AND stato IN ('attivo','revisione') AND asta_base_sats>0 "
@@ -9074,6 +9200,9 @@ async def fai_offerta(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Non puoi fare un'offerta sul tuo "
                                  "stesso annuncio")
+    # In ferie non si tratta: il venditore non e' li' a rispondere, e
+    # un'offerta che scade da sola in 48 ore sarebbe solo un'attesa.
+    guardia_ferie(con, a["venditore_id"])
     if _asta(a):
         con.close()
         raise HTTPException(400, "Questo oggetto è all'asta: l'offerta "
@@ -9245,6 +9374,12 @@ async def rispondi_offerta(offerta_id: int, req: Request,
             con.commit()
             con.close()
             raise HTTPException(400, "L'annuncio non è più disponibile")
+        # CINTURA: per costruzione non ci si arriva — le offerte vive
+        # decadono quando il negozio chiude, e in ferie non se ne
+        # aprono di nuove. Ma un accordo stretto verso un negozio
+        # chiuso sarebbe impagabile, ed e' il tipo di trappola che
+        # vale una riga in piu'.
+        guardia_ferie(con, off["venditore_id"])
         con.execute("UPDATE offerte SET stato='accettata', scadenza=?, "
                     "aggiornato=? WHERE id=?",
                     (adesso + ORE_PAGAMENTO_OFFERTA * 3600, adesso,
@@ -9399,6 +9534,9 @@ async def lancia_lampo(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(403, "Solo il venditore può lanciare "
                                  "un'offerta lampo")
+    # Uno sconto a tempo su una bottega chiusa e' una promessa che la
+    # vetrina non mantiene: chi lo vede non puo' comprare.
+    guardia_ferie_venditore(con, user["id"], "lancerai un'offerta lampo")
     if _asta(a):
         con.close()
         raise HTTPException(400, "Questo annuncio è all'asta: il prezzo "
@@ -9545,6 +9683,75 @@ def _ordini_vivi_annuncio(con, annuncio_id: int, stati: tuple,
         (*stati, annuncio_id, annuncio_id)).fetchone()["n"]
 
 
+def _impegni_aperti(con, tg_id: int) -> list:
+    """NON SI CHIUDE CON IMPEGNI APERTI (ago 2026): le cinque cose che
+    fermano la partenza per le ferie, ognuna con la sua VIA D'USCITA
+    scritta accanto — restituisce righe leggibili e non un booleano,
+    perche' il messaggio deve dire COSA manca, non che «qualcosa»
+    manca. Nessun automatismo: la lampo non si annulla da sola, il
+    venditore ha gia' il suo bottone.
+    Il LEFT JOIN su annunci NON e' un dettaglio: i SET hanno
+    annuncio_id=0 e con l'INNER sparirebbero in silenzio — un ordine
+    pagato che non blocca le ferie e' esattamente il buco che questa
+    funzione esiste per chiudere. E' la lezione gia' pagata due volte
+    (sollecita_incassi, sollecita_venditori_fermi), qui alla terza."""
+    adesso = int(time.time())
+    voci = []
+    # 1) Merce pagata e mai partita: e' il caso piu' grave — i sats di
+    #    qualcuno sono in cassaforte e aspettano lui.
+    for o in con.execute(
+            "SELECT o.id, o.annuncio_id, o.consegna_scelta, a.titolo "
+            "FROM ordini o LEFT JOIN annunci a ON a.id = o.annuncio_id "
+            "WHERE o.venditore_id=? AND o.stato='locked' ORDER BY o.id",
+            (tg_id,)):
+        titolo = o["titolo"]
+        if not o["annuncio_id"]:      # un SET: il titolo lo sintetizziamo
+            titolo = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (o["id"],))])
+        cosa = ("consegna il codice" if o["consegna_scelta"] == "digitale"
+                else "segna la spedizione")
+        voci.append(f"ordine #{o['id']} «{(titolo or '?')[:40]}»: {cosa}")
+    # 2) Le aste vive sono VINCOLANTI: chi ha versato sta gareggiando.
+    #    Stessa query del tetto per venditore in pubblica().
+    for a in con.execute(
+            "SELECT id, titolo, asta_scadenza FROM annunci WHERE "
+            "venditore_id=? AND stato IN ('attivo','revisione') AND "
+            "asta_base_sats>0 AND asta_scadenza>? ORDER BY asta_scadenza",
+            (tg_id, adesso)):
+        voci.append(f"asta «{a['titolo'][:40]}»: si chiude il "
+                    f"{data_ferie(a['asta_scadenza'])}")
+    # 3) Una stretta di mano gia' data: il compratore ha le sue ore
+    #    per pagare, e in ferie non potrebbe. Scade da sola.
+    for o in con.execute(
+            "SELECT o.id, o.scadenza, a.titolo FROM offerte o "
+            "JOIN annunci a ON a.id = o.annuncio_id "
+            "WHERE o.venditore_id=? AND o.stato='accettata' "
+            "ORDER BY o.scadenza", (tg_id,)):
+        voci.append(f"offerta accettata su «{o['titolo'][:40]}»: "
+                    f"l'accordo scade da solo entro "
+                    f"{ORE_PAGAMENTO_OFFERTA} ore")
+    # 4) Un pagamento gia' in viaggio: verifica_pagamento non passa
+    #    dai gate di compra(), quindi senza questa riga nascerebbe un
+    #    'locked' proprio durante le ferie. Dura al massimo mezz'ora
+    #    (la soglia di _riservati: vita della invoice + reaper).
+    n = con.execute(
+        "SELECT COUNT(*) AS n FROM ordini WHERE venditore_id=? AND "
+        "stato='creato' AND creato>=?",
+        (tg_id, adesso - 1800)).fetchone()["n"]
+    if n:
+        voci.append(f"{n} pagament{'o' if n == 1 else 'i'} in corso: "
+                    f"aspetta qualche minuto e riprova")
+    # 5) Uno sconto pubblico a tempo e' una promessa in vetrina.
+    for a in con.execute(
+            "SELECT id, titolo FROM annunci WHERE venditore_id=? AND "
+            "lampo_percento>0 AND lampo_scadenza>? ORDER BY id",
+            (tg_id, adesso)):
+        voci.append(f"offerta lampo su «{a['titolo'][:40]}»: annullala "
+                    f"dal suo annuncio")
+    return voci
+
+
 def _riservati(con, annuncio_id: int) -> int:
     """Pezzi prenotati: la somma degli ordini 'creato' freschi.
 
@@ -9637,6 +9844,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
     if venditore_id == user["id"]:
         con.close()
         raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+    # Il carrello e' di UN venditore alla volta, quindi una guardia
+    # sola copre tutte le righe: se e' in ferie, non se ne compra
+    # nessuna. Qui, prima della invoice.
+    guardia_ferie(con, venditore_id)
     # STESSO VENDITORE VERO, non solo stessa RIGA di utenti (lug 2026,
     # dopo il caso dell'account fantasma). `venditore_id` dice a chi
     # vanno i sats, ed e' giusto che il conto lo segua; ma non dice da
@@ -9996,6 +10207,10 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     if a["venditore_id"] == user["id"]:
         con.close()
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
+    # Anche il preventivo si ferma: la pagina d'acquisto non deve
+    # nemmeno nascere per un negozio chiuso (il client lo sa gia' dal
+    # campo di vetrina, questa e' la cintura).
+    guardia_ferie(con, a["venditore_id"])
     if _asta(a):
         con.close()
         raise HTTPException(400, "Questo oggetto è all'asta: si "
@@ -10135,6 +10350,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     if venditore_id == user["id"]:
         con.close()
         raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+    guardia_ferie(con, venditore_id)   # il gemello di _compra_set
     origini = {(a["contatto_nostr"] or "") for a in tutti.values()}
     if len(origini) > 1:
         con.close()
@@ -10260,6 +10476,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(404, "Annuncio non disponibile")
     if a["venditore_id"] == user["id"]:
         raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
+    # Il negozio in ferie non vende: qui, ben prima della invoice —
+    # l'annuncio resta in vetrina, ma i sats non si muovono.
+    guardia_ferie(con, a["venditore_id"])
     if _asta(a):
         # Vale anche per la deserta (base>0, scadenza 0): finche' il
         # venditore non la converte a prezzo fisso, l'acquisto diretto
@@ -11540,6 +11759,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il catalogo degli spedizionieri per il cassetto «📦 Come
     # spedisci» (stesso patto: le voci non si hardcodano nel client).
     profilo["spedizionieri"] = list(SPEDIZIONIERI)
+    # Il negozio in ferie, per il cassetto «🌴»: lo stato di adesso e
+    # le sue leve — il client non hardcoda mai un tetto (il patto di
+    # max_barattolo). `ferie_fino` esce gia' dal SELECT *, ma il
+    # tetto e l'interruttore no.
+    profilo["ferie_leve"] = {
+        "attive": bool(FERIE_ATTIVE),
+        "max_giorni": FERIE_MAX_GIORNI}
     # E quelle dell'asta, per il form di vendita e il foglio puntata
     # (stesso patto: mai cifre hardcodate nel client).
     profilo["asta_leve"] = {
@@ -11852,6 +12078,85 @@ async def scegli_spedizioniere(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "spedizioniere": scelta}
+
+
+@app.post("/api/me/ferie")
+async def imposta_ferie(req: Request,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """«🌴 Negozio in ferie»: il venditore che parte chiude la bottega
+    con la data di rientro. Gli annunci RESTANO in vetrina, col prezzo
+    in grigio e la data scritta sopra — si guarda, non si compra: e'
+    tutta la differenza con la rimozione, e il motivo per cui non si
+    tocca nemmeno una riga di `annunci`.
+    Body {fino: <timestamp>}. `fino = 0` e' il RIENTRO, e non ha
+    nessuna guardia: riaprire il negozio non e' mai un problema, e
+    dall'istante dopo tutto e' comprabile — il gate e' in lettura,
+    non c'e' nessun giro da aspettare.
+    NON SI CHIUDE CON IMPEGNI APERTI: _impegni_aperti li elenca uno
+    per uno con la sua via d'uscita, e il 400 li dice tutti insieme —
+    un venditore non deve scoprirli a uno a uno riprovando.
+    Le offerte PENDENTI ricevute decadono nella stessa transazione
+    (decisione di Andrea): lasciarle vive sarebbe la trappola «il
+    venditore accetta dalle ferie e il compratore non puo' pagare».
+    Le notifiche 🕊 partono DOPO il commit, come sempre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not FERIE_ATTIVE:
+        raise HTTPException(400, "Le ferie del negozio non sono attive")
+    try:
+        fino = int(d.get("fino") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Data di rientro non valida")
+    adesso = int(time.time())
+    con = db()
+    if fino:
+        if fino <= adesso:
+            con.close()
+            raise HTTPException(400, "La data di rientro deve essere nel "
+                                     "futuro: scegli il giorno in cui "
+                                     "riapri.")
+        if fino > adesso + FERIE_MAX_GIORNI * 86400:
+            con.close()
+            raise HTTPException(400,
+                f"Le ferie durano al massimo {FERIE_MAX_GIORNI} giorni: "
+                f"per una pausa piu' lunga conviene ritirare gli annunci.")
+        impegni = _impegni_aperti(con, user["id"])
+        if impegni:
+            con.close()
+            raise HTTPException(400,
+                "Prima di chiudere devi sistemare questi impegni:\n• "
+                + "\n• ".join(impegni)
+                + "\nGli affari gia' spediti seguono il loro corso: quelli "
+                  "non ti trattengono.")
+    # Le offerte pendenti ricevute decadono: il venditore non sara' li'
+    # a rispondere, e chi ha offerto deve poter cercare altrove subito.
+    pendenti = []
+    if fino:
+        pendenti = [dict(r) for r in con.execute(
+            "SELECT o.id, o.compratore_id, a.titolo FROM offerte o "
+            "JOIN annunci a ON a.id = o.annuncio_id "
+            "WHERE o.venditore_id=? AND o.stato IN "
+            "('proposta','controproposta')", (user["id"],))]
+        for o in pendenti:
+            con.execute("UPDATE offerte SET stato='decaduta', aggiornato=? "
+                        "WHERE id=?", (adesso, o["id"]))
+    # ferie_avvisato torna a zero: il promemoria del rientro e' di
+    # QUESTE ferie, non di quelle dell'anno scorso.
+    con.execute("UPDATE utenti SET ferie_fino=?, ferie_avvisato=0 "
+                "WHERE tg_id=?", (fino, user["id"]))
+    con.commit()
+    con.close()
+    for o in pendenti:
+        try:
+            await notifica(o["compratore_id"],
+                f"🕊 Il venditore di «{html.escape((o['titolo'] or '?')[:60])}» "
+                f"è andato in ferie: la tua offerta decade. L'annuncio "
+                f"resta in vetrina — riapre il {data_ferie(fino)}, e da "
+                f"lì potrai riprovare.")
+        except Exception as e:
+            print(f"⚠️ Avviso decadenza per ferie saltato (#{o['id']}): {e}")
+    return {"ok": True, "ferie_fino": fino}
 
 
 @app.post("/api/me/suggerimenti")
@@ -13076,10 +13381,16 @@ async def _drena_promo():
     try:
         annunci = []
         con = db()
+        adesso_f = int(time.time())
         for i in ids:
-            a = con.execute("SELECT * FROM annunci WHERE id=?",
-                            (i,)).fetchone()
-            if a and a["stato"] == "attivo" and not a["contatto_nostr"]:
+            # il ferie_fino del venditore viaggia col giro: un negozio
+            # chiuso non si annuncia in piazza — sarebbe una vetrina
+            # che promette una cosa che non si puo' comprare
+            a = con.execute("SELECT a.*, u.ferie_fino FROM annunci a "
+                            "JOIN utenti u ON u.tg_id=a.venditore_id "
+                            "WHERE a.id=?", (i,)).fetchone()
+            if a and a["stato"] == "attivo" and not a["contatto_nostr"] \
+                    and not in_ferie(a["ferie_fino"], adesso_f):
                 annunci.append(dict(a))
         con.close()
         if not annunci:
@@ -13322,10 +13633,16 @@ async def _drena_match():
         cambio = await cambio_btc_eur()
         per_utente: dict[int, list] = {}
         con = db()
+        adesso_f = int(time.time())
         for i in ids:
-            a = con.execute("SELECT * FROM annunci WHERE id=?",
-                            (i,)).fetchone()
-            if not a or a["stato"] != "attivo":
+            # come nel drenatore promo: un avviso di ricerca che suona
+            # per un negozio chiuso manderebbe qualcuno davanti a una
+            # vetrina da cui non si compra
+            a = con.execute("SELECT a.*, u.ferie_fino FROM annunci a "
+                            "JOIN utenti u ON u.tg_id=a.venditore_id "
+                            "WHERE a.id=?", (i,)).fetchone()
+            if not a or a["stato"] != "attivo" \
+                    or in_ferie(a["ferie_fino"], adesso_f):
                 continue
             a = dict(a)
             token = normalizza(f"{a['titolo']} {a['descrizione']}").split()
@@ -16868,6 +17185,61 @@ def scadenze_lampo():
     con.close()
 
 
+def scadenze_ferie():
+    """La scopa delle ferie, gemella esatta di scadenze_lampo: le
+    colonne si azzerano quando la data di rientro e' passata.
+    NON E' LEI A RIAPRIRE IL NEGOZIO, ed e' la cosa da ricordare: ogni
+    lettura gatea gia' su `ferie_fino` (in_ferie), quindi il negozio e'
+    aperto dall'istante esatto del rientro anche se questa non gira —
+    se il server resta spento una settimana, al riavvio chi doveva
+    riaprire e' gia' aperto, e chi compra non aspetta nessun giro.
+    Qui si fa pulizia, e si rimette a zero il timbro del promemoria
+    per le ferie successive. Nessuna notifica: il preavviso l'ha gia'
+    detto, e un secondo squillo sarebbe rumore."""
+    con = db()
+    con.execute("UPDATE utenti SET ferie_fino=0, ferie_avvisato=0 "
+                "WHERE ferie_fino>0 AND ferie_fino<=?",
+                (int(time.time()),))
+    con.commit()
+    con.close()
+
+
+async def avvisa_rientro_ferie():
+    """«Domani riapri»: il promemoria del giorno prima, cosi' il
+    rientro automatico non coglie nessuno impreparato — e chi vuole
+    restare via ancora un po' fa in tempo a spostare la data.
+    Gemella della campagna spedizioniere: il TIMBRO SI SCRIVE PRIMA
+    dell'invio, perche' un errore di rete puo' perdere un avviso di
+    cortesia ma non deve mai raddoppiarlo. Una volta per ferie: lo
+    zero lo rimettono la scopa e ogni nuova chiusura."""
+    if FERIE_PREAVVISO_ORE <= 0:
+        return                       # nessun preavviso, il rientro e' muto
+    adesso = int(time.time())
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT tg_id, ferie_fino FROM utenti WHERE ferie_fino>? "
+        "AND ferie_fino<=? AND ferie_avvisato=0",
+        (adesso, adesso + FERIE_PREAVVISO_ORE * 3600))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        con.execute("UPDATE utenti SET ferie_avvisato=1 WHERE tg_id=?",
+                    (r["tg_id"],))
+    con.commit()
+    con.close()
+    for r in righe:
+        try:
+            await notifica(r["tg_id"],
+                f"🌴 <b>Il tuo negozio riapre il "
+                f"{data_ferie(r['ferie_fino'])}.</b> Da quel momento i tuoi "
+                f"annunci tornano comprabili da soli, senza che tu debba "
+                f"fare niente. Se ti serve piu' tempo, sposta la data dal "
+                f"Profilo, in «🌴 Negozio in ferie».")
+        except Exception as e:
+            print(f"⚠️ Preavviso rientro saltato (#{r['tg_id']}): {e}")
+
+
 async def avvisa_contatto_mancante(tg_id: int):
     """L'avviso UNA-TANTUM del venditore irraggiungibile (ago 2026,
     figlio dello stesso caso dello strumento «Scrivi a un utente»):
@@ -17001,6 +17373,11 @@ async def orologio():
             scadenze_lampo()
         except Exception as e:
             print(f"⚠️ Scadenze lampo saltate: {e}")
+        try:
+            await avvisa_rientro_ferie()   # prima: legge le ferie ancora vive
+            scadenze_ferie()               # poi la scopa azzera le passate
+        except Exception as e:
+            print(f"⚠️ Giro delle ferie saltato: {e}")
         try:
             await importa_nostr_periodico()
         except Exception as e:

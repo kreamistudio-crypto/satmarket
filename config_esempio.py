@@ -136,6 +136,18 @@ ORE_PAGAMENTO_OFFERTA = 24   # tempo per pagare dopo l'accettazione
 MAX_OFFERTE_ANNUNCIO = 3     # tentativi totali per compratore per
                              # annuncio (una offerta attiva alla volta)
 
+# --- Negozio in ferie ------------------------------------------------
+# Il venditore che parte chiude la bottega con la data di rientro. Gli
+# annunci RESTANO in vetrina, col prezzo in grigio e la data scritta
+# sopra: si guardano, non si comprano — niente acquisti, offerte,
+# carrello, lampo ne' aste nuove. Non si chiude con affari da spedire,
+# aste vive, accordi da pagare o pagamenti in corso.
+# Il rientro e' AUTOMATICO alla data: il controllo e' in lettura, quindi
+# il negozio riapre da solo anche se il server e' stato spento.
+FERIE_ATTIVE = True          # interruttore generale (False = spento)
+FERIE_MAX_GIORNI = 90        # quanto in la' puo' stare la data di rientro
+FERIE_PREAVVISO_ORE = 24     # «domani riapri» (0 = nessun promemoria)
+
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
 # Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
 # nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare

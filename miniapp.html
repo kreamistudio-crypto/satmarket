@@ -657,6 +657,40 @@
      numero per famiglia», ma la simmetria giusta non e' fra il
      numero e la sua unita' — e' fra le unita' di tutti gli stati,
      che ora si somigliano tutte. */
+  /* ---- il negozio in ferie (ago 2026): si guarda, non si compra ----
+     Nessun colore NUOVO e nessun accento: le ferie non sono
+     un'occasione da annunciare, sono una porta chiusa — quindi il
+     linguaggio e' lo SPEGNIMENTO, la coppia --off-bg/--muted che
+     nell'app veste gia' i badge degli stati conclusi (refunded,
+     annullato). Il badge non porta l'ombra dei fratelli: non deve
+     staccare dalla foto come fa un'offerta. */
+  .card-ferie{position:absolute;top:8px;left:8px;z-index:2;
+    background:var(--off-bg);color:var(--muted);border-radius:999px;
+    padding:3px 9px;font-size:11.5px;font-weight:800;
+    display:flex;align-items:center;gap:5px}
+  /* NIENTE outline sulla card, a differenza di lampo e asta: quelli
+     sono richiami, questo e' il contrario di un richiamo. */
+  /* Il prezzo del cartellino in GRIGIO — e il grigio e' un valore
+     FISSO, mai var(--muted): .tag-price e' di carta chiara nei due
+     temi (il patto dell'etichetta prezzo), e il token di notte
+     diventa chiaro e sparirebbe sulla carta. E' lo stesso #8A8271
+     del price-sub e del barrato, che vivono sulla stessa carta.
+     MISURATO, e vale la pena averlo scritto: sulla carta #FFF8EA
+     questo grigio rende 3,60 — e il prezzo ARANCIO di sempre, li'
+     sopra, rende 3,59. Cioe' lo stato spento si legge ESATTAMENTE
+     quanto quello acceso, e a distinguerli e' la tinta e non la
+     luce. Un grigio piu' scuro (4,8 e oltre, provati) renderebbe le
+     ferie piu' leggibili di un prezzo vero: il contrario di quel che
+     deve dire. Chi un giorno alzera' il contrasto del cartellino
+     alzi PRIMA quello arancio, e questo dietro di lui. */
+  .tag-price.ferie .price{color:#8A8271}
+  /* Nel dettaglio invece il token e' quello GIUSTO: li' il prezzo sta
+     sulla pagina, e l'inchiostro segue la carta come ovunque. */
+  .detail-price.ferie{color:var(--muted)}
+  /* Anche questa non nomina .unit, per la regola qui sopra. */
+  /* La riga sotto il prezzo, nella forma discreta di .asta-riga */
+  .ferie-riga{font-size:13px;color:var(--muted);font-weight:700;
+    margin-top:4px;line-height:1.35}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
@@ -3112,6 +3146,15 @@
         <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
       </div>
 
+      <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
+           data di rientro. Gli annunci RESTANO in vetrina — si
+           guardano, non si comprano — e al rientro tornano
+           comprabili da soli. In DEMO sparisce, il patto del wallet. -->
+      <div class="acc" id="accFerie">
+        <button class="acc-h" onclick="toggleAcc('accFerie')"><span class="em">🌴</span>Negozio in ferie <span class="conta" id="ferieConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="ferieBlocco"></div></div>
+      </div>
+
       <div class="acc" id="accRicerche" style="display:none">
         <button class="acc-h" onclick="toggleAcc('accRicerche')"><span class="em">🔎</span>Avvisi di ricerca <span class="conta" id="ricercheConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="ricercheBlocco"></div></div>
@@ -3810,6 +3853,10 @@ function mapListing(a){
        pubblico e anonimo, mai un nome. Un server di ieri non manda
        la chiave e il conteggio semplicemente non si disegna. */
     barattoli:a.barattoli||0,
+    /* il negozio in ferie (ago 2026): 0 = aperto, altrimenti la data
+       del rientro (unix, come lampoFine e astaFine). L'annuncio resta
+       in vetrina: cambia solo che non si compra. */
+    ferie:a.venditore_ferie||0,
     distintivi:a.venditore_distintivi||[],
     /* il titolo arriva GIA' col suo nome dal server: qui e' testo */
     sellerTitolo:a.venditore_titolo||''};
@@ -5154,11 +5201,24 @@ const cardHTML = l => {
      (o la base), il badge 🔨 il tempo a grana grossa. Asta e lampo
      non convivono per costruzione (esclusioni del server): il
      giudizio qui e' solo una cintura. */
+  /* Il negozio in ferie (ago 2026): l'annuncio RESTA in vetrina — non
+     sparisce e non si spegne — ma il prezzo va in grigio e il badge
+     dice quando si torna. Vince sugli altri due badge, e lo slot e'
+     libero per costruzione: una lampo viva e un'asta viva bloccano
+     la partenza per le ferie, quindi non convivono mai. Il giudizio
+     qui e' la solita cintura, come asta-vs-lampo. */
+  const ferie = inFerie(l);
   const asta = astaE(l);
-  const lampo = !asta && lampoAttiva(l);
+  const lampo = !asta && !ferie && lampoAttiva(l);
   const p = prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)})
                              : conLampo(l));
-  const flash = asta
+  /* Il badge dice lo STATO, la data la dice la scheda: insieme in una
+     pillola sola facevano 117px contro i 108 che la card concede a
+     360px, e il barattolino — che sta a destra e non si stringe mai —
+     ci finiva sotto (misurato: -9px a 360, -29 a 320). */
+  const flash = ferie
+    ? `<div class="card-ferie">🌴 In ferie</div>`
+    : asta
     ? `<div class="card-asta">🔨 ${astaViva(l) ? astaResta(l.astaFine)
                                                : 'conclusa'}</div>`
     : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>` : '';
@@ -5168,12 +5228,12 @@ const cardHTML = l => {
      dettaglio. */
   const jar = bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
   return `
-    <div class="card${asta?' in-asta':lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
+    <div class="card${ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
-        <div class="tag-price${asta?' asta':''}">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        <div class="tag-price${ferie?' ferie':asta?' asta':''}">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
         ${flash}${jar}
       </div>
       <div class="info">
@@ -5603,6 +5663,25 @@ function astaResta(fine){
 /* La cifra che l'asta mostra come prezzo: la puntata in testa, o la
    base se nessuno ha ancora puntato */
 function astaCifra(l){ return l.astaTop > 0 ? l.astaTop : l.astaBase; }
+/* ---------------- il negozio in ferie (ago 2026) ----------------
+   Gemello client di in_ferie: gate in LETTURA sulla data, come lampo
+   e asta. Il giudice vero resta il server (guardia_ferie), che
+   rifiuta comunque — qui si decide solo cosa DISEGNARE, e il negozio
+   torna comprabile da solo appena la data passa, senza ricaricare
+   niente. Al filo esatto e' aperto, come astaViva. */
+function inFerie(l){
+  return ((l && l.ferie) || 0)*1000 > Date.now();
+}
+const MESI_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno',
+  'luglio','agosto','settembre','ottobre','novembre','dicembre'];
+/* La data di rientro come la legge una persona: «12 settembre».
+   UNA misura sola — la card dice lo stato e non la data (il badge
+   con tutt'e due non ci stava accanto al barattolino), quindi il
+   mese abbreviato non serve a nessuno. */
+function ferieData(ts){
+  const d = new Date(ts*1000);
+  return `${d.getDate()} ${MESI_IT[d.getMonth()]}`;
+}
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
    contatore «Scade tra 2h 14m» vive SOLO nella scheda (in griglia il
    badge dice la sola percentuale), quindi qui si aggiorna in-place
@@ -6234,7 +6313,11 @@ function compraDaBarra(){
 function aggiornaBarraCompra(view){
   const l = currentListing;
   const mio = !DEMO && myTgId && l && l.sellerId===myTgId;
-  const su = view==='dettaglio' && !!l && !mio && (l.stato||'attivo')==='attivo';
+  /* Il negozio in ferie non compra e non tratta: la barra non nasce
+     proprio e resta la tab bar, come su un annuncio non attivo. La
+     riga della scheda dice gia' quando si torna. */
+  const su = view==='dettaglio' && !!l && !mio
+             && (l.stato||'attivo')==='attivo' && !inFerie(l);
   document.body.classList.toggle('con-barra', su);
   if (!su) return;
   /* Lo stepper dei pezzi vive anche qui dentro (gemello di quello in
@@ -6309,7 +6392,7 @@ async function sezioneAltriOggetti(l){
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
-      ${DEMO || astaE(l) || tuttoDigitale ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>`}
+      ${DEMO || astaE(l) || tuttoDigitale || inFerie(l) ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>`}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
 }
@@ -6578,6 +6661,13 @@ function apriAcquisto(l){
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
+  /* Il negozio in ferie: la pagina d'acquisto non nasce nemmeno — il
+     server rifiuterebbe comunque (guardia_ferie), questa e' la
+     cortesia di dirlo prima e con la data in mano. */
+  if (inFerie(l)) {
+    toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
+    return;
+  }
   currentListing = l;
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id)?.id || 0,
@@ -6613,6 +6703,16 @@ function apriAcquistoSet(){
       { toast('Questo oggetto non è più disponibile'); rinfrescaSet(); return; }
     qtaScelta = Math.min(qta, l.quantita||1);
     apriAcquisto(l);
+    return;
+  }
+  /* Il carrello e' di UN venditore alla volta: se e' in ferie non se
+     ne compra nessuna riga, e basta guardarne una (il .some() e' la
+     cintura, non la regola). */
+  const inPausa = [...setScelte.keys()]
+    .map(id => listings.find(t=>t.id===id)).find(t => t && inFerie(t));
+  if (inPausa) {
+    toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(inPausa.ferie)}`,
+          5000);
     return;
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
@@ -7238,6 +7338,11 @@ function openDetail(id){
      puntata in testa, il recinto parla di puntate e lo stato
      personale arriva da /api/aste/{id} (caricaAsta, in coda) */
   const asta = astaE(l);
+  /* il negozio in ferie (ago 2026): la scheda si vede tutta — foto,
+     descrizione, condizione, strade di consegna — ma il prezzo e'
+     grigio e al posto del recinto c'e' la riga che dice quando si
+     torna. Non e' un annuncio spento: e' un negozio chiuso. */
+  const ferie = !mio && inFerie(l);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
   qtaScelta = 1;                   // e i pezzi ripartono da uno
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
@@ -7303,10 +7408,11 @@ function openDetail(id){
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">
-          <div class="detail-price${asta?' asta':lampoAttiva(l)?' lampo':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
+          <div class="detail-price${ferie?' ferie':asta?' asta':lampoAttiva(l)?' lampo':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
           <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
-          ${asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
-          ${!asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
+          ${ferie?`<div class="ferie-riga">🌴 <b>Il negozio è in ferie</b> — torna il ${ferieData(l.ferie)}</div>`:''}
+          ${!ferie && asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
+          ${!ferie && !asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
              valuta LEGGERE questo annuncio, e la scelta e' la stessa -->
@@ -7338,11 +7444,14 @@ function openDetail(id){
       ${mio
         ? asta ? mioAstaBlocco
         : `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
-           ${!(lampoLeve && lampoLeve.attive) ? '' : (lampoAttiva(l)
+           ${inFerie(l) ? `<div class="trust-note">🌴 <span><b>Il tuo negozio è in ferie fino al ${ferieData(l.ferie)}:</b> questo annuncio si vede ma non si compra. Rientri quando vuoi dal Profilo.</span></div>` : ''}
+           ${!(lampoLeve && lampoLeve.attive) || inFerie(l) ? '' : (lampoAttiva(l)
              ? `<button class="btn ghost" style="margin-top:0" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" style="margin-top:0" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
+        : ferie
+            ? `<div class="trust-note">🌴 <span><b>Il negozio è in ferie fino al ${ferieData(l.ferie)}.</b> L'annuncio resta qui e non va da nessuna parte: al rientro del venditore torna comprabile da solo. Intanto puoi metterlo nel barattolo 🫙 per ritrovarlo al volo.</span></div>`
         : asta ? (astaViva(l) ? zonaAsta
             : `<div class="trust-note">🔨 <span><b>Quest'asta si è chiusa.</b> ${l.astaTop>0?'È in aggiudicazione al miglior offerente.':'Il venditore deciderà se rilanciarla o metterla a prezzo fisso.'}</span></div>`)
         : `<div class="escrow-zone">
@@ -7789,6 +7898,12 @@ function apriPunta(modo){
   }
   if (DEMO) { toast('Nel demo si guarda soltanto 🔨'); return; }
   if (!astaViva(l)) { toast('L\'asta è chiusa'); return; }
+  /* CINTURA, come lato server: un'asta viva blocca la partenza per
+     le ferie, quindi qui non ci si arriva. Ci sta lo stesso. */
+  if (inFerie(l)) {
+    toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
+    return;
+  }
   const mia = astaInfo && astaInfo.mia;
   const topup = !!(mia && mia.in_testa && modo === 'proxy' && proxyAttivo());
   if (mia && mia.in_testa && !topup) { toast('Sei già in testa 👑'); return; }
@@ -8552,6 +8667,11 @@ function apriOfferta(){
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
   const l = currentListing; if (!l) return;
+  /* In ferie non si tratta: il venditore non e' li' a rispondere */
+  if (inFerie(l)) {
+    toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
+    return;
+  }
   const inEur = l.valuta==='eur' && l.priceEur>0;
   el('offTestata').innerHTML = `
     ${l.thumbs && l.thumbs[0]
@@ -9385,6 +9505,10 @@ let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
 /* Lo spedizioniere del negozio e il suo catalogo, da /api/me: le
    voci non si hardcodano mai (il pattern di max_barattolo) */
 let mySpedizioniere = '', spedizionieriCatalogo = [];
+/* Il negozio in ferie: 0 = aperto, altrimenti la data del rientro.
+   Le leve (attive, tetto in giorni) arrivano dal server come tutte le
+   altre — il client non ne tiene una copia a memoria. */
+let myFerieFino = 0, ferieLeve = null;
 let mySuggerimenti = false;   // «💡 Suggerimenti sui miei annunci»: opt-in, spento di serie
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
@@ -9834,6 +9958,7 @@ function renderIdentita(){
   box.innerHTML = tgRiga + nsRiga + fotoRiga;
   renderAvvisi();
   renderSpedizioniere();
+  renderFerie();
   renderRicerche();
 }
 
@@ -9998,6 +10123,95 @@ async function setSpedizioniere(v){
     : 'Spedizioniere tolto: chi sceglie il punto si accorderà in chat');
   /* la riga del form segue la dichiarazione appena fatta */
   if (el('view-vendi')) aggiornaConsegnaForm();
+}
+
+/* ---- «🌴 Negozio in ferie» (ago 2026) ----
+   Il venditore che parte chiude la bottega con la data di rientro. Gli
+   annunci RESTANO in vetrina — prezzo in grigio e data scritta sopra —
+   e al rientro tornano comprabili DA SOLI: il gate e' in lettura sulla
+   data, quindi non c'e' nessun giro da aspettare.
+   Il 400 con gli impegni aperti si rende QUI DENTRO e non in un toast:
+   e' un elenco, e un elenco in un toast non si legge. */
+function renderFerie(){
+  const box = el('ferieBlocco');
+  if (!box) return;
+  const sez = el('accFerie');
+  if (DEMO || !(ferieLeve && ferieLeve.attive)){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const chiuso = (myFerieFino||0)*1000 > Date.now();
+  el('ferieConta').textContent = chiuso
+    ? `chiuso fino al ${ferieData(myFerieFino)}` : '';
+  /* il valore di default del campo: domani, che e' la scelta piu'
+     probabile di chi apre il cassetto per chiudere */
+  const dom = new Date(Date.now() + 86400000).toISOString().slice(0,10);
+  const max = new Date(Date.now() + (ferieLeve.max_giorni||90)*86400000)
+    .toISOString().slice(0,10);
+  const val = chiuso
+    ? new Date(myFerieFino*1000).toISOString().slice(0,10) : dom;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      ${chiuso
+        ? `Il tuo negozio è <b style="color:var(--ink)">chiuso fino al
+           ${ferieData(myFerieFino)}</b>. I tuoi annunci si vedono ancora
+           in vetrina, col prezzo in grigio: nessuno può comprarli,
+           fare offerte o puntare. Al rientro tornano comprabili da
+           soli — non devi fare niente.`
+        : `Parti? Chiudi il negozio e dì quando torni. I tuoi annunci
+           <b style="color:var(--ink)">restano in vetrina</b> ma non si
+           comprano, e chi guarda vede la data del tuo rientro.
+           Non si chiude con affari da spedire o aste in corso.`}</div>
+    <div id="ferieErrore"></div>
+    <div class="field" style="margin-top:12px">
+      <label for="ferieData">${chiuso ? 'Sposta il rientro a' : 'Torno il'}</label>
+      <input type="date" id="ferieData" value="${val}" min="${dom}" max="${max}">
+    </div>
+    <button class="btn ${chiuso?'ghost':'orange'}" style="margin-top:0" onclick="setFerie()">
+      ${chiuso ? '📅 Sposta la data' : '🌴 Chiudi il negozio'}</button>
+    ${chiuso ? `<button class="btn orange" onclick="setFerie(true)">☀️ Riapri adesso</button>` : ''}`;
+}
+async function setFerie(riapri){
+  haptic();
+  if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  let fino = 0;
+  if (!riapri){
+    const v = el('ferieData')?.value;
+    if (!v) { toast('Scegli la data del rientro'); return; }
+    /* mezzogiorno locale: cosi' il giorno scelto e' quello giusto in
+       qualunque fuso, senza sorprese da mezzanotte */
+    fino = Math.floor(new Date(v + 'T12:00:00').getTime()/1000);
+  } else if (!confirm('Riapri il negozio adesso? I tuoi annunci tornano '
+                      + 'comprabili subito.')) return;
+  const box = el('ferieErrore');
+  if (box) box.innerHTML = '';
+  let d = {};
+  try {
+    const r = await fetch(`${API_BASE}/me/ferie`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({fino})});
+    d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      /* l'elenco degli impegni aperti vive nel cassetto: e' lungo, e
+         un toast lo taglierebbe proprio dove serve. `pre-line` NON e'
+         un vezzo: il server manda una voce per riga («• ...\n• ...»)
+         e senza di lui i capoversi collassano in un muro di testo —
+         cioe' proprio l'elenco diventa illeggibile (misurato). E' la
+         stessa ricetta del cartello «fase di test». */
+      if (box) box.innerHTML =
+        `<div class="trust-note" style="margin-top:10px">⚠️ <span style="white-space:pre-line">${
+          esc(d.detail || 'Non ci sono riuscito, riprova')
+        }</span></div>`;
+      else toast(d.detail || 'Non ci sono riuscito, riprova', 6000);
+      return;
+    }
+    myFerieFino = d.ferie_fino || 0;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderFerie();
+  toast(myFerieFino
+    ? `🌴 Negozio chiuso: riapre il ${ferieData(myFerieFino)}`
+    : '☀️ Bentornato: i tuoi annunci sono di nuovo comprabili');
 }
 
 /* ---- Avvisi di ricerca: «dimmi quando esce quello che cerco».
@@ -13545,6 +13759,8 @@ async function avvia(){
     mySuggerimenti = !!me.suggerimenti_annunci;
     mySpedizioniere = me.spedizioniere || '';
     spedizionieriCatalogo = me.spedizionieri || [];
+    myFerieFino = me.ferie_fino || 0;
+    ferieLeve = me.ferie_leve || null;   // server di ieri = cassetto assente
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;

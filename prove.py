@@ -2444,6 +2444,228 @@ def prove_barattolo():
               visti, sorted(visti))
 
 
+def prove_ferie():
+    """IL NEGOZIO IN FERIE (ago 2026): si guarda, non si compra.
+    Le due cose che questa famiglia difende: il gate e' in LETTURA
+    sulla data (quindi il rientro e' immediato e non aspetta nessun
+    giro d'orologio), e NON SI CHIUDE CON IMPEGNI APERTI — coi set,
+    che hanno annuncio_id=0, dentro l'elenco: e' la lezione del LEFT
+    JOIN, gia' pagata due volte prima di questa."""
+    print("\n[il negozio in ferie]")
+    import sqlite3
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    def solo_codice(c):
+        """Il corpo SENZA la docstring: qui si cercano CHIAMATE, e le
+        docstring di questo cantiere nominano apposta le funzioni di
+        cui spiegano il rapporto — cercarle nel testo intero da'
+        verdetti a caso (successo due volte scrivendo queste prove)."""
+        p = c.split('"""')
+        return p[0] + "".join(p[2:]) if len(p) > 2 else c
+
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    # 1-3: le tre leve, gemelle server/config
+    for riga in ("FERIE_ATTIVE = True", "FERIE_MAX_GIORNI = 90",
+                 "FERIE_PREAVVISO_ORE = 24"):
+        prova(f"leva gemella server/config: {riga}", True,
+              riga in _SORGENTE and riga in cfg)
+
+    # 4-7: il giudice PURO — al filo esatto il negozio e' APERTO,
+    # come _asta_viva (e' la riga che decide il rientro immediato)
+    amb = {}
+    exec(pezzo("in_ferie"), amb)
+    inf = amb["in_ferie"]
+    prova("in ferie: data nel futuro", True, inf(2000, 1000))
+    prova("aperto: data passata", False, inf(1000, 2000))
+    prova("aperto: al filo esatto", False, inf(1000, 1000))
+    prova("aperto: nessuna data (0 = mai partito)", False, inf(0, 1000))
+
+    # 8: LA REGOLA DEL RIENTRO — il gate e' in lettura, quindi la
+    # scopa NON e' cio' che riapre. Se un domani qualcuno spostasse
+    # la decisione dentro scadenze_ferie, il rientro smetterebbe di
+    # essere immediato e nessun altro test se ne accorgerebbe.
+    sc = corpo("scadenze_ferie")
+    prova("la scopa azzera soltanto, non decide chi e' aperto", True,
+          "UPDATE utenti SET ferie_fino=0" in sc
+          and "in_ferie(" not in solo_codice(sc))
+    prova("...e rimette a zero il timbro del preavviso", True,
+          "ferie_avvisato=0" in sc)
+
+    # 9-11: il preavviso e' gemello della campagna spedizioniere —
+    # TIMBRO PRIMA dell'invio (perdere un avviso di cortesia si puo',
+    # raddoppiarlo no) e leva che lo spegne
+    av = corpo("avvisa_rientro_ferie")
+    prova("preavviso: il timbro si scrive prima della notifica", True,
+          av.index("ferie_avvisato=1") < av.index("await notifica"))
+    prova("preavviso: la leva a 0 lo spegne", True,
+          "if FERIE_PREAVVISO_ORE <= 0:" in av)
+    prova("preavviso: agganciato all'orologio", True,
+          "avvisa_rientro_ferie()" in corpo("orologio")
+          and "scadenze_ferie()" in corpo("orologio"))
+
+    # 12-18: TUTTI i varchi dei compratori hanno la guardia
+    for f in ("compra", "_compra_set", "preventivo_ordine",
+              "_preventivo_set", "fai_offerta", "fai_puntata",
+              "rispondi_offerta"):
+        prova(f"guardia nei varchi: {f}", True,
+              "guardia_ferie(" in corpo(f))
+    # 19-21: e i tre del venditore, col messaggio suo
+    for f in ("lancia_lampo", "pubblica", "rilancia_asta_deserta"):
+        prova(f"guardia venditore: {f}", True,
+              "guardia_ferie_venditore(" in corpo(f))
+
+    # 22-23: LA GUARDIA STA PRIMA DELLA INVOICE, ed e' il punto: un
+    # rifiuto dopo crea_invoice_escrow lascerebbe una fattura orfana
+    for f in ("compra", "_compra_set"):
+        c = corpo(f)
+        prova(f"{f}: la guardia viene prima della invoice", True,
+              c.index("guardia_ferie(") < c.index("crea_invoice_escrow"))
+
+    # 24: chiudere il negozio non muove MAI sats (la regola cardinale)
+    imp = corpo("imposta_ferie")
+    prova("chiudere il negozio non muove sats, solo parole", True,
+          not any(x in imp for x in
+                  ("_sblocca_sats", "_rimborsa_compratore",
+                   "_paga_rimborso", "paga_venditore", "released")))
+    # 25: il rientro (fino=0) non ha guardie — riaprire non e' mai un
+    # problema, e la lista degli impegni si guarda solo se si chiude
+    impc = solo_codice(imp)
+    prova("il rientro non passa dagli impegni aperti", True,
+          "if fino:" in impc
+          and impc.index("if fino:") < impc.index("_impegni_aperti("))
+
+    # 26: IL LEFT JOIN, la lezione gia' pagata due volte
+    ia = corpo("_impegni_aperti")
+    prova("impegni: i set non spariscono (LEFT JOIN)", True,
+          "LEFT JOIN annunci" in ia)
+
+    # 27-34: gli impegni sul DB gemello in memoria — le sole tabelle
+    # che servono, il modo di prove_asta
+    amb2 = {"time": __import__("time"), "ORE_PAGAMENTO_OFFERTA": 24}
+    i = _SORGENTE.index("MESI_IT = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
+    exec(pezzo("_titolo_ordine"), amb2)
+    exec(pezzo("data_ferie"), amb2)
+    exec(pezzo("_impegni_aperti"), amb2)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+      venditore_id INT, stato TEXT, consegna_scelta TEXT, creato INT);
+    CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+      annuncio_id INT, quantita INT, titolo TEXT);
+    CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
+      titolo TEXT, stato TEXT, asta_base_sats INT DEFAULT 0,
+      asta_scadenza INT DEFAULT 0, lampo_percento INT DEFAULT 0,
+      lampo_scadenza INT DEFAULT 0);
+    CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
+      venditore_id INT, stato TEXT, scadenza INT);
+    """)
+    import time as _t
+    ora = int(_t.time())
+    # un venditore pulito: niente lo trattiene
+    prova("negozio libero: nessun impegno", [],
+          amb2["_impegni_aperti"](con, 7))
+    # 1) un ordine pagato e mai spedito
+    con.execute("INSERT INTO annunci VALUES(1,7,'Bici',"
+                "'attivo',0,0,0,0)")
+    con.execute("INSERT INTO ordini VALUES(10,1,7,'locked',"
+                "'spedizione',?)", (ora,))
+    v = amb2["_impegni_aperti"](con, 7)
+    prova("impegno: l'ordine locked trattiene, e dice cosa fare",
+          True, len(v) == 1 and "#10" in v[0] and "spedizione" in v[0])
+    # IL CASO SET: annuncio_id=0, il titolo arriva dalle righe
+    con.execute("INSERT INTO ordini VALUES(11,0,7,'locked',"
+                "'spedizione',?)", (ora,))
+    con.execute("INSERT INTO ordine_righe VALUES(1,11,1,1,'Casco')")
+    con.execute("INSERT INTO ordine_righe VALUES(2,11,1,1,'Guanti')")
+    v = amb2["_impegni_aperti"](con, 7)
+    prova("impegno: il SET non sparisce (annuncio_id=0)", True,
+          len(v) == 2 and "#11" in v[1] and "Casco" in v[1])
+    con.execute("DELETE FROM ordini")
+    con.execute("DELETE FROM ordine_righe")
+    # gli ordini gia' spediti NON trattengono (regola di Andrea)
+    con.execute("INSERT INTO ordini VALUES(12,1,7,'shipped',"
+                "'spedizione',?)", (ora,))
+    prova("gli ordini gia' spediti seguono il loro corso", [],
+          amb2["_impegni_aperti"](con, 7))
+    # 2) un'asta viva
+    con.execute("UPDATE annunci SET asta_base_sats=100, asta_scadenza=? "
+                "WHERE id=1", (ora + 3600,))
+    v = amb2["_impegni_aperti"](con, 7)
+    prova("impegno: l'asta viva trattiene", True,
+          len(v) == 1 and "asta" in v[0])
+    con.execute("UPDATE annunci SET asta_scadenza=? WHERE id=1",
+                (ora - 10,))
+    prova("...l'asta gia' chiusa no", [],
+          amb2["_impegni_aperti"](con, 7))
+    con.execute("UPDATE annunci SET asta_base_sats=0 WHERE id=1")
+    # 3) un accordo stretto
+    con.execute("INSERT INTO offerte VALUES(20,1,7,'accettata',?)",
+                (ora + 3600,))
+    v = amb2["_impegni_aperti"](con, 7)
+    prova("impegno: l'offerta accettata trattiene", True,
+          len(v) == 1 and "accettata" in v[0])
+    con.execute("UPDATE offerte SET stato='proposta' WHERE id=20")
+    prova("...quella solo PROPOSTA no: quella decade da sola", [],
+          amb2["_impegni_aperti"](con, 7))
+    con.execute("DELETE FROM offerte")
+    # 4) un pagamento in viaggio, e il suo gemello stantio
+    con.execute("INSERT INTO ordini VALUES(13,1,7,'creato','',?)",
+                (ora - 60,))
+    v = amb2["_impegni_aperti"](con, 7)
+    prova("impegno: il pagamento in corso trattiene", True,
+          len(v) == 1 and "pagament" in v[0])
+    con.execute("UPDATE ordini SET creato=? WHERE id=13", (ora - 3600,))
+    prova("...ma non quello stantio oltre la mezz'ora", [],
+          amb2["_impegni_aperti"](con, 7))
+    con.execute("DELETE FROM ordini")
+    # 5) una lampo in corso, con la sua via d'uscita
+    con.execute("UPDATE annunci SET lampo_percento=20, lampo_scadenza=? "
+                "WHERE id=1", (ora + 3600,))
+    v = amb2["_impegni_aperti"](con, 7)
+    prova("impegno: la lampo trattiene, e non si annulla da sola",
+          True, len(v) == 1 and "annullala" in v[0])
+    con.execute("UPDATE annunci SET lampo_scadenza=? WHERE id=1",
+                (ora - 10,))
+    prova("...la lampo scaduta no", [], amb2["_impegni_aperti"](con, 7))
+    # e gli impegni di un ALTRO venditore non trattengono me
+    con.execute("UPDATE annunci SET lampo_scadenza=? WHERE id=1",
+                (ora + 3600,))
+    prova("gli impegni sono per venditore", [],
+          amb2["_impegni_aperti"](con, 999))
+    con.close()
+
+    # 35-37: la superficie pubblica e il gemello client
+    prova("il campo esce dalla vetrina (JOIN gia' presente)", True,
+          "u.ferie_fino AS venditore_ferie" in _SORGENTE)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client legge il campo in mapListing", True,
+          "ferie:a.venditore_ferie||0" in mini)
+    prova("il client ha il suo giudice in lettura", True,
+          "function inFerie(l){" in mini)
+
+    # 38-40: IL GRIGIO DEL CARTELLINO E' FISSO, mai var(--muted): la
+    # carta chiara non cambia di notte e il token sparirebbe sopra.
+    i = mini.index(".tag-price.ferie .price{")
+    prova("il cartellino usa un grigio fisso, non il token", True,
+          "#8A8271" in mini[i:i + 60] and "--muted" not in mini[i:i + 60])
+    # nel dettaglio invece il token e' quello giusto (sta sulla pagina)
+    j = mini.index(".detail-price.ferie{")
+    prova("il dettaglio segue il tema col token", True,
+          "var(--muted)" in mini[j:j + 60])
+    # e NESSUNA delle due nomina .unit (la regola dichiarata)
+    prova("nessuna regola di stato ferie nomina .unit", True,
+          ".unit" not in mini[i:i + 60] and ".unit" not in mini[j:j + 60])
+
+    # 41: la barra d'acquisto non nasce a negozio chiuso
+    prova("la barra d'acquisto tace in ferie", True,
+          "&& !inFerie(l)" in mini)
+
+
 def prove_bip353():
     """Perche' un Lightning address non ha risposto (ago 2026, dal
     caso vero di Phoenix). Un indirizzo BIP-353 e' scritto benissimo:
@@ -3143,6 +3365,7 @@ def main():
               prove_tracking_corretto, prove_barattolo,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_conta_feedback,
+              prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_consegna_payload_punto, prove_pagina_acquisto):
         try:
