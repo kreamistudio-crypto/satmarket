@@ -1565,6 +1565,87 @@ def prove_contenuti_cifrati():
           a["_chiave_fernet"]("f2") != a["_chiave_fernet"]("f"))
 
 
+def prove_ssrf_redirect():
+    """Il guardiano anti-SSRF si aggirava con un 302 (ago 2026,
+    audit): urllib segue i redirect da solo e `url_foto_ammesso`
+    giudicava solo il PRIMO indirizzo, quindi un host pubblico che
+    rispondeva «vai a 127.0.0.1» portava il server dentro la sua
+    stessa rete. E l'import da Nostr non aveva guardie affatto — e
+    gira DENTRO il server ogni ora."""
+    print("\n[il redirect ricontrollato]")
+    import ipaddress
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlparse
+
+    class _Dns:
+        """Un DNS di cartone: nessuna prova deve dipendere da una
+        risoluzione vera — la rete altrui non e' una prova."""
+        FINTI = {"pubblico.tld": "93.184.216.34",
+                 "interno.tld": "10.0.0.5"}
+
+        @staticmethod
+        def getaddrinfo(host, _porta):
+            ip = _Dns.FINTI.get(host, host)
+            ipaddress.ip_address(ip)      # un nome sconosciuto esplode qui
+            return [(2, 1, 6, "", (ip, 0))]
+
+    amb = {"urllib": urllib, "socket": _Dns, "ipaddress": ipaddress,
+           "urlparse": urlparse, "print": lambda *a, **k: None}
+    exec(pezzo("url_foto_ammesso"), amb)
+    i = _SORGENTE.index("class _RedirectControllato")
+    exec(_SORGENTE[i:_SORGENTE.index("def scarica_foto_import(", i)], amb)
+
+    ammesso = amb["url_foto_ammesso"]
+    prova("un host pubblico va bene", True, ammesso("http://pubblico.tld/a.jpg"))
+    prova("un indirizzo privato no", False, ammesso("http://10.0.0.5/a.jpg"))
+    prova("e nemmeno il loopback", False, ammesso("http://127.0.0.1/a.jpg"))
+
+    # IL SALTO: e' qui che stava il buco, e si prova sul salto
+    class _Testa(dict):
+        def get_all(self, n, d=None):
+            return d
+
+    guardia = amb["_RedirectControllato"]()
+    partenza = urllib.request.Request("http://pubblico.tld/foto.jpg")
+
+    def salto(dove):
+        try:
+            r = guardia.redirect_request(partenza, None, 302, "Found",
+                                         _Testa(), dove)
+            return "seguito" if r is not None else "non seguito"
+        except urllib.error.HTTPError:
+            return "fermato"
+
+    prova("il salto verso il loopback si ferma", "fermato",
+          salto("http://127.0.0.1/segreto"))
+    prova("il salto verso la rete interna si ferma", "fermato",
+          salto("http://interno.tld/admin"))
+    prova("il salto verso i metadati del cloud si ferma", "fermato",
+          salto("http://169.254.169.254/latest/meta-data/"))
+    prova("il salto verso file:// si ferma", "fermato",
+          salto("file:///etc/passwd"))
+    prova("un salto onesto si segue come sempre", "seguito",
+          salto("http://pubblico.tld/altra.jpg"))
+
+    # --- SENTINELLE -------------------------------------------------
+    # Uno scaricatore solo: se ne ricompare un altro con urlopen nudo,
+    # le guardie tornano a valere per meta' del progetto
+    prova("sentinella: in server.py non c'e' piu' un urlopen nudo", True,
+          "urllib.request.urlopen(" not in _SORGENTE)
+    prova("sentinella: l'apritore controllato e' quello usato", True,
+          "_APRITORE_FOTO.open(" in pezzo("scarica_foto_url"))
+    prova("sentinella: il guardiano si chiama anche sulla partenza",
+          True, "url_foto_ammesso(url)" in pezzo("scarica_foto_url"))
+    # e l'import da Nostr lo riceve: il patto del `vaglio`
+    prova("sentinella: l'import orario riceve lo scaricatore del server",
+          True, "vaglio, scarica_foto_url)" in _SORGENTE)
+    imp = open("importa_nostr.py", encoding="utf-8").read()
+    prova("sentinella: e l'import lo usa quando ce l'ha", True,
+          "def scarica_foto(url: str, annuncio_id: int, indice: int, "
+          "scarica=None)" in imp and "esito = scarica(url)" in imp)
+
+
 def prove_initdata():
     """La freschezza dell'initData (ago 2026, audit). La firma dice
     CHI, non QUANDO: finche' nessuno guardava `auth_date`, un initData
@@ -1855,7 +1936,8 @@ def main():
               prove_ritiro, prove_disarmo, prove_importo_uscita,
              prove_initdata, prove_foto, prove_avatar,
              prove_pagamento_incerto, prove_disputa_incagliata,
-             prove_idor_verifica, prove_contenuti_cifrati):
+             prove_idor_verifica, prove_contenuti_cifrati,
+             prove_ssrf_redirect):
         try:
             f()
         except Exception as e:

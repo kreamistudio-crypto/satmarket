@@ -3113,23 +3113,61 @@ def url_foto_ammesso(url: str) -> bool:
         return False
 
 
-def scarica_foto_import(url: str) -> bytes | None:
-    """Scarica una foto per l'import (timeout 10s, tetto 8MB sul file
-    grezzo: tanto poi lo ridimensiona la filiera). Ritorna i bytes o
-    None, mai eccezioni: una foto morta e' un avviso nel report, non
-    un annuncio perso. Sincrona: va chiamata in asyncio.to_thread."""
+class _RedirectControllato(urllib.request.HTTPRedirectHandler):
+    """urllib segue i redirect DA SOLO, in silenzio, fino a dieci
+    salti. Senza questa classe `url_foto_ammesso` giudicava soltanto
+    il PRIMO indirizzo: bastava che un host pubblico rispondesse
+    «302 Location: http://127.0.0.1:…» per portare il server esatta-
+    mente dove il guardiano voleva impedirgli di andare, e i byte
+    tornavano al chiamante. Qui ogni salto ripassa dal guardiano."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not url_foto_ammesso(newurl):
+            raise urllib.error.HTTPError(
+                newurl, code, "redirect verso un indirizzo non ammesso",
+                headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_APRITORE_FOTO = urllib.request.build_opener(_RedirectControllato)
+
+
+def scarica_foto_url(url: str) -> tuple[bytes, str] | None:
+    """L'UNICO scaricatore di foto da un URL scritto da un utente.
+
+    Tutte le guardie in un posto solo: `url_foto_ammesso` sulla
+    partenza E su ogni salto del redirect, timeout 10s, tetto 8MB sul
+    file grezzo (tanto poi lo ridimensiona la filiera). Ritorna
+    (byte, content-type) o None, mai eccezioni: una foto morta e' un
+    avviso nel report, non un annuncio perso.
+
+    L'import da Nostr riceve QUESTA funzione invece di averne una sua
+    — e' il patto del `vaglio`: quel che ha bisogno delle guardie del
+    server vive nel server, e lo script lanciato a mano resta com'era.
+    Sincrona: va chiamata in asyncio.to_thread."""
+    if not url_foto_ammesso(url):
+        print(f"⚠️ Foto non scaricata, indirizzo non ammesso: {url[:80]}")
+        return None
     try:
         req = urllib.request.Request(
             url, headers={"User-Agent": "Barattolo/1.0"})
-        with urllib.request.urlopen(req, timeout=10) as r:
+        with _APRITORE_FOTO.open(req, timeout=10) as r:
             raw = r.read(8_000_001)
+            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
         if len(raw) > 8_000_000:
             print(f"⚠️ Foto import troppo pesante (> 8MB): {url[:80]}")
             return None
-        return raw or None
+        return (raw, ctype) if raw else None
     except Exception as e:
         print(f"⚠️ Foto import non scaricata ({url[:80]}): {e}")
         return None
+
+
+def scarica_foto_import(url: str) -> bytes | None:
+    """I soli byte, per chi il content-type non lo guarda (CSV e
+    avatar): la filiera li riconosce dai byte."""
+    esito = scarica_foto_url(url)
+    return esito[0] if esito else None
 
 
 def normalizza_foto_import(raw: bytes) -> bytes | None:
@@ -14514,9 +14552,12 @@ async def importa_nostr_periodico():
         # per ritrovare nel database cio' che ha gia' giudicato.
         vaglio = _vaglio_nostr(loop, npub, venditore_id)
         try:
+            # ...e lo scaricatore col guardiano anti-SSRF: l'URL della
+            # foto di un evento lo scrive chiunque su Nostr, e prima
+            # l'import se lo prendeva senza chiedere niente a nessuno.
             i, a, s = await asyncio.to_thread(
                 importa_nostr.importa_venditore, npub, venditore_id, DB,
-                vaglio)
+                vaglio, scarica_foto_url)
             importati, aggiornati, saltati = (importati + i, aggiornati + a,
                                               saltati + s)
             await _apri_revisioni(npub, venditore_id)

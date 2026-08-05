@@ -253,19 +253,34 @@ def in_sats(importo: float, valuta: str, cambio: dict):
     return None
 
 
-def scarica_foto(url: str, annuncio_id: int, indice: int):
+def scarica_foto(url: str, annuncio_id: int, indice: int, scarica=None):
     """Scarica una foto esterna e la salva in foto/ con lo stesso
     schema nomi degli annunci normali (a{id}_{indice}.ext).
-    Ritorna il nome del file locale, o None se qualcosa va storto."""
+    Ritorna il nome del file locale, o None se qualcosa va storto.
+
+    `scarica` e' lo scaricatore che il SERVER passa (ago 2026, audit):
+    ha le guardie anti-SSRF e ricontrolla ogni salto dei redirect.
+    Vive li' e non qui per lo stesso motivo del `vaglio`. Senza —
+    script lanciato a mano, con la npub fidata scritta nel config —
+    si scarica come si e' sempre fatto."""
     try:
-        req = urllib.request.Request(
-            url, headers={"User-Agent": "Barattolo/1.0"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            raw = r.read(MAX_FOTO_BYTES + 1)
+        if scarica is not None:
+            esito = scarica(url)
+            if not esito:
+                return None
+            raw, ctype = esito
             if len(raw) > MAX_FOTO_BYTES:
                 print(f"    ⚠️  foto troppo grande, tengo l'URL: {url[:60]}")
                 return None
-            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
+        else:
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "Barattolo/1.0"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                raw = r.read(MAX_FOTO_BYTES + 1)
+                if len(raw) > MAX_FOTO_BYTES:
+                    print(f"    ⚠️  foto troppo grande, tengo l'URL: {url[:60]}")
+                    return None
+                ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
         est = {"image/png": "png", "image/webp": "webp",
                "image/gif": "gif"}.get(ctype, "jpg")
         nome = f"a{annuncio_id}_{indice}.{est}"
@@ -303,7 +318,7 @@ def scarica_foto(url: str, annuncio_id: int, indice: int):
         return None
 
 
-def localizza_foto(annuncio_id: int, foto_json: str) -> str:
+def localizza_foto(annuncio_id: int, foto_json: str, scarica=None) -> str:
     """Prende la lista foto (JSON) e scarica in locale gli URL esterni.
     Se un download fallisce, l'URL resta com'e' (meglio di niente)."""
     try:
@@ -315,7 +330,7 @@ def localizza_foto(annuncio_id: int, foto_json: str) -> str:
         if not isinstance(f, str) or not f.startswith("http"):
             nuove.append(f)                    # gia' un file locale
             continue
-        nome = scarica_foto(f, annuncio_id, i)
+        nome = scarica_foto(f, annuncio_id, i, scarica)
         nuove.append(nome or f)
     return json.dumps(nuove) if nuove else ""
 
@@ -586,7 +601,7 @@ def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
 
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
-                      db: str = DB, vaglio=None):
+                      db: str = DB, vaglio=None, scarica=None):
     """Il cuore dell'import, in forma riusabile: lo chiama lo script
     manuale (main, qui sotto) e ogni ora l'orologio del server.
     Ritorna la terna (importati, aggiornati, saltati).
@@ -911,7 +926,7 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
             if a["origine_foto"] and a["origine_foto"] == gia[2]:
                 foto_loc = gia[1]      # stesse foto: niente ri-download
             else:
-                foto_loc = localizza_foto(gia[0], a["foto"])
+                foto_loc = localizza_foto(gia[0], a["foto"], scarica)
             con.execute(
                 "UPDATE annunci SET titolo=?, descrizione=?, zona=?, "
                 "foto=?, contatto_nostr=?, prezzo_sats=?, valuta=?, "
@@ -952,7 +967,7 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
              "revisione" if e.get("_revisione") else "attivo"))
         scrivi_commercio(con, cur.lastrowid, a["commercio"])
         # Le foto si scaricano DOPO l'insert: il nome file vuole l'id
-        foto_loc = localizza_foto(cur.lastrowid, a["foto"])
+        foto_loc = localizza_foto(cur.lastrowid, a["foto"], scarica)
         if foto_loc != a["foto"]:
             con.execute("UPDATE annunci SET foto=? WHERE id=?",
                         (foto_loc, cur.lastrowid))
