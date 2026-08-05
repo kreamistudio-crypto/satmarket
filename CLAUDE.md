@@ -2029,6 +2029,104 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `.distintivo` di TUTTI i guadagnati, nome e descrizione — qui
   `nostrano` c'è, ed è il posto che spiega il pallino viola; i
   mancanti mai in pubblico. Cassetto nascosto in DEMO come il wallet.
+  XP, coorti, livelli e titoli (ago 2026, gamification parte 3): il
+  piano intero sta in `proposte/roadmap-gamification-aste.md`, coi
+  motivi e le strade scartate.
+  LA DIFFERENZA CHE GOVERNA TUTTO: distintivi e rating si RICALCOLANO
+  dai dati veri, quindi una passata retroattiva li rimette in pari e
+  un bug non lascia cicatrici. GLI XP NO — una visita giornaliera è
+  un evento, e se non lo scrivi quando succede è perso per sempre.
+  Quindi la verità è la tabella `xp_eventi` (append-only: tg_id, tipo,
+  punti, riferimento, creato) e `utenti.xp` è solo la sua somma
+  (cache, `_ricalcola_xp`). La `UNIQUE(tg_id, tipo, riferimento)` è il
+  GIUDICE dell'idempotenza: non si chiede a chi scrive un gancio di
+  ricordarsi «gliel'ho già dato?» — retry, doppio gancio e riavvio a
+  metà ci sbattono contro. Lo stesso vincolo fa da TETTO GIORNALIERO
+  senza che nessuno lo scriva: visita e primo annuncio del giorno
+  hanno il giorno DENTRO il riferimento (`giorno:2026-08-05`), e il
+  secondo annuncio non paga — serve, o la strada più veloce per
+  salire sarebbe pubblicare spazzatura.
+  LA FORMULA DEGLI ORDINI (decisioni di Andrea, da non rovesciare):
+  `xp_ordine` = (FISSO_XP_ORDINE 10 + euro × XP_PER_EURO 1) ×
+  XP_RUOLO (venditore 1.0, compratore 0.6), e la base è
+  `ordini.prezzo_sats` INTERO — spedizione e protezione comprese:
+  chi paga 300 € di spedizione ha speso 300 €. NESSUN TETTO: un
+  acquisto da 4.000 € non è un'anomalia da limare, è qualcuno che ha
+  affidato quella cifra al deposito di garanzia; frequenza e importo
+  valgono ENTRAMBI (sul volume guadagniamo le fee, sull'importo la
+  fiducia). NESSUNA regola della coppia: si può essere fidelizzati a
+  un negozio e usare Barattolo proprio perché ci si fida dell'escrow,
+  che per giunta è pagato. Il cambio è `ordini.cambio_eur`, appena
+  scritto in colonna per l'export: nessun giro di rete in più; cambio
+  a 0 = resta il solo fisso (mai un numero inventato, la regola
+  dell'avviso EUR senza cambio). Il RUOLO sta nel riferimento
+  (`ordine:42:venditore`) o le due parti si pesterebbero sulla
+  UNIQUE. SOLO su `released`: rimborsato = merce tornata indietro.
+  Ganci dove vivono già i distintivi: `_sblocca_sats`, `/api/me`
+  (visita), `pubblica`, `lascia_feedback`, `ln-address`,
+  `verifica_npub_controlla`, `login_nostr` nativo, `esegui_fusione`.
+  `premia_xp` è il gemello fail-open di `premia_distintivi` (un
+  errore negli XP non tocca MAI uno sblocco di sats); nessuna
+  notifica, gli XP si guardano nel Profilo.
+  ORDINI FASULLI TOLLERATI (decisione di Andrea): chi li crea paga la
+  commissione a ogni giro — si compra la fama, ed è un cliente. Due
+  cose da ricordare, perché il ragionamento regge a commissione
+  ACCESA e oggi è SOSPESA: la CLASSIFICA aspetta quel giorno (finché
+  farmare è gratis misurerebbe il tempo libero, non il commercio), e
+  il «da N persone» qui sotto va tenuto, o nessuno può accorgersi di
+  niente. NIENTE streak consecutivo: in un mercatino non c'è nulla da
+  fare ogni giorno, e una fiammella che si spegne punisce chi ha
+  lavorato invece di aprire l'app; se servirà, si contano i giorni
+  TOTALI, che salgono e basta.
+  COORTI: `COORTI` generalizza il distintivo Pioniere (posizione
+  ≤100) in una scala — pioniere 100 · fondatore 500 · veterano 2000 ·
+  bottegaio 10000. Chi entra oltre l'ultima soglia NON ha coorte, ed
+  è giusto: è un FATTO, non un premio da dare a tutti — se ce l'hanno
+  tutti non dice più niente. `utenti.coorte` si CONGELA al primo
+  calcolo (`assegna_coorte`): la posizione in una fila non cambia mai
+  più, e ricalcolarla sarebbe una scansione per chiamata a diecimila
+  utenti. Backfill idempotente in `init_db` + `/api/me` per i nuovi.
+  LIVELLI a DUE CHIAVI (`LIVELLI`, `livello_utente(xp, affari)`), ed
+  è la conseguenza diretta del niente-tetto: senza il secondo
+  requisito una vendita da 4.000 € basterebbe a fare un maestro, e il
+  grado direbbe «ha venduto una cosa cara» invece di «commercia».
+  Derivati, mai in colonna. Il client ripete le sole SOGLIE XP
+  (`SOGLIE_LIV`) per disegnare la barra DENTRO il gradino, e
+  `prove.py` le incrocia (lezione delle categorie senza condizione).
+  TITOLI: il distintivo dice «ho fatto», il titolo dice «chi sono» —
+  ed è l'unica cosa che l'utente SCEGLIE. `TITOLI` (requisito =
+  coorte | distintivo | livello: fatti già calcolati altrove, qui non
+  si giudica niente di nuovo), `utenti.titolo`, `POST /api/me/titolo`
+  col pattern di canale-notifiche (si accetta solo un titolo
+  SBLOCCATO) e `titoli_disponibili` giudice unico dell'elenco E della
+  validazione, o si indosserebbe qualcosa che l'elenco non offre. I
+  livelli sono una SCALA: chi è esperto porta anche i gradini sotto.
+  IL CATALOGO RESTA CHIUSO: un titolo scritto a mano sarebbe
+  impersonazione («Moderatore»), che non è un problema di `esc()` ma
+  di significato. In pubblico esce col NOME e non con l'id, espanso
+  in `arricchisci_righe_vetrina` (`NOMI_TITOLI`): il catalogo sta sul
+  server. `venditore_titolo` in CAMPI_VETRINA, `titolo` e `livello`
+  nel profilo di `/api/negozio`. Frontend: cassetto «🎖 Livello e
+  titolo» sopra i distintivi (grado, barra `.barra-xp`, cosa manca al
+  prossimo, pillole `.titolo-pill` — le non sbloccate restano in
+  elenco spente col perché, la molla dei distintivi in grigio) e riga
+  `.titolo-riga` sotto il nome in Profilo, testata negozio e riquadro
+  venditore del dettaglio. Mai in card: la riga meta è già satura.
+  Da quante PERSONE arrivano i feedback (ago 2026): sul negozio
+  pubblico i voti escono senza nomi, di proposito — mostrare chi ha
+  comprato rivelerebbe gli acquisti altrui —, ma senza un secondo
+  numero un venditore con 40 voti dallo stesso account si vede
+  IDENTICO a uno con 40 voti di 40 persone. Un CONTEGGIO, non dei
+  nomi: la privacy resta intera e il giudizio torna a chi legge.
+  Colonna `utenti.n_recensori`, `COUNT(DISTINCT da_tg_id)` dentro
+  `_ricalcola_rating` accanto a rating e n_feedback (quindi rimozione
+  admin e fusione si sistemano da sole), backfill idempotente
+  all'avvio. LA SECONDA CIFRA COMPARE SOLO QUANDO I DUE NUMERI
+  DIFFERISCONO — «(40 da 1 persona)» parla, «(40)» quando sono
+  quaranta persone tace: è tutta la soglia, non c'è niente da tarare.
+  Giudice unico `contaFeedback()`, due soli posti (negozio pubblico e
+  Profilo); MAI nel dettaglio annuncio, dove la riga è già
+  «4,8 (40) ·» e un secondo numero la rende illeggibile.
   Export dati contabili (lug 2026): colonna `ordini.cambio_eur` = EUR
   per BTC al momento della chiusura, scritta da `_sblocca_sats` e
   `_rimborsa_compratore` via `cambio_btc_eur()` (CoinGecko lato server
