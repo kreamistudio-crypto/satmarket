@@ -1310,9 +1310,38 @@ def init_db():
                     # contrario: quando il venditore ha sollecitato il
                     # compratore col suo bottone.)
                     "sollecito_venditore_il INTEGER DEFAULT 0",
-                    "solleciti_venditore INTEGER DEFAULT 0"):
+                    "solleciti_venditore INTEGER DEFAULT 0",
+                    # il pagamento in uscita di cui non sappiamo l'esito
+                    # (ago 2026, audit): '' = normale, 'incerto' =
+                    # congelato, nessuna strada puo' ritentare finche'
+                    # un moderatore non guarda; 'uscito' = ha guardato,
+                    # i sats erano partiti, e il prossimo giro chiude
+                    # l'ordine SENZA pagare di nuovo — cosi' il ramo
+                    # riuscito di sempre si riusa dov'e', invece di
+                    # riscriverlo qui in copia.
+                    "payout_stato TEXT DEFAULT ''",
+                    "payout_hash TEXT DEFAULT ''",
+                    # CHI stava per essere pagato. Non si deduce dallo
+                    # stato: un ordine in 'dispute' puo' essere sulla
+                    # strada del venditore (disputa decisa a suo
+                    # favore) o su quella del compratore (rimborso), e
+                    # indovinare vorrebbe dire pagare la persona
+                    # sbagliata quando il moderatore dice «e' uscito».
+                    "payout_verso TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
+    # Le stesse sul registro dei rimborsi d'asta: il moderatore deve
+    # avere lo stesso dato ovunque, e «Da riscuotere» esce dallo
+    # stesso tubo (paga_venditore) degli incassi. Qui `payout_verso`
+    # e' sempre lo stesso — c'e' una strada sola — ma si tiene per
+    # avere una colonna in meno da ricordare a chi legge il codice.
+    for colonna in ("payout_stato TEXT DEFAULT ''",
+                    "payout_hash TEXT DEFAULT ''",
+                    "payout_verso TEXT DEFAULT ''"):
+        try:
+            con.execute(f"ALTER TABLE rimborsi_asta ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
     # Backfill di disputata: questi stati esistono SOLO a valle di una
@@ -1819,7 +1848,19 @@ async def invoice_pagata(payment_hash: str) -> bool:
         return r.status_code == 200 and r.json().get("paid", False)
 
 
-async def paga_venditore(invoice: str, atteso_sats: int) -> bool:
+# I tre esiti di un pagamento in uscita (ago 2026, audit). INCERTO non
+# e' un fallimento: e' «non lo so» — LNbits puo' aver pagato davvero e
+# non essere riuscito a dircelo. Un fallimento si ritenta, un «non lo
+# so» MAI, e la ragione e' precisa: sul ramo del Lightning address ogni
+# tentativo conia una fattura NUOVA, quindi il secondo pagherebbe una
+# seconda volta per davvero. (Sul ramo dell'invoice incollata a mano ci
+# salverebbe Lightning, che una fattura gia' saldata non la paga due
+# volte — ma e' proprio il ramo che NON si usa quando le cose vanno
+# storte, perche' li' la invoice si azzera e si riparte dall'address.)
+PAGATO, NON_PAGATO, INCERTO = "pagato", "non_pagato", "incerto"
+
+
+async def paga_venditore(invoice: str, atteso_sats: int) -> str:
     """Sblocca i sats: paga la invoice fornita dal venditore.
 
     LA CINTURA (ago 2026): l'importo si controlla QUI, sull'ultimo
@@ -1833,7 +1874,16 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> bool:
     glielo dice Python. Il rifiuto non chiama LNbits nemmeno una
     volta, e i moderatori lo sanno subito: un importo storto e' o un
     wallet rotto o un tentativo di prelievo, e in nessuno dei due casi
-    puo' restare dentro un `return False`."""
+    puo' restare dentro un `return False`.
+
+    I TRE ESITI (ago 2026): PAGATO, NON_PAGATO e INCERTO. Il terzo e'
+    la risposta onesta al timeout — il nodo puo' aver pagato e non
+    essere riuscito a dircelo — e chi chiama deve trattarlo come un
+    caso a se': congelare, non ritentare. Non e' un booleano apposta:
+    messa dentro un «if» questa funzione direbbe che l'incerto e' un
+    successo, e messa sotto un «not» che e' un fallimento — sono
+    entrambe bugie, e una sentinella in prove.py verifica che nessuno
+    la rimetta li'."""
     chiesto = await importo_invoice(invoice)
     if chiesto is None or atteso_sats <= 0 or chiesto != atteso_sats:
         print(f"⛔ Pagamento rifiutato: la invoice chiede {chiesto} sats, "
@@ -1848,12 +1898,64 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> bool:
                 f"del dovuto: vale un'occhiata.")
         except Exception as e:   # un avviso non deve mai rompere il rifiuto
             print(f"⚠️ Avviso ai moderatori non partito: {e}")
-        return False
-    async with httpx.AsyncClient(timeout=60) as c:
-        r = await c.post(f"{LNBITS_URL}/api/v1/payments",
-                         headers={"X-Api-Key": LNBITS_ADMIN_KEY},
-                         json={"out": True, "bolt11": invoice})
-        return r.status_code < 300
+        return NON_PAGATO
+    try:
+        async with httpx.AsyncClient(timeout=60) as c:
+            r = await c.post(f"{LNBITS_URL}/api/v1/payments",
+                             headers={"X-Api-Key": LNBITS_ADMIN_KEY},
+                             json={"out": True, "bolt11": invoice})
+            return PAGATO if r.status_code < 300 else NON_PAGATO
+    except Exception as e:
+        # Il nodo ha taciuto. Prima di questa riga l'eccezione risaliva
+        # e il database non registrava NIENTE: l'ordine restava
+        # ritentabile e il tentativo dopo coniava una fattura nuova.
+        # Qualunque cosa vada storta mentre parliamo col nodo e' un
+        # «non lo so»: il ramo largo e' voluto, perche' l'unica
+        # risposta sbagliata qui e' «non e' uscito».
+        print(f"🧊 Pagamento INCERTO ({type(e).__name__}: {e}): il nodo "
+              f"non ha risposto in tempo. Non si ritenta.")
+        return INCERTO
+
+
+async def _payment_hash(bolt11: str) -> str:
+    """Il payment_hash di una bolt11: e' il numero che un moderatore
+    cerca su LNbits per sapere se quel pagamento e' uscito davvero.
+    Fail-open — se anche questa chiamata tace, resta il congelamento,
+    che e' la parte che conta."""
+    try:
+        dec = await decodifica_invoice(bolt11)
+        return str((dec or {}).get("payment_hash", ""))[:100]
+    except Exception:
+        return ""
+
+
+async def _congela_pagamento(con, tabella: str, riga_id: int, bolt11: str,
+                             verso: str, avviso: str):
+    """L'esito e' IGNOTO: la riga si congela e la palla passa a un
+    umano. Da qui in poi nessuna strada — scandaglio, invoice
+    depositata, conferma, orologio — puo' far partire un secondo
+    pagamento: le tre funzioni d'uscita escono a mani vuote finche'
+    un moderatore non dice com'e' andata. `tabella` e' un letterale
+    del nostro codice, mai roba che arriva da fuori.
+    Chiude la connessione che riceve: il chiamante l'ha aperta e da
+    qui non ci torna."""
+    phash = await _payment_hash(bolt11)
+    con.execute(f"UPDATE {tabella} SET payout_stato='incerto', "
+                "payout_hash=?, payout_verso=?, aggiornato=? WHERE id=?",
+                (phash, verso, int(time.time()), riga_id))
+    con.commit()
+    con.close()
+    try:
+        await notifica_admin(
+            f"🧊 <b>Pagamento da verificare a mano.</b> {avviso}\n\n"
+            f"Il nodo non ha risposto: <b>non sappiamo</b> se i sats "
+            f"sono usciti. Nessun ritentativo partirà da solo. Cerca "
+            f"questo pagamento su LNbits e poi rispondi dal Profilo, "
+            f"nella sezione «🧊 Pagamenti da verificare».\n"
+            + (f"<code>{phash}</code>" if phash else
+               "(il payment_hash non si è potuto leggere)"))
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
 
 def netto_venditore(prezzo_sats: int) -> int:
@@ -6223,6 +6325,94 @@ async def decidi_revisione_admin(annuncio_id: int, req: Request,
     return {"ok": True, "esito": esito}
 
 
+# --- La coda dei pagamenti incerti (ago 2026, audit) ----------------
+# Quando il nodo non risponde non sappiamo se i sats sono usciti, e
+# l'unica risposta sbagliata sarebbe indovinare. La riga si congela e
+# finisce qui: un moderatore cerca il payment_hash su LNbits e dice
+# com'e' andata. Sono le uniche due strade per uscire dal congelamento.
+
+@app.get("/api/admin/pagamenti")
+def coda_pagamenti(x_tg_init_data: str = Header(""),
+                   barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: i pagamenti in uscita di cui non sappiamo l'esito,
+    dal piu' vecchio. Ordini e rimborsi d'asta insieme: chi modera
+    guarda una lista sola, e su LNbits sono la stessa cosa."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT 'ordine' AS tipo, o.id, o.payout_hash, o.aggiornato, "
+        "  o.stato, o.prezzo_sats AS importo, "
+        "  COALESCE(a.titolo, '') AS titolo "
+        "FROM ordini o LEFT JOIN annunci a ON a.id=o.annuncio_id "
+        "WHERE o.payout_stato='incerto' "
+        "UNION ALL "
+        "SELECT 'rimborso' AS tipo, r.id, r.payout_hash, r.aggiornato, "
+        "  r.stato, r.importo_sats AS importo, "
+        "  COALESCE(a.titolo, '') AS titolo "
+        "FROM rimborsi_asta r LEFT JOIN annunci a ON a.id=r.annuncio_id "
+        "WHERE r.payout_stato='incerto' "
+        "ORDER BY aggiornato ASC")]
+    con.close()
+    return righe
+
+
+@app.post("/api/admin/pagamenti/decidi")
+async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: com'e' finito quel pagamento.
+
+    - 'uscito'     = su LNbits i sats risultano partiti. La riga passa
+                     a 'uscito' e si richiama la funzione di sempre,
+                     che vede il timbro, NON paga e va dritta al ramo
+                     riuscito: contatori, notifiche e stato finale
+                     restano scritti in un posto solo.
+    - 'non_uscito' = non e' partito niente. Il congelamento cade e le
+                     strade normali possono ritentare.
+
+    UPDATE condizionato sul congelamento, come decidi_revisione: il
+    secondo moderatore trova il 409, mai due chiusure."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    tipo, riga_id = d.get("tipo", ""), int(d.get("id") or 0)
+    esito = d.get("esito", "")
+    if tipo not in ("ordine", "rimborso") or esito not in ("uscito",
+                                                           "non_uscito"):
+        raise HTTPException(400, "Decisione non valida")
+    tabella = "ordini" if tipo == "ordine" else "rimborsi_asta"
+    con = db()
+    cur = con.execute(
+        f"UPDATE {tabella} SET payout_stato=?, aggiornato=? "
+        "WHERE id=? AND payout_stato='incerto'",
+        ("uscito" if esito == "uscito" else "", int(time.time()), riga_id))
+    con.commit()
+    con.close()
+    if cur.rowcount == 0:
+        raise HTTPException(409, "Questo pagamento non è più in attesa: "
+                                 "l'ha già deciso qualcun altro")
+    if esito != "uscito":
+        return {"ok": True, "stato": "sbloccato"}
+    # I sats erano usciti: si chiude l'affare senza pagare di nuovo.
+    # Quale delle due strade dipende da chi aspettava i sats.
+    if tipo == "rimborso":
+        return await _paga_rimborso(riga_id)
+    con = db()
+    o = con.execute("SELECT payout_verso FROM ordini WHERE id=?",
+                    (riga_id,)).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(404, "Ordine non trovato")
+    # CHI aspettava i sats lo dice la colonna, mai lo stato: un ordine
+    # in 'dispute' puo' essere su tutte e due le strade, e indovinare
+    # vorrebbe dire chiudere l'affare a favore della persona sbagliata.
+    if o["payout_verso"] == "compratore":
+        return await _rimborsa_compratore(riga_id)
+    return await _sblocca_sats(riga_id)
+
+
 # --- La coda delle categorie (lug 2026) ------------------------------
 # Quando il catalogo e' passato da 9 voci a 25, gli annunci di ieri
 # sono rimasti nelle caselle di ieri e quelli che arrivano da Nostr
@@ -7082,14 +7272,29 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         if r["stato"] != "da_riscuotere":
             con.close()
             return {"ok": r["stato"] == "riscosso", "stato": r["stato"]}
+        if r["payout_stato"] == "incerto":
+            con.close()          # gemello di _sblocca_sats: mai due uscite
+            return {"ok": False, "stato": r["stato"], "incerto": True}
         u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                         (r["tg_id"],)).fetchone()
         importo = r["importo_sats"]      # integrale, al sat
-        bolt11 = r["invoice_riscossione"]
-        if not bolt11 and u and u["ln_address"]:
-            bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
+        bolt11 = ""
+        if r["payout_stato"] != "uscito":
+            bolt11 = r["invoice_riscossione"]
+            if not bolt11 and u and u["ln_address"]:
+                bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
         titolo = (r["titolo"] or "un'asta")[:60]
-        if bolt11 and await paga_venditore(bolt11, importo):
+        esito = (PAGATO if r["payout_stato"] == "uscito"
+                 else await paga_venditore(bolt11, importo) if bolt11
+                 else NON_PAGATO)
+        if esito == INCERTO:
+            await _congela_pagamento(
+                con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
+                f"Riscossione del rimborso d'asta #{rimborso_id} "
+                f"(«{titolo}»): <b>{importo} sats</b>.")
+            return {"ok": False, "stato": r["stato"], "incerto": True}
+
+        if esito == PAGATO:
             con.execute("UPDATE rimborsi_asta SET stato='riscosso', "
                         "aggiornato=? WHERE id=?",
                         (int(time.time()), rimborso_id))
@@ -11487,6 +11692,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         if o["stato"] in ("released", "refunded", "refund", "creato", "annullato"):
             con.close()          # gia' risolto (o mai pagato): niente doppioni
             return {"ok": o["stato"] == "released", "stato": o["stato"]}
+        if o["payout_stato"] == "incerto":
+            con.close()   # un pagamento in volo di cui non sappiamo l'esito:
+            #               finche' un moderatore non guarda, qui non si paga
+            return {"ok": False, "stato": o["stato"], "incerto": True}
         v = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                         (o["venditore_id"],)).fetchone()
         # Al venditore va articolo + spedizione: la protezione del
@@ -11494,11 +11703,25 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # ordini di ieri la quota e' 0 e non cambia nulla.
         netto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
 
-        bolt11 = o["invoice_venditore"]
-        if not bolt11 and v and v["ln_address"]:
-            bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
+        # Con 'uscito' il pagamento e' GIA' partito e un moderatore
+        # l'ha verificato su LNbits: non si conia nessuna fattura e
+        # non si chiama il nodo, si va dritti al ramo riuscito.
+        bolt11 = ""
+        if o["payout_stato"] != "uscito":
+            bolt11 = o["invoice_venditore"]
+            if not bolt11 and v and v["ln_address"]:
+                bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
+        esito = (PAGATO if o["payout_stato"] == "uscito"
+                 else await paga_venditore(bolt11, netto) if bolt11
+                 else NON_PAGATO)
+        if esito == INCERTO:
+            await _congela_pagamento(
+                con, "ordini", ordine_id, bolt11, "venditore",
+                f"Incasso del venditore sull'ordine #{ordine_id}: "
+                f"<b>{netto} sats</b>.")
+            return {"ok": False, "stato": o["stato"], "incerto": True}
 
-        if bolt11 and await paga_venditore(bolt11, netto):
+        if esito == PAGATO:
             # Il titolo di cortesia copre anche i set («primo + N altri»)
             titolo = _titolo_ordine(_righe_ordine(con, o))
             if titolo == "?":
@@ -11600,6 +11823,9 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         if o["stato"] in ("refunded", "released", "creato", "annullato"):
             con.close()          # gia' risolto (o mai pagato): niente doppioni
             return {"ok": o["stato"] == "refunded", "stato": o["stato"]}
+        if o["payout_stato"] == "incerto":
+            con.close()          # gemello di _sblocca_sats: mai due uscite
+            return {"ok": False, "stato": o["stato"], "incerto": True}
         c_utente = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                                (o["compratore_id"],)).fetchone()
         # Rimborso integrale: articolo, spedizione e protezione tornano
@@ -11607,11 +11833,23 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         # si e' consumata) — e' il totale, zero commissioni.
         importo = o["prezzo_sats"]
 
-        bolt11 = o["invoice_rimborso"]
-        if not bolt11 and c_utente and c_utente["ln_address"]:
-            bolt11 = await invoice_da_ln_address(c_utente["ln_address"], importo)
+        bolt11 = ""
+        if o["payout_stato"] != "uscito":
+            bolt11 = o["invoice_rimborso"]
+            if not bolt11 and c_utente and c_utente["ln_address"]:
+                bolt11 = await invoice_da_ln_address(c_utente["ln_address"],
+                                                     importo)
+        esito = (PAGATO if o["payout_stato"] == "uscito"
+                 else await paga_venditore(bolt11, importo) if bolt11
+                 else NON_PAGATO)
+        if esito == INCERTO:
+            await _congela_pagamento(
+                con, "ordini", ordine_id, bolt11, "compratore",
+                f"Rimborso al compratore sull'ordine #{ordine_id}: "
+                f"<b>{importo} sats</b>.")
+            return {"ok": False, "stato": o["stato"], "incerto": True}
 
-        if bolt11 and await paga_venditore(bolt11, importo):
+        if esito == PAGATO:
             cambio = await cambio_btc_eur()
             con.execute("UPDATE ordini SET stato='refunded', cambio_eur=?, "
                         "aggiornato=? WHERE id=?",

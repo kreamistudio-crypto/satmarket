@@ -1017,10 +1017,12 @@ def prove_disarmo():
           "sollecita_venditori_fermi()" in oro)
 
 
-def _finto_lnbits(uscite, codice=200):
+def _finto_lnbits(uscite, codice=200, muto=False):
     """Un LNbits di cartone che REGISTRA ogni chiamata invece di
     farla. L'asserzione che conta in questa sezione e' sempre la
-    stessa: la richiesta di pagamento non e' mai partita."""
+    stessa: la richiesta di pagamento non e' mai partita.
+    Con `muto` il nodo prende la chiamata e non risponde mai: e' il
+    caso in cui i sats possono essere usciti senza che lo sappiamo."""
     import types
 
     class R:
@@ -1044,6 +1046,8 @@ def _finto_lnbits(uscite, codice=200):
 
         async def post(self, url, **kw):
             uscite.append(url)
+            if muto:
+                raise TimeoutError("il nodo non ha risposto")
             return R()
 
     return types.SimpleNamespace(AsyncClient=C)
@@ -1114,25 +1118,31 @@ def prove_importo_uscita():
         amb = {"httpx": _finto_lnbits(uscite, codice),
                "importo_invoice": _importo, "notifica_admin": _admin,
                "print": lambda *a, **k: None,
-               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k"}
+               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k",
+               # i tre esiti (ago 2026): qui interessa il rifiuto, ma
+               # senza i nomi la funzione non gira nemmeno
+               "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
+               "INCERTO": "incerto"}
         exec(pezzo_async("paga_venditore"), amb)
         return gira(amb["paga_venditore"]("lnbc", dovuti)), len(uscite), len(avvisi)
 
     # 1: il caso felice deve restare felice — e' meta' della prova
-    prova("cintura: importo esatto, il pagamento parte", (True, 1, 0),
+    prova("cintura: importo esatto, il pagamento parte", ("pagato", 1, 0),
           cintura(50_000, 50_000))
     # 2: LA FALLA. Un sat dovuto, cento milioni nella fattura.
-    prova("cintura: ECCESSO rifiutato, zero POST", (False, 0, 1),
+    #    (Il rifiuto e' NON_PAGATO e non INCERTO: qui sappiamo
+    #    benissimo com'e' andata — non e' partito niente.)
+    prova("cintura: ECCESSO rifiutato, zero POST", ("non_pagato", 0, 1),
           cintura(100_000_000, 1))
     # 3: pagare meno non e' un favore — e' un ordine chiuso con un
     #    venditore non pagato, e i sats restano orfani in cassaforte
-    prova("cintura: DIFETTO rifiutato, zero POST", (False, 0, 1),
+    prova("cintura: DIFETTO rifiutato, zero POST", ("non_pagato", 0, 1),
           cintura(1, 100))
     # 4: fattura illeggibile (LNbits muto): fail-closed
-    prova("cintura: invoice illeggibile rifiutata, zero POST", (False, 0, 1),
-          cintura(None, 100))
+    prova("cintura: invoice illeggibile rifiutata, zero POST",
+          ("non_pagato", 0, 1), cintura(None, 100))
     # 5: un'uscita a zero non ha un mittente legittimo
-    prova("cintura: dovuto zero rifiutato, zero POST", (False, 0, 1),
+    prova("cintura: dovuto zero rifiutato, zero POST", ("non_pagato", 0, 1),
           cintura(0, 0))
     # 6: e i moderatori lo sanno sempre — mai dentro un return False
     prova("cintura: il rifiuto avvisa i moderatori", 1, cintura(999, 1)[2])
@@ -1176,7 +1186,7 @@ def prove_importo_uscita():
     # 2: il rifiuto sta PRIMA della chiamata all'admin key
     prova("sentinella: si rifiuta prima di toccare l'admin key", True,
           "importo_invoice" in pv
-          and pv.index("return False") < pv.index("LNBITS_ADMIN_KEY"))
+          and pv.index("return NON_PAGATO") < pv.index("LNBITS_ADMIN_KEY"))
     # 3: la chiamata a un argomento non deve esistere piu' da nessuna
     #    parte — e' la sentinella che prende il refactor distratto
     prova("sentinella: nessuna chiamata a un solo argomento", [],
@@ -1189,6 +1199,170 @@ def prove_importo_uscita():
     prova("sentinella: la fattura del wallet si rilegge sempre", True,
           "importo_invoice" in lna
           and 'return r.json().get("pr")' not in lna)
+
+
+def prove_pagamento_incerto():
+    """Il timeout di paga_venditore (ago 2026, audit). LNbits puo'
+    aver pagato e non essere riuscito a dircelo: prima l'eccezione
+    risaliva, il database non registrava NIENTE e il tentativo dopo
+    coniava una fattura nuova dal Lightning address — cioe' pagava
+    una seconda volta per davvero. Qui si prova il non-fatto: nessuna
+    seconda uscita, nessuno stato riscritto."""
+    print("\n[il pagamento incerto]")
+    import asyncio
+    import sqlite3
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    def pezzo_async(nome):
+        return "async " + pezzo(nome)
+
+    async def _niente(*a, **k):
+        return None
+
+    ESITI = {"PAGATO": "pagato", "NON_PAGATO": "non_pagato",
+             "INCERTO": "incerto"}
+
+    # --- 1. I tre esiti di paga_venditore ---------------------------
+    def paga(codice=200, muto=False, chiesto=1000):
+        uscite = []
+
+        async def _importo(_b):
+            return chiesto
+
+        amb = {"httpx": _finto_lnbits(uscite, codice, muto),
+               "importo_invoice": _importo, "notifica_admin": _niente,
+               "print": lambda *a, **k: None,
+               "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k", **ESITI}
+        exec(pezzo_async("paga_venditore"), amb)
+        return gira(amb["paga_venditore"]("lnbc1", 1000)), len(uscite)
+
+    prova("nodo che risponde ok: PAGATO", ("pagato", 1), paga())
+    prova("nodo che risponde no: NON_PAGATO", ("non_pagato", 1),
+          paga(codice=500))
+    prova("nodo che TACE: INCERTO, non un fallimento", ("incerto", 1),
+          paga(muto=True))
+    prova("importo storto: NON_PAGATO e zero uscite", ("non_pagato", 0),
+          paga(chiesto=999))
+
+    # --- 2. _sblocca_sats: il congelamento --------------------------
+    # Un ordine vero in un database vero (in memoria), e tutto il
+    # resto di cartone: quello che si guarda e' la riga dopo.
+    def mondo(payout_stato="", esiti=("incerto",)):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute(
+            "CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT, "
+            "compratore_id INT, venditore_id INT, prezzo_sats INT, "
+            "protezione_sats INT, quantita INT, stato TEXT, disputata INT, "
+            "invoice_venditore TEXT, aggiornato INT, cambio_eur REAL, "
+            "payout_stato TEXT, payout_hash TEXT, payout_verso TEXT)")
+        vero.execute(
+            "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,'delivered',0,"
+            f"'',0,0,'{payout_stato}','','')")
+        vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
+                     "vendite_ok INT, acquisti_ok INT)")
+        vero.execute("INSERT INTO utenti VALUES(222,'io@wallet.tld',0,0)")
+        vero.commit()
+
+        class Con:
+            """close() non chiude davvero: il :memory: deve
+            sopravvivere fra una chiamata e l'altra."""
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        tentativi, coniate = [], []
+        resto = list(esiti)
+
+        async def _paga(bolt11, atteso):
+            tentativi.append((bolt11, atteso))
+            return resto.pop(0) if resto else "non_pagato"
+
+        async def _address(addr, importo):
+            # OGNI chiamata conia una fattura NUOVA: e' esattamente il
+            # motivo per cui un ritentativo pagherebbe due volte
+            coniate.append(addr)
+            return f"lnbc-nuova-{len(coniate)}"
+
+        amb = {"db": Con, "time": __import__("time"),
+               "_lucchetti_ordine": __import__("collections").defaultdict(
+                   asyncio.Lock),
+               "netto_venditore": lambda p: p,
+               "invoice_da_ln_address": _address, "paga_venditore": _paga,
+               "_righe_ordine": lambda con, o: [],
+               "_titolo_ordine": lambda righe: "una cosa",
+               "cambio_btc_eur": _niente, "notifica": _niente,
+               "premia_distintivi": _niente, "polso_ordini_admin": _niente,
+               "notifica_admin": _niente, "_payment_hash": _niente,
+               "print": lambda *a, **k: None, **ESITI}
+        exec(pezzo_async("_congela_pagamento"), amb)
+        exec(pezzo_async("_sblocca_sats"), amb)
+        return amb["_sblocca_sats"], vero, tentativi, coniate
+
+    def riga(vero):
+        r = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+        return (r["stato"], r["payout_stato"], r["payout_verso"])
+
+    # il nodo tace: si congela e NON si tocca niente
+    sblocca, vero, tentativi, coniate = mondo(esiti=("incerto",))
+    gira(sblocca(1))
+    prova("incerto: lo stato dell'ordine NON si riscrive",
+          ("delivered", "incerto", "venditore"), riga(vero))
+    prova("incerto: un tentativo solo, e si ferma li'", 1, len(tentativi))
+    # ...e ora tutte le strade normali ci riprovano: non deve uscire
+    # nemmeno una fattura nuova
+    gira(sblocca(1))
+    gira(sblocca(1))
+    prova("incerto: nessun secondo pagamento, mai", 1, len(tentativi))
+    prova("incerto: nessuna fattura nuova coniata dall'address", 1,
+          len(coniate))
+    vero.close()
+
+    # il nodo risponde di no: il ramo di sempre, invariato
+    sblocca, vero, tentativi, _ = mondo(esiti=("non_pagato",))
+    gira(sblocca(1))
+    prova("fallimento vero: si va in 'confirmed' come sempre",
+          ("confirmed", "", ""), riga(vero))
+    vero.close()
+
+    # il moderatore ha guardato su LNbits: era uscito
+    sblocca, vero, tentativi, coniate = mondo(payout_stato="uscito")
+    gira(sblocca(1))
+    prova("«è uscito»: si chiude l'ordine SENZA pagare di nuovo",
+          ("released", "uscito", ""), riga(vero))
+    prova("«è uscito»: zero tentativi e zero fatture coniate",
+          (0, 0), (len(tentativi), len(coniate)))
+    vero.close()
+
+    # regressione: il giorno buono resta il giorno buono
+    sblocca, vero, tentativi, _ = mondo(esiti=("pagato",))
+    gira(sblocca(1))
+    prova("pagamento riuscito: 'released' come sempre",
+          ("released", "", ""), riga(vero))
+    vero.close()
+
+    # --- 3. SENTINELLE ----------------------------------------------
+    # Il tri-stato sparisce in un riordino: basta che qualcuno rimetta
+    # un `if await paga_venditore(...)` e «incerto» torna a leggersi
+    # come successo, senza che nessuna prova funzionale si rompa.
+    prova("sentinella: paga_venditore non si legge come booleano", [],
+          re.findall(r"(?:and|not|if) await paga_venditore\(", _SORGENTE))
+    prova("sentinella: tutt'e tre le uscite guardano l'INCERTO", 3,
+          _SORGENTE.count("esito == INCERTO"))
+    prova("sentinella: tutt'e tre si fermano se sono congelate", 3,
+          _SORGENTE.count('payout_stato"] == "incerto"'))
+    prova("sentinella: il congelamento scrive CHI aspettava i sats",
+          True, "payout_verso=?" in pezzo("_congela_pagamento"))
+    # e la coda admin non deve indovinare la strada dallo stato
+    prova("sentinella: la coda admin legge payout_verso, non lo stato",
+          True, 'payout_verso"] == "compratore"' in pezzo("decidi_pagamento"))
 
 
 def prove_initdata():
@@ -1479,7 +1653,8 @@ def main():
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_foto, prove_avatar):
+             prove_initdata, prove_foto, prove_avatar,
+             prove_pagamento_incerto):
         try:
             f()
         except Exception as e:
