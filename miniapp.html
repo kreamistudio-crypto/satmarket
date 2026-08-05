@@ -5466,6 +5466,9 @@ function setValuta(v){
   if (el('view-pacco')?.classList.contains('active')) renderPacco();
   /* e il riepilogo del pacco: il conto segue il toggle */
   if (el('view-controllapacco')?.classList.contains('active')) renderControlla();
+  /* e la pagina d'acquisto: si ridisegna dal preventivo in CACHE —
+     il toggle e' una conversione di vista, mai un secondo fetch */
+  if (el('view-acquisto')?.classList.contains('active')) renderAcquisto();
 }
 /* I toggle valuta sono due (searchbar e dettaglio) e vanno accesi
    insieme: si pescano per `data-cur`, non per id */
