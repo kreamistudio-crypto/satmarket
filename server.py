@@ -2908,6 +2908,17 @@ def genera_miniature_mancanti():
     for nome in os.listdir(FOTO_DIR):
         if not nome.endswith(".jpg") or nome.endswith("_min.jpg"):
             continue
+        # GLI AVATAR NO (ago 2026): questa passata guardava OGNI .jpg
+        # della cartella, e nella cartella ci sono anche i francobolli
+        # av_ — che _salva_avatar scrive gia' a AVATAR_LATO (128px),
+        # cioe' piu' piccoli del francobollo di qui. E miniatura_jpeg
+        # non ingrandisce mai: la "miniatura" usciva della STESSA
+        # misura, cioe' una copia. Che poi nessuno chiede — il _min lo
+        # deriva solo fotoMini, per le foto degli annunci, mentre
+        # avatarImg usa il nome pieno. 75 file inutili in produzione,
+        # e uno in piu' a ogni cambio di foto profilo.
+        if nome.startswith("av_"):
+            continue
         percorso_pieno = os.path.join(FOTO_DIR, nome)
         percorso_min = os.path.join(FOTO_DIR, nome[:-4] + "_min.jpg")
         if (os.path.exists(percorso_min)
@@ -9275,10 +9286,16 @@ def _scrivi_avatar(tg_id: int, nome_nuovo: str):
     con.commit()
     con.close()
     if vecchio and vecchio != nome_nuovo:
-        try:
-            os.remove(os.path.join(FOTO_DIR, vecchio))
-        except OSError:
-            pass
+        # Col francobollo vecchio se ne va anche la _min che gli avatar
+        # non avrebbero mai dovuto avere (ago 2026): finche' la passata
+        # d'avvio gliela faceva, ogni cambio di foto profilo ne lasciava
+        # indietro una — nessuno la chiedeva e nessuno la cancellava.
+        # E' il pattern delle foto degli annunci in modifica().
+        for da_togliere in (vecchio, vecchio[:-4] + "_min.jpg"):
+            try:
+                os.remove(os.path.join(FOTO_DIR, da_togliere))
+            except OSError:
+                pass
 
 
 async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
@@ -14785,18 +14802,19 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
 #   a{id}_{i}.{jpg|png|webp|gif}  scarica_foto    (import da Nostr:
 #                                                  l'estensione viene
 #                                                  dal Content-Type)
-#   av_{negozio}_{ts}[_min].jpg   _salva_avatar   (il _min lo aggiunge
-#                                                  genera_miniature_
-#                                                  mancanti, che passa
-#                                                  su OGNI .jpg della
-#                                                  cartella, avatar
-#                                                  compresi: 75 file
-#                                                  veri in produzione)
+#   av_{negozio}_{ts}[_min].jpg   _salva_avatar   (il _min e' RESIDUO,
+#                                                  vedi qui sotto)
 # — cosi' un file lasciato li' dentro per sbaglio non e' pubblico, e
 # l'insieme di cio' che si serve resta chiuso e derivato.
 # CHI AGGIUNGE UNO SCRITTORE deve aggiungere la sua forma qui, o le
 # sue foto non si vedranno: e' il prezzo — voluto — di non montare
 # una directory.
+# IL `_min` DEGLI AVATAR NON SI PRODUCE PIU' (ago 2026): la passata
+# d'avvio salta i francobolli, e ora quelli vecchi se ne vanno col
+# loro pieno. La forma resta qui solo per i 75 file gia' sul disco in
+# produzione: quando ripulisci_avatar_min.py sara' girato la' sopra,
+# `av_..._min` si puo' togliere dalla regex — insieme al suo caso in
+# prove_foto(), che ci si appoggia.
 # (`\Z` e non `$`: in Python il dollaro combacia anche PRIMA di un
 # a-capo finale, e un nome che arriva da un URL puo' averlo)
 NOME_FOTO = re.compile(

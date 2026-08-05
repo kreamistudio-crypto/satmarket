@@ -1328,10 +1328,13 @@ def prove_foto():
     exec(_SORGENTE[i:_SORGENTE.index("TIPI_FOTO =", i)], amb)
     ammesso = lambda n: bool(amb["NOME_FOTO"].match(n))
 
-    # I nomi VERI, uno per scrittore (gli av_ col _min sono i 75
-    # contati in produzione: li fa genera_miniature_mancanti, che
-    # passa su ogni .jpg della cartella e non solo sugli annunci —
-    # la forma che al primo giro era sfuggita alla tabella)
+    # I nomi VERI, uno per scrittore. L'av_ col _min e' RESIDUO (ago
+    # 2026): li faceva genera_miniature_mancanti passando su ogni .jpg
+    # della cartella e non solo sugli annunci — la forma che al primo
+    # giro era sfuggita alla tabella —, ma non se ne producono piu' e
+    # i 75 di produzione se ne vanno con ripulisci_avatar_min.py.
+    # Quando sara' girato la' sopra, questa riga e la sua forma nella
+    # regex si tolgono insieme.
     for nome in ("a12_0.jpg", "a12_0_min.jpg",
                  "a12_0_1785852876.jpg", "a12_0_1785852876_min.jpg",
                  "a7_1.png", "a7_1.webp", "a7_1.gif", "a7_1_min.jpg",
@@ -1374,6 +1377,78 @@ def prove_foto():
           "secrets.token_hex(" in pezzo("nuovo_codice_negozio"))
 
 
+def prove_avatar():
+    """I francobolli degli avatar non vogliono una miniatura (ago 2026).
+    _salva_avatar li scrive gia' a 128px e miniatura_jpeg non ingrandisce
+    mai: la gemella usciva della STESSA misura, cioe' una copia — e per
+    giunta una copia che nessuno chiede, visto che il nome _min lo deriva
+    solo fotoMini per le foto degli annunci. 75 file inutili in
+    produzione, uno in piu' a ogni cambio di foto profilo."""
+    print("\n[gli avatar non fanno miniature]")
+    import io
+    import tempfile
+
+    # --- la passata d'avvio, girata per davvero -----------------------
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        salta("la passata d'avvio salta i francobolli",
+              "Pillow non e' installata")
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            Image.new("RGB", (800, 600), (200, 120, 40)).save(
+                os.path.join(tmp, "a1_0.jpg"))
+            faccia = "av_0236b74b_1784996031.jpg"
+            Image.new("RGB", (128, 128), (40, 120, 200)).save(
+                os.path.join(tmp, faccia))
+            amb = {"os": os, "io": io, "ImmaginePillow": Image,
+                   "ImageOps": ImageOps, "FOTO_DIR": tmp,
+                   # la riga di riepilogo qui non serve a nessuno: il
+                   # print sta nelle globali, quindi lo trova prima dei
+                   # builtin e la passata resta muta
+                   "print": lambda *a, **k: None}
+            i = _SORGENTE.index("MINIATURA_LATO = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            for f in ("miniatura_jpeg", "_miniatura_da_rifare",
+                      "genera_miniature_mancanti"):
+                exec(pezzo(f), amb)
+            amb["genera_miniature_mancanti"]()
+            c_e = lambda n: os.path.exists(os.path.join(tmp, n))
+            prova("la foto dell'annuncio la miniatura ce l'ha ancora",
+                  True, c_e("a1_0_min.jpg"))
+            prova("il francobollo dell'avatar non ne riceve una",
+                  False, c_e(faccia[:-4] + "_min.jpg"))
+
+    # --- SENTINELLE ---------------------------------------------------
+    prova("sentinella: la passata salta i nomi av_", True,
+          'nome.startswith("av_")' in pezzo("genera_miniature_mancanti"))
+    # cambiando foto profilo se ne va anche la gemella: senza, gli
+    # orfani si riaccumulerebbero uno per cambio, che e' meta' del
+    # guaio da cui e' nato questo cantiere
+    prova("sentinella: col francobollo vecchio se ne va la sua _min",
+          True, "_min.jpg" in pezzo("_scrivi_avatar"))
+
+    # --- la spazzata e la rotta devono dire la stessa cosa -------------
+    # Lo script cancella cio' che la rotta servirebbe: se le due forme
+    # divergessero, resterebbe sul disco proprio la spazzatura pubblica.
+    # (importarlo e' sicuro: il config lo chiede dentro main(), la
+    # regola degli script puri)
+    import ripulisci_avatar_min
+    amb = {"re": re}
+    i = _SORGENTE.index("NOME_FOTO = re.compile")
+    exec(_SORGENTE[i:_SORGENTE.index("TIPI_FOTO =", i)], amb)
+    for nome in ("av_0236b74b_1784996031_min.jpg",
+                 "av_f29bcbf7_1785852876_min.jpg",
+                 "av_XYZ_1_min.jpg", "av__min.jpg", "avatar_min.jpg"):
+        prova(f"la spazzata e la rotta concordano su {nome}",
+              bool(amb["NOME_FOTO"].match(nome)),
+              bool(ripulisci_avatar_min.AVATAR_MIN.match(nome)))
+    # e non si tocca mai un file pieno: quello e' la faccia di qualcuno
+    for nome in ("av_0236b74b_1784996031.jpg", "a12_0_min.jpg"):
+        prova(f"la spazzata lascia stare {nome}", False,
+              bool(ripulisci_avatar_min.AVATAR_MIN.match(nome)))
+
+
 def _codice_rifiuto(funzione, init, errore):
     """Il codice HTTP del rifiuto (401), non il suo testo."""
     try:
@@ -1392,7 +1467,7 @@ def main():
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_foto):
+              prove_initdata, prove_foto, prove_avatar):
         try:
             f()
         except Exception as e:
