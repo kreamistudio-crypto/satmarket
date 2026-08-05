@@ -5243,6 +5243,10 @@ CAMPI_VETRINA = (
     "a.id, a.titolo, a.descrizione, a.categoria, a.prezzo_sats, a.zona, "
     "a.valuta, a.prezzo_eur, "
     "a.consegna, a.spedizione_sats, a.spedizione_eur, a.taglia_pacco, "
+    # la tariffa punto e' un costo di listino, pubblica come le gemelle
+    # (il conto vero lo dice comunque il preventivo, lato server)
+    "a.spedizione_punto_sats, a.spedizione_punto_eur, "
+    "a.spedizione_punto_dichiarata, "
     "a.anche_digitale, a.condizione, a.regione, "
     # la quantita' e' pubblica per natura: il selettore dei pezzi nel
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
@@ -9192,7 +9196,32 @@ async def _compra_set(user: dict, d: dict) -> dict:
             raise HTTPException(400, "Il set non prevede questa modalità "
                                      "di consegna")
         scelta = "spedizione" if "spedizione" in strade else "ritiro"
-    via = "casa"   # la via 'punto' arriva col passo successivo
+
+    # La VIA della spedizione, come nel mono (il venditore del set e'
+    # UNO: una SELECT sola per lo spedizioniere). Lettura prima della
+    # invoice: il patto del ricontrollo senza await non si tocca.
+    via = (str(d.get("spedizione_via") or "casa")).strip().lower()
+    if via not in ("casa", "punto"):
+        con.close()
+        raise HTTPException(400, "Strada di spedizione sconosciuta")
+    punto = " ".join(str(d.get("punto_ritiro") or "").split())[:120]
+    if via == "punto":
+        if scelta != "spedizione":
+            con.close()
+            raise HTTPException(400, "Il punto di ritiro vale solo con "
+                                     "la spedizione")
+        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
+                         (venditore_id,)).fetchone()
+        if not sp or not sp["spedizioniere"]:
+            con.close()
+            raise HTTPException(400, "Questo venditore non spedisce ai "
+                                     "punti di ritiro")
+        if not punto:
+            con.close()
+            raise HTTPException(400, "Indica il punto di ritiro (nome o "
+                                     "indirizzo del punto)")
+    else:
+        punto = ""
 
     # --- Fail-fast di cortesia sullo stock, riga per riga (quello
     # che fa fede e' il ricontrollo dopo la invoice, come nel mono)
@@ -9323,11 +9352,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
-        "cambio_ordine,consegna_scelta,spedizione_sats,protezione_sats,"
-        "quantita) VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "cambio_ordine,consegna_scelta,punto_ritiro,spedizione_sats,"
+        "protezione_sats,quantita) VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         sped, prot, pezzi))
+         punto, sped, prot, pezzi))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     for r in righe:
         con.execute(
@@ -9353,6 +9382,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
             "protezione_sats": prot, "consegna": scelta,
+            "punto_ritiro": punto,
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
                        "titolo": r["titolo"], "quantita": r["quantita"],
@@ -9364,6 +9394,324 @@ async def _compra_set(user: dict, d: dict) -> dict:
 # ripresentarne una con pochi secondi di vita sarebbe una beffa —
 # sotto i ~3 minuti restanti si rinnova e basta.
 RIPRESA_INVOICE_S = 720
+
+
+def _strade_preventivo(annunci: list, spedizioniere: str,
+                       articolo: int, cambio: float,
+                       disponibili: set) -> list:
+    """Le strade del preventivo coi loro totali, nell'ordine FISSO
+    ritiro → casa → punto → digitale. `disponibili` le decide il
+    CHIAMANTE — per il mono le strade dell'annuncio, per il set
+    l'INTERSEZIONE delle fisiche: rifarle qui dall'unione direbbe una
+    strada che il set non offre. `annunci` sono le righe su cui fare
+    il MAX delle tariffe (una sola per il mono); la via 'punto'
+    esiste solo con lo spedizioniere dichiarato (decisione di Andrea:
+    senza rete il compratore scriverebbe un punto inutilizzabile).
+    Una tariffa ancorata all'euro senza cambio = strada che esce con
+    `cambio_assente` e senza numeri: si spegne col motivo, le altre
+    restano comprabili — mai un 503 che spegne anche il ritiro."""
+    fuori = []
+
+    def _entra(v, sped, stima_sped, extra=None):
+        conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
+                              COMMISSIONE_PERCENTO)
+        e = {"via": v, "spedizione_sats": sped,
+             "totale_sats": conto["totale"], "stima": stima_sped}
+        if extra:
+            e.update(extra)
+        fuori.append(e)
+
+    if "ritiro" in disponibili:
+        _entra("ritiro", 0, False)
+    if "spedizione" in disponibili:
+        for v in ("casa", "punto"):
+            if v == "punto" and not spedizioniere:
+                continue
+            sped, stima_sped = 0, False
+            for a in annunci:
+                t_sats, t_eur = _tariffa_dichiarata(a, v)
+                costo = _sped_in_sats(t_sats, t_eur, cambio)
+                if costo is None:
+                    sped = None
+                    break
+                if t_eur > 0:
+                    stima_sped = True
+                sped = max(sped, costo)
+            extra = ({"fallback_casa": not any(
+                a["spedizione_punto_dichiarata"] for a in annunci)}
+                if v == "punto" else None)
+            if sped is None:
+                e = {"via": v, "cambio_assente": True}
+                if extra:
+                    e.update(extra)
+                fuori.append(e)
+            else:
+                _entra(v, sped, stima_sped, extra)
+    if "digitale" in disponibili:
+        _entra("digitale", 0, False)
+    if not fuori:
+        # Annuncio storico senza modalita': il flusso di sempre, una
+        # pseudo-strada '' — il client non disegna la scelta e il body
+        # di compra non porta consegna.
+        _entra("", 0, False)
+    return fuori
+
+
+@app.post("/api/orders/preventivo")
+async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il conto della pagina d'acquisto (ago 2026), PER OGNI strada
+    disponibile in una chiamata sola. Stesso body di compra (mono o
+    righe), ma NON CREA NULLA: niente invoice, niente INSERT, nessun
+    DML — nemmeno il timbro dell'offerta scaduta, che spetta a compra.
+    La matematica e' quella delle pure del conto: preventivo e invoice
+    devono dire la stessa cifra per costruzione. I listini EUR sono
+    una stima al cambio di adesso (`stima`): il totale vero si fissa
+    con la invoice, come sempre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if not d.get("annuncio_id") and isinstance(d.get("righe"), list):
+        return await _preventivo_set(user, d)
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
+                    (d.get("annuncio_id"),)).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(404, "Annuncio non disponibile")
+    if a["venditore_id"] == user["id"]:
+        con.close()
+        raise HTTPException(400, "Non puoi comprare il tuo stesso annuncio")
+    if _asta(a):
+        con.close()
+        raise HTTPException(400, "Questo oggetto è all'asta: si "
+                                 "aggiudica puntando, non si compra a "
+                                 "prezzo fisso")
+    try:
+        richiesti = max(1, int(d.get("quantita") or 1))
+    except (TypeError, ValueError):
+        richiesti = 1
+    # Il fail-fast dello stock, di cortesia come in compra: la pagina
+    # avvisa subito, e il ricontrollo vero resta quello della invoice.
+    disponibile = a["quantita"] - _riservati(con, a["id"])
+    if richiesti > disponibile:
+        con.close()
+        if disponibile < 1:
+            raise HTTPException(409, "Qualcun altro sta già pagando questo "
+                                     "oggetto: se il suo pagamento non va "
+                                     "in porto tornerà disponibile tra "
+                                     "pochi minuti")
+        raise HTTPException(400, f"Ne restano solo {disponibile}: scegli "
+                                 f"una quantità più piccola")
+    # L'offerta accettata, con le guardie di compra ma SENZA il DML
+    # della scaduta (quel timbro spetta a compra: qui solo un 400
+    # con lo stesso testo).
+    off = None
+    if d.get("offerta_id"):
+        off = con.execute(
+            "SELECT * FROM offerte WHERE id=? AND compratore_id=? AND "
+            "annuncio_id=? AND stato='accettata'",
+            (d["offerta_id"], user["id"], a["id"])).fetchone()
+        if not off:
+            con.close()
+            raise HTTPException(404, "Offerta non trovata o non più valida")
+        if 0 < off["scadenza"] < int(time.time()):
+            con.close()
+            raise HTTPException(400, "Il tempo per pagare questa offerta "
+                                     "è finito: l'offerta è scaduta")
+    sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
+                     (a["venditore_id"],)).fetchone()
+    spedizioniere = sp["spedizioniere"] if sp else ""
+    con.close()
+    # Il cambio, UNA volta: obbligatorio per il listino EUR (503 come
+    # in compra), facoltativo per le sole tariffe ancorate (la strada
+    # esce spenta col motivo, le altre vivono).
+    listino_eur = a["valuta"] == "eur" and a["prezzo_eur"] > 0
+    cambio = 0.0
+    if (listino_eur or a["spedizione_eur"] > 0
+            or a["spedizione_punto_eur"] > 0):
+        cambio = await cambio_btc_eur()
+        if listino_eur and cambio <= 0:
+            raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                     "questo momento: riprova tra qualche "
+                                     "minuto")
+    adesso = int(time.time())
+    unitario = _unitario_effettivo(a, off, adesso, cambio)
+    if (listino_eur and TETTO_SATS_ANNUNCIO
+            and unitario > TETTO_SATS_ANNUNCIO * 1.2):
+        # Il tetto di rodaggio, col 409 di compra ma SENZA la notifica
+        # al venditore: questa e' un'anteprima, non un acquisto.
+        raise HTTPException(409, "Il cambio è cambiato troppo da quando "
+                                 "l'annuncio è stato pubblicato: il "
+                                 "venditore deve ritoccare il prezzo")
+    articolo = unitario * richiesti
+    conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
+                          COMMISSIONE_PERCENTO)
+    disponibili = set()
+    if a["consegna"] in ("spedizione", "entrambe"):
+        disponibili.add("spedizione")
+    if a["consegna"] in ("ritiro", "entrambe"):
+        disponibili.add("ritiro")
+    if a["consegna"] == "digitale" or a["anche_digitale"]:
+        disponibili.add("digitale")
+    return {"set": False, "quantita": richiesti,
+            "articolo_sats": articolo, "articolo_unitario_sats": unitario,
+            "protezione_sats": conto["protezione"],
+            "commissione_sats": conto["commissione"],
+            "stima": listino_eur,
+            "spedizioniere": spedizioniere,
+            "strade": _strade_preventivo([a], spedizioniere, articolo,
+                                         cambio, disponibili)}
+
+
+async def _preventivo_set(user: dict, d: dict) -> dict:
+    """Il ramo SET del preventivo: le guardie di _compra_set in sola
+    lettura, il conto dalle stesse pure. Le strade del set restano
+    quelle FISICHE (intersezione), col punto in piu' se lo
+    spedizioniere e' dichiarato."""
+    grezze = d.get("righe") or []
+    if not isinstance(grezze, list) or len(grezze) < 2:
+        raise HTTPException(400, "Un set ha almeno due oggetti diversi: "
+                                 "per uno solo c'è l'acquisto di sempre")
+    if len(grezze) > MAX_RIGHE_SET:
+        raise HTTPException(400, f"Un set può avere al massimo "
+                                 f"{MAX_RIGHE_SET} oggetti diversi")
+    richieste, offerte_chieste = {}, {}
+    for r in grezze:
+        try:
+            aid = int(r.get("annuncio_id") or 0)
+            qta = max(1, int(r.get("quantita") or 1))
+            off_id = int(r.get("offerta_id") or 0)
+        except (TypeError, ValueError, AttributeError):
+            raise HTTPException(400, "Righe del set non leggibili")
+        if aid <= 0 or aid in richieste:
+            raise HTTPException(400, "Righe del set non leggibili")
+        richieste[aid] = qta
+        if off_id:
+            offerte_chieste[aid] = off_id
+    con = db()
+    seg = ",".join("?" * len(richieste))
+    tutti = {a["id"]: a for a in con.execute(
+        f"SELECT * FROM annunci WHERE id IN ({seg})",
+        tuple(richieste)).fetchall()}
+    for aid in richieste:
+        a = tutti.get(aid)
+        if not a or a["stato"] != "attivo":
+            con.close()
+            titolo = a["titolo"][:40] if a else "Uno degli oggetti"
+            raise HTTPException(404, f"«{titolo}» non è più disponibile: "
+                                     f"toglilo dal set e riprova")
+        if _asta(a):
+            con.close()
+            raise HTTPException(400, f"«{a['titolo'][:40]}» è all'asta: "
+                                     f"si aggiudica da solo, fuori dal set")
+    venditori = {a["venditore_id"] for a in tutti.values()}
+    if len(venditori) > 1:
+        con.close()
+        raise HTTPException(400, "Un set contiene solo oggetti dello "
+                                 "stesso venditore")
+    venditore_id = venditori.pop()
+    if venditore_id == user["id"]:
+        con.close()
+        raise HTTPException(400, "Non puoi comprare i tuoi stessi annunci")
+    origini = {(a["contatto_nostr"] or "") for a in tutti.values()}
+    if len(origini) > 1:
+        con.close()
+        raise HTTPException(400, "Questi oggetti non arrivano tutti dallo "
+                                 "stesso posto: si comprano uno per volta")
+    # L'intersezione delle strade fisiche, coi 400 di _compra_set
+    strade = {"spedizione", "ritiro"}
+    for a in tutti.values():
+        sue = set()
+        if a["consegna"] in ("spedizione", "entrambe"):
+            sue.add("spedizione")
+        if a["consegna"] in ("ritiro", "entrambe"):
+            sue.add("ritiro")
+        if not sue:
+            con.close()
+            if a["consegna"] == "digitale":
+                raise HTTPException(400, f"«{a['titolo'][:40]}» si consegna "
+                    f"solo come codice online: si compra da solo, "
+                    f"fuori dal set")
+            raise HTTPException(400, f"«{a['titolo'][:40]}» non dichiara "
+                f"una modalità di consegna: si compra da solo, "
+                f"fuori dal set")
+        strade &= sue
+    if not strade:
+        con.close()
+        raise HTTPException(400, "Questi oggetti non viaggiano insieme: "
+                                 "uno si consegna solo a mano e un altro "
+                                 "solo con la spedizione")
+    for aid, qta in richieste.items():
+        a = tutti[aid]
+        disponibile = a["quantita"] - _riservati(con, aid)
+        if qta > disponibile:
+            con.close()
+            if disponibile < 1:
+                raise HTTPException(409, f"Qualcun altro sta già pagando "
+                    f"«{a['titolo'][:40]}»: togli quel pezzo dal set o "
+                    f"riprova tra pochi minuti")
+            raise HTTPException(400, f"Di «{a['titolo'][:40]}» ne restano "
+                                     f"solo {disponibile}: scegli una "
+                                     f"quantità più piccola")
+    offerte = {}
+    for aid, off_id in offerte_chieste.items():
+        off = con.execute(
+            "SELECT * FROM offerte WHERE id=? AND compratore_id=? AND "
+            "annuncio_id=? AND stato='accettata'",
+            (off_id, user["id"], aid)).fetchone()
+        if not off:
+            con.close()
+            raise HTTPException(404, "Offerta non trovata o non più valida")
+        if 0 < off["scadenza"] < int(time.time()):
+            con.close()
+            raise HTTPException(400, f"Il tempo per pagare l'offerta su "
+                                     f"«{tutti[aid]['titolo'][:40]}» è "
+                                     f"finito: l'offerta è scaduta")
+        offerte[aid] = off
+    sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
+                     (venditore_id,)).fetchone()
+    spedizioniere = sp["spedizioniere"] if sp else ""
+    con.close()
+    listino_eur = any(a["valuta"] == "eur" and a["prezzo_eur"] > 0
+                      for a in tutti.values())
+    cambio = 0.0
+    if listino_eur or any(a["spedizione_eur"] > 0
+                          or a["spedizione_punto_eur"] > 0
+                          for a in tutti.values()):
+        cambio = await cambio_btc_eur()
+        if listino_eur and cambio <= 0:
+            raise HTTPException(503, "Il cambio euro non è disponibile in "
+                                     "questo momento: riprova tra qualche "
+                                     "minuto")
+    adesso = int(time.time())
+    righe, articolo = [], 0
+    pezzi = 0
+    for aid, qta in richieste.items():
+        a = tutti[aid]
+        unitario = _unitario_effettivo(a, offerte.get(aid), adesso, cambio)
+        if (a["valuta"] == "eur" and a["prezzo_eur"] > 0
+                and TETTO_SATS_ANNUNCIO
+                and unitario > TETTO_SATS_ANNUNCIO * 1.2):
+            raise HTTPException(409, f"Il cambio è cambiato troppo per "
+                                     f"«{a['titolo'][:40]}»: il "
+                                     f"venditore deve ritoccare il "
+                                     f"prezzo")
+        articolo += unitario * qta
+        pezzi += qta
+        righe.append({"annuncio_id": aid, "titolo": a["titolo"],
+                      "quantita": qta, "unitario_sats": unitario})
+    conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
+                          COMMISSIONE_PERCENTO)
+    return {"set": True, "quantita": pezzi,
+            "articolo_sats": articolo,
+            "protezione_sats": conto["protezione"],
+            "commissione_sats": conto["commissione"],
+            "stima": listino_eur,
+            "spedizioniere": spedizioniere,
+            "strade": _strade_preventivo(list(tutti.values()),
+                                         spedizioniere, articolo,
+                                         cambio, strade),
+            "righe": righe}
 
 
 @app.post("/api/orders")
@@ -9432,7 +9780,40 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         scelta = ("spedizione" if "spedizione" in disponibili
                   else "ritiro" if "ritiro" in disponibili
                   else "digitale")
-    via = "casa"   # la via 'punto' arriva col passo successivo
+
+    # La VIA della spedizione (ago 2026, pagina d'acquisto): 'casa' e'
+    # il default — i client di ieri non mandano il campo e per loro
+    # nulla cambia — 'punto' e' la spedizione a un punto di ritiro,
+    # che esige TRE cose: la spedizione scelta, il venditore con lo
+    # spedizioniere dichiarato (senza rete il compratore scriverebbe
+    # un punto inutilizzabile) e il punto scritto. Il punto e' testo
+    # libero del compratore: strip, spazi collassati, tetto 120 — e
+    # NON va mai interpolato nell'HTML delle notifiche (si legge
+    # nell'ordine, dove il client lo passa da esc()). La SELECT dello
+    # spedizioniere sta QUI, prima della invoice: il patto del
+    # ricontrollo senza await non si tocca.
+    via = (str(d.get("spedizione_via") or "casa")).strip().lower()
+    if via not in ("casa", "punto"):
+        con.close()
+        raise HTTPException(400, "Strada di spedizione sconosciuta")
+    punto = " ".join(str(d.get("punto_ritiro") or "").split())[:120]
+    if via == "punto":
+        if scelta != "spedizione":
+            con.close()
+            raise HTTPException(400, "Il punto di ritiro vale solo con "
+                                     "la spedizione")
+        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
+                         (a["venditore_id"],)).fetchone()
+        if not sp or not sp["spedizioniere"]:
+            con.close()
+            raise HTTPException(400, "Questo venditore non spedisce ai "
+                                     "punti di ritiro")
+        if not punto:
+            con.close()
+            raise HTTPException(400, "Indica il punto di ritiro (nome o "
+                                     "indirizzo del punto)")
+    else:
+        punto = ""
 
     # LA RIPRESA (ago 2026): il compratore pentito che RITENTA non e'
     # un rivale — il messaggio d'attesa resta SOLO per gli altri, che
@@ -9453,6 +9834,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                              (mio["id"],)).fetchone()
         stessa = (mio["quantita"] == richiesti
                   and mio["consegna_scelta"] == scelta
+                  # anche il punto: cambiarlo (o passare casa<->punto)
+                  # e' una richiesta diversa — la tariffa puo' cambiare
+                  and (mio["punto_ritiro"] or "") == punto
                   and (legame["id"] if legame else 0)
                   == int(d.get("offerta_id") or 0))
         viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
@@ -9467,6 +9851,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "spedizione_sats": mio["spedizione_sats"],
                     "protezione_sats": mio["protezione_sats"],
                     "consegna": mio["consegna_scelta"],
+                    "punto_ritiro": mio["punto_ritiro"],
                     "quantita": mio["quantita"],
                     "articolo_unitario_sats": art // (mio["quantita"] or 1),
                     "offerta_id": legame["id"] if legame else 0,
@@ -9649,12 +10034,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,spedizione_sats,protezione_sats,quantita) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "consegna_scelta,punto_ritiro,spedizione_sats,protezione_sats,"
+        "quantita) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
-         cambio_ordine, scelta, sped, prot, richiesti))
+         cambio_ordine, scelta, punto, sped, prot, richiesti))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
@@ -9669,6 +10054,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
             "protezione_sats": prot, "consegna": scelta,
+            "punto_ritiro": punto,
             "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
 
@@ -9855,6 +10241,12 @@ async def _incassa_ordine(ordine_id: int) -> dict:
             msg += ("\n\n🟣 Questo annuncio è pubblicato anche su <b>Nostr</b>: "
                     "ricordati di segnarlo come <b>venduto (sold)</b> dal tuo "
                     "client, così nessun altro proverà a comprarlo lì.")
+    if o["punto_ritiro"]:
+        # Coda STATICA, mai il testo del compratore dentro l'HTML
+        # della notifica (parse_mode HTML: un «<» la spegnerebbe).
+        # Il punto scritto si legge nell'ordine, dove passa da esc().
+        msg += ("\n\n📦 Il compratore ha scelto la <b>spedizione a un "
+                "punto di ritiro</b>: trovi il punto nell'ordine.")
     await notifica(o["venditore_id"], msg)
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
@@ -13626,8 +14018,12 @@ def _purga_lavori():
 
 
 MODELLO_IMPORT = (
+    # spedizione_punto (ago 2026): la tariffa verso un punto di
+    # ritiro, IN CODA cosi' i file di ieri passano intonsi (le
+    # colonne si leggono per nome). Cella vuota = non dichiarata,
+    # vale la tariffa di `spedizione`; 0 = gratis al punto.
     "titolo;descrizione;prezzo;valuta;categoria;zona;foto;"
-    "consegna;spedizione;taglia;condizione;quantita\n"
+    "consegna;spedizione;taglia;condizione;quantita;spedizione_punto\n"
     "Tastiera meccanica 60%;Come nuova, switch rossi, scatola "
     "originale;35000;sats;Elettronica;Milano;;spedizione;450;piccolo;"
     "come nuovo;\n"
@@ -13645,9 +14041,12 @@ MODELLO_IMPORT = (
     # invece resta VUOTA di proposito: negli alimenti (e in «Bellezza e
     # benessere») non si chiede, e una cella che il server butta via
     # insegnerebbe una cosa falsa a chi compila il file
+    # ...e la tariffa punto: verso un punto di ritiro il miele viaggia
+    # a 4,50 invece di 6,00 (vale solo se nel Profilo hai dichiarato
+    # lo spedizioniere)
     "Miele di castagno 500g;Produzione propria 2026, vasetto in "
     "vetro;12,00;eur;Alimenti e bevande;Cuneo;;spedizione;6,00;piccolo;"
-    ";12\n"
+    ";12;4,50\n"
     "Crema mani alla calendula;Vasetto 50ml, produzione artigianale;"
     "9,00;eur;Bellezza e benessere;Bergamo;;spedizione;4,00;busta;;30\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
