@@ -7614,6 +7614,313 @@ def statistiche_admin(x_tg_init_data: str = Header(""),
                             "registro_totale": registro_totale}}
 
 
+# --- Lo stato delle leve (ago 2026) ----------------------------------
+# Le leve vivono nel config del VPS, e fino a oggi l'unico modo di
+# sapere cosa fosse ACCESO in produzione era entrare nel server: e'
+# gia' successo di ricordare male. Qui il pannello dei moderatori dice
+# il valore con cui il processo sta girando ADESSO.
+#
+# «ADESSO» E' LA PAROLA CHE CONTA, ed e' il motivo per cui questa
+# pagina non si sostituisce con una lettura di config_esempio.py: si
+# leggono i GLOBALI del modulo, cioe' il valore gia' risolto fra la
+# riga del config e il default del codice. E' esattamente la trappola
+# di MAX_PREFERITI — default 10 nel codice, ma una riga esplicita nel
+# config del VPS vince su di lui e il tetto nuovo non entra mai in
+# vigore. Un elenco di default sarebbe una seconda bugia da leggere.
+#
+# SI GUARDA E BASTA. Nessuna scrittura, nessun endpoint di modifica, e
+# non e' pigrizia: una leva che si accende da un telefono e' una leva
+# che si accende per sbaglio — ASTA_ABILITATA, IMPORT_NOSTR_APERTO e
+# AUTO_SBLOCCO_ATTIVO nascono spente nel CODICE proprio perche' il
+# gesto costi qualcosa. Si cambia sul VPS e si riavvia, che e' anche il
+# momento in cui si rilegge il commento della leva.
+#
+# I SEGRETI NON ESCONO MAI, ed e' la regola da non ammorbidire: non le
+# chiavi LNbits, non il token del bot, non la nsec, non il segreto del
+# webhook, non l'id del canale, non il percorso del database. Dove il
+# segreto E' l'interruttore (senza nsec, Nostr e' spento) esce il solo
+# FATTO — acceso o spento — chiesto alla STESSA guardia che usa il
+# server, mai al valore: `_NOSTR is not None` e `webhook_attivo()`
+# rispondono «funziona?», che e' la domanda giusta e non rivela nulla.
+# Il NOME della chiave invece esce apposta: e' quello che serve per
+# andarla a cambiare, ed e' scritto in chiaro in config_esempio.py.
+def _leva(nome, chiave, valore, spento="", acceso="", allarme=False):
+    """Una riga del censimento.
+
+    La nota compare SOLO nello stato che la merita — `spento` quando la
+    leva e' spenta (False o 0), `acceso` quando e' accesa: settanta
+    righe di spiegazione tutte insieme sono un muro, e in un muro non
+    si legge piu' niente. `allarme` lo decide il chiamante, perche' il
+    valore che fa paura non e' sempre lo stesso: MODALITA_COLLAUDO
+    spaventa accesa, ORE_INITDATA spenta."""
+    riga = {"nome": nome, "chiave": chiave, "valore": valore}
+    nota = acceso if valore else spento
+    if nota:
+        riga["nota"] = nota
+    if allarme:
+        riga["allarme"] = True
+    return riga
+
+
+def _elenco(valori):
+    """Una leva che e' una LISTA (le durate d'asta, i chip dello sconto)
+    diventa una stringa da leggere: il client rende numeri, booleani e
+    testo — non array, che vorrebbero una quarta resa per una riga."""
+    return " · ".join(str(v) for v in valori)
+
+
+def _leve_stato():
+    """Il censimento, raggruppato per cantiere e ordinato per
+    conseguenza: prima cio' che apre porte o muove soldi, poi le regole
+    del mercatino, in fondo i limiti e gli avvisi di servizio."""
+    return [
+        {"gruppo": "🚦 Sicurezza", "voci": [
+            _leva("Modalità collaudo", "MODALITA_COLLAUDO",
+                  bool(MODALITA_COLLAUDO), allarme=bool(MODALITA_COLLAUDO),
+                  acceso="in produzione va SPENTA: accesa, l'header "
+                         "«collaudo:111» apre l'account di chiunque senza "
+                         "una firma"),
+            _leva("Scadenza dell'initData (ore)", "ORE_INITDATA",
+                  ORE_INITDATA, allarme=not ORE_INITDATA,
+                  spento="un initData catturato apre quell'account per "
+                         "sempre: è il freno d'emergenza, non una scelta"),
+            _leva("Ricerche AI per utente all'ora", "TETTO_RICERCHE_AI_ORA",
+                  TETTO_RICERCHE_AI_ORA,
+                  spento="nessun freno: ogni ricerca è una chiamata ad "
+                         "Anthropic, e un ciclo banale brucia il credito"),
+            _leva("Bot in ascolto (webhook)", "TELEGRAM_WEBHOOK_SEGRETO",
+                  webhook_attivo(),
+                  spento="il bot manda e basta: niente /start, niente "
+                         "tastiere ✅/❌ sulla revisione, niente fusione "
+                         "Nostr→Telegram"),
+            _leva("Moderatori", "ADMIN_IDS", len(ADMIN_IDS),
+                  allarme=not ADMIN_IDS,
+                  spento="nessuno riceve gli avvisi e nessuno può "
+                         "decidere una disputa"),
+        ]},
+        {"gruppo": "🔒 Escrow e denaro", "voci": [
+            _leva("Auto-sblocco dei sats", "AUTO_SBLOCCO_ATTIVO",
+                  bool(AUTO_SBLOCCO_ATTIVO),
+                  spento="nessun timer sposta sats: al posto dello sblocco "
+                         "parte il promemoria al compratore, e al tetto la "
+                         "segnalazione ai moderatori. Le due finestre del "
+                         "digitale restano armate lo stesso",
+                  acceso="i sats partono da soli allo scadere delle finestre "
+                         "fisiche: vanno rimessi i testi scritti sul mondo "
+                         "disarmato (l'elenco dei posti è in CLAUDE.md)"),
+            _leva("Commissione (%)", "COMMISSIONE_PERCENTO",
+                  COMMISSIONE_PERCENTO,
+                  spento="sospesa: il venditore incassa tutto il netto"),
+            _leva("Protezione acquisti (%)", "PROTEZIONE_PERCENTO",
+                  PROTEZIONE_PERCENTO,
+                  spento="al conto del compratore non si aggiunge niente"),
+            _leva("Tetto di prezzo per annuncio (sats)",
+                  "TETTO_SATS_ANNUNCIO", TETTO_SATS_ANNUNCIO,
+                  spento="nessun limite di prezzo"),
+            _leva("Cifratura dei codici digitali",
+                  "CHIAVE_CONTENUTI_DIGITALI",
+                  bool(CHIAVE_CONTENUTI_DIGITALI and Fernet is not None),
+                  spento="i codici consegnati restano in chiaro nel "
+                         "database: tutto funziona uguale, protegge meno "
+                         "un backup rubato"),
+            _leva("La ronda del libro mastro", "CONTROLLO_LIBRO_MASTRO",
+                  bool(CONTROLLO_LIBRO_MASTRO),
+                  spento="gli invarianti non si controllano più da soli: "
+                         "restano le query a mano di query_libro_mastro.sql"),
+        ]},
+        {"gruppo": "⏱ Tempi e promemoria", "voci": [
+            _leva("Conferma dopo la consegna (ore)", "ORE_CONFERMA",
+                  ORE_CONFERMA),
+            _leva("Silenzio dopo la spedizione (giorni)",
+                  "GIORNI_AUTO_SBLOCCO", GIORNI_AUTO_SBLOCCO),
+            _leva("Digitale: dopo la rivelazione (ore)",
+                  "ORE_CONFERMA_DIGITALE", ORE_CONFERMA_DIGITALE),
+            _leva("Digitale: consegnato e mai letto (ore)",
+                  "ORE_SILENZIO_DIGITALE", ORE_SILENZIO_DIGITALE),
+            _leva("Ogni quanto si ribussa (giorni)",
+                  "PROMEMORIA_CONFERMA_GIORNI", PROMEMORIA_CONFERMA_GIORNI,
+                  spento="TUTTI i promemoria sono spenti, anche quelli al "
+                         "venditore: è la leva del passo, e senza passo non "
+                         "si ribussa a nessuno"),
+            _leva("Promemoria ignorati prima dei moderatori",
+                  "PROMEMORIA_CONFERMA_MAX", PROMEMORIA_CONFERMA_MAX),
+            _leva("Merce mai partita: primo squillo (giorni)",
+                  "PROMEMORIA_SPEDIZIONE_GIORNI", PROMEMORIA_SPEDIZIONE_GIORNI,
+                  spento="l'ordine pagato e mai spedito non squilla a "
+                         "nessuno"),
+            _leva("Codice mai consegnato: primo squillo (ore)",
+                  "PROMEMORIA_DIGITALE_ORE", PROMEMORIA_DIGITALE_ORE,
+                  spento="il codice mai consegnato non squilla a nessuno"),
+            _leva("Sollecito degli incassi fermi (giorni)",
+                  "SOLLECITO_INCASSO_GIORNI", SOLLECITO_INCASSO_GIORNI,
+                  spento="il venditore senza metodo d'incasso non viene più "
+                         "sollecitato: i sats restano fermi in silenzio"),
+            _leva("Solleciti prima dei moderatori", "SOLLECITO_INCASSO_MAX",
+                  SOLLECITO_INCASSO_MAX),
+        ]},
+        {"gruppo": "🔨 Aste", "voci": [
+            _leva("Aste", "ASTA_ABILITATA", bool(ASTA_ABILITATA),
+                  spento="niente aste nuove né puntate: nella nav il "
+                         "martelletto porta al «presto disponibile». "
+                         "Chiusure, ritiri e riscossioni delle aste già "
+                         "vive continuano — i sats non sono mai ostaggio "
+                         "di una leva"),
+            _leva("Rilancio automatico (proxy)", "ASTA_PROXY_ATTIVO",
+                  bool(ASTA_PROXY_ATTIVO),
+                  spento="si punta solo a puntata secca; il motore continua "
+                         "a esporre per i proxy già vivi"),
+            _leva("Durate offerte (giorni)", "ASTA_DURATE_GIORNI",
+                  _elenco(ASTA_DURATE_GIORNI)),
+            _leva("Rilancio minimo (%)", "ASTA_INCREMENTO_PERCENTO",
+                  ASTA_INCREMENTO_PERCENTO),
+            _leva("Proroga anti-cecchino (minuti)", "ASTA_PROROGA_MINUTI",
+                  ASTA_PROROGA_MINUTI),
+            _leva("Aste vive per venditore", "ASTA_MAX_ATTIVE_VENDITORE",
+                  ASTA_MAX_ATTIVE_VENDITORE),
+        ]},
+        {"gruppo": "⚡ Offerta lampo", "voci": [
+            _leva("Offerte lampo", "LAMPO_ATTIVE", bool(LAMPO_ATTIVE),
+                  spento="il venditore non può più lanciare sconti a tempo "
+                         "(le lampo già vive scadono da sole)"),
+            _leva("Sconti proposti (%)", "LAMPO_SCONTI", _elenco(LAMPO_SCONTI)),
+            _leva("Sconto minimo (%)", "LAMPO_MIN_PERCENTO", LAMPO_MIN_PERCENTO),
+            _leva("Sconto massimo (%)", "LAMPO_MAX_PERCENTO", LAMPO_MAX_PERCENTO),
+            _leva("Durate proposte (ore)", "ORE_LAMPO_OPZIONI",
+                  _elenco(ORE_LAMPO_OPZIONI)),
+            _leva("Lanci per annuncio in 7 giorni", "MAX_LAMPO_SETTIMANA",
+                  MAX_LAMPO_SETTIMANA),
+            _leva("Cooldown «ha fatto colpo» (giorni)", "GIORNI_COLPO",
+                  GIORNI_COLPO),
+        ]},
+        {"gruppo": "🎁 Sconto carrello", "voci": [
+            _leva("Sconto carrello", "SCONTO_PACCO_ATTIVO",
+                  bool(SCONTO_PACCO_ATTIVO),
+                  spento="nessun venditore può premiare chi compra più "
+                         "cose, e le regole già salvate non scattano"),
+            _leva("Soglie proposte (articoli)", "SCONTO_PACCO_SOGLIE",
+                  _elenco(SCONTO_PACCO_SOGLIE)),
+            _leva("Sconti proposti (%)", "SCONTO_PACCO_SCONTI",
+                  _elenco(SCONTO_PACCO_SCONTI)),
+            _leva("Soglia minima (articoli)", "SCONTO_PACCO_MIN_SOGLIA",
+                  SCONTO_PACCO_MIN_SOGLIA),
+            _leva("Sconto massimo (%)", "SCONTO_PACCO_MAX_PERCENTO",
+                  SCONTO_PACCO_MAX_PERCENTO),
+        ]},
+        {"gruppo": "💰 Offerte e 🌴 ferie", "voci": [
+            _leva("Offerta minima (% del listino)",
+                  "OFFERTA_MINIMA_PERCENTO", OFFERTA_MINIMA_PERCENTO),
+            _leva("Tempo per rispondere (ore)", "ORE_RISPOSTA_OFFERTA",
+                  ORE_RISPOSTA_OFFERTA),
+            _leva("Tempo per pagare (ore)", "ORE_PAGAMENTO_OFFERTA",
+                  ORE_PAGAMENTO_OFFERTA),
+            _leva("Tentativi per annuncio", "MAX_OFFERTE_ANNUNCIO",
+                  MAX_OFFERTE_ANNUNCIO),
+            _leva("Negozio in ferie", "FERIE_ATTIVE", bool(FERIE_ATTIVE),
+                  spento="nessuno può chiudere la bottega (chi è già in "
+                         "ferie rientra lo stesso alla sua data)"),
+            _leva("Ferie: quanto in là (giorni)", "FERIE_MAX_GIORNI",
+                  FERIE_MAX_GIORNI),
+            _leva("Ferie: preavviso di rientro (ore)", "FERIE_PREAVVISO_ORE",
+                  FERIE_PREAVVISO_ORE,
+                  spento="nessun «domani riapri» al venditore"),
+        ]},
+        {"gruppo": "💾 Consegna digitale", "voci": [
+            _leva("Tetto per compratori nuovi (sats)",
+                  "TETTO_DIGITALE_NUOVI", TETTO_DIGITALE_NUOVI,
+                  spento="chi non ha mai concluso un acquisto compra "
+                         "digitale senza limite di cifra"),
+            _leva("Vendite minime per vendere digitale",
+                  "DIGITALE_MIN_VENDITE", DIGITALE_MIN_VENDITE,
+                  spento="chiunque può pubblicare codici e buoni"),
+        ]},
+        {"gruppo": "🛡 Moderazione", "voci": [
+            _leva("Terza via (il dubbio va in revisione)",
+                  "MODERAZIONE_REVISIONE", bool(MODERAZIONE_REVISIONE),
+                  spento="si torna al binario di ieri: un dubbio dell'AI "
+                         "vale come un divieto e l'annuncio non nasce"),
+            _leva("Attesa dichiarata al venditore (ore)",
+                  "REVISIONE_ATTESA_ORE", REVISIONE_ATTESA_ORE),
+            _leva("Sollecito ai moderatori (giorni)",
+                  "REVISIONE_SOLLECITO_GIORNI", REVISIONE_SOLLECITO_GIORNI,
+                  spento="la coda in attesa non ci richiama più (gli "
+                         "annunci restano comunque fermi: mai online da "
+                         "soli)"),
+            _leva("Categorie proposte dopo ogni import",
+                  "RICATEGORIZZA_AUTO", bool(RICATEGORIZZA_AUTO),
+                  spento="la coda «Categorie da sistemare» non si riempie "
+                         "più da sola: restano ricategorizza.py e "
+                         "sposta_a_mano.py"),
+        ]},
+        {"gruppo": "🟣 Nostr e canali", "voci": [
+            _leva("Import aperto da Nostr", "IMPORT_NOSTR_APERTO",
+                  bool(IMPORT_NOSTR_APERTO),
+                  acceso="il server apre account per venditori che non ci "
+                         "conoscono e manda loro un DM di benvenuto. È "
+                         "anche l'interruttore d'emergenza: False e riavvia"),
+            _leva("Barattolo pubblica su Nostr",
+                  "NOSTR_NSEC_PIATTAFORMA", _NOSTR is not None,
+                  spento="gli annunci non escono come eventi NIP-99 (manca "
+                         "la nsec della piattaforma, o coincurve)"),
+            _leva("Post automatici", "POST_AUTOMATICI", bool(POST_AUTOMATICI),
+                  spento="i nuovi annunci non vengono raccontati da nessuna "
+                         "parte (il ciclo di vita dei post già fatti "
+                         "continua)"),
+            _leva("Canale Telegram", "TELEGRAM_CANALE_ID",
+                  bool(TELEGRAM_CANALE_ID),
+                  spento="niente post sul canale; la nota Nostr vive lo "
+                         "stesso"),
+            _leva("Post singoli all'ora", "POST_MAX_ORA", POST_MAX_ORA),
+        ]},
+        {"gruppo": "🏷️ Vetrina e limiti", "voci": [
+            _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
+                  acceso="il cartello si apre una volta al giorno per "
+                         "dispositivo, e la fascia resta sotto la vetrina"),
+            _leva("Bottone del canale nel cartello", "BANNER_TEST_LINK",
+                  bool(BANNER_TEST_LINK),
+                  spento="il cartello non porta nessun bottone (e la fascia "
+                         "non finge di essere toccabile)"),
+            _leva("Contatore dei pionieri", "CONTATORE_UTENTI",
+                  bool(CONTATORE_UTENTI),
+                  spento="la riga «N pionieri» non compare in vetrina"),
+            _leva("«Pubblicato N giorni fa» fino a (giorni)",
+                  "GIORNI_DATA_ANNUNCIO", GIORNI_DATA_ANNUNCIO,
+                  spento="la data non si mostra mai nel dettaglio"),
+            _leva("Annunci nel barattolo", "MAX_PREFERITI", MAX_PREFERITI),
+            _leva("Pezzi per annuncio", "MAX_QUANTITA_ANNUNCIO",
+                  MAX_QUANTITA_ANNUNCIO),
+            _leva("Annunci diversi in un carrello", "MAX_RIGHE_SET",
+                  MAX_RIGHE_SET),
+        ]},
+        {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
+            _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
+                  bool(AVVISI_ISCRITTI),
+                  spento="non sapete più chi entra"),
+            _leva("Avvisi singoli all'ora", "AVVISI_ISCRITTI_MAX_ORA",
+                  AVVISI_ISCRITTI_MAX_ORA),
+            _leva("Polso degli ordini", "AVVISI_ORDINI_ADMIN",
+                  bool(AVVISI_ORDINI_ADMIN),
+                  spento="nessuna riga quando un ordine nasce o si chiude"),
+            _leva("Termometro delle sottocategorie",
+                  "TERMOMETRO_SOTTOCATEGORIE", bool(TERMOMETRO_SOTTOCATEGORIE),
+                  spento="il lunedì non arriva più il report degli annunci "
+                         "senza sottocategoria"),
+            _leva("Termometro: sotto questi vuoti tace",
+                  "TERMOMETRO_SOTTOCATEGORIE_MINIMO",
+                  TERMOMETRO_SOTTOCATEGORIE_MINIMO),
+        ]},
+    ]
+
+
+@app.get("/api/admin/leve")
+def leve_admin(x_tg_init_data: str = Header(""),
+               barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: con quali leve sta girando il server, adesso."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    return {"gruppi": _leve_stato()}
+
+
 @app.post("/api/admin/utenti/{tg_id}/messaggio")
 async def messaggio_utente_admin(tg_id: int, req: Request,
                                  x_tg_init_data: str = Header(""),

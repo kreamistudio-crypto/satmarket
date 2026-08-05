@@ -1088,11 +1088,45 @@
   .acc-b{display:none;padding:0 14px 14px}
   .acc.open .acc-b{display:block}
   /* Nel pannello dei moderatori i cassetti tengono cio' che e' GIA'
-     successo — le decisioni prese, il registro: aperto resta solo cio'
-     che aspetta una decisione.
-     Il margine e' quello delle sezioni vicine, non i 10px
+     successo (le decisioni prese, il registro) e cio' che si consulta
+     (lo stato delle leve): aperto resta solo cio' che aspetta una
+     decisione. Il margine e' quello delle sezioni vicine, non i 10px
      di serie: qui i cassetti stanno in fila con dei section-label. */
   #adminStats .acc{margin-top:22px}
+
+  /* ---------- ⚙️ stato delle leve (ago 2026) ----------
+     Settanta righe fitte: il nome a sinistra con sotto la chiave da
+     andare a cambiare sul VPS, il valore a destra incolonnato. */
+  .leva-gruppo{font:800 11.5px 'Nunito',sans-serif;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.4px;padding:16px 0 4px}
+  .leva-gruppo:first-child{padding-top:2px}
+  .leva-riga{display:flex;gap:10px;align-items:flex-start;padding:9px 0;
+    border-bottom:1px solid var(--line-soft)}
+  .leva-riga:last-child{border-bottom:0}
+  .leva-testo{flex:1 1 auto;min-width:0}
+  .leva-nome{font-size:13px;font-weight:700;line-height:1.25}
+  /* Il nome della chiave e' la parte OPERATIVA della riga — e' quello
+     che si va a cambiare sul VPS — quindi non scende sotto gli 11px:
+     il resto dell'app non ha testo piu' piccolo di cosi'. */
+  .leva-chiave{font-family:'JetBrains Mono',monospace;font-size:11px;
+    color:var(--muted);font-weight:600;word-break:break-all}
+  .leva-nota{font-size:11.5px;color:var(--muted);font-weight:600;
+    line-height:1.35;margin-top:4px}
+  .leva-val{flex:0 0 auto;white-space:nowrap;font-family:'JetBrains Mono',
+    monospace;font-size:13px;font-weight:800;color:var(--sats-deep);
+    padding-top:1px}
+  .leva-si,.leva-no{display:inline-block;padding:2px 9px;border-radius:999px;
+    font:800 11px 'Nunito',sans-serif}
+  .leva-si{background:var(--trust-soft);color:var(--trust-text)}
+  .leva-no{background:var(--off-bg);color:var(--muted)}
+  /* L'allarme non e' la nota: la nota spiega, questo grida. Vale per
+     il valore che fa paura, che non e' sempre lo stesso — il collaudo
+     acceso, la scadenza dell'initData spenta. */
+  .leva-riga.allarme .leva-nome{color:var(--danger)}
+  .leva-riga.allarme .leva-nota{color:var(--danger)}
+  .leva-riga.allarme .leva-si,.leva-riga.allarme .leva-no,
+  .leva-riga.allarme .leva-val{background:var(--warn-bg);color:var(--danger)}
+  .leva-riga.allarme .leva-val{border-radius:999px;padding:2px 9px}
 
   /* le pillole del tema nel cassetto Aspetto: gemelle di quelle del
      canale avvisi, ma statiche nel markup (il tema e' solo client) */
@@ -11867,6 +11901,15 @@ async function loadAdminStats(){
       if (rc.ok) gruppiCat = (await rc.json()).gruppi || [];
     } catch(e) {}
     gruppiCat.forEach(g => { g.esclusi = new Set(); g.tutti = false; });
+    /* con che leve sta girando il server: si chiede SEMPRE (è una
+       risposta senza database, e un allarme lo si vuole vedere
+       proprio nel giro in cui non lo si stava cercando) */
+    let leve = [];
+    try {
+      const rl = await fetch(`${API_BASE}/admin/leve`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rl.ok) leve = (await rl.json()).gruppi || [];
+    } catch(e) {}
     const card = (emoji, valore, nome) => `
       <div style="background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px;text-align:center">
         <div style="font-size:20px">${emoji}</div>
@@ -11934,6 +11977,7 @@ async function loadAdminStats(){
         </div>
         <div id="admUtenteEsiti"></div>
       </div>
+      ${boxLeve(leve)}
       <button class="btn ghost" style="margin-top:10px" onclick="trattamiDaNuovo()"
         title="Azzera le dismissioni degli hint su questo dispositivo: il cartello del rodaggio, il tour di benvenuto e la checklist tornano come alla prima visita. Annunci, ordini e profilo non si toccano.">🧽 Trattami da nuovo — riarma gli hint</button>`;
   } catch(e) { box.innerHTML = ''; }
@@ -12186,9 +12230,10 @@ async function decidiCategorie(i, esito){
 
 /* ---- i cassetti del pannello dei moderatori (ago 2026) ----
    Il pannello mostra APERTO solo cio' che aspetta una decisione. Quel
-   che e' gia' successo — le decisioni prese, il registro — sta in un
-   cassetto CHIUSO: lo storico non sparisce (serve a chi ha deciso per
-   sbaglio), ma smette di ingombrare la coda di chi decide adesso.
+   che e' gia' successo — le decisioni prese, il registro — e quel che
+   si consulta — lo stato delle leve — sta in un cassetto CHIUSO: lo
+   storico non sparisce (serve a chi ha deciso per sbaglio), ma smette
+   di ingombrare la coda di chi deve decidere adesso.
    NASCONO CHIUSI e RESTANO come li lasci: il pannello si ridisegna
    INTERO a ogni decisione, e senza memoria un cassetto aperto si
    richiuderebbe sotto le dita di chi sta ancora sistemando. Il Set
@@ -12232,6 +12277,46 @@ function registroModerazione(mod){
           <span style="color:var(--muted);font-weight:600"> — ${esc(v.esito)}${v.motivo?` (${esc(v.motivo)})`:''} · ${v.strato}${v.deciso_da?` · admin ${v.deciso_da}`:''} · ${new Date(v.creato*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</span>
         </div>`).join('')}
     </div>`);
+}
+
+/* ---- ⚙️ Stato delle leve (ago 2026) ----
+   Le leve vivono nel config del VPS, e per sapere cosa fosse acceso in
+   produzione bisognava entrare nel server: e' gia' successo di
+   ricordare male. Qui c'e' il valore con cui il server sta girando
+   ADESSO — mai il default del codice, mai un segreto (dove il segreto
+   E' l'interruttore esce il solo fatto: acceso o spento).
+   SI GUARDA E BASTA: si cambia dal VPS e con un riavvio.
+   L'ALLARME ESCE ANCHE DAL CASSETTO CHIUSO, ed e' il motivo per cui la
+   conta non dice sempre lo stesso: un cartello «modalità collaudo
+   accesa» che si vede solo aprendo un cassetto e' un cartello che non
+   vede nessuno. */
+function boxLeve(gruppi){
+  if (!gruppi || !gruppi.length) return '';
+  let quante = 0, allarmi = 0;
+  const corpo = gruppi.map(g => {
+    const righe = (g.voci||[]).map(v => {
+      quante++;
+      if (v.allarme) allarmi++;
+      const val = typeof v.valore === 'boolean'
+        ? `<span class="${v.valore?'leva-si':'leva-no'}">${v.valore?'Acceso':'Spento'}</span>`
+        : esc(typeof v.valore === 'number' && Number.isInteger(v.valore)
+              ? fmt(v.valore) : String(v.valore));
+      return `
+        <div class="leva-riga${v.allarme?' allarme':''}">
+          <div class="leva-testo">
+            <div class="leva-nome">${esc(v.nome)}</div>
+            <div class="leva-chiave">${esc(v.chiave)}</div>
+            ${v.nota?`<div class="leva-nota">${esc(v.nota)}</div>`:''}
+          </div>
+          <div class="leva-val">${val}</div>
+        </div>`;
+    }).join('');
+    return `<div class="leva-gruppo">${esc(g.gruppo)}</div>${righe}`;
+  }).join('');
+  return cassettoAdm('accAdmLeve', '⚙️', 'Stato delle leve',
+    allarmi ? `⚠️ ${allarmi} da guardare` : `${quante} leve`, `
+    <div class="sub">Il valore con cui il server sta girando <b>adesso</b>. Si guarda e basta: si cambia nel <b>config del VPS</b>, poi un riavvio.</div>
+    ${corpo}`);
 }
 
 /* La decisione dalla Mini App: stesso cuore della tastiera Telegram

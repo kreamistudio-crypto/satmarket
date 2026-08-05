@@ -3832,6 +3832,180 @@ def prove_coorti_titoli():
 
 
 # ====================================================================
+class _ConfigFinto(dict):
+    """Un config finto dove le chiavi che NON abbiamo messo a mano
+    valgono 7 — un numero qualunque.
+
+    Serve a non tenere allineato un elenco di settanta nomi: una leva
+    aggiunta domani entra da sola nel censimento senza rompere niente.
+    SE LA PROVA ESPLODE con un TypeError su _elenco, la leva nuova e'
+    una LISTA: mettila a mano qui sotto accanto alle altre."""
+
+    def __missing__(self, nome):
+        # I builtins vanno lasciati passare: con __missing__ definito
+        # la ricerca di un nome globale non arriva MAI da sola fino a
+        # loro, e senza questa riga perfino `bool` varrebbe 7.
+        import builtins
+        if hasattr(builtins, nome):
+            raise KeyError(nome)
+        return 7
+
+
+# I segreti veri, con un valore riconoscibile a occhio: se uno di
+# questi finisce nel censimento, la prova lo trova nel JSON. Il
+# nome della chiave invece PUO' uscire (serve per andarla a
+# cambiare, ed e' scritto in chiaro in config_esempio.py): a essere
+# controllato e' il VALORE.
+_SEGRETI_FINTI = {
+    "BOT_TOKEN": "SEGRETO-token-del-bot",
+    "ANTHROPIC_API_KEY": "SEGRETO-chiave-anthropic",
+    "LNBITS_URL": "SEGRETO-url-lnbits",
+    "LNBITS_INVOICE_KEY": "SEGRETO-invoice-key",
+    "LNBITS_ADMIN_KEY": "SEGRETO-admin-key",
+    "NOSTR_NSEC_PIATTAFORMA": "SEGRETO-nsec-piattaforma",
+    "TELEGRAM_WEBHOOK_SEGRETO": "SEGRETO-webhook",
+    "TELEGRAM_CANALE_ID": "SEGRETO-canale",
+    "CHIAVE_CONTENUTI_DIGITALI": "SEGRETO-contenuti",
+    "DB": "SEGRETO-percorso-database",
+}
+
+
+def _censimento(acceso):
+    """Gira il censimento con tutte le leve accese o tutte spente, e
+    restituisce (voci per chiave, JSON di tutto)."""
+    import json
+    amb = _ConfigFinto(_SEGRETI_FINTI)
+    amb["__builtins__"] = __builtins__
+    # Le leve che sono LISTE: _elenco ci itera sopra.
+    for nome in ("ASTA_DURATE_GIORNI", "LAMPO_SCONTI", "ORE_LAMPO_OPZIONI",
+                 "SCONTO_PACCO_SOGLIE", "SCONTO_PACCO_SCONTI"):
+        amb[nome] = [1, 2, 3]
+    # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
+    # roba da mostrare, nemmeno a un moderatore.
+    amb["ADMIN_IDS"] = [111111111, 222222222]
+    # Le leve booleane e i numeri che l'interruttore governa.
+    for nome in ("MODALITA_COLLAUDO", "AUTO_SBLOCCO_ATTIVO",
+                 "ASTA_ABILITATA", "ASTA_PROXY_ATTIVO", "LAMPO_ATTIVE",
+                 "SCONTO_PACCO_ATTIVO", "FERIE_ATTIVE", "BANNER_TEST",
+                 "BANNER_TEST_LINK", "CONTATORE_UTENTI", "POST_AUTOMATICI",
+                 "IMPORT_NOSTR_APERTO", "RICATEGORIZZA_AUTO",
+                 "MODERAZIONE_REVISIONE", "AVVISI_ISCRITTI",
+                 "AVVISI_ORDINI_ADMIN", "TERMOMETRO_SOTTOCATEGORIE",
+                 "CONTROLLO_LIBRO_MASTRO", "ORE_INITDATA",
+                 "TETTO_RICERCHE_AI_ORA", "COMMISSIONE_PERCENTO",
+                 "PROTEZIONE_PERCENTO", "TETTO_SATS_ANNUNCIO",
+                 "SOLLECITO_INCASSO_GIORNI", "PROMEMORIA_CONFERMA_GIORNI",
+                 "PROMEMORIA_SPEDIZIONE_GIORNI", "PROMEMORIA_DIGITALE_ORE",
+                 "REVISIONE_SOLLECITO_GIORNI", "FERIE_PREAVVISO_ORE",
+                 "GIORNI_DATA_ANNUNCIO", "TETTO_DIGITALE_NUOVI",
+                 "DIGITALE_MIN_VENDITE"):
+        amb[nome] = acceso and 24
+    # I due che dipendono da un pacchetto oltre che dalla chiave.
+    amb["Fernet"] = object() if acceso else None
+    amb["_NOSTR"] = ("chiave", "pubkey") if acceso else None
+    if not acceso:
+        amb["TELEGRAM_WEBHOOK_SEGRETO"] = ""
+        amb["TELEGRAM_CANALE_ID"] = ""
+        amb["CHIAVE_CONTENUTI_DIGITALI"] = ""
+        amb["ADMIN_IDS"] = []
+    for f in ("webhook_attivo", "_leva", "_elenco", "_leve_stato"):
+        exec(pezzo(f), amb)
+    gruppi = amb["_leve_stato"]()
+    voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
+    return gruppi, voci, json.dumps(gruppi, default=str, ensure_ascii=False)
+
+
+def prove_leve():
+    """Lo stato delle leve nel pannello admin (ago 2026).
+
+    Due cose sole, e la prima e' la ragione per cui la pagina puo'
+    esistere: che il valore DETTO sia quello con cui il server sta
+    girando, e che nessun segreto esca mai — nemmeno quando e' il
+    segreto stesso a fare da interruttore."""
+    print("\n[stato delle leve]")
+    gruppi_on, voci_on, json_on = _censimento(True)
+    gruppi_off, voci_off, json_off = _censimento(False)
+
+    # --- 1) I SEGRETI, che e' il punto di tutto -------------------
+    for chiave, valore in _SEGRETI_FINTI.items():
+        prova(f"il valore di {chiave} non esce (leve accese)",
+              True, valore not in json_on)
+        prova(f"il valore di {chiave} non esce (leve spente)",
+              True, valore not in json_off)
+    prova("nessun id di moderatore nel censimento", True,
+          "111111111" not in json_on and "222222222" not in json_on)
+    prova("i moderatori escono come CONTEGGIO", 2, voci_on["ADMIN_IDS"]["valore"])
+    # Il segreto che E' l'interruttore: esce il fatto, mai la chiave.
+    prova("Nostr acceso col fatto, non con la nsec",
+          True, voci_on["NOSTR_NSEC_PIATTAFORMA"]["valore"])
+    prova("Nostr spento senza nsec",
+          False, voci_off["NOSTR_NSEC_PIATTAFORMA"]["valore"])
+    prova("webhook: acceso col segreto vero",
+          True, voci_on["TELEGRAM_WEBHOOK_SEGRETO"]["valore"])
+    prova("webhook: spento senza segreto",
+          False, voci_off["TELEGRAM_WEBHOOK_SEGRETO"]["valore"])
+    prova("cifratura dei codici: accesa con chiave e pacchetto",
+          True, voci_on["CHIAVE_CONTENUTI_DIGITALI"]["valore"])
+    prova("cifratura dei codici: spenta senza chiave",
+          False, voci_off["CHIAVE_CONTENUTI_DIGITALI"]["valore"])
+    prova("canale Telegram: solo acceso/spento",
+          (True, False), (voci_on["TELEGRAM_CANALE_ID"]["valore"],
+                          voci_off["TELEGRAM_CANALE_ID"]["valore"]))
+    prova("il percorso del database non e' una leva",
+          False, "DB" in voci_on)
+
+    # --- 2) LA FORMA ---------------------------------------------
+    prova("ogni gruppo ha delle voci", True,
+          all(g["voci"] for g in gruppi_on) and len(gruppi_on) >= 8)
+    prova("ogni voce ha nome, chiave e valore", True,
+          all(v.get("nome") and v.get("chiave") and "valore" in v
+              for v in voci_on.values()))
+    prova("le chiavi sono nomi di config, non valori", True,
+          all(c.isupper() or c.startswith("_") for c in voci_on))
+    prova("acceso e spento censiscono le stesse leve",
+          set(voci_on), set(voci_off))
+
+    # --- 3) LA NOTA COMPARE SOLO DOVE SERVE ----------------------
+    # Settanta righe di spiegazione tutte insieme sono un muro.
+    prova("l'auto-sblocco spiega il disarmo quando e' spento", True,
+          "gesto umano" in voci_off["AUTO_SBLOCCO_ATTIVO"].get("nota", "")
+          or "timer" in voci_off["AUTO_SBLOCCO_ATTIVO"].get("nota", ""))
+    prova("e acceso dice l'altra cosa (i testi da rimettere)", True,
+          "testi" in voci_on["AUTO_SBLOCCO_ATTIVO"].get("nota", ""))
+    prova("la commissione spiega solo da sospesa", True,
+          "nota" in voci_off["COMMISSIONE_PERCENTO"]
+          and "nota" not in voci_on["COMMISSIONE_PERCENTO"])
+    prova("le durate d'asta non hanno niente da spiegare", True,
+          "nota" not in voci_on["ASTA_DURATE_GIORNI"])
+
+    # --- 4) L'ALLARME, che e' un'altra cosa dalla nota -------------
+    # Il valore che fa paura non e' sempre lo stesso: il collaudo
+    # spaventa ACCESO, la scadenza dell'initData SPENTA.
+    prova("collaudo acceso = allarme", True,
+          voci_on["MODALITA_COLLAUDO"].get("allarme", False))
+    prova("collaudo spento = nessun allarme", False,
+          voci_off["MODALITA_COLLAUDO"].get("allarme", False))
+    prova("initData senza scadenza = allarme", True,
+          voci_off["ORE_INITDATA"].get("allarme", False))
+    prova("initData con scadenza = nessun allarme", False,
+          voci_on["ORE_INITDATA"].get("allarme", False))
+    prova("nessun moderatore = allarme", True,
+          voci_off["ADMIN_IDS"].get("allarme", False))
+
+    # --- 5) SI GUARDA E BASTA -------------------------------------
+    # Una leva che si accende da un telefono e' una leva che si
+    # accende per sbaglio: le tre che nascono spente nel codice
+    # vogliono un gesto sul VPS, e qui non deve nascere una scorciatoia.
+    prova("nessuna rotta che SCRIVE le leve", True,
+          '@app.post("/api/admin/leve' not in _SORGENTE
+          and '@app.put("/api/admin/leve' not in _SORGENTE)
+    i = _SORGENTE.index("def leve_admin(")
+    corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+    prova("la rotta e' riservata ai moderatori", True,
+          "e_admin" in corpo and "403" in corpo)
+
+
+# ====================================================================
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -3853,7 +4027,7 @@ def main():
               prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_sconto_pacco, prove_forma_sconto_pacco,
-              prove_libro_mastro,
+              prove_libro_mastro, prove_leve,
               prove_consegna_payload_punto, prove_pagina_acquisto):
         try:
             f()
