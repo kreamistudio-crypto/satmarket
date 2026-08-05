@@ -2408,6 +2408,51 @@ async def importo_invoice(bolt11: str) -> int | None:
     return int(dec.get("amount_msat", 0)) // 1000
 
 
+# I domini che servono indirizzi BIP-353, cioe' via DNS e non via
+# HTTPS (ago 2026). Phoenix e' il caso vero da cui e' nata questa
+# voce: il suo «indirizzo» somiglia in tutto a un Lightning address,
+# ma dentro non c'e' un LNURL — c'e' un record TXT col numero di
+# un'offerta BOLT12, che il nostro nodo non sa pagare (verificato
+# sull'API di LNbits: zero occorrenze di bolt12). L'elenco e' corto di
+# proposito: serve a scegliere le PAROLE di un errore, mai a muovere
+# un sat.
+DOMINI_BIP353 = ("phoenixwallet.me", "phoenix.acinq.co")
+
+
+def diagnosi_ln_address(dominio: str) -> str:
+    """Perche' quell'indirizzo non ha risposto, in una parola:
+    'bip353' (parla un'altra lingua) | 'inesistente' (il dominio non
+    c'e': quasi sempre un refuso) | 'muto' (c'e' un server, ma il
+    LNURL no). Serve SOLO a scegliere le parole di un errore, mai a
+    muovere un sat.
+
+    I due casi si tengono SEPARATI perche' i consigli sono opposti:
+    a chi ha un indirizzo Phoenix si dice «non hai sbagliato a
+    scriverlo», e dirlo a chi invece ha scritto «walletofsatosi.com»
+    sarebbe la stessa bugia di prima, al contrario. Per questo un
+    dominio che non risolve NON si dichiara BIP-353, anche se e'
+    tecnicamente vero che un LNURL non potra' mai servirlo: dei due
+    perche' possibili, il refuso e' di gran lunga il piu' comune."""
+    if dominio in DOMINI_BIP353:
+        return "bip353"
+    try:
+        socket.getaddrinfo(dominio, 443)
+        return "muto"
+    except Exception:
+        return "inesistente"
+
+
+# Il consiglio a chi resta senza incassi automatici. Vive in un posto
+# solo perche' lo dicono DUE errori diversi e devono dire la stessa
+# cosa — con un esempio concreto e il come, non un rimprovero.
+CONSIGLIO_LNURL = (
+    "Per gli incassi automatici serve un Lightning address LNURL: il "
+    "più semplice è Wallet of Satoshi — installi l'app e in «Receive» "
+    "trovi già pronto il tuo nome@walletofsatoshi.com. Oppure lascia "
+    "vuoto questo campo e incolla una invoice a mano quando vendi."
+)
+
+
 async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
     """INCASSO AUTOMATICO: dato il Lightning address del venditore
     (es. mario@walletofsatoshi.com), chiede al suo wallet una invoice
@@ -11193,9 +11238,28 @@ async def salva_ln_address(req: Request, x_tg_init_data: str = Header(""),
             raise HTTPException(400, "Formato non valido: dev'essere tipo nome@wallet.com")
         # Verifica dal vivo: il wallet risponde e accetta almeno 100 sats?
         if not await invoice_da_ln_address(addr, 100):
+            # PERCHE' due messaggi (ago 2026): un indirizzo Phoenix e'
+            # scritto benissimo, semplicemente parla un'altra lingua —
+            # e dirgli «controlla di averlo scritto giusto» lo manda a
+            # caccia di un refuso che non esiste. Il primo messaggio
+            # spiega, il secondo resta quello di sempre; tutti e due
+            # finiscono col CONSIGLIO, che e' l'unica cosa che serve
+            # davvero a chi e' rimasto senza incassi.
+            perche = diagnosi_ln_address(addr.split("@")[-1])
+            if perche == "bip353":
+                raise HTTPException(400,
+                    "Questo è un indirizzo BIP-353 (è il tipo che usa "
+                    "Phoenix): funziona via DNS, non via LNURL, e "
+                    "Barattolo non lo sa ancora pagare. Non hai "
+                    f"sbagliato a scriverlo. {CONSIGLIO_LNURL}")
+            if perche == "inesistente":
+                raise HTTPException(400,
+                    f"Il dominio «{addr.split('@')[-1]}» non esiste: "
+                    "quasi sempre è un carattere sbagliato. "
+                    f"{CONSIGLIO_LNURL}")
             raise HTTPException(400,
-                "Questo Lightning address non risponde: controlla di averlo "
-                "scritto giusto (lo trovi nel tuo wallet, tipo nome@walletofsatoshi.com)")
+                "Questo Lightning address non risponde: controlla di "
+                f"averlo scritto giusto. {CONSIGLIO_LNURL}")
 
     con = db()
     con.execute("UPDATE utenti SET ln_address=? WHERE tg_id=?",

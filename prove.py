@@ -2142,6 +2142,63 @@ def prove_barattolo():
               visti, sorted(visti))
 
 
+def prove_bip353():
+    """Perche' un Lightning address non ha risposto (ago 2026, dal
+    caso vero di Phoenix). Un indirizzo BIP-353 e' scritto benissimo:
+    parla via DNS invece che via LNURL, e il vecchio «controlla di
+    averlo scritto giusto» mandava a caccia di un refuso inesistente.
+    La cosa da NON rompere e' che i tre casi restino tre: dire «non
+    hai sbagliato» a chi ha scritto «walletofsatosi.com» sarebbe la
+    stessa bugia di prima, al contrario.
+    Il DNS qui e' FINTO: una prova che interroga la rete vera diventa
+    rossa quando un dominio altrui ha il raffreddore."""
+    print("\n[l'indirizzo che non risponde]")
+
+    class _SocketFinto:
+        """Risolve solo i domini che gli diciamo noi."""
+        VIVI = {"walletofsatoshi.com", "demo.lnbits.com",
+                "phoenix.acinq.co"}
+
+        def getaddrinfo(self, host, porta):
+            if host not in self.VIVI:
+                raise OSError("Name or service not known")
+            return [(2, 1, 6, "", ("1.2.3.4", porta))]
+
+    amb = {"socket": _SocketFinto()}
+    i = _SORGENTE.index("DOMINI_BIP353 = ")
+    exec(_SORGENTE[i:_SORGENTE.index(
+        "\n\n\n", _SORGENTE.index("def diagnosi_ln_address"))], amb)
+    diagnosi = amb["diagnosi_ln_address"]
+
+    prova("Phoenix sul dominio DNS puro", "bip353",
+          diagnosi("phoenixwallet.me"))
+    # phoenix.acinq.co un server ce l'ha (e' il sito vetrina): senza
+    # l'elenco finirebbe fra i «muti» e nessuno capirebbe perche'
+    prova("Phoenix sul dominio col sito vetrina", "bip353",
+          diagnosi("phoenix.acinq.co"))
+    prova("un LNURL vero e' solo muto", "muto",
+          diagnosi("walletofsatoshi.com"))
+    prova("LNbits e' solo muto", "muto", diagnosi("demo.lnbits.com"))
+    # IL CASO CHE CONTA: un refuso NON si dichiara BIP-353, o gli si
+    # direbbe «non hai sbagliato a scriverlo» proprio mentre ha
+    # sbagliato a scriverlo
+    prova("un refuso resta un refuso", "inesistente",
+          diagnosi("walletofsatosi.com"))
+
+    # Il consiglio e' uno solo e lo dicono tutti e tre gli errori: se
+    # si sfilacciasse, due utenti nello stesso guaio leggerebbero due
+    # cose diverse
+    i = _SORGENTE.index("CONSIGLIO_LNURL = (")
+    consiglio = _SORGENTE[i:_SORGENTE.index(")\n", i)]
+    prova("il consiglio nomina un wallet CONCRETO", True,
+          "Wallet of Satoshi" in consiglio)
+    prova("...e dice come si fa", True, "Receive" in consiglio)
+    prova("...e lascia la via della invoice a mano", True,
+          "invoice" in consiglio)
+    prova("tutti e tre gli errori lo portano", 3,
+          _SORGENTE.count("{CONSIGLIO_LNURL}"))
+
+
 def prove_forma_tracking():
     """L'euristica sulla forma del codice (ago 2026): riconosce i
     formati tipici dei corrieri in elenco e — soprattutto — NON blocca
@@ -2781,7 +2838,7 @@ def main():
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
-              prove_forma_tracking, prove_conta_feedback,
+              prove_forma_tracking, prove_bip353, prove_conta_feedback,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_consegna_payload_punto, prove_pagina_acquisto):
         try:
