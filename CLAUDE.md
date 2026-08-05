@@ -3278,6 +3278,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   spesa in corso svuota come sempre ma ora col toast «Carrello nuovo:
   è di un venditore alla volta…» — è il modello, non un errore, e in
   silenzio sembrava roba sparita.
+  IL CARRELLO A UNA RIGA VA FINO IN FONDO (ago 2026, decisione di
+  Andrea): «Controlla e paga» con un solo articolo non blocca più con
+  l'invito a comprare dalla scheda. Il set a una riga resta
+  INESISTENTE per il server (2..MAX_RIGHE_SET, in _compra_set E nel
+  preventivo: guardia dei soldi, non si ammorbidisce) — la strada è il
+  BINARIO MONO DIETRO LE QUINTE: `apriAcquistoSet` con una riga passa
+  il testimone ad `apriAcquisto` (qtaScelta dal carrello, il passamano
+  dello stepper del dettaglio) e da lì pagina Paga, ordine e invoice
+  sono quelli di sempre — offerte, lampo, ripresa del pentito e NWC
+  funzionano gratis. `caricaPreventivoPacco` con una riga manda il
+  body MONO (le chiavi della risposta sono le stesse e renderControlla
+  non se ne accorge): il riepilogo dice comunque il conto del SERVER,
+  mai la stima. La guardia `< 2` di startBuySet resta come cintura di
+  un varco che con una riga non si imbocca più.
   I SOLO-DIGITALI SONO FUORI DALLA GRIGLIA di composizione (ago 2026):
   non entreranno mai nel carrello per regola, e una cella spenta per
   sempre non è un'informazione — è rumore. renderPacco li filtra
