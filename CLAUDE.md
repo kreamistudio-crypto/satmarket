@@ -3041,6 +3041,83 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   intero: far pagare l'uscita scoraggia le puntate, il costo vero è
   solo il routing); aste multi-pezzo e Compralo subito (fuori dalla
   v1).
+  IL PROXY A BUDGET DEPOSITATO (ago 2026, nato dagli utenti): chi
+  punta può depositare il suo MASSIMO e lasciare che il sistema
+  rilanci per lui. È la versione SENZA mandati di spesa — la strada
+  «proxy via NWC» è stata valutata e scartata: mandato di spesa
+  complesso, e un wallet muto a metà gara lascerebbe una puntata
+  fantasma — perché il budget è GIÀ nel deposito di garanzia: il
+  proxy non versa mai niente, ESPONE il minimo necessario pescando
+  dal versato. Nasce la distinzione VERSATO (il budget, SEGRETO) vs
+  ESPOSTO (`offerto_sats`, la puntata in gara): invariante nuova
+  `versato >= offerto`, uguali quando `puntate.proxy=0` — e per le
+  manuali NON cambia niente, che è la prova regina del collaudo (la
+  partita tutta-manuale identica a ieri, byte per byte).
+  IL MOTORE è `esposizioni_proxy` (pura accanto a conto_chiusura):
+  la CAPACITÀ che gareggia è il versato, ranking (versato, saldo_seq,
+  id) — lo stesso tie-break di _leader_asta, e la coerenza dei due
+  giudici sul campo post-motore è provata in CI; manuale: esposto =
+  versato; proxy non in testa: esposto = versato (ha provato e perso:
+  «budget esaurito», da lì è indistinguibile da una manuale); proxy
+  in testa: min(versato, max(base, rilancio_minimo(versato del
+  secondo))), senza un secondo la base. NESSUN esposto scende MAI
+  (monotone: il ritiro di un rivale non richiede ricalcoli, il motore
+  è già un punto fisso) ed è IDEMPOTENTE: due proxy convergono in UNA
+  passata contabile dentro il saldo che l'ha scatenata — niente
+  rincorsa di pagamenti, niente proroga eterna. Gira nel blocco senza
+  await di verifica_rilancio (PRIMA di testa_dopo: proroga, notifiche
+  e payload dicono la verità post-convergenza) e in coda al ramo
+  puntate di esegui_fusione, DOPO la chiusura delle auto-puntate.
+  TRE FUGHE DEL MASSIMO chiuse prima di nascere, ed è la parte da
+  ricordare quando si tocca qualcosa: 1) la CRONOLOGIA leggeva
+  `rilanci.offerto_sats` = il totale dichiarato, che per una fattura
+  proxy È il budget — ora legge `rilanci.esposto_sats`, scritto al
+  saldo post-motore (backfill = offerto per le righe di ieri, tutte
+  manuali); 2) la notifica «Nuova puntata» al venditore diceva
+  `ril['offerto_sats']` — ora dice l'esposto di testa_dopo, ed è MUTA
+  sul top-up del leader (per lui non è successo niente); 3) il
+  racconto di chiusura diceva il versato in quattro punti — ora dice
+  l'esposto, che è il prezzo dell'ordine. Il flag proxy e il versato
+  escono dal server SOLO in `mia` (stato_asta) e nelle righe di
+  mie_puntate: pubblico e venditore NON distinguono mai una puntata
+  proxy da una manuale.
+  LA PROROGA HA UNA GUARDIA NUOVA: proroga solo se il saldante non
+  era già leader o se (id, esposto) della testa è cambiato. Senza, il
+  TOP-UP del leader (lecito: proxy=1 e totale>versato, il minimo non
+  si applica — sale il massimo segreto, l'esposto no) comprerebbe
+  proroghe a costo ZERO, perché la sua fattura è rimborsabile per
+  costruzione (eccedenza). I rialzi automatici non prorogano mai e
+  sono SILENZIOSI: il proxy esiste per non guardare l'asta, squilla
+  solo il «budget esaurito» (la notifica «superato» arricchita) — il
+  patto dei solleciti.
+  L'ECCEDENZA: alla chiusura il vincitore paga l'ESPOSTO
+  (crea_ordine_pagato riceve offerto_sats) e `conto_chiusura` mette
+  la differenza nel registro con motivo 'eccedenza' — INVARIANTE
+  aggiornata: Σ delta saldati = esposto della vincitrice + Σ registro.
+  A gara viva il leader proxy può RITIRARLA (`POST /api/aste/{id}/
+  ritira-eccedenza`, fuori dai gate delle leve come il ritiro): UNA
+  volta per asta, la puntata torna SECCA (proxy=0, versato=offerto)
+  e su quell'asta il proxy non si riaccende — «scesa l'eccedenza non
+  risale», e la fusione lo rispetta (un'eccedenza ritirata su una
+  metà forza proxy=0 sul superstite). I motivi sono DUE APPOSTA
+  ('eccedenza_ritiro' e 'eccedenza'), ognuno col suo indice parziale
+  UNIQUE: un motivo solo, con la fusione che riaccende il proxy,
+  farebbe IGNORARE la riga di chiusura dall'indice = sats mai
+  rimborsati in silenzio. La fusione inoltre non scrive più
+  `offerto=somma` (sarebbe la fuga del massimo): versato = somma
+  delle attive, esposto = MAX degli esposti attivi, proxy = OR, e il
+  motore rimette in riga.
+  LEVA `ASTA_PROXY_ATTIVO`, FALSE nel codice e in config_esempio:
+  gatea le sole puntate proxy NUOVE (il motore continua per i proxy
+  vivi — i sats non sono mai ostaggio di una leva). STRATEGIA
+  D'ACCENSIONE (decisione di Andrea): resta spenta ANCHE quando
+  ASTA_ABILITATA si accenderà — il proxy parte solo a gara manuale
+  rodata. Frontend: pillole «Puntata secca» / «🤖 Rilancia per me
+  fino a…» nel foglio puntata (solo a leva accesa, via
+  asta_leve.proxy_attivo), stato personale con esposto + budget
+  residuo «(lo vedi solo tu)», «➕ Aggiungi budget» e «🕊 Ritira
+  l'eccedenza» per il leader proxy, righe di «Le tue puntate» col
+  residuo. In DEMO niente leva = niente pillole, coerente.
   Quantità in stock (lug 2026, il mattone del futuro «set»): colonne
   `annunci.quantita` (pezzi disponibili ADESSO, default 1: gli storici
   restano un pezzo solo) e `ordini.quantita`. INVARIANTE: venduto <=>
