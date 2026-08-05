@@ -1388,16 +1388,22 @@
      (le barre dei browser mobili), vh come ripiego; il padding in
      basso porta la safe-area della gesture bar. Su schermi corti i
      bottoni seguono il contenuto, mai coperti. */
-  #view-controllapacco.active{display:flex;flex-direction:column;
-    min-height:100vh;min-height:100dvh}
+  #view-controllapacco.active,#view-acquisto.active{display:flex;
+    flex-direction:column;min-height:100vh;min-height:100dvh}
   .ctrl-corpo{padding:6px var(--pad) calc(26px + env(safe-area-inset-bottom));
     max-width:520px;margin:0 auto;width:100%;
     display:flex;flex-direction:column;flex:1 1 auto}
-  .ctrl-corpo #ctrlAcquista{margin-top:auto}
+  /* i bottoni del fondo vivono in un contenitore UNICO col
+     margin-top:auto: cosi' il primo puo' anche non esserci (il ⚡ NWC
+     senza wallet) e il fondo resta il fondo — la lezione dei gemelli */
+  .ctrl-corpo .ctrl-fondo{margin-top:auto;display:flex;
+    flex-direction:column;gap:10px}
+  .ctrl-fondo .btn,.ctrl-fondo .ctrl-secondari{margin-top:0}
   @media (min-width:768px){
     /* da desktop #app porta 76px di topbar sopra e 40 sotto: la
        colonna li sconta, o la pagina scrollerebbe sempre di 116px */
-    #view-controllapacco.active{min-height:calc(100vh - 116px)}
+    #view-controllapacco.active,#view-acquisto.active{
+      min-height:calc(100vh - 116px)}
   }
   /* la testata: il conteggio a sinistra non si stringe mai, i
      francobolli scorrono di lato (overscroll contenuto: la lezione
@@ -1436,6 +1442,35 @@
      di Applica/Azzera: col basis 0 i bordi si sommano fuori) */
   .ctrl-secondari{display:flex;gap:10px;margin-top:10px}
   .ctrl-secondari .btn{margin-top:0;flex:1 1 50%;font-size:14px}
+  /* le vie della pagina d'acquisto: bottoni-radio col totale in mono
+     a destra. Solo token di tema (chiaro/scuro gratis); l'unita' non
+     si colora mai — la cifra passa da cifraCtrl col suo .unit */
+  .via-opzione{display:flex;justify-content:space-between;align-items:center;
+    gap:12px;width:100%;text-align:left;background:var(--card);
+    border:1.5px solid var(--line);border-radius:var(--radius-btn);
+    padding:12px 14px;margin-top:8px;font:inherit;font-weight:700;
+    color:var(--ink);cursor:pointer}
+  .via-opzione[aria-checked="true"]{border-color:var(--sats);
+    background:var(--sats-soft)}
+  .via-opzione .via-nome{display:flex;flex-direction:column;gap:2px;
+    min-width:0}
+  .via-opzione .via-sped{font-size:11.5px;color:var(--muted);
+    font-weight:600}
+  .via-opzione .via-tot{font-family:'JetBrains Mono',monospace;
+    flex:0 0 auto;font-size:14.5px}
+  /* la strada spenta (cambio assente) resta visibile col motivo:
+     si spegne, non sparisce — il campo non deve mentire */
+  .via-opzione.off{opacity:.55;cursor:default}
+  .acq-nota{font-size:12.5px;color:var(--muted);font-weight:600;
+    line-height:1.45;margin-top:10px}
+  /* la card del singolo articolo: francobollo + titolo + unitario */
+  .acq-art{display:flex;align-items:center;gap:12px;background:var(--card);
+    border:1.5px solid var(--line);border-radius:var(--radius);
+    padding:10px 12px;margin-top:4px}
+  .acq-art .acq-tit{min-width:0;flex:1;font-weight:800;font-size:14.5px;
+    overflow:hidden;text-overflow:ellipsis;display:-webkit-box;
+    -webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .acq-art .mono{flex:0 0 auto}
   /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
      768 sparisce come nella pagina del pacco, ma senza barra propria */
   @media (max-width:767.98px){
@@ -1444,6 +1479,8 @@
        un buco sotto i bottoni: via, o il fondo non e' il fondo */
     body.senza-nav #app{padding-bottom:0}
   }
+  /* la pagina d'acquisto e' una cassa come il riepilogo del pacco:
+     stessa classe senza-nav, accesa da go() anche per lei */
 
   /* ---------- dettaglio annuncio ---------- */
   /* (la forma rettangolare dei bottoni del dettaglio vive ora accanto
@@ -2718,13 +2755,39 @@
       <div class="ctrl-conto" id="ctrlConto"></div>
       <!-- niente stima taglia e niente nota verde (decisione di
            Andrea): la pagina dice il conto e basta, e i bottoni
-           scendono in fondo (margin-top:auto, vedi CSS) -->
-      <button class="btn orange" id="ctrlAcquista" onclick="startBuySet()">Acquista</button>
-      <div class="ctrl-secondari">
-        <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
-        <button type="button" class="btn ghost" onclick="go('offertapresto')">Fai un'offerta</button>
+           scendono in fondo (.ctrl-fondo col margin-top:auto) -->
+      <div class="ctrl-fondo">
+        <!-- Acquista porta alla PAGINA D'ACQUISTO (ago 2026): la
+             scelta della consegna e il conto della strada vivono la',
+             l'ordine nasce solo da la' -->
+        <button class="btn orange" id="ctrlAcquista" onclick="apriAcquistoSet()">Acquista</button>
+        <div class="ctrl-secondari">
+          <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
+          <button type="button" class="btn ghost" onclick="go('offertapresto')">Fai un'offerta</button>
+        </div>
       </div>
     </div>
+  </div>
+
+  <!-- ============ VISTA: LA PAGINA D'ACQUISTO (ago 2026) ============
+       L'ordine nasce SOLO da qui (salvo le aste, che hanno gia'
+       pagato). Dall'alto: gli articoli, la CONSEGNA a strade col
+       totale per pillola (ritiro / casa / punto di ritiro / codice
+       online — solo quelle offerte), il campo del punto, il CONTO del
+       SERVER (POST /orders/preventivo: il client mostra, mai
+       calcola), Acquista in fondo. Il contenuto lo disegna
+       renderAcquisto() da acqDati: qui solo la testata, il pattern
+       del riepilogo del pacco. -->
+  <div class="view" id="view-acquisto">
+    <div class="pacco-testa">
+      <button type="button" class="pacco-x" onclick="navIndietro()" title="Torna indietro" aria-label="Torna indietro">←</button>
+      <div class="pacco-tit"><b>Acquista</b><span class="eur-hint" id="acqSub"></span></div>
+      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+      </div>
+    </div>
+    <div class="ctrl-corpo" id="acqCorpo"></div>
   </div>
 
   <!-- ============ VISTA: L'OFFERTA SUL PACCO, PRESTO (ago 2026) ====
@@ -2862,6 +2925,14 @@
         <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. 0&nbsp;= spedizione gratuita, inclusa nel prezzo.</div></div>
+      <!-- Il SECONDO costo (ago 2026, pagina d'acquisto): la tariffa
+           verso un punto di ritiro. Facoltativo, stessa valuta del
+           campo sopra (un toggle solo per i due costi); VUOTO e ZERO
+           sono cose diverse — vuoto = vale il costo qui sopra,
+           0 scritto = gratis al punto. -->
+      <div class="field" id="sellSpedPuntoField" style="display:none"><label>Costo verso un punto di ritiro (facoltativo)</label>
+        <div class="sats-input"><input id="sellSpedPunto" type="number" inputmode="numeric" placeholder="come sopra"><span class="suffix" id="sellSpedPuntoCur" style="pointer-events:none">sats</span></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Spesso costa meno che a casa. Vuoto&nbsp;= vale il costo qui sopra; 0&nbsp;= gratis al punto. La consegna al punto si offre solo se dichiari lo spedizioniere nel Profilo (📦&nbsp;Come spedisci).</div></div>
       <div class="field" id="sellTagliaField" style="display:none"><label>Taglia del pacco</label>
         <select id="sellTaglia" hidden>
           <option value="">Scegli la taglia…</option>
@@ -3005,6 +3076,16 @@
       <div class="acc" id="accAvvisi">
         <button class="acc-h" onclick="toggleAcc('accAvvisi')"><span class="em">🔔</span>Avvisi<span class="fr">▾</span></button>
         <div class="acc-b"><div id="avvisiBlocco"></div></div>
+      </div>
+
+      <!-- Lo spedizioniere del negozio (ago 2026, pagina d'acquisto):
+           con che rete di punti di ritiro spedisci. Dichiarato,
+           accende la strada «punto di ritiro» su tutti i tuoi
+           annunci; le voci arrivano da /api/me (mai hardcodate).
+           In DEMO il cassetto sparisce, il patto del wallet. -->
+      <div class="acc" id="accSpedizioniere">
+        <button class="acc-h" onclick="toggleAcc('accSpedizioniere')"><span class="em">📦</span>Come spedisci<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
       </div>
 
       <div class="acc" id="accRicerche" style="display:none">
@@ -3655,6 +3736,11 @@ function mapListing(a){
        nessuna promessa nuova (il dettaglio non mostra la riga) */
     consegna:a.consegna||'', sped:a.spedizione_sats||0,
     spedEur:a.spedizione_eur||0, taglia:a.taglia_pacco||'',
+    /* la tariffa punto (ago 2026): serve al form di modifica e alla
+       stima DEMO — il conto vero lo dice il preventivo del server */
+    spedPunto:a.spedizione_punto_sats||0,
+    spedPuntoEur:a.spedizione_punto_eur||0,
+    spedPuntoDich:!!a.spedizione_punto_dichiarata,
     /* la combo della gift card: modalita' fisica + codice in
        piattaforma, sceglie chi compra */
     ancheDigitale:!!a.anche_digitale,
@@ -3717,6 +3803,9 @@ function mapOrder(o){
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
     protSats:o.protezione_sats||0,
+    /* il punto di ritiro scelto dal compratore (ago 2026): testo
+       libero — alla resa passa SEMPRE da esc() */
+    puntoRitiro:o.punto_ritiro||'',
     /* l'ordine nato da un'asta (ago 2026): con la scelta di consegna
        ancora vuota il vincitore sceglie dal varco e il venditore
        aspetta (niente bottoni di spedizione) */
@@ -4141,7 +4230,7 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
    dove sei, e «dove sei» e' la strada che hai fatto. */
 function voceNav(view){
   if (['dettaglio','negozio','sicurezza','pacco',
-       'controllapacco','offertapresto'].includes(view)) view = 'esplora';
+       'controllapacco','acquisto','offertapresto'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
@@ -4201,9 +4290,11 @@ function go(view){
      totale (il CSS decide dove: sotto i 768 sostituisce la nav, da
      desktop convive con la topbar) */
   document.body.classList.toggle('con-pacco', view==='pacco');
-  /* Nel riepilogo del pacco la tab bar sparisce e basta: e' una
-     cassa, non una vetrina, e Acquista vive in pagina */
-  document.body.classList.toggle('senza-nav', view==='controllapacco');
+  /* Nel riepilogo del pacco e nella pagina d'acquisto la tab bar
+     sparisce e basta: sono casse, non vetrine, e Acquista vive in
+     pagina */
+  document.body.classList.toggle('senza-nav',
+    view==='controllapacco' || view==='acquisto');
   /* la griglia e' STATICA — le stesse 26 voci del catalogo, senza piu'
      conteggi da rileggere — quindi si disegna una volta sola: rifarla
      a ogni entrata ricreerebbe 26 <img> per nulla */
@@ -4311,6 +4402,12 @@ function navVista(){
                     /* il riepilogo appartiene allo stesso pacco: la
                        chiave e' la sua, e con lei la ricostruzione */
                     : v==='controllapacco' ? (paccoDati?.origineId || 0)
+                    /* la pagina d'acquisto: l'annuncio per il mono,
+                       il pacco per il set */
+                    : v==='acquisto'  ? (!acqDati ? 0
+                        : acqDati.tipo==='set'
+                          ? 'set|' + (paccoDati?.origineId || 0)
+                          : acqDati.annuncioId)
                     : v==='esplora'   ? chiaveVetrina()
                     : 0};
 }
@@ -4384,6 +4481,22 @@ function navRendiVista(b){
     if (paccoDati && paccoDati.origineId===b.k && setScelte.size
         && listings.some(x=>x.id===b.k))
       { renderControlla(); return go('controllapacco'); }
+    return go('esplora');
+  }
+  if (b.v === 'acquisto') {
+    /* mai ricostruire il vuoto: acqDati dev'essere ancora SUO
+       (stesso annuncio, o stesso pacco con articoli) — svuotato da
+       un pagamento o da un reload, si ripiega sulla vetrina */
+    const ok = acqDati && (acqDati.tipo==='set'
+      ? ('set|' + (paccoDati?.origineId || 0)) === b.k && setScelte.size >= 2
+      : acqDati.annuncioId === b.k
+        && (listings.some(x=>x.id===b.k) || myListings.some(x=>x.id===b.k)));
+    if (ok) {
+      if (acqDati.tipo==='mono')
+        currentListing = listings.find(x=>x.id===b.k)
+                      || myListings.find(x=>x.id===b.k) || currentListing;
+      renderAcquisto(); return go('acquisto');
+    }
     return go('esplora');
   }
   if (b.v === 'negozio') {
@@ -5571,10 +5684,8 @@ function stradeConsegna(l){
    se la scelta non e' tra le strade offerte vince la prima
    (la fisica: stesso default del server). */
 let consegnaScelta = 'spedizione';
-/* Vera solo dopo un tocco dell'utente (pillola in pagina o foglio
-   delle strade): finche' la scelta e' implicita, la barra d'acquisto
-   non compra in silenzio — apre il foglio «Come vuoi riceverlo?». */
-let consegnaEsplicita = false;
+/* (consegnaEsplicita e' morta con il foglio del varco, ago 2026:
+   nella pagina d'acquisto la scelta e' esplicita per costruzione.) */
 /* I pezzi scelti dal compratore (cantiere stock): si riparte da 1 a
    ogni dettaglio aperto; il massimo e' la quantita' dell'annuncio.
    Lo stepper compare solo con piu' di un pezzo disponibile. */
@@ -5617,7 +5728,6 @@ function setQta(d){
   q('.qta-mini .qm-meno').forEach(b => b.classList.toggle('off', qtaScelta <= 1));
   q('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= (l.quantita||1)));
   haptic();
-  aggiornaCifreCompra(l);
 }
 function sceltaConsegna(l){
   const s = stradeConsegna(l);
@@ -5672,24 +5782,11 @@ function contoScomposto(art, sped, prot, tot, qta){
        + (sped>0 ? r(sped, 'Spedizione') : '')
        + (prot>0 ? r(prot, 'Protezione acquisti') : '') + r(tot, 'Totale', 1);
 }
-/* La scelta della strada, oggi solo dal foglio «Come vuoi
-   riceverlo?»: aggiorna la nota digitale e le cifre del Compra
-   subito NWC senza ridisegnare il dettaglio. */
-function setConsegnaScelta(v){
-  consegnaScelta = v; consegnaEsplicita = true; haptic();
-  /* l'avviso asimmetrico segue la SCELTA: su una combo non deve
-     spaventare chi prende la strada fisica */
-  const nd = el('notaDigitale');
-  if (nd) nd.style.display = v==='digitale' ? '' : 'none';
-  if (currentListing) aggiornaCifreCompra(currentListing);
-}
-/* Le cifre sui bottoni compra che ancora le portano (il solo Compra
-   subito NWC: Acquista e' nudo per scelta), riscritte a ogni tocco
-   su foglio e stepper senza ridisegnare il dettaglio. */
-function aggiornaCifreCompra(l){
-  document.querySelectorAll('#detailContent .compra .cifra').forEach(s =>
-    s.textContent = `${stimaCirca(l)}${fmt(totaleStima(l))} sats`);
-}
+/* (setConsegnaScelta e aggiornaCifreCompra sono morte col foglio del
+   varco e col ⚡ NWC del recinto, ago 2026: la scelta della strada e
+   le cifre vivono nella pagina d'acquisto — setViaAcquisto e
+   renderAcquisto. consegnaScelta/sceltaConsegna restano per le
+   pillole informative del dettaglio e per le stime DEMO.) */
 /* La consegna nel dettaglio (lug 2026): le strade offerte diventano
    pillole esplicite nella riga delle pillole («🚚 Spedizione
    disponibile», «🤝 Ritiro in zona», «💾 Codice online») — il 🚚
@@ -6075,63 +6172,18 @@ let hintPubblicazione = null;
    E' markup (la strada non e' mono), quindi va in innerHTML: dentro
    ci passano solo i nostri cataloghi, mai testo utente. */
 /* La barra non porta piu' cifre ne' strade (lug 2026): «Acquista» e'
-   nudo, il conto e la scelta vivono nel foglio di oggi e nella
-   pagina dedicata di domani. Il vecchio cifraBarra e' morto qui. */
-/* Il varco della barra: chi tocca «Compra» dalla barra puo' non aver
-   mai incontrato le pillole spedizione/ritiro (la barra si raggiunge
-   senza scorrere). Con piu' strade e scelta ancora IMPLICITA si apre
-   il foglio «Come vuoi riceverlo?»; scelta fatta (pillola o foglio),
-   la barra paga in un tocco come sempre. In vetrina il varco non
-   serve: startBuy apre l'invito. */
+   nudo, il conto e la scelta vivono nella pagina d'acquisto. */
+/* IL FOGLIO «Come vuoi riceverlo?» NON ESISTE PIU' (ago 2026): al
+   suo posto la PAGINA D'ACQUISTO — apriFoglioConsegna,
+   scegliConsegnaFoglio e cifraVia sono morti con lui, e con loro
+   consegnaEsplicita (nella pagina la scelta e' sempre esplicita).
+   Acquista porta SEMPRE alla pagina, anche con una strada sola: e'
+   li' che il costo di spedizione si vede PRIMA della invoice — la
+   lacuna dichiarata che questo cantiere chiude. */
 function compraDaBarra(){
   const l = currentListing; if (!l) return;
   if (astaE(l)) { apriPunta(); return; }   /* l'asta si vince puntando */
-  if (!VETRINA && !consegnaEsplicita && stradeConsegna(l).length >= 2)
-    return apriFoglioConsegna();
-  startBuy();
-}
-/* Il totale stimato per UNA strada: la matematica di totaleStima ma
-   con la via passata per argomento, per le voci del foglio. */
-function cifraVia(l, v){
-  const art = artStima(l) * qtaScelta;   /* i pezzi scelti, come totaleStima */
-  const sped = v === 'spedizione' ? satsSpedizione(l) : 0;
-  return `${stimaCirca(l)}${fmt(art + sped + Math.floor(art * protPercento / 100))} sats totali`;
-}
-/* Il foglio delle strade: riusa il pickerSheet (markup, frecce, Esc,
-   tap fuori) SENZA passare dal catalogo PICKER — qui il deposito non
-   e' una select ma consegnaScelta. La scelta chiude e procede
-   all'acquisto in un gesto solo; Esc e tap fuori chiudono e basta,
-   nessun acquisto a sorpresa. */
-function apriFoglioConsegna(){
-  const l = currentListing; if (!l) return;
-  const att = sceltaConsegna(l);
-  const nome = v => v==='spedizione'
-    ? '🚚 Spedizione' + ((l.sped>0 || l.spedEur>0) ? '' : ' gratuita')
-    : v==='ritiro' ? '🤝 Ritiro in zona' : '💾 Codice online';
-  /* il digitale porta la sua regola asimmetrica gia' qui: va detta
-     PRIMA dell'acquisto, e chi passa dal foglio puo' non aver visto
-     la trust-note in pagina */
-  const desc = v => v==='digitale'
-    ? `${cifraVia(l, v)} — un codice rivelato non torna indietro: ${TEMPI.confermaDig} ore per la disputa`
-    : cifraVia(l, v);
-  pickerTrigger = el('bcCompra');
-  el('pickerTitolo').textContent = 'Come vuoi riceverlo?';
-  el('pickerLista').innerHTML = stradeConsegna(l).map(v =>
-    `<button type="button" role="radio" aria-checked="${v===att}"
-       class="picker-voce${v===att?' sel':''}" data-val="${v}"
-       onclick="scegliConsegnaFoglio(this.dataset.val)">
-       <span><b>${nome(v)}</b><span class="p-desc">${desc(v)}</span></span>${
-       v===att?'<span class="p-check">✓</span>':''}</button>`).join('');
-  el('sheetBg').classList.add('open');
-  el('pickerSheet').classList.add('open');
-  (el('pickerLista').querySelector('.sel') || el('pickerLista').firstElementChild)?.focus();
-}
-function scegliConsegnaFoglio(v){
-  setConsegnaScelta(v);   /* cifre NWC, nota digitale e haptic: tutto li' */
-  /* chiusura MIRATA, mai closeSheet: spegnerebbe la pila intera e
-     azzererebbe il pollTimer del pagamento che sta per partire */
-  chiudiPicker();
-  startBuy();             /* si procede senza un secondo tocco */
+  apriAcquisto(l);
 }
 /* La regia, chiamata da go() a ogni cambio vista: la barra esiste solo
    nel dettaglio di un annuncio comprabile — mai sui propri annunci ne'
@@ -6228,6 +6280,10 @@ async function sezioneAltriOggetti(l){
    che resta il giudice. Nomi non-barattolo sui bottoni: il 🫙 e' dei
    preferiti. */
 let setScelte = new Map();          // annuncioId -> quantita scelta
+/* CONGELATA a 'spedizione' (ago 2026, pagina d'acquisto): la scelta
+   vera della strada vive nella pagina d'acquisto; questa resta solo
+   per la stima DEMO di totaleSet/setCirca — al peggio la stima e'
+   quella con la spedizione, che e' l'onesta piu' alta. */
 let consegnaSetScelta = 'spedizione';
 /* IL TETTO CONTA LE RIGHE, NON I PEZZI (gemello client di
    MAX_RIGHE_SET del server, che limita le righe del body di
@@ -6346,42 +6402,81 @@ function renderControlla(){
   el('ctrlStrip').innerHTML = strip.join('');
   const primo = listings.find(x=>setScelte.has(x.id));
   el('ctrlSub').textContent = primo ? `di ${primo.seller}` : '';
-  /* la consegna: le strade che l'INTERSEZIONE del pacco consente. Con
-     una sola non c'e' scelta: quella, gia' accesa, e l'altra non
-     compare — il campo non mente */
+  /* La consegna NON si sceglie piu' qui (ago 2026, decisione di
+     Andrea, stile Vinted): la scelta vera vive nella pagina
+     d'acquisto. Qui una riga onesta con le strade del pacco. */
   const strade = stradeSet();
-  if (!strade.includes(consegnaSetScelta))
-    consegnaSetScelta = strade[0] || 'spedizione';
-  el('ctrlConsegna').innerHTML = strade.map(v =>
-    `<button type="button" class="consegna-pill${v===consegnaSetScelta?' attiva':''}" data-v="${v}" onclick="setConsegnaControlla(this.dataset.v)">${v==='spedizione'?'🚚 Spedizione':'🤝 Ritiro in zona'}</button>`).join('');
+  el('ctrlConsegna').innerHTML = `<div class="acq-nota" style="margin-top:2px">${
+    strade.map(v => v==='spedizione' ? '🚚 Spedizione' : '🤝 Ritiro in zona').join(' · ')
+    || '—'} — la scegli al passo dopo, con «Acquista».</div>`;
   /* (la stima taglia qui non si mostra piu' — decisione di Andrea:
      resta nell'ordine, dove la scrive il server; stimaTagliaSet e' il
      gemello client che aspetta, come il vestito appeso di .carton) */
-  el('ctrlConto').innerHTML = contoControlla(totaleSet());
+  /* IL CONTO E' DEL SERVER anche qui (decisione 3 di Andrea): lo
+     stesso preventivo della pagina d'acquisto, mai due conti che
+     possono divergere. Con la scelta ancora aperta l'anteprima e' la
+     strada PIU' ECONOMICA, e la riga lo DICE. In DEMO resta la stima
+     client di totaleSet, dichiarata dal ≈. */
+  const p = ctrlPrev && ctrlPrev.firma===firmaSet() ? ctrlPrev.dati : null;
+  if (!DEMO && p) {
+    const vive = (p.strade||[]).filter(s => !s.cambio_assente);
+    const min = vive.length
+      ? vive.reduce((a, b) => b.totale_sats < a.totale_sats ? b : a) : null;
+    const sped = min ? min.spedizione_sats||0 : 0;
+    const tot = min ? min.totale_sats
+              : p.articolo_sats + (p.protezione_sats||0);
+    el('ctrlConto').innerHTML = contoRighe({
+      art: p.articolo_sats, sped, prot: p.protezione_sats||0, tot,
+      circa: (p.stima || (min && min.stima)) ? '≈ ' : '',
+      spedLabel: vive.length > 1 ? 'Spedizione (dalla più economica)'
+                                 : 'Spedizione'});
+  } else {
+    el('ctrlConto').innerHTML = contoRighe({...totaleSet(),
+                                            circa: setCirca()});
+    if (!DEMO) caricaPreventivoPacco();   /* arriva e ridisegna */
+  }
+}
+/* Il preventivo del pacco, con la firma della composizione come
+   cache: cambia un pezzo o una quantita' e si richiede, altrimenti
+   mai due volte. Fail-open: senza risposta resta la stima client. */
+let ctrlPrev = null;   // {firma, dati|null}
+const firmaSet = () =>
+  [...setScelte].map(([id, q]) => id + 'x' + q).sort().join(',');
+async function caricaPreventivoPacco(){
+  const f = firmaSet();
+  if (!f || (ctrlPrev && ctrlPrev.firma === f)) return;
+  ctrlPrev = {firma: f, dati: null};   /* prenota: mai due fetch gemelli */
+  try {
+    const r = await fetch(`${API_BASE}/orders/preventivo`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({righe: [...setScelte].map(([id, qta]) =>
+        ({annuncio_id:id, quantita:qta,
+          offerta_id: offertaAccettataPer(id)?.id || 0}))})});
+    const d = await r.json().catch(()=>({}));
+    if (r.ok && ctrlPrev && ctrlPrev.firma === f) ctrlPrev.dati = d;
+  } catch(e) {}
+  if (el('view-controllapacco')?.classList.contains('active'))
+    renderControlla();
 }
 /* Una cifra del conto nella valuta del toggle: in euro e' sempre una
-   conversione (≈), in sats il «circa» arriva dai listini EUR del
-   pacco (setCirca). Lo zero non porta mai il ≈: zero e' zero. */
+   conversione (≈), in sats il «circa» arriva col flag di stima. Lo
+   zero non porta mai il ≈: zero e' zero. */
 function cifraCtrl(sats, circa){
   if (valutaVista==='eur')
     return `${sats>0?'≈ ':''}${fmtEur(sats * eurPerSat)}<span class="unit eur">€</span>`;
   return `${sats>0 ? (circa||'') : ''}${fmt(sats)}<span class="unit">sats</span>`;
 }
-/* Le righe del conto: Prezzo, la commissione in promo, Spedizione
-   (che col ritiro vale 0, e la riga lo dice invece di sparire), la
-   protezione solo quando esiste, e il totale evidenziato. */
-function contoControlla(c){
-  const circa = setCirca();
+/* Le righe del conto — UN vestito per il riepilogo del pacco e la
+   pagina d'acquisto: Prezzo, la commissione in promo, Spedizione
+   (che a costo 0 resta, invece di sparire), la protezione solo
+   quando esiste, e il totale evidenziato. */
+function contoRighe(c){
   const r = (t, v, cls) => `<div class="ctrl-riga${cls?' '+cls:''}"><span>${t}</span><span class="mono">${v}</span></div>`;
-  return r('Prezzo', cifraCtrl(c.art, circa))
+  return r('Prezzo', cifraCtrl(c.art, c.circa))
     + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
-    + r('Spedizione', cifraCtrl(c.sped, circa))
+    + r(c.spedLabel || 'Spedizione', cifraCtrl(c.sped, c.circa))
     + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot)) : '')
-    + r('Totale da pagare', cifraCtrl(c.tot, circa), 'tot');
-}
-function setConsegnaControlla(v){
-  consegnaSetScelta = v; haptic();
-  renderControlla();
+    + r('Totale da pagare', cifraCtrl(c.tot, c.circa), 'tot');
 }
 /* «Chiedi info» → la pagina del venditore, coi ponti di contatto che
    vivono gia' la'. Il codice negozio arriva dagli annunci del pacco. */
@@ -6392,6 +6487,240 @@ function ctrlChiediInfo(){
   const chi = x && (x.negozio || x.username);
   if (chi) apriNegozio(chi);
   else toast('Questo venditore non ha una pagina pubblica');
+}
+
+/* ================= LA PAGINA D'ACQUISTO (ago 2026) =================
+   Sostituisce il foglio «Come vuoi riceverlo?»: l'ordine nasce SOLO
+   da qui (salvo le aste, che hanno gia' pagato). Il CONTO e' DEL
+   SERVER — POST /orders/preventivo, le stesse funzioni pure di
+   compra(): il client mostra, mai calcola — con una sola eccezione
+   dichiarata, la stima della DEMO. Le strade arrivano gia' coi
+   totali, quindi cambiare pillola non rifa' la rete. */
+let acqDati = null;
+/* {tipo:'mono'|'set', annuncioId, qta, offertaId,
+    preventivo:null|risposta del server, via:'', punto:'', errore:''} */
+
+const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
+  : v==='casa' ? '🏠 Spedizione a casa'
+  : v==='punto' ? '📦 Spedizione a un punto di ritiro'
+  : v==='digitale' ? '💾 Codice online' : '';
+
+function apriAcquisto(l){
+  haptic();
+  if (VETRINA) {
+    invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
+      + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
+    return;
+  }
+  currentListing = l;
+  acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
+             offertaId: offertaAccettataPer(l.id)?.id || 0,
+             preventivo:null, via:'', punto:'', errore:''};
+  go('acquisto');
+  renderAcquisto();                 /* lo scheletro, subito */
+  if (DEMO) {
+    acqDati.preventivo = preventivoDemo(l);
+    acqDati.via = (acqDati.preventivo.strade[0] || {}).via || '';
+    renderAcquisto();
+    return;
+  }
+  caricaPreventivo();
+}
+function apriAcquistoSet(){
+  haptic();
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  if (setScelte.size < 2)
+    { toast('Con un oggetto solo c\'è l\'acquisto di sempre: aprilo dalla sua scheda'); return; }
+  acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
+             preventivo:null, via:'', punto:'', errore:''};
+  go('acquisto');
+  renderAcquisto();
+  caricaPreventivo();
+}
+/* La stima della DEMO, DICHIARATA (in demo non c'e' un server che
+   faccia il conto): la matematica di totaleStima, spacchettata nella
+   forma del preventivo. La strada punto in demo non esiste — vuole
+   lo spedizioniere, che e' roba del server. */
+function preventivoDemo(l){
+  const art = artStima(l) * qtaScelta;
+  const prot = Math.floor(art * protPercento / 100);
+  const strade = stradeConsegna(l).map(v => {
+    const sped = v==='spedizione' ? satsSpedizione(l) : 0;
+    return {via: v==='spedizione' ? 'casa' : v, spedizione_sats: sped,
+            totale_sats: art + sped + prot,
+            stima: v==='spedizione' && l.spedEur>0};
+  });
+  if (!strade.length)
+    strade.push({via:'', spedizione_sats:0, totale_sats:art+prot, stima:false});
+  return {set:false, demo:true, quantita:qtaScelta, articolo_sats:art,
+          articolo_unitario_sats:artStima(l), protezione_sats:prot,
+          commissione_sats:0, stima:l.valuta==='eur', spedizioniere:'',
+          strade};
+}
+async function caricaPreventivo(){
+  const d0 = acqDati; if (!d0) return;
+  const body = d0.tipo==='set'
+    ? {righe: [...setScelte].map(([id, qta]) => ({annuncio_id:id,
+        quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}))}
+    : {annuncio_id: d0.annuncioId, quantita: d0.qta,
+       offerta_id: d0.offertaId};
+  try {
+    const r = await fetch(`${API_BASE}/orders/preventivo`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(body)});
+    const d = await r.json().catch(()=>({}));
+    if (acqDati !== d0) return;   /* nel frattempo la pagina e' un'altra */
+    if (!r.ok) {
+      acqDati.errore = d.detail || 'Non riesco a fare il conto: riprova';
+      renderAcquisto(); return;
+    }
+    acqDati.preventivo = d;
+    /* il default e' la PRIMA strada viva (l'ordine del server e' la
+       precedenza: ritiro → casa → punto → codice online) */
+    const vive = (d.strade||[]).filter(s => !s.cambio_assente);
+    acqDati.via = vive.length ? vive[0].via : '';
+    renderAcquisto();
+  } catch(e) {
+    if (acqDati !== d0) return;
+    acqDati.errore = 'Rete assente: riprova';
+    renderAcquisto();
+  }
+}
+/* Tutto si disegna da acqDati, MAI un fetch qui dentro: il toggle
+   valuta e il cambio di pillola ridisegnano dal preventivo in cache. */
+function renderAcquisto(){
+  const box = el('acqCorpo'); if (!box || !acqDati) return;
+  const d = acqDati, p = d.preventivo;
+  /* il sottotitolo: di chi si sta comprando */
+  const primo = d.tipo==='set'
+    ? listings.find(x=>setScelte.has(x.id))
+    : (listings.find(x=>x.id===d.annuncioId)
+       || myListings.find(x=>x.id===d.annuncioId));
+  el('acqSub').textContent = primo ? `di ${primo.seller}` : '';
+  if (d.errore) {
+    box.innerHTML = `<div class="acq-nota" style="margin-top:20px">⚠️ ${esc(d.errore)}</div>
+      <div class="ctrl-fondo"><button class="btn ghost" onclick="navIndietro()">← Torna</button></div>`;
+    return;
+  }
+  if (!p) {
+    box.innerHTML = `<div class="acq-nota" style="margin-top:20px">Calcolo il conto…</div>`;
+    return;
+  }
+  /* --- gli articoli --- */
+  let articoli;
+  if (d.tipo==='set') {
+    const strip = [];
+    for (const [id, qta] of setScelte){
+      const x = listings.find(t=>t.id===id);
+      if (!x) continue;
+      const t = (x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '';
+      strip.push(`<div class="ctrl-mini" title="${esc(x.title)}">${
+        t ? `<img src="${esc(t)}" alt="">` : `<span>${x.emoji}</span>`}${
+        qta>1 ? `<b class="ctrl-mini-n">×${fmt(qta)}</b>` : ''}</div>`);
+    }
+    articoli = `<div class="ctrl-articoli"><b>${fmt(p.quantita)} articol${p.quantita===1?'o':'i'}</b>
+      <div class="ctrl-strip">${strip.join('')}</div></div>`;
+  } else {
+    const x = primo;
+    const t = x && ((x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '');
+    articoli = `<div class="acq-art">
+      <div class="ctrl-mini">${t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}</div>
+      <div class="acq-tit">${esc(x ? x.title : '')}${(p.quantita||1)>1 ? ` <span class="mono">× ${fmt(p.quantita)}</span>` : ''}</div>
+      <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'')}</span>
+    </div>`;
+  }
+  /* --- le vie, coi totali gia' nel preventivo --- */
+  const strade = (p.strade||[]).filter(s => s.via !== '');
+  const stradaSel = (p.strade||[]).find(s => s.via === d.via) || null;
+  let vie = '';
+  if (strade.length) {
+    vie = `<div class="section-label">Consegna</div>
+      <div role="radiogroup" aria-label="Come vuoi riceverlo">` + strade.map(s => {
+      if (s.cambio_assente)
+        return `<div class="via-opzione off"><span class="via-nome">${nomeVia(s.via)}
+          <span class="via-sped">il cambio euro non è disponibile: riprova tra poco</span></span></div>`;
+      const spedRiga = (s.via==='casa' || s.via==='punto')
+        ? `<span class="via-sped">${s.spedizione_sats>0
+            ? `spedizione ${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'')}`
+            : 'spedizione gratuita'}${s.via==='punto' && s.fallback_casa
+            ? ' (come a casa)' : ''}</span>` : '';
+      return `<button type="button" role="radio" aria-checked="${s.via===d.via}"
+        class="via-opzione" data-via="${s.via}" onclick="setViaAcquisto(this.dataset.via)">
+        <span class="via-nome">${nomeVia(s.via)}${spedRiga}</span>
+        <span class="via-tot">${cifraCtrl(s.totale_sats, (p.stima||s.stima)?'≈ ':'')}</span>
+      </button>`;
+    }).join('') + `</div>`;
+  }
+  /* --- il campo del punto di ritiro --- */
+  /* VARCO MAPPA (futuro, API corriere): questo contenitore verra'
+     sostituito dal selettore dei punti (ricerca/mappa) DELLO
+     spedizioniere dichiarato. Il contratto non cambia: un testo in
+     acqDati.punto che viaggia come punto_ritiro nel body. */
+  const campoPunto = `<div class="field" id="acqPuntoCampo"
+      style="margin-top:10px;display:${d.via==='punto'?'':'none'}">
+    <label>Indica il punto di ritiro (nome o indirizzo del punto ${esc(p.spedizioniere||'')})</label>
+    <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
+      placeholder="Es. Locker — Via Roma 1, Pavia"
+      oninput="if(acqDati)acqDati.punto=this.value">
+  </div>`;
+  /* --- le note oneste --- */
+  let note = '';
+  if (p.spedizioniere && (d.via==='casa' || d.via==='punto'))
+    note += `<div class="acq-nota">📦 Spedisce con <b>${esc(p.spedizioniere)}</b></div>`;
+  if (d.via==='digitale')
+    note += `<div class="acq-nota">💾 Un codice, una volta rivelato, non torna indietro: hai <b>${TEMPI.confermaDig} ore</b> per aprire una disputa, poi l'acquisto è definitivo.</div>`;
+  if (p.stima || (stradaSel && stradaSel.stima))
+    note += `<div class="acq-nota">≈ convertito ora al cambio: il totale definitivo si fissa con la invoice (${TEMPI.invoice} minuti).</div>`;
+  if (p.demo)
+    note += `<div class="acq-nota">🧪 Stima dimostrativa: in demo il conto del server non c'è.</div>`;
+  /* --- il conto della strada scelta, riga per riga --- */
+  const sped = stradaSel && !stradaSel.cambio_assente ? (stradaSel.spedizione_sats||0) : 0;
+  const tot = stradaSel && !stradaSel.cambio_assente ? stradaSel.totale_sats
+            : p.articolo_sats + (p.protezione_sats||0);
+  const circa = (p.stima || (stradaSel && stradaSel.stima)) ? '≈ ' : '';
+  const conto = contoRighe({art: p.articolo_sats, sped, prot: p.protezione_sats||0,
+                            tot, circa, spedLabel: 'Spedizione'});
+  /* --- il fondo: ⚡ NWC (solo mono, col wallet) e Acquista --- */
+  const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
+    ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
+       <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
+  box.innerHTML = `${articoli}${vie}${campoPunto}${note}
+    <div class="section-label">Il conto</div>
+    <div class="ctrl-conto">${conto}</div>
+    <div class="ctrl-fondo">${nwc}
+      <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Acquista</button>
+    </div>`;
+  aggiornaCurToggle();   /* il toggle in testata dice la verita' */
+}
+function setViaAcquisto(v){
+  if (!acqDati) return;
+  haptic();
+  /* il testo del punto gia' digitato si conserva: sta in acqDati,
+     e il re-render lo riscrive nel campo */
+  acqDati.via = v;
+  renderAcquisto();
+  if (v === 'punto') el('acqPunto')?.focus();
+}
+/* Il corpo della consegna per i varchi POST: la via scelta nella
+   pagina, nel vocabolario del server. Via '' = annuncio storico,
+   nessuna chiave (il server fa il flusso di sempre). */
+function corpoConsegna(){
+  const v = acqDati?.via || '';
+  if (!v) return {};
+  if (v==='ritiro' || v==='digitale') return {consegna: v};
+  const out = {consegna:'spedizione',
+               spedizione_via: v==='punto' ? 'punto' : 'casa'};
+  if (v==='punto') out.punto_ritiro = acqDati.punto.trim().slice(0,120);
+  return out;
+}
+function ctaAcquisto(){
+  haptic();
+  const d = acqDati; if (!d || !d.preventivo) return;
+  if (d.via==='punto' && !d.punto.trim()){
+    toast('Indica il punto di ritiro: al venditore serve per spedire');
+    el('acqPunto')?.focus(); return;
+  }
+  if (d.tipo==='set') startBuySet(); else startBuy();
 }
 /* ---------------- la pagina del pacco (ago 2026) ----------------
    «📦 Aggiungi al pacco» dal dettaglio apre una PAGINA in stile
@@ -6562,6 +6891,9 @@ function aggiornaBarraPacco(){
 function rinfrescaViste(){
   if (el('view-pacco')?.classList.contains('active')) renderPacco();
   if (el('view-controllapacco')?.classList.contains('active')) renderControlla();
+  /* la pagina d'acquisto si ridisegna dal preventivo in CACHE: il
+     toggle e' una conversione di vista, mai un secondo fetch */
+  if (el('view-acquisto')?.classList.contains('active')) renderAcquisto();
 }
 /* Il tocco su «Aggiungi»: la riga entra con UN pezzo. */
 function aggiungiAlPacco(id){
@@ -6678,10 +7010,21 @@ async function startBuySet(){
                                 mai colpire un ordine di un giro prima */
   const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
     quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}));
-  const c = totaleSet();
-  /* il foglio invoice si apre SOPRA la pagina del riepilogo, che
-     resta sotto com'e' (niente chiusure: il velo fa il suo mestiere) */
-  el('payAmount').textContent = setCirca() + fmt(c.tot);
+  /* le cifre del foglio dal PREVENTIVO della pagina d'acquisto
+     (stessi numeri per costruzione), con la stima client di ripiego */
+  const p = acqDati?.preventivo;
+  const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
+  const c = p ? {art: p.articolo_sats,
+                 sped: via ? (via.spedizione_sats||0) : 0,
+                 prot: p.protezione_sats||0,
+                 tot: via ? via.totale_sats
+                    : p.articolo_sats + (p.protezione_sats||0)}
+              : totaleSet();
+  const circaS = p ? ((p.stima || (via && via.stima)) ? '≈ ' : '')
+               : setCirca();
+  /* il foglio invoice si apre SOPRA la pagina, che resta sotto com'e'
+     (niente chiusure: il velo fa il suo mestiere) */
+  el('payAmount').textContent = circaS + fmt(c.tot);
   el('payScomposto').innerHTML = contoScomposto(c.art, c.sped, c.prot, c.tot, 1);
   el('payEurNota').style.display = 'none';
   el('sheetBg').classList.add('open');
@@ -6692,7 +7035,7 @@ async function startBuySet(){
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({righe, consegna: consegnaSetScelta})});
+    body: JSON.stringify({righe, ...corpoConsegna()})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) {
     toast(d.detail || 'Errore nella creazione dell\'ordine', 6000);
@@ -6732,7 +7075,6 @@ function openDetail(id){
      personale arriva da /api/aste/{id} (caricaAsta, in coda) */
   const asta = astaE(l);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
-  consegnaEsplicita = false;       // e la scelta torna implicita
   qtaScelta = 1;                   // e i pezzi ripartono da uno
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
      carta: il ritorno al mercatino a sinistra — c'e' SEMPRE, anche in
@@ -6849,9 +7191,9 @@ function openDetail(id){
              <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai ${TEMPI.confermaDig} ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
-             ${(!DEMO && !VETRINA && walletNwc())
-               ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${stimaCirca(l)}${fmt(totaleStima(l))} sats</span></button>
-                  <div class="escrow-note">In un tocco, col wallet collegato</div>` : ''}
+             <!-- Il ⚡ «Compra subito» NWC non vive piu' qui (ago
+                  2026): l'ordine nasce SOLO dalla pagina d'acquisto,
+                  e il wallet paga da la' -->
              <button class="btn orange acquista-cta" onclick="compraDaBarra()">Acquista${stepperAcquista(l)}</button>
              <!-- Sotto il bottone non c'e' piu' nulla, davvero: la riga
                   «Ricevi una invoice Lightning...» e' uscita (troppo
@@ -7412,20 +7754,27 @@ async function startBuy(){
       + 'Telegram: è lì che i tuoi sats restano al sicuro fino alla consegna.');
     return;
   }
-  /* Per i listini EUR i sats esatti li decide il server tra un attimo:
-     intanto una stima onesta (col conto scomposto), poi i valori veri
-     dalla risposta */
+  /* Le cifre del foglio vengono dal PREVENTIVO della pagina
+     d'acquisto (stessi numeri per costruzione); la vecchia stima
+     client resta solo come ripiego difensivo. Per i listini EUR i
+     sats esatti li decide comunque il server tra un attimo. */
   const l = currentListing, inEur = l.valuta==='eur' && l.priceEur>0;
   /* con un'offerta accettata l'articolo e' la cifra pattuita, e
      l'ordine viaggia con offerta_id: il server fa i conti su quella */
   const offAcc = offertaAccettataPer(l.id);
-  const artS = artStima(l) * qtaScelta,
-        spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
-        protS = Math.floor(artS * protPercento / 100);
-  el('payAmount').textContent = stimaCirca(l) + fmt(totaleStima(l));
-  el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS,
-                                                artS + spedS + protS,
-                                                qtaScelta);
+  const p = acqDati?.preventivo;
+  const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
+  const artS = p ? p.articolo_sats : artStima(l) * qtaScelta,
+        spedS = via ? (via.spedizione_sats||0)
+              : (sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0),
+        protS = p ? (p.protezione_sats||0)
+              : Math.floor(artS * protPercento / 100),
+        totS = via ? via.totale_sats : artS + spedS + protS,
+        circaS = p ? ((p.stima || (via && via.stima)) ? '≈ ' : '')
+               : stimaCirca(l);
+  el('payAmount').textContent = circaS + fmt(totS);
+  el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS, totS,
+                                                (p && p.quantita) || qtaScelta);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
     `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale ${TEMPI.invoice} minuti`;
@@ -7443,9 +7792,10 @@ async function startBuy(){
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({annuncio_id: l.id, consegna: sceltaConsegna(l),
-                          quantita: qtaScelta,
-                          offerta_id: offAcc ? offAcc.id : 0})});
+    body: JSON.stringify({annuncio_id: l.id,
+                          quantita: acqDati?.qta || qtaScelta,
+                          offerta_id: offAcc ? offAcc.id : 0,
+                          ...corpoConsegna()})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
   currentOrderId = d.ordine_id;
@@ -7480,8 +7830,11 @@ async function verificaOrdine(oid){
       if (nwcRipristina) { nwcRipristina(); nwcRipristina = null; }
       closeSheet();
       /* qualunque pagamento riuscito azzera il pacco in composizione:
-         lo stock e' appena cambiato, e un pacco stantio mentirebbe */
+         lo stock e' appena cambiato, e un pacco stantio mentirebbe —
+         e con lui il preventivo della pagina d'acquisto, per la
+         stessa ragione */
       paccoDati = null; setScelte = new Map();
+      acqDati = null; ctrlPrev = null;
       toast('⚡ Sats al sicuro nel deposito!');
       await loadOrders(); renderOrders();
       setTimeout(()=>openOrder(oid), 400);
@@ -7505,15 +7858,22 @@ function compraSubito(){
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
   if (!walletNwc()) { startBuy(); return; }
-  /* per i listini EUR e' una stima: i sats veri li fissa il server */
-  const l = currentListing;
-  el('nwcConfermaSats').textContent = stimaCirca(l) + fmt(totaleStima(l));
-  const artS = artStima(l) * qtaScelta,
-        spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0,
-        protS = Math.floor(artS * protPercento / 100);
-  el('nwcScomposto').innerHTML = contoScomposto(artS, spedS, protS,
-                                                artS + spedS + protS,
-                                                qtaScelta);
+  /* Il ⚡ vive nella pagina d'acquisto (ago 2026): le cifre sono
+     quelle del preventivo — per i listini EUR restano una stima, i
+     sats veri li fissa il server con la invoice. Senza preventivo
+     (non dovrebbe succedere) si ripiega sul flusso manuale. */
+  const p = acqDati?.preventivo;
+  const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
+  if (!p || !via || via.cambio_assente) { startBuy(); return; }
+  if (acqDati.via==='punto' && !acqDati.punto.trim()){
+    toast('Indica il punto di ritiro: al venditore serve per spedire');
+    el('acqPunto')?.focus(); return;
+  }
+  const circaS = (p.stima || via.stima) ? '≈ ' : '';
+  el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);
+  el('nwcScomposto').innerHTML = contoScomposto(p.articolo_sats,
+    via.spedizione_sats||0, p.protezione_sats||0, via.totale_sats,
+    p.quantita||1);
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -7535,9 +7895,9 @@ async function confermaCompraSubito(btn){
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({annuncio_id: currentListing.id,
-                            consegna: sceltaConsegna(currentListing),
-                            quantita: qtaScelta,
-                            offerta_id: offertaAccettataPer(currentListing.id)?.id || 0})});
+                            quantita: acqDati?.qta || qtaScelta,
+                            offerta_id: offertaAccettataPer(currentListing.id)?.id || 0,
+                            ...corpoConsegna()})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
     currentOrderId = d.ordine_id;
@@ -8453,12 +8813,13 @@ function openOrder(id){
       ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0 || (o.qta>1 && !o.righe.length)) ? `<div class="eur-hint" style="margin-top:-6px">${
         (o.qta>1 && !o.righe.length) ? `${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats` : ''}${
         (o.qta>1 && !o.righe.length) && o.consegnaScelta ? ' — ' : ''}${
-        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : '🚚 con spedizione') : ''}${
+        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : o.puntoRitiro ? '📦 spedizione a un punto di ritiro' : '🚚 con spedizione') : ''}${
         ((o.qta>1||o.consegnaScelta) && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
         (o.spedSats>0||o.protSats>0) ? 'di cui ' + [
           o.spedSats>0 ? fmt(o.spedSats)+' sats di spedizione' : '',
           o.protSats>0 ? fmt(o.protSats)+' sats di protezione acquisti' : ''
         ].filter(Boolean).join(' e ') : ''}</div>` : ''}
+      ${o.puntoRitiro ? `<div class="eur-hint" style="margin-top:-2px">📦 Punto di ritiro indicato dall'acquirente: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
 
       <div class="vault">
         <div class="vault-head">
@@ -8530,6 +8891,7 @@ function openOrder(id){
         <div class="payout">
           <h4>📦 Spedisci ${o.righe.length ? 'il set (un pacco solo)' : 'l\'oggetto'}</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Spedisci e inserisci il tracciamento (l'acquirente lo vedrà e potrà seguire il pacco). Per la consegna di persona scegli "Consegna a mano".</div>
+          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${selettoreCorriere('shipCorriere')}
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
@@ -8753,6 +9115,9 @@ async function salvaLnAddressProfilo(btn){
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
+/* Lo spedizioniere del negozio e il suo catalogo, da /api/me: le
+   voci non si hardcodano mai (il pattern di max_barattolo) */
+let mySpedizioniere = '', spedizionieriCatalogo = [];
 let mySuggerimenti = false;   // «💡 Suggerimenti sui miei annunci»: opt-in, spento di serie
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
@@ -9184,6 +9549,7 @@ function renderIdentita(){
         ${pillFoto('nessuna','Nessuna')}</div>`;
   box.innerHTML = tgRiga + nsRiga + fotoRiga;
   renderAvvisi();
+  renderSpedizioniere();
   renderRicerche();
 }
 
@@ -9303,6 +9669,49 @@ async function setCanale(canale){
   toast(canale==='nostr' ? '💌 Avvisi via DM Nostr'
       : canale==='entrambi' ? '🔔 Avvisi su Telegram e Nostr'
       : '✈️ Avvisi su Telegram');
+}
+
+/* «📦 Come spedisci» (ago 2026, pagina d'acquisto): con che rete di
+   punti di ritiro lavora il negozio. Dichiarato, accende la strada
+   «punto di ritiro» su tutti gli annunci del venditore; le voci
+   arrivano da /api/me — mai hardcodate (il pattern di max_barattolo).
+   In DEMO il cassetto sparisce, il patto del wallet. */
+function renderSpedizioniere(){
+  const box = el('spedizioniereBlocco');
+  if (!box) return;
+  const sez = el('accSpedizioniere');
+  if (DEMO || !spedizionieriCatalogo.length){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const pill = (val, nome) =>
+    `<button onclick="setSpedizioniere('${esc(val)}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${mySpedizioniere===val?'var(--sats)':'var(--line)'};background:${mySpedizioniere===val?'var(--sats)':'transparent'};color:${mySpedizioniere===val?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${esc(nome)}</button>`;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      Con quale rete di punti di ritiro spedisci? Dichiarala e chi
+      compra potrà scegliere la <b style="color:var(--ink)">consegna a
+      un punto di ritiro</b> (locker o negozio convenzionato) sui tuoi
+      annunci. Senza, resta solo la spedizione a casa.</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+      ${pill('', 'Non dichiarato')}${spedizionieriCatalogo.map(s => pill(s, s)).join('')}</div>`;
+}
+
+async function setSpedizioniere(v){
+  haptic();
+  if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/spedizioniere`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({spedizioniere: v})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    mySpedizioniere = d.spedizioniere || '';
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderSpedizioniere();
+  toast(mySpedizioniere
+    ? `📦 Spedisci con ${mySpedizioniere}: la consegna al punto è accesa sui tuoi annunci`
+    : 'Spedizioniere tolto: i compratori vedranno solo la consegna a casa');
 }
 
 /* ---- Avvisi di ricerca: «dimmi quando esce quello che cerco».
@@ -11045,6 +11454,9 @@ function toggleSpedCur(){
   haptic();
   spedValuta = spedValuta==='sats' ? 'eur' : 'sats';
   el('sellSped').value = '';
+  /* il toggle e' UNO per i due costi: cambiarlo azzera anche il
+     campo punto, o resterebbe un numero nella valuta di prima */
+  if (el('sellSpedPunto')) el('sellSpedPunto').value = '';
   aggiornaSpedCampo();
 }
 function aggiornaSpedCampo(){
@@ -11058,6 +11470,14 @@ function aggiornaSpedCampo(){
   inp.step = inEur ? '0.01' : '1';
   inp.inputMode = inEur ? 'decimal' : 'numeric';
   inp.placeholder = inEur ? '0,00' : '0';
+  /* il campo punto SEGUE il toggle del campo casa (un interruttore
+     solo, mai due semantiche diverse per i due costi) */
+  const inpP = el('sellSpedPunto'), etP = el('sellSpedPuntoCur');
+  if (inpP && etP){
+    etP.textContent = inEur ? '€' : 'sats';
+    inpP.step = inEur ? '0.01' : '1';
+    inpP.inputMode = inEur ? 'decimal' : 'numeric';
+  }
   aggiornaSpedHint();
 }
 /* L'hint dice la SEMANTICA del toggle, con la stima live quando il
@@ -11170,6 +11590,8 @@ function aggiornaConsegnaForm(){
         rit = el('sellConsRitiro').checked,
         asta = astaAccesa();
   el('sellSpedField').style.display = (sped && !asta) ? '' : 'none';
+  if (el('sellSpedPuntoField'))
+    el('sellSpedPuntoField').style.display = (sped && !asta) ? '' : 'none';
   el('sellTagliaField').style.display = sped ? '' : 'none';
   if (el('sellQtaField') && !editandoNostr)
     el('sellQtaField').style.display = asta ? 'none' : '';
@@ -11213,6 +11635,19 @@ function consegnaPayload(){
     if (sellValuta==='eur' || spedValuta==='eur')
       out.spedizione_eur = eurCampo('sellSped');
     else out.spedizione_sats = parseInt(el('sellSped').value)||0;
+    /* La tariffa PUNTO: VUOTO ≠ ZERO, mai un ||0 sul test di
+       presenza — vuoto = non dichiarata (vale la casa), «0» scritto
+       = gratis al punto. La dichiarazione esplicita (anche a 0)
+       viaggia sempre: cosi' in modifica svuotare il campo toglie la
+       dichiarazione, mentre il client vecchio in cache, che non
+       manda nessuna chiave, la CONSERVA (decide il server). */
+    const vp = String(el('sellSpedPunto')?.value ?? '').trim();
+    out.spedizione_punto_dichiarata = vp !== '' ? 1 : 0;
+    if (vp !== ''){
+      if (sellValuta==='eur' || spedValuta==='eur')
+        out.spedizione_punto_eur = eurCampo('sellSpedPunto');
+      else out.spedizione_punto_sats = parseInt(vp)||0;
+    }
   }
   return out;
 }
@@ -11252,6 +11687,12 @@ function editListing(id){
   spedValuta = l.spedEur>0 ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
   el('sellSped').value = (l.consegna==='spedizione'||l.consegna==='entrambe')
     ? (l.spedEur>0 ? l.spedEur : (l.sped||0)) : '';
+  /* la tariffa punto si precompila SOLO se dichiarata: il campo
+     vuoto e' il suo modo di dire «vale il costo qui sopra» */
+  if (el('sellSpedPunto'))
+    el('sellSpedPunto').value = (l.spedPuntoDich
+      && (l.consegna==='spedizione'||l.consegna==='entrambe'))
+      ? (l.spedPuntoEur>0 ? l.spedPuntoEur : (l.spedPunto||0)) : '';
   aggiornaSpedCampo();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
   renderFotoPreview(); aggiornaFormVendi();
@@ -11261,7 +11702,8 @@ function editListing(id){
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
-  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped','sellQta'].forEach(i=>el(i).value='');
+  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
+   'sellSpedPunto','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
@@ -11488,7 +11930,11 @@ async function publish(){
       cat:el('sellCat').value,
       /* come il server: spedEur pieno = costo ancorato all'euro */
       consegna:cns.consegna, sped:cns.spedizione_sats||0,
-      spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
+      spedEur:cns.spedizione_eur||0,
+      spedPunto:cns.spedizione_punto_sats||0,
+      spedPuntoEur:cns.spedizione_punto_eur||0,
+      spedPuntoDich:!!cns.spedizione_punto_dichiarata,
+      taglia:cns.taglia_pacco,
       ancheDigitale:!!cns.anche_digitale,
       condizione:el('sellCond').value, quantita:qtaForm(),
       zone:el('sellZone').value||'', comune:comuneDemo(el('sellZone').value),
@@ -11519,7 +11965,8 @@ async function publish(){
         hintPubblicazione = {id:'npubverifica', annuncio:nuovoId};
     }
   }
-  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped','sellQta'].forEach(i=>el(i).value='');
+  ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
+   'sellSpedPunto','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
@@ -11557,7 +12004,11 @@ async function salvaModifica(t, p){
         valuta:sellValuta, priceEur: sellValuta==='eur' ? p : 0,
         cat:el('sellCat').value,
         consegna:cns.consegna, sped:cns.spedizione_sats||0,
-        spedEur:cns.spedizione_eur||0, taglia:cns.taglia_pacco,
+        spedEur:cns.spedizione_eur||0,
+        spedPunto:cns.spedizione_punto_sats||0,
+        spedPuntoEur:cns.spedizione_punto_eur||0,
+        spedPuntoDich:!!cns.spedizione_punto_dichiarata,
+        taglia:cns.taglia_pacco,
         ancheDigitale:!!cns.anche_digitale,
         condizione:el('sellCond').value, quantita:qtaForm(),
         zone:el('sellZone').value||'', comune:comuneDemo(el('sellZone').value),
@@ -12693,6 +13144,8 @@ async function avvia(){
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
     mySuggerimenti = !!me.suggerimenti_annunci;
+    mySpedizioniere = me.spedizioniere || '';
+    spedizionieriCatalogo = me.spedizionieri || [];
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;
