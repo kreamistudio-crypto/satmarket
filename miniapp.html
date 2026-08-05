@@ -1458,6 +1458,9 @@
     font-weight:600}
   .via-opzione .via-tot{font-family:'JetBrains Mono',monospace;
     flex:0 0 auto;font-size:14.5px}
+  /* «gratuita» e' una parola, non un numero: niente mono, grassetto
+     per il patto della spedizione gratuita (mai col colore) */
+  .via-opzione .via-gratis{flex:0 0 auto;font-weight:800;font-size:13.5px}
   /* la strada spenta (cambio assente) resta visibile col motivo:
      si spegne, non sparisce — il campo non deve mentire */
   .via-opzione.off{opacity:.55;cursor:default}
@@ -6632,7 +6635,11 @@ function renderAcquisto(){
       <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'')}</span>
     </div>`;
   }
-  /* --- le vie, coi totali gia' nel preventivo --- */
+  /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
+     (decisione di Andrea, ago 2026: il totale con dentro l'oggetto
+     si leggeva come «costo di spedizione» — il totale lo dice IL
+     CONTO qui sotto, che segue la via scelta; mai due totali in
+     pagina). Ritiro e codice online non spediscono: niente cifra. */
   const strade = (p.strade||[]).filter(s => s.via !== '');
   const stradaSel = (p.strade||[]).find(s => s.via === d.via) || null;
   let vie = '';
@@ -6642,15 +6649,17 @@ function renderAcquisto(){
       if (s.cambio_assente)
         return `<div class="via-opzione off"><span class="via-nome">${nomeVia(s.via)}
           <span class="via-sped">il cambio euro non è disponibile: riprova tra poco</span></span></div>`;
-      const spedRiga = (s.via==='casa' || s.via==='punto')
-        ? `<span class="via-sped">${s.spedizione_sats>0
-            ? `spedizione ${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'')}`
-            : 'spedizione gratuita'}${s.via==='punto' && s.fallback_casa
-            ? ' (come a casa)' : ''}</span>` : '';
+      const nota = (s.via==='punto' && s.fallback_casa)
+        ? `<span class="via-sped">come a casa</span>` : '';
+      const cifra = (s.via==='casa' || s.via==='punto')
+        ? (s.spedizione_sats>0
+            ? `<span class="via-tot">${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'')}</span>`
+            /* la gratuita' parla col grassetto, mai col colore */
+            : `<span class="via-gratis">gratuita</span>`)
+        : '';
       return `<button type="button" role="radio" aria-checked="${s.via===d.via}"
         class="via-opzione" data-via="${s.via}" onclick="setViaAcquisto(this.dataset.via)">
-        <span class="via-nome">${nomeVia(s.via)}${spedRiga}</span>
-        <span class="via-tot">${cifraCtrl(s.totale_sats, (p.stima||s.stima)?'≈ ':'')}</span>
+        <span class="via-nome">${nomeVia(s.via)}${nota}</span>${cifra}
       </button>`;
     }).join('') + `</div>`;
   }
