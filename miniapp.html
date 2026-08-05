@@ -61,20 +61,21 @@
     /* I DUE PONTI (ago 2026, decisione di Andrea): «Scrivi su
        Telegram» e «Scrivi su Nostr» prendono il colore del loro
        MONDO — è l'unico posto dell'app dove un bottone porta fuori,
-       e il colore dice dove. Sono FISSI nei due temi, come tutti i
-       colori che SIGNIFICANO qualcosa (il patto di --ship-soft): un
-       marchio non cambia tinta di notte, e il testo sopra è bianco
-       in tutti e due i casi.
-       ATTENZIONE, e per questo non si riusa `var(--nostr)` così
-       com'è: quel token è TEMATICO (#8B5CF6 di giorno, #A78BFA di
-       sera) perché veste pallini e accenti SUL fondo della pagina;
-       su un bottone PIENO col testo bianco, di sera scenderebbe a
-       2,72 — cioè illeggibile. `--nostr-btn` è lo stesso viola di
-       casa (è esattamente `--nostr-text` del tema chiaro) ma PINNATO.
-       Misurati, bianco sopra: Telegram 4,75 e Nostr 5,70 — AA pieno
-       in entrambi i temi, e sopra la linea del nostro stesso CTA
-       arancio (2,30), che resta lo standard di casa. */
-    --tg-btn:#1878B8; --nostr-btn:#7C3AED;
+       e il colore dice dove.
+       SBIADITI, non pieni (ritocco di Andrea guardandoli a schermo):
+       il fondo è una velatura della tinta e a portare l'identità sono
+       il testo e il contorno. Due blocchi saturi in fila facevano
+       concorrenza a tutto il resto della pagina, e questi non sono
+       nemmeno azioni dentro Barattolo — portano FUORI: devono farsi
+       trovare, non gridare. È la ricetta di `.btn.ghost` con la
+       tonalità al posto dell'inchiostro, quindi zero forme nuove.
+       Il TELEGRAM ha la sua coppia (l'azzurro di casa è dei badge
+       spedizione, e un colore che significa una cosa non se ne
+       prende un'altra); il NOSTR riusa i token che c'erano già —
+       `--nostr-soft` e `--nostr-text` sono nati proprio per questo.
+       Misurati, testo su fondo: Telegram 5,36 (giorno) e 7,81
+       (notte), Nostr 4,91 e 7,88 — AA pieno in entrambi i temi. */
+    --tg-soft:#E3F1FB; --tg-soft-on:#1A6699;
     --trust-deep:#10603A; --trust-text:#157347;
     --nostr:#8B5CF6; --nostr-soft:#F2EBFE; --nostr-text:#7C3AED;
     --chip-bg:#F3ECDA;
@@ -173,6 +174,11 @@
     --lampo-text:#FF8A6B;
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
     --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
+    /* il ponte Telegram di sera: la velatura si scurisce e il testo
+       si schiarisce — si abbassa la luce, non si cambia il segno.
+       Il gemello Nostr non serve: --nostr-soft e --nostr-text girano
+       gia' da soli. */
+    --tg-soft:#1B2A38; --tg-soft-on:#8FC4E6;
     --chip-bg:#37301F;
     --jar-riflesso:#7FA3B5;   /* il vetro di sera riflette piu' piano */
     --field-line:#4A4029; --line-soft:#362E1E;
@@ -1766,25 +1772,31 @@
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
   /* I DUE PONTI verso l'esterno (ago 2026): stessa FORMA di ogni
-     altro bottone — rettangolo col raggio di casa, ombra piena,
-     stesso peso — e a cambiare e' solo il colore, che qui dice DOVE
-     porta. L'ombra e' il colore stesso al buio invece di --ink: su un
-     fondo saturo l'ombra nera del ghost sembrerebbe sporco.
-     Sono gli unici bottoni pieni che NON sono un'azione dentro
-     Barattolo: proprio per questo non parlano arancio, che resta
+     altro bottone — rettangolo col raggio di casa, contorno da 2 e
+     ombra piena — e a cambiare e' solo la TINTA. E' la ricetta esatta
+     di `.btn.ghost`, che veste testo, bordo e ombra dello stesso
+     colore: qui quel colore non e' l'inchiostro, e' il mondo dove il
+     bottone porta.
+     Il fondo e' una VELATURA e non la tinta piena (ritocco di Andrea
+     guardandoli a schermo): due blocchi saturi in fila facevano
+     concorrenza a tutta la pagina, e questi non sono nemmeno azioni
+     dentro Barattolo — portano FUORI, quindi devono farsi trovare,
+     non gridare. Per la stessa ragione non parlano arancio, che resta
      dell'acquisto. */
   /* La testata del negozio non aveva MARGINI su mobile (li metteva
      solo la media query da 768 in su): riquadro venditore e bottoni
      arrivavano a filo schermo, e col ghost bianco non si notava. Coi
-     due ponti PIENI si vede eccome — due blocchi di colore incollati
-     ai bordi — quindi il rientro va messo, ed è lo stesso `--pad` del
+     due ponti COLORATI si vede eccome — due blocchi di tinta
+     incollati ai bordi — quindi il rientro va messo, ed è lo stesso `--pad` del
      resto (la `.back` sopra stava già a 16). Il dettaglio ce l'aveva
      già, dal padding di `.detail-body`: ora le due pagine si
      somigliano. */
   #negozioHeader{padding:0 var(--pad)}
-  .btn.ponte{color:#fff;border:0}
-  .btn.ponte.tg{background:var(--tg-btn);box-shadow:0 3px 0 #125C8E}
-  .btn.ponte.nostr{background:var(--nostr-btn);box-shadow:0 3px 0 #5B21B6}
+  .btn.ponte{border:2px solid}
+  .btn.ponte.tg{background:var(--tg-soft);color:var(--tg-soft-on);
+    border-color:var(--tg-soft-on);box-shadow:0 3px 0 var(--tg-soft-on)}
+  .btn.ponte.nostr{background:var(--nostr-soft);color:var(--nostr-text);
+    border-color:var(--nostr-text);box-shadow:0 3px 0 var(--nostr-text)}
   .btn.ponte:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   /* Il ghost vestito di cartone. NON LO PORTA PIU' NESSUNO dall'ago
      2026 (decisione di Andrea): l'aveva «📦 Aggiungi al pacco», che

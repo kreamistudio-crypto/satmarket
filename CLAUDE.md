@@ -4004,18 +4004,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (rettangolo, ombra piena, stesso peso): cambia solo il colore, che
   qui dice DOVE porta. Sono gli unici bottoni pieni che NON sono
   un'azione dentro Barattolo, e per questo non parlano arancio, che
-  resta dell'acquisto. Token `--tg-btn` #1878B8 e `--nostr-btn`
-  #7C3AED, FISSI nei due temi come tutti i colori che SIGNIFICANO
-  qualcosa (il patto di `--ship-soft`: un marchio non cambia tinta di
-  notte). ATTENZIONE, ed è il motivo per cui non si riusa `var(--nostr)`
-  così com'è: quel token è TEMATICO (#8B5CF6 / #A78BFA) perché veste
-  pallini e accenti SUL fondo della pagina — su un bottone PIENO col
-  testo bianco, di sera scenderebbe a 2,72, cioè illeggibile.
-  `--nostr-btn` è lo stesso viola di casa (è esattamente
-  `--nostr-text` del tema chiaro) ma PINNATO. Misurati, bianco sopra:
-  Telegram 4,75 e Nostr 5,70 — AA pieno in entrambi i temi, e sopra la
-  linea del nostro stesso CTA arancio (2,30), che resta lo standard di
-  casa. Col colore è venuto fuori un difetto che il ghost bianco
+  resta dell'acquisto.
+  SBIADITI, NON PIENI (ritocco di Andrea guardandoli a schermo, ed è
+  la versione che vale): il fondo è una VELATURA della tinta, e a
+  portare l'identità sono il testo e il contorno. Nati saturi col
+  testo bianco, due blocchi di colore in fila facevano concorrenza a
+  tutta la pagina — e questi non sono nemmeno azioni dentro Barattolo:
+  portano FUORI, quindi devono farsi trovare, non gridare. La ricetta
+  è quella di `.btn.ghost`, che veste testo, bordo e ombra dello
+  stesso colore: qui quel colore non è l'inchiostro, è il mondo dove
+  il bottone porta — zero forme nuove.
+  Il NOSTR riusa i token che c'erano già, `--nostr-soft` +
+  `--nostr-text`, nati esattamente per una superficie velata (ed è
+  anche il motivo per cui il `var(--nostr)` pieno non andava: su un
+  fondo saturo col testo bianco, di sera scendeva a 2,72). Il
+  TELEGRAM ha la sua coppia `--tg-soft` / `--tg-soft-on`
+  (#E3F1FB/#1A6699 di giorno, #1B2A38/#8FC4E6 di sera — di notte la
+  velatura si scurisce e il testo si schiarisce: si abbassa la luce,
+  non si cambia il segno), e NON prende in prestito l'azzurro di casa,
+  che è dei badge spedizione: un colore che significa una cosa non se
+  ne prende un'altra. Misurati, testo su fondo: Telegram 5,36 e 7,81,
+  Nostr 4,91 e 7,88 — AA pieno in entrambi i temi.
+  ATTENZIONE se un domani si vorrà sbiadirli ancora: il fondo è già al
+  livello «soft» di casa (contro la pagina fa 1,05–1,18, cioè si legge
+  come una velatura e basta) ed è il CONTORNO a dire che è un bottone.
+  La leva che resta è l'ombra piena, non il fondo.
+  Col colore è venuto fuori un difetto che il ghost bianco
   nascondeva: `#negozioHeader` non aveva MARGINI su mobile (li metteva
   solo la media query da 768 in su) e i due blocchi pieni arrivavano a
   filo schermo — ora il rientro c'è, ed è lo stesso `--pad` del resto.
