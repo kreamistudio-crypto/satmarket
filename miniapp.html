@@ -5093,6 +5093,10 @@ async function aggiornaVista(){
     await loadListings();
     renderGrid();
     if (!VETRINA) { try { await caricaPreferiti(); aggiornaJarCards(); } catch(e){} }
+    /* La coda delle firme Nostr si svuota qui, in sottofondo e in
+       silenzio: se non c'e' una strada automatica non fa niente e
+       riprova alla prossima apertura. Mai atteso, mai bloccante. */
+    if (!VETRINA) svuotaFirmeNostr().catch(()=>{});
     return;
   }
   if (v === 'affari' || v === 'profilo') go(v);
@@ -7966,9 +7970,13 @@ function openDetail(id){
         ? hintHTML('lnaddr',
             'Imposta il tuo Lightning address: quando vendi, i sats ti arrivano da soli.',
             'Imposta', "apriCassettoProfilo('walletBlocco')", 'Dopo')
-        : hintHTML('npubverifica',
+        : hintPubblicazione.id === 'npubverifica'
+        ? hintHTML('npubverifica',
             'La tua npub non è ancora verificata: il badge 🟣 sugli annunci arriva con la verifica.',
-            'Verifica', "apriCassettoProfilo('accIdentita')", 'Dopo');
+            'Verifica', "apriCassettoProfilo('accIdentita')", 'Dopo')
+        : hintHTML('nostrpub',
+            'Questo annuncio è finito su Nostr firmato da Barattolo. Collega la tua chiave Nostr e i prossimi nasceranno sul TUO profilo, con la tua reputazione.',
+            'Collega Nostr', "apriCassettoProfilo('accIdentita')", 'Dopo');
       document.querySelector('#detailContent .detail-body')
         ?.insertAdjacentHTML('beforeend', h);
     }
@@ -13530,6 +13538,7 @@ async function publish(){
     inRevisione = !!d.revisione; attesaOre = d.attesa_ore || 24;
     avvisoFotoTesto = avvisoFoto(d, sellFoto.length);
     await loadListings();
+    svuotaFirmeNostr().catch(()=>{});   // l'annuncio appena nato
     /* Un suggerimento al massimo, sul momento giusto: prima gli
        incassi (senza ln address restano appesi), poi il badge 🟣.
        In revisione niente hint: il dettaglio non si aprirà. */
@@ -13538,6 +13547,14 @@ async function publish(){
         hintPubblicazione = {id:'lnaddr', annuncio:nuovoId};
       else if (myNpub && !myNpubVerified && !hintDismesso('npubverifica'))
         hintPubblicazione = {id:'npubverifica', annuncio:nuovoId};
+      /* Terzo (ago 2026): chi NON ha una chiave Nostr provata non sa
+         che i suoi annunci finiscono su Nostr a nome di Barattolo.
+         Glielo si dice QUI, dove ha appena pubblicato e il vantaggio
+         si capisce: con la sua chiave, l'annuncio nasce sul SUO
+         profilo e la reputazione se la costruisce lui. */
+      else if (!myNpubAccesso && !myNpubVerified
+               && !hintDismesso('nostrpub'))
+        hintPubblicazione = {id:'nostrpub', annuncio:nuovoId};
     }
   }
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
@@ -13641,6 +13658,88 @@ async function salvaModifica(t, p){
    {biglietto, pubkey, sig} e la copia locale si allinea subito. Se il
    passo 5 fallisce dopo i relay, l'import orario riconcilia entro
    un'ora: per gli importati i relay sono la fonte di verita'. */
+
+/* ---- LA CODA DELLE FIRME NOSTR (ago 2026) ----------------------
+   Un doppio cittadino deve ritrovarsi gli annunci sul SUO account
+   Nostr, non su quello di Barattolo. La nsec pero' ce l'ha solo lui
+   (regola 2), quindi a firmare e' questo browser: il server prepara
+   gli eventi, qui si firmano e si mandano ai relay.
+   SILENZIOSO PER SCELTA: si firma solo se una strada AUTOMATICA c'e'
+   gia' (sessione bunker o estensione). Mai aprire il foglio della
+   chiave all'avvio dell'app — sarebbe un'imboscata, e chi non se
+   l'aspetta impara a dire di no. Se non si puo' firmare la coda
+   resta li' e riprova alla prossima apertura: non si perde niente. */
+async function firmatarioAutomatico(){
+  const salvata = bunkerSalvato();
+  if (salvata) {
+    try { return {f: await firmatarioBunker(salvata.uri, salvata.sk),
+                  chiudi: true}; }
+    catch(e){
+      console.log(`🟪 [coda] bunker muto (${e.message||e}): si riprovera'`);
+      return null;   // NON si scorda: puo' essere solo offline adesso
+    }
+  }
+  if (window.nostr) return {f: firmatarioEstensione(), chiudi: false};
+  return null;
+}
+
+async function svuotaFirmeNostr(){
+  if (DEMO || VETRINA || !(myNpubAccesso || myNpubVerified)) return;
+  let d;
+  try {
+    const r = await fetch(`${API_BASE}/me/firme-nostr`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok) return;
+    d = await r.json();
+  } catch(e){ return; }
+  if (!d.firme || !d.firme.length) return;
+  const auto = await firmatarioAutomatico();
+  if (!auto) {
+    console.log(`🟪 [coda] ${d.firme.length} firme in attesa, nessuna `
+      + `strada automatica: restano in coda`);
+    return;
+  }
+  try {
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    let pub;
+    try { pub = String(await auto.f.pubkey() || '').toLowerCase(); }
+    catch(e){ return; }
+    for (const voce of d.firme){
+      /* Stessa cintura della modifica firmata: l'id si ricontrolla in
+         pagina, cosi' un firmatario che altera l'evento si ferma qui */
+      let firmato;
+      try { firmato = await auto.f.firma(voce.evento); }
+      catch(e){
+        console.log(`🟪 [coda] firma rifiutata su #${voce.annuncio_id}`);
+        break;      // ha detto no: non si insiste sulle altre
+      }
+      if (!firmato || firmato.id !== NT.getEventHash({...voce.evento, pubkey: pub})){
+        console.log('🟪 [coda] evento alterato dal firmatario: fermo');
+        break;
+      }
+      /* Prima i relay: zero OK = non e' successo niente, e il server
+         non deve credere che l'evento sia in piazza */
+      const ok = d.collaudo ? 1
+        : await pubblicaEventoSuRelay(d.relays, firmato);
+      if (!ok){
+        console.log(`🟪 [coda] nessun relay ha preso #${voce.annuncio_id}`);
+        continue;
+      }
+      try {
+        await fetch(`${API_BASE}/me/firme-nostr`,
+          {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),
+                                   'Content-Type':'application/json'},
+           body: JSON.stringify({biglietto: voce.biglietto,
+                                 pubkey: pub, sig: firmato.sig})});
+        console.log(`🟪 [coda] #${voce.annuncio_id} (${voce.azione}) `
+          + `firmato e in piazza`);
+      } catch(e){ /* i relay ce l'hanno: il server si allinea al giro dopo */ }
+    }
+  } finally {
+    if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} }
+  }
+}
 
 async function pubblicaEventoSuRelay(relays, evento){
   /* Consegna l'evento firmato ai relay, uno per uno in parallelo,

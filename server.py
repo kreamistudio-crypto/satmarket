@@ -1238,6 +1238,24 @@ def init_db():
         ottenuto_il INTEGER,
         PRIMARY KEY(tg_id, badge_id)
     );
+    CREATE TABLE IF NOT EXISTS firme_nostr(
+        -- LA CODA DELLE FIRME (ago 2026). Un doppio cittadino che
+        -- pubblica qui deve ritrovarsi l'annuncio sul SUO account
+        -- Nostr, non su quello di Barattolo: e' la sua reputazione,
+        -- non la nostra. Ma la nsec non ce l'abbiamo e non la vogliamo
+        -- (regola ferrea 2), quindi a firmare e' il BROWSER — e il
+        -- browser c'e' solo quando l'utente e' li'.
+        -- Da qui la coda: il server prepara l'evento e aspetta. La
+        -- PUBBLICAZIONE e' solo la prima azione, non un caso a parte,
+        -- e cosi' pubblicare e aggiornare hanno un motore solo.
+        -- UNA riga per annuncio (PK): l'ultima azione vince, che e'
+        -- anche la cosa giusta — venduto e poi rimborsato fa 'active',
+        -- e non due firme da chiedere.
+        annuncio_id INTEGER PRIMARY KEY,
+        tg_id INTEGER NOT NULL,
+        azione TEXT NOT NULL,     -- pubblica | sold | active | ritira
+        creato INTEGER
+    );
     CREATE TABLE IF NOT EXISTS xp_eventi(
         -- IL REGISTRO DEGLI XP, ed e' append-only per una ragione che
         -- vale la pena scrivere: distintivi e rating si RICALCOLANO
@@ -1820,6 +1838,19 @@ def init_db():
     # (✏️ "Venduto" sul canale, cancellazione alla rimozione)
     for colonna in ("foto TEXT DEFAULT ''", "contatto_nostr TEXT DEFAULT ''",
                     "nostr_event_id TEXT DEFAULT ''",
+                    # nostr_autore (ago 2026): la chiave hex che ha
+                    # FIRMATO l'evento di questo annuncio ('' = la
+                    # piattaforma, com'e' sempre stato). Serve a una
+                    # cosa sola ma decisiva: un evento firmato
+                    # dall'utente la piattaforma NON lo puo' piu'
+                    # toccare — niente «venduto», niente NIP-09 — e
+                    # senza questa colonna ci proverebbe lo stesso,
+                    # scrivendone uno suo accanto al suo.
+                    # NON si usa contatto_nostr per dirlo: quella
+                    # colonna significa «importato dai relay» e
+                    # l'import orario riscriverebbe l'annuncio da capo
+                    # (piu' l'invariante che le due non stiano insieme).
+                    "nostr_autore TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
                     "prezzo_eur REAL DEFAULT 0",
                     "nostr_origine_d TEXT DEFAULT ''",
@@ -13795,6 +13826,139 @@ async def scegli_suggerimenti(req: Request,
     return {"ok": True, "attivi": bool(attivi)}
 
 
+BIGLIETTI_FIRMA_NOSTR: dict[str, dict] = {}
+
+
+@app.get("/api/me/firme-nostr")
+async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Cosa aspetta la firma di questo utente. Per ogni annuncio in
+    coda si prepara l'evento GIA' PRONTO ma NON firmato, col suo
+    biglietto: il client firma (bunker, estensione o nsec in pagina —
+    mai qui), pubblica sui relay e torna con {biglietto, pubkey, sig}.
+    Se l'utente non ha piu' una chiave provata la coda si svuota da
+    sola: senza chiave quelle firme non arriveranno mai."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    u = con.execute("SELECT npub, npub_verificata, npub_accesso "
+                    "FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
+    sua = chiave_nostr_provata(u)
+    if not sua:
+        con.execute("DELETE FROM firme_nostr WHERE tg_id=?", (user["id"],))
+        con.commit()
+        con.close()
+        return {"firme": []}
+    righe = con.execute(
+        "SELECT f.annuncio_id, f.azione, a.* FROM firme_nostr f "
+        "JOIN annunci a ON a.id=f.annuncio_id "
+        "WHERE f.tg_id=? ORDER BY f.creato LIMIT 20",
+        (user["id"],)).fetchall()
+    con.close()
+
+    adesso = time.time()
+    for b in [b for b, v in BIGLIETTI_FIRMA_NOSTR.items()
+              if v["scade"] < adesso]:
+        BIGLIETTI_FIRMA_NOSTR.pop(b, None)
+    while len(BIGLIETTI_FIRMA_NOSTR) >= 1000:
+        BIGLIETTI_FIRMA_NOSTR.pop(next(iter(BIGLIETTI_FIRMA_NOSTR)))
+
+    fuori = []
+    for r in righe:
+        a = dict(r)
+        if a["azione"] == "ritira":
+            if not a["nostr_event_id"]:
+                continue     # non e' mai nato: non c'e' niente da ritirare
+            tags = [["e", a["nostr_event_id"]],
+                    ["a", f"30402:{sua}:barattolo-{a['id']}"],
+                    ["k", "30402"]]
+            evento = evento_non_firmato(sua, 5, tags,
+                                        "Annuncio rimosso da Barattolo",
+                                        int(time.time()))
+        else:
+            # 'pubblica' rilegge lo stato di ADESSO: fra l'accodamento
+            # e la firma l'annuncio puo' essere stato venduto, e
+            # nascere «attivo» sarebbe una bugia in piazza.
+            stato = a["azione"] if a["azione"] in ("sold", "active") else (
+                "sold" if a["stato"] == "venduto" else "active")
+            # Si riusa evento_annuncio per non avere DUE posti che
+            # costruiscono i tag NIP-99 di un annuncio (divergerebbero
+            # al primo campo nuovo, ed e' anche cio' che la sentinella
+            # del «punto» sorveglia). Firma con la chiave nostra e la
+            # firma si butta: qui servono solo tags e content, che poi
+            # l'utente firma con la SUA. Uno spreco dichiarato, in
+            # cambio di un posto solo — e la coda si riempie solo dopo
+            # il gate _NOSTR, quindi la chiave c'e' di sicuro.
+            base = evento_annuncio(a, stato)
+            evento = evento_non_firmato(sua, 30402, base["tags"],
+                                        base["content"], base["created_at"])
+        biglietto = secrets.token_urlsafe(32)
+        BIGLIETTI_FIRMA_NOSTR[biglietto] = {
+            "annuncio_id": a["id"], "tg_id": user["id"],
+            "azione": a["azione"], "kind": evento["kind"],
+            "tags": evento["tags"], "content": evento["content"],
+            "created_at": evento["created_at"], "scade": adesso + 600}
+        fuori.append({"biglietto": biglietto, "annuncio_id": a["id"],
+                      "titolo": a["titolo"], "azione": a["azione"],
+                      "evento": evento})
+    return {"firme": fuori, "relays": _relays_import(),
+            "collaudo": MODALITA_COLLAUDO}
+
+
+@app.post("/api/me/firme-nostr")
+async def firma_nostr_fatta(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il client ha firmato e messo l'evento sui relay: qui si
+    verifica la firma sull'evento RICOSTRUITO dal biglietto (una
+    divergenza e' impossibile per costruzione) e si registra chi l'ha
+    firmato. Da quel momento la piattaforma NON tocca piu' quell'evento
+    — e' proprio il punto di tutto questo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    b = BIGLIETTI_FIRMA_NOSTR.pop(str(d.get("biglietto") or ""), None)
+    if not b or b["scade"] < time.time() or b["tg_id"] != user["id"]:
+        raise HTTPException(400, "La firma ha aspettato troppo: "
+                                 "la richiesta tornerà da sola")
+    pubkey = str(d.get("pubkey") or "").lower()
+    sig = str(d.get("sig") or "").lower()
+    if not RE_HEX_64.fullmatch(pubkey) or not RE_HEX_128.fullmatch(sig):
+        raise HTTPException(400, "Firma malformata")
+    if ChiavePubblicaNostr is None:
+        raise HTTPException(503, "Firma Nostr non disponibile: sul server "
+                                 "manca il pacchetto coincurve")
+    con = db()
+    u = con.execute("SELECT npub, npub_verificata, npub_accesso "
+                    "FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
+    # La chiave si rilegge FRESCA: fra il biglietto e adesso l'utente
+    # puo' aver cambiato npub, e un evento firmato da una chiave che
+    # non e' piu' sua non e' suo.
+    if pubkey != chiave_nostr_provata(u):
+        con.close()
+        raise HTTPException(400, "La firma non è della tua chiave Nostr")
+    ev = evento_non_firmato(pubkey, b["kind"], b["tags"], b["content"],
+                            b["created_at"])
+    try:
+        buona = ChiavePubblicaNostr(bytes.fromhex(pubkey)).verify(
+            bytes.fromhex(sig), bytes.fromhex(ev["id"]))
+    except Exception:
+        buona = False
+    if not buona:
+        con.close()
+        raise HTTPException(400, "Firma non valida")
+    if b["azione"] == "ritira":
+        # Ritirato: la riga torna com'era prima di Nostr, e nessun
+        # gancio la ripubblichera' piu' (sono tutti solo_aggiornamento)
+        con.execute("UPDATE annunci SET nostr_event_id='', nostr_autore='' "
+                    "WHERE id=?", (b["annuncio_id"],))
+    else:
+        con.execute("UPDATE annunci SET nostr_event_id=?, nostr_autore=? "
+                    "WHERE id=?", (ev["id"], pubkey, b["annuncio_id"]))
+    con.execute("DELETE FROM firme_nostr WHERE annuncio_id=?",
+                (b["annuncio_id"],))
+    con.commit()
+    con.close()
+    return {"ok": True, "evento": ev["id"]}
+
+
 @app.post("/api/me/titolo")
 async def scegli_titolo(req: Request,
                         x_tg_init_data: str = Header(""),
@@ -14809,6 +14973,39 @@ async def manda_dm_nostr(dest_hex: str, testo: str) -> bool:
         return False
 
 
+def chiave_nostr_provata(u) -> str:
+    """La chiave Nostr di cui quell'utente ha DIMOSTRATO il possesso,
+    in hex ('' = nessuna). E' la regola di notifica() e dei ponti:
+    `npub_accesso` (ci entra) oppure il badge `npub` ma solo se
+    VERIFICATO — mai una npub nuda, che e' una dichiarazione e non una
+    prova. Qui conta piu' che altrove: da questa chiave dipende A CHI
+    si intesta un annuncio in piazza."""
+    if not u:
+        return ""
+    for campo, serve_verifica in (("npub_accesso", False),
+                                  ("npub", True)):
+        val = (u[campo] if campo in u.keys() else "") or ""
+        if not val or (serve_verifica and not u["npub_verificata"]):
+            continue
+        try:
+            return npub_to_hex(val)
+        except ValueError:
+            continue
+    return ""
+
+
+def accoda_firma(con, annuncio_id: int, tg_id: int, azione: str):
+    """Mette (o sostituisce) l'azione in sospeso su quell'annuncio.
+    L'ultima vince: venduto e poi rimborsato fa 'active', e all'utente
+    si chiede UNA firma sola invece di due. Niente commit: e' del
+    chiamante."""
+    con.execute(
+        "INSERT INTO firme_nostr(annuncio_id, tg_id, azione, creato) "
+        "VALUES(?,?,?,?) ON CONFLICT(annuncio_id) DO UPDATE SET "
+        "azione=excluded.azione, creato=excluded.creato",
+        (annuncio_id, tg_id, azione, int(time.time())))
+
+
 async def annuncio_su_nostr(annuncio_id: int, status: str,
                             solo_aggiornamento: bool = False):
     """Pubblica (o ripubblica con nuovo status) un annuncio su Nostr.
@@ -14821,9 +15018,35 @@ async def annuncio_su_nostr(annuncio_id: int, status: str,
         con = db()
         a = con.execute("SELECT * FROM annunci WHERE id=?",
                         (annuncio_id,)).fetchone()
-        con.close()
+        u = con.execute("SELECT npub, npub_verificata, npub_accesso "
+                        "FROM utenti WHERE tg_id=?",
+                        (a["venditore_id"],)).fetchone() if a else None
         if not a or a["contatto_nostr"]:
+            con.close()
             return   # importato da Nostr: l'evento e' gia' del venditore
+        # IL BIVIO (ago 2026): se il venditore ha una chiave Nostr sua,
+        # l'annuncio va sul SUO account e non sul nostro — e' la sua
+        # reputazione, non la nostra. Ma la nsec ce l'ha solo lui,
+        # quindi qui non si firma niente: si ACCODA, e a firmare sara'
+        # il browser alla prima apertura. Il bivio sta DENTRO il
+        # funnel e non nei suoi chiamanti, cosi' prima pubblicazione e
+        # aggiornamenti lo ereditano tutti senza toccarne nessuno.
+        if chiave_nostr_provata(u):
+            gia = con.execute("SELECT azione FROM firme_nostr "
+                              "WHERE annuncio_id=?",
+                              (annuncio_id,)).fetchone()
+            if gia and gia["azione"] == "pubblica":
+                con.close()
+                return   # deve ancora nascere: l'evento nascera' gia'
+                         # col suo stato di adesso, riletto alla firma
+            if a["nostr_event_id"]:
+                accoda_firma(con, annuncio_id, a["venditore_id"], status)
+            elif not solo_aggiornamento:
+                accoda_firma(con, annuncio_id, a["venditore_id"], "pubblica")
+            con.commit()
+            con.close()
+            return
+        con.close()
         if solo_aggiornamento and not a["nostr_event_id"]:
             return
         evento = evento_annuncio(dict(a), status)
@@ -14857,11 +15080,20 @@ async def ritira_da_nostr(annuncio_id: int, esigi_ok: bool = False) -> int:
         return 0
     try:
         con = db()
-        a = con.execute("SELECT nostr_event_id FROM annunci WHERE id=?",
-                        (annuncio_id,)).fetchone()
-        con.close()
+        a = con.execute("SELECT nostr_event_id, nostr_autore, venditore_id "
+                        "FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
         if not a or not a["nostr_event_id"]:
+            con.close()
             return 0
+        # Un evento firmato dall'UTENTE lo puo' cancellare solo lui: la
+        # NIP-09 della piattaforma su un evento altrui non la accetta
+        # nessun relay serio, e sarebbe anche scorretta. Si accoda.
+        if a["nostr_autore"]:
+            accoda_firma(con, annuncio_id, a["venditore_id"], "ritira")
+            con.commit()
+            con.close()
+            return 0
+        con.close()
         evento = firma_evento(5, [
             ["e", a["nostr_event_id"]],
             ["a", f"30402:{_NOSTR[1]}:barattolo-{annuncio_id}"],

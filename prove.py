@@ -2786,6 +2786,61 @@ def prove_ferie():
           "&& !inFerie(l)" in mini)
 
 
+def prove_firme_nostr():
+    """L'annuncio di un doppio cittadino va sul SUO account Nostr
+    (ago 2026). Il pezzo che conta e' il NON FATTO: quando il
+    venditore ha una chiave provata, la piattaforma non deve firmare
+    niente — ne' l'annuncio, ne' il «venduto», ne' la cancellazione.
+    Se un domani qualcuno togliesse il bivio, quegli eventi
+    tornerebbero a nome di Barattolo in silenzio."""
+    print("\n[le firme dei doppi cittadini]")
+
+    # 1. Chi ha una chiave PROVATA (la regola di notifica() e dei ponti)
+    amb = {}
+    exec(pezzo("npub_to_hex"), amb)
+    exec(pezzo("chiave_nostr_provata"), amb)
+    prova_k = amb["chiave_nostr_provata"]
+    HEX = "a" * 64
+
+    class Riga(dict):
+        def keys(self):
+            return dict.keys(self)
+
+    npub = amb["hex_to_npub"](HEX) if "hex_to_npub" in amb else None
+    prova("senza utente nessuna chiave", "", prova_k(None))
+    prova("npub NUDA non basta (e' una dichiarazione)", "",
+          prova_k(Riga(npub="npub1storta", npub_verificata=0,
+                       npub_accesso="")))
+
+    # 2. IL BIVIO nel funnel: se il venditore ha una chiave sua, si
+    #    accoda invece di firmare. Si guarda il corpo, che e' l'unico
+    #    posto dove quella decisione vive.
+    corpo = pezzo("annuncio_su_nostr")
+    prova("il funnel guarda la chiave del venditore", True,
+          "chiave_nostr_provata" in corpo)
+    prova("...e in quel caso ACCODA", True, "accoda_firma" in corpo)
+    # Il ramo dell'utente deve uscire PRIMA di firmare: se il return
+    # sparisse, si firmerebbe due volte lo stesso annuncio
+    i = corpo.index("chiave_nostr_provata")
+    j = corpo.index("evento_annuncio(dict(a)")
+    prova("...e esce prima che la piattaforma firmi", True,
+          "return" in corpo[i:j])
+
+    # 3. La cancellazione: una NIP-09 nostra su un evento altrui non
+    #    la accetta nessun relay serio, e sarebbe pure scorretta
+    ritiro = pezzo("ritira_da_nostr")
+    prova("il ritiro guarda chi ha firmato", True, "nostr_autore" in ritiro)
+    prova("...e su un evento altrui accoda", True, "accoda_firma" in ritiro)
+
+    # 4. Una firma sola per annuncio: l'ultima vince (venduto e poi
+    #    rimborsato fa 'active', non due firme da chiedere)
+    coda = _SORGENTE[_SORGENTE.index("CREATE TABLE IF NOT EXISTS firme_nostr"):]
+    coda = coda[:coda.index(");")]
+    prova("una riga per annuncio", True, "annuncio_id INTEGER PRIMARY KEY" in coda)
+    prova("l'ultima azione vince", True,
+          "DO UPDATE SET" in pezzo("accoda_firma"))
+
+
 def prove_bip353():
     """Perche' un Lightning address non ha risposto (ago 2026, dal
     caso vero di Phoenix). Un indirizzo BIP-353 e' scritto benissimo:
@@ -4973,7 +5028,7 @@ def main():
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_messaggio_admin, prove_avviso_contatto,
-              prove_forma_tracking, prove_bip353, prove_conta_feedback,
+              prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
               prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_sconto_pacco, prove_forma_sconto_pacco,
