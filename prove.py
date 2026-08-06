@@ -4007,6 +4007,27 @@ def prove_conta_feedback():
     prova("senza voti non c'e' riga", "", conta(0, 0))
     prova("un server vecchio non rompe niente", " (5)", conta(5, 0))
 
+    # I NOMI (ago 2026): i feedback del negozio non sono piu' anonimi
+    # — un voto senza un volto non si puo' pesare. Ma i due confini
+    # restano, e sono queste due prove: mai l'oggetto comprato, mai un
+    # recapito. Si guarda la QUERY, che e' l'unico posto da cui quei
+    # campi potrebbero uscire.
+    i = _SORGENTE.index("feedback = [dict(r) for r in con.execute(")
+    query = _SORGENTE[i:_SORGENTE.index("(v[\"tg_id\"],))]", i)]
+    prova("il nome di chi ha votato esce", True, "da_nome" in query)
+    prova("la faccia rispetta la scelta «nessuna»", True,
+          "avatar_scelta='nessuna'" in query)
+    prova("il codice del negozio porta alla sua pagina", True,
+          "da_negozio" in query)
+    # Se un domani qualcuno facesse un JOIN su annunci per «arricchire»
+    # la riga, il titolo dell'oggetto finirebbe in pagina: qui cade
+    prova("l'OGGETTO comprato non esce mai", False,
+          "titolo" in query or "annunci" in query)
+    # Lo @username e la npub stanno sulla pagina del negozio, con le
+    # loro regole: qui sarebbero una seconda porta da tenere allineata
+    prova("nessun recapito nel payload", False,
+          "username" in query or "npub" in query)
+
 
 # ====================================================================
 def prove_xp():

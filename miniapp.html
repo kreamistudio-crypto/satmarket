@@ -1157,6 +1157,16 @@
      bruno di casa, e mai piu' forte del nome che gli sta sopra. */
   .titolo-riga{font-family:var(--font-tit);font-size:12.5px;
     font-weight:700;color:var(--carton);margin-top:1px}
+  /* La faccina di chi ha lasciato il feedback (ago 2026): il cerchio
+     dell'avatar rimpicciolito, che qui accompagna il nome e non lo
+     comanda — e' un francobollo, non un ritratto. */
+  .fb-faccia{width:20px;height:20px;border-radius:50%;
+    background:var(--ink);color:var(--on-ink);display:inline-flex;
+    align-items:center;justify-content:center;font-weight:800;
+    font-size:10px;position:relative;overflow:hidden;
+    vertical-align:-5px}
+  .fb-chi{cursor:pointer;text-decoration:underline;
+    text-decoration-thickness:1px;text-underline-offset:2px}
 
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
@@ -1793,7 +1803,8 @@
   /* La foto profilo sopra l'iniziale (avatar lug 2026): copre il
      cerchio, e se non arriva l'onerror la toglie e resta l'iniziale
      — mai un'immagine rotta, il patto della mascotte */
-  .avatar .av-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .avatar .av-foto,
+  .fb-faccia .av-foto{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   /* min-width:0 e' quello che rende EFFICACE l'overflow-wrap ereditato
      dal corpo: un figlio flex non scende mai sotto il proprio contenuto
      (min-width:auto), quindi con un nome lungo senza spazi la parola
@@ -5555,19 +5566,33 @@ function renderNegozio(v, annunci, feedback=[]){
     ${ponti}
     ${scontoNegozioRiga(v)}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
-  /* Gli ultimi feedback ricevuti: stelle + commento + ruolo + data.
-     Mai nomi (il server non li manda proprio): su una pagina pubblica
-     rivelerebbero gli acquisti di chi non ha scelto di apparire. */
+  /* Gli ultimi feedback ricevuti: stelle, commento, ruolo, data — e
+     CHI li ha scritti, con nome e faccia (ago 2026). Un voto senza un
+     volto non si puo' pesare: e' la stessa ragione del «da N persone».
+     Il nome porta al SUO negozio, dove i ponti Telegram/Nostr ci sono
+     gia' — nessun recapito qui, o sarebbe una seconda porta da tenere
+     allineata. L'oggetto comprato non esce MAI: si vede che ha fatto
+     un affare qui, non che cosa ha preso. Il codice del negozio passa
+     dal filtro-alfabeto, che finisce dentro un onclick. */
   el('negozioFeedback').innerHTML = feedback.length ? `
     <div class="section-label" style="margin-top:16px">Gli ultimi feedback</div>
-    ${feedback.map(f=>`
+    ${feedback.map(f=>{
+      const cod = (f.da_negozio||'').replace(/[^A-Za-z0-9]/g,'');
+      const chi = f.da_nome || '';
+      const faccia = `<span class="fb-faccia">${avatarImg(f.da_avatar)}${esc((chi||'?')[0])}</span>`;
+      const nome = chi
+        ? (cod ? `<b class="fb-chi" onclick="apriNegozio('${cod}')">${esc(chi)}</b>`
+               : `<b>${esc(chi)}</b>`)
+        : '<b>Un utente</b>';
+      return `
       <div class="trust-note" style="align-items:flex-start">
         <span class="stars">${'★'.repeat(f.voto)}</span>
-        <span>${f.commento?`${esc(f.commento)}<br>`:''}
-          <small style="opacity:.65">${f.ruolo==='acquirente'?'Un acquirente':f.ruolo==='venditore'?'Un venditore':'Un utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
+        <span>${nome} ${faccia}<br>
+          ${f.commento?`${esc(f.commento)}<br>`:''}
+          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
           ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
         </span>
-      </div>`).join('')}` : '';
+      </div>`;}).join('')}` : '';
   el('negozioGrid').innerHTML = annunci.length
     ? annunci.map(cardHTML).join('')
     : `<div class="empty" style="grid-column:1/-1">

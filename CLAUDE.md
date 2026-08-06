@@ -2063,9 +2063,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ricalcola. `/api/orders` espone `mio_voto/mio_commento` e
   `suo_voto/suo_commento`; `/api/negozio/{chi}` aggiunge
   `n_feedback` al profilo e `feedback` = ultimi 10 ricevuti (voto,
-  commento, data, ruolo «acquirente/venditore» — MAI nomi: su una
-  pagina pubblica rivelerebbero gli acquisti altrui; `f.id` è opaco
-  e serve al bottone rimuovi dell'admin). Invito ⭐ in coda alle
+  commento, data, ruolo «acquirente/venditore», e dall'ago 2026
+  anche CHI l'ha scritto: `da_nome`, `da_avatar`, `da_negozio`;
+  `f.id` è opaco e serve al bottone rimuovi dell'admin).
+  I FEEDBACK NON SONO PIÙ ANONIMI (ago 2026, decisione di Andrea che
+  ROVESCIA la regola di ieri — qui c'era scritto «MAI nomi: su una
+  pagina pubblica rivelerebbero gli acquisti altrui»). Il motivo del
+  rovesciamento è lo stesso che aveva fatto nascere il «da N
+  persone»: un voto senza un volto non si può pesare, e quaranta voti
+  dallo stesso account si vedevano identici a quaranta di quaranta
+  persone. Il conteggio dice il sospetto, i nomi lo fanno vedere —
+  e i due convivono, che il conteggio si legge a colpo d'occhio.
+  DUE COSE RESTANO DENTRO, e sono la parte da non allentare: 1)
+  l'OGGETTO comprato non esce MAI (si vede che quella persona ha
+  fatto un affare lì, non che cosa ha preso — quello resta un fatto
+  suo); 2) nessun RECAPITO nel payload: esce il codice del negozio,
+  il nome ci porta (`.fb-chi` → `apriNegozio`), e i ponti
+  Telegram/Nostr vivono di là con le loro regole di sempre (npub solo
+  dal possesso dimostrato). Un contatto qui sarebbe una seconda porta
+  da tenere allineata per sempre. L'avatar segue la scelta
+  dell'utente col solito CASE su `avatar_scelta='nessuna'`, e
+  `.av-foto` ha dovuto imparare un secondo genitore (`.fb-faccia`):
+  era agganciato al solo `.avatar`, e altrove l'immagine sarebbe
+  uscita a dimensione naturale. Invito ⭐ in coda alle
   notifiche di chiusura (sblocco manuale/automatico e rimborso).
   Frontend: `feedbackPanel(o)` nel dettaglio ordine (5 stelle
   cliccabili + textarea, `confirm` prima dell'invio, gira in

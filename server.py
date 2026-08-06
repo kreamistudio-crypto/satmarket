@@ -6582,16 +6582,31 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
             f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
             (v["tg_id"], TETTO_LEGACY))]
     annunci = arricchisci_righe_vetrina(righe)
-    # Gli ultimi feedback ricevuti: stelle + commento + data + ruolo di
-    # chi scrive («acquirente»/«venditore»), MAI il nome — su una pagina
-    # pubblica rivelerebbe gli acquisti di chi non ha scelto di apparire.
+    # Gli ultimi feedback ricevuti: stelle, commento, data, ruolo — e
+    # dall'ago 2026 anche CHI li ha scritti, nome e faccia (decisione
+    # di Andrea, che ROVESCIA l'anonimato di ieri). Il perche' e' lo
+    # stesso per cui esiste il conto «da N persone»: un voto senza un
+    # volto non si puo' pesare, e quaranta voti dallo stesso account
+    # si vedevano identici a quaranta di quaranta persone. Coi nomi
+    # chi guarda se ne accorge da solo.
+    # COSA NON ESCE, e resta la parte da non allentare: l'OGGETTO
+    # comprato. Si vede che quella persona ha fatto un affare qui, mai
+    # che cosa ha comprato — quello resterebbe un fatto suo.
+    # E nemmeno il recapito: esce il CODICE del negozio, che porta
+    # alla sua pagina, dove i ponti Telegram/Nostr vivono gia' con le
+    # loro regole (npub solo dal possesso dimostrato). Un contatto in
+    # piu' qui sarebbe una seconda porta da tenere allineata.
     # f.id e' un numero opaco: serve solo al bottone rimuovi dell'admin.
     feedback = [dict(r) for r in con.execute(
         "SELECT f.id, f.voto, f.commento, f.creato, "
         "CASE WHEN o.id IS NULL THEN 'utente' "
         "WHEN f.da_tg_id=o.compratore_id THEN 'acquirente' "
-        "ELSE 'venditore' END AS ruolo "
+        "ELSE 'venditore' END AS ruolo, "
+        "au.nome AS da_nome, au.negozio AS da_negozio, "
+        "(CASE WHEN au.avatar_scelta='nessuna' THEN '' "
+        " ELSE au.avatar END) AS da_avatar "
         "FROM feedback f LEFT JOIN ordini o ON o.id=f.ordine_id "
+        "LEFT JOIN utenti au ON au.tg_id=f.da_tg_id "
         "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT 10",
         (v["tg_id"],))]
     # Sul profilo pubblico TUTTI i distintivi guadagnati (lug 2026,
