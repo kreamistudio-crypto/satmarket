@@ -5225,6 +5225,120 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `tag_commercio` ed `evento_annuncio` ciechi per sentinella
   (imperfezione dichiarata: un client Nostr vede la sola tariffa
   casa).
+  IL SUPPLEMENTO PER PEZZO (ago 2026, caso dal campo: il riso da 4 kg
+  venduto a sacchi con la spedizione di UNO solo dichiarata — chi ne
+  comprava dieci pagava la spedizione di uno, e ci rimetteva il
+  venditore). Terza tariffa, colonne `annunci.spedizione_extra_sats/
+  _eur`, gemelle delle altre nella semantica di valuta (stesso toggle,
+  sats fisso o euro ancorato) ma SENZA il flag delle punto, ed è la
+  differenza da ricordare: là vuoto e zero dicono cose diverse (vuoto
+  = vale la casa), qui «supplemento 0» e «nessun supplemento» sono la
+  stessa cosa. UNO SOLO per annuncio, valido per casa E per punto
+  (decisione di Andrea): dipende dall'OGGETTO, non dalla destinazione
+  — un sacco di riso pesa uguale ovunque vada. È PER ANNUNCIO e non
+  per negozio, a differenza di sconto carrello e spedizione gratis,
+  per la stessa ragione.
+  LA REGOLA, in una riga — **la spedizione più cara fa da base, e ogni
+  altro pezzo aggiunge il suo supplemento**:
+  `max(base_i) + Σ(qta_i × supp_i) − supp_del_vincitore`. 10 sacchi
+  (base 6, supp 3) = 6 + 30 − 3 = 33; riso + collanina = 6 + 4 − 3 =
+  7. Il MONO con quantità NON è un caso a parte: `base + (q−1)×supp`
+  esce da sé. Pareggio nel MAX: vince `(base, supp)` lessicografico,
+  cioè a parità di base si assorbe il supplemento più GRANDE, a favore
+  di chi compra — *quale* riga vinca dipende dall'ordine della lista,
+  il TOTALE no, e va detto perché qualcuno vorrà aggiungere un terzo
+  criterio «per sicurezza».
+  DUE PROPRIETÀ, provate e non sperate: a supplementi tutti a ZERO il
+  risultato è IDENTICO al MAX di sempre (la retrocompat a costo zero),
+  e il totale non scende MAI sotto quel MAX (`Σ qta·supp ≥ supp_w`
+  perché `qta_w ≥ 1`) — nessun venditore incassa meno di prima.
+  IL MAX NON È IL MINIMO, ED È GIUSTO: A(base 10, supp 0) + B(base 9,
+  supp 5) fa 15, non 9 — partire da B darebbe meno di quanto costa
+  spedire A da solo. Il primo che lo nota lo chiamerà bug; non lo è.
+  IL CUORE È UNA PURA SOLA, `_sped_pacco(righe, via, cambio)` accanto
+  alle altre del conto, che restituisce un DICT (sats|None, eur
+  nativo, stima, supplemento, pezzi) e non una tupla — con cinque
+  campi posizionali il terzo chiamante li scambia. Prima il MAX era
+  scritto DUE volte (`_compra_set` e `_strade_preventivo`) più una
+  terza forma nel mono di `compra()`: tenerne tre in pari col
+  supplemento era il modo di farli divergere. `righe` è
+  `[(annuncio, qta)]`, e LA QUANTITÀ NON È UN DETTAGLIO —
+  `_strade_preventivo` riceveva i soli annunci, quindi il preventivo
+  mono avrebbe detto la spedizione di UN pezzo e la invoice quella di
+  dieci; col supplemento a zero i due numeri coincidono, ed è
+  esattamente perché quel buco poteva restare a lungo invisibile. Nel
+  set le righe si prendono da `richieste`, MAI zippando
+  `tutti.values()` con `richieste.values()`: l'ordine di `tutti` viene
+  dalla SELECT IN (...) e le quantità finirebbero sull'annuncio
+  sbagliato in silenzio.
+  L'EURO NATIVO ha una condizione da leggere due volte: «contribuisce
+  in sats», NON «eur == 0». Una tariffa che vale ZERO non contribuisce
+  e non deve azzerare il nativo (zero è zero in tutte le valute),
+  mentre una con sats>0 nata in sats sì — scritta nell'altro modo,
+  quello che viene in mente, un supplemento a zero farebbe comparire
+  il ≈ su tutti i carrelli. E si converte PRIMA e si moltiplica DOPO,
+  il patto di `_unitario_effettivo`: qui vale doppio, perché il numero
+  finisce in `ordini.spedizione_sats` e `_righe_ordine` lo sottrae.
+  LA DIVISIONE A RITROSO DEL MONO RESTA ESATTA, ed è il motivo per cui
+  questa funzione si può fare mentre lo sconto carrello sul mono no:
+  il supplemento finisce dentro `spedizione_sats`, che è una delle
+  colonne SOTTRATTE da `_righe_ordine`, mentre `sconto_sats` sta
+  fuori. Vale anche sul ramo della RIPRESA e con la spedizione gratis
+  (che azzera la colonna: si sottrae 0). Per la stessa ragione NIENTE
+  colonna nuova su `ordini` — l'aritmetica quadra già, e una colonna
+  nella tabella del denaro per un dato ornamentale è ciò che questo
+  file sconsiglia per `sconto_pacco_criterio`; la riga «spedizione per
+  N pezzi» viaggia come CHIAVE nella risposta (`supplemento_sats`,
+  `pezzi`) del preventivo E di compra/_compra_set, e quella seconda
+  metà non è opzionale: senza, la riga comparirebbe nella pagina
+  d'acquisto e sparirebbe nel paySheet un istante dopo, che si legge
+  come «il prezzo è cambiato» un attimo prima di pagare.
+  LA PROMESSA GRATIS OFFRE TUTTO, supplemento compreso: offrire la
+  sola base romperebbe `sped_gratis_sats XOR spedizione_sats` e
+  vorrebbe una colonna nuova. Quando scatta, il supplemento si azzera
+  con la tariffa, o la pagina direbbe «gratuita» e sotto «spedizione
+  per 10 pezzi».
+  IL `None` NON SI PARA CON UN RAMO MA CON UNA PROVA: i due blocchi
+  del cambio nominano TUTTE le tariffe ancorabili all'euro, e una
+  sentinella incrocia quell'elenco con le colonne `spedizione*_eur`
+  vere di `annunci` — la quarta tariffa che qualcuno aggiungerà lo
+  sente dalla CI. Un retry difensivo è stato scritto e TOLTO: era
+  codice morto e un terzo `raise 503` là dove la sentinella di ieri ne
+  contava due, cioè un allarme che diceva la verità. Senza la
+  guardia il conto esplode — `max(sped, None)` nel set, `netto + None`
+  nel mono: un 500 col database aperto, non un 503 (riprodotto).
+  IL SUPPLEMENTO NON ESCE SU NOSTR, per la ragione della tariffa punto
+  (sentinelle), e la modifica firmata non lo tocca. Nel CSV è la
+  colonna `spedizione_extra` IN CODA — le colonne di coda vuote si
+  omettono, la convenzione che il modello ha già — e la riga del miele
+  è quella che la INSEGNA (12 vasetti, 6,00 di base e 1,50 a vasetto:
+  è il caso del riso). In `modifica()` si CONSERVA se il payload non
+  la nomina, il patto della tariffa punto: il client vecchio in cache
+  non sa che il campo esiste; si azzera mandando 0.
+  CLIENT: terzo campo nel form sotto quello del punto, stesso toggle,
+  più l'hint live «10 pezzi = X sats di spedizione» — la rete contro
+  il refuso ×1000 amplificato dal ×q (nessun tetto: chi spedisce roba
+  pesante ha supplementi veri alti). `spedGratis` guarda ANCHE il
+  supplemento, ed è il punto in cui il cantiere poteva far mentire la
+  vetrina: «il primo pezzo lo offro io» è base 0 + supplemento pieno,
+  e senza quelle due condizioni la card avrebbe scritto «🚚 gratis» su
+  un annuncio dove due pezzi si pagano — fail-closed, mai una
+  gratuità che regge per un pezzo solo. `satsSpedPezzi` è il gemello
+  client, e vive SOLO nelle stime (DEMO, foglio offerta, barra del
+  carrello): il conto che si paga arriva sempre dal preventivo.
+  `editListing` deduce la valuta da TUTTE E TRE le tariffe e non dalla
+  sola base — con la base a 0 e il solo supplemento (o la sola tariffa
+  punto) in euro il toggle tornava su sats e rileggeva euro come sats.
+  NESSUN controllo nuovo del LIBRO MASTRO, e il perché va tenuto: i
+  candidati non passano la domanda che decide («esiste uno stato
+  transitorio LEGITTIMO in cui è falso?») o sono allarmi che non
+  possono suonare — un supplemento su chi non spedisce non ha
+  conseguenze (la pura si chiama solo sulla spedizione),
+  `extra_sats>0 AND extra_eur>0` è legittimo sul listino EUR, e un
+  supplemento su base 0 è una promessa vera. Soprattutto: un
+  supplemento contato MALE la ronda non lo vedrebbe comunque, perché
+  `prezzo_sats` quadra con qualunque numero dentro `spedizione_sats`.
+  Il posto dove si prende è la prova regina.
   LO SPEDIZIONIERE È DEL NEGOZIO (decisione di Andrea): catalogo
   server `SPEDIZIONIERI` (InPost · Poste Italiane · Altro — NON è il
   catalogo CORRIERI del tracking né le sentinelle), colonna
@@ -7558,6 +7672,56 @@ diventano INERTI: vanno riscritte coi nomi `*_EUR` e con cifre in
 euro, o valgono i default del codice (10·25·50·100 €).
 DA GUARDARE al primo giro: il primo venditore che rimette la soglia in
 euro, e il primo ordine scontato vero con la bolt11 su LNbits.
+
+Il supplemento di spedizione per pezzo (ago 2026, caso dal campo: il
+riso da 4 kg venduto a sacchi con la spedizione di UNO dichiarata —
+chi ne comprava dieci pagava la spedizione di uno). Un campo
+facoltativo accanto al costo base, «ogni pezzo in più: +N», PER
+ANNUNCIO e non per negozio: il supplemento dipende dall'oggetto, un
+sacco di riso non è una collanina. La regola sta in una riga — la
+spedizione più cara fa da base, e ogni altro pezzo aggiunge il suo
+supplemento — e il mono con quantità ne è un caso particolare, non un
+ramo. Le decisioni di Andrea: un supplemento SOLO (vale casa e punto),
+la colonna nel CSV, e il fix del bug preesistente qui sotto nel suo
+commit. Vedi Architettura, «IL SUPPLEMENTO PER PEZZO», per il MAX che
+non è il minimo, l'euro nativo e la ragione per cui qui la divisione a
+ritroso dell'unitario regge mentre lo sconto sul mono no.
+DUE BUCHI TROVATI mentre si costruiva, tutti e due nel codice di ieri:
+`preventivo_ordine` passava a `_strade_preventivo` l'annuncio SENZA la
+quantità (col supplemento il preventivo mono avrebbe detto la
+spedizione di un pezzo e la invoice quella di dieci — la prima
+divergenza preventivo↔compra), e il `None` di una tariffa ancorata col
+cambio muto sarebbe diventato un 500 (`max(sped, None)`) invece di un
+503. Più la bugia chiusa in vetrina: con base 0 e supplemento, la card
+avrebbe scritto «🚚 gratis» e la pagina Paga avrebbe chiesto 27.000
+sats per dieci pezzi.
+Collaudato: 1296 prove verdi in `prove.py` (erano 1267 — 31 pure sulla
+formula, fra cui il fuzz a seme fisso sulle due proprietà strutturali,
+il pareggio nelle due permutazioni e l'arrotondamento che si smaschera
+solo a cambio non tondo, più le sentinelle di forma, quattro delle
+quali torturate rompendole a una a una), e un collaudo eseguibile su
+DB usa-e-getta (59 verdi) con in testa LA PROVA REGINA — preventivo ==
+compra AL SAT su mono 1/10 pezzi, listino sats e EUR, via casa e
+punto, carrello a quantità diverse, spedizione offerta — col confronto
+fra `prezzo_sats` e l'importo della bolt11 CONIATA, la divisione a
+ritroso verificata anche sul ramo della ripresa, il 503 che resta un
+503, e la ronda del libro mastro che tace. Più il giro visivo via CDP
+a 375px nei due temi.
+IN PRODUZIONE basta il deploy: le due colonne nascono a 0, cioè
+supplemento spento per tutti — nessuna migrazione, nessun ordine
+esistente cambia di un sat. DA GUARDARE al primo giro: il primo
+venditore che lo scrive, e il primo ordine con q≥2 e supplemento vero
+dentro Telegram, con la bolt11 confrontata su LNbits.
+
+La promessa della spedizione gratis si leggeva sulla cifra, non sulla
+strada (ago 2026, commit suo, trovato col cantiere qui sopra): su un
+listino in SATS con la tariffa ancorata all'EURO i sats in colonna
+sono 0, quindi il gate `if sped:` non leggeva nemmeno la soglia del
+venditore e la spedizione si pagava — mentre `preventivo_ordine` la
+legge senza quel gate e la pagina Paga scriveva «gratuita».
+Riprodotto su DB usa-e-getta prima di toccare: preventivo 100.000,
+invoice 105.000. Ora la guardia è la STRADA. Va nel verso di chi
+compra: dopo il deploy quelle spedizioni diventano gratis davvero.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
