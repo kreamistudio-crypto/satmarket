@@ -3812,6 +3812,166 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `totaleSet()` resta ASCIUTTO apposta: è l'unico posto dove un
   calcolo client sul denaro potrebbe filtrare se un giorno il gate
   della DEMO si spostasse.
+  LA SPEDIZIONE GRATIS SOPRA SOGLIA 🚚 (ago 2026, richiesta dal campo
+  subito dopo lo sconto: «si può fare come negli e-commerce?»): «da N
+  sats di articoli la spedizione la offro io», una regola per tutto il
+  negozio. Soglia in SATS con l'euro come aiuto nel cassetto — le
+  ragioni sono quelle dello sconto, per intero (una promessa in vetrina
+  non dipende dal cambio, e `_sped_gratis` resta pura e senza cambio).
+  NON È UNA COPIA DELLO SCONTO, E LA DIFFERENZA È QUELLA CHE LE PERMETTE
+  DI VALERE ANCHE SULL'ACQUISTO SINGOLO — è la prima cosa da capire, e
+  non è una scelta di prodotto ma una proprietà della FORMA. Lo sconto
+  sottrae dal TOTALE senza toccare le colonne che `_righe_ordine`
+  sottrae, ed è per quello che il mono non sconta mai; la spedizione
+  gratis non sottrae, AZZERA UNA TARIFFA: scrive `spedizione_sats=0`,
+  cioè lo stato che ogni annuncio con tariffa gratis dichiarata (e ogni
+  ritiro) ha da sempre. La divisione a ritroso dell'unitario resta
+  esatta per costruzione, senza un ramo nuovo. Stessa verifica
+  sull'uscita dei sats: il venditore incassa `prezzo_sats −
+  protezione_sats`, quindi con la spedizione offerta incassa MENO — che
+  è precisamente cosa vuol dire offrirla.
+  LE DUE PROMESSE GUARDANO LO STESSO NUMERO (decisione di Andrea):
+  l'articolo LORDO, dopo lampo e accordo e PRIMA dello sconto carrello.
+  Così sono INDIPENDENTI — nessuna può spegnere l'altra facendo cadere
+  l'altra sotto la sua soglia — e si spiegano a chi compra in una riga
+  sola. C'è la prova apposta, e sceglie i numeri per il caso che
+  smaschera una dipendenza: lordo 105.000 sopra entrambe le soglie, ma
+  NETTO 94.500 sotto quella della spedizione — se un domani la
+  spedizione misurasse il netto, quel carrello perderebbe la gratuità e
+  la riga diventerebbe rossa. Come per lo sconto, una lampo generosa
+  può far scendere sotto soglia (dichiarato, detto al venditore nel
+  cassetto, con la sua prova).
+  MODELLO: `utenti.sped_gratis_soglia` (0 = spenta) — UNA colonna,
+  niente criterio (il criterio È il valore) e niente percentuale
+  (gratis è gratis) — più `ordini.sped_gratis_sats`, la tariffa che il
+  compratore NON ha pagato. Quella è una **colonna TESTIMONE, NON UN
+  MOTORE**, e vale parola per parola l'avvertimento di `sconto_sats`:
+  `prezzo_sats` nasce già senza la spedizione, e un
+  `netto_venditore(prezzo + sped_gratis_sats)` farebbe uscire
+  dall'escrow DI ALTRI ORDINI la differenza senza che la cintura di
+  `paga_venditore` se ne accorga (per lei dovuto e bolt11
+  combacerebbero). Sentinelle apposta sulle tre strade d'uscita e sul
+  CSV. A differenza dello sconto qui l'aritmetica quadrerebbe anche
+  senza la colonna (spedizione 0 è tutta la verità del conto): serve a
+  RACCONTARE — chi ha visto un costo nella scheda deve poter capire
+  dove è finito — e a dare al libro mastro due invarianti veri.
+  Giudici: `_sped_gratis(articolo, soglia)` fra le pure del conto (al
+  filo esatto è GRATIS, come `_asta_viva` e `in_ferie`) e
+  `_regola_sped_gratis(soglia)` fuori, che guarda le leve. NON esiste
+  il gemello di `_sconto_pubblico`, e non è una dimenticanza: quello
+  serve alla regola d'oro del client vecchio che di quattro campi ne
+  legge uno — qui il campo è UNO e un client di ieri non lo conosce
+  affatto, quindi non disegna niente, che è un'assenza e non una bugia.
+  DOVE SI DECIDE, ed è il vincolo: nello STESSO punto logico nei
+  quattro percorsi (`compra` mono, `_compra_set`, i due preventivi) —
+  DOPO che la tariffa è stata contata, subito prima di `_conto_ordine`.
+  Se il preventivo decidesse prima, la pagina direbbe «gratuita» dove
+  la invoice risponde 503, e «preventivo == compra al sat» è il patto
+  che regge la pagina d'acquisto. IMPERFEZIONE DICHIARATA che è il
+  prezzo di questa scelta (decisione di Andrea): una tariffa ancorata
+  all'EURO col cambio muto ferma la strada — 503 nel mono,
+  `cambio_assente` nel preventivo — anche quando la spedizione sarebbe
+  gratis. Serve tariffa-in-euro + CoinGecko giù + carrello sopra
+  soglia: rara e transitoria, e il verso in cui sbagliare è quello di
+  non far partire un ordine, mai quello di farne partire uno sbagliato.
+  LA STRADA SCARTATA, e va tenuta perché torna in mente: decidere
+  PRESTO, riordinando `compra()` e `_compra_set` così che una tariffa
+  che non si paga non venga nemmeno convertita. Chiude il caso e
+  semplificherebbe pure i due rami del cambio del mono, che oggi si
+  sovrappongono — ma è chirurgia sul percorso dei soldi per un caso
+  transitorio. Se le tariffe in euro diventassero la norma, è lì la
+  leva.
+  SUPERFICIE: `u.sped_gratis_soglia AS venditore_sped_gratis` in
+  `CAMPI_VETRINA` a costo ZERO (il JOIN su `u` c'era già) e
+  normalizzata in `arricchisci_righe_vetrina`, così la leva spenta la
+  spegne in tutte le vetrine insieme; `sped_gratis_soglia` nel profilo
+  di `/api/negozio`; `sped_gratis_leve` in `/api/me` (il valore salvato
+  esce GREZZO di proposito: è il suo negozio, deve vedere cosa ha
+  scritto). Il preventivo porta `sped_gratis_soglia`,
+  `mancano_sped_sats` (che conta il SERVER anche se il client
+  potrebbe: è il numero dove vive un off-by-one, la lezione di
+  `mancano_pezzi`) e `sped_gratis_sats` dentro ogni strada casa/punto —
+  che è anche ciò che rende la prova regina verificabile. Zero query in
+  più: le due SELECT del venditore c'erano già; solo `compra` mono ne
+  aggiunge una (lettura, prima della invoice, nessun DML — il vincolo
+  del ricontrollo resta intatto).
+  ENDPOINT `POST /api/me/spedizione-gratis`, il pattern dello sconto ma
+  molto più corto: `soglia <= 0` è lo SPEGNIMENTO e non ha nessuna
+  guardia; niente `_impegni_aperti` e niente `guardia_ferie_venditore`,
+  per le due ragioni scritte per esteso nello sconto. LEVE:
+  `SPED_GRATIS_ATTIVO` nasce ACCESA (non muove denaro verso l'esterno,
+  abbassa un conto in entrata), `SPED_GRATIS_SOGLIE` le pillole,
+  `SPED_GRATIS_MIN` 1.000 la cintura. ⚠️ `SPED_GRATIS_SOGLIE` è una
+  leva-LISTA: la prova del censimento in `prove.py` va aggiornata a
+  mano, ed è esattamente il modo in cui ci si inciampa.
+  IL LIBRO MASTRO guadagna DUE controlli, e li apre la colonna
+  testimone: «spedizione risparmiata e pagata insieme»
+  (`sped_gratis_sats>0 AND spedizione_sats>0`) e «spedizione
+  risparmiata dove non si spediva» (via ritiro/digitale). Superano
+  tutti e due la domanda che decide — «esiste uno stato transitorio
+  legittimo in cui sono false?» — perché le due colonne si scrivono
+  nello stesso INSERT e si escludono per costruzione. NON c'è il
+  gemello di «promessa che non può scattare»: lì il criterio poteva
+  finire fuori catalogo, qui c'è un intero ≥ 0 dove 0 significa
+  «spenta» — non esiste un valore rotto da trovare, e un allarme che
+  non può suonare è peggio di nessun allarme. I quattro controlli
+  sull'aritmetica NON cambiano di un carattere, ed è la prova che
+  questa funzione non tocca il denaro; il polso guadagna chi promette
+  la spedizione e da che soglia, accanto a chi sconta.
+  CLIENT: le pillole delle vie dicevano GIÀ «gratuita» a costo zero
+  (zero righe). `contoRighe` guadagna il flag `spedGratis` e con lui la
+  riga dice «gratuita» invece di «0 sats» — ma solo su una via che
+  SPEDISCE, e la stessa regola copre anche la tariffa dichiarata a zero
+  dal venditore: un caso solo, nessun ramo per la funzione nuova (il
+  ritiro continua a dire 0, che lì non c'è nessuna spedizione da
+  offrire). La parola vuole `.ctrl-riga .via-gratis`, o dentro lo
+  `.mono` della colonna delle cifre verrebbe scritta come un numero.
+  Giudice unico `regolaSpedGratis` e frase unica
+  `frasePromessaSpedGratis`, per la ragione delle gemelle dello sconto.
+  TRE righe pubbliche — testata negozio, «Altri oggetti», e (la novità)
+  la SCHEDA DELL'ANNUNCIO, che lo sconto non ha perché nel mono non
+  esiste e questa sì. La riga della scheda DICE LA REGOLA, MAI UN
+  VERDETTO SU QUELL'OGGETTO, ed è il punto dove è più facile scivolare:
+  verrebbe da scrivere «questo è già sopra soglia» leggendo il prezzo
+  accanto, ma quel prezzo non è il numero che il server confronta — una
+  lampo viva, un accordo accettato o la quantità scelta lo spostano, e
+  la riga direbbe una cosa che il conto poi non fa. Fuori in due casi:
+  annuncio che NON spedisce, e spedizione già gratis SENZA condizioni
+  (lì la pillola lo dice meglio, e una soglia accanto farebbe dubitare
+  di una gratuità che è piena). Mai in card, mai fra le pillole: là una
+  cifra si legge come proprietà di quell'oggetto. Più l'INVITO nella
+  pagina Paga («Ancora N sats e la spedizione è gratis»), che si
+  TRASFORMA in conferma invece di sparire (la lezione dell'invito dello
+  sconto) e non calcola, riceve — ed è il posto unico e giusto, perché
+  di lì passano sia il pezzo singolo sia il carrello; e la riga nella
+  RICEVUTA dell'ordine, che dice quanti sats il venditore ha offerto.
+  Cassetto «🚚 Spedizione gratis» fra «📦 Come spedisci» e «🎁 Sconto
+  sul carrello»: il calco del gemello, ma con UN numero solo — quindi
+  le pillole SALVANO davvero, che non c'è una seconda scelta da tenere
+  in pari (nello sconto quel mezzo secondo con una regola a metà era il
+  motivo del bottone unico).
+  NEL FORM VENDI DUE RIGHE DELLE POLITICHE (ago 2026, chieste da
+  Andrea): lo sconto sotto il Prezzo, la spedizione gratis sotto il
+  Costo di spedizione. Non sono informazioni sul negozio, sono
+  AVVERTIMENTI SUL NUMERO CHE SI HA SOTTO LE DITA — «questa cifra in un
+  carrello scenderà del 15%», «sopra soglia questo costo lo metti tu».
+  Andrea ha chiesto di valutare se UNIRLE in una riga sola quando sono
+  tutte e due accese: SCARTATO, e le tre ragioni valgono più della
+  decisione — 1) parlano di due CAMPI diversi, e una riga sola starebbe
+  accanto a uno solo dei due, cioè fuori posto per l'altro, perdendo
+  proprio ciò che le rende utili; 2) non compaiono quasi mai insieme,
+  perché il campo del costo esiste solo con la spedizione spuntata e
+  mai in asta, mentre il Prezzo c'è sempre — quindi la riga unita
+  dovrebbe vivere sul Prezzo e parlare di un campo che spesso non è
+  nemmeno a schermo; 3) è il pattern degli hint contestuali di casa (la
+  riga «nessuno può scriverti» sopra Pubblica, quella dello
+  spedizioniere accanto alla tariffa punto): la riga nasce dove nasce
+  il dubbio. Il peso resta basso perché ognuna è UNA frase e compare
+  solo a regola accesa. Scrittore unico `aggiornaHintPolitiche`,
+  chiamato all'ingresso in Vendi (fra un ingresso e l'altro il
+  venditore può essere passato dal Profilo a cambiarle) e dopo ognuno
+  dei due salvataggi; la riga della spedizione vive DENTRO
+  `#sellSpedField` e si nasconde da sola col suo campo.
   LA RONDA DEL LIBRO MASTRO (ago 2026): gli invarianti già dichiarati
   in questo file diventano un controllo dell'orologio invece di query
   da lanciare a mano — perché un controllo che dipende da qualcuno che
@@ -7088,6 +7248,45 @@ continuano identici, e le tre leve nuove hanno il default nel codice.
 DA GUARDARE al primo giro: il primo venditore che passa a valore (che
 il cassetto e la riga pubblica dicano la stessa cifra) e il polso SQL
 17, che adesso dice anche il criterio.
+La spedizione gratis sopra soglia (ago 2026, il giorno dopo, richiesta
+dal campo): «da N sats di articoli la spedizione la offro io», la
+seconda promessa di negozio. La cosa da sapere prima di tutte è che
+VALE ANCHE SULL'ACQUISTO SINGOLO, e non per scelta ma per FORMA:
+azzerare una tariffa scrive `spedizione_sats=0` — lo stato che ogni
+annuncio con tariffa gratis dichiarata ha da sempre — mentre lo sconto
+sottrae dal totale e romperebbe la divisione a ritroso dell'unitario,
+che è il motivo per cui il mono non sconta. Le decisioni di Andrea: la
+soglia in sats, le due promesse che guardano lo STESSO numero (l'
+articolo lordo) e quindi non possono spegnersi a vicenda, la riga
+pubblica in TRE posti — negozio, «Altri oggetti» e la scheda
+dell'annuncio, che lo sconto non ha —, la colonna testimone
+`ordini.sped_gratis_sats`, e la decisione TARDI sul cambio con la sua
+imperfezione dichiarata. Più le due righe nel form Vendi, ognuna
+attaccata al campo di cui parla (unirle è stato valutato e scartato:
+il perché sta in Architettura, ed è la parte che vale). Vedi
+Architettura, «LA SPEDIZIONE GRATIS SOPRA SOGLIA».
+Collaudata: 100 prove nuove in `prove.py` (1120 verdi, erano 1020) —
+le pure al filo della soglia, i quattro quadranti dell'indipendenza
+col caso che smaschera una dipendenza (netto sotto soglia, lordo
+sopra), la lampo che fa scendere sotto, e le sentinelle che tengono la
+tariffa offerta fuori da ogni strada d'uscita del denaro e la
+decisione nello stesso punto nei quattro percorsi. Più un collaudo
+eseguibile su DB usa-e-getta (80 verdi) con in testa LA PROVA REGINA:
+preventivo == compra AL SAT su mono e set, sopra e sotto soglia, in
+sats e in EUR, e `prezzo_sats` == l'importo della bolt11 CONIATA — più
+l'euro nativo che resta esatto, la soglia cambiata fra preventivo e
+acquisto nei due versi, la leva spenta che spegne tutte le vetrine
+insieme, e la ronda che tace. Più il giro visivo via CDP a 375px nei
+due temi e nelle due valute, zero errori JS, che ha trovato dal vivo
+tre cose: «gratuita» che usciva in monospazio (contro la regola di
+casa per quella parola), il titolo del cassetto che andava a capo, e
+la punteggiatura della riga dello sconto nel form. IN PRODUZIONE basta
+il deploy — le due colonne nascono a 0, cioè promessa spenta per
+tutti, e le tre leve hanno il default nel codice
+(`SPED_GRATIS_ATTIVO` è ACCESA: non esce niente verso nessuno). DA
+GUARDARE al primo giro: il primo venditore che l'accende, e il primo
+ordine con spedizione offerta vero dentro Telegram con la bolt11 su
+LNbits — se `paga_venditore` avvisa i moderatori, ci si ferma.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
