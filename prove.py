@@ -3088,6 +3088,225 @@ def prove_conto_acquisto():
 
 
 # ====================================================================
+def prove_supplemento_spedizione():
+    """IL SUPPLEMENTO PER PEZZO (ago 2026, caso dal campo: il riso da
+    4 kg venduto a sacchi con la spedizione di UNO dichiarata). La
+    regola sta in una riga — la spedizione piu' cara fa da base, e
+    ogni altro pezzo aggiunge il suo supplemento — e qui si tortura
+    da sola: e' il posto dove un errore costa sats veri, e la pura
+    nasce provata PRIMA che i quattro chiamanti la usino."""
+    print("\n[il supplemento di spedizione per pezzo]")
+    amb = {}
+    for f in ("_tariffa_dichiarata", "_sped_in_sats", "_sped_pacco"):
+        exec(pezzo(f), amb)
+    pacco = amb["_sped_pacco"]
+    CAMBIO = 100_000.0                 # 1.000 sats = 1 euro, tondo
+
+    def a(base=0, extra=0, base_eur=0.0, extra_eur=0.0, punto=None):
+        """Un annuncio ridotto ai soli campi della spedizione."""
+        return {"spedizione_sats": base, "spedizione_eur": base_eur,
+                "spedizione_punto_sats": (punto or 0),
+                "spedizione_punto_eur": 0.0,
+                "spedizione_punto_dichiarata": 1 if punto is not None else 0,
+                "spedizione_extra_sats": extra,
+                "spedizione_extra_eur": extra_eur}
+
+    def sats(righe, via="casa", cambio=0.0):
+        return pacco(righe, via, cambio)["sats"]
+
+    # --- IL PATTO COL MONDO DI IERI: campo vuoto ⇒ identico a oggi ---
+    # se questo cantiere spostasse di un sat il conto di prima, queste
+    # quattro diventano rosse tutte insieme
+    for q in (1, 2, 10):
+        prova(f"vuoto, mono x{q}: e' la tariffa di sempre", 500,
+              sats([(a(base=500), q)]))
+    prova("vuoto, set a 3 righe: e' il MAX di sempre", 700,
+          sats([(a(base=400), 2), (a(base=700), 1), (a(base=300), 5)]))
+
+    # --- LA FORMULA, sugli esempi del cantiere -----------------------
+    prova("10 sacchi (base 6.000, supp 3.000) → 33.000", 33_000,
+          sats([(a(base=6_000, extra=3_000), 10)]))
+    prova("...ed e' base + (q-1) x supp", 33_000, 6_000 + 9 * 3_000)
+    prova("un pezzo solo non paga MAI il supplemento", 6_000,
+          sats([(a(base=6_000, extra=3_000), 1)]))
+    prova("riso + collanina → 7.000 (base del riso + supp della collanina)",
+          7_000, sats([(a(base=6_000, extra=3_000), 1),
+                       (a(base=2_000, extra=1_000), 1)]))
+
+    # --- IL PAREGGIO: si assorbe il supplemento piu' GRANDE ----------
+    coppia = [(a(base=5_000, extra=3_000), 1), (a(base=5_000, extra=1_000), 1)]
+    prova("pareggio: si assorbe il supplemento piu' grande", 6_000,
+          sats(coppia))
+    prova("...e le due permutazioni dicono lo stesso numero",
+          sats(coppia), sats(list(reversed(coppia))))
+
+    # --- LE DUE PROPRIETA' STRUTTURALI, a fuzz con seme fisso --------
+    import random
+    rnd = random.Random(20260806)
+    sotto, giu = 0, 0
+    for _ in range(200):
+        righe = [(a(base=rnd.randrange(0, 9_000),
+                    extra=rnd.randrange(0, 4_000)), rnd.randint(1, 6))
+                 for _ in range(rnd.randint(1, 5))]
+        max_ieri = max(x["spedizione_sats"] for x, _ in righe)
+        if sats(righe) < max_ieri:
+            sotto += 1
+        # monotonia: un pezzo in piu' non abbassa mai il totale
+        piu = [(x, q + 1) for x, q in righe]
+        if sats(piu) < sats(righe):
+            giu += 1
+    prova("mai sotto il MAX di ieri (200 combinazioni)", 0, sotto)
+    prova("un pezzo in piu' non abbassa mai il totale", 0, giu)
+
+    # --- BASE ZERO + SUPPLEMENTO: e qui la vetrina NON deve dire
+    #     «gratuita» (il primo pezzo lo offro io, gli altri no) -------
+    prova("base 0 + supp 1.000 x3 → 2.000, e NON e' spedizione gratuita",
+          2_000, sats([(a(base=0, extra=1_000), 3)]))
+
+    # --- IL CAMBIO ASSENTE: fail-closed, come _sped_in_sats ----------
+    prova("base ancorata senza cambio → None", None,
+          sats([(a(base_eur=5.0), 1)]))
+    prova("SUPPLEMENTO ancorato senza cambio → None (il caso nuovo)",
+          None, sats([(a(base=500, extra_eur=3.0), 4)]))
+    prova("...e anche a UN pezzo solo, che il supplemento non paga",
+          None, sats([(a(base=500, extra_eur=3.0), 1)]))
+    prova("col cambio, l'ancora diventa sats", 500 + 3_000 * 3,
+          sats([(a(base=500, extra_eur=3.0), 4)], cambio=CAMBIO))
+
+    # --- L'EURO NATIVO: «contribuisce in sats», non «eur == 0» -------
+    tutto_eur = pacco([(a(base_eur=6.0, extra_eur=3.0), 10)], "casa", CAMBIO)
+    prova("tutte in euro: l'euro nativo e' esatto", 33.0, tutto_eur["eur"])
+    prova("...e i sats combaciano", 33_000, tutto_eur["sats"])
+    misto = pacco([(a(base_eur=6.0, extra_eur=3.0), 1),
+                   (a(base=2_000, extra=1_000), 1)], "casa", CAMBIO)
+    prova("una nata in sats: l'euro nativo si azzera (compare il ≈)",
+          0.0, misto["eur"])
+    zero = pacco([(a(base_eur=6.0, extra=0), 3)], "casa", CAMBIO)
+    prova("una tariffa a ZERO non azzera l'euro nativo", 6.0, zero["eur"])
+
+    # --- LA STIMA (il ≈) e i due campi per il client -----------------
+    prova("stima: vera se una contribuente e' nata in euro", True,
+          pacco([(a(base=500, extra_eur=3.0), 2)], "casa", CAMBIO)["stima"])
+    prova("stima: falsa se sono tutte in sats", False,
+          pacco([(a(base=500, extra=300), 2)], "casa", CAMBIO)["stima"])
+    p = pacco([(a(base=6_000, extra=3_000), 10)], "casa", 0.0)
+    prova("supplemento: la sola parte per-pezzo", 27_000, p["supplemento"])
+    prova("...e sats == max(base) + supplemento", 33_000,
+          6_000 + p["supplemento"])
+    prova("pezzi: la somma delle quantita'", 12,
+          pacco([(a(base=500), 10), (a(base=300), 2)], "casa", 0.0)["pezzi"])
+
+    # --- L'ARROTONDAMENTO: si converte PRIMA, si moltiplica DOPO -----
+    # 0,01 € al cambio tondo fa 10 sats: dieci pezzi fanno 10x10=100.
+    # Con round(10 x 0,01/cambio) sarebbe lo stesso numero solo per
+    # caso; il caso che le separa e' un cambio non tondo.
+    storto = 97_531.0
+    uno = round(0.01 / storto * 100_000_000)
+    q = 10
+    prova("converte prima e moltiplica dopo (mai il contrario)",
+          uno * q, sats([(a(base=0, extra_eur=0.01), q + 1)], cambio=storto))
+
+    # --- LA VIA e i casi degeneri ------------------------------------
+    prova("il ritiro non spedisce: zero e nessuna eccezione", 0,
+          sats([(a(base=6_000, extra=3_000), 10)], via="ritiro"))
+    prova("lista vuota: zero, mai un ValueError da max()", 0,
+          sats([]))
+    prova("la via punto segue la sua tariffa, il supplemento e' UNO",
+          400 + 3_000 * 2,
+          sats([(a(base=9_000, extra=3_000, punto=400), 3)], via="punto"))
+    prova("punto NON dichiarato: ripiega sulla base casa", 900 + 300 * 2,
+          sats([(a(base=900, extra=300), 3)], via="punto"))
+
+    # ================================================================
+    # LA FORMA: le sentinelle del cantiere
+    # ================================================================
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la spedizione dell'ordine ha UN giudice solo", 1,
+          src.count("def _sped_pacco("))
+    # ...e le TRE copie del MAX scritte a mano sono sparite: e' la
+    # prova che il cantiere ha unificato invece di aggiungere un
+    # quarto posto da tenere in pari.
+    prova("il MAX a mano di _compra_set non c'e' piu'", False,
+          "max(sped, costo)" in src)
+    prova("...e nemmeno quello di _strade_preventivo", False,
+          "if costo > sped:" in src)
+    prova("i chiamanti della pura sono tre (mono, set, preventivo)", 3,
+          src.count("_sped_pacco(") - 1)
+    # LA PURA RESTA PURA: se un domani ci entrasse una query o un
+    # await, compra e preventivo potrebbero cominciare a divergere
+    # senza che nessuna prova funzionale se ne accorga.
+    corpo = pezzo("_sped_pacco").split('"""')[-1]
+    for vietato in ("INSERT", "SELECT", "await", "con.", "HTTPException",
+                    "cambio_btc_eur", "PROTEZIONE_", "SPED_GRATIS"):
+        prova(f"_sped_pacco: niente {vietato} (e' una pura)", False,
+              vietato in corpo)
+    # IL SUPPLEMENTO NON ARRIVA MAI DAL COMPRATORE: una tariffa che
+    # chi paga puo' scrivere non e' piu' una tariffa.
+    corpo_mono2 = src[src.index("async def compra("):
+                      src.index("def crea_ordine_pagato(")]
+    corpo_set2 = src[src.index("async def _compra_set("):
+                     src.index("async def _preventivo_set(")]
+    for chi, c2 in (("compra", corpo_mono2), ("_compra_set", corpo_set2)):
+        prova(f"{chi}: il supplemento non si legge dal payload", False,
+              'd.get("spedizione_extra' in c2)
+    # LA QUANTITA' ARRIVA AL PREVENTIVO, ed e' la riga che tiene
+    # insieme preventivo e invoice sul mono: con [a] al posto di
+    # [(a, richiesti)] la pagina direbbe la spedizione di UN pezzo.
+    corpo_prev = src[src.index("async def preventivo_ordine("):
+                     src.index("async def _preventivo_set(")]
+    prova("preventivo mono: la quantita' arriva alla pura", True,
+          "_strade_preventivo([(a, richiesti)]" in corpo_prev)
+    corpo_pset = src[src.index("async def _preventivo_set("):][:20_000]
+    prova("preventivo set: le quantita' si prendono da `richieste`",
+          True, "[(tutti[aid], q) for aid, q" in corpo_pset)
+    prova("...e MAI zippando due dizionari diversi", False,
+          "zip(tutti.values()" in src)
+    # LA PROMESSA OFFRE TUTTO: se azzerasse la sola base, la pagina
+    # direbbe «gratuita» e sotto «spedizione per 10 pezzi».
+    for chi, c2 in (("compra", corpo_mono2), ("_compra_set", corpo_set2)):
+        prova(f"{chi}: la spedizione gratis azzera anche il supplemento",
+              True, "supplemento = sped, 0, 0" in c2)
+    # E' un costrutto del CHECKOUT: non esce sui relay, come la
+    # tariffa punto (NIP-99 non ha un vocabolario per il per-pezzo).
+    for nome in ("tag_commercio", "evento_annuncio"):
+        prova(f"{nome}: cieco al supplemento", False,
+              "spedizione_extra" in pezzo(nome))
+    prova("la modifica firmata non tocca il supplemento", False,
+          "spedizione_extra" in src[src.index("async def modifica_firmata("):
+                                    src.index("async def modifica_firmata(") + 9000])
+    # LA COLONNA SI CONSERVA se il client vecchio non la nomina, il
+    # patto della tariffa punto.
+    corpo_mod = src[src.index("async def modifica_annuncio("):
+                    src.index("async def modifica_firmata_prepara(")]
+    prova("modifica: il supplemento assente si CONSERVA", True,
+          '"spedizione_extra_sats",' in corpo_mod
+          and 'a["spedizione_extra_sats"]' in corpo_mod)
+    # NESSUNA COLONNA su ordini: l'aritmetica quadra gia', e una
+    # colonna nella tabella del denaro per un dato ornamentale e'
+    # quello che questo progetto tiene fuori.
+    prova("nessuna colonna `supplemento` su ordini", False,
+          "supplemento_sats INTEGER" in src)
+    # IL CLIENT: il giudice della gratuita' guarda il supplemento, o
+    # scriverebbe «gratis» dove solo il primo pezzo lo e'.
+    g = mini[mini.index("const spedGratis ="):]
+    g = g[:g.index(";")]
+    prova("il client non promette una gratuita' a meta'", True,
+          "spedExtra" in g)
+    # ...e la riga breve arriva fino al paySheet: se comparisse nella
+    # pagina d'acquisto e sparisse un istante dopo, si leggerebbe come
+    # «il prezzo e' cambiato» un attimo prima di pagare.
+    prova("il server dice supplemento e pezzi nelle risposte d'ordine",
+          2, src.count('"supplemento_sats": supplemento'))
+    prova("...e in ogni strada del preventivo", 1,
+          src.count('"supplemento_sats": p["supplemento"]'))
+    prova("il paySheet sa scrivere «per N pezzi»", True,
+          "Spedizione per ${fmt(nSped)} pezzi" in mini)
+    prova("...e la pagina d'acquisto pure", True,
+          'class="ctrl-nota">per ${fmt(c.pezzi)} pezzi' in mini)
+
+
+# ====================================================================
 def prove_sconto_pacco():
     """LO SCONTO CARRELLO (ago 2026): il venditore premia chi compra
     piu' cose — UNA regola per negozio, soglia + percentuale, sul SOLO
@@ -3952,6 +4171,28 @@ def prove_sped_gratis():
     prova("_compra_set: cambio_ordine non si scrive mai dalla rete", 0,
           corpo_set.count("cambio_ordine = await"))
 
+    # OGNI TARIFFA ANCORABILE ALL'EURO DEV'ESSERE NOMINATA NEI DUE
+    # BLOCCHI DEL CAMBIO, e questa e' la prova che sostituisce un ramo
+    # difensivo (ago 2026, cantiere del supplemento). Se una tariffa
+    # nuova non entra nella guardia, _sped_pacco torna None e il conto
+    # esplode: era `max(sped, None)` in _compra_set e `netto + None`
+    # nel mono, cioe' un 500 col database aperto invece di un 503.
+    # L'elenco NON si scrive a mano: si legge dalle colonne vere di
+    # `annunci`, cosi' la quarta tariffa che qualcuno aggiungera' fa
+    # diventare rossa questa riga da sola. (`spedizione_punto_eur` la
+    # nominano via _tariffa_dichiarata, che le sceglie per via: si
+    # accetta l'una o l'altra forma.)
+    colonne_eur = sorted(set(re.findall(r'"(spedizione\w*_eur) REAL', _SORGENTE)))
+    prova("le tariffe ancorabili all'euro sono tre", 3, len(colonne_eur))
+    for chi, c2, tramite in (("compra", corpo_mono, "_tariffa_dichiarata(a, via)"),
+                             ("_compra_set", corpo_set,
+                              "_tariffa_dichiarata(a, via)")):
+        for col in colonne_eur:
+            prova(f"{chi}: il cambio guarda {col}", True,
+                  f'["{col}"] > 0' in c2
+                  or (col.startswith("spedizione_punto") and tramite in c2)
+                  or (col == "spedizione_eur" and tramite in c2))
+
     # IL CLIENT: il giudice unico che alla prima promessa c'era e alla
     # seconda no (buco trovato col cantiere dell'euro). Sono QUATTRO le
     # superfici che la mostrano — testata negozio, «Altri oggetti»,
@@ -4034,9 +4275,14 @@ def prove_consegna_payload_punto():
     exec("async " + pezzo("consegna_da_payload"), amb)
 
     def giudica(d, valuta="sats"):
-        (_, _, _, p_sats, p_eur, p_dich, _, _) = \
+        (_, _, _, p_sats, p_eur, p_dich, _, _, _, _) = \
             gira(amb["consegna_da_payload"](d, valuta))
         return p_sats, p_eur, p_dich
+
+    def supplemento(d, valuta="sats"):
+        (_, _, _, _, _, _, e_sats, e_eur, _, _) = \
+            gira(amb["consegna_da_payload"](d, valuta))
+        return e_sats, e_eur
 
     prova("chiavi assenti: NON dichiarata (i client di ieri)",
           (0, 0.0, 0), giudica({"consegna": "spedizione"}))
@@ -4066,9 +4312,34 @@ def prove_consegna_payload_punto():
     prova("listino sats, punto in euro: resta ANCORATO", (0, 4.5, 1),
           giudica({"consegna": "spedizione",
                    "spedizione_punto_eur": "4.5"}))
+    # IL SUPPLEMENTO (ago 2026): stesso aiutante, ma NIENTE
+    # dichiarazione — «0» e «assente» sono la stessa cosa, ed e' la
+    # differenza dalla tariffa punto qui sopra. Chi lo svuota in
+    # modifica manda 0, e 0 vuol dire «nessun supplemento».
+    prova("supplemento assente: zero", (0, 0.0),
+          supplemento({"consegna": "spedizione"}))
+    prova("supplemento in sats", (300, 0.0),
+          supplemento({"consegna": "spedizione",
+                       "spedizione_extra_sats": "300"}))
+    prova("supplemento a zero esplicito: zero, come l'assenza", (0, 0.0),
+          supplemento({"consegna": "spedizione",
+                       "spedizione_extra_sats": 0}))
+    prova("listino sats, supplemento in euro: resta ANCORATO", (0, 1.5),
+          supplemento({"consegna": "spedizione",
+                       "spedizione_extra_eur": "1.5"}))
+    prova("listino EUR: euro + equivalente al cambio", (1_500, 1.5),
+          supplemento({"consegna": "spedizione",
+                       "spedizione_extra_eur": "1.5"}, "eur"))
+    prova("col ritiro il supplemento si azzera", (0, 0.0),
+          supplemento({"consegna": "ritiro",
+                       "spedizione_extra_sats": "300"}))
+    prova("col codice online idem", (0, 0.0),
+          supplemento({"consegna": "digitale",
+                       "spedizione_extra_sats": "300"}))
+
     # la simmetria con la tariffa casa: stesso aiutante, stessi numeri
     def entrambe(d, valuta="sats"):
-        (_, s_sats, s_eur, p_sats, p_eur, _, _, _) = \
+        (_, s_sats, s_eur, p_sats, p_eur, _, _, _, _, _) = \
             gira(amb["consegna_da_payload"](d, valuta))
         return (s_sats, s_eur) == (p_sats, p_eur)
     prova("stessa cifra nei due campi = stessa lettura", True,
@@ -4184,8 +4455,14 @@ def prove_pagina_acquisto():
     #    passano intonsi, le colonne si leggono per nome)
     i = src.index("MODELLO_IMPORT = (")
     intest = src[i:src.index("\\n", i)]
-    prova("il modello CSV chiude con spedizione_punto", True,
-          intest.rstrip().endswith("spedizione_punto"))
+    # ...e ci resta anche quando ne arriva un'altra dopo: le colonne si
+    # AGGIUNGONO in coda, mai in mezzo, o i CSV gia' compilati
+    # comincerebbero a leggere il valore sbagliato sotto l'intestazione
+    # giusta. Dall'ago 2026 l'ultima e' il supplemento per pezzo.
+    prova("il modello CSV chiude con spedizione_extra", True,
+          intest.rstrip().endswith("spedizione_extra"))
+    prova("...e spedizione_punto e' rimasta al suo posto, prima", True,
+          "spedizione_punto;" in intest)
 
     # --- il client ---------------------------------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -5092,6 +5369,7 @@ def main():
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
               prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
+              prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_sped_gratis, prove_suggerimenti,
               prove_libro_mastro, prove_leve,

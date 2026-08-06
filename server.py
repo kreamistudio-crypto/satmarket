@@ -1968,7 +1968,22 @@ def init_db():
                     # sentinella -1 costringerebbe guardie >=0 sparse.
                     "spedizione_punto_sats INTEGER DEFAULT 0",
                     "spedizione_punto_eur REAL DEFAULT 0",
-                    "spedizione_punto_dichiarata INTEGER DEFAULT 0"):
+                    "spedizione_punto_dichiarata INTEGER DEFAULT 0",
+                    # IL SUPPLEMENTO PER PEZZO (ago 2026, caso dal
+                    # campo: il riso da 4 kg venduto a sacchi, con la
+                    # spedizione di UNO solo dichiarata). Gemella di
+                    # spedizione_sats/eur nella semantica di valuta —
+                    # sats = fisso, eur = ancorato, stesso toggle — ma
+                    # SENZA il flag delle punto, ed e' la differenza da
+                    # ricordare: la' vuoto e zero sono cose diverse
+                    # (vuoto = vale la casa), qui «supplemento 0» e
+                    # «nessun supplemento» sono la STESSA cosa, quindi
+                    # lo zero basta a dirlo. Uno solo per annuncio: vale
+                    # per la via casa e per la via punto, perche'
+                    # dipende dall'OGGETTO e non dalla destinazione (un
+                    # sacco di riso pesa uguale ovunque vada).
+                    "spedizione_extra_sats INTEGER DEFAULT 0",
+                    "spedizione_extra_eur REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -3162,9 +3177,10 @@ def _decifra_contenuto(blob: str) -> str:
 
 async def consegna_da_payload(d: dict, valuta: str):
     """Il giudice unico dei campi di consegna (lug 2026): legge il
-    payload di pubblica/modifica e ritorna la 8-tupla
+    payload di pubblica/modifica e ritorna la 10-tupla
     (consegna, spedizione_sats, spedizione_eur, spedizione_punto_sats,
-    spedizione_punto_eur, spedizione_punto_dichiarata, taglia_pacco,
+    spedizione_punto_eur, spedizione_punto_dichiarata,
+    spedizione_extra_sats, spedizione_extra_eur, taglia_pacco,
     anche_digitale), gia' normalizzata. Pattern categoria: i valori
     sconosciuti si normalizzano a '' (mai un 400 — i client di ieri
     non sanno di consegne, e non devono rompersi). anche_digitale e'
@@ -3184,7 +3200,14 @@ async def consegna_da_payload(d: dict, valuta: str):
     divergere). La dichiarazione e' la PRESENZA di una chiave punto
     non vuota: il campo vuoto del form non manda la chiave (= non
     dichiarato, vale la tariffa casa), «0» scritto = gratis al
-    punto. I client di ieri non mandano nulla → 0, mai un 400."""
+    punto. I client di ieri non mandano nulla → 0, mai un 400.
+
+    Il SUPPLEMENTO per pezzo (ago 2026) e' la terza tariffa, e passa
+    dallo stesso aiutante: quel che cambia e' che NON ha una
+    dichiarazione, perche' non le serve — «supplemento 0» e «nessun
+    supplemento» sono la stessa cosa, mentre per il punto vuoto e zero
+    dicono due cose diverse. Quindi qui basta il numero, e il campo
+    svuotato in modifica e' esprimibile mandando 0."""
     consegna = d.get("consegna", "")
     if consegna not in MODALITA_CONSEGNA:
         consegna = ""
@@ -3243,6 +3266,7 @@ async def consegna_da_payload(d: dict, valuta: str):
 
     sped_sats, sped_eur = 0, 0.0
     punto_sats, punto_eur, punto_dich = 0, 0.0, 0
+    extra_sats, extra_eur = 0, 0.0
     if consegna in ("spedizione", "entrambe"):
         sped_sats, sped_eur = await _leggi_costo("spedizione_sats",
                                                  "spedizione_eur")
@@ -3256,8 +3280,12 @@ async def consegna_da_payload(d: dict, valuta: str):
             punto_dich = 1
             punto_sats, punto_eur = await _leggi_costo(
                 "spedizione_punto_sats", "spedizione_punto_eur")
+        # Il supplemento: nessun test di presenza, il numero basta.
+        extra_sats, extra_eur = await _leggi_costo("spedizione_extra_sats",
+                                                   "spedizione_extra_eur")
     return (consegna, sped_sats, sped_eur,
-            punto_sats, punto_eur, punto_dich, taglia, anche_digitale)
+            punto_sats, punto_eur, punto_dich,
+            extra_sats, extra_eur, taglia, anche_digitale)
 
 
 def guardia_venditore_digitale(tg_id: int, consegna: str,
@@ -6005,6 +6033,11 @@ CAMPI_VETRINA = (
     # (il conto vero lo dice comunque il preventivo, lato server)
     "a.spedizione_punto_sats, a.spedizione_punto_eur, "
     "a.spedizione_punto_dichiarata, "
+    # e il supplemento per pezzo con loro: serve alla precompilazione
+    # del form, alla stima della DEMO e — soprattutto — al giudice
+    # client della spedizione gratuita, che senza di lui direbbe
+    # «gratis» su un annuncio dove solo il primo pezzo lo e'
+    "a.spedizione_extra_sats, a.spedizione_extra_eur, "
     "a.anche_digitale, a.condizione, a.regione, "
     # la quantita' e' pubblica per natura: il selettore dei pezzi nel
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
@@ -6414,7 +6447,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # cambio, e tra lo scudo anti-doppione e l'INSERT non deve esserci
     # nessun await (il patto del server mono-processo).
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
-     taglia, anche_dig) = await consegna_da_payload(d, valuta)
+     extra_sats, extra_eur, taglia,
+     anche_dig) = await consegna_da_payload(d, valuta)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     condizione = guardia_zona_condizione(d, consegna)
     quantita = quantita_da_payload(d)
@@ -6522,14 +6556,16 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,"
         "spedizione_punto_sats,spedizione_punto_eur,"
-        "spedizione_punto_dichiarata,taglia_pacco,"
+        "spedizione_punto_dichiarata,"
+        "spedizione_extra_sats,spedizione_extra_eur,taglia_pacco,"
         "anche_digitale,condizione,quantita,stato,creato,"
         "asta_base_sats,asta_scadenza,asta_creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
-         punto_sats, punto_eur, punto_dich, taglia, anche_dig,
+         punto_sats, punto_eur, punto_dich,
+         extra_sats, extra_eur, taglia, anche_dig,
          condizione, quantita, "revisione" if in_revisione else "attivo",
          adesso,
          # la base d'asta E' il prezzo del listino (un campo solo da
@@ -7058,7 +7094,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
-     taglia, anche_dig) = await consegna_da_payload(d, valuta)
+     extra_sats, extra_eur, taglia,
+     anche_dig) = await consegna_da_payload(d, valuta)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
@@ -7114,6 +7151,15 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         punto_sats = a["spedizione_punto_sats"]
         punto_eur = a["spedizione_punto_eur"]
         punto_dich = a["spedizione_punto_dichiarata"]
+    # E lo stesso per il SUPPLEMENTO, per la stessa ragione: il client
+    # vecchio in cache non sa nemmeno che il campo esiste, e un ritocco
+    # al titolo non deve togliere al venditore la tariffa dei pezzi in
+    # piu' — che qui, a differenza del punto, si azzera mandando 0.
+    if (consegna in ("spedizione", "entrambe")
+            and not any(k in d for k in ("spedizione_extra_sats",
+                                         "spedizione_extra_eur"))):
+        extra_sats = a["spedizione_extra_sats"]
+        extra_eur = a["spedizione_extra_eur"]
     in_corso = _ordini_vivi_annuncio(
         con, annuncio_id, ("released", "refunded", "annullato"), esclusi=True)
     con.close()
@@ -7179,13 +7225,15 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "regione=?, "
         "consegna=?, spedizione_sats=?, spedizione_eur=?, "
         "spedizione_punto_sats=?, spedizione_punto_eur=?, "
-        "spedizione_punto_dichiarata=?, taglia_pacco=?, "
+        "spedizione_punto_dichiarata=?, "
+        "spedizione_extra_sats=?, spedizione_extra_eur=?, taglia_pacco=?, "
         "anche_digitale=?, condizione=?, quantita=?, stato=?, "
         "modificato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
-         punto_sats, punto_eur, punto_dich, taglia, anche_dig,
+         punto_sats, punto_eur, punto_dich,
+         extra_sats, extra_eur, taglia, anche_dig,
          condizione, quantita, "revisione" if in_revisione else "attivo",
          int(time.time()), annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
@@ -8706,6 +8754,82 @@ def _sped_in_sats(sped_sats: int, sped_eur: float, cambio: float):
             return None
         return round(sped_eur / cambio * 100_000_000)
     return sped_sats
+
+
+def _sped_pacco(righe: list, via: str, cambio: float) -> dict:
+    """LA SPEDIZIONE DI UN ORDINE INTERO, in una riga sola:
+    **la spedizione piu' cara fa da base, e ogni altro pezzo aggiunge
+    il suo supplemento.**
+
+        totale = max(base_i) + (somma qta_i x supp_i) - supp_vincitore
+
+    `righe` = [(annuncio, quantita)] — il mono e' [(a, quanti)], e non
+    e' un caso particolare da scrivere a parte: base + (q-1) x supp
+    esce da sola. Fino ad ago 2026 il MAX era scritto a mano in DUE
+    posti (_compra_set e _strade_preventivo) piu' una terza forma nel
+    mono di compra(): tenerne tre in pari col supplemento sarebbe
+    stato il modo di farli divergere, quindi qui ce n'e' UNO.
+
+    IL PAREGGIO nel MAX si rompe su (base, supp), cioe' a parita' di
+    base si assorbe il supplemento piu' GRANDE — a favore di chi
+    compra. *Quale* riga vinca dipende dall'ordine della lista, il
+    TOTALE no: e' quello che conta, e va detto perche' qualcuno un
+    giorno vorra' aggiungere un terzo criterio «per sicurezza».
+
+    IL MAX NON E' IL MINIMO, ED E' GIUSTO COSI'. A(base 10, supp 0) +
+    B(base 9, supp 5) fa 15, non 9: partire da B darebbe meno di
+    quanto costa spedire A da solo, che e' assurdo. Il primo che lo
+    nota lo chiamera' bug — non lo e'.
+
+    DUE PROPRIETA' che le prove torturano, perche' sono il patto col
+    mondo di ieri: a supplementi tutti a ZERO il risultato e' identico
+    al MAX di sempre, e il totale non scende MAI sotto quel MAX
+    (somma qta x supp >= supp_vincitore, perche' qta >= 1). Nessun
+    venditore incassa meno di prima.
+
+    L'EURO NATIVO segue la stessa strada dei sats, e la condizione e'
+    «contribuisce in sats», non «eur == 0»: una tariffa che vale ZERO
+    non contribuisce e NON deve azzerare il nativo (zero e' zero in
+    tutte le valute), mentre una con sats>0 nata in sats si'. Scritta
+    nell'altro modo — quello che viene in mente — un supplemento a
+    zero farebbe comparire il ≈ su tutti i carrelli.
+
+    L'ARROTONDAMENTO converte PRIMA e moltiplica DOPO, il patto di
+    _unitario_effettivo: qui vale doppio, perche' questo numero
+    finisce dentro ordini.spedizione_sats e _righe_ordine lo sottrae.
+
+    sats None = una tariffa e' ancorata all'euro e il cambio manca:
+    decide il chiamante (503 in compra dopo aver richiesto il cambio,
+    strada spenta col motivo nel preventivo)."""
+    fuori = {"sats": 0, "eur": 0.0, "stima": False,
+             "supplemento": 0, "pezzi": 0}
+    if via not in ("casa", "punto"):
+        return fuori           # ritiro e codice online non spediscono
+    base, base_eur, supp_vinc, supp_vinc_eur = 0, 0.0, 0, 0.0
+    extra, extra_eur, stima, pezzi = 0, 0.0, False, 0
+    sats_puri = False          # una tariffa che contribuisce nata in sats
+    for a, qta in righe:
+        b_sats, b_eur = _tariffa_dichiarata(a, via)
+        b = _sped_in_sats(b_sats, b_eur, cambio)
+        s = _sped_in_sats(a["spedizione_extra_sats"],
+                          a["spedizione_extra_eur"], cambio)
+        s_eur = a["spedizione_extra_eur"]
+        if b is None or s is None:
+            return {**fuori, "sats": None}
+        pezzi += qta
+        extra += s * qta
+        extra_eur += round(s_eur * qta, 2)
+        if s > 0:
+            stima, sats_puri = (stima or s_eur > 0), (sats_puri or s_eur <= 0)
+        if (b, s) > (base, supp_vinc):
+            base, base_eur, supp_vinc, supp_vinc_eur = b, b_eur, s, s_eur
+    if base > 0:
+        stima, sats_puri = (stima or base_eur > 0), (sats_puri or base_eur <= 0)
+    return {"sats": base + extra - supp_vinc,
+            "eur": (0.0 if sats_puri
+                    else round(base_eur + extra_eur - supp_vinc_eur, 2)),
+            "stima": stima, "pezzi": pezzi,
+            "supplemento": extra - supp_vinc}
 
 
 def _eur_interi(sats: int, cambio: float):
@@ -11197,7 +11321,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
     serve_cambio_duro = any(
         (a["valuta"] == "eur" and a["prezzo_eur"] > 0)
         or (scelta == "spedizione"
-            and _tariffa_dichiarata(a, via)[1] > 0)
+            and (_tariffa_dichiarata(a, via)[1] > 0
+                 # il supplemento ancorato all'euro conta come la
+                 # tariffa: se lo si dimentica qui, _sped_pacco torna
+                 # None e il max() di ieri dava un TypeError, cioe' un
+                 # 500 invece di un 503 onesto
+                 or a["spedizione_extra_eur"] > 0))
         for a in tutti.values())
     # DUE variabili e non una: `cambio_ordine` finisce in colonna e
     # dichiara «0 = nessuna conversione», quindi resta zero quando non
@@ -11219,10 +11348,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # --- Il conto, riga per riga: unitario gia' col MIN tra lampo e
     # accordo (il patto del mono: si arrotonda PRIMA di moltiplicare,
     # cosi' la divisione a ritroso di chi legge l'ordine e' esatta).
-    # La spedizione e' il MAX dei costi dichiarati: il pacco e' uno —
-    # compromesso dichiarato del v1, mai a sfavore del compratore.
+    # La spedizione la dice _sped_pacco: il MAX dei costi dichiarati
+    # (il pacco e' uno — compromesso dichiarato del v1) piu' il
+    # supplemento di ogni pezzo oltre il primo.
     adesso = int(time.time())
-    righe, articolo, sped, pezzi = [], 0, 0, 0
+    righe, articolo, pezzi = [], 0, 0
     for aid, qta in richieste.items():
         a = tutti[aid]
         # La matematica e' quella delle pure del conto (il patto del
@@ -11249,10 +11379,17 @@ async def _compra_set(user: dict, d: dict) -> dict:
         pezzi += qta
         righe.append({"annuncio_id": aid, "quantita": qta,
                       "unitario_sats": unitario, "titolo": a["titolo"]})
-        if scelta == "spedizione":
-            costo = _sped_in_sats(*_tariffa_dichiarata(a, via),
-                                  cambio_ordine)
-            sped = max(sped, costo)
+
+    # La spedizione dell'ordine intero, dalla pura che serve anche il
+    # preventivo. `sats` non puo' essere None: serve_cambio_duro nomina
+    # TUTTE le tariffe ancorabili all'euro, e una prova in CI incrocia
+    # quell'elenco con le colonne `spedizione*_eur` di annunci — la
+    # quarta tariffa che qualcuno aggiungera' lo sentira' dalla CI e
+    # non da un TypeError (che qui era `max(sped, None)`, cioe' un 500
+    # col database aperto).
+    sp = _sped_pacco([(tutti[aid], q) for aid, q in richieste.items()],
+                     via if scelta == "spedizione" else "", cambio_ordine)
+    sped = sp["sats"]
 
     # La MISURA delle due promesse, contata UNA volta sola: e' cosi'
     # che «guardano lo stesso numero» resta vero per costruzione invece
@@ -11271,9 +11408,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # tariffa (il MAX qui sopra), che e' anche il punto in cui decide
     # _strade_preventivo: preventivo e invoice devono dire la stessa
     # cifra per costruzione.
-    sped_gratis_sats = 0
+    sped_gratis_sats, supplemento = 0, sp["supplemento"]
     if sped and _sped_gratis(misura_eur, sog_gratis):
-        sped_gratis_sats, sped = sped, 0
+        # la promessa offre la spedizione INTERA, supplemento compreso
+        sped_gratis_sats, sped, supplemento = sped, 0, 0
     conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO, sconto)
     prot, totale = conto["protezione"], conto["totale"]
@@ -11344,6 +11482,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
             # qualcosa che non c'e'
             "sconto_criterio": crit if sconto else "",
             "spedizione_sats": sped,
+            # la parte per-pezzo, e i pezzi: sono le due chiavi con cui
+            # il paySheet tiene la riga «spedizione per N pezzi» che la
+            # pagina d'acquisto mostrava un istante prima. Senza, quella
+            # riga sparirebbe sullo stesso schermo e si leggerebbe come
+            # «il prezzo e' cambiato» — un attimo prima di pagare.
+            "supplemento_sats": supplemento, "pezzi": pezzi,
             # la tariffa risparmiata: colonna TESTIMONE, e qui e' la
             # chiave che permette al compratore di ritrovarla
             "sped_gratis_sats": sped_gratis_sats,
@@ -11362,7 +11506,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
 RIPRESA_INVOICE_S = 720
 
 
-def _strade_preventivo(annunci: list, articolo: int, cambio: float,
+def _strade_preventivo(righe: list, articolo: int, cambio: float,
                        disponibili: set, articolo_eur: float = 0.0,
                        sconto: int = 0, sconto_eur: float = 0.0,
                        sped_gratis: bool = False) -> list:
@@ -11370,8 +11514,13 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
     ritiro → casa → punto → digitale. `disponibili` le decide il
     CHIAMANTE — per il mono le strade dell'annuncio, per il set
     l'INTERSEZIONE delle fisiche: rifarle qui dall'unione direbbe una
-    strada che il set non offre. `annunci` sono le righe su cui fare
-    il MAX delle tariffe (una sola per il mono); la via 'punto' c'e'
+    strada che il set non offre. `righe` sono le [(annuncio, qta)] su
+    cui contare la spedizione — e la QUANTITA' non e' un dettaglio:
+    finche' qui arrivavano i soli annunci, il mono col supplemento
+    avrebbe detto la spedizione di UN pezzo e la invoice quella di
+    dieci (col supplemento a zero i due numeri coincidono, ed e'
+    esattamente il motivo per cui il buco poteva restare a lungo
+    invisibile). La via 'punto' c'e'
     SEMPRE dove c'e' la spedizione — anche senza spedizioniere
     dichiarato (secondo giro, la decisione che SUPERA il gate: meglio
     l'accordo in chat che la porta chiusa; la rete, se dichiarata, la
@@ -11432,23 +11581,18 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
         # spedizioniere) — senza rete il punto arriva dopo, dal campo
         # dell'ordine (terzo giro); la tariffa e' il fallback casa
         for v in ("casa", "punto"):
-            sped, stima_sped, sped_eur = 0, False, 0.0
-            for a in annunci:
-                t_sats, t_eur = _tariffa_dichiarata(a, v)
-                costo = _sped_in_sats(t_sats, t_eur, cambio)
-                if costo is None:
-                    sped = None
-                    break
-                if t_eur > 0:
-                    stima_sped = True
-                if costo > sped:
-                    # l'euro nativo segue la tariffa che VINCE il MAX
-                    # (0 se la vincente e' nata in sats: allora l'euro
-                    # e' una conversione e il ≈ e' suo)
-                    sped, sped_eur = costo, t_eur
+            # il MAX (e il supplemento per pezzo) li fa la pura, la
+            # stessa da cui passano compra() e _compra_set: qui non si
+            # ricalcola niente, o sarebbero due conti da tenere in pari
+            p = _sped_pacco(righe, v, cambio)
+            sped, sped_eur, stima_sped = p["sats"], p["eur"], p["stima"]
             extra = ({"fallback_casa": not any(
-                a["spedizione_punto_dichiarata"] for a in annunci)}
+                a["spedizione_punto_dichiarata"] for a, _ in righe)}
                 if v == "punto" else None)
+            # i due campi che raccontano la riga breve «spedizione per
+            # N pezzi»: il client non li calcola, li riceve
+            extra = {**(extra or {}), "supplemento_sats": p["supplemento"],
+                     "pezzi": p["pezzi"]}
             # LA PROMESSA DEL NEGOZIO, qui e non prima: la tariffa si
             # azzera dopo essere stata contata, cosi' questo punto e'
             # lo stesso di compra() e la pagina non puo' promettere una
@@ -11459,6 +11603,10 @@ def _strade_preventivo(annunci: list, articolo: int, cambio: float,
             risparmio = 0
             if sped_gratis and sped:
                 risparmio, sped, sped_eur, stima_sped = sped, 0, 0.0, False
+                # il supplemento se ne va col resto: la promessa offre
+                # la spedizione INTERA, e senza questa riga la pagina
+                # direbbe «gratuita» e sotto «spedizione per 10 pezzi»
+                extra["supplemento_sats"] = 0
             extra = {**(extra or {}), "sped_gratis_sats": risparmio}
             if sped is None:
                 e = {"via": v, "cambio_assente": True}
@@ -11559,7 +11707,8 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     listino_eur = a["valuta"] == "eur" and a["prezzo_eur"] > 0
     cambio = 0.0
     if (listino_eur or a["spedizione_eur"] > 0
-            or a["spedizione_punto_eur"] > 0 or sog_gratis > 0):
+            or a["spedizione_punto_eur"] > 0
+            or a["spedizione_extra_eur"] > 0 or sog_gratis > 0):
         cambio = await cambio_btc_eur()
         if listino_eur and cambio <= 0:
             raise HTTPException(503, "Il cambio euro non è disponibile in "
@@ -11620,7 +11769,10 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # negozio non si sanno valutare e la pagina lo dice invece
             # di far sparire una riga senza spiegazione
             "promesse_sospese": sog_gratis > 0 and misura_eur is None,
-            "strade": _strade_preventivo([a], articolo, cambio,
+            # [(annuncio, QUANTI)]: la quantita' e' la meta' del conto
+            # della spedizione, e passarla e' l'unico modo di dire la
+            # stessa cifra che dira' la invoice
+            "strade": _strade_preventivo([(a, richiesti)], articolo, cambio,
                                          disponibili, articolo_eur,
                                          sped_gratis=gratis)}
 
@@ -11756,6 +11908,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     if (listino_eur or crit == "valore" or sog_gratis > 0
             or any(a["spedizione_eur"] > 0
                    or a["spedizione_punto_eur"] > 0
+                   or a["spedizione_extra_eur"] > 0
                    for a in tutti.values())):
         cambio = await cambio_btc_eur()
         if listino_eur and cambio <= 0:
@@ -11855,7 +12008,12 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # far sparire una riga senza spiegazione
             "promesse_sospese": ((crit == "valore" or sog_gratis > 0)
                                  and misura_eur is None),
-            "strade": _strade_preventivo(list(tutti.values()), articolo,
+            # si cammina su `richieste`, MAI zippando tutti.values() con
+            # richieste.values(): l'ordine di `tutti` viene dalla SELECT
+            # ... IN (...), non da `richieste`, e le quantita' si
+            # appaierebbero all'annuncio sbagliato in silenzio
+            "strade": _strade_preventivo([(tutti[aid], q) for aid, q
+                                          in richieste.items()], articolo,
                                          cambio, strade, articolo_eur,
                                          sconto, sconto_eur,
                                          _sped_gratis(misura_eur, sog_gratis)),
@@ -12086,10 +12244,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # preventivo devono dire la stessa cifra per costruzione. Qui
     # restano cambio, 503 e tetto — hanno await e HTTPException.
     adesso = int(time.time())
-    t_sats, t_eur = (_tariffa_dichiarata(a, via)
-                     if scelta == "spedizione" else (0, 0.0))
+    t_eur = (_tariffa_dichiarata(a, via)[1]
+             if scelta == "spedizione" else 0.0)
     cambio_ordine = 0.0
-    sped = t_sats if scelta == "spedizione" else 0
     # LA PROMESSA DEL VENDITORE SI LEGGE QUI, e la posizione e' il solo
     # riordino di questo cantiere: da quando la soglia e' in EURO e' il
     # suo valore a dire se serve il cambio, quindi deve arrivare PRIMA
@@ -12117,7 +12274,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # cambio l'ordine con spedizione non puo' partire — 503 onesto,
     # SOLO per questa scelta: il ritiro resta sempre acquistabile e
     # l'articolo in sats non dipende mai dal cambio.
-    if scelta == "spedizione" and a["valuta"] != "eur" and t_eur > 0:
+    if (scelta == "spedizione" and a["valuta"] != "eur"
+            and (t_eur > 0 or a["spedizione_extra_eur"] > 0)):
         cambio_ordine = await cambio_btc_eur()
         if cambio_ordine <= 0:
             con.close()
@@ -12125,7 +12283,6 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                      "il prezzo in euro e il cambio non è "
                                      "disponibile in questo momento: "
                                      "riprova tra poco")
-        sped = _sped_in_sats(t_sats, t_eur, cambio_ordine)
     if a["valuta"] == "eur" and a["prezzo_eur"] > 0:
         cambio_ordine = await cambio_btc_eur()
         if cambio_ordine <= 0:
@@ -12133,8 +12290,6 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             raise HTTPException(503, "Il cambio euro non è disponibile in "
                                      "questo momento: riprova tra qualche "
                                      "minuto")
-        if scelta == "spedizione":
-            sped = _sped_in_sats(t_sats, t_eur, cambio_ordine)
     # Il cambio serve anche solo per SAPERE se la promessa scatta, su
     # un annuncio che di suo non ne avrebbe bisogno. In una variabile
     # SUA e non in cambio_ordine: quella colonna dichiara «0 = nessuna
@@ -12176,7 +12331,17 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # e' a 0: il ramo esiste ma non scatta. Il compratore paga il
     # TOTALE nel deposito; al rilascio il venditore riceve
     # articolo+spedizione e la protezione resta alla piattaforma.
-    # La spedizione resta UNA volta sola, qualunque sia la quantita'.
+    # La spedizione la dice _sped_pacco, la stessa pura del set e del
+    # preventivo: la tariffa UNA volta sola piu' il supplemento di ogni
+    # pezzo oltre il primo — con la colonna vuota e' la tariffa e basta,
+    # cioe' il conto di sempre. Qui `sats` non puo' essere None: il
+    # blocco del cambio qui sopra nomina TUTTE le tariffe che possono
+    # essere ancorate all'euro, e una prova in CI incrocia quell'elenco
+    # con le colonne `spedizione*_eur` di annunci — chi ne aggiungera'
+    # una quarta lo sentira' dalla CI invece che da un 500.
+    sp = _sped_pacco([(a, richiesti)],
+                     via if scelta == "spedizione" else "", cambio_ordine)
+    sped = sp["sats"]
     # LA SPEDIZIONE GRATIS SOPRA SOGLIA, e qui c'e' anche sul MONO —
     # lo sconto carrello no, ed e' la forma a deciderlo, non il gusto:
     # azzerare una tariffa scrive spedizione_sats=0, cioe' uno stato
@@ -12188,9 +12353,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # _strade_preventivo — preventivo e invoice devono dire la stessa
     # cifra per costruzione.
     misura_eur = _eur_interi(articolo, cambio_misura)
-    sped_gratis_sats = 0
+    sped_gratis_sats, supplemento = 0, sp["supplemento"]
     if sped and _sped_gratis(misura_eur, sog_gratis):
-        sped_gratis_sats, sped = sped, 0
+        # intera, supplemento compreso: e' quello che il venditore
+        # promette quando dice «la spedizione la offro io»
+        sped_gratis_sats, sped, supplemento = sped, 0, 0
     conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO)
     prot, totale = conto["protezione"], conto["totale"]
@@ -12254,6 +12421,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
             "articolo_sats": articolo, "spedizione_sats": sped,
+            # la parte per-pezzo e i pezzi: le due chiavi che tengono
+            # viva nel paySheet la riga «spedizione per N pezzi» gia'
+            # vista nella pagina d'acquisto (sparire li' si legge come
+            # «il prezzo e' cambiato», un attimo prima di pagare)
+            "supplemento_sats": supplemento, "pezzi": sp["pezzi"],
             # la tariffa risparmiata (0 = nessuna promessa scattata):
             # colonna TESTIMONE, e la chiave che la fa ritrovare
             "sped_gratis_sats": sped_gratis_sats,
@@ -16815,8 +16987,13 @@ MODELLO_IMPORT = (
     # ritiro, IN CODA cosi' i file di ieri passano intonsi (le
     # colonne si leggono per nome). Cella vuota = non dichiarata,
     # vale la tariffa di `spedizione`; 0 = gratis al punto.
+    # spedizione_extra (ago 2026): il supplemento per ogni pezzo OLTRE
+    # il primo, anche lui in coda. Le righe che non lo usano non lo
+    # scrivono proprio — le colonne di coda vuote si omettono, e' la
+    # convenzione che questo modello ha gia'.
     "titolo;descrizione;prezzo;valuta;categoria;zona;foto;"
-    "consegna;spedizione;taglia;condizione;quantita;spedizione_punto\n"
+    "consegna;spedizione;taglia;condizione;quantita;spedizione_punto;"
+    "spedizione_extra\n"
     "Tastiera meccanica 60%;Come nuova, switch rossi, scatola "
     "originale;35000;sats;Elettronica;Milano;;spedizione;450;piccolo;"
     "come nuovo;\n"
@@ -16836,10 +17013,15 @@ MODELLO_IMPORT = (
     # insegnerebbe una cosa falsa a chi compila il file
     # ...e la tariffa punto: verso un punto di ritiro il miele viaggia
     # a 4,50 invece di 6,00 (vale solo se nel Profilo hai dichiarato
-    # lo spedizioniere)
+    # lo spedizioniere).
+    # E' anche la riga che INSEGNA il supplemento, perche' e' l'unica
+    # che si vende a scorte: il primo vasetto costa 6,00 di spedizione
+    # e ogni vasetto in piu' 1,50 — dodici vasetti non viaggiano nella
+    # scatola di uno solo. E' il caso del riso da 4 kg che ha aperto
+    # il cantiere.
     "Miele di castagno 500g;Produzione propria 2026, vasetto in "
     "vetro;12,00;eur;Alimenti e bevande;Cuneo;;spedizione;6,00;piccolo;"
-    ";12;4,50\n"
+    ";12;4,50;1,50\n"
     "Crema mani alla calendula;Vasetto 50ml, produzione artigianale;"
     "9,00;eur;Bellezza e benessere;Bergamo;;spedizione;4,00;busta;;30\n"
     # la quarta via: consegna digitale (buoni, codici, licenze) —
@@ -17082,8 +17264,17 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                 payload_consegna["spedizione_punto_eur"] = punto_testo
             else:
                 payload_consegna["spedizione_punto_sats"] = punto_testo
+        # Il SUPPLEMENTO per pezzo (ago 2026), anche lui in coda: qui
+        # la chiave si manda SEMPRE, che vuoto e zero dicono la stessa
+        # cosa — e' la differenza dalla tariffa punto qui sopra.
+        extra_testo = cella(r, "spedizione_extra") \
+            .replace(" ", "").replace(",", ".")
+        if valuta == "eur":
+            payload_consegna["spedizione_extra_eur"] = extra_testo or 0
+        else:
+            payload_consegna["spedizione_extra_sats"] = extra_testo or 0
         (consegna, sped_sats, sped_eur, punto_sats, punto_eur,
-         punto_dich, taglia, anche_dig) = \
+         punto_dich, extra_sats, extra_eur, taglia, anche_dig) = \
             await consegna_da_payload(payload_consegna, valuta)
         # La regola della zona e' quella del form Vendi (lug 2026): col
         # RITIRO il comune e' d'obbligo, e in ogni caso una zona
@@ -17140,6 +17331,8 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                       "spedizione_punto_sats": punto_sats,
                       "spedizione_punto_eur": punto_eur,
                       "spedizione_punto_dichiarata": punto_dich,
+                      "spedizione_extra_sats": extra_sats,
+                      "spedizione_extra_eur": extra_eur,
                       "taglia_pacco": taglia,
                       "anche_digitale": anche_dig,
                       # colonna facoltativa, sinonimi tollerati:
@@ -17247,9 +17440,10 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
         "prezzo_sats,zona,valuta,prezzo_eur,lat,lon,regione,"
         "consegna,spedizione_sats,spedizione_eur,"
         "spedizione_punto_sats,spedizione_punto_eur,"
-        "spedizione_punto_dichiarata,taglia_pacco,"
+        "spedizione_punto_dichiarata,"
+        "spedizione_extra_sats,spedizione_extra_eur,taglia_pacco,"
         "anche_digitale,condizione,quantita,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga.get("sottocategoria", ""),
          riga["prezzo_sats"], riga["zona"],
@@ -17260,6 +17454,8 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
          riga.get("spedizione_punto_sats", 0),
          riga.get("spedizione_punto_eur", 0),
          riga.get("spedizione_punto_dichiarata", 0),
+         riga.get("spedizione_extra_sats", 0),
+         riga.get("spedizione_extra_eur", 0),
          riga.get("taglia_pacco", ""),
          riga.get("anche_digitale", 0), riga.get("condizione", ""),
          riga.get("quantita", 1),

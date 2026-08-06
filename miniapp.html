@@ -1534,6 +1534,10 @@
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ctrl-riga .mono{white-space:nowrap;flex:0 0 auto}
   .ctrl-riga+.ctrl-riga{border-top:1px dashed var(--line)}
+  /* «per N pezzi» accanto a «Spedizione»: e' una precisazione, non
+     un'altra voce — piu' piccola e in grigio, e cede coi puntini
+     insieme all'etichetta che accompagna (sta dentro lo stesso span) */
+  .ctrl-riga .ctrl-nota{font-size:12.5px;font-weight:600;color:var(--muted)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
   /* Lo sconto del negozio: la sola cifra in grassetto oltre al totale.
@@ -3062,7 +3066,7 @@
           <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Il prezzo qui sopra diventa la <b>base d'asta</b> (solo sats). Un pezzo solo; la consegna è senza costi extra — la spedizione, se la offri, è <b>inclusa nel prezzo</b>. Chi punta versa subito nel deposito di garanzia; chi non vince viene rimborsato.</div>
         </div></div>
       <div class="field" id="sellQtaField"><label>Quantità disponibile</label>
-        <input id="sellQta" type="number" inputmode="numeric" min="1" placeholder="1">
+        <input id="sellQta" type="number" inputmode="numeric" min="1" placeholder="1" oninput="aggiornaSupplHint()">
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanti pezzi uguali hai? Vuoto o 1&nbsp;= un pezzo solo. All'esaurimento l'annuncio si mette in pausa: lo ricarichi dai tuoi annunci.</div></div>
       <div class="field" id="sellConsegnaField"><label>Consegna — spunta le opzioni che offri</label>
         <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🚚</span>Spedizione</span></label>
@@ -3094,6 +3098,15 @@
              accordarsi in chat — il promemoria vive dove il venditore
              sta gia' pensando alla spedizione -->
         <div id="sellSpedizioniereHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) se spedisci con InPost o Poste: chi compra saprà che punto scegliere, senza accordi in chat.</div></div>
+      <!-- Il TERZO costo (ago 2026, dal campo: il riso da 4 kg venduto
+           a sacchi con la spedizione di UNO dichiarata). Vale per
+           tutte e due le strade qui sopra — dipende dall'oggetto, non
+           da dove va — e stessa valuta, che il toggle e' uno solo.
+           Vuoto e 0 sono la stessa cosa: nessun supplemento. -->
+      <div class="field" id="sellSpedExtraField" style="display:none"><label>Ogni pezzo in più: +</label>
+        <div class="sats-input"><input id="sellSpedExtra" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><span class="suffix" id="sellSpedExtraCur" style="pointer-events:none">sats</span></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Il primo pezzo costa il prezzo qui sopra; ogni pezzo in più aggiunge questa cifra. Lascia vuoto se spedisci tutto in un pacco solo.</div>
+        <div id="sellSpedExtraHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div></div>
       <div class="field" id="sellTagliaField" style="display:none"><label>Taglia del pacco</label>
         <select id="sellTaglia" hidden>
           <option value="">Scegli la taglia…</option>
@@ -3948,6 +3961,8 @@ function mapListing(a){
        stima DEMO — il conto vero lo dice il preventivo del server */
     spedPunto:a.spedizione_punto_sats||0,
     spedPuntoEur:a.spedizione_punto_eur||0,
+    spedExtra:a.spedizione_extra_sats||0,
+    spedExtraEur:a.spedizione_extra_eur||0,
     spedPuntoDich:!!a.spedizione_punto_dichiarata,
     /* la combo della gift card: modalita' fisica + codice in
        piattaforma, sceglie chi compra */
@@ -5992,13 +6007,27 @@ function satsSpedizione(l){
     return Math.round(l.spedEur / eurPerSat);
   return l.sped||0;
 }
+/* Il supplemento per pezzo, stessa liturgia della tariffa. */
+function satsSupplemento(l){
+  if (l.spedExtraEur>0 && cambioVivo)
+    return Math.round(l.spedExtraEur / eurPerSat);
+  return l.spedExtra||0;
+}
+/* La spedizione di N pezzi dello STESSO annuncio: la tariffa una
+   volta sola piu' il supplemento di ogni pezzo oltre il primo — il
+   gemello client di _sped_pacco sul caso mono. Vive solo nelle STIME
+   (demo, foglio offerta, barra del carrello): il conto che si paga
+   arriva sempre dal preventivo del server. */
+const satsSpedPezzi = (l, q) =>
+  satsSpedizione(l) + satsSupplemento(l) * Math.max(0, (q || 1) - 1);
 /* (Il costo di spedizione da solo, nella valuta di chi guarda, non
    si mostra piu' da nessuna parte — lug 2026: la spedizione entra
    nei conti come sats, dentro i totali e nel conto scomposto.) */
 /* Il prefisso «≈» dei bottoni compra: la cifra e' una stima quando
    l'articolo e' in euro O la spedizione scelta e' ancorata all'euro */
 const stimaCirca = l => (l.valuta==='eur'
-  || (sceltaConsegna(l)==='spedizione' && l.spedEur>0)) ? '≈ ' : '';
+  || (sceltaConsegna(l)==='spedizione'
+      && (l.spedEur>0 || l.spedExtraEur>0))) ? '≈ ' : '';
 /* Le strade che l'annuncio offre davvero: la parte fisica dal
    catalogo di sempre, il digitale anche in COMBO (ancheDigitale =
    «ti spedisco la tessera, oppure ti mando il codice»). L'ordine
@@ -6080,7 +6109,8 @@ function totaleStima(l){
   /* l'articolo e' unitario x pezzi scelti; la spedizione resta UNA
      volta sola e la protezione segue l'articolo intero (come compra) */
   const art = artStima(l) * qtaScelta;
-  const sped = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0;
+  const sped = sceltaConsegna(l)==='spedizione'
+    ? satsSpedPezzi(l, qtaScelta) : 0;
   return art + sped + Math.floor(art * protPercento / 100);
 }
 /* L'articolo per le stime dei bottoni compra: la cifra pattuita
@@ -6106,8 +6136,12 @@ function artStima(l){
 let offertaMinPercento = 0;
 /* Le righe del conto scomposto per i fogli di pagamento: compaiono
    solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
-function contoScomposto(art, sped, prot, tot, qta, sconto){
+function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped){
   const pezzi = qta || 1;
+  /* i pezzi della SPEDIZIONE sono un'altra cosa dalla quantita' della
+     riga «Articolo × N»: in un carrello l'articolo non ha un numero
+     solo, mentre i pezzi spediti sono la loro somma */
+  const nSped = pezziSped || pezzi;
   if (!(sped > 0 || prot > 0 || pezzi > 1 || sconto > 0)) return '';
   const r = (n, t, b, meno) => `<div style="display:flex;justify-content:space-between;gap:12px${b?';font-weight:800;border-top:1px dashed var(--line);padding-top:5px;margin-top:5px':''}"><span>${t}</span><span class="mono">${meno?'−':''}${fmt(n)} sats</span></div>`;
   return r(art, pezzi > 1 ? `Articolo × ${fmt(pezzi)}` : 'Articolo')
@@ -6117,7 +6151,12 @@ function contoScomposto(art, sped, prot, tot, qta, sconto){
           mette la riga: fmt() di un negativo scriverebbe il trattino
           ASCII invece del meno tipografico. */
        + (sconto>0 ? r(sconto, 'Sconto carrello', 0, 1) : '')
-       + (sped>0 ? r(sped, 'Spedizione') : '')
+       /* «per N pezzi» viaggia fin qui apposta: la pagina d'acquisto
+          l'ha appena mostrata, e una riga che compare e sparisce
+          sullo stesso schermo si legge come «il prezzo e' cambiato»
+          — un attimo prima di pagare, che e' il momento peggiore. */
+       + (sped>0 ? r(sped, (suppl > 0 && nSped > 1)
+                     ? `Spedizione per ${fmt(nSped)} pezzi` : 'Spedizione') : '')
        + (prot>0 ? r(prot, 'Protezione acquisti') : '') + r(tot, 'Totale', 1);
 }
 /* (setConsegnaScelta e aggiornaCifreCompra sono morte col foglio del
@@ -6151,8 +6190,15 @@ function pilloleModalita(l){
 const spedisce = l => l.consegna==='spedizione' || l.consegna==='entrambe';
 /* Vero quando quella spedizione non costa nulla: nessun costo in sats
    e nessuna ancora all'euro. Il giudice unico dei due badge e
-   dell'icona in card — «gratis» si dice in un posto solo. */
-const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0);
+   dell'icona in card — «gratis» si dice in un posto solo.
+   Il SUPPLEMENTO per pezzo (ago 2026) entra qui, ed e' il punto in
+   cui il cantiere poteva far mentire la vetrina: «il primo pezzo lo
+   offro io» e' una base a 0 con un supplemento pieno, e senza queste
+   due condizioni la card avrebbe scritto «🚚 gratis» su un annuncio
+   dove due pezzi si pagano. Fail-closed: non si promette una
+   gratuita' che regge solo per un pezzo. */
+const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0)
+  && !(l.spedExtra > 0) && !(l.spedExtraEur > 0);
 /* Il badge della spedizione accanto al prezzo (lug 2026, stile
    Subito.it): sfondo evidenziato — la coppia azzurra --ship dei badge
    di stato «spedito», AA nei due temi — solo se la spedizione e'
@@ -6726,14 +6772,21 @@ function pezziSet(){
   let n = 0; for (const q of setScelte.values()) n += q; return n;
 }
 function totaleSet(){
-  let art = 0, sped = 0;
+  let art = 0, sped = 0, extra = 0, suppVinc = 0;
   for (const [id, qta] of setScelte){
     const x = listings.find(t=>t.id===id);
     if (!x) continue;
     art += artStima(x) * qta;
-    if (consegnaSetScelta==='spedizione')
-      sped = Math.max(sped, satsSpedizione(x));
+    if (consegnaSetScelta==='spedizione'){
+      /* il gemello client di _sped_pacco: la tariffa piu' cara fa da
+         base, e ogni altro pezzo aggiunge il suo supplemento (a
+         parita' di base si assorbe il piu' grande, come sul server) */
+      const b = satsSpedizione(x), s = satsSupplemento(x);
+      extra += s * qta;
+      if (b > sped || (b === sped && s > suppVinc)) { sped = b; suppVinc = s; }
+    }
   }
+  sped += extra - suppVinc;
   const prot = Math.floor(art * protPercento / 100);
   return {art, sped, prot, tot: art + sped + prot};
 }
@@ -6743,7 +6796,8 @@ function setCirca(){
   for (const id of setScelte.keys()){
     const x = listings.find(t=>t.id===id);
     if (x && (x.valuta==='eur'
-              || (consegnaSetScelta==='spedizione' && x.spedEur>0)))
+              || (consegnaSetScelta==='spedizione'
+                  && (x.spedEur>0 || x.spedExtraEur>0))))
       return '≈ ';
   }
   return '';
@@ -6825,6 +6879,8 @@ function renderControlla(){
       scontoPct: p.sconto_percento||0,
       spedEur: min ? (min.spedizione_eur||0) : 0,
       totEur: min ? (min.totale_eur||0) : 0,
+      suppl: min ? (min.supplemento_sats||0) : 0,
+      pezzi: min ? (min.pezzi||0) : 0,
       /* «gratuita» solo se a costare zero e' una strada che SPEDISCE:
          qui l'anteprima e' la piu' economica, e con un ritiro in
          elenco lo zero potrebbe essere il suo — che spedizione non e'.
@@ -6917,7 +6973,14 @@ function contoRighe(c){
        nuova. Il grassetto e mai il colore, il patto della gratuita'.
        Il ritiro continua a dire 0: li' non c'e' nessuna spedizione da
        offrire, e chiamarla «gratuita» sarebbe una cortesia falsa. */
-    + r(c.spedLabel || 'Spedizione', c.spedGratis
+    /* «Spedizione per N pezzi» quando il supplemento ha contato: la
+       cifra sarebbe altrimenti inspiegabile per chi ha in mano UNA
+       tariffa. Non e' un calcolo — supplemento e pezzi arrivano dal
+       server, che e' l'unico a sapere quale riga ha vinto il MAX. */
+    + r((c.spedLabel || 'Spedizione')
+        + ((c.suppl > 0 && c.pezzi > 1)
+            ? ` <span class="ctrl-nota">per ${fmt(c.pezzi)} pezzi</span>` : ''),
+        c.spedGratis
         ? `<span class="via-gratis">gratuita</span>`
         : cifraCtrl(c.sped, c.circa, c.spedEur))
     + (c.prot>0 ? r('Protezione acquisti', cifraCtrl(c.prot, c.circa)) : '')
@@ -7031,16 +7094,28 @@ function preventivoDemo(l){
     ? Math.round(l.priceEur * qtaScelta * 100) / 100 : 0;
   const strade = [];
   for (const v of stradeConsegna(l)){
-    const sped = v==='spedizione' ? satsSpedizione(l) : 0;
-    const stima = v==='spedizione' && l.spedEur>0;
-    const spedEur = (v==='spedizione' && sped) ? (l.spedEur||0) : 0;
+    /* la spedizione dei pezzi scelti, supplemento compreso: la demo
+       deve dire la stessa cifra della pagina vera */
+    const sped = v==='spedizione' ? satsSpedPezzi(l, qtaScelta) : 0;
+    const suppl = v==='spedizione'
+      ? sped - satsSpedizione(l) : 0;
+    const stima = v==='spedizione' && (l.spedEur>0 || l.spedExtraEur>0);
+    /* l'euro nativo esiste solo se TUTTE le tariffe che contribuiscono
+       sono nate in euro: mescolarle e' un ≈, come sul server */
+    const spedEur = (v==='spedizione' && sped
+                     && (!(l.sped>0) || l.spedEur>0)
+                     && (!(l.spedExtra>0) || l.spedExtraEur>0))
+      ? Math.round(((l.spedEur||0)
+          + (l.spedExtraEur||0) * Math.max(0, qtaScelta-1)) * 100) / 100 : 0;
     const totEur = (artEur>0 && !prot && (!sped || spedEur>0))
       ? Math.round((artEur + spedEur) * 100) / 100 : 0;
     if (v==='spedizione'){
       strade.push({via:'casa', spedizione_sats:sped, spedizione_eur:spedEur,
-                   totale_sats:art+sped+prot, totale_eur:totEur, stima});
+                   totale_sats:art+sped+prot, totale_eur:totEur, stima,
+                   supplemento_sats:suppl, pezzi:qtaScelta});
       strade.push({via:'punto', spedizione_sats:sped, spedizione_eur:spedEur,
                    totale_sats:art+sped+prot, totale_eur:totEur, stima,
+                   supplemento_sats:suppl, pezzi:qtaScelta,
                    fallback_casa:true});
     } else {
       strade.push({via:v, spedizione_sats:0, spedizione_eur:0,
@@ -7244,6 +7319,8 @@ function renderAcquisto(){
                                e' esatto: spedisce e non si paga */
                             spedGratis: viaOk && !sped
                               && (d.via==='casa' || d.via==='punto'),
+                            suppl: viaOk ? (stradaSel.supplemento_sats||0) : 0,
+                            pezzi: viaOk ? (stradaSel.pezzi||0) : 0,
                             spedEur: viaOk ? (stradaSel.spedizione_eur||0) : 0,
                             totEur: viaOk ? (stradaSel.totale_eur||0)
                                   : ((p.protezione_sats||0) ? 0 : p.articolo_eur||0)});
@@ -7764,7 +7841,9 @@ async function startBuySet(){
      (niente chiusure: il velo fa il suo mestiere) */
   el('payAmount').textContent = circaS + fmt(c.tot);
   el('payScomposto').innerHTML = contoScomposto(c.art, c.sped, c.prot, c.tot,
-                                                1, c.sconto||0);
+                                                1, c.sconto||0,
+                                                (via && via.supplemento_sats)||0,
+                                                (via && via.pezzi)||0);
   el('payEurNota').style.display = 'none';
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
@@ -7791,7 +7870,7 @@ async function startBuySet(){
   el('payScomposto').innerHTML = contoScomposto(
     d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
     d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1,
-    d.sconto_sats||0);
+    d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0);
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   if (pollTimer) clearInterval(pollTimer);
@@ -8620,7 +8699,10 @@ async function startBuy(){
                : stimaCirca(l);
   el('payAmount').textContent = circaS + fmt(totS);
   el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS, totS,
-                                                (p && p.quantita) || qtaScelta);
+                                                (p && p.quantita) || qtaScelta,
+                                                0,
+                                                (via && via.supplemento_sats)||0,
+                                                (via && via.pezzi)||0);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
     `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale ${TEMPI.invoice} minuti`;
@@ -8649,7 +8731,7 @@ async function startBuy(){
   if (d.prezzo_sats !== undefined)
     el('payScomposto').innerHTML = contoScomposto(d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1);
+      d.quantita||1, 0, d.supplemento_sats||0, d.pezzi||0);
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
@@ -8719,7 +8801,7 @@ function compraSubito(){
   el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);
   el('nwcScomposto').innerHTML = contoScomposto(p.articolo_sats,
     via.spedizione_sats||0, p.protezione_sats||0, via.totale_sats,
-    p.quantita||1);
+    p.quantita||1, 0, via.supplemento_sats||0, via.pezzi||0);
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -8751,7 +8833,7 @@ async function confermaCompraSubito(btn){
     satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
     scompOrdine = d.prezzo_sats ? contoScomposto(d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1) : '';
+      d.quantita||1, 0, d.supplemento_sats||0, d.pezzi||0) : '';
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);
@@ -12999,9 +13081,10 @@ function toggleSpedCur(){
   haptic();
   spedValuta = spedValuta==='sats' ? 'eur' : 'sats';
   el('sellSped').value = '';
-  /* il toggle e' UNO per i due costi: cambiarlo azzera anche il
-     campo punto, o resterebbe un numero nella valuta di prima */
+  /* il toggle e' UNO per i tre costi: cambiarlo azzera anche il campo
+     punto e il supplemento, o resterebbero numeri nella valuta di prima */
   if (el('sellSpedPunto')) el('sellSpedPunto').value = '';
+  if (el('sellSpedExtra')) el('sellSpedExtra').value = '';
   aggiornaSpedCampo();
 }
 function aggiornaSpedCampo(){
@@ -13015,14 +13098,16 @@ function aggiornaSpedCampo(){
   inp.step = inEur ? '0.01' : '1';
   inp.inputMode = inEur ? 'decimal' : 'numeric';
   inp.placeholder = inEur ? '0,00' : '0';
-  /* il campo punto SEGUE il toggle del campo casa (un interruttore
-     solo, mai due semantiche diverse per i due costi) */
-  const inpP = el('sellSpedPunto'), etP = el('sellSpedPuntoCur');
-  if (inpP && etP){
-    etP.textContent = inEur ? '€' : 'sats';
-    inpP.step = inEur ? '0.01' : '1';
-    inpP.inputMode = inEur ? 'decimal' : 'numeric';
-  }
+  /* il campo punto e il supplemento SEGUONO il toggle del campo casa
+     (un interruttore solo, mai semantiche diverse per i tre costi) */
+  [['sellSpedPunto','sellSpedPuntoCur'],
+   ['sellSpedExtra','sellSpedExtraCur']].forEach(([ci, ce])=>{
+    const i2 = el(ci), e2 = el(ce);
+    if (!i2 || !e2) return;
+    e2.textContent = inEur ? '€' : 'sats';
+    i2.step = inEur ? '0.01' : '1';
+    i2.inputMode = inEur ? 'decimal' : 'numeric';
+  });
   aggiornaSpedHint();
 }
 /* L'hint dice la SEMANTICA del toggle, con la stima live quando il
@@ -13038,6 +13123,29 @@ function aggiornaSpedHint(){
   } else if (sellValuta==='sats' && el('sellConsSped')?.checked){
     h.textContent = 'Costo fisso in sats, qualunque cosa faccia il cambio';
   } else h.textContent = '';
+  aggiornaSupplHint();
+}
+/* Il conto ad alta voce del supplemento, sotto il suo campo: e' la
+   rete contro il refuso da ×1000 (5000 al posto di 5,00), che qui
+   viene moltiplicato per i pezzi e diventa una cifra assurda. Un
+   tetto sarebbe un giudizio sbagliato — chi spedisce roba pesante ha
+   supplementi veri alti — mentre vedere il totale del proprio
+   magazzino e' un fatto. Compare solo quando c'e' qualcosa da dire:
+   un supplemento scritto E piu' di un pezzo in vendita. */
+function aggiornaSupplHint(){
+  const h = el('sellSpedExtraHint');
+  if (!h) return;
+  const inEur = sellValuta==='eur' || spedValuta==='eur';
+  const leggi = id => el(id)
+    ? (inEur ? eurCampo(id) : (parseInt(el(id).value)||0)) : 0;
+  const extra = leggi('sellSpedExtra'), base = leggi('sellSped');
+  const q = qtaForm();
+  if (!(extra > 0 && q > 1)) { h.style.display = 'none'; return; }
+  const tot = base + extra * (q - 1);
+  h.style.display = '';
+  h.textContent = inEur
+    ? `${q} pezzi = ${fmtEur(tot)} € di spedizione`
+    : `${q} pezzi = ${fmt(tot)} sats di spedizione`;
 }
 /* parseFloat non capisce la virgola italiana: gliela traduciamo */
 const eurCampo = id =>
@@ -13186,6 +13294,8 @@ function aggiornaConsegnaForm(){
   el('sellSpedField').style.display = (sped && !asta) ? '' : 'none';
   if (el('sellSpedPuntoField'))
     el('sellSpedPuntoField').style.display = (sped && !asta) ? '' : 'none';
+  if (el('sellSpedExtraField'))
+    el('sellSpedExtraField').style.display = (sped && !asta) ? '' : 'none';
   /* il promemoria dello spedizioniere: solo a chi spedisce e non
      l'ha dichiarato (in DEMO il catalogo non arriva e la riga tace) */
   if (el('sellSpedizioniereHint'))
@@ -13248,6 +13358,13 @@ function consegnaPayload(){
         out.spedizione_punto_eur = eurCampo('sellSpedPunto');
       else out.spedizione_punto_sats = parseInt(vp)||0;
     }
+    /* Il SUPPLEMENTO: la chiave viaggia SEMPRE, che qui vuoto e zero
+       dicono la stessa cosa — ed e' proprio cio' che rende
+       esprimibile «l'ho svuotato». Il client vecchio in cache non
+       manda nessuna chiave e il server CONSERVA, come per il punto. */
+    if (sellValuta==='eur' || spedValuta==='eur')
+      out.spedizione_extra_eur = eurCampo('sellSpedExtra');
+    else out.spedizione_extra_sats = parseInt(el('sellSpedExtra')?.value)||0;
   }
   return out;
 }
@@ -13283,8 +13400,13 @@ function editListing(id){
   el('sellQta').value = (l.quantita||1) > 1 ? l.quantita : '';
   aggiornaPickerVendi();
   /* spedEur pieno = costo ancorato all'euro: si rientra in euro
-     anche sul listino sats (il toggle segue la semantica salvata) */
-  spedValuta = l.spedEur>0 ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
+     anche sul listino sats (il toggle segue la semantica salvata).
+     Si guardano TUTTE E TRE le tariffe, non la sola base: con la
+     spedizione gratis e il solo supplemento in euro (o la sola
+     tariffa punto) la base e' 0 e il toggle sarebbe tornato su sats,
+     rileggendo degli euro come se fossero sats. */
+  spedValuta = (l.spedEur>0 || l.spedPuntoEur>0 || l.spedExtraEur>0)
+    ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
   el('sellSped').value = (l.consegna==='spedizione'||l.consegna==='entrambe')
     ? (l.spedEur>0 ? l.spedEur : (l.sped||0)) : '';
   /* la tariffa punto si precompila SOLO se dichiarata: il campo
@@ -13293,6 +13415,13 @@ function editListing(id){
     el('sellSpedPunto').value = (l.spedPuntoDich
       && (l.consegna==='spedizione'||l.consegna==='entrambe'))
       ? (l.spedPuntoEur>0 ? l.spedPuntoEur : (l.spedPunto||0)) : '';
+  /* il supplemento: a zero il campo resta VUOTO — «nessun
+     supplemento» si scrive non scrivendo niente, come nel form nuovo */
+  if (el('sellSpedExtra')){
+    const ex = (l.consegna==='spedizione'||l.consegna==='entrambe')
+      ? (l.spedExtraEur>0 ? l.spedExtraEur : (l.spedExtra||0)) : 0;
+    el('sellSpedExtra').value = ex > 0 ? ex : '';
+  }
   aggiornaSpedCampo();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
   renderFotoPreview(); aggiornaFormVendi();
@@ -13303,7 +13432,7 @@ function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
-   'sellSpedPunto','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
+   'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
@@ -13612,6 +13741,8 @@ async function publish(){
       spedPunto:cns.spedizione_punto_sats||0,
       spedPuntoEur:cns.spedizione_punto_eur||0,
       spedPuntoDich:!!cns.spedizione_punto_dichiarata,
+      spedExtra:cns.spedizione_extra_sats||0,
+      spedExtraEur:cns.spedizione_extra_eur||0,
       taglia:cns.taglia_pacco,
       ancheDigitale:!!cns.anche_digitale,
       condizione:el('sellCond').value, quantita:qtaForm(),
@@ -13661,7 +13792,7 @@ async function publish(){
     }
   }
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
-   'sellSpedPunto','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
+   'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
@@ -13706,6 +13837,8 @@ async function salvaModifica(t, p){
         spedPunto:cns.spedizione_punto_sats||0,
         spedPuntoEur:cns.spedizione_punto_eur||0,
         spedPuntoDich:!!cns.spedizione_punto_dichiarata,
+        spedExtra:cns.spedizione_extra_sats||0,
+        spedExtraEur:cns.spedizione_extra_eur||0,
         taglia:cns.taglia_pacco,
         ancheDigitale:!!cns.anche_digitale,
         condizione:el('sellCond').value, quantita:qtaForm(),
