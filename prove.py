@@ -3940,6 +3940,35 @@ def prove_sped_gratis():
           mini.count("const NOTA_SOGLIA_EURO"))
     prova("...e la portano tutti e due i cassetti", 2,
           mini.count("${NOTA_SOGLIA_EURO}"))
+
+    # IL CAMPO LIBERO delle due soglie (ago 2026): le pillole non
+    # riproducono le cifre nate dal travaso (14 €, 56 €), e chi se le
+    # ritrova non potrebbe piu' rimetterle. UNA funzione per tutti e
+    # due i cassetti: erano gia' due gemelle una volta, e sono
+    # divergute.
+    for f in ("sogliaLibera", "anteprimaSoglia", "campoSogliaLibera",
+              "sogliaMancante"):
+        prova(f"il campo libero: {f} e' scritta UNA volta", 1,
+              mini.count(f"function {f}("))
+    prova("...e il campo lo montano tutti e due i cassetti", 2,
+          mini.count("campoSogliaLibera('"))
+    prova("...e tutti e due si fermano sul campo vuoto", 2,
+          mini.count("sogliaMancante('"))
+    # L'ANTEPRIMA passa dalla stessa funzione del render: due frasi
+    # scritte in due posti divergono al primo ritocco (e qui una la
+    # riscrive il campo a ogni tasto).
+    prova("l'anteprima ha UNA fonte sola", 2,
+          mini.count("anteprimaSoglia('"))
+    # NIENTE CLAMP MUTO: a limare al minimo sarebbe il client, e il
+    # venditore vedrebbe un numero che non ha scritto. A dire la cifra
+    # e' il 400 del server, che il cassetto rende dentro di se'.
+    _sl = mini[mini.index("function sogliaLibera("):
+               mini.index("function sogliaMancante(")]
+    for vietato in ("Math.max", "Math.min", "min_eur", "min_valore_eur"):
+        prova(f"il campo libero non lima: niente {vietato}", False,
+              vietato in _sl)
+    prova("...e scrive INTERI (la colonna del server e' un INTEGER)",
+          True, "parseInt(" in _sl and "parseFloat(" not in _sl)
     # LE CHIAVI VECCHIE, che portavano SATS, non si leggono piu' dal
     # body: scriverle in una colonna che ora parla euro farebbe di
     # «50.000» una soglia da cinquantamila euro, cioe' una promessa

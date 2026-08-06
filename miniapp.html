@@ -10658,6 +10658,99 @@ const NOTA_SOGLIA_EURO = `
     cambia da sola col cambio. Tu incassi sempre in
     <b style="color:var(--ink)">sats</b>.</div>`;
 
+/* ---- IL CAMPO LIBERO DELLE DUE SOGLIE (ago 2026) ----
+   Le pillole propongono, il campo lascia scrivere: «15», «35», «40».
+   Nasce da un caso vero — il travaso delle soglie dai sats agli euro
+   ha prodotto cifre come 14 € e 56 €, che nessuna pillola riproduce:
+   senza campo, chi se le ritrova non potrebbe piu' rimetterle se le
+   cambia per sbaglio. Le pillole restano perche' rispondono alla
+   domanda «che cifre hanno senso?», che il campo vuoto non risponde.
+   UNA funzione per tutti e due i cassetti e non due gemelle: gia' una
+   volta (il vecchio campo d'aiuto in euro) erano due copie, e sono
+   divergute. Qui cambia solo QUALE bozza si tocca.
+   NON RIDISEGNA IL CASSETTO, ed e' il vincolo che detta la forma: un
+   re-render toglierebbe il fuoco al campo a ogni tasto. Si riscrivono
+   in place le due cose che dipendono dal numero — l'anteprima e le
+   pillole — e l'anteprima passa dalla STESSA funzione che usa il
+   render, o le due frasi divergerebbero al primo ritocco. */
+const SOGLIE_LIBERE = {
+  sconto: {campo: 'valoreEur', box: 'scontoPaccoBlocco',
+           bozza: () => scontoPaccoBozza},
+  sped:   {campo: 'soglia', box: 'spedGratisBlocco',
+           bozza: () => spedGratisBozza}};
+
+function anteprimaSoglia(quale){
+  /* la frase dell'anteprima, in UN posto: la scrive il render e la
+     riscrive il campo libero. A cifra mancante NON si finge un «da
+     0 €» — si dice che manca, che e' anche cio' che il bottone poi
+     rifiuta di salvare. */
+  if (quale === 'sconto'){
+    const b = scontoPaccoBozza;
+    if (b.criterio !== 'valore')
+      return `Da ${b.soglia} pezzi in su, −${b.pct}% su tutto il carrello.`;
+    return b.valoreEur > 0
+      ? `Da ${fmt(b.valoreEur)} € di articoli in su, −${b.pct}% su tutto
+         il carrello.`
+      : 'Scrivi da quanti euro parte lo sconto.';
+  }
+  const b = spedGratisBozza;
+  return b.soglia > 0
+    ? `Da ${fmt(b.soglia)} € di articoli in su, spedizione gratis.`
+    : 'Scrivi da quanti euro offri la spedizione.';
+}
+
+function campoSogliaLibera(quale, valore, minimo){
+  /* `value` vuoto quando la cifra non c'e': un «0» scritto nel campo
+     si leggerebbe come una scelta, e non lo e'. */
+  return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--muted)">
+      <span>oppure</span>
+      <input id="soglia-${quale}" type="number" inputmode="numeric"
+        min="${minimo || 1}" step="1" value="${valore > 0 ? valore : ''}"
+        oninput="sogliaLibera('${quale}', this.value)"
+        aria-label="Soglia in euro"
+        style="font:inherit;width:88px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink)">
+      <span>€</span></div>`;
+}
+
+function sogliaLibera(quale, v){
+  const q = SOGLIE_LIBERE[quale], b = q && q.bozza();
+  if (!b) return;
+  /* interi: la soglia e' una promessa di bottega, «da 50 €» e non «da
+     49,90» — e la colonna del server e' un INTEGER. Cifra illeggibile
+     o vuota = 0, cioe' «manca»: NON si lima al minimo qui, che sarebbe
+     un clamp muto — a dire la cifra e' il 400 del server. */
+  const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
+  b[q.campo] = n > 0 ? n : 0;
+  const nota = el(q.box) && el(q.box).querySelector('.acq-nota b');
+  if (nota) nota.innerHTML = anteprimaSoglia(quale);
+  /* e le pillole tornano a dire la verita': scrivendo una cifra libera
+     quasi mai una combacia, e una pillola accesa su un numero diverso
+     da quello scritto sopra e' la stessa bugia del campo che mente */
+  document.querySelectorAll(`#${q.box} [data-campo="${q.campo}"]`)
+    .forEach(p => {
+      const on = Number(p.dataset.v) === b[q.campo];
+      p.style.borderColor = on ? 'var(--sats)' : 'var(--line)';
+      p.style.background = on ? 'var(--sats)' : 'transparent';
+      p.style.color = on ? '#fff' : 'var(--muted)';
+    });
+}
+
+function sogliaMancante(quale, idErrore){
+  /* Il campo vuoto NON e' uno spegnimento, ed e' il motivo per cui
+     questa guardia esiste: sul lato spedizione una soglia <= 0 e' lo
+     SPEGNIMENTO senza guardie, quindi salvare un campo vuoto
+     toglierebbe la promessa in silenzio. A spegnere c'e' il suo
+     bottone, che lo dice. */
+  const q = SOGLIE_LIBERE[quale], b = q.bozza() || {};
+  if (b[q.campo] > 0) return false;
+  const dove = el(idErrore);
+  if (dove) dove.innerHTML =
+    `<div class="trust-note" style="margin-top:10px">⚠️ <span>Scrivi da
+      quanti euro parte, o scegli una delle cifre qui sotto. Per
+      togliere la promessa c'è il bottone apposta.</span></div>`;
+  return true;
+}
+
 /* ---- «🎁 Sconto sul carrello» (ago 2026) ----
    Il venditore premia chi prende piu' cose: UNA regola per tutto il
    negozio — soglia di pezzi + percentuale — sui soli ARTICOLI, che la
@@ -10719,6 +10812,8 @@ function renderScontoPacco(){
       <div class="section-label" style="margin-top:12px">Da quanti euro di articoli</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
         ${(scontoPaccoLeve.valori_eur||[]).map(pillValore).join('')}</div>
+      ${campoSogliaLibera('sconto', b.valoreEur,
+                          scontoPaccoLeve.min_valore_eur)}
       ${NOTA_SOGLIA_EURO}
     ` : `
       <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
@@ -10727,10 +10822,7 @@ function renderScontoPacco(){
     <div class="section-label" style="margin-top:12px">Quanto sconto</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(scontoPaccoLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
-    <div class="acq-nota">🎁 <b>${aValore
-      ? `Da ${fmt(b.valoreEur)} € di articoli in su, −${b.pct}%`
-      : `Da ${b.soglia} pezzi in su, −${b.pct}%`} su tutto il
-      carrello.</b> ${aValore
+    <div class="acq-nota">🎁 <b>${anteprimaSoglia('sconto')}</b> ${aValore
       ? `La soglia guarda il carrello <b>dopo</b> le tue offerte lampo e
          gli accordi: una lampo generosa può farlo scendere sotto.`
       : `Chi ne prende ${b.soglia-1} paga pieno.`}</div>
@@ -10751,6 +10843,10 @@ async function setScontoPacco(spegni){
   haptic();
   if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
   const b = scontoPaccoBozza || {};
+  /* il campo libero puo' essere vuoto, e un vuoto non e' una scelta:
+     a criterio valore si ferma qui invece di mandare uno zero */
+  if (!spegni && b.criterio === 'valore'
+      && sogliaMancante('sconto', 'scontoPaccoErrore')) return;
   /* si mandano SEMPRE tutte e due le soglie: il server le conserva a
      vicenda (chiave assente = conserva), e cosi' quella dell'altro
      criterio resta com'era invece di sparire a ogni salvataggio */
@@ -10796,8 +10892,10 @@ async function setScontoPacco(spegni){
    La seconda promessa di negozio: «da N € di articoli la spedizione
    la offro io». Il calco del cassetto qui sopra, ma con UN numero solo
    da scegliere — niente criterio (il criterio E' il valore) e niente
-   percentuale (gratis e' gratis) — quindi le pillole SALVANO qui, che
-   non c'e' nessuna seconda scelta da tenere in pari con la prima. */
+   percentuale (gratis e' gratis). Le pillole SCELGONO e il bottone
+   salva, come nel gemello: dall'ago 2026 accanto a loro c'e' anche il
+   CAMPO LIBERO (vedi sogliaLibera), e con due modi di dire lo stesso
+   numero un salvataggio per tocco lascerebbe il campo indietro. */
 function renderSpedGratis(){
   const box = el('spedGratisBlocco');
   if (!box) return;
@@ -10816,7 +10914,7 @@ function renderSpedGratis(){
     spedGratisBozza = {soglia: ora || (spedGratisLeve.soglie_eur||[])[0] || 25};
   const b = spedGratisBozza;
   const pill = v =>
-    `<button data-v="${v}" onclick="spedGratisPill(${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b.soglia===v?'var(--sats)':'var(--line)'};background:${b.soglia===v?'var(--sats)':'transparent'};color:${b.soglia===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${fmt(v)} €</button>`;
+    `<button data-campo="soglia" data-v="${v}" onclick="spedGratisPill(${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b.soglia===v?'var(--sats)':'var(--line)'};background:${b.soglia===v?'var(--sats)':'transparent'};color:${b.soglia===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${fmt(v)} €</button>`;
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
       Da una certa spesa in su la spedizione la offri tu: chi compra
@@ -10828,9 +10926,10 @@ function renderSpedGratis(){
     <div class="section-label" style="margin-top:14px">Da quanti euro di articoli</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(spedGratisLeve.soglie_eur||[]).map(pill).join('')}</div>
+    ${campoSogliaLibera('sped', b.soglia, spedGratisLeve.min_eur)}
     ${NOTA_SOGLIA_EURO}
-    <div class="acq-nota">🚚 <b>Da ${fmt(b.soglia)} € di articoli in su,
-      spedizione gratis.</b> La soglia guarda il carrello <b>dopo</b> le
+    <div class="acq-nota">🚚 <b>${anteprimaSoglia('sped')}</b>
+      La soglia guarda il carrello <b>dopo</b> le
       tue offerte lampo e gli accordi: una lampo generosa può farlo
       scendere sotto.</div>
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
@@ -10851,6 +10950,10 @@ function spedGratisPill(v){
 async function setSpedGratis(spegni){
   haptic();
   if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  /* qui il vuoto e' piu' pericoloso che nel gemello: soglia <= 0 e' lo
+     SPEGNIMENTO senza guardie, quindi un campo svuotato per sbaglio
+     toglierebbe la promessa in SILENZIO. A spegnere c'e' il bottone. */
+  if (!spegni && sogliaMancante('sped', 'spedGratisErrore')) return;
   const soglia = spegni ? 0 : (spedGratisBozza || {}).soglia || 0;
   const box = el('spedGratisErrore');
   if (box) box.innerHTML = '';
