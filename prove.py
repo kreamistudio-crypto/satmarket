@@ -2840,6 +2840,21 @@ def prove_firme_nostr():
     prova("l'ultima azione vince", True,
           "DO UPDATE SET" in pezzo("accoda_firma"))
 
+    # 5. Il sollecito e' OPT-IN, e il gate sta nella QUERY cioe' PRIMA
+    #    del timbro: se contasse anche a levetta spenta, chi la
+    #    accendesse fra un mese troverebbe il contatore gia' al tetto
+    #    e non riceverebbe mai il promemoria appena chiesto. E' la
+    #    trappola gia' pagata con completamento_avvisato.
+    soll = pezzo("sollecita_firme_nostr")
+    prova("il sollecito e' opt-in", True,
+          "u.suggerimenti_annunci=1" in soll)
+    i = soll.index("suggerimenti_annunci=1")
+    j = soll.index("solleciti_firme=solleciti_firme+1")
+    prova("...e il gate viene PRIMA del timbro", True, i < j)
+    # Nessun 🧊 ai moderatori: qui non ci sono sats fermi
+    prova("nessuna segnalazione ai moderatori", False,
+          "notifica_admin" in soll)
+
 
 def prove_bip353():
     """Perche' un Lightning address non ha risposto (ago 2026, dal

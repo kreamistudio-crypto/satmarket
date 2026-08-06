@@ -17653,7 +17653,7 @@ async def controlla_scadenze():
 try:
     from config import SOLLECITO_FIRME_GIORNI
 except ImportError:
-    SOLLECITO_FIRME_GIORNI = 2      # 0 = sollecito spento
+    SOLLECITO_FIRME_GIORNI = 7      # una volta a settimana; 0 = spento
 try:
     from config import SOLLECITO_FIRME_MAX
 except ImportError:
@@ -17672,10 +17672,22 @@ async def sollecita_firme_nostr():
     non e' il problema — il silenzio si'.
 
     UNO per utente e non per annuncio (dieci annunci farebbero dieci
-    messaggi), la cadenza e il tetto del patto dei solleciti, e poi
-    silenzio: chi non collega la chiave ha deciso, e continuare a
-    bussare sarebbe molestia. Niente 🧊 ai moderatori qui: non ci sono
-    sats fermi da nessuna parte, solo una vetrina in meno."""
+    messaggi), una volta a SETTIMANA, e dopo il tetto silenzio: chi non
+    collega la chiave ha deciso, e continuare a bussare sarebbe
+    molestia. Niente 🧊 ai moderatori qui: non ci sono sats fermi da
+    nessuna parte, solo una vetrina in meno.
+
+    OPT-IN (decisione di Andrea): parte solo a
+    `suggerimenti_annunci` acceso, che nasce SPENTO — quindi di serie
+    nessuno lo riceve. E' un consiglio su come stanno i propri
+    annunci, cioe' esattamente la famiglia di messaggi che quella
+    levetta governa; mandarlo a chi non l'ha chiesto sarebbe spam
+    anche se il consiglio e' buono.
+    IL GATE STA NELLA QUERY, cioe' PRIMA del timbro, e non e'
+    pignoleria: e' la trappola gia' pagata con
+    `completamento_avvisato`. Se si contasse anche a levetta spenta,
+    chi la accendesse fra un mese troverebbe il contatore gia' al
+    tetto e non riceverebbe mai il promemoria appena chiesto."""
     if not SOLLECITO_FIRME_GIORNI:
         return
     adesso = int(time.time())
@@ -17685,6 +17697,7 @@ async def sollecita_firme_nostr():
         "SELECT f.tg_id, COUNT(*) AS quanti, MIN(f.creato) AS primo, "
         "u.sollecito_firme_il AS timbro, u.solleciti_firme AS conta "
         "FROM firme_nostr f JOIN utenti u ON u.tg_id=f.tg_id "
+        "WHERE u.suggerimenti_annunci=1 "
         "GROUP BY f.tg_id").fetchall()
     da_avvisare = []
     for r in righe:
