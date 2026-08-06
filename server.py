@@ -12096,8 +12096,18 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # del blocco qui sotto. E' una LETTURA e nessun DML — il vincolo
     # «niente DML fra le guardie e il ricontrollo» resta intatto, ed e'
     # la stessa ragione per cui era lecita dove stava prima.
+    # LA GUARDIA E' LA SCELTA, NON LA CIFRA (ago 2026, bug trovato col
+    # cantiere del supplemento). Qui c'era «if sped:», cioe' i soli
+    # sats: su un listino in SATS con la tariffa ancorata all'EURO
+    # (spedizione_sats=0, spedizione_eur=5.00) t_sats e' 0, quindi la
+    # promessa non si leggeva NEMMENO e la spedizione si pagava —
+    # mentre preventivo_ordine la legge senza quel gate e la pagina
+    # scriveva «gratuita». Preventivo e invoice divergevano in
+    # silenzio, sul mono; _compra_set non aveva il difetto perche' la
+    # regola la legge sempre. Guardare la STRADA e non il suo prezzo
+    # e' anche cio' che tiene la riga vera quando la tariffa e' 0.
     sog_gratis = 0
-    if sped:
+    if scelta == "spedizione":
         vg = con.execute("SELECT sped_gratis_soglia_eur FROM utenti "
                          "WHERE tg_id=?", (a["venditore_id"],)).fetchone()
         sog_gratis = _regola_sped_gratis(

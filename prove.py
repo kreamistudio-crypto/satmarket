@@ -3855,6 +3855,23 @@ def prove_sped_gratis():
         prova(f"{chi}: la regola arriva dalla riga del VENDITORE", True,
               "_regola_sped_gratis(" in c2 and "WHERE tg_id=?" in c2)
 
+    # LA PROMESSA SI LEGGE GUARDANDO LA STRADA, MAI IL SUO PREZZO (ago
+    # 2026): in compra() il gate era «if sped:», cioe' i soli sats, e su
+    # un listino in SATS con la tariffa ancorata all'EURO quei sats sono
+    # 0 — la promessa non si leggeva nemmeno e la spedizione si pagava,
+    # mentre la pagina Paga scriveva «gratuita». Una cifra come guardia
+    # e' sempre il posto dove entra questo bug: a 0 sembra «non c'e'
+    # spedizione», e a 0 ci si arriva in due modi onesti (l'ancora
+    # all'euro e la tariffa gratis dichiarata).
+    # La sentinella nomina il gate INSIEME a cio' che protegge: il solo
+    # 'if scelta == "spedizione":' compare tre volte in compra() e
+    # passerebbe col bug ancora dentro — provato rimettendolo.
+    prova("compra: la promessa si legge sulla STRADA, non sulla cifra",
+          True, ('if scelta == "spedizione":\n        vg = con.execute('
+                 '"SELECT sped_gratis_soglia_eur') in corpo_mono)
+    prova("compra: il gate a cifra non torna", False,
+          "\n    if sped:\n" in corpo_mono)
+
     # IL DOVUTO IN USCITA NON CONOSCE LA TARIFFA OFFERTA. E' la stessa
     # riga della colonna testimone dello sconto, e il danno sarebbe
     # identico: un netto_venditore(prezzo + sped_gratis_sats) farebbe
