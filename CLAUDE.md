@@ -5813,33 +5813,105 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   condizioni/quantità/categoria), la reputazione che si costruisce
   vendendo, il progetto in fase di test con la sua npub, e in fondo la
   riga sui suggerimenti — «di serie non ti scriviamo più»).
-  I SUGGERIMENTI SUGLI ANNUNCI SONO OPT-IN (lug 2026, decisione di
-  Andrea). Un evento NIP-99 non dice consegna, condizione e categoria
-  — ed è proprio ciò su cui il compratore filtra — quindi
-  `_chiedi_completamento` sa cosa manca e potrebbe dirlo; ma nasceva
-  automatico, cioè un consiglio utile mandato a gente che non ci aveva
-  chiesto niente: spam, perché a decidere se un messaggio è benvenuto
-  non è chi lo scrive. Ora lo governa `utenti.suggerimenti_annunci`,
-  SPENTO di serie, acceso dalla voce «💡 Suggerimenti sui miei
-  annunci» nel cassetto «🔔 Avvisi» del Profilo
-  (`POST /api/me/suggerimenti`, pattern di canale-notifiche;
-  `rigaSuggerimenti`/`setSuggerimenti`, il flag esce da /api/me che fa
-  SELECT *). Chi non lo accende non riceve MAI nulla, e l'unico posto
-  dove lo nominiamo di nostra iniziativa è l'ultima riga del benvenuto.
+  I SUGGERIMENTI SUGLI ANNUNCI (lug 2026 opt-in, ROVESCIATI ago 2026 —
+  decisione di Andrea). Un evento NIP-99 non dice consegna, condizione
+  e categoria — ed è proprio ciò su cui il compratore filtra — quindi
+  `_chiedi_completamento` sa cosa manca e lo dice. Nacque automatico,
+  poi divenne opt-in perché un consiglio mandato a chi non ha chiesto
+  niente è spam; dall'ago 2026 torna ACCESO di serie, e la lezione del
+  giro è che LA DIFFERENZA TRA UN CONSIGLIO E LO SPAM NON ERA
+  L'OPT-IN, ERA LA FREQUENZA — l'opt-in non lo accendeva quasi
+  nessuno, e intanto il tetto per ANNUNCIO faceva arrivare cinque
+  messaggi a chi ne pubblicava cinque in un pomeriggio.
+  IL RITMO È LA METÀ CHE CONTA, e va tenuto anche se un giorno il
+  default tornasse spento: al massimo UNO ogni
+  `SUGGERIMENTI_OGNI_GIORNI` (7) per PERSONA, qualunque sia la coda.
+  Il perché va scritto perché è quello che rende la regola non
+  negoziabile: CHI SI STUFA BLOCCA IL BOT, e col bot bloccato non
+  riceve più le notifiche degli ordini, che sono portanti. Su Nostr il
+  danno è identico e meno visibile — smette semplicemente di leggere i
+  DM, e non se ne accorge nessuno. Nessun consiglio vale quel rischio.
+  Giudice unico `_puo_suggerire` (interruttore + ritmo in una domanda
+  sola, perché chi manda deve poterne fare UNA) e `_timbra_
+  suggerimento`, che scrive `utenti.suggerito_il` PRIMA dell'invio —
+  il patto delle campagne, e qui raddoppiare vorrebbe dire proprio la
+  raffica che il ritmo esiste per togliere. La leva a 0 spegne il
+  RITMO, non i suggerimenti: è la raffica di ieri, un freno
+  d'emergenza e non una taratura.
+  «MAI INSIEME» NON È UNA REGOLA SCRITTA, è quel timbro: due
+  suggerimenti nello stesso giro passano dallo stesso giudice, e il
+  secondo trova la porta che il primo ha appena chiuso. Un meccanismo
+  solo per due garanzie — il ritmo fra i giri e il «mai insieme»
+  dentro il giro — invece di due che un giorno divergono. Per la
+  stessa ragione il COMPLETAMENTO ha la precedenza senza che nessuno
+  scriva un ordine: gira dentro l'import, che nell'orologio viene
+  prima di `suggerisci_funzioni`. Ed è giusto che vinca lui — un
+  annuncio incompleto è già in vetrina e non lo trova nessuno, mentre
+  lo sconto e la spedizione gratis sono occasioni che possono
+  aspettare.
+  COME SI DISTINGUE «MAI TOCCATO» DA «SPENTO DA LUI» (la domanda di
+  Andrea, e la risposta ha due metà). La prima: una colonna del GESTO,
+  `utenti.suggerimenti_scelti` (0 = non l'ha mai toccato), letta dal
+  giudice `suggerimenti_accesi(scelti, valore)` — il valore vale solo
+  se c'è stato un gesto, altrimenti comanda la leva. UNA COLONNA E NON
+  UN TERZO STATO dentro l'altra: con «2 = spento esplicito» il primo
+  `if u["suggerimenti_annunci"]` scritto distrattamente leggerebbe 2
+  come ACCESO, cioè fallirebbe nel verso di scrivere a chi ha detto
+  no; così invece il valore conserva per sempre il suo significato,
+  che è il patto delle due soglie dello sconto e delle due tariffe di
+  spedizione. Da qui il rovesciamento del default è REVERSIBILE: chi
+  ha scelto non viene scavalcato mai, in nessuno dei due versi, e c'è
+  la prova che lo tortura.
+  LA SECONDA METÀ È QUELLA CHE NON SI PUÒ SAPERE, e va detta invece di
+  far finta: del PREGRESSO il gesto non esiste. Fino all'ago 2026
+  l'endpoint scriveva solo il valore, quindi chi è a 0 può essere chi
+  non l'ha mai guardato O chi l'aveva acceso e poi spento, e nessuna
+  traccia li distingue. `registra_gesti_suggerimenti()` (all'avvio,
+  idempotente) fa l'unica cosa dimostrabile — chi è a 1 l'ha
+  CERTAMENTE acceso lui, di serie era spento, quindi quello è un gesto
+  e da adesso è registrato — e per gli altri si sceglie «mai toccato»,
+  DICHIARANDOLO. Il prezzo è UN messaggio a chi l'aveva spento, e quel
+  messaggio porta in fondo il modo di rispegnerlo: da lì il gesto è
+  registrato e non si perde più.
   ATTENZIONE, il gate sta PRIMA di ogni lettura e non è pignoleria: a
-  interruttore spento non si timbra `completamento_avvisato`, o chi lo
-  accendesse domani troverebbe i suoi annunci già «avvisati» e non
-  riceverebbe mai il consiglio appena chiesto.
-  Acceso, resta gentile: una volta sola per annuncio (la colonna, e non
-  una coda in memoria, perché «gliel'ho già chiesto» deve sopravvivere
-  ai riavvii), mai nel giro in cui l'annuncio è apparso (`creato < t0`:
-  chi è appena stato scoperto ha già avuto il benvenuto, e due messaggi
-  di fila sono un'altra cosa), un messaggio per VENDITORE e non per
-  annuncio, ogni voce dice A COSA SERVE (un motivo, non un rimprovero),
-  il paragrafo sul codice online compare solo a chi non ha dichiarato
-  nessuna consegna (è il caso di buoni e gift card; a chi vende una
-  bici sarebbe rumore), e la chiusa dice dov'è la maniglia per
-  spegnerli.
+  interruttore spento — o col ritmo ancora chiuso — non si timbra
+  `completamento_avvisato`, o quegli annunci resterebbero «avvisati»
+  senza che nessuno abbia avvisato niente, e il consiglio non
+  partirebbe mai più.
+  I DUE SUGGERIMENTI DI FUNZIONE (ago 2026) non dicono cosa manca a un
+  annuncio, ma che c'è una leva del negozio ancora spenta: lo SCONTO
+  CARRELLO e la SPEDIZIONE GRATIS. Catalogo `SUGGERIMENTI_FUNZIONE`
+  (timbro, leva, SQL, testo) + `suggerisci_funzioni` nell'orologio;
+  una volta sola per funzione e per sempre, coi timbri
+  `suggerito_sconto`/`suggerito_sped` — colonne come le quattro
+  sorelle di casa (`avvisato_contatto`, `avvisato_spedizioniere`…), che
+  il ritmo è un'altra cosa e vive per conto suo. La condizione di
+  ognuno dice anche A CHI NON SI MANDA, ed è la parte che li tiene
+  onesti: lo sconto carrello vuole ALMENO DUE annunci attivi (sotto
+  non potrebbe scattare mai, vale da due oggetti diversi in su) e la
+  spedizione gratis solo a chi SPEDISCE davvero (al ritiro e al codice
+  online non c'è nessuna spedizione da offrire). E ognuno guarda la
+  SUA leva del server: suggerire una funzione spenta sarebbe mandare
+  qualcuno a cercare un cassetto che non c'è.
+  `TIMBRI_SUGGERIMENTO` è una whitelist e l'elenco È la guardia: il
+  nome della colonna finisce dentro una query, e un nome che arriva da
+  altrove non deve poterci entrare mai — nemmeno oggi che i chiamanti
+  sono due e passano due letterali. Ha la sua sentinella.
+  LA CODA CON L'INTERRUTTORE sta in fondo a OGNI messaggio e in un
+  posto solo (`CODA_SUGGERIMENTI`): chi riceve un consiglio deve
+  sempre vedere, nello stesso messaggio, come farlo smettere e ogni
+  quanto arriverà. Il testo del benvenuto Nostr si è rovesciato con
+  loro — diceva «di serie non ti scriviamo più», e lasciarlo sarebbe
+  stata la bugia più facile del cantiere.
+  `/api/me` dice lo STATO EFFETTIVO e non il valore grezzo, ed è la
+  riga che sembra un dettaglio: col grezzo il bottone direbbe «Attiva»
+  a chi li ha già accesi, e il suo tocco li SPEGNEREBBE. Il client
+  riceve anche `suggerimenti_ogni_giorni` e non hardcoda mai il
+  numero. Resta vero il resto: mai nel giro in cui l'annuncio è
+  apparso (`creato < t0`), un messaggio per VENDITORE e non per
+  annuncio, ogni voce dice A COSA SERVE (un motivo, non un
+  rimprovero), il paragrafo sul codice online solo a chi non ha
+  dichiarato nessuna consegna.
   RISCHIO DICHIARATO E ACCETTATO (decisione di Andrea): si può
   comprare in escrow da un venditore che non sa di essere qui. Prima
   valeva per un venditore consenziente, ora per chiunque venga
@@ -7287,6 +7359,48 @@ tutti, e le tre leve hanno il default nel codice
 GUARDARE al primo giro: il primo venditore che l'accende, e il primo
 ordine con spedizione offerta vero dentro Telegram con la bolt11 su
 LNbits — se `paga_venditore` avvisa i moderatori, ci si ferma.
+I suggerimenti dal bot diventano attivi di serie, ma col RITMO (ago
+2026, decisione di Andrea): «💡 Suggerimenti sui miei annunci» nasce
+acceso — l'opt-in non lo accendeva quasi nessuno — e a tenerli gentili
+è il tetto di uno ogni 7 giorni per PERSONA, qualunque sia la coda
+(prima era per annuncio, e chi ne pubblicava cinque in un pomeriggio
+ne riceveva cinque). Il perché è la parte da non ammorbidire: chi si
+stufa BLOCCA IL BOT, e col bot bloccato non riceve più le notifiche
+degli ordini, che sono portanti; su Nostr il danno è identico e meno
+visibile, perché smette di leggere i DM. Più due suggerimenti nuovi —
+lo sconto carrello e la spedizione gratis a chi non li ha accesi —
+una volta sola per funzione e mai insieme, che è una proprietà del
+timbro del ritmo e non una regola scritta.
+COME SI DISTINGUE «mai toccato» da «spento da lui» (la domanda di
+Andrea): una colonna del GESTO, `utenti.suggerimenti_scelti`, e non un
+terzo stato dentro il valore — con «2 = spento» il primo `if` scritto
+distrattamente leggerebbe 2 come acceso, cioè fallirebbe nel verso di
+scrivere a chi ha detto no. Del PREGRESSO però il gesto NON ESISTE, e
+si dichiara: l'endpoint di ieri scriveva solo il valore, quindi chi è
+a 0 può essere chi non l'ha mai guardato o chi l'ha spento. La
+migrazione fa l'unica cosa dimostrabile (chi è acceso l'ha acceso lui)
+e per gli altri sceglie «mai toccato»; il prezzo è UN messaggio a chi
+l'aveva spento, con dentro il modo di rispegnerlo. Vedi Architettura,
+«I SUGGERIMENTI SUGLI ANNUNCI».
+Collaudati: 37 prove nuove in `prove.py` (1162 verdi, erano 1125) — i
+quattro casi del giudice per entrambi i default, la prova che
+rovesciare il default non tocca chi ha scelto, il ritmo su un database
+di cartone (al sesto giorno chiuso, al settimo esatto riapre), la
+whitelist dei timbri che rifiuta un nome fuori catalogo, e le
+sentinelle sul timbro-prima-dell'invio e sul gate prima di
+`completamento_avvisato`. Più un collaudo eseguibile su DB usa-e-getta
+(28 verdi) che gira le funzioni VERE dell'orologio: la migrazione e la
+sua idempotenza, chi riceve e chi no, un solo messaggio per giro, il
+secondo che arriva solo dopo N giorni ed è l'ALTRA funzione, «una
+volta per funzione per sempre», il bersaglio (un annuncio solo →
+niente sconto; solo ritiro → niente spedizione gratis), le due leve
+nei due stati, e `/api/me` che dice lo stato effettivo. Più il giro
+visivo sul cassetto «🔔 Avvisi» nei due temi. IN PRODUZIONE il deploy
+fa girare le quattro colonne nuove e la migrazione dei gesti (che
+stampa quanti utenti ha registrato); le due leve hanno il default nel
+codice. DA GUARDARE al primo giro: il journal della prima passata di
+`suggerisci_funzioni` — quanti ne partono — e che nessuno riceva due
+messaggi.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
