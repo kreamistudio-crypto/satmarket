@@ -150,6 +150,20 @@ SELECT tg_id, nome, sconto_pacco_criterio AS criterio,
     OR (sconto_pacco_criterio = 'pezzi'  AND sconto_pacco_soglia < 2)
     OR (sconto_pacco_criterio = 'valore' AND sconto_pacco_valore < 1));
 
+SELECT '16b) SPEDIZIONE RISPARMIATA E PAGATA INSIEME (vuoto)' AS controllo;
+-- sped_gratis_sats è la tariffa OFFERTA, spedizione_sats quella
+-- INCASSATA: le due si scrivono nello stesso INSERT e si escludono per
+-- costruzione, quindi una riga qui vuol dire che una delle due cifre è
+-- falsa — e una delle due è la ricevuta di qualcuno.
+SELECT id, stato, consegna_scelta, spedizione_sats, sped_gratis_sats
+  FROM ordini WHERE sped_gratis_sats > 0 AND spedizione_sats > 0;
+
+SELECT '16c) SPEDIZIONE RISPARMIATA DOVE NON SI SPEDIVA (vuoto)' AS controllo;
+-- un ritiro o un codice online non hanno una tariffa da regalare
+SELECT id, stato, consegna_scelta, sped_gratis_sats
+  FROM ordini WHERE sped_gratis_sats > 0
+   AND consegna_scelta IN ('ritiro','digitale');
+
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non
 -- racconta perché non è un allarme.
@@ -164,6 +178,20 @@ SELECT tg_id, nome, sconto_pacco_criterio AS criterio,
        sconto_pacco_percento AS sconto
   FROM utenti WHERE sconto_pacco_percento > 0
  ORDER BY sconto_pacco_percento DESC;
+
+SELECT '17b) I NEGOZI CHE OFFRONO LA SPEDIZIONE' AS polso;
+-- la seconda promessa di negozio, e le due si guardano insieme: sono
+-- indipendenti (misurano lo stesso lordo, senza vedersi), ma un
+-- venditore che le tiene tutte e due va letto in una riga sola
+SELECT tg_id, nome, sped_gratis_soglia AS gratis_da_sats,
+       sconto_pacco_percento AS sconto_carrello
+  FROM utenti WHERE sped_gratis_soglia > 0
+ ORDER BY sped_gratis_soglia;
+
+SELECT '17c) GLI ORDINI CON LA SPEDIZIONE OFFERTA' AS polso;
+SELECT COUNT(*) AS ordini, SUM(sped_gratis_sats) AS sats_di_spedizione,
+       SUM(prezzo_sats) AS incassato
+  FROM ordini WHERE sped_gratis_sats > 0;
 
 SELECT '18) GLI ORDINI SCONTATI' AS polso;
 SELECT COUNT(*) AS ordini, SUM(sconto_sats) AS sats_scontati,

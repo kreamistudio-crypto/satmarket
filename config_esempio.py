@@ -199,6 +199,27 @@ SCONTO_PACCO_MIN_VALORE = 1_000  # la gemella a valore: una cintura
                                 # carrello
 SCONTO_PACCO_MAX_PERCENTO = 30  # sconto massimo consentito
 
+# --- Spedizione gratis sopra soglia ----------------------------------
+# La seconda promessa di negozio: «da N sats di articoli la spedizione
+# la offro io». La soglia e' in SATS per le stesse ragioni dello sconto
+# qui sopra, e nel cassetto l'euro resta un aiuto per scegliere.
+# A DIFFERENZA DELLO SCONTO vale anche su un oggetto solo: azzerare una
+# tariffa scrive spedizione_sats=0, cioe' lo stato che gli annunci con
+# spedizione gratuita dichiarata hanno da sempre — mentre uno sconto di
+# testata romperebbe il conto dell'unitario di un ordine a un annuncio
+# solo. Il venditore incassa meno, che e' cosa vuol dire offrirla.
+# Le due promesse guardano lo STESSO numero, il prezzo degli articoli
+# prima dello sconto carrello: sono indipendenti, e nessuna delle due
+# puo' spegnere l'altra. Attenzione, come per lo sconto: la soglia
+# guarda il carrello DOPO lampo e accordi.
+SPED_GRATIS_ATTIVO = True       # interruttore generale (False = spento)
+SPED_GRATIS_SOGLIE = (50_000, 100_000, 250_000, 500_000)  # le soglie
+                                # proposte al venditore, in sats
+SPED_GRATIS_MIN = 1_000         # una cintura contro lo zero travestito:
+                                # sotto, la spedizione sarebbe gratis
+                                # sempre — e quella si dichiara nel
+                                # prezzo dell'annuncio (costo 0)
+
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
 # Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
 # nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare

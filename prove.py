@@ -3375,6 +3375,196 @@ def prove_sconto_pacco():
 
 
 # ====================================================================
+def prove_sped_gratis():
+    """LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026): la seconda
+    promessa di negozio. Qui si tortura la matematica e — soprattutto —
+    l'INDIPENDENZA dalla prima: le due guardano lo stesso numero senza
+    vedersi, e se un domani una cominciasse a misurare l'altra queste
+    prove diventerebbero rosse tutte insieme."""
+    print("\n[la spedizione gratis sopra soglia]")
+    amb = {"SPED_GRATIS_ATTIVO": True, "SPED_GRATIS_MIN": 1_000}
+    for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
+              "_sped_gratis", "_sconto_pacco", "_conto_ordine",
+              "_regola_sped_gratis"):
+        exec(pezzo(f), amb)
+    gratis, conto = amb["_sped_gratis"], amb["_conto_ordine"]
+    reg, unit = amb["_regola_sped_gratis"], amb["_unitario_effettivo"]
+
+    # --- LA SOGLIA E' UNA PORTA, e al filo esatto e' APERTA -----------
+    prova("soglia esatta: a 100.000 su 100.000 la spedizione e' gratis",
+          True, gratis(100_000, 100_000))
+    prova("un sat sotto: si paga", False, gratis(99_999, 100_000))
+    prova("ben sopra: gratis e basta (non c'e' una scala)", True,
+          gratis(9_000_000, 100_000))
+    prova("soglia 0 = promessa spenta: non e' mai gratis", False,
+          gratis(9_000_000, 0))
+    prova("articolo 0 (payload storto): non regala niente", False,
+          gratis(0, 100_000))
+    prova("soglia negativa (colonna sporca): spenta", False,
+          gratis(9_000_000, -100))
+
+    # --- IL LETTORE DELLE LEVE ---------------------------------------
+    prova("regola normale: la soglia passa", 100_000, reg(100_000))
+    prova("sotto il minimo: nessuna promessa", 0, reg(999))
+    prova("il minimo esatto passa", 1_000, reg(1_000))
+    prova("zero resta zero (spenta)", 0, reg(0))
+    prova("None (colonna mai scritta): 0", 0, reg(None))
+    prova("stringa illeggibile: 0, non un'esplosione", 0, reg("ciao"))
+    amb["SPED_GRATIS_ATTIVO"] = False
+    prova("leva generale spenta: nessuna promessa scatta", 0,
+          reg(100_000))
+    amb["SPED_GRATIS_ATTIVO"] = True
+
+    # ================================================================
+    # LE DUE PROMESSE SONO INDIPENDENTI (decisione 3 di Andrea), ed e'
+    # la parte che vale il cantiere: misurano ENTRAMBE l'articolo
+    # LORDO, quindi nessuna delle due puo' spegnere l'altra. I quattro
+    # quadranti, uno per uno.
+    # ================================================================
+    # 105.000 e non un numero tondo qualunque: e' scelto perche' il
+    # NETTO (94.500) caschi SOTTO la soglia della spedizione. E' il
+    # caso che smaschera una dipendenza, e con un lordo generoso non
+    # succederebbe mai.
+    lordo = 105_000          # sopra tutte e due le soglie
+    sog_sped, sog_sconto, pct = 100_000, 100_000, 10
+    quadranti = [
+        ("nessuna delle due", 50_000, False, 0),
+        ("solo la spedizione", 120_000, True, 0),
+        ("solo lo sconto", 120_000, False, 12_000),
+        ("tutte e due", 120_000, True, 12_000)]
+    for nome, art, att_g, att_s in quadranti:
+        g = gratis(art, sog_sped if att_g or nome == "nessuna delle due"
+                   else 0)
+        s = amb["_sconto_pacco"](art, 2, "valore",
+                                 sog_sconto if att_s or
+                                 nome == "nessuna delle due" else 0, pct)
+        if nome == "nessuna delle due":
+            prova("quadrante: sotto soglia non scatta niente", (False, 0),
+                  (g, s))
+        else:
+            prova(f"quadrante «{nome}»: spedizione", att_g, g)
+            prova(f"quadrante «{nome}»: sconto", att_s, s)
+    # LA PROVA CHE CONTA: lo sconto NON sposta la spedizione, e
+    # viceversa. Se un domani la spedizione misurasse il NETTO, questo
+    # carrello — 120.000 lordi, 108.000 netti — smetterebbe di avere la
+    # spedizione gratis, e la riga qui sotto diventerebbe rossa.
+    sconto = amb["_sconto_pacco"](lordo, 2, "valore", sog_sconto, pct)
+    prova("lo sconto NON fa scendere la spedizione sotto soglia", True,
+          gratis(lordo, sog_sped) and sconto > 0
+          and lordo - sconto < sog_sped)
+    prova("...e la spedizione gratis non tocca lo sconto", 10_500, sconto)
+    c = conto(lordo, 0, 0, 0, sconto)      # la spedizione gia' azzerata
+    prova("il totale col carrello scontato E la spedizione offerta",
+          94_500, c["totale"])
+    prova("invariante: lordo - sconto + 0 + protezione = totale",
+          c["totale"], lordo - c["sconto"] + c["spedizione"] + c["protezione"])
+
+    # --- LA LAMPO PUO' FAR SCENDERE SOTTO SOGLIA (decisione 5) -------
+    # gemella della prova dello sconto: la misura e' quel che si paga
+    # davvero per la merce, non un listino che in quel momento non e'
+    # il prezzo di nessuno.
+    a = {"prezzo_sats": 60_000, "prezzo_eur": 0, "valuta": "sats",
+         "lampo_percento": 50, "lampo_scadenza": 2_000_000_000}
+    pieno = 60_000 * 2
+    scontato = unit(a, None, 1_000_000_000, 0.0) * 2
+    prova("a listino il carrello arriva alla soglia", True,
+          gratis(pieno, 100_000))
+    prova("con la lampo −50% ci scende sotto: la spedizione si paga",
+          False, gratis(scontato, 100_000))
+
+    # --- IL MONO: la forma che rende possibile tutto questo ----------
+    # spedizione azzerata = spedizione_sats 0 in colonna, cioe' lo
+    # stato di ogni annuncio con tariffa gratis dichiarata: la
+    # divisione a ritroso di _righe_ordine resta esatta, che e' il
+    # motivo per cui il mono puo' averla mentre lo sconto no.
+    amb2 = {}
+    exec(pezzo("_righe_ordine"), amb2)
+
+    class _Fila:
+        def __init__(self, d): self.d = d
+        def __getitem__(self, k): return self.d[k]
+
+    class _Con:
+        def execute(self, q, p):
+            self.r = _Fila({"titolo": "Tazza"})
+            return self
+        def fetchone(self): return self.r
+
+    o = {"annuncio_id": 7, "quantita": 3, "prezzo_sats": 90_000,
+         "spedizione_sats": 0, "protezione_sats": 0}
+    prova("mono con spedizione offerta: unitario esatto (30.000)",
+          30_000, amb2["_righe_ordine"](_Con(), o)[0]["unitario_sats"])
+
+    # ================================================================
+    # LA FORMA: le righe che un riordino farebbe sparire senza rompere
+    # nessuna prova funzionale.
+    # ================================================================
+    src = open("server.py", encoding="utf-8").read()
+    prova("la promessa ha UN giudice solo", 1,
+          src.count("def _sped_gratis("))
+    prova("la regola si legge da UN lettore solo", 1,
+          src.count("def _regola_sped_gratis("))
+    # QUATTRO chiamanti e quattro soli — i due preventivi e i due
+    # rami di compra —: se ne spuntasse un quinto, il conto si
+    # deciderebbe in un posto che nessuno ha confrontato con gli altri
+    # (il -1 e' la definizione, che porta lo stesso testo)
+    prova("...e i chiamanti sono i quattro percorsi del conto", 4,
+          src.count("_sped_gratis(articolo") - 1)
+    # LA PURA RESTA PURA: senza sentinella, la prima SELECT infilata li'
+    # dentro fa esplodere la suite (e qualcuno la commenterebbe)
+    corpo = pezzo("_sped_gratis").split('"""')[-1]
+    for vietato in ("INSERT", "UPDATE", "SELECT", "await", "con.",
+                    "SPED_GRATIS", "cambio"):
+        prova(f"_sped_gratis: niente {vietato} (e' una pura)", False,
+              vietato in corpo)
+
+    # LA PROMESSA NON ARRIVA MAI DAL COMPRATORE: una spedizione
+    # azzerata da chi paga sarebbe un furto con la ricevuta.
+    corpo_set = src[src.index("async def _compra_set("):
+                    src.index("async def _preventivo_set(")]
+    corpo_mono = src[src.index("async def compra("):
+                     src.index("def crea_ordine_pagato(")]
+    for chi, c2 in (("_compra_set", corpo_set), ("compra", corpo_mono)):
+        prova(f"{chi}: la soglia non si legge dal payload", False,
+              any(k in c2 for k in ('d.get("sped_gratis',
+                                    'd.get("gratis', 'd.get("soglia')))
+        prova(f"{chi}: la regola arriva dalla riga del VENDITORE", True,
+              "_regola_sped_gratis(" in c2 and "WHERE tg_id=?" in c2)
+
+    # IL DOVUTO IN USCITA NON CONOSCE LA TARIFFA OFFERTA. E' la stessa
+    # riga della colonna testimone dello sconto, e il danno sarebbe
+    # identico: un netto_venditore(prezzo + sped_gratis_sats) farebbe
+    # uscire dall'escrow DI ALTRI ORDINI la differenza, e la cintura di
+    # paga_venditore non lo vedrebbe (per lei dovuto e bolt11
+    # combacerebbero).
+    prova("netto_venditore non conosce la spedizione offerta", False,
+          "sped_gratis" in pezzo("netto_venditore"))
+    for nome in ("_sblocca_sats", "_rimborsa_compratore",
+                 "deposita_invoice"):
+        prova(f"{nome}: il dovuto NON riaggiunge la tariffa offerta",
+              False, "sped_gratis" in pezzo(nome).split('"""')[-1])
+    # e nemmeno il CSV, che e' contabilita': li' conta cio' che e'
+    # stato pagato davvero
+    prova("l'export non conosce la tariffa offerta", False,
+          "sped_gratis" in pezzo("esporta_csv")
+          if "def esporta_csv(" in src else False)
+
+    # E' un costrutto del CHECKOUT: non esce sui relay (il NIP-99 resta
+    # col prezzo pieno, come per lampo, sconto e tariffa punto).
+    for nome in ("tag_commercio", "evento_annuncio"):
+        prova(f"{nome}: cieco alla spedizione gratis", False,
+              "sped_gratis" in pezzo(nome))
+    prova("un solo UPDATE scrive la soglia", 1,
+          src.count("sped_gratis_soglia=?"))
+    # LA DECISIONE STA NELLO STESSO PUNTO nei tre percorsi: DOPO il
+    # conto della tariffa. Se il preventivo decidesse prima, la pagina
+    # direbbe «gratuita» dove la invoice risponde 503.
+    for chi, c2 in (("_compra_set", corpo_set), ("compra", corpo_mono)):
+        prova(f"{chi}: si decide DOPO aver contato la tariffa", True,
+              c2.index("_sped_gratis(articolo") < c2.index("_conto_ordine("))
+
+
+# ====================================================================
 def prove_consegna_payload_punto():
     """Il giudice unico dei campi di consegna, sul ramo nuovo: la
     dichiarazione della tariffa punto e' la PRESENZA di una chiave,
@@ -3635,6 +3825,8 @@ def prove_libro_mastro():
           prezzo_sats INT, sconto_sats INT DEFAULT 0,
           sconto_percento INT DEFAULT 0, spedizione_sats INT DEFAULT 0,
           protezione_sats INT DEFAULT 0, quantita INT DEFAULT 1,
+          sped_gratis_sats INT DEFAULT 0,
+          consegna_scelta TEXT DEFAULT 'spedizione',
           stato TEXT DEFAULT 'locked', payout_stato TEXT DEFAULT '',
           aggiornato INT DEFAULT 0);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
@@ -3760,6 +3952,14 @@ def prove_libro_mastro():
          "promessa di sconto che non puo' scattare", "222"),
         ("UPDATE utenti SET sconto_pacco_valore=0 WHERE tg_id=333",
          "promessa di sconto che non puo' scattare", "333"),
+        # la spedizione gratis: le due colonne si escludono per
+        # costruzione (stesso INSERT), quindi una riga qui vuol dire
+        # che una delle due cifre e' falsa
+        ("UPDATE ordini SET sped_gratis_sats=800 WHERE id=1",
+         "spedizione risparmiata e pagata insieme", "1"),
+        ("UPDATE ordini SET sped_gratis_sats=800, consegna_scelta='ritiro' "
+         "WHERE id=2",
+         "spedizione risparmiata dove non si spediva", "2"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -4281,7 +4481,8 @@ def _censimento(acceso):
     # Le leve che sono LISTE: _elenco ci itera sopra.
     for nome in ("ASTA_DURATE_GIORNI", "LAMPO_SCONTI", "ORE_LAMPO_OPZIONI",
                  "SCONTO_PACCO_SOGLIE", "SCONTO_PACCO_SCONTI",
-                 "SCONTO_PACCO_VALORI", "SCONTO_PACCO_CRITERI"):
+                 "SCONTO_PACCO_VALORI", "SCONTO_PACCO_CRITERI",
+                 "SPED_GRATIS_SOGLIE"):
         amb[nome] = [1, 2, 3]
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
@@ -4430,6 +4631,7 @@ def main():
               prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_sconto_pacco, prove_forma_sconto_pacco,
+              prove_sped_gratis,
               prove_libro_mastro, prove_leve,
               prove_consegna_payload_punto, prove_pagina_acquisto):
         try:
