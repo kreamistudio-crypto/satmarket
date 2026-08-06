@@ -3475,10 +3475,68 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tre cose nella scatola sono tre cose, ed è già il significato di
   `ordini.quantita`. Il carrello richiede comunque ≥2 righe, quindi la
   soglia non si raggiunge mai con un pezzo solo.
+  IL CRITERIO LO SCEGLIE IL VENDITORE, LA SOGLIA RESTA UNA (ago 2026,
+  e questa voce EMENDA la 4: i pezzi restano il criterio di serie, non
+  sono più l'unico). Nasce da un venditore vero: «se vendo un computer
+  lo sconto lo do già da 2 pezzi, se vendo cianfrusaglie ne servono
+  tante». Lui chiedeva una soglia per PRODOTTO, ed è stata SCARTATA —
+  lo sconto è del carrello e vale sul totale, quindi con un computer
+  (soglia 2) e cinque cianfrusaglie (soglia 10) nello stesso carrello
+  nessuna regola sarebbe spiegabile a chi paga; e una soglia per riga
+  romperebbe la divisione a ritroso dell'unitario di `_righe_ordine`,
+  che è la stessa ragione per cui il mono non sconta (decisione 1).
+  Col CRITERIO l'asimmetria si ottiene lo stesso, con UNA regola sola:
+  a PEZZI come sempre, o a VALORE degli articoli («da 100.000 sats nel
+  carrello») — un computer ci arriva da solo, di cianfrusaglie ne
+  servono venti.
+  LA SOGLIA A VALORE È IN SATS, e non in euro. In ordine di peso:
+  `_sconto_pacco` resta PURA e senza il cambio — è la funzione dove un
+  errore costa sats veri; non esiste il caso «promessa in vetrina non
+  mantenuta perché CoinGecko tace», che in euro spegnerebbe lo sconto
+  perfino su un carrello tutto-sats, cioè proprio nei negozi
+  bitcoin-native; e il confronto è con l'articolo, che è GIÀ in sats,
+  quindi coerente per costruzione con la cifra della invoice. Il
+  precedente in casa sono `TETTO_SATS_ANNUNCIO` e
+  `TETTO_DIGITALE_NUOVI`, leve in sats che giudicano l'articolo nella
+  stessa posizione del conto. L'EURO RESTA UN AIUTO PER SCEGLIERE
+  (decisione di Andrea): nel cassetto il venditore può digitare la
+  cifra in euro e vede la conversione mentre sceglie, ma ciò che si
+  salva è sempre e solo il numero in sats — così la regola è
+  deterministica e non oscilla col cambio, e il cassetto lo dice a
+  parole. Cambio muto = il campo euro non compare e restano le pillole.
+  LA MISURA È IL LORDO DEL CONTO, cioè l'articolo DOPO lampo e accordo
+  (`_unitario_effettivo` li ha già applicati) e PRIMA dello sconto — o
+  si morderebbe la coda. CONSEGUENZA VOLUTA, da sapere perché sembra
+  un bug quando un venditore la nota: una lampo al −50% può far
+  scendere SOTTO soglia un carrello che a listino ci arrivava. È
+  giusto così — la soglia guarda quel che si paga davvero per la
+  merce, non un listino che in quel momento non è il prezzo di
+  nessuno — e scontare ancora un carrello che la soglia non la
+  raggiunge più sarebbe la vera incoerenza. C'è la prova apposta, e il
+  cassetto lo dice al venditore sotto l'anteprima.
+  IL MONO NON SCONTA NEMMENO A VALORE, ed è la cosa che a valore si
+  fraintende di più: «da 100.000 sats» si legge come «da 100.000 sats
+  di spesa», e chi compra UN oggetto da 200.000 dalla sua scheda non
+  sconta. L'antidoto è testuale e sta in tre posti: la riga fissa del
+  cassetto («vale solo nel carrello, da due oggetti diversi in su»), e
+  le due frasi pubbliche, che dicono sempre «nello stesso carrello».
+  Per la stessa ragione la decisione 3 si RICONFERMA con più forza: mai
+  nelle card, mai nelle pillole del dettaglio.
   IL MODELLO: `utenti.sconto_pacco_soglia`/`sconto_pacco_percento`
   (0/0 = spento; nessun flag «dichiarata» come per la tariffa punto —
   lì lo zero era ambiguo, qui uno sconto dello 0% e nessuno sconto
-  sono la stessa cosa) e, sull'ordine, `sconto_sats` + `sconto_percento`
+  sono la stessa cosa) più `sconto_pacco_criterio TEXT DEFAULT 'pezzi'`
+  e `sconto_pacco_valore` (ago 2026). TRE colonne e non due riscritte:
+  `sconto_pacco_soglia` resta i PEZZI e non cambia MAI significato —
+  chi legge il database a mano (il polso SQL) non deve incrociare due
+  colonne per sapere cosa vuol dire un numero, e chi prova il criterio
+  a valore e torna indietro ritrova la sua soglia. È il patto delle due
+  tariffe di spedizione, tenute separate. Il `DEFAULT 'pezzi'` È la
+  migrazione: SQLite riempie da sola le righe di ieri (il precedente è
+  `valuta TEXT DEFAULT 'sats'`), e NIENTE si fotografa in `ordini` —
+  il criterio non serve alla ricevuta, che il «−10%» ce l'ha già, e
+  sarebbe una colonna nella tabella del denaro per un'informazione
+  ornamentale. Sull'ordine restano `sconto_sats` + `sconto_percento`
   come voce di TESTATA — `ordine_righe` resta INTATTA, gli unitari
   LORDI. È la strada che questo file dichiarava già preparata: lo
   sconto è una proprietà del CARRELLO, non della cosa, e limare gli
@@ -3512,10 +3570,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   floor e lo sconto per DIFFERENZA, la regola di `_prezzo_lampo` —
   così `articolo − sconto` È il netto per costruzione (mai un sat di
   scarto fra la riga mostrata e il totale) e il sat di dubbio resta a
-  CHI PAGA (999 a −10% → sconto 100, non 99). `_regola_sconto(soglia,
-  percento)` è il lettore unico e prende due INT e non una riga — il
-  patto di `in_ferie`: così serve la riga di `utenti`, gli alias
-  `venditore_sconto_*` della vetrina e la prova in CI.
+  CHI PAGA (999 a −10% → sconto 100, non 99). `_regola_sconto(criterio,
+  soglia_pezzi, soglia_valore, percento)` è il lettore unico e prende
+  quattro campi e non una riga — il patto di `in_ferie`: così serve la
+  riga di `utenti`, gli alias `venditore_sconto_*` della vetrina e la
+  prova in CI; restituisce `(criterio, soglia, percento)` con la soglia
+  GIÀ quella del criterio scelto, cioè un valore solo da guardare, e
+  `('', 0, 0)` quando non c'è una regola vera.
+  IL CRITERIO IGNOTO NON RIPIEGA SUI PEZZI (ago 2026): la colonna VUOTA
+  vale 'pezzi' — è letteralmente il mondo di ieri, cioè la
+  retrocompatibilità — ma una stringa SCRITTA e fuori catalogo spegne
+  tutto, perché ripiegare applicherebbe una soglia in pezzi che il
+  venditore non ha promesso in pezzi (una colonna scritta a mano, o il
+  rollback da un criterio futuro, farebbero scontare a caso).
+  Fail-closed come `importo_invoice`, e la stessa riga fa da
+  kill-switch alla leva `SCONTO_PACCO_CRITERI`.
+  IL GEMELLO IN EURO NON DECIDE PIÙ DA SOLO: a criterio valore la porta
+  si apre guardando i SATS, che l'euro non ha. Quindi `_sconto_pacco_
+  eur(articolo_eur, percento)` ha perso la condizione ed è il chiamante
+  ad azionarla (`… if sconto else 0.0`) — prima era ripetuta identica
+  nei due gemelli, e col criterio quella copia sarebbe diventata il
+  posto esatto in cui i due possono divergere. La cintura di
+  `_strade_preventivo` resta e ne esce rafforzata.
+  LA REGOLA D'ORO DELLA RETROCOMPATIBILITÀ, e vive in una pura sua —
+  `_sconto_pubblico`: la soglia in PEZZI esce maggiore di zero SOLO a
+  criterio 'pezzi'. È lei il lucchetto del client vecchio rimasto in
+  cache, che di campi ne legge uno solo (`venditore_sconto_soglia`) e
+  chiede `soglia>0 && percento>0` prima di disegnare la promessa: con
+  la soglia a zero non disegna niente, e un'assenza non è una bugia
+  mentre un «−10% da 100000 pezzi» lo sarebbe. Sta in una funzione e
+  non a mano nelle due superfici (vetrina e profilo del negozio) perché
+  una regola ripetuta in due posti è una regola che un giorno uno dei
+  due dimentica — e stando in una pura si tortura in CI invece di
+  sperarci.
   L'EURO SI SCONTA IN EURO e non convertendo i sats: un carrello nato
   in euro con la protezione a zero ha oggi un `totale_eur` ESATTO, e
   uno sconto non deve poter peggiorare la QUALITÀ di un numero — chi
@@ -3547,15 +3634,49 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   prezzo e per la lampo. E niente `guardia_ferie_venditore`: lampo e
   asta ce l'hanno perché sono atti di vendita, mentre sistemare il
   listino mentre si è via è esattamente ciò che si fa in ferie.
+  IL BODY DELL'ENDPOINT è `{criterio, soglia, valore, percento}`, e le
+  DUE SOGLIE SI CONSERVANO A VICENDA: chiave assente = conserva (il
+  pattern dello stock), con un `COALESCE` che tiene tutto in UN solo
+  UPDATE — una SELECT prima aprirebbe la finestra in cui la regola è
+  letta e non ancora scritta. Così chi prova un criterio e torna
+  indietro ritrova la sua soglia, e un client vecchio — che di `valore`
+  non sa niente — non cancella a ogni salvataggio una colonna che non
+  ha mai visto. La risposta RILEGGE dal database: col COALESCE non si
+  può dedurre dal body. Lo SPEGNIMENTO azzera invece entrambe, criterio
+  compreso: «spento» resta uno stato solo, e chi spegne non deve saper
+  compilare un campo.
   LEVE: `SCONTO_PACCO_ATTIVO` nasce ACCESA (non muove denaro verso
   l'esterno, abbassa soltanto un conto in entrata),
-  `SCONTO_PACCO_SOGLIE`/`SCONTO_PACCO_SCONTI` sono le pillole del
-  venditore (il patto di LAMPO_SCONTI), `MIN_SOGLIA` 2 e
-  `MAX_PERCENTO` 30 restano la cintura del server anche se le liste
-  cambiano. Superficie: i due alias in `CAMPI_VETRINA` a costo ZERO
-  (il JOIN su `u` c'era già) e nel profilo di `/api/negozio`, ENTRAMBI
-  normalizzati da `_regola_sconto` — così la leva spenta li spegne in
+  `SCONTO_PACCO_SOGLIE`/`SCONTO_PACCO_VALORI`/`SCONTO_PACCO_SCONTI`
+  sono le pillole del venditore (il patto di LAMPO_SCONTI),
+  `SCONTO_PACCO_CRITERI` è il kill-switch del criterio nuovo (toglierlo
+  di lì lo spegne per chi l'aveva scelto, senza un deploy), e
+  `MIN_SOGLIA` 2, `MIN_VALORE` 1.000 e `MAX_PERCENTO` 30 restano la
+  cintura del server anche se le liste cambiano. Il minimo a valore è
+  basso di proposito: è una cintura contro lo zero travestito, non un
+  giudizio su quanto debba valere un carrello (la regola di
+  MAX_QUANTITA_ANNUNCIO — quanto vale il suo negozio lo sa il
+  venditore, non noi).
+  Superficie: i QUATTRO alias in `CAMPI_VETRINA` a costo ZERO
+  (il JOIN su `u` c'era già) e nel profilo di `/api/negozio`, TUTTI
+  normalizzati da `_sconto_pubblico` — così la leva spenta li spegne in
   tutte le vetrine insieme e il client non deve ricordarsi i casi.
+  Il preventivo porta `sconto_criterio`/`sconto_valore`/`mancano_sats`
+  accanto alle chiavi di sempre, speculari: la soglia in pezzi e
+  `mancano_pezzi` tacciono a criterio valore, e viceversa — nessuno può
+  leggere dei sats come se fossero pezzi. Nella risposta di compra il
+  criterio è la FOTOGRAFIA di cosa è scattato (`crit if sconto else ''`,
+  gemella della percentuale).
+  IL LIBRO MASTRO guadagna UN controllo solo, e non sugli ordini: «una
+  promessa di sconto che non può scattare» (criterio fuori catalogo, o
+  soglia sotto il minimo STRUTTURALE — 2 pezzi, 1 sat, e non le leve:
+  un allarme agganciato a una leva suonerebbe al primo ritocco della
+  leva, ed è così che gli allarmi muoiono). Qui non si perdono sats: si
+  perde una vendita, e in silenzio. I quattro controlli sugli ordini
+  NON cambiano di un carattere, ed è la prova che il criterio non tocca
+  il denaro; il POLSO invece sì (query 17), o la colonna «soglia»
+  mescolerebbe pezzi e sats ed è il primo posto dove un umano si
+  sbaglia.
   FRONTEND: la riga «Sconto carrello −10%» entra in `contoRighe` fra
   Prezzo e Commissione, SOLO quando scatta (una riga a zero direbbe
   «non hai avuto niente», che non è un'informazione); il valore arriva
@@ -3566,12 +3687,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   grassetto sulla cifra: l'unico chip colorato del sistema resta il
   «gratis» della spedizione. L'INVITO nella pagina del carrello
   (`aggiornaInvitoSconto`, agganciato ad `aggiornaBarraPacco` perché è
-  LEI a girare a ogni ±) dice quanti pezzi mancano e poi SI TRASFORMA
+  LEI a girare a ogni ±) dice quanto manca e poi SI TRASFORMA
   in conferma invece di sparire — se sparisse, chi ha appena
   guadagnato lo sconto non vedrebbe cambiare niente. Il dato viene
   dall'ANNUNCIO e non dal preventivo (che ha una firma e arriva in
-  ritardo), e il patto resta intero perché nell'invito NON C'È UN SAT:
-  contare pezzi non è fare il conto. LA BARRA DEL CARRELLO RESTA AL
+  ritardo). A criterio VALORE una cifra la porta, e il patto si
+  riformula onestamente: L'INVITO NON CALCOLA, RICEVE — il totale
+  glielo passa `aggiornaBarraPacco`, che quel numero lo mostra già due
+  centimetri più sotto, quindi i due non possono divergere e non c'è
+  un secondo conto; quel che resta VIETATO è la percentuale, cioè
+  quanto si risparmia, che lo dice solo il conto del server. La cifra
+  passa da `cifraCtrl` e segue il toggle €/₿ (la view-pacco si
+  ridisegna in `setValuta`); le due righe PUBBLICHE invece non lo
+  seguono — `setValuta` non ridisegna il negozio — quindi scrivono i
+  sats con l'≈€ accanto, e MAI un ≈ senza `cambioVivo`, che sul cambio
+  di riserva sarebbe una cifra inventata. Nel client il giudice della
+  regola è UNO (`regolaSconto`) e la frase pubblica pure
+  (`frasePromessaSconto`), per la stessa ragione di
+  `_sconto_pubblico`: sono quattro le superfici che la mostrano.
+  LA BARRA DEL CARRELLO RESTA AL
   LORDO, dichiarato: non è già oggi il totale da pagare (non ha
   spedizione né protezione), e le alternative sono peggio — una
   chiamata a ogni tocco dello stepper (con un debounce che litiga
@@ -3583,7 +3717,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SCELGONO mentre a salvare è un bottone solo — soglia e percentuale
   sono UNA regola, e con un POST per tocco esisterebbe il mezzo
   secondo in cui il negozio ne ha una a metà, e in quel mezzo secondo
-  qualcuno può comprare. La bozza si butta a ogni `/api/me` (o
+  qualcuno può comprare. Col criterio (ago 2026) in testa ci sono due
+  pillole «A pezzi / A valore» e sotto cambiano le soglie; ogni pillola
+  a valore porta il suo ≈ € (l'app parte in vista euro: una fila di
+  cifre in sats si sceglierebbe alla cieca), e quell'≈ NON è una
+  `.unit` — il selettore nudo forza `var(--muted)`, e sulla pillola
+  ACCESA il grigio sparisce sul fondo arancione: è una glossa e segue
+  il colore del bottone (difetto visto in tema scuro, non a
+  ragionamento). Il campo euro d'aiuto scrive nella bozza i SATS,
+  compare solo con `cambioVivo`, e non ridisegna il cassetto — il campo
+  perderebbe il fuoco a ogni tasto: riscrive in place le due cifre che
+  dipendono da lui e SPEGNE le pillole che non combaciano più, che una
+  pillola accesa su un numero diverso da quello scritto sopra è la
+  stessa bugia del campo che mente. La bozza si butta a ogni `/api/me` (o
   resterebbe quella fissata da un render girato prima che la regola
   vera arrivasse: bug visto dal vivo). Il 400 si rende DENTRO il
   cassetto, la ricetta delle ferie. Più la riga nell'ORDINE, che non è
@@ -6833,6 +6979,42 @@ IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione, e
 la leva ha il default nel codice. DA GUARDARE al primo giro: che nel
 journal non compaia NIENTE — se arriva un 🧊 il primo giorno, quello è
 il momento di guardare, non di sistemare la ronda.
+Il criterio dello sconto carrello (ago 2026, il giorno dopo, da un
+venditore vero): «se vendo un computer lo sconto lo do già da 2 pezzi,
+se vendo cianfrusaglie ne servono tante». Lui chiedeva una soglia per
+PRODOTTO — scartata, non sarebbe spiegabile su un carrello misto e
+romperebbe la divisione a ritroso dell'unitario. La soglia resta UNA
+per negozio e a cambiare è il CRITERIO: a pezzi come sempre, o a
+VALORE degli articoli. Le decisioni di Andrea: la soglia a valore è in
+SATS (l'euro è un aiuto per SCEGLIERE nel cassetto, mai l'unità della
+soglia), colonne separate perché `sconto_pacco_soglia` non cambi mai
+significato, e il valore si confronta col LORDO — cioè col carrello
+DOPO lampo e accordo, quindi una lampo generosa può far scendere sotto
+soglia un carrello che a listino ci arrivava: è voluto, ha la sua
+prova e il cassetto lo dice al venditore. Vedi Architettura, «IL
+CRITERIO LO SCEGLIE IL VENDITORE», per il perché dei sats e per la
+regola d'oro della retrocompatibilità (`_sconto_pubblico`: la soglia
+in pezzi esce >0 solo a criterio pezzi, ed è il lucchetto del client
+vecchio in cache).
+Collaudato: 118 prove nuove in `prove.py` (1020 verdi, erano 902) —
+fra cui gli shim che fanno girare IDENTICHE le ~35 asserzioni di ieri
+(la regressione dei negozi esistenti, gratis), il caso misto nei due
+versi, la lampo che spegne lo sconto, il criterio ignoto che NON
+ripiega sui pezzi, e le prime prove funzionali di `_regola_sconto`,
+che la sua docstring prometteva dal giorno in cui è nata e non aveva
+mai avuto. Più un collaudo eseguibile su DB usa-e-getta (58 verdi) con
+in testa LA PROVA REGINA aggiornata — preventivo == compra AL SAT su
+entrambi i criteri e al filo della soglia — l'identità di bilancio
+riletta dal database, le due soglie che si conservano a vicenda anche
+da un client vecchio, e la ronda che tace. Più il giro visivo via CDP
+a 320 e 375px nei due temi, che ha trovato dal vivo l'unico difetto
+del cantiere: sulla pillola accesa l'≈€ spariva, perché era una
+`.unit`. IN PRODUZIONE basta il deploy — le due colonne nascono col
+loro default (`'pezzi'`, 0), cioè tutti i negozi che scontano oggi
+continuano identici, e le tre leve nuove hanno il default nel codice.
+DA GUARDARE al primo giro: il primo venditore che passa a valore (che
+il cassetto e la riga pubblica dicano la stessa cifra) e il polso SQL
+17, che adesso dice anche il criterio.
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
