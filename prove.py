@@ -3375,6 +3375,190 @@ def prove_sconto_pacco():
 
 
 # ====================================================================
+def prove_suggerimenti():
+    """I SUGGERIMENTI DAL BOT (ago 2026): accesi di serie, ma col
+    RITMO. Qui si torturano le due cose che li rendono non-spam — il
+    giudice che sa distinguere «mai toccato» da «spento da lui», e il
+    tetto per PERSONA — piu' le righe di forma che un riordino
+    farebbe sparire senza rompere niente."""
+    print("\n[i suggerimenti dal bot]")
+    import sqlite3
+
+    # ---- IL GIUDICE DELL'INTERRUTTORE ------------------------------
+    # Quattro casi, e sono tutti quelli che esistono: il gesto c'e' o
+    # non c'e', il default e' acceso o spento.
+    for di_serie in (True, False):
+        amb = {"SUGGERIMENTI_DI_SERIE": di_serie}
+        exec(pezzo("suggerimenti_accesi"), amb)
+        acc = amb["suggerimenti_accesi"]
+        prova(f"default {di_serie}: mai toccato → vale il default",
+              di_serie, acc(0, 0))
+        # ...e il valore grezzo di chi non ha mai scelto NON conta: e'
+        # 0 per tutti, anche per chi i suggerimenti li riceve
+        prova(f"default {di_serie}: mai toccato, valore 1 → il default",
+              di_serie, acc(0, 1))
+        prova(f"default {di_serie}: ACCESO da lui → acceso comunque",
+              True, acc(1, 1))
+        prova(f"default {di_serie}: SPENTO da lui → spento comunque",
+              False, acc(1, 0))
+    # LA PROVA CHE VALE IL CANTIERE: rovesciare il default non tocca
+    # chi ha scelto. Se un domani `suggerimenti_scelti` sparisse in un
+    # riordino, questa diventa rossa — ed e' l'unica cosa che protegge
+    # chi ha detto no.
+    amb_on = {"SUGGERIMENTI_DI_SERIE": True}
+    amb_off = {"SUGGERIMENTI_DI_SERIE": False}
+    exec(pezzo("suggerimenti_accesi"), amb_on)
+    exec(pezzo("suggerimenti_accesi"), amb_off)
+    prova("chi ha SCELTO non lo scavalca nessun default", True,
+          amb_on["suggerimenti_accesi"](1, 0)
+          == amb_off["suggerimenti_accesi"](1, 0) is False
+          and amb_on["suggerimenti_accesi"](1, 1)
+          == amb_off["suggerimenti_accesi"](1, 1) is True)
+
+    # ---- IL RITMO, su un database di cartone -----------------------
+    def db_finto():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+          suggerimenti_annunci INT DEFAULT 0,
+          suggerimenti_scelti INT DEFAULT 0,
+          suggerito_il INT DEFAULT 0,
+          suggerito_sconto INT DEFAULT 0,
+          suggerito_sped INT DEFAULT 0);
+        INSERT INTO utenti(tg_id) VALUES(1), (2), (3);
+        -- 2 ha SPENTO a mano, 3 ha ricevuto un consiglio ieri
+        UPDATE utenti SET suggerimenti_scelti=1, suggerimenti_annunci=0
+          WHERE tg_id=2;
+        """)
+        return con
+
+    ADESSO = 1_800_000_000
+    amb = {"SUGGERIMENTI_DI_SERIE": True, "SUGGERIMENTI_OGNI_GIORNI": 7}
+    exec(pezzo("suggerimenti_accesi"), amb)
+    exec(pezzo("_puo_suggerire"), amb)
+    # il catalogo dei timbri si ripete qui, e una prova di forma piu'
+    # sotto lo incrocia col sorgente: se divergessero, la whitelist
+    # proverebbe qualcosa che in produzione non esiste
+    amb["TIMBRI_SUGGERIMENTO"] = ("suggerito_sconto", "suggerito_sped")
+    exec(pezzo("_timbra_suggerimento"), amb)
+    puo, timbra = amb["_puo_suggerire"], amb["_timbra_suggerimento"]
+
+    con = db_finto()
+    prova("mai toccato e mai servito: si puo'", True, puo(con, 1, ADESSO))
+    prova("chi l'ha SPENTO a mano: mai", False, puo(con, 2, ADESSO))
+    prova("utente che non esiste: mai (fail-closed)", False,
+          puo(con, 999, ADESSO))
+    # il timbro chiude la porta per N giorni, ed e' il cuore del giro
+    timbra(con, 1, ADESSO)
+    con.commit()
+    prova("subito dopo il timbro: chiuso", False, puo(con, 1, ADESSO))
+    prova("dopo 6 giorni: ancora chiuso", False,
+          puo(con, 1, ADESSO + 6 * 86400))
+    prova("al settimo giorno esatto: riapre", True,
+          puo(con, 1, ADESSO + 7 * 86400))
+    # IL «MAI INSIEME» non e' una regola scritta: e' questo timbro.
+    # Due suggerimenti di funzione nello stesso giro passano dallo
+    # stesso giudice, e il secondo trova la porta chiusa dal primo.
+    prova("il secondo suggerimento dello stesso giro non parte", False,
+          puo(con, 1, ADESSO))
+    con.close()
+
+    # il ritmo a 0 e' il freno d'emergenza: la raffica di ieri
+    amb["SUGGERIMENTI_OGNI_GIORNI"] = 0
+    con = db_finto()
+    timbra(con, 1, ADESSO)
+    con.commit()
+    prova("ritmo a 0: nessun tetto (la raffica di ieri)", True,
+          puo(con, 1, ADESSO))
+    prova("...ma chi l'ha spento resta spento anche senza ritmo", False,
+          puo(con, 2, ADESSO))
+    con.close()
+    amb["SUGGERIMENTI_OGNI_GIORNI"] = 7
+
+    # ---- IL TIMBRO SCRIVE SOLO COLONNE DI CASA ---------------------
+    # Il nome finisce dentro una query: un nome che arriva da altrove
+    # non deve poterci entrare mai, nemmeno oggi che i chiamanti sono
+    # due e passano due letterali.
+    con = db_finto()
+    timbra(con, 1, ADESSO, "suggerito_sconto")
+    prova("il timbro di funzione si scrive", 1,
+          con.execute("SELECT suggerito_sconto AS s FROM utenti "
+                      "WHERE tg_id=1").fetchone()["s"])
+    rotto = False
+    try:
+        timbra(con, 1, ADESSO, "xp=999, suggerito_sped")
+    except ValueError:
+        rotto = True
+    prova("un nome fuori catalogo non entra nella query", True, rotto)
+    con.close()
+
+    # ---- LA MIGRAZIONE DEL PREGRESSO -------------------------------
+    # Fa l'unica cosa dimostrabile (chi e' acceso ha scelto), ed e'
+    # idempotente: chi spegne DOPO non viene ripescato mai piu'.
+    con = db_finto()
+    con.execute("UPDATE utenti SET suggerimenti_annunci=1 WHERE tg_id=3")
+    SQL = ("UPDATE utenti SET suggerimenti_scelti=1 "
+           "WHERE suggerimenti_annunci=1 AND suggerimenti_scelti=0")
+    prova("registra il gesto di chi li aveva accesi", 1,
+          con.execute(SQL).rowcount)
+    prova("...e al secondo giro non trova piu' nessuno", 0,
+          con.execute(SQL).rowcount)
+    con.execute("UPDATE utenti SET suggerimenti_annunci=0 WHERE tg_id=3")
+    prova("chi spegne dopo la migrazione non si riaccende", 0,
+          con.execute(SQL).rowcount)
+    prova("...e resta spento davvero", False, puo(con, 3, ADESSO))
+    con.close()
+
+    # ---- LA FORMA --------------------------------------------------
+    src = open("server.py", encoding="utf-8").read()
+    prova("l'interruttore ha UN giudice solo", 1,
+          src.count("def suggerimenti_accesi("))
+    prova("la whitelist dei timbri e' quella che si e' provata", True,
+          'TIMBRI_SUGGERIMENTO = ("suggerito_sconto", "suggerito_sped")'
+          in src)
+    prova("il ritmo ha UN giudice solo", 1, src.count("def _puo_suggerire("))
+    # IL TIMBRO PRIMA DELL'INVIO, il patto delle campagne: un errore di
+    # rete puo' perdere un consiglio, mai raddoppiarlo — e qui
+    # raddoppiarlo sarebbe la raffica che il ritmo esiste per togliere
+    corpo = pezzo("suggerisci_funzioni")
+    prova("suggerisci_funzioni: timbra PRIMA di notificare", True,
+          corpo.index("_timbra_suggerimento(") < corpo.index("await notifica("))
+    compl = pezzo("_chiedi_completamento")
+    prova("_chiedi_completamento: timbra PRIMA di notificare", True,
+          compl.index("_timbra_suggerimento(") < compl.index("await notifica("))
+    # ...e il gate viene PRIMA del timbro per-annuncio, o gli annunci
+    # resterebbero «avvisati» senza che nessuno abbia avvisato niente
+    prova("...e il gate viene prima del timbro per annuncio", True,
+          compl.index("_puo_suggerire(")
+          < compl.index("completamento_avvisato=1"))
+    # LA CODA CON L'INTERRUTTORE in fondo a OGNI messaggio: chi riceve
+    # un consiglio deve sempre vedere come farlo smettere
+    prova("la coda esiste in un posto solo", 1,
+          src.count("CODA_SUGGERIMENTI = ("))
+    prova("...e la portano tutti e due i mittenti", 2,
+          src.count("CODA_SUGGERIMENTI.format("))
+    prova("la coda dice dove si spengono", True,
+          "Profilo" in src[src.index("CODA_SUGGERIMENTI = ("):
+                           src.index("def suggerimenti_accesi(")])
+    # I due suggerimenti di funzione non si mandano dove non
+    # potrebbero servire: lo sconto vuole ALMENO DUE annunci (sotto
+    # non scatterebbe mai), la spedizione gratis solo a chi spedisce
+    cat = src[src.index("SUGGERIMENTI_FUNZIONE = ("):
+              src.index("async def suggerisci_funzioni(")]
+    prova("lo sconto non si suggerisce a chi ha un annuncio solo", True,
+          "COUNT(*) >= 2" in cat)
+    prova("la spedizione gratis solo a chi spedisce davvero", True,
+          "consegna IN ('spedizione','entrambe')" in cat)
+    prova("ognuno guarda la SUA leva", 2, cat.count('"leva": lambda:'))
+    # e /api/me dice lo STATO EFFETTIVO, non il valore grezzo: col
+    # grezzo il bottone direbbe «Attiva» a chi li ha gia' accesi, e il
+    # suo tocco li spegnerebbe
+    prova("/api/me passa dal giudice", 1,
+          src.count('profilo["suggerimenti_annunci"] = suggerimenti_accesi('))
+
+
+# ====================================================================
 def prove_sped_gratis():
     """LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026): la seconda
     promessa di negozio. Qui si tortura la matematica e — soprattutto —
@@ -4502,7 +4686,8 @@ def _censimento(acceso):
                  "PROMEMORIA_SPEDIZIONE_GIORNI", "PROMEMORIA_DIGITALE_ORE",
                  "REVISIONE_SOLLECITO_GIORNI", "FERIE_PREAVVISO_ORE",
                  "GIORNI_DATA_ANNUNCIO", "TETTO_DIGITALE_NUOVI",
-                 "DIGITALE_MIN_VENDITE"):
+                 "DIGITALE_MIN_VENDITE", "SUGGERIMENTI_DI_SERIE",
+                 "SUGGERIMENTI_OGNI_GIORNI"):
         amb[nome] = acceso and 24
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
@@ -4631,7 +4816,7 @@ def main():
               prove_ferie,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_sconto_pacco, prove_forma_sconto_pacco,
-              prove_sped_gratis,
+              prove_sped_gratis, prove_suggerimenti,
               prove_libro_mastro, prove_leve,
               prove_consegna_payload_punto, prove_pagina_acquisto):
         try:

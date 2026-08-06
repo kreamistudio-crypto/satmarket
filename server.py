@@ -306,6 +306,29 @@ except ImportError:
     # venditore, non noi)
     SPED_GRATIS_MIN = 1_000
 
+# I SUGGERIMENTI DAL BOT (ago 2026, decisione di Andrea che ROVESCIA
+# l'opt-in di luglio): «💡 Suggerimenti sui miei annunci» nasce ACCESO.
+# Il motivo del rovesciamento e' che l'opt-in, in pratica, non lo
+# accendeva quasi nessuno — e i consigli che davamo erano quelli su cui
+# il compratore filtra, cioe' roba che al venditore serve sapere.
+# MA IL RITMO E' LA META' CHE CONTA, e va tenuto anche se un giorno il
+# default tornasse spento: al massimo UN suggerimento ogni N giorni per
+# PERSONA, qualunque sia la coda. Chi si stufa blocca il bot, e col bot
+# bloccato non riceve piu' le notifiche degli ordini, che sono
+# portanti; su Nostr il danno e' identico e meno visibile, perche'
+# smette di leggere i DM e nessuno se ne accorge. Nessun consiglio vale
+# quel rischio.
+try:
+    from config import SUGGERIMENTI_DI_SERIE
+except ImportError:
+    SUGGERIMENTI_DI_SERIE = True
+try:
+    from config import SUGGERIMENTI_OGNI_GIORNI
+except ImportError:
+    # 0 spegne il RITMO, non i suggerimenti: si torna alla raffica di
+    # ieri, quindi e' un freno d'emergenza e non una taratura
+    SUGGERIMENTI_OGNI_GIORNI = 7
+
 # La protezione acquisti (lug 2026, modello Vinted): percentuale a
 # carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
 # e resta alla piattaforma quando l'affare si chiude bene. Distinta da
@@ -1512,14 +1535,51 @@ def init_db():
                     "avatar_scelta TEXT DEFAULT ''",
                     # suggerimenti_annunci (lug 2026): l'interruttore
                     # del singolo utente per «💡 Suggerimenti sui miei
-                    # annunci». SPENTO di serie, e il default 0 e'
-                    # tutta la regola: scrivere a chi non ha chiesto
-                    # niente e' spam, anche quando il consiglio e'
-                    # buono. Si accende dal Profilo; l'unico posto dove
-                    # lo nominiamo di nostra iniziativa e' l'ultima
-                    # riga del benvenuto, che e' anche l'unico
-                    # messaggio che mandiamo senza permesso.
+                    # annunci». Il VALORE della sua scelta, e non se
+                    # l'ha fatta — quello lo dice la colonna qui sotto.
+                    # Dall'ago 2026 il default di serie e' una LEVA
+                    # (SUGGERIMENTI_DI_SERIE, accesa) e questo 0 non e'
+                    # piu' «spento», e' solo «il valore di partenza di
+                    # una riga che nessuno ha ancora toccato»: a
+                    # deciderlo e' suggerimenti_accesi().
                     "suggerimenti_annunci INTEGER DEFAULT 0",
+                    # IL GESTO (ago 2026): 0 = l'utente non ha mai
+                    # toccato quell'interruttore, 1 = ha deciso lui, in
+                    # un verso o nell'altro. Serve perche' «acceso di
+                    # serie» e «acceso da lui» sono la stessa cosa
+                    # finche' non si vuole ROVESCIARE il default: da
+                    # quel momento chi l'aveva spento a mano deve
+                    # restare spento, e senza questa colonna e'
+                    # indistinguibile da chi non l'ha mai guardato.
+                    # UNA COLONNA E NON UN TERZO STATO dentro l'altra:
+                    # con «2 = spento esplicito» il primo
+                    # `if u["suggerimenti_annunci"]` scritto
+                    # distrattamente leggerebbe 2 come ACCESO — fallire
+                    # nel verso di scrivere a chi ha detto no. Cosi'
+                    # invece il valore conserva per sempre il suo
+                    # significato (0 no, 1 si'), che e' il patto delle
+                    # due soglie dello sconto e delle due tariffe di
+                    # spedizione.
+                    "suggerimenti_scelti INTEGER DEFAULT 0",
+                    # IL RITMO (ago 2026): quando e' partito l'ULTIMO
+                    # suggerimento, di qualunque tipo. Il tetto e' per
+                    # PERSONA e non per coda — prima era per annuncio, e
+                    # chi ne pubblicava cinque in un pomeriggio ne
+                    # riceveva cinque. Il perche' vale piu' del come:
+                    # chi si stufa BLOCCA IL BOT, e col bot bloccato non
+                    # riceve piu' le notifiche degli ordini, che sono
+                    # portanti; su Nostr il danno e' lo stesso e meno
+                    # visibile, perche' smette semplicemente di leggere
+                    # i DM. Un consiglio non vale quel rischio.
+                    "suggerito_il INTEGER DEFAULT 0",
+                    # I due timbri dei suggerimenti di FUNZIONE: una
+                    # volta sola per sempre, come avvisato_contatto e
+                    # avvisato_spedizioniere (quattro precedenti in
+                    # casa, tutti a colonna). Il ritmo qui sopra e'
+                    # un'altra cosa e vive per conto suo: questi dicono
+                    # «gliel'ho gia' detto», quello «non adesso».
+                    "suggerito_sconto INTEGER DEFAULT 0",
+                    "suggerito_sped INTEGER DEFAULT 0",
                     # n_recensori (ago 2026): quante PERSONE DIVERSE
                     # hanno lasciato un feedback, accanto a quanti
                     # feedback sono. Serve perche' i feedback del
@@ -4726,10 +4786,38 @@ def deriva_regioni():
         print(f"🗺️ Derivazione regioni saltata: {e}")
 
 
+def registra_gesti_suggerimenti():
+    """La migrazione del PREGRESSO dei suggerimenti (ago 2026), e fa
+    l'unica cosa dimostrabile: chi ha l'interruttore ACCESO l'ha
+    certamente acceso lui — di serie era spento — quindi quello e' un
+    GESTO, e da adesso e' registrato. Restera' acceso perche' l'ha
+    voluto, non perche' e' cambiato il default.
+    QUEL CHE NON SI PUO' SAPERE resta non sapibile, ed e' scritto in
+    suggerimenti_accesi: di chi e' a 0 non c'e' traccia — l'endpoint di
+    ieri scriveva solo il valore — quindi «mai toccato» e «acceso e poi
+    spento» sono la stessa riga. Quelli si accendono, e il prezzo e' UN
+    messaggio a chi l'aveva spento, con dentro il modo di rispegnerlo.
+    Idempotente per costruzione: chi spegne dopo la migrazione ha
+    scelti=1 e valore=0, e la WHERE non lo pesca mai piu'."""
+    try:
+        con = db()
+        n = con.execute(
+            "UPDATE utenti SET suggerimenti_scelti=1 "
+            "WHERE suggerimenti_annunci=1 AND suggerimenti_scelti=0").rowcount
+        con.commit()
+        con.close()
+        if n:
+            print(f"💡 Suggerimenti: registrato il gesto di {n} utenti "
+                  f"che li avevano accesi")
+    except Exception as e:
+        print(f"💡 Registrazione dei gesti saltata: {e}")
+
+
 carica_comuni()
 backfill_coordinate()
 arricchisci_zone_esistenti()
 deriva_regioni()
+registra_gesti_suggerimenti()
 
 
 PROMPT_MODERAZIONE = (
@@ -8195,6 +8283,18 @@ def _leve_stato():
             _leva("Termometro: sotto questi vuoti tace",
                   "TERMOMETRO_SOTTOCATEGORIE_MINIMO",
                   TERMOMETRO_SOTTOCATEGORIE_MINIMO),
+        ]},
+        {"gruppo": "💡 Suggerimenti ai venditori", "voci": [
+            _leva("Accesi di serie", "SUGGERIMENTI_DI_SERIE",
+                  bool(SUGGERIMENTI_DI_SERIE),
+                  spento="tornano opt-in: li riceve solo chi li accende "
+                         "(chi ha già scelto resta com'è, nei due sensi)"),
+            _leva("Ritmo: uno ogni (giorni)", "SUGGERIMENTI_OGNI_GIORNI",
+                  SUGGERIMENTI_OGNI_GIORNI,
+                  spento="NESSUN ritmo: si torna a un messaggio per "
+                         "annuncio pubblicato — chi si stufa blocca il "
+                         "bot, e col bot bloccato perde le notifiche "
+                         "degli ordini"),
         ]},
     ]
 
@@ -12888,6 +12988,17 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "attivo": bool(SPED_GRATIS_ATTIVO),
         "soglie": list(SPED_GRATIS_SOGLIE),
         "min": SPED_GRATIS_MIN}
+    # I SUGGERIMENTI escono come STATO EFFETTIVO e non come valore
+    # grezzo: `suggerimenti_annunci` esce dal SELECT * ed e' 0 anche
+    # per chi non ha mai toccato niente — cioe' per chi li riceve. Un
+    # client che leggesse quello direbbe «Attiva» a gente che li ha
+    # gia' accesi, e chi tocca il bottone per accenderli li
+    # SPEGNEREBBE. Il giudice e' uno solo, ed e' lo stesso che decide
+    # se il messaggio parte davvero.
+    profilo["suggerimenti_annunci"] = suggerimenti_accesi(
+        u["suggerimenti_scelti"] if u else 0,
+        u["suggerimenti_annunci"] if u else 0)
+    profilo["suggerimenti_ogni_giorni"] = SUGGERIMENTI_OGNI_GIORNI
     # E quelle dell'asta, per il form di vendita e il foglio puntata
     # (stesso patto: mai cifre hardcodate nel client).
     profilo["asta_leve"] = {
@@ -13432,15 +13543,24 @@ async def scegli_suggerimenti(req: Request,
     revoca) i messaggi che segnalano cosa manca ai suoi annunci —
     consegna, condizioni, categoria, e il codice online per i buoni.
 
-    OPT-IN, spento di serie. Non c'e' nulla da validare: e' un si' o
-    un no, e il no e' il default. Nessun canale da controllare — se
-    l'utente non e' raggiungibile il messaggio semplicemente non
-    parte, come ogni altra notifica."""
+    Dall'ago 2026 sono ACCESI di serie (leva SUGGERIMENTI_DI_SERIE) e a
+    tenerli gentili e' il RITMO, non l'opt-in: uno ogni N giorni per
+    persona, qualunque sia la coda.
+    QUI SI SCRIVONO DUE COSE, e la seconda e' il punto: il valore, e il
+    fatto che a sceglierlo sia stato l'utente. Da questo momento la sua
+    decisione batte il default per sempre — se un domani il default
+    tornasse spento, chi l'ha acceso resta acceso, e viceversa. Senza
+    `suggerimenti_scelti` un rovesciamento del default calpesterebbe
+    ogni volta meta' delle persone (vedi suggerimenti_accesi).
+    Non c'e' nulla da validare: e' un si' o un no. Nessun canale da
+    controllare — se l'utente non e' raggiungibile il messaggio
+    semplicemente non parte, come ogni altra notifica."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     attivi = 1 if d.get("attivi") else 0
     con = db()
-    con.execute("UPDATE utenti SET suggerimenti_annunci=? WHERE tg_id=?",
+    con.execute("UPDATE utenti SET suggerimenti_annunci=?, "
+                "suggerimenti_scelti=1 WHERE tg_id=?",
                 (attivi, user["id"]))
     con.commit()
     con.close()
@@ -17568,8 +17688,15 @@ BENVENUTO_NOSTR = (
     "Ci trovi su barattolo.store e su Nostr:\n"
     "npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy"
     "\n\n"
-    "💡 Se vuoi, dal tuo profilo puoi attivare i suggerimenti per "
-    "migliorare gli annunci — di serie non ti scriviamo più. 🕊")
+    # Dall'ago 2026 i suggerimenti nascono ACCESI, e la riga si
+    # rovescia con loro: prima diceva «di serie non ti scriviamo piu'»,
+    # e lasciarla sarebbe la bugia piu' facile del cantiere — a
+    # riscrivere il default ci si dimentica del testo che lo racconta.
+    # Adesso dice la stessa cosa dall'altro lato: cosa arrivera', ogni
+    # quanto, e dove si spegne.
+    "💡 Ogni tanto ti scriveremo un consiglio per far vendere meglio i "
+    "tuoi annunci — al massimo uno ogni {giorni} giorni, e li spegni "
+    "quando vuoi dal tuo profilo. 🕊")
 
 # Le voci del promemoria: ognuna dice anche A COSA SERVE. «Manca la
 # condizione» e' un rimprovero; «e' la prima cosa che guarda chi compra
@@ -17583,6 +17710,89 @@ VOCI_COMPLETAMENTO = {
     "categoria": "• <b>la categoria giusta</b>: dai relay arrivano tutti "
                  "in «Altro», dove non li cerca nessuno",
 }
+
+# La coda di OGNI suggerimento, in un posto solo: dice il ritmo e dove
+# si spegne. Il patto e' quello dei solleciti — chi riceve un consiglio
+# deve sempre vedere, nello stesso messaggio, come farlo smettere.
+CODA_SUGGERIMENTI = ("\n\n<i>È un consiglio, non un obbligo: te ne mando "
+                     "al massimo uno ogni {giorni} giorni, e li spegni "
+                     "quando vuoi dal Profilo → 🔔 Avvisi.</i> 🕊")
+
+
+def suggerimenti_accesi(scelti, valore) -> bool:
+    """L'interruttore dei suggerimenti, letto come va letto (ago 2026).
+
+    Prende i due CAMPI e non la riga — il patto di in_ferie e di
+    _regola_sconto — cosi' lo stesso giudice serve la riga di `utenti`
+    e la prova in CI.
+
+    `scelti` e' IL GESTO: 0 = quell'interruttore non l'ha mai toccato
+    nessuno, e allora vale il default di serie (leva); 1 = ha deciso
+    l'utente, e la sua decisione batte qualunque default, per sempre e
+    in tutti e due i versi. E' l'unica cosa che rende REVERSIBILE il
+    rovesciamento del default senza calpestare chi aveva detto no.
+
+    QUEL CHE NON SI PUO' SAPERE, e va detto invece di far finta:
+    del PREGRESSO il gesto non esiste. Fino all'ago 2026 l'endpoint
+    scriveva solo il valore, quindi chi oggi e' a 0 puo' essere chi non
+    l'ha mai guardato O chi l'aveva acceso e poi spento, e nessuna
+    traccia li distingue. La migrazione fa l'unica cosa dimostrabile —
+    chi e' a 1 ha CERTAMENTE fatto un gesto, e resta acceso senza che
+    nessuno lo tocchi — e per gli altri si sceglie «mai toccato»,
+    dichiarandolo. Il danno massimo e' UN messaggio a chi l'aveva
+    spento, e quel messaggio porta in fondo il modo di rispegnerlo: da
+    li' il gesto e' registrato e non si perde piu'."""
+    return bool(valore) if scelti else bool(SUGGERIMENTI_DI_SERIE)
+
+
+def _puo_suggerire(con, tg_id: int, adesso: int) -> bool:
+    """Il RITMO, giudice unico di «adesso si puo'?» (ago 2026).
+
+    Due domande in una, e vanno insieme perche' chi manda un
+    suggerimento deve poterne fare UNA sola: l'utente li ha accesi, e
+    non ne ha ricevuto un altro da meno di SUGGERIMENTI_OGNI_GIORNI.
+
+    IL TETTO E' PER PERSONA E NON PER CODA, ed e' tutto il cantiere:
+    prima ogni suggerimento aveva il suo tetto (uno per annuncio), e
+    chi pubblicava cinque annunci in un pomeriggio ne riceveva cinque —
+    perche' i giri d'import sono orari e ognuno pescava l'annuncio
+    nuovo. Adesso a contare e' `suggerito_il`, che non sa da quale coda
+    venisse il messaggio precedente: e' questo a rendere vero il «mai
+    insieme» senza doverne scrivere l'ordine da nessuna parte.
+    Leva a 0 = nessun ritmo (la raffica di ieri): freno d'emergenza,
+    non una taratura."""
+    u = con.execute("SELECT suggerimenti_annunci, suggerimenti_scelti, "
+                    "suggerito_il FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    if not u or not suggerimenti_accesi(u["suggerimenti_scelti"],
+                                        u["suggerimenti_annunci"]):
+        return False
+    if SUGGERIMENTI_OGNI_GIORNI <= 0:
+        return True
+    return adesso - (u["suggerito_il"] or 0) >= \
+        SUGGERIMENTI_OGNI_GIORNI * 86400
+
+
+# I timbri per-funzione ammessi, e l'elenco E' la guardia: il nome
+# della colonna finisce dentro una query, e un nome che arriva da
+# altrove non deve poterci entrare mai — nemmeno oggi che i chiamanti
+# sono due e scrivono due letterali. E' la riga che sparisce in un
+# riordino, quindi ha la sua sentinella.
+TIMBRI_SUGGERIMENTO = ("suggerito_sconto", "suggerito_sped")
+
+
+def _timbra_suggerimento(con, tg_id: int, adesso: int, colonna: str = ""):
+    """Il timbro del ritmo, e (facoltativo) quello della funzione.
+    Si scrive PRIMA dell'invio, il patto delle campagne: un errore di
+    rete puo' al massimo far perdere un consiglio, mai raddoppiarlo —
+    e qui raddoppiarlo vorrebbe dire proprio la raffica che il ritmo
+    esiste per togliere. Nessun commit: la transazione e' del
+    chiamante."""
+    if colonna and colonna not in TIMBRI_SUGGERIMENTO:
+        raise ValueError(f"timbro sconosciuto: {colonna}")
+    extra = f", {colonna}=1" if colonna else ""
+    con.execute(f"UPDATE utenti SET suggerito_il=?{extra} WHERE tg_id=?",
+                (adesso, tg_id))
 
 
 def annuncio_italiano(evento) -> str:
@@ -17916,28 +18126,35 @@ async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
     Nostr no. Importati cosi', quegli annunci restano a meta' — e la
     meta' che manca e' proprio quella su cui il compratore filtra.
 
-    SI MANDA SOLO A CHI L'HA CHIESTO (lug 2026, decisione di Andrea).
-    Nasceva automatico: un consiglio utile, mandato a gente che non ci
-    aveva chiesto niente — cioe' spam, perche' a decidere se un
-    messaggio e' benvenuto non e' chi lo scrive. Ora e' governato da
-    `utenti.suggerimenti_annunci`, SPENTO di serie: chi non lo accende
-    non riceve mai nulla, e l'unico posto dove lo nominiamo di nostra
-    iniziativa e' l'ultima riga del benvenuto.
-    Il gate viene PRIMA di tutto: a interruttore spento non si legge
-    nulla e soprattutto non si timbra `completamento_avvisato`, o chi
-    lo accendesse domani troverebbe i suoi annunci gia' «avvisati» e
-    non riceverebbe mai il consiglio che ha appena chiesto.
+    SI MANDA SOLO A CHI NON L'HA SPENTO (lug 2026, riveduto ago 2026).
+    Nasceva automatico, poi divenne opt-in — un consiglio utile mandato
+    a chi non aveva chiesto niente e' spam — e dall'ago 2026 torna
+    ACCESO di serie ma col RITMO: la differenza tra un consiglio e lo
+    spam non era l'opt-in, era la frequenza. Il giudice
+    dell'interruttore e' `suggerimenti_accesi` (che sa distinguere «mai
+    toccato» da «spento da lui») e quello della frequenza e'
+    `_puo_suggerire`.
+    Il gate viene PRIMA di tutto: a interruttore spento — o col ritmo
+    ancora chiuso — non si legge nulla e soprattutto non si timbra
+    `completamento_avvisato`, o quegli annunci resterebbero «avvisati»
+    senza che nessuno abbia avvisato niente, e il consiglio non
+    partirebbe mai piu'.
 
     Acceso, resta gentile com'era: UNA volta sola per annuncio
     (`completamento_avvisato`) e mai nel giro in cui l'annuncio e'
     apparso — chi e' appena stato scoperto ha gia' avuto il benvenuto,
     e due messaggi di fila sono un'altra cosa. Il giro dopo va bene.
+    IL RITMO GLI DA' LA PRECEDENZA sugli altri due suggerimenti, e non
+    per una regola scritta: gira dentro l'import, che nell'orologio
+    viene prima di `suggerisci_funzioni` — e chi ha ricevuto questo
+    timbra `suggerito_il`, quindi gli altri per N giorni non partono.
+    E' giusto che vinca lui: un annuncio incompleto e' gia' in vetrina
+    e non lo trova nessuno, mentre lo sconto e la spedizione gratis
+    sono occasioni che possono aspettare.
     """
     con = db()
-    acceso = con.execute(
-        "SELECT suggerimenti_annunci AS s FROM utenti WHERE tg_id=?",
-        (venditore_id,)).fetchone()
-    if not acceso or not acceso["s"]:
+    adesso = int(time.time())
+    if not _puo_suggerire(con, venditore_id, adesso):
         con.close()
         return
     righe = con.execute(
@@ -17958,6 +18175,10 @@ async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
     con.execute(
         "UPDATE annunci SET completamento_avvisato=1 WHERE id IN "
         f"({','.join('?' * len(righe))})", tuple(r["id"] for r in righe))
+    # e il timbro del RITMO, nella stessa transazione dei timbri per
+    # annuncio: da qui l'utente e' «servito» per N giorni, qualunque
+    # sia la coda che passera' dopo
+    _timbra_suggerimento(con, venditore_id, adesso)
     con.commit()
     con.close()
     manca = []
@@ -17989,15 +18210,109 @@ async def _chiedi_completamento(npub: str, venditore_id: int, t0: int):
              f"compra filtra:\n\n"
              + "\n".join(VOCI_COMPLETAMENTO[m] for m in manca) + codice +
              f"\n\nEntra con la stessa chiave con cui hai firmato e li "
-             f"trovi già tuoi: {URL_PUBBLICO}\n\n"
-             f"<i>Hai i suggerimenti accesi: te lo dico una volta sola "
-             f"per annuncio, e li spegni quando vuoi dal Profilo.</i> 🕊")
+             f"trovi già tuoi: {URL_PUBBLICO}"
+             + CODA_SUGGERIMENTI.format(giorni=SUGGERIMENTI_OGNI_GIORNI))
     try:
         await notifica(venditore_id, testo)
         print(f"  ✉️ chiesto il completamento di {quanti} annunci a "
               f"{npub[:16]}…")
     except Exception as e:
         print(f"⚠️ Richiesta di completamento non consegnata: {e}")
+
+
+# I due suggerimenti di FUNZIONE (ago 2026): non dicono cosa manca a un
+# annuncio, ma che esiste una leva del negozio che il venditore non ha
+# ancora acceso. Ognuno una volta sola per sempre, e MAI insieme —
+# quello lo garantisce il ritmo, non un ordine scritto qui.
+# La condizione di ognuno dice anche a CHI non si manda, ed e' la parte
+# che li tiene onesti: lo sconto carrello a chi ha un annuncio solo non
+# potrebbe scattare mai (vale da due oggetti diversi in su), e la
+# spedizione gratis a chi fa solo ritiro non vuol dire niente.
+SUGGERIMENTI_FUNZIONE = (
+    {
+        "timbro": "suggerito_sconto",
+        # la leva del server: suggerire una funzione spenta sarebbe
+        # mandare qualcuno a cercare un cassetto che non c'e'
+        "leva": lambda: SCONTO_PACCO_ATTIVO,
+        # ...e almeno DUE annunci attivi, o la promessa non potrebbe
+        # scattare nemmeno volendo
+        "sql": "SELECT u.tg_id FROM utenti u JOIN annunci a "
+               "ON a.venditore_id=u.tg_id "
+               "WHERE a.stato='attivo' AND u.sconto_pacco_percento=0 "
+               "AND u.suggerito_sconto=0 "
+               "GROUP BY u.tg_id HAVING COUNT(*) >= 2",
+        "testo": (
+            "🎁 <b>Vuoi che chi compra prenda più cose in una volta?</b>\n\n"
+            "Puoi fare uno sconto su tutto il carrello — «da 3 articoli, "
+            "−10%» — che vale su tutti i tuoi annunci. Chi riempie il "
+            "carrello spende di più e tu spedisci una volta sola.\n\n"
+            "Si accende in mezzo minuto dal Profilo → 🎁 Sconto sul "
+            "carrello."),
+    },
+    {
+        "timbro": "suggerito_sped",
+        "leva": lambda: SPED_GRATIS_ATTIVO,
+        # solo a chi SPEDISCE davvero: al ritiro e al codice online una
+        # spedizione da offrire non c'e'
+        "sql": "SELECT DISTINCT u.tg_id FROM utenti u JOIN annunci a "
+               "ON a.venditore_id=u.tg_id "
+               "WHERE a.stato='attivo' "
+               "AND a.consegna IN ('spedizione','entrambe') "
+               "AND u.sped_gratis_soglia=0 AND u.suggerito_sped=0",
+        "testo": (
+            "🚚 <b>La spedizione gratis sopra una certa spesa.</b>\n\n"
+            "«Da 100.000 sats di articoli la spedizione la offro io»: è "
+            "la spinta che negli e-commerce fa aggiungere l'ultima cosa "
+            "al carrello. Vale su tutti i tuoi annunci che spediscono, "
+            "e anche su un oggetto solo se costa abbastanza.\n\n"
+            "Si accende dal Profilo → 🚚 Spedizione gratis."),
+    },
+)
+
+
+async def suggerisci_funzioni():
+    """I suggerimenti di funzione, dall'orologio (ago 2026).
+
+    Gira DOPO l'import nell'orologio, ed e' il modo in cui il
+    completamento ha la precedenza senza che nessuno scriva un ordine:
+    chi ha appena ricevuto quello ha `suggerito_il` fresco, e qui non
+    passa. Fra i due di qui, la precedenza e' l'ordine del catalogo.
+    UNO SOLO PER PERSONA PER GIRO, e non serve un contatore: il timbro
+    del ritmo si scrive PRIMA dell'invio, quindi quando il catalogo
+    arriva alla seconda voce lo stesso utente non passa piu' da
+    `_puo_suggerire`. Un meccanismo solo per due garanzie — il ritmo
+    fra i giri e il «mai insieme» dentro il giro — invece di due che
+    un giorno divergono.
+    Il timbro — ritmo + funzione — si scrive PRIMA dell'invio, il patto
+    delle campagne. Fail-open per persona: un errore di rete su uno non
+    ferma gli altri."""
+    adesso = int(time.time())
+    for voce in SUGGERIMENTI_FUNZIONE:
+        if not voce["leva"]():
+            continue
+        con = db()
+        candidati = [r["tg_id"] for r in con.execute(voce["sql"]).fetchall()]
+        con.close()
+        for tg in candidati:
+            con = db()
+            # il ritmo si ricontrolla per OGNI destinatario e qui
+            # dentro, non nella query: cosi' un utente servito dal
+            # giro precedente di questa stessa funzione non riceve il
+            # secondo consiglio due righe dopo
+            if not _puo_suggerire(con, tg, adesso):
+                con.close()
+                continue
+            _timbra_suggerimento(con, tg, adesso, voce["timbro"])
+            con.commit()
+            con.close()
+            try:
+                await notifica(tg, voce["testo"] + CODA_SUGGERIMENTI.format(
+                    giorni=SUGGERIMENTI_OGNI_GIORNI))
+                print(f"  💡 suggerito {voce['timbro']} a {tg}")
+            except Exception as e:
+                print(f"⚠️ Suggerimento {voce['timbro']} saltato "
+                      f"per {tg}: {e}")
+            await asyncio.sleep(0.2)
 
 
 async def _accogli_venditore_nostr(hexkey: str) -> int:
@@ -18026,7 +18341,8 @@ async def _accogli_venditore_nostr(hexkey: str) -> int:
     # Il benvenuto e' fail-open: un DM che non parte (relay muti,
     # cryptography assente) non deve far saltare l'import.
     try:
-        await notifica(tg_id, BENVENUTO_NOSTR.format(url=URL_PUBBLICO))
+        await notifica(tg_id, BENVENUTO_NOSTR.format(
+            url=URL_PUBBLICO, giorni=SUGGERIMENTI_OGNI_GIORNI))
     except Exception as e:
         print(f"⚠️ Benvenuto Nostr non consegnato a {npub[:16]}…: {e}")
     print(f"  🎉 Venditore nuovo accolto: {npub[:20]}… (id {tg_id})")
@@ -18672,6 +18988,13 @@ async def orologio():
             await termometro_sottocategorie()
         except Exception as e:
             print(f"⚠️ Termometro sottocategorie saltato: {e}")
+        try:
+            # DOPO l'import, ed e' la precedenza: chi ha appena
+            # ricevuto il completamento ha il ritmo chiuso e qui non
+            # passa (vedi suggerisci_funzioni)
+            await suggerisci_funzioni()
+        except Exception as e:
+            print(f"⚠️ Suggerimenti di funzione saltati: {e}")
         try:
             # una-tantum col timbro: dopo il primo giro non trova
             # piu' nessuno (e i nuovi ne ricevono uno solo)

@@ -220,6 +220,25 @@ SPED_GRATIS_MIN = 1_000         # una cintura contro lo zero travestito:
                                 # sempre — e quella si dichiara nel
                                 # prezzo dell'annuncio (costo 0)
 
+# --- Suggerimenti dal bot --------------------------------------------
+# I consigli che il bot manda al venditore: cosa manca a un annuncio, e
+# le leve del negozio che non ha ancora acceso. ACCESI di serie
+# dall'ago 2026 (prima erano opt-in, e non li accendeva quasi nessuno).
+# IL RITMO E' LA META' CHE CONTA, e va tenuto anche se un giorno il
+# default tornasse spento: chi si stufa BLOCCA IL BOT, e col bot
+# bloccato non riceve piu' le notifiche degli ordini, che sono
+# portanti. Su Nostr il danno e' identico e meno visibile: smette
+# semplicemente di leggere i DM, e non se ne accorge nessuno.
+# Chi ha SCELTO — in un verso o nell'altro — non viene mai scavalcato
+# dal default: lo garantisce la colonna utenti.suggerimenti_scelti.
+SUGGERIMENTI_DI_SERIE = True    # False = tornano opt-in (chi ha gia'
+                                # scelto resta com'e', in entrambi i sensi)
+SUGGERIMENTI_OGNI_GIORNI = 7    # al massimo uno ogni N giorni PER
+                                # PERSONA, qualunque sia la coda.
+                                # 0 = nessun ritmo: e' la raffica di
+                                # ieri, un freno d'emergenza e non una
+                                # taratura
+
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
 # Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
 # nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare

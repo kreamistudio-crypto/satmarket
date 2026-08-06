@@ -9977,7 +9977,11 @@ let myScontoPacco = null, scontoPaccoLeve = null, scontoPaccoBozza = null;
    esiste il mezzo secondo con una regola a meta'. La bozza resta per
    il campo euro, che scrive sats mentre si digita. */
 let mySpedGratis = 0, spedGratisLeve = null, spedGratisBozza = null;
-let mySuggerimenti = false;   // «💡 Suggerimenti sui miei annunci»: opt-in, spento di serie
+/* «💡 Suggerimenti sui miei annunci»: lo STATO EFFETTIVO (il server ci
+   mette il giudice, che sa distinguere «mai toccato» da «spento da
+   lui») e il RITMO in giorni, che e' del config e non si hardcoda —
+   0 o assente = server di ieri, e la riga non lo nomina. */
+let mySuggerimenti = false, suggerimentiOgni = 0;
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
    ('' = automatico, la catena Telegram → Nostr → iniziale; oppure
@@ -10499,24 +10503,29 @@ function renderAvvisi(){
     ${rigaSuggerimenti()}`;
 }
 
-/* «💡 Suggerimenti sui miei annunci»: l'interruttore con cui l'utente
-   CI AUTORIZZA a segnalargli cosa manca a un annuncio (consegna,
-   condizioni, categoria, codice online per i buoni). Spento di serie,
-   e resta spento finche' non lo tocca lui: e' l'unica differenza tra
-   un consiglio e lo spam. */
+/* «💡 Suggerimenti sui miei annunci»: l'interruttore dei consigli che
+   il bot manda al venditore — cosa manca a un annuncio, e le leve del
+   negozio che non ha ancora acceso.
+   ACCESI di serie dall'ago 2026, e a tenerli gentili e' il RITMO: uno
+   ogni N giorni per persona, qualunque sia la coda. Il numero arriva
+   dal server (`suggerimentiOgni`) e non si scrive qui: il client non
+   hardcoda mai una cifra che il config puo' cambiare.
+   `mySuggerimenti` e' lo STATO EFFETTIVO, non il valore grezzo: il
+   server ci mette il giudice, o a chi non ha mai toccato niente il
+   bottone direbbe «Attiva» e il suo tocco li SPEGNEREBBE. */
 const rigaSuggerimenti = () => `
   <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
     <div style="min-width:0;flex:1">
       <div style="font-size:13.5px;font-weight:800">💡 Suggerimenti sui miei annunci</div>
       <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
-        Ti segnaliamo cosa manca per vendere meglio: consegna, condizioni,
-        categoria, e il codice online per buoni e gift card. Una volta sola
-        per annuncio.</div>
+        Consigli per vendere meglio: cosa manca a un annuncio, e le leve
+        del negozio che non hai ancora acceso.${suggerimentiOgni
+          ? ` Al massimo uno ogni <b style="color:var(--ink)">${suggerimentiOgni} giorni</b>.` : ''}</div>
     </div>
     <button onclick="setSuggerimenti(${mySuggerimenti ? 'false' : 'true'})"
       aria-pressed="${mySuggerimenti ? 'true' : 'false'}"
       style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${mySuggerimenti?'var(--sats)':'var(--line)'};background:${mySuggerimenti?'var(--sats)':'transparent'};color:${mySuggerimenti?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
-      ${mySuggerimenti ? 'Attivi' : 'Attiva'}</button>
+      ${mySuggerimenti ? 'Attivi' : 'Spenti'}</button>
   </div>`;
 
 async function setSuggerimenti(attivi){
@@ -10531,8 +10540,10 @@ async function setSuggerimenti(attivi){
     mySuggerimenti = !!d.attivi;
   } catch(e) { toast('Rete assente: riprova'); return; }
   renderAvvisi();
-  toast(mySuggerimenti ? '💡 Suggerimenti attivi'
-                       : 'Suggerimenti spenti: non ti scriviamo più');
+  toast(mySuggerimenti
+    ? (suggerimentiOgni ? `💡 Suggerimenti attivi: al massimo uno ogni ${suggerimentiOgni} giorni`
+                        : '💡 Suggerimenti attivi')
+    : 'Suggerimenti spenti: non ti scriviamo più');
 }
 
 async function setCanale(canale){
@@ -14762,6 +14773,7 @@ async function avvia(){
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
     mySuggerimenti = !!me.suggerimenti_annunci;
+    suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     mySpedizioniere = me.spedizioniere || '';
     spedizionieriCatalogo = me.spedizionieri || [];
     myFerieFino = me.ferie_fino || 0;
