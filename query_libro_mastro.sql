@@ -140,15 +140,19 @@ SELECT id, payout_stato FROM rimborsi_asta
 SELECT '16) PROMESSE DI SCONTO CHE NON POSSONO SCATTARE (vuoto)' AS controllo;
 -- Qui non si perdono sats: si perde una vendita, e in silenzio. Un
 -- criterio che nessun ramo sa applicare, o una soglia sotto il minimo
--- STRUTTURALE (2 pezzi, 1 sat) — non le leve SCONTO_PACCO_MIN_*, che
+-- STRUTTURALE (2 pezzi, 1 €) — non le leve SCONTO_PACCO_MIN_*, che
 -- cambiando farebbero suonare l'allarme senza che sia rotto niente.
+-- Dal passaggio all'euro (ago 2026) questo controllo pesca ANCHE la
+-- migrazione dimenticata: un negozio a criterio valore con la colonna
+-- in euro ancora a zero promette e non scatta. Il rimedio è
+-- converti_soglie_euro.py.
 SELECT tg_id, nome, sconto_pacco_criterio AS criterio,
        sconto_pacco_soglia AS soglia_pezzi,
-       sconto_pacco_valore AS soglia_sats, sconto_pacco_percento AS pct
+       sconto_pacco_valore_eur AS soglia_eur, sconto_pacco_percento AS pct
   FROM utenti WHERE sconto_pacco_percento > 0 AND (
        sconto_pacco_criterio NOT IN ('pezzi','valore')
     OR (sconto_pacco_criterio = 'pezzi'  AND sconto_pacco_soglia < 2)
-    OR (sconto_pacco_criterio = 'valore' AND sconto_pacco_valore < 1));
+    OR (sconto_pacco_criterio = 'valore' AND sconto_pacco_valore_eur < 1));
 
 SELECT '16b) SPEDIZIONE RISPARMIATA E PAGATA INSIEME (vuoto)' AS controllo;
 -- sped_gratis_sats è la tariffa OFFERTA, spedizione_sats quella
@@ -171,9 +175,9 @@ SELECT id, stato, consegna_scelta, sped_gratis_sats
 
 SELECT '17) I NEGOZI CHE SCONTANO' AS polso;
 -- il CASE non è una comodità: senza, la colonna «soglia» mescola pezzi
--- e sats ed è il primo posto dove un umano si sbaglia leggendo
+-- ed euro ed è il primo posto dove un umano si sbaglia leggendo
 SELECT tg_id, nome, sconto_pacco_criterio AS criterio,
-       CASE sconto_pacco_criterio WHEN 'valore' THEN sconto_pacco_valore
+       CASE sconto_pacco_criterio WHEN 'valore' THEN sconto_pacco_valore_eur
             ELSE sconto_pacco_soglia END AS soglia,
        sconto_pacco_percento AS sconto
   FROM utenti WHERE sconto_pacco_percento > 0
@@ -183,10 +187,23 @@ SELECT '17b) I NEGOZI CHE OFFRONO LA SPEDIZIONE' AS polso;
 -- la seconda promessa di negozio, e le due si guardano insieme: sono
 -- indipendenti (misurano lo stesso lordo, senza vedersi), ma un
 -- venditore che le tiene tutte e due va letto in una riga sola
-SELECT tg_id, nome, sped_gratis_soglia AS gratis_da_sats,
+SELECT tg_id, nome, sped_gratis_soglia_eur AS gratis_da_eur,
        sconto_pacco_percento AS sconto_carrello
-  FROM utenti WHERE sped_gratis_soglia > 0
- ORDER BY sped_gratis_soglia;
+  FROM utenti WHERE sped_gratis_soglia_eur > 0
+ ORDER BY sped_gratis_soglia_eur;
+
+SELECT '17d) SOGLIE ANCORA IN SATS DA CONVERTIRE (dovrebbe essere vuoto)' AS polso;
+-- Il travaso del passaggio all'euro (ago 2026). NON è un controllo del
+-- libro mastro, ed è deliberato: finché lo script non è girato questo
+-- è uno stato transitorio LEGITTIMO, e un allarme che suona su uno
+-- stato legittimo insegna a ignorarlo. Qui invece è il posto giusto:
+-- lo si guarda quando si guarda il resto. Rimedio:
+-- python converti_soglie_euro.py --scrivi
+SELECT tg_id, nome, sconto_pacco_valore AS vecchia_sconto_sats,
+       sped_gratis_soglia AS vecchia_sped_sats
+  FROM utenti
+ WHERE (sconto_pacco_valore > 0 AND sconto_pacco_valore_eur = 0)
+    OR (sped_gratis_soglia  > 0 AND sped_gratis_soglia_eur  = 0);
 
 SELECT '17c) GLI ORDINI CON LA SPEDIZIONE OFFERTA' AS polso;
 SELECT COUNT(*) AS ordini, SUM(sped_gratis_sats) AS sats_di_spedizione,
