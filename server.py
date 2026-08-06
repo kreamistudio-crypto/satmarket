@@ -239,8 +239,9 @@ except ImportError:
 # di Andrea che ROVESCIA la riga che stava qui — «in sats, ed e' la
 # decisione da non rovesciare»). Il motivo del rovesciamento e' che una
 # soglia in sats DERIVA COL CAMBIO: il venditore scrive 100.000
-# pensando «circa 90 €» e fra sei mesi la stessa riga vale 180 € — la
-# sua promessa e' cambiata senza che lui abbia toccato niente. Le
+# pensando «una cinquantina di euro» e fra sei mesi la stessa riga ne
+# vale il doppio — la sua promessa e' cambiata senza che lui abbia
+# toccato niente. Le
 # spedizioni nel mondo vero si pagano in euro, e la tariffa di un
 # annuncio puo' gia' essere ancorata all'euro (spedizione_eur): il
 # precedente e' in casa.
@@ -272,9 +273,10 @@ try:
     from config import SCONTO_PACCO_VALORI_EUR
 except ImportError:
     # piu' basse di quel che darebbe la conversione delle vecchie
-    # (22·45·90·180 €): Barattolo e' un mercatino dell'usato e il
-    # carrello medio e' piccolo — con soglie alte la promessa non
-    # scatterebbe quasi mai, cioe' sarebbe una vetrina senza effetto
+    # (14·28·56·112 € al cambio di agosto 2026): Barattolo e' un
+    # mercatino dell'usato e il carrello medio e' piccolo — con soglie
+    # alte la promessa non scatterebbe quasi mai, cioe' sarebbe una
+    # vetrina senza effetto
     SCONTO_PACCO_VALORI_EUR = (10, 25, 50, 100)
 try:
     from config import SCONTO_PACCO_MIN_VALORE_EUR
@@ -13631,7 +13633,8 @@ async def imposta_sconto_pacco(req: Request,
                 f"{SCONTO_PACCO_MIN_SOGLIA} articoli: sotto non è uno "
                 f"sconto sul carrello, è un ribasso di listino — e quello "
                 f"si fa sul prezzo.")
-        if criterio == "valore" and (valore or 0) < SCONTO_PACCO_MIN_VALORE_EUR:
+        if (criterio == "valore"
+                and (valore or 0) < SCONTO_PACCO_MIN_VALORE_EUR):
             raise HTTPException(400,
                 f"Lo sconto sul carrello a valore parte da almeno "
                 f"{SCONTO_PACCO_MIN_VALORE_EUR} € di merce: sotto non è "

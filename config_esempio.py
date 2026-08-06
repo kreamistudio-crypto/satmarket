@@ -175,10 +175,10 @@ CONTROLLO_LIBRO_MASTRO = True   # False = ronda spenta
 # carrello»), che e' il modo di dare lo sconto da due pezzi su un
 # computer e da venti su una scatola di cianfrusaglie, con una regola
 # sola. La soglia a valore e' in EURO (ago 2026: prima era in sats, e
-# derivava col cambio — chi scriveva 100.000 pensando «circa 90 €» si
-# ritrovava una promessa da 180 € senza aver toccato niente). A cambio
-# muto la promessa non scatta e la pagina lo dice; l'incasso resta
-# sempre in sats.
+# derivava col cambio — chi scriveva 100.000 pensando «una cinquantina
+# di euro» si ritrovava una promessa del doppio senza aver toccato
+# niente). A cambio muto la promessa non scatta e la pagina lo dice;
+# l'incasso resta sempre in sats.
 # ATTENZIONE se questo file lo copi su un config gia' esistente: le
 # leve si chiamano *_EUR apposta, cosi' una riga vecchia in sats resta
 # INERTE invece di essere letta come euro (che sarebbe una promessa da

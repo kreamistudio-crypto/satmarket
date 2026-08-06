@@ -3566,9 +3566,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ROVESCIA la riga che stava qui — «è in sats, e non in euro» — e vale
   per TUTTE E DUE le promesse, o avremmo due promesse identiche in due
   valute diverse). Il motivo: una soglia in sats DERIVA COL CAMBIO. Il
-  venditore scrive 100.000 pensando «circa 90 €» e fra sei mesi la
-  stessa riga vale 180 € — la sua promessa è cambiata senza che lui
-  abbia toccato niente. Le spedizioni nel mondo vero si pagano in
+  venditore scrive 100.000 pensando «una cinquantina di euro» e fra sei
+  mesi la stessa riga ne vale il doppio — la sua promessa è cambiata
+  senza che lui abbia toccato niente. Le spedizioni nel mondo vero si pagano in
   euro, e la tariffa di un annuncio può già essere ancorata all'euro
   (`spedizione_eur`): il precedente era in casa.
   L'ARGOMENTO PERDENTE va tenuto perché era buono: in sats
@@ -7510,9 +7510,9 @@ codice. DA GUARDARE al primo giro: il journal della prima passata di
 messaggi.
 Le due soglie a valore passano all'EURO (ago 2026, cambio di rotta
 deciso da Andrea il giorno dopo averle fatte in sats): una soglia in
-sats DERIVA COL CAMBIO — chi scrive 100.000 pensando «circa 90 €» si
-ritrova, sei mesi dopo, una promessa da 180 € senza aver toccato
-niente. Vale per TUTTE E DUE le promesse, o avremmo due promesse
+sats DERIVA COL CAMBIO — chi scrive 100.000 pensando «una cinquantina
+di euro» si ritrova, sei mesi dopo, una promessa del doppio senza aver
+toccato niente. Vale per TUTTE E DUE le promesse, o avremmo due promesse
 identiche in due valute diverse. Non cambia niente di sostanziale: si
 paga sempre in sats, l'escrow è in sats, il conto è del server, e
 `ordini` non si tocca di una riga.
