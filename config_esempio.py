@@ -21,6 +21,13 @@ ADMIN_IDS = [123456789]      # il TUO user id Telegram (da @userinfobot):
                              # si cambia SOLO qui, sul server: nessun
                              # comando dell'app o del bot la tocca.
 
+# Chi ha FONDATO Barattolo (id Telegram, come sopra). Portano il
+# titolo «🏛 Fondatore» sotto il nome, messo da solo alla prima
+# apertura. Non e' un traguardo che si raggiunge e nessun altro
+# potra' mai ottenerlo: e' un fatto, e per questo sta qui e non fra i
+# criteri. Vuoto = nessuno, che e' il default del codice.
+FONDATORI = []               # es. [123456789, 987654321]
+
 # --- Bot Telegram in ricezione (doppia cittadinanza) -----------------
 # Il segreto che Telegram ci rimanda in ogni update (header
 # X-Telegram-Bot-Api-Secret-Token), cosi' il webhook sa che a suonare

@@ -1153,7 +1153,6 @@
     border-radius:99px;padding:5px 12px;cursor:pointer}
   .titolo-pill.active{border-color:var(--sats);background:var(--sats);
     color:#fff}
-  .titolo-pill.off{opacity:.45;cursor:default;color:var(--muted)}
   /* Il titolo sotto il nome: e' un'insegna, non un dato — piccolo, nel
      bruno di casa, e mai piu' forte del nome che gli sta sopra. */
   .titolo-riga{font-family:var(--font-tit);font-size:12.5px;
@@ -9877,8 +9876,13 @@ function renderLivello(){
         ? ` e ${fmt(myLivello.affari_prossimo - myAffari)} affari conclusi`
         : '')
     : 'Sei in cima alla scala. 🫙';
+  /* SOLO gli sbloccati (ago 2026, decisione di Andrea): mostrare
+     quelli chiusi era una molla finche' tutti erano raggiungibili,
+     ma «Fondatore» non lo potra' ottenere piu' nessuno — e una
+     lista che non si puo' completare non e' una molla, e' un
+     dispetto. Chi non ha ancora niente non vede l'elenco vuoto:
+     vede solo «Nessuno», che e' la verita' senza il rimprovero. */
   const scelti = (myTitoli||[]).filter(t=>t.sbloccato);
-  const spenti = (myTitoli||[]).filter(t=>!t.sbloccato);
   box.innerHTML = `
     <div class="grado">${esc(myLivello.nome)}</div>
     <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
@@ -9894,12 +9898,7 @@ function renderLivello(){
                 data-tit="${esc(t.id)}"
                 onclick="setTitolo(this.dataset.tit)">${esc(t.nome)}</button>`
       ).join('')}
-    </div>
-    ${spenti.length ? `
-      <div class="hint" style="margin-top:12px">Ancora da sbloccare:</div>
-      <div class="titoli">${spenti.map(t=>`
-        <span class="titolo-pill off" title="${esc(t.descrizione)}"
-          >${esc(t.nome)}</span>`).join('')}</div>` : ''}`;
+    </div>`;
 }
 
 /* Le soglie XP dei gradini, per disegnare la barra DENTRO il gradino.

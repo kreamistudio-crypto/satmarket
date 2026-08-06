@@ -3762,7 +3762,7 @@ def prove_coorti_titoli():
 
     prova("il primo iscritto e' pioniere", "pioniere", coorte(1))
     prova("il centesimo ancora pioniere", "pioniere", coorte(100))
-    prova("il 101esimo e' fondatore", "fondatore", coorte(101))
+    prova("il 101esimo e' dei primi giorni", "primi_giorni", coorte(101))
     # Oltre l'ultima soglia NON c'e' coorte: e' un fatto, non un
     # premio da dare a tutti — se ce l'hanno tutti non dice niente
     prova("oltre l'ultima soglia nessuna coorte", "", coorte(10001))
@@ -3804,7 +3804,11 @@ def prove_coorti_titoli():
 
     t = amb["titoli_disponibili"](con, 1)
     prova("il pioniere ha il suo titolo", True, "coorte_pioniere" in t)
-    prova("non quello di un'altra coorte", False, "coorte_fondatore" in t)
+    prova("non quello di un'altra coorte", False,
+          "coorte_primi_giorni" in t)
+    # «Fondatore» non e' una coorte e NON si guadagna: senza il config
+    # non ce l'ha nessuno, nemmeno il primo iscritto di tutti
+    prova("Fondatore non si guadagna col tempo", False, "t_fondatore" in t)
     prova("senza distintivo niente titolo nostrano", False, "t_nostrano" in t)
     con.execute("INSERT INTO badge_utente VALUES(1,'nostrano',0)")
     con.execute("UPDATE utenti SET xp=3000, vendite_ok=10, acquisti_ok=6 "
@@ -3815,7 +3819,26 @@ def prove_coorti_titoli():
     # I livelli sono una SCALA: li ha attraversati tutti
     prova("...e anche i gradini di sotto", True, "t_pratico" in t)
     prova("ma non quello sopra", False, "t_maestro" in t)
+
+    # I FONDATORI (ago 2026): il titolo arriva dal config, non da un
+    # criterio — non e' un traguardo, e' un fatto di due persone. Qui
+    # si finge il config, che in CI non esiste.
+    amb["FONDATORI"] = (1,)
+    t = amb["titoli_disponibili"](con, 1)
+    prova("il fondatore ha il suo titolo", True, "t_fondatore" in t)
+    t5 = amb["titoli_disponibili"](con, 5)
+    prova("...e nessun altro, per quanto anziano", False,
+          "t_fondatore" in t5)
     con.close()
+
+    # E il CLIENT non mostra piu' i titoli chiusi: con «Fondatore»
+    # irraggiungibile per sempre, un elenco che non si puo' completare
+    # non e' una molla ma un dispetto (decisione di Andrea).
+    html = open("miniapp.html", encoding="utf-8").read()
+    prova("il client non disegna i titoli chiusi", False,
+          "Ancora da sbloccare" in html)
+    prova("...e non filtra piu' gli sbloccati per scartarli", False,
+          "filter(t=>!t.sbloccato)" in html)
 
     # Il client ripete le soglie XP per disegnare la barra DENTRO il
     # gradino (senza, non saprebbe da dove parte il tratto). E' una

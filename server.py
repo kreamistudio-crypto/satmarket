@@ -760,14 +760,28 @@ def controlla_distintivi(con, tg_id: int) -> list[str]:
 # coorte e' un FATTO, non un premio da distribuire a tutti. Se ce
 # l'hanno tutti non dice piu' niente, e chi e' arrivato per primo se
 # ne accorge.
+# «Fondatore» NON e' una coorte (ago 2026, decisione di Andrea): e' di
+# chi il Barattolo l'ha fatto, e nessuno puo' piu' ottenerlo. La voce
+# dei 500 si chiamava cosi' e ha cambiato nome — l'id con lei, perche'
+# un id 'fondatore' che mostra «Dei primi giorni» sarebbe una trappola
+# per chi legge fra sei mesi; il pregresso lo raddrizza una riga di
+# migrazione in init_db.
 COORTI = [(100, "pioniere", "🌱", "Pioniere",
            "Tra i primi 100 iscritti del Barattolo"),
-          (500, "fondatore", "🧱", "Fondatore",
+          (500, "primi_giorni", "🧱", "Dei primi giorni",
            "Tra i primi 500 iscritti del Barattolo"),
-          (2000, "veterano", "🏺", "Dei primi giorni",
+          (2000, "veterano", "🏺", "Veterano",
            "Tra i primi 2.000 iscritti del Barattolo"),
           (10000, "bottegaio", "🏪", "Bottegaio",
            "Tra i primi 10.000 iscritti del Barattolo")]
+
+# I FONDATORI, per tg_id, dal config del VPS (vuoto nel codice: gli id
+# delle persone non stanno in repo). Non e' un traguardo che si
+# raggiunge — e' un fatto, come la coorte, ma di due persone sole.
+try:
+    from config import FONDATORI
+except ImportError:
+    FONDATORI = ()
 
 
 def coorte_da_posizione(posizione: int) -> str:
@@ -937,8 +951,12 @@ def livello_utente(xp: int, affari: int) -> dict:
 # «Barattolo ufficiale» — che nessun esc() risolve, perche' il
 # problema non e' l'HTML ma il significato.
 TITOLI = (
-    [dict(id=f"coorte_{cid}", nome=f"{emo} {nome}", descrizione=desc,
-          serve=("coorte", cid)) for _s, cid, emo, nome, desc in COORTI]
+    # Il primo della fila, e l'unico che non si puo' guadagnare
+    [dict(id="t_fondatore", nome="🏛 Fondatore",
+          descrizione="Ha fondato Barattolo",
+          serve=("fondatore", ""))]
+    + [dict(id=f"coorte_{cid}", nome=f"{emo} {nome}", descrizione=desc,
+            serve=("coorte", cid)) for _s, cid, emo, nome, desc in COORTI]
     + [dict(id="t_nostrano", nome="🟣 Nostrano",
             descrizione="Serve la npub verificata con nota pubblica",
             serve=("distintivo", "nostrano")),
@@ -981,7 +999,8 @@ def titoli_disponibili(con, tg_id: int) -> list[str]:
         next(l for l in LIVELLI if l[2] == liv["id"])) + 1]}
     fatto = {"coorte": lambda v: v == (u["coorte"] or ""),
              "distintivo": lambda v: v in badge,
-             "livello": lambda v: v in raggiunti}
+             "livello": lambda v: v in raggiunti,
+             "fondatore": lambda _v: tg_id in FONDATORI}
     return [t["id"] for t in TITOLI if fatto[t["serve"][0]](t["serve"][1])]
 
 
@@ -1545,6 +1564,23 @@ def init_db():
             "SELECT tg_id FROM utenti WHERE negozio=''").fetchall():
         con.execute("UPDATE utenti SET negozio=? WHERE tg_id=?",
                     (nuovo_codice_negozio(con), r["tg_id"]))
+    # «Fondatore» e' diventato un titolo dei due che hanno fatto
+    # Barattolo, quindi la coorte dei primi 500 ha cambiato nome. Una
+    # riga, idempotente: chi l'aveva gia' scritta in colonna la trova
+    # raddrizzata e non si accorge di niente.
+    try:
+        con.execute("UPDATE utenti SET coorte='primi_giorni' "
+                    "WHERE coorte='fondatore'")
+        con.execute("UPDATE utenti SET titolo='coorte_primi_giorni' "
+                    "WHERE titolo='coorte_fondatore'")
+    except sqlite3.OperationalError:
+        pass
+    # I fondatori portano il loro titolo SUBITO, senza doverlo
+    # scegliere: non e' un premio da sbloccare, e' chi sono. Solo se
+    # il posto e' libero — chi ne ha scelto un altro se lo tiene.
+    for tg in FONDATORI:
+        con.execute("UPDATE utenti SET titolo='t_fondatore' "
+                    "WHERE tg_id=? AND titolo=''", (tg,))
     # Le coorti di chi c'era gia': idempotente, tocca solo chi non ce
     # l'ha ancora (la colonna e' congelata al primo calcolo). Girato in
     # ordine d'iscrizione, cosi' la posizione e' quella vera.
@@ -12257,6 +12293,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # (il backfill di init_db copre solo chi c'era). Congelata.
         if not u["coorte"]:
             assegna_coorte(con, user["id"])
+        # Il titolo dei fondatori si mette da solo anche qui, non solo
+        # all'avvio: cosi' vale pure per un fondatore che apre l'app
+        # la prima volta dopo che il suo id e' finito nel config.
+        # Auto-riparante come la passata dei distintivi.
+        if user["id"] in FONDATORI and not u["titolo"]:
+            con.execute("UPDATE utenti SET titolo='t_fondatore' "
+                        "WHERE tg_id=?", (user["id"],))
         giorno = oggi_locale()
         if (u["xp_ultimo_giorno"] or "") != giorno:
             assegna_xp(con, user["id"], "visita", AZIONI_XP["visita"],
