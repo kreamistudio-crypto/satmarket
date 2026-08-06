@@ -3562,21 +3562,71 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   a PEZZI come sempre, o a VALORE degli articoli («da 100.000 sats nel
   carrello») — un computer ci arriva da solo, di cianfrusaglie ne
   servono venti.
-  LA SOGLIA A VALORE È IN SATS, e non in euro. In ordine di peso:
-  `_sconto_pacco` resta PURA e senza il cambio — è la funzione dove un
-  errore costa sats veri; non esiste il caso «promessa in vetrina non
-  mantenuta perché CoinGecko tace», che in euro spegnerebbe lo sconto
-  perfino su un carrello tutto-sats, cioè proprio nei negozi
-  bitcoin-native; e il confronto è con l'articolo, che è GIÀ in sats,
-  quindi coerente per costruzione con la cifra della invoice. Il
-  precedente in casa sono `TETTO_SATS_ANNUNCIO` e
-  `TETTO_DIGITALE_NUOVI`, leve in sats che giudicano l'articolo nella
-  stessa posizione del conto. L'EURO RESTA UN AIUTO PER SCEGLIERE
-  (decisione di Andrea): nel cassetto il venditore può digitare la
-  cifra in euro e vede la conversione mentre sceglie, ma ciò che si
-  salva è sempre e solo il numero in sats — così la regola è
-  deterministica e non oscilla col cambio, e il cassetto lo dice a
-  parole. Cambio muto = il campo euro non compare e restano le pillole.
+  LA SOGLIA A VALORE È IN EURO (ago 2026, decisione di Andrea che
+  ROVESCIA la riga che stava qui — «è in sats, e non in euro» — e vale
+  per TUTTE E DUE le promesse, o avremmo due promesse identiche in due
+  valute diverse). Il motivo: una soglia in sats DERIVA COL CAMBIO. Il
+  venditore scrive 100.000 pensando «circa 90 €» e fra sei mesi la
+  stessa riga vale 180 € — la sua promessa è cambiata senza che lui
+  abbia toccato niente. Le spedizioni nel mondo vero si pagano in
+  euro, e la tariffa di un annuncio può già essere ancorata all'euro
+  (`spedizione_eur`): il precedente era in casa.
+  L'ARGOMENTO PERDENTE va tenuto perché era buono: in sats
+  `_sconto_pacco` non vedeva il cambio, e non esisteva il caso
+  «promessa non mantenuta perché CoinGecko tace». Resta vero, e il
+  prezzo si paga a cambio muto — dove la promessa NON scatta, vedi
+  sotto. Ma «muto» vuol dire pochissimo: `cambio_btc_eur` è fail-open
+  e tiene l'ultimo valore noto anche scaduto, quindi lo 0 esce solo se
+  CoinGecko non ha MAI risposto da quando il processo è partito, cioè
+  un riavvio dentro un'interruzione. Una promessa che deriva da sola
+  per mesi è un guasto più grande di uno che dura un riavvio.
+  LE PURE RESTANO PURE, ed è il perno: guadagnano un ARGOMENTO
+  (`articolo_eur`), non una chiamata. Il cambio lo prende il
+  chiamante, dove lo prende già. Nasce `_eur_interi(sats, cambio)`,
+  specchio di `_sped_in_sats`: euro INTERI e per DIFETTO (49,99 è
+  sotto una soglia da 50: nessuna promessa scatta per un
+  arrotondamento), `None` quando il cambio manca. Si chiama UNA VOLTA
+  per conto e il numero va a tutte e due le promesse — è così che «LE
+  DUE PROMESSE GUARDANO LO STESSO NUMERO» smette di essere un patto da
+  ricordare e diventa una proprietà della struttura.
+  A CAMBIO MUTO LA PROMESSA NON SCATTA, E LO SI DICE. Il precedente è
+  già in casa, negli avvisi di ricerca: «cambio mai arrivato = l'avviso
+  EUR NON scatta, meglio un match perso che uno sbagliato». Il `None`
+  si gestisce DENTRO i due giudici (fail-closed come `importo_invoice`,
+  un posto solo invece di quattro «if» nei percorsi del conto); il
+  preventivo porta `promesse_sospese` — il motivo, mai un silenzio — e
+  la pagina Paga mette una riga onesta al posto dell'invito. Le righe
+  pubbliche RESTANO: dicono la regola del negozio, che è vera, non un
+  verdetto su quel carrello. NESSUN 503 NUOVO: `serve_cambio_duro` è
+  distinto dal bisogno della promessa — senza cambio un listino in
+  euro non si sa CONVERTIRE e l'ordine non nasce, una promessa non si
+  sa solo VALUTARE, e far fallire un acquisto perché non si riesce a
+  regalare uno sconto sarebbe curare un male causandone uno peggiore.
+  DUE CONSEGUENZE DICHIARATE: se il cambio muore fra preventivo e
+  pagamento la invoice nasce senza promessa mentre la pagina la
+  mostrava (il paySheet dice comunque le cifre vere della risposta, il
+  pattern già accettato per la lampo che scade); e il costo cade sui
+  negozi TUTTO-SATS, che il cambio non lo toccavano proprio.
+  SCARTATO un cambio di riserva NOSTRO con scadenza: sbaglierebbe solo
+  nella fascia stretta attorno alla soglia invece che su tutti i
+  carrelli, ma sarebbe il primo numero inventato che decide del denaro.
+  EURO INTERI, non centesimi e non `REAL`: il filo resta esatto senza
+  una convenzione nuova, la colonna ha la stessa forma delle sorelle
+  (`INTEGER DEFAULT 0`), e una soglia è una promessa di bottega — «da
+  50 €», non «da 49,90», che è un trucco da listino.
+  IL CASSETTO PARLA SOLO EURO (decisione di Andrea): spariscono il
+  campo d'aiuto in euro, i due `*DaEuro` e gli `≈` sulle pillole — il
+  cantiere, sulla superficie, CANCELLA codice. Al loro posto UNA riga,
+  `NOTA_SOGLIA_EURO`, in un posto solo e portata da tutti e due i
+  cassetti (il patto di `AVVISO_INTERMEDIARIO`): «la soglia si misura
+  in EURO, così non cambia da sola col cambio; tu incassi sempre in
+  SATS». Serve perché col passaggio all'euro la parola «sats» era
+  sparita dal cassetto del venditore, e una soglia in euro accanto a
+  un negozio che incassa in bitcoin si legge come «mi pagano in euro»;
+  la prima frase è anche la risposta a «perché euro?». Per chi COMPRA
+  non si aggiunge niente: le righe pubbliche restano una riga, e il
+  momento in cui conta — il paySheet — parla sats da solo
+  (`contoScomposto` scrive «sats» su ogni riga, ignorando il toggle).
   LA MISURA È IL LORDO DEL CONTO, cioè l'articolo DOPO lampo e accordo
   (`_unitario_effettivo` li ha già applicati) e PRIMA dello sconto — o
   si morderebbe la coda. CONSEGUENZA VOLUTA, da sapere perché sembra
@@ -3720,16 +3770,54 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   compilare un campo.
   LEVE: `SCONTO_PACCO_ATTIVO` nasce ACCESA (non muove denaro verso
   l'esterno, abbassa soltanto un conto in entrata),
-  `SCONTO_PACCO_SOGLIE`/`SCONTO_PACCO_VALORI`/`SCONTO_PACCO_SCONTI`
+  `SCONTO_PACCO_SOGLIE`/`SCONTO_PACCO_VALORI_EUR`/`SCONTO_PACCO_SCONTI`
   sono le pillole del venditore (il patto di LAMPO_SCONTI),
   `SCONTO_PACCO_CRITERI` è il kill-switch del criterio nuovo (toglierlo
   di lì lo spegne per chi l'aveva scelto, senza un deploy), e
-  `MIN_SOGLIA` 2, `MIN_VALORE` 1.000 e `MAX_PERCENTO` 30 restano la
+  `MIN_SOGLIA` 2, `MIN_VALORE_EUR` 1 e `MAX_PERCENTO` 30 restano la
   cintura del server anche se le liste cambiano. Il minimo a valore è
   basso di proposito: è una cintura contro lo zero travestito, non un
   giudizio su quanto debba valere un carrello (la regola di
   MAX_QUANTITA_ANNUNCIO — quanto vale il suo negozio lo sa il
   venditore, non noi).
+  I NOMI DELLE LEVE PORTANO `_EUR`, E NON È COSMESI (ago 2026): una
+  riga `SCONTO_PACCO_VALORI = (25_000, …)` già scritta in un config
+  verrebbe letta come EURO, e la promessa non scatterebbe più — in
+  silenzio. Col nome nuovo la riga vecchia diventa INERTE, che è la
+  stessa regola delle colonne: un nome non cambia mai significato.
+  Vale per `SCONTO_PACCO_VALORI_EUR`, `SCONTO_PACCO_MIN_VALORE_EUR`,
+  `SPED_GRATIS_SOGLIE_EUR`, `SPED_GRATIS_MIN_EUR`. Le pillole sono
+  BASSE (10·25·50·100 €, decisione di Andrea) e non la conversione
+  delle vecchie: Barattolo è un mercatino dell'usato e il carrello
+  medio è piccolo — con soglie alte la promessa non scatterebbe quasi
+  mai, cioè sarebbe una vetrina senza effetto.
+  LE COLONNE NUOVE sono `sconto_pacco_valore_eur` e
+  `sped_gratis_soglia_eur`; le due in sats restano dov'erano, INERTI —
+  nessuno le legge più, e sono anche l'unico posto dove ritrovare cosa
+  il venditore aveva scritto (precedenti in casa: `utenti.comune`,
+  `avatar_visibile`). `ordini` NON si tocca: le tre colonne testimone
+  sono la cifra vera in sats, e questo cantiere non passa da lì.
+  IL TRAVASO LO FA UNO SCRIPT, `converti_soglie_euro.py` (anteprima di
+  serie, `--scrivi`, `--cambio` a mano, percorso di database
+  opzionale; arrotonda all'euro più VICINO — lì si traduce una
+  promessa, non si misura un carrello — e clampa al minimo dicendolo).
+  NON `init_db`: è sincrona e senza rete, e una migrazione che dipende
+  da CoinGecko può restare a metà — non su una riga che decide del
+  denaro. A ricordarlo c'è UNA riga all'avvio
+  (`avvisa_soglie_da_convertire`, che LEGGE e basta) e il polso SQL
+  17d; NON una voce del libro mastro, perché finché lo script non è
+  girato quello è uno stato transitorio LEGITTIMO, e un allarme che
+  suona su uno stato legittimo insegna a ignorarlo.
+  LE CHIAVI VECCHIE ESCONO A ZERO, e sono due denti dello stesso
+  lucchetto: `_sconto_pubblico` azzera `valore` (il client di ieri lo
+  legge in sats e scriverebbe «da 25 sats», che non è una promessa
+  avara — è assurda, e sembra un guasto) e nasce
+  `_sped_gratis_pubblico`, il gemello che questo file dichiarava NON
+  necessario «perché il campo è UNO»: col passaggio i campi sono due,
+  e la nota si rovescia. Stessa cosa nel BODY degli endpoint —
+  `valore_eur` e `soglia_eur` sono chiavi nuove, e le vecchie si
+  IGNORANO: un client in cache prende un 400 onesto invece di
+  scrivere una soglia da cinquantamila euro.
   Superficie: i QUATTRO alias in `CAMPI_VETRINA` a costo ZERO
   (il JOIN su `u` c'era già) e nel profilo di `/api/negozio`, TUTTI
   normalizzati da `_sconto_pubblico` — così la leva spenta li spegne in
@@ -3765,19 +3853,35 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   guadagnato lo sconto non vedrebbe cambiare niente. Il dato viene
   dall'ANNUNCIO e non dal preventivo (che ha una firma e arriva in
   ritardo). A criterio VALORE una cifra la porta, e il patto si
-  riformula onestamente: L'INVITO NON CALCOLA, RICEVE — il totale
-  glielo passa `aggiornaBarraPacco`, che quel numero lo mostra già due
-  centimetri più sotto, quindi i due non possono divergere e non c'è
-  un secondo conto; quel che resta VIETATO è la percentuale, cioè
-  quanto si risparmia, che lo dice solo il conto del server. La cifra
-  passa da `cifraCtrl` e segue il toggle €/₿ (la view-pacco si
-  ridisegna in `setValuta`); le due righe PUBBLICHE invece non lo
-  seguono — `setValuta` non ridisegna il negozio — quindi scrivono i
-  sats con l'≈€ accanto, e MAI un ≈ senza `cambioVivo`, che sul cambio
-  di riserva sarebbe una cifra inventata. Nel client il giudice della
+  riformula onestamente: L'INVITO NON CALCOLA IL RISPARMIO, RICEVE il
+  totale — glielo passa `aggiornaBarraPacco`, che quel numero lo mostra
+  già due centimetri più sotto, quindi i due non possono divergere;
+  quel che resta VIETATO è la percentuale, cioè quanto si risparmia,
+  che lo dice solo il conto del server.
+  MA COL PASSAGGIO ALL'EURO L'INVITO DEL CARRELLO CONVERTE (ago 2026),
+  ed è l'UNICO posto dell'app dove il client fa una conversione su una
+  promessa: il preventivo in quella pagina non c'è, e chiamarlo a ogni
+  tocco dello stepper è già stato valutato e scartato (il debounce
+  litiga con chi sale in fretta). IMPERFEZIONE DICHIARATA, nuova: in
+  una fascia stretta attorno alla soglia il cambio del client e quello
+  del server possono non combaciare, quindi la riga può dire «✅
+  attivo» dove il conto non sconta. È tollerabile perché è un invito
+  durante la COMPOSIZIONE e non un verdetto — lo dice da sé, «lo vedi
+  nel conto» — e senza `cambioVivo` la riga non compare affatto (il
+  patto del ≈). Il floor è quello di `_eur_interi`, cioè il verso
+  prudente. L'invito della pagina PAGA invece è SERVER-DRIVEN
+  (`mancano_sped_eur`) e lì la fascia non esiste: quell'asimmetria si
+  tiene, non si uniforma.
+  Le righe PUBBLICHE non seguono il toggle — `setValuta` non ridisegna
+  il negozio — ma dall'euro non ne hanno più bisogno: scrivono la
+  cifra che il venditore ha scritto, senza ≈ e senza cambio, quindi si
+  disegnano anche a cambio muto. Nel client il giudice della
   regola è UNO (`regolaSconto`) e la frase pubblica pure
   (`frasePromessaSconto`), per la stessa ragione di
-  `_sconto_pubblico`: sono quattro le superfici che la mostrano.
+  `_sconto_pubblico`: sono quattro le superfici che la mostrano — e
+  dall'ago 2026 lo stesso vale per la SECONDA promessa
+  (`regolaSpedGratis`/`frasePromessaSpedGratis`), che quella sentinella
+  non ce l'aveva: buco trovato proprio con questo cantiere.
   LA BARRA DEL CARRELLO RESTA AL
   LORDO, dichiarato: non è già oggi il totale da pagare (non ha
   spedizione né protezione), e le alternative sono peggio — una
@@ -3791,18 +3895,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sono UNA regola, e con un POST per tocco esisterebbe il mezzo
   secondo in cui il negozio ne ha una a metà, e in quel mezzo secondo
   qualcuno può comprare. Col criterio (ago 2026) in testa ci sono due
-  pillole «A pezzi / A valore» e sotto cambiano le soglie; ogni pillola
-  a valore porta il suo ≈ € (l'app parte in vista euro: una fila di
-  cifre in sats si sceglierebbe alla cieca), e quell'≈ NON è una
-  `.unit` — il selettore nudo forza `var(--muted)`, e sulla pillola
-  ACCESA il grigio sparisce sul fondo arancione: è una glossa e segue
-  il colore del bottone (difetto visto in tema scuro, non a
-  ragionamento). Il campo euro d'aiuto scrive nella bozza i SATS,
-  compare solo con `cambioVivo`, e non ridisegna il cassetto — il campo
-  perderebbe il fuoco a ogni tasto: riscrive in place le due cifre che
-  dipendono da lui e SPEGNE le pillole che non combaciano più, che una
-  pillola accesa su un numero diverso da quello scritto sopra è la
-  stessa bugia del campo che mente. La bozza si butta a ogni `/api/me` (o
+  pillole «A pezzi / A valore» e sotto cambiano le soglie, che dal
+  passaggio all'euro sono pillole in EURO e basta: sono spariti il
+  campo d'aiuto, i due `*DaEuro` e gli `≈` sulle pillole — con loro se
+  n'è andato anche il difetto dell'≈ che spariva sulla pillola accesa,
+  e al loro posto c'è `NOTA_SOGLIA_EURO` (vedi sopra). La bozza si butta a ogni `/api/me` (o
   resterebbe quella fissata da un render girato prima che la regola
   vera arrivasse: bug visto dal vivo). Il 400 si rende DENTRO il
   cassetto, la ricetta delle ferie. Più la riga nell'ORDINE, che non è
@@ -3814,10 +3911,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   della DEMO si spostasse.
   LA SPEDIZIONE GRATIS SOPRA SOGLIA 🚚 (ago 2026, richiesta dal campo
   subito dopo lo sconto: «si può fare come negli e-commerce?»): «da N
-  sats di articoli la spedizione la offro io», una regola per tutto il
-  negozio. Soglia in SATS con l'euro come aiuto nel cassetto — le
-  ragioni sono quelle dello sconto, per intero (una promessa in vetrina
-  non dipende dal cambio, e `_sped_gratis` resta pura e senza cambio).
+  € di articoli la spedizione la offro io», una regola per tutto il
+  negozio. Soglia in EURO — le ragioni del rovesciamento sono quelle
+  dello sconto, per intero, e vale per tutte e due o non varrebbe per
+  nessuna. `_sped_gratis` resta pura: riceve gli euro da
+  `_eur_interi`, non va a prendere il cambio.
   NON È UNA COPIA DELLO SCONTO, E LA DIFFERENZA È QUELLA CHE LE PERMETTE
   DI VALERE ANCHE SULL'ACQUISTO SINGOLO — è la prima cosa da capire, e
   non è una scelta di prodotto ma una proprietà della FORMA. Lo sconto
@@ -3841,7 +3939,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la riga diventerebbe rossa. Come per lo sconto, una lampo generosa
   può far scendere sotto soglia (dichiarato, detto al venditore nel
   cassetto, con la sua prova).
-  MODELLO: `utenti.sped_gratis_soglia` (0 = spenta) — UNA colonna,
+  MODELLO: `utenti.sped_gratis_soglia_eur` (0 = spenta) — UNA colonna,
   niente criterio (il criterio È il valore) e niente percentuale
   (gratis è gratis) — più `ordini.sped_gratis_sats`, la tariffa che il
   compratore NON ha pagato. Quella è una **colonna TESTIMONE, NON UN
@@ -3881,14 +3979,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sovrappongono — ma è chirurgia sul percorso dei soldi per un caso
   transitorio. Se le tariffe in euro diventassero la norma, è lì la
   leva.
-  SUPERFICIE: `u.sped_gratis_soglia AS venditore_sped_gratis` in
+  SUPERFICIE: `u.sped_gratis_soglia_eur AS venditore_sped_gratis_eur` in
   `CAMPI_VETRINA` a costo ZERO (il JOIN su `u` c'era già) e
   normalizzata in `arricchisci_righe_vetrina`, così la leva spenta la
-  spegne in tutte le vetrine insieme; `sped_gratis_soglia` nel profilo
+  spegne in tutte le vetrine insieme; `sped_gratis_eur` nel profilo
   di `/api/negozio`; `sped_gratis_leve` in `/api/me` (il valore salvato
   esce GREZZO di proposito: è il suo negozio, deve vedere cosa ha
-  scritto). Il preventivo porta `sped_gratis_soglia`,
-  `mancano_sped_sats` (che conta il SERVER anche se il client
+  scritto). Il preventivo porta `sped_gratis_eur`,
+  `mancano_sped_eur` (che conta il SERVER anche se il client
   potrebbe: è il numero dove vive un off-by-one, la lezione di
   `mancano_pezzi`) e `sped_gratis_sats` dentro ogni strada casa/punto —
   che è anche ciò che rende la prova regina verificabile. Zero query in
@@ -3900,8 +3998,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   guardia; niente `_impegni_aperti` e niente `guardia_ferie_venditore`,
   per le due ragioni scritte per esteso nello sconto. LEVE:
   `SPED_GRATIS_ATTIVO` nasce ACCESA (non muove denaro verso l'esterno,
-  abbassa un conto in entrata), `SPED_GRATIS_SOGLIE` le pillole,
-  `SPED_GRATIS_MIN` 1.000 la cintura. ⚠️ `SPED_GRATIS_SOGLIE` è una
+  abbassa un conto in entrata), `SPED_GRATIS_SOGLIE_EUR` le pillole,
+  `SPED_GRATIS_MIN_EUR` 1 la cintura. ⚠️ `SPED_GRATIS_SOGLIE_EUR` è una
   leva-LISTA: la prova del censimento in `prove.py` va aggiornata a
   mano, ed è esattamente il modo in cui ci si inciampa.
   IL LIBRO MASTRO guadagna DUE controlli, e li apre la colonna
@@ -5893,6 +5991,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   online non c'è nessuna spedizione da offrire). E ognuno guarda la
   SUA leva del server: suggerire una funzione spenta sarebbe mandare
   qualcuno a cercare un cassetto che non c'è.
+  LA CIFRA DENTRO IL TESTO è passata dai sats agli euro col cantiere
+  delle soglie (ago 2026): la voce della spedizione gratis diceva «Da
+  100.000 sats di articoli la spedizione la offro io», adesso dice «Da
+  25 €». I 12 venditori che l'avevano già ricevuta NON la ricevono di
+  nuovo — il timbro `suggerito_sped` è già scritto per loro e nessuno
+  lo tocca — e va bene così: la sostanza era ed è la stessa
+  (decisione di Andrea). La voce dello SCONTO non si è toccata: il suo
+  esempio è «da 3 articoli, −10%», cioè il criterio a pezzi, che di
+  valute non parla.
   `TIMBRI_SUGGERIMENTO` è una whitelist e l'elenco È la guardia: il
   nome della colonna finisce dentro una query, e un nome che arriva da
   altrove non deve poterci entrare mai — nemmeno oggi che i chiamanti
@@ -7401,6 +7508,57 @@ stampa quanti utenti ha registrato); le due leve hanno il default nel
 codice. DA GUARDARE al primo giro: il journal della prima passata di
 `suggerisci_funzioni` — quanti ne partono — e che nessuno riceva due
 messaggi.
+Le due soglie a valore passano all'EURO (ago 2026, cambio di rotta
+deciso da Andrea il giorno dopo averle fatte in sats): una soglia in
+sats DERIVA COL CAMBIO — chi scrive 100.000 pensando «circa 90 €» si
+ritrova, sei mesi dopo, una promessa da 180 € senza aver toccato
+niente. Vale per TUTTE E DUE le promesse, o avremmo due promesse
+identiche in due valute diverse. Non cambia niente di sostanziale: si
+paga sempre in sats, l'escrow è in sats, il conto è del server, e
+`ordini` non si tocca di una riga.
+Le tre cose da sapere. 1) LE PURE RESTANO PURE: guadagnano un
+argomento (`articolo_eur`), non una chiamata — nasce `_eur_interi`,
+che si invoca UNA volta per conto e serve tutte e due le promesse,
+così «guardano lo stesso numero» diventa una proprietà della
+struttura invece di un patto da ricordare. 2) A CAMBIO MUTO la
+promessa NON scatta e lo si dice (fail-closed dentro il giudice,
+`promesse_sospese` nel preventivo, riga onesta in pagina), MAI un 503
+nuovo: senza cambio un listino in euro non si sa convertire e
+l'ordine non nasce, una promessa non si sa solo valutare. E «muto»
+vuol dire pochissimo — `cambio_btc_eur` è fail-open e tiene l'ultimo
+valore noto, quindi lo 0 esce solo dopo un riavvio dentro
+un'interruzione. 3) COLONNE E LEVE NUOVE col suffisso, le vecchie
+inerti: una riga `SPED_GRATIS_SOGLIE = (50_000, …)` già scritta in un
+config verrebbe letta come euro e spegnerebbe la promessa in silenzio.
+Vedi Architettura, «LA SOGLIA A VALORE È IN EURO».
+Collaudato: 1198 prove verdi in `prove.py` (erano 1162) — fra cui il
+filo esatto nelle due unità, il floor che decide, il cambio muto sui
+due giudici, il criterio a PEZZI che a cambio muto scatta lo stesso, e
+le sentinelle nuove sulla purezza di `_eur_interi`, sui due 503 che
+restano due, e su `cambio_ordine` che non si sporca con la misura. Più
+un collaudo eseguibile su DB usa-e-getta (57 verdi) con in testa LA
+PROVA REGINA aggiornata — preventivo == compra AL SAT su set e mono,
+sotto/al filo/sopra soglia, in sats e in EUR, **e a cambio muto** — col
+confronto fra `prezzo_sats` e l'importo della bolt11 coniata, e la
+ronda del libro mastro che tace. Più il giro visivo via CDP a 375px nei
+due temi (cassetti, tre righe pubbliche, invito del carrello nei suoi
+quattro casi compreso il floor a 49 €), zero errori JS. Due difetti
+trovati e chiusi strada facendo, tutti e due nelle PROVE e non nel
+codice: una sentinella che non poteva fallire, e una finestra a
+lunghezza fissa che aveva smesso di provare quel che diceva.
+IN PRODUZIONE: il deploy fa nascere le due colonne `*_eur` a zero,
+cioè **promesse spente per chi le aveva a valore** — ed è il momento
+da guardare. Il rimedio è una riga: `python converti_soglie_euro.py`
+in anteprima e poi `--scrivi`. Se non l'ha impostata nessuno (molto
+probabile: le due funzioni sono nate ieri) stampa «nessuno» e si
+chiude; a ricordarlo c'è la riga d'avvio e il polso SQL 17d. ⚠️ Se il
+config del VPS ha righe esplicite `SCONTO_PACCO_VALORI`,
+`SCONTO_PACCO_MIN_VALORE`, `SPED_GRATIS_SOGLIE` o `SPED_GRATIS_MIN`,
+diventano INERTI: vanno riscritte coi nomi `*_EUR` e con cifre in
+euro, o valgono i default del codice (10·25·50·100 €).
+DA GUARDARE al primo giro: il primo venditore che rimette la soglia in
+euro, e il primo ordine scontato vero con la bolt11 su LNbits.
+
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
