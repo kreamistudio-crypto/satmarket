@@ -1652,6 +1652,15 @@ def init_db():
                     # fila non cambia mai piu' —, '' = arrivato oltre
                     # l'ultima soglia, e va bene cosi'.
                     "coorte TEXT DEFAULT ''",
+                    # Il sollecito «hai annunci che aspettano la tua
+                    # firma»: per UTENTE e non per annuncio — si bussa
+                    # una volta sola per tutta la coda, o dieci
+                    # annunci farebbero dieci messaggi. Colonne sue e
+                    # non quelle degli altri solleciti: un contatore
+                    # ereditato manderebbe al tetto una coda appena
+                    # nata (la lezione di sollecita_conferme_ferme).
+                    "sollecito_firme_il INTEGER DEFAULT 0",
+                    "solleciti_firme INTEGER DEFAULT 0",
                     # titolo (ago 2026): quale dei titoli SBLOCCATI
                     # l'utente ha scelto di portare sotto il nome
                     # ('' = nessuno). Il distintivo dice «ho fatto»,
@@ -17641,6 +17650,73 @@ async def controlla_scadenze():
         await _sblocca_sats(oid, automatico=True)
 
 
+try:
+    from config import SOLLECITO_FIRME_GIORNI
+except ImportError:
+    SOLLECITO_FIRME_GIORNI = 2      # 0 = sollecito spento
+try:
+    from config import SOLLECITO_FIRME_MAX
+except ImportError:
+    SOLLECITO_FIRME_MAX = 3         # poi silenzio
+
+
+async def sollecita_firme_nostr():
+    """«Hai annunci che aspettano la tua firma»: il promemoria a chi ha
+    una chiave Nostr ma non l'ha a portata di mano — bunker spento,
+    estensione assente, oppure e' entrato con la nsec incollata, che
+    per scelta non conserviamo.
+
+    Senza questo, la coda resta MUTA: l'utente non sa nemmeno che
+    esiste, e i suoi annunci restano fuori da Nostr per sempre senza
+    che nessuno glielo dica. La coda non scade mai, quindi il tempo
+    non e' il problema — il silenzio si'.
+
+    UNO per utente e non per annuncio (dieci annunci farebbero dieci
+    messaggi), la cadenza e il tetto del patto dei solleciti, e poi
+    silenzio: chi non collega la chiave ha deciso, e continuare a
+    bussare sarebbe molestia. Niente 🧊 ai moderatori qui: non ci sono
+    sats fermi da nessuna parte, solo una vetrina in meno."""
+    if not SOLLECITO_FIRME_GIORNI:
+        return
+    adesso = int(time.time())
+    soglia = adesso - SOLLECITO_FIRME_GIORNI * 86400
+    con = db()
+    righe = con.execute(
+        "SELECT f.tg_id, COUNT(*) AS quanti, MIN(f.creato) AS primo, "
+        "u.sollecito_firme_il AS timbro, u.solleciti_firme AS conta "
+        "FROM firme_nostr f JOIN utenti u ON u.tg_id=f.tg_id "
+        "GROUP BY f.tg_id").fetchall()
+    da_avvisare = []
+    for r in righe:
+        if (r["conta"] or 0) >= SOLLECITO_FIRME_MAX:
+            continue                      # ha deciso: silenzio
+        # L'attesa riparte dall'ultimo squillo, o dalla nascita della
+        # coda se non ce n'e' mai stato uno
+        da = max(r["primo"] or 0, r["timbro"] or 0)
+        if da <= soglia:
+            da_avvisare.append((r["tg_id"], r["quanti"]))
+    for tg, quanti in da_avvisare:
+        con.execute("UPDATE utenti SET sollecito_firme_il=?, "
+                    "solleciti_firme=solleciti_firme+1 WHERE tg_id=?",
+                    (adesso, tg))
+    con.commit()
+    con.close()
+    for tg, quanti in da_avvisare:
+        oggetto = ("Un tuo annuncio aspetta" if quanti == 1
+                   else f"{quanti} tuoi annunci aspettano")
+        await notifica(tg,
+            f"🟣 <b>{oggetto} la tua firma.</b>\n"
+            f"Per finire su Nostr a nome TUO — con la tua reputazione, "
+            f"non la nostra — l'annuncio va firmato con la tua chiave, "
+            f"e la chiave ce l'hai solo tu.\n\n"
+            f"Apri Barattolo con la tua estensione Nostr o col bunker "
+            f"collegato: la firma parte da sola, non devi fare altro. "
+            f"Finché non succede l'annuncio vive qui e si vende "
+            f"normalmente — gli manca solo la piazza.")
+    if da_avvisare:
+        print(f"🟣 Solleciti firme Nostr: {len(da_avvisare)}")
+
+
 async def sollecita_ritiri_fermi():
     """Il ritiro in zona mai concluso (ago 2026, riprodotto dal campo):
     un ordine 'locked' col ritiro scelto NON ha nessun timer che corre
@@ -19397,6 +19473,10 @@ async def orologio():
             await sollecita_ritiri_fermi()
         except Exception as e:
             print(f"⚠️ Solleciti ritiri fermi saltati: {e}")
+        try:
+            await sollecita_firme_nostr()
+        except Exception as e:
+            print(f"⚠️ Solleciti firme Nostr saltati: {e}")
         try:
             # il sostituto dell'auto-sblocco disarmato: gira solo a
             # leva spenta, e non muove mai un sat
