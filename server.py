@@ -2070,6 +2070,18 @@ elif Fernet is None:
           "cryptography:\n   i codici si scrivono IN CHIARO "
           "(pip install cryptography).")
 
+# Stesso patto per le foto (ago 2026, cantiere «nessuna foto sparisce
+# in silenzio»): senza questi pacchetti gli scarti sono SILENZIOSI per
+# chi guarda il server — l'utente adesso il motivo lo riceve, ma qui
+# non compariva niente e non c'era modo di sapere che mancavano.
+if not ImmaginePillow:
+    print("⚠️  Manca Pillow: le foto PNG/WebP/HEIC non si convertono e "
+          "il tetto\n   per foto scende a 2,5MB (pip install pillow "
+          "pillow-heif).")
+elif not pillow_heif:
+    print("ℹ️  Manca pillow-heif: le foto HEIC (iPhone) vengono SCARTATE "
+          "in pubblicazione\n   (pip install pillow-heif).")
+
 
 # --------------- SICUREZZA: verifica initData Telegram --------------
 # Ogni richiesta della Mini App porta l'initData firmato da Telegram:
@@ -3873,33 +3885,66 @@ def _salva_una_foto(annuncio_id: int, indice: int, raw: bytes,
     return nome
 
 
-def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
+def _e_immagine(raw: bytes) -> bool:
+    """I byte dicono la verita', l'etichetta no. Il `data:image/jpeg`
+    lo scrive il BROWSER, che il tipo lo deduce dall'ESTENSIONE del
+    file: un PDF rinominato .jpg arriva qui vestito da foto, passa la
+    regex e — senza questo controllo — finisce SCRITTO in foto/ e
+    servito come immagine (riprodotto, ago 2026). Senza Pillow ci si
+    fida dell'etichetta come si e' sempre fatto: fail-open."""
+    if not ImmaginePillow:
+        return True
+    try:
+        # verify() legge le intestazioni e non decodifica: costa nulla
+        ImmaginePillow.open(io.BytesIO(raw)).verify()
+        return True
+    except Exception:
+        return False
+
+
+def salva_foto(annuncio_id: int, foto_lista: list,
+               versione: str = "") -> tuple[list, list]:
     """Salva le foto dell'annuncio. Dalla Mini App di solito arrivano
     gia' ridimensionate in JPEG (base64); quelle che il browser non ha
     saputo leggere (le HEIC degli iPhone) arrivano grezze e le converte
-    Pillow qui, se e' installata. Ritorna i nomi dei file."""
-    nomi = []
+    Pillow qui, se e' installata.
+
+    Ritorna DUE liste: i nomi dei file salvati e i MOTIVI degli scarti.
+    I motivi sono la ragione d'essere di questa firma (ago 2026): prima
+    ogni scarto era un `continue` muto, l'annuncio nasceva con meno
+    foto e nessuno lo diceva — chi pubblica se ne accorgeva aprendo la
+    scheda. Nessuna foto sparisce in silenzio: o si carica, o l'utente
+    sa perche' no."""
+    nomi, scarti = [], []
     for i, f in enumerate((foto_lista or [])[:5]):     # max 5 foto
         m = re.match(r"data:image/(jpeg|jpg|png|webp|heic|heif);base64,(.+)",
                      f or "", re.S)
         if not m:
+            scarti.append("formato non riconosciuto")
             continue
         try:
             raw = base64.b64decode(m.group(2))
         except Exception:
+            scarti.append("foto illeggibile")
             continue
         # I JPEG del telefono pesano poco; agli originali da convertire
         # (mai ridimensionati dal browser: gli iPhone moderni superano
         # i 6MB senza sforzo) si concede piu' spazio, tanto Pillow li
         # riporta comunque a un JPEG da 1200px
-        if len(raw) > (15_000_000 if ImmaginePillow else 2_500_000):
+        tetto = 15_000_000 if ImmaginePillow else 2_500_000
+        if len(raw) > tetto:
+            scarti.append(f"troppo grande (oltre {tetto // 1_000_000}MB)")
             continue
         if m.group(1) in ("heic", "heif"):
             if not (ImmaginePillow and pillow_heif):
                 print(f"⚠️ Foto HEIC saltata (annuncio #{annuncio_id}): "
                       f"servono i pacchetti pillow e pillow-heif")
+                scarti.append("foto HEIC: questo server non sa convertirla")
                 continue
             raw = converti_in_jpeg(raw)
+        elif not _e_immagine(raw):
+            scarti.append("non è una foto")
+            continue
         elif m.group(1) not in ("jpeg", "jpg") and ImmaginePillow:
             # PNG/WebP grezzi: gia' prima finivano in un file .jpg;
             # con Pillow diventano JPEG per davvero
@@ -3907,7 +3952,9 @@ def salva_foto(annuncio_id: int, foto_lista: list, versione: str = "") -> list:
         nome = _salva_una_foto(annuncio_id, i, raw, versione)
         if nome:
             nomi.append(nome)
-    return nomi
+        else:
+            scarti.append("non riesco a leggere questa foto")
+    return nomi, scarti
 
 
 def _miniatura_da_rifare(percorso_min, percorso_pieno) -> bool:
@@ -6217,13 +6264,18 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # Le foto in un thread: convertire una HEIC da 15MB costa secondi
     # di CPU e non deve congelare il server (che e' mono-processo).
     # Il commit e' gia' fatto: niente lock del database nel frattempo.
-    nomi = await asyncio.to_thread(salva_foto, annuncio_id, d.get("foto"))
+    nomi, scarti_foto = await asyncio.to_thread(salva_foto, annuncio_id,
+                                                d.get("foto"))
     if nomi:
         con = db()
         con.execute("UPDATE annunci SET foto=? WHERE id=?",
                     (json.dumps(nomi), annuncio_id))
         con.commit()
         con.close()
+    # Quante ne sono entrate davvero: la risposta lo DICE, e il client
+    # avvisa. Un annuncio che nasce con meno foto di quelle scelte non
+    # e' una cosa da scoprire da soli aprendo la scheda.
+    conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
     if in_revisione:
         # La terza via: l'annuncio esiste ma non e' online — niente
         # Nostr, niente promo, niente avvisi di ricerca, niente
@@ -6233,7 +6285,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
                              annuncio_id, user["id"])
         await avvisa_revisione(annuncio_id, motivo_dubbio)
         return {"ok": True, "id": annuncio_id, "revisione": True,
-                "attesa_ore": REVISIONE_ATTESA_ORE}
+                "attesa_ore": REVISIONE_ATTESA_ORE, **conto_foto}
     # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina ---
     marca_asta = " · 🔨 all'asta" if asta_secondi else ""
     await notifica_admin(
@@ -6271,7 +6323,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # dichiarata: chi debutta in revisione ricevera' l'avviso alla
     # prima pubblicazione diretta).
     await avvisa_contatto_mancante(user["id"])
-    risposta = {"ok": True, "id": annuncio_id}
+    risposta = {"ok": True, "id": annuncio_id, **conto_foto}
     if asta_secondi:
         risposta["asta_scadenza"] = adesso + asta_secondi
     return risposta
@@ -6858,13 +6910,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"«{d['titolo'][:60]}»: la tua offerta decade. Se ti "
             f"interessa ancora, riproponi sul prezzo nuovo."
             f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
+    conto_foto = {}
     if isinstance(d.get("foto"), list):
         # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
         # puo' mostrare per sbaglio la foto vecchia dalla sua cache.
         # E in un thread, come in pubblica(): la conversione HEIC non
         # deve congelare il server.
-        nomi = await asyncio.to_thread(salva_foto, annuncio_id, d["foto"],
-                                       versione=f"_{int(time.time())}")
+        nomi, scarti_foto = await asyncio.to_thread(
+            salva_foto, annuncio_id, d["foto"],
+            versione=f"_{int(time.time())}")
+        # come in pubblica(): quante ne sono entrate lo dice la risposta
+        conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
         try:
             vecchie = json.loads(a["foto"]) if a["foto"] else []
         except Exception:
@@ -6892,7 +6948,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                              annuncio_id, user["id"])
         await avvisa_revisione(annuncio_id, motivo_dubbio)
         return {"ok": True, "id": annuncio_id, "revisione": True,
-                "attesa_ore": REVISIONE_ATTESA_ORE}
+                "attesa_ore": REVISIONE_ATTESA_ORE, **conto_foto}
     # --- Strato 3: i moderatori vedono anche cio' che cambia ---
     await notifica_admin(
         f"✏️ <b>Annuncio #{annuncio_id} modificato</b>\n"
@@ -6902,7 +6958,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # stabile fa si' che sostituisca il precedente da solo
     asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
                                           solo_aggiornamento=True))
-    return {"ok": True, "id": annuncio_id}
+    return {"ok": True, "id": annuncio_id, **conto_foto}
 
 
 # --- Modifica FIRMATA degli annunci importati da Nostr ---------------

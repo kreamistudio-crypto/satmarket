@@ -2104,6 +2104,126 @@ def prove_foto():
           "secrets.token_hex(" in pezzo("nuovo_codice_negozio"))
 
 
+def prove_foto_scarti():
+    """NESSUNA FOTO SPARISCE IN SILENZIO (ago 2026, caso dal campo).
+    Ogni scarto di salva_foto era un `continue` muto: l'annuncio
+    nasceva con meno foto e nessuno lo diceva. Adesso salva_foto torna
+    anche i MOTIVI, e la risposta della pubblicazione li porta fino
+    all'utente. Qui si gira il pezzo VERO su una cartella usa-e-getta,
+    piu' le sentinelle sulle righe che in un riordino sparirebbero
+    riportandosi dentro il bug."""
+    print("\n[le foto che sparivano in silenzio]")
+    import base64
+    import io
+    import re
+    import tempfile
+
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        salta("gli scarti di salva_foto, girati per davvero",
+              "Pillow non e' installata")
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            amb = {"os": os, "io": io, "re": re, "base64": base64,
+                   "ImmaginePillow": Image, "ImageOps": ImageOps,
+                   "pillow_heif": None, "FOTO_DIR": tmp,
+                   "print": lambda *a, **k: None}
+            i = _SORGENTE.index("MINIATURA_LATO = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            for f in ("converti_in_jpeg", "miniatura_jpeg", "_salva_una_foto",
+                      "_e_immagine", "salva_foto"):
+                exec(pezzo(f), amb)
+
+            def uri(raw, tipo="jpeg"):
+                return (f"data:image/{tipo};base64,"
+                        + base64.b64encode(raw).decode())
+
+            out = io.BytesIO()
+            Image.new("RGB", (60, 40), (200, 120, 40)).save(out, "JPEG")
+            buona = out.getvalue()
+            pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n"
+
+            # il giudice dei byte, sui casi nudi
+            prova("un JPEG e' un'immagine", True, amb["_e_immagine"](buona))
+            prova("un PDF no", False, amb["_e_immagine"](pdf))
+            prova("il vuoto no", False, amb["_e_immagine"](b""))
+
+            # IL CASO DAL CAMPO: un PDF rinominato .jpg. Il data-URI lo
+            # scrive il browser dall'ESTENSIONE, quindi arriva qui
+            # etichettato image/jpeg e prima finiva SCRITTO sul disco.
+            nomi, scarti = amb["salva_foto"](7, [uri(buona), uri(pdf)])
+            prova("il PDF vestito da foto non si salva", 1, len(nomi))
+            prova("...e il motivo si dice", ["non è una foto"], scarti)
+            prova("...e sul disco non ci finisce", ["a7_0.jpg", "a7_0_min.jpg"],
+                  sorted(f for f in os.listdir(tmp) if f.startswith("a7_")))
+
+            # gli altri motivi, uno per uno
+            for foto, atteso in (
+                    (["non sono un data-uri"], "formato non riconosciuto"),
+                    # base64 che non torna: b64decode butta i caratteri
+                    # fuori alfabeto, quindi per farlo INCIAMPARE serve
+                    # una lunghezza storta, non solo spazzatura — la
+                    # spazzatura pura decodifica a vuoto e la ferma
+                    # _e_immagine, un passo piu' in la'
+                    (["data:image/jpeg;base64,!!!non-base64!!!"],
+                     "foto illeggibile"),
+                    (["data:image/jpeg;base64,!!!"], "non è una foto"),
+                    ([uri(b"\xff\xd8" + bytes(16_000_000))],
+                     "troppo grande (oltre 15MB)"),
+                    ([uri(b"nemmeno per sogno", "heic")],
+                     "foto HEIC: questo server non sa convertirla")):
+                nomi, scarti = amb["salva_foto"](8, foto)
+                prova(f"scarto detto: {atteso}", ([], [atteso]), (nomi, scarti))
+
+            # e il caso normale non inventa avvisi
+            nomi, scarti = amb["salva_foto"](9, [uri(buona), uri(buona)])
+            prova("due foto buone, zero scarti", (2, []), (len(nomi), scarti))
+            prova("nessuna foto chiesta, nessuno scarto", ([], []),
+                  amb["salva_foto"](10, []))
+
+    # --- SENTINELLE ---------------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # 1) IL TRASCINAMENTO. Il riquadro e' tratteggiato e si chiama
+    # photo-drop: sul desktop chiede di essere usato cosi', e per un
+    # anno ha avuto il solo onclick — senza preventDefault sul dragover
+    # il browser non emette nemmeno l'evento drop, quindi trascinare una
+    # foto non faceva ASSOLUTAMENTE NIENTE (riprodotto). Se queste
+    # righe spariscono, il caso dal campo torna identico.
+    riquadro = mini[mini.index('<div class="photo-drop"'):]
+    riquadro = riquadro[:riquadro.index(">")]
+    for gancio in ("ondragenter", "ondragover", "ondragleave", "ondrop"):
+        prova(f"sentinella: il riquadro ascolta {gancio}", True,
+              gancio in riquadro)
+    i = mini.index("function fotoSopra(")
+    prova("sentinella: ed e' il preventDefault a renderlo un bersaglio",
+          True, "ev.preventDefault()" in mini[i:mini.index("\n}", i)])
+    # 2) l'errore dell'anteprima si LEGGE e si DICE: prima era un
+    # `if (r.ok)` senza else, e in pagina restava il segnaposto «verra'
+    # convertita alla pubblicazione» — una promessa mai verificata
+    prova("sentinella: il motivo del server arriva all'utente", True,
+          "d.detail || 'Non riesco a preparare questa foto'" in mini)
+    prova("sentinella: il segnaposto bugiardo non c'e' piu'", False,
+          "verrà convertita" in mini)
+    # 3) il FileReader che fallisce non e' piu' muto
+    prova("sentinella: il FileReader che fallisce lo dice", True,
+          "Non riesco a leggere «" in mini)
+    # 4) quante ne sono entrate: il server lo dice e il client lo mostra
+    prova("sentinella: la pubblicazione conta le foto", 2,
+          _SORGENTE.count('"foto_salvate": len(nomi)'))
+    # due chiamate (pubblicazione e modifica) piu' la definizione
+    prova("sentinella: e il client lo racconta in due posti", 2,
+          mini.count("= avvisoFoto("))
+    # 5) salva_foto ha DUE valori di ritorno, e chi la chiama li prende
+    # entrambi: con un solo nome l'unpacking esplode subito, ma un
+    # terzo chiamante distratto potrebbe scrivere `nomi = salva_foto(...)`
+    # e ritrovarsi una tupla dove aspetta una lista
+    prova("sentinella: i chiamanti di salva_foto scompattano in due", 2,
+          len(re.findall(r"\w+, \w+ = await asyncio.to_thread\(\s*salva_foto|"
+                         r"\w+, \w+ = await asyncio\.to_thread\(salva_foto",
+                         _SORGENTE)))
+
+
 def prove_avatar():
     """I francobolli degli avatar non vogliono una miniatura (ago 2026).
     _salva_avatar li scrive gia' a 128px e miniatura_jpeg non ingrandisce
@@ -4279,7 +4399,7 @@ def main():
               prove_ricategorizza, prove_asta, prove_proxy_asta,
               prove_annullo,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
-              prove_initdata, prove_foto, prove_avatar,
+              prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_ssrf_redirect, prove_quota_ricerca,

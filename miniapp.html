@@ -2117,6 +2117,15 @@
     padding:26px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;cursor:pointer;
   }
   .photo-drop .big{font-size:30px;display:block;margin-bottom:6px}
+  /* «o trascinale qui» solo dove un file si puo' trascinare: sul
+     telefono non esiste il gesto, e prometterlo sarebbe una bugia */
+  .photo-drop .trascina{display:none}
+  @media(hover:hover) and (pointer:fine){
+    .photo-drop .trascina{display:block;font-size:12px;font-weight:600;margin-top:3px;opacity:.75}
+  }
+  /* il riquadro si accende mentre la foto ci passa sopra: il segnale
+     che il bersaglio c'e' davvero */
+  .photo-drop.sopra{border-color:var(--sats);background:var(--sats-soft);color:var(--sats-text)}
 
   /* ---------- affari (ordini) ---------- */
   .order{
@@ -2989,8 +2998,13 @@
       <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
       <div class="field">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
-        <div class="photo-drop" onclick="el('sellPhotos').click()">
+        <!-- Si tocca E si trascina: sul desktop il riquadro tratteggiato
+             chiede di essere usato cosi', e per un anno non lo era. -->
+        <div class="photo-drop" onclick="el('sellPhotos').click()"
+             ondragenter="fotoSopra(event,true)" ondragover="fotoSopra(event,true)"
+             ondragleave="fotoSopra(event,false)" ondrop="fotoLasciate(event)">
           <span class="big">📸</span>Aggiungi foto (fino a 5)
+          <span class="trascina">o trascinale qui</span>
         </div>
         <div id="photoPreview"></div>
       </div>
@@ -12912,6 +12926,25 @@ function ridimensiona(file){
     img.onerror = ()=>{
       URL.revokeObjectURL(img.src);
       if (file.size > 15_000_000) { toast('Foto troppo grande (max 15MB)'); res(null); return; }
+      /* Il browser JPEG, PNG, WebP e GIF li sa leggere: se ha detto di
+         no su uno di quelli, il file non e' quello che il suo nome
+         promette (un PDF rinominato .jpg arriva qui etichettato
+         image/jpeg dal sistema) oppure e' rovinato. Si rifiuta SUBITO,
+         senza chiedere niente al server: solo le HEIC hanno bisogno
+         di lui, e tutto il resto — tipi sconosciuti compresi — ci
+         prova, che Pillow legge i byte e non l'etichetta. */
+      const nativo = /^image\/(jpeg|png|webp|gif|bmp)$/i.test(file.type)
+                  || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name);
+      if (nativo) {
+        toast(`«${file.name}» non è una foto che riesco a leggere`, 6000);
+        res(null); return;
+      }
+      if (DEMO || VETRINA) {
+        /* la conversione la fa il server, e qui non c'e': meglio dirlo
+           che promettere una conversione che non avverra' mai */
+        toast('Questa foto va convertita dal server: qui non si può', 6000);
+        res(null); return;
+      }
       const fr = new FileReader();
       fr.onload = async ()=>{
         let uri = fr.result;
@@ -12925,21 +12958,33 @@ function ridimensiona(file){
         }
         /* Anteprima vera: il server la converte al volo (stateless,
            niente disco) e il JPEG che torna e' lo stesso che verra'
-           salvato — e alla pubblicazione viaggia gia' leggero. Se il
-           server non puo' (Pillow assente, rete...), resta l'originale
-           col segnaposto e ci riprova la pubblicazione. */
-        if (!DEMO && !VETRINA) {
-          try {
-            const r = await fetch(`${API_BASE}/foto/anteprima`, {
-              method:'POST',
-              headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-              body: JSON.stringify({foto: uri})});
-            if (r.ok) { const d = await r.json(); if (d.foto) uri = d.foto; }
-          } catch(e){}
+           salvato — e alla pubblicazione viaggia gia' leggero.
+           Se NON ci riesce la foto si rifiuta QUI, dicendo il motivo
+           che il server manda in `detail`: prima l'errore si ingoiava
+           (`if (r.ok)` senza else) e restava in pagina il segnaposto
+           «verra' convertita alla pubblicazione» — una promessa che
+           nessuno aveva verificato, e che alla pubblicazione veniva
+           disattesa in silenzio. */
+        try {
+          const r = await fetch(`${API_BASE}/foto/anteprima`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+            body: JSON.stringify({foto: uri})});
+          const d = await r.json().catch(()=>({}));
+          if (!r.ok || !d.foto) {
+            toast(d.detail || 'Non riesco a preparare questa foto', 6000);
+            res(null); return;
+          }
+          res(d.foto);
+        } catch(e){
+          toast('Non sono riuscito a preparare la foto: riprova', 6000);
+          res(null);
         }
-        res(uri);
       };
-      fr.onerror = ()=>res(null);
+      fr.onerror = ()=>{
+        toast(`Non riesco a leggere «${file.name}»`, 6000);
+        res(null);
+      };
       fr.readAsDataURL(file);
     };
     img.src = URL.createObjectURL(file);
@@ -12947,23 +12992,54 @@ function ridimensiona(file){
 }
 
 async function fotoScelte(ev){
+  await aggiungiFoto(ev.target.files);
+  ev.target.value = '';       // cosi' si puo' riscegliere lo stesso file
+  renderFotoPreview();
+}
+
+/* Le foto arrivano da DUE gesti — il selettore e il trascinamento — e
+   da qui in giu' la strada e' una sola. */
+async function aggiungiFoto(files){
   if (editandoNostr) {
     toast('Le foto degli annunci importati si cambiano dal tuo client Nostr', 6000);
     return;
   }
-  for (const file of ev.target.files){
+  for (const file of files){
     if (sellFoto.length >= 5) { toast('Massimo 5 foto'); break; }
     /* Chip segnaposto SUBITO: le HEIC pesanti passano dal server e
        costano qualche secondo — senza un segnale sembra bloccato */
     const segn = 'caricando:' + Math.random();
     sellFoto.push(segn);
     renderFotoPreview();
-    const f = await ridimensiona(file);
+    const f = await ridimensiona(file);   /* il perche' del no lo dice lei */
     const j = sellFoto.indexOf(segn);   // puo' essersi spostato (✕ su altre)
     if (j >= 0) { if (f) sellFoto[j] = f; else sellFoto.splice(j, 1); }
     renderFotoPreview();
   }
-  ev.target.value = '';
+}
+
+/* IL TRASCINAMENTO (ago 2026, caso dal campo: «carico un JPG dal
+   computer e non succede NULLA»). Il riquadro e' tratteggiato, si
+   chiama photo-drop e sul desktop chiede di essere usato cosi' — ma
+   aveva solo un onclick. Senza un preventDefault sul dragover il
+   browser non emette NEMMENO l'evento drop: nessuna foto, nessun
+   chip, nessun errore, riprodotto. */
+function fotoSopra(ev, sopra){
+  ev.preventDefault();        // e' LUI che rende il riquadro un bersaglio
+  ev.currentTarget.classList.toggle('sopra', sopra);
+}
+
+async function fotoLasciate(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('sopra');
+  const files = [...(ev.dataTransfer?.files || [])];
+  if (!files.length) {
+    /* si trascina un'immagine da un'altra pagina: arriva un URL, non
+       un file — e va detto, invece di non fare niente */
+    toast('Trascina un file dal tuo computer, non un\'immagine da una pagina', 6000);
+    return;
+  }
+  await aggiungiFoto(files);
   renderFotoPreview();
 }
 
@@ -12979,10 +13055,13 @@ function renderFotoPreview(){
         : 'Queste sono le foto attuali: restano così, oppure scegline di nuove per sostituirle tutte'}</div>`;
     return;
   }
-  /* Il canvas produce sempre data:image/jpeg: 'caricando:' e' il chip
-     d'attesa (conversione in corso, niente ✕: arriva tra poco), e ogni
-     altro non-jpeg e' un originale che il browser non sa mostrare —
-     segnaposto chiaro invece dell'icona rotta */
+  /* INVARIANTE (ago 2026): qui dentro c'e' SOLO il chip d'attesa
+     'caricando:' oppure un JPEG vero — il canvas ne produce uno, e le
+     HEIC tornano gia' convertite dal server (se non torna niente, la
+     foto viene rifiutata col motivo e non entra piu' nell'elenco).
+     Per questo il vecchio segnaposto «verra' convertita alla
+     pubblicazione» non c'e' piu': prometteva una cosa che nessuno
+     aveva verificato. */
   const chip = (testo, extra) => `
     <div style="width:110px;height:64px;border-radius:10px;background:var(--chip-bg);border:1.5px dashed var(--field-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box;${extra||''}">
       <span style="font-size:17px">📷</span>
@@ -12991,12 +13070,25 @@ function renderFotoPreview(){
   el('photoPreview').innerHTML = sellFoto.map((f,i)=>`
     <div class="th">${f.startsWith('caricando:')
       ? chip('Carico la foto…', 'opacity:.55')
-      : !f.startsWith('data:image/jpeg')
-      ? chip('HEIC: verrà convertita<br>alla pubblicazione')
       : `<img src="${f}" alt="">`}
       ${f.startsWith('caricando:') ? ''
         : `<span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>`}
     </div>`).join('');
+}
+
+/* Quante foto sono entrate DAVVERO. Il server lo dice (`foto_salvate`
+   e i motivi degli scarti): prima ogni scarto era un `continue` muto e
+   l'annuncio nasceva con meno foto senza che nessuno lo dicesse — lo
+   si scopriva aprendo la scheda. Torna la coda da attaccare al toast
+   di conferma: un toast in piu' coprirebbe quello del successo. */
+function avvisoFoto(d, chieste){
+  const salvate = d.foto_salvate;
+  if (!chieste || salvate === undefined) return '';   /* server di ieri */
+  const perse = chieste - salvate;
+  if (perse <= 0) return '';
+  const motivi = [...new Set(d.foto_scarti || [])].join(' · ');
+  return ` — ⚠️ ${perse} foto su ${chieste} non ${perse === 1
+    ? 'è entrata' : 'sono entrate'}${motivi ? ': ' + motivi : ''}`;
 }
 
 async function publish(){
@@ -13048,7 +13140,7 @@ async function publish(){
   try {
   /* il prezzo nel payload parla la valuta scelta dal venditore */
   const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
-  let nuovoId, inRevisione = false, attesaOre = 24;
+  let nuovoId, inRevisione = false, attesaOre = 24, avvisoFotoTesto = '';
   const cns = consegnaPayload();
   const asta = astaForm();   /* null = vendita normale */
   if (DEMO) {
@@ -13080,9 +13172,17 @@ async function publish(){
         zona:el('sellZone').value||'', descrizione:el('sellDesc').value||'',
         foto:sellFoto})});
     const d = await r.json().catch(()=>({}));
+    /* 413: il corpo intero e' stato rifiutato prima di arrivare al
+       server (un proxy davanti a noi). Non e' un errore generico ed e'
+       l'unico che si ripara da soli: meno foto. */
+    if (r.status === 413) {
+      toast('Le foto sono troppo pesanti tutte insieme: togline una e riprova', 7000);
+      return;
+    }
     if (!r.ok) { toast(d.detail||'Errore nella pubblicazione', 6000); return; }
     nuovoId = d.id;
     inRevisione = !!d.revisione; attesaOre = d.attesa_ore || 24;
+    avvisoFotoTesto = avvisoFoto(d, sellFoto.length);
     await loadListings();
     /* Un suggerimento al massimo, sul momento giusto: prima gli
        incassi (senza ln address restano appesi), poi il badge 🟣.
@@ -13106,12 +13206,14 @@ async function publish(){
   if (inRevisione) {
     /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
        verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */
-    toast(`⏳ Annuncio inviato: un moderatore lo controllerà (di solito entro ${attesaOre} ore). Lo trovi tra i tuoi annunci.`, 6000);
+    toast(`⏳ Annuncio inviato: un moderatore lo controllerà (di solito entro ${attesaOre} ore). Lo trovi tra i tuoi annunci.${avvisoFotoTesto}`, 6000);
     setCat('Tutto');
     apriCassettoProfilo('accAnnunci');
     return;
   }
-  toast('⚡ Annuncio pubblicato!'); setCat('Tutto');
+  toast('⚡ Annuncio pubblicato!' + avvisoFotoTesto,
+        avvisoFotoTesto ? 7000 : undefined);
+  setCat('Tutto');
   /* L'annuncio appena nato ti si apre davanti: la soddisfazione di
      vederlo in vetrina. Se non è in lista, si torna a Esplora. */
   if (listings.find(x=>x.id===nuovoId)) openDetail(nuovoId); else go('esplora');
@@ -13125,6 +13227,7 @@ async function salvaModifica(t, p){
   const id = editandoId;
   if (editandoNostr) { await salvaModificaFirmata(t, p); return; }
   const cns = consegnaPayload();
+  let avvisoFotoTesto = '';
   if (DEMO) {
     const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
     if (l){
@@ -13156,12 +13259,13 @@ async function salvaModifica(t, p){
       body: JSON.stringify(body)});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail||'Errore nella modifica', 6000); return; }
+    avvisoFotoTesto = avvisoFoto(d, (body.foto || []).length);
     if (d.revisione) {
       /* la modifica ha insospettito l'AI: l'annuncio esce dalla
          vetrina finché un moderatore non decide — la verità subito */
       await loadListings(); await loadMyListings(); renderMyListings();
       annullaModifica();
-      toast(`⏳ Modifica salvata, ma l'annuncio è in revisione: un moderatore lo controllerà (di solito entro ${d.attesa_ore||24} ore).`, 6000);
+      toast(`⏳ Modifica salvata, ma l'annuncio è in revisione: un moderatore lo controllerà (di solito entro ${d.attesa_ore||24} ore).${avvisoFotoTesto}`, 6000);
       setCat('Tutto');
       apriCassettoProfilo('accAnnunci');
       return;
@@ -13170,7 +13274,9 @@ async function salvaModifica(t, p){
   }
   await loadMyListings(); renderMyListings();
   annullaModifica();
-  toast('✏️ Annuncio aggiornato!'); setCat('Tutto');
+  toast('✏️ Annuncio aggiornato!' + avvisoFotoTesto,
+        avvisoFotoTesto ? 7000 : undefined);
+  setCat('Tutto');
   /* Come per la pubblicazione: l'annuncio aggiornato si apre subito */
   if (listings.find(x=>x.id===id) || myListings.find(x=>x.id===id)) openDetail(id);
   else go('esplora');
