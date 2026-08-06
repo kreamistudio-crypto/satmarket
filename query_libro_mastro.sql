@@ -13,7 +13,7 @@
 --
 -- TUTTO IN SOLA LETTURA. Nessuna correzione automatica esiste, né qui
 -- né nell'orologio: un libro mastro sbagliato lo guarda una persona.
--- I controlli da 1 a 15 DEVONO stampare «(nessuna riga)».
+-- I controlli da 1 a 16 DEVONO stampare «(nessuna riga)».
 -- =====================================================================
 
 .mode column
@@ -137,30 +137,52 @@ SELECT id, payout_stato FROM ordini
 SELECT id, payout_stato FROM rimborsi_asta
  WHERE payout_stato NOT IN ('', 'incerto', 'uscito');
 
+SELECT '16) PROMESSE DI SCONTO CHE NON POSSONO SCATTARE (vuoto)' AS controllo;
+-- Qui non si perdono sats: si perde una vendita, e in silenzio. Un
+-- criterio che nessun ramo sa applicare, o una soglia sotto il minimo
+-- STRUTTURALE (2 pezzi, 1 sat) — non le leve SCONTO_PACCO_MIN_*, che
+-- cambiando farebbero suonare l'allarme senza che sia rotto niente.
+SELECT tg_id, nome, sconto_pacco_criterio AS criterio,
+       sconto_pacco_soglia AS soglia_pezzi,
+       sconto_pacco_valore AS soglia_sats, sconto_pacco_percento AS pct
+  FROM utenti WHERE sconto_pacco_percento > 0 AND (
+       sconto_pacco_criterio NOT IN ('pezzi','valore')
+    OR (sconto_pacco_criterio = 'pezzi'  AND sconto_pacco_soglia < 2)
+    OR (sconto_pacco_criterio = 'valore' AND sconto_pacco_valore < 1));
+
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non
 -- racconta perché non è un allarme.
 -- =====================================================================
 
-SELECT '16) I NEGOZI CHE SCONTANO' AS polso;
-SELECT tg_id, nome, sconto_pacco_soglia AS da_pezzi,
+SELECT '17) I NEGOZI CHE SCONTANO' AS polso;
+-- il CASE non è una comodità: senza, la colonna «soglia» mescola pezzi
+-- e sats ed è il primo posto dove un umano si sbaglia leggendo
+SELECT tg_id, nome, sconto_pacco_criterio AS criterio,
+       CASE sconto_pacco_criterio WHEN 'valore' THEN sconto_pacco_valore
+            ELSE sconto_pacco_soglia END AS soglia,
        sconto_pacco_percento AS sconto
   FROM utenti WHERE sconto_pacco_percento > 0
  ORDER BY sconto_pacco_percento DESC;
 
-SELECT '17) GLI ORDINI SCONTATI' AS polso;
+SELECT '18) GLI ORDINI SCONTATI' AS polso;
 SELECT COUNT(*) AS ordini, SUM(sconto_sats) AS sats_scontati,
        ROUND(AVG(sconto_percento), 1) AS percento_medio,
        SUM(prezzo_sats) AS incassato
   FROM ordini WHERE sconto_sats > 0;
 
-SELECT '18) GLI ULTIMI DIECI SCONTATI' AS polso;
-SELECT id, stato, quantita AS pezzi, sconto_percento AS pct,
-       sconto_sats, prezzo_sats,
-       datetime(creato, 'unixepoch', 'localtime') AS quando
-  FROM ordini WHERE sconto_sats > 0 ORDER BY id DESC LIMIT 10;
+SELECT '19) GLI ULTIMI DIECI SCONTATI' AS polso;
+-- il lordo accanto ai pezzi: a criterio valore è LUI il numero che ha
+-- fatto scattare la soglia, e senza non si capisce perché quell'ordine
+-- ha scontato e quello sopra no
+SELECT o.id, o.stato, o.quantita AS pezzi,
+       SUM(r.unitario_sats*r.quantita) AS lordo,
+       o.sconto_percento AS pct, o.sconto_sats, o.prezzo_sats,
+       datetime(o.creato, 'unixepoch', 'localtime') AS quando
+  FROM ordini o LEFT JOIN ordine_righe r ON r.ordine_id = o.id
+ WHERE o.sconto_sats > 0 GROUP BY o.id ORDER BY o.id DESC LIMIT 10;
 
-SELECT '19) I PAGAMENTI CONGELATI (non è un guasto: è la coda)' AS polso;
+SELECT '20) I PAGAMENTI CONGELATI (non è un guasto: è la coda)' AS polso;
 -- payout_stato='incerto' NON è un allarme — è una riga che aspetta un
 -- moderatore, cioè il funzionamento previsto. Qui si guarda da quanto.
 SELECT id, stato, payout_stato, payout_verso, payout_hash,

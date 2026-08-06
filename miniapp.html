@@ -3934,12 +3934,17 @@ function mapListing(a){
        del rientro (unix, come lampoFine e astaFine). L'annuncio resta
        in vetrina: cambia solo che non si compra. */
     ferie:a.venditore_ferie||0,
-    /* lo sconto sul carrello del negozio (ago 2026): la REGOLA —
-       quanti pezzi, quanta percentuale — non il conto, che resta del
-       server. Vale per tutti gli annunci del venditore, quindi la
-       porta ognuno di loro; 0 = nessuna regola, o server di ieri, e
-       non se ne parla. */
+    /* lo sconto sul carrello del negozio (ago 2026): la REGOLA — il
+       criterio, quanto ci vuole, quanta percentuale — non il conto,
+       che resta del server. Vale per tutti gli annunci del venditore,
+       quindi la porta ognuno di loro; 0 = nessuna regola, o server di
+       ieri, e non se ne parla. Le due soglie si escludono a vicenda
+       (lo garantisce _sconto_pubblico lato server): a criterio valore
+       `scontoSoglia` e' 0, ed e' cio' che impedisce a un client fermo
+       a ieri di leggere dei sats come se fossero pezzi. */
+    scontoCriterio:a.venditore_sconto_criterio||'',
     scontoSoglia:a.venditore_sconto_soglia||0,
+    scontoValore:a.venditore_sconto_valore||0,
     scontoPct:a.venditore_sconto_percento||0,
     distintivi:a.venditore_distintivi||[],
     /* il titolo arriva GIA' col suo nome dal server: qui e' testo */
@@ -5514,12 +5519,11 @@ function renderNegozio(v, annunci, feedback=[]){
      dal link pubblico. I due numeri finiscono in innerHTML senza esc:
      Number() e' la cintura, la stessa di v.rating. */
   const scontoNegozioRiga = w => {
-    const s = Number(w.sconto_pacco_soglia)||0,
-          p = Number(w.sconto_pacco_percento)||0;
-    return (s > 0 && p > 0)
+    const r = regolaSconto(w.sconto_pacco_criterio, w.sconto_pacco_soglia,
+                           w.sconto_pacco_valore, w.sconto_pacco_percento);
+    return r
       ? `<div class="trust-note" style="margin-top:12px">🎁 <span>Questo
-           negozio fa <b>−${p}%</b> da ${s} pezzi nello stesso
-           carrello.</span></div>` : '';
+           negozio fa ${frasePromessaSconto(r, 1)}.</span></div>` : '';
   };
   const chi = (v.nome||'').split(' ')[0];
   const ponti = mio ? '' : pontiContatto(
@@ -6502,11 +6506,12 @@ async function sezioneAltriOggetti(l){
      l'azione. Stesse condizioni del bottone: mai una promessa dove il
      carrello non esiste. */
   const scOk = !(DEMO || astaE(l) || tuttoDigitale || inFerie(l))
-    && l.scontoSoglia > 0 && l.scontoPct > 0;
+    ? regolaSconto(l.scontoCriterio, l.scontoSoglia, l.scontoValore,
+                   l.scontoPct) : null;
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
-      ${scOk ? `<div class="acq-nota" style="margin-top:6px">🎁 Questo negozio fa <b>−${l.scontoPct}%</b> da ${l.scontoSoglia} pezzi nello stesso carrello.</div>` : ''}
+      ${scOk ? `<div class="acq-nota" style="margin-top:6px">🎁 Questo negozio fa ${frasePromessaSconto(scOk, 1)}.</div>` : ''}
       ${DEMO || astaE(l) || tuttoDigitale || inFerie(l) ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>`}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
@@ -7299,13 +7304,52 @@ function aggiornaBarraPacco(){
      titolo «Il carrello», e a 375px la coda si troncava coi puntini */
   el('paccoConta').textContent = pezzi
     ? `${pezzi} pezz${pezzi===1?'o':'i'}` : 'il carrello è vuoto';
-  aggiornaInvitoSconto();     /* l'invito parla dello stesso conteggio */
+  /* l'invito parla dello stesso conteggio, e a criterio valore dello
+     stesso TOTALE: glielo passiamo invece di farglielo rifare — cosi'
+     l'invito non calcola, riceve, e i due numeri non possono divergere */
+  aggiornaInvitoSconto(tot, circa);
+}
+/* ---- LA REGOLA DELLO SCONTO, GIUDICE UNICO DEL CLIENT (ago 2026) ----
+   Il criterio arriva dal server insieme alle due soglie, che si
+   escludono a vicenda per costruzione (_sconto_pubblico): a criterio
+   valore `soglia` e' 0, a criterio pezzi e' 0 `valore`. Qui si sceglie
+   quale guardare UNA volta sola — se lo facessero le quattro superfici
+   che la promessa la mostrano (testata negozio, «Altri oggetti»,
+   invito del carrello, cassetto), basterebbe che una se lo dimenticasse
+   perche' dei sats si leggano come pezzi. Null-safe sulle chiavi
+   mancanti: DEMO e server di ieri passano di qui e ottengono `null`. */
+function regolaSconto(criterio, soglia, valore, pct){
+  const p = Number(pct) || 0;
+  if (p <= 0) return null;
+  const c = criterio || (Number(soglia) > 0 ? 'pezzi' : '');
+  const q = Number(c === 'valore' ? valore : soglia) || 0;
+  return q > 0 && (c === 'pezzi' || c === 'valore')
+    ? {criterio: c, quanto: q, pct: p} : null;
+}
+/* La promessa scritta a parole, e in UN posto solo: due copie
+   divergono al primo ritocco. `viva` = il cambio ha risposto davvero,
+   e senza non si scrive nessun «≈ €» — il cambio di riserva
+   inventerebbe una cifra. Dice sempre «nello stesso carrello», ed e'
+   deliberato: a criterio valore «da 100.000 sats» si legge come «da
+   100.000 sats di spesa», e chi compra UNA cosa cara non sconta mai
+   (il mono non sconta, vedi _righe_ordine). */
+function frasePromessaSconto(r, viva){
+  if (!r) return '';
+  if (r.criterio === 'pezzi')
+    return `<b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi nello stesso
+      carrello`;
+  const eur = (viva && cambioVivo)
+    ? ` <span class="unit">(≈ ${fmtEur(r.quanto * eurPerSat)} €)</span>` : '';
+  return `<b>−${r.pct}%</b> da ${fmt(r.quanto)} sats${eur} di articoli
+    nello stesso carrello`;
 }
 /* ---- L'INVITO DELLO SCONTO SUL CARRELLO (ago 2026) ----
-   La regola del negozio in una riga: quanti pezzi mancano e di quanto
-   scende il carrello. NON e' un conto — qui dentro non c'e' un sat —
-   quindi il patto resta intero: il client conta i PEZZI (lo fa gia') e
-   ripete una regola che il server gli ha scritto sull'annuncio.
+   La regola del negozio in una riga: quanto manca e di quanto scende
+   il carrello. NON e' un conto: l'invito non CALCOLA, riceve — il
+   totale glielo passa aggiornaBarraPacco, che quel numero lo mostra
+   gia' due centimetri piu' sotto. Quindi i due non possono divergere,
+   e la percentuale non si applica mai qui: quanto si risparmia lo dice
+   il conto del server, nel riepilogo.
    Il dato viene dall'ANNUNCIO e non dal preventivo, che ha una firma e
    arriva in ritardo: un invito che risponde mezzo secondo dopo — o che
    dice la cosa vecchia — e' peggio di nessun invito.
@@ -7316,30 +7360,36 @@ function scontoNegozio(){
      basta guardare il primo che c'e' */
   const x = listings.find(t => t.id===paccoDati?.origineId)
          || annunciPacco()[0];
-  return (x && x.scontoSoglia > 0 && x.scontoPct > 0)
-    ? {soglia: x.scontoSoglia, pct: x.scontoPct} : null;
+  return x ? regolaSconto(x.scontoCriterio, x.scontoSoglia,
+                          x.scontoValore, x.scontoPct) : null;
 }
-function aggiornaInvitoSconto(){
+function aggiornaInvitoSconto(tot, circa){
   const box = el('paccoSconto');
   if (!box) return;
   const s = scontoNegozio(), pezzi = pezziSet();
   /* a carrello vuoto la promessa non ha ancora un destinatario: la
      riga nasce col primo pezzo, quando c'e' qualcosa da far crescere */
   if (!s || !pezzi) { box.innerHTML = ''; return; }
-  if (pezzi >= s.soglia){
+  /* a valore si misura il LORDO degli articoli, che e' il numero della
+     barra: lo stesso che la soglia confronta sul server */
+  const ora = s.criterio === 'valore' ? (tot || 0) : pezzi;
+  if (ora >= s.quanto){
     /* SCATTATO: la riga non sparisce, si TRASFORMA in conferma. Se
        sparisse, chi ha appena guadagnato lo sconto non vedrebbe
        cambiare niente — la barra qui sotto e' al lordo, di proposito —
        e la promessa sembrerebbe evaporata. Percio' dice anche DOVE
-       sono finiti i sats. */
+       sono finiti i sats: e' il conto del server a decidere, non
+       questa riga. */
     box.innerHTML = `<div class="trust-note">✅ <span>Sconto attivo:
       <b>−${s.pct}%</b> su tutto il carrello, lo vedi nel conto.</span></div>`;
     return;
   }
-  const n = s.soglia - pezzi;
-  box.innerHTML = `<div class="acq-nota">🎁 Ancora ${fmt(n)}
-    articol${n===1?'o':'i'}: il negozio fa <b>−${s.pct}%</b>
-    su tutto il carrello.</div>`;
+  const n = s.quanto - ora;
+  const manca = s.criterio === 'valore'
+    ? cifraCtrl(n, circa || '')
+    : `${fmt(n)} articol${n===1?'o':'i'}`;
+  box.innerHTML = `<div class="acq-nota">🎁 Ancora ${manca}: il negozio
+    fa <b>−${s.pct}%</b> su tutto il carrello.</div>`;
 }
 /* GRIGLIA E RIEPILOGO SONO DUE VISTE DELLO STESSO STATO (`setScelte`,
    che e' il conteggio UNICO): la quantita' toccata in una si vede
@@ -10353,37 +10403,117 @@ function renderScontoPacco(){
   }
   if (sez) sez.style.display = '';
   const attivo = !!(myScontoPacco && myScontoPacco.percento > 0);
+  const criteri = scontoPaccoLeve.criteri || ['pezzi'];
   el('scontoPaccoConta').textContent = attivo
-    ? `−${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi` : '';
+    ? (myScontoPacco.criterio === 'valore'
+        ? `−${myScontoPacco.percento}% da ${fmt(myScontoPacco.valore)} sats`
+        : `−${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`)
+    : '';
   /* la bozza parte da cio' che c'e' gia' (o dalla prima voce utile per
-     chi non ha ancora niente): il cassetto si apre con una proposta */
+     chi non ha ancora niente): il cassetto si apre con una proposta.
+     Porta ENTRAMBE le soglie, cosi' chi prova l'altro criterio e torna
+     indietro ritrova la sua — e il server le conserva a vicenda */
   if (!scontoPaccoBozza)
-    scontoPaccoBozza = attivo
-      ? {soglia: myScontoPacco.soglia, pct: myScontoPacco.percento}
-      : {soglia: (scontoPaccoLeve.soglie||[])[0] || 2,
-         pct: (scontoPaccoLeve.sconti||[])[0] || 5};
-  const b = scontoPaccoBozza;
+    scontoPaccoBozza = {
+      criterio: (attivo && myScontoPacco.criterio) || criteri[0] || 'pezzi',
+      soglia: (attivo && myScontoPacco.soglia)
+              || (scontoPaccoLeve.soglie||[])[0] || 2,
+      valore: (attivo && myScontoPacco.valore)
+              || (scontoPaccoLeve.valori||[])[0] || 25000,
+      pct: (attivo && myScontoPacco.percento)
+           || (scontoPaccoLeve.sconti||[])[0] || 5};
+  const b = scontoPaccoBozza, aValore = b.criterio === 'valore';
   const pill = (v, testo, campo) =>
-    `<button onclick="scontoPaccoPill('${campo}',${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+    `<button data-campo="${campo}" data-v="${v}" onclick="scontoPaccoPill('${campo}',${typeof v==='string'?`'${v}'`:v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+  /* le pillole a valore portano il loro ≈ €: l'app parte in vista euro,
+     e una fila di cifre in sats si sceglierebbe alla cieca.
+     L'≈€ NON e' una `.unit` — quella e' il selettore nudo che forza
+     var(--muted), e sulla pillola ACCESA (fondo arancione, testo
+     bianco) il grigio sparisce: qui e' una glossa, e segue il colore
+     del bottone con un filo di trasparenza */
+  const pillValore = v => pill(v, `${fmt(v)} sats${cambioVivo
+    ? `<span style="opacity:.72;font-weight:600"> ≈ ${
+        fmtEur(v * eurPerSat)} €</span>` : ''}`, 'valore');
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      Premia chi prende più cose in una volta: da un certo numero di
-      pezzi nello stesso carrello, il prezzo degli
+      Premia chi prende più cose in una volta: il prezzo degli
       <b style="color:var(--ink)">articoli</b> scende della percentuale
-      che scegli. La <b style="color:var(--ink)">spedizione non si
-      tocca</b> — ed è già una sola per tutto il carrello.</div>
+      che scegli, quando il carrello arriva alla soglia. La
+      <b style="color:var(--ink)">spedizione non si tocca</b> — ed è già
+      una sola per tutto il carrello.</div>
     <div id="scontoPaccoErrore"></div>
-    <div class="section-label" style="margin-top:14px">Da quanti pezzi</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${(scontoPaccoLeve.soglie||[]).map(s => pill(s, `${s} pezzi`, 'soglia')).join('')}</div>
+    ${criteri.length > 1 ? `
+      <div class="section-label" style="margin-top:14px">Come si conta</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${pill('pezzi', 'A pezzi', 'criterio')}
+        ${pill('valore', 'A valore', 'criterio')}</div>` : ''}
+    ${aValore ? `
+      <div class="section-label" style="margin-top:12px">Da quanti sats di articoli</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${(scontoPaccoLeve.valori||[]).map(pillValore).join('')}</div>
+      ${cambioVivo ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--muted)">
+          <span>oppure</span>
+          <input id="scontoPaccoEur" type="number" inputmode="decimal" min="0"
+            step="1" value="${(b.valore * eurPerSat).toFixed(0)}"
+            oninput="scontoPaccoDaEuro(this.value)"
+            style="font:inherit;width:88px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink)">
+          <span>€ = <b style="color:var(--ink)">${fmt(b.valore)} sats</b></span>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:6px">
+          L'euro serve solo a scegliere: quello che si salva è la cifra
+          in <b style="color:var(--ink)">sats</b>, così la tua regola
+          resta la stessa anche quando il cambio si muove.</div>` : ''}
+    ` : `
+      <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${(scontoPaccoLeve.soglie||[]).map(s => pill(s, `${s} pezzi`, 'soglia')).join('')}</div>`}
     <div class="section-label" style="margin-top:12px">Quanto sconto</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(scontoPaccoLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
-    <div class="acq-nota">🎁 <b>Da ${b.soglia} pezzi in su, −${b.pct}% su
-      tutto il carrello.</b> Chi ne prende ${b.soglia-1} paga pieno.</div>
+    <div class="acq-nota">🎁 <b>${aValore
+      ? `Da ${fmt(b.valore)} sats${cambioVivo ? ` (≈ ${fmtEur(b.valore * eurPerSat)} €)` : ''} di articoli in su, −${b.pct}%`
+      : `Da ${b.soglia} pezzi in su, −${b.pct}%`} su tutto il
+      carrello.</b> ${aValore
+      ? `La soglia guarda il carrello <b>dopo</b> le tue offerte lampo e
+         gli accordi: una lampo generosa può farlo scendere sotto.`
+      : `Chi ne prende ${b.soglia-1} paga pieno.`}</div>
+    <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
+      Vale solo nel <b style="color:var(--ink)">carrello</b>, da due
+      oggetti diversi in su: chi ne prende uno solo paga pieno, per
+      quanto costi.</div>
     <button class="btn orange" onclick="setScontoPacco()">
       ${attivo ? '🎁 Aggiorna lo sconto' : '🎁 Attiva lo sconto'}</button>
     ${attivo ? `<button class="btn ghost" onclick="setScontoPacco(true)">Spegni lo sconto</button>` : ''}`;
+}
+/* Il campo in euro e' un AIUTO A SCEGLIERE e non una seconda unita':
+   scrive nella bozza la cifra in SATS e basta. Cosi' la regola salvata
+   e' deterministica — non cambia da sola quando si muove il cambio —
+   ed e' anche il motivo per cui il campo sparisce se CoinGecko non ha
+   risposto: senza cambio vivo il numero sarebbe inventato.
+   Non ridisegna il cassetto (il campo perderebbe il fuoco a ogni
+   tasto): riscrive in place le due cifre che dipendono da lui. */
+function scontoPaccoDaEuro(v){
+  const e = parseFloat(String(v).replace(',', '.'));
+  if (!(e > 0) || !cambioVivo || !scontoPaccoBozza) return;
+  scontoPaccoBozza.valore = Math.round(e / eurPerSat);
+  const b = scontoPaccoBozza;
+  const riga = el('scontoPaccoEur')?.parentElement?.querySelector('b');
+  if (riga) riga.textContent = `${fmt(b.valore)} sats`;
+  const nota = el('scontoPaccoBlocco')?.querySelector('.acq-nota b');
+  if (nota) nota.innerHTML = `Da ${fmt(b.valore)} sats (≈ ${
+    fmtEur(b.valore * eurPerSat)} €) di articoli in su, −${b.pct}% su
+    tutto il carrello.`;
+  /* e le pillole tornano a dire la verita': scrivendo una cifra libera
+     quasi mai una combacia, e una pillola accesa su un numero diverso
+     da quello scritto sopra e' la stessa bugia del campo che mente */
+  document.querySelectorAll('#scontoPaccoBlocco [data-campo="valore"]')
+    .forEach(p => {
+      const on = Number(p.dataset.v) === b.valore;
+      p.style.borderColor = on ? 'var(--sats)' : 'var(--line)';
+      p.style.background = on ? 'var(--sats)' : 'transparent';
+      p.style.color = on ? '#fff' : 'var(--muted)';
+    });
 }
 function scontoPaccoPill(campo, v){
   haptic();
@@ -10394,8 +10524,13 @@ async function setScontoPacco(spegni){
   haptic();
   if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
   const b = scontoPaccoBozza || {};
-  const corpo = spegni ? {soglia: 0, percento: 0}
-                       : {soglia: b.soglia, percento: b.pct};
+  /* si mandano SEMPRE tutte e due le soglie: il server le conserva a
+     vicenda (chiave assente = conserva), e cosi' quella dell'altro
+     criterio resta com'era invece di sparire a ogni salvataggio */
+  const corpo = spegni ? {percento: 0}
+                       : {criterio: b.criterio || 'pezzi',
+                          soglia: b.soglia, valore: b.valore,
+                          percento: b.pct};
   const box = el('scontoPaccoErrore');
   if (box) box.innerHTML = '';
   try {
@@ -10411,13 +10546,19 @@ async function setScontoPacco(spegni){
       else toast(d.detail || 'Non ci sono riuscito, riprova', 6000);
       return;
     }
+    /* si adotta cio' che il server ha RILETTO, non cio' che si e'
+       mandato: col COALESCE la soglia dell'altro criterio non si
+       deduce dal body */
     myScontoPacco = d.percento > 0
-      ? {soglia: d.soglia, percento: d.percento} : null;
+      ? {criterio: d.criterio, soglia: d.soglia, valore: d.valore,
+         percento: d.percento} : null;
   } catch(e) { toast('Rete assente: riprova'); return; }
   scontoPaccoBozza = null;     /* la bozza riparte da cio' che e' salvato */
   renderScontoPacco();
   toast(myScontoPacco
-    ? `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`
+    ? (myScontoPacco.criterio === 'valore'
+        ? `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${fmt(myScontoPacco.valore)} sats`
+        : `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`)
     : 'Sconto spento: da adesso il prezzo è pieno per tutti');
 }
 
@@ -14137,7 +14278,10 @@ async function avvia(){
     myFerieFino = me.ferie_fino || 0;
     ferieLeve = me.ferie_leve || null;   // server di ieri = cassetto assente
     myScontoPacco = (me.sconto_pacco_percento > 0)
-      ? {soglia: me.sconto_pacco_soglia, percento: me.sconto_pacco_percento}
+      ? {criterio: me.sconto_pacco_criterio || 'pezzi',
+         soglia: me.sconto_pacco_soglia,
+         valore: me.sconto_pacco_valore || 0,
+         percento: me.sconto_pacco_percento}
       : null;
     scontoPaccoLeve = me.sconto_pacco_leve || null;   // idem
     /* la bozza si butta a ogni /api/me, o resterebbe quella fissata da

@@ -167,18 +167,36 @@ CONTROLLO_LIBRO_MASTRO = True   # False = ronda spenta
 # --- Sconto carrello (chi prende piu' cose paga meno) ----------------
 # Il venditore premia chi compra piu' articoli in un ordine solo: UNA
 # regola per tutto il suo negozio — «da N articoli, −X%» — senza
-# scaglioni. Vale SOLO sul prezzo degli articoli, MAI sulla spedizione,
-# e si conta a PEZZI. Non vale su un annuncio comprato da solo, per
-# quante copie se ne prendano: lo sconto e' del carrello.
+# scaglioni. Vale SOLO sul prezzo degli articoli, MAI sulla spedizione.
+# Non vale su un annuncio comprato da solo, per quante copie se ne
+# prendano: lo sconto e' del carrello.
+# IL CRITERIO della soglia lo sceglie il venditore: a PEZZI («da 3
+# articoli») o a VALORE degli articoli («da 100.000 sats nel
+# carrello»), che e' il modo di dare lo sconto da due pezzi su un
+# computer e da venti su una scatola di cianfrusaglie, con una regola
+# sola. La soglia a valore e' in SATS e non in euro: cosi' non dipende
+# dal cambio (che potrebbe non rispondere) e si confronta con
+# l'articolo, che e' gia' in sats. Nel cassetto il venditore puo'
+# digitare la cifra in euro come AIUTO, ma cio' che si salva sono i
+# sats.
 # Si cumula con la lampo e con le offerte accettate: e' una promessa di
 # negozio, e un pezzo che non la mantenesse non avrebbe un posto onesto
-# dove dirlo. Il tetto qui sotto e' il guardrail della cascata.
+# dove dirlo. Il tetto qui sotto e' il guardrail della cascata — e
+# attenzione, a criterio valore la soglia guarda il carrello DOPO
+# lampo e accordo: una lampo generosa puo' farlo scendere sotto soglia.
 SCONTO_PACCO_ATTIVO = True      # interruttore generale (False = spento)
+SCONTO_PACCO_CRITERI = ("pezzi", "valore")   # togliere un criterio da
+                                # qui lo spegne per chi l'aveva scelto
 SCONTO_PACCO_SOGLIE = (2, 3, 4, 5)      # le soglie proposte al venditore
+SCONTO_PACCO_VALORI = (25_000, 50_000, 100_000, 200_000)  # a valore, sats
 SCONTO_PACCO_SCONTI = (5, 10, 15, 20)   # le percentuali proposte
 SCONTO_PACCO_MIN_SOGLIA = 2     # sotto non e' uno sconto carrello: e'
                                 # un ribasso di listino, e quello si fa
                                 # sul prezzo
+SCONTO_PACCO_MIN_VALORE = 1_000  # la gemella a valore: una cintura
+                                # contro lo zero travestito, non un
+                                # giudizio su quanto debba valere un
+                                # carrello
 SCONTO_PACCO_MAX_PERCENTO = 30  # sconto massimo consentito
 
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
