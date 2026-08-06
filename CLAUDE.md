@@ -1414,17 +1414,70 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (niente disco né database prima della pubblicazione) che converte
   con Pillow e restituisce il JPEG — anteprima VERA appena scelta la
   foto, ed è lo stesso identico JPEG che poi si pubblica, già
-  leggero. Se il server non può (Pillow assente, rete giù), resta
-  l'originale col segnaposto 📷 «verrà convertita» e ci pensa
-  `salva_foto` alla pubblicazione, con Pillow+pillow-heif, dentro
+  leggero. Se il server non può, la foto si RIFIUTA lì (vedi «nessuna
+  foto sparisce in silenzio»); la conversione vera vive comunque anche
+  in `salva_foto` alla pubblicazione, con Pillow+pillow-heif, dentro
   `asyncio.to_thread` e fuori dalla transazione SQLite: secondi di
   CPU che non devono congelare il server mono-processo. La strada
   libheif-WASM in pagina è stata valutata e scartata: ~1MB di blob
   inauditabile nel repo per un caso raro, contro 25 righe che
   riusano `converti_in_jpeg`. Import
   fail-open: senza `pillow` tutto come prima (JPEG passano, limite
-  2.5MB), senza `pillow-heif` le HEIC si saltano con una riga in
-  console. Con Pillow anche i PNG/WebP grezzi diventano JPEG veri.
+  2.5MB), senza `pillow-heif` le HEIC si saltano — e dall'ago 2026
+  l'AVVIO lo dichiara con una riga, il patto della chiave dei
+  contenuti digitali: un fail-open silenzioso anche per chi guarda il
+  server non è dichiarato, è solo silenzio. Con Pillow anche i
+  PNG/WebP grezzi diventano JPEG veri.
+  NESSUNA FOTO SPARISCE IN SILENZIO (ago 2026, caso dal campo: «carico
+  un JPG dal computer, qualche mega, e non succede NULLA — nessun
+  errore, nessun chip»). La causa NON era il canvas, ed è la prima
+  cosa da sapere perché è dove si guarda per istinto: il percorso del
+  selettore file regge tutto, misurato — 6000×4000, 20000×15000 (300
+  Mpx, che Chrome sottocampiona da solo) e HEIC vere; il canvas di
+  uscita è sempre 1200px, quindi non è mai lui a essere grande. Era il
+  TRASCINAMENTO: `.photo-drop` è un riquadro tratteggiato che si
+  chiama photo-drop e sul desktop chiede di essere usato così, e aveva
+  il solo `onclick`. Senza un `preventDefault` sul `dragover` il
+  browser non emette NEMMENO l'evento `drop` — quindi niente foto,
+  niente chip, nessun errore e nessuna navigazione: il nulla esatto
+  che l'utente descriveva. Ora i quattro gestori stanno sul riquadro
+  (`fotoSopra`/`fotoLasciate`, classe `.sopra` mentre il file ci passa
+  sopra) e `aggiungiFoto(files)` è la strada UNICA dei due gesti,
+  che `fotoScelte` ora si limita a chiamare. «o trascinale qui» si
+  mostra solo sotto `(hover:hover) and (pointer:fine)`: sul telefono
+  quel gesto non esiste e prometterlo sarebbe una bugia.
+  Con lui gli ALTRI QUATTRO SILENZI, che erano il vero tema: 1)
+  l'errore dell'anteprima si ingoiava (`if (r.ok)` senza else) e in
+  pagina restava il segnaposto «verrà convertita alla pubblicazione»
+  — ora si legge `detail` e la foto si rifiuta, e quel chip NON ESISTE
+  PIÙ: era una promessa che nessuno aveva verificato e che alla
+  pubblicazione veniva disattesa in silenzio; 2) il `FileReader` che
+  fallisce lo dice; 3) gli scarti di `salva_foto` erano `continue`
+  muti — adesso la funzione torna `(nomi, scarti)` coi MOTIVI, la
+  risposta di pubblica() e modifica() porta `foto_salvate` e
+  `foto_scarti`, e `avvisoFoto()` li attacca in coda al toast di
+  conferma (mai un secondo toast: coprirebbe quello del successo;
+  `foto_salvate` assente = server di ieri e non si dice niente); 4)
+  il file che immagine NON È si rifiuta subito col suo nome. Su
+  quest'ultimo la lezione da tenere: il `data:image/jpeg` lo scrive il
+  BROWSER deducendo il tipo dall'ESTENSIONE, quindi un PDF rinominato
+  .jpg arrivava etichettato image/jpeg, passava la regex e finiva
+  SCRITTO in `foto/` e servito come immagine (riprodotto). Due
+  guardie: nel client, se il browser non ha saputo decodificare un
+  formato che sa decodificare (jpeg/png/webp/gif/bmp per tipo O
+  estensione) il file non è quel che promette e si rifiuta SENZA
+  chiedere niente al server — solo le HEIC hanno bisogno di lui, e i
+  tipi sconosciuti ci provano lo stesso, che Pillow legge i byte; nel
+  server `_e_immagine` (Pillow `verify()`, fail-open senza Pillow), da
+  cui passa tutto il non-HEIC prima di toccare il disco.
+  INVARIANTE che ne esce, ed è ciò che tiene semplice il resto: in
+  `sellFoto` c'è SOLO il chip `caricando:` o un JPEG vero.
+  IL CORPO DELLA POST non ha tetto né in uvicorn né in Caddy (che di
+  default non ne mette, a differenza di nginx), e misurato non è un
+  problema: 5 foto scelte da 216 MB di originali fanno **1,53 MB** di
+  POST — il ridimensionamento a 1200px è il livellatore. Il 413 ha
+  comunque il suo messaggio, che è l'unico errore che l'utente ripara
+  da solo togliendo una foto.
   Badge Nostr: colonna `utenti.npub` auto-dichiarata via `/api/me/npub`
   (formato bech32, rifiuta le nsec) + verifica con NOTA PUBBLICA:
   `/api/me/npub/verifica-avvia` genera un codice (vale 1h), l'utente lo
