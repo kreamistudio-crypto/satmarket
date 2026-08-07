@@ -5566,7 +5566,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Scopri di più» nel recinto, la riga di fiducia di Esplora e del
   negozio (ora un `<button class="trust-line">` col ›: il tour la
   cerca per classe e la classe non è cambiata), un bottone in fondo
-  al Profilo — e `apriSicurezza()`/`tornaDaSicurezza()` ricordano da
+  al Profilo — più il LINK CONDIVISIBILE `/sicurezza` (ago 2026, rotta
+  esplicita gemella di `/annuncio/{id}`, letta da `apriSicurezzaDaUrl`
+  in avvia E in avviaVetrina): l'ancora sta nel FRAMMENTO e senza
+  prefisso (`/sicurezza#limiti` → l'id `sicu-limiti`), così
+  l'indirizzo che si manda resta corto e il prefisso lo rimette il
+  codice; un'ancora inesistente lascia la pagina in cima, senza un
+  ramo d'errore. L'URL poi non si tocca più (il patto del motore di
+  navigazione: `pushState` con `location.href`), quindi navigando
+  altrove la barra resta su /sicurezza — innocuo, ed è la ragione per
+  cui NON si apre una rotta per ogni vista.
+  E `apriSicurezza(ancora)`/`tornaDaSicurezza()` ricordano da
   dove si veniva (il patto di `tornaDalNegozio`, con la vista di
   partenza che può essersi svuotata). Vale anche per gli anonimi in
   vetrina: la fiducia si spiega prima di chiedere di entrare.
@@ -6571,7 +6581,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/annuncio/*`, `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
+   `/annuncio/*`, `/sicurezza` (la pagina «Il pagamento protetto», link
+   condivisibile con l'ancora facoltativa `#limiti`: si manda a chi
+   chiede «mi fido?», cioè a chi Barattolo non ce l'ha ancora),
+   `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
    calcolata dal catalogo), `/assets/mascotte.jpeg`,
