@@ -2018,6 +2018,7 @@ def prove_busta_ritiro():
                "verifica_utente": lambda h, s: {"id": chi},
                "leggi_json": _leggi, "notifica": _notifica,
                "hashlib": __import__("hashlib"), "time": _t,
+               "html": __import__("html"),   # segna_spedito scappa i suoi
                "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
                "MSG_BUSTA_PRONTA": "TI-ASPETTA"}
         exec(pezzo("_cifra_contenuto"), amb)
@@ -6569,6 +6570,344 @@ def prove_posizione_vetrina():
 
 
 # ====================================================================
+def prove_impersonazione():
+    """CHI SI FINGE BARATTOLO (ago 2026, M1 dell'audit). Da quando
+    esistono le anteprime dei link, /annuncio/{id} e' una scheda col
+    nome Barattolo su un indirizzo di Barattolo, dove titolo,
+    descrizione e immagine li sceglie chi pubblica: «Barattolo —
+    verifica il tuo pagamento in sospeso» condiviso da li' e' un
+    messaggio che sembra ufficiale, e chi lo riceve non ha NESSUN
+    segnale per distinguerlo.
+
+    Il verdetto lo da' un modello, quindi qui non si prova che l'AI
+    risponda giusto — la chiave Anthropic sta fuori dalla CI apposta,
+    e una prova che dipende da un server altrui e' un oroscopo. Si
+    prova che LA VOCE ESISTA e che le tre cose che la tengono
+    onesta siano ancora scritte: il divieto, il perimetro (titolo E
+    descrizione) e la CONTRO-REGOLA — nominare Barattolo e' lecito —
+    che e' quella che un riordino toglie per prima perche' sembra un
+    ripensamento. Il collaudo col modello vero e' collaudo_
+    impersonazione.py, che vuole la chiave."""
+    print("\n[chi si finge Barattolo]")
+    i = _SORGENTE.index("PROMPT_MODERAZIONE = (")
+    # Le stringhe spezzate su piu' righe si RICUCIONO prima di
+    # cercare: e' nella piega — «'venduto tramite "» a capo «"Barattolo'»
+    # — che una frase si nasconde a chi la cerca, ed e' la lezione
+    # gia' pagata dalla sentinella dei sats.
+    prompt = re.sub(r'"\s*\n\s*"', "",
+                    _SORGENTE[i:_SORGENTE.index("\n\n\n", i)])
+
+    # --- 1) la voce c'e', ed e' un divieto -------------------------
+    prova("il prompt nomina l'impersonazione", True,
+          "IMPERSONAZIONE" in prompt)
+    prova("...e la mette fra i casi netti, non fra i dubbi", True,
+          "Ai casi netti si aggiunge l'IMPERSONAZIONE" in prompt)
+    prova("...nominando le tre cose per cui ci si puo' spacciare",
+          True, all(p in prompt for p in
+                    ("da Barattolo", "moderatori", "altro servizio")))
+
+    # --- 2) il perimetro: l'anteprima pesca da tutti e due ---------
+    # E' la riga del cantiere: og:title viene dal titolo e
+    # og:description dalla descrizione, quindi un divieto scritto sul
+    # solo titolo lascerebbe aperta meta' della card.
+    prova("vale sul titolo COME sulla descrizione", True,
+          "Vale sul TITOLO come sulla DESCRIZIONE" in prompt)
+
+    # --- 3) LA CONTRO-REGOLA, che e' la meta' delicata -------------
+    # Un divieto sull'impersonazione senza il permesso di NOMINARE la
+    # piattaforma e' un filtro sulla parola «Barattolo», cioe' un
+    # blocco su annunci legittimi e comunissimi. Deve restare scritto
+    # che citare non e' mai di per se' un motivo, e devono restare gli
+    # esempi: sono loro a insegnare il confine.
+    prova("citare Barattolo resta lecito, a chiare lettere", True,
+          "non e' MAI di per" in prompt and "il citarla" in prompt)
+    for legittimo in ("gadget di Barattolo", "venduto tramite Barattolo",
+                      "regolamento Barattolo", "negozio Barattolo"):
+        prova(f"...con l'esempio «{legittimo}»", True, legittimo in prompt)
+    prova("...e il criterio per decidere: c'e' una COSA in vendita?",
+          True, "una COSA in vendita" in prompt)
+
+    # --- 4) i tre esempi, uno per esito ----------------------------
+    # Il prompt insegna per esempi, e questi tre sono le tre risposte
+    # possibili sullo STESSO nome: OK chi cita, DUBBIO chi si intesta
+    # un ruolo, VIETATO chi finge un messaggio.
+    prova("l'esempio che cita il mercatino finisce in OK", True,
+          "Adesivi e gadget di Barattolo, lotto da 10' -> OK" in prompt)
+    prova("...chi si intesta un ruolo va in DUBBIO", True,
+          "supporto agli utenti' -> DUBBIO" in prompt)
+    prova("...e il finto messaggio e' VIETATO", True,
+          "verifica il tuo pagamento in sospeso' -> VIETATO" in prompt)
+
+    # --- 5) L'IMPORT IN BLOCCO LA EREDITA --------------------------
+    # 500 righe di CSV passano da moderazione_ai_lotto, che NON ha un
+    # prompt suo: e' lo stesso piu' l'appendice sul formato. Se un
+    # domani i due si sdoppiassero, la strada da cui entrano gli
+    # annunci a centinaia resterebbe scoperta — e in silenzio.
+    lotto = pezzo("moderazione_ai_lotto")
+    prova("il lotto non ha un prompt suo: eredita quello del singolo",
+          True, "PROMPT_MODERAZIONE + APPENDICE_LOTTO" in lotto)
+    prova("...e il singolo pure", True,
+          "system=PROMPT_MODERAZIONE," in pezzo("moderazione_ai"))
+
+    # --- 6) il verdetto si legge, e non finisce nel messaggio
+    #        sbagliato ---------------------------------------------
+    amb = {"MODERAZIONE_REVISIONE": True}
+    exec(pezzo("_leggi_verdetto"), amb)
+    prova("«VIETATO: impersonazione» si legge come un vietato netto",
+          ("vietato", "impersonazione della piattaforma"),
+          amb["_leggi_verdetto"]("VIETATO: impersonazione della "
+                                 "piattaforma"))
+    prova("...e il dubbio del ruolo intestato resta un dubbio",
+          ("dubbio", "si intesta un ruolo che non ha"),
+          amb["_leggi_verdetto"]("DUBBIO: si intesta un ruolo che non ha"))
+    # --- 7) e il rifiuto dice COSA ha sbagliato -------------------
+    # Prima l'impersonazione si prendeva la lista delle armi e delle
+    # droghe, che non c'entra niente. Adesso ha il suo messaggio, e
+    # deve dire anche DOV'E' IL CONFINE: qui e' sottile e non ovvio —
+    # nominare il mercatino va benissimo, parlare a nome suo no.
+    amb2 = {}
+    for costante in ("MSG_RIFIUTO = (", "MSG_RIFIUTO_SERVIZI = (",
+                     "MSG_RIFIUTO_IMPERSONAZIONE = (",
+                     "PAROLE_IMPERSONAZIONE = ("):
+        j = _SORGENTE.index(costante)
+        exec(_SORGENTE[j:_SORGENTE.index("\n\n", j)], amb2)
+    exec(pezzo("messaggio_rifiuto"), amb2)
+    rifiuto = amb2["messaggio_rifiuto"]
+    prova("chi si e' spacciato per noi ha il messaggio suo",
+          amb2["MSG_RIFIUTO_IMPERSONAZIONE"],
+          rifiuto("impersonazione della piattaforma"))
+    prova("...che dice il confine, non l'elenco delle armi", True,
+          "nominare il mercatino va benissimo" in
+          amb2["MSG_RIFIUTO_IMPERSONAZIONE"]
+          and "droghe" not in amb2["MSG_RIFIUTO_IMPERSONAZIONE"])
+    # l'AI scrive il motivo con parole sue: le varianti ragionevoli
+    # devono cadere tutte nello stesso ramo
+    # «finto» NON e' una declinazione di «finge» — sono due parole, e
+    # a dirlo e' stata questa riga: la prima stesura della lista non
+    # lo prendeva, e il caso qui sotto passava dai servizi.
+    for variante in ("si finge Barattolo", "fingersi la piattaforma",
+                     "fingendosi il supporto", "finto avviso di sicurezza",
+                     "impersona un corriere",
+                     "si spaccia per un moderatore",
+                     "phishing mascherato da annuncio"):
+        prova(f"...anche detto «{variante}»",
+              amb2["MSG_RIFIUTO_IMPERSONAZIONE"], rifiuto(variante))
+    # LA RIGA CHE DECIDE L'ORDINE dei due rami, e senza questa prova
+    # sarebbe invisibile: il motivo puo' nominare un servizio proprio
+    # perche' quello e' cio' per cui ci si finge. Col ramo dei servizi
+    # davanti, a chi ha provato a spacciarsi per noi risponderemmo
+    # «i servizi non sono ancora supportati».
+    prova("«finto servizio clienti» e' impersonazione, non un servizio",
+          amb2["MSG_RIFIUTO_IMPERSONAZIONE"],
+          rifiuto("finto servizio clienti di Barattolo"))
+    # e le due strade di sempre non si sono mosse
+    prova("i servizi veri tengono il loro garbo",
+          amb2["MSG_RIFIUTO_SERVIZI"], rifiuto("servizio su commissione"))
+    prova("...i servizi sessuali il messaggio severo",
+          amb2["MSG_RIFIUTO"], rifiuto("servizi sessuali mascherati"))
+    prova("...e le armi la lista di sempre",
+          amb2["MSG_RIFIUTO"], rifiuto("arma da fuoco"))
+
+
+# ====================================================================
+def prove_avviso_spedizione():
+    """L'AVVISO DI SPEDIZIONE CHE SPARIVA IN SILENZIO (ago 2026, B6
+    dell'audit). Le notifiche sono HTML, corriere e tracciamento sono
+    testo del VENDITORE: un «<» nel nome del corriere fa fallire il
+    parse di Telegram, e il compratore non riceve l'avviso — nessun
+    errore, nessuna traccia, semplicemente non arriva.
+
+    ESEGUIBILE e non una sentinella sulla forma: si chiama la funzione
+    VERA con un corriere cattivo e si guarda il testo che esce. E si
+    guarda anche il ROVESCIO, che e' la meta' che si dimentica: nel
+    database e nei confronti coi corrieri-sentinella il corriere deve
+    restare quello che il venditore ha scritto, o si escaperebbe a
+    monte rompendo 'Ritiro in zona'."""
+    print("\n[l'avviso di spedizione]")
+    import asyncio
+    import html as _html
+    import re as _re
+    import sqlite3
+    import time as _time
+
+    # L'ordine di cartone, coi soli campi che la funzione guarda.
+    def ordine(**extra):
+        d = {"id": 7, "compratore_id": 111, "venditore_id": 222,
+             "stato": "locked", "consegna_scelta": "spedizione",
+             "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
+             "busta_il": 0}
+        d.update(extra)
+        return d
+
+    def gira(corriere, tracking, **extra):
+        """Chiama segna_spedito davvero e restituisce (testo della
+        notifica, corriere finito nel database)."""
+        o = ordine(**extra)
+        scritto = {}
+        con = sqlite3.connect(":memory:")
+
+        class ConFinta:
+            def execute(self, sql, par=()):
+                if sql.startswith("SELECT * FROM ordini"):
+                    return TrovaOrdine()
+                if sql.startswith("UPDATE ordini"):
+                    scritto["corriere"], scritto["tracking"] = par[0], par[1]
+                    return None
+                return con.execute("SELECT 1")     # l'asta: nessuna riga
+
+            def commit(self): pass
+
+            def close(self): pass
+
+        class TrovaOrdine:
+            def fetchone(self): return o
+
+        detto = []
+
+        async def notifica_finta(chi, testo, *a, **k):
+            detto.append(testo)
+
+        amb = {"html": _html, "time": _time, "db": lambda: ConFinta(),
+               "notifica": notifica_finta,
+               "MSG_BUSTA_PRONTA": "il pacco ti aspetta",
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "Request": object,
+               "verifica_utente": lambda *a: {"id": 222},
+               "HTTPException": type("HTTPException", (Exception,), {}),
+               "leggi_json": None}
+
+        async def json_finto(req):
+            return {"corriere": corriere, "tracking": tracking}
+        amb["leggi_json"] = json_finto
+
+        exec("async " + pezzo("segna_spedito"), amb)
+        asyncio.run(amb["segna_spedito"](7, None, "", ""))
+        return (detto[0] if detto else ""), scritto
+
+    # --- 1) IL CASO CHE HA APERTO IL PUNTO -------------------------
+    # «Bartolini <BRT>» e' un nome che uno scrive senza pensarci.
+    testo, _ = gira("Bartolini <BRT>", "1234")
+    prova("il corriere col minore non entra nudo nel messaggio", False,
+          "Bartolini <BRT>" in testo)
+    prova("...ci entra scappato", True, "Bartolini &lt;BRT&gt;" in testo)
+    # LA PROVA VERA non e' cercare le entita': e' che i tag <b> del
+    # messaggio restino pari e richiudibili, che e' cio' che Telegram
+    # controlla prima di rifiutare l'invio.
+    tag = _re.findall(r"</?b>", testo)
+    prova("...e i grassetti restano pari, cioe' il messaggio parte",
+          tag.count("<b>"), tag.count("</b>"))
+
+    # --- 2) anche il tracciamento, che nessuno guarda --------------
+    testo, _ = gira("Poste Italiane", "AB<script>12")
+    prova("il tracciamento cattivo e' scappato pure lui", True,
+          "AB&lt;script&gt;12" in testo)
+    tag = _re.findall(r"</?b>", testo)
+    prova("...e i grassetti reggono anche li'",
+          tag.count("<b>"), tag.count("</b>"))
+
+    # --- 3) LO STESSO SULLA STRADA DEL PUNTO DI RITIRO -------------
+    # E' il ramo nato col cantiere della busta, quello dove il buco e'
+    # stato trovato: qui il messaggio dice «in viaggio verso il punto».
+    testo, _ = gira("InPost <lockers>", "999", via_punto=1,
+                    punto_ritiro="Bar Centrale, Carmagnola")
+    prova("la strada del punto scappa il corriere come l'altra", True,
+          "InPost &lt;lockers&gt;" in testo and "<lockers>" not in testo)
+    prova("...ed e' proprio il messaggio del punto", True,
+          "verso il punto di ritiro" in testo)
+
+    # --- 4) IL ROVESCIO: quel che si scrive resta quel che ha
+    #        scritto lui -------------------------------------------
+    # Se si escapasse a monte, nel database finirebbe «Bartolini
+    # &lt;BRT&gt;» — e il compratore leggerebbe QUELLO nella scheda
+    # dell'ordine, dove il client ha gia' il suo esc().
+    _, scritto = gira("Bartolini <BRT>", "12<34")
+    prova("nel database il corriere resta quello del venditore",
+          "Bartolini <BRT>", scritto["corriere"])
+    prova("...e il tracciamento pure", "12<34", scritto["tracking"])
+
+    # ...e soprattutto i CORRIERI-SENTINELLA continuano a matchare: e'
+    # il confronto per stringa che decide se parte il timer del ritiro
+    # invece di quello della spedizione.
+    testo, scritto = gira("Ritiro in zona", "")
+    prova("«Ritiro in zona» e' ancora riconosciuto", True,
+          "consegna a mano" in testo)
+    prova("...e arriva intero nel database", "Ritiro in zona",
+          scritto["corriere"])
+
+    # --- 5) e il caso normale non e' cambiato ----------------------
+    testo, _ = gira("BRT", "0123456789")
+    prova("un corriere onesto esce come sempre", True,
+          "con <b>BRT</b>, tracciamento <b>0123456789</b>" in testo)
+
+    # --- 6) IL GEMELLO DEL RESO, che aveva lo stesso buco ----------
+    # Stessa trappola, altra parte: qui il testo e' del COMPRATORE che
+    # rispedisce e ad aspettare e' il venditore. Un «<» e l'avviso che
+    # il reso e' partito non arriva — e li' dentro c'e' un rimborso.
+    def gira_reso(corriere, tracking):
+        o = {"id": 5, "compratore_id": 111, "venditore_id": 222,
+             "stato": "return_pending"}
+        scritto, detto = {}, []
+
+        class ConFinta:
+            def execute(self, sql, par=()):
+                if sql.startswith("SELECT * FROM ordini"):
+                    return type("R", (), {"fetchone": lambda s: o})()
+                scritto["corriere"], scritto["tracking"] = par[0], par[1]
+
+            def commit(self): pass
+
+            def close(self): pass
+
+        async def notifica_finta(chi, testo, *a, **k):
+            detto.append((chi, testo))
+
+        async def json_finto(req):
+            return {"corriere": corriere, "tracking": tracking}
+
+        amb = {"html": _html, "time": _time, "db": lambda: ConFinta(),
+               "notifica": notifica_finta, "leggi_json": json_finto,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "Request": object,
+               "verifica_utente": lambda *a: {"id": 111},
+               "HTTPException": type("HTTPException", (Exception,), {})}
+        exec("async " + pezzo("reso_spedito"), amb)
+        asyncio.run(amb["reso_spedito"](5, None, "", ""))
+        return detto[0], scritto
+
+    (chi, testo), scritto = gira_reso("Bartolini <BRT>", "99<88")
+    prova("il reso avvisa il VENDITORE, che aspetta l'oggetto", 222, chi)
+    prova("...col corriere scappato", True,
+          "Bartolini &lt;BRT&gt;" in testo and "<BRT>" not in testo)
+    prova("...e il tracciamento pure", True, "99&lt;88" in testo)
+    tag = _re.findall(r"</?b>", testo)
+    prova("...coi grassetti pari, cioe' l'avviso parte",
+          tag.count("<b>"), tag.count("</b>"))
+    # e nel database resta il testo vero: il tracciamento di un reso e'
+    # anche una prova in disputa, e deve restare quello che e' stato
+    # scritto
+    prova("nel database il tracciamento del reso resta intero", "99<88",
+          scritto["tracking"])
+    (_, testo), scritto = gira_reso("Consegna a mano", "")
+    prova("«Consegna a mano» e' ancora riconosciuta", True,
+          "in consegna a mano" in testo)
+
+    # --- 7) le sentinelle: nessuna delle due variabili nude --------
+    # E' la riga che sparisce in un riordino senza rompere niente di
+    # visibile — il messaggio si vede uguale finche' nessuno scrive un
+    # «<», e il giorno che qualcuno lo scrive non se ne accorge
+    # nessuno. I nudi che restano sono quelli che vanno nel DATABASE.
+    corpo = pezzo("segna_spedito")
+    corpo_avvisi = corpo[corpo.index("corr_e, track_e ="):]
+    prova("dopo l'escape nessuna notifica nomina il corriere nudo", 0,
+          corpo_avvisi.count("{corriere}"))
+    prova("...ne' il tracciamento nudo", 0, corpo_avvisi.count("{tracking}"))
+    reso = pezzo("reso_spedito")
+    corpo_reso = reso[reso.index("con.close()"):]
+    prova("e nel reso lo stesso, dopo l'UPDATE", 0,
+          corpo_reso.count("{corriere}") + corpo_reso.count("{tracking}"))
+
+
+# ====================================================================
 def prove_anteprime():
     """LE ANTEPRIME DEI LINK (ago 2026). La famiglia difende tre cose,
     e la prima e' quella che conta: UN ANNUNCIO NON ATTIVO NON RACCONTA
@@ -6777,10 +7116,40 @@ def prove_anteprime():
         prova("nessuna foto: il brand", amb["IMMAGINE_BRAND"], img("[]"))
         prova("foto illeggibile: il brand", amb["IMMAGINE_BRAND"],
               img("non e' json"))
-        prova("importato da Nostr: l'URL remoto passa intero",
-              "https://blossom.example/x.jpg",
-              img('["https://blossom.example/x.jpg"]')[0])
+
+        # --- 4bis) L'OG:IMAGE E' SOLO ROBA NOSTRA (M2 dell'audit) ---
+        # Un URL remoto in colonna e' l'host di chi pubblica su Nostr,
+        # e ci resta proprio quando lo scaricamento FALLISCE — cosa
+        # che chi pubblica puo' provocare (403, redirect, corpo sopra
+        # il tetto). In og:image quell'indirizzo diventa la campana di
+        # chiunque veda l'anteprima: il crawler di ogni piattaforma e,
+        # nei client che risolvono l'immagine, il telefono di gente
+        # che Barattolo non l'ha mai aperto. E resta sostituibile dopo
+        # la condivisione, a card gia' in giro.
+        prova("l'URL remoto non finisce mai in og:image",
+              amb["IMMAGINE_BRAND"],
+              img('["https://blossom.example/x.jpg"]'))
+        # e non basta scartare la PRIMA: se la remota e' in testa e una
+        # nostra viene dopo, la card deve prendere la nostra — saltare
+        # e' un `continue`, non un `return`
+        for p in (os.path.join(d, "a9_1_3.jpg"),
+                  os.path.join(d, "a9_1_3_min.jpg")):
+            open(p, "w").close()
+        prova("...e una foto nostra piu' in fondo si prende lo stesso",
+              "https://barattolo.store/foto/a9_1_3_min.jpg",
+              img('["https://blossom.example/x.jpg", "a9_1_3.jpg"]')[0])
+        prova("...anche in http nudo", amb["IMMAGINE_BRAND"],
+              img('["http://host.example/x.jpg"]'))
     amb["FOTO_DIR"] = "foto"
+
+    # LA VETRINA NON SI TOCCA, ed e' dichiarato: nel client l'URL
+    # remoto passa intero (fotoMini lo lascia stare), ed e' un'altra
+    # superficie — li' l'immagine la chiede il browser di chi ha
+    # aperto una scheda, non quello di chiunque riceva un link.
+    mini_js = open("miniapp.html", encoding="utf-8").read()
+    prova("in vetrina l'URL remoto passa ancora intero", True,
+          "nome.startsWith('http')" in
+          pezzo_js(mini_js, "function fotoMini(nome){", "\n}\n"))
 
     # --- 5) LA PROVA REGINA: solo gli attivi parlano ----------------
     con = sqlite3.connect(":memory:")
@@ -6984,7 +7353,8 @@ def main():
               prove_sped_gratis, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_cambio,
               prove_consegna_payload_punto, prove_pagina_acquisto,
-              prove_posizione_vetrina, prove_anteprime):
+              prove_posizione_vetrina, prove_anteprime,
+              prove_impersonazione, prove_avviso_spedizione):
         try:
             f()
         except Exception as e:

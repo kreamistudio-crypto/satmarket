@@ -4847,12 +4847,44 @@ MSG_RIFIUTO_SERVIZI = ("I servizi e le prestazioni non sono ancora "
                        "(anche buoni regalo, codici e licenze). "
                        "Grazie della comprensione!")
 
+# E chi si e' spacciato per la piattaforma non merita la lista delle
+# armi e delle droghe, che non c'entra niente: merita di sentirsi dire
+# COSA ha sbagliato — e dov'e' il confine, che qui e' sottile e non
+# ovvio. Nominare Barattolo e' lecito e comunissimo; parlare a nome
+# suo no, e la ragione e' che l'annuncio diventa una scheda col nostro
+# nome su un nostro indirizzo.
+MSG_RIFIUTO_IMPERSONAZIONE = ("Questo annuncio sembra un messaggio da "
+                              "parte di Barattolo o di un altro "
+                              "servizio. Gli annunci descrivono una "
+                              "cosa in vendita: nominare il mercatino "
+                              "va benissimo, parlare a nome suo no.")
+
+# Le parole con cui l'AI dice «si e' spacciato per qualcuno»: il
+# motivo lo scrive lui con parole sue, e questa e' la lista delle
+# ragionevoli. I prefissi sono voluti — 'finge' prende 'fingersi' e
+# 'fingendosi', 'fint' prende 'finto' e 'finta', che sono parole
+# DIVERSE e non declinazioni della prima (l'ha detto una prova, non
+# la lettura del codice). Un 'finta' che finisse qui dentro per
+# un'altra ragione manderebbe il messaggio sbagliato a un annuncio
+# gia' rifiutato: imperfezione dichiarata, e del verso innocuo.
+PAROLE_IMPERSONAZIONE = ("impersona", "finge", "fint", "spaccia",
+                         "phishing")
+
 
 def messaggio_rifiuto(motivo: str) -> str:
-    """Il messaggio giusto per il no dell'AI: ai servizi il garbo,
-    a tutto il resto la lista dei divieti. 'servizi sessuali' NON
-    e' un servizio da garbo: resta col messaggio di sempre."""
+    """Il messaggio giusto per il no dell'AI: a chi si e' spacciato
+    per noi il confine, ai servizi il garbo, a tutto il resto la lista
+    dei divieti. 'servizi sessuali' NON e' un servizio da garbo: resta
+    col messaggio di sempre.
+
+    L'IMPERSONAZIONE SI GUARDA PER PRIMA, e non e' l'ordine che
+    capita: il motivo scritto dall'AI puo' benissimo dire «finto
+    servizio clienti di Barattolo», e quella parola cadrebbe nel ramo
+    dei servizi — cioe' risponderebbe «i servizi non sono ancora
+    supportati» a chi ha appena provato a spacciarsi per noi."""
     m = (motivo or "").lower()
+    if any(p in m for p in PAROLE_IMPERSONAZIONE):
+        return MSG_RIFIUTO_IMPERSONAZIONE
     if (("servizio" in m or "servizi" in m or "prestazion" in m)
             and "sessual" not in m):
         return MSG_RIFIUTO_SERVIZI
@@ -5401,6 +5433,25 @@ PROMPT_MODERAZIONE = (
     "riguarda i lavori che il VENDITORE stesso svolge su commissione, "
     "non i buoni spendibili presso terzi; anche il cibo confezionato "
     "da spedire o ritirare e' merce lecita. "
+    "Ai casi netti si aggiunge l'IMPERSONAZIONE, e la ragione e' che "
+    "un annuncio ha un indirizzo del mercatino e diventa una scheda "
+    "col nome Barattolo: e' VIETATO il testo scritto come se venisse "
+    "da Barattolo, dai suoi moderatori o da un altro servizio (una "
+    "banca, un corriere, un wallet) invece che da una persona che "
+    "vende una cosa. Il segno e' che PARLA A CHI LEGGE come farebbe "
+    "la piattaforma — un avviso di sicurezza, una comunicazione di "
+    "servizio, un account sospeso o da sbloccare, un pagamento da "
+    "verificare, dati o credenziali da confermare, un link da aprire "
+    "per non perdere qualcosa — e non descrive nessun oggetto in "
+    "vendita. Vale sul TITOLO come sulla DESCRIZIONE. NOMINARE "
+    "Barattolo invece e' lecito e comunissimo, e non e' MAI di per "
+    "se' un motivo: 'gadget di Barattolo', 'venduto tramite "
+    "Barattolo', 'spedisco come da regolamento Barattolo', 'lo trovi "
+    "anche sul mio negozio Barattolo' -> OK. E' il FINGERSI la "
+    "piattaforma a essere vietato, non il citarla: nel dubbio guarda "
+    "se c'e' una COSA in vendita. DUBBIO invece per chi si intesta un "
+    "ruolo che non ha senza pero' fingersi un messaggio ('Assistenza "
+    "Barattolo', 'Barattolo Ufficiale', 'staff Barattolo'). "
     "Riconosci storpiature e mascheramenti "
     "(numeri al posto di lettere, spazi o simboli in mezzo alle "
     "parole). Se l'annuncio e' ambiguo ma plausibilmente lecito "
@@ -5412,8 +5463,14 @@ PROMPT_MODERAZIONE = (
     "'Piadina digitale: buono con codice da riscattare' -> OK. "
     "'Pacchetto soggiorno 2 notti in B&B, colazione inclusa' -> OK: "
     "e' un pernottamento definito, non una prestazione su misura. "
+    "'Adesivi e gadget di Barattolo, lotto da 10' -> OK: cita il "
+    "mercatino, non lo impersona. "
     "'Ti sviluppo un bot Telegram' -> DUBBIO: servizio. 'Buono per "
     "una lezione di chitarra con me' -> DUBBIO: buono-prestazione. "
+    "'Assistenza Barattolo - supporto agli utenti' -> DUBBIO: si "
+    "intesta un ruolo che non ha. "
+    "'Barattolo: verifica il tuo pagamento in sospeso' -> VIETATO: "
+    "impersonazione della piattaforma. "
     "'Revolver "
     "calibro 38 funzionante con munizioni' -> VIETATO: arma da fuoco. "
     "'Serata speciale con tr0mb4mic1' -> VIETATO: servizi sessuali "
@@ -13482,6 +13539,13 @@ async def segna_spedito(ordine_id: int, req: Request,
                  ordine_id))
     con.commit()
     con.close()
+    # Le notifiche sono HTML: corriere e tracciamento sono testo del
+    # VENDITORE, e un «<» nel nome del corriere fa fallire il parse di
+    # Telegram — il compratore non riceve l'avviso della spedizione e
+    # non se ne accorge nessuno. Si escapa QUI e non a monte: nel
+    # database, e nei confronti coi corrieri-sentinella, corriere e
+    # tracciamento devono restare quelli che il venditore ha scritto.
+    corr_e, track_e = html.escape(corriere), html.escape(tracking)
     if corriere == "Ritiro in zona":
         await notifica(o["compratore_id"],
                        f"🤝 <b>Il venditore ha segnato la consegna a mano</b>. "
@@ -13500,14 +13564,14 @@ async def segna_spedito(ordine_id: int, req: Request,
             # Il caso normale: il pacco parte, il codice arrivera'
             # al venditore quando il pacco e' al punto — e sara' il
             # deposito della busta a dire «ti aspetta».
-            dettaglio = (f" con <b>{corriere}</b>, tracciamento "
-                         f"<b>{tracking}</b>" if tracking else "")
+            dettaglio = (f" con <b>{corr_e}</b>, tracciamento "
+                         f"<b>{track_e}</b>" if tracking else "")
             await notifica(o["compratore_id"],
                 f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
                 f"ritiro</b>{dettaglio}! Ti avviseremo quando il nome "
                 f"e il codice per ritirarlo saranno nell'ordine.")
         return {"ok": True}
-    dettaglio = (f"con <b>{corriere}</b>, tracciamento <b>{tracking}</b>"
+    dettaglio = (f"con <b>{corr_e}</b>, tracciamento <b>{track_e}</b>"
                  if tracking else "in consegna a mano")
     await notifica(o["compratore_id"],
                    f"📦 <b>Il tuo oggetto è in viaggio</b> {dettaglio}! "
@@ -17267,7 +17331,14 @@ async def reso_spedito(ordine_id: int, req: Request,
                 (corriere, tracking, int(time.time()), ordine_id))
     con.commit()
     con.close()
-    dettaglio = (f"con <b>{corriere}</b>, tracciamento <b>{tracking}</b>"
+    # Gemello di segna_spedito: qui il testo e' del COMPRATORE e ad
+    # aspettare e' il venditore, ma la trappola e' la stessa — un «<»
+    # nel nome del corriere fa fallire il parse HTML di Telegram, e
+    # l'avviso che il reso e' partito non arriva, in silenzio. Si
+    # scappa QUI: nel database il tracciamento resta quello scritto,
+    # ed e' anche una prova in disputa.
+    dettaglio = (f"con <b>{html.escape(corriere)}</b>, tracciamento "
+                 f"<b>{html.escape(tracking)}</b>"
                  if tracking else "in consegna a mano")
     await notifica(o["venditore_id"],
                    f"↩️ <b>Il reso è in viaggio</b> {dettaglio}. Quando ricevi "
@@ -21264,7 +21335,21 @@ def _immagine_anteprima(foto_json: str):
     la misura giusta per ogni piattaforma e pesa un decimo del pieno.
     Il pieno e' il ripiego, e il brand il ripiego del ripiego — un
     og:image che non risponde e' peggio di nessun og:image: diversi
-    crawler, non trovando l'immagine, non disegnano la card affatto."""
+    crawler, non trovando l'immagine, non disegnano la card affatto.
+
+    SOLO LE NOSTRE FOTO (ago 2026, M2 dell'audit). Un URL remoto in
+    colonna e' roba di chi pubblica su Nostr: lo scaricamento puo'
+    FALLIRE APPOSTA — un 403, un redirect, un corpo sopra il tetto —
+    e allora l'URL originale resta li'. Messo in og:image diventa la
+    campana di chiunque veda l'anteprima: bussano il crawler di ogni
+    piattaforma e, nei client che risolvono l'immagine, il telefono
+    di gente che Barattolo non l'ha mai aperto. Ed e' sostituibile
+    dopo la condivisione, quando la card e' gia' in giro. Quindi
+    l'URL remoto si SALTA e si ripiega sul brand.
+    NON e' la regola della vetrina: li' l'URL remoto passa intero, ed
+    e' una decisione presa e dichiarata — ma li' l'immagine la chiede
+    il browser di chi ha aperto una scheda, non quello di chiunque
+    riceva un link."""
     try:
         nomi = json.loads(foto_json or "[]")
     except Exception:
@@ -21272,8 +21357,8 @@ def _immagine_anteprima(foto_json: str):
     for n in nomi:
         if not n or n.startswith("data:"):
             continue
-        if n.startswith("http"):       # importato da Nostr: gia' assoluto
-            return n, 0, 0
+        if n.startswith("http"):       # host di terzi: mai in og:image
+            continue
         mini = n[:-4] + "_min.jpg" if n.endswith(".jpg") else ""
         for nome in (mini, n):
             if nome and os.path.exists(os.path.join(FOTO_DIR, nome)):
