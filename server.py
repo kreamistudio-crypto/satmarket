@@ -2986,12 +2986,22 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> str:
     la rimetta li'."""
     chiesto = await importo_invoice(invoice)
     if chiesto is None or atteso_sats <= 0 or chiesto != atteso_sats:
-        print(f"⛔ Pagamento rifiutato: la invoice chiede {chiesto} sats, "
+        # I motivi del rifiuto sono tre e vogliono parole diverse: una
+        # bolt11 che non si decodifica non «chiede None sats», e'
+        # ILLEGGIBILE — e chi legge l'avviso deve capire al primo
+        # sguardo se ha davanti un wallet rotto o un tentativo di
+        # prelievo, che sono due mestieri diversi.
+        quanto = ("una cifra illeggibile" if chiesto is None
+                  else f"{_fmt_sats(chiesto)} sats")
+        motivo = ("una invoice <b>illeggibile</b>: non si capisce quanto "
+                  "chieda, e ne erano dovuti " if chiesto is None else
+                  f"una invoice chiedeva <b>{_fmt_sats(chiesto)} sats</b> "
+                  "ma ne erano dovuti ")
+        print(f"⛔ Pagamento rifiutato: la invoice chiede {quanto}, "
               f"ne sono dovuti {atteso_sats}. Niente e' uscito.")
         try:
             await notifica_admin(
-                f"⛔ <b>Pagamento rifiutato:</b> una invoice chiedeva "
-                f"<b>{_fmt_sats(chiesto)} sats</b> ma ne erano dovuti "
+                f"⛔ <b>Pagamento rifiutato:</b> {motivo}"
                 f"<b>{_fmt_sats(atteso_sats)}</b>. Il pagamento NON è partito e i "
                 f"sats sono al sicuro nel deposito di garanzia. Se non è "
                 f"un wallet rotto, qualcuno ha provato a prelevare più "

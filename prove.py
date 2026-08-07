@@ -1377,9 +1377,12 @@ def prove_importo_uscita():
         return "async " + pezzo(nome)
 
     # --- LA CINTURA: paga_venditore ---------------------------------
+    detti = []          # il TESTO degli avvisi, per chi vuole leggerlo
+
     def cintura(dice_la_fattura, dovuti, codice=200):
         """Monta paga_venditore con un giudice dell'importo finto e un
-        LNbits di cartone. Torna (esito, quante POST, quanti avvisi)."""
+        LNbits di cartone. Torna (esito, quante POST, quanti avvisi);
+        il testo degli avvisi si ritrova in `detti`."""
         uscite, avvisi = [], []
 
         async def _importo(_b):
@@ -1387,6 +1390,7 @@ def prove_importo_uscita():
 
         async def _admin(t):
             avvisi.append(t)
+            detti.append(t)
 
         amb = {"httpx": _finto_lnbits(uscite, codice),
                "importo_invoice": _importo, "notifica_admin": _admin,
@@ -1419,6 +1423,15 @@ def prove_importo_uscita():
     # 4: fattura illeggibile (LNbits muto): fail-closed
     prova("cintura: invoice illeggibile rifiutata, zero POST",
           ("non_pagato", 0, 1), cintura(None, 100))
+    # ...e l'avviso DICE che era illeggibile. Sembra cosmesi e non lo
+    # e': i motivi del rifiuto sono tre e chi legge deve capire al
+    # primo sguardo se ha davanti un wallet rotto o un tentativo di
+    # prelievo. Fino all'ago 2026 diceva «chiedeva None sats», che
+    # era il modo di non dirlo.
+    prova("...e l'avviso dice ILLEGGIBILE, non «None sats»", True,
+          "illeggibile" in detti[-1] and "None" not in detti[-1])
+    prova("...mentre il rifiuto per cifra sbagliata dice la cifra", True,
+          "100.000.000 sats" in (cintura(100_000_000, 1), detti)[1][-1])
     # 5: un'uscita a zero non ha un mittente legittimo
     prova("cintura: dovuto zero rifiutato, zero POST", ("non_pagato", 0, 1),
           cintura(0, 0))
@@ -6692,13 +6705,13 @@ def prove_anteprime():
     cucito = _re.sub(r'"\s*\n\s*f?"', "", _SORGENTE)
     grezzi = [m for m in _re.findall(r"\{[^{}]*\} ?sats", cucito)
               if "_fmt_sats" not in m]
-    # I CINQUE superstiti, e nessuno di loro e' testo per una persona:
-    # due righe di journal (log diagnostici, un lettore solo), la riga
-    # del catalogo che va in pasto ad Haiku, e le due righe di prosa
-    # del NIP-99 che ripetono i tag a parole. Se il numero cambia,
-    # qualcuno ha ricominciato a scrivere una cifra a mano.
-    prova("nessuna cifra in sats sfugge a _fmt_sats (restano i cinque "
-          "che una persona non legge)", 5, len(grezzi))
+    # I QUATTRO superstiti, e nessuno di loro e' testo per una
+    # persona: una riga di journal (log diagnostico, un lettore solo),
+    # la riga del catalogo che va in pasto ad Haiku, e le due righe di
+    # prosa del NIP-99 che ripetono i tag a parole. Se il numero
+    # cambia, qualcuno ha ricominciato a scrivere una cifra a mano.
+    prova("nessuna cifra in sats sfugge a _fmt_sats (restano i quattro "
+          "che una persona non legge)", 4, len(grezzi))
     # e le due convenzioni straniere non devono tornare: la virgola
     # inglese di {n:,} e lo spazio del .replace, che erano il terzo e
     # il quarto formato
