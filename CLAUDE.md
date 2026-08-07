@@ -1278,7 +1278,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   terminale (anche `creato`: chi sta pagando deve trovare l'annuncio
   com'era) e per gli annunci importati da Nostr (contatto_nostr pieno:
   l'import orario li sovrascriverebbe). Ripassa TUTTI gli strati di
-  moderazione come una pubblicazione nuova (notifiche admin «✏️»);
+  moderazione come una pubblicazione nuova — ma la modifica APPROVATA
+  NON avvisa piu' i moderatori (ago 2026, decisione di Andrea: la
+  «✏️» era rumore in un fiume gia' pieno e non chiedeva nessun gesto,
+  visto che i tre strati l'avevano appena promossa). COSA NON SI
+  PERDE, ed e' la ragione per cui si poteva togliere: il vietato
+  blocca con la sua notifica, il dubbio manda in `stato='revisione'`
+  e li' restano SIA la tastiera ✅/❌ di `avvisa_revisione` SIA la
+  coda del pannello — che filtra per STATO e non per come ci si e'
+  arrivati, quindi prende le modifiche senza una riga dedicata. Il
+  fatto in se' resta scritto in `annunci.modificato`, che la scheda
+  mostra. A sparire e' solo lo squillo. La modifica FIRMATA degli
+  importati tiene ancora la sua «✏️🟣», che e' un altro evento (rara,
+  e dice che abbiamo rispedito ai relay un evento firmato da altri);
   foto sostituite in blocco solo se il campo `foto` arriva (nomi
   versionati col timestamp anti-cache del browser, file vecchi
   cancellati dal disco), altrimenti restano; ripubblica su Nostr con
