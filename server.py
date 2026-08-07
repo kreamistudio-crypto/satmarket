@@ -2991,8 +2991,8 @@ async def paga_venditore(invoice: str, atteso_sats: int) -> str:
         try:
             await notifica_admin(
                 f"⛔ <b>Pagamento rifiutato:</b> una invoice chiedeva "
-                f"<b>{chiesto} sats</b> ma ne erano dovuti "
-                f"<b>{atteso_sats}</b>. Il pagamento NON è partito e i "
+                f"<b>{_fmt_sats(chiesto)} sats</b> ma ne erano dovuti "
+                f"<b>{_fmt_sats(atteso_sats)}</b>. Il pagamento NON è partito e i "
                 f"sats sono al sicuro nel deposito di garanzia. Se non è "
                 f"un wallet rotto, qualcuno ha provato a prelevare più "
                 f"del dovuto: vale un'occhiata.")
@@ -3471,8 +3471,7 @@ async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
             raise HTTPException(400, "Titolo e prezzo obbligatori")
     if TETTO_SATS_ANNUNCIO and prezzo_sats > TETTO_SATS_ANNUNCIO:
         raise HTTPException(400, f"Nel rodaggio il prezzo massimo è "
-                                 f"{TETTO_SATS_ANNUNCIO:,} sats per annuncio"
-                                 .replace(",", " "))
+                                 f"{_fmt_sats(TETTO_SATS_ANNUNCIO)} sats per annuncio")
     return valuta, prezzo_sats, prezzo_eur
 
 
@@ -3768,8 +3767,8 @@ def guardia_ferie_venditore(con, tg_id: int, cosa: str):
 def testo_prezzo(valuta: str, prezzo_sats: int, prezzo_eur: float) -> str:
     """Il prezzo come lo leggono i moderatori nelle notifiche."""
     if valuta == "eur":
-        return f"{_fmt_eur(prezzo_eur)} EUR (≈ {prezzo_sats} sats)"
-    return f"{prezzo_sats} sats"
+        return f"{_fmt_eur(prezzo_eur)} EUR (≈ {_fmt_sats(prezzo_sats)} sats)"
+    return f"{_fmt_sats(prezzo_sats)} sats"
 
 
 def spoglia_html(testo: str) -> str:
@@ -9928,7 +9927,7 @@ async def fai_puntata(annuncio_id: int, req: Request,
         if totale < minimo:
             con.close()
             raise HTTPException(400, f"La puntata minima ora è "
-                                     f"{minimo:,} sats".replace(",", " "))
+                                     f"{_fmt_sats(minimo)} sats")
     # il leader proxy che AGGIUNGE budget salta il minimo: il suo
     # esposto non cambia (il secondo non e' cambiato), sale solo il
     # massimo segreto — basta che il totale superi il versato (la
@@ -9940,7 +9939,7 @@ async def fai_puntata(annuncio_id: int, req: Request,
         raise HTTPException(400, "Hai già versato abbastanza per questo "
                                  "totale: alza la cifra")
     inv = await crea_invoice_escrow(
-        delta, f"Barattolo asta #{annuncio_id}: puntata {totale} sats",
+        delta, f"Barattolo asta #{annuncio_id}: puntata {_fmt_sats(totale)} sats",
         expiry=RILANCIO_EXPIRY)
     # Il ricontrollo che fa fede (patto mono-processo: da qui al
     # commit nessun await). Durante l'attesa della invoice l'asta puo'
@@ -10367,7 +10366,7 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
                 f"Riscossione del rimborso d'asta #{rimborso_id} "
-                f"(«{titolo}»): <b>{importo} sats</b>.")
+                f"(«{titolo}»): <b>{_fmt_sats(importo)} sats</b>.")
             return {"ok": False, "stato": r["stato"], "incerto": True}
 
         if esito == PAGATO:
@@ -10557,8 +10556,8 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
     if importo_sats != r["importo_sats"]:
         con.close()
         raise HTTPException(400,
-            f"Importo sbagliato: la invoice è di {importo_sats} sats, "
-            f"deve essere esattamente {r['importo_sats']} sats "
+            f"Importo sbagliato: la invoice è di {_fmt_sats(importo_sats)} sats, "
+            f"deve essere esattamente {_fmt_sats(r['importo_sats'])} sats "
             f"(rimborso integrale)")
     con.execute("UPDATE rimborsi_asta SET invoice_riscossione=?, "
                 "aggiornato=? WHERE id=?",
@@ -11883,7 +11882,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
                 await notifica(a["venditore_id"],
                     f"📈 Il cambio si è mosso troppo: il tuo annuncio "
                     f"«{a['titolo'][:60]}» ({_fmt_eur(a['prezzo_eur'])} EUR) "
-                    f"supera ora il tetto di {TETTO_SATS_ANNUNCIO} sats e "
+                    f"supera ora il tetto di {_fmt_sats(TETTO_SATS_ANNUNCIO)} sats e "
                     f"gli acquisti sono in pausa. Ritocca il prezzo per "
                     f"riaprirli.")
                 raise HTTPException(409, f"Il cambio è cambiato troppo per "
@@ -12836,7 +12835,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             await notifica(a["venditore_id"],
                 f"📈 Il cambio si è mosso troppo: il tuo annuncio "
                 f"«{a['titolo'][:60]}» ({_fmt_eur(a['prezzo_eur'])} EUR) supera "
-                f"ora il tetto di {TETTO_SATS_ANNUNCIO} sats e gli acquisti "
+                f"ora il tetto di {_fmt_sats(TETTO_SATS_ANNUNCIO)} sats e gli acquisti "
                 f"sono in pausa. Ritocca il prezzo per riaprirli.")
             raise HTTPException(409, "Il cambio è cambiato troppo da quando "
                                      "l'annuncio è stato pubblicato: il "
@@ -12894,8 +12893,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             raise HTTPException(400,
                 f"Per il tuo primo acquisto i beni digitali sopra "
-                f"{TETTO_DIGITALE_NUOVI:,} sats non sono disponibili: "
-                f"concludi prima un acquisto qualsiasi".replace(",", " "))
+                f"{_fmt_sats(TETTO_DIGITALE_NUOVI)} sats non sono disponibili: "
+                f"concludi prima un acquisto qualsiasi")
 
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}")
@@ -13153,7 +13152,7 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
         f"🛒 <b>Nuovo ordine:</b> «{_titolo_ordine(righe)[:60]}» — "
-        f"{o['prezzo_sats']} sats. Ordini aperti: {{aperti}}")
+        f"{_fmt_sats(o['prezzo_sats'])} sats. Ordini aperti: {{aperti}}")
     # Il garbo verso chi restava in trattativa: l'oggetto e' andato.
     # MAI al compratore che ha appena pagato: se aveva un'altra
     # offerta sua, decade in silenzio (dirgli «venduto a qualcun
@@ -16091,8 +16090,24 @@ SOGLIA_AGGREGA = 3         # piu' di cosi' in una finestra = aggregato
 PAUSA_TRA_PROMO = 2        # secondi tra un post singolo e l'altro
 
 
-def _fmt_sats(n: int) -> str:
-    """80000 -> '80.000': i puntini delle migliaia all'italiana."""
+def _fmt_sats(n) -> str:
+    """80000 -> '80.000': i puntini delle migliaia all'italiana.
+
+    NON SOLLEVA MAI, e non e' pigrizia: da qui passano le cifre delle
+    NOTIFICHE, e parecchie di quelle vivono dentro un try/except che
+    protegge un'operazione piu' importante — l'avviso ai moderatori di
+    un pagamento rifiutato, per dirne una, sta apposta sotto except
+    perche' una notifica non deve mai rompere un rifiuto. Il prezzo di
+    quella scelta e' che un formattatore che alza le mani li' dentro
+    non fa un errore: fa SPARIRE L'ALLARME, in silenzio.
+    Il caso vero: `importo_invoice` torna None quando la bolt11 non si
+    decodifica, e con un `f"{None:,}"` l'avviso «importo storto» —
+    cioe' o un wallet rotto o un tentativo di prelievo — non partiva
+    piu'. Su qualunque cosa non sia un numero si ripiega su str(),
+    che e' anche esattamente quel che si vedeva prima che le cifre
+    passassero di qui."""
+    if not isinstance(n, (int, float)) or isinstance(n, bool):
+        return str(n)
     return f"{n:,}".replace(",", ".")
 
 
@@ -16720,10 +16735,10 @@ async def deposita_invoice(ordine_id: int, req: Request,
         ruolo, atteso, colonna = "venditore", \
             netto_venditore(o["prezzo_sats"] - o["protezione_sats"]), \
             "invoice_venditore"
-        spiegazione = f"{atteso} sats (il tuo incasso)"
+        spiegazione = f"{_fmt_sats(atteso)} sats (il tuo incasso)"
     elif o and o["compratore_id"] == user["id"] and o["stato"] == "refund":
         ruolo, atteso, colonna = "compratore", o["prezzo_sats"], "invoice_rimborso"
-        spiegazione = f"{atteso} sats (rimborso integrale)"
+        spiegazione = f"{_fmt_sats(atteso)} sats (rimborso integrale)"
     else:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
@@ -16735,7 +16750,7 @@ async def deposita_invoice(ordine_id: int, req: Request,
     if importo_sats != atteso:
         con.close()
         raise HTTPException(400,
-            f"Importo sbagliato: la invoice e' di {importo_sats} sats, "
+            f"Importo sbagliato: la invoice e' di {_fmt_sats(importo_sats)} sats, "
             f"deve essere esattamente {spiegazione}")
 
     con.execute(f"UPDATE ordini SET {colonna}=?, aggiornato=? WHERE id=?",
@@ -16802,7 +16817,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "venditore",
                 f"Incasso del venditore sull'ordine #{ordine_id}: "
-                f"<b>{netto} sats</b>.")
+                f"<b>{_fmt_sats(netto)} sats</b>.")
             return {"ok": False, "stato": o["stato"], "incerto": True}
 
         if esito == PAGATO:
@@ -16826,7 +16841,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 await notifica(o["venditore_id"],
                                f"🔓 <b>Sats sbloccati automaticamente!</b> Il tempo di "
                                f"conferma è scaduto senza problemi segnalati: "
-                               f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. ⚡ "
+                               f"<b>{_fmt_sats(netto)} sats</b> sono in arrivo nel tuo wallet. ⚡ "
                                f"{invito}")
                 await notifica(o["compratore_id"],
                                f"✅ <b>Affare concluso:</b> «{titolo}». Il tempo per "
@@ -16838,7 +16853,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 # il messaggio dice la verita', non «ha confermato».
                 await notifica(o["venditore_id"],
                                f"⚖️ <b>La disputa è stata decisa a tuo favore:</b> "
-                               f"<b>{netto} sats</b> sono in arrivo nel tuo wallet. "
+                               f"<b>{_fmt_sats(netto)} sats</b> sono in arrivo nel tuo wallet. "
                                f"Affare concluso! ⚡ {invito}")
                 await notifica(o["compratore_id"],
                                f"⚖️ <b>La disputa su «{titolo}» è stata decisa a "
@@ -16847,7 +16862,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             else:
                 await notifica(o["venditore_id"],
                                f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
-                               f"ricezione: <b>{netto} sats</b> sono in arrivo nel tuo "
+                               f"ricezione: <b>{_fmt_sats(netto)} sats</b> sono in arrivo nel tuo "
                                f"wallet. Affare concluso! ⚡ {invito}")
                 await notifica(o["compratore_id"],
                                f"✅ <b>Affare concluso:</b> «{titolo}». "
@@ -16871,11 +16886,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             if o["disputata"]:
                 await polso_ordini_admin(
                     f"⚖️ <b>Disputa chiusa a favore del venditore:</b> "
-                    f"«{titolo[:60]}» — {netto} sats sbloccati. "
+                    f"«{titolo[:60]}» — {_fmt_sats(netto)} sats sbloccati. "
                     f"Restano {{aperti}} ordini aperti.")
             else:
                 await polso_ordini_admin(
-                    f"✅ <b>Ordine concluso:</b> «{titolo[:60]}» — {netto} "
+                    f"✅ <b>Ordine concluso:</b> «{titolo[:60]}» — {_fmt_sats(netto)} "
                     f"sats al venditore. Restano {{aperti}} ordini aperti.")
             return {"ok": True, "stato": "released"}
 
@@ -16906,13 +16921,13 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                    "(il tuo wallet non ha risposto come doveva). I sats sono al "
                    "sicuro nel deposito di garanzia: apri l'ordine nella Mini App "
                    "per riprovare "
-                   f"con una invoice da <b>{netto} sats</b>.")
+                   f"con una invoice da <b>{_fmt_sats(netto)} sats</b>.")
         else:
             testa = ("⚖️ <b>La disputa è stata decisa a tuo favore!</b>"
                      if o["disputata"] else
                      "✅ <b>L'acquirente ha confermato la ricezione!</b>")
             msg = (f"{testa} Per incassare "
-                   f"i tuoi <b>{netto} sats</b>: apri l'ordine nella Mini App e "
+                   f"i tuoi <b>{_fmt_sats(netto)} sats</b>: apri l'ordine nella Mini App e "
                    f"imposta il tuo Lightning address (incassi automatici, per "
                    f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
         await notifica(o["venditore_id"], msg)
@@ -16957,7 +16972,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "compratore",
                 f"Rimborso al compratore sull'ordine #{ordine_id}: "
-                f"<b>{importo} sats</b>.")
+                f"<b>{_fmt_sats(importo)} sats</b>.")
             return {"ok": False, "stato": o["stato"], "incerto": True}
 
         if esito == PAGATO:
@@ -16998,7 +17013,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                                                   venduto=False))
             await notifica(o["compratore_id"],
                            f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
-                           f"<b>{importo} sats</b> è in arrivo nel tuo wallet. "
+                           f"<b>{_fmt_sats(importo)} sats</b> è in arrivo nel tuo wallet. "
                            f"⭐ Com'è andata? Apri l'ordine nella Mini App e "
                            f"lascia un feedback.")
             await notifica(o["venditore_id"],
@@ -17009,7 +17024,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # Il polso dei moderatori: anche gli esiti storti contano
             await polso_ordini_admin(
                 f"↩️ <b>Ordine rimborsato al compratore:</b> «{titolo}» — "
-                f"{importo} sats. Restano {{aperti}} ordini aperti.")
+                f"{_fmt_sats(importo)} sats. Restano {{aperti}} ordini aperti.")
             return {"ok": True, "stato": "refunded"}
 
         # Nessun metodo di rimborso disponibile: si mette in attesa
@@ -17020,7 +17035,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         con.close()
         await notifica(o["compratore_id"],
                        f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
-                       f"rimborso di <b>{importo} sats</b>: apri l'ordine nella "
+                       f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
                        f"Mini App e imposta il tuo Lightning address, oppure "
                        f"incolla una invoice di esattamente quell'importo.")
         # Il gemello del ramo di sopra: anche qui chi ha perso deve
@@ -18836,7 +18851,7 @@ async def sollecita_ritiri_fermi():
             else:
                 await notifica_admin(
                     f"🧊 <b>Ritiro in zona fermo:</b> ordine #{r['id']} "
-                    f"(«{titolo}»), <b>{r['prezzo_sats']} sats</b> in "
+                    f"(«{titolo}»), <b>{_fmt_sats(r['prezzo_sats'])} sats</b> in "
                     f"cassaforte da settimane e nessuna delle due parti "
                     f"si muove. Serve un occhio umano.")
         except Exception as e:
@@ -18928,7 +18943,7 @@ async def sollecita_conferme_ferme():
                 netto = netto_venditore(r["prezzo_sats"] - r["protezione_sats"])
                 await notifica_admin(
                     f"🧊 <b>Conferma ferma:</b> ordine #{r['id']} "
-                    f"(«{titolo}»), <b>{netto} sats</b> in cassaforte. "
+                    f"(«{titolo}»), <b>{_fmt_sats(netto)} sats</b> in cassaforte. "
                     f"Il compratore ha ignorato {PROMEMORIA_CONFERMA_MAX} "
                     f"promemoria in ~{PROMEMORIA_CONFERMA_MAX * PROMEMORIA_CONFERMA_GIORNI} "
                     f"giorni: serve un occhio umano.")
@@ -19225,7 +19240,7 @@ async def sollecita_incassi():
             if r["solleciti_incasso"] < SOLLECITO_INCASSO_MAX:
                 await notifica(r["venditore_id"],
                     f"💰 <b>Hai sats da incassare!</b> L'affare «{titolo}» "
-                    f"è concluso e i tuoi <b>{netto} sats</b> ti aspettano "
+                    f"è concluso e i tuoi <b>{_fmt_sats(netto)} sats</b> ti aspettano "
                     f"nel deposito di garanzia. Per riceverli apri l'ordine "
                     f"nella Mini App e imposta il tuo Lightning address "
                     f"(incassi automatici, per sempre) oppure incolla una "
@@ -19235,7 +19250,7 @@ async def sollecita_incassi():
                 # M solleciti ignorati, tocca a un umano.
                 await notifica_admin(
                     f"🧊 <b>Incasso fermo:</b> ordine #{r['id']} "
-                    f"(«{titolo}»), <b>{netto} sats</b> in cassaforte. "
+                    f"(«{titolo}»), <b>{_fmt_sats(netto)} sats</b> in cassaforte. "
                     f"Il venditore ha ignorato {SOLLECITO_INCASSO_MAX} "
                     f"solleciti in ~{(SOLLECITO_INCASSO_MAX + 1) * SOLLECITO_INCASSO_GIORNI} "
                     f"giorni: serve un occhio umano.")

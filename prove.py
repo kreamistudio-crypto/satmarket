@@ -62,6 +62,18 @@ def pezzo(nome, fine="\n\n\n"):
 _SORGENTE = open("server.py", encoding="utf-8").read()
 
 
+def reale(nome):
+    """Il pezzo VERO, per gli ambienti finti che ne hanno bisogno.
+    Meglio di uno stub scritto a mano, e la ragione l'ha insegnata
+    _fmt_sats: il finto sollevava sul None esattamente come quello
+    vero PRIMA della cura, quindi la prova restava rossa anche a
+    guasto riparato — uno stub che imita un pezzo finisce per
+    imitarne anche i bug."""
+    amb = {}
+    exec(pezzo(nome), amb)
+    return amb[nome]
+
+
 # ====================================================================
 def prove_filtro_italiano():
     """Il filtro lingua dell'import aperto, sui casi VERI incontrati
@@ -1383,7 +1395,12 @@ def prove_importo_uscita():
                # i tre esiti (ago 2026): qui interessa il rifiuto, ma
                # senza i nomi la funzione non gira nemmeno
                "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
-               "INCERTO": "incerto"}
+               "INCERTO": "incerto",
+               # e il formattatore dei sats, che l'avviso ai
+               # moderatori usa da quando un satoshi si scrive in un
+               # modo solo: chi estrae una funzione ne eredita le
+               # dipendenze, ed e' cosi' che questa prova e' esplosa
+               "_fmt_sats": reale("_fmt_sats")}
         exec(pezzo_async("paga_venditore"), amb)
         return gira(amb["paga_venditore"]("lnbc", dovuti)), len(uscite), len(avvisi)
 
@@ -1502,6 +1519,8 @@ def prove_pagamento_incerto():
         amb = {"httpx": _finto_lnbits(uscite, codice, muto),
                "importo_invoice": _importo, "notifica_admin": _niente,
                "print": lambda *a, **k: None,
+               # chi estrae una funzione ne eredita le dipendenze
+               "_fmt_sats": reale("_fmt_sats"),
                "LNBITS_URL": "http://x", "LNBITS_ADMIN_KEY": "k", **ESITI}
         exec(pezzo_async("paga_venditore"), amb)
         return gira(amb["paga_venditore"]("lnbc1", 1000)), len(uscite)
@@ -1563,6 +1582,7 @@ def prove_pagamento_incerto():
                "_lucchetti_ordine": __import__("collections").defaultdict(
                    asyncio.Lock),
                "netto_venditore": lambda p: p,
+               "_fmt_sats": reale("_fmt_sats"),
                "invoice_da_ln_address": _address, "paga_venditore": _paga,
                "_righe_ordine": lambda con, o: [],
                "_titolo_ordine": lambda righe: "una cosa",
@@ -6603,9 +6623,37 @@ def prove_anteprime():
           "100.000 sats",
           pp({"valuta": "sats", "prezzo_sats": 100000}, 0))
     exec(pezzo("_cifra_offerta"), amb)
-    co = amb["_cifra_offerta"]
+    exec(pezzo("testo_prezzo"), amb)
+    co, tp = amb["_cifra_offerta"], amb["testo_prezzo"]
     prova("e l'offerta dice la stessa cosa", "15,50 €", co("eur", 0, 15.5))
-    prova("...coi sats intonsi", "80.000 sats", co("sats", 80000, 0.0))
+
+    # --- 1ter) e UN SATOSHI si scrive in un modo solo --------------
+    # Stesso argomento un piano piu' in la' (ago 2026): _fmt_sats
+    # esisteva gia' ma meta' dell'app lo scavalcava, e i formati in
+    # giro erano QUATTRO — «509000» grezzo, «509.000» dal giudice,
+    # «509,000» con la virgola INGLESE di {n:,}, e «509 000» con lo
+    # spazio. Adesso ci passa tutto quello che una persona legge.
+    prova("i sats portano i puntini, ovunque",
+          "80.000 sats", co("sats", 80000, 0.0))
+    prova("...anche nel prezzo che leggono i moderatori",
+          "509.000 sats", tp("sats", 509000, 0))
+    prova("...e nel ≈ accanto a un listino in euro",
+          "284,61 EUR (≈ 509.000 sats)", tp("eur", 509000, 284.61))
+
+    # E _fmt_sats NON SOLLEVA MAI, che e' la riga piu' importante di
+    # questa famiglia: da qui passano le cifre delle notifiche, e
+    # parecchie vivono dentro un try/except che protegge qualcosa di
+    # piu' importante — un formattatore che alza le mani li' dentro
+    # non fa un errore, fa SPARIRE L'ALLARME in silenzio. Il caso
+    # vero, preso da questa prova mentre il cantiere era in corso:
+    # importo_invoice torna None sulla bolt11 illeggibile, e con un
+    # f"{None:,}" l'avviso «importo storto» ai moderatori — o un
+    # wallet rotto, o un tentativo di prelievo — non partiva piu'.
+    fs = amb["_fmt_sats"]
+    prova("_fmt_sats non solleva sul None di una invoice illeggibile",
+          "None", fs(None))
+    prova("...ne' su una stringa arrivata per sbaglio", "boh", fs("boh"))
+    prova("...e i numeri veri restano quelli", "1.234.567", fs(1234567))
 
     # LA SENTINELLA che rende il principio verificabile invece che
     # raccomandato: nessuno scrive un euro a mano. Cercare `:.2f} €`
@@ -6635,6 +6683,35 @@ def prove_anteprime():
     # o qualcuno ha ricominciato a scrivere un euro a mano.
     prova("...e gli otto superstiti sono tutti censiti", 8,
           _SORGENTE.count(":.2f}"))
+
+    # LA SENTINELLA DEI SATS, gemella. Le stringhe spezzate su piu'
+    # righe si RICUCIONO prima di cercare: e' esattamente nella piega
+    # — «… {netto} "» a capo «"sats …» — che due siti si erano
+    # nascosti al censimento a mano, e una sentinella che non guarda
+    # li' dentro certifica una pulizia che non c'e'.
+    cucito = _re.sub(r'"\s*\n\s*f?"', "", _SORGENTE)
+    grezzi = [m for m in _re.findall(r"\{[^{}]*\} ?sats", cucito)
+              if "_fmt_sats" not in m]
+    # I CINQUE superstiti, e nessuno di loro e' testo per una persona:
+    # due righe di journal (log diagnostici, un lettore solo), la riga
+    # del catalogo che va in pasto ad Haiku, e le due righe di prosa
+    # del NIP-99 che ripetono i tag a parole. Se il numero cambia,
+    # qualcuno ha ricominciato a scrivere una cifra a mano.
+    prova("nessuna cifra in sats sfugge a _fmt_sats (restano i cinque "
+          "che una persona non legge)", 5, len(grezzi))
+    # e le due convenzioni straniere non devono tornare: la virgola
+    # inglese di {n:,} e lo spazio del .replace, che erano il terzo e
+    # il quarto formato
+    prova("...ne' la virgola inglese di {n:,}", 0,
+          len(_re.findall(r"\{[^{}]*:,\} ?sats", cucito)))
+    # ...e nemmeno lo spazio fatto a mano, che era il quarto formato.
+    # I DUE superstiti non sono sats: sono le righe di journal del
+    # cambio €/BTC («55 983 €/BTC»), un'altra cifra e un altro giro —
+    # scritto qui perche' la prima stesura di questa sentinella li
+    # aveva presi per sats e chiedeva zero.
+    prova("...ne' il separatore a spazio fatto a mano (restano i due "
+          "del cambio €/BTC, che sats non sono)", 2,
+          _SORGENTE.count('.replace(",", " ")'))
 
     # --- 2) L'ESCAPING: qui il testo dell'utente sta in un ATTRIBUTO -
     # Una virgoletta non escapata non «si vede male»: chiude il
