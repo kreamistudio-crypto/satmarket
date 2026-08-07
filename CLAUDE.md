@@ -4599,6 +4599,62 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   successivo a rimettere la entry in pari — sistema auto-guarente; il
   pannello Filtri è fuori di proposito (è in pagina, usa `style.display`
   che l'osservatore delle classi non vede, e non intrappola nessuno).
+  TORNANDO INDIETRO LA VETRINA RIPARTE DA DOVE SI ERA (ago 2026), e la
+  prima cosa da sapere è la DIAGNOSI, perché rovescia l'istinto: la
+  griglia NON si perde mai. Aprire un annuncio non svuota `#grid` —
+  misurato, 90 card prima, 90 durante, 90 dopo — quindi non c'era
+  niente da ricaricare, e la cura è la più semplice delle due. A
+  perdersi era la sola POSIZIONE, per due cause che si sommano:
+  entrando nel dettaglio la vetrina va in `display:none`, il documento
+  si accorcia da 13364 a 2273px e il browser CLAMPA lo scorrimento a
+  zero — cioè la posizione è già persa prima di tornare — e poi `go()`
+  lo riportava comunque in cima col suo `scrollTo(0,0)`.
+  Quindi: `vetrinaPos` = `{y, n}`, salvato IN CIMA a `go()`, PRIMA del
+  `remove('active')` (spostarlo sotto salverebbe sempre zero, ed è la
+  trappola di questo cantiere: non romperebbe niente di visibile), e
+  riletto dal giudice unico `posizioneDaRendere(view)`, che ha preso il
+  posto dello `scrollTo(0,0)` nudo.
+  IL GIUDICE DEL «RITORNO» È `navApplicando`, la bandierina che il
+  motore alza mentre RI-APPLICA una entry — l'unica cosa che distingue
+  un ritorno da un ingresso nuovo, e ci passano allo stesso modo lo
+  swipe di sistema della PWA, il tasto di Telegram e la freccia ←. Da
+  lì escono GRATIS le regole che nessuno ha scritto: la tirata di
+  aggiornamento e il cambio di filtro non sono traversate; i percorsi
+  che entrano da fuori (deep link, ritorno dopo il pagamento,
+  ripristino d'identità) non hanno né entry né posizione salvata; e il
+  tocco sul tab Esplora mentre si è GIÀ in Esplora torna in cima
+  (non è un indietro), mentre arrivandoci da un'altra radice si ritrova
+  la vetrina dov'era — che è la convenzione dei tab.
+  DUE DENTI DELLO STESSO LUCCHETTO, e servono tutt'e due: il CONTO
+  delle card (`n`) dice che la griglia è ancora quella — ricerca AI,
+  potatura, un annuncio sparito fanno ripartire dalla cima invece di
+  atterrare nel vuoto, che il cantiere dichiara peggio di niente — e
+  `loadListings` BUTTA `vetrinaPos` accanto al giro, perché due vetrine
+  diverse possono avere lo stesso numero di card (30 e 30): è il caso
+  vero «modifico l'annuncio dal dettaglio e torno». Più
+  `history.scrollRestoration='manual'` nel motore: con l'URL che non
+  cambia mai le entry del browser si somigliano tutte e il suo
+  tentativo arriverebbe dopo il nostro, diverso da un browser
+  all'altro.
+  COSA COPRE: la vetrina, da ogni strada che la lascia — dettaglio,
+  negozio, carrello e riepilogo, pagina d'acquisto, ordine — e dentro
+  qualunque ramo (Esplora, una categoria aperta da Sfoglia, il filtro
+  delle Aste), salti multipli compresi. COSA NO, ed è dichiarato:
+  negozio, Ordini, Profilo e «I tuoi annunci» si RIFANNO quando ci si
+  torna (un fetch, e i dati arrivano dopo), quindi al momento dello
+  scorrimento la pagina non è ancora alta come sarà e la posizione
+  cadrebbe nel vuoto per davvero — chi vorrà aggiungerne una deve prima
+  garantire che il suo markup sopravviva al ritorno, com'è per la
+  vetrina. In DEMO da `file://` il motore è spento, quindi
+  `navApplicando` non si accende mai e vale il comportamento di ieri.
+  E NEMMENO IL FOCUS DEVE TRASCINARE LA PAGINA (trovato di striscia,
+  ed era lì da sempre): chiudendo il picker, `pickerTrigger.focus()`
+  riportava in cima — il campo-bottone «Ordina» vive lassù — cioè la
+  stessa frustrazione per un'altra strada. `preventScroll:true` in
+  tutt'e due i chiamanti (`closeSheet` e `chiudiPicker`, che devono
+  restare allineati): il focus torna al campo, l'accessibilità del
+  picker resta intera, la pagina no. Dove l'opzione non c'è (i Safari
+  vecchi) si ignora e vale il comportamento di ieri: mai peggio.
   IL GESTO DI AGGIORNAMENTO (lug 2026): tirare giù dalla cima rilegge la
   vista e ci RESTA — pastiglia di carta `#ptr` che scende col dito
   (z-index 25: sopra l'header, o dietro sparirebbe; sotto nav, barra
@@ -8127,6 +8183,40 @@ mostrali → rimetti in vista esercitati dal vivo sul server locale.
 IN PRODUZIONE basta il deploy: le due colonne nascono da sole a 0,
 nessuna leva, nessun backfill; il client vecchio in cache ignora
 foto0 e nascosto e vive come oggi.
+Tornando indietro la vetrina riparte da dove si era (ago 2026): si apre
+un annuncio, si torna, e ci si ritrova sulla stessa riga di card invece
+che in cima. LA DIAGNOSI PRIMA DI TUTTO, perché ha deciso il cantiere e
+rovescia l'istinto: la griglia non si perde MAI — 90 card prima, 90
+durante, 90 dopo, misurate — quindi non c'era niente da ricaricare e la
+cura è stata la più semplice delle due (salvare la posizione lasciando
+la vetrina, rileggerla tornando). Il giudice del «ritorno» è
+`navApplicando`, la bandierina che il motore alza già oggi mentre
+ri-applica una entry: da lì escono gratis il pull-to-refresh e il
+cambio filtro che ripartono dalla cima, i percorsi che entrano da fuori
+che partono normalmente, e la convenzione dei tab. Vedi Architettura,
+«TORNANDO INDIETRO LA VETRINA RIPARTE DA DOVE SI ERA», per i due denti
+del lucchetto (il conto delle card e l'azzeramento in `loadListings`) e
+per cosa NON si copre e perché.
+Collaudato: 14 prove nuove in `prove.py` (1457 verdi, erano 1443) —
+sentinelle di forma TORTURATE con nove mutazioni del codice, una per
+riga sorvegliata (salvataggio spostato dopo il `display:none`, guardia
+del ritorno tolta, cintura del conto card tolta, `scrollTo(0,0)`
+rimesso, azzeramento spostato dopo il fetch…): ognuna diventa rossa da
+sola, nessuna sopravvive. Più il giro dal vivo sul server locale con le
+misure a mano — 90 card e 4200px ritrovati identici da dettaglio,
+negozio, carrello e pagina d'acquisto, salto multiplo compreso; e i
+casi che NON devono ripristinare, verificati uno per uno: vetrina
+ricaricata mentre si è via (→ cima, mai il clamp in fondo), ricerca AI,
+cambio categoria, tab Esplora su Esplora, deep link `/annuncio/{id}`.
+Più due screenshot CDP prima/dopo identici pixel per pixel, e zero
+errori JS. Un difetto PREESISTENTE trovato di striscia e chiuso qui: il
+focus che torna al campo alla chiusura del picker trascinava la pagina
+in cima (`preventScroll`). IN PRODUZIONE basta il deploy: nessuna
+colonna, nessuna leva, nessuna rotta — e lo stato vive per la sessione,
+niente localStorage. DA GUARDARE dal vivo: il giro su un telefono vero
+nei DUE contesti — Mini App (il tasto di Telegram) e PWA installata (lo
+swipe di sistema) — che è dove i due cammini si sono già divisi in
+passato.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
