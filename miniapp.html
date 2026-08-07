@@ -4134,6 +4134,12 @@ function mapOrder(o){
        STRADA (terzo giro): puo' essere vera col punto ancora vuoto,
        ed e' lo stato che apre il campo nell'ordine */
     puntoRitiro:o.punto_ritiro||'', viaPunto:!!o.via_punto,
+    /* la busta di consegna (ago 2026): nome e codice NON viaggiano
+       mai in /api/orders — qui arrivano solo il quando (bustaIl =
+       PRIMO deposito, 0 = mai) e le correzioni; il testo lo serve
+       /busta-ritiro alle sole parti, MAI all'admin */
+    bustaIl:o.busta_il||0, bustaCorrettaIl:o.busta_corretta_il||0,
+    bustaCorrezioni:o.busta_correzioni||0,
     /* l'ordine nato da un'asta (ago 2026): con la scelta di consegna
        ancora vuota il vincitore sceglie dal varco e il venditore
        aspetta (niente bottoni di spedizione) */
@@ -9948,6 +9954,7 @@ function openOrder(id){
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
         </div>`):''}
       ${pannelloContenutoDigitale(o)}
+      ${pannelloBustaRitiro(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
       ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — mi prendo ${TEMPI.conferma}h per controllarlo`:`📬 È arrivato — mi prendo ${TEMPI.conferma}h per controllarlo`}</button>`:''}
@@ -12152,6 +12159,135 @@ async function consegnaContenuto(btn){
   contenutoRivelato[currentOrder.id] = testo;
   openOrder(currentOrder.id);
   toast('💾 Contenuto consegnato: l\'acquirente è stato avvisato');
+}
+
+/* ---- la busta di consegna (ago 2026): nome del destinatario e
+   codice di ritiro per gli ordini verso un PUNTO. Riusa il TRASPORTO
+   dei contenuti digitali, MAI la sua semantica: aprire la busta NON
+   e' una ricevuta — niente confirm, niente cambio di stato — e i
+   sats si muovono solo coi bottoni di conferma di sempre. L'admin
+   non la legge mai (il server glielo nega; qui non gli si disegna
+   nemmeno il bottone). Il testo non viaggia in /api/orders: si
+   carica solo da /busta-ritiro, e questa e' la copia di pagina. ---- */
+let bustaLetta = {};          // ordineId -> {nome, codice}
+
+function pannelloBustaRitiro(o){
+  if (!o.viaPunto || o.role==='admin') return '';
+  const quando = o.bustaIl
+    ? new Date(o.bustaIl*1000).toLocaleString('it-IT',
+        {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+  const corr = o.bustaCorrezioni
+    ? ` — aggiornate ${o.bustaCorrezioni===1?'una volta':o.bustaCorrezioni+' volte'}` : '';
+  const b = bustaLetta[o.id];
+  if (o.role==='buyer'){
+    if (!o.bustaIl)
+      /* lo stato d'attesa visibile (decisione di Andrea, al posto del
+         gate): il venditore ha spedito, il codice arriva all'arrivo */
+      return o.state==='shipped' ? `
+      <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>` : '';
+    if (b) return `
+      <div class="payout">
+        <h4>📦 Istruzioni per il ritiro</h4>
+        <div class="hint">Nome del destinatario sul pacco (lo ha scelto il venditore — se al banco te lo chiedono, è questo):</div>
+        <div class="hint mono" style="user-select:all">${esc(b.nome)}</div>
+        <div class="hint" style="margin-top:8px">Codice di ritiro:</div>
+        <div class="hint mono" style="user-select:all;white-space:pre-wrap;word-break:break-word">${esc(b.codice)}</div>
+        <button class="btn ghost" style="margin-top:10px" onclick="copiaBusta()">📋 Copia il codice</button>
+        <div class="hint" style="margin-top:8px">Leggerle non conferma nulla: i sats restano nel deposito di garanzia finché non confermi tu il ritiro, coi bottoni qui sotto.</div>
+      </div>`;
+    return `
+      <div class="payout">
+        <h4>📦 Istruzioni per il ritiro</h4>
+        <div class="hint">Depositate il ${quando}${corr}: il nome del destinatario e il codice per ritirare il pacco al punto. <b>Leggerle non conferma nulla</b> — i sats restano nel deposito di garanzia finché non confermi tu il ritiro. ⏳ Ricorda la giacenza: al punto il pacco aspetta pochi giorni (di solito circa 3).</div>
+        <button class="btn orange" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra le istruzioni</button>
+      </div>`;
+  }
+  /* venditore: deposito su 'locked' (il caso raro del codice
+     immediato), il caso normale su 'shipped', la correzione fino a
+     'dispute' — un PIN sbagliato lo corregge solo lui, il moderatore
+     non puo' (non legge la busta) */
+  if (o.role==='seller' && ['locked','shipped','dispute'].includes(o.state)){
+    const testa = o.bustaIl
+      ? `✓ Depositate il ${quando}${corr}. Se hai sbagliato qualcosa (il PIN, il nome), correggile da qui: l'acquirente riceve un avviso. Nemmeno i moderatori possono leggerle o correggerle per te.`
+      : (o.state==='locked'
+        ? 'Se hai già il codice di ritiro (capita spedendo da un punto: arriva subito), puoi depositarlo ora; altrimenti torna qui quando il corriere te lo manda, a pacco arrivato.'
+        : 'Appena il corriere ti manda il codice — arriva quando il pacco è al punto — depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
+    return `
+      <div class="payout">
+        <h4>📦 Istruzioni di ritiro per l'acquirente</h4>
+        <div class="hint">${testa}</div>
+        <div class="hint" style="margin-top:6px">Scrivi il <b>nome che hai messo come destinatario</b> (anche di fantasia: serve all'acquirente se glielo chiedono al banco, e a tutti e due se il pacco non viene ritirato e torna indietro) e il <b>codice di ritiro</b> (PIN o link del QR). Restano cifrati e li legge solo l'acquirente; aprirli non sblocca nulla — i sats si muovono solo quando conferma il ritiro.</div>
+        <textarea id="bustaNome" maxlength="80" style="min-height:38px" placeholder="Nome del destinatario (es. Mario Rossi)">${b?esc(b.nome):''}</textarea>
+        <textarea id="bustaCodice" maxlength="1000" style="min-height:38px" placeholder="Codice di ritiro (PIN o link del QR)">${b?esc(b.codice):''}</textarea>
+        ${o.bustaIl && !b ? `<button class="btn ghost" style="margin-top:8px" onclick="mostraBusta(this)">👁 Rileggi ciò che hai depositato</button>` : ''}
+        <button class="btn orange" style="margin-top:10px" onclick="depositaBusta(this)">📦 ${o.bustaIl?'Aggiorna le istruzioni':'Deposita le istruzioni'}</button>
+      </div>`;
+  }
+  /* venditore fuori dagli stati di scrittura: rilettura e basta */
+  if (o.role==='seller' && o.bustaIl) return `
+    <div class="payout">
+      <h4>📦 Istruzioni di ritiro</h4>
+      <div class="hint">Depositate il ${quando}${corr}. Puoi rileggere ciò che hai depositato:</div>
+      <button class="btn ghost" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra</button>
+    </div>`;
+  return '';
+}
+
+async function caricaBusta(){
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/busta-ritiro`,
+    {headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return null; }
+  bustaLetta[currentOrder.id] = {nome:d.nome||'', codice:d.codice||''};
+  return d;
+}
+
+/* nessun confirm, ed e' il punto: aprire la busta non e' il gesto
+   consequenziale della rivelazione digitale — e' leggere un
+   bigliettino, e non muove niente */
+async function mostraBusta(btn){
+  haptic();
+  const ripristina = bottoneInAttesa(btn);
+  const d = await caricaBusta();
+  ripristina();
+  if (d) openOrder(currentOrder.id);
+}
+
+function copiaBusta(){
+  haptic();
+  const b = bustaLetta[currentOrder?.id];
+  if (!b) return;
+  navigator.clipboard?.writeText(b.codice)
+    .then(()=>toast('📋 Codice copiato'))
+    .catch(()=>toast('Tieni premuto sul testo per copiarlo'));
+}
+
+async function depositaBusta(btn){
+  haptic();
+  const nome = (el('bustaNome').value||'').trim();
+  const codice = (el('bustaCodice').value||'').trim();
+  if (!nome || !codice) { toast('Servono entrambi: nome del destinatario e codice di ritiro'); return; }
+  const correzione = currentOrder.bustaIl > 0;
+  if (!confirm(correzione
+      ? 'Aggiornare le istruzioni di ritiro?\n\nL\'acquirente riceve un avviso e userà il nome e il codice nuovi.'
+      : 'Depositare le istruzioni di ritiro?\n\nL\'acquirente le leggerà nell\'ordine'
+        + (currentOrder.state==='locked'
+           ? ' (l\'avviso gli arriva quando segni la spedizione).'
+           : ' e riceve subito l\'avviso «il tuo pacco ti aspetta».'))) return;
+  const ripristina = bottoneInAttesa(btn);
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/busta-ritiro`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({nome, codice})});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
+  currentOrder.bustaIl = d.busta_il || Math.floor(Date.now()/1000);
+  currentOrder.bustaCorrezioni = d.busta_correzioni || 0;
+  bustaLetta[currentOrder.id] = {nome, codice};
+  openOrder(currentOrder.id);
+  toast(correzione ? '📦 Istruzioni aggiornate: l\'acquirente è stato avvisato'
+                   : '📦 Istruzioni depositate');
 }
 
 async function markDelivered(){

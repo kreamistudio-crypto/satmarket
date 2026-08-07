@@ -1838,6 +1838,291 @@ def prove_contenuti_cifrati():
           a["_chiave_fernet"]("f2") != a["_chiave_fernet"]("f"))
 
 
+def prove_busta_ritiro():
+    """La busta di consegna (ago 2026): nome del destinatario e codice
+    di ritiro DENTRO l'ordine, cifrati col trasporto dei contenuti
+    digitali ma MAI con la sua semantica — aprire la busta non e' una
+    ricevuta, e la macchina dell'escrow non sa che esiste. NIENTE gate
+    su segna_spedito (decisione di Andrea): il codice arriva quando il
+    pacco e' GIA' al punto."""
+    print("\n[la busta di consegna]")
+    import asyncio
+    import sqlite3
+    import time as _t
+
+    # --- le sentinelle di forma: la SEPARAZIONE dall'escrow ---------
+    dep = pezzo("deposita_busta_ritiro").split('"""')[-1]
+    let = pezzo("leggi_busta_ritiro").split('"""')[-1]
+    sped = pezzo("segna_spedito").split('"""')[-1]
+    prova("deposito: solo venditore, su locked/shipped/dispute", True,
+          "venditore_id=?" in dep
+          and "'locked','shipped','dispute'" in dep)
+    prova("deposito: esige la via punto", True, 'o["via_punto"]' in dep)
+    prova("deposito: UN solo UPDATE, e tocca SOLO le colonne busta", 1,
+          dep.count("UPDATE"))
+    prova("deposito: non tocca stato, spedito_il, consegnato", [],
+          [x for x in ("stato='", "spedito_il", "consegnato")
+           if x in dep])
+    prova("deposito: cifra col trasporto dei contenuti digitali", True,
+          "_cifra_contenuto(" in dep)
+    prova("deposito: il journal porta l'impronta, mai il testo", True,
+          "hashlib.sha256(codice" in dep and "[:16]" in dep)
+    prova("deposito: notifiche statiche, mai il contenuto", [],
+          [x for x in ("{nome", "{codice") if x in dep])
+    # il GET e' PURO: aprire la busta significa poter andare a
+    # ritirare, NON aver ricevuto — qui vive la separazione
+    prova("lettura: GET puro, nessuna scrittura", [],
+          [x for x in ("UPDATE", "INSERT", "commit") if x in let])
+    prova("lettura: non sa nemmeno cosa sia `consegnato`", False,
+          "consegnato" in let)
+    prova("lettura: l'admin non ha strada", False, "e_admin" in let)
+    prova("lettura: autorizzazione PRIMA dell'esistenza (anti-oracolo)",
+          True, "compratore_id=? OR venditore_id=?" in let
+          and let.index("Operazione non permessa")
+          < let.index("Nessuna istruzione"))
+    # il gate NON esiste (decisione di Andrea che ha rovesciato il
+    # brief): in segna_spedito la busta compare solo DOPO l'UPDATE,
+    # cioe' nel ramo delle notifiche — mai in una guardia
+    prova("segna_spedito: nessun gate sulla busta", True,
+          sped.index("UPDATE ordini SET stato='shipped'")
+          < sped.index("busta_il"))
+    # il segnale d'arrivo e' UNO e parte da due strade: la costante
+    # e' definita una volta e usata due
+    prova("il «ti aspetta» e' UNA costante per due strade", 3,
+          _SORGENTE.count("MSG_BUSTA_PRONTA"))
+    # le finestre dell'escrow non sanno che la busta esiste
+    prova("controlla_scadenze e' cieca alla busta", False,
+          "busta" in pezzo("controlla_scadenze"))
+    # lo strip: nome e codice non escono MAI da /api/orders
+    mo = pezzo("miei_ordini")
+    prova("lo strip di /api/orders copre nome e codice", True,
+          'r.pop("busta_nome"' in mo and 'r.pop("busta_codice"' in mo)
+    # la nota in disputa dice SE e QUANDO (e le correzioni), mai cosa
+    ad = pezzo("apri_disputa")
+    prova("la disputa racconta la busta senza aprirla", True,
+          "nota_punto" in ad and "busta_correzioni" in ad
+          and "_decifra_contenuto" not in ad)
+    # il promemoria al posto del gate: popolazione e ancora giuste
+    sb = pezzo("sollecita_buste_ferme").split('"""')[-1]
+    prova("il promemoria pesca shipped+via_punto+busta assente", True,
+          "o.stato='shipped' AND o.via_punto=1 AND o.busta_il=0" in sb)
+    prova("...con l'ancora spedito_il e le colonne SUE", True,
+          "MAX(o.spedito_il + ?" in sb and "sollecito_busta_il" in sb)
+    prova("...ed e' agganciato all'orologio", 1,
+          _SORGENTE.count("await sollecita_buste_ferme()"))
+    prova("il libro mastro sorveglia la busta fuori contratto", True,
+          "busta fuori contratto" in _SORGENTE)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("client: bustaIl in mapOrder e pannello presente", True,
+          "bustaIl:o.busta_il" in mini and "pannelloBustaRitiro" in mini)
+    prova("client: nome e codice resi sotto esc()", True,
+          "esc(b.nome)" in mini and "esc(b.codice)" in mini)
+    prova("client: aprire la busta non chiede conferme", False,
+          "confirm" in pezzo_js(mini, "async function mostraBusta"))
+
+    # --- il funzionale su sqlite in memoria -------------------------
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE ordini(
+        id INTEGER PRIMARY KEY, compratore_id INT, venditore_id INT,
+        stato TEXT, consegna_scelta TEXT DEFAULT 'spedizione',
+        via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
+        corriere TEXT DEFAULT '', tracking TEXT DEFAULT '',
+        spedito_il INT DEFAULT 0, aggiornato INT DEFAULT 0,
+        consegnato INT DEFAULT 0, annuncio_id INT DEFAULT 1,
+        prezzo_sats INT DEFAULT 1000,
+        busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
+        busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
+        busta_correzioni INT DEFAULT 0,
+        sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0);
+      CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
+        asta_base_sats INT DEFAULT 0);
+      INSERT INTO annunci(id, titolo) VALUES(1, 'Un oggetto');
+      -- 1: via punto, gia' spedito (il caso normale del deposito)
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        via_punto, punto_ritiro, spedito_il)
+        VALUES(1, 111, 222, 'shipped', 1, 'Locker InPost', 1000);
+      -- 2: spedizione a casa (la busta non c'entra)
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato)
+        VALUES(2, 111, 222, 'shipped');
+      -- 3: via punto ancora 'locked' (il caso del codice immediato)
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        via_punto, punto_ritiro)
+        VALUES(3, 111, 222, 'locked', 1, 'Punto Poste');
+    """)
+    vero.commit()
+
+    class Con:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    avvisi = []
+
+    async def _notifica(tg, testo):
+        avvisi.append((tg, testo))
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    def _amb(chi):
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "leggi_json": _leggi, "notifica": _notifica,
+               "hashlib": __import__("hashlib"), "time": _t,
+               "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
+               "MSG_BUSTA_PRONTA": "TI-ASPETTA"}
+        exec(pezzo("_cifra_contenuto"), amb)
+        exec(pezzo("_decifra_contenuto"), amb)
+        return amb
+
+    def corri(amb, nome, *args):
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb[nome](*args))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    def deposita(chi, oid, body):
+        amb = _amb(chi)
+        exec("async " + pezzo("deposita_busta_ritiro"), amb)
+        return corri(amb, "deposita_busta_ritiro", oid, _Req(body))
+
+    def leggi(chi, oid):
+        amb = _amb(chi)
+        exec("async " + pezzo("leggi_busta_ritiro"), amb)
+        return corri(amb, "leggi_busta_ritiro", oid)
+
+    busta = {"nome": "Mario Rossi", "codice": "PIN 4321"}
+    prova("il compratore non deposita", "400 Operazione non permessa",
+          deposita(111, 1, busta))
+    prova("l'estraneo nemmeno", "400 Operazione non permessa",
+          deposita(999, 1, busta))
+    prova("niente busta fuori dalla via punto", True,
+          str(deposita(222, 2, busta)).startswith("400 Questo ordine"))
+    prova("i due campi servono insieme", True,
+          str(deposita(222, 1, {"nome": "Mario"})).startswith(
+              "400 Servono entrambi"))
+    prima = [tuple(r) for r in vero.execute(
+        "SELECT stato, spedito_il, consegnato, aggiornato FROM ordini")]
+    r1 = deposita(222, 1, busta)
+    prova("il deposito riesce e timbra busta_il", True,
+          isinstance(r1, dict) and r1["busta_il"] > 0)
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("nel DB il codice non e' nudo... e' il trasporto di casa",
+          True, o1["busta_codice"].startswith("plain:")
+          and o1["busta_nome"].startswith("plain:"))
+    prova("l'escrow non si e' mosso di un millimetro", prima,
+          [tuple(r) for r in vero.execute(
+              "SELECT stato, spedito_il, consegnato, aggiornato "
+              "FROM ordini")])
+    prova("a pacco in viaggio parte il «ti aspetta», una volta",
+          [(111, "TI-ASPETTA")], avvisi)
+    avvisi.clear()
+    primo_timbro = o1["busta_il"]
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "PIN 9999"})
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("la correzione NON riscrive il primo deposito", primo_timbro,
+          o1["busta_il"])
+    prova("...ma si conta e si timbra", True,
+          o1["busta_correzioni"] == 1
+          and o1["busta_corretta_il"] >= primo_timbro)
+    prova("...e l'avviso e' quello statico dell'aggiornamento", True,
+          len(avvisi) == 1 and "aggiornate" in avvisi[0][1])
+    avvisi.clear()
+    # il caso del codice immediato: deposito su 'locked' SILENZIOSO...
+    deposita(222, 3, busta)
+    prova("su 'locked' il deposito tace (parlera' segna_spedito)",
+          [], avvisi)
+    # ...e il segnale d'arrivo parte da segna_spedito, senza doppione
+    amb = _amb(222)
+    exec("async " + pezzo("segna_spedito"), amb)
+    corri(amb, "segna_spedito", 3,
+          _Req({"corriere": "InPost", "tracking": "1234567890"}))
+    prova("segna_spedito col codice gia' li': UN «ti aspetta»",
+          [(111, "TI-ASPETTA")], avvisi)
+    prova("...e l'ordine e' spedito davvero", "shipped",
+          vero.execute("SELECT stato FROM ordini "
+                       "WHERE id=3").fetchone()["stato"])
+    avvisi.clear()
+    # la lettura: le parti si', l'estraneo e l'inesistente uguali,
+    # e il database non cambia di un byte
+    dump = [tuple(r) for r in vero.execute(
+        "SELECT * FROM ordini ORDER BY id")]
+    letto = leggi(111, 1)
+    prova("il compratore legge nome e codice in chiaro", True,
+          isinstance(letto, dict) and letto["nome"] == "Mario Rossi"
+          and letto["codice"] == "PIN 9999")
+    prova("il venditore rilegge cio' che ha depositato", True,
+          isinstance(leggi(222, 1), dict))
+    prova("estraneo e ordine inesistente rispondono uguale", True,
+          leggi(999, 1) == leggi(111, 777))
+    prova("l'ordine senza busta e' un 404 onesto", True,
+          str(leggi(111, 2)).startswith("404"))
+    prova("la lettura non scrive NIENTE (la prova regina)", dump,
+          [tuple(r) for r in vero.execute(
+              "SELECT * FROM ordini ORDER BY id")])
+
+    # --- il promemoria al posto del gate -----------------------------
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il) "
+                 "VALUES(9, 111, 222, 'shipped', 1, ?)",
+                 (int(_t.time()) - 4 * 86400,))
+    vero.commit()
+    amb = {"db": Con, "notifica": _notifica,
+           "notifica_admin": _notifica_admin_spia(avvisi),
+           "_titolo_ordine": lambda righe: "un set",
+           "html": __import__("html"),
+           "_fmt_sats": lambda n: str(n), "time": _t,
+           "PROMEMORIA_BUSTA_GIORNI": 3, "PROMEMORIA_CONFERMA_GIORNI": 3,
+           "PROMEMORIA_CONFERMA_MAX": 3}
+    exec("async " + pezzo("sollecita_buste_ferme"), amb)
+    asyncio.new_event_loop().run_until_complete(
+        amb["sollecita_buste_ferme"]())
+    prova("a 4 giorni senza busta squilla il SOLO venditore",
+          [222], [a[0] for a in avvisi])
+    avvisi.clear()
+    asyncio.new_event_loop().run_until_complete(
+        amb["sollecita_buste_ferme"]())
+    prova("e non ribussa subito: la cadenza e' delle sorelle", [], avvisi)
+    amb["PROMEMORIA_BUSTA_GIORNI"] = 0
+    vero.execute("UPDATE ordini SET sollecito_busta_il=0, "
+                 "solleciti_busta=0 WHERE id=9")
+    vero.commit()
+    asyncio.new_event_loop().run_until_complete(
+        amb["sollecita_buste_ferme"]())
+    prova("la leva a 0 spegne la popolazione", [], avvisi)
+    vero.close()
+
+
+def _notifica_admin_spia(avvisi):
+    async def _n(testo):
+        avvisi.append(("admin", testo))
+    return _n
+
+
+def pezzo_js(mini, firma, fine="\n\n"):
+    """Il gemello di pezzo() per miniapp.html: estrae una funzione JS
+    per testo, dalla firma alla prima riga vuota."""
+    i = mini.index(firma)
+    return mini[i:mini.index(fine, i)]
+
+
 def prove_ssrf_redirect():
     """Il guardiano anti-SSRF si aggirava con un 302 (ago 2026,
     audit): urllib segue i redirect da solo e `url_foto_ammesso`
@@ -4608,7 +4893,10 @@ def prove_libro_mastro():
           sped_gratis_sats INT DEFAULT 0,
           consegna_scelta TEXT DEFAULT 'spedizione',
           stato TEXT DEFAULT 'locked', payout_stato TEXT DEFAULT '',
-          aggiornato INT DEFAULT 0);
+          aggiornato INT DEFAULT 0, via_punto INT DEFAULT 0,
+          busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
+          busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
+          busta_correzioni INT DEFAULT 0);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
           annuncio_id INT, quantita INT, unitario_sats INT,
           titolo TEXT DEFAULT '');
@@ -4660,6 +4948,11 @@ def prove_libro_mastro():
           VALUES(7, 222, 'attivo', 'npub1xxx');
         INSERT INTO annunci(id,venditore_id,stato,nostr_event_id)
           VALUES(8, 222, 'attivo', 'evento123');
+        -- UNA BUSTA SANA: via punto, nome+codice+timbro insieme
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,via_punto,
+          busta_nome,busta_codice,busta_il)
+          VALUES(4, 9, 1000, 'shipped', 1,
+                 'plain:Mario Rossi', 'plain:PIN 4321', 123);
         -- TRE NEGOZI SANI: uno sconta a pezzi, uno a valore, uno e'
         -- spento (e uno spento non deve suonare mai)
         INSERT INTO utenti(tg_id,sconto_pacco_criterio,sconto_pacco_soglia,
@@ -4740,6 +5033,19 @@ def prove_libro_mastro():
         ("UPDATE ordini SET sped_gratis_sats=800, consegna_scelta='ritiro' "
          "WHERE id=2",
          "spedizione risparmiata dove non si spediva", "2"),
+        # la busta fuori contratto, nei suoi quattro modi: flag, nome
+        # e codice si scrivono nello stesso UPDATE dietro la stessa
+        # guardia — una riga spaiata e' un deposito a meta' o una
+        # guardia caduta
+        ("UPDATE ordini SET busta_nome='' WHERE id=4",
+         "busta fuori contratto", "4"),
+        ("UPDATE ordini SET busta_codice='' WHERE id=4",
+         "busta fuori contratto", "4"),
+        ("UPDATE ordini SET via_punto=0 WHERE id=4",
+         "busta fuori contratto", "4"),
+        ("UPDATE ordini SET busta_il=0, busta_nome='', busta_codice='', "
+         "busta_corretta_il=99 WHERE id=4",
+         "busta fuori contratto", "4"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -5418,6 +5724,7 @@ def main():
               prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
+              prove_busta_ritiro,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_messaggio_admin, prove_avviso_contatto,

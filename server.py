@@ -550,6 +550,20 @@ except ImportError:
                                        # e' ORE_SILENZIO_DIGITALE, l'altra
                                        # finestra di silenzio di quella
                                        # strada
+# La busta di consegna (ago 2026): sugli ordini verso un punto di
+# ritiro il codice arriva al venditore quando il pacco e' GIA' al
+# punto — quindi NESSUN gate su segna_spedito (decisione di Andrea:
+# col gate non potrebbe dichiarare la spedizione per tutto il
+# viaggio, e chi ha pagato vedrebbe il nulla). Al posto del gate, il
+# promemoria: primo squillo a N giorni dalla spedizione se la busta
+# non c'e' ancora; cadenza e tetto sono PROMEMORIA_CONFERMA_* come
+# per le sorelle. A 0 la popolazione e' spenta.
+try:
+    from config import PROMEMORIA_BUSTA_GIORNI
+except ImportError:
+    PROMEMORIA_BUSTA_GIORNI = 3        # il transito dura 1-3 giorni: al
+                                       # terzo o il pacco e' lento o il
+                                       # codice e' nel dimenticatoio
 
 # Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
 # propone una cifra, il venditore accetta/rifiuta/contropropone UNA
@@ -2233,7 +2247,35 @@ def init_db():
                     # spedizione_sats da solo non potrebbe avere.
                     # Si scrive SOLO quando la promessa e' scattata su
                     # una via che spediva: 0 ovunque altrove.
-                    "sped_gratis_sats INTEGER DEFAULT 0"):
+                    "sped_gratis_sats INTEGER DEFAULT 0",
+                    # LA BUSTA DI CONSEGNA (ago 2026): sugli ordini con
+                    # la via del punto di ritiro il venditore deposita
+                    # il nome del destinatario e il codice di ritiro —
+                    # cifrati col TRASPORTO dei contenuti digitali, MAI
+                    # la sua semantica: aprire la busta non e' una
+                    # ricevuta, `consegnato` e lo stato non si toccano
+                    # (consegna_scelta resta 'spedizione', quindi le
+                    # finestre corte del digitale non vedono mai questi
+                    # ordini). L'admin non la legge MAI: in disputa
+                    # vede solo SE e QUANDO (busta_il e le correzioni).
+                    "busta_nome TEXT DEFAULT ''",
+                    "busta_codice TEXT DEFAULT ''",
+                    # il PRIMO deposito (0 = mai): e' il flag E il
+                    # «quando» — le correzioni non lo riscrivono
+                    "busta_il INTEGER DEFAULT 0",
+                    # le correzioni si vedono (decisione di Andrea): la
+                    # busta resta correggibile fino a 'dispute' — il
+                    # moderatore non puo' correggerla perche' non la
+                    # legge — e deve sapere che e' cambiata e quando,
+                    # magari proprio dopo l'apertura della disputa.
+                    # Fatti, mai il contenuto.
+                    "busta_corretta_il INTEGER DEFAULT 0",
+                    "busta_correzioni INTEGER DEFAULT 0",
+                    # il promemoria al venditore che non deposita la
+                    # busta: colonne SUE, come per le sorelle — un
+                    # contatore ereditato salterebbe al tetto
+                    "sollecito_busta_il INTEGER DEFAULT 0",
+                    "solleciti_busta INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -8280,6 +8322,11 @@ def _leve_stato():
             _leva("Codice mai consegnato: primo squillo (ore)",
                   "PROMEMORIA_DIGITALE_ORE", PROMEMORIA_DIGITALE_ORE,
                   spento="il codice mai consegnato non squilla a nessuno"),
+            _leva("Busta di ritiro mai depositata: primo squillo (giorni)",
+                  "PROMEMORIA_BUSTA_GIORNI", PROMEMORIA_BUSTA_GIORNI,
+                  spento="il venditore che non deposita il codice di "
+                         "ritiro non squilla: il compratore resta davanti "
+                         "a un locker chiuso, in silenzio"),
             _leva("Sollecito degli incassi fermi (giorni)",
                   "SOLLECITO_INCASSO_GIORNI", SOLLECITO_INCASSO_GIORNI,
                   spento="il venditore senza metodo d'incasso non viene più "
@@ -10080,7 +10127,12 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
 def _strade_asta(a) -> set:
     """Le strade che l'asta offre al vincitore (tutte a costo zero,
     per regola: la spedizione e' inclusa nel prezzo). La scelta
-    avviene DENTRO l'ordine, dal varco esistente."""
+    avviene DENTRO l'ordine, dal varco esistente. NIENTE via del
+    punto di ritiro, dichiarato (ago 2026, busta di consegna): qui il
+    vincitore sceglie solo la STRADA e scegli_consegna_ordine non
+    scrive mai via_punto, quindi gli ordini d'asta non hanno mai la
+    busta — se un giorno servira', e' un cantiere suo (via e punto
+    dentro la scelta del vincitore)."""
     strade = set()
     if a["consegna"] in ("spedizione", "entrambe"):
         strade.add("spedizione")
@@ -12701,6 +12753,153 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
     return {"ok": True, "punto_ritiro": punto}
 
 
+# ------------------ LA BUSTA DI CONSEGNA (ago 2026) ------------------
+# Per ritirare un pacco a un punto servono il NOME che il venditore ha
+# messo come destinatario (di fantasia: il corriere esige un nome, noi
+# non raccogliamo dati veri) e il CODICE di ritiro che il corriere gli
+# manda quando il pacco arriva al punto. Prima viaggiavano in chat
+# privata — e chi non ha username Telegram ne' npub non e'
+# contattabile: l'ordine restava bloccato (successo davvero). La busta
+# li porta DENTRO l'ordine, cifrati col trasporto dei contenuti
+# digitali (_cifra_contenuto) ma MAI con la sua semantica: aprire la
+# busta significa poter andare a ritirare, NON aver ricevuto — la
+# lettura non e' una ricevuta, non tocca `consegnato` ne' lo stato, e
+# i sats si muovono solo con la conferma del compratore, coi bottoni
+# di sempre.
+
+# Il segnale d'arrivo e' UNA costante perche' parte da due strade — il
+# deposito a pacco gia' dichiarato in viaggio (il caso normale) e
+# segna_spedito nel caso raro del codice immediato — e le due non
+# devono divergere.
+MSG_BUSTA_PRONTA = (
+    "📦 <b>Il tuo pacco ti aspetta al punto di ritiro!</b> Nell'ordine "
+    "trovi il <b>nome del destinatario</b> e il <b>codice</b> per "
+    "ritirarlo. ⏳ La giacenza dura pochi giorni (di solito circa 3), "
+    "poi il pacco torna indietro: ritiralo presto, e dopo il ritiro "
+    "conferma nella Mini App per sbloccare i sats al venditore.")
+
+
+@app.post("/api/orders/{ordine_id}/busta-ritiro")
+async def deposita_busta_ritiro(ordine_id: int, req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Il VENDITORE deposita le istruzioni di ritiro: il nome del
+    destinatario (serve al compratore se glielo chiedono al banco, e
+    a entrambi se il pacco torna indietro) e il codice di ritiro.
+    NIENTE gate su segna_spedito (decisione di Andrea): il codice
+    arriva quando il pacco e' GIA' al punto, e col gate il venditore
+    non potrebbe dichiarare la spedizione per tutto il viaggio — al
+    posto del gate ci sono lo stato «in attesa del codice» visibile
+    nell'ordine e sollecita_buste_ferme nell'orologio. Deposito su
+    'locked' (caso raro del codice immediato: spedizione da un punto),
+    'shipped' (il caso normale) e 'dispute' (un PIN sbagliato si
+    corregge SOLO da qui: il moderatore non puo', non legge la busta).
+    busta_il resta il PRIMO deposito; le correzioni timbrano
+    busta_corretta_il e contano in busta_correzioni — cosi' in disputa
+    si vede che la busta e' cambiata e quando, mai cosa c'e' dentro.
+    Qui non si tocca ne' lo stato ne' spedito_il ne' consegnato: la
+    macchina dell'escrow non sa che la busta esiste. Dichiarato: il
+    compratore puo' ancora cambiare punto su 'locked' dopo un deposito
+    precoce (il venditore riceve gia' la notifica statica a ogni
+    cambio, e il codice immediato e' suo: sa se combacia)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    nome = " ".join(str(d.get("nome") or "").split())
+    codice = (d.get("codice") or "").strip()
+    if not nome or not codice:
+        raise HTTPException(400, "Servono entrambi: il nome del "
+                                 "destinatario e il codice di ritiro")
+    # 400 espliciti, MAI il troncamento silenzioso del punto_ritiro:
+    # un PIN troncato e' un PIN rotto, e il nome deve combaciare con
+    # quello scritto sull'etichetta.
+    if len(nome) > 80:
+        raise HTTPException(400, "Il nome del destinatario è troppo "
+                                 "lungo (massimo 80 caratteri)")
+    if len(codice) > 1000:
+        raise HTTPException(400, "Il codice di ritiro è troppo lungo "
+                                 "(massimo 1000 caratteri)")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('locked','shipped','dispute')",
+                    (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["via_punto"]:
+        con.close()
+        raise HTTPException(400, "Questo ordine non è una spedizione a "
+                                 "un punto di ritiro")
+    adesso = int(time.time())
+    correzione = o["busta_il"] > 0
+    con.execute("UPDATE ordini SET busta_nome=?, busta_codice=?, "
+                "busta_il=?, busta_corretta_il=?, busta_correzioni=? "
+                "WHERE id=?",
+                (_cifra_contenuto(nome), _cifra_contenuto(codice),
+                 o["busta_il"] or adesso,
+                 adesso if correzione else o["busta_corretta_il"],
+                 o["busta_correzioni"] + (1 if correzione else 0),
+                 ordine_id))
+    con.commit()
+    con.close()
+    # Il journal dice COSA (impronta, mai il testo: nel journal non
+    # entrano segreti) e QUANDO — il pattern della consegna digitale.
+    impronta = hashlib.sha256(codice.encode("utf-8")).hexdigest()[:16]
+    print(f"📦 Ordine #{ordine_id}: busta di consegna "
+          f"{'corretta' if correzione else 'depositata'} "
+          f"(nome {len(nome)} caratteri, codice {len(codice)}, "
+          f"impronta {impronta})")
+    # La dedup del segnale d'arrivo: su 'locked' SILENZIO (parlera'
+    # segna_spedito col suo ramo via_punto), sul primo deposito a
+    # pacco gia' in viaggio parte il «ti aspetta», sulla correzione
+    # l'avviso statico. Il segnale parte cosi' ESATTAMENTE una volta,
+    # da una sola delle due strade. Testi statici, mai il contenuto.
+    if o["stato"] != "locked":
+        if correzione:
+            await notifica(o["compratore_id"],
+                           "📦 <b>Le istruzioni di ritiro sono state "
+                           "aggiornate</b>: apri l'ordine e usa il "
+                           "nome e il codice nuovi.")
+        else:
+            await notifica(o["compratore_id"], MSG_BUSTA_PRONTA)
+    return {"ok": True, "busta_il": o["busta_il"] or adesso,
+            "busta_correzioni": o["busta_correzioni"]
+            + (1 if correzione else 0)}
+
+
+@app.get("/api/orders/{ordine_id}/busta-ritiro")
+async def leggi_busta_ritiro(ordine_id: int,
+                             x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """La busta si legge SOLO da qui, mai da /api/orders — e SOLO le
+    due parti: il moderatore MAI, da nessuna strada (a differenza del
+    contenuto digitale; in disputa vede solo SE e QUANDO, dalla nota
+    e da busta_il). GET PURO, ed e' la separazione dall'escrow:
+    aprire la busta significa poter andare a ritirare, NON aver
+    ricevuto — nessuna scrittura, `consegnato` e lo stato non si
+    toccano, i sats restano in cassaforte finche' il compratore non
+    conferma coi bottoni di sempre. L'autorizzazione sta PRIMA
+    dell'esistenza: l'estraneo e l'ordine inesistente ricevono la
+    stessa risposta (niente oracolo, la lezione di
+    verifica-pagamento)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["busta_il"]:
+        raise HTTPException(404, "Nessuna istruzione di ritiro su "
+                                 "questo ordine")
+    return {"ok": True,
+            "nome": _decifra_contenuto(o["busta_nome"]),
+            "codice": _decifra_contenuto(o["busta_codice"]),
+            "depositata_il": o["busta_il"],
+            "corretta_il": o["busta_corretta_il"],
+            "correzioni": o["busta_correzioni"]}
+
+
 @app.post("/api/orders/{ordine_id}/spedito")
 async def segna_spedito(ordine_id: int, req: Request,
                         x_tg_init_data: str = Header(""),
@@ -12768,6 +12967,25 @@ async def segna_spedito(ordine_id: int, req: Request,
                        f"🤝 <b>Il venditore ha segnato la consegna a mano</b>. "
                        f"Se hai ritirato l'oggetto, confermalo nella Mini App "
                        f"per sbloccare i sats al venditore.")
+        return {"ok": True}
+    if o["via_punto"]:
+        if o["busta_il"]:
+            # Il caso raro dei due momenti coincidenti (codice
+            # immediato, spedizione da un punto): la busta era gia'
+            # depositata in silenzio su 'locked', e il segnale
+            # d'arrivo parte da QUI — una volta sola, mai il doppione
+            # «in viaggio» + «ti aspetta».
+            await notifica(o["compratore_id"], MSG_BUSTA_PRONTA)
+        else:
+            # Il caso normale: il pacco parte, il codice arrivera'
+            # al venditore quando il pacco e' al punto — e sara' il
+            # deposito della busta a dire «ti aspetta».
+            dettaglio = (f" con <b>{corriere}</b>, tracciamento "
+                         f"<b>{tracking}</b>" if tracking else "")
+            await notifica(o["compratore_id"],
+                f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
+                f"ritiro</b>{dettaglio}! Ti avviseremo quando il nome "
+                f"e il codice per ritirarlo saranno nell'ordine.")
         return {"ok": True}
     dettaglio = (f"con <b>{corriere}</b>, tracciamento <b>{tracking}</b>"
                  if tracking else "in consegna a mano")
@@ -16575,11 +16793,36 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             f"stato riscattato."
             f"\n📊 Dispute aperte da questo compratore, in totale: "
             f"{gia_aperte}.")
+    # Il gemello per la via del punto di ritiro (mutuamente esclusivo
+    # col digitale: via_punto implica consegna 'spedizione'): SOLO
+    # fatti — SE e QUANDO la busta e' stata depositata, e se e' stata
+    # corretta dopo (magari proprio a disputa aperta: per questo le
+    # correzioni si contano) — MAI il contenuto, che a differenza del
+    # bene digitale nessun moderatore puo' leggere.
+    nota_punto = ""
+    if o["via_punto"]:
+        if o["busta_il"]:
+            quando = time.strftime("%d/%m/%Y %H:%M",
+                                   time.localtime(o["busta_il"]))
+            stato_busta = f"istruzioni di ritiro depositate il {quando}"
+            n = o["busta_correzioni"]
+            if n:
+                ultima = time.strftime(
+                    "%d/%m/%Y %H:%M", time.localtime(o["busta_corretta_il"]))
+                stato_busta += (f", poi corrett{'a' if n == 1 else 'e'} "
+                                f"{n} volt{'a' if n == 1 else 'e'} "
+                                f"(ultima il {ultima})")
+        else:
+            stato_busta = "istruzioni di ritiro MAI depositate"
+        nota_punto = (
+            f"\n📦 Spedizione a un PUNTO DI RITIRO: {stato_busta}. "
+            f"Il contenuto della busta lo leggono solo le parti: la "
+            f"piattaforma non può verificarlo.")
     con.close()
     for admin in ADMIN_IDS:
         await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
                               "I sats restano bloccati in attesa della tua "
-                              "decisione." + nota_digitale)
+                              "decisione." + nota_digitale + nota_punto)
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
                    "vi contattera' entrambi. I sats restano nel deposito "
@@ -16867,6 +17110,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # ricevuta. Resta il flag: il client sa se c'e' qualcosa da
         # rivelare senza poterlo sbirciare.
         r["contenuto_presente"] = bool(r.pop("contenuto_digitale", ""))
+        # La busta di consegna idem: nome e codice si leggono solo da
+        # /busta-ritiro, e SOLO le due parti (l'admin mai). busta_il e
+        # le colonne delle correzioni invece ESCONO: sono il SE e il
+        # QUANDO — per il compratore, e per il moderatore in disputa.
+        r.pop("busta_nome", "")
+        r.pop("busta_codice", "")
     return righe
 
 
@@ -18232,6 +18481,83 @@ async def sollecita_venditori_fermi():
                     f"giorni: serve un occhio umano.")
         except Exception as e:
             print(f"⚠️ Promemoria venditore saltato (#{r['id']}): {e}")
+
+
+async def sollecita_buste_ferme():
+    """IL PROMEMORIA DELLA BUSTA DI CONSEGNA (ago 2026): su un ordine
+    verso un punto di ritiro il codice arriva al venditore quando il
+    pacco e' GIA' al punto, e Barattolo non parla coi corrieri — se il
+    venditore non lo deposita, il compratore resta davanti a un locker
+    chiuso mentre la giacenza (~3 giorni) scade. E' il SOSTITUTO del
+    gate su segna_spedito (decisione di Andrea: col gate il venditore
+    non potrebbe dichiarare la spedizione per tutto il viaggio).
+    Sorella di sollecita_venditori_fermi, ma squilla SOLO il venditore:
+    il compratore vede gia' «in attesa del codice» nell'ordine e ha i
+    suoi bottoni — nessuna azione nuova per lui, dichiarato.
+    L'ancora e' `spedito_il`, immutabile su 'shipped' (correggi_
+    tracking non lo tocca per regola dichiarata: riscriverlo farebbe
+    ripartire l'attesa); primo squillo a PROMEMORIA_BUSTA_GIORNI, poi
+    cadenza e tetto delle sorelle (PROMEMORIA_CONFERMA_*: un posto
+    solo da cambiare). Colonne SUE (sollecito_busta_il /
+    solleciti_busta): un contatore ereditato salterebbe al tetto. Al
+    tetto il 🧊 ai moderatori — a quel punto il pacco e' probabilmente
+    tornato indietro — poi silenzio, il patto dei solleciti. Qui i
+    sats non si muovono mai, solo parole; notifiche DOPO il commit."""
+    if PROMEMORIA_BUSTA_GIORNI <= 0 or PROMEMORIA_CONFERMA_GIORNI <= 0:
+        return
+    adesso = int(time.time())
+    passo = PROMEMORIA_CONFERMA_GIORNI * 86400
+    finestra = PROMEMORIA_BUSTA_GIORNI * 86400
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT o.id, o.venditore_id, o.annuncio_id, o.prezzo_sats, "
+        "o.solleciti_busta, a.titolo FROM ordini o "
+        # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
+        "LEFT JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.stato='shipped' AND o.via_punto=1 AND o.busta_il=0 "
+        "AND o.spedito_il>0 AND o.solleciti_busta <= ? "
+        "AND MAX(o.spedito_il + ?, o.sollecito_busta_il + ?) < ?",
+        (PROMEMORIA_CONFERMA_MAX, finestra, passo, adesso))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+        con.execute("UPDATE ordini SET sollecito_busta_il=?, "
+                    "solleciti_busta=solleciti_busta+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        # escape: le notifiche sono HTML e il titolo lo scrive un
+        # utente — un «<» spegnerebbe il promemoria in silenzio.
+        titolo = html.escape((r["titolo"] or "il tuo affare")[:60])
+        try:
+            if r["solleciti_busta"] < PROMEMORIA_CONFERMA_MAX:
+                await notifica(r["venditore_id"],
+                    f"📦 <b>«{titolo}» aspetta le istruzioni di "
+                    f"ritiro.</b> Appena il corriere ti manda il "
+                    f"codice (arriva quando il pacco è al punto), "
+                    f"apri l'ordine e deposita il nome del "
+                    f"destinatario e il codice: senza, il compratore "
+                    f"non può ritirare il pacco, e la giacenza scade "
+                    f"in pochi giorni.")
+            else:
+                # Il tetto e' passato: tocca a un umano, poi silenzio.
+                await notifica_admin(
+                    f"🧊 <b>Busta di consegna mai depositata:</b> "
+                    f"ordine #{r['id']} («{titolo}»), spedito a un "
+                    f"punto di ritiro, "
+                    f"<b>{_fmt_sats(r['prezzo_sats'])} sats</b> in "
+                    f"cassaforte. Il venditore ha ignorato "
+                    f"{PROMEMORIA_CONFERMA_MAX} promemoria: il pacco "
+                    f"è probabilmente in giacenza scaduta — serve un "
+                    f"occhio umano.")
+        except Exception as e:
+            print(f"⚠️ Promemoria busta saltato (#{r['id']}): {e}")
 
 
 async def sollecita_rimborsi_puntate():
@@ -19739,6 +20065,12 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Promemoria venditori fermi saltati: {e}")
         try:
+            # la busta di consegna mai depositata: e' il sostituto
+            # del gate su segna_spedito — parole, mai sats
+            await sollecita_buste_ferme()
+        except Exception as e:
+            print(f"⚠️ Promemoria buste ferme saltati: {e}")
+        try:
             await scadenze_offerte()
         except Exception as e:
             print(f"⚠️ Scadenze offerte saltate: {e}")
@@ -20045,6 +20377,18 @@ CONTROLLI_LIBRO_MASTRO = (
      "WHERE payout_stato NOT IN ('','incerto','uscito') "
      "UNION ALL SELECT id FROM rimborsi_asta "
      "WHERE payout_stato NOT IN ('','incerto','uscito')"),
+    # NB: «shipped via punto senza busta» NON e' un controllo, e va
+    # ricordato perche' verra' in mente: e' lo stato NORMALE del
+    # flusso durante il transito (il codice arriva quando il pacco e'
+    # al punto), e sarebbe falso anche su tutto il pregresso.
+    ("busta fuori contratto",
+     "flag, nome e codice si scrivono nello stesso UPDATE e solo "
+     "sulla via punto: una riga spaiata e' un deposito a meta' o una "
+     "guardia caduta",
+     "SELECT id FROM ordini WHERE (busta_il>0) <> (busta_nome<>'') "
+     "OR (busta_il>0) <> (busta_codice<>'') "
+     "OR (busta_il>0 AND via_punto=0) "
+     "OR (busta_corretta_il>0 AND busta_il=0)"),
 )
 
 _ultimo_libro_mastro = ""                # il giorno dell'ultima ronda
