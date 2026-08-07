@@ -145,6 +145,50 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'era prima della colonna). I casi ambigui (cannabis
   light, pistola sparachiodi...) NON vanno nella lista parole: li
   valuta l'AI.
+  CHI SI FINGE BARATTOLO (ago 2026, M1 dell'audit): dalle anteprime
+  dei link `/annuncio/{id}` è una scheda COL NOSTRO NOME su un NOSTRO
+  indirizzo dove titolo, descrizione e immagine li sceglie chi
+  pubblica — «Barattolo — verifica il tuo pagamento in sospeso»
+  condiviso da lì è un link autentico che sembra un messaggio
+  ufficiale, e chi lo riceve non ha NESSUN segnale per distinguerlo.
+  Voce nel `PROMPT_MODERAZIONE` con DUE esiti, e la gradazione è il
+  punto: VIETATO quando il testo PARLA A CHI LEGGE come farebbe la
+  piattaforma (avviso di sicurezza, account da sbloccare, pagamento
+  da verificare, dati da confermare, link da aprire) e non descrive
+  nessun oggetto — vale anche per un ALTRO servizio, una banca o un
+  corriere; DUBBIO per chi si intesta soltanto un ruolo che non ha
+  («Assistenza Barattolo», «Barattolo Ufficiale»), che in revisione è
+  già fuori dalla vetrina E dall'anteprima, quindi il caso incerto
+  costa una riga di coda e non un rifiuto.
+  LA CONTRO-REGOLA È LA METÀ CHE CONTA, ed è quella che un riordino
+  toglie per prima perché sembra un ripensamento: **nominare
+  Barattolo è lecito e comunissimo, e non è MAI di per sé un
+  motivo** — «gadget di Barattolo», «venduto tramite Barattolo»,
+  «spedisco come da regolamento Barattolo» sono annunci normali.
+  Senza quella riga il divieto diventa un filtro sulla PAROLA, cioè
+  un blocco su merce legittima; il criterio scritto nel prompt è
+  «c'è una COSA in vendita?». VALE SU TITOLO E DESCRIZIONE, detto
+  esplicitamente: `og:title` viene dall'uno e `og:description`
+  dall'altra, e il caso cattivo vero è il titolo pulito con la
+  descrizione avvelenata.
+  IL RIFIUTO DICE COSA HA SBAGLIATO: `MSG_RIFIUTO_IMPERSONAZIONE` al
+  posto della lista di armi e droghe, che non c'entrava niente — e
+  dice anche DOV'È IL CONFINE, che qui è sottile. In
+  `messaggio_rifiuto` l'impersonazione si guarda PRIMA dei servizi, e
+  non è l'ordine che capita: il motivo lo scrive l'AI con parole sue
+  e può dire «finto servizio clienti», che col ramo dei servizi
+  davanti risponderebbe «i servizi non sono ancora supportati» a chi
+  ha appena provato a spacciarsi per noi (una prova nomina quel caso,
+  ed è l'unica che diventa rossa scambiando i rami).
+  `PAROLE_IMPERSONAZIONE` sono prefissi, e «fint» c'è perché «finto»
+  NON è una declinazione di «finge» — l'ha detto una prova, non la
+  lettura del codice.
+  Il collaudo col MODELLO vero è `collaudo_impersonazione.py`, che
+  vuole la chiave: `prove.py` difende la FORMA del prompt (la voce,
+  il perimetro, la contro-regola coi suoi esempi) e che
+  `moderazione_ai_lotto` non abbia un prompt SUO — 500 righe di CSV
+  passano di lì, e due prompt che si sdoppiano lascerebbero scoperta
+  in silenzio la strada da cui gli annunci entrano a centinaia.
   Terza via della moderazione (lug 2026, decisione di Andrea: basta
   blocchi a priori — l'AI segnala, l'ADMIN decide): il prompt ha TRE
   verdetti — VIETATO solo per i casi netti (armi, droghe, sesso...),
@@ -539,6 +583,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   passa da `html.escape`: le notifiche sono HTML e un «<» spegnerebbe
   il promemoria in silenzio. I quattro solleciti fratelli non lo fanno
   ancora — buco piccolo, dichiarato, non chiuso qui.
+  LO STESSO «<» SPEGNEVA L'AVVISO DELLA SPEDIZIONE (ago 2026, B6
+  dell'audit, chiuso): corriere e tracciamento sono testo di CHI
+  SPEDISCE e finivano nudi nell'HTML — un «Bartolini <BRT>», che uno
+  scrive senza pensarci, faceva fallire il parse di Telegram e il
+  compratore non riceveva l'avviso, senza errore e senza traccia. Ora
+  passano da `html.escape` in tutti e tre i rami di `segna_spedito` e
+  nel gemello `reso_spedito`, dove ad aspettare è il venditore e c'è
+  un rimborso di mezzo. SI SCAPPA AL MOMENTO DELL'AVVISO E MAI A
+  MONTE, ed è la riga da non ammorbidire: nel database, e nel
+  confronto coi CORRIERI-SENTINELLA ('Ritiro in zona', 'Consegna a
+  mano'), il testo deve restare quello che è stato scritto — è anche
+  una prova in disputa, e il client ha già il suo `esc()`. Le prove
+  sono ESEGUIBILI e guardano che i `<b>` restino PARI, che è quel che
+  Telegram controlla prima di rifiutare l'invio, più il rovescio (nel
+  database il testo arriva intero e le sentinelle matchano ancora).
   BUCHI PREESISTENTI, dichiarati e NON chiusi: 1) ordine d'asta con
   `consegna_scelta=''` mai scelta — non squilla da nessuna parte
   (`sollecita_ritiri_fermi` filtra 'ritiro',
@@ -1305,6 +1364,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   brand, dove le sappiamo: il lato del francobollo dipende dalla foto
   (`min(MINIATURA_LATO, lato corto)`) e un numero sbagliato è peggio di
   uno assente.
+  E SOLO LE NOSTRE FOTO (ago 2026, M2 dell'audit): un URL remoto in
+  colonna è l'host di chi pubblica su Nostr, e ci resta proprio quando
+  lo scaricamento FALLISCE — cosa che chi pubblica può provocare (un
+  403, un redirect, un corpo sopra il tetto). Messo in `og:image`
+  quell'indirizzo diventa la CAMPANA di chiunque veda l'anteprima: ci
+  bussano il crawler di ogni piattaforma e, nei client che risolvono
+  l'immagine, il telefono di gente che Barattolo non l'ha mai aperto —
+  ed è sostituibile DOPO la condivisione, a card già in giro. Quindi
+  `_immagine_anteprima` lo SALTA e ripiega sul brand, e il salto è un
+  `continue` e non un `return`: se sotto c'è una foto nostra la prende
+  lo stesso.
+  IL CLIENT IN VETRINA NON SI TOCCA, ed è una divergenza VOLUTA fra
+  due superfici: lì `fotoMini` lascia passare l'URL intero (decisione
+  già presa e dichiarata), perché quell'immagine la chiede il browser
+  di chi ha APERTO una scheda, non quello di chiunque riceva un link.
+  C'è una prova per lato, così nessuna delle due si sposta per
+  distrazione credendo di allinearsi all'altra.
   Il `<title>` NON si tocca: dove conta og:title ha comunque la
   precedenza, e la pagina resta una sola con un titolo solo. L'og:url
   del negozio porta il CODICE letto dal database e mai il `chi`
@@ -7165,6 +7241,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   rimuovere subito — perché Telegram e WhatsApp cachano le card a lungo
   e dal nostro lato non si bustano; puntato sul dominio vero lo
   ricorda da solo in coda.
+- `collaudo_impersonazione.py` (ago 2026) — la voce sull'impersonazione
+  provata sul MODELLO vero, che è il pezzo che `prove.py` non può fare:
+  la chiave Anthropic sta fuori dalla CI apposta. Prende
+  `PROMPT_MODERAZIONE` dal TESTO di server.py (mai importandolo:
+  l'import farebbe partire init_db e le migrazioni — la lezione di
+  `ricategorizza.py`) e lo gira su 15 casi limite scelti dove la voce
+  può sbagliare, con l'esito atteso accanto a ognuno. Va rilanciato a
+  OGNI ritocco del prompt, e legge e basta.
+  I FALSI POSITIVI sono la metà che conta, e la tabella è scritta per
+  loro: un divieto sull'impersonazione formulato male diventa un filtro
+  sulla parola «Barattolo», cioè un blocco su annunci legittimi. Il
+  caso che lo dice meglio di ogni ragionamento è «Barattolo di vetro
+  per conserve, 1 litro» — in italiano barattolo è anche un VASO, e chi
+  ne vende sei non sta impersonando nessuno. Poi il titolo pulito con
+  la descrizione avvelenata (la metà che un divieto scritto sul solo
+  titolo perderebbe), una finta giacenza Poste (un ALTRO servizio), e
+  tre regressioni: buoni leciti, servizi dubbi, armi vietate.
 - `prove.py` + `.github/workflows/prove.yml` (lug 2026) — la rete di
   sicurezza, a ogni push e ogni PR. Solo pezzi PURI: niente config,
   database, relay o Anthropic — una CI che dipende da un server altrui
@@ -8851,6 +8944,37 @@ URL USA-E-GETTA — un annuncio di prova da rimuovere subito dopo —
 perché Telegram e WhatsApp cachano a lungo e dal nostro lato non si
 bustano; e verificare col rimosso VERO che la sua card sia quella
 generica e col venduto VERO che porti il suo «✅ Venduto».
+Tre correzioni dall'audit (ago 2026), tutte e tre sulla stessa idea:
+un annuncio può raccontare cose a gente che Barattolo non l'ha mai
+aperto. M1, CHI SI FINGE BARATTOLO — la card brandizzata è un link
+autentico sul nostro dominio dove i testi li sceglie chi pubblica:
+voce nuova nel prompt, VIETATO a chi parla A NOME della piattaforma e
+DUBBIO a chi si intesta solo un ruolo, con la contro-regola («nominare
+è lecito») che è la metà delicata, e il rifiuto che ora dice cosa si è
+sbagliato invece dell'elenco di armi e droghe. M2, L'OG:IMAGE VERSO
+HOST DI TERZI — l'URL remoto di chi pubblica su Nostr non ci finisce
+più: diventava la campana di chiunque veda un'anteprima, ed è
+sostituibile a card già in giro. B6, L'AVVISO CHE SPARIVA IN SILENZIO —
+corriere e tracciamento scappati in `segna_spedito` e `reso_spedito`.
+Vedi le voci loro in Architettura per i perché.
+Collaudate: 53 prove nuove (1683 verdi, erano 1630) — quelle di B6
+ESEGUIBILI sulle funzioni vere, quelle di M1 sulla forma del prompt
+più la sentinella che il lotto non se ne sdoppi uno suo — e
+QUATTORDICI mutazioni del codice, una per riga sorvegliata: ognuna
+diventa rossa da sola. Due difetti trovati dalle prove e non dalla
+lettura del codice: «finto» non è una declinazione di «finge» (la
+lista dei motivi non lo prendeva, e «finto servizio clienti» cadeva
+nel ramo dei servizi), e l'ordine dei due rami di `messaggio_rifiuto`,
+che scambiato manderebbe a un impostore il messaggio di garbo.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva. DA FARE AL PRIMO DEPLOY, ed è il pezzo che in locale non
+si può fare perché vuole la chiave vera: `python
+collaudo_impersonazione.py` sul VPS — se un OK atteso finisce in
+VIETATO è un falso positivo, cioè annunci legittimi bloccati, e il
+prompt si corregge A MANO. IMPERFEZIONI DICHIARATE e non chiuse: i
+quattro solleciti fratelli hanno ancora il titolo nudo nell'HTML, e
+l'immagine remota la scarica comunque il browser di chi APRE la
+scheda (è la regola della vetrina, dichiarata).
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
