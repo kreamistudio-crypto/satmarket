@@ -1351,10 +1351,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con lo spazio fatto a mano. Ora ci passano tutte e 33 le cifre che
   una persona legge come parole di Barattolo (notifiche, avvisi ai
   moderatori, polso ordini, messaggi d'errore, memo della invoice).
-  RESTANO FUORI CINQUE, e sono la stessa famiglia delle eccezioni
-  dell'euro: due righe di journal (log diagnostici, un lettore solo),
+  RESTANO FUORI QUATTRO, e sono la stessa famiglia delle eccezioni
+  dell'euro: una riga di journal (log diagnostico, un lettore solo),
   la riga del catalogo che va in pasto ad Haiku, e le due righe di
   prosa del NIP-99 che ripetono i tag a parole.
+  E IL RIFIUTO DI `paga_venditore` HA TRE MOTIVI, non uno, e ognuno
+  vuole le sue parole: una bolt11 che non si decodifica NON «chiede
+  None sats» — è **illeggibile**, e l'avviso lo dice. Sembra cosmesi e
+  non lo è: chi legge quel 🧊 deve capire al primo sguardo se ha
+  davanti un wallet rotto o un tentativo di prelievo, che sono due
+  mestieri diversi. La cifra vera resta dov'era negli altri due casi
+  (importo sbagliato, dovuto zero), e c'è una prova per ciascuna.
   `_fmt_sats` NON SOLLEVA PIÙ, ed è la riga da non togliere: da lì
   passano le cifre delle NOTIFICHE, e parecchie vivono dentro un
   `try/except` che protegge qualcosa di più importante — l'avviso ai
@@ -1373,14 +1380,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   siti si erano nascosti al censimento a mano, ed è la stessa trappola
   dell'euro che si nascondeva dietro «EUR» a parole. Una sentinella che
   non guarda lì dentro certifica una pulizia che non c'è.
-  DIVERGENZA DICHIARATA COL CLIENT, e non è una svista: il server usa i
+  DIVERGENZA DICHIARATA COL CLIENT, e non è una svista — **decisione di
+  Andrea, ago 2026: due superfici, due vincoli**. Il server usa i
   PUNTINI (`509.000`), il client lo SPAZIO STRETTO U+202F (`509 000`),
   e il perché sta nella voce del toggle valuta — col separatore normale
   il mono di casa spezzava «905 000» in due blocchi lontani. È una
   ragione di RESA che in una notifica Telegram non esiste, quindi le
-  due convenzioni convivono con un motivo. Se un giorno si vorrà una
-  sola: la leva è `_fmt_sats`, e cambia l'aspetto di ogni notifica,
-  nota Nostr e post di canale in un colpo.
+  due convenzioni convivono con un motivo, e la regola «un formato
+  solo» vale DENTRO ogni superficie e non attraverso. Chi volesse
+  uniformarle sappia che è una decisione di prodotto e non un riordino:
+  la leva è `_fmt_sats`, e cambia l'aspetto di ogni notifica, nota
+  Nostr e post di canale in un colpo.
   E CHI ESTRAE UNA FUNZIONE NE EREDITA LE DIPENDENZE (lezione ripagata
   qui): tre ambienti finti di `prove.py` montavano `paga_venditore` e
   `_sblocca_sats` senza `_fmt_sats`, e sono esplosi. Il rimedio è
@@ -8810,9 +8820,9 @@ soprattutto `_fmt_sats` che NON SOLLEVA PIÙ — un formattatore che alza
 le mani dentro il `try/except` di una notifica non fa un errore, fa
 sparire l'allarme, ed era successo davvero sull'avviso di pagamento
 rifiutato (`importo_invoice` torna `None` sulla bolt11 illeggibile).
-Collaudate: 76 prove nuove (1627 verdi), e quella sul rimosso è
+Collaudate: 78 prove nuove (1629 verdi), e quella sul rimosso è
 ESEGUIBILE e non una sentinella sulla forma — passa da un database vero
-e il titolo si cerca nell'HTML che esce. TORTURATE con venti mutazioni
+e il titolo si cerca nell'HTML che esce. TORTURATE con ventuno mutazioni
 del codice, una per riga sorvegliata (stato tolto dalla WHERE, rimosso
 rimesso dentro, venduto tolto fuori, «✅ Venduto» che sparisce, euro
 tornato al punto in tre modi diversi, `_fmt_sats` che torna a sollevare
