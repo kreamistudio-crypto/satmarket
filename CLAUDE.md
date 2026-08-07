@@ -3591,11 +3591,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `_sconto_pacco` non vedeva il cambio, e non esisteva il caso
   «promessa non mantenuta perché CoinGecko tace». Resta vero, e il
   prezzo si paga a cambio muto — dove la promessa NON scatta, vedi
-  sotto. Ma «muto» vuol dire pochissimo: `cambio_btc_eur` è fail-open
-  e tiene l'ultimo valore noto anche scaduto, quindi lo 0 esce solo se
-  CoinGecko non ha MAI risposto da quando il processo è partito, cioè
-  un riavvio dentro un'interruzione. Una promessa che deriva da sola
-  per mesi è un guasto più grande di uno che dura un riavvio.
+  sotto. Ma «muto» vuol dire pochissimo: `cambio_btc_eur` è fail-open e
+  tiene l'ultimo valore noto — che dall'ago 2026 SOPRAVVIVE ANCHE AI
+  RIAVVII (vedi «il cambio non muore a un riavvio») —, quindi lo 0 esce
+  solo al primissimo avvio di un database nuovo o quando l'ultimo
+  cambio noto ha più di `ORE_CAMBIO_VALIDO`. Una promessa che deriva da
+  sola per mesi è un guasto più grande di uno che dura un riavvio.
   LE PURE RESTANO PURE, ed è il perno: guadagnano un ARGOMENTO
   (`articolo_eur`), non una chiamata. Il cambio lo prende il
   chiamante, dove lo prende già. Nasce `_eur_interi(sats, cambio)`,
@@ -4419,12 +4420,74 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (l'escape, mai il carattere: nel sorgente sarebbe invisibile): con
   lo spazio normale il mono di casa spezzava «905 000» in due blocchi
   lontani, e questo per giunta non va mai a capo a metà numero.
-  `cambioVivo` + re-render della griglia all'arrivo del
-  cambio CoinGecko; form Vendi col suffisso-bottone sats/€
+  `cambioVivo` (il cambio arriva dal nostro server, vedi sotto);
+  form Vendi col suffisso-bottone sats/€
   (`sellValuta`, virgola decimale tradotta); paySheet e conferma NWC
   mostrano la stima «≈» e poi i sats VERI da `prezzo_sats` della
   risposta di POST /orders (MAI da `l.price`, che per i listini EUR
   è solo l'equivalente di pubblicazione).
+  IL CAMBIO NON MUORE A UN RIAVVIO (ago 2026, caso vero dal campo: due
+  deploy alle 13:34 e alle 13:48, CoinGecko muto in tutti e due, e un
+  compratore davanti alla pagina d'acquisto bloccata da «il cambio euro
+  non è disponibile»). La cache era già fail-open e teneva l'ultimo
+  valore noto: il buco era che NASCEVA VUOTA — se al riavvio la prima
+  lettura non riusciva, l'app non sapeva più convertire finché non ne
+  riusciva una, e nel frattempo ogni listino in euro era incomprabile.
+  Adesso l'ultimo cambio letto vive nella tabella `cambio_noto` (una
+  riga, oggi 'eur') e `carica_cambio_salvato()` lo rimette in cache
+  nello startup `scalda_cambio`, che finisce PRIMA che uvicorn accetti
+  connessioni: la primissima pagina d'acquisto dopo un deploy trova già
+  un cambio. La riga NON è un dato di denaro e nessun conto ci poggia
+  sopra — è il promemoria fra un riavvio e l'altro, e per questo si
+  scrive fail-open (un database che fa i capricci non deve rompere una
+  conversione).
+  TRE ETÀ, ed è la struttura da tenere: FRESCO (< `CAMBIO_TTL`, 15 min)
+  si usa e basta; VECCHIO ma dentro `ORE_CAMBIO_VALIDO` si prova a
+  rinfrescarlo e vale lo stesso se la rete tace; TROPPO VECCHIO vale 0,
+  cioè «non disponibile» — il ripiego dichiarato di sempre (503 onesto
+  sui listini in euro, promesse di negozio che non scattano e lo
+  dicono), mai una conversione sbagliata. Giudice PURO
+  `_cambio_valido(valore, quando, adesso, ore)` — prende i campi e non
+  la cache, il patto di `in_ferie`: così serve la memoria, la riga del
+  database e la prova in CI; al filo esatto è ancora buono, come
+  `_asta_viva`.
+  VENTIQUATTRO ORE, e la scelta va letta così: fino a ieri il valore in
+  memoria non scadeva MAI — un processo acceso da una settimana poteva
+  convertire col cambio di sette giorni prima senza che nessuno lo
+  sapesse — quindi QUALUNQUE soglia finita è una stretta, e le 24 ore
+  non bloccano nessuna interruzione realistica di CoinGecko, che si
+  misura in minuti. Più in là il numero mente troppo: in un giorno BTC
+  si muove di qualche punto, in una settimana di parecchi. `0` = non
+  scade mai, cioè il mondo di ieri: freno d'emergenza, non una scelta.
+  NON SI RIBUSSA A OGNI RICHIESTA: `CAMBIO_RIPROVA_S` (60) è il
+  raffreddamento dopo un buco — senza, durante un'interruzione ogni
+  pagina d'acquisto pagherebbe i 10 secondi di timeout per farsi dire
+  di nuovo di no. E il cambio si tiene fresco NELL'OROLOGIO
+  (`_rileggi_cambio` in testa al giro, ogni 10 min): il percorso caldo
+  quasi non tocca più la rete, e la copia sul disco è vecchia di dieci
+  minuti al massimo — cioè quanto perde un riavvio nel caso peggiore.
+  Al boot `_insisti_sul_cambio` riprova con pause che crescono
+  (0·5·15·30·60·120·300s, si smette al primo successo) invece di
+  aspettare che a chiedere il cambio sia qualcuno che sta comprando;
+  gira in un task, l'avvio non aspetta nessuno. Tre righe di journal
+  all'avvio, e vanno lette: «ripreso dal database», «l'ultimo salvato
+  ha più di N ore», «nessun valore salvato».
+  UNA SOLA FONTE, ed è la parte che tocca il client: prima ogni browser
+  chiamava CoinGecko per conto suo — N utenti N chiamate, e soprattutto
+  DUE verità, perché il «≈» della vetrina poteva dire una cifra e il
+  conto del server un'altra (erano due letture di momenti diversi).
+  Adesso il cambio viaggia in `cambio_eur` nella busta di PRIMA PAGINA
+  di `/api/listings`, che il client chiede già all'avvio: zero giri di
+  rete in più, e la vetrina parla la stessa lingua della invoice. Il
+  server ci mette `cambio_noto_ora()` — la cache, MAI la rete: chi
+  sfoglia il mercatino non deve aspettare CoinGecko. Nel client
+  `impostaCambio(eurPerBtc)` rifiuta lo 0 (mai un numero inventato) e
+  arriva PRIMA del primo `renderGrid` (`loadListings` è atteso), quindi
+  è sparito anche il giro di render che rimediava alla risposta in
+  ritardo. IMPERFEZIONE DICHIARATA: in DEMO da `file://` non c'è
+  nessuna busta, quindi resta il valore di riserva con `cambioVivo`
+  falso — cioè il patto di sempre, dove il numero conta il «≈» si
+  omette. Leva `ORE_CAMBIO_VALIDO` nel pannello «⚙️ Stato delle leve».
   IL GESTO INDIETRO (lug 2026): il tasto indietro di Android, lo swipe
   dal bordo e il tasto del browser tornano indietro di un passo invece
   di chiudere l'app — prima chiudono i fogli aperti, poi smontano le
@@ -8217,6 +8280,38 @@ niente localStorage. DA GUARDARE dal vivo: il giro su un telefono vero
 nei DUE contesti — Mini App (il tasto di Telegram) e PWA installata (lo
 swipe di sistema) — che è dove i due cammini si sono già divisi in
 passato.
+Il cambio non muore a un riavvio (ago 2026, caso vero: due deploy alle
+13:34 e alle 13:48, CoinGecko muto in tutti e due, e un compratore
+davanti alla pagina d'acquisto bloccata). La cache era già fail-open e
+teneva l'ultimo valore noto: il buco era che NASCEVA VUOTA. Ora
+l'ultimo cambio letto vive nella tabella `cambio_noto` e torna in cache
+nello startup, prima che il server risponda a chiunque; ha un'età oltre
+la quale smette di valere (`ORE_CAMBIO_VALIDO`, 24 — fino a ieri non
+scadeva mai, quindi qualunque soglia finita è una stretta); si tiene
+fresco nell'orologio invece che nel percorso caldo, con la riprova a
+pause crescenti al boot e il raffreddamento di un minuto dopo un buco;
+e il client non chiama più CoinGecko per conto suo — il cambio viaggia
+nella busta di prima pagina di `/api/listings`, una fonte sola, così il
+«≈» della vetrina e il conto del server non possono più divergere. Vedi
+Architettura, «IL CAMBIO NON MUORE A UN RIAVVIO», per le tre età e per
+il perché delle 24 ore.
+Collaudato: 29 prove nuove in `prove.py` (1486 verdi, erano 1457) — il
+giudice puro al filo esatto e un secondo dopo, l'andata e ritorno dal
+disco, e il caso del cantiere provato per davvero (cache vuota + rete
+muta = vale l'ultimo noto, e un buco non azzera niente) — con le
+sentinelle di forma TORTURATE, cinque mutazioni del codice una per
+riga sorvegliata, ognuna rossa da sola. Più il giro dal vivo sul
+server locale con CoinGecko puntato su un host irraggiungibile: al
+riavvio la riga «ripreso dal database», la vetrina che serve il cambio
+lo stesso, e un preventivo su un listino da 38,50 € che esce a 68.455
+sats invece del 503 di ieri; poi la stessa prova con la riga sul disco
+invecchiata a 30 ore, che torna al 503 onesto invece di convertire con
+un numero vecchio. E in browser: zero chiamate a CoinGecko, prezzi col
+«≈» e nessun errore JS. IN PRODUZIONE basta il deploy: la tabella
+nasce da sola (vuota, quindi il primo avvio dice «nessun valore
+salvato» e lo chiede subito) e la leva ha il default nel codice. DA
+GUARDARE al primo deploy: le due righe 💱 nel journal — al secondo
+riavvio deve comparire «ripreso dal database».
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
