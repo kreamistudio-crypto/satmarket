@@ -5575,7 +5575,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ramo d'errore. L'URL poi non si tocca più (il patto del motore di
   navigazione: `pushState` con `location.href`), quindi navigando
   altrove la barra resta su /sicurezza — innocuo, ed è la ragione per
-  cui NON si apre una rotta per ogni vista.
+  cui NON si apre una rotta per ogni vista. In fondo alla pagina
+  «🔗 Condividi questa pagina» (`condividiSicurezza`), che il link si
+  poteva raggiungere ma non PRENDERE: sparisce in DEMO, dove
+  `location.origin` è "null" e uscirebbe rotto — il patto del bottone
+  condividi sulla foto. La SCALA è ora una sola (`condividiLink`:
+  Telegram shareURL → t.me/share/url → navigator.share → appunti →
+  link nel toast, mai il silenzio), estratta quando i chiamanti sono
+  diventati due; `condividiNegozio`/`condividiMioNegozio` restano di
+  proposito i soli appunti — copiano e basta, e passare anche loro
+  dalla scala aprirebbe il selettore chat di Telegram, che è un'altra
+  cosa da quella che quel bottone promette oggi.
   E `apriSicurezza(ancora)`/`tornaDaSicurezza()` ricordano da
   dove si veniva (il patto di `tornaDalNegozio`, con la vista di
   partenza che può essersi svuotata). Vale anche per gli anonimi in
