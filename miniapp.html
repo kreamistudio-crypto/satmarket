@@ -2994,6 +2994,8 @@
       <ul class="sicu-lista">
         <li><b>Un codice rivelato non torna indietro.</b> Nessuno — nemmeno noi — può sapere se l'hai già riscattato. Per questo la finestra è di <span data-tempo="confermaDig"></span> ore: provalo <i>subito</i>. Se non ci sono prove da nessuna delle due parti, la regola di default dà ragione a chi ha consegnato.<br>Vale anche al contrario: <b>se il codice non funziona, hai <span data-tempo="confermaDig"></span> ore per aprire una disputa</b> — e in quel momento i sats sono ancora fermi.</li>
         <li><b>Nel ritiro a mano, il controllo è il tuo.</b> Guarda e prova l'oggetto <i>prima</i> di confermare che l'hai ritirato: con la conferma i sats partono al venditore, e non tornano indietro.</li>
+        <li><b>Il pacco perso o rovinato è una cosa fra chi spedisce e il corriere.</b> Barattolo garantisce la <b>transazione</b>: che il venditore non incassi senza aver consegnato e che tu non paghi senza ricevere. L'oggetto in viaggio no — se il corriere lo perde o lo rompe, il reclamo si apre con lui.</li>
+        <li><b>Spedite sempre col tracciamento</b>, e per le cose di valore con la <b>copertura del corriere</b>. Il tracciamento è la prova che l'oggetto è partito ed è arrivato, ed è la prima cosa che guarda un moderatore; la copertura di base, verso i punti di ritiro, è quasi sempre molto bassa.</li>
         <li><b>Il deposito garantisce l'oggetto promesso, non i gusti.</b> «Non mi piace più» non è un difetto; un oggetto diverso da com'era descritto sì.</li>
       </ul>
 
@@ -9847,6 +9849,11 @@ function openOrder(id){
         <div class="payout">
           <h4>📦 Spedisci ${o.righe.length ? 'il set (un pacco solo)' : 'l\'oggetto'}</h4>
           <div class="hint">I sats sono al sicuro in cassaforte. Spedisci e inserisci il tracciamento (l'acquirente lo vedrà e potrà seguire il pacco). Per la consegna di persona scegli "Consegna a mano".</div>
+          <!-- Il deposito garantisce la transazione, non il pacco: qui il
+               venditore sta per andare a spedire, ed e' l'ultimo momento
+               utile per comprare la copertura. La regola per esteso sta
+               nella pagina «Il pagamento protetto». -->
+          <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto bassa.</div>
           ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
