@@ -2189,6 +2189,18 @@
   /* l'annuncio in attesa dei moderatori (terza via della moderazione) */
   .badge.revisione{background:var(--sats-soft);color:var(--sats-text)}
   .badge.annullato{background:var(--off-bg);color:var(--muted)}
+  /* La ✕ del nascondere (ago 2026): compare SOLO sugli stati
+     nascondibili (released/refunded). Cerchietto discreto, bersaglio
+     largo via ::after — il trucco del barattolino in card */
+  .order-x{position:relative;flex:0 0 auto;width:22px;height:22px;border:0;
+    border-radius:999px;background:var(--off-bg);color:var(--muted);
+    font-size:11px;font-weight:800;line-height:22px;text-align:center;
+    cursor:pointer;padding:0}
+  .order-x::after{content:'';position:absolute;inset:-9px}
+  /* la riga nascosta, visibile solo da «mostrali»: spenta come i
+     preferiti non piu' disponibili */
+  .order.nascosta{opacity:.55}
+  .order.nascosta .order-ic{filter:grayscale(1)}
 
   /* ---------- pannello incasso venditore ---------- */
   .payout{
@@ -3194,6 +3206,19 @@
       <div id="offerteList" style="margin-top:12px"></div>
     </div>
     <div class="section-label" style="padding-top:22px">I tuoi ordini</div>
+    <!-- I controlli della lista (ago 2026): filtro in alto, pillole
+         sotto. Lo stato vive nelle variabili ordini* (sessione, mai
+         localStorage) e il markup e' STATICO: la tirata di
+         aggiornamento riscrive solo #ordersList, quindi spunta e
+         pillole sopravvivono da sole. -->
+    <div id="ordiniControlli" style="margin:12px var(--pad) 0">
+      <label class="filtro-check"><input type="checkbox" id="ordiniAttiviCheck" onchange="setOrdiniAttivi(this.checked)"> Solo attivi</label>
+      <div class="consegna-scelta" id="ordiniRuoloPills" style="margin:10px 0 0">
+        <button class="consegna-pill attiva" data-ruolo="" onclick="setOrdiniRuolo('')">Tutti</button>
+        <button class="consegna-pill" data-ruolo="buyer" onclick="setOrdiniRuolo('buyer')">Acquisti</button>
+        <button class="consegna-pill" data-ruolo="seller" onclick="setOrdiniRuolo('seller')">Vendite</button>
+      </div>
+    </div>
     <div id="ordersList" style="margin-top:12px"></div>
   </div>
 
@@ -4104,6 +4129,13 @@ function mapOrder(o){
              : o.venditore_id===myTgId ? 'seller' : 'admin';
   return {id:o.id, listing:{emoji:'📦', title:o.titolo, price:o.prezzo_sats},
     state:o.stato, role,
+    /* la miniatura della riga (ago 2026): il server manda SOLO il
+       primo nome ('' = niente foto, e resta il 📦); per i set e' la
+       foto del primo pezzo, quello che il titolo nomina */
+    foto0:o.foto0||'',
+    /* il flag del nascondere, PER-PARTE: e' gia' il MIO (il server
+       non fa mai uscire quello dell'altra parte) */
+    nascosto:o.nascosto||0,
     /* i pezzi dell'ordine: l'articolo unitario si ricava per divisione */
     qta:o.quantita||1,
     sellerInvoice:o.invoice_venditore||'',
@@ -9748,22 +9780,109 @@ const STATES = {
   annullato:{label:'Annullato',       badge:'annullato'},
 };
 
+/* I controlli della lista Ordini (ago 2026): stato di SESSIONE, mai
+   localStorage (il patto dei filtri di Esplora). Due assi
+   indipendenti — «solo attivi» e il ruolo — piu' il velo dei
+   nascosti. ATTIVO = tutto tranne released/refunded/annullato
+   (un consegnato non confermato e' attivissimo, una disputa pure);
+   NASCONDIBILE = released/refunded e basta, gli unici stati
+   assorbenti — la parita' col gate del server e' sorvegliata da
+   prove.py. */
+let ordiniSoloAttivi = false;     // spento all'apertura (deciso da Andrea)
+let ordiniRuolo = '';             // '' = Tutti | 'buyer' | 'seller'
+let ordiniMostraNascosti = false; // il velo dei nascosti, per sessione
+const CONCLUSI = ['released','refunded','annullato'];
+const NASCONDIBILI = ['released','refunded'];
+function setOrdiniAttivi(v){ ordiniSoloAttivi = !!v; renderOrders(); }
+function setOrdiniRuolo(r){
+  haptic();
+  ordiniRuolo = r;
+  document.querySelectorAll('#ordiniRuoloPills .consegna-pill').forEach(b =>
+    b.classList.toggle('attiva', (b.dataset.ruolo||'') === r));
+  renderOrders();
+}
+function toggleNascosti(){ ordiniMostraNascosti = !ordiniMostraNascosti; renderOrders(); }
+/* Nascondere non e' cancellare: il server tiene la riga e accende il
+   flag della MIA parte, solo su released/refunded. Il toast dice dove
+   ritrovarlo — una riga che sparisce in silenzio la prima volta e'
+   quella che si cerca per dieci minuti. */
+async function nascondiOrdine(id, valore, ev){
+  if (ev) ev.stopPropagation();          // il tocco non apre l'ordine
+  if (DEMO || VETRINA) return;
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/orders/${id}/nascondi`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({nascosto: valore})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova'); return; }
+    const o = orders.find(x=>x.id===id);
+    if (o) o.nascosto = d.nascosto;
+    renderOrders();
+    if (d.nascosto) toast('Nascosto — lo ritrovi da «mostrali»');
+  } catch(e) { toast('Connessione assente, riprova'); }
+}
 function renderOrders(){
-  el('ordersList').innerHTML = orders.length ? orders.map(o=>`
-    <div class="order" onclick="openOrder(${o.id})">
+  /* Il filtro vive QUI e mai in loadOrders: `orders` resta INTERO,
+     o si romperebbero openOrder dal deep link, il ritorno
+     post-pagamento e il ripristino d'identita' (orders.find senza
+     guardie). Le righe 'admin' (le dispute da moderare) passano solo
+     con «Tutti»: non sono ne' acquisti ne' vendite del moderatore. */
+  const filtri = o =>
+    (!ordiniRuolo || o.role === ordiniRuolo) &&
+    (!ordiniSoloAttivi || !CONCLUSI.includes(o.state));
+  const vista = orders.filter(o => filtri(o) &&
+    (!o.nascosto || ordiniMostraNascosti));
+  /* il conteggio dice i nascosti che i filtri correnti coprirebbero:
+     con «solo attivi» acceso i nascosti (tutti conclusi) non ci sono
+     e la riga non compare */
+  const nNascosti = orders.filter(o => filtri(o) && o.nascosto).length;
+  const rigaNascosti = nNascosti
+    ? `<div style="text-align:center;margin:2px var(--pad) 8px">
+         <button class="btn link" style="margin:0" onclick="toggleNascosti()">${
+           ordiniMostraNascosti ? 'Richiudi i nascosti'
+           : `${nNascosti} ordin${nNascosti===1?'e nascosto':'i nascosti'} — mostrali`}</button>
+       </div>`
+    : '';
+  if (!orders.length) {
+    el('ordersList').innerHTML = `<div class="empty"><div class="big">🤝</div>Ancora nessun ordine.<br>Quando compri o vendi, <b>lo seguirai da qui</b>.</div>`;
+    return;
+  }
+  if (!vista.length) {
+    /* c'e' qualcosa ma i filtri non lasciano passare niente: un
+       messaggio SUO, distinto dall'«ancora nessun ordine» */
+    el('ordersList').innerHTML =
+      `<div class="empty"><div class="big">🔍</div>Niente qui con questi filtri.</div>` + rigaNascosti;
+    return;
+  }
+  el('ordersList').innerHTML = vista.map(o=>{
+    /* la foto vera al posto del 📦 (pattern delle Offerte qui sopra):
+       prima la _min, sul suo errore l'originale, poi il 📦 di sempre
+       — mai un'immagine rotta. In DEMO resta l'emoji del listing. */
+    const ic = o.foto0
+      ? `<img src="${esc(fotoUrl(fotoMini(o.foto0)))}" data-full="${esc(fotoUrl(o.foto0))}" loading="lazy" decoding="async" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px" onerror="if(!this.dataset.p){this.dataset.p=1;this.src=this.dataset.full}else{this.replaceWith('📦')}">`
+      : (o.listing.emoji || '📦');
+    const puoNascondere = !DEMO && o.role!=='admin' && NASCONDIBILI.includes(o.state);
+    const x = !puoNascondere ? ''
+      : o.nascosto
+        ? `<button class="order-x" title="Rimetti in vista" onclick="nascondiOrdine(${o.id},0,event)">↩</button>`
+        : `<button class="order-x" title="Nascondi" onclick="nascondiOrdine(${o.id},1,event)">✕</button>`;
+    return `
+    <div class="order${o.nascosto?' nascosta':''}" onclick="openOrder(${o.id})">
       <div class="row">
         <div class="order-left">
-          <span class="order-ic">${o.listing.emoji}</span>
+          <span class="order-ic">${ic}</span>
           <div class="order-main">
             <b>${esc(o.listing.title)}</b>
             <div class="sub">${o.role==='buyer'?'Stai comprando':o.role==='seller'?'Stai vendendo':'⚖️ Da moderare'} · <span class="mono" style="color:var(--sats-deep)">${fmt(o.listing.price)}</span> sats · ${o.when}</div>
           </div>
         </div>
-        <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>
+        <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>${x}
       </div>
-    </div>`).join('')
-    + `<div class="csv-line">Il CSV completo è nel Profilo → Esporta i tuoi dati</div>`
-    : `<div class="empty"><div class="big">🤝</div>Ancora nessun ordine.<br>Quando compri o vendi, <b>lo seguirai da qui</b>.</div>`;
+    </div>`;}).join('')
+    + rigaNascosti
+    + `<div class="csv-line">Il CSV completo è nel Profilo → Esporta i tuoi dati</div>`;
 }
 
 function openOrder(id){

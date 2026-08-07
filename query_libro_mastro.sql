@@ -168,6 +168,14 @@ SELECT id, stato, consegna_scelta, sped_gratis_sats
   FROM ordini WHERE sped_gratis_sats > 0
    AND consegna_scelta IN ('ritiro','digitale');
 
+SELECT '16d) ORDINE NASCOSTO SU UNO STATO NON FINALE (vuoto)' AS controllo;
+-- il nascondere (ago 2026) è ammesso solo su released/refunded, gli
+-- stati assorbenti: un flag altrove è una guardia caduta — e un ordine
+-- vivo che una parte non vede più
+SELECT id, stato, nascosto_compratore, nascosto_venditore
+  FROM ordini WHERE (nascosto_compratore = 1 OR nascosto_venditore = 1)
+   AND stato NOT IN ('released', 'refunded');
+
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non
 -- racconta perché non è un allarme.

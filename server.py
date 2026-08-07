@@ -2275,7 +2275,20 @@ def init_db():
                     # busta: colonne SUE, come per le sorelle — un
                     # contatore ereditato salterebbe al tetto
                     "sollecito_busta_il INTEGER DEFAULT 0",
-                    "solleciti_busta INTEGER DEFAULT 0"):
+                    "solleciti_busta INTEGER DEFAULT 0",
+                    # IL NASCONDERE DEGLI AFFARI CONCLUSI (ago 2026):
+                    # NASCONDERE, mai cancellare — la riga resta nel
+                    # database, perche' libro mastro, feedback, export
+                    # e registro di moderazione ci poggiano sopra.
+                    # DUE colonne e non una (il patto delle sorelle
+                    # sollecito_*): il compratore nasconde il SUO,
+                    # il venditore il suo — non si nasconde a vicenda
+                    # un ordine. Il gate ammette SOLO released e
+                    # refunded, gli unici stati ASSORBENTI: quindi
+                    # «un nascosto che torna a muoversi» non esiste
+                    # per costruzione (vedi nascondi_ordine).
+                    "nascosto_compratore INTEGER DEFAULT 0",
+                    "nascosto_venditore INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -12900,6 +12913,50 @@ async def leggi_busta_ritiro(ordine_id: int,
             "correzioni": o["busta_correzioni"]}
 
 
+@app.post("/api/orders/{ordine_id}/nascondi")
+async def nascondi_ordine(ordine_id: int, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Nasconde (o rimette in vista, body {"nascosto": 0}) un affare
+    CONCLUSO dalla lista di chi lo chiede. NASCONDERE, mai cancellare:
+    la riga resta nel database — libro mastro, feedback, export e
+    registro di moderazione ci poggiano sopra. Il flag e' PER-PARTE
+    (il compratore nasconde il suo, il venditore il suo, mai a
+    vicenda) e solo su released/refunded, gli unici stati ASSORBENTI
+    (risolvi_disputa li esclude, nessuna rotta li riapre): quindi «un
+    nascosto che torna a muoversi» non esiste per costruzione. Il
+    feedback della controparte puo' ancora arrivare, e l'ordine RESTA
+    nascosto — un feedback non e' un movimento: lo si ritrova da
+    «mostrali». NON `annullato`: e' una lapide che il reaper cancella
+    o risuscita da solo. Rimettere in vista non ha guardie in piu'
+    (riaprire non e' mai un problema, il patto delle ferie).
+    L'autorizzazione sta PRIMA dell'esistenza: estraneo, inesistente
+    e stato sbagliato ricevono la STESSA risposta (niente oracolo,
+    la lezione di verifica-pagamento)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    valore = 1 if d.get("nascosto", 1) else 0
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?) AND "
+                    "stato IN ('released','refunded')",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    colonna = ("nascosto_compratore" if user["id"] == o["compratore_id"]
+               else "nascosto_venditore")
+    # UNA colonna e basta, MAI `aggiornato`: nascondere non e' un
+    # movimento dell'ordine — non riordina la lista di nessuno e non
+    # sposta nessuna ancora. E nessuna notifica: e' un fatto privato
+    # di una parte.
+    con.execute(f"UPDATE ordini SET {colonna}=? WHERE id=?",
+                (valore, ordine_id))
+    con.commit()
+    con.close()
+    return {"ok": True, "nascosto": valore}
+
+
 @app.post("/api/orders/{ordine_id}/spedito")
 async def segna_spedito(ordine_id: int, req: Request,
                         x_tg_init_data: str = Header(""),
@@ -17025,6 +17082,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     pulisci_ordini_fantasma(con)
     con.commit()
     q = ("SELECT o.*, a.titolo, a.zona, "
+         # la lista JSON dei nomi foto dell'annuncio: serve alla riga
+         # della pagina Ordini, che ne mostra la PRIMA come miniatura
+         # (lo strip in fondo la riduce a foto0 e butta il resto)
+         "a.foto, "
          # l'ordine nato da un'asta si riconosce dall'annuncio: al
          # client serve per lo stato «in attesa della scelta» del
          # vincitore (i mono normali portano 0, i set NULL)
@@ -17078,13 +17139,15 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         seg = ",".join("?" * len(set_ids))
         per_ordine: dict[int, list] = {}
         taglie_ordine: dict[int, list] = {}
+        foto_ordine: dict[int, str] = {}
         for x in con.execute(
                 f"SELECT r.ordine_id, r.annuncio_id, r.quantita, "
                 f"r.unitario_sats, r.titolo, "
                 # la taglia si legge FRESCA dall'annuncio (non si
                 # fotografa: la stima puo' solo migliorare se il
                 # venditore la corregge)
-                f"COALESCE(a.taglia_pacco,'') AS taglia "
+                f"COALESCE(a.taglia_pacco,'') AS taglia, "
+                f"COALESCE(a.foto,'') AS foto "
                 f"FROM ordine_righe r "
                 f"LEFT JOIN annunci a ON a.id=r.annuncio_id "
                 f"WHERE r.ordine_id IN ({seg}) ORDER BY r.id", set_ids):
@@ -17095,11 +17158,16 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                  "titolo": x["titolo"]})
             taglie_ordine.setdefault(x["ordine_id"], []).append(
                 (x["taglia"], x["quantita"]))
+            # la miniatura del set e' quella del PRIMO pezzo (ORDER BY
+            # r.id), coerente con _titolo_ordine che lo nomina —
+            # setdefault: le righe dopo la prima non la toccano
+            foto_ordine.setdefault(x["ordine_id"], x["foto"])
         for r in righe:
             if not r["annuncio_id"]:
                 r["righe"] = per_ordine.get(r["id"], [])
                 r["titolo"] = _titolo_ordine(r["righe"])
                 r["zona"] = r["zona"] or ""
+                r["foto"] = foto_ordine.get(r["id"], "")
                 r["taglia_stimata"] = (
                     stima_taglia_set(taglie_ordine.get(r["id"], []))
                     if r["consegna_scelta"] == "spedizione" else "")
@@ -17116,6 +17184,24 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # QUANDO — per il compratore, e per il moderatore in disputa.
         r.pop("busta_nome", "")
         r.pop("busta_codice", "")
+        # La foto per la riga della lista: SOLO il primo nome (il
+        # pattern di scheda() dei doppioni) — la galleria intera qui
+        # non serve e gonfierebbe il payload. Per i set e' gia' la
+        # foto del primo pezzo (vedi sopra); annuncio sparito o lista
+        # vuota = '' e il client ripiega sul 📦 di sempre.
+        try:
+            r["foto0"] = (json.loads(r.pop("foto", "") or "[]")
+                          or [""])[0]
+        except Exception:
+            r["foto0"] = ""
+        # Il flag del nascondere e' PER-PARTE ed esce solo il PROPRIO:
+        # che l'altra parte abbia nascosto il suo e' un fatto privato
+        # suo (all'admin sugli ordini altrui arriva 0, innocuo).
+        mio_c = r.pop("nascosto_compratore", 0)
+        mio_v = r.pop("nascosto_venditore", 0)
+        r["nascosto"] = (mio_c if user["id"] == r["compratore_id"]
+                         else mio_v if user["id"] == r["venditore_id"]
+                         else 0)
     return righe
 
 
@@ -20389,6 +20475,16 @@ CONTROLLI_LIBRO_MASTRO = (
      "OR (busta_il>0) <> (busta_codice<>'') "
      "OR (busta_il>0 AND via_punto=0) "
      "OR (busta_corretta_il>0 AND busta_il=0)"),
+    # Passa la domanda che decide: il gate di nascondi_ordine ammette
+    # solo released/refunded, che sono ASSORBENTI — non esiste uno
+    # stato transitorio legittimo in cui questa e' falsa.
+    ("ordine nascosto su uno stato non finale",
+     "il nascondere e' ammesso solo sugli stati assorbenti "
+     "(released/refunded): un flag altrove e' una guardia caduta — "
+     "e un ordine vivo che una parte non vede piu'",
+     "SELECT id FROM ordini "
+     "WHERE (nascosto_compratore=1 OR nascosto_venditore=1) "
+     "AND stato NOT IN ('released','refunded')"),
 )
 
 _ultimo_libro_mastro = ""                # il giorno dell'ultima ronda

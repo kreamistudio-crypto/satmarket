@@ -2110,6 +2110,217 @@ def prove_busta_ritiro():
     vero.close()
 
 
+def prove_nascondi_ordine():
+    """IL NASCONDERE DEGLI AFFARI CONCLUSI (ago 2026): nascondere, MAI
+    cancellare — la riga resta nel database (libro mastro, feedback,
+    export e registro ci poggiano). Qui si prova che il gate ammette
+    SOLO released/refunded (gli stati assorbenti), che nessuno
+    nasconde per conto dell'altra parte, che l'estraneo e l'ordine
+    inesistente rispondono uguale (anti-oracolo), e che nascondere non
+    muove NIENTE oltre alla colonna della propria parte. Piu' la foto
+    della riga: /api/orders esce con foto0 (primo nome; per i set il
+    primo pezzo) e mai con la lista intera."""
+    print("\n[il nascondere degli affari conclusi]")
+    import asyncio
+    import sqlite3
+
+    # --- le sentinelle di forma -------------------------------------
+    na = pezzo("nascondi_ordine").split('"""')[-1]
+    prova("gate: released/refunded e basta", True,
+          "stato IN ('released','refunded')" in na)
+    prova("guardia a due parti nella stessa WHERE (anti-oracolo)", True,
+          "(compratore_id=? OR " in na and "venditore_id=?)" in na
+          and "Operazione non permessa" in na)
+    prova("UN solo UPDATE, e non scrive mai `aggiornato` ne' lo stato",
+          True, na.count("UPDATE") == 1 and "aggiornato=?" not in na
+          and "stato='" not in na)
+    prova("nessuna notifica: e' un fatto privato di una parte", False,
+          "notifica(" in na)
+    prova("la colonna e' un ternario su due letterali NOSTRI", True,
+          '"nascosto_compratore" if' in na
+          and '"nascosto_venditore")' in na)
+    mo = pezzo("miei_ordini")
+    prova("/api/orders: escono foto0 e nascosto, mai le colonne grezze",
+          True, 'r["foto0"]' in mo and 'r["nascosto"]' in mo
+          and 'r.pop("nascosto_compratore"' in mo
+          and 'r.pop("nascosto_venditore"' in mo
+          and 'r.pop("foto"' in mo)
+    prova("/api/orders: il WHERE di sempre non e' cambiato", True,
+          "WHERE o.compratore_id=? OR o.venditore_id=?" in mo)
+    prova("il libro mastro sorveglia il nascosto fuori posto", True,
+          "ordine nascosto su uno stato non finale" in _SORGENTE)
+    # la parita' col client (pattern CAT_SENZA_COND): il gate del
+    # server e la ✕ del client devono dire lo stesso elenco
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("client: NASCONDIBILI == il gate del server", True,
+          "const NASCONDIBILI = ['released','refunded']" in mini)
+    ro = pezzo_js(mini, "function renderOrders(){")
+    prova("client: il filtro vive in renderOrders, orders resta intero",
+          True, "orders.filter" in ro
+          and "filter" not in pezzo_js(mini, "async function loadOrders"))
+    prova("client: il toast dice dove ritrovarlo", True,
+          "Nascosto — lo ritrovi da «mostrali»" in mini)
+    prova("client: la ✕ non apre l'ordine (stopPropagation)", True,
+          "ev.stopPropagation()"
+          in pezzo_js(mini, "async function nascondiOrdine"))
+
+    # --- il funzionale su sqlite in memoria -------------------------
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE ordini(
+        id INTEGER PRIMARY KEY, annuncio_id INT DEFAULT 1,
+        compratore_id INT, venditore_id INT, stato TEXT,
+        prezzo_sats INT DEFAULT 1000, quantita INT DEFAULT 1,
+        consegna_scelta TEXT DEFAULT '', aggiornato INT DEFAULT 42,
+        contenuto_digitale TEXT DEFAULT '',
+        busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
+        nascosto_compratore INT DEFAULT 0,
+        nascosto_venditore INT DEFAULT 0);
+      CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
+        zona TEXT DEFAULT '', foto TEXT DEFAULT '',
+        taglia_pacco TEXT DEFAULT '', asta_base_sats INT DEFAULT 0);
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+        username TEXT DEFAULT '', npub TEXT DEFAULT '',
+        npub_accesso TEXT DEFAULT '', npub_verificata INT DEFAULT 0);
+      CREATE TABLE feedback(ordine_id INT, da_tg_id INT, per_tg_id INT,
+        voto INT, commento TEXT);
+      CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+        annuncio_id INT, quantita INT DEFAULT 1, unitario_sats INT,
+        titolo TEXT DEFAULT '');
+      INSERT INTO utenti(tg_id, username) VALUES(111, 'compra'),
+        (222, 'vende');
+      INSERT INTO annunci(id, titolo, foto) VALUES
+        (1, 'Vaso di ceramica', '["a1_0.jpg","a1_1.jpg"]'),
+        (2, 'Senza foto', ''),
+        (3, 'Tazza al tornio', '["a3_0.jpg"]');
+    """)
+    stati = ("creato", "locked", "shipped", "delivered", "confirmed",
+             "dispute", "return_pending", "return_shipped", "refund",
+             "annullato", "released", "refunded")
+    for n, s in enumerate(stati, start=1):
+        vero.execute("INSERT INTO ordini(id, compratore_id, "
+                     "venditore_id, stato) VALUES(?, 111, 222, ?)",
+                     (n, s))
+    vero.commit()
+
+    class Con:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    def nascondi(chi, oid, body):
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "leggi_json": _leggi}
+        exec("async " + pezzo("nascondi_ordine"), amb)
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb["nascondi_ordine"](oid, _Req(body)))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    # il gate, stato per stato: TUTTI i non assorbenti rifiutano —
+    # confirmed e refund SEMBRANO conclusi ma sono un limbo, e
+    # annullato e' una lapide che il reaper gestisce da solo
+    for n, s in enumerate(stati[:10], start=1):
+        prova(f"non si nasconde un ordine '{s}'",
+              "400 Operazione non permessa", nascondi(111, n, {}))
+    dump = [tuple(r) for r in vero.execute("SELECT * FROM ordini")]
+    prova("...e dieci rifiuti non hanno scritto NIENTE", dump,
+          [tuple(r) for r in vero.execute("SELECT * FROM ordini")])
+    prova("il compratore nasconde il released",
+          {"ok": True, "nascosto": 1}, nascondi(111, 11, {}))
+    o = vero.execute("SELECT * FROM ordini WHERE id=11").fetchone()
+    prova("...sulla SUA colonna e solo quella", (1, 0),
+          (o["nascosto_compratore"], o["nascosto_venditore"]))
+    prova("...senza toccare stato ne' aggiornato", ("released", 42),
+          (o["stato"], o["aggiornato"]))
+    prova("il venditore nasconde il suo refunded",
+          {"ok": True, "nascosto": 1}, nascondi(222, 12, {"nascosto": 1}))
+    prova("...sulla colonna del venditore", (0, 1),
+          tuple(vero.execute(
+              "SELECT nascosto_compratore, nascosto_venditore "
+              "FROM ordini WHERE id=12").fetchone()))
+    prova("rimettere in vista funziona (nessuna guardia in piu')",
+          {"ok": True, "nascosto": 0},
+          nascondi(111, 11, {"nascosto": 0}))
+    prova("...e la colonna torna 0", 0,
+          vero.execute("SELECT nascosto_compratore FROM ordini "
+                       "WHERE id=11").fetchone()[0])
+    prova("estraneo e ordine inesistente rispondono uguale", True,
+          nascondi(999, 11, {}) == nascondi(111, 777, {}))
+
+    # --- il GET: foto0 e il flag per-parte, dal pezzo vero ----------
+    vero.execute("UPDATE ordini SET annuncio_id=1, "
+                 "nascosto_compratore=1 WHERE id=11")
+    vero.execute("UPDATE ordini SET annuncio_id=2 WHERE id=12")
+    # un mono il cui annuncio e' SPARITO (LEFT JOIN a vuoto)
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, annuncio_id) VALUES(20, 111, 222, "
+                 "'released', 999)")
+    # un SET: la foto e' quella del PRIMO pezzo, l'altro e' orfano
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, annuncio_id, consegna_scelta) "
+                 "VALUES(21, 111, 222, 'locked', 0, 'ritiro')")
+    vero.executescript("""
+      INSERT INTO ordine_righe(ordine_id, annuncio_id, quantita,
+        unitario_sats, titolo) VALUES(21, 3, 1, 500, 'Tazza al tornio'),
+        (21, 999, 1, 500, 'Pezzo sparito');
+    """)
+    vero.commit()
+
+    def miei(chi):
+        amb = {"db": Con, "HTTPException": _H,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "pulisci_ordini_fantasma": lambda con: None,
+               "e_admin": lambda tg: False,
+               "stima_taglia_set": lambda t: "",
+               "json": __import__("json")}
+        exec(pezzo("_titolo_ordine"), amb)
+        exec(pezzo("miei_ordini"), amb)
+        return {r["id"]: r for r in amb["miei_ordini"](0, "", "")}
+
+    lato_c, lato_v = miei(111), miei(222)
+    prova("mono con foto: esce il PRIMO nome e la lista non esce",
+          ("a1_0.jpg", False),
+          (lato_c[11]["foto0"], "foto" in lato_c[11]))
+    prova("mono senza foto: foto0 vuota (il client tiene il 📦)", "",
+          lato_c[12]["foto0"])
+    prova("annuncio sparito: foto0 vuota, mai un errore", "",
+          lato_c[20]["foto0"])
+    prova("set: la foto del PRIMO pezzo, quello che il titolo nomina",
+          ("a3_0.jpg", "Tazza al tornio + 1 altri"),
+          (lato_c[21]["foto0"], lato_c[21]["titolo"]))
+    prova("il nascosto del compratore per il compratore e' 1", 1,
+          lato_c[11]["nascosto"])
+    prova("...e per il VENDITORE e' 0: il flag altrui non esce", 0,
+          lato_v[11]["nascosto"])
+    prova("le colonne grezze non escono da nessun lato", True,
+          all("nascosto_compratore" not in r and
+              "nascosto_venditore" not in r
+              for r in list(lato_c.values()) + list(lato_v.values())))
+    vero.close()
+
+
 def _notifica_admin_spia(avvisi):
     async def _n(testo):
         avvisi.append(("admin", testo))
@@ -4944,7 +5155,9 @@ def prove_libro_mastro():
           aggiornato INT DEFAULT 0, via_punto INT DEFAULT 0,
           busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
           busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
-          busta_correzioni INT DEFAULT 0);
+          busta_correzioni INT DEFAULT 0,
+          nascosto_compratore INT DEFAULT 0,
+          nascosto_venditore INT DEFAULT 0);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
           annuncio_id INT, quantita INT, unitario_sats INT,
           titolo TEXT DEFAULT '');
@@ -5001,6 +5214,11 @@ def prove_libro_mastro():
           busta_nome,busta_codice,busta_il)
           VALUES(4, 9, 1000, 'shipped', 1,
                  'plain:Mario Rossi', 'plain:PIN 4321', 123);
+        -- UN NASCOSTO SANO: released, il compratore l'ha messo via —
+        -- e' il caso LEGITTIMO, e non deve suonare
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,
+          nascosto_compratore)
+          VALUES(5, 9, 1000, 'released', 1);
         -- TRE NEGOZI SANI: uno sconta a pezzi, uno a valore, uno e'
         -- spento (e uno spento non deve suonare mai)
         INSERT INTO utenti(tg_id,sconto_pacco_criterio,sconto_pacco_soglia,
@@ -5094,6 +5312,11 @@ def prove_libro_mastro():
         ("UPDATE ordini SET busta_il=0, busta_nome='', busta_codice='', "
          "busta_corretta_il=99 WHERE id=4",
          "busta fuori contratto", "4"),
+        # il nascondere e' ammesso solo sugli stati assorbenti: un
+        # flag su un ordine vivo e' una guardia caduta — e un ordine
+        # che una parte non vede piu'
+        ("UPDATE ordini SET nascosto_venditore=1 WHERE id=2",
+         "ordine nascosto su uno stato non finale", "2"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -5772,7 +5995,7 @@ def main():
               prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
-              prove_busta_ritiro,
+              prove_busta_ritiro, prove_nascondi_ordine,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_messaggio_admin, prove_avviso_contatto,
