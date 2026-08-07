@@ -4845,6 +4845,25 @@ def prove_pagina_acquisto():
           "me.spedizionieri" in mini)
     prova("...e il client non lo riempie mai da solo", 1,
           mini.count("spedizionieriCatalogo = ["))
+    # le mappe dei punti (ago 2026): due link alle mappe ufficiali,
+    # niente widget ne' API. Gli URL vivono in MAPPE_PUNTI e mai
+    # dentro un onclick, e dentro Telegram si apre con tg.openLink —
+    # la strada documentata: un target="_blank" nella WebView di
+    # certi client non apre niente.
+    prova("le mappe dei punti: l'URL InPost vive nel catalogo, una volta",
+          1, mini.count("https://inpost.it/trova-un-locker"))
+    prova("...e quello di Poste", 1,
+          mini.count("https://www.poste.it/cerca-mappe-app/?vieni-in-poste"))
+    prova("dentro Telegram si apre con tg.openLink", True,
+          "tg.openLink(m.url)" in mini)
+    prova("il giudice dei link e' UNO (linkMappePunti)", 1,
+          mini.count("function linkMappePunti"))
+    prova("...e lo chiamano le due superfici del punto", 2,
+          mini.count("${linkMappePunti("))
+    prova("con 'Altro' nessun link: la mappa sbagliata e' peggio di "
+          "nessuna", True, ": spedizioniere ? []" in mini)
+    prova("la nota consiglia il locker automatico", True,
+          "NOTA_LOCKER" in mini and "locker automatico" in mini)
 
 
 # ====================================================================

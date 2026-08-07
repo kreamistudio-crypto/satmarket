@@ -7348,6 +7348,7 @@ function renderAcquisto(){
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
+    ${linkMappePunti(p.spedizioniere)}
   </div>`;
   /* --- le note oneste --- */
   let note = '';
@@ -9865,6 +9866,7 @@ function openOrder(id){
         <div class="hint">${o.puntoRitiro
           ? 'Puoi correggerlo finché il venditore non spedisce.'
           : 'Nome o indirizzo del punto (locker o negozio convenzionato): il venditore lo vedrà qui e potrà spedire. Se non sai la rete del corriere, chiediglielo in chat.'}</div>
+        ${linkMappePunti('')}
         <textarea id="puntoRitiroInp" style="min-height:38px" maxlength="120" placeholder="Es. Locker InPost — Via Roma 1">${esc(o.puntoRitiro)}</textarea>
         <button class="btn orange" onclick="salvaPuntoRitiro()">${o.puntoRitiro ? 'Aggiorna il punto' : 'Salva il punto'}</button>
       </div>` : ''}
@@ -12033,6 +12035,48 @@ async function scegliConsegnaOrdine(v){
   toast('✔ Scelta fatta: il venditore prepara la consegna');
   openOrder(o.id);
 }
+/* Le mappe ufficiali dei punti di ritiro (ago 2026): il compratore
+   non deve sapere il punto a memoria — apre la mappa in una scheda
+   nuova, cerca, copia il nome e torna a incollarlo. Niente widget,
+   niente API, niente token: due link. Gli URL vivono QUI e mai
+   dentro un onclick (il patto di linkCanaleTest); dentro Telegram
+   si apre con tg.openLink, la strada documentata della Bot API —
+   un <a target="_blank"> nella WebView di certi client non apre
+   niente. */
+const MAPPE_PUNTI = {
+  inpost: {url: 'https://inpost.it/trova-un-locker',
+           nome: 'trova un punto InPost'},
+  poste:  {url: 'https://www.poste.it/cerca-mappe-app/?vieni-in-poste',
+           nome: 'trova un Punto Poste'}};
+const NOTA_LOCKER = '💡 Se puoi scegli un locker automatico: si '
+  + 'ritira col solo codice — al banco di un negozio possono '
+  + 'chiedere il nome scritto sul pacco.';
+
+function apriMappaPunti(rete){
+  haptic();
+  const m = MAPPE_PUNTI[rete];
+  if (!m) return;
+  if (tg?.initData && tg.openLink) tg.openLink(m.url);
+  else window.open(m.url, '_blank', 'noopener');
+}
+
+/* Il giudice unico dei link: con la rete dichiarata si mostra SOLO
+   la sua mappa (l'altra sarebbe una strada sbagliata: il venditore
+   spedisce con quella rete); con 'Altro' NESSUN link e niente nota
+   — la rete non e' nessuna delle due, e un link fuorviante e'
+   peggio di nessun link, dichiarato; senza rete dichiarata (il
+   campo dentro l'ordine) entrambi, pari. */
+function linkMappePunti(spedizioniere){
+  const reti = spedizioniere === 'InPost' ? ['inpost']
+    : spedizioniere === 'Poste Italiane' ? ['poste']
+    : spedizioniere ? [] : ['inpost', 'poste'];
+  if (!reti.length) return '';
+  const link = reti.map(r =>
+    `<button type="button" class="scopri-link" onclick="apriMappaPunti('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
+  ).join(' · ');
+  return `<div class="hint" style="margin-top:6px">${link}<br>${NOTA_LOCKER}</div>`;
+}
+
 /* Il punto di ritiro dal campo dell'ordine (terzo giro): solo il
    compratore, solo su 'locked' — il server e' il giudice, qui il
    gesto. Il testo viaggia nudo nel JSON e torna sotto esc(). */
