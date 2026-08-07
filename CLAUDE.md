@@ -5427,6 +5427,69 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in pagina porta il commento-VARCO MAPPA: il selettore punti delle
   API corriere sostituirà il contenitore, il contratto resta un testo
   in `acqDati.punto`.
+  LA BUSTA DI CONSEGNA (ago 2026, dal campo): per ritirare a un punto
+  servono il NOME che il venditore ha messo come destinatario (di
+  fantasia: il corriere esige un nome, noi non raccogliamo dati veri;
+  serve al banco, e a entrambi se il pacco non viene ritirato e torna
+  indietro) e il CODICE di ritiro (PIN/QR). Prima viaggiavano in chat
+  privata — e chi non ha username Telegram né npub non è contattabile:
+  l'ordine restava bloccato, successo davvero. Ora vivono DENTRO
+  l'ordine: `POST/GET /api/orders/{id}/busta-ritiro`, colonne
+  `busta_nome`/`busta_codice` cifrate col TRASPORTO dei contenuti
+  digitali (`_cifra_contenuto`) ma MAI con la sua semantica, ed è la
+  riga da non ammorbidire: APRIRE LA BUSTA NON È UNA RICEVUTA — il GET
+  è PURO (zero scritture, `consegnato` e stato intonsi, sentinelle in
+  CI), `consegna_scelta` resta 'spedizione' quindi le finestre corte
+  del digitale non vedono mai questi ordini per costruzione, e i sats
+  si muovono solo coi bottoni di conferma di sempre.
+  NIENTE GATE SU segna_spedito (decisione di Andrea, che ha ROVESCIATO
+  il brief del cantiere — e il perché va tenuto perché il gate torna
+  in mente): il codice arriva al venditore quando il pacco è GIÀ al
+  punto, quindi col gate non potrebbe dichiarare la spedizione per
+  tutto il viaggio — 1-3 giorni in cui chi ha pagato vede il nulla. I
+  due momenti restano separati come nella realtà, due messaggi
+  distanti giorni: «in viaggio verso il punto» alla spedizione (con la
+  coda «ti avviseremo quando il codice sarà pronto»), e «il tuo pacco
+  ti aspetta» al deposito — quello che conta, con la giacenza ~3
+  giorni dentro. Al posto del gate: la riga «⏳ in attesa del codice»
+  visibile a ENTRAMBI nell'ordine, e `sollecita_buste_ferme`
+  nell'orologio (leva `PROMEMORIA_BUSTA_GIORNI` 3, 0 = spenta; cadenza
+  e tetto RIUSATI da PROMEMORIA_CONFERMA_* come le sorelle; ancora
+  `spedito_il`, colonne SUE `sollecito_busta_il`/`solleciti_busta`;
+  squilla SOLO il venditore — il compratore vede già l'attesa e ha i
+  suoi bottoni — e al tetto 🧊 ai moderatori, poi silenzio).
+  LA DEDUP DEL SEGNALE D'ARRIVO, per il caso raro dei due momenti
+  coincidenti (codice immediato, spedizione da un punto):
+  `MSG_BUSTA_PRONTA` è UNA costante e parte da UNA sola delle due
+  strade — il deposito su 'locked' è SILENZIOSO e a parlare è
+  segna_spedito, che col `busta_il` già pieno dice «ti aspetta» al
+  posto di «in viaggio»; il deposito su 'shipped' parla da sé. Mai il
+  doppione, e c'è la prova.
+  IL DEPOSITO è del venditore su 'locked'/'shipped'/'dispute' —
+  'dispute' è deliberato: un PIN sbagliato si corregge SOLO da lui,
+  perché il moderatore la busta NON LA LEGGE MAI, da nessuna strada
+  (a differenza del contenuto digitale: il GET autorizza le sole
+  parti, e l'estraneo riceve la stessa risposta dell'ordine
+  inesistente — niente oracolo). `busta_il` resta il PRIMO deposito;
+  le correzioni si contano e si timbrano (`busta_correzioni`,
+  `busta_corretta_il`, aggiunta di Andrea): in disputa la nota ai
+  moderatori dice «depositate il X, poi corrette N volte (ultima il
+  Y)» o «MAI depositate» — sempre e solo fatti, mai il contenuto.
+  Campi obbligatori INSIEME, 400 espliciti sui limiti (80/1000) e MAI
+  il troncamento silenzioso del punto_ritiro: un PIN troncato è un PIN
+  rotto. Journal con sha256 troncata + lunghezze, il pattern del
+  digitale. Lo strip di /api/orders poppa nome e codice; `busta_il` e
+  le correzioni ESCONO (sono il SE e il QUANDO). Il libro mastro
+  guadagna «busta fuori contratto» (flag/nome/codice si scrivono nello
+  stesso UPDATE e solo sulla via punto); da NON aggiungere, e verrà in
+  mente: «shipped via punto senza busta» — è lo stato NORMALE del
+  transito, e sarebbe falso anche su tutto il pregresso. Le ASTE non
+  hanno la busta per costruzione (scegli_consegna_ordine non scrive
+  mai via_punto, dichiarato in _strade_asta). Client:
+  `pannelloBustaRitiro(o)` accanto al pannello digitale, cache
+  `bustaLetta`, «👁 Mostra» SENZA confirm (non è la rivelazione:
+  leggere un bigliettino non muove niente), tutto sotto esc(), admin
+  senza nemmeno il bottone.
   «CONTROLLA IL PACCO» HA PERSO LE PILLOLE DI SCELTA (decisione 3 di
   Andrea, stile Vinted): la scelta vive nella pagina d'acquisto
   (`#ctrlAcquista` → `apriAcquistoSet`), al loro posto la riga onesta
@@ -7922,6 +7985,33 @@ esposto al giro dopo. L'ORDINE DEI LAVORI ERA VINCOLANTE e vale per
 chiunque ripulisca a mano i doppioni dell'anello: prima il tappo, poi
 la rimozione della copia — vedi il caso dell'annuncio 173, che faceva
 da parafulmine all'89.
+
+La busta di consegna nell'ordine (ago 2026, dal campo): sugli ordini
+verso un punto di ritiro il venditore deposita nome del destinatario e
+codice di ritiro DENTRO l'ordine, cifrati, e il compratore li legge da
+lì — sostituisce la chat privata, non il corriere (niente mappa,
+niente API, niente tracking). La decisione che governa il cantiere:
+NIENTE gate su segna_spedito — il codice arriva quando il pacco è GIÀ
+al punto, e i due momenti restano separati come nella realtà; al posto
+del gate lo stato d'attesa visibile e il promemoria al venditore. La
+riga da non ammorbidire: aprire la busta NON è una ricevuta — il GET è
+puro, l'escrow si muove solo coi bottoni di sempre, e il moderatore la
+busta non la legge mai (in disputa vede solo SE e QUANDO, correzioni
+contate comprese). Vedi Architettura, «LA BUSTA DI CONSEGNA», per la
+dedup del segnale d'arrivo e il controllo del libro mastro (col suo
+gemello da NON fare). Collaudata: 1375 prove verdi (61 nuove, fra cui
+la prova regina «la lettura non scrive niente» e la sentinella
+rovesciata sul gate che non esiste), collaudo TestClient su DB
+usa-e-getta (40 verdi: escrow immobile al deposito, admin respinto,
+correzione fino in disputa, nota al moderatore senza mai il contenuto,
+ronda che tace sul sano) e giro visivo CDP a 375px nei due temi, con
+la verifica dal vivo che dopo l'apertura l'ordine resta `shipped`.
+IN PRODUZIONE basta il deploy: sette colonne additive nascono da sole
+e la leva ha il default nel codice. DA GUARDARE al primo giro vero: il
+primo ordine al punto con la busta depositata dentro Telegram (i due
+messaggi a giorni di distanza, mai il doppione) e il journal di
+`sollecita_buste_ferme` al primo battito con un ordine oltre i 3
+giorni.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
