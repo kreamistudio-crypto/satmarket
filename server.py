@@ -11297,12 +11297,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
-        # TERZO giro (decisione di Andrea): il punto si fissa quando
-        # il corriere e' NOTO. Rete dichiarata = il punto si scrive
-        # al pagamento (obbligatorio, come sempre); senza rete la via
-        # si sceglie lo stesso ma il punto arriva DOPO, dal campo
-        # dell'ordine — la SELECT e' una lettura prima della invoice,
-        # il patto del ricontrollo non si tocca.
+        # QUARTO giro (decisione di Andrea, rovescia il terzo): il
+        # punto si sceglie SEMPRE in pagina, prima di «Paga» — la
+        # regola vive nel CLIENT. Qui il 400 resta SOLO con la rete
+        # dichiarata: il client di ieri senza rete non ha il campo, e
+        # un 400 senza campo sarebbe un vicolo cieco. Il residuo
+        # (ordine nato senza punto) lo coprono il campo dell'ordine e
+        # il gate di segna_spedito — la SELECT e' una lettura prima
+        # della invoice, il patto del ricontrollo non si tocca.
         sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
                          (venditore_id,)).fetchone()
         if sp and sp["spedizioniere"] and not punto:
@@ -12184,9 +12186,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
-        # TERZO giro, il patto del set: punto obbligatorio al
-        # pagamento SOLO con la rete dichiarata — senza, si indica
-        # dopo, dal campo dell'ordine (lettura prima della invoice)
+        # QUARTO giro, il patto del set (rovescia il terzo): il punto
+        # si sceglie SEMPRE in pagina — la regola vive nel CLIENT, e
+        # il 400 resta SOLO con la rete dichiarata: tolleranza per il
+        # client di ieri, che senza rete non ha il campo. Il residuo
+        # lo coprono il campo dell'ordine e il gate di segna_spedito.
+        # (Lettura prima della invoice: il patto del ricontrollo.)
         sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
                          (a["venditore_id"],)).fetchone()
         if sp and sp["spedizioniere"] and not punto:
@@ -12698,9 +12703,10 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         msg += ("\n\n📦 Il compratore ha scelto la <b>spedizione a un "
                 "punto di ritiro</b>: trovi il punto nell'ordine.")
     elif o["via_punto"]:
-        # Terzo giro: la via e' scelta ma il punto arriva dopo (il
-        # venditore non ha la rete dichiarata) — va detto SUBITO, e
-        # con la via d'uscita: la chat, se serve accordarsi.
+        # Il residuo del quarto giro: via scelta senza punto — solo
+        # ordini nati da un client di ieri (il server tollera il
+        # punto assente senza rete). Va detto SUBITO, e con la via
+        # d'uscita: la chat, se serve accordarsi.
         msg += ("\n\n📦 Il compratore vuole la <b>spedizione a un punto "
                 "di ritiro</b>: indicherà il punto nell'ordine — se "
                 "serve, accordatevi in chat sul corriere.")
@@ -12728,15 +12734,20 @@ async def _incassa_ordine(ordine_id: int) -> dict:
 async def indica_punto_ritiro(ordine_id: int, req: Request,
                               x_tg_init_data: str = Header(""),
                               barattolo_sessione: str = Cookie("")):
-    """Il COMPRATORE indica (o corregge) il punto di ritiro dentro
-    l'ordine (ago 2026, terzo giro: il punto si fissa quando il
-    corriere e' noto — senza rete dichiarata al pagamento si sceglie
-    solo la STRADA, e il punto arriva da qui). Solo il compratore,
-    solo su 'locked' e solo sulla via punto: dopo la spedizione il
-    pacco e' partito e il campo si chiude. Modificabile finche'
-    l'ordine e' 'locked' (un refuso si corregge); il venditore riceve
-    la notifica STATICA a ogni cambio — mai il testo del compratore
-    nell'HTML, si legge nell'ordine sotto esc()."""
+    """Il COMPRATORE corregge (o indica) il punto di ritiro dentro
+    l'ordine. Dal QUARTO giro (ago 2026) e' la RETE DI SICUREZZA
+    della scelta anticipata: il punto si sceglie in pagina prima di
+    «Paga», qui si corregge finche' il venditore non spedisce — ed e'
+    cio' che rende sostenibile sceglierlo senza conoscere la rete;
+    per gli ordini nati senza punto (i client di ieri, che il server
+    tollera) qui si scrive la prima volta. Solo il compratore, solo
+    su 'locked' e solo sulla via punto: dopo la spedizione il pacco
+    e' partito e il campo si chiude. Il VUOTO si rifiuta: un punto
+    scritto si corregge, non si svuota mai — cosi' il gate di
+    segna_spedito non puo' riscattare su un ordine gia' compilato.
+    Il venditore riceve la notifica STATICA a ogni cambio — mai il
+    testo del compratore nell'HTML, si legge nell'ordine sotto
+    esc()."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     punto = " ".join(str(d.get("punto_ritiro") or "").split())[:120]
@@ -13004,8 +13015,12 @@ async def segna_spedito(ordine_id: int, req: Request,
                                      "attendi la sua scelta prima di "
                                      "spedire")
     if o["via_punto"] and not o["punto_ritiro"]:
-        # Via punto senza punto indicato: DOVE spedirebbe? (terzo
-        # giro, scelta dichiarata con Andrea). Il compratore ha il
+        # Via punto senza punto indicato: DOVE spedirebbe? Dal quarto
+        # giro il punto si sceglie in pagina e questo caso e' quasi
+        # sparito (resta per gli ordini dei client di ieri, che il
+        # server tollera) — la guardia RESTA, e una volta scritto il
+        # punto non puo' riscattare: si CORREGGE ma non si svuota mai
+        # (indica_punto_ritiro rifiuta il vuoto). Il compratore ha il
         # campo nell'ordine; se serve, la chat.
         con.close()
         raise HTTPException(400, "Il compratore non ha ancora indicato "

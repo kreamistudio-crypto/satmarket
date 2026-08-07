@@ -4989,13 +4989,20 @@ def prove_pagina_acquisto():
     prova("_strade_preventivo non filtra piu' sullo spedizioniere",
           False, "not spedizioniere" in pezzo("_strade_preventivo"))
 
-    # 5ter. IL TERZO GIRO (decisione di Andrea che supera il secondo):
-    #    il punto si fissa quando il corriere e' NOTO. Al pagamento e'
-    #    obbligatorio SOLO con la rete dichiarata (nei due compratori);
-    #    senza, si sceglie la strada (via_punto) e il punto arriva dal
-    #    campo dell'ordine — e il venditore non puo' segnare «spedito»
-    #    finche' il punto non c'e' (dove spedirebbe?).
-    prova("punto obbligatorio al pagamento SOLO con la rete (x2)", 2,
+    # 5ter. IL QUARTO GIRO (decisione di Andrea che ROVESCIA il terzo):
+    #    la scelta del punto torna SEMPRE prima di «Paga», come su
+    #    Subito e Vinted — il campo c'e' anche senza rete dichiarata,
+    #    con tutte e due le mappe e la riga onesta. LA REGOLA VIVE NEL
+    #    CLIENT: il server esige il punto solo con la rete dichiarata,
+    #    ed e' TOLLERANZA per il client di ieri (che senza rete non ha
+    #    il campo: un 400 senza campo sarebbe un vicolo cieco), non la
+    #    regola del prodotto. Il residuo — ordini nati senza punto —
+    #    lo coprono il campo dell'ordine (la rete di sicurezza: il
+    #    punto si corregge finche' il venditore non spedisce) e il
+    #    gate di segna_spedito, che non puo' riscattare dopo: il vuoto
+    #    si rifiuta, un punto scritto si corregge e non si svuota mai.
+    prova("server: il 400 del punto resta sul solo ramo con rete (x2, "
+          "tolleranza per il client di ieri)", 2,
           src.count('if sp and sp["spedizioniere"] and not punto:'))
     corpo_sped = pezzo("segna_spedito").split('"""')[-1]
     prova("segna_spedito: bloccato sulla via punto senza punto", True,
@@ -5004,13 +5011,19 @@ def prove_pagina_acquisto():
     prova("il campo dell'ordine e' del COMPRATORE, su 'locked'", True,
           "compratore_id" in corpo_pr and "'locked'" in corpo_pr)
     prova("...esige la via punto", True, 'o["via_punto"]' in corpo_pr)
+    prova("...rifiuta il vuoto: il punto si corregge, non si svuota",
+          True, "if not punto:" in corpo_pr)
     prova("...e la notifica al venditore e' STATICA (mai il testo)",
           False, "{punto" in corpo_pr)
     mini3 = open("miniapp.html", encoding="utf-8").read()
-    prova("client: il campo al pagamento esiste solo con la rete",
-          True, "const campoPunto = !p.spedizioniere ? ''" in mini3)
-    prova("client: la riga «lo indicherai dopo l'acquisto» esiste",
-          True, "lo indicherai dopo l'acquisto" in mini3)
+    prova("client: il campo del punto non gatea piu' sulla rete",
+          False, "campoPunto = !p.spedizioniere" in mini3)
+    prova("client: le due guardie del punto non guardano la rete", 0,
+          mini3.count("spedizioniere && !"))
+    prova("client: la riga «lo indicherai dopo l'acquisto» e' morta "
+          "col quarto giro", False, "lo indicherai dopo l'acquisto" in mini3)
+    prova("client: la riga onesta senza rete esiste", True,
+          "senza sapere con che rete" in mini3)
     prova("client: il campo dentro l'ordine esiste", True,
           "salvaPuntoRitiro" in mini3 and "puntoRitiroInp" in mini3)
 

@@ -7366,17 +7366,19 @@ function renderAcquisto(){
       </button>`;
     }).join('') + `</div>`;
   }
-  /* --- il campo del punto di ritiro: SOLO con la rete dichiarata
-     (terzo giro, decisione di Andrea: il punto si fissa quando il
-     corriere e' noto — senza rete si sceglie la strada e il punto
-     si indica DOPO, dal campo dell'ordine) --- */
+  /* --- il campo del punto di ritiro: c'e' SEMPRE (quarto giro,
+     decisione di Andrea che ROVESCIA il terzo: la scelta del punto
+     torna sempre PRIMA di «Paga», come su Subito e Vinted — con la
+     rete dichiarata la sua mappa, senza tutte e due piu' la riga
+     onesta qui sotto; la rete di sicurezza e' il campo dell'ordine,
+     dove il punto si corregge finche' il venditore non spedisce) --- */
   /* VARCO MAPPA (futuro, API corriere): questo contenitore verra'
      sostituito dal selettore dei punti (ricerca/mappa) dello
      spedizioniere dichiarato. Il contratto non cambia: un testo in
      acqDati.punto che viaggia come punto_ritiro nel body. */
-  const campoPunto = !p.spedizioniere ? '' : `<div class="field" id="acqPuntoCampo"
+  const campoPunto = `<div class="field" id="acqPuntoCampo"
       style="margin-top:10px;display:${d.via==='punto'?'':'none'}">
-    <label>Indica il punto di ritiro (nome o indirizzo del punto ${esc(p.spedizioniere)})</label>
+    <label>Indica il punto di ritiro (nome o indirizzo del punto${p.spedizioniere?' '+esc(p.spedizioniere):''})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
@@ -7386,10 +7388,11 @@ function renderAcquisto(){
   let note = '';
   if (p.spedizioniere && (d.via==='casa' || d.via==='punto'))
     note += `<div class="acq-nota">📦 Spedisce con <b>${esc(p.spedizioniere)}</b></div>`;
-  /* la via punto SENZA rete dichiarata: la riga del terzo giro — il
-     punto arriva dopo, dall'ordine, quando il corriere e' noto */
+  /* la via punto SENZA rete dichiarata: la riga onesta del quarto
+     giro — si sceglie un punto senza sapere la rete, e la rete di
+     sicurezza e' la correzione dall'ordine */
   if (!p.spedizioniere && d.via==='punto')
-    note += `<div class="acq-nota">📦 Il punto preciso lo indicherai dopo l'acquisto, quando il venditore sceglie il corriere.</div>`;
+    note += `<div class="acq-nota">📦 Il venditore non ha ancora dichiarato il corriere: stai scegliendo il punto senza sapere con che rete viaggerà il pacco — puoi correggerlo dall'ordine finché non spedisce.</div>`;
   if (d.via==='digitale')
     note += `<div class="acq-nota">💾 Un codice, una volta rivelato, non torna indietro: hai <b>${TEMPI.confermaDig} ore</b> per aprire una disputa, poi l'acquisto è definitivo.</div>`;
   if (p.stima || (stradaSel && stradaSel.stima))
@@ -7479,8 +7482,8 @@ function corpoConsegna(){
   if (v==='ritiro' || v==='digitale') return {consegna: v};
   const out = {consegna:'spedizione',
                spedizione_via: v==='punto' ? 'punto' : 'casa'};
-  /* il testo viaggia solo se c'e': senza rete dichiarata il punto
-     si indica dopo, dal campo dell'ordine (terzo giro) */
+  /* dal quarto giro il punto c'e' sempre (ctaAcquisto lo esige
+     prima di chiamare): il trim e' la cintura contro il vuoto */
   if (v==='punto' && acqDati.punto.trim())
     out.punto_ritiro = acqDati.punto.trim().slice(0,120);
   return out;
@@ -7488,9 +7491,11 @@ function corpoConsegna(){
 function ctaAcquisto(){
   haptic();
   const d = acqDati; if (!d || !d.preventivo) return;
-  /* il punto e' obbligatorio QUI solo con la rete dichiarata: senza,
-     si indica dopo dal campo dell'ordine (terzo giro) */
-  if (d.via==='punto' && d.preventivo.spedizioniere && !d.punto.trim()){
+  /* il punto e' obbligatorio SEMPRE sulla via punto (quarto giro):
+     il server lo esige solo con la rete dichiarata — tolleranza per
+     il client di ieri, che senza rete non ha il campo — quindi la
+     regola del prodotto vive qui */
+  if (d.via==='punto' && !d.punto.trim()){
     toast('Indica il punto di ritiro: al venditore serve per spedire');
     el('acqPunto')?.focus(); return;
   }
@@ -8918,7 +8923,7 @@ function compraSubito(){
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
   if (!p || !via || via.cambio_assente) { startBuy(); return; }
-  if (acqDati.via==='punto' && p.spedizioniere && !acqDati.punto.trim()){
+  if (acqDati.via==='punto' && !acqDati.punto.trim()){
     toast('Indica il punto di ritiro: al venditore serve per spedire');
     el('acqPunto')?.focus(); return;
   }
@@ -9977,9 +9982,11 @@ function openOrder(id){
       ${o.puntoRitiro ? `<div class="eur-hint" style="margin-top:-2px">📦 Punto di ritiro indicato dall'acquirente: <b>${esc(o.puntoRitiro)}</b></div>`
         : (o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
       ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
-      <!-- Il campo del punto DENTRO l'ordine (terzo giro): senza rete
-           dichiarata il punto si fissa qui, quando il corriere e'
-           noto — modificabile finche' il venditore non spedisce -->
+      <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
+           RETE DI SICUREZZA della scelta anticipata — il punto si
+           sceglie in pagina prima di «Paga», qui si CORREGGE finche'
+           il venditore non spedisce (e si scrive per gli ordini nati
+           senza: i client di ieri, che il server tollera) -->
       <div class="payout">
         <h4>📦 Il tuo punto di ritiro</h4>
         <div class="hint">${o.puntoRitiro
@@ -12234,8 +12241,9 @@ function apriMappaPunti(rete){
    la sua mappa (l'altra sarebbe una strada sbagliata: il venditore
    spedisce con quella rete); con 'Altro' NESSUN link e niente nota
    — la rete non e' nessuna delle due, e un link fuorviante e'
-   peggio di nessun link, dichiarato; senza rete dichiarata (il
-   campo dentro l'ordine) entrambi, pari. */
+   peggio di nessun link, dichiarato; senza rete dichiarata
+   entrambi, pari — in pagina d'acquisto (quarto giro) come nel
+   campo dentro l'ordine. */
 function linkMappePunti(spedizioniere){
   const reti = spedizioniere === 'InPost' ? ['inpost']
     : spedizioniere === 'Poste Italiane' ? ['poste']
@@ -12247,9 +12255,11 @@ function linkMappePunti(spedizioniere){
   return `<div class="hint" style="margin-top:6px">${link}<br>${NOTA_LOCKER}</div>`;
 }
 
-/* Il punto di ritiro dal campo dell'ordine (terzo giro): solo il
-   compratore, solo su 'locked' — il server e' il giudice, qui il
-   gesto. Il testo viaggia nudo nel JSON e torna sotto esc(). */
+/* Il punto di ritiro dal campo dell'ordine (dal quarto giro la rete
+   di sicurezza: si corregge un punto gia' scelto in pagina, o si
+   scrive quello degli ordini nati senza): solo il compratore, solo
+   su 'locked' — il server e' il giudice, qui il gesto. Il testo
+   viaggia nudo nel JSON e torna sotto esc(). */
 async function salvaPuntoRitiro(){
   haptic();
   const o = currentOrder; if (!o) return;
