@@ -664,7 +664,12 @@
      nell'app veste gia' i badge degli stati conclusi (refunded,
      annullato). Il badge non porta l'ombra dei fratelli: non deve
      staccare dalla foto come fa un'offerta. */
-  .card-ferie{position:absolute;top:8px;left:8px;z-index:2;
+  /* Lo SCAFFALE VUOTO (ago 2026) parla la stessa lingua, e per questo
+     si AGGIUNGE ai selettori delle ferie invece di ricopiarne i valori
+     misurati: «e' qui, non si compra» e' una cosa sola, detta per due
+     ragioni diverse. Chi ritocca il grigio li ritocca insieme, che e'
+     esattamente quel che deve succedere. */
+  .card-ferie, .card-esaurito{position:absolute;top:8px;left:8px;z-index:2;
     background:var(--off-bg);color:var(--muted);border-radius:999px;
     padding:3px 9px;font-size:11.5px;font-weight:800;
     display:flex;align-items:center;gap:5px}
@@ -683,14 +688,67 @@
      ferie piu' leggibili di un prezzo vero: il contrario di quel che
      deve dire. Chi un giorno alzera' il contrasto del cartellino
      alzi PRIMA quello arancio, e questo dietro di lui. */
-  .tag-price.ferie .price{color:#8A8271}
+  .tag-price.ferie .price, .tag-price.esaurito .price{color:#8A8271}
   /* Nel dettaglio invece il token e' quello GIUSTO: li' il prezzo sta
      sulla pagina, e l'inchiostro segue la carta come ovunque. */
-  .detail-price.ferie{color:var(--muted)}
+  .detail-price.ferie, .detail-price.esaurito{color:var(--muted)}
   /* Anche questa non nomina .unit, per la regola qui sopra. */
   /* La riga sotto il prezzo, nella forma discreta di .asta-riga */
-  .ferie-riga{font-size:13px;color:var(--muted);font-weight:700;
-    margin-top:4px;line-height:1.35}
+  .ferie-riga, .esaurito-riga{font-size:13px;color:var(--muted);
+    font-weight:700;margin-top:4px;line-height:1.35}
+  /* L'UNICA cosa che l'esaurito ha in piu' delle ferie: la FOTO si
+     spegne. Le ferie sono una porta chiusa a ora nota e la merce
+     resta li', bella da guardare; qui la merce non c'e'. E' lo stesso
+     gesto gia' in casa — le righe del Profilo e del barattolo
+     spengono la miniatura del «non piu' disponibile» con
+     grayscale(1)+opacity — quindi nessun valore nuovo, solo un posto
+     nuovo.
+     VA SUL WRAPPER .ph E NON SULL'IMG, ed e' la trappola pagata qui:
+     `html[data-tema="scuro"] .card .ph img{filter:brightness(.92)}`
+     ha specificita' piu' alta di `.card.esaurito .ph img` e di notte
+     si mangerebbe il grigio. Sul genitore i due filtri si COMPONGONO
+     invece di litigare, e l'emoji-segnaposto si spegne con la foto.
+     Badge, cartellino e barattolino sono FRATELLI di .ph dentro
+     .ph-wrap: non li tocca. */
+  .card.esaurito .ph{filter:grayscale(1);opacity:.62}
+  /* «ULTIMO PEZZO» (ago 2026) — l'unico badge NUOVO del cantiere, e
+     l'unico che dice «sbrigati». NON si prende un colore, e le tre
+     strade scartate valgono piu' della scelta:
+     · il GRIGIO spento (--off-bg/--muted) e' la lingua delle cose
+       FINITE — refunded, annullato, ferie: chi l'ha imparato cosi'
+       leggerebbe l'ultimo pezzo come gia' venduto, cioe' il contrario;
+     · un colore NUOVO sarebbe il quarto segno colorato in card e il
+       piu' FREQUENTE dei quattro (ogni bottega ha un ultimo pezzo,
+       poche hanno una lampo) — l'errore gia' pagato col chip
+       «Spedizione disponibile», dove quello che diceva meno era
+       quello che compariva di piu';
+     · il rosso della lampo significa «sconto a tempo», e i due
+       possono convivere: due sensi sullo stesso segno, indistinguibili
+       proprio quando contano tutti e due.
+     Quindi non un colore ma una SUPERFICIE che in casa c'e' gia': la
+     CARTA del cartellino e dei cerchietti sulla foto. Fissa nei due
+     temi, come tutto cio' che sta sulla foto. MISURATO: l'inchiostro
+     sulla carta al 92% rende 11,77 sopra una foto nera e 14,18 sopra
+     una bianca — e' il badge piu' leggibile dei cinque, ed e' giusto:
+     e' l'unico che chiede di essere letto ADESSO. Quieto nel colore,
+     forte nella luce — il rovescio esatto del cartellino in ferie.
+     L'ombra c'e', come lampo e asta e a differenza delle ferie:
+     questo deve staccare dalla foto, non nascondersi. */
+  .card-ultimo{position:absolute;top:8px;left:8px;z-index:2;
+    background:rgba(255,248,234,.92);color:#23282C;border-radius:999px;
+    padding:3px 9px;font-size:11.5px;font-weight:800;
+    display:flex;align-items:center;gap:5px;
+    box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  /* Il rifornimento sulla card: prende posto e materia dal
+     barattolino che li' non c'e' (vedi bottoneRifornisci) — pastiglia
+     e non cerchietto perche' porta una parola. */
+  .card-rifornisci{position:absolute;top:8px;right:8px;z-index:2;
+    border:0;cursor:pointer;border-radius:999px;padding:5px 10px;
+    background:rgba(255,248,234,.92);color:#23282C;
+    font:inherit;font-size:11.5px;font-weight:800;
+    display:flex;align-items:center;gap:4px;
+    box-shadow:0 1px 4px rgba(0,0,0,.18)}
+  .card-rifornisci:active{transform:scale(.94)}
   /* Il listino barrato sul cartellino: piccolo, sopra il prezzo vero */
   .tag-price .price-was{font-size:10.5px;color:#8A8271;line-height:1.1}
   .tag-price .price-was .unit{font-size:10.5px}
@@ -1415,9 +1473,14 @@
   .pacco-cella .btn.pacco-btn.dentro{padding:3px 8px 4px;cursor:default}
   .pacco-cella .btn.pacco-btn.dentro:active{transform:none;
     box-shadow:0 2px 0 var(--ink)}
-  .pacco-btn .qta-mini{margin-left:0;background:var(--chip-bg)}
-  .pacco-btn .qta-mini .qm-btn{color:var(--sats-text)}
-  .pacco-btn .qta-mini .qm-btn:active{background:var(--sats-soft)}
+  /* Lo stesso vestito serve il foglio del rifornimento: fuori
+     dall'arancio il traslucido bianco sparirebbe sulla carta. */
+  .pacco-btn .qta-mini,
+  #rifornisciSheet .qta-mini{margin-left:0;background:var(--chip-bg)}
+  .pacco-btn .qta-mini .qm-btn,
+  #rifornisciSheet .qta-mini .qm-btn{color:var(--sats-text)}
+  .pacco-btn .qta-mini .qm-btn:active,
+  #rifornisciSheet .qta-mini .qm-btn:active{background:var(--sats-soft)}
   /* spento col motivo scritto sotto: il perche' non sta mai nel bottone */
   .pacco-cella .btn.pacco-btn[disabled]{opacity:.45;box-shadow:none}
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
@@ -2832,6 +2895,13 @@
     <div class="section-label">In vetrina in questo negozio</div>
     <div class="grid" id="negozioGrid" style="margin-top:12px"></div>
     <div id="negozioSentinella" style="height:1px"></div>
+    <!-- ============ ESAURITI (ago 2026) ============
+         In fondo e DOPO la sentinella dello scroll infinito, che resta
+         all'offset di prima: l'osservatore scatta quando scattava, la
+         pagina e' solo piu' lunga. Un negozio e' una bottega, e uno
+         scaffale temporaneamente vuoto dice qualcosa della bottega —
+         ma sta in fondo, dopo la merce vera. -->
+    <div id="negozioEsauriti"></div>
   </div>
 
   <!-- ============ VISTA: ASTE, COMING SOON (ago 2026) ============
@@ -3672,6 +3742,37 @@
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET RIFORNIMENTO (solo il venditore) ============
+       Il gemello onesto del prompt() che stava in ricaricaAnnuncio —
+       l'ultimo dialogo del sistema operativo rimasto su una strada
+       battuta, e da oggi la battono in tre (Profilo, scheda, negozio).
+       Il guadagno vero non e' il vestito: e' che sull'errore il foglio
+       RESTA APERTO col numero ancora dentro. Il 400 tipico e' «N pezzi
+       sono in pagamento proprio ora: scegli un numero piu' alto»,
+       cioe' un numero da correggere — col prompt si perdeva tutto.
+       Scrittura ASSOLUTA, come l'endpoint: quanti pezzi hai ORA. -->
+  <div class="sheet" id="rifornisciSheet">
+    <div class="grab"></div>
+    <h3>🔄 Rifornisci l'annuncio</h3>
+    <!-- La testata (miniatura + titolo + stato di adesso): apriRifornisci() -->
+    <div id="rifTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <!-- IL CAMPO E' LA VERITA', lo stepper ci scrive dentro: e' lo
+         stesso patto dei chip del foglio lampo. Due controlli, un
+         numero solo — il dito fa 1→2→3, la tastiera fa 240. -->
+    <div class="qta-riga">
+      <span class="qta-lab">Quanti pezzi hai ora</span>
+      <span id="rifStepper"></span>
+    </div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="rifQtaInp" type="text" inputmode="numeric" autocomplete="off" placeholder="1" style="flex:1" oninput="rifDigitata()">
+      <span style="font-weight:800;color:var(--muted)">pezzi</span>
+    </div>
+    <div id="rifNota" style="font-size:12.5px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:4px;line-height:1.4">È il numero che hai <b>adesso</b>, non quanti ne aggiungi. Non tocca nient'altro: gli affari in corso restano dove sono.</div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaRifornimento(this)">🔄 Rifornisci</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
   <!-- ============ SHEET PICKER (categoria e condizioni del form Vendi) ============
        Al posto della tendina nativa del sistema: titolo, voci toccabili
        con la scelta evidenziata, Esc/tap fuori/Annulla per chiudere.
@@ -4063,11 +4164,16 @@ function mapListing(a){
     ancheDigitale:!!a.anche_digitale,
     /* la condizione dell'oggetto: '' = mai dichiarata (storici) */
     condizione:a.condizione||'',
-    /* lo stato viaggia solo dove serve (i preferiti): la vetrina
-       serve comunque solo gli attivi */
+    /* lo stato viaggia dove serve — i preferiti, il singolo e lo
+       scaffale degli esauriti in fondo al negozio: la vetrina serve
+       comunque solo gli attivi */
     stato:a.stato||'attivo',
     /* i pezzi disponibili (cantiere stock): 1 per gli annunci di ieri */
     quantita:a.quantita||1,
+    /* «ne resta uno e ne ha avuti piu' d'uno»: il flag arriva GIA'
+       deciso dal server (ultimo_pezzo), qui non si rifa' il conto —
+       il numero da cui nasce non esce apposta */
+    ultimo:!!a.ultimo,
     /* le date della riga «pubblicato/aggiornato N giorni fa» del
        dettaglio: modificato = 0 se mai toccato (per gli importati
        porta la data dell'EVENTO Nostr, che e' la pubblicazione vera) */
@@ -5575,34 +5681,69 @@ const cardHTML = l => {
      libero per costruzione: una lampo viva e un'asta viva bloccano
      la partenza per le ferie, quindi non convivono mai. Il giudizio
      qui e' la solita cintura, come asta-vs-lampo. */
-  const ferie = inFerie(l);
+  /* L'ESAURITO (ago 2026) vince su tutti, ed e' l'unica precedenza che
+     non e' una cintura ma una regola: le colonne della lampo restano
+     vive anche a scorte finite, e uno sconto su una cosa che non c'e'
+     e' una promessa che non si puo' mantenere. In vetrina non capita
+     mai — l'esaurito arriva solo dallo scaffale del negozio e dal
+     link condiviso — ma la card e' la stessa, e la regola vale li'. */
+  const esa = esaurito(l);
+  const ferie = !esa && inFerie(l);
   const asta = astaE(l);
-  const lampo = !asta && !ferie && lampoAttiva(l);
+  const lampo = !esa && !asta && !ferie && lampoAttiva(l);
+  /* Ultimo posto in fila, ed e' la sua misura giusta: uno stato che
+     dice «sbrigati» non deve mai coprirne uno che dice «non si puo'
+     comprare». Puo' convivere con la lampo (ultimo pezzo scontato) e
+     li' vince la lampo — lo sconto e' il motivo piu' forte per
+     toccare, e la scarsita' si dice comunque nella scheda. */
+  const ultimo = !esa && !ferie && !asta && !lampo && ultimoPezzo(l);
   const p = prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)})
                              : conLampo(l));
   /* Il badge dice lo STATO, la data la dice la scheda: insieme in una
      pillola sola facevano 117px contro i 108 che la card concede a
      360px, e il barattolino — che sta a destra e non si stringe mai —
      ci finiva sotto (misurato: -9px a 360, -29 a 320). */
-  const flash = ferie
+  /* «Esaurito» non porta emoji, e nemmeno la riga della scheda: 🌴 ⚡
+     🔨 sono cose che ACCADONO, un'assenza no. Il 📦 e' gia' del pacco
+     della taglia e il 🔄 e' il gesto del VENDITORE — metterlo qui
+     prometterebbe a chi compra un ritorno che nessuno gli ha
+     promesso. */
+  const flash = esa
+    ? `<div class="card-esaurito">Esaurito</div>`
+    : ferie
     ? `<div class="card-ferie">🌴 In ferie</div>`
     : asta
     ? `<div class="card-asta">🔨 ${astaViva(l) ? astaResta(l.astaFine)
                                                : 'conclusa'}</div>`
-    : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>` : '';
+    : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>`
+    /* «Ne resta 1» e non «Ultimo pezzo», e la ragione e' MISURATA:
+       a 320px «Ultimo pezzo» fa 89px e tocca il barattolino (−1px di
+       aria), «Ultimo rimasto» lo scavalca di 12. Questo ne fa 74 e
+       lascia 14px. «Ultimo» secco ci starebbe largo ma da solo, sopra
+       un prezzo, si legge «ultimo A QUESTO PREZZO»: dice un'altra
+       cosa. E' anche la stessa voce del catalogo della ricerca AI
+       («ne restano N»). Nella scheda invece la pillola dice «Ultimo
+       disponibile», che li' e' il singolare di «N disponibili» nella
+       stessa fila: a cedere e' il luogo, mai il significato. */
+    : ultimo ? `<div class="card-ultimo">Ne resta 1</div>` : '';
   /* Il barattolino: UNA fabbrica sola per la griglia e per la scheda
      (bottoneJar, ago 2026) — «stessa icona delle card, non una
      copia». stopPropagation: il tocco sul barattolino non apre il
      dettaglio. */
   const jar = bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
+  /* Sui PROPRI esauriti il barattolino tace per costruzione (bottoneJar
+     esce sui propri annunci), quindi quel posto e' libero: e' il
+     motivo per cui questo bottone puo' esistere senza dare alla card
+     un terzo bersaglio. */
+  const rif = bottoneRifornisci(l);
   return `
-    <div class="card${ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
-        <div class="tag-price${ferie?' ferie':asta?' asta':''}">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
-        ${flash}${jar}
+        <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        ${flash}${jar}${rif}
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
@@ -5722,7 +5863,7 @@ async function apriNegozio(chi){
     /* Gli annunci del negozio entrano anche nel catalogo in memoria:
        cosi' openDetail li trova pure arrivando dal link diretto */
     inCatalogo(annunci);
-    renderNegozio(d.venditore, annunci, d.feedback||[]);
+    renderNegozio(d.venditore, annunci, d.feedback||[], d.esauriti||[]);
   } catch(e) { toast('Negozio non trovato'); }
 }
 
@@ -5780,7 +5921,7 @@ function apriDistintiviSheet(){
   el('distintiviSheet').classList.add('open');
 }
 
-function renderNegozio(v, annunci, feedback=[]){
+function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   negozioCorrente = v;
   /* Il badge pubblico esiste SOLO con la npub verificata (e quindi
      senza ✓: il non-verificato qui non compare proprio) */
@@ -5878,6 +6019,24 @@ function renderNegozio(v, annunci, feedback=[]){
          <div class="big">🫙</div>
          <b class="empty-title">Il barattolo qui è vuoto</b>
          Niente in vetrina al momento</div>`;
+  /* Lo SCAFFALE VUOTO (ago 2026): gli esauriti NON fanno numero e NON
+     si paginano — il conteggio della vetrina viva li ignora, la
+     sentinella non li conosce, e in vetrina/ricerca/filtri non ci
+     arrivano perche' il server non ce li manda. Il tetto e' suo, sul
+     server: il client non hardcoda mai un tetto. */
+  const boxEs = el('negozioEsauriti');
+  if (boxEs) {
+    /* CINTURA: la chiave dice gia' che cosa sono. Se un server di
+       domani scordasse `stato` su queste righe, esaurito() non le
+       riconoscerebbe e si disegnerebbero COMPRABILI — prezzo arancio
+       e scheda col recinto escrow. Una riga, nessun ramo. */
+    const fin = (esauriti||[]).map(mapListing)
+      .map(l => (l.stato = 'venduto', l));
+    inCatalogo(fin);          // openDetail le trova gia', come le vive
+    boxEs.innerHTML = !fin.length ? '' : `
+      <div class="section-label" style="margin-top:16px">Esauriti di recente</div>
+      <div class="grid" style="margin-top:12px">${fin.map(cardHTML).join('')}</div>`;
+  }
   go('negozio');
 }
 
@@ -6112,6 +6271,48 @@ function ferieData(ts){
   const d = new Date(ts*1000);
   return `${d.getDate()} ${MESI_IT[d.getMonth()]}`;
 }
+/* ---------------- lo scaffale vuoto (ago 2026) ----------------
+   L'ESAURITO parla la lingua delle ferie, ed e' la stessa cosa detta
+   per un'altra ragione: e' qui, si guarda, non si compra. Non e' uno
+   stato nuovo — riusa 'venduto', che e' l'invariante di sempre
+   (venduto <=> zero pezzi) — e arriva solo dalle tre rotte che lo
+   servono: il singolo (link condiviso), lo scaffale in fondo al
+   negozio e il barattolo. In vetrina non ci finisce mai.
+   L'ASTA NON E' MAI ESAURITA, ed e' la parte da tenere: un'asta non
+   ha stock, ha un aggiudicatario — «🔨 conclusa» dice gia' tutto quel
+   che direbbe «Esaurito», e in piu' dice di che cosa si tratta. Non
+   e' un'eccezione di comodo: e' la STESSA riga che il server ha gia'
+   scritto in ricarica_quantita, dove l'asta e' l'unico caso rifiutato
+   per NATURA e non per stato. Chi toglie questo `&& !astaE(l)` deve
+   togliere anche quel 400, o il bottone «Rifornisci» comparirebbe
+   proprio dove non puo' funzionare. */
+function esaurito(l){
+  return ((l && l.stato) || 'attivo') === 'venduto' && !astaE(l);
+}
+/* «Ne resta uno» e' una notizia solo dove ce n'erano di piu', e a
+   deciderlo e' il SERVER (`ultimo_pezzo`). Il client NON lo deriva da
+   quantita===1: un annuncio nato a pezzo unico non e' una scarsita',
+   e' un oggetto — e urlargli dietro sarebbe la prima urgenza
+   inventata di questa app. Chiave assente = niente, il patto di
+   sempre col server di ieri. Il resto e' una CINTURA: se una riga
+   ferma a ieri portasse il flag e un numero che non lo conferma,
+   vince il numero. */
+const ultimoPezzo = l => !!(l && l.ultimo) && (l.quantita || 1) === 1
+  && ((l.stato || 'attivo') === 'attivo');
+/* Il recinto del PROPRIETARIO su un annuncio esaurito: al posto di
+   Modifica ed Elimina — che il server rifiuta tutti e due sui
+   'venduto', vogliono lo stato attivo — c'e' l'unica cosa che li' si
+   puo' fare davvero. Il bottone e' ARANCIO e non ghost: su questa
+   pagina il posto della CTA e' vuoto (niente recinto, niente
+   Acquista) ed e' l'azione per cui la pagina esiste.
+   Sugli IMPORTATI non c'e' bottone ma una riga che dice perche': la
+   quantita' di un annuncio Nostr vive sui relay, e ricarica_quantita
+   risponde 400 proprio li'. */
+const bloccoMioEsaurito = l => `
+  <div class="trust-note">🔄 <span><b>Questo annuncio è esaurito.</b> Resta tuo e non è sparito da nessuna parte: torna in vetrina appena gli rimetti dei pezzi.</span></div>
+  ${l.nostr
+    ? `<div class="trust-note">🟣 <span>Arriva da Nostr: la quantità vive sui relay, non qui.</span></div>`
+    : `<button class="btn orange" style="margin-top:0" onclick="apriRifornisci(${l.id})">🔄 Rifornisci</button>`}`;
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
    contatore «Scade tra 2h 14m» vive SOLO nella scheda (in griglia il
    badge dice la sola percentuale), quindi qui si aggiorna in-place
@@ -8106,7 +8307,13 @@ function openDetail(id){
      descrizione, condizione, strade di consegna — ma il prezzo e'
      grigio e al posto del recinto c'e' la riga che dice quando si
      torna. Non e' un annuncio spento: e' un negozio chiuso. */
-  const ferie = !mio && inFerie(l);
+  /* L'ESAURITO (ago 2026) NON si spegne solo per gli altri, a
+     differenza delle ferie — che hanno il loro cassetto nel Profilo:
+     il prezzo grigio va detto anche al proprietario, e' il SUO
+     annuncio a essere finito. A cambiare col `mio` e' solo cosa c'e'
+     al posto del recinto, piu' in basso. */
+  const esa = esaurito(l);
+  const ferie = !mio && !esa && inFerie(l);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
   qtaScelta = 1;                   // e i pezzi ripartono da uno
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
@@ -8172,11 +8379,16 @@ function openDetail(id){
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">
-          <div class="detail-price${ferie?' ferie':asta?' asta':lampoAttiva(l)?' lampo':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
+          <div class="detail-price${esa?' esaurito':ferie?' ferie':asta?' asta':lampoAttiva(l)?' lampo':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
           <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
+          ${esa?`<div class="esaurito-riga"><b>Esaurito</b> — al momento non c'è nessun pezzo disponibile</div>`:''}
           ${ferie?`<div class="ferie-riga">🌴 <b>Il negozio è in ferie</b> — torna il ${ferieData(l.ferie)}</div>`:''}
           ${!ferie && asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
-          ${!ferie && !asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
+          <!-- il countdown della lampo TACE su un esaurito: le colonne
+               lampo_* restano vive anche a scorte finite, e «Scade tra
+               2h» su una cosa che non si compra e' l'unica riga di
+               questa pagina che direbbe il falso -->
+          ${!esa && !ferie && !asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
              valuta LEGGERE questo annuncio, e la scelta e' la stessa -->
@@ -8187,7 +8399,14 @@ function openDetail(id){
       </div>
       ${(p => p ? `<div class="pills">${p}</div>` : '')(
         spedBadge(l) + pilloleModalita(l)
-        + ((l.quantita||1)>1?`<span class="pill">${fmt(l.quantita)} disponibili</span>`:''))}
+        + ((l.quantita||1)>1?`<span class="pill">${fmt(l.quantita)} disponibili</span>`
+           /* A UNO oggi non c'e' niente, e continua a non esserci: il
+              «1» di un annuncio nato a pezzo unico non e' una notizia.
+              A parlare e' solo il flag del server, e lo fa col
+              GRASSETTO invece che col colore — la regola dello
+              sfollamento, la stessa di «spedizione gratuita». Zero CSS
+              nuovo, e la fila resta una fila di fatti. */
+           : ultimoPezzo(l)?`<span class="pill"><b>Ultimo</b> disponibile</span>`:''))}
       ${rigaSpedGratis(l)}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${esc(l.desc)}</div>
@@ -8208,6 +8427,7 @@ function openDetail(id){
       </div>
       ${mio
         ? asta ? mioAstaBlocco
+        : esa ? bloccoMioEsaurito(l)
         : `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
            ${inFerie(l) ? `<div class="trust-note">🌴 <span><b>Il tuo negozio è in ferie fino al ${ferieData(l.ferie)}:</b> questo annuncio si vede ma non si compra. Rientri quando vuoi dal Profilo.</span></div>` : ''}
            ${!(lampoLeve && lampoLeve.attive) || inFerie(l) ? '' : (lampoAttiva(l)
@@ -8215,10 +8435,20 @@ function openDetail(id){
              : `<button class="btn ghost" style="margin-top:0" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
+        : esa
+            ? `<div class="trust-note"><span><b>Per ora è esaurito.</b> L'annuncio resta qui e non va da nessuna parte: se il venditore rimette dei pezzi torna comprabile da solo. Intanto puoi metterlo nel barattolo 🫙 per ritrovarlo al volo.</span></div>`
         : ferie
             ? `<div class="trust-note">🌴 <span><b>Il negozio è in ferie fino al ${ferieData(l.ferie)}.</b> L'annuncio resta qui e non va da nessuna parte: al rientro del venditore torna comprabile da solo. Intanto puoi metterlo nel barattolo 🫙 per ritrovarlo al volo.</span></div>`
         : asta ? (astaViva(l) ? zonaAsta
             : `<div class="trust-note">🔨 <span><b>Quest'asta si è chiusa.</b> ${l.astaTop>0?'È in aggiudicazione al miglior offerente.':'Il venditore deciderà se rilanciarla o metterla a prezzo fisso.'}</span></div>`)
+        /* CINTURA (ago 2026): qualunque altro stato non attivo non
+           deve MAI arrivare al recinto escrow col suo «Acquista».
+           Oggi non ci si arriva — il server serve solo attivi e
+           venduti — ma se un domani servisse un 'rimosso' al link
+           condiviso, senza questa riga la scheda gli disegnerebbe il
+           bottone. Due righe contro un buco silenzioso. */
+        : (l.stato||'attivo') !== 'attivo'
+            ? `<div class="trust-note">🔒 <span>Questo annuncio non è più disponibile.</span></div>`
         : `<div class="escrow-zone">
              <span class="escrow-flag">🔒 pagamento protetto</span>
              <!-- Una riga sola (lug 2026): il paragrafo intero e' andato
@@ -9196,6 +9426,7 @@ function closeSheet(){
   el('offertaSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
+  el('rifornisciSheet').classList.remove('open');
   el('paccoSvuotaSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
@@ -12786,16 +13017,27 @@ async function caricaAltriMiei(){
    spento (pattern dei preferiti «non più disponibile»): badge ⏳, il
    dettaglio non si apre, niente Modifica (riparte dopo la decisione),
    resta 🗑 per ritirarlo. */
+/* SPENTO NON VUOL DIRE CHIUSO (ago 2026). La foto grigia dice «non si
+   compra» e vale per tutti e due; la PORTA invece la chiude solo la
+   revisione — li' non c'e' niente da vedere e niente da fare finche'
+   un moderatore non decide. L'esaurito si APRE: il dettaglio e' dove
+   vive «🔄 Rifornisci», e senza questo click quel bottone non lo
+   raggiungerebbe nessuno. Il ramo revisione resta parola per parola
+   quello di ieri. */
 const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
-  esa = l.stato==='venduto', spento = rev || esa; return `
+  esa = l.stato==='venduto', spento = rev || esa, apre = !rev; return `
     <div class="order">
       <div class="row">
-        <b ${spento?'style="':'onclick="openDetail('+l.id+')" style="cursor:pointer;'}display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
+        <b ${apre?'onclick="openDetail('+l.id+')" style="cursor:pointer;':'style="'}display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento?';filter:grayscale(1);opacity:.6':''}">`
           : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis${spento?';color:var(--muted)':''}">${esc(l.title)}</span></b>
         <span style="white-space:nowrap">
           ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
-            :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge" onclick="ricaricaAnnuncio(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">↻ Rimetti in vendita</span>`
+            /* Qui la parola resta «Venduto» ed e' voluto: questo e' il
+               libro mastro del venditore, e la vendita e' successa
+               davvero. «Esaurito» e' la parola PUBBLICA, per chi
+               guarda da fuori uno scaffale vuoto. */
+            :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge" onclick="apriRifornisci(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">🔄 Rifornisci</span>`
             :`<span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
           ${esa?'':`<span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
         </span>
@@ -12803,30 +13045,97 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
       <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}</div>
     </div>`; };
 
-/* La ricarica dello stock: un numero e via. Tocca SOLO la quantita'
-   (il server non aspetta gli affari in corso) e un esaurito torna in
-   vetrina da solo. Scrittura assoluta: quanti pezzi hai ORA. */
-async function ricaricaAnnuncio(id){
+/* ---------------- il rifornimento (ago 2026) ----------------
+   UN GESTO SOLO PER TRE POSTI: la riga del Profilo, il bottone della
+   scheda, la pastiglia sulla card del proprio negozio. L'annuncio si
+   cerca in TUTTI i cataloghi — dal negozio arriva in `listings`, dal
+   Profilo in `myListings` — perche' il chiamante non deve sapere da
+   dove viene. Tocca SOLO la quantita' (il server non aspetta gli
+   affari in corso) e un esaurito torna in vetrina da solo.
+   Scrittura ASSOLUTA: quanti pezzi hai ORA. */
+let rifId = 0;
+const rifQta = () => Math.max(1,
+  parseInt(String(el('rifQtaInp').value).replace(/\D/g, ''), 10) || 1);
+
+function apriRifornisci(id){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
-  const l = myListings.find(x=>x.id===id);
-  const n = prompt('Quanti pezzi hai ora in vendita?',
-                   l && l.quantita > 1 ? l.quantita : '1');
-  if (n === null) return;
-  const q = parseInt(String(n).trim(), 10);
-  if (!q || q < 1) { toast('Serve un numero di pezzi (almeno 1)'); return; }
+  const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
+  if (!l) { toast('Annuncio non trovato'); return; }
+  rifId = id;
+  el('rifTestata').innerHTML = `
+    ${l.thumbs && l.thumbs[0]
+      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
+      : `<span style="font-size:28px">${l.emoji}</span>`}
+    <div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
+    <span style="font-size:12.5px;color:var(--muted);font-weight:700">${esaurito(l)
+      ? 'ora è esaurito'
+      : `ora in vetrina con ${fmt(l.quantita||1)} pezz${(l.quantita||1)===1?'o':'i'}`}</span></div>`;
+  el('rifQtaInp').value = String(Math.max(1, l.quantita || 1));
+  rifDigitata();
+  el('sheetBg').classList.add('open');
+  el('rifornisciSheet').classList.add('open');
+}
+function rifPasso(d){
+  haptic();
+  el('rifQtaInp').value = String(Math.max(1, rifQta() + d));
+  rifDigitata();
+}
+function rifDigitata(){
+  const n = rifQta();
+  /* Lo stepper e' il chip di casa con le SUE chiamate: setQta e' del
+     COMPRATORE e qui non c'entra — e i due non si vedono nemmeno,
+     perche' l'aggiornamento in-place di setQta guarda solo
+     #detailContent e #barraCompra. */
+  el('rifStepper').innerHTML =
+    stepperMini(n, 'rifPasso(-1)', 'rifPasso(1)', n <= 1, false);
+  const nota = el('rifNota');
+  nota.style.color = 'var(--ink-soft)';
+  nota.innerHTML = `Torna in vetrina con <b>${fmt(n)} pezz${n===1?'o':'i'}</b>`;
+}
+async function inviaRifornimento(btn){
+  haptic();
+  const id = rifId, q = rifQta();
+  const ripristina = bottoneInAttesa(btn, '🔄 Rifornisco…');
   try {
     const r = await fetch(`${API_BASE}/listings/${id}/quantita`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({quantita: q})});
     const d = await r.json().catch(()=>({}));
-    if (!r.ok) { toast(d.detail||'Ricarica non riuscita', 5000); return; }
+    if (!r.ok) {
+      /* IL FOGLIO RESTA APERTO, ed e' il guadagno vero sul prompt():
+         il motivo si rende DENTRO e il numero e' ancora li' da
+         correggere — la ricetta del 400 delle ferie nel suo cassetto. */
+      el('rifNota').style.color = 'var(--danger)';
+      el('rifNota').textContent = d.detail || 'Rifornimento non riuscito';
+      return;
+    }
+    closeSheet();
     toast(d.riattivato ? '⚡ Annuncio di nuovo in vetrina!'
                        : '✔ Quantità aggiornata');
-    await loadListings();
-    await loadMyListings(); renderMyListings();
-  } catch(e) { toast('Ricarica non riuscita: riprova'); }
+    await dopoRifornimento(id);
+  } catch(e) {
+    el('rifNota').style.color = 'var(--danger)';
+    el('rifNota').textContent = 'Rete assente: riprova';
+  } finally { ripristina(); }
+}
+/* Si ridisegna SOLO cio' che e' davvero in pagina, e nell'ordine che
+   conta: prima i cataloghi, poi le viste — openDetail cerca in
+   listings/myListings e deve trovarci l'annuncio NUOVO, non quello di
+   un secondo fa. Il ramo esaurito e' cotto dentro l'HTML della scheda
+   (prezzo grigio, riga, nota al posto del recinto) e nessuna classe lo
+   toglie: quindi il dettaglio si RIAPRE, come fa la lampo lanciata. */
+async function dopoRifornimento(id){
+  await loadListings();
+  await loadMyListings();
+  renderMyListings();
+  renderGrid();
+  const attiva = v => el('view-'+v) && el('view-'+v).classList.contains('active');
+  if (attiva('dettaglio') && currentListing && currentListing.id === id) {
+    openDetail(id); return;
+  }
+  if (attiva('negozio') && negozioPag.chi) apriNegozio(negozioPag.chi);
 }
 
 function renderMyListings(){
@@ -12901,6 +13210,24 @@ function bottoneJar(l, classe, misura, prima){
     + jarSVG(sal?4:0, misura)
     + (n ? `<span class="jar-conta">${fmt(n)}</span>` : '')
     + `</button>`;
+}
+/* IL RIFORNIMENTO SULLA CARD (ago 2026), gemello di bottoneJar e con
+   le sue stesse guardie ROVESCIATE: il barattolino tace sui PROPRI
+   annunci, quindi in alto a destra, sui miei esauriti, quel posto e'
+   vuoto per costruzione — la card non guadagna un terzo bersaglio, ne
+   ha sempre due e il secondo cambia secondo chi guarda.
+   Le altre due guardie sono le stesse righe del server
+   (ricarica_quantita): mai un'asta (e' a pezzo unico), mai un
+   importato (la quantita' vive sui relay). Un bottone che porta a un
+   400 e' peggio di un bottone che non c'e'. Nessun flag di render:
+   e' un GIUDICE, e vale ovunque questa card capiti di essere
+   disegnata. */
+function bottoneRifornisci(l){
+  if (DEMO || VETRINA || !myTgId || l.sellerId !== myTgId) return '';
+  if (!esaurito(l) || astaE(l) || l.nostr) return '';
+  return `<button class="card-rifornisci" onclick="event.stopPropagation();`
+    + `apriRifornisci(${l.id})" title="Hai altri pezzi? L'annuncio torna `
+    + `in vetrina" aria-label="Rifornisci">🔄 Rifornisci</button>`;
 }
 /* Da quanti in su si mostra il numero: DA DUE (ago 2026, dichiarato).
    Un «1» accanto all'icona non e' una prova sociale — e' un numero che

@@ -1194,6 +1194,25 @@ def titoli_disponibili(con, tg_id: int) -> list[str]:
     return [t["id"] for t in TITOLI if fatto[t["serve"][0]](t["serve"][1])]
 
 
+def riallinea_quantita_max(con):
+    """«Ne ha avuti almeno tanti quanti ne ha ADESSO»: un limite
+    INFERIORE vero, non un passato fabbricato. Gemella della
+    riparazione dell'invariante venduto <=> quantita=0, e serve in due
+    posti:
+    · all'AVVIO, dove e' anche il BACKFILL onesto dello storico — di un
+      annuncio di ieri non sappiamo quanti pezzi abbia avuto, sappiamo
+      quanti ne ha, e dire solo quello e' il modo di non mentire;
+    · dopo l'IMPORT NOSTR di ogni ora, perche' importa_nostr.py
+      riscrive `quantita` dal tag `stock` scrivendo DRITTO nel database:
+      quel file deve poter girare anche da solo, su un Barattolo piu'
+      vecchio, e per questo non conosce — e non deve conoscere — questa
+      colonna.
+    Idempotente e non-decrescente per costruzione: la WHERE tocca solo
+    le righe salite sopra il massimo, e nessun giro puo' abbassarlo."""
+    con.execute("UPDATE annunci SET quantita_max=quantita "
+                "WHERE quantita>quantita_max")
+
+
 def init_db():
     con = db()
     con.executescript("""
@@ -2008,6 +2027,17 @@ def init_db():
                     # verifica_pagamento, risale col rimborso e con la
                     # ricarica del venditore.
                     "quantita INTEGER DEFAULT 1",
+                    # quantita_max (ago 2026, cantiere «lo stock
+                    # raccontato bene»): il MASSIMO numero di pezzi che
+                    # questo annuncio abbia mai dichiarato — non
+                    # «l'iniziale», che coi rifornimenti mentirebbe al
+                    # secondo giro. Serve a UNA domanda sola: la
+                    # scarsita' e' una notizia? Su un mercatino
+                    # dell'usato quasi tutto e' unico, quindi un badge
+                    # «ultimo disponibile» su ogni annuncio sarebbe vero
+                    # e insignificante — e smetterebbe di essere letto.
+                    # 0 = non lo sappiamo, e allora non si dice niente.
+                    "quantita_max INTEGER DEFAULT 0",
                     # modificato (lug 2026): quando il contenuto e'
                     # cambiato l'ultima volta (0 = mai). Per i nativi lo
                     # scrivono modifica() e la modifica firmata; per gli
@@ -2381,6 +2411,16 @@ def init_db():
     # la colonna.
     con.execute("UPDATE annunci SET quantita=0 "
                 "WHERE stato='venduto' AND quantita!=0")
+    # La memoria dei pezzi (ago 2026), che e' anche il backfill onesto
+    # dello storico: un annuncio a un pezzo solo resta a 1 e il badge
+    # «ultimo» non lo riguardera' mai; uno a cinque lo avra' quando
+    # scendera' a uno, ed e' la verita'. Un esaurito (quantita=0) resta
+    # a 0 finche' non lo rifornisci: il badge non parla di lui.
+    # CONSEGUENZA DA SAPERE: il giorno del deploy il badge e' spento
+    # OVUNQUE — chi aveva 10 pezzi e oggi ne ha 1 viene riallineato a 1,
+    # e nessun badge si accende finche' non ricarica. Non e' un guasto:
+    # e' il prezzo di non inventare un passato.
+    riallinea_quantita_max(con)
     # La prenotazione dello stock (lug 2026) conta gli ordini 'creato'
     # per annuncio a ogni acquisto: e' la prima query calda su ordini
     # (finora la tabella viveva senza indici).
@@ -6399,6 +6439,11 @@ CAMPI_VETRINA = (
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
     # quindi sempre >= 1)
     "a.quantita, "
+    # il massimo mai dichiarato NON esce da qui: lo legge
+    # arricchisci_righe_vetrina per decidere il flag `ultimo`, e poi lo
+    # butta via — grezzo racconterebbe «ne ha venduti N», che e' un dato
+    # nuovo che nessuno ha chiesto
+    "a.quantita_max, "
     "a.foto, a.contatto_nostr, a.creato, a.modificato, "
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
@@ -6480,6 +6525,21 @@ def arricchisci_righe_vetrina(righe):
             r["venditore_titolo"] = NOMI_TITOLI.get(
                 r["venditore_titolo"] or "", "")
         r["zona_comune"] = comune_da_zona(r.get("zona") or "")
+        # 3-bis) `ultimo` (ago 2026): «ne resta UNO e ne ha avuti piu'
+        # d'uno». UN campo derivato invece del numero grezzo, per la
+        # ragione di zona_comune: il nome porta gia' dentro la risposta
+        # alla domanda, e chi legge non deve fare il confronto.
+        # La soglia e' tutta qui e non c'e' niente da tarare: su un
+        # mercatino dell'usato quasi tutto e' unico, quindi «ultimo» su
+        # un pezzo unico sarebbe vero e insignificante. Dove il dato non
+        # c'e' (storici mai ricaricati, importati freschi) esce 0, cioe'
+        # non si dice niente: mai un'urgenza fabbricata.
+        # Il pop e' la meta' che conta — il massimo non deve uscire da
+        # NESSUNA rotta, nemmeno da quelle che servono l'annuncio intero
+        # con `a.*` (ricerca AI, i tuoi annunci), che passano di qui.
+        if "quantita_max" in r:
+            r["ultimo"] = ultimo_pezzo(r.get("quantita") or 0,
+                                       r.pop("quantita_max") or 0)
         # 4) Lo sconto carrello del venditore passa dal suo giudice:
         # cosi' la leva spenta lo spegne in TUTTE le vetrine insieme, e
         # il client non deve ricordarsi i casi (mostra, non decide).
@@ -6551,6 +6611,11 @@ def arricchisci_righe_vetrina(righe):
 # idx_annunci_* lo serve dritto senza contare righe da saltare.
 LIMITE_PAGINA_MAX = 100   # nessun client onesto chiede di piu'
 TETTO_LEGACY = 500        # rete di sicurezza per chi chiama senza limit
+# Lo scaffale vuoto in fondo al negozio (ago 2026): pochi e recenti,
+# perche' non e' merce ma il racconto di cosa quel negozio vende.
+# Niente paginazione apposta: se non ci stanno in dodici, il messaggio
+# e' gia' passato.
+TETTO_ESAURITI = 12
 
 
 # Gli ordinamenti della vetrina: chiave del keyset + verso. Il
@@ -6923,15 +6988,18 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "spedizione_punto_sats,spedizione_punto_eur,"
         "spedizione_punto_dichiarata,"
         "spedizione_extra_sats,spedizione_extra_eur,taglia_pacco,"
-        "anche_digitale,condizione,quantita,stato,creato,"
+        "anche_digitale,condizione,quantita,quantita_max,stato,creato,"
         "asta_base_sats,asta_scadenza,asta_creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
          punto_sats, punto_eur, punto_dich,
          extra_sats, extra_eur, taglia, anche_dig,
-         condizione, quantita, "revisione" if in_revisione else "attivo",
+         # il massimo nasce uguale alla quantita': da qui in poi puo'
+         # solo salire, e non scende mai coi pezzi venduti
+         condizione, quantita, quantita,
+         "revisione" if in_revisione else "attivo",
          adesso,
          # la base d'asta E' il prezzo del listino (un campo solo da
          # tenere vero); il cronometro parte adesso — e se l'annuncio
@@ -7096,12 +7164,20 @@ def miei_annunci(limit: int = 0, cursore: str = "",
 @app.get("/api/listings/{annuncio_id}")
 def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
                 barattolo_sessione: str = Cookie("")):
+    """Il singolo annuncio, per il link condiviso e per chi arriva dal
+    barattolo. Serve anche gli ESAURITI (ago 2026): finche' rispondeva
+    404 un link mandato a un amico moriva insieme alle scorte, e uno
+    scaffale vuoto non e' un annuncio che non c'e'. Esce con `a.stato`,
+    che e' quel che permette al client di renderlo spento — e la barra
+    d'acquisto non nasce gia' oggi su uno stato diverso da 'attivo'.
+    Il 'rimosso' e il 'revisione' restano 404: quelli non sono scaffali
+    vuoti, sono annunci che non esistono (piu')."""
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
     con = db()
-    r = con.execute(f"SELECT {campi} FROM annunci a "
+    r = con.execute(f"SELECT {campi}, a.stato FROM annunci a "
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
-                    "WHERE a.id=? AND a.stato='attivo'",
+                    "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
                     (annuncio_id,)).fetchone()
     con.close()
     if not r:
@@ -7264,7 +7340,24 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
             "JOIN utenti u ON u.tg_id=a.venditore_id "
             f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
             (v["tg_id"], TETTO_LEGACY))]
+    # Lo SCAFFALE VUOTO (ago 2026): gli esauriti restano nel negozio, in
+    # fondo e spenti. Un negozio e' una bottega, e uno scaffale
+    # temporaneamente vuoto dice qualcosa della bottega — mentre in
+    # vetrina sarebbe solo roba che non si puo' comprare. Per questo
+    # `totale` e il cursore NON si toccano: il numero del negozio
+    # continua a dire quanto si puo' comprare davvero.
+    # Chiave in piu' nel dict di sempre: un client vecchio in cache la
+    # ignora e vede il negozio di ieri.
+    # L'ordine e' `creato DESC` come ovunque: «venduto il» non esiste in
+    # colonna, e non si inventa una colonna per uno scaffale.
+    esauriti = [dict(r) for r in con.execute(
+        f"SELECT {campi}, a.stato FROM annunci a "
+        "JOIN utenti u ON u.tg_id=a.venditore_id "
+        "WHERE a.venditore_id=? AND a.stato='venduto' "
+        "ORDER BY a.creato DESC, a.id DESC LIMIT ?",
+        (v["tg_id"], TETTO_ESAURITI))]
     annunci = arricchisci_righe_vetrina(righe)
+    esauriti = arricchisci_righe_vetrina(esauriti)
     # Gli ultimi feedback ricevuti: stelle, commento, data, ruolo — e
     # dall'ago 2026 anche CHI li ha scritti, nome e faccia (decisione
     # di Andrea, che ROVESCIA l'anonimato di ieri). Il perche' e' lo
@@ -7329,7 +7422,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     del venditore["xp"], venditore["acquisti_ok"]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     risposta = {"venditore": venditore, "annunci": annunci,
-                "feedback": feedback}
+                "esauriti": esauriti, "feedback": feedback}
     if limit:
         risposta["cursore"] = prossimo
         if totale is not None:
@@ -7430,8 +7523,12 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
                             f"in pagamento proprio ora: riprova tra qualche "
                             f"minuto o scegli un numero più alto")
     riattivato = a["stato"] == "venduto"
-    con.execute("UPDATE annunci SET quantita=?, stato='attivo' WHERE id=?",
-                (quantita, annuncio_id))
+    # Il massimo sale col MAX e non si assegna mai secco: chi rifornisce
+    # UN pezzo dopo averne avuti dieci non deve perdere quella memoria,
+    # o il badge «ultimo» direbbe di no proprio quando dice il vero.
+    con.execute("UPDATE annunci SET quantita=?, "
+                "quantita_max=MAX(quantita_max,?), stato='attivo' "
+                "WHERE id=?", (quantita, quantita, annuncio_id))
     con.commit()
     con.close()
     if riattivato:
@@ -7592,14 +7689,18 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "spedizione_punto_sats=?, spedizione_punto_eur=?, "
         "spedizione_punto_dichiarata=?, "
         "spedizione_extra_sats=?, spedizione_extra_eur=?, taglia_pacco=?, "
-        "anche_digitale=?, condizione=?, quantita=?, stato=?, "
+        "anche_digitale=?, condizione=?, quantita=?, "
+        # il massimo non si assegna MAI secco: una modifica che abbassa
+        # la quantita' non deve cancellare la memoria dei pezzi avuti
+        "quantita_max=MAX(quantita_max,?), stato=?, "
         "modificato=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
          punto_sats, punto_eur, punto_dich,
          extra_sats, extra_eur, taglia, anche_dig,
-         condizione, quantita, "revisione" if in_revisione else "attivo",
+         condizione, quantita, quantita,
+         "revisione" if in_revisione else "attivo",
          int(time.time()), annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
@@ -9519,6 +9620,23 @@ def in_ferie(ferie_fino: int, adesso: int) -> bool:
     CI, senza assumere la forma del contenitore. Al filo esatto
     (ferie_fino == adesso) il negozio e' APERTO, come _asta_viva."""
     return ferie_fino > adesso
+
+
+def ultimo_pezzo(quantita: int, quantita_max: int) -> bool:
+    """«ULTIMO DISPONIBILE»: e' una NOTIZIA o e' l'ovvio? (ago 2026)
+    Vero solo su cio' che ne ha avuti PIU' DI UNO ed e' sceso a uno.
+    La ragione e' tutta qui, e non c'e' niente da tarare: su un
+    mercatino dell'usato quasi ogni oggetto e' unico, quindi un badge
+    acceso su `quantita == 1` sarebbe vero dappertutto — e un badge che
+    dice sempre la stessa cosa smette di essere letto dopo il terzo.
+    Su un ESAURITO e' falso da solo (quantita 0), e sull'ASTA anche (la
+    quantita' e' forzata a 1 alla pubblicazione: li' l'unicita' e' il
+    formato, non una notizia).
+    Prende due INT e non una riga, come in_ferie: lo stesso giudice
+    serve la riga annunci, la riga di vetrina e la prova in CI. Col
+    massimo a 0 — storico non ancora riallineato, importato appena
+    nato — risponde NO: nel dubbio si tace, mai un'urgenza inventata."""
+    return quantita == 1 and quantita_max > 1
 
 
 def rilancio_minimo(testa_sats: int, incremento_percento: int) -> int:
@@ -16832,11 +16950,17 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # per-pezzo richiederebbe due mosse Lightning coordinate.
             # Nel SET tornano in vetrina TUTTI gli annunci, riga per
             # riga: il pacco e' tornato indietro intero.
+            # Il massimo sale col MAX anche qui, e non e' teoria: chi
+            # aveva 3 pezzi, li vende tutti e poi ricarica a 1 si
+            # ritrova a 4 se una disputa gliene rimborsa 3 — cioe' sopra
+            # il massimo di ieri. Chiudere la falla dove nasce vale piu'
+            # che aspettare la scopa del riavvio.
             righe = _righe_ordine(con, o)
             for r in righe:
                 con.execute("UPDATE annunci SET quantita=quantita+?, "
+                            "quantita_max=MAX(quantita_max,quantita+?), "
                             "stato='attivo' WHERE id=?",
-                            (r["quantita"], r["annuncio_id"]))
+                            (r["quantita"], r["quantita"], r["annuncio_id"]))
             con.commit()
             titolo = _titolo_ordine(righe)[:60]
             con.close()
@@ -18138,8 +18262,8 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
         "spedizione_punto_sats,spedizione_punto_eur,"
         "spedizione_punto_dichiarata,"
         "spedizione_extra_sats,spedizione_extra_eur,taglia_pacco,"
-        "anche_digitale,condizione,quantita,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "anche_digitale,condizione,quantita,quantita_max,stato,creato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga.get("sottocategoria", ""),
          riga["prezzo_sats"], riga["zona"],
@@ -18154,7 +18278,9 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
          riga.get("spedizione_extra_eur", 0),
          riga.get("taglia_pacco", ""),
          riga.get("anche_digitale", 0), riga.get("condizione", ""),
-         riga.get("quantita", 1),
+         # il massimo nasce uguale alla quantita', come in pubblica():
+         # questo INSERT ha una vita sua ed e' il punto che si dimentica
+         riga.get("quantita", 1), riga.get("quantita", 1),
          "revisione" if in_revisione else "attivo", int(time.time())))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
@@ -20059,6 +20185,13 @@ async def importa_nostr_periodico():
                     con.execute("UPDATE annunci SET sottocategoria=? "
                                 "WHERE id=? AND sottocategoria=''",
                                 (sotto, r["id"]))
+        # E la memoria dei pezzi, per la stessa ragione delle
+        # coordinate: importa_nostr.py riscrive `quantita` dal tag
+        # `stock` e non conosce — ne' deve conoscere — quella colonna.
+        # Senza questa riga un importato sceso da 5 a 1 resterebbe col
+        # massimo a zero, e il badge non si accenderebbe MAI proprio
+        # dove la notizia c'e'.
+        riallinea_quantita_max(con)
         con.commit()
         nuovi = con.execute("SELECT id FROM annunci WHERE creato>=? "
                             "AND contatto_nostr!='' AND stato='attivo'",

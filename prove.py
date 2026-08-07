@@ -3322,20 +3322,199 @@ def prove_ferie():
 
     # 38-40: IL GRIGIO DEL CARTELLINO E' FISSO, mai var(--muted): la
     # carta chiara non cambia di notte e il token sparirebbe sopra.
-    i = mini.index(".tag-price.ferie .price{")
+    # La regola si legge dall'ancora alla graffa e non a finestra
+    # fissa: dal cantiere dello stock questi selettori sono CONDIVISI
+    # con l'esaurito (stessa lingua, un posto solo da tarare), e una
+    # finestra a lunghezza fissa smetterebbe di provare quel che dice
+    # al prossimo che li estende.
+    def regola(ancora):
+        i = mini.index(ancora)
+        return mini[i:mini.index("}", i) + 1]
+
+    tag = regola(".tag-price.ferie .price")
     prova("il cartellino usa un grigio fisso, non il token", True,
-          "#8A8271" in mini[i:i + 60] and "--muted" not in mini[i:i + 60])
+          "#8A8271" in tag and "--muted" not in tag)
     # nel dettaglio invece il token e' quello giusto (sta sulla pagina)
-    j = mini.index(".detail-price.ferie{")
+    det = regola(".detail-price.ferie")
     prova("il dettaglio segue il tema col token", True,
-          "var(--muted)" in mini[j:j + 60])
+          "var(--muted)" in det)
     # e NESSUNA delle due nomina .unit (la regola dichiarata)
     prova("nessuna regola di stato ferie nomina .unit", True,
-          ".unit" not in mini[i:i + 60] and ".unit" not in mini[j:j + 60])
+          ".unit" not in tag and ".unit" not in det)
 
     # 41: la barra d'acquisto non nasce a negozio chiuso
     prova("la barra d'acquisto tace in ferie", True,
           "&& !inFerie(l)" in mini)
+
+
+def prove_stock_raccontato():
+    """«Lo stock raccontato bene» (ago 2026): l'annuncio esaurito non
+    sparisce piu' del tutto — resta raggiungibile dal link condiviso e
+    nello scaffale in fondo al negozio — e il badge «ultimo pezzo»
+    parla SOLO dove la scarsita' e' una notizia.
+    Il pezzo che conta e' `quantita_max`: non scende MAI, e la scopa
+    che la ripara e' anche il backfill onesto dello storico. Se
+    qualcuno la assegnasse secca, una ricarica a un pezzo dopo averne
+    avuti dieci cancellerebbe quella memoria in silenzio — e il badge
+    direbbe di no proprio quando dice il vero."""
+    print("\n[lo stock raccontato bene]")
+    import sqlite3
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    def solo_codice(c):
+        """Il corpo SENZA la docstring — la lezione di prove_ferie,
+        ripagata subito: la docstring di `un_annuncio` NOMINA apposta
+        i due stati che restano 404, quindi cercarli nel testo intero
+        dava verdetti rovesciati."""
+        p = c.split('"""')
+        return p[0] + "".join(p[2:]) if len(p) > 2 else c
+
+    # ---- 1-7: il giudice puro, sui casi che decidono ----
+    amb = {}
+    exec(pezzo("ultimo_pezzo"), amb)
+    up = amb["ultimo_pezzo"]
+    # L'OGGETTO UNICO: e' la ragione per cui la colonna esiste. Su un
+    # mercatino dell'usato quasi tutto e' cosi', e un badge acceso qui
+    # sarebbe vero e insignificante.
+    prova("ultimo: un pezzo unico NON e' una notizia", False, up(1, 1))
+    prova("ultimo: ne aveva due, ne resta uno", True, up(1, 2))
+    prova("ultimo: ne aveva cinque, ne resta uno", True, up(1, 5))
+    prova("ultimo: gliene restano due, non e' ancora l'ultimo",
+          False, up(2, 5))
+    prova("ultimo: l'esaurito e' falso da solo", False, up(0, 5))
+    # Nel dubbio si tace: un massimo a zero e' «non lo so ancora»
+    # (storico non riallineato, importato appena nato), mai un'urgenza.
+    prova("ultimo: massimo sconosciuto = si tace", False, up(1, 0))
+    # E la finestra dell'import, che il libro mastro NON sorveglia
+    # apposta: quantita sopra il massimo non e' un guasto, e' la scopa
+    # che deve ancora passare.
+    prova("ultimo: quantita sopra il massimo non accende niente",
+          False, up(5, 1))
+
+    # ---- 8-13: la scopa, girata DAVVERO su un database di cartone ----
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                "quantita INT, quantita_max INT)")
+    con.executemany("INSERT INTO annunci VALUES(?,?,?)", [
+        (1, 7, 0),    # lo storico: non lo sappiamo, ne ha almeno 7
+        (2, 3, 3),    # gia' in pari
+        (3, 1, 9),    # ne ha avuti nove: NON deve scendere
+        (4, 0, 4),    # esaurito: non si tocca
+    ])
+    amb2 = {}
+    exec(pezzo("riallinea_quantita_max"), amb2)
+    amb2["riallinea_quantita_max"](con)
+    leggi = lambda i: tuple(con.execute(
+        "SELECT quantita, quantita_max FROM annunci WHERE id=?",
+        (i,)).fetchone())
+    prova("scopa: il backfill onesto dello storico", (7, 7), leggi(1))
+    prova("scopa: chi e' in pari non si tocca", (3, 3), leggi(2))
+    prova("scopa: NON abbassa mai il massimo", (1, 9), leggi(3))
+    prova("scopa: l'esaurito resta com'e'", (0, 4), leggi(4))
+    prima = [leggi(i) for i in (1, 2, 3, 4)]
+    amb2["riallinea_quantita_max"](con)
+    prova("scopa: idempotente al secondo giro", prima,
+          [leggi(i) for i in (1, 2, 3, 4)])
+    # La scopa LEGGE E ALZA, mai il contrario
+    prova("scopa: una riga sola, e non abbassa", True,
+          "quantita>quantita_max" in corpo("riallinea_quantita_max")
+          and "MIN(" not in corpo("riallinea_quantita_max"))
+
+    # ---- 14-19: il massimo si alza col MAX, mai secco ----
+    # E' la sentinella che vale di piu': un'assegnazione secca non
+    # rompe niente di visibile, cancella solo la memoria.
+    for nome in ("ricarica_quantita", "modifica_annuncio"):
+        prova(f"il massimo sale col MAX: {nome}", True,
+              "quantita_max=MAX(quantita_max," in corpo(nome))
+    # il rimborso: aveva 3, li vende tutti, ricarica a 1, e una disputa
+    # gliene rimborsa 3 — cioe' 4, sopra il massimo di ieri
+    prova("il massimo sale col MAX anche nel rimborso", True,
+          "quantita_max=MAX(quantita_max,quantita+?)" in _SORGENTE)
+    # i due INSERT, che sono DUE: l'import CSV ha una vita sua
+    prova("i due INSERT scrivono il massimo", 2,
+          _SORGENTE.count("quantita,quantita_max,stato"))
+    # e chi SCENDE non lo tocca mai
+    prova("la vendita non tocca il massimo (SCENDE)", False,
+          "quantita_max" in corpo("_incassa_ordine"))
+    # la scopa gira in DUE posti: avvio e dopo-import
+    prova("la scopa gira all'avvio e dopo l'import", 3,
+          _SORGENTE.count("riallinea_quantita_max("))
+
+    # ---- 20-22: il numero grezzo non esce da NESSUNA rotta ----
+    arr = corpo("arricchisci_righe_vetrina")
+    prova("il massimo grezzo se ne va col pop", True,
+          'r.pop("quantita_max")' in arr)
+    prova("il flag lo decide il giudice, non un confronto a mano", True,
+          "ultimo_pezzo(" in arr)
+    # importa_nostr.py deve restare CIECO alla colonna, o smette di
+    # girare da solo su un Barattolo piu' vecchio
+    imp = open("importa_nostr.py", encoding="utf-8").read()
+    prova("l'import Nostr non conosce la colonna", False,
+          "quantita_max" in imp)
+
+    # ---- 23-26: la porta del link condiviso ----
+    un = solo_codice(corpo("un_annuncio"))
+    prova("il singolo serve anche gli esauriti", True,
+          "a.stato IN ('attivo','venduto')" in un)
+    prova("...e manda lo stato, o la scheda lo disegna comprabile",
+          True, "a.stato" in un)
+    prova("il rimosso resta un 404", False, "'rimosso'" in un)
+    prova("la revisione resta un 404", False, "'revisione'" in un)
+
+    # ---- 27-30: cio' che NON deve cambiare ----
+    prova("la vetrina resta ai soli attivi", True,
+          'dove = "a.stato=\'attivo\'"' in corpo("lista_annunci"))
+    prova("la ricerca AI resta ai soli attivi", True,
+          "WHERE a.stato='attivo'" in corpo("cerca"))
+    neg = corpo("negozio")
+    prova("nel negozio gli attivi tengono il loro filtro", True,
+          "dove = \"a.venditore_id=? AND a.stato='attivo'\"" in neg)
+    # lo scaffale e' una query A PARTE: non entra nel `dove`, quindi
+    # non tocca ne' `totale` ne' il cursore
+    prova("lo scaffale non entra nel conteggio degli attivi", True,
+          neg.index("totale = con.execute") < neg.index("a.stato='venduto'"))
+
+    # ---- 31-40: il client ----
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client ha il suo giudice dell'esaurito", True,
+          "function esaurito(l){" in mini)
+    # L'ASTA NON E' MAI ESAURITA: ha un aggiudicatario, non stock — ed
+    # e' la stessa riga che il server ha gia' scritto nella ricarica.
+    prova("l'asta non e' mai esaurita (client)", True,
+          "&& !astaE(l)" in pezzo_js(mini, "function esaurito(l){"))
+    prova("...e il server la rifiuta per natura", True,
+          'asta_base_sats"] > 0' in corpo("ricarica_quantita"))
+    prova("il flag arriva dal server, non si deriva da quantita===1",
+          True, "l.ultimo" in mini and "ultimo:!!a.ultimo," in mini)
+    # il badge di casa non inventa un colore: e' la CARTA
+    i = mini.index(".card-ultimo{")
+    reg = mini[i:mini.index("}", i)]
+    prova("il badge ultimo non prende un colore nuovo", True,
+          "255,248,234" in reg and "--lampo" not in reg
+          and "--asta" not in reg and "--sats" not in reg)
+    prova("il rifornimento sulla card ha le guardie del server", True,
+          "astaE(l) || l.nostr" in pezzo_js(
+              mini, "function bottoneRifornisci(l){"))
+    prova("il prompt() del rifornimento non esiste piu'", False,
+          "ricaricaAnnuncio" in pezzo_js(mini, "function renderMyListings"))
+    prova("il foglio si chiude con gli altri", True,
+          "el('rifornisciSheet').classList.remove('open')" in mini)
+    # La scheda dell'esaurito non deve mai arrivare al recinto — e fra
+    # i due c'e' la CINTURA che ferma ogni altro stato non attivo. Si
+    # legge il tratto FRA le due ancore invece di confrontare due
+    # offset: cosi' l'ordine e la presenza si provano insieme, e
+    # nessuna delle due puo' pescare un'occorrenza di un altro ramo.
+    i = mini.index(": esa\n")
+    fra = mini[i:mini.index('`<div class="escrow-zone">', i)]
+    prova("fra l'esaurito e il recinto c'e' la cintura degli stati",
+          True, "(l.stato||'attivo') !== 'attivo'" in fra)
+    # e la lampo tace: le colonne restano vive anche a scorte finite
+    prova("il countdown della lampo tace su un esaurito", True,
+          "${!esa && !ferie && !asta && lampoAttiva(l)?" in mini)
 
 
 def prove_firme_nostr():
@@ -6376,7 +6555,7 @@ def main():
               prove_tracking_corretto, prove_barattolo,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
-              prove_ferie,
+              prove_ferie, prove_stock_raccontato,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
