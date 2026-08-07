@@ -1316,13 +1316,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL PREZZO È IL LISTINO anche con una lampo viva, deliberato:
   l'anteprima resta in cache per giorni, quindi una cifra a tempo ci
   sopravviverebbe — meglio dire il prezzo che non scade che promettere
-  uno sconto finito. E l'euro si scrive con la VIRGOLA: `_fmt_eur`,
-  gemello di `_fmt_sats`, nato qui ma corretto DENTRO `_prezzo_promo`,
-  cioè nell'unico posto che serve tutti e tre i canali che dicono la
-  stessa riga di prezzo — post del canale, note Nostr e anteprime (col
-  punto, una cifra grande si legge per un fattore mille). Restano col
-  punto le cifre di `_cifra_offerta`, che è un'altra superficie e un
-  altro giro.
+  uno sconto finito.
+  E DA QUI È NATO `_fmt_eur` (ago 2026): **un euro si scrive in un modo
+  solo in tutta l'app**. Gemello di `_fmt_sats`, con la VIRGOLA dei
+  decimali — col punto una cifra grande si legge per un fattore mille —
+  e ci passa OGNI posto dove un euro diventa testo per una persona:
+  `_prezzo_promo` (post del canale, note Nostr, anteprime),
+  `_cifra_offerta` (notifiche delle offerte), `testo_prezzo` (le
+  notifiche ai moderatori) e i due avvisi gemelli del drift del cambio.
+  Il CLIENT lo diceva già giusto per conto suo (`fmtEur`,
+  `toLocaleString('it-IT')`): il server era l'unico fuori riga, e la
+  correzione è una convergenza, non una convenzione nuova.
+  NON ci passano — e non è una dimenticanza — i valori dei TAG NIP-99
+  (`price`, `delivery`), che non sono testo per una persona ma campi di
+  protocollo che `importa_nostr` rilegge: lì il punto decimale è la
+  SPECIFICA. Per la stessa ragione restano col punto le due righe di
+  prosa del content (`Prezzo:`, `spedizione:`), che stanno nello stesso
+  evento dei tag e li ripetono a parole — divergere da loro sarebbe
+  peggio —, e la riga del catalogo che va in pasto ad Haiku, che una
+  persona non legge. Il CSV la virgola ce l'ha già per conto suo.
+  LA SENTINELLA che rende il principio verificabile invece che
+  raccomandato conta tre cose: zero `:.2f} €`, tre `:.2f} EUR` (i soli
+  che una persona non legge) e otto `:.2f}` in tutto, che è il
+  censimento completo dei superstiti. Serve perché QUESTA FAMIGLIA SI
+  NASCONDE: cercando il solo `€` il primo censimento ne aveva mancati
+  tre, tutti che scrivevano «EUR» a parole, ed è stata la sentinella a
+  prenderli — non la lettura del codice. Se quei numeri cambiano, o è
+  nato un campo di protocollo nuovo, o qualcuno ha ricominciato a
+  scrivere un euro a mano.
+  IMPERFEZIONE DICHIARATA, notata scrivendo questa voce e NON chiusa:
+  i SATS invece due formati ce li hanno ancora — `testo_prezzo` scrive
+  `509000 sats` grezzo mentre `_cifra_offerta` passa da `_fmt_sats` e
+  scrive `509.000`. Stessa medicina, altro giro.
   ATTENZIONE AL COLLAUDO: Telegram e WhatsApp cachano le anteprime a
   lungo e non si bustano dal nostro lato, quindi si prova con URL
   USA-E-GETTA prima di condividere qualcosa di vero — e a farlo c'è
@@ -8734,15 +8759,22 @@ da una prova apposta. Vedi Architettura, «LE ANTEPRIME DEI LINK», per
 le altre due cose da non rovesciare (i meta in cima a 900 KB di pagina,
 l'escaping in attributo) e per la scelta dell'immagine coi suoi tre
 ripieghi.
-Collaudate: 63 prove nuove (1614 verdi), e quella sul rimosso è
+Col cantiere è arrivato `_fmt_eur` e la regola che un euro si scrive in
+un modo solo in tutta l'app (il client lo faceva già: il server era
+l'unico fuori riga) — coi tag NIP-99 fuori apposta, che lì il punto
+decimale è la specifica. La sentinella che lo sorveglia ha preso tre
+casi che il censimento a mano aveva mancato, perché scrivevano «EUR» a
+parole invece del simbolo.
+Collaudate: 68 prove nuove (1619 verdi), e quella sul rimosso è
 ESEGUIBILE e non una sentinella sulla forma — passa da un database vero
-e il titolo si cerca nell'HTML che esce. TORTURATE con tredici
+e il titolo si cerca nell'HTML che esce. TORTURATE con quindici
 mutazioni del codice, una per riga sorvegliata (stato tolto dalla
 WHERE, rimosso rimesso dentro, venduto tolto fuori, «✅ Venduto» che
-sparisce, euro tornato al punto, escaping a quote=False, rotta tornata
-al file nudo, francobollo scambiato col pieno, conto del negozio senza
-stato, tg_id nell'anteprima, meta prima del charset, cintura che
-rilancia, ripiego che appende in fondo, ritorno alla modalità testo):
+sparisce, euro tornato al punto in tre modi diversi, escaping a
+quote=False, rotta tornata al file nudo, francobollo scambiato col
+pieno, conto del negozio senza stato, tg_id nell'anteprima, meta prima
+del charset, cintura che rilancia, ripiego che appende in fondo,
+ritorno alla modalità testo):
 ognuna diventa rossa da sola, e la prima ne fa rosse cinque insieme. Più
 il giro dal vivo sul server locale simulando gli User-Agent veri di
 Telegram, WhatsApp, Facebook, Slack e dei client Nostr con la loro
