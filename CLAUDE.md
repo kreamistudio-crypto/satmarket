@@ -4462,16 +4462,48 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   NON SI RIBUSSA A OGNI RICHIESTA: `CAMBIO_RIPROVA_S` (60) è il
   raffreddamento dopo un buco — senza, durante un'interruzione ogni
   pagina d'acquisto pagherebbe i 10 secondi di timeout per farsi dire
-  di nuovo di no. E il cambio si tiene fresco NELL'OROLOGIO
-  (`_rileggi_cambio` in testa al giro, ogni 10 min): il percorso caldo
-  quasi non tocca più la rete, e la copia sul disco è vecchia di dieci
-  minuti al massimo — cioè quanto perde un riavvio nel caso peggiore.
-  Al boot `_insisti_sul_cambio` riprova con pause che crescono
-  (0·5·15·30·60·120·300s, si smette al primo successo) invece di
-  aspettare che a chiedere il cambio sia qualcuno che sta comprando;
-  gira in un task, l'avvio non aspetta nessuno. Tre righe di journal
-  all'avvio, e vanno lette: «ripreso dal database», «l'ultimo salvato
-  ha più di N ore», «nessun valore salvato».
+  di nuovo di no.
+  IL RINFRESCO HA UN GIRO SUO (`orologio_cambio`, leva
+  `CAMBIO_RINFRESCO_S`, 60s) e NON quello da dieci minuti dell'orologio
+  grande, dove era nato. La ragione è la fonte unica: da quando il
+  client non chiama più CoinGecko per conto suo, LA CADENZA DEL SERVER
+  È LA FRESCHEZZA CHE VEDE CHIUNQUE GUARDI UN PREZZO — prima il browser
+  vedeva un numero fresco di secondi, e dieci minuti lì dentro erano un
+  numero vecchio in mano a tutti. La fonte unica non si tocca (due
+  letture diverse erano un difetto vero: il «≈» della vetrina e il
+  conto della invoice potevano divergere); a stringersi è solo la
+  finestra. Lo stesso giro è anche la riprova del boot — il primo giro
+  parte subito e un buco si ribussa dopo un minuto — quindi la scaletta
+  di pause crescenti di ieri (`_insisti_sul_cambio`) NON ESISTE PIÙ: a
+  regime sarebbe stata più LENTA di questo giro.
+  `CAMBIO_TTL` È DERIVATA e non un secondo numero da tenere in pari:
+  `max(120, CAMBIO_RINFRESCO_S * 2)`, due giri di slack. Chi alza la
+  leva non deve ricordarsi di alzare anche la soglia, e soprattutto le
+  due non possono mettersi di traverso — una soglia più STRETTA della
+  cadenza rimetterebbe la rete nel percorso caldo a ogni giro, che è
+  esattamente ciò che il rinfresco esiste per evitare. C'è la prova che
+  la tortura su quattro cadenze.
+  E NON SI FORZA MAI UNA LETTURA AL MOMENTO DELLA FATTURA (decisione di
+  Andrea): nel percorso caldo la rete si tocca in un posto solo e dietro
+  il raffreddamento — è la rete di sicurezza per quando il giro di
+  sfondo si ferma, non un giro di rete in mezzo a un acquisto. In più il
+  giro di sfondo lo disinnesca gratis: timbra `tentato` a ogni battito,
+  riuscito o no, quindi finché batte dal percorso caldo non parte una
+  chiamata nemmeno per sbaglio. Due sentinelle lo sorvegliano.
+  IL CARICO, misurato: un minuto = ~1.400 chiamate al giorno da un IP
+  solo, comodamente dentro il limite al minuto dell'endpoint pubblico
+  di CoinGecko — ma ~43.000 al mese, cioè BEN OLTRE le 10.000 di una
+  chiave Demo gratuita: se un giorno se ne mette una, la leva va alzata
+  (300s ≈ 9.000/mese). È anche il motivo per cui è una leva e non una
+  costante: un 429 si cura con una riga nel config del VPS invece che
+  con un deploy. `0` = niente giro di sfondo (una lettura all'avvio e
+  poi se ne occupa il caldo).
+  Tre righe di journal all'avvio, e vanno lette: «ripreso dal
+  database», «l'ultimo salvato ha più di N ore», «nessun valore
+  salvato»; più «letto: N €/BTC» alla prima lettura buona, e UNA sola
+  riga per interruzione dopo dieci minuti di silenzio (il conto è in
+  GIRI e non in secondi, o con una cadenza che non divide 600 quel
+  momento non arriverebbe mai).
   UNA SOLA FONTE, ed è la parte che tocca il client: prima ogni browser
   chiamava CoinGecko per conto suo — N utenti N chiamate, e soprattutto
   DUE verità, perché il «≈» della vetrina poteva dire una cifra e il
@@ -8295,6 +8327,17 @@ nella busta di prima pagina di `/api/listings`, una fonte sola, così il
 «≈» della vetrina e il conto del server non possono più divergere. Vedi
 Architettura, «IL CAMBIO NON MUORE A UN RIAVVIO», per le tre età e per
 il perché delle 24 ore.
+Poi la fonte unica è costata freschezza, e si è stretta la finestra
+(ago 2026, il giorno dopo): il rinfresco ha un giro suo da 60 secondi
+(`orologio_cambio`, leva `CAMBIO_RINFRESCO_S`) invece di stare
+nell'orologio da dieci minuti — perché da quando la fonte è una sola,
+la cadenza del server è la freschezza che vede chiunque guardi un
+prezzo. La soglia si DERIVA dalla cadenza (due giri di slack, minimo
+120s) invece di essere un secondo numero da tenere in pari, e al
+momento della fattura non si forza nessuna lettura: nel percorso caldo
+la rete resta la rete di sicurezza dietro il raffreddamento. Misurato
+dal vivo: il valore sul disco non ha mai più di 60 secondi, e nell'arco
+di due minuti si vede muovere (56.324 → 56.329 → 56.340 €/BTC).
 Collaudato: 29 prove nuove in `prove.py` (1486 verdi, erano 1457) — il
 giudice puro al filo esatto e un secondo dopo, l'andata e ritorno dal
 disco, e il caso del cantiere provato per davvero (cache vuota + rete
