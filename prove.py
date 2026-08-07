@@ -2406,9 +2406,10 @@ def prove_ssrf_redirect():
           "_APRITORE_FOTO.open(" in pezzo("scarica_foto_url"))
     prova("sentinella: il guardiano si chiama anche sulla partenza",
           True, "url_foto_ammesso(url)" in pezzo("scarica_foto_url"))
-    # e l'import da Nostr lo riceve: il patto del `vaglio`
+    # e l'import da Nostr lo riceve: il patto del `vaglio` — insieme al
+    # cambio, che dall'ago 2026 viaggia sulla stessa strada
     prova("sentinella: l'import orario riceve lo scaricatore del server",
-          True, "vaglio, scarica_foto_url)" in _SORGENTE)
+          True, "vaglio, scarica_foto_url, cambio_import)" in _SORGENTE)
     imp = open("importa_nostr.py", encoding="utf-8").read()
     prova("sentinella: e l'import lo usa quando ce l'ha", True,
           "def scarica_foto(url: str, annuncio_id: int, indice: int, "
@@ -5817,7 +5818,8 @@ def prove_coorti_titoli():
 
 
 # ====================================================================
-def _finto_coingecko(chiamate, valore=100000.0, muto=False):
+def _finto_coingecko(chiamate, valore=100000.0, muto=False,
+                     usd=110000.0):
     """CoinGecko di cartone: REGISTRA le chiamate invece di farle. Con
     `muto` la rete non risponde — che e' il caso vero del cantiere."""
     import types
@@ -5827,7 +5829,7 @@ def _finto_coingecko(chiamate, valore=100000.0, muto=False):
             pass
 
         def json(self):
-            return {"bitcoin": {"eur": valore}}
+            return {"bitcoin": {"eur": valore, "usd": usd}}
 
     class C:
         def __init__(self, **kw):
@@ -5884,7 +5886,7 @@ def prove_cambio():
           val(99000.0, ORA - 1000 * 3600, ORA, 0))
 
     # --- 2) IL MONDO: un database vero, la rete di cartone ---------
-    def mondo(valore=0.0, quando=0.0, muto=False, ore=24):
+    def mondo(valore=0.0, quando=0.0, muto=False, ore=24, usd=0.0):
         vero = sqlite3.connect(":memory:")
         vero.row_factory = sqlite3.Row
         vero.execute("CREATE TABLE cambio_noto(valuta TEXT PRIMARY KEY, "
@@ -5907,11 +5909,11 @@ def prove_cambio():
         a = {"db": Con, "time": _time,
              "httpx": _finto_coingecko(chiamate, muto=muto),
              "ORE_CAMBIO_VALIDO": ore, "CAMBIO_TTL": 120,
-             "CAMBIO_RIPROVA_S": 60,
-             "_cambio_eur_cache": {"valore": valore, "quando": quando,
-                                   "tentato": 0.0}}
+             "CAMBIO_RIPROVA_S": 60, "VALUTE_CAMBIO": ("eur", "usd"),
+             "_cambio_cache": {"valori": {"eur": valore, "usd": usd},
+                               "quando": quando, "tentato": 0.0}}
         for f in ("_cambio_valido", "_salva_cambio", "cambio_noto_ora",
-                  "carica_cambio_salvato"):
+                  "cambio_per_import", "carica_cambio_salvato"):
             exec(pezzo(f), a)
         for f in ("_rileggi_cambio", "cambio_btc_eur"):
             exec("async " + pezzo(f), a)
@@ -5919,11 +5921,11 @@ def prove_cambio():
 
     # --- 3) ANDATA E RITORNO DAL DISCO -----------------------------
     a, _, vero = mondo()
-    a["_salva_cambio"](99000.0, 1_700_000_000)
+    a["_salva_cambio"]({"eur": 99000.0}, 1_700_000_000)
     riga = vero.execute("SELECT * FROM cambio_noto").fetchone()
     prova("il cambio letto finisce sul disco", (99000.0, 1_700_000_000),
           (riga["valore"], riga["quando"]))
-    a["_salva_cambio"](98000.0, 1_700_000_600)
+    a["_salva_cambio"]({"eur": 98000.0}, 1_700_000_600)
     prova("...e una riga sola, sempre aggiornata", (1, 98000.0),
           (vero.execute("SELECT COUNT(*) c FROM cambio_noto").fetchone()["c"],
            vero.execute("SELECT valore v FROM cambio_noto").fetchone()["v"]))
@@ -5935,7 +5937,7 @@ def prove_cambio():
     prova("all'avvio si riprende dal disco", 99000.0,
           a["carica_cambio_salvato"]())
     prova("...e la cache non e' piu' vuota", 99000.0,
-          a["_cambio_eur_cache"]["valore"])
+          a["_cambio_cache"]["valori"]["eur"])
 
     a, _, vero = mondo()
     vero.execute("INSERT INTO cambio_noto VALUES('eur', 99000.0, ?)",
@@ -5957,7 +5959,7 @@ def prove_cambio():
     prova("...ma non ribussa a ogni richiesta", (99000.0, 1),
           (gira(a["cambio_btc_eur"]()), len(chiamate)))
     prova("...e il buco non ha azzerato niente", 99000.0,
-          a["_cambio_eur_cache"]["valore"])
+          a["_cambio_cache"]["valori"]["eur"])
 
     a, _, _ = mondo(valore=99000.0, quando=_time.time() - 30 * 3600,
                     muto=True)
@@ -5983,7 +5985,7 @@ def prove_cambio():
 
     # --- 5) LA FORMA, che e' quella che sparisce in un riordino ----
     prova("ogni lettura riuscita si salva", True,
-          "_salva_cambio(valore, adesso)" in pezzo("_rileggi_cambio"))
+          "_salva_cambio(valori, adesso)" in pezzo("_rileggi_cambio"))
     prova("la tabella del cambio esiste", True,
           "CREATE TABLE IF NOT EXISTS cambio_noto" in _SORGENTE)
     scalda = pezzo("scalda_cambio")
@@ -6024,6 +6026,58 @@ def prove_cambio():
           caldo.count("_rileggi_cambio"))
     prova("...e sempre dietro il raffreddamento", True,
           caldo.index("CAMBIO_RIPROVA_S") < caldo.index("_rileggi_cambio"))
+
+    # --- 6) L'IMPORT BEVE ALLA STESSA FONTE ------------------------
+    # Era la seconda verita' rimasta in piedi, e si e' fatta vedere nel
+    # journal: alle 14:52:33 il server legge 56.313, alle 14:52:57
+    # l'import dice «Cambio BTC non disponibile». Due letture, due
+    # esiti, per convertire gli stessi bitcoin — e quella dell'import
+    # viveva DENTRO importa_venditore, che il giro chiama una volta per
+    # VENDITORE: una raffica di chiamate a ogni giro.
+    a, _, _ = mondo(valore=99000.0, quando=_time.time(), usd=110000.0)
+    prova("il cambio per l'import esce nella forma che vuole lui",
+          {"EUR": 99000.0, "USD": 110000.0}, a["cambio_per_import"]())
+    a, _, _ = mondo(valore=99000.0, quando=_time.time())
+    prova("...e porta solo cio' che e' davvero utilizzabile",
+          {"EUR": 99000.0}, a["cambio_per_import"]())
+    a, _, _ = mondo(valore=99000.0, quando=_time.time() - 30 * 3600,
+                    usd=110000.0)
+    prova("...troppo vecchio: vuoto, come una lettura fallita",
+          {}, a["cambio_per_import"]())
+    # LA STESSA ETA' per le due valute: arrivano dalla stessa GET,
+    # quindi invecchiano insieme e `quando` e' UNO.
+    a, _, vero = mondo()
+    gira(a["_rileggi_cambio"]())
+    righe = {r["valuta"]: r["quando"]
+             for r in vero.execute("SELECT * FROM cambio_noto")}
+    prova("euro e dollaro sul disco, con la stessa eta'", 1,
+          len(set(righe.values())))
+    prova("...e sono le due valute", {"eur", "usd"}, set(righe))
+    # L'EURO COMANDA: e' lui che fa le invoice.
+    a, _, _ = mondo()
+    a["httpx"] = _finto_coingecko([], valore=0.0)
+    prova("senza euro la lettura non vale, dollaro o no",
+          (False, 0.0), (gira(a["_rileggi_cambio"]()),
+                         a["_cambio_cache"]["valori"]["eur"]))
+
+    imp = open("importa_nostr.py", encoding="utf-8").read()
+    prova("l'import accetta il cambio dal server", True,
+          "vaglio=None, scarica=None,\n                      cambio=None"
+          in imp)
+    prova("...e lo script a mano resta identico (cambio=None)", True,
+          "elif cambio is None:" in imp and "cambio = cambio_btc()" in imp)
+    prova("...un cambio VUOTO non passa in silenzio", True,
+          "elif not cambio:" in imp and "print(MSG_CAMBIO_MANCANTE)" in imp)
+    prova("il messaggio del cambio mancante vive in un posto solo", 1,
+          imp.count('MSG_CAMBIO_MANCANTE = ('))
+    prova("...e lo dicono tutte e due le strade", 3,   # def + 2 usi
+          imp.count("MSG_CAMBIO_MANCANTE"))
+    giro_imp = pezzo("importa_nostr_periodico")
+    prova("il server legge il cambio UNA volta per giro, fuori dal for",
+          1, giro_imp.count("cambio_per_import()"))
+    i_letto = giro_imp.index("cambio_import = cambio_per_import()")
+    i_for = giro_imp.index("for npub, venditore_id in")
+    prova("...e prima del giro dei venditori", True, i_letto < i_for)
 
     # UNA SOLA FONTE: il client non chiama piu' CoinGecko per conto suo.
     mini = open("miniapp.html", encoding="utf-8").read()

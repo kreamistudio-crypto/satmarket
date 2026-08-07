@@ -3170,7 +3170,17 @@ CAMBIO_RIPROVA_S = 60     # dopo un buco si aspetta prima di ribussare:
 #                           caldo non parte una chiamata nemmeno per
 #                           sbaglio
 
-_cambio_eur_cache = {"valore": 0.0, "quando": 0.0, "tentato": 0.0}
+# UNA LETTURA, DUE NUMERI, UNA SOLA ETA' (ago 2026): la stessa GET
+# porta euro e dollari senza costare un byte in piu' (`vs_currencies=
+# eur,usd`), e siccome arrivano insieme invecchiano insieme — quindi
+# `quando` e' UNO, non uno per valuta. Il dollaro non entra in nessun
+# percorso del denaro: le invoice le fa `cambio_btc_eur`, che e' e
+# resta l'euro. Serve SOLO all'import da Nostr, che incontra tag
+# `price` in USD e senza un cambio quegli annunci li salta (vedi
+# `cambio_per_import`).
+VALUTE_CAMBIO = ("eur", "usd")
+_cambio_cache = {"valori": {v: 0.0 for v in VALUTE_CAMBIO},
+                 "quando": 0.0, "tentato": 0.0}
 
 
 def _cambio_valido(valore: float, quando: float, adesso: float,
@@ -3188,14 +3198,18 @@ def _cambio_valido(valore: float, quando: float, adesso: float,
     return float(valore)
 
 
-def _salva_cambio(valore: float, quando: float) -> None:
-    """L'ultimo cambio noto sul disco. Fail-open totale: se il database
-    fa i capricci si tira avanti con la memoria — questo e' un
-    promemoria, non una scrittura di denaro."""
+def _salva_cambio(valori: dict, quando: float) -> None:
+    """L'ultimo cambio noto sul disco, una riga per valuta. Fail-open
+    totale: se il database fa i capricci si tira avanti con la memoria —
+    questo e' un promemoria, non una scrittura di denaro."""
     try:
         con = db()
-        con.execute("INSERT OR REPLACE INTO cambio_noto(valuta, valore, "
-                    "quando) VALUES('eur', ?, ?)", (valore, int(quando)))
+        for valuta, valore in valori.items():
+            if valore > 0:
+                con.execute(
+                    "INSERT OR REPLACE INTO cambio_noto(valuta, valore, "
+                    "quando) VALUES(?, ?, ?)",
+                    (valuta, valore, int(quando)))
         con.commit()
         con.close()
     except Exception:
@@ -3203,65 +3217,98 @@ def _salva_cambio(valore: float, quando: float) -> None:
 
 
 def carica_cambio_salvato() -> float:
-    """Rimette in cache l'ultimo cambio noto, all'avvio. Restituisce il
-    valore se e' ancora USABILE, 0 altrimenti — ma in cache ci finisce
-    comunque: a decidere se vale e' `_cambio_valido` al momento dell'uso,
-    non chi legge il database."""
+    """Rimette in cache l'ultimo cambio noto, all'avvio. Restituisce
+    l'EURO se e' ancora USABILE, 0 altrimenti — ma in cache ci finisce
+    comunque: a decidere se vale e' `_cambio_valido` al momento
+    dell'uso, non chi legge il database. Le valute si scrivono insieme,
+    quindi hanno lo stesso `quando`; il MAX e' la cintura per un
+    database toccato a mano."""
     try:
         con = db()
-        r = con.execute("SELECT valore, quando FROM cambio_noto "
-                        "WHERE valuta='eur'").fetchone()
+        righe = con.execute("SELECT valuta, valore, quando "
+                            "FROM cambio_noto").fetchall()
         con.close()
     except Exception:
         return 0.0
-    if not r or not r["valore"]:
+    quando = 0.0
+    for r in righe:
+        if r["valuta"] in VALUTE_CAMBIO and r["valore"]:
+            _cambio_cache["valori"][r["valuta"]] = float(r["valore"])
+            quando = max(quando, float(r["quando"] or 0))
+    if not quando:
         return 0.0
-    _cambio_eur_cache.update(valore=float(r["valore"]),
-                             quando=float(r["quando"] or 0))
+    _cambio_cache["quando"] = quando
     return cambio_noto_ora()
 
 
-def cambio_noto_ora() -> float:
+def cambio_noto_ora(valuta: str = "eur") -> float:
     """Il cambio che sappiamo ADESSO, senza toccare la rete: 0 se non
     c'e' o e' troppo vecchio. Lo usa la vetrina — una pagina che si
     sfoglia non deve mai aspettare CoinGecko — e chiunque debba solo
     LEGGERE quello che gia' abbiamo."""
-    return _cambio_valido(_cambio_eur_cache["valore"],
-                          _cambio_eur_cache["quando"], time.time(),
+    return _cambio_valido(_cambio_cache["valori"].get(valuta, 0.0),
+                          _cambio_cache["quando"], time.time(),
                           ORE_CAMBIO_VALIDO)
+
+
+def cambio_per_import() -> dict:
+    """Il cambio nella forma che vuole l'import da Nostr: {'EUR': x,
+    'USD': y}, con dentro solo quel che e' davvero utilizzabile.
+
+    E' la stessa fonte del resto — la cache, mai la rete — perche'
+    `importa_nostr.cambio_btc()` era la SECONDA verita' rimasta in
+    piedi: un'altra lettura, con un altro esito, per convertire gli
+    stessi bitcoin. Peggio ancora, viveva DENTRO `importa_venditore`,
+    che il giro orario chiama UNA VOLTA PER VENDITORE — cioe' una
+    raffica di chiamate a ogni giro, dallo stesso IP da cui bussa gia'
+    il nostro rinfresco.
+    Vuoto = «non disponibile», e l'import si comporta come ha sempre
+    fatto in quel caso: salta gli annunci in EUR/USD e lo dice."""
+    return {v.upper(): c for v in VALUTE_CAMBIO
+            if (c := cambio_noto_ora(v)) > 0}
 
 
 async def _rileggi_cambio() -> bool:
     """Una lettura vera da CoinGecko. True se e' andata: cache e copia
     sul disco si aggiornano INSIEME, o al riavvio dopo ci ritroveremmo
     con un valore piu' vecchio di quello che avevamo in mano. Non alza
-    mai: e' il chiamante a decidere cosa fare del vecchio."""
-    _cambio_eur_cache["tentato"] = time.time()
+    mai: e' il chiamante a decidere cosa fare del vecchio.
+
+    L'EURO comanda: se manca lui la lettura non vale, anche se il
+    dollaro fosse arrivato — e' l'euro che fa le invoice."""
+    _cambio_cache["tentato"] = time.time()
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get("https://api.coingecko.com/api/v3/simple/price",
-                            params={"ids": "bitcoin", "vs_currencies": "eur"})
+                            params={"ids": "bitcoin",
+                                    "vs_currencies": ",".join(VALUTE_CAMBIO)})
             r.raise_for_status()
-            valore = float(r.json()["bitcoin"]["eur"])
+            letti = r.json()["bitcoin"]
+            valori = {v: float(letti.get(v) or 0) for v in VALUTE_CAMBIO}
     except Exception:
         return False
-    if valore <= 0:
+    if valori["eur"] <= 0:
         return False
     adesso = time.time()
-    _cambio_eur_cache.update(valore=valore, quando=adesso)
-    _salva_cambio(valore, adesso)
+    # Solo le valute arrivate: un dollaro assente non deve cancellare
+    # quello di prima, che magari serve all'import fra un minuto.
+    for valuta, valore in valori.items():
+        if valore > 0:
+            _cambio_cache["valori"][valuta] = valore
+    _cambio_cache["quando"] = adesso
+    _salva_cambio(valori, adesso)
     return True
 
 
 async def cambio_btc_eur() -> float:
     adesso = time.time()
-    if (_cambio_eur_cache["valore"] > 0
-            and adesso - _cambio_eur_cache["quando"] < CAMBIO_TTL):
-        return _cambio_eur_cache["valore"]
+    if (_cambio_cache["valori"]["eur"] > 0
+            and adesso - _cambio_cache["quando"] < CAMBIO_TTL):
+        return _cambio_cache["valori"]["eur"]
     # Vale la pena riprovare SEMPRE, tranne quando abbiamo appena
     # bussato a vuoto: durante un'interruzione ogni richiesta
     # aspetterebbe dieci secondi per farsi dire di nuovo di no.
-    if adesso - _cambio_eur_cache["tentato"] >= CAMBIO_RIPROVA_S:
+    if adesso - _cambio_cache["tentato"] >= CAMBIO_RIPROVA_S:
         await _rileggi_cambio()
     return cambio_noto_ora()
 
@@ -3296,7 +3343,7 @@ async def orologio_cambio():
         if riuscito:
             if primo:               # la prima lettura buona dopo l'avvio
                 print(f"💱 Cambio BTC/EUR letto: "
-                      f"{_cambio_eur_cache['valore']:,.0f} €/BTC"
+                      f"{_cambio_cache['valori']['eur']:,.0f} €/BTC"
                       .replace(",", " "), flush=True)
                 primo = False
             buchi = 0
@@ -3326,13 +3373,13 @@ async def scalda_cambio():
     cercarne uno fresco, ma in un task: l'avvio non aspetta CoinGecko."""
     salvato = carica_cambio_salvato()
     if salvato:
-        eta = (time.time() - _cambio_eur_cache["quando"]) / 60
+        eta = (time.time() - _cambio_cache["quando"]) / 60
         quanto = ("di poco fa" if eta < 1 else
                   f"di {eta:.0f} minut{'o' if round(eta) == 1 else 'i'} fa")
         print(f"💱 Cambio BTC/EUR ripreso dal database: "
               f"{salvato:,.0f} €/BTC ({quanto})"
               .replace(",", " "), flush=True)
-    elif _cambio_eur_cache["valore"] > 0:
+    elif _cambio_cache["valori"]["eur"] > 0:
         print(f"💱 Cambio BTC/EUR: l'ultimo salvato ha piu' di "
               f"{ORE_CAMBIO_VALIDO} ore e non si usa. Finché non ne "
               "arriva uno nuovo, i listini in euro non si comprano.",
@@ -19949,6 +19996,15 @@ async def importa_nostr_periodico():
     # verra' piu' a ritirarlo. Senza questa riga il dizionario
     # cresce per sempre, un titolo alla volta.
     _MOTIVI_REVISIONE.clear()
+    # IL CAMBIO SI LEGGE UNA VOLTA PER GIRO, e si passa a tutti (ago
+    # 2026). Prima ogni `importa_venditore` si andava a prendere il suo
+    # da CoinGecko: con dieci venditori erano dieci letture in raffica,
+    # dieci esiti possibili — e dieci conversioni diverse per annunci
+    # dello stesso giro. Adesso e' la nostra cache, la stessa che fa le
+    # invoice: una verita' sola, e un giro d'import non bussa piu' a
+    # nessuno. Vuoto = l'import salta gli annunci in EUR/USD e lo dice,
+    # esattamente come faceva quando la sua lettura falliva.
+    cambio_import = cambio_per_import()
     importati = aggiornati = saltati = 0
     for npub, venditore_id in venditori_nostr_attivi():
         # Un vaglio per venditore: deve sapere di chi sono gli annunci
@@ -19960,7 +20016,7 @@ async def importa_nostr_periodico():
             # l'import se lo prendeva senza chiedere niente a nessuno.
             i, a, s = await asyncio.to_thread(
                 importa_nostr.importa_venditore, npub, venditore_id, DB,
-                vaglio, scarica_foto_url)
+                vaglio, scarica_foto_url, cambio_import)
             importati, aggiornati, saltati = (importati + i, aggiornati + a,
                                               saltati + s)
             await _apri_revisioni(npub, venditore_id)

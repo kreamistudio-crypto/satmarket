@@ -228,17 +228,31 @@ def interroga_aperto(relay, limite=500):
     return eventi
 
 
+# Il messaggio vive in un posto solo: lo dicono sia la lettura fallita
+# dello script a mano, sia il cambio VUOTO che il server puo' passare —
+# e sono la stessa notizia per chi legge il journal.
+MSG_CAMBIO_MANCANTE = ("⚠️  Cambio BTC non disponibile: gli annunci in "
+                       "EUR/USD verranno saltati.")
+
+
 def cambio_btc():
-    """Prezzo del Bitcoin in EUR e USD (per convertire i prezzi in sats)."""
+    """Prezzo del Bitcoin in EUR e USD (per convertire i prezzi in sats).
+
+    E' la strada dello SCRIPT A MANO. Quando l'import gira dal server
+    non si chiama nessuno: il cambio arriva gia' pronto dalla cache del
+    server (vedi `importa_venditore`), che e' la stessa fonte delle
+    invoice — una verita' sola, e un giro d'import che non bussa a
+    CoinGecko una volta per venditore."""
     try:
         with urllib.request.urlopen(
             "https://api.coingecko.com/api/v3/simple/price"
             "?ids=bitcoin&vs_currencies=eur,usd", timeout=15) as r:
             d = json.loads(r.read())["bitcoin"]
             return {"EUR": d["eur"], "USD": d["usd"]}
-    except Exception:
-        print("⚠️  Cambio BTC non disponibile: gli annunci in EUR/USD "
-              "verranno saltati.")
+    except Exception as err:
+        # Il PERCHE' serve: «non disponibile» puo' essere una rete giu'
+        # o un 429 di CoinGecko, e sono due problemi diversi.
+        print(f"{MSG_CAMBIO_MANCANTE} ({type(err).__name__}: {err})")
         return {}
 
 
@@ -649,7 +663,8 @@ def e_riflesso(riga, pubkey: str) -> bool:
 
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
-                      db: str = DB, vaglio=None, scarica=None):
+                      db: str = DB, vaglio=None, scarica=None,
+                      cambio=None):
     """Il cuore dell'import, in forma riusabile: lo chiama lo script
     manuale (main, qui sotto) e ogni ora l'orologio del server.
     Ritorna la terna (importati, aggiornati, saltati).
@@ -665,6 +680,18 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     lo stesso, ma nasce (o torna) in stato 'revisione', fuori dalla
     vetrina, in attesa che un moderatore decida. Qui si legge solo il
     marchio — il perche' lo sa il server.
+
+    `cambio` e' lo stesso patto del vaglio, per i soldi: {'EUR': x,
+    'USD': y} letto UNA volta dal server per tutto il giro e passato a
+    tutti. Senza (script a mano) ci si legge il proprio, come sempre.
+    Serve perche' questa funzione la chiama il server una volta PER
+    VENDITORE: la lettura che stava qui dentro diventava una raffica di
+    chiamate a CoinGecko a ogni giro — e una conversione diversa per
+    ogni venditore dello stesso giro, cioe' la seconda verita' che il
+    cantiere del cambio doveva togliere di mezzo.
+    Un dizionario VUOTO passato apposta vuol dire «non ce l'ho»: gli
+    annunci in EUR/USD si saltano e lo si dice, come quando falliva la
+    lettura di qui.
     """
     hexkey = npub_to_hex(npub_venditore)
     os.makedirs(FOTO_DIR, exist_ok=True)
@@ -745,7 +772,12 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
         # riga il cui evento non esiste piu' da nessuna parte).
 
     # il cambio serve solo se c'e' qualcosa da importare
-    cambio = cambio_btc() if prodotti else {}
+    if not prodotti:
+        cambio = {}
+    elif cambio is None:            # script a mano: ce lo leggiamo noi
+        cambio = cambio_btc()       # (che se non ce la fa lo dice da se')
+    elif not cambio:                # il server ce l'ha passato VUOTO:
+        print(MSG_CAMBIO_MANCANTE)  # la stessa notizia, mai in silenzio
     # timeout generoso: quando gira dal server il database e' conteso
     con = sqlite3.connect(db, timeout=15)
     # Assicura che il database abbia le colonne nuove (foto, nostr).
