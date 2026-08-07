@@ -3045,6 +3045,14 @@
            di tutta la pagina. -->
       <p><b>Oggi il punto di fiducia siamo noi due</b>, e non pretendiamo il contrario. La direzione è ridurlo, non nasconderlo.</p>
 
+      <!-- Il link della pagina si poteva raggiungere ma non PRENDERE:
+           chi voleva mandarla a qualcuno doveva ricordarsi l'indirizzo
+           a memoria. In DEMO sparisce (là `location.origin` è "null" e
+           il link uscirebbe rotto), il patto del bottone condividi
+           sulla foto dell'annuncio. -->
+      <button class="btn ghost" id="sicuShare"
+              onclick="condividiSicurezza()">🔗 Condividi questa pagina</button>
+
       <div class="sicu-piede">🫙 Domande, dubbi, o qualcosa che non torna? Scrivici: durante il rodaggio leggiamo tutto.</div>
     </div>
   </div>
@@ -5557,6 +5565,10 @@ let negozioCorrente = null;   // il profilo pubblico mostrato nella vista
    qui una scivolata di due schermate sarebbe solo attesa. */
 function apriSicurezza(ancora){
   go('sicurezza');
+  /* si decide a ogni apertura e non una volta all'avvio: DEMO cambia
+     sotto i piedi (il ripiego quando il backend tace, e il collaudo) */
+  const sh = el('sicuShare');
+  if (sh) sh.style.display = DEMO ? 'none' : '';
   if (!ancora) return;
   const e = el(ancora);
   /* i 16px di respiro sopra il titolo non sono cosmesi: senza,
@@ -10532,17 +10544,17 @@ function renderAvatar(){
    entrato). Condivisione nativa del telefono dove c'e'
    (navigator.share), altrimenti copia negli appunti col toast —
    il pattern del negozio. */
-async function condividiAnnuncio(){
-  const l = currentListing; if (!l) return;
+/* LA SCALA DELLA CONDIVISIONE, un cuore solo — la portano il bottone
+   sulla foto dell'annuncio e (ago 2026) «Condividi questa pagina» in
+   fondo alla pagina del deposito. Estratta quando i chiamanti sono
+   diventati due: una scala del genere ricopiata diverge al primo
+   ripiego che si aggiunge da una parte sola.
+   Dentro Telegram (initData vero: nel browser lo stub mentirebbe) la
+   WebView NON ha navigator.share — si usa il canale di Telegram, a
+   scalare: shareURL se il client lo offre, altrimenti il selettore
+   chat via t.me/share/url. */
+async function condividiLink(link, testo, titolo){
   haptic();
-  const link = `${location.origin}/annuncio/${l.id}`;
-  const prezzo = (l.valuta==='eur' && l.priceEur>0)
-    ? `${fmtEur(l.priceEur)} €` : `${fmt(l.price)} sats`;
-  const testo = `${l.title} — ${prezzo} su Barattolo 🫙`;
-  /* Dentro Telegram (initData vero: nel browser lo stub mentirebbe)
-     la WebView NON ha navigator.share — si usa il canale di
-     Telegram, a scalare: shareURL se il client lo offre, altrimenti
-     il selettore chat via t.me/share/url. */
   if (tg?.initData) {
     if (typeof tg.shareURL === 'function') { tg.shareURL(link, testo); return; }
     if (typeof tg.openTelegramLink === 'function') {
@@ -10552,7 +10564,7 @@ async function condividiAnnuncio(){
     }
   }
   if (navigator.share) {
-    try { await navigator.share({title: l.title, text: testo, url: link}); return; }
+    try { await navigator.share({title: titolo, text: testo, url: link}); return; }
     catch(e) { if (e.name === 'AbortError') return; }  // ripensamento: fine
   }
   /* niente clipboard (contesti non sicuri): almeno il link nel toast,
@@ -10561,6 +10573,25 @@ async function condividiAnnuncio(){
     .then(()=>toast('Link copiato 🔗'))
     .catch(()=>toast(link, 5000));
   else toast(link, 5000);
+}
+
+function condividiAnnuncio(){
+  const l = currentListing; if (!l) return;
+  const prezzo = (l.valuta==='eur' && l.priceEur>0)
+    ? `${fmtEur(l.priceEur)} €` : `${fmt(l.price)} sats`;
+  return condividiLink(`${location.origin}/annuncio/${l.id}`,
+                       `${l.title} — ${prezzo} su Barattolo 🫙`, l.title);
+}
+
+/* Il link della spiegazione lunga del deposito. Il testo che
+   accompagna il link dice la COSA e non il nome della pagina: si manda
+   a chi ha chiesto «ma come funziona, mi fido?», che del nome delle
+   nostre viste non sa niente. Senza ancora: chi lo riceve la legge
+   dall'inizio. */
+function condividiSicurezza(){
+  return condividiLink(`${location.origin}/sicurezza`,
+    'Come funziona il pagamento protetto su Barattolo 🫙⚡',
+    'Il pagamento protetto');
 }
 
 function condividiMioNegozio(){
