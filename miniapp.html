@@ -15115,6 +15115,25 @@ async function apriAnnuncioDaUrl(){
   openDetail(id);
 }
 
+/* /sicurezza — il link condivisibile della pagina «Il pagamento
+   protetto» (ago 2026). Gemella delle due qui sopra, ma senza niente
+   da caricare: la pagina è markup fisso, quindi basta aprirla.
+   L'ANCORA è facoltativa e vive nel frammento: `/sicurezza#limiti`
+   atterra su «Dove il deposito non può proteggerti». Nel markup gli id
+   portano il prefisso `sicu-`, e il frammento no — così l'indirizzo
+   che si manda a qualcuno resta corto e leggibile, e il prefisso lo
+   rimette qui il codice. Un'ancora che non esiste non fa niente:
+   apriSicurezza cerca l'elemento e, se non c'è, lascia la pagina in
+   cima (nessun ramo d'errore da scrivere). */
+const SICUREZZA_URL = location.pathname.match(/^\/sicurezza\/?$/);
+let sicurezzaAperta = false;
+function apriSicurezzaDaUrl(){
+  if (!SICUREZZA_URL || sicurezzaAperta) return;
+  sicurezzaAperta = true;
+  const anc = (location.hash || '').replace(/^#/, '');
+  apriSicurezza(anc ? 'sicu-' + anc : '');
+}
+
 /* Browser senza identità Telegram: si prova la vetrina vera, cioè gli
    annunci pubblici in sola lettura. Niente header di autenticazione:
    siamo anonimi e il backend non deve sapere nulla di noi. */
@@ -15129,6 +15148,7 @@ async function avviaVetrina(){
     renderGrid();
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
+    apriSicurezzaDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
        guardie interne decidono comunque se comparire */
     modaleTest(bannerInstallaPwa);
@@ -15262,6 +15282,7 @@ async function avvia(){
     }
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
+    apriSicurezzaDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour
        one-shot (e poi il banner installa) partono alla sua chiusura */
     modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });

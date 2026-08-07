@@ -20164,6 +20164,21 @@ def pagina_annuncio(aid: int):
     return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
 
 
+@app.get("/sicurezza")
+def pagina_sicurezza():
+    """Link condivisibile della pagina «Il pagamento protetto»: stessa
+    Mini App, il JS legge /sicurezza dall'URL e apre la vista — con
+    l'ancora facoltativa (`/sicurezza#limiti` atterra su «Dove il
+    deposito non puo' proteggerti»).
+
+    E' la pagina che si manda a chi chiede «ma come funziona, mi
+    fido?», cioe' proprio a chi non ha ancora aperto Barattolo: da qui
+    si legge tutta, anche da anonimi, senza entrare da nessuna parte.
+    Nessun `{parametro}` come nelle gemelle: la pagina e' UNA."""
+    return FileResponse("miniapp.html", media_type="text/html",
+                        headers=HEADER_NO_CACHE)
+
+
 @app.get("/vendor/nostr.js")
 def vendor_nostr():
     """La libreria nostr-tools, servita da casa nostra e mai da una CDN:
