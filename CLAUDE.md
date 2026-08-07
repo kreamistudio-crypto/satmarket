@@ -5615,10 +5615,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   solo e un database solo, non ridondato; poi cosa NON si ferma con lui
   — ⚡ i sats (nodo Lightning nostro, seed offline), 🟣 gli annunci su
   Nostr, 📖 il codice, 💾 storico e reputazione col backup giornaliero
-  fuori dal server — e la chiusa di Andrea, «oggi il punto di fiducia
-  siamo noi due… la direzione è ridurlo, non nasconderlo», a grandezza
-  PIENA e non in `.sicu-nota`: rimpicciolire la riga che dice «non
-  nasconderlo» sarebbe la cosa più storta della pagina.
+  fuori dal server. E FINISCE LÌ, SULL'ELENCO (ago 2026, decisione di
+  Andrea): le due righe che chiudevano la sezione — «quello che resta
+  fragile è l'infrastruttura, non i fondi… il passo dichiarato è un
+  relay Nostr nostro» e la chiusa «oggi il punto di fiducia siamo noi
+  due… la direzione è ridurlo, non nasconderlo» — sono state TOLTE.
+  IL PERCHÉ DELLA PRIMA È UN FATTO CAMBIATO, ed è la parte da
+  ricordare: oggi ci sono gli SNAPSHOT dell'intera macchina, un backup
+  GIORNALIERO del database e una copia FUORI dal server — la macchina
+  si rimette in piedi, quindi «resta fragile l'infrastruttura» era
+  diventato falso quanto lo sarebbe promettere che non si ferma niente.
+  La seconda se n'è andata con lei: era il commento di quella riga, e
+  da sola avrebbe chiuso la pagina su una promessa invece che su un
+  elenco di fatti — che è l'affermazione più forte delle due. Chi
+  volesse rimetterci una terza riga si chieda prima quale FATTO
+  racconta: la coda della pagina è il posto dove le frasi invecchiano
+  per prime.
   OGNI RIGA È UN FATTO OPERATIVO, e chi la ritocca verifica il FATTO e
   non la frase — sono affermazioni sui soldi e sui dati di altri, e
   invecchiano fuori dal repo (nel codice non se ne vede nessuna). Le
