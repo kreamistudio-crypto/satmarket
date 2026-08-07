@@ -16092,16 +16092,25 @@ def _fmt_sats(n: int) -> str:
     return f"{n:,}".replace(",", ".")
 
 
+def _fmt_eur(x: float) -> str:
+    """284.61 -> '284,61': la VIRGOLA dei decimali, che in italiano il
+    punto separa le migliaia e su una cifra grande si legge per un
+    fattore mille. Gemello di _fmt_sats, e come lui vive in un posto
+    solo: da qui passano i post del canale, le note Nostr e le
+    anteprime dei link, che dicono tutti la stessa riga di prezzo."""
+    return f"{x:.2f}".replace(".", ",")
+
+
 def _prezzo_promo(a: dict, cambio: float) -> str:
     """Il prezzo del post: la valuta del listino per prima, l'altra
     col ≈. Se il cambio non c'e' (CoinGecko muto) il ≈ si omette."""
     if a.get("valuta") == "eur" and a.get("prezzo_eur"):
-        return (f"{a['prezzo_eur']:.2f} € "
+        return (f"{_fmt_eur(a['prezzo_eur'])} € "
                 f"(≈ {_fmt_sats(a['prezzo_sats'])} sats)")
     prezzo = f"{_fmt_sats(a['prezzo_sats'])} sats"
     if cambio > 0:
         eur = a["prezzo_sats"] / 100_000_000 * cambio
-        prezzo += f" (≈ {eur:.2f} €)"
+        prezzo += f" (≈ {_fmt_eur(eur)} €)"
     return prezzo
 
 
@@ -21241,19 +21250,32 @@ def _meta_annuncio(aid: int) -> str:
     prezzo che non scade che promettere uno sconto finito."""
     con = db()
     try:
-        # SOLO GLI ATTIVI (punto 1 qui sopra): la stessa clausola di
-        # /api/listings/{id}, ed e' la riga che tiene l'anteprima
-        # dentro il patto dello scudo anti-resurrezione.
+        # ATTIVI E VENDUTI (punto 1 qui sopra), la stessa coppia di
+        # /api/listings/{id}: un esaurito e' uno SCAFFALE VUOTO, il
+        # link mandato a un amico non deve morire con le scorte, e la
+        # scheda c'e' ancora (spenta, col «rimetti in vendita» del suo
+        # venditore). Fuori restano 'rimosso' e 'revisione', che non
+        # sono scaffali vuoti ma annunci che non esistono (piu'), e
+        # sono la riga che tiene l'anteprima dentro il patto dello
+        # scudo anti-resurrezione: una card cachata e inoltrata li
+        # farebbe vivere in giro per giorni.
         r = con.execute(
             "SELECT titolo, descrizione, zona, valuta, prezzo_sats, "
-            "prezzo_eur, foto FROM annunci WHERE id=? AND stato='attivo'",
+            "prezzo_eur, foto, stato FROM annunci "
+            "WHERE id=? AND stato IN ('attivo','venduto')",
             (aid,)).fetchone()
     finally:
         con.close()
     if not r:
         return META_GENERICI
     a = dict(r)
-    testa = _prezzo_promo(a, cambio_noto_ora())
+    # Il ✅ davanti a tutto e' il patto di _caption_canale, che al
+    # venduto riscrive la caption del canale: IL POST NON DEVE MENTIRE.
+    # Vale doppio qui, dove la card la ripubblica chi inoltra: sta in
+    # TESTA alla descrizione perche' e' l'unico pezzo che nessuna
+    # piattaforma puo' troncare via.
+    testa = "✅ Venduto · " if a["stato"] == "venduto" else ""
+    testa += _prezzo_promo(a, cambio_noto_ora())
     comune = comune_da_zona(a["zona"] or "")
     if comune:
         testa += f" · {comune}"

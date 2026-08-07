@@ -6565,7 +6565,7 @@ def prove_anteprime():
         i = _SORGENTE.index(costante)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     for f in ("_meta_anteprima", "_taglia_meta", "_immagine_anteprima",
-              "_fmt_sats", "_prezzo_promo", "_meta_annuncio",
+              "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_meta_annuncio",
               "_meta_negozio", "_meta_o_generici"):
         exec(pezzo(f), amb)
     i = _SORGENTE.index("META_GENERICI = _meta_anteprima(")
@@ -6580,6 +6580,26 @@ def prove_anteprime():
     prova("...taglia a parola intera", "uno due…",
           taglia("uno due tre quattro", 9))
     prova("...e regge il campo vuoto", "", taglia(None, 20))
+
+    # --- 1bis) l'euro si scrive con la VIRGOLA ---------------------
+    # Vive in _fmt_eur, gemello di _fmt_sats, e da li' passano tutti e
+    # tre i posti che dicono la stessa riga di prezzo: i post del
+    # canale, le note Nostr e le anteprime. Col punto una cifra grande
+    # si legge per un fattore mille.
+    eur = amb["_fmt_eur"]
+    prova("l'euro porta la virgola dei decimali", "284,61", eur(284.61))
+    prova("...anche tondo", "5,00", eur(5))
+    prova("...e i centesimi non si perdono", "0,07", eur(0.07))
+    pp = amb["_prezzo_promo"]
+    prova("il listino in euro parla italiano",
+          "38,50 € (≈ 70.000 sats)",
+          pp({"valuta": "eur", "prezzo_eur": 38.5, "prezzo_sats": 70000}, 0))
+    prova("...e il ≈ del listino in sats pure",
+          "100.000 sats (≈ 55,00 €)",
+          pp({"valuta": "sats", "prezzo_sats": 100000}, 55000.0))
+    prova("...senza cambio il ≈ si omette, come sempre",
+          "100.000 sats",
+          pp({"valuta": "sats", "prezzo_sats": 100000}, 0))
 
     # --- 2) L'ESCAPING: qui il testo dell'utente sta in un ATTRIBUTO -
     # Una virgoletta non escapata non «si vede male»: chiude il
@@ -6679,15 +6699,40 @@ def prove_anteprime():
           "RISERVATO1" in attivo)
     prova("...e l'og:url canonico", True,
           'content="https://barattolo.store/annuncio/1"' in attivo)
+    prova("...e non si spaccia per venduto", False, "Venduto" in attivo)
 
-    # ECCO IL PUNTO: togliendo `AND stato='attivo'` dalla WHERE, queste
-    # otto diventano rosse tutte insieme.
-    for aid, stato in ((2, "rimosso"), (3, "revisione"), (4, "venduto")):
+    # IL VENDUTO E' UNO SCAFFALE VUOTO, non un annuncio che non c'e':
+    # la scheda esiste ancora (/api/listings/{id} la serve dal cantiere
+    # dello stock), quindi il link mandato a un amico non deve morire
+    # con le scorte. Ma la card non deve nemmeno MENTIRE — e' il patto
+    # di _caption_canale, che al venduto riscrive il post del canale.
+    venduto = ma(4)
+    prova("il venduto ha la sua anteprima vera", True,
+          "SEGRETO4 cuffie da studio" in venduto)
+    prova("...e lo DICE, in testa alla descrizione", True,
+          'content="✅ Venduto · ' in venduto)
+    prova("...senza perdere il link al suo scaffale", True,
+          'content="https://barattolo.store/annuncio/4"' in venduto)
+
+    # ECCO IL PUNTO: togliendo lo stato dalla WHERE, queste quattro
+    # diventano rosse tutte insieme.
+    for aid, stato in ((2, "rimosso"), (3, "revisione")):
         m = ma(aid)
         prova(f"un annuncio {stato} ricade sui tag generici", GEN, m)
         prova(f"...e di lui non trapela una parola ({stato})", True,
               f"SEGRETO{aid}" not in m and f"RISERVATO{aid}" not in m)
     prova("un annuncio che non esiste: tag generici", GEN, ma(999))
+
+    # e i due elenchi non possono divergere: quello che la scheda
+    # serve e' quello di cui l'anteprima puo' parlare, o si manda un
+    # link con una bella card che poi atterra su un «non trovato»
+    corpo_rotta = _SORGENTE[_SORGENTE.index('@app.get("/api/listings/'
+                                            '{annuncio_id}")'):]
+    corpo_rotta = corpo_rotta[:corpo_rotta.index("\n\n\n")]
+    stati_scheda = _re.findall(r"stato IN \(([^)]+)\)", corpo_rotta)
+    stati_meta = _re.findall(r"stato IN \(([^)]+)\)", pezzo("_meta_annuncio"))
+    prova("l'anteprima parla degli stessi stati che la scheda serve",
+          stati_scheda, stati_meta)
 
     # --- 6) il negozio: quel che esce e quel che non esce -----------
     neg = mn("rosina")
