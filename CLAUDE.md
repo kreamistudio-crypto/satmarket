@@ -4504,6 +4504,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   riga per interruzione dopo dieci minuti di silenzio (il conto è in
   GIRI e non in secondi, o con una cadenza che non divide 600 quel
   momento non arriverebbe mai).
+  DUE NUMERI, UNA SOLA ETÀ (ago 2026): la stessa GET porta euro E
+  dollari (`vs_currencies=eur,usd`) senza costare un byte in più, e
+  siccome arrivano insieme invecchiano insieme — quindi `quando` è UNO
+  e non uno per valuta, e `_cambio_valido` non cambia di una riga. Il
+  DOLLARO NON ENTRA IN NESSUN PERCORSO DEL DENARO: le invoice le fa
+  `cambio_btc_eur`, che è e resta l'euro; il dollaro esce solo da
+  `cambio_per_import()`. E l'euro COMANDA la lettura: se manca lui la
+  lettura non vale, anche se il dollaro fosse arrivato.
+  L'IMPORT DA NOSTR BEVE ALLA STESSA FONTE, ed era l'ultima verità
+  doppia rimasta in piedi — si è fatta vedere nel journal: alle
+  14:52:33 il server legge 56.313, alle 14:52:57 l'import stampa
+  «⚠️ Cambio BTC non disponibile: gli annunci in EUR/USD verranno
+  saltati». Due letture, due esiti, per convertire gli stessi bitcoin.
+  E il guasto era più grosso di una chiamata doppia: quella lettura
+  viveva DENTRO `importa_venditore`, che il giro orario chiama UNA
+  VOLTA PER VENDITORE — cioè una raffica di chiamate a ogni giro, dallo
+  stesso IP da cui bussa già il nostro rinfresco (probabile causa del
+  429 osservato), e per giunta una conversione DIVERSA per ogni
+  venditore dello stesso giro. Ora `importa_venditore` accetta
+  `cambio`, il patto del `vaglio` e di `scarica`: il server lo legge
+  UNA volta per giro con `cambio_per_import()` (dalla cache, mai dalla
+  rete) e lo passa a tutti — quindi tutti gli annunci di un giro si
+  convertono allo stesso cambio, che è anche quello delle invoice.
+  Lo SCRIPT A MANO resta identico: `cambio=None` vuol dire «me lo leggo
+  io», e `cambio_btc()` è ancora lì per lui (adesso col PERCHÉ nel
+  messaggio d'errore — «non disponibile» può essere una rete giù o un
+  429, e sono due problemi diversi). Un dizionario VUOTO passato
+  apposta vuol dire «non ce l'ho», e l'import si comporta come ha
+  sempre fatto: salta gli annunci in EUR/USD e LO DICE — il messaggio
+  vive in `MSG_CAMBIO_MANCANTE`, un posto solo per le due strade, o il
+  ramo nuovo avrebbe saltato in silenzio.
   UNA SOLA FONTE, ed è la parte che tocca il client: prima ogni browser
   chiamava CoinGecko per conto suo — N utenti N chiamate, e soprattutto
   DUE verità, perché il «≈» della vetrina poteva dire una cifra e il
@@ -8338,6 +8369,28 @@ momento della fattura non si forza nessuna lettura: nel percorso caldo
 la rete resta la rete di sicurezza dietro il raffreddamento. Misurato
 dal vivo: il valore sul disco non ha mai più di 60 secondi, e nell'arco
 di due minuti si vede muovere (56.324 → 56.329 → 56.340 €/BTC).
+E poi l'ultima verità doppia, trovata nel journal dopo il deploy (ago
+2026): alle 14:52:33 il server legge il cambio, alle 14:52:57 l'import
+Nostr dice che non è disponibile. `importa_nostr.cambio_btc()` era una
+seconda lettura — e stava DENTRO `importa_venditore`, cioè una chiamata
+PER VENDITORE a ogni giro orario, dallo stesso IP da cui bussa già il
+nostro rinfresco. Ora il server legge il cambio una volta per giro e lo
+passa a tutti (`cambio_per_import()`, il patto del `vaglio`), la stessa
+GET porta anche il dollaro che all'import serve, e lo script a mano
+resta identico. Vedi Architettura, «L'IMPORT DA NOSTR BEVE ALLA STESSA
+FONTE».
+Collaudato: 21 prove nuove/aggiornate (1512 verdi, erano 1499) più
+cinque mutazioni del codice — import che torna a leggersi il cambio da
+solo, cambio vuoto che passa in silenzio, lettura spostata dentro il
+giro dei venditori, dollaro scaduto che esce lo stesso, euro che smette
+di comandare — ognuna rossa da sola. E un collaudo eseguibile che gira
+`importa_venditore` VERA su database usa-e-getta coi relay di cartone,
+12 verdi: col cambio iniettato l'annuncio in EUR entra convertito al
+cambio del server e CoinGecko non viene toccato; col cambio vuoto si
+salta e lo si dice; con `cambio=None` la strada di ieri è intatta; e
+l'annuncio in USD entra col dollaro del server e si salta senza. IN
+PRODUZIONE basta il deploy: la riga 'usd' nasce da sola al primo
+rinfresco.
 Collaudato: 29 prove nuove in `prove.py` (1486 verdi, erano 1457) — il
 giudice puro al filo esatto e un secondo dopo, l'andata e ritorno dal
 disco, e il caso del cantiere provato per davvero (cache vuota + rete
