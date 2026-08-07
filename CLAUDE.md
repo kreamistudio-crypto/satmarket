@@ -163,6 +163,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   netto del VIETATO è che nomina un ordine, un account o un pagamento
   CHE ESISTEREBBERO GIÀ — cosa impossibile in un annuncio che chi
   legge sta guardando per la prima volta.
+  SUL PRIMO DEI DUE ESEMPI IL MODELLO È PIÙ SEVERO DEL PROMPT, ed è
+  registrato invece che nascosto (decisione di Andrea): «Assistenza
+  Barattolo — supporto agli utenti» esce VIETATO benché il prompt gli
+  insegni DUBBIO su quella riga esatta — chi si mette «Assistenza»
+  davanti al nostro nome e si offre di risolvere problemi con gli
+  ordini fa già un passo dentro il parlare a nome nostro. Si accetta
+  perché sbaglia dalla parte SEVERA su un caso che la severità la
+  merita, e nel collaudo l'atteso è stato portato a VIETATO — stretto,
+  mai «VIETATO o DUBBIO», o i giri non tornerebbero mai pieni e una
+  regressione vera si perderebbe nel rumore. Il prompt NON si tocca:
+  la sua riga DUBBIO è ancora viva e la tiene in piedi «Barattolo
+  Ufficiale — store», che DUBBIO lo prende davvero. Se un domani
+  cadessero tutt'e due, la voce è scivolata verso il rifiuto e va
+  guardata.
   DUE CONTRO-REGOLE, e sono la metà che conta: quelle che un riordino
   toglie per prime perché sembrano un ripensamento. 1) **Nominare
   Barattolo è lecito e non è MAI di per sé un motivo** («gadget di
