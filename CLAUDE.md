@@ -5640,14 +5640,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   metà che non ce l'ha. IL TESTO SI FERMA LÌ, e la ragione è la
   domanda che verrà subito dopo: «e allora posso aggiornarlo o
   ritirarlo da un client qualunque?». Su Nostr sì, l'autore è lui; su
-  BARATTOLO no, e oggi il comportamento è accidentale invece che
-  deciso — le colonne del match dell'import (`nostr_origine_d`,
-  `nostr_origine_id`) sono vuote per gli annunci nati qui, quindi una
-  sua NIP-09 non spegne la riga locale, mentre il match per TITOLO
-  dell'import aperto può «adottare» la riga e scriverle addosso
-  `contatto_nostr` (vedi il compito aperto). Finché quel giro non è
-  deciso, la pagina promette il possesso dell'EVENTO e non un flusso
-  di modifica che non esiste.
+  BARATTOLO no, ed è una scelta e non più un accidente (ago 2026, vedi
+  «IL RIFLESSO NON È UNA FONTE»): l'annuncio nato qui si modifica e si
+  ritira DA QUI, e l'import non tocca gli eventi che ha fatto firmare
+  lui. La pagina promette quindi il possesso dell'EVENTO — che è vero
+  e resta vero senza di noi — e non un flusso di modifica da fuori,
+  che non esiste apposta.
   I TEMPI DELL'ESCROW STANNO IN UN POSTO SOLO (lug 2026): la costante
   `TEMPI` in cima al JS — `conferma` 72 ore, `autoSblocco` 10 giorni,
   `confermaDig` 24 ore, `silenzioDig` 48 ore, `invoice` 15 minuti —
@@ -6076,6 +6074,75 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   è il tipo di riga che sparisce in un refactor.
   La pulizia delle copie già nate è `ripulisci_anello_nostr.py` (vedi
   sotto).
+  IL RIFLESSO NON È UNA FONTE (ago 2026, la stessa lezione dell'anello
+  con la chiave dell'ALTRO — trovata leggendo il codice e riprodotta
+  prima di toccare niente). Dal BIVIO, l'annuncio di chi ha una chiave
+  provata esce sul SUO account: lo componiamo noi (`evento_annuncio`)
+  e a firmarlo è il suo browser. La riga resta NATIVA — `contatto_nostr`
+  e `nostr_origine_d` vuoti, solo `nostr_event_id` e `nostr_autore` —
+  ma quel venditore è in `venditori_nostr_attivi`, quindi l'import
+  RILEGGE i suoi eventi, `barattolo-{id}` compresi. `chiave_di_casa`
+  non lo para: esclude la chiave della PIATTAFORMA, e qui la chiave è
+  la SUA.
+  A scattare era il match per TITOLO (quello per `d` non può: la riga
+  nativa ha `nostr_origine_d` vuoto), la cui clausola ammette proprio
+  quel vuoto — e da lì la riga veniva ADOTTATA: `contatto_nostr` e
+  coordinata scritte addosso, e l'annuncio nato qui diventava un
+  importato a tutti gli effetti. Le conseguenze, tutte riprodotte:
+  `modifica()` e la ricarica dello stock rispondono 400; la via di
+  scampo `modifica-firmata` esige `npub_accesso`, quindi chi ha SOLO
+  il badge 🟣 verificato resta senza NESSUNA strada; una sua NIP-09 da
+  un client qualunque spegne la riga su Barattolo (prima non faceva
+  niente); la descrizione si prende il FOOTER promozionale, perché il
+  BIVIO firma con `evento_annuncio` — è esattamente ciò che la
+  modifica firmata evita apposta, e il BIVIO non lo sapeva; le foto si
+  riscaricano da noi stessi con nomi NON versionati, quindi la `_min`
+  non combacia più; e la riga diventa «a due teste», che il libro
+  mastro considera già un guasto suo.
+  IL RICONOSCIMENTO È UNA DOMANDA AL DATABASE, NON AL TESTO
+  DELL'EVENTO, ed è la parte da non ammorbidire: TRE condizioni
+  insieme — il `d` è una coordinata nostra (`id_riflesso`), la riga
+  che nomina è NATIVA, e quella riga l'abbiamo fatta firmare proprio a
+  QUELLA chiave (`e_riflesso`, due giudici puri torturati in CI). Col
+  solo prefisso `barattolo-` ci si affiderebbe a una convenzione di
+  stringa che chiunque può scrivere; con tutte e tre, a mentire
+  dovrebbe essere il nostro stesso database. `nostr_autore` vuoto non
+  basta MAI (vuol dire riga mai firmata, e due vuoti che si somigliano
+  non sono una prova) e la colonna è entrata nella lista delle
+  migrazioni di `importa_nostr.py`, o lo script lanciato a mano su un
+  database vecchio non filtrerebbe niente in silenzio.
+  Il filtro sta PRIMA del vaglio, e non è un dettaglio: così non si
+  paga l'AI per rigiudicare un testo che la moderazione ha già
+  approvato quando l'annuncio è nato — e soprattutto un «dubbio» non
+  può rimandare in revisione un annuncio VIVO e in vetrina, che era il
+  modo peggiore in cui questo bug poteva presentarsi (l'evento non
+  combacia mai col database finché l'adozione non avviene: il footer).
+  LA PERDITA DICHIARATA: se il venditore modifica quell'evento da
+  Amethyst — titolo, prezzo, zona — Barattolo non lo recepisce più e
+  le due copie divergono in silenzio. È il verso giusto: quell'annuncio
+  è NATO QUI e ha categoria, condizione, stock, spedizione e magari
+  un'asta che sui relay non esistono, e lasciare che un evento li
+  ricopra è proprio ciò che rompeva la modifica. Ma è una perdita
+  vera, non un effetto collaterale gradito.
+  LA STRADA SCARTATA, e va tenuta perché è quella che torna in mente:
+  non adottare il contenuto ma OBBEDIRE LO STESSO AL KIND 5 (facendo
+  matchare le cancellazioni anche su `nostr_event_id`), cioè
+  «modifichi qui, ritiri da dove vuoi» — più nostr-nativo, e forse
+  quello che un bitcoiner si aspetta. Scartata perché il kind 5 si usa
+  con leggerezza: chi ripulisce la sua cronologia sui relay
+  chiuderebbe il negozio qui senza volerlo, e la LAPIDE è per sempre —
+  non potrebbe rimettere in vendita quell'annuncio senza ripubblicarlo
+  con un `d` nuovo. Fra un ritiro che obbedisce a metà e una regola
+  sola, la regola. Chi la riproponga porti il pezzo che manca: un modo
+  di distinguere «ritiro questo annuncio» da «faccio pulizia».
+  IL CASO VERO DEL CANTIERE, che spiega perché in produzione il
+  contatore diceva zero: l'annuncio 173 (copia dell'89 nata
+  dall'anello) porta `nostr_origine_d='barattolo-89'` ed era ancora
+  ATTIVO, quindi intercettava il match per `d` a ogni giro e faceva da
+  PARAFULMINE all'89. Toglierlo per primo avrebbe scoperto l'89 al giro
+  successivo — l'ordine dei lavori era vincolante, prima il tappo e poi
+  la pulizia, ed è la stessa trappola per chiunque ripulisca a mano dei
+  doppioni: si guarda cosa stava riparando la riga che si sta togliendo.
   MODERAZIONE, e qui i due strati finiscono in modo DIVERSO:
   le PAROLE VIETATE restano uno scarto secco (deterministico: armi e
   droga non vogliono una coda ma una porta chiusa; resta nel registro,
@@ -7815,6 +7882,34 @@ legge senza quel gate e la pagina Paga scriveva «gratuita».
 Riprodotto su DB usa-e-getta prima di toccare: preventivo 100.000,
 invoice 105.000. Ora la guardia è la STRADA. Va nel verso di chi
 compra: dopo il deploy quelle spedizioni diventano gratis davvero.
+
+L'import non adotta più gli annunci nati qui (ago 2026): un evento che
+abbiamo composto noi e fatto firmare al venditore — il BIVIO — è il
+RIFLESSO di una riga locale, non una sua fonte, e l'import lo salta.
+Senza il tappo il match per TITOLO gli scriveva addosso
+`contatto_nostr`: da lì niente più modifica dal form (e chi ha solo il
+badge 🟣 restava senza nessuna strada, che `modifica-firmata` esige
+`npub_accesso`), la descrizione si prendeva il footer promozionale, e
+una sua NIP-09 da un client qualunque spegneva l'annuncio su Barattolo.
+Vedi Architettura, «IL RIFLESSO NON È UNA FONTE», per le tre condizioni
+del riconoscimento, la perdita dichiarata (una modifica fatta da un
+altro client non arriva più) e la strada scartata del kind 5.
+Riprodotto su DB usa-e-getta prima di toccare — adozione, NIP-09 che
+spegne, footer nella descrizione e foto riscaricate da noi stessi —
+poi verificato che la correzione chiuda tutti e quattro senza spegnere
+l'import vero (un annuncio davvero importato entra e si aggiorna come
+sempre). 1314 prove verdi, di cui 15 nuove: i due giudici puri sui loro
+casi e due sentinelle di forma, TORTURATE con cinque mutazioni del
+codice — chiamata tolta, filtro spostato dopo il vaglio, ognuna delle
+tre condizioni rotta — e ognuna diventa rossa da sola. IN PRODUZIONE
+basta il deploy: nessuna colonna nuova sul server, nessuna migrazione,
+nessuna leva (la colonna `nostr_autore` è solo entrata nella lista di
+`importa_nostr.py`, per lo script lanciato a mano su un database
+vecchio). Il conto prima del cantiere: zero annunci già adottati, uno
+esposto al giro dopo. L'ORDINE DEI LAVORI ERA VINCOLANTE e vale per
+chiunque ripulisca a mano i doppioni dell'anello: prima il tappo, poi
+la rimozione della copia — vedi il caso dell'annuncio 173, che faceva
+da parafulmine all'89.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
