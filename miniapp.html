@@ -1903,6 +1903,17 @@
      sta e va a capo — legati scendono INSIEME («...di aver ricevuto /
      l'oggetto. Scopri di piu'») invece di lasciare il link solo, in
      fondo, che tornerebbe a somigliare al piede staccato di prima. */
+  /* La base vale ovunque (dall'ago 2026 il link vive anche nel
+     pannello «Spedisci»): prende il COLORE DEL TESTO ATTORNO, cosi' in
+     ogni posto sembra la stessa frase che continua — verde nel
+     recinto, grigio nel pannello. La regola del recinto resta sotto e
+     vince per specificita': quel verde e' dichiarato, non ereditato
+     per caso. */
+  .fine-frase{white-space:nowrap}
+  .scopri-link{border:0;background:none;padding:0;margin:0;
+    font:inherit;font-weight:800;color:inherit;
+    text-decoration:underline;text-underline-offset:3px;
+    white-space:nowrap;cursor:pointer}
   .escrow-zone .fine-frase{white-space:nowrap}
   .escrow-zone .scopri-link{border:0;background:none;padding:0;margin:0;
     font:inherit;font-weight:800;color:var(--trust-note);
@@ -2995,7 +3006,7 @@
       <p>Finché i sats sono nel deposito puoi <b>aprire una disputa</b> dalla pagina del tuo ordine. Il deposito si congela e interviene un <b>moderatore</b>: legge le due versioni, guarda quello che avete (foto, tracking, messaggi) e decide. Le strade sono due — i sats <b>tornano a te</b>, spedizione compresa, oppure vanno al venditore. Quando l'oggetto va restituito, il rimborso parte dopo che è tornato indietro.</p>
       <p class="sicu-nota">Aprire una disputa non è un'accusa: nella gran parte dei casi è un malinteso che si chiarisce in mezza giornata.</p>
 
-      <h3>Dove il deposito non può proteggerti</h3>
+      <h3 id="sicu-limiti">Dove il deposito non può proteggerti</h3>
       <p>Meglio dirlo prima che scoprirlo dopo.</p>
       <ul class="sicu-lista">
         <li><b>Un codice rivelato non torna indietro.</b> Nessuno — nemmeno noi — può sapere se l'hai già riscattato. Per questo la finestra è di <span data-tempo="confermaDig"></span> ore: provalo <i>subito</i>. Se non ci sono prove da nessuna delle due parti, la regola di default dà ragione a chi ha consegnato.<br>Vale anche al contrario: <b>se il codice non funziona, hai <span data-tempo="confermaDig"></span> ore per aprire una disputa</b> — e in quel momento i sats sono ancora fermi.</li>
@@ -3024,7 +3035,7 @@
       <p>Quello che <b>non</b> si ferma con lui:</p>
       <ul class="sicu-lista sicu-cose">
         <li><span class="em">⚡</span><b>I sats.</b> Il deposito non vive qui dentro: sta su un <b>nodo Lightning nostro</b>, separato dal server, e la sua seed è custodita offline. Il gestionale che lo comanda è ospitato da terzi; il nodo e la seed no.</li>
-        <li><span class="em">🟣</span><b>Gli annunci.</b> Quelli pubblicati da qui finiscono su <b>Nostr</b> (NIP-99): esistono sui relay indipendentemente da noi, firmati dalla nostra chiave. Chi entra con la propria chiave e pubblica dal suo client firma con la sua: identità e catalogo restano suoi, noi li mostriamo e basta. È il motivo per cui abbiamo scelto Nostr dal primo giorno.</li>
+        <li><span class="em">🟣</span><b>Gli annunci.</b> Vanno su <b>Nostr</b> (NIP-99) ed esistono sui relay indipendentemente da noi. Se hai una <b>chiave Nostr tua</b>, provata, l'annuncio esce sul <b>tuo</b> account — a firmarlo è il tuo browser, la chiave non passa mai di qui — e resta tuo anche se Barattolo non c'è più. Se non ce l'hai lo firma la nostra: resta leggibile in piazza, ma a governarlo siamo noi. La chiave si collega dal Profilo, ed è il motivo per cui abbiamo scelto Nostr dal primo giorno.</li>
         <li><span class="em">📖</span><b>Il codice.</b> È la cosa più facile da rimettere in piedi altrove.</li>
         <li><span class="em">💾</span><b>Lo storico degli ordini</b> e la reputazione che ci avete costruito. Vivono in un posto solo, ma sono salvati ogni giorno, con copie anche fuori dal server.</li>
       </ul>
@@ -3540,6 +3551,34 @@
       azione: il carrello si svuota e si ricomincia da capo.</div>
     <button class="btn orange" onclick="svuotaPacco()">Sì, ignora le modifiche</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET: LA PRIMA SPEDIZIONE ============ -->
+  <!-- Si legge PRIMA di andare all'ufficio postale, e per questo si
+       apre quando il venditore vede il pannello di spedizione — non al
+       tocco di «Segna come spedito», dove il pacco e' gia' partito e un
+       consiglio sulla copertura arriverebbe a cose fatte.
+       UNA volta per venditore e per sempre (utenti.avvisato_trasporto,
+       colonna e non localStorage: e' un fatto della persona). Il timbro
+       si scrive quando il foglio SI APRE, il patto del tour che si
+       consuma appena parte: chiuderlo senza leggere e' una scelta,
+       riproporlo a ogni spedizione sarebbe rumore — e col rumore si
+       smette di leggere anche il resto. -->
+  <div class="sheet" id="trasportoSheet" role="dialog" aria-modal="true"
+       aria-labelledby="trasportoTit">
+    <div class="grab"></div>
+    <h3 id="trasportoTit">📦 La tua prima spedizione</h3>
+    <div style="font-size:13.5px;color:var(--desc);font-weight:600;
+      line-height:1.55;margin-bottom:14px">
+      Il deposito protegge i <b>sats</b>, non il pacco: se il corriere lo
+      perde o lo rovina, il reclamo lo apri tu con lui.<br>
+      • <b>Spedisci col tracciamento</b> — è la prova che l'oggetto è
+      partito ed è arrivato.<br>
+      • <b>Per le cose di valore, compra la copertura</b> del corriere:
+      quella di base, verso i punti di ritiro, è molto bassa.
+    </div>
+    <button class="btn orange" onclick="navIndietro()">Ho capito</button>
+    <button class="btn ghost" onclick="trasportoScopri()">Come funziona il deposito</button>
   </div>
 
   <!-- ============ SHEET OFFERTA (contrattazione sul prezzo) ============ -->
@@ -5511,7 +5550,20 @@ let negozioCorrente = null;   // il profilo pubblico mostrato nella vista
    Il ritorno deve ricordare da dove si veniva — il patto di
    tornaDalNegozio. Nessun dato da caricare: la pagina e' markup fisso
    e vale anche per gli anonimi in vetrina. */
-function apriSicurezza(){ go('sicurezza'); }
+/* `ancora` = l'id di un titolo della pagina: chi ci arriva da un
+   pannello (il «Scopri di più» della spedizione) atterra sulla sezione
+   che gli interessa invece che in cima a una pagina lunga. Salto
+   SECCO e non scivolato: reduced-motion non ha niente da spegnere, e
+   qui una scivolata di due schermate sarebbe solo attesa. */
+function apriSicurezza(ancora){
+  go('sicurezza');
+  if (!ancora) return;
+  const e = el(ancora);
+  /* i 16px di respiro sopra il titolo non sono cosmesi: senza,
+     `block:'start'` lo appoggia al bordo e la prima riga si legge
+     tagliata (misurato: -6px) */
+  if (e) { e.scrollIntoView({block:'start'}); window.scrollBy(0, -16); }
+}
 /* I due «← Torna» sono la stessa cosa del gesto indietro, e da quando
    il gesto esiste dicono la stessa cosa per costruzione: la cronologia
    sa da dove si veniva meglio di quanto sapessero la variabile
@@ -9878,7 +9930,7 @@ function openOrder(id){
                venditore sta per andare a spedire, ed e' l'ultimo momento
                utile per comprare la copertura. La regola per esteso sta
                nella pagina «Il pagamento protetto». -->
-          <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto bassa.</div>
+          <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto <span class="fine-frase">bassa. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Scopri di più</button></span></div>
           ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
@@ -9912,6 +9964,7 @@ function openOrder(id){
      server (fail-open: senza rete la scritta invita a riaprire) */
   if (o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta)
     caricaStradeOrdine(o);
+  forseAvvisoTrasporto(o);
   /* Le monete partono dal messaggio di chiusura («Hai incassato…» /
      «Deposito sbloccato»), solo la prima volta che questo dispositivo
      vede l'affare concluso. Il ritardo lascia finire il cambio vista. */
@@ -9972,6 +10025,40 @@ async function inviaFeedback(btn){
   stellaScelta = 0;
   toast('⭐ Grazie per il feedback!');
   openOrder(currentOrder.id);
+}
+
+/* ---- l'avviso sul rischio del trasporto, una volta sola ----
+   Parte 1 nasce a 1 apposta: finche' /api/me non dice il contrario non
+   si apre nessun foglio a sorpresa (un server di ieri non manda la
+   chiave, e il silenzio non deve diventare un avviso). */
+let myAvvisatoTrasporto = 1;
+
+function forseAvvisoTrasporto(o){
+  if (DEMO || VETRINA || myAvvisatoTrasporto) return;
+  /* le stesse condizioni del pannello «📦 Spedisci»: il venditore, i
+     sats gia' in cassaforte, e una strada che spedisce davvero — sul
+     ritiro e sul codice online non c'e' nessun corriere di mezzo */
+  if (o.role!=='seller' || o.state!=='locked') return;
+  if (o.consegnaScelta==='ritiro' || o.consegnaScelta==='digitale') return;
+  if (o.asta && !o.consegnaScelta) return;   // aspetta la scelta del vincitore
+  myAvvisatoTrasporto = 1;                   // il timbro PRIMA di aprire
+  el('sheetBg').classList.add('open');
+  el('trasportoSheet').classList.add('open');
+  /* Fail-open: se la POST non arriva il foglio non torna comunque in
+     questa sessione, e al massimo ricompare la prossima volta. Meglio
+     un avviso in piu' che un avviso perso. */
+  fetch(`${API_BASE}/me/avviso-trasporto`, {method:'POST',
+    headers:{'X-Tg-Init-Data':authHdr()}}).catch(()=>{});
+}
+
+/* Dal foglio alla pagina: chiusura MIRATA (mai closeSheet, che
+   spegnerebbe tutta la pila) e poi la sezione che spiega il perche'. */
+function trasportoScopri(){
+  haptic();
+  el('trasportoSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open'))
+    el('sheetBg').classList.remove('open');
+  apriSicurezza('sicu-limiti');
 }
 
 /* ---- pannello incasso del venditore ---- */
@@ -15122,6 +15209,7 @@ async function avvia(){
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
     myDoppioni = me.doppioni_nostr || [];
     lampoLeve = me.lampo_leve || null;
+    myAvvisatoTrasporto = me.avvisato_trasporto ? 1 : 0;
     /* il tetto del barattolo lo decide il config del VPS: qui si
        adotta, non si indovina (un server di ieri non manda la chiave
        e resta il valore di partenza) */

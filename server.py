@@ -1702,6 +1702,15 @@ def init_db():
                     # mancante) — colonna e non memoria, il patto del
                     # gemello qui sopra
                     "avvisato_contatto INTEGER DEFAULT 0",
+                    # il timbro dell'avviso sul rischio del trasporto
+                    # (ago 2026): il foglio che si legge PRIMA della
+                    # prima spedizione — il deposito protegge i sats,
+                    # non il pacco. UNA volta per venditore e per
+                    # sempre; colonna e non localStorage perche' e' un
+                    # fatto della PERSONA e non del dispositivo (a
+                    # differenza del dismiss del wallet NWC, che il
+                    # wallet ce l'ha solo quel telefono).
+                    "avvisato_trasporto INTEGER DEFAULT 0",
                     # IL NEGOZIO IN FERIE (ago 2026): 0 = aperto,
                     # altrimenti il timestamp del rientro. UNA colonna
                     # e non un booleano piu' una data, ed e' la scelta
@@ -14018,6 +14027,26 @@ async def scegli_suggerimenti(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "attivi": bool(attivi)}
+
+
+@app.post("/api/me/avviso-trasporto")
+async def timbra_avviso_trasporto(x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """«L'ho visto»: il foglio sul rischio del trasporto e' stato
+    aperto, e non si riapre mai piu' (vedi #trasportoSheet nel client).
+
+    Niente body e niente da validare: e' un timbro, e l'unico valore
+    possibile e' 1 — non esiste il verso opposto, perche' un avviso
+    letto non si puo' slettere. Il client lo scrive quando il foglio SI
+    APRE e non quando si chiude, il patto delle campagne: un errore di
+    rete puo' perdere un avviso di cortesia, mai raddoppiarlo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    con.execute("UPDATE utenti SET avvisato_trasporto=1 WHERE tg_id=?",
+                (user["id"],))
+    con.commit()
+    con.close()
+    return {"ok": True}
 
 
 BIGLIETTI_FIRMA_NOSTR: dict[str, dict] = {}
