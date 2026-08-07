@@ -5163,9 +5163,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   segue la via scelta: mai due totali in pagina; ritiro e codice
   online non spediscono e non portano cifra, lo 0 di casa/punto dice
   «gratuita» in grassetto, il patto della spedizione gratuita) · il
-  campo del punto (sotto, il VARCO MAPPA — dal terzo giro SOLO con
-  la rete dichiarata: senza, la riga «lo indicherai dopo
-  l'acquisto») · le note
+  campo del punto (sotto, il VARCO MAPPA — dal quarto giro c'è
+  SEMPRE: con la rete dichiarata la sua mappa, senza tutte e due più
+  la riga onesta) · le note
   oneste («Spedisce con InPost», la regola asimmetrica del digitale,
   il ≈ dei listini EUR) · IL CONTO in righe (Prezzo · Commissione
   «in promo» · Spedizione della via scelta · Protezione se >0 ·
@@ -5371,19 +5371,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   giro ed è morto con la sua sentinella rovesciata in CI: non deve
   tornare di soppiatto. Con la regola nuova la via punto vale anche
   per gli IMPORTATI.
-  E IL PUNTO SI FISSA QUANDO IL CORRIERE È NOTO (TERZO giro, ago
-  2026 — la decisione che supera il secondo; il perché: il venditore
-  non deve ragionare di corrieri quando pubblica, ci pensa a vendita
-  fatta — e il compratore non deve indovinare la rete di un punto
-  che non sa). CON la rete dichiarata tutto come prima: il punto si
-  scrive al pagamento, obbligatorio («Spedisce con InPost»). SENZA:
-  al pagamento si sceglie solo la STRADA con la sua tariffa — il
-  campo non compare, al suo posto la riga «il punto preciso lo
-  indicherai dopo l'acquisto, quando il venditore sceglie il
-  corriere» — e il punto arriva dal campo DENTRO l'ordine (vedi
-  sotto). La riga «accordatevi in chat» del secondo giro è morta con
-  il suo flusso: la chat resta la via d'uscita nominata nelle
-  notifiche e nei pannelli, non un passaggio obbligato.
+  E LA SCELTA DEL PUNTO TORNA SEMPRE PRIMA DI «PAGA» (QUARTO giro,
+  ago 2026 — la decisione di Andrea che ROVESCIA il terzo; il
+  perché: è così che fanno Subito e Vinted, la convenzione che chi
+  compra ha già nelle dita — e ciò che rende SOSTENIBILE scegliere
+  un punto senza conoscere la rete è la rete di sicurezza che il
+  terzo giro aveva già costruito, il campo dentro l'ordine dove il
+  punto si corregge finché il venditore non spedisce). Il campo c'è
+  SEMPRE nella pagina d'acquisto: con la rete dichiarata come
+  sempre, con la sua mappa; SENZA rete con TUTTE E DUE le mappe e
+  la riga onesta «stai scegliendo il punto senza sapere con che
+  rete viaggerà il pacco — puoi correggerlo dall'ordine finché non
+  spedisce». LA REGOLA VIVE NEL CLIENT (le due guardie di
+  ctaAcquisto e compraSubito, senza più guardare la rete): il
+  server continua a esigere il punto SOLO con la rete dichiarata,
+  ed è TOLLERANZA per il client di ieri — che senza rete il campo
+  non ce l'ha, e un 400 senza campo sarebbe un vicolo cieco — non
+  la regola del prodotto. IL PERCHÉ DEL TERZO GIRO, che resta vero
+  e ha perso solo il braccio di ferro con la convenzione: il
+  venditore non deve ragionare di corrieri quando pubblica, e il
+  compratore non deve indovinare la rete di un punto che non sa —
+  la risposta nuova a quel problema non è nascondere il campo ma
+  dirlo (la riga onesta) e rendere la scelta correggibile. La riga
+  «il punto preciso lo indicherai dopo l'acquisto» è morta col suo
+  flusso, e la sentinella in CI è rovesciata: non deve tornare.
   E LA NOTIFICA UNA-TANTUM (`avvisa_spedizioniere_mancante`,
   nell'orologio): ai venditori con annunci attivi che spediscono e
   senza spedizioniere — «da oggi i compratori possono scegliere il
@@ -5405,19 +5416,26 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tariffa scelta finisce in `spedizione_sats` come sempre. Il body
   di compra porta `spedizione_via` ('casa' default | 'punto',
   whitelist con sentinella) + `punto_ritiro` (testo libero del
-  compratore: strip, spazi collassati, tetto 120 — obbligatorio al
-  pagamento SOLO con la rete dichiarata, sentinella sul conteggio
-  x2; il patto del ricontrollo senza await ha la sua sentinella in
-  CI). SENZA rete il punto arriva da
-  `POST /api/orders/{id}/punto-ritiro`: solo il COMPRATORE, solo su
-  'locked', solo sulla via punto — modificabile finché il venditore
-  non spedisce (un refuso si corregge), notifica STATICA al
-  venditore a ogni cambio. E `segna_spedito` È BLOCCATO sulla via
-  punto finché il punto non c'è (400 che rimanda al campo e alla
-  chat): DOVE SPEDIREBBE? — scelta dichiarata con Andrea, con la
-  conseguenza accettata che un compratore che non indica mai il
-  punto tiene l'ordine fermo in 'locked', dove i promemoria di
-  `sollecita_venditori_fermi` e la disputa esistono già. La RIPRESA
+  compratore: strip, spazi collassati, tetto 120 — il CLIENT lo
+  esige sempre prima di «Paga», il 400 del server resta sul solo
+  ramo con rete dichiarata per tolleranza verso il client di ieri,
+  sentinella sul conteggio x2; il patto del ricontrollo senza await
+  ha la sua sentinella in CI).
+  `POST /api/orders/{id}/punto-ritiro` è la RETE DI SICUREZZA: solo
+  il COMPRATORE, solo su 'locked', solo sulla via punto — il punto
+  scelto in pagina si CORREGGE finché il venditore non spedisce (un
+  refuso, o la rete scoperta dopo), e per gli ordini nati senza (i
+  client di ieri) si scrive lì la prima volta; notifica STATICA al
+  venditore a ogni cambio. IL VUOTO SI RIFIUTA (400): un punto
+  scritto si corregge, non si svuota mai — quindi il gate qui sotto
+  non può riscattare su un ordine già compilato. E `segna_spedito`
+  RESTA BLOCCATO sulla via punto finché il punto non c'è (400 che
+  rimanda al campo e alla chat): DOVE SPEDIREBBE? — col quarto giro
+  il caso è quasi sparito (solo ordini dei client di ieri), ma la
+  guardia resta, con la conseguenza accettata che un compratore che
+  non indica mai il punto tiene l'ordine fermo in 'locked', dove i
+  promemoria di `sollecita_venditori_fermi` e la disputa esistono
+  già. La RIPRESA
   confronta punto E via: cambiarli è una richiesta diversa =
   rinnovo (la tariffa può cambiare). Il testo attraversa la filiera
   INTERO ma mai nudo: `esc()` a ogni resa client (ordine, pannello
@@ -7696,11 +7714,22 @@ setValuta finito su rinfrescaViste). Col SECONDO GIRO (feedback di
 Andrea sul primo): il bottone finale dice «Paga», le pillole della
 consegna il solo costo di spedizione, e la via punto si offre SEMPRE
 (la decisione che supera il gate del primo giro). Col TERZO GIRO il
-punto si fissa quando il corriere è noto: con la rete dichiarata si
-scrive al pagamento come prima, senza si sceglie la sola strada e il
-punto arriva dal campo dentro l'ordine (`via_punto`,
+punto si fissava quando il corriere era noto: con la rete dichiarata
+si scriveva al pagamento, senza si sceglieva la sola strada e il
+punto arrivava dal campo dentro l'ordine (`via_punto`,
 `POST /api/orders/{id}/punto-ritiro`, spedito bloccato finché manca
-— dove spedirebbe?). IN PRODUZIONE il deploy fa girare le migrazioni
+— dove spedirebbe?). E col QUARTO GIRO (ago 2026) la scelta del punto
+è tornata SEMPRE prima di «Paga», come su Subito e Vinted: il campo
+c'è anche senza rete — due mappe e la riga onesta — la regola vive
+nel client (il 400 del server resta sul solo ramo con rete,
+tolleranza per il client di ieri), il campo dell'ordine è diventato
+la rete di sicurezza della correzione e il gate di segna_spedito
+resta per il residuo; vedi Architettura, «E LA SCELTA DEL PUNTO
+TORNA SEMPRE PRIMA DI "PAGA"», coi perché di tutti e due i giri.
+Collaudato il quarto giro dal vivo sul server locale: campo e mappe
+nei due casi, guardia a punto vuoto (zero POST), ordine nato col
+punto scritto anche senza rete, 1443 prove verdi (4 nuove, 1
+rovesciata). IN PRODUZIONE il deploy fa girare le migrazioni
 additive (tre colonne punto su annunci, punto_ritiro + via_punto su
 ordini, spedizioniere + avvisato_spedizioniere su utenti) e al primo
 battito dell'orologio parte la notifica UNA-TANTUM ai venditori che
