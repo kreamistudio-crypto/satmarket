@@ -1249,19 +1249,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `/negozio/{chi}`, `/annuncio/{aid}`, `/sicurezza`) ci infilano ora in
   testa il loro blocchetto di meta: nessuna rotta nuova, la regola
   ferrea 3 non si tocca.
-  LA REGOLA CHE HA APERTO IL CANTIERE: **solo gli annunci ATTIVI
-  raccontano qualcosa di sé**. Un rimosso o uno in revisione ricade sui
-  tag GENERICI, e non è pignoleria — l'anteprima di Telegram resta in
-  cache per giorni e viaggia RIPUBBLICATA da chi inoltra il messaggio,
-  quindi un titolo finito lì dentro è un annuncio che continua a
-  esistere in giro dopo che lo scudo anti-resurrezione l'ha spento: è
-  lo stesso scudo, bucato da un'altra parte. Per questo la clausola sta
-  nella WHERE di `_meta_annuncio` (dove non si può dimenticare) e la
-  prova è ESEGUIBILE e non una sentinella sulla forma — il rimosso ci
-  passa davvero, su un database vero, e il suo titolo si cerca
-  nell'HTML che esce; togliendo lo stato dalla WHERE ne diventano rosse
-  sei insieme. Vale anche per il VENDUTO e per l'annuncio che non
-  esiste (`/api/listings/{id}` fa già 404 su tutti e tre).
+  LA REGOLA CHE HA APERTO IL CANTIERE: **un rimosso o uno in revisione
+  NON raccontano niente di sé**, e ricadono sui tag GENERICI. Non è
+  pignoleria — l'anteprima di Telegram resta in cache per giorni e
+  viaggia RIPUBBLICATA da chi inoltra il messaggio, quindi un titolo
+  finito lì dentro è un annuncio che continua a esistere in giro dopo
+  che lo scudo anti-resurrezione l'ha spento: è lo stesso scudo, bucato
+  da un'altra parte. Per questo la clausola sta nella WHERE di
+  `_meta_annuncio` (dove non si può dimenticare) e la prova è
+  ESEGUIBILE e non una sentinella sulla forma — il rimosso ci passa
+  davvero, su un database vero, e il suo titolo si cerca nell'HTML che
+  esce.
+  IL VENDUTO INVECE HA LA SUA ANTEPRIMA VERA (decisione di Andrea): è
+  uno SCAFFALE VUOTO, non un annuncio che non c'è — il link mandato a
+  un amico non deve morire con le scorte, e la scheda esiste ancora
+  (dal cantiere dello stock `/api/listings/{id}` serve
+  `('attivo','venduto')`, spenta e col «rimetti in vendita» del suo
+  venditore). Il confine dei due elenchi è LO STESSO, e una prova lo
+  incrocia: quel che la scheda serve è quel che l'anteprima può
+  nominare, o si manda in giro una bella card che poi atterra su un
+  «non trovato». Ma la card non deve nemmeno MENTIRE, ed è il patto di
+  `_caption_canale` che al venduto riscrive il post del canale: il
+  «✅ Venduto ·» sta in TESTA alla descrizione, che è l'unico pezzo che
+  nessuna piattaforma può troncare via. Fuori restano i due di sopra e
+  l'annuncio che non esiste.
   IL BLOCCO VA IN CIMA, subito dopo `<meta charset>` — che per
   specifica deve restare nei primi 1024 byte, e quindi si resta suoi
   vicini invece di prendergli il posto: la pagina pesa quasi 900 KB e
@@ -1305,12 +1316,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL PREZZO È IL LISTINO anche con una lampo viva, deliberato:
   l'anteprima resta in cache per giorni, quindi una cifra a tempo ci
   sopravviverebbe — meglio dire il prezzo che non scade che promettere
-  uno sconto finito. IMPERFEZIONE EREDITATA: `_prezzo_promo` scrive
-  l'euro col punto decimale (`284.61 €`), come già fa nei post di
-  canale e nelle note Nostr — si corregge lì o in nessun posto.
+  uno sconto finito. E l'euro si scrive con la VIRGOLA: `_fmt_eur`,
+  gemello di `_fmt_sats`, nato qui ma corretto DENTRO `_prezzo_promo`,
+  cioè nell'unico posto che serve tutti e tre i canali che dicono la
+  stessa riga di prezzo — post del canale, note Nostr e anteprime (col
+  punto, una cifra grande si legge per un fattore mille). Restano col
+  punto le cifre di `_cifra_offerta`, che è un'altra superficie e un
+  altro giro.
   ATTENZIONE AL COLLAUDO: Telegram e WhatsApp cachano le anteprime a
   lungo e non si bustano dal nostro lato, quindi si prova con URL
-  USA-E-GETTA prima di condividere qualcosa di vero.
+  USA-E-GETTA prima di condividere qualcosa di vero — e a farlo c'è
+  `anteprime.py` (vedi più sotto), che ridisegna la card come la
+  vedrebbe ognuno.
   Frontend: prima pagina da 30 (`LIMITE_PAGINA`) e
   scroll infinito con sentinelle + IntersectionObserver (vetrina,
   negozio, tuoi annunci; guardie DENTRO le callback: demo, ricerca
@@ -7059,6 +7076,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   database opzionale (il pattern di `ripulisci_anello_nostr.py`);
   idempotente, e si può girare a server ACCESO — un file che non
   chiede nessuno non manca a nessuno.
+- `anteprime.py` (ago 2026) — come si vede un link di Barattolo quando
+  qualcuno lo incolla. Interroga un Barattolo (locale o vero) con gli
+  User-Agent dei crawler di Telegram, WhatsApp, Facebook, Slack e dei
+  client Nostr, legge SOLO i primi byte come fanno loro, ridisegna la
+  card che ne verrebbe fuori, e misura l'og:image contro i limiti di
+  ognuno (lato minimo e byte massimi, dove sotto/sopra la card grande
+  non si disegna). Dice anche a che BYTE cade l'ultimo meta, che è
+  l'invariante su cui poggia tutto: in cima, non in coda a 900 KB.
+  Legge e basta, nessuna scrittura da nessuna parte. Serve al collaudo
+  dopo il deploy, ed è lì che vale la regola scritta nella sua
+  docstring: si prova con URL USA-E-GETTA — un annuncio di prova, da
+  rimuovere subito — perché Telegram e WhatsApp cachano le card a lungo
+  e dal nostro lato non si bustano; puntato sul dominio vero lo
+  ricorda da solo in coda.
 - `prove.py` + `.github/workflows/prove.yml` (lug 2026) — la rete di
   sicurezza, a ogni push e ogni PR. Solo pezzi PURI: niente config,
   database, relay o Anthropic — una CI che dipende da un server altrui
@@ -8692,20 +8723,27 @@ WhatsApp o in un DM Nostr arrivava come una card vuota col titolo
 generico — i crawler non eseguono JavaScript, e qui titolo, prezzo e
 foto nascono tutti da fetch. Adesso le cinque rotte che servono
 miniapp.html ci infilano in testa i loro meta Open Graph. La regola che
-ha aperto il cantiere, e la sola da non ammorbidire: SOLO GLI ANNUNCI
-ATTIVI raccontano qualcosa di sé — un rimosso in un'anteprima cachata e
-inoltrata è lo scudo anti-resurrezione bucato da un'altra parte. Vedi
-Architettura, «LE ANTEPRIME DEI LINK», per le altre due cose da non
-rovesciare (i meta in cima a 900 KB di pagina, l'escaping in attributo)
-e per la scelta dell'immagine coi suoi tre ripieghi.
-Collaudate: 54 prove nuove (1605 verdi), e quella sul rimosso è
+ha aperto il cantiere, e la sola da non ammorbidire: RIMOSSO E
+REVISIONE non raccontano niente di sé — un rimosso in un'anteprima
+cachata e inoltrata è lo scudo anti-resurrezione bucato da un'altra
+parte. Il VENDUTO invece ha la sua card vera (decisione di Andrea: è
+uno scaffale vuoto, non un annuncio che non c'è — il link non muore con
+le scorte), col «✅ Venduto» in testa alla descrizione perché non
+menta, e col confine tenuto allineato a quello di `/api/listings/{id}`
+da una prova apposta. Vedi Architettura, «LE ANTEPRIME DEI LINK», per
+le altre due cose da non rovesciare (i meta in cima a 900 KB di pagina,
+l'escaping in attributo) e per la scelta dell'immagine coi suoi tre
+ripieghi.
+Collaudate: 63 prove nuove (1614 verdi), e quella sul rimosso è
 ESEGUIBILE e non una sentinella sulla forma — passa da un database vero
-e il titolo si cerca nell'HTML che esce. TORTURATE con nove mutazioni
-del codice, una per riga sorvegliata (stato tolto dalla WHERE, escaping
-a quote=False, rotta tornata al file nudo, francobollo scambiato col
-pieno, conto del negozio senza stato, tg_id nell'anteprima, meta prima
-del charset, cintura che rilancia, ripiego che appende in fondo):
-ognuna diventa rossa da sola, e la prima ne fa rosse sei insieme. Più
+e il titolo si cerca nell'HTML che esce. TORTURATE con tredici
+mutazioni del codice, una per riga sorvegliata (stato tolto dalla
+WHERE, rimosso rimesso dentro, venduto tolto fuori, «✅ Venduto» che
+sparisce, euro tornato al punto, escaping a quote=False, rotta tornata
+al file nudo, francobollo scambiato col pieno, conto del negozio senza
+stato, tg_id nell'anteprima, meta prima del charset, cintura che
+rilancia, ripiego che appende in fondo, ritorno alla modalità testo):
+ognuna diventa rossa da sola, e la prima ne fa rosse cinque insieme. Più
 il giro dal vivo sul server locale simulando gli User-Agent veri di
 Telegram, WhatsApp, Facebook, Slack e dei client Nostr con la loro
 lettura parziale — tutti vedono la stessa card, l'ultimo meta cade al
@@ -8713,14 +8751,17 @@ byte ~1300, e l'og:image sta dentro i limiti di tutti e tre —, la
 verifica che la pagina esca IDENTICA al file byte per byte, e
 l'escaping provato end-to-end con una riga usa-e-getta dal titolo
 cattivo (virgolette, `<script>`, apostrofi: 13 meta interi, nessun tag
-spezzato, e la riga poi cancellata).
+spezzato, e la riga poi cancellata), più il venduto vero e un listino
+in euro guardati dal vivo («✅ Venduto · 50 sats (≈ 0,03 €)»,
+«40,00 € (≈ 70.764 sats)»).
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta nuova. DA FARE AL PRIMO DEPLOY, ed è il
-pezzo che in locale non si può fare: provare le anteprime con URL
-USA-E-GETTA — un annuncio di prova da rimuovere subito dopo — perché
-Telegram e WhatsApp cachano le card a lungo e dal nostro lato non si
+pezzo che in locale non si può fare: `python anteprime.py
+https://barattolo.store /annuncio/N` e poi le card vere in chat, con
+URL USA-E-GETTA — un annuncio di prova da rimuovere subito dopo —
+perché Telegram e WhatsApp cachano a lungo e dal nostro lato non si
 bustano; e verificare col rimosso VERO che la sua card sia quella
-generica.
+generica e col venduto VERO che porti il suo «✅ Venduto».
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
