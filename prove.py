@@ -5906,7 +5906,7 @@ def prove_cambio():
         chiamate = []
         a = {"db": Con, "time": _time,
              "httpx": _finto_coingecko(chiamate, muto=muto),
-             "ORE_CAMBIO_VALIDO": ore, "CAMBIO_TTL": 900,
+             "ORE_CAMBIO_VALIDO": ore, "CAMBIO_TTL": 120,
              "CAMBIO_RIPROVA_S": 60,
              "_cambio_eur_cache": {"valore": valore, "quando": quando,
                                    "tentato": 0.0}}
@@ -5967,6 +5967,13 @@ def prove_cambio():
     a, chiamate, _ = mondo(valore=99000.0, quando=_time.time())
     prova("cambio fresco: nessuna chiamata", (99000.0, 0),
           (gira(a["cambio_btc_eur"]()), len(chiamate)))
+    # Oltre la soglia il percorso caldo ci prova ancora — e' la rete di
+    # sicurezza se il giro di sfondo si ferma. Non e' una lettura
+    # FORZATA al momento della fattura: e' il ripiego di sempre, che il
+    # raffreddamento tiene a uno al minuto.
+    a, chiamate, _ = mondo(valore=99000.0, quando=_time.time() - 200)
+    prova("oltre la soglia il caldo ci riprova (rete di sicurezza)",
+          (100000.0, 1), (gira(a["cambio_btc_eur"]()), len(chiamate)))
 
     a, _, vero = mondo()
     prova("lettura riuscita", 100000.0, gira(a["cambio_btc_eur"]()))
@@ -5984,10 +5991,39 @@ def prove_cambio():
           "carica_cambio_salvato()" in scalda)
     prova("...e la riprova non fa aspettare l'avvio", True,
           "create_task" in scalda)
-    prova("la riprova insiste con pause che crescono", True,
-          "for pausa in (0, 5, 15" in pezzo("_insisti_sul_cambio"))
-    prova("l'orologio tiene fresco il cambio", True,
-          "await _rileggi_cambio()" in pezzo("orologio"))
+    # IL RINFRESCO HA UN GIRO SUO (ago 2026): da quando la fonte e' una
+    # sola, la cadenza del server E' la freschezza che vede chiunque
+    # guardi un prezzo — dentro l'orologio grande da dieci minuti
+    # sarebbe un numero vecchio in mano a tutti.
+    giro = pezzo("orologio_cambio")
+    prova("il cambio si rilegge nel suo giro, alla sua cadenza", True,
+          "await _rileggi_cambio()" in giro
+          and "await asyncio.sleep(CAMBIO_RINFRESCO_S)" in giro)
+    prova("...e non piu' dentro l'orologio da dieci minuti", False,
+          "_rileggi_cambio" in pezzo("orologio"))
+    prova("il giro parte all'avvio", True,
+          "create_task(orologio_cambio())" in pezzo("scalda_cambio"))
+    prova("un giro morto non si rialza: c'e' la cintura", True,
+          "except Exception as e:" in giro)
+    # LA SOGLIA E' DERIVATA dalla cadenza, non un secondo numero da
+    # tenere in pari: se fosse piu' STRETTA della cadenza, il percorso
+    # caldo tornerebbe a chiamare la rete a ogni giro.
+    i = _SORGENTE.index("CAMBIO_TTL = max(")
+    riga = _SORGENTE[i:_SORGENTE.index("\n", i)]
+    for cadenza, atteso in ((60, 120), (30, 120), (300, 600), (0, 120)):
+        a = {"CAMBIO_RINFRESCO_S": cadenza}
+        exec(riga, a)
+        prova(f"soglia derivata: cadenza {cadenza}s → {atteso}s", atteso,
+              a["CAMBIO_TTL"])
+        prova(f"...e mai piu' stretta della cadenza ({cadenza}s)", True,
+              a["CAMBIO_TTL"] >= cadenza)
+    # NESSUNA lettura forzata al momento della fattura: nel percorso
+    # caldo la rete si tocca in UN posto solo, e dietro il freno.
+    caldo = pezzo("cambio_btc_eur")
+    prova("nel percorso caldo la rete si tocca una volta sola", 1,
+          caldo.count("_rileggi_cambio"))
+    prova("...e sempre dietro il raffreddamento", True,
+          caldo.index("CAMBIO_RIPROVA_S") < caldo.index("_rileggi_cambio"))
 
     # UNA SOLA FONTE: il client non chiama piu' CoinGecko per conto suo.
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -6071,7 +6107,7 @@ def _censimento(acceso):
                  "PROMEMORIA_SPEDIZIONE_GIORNI", "PROMEMORIA_DIGITALE_ORE",
                  "REVISIONE_SOLLECITO_GIORNI", "FERIE_PREAVVISO_ORE",
                  "GIORNI_DATA_ANNUNCIO", "ORE_CAMBIO_VALIDO",
-                 "TETTO_DIGITALE_NUOVI",
+                 "CAMBIO_RINFRESCO_S", "TETTO_DIGITALE_NUOVI",
                  "DIGITALE_MIN_VENDITE", "SUGGERIMENTI_DI_SERIE",
                  "SUGGERIMENTI_OGNI_GIORNI"):
         amb[nome] = acceso and 24

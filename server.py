@@ -505,6 +505,25 @@ try:
 except ImportError:
     ORE_CAMBIO_VALIDO = 24
 
+# OGNI QUANTO SI RILEGGE IL CAMBIO (ago 2026, subito dopo: la fonte
+# unica costava freschezza). Finche' ogni browser chiamava CoinGecko
+# per conto suo vedeva un numero fresco di secondi; adesso vede quello
+# del server, quindi la CADENZA del server e' diventata la freschezza
+# di tutti — e dieci minuti erano troppi. Un minuto, che e' il ritmo
+# con cui il numero cambia davvero.
+# La fonte unica NON si tocca (due letture diverse erano un difetto
+# vero: il «≈» della vetrina e il conto della invoice potevano
+# divergere): a stringersi e' solo la finestra.
+# E' UNA LEVA perche' il tetto non e' nostro: se un giorno CoinGecko
+# comincia a rispondere 429, alzare questo numero e' una riga nel
+# config del VPS invece di un deploy. 0 = niente rinfresco di sfondo,
+# e allora il cambio se lo va a prendere il percorso caldo quando gli
+# serve, col raffreddamento di sempre a fargli da freno.
+try:
+    from config import CAMBIO_RINFRESCO_S
+except ImportError:
+    CAMBIO_RINFRESCO_S = 60
+
 # La consegna digitale (lug 2026): buoni regalo, codici, licenze. Il
 # codice passa DENTRO Barattolo (campo dedicato dell'ordine, rivelato
 # dal compratore con un tocco che fa da ricevuta di lettura) e le
@@ -3132,11 +3151,24 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
 # azzerare una cosa che sapevamo un minuto prima (vedi ORE_CAMBIO_VALIDO
 # per il caso vero che ha aperto il cantiere).
 
-CAMBIO_TTL = 900          # 15 minuti: oltre, si prova a rileggerlo
-CAMBIO_RIPROVA_S = 60     # ...ma dopo un buco si aspetta prima di
-#                           ribussare: durante un'interruzione ogni
-#                           pagina d'acquisto pagherebbe il timeout di
-#                           CoinGecko per farsi dire la stessa cosa
+# La soglia di freschezza NON e' un numero suo: e' DERIVATA dalla
+# cadenza del rinfresco di sfondo, due giri di slack. Cosi' c'e' un
+# posto solo da toccare — chi alza la leva non deve ricordarsi di
+# alzare anche questa, e le due non possono mettersi di traverso (una
+# soglia piu' STRETTA della cadenza rimetterebbe la rete nel percorso
+# caldo a ogni giro, che e' esattamente cio' che il rinfresco evita).
+# Il pavimento a 120s vale per la leva a 0, dove una cadenza non c'e'.
+CAMBIO_TTL = max(120, CAMBIO_RINFRESCO_S * 2)
+CAMBIO_RIPROVA_S = 60     # dopo un buco si aspetta prima di ribussare:
+#                           durante un'interruzione ogni pagina
+#                           d'acquisto pagherebbe il timeout di
+#                           CoinGecko per farsi dire la stessa cosa.
+#                           Vale per il percorso CALDO, e il rinfresco
+#                           di sfondo lo fa lavorare gratis: timbra
+#                           `tentato` a ogni suo giro — riuscito o no —
+#                           quindi finche' quel giro batte, dal percorso
+#                           caldo non parte una chiamata nemmeno per
+#                           sbaglio
 
 _cambio_eur_cache = {"valore": 0.0, "quando": 0.0, "tentato": 0.0}
 
@@ -3238,21 +3270,51 @@ _TASK_CAMBIO = None   # il riferimento tiene vivo il task (senza, il
 #                       garbage collector puo' cancellarlo a meta' volo)
 
 
-async def _insisti_sul_cambio():
-    """Al riavvio si riprova PRESTO invece di aspettare che a chiedere
-    il cambio sia qualcuno che sta comprando. Pause che crescono, si
-    smette al primo successo; dopo, ci pensa il giro dell'orologio."""
-    for pausa in (0, 5, 15, 30, 60, 120, 300):
-        if pausa:
-            await asyncio.sleep(pausa)
-        if await _rileggi_cambio():
-            print(f"💱 Cambio BTC/EUR letto: "
-                  f"{_cambio_eur_cache['valore']:,.0f} €/BTC"
-                  .replace(",", " "), flush=True)
+async def orologio_cambio():
+    """Il rinfresco del cambio ha un giro SUO, e non quello da dieci
+    minuti dell'orologio grande: da quando la fonte e' una sola, la
+    cadenza del server E' la freschezza che vede chiunque guardi un
+    prezzo — dieci minuti li' dentro erano un numero vecchio in mano a
+    tutti. Un minuto.
+
+    E' anche la riprova del boot: il primo giro parte subito, e se
+    CoinGecko tace si ribussa dopo un minuto — non serve piu' una
+    scaletta di pause crescenti, che a regime sarebbe piu' LENTA di
+    questo giro. Fail-open come tutto il resto: un buco non azzera
+    niente, vale l'ultimo cambio noto finche' non invecchia."""
+    primo, buchi = True, 0
+    # Ogni quanti giri a vuoto lo si dice: dieci minuti, tradotti nella
+    # cadenza corrente. Un conto in GIRI e non in secondi, o con una
+    # cadenza che non divide 600 il momento esatto non arriverebbe mai.
+    giri_avviso = max(1, 600 // max(CAMBIO_RINFRESCO_S, 1))
+    while True:
+        try:
+            riuscito = await _rileggi_cambio()
+        except Exception as e:      # non alza mai, ma un giro che muore
+            riuscito = False        # non si rialza: meglio la cintura
+            print(f"⚠️ Rinfresco del cambio saltato: {e}", flush=True)
+        if riuscito:
+            if primo:               # la prima lettura buona dopo l'avvio
+                print(f"💱 Cambio BTC/EUR letto: "
+                      f"{_cambio_eur_cache['valore']:,.0f} €/BTC"
+                      .replace(",", " "), flush=True)
+                primo = False
+            buchi = 0
+        else:
+            buchi += 1
+            # Una volta sola per interruzione, e non a ogni giro: un
+            # avviso al minuto e' rumore, e il rumore e' il modo in cui
+            # gli avvisi muoiono (il patto dei solleciti).
+            if buchi == giri_avviso:
+                print("⚠️ Cambio BTC/EUR: CoinGecko non risponde da dieci "
+                      "minuti. Vale l'ultimo cambio noto finché non "
+                      "invecchia; si continua a riprovare.", flush=True)
+        if CAMBIO_RINFRESCO_S <= 0:
+            # Leva spenta: la lettura del boot si fa lo stesso (o il
+            # primo che compra pagherebbe lui il giro di rete), poi il
+            # cambio se lo va a prendere il percorso caldo quando serve.
             return
-    print("⚠️ Cambio BTC/EUR: CoinGecko non risponde da dieci minuti. "
-          "Vale l'ultimo cambio noto finché non invecchia; si riprova a "
-          "ogni giro dell'orologio.", flush=True)
+        await asyncio.sleep(CAMBIO_RINFRESCO_S)
 
 
 @app.on_event("startup")
@@ -3279,7 +3341,7 @@ async def scalda_cambio():
         print("💱 Cambio BTC/EUR: nessun valore salvato (primo avvio, o "
               "database nuovo). Lo si chiede adesso.", flush=True)
     global _TASK_CAMBIO
-    _TASK_CAMBIO = asyncio.create_task(_insisti_sul_cambio())
+    _TASK_CAMBIO = asyncio.create_task(orologio_cambio())
 
 
 async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
@@ -8504,6 +8566,12 @@ def _leve_stato():
                   spento="l'ultimo cambio noto non scade mai: si continua "
                          "a convertire in euro anche con un valore di "
                          "settimane fa, e nessuno se ne accorge"),
+            _leva("Si rilegge il cambio ogni (secondi)",
+                  "CAMBIO_RINFRESCO_S", CAMBIO_RINFRESCO_S,
+                  spento="nessun rinfresco di sfondo: il cambio se lo va a "
+                         "prendere il percorso caldo, quindi ogni tanto una "
+                         "pagina d'acquisto aspetta CoinGecko. Si alza se "
+                         "CoinGecko comincia a rispondere 429"),
             _leva("La ronda del libro mastro", "CONTROLLO_LIBRO_MASTRO",
                   bool(CONTROLLO_LIBRO_MASTRO),
                   spento="gli invarianti non si controllano più da soli: "
@@ -20322,14 +20390,10 @@ async def avvisa_spedizioniere_mancante():
 
 async def orologio():
     while True:
-        try:
-            # Il cambio si tiene fresco QUI, non nel percorso caldo: una
-            # pagina d'acquisto non deve mai aspettare CoinGecko, e cosi'
-            # la copia sul disco e' vecchia di dieci minuti al massimo —
-            # cioe' quanto perde un riavvio nel caso peggiore.
-            await _rileggi_cambio()
-        except Exception as e:
-            print(f"⚠️ Rinfresco del cambio saltato: {e}")
+        # Il cambio NON si rinfresca qui: ha un giro suo da un minuto
+        # (orologio_cambio), perche' da quando la fonte e' una sola la
+        # cadenza del server e' la freschezza che vede chiunque guardi
+        # un prezzo — e questo giro batte ogni dieci minuti.
         try:
             await controlla_scadenze()
         except Exception as e:

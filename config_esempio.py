@@ -408,6 +408,22 @@ TETTO_RICERCHE_AI_ORA = 30
 # 0 = non scade mai: freno d'emergenza, non una scelta.
 ORE_CAMBIO_VALIDO = 24
 
+# Ogni quanti secondi si rilegge il cambio, in un giro di sfondo suo.
+# Da quando la fonte e' UNA SOLA (il client non chiama piu' CoinGecko
+# per conto suo, il cambio gli arriva dalla vetrina) questa cadenza e'
+# la freschezza che vede chiunque guardi un prezzo: un minuto e' il
+# ritmo con cui il numero cambia davvero. La soglia oltre la quale il
+# percorso caldo va a rileggerlo da se' NON e' un secondo numero: si
+# ricava da qui (due giri di slack, minimo 120s).
+# Un minuto sono ~1.400 chiamate al giorno da un IP solo: comodamente
+# dentro il limite al minuto dell'endpoint pubblico di CoinGecko, ma
+# BEN OLTRE le 10.000 al mese di una chiave Demo gratuita — se un
+# giorno se ne mette una, questo numero va alzato (300 = ~9.000/mese).
+# Si alza anche se CoinGecko comincia a rispondere 429.
+# 0 = niente giro di sfondo: una lettura all'avvio e poi se ne occupa
+# il percorso caldo, col suo raffreddamento da un minuto.
+CAMBIO_RINFRESCO_S = 60
+
 # --- Collaudo ---------------------------------------------------------
 # False = com'e' giusto che sia online: nessuna identita' finta.
 # True  = test locale con gli utenti finti (Compratore/Venditore/Admin),
