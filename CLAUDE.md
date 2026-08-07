@@ -1575,6 +1575,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `asyncio.create_task`: mai errori né attese per l'utente. In
   collaudo gli eventi si firmano ma si stampano soltanto
   (`🟣 [nostr simulato]`).
+  MA LA CHIAVE DELLA PIATTAFORMA È IL RIPIEGO, NON LA REGOLA (ago 2026,
+  «IL BIVIO» dentro `annuncio_su_nostr`, ed è la riga che si legge per
+  ultima e andrebbe letta per prima): se il venditore ha una chiave
+  Nostr di cui ha DIMOSTRATO il possesso (`chiave_nostr_provata` =
+  `npub_accesso`, o il badge `npub` verificato) l'annuncio esce sul SUO
+  account e non sul nostro — è la sua reputazione, non la nostra. La
+  nsec ce l'ha solo lui, quindi qui non si firma niente: si ACCODA in
+  `firme_nostr` e a firmare è il BROWSER alla prima apertura
+  (`GET/POST /api/me/firme-nostr`, biglietto + evento non firmato,
+  `sollecita_firme_nostr` nell'orologio per chi non torna). Il bivio
+  sta DENTRO il funnel e non nei chiamanti, così prima pubblicazione e
+  aggiornamenti lo ereditano tutti. `annunci.nostr_autore` dice CHI ha
+  firmato ('' = noi), ed è il campo da guardare prima di affermare
+  qualunque cosa su chi controlla un evento. Da quel momento la
+  piattaforma NON tocca più quell'evento: anche il ritiro passa da una
+  firma sua (azione 'ritira' = kind 5 dal suo browser).
   Post automatici (lug 2026): la piattaforma racconta i fatti — ogni
   nuovo annuncio in vetrina esce da solo come nota Nostr kind-1
   (chiave piattaforma, tag `t=barattolo`, foto come URL nel content)
@@ -5593,12 +5609,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   no», e la scorciatoia «istanza nostra» sarebbe stata falsa; e il
   backup giornaliero fuori dal server esiste sul VPS, benché nel repo
   non ci sia niente che lo mostri. IL CATALOGO NON È DI TUTTI ALLO
-  STESSO MODO, ed è la riga che si sbaglia per prima: gli annunci nati
-  QUI vanno sui relay firmati dalla chiave della PIATTAFORMA (tag `d`
-  `barattolo-{id}`), quindi restano leggibili senza di noi ma non li
-  controlla il venditore; solo chi pubblica dal proprio client Nostr
-  (gli importati) ha identità E catalogo suoi. Scriverlo indistinto
-  prometterebbe a metà utenti una proprietà che non hanno.
+  STESSO MODO, ed è la riga che si sbaglia per prima — chi scrive
+  guardi `annuncio_su_nostr` e non `evento_annuncio`, o si sbaglia come
+  ci si è sbagliati la prima volta: chi ha una chiave PROVATA vede
+  l'annuncio uscire sul PROPRIO account, firmato dal suo browser
+  («IL BIVIO», sopra), e quello resta suo anche senza di noi; chi non
+  ce l'ha lo vede firmato dalla nostra chiave, leggibile in piazza ma
+  governato da noi. Dirlo indistinto — in un verso o nell'altro —
+  toglie a metà utenti una proprietà che hanno, o la promette all'altra
+  metà che non ce l'ha. IL TESTO SI FERMA LÌ, e la ragione è la
+  domanda che verrà subito dopo: «e allora posso aggiornarlo o
+  ritirarlo da un client qualunque?». Su Nostr sì, l'autore è lui; su
+  BARATTOLO no, e oggi il comportamento è accidentale invece che
+  deciso — le colonne del match dell'import (`nostr_origine_d`,
+  `nostr_origine_id`) sono vuote per gli annunci nati qui, quindi una
+  sua NIP-09 non spegne la riga locale, mentre il match per TITOLO
+  dell'import aperto può «adottare» la riga e scriverle addosso
+  `contatto_nostr` (vedi il compito aperto). Finché quel giro non è
+  deciso, la pagina promette il possesso dell'EVENTO e non un flusso
+  di modifica che non esiste.
   I TEMPI DELL'ESCROW STANNO IN UN POSTO SOLO (lug 2026): la costante
   `TEMPI` in cima al JS — `conferma` 72 ore, `autoSblocco` 10 giorni,
   `confermaDig` 24 ore, `silenzioDig` 48 ore, `invoice` 15 minuti —
