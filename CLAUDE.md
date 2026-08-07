@@ -5545,7 +5545,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nei due sensi: quello che non torna indietro e quello che non
   funziona; il ritiro a mano; il PACCO PERSO O ROVINATO; «l'oggetto
   promesso, non i gusti»), il
-  pagamento Lightning e dove stanno i sats. Markup FISSO e nessun
+  pagamento Lightning, dove stanno i sats e SE BARATTOLO SPARISSE. Markup FISSO e nessun
   dato utente dentro: mai un `esc()` da ricordare. TRE PORTE —
   «Scopri di più» nel recinto, la riga di fiducia di Esplora e del
   negozio (ora un `<button class="trust-line">` col ›: il tour la
@@ -5573,6 +5573,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   per il deposito (regola ferrea 9) né qui: si dice «copertura del
   corriere». Il pannello del RESO non la porta (il rischio è lo stesso
   ma sull'altra parte): si valuta se il caso si presenta.
+  «SE BARATTOLO SPARISSE» (ago 2026, da una domanda di un utente sulla
+  centralizzazione: la risposta si scrive invece di aspettare che la
+  chiedano). In fondo alla pagina, dopo «Dove stanno i sats»: un server
+  solo e un database solo, non ridondato; poi cosa NON si ferma con lui
+  — ⚡ i sats (nodo Lightning nostro, seed offline), 🟣 gli annunci su
+  Nostr, 📖 il codice, 💾 storico e reputazione col backup giornaliero
+  fuori dal server — e la chiusa di Andrea, «oggi il punto di fiducia
+  siamo noi due… la direzione è ridurlo, non nasconderlo», a grandezza
+  PIENA e non in `.sicu-nota`: rimpicciolire la riga che dice «non
+  nasconderlo» sarebbe la cosa più storta della pagina.
+  OGNI RIGA È UN FATTO OPERATIVO, e chi la ritocca verifica il FATTO e
+  non la frase — sono affermazioni sui soldi e sui dati di altri, e
+  invecchiano fuori dal repo (nel codice non se ne vede nessuna). Le
+  due delicate, confermate da Andrea il giorno in cui è stata scritta:
+  l'istanza LNbits del config è OSPITATA (`*.lnbits.com`) ma la funding
+  source è un nodo suo con la seed offline — per questo il testo dice
+  «il gestionale che lo comanda è ospitato da terzi; il nodo e la seed
+  no», e la scorciatoia «istanza nostra» sarebbe stata falsa; e il
+  backup giornaliero fuori dal server esiste sul VPS, benché nel repo
+  non ci sia niente che lo mostri. IL CATALOGO NON È DI TUTTI ALLO
+  STESSO MODO, ed è la riga che si sbaglia per prima: gli annunci nati
+  QUI vanno sui relay firmati dalla chiave della PIATTAFORMA (tag `d`
+  `barattolo-{id}`), quindi restano leggibili senza di noi ma non li
+  controlla il venditore; solo chi pubblica dal proprio client Nostr
+  (gli importati) ha identità E catalogo suoi. Scriverlo indistinto
+  prometterebbe a metà utenti una proprietà che non hanno.
   I TEMPI DELL'ESCROW STANNO IN UN POSTO SOLO (lug 2026): la costante
   `TEMPI` in cima al JS — `conferma` 72 ore, `autoSblocco` 10 giorni,
   `confermaDig` 24 ore, `silenzioDig` 48 ore, `invoice` 15 minuti —
