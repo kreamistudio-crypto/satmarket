@@ -287,13 +287,68 @@ def prove_anello():
     # La sentinella sull'autore: qui non c'è una funzione da chiamare
     # (il filtro è dentro importa_venditore), quindi si guarda che ci
     # sia. Grezza, ma è esattamente il pezzo che sparisce per sbaglio.
-    corpo = open("importa_nostr.py", encoding="utf-8").read()
-    i = corpo.index("def importa_venditore(")
-    corpo = corpo[i:corpo.index("\ndef ", i + 10)]
+    sorgente_imp = open("importa_nostr.py", encoding="utf-8").read()
+
+    def pezzo_imp(nome):
+        """pezzo(), ma sull'altro file: `pezzo` legge solo server.py."""
+        i = sorgente_imp.index(f"def {nome}(")
+        return sorgente_imp[i:sorgente_imp.index("\n\n\n", i)]
+
+    i = sorgente_imp.index("def importa_venditore(")
+    corpo = sorgente_imp[i:sorgente_imp.index("\ndef ", i + 10)]
     prova("l'import confronta l'autore dell'evento con la chiave chiesta",
           True,
           bool(re.search(r'\(e\.get\("pubkey"\)\s*or\s*""\)\.lower\(\)\s*'
                          r'[!=]=\s*hexkey', corpo)))
+
+    # --- Il riflesso non e' una fonte (ago 2026) --------------------
+    # Il gemello di chiave_di_casa un piano piu' in basso: un evento
+    # che abbiamo composto NOI e fatto firmare al venditore e' lo
+    # specchio di una riga nata qui, e importarlo «adottava» quella
+    # riga (via il match per TITOLO), togliendo al venditore la
+    # modifica dal form e consegnando a una sua NIP-09 il potere di
+    # spegnerla su Barattolo.
+    amb2 = {}
+    exec(pezzo_imp("id_riflesso"), amb2)
+    exec(pezzo_imp("e_riflesso"), amb2)
+    idr, erifl = amb2["id_riflesso"], amb2["e_riflesso"]
+    # 1ª condizione: la coordinata e' una NOSTRA
+    prova("«barattolo-42» nomina la riga 42", 42, idr("barattolo-42"))
+    prova("una coordinata di un altro non nomina niente", 0,
+          idr("mio-annuncio-42"))
+    # ...nemmeno una lunga uguale, che senza il prefisso finirebbe per
+    # nominare la riga 89 di un altro mercatino (torturato: togliendo
+    # il controllo del prefisso, questa riga diventa rossa e le altre
+    # no — era l'unico buco della mutazione)
+    prova("...nemmeno una che ha le cifre al posto giusto", 0,
+          idr("altrosito-89"))
+    prova("il vuoto non nomina niente", 0, idr(""))
+    prova("«barattolo-» senza numero non nomina niente", 0,
+          idr("barattolo-"))
+    prova("un id non numerico non nomina niente", 0, idr("barattolo-89x"))
+    # 2ª e 3ª: la riga e' NATIVA ed e' firmata proprio da quella chiave
+    mia = "bb" * 32
+    prova("riga nativa firmata da lui: e' un riflesso", True,
+          erifl(("", mia), mia))
+    prova("...anche se la colonna e' in maiuscolo", True,
+          erifl(("", mia.upper()), mia))
+    prova("riga IMPORTATA: non e' un riflesso (l'import e' a casa sua)",
+          False, erifl(("npub1qualcosa", mia), mia))
+    prova("riga mai firmata: non e' un riflesso", False, erifl(("", ""), mia))
+    prova("due vuoti non sono una prova", False, erifl(("", ""), ""))
+    prova("firmata da un ALTRO: non e' un riflesso", False,
+          erifl(("", "cc" * 32), mia))
+    prova("riga sparita: non e' un riflesso", False, erifl(None, mia))
+    # E che il filtro sia ancora attaccato al giro d'import: sono tre
+    # righe che un riordino porta via senza rompere nessun'altra prova.
+    prova("l'import chiama i due giudici del riflesso", True,
+          "id_riflesso(" in corpo and "e_riflesso(" in corpo)
+    # find() e non index(): se la chiamata sparisce questa prova deve
+    # FALLIRE, non esplodere — una prova che si schianta fa rossa la CI
+    # senza dire quale patto e' saltato.
+    dove = corpo.find("e_riflesso(")
+    prova("...e li chiama PRIMA del vaglio (l'AI non giudica i nostri)",
+          True, 0 <= dove < corpo.index("if vaglio:"))
 
 
 # ====================================================================

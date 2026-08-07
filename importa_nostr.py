@@ -600,6 +600,54 @@ def spegni_annuncio(con, annuncio_id: int, stato: str = "rimosso"):
         pass
 
 
+# --- IL RIFLESSO NON E' UNA FONTE (ago 2026) -------------------------
+# Un evento che abbiamo composto NOI e fatto firmare al venditore (IL
+# BIVIO di annuncio_su_nostr: chi ha una chiave provata pubblica sul
+# SUO account, e a firmare e' il suo browser) e' lo SPECCHIO di una
+# riga nata su Barattolo, non un annuncio da importare.
+#
+# Senza questo filtro il match per TITOLO qui sotto «adottava» la riga
+# nativa — la clausola ammette `nostr_origine_d=''` e il venditore_id
+# e' il suo — scrivendole addosso `contatto_nostr` e la coordinata. Da
+# li' l'annuncio nato qui diventava a tutti gli effetti un IMPORTATO:
+# il venditore non poteva piu' modificarlo dal form, l'import gli
+# riscriveva testo e prezzo dai relay (footer promozionale compreso) e
+# una sua NIP-09 da un client qualunque lo spegneva su Barattolo.
+#
+# E' il gemello di `chiave_di_casa` un piano piu' in basso, ma il
+# marchio non puo' essere lo stesso: li' la chiave e' la NOSTRA, qui e'
+# la SUA. Quindi il riconoscimento e' una domanda al DATABASE e non al
+# testo dell'evento, e sta in TRE condizioni insieme — il `d` e' una
+# coordinata nostra, la riga che nomina e' NATIVA, e quella riga
+# l'abbiamo fatta firmare proprio a quella chiave. Col solo prefisso
+# `barattolo-` ci si affiderebbe a una convenzione di stringa che
+# chiunque puo' scrivere; con tutte e tre, a mentire dovrebbe essere il
+# nostro stesso database.
+def id_riflesso(d: str) -> int:
+    """L'id della riga locale di cui questo tag `d` e' la coordinata
+    (0 = non e' un evento composto da noi). Prima condizione."""
+    if not d or not d.startswith("barattolo-"):
+        return 0
+    coda = d[len("barattolo-"):]
+    return int(coda) if coda.isdigit() else 0
+
+
+def e_riflesso(riga, pubkey: str) -> bool:
+    """Le altre DUE condizioni, sulla riga che la coordinata nomina:
+    `riga` e' la coppia (contatto_nostr, nostr_autore) — o None se
+    quella riga non esiste piu'.
+
+    Nativa (`contatto_nostr` vuoto: se fosse piena l'annuncio verrebbe
+    davvero dai relay e l'import e' a casa sua) e firmata proprio da
+    QUELLA chiave. `nostr_autore` vuoto non basta mai: vuol dire riga
+    mai firmata da nessuno, e due vuoti che si somigliano non sono una
+    prova."""
+    if not riga:
+        return False
+    contatto, autore = (riga[0] or ""), (riga[1] or "").lower()
+    return not contatto and bool(autore) and autore == (pubkey or "").lower()
+
+
 def importa_venditore(npub_venditore: str, venditore_id: int,
                       db: str = DB, vaglio=None, scarica=None):
     """Il cuore dell'import, in forma riusabile: lo chiama lo script
@@ -707,6 +755,11 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                     "nostr_origine_d TEXT DEFAULT ''",
                     "nostr_origine_foto TEXT DEFAULT ''",
                     "nostr_origine_id TEXT DEFAULT ''",
+                    # la chiave che ha FIRMATO l'evento di una riga nata
+                    # qui: e' il marchio del riflesso (v. e_riflesso).
+                    # Senza la colonna il filtro non scatterebbe e
+                    # l'adozione tornerebbe in silenzio.
+                    "nostr_autore TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
                     "prezzo_eur REAL DEFAULT 0",
                     "modificato INTEGER DEFAULT 0"):
@@ -808,6 +861,29 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     if len(vivi) < len(prodotti):
         print(f"  🪦 {len(prodotti) - len(vivi)} eventi sotto lapide: "
               f"ignorati")
+    prodotti = vivi
+
+    # E i RIFLESSI di Barattolo non si importano MAI: un evento che
+    # abbiamo composto noi e fatto firmare al venditore e' lo specchio
+    # di una riga nata qui (v. id_riflesso / e_riflesso qui sopra). Si
+    # filtra PRIMA del vaglio: cosi' non si paga l'AI per giudicare un
+    # testo che la moderazione ha gia' approvato quando l'annuncio e'
+    # nato — e soprattutto un «dubbio» non puo' rimandare in revisione
+    # un annuncio vivo e in vetrina.
+    vivi, riflessi = [], 0
+    for e in prodotti:
+        dt = tag(e, "d")
+        aid = id_riflesso(dt[1] if dt else "")
+        if aid:
+            riga = con.execute("SELECT contatto_nostr, nostr_autore "
+                               "FROM annunci WHERE id=?", (aid,)).fetchone()
+            if e_riflesso(riga, e.get("pubkey") or ""):
+                riflessi += 1
+                continue
+        vivi.append(e)
+    if riflessi:
+        print(f"  🪞 {riflessi} riflessi di Barattolo (annunci nati qui e "
+              f"firmati dal venditore): ignorati")
     prodotti = vivi
 
     # Il vaglio del server (firma, lingua, moderazione) decide cosa
