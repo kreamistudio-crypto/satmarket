@@ -6536,6 +6536,258 @@ def prove_posizione_vetrina():
 
 
 # ====================================================================
+def prove_anteprime():
+    """LE ANTEPRIME DEI LINK (ago 2026). La famiglia difende tre cose,
+    e la prima e' quella che conta: UN ANNUNCIO NON ATTIVO NON RACCONTA
+    NIENTE DI SE'. L'anteprima di Telegram resta in cache per giorni e
+    viaggia ripubblicata da chi inoltra il messaggio — un titolo finito
+    li' dentro e' un annuncio che continua a esistere in giro anche
+    dopo che lo scudo anti-resurrezione l'ha spento, cioe' lo stesso
+    scudo bucato da un'altra parte. Per questo NON e' una sentinella di
+    forma sulla WHERE ma una prova ESEGUIBILE: il rimosso ci passa
+    davvero, su un database vero, e il suo titolo si cerca nell'HTML
+    che esce."""
+    print("\n[le anteprime dei link]")
+    import html as _html
+    import json as _json
+    import re as _re
+    import sqlite3
+    import tempfile
+
+    amb = {"html": _html, "json": _json, "os": os,
+           "URL_PUBBLICO": "https://barattolo.store", "FOTO_DIR": "foto",
+           # i due che vogliono il dataset dei comuni e la rete: qui
+           # non si collauda la geografia ne' CoinGecko
+           "comune_da_zona": lambda z: "Carmagnola (TO)" if "Carmagnola" in z
+           else "",
+           "cambio_noto_ora": lambda *a: 0.0}
+    for costante in ("IMMAGINE_BRAND = (", "SEGNO_META = "):
+        i = _SORGENTE.index(costante)
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    for f in ("_meta_anteprima", "_taglia_meta", "_immagine_anteprima",
+              "_fmt_sats", "_prezzo_promo", "_meta_annuncio",
+              "_meta_negozio", "_meta_o_generici"):
+        exec(pezzo(f), amb)
+    i = _SORGENTE.index("META_GENERICI = _meta_anteprima(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    GEN = amb["META_GENERICI"]
+
+    # --- 1) il taglio: una riga sola, mai a meta' parola ------------
+    taglia = amb["_taglia_meta"]
+    prova("il taglio schiaccia a-capo e doppi spazi", "ciao mondo",
+          taglia("  ciao\n\n   mondo  ", 100))
+    prova("...e sotto la misura non mette puntini", "ciao", taglia("ciao", 10))
+    prova("...taglia a parola intera", "uno due…",
+          taglia("uno due tre quattro", 9))
+    prova("...e regge il campo vuoto", "", taglia(None, 20))
+
+    # --- 2) L'ESCAPING: qui il testo dell'utente sta in un ATTRIBUTO -
+    # Una virgoletta non escapata non «si vede male»: chiude il
+    # content e sputa il resto del titolo come markup.
+    cattivo = 'Cuffie "AKG" <b> & l\'amico'
+    m = amb["_meta_anteprima"](cattivo, "una descrizione", "https://x/y",
+                               ("https://x/a.jpg", 0, 0))
+    prova("il titolo cattivo non spezza l'attributo", False,
+          f'content="{cattivo}"' in m)
+    prova("...la virgoletta diventa entita'", True, "&quot;AKG&quot;" in m)
+    prova("...e il minore pure", True, "&lt;b&gt;" in m)
+    prova("...e l'apostrofo", True, "&#x27;" in m)
+    # la prova vera dell'escaping non e' cercare le entita': e' che il
+    # blocco resti fatto di attributi INTERI e rileggibili — se una
+    # virgoletta passasse, il regex qui sotto troverebbe pezzi in piu'
+    # e la riga si spezzerebbe a meta' del titolo
+    contenuti = _re.findall(r'content="([^"]*)"', m)
+    prova("restano i dodici attributi di base, interi", 12, len(contenuti))
+    prova("...e ognuno si rilegge com'era", True,
+          cattivo in [_html.unescape(v) for v in contenuti])
+
+    # --- 3) misure dichiarate solo quando si sanno ------------------
+    prova("il brand dichiara le sue misure", True, "og:image:width" in
+          amb["_meta_anteprima"]("t", "d", "u"))
+    prova("...il francobollo di un annuncio no (il lato dipende dalla "
+          "foto, e un numero sbagliato e' peggio di uno assente)", False,
+          "og:image:width" in
+          amb["_meta_anteprima"]("t", "d", "u", ("https://x/a.jpg", 0, 0)))
+
+    # --- 4) quale immagine finisce nella card -----------------------
+    img = amb["_immagine_anteprima"]
+    with tempfile.TemporaryDirectory() as d:
+        amb["FOTO_DIR"] = d
+        pieno = os.path.join(d, "a7_0_9.jpg")
+        mini_f = os.path.join(d, "a7_0_9_min.jpg")
+        for p in (pieno, mini_f):
+            open(p, "w").close()
+        prova("la card prende il francobollo, non il pieno",
+              "https://barattolo.store/foto/a7_0_9_min.jpg",
+              img('["a7_0_9.jpg"]')[0])
+        os.remove(mini_f)
+        prova("...senza francobollo ripiega sul pieno",
+              "https://barattolo.store/foto/a7_0_9.jpg",
+              img('["a7_0_9.jpg"]')[0])
+        os.remove(pieno)
+        # un og:image che non risponde e' peggio di nessun og:image:
+        # diversi crawler, non trovandolo, non disegnano la card
+        prova("...e su una foto sparita dal disco ripiega sul brand",
+              amb["IMMAGINE_BRAND"], img('["a7_0_9.jpg"]'))
+        prova("nessuna foto: il brand", amb["IMMAGINE_BRAND"], img("[]"))
+        prova("foto illeggibile: il brand", amb["IMMAGINE_BRAND"],
+              img("non e' json"))
+        prova("importato da Nostr: l'URL remoto passa intero",
+              "https://blossom.example/x.jpg",
+              img('["https://blossom.example/x.jpg"]')[0])
+    amb["FOTO_DIR"] = "foto"
+
+    # --- 5) LA PROVA REGINA: solo gli attivi parlano ----------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci (id INTEGER PRIMARY KEY, titolo TEXT, "
+                "descrizione TEXT, zona TEXT, valuta TEXT, prezzo_sats INT, "
+                "prezzo_eur REAL, foto TEXT, stato TEXT, venditore_id INT)")
+    con.execute("CREATE TABLE utenti (tg_id INT, nome TEXT, username TEXT, "
+                "negozio TEXT, rating REAL, n_feedback INT)")
+    for aid, stato in ((1, "attivo"), (2, "rimosso"), (3, "revisione"),
+                       (4, "venduto")):
+        con.execute("INSERT INTO annunci VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (aid, f"SEGRETO{aid} cuffie da studio",
+                     f"RISERVATO{aid} in ottimo stato, poco usate.",
+                     "Frazione Salsasio, Carmagnola (TO)", "sats",
+                     80000, 0.0, "[]", stato, 777888999))
+    con.execute("INSERT INTO utenti VALUES (777888999, 'Rosa', 'rosina', "
+                "'ab12cd34', 4.75, 12)")
+    con.commit()
+
+    class ConFinta:
+        """La connessione di cartone: _meta_annuncio la chiude nel
+        finally, e chiudere davvero un :memory: sarebbe buttare via il
+        database fra una prova e l'altra."""
+        def execute(self, *a):
+            return con.execute(*a)
+
+        def close(self):
+            pass
+
+    amb["db"] = lambda: ConFinta()
+    ma, mn = amb["_meta_annuncio"], amb["_meta_negozio"]
+
+    attivo = ma(1)
+    prova("l'annuncio attivo racconta il suo titolo", True,
+          "SEGRETO1 cuffie da studio" in attivo)
+    prova("...col prezzo", True, "80.000 sats" in attivo)
+    prova("...il comune, non la zona intera", True,
+          "Carmagnola (TO)" in attivo and "Frazione Salsasio" not in attivo)
+    prova("...e le prime righe della descrizione", True,
+          "RISERVATO1" in attivo)
+    prova("...e l'og:url canonico", True,
+          'content="https://barattolo.store/annuncio/1"' in attivo)
+
+    # ECCO IL PUNTO: togliendo `AND stato='attivo'` dalla WHERE, queste
+    # otto diventano rosse tutte insieme.
+    for aid, stato in ((2, "rimosso"), (3, "revisione"), (4, "venduto")):
+        m = ma(aid)
+        prova(f"un annuncio {stato} ricade sui tag generici", GEN, m)
+        prova(f"...e di lui non trapela una parola ({stato})", True,
+              f"SEGRETO{aid}" not in m and f"RISERVATO{aid}" not in m)
+    prova("un annuncio che non esiste: tag generici", GEN, ma(999))
+
+    # --- 6) il negozio: quel che esce e quel che non esce -----------
+    neg = mn("rosina")
+    prova("il negozio si trova per username", True, "Rosa su Barattolo" in neg)
+    prova("...e per codice", neg, mn("ab12cd34"))
+    prova("...conta i soli annunci ATTIVI", True,
+          "1 oggetto in vetrina" in neg)
+    prova("...mostra le stelle all'italiana", True, "4,8 (12)" in neg)
+    prova("...porta il CODICE nell'og:url, mai il `chi` dell'URL", True,
+          'content="https://barattolo.store/negozio/ab12cd34"' in neg)
+    # il tg_id non esce mai in vetrina: qui serve solo a contare
+    prova("...e il tg_id del venditore non esce da nessuna parte", True,
+          "777888999" not in neg)
+    prova("un negozio che non esiste: tag generici", GEN, mn("nessuno"))
+
+    # --- 7) la cintura: un ornamento non manda giu' il mercatino ----
+    def esplode(*a):
+        raise RuntimeError("database in fiamme")
+
+    prova("un'anteprima che esplode ricade sui generici", GEN,
+          amb["_meta_o_generici"](esplode, 1))
+
+    # --- 8) i due file restano allineati ---------------------------
+    # Il segno e' il punto in cui i meta si infilano. Se qualcuno
+    # ritocca le prime righe di miniapp.html il server non cade (il
+    # ripiego serve la pagina senza meta), ma le anteprime si
+    # spengono in silenzio: e' questa prova a dirlo.
+    mini = open("miniapp.html", "rb").read()
+    prova("il segno dove si infilano i meta esiste in miniapp.html", 1,
+          mini.count(amb["SEGNO_META"]))
+    prova("...ed e' in cima, prima di ogni altro meta", True,
+          mini.index(amb["SEGNO_META"]) < mini.index(b'<meta name="viewport"'))
+    prova("...e non nomina il fine-riga, che cambia da un disco "
+          "all'altro", False,
+          b"\n" in amb["SEGNO_META"] or b"\r" in amb["SEGNO_META"])
+
+    # --- 8bis) e il taglio si esercita DAVVERO, sul file vero ------
+    # Il punto 2 del cantiere: i meta vanno DOPO il charset (che per
+    # specifica deve restare nei primi 1024 byte) e comunque in cima,
+    # perche' parecchi crawler smettono di scaricare molto prima della
+    # fine di 900 KB. Qui HTMLResponse e' di cartone: serve il corpo,
+    # non fastapi.
+    amb["HTMLResponse"] = lambda corpo, headers=None: corpo
+    amb["HEADER_NO_CACHE"] = {}
+    exec(pezzo("_pagina_con_meta"), amb)
+    i = _SORGENTE.index("_PAGINA_CACHE = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    pagina = amb["_pagina_con_meta"]("<!--SEGNAPOSTO-->\n")
+    prova("il charset resta il primo tag della pagina", True,
+          0 < pagina.index(amb["SEGNO_META"]) < pagina.index(b"<!--SEGNAPOSTO"))
+    prova("...e i meta stanno subito dietro, prima del titolo", True,
+          pagina.index(b"<!--SEGNAPOSTO") < pagina.index(b"<title>"))
+    # LA PAGINA ESCE IDENTICA A COM'E' SUL DISCO, byte per byte: la
+    # modalita' testo normalizzerebbe i fine-riga, e sarebbero 15 KB
+    # di differenza su cio' che scarica ogni utente — un effetto
+    # collaterale di un ornamento.
+    prova("...e la pagina esce identica al file, byte per byte", mini,
+          pagina.replace(b"\n<!--SEGNAPOSTO-->", b""))
+
+    # --- 8ter) senza il segno la pagina VIVE, muta ------------------
+    # Un'anteprima e' un ornamento: se qualcuno ritocca le prime righe
+    # di miniapp.html i meta si perdono, ma il mercatino si apre.
+    import tempfile as _tmp
+    dove_ero = os.getcwd()
+    with _tmp.TemporaryDirectory() as d:
+        with open(os.path.join(d, "miniapp.html"), "wb") as fh:
+            fh.write(b"<!DOCTYPE html>\n<html><head><title>x</title>\n")
+        try:
+            os.chdir(d)
+            amb["_PAGINA_CACHE"].update(timbro=False)
+            muta = amb["_pagina_con_meta"]("<!--SEGNAPOSTO-->\n")
+        finally:
+            os.chdir(dove_ero)
+            amb["_PAGINA_CACHE"].update(timbro=False)
+    prova("segno sparito: la pagina esce comunque intera", True,
+          b"<title>x</title>" in muta)
+    prova("...e senza i meta appesi in un posto a caso", False,
+          b"SEGNAPOSTO" in muta)
+
+    # --- 9) nessuna rotta condivisibile torna a servire il file nudo -
+    # E' la riga che sparisce in un riordino senza rompere niente di
+    # visibile: la pagina si aprirebbe uguale, e a mancare sarebbe
+    # solo l'anteprima — cioe' proprio la cosa che nessuno guarda.
+    for rotta in ('@app.get("/")', '@app.get("/miniapp.html")',
+                  '@app.get("/negozio/{chi}")', '@app.get("/annuncio/{aid}")',
+                  '@app.get("/sicurezza")'):
+        i = _SORGENTE.index(rotta)
+        corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+        prova(f"{rotta} passa dai meta e non dal file nudo", True,
+              "_pagina_con_meta(" in corpo and "FileResponse(" not in corpo)
+    # e le due che portano dati passano dalla cintura
+    for rotta, quale in (('@app.get("/negozio/{chi}")', "_meta_negozio"),
+                         ('@app.get("/annuncio/{aid}")', "_meta_annuncio")):
+        i = _SORGENTE.index(rotta)
+        corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+        prova(f"{quale} passa dalla cintura fail-open", True,
+              f"_meta_o_generici({quale}" in corpo)
+
+
+# ====================================================================
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -6562,7 +6814,7 @@ def main():
               prove_sped_gratis, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_cambio,
               prove_consegna_payload_punto, prove_pagina_acquisto,
-              prove_posizione_vetrina):
+              prove_posizione_vetrina, prove_anteprime):
         try:
             f()
         except Exception as e:

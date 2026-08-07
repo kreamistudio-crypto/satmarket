@@ -21045,7 +21045,7 @@ async def avvia_orologio():
 # SOLO la Mini App e le foto degli annunci: tutto il resto e'
 # invisibile per costruzione.
 
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 # Header anti-cache: la WebView di Telegram (e ogni browser) non deve mai
 # conservare la pagina HTML — così ogni push arriva subito fresco a tutti.
@@ -21057,29 +21057,290 @@ HEADER_NO_CACHE = {
 }
 
 
+# --------------- LE ANTEPRIME DEI LINK (Open Graph, ago 2026) --------
+# Quando qualcuno incolla un link di Barattolo su Telegram, WhatsApp o
+# in un DM Nostr, dall'altra parte non arriva Barattolo: arriva un
+# CRAWLER, che scarica i primi byte della pagina e non esegue una riga
+# di JavaScript. Titolo, prezzo e foto qui nascono tutti da fetch +
+# innerHTML — quindi di ogni link (un annuncio, un negozio, la pagina
+# della sicurezza) si vedeva la stessa card vuota col titolo generico.
+# I meta si INIETTANO, perche' miniapp.html e' un file solo: le rotte
+# condivisibili lo servono gia' tutte (regola ferrea 3, nessuna rotta
+# nuova) e adesso ci infilano davanti il loro blocchetto.
+#
+# TRE COSE DA NON ROVESCIARE:
+#
+# 1) SOLO GLI ANNUNCI ATTIVI raccontano qualcosa di se'. Un rimosso o
+#    uno in revisione ricade sui tag GENERICI, e non e' pignoleria:
+#    l'anteprima di Telegram resta in cache per giorni e viaggia
+#    RIPUBBLICATA da chi inoltra il messaggio — un titolo finito li'
+#    dentro e' un annuncio che continua a esistere in giro anche dopo
+#    che lo scudo anti-resurrezione l'ha spento. E' lo stesso scudo,
+#    bucato da un'altra parte, e per questo la clausola sta nella
+#    WHERE (dove non si puo' dimenticare) e non in un «if» dopo.
+#
+# 2) IL BLOCCO VA IN CIMA, subito dopo il charset — che deve restare
+#    lui il primo, sta nei primi 1024 byte per specifica. miniapp.html
+#    pesa quasi 900 KB e diversi crawler smettono di scaricare molto
+#    prima della fine: in coda al <head> i meta non li leggerebbe
+#    nessuno.
+#
+# 3) TUTTO PASSA DA html.escape(quote=True): qui il testo dell'utente
+#    finisce dentro un ATTRIBUTO, non dentro un nodo — una virgoletta
+#    in un titolo spezzerebbe il tag in silenzio, e sarebbe la lezione
+#    di «Valle d'Aosta» ripagata un piano piu' sotto.
+#
+# Il <title> non si tocca: dove conta (Telegram, WhatsApp, i client
+# Nostr, Slack) og:title ha comunque la precedenza, e la pagina resta
+# quella che e' — una sola, con un titolo solo.
+
+# L'immagine di ripiego: il brand, quando la pagina non ne ha una sua.
+# E' icona-512 e non il barattolo del logo (256px: sotto il minimo che
+# serve per la card grande) ne' l'hero, che e' l'UNICO asset di casa
+# con l'alpha — un barattolo scontornato lo comporrebbe ogni client sul
+# fondo che gli pare. 512 quadrati, opaco, gia' servito da una rotta.
+IMMAGINE_BRAND = (f"{URL_PUBBLICO}/assets/icona-512.png", 512, 512)
+
+
+def _meta_anteprima(titolo: str, descrizione: str, url: str,
+                    immagine=IMMAGINE_BRAND) -> str:
+    """Il blocchetto che i crawler leggono: og:* per tutti quelli che
+    ci interessano, name="description" per chi Open Graph non lo
+    conosce, twitter:card solo per dire «falla grande»."""
+    img, larg, alt = immagine
+    righe = [("property", "og:site_name", "Barattolo"),
+             ("property", "og:type", "website"),
+             ("property", "og:locale", "it_IT"),
+             ("property", "og:title", titolo),
+             ("property", "og:description", descrizione),
+             ("property", "og:url", url),
+             ("property", "og:image", img),
+             ("name", "description", descrizione),
+             ("name", "twitter:card", "summary_large_image"),
+             ("name", "twitter:title", titolo),
+             ("name", "twitter:description", descrizione),
+             ("name", "twitter:image", img)]
+    # Larghezza e altezza si dichiarano solo quando le SAPPIAMO. Il
+    # francobollo di un annuncio e' quadrato ma il lato dipende dalla
+    # foto — min(MINIATURA_LATO, lato corto) —, e un numero sbagliato
+    # e' peggio di un numero assente: il crawler disegna la card sulla
+    # misura dichiarata e poi ci mette dentro un'altra immagine.
+    if larg and alt:
+        righe += [("property", "og:image:width", larg),
+                  ("property", "og:image:height", alt)]
+    return "".join(
+        f'<meta {attr}="{chiave}" '
+        f'content="{html.escape(str(valore), quote=True)}">\n'
+        for attr, chiave, valore in righe)
+
+
+META_GENERICI = _meta_anteprima(
+    "Barattolo — il mercatino in sats",
+    "Compra e vendi in bitcoin: i sats restano nel deposito di garanzia "
+    "finché chi compra non conferma di aver ricevuto l'oggetto.",
+    URL_PUBBLICO)
+
+META_SICUREZZA = _meta_anteprima(
+    "Il pagamento protetto — Barattolo",
+    "Come funziona il deposito di garanzia: i sats restano bloccati "
+    "finché chi compra non conferma. Cosa copre, cosa no, e dove "
+    "stanno i sats.",
+    f"{URL_PUBBLICO}/sicurezza")
+
+
+# Il segno NON porta il fine-riga: sul VPS il file ha \n e sul portatile
+# di chi lo scrive \r\n, e un marcatore che li nomina ne mancherebbe uno
+# dei due. Ci si infila subito dopo il «>», col fine-riga che resta dov'e'.
+SEGNO_META = b'<meta charset="UTF-8">'
+# timbro False (e non None) e' il «mai letto»: nessuna coppia
+# (mtime, size) puo' esserci uguale, nemmeno quella di uno stat fallito
+_PAGINA_CACHE = {"timbro": False, "prima": b"", "dopo": b"", "taglio": False}
+
+
+def _pagina_con_meta(meta: str) -> HTMLResponse:
+    """miniapp.html col blocchetto infilato in testa. Il file si legge
+    UNA volta e resta in memoria spezzato in due: sono quasi 900 KB, e
+    rileggerli a ogni richiesta su un VPS piccolo mono-processo si
+    sentirebbe. Il timbro e' (mtime, size), cosi' in sviluppo basta
+    salvare il file perche' la pagina cambi senza riavviare nulla.
+
+    Si lavora sui BYTE e non sul testo: la pagina deve uscire IDENTICA
+    a com'e' sul disco, e la modalita' testo normalizzerebbe i
+    fine-riga — quindici KB di differenza su cio' che scarica ogni
+    utente, come effetto collaterale di un ornamento. Nemmeno per
+    sbaglio."""
+    try:
+        s = os.stat("miniapp.html")
+        timbro = (s.st_mtime, s.st_size)
+    except OSError:
+        timbro = None
+    if timbro != _PAGINA_CACHE["timbro"]:
+        with open("miniapp.html", "rb") as f:
+            grezzo = f.read()
+        i = grezzo.find(SEGNO_META)
+        if i < 0:
+            # Il segno non c'e' piu' — qualcuno ha ritoccato le prime
+            # righe di miniapp.html. I meta si perdono e la PAGINA
+            # VIVE: un'anteprima e' un ornamento, e un ornamento non
+            # deve poter mandare giu' il mercatino. A tenere allineati
+            # i due file c'e' la prova, che lo dice in CI prima che
+            # succeda davvero.
+            print("⚠️ Anteprime spente: <meta charset> non trovato "
+                  "in miniapp.html", flush=True)
+            _PAGINA_CACHE.update(timbro=timbro, prima=grezzo, dopo=b"",
+                                 taglio=False)
+        else:
+            i += len(SEGNO_META)
+            _PAGINA_CACHE.update(timbro=timbro, prima=grezzo[:i],
+                                 dopo=grezzo[i:], taglio=True)
+    corpo = b""
+    if _PAGINA_CACHE["taglio"] and meta:
+        corpo = b"\n" + meta.rstrip("\n").encode("utf-8")
+    return HTMLResponse(_PAGINA_CACHE["prima"] + corpo + _PAGINA_CACHE["dopo"],
+                        headers=HEADER_NO_CACHE)
+
+
+def _taglia_meta(testo: str, quanti: int) -> str:
+    """Una riga sola — niente a-capo, niente doppi spazi — tagliata a
+    parola intera col puntino di sospensione. Le descrizioni degli
+    annunci sono lunghe e vanno a capo; una card ne mostra due righe."""
+    testo = " ".join((testo or "").split())
+    if len(testo) <= quanti:
+        return testo
+    corto = testo[:quanti].rsplit(" ", 1)[0]
+    return (corto or testo[:quanti]) + "…"
+
+
+def _immagine_anteprima(foto_json: str):
+    """La foto della card: il FRANCOBOLLO (_min) se c'e', che e' gia'
+    la misura giusta per ogni piattaforma e pesa un decimo del pieno.
+    Il pieno e' il ripiego, e il brand il ripiego del ripiego — un
+    og:image che non risponde e' peggio di nessun og:image: diversi
+    crawler, non trovando l'immagine, non disegnano la card affatto."""
+    try:
+        nomi = json.loads(foto_json or "[]")
+    except Exception:
+        nomi = []
+    for n in nomi:
+        if not n or n.startswith("data:"):
+            continue
+        if n.startswith("http"):       # importato da Nostr: gia' assoluto
+            return n, 0, 0
+        mini = n[:-4] + "_min.jpg" if n.endswith(".jpg") else ""
+        for nome in (mini, n):
+            if nome and os.path.exists(os.path.join(FOTO_DIR, nome)):
+                return f"{URL_PUBBLICO}/foto/{nome}", 0, 0
+    return IMMAGINE_BRAND
+
+
+def _meta_annuncio(aid: int) -> str:
+    """L'anteprima di un annuncio: prezzo, comune e le prime righe
+    della descrizione. Il prezzo e' il LISTINO anche con una lampo
+    viva, ed e' deliberato: l'anteprima resta in cache per giorni,
+    quindi una cifra a tempo ci sopravviverebbe — meglio dire il
+    prezzo che non scade che promettere uno sconto finito."""
+    con = db()
+    try:
+        # SOLO GLI ATTIVI (punto 1 qui sopra): la stessa clausola di
+        # /api/listings/{id}, ed e' la riga che tiene l'anteprima
+        # dentro il patto dello scudo anti-resurrezione.
+        r = con.execute(
+            "SELECT titolo, descrizione, zona, valuta, prezzo_sats, "
+            "prezzo_eur, foto FROM annunci WHERE id=? AND stato='attivo'",
+            (aid,)).fetchone()
+    finally:
+        con.close()
+    if not r:
+        return META_GENERICI
+    a = dict(r)
+    testa = _prezzo_promo(a, cambio_noto_ora())
+    comune = comune_da_zona(a["zona"] or "")
+    if comune:
+        testa += f" · {comune}"
+    coda = _taglia_meta(a["descrizione"], 150)
+    return _meta_anteprima(_taglia_meta(a["titolo"], 90),
+                           f"{testa} — {coda}" if coda else testa,
+                           f"{URL_PUBBLICO}/annuncio/{aid}",
+                           _immagine_anteprima(a["foto"]))
+
+
+def _meta_negozio(chi: str) -> str:
+    """L'anteprima di un negozio: nome, quanti oggetti, le stelle.
+    L'avatar NON ci va — e' un francobollo da 128px, sotto la misura
+    minima delle card — quindi l'immagine e' quella del brand.
+    Il tg_id serve solo a contare gli annunci e non esce da qui, come
+    in tutta la vetrina; l'og:url porta il CODICE del negozio letto dal
+    database e mai il `chi` arrivato dall'URL, che potrebbe essere
+    qualunque cosa."""
+    con = db()
+    try:
+        campi = ("SELECT tg_id, nome, negozio, rating, n_feedback "
+                 "FROM utenti ")
+        v = con.execute(campi + "WHERE username=? COLLATE NOCASE "
+                        "AND username!='' LIMIT 1", (chi,)).fetchone()
+        if not v:
+            v = con.execute(campi + "WHERE negozio=? LIMIT 1",
+                            (chi,)).fetchone()
+        if not v:
+            return META_GENERICI
+        quanti = con.execute("SELECT COUNT(*) FROM annunci WHERE "
+                             "venditore_id=? AND stato='attivo'",
+                             (v["tg_id"],)).fetchone()[0]
+    finally:
+        con.close()
+    conto = ("Ancora nessun oggetto in vetrina" if not quanti else
+             "1 oggetto in vetrina" if quanti == 1 else
+             f"{quanti} oggetti in vetrina")
+    if v["rating"]:
+        stelle = f"{v['rating']:.1f}".replace(".", ",")
+        conto += f" · ⭐ {stelle} ({v['n_feedback']})"
+    nome = _taglia_meta(v["nome"], 60) or "Un negozio"
+    return _meta_anteprima(
+        f"{nome} su Barattolo",
+        f"{conto} — paghi in sats, e restano nel deposito di garanzia "
+        f"finché la merce non è arrivata.",
+        f"{URL_PUBBLICO}/negozio/{v['negozio']}" if v["negozio"]
+        else URL_PUBBLICO)
+
+
+def _meta_o_generici(costruisci, *dati) -> str:
+    """La cintura: un'anteprima e' un ornamento, e nessun ornamento
+    deve poter impedire a una pagina di aprirsi. Qualunque cosa vada
+    storta — database occupato, riga strana — si ricade sui tag
+    generici, che e' esattamente il ripiego di sempre."""
+    try:
+        return costruisci(*dati)
+    except Exception as e:
+        print(f"⚠️ Anteprima non costruita: {e}", flush=True)
+        return META_GENERICI
+
+
 @app.get("/")
 def home():
-    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
+    return _pagina_con_meta(META_GENERICI)
 
 
 @app.get("/miniapp.html")
 def pagina_miniapp():
-    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
+    return _pagina_con_meta(META_GENERICI)
 
 
 @app.get("/negozio/{chi}")
 def pagina_negozio(chi: str):
     """Link condivisibile del negozio: e' sempre la stessa Mini App,
-    il JS legge /negozio/... dall'URL e apre la vista giusta."""
-    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
+    il JS legge /negozio/... dall'URL e apre la vista giusta. In testa
+    ci vanno i meta di QUEL negozio, per chi il link lo riceve e non
+    lo apre (vedi le anteprime dei link, qui sopra)."""
+    return _pagina_con_meta(_meta_o_generici(_meta_negozio, chi))
 
 
 @app.get("/annuncio/{aid}")
 def pagina_annuncio(aid: int):
     """Link condivisibile di un annuncio (bottone condividi del
     dettaglio): stessa Mini App, il JS legge /annuncio/{id} dall'URL
-    e apre il dettaglio — in vetrina anonima per chi non e' entrato."""
-    return FileResponse("miniapp.html", media_type="text/html", headers=HEADER_NO_CACHE)
+    e apre il dettaglio — in vetrina anonima per chi non e' entrato.
+    I meta in testa raccontano l'annuncio SOLO se e' ancora attivo."""
+    return _pagina_con_meta(_meta_o_generici(_meta_annuncio, aid))
 
 
 @app.get("/sicurezza")
@@ -21092,9 +21353,11 @@ def pagina_sicurezza():
     E' la pagina che si manda a chi chiede «ma come funziona, mi
     fido?», cioe' proprio a chi non ha ancora aperto Barattolo: da qui
     si legge tutta, anche da anonimi, senza entrare da nessuna parte.
-    Nessun `{parametro}` come nelle gemelle: la pagina e' UNA."""
-    return FileResponse("miniapp.html", media_type="text/html",
-                        headers=HEADER_NO_CACHE)
+    Nessun `{parametro}` come nelle gemelle: la pagina e' UNA — e per
+    la stessa ragione i suoi meta sono una costante: e' il link che si
+    manda a chi chiede «mi fido?», cioe' quello dove un'anteprima nuda
+    faceva il danno peggiore."""
+    return _pagina_con_meta(META_SICUREZZA)
 
 
 @app.get("/vendor/nostr.js")
