@@ -1240,6 +1240,77 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   revalidazione per le illustrazioni (nomi NON versionati), un giorno
   per le foto (versionati). Il middleware `cache_foto` è sparito:
   esisteva solo per mettere quell'header.
+  LE ANTEPRIME DEI LINK (ago 2026): un link di Barattolo incollato su
+  Telegram, WhatsApp o in un DM Nostr arrivava come una card vuota col
+  titolo generico — dall'altra parte non c'è un browser ma un CRAWLER,
+  che scarica i primi byte e non esegue una riga di JavaScript, mentre
+  qui titolo, prezzo e foto nascono tutti da fetch + innerHTML. Le
+  cinque rotte che servono `miniapp.html` (`/`, `/miniapp.html`,
+  `/negozio/{chi}`, `/annuncio/{aid}`, `/sicurezza`) ci infilano ora in
+  testa il loro blocchetto di meta: nessuna rotta nuova, la regola
+  ferrea 3 non si tocca.
+  LA REGOLA CHE HA APERTO IL CANTIERE: **solo gli annunci ATTIVI
+  raccontano qualcosa di sé**. Un rimosso o uno in revisione ricade sui
+  tag GENERICI, e non è pignoleria — l'anteprima di Telegram resta in
+  cache per giorni e viaggia RIPUBBLICATA da chi inoltra il messaggio,
+  quindi un titolo finito lì dentro è un annuncio che continua a
+  esistere in giro dopo che lo scudo anti-resurrezione l'ha spento: è
+  lo stesso scudo, bucato da un'altra parte. Per questo la clausola sta
+  nella WHERE di `_meta_annuncio` (dove non si può dimenticare) e la
+  prova è ESEGUIBILE e non una sentinella sulla forma — il rimosso ci
+  passa davvero, su un database vero, e il suo titolo si cerca
+  nell'HTML che esce; togliendo lo stato dalla WHERE ne diventano rosse
+  sei insieme. Vale anche per il VENDUTO e per l'annuncio che non
+  esiste (`/api/listings/{id}` fa già 404 su tutti e tre).
+  IL BLOCCO VA IN CIMA, subito dopo `<meta charset>` — che per
+  specifica deve restare nei primi 1024 byte, e quindi si resta suoi
+  vicini invece di prendergli il posto: la pagina pesa quasi 900 KB e
+  parecchi crawler smettono di scaricare molto prima della fine
+  (misurato: l'ultimo meta cade al byte ~1300, li leggono tutti).
+  SI LAVORA SUI BYTE e non sul testo, ed è la riga che sembra un
+  dettaglio: la modalità testo normalizza i fine-riga, cioè 15 KB di
+  differenza su ciò che scarica OGNI utente come effetto collaterale di
+  un ornamento. `SEGNO_META` per la stessa ragione non nomina il
+  fine-riga (sul VPS è `\n`, sul portatile di chi scrive `\r\n`) e ci
+  si infila subito dopo il `>`. C'è la prova che la pagina esce
+  identica al file, byte per byte.
+  UN ORNAMENTO NON MANDA GIÙ IL MERCATINO, due volte: se il segno non
+  si trova più (qualcuno ha ritoccato le prime righe di miniapp.html) i
+  meta si perdono e la pagina VIVE — mai appesi in fondo, che sarebbe
+  peggio del niente —, e `_meta_o_generici` è la cintura fail-open su
+  qualunque cosa vada storta nel costruirli. Il template si legge una
+  volta e resta in memoria spezzato in due, col timbro `(mtime, size)`:
+  in sviluppo basta salvare il file perché la pagina cambi.
+  L'IMMAGINE è il FRANCOBOLLO `_min` dell'annuncio — già la misura
+  giusta per ogni piattaforma (640 quadrati, ~175 KB: dentro i limiti
+  di Telegram, WhatsApp e Facebook, verificati) — col pieno come
+  ripiego e il brand come ripiego del ripiego, perché un `og:image` che
+  non risponde è PEGGIO di nessun og:image: diversi crawler, non
+  trovandolo, non disegnano la card affatto. Per il NEGOZIO è sempre il
+  brand: l'avatar è un francobollo da 128px, sotto il minimo delle card
+  — ed è `icona-512.png` e non l'hero, che è l'UNICO asset di casa con
+  l'alpha (un barattolo scontornato lo comporrebbe ogni client sul
+  fondo che gli pare). `og:image:width`/`height` si dichiarano SOLO sul
+  brand, dove le sappiamo: il lato del francobollo dipende dalla foto
+  (`min(MINIATURA_LATO, lato corto)`) e un numero sbagliato è peggio di
+  uno assente.
+  Il `<title>` NON si tocca: dove conta og:title ha comunque la
+  precedenza, e la pagina resta una sola con un titolo solo. L'og:url
+  del negozio porta il CODICE letto dal database e mai il `chi`
+  arrivato dall'URL; il tg_id serve solo a contare gli annunci e non
+  esce (prova apposta). Tutto passa da `html.escape(quote=True)` — qui
+  il testo dell'utente sta in un ATTRIBUTO, non in un nodo — e la prova
+  non cerca le entità ma che il blocco resti fatto di attributi INTERI
+  e rileggibili.
+  IL PREZZO È IL LISTINO anche con una lampo viva, deliberato:
+  l'anteprima resta in cache per giorni, quindi una cifra a tempo ci
+  sopravviverebbe — meglio dire il prezzo che non scade che promettere
+  uno sconto finito. IMPERFEZIONE EREDITATA: `_prezzo_promo` scrive
+  l'euro col punto decimale (`284.61 €`), come già fa nei post di
+  canale e nelle note Nostr — si corregge lì o in nessun posto.
+  ATTENZIONE AL COLLAUDO: Telegram e WhatsApp cachano le anteprime a
+  lungo e non si bustano dal nostro lato, quindi si prova con URL
+  USA-E-GETTA prima di condividere qualcosa di vero.
   Frontend: prima pagina da 30 (`LIMITE_PAGINA`) e
   scroll infinito con sentinelle + IntersectionObserver (vetrina,
   negozio, tuoi annunci; guardie DENTRO le callback: demo, ricerca
@@ -8615,6 +8686,41 @@ giro: che il badge sia spento ovunque — è giusto così, si accende solo
 su chi rifornisce da qui in avanti — e il primo venditore vero che
 rifornisce (che il post di canale perda la ✅ e l'evento Nostr torni
 `active`).
+
+Le anteprime dei link (ago 2026): un link di Barattolo su Telegram,
+WhatsApp o in un DM Nostr arrivava come una card vuota col titolo
+generico — i crawler non eseguono JavaScript, e qui titolo, prezzo e
+foto nascono tutti da fetch. Adesso le cinque rotte che servono
+miniapp.html ci infilano in testa i loro meta Open Graph. La regola che
+ha aperto il cantiere, e la sola da non ammorbidire: SOLO GLI ANNUNCI
+ATTIVI raccontano qualcosa di sé — un rimosso in un'anteprima cachata e
+inoltrata è lo scudo anti-resurrezione bucato da un'altra parte. Vedi
+Architettura, «LE ANTEPRIME DEI LINK», per le altre due cose da non
+rovesciare (i meta in cima a 900 KB di pagina, l'escaping in attributo)
+e per la scelta dell'immagine coi suoi tre ripieghi.
+Collaudate: 54 prove nuove (1605 verdi), e quella sul rimosso è
+ESEGUIBILE e non una sentinella sulla forma — passa da un database vero
+e il titolo si cerca nell'HTML che esce. TORTURATE con nove mutazioni
+del codice, una per riga sorvegliata (stato tolto dalla WHERE, escaping
+a quote=False, rotta tornata al file nudo, francobollo scambiato col
+pieno, conto del negozio senza stato, tg_id nell'anteprima, meta prima
+del charset, cintura che rilancia, ripiego che appende in fondo):
+ognuna diventa rossa da sola, e la prima ne fa rosse sei insieme. Più
+il giro dal vivo sul server locale simulando gli User-Agent veri di
+Telegram, WhatsApp, Facebook, Slack e dei client Nostr con la loro
+lettura parziale — tutti vedono la stessa card, l'ultimo meta cade al
+byte ~1300, e l'og:image sta dentro i limiti di tutti e tre —, la
+verifica che la pagina esca IDENTICA al file byte per byte, e
+l'escaping provato end-to-end con una riga usa-e-getta dal titolo
+cattivo (virgolette, `<script>`, apostrofi: 13 meta interi, nessun tag
+spezzato, e la riga poi cancellata).
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta nuova. DA FARE AL PRIMO DEPLOY, ed è il
+pezzo che in locale non si può fare: provare le anteprime con URL
+USA-E-GETTA — un annuncio di prova da rimuovere subito dopo — perché
+Telegram e WhatsApp cachano le card a lungo e dal nostro lato non si
+bustano; e verificare col rimosso VERO che la sua card sia quella
+generica.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
