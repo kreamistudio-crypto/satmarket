@@ -6604,14 +6604,22 @@ def prove_impersonazione():
           "Ai casi netti si aggiunge l'IMPERSONAZIONE" in prompt)
     prova("...nominando le tre cose per cui ci si puo' spacciare",
           True, all(p in prompt for p in
-                    ("da Barattolo", "moderatori", "altro servizio")))
+                    ("la piattaforma", "moderatori", "altro servizio")))
 
-    # --- 2) il perimetro: l'anteprima pesca da tutti e due ---------
-    # E' la riga del cantiere: og:title viene dal titolo e
-    # og:description dalla descrizione, quindi un divieto scritto sul
-    # solo titolo lascerebbe aperta meta' della card.
-    prova("vale sul titolo COME sulla descrizione", True,
-          "Vale sul TITOLO come sulla DESCRIZIONE" in prompt)
+    # --- 2) il perimetro: l'annuncio si giudica INTERO -------------
+    # og:title viene dal titolo e og:description dalla descrizione,
+    # quindi un divieto scritto sul solo titolo lascerebbe aperta
+    # meta' della card. Ma NON si giudicano separatamente, e la
+    # differenza e' costata un falso positivo (vedi il punto 3bis):
+    # la prima stesura diceva «vale sul TITOLO come sulla
+    # DESCRIZIONE», e il modello ha letto la descrizione da sola.
+    prova("l'annuncio si giudica intero, non campo per campo", True,
+          "Giudica l'annuncio INTERO" in prompt)
+    prova("...e l'oggetto puo' stare nel solo titolo", True,
+          "l'oggetto puo' stare nel solo TITOLO" in prompt)
+    prova("...ma il titolo pulito non salva la descrizione", True,
+          "avvelena l'annuncio anche quando il titolo e' pulito"
+          in prompt)
 
     # --- 3) LA CONTRO-REGOLA, che e' la meta' delicata -------------
     # Un divieto sull'impersonazione senza il permesso di NOMINARE la
@@ -6620,12 +6628,53 @@ def prove_impersonazione():
     # che citare non e' mai di per se' un motivo, e devono restare gli
     # esempi: sono loro a insegnare il confine.
     prova("citare Barattolo resta lecito, a chiare lettere", True,
-          "non e' MAI di per" in prompt and "il citarla" in prompt)
+          "non e' MAI di per" in prompt and "non il citarla" in prompt)
     for legittimo in ("gadget di Barattolo", "venduto tramite Barattolo",
                       "regolamento Barattolo", "negozio Barattolo"):
         prova(f"...con l'esempio «{legittimo}»", True, legittimo in prompt)
-    prova("...e il criterio per decidere: c'e' una COSA in vendita?",
-          True, "una COSA in vendita" in prompt)
+
+    # --- 3bis) IL FALSO POSITIVO CHE ABBIAMO PAGATO PER TROVARE ----
+    # Primo giro del collaudo col modello vero, 14/15: «Bicicletta da
+    # corsa Bianchi» la cui DESCRIZIONE spiega come funziona l'escrow
+    # e' uscita VIETATO col motivo «non descrive l'oggetto in
+    # vendita» — ma l'oggetto c'e', e' una bici, sta nel titolo. La
+    # causa era mia: avevo scritto «e non descrive nessun oggetto in
+    # vendita» dentro la definizione del VIETATO, e il modello l'ha
+    # presa per un test sufficiente da applicare alla sola
+    # descrizione. Tre righe lo chiudono, e vanno tenute tutte e tre.
+    prova("raccontare come funziona Barattolo e' dichiarato LECITO",
+          True, "RACCONTARE come funziona Barattolo" in prompt
+          and "non e' MAI impersonazione" in prompt)
+    prova("...perche' chi spiega l'escrow RASSICURA chi compra", True,
+          "RASSICURANDO" in prompt)
+    prova("...e il divieto colpisce chi SI RIVOLGE al lettore", True,
+          "SI RIVOLGE A CHI LEGGE" in prompt)
+    # la regola che il modello aveva scavalcato, adesso dichiarata
+    # sovrana e con l'uscita esplicita per l'annuncio prolisso
+    prova("la cosa in vendita VINCE sulle altre regole", True,
+          "LA REGOLA CHE VINCE SULLE ALTRE" in prompt
+          and "una COSA in vendita" in prompt)
+    prova("...e un annuncio prolisso e' OK, non impersonazione", True,
+          "un annuncio prolisso e' OK" in prompt)
+    # ...senza pero' diventare una scappatoia: il caso avvelenato ha
+    # anche lui una cosa in vendita, e a distinguerlo e' la seconda
+    # meta' della condizione
+    prova("...ma solo se al lettore non si chiede NIENTE", True,
+          "non si chiede di verificare, sbloccare o confermare NIENTE"
+          in prompt.replace("\n", " "))
+    # LA COPPIA DI ESEMPI: due descrizioni che nominano tutt'e due
+    # Barattolo e finiscono in due esiti opposti. E' il modo in cui un
+    # prompt insegna un confine — la regola astratta da sola non era
+    # bastata.
+    prova("l'esempio della bici (il falso positivo) e' nel prompt",
+          True, "Bicicletta da corsa Bianchi" in prompt
+          and "finche' non confermi di aver ricevuto la bici' -> OK"
+          in prompt)
+    prova("...col suo gemello avvelenato che resta VIETATO", True,
+          "scrivi a @supporto per sbloccare l'ordine' -> VIETATO"
+          in prompt)
+    prova("...e la coppia dice che l'oggetto non basta a salvarlo",
+          True, "non lo salva il fatto che le cuffie ci siano" in prompt)
 
     # --- 4) i tre esempi, uno per esito ----------------------------
     # Il prompt insegna per esempi, e questi tre sono le tre risposte

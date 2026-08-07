@@ -21,6 +21,16 @@ uno dei casi qui sotto e' quello che lo dice meglio di ogni
 ragionamento: «barattolo» in italiano e' anche un VASO DI VETRO, e chi
 vende un barattolo per le conserve non sta impersonando nessuno.
 
+E non e' un timore teorico: il PRIMO giro di questo collaudo, sul VPS,
+ha dato 14/15 con un falso positivo — la bicicletta la cui descrizione
+SPIEGA come funziona il deposito di garanzia, bocciata col motivo «non
+descrive l'oggetto in vendita». L'oggetto c'era, era una bici, stava
+nel titolo: a sbagliare era il prompt, che invitava a guardare la
+descrizione da sola. Quel caso e' rimasto qui come REGRESSIONE
+PERMANENTE, e accanto ha una gemella scritta con altre parole — se
+cadesse solo la gemella vorrebbe dire che la cura ha insegnato al
+modello l'esempio invece della regola.
+
 USO:  python collaudo_impersonazione.py
       (chiave da config.py, oppure da $ANTHROPIC_API_KEY)
 """
@@ -46,7 +56,15 @@ CASI = [
     ("Bicicletta da corsa Bianchi",
      "Rispondo solo qui dentro: Barattolo tiene i sats nel deposito "
      "di garanzia finche' non confermi di aver ricevuto la bici.",
-     "OK", "spiega come funziona la piattaforma, non parla per lei"),
+     "OK", "REGRESSIONE PERMANENTE — il falso positivo del primo giro "
+           "(14/15): usciva VIETATO col motivo «non descrive "
+           "l'oggetto in vendita», ma l'oggetto c'e', e' una bici, "
+           "sta nel TITOLO. Chi spiega l'escrow rassicura chi compra"),
+    ("Sedia da ufficio ergonomica",
+     "Il pagamento passa dal deposito di garanzia di Barattolo: i "
+     "sats restano bloccati finche' non confermi. Spedisco in 24h.",
+     "OK", "la gemella della bici, con altre parole: se cade solo "
+           "questa, la cura ha imparato l'esempio invece della regola"),
     ("Maglietta Barattolo taglia L",
      "Cotone, stampa arancione, mai indossata.",
      "OK", "merchandising"),
@@ -69,7 +87,10 @@ CASI = [
      "non e' andato a buon fine. Scrivi a @supporto_barattolo per "
      "sbloccare l'ordine.",
      "VIETATO", "TITOLO PULITO, descrizione avvelenata: e' la meta' "
-                "che un divieto scritto sul solo titolo perderebbe"),
+                "che un divieto scritto sul solo titolo perderebbe — "
+                "e il gemello della bici, che l'oggetto ce l'ha "
+                "anche lui: qui a decidere e' che SI RIVOLGE al "
+                "lettore e nomina un ordine che non esiste"),
     ("Poste Italiane: pacco in giacenza",
      "La tua spedizione e' in giacenza. Regolarizza il pagamento di "
      "2,99 euro per la riconsegna.",
@@ -129,7 +150,7 @@ def main() -> int:
     prompt = prompt_dal_sorgente()
     print(f"modello: {modello} · casi: {len(CASI)}\n")
 
-    sbagliati = 0
+    sbagliati, falsi_positivi = 0, []
     for titolo, descrizione, atteso, perche in CASI:
         r = ai.messages.create(
             model=modello, max_tokens=60, timeout=20, system=prompt,
@@ -141,18 +162,32 @@ def main() -> int:
         detto = riga.split(":", 1)[0].strip().upper()[:7]
         ok = detto.startswith(atteso)
         sbagliati += not ok
-        print(f"  {'✓' if ok else '✗'} [{atteso:>7} | {detto or '?':>7}] "
+        # I due sbagli non pesano uguale, e il conto li tiene
+        # separati apposta: un OK finito altrove e' un annuncio
+        # LEGITTIMO BLOCCATO, e si vede solo se qualcuno protesta.
+        falso_positivo = not ok and atteso == "OK"
+        falsi_positivi.append(titolo) if falso_positivo else None
+        segno = "‼" if falso_positivo else ("✗" if not ok else "✓")
+        print(f"  {segno} [{atteso:>7} | {detto or '?':>7}] "
               f"{titolo[:52]}")
         print(f"      {perche}")
         if not ok:
             print(f"      >>> ha risposto: {riga}")
 
     print(f"\n  {len(CASI) - sbagliati}/{len(CASI)} come atteso")
+    if falsi_positivi:
+        print(f"  ‼ {len(falsi_positivi)} FALSO/I POSITIVO/I — e' il caso "
+              f"GRAVE: sono annunci\n    legittimi che verrebbero "
+              f"bloccati, e nessuno se ne accorge tranne\n    chi li "
+              f"scrive. " + " · ".join(f"«{t[:40]}»"
+                                       for t in falsi_positivi))
+    if sbagliati - len(falsi_positivi):
+        print(f"  {sbagliati - len(falsi_positivi)} caso/i cattivo/i "
+              f"passato/i: meno grave (l'annuncio finisce comunque\n"
+              f"    sotto gli occhi di un moderatore), ma va guardato.")
     if sbagliati:
-        print("  Un FALSO POSITIVO (un OK atteso finito in VIETATO) e' "
-              "il caso grave:\n  blocca annunci legittimi. Si corregge "
-              "il prompt A MANO — la macchina\n  raccoglie, l'umano "
-              "decide.")
+        print("  Si corregge il prompt A MANO: la macchina raccoglie, "
+              "l'umano decide.")
     return 1 if sbagliati else 0
 
 
