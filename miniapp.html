@@ -1950,6 +1950,12 @@
   .sicu-lista li{position:relative;padding-left:18px}
   .sicu-lista li::before{content:'';position:absolute;left:2px;top:9px;
     width:6px;height:6px;border-radius:999px;background:var(--trust)}
+  /* L'elenco di «cosa non si perde»: qui il marcatore e' l'EMOJI della
+     voce (⚡🟣📖💾), che dice gia' di che cosa si parla — il pallino
+     verde accanto sarebbe un secondo marcatore che non aggiunge nulla. */
+  .sicu-cose li{padding-left:30px}
+  .sicu-cose li::before{content:none}
+  .sicu-cose .em{position:absolute;left:0;top:0;font-size:15px}
   .sicu-piede{margin-top:26px;padding:12px 14px;background:var(--card);
     border:1px solid var(--line);border-radius:14px;
     font-size:13.5px;font-weight:600;color:var(--ink-soft);text-align:center}
@@ -3008,6 +3014,25 @@
            parola «custodia», che in ambito regolatorio ha un peso
            specifico. Si dice dove stanno tecnicamente e per quanto. -->
       <p>I sats restano bloccati in un <b>conto Lightning della piattaforma</b> per il tempo dell'affare, e non un minuto di più: dal pagamento alla conferma. Non è un conto tuo, non è un investimento, non li mettiamo a rendere da nessuna parte. Quando l'affare si chiude, escono — al venditore o a te.</p>
+
+      <!-- Come stiamo messi con l'infrastruttura (ago 2026): un utente
+           l'ha chiesto, e la risposta si scrive invece di aspettare la
+           domanda. Ogni riga qui dev'essere VERA: chi la ritocca
+           verifichi prima il fatto, non la frase. -->
+      <h3>Se Barattolo sparisse</h3>
+      <p>Oggi il mercatino gira su <b>un server solo, con un database solo</b>. Non è ridondato in altre nazioni: se lo spegnessero, Barattolo si fermerebbe. Meglio dirlo prima che chiederlo.</p>
+      <p>Quello che <b>non</b> si ferma con lui:</p>
+      <ul class="sicu-lista sicu-cose">
+        <li><span class="em">⚡</span><b>I sats.</b> Il deposito non vive qui dentro: sta su un <b>nodo Lightning nostro</b>, separato dal server, e la sua seed è custodita offline. Il gestionale che lo comanda è ospitato da terzi; il nodo e la seed no.</li>
+        <li><span class="em">🟣</span><b>Gli annunci.</b> Quelli pubblicati da qui finiscono su <b>Nostr</b> (NIP-99): esistono sui relay indipendentemente da noi, firmati dalla nostra chiave. Chi entra con la propria chiave e pubblica dal suo client firma con la sua: identità e catalogo restano suoi, noi li mostriamo e basta. È il motivo per cui abbiamo scelto Nostr dal primo giorno.</li>
+        <li><span class="em">📖</span><b>Il codice.</b> È la cosa più facile da rimettere in piedi altrove.</li>
+        <li><span class="em">💾</span><b>Lo storico degli ordini</b> e la reputazione che ci avete costruito. Vivono in un posto solo, ma sono salvati ogni giorno, con copie anche fuori dal server.</li>
+      </ul>
+      <p>Quello che resta fragile, insomma, è <b>l'infrastruttura, non i fondi</b>. Il passo dichiarato è un <b>relay Nostr nostro</b> e una infrastruttura meno esposta.</p>
+      <!-- A grandezza piena e non in `.sicu-nota`: rimpicciolire proprio
+           la riga che dice «non nasconderlo» sarebbe la cosa piu' storta
+           di tutta la pagina. -->
+      <p><b>Oggi il punto di fiducia siamo noi due</b>, e non pretendiamo il contrario. La direzione è ridurlo, non nasconderlo.</p>
 
       <div class="sicu-piede">🫙 Domande, dubbi, o qualcosa che non torna? Scrivici: durante il rodaggio leggiamo tutto.</div>
     </div>
