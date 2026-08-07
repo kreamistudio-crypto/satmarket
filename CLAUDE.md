@@ -152,25 +152,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   condiviso da lì è un link autentico che sembra un messaggio
   ufficiale, e chi lo riceve non ha NESSUN segnale per distinguerlo.
   Voce nel `PROMPT_MODERAZIONE` con DUE esiti, e la gradazione è il
-  punto: VIETATO quando il testo PARLA A CHI LEGGE come farebbe la
-  piattaforma (avviso di sicurezza, account da sbloccare, pagamento
-  da verificare, dati da confermare, link da aprire) e non descrive
-  nessun oggetto — vale anche per un ALTRO servizio, una banca o un
-  corriere; DUBBIO per chi si intesta soltanto un ruolo che non ha
-  («Assistenza Barattolo», «Barattolo Ufficiale»), che in revisione è
-  già fuori dalla vetrina E dall'anteprima, quindi il caso incerto
-  costa una riga di coda e non un rifiuto.
-  LA CONTRO-REGOLA È LA METÀ CHE CONTA, ed è quella che un riordino
-  toglie per prima perché sembra un ripensamento: **nominare
-  Barattolo è lecito e comunissimo, e non è MAI di per sé un
-  motivo** — «gadget di Barattolo», «venduto tramite Barattolo»,
-  «spedisco come da regolamento Barattolo» sono annunci normali.
-  Senza quella riga il divieto diventa un filtro sulla PAROLA, cioè
-  un blocco su merce legittima; il criterio scritto nel prompt è
-  «c'è una COSA in vendita?». VALE SU TITOLO E DESCRIZIONE, detto
-  esplicitamente: `og:title` viene dall'uno e `og:description`
-  dall'altra, e il caso cattivo vero è il titolo pulito con la
-  descrizione avvelenata.
+  punto: VIETATO quando il testo **SI RIVOLGE A CHI LEGGE** come
+  farebbe la piattaforma (avviso di sicurezza, account da sbloccare,
+  pagamento in sospeso, dati da confermare, link da aprire,
+  un'AZIONE da compiere) — vale anche per un ALTRO servizio, una
+  banca o un corriere; DUBBIO per chi si intesta soltanto un ruolo
+  che non ha («Assistenza Barattolo», «Barattolo Ufficiale»), che in
+  revisione è già fuori dalla vetrina E dall'anteprima, quindi il
+  caso incerto costa una riga di coda e non un rifiuto. Il segno più
+  netto del VIETATO è che nomina un ordine, un account o un pagamento
+  CHE ESISTEREBBERO GIÀ — cosa impossibile in un annuncio che chi
+  legge sta guardando per la prima volta.
+  DUE CONTRO-REGOLE, e sono la metà che conta: quelle che un riordino
+  toglie per prime perché sembrano un ripensamento. 1) **Nominare
+  Barattolo è lecito e non è MAI di per sé un motivo** («gadget di
+  Barattolo», «venduto tramite Barattolo»): senza, il divieto diventa
+  un filtro sulla PAROLA, cioè un blocco su merce legittima.
+  2) **RACCONTARE come funziona Barattolo è lecito e comune** — chi
+  spiega il deposito di garanzia sta RASSICURANDO chi compra, parla
+  in prima persona di sé e della sua roba, non a nome nostro.
+  LA SECONDA È COSTATA UN FALSO POSITIVO VERO, ed è la storia da
+  tenere. Prima stesura, primo giro del collaudo sul VPS: 14/15, e a
+  cadere era «Bicicletta da corsa Bianchi» la cui DESCRIZIONE spiega
+  l'escrow — bocciata col motivo «non descrive l'oggetto in vendita».
+  L'oggetto c'era, era una bici, stava nel TITOLO. La causa era la
+  formulazione: dentro la definizione del VIETATO c'era scritto «e
+  non descrive nessun oggetto in vendita», e il modello l'ha presa
+  per un test SUFFICIENTE da applicare alla sola descrizione. La cura
+  ha tre gambe — la distinzione rivolgersi/raccontare, la REGOLA CHE
+  VINCE SULLE ALTRE («se c'è davvero una COSA in vendita e a chi
+  legge non si chiede di verificare, sbloccare o confermare NIENTE
+  allora non è impersonazione: al massimo è un annuncio prolisso, e
+  un annuncio prolisso è OK»), e la COPPIA DI ESEMPI che insegna il
+  confine meglio della regola astratta: la bici → OK e le cuffie con
+  la descrizione avvelenata → VIETATO, due descrizioni che nominano
+  tutt'e due Barattolo e finiscono in due esiti opposti.
+  ATTENZIONE alla seconda metà della regola sovrana («…e non si
+  chiede NIENTE»): senza, diventerebbe una scappatoia — anche
+  l'annuncio avvelenato una cosa in vendita ce l'ha.
+  E L'ANNUNCIO SI GIUDICA INTERO, titolo e descrizione INSIEME:
+  l'oggetto può stare nel solo titolo e la descrizione parlare
+  d'altro, e va benissimo; ma un messaggio rivolto al lettore
+  avvelena l'annuncio anche col titolo pulito — `og:title` viene
+  dall'uno e `og:description` dall'altra, e la card li mostra
+  entrambi. Il «vale sul TITOLO come sulla DESCRIZIONE» della prima
+  stesura diceva la cosa giusta e induceva quella sbagliata: il
+  modello ha giudicato i due campi SEPARATAMENTE.
   IL RIFIUTO DICE COSA HA SBAGLIATO: `MSG_RIFIUTO_IMPERSONAZIONE` al
   posto della lista di armi e droghe, che non c'entrava niente — e
   dice anche DOV'È IL CONFINE, che qui è sottile. In
@@ -184,11 +211,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   NON è una declinazione di «finge» — l'ha detto una prova, non la
   lettura del codice.
   Il collaudo col MODELLO vero è `collaudo_impersonazione.py`, che
-  vuole la chiave: `prove.py` difende la FORMA del prompt (la voce,
-  il perimetro, la contro-regola coi suoi esempi) e che
+  vuole la chiave e VA RILANCIATO A OGNI RITOCCO DEL PROMPT — è
+  l'unica cosa che dice se il modello ha capito, e il falso positivo
+  della bici è saltato fuori da lì e non dalla lettura. `prove.py`
+  difende la FORMA (la voce, le due contro-regole, la regola sovrana
+  con la sua seconda condizione, la coppia di esempi) e che
   `moderazione_ai_lotto` non abbia un prompt SUO — 500 righe di CSV
   passano di lì, e due prompt che si sdoppiano lascerebbero scoperta
   in silenzio la strada da cui gli annunci entrano a centinaia.
+  Nel collaudo la bici è una REGRESSIONE PERMANENTE e ha accanto una
+  GEMELLA scritta con altre parole: se cadesse solo la gemella
+  vorrebbe dire che la cura ha insegnato al modello l'esempio invece
+  della regola. Il conto separa i falsi positivi dagli altri sbagli,
+  perché non pesano uguale — un OK finito altrove è un annuncio
+  legittimo bloccato, e se ne accorge solo chi l'ha scritto.
   Terza via della moderazione (lug 2026, decisione di Andrea: basta
   blocchi a priori — l'AI segnala, l'ADMIN decide): il prompt ha TRE
   verdetti — VIETATO solo per i casi netti (armi, droghe, sesso...),
@@ -8948,9 +8984,10 @@ Tre correzioni dall'audit (ago 2026), tutte e tre sulla stessa idea:
 un annuncio può raccontare cose a gente che Barattolo non l'ha mai
 aperto. M1, CHI SI FINGE BARATTOLO — la card brandizzata è un link
 autentico sul nostro dominio dove i testi li sceglie chi pubblica:
-voce nuova nel prompt, VIETATO a chi parla A NOME della piattaforma e
-DUBBIO a chi si intesta solo un ruolo, con la contro-regola («nominare
-è lecito») che è la metà delicata, e il rifiuto che ora dice cosa si è
+voce nuova nel prompt, VIETATO a chi SI RIVOLGE al lettore a nome
+della piattaforma e DUBBIO a chi si intesta solo un ruolo, con le due
+contro-regole («nominare è lecito», «raccontare come funziona pure»)
+che sono la metà delicata, e il rifiuto che ora dice cosa si è
 sbagliato invece dell'elenco di armi e droghe. M2, L'OG:IMAGE VERSO
 HOST DI TERZI — l'URL remoto di chi pubblica su Nostr non ci finisce
 più: diventava la campana di chiunque veda un'anteprima, ed è
@@ -8966,9 +9003,18 @@ lettura del codice: «finto» non è una declinazione di «finge» (la
 lista dei motivi non lo prendeva, e «finto servizio clienti» cadeva
 nel ramo dei servizi), e l'ordine dei due rami di `messaggio_rifiuto`,
 che scambiato manderebbe a un impostore il messaggio di garbo.
+E IL COLLAUDO COL MODELLO VERO HA PAGATO SUBITO (ago 2026, secondo
+giro): 14/15, con un FALSO POSITIVO — la bici la cui descrizione
+spiega l'escrow, bocciata perché «non descrive l'oggetto in vendita».
+La causa era la formulazione, non il modello, e la storia con la cura
+a tre gambe sta nella voce sua in Architettura; il caso è rimasto nel
+collaudo come regressione permanente, con una gemella accanto. È
+esattamente il motivo per cui quel collaudo esiste: nessuna prova di
+CI l'avrebbe visto, e in vetrina si sarebbe visto solo quando un
+venditore onesto avesse protestato.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
-nessuna leva. DA FARE AL PRIMO DEPLOY, ed è il pezzo che in locale non
-si può fare perché vuole la chiave vera: `python
+nessuna leva. DA FARE PRIMA DEL DEPLOY, ed è il pezzo che in locale
+non si può fare perché vuole la chiave vera: `python
 collaudo_impersonazione.py` sul VPS — se un OK atteso finisce in
 VIETATO è un falso positivo, cioè annunci legittimi bloccati, e il
 prompt si corregge A MANO. IMPERFEZIONI DICHIARATE e non chiuse: i
