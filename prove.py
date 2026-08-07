@@ -5993,6 +5993,92 @@ def prove_leve():
           "e_admin" in corpo and "403" in corpo)
 
 
+def prove_posizione_vetrina():
+    """Tornando indietro la vetrina riparte da dove si era (ago 2026).
+    La griglia non si perde MAI — il markup delle pagine caricate resta
+    nel DOM per tutto il tempo — quindi qui non c'e' niente da
+    ricaricare: si sorveglia solo che la POSIZIONE si salvi e si
+    rilegga nei momenti giusti. Sono tutte righe che sparirebbero in un
+    riordino senza rompere niente di visibile, ed e' esattamente il
+    tipo di riga che va guardata."""
+    print("\n[dove si era rimasti in vetrina]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    go = pezzo_js(mini, "function go(view){", "\n}\n")
+
+    # --- 1) SI SALVA PRIMA DI SPEGNERE, ed e' LA trappola ---------
+    # Un istante dopo il display:none il documento si accorcia e il
+    # browser clampa lo scorrimento a zero: chi spostasse questo blocco
+    # sotto il remove('active') salverebbe sempre zero, e il ritorno
+    # tornerebbe a partire dalla cima senza che nessuna prova si
+    # accorga di niente.
+    i_salva = go.index("vetrinaPos = {")
+    i_spegni = go.index("classList.remove('active')")
+    prova("la posizione si salva PRIMA del display:none", True,
+          i_salva < i_spegni)
+    prova("si salva solo lasciando la VETRINA", True,
+          "'view-esplora'" in go[:i_salva])
+    # Il conto delle card viaggia con la posizione: e' la cintura che
+    # al ritorno dice se la griglia e' ancora quella.
+    prova("con la posizione si salva anche il conto delle card", True,
+          "el('grid').children.length" in go[i_salva:i_salva + 200])
+
+    # --- 2) IL RIPRISTINO E' UNO SOLO ------------------------------
+    # go() aveva uno scrollTo(0,0) nudo in coda: se qualcuno lo
+    # rimettesse accanto al giudice, vincerebbe l'ultimo e il ritorno
+    # non si vedrebbe piu'.
+    prova("in go() nessuno scrollTo nudo", True,
+          "scrollTo(0,0)" not in go and "scrollTo(0, 0)" not in go)
+    prova("lo scorrimento passa dal giudice unico", 1,
+          go.count("posizioneDaRendere("))
+    prova("il giudice esiste una volta sola", 1,
+          mini.count("function posizioneDaRendere("))
+
+    giudice = pezzo_js(mini, "function posizioneDaRendere(view){", "\n}\n")
+    # --- 3) SOLO TORNANDO INDIETRO ---------------------------------
+    # `navApplicando` e' la sola cosa che distingue un ritorno da un
+    # ingresso nuovo. Senza, il tocco sul tab Esplora mentre si e' gia'
+    # in Esplora non riporterebbe piu' in cima, e la tirata di
+    # aggiornamento nemmeno.
+    prova("si ripristina SOLO ri-applicando una entry", True,
+          "navApplicando" in giudice)
+    prova("e solo se la griglia e' ancora quella", True,
+          "vetrinaPos.n === el('grid').children.length" in giudice)
+    prova("solo la vetrina ha una posizione da ritrovare", True,
+          "'esplora'" in giudice
+          and not any(v in giudice for v in
+                      ("'negozio'", "'affari'", "'profilo'", "'miei'")))
+
+    # --- 4) LA CINTURA DEL GIRO NUOVO ------------------------------
+    # Il conto delle card da solo non basta: due vetrine diverse
+    # possono averne 30 e 30. Chi ricarica la PRIMA pagina — la tirata
+    # di aggiornamento, il cambio categoria, i filtri, la ricerca —
+    # butta la posizione, e quello e' un giro nuovo, non un ritorno.
+    carica = pezzo_js(mini, "async function loadListings(anonimo){", "\n}\n")
+    prova("una ricarica di prima pagina butta la posizione", True,
+          "vetrinaPos = null" in carica)
+    prova("la butta accanto al giro, prima di ogni await", True,
+          carica.index("vetrinaPos = null") < carica.index("await fetch"))
+
+    # --- 5) LO SCORRIMENTO LO DECIDIAMO NOI ------------------------
+    # Di serie il browser prova a rimetterlo lui a ogni traversata, e
+    # con l'URL che non cambia mai le sue entry si somigliano tutte:
+    # il suo tentativo arriverebbe dopo il nostro.
+    motore = pezzo_js(mini, "function navMotore(){", "\n}\n")
+    prova("il ripristino del browser resta spento", True,
+          "history.scrollRestoration = 'manual'" in motore)
+
+    # --- 6) NEMMENO IL FOCUS TRASCINA LA PAGINA --------------------
+    # Trovato di striscia, ed era li' da sempre: il campo-bottone
+    # «Ordina» vive in cima alla vetrina, quindi il focus che torna al
+    # campo alla chiusura del picker ce la riportava — stessa
+    # frustrazione del cantiere, per un'altra strada. I chiamanti sono
+    # DUE (closeSheet e chiudiPicker) e devono restare allineati.
+    prova("il focus del picker non scorre, in tutti i suoi chiamanti", 0,
+          mini.count("pickerTrigger.focus();"))
+    prova("...e sono due, entrambi con preventScroll", 2,
+          mini.count("pickerTrigger.focus({preventScroll:true})"))
+
+
 # ====================================================================
 def main():
     print("=" * 58)
@@ -6019,7 +6105,8 @@ def main():
               prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_sped_gratis, prove_suggerimenti,
               prove_libro_mastro, prove_leve,
-              prove_consegna_payload_punto, prove_pagina_acquisto):
+              prove_consegna_payload_punto, prove_pagina_acquisto,
+              prove_posizione_vetrina):
         try:
             f()
         except Exception as e:

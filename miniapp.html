@@ -4215,6 +4215,18 @@ let vetrinaCursore = null, vetrinaCaricando = false, vetrinaTotale = 0;
    in una categoria piccola quella pagina e' esattamente la prima, e
    ogni annuncio finiva in griglia due volte. */
 let vetrinaGiro = 0;
+/* DOVE SI ERA RIMASTI IN VETRINA (ago 2026). Aprire un annuncio non
+   svuota MAI la griglia — il markup delle pagine gia' caricate resta
+   nel DOM per tutto il tempo (misurato: 90 card prima, 90 durante, 90
+   dopo). A perdersi e' la sola POSIZIONE, e per due cause che si
+   sommano: entrando nel dettaglio la vetrina va in display:none, il
+   documento si accorcia e il browser clampa lo scorrimento a zero; poi
+   go() lo riporta comunque in cima. Quindi non c'e' niente da
+   ricaricare: basta segnare dove si era e tornarci.
+   Si salva LASCIANDO la vetrina (in cima a go(), prima del
+   display:none) e si rilegge SOLO tornando indietro. Vive per la
+   sessione, come i filtri: niente localStorage. */
+let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
 let conteggiServer = null, ultimaRicercaAI = false;
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
 let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
@@ -4386,6 +4398,13 @@ async function loadListings(anonimo){
      da apriCategoria) non ha piu' niente da chiedere e tace da sola. */
   const giro = ++vetrinaGiro;
   vetrinaCursore = null;
+  /* Giro nuovo, vetrina nuova: dove si era rimasti non vuol piu' dire
+     niente. E' la CINTURA del ritorno — la guardia del conto card non
+     basta da sola, perche' due vetrine diverse possono avere lo stesso
+     numero di card (30 e 30). Vale per la tirata di aggiornamento, il
+     cambio categoria, i filtri, la ricerca e l'ordinamento: sono giri
+     nuovi, non ritorni, e devono ripartire dalla cima. */
+  vetrinaPos = null;
   const opz = (VETRINA || anonimo) ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
   const r = await fetch(`${API_BASE}/listings?${paramsVetrina()}`, opz);
   if (!r.ok) throw new Error('vetrina non disponibile');
@@ -4643,6 +4662,14 @@ function go(view){
       : 'Il tuo profilo vive su Telegram: apri Barattolo per gestire annunci, incassi e identità.');
     return;
   }
+  /* Si segna dove si era in vetrina PRIMA di spegnerla: un istante
+     dopo il display:none accorcia il documento e il browser clampa lo
+     scorrimento a zero — la posizione sarebbe gia' persa. Insieme alla
+     posizione si segna il CONTO delle card, che al ritorno dice se la
+     griglia e' ancora quella (vedi il ripristino, in fondo). */
+  if (document.querySelector('.view.active')?.id === 'view-esplora')
+    vetrinaPos = {y: Math.round(window.scrollY),
+                  n: el('grid').children.length};
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
@@ -4687,7 +4714,41 @@ function go(view){
     /* il barattolo si rilegge dal server: un annuncio salvato puo'
        essere stato venduto nel frattempo, e il cassetto deve dirlo */
     caricaPreferiti().then(renderPreferiti); }
-  window.scrollTo(0,0);
+  window.scrollTo(0, posizioneDaRendere(view));
+}
+
+/* Da che altezza far ripartire la vista. Di regola la cima; in vetrina
+   il punto dove si era, ma SOLO tornando indietro.
+   Il giudice del «ritorno» e' `navApplicando`, cioe' la bandierina che
+   il motore alza mentre RI-APPLICA una entry della cronologia: e'
+   l'unica cosa che distingue un ritorno da un ingresso nuovo, e ci
+   passano allo stesso modo lo swipe di sistema della PWA, il tasto
+   indietro di Telegram e la freccia ←. Da qui escono gratis anche le
+   regole che non sono scritte da nessuna parte:
+   - la tirata di aggiornamento e il cambio di filtro non sono
+     traversate, quindi riportano in cima (e loadListings ha comunque
+     buttato la posizione: due denti dello stesso lucchetto);
+   - i percorsi che entrano da fuori — deep link a un annuncio, ritorno
+     dopo il pagamento, ripristino d'identita' — non hanno una entry da
+     ri-applicare ne' una posizione salvata: partono normalmente;
+   - il tocco sul tab Esplora mentre si e' GIA' in Esplora torna in
+     cima (non e' un indietro), mentre arrivandoci da un'altra radice
+     si ritrova la vetrina dov'era — che e' la convenzione dei tab.
+   La guardia del CONTO delle card e' la cintura: se nel frattempo la
+   griglia e' cambiata (una ricerca AI, una potatura, un annuncio
+   sparito) si riparte dalla cima invece di atterrare nel vuoto —
+   ripristinare una posizione senza i contenuti sotto sarebbe peggio
+   che non ripristinarla.
+   Le altre viste non sono qui, e non per dimenticanza: negozio,
+   Ordini e Profilo si RIFANNO quando ci si torna (un fetch, e i dati
+   arrivano dopo), quindi al momento dello scorrimento la pagina non e'
+   ancora alta come sara' — la posizione cadrebbe nel vuoto per
+   davvero. Chi vorra' aggiungerne una deve prima garantire che il suo
+   markup sopravviva al ritorno, com'e' per la vetrina. */
+function posizioneDaRendere(view){
+  if (view === 'esplora' && navApplicando && vetrinaPos
+      && vetrinaPos.n === el('grid').children.length) return vetrinaPos.y;
+  return 0;
 }
 
 /* ---------------- il gesto indietro ----------------
@@ -5045,6 +5106,13 @@ function navFreccia(pila){
    vecchia identita'. */
 function navMotore(){
   if (!STORIA) return;
+  /* Lo scorrimento lo decidiamo noi, in un posto solo (go()). Di serie
+     il browser prova a rimetterlo lui a ogni traversata, e siccome
+     l'URL non cambia mai le sue entry si somigliano tutte: farebbe il
+     suo tentativo DOPO il nostro, e il ritorno in vetrina finirebbe
+     dove dice lui invece che dove eravamo — un comportamento diverso
+     da un browser all'altro proprio dove serve che sia uguale. */
+  try { history.scrollRestoration = 'manual'; } catch(e){}
   try { history.replaceState({app:'brt', pila: navPila(), d:0}, '', location.href); } catch(e){}
   /* Il callback e' un microtask: gira ancora dentro il task del gesto
      dell'utente (l'entry non viene marcata saltabile) e COALESCE i piu'
@@ -9121,8 +9189,9 @@ function closeSheet(){
   el('paccoSvuotaSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
-     scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui) */
-  if (pickerTrigger) { pickerTrigger.focus(); pickerTrigger = null; }
+     scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui),
+     ma SENZA trascinarsi dietro la pagina — vedi chiudiPicker */
+  if (pickerTrigger) { pickerTrigger.focus({preventScroll:true}); pickerTrigger = null; }
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
@@ -9217,7 +9286,15 @@ function altroFoglioAperto(){
 function chiudiPicker(){
   el('pickerSheet').classList.remove('open');
   if (!altroFoglioAperto()) el('sheetBg').classList.remove('open');
-  if (pickerTrigger) { pickerTrigger.focus(); pickerTrigger = null; }
+  /* IL FOCUS NON TRASCINA LA PAGINA (trovato di striscia col cantiere
+     della posizione, ago 2026, ed era li' da sempre): il campo-bottone
+     «Ordina» vive in cima alla vetrina, quindi un focus normale ce la
+     riportava — si scorreva un pezzo, si apriva il foglio, ci si
+     ripensava, e ci si ritrovava in cima. Il focus deve tornare al
+     campo (e' l'accessibilita' del picker), lo scorrimento no. Dove
+     preventScroll non c'e' — i Safari vecchi — l'opzione si ignora e
+     vale il comportamento di ieri: mai peggio. */
+  if (pickerTrigger) { pickerTrigger.focus({preventScroll:true}); pickerTrigger = null; }
 }
 /* Il tocco sul velo chiude il foglio piu' in ALTO, non tutta la pila —
    ed e' un passo indietro come tutti gli altri: se non passasse di li'
