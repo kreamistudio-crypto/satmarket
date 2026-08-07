@@ -3768,7 +3768,7 @@ def guardia_ferie_venditore(con, tg_id: int, cosa: str):
 def testo_prezzo(valuta: str, prezzo_sats: int, prezzo_eur: float) -> str:
     """Il prezzo come lo leggono i moderatori nelle notifiche."""
     if valuta == "eur":
-        return f"{prezzo_eur:.2f} EUR (≈ {prezzo_sats} sats)"
+        return f"{_fmt_eur(prezzo_eur)} EUR (≈ {prezzo_sats} sats)"
     return f"{prezzo_sats} sats"
 
 
@@ -9159,8 +9159,12 @@ def _importo_accordo(off) -> tuple[int, float]:
 
 
 def _cifra_offerta(valuta: str, sats: int, eur: float) -> str:
-    """«80.000 sats» oppure «15.50 €»: la valuta del listino."""
-    return f"{eur:.2f} €" if valuta == "eur" else f"{_fmt_sats(sats)} sats"
+    """«80.000 sats» oppure «15,50 €»: la valuta del listino.
+    Le due cifre passano dai formattatori di casa (_fmt_sats,
+    _fmt_eur), che vivono piu' in basso ma si risolvono alla chiamata:
+    in tutta l'app un euro si scrive in un modo solo."""
+    return (f"{_fmt_eur(eur)} €" if valuta == "eur"
+            else f"{_fmt_sats(sats)} sats")
 
 
 # ------------------ IL CONTO D'ACQUISTO: matematica pura -------------
@@ -11878,7 +11882,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
                 con.close()
                 await notifica(a["venditore_id"],
                     f"📈 Il cambio si è mosso troppo: il tuo annuncio "
-                    f"«{a['titolo'][:60]}» ({a['prezzo_eur']:.2f} EUR) "
+                    f"«{a['titolo'][:60]}» ({_fmt_eur(a['prezzo_eur'])} EUR) "
                     f"supera ora il tetto di {TETTO_SATS_ANNUNCIO} sats e "
                     f"gli acquisti sono in pausa. Ritocca il prezzo per "
                     f"riaprirli.")
@@ -12831,7 +12835,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             await notifica(a["venditore_id"],
                 f"📈 Il cambio si è mosso troppo: il tuo annuncio "
-                f"«{a['titolo'][:60]}» ({a['prezzo_eur']:.2f} EUR) supera "
+                f"«{a['titolo'][:60]}» ({_fmt_eur(a['prezzo_eur'])} EUR) supera "
                 f"ora il tetto di {TETTO_SATS_ANNUNCIO} sats e gli acquisti "
                 f"sono in pausa. Ritocca il prezzo per riaprirli.")
             raise HTTPException(409, "Il cambio è cambiato troppo da quando "
@@ -16096,8 +16100,18 @@ def _fmt_eur(x: float) -> str:
     """284.61 -> '284,61': la VIRGOLA dei decimali, che in italiano il
     punto separa le migliaia e su una cifra grande si legge per un
     fattore mille. Gemello di _fmt_sats, e come lui vive in un posto
-    solo: da qui passano i post del canale, le note Nostr e le
-    anteprime dei link, che dicono tutti la stessa riga di prezzo."""
+    solo — UN euro si scrive in un modo solo in tutta l'app: da qui
+    passano i post del canale, le note Nostr, le anteprime dei link e
+    le notifiche delle offerte. Il client dice gia' la stessa cosa per
+    conto suo (fmtEur, toLocaleString 'it-IT'): il server era l'unico
+    fuori riga.
+
+    NON ci passano i valori dei TAG NIP-99 (price, delivery), e non e'
+    una dimenticanza: quelli non sono testo per una persona ma campi
+    di protocollo, che importa_nostr rilegge — li' il punto decimale
+    e' la specifica, non una nostra scelta. Per la stessa ragione
+    resta col punto la riga «Prezzo:» del content di evento_annuncio,
+    che sta nello stesso evento del tag e lo ripete a parole."""
     return f"{x:.2f}".replace(".", ",")
 
 

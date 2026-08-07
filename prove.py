@@ -6581,11 +6581,13 @@ def prove_anteprime():
           taglia("uno due tre quattro", 9))
     prova("...e regge il campo vuoto", "", taglia(None, 20))
 
-    # --- 1bis) l'euro si scrive con la VIRGOLA ---------------------
-    # Vive in _fmt_eur, gemello di _fmt_sats, e da li' passano tutti e
-    # tre i posti che dicono la stessa riga di prezzo: i post del
-    # canale, le note Nostr e le anteprime. Col punto una cifra grande
-    # si legge per un fattore mille.
+    # --- 1bis) UN EURO SI SCRIVE IN UN MODO SOLO -------------------
+    # Vive in _fmt_eur, gemello di _fmt_sats, e da li' passano TUTTI i
+    # posti dove un euro diventa testo per una persona: i post del
+    # canale, le note Nostr, le anteprime dei link e le notifiche
+    # delle offerte. Col punto una cifra grande si legge per un
+    # fattore mille — e il client lo diceva gia' giusto per conto suo
+    # (fmtEur, toLocaleString 'it-IT'): il server era l'unico fuori.
     eur = amb["_fmt_eur"]
     prova("l'euro porta la virgola dei decimali", "284,61", eur(284.61))
     prova("...anche tondo", "5,00", eur(5))
@@ -6600,6 +6602,39 @@ def prove_anteprime():
     prova("...senza cambio il ≈ si omette, come sempre",
           "100.000 sats",
           pp({"valuta": "sats", "prezzo_sats": 100000}, 0))
+    exec(pezzo("_cifra_offerta"), amb)
+    co = amb["_cifra_offerta"]
+    prova("e l'offerta dice la stessa cosa", "15,50 €", co("eur", 0, 15.5))
+    prova("...coi sats intonsi", "80.000 sats", co("sats", 80000, 0.0))
+
+    # LA SENTINELLA che rende il principio verificabile invece che
+    # raccomandato: nessuno scrive un euro a mano. Cercare `:.2f} €`
+    # e' cercare esattamente il gesto — una cifra formattata al volo
+    # col simbolo attaccato — che _fmt_eur esiste per non fare piu'.
+    prova("nessun euro col simbolo sfugge a _fmt_eur", 0,
+          _SORGENTE.count(":.2f} €"))
+    # ...e nemmeno quelli che dicono «EUR» a parole, che sono il modo
+    # in cui questa famiglia si nasconde: cercando il solo € il primo
+    # censimento ne aveva mancati tre (testo_prezzo dei moderatori e i
+    # due avvisi gemelli del drift del cambio), ed e' stata questa
+    # sentinella a prenderli.
+    # I TRE superstiti non li legge una persona: le due righe di prosa
+    # del NIP-99 («Prezzo:» e «spedizione:»), che stanno nello stesso
+    # evento dei tag e li ripetono a parole — divergere da loro sarebbe
+    # peggio —, e la riga del catalogo che va in pasto ad Haiku, dove
+    # il formato compatto e' per la macchina.
+    prova("...ne' quelli che scrivono EUR a parole (restano i tre che "
+          "una persona non legge)", 3, _SORGENTE.count(":.2f} EUR"))
+    # Il censimento completo dei superstiti, che vale come elenco: i
+    # tre TAG NIP-99 (price ×2, delivery) e le due righe di prosa che
+    # li accompagnano — campi di protocollo che importa_nostr rilegge,
+    # dove il punto e' la specifica e non una nostra scelta —, la riga
+    # del catalogo che va all'AI (non la legge una persona), _fmt_eur
+    # stesso e il CSV, che la virgola ce l'ha gia' per conto suo.
+    # Se questo numero cambia: o e' nato un campo di protocollo nuovo,
+    # o qualcuno ha ricominciato a scrivere un euro a mano.
+    prova("...e gli otto superstiti sono tutti censiti", 8,
+          _SORGENTE.count(":.2f}"))
 
     # --- 2) L'ESCAPING: qui il testo dell'utente sta in un ATTRIBUTO -
     # Una virgoletta non escapata non «si vede male»: chiude il
