@@ -397,6 +397,17 @@ ORE_INITDATA = 24
 # filtro per parole, che non costa niente. 0 = nessun freno.
 TETTO_RICERCHE_AI_ORA = 30
 
+# Quanto resta buono un cambio BTC/EUR che non riusciamo a rinfrescare.
+# L'ultimo cambio letto vive nel database e torna in cache a ogni
+# riavvio (prima la cache nasceva vuota, e un deploy dentro
+# un'interruzione di CoinGecko lasciava l'app senza saper convertire:
+# pagina d'acquisto bloccata sui listini in euro). Ma un valore che
+# sopravvive ai riavvii puo' invecchiare per sempre, quindi oltre
+# queste ore torna a essere «non disponibile» — il ripiego onesto di
+# sempre — invece di far pagare a qualcuno la cifra di ieri.
+# 0 = non scade mai: freno d'emergenza, non una scelta.
+ORE_CAMBIO_VALIDO = 24
+
 # --- Collaudo ---------------------------------------------------------
 # False = com'e' giusto che sia online: nessuna identita' finta.
 # True  = test locale con gli utenti finti (Compratore/Venditore/Admin),

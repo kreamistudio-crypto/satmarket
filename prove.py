@@ -5817,6 +5817,192 @@ def prove_coorti_titoli():
 
 
 # ====================================================================
+def _finto_coingecko(chiamate, valore=100000.0, muto=False):
+    """CoinGecko di cartone: REGISTRA le chiamate invece di farle. Con
+    `muto` la rete non risponde — che e' il caso vero del cantiere."""
+    import types
+
+    class R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"bitcoin": {"eur": valore}}
+
+    class C:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, params=None):
+            chiamate.append(url)
+            if muto:
+                raise OSError("rete giù")
+            return R()
+
+    return types.SimpleNamespace(AsyncClient=C)
+
+
+def prove_cambio():
+    """IL CAMBIO NON MUORE A UN RIAVVIO (ago 2026, caso vero: due deploy
+    a quattordici minuti l'uno dall'altro, CoinGecko muta in tutti e
+    due, e un compratore davanti alla pagina d'acquisto bloccata).
+
+    La cache era gia' fail-open e teneva l'ultimo valore noto: il buco
+    era che NASCEVA VUOTA. Qui si guardano le tre cose che quel buco lo
+    chiudono — il valore sopravvive al riavvio, un buco di rete non lo
+    cancella, e adesso ha un'eta' oltre la quale smette di valere."""
+    print("\n[cambio BTC/EUR]")
+    import asyncio
+    import sqlite3
+    import time as _time
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    # --- 1) IL GIUDICE PURO ----------------------------------------
+    amb = {}
+    exec(pezzo("_cambio_valido"), amb)
+    val = amb["_cambio_valido"]
+    ORA = 1_000_000.0
+    prova("cambio fresco: si usa", 99000.0, val(99000.0, ORA - 60, ORA, 24))
+    prova("mai letto: non disponibile", 0.0, val(0.0, 0.0, ORA, 24))
+    prova("di trenta ore fa: non disponibile", 0.0,
+          val(99000.0, ORA - 30 * 3600, ORA, 24))
+    # Al filo esatto e' ancora buono, come _asta_viva e in_ferie: la
+    # scadenza e' un «oltre», non un «da».
+    prova("al filo esatto delle 24 ore vale ancora", 99000.0,
+          val(99000.0, ORA - 24 * 3600, ORA, 24))
+    prova("un secondo dopo il filo, no", 0.0,
+          val(99000.0, ORA - 24 * 3600 - 1, ORA, 24))
+    prova("leva a 0: non scade mai (il mondo di ieri)", 99000.0,
+          val(99000.0, ORA - 1000 * 3600, ORA, 0))
+
+    # --- 2) IL MONDO: un database vero, la rete di cartone ---------
+    def mondo(valore=0.0, quando=0.0, muto=False, ore=24):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute("CREATE TABLE cambio_noto(valuta TEXT PRIMARY KEY, "
+                     "valore REAL DEFAULT 0, quando INTEGER DEFAULT 0)")
+        vero.commit()
+
+        class Con:
+            """close() non chiude davvero: il :memory: deve
+            sopravvivere fra una chiamata e l'altra."""
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        chiamate = []
+        a = {"db": Con, "time": _time,
+             "httpx": _finto_coingecko(chiamate, muto=muto),
+             "ORE_CAMBIO_VALIDO": ore, "CAMBIO_TTL": 900,
+             "CAMBIO_RIPROVA_S": 60,
+             "_cambio_eur_cache": {"valore": valore, "quando": quando,
+                                   "tentato": 0.0}}
+        for f in ("_cambio_valido", "_salva_cambio", "cambio_noto_ora",
+                  "carica_cambio_salvato"):
+            exec(pezzo(f), a)
+        for f in ("_rileggi_cambio", "cambio_btc_eur"):
+            exec("async " + pezzo(f), a)
+        return a, chiamate, vero
+
+    # --- 3) ANDATA E RITORNO DAL DISCO -----------------------------
+    a, _, vero = mondo()
+    a["_salva_cambio"](99000.0, 1_700_000_000)
+    riga = vero.execute("SELECT * FROM cambio_noto").fetchone()
+    prova("il cambio letto finisce sul disco", (99000.0, 1_700_000_000),
+          (riga["valore"], riga["quando"]))
+    a["_salva_cambio"](98000.0, 1_700_000_600)
+    prova("...e una riga sola, sempre aggiornata", (1, 98000.0),
+          (vero.execute("SELECT COUNT(*) c FROM cambio_noto").fetchone()["c"],
+           vero.execute("SELECT valore v FROM cambio_noto").fetchone()["v"]))
+
+    a, _, vero = mondo()          # cache VUOTA: e' esattamente un riavvio
+    vero.execute("INSERT INTO cambio_noto VALUES('eur', 99000.0, ?)",
+                 (int(_time.time()) - 600,))
+    vero.commit()
+    prova("all'avvio si riprende dal disco", 99000.0,
+          a["carica_cambio_salvato"]())
+    prova("...e la cache non e' piu' vuota", 99000.0,
+          a["_cambio_eur_cache"]["valore"])
+
+    a, _, vero = mondo()
+    vero.execute("INSERT INTO cambio_noto VALUES('eur', 99000.0, ?)",
+                 (int(_time.time()) - 30 * 3600,))
+    vero.commit()
+    prova("un cambio salvato trenta ore fa non si usa", 0.0,
+          a["carica_cambio_salvato"]())
+
+    # --- 4) LA RETE CADE, IL VALORE RESTA --------------------------
+    # E' il caso del cantiere: deploy mentre CoinGecko tace.
+    a, chiamate, vero = mondo(muto=True)
+    vero.execute("INSERT INTO cambio_noto VALUES('eur', 99000.0, ?)",
+                 (int(_time.time()) - 3600,))
+    vero.commit()
+    a["carica_cambio_salvato"]()
+    prova("rete muta dopo un riavvio: vale l'ultimo noto", 99000.0,
+          gira(a["cambio_btc_eur"]()))
+    prova("...e ci ha davvero provato", 1, len(chiamate))
+    prova("...ma non ribussa a ogni richiesta", (99000.0, 1),
+          (gira(a["cambio_btc_eur"]()), len(chiamate)))
+    prova("...e il buco non ha azzerato niente", 99000.0,
+          a["_cambio_eur_cache"]["valore"])
+
+    a, _, _ = mondo(valore=99000.0, quando=_time.time() - 30 * 3600,
+                    muto=True)
+    prova("troppo vecchio e rete muta: non disponibile", 0.0,
+          gira(a["cambio_btc_eur"]()))
+
+    a, chiamate, _ = mondo(valore=99000.0, quando=_time.time())
+    prova("cambio fresco: nessuna chiamata", (99000.0, 0),
+          (gira(a["cambio_btc_eur"]()), len(chiamate)))
+
+    a, _, vero = mondo()
+    prova("lettura riuscita", 100000.0, gira(a["cambio_btc_eur"]()))
+    riga = vero.execute("SELECT valore v FROM cambio_noto").fetchone()
+    prova("...e si e' salvata sul disco", 100000.0,
+          riga["v"] if riga else None)
+
+    # --- 5) LA FORMA, che e' quella che sparisce in un riordino ----
+    prova("ogni lettura riuscita si salva", True,
+          "_salva_cambio(valore, adesso)" in pezzo("_rileggi_cambio"))
+    prova("la tabella del cambio esiste", True,
+          "CREATE TABLE IF NOT EXISTS cambio_noto" in _SORGENTE)
+    scalda = pezzo("scalda_cambio")
+    prova("all'avvio si riprende dal disco, prima di servire", True,
+          "carica_cambio_salvato()" in scalda)
+    prova("...e la riprova non fa aspettare l'avvio", True,
+          "create_task" in scalda)
+    prova("la riprova insiste con pause che crescono", True,
+          "for pausa in (0, 5, 15" in pezzo("_insisti_sul_cambio"))
+    prova("l'orologio tiene fresco il cambio", True,
+          "await _rileggi_cambio()" in pezzo("orologio"))
+
+    # UNA SOLA FONTE: il client non chiama piu' CoinGecko per conto suo.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client non chiama piu' CoinGecko da solo", 0,
+          mini.count("api.coingecko.com"))
+    prova("...lo prende dalla busta della vetrina", 1,
+          mini.count("impostaCambio(j.cambio_eur)"))
+    prova("...e la vetrina legge la cache, mai la rete", True,
+          'risposta["cambio_eur"] = cambio_noto_ora()' in _SORGENTE)
+    prova("il cambio assente non diventa un numero inventato", True,
+          "if (v <= 0) return;"
+          in pezzo_js(mini, "function impostaCambio(", "\n}\n"))
+
+
+# ====================================================================
 class _ConfigFinto(dict):
     """Un config finto dove le chiavi che NON abbiamo messo a mano
     valgono 7 — un numero qualunque.
@@ -5884,7 +6070,8 @@ def _censimento(acceso):
                  "SOLLECITO_INCASSO_GIORNI", "PROMEMORIA_CONFERMA_GIORNI",
                  "PROMEMORIA_SPEDIZIONE_GIORNI", "PROMEMORIA_DIGITALE_ORE",
                  "REVISIONE_SOLLECITO_GIORNI", "FERIE_PREAVVISO_ORE",
-                 "GIORNI_DATA_ANNUNCIO", "TETTO_DIGITALE_NUOVI",
+                 "GIORNI_DATA_ANNUNCIO", "ORE_CAMBIO_VALIDO",
+                 "TETTO_DIGITALE_NUOVI",
                  "DIGITALE_MIN_VENDITE", "SUGGERIMENTI_DI_SERIE",
                  "SUGGERIMENTI_OGNI_GIORNI"):
         amb[nome] = acceso and 24
@@ -6104,7 +6291,7 @@ def main():
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_sped_gratis, prove_suggerimenti,
-              prove_libro_mastro, prove_leve,
+              prove_libro_mastro, prove_leve, prove_cambio,
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina):
         try:

@@ -250,10 +250,11 @@ except ImportError:
 # non mantenuta perche' CoinGecko tace». Resta vero, e il prezzo si
 # paga a cambio muto — dove la promessa NON scatta e lo si dice. Ma
 # «muto» vuol dire pochissimo: cambio_btc_eur e' fail-open e tiene
-# l'ultimo valore noto anche scaduto, quindi lo 0 esce solo se
-# CoinGecko non ha MAI risposto da quando il processo e' partito, cioe'
-# un riavvio dentro un'interruzione. Una promessa che deriva da sola
-# per mesi e' un guasto piu' grande di uno che dura un riavvio.
+# l'ultimo valore noto, che dall'ago 2026 sopravvive anche ai RIAVVII
+# (vive nel database, vedi ORE_CAMBIO_VALIDO), quindi lo 0 esce solo al
+# primissimo avvio di un database nuovo o quando l'ultimo cambio noto
+# ha piu' di ORE_CAMBIO_VALIDO. Una promessa che deriva da sola per
+# mesi e' un guasto piu' grande di uno che dura un riavvio.
 # E LE PURE RESTANO PURE: guadagnano un ARGOMENTO (articolo_eur), non
 # una chiamata — il cambio lo prende il chiamante, dove lo prende gia'.
 # LE LEVE SI CHIAMANO *_EUR, e non e' cosmesi: una riga
@@ -473,6 +474,36 @@ try:
     from config import TETTO_RICERCHE_AI_ORA
 except ImportError:
     TETTO_RICERCHE_AI_ORA = 30
+
+# QUANTO VALE UN CAMBIO VECCHIO (ago 2026, da un caso vero: due deploy
+# a quattordici minuti l'uno dall'altro, e in tutti e due CoinGecko
+# muta — un compratore si e' trovato la pagina d'acquisto bloccata da
+# «il cambio euro non e' disponibile»). La cache era fail-open e teneva
+# l'ultimo valore noto anche scaduto, ma NASCEVA VUOTA: se al riavvio
+# la prima lettura non riusciva, l'app non sapeva piu' convertire
+# finche' non ne riusciva una. Adesso l'ultimo cambio noto vive nel
+# database e torna in cache all'avvio — un riavvio non azzera piu' una
+# cosa che sapevamo un minuto prima.
+# E siccome un valore che sopravvive ai riavvii puo' invecchiare per
+# sempre, adesso si DICE quanto vale: oltre ORE_CAMBIO_VALIDO il cambio
+# torna a essere «non disponibile», cioe' esattamente il ripiego
+# dichiarato di sempre (503 onesto sui listini in euro, promesse di
+# negozio che non scattano e lo dicono).
+# VENTIQUATTRO ORE, e la scelta va letta cosi': fino a ieri il valore in
+# memoria non scadeva MAI — un processo acceso da una settimana poteva
+# convertire col cambio di sette giorni prima senza che nessuno lo
+# sapesse — quindi QUALUNQUE soglia finita e' una stretta, e le 24 ore
+# non bloccano nessuna interruzione realistica di CoinGecko, che si
+# misura in minuti. Piu' in la' il numero mente troppo: in un giorno
+# BTC si muove di qualche punto, in una settimana di parecchi, e
+# convertire un listino in euro con un cambio della settimana scorsa
+# vuol dire far pagare la cifra sbagliata a qualcuno.
+# 0 = nessuna scadenza, cioe' il mondo di ieri: freno d'emergenza, non
+# una scelta.
+try:
+    from config import ORE_CAMBIO_VALIDO
+except ImportError:
+    ORE_CAMBIO_VALIDO = 24
 
 # La consegna digitale (lug 2026): buoni regalo, codici, licenze. Il
 # codice passa DENTRO Barattolo (campo dedicato dell'ordine, rivelato
@@ -1552,6 +1583,18 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_categoria_proposta
         ON categoria_proposta(stato, categoria_ora, categoria_nuova);
+    CREATE TABLE IF NOT EXISTS cambio_noto(
+        -- L'ULTIMO CAMBIO CHE ABBIAMO LETTO DAVVERO (ago 2026). Una
+        -- riga sola, oggi 'eur'. NON e' un dato di denaro e nessun
+        -- conto ci poggia sopra: e' il promemoria fra un riavvio e
+        -- l'altro — la verita' resta CoinGecko, questa e' la memoria
+        -- di cosa aveva detto l'ultima volta che ha risposto. Serve
+        -- perche' la cache in RAM nasceva vuota, e un deploy dentro
+        -- un'interruzione lasciava l'app senza saper convertire.
+        valuta TEXT PRIMARY KEY,      -- 'eur' (oggi l'unica)
+        valore REAL DEFAULT 0,        -- euro per BTC
+        quando INTEGER DEFAULT 0      -- quando l'abbiamo letto (unix)
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -3074,29 +3117,169 @@ async def invoice_da_ln_address(ln_address: str, sats: int) -> str | None:
 
 
 # ----------------------- CAMBIO BTC/EUR -----------------------------
-# Serve al controvalore in euro degli affari conclusi (export CSV).
-# Cache di 15 minuti; se la rete non risponde si tiene l'ultimo valore
-# noto, e se non c'e' mai stato resta 0 = "non disponibile".
+# Serve a convertire i listini in euro, ai filtri di prezzo, alle due
+# promesse di negozio e al controvalore degli affari conclusi (CSV).
+#
+# TRE ETA', e vanno tenute distinte:
+#  - FRESCO (meno di CAMBIO_TTL): si usa e basta, nessuna chiamata.
+#  - VECCHIO ma dentro ORE_CAMBIO_VALIDO: si prova a rinfrescarlo, e se
+#    la rete tace vale lo stesso — fail-open, meglio il cambio di
+#    stamattina che un acquisto bloccato.
+#  - TROPPO VECCHIO: vale 0, cioe' «non disponibile», che e' il ripiego
+#    dichiarato di sempre (503 sui listini in euro, promesse che non
+#    scattano e lo dicono).
+# E l'ultimo valore noto vive anche nel DATABASE: un riavvio non deve
+# azzerare una cosa che sapevamo un minuto prima (vedi ORE_CAMBIO_VALIDO
+# per il caso vero che ha aperto il cantiere).
 
-_cambio_eur_cache = {"valore": 0.0, "quando": 0.0}
+CAMBIO_TTL = 900          # 15 minuti: oltre, si prova a rileggerlo
+CAMBIO_RIPROVA_S = 60     # ...ma dopo un buco si aspetta prima di
+#                           ribussare: durante un'interruzione ogni
+#                           pagina d'acquisto pagherebbe il timeout di
+#                           CoinGecko per farsi dire la stessa cosa
+
+_cambio_eur_cache = {"valore": 0.0, "quando": 0.0, "tentato": 0.0}
 
 
-async def cambio_btc_eur() -> float:
-    adesso = time.time()
-    if (_cambio_eur_cache["valore"] > 0
-            and adesso - _cambio_eur_cache["quando"] < 900):
-        return _cambio_eur_cache["valore"]
+def _cambio_valido(valore: float, quando: float, adesso: float,
+                   ore: int) -> float:
+    """Il cambio se e' ancora buono, 0 se non c'e' o e' troppo vecchio.
+
+    PURO apposta — prende i campi e non la cache, il patto di
+    `in_ferie`: cosi' lo stesso giudice serve la memoria, la riga del
+    database e la prova in CI. Al filo esatto e' ancora buono, come
+    `_asta_viva`; `ore=0` vuol dire «non scade mai»."""
+    if valore <= 0:
+        return 0.0
+    if ore and adesso - quando > ore * 3600:
+        return 0.0
+    return float(valore)
+
+
+def _salva_cambio(valore: float, quando: float) -> None:
+    """L'ultimo cambio noto sul disco. Fail-open totale: se il database
+    fa i capricci si tira avanti con la memoria — questo e' un
+    promemoria, non una scrittura di denaro."""
+    try:
+        con = db()
+        con.execute("INSERT OR REPLACE INTO cambio_noto(valuta, valore, "
+                    "quando) VALUES('eur', ?, ?)", (valore, int(quando)))
+        con.commit()
+        con.close()
+    except Exception:
+        pass
+
+
+def carica_cambio_salvato() -> float:
+    """Rimette in cache l'ultimo cambio noto, all'avvio. Restituisce il
+    valore se e' ancora USABILE, 0 altrimenti — ma in cache ci finisce
+    comunque: a decidere se vale e' `_cambio_valido` al momento dell'uso,
+    non chi legge il database."""
+    try:
+        con = db()
+        r = con.execute("SELECT valore, quando FROM cambio_noto "
+                        "WHERE valuta='eur'").fetchone()
+        con.close()
+    except Exception:
+        return 0.0
+    if not r or not r["valore"]:
+        return 0.0
+    _cambio_eur_cache.update(valore=float(r["valore"]),
+                             quando=float(r["quando"] or 0))
+    return cambio_noto_ora()
+
+
+def cambio_noto_ora() -> float:
+    """Il cambio che sappiamo ADESSO, senza toccare la rete: 0 se non
+    c'e' o e' troppo vecchio. Lo usa la vetrina — una pagina che si
+    sfoglia non deve mai aspettare CoinGecko — e chiunque debba solo
+    LEGGERE quello che gia' abbiamo."""
+    return _cambio_valido(_cambio_eur_cache["valore"],
+                          _cambio_eur_cache["quando"], time.time(),
+                          ORE_CAMBIO_VALIDO)
+
+
+async def _rileggi_cambio() -> bool:
+    """Una lettura vera da CoinGecko. True se e' andata: cache e copia
+    sul disco si aggiornano INSIEME, o al riavvio dopo ci ritroveremmo
+    con un valore piu' vecchio di quello che avevamo in mano. Non alza
+    mai: e' il chiamante a decidere cosa fare del vecchio."""
+    _cambio_eur_cache["tentato"] = time.time()
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get("https://api.coingecko.com/api/v3/simple/price",
                             params={"ids": "bitcoin", "vs_currencies": "eur"})
             r.raise_for_status()
             valore = float(r.json()["bitcoin"]["eur"])
-            if valore > 0:
-                _cambio_eur_cache.update(valore=valore, quando=adesso)
     except Exception:
-        pass          # fail-open: meglio un cambio vecchio che un errore
-    return _cambio_eur_cache["valore"]
+        return False
+    if valore <= 0:
+        return False
+    adesso = time.time()
+    _cambio_eur_cache.update(valore=valore, quando=adesso)
+    _salva_cambio(valore, adesso)
+    return True
+
+
+async def cambio_btc_eur() -> float:
+    adesso = time.time()
+    if (_cambio_eur_cache["valore"] > 0
+            and adesso - _cambio_eur_cache["quando"] < CAMBIO_TTL):
+        return _cambio_eur_cache["valore"]
+    # Vale la pena riprovare SEMPRE, tranne quando abbiamo appena
+    # bussato a vuoto: durante un'interruzione ogni richiesta
+    # aspetterebbe dieci secondi per farsi dire di nuovo di no.
+    if adesso - _cambio_eur_cache["tentato"] >= CAMBIO_RIPROVA_S:
+        await _rileggi_cambio()
+    return cambio_noto_ora()
+
+
+_TASK_CAMBIO = None   # il riferimento tiene vivo il task (senza, il
+#                       garbage collector puo' cancellarlo a meta' volo)
+
+
+async def _insisti_sul_cambio():
+    """Al riavvio si riprova PRESTO invece di aspettare che a chiedere
+    il cambio sia qualcuno che sta comprando. Pause che crescono, si
+    smette al primo successo; dopo, ci pensa il giro dell'orologio."""
+    for pausa in (0, 5, 15, 30, 60, 120, 300):
+        if pausa:
+            await asyncio.sleep(pausa)
+        if await _rileggi_cambio():
+            print(f"💱 Cambio BTC/EUR letto: "
+                  f"{_cambio_eur_cache['valore']:,.0f} €/BTC"
+                  .replace(",", " "), flush=True)
+            return
+    print("⚠️ Cambio BTC/EUR: CoinGecko non risponde da dieci minuti. "
+          "Vale l'ultimo cambio noto finché non invecchia; si riprova a "
+          "ogni giro dell'orologio.", flush=True)
+
+
+@app.on_event("startup")
+async def scalda_cambio():
+    """Il cambio salvato torna in cache PRIMA che il server risponda a
+    chiunque (gli startup di FastAPI finiscono prima che uvicorn accetti
+    connessioni): cosi' la primissima pagina d'acquisto dopo un deploy
+    trova gia' un cambio, anche se la rete e' ancora muta. Poi si va a
+    cercarne uno fresco, ma in un task: l'avvio non aspetta CoinGecko."""
+    salvato = carica_cambio_salvato()
+    if salvato:
+        eta = (time.time() - _cambio_eur_cache["quando"]) / 60
+        quanto = ("di poco fa" if eta < 1 else
+                  f"di {eta:.0f} minut{'o' if round(eta) == 1 else 'i'} fa")
+        print(f"💱 Cambio BTC/EUR ripreso dal database: "
+              f"{salvato:,.0f} €/BTC ({quanto})"
+              .replace(",", " "), flush=True)
+    elif _cambio_eur_cache["valore"] > 0:
+        print(f"💱 Cambio BTC/EUR: l'ultimo salvato ha piu' di "
+              f"{ORE_CAMBIO_VALIDO} ore e non si usa. Finché non ne "
+              "arriva uno nuovo, i listini in euro non si comprano.",
+              flush=True)
+    else:
+        print("💱 Cambio BTC/EUR: nessun valore salvato (primo avvio, o "
+              "database nuovo). Lo si chiede adesso.", flush=True)
+    global _TASK_CAMBIO
+    _TASK_CAMBIO = asyncio.create_task(_insisti_sul_cambio())
 
 
 async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
@@ -6491,6 +6674,15 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # ACCESE — cioe' una bugia. Era l'imperfezione dichiarata di
         # aggiornaAstaVisibilita, e questa e' la riga che la chiude.
         risposta["asta_abilitata"] = bool(ASTA_ABILITATA)
+        # IL CAMBIO, cosi' il client non lo chiede per conto suo (ago
+        # 2026): prima ogni browser interrogava CoinGecko da solo — N
+        # utenti N chiamate, e soprattutto DUE verita', perche' il «≈»
+        # della vetrina poteva dire una cifra e il conto del server
+        # un'altra. Qui viaggia gratis, che questa risposta il client la
+        # chiede gia'. Si legge la cache e non si tocca la rete: chi
+        # sfoglia il mercatino non deve aspettare nessuno. 0 = non
+        # disponibile, e il client sa gia' cosa farne (omette il «≈»).
+        risposta["cambio_eur"] = cambio_noto_ora()
     con.close()
     return risposta
 
@@ -8307,6 +8499,11 @@ def _leve_stato():
                   spento="i codici consegnati restano in chiaro nel "
                          "database: tutto funziona uguale, protegge meno "
                          "un backup rubato"),
+            _leva("Il cambio vale al massimo (ore)", "ORE_CAMBIO_VALIDO",
+                  ORE_CAMBIO_VALIDO,
+                  spento="l'ultimo cambio noto non scade mai: si continua "
+                         "a convertire in euro anche con un valore di "
+                         "settimane fa, e nessuno se ne accorge"),
             _leva("La ronda del libro mastro", "CONTROLLO_LIBRO_MASTRO",
                   bool(CONTROLLO_LIBRO_MASTRO),
                   spento="gli invarianti non si controllano più da soli: "
@@ -20125,6 +20322,14 @@ async def avvisa_spedizioniere_mancante():
 
 async def orologio():
     while True:
+        try:
+            # Il cambio si tiene fresco QUI, non nel percorso caldo: una
+            # pagina d'acquisto non deve mai aspettare CoinGecko, e cosi'
+            # la copia sul disco e' vecchia di dieci minuti al massimo —
+            # cioe' quanto perde un riavvio nel caso peggiore.
+            await _rileggi_cambio()
+        except Exception as e:
+            print(f"⚠️ Rinfresco del cambio saltato: {e}")
         try:
             await controlla_scadenze()
         except Exception as e:

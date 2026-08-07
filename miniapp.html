@@ -4416,6 +4416,9 @@ async function loadListings(anonimo){
   vetrina = (j.annunci || []).map(mapListing);
   inCatalogo(vetrina);
   vetrinaCursore = j.cursore || null;
+  /* il cambio del SERVER, prima che la griglia si disegni (vedi
+     impostaCambio): fonte unica, zero chiamate in piu' */
+  if (j.cambio_eur !== undefined) impostaCambio(j.cambio_eur);
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
@@ -5945,22 +5948,29 @@ function pontiOrdine(username, npub, chi, soggetto){
     || `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`;
 }
 
-/* Cambio BTC/EUR aggiornato all'avvio (per il "≈ X €" sotto i prezzi) */
-let eurPerSat = 0.00092;   // valore di riserva se la rete non risponde
-let cambioVivo = false;    // true solo quando CoinGecko ha davvero risposto
+/* Cambio BTC/EUR (per il "≈ X €" sotto i prezzi): UNA SOLA FONTE, il
+   NOSTRO server (ago 2026). Prima ogni browser chiamava CoinGecko per
+   conto suo: N utenti N chiamate, e soprattutto DUE verita' — il «≈»
+   della vetrina poteva dire una cifra e il conto del server un'altra,
+   perche' erano due letture di momenti diversi. Adesso il cambio
+   viaggia nella busta di PRIMA PAGINA di /api/listings, che il client
+   chiede gia' all'avvio: zero giri di rete in piu', e la vetrina parla
+   la stessa lingua della invoice.
+   Arriva anche PRIMA del primo renderGrid (loadListings e' atteso),
+   quindi non serve piu' nessun giro di render per rimediare: le card
+   nascono gia' con la cifra giusta.
+   Senza cambio — server muto, DEMO da file://, o cambio troppo vecchio
+   perche' CoinGecko tace da un giorno — resta il valore di riserva e
+   `cambioVivo` resta falso: dove il numero conta davvero il «≈» si
+   omette, che e' il patto di sempre. */
+let eurPerSat = 0.00092;   // valore di riserva se il cambio non arriva
+let cambioVivo = false;    // true solo col cambio VERO in mano
 function eur(sats){ return (sats * eurPerSat).toFixed(0); }
-fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur')
-  .then(r=>r.json()).then(d=>{ if (d?.bitcoin?.eur) {
-    eurPerSat = d.bitcoin.eur / 100000000; cambioVivo = true;
-    /* le card gia' disegnate portano il cambio di riserva: un giro di
-       render le aggiorna (mai sopra i risultati di una ricerca).
-       MA solo se c'e' gia' qualcosa di VERO da ridisegnare: CoinGecko
-       puo' rispondere prima di avvia()/loadListings(), e senza questa
-       guardia ridisegnerebbe il seme demo (Keychron/MTB) spacciandolo
-       per vetrina vera finche' i dati non arrivano. In DEMO il seme e'
-       legittimo; coi dati vivi lo dice datiVivi. */
-    if (!el('q').value.trim() && (DEMO || datiVivi)) renderGrid();
-  }}).catch(()=>{});
+function impostaCambio(eurPerBtc){
+  const v = Number(eurPerBtc) || 0;
+  if (v <= 0) return;   // 0 = «non disponibile»: mai un numero inventato
+  eurPerSat = v / 100000000; cambioVivo = true;
+}
 
 /* ---------------- doppia valuta: la vista ₿/€ ----------------
    Il venditore sceglie la valuta del SUO listino (l.valuta); lo
