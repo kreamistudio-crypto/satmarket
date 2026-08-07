@@ -5543,7 +5543,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   barattolo, cosa succede quando paghi (4 passi), i tempi, la
   disputa, DOVE IL DEPOSITO NON PUÒ PROTEGGERE (il codice rivelato,
   nei due sensi: quello che non torna indietro e quello che non
-  funziona; il ritiro a mano; «l'oggetto promesso, non i gusti»), il
+  funziona; il ritiro a mano; il PACCO PERSO O ROVINATO; «l'oggetto
+  promesso, non i gusti»), il
   pagamento Lightning e dove stanno i sats. Markup FISSO e nessun
   dato utente dentro: mai un `esc()` da ricordare. TRE PORTE —
   «Scopri di più» nel recinto, la riga di fiducia di Esplora e del
@@ -5558,6 +5559,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «custodia» — che in ambito regolatorio ha un peso specifico
   (decisione di Andrea, da tenere se qualcuno riscrive quel
   paragrafo; il parere legale MiCA è nel backlog).
+  BARATTOLO GARANTISCE LA TRANSAZIONE, NON IL PACCO (ago 2026, buco di
+  testo: nessuna riga dell'app diceva cosa succede se il corriere perde
+  o rovina la spedizione). Due voci nell'elenco «dove il deposito non
+  può proteggerti» — il principio (che il venditore non incassi senza
+  aver consegnato e il compratore non paghi senza ricevere; l'oggetto
+  in viaggio no, il reclamo si apre col corriere) e il consiglio
+  pratico (tracciamento sempre, copertura del corriere per le cose di
+  valore, quella di base verso i punti di ritiro è bassa) — più UNA
+  riga nel pannello «📦 Spedisci» del venditore, che è l'ultimo momento
+  utile per comprare la copertura: il pattern degli hint contestuali,
+  la riga nasce dove nasce il dubbio. MAI la parola «assicurato», né
+  per il deposito (regola ferrea 9) né qui: si dice «copertura del
+  corriere». Il pannello del RESO non la porta (il rischio è lo stesso
+  ma sull'altra parte): si valuta se il caso si presenta.
   I TEMPI DELL'ESCROW STANNO IN UN POSTO SOLO (lug 2026): la costante
   `TEMPI` in cima al JS — `conferma` 72 ore, `autoSblocco` 10 giorni,
   `confermaDig` 24 ore, `silenzioDig` 48 ore, `invoice` 15 minuti —
