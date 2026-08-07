@@ -7664,11 +7664,16 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         await avvisa_revisione(annuncio_id, motivo_dubbio)
         return {"ok": True, "id": annuncio_id, "revisione": True,
                 "attesa_ore": REVISIONE_ATTESA_ORE, **conto_foto}
-    # --- Strato 3: i moderatori vedono anche cio' che cambia ---
-    await notifica_admin(
-        f"✏️ <b>Annuncio #{annuncio_id} modificato</b>\n"
-        f"«{d['titolo'][:80]}» — {testo_prezzo(valuta, prezzo_sats, prezzo_eur)}\n"
-        f"Venditore: {user['first_name']} (id {user['id']})")
+    # NIENTE notifica ai moderatori sulla modifica APPROVATA (ago 2026,
+    # decisione di Andrea): era rumore in un fiume gia' pieno, e non
+    # chiedeva nessun gesto — i tre strati l'avevano appena promossa.
+    # Cosa NON si perde, ed e' la ragione per cui si poteva togliere:
+    # la modifica ripassa dalla moderazione INTERA, quindi il vietato
+    # blocca (con la sua notifica, poco sopra) e il dubbio manda in
+    # 'revisione', dove restano sia la tastiera ✅/❌ sia la coda del
+    # pannello — che filtra per STATO, non per come ci si e' arrivati.
+    # Il fatto in se' resta scritto: `annunci.modificato` porta la data
+    # e la scheda la mostra. A sparire e' solo lo squillo.
     # Se era in piazza su Nostr, l'evento riparte aggiornato: il tag d
     # stabile fa si' che sostituisca il precedente da solo
     asyncio.create_task(annuncio_su_nostr(annuncio_id, "active",
