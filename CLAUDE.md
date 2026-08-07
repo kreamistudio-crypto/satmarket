@@ -5490,6 +5490,67 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `bustaLetta`, «👁 Mostra» SENZA confirm (non è la rivelazione:
   leggere un bigliettino non muove niente), tutto sotto esc(), admin
   senza nemmeno il bottone.
+  LA PAGINA ORDINI RISTRUTTURATA (ago 2026): filtro «Solo attivi»,
+  pillole [Tutti|Acquisti|Vendite], la foto vera al posto del 📦, e il
+  NASCONDERE degli affari conclusi. Le definizioni, dichiarate:
+  ATTIVO = stato NOT IN (released, refunded, annullato) — un
+  consegnato non confermato è attivissimo, una disputa pure,
+  confirmed/refund sono il limbo che aspetta una invoice; annullato
+  sta coi conclusi (è una lapide ≤1h del reaper). NASCONDIBILE =
+  released/refunded E BASTA, gli unici stati ASSORBENTI: quindi «un
+  nascosto che torna a muoversi» NON ESISTE per costruzione — il
+  feedback della controparte può ancora arrivare e l'ordine RESTA
+  nascosto (un feedback non è un movimento; lo si ritrova da
+  «mostrali»). La parità dei due elenchi server↔client (gate e ✕) è
+  sorvegliata da prove.py.
+  I FILTRI SONO TUTTI CLIENT-SIDE e vivono SOLO in renderOrders:
+  `orders` resta INTERO (openOrder fa orders.find senza guardie — deep
+  link, ritorno post-pagamento, ripristino d'identità) e la WHERE di
+  /api/orders NON si tocca (è una catena di OR senza parentesi: un AND
+  in coda si legherebbe all'ultimo OR). Stato per SESSIONE (variabili
+  ordini*, mai localStorage), markup dei controlli STATICO in
+  view-affari: la tirata di aggiornamento riscrive solo #ordersList e
+  le scelte sopravvivono da sole. All'apertura: Tutti + filtro spento
+  (deciso da Andrea) = la lista di sempre, meno i nascosti. Le righe
+  'admin' (dispute da moderare) passano solo con «Tutti». LIMITE NOTO,
+  dichiarato (Andrea): coi filtri lato client la lista continua a
+  SCARICARE anche gli ordini nascosti — nascondere alleggerisce la
+  vista, non la risposta. Ai numeri di oggi va benissimo; chi un
+  domani vedrà una lista lenta guardi qui invece di sospettare del
+  filtro.
+  LA FOTO: il server manda SOLO `foto0` (primo nome della lista JSON,
+  pattern scheda() dei doppioni; la lista intera si poppa nello
+  strip). Per i SET è la foto del PRIMO pezzo — LEFT JOIN sulla query
+  delle righe, coerente con _titolo_ordine che lo nomina; il mosaico è
+  stato scartato (in 38px non si legge). Ripiego a catena nel client:
+  _min → foto piena → il 📦 di sempre, mai un'immagine rotta; annuncio
+  sparito = foto0 '' per costruzione. In DEMO resta l'emoji del
+  listing (`o.listing.emoji`). Digitali e ordini d'asta non sono casi
+  speciali: annunci con foto come gli altri.
+  IL NASCONDERE, MAI CANCELLARE: la riga resta nel database — libro
+  mastro, feedback, export e registro ci poggiano. DUE colonne
+  per-parte (`nascosto_compratore`/`nascosto_venditore`, il patto
+  delle sorelle sollecito_*: mai una colonna condivisa), e da
+  /api/orders esce SOLO il PROPRIO flag (`nascosto`), mai quello
+  dell'altra parte — è un fatto privato suo. Endpoint
+  `POST /api/orders/{id}/nascondi` (body {nascosto:1|0}): guardia a
+  due parti + stato nella STESSA WHERE col 400 anti-oracolo, UPDATE
+  della sola colonna della parte, MAI `aggiornato` (nascondere non è
+  un movimento: non riordina e non sposta ancore), nessuna notifica.
+  Rimettere in vista non ha guardie in più (il patto delle ferie). La
+  ✕ vive sulla riga (stopPropagation, bersaglio largo via ::after)
+  SOLO sugli stati nascondibili, mai in DEMO; al nascondere parte il
+  toast «Nascosto — lo ritrovi da "mostrali"» — non una conferma, un
+  cartello: una riga che sparisce in silenzio la prima volta è quella
+  che si cerca per dieci minuti. In fondo «N ordini nascosti —
+  mostrali» (il conteggio segue i filtri correnti: con «solo attivi»
+  acceso non compare, i nascosti sono tutti conclusi); da lì le righe
+  escono SPENTE col «↩» che rimette in vista. Il libro mastro
+  sorveglia «ordine nascosto su uno stato non finale» (passa la
+  domanda che decide: il gate ammette solo stati assorbenti, non
+  esiste transitorio legittimo) — anche in query_libro_mastro.sql
+  (16d). Empty state SUO per i filtri a vuoto («Niente qui con questi
+  filtri»), distinto dall'«Ancora nessun ordine».
   «CONTROLLA IL PACCO» HA PERSO LE PILLOLE DI SCELTA (decisione 3 di
   Andrea, stile Vinted): la scelta vive nella pagina d'acquisto
   (`#ctrlAcquista` → `apriAcquistoSet`), al loro posto la riga onesta
@@ -8012,6 +8073,31 @@ primo ordine al punto con la busta depositata dentro Telegram (i due
 messaggi a giorni di distanza, mai il doppione) e il journal di
 `sollecita_buste_ferme` al primo battito con un ordine oltre i 3
 giorni.
+
+La pagina Ordini ristrutturata (ago 2026): filtro «Solo attivi» e
+pillole Tutti/Acquisti/Vendite (due assi indipendenti, stato di
+sessione, tutto client-side — la WHERE di /api/orders non si tocca),
+la foto vera dell'articolo al posto del 📦 (foto0 dal server, per i
+set il primo pezzo, ripiego a catena fino al 📦), e il NASCONDERE
+degli affari conclusi — mai cancellare: due colonne per-parte, gate
+sui soli stati assorbenti released/refunded, ✕ sulla riga col toast
+che dice dove ritrovarlo, «N nascosti — mostrali» col ↩ per
+rimetterli in vista, controllo nuovo nella ronda del libro mastro.
+Vedi Architettura, «LA PAGINA ORDINI RISTRUTTURATA», per le
+definizioni dichiarate (cosa è attivo, perché confirmed/refund e
+annullato NON si nascondono) e per il LIMITE NOTO: la lista scarica
+anche i nascosti, nascondere alleggerisce la vista e non la risposta.
+Collaudata: 1440 prove verdi (65 nuove — il gate su TUTTI i dieci
+stati non assorbenti, il per-parte, l'anti-oracolo estraneo ==
+inesistente, il dump prima/dopo che dimostra che nascondere non muove
+niente, il GET vero con foto0 nei quattro casi e il flag che non esce
+mai all'altra parte, la parità NASCONDIBILI server↔client, la riga
+rotta della ronda trovata col suo id) più il giro visivo CDP a 375px
+nei due temi, con e senza foto, zero errori JS: nascondi → toast →
+mostrali → rimetti in vista esercitati dal vivo sul server locale.
+IN PRODUZIONE basta il deploy: le due colonne nascono da sole a 0,
+nessuna leva, nessun backfill; il client vecchio in cache ignora
+foto0 e nascosto e vive come oggi.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
