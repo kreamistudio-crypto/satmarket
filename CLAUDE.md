@@ -2952,14 +2952,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `var(--muted)`: `.tag-price` è di carta chiara nei DUE temi e il
   token di notte si schiarirebbe fino a sparire. MISURATO, ed è la
   parte da tenere: sulla carta rende 3,60 — e il prezzo ARANCIO di
-  sempre, lì sopra, rende 3,59. Cioè lo stato spento si legge
-  ESATTAMENTE quanto quello acceso, e a distinguerli è la TINTA e non
-  la luce; un grigio più scuro (4,8 e oltre, provati) renderebbe le
-  ferie più leggibili di un prezzo vero, il contrario di quel che deve
-  dire. Chi alzerà il contrasto del cartellino alzi PRIMA l'arancio.
+  sempre, lì sopra, rende **3,01** (`--sats-deep` è #D97706; qui c'è
+  stato scritto 3,59 per mesi, ed era un errore di trascrizione —
+  ricontato ago 2026 col cantiere dello stock, che quel grigio se l'è
+  preso in prestito). La conclusione non cambia e anzi si rafforza: lo
+  stato spento si legge quanto quello acceso — un filo MEGLIO,
+  perfino — e a distinguerli è la TINTA e non la luce; un grigio più
+  scuro (4,8 e oltre, provati) renderebbe le ferie più leggibili di un
+  prezzo vero, il contrario di quel che deve dire. Chi alzerà il
+  contrasto del cartellino alzi PRIMA l'arancio.
   Nella scheda invece `var(--muted)` è giusto: lì il prezzo sta sulla
   pagina e l'inchiostro segue la carta. Nessuna delle due nomina
-  `.unit`, la regola dichiarata.
+  `.unit`, la regola dichiarata. E dall'ago 2026 quei tre selettori
+  sono CONDIVISI con l'esaurito (vedi «lo scaffale vuoto»): stessa
+  frase, un posto solo da tarare.
   LA CARD DICE LO STATO, NON LA DATA (decisione di Andrea sui numeri):
   «🌴 In ferie — torna il 17 ago» in una pillola sola fa 117px, ma a
   360px — la larghezza di riferimento del progetto — la card ne
@@ -3469,6 +3475,152 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   un ordine pagato ma verificato oltre i 30 minuti può superare lo
   stock (il MAX para il negativo, il doppio-escrow resta caso da
   moderatore — com'era il doppio acquisto di ieri, ma molto più raro).
+  LO SCAFFALE VUOTO (ago 2026, «lo stock raccontato bene»): chi vende
+  prodotti propri — il riso, lo shoyu, il miele — non vende pezzi
+  unici, e l'annuncio esaurito non si butta. LA DIAGNOSI HA RIDOTTO IL
+  CANTIERE, ed è la parte da leggere per prima: il riassortimento
+  ESISTEVA GIÀ (`ricarica_quantita` accetta lo stato 'venduto', rimette
+  'attivo', rifà l'evento Nostr `active` e toglie la ✅ dal canale) —
+  non c'era da costruirlo, c'era da renderlo raggiungibile. NIENTE
+  stato nuovo: l'esaurito resta 'venduto' e l'invariante venduto ⟺
+  quantita=0 non si tocca, quindi filtri, offerte e import valgono
+  gratis come sempre.
+  IL GUASTO VERO era che `GET /api/listings/{id}` rispondeva **404**:
+  un link mandato a un amico e un annuncio nel barattolo morivano
+  insieme alle scorte. Ora serve `('attivo','venduto')` con `a.stato`
+  nella SELECT (come già faceva il solo ramo preferiti), che è ciò che
+  permette al client di disegnarlo spento — la barra d'acquisto non
+  nasceva già oggi su uno stato diverso da 'attivo'. Il 'rimosso' e il
+  'revisione' restano 404, e la ragione è che NON sono scaffali vuoti:
+  il primo il venditore l'ha tolto apposta e un link pubblico non deve
+  rovesciare la sua decisione, il secondo non è mai stato pubblico e
+  servirlo aprirebbe a chiunque abbia un id una finestra sulla coda di
+  moderazione.
+  DOVE SI VEDE (decisione di Andrea): SOLO nella pagina del negozio,
+  in fondo, sezione «Esauriti di recente» — chiave `esauriti` nel dict
+  di `/api/negozio` (tetto `TETTO_ESAURITI` 12, `creato DESC`, una
+  query a parte che NON tocca `totale` né il cursore: il numero della
+  bottega continua a dire quanto si può comprare). Un negozio è una
+  bottega e uno scaffale temporaneamente vuoto dice qualcosa della
+  bottega; in vetrina, ricerca, filtri e conteggi resta FUORI — chi
+  sfoglia non deve trovare cose che non può comprare. Niente COUNT
+  degli esauriti: `vendite_ok` lo dice già nel profilo, e due numeri
+  sulla stessa cosa da tabelle diverse divergono al primo caso storto.
+  LA MEMORIA DEI PEZZI, `annunci.quantita_max`: il MASSIMO mai
+  dichiarato, non «l'iniziale» — coi rifornimenti l'iniziale mentirebbe
+  al secondo giro. Serve a UNA domanda sola, «la scarsità è una
+  notizia?», e da lì nasce il badge. `riallinea_quantita_max(con)` è
+  una riga (`UPDATE … SET quantita_max=quantita WHERE
+  quantita>quantita_max`) ed è ANCHE IL BACKFILL ONESTO: «ne ha almeno
+  tanti quanti ne ha adesso» è un limite INFERIORE vero, non un passato
+  fabbricato. Gira in due posti — all'avvio accanto alla riparazione
+  gemella dell'invariante, e nel DOPO-IMPORT Nostr, perché
+  `importa_nostr.py` riscrive `quantita` dal tag `stock` scrivendo
+  dritto nel database e deve restare CIECO alla colonna (dev'essere
+  lanciabile anche su un Barattolo più vecchio: c'è la sentinella).
+  IL MASSIMO NON SI ASSEGNA MAI SECCO: `quantita_max=MAX(quantita_max,?)`
+  in `ricarica_quantita`, in `modifica_annuncio` e — questa è la falla
+  che sembrava impossibile — nel RIMBORSO: 3 pezzi, venduti tutti,
+  ricarica a 1, e una disputa ne rimborsa 3 = 4, sopra il massimo di
+  ieri. I due INSERT sono DUE (pubblica e l'import CSV, che ha una vita
+  sua ed è il punto che si dimentica); `_incassa_ordine` non lo tocca
+  mai, perché lì la quantità SCENDE.
+  IL NUMERO GREZZO NON ESCE: `arricchisci_righe_vetrina` lo legge,
+  decide il flag `ultimo` col giudice puro `ultimo_pezzo(quantita,
+  quantita_max)` e lo POPPA — grezzo racconterebbe «ne ha venduti N»,
+  un dato nuovo che nessuno ha chiesto, e il pop copre anche le rotte
+  che servono l'annuncio intero con `a.*` (ricerca AI, i tuoi annunci).
+  È il pattern di `zona_comune`: un campo derivato che porta già dentro
+  la risposta alla domanda.
+  IL BADGE «ULTIMO» esiste solo dove la scarsità è una NOTIZIA — ne ha
+  avuti più d'uno ed è sceso a uno. Su un mercatino dell'usato quasi
+  tutto è unico, quindi un badge su `quantita == 1` sarebbe vero e
+  insignificante, e smetterebbe di essere letto dopo il terzo. Dove il
+  dato non c'è (storici mai ricaricati, importati appena nati) esce 0:
+  nel dubbio si tace, mai un'urgenza inventata.
+  NON PRENDE UN COLORE, e le tre strade scartate valgono più della
+  scelta: il GRIGIO spento è la lingua delle cose FINITE (chi l'ha
+  imparato così leggerebbe l'ultimo pezzo come già venduto, cioè il
+  contrario); un colore NUOVO sarebbe il quarto segno colorato in card
+  e il più FREQUENTE dei quattro — l'errore già pagato col chip
+  «Spedizione disponibile», dove quello che diceva meno compariva di
+  più; il rosso della lampo significa «sconto a tempo» e i due possono
+  convivere. Quindi una SUPERFICIE già di casa, la CARTA del cartellino
+  e dei cerchietti sulla foto, fissa nei due temi: misurato, 11,77
+  sopra una foto nera e 14,18 sopra una bianca — il badge più leggibile
+  dei cinque, ed è giusto, è l'unico che chiede di essere letto ADESSO.
+  Quieto nel colore, forte nella luce: il rovescio esatto del
+  cartellino in ferie. L'ombra c'è, come lampo e asta: deve staccare.
+  IL TESTO È «Ne resta 1» E NON «Ultimo pezzo», e la ragione è
+  MISURATA: a 320px quello fa 89px e tocca il barattolino (−1px
+  d'aria), «Ultimo rimasto» lo scavalca di 12; questo ne fa 74 e ne
+  lascia 14. «Ultimo» secco ci starebbe largo ma da solo, sopra un
+  prezzo, si legge «ultimo A QUESTO PREZZO» — dice un'altra cosa. Nella
+  SCHEDA invece la pillola dice «**Ultimo** disponibile», che lì è il
+  singolare di «N disponibili» nella stessa fila, e parla col GRASSETTO
+  e non col colore (la regola dello sfollamento, quella di «spedizione
+  gratuita»): a cedere è il luogo, mai il significato.
+  PRECEDENZA IN CARD: esaurito > ferie > asta > lampo > ultimo.
+  L'esaurito vince ed è l'unica precedenza che non è una cintura ma una
+  regola — le colonne `lampo_*` restano vive anche a scorte finite, e
+  un «⚡ −30%» su una cosa che non si compra è una promessa che non si
+  può mantenere (per la stessa ragione il countdown della lampo tace
+  nella scheda di un esaurito). L'«ultimo» sta in coda: uno stato che
+  dice «sbrigati» non deve mai coprirne uno che dice «non si può
+  comprare».
+  L'ASTA NON È MAI ESAURITA (`esaurito(l)` esclude `astaE(l)`): non ha
+  stock, ha un aggiudicatario, e «🔨 conclusa» dice già tutto quel che
+  direbbe «Esaurito» e in più dice di che cosa si tratta. Non è
+  un'eccezione di comodo: è la STESSA riga che `ricarica_quantita` ha
+  sempre avuto, dove l'asta è l'unico caso rifiutato per NATURA e non
+  per stato. Chi toglie quel `&& !astaE(l)` deve togliere anche quel
+  400, o «Rifornisci» comparirebbe dove non può funzionare.
+  LA RESA parla la lingua delle FERIE, e per questo si AGGIUNGE ai loro
+  selettori invece di ricopiarne i valori misurati (`.card-ferie,
+  .card-esaurito`, `.tag-price.ferie .price, .tag-price.esaurito
+  .price`, e le due sorelle): «è qui, non si compra» è una cosa sola
+  detta per due ragioni. L'UNICA differenza è che la FOTO si spegne
+  (`.card.esaurito .ph{filter:grayscale(1);opacity:.62}`) — le ferie
+  sono una porta chiusa a ora nota e la merce resta bella da guardare,
+  qui la merce non c'è; è lo stesso gesto delle righe «non più
+  disponibile» del Profilo e del barattolo. VA SUL WRAPPER `.ph` e non
+  sull'`img`: `html[data-tema="scuro"] .card .ph img{filter:
+  brightness(.92)}` ha specificità più alta e di notte si mangerebbe il
+  grigio — sul genitore i due filtri si compongono invece di litigare,
+  e l'emoji-segnaposto si spegne con la foto.
+  IL RIFORNIMENTO È UN GESTO, NON UNA RIPUBBLICAZIONE: foglio
+  `#rifornisciSheet` (stepper `stepperMini`, campo numerico, scrittura
+  ASSOLUTA come l'endpoint) al posto del `prompt()` — l'ultimo dialogo
+  del sistema operativo rimasto su una strada battuta, in un'app che ha
+  sostituito ogni tendina nativa. IL GUADAGNO NON È IL VESTITO: sul 400
+  il foglio RESTA APERTO col numero ancora dentro da correggere («N
+  pezzi sono in pagamento proprio ora: scegli un numero più alto»), che
+  col prompt si perdeva tutto. Tre porte, un gesto solo: il badge «🔄
+  Rifornisci» nel Profilo, il bottone ARANCIO nella scheda del proprio
+  esaurito (dove il posto della CTA è vuoto: niente recinto, niente
+  Acquista) e la pastiglia sulla card del proprio negozio — NELLO SLOT
+  DEL BARATTOLINO, che sui propri annunci è libero per costruzione,
+  così la card non guadagna un terzo bersaglio. Le sue guardie sono le
+  righe del server (mai un'asta, mai un importato): un bottone che
+  porta a un 400 è peggio di un bottone che non c'è. Dopo,
+  `dopoRifornimento` ricarica i cataloghi PRIMA delle viste e riapre la
+  scheda, che il ramo esaurito è cotto dentro l'HTML.
+  SPENTO NON VUOL DIRE CHIUSO: in `rigaMioAnnuncio` l'esaurito ora si
+  APRE (la foto resta grigia), perché il dettaglio è dove vive
+  «Rifornisci»; il ramo revisione resta parola per parola quello di
+  ieri — lì non c'è niente da vedere e niente da fare finché un
+  moderatore non decide.
+  LIBRO MASTRO: NESSUN controllo nuovo, e il perché è la domanda che
+  decide — «esiste uno stato TRANSITORIO LEGITTIMO in cui è falsa?».
+  Per `quantita > quantita_max` sì: l'import scrive `quantita` dritto
+  nel database e aspetta la scopa. Un allarme su un caso normale è
+  peggio di nessun allarme, ed è per giunta una condizione che una
+  scopa programmata ripara per mestiere — misurerebbe il ritardo della
+  scopa, non un guasto.
+  CONSEGUENZA DA SAPERE AL DEPLOY: il badge è spento OVUNQUE il primo
+  giorno — chi aveva 10 pezzi e oggi ne ha 1 viene riallineato a 1, e
+  niente si accende finché non rifornisce. Non è un guasto: è il prezzo
+  di non inventare un passato.
   Il SET «Riempi il barattolo» (lug 2026): più annunci DIVERSI dello
   stesso venditore in UN ordine solo — una invoice escrow, UNA
   spedizione, un tracking, una conferma. Modello «testata + righe»,
@@ -8420,6 +8572,49 @@ nasce da sola (vuota, quindi il primo avvio dice «nessun valore
 salvato» e lo chiede subito) e la leva ha il default nel codice. DA
 GUARDARE al primo deploy: le due righe 💱 nel journal — al secondo
 riavvio deve comparire «ripreso dal database».
+Lo stock raccontato bene (ago 2026): l'annuncio esaurito non si butta
+più — resta nel negozio in fondo, spento, e il venditore lo rifornisce
+con un gesto invece di rifare la scheda da capo. La DIAGNOSI ha ridotto
+il cantiere prima di scrivere una riga: il riassortimento esisteva già
+(`ricarica_quantita` accettava lo stato 'venduto'), e il guasto vero
+era che il deep-link `/annuncio/{id}` rispondeva 404 — un link mandato
+a un amico moriva insieme alle scorte. Più il badge «Ne resta 1», che
+parla SOLO dove la scarsità è una notizia: la colonna `quantita_max`
+esiste per quella domanda sola, e la sua scopa è anche il backfill
+onesto («ne ha almeno tanti quanti ne ha adesso» è un limite inferiore
+vero, non un passato fabbricato). E il `prompt()` del sistema
+operativo se n'è andato: un foglio di casa che sull'errore resta aperto
+col numero da correggere. Vedi Architettura, «LO SCAFFALE VUOTO», per
+le decisioni di Andrea (dove si vede l'esaurito, dove compare il badge,
+il foglio al posto del prompt) e per le tre strade scartate sul colore.
+QUATTRO CORREZIONI al piano approvato, tutte trovate costruendo:
+1) il RIMBORSO alza il massimo — avevo dichiarato il caso impossibile,
+e non lo è (3 pezzi, venduti tutti, ricarica a 1, una disputa ne
+rimborsa 3 = 4, sopra il massimo di ieri); 2) l'ASTA non è mai
+«esaurita», ed è la stessa riga che il server ha sempre avuto in
+`ricarica_quantita`; 3) il badge non prende un colore ma la CARTA, e
+dice «Ne resta 1» perché a 320px «Ultimo pezzo» tocca il barattolino
+(misurato); 4) Esc NON arriva gratis ai fogli — solo picker, lightbox
+e tour lo ascoltano, e aggiungerlo sarebbe un cantiere per tutti e
+dodici o per nessuno. Più la correzione di un numero SBAGLIATO in
+questo file da mesi: il prezzo arancio del cartellino rende 3,01 e non
+3,59 (la conclusione regge e anzi si rafforza — vedi la voce ferie).
+Collaudato: 1552 prove verdi (40 nuove, fra cui la scopa girata
+DAVVERO su un database di cartone e il giudice puro sui sette casi che
+decidono), 11 MUTAZIONI del codice una riga alla volta — massimo
+assegnato secco, scopa che abbassa, pop tolto, guardie del bottone,
+lampo che torna a parlare su un esaurito — e ognuna diventa rossa da
+sola; 23 prove funzionali su DB usa-e-getta (il link condiviso che non
+muore, lo scaffale che non entra nel totale, «ricaricare a UNO non
+cancella la memoria dei quattro», la ronda che tace); giro visivo via
+CDP a 375/360/320px nei due temi col rifornimento esercitato dal vivo.
+IN PRODUZIONE basta il deploy: la colonna nasce da sola e la scopa la
+riempie al primo avvio (misurato su 888 annunci veri in locale), nessuna
+leva, nessuna rotta nuova, nessuno stato nuovo. DA GUARDARE al primo
+giro: che il badge sia spento ovunque — è giusto così, si accende solo
+su chi rifornisce da qui in avanti — e il primo venditore vero che
+rifornisce (che il post di canale perda la ✅ e l'evento Nostr torni
+`active`).
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
