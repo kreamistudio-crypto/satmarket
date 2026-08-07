@@ -3320,6 +3320,35 @@ def prove_forma_tracking():
     prova("...ed e' nel form della spedizione e in quello del reso",
           2, src.count("${AVVISO_INTERMEDIARIO}"))
 
+    # LE NOTIFICHE DEL PACCO via @trackbot (ago 2026): il giudice
+    # della forma e' lo STESSO dell'euristica qui sopra — il codice
+    # dell'intermediario, che per il corriere dichiarato ha la forma
+    # storta, non arriva mai a trackbot.
+    bn = pezzo_js(src, "function bottoneNotifichePacco")
+    prova("trackbot: solo il compratore", True, "'buyer'" in bn)
+    prova("trackbot: solo col tracciamento", True, "!o.tracking" in bn)
+    prova("trackbot: il giudice e' formaTracking, riusato", True,
+          "formaTracking(o.corriere, o.tracking)" in bn)
+    prova("...e formaTracking resta UNO", 1,
+          src.count("function formaTracking"))
+    prova("trackbot: il deep link e' uno e vive nell'helper", 1,
+          src.count("https://t.me/trackbot?start="))
+    prova("trackbot: dentro Telegram passa da openTelegramLink", True,
+          "tg.openTelegramLink(url)" in
+          pezzo_js(src, "async function attivaNotifichePacco"))
+    prova("trackbot: la riga dice CHI manda le notifiche", True,
+          "te le manda @trackbot, non Barattolo" in src)
+    # IL FATTO su come arriva il codice (ago 2026): una costante, due
+    # pannelli — la busta del venditore e il form di spedizione via
+    # punto. Il fatto, mai l'istruzione.
+    prova("la riga del codice: una costante", 1,
+          src.count("const RIGA_CODICE_CORRIERE"))
+    prova("...detta nei due pannelli", 2,
+          src.count("${RIGA_CODICE_CORRIERE}"))
+    prova("...e dice il fatto, non l'istruzione", True,
+          "ai recapiti che hai indicato come destinatario" in src
+          and "metti i tuoi recapiti" not in src)
+
 
 # ====================================================================
 def prove_conto_acquisto():

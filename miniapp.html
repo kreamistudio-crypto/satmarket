@@ -9886,6 +9886,7 @@ function openOrder(id){
       </div>
       ${s==='dispute' ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
       ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a>${rigaCorretto(o.trackingCorretto)}</span></div>`:''}
+      ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${isAdmin && s==='dispute' ? `
         <div class="payout" style="border-color:var(--danger)">
@@ -9948,6 +9949,7 @@ function openOrder(id){
           <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto <span class="fine-frase">bassa. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Scopri di più</button></span></div>
           ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
+          ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${selettoreCorriere('shipCorriere')}
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
@@ -11926,6 +11928,16 @@ const AVVISO_INTERMEDIARIO = 'Se hai comprato la spedizione da un '
   + 'intermediario (Packlink, Sendcloud…), inserisci il codice del '
   + '<b>corriere</b>, non quello dell\'ordine dell\'intermediario: '
   + 'spesso arriva per email dopo la consegna al punto di ritiro.';
+/* Il FATTO su come arriva il codice di ritiro (ago 2026, voce di
+   Andrea): senza, la busta serve a meta' — il venditore non sa da
+   dove gli arrivera' il codice da depositare. Si dice il FATTO, mai
+   l'istruzione su quali recapiti usare: chi legge capisce da solo,
+   e la riga resta vera anche per chi ha messo i recapiti veri del
+   compratore. Un posto solo, due pannelli (il patto di
+   AVVISO_INTERMEDIARIO). */
+const RIGA_CODICE_CORRIERE = 'Il codice di ritiro te lo manda il '
+  + 'corriere ai recapiti che hai indicato come destinatario, quando '
+  + 'il pacco arriva al punto.';
 
 /* LE FORME SONO UN'EURISTICA, NON UNA VERIFICA, e la differenza e'
    tutta nel fatto che non blocca MAI: nessuno di questi codici lo
@@ -11979,6 +11991,45 @@ function trackingDaControllare(corriere, tracking, idAvviso){
   if (box) { box.style.display = ''; box.innerHTML = `⚠️ ${msg}`; }
   haptic();
   return false;
+}
+
+/* LE NOTIFICHE DEL PACCO (ago 2026): il compratore le attiva su
+   @trackbot col deep link t.me — verificato dal vivo: ?start={codice}
+   precompila il bot, che risponde col tracciamento. Le notifiche le
+   manda LUI, non Barattolo, e la riga sotto il bottone lo dice; il
+   codice intanto finisce negli appunti, la rete se qualcosa non
+   funzionasse. Il giudice della forma e' formaTracking, lo STESSO
+   dell'euristica della spedizione: il codice di un intermediario
+   (Packlink & co.) ha la forma storta per il corriere dichiarato e
+   il bottone NON compare — a trackbot serve il codice del CORRIERE,
+   ed e' l'errore gia' successo. Dove l'euristica si astiene per
+   regola («Altro corriere») il bottone c'e': non sappiamo dire che
+   il codice e' sbagliato, e al peggio trackbot dira' che non lo
+   conosce. Solo il compratore (e' il suo pacco), solo col
+   tracciamento — le sentinelle 'Consegna a mano'/'Ritiro in zona'
+   restano fuori da sole, il tracking non ce l'hanno. */
+function bottoneNotifichePacco(o, s){
+  if (o.role !== 'buyer' || !o.tracking) return '';
+  if (!['shipped','delivered'].includes(s)) return '';
+  if (formaTracking(o.corriere, o.tracking)) return '';
+  return `<button class="btn ghost" style="margin-top:0" onclick="attivaNotifichePacco()">📦 Attiva le notifiche del pacco</button>
+    <div class="hint" style="margin-top:2px;text-align:center">Le notifiche te le manda @trackbot, non Barattolo. Il codice te lo copiamo negli appunti, se servisse incollarlo.</div>`;
+}
+
+async function attivaNotifichePacco(){
+  haptic();
+  const vero = currentOrder?.tracking || '';
+  /* il payload di /start ammette [A-Za-z0-9_-]: il codice viaggia
+     nudo di spazi e trattini, come nel confronto di formaTracking */
+  const nudo = vero.toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+  if (!nudo) return;
+  try {
+    await navigator.clipboard?.writeText(vero);
+    toast('📋 Codice copiato negli appunti');
+  } catch(e) {}
+  const url = `https://t.me/trackbot?start=${nudo}`;
+  if (tg?.initData && tg.openTelegramLink) tg.openTelegramLink(url);
+  else window.open(url, '_blank', 'noopener');
 }
 
 async function markShipped(){
@@ -12254,12 +12305,13 @@ function pannelloBustaRitiro(o){
     const testa = o.bustaIl
       ? `✓ Depositate il ${quando}${corr}. Se hai sbagliato qualcosa (il PIN, il nome), correggile da qui: l'acquirente riceve un avviso. Nemmeno i moderatori possono leggerle o correggerle per te.`
       : (o.state==='locked'
-        ? 'Se hai già il codice di ritiro (capita spedendo da un punto: arriva subito), puoi depositarlo ora; altrimenti torna qui quando il corriere te lo manda, a pacco arrivato.'
-        : 'Appena il corriere ti manda il codice — arriva quando il pacco è al punto — depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
+        ? 'Se hai già il codice di ritiro (capita spedendo da un punto: arriva subito), puoi depositarlo ora; altrimenti torna qui quando ti arriva.'
+        : 'Appena hai il codice, depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
     return `
       <div class="payout">
         <h4>📦 Istruzioni di ritiro per l'acquirente</h4>
         <div class="hint">${testa}</div>
+        <div class="hint" style="margin-top:6px">📮 ${RIGA_CODICE_CORRIERE}</div>
         <div class="hint" style="margin-top:6px">Scrivi il <b>nome che hai messo come destinatario</b> (anche di fantasia: serve all'acquirente se glielo chiedono al banco, e a tutti e due se il pacco non viene ritirato e torna indietro) e il <b>codice di ritiro</b> (PIN o link del QR). Restano cifrati e li legge solo l'acquirente; aprirli non sblocca nulla — i sats si muovono solo quando conferma il ritiro.</div>
         <textarea id="bustaNome" maxlength="80" style="min-height:38px" placeholder="Nome del destinatario (es. Mario Rossi)">${b?esc(b.nome):''}</textarea>
         <textarea id="bustaCodice" maxlength="1000" style="min-height:38px" placeholder="Codice di ritiro (PIN o link del QR)">${b?esc(b.codice):''}</textarea>
