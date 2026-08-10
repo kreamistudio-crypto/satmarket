@@ -1776,6 +1776,10 @@ def prove_pagamento_incerto():
                # due la prova ESPLODE invece di fallire, che e' la
                # trappola scritta in CLAUDE.md sulle funzioni estratte.
                "premia_xp": _niente, "xp_ordine": lambda *a: 0,
+               # ...e il titolo delle notifiche passa da html.escape
+               # (ago 2026, la famiglia di B6): stessa trappola, secondo
+               # giro — chi estrae una funzione ne eredita le dipendenze.
+               "html": __import__("html"),
                "print": lambda *a, **k: None, **ESITI}
         exec(pezzo_async("_congela_pagamento"), amb)
         exec(pezzo_async("_sblocca_sats"), amb)
@@ -7353,6 +7357,195 @@ def prove_ricevuta_compratore():
 
 
 # ====================================================================
+def prove_titoli_scappati():
+    """IL TITOLO NUDO NELLE NOTIFICHE (ago 2026, la famiglia di B6).
+    Le notifiche sono HTML e il titolo lo scrive il VENDITORE: un «<»
+    fa fallire il parse di Telegram e l'avviso non arriva — senza
+    errore e senza traccia. B6 aveva chiuso i due rami della
+    spedizione; restavano scoperti il polso degli ordini (che e'
+    l'avviso ai MODERATORI), quattro solleciti su sei, e altri otto
+    siti che solo il censimento ha tirato fuori.
+
+    LA REGOLA E' UNA SOLA, e la prova che conta e' il CENSIMENTO: chi
+    manda un avviso scappa il testo dell'utente ALL'ASSEGNAZIONE, una
+    volta, e da li' lo stesso valore serve le notifiche e il polso.
+    L'alternativa — l'escape dentro polso_ordini_admin — e' stata
+    scritta e poi scartata: i chiamanti che compongono anche messaggi
+    loro (_sblocca_sats, _rimborsa_compratore) userebbero la stessa
+    variabile in due regimi, e il primo che li confonde scrive
+    «&amp;lt;» dentro un avviso.
+
+    Piu' l'ULTIMA RETE in fondo al tubo, che NON sostituisce l'escape
+    alla fonte: e' quel che salva il sito scritto l'anno prossimo."""
+    print("\n[i titoli scappati nelle notifiche]")
+    import asyncio as _aio
+    import html as _html
+    import re as _re
+    import types as _types
+
+    righe = _SORGENTE.split("\n")
+    inizi = [(i, m.group(1)) for i, r in enumerate(righe)
+             if (m := _re.match(r"(?:async )?def ([a-z_][a-z_0-9]*)\(", r))]
+
+    def corpi():
+        for k, (i, nome) in enumerate(inizi):
+            fine = inizi[k + 1][0] if k + 1 < len(inizi) else len(righe)
+            yield nome, "\n".join(righe[i:fine])
+
+    # --- 1) IL CENSIMENTO, che e' la prova vera --------------------
+    # Non un elenco di funzioni scritto a mano — quello invecchia al
+    # primo sollecito nuovo: si guarda TUTTO il file e si chiede che
+    # ogni «titolo» che finisce in un avviso nasca scappato.
+    scoperti, visti = [], []
+    for nome, c in corpi():
+        if not _re.search(r"\{titolo[\}\[]", c):
+            continue
+        if not _re.search(r"notifica|polso_ordini_admin|_congela_pagamento", c):
+            continue
+        visti.append(nome)
+        for ass in _re.findall(r"^\s*titolo = (.+)$", c, _re.M):
+            if "html.escape" in ass or _re.fullmatch(r'"[^"]*"', ass.strip()):
+                continue          # gia' scappato, o un letterale nostro
+            scoperti.append((nome, ass.strip()))
+    prova("nessuna funzione che notifica interpola un titolo nudo",
+          [], scoperti)
+    # ...e che il censimento abbia davvero guardato dove serve: se un
+    # domani il predicato smettesse di pescarle, il conto a zero
+    # sembrerebbe una promozione invece di una cecita'.
+    for f in ("sollecita_incassi", "sollecita_ritiri_fermi",
+              "sollecita_conferme_ferme", "sollecita_rimborsi_puntate",
+              "sollecita_venditori_fermi", "sollecita_buste_ferme",
+              "_paga_rimborso", "_sblocca_sats", "_rimborsa_compratore",
+              "_incassa_ordine", "_racconta_chiusura", "verifica_rilancio",
+              "rispondi_offerta", "scadenze_offerte", "annulla_asta_admin"):
+        prova(f"il censimento vede «{f}»", True, f in visti)
+
+    # --- 2) IL ROVESCIO: non si scappa dove non e' HTML ------------
+    # In _compra_set il nome del pezzo esaurito va nel detail di un 404,
+    # cioe' JSON che il client rende col SUO esc(): un html.escape li'
+    # farebbe leggere «Cuffie &lt;b&gt;AKG&lt;/b&gt;» a chi compra. La
+    # variabile si chiama apposta in un altro modo, cosi' il censimento
+    # non la pesca e chi legge vede subito che e' un'altra cosa.
+    cs = pezzo("_compra_set")
+    prova("il 404 del set non scappa il nome del pezzo", True,
+          'nome_pezzo = a["titolo"][:40]' in cs
+          and 'html.escape(a["titolo"][:40]' not in cs)
+
+    # --- 3) IL POLSO riceve un titolo GIA' scappato ----------------
+    detto = []
+
+    async def notifica_admin_finta(t):
+        detto.append(t)
+
+    class ContaFinta:
+        def execute(self, sql, par=()):
+            return _types.SimpleNamespace(fetchone=lambda: [4])
+
+        def close(self):
+            pass
+
+    amb = {"AVVISI_ORDINI_ADMIN": True,
+           "notifica_admin": notifica_admin_finta, "db": lambda: ContaFinta()}
+    exec("async " + pezzo("polso_ordini_admin"), amb)
+    _aio.run(amb["polso_ordini_admin"](
+        "🛒 «Cuffie &lt;b&gt;AKG&lt;/b&gt;» — aperti: {aperti}"))
+    prova("il polso non ri-scappa quel che riceve", True,
+          "&lt;b&gt;AKG&lt;/b&gt;" in detto[0] and "&amp;" not in detto[0])
+    prova("...e il conto degli aperti si riempie come sempre", True,
+          detto[0].endswith("aperti: 4"))
+    prova("il polso NON ha un escape suo (la regola sta alla fonte)",
+          False, "html.escape" in pezzo("polso_ordini_admin"))
+
+    # --- 4) I QUATTRO SOLLECITI, coi loro ripieghi -----------------
+    # Tutti e quattro assegnano una volta sola; il ripiego «or ...» e'
+    # la cintura del titolo NULL, che stava FUORI dal try — il giorno
+    # che diventasse raggiungibile ammazzerebbe il giro per tutti.
+    for f, ripiego in (("sollecita_incassi", "il tuo affare"),
+                       ("sollecita_ritiri_fermi", "il vostro scambio"),
+                       ("sollecita_conferme_ferme", "il tuo acquisto"),
+                       ("sollecita_rimborsi_puntate", "un'asta")):
+        c = pezzo(f)
+        atteso = 'html.escape((r["titolo"] or "' + ripiego + '")[:60])'
+        prova(f"{f}: titolo scappato col suo ripiego", True, atteso in c)
+
+    # --- 5) IL PIU' GRAVE: il 🧊 del pagamento incerto -------------
+    # E' l'avviso che questo progetto dichiara non debba MAI sparire —
+    # un pagamento che puo' essere uscito davvero — e il titolo ci
+    # finiva nudo.
+    pag = pezzo("_paga_rimborso")
+    prova("il 🧊 del pagamento incerto ha il titolo scappato", True,
+          "_congela_pagamento" in pag
+          and 'html.escape((r["titolo"] or "un' + "'" + 'asta")[:60])' in pag)
+
+    # --- 6) L'ULTIMA RETE in fondo al tubo -------------------------
+    mandati = []
+
+    class ClientFinto:
+        def __init__(self, esiti):
+            self.esiti = list(esiti)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, json=None):
+            mandati.append(json)
+            return self.esiti.pop(0)
+
+    def risposta(code, testo=""):
+        return _types.SimpleNamespace(status_code=code, text=testo)
+
+    def manda(esiti, testo):
+        mandati.clear()
+        spoglia = {"html": _html, "re": _re}
+        exec(pezzo("spoglia_html"), spoglia)
+        amb = {"MODALITA_COLLAUDO": False, "BOT_TOKEN": "t",
+               "spoglia_html": spoglia["spoglia_html"],
+               "httpx": _types.SimpleNamespace(
+                   AsyncClient=lambda: ClientFinto(esiti))}
+        exec("async " + pezzo("_manda_telegram"), amb)
+        _aio.run(amb["_manda_telegram"](12345678, testo))
+        return list(mandati)
+
+    # il caso felice non cambia di un byte
+    inviati = manda([risposta(200)], "🔒 <b>Venduto</b>")
+    prova("messaggio buono: un invio solo", 1, len(inviati))
+    prova("...in HTML come sempre", "HTML", inviati[0]["parse_mode"])
+
+    # IL GUASTO: Telegram rifiuta il parse. Prima si perdeva qui, e la
+    # risposta non la guardava nessuno.
+    rotto = '{"description":"Bad Request: can' + "'" + 't parse entities"}'
+    inviati = manda([risposta(400, rotto), risposta(200)],
+                    "🔒 <b>Venduto</b> «Cuffie <AKG>»")
+    prova("HTML rifiutato: si rimanda invece di perderlo", 2, len(inviati))
+    prova("...il secondo invio e' senza parse_mode", True,
+          "parse_mode" not in inviati[1])
+    prova("...ed e' spoglio e leggibile", "🔒 Venduto «Cuffie »",
+          inviati[1]["text"])
+
+    # ogni ALTRO errore resta muto: un secondo invio non lo ripara
+    for code, desc in ((403, "bot was blocked by the user"),
+                       (400, "chat not found"),
+                       (429, "Too Many Requests")):
+        inviati = manda([risposta(code, '{"description":"%s"}' % desc)],
+                        "🔒 <b>Venduto</b>")
+        prova(f"«{desc}»: nessun secondo invio", 1, len(inviati))
+
+    corpo = pezzo("_manda_telegram")
+    prova("la risposta di Telegram si GUARDA", True, "status_code" in corpo)
+    # ATTENZIONE: qui la prima stesura chiedeva «print( in corpo», e non
+    # poteva fallire — il print del collaudo, dieci righe piu' su, la
+    # teneva verde anche togliendo quello del ripiego. La tortura l'ha
+    # smascherata (0 rosse su una mutazione che doveva farne almeno una).
+    # Si guarda DENTRO il ramo, che e' l'unico posto che conta.
+    ramo = corpo[corpo.index("if r.status_code"):]
+    prova("...e il ripiego STAMPA, mai una riparazione silenziosa",
+          True, "print(" in ramo)
+    prova("...e non puo' fare catena (un solo invio spoglio)",
+          1, corpo.count("spoglia_html("))
+# ====================================================================
 def prove_anteprime():
     """LE ANTEPRIME DEI LINK (ago 2026). La famiglia difende tre cose,
     e la prima e' quella che conta: UN ANNUNCIO NON ATTIVO NON RACCONTA
@@ -7800,7 +7993,7 @@ def main():
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime,
               prove_impersonazione, prove_avviso_spedizione,
-              prove_ricevuta_compratore):
+              prove_ricevuta_compratore, prove_titoli_scappati):
         try:
             f()
         except Exception as e:

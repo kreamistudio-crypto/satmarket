@@ -3798,14 +3798,41 @@ def spoglia_html(testo: str) -> str:
 
 async def _manda_telegram(tg_id: int, testo: str):
     """Il ramo Telegram di notifica(): il messaggio via bot (l'utente
-    deve averlo avviato almeno una volta), simulato nel collaudo."""
+    deve averlo avviato almeno una volta), simulato nel collaudo.
+
+    LA RETE DI SICUREZZA DELL'HTML (ago 2026): le notifiche nascono coi
+    tag di Telegram e dentro ci finisce testo di chi vende e di chi
+    compra — un «<» storto e il parse fallisce, cioe' l'avviso NON
+    ARRIVA. Ogni sito che interpola testo dell'utente deve scappare il
+    suo (la lezione dell'avviso di spedizione), ma sono decine e il
+    prossimo se ne dimentichera': qui c'e' l'ultima rete, in UN posto
+    solo, che vale anche per il sito scritto l'anno prossimo.
+    LA RISPOSTA NON LA GUARDAVA NESSUNO, ed e' quello che rendeva il
+    guasto invisibile: un `await c.post(...)` e via, quindi il 400 di
+    Telegram («can't parse entities») finiva nel nulla — e' la parte
+    letterale di «senza errore e senza traccia». Adesso, su un rifiuto
+    del parse, il messaggio si rimanda SPOGLIO (spoglia_html, lo stesso
+    ripiego dei DM Nostr): arriva senza grassetti invece di non
+    arrivare, che e' sempre il verso giusto in cui sbagliare. E si
+    STAMPA, o resterebbe un guasto che si autoripara in silenzio e
+    nessuno andrebbe mai a scappare il sito che l'ha causato.
+    Il ripiego si tenta UNA volta sola e non guarda il suo esito: qui
+    non si puo' fare altro, e una notifica non deve mai diventare un
+    ciclo. Ogni altro errore (utente che ha bloccato il bot, rete giu')
+    resta muto come sempre — quelli non li ripara un secondo invio."""
     if MODALITA_COLLAUDO and tg_id < 100000:
         # Utente finto del collaudo: la notifica si stampa in console
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
         return
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     async with httpx.AsyncClient() as c:
-        await c.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                     json={"chat_id": tg_id, "text": testo, "parse_mode": "HTML"})
+        r = await c.post(url, json={"chat_id": tg_id, "text": testo,
+                                    "parse_mode": "HTML"})
+        if r.status_code == 400 and "parse" in r.text.lower():
+            print(f"⚠️ HTML rifiutato da Telegram per l'utente {tg_id}: "
+                  f"rimando spoglio. Da scappare alla fonte — {r.text[:200]}")
+            await c.post(url, json={"chat_id": tg_id,
+                                    "text": spoglia_html(testo)})
 
 
 async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int):
@@ -3879,7 +3906,18 @@ async def polso_ordini_admin(riga: str):
     che hanno ancora sats in cassaforte. Il segnaposto {aperti} si
     riempie qui con un replace (mai format: i titoli possono avere
     graffe). Solo titolo e importi, mai nomi. Fail-open totale: una
-    notifica di cortesia non deve mai toccare il flusso dei soldi."""
+    notifica di cortesia non deve mai toccare il flusso dei soldi.
+
+    IL TITOLO ARRIVA GIA' SCAPPATO, ed e' una regola del progetto e non
+    di questa funzione (ago 2026): chi manda un avviso scappa il testo
+    dell'utente all'ASSEGNAZIONE, una volta, e da li' lo stesso valore
+    serve le notifiche e il polso. Farlo scappare QUI sembrava meglio —
+    un posto solo — ma i chiamanti che compongono anche messaggi loro
+    (_sblocca_sats, _rimborsa_compratore) userebbero la stessa
+    variabile in due regimi diversi, e il primo che li confonde scrive
+    «&amp;lt;» dentro un avviso. Una regola sola, con la sentinella che
+    la fa valere su TUTTE le funzioni che notificano, batte due
+    meccanismi che si somigliano."""
     if not AVVISI_ORDINI_ADMIN:
         return
     try:
@@ -10284,7 +10322,7 @@ async def verifica_rilancio(rilancio_id: int,
         con.close()
     except Exception:
         pass
-    titolo = a["titolo"][:60]
+    titolo = html.escape(a["titolo"][:60])
     link = f"\n{URL_PUBBLICO}/annuncio/{ril['annuncio_id']}"
     if in_testa and testa_prima and testa_prima["tg_id"] != user["id"]:
         # il «budget esaurito»: un proxy spodestato e' stato esposto
@@ -10460,7 +10498,7 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
             bolt11 = r["invoice_riscossione"]
             if not bolt11 and u and u["ln_address"]:
                 bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
-        titolo = (r["titolo"] or "un'asta")[:60]
+        titolo = html.escape((r["titolo"] or "un'asta")[:60])
         esito = (PAGATO if r["payout_stato"] == "uscito"
                  else await paga_venditore(bolt11, importo) if bolt11
                  else NON_PAGATO)
@@ -10780,7 +10818,7 @@ def _chiudi_una_asta(annuncio_id: int, cambio: float):
 async def _racconta_chiusura(esito: dict):
     """Notifiche e riscossioni DOPO il commit, mai dentro."""
     a = esito["annuncio"]
-    titolo = a["titolo"][:60]
+    titolo = html.escape(a["titolo"][:60])
     if esito["tipo"] == "deserta":
         await notifica(a["venditore_id"],
             f"🔨 <b>L'asta «{titolo}» si è chiusa senza offerte.</b> "
@@ -11007,7 +11045,7 @@ async def annulla_asta_admin(annuncio_id: int,
     con.close()
     registra_moderazione("admin", "asta_annullata", "", a["titolo"],
                          annuncio_id, a["venditore_id"], user["id"])
-    titolo = a["titolo"][:60]
+    titolo = html.escape(a["titolo"][:60])
     await notifica(a["venditore_id"],
                    f"🛡 <b>L'asta «{titolo}» è stata annullata dai "
                    f"moderatori.</b> I puntatori vengono rimborsati; "
@@ -11278,7 +11316,7 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Operazione non permessa")
 
-    titolo = off["titolo"][:60]
+    titolo = html.escape(off["titolo"][:60])
     link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
     cifra_proposta = _cifra_offerta(off["valuta"], off["importo_sats"],
                                     off["importo_eur"])
@@ -11752,8 +11790,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
         a = tutti.get(aid)
         if not a or a["stato"] != "attivo":
             con.close()
-            titolo = a["titolo"][:40] if a else "Uno degli oggetti"
-            raise HTTPException(404, f"«{titolo}» non è più disponibile: "
+            # NON si scappa, e il nome della variabile lo dice: questo
+            # non e' un titolo da notifica ma il detail di un 404, cioe'
+            # JSON che il client rende col suo esc(). Un html.escape qui
+            # farebbe leggere «Cuffie &lt;b&gt;AKG&lt;/b&gt;» a chi compra.
+            nome_pezzo = a["titolo"][:40] if a else "Uno degli oggetti"
+            raise HTTPException(404, f"«{nome_pezzo}» non è più disponibile: "
                                      f"toglilo dal set e riprova")
         if _asta(a):
             con.close()
@@ -13311,15 +13353,15 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # testo del VENDITORE e le notifiche sono HTML: si tronca PRIMA e si
     # escapa DOPO, o un «<» spegne la ricevuta in silenzio (la lezione
     # dell'avviso di spedizione).
+    titolo = html.escape(_titolo_ordine(righe)[:60])
     await notifica(o["compratore_id"],
-                   f"🔒 <b>Ordine pagato!</b> «"
-                   f"{html.escape(_titolo_ordine(righe)[:60])}» — i sats "
+                   f"🔒 <b>Ordine pagato!</b> «{titolo}» — i sats "
                    f"sono nel deposito di garanzia: "
                    + _coda_ricevuta(o["consegna_scelta"], o["via_punto"],
                                     bool(o["punto_ritiro"])))
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
-        f"🛒 <b>Nuovo ordine:</b> «{_titolo_ordine(righe)[:60]}» — "
+        f"🛒 <b>Nuovo ordine:</b> «{titolo}» — "
         f"{_fmt_sats(o['prezzo_sats'])} sats. Ordini aperti: {{aperti}}")
     # Il garbo verso chi restava in trattativa: l'oggetto e' andato.
     # MAI al compratore che ha appena pagato: se aveva un'altra
@@ -16997,7 +17039,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
 
         if esito == PAGATO:
             # Il titolo di cortesia copre anche i set («primo + N altri»)
-            titolo = _titolo_ordine(_righe_ordine(con, o))
+            titolo = html.escape(_titolo_ordine(_righe_ordine(con, o)))
             if titolo == "?":
                 titolo = "il tuo acquisto"
             cambio = await cambio_btc_eur()
@@ -17061,11 +17103,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             if o["disputata"]:
                 await polso_ordini_admin(
                     f"⚖️ <b>Disputa chiusa a favore del venditore:</b> "
-                    f"«{titolo[:60]}» — {_fmt_sats(netto)} sats sbloccati. "
+                    f"«{titolo}» — {_fmt_sats(netto)} sats sbloccati. "
                     f"Restano {{aperti}} ordini aperti.")
             else:
                 await polso_ordini_admin(
-                    f"✅ <b>Ordine concluso:</b> «{titolo[:60]}» — {_fmt_sats(netto)} "
+                    f"✅ <b>Ordine concluso:</b> «{titolo}» — {_fmt_sats(netto)} "
                     f"sats al venditore. Restano {{aperti}} ordini aperti.")
             return {"ok": True, "stato": "released"}
 
@@ -17175,7 +17217,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                             "stato='attivo' WHERE id=?",
                             (r["quantita"], r["quantita"], r["annuncio_id"]))
             con.commit()
-            titolo = _titolo_ordine(righe)[:60]
+            titolo = html.escape(_titolo_ordine(righe)[:60])
             con.close()
             for r in righe:
                 # ...e torna disponibile anche sulla piazza Nostr
@@ -19135,7 +19177,7 @@ async def sollecita_ritiri_fermi():
     con.commit()
     con.close()
     for r in righe:
-        titolo = (r["titolo"] or "il vostro scambio")[:60]
+        titolo = html.escape((r["titolo"] or "il vostro scambio")[:60])
         try:
             if r["solleciti_ritiro"] < SOLLECITO_INCASSO_MAX:
                 await notifica(r["compratore_id"],
@@ -19220,7 +19262,7 @@ async def sollecita_conferme_ferme():
     con.commit()
     con.close()
     for r in righe:
-        titolo = (r["titolo"] or "il tuo acquisto")[:60]
+        titolo = html.escape((r["titolo"] or "il tuo acquisto")[:60])
         try:
             if r["solleciti_conferma"] < PROMEMORIA_CONFERMA_MAX:
                 await notifica(r["compratore_id"],
@@ -19473,7 +19515,7 @@ async def sollecita_rimborsi_puntate():
     con.commit()
     con.close()
     for r in righe:
-        titolo = (r["titolo"] or "un'asta")[:60]
+        titolo = html.escape((r["titolo"] or "un'asta")[:60])
         try:
             if r["solleciti"] < SOLLECITO_INCASSO_MAX:
                 await notifica(r["tg_id"],
@@ -19537,7 +19579,7 @@ async def sollecita_incassi():
     con.close()
     for r in righe:
         netto = netto_venditore(r["prezzo_sats"] - r["protezione_sats"])
-        titolo = r["titolo"][:60]
+        titolo = html.escape((r["titolo"] or "il tuo affare")[:60])
         try:
             if r["solleciti_incasso"] < SOLLECITO_INCASSO_MAX:
                 await notifica(r["venditore_id"],
@@ -20740,7 +20782,7 @@ async def scadenze_offerte():
     con.commit()
     con.close()
     for r in righe:
-        titolo = r["titolo"][:60]
+        titolo = html.escape(r["titolo"][:60])
         try:
             if r["stato_annuncio"] != "attivo":
                 await notifica(r["compratore_id"],
