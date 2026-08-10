@@ -4993,8 +4993,15 @@ MSG_RIFIUTO_IMPERSONAZIONE = ("Questo annuncio sembra un messaggio da "
 # la lettura del codice). Un 'finta' che finisse qui dentro per
 # un'altra ragione manderebbe il messaggio sbagliato a un annuncio
 # gia' rifiutato: imperfezione dichiarata, e del verso innocuo.
+# 'confond' e' entrata ad ago 2026 da un caso VERO: il motivo diceva
+# «il nome appare progettato per confondere con Barattolo», nessuna
+# delle altre parole matchava, e a un venditore onesto e' arrivata la
+# lista delle armi e delle droghe. Il difetto primario era il verdetto
+# (vedi la contro-regola sui satoshi nel prompt), ma il buco della
+# lista era vero e SEPARATO: si chiude comunque, o il prossimo motivo
+# scritto con quelle parole ricasca nello stesso messaggio.
 PAROLE_IMPERSONAZIONE = ("impersona", "finge", "fint", "spaccia",
-                         "phishing")
+                         "phishing", "confond")
 
 
 def messaggio_rifiuto(motivo: str) -> str:
@@ -5027,6 +5034,74 @@ def controlla_vietato(titolo: str, descrizione: str) -> str | None:
             if f" {t} " in testo:
                 return categoria
     return None
+
+
+# ---------------------------------------------------------------
+# L'AI SEGNALA, NON DECIDE (ago 2026, decisione di Andrea dopo un
+# falso positivo VERO che ha fermato un venditore). Fino a ieri un
+# VIETATO dell'AI bloccava secco e l'annuncio non nasceva nemmeno: chi
+# sbagliava non lo sapeva nessuno, tranne chi protestava. Da adesso il
+# rifiuto resta SOLO dove la risposta giusta e' no anche quando il
+# modello ha sbagliato — cioe' dove non esiste una lettura innocente
+# dell'annuncio — e tutto il resto finisce in REVISIONE.
+#
+# LA RAGIONE PER CUI SI PUO' FARE, ed e' quella che rende la scelta
+# poco rischiosa: in revisione l'annuncio NON e' pubblico. Non e' che
+# la merce illegale va online in attesa di un umano — resta invisibile
+# esattamente come se fosse stata rifiutata. La sola differenza e' che
+# esiste una riga, che il venditore legge «in attesa» invece di «no»,
+# e che qualcuno deve guardarla. Il costo e' la nostra coda, non il
+# rischio.
+#
+# L'ELENCO, dichiarato e non dedotto (quattro famiglie):
+#   1. armi, munizioni ed esplosivi
+#   2. droghe e stupefacenti
+#   3. sesso a pagamento e sfruttamento, minori compresi
+#   4. documenti falsi, credenziali, carte clonate, account rubati
+# COSA NON C'E' E PERCHE', che e' la meta' da leggere: refurtiva,
+# contraffazione, farmaci con obbligo di ricetta e animali protetti
+# sono illegali quanto gli altri, ma hanno tutti una LETTURA INNOCENTE
+# che il modello puo' aver frainteso — un iPhone senza scatola non e'
+# rubato, una borsa di marca non e' falsa, un integratore non e' un
+# farmaco, un pappagallo non e' una specie protetta. Su quelli un no
+# secco fermerebbe gente onesta, e una riga in coda costa un tocco.
+# Fuori anche l'IMPERSONAZIONE, che e' il caso che ha aperto il
+# cantiere, e i servizi, che erano gia' DUBBIO.
+#
+# IMPERFEZIONE DICHIARATA: se l'AI scrive «droga» sulla cannabis light
+# — un caso che questo progetto considera grigio apposta — il blocco
+# scatta. Si accetta: quando il modello e' abbastanza sicuro da dire
+# quella parola secca, il no e' la risposta giusta, e chi non e'
+# d'accordo protesta. La lista si accorcia, non si allunga.
+PAROLE_BLOCCANTI = frozenset((
+    # ESATTE, e la ragione e' che sono corte: «arma» sta dentro
+    # «armadio», «droga» dentro «drogato» va bene ma «armi» dentro
+    # «armistizio» no — a parole intere non succede.
+    "arma", "armi", "droga", "droghe", "minore", "minori",
+    "escort", "prostituta", "prostitute",
+))
+PREFISSI_BLOCCANTI = (
+    # LUNGHE e senza omonimi: qui il prefisso e' sicuro e prende le
+    # declinazioni («sessuali», «sfruttamento», «clonate»...)
+    "munizion", "esplosiv", "stupefacent", "cocain", "eroin",
+    "hashish", "marijuana", "anfetamin", "sessual", "prostituzion",
+    "pedoporn", "sfruttament", "clonat", "credenzial",
+)
+
+
+def _vietato_bloccante(motivo: str) -> bool:
+    """Il VIETATO dell'AI ferma davvero, o va in coda? Guarda il MOTIVO
+    che il modello ha scritto con parole sue, a PAROLE INTERE come il
+    filtro di casa (con gli spazi ai lati, 'armadio' non contiene
+    'arma'). Fail-SAFE verso la coda: un motivo che non si riconosce
+    non blocca — sbagliare qui vuol dire far guardare una riga a un
+    umano, mentre sbagliare nell'altro verso vuol dire fermare un
+    venditore onesto senza che nessuno lo sappia."""
+    testo = f" {normalizza(motivo)} "
+    if any(f" {p} " in testo for p in PAROLE_BLOCCANTI):
+        return True
+    return any(any(w.startswith(p) for p in PREFISSI_BLOCCANTI)
+               for w in testo.split())
 
 
 def registra_moderazione(strato: str, esito: str, motivo: str,
@@ -5582,6 +5657,19 @@ PROMPT_MODERAZIONE = (
     "regolamento Barattolo', 'lo trovi anche sul mio negozio "
     "Barattolo' -> OK. E' il PARLARE A NOME della piattaforma a "
     "essere vietato, non il citarla ne' lo spiegarla. "
+    "E NOMINARE I SATOSHI non e' MAI impersonazione: 'sat', 'sats', "
+    "'satoshi', 'bitcoin' sono la MONETA di questo mercatino, non un "
+    "marchio nostro — un prodotto o un venditore che se ne chiama e' "
+    "un bitcoiner, non qualcuno che si spaccia per la piattaforma. "
+    "«Sat's Oil», «SatShop», «Satoshi Coffee», «Il barattolo dei "
+    "sats» -> OK. Una somiglianza di NOME non e' mai un motivo: a "
+    "decidere e' sempre e solo il gesto di RIVOLGERSI a chi legge "
+    "come farebbe la piattaforma. "
+    "SE IL TESTO NON C'E', NON SI CONCLUDE NIENTE: quando titolo e "
+    "descrizione sono vuoti o mancanti non c'e' nessun gesto da "
+    "giudicare, e la risposta e' OK — un'assenza non e' un tentativo "
+    "di ingannare nessuno. Non dedurre MAI l'impersonazione da cio' "
+    "che il testo non dice. "
     "LA REGOLA CHE VINCE SULLE ALTRE: se l'annuncio ha davvero una "
     "COSA in vendita e a chi legge non si chiede di verificare, "
     "sbloccare o confermare NIENTE, allora NON e' impersonazione — al "
@@ -5606,6 +5694,8 @@ PROMPT_MODERAZIONE = (
     "e' un pernottamento definito, non una prestazione su misura. "
     "'Adesivi e gadget di Barattolo, lotto da 10' -> OK: cita il "
     "mercatino, non lo impersona. "
+    "\"Sat's Oil GENESIS EDITION\" -> OK: nomina i satoshi, che sono "
+    "la moneta di qui, e vende dell'olio. "
     "LA COPPIA CHE INSEGNA IL CONFINE, e sono due descrizioni che "
     "nominano tutt'e due Barattolo. 'Bicicletta da corsa Bianchi', "
     "descrizione 'Rispondo solo qui dentro: Barattolo tiene i sats "
@@ -5638,10 +5728,27 @@ def _leggi_verdetto(verdetto: str):
     strana), ('vietato', motivo) per i casi netti, ('dubbio', motivo)
     per cio' che deve decidere un umano. A leva spenta il dubbio
     torna vietato: e' il comportamento binario di prima, e i chiamanti
-    non devono conoscere la leva."""
+    non devono conoscere la leva.
+
+    E DA AGO 2026 UN VIETATO NON BASTA A BLOCCARE: passa da
+    _vietato_bloccante, e se il motivo non nomina una delle quattro
+    famiglie che fermano davvero diventa un DUBBIO, cioe' la coda.
+    IL DECLASSAMENTO STA QUI, nel giudice unico di singolo e lotto, e
+    NON nel prompt — deliberatamente: il modello e' gia' stato visto
+    disobbedire alla lettera del prompt (dice VIETATO dove gli si
+    insegna DUBBIO, vedi «Assistenza Barattolo»), quindi la garanzia
+    deve stare dove il modello non arriva. Il prompt non si tocca
+    anche perche' i suoi verdetti li collauda uno script che vuole la
+    chiave: cambiarlo alla cieca sarebbe un ritocco non verificato."""
     v = verdetto.strip()
     if v.upper().startswith("VIETATO"):
-        return ("vietato", v.split(":", 1)[-1].strip() or "contenuto vietato")
+        motivo = v.split(":", 1)[-1].strip() or "contenuto vietato"
+        if _vietato_bloccante(motivo):
+            return ("vietato", motivo)
+        # Tutto il resto SEGNALA. La leva resta sovrana: spenta, e'
+        # ancora il binario di ieri (rifiuto secco) — cosi' il freno
+        # d'emergenza continua a fare quello che promette.
+        return (("dubbio" if MODERAZIONE_REVISIONE else "vietato"), motivo)
     if v.upper().startswith("DUBBIO"):
         motivo = v.split(":", 1)[-1].strip() or "caso ambiguo"
         return (("dubbio" if MODERAZIONE_REVISIONE else "vietato"), motivo)

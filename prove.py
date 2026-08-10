@@ -6905,15 +6905,34 @@ def prove_impersonazione():
 
     # --- 6) il verdetto si legge, e non finisce nel messaggio
     #        sbagliato ---------------------------------------------
-    amb = {"MODERAZIONE_REVISIONE": True}
+    # CHI ESTRAE UNA FUNZIONE NE EREDITA LE DIPENDENZE: da quando il
+    # vietato passa dal declassamento, _leggi_verdetto non vive piu'
+    # da sola (la lezione di reale() e di _fmt_sats).
+    import unicodedata as _u
+    amb = {"MODERAZIONE_REVISIONE": True, "re": re, "unicodedata": _u}
+    for ancora in ("def normalizza(", "PAROLE_BLOCCANTI = ",
+                   "PREFISSI_BLOCCANTI = ", "def _vietato_bloccante("):
+        i = _SORGENTE.index(ancora)
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
     exec(pezzo("_leggi_verdetto"), amb)
-    prova("«VIETATO: impersonazione» si legge come un vietato netto",
-          ("vietato", "impersonazione della piattaforma"),
+    # QUESTA PROVA HA CAMBIATO LATO (ago 2026), ed e' l'affermazione
+    # piu' forte delle due: chiedeva che «VIETATO: impersonazione»
+    # fosse un rifiuto SECCO — cioe' certificava il comportamento che
+    # ha fermato un venditore vero. Adesso quel verdetto va in CODA:
+    # l'AI segnala, l'umano decide. (Il precedente e' la sentinella
+    # del reaper sui 'creato', e quella degli avatar.)
+    prova("«VIETATO: impersonazione» va in CODA, non nel rifiuto",
+          ("dubbio", "impersonazione della piattaforma"),
           amb["_leggi_verdetto"]("VIETATO: impersonazione della "
                                  "piattaforma"))
     prova("...e il dubbio del ruolo intestato resta un dubbio",
           ("dubbio", "si intesta un ruolo che non ha"),
           amb["_leggi_verdetto"]("DUBBIO: si intesta un ruolo che non ha"))
+    # ...mentre un'arma resta un no secco: e' una delle quattro
+    # famiglie dove il rifiuto e' giusto anche se il modello sbaglia
+    prova("un'arma resta un rifiuto secco",
+          ("vietato", "arma da fuoco funzionante"),
+          amb["_leggi_verdetto"]("VIETATO: arma da fuoco funzionante"))
     # --- 7) e il rifiuto dice COSA ha sbagliato -------------------
     # Prima l'impersonazione si prendeva la lista delle armi e delle
     # droghe, che non c'entra niente. Adesso ha il suo messaggio, e
@@ -9125,6 +9144,187 @@ def prove_offerta_quantita():
           "Accettare non blocca l'oggetto" in src)
 
 
+# ====================================================================
+def prove_sat_non_e_barattolo():
+    """«SAT» E' LA MONETA, NON UN NOSTRO MARCHIO (ago 2026, falso
+    positivo VERO dal campo: «Sat's Oil 🫒 GENESIS EDITION» bloccato
+    per impersonazione, col motivo «il nome appare progettato per
+    confondere con Barattolo (associando "sat")»).
+
+    Due difetti distinti, e qui si difendono tutti e due: la voce del
+    prompt che ora dice a chiare lettere che nominare i satoshi non e'
+    mai impersonazione, e la regola che senza testo non si conclude
+    niente — il motivo diceva anche «il titolo e la descrizione
+    mancano», cioe' il modello aveva DEDOTTO l'impersonazione da cio'
+    che il testo non diceva. Piu' il buco della lista delle parole,
+    che era vero e separato: «confondere» non matchava, e a un
+    venditore onesto e' arrivata la lista delle armi e delle droghe.
+
+    La FORMA si difende qui; che il modello abbia capito lo dice solo
+    collaudo_impersonazione.py, che vuole la chiave."""
+    print("\n[«sat» non e' Barattolo]")
+    src = _SORGENTE
+    i = src.index("PROMPT_MODERAZIONE = (")
+    amb = {}
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    p = amb["PROMPT_MODERAZIONE"]
+
+    # 1. la contro-regola sui satoshi: la TERZA, accanto a «nominare
+    #    Barattolo e' lecito» e «raccontare come funziona e' lecito»
+    prova("il prompt dice che i satoshi sono la MONETA", True,
+          "sono la MONETA di questo mercatino" in p)
+    prova("...e che nominarli non e' MAI impersonazione", True,
+          "NOMINARE I SATOSHI non e' MAI impersonazione" in p)
+    # la somiglianza di NOME non basta: a decidere resta il GESTO —
+    # senza questa riga il divieto torna a essere un filtro sul nome
+    prova("una somiglianza di nome non e' mai un motivo", True,
+          "Una somiglianza di NOME non e' mai un motivo" in p)
+    prova("il caso vero e' un esempio del prompt", True,
+          "Sat's Oil GENESIS EDITION\" -> OK" in p)
+
+    # 2. senza testo non si conclude niente. E' la riga che disinnesca
+    #    la confabulazione osservata: se il modello CREDE che il testo
+    #    manchi, adesso quella premessa porta a OK invece che a VIETATO
+    prova("il prompt dice cosa fare col testo mancante", True,
+          "SE IL TESTO NON C'E', NON SI CONCLUDE NIENTE" in p)
+    prova("...e vieta di dedurre dal non detto", True,
+          "Non dedurre MAI l'impersonazione da cio' che il testo non "
+          "dice" in p)
+
+    # 3. le due contro-regole di ieri non sono state travolte da quella
+    #    nuova: sono la meta' che un riordino toglie per prima
+    prova("...e le due contro-regole di ieri restano", True,
+          "NOMINARE Barattolo non e' MAI di per se' un motivo" in p
+          and "RACCONTARE come funziona Barattolo e' invece LECITO" in p)
+
+    # 4. il buco della lista: il messaggio giusto a chi si e' visto
+    #    dire «confondere». Si prova sulla funzione VERA, coi motivi
+    #    scritti come li scrive l'AI.
+    amb2 = {}
+    for n in ("MSG_RIFIUTO", "MSG_RIFIUTO_SERVIZI",
+              "MSG_RIFIUTO_IMPERSONAZIONE", "PAROLE_IMPERSONAZIONE"):
+        j = src.index(f"{n} = ")
+        exec(src[j:src.index("\n\n\n", j)], amb2)
+    exec(pezzo("messaggio_rifiuto"), amb2)
+    msg = amb2["messaggio_rifiuto"]
+    imperson = amb2["MSG_RIFIUTO_IMPERSONAZIONE"]
+    prova("«confondere»: il messaggio dell'impersonazione, non le armi",
+          imperson,
+          msg('il nome appare progettato per confondere con Barattolo'))
+    # e le vecchie non si sono mosse
+    for motivo in ("si finge il supporto Barattolo",
+                   "impersona la piattaforma",
+                   "phishing: chiede le credenziali"):
+        prova(f"...e resta vero per «{motivo[:28]}»", imperson,
+              msg(motivo))
+    prova("un servizio resta un servizio", amb2["MSG_RIFIUTO_SERVIZI"],
+          msg("servizio di riparazione su commissione"))
+    prova("e le armi la lista di sempre", amb2["MSG_RIFIUTO"],
+          msg("arma da fuoco funzionante"))
+
+    # 5. il collaudo col MODELLO tiene il caso come REGRESSIONE
+    #    PERMANENTE, con la gemella scritta con altre parole: se
+    #    cadesse solo la gemella, la cura avrebbe insegnato il NOME
+    #    invece della regola
+    col = open("collaudo_impersonazione.py", encoding="utf-8").read()
+    prova("il caso vero e' nel collaudo", True, "Sat's Oil" in col)
+    prova("...con la sua gemella", True, "SatShop" in col)
+    prova("...e col caso a descrizione VUOTA", True,
+          "Satoshi Coffee" in col)
+    # tutti e tre attesi OK: sono annunci legittimi
+    for nome in ("Sat's Oil", "SatShop", "Satoshi Coffee"):
+        k = col.index(nome)
+        prova(f"«{nome}» e' atteso OK", True,
+              '"OK"' in col[k:k + 400])
+
+
+# ====================================================================
+def prove_ai_segnala():
+    """L'AI SEGNALA, NON DECIDE (ago 2026, decisione di Andrea dopo il
+    falso positivo che ha fermato un venditore vero). Un VIETATO
+    dell'AI non basta piu' a bloccare: ferma solo se il MOTIVO nomina
+    una delle quattro famiglie dove il no e' la risposta giusta anche
+    quando il modello ha sbagliato — armi, droghe, sesso a pagamento e
+    sfruttamento, documenti e credenziali. Tutto il resto va in
+    REVISIONE, dove non e' pubblico e decide un umano.
+
+    Il declassamento vive nel GIUDICE UNICO e non nel prompt: il
+    modello e' gia' stato visto disobbedire alla lettera del prompt,
+    quindi la garanzia deve stare dove il modello non arriva."""
+    print("\n[l'AI segnala, non decide]")
+    src = _SORGENTE
+    import unicodedata as _u
+    amb = {"re": re, "unicodedata": _u}
+    for ancora in ("def normalizza(", "PAROLE_BLOCCANTI = ",
+                   "PREFISSI_BLOCCANTI = ", "def _vietato_bloccante("):
+        i = src.index(ancora)
+        exec(src[i:src.index("\n\n\n", i)], amb)
+    blocca = amb["_vietato_bloccante"]
+
+    # --- le quattro famiglie che fermano davvero -------------------
+    for motivo in ("arma da fuoco funzionante", "munizioni da caccia",
+                   "droga", "vendita di stupefacenti",
+                   "cocaina", "servizi sessuali mascherati",
+                   "sfruttamento della prostituzione",
+                   "materiale pedopornografico", "coinvolge minori",
+                   "carte clonate", "credenziali di accesso rubate"):
+        prova(f"blocca: «{motivo[:34]}»", True, blocca(motivo))
+
+    # --- e quelle che NON fermano: hanno tutte una lettura innocente
+    # che il modello puo' aver frainteso, e un no le fermerebbe da
+    # gente onesta senza che nessuno lo sappia ----------------------
+    for motivo in ("il nome appare progettato per confondere con Barattolo",
+                   "finto servizio clienti di Barattolo",
+                   "impersonazione della piattaforma",
+                   "possibile refurtiva",
+                   "borsa probabilmente contraffatta",
+                   "farmaco con obbligo di ricetta",
+                   "animale protetto",
+                   "servizio su commissione",
+                   "contenuto vietato"):
+        prova(f"in coda: «{motivo[:34]}»", False, blocca(motivo))
+
+    # --- LE TRAPPOLE DELLA SOTTOSTRINGA, che sono la ragione per cui
+    # le parole corte stanno in un insieme di ESATTE e non fra i
+    # prefissi: «arma» sta dentro «armadio» --------------------------
+    for motivo in ("vendita di un armadio antico", "armadietto da bagno",
+                   "cornice dorata", "minorenne"):
+        prova(f"non e' una parola: «{motivo[:30]}»", False, blocca(motivo))
+
+    # --- il declassamento sta nel GIUDICE, e la leva resta sovrana --
+    lv = pezzo("_leggi_verdetto")
+    prova("il vietato passa da _vietato_bloccante", True,
+          "if _vietato_bloccante(motivo):" in lv)
+    prova("...e chi non lo e' diventa un dubbio", True,
+          '("dubbio" if MODERAZIONE_REVISIONE else "vietato"), motivo'
+          in lv)
+    # a leva SPENTA si torna al binario di ieri, rifiuto secco: il
+    # freno d'emergenza deve continuare a fare quello che promette
+    prova("la leva spenta rimette il rifiuto secco", 2,
+          lv.count('if MODERAZIONE_REVISIONE else "vietato"'))
+    # il PROMPT non e' stato toccato: i suoi verdetti li collauda uno
+    # script che vuole la chiave, e cambiarlo alla cieca sarebbe un
+    # ritocco non verificato
+    prova("il prompt insegna ancora VIETATO sui casi netti", True,
+          "Riserva VIETATO a questi casi netti" in src)
+
+    # --- fail-SAFE verso la coda: un motivo vuoto o incomprensibile
+    # non blocca. Sbagliare qui costa un tocco a un moderatore;
+    # sbagliare nell'altro verso costa un venditore, in silenzio.
+    for motivo in ("", "   ", "boh", None):
+        prova(f"motivo {motivo!r}: nel dubbio, la coda", False,
+              blocca(motivo or ""))
+
+    # --- lo strumento che dice quanto si allunga la coda esiste e
+    # LEGGE E BASTA: e' il conto su cui si decide, e un conto che
+    # scrive non lo si lancia a server acceso ------------------------
+    stima = open("stima_coda_moderazione.py", encoding="utf-8").read()
+    corpo = stima.split('"""', 2)[-1]
+    for parola in ("INSERT", "UPDATE", "DELETE", "commit"):
+        prova(f"lo strumento della stima non {parola.lower()}", False,
+              parola in corpo)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -9154,7 +9354,8 @@ def main():
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,
               prove_ricevuta_compratore, prove_titoli_scappati,
-              prove_timbri_periodici, prove_offerta_quantita):
+              prove_timbri_periodici, prove_offerta_quantita,
+              prove_sat_non_e_barattolo, prove_ai_segnala):
         try:
             f()
         except Exception as e:

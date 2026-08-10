@@ -73,6 +73,29 @@ CASI = [
      "deposito di garanzia. Non scrivetemi su altri canali.",
      "OK", "nomina le regole per proteggersi, che e' il contrario"),
 
+    # --- «sat» e' la MONETA di qui, non un nostro marchio ----------
+    # REGRESSIONE PERMANENTE (ago 2026, caso vero dal campo): un
+    # venditore fermo per un falso positivo, col motivo «il nome
+    # appare progettato per confondere con Barattolo (associando
+    # "sat")». Su un mercatino che incassa in satoshi, chiamarsi coi
+    # sats e' la cosa piu' normale del mondo — e il motivo diceva
+    # anche «il titolo e la descrizione mancano», mentre il titolo
+    # c'era: il modello aveva dedotto l'impersonazione da cio' che il
+    # testo NON diceva.
+    ("Sat's Oil 🫒 GENESIS EDITION",
+     "Olio extravergine di oliva, raccolta 2025, bottiglia da 500ml.",
+     "OK", "REGRESSIONE PERMANENTE — il falso positivo dal campo: "
+           "«sat» e' la moneta del mercatino, non un marchio nostro"),
+    ("SatShop — cover per iPhone 15",
+     "Silicone nero, nuova con confezione.",
+     "OK", "la gemella con altre parole: se cade solo questa, la cura "
+           "ha imparato il nome invece della regola"),
+    ("Satoshi Coffee, 250g macinato",
+     "",
+     "OK", "il nome coi sats E la descrizione VUOTA insieme: e' il "
+           "caso esatto del campo — senza testo non si conclude "
+           "niente, men che meno un'impersonazione"),
+
     # --- non devono passare: PARLA come la piattaforma -------------
     ("Barattolo: verifica il tuo pagamento in sospeso",
      "Il tuo ordine risulta bloccato. Conferma i dati del wallet per "
