@@ -223,8 +223,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ed è l'unica che diventa rossa scambiando i rami).
   `PAROLE_IMPERSONAZIONE` sono prefissi, e «fint» c'è perché «finto»
   NON è una declinazione di «finge» — l'ha detto una prova, non la
-  lettura del codice.
-  Il collaudo col MODELLO vero è `collaudo_impersonazione.py`, che
+  lettura del codice. E «confond» è entrata ad ago 2026 da un caso
+  VERO (sotto): il motivo diceva «progettato per confondere con
+  Barattolo», nessuna delle altre parole matchava, e a un venditore
+  onesto è arrivata la lista delle armi e delle droghe.
+  «SAT» È LA MONETA, NON UN NOSTRO MARCHIO (ago 2026, falso positivo
+  vero dal campo, e la TERZA contro-regola): «Sat's Oil 🫒 GENESIS
+  EDITION» bloccato per impersonazione col motivo «il nome appare
+  progettato per confondere con Barattolo (associando "sat")». Su un
+  mercatino che incassa in satoshi chiamarsi coi sats è la cosa più
+  normale del mondo: il prompt ora dice che 'sat', 'sats', 'satoshi',
+  'bitcoin' sono la MONETA e non un marchio, e soprattutto che UNA
+  SOMIGLIANZA DI NOME NON È MAI UN MOTIVO — a decidere resta sempre e
+  solo il gesto di RIVOLGERSI a chi legge. Senza quella riga il
+  divieto torna a essere un filtro sulla PAROLA, che è l'errore già
+  pagato col «barattolo» vaso di vetro.
+  E SE IL TESTO NON C'È NON SI CONCLUDE NIENTE: lo stesso motivo
+  diceva «il titolo e la descrizione mancano» mentre il titolo c'era
+  — il modello aveva DEDOTTO l'impersonazione da ciò che il testo non
+  diceva. La regola nuova («un'assenza non è un tentativo di
+  ingannare nessuno; non dedurre MAI l'impersonazione dal non detto»)
+  vale in sé, e in più DISINNESCA quella confabulazione: se il
+  modello crede che il testo manchi, adesso quella premessa porta a
+  OK invece che a VIETATO. Nel collaudo il caso è una REGRESSIONE
+  PERMANENTE con due gemelle — «SatShop», che dice se la cura ha
+  imparato la regola o solo il nome, e «Satoshi Coffee» a descrizione
+  VUOTA, che mette insieme i due difetti.
+  Il collaudo col MODELLO vero è `collaudo_impersonazione.py` (19
+  casi, ago 2026: **18/19 e ZERO falsi positivi**, i tre nuovi sui
+  sats passano tutti; l'unico fuori posto è un «caso cattivo
+  passato», cioè il tipo meno grave — e da quando l'AI segnala e non
+  decide quel caso finisce comunque in coda, sotto gli occhi di un
+  moderatore. CHI LO RILANCIA SCRIVA QUI QUALE È: un 18/19 senza nome
+  è un numero su cui fra sei mesi nessuno può agire, ed è
+  esattamente il rumore in cui una regressione vera si perde), che
   vuole la chiave e VA RILANCIATO A OGNI RITOCCO DEL PROMPT — è
   l'unica cosa che dice se il modello ha capito, e il falso positivo
   della bici è saltato fuori da lì e non dalla lettura. `prove.py`
@@ -239,6 +271,64 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   della regola. Il conto separa i falsi positivi dagli altri sbagli,
   perché non pesano uguale — un OK finito altrove è un annuncio
   legittimo bloccato, e se ne accorge solo chi l'ha scritto.
+  L'AI SEGNALA, NON DECIDE (ago 2026, decisione di Andrea dopo il
+  falso positivo qui sopra, che ha tenuto fermo un venditore vero).
+  Fino a ieri un VIETATO dell'AI bloccava secco e l'annuncio non
+  nasceva nemmeno: chi sbagliava non lo sapeva nessuno, tranne chi
+  protestava. Ora il rifiuto resta SOLO dove il no è la risposta
+  giusta anche quando il modello ha sbagliato — cioè dove non esiste
+  una lettura innocente — e tutto il resto va in REVISIONE.
+  LA RAGIONE PER CUI SI PUÒ FARE, ed è quella che rende la scelta poco
+  rischiosa: in revisione l'annuncio NON È PUBBLICO. Non è che la
+  merce illegale va online aspettando un umano — resta invisibile
+  esattamente come se fosse stata rifiutata. Cambia solo che esiste
+  una riga, che il venditore legge «in attesa» invece di «no», e che
+  qualcuno deve guardarla: IL COSTO È LA CODA, NON IL RISCHIO.
+  L'ELENCO, dichiarato e non dedotto — QUATTRO famiglie: 1) armi,
+  munizioni ed esplosivi; 2) droghe e stupefacenti; 3) sesso a
+  pagamento e sfruttamento, minori compresi; 4) documenti falsi,
+  credenziali, carte clonate, account rubati.
+  COSA NON C'È E PERCHÉ, che è la metà da leggere: refurtiva,
+  contraffazione, farmaci con obbligo di ricetta e animali protetti
+  sono illegali quanto gli altri, ma hanno tutti una LETTURA INNOCENTE
+  che il modello può aver frainteso — un iPhone senza scatola non è
+  rubato, una borsa di marca non è falsa, un integratore non è un
+  farmaco, un pappagallo non è una specie protetta. Su quelli un no
+  secco ferma gente onesta in silenzio, e una riga in coda costa un
+  tocco. Fuori anche l'impersonazione (il caso che ha aperto tutto) e
+  i servizi, che erano già DUBBIO.
+  IL GIUDICE È `_vietato_bloccante(motivo)`, che guarda il motivo
+  scritto dal modello con parole sue, A PAROLE INTERE come il filtro
+  di casa — `PAROLE_BLOCCANTI` per le corte (esatte: «arma» sta dentro
+  «armadio») e `PREFISSI_BLOCCANTI` per le lunghe senza omonimi, che
+  così prendono le declinazioni. FAIL-SAFE VERSO LA CODA: un motivo
+  che non si riconosce non blocca — sbagliare qui fa guardare una riga
+  a un umano, sbagliare nell'altro verso ferma un venditore onesto
+  senza che nessuno lo sappia.
+  E IL DECLASSAMENTO STA NEL GIUDICE UNICO `_leggi_verdetto`, NON NEL
+  PROMPT, deliberatamente: il modello è già stato visto disobbedire
+  alla lettera del prompt (dice VIETATO dove gli si insegna DUBBIO,
+  vedi «Assistenza Barattolo»), quindi la garanzia deve stare dove il
+  modello non arriva; e i verdetti del prompt li collauda uno script
+  che vuole la chiave, cambiarlo alla cieca sarebbe un ritocco non
+  verificato. La leva `MODERAZIONE_REVISIONE` resta sovrana: spenta,
+  è ancora il binario di ieri (rifiuto secco), quindi il freno
+  d'emergenza continua a fare quello che promette — ed è anche
+  l'unica strada da cui `MSG_RIFIUTO_IMPERSONAZIONE` è ancora
+  raggiungibile.
+  IMPERFEZIONE DICHIARATA: se l'AI scrive «droga» sulla cannabis
+  light — un caso che questo progetto considera grigio apposta — il
+  blocco scatta. Si accetta: quando il modello è abbastanza sicuro da
+  dire quella parola secca il no è la risposta giusta, e chi non è
+  d'accordo protesta. La lista si accorcia, non si allunga.
+  IL COSTO, MISURATO e non stimato (`stima_coda_moderazione.py` sui
+  rifiuti VERI del registro, 30 giorni di produzione): la coda passa
+  da 7 a 14, cioè **0,2 annunci in più al giorno**. È il numero che
+  rende la decisione facile — e va rimisurato se il volume cresce.
+  UNA PROVA HA CAMBIATO LATO: chiedeva che «VIETATO: impersonazione»
+  fosse un rifiuto secco, cioè certificava il comportamento che ha
+  fermato il venditore (il precedente è la sentinella del reaper sui
+  'creato', e quella degli avatar).
   Terza via della moderazione (lug 2026, decisione di Andrea: basta
   blocchi a priori — l'AI segnala, l'ADMIN decide): il prompt ha TRE
   verdetti — VIETATO solo per i casi netti (armi, droghe, sesso...),
@@ -3726,8 +3816,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   di piu'. Col pezzo singolo i testi restano quelli di sempre.
   IL FOGLIO RIFATTO nello stesso giro: tre pillole («−10%», «−20%»,
   «Personalizzato») SENZA il controvalore — erano due cifre in
-  concorrenza con quella che conta — e il campo libero si vede solo
-  sulla terza. Toggle €/₿ in testata (`.sheet-testa`, col titolo che
+  concorrenza con quella che conta.
+  IL CAMPO È SEMPRE VISIBILE E MODIFICABILE (ago 2026, dal campo, e
+  ROVESCIA la prima stesura in cui si vedeva solo sulla terza
+  pillola): le pillole lo RIEMPIONO, non lo nascondono — chi parte da
+  −10% e poi ritocca dev'essere libero di farlo, e «Personalizzato»
+  mette a fuoco un campo che c'è già, col testo selezionato.
+  E LA PILLOLA ACCESA NON SI RICORDA, SI DEDUCE dalla cifra: con una
+  scelta memorizzata, dopo un ritocco l'etichetta direbbe il falso —
+  «−10%» acceso su una cifra che −10% non è più. Derivata non può
+  mentire, e la variabile che la teneva non esiste più.
+  IL CAMPO DICE «AL PEZZO» mentre si digita (sotto l'unità, e SOLO
+  coi pezzi scelti >1: col pezzo singolo sarebbe rumore). Il perché è
+  un rischio vero: la cifra è l'unitario, ma chi vuole tre pezzi
+  ragiona sul TOTALE e rischia di scrivere 120 intendendo il totale
+  mentre ne sta offrendo 360 — e prima lo si scopriva dalla riga
+  sotto, cioè DOPO aver scritto. Va a capo e non in riga, o a 320px
+  il suffisso si mangia il campo (misurato: così resta largo 236px).
+  IL MINIMO NON È UN CARTELLO PERMANENTE: compare SOLO quando la
+  cifra ci finisce sotto, come avviso inline (la veste di
+  `#zonaHint`). Dirlo prima che serva è rumore, e affiancava un
+  numero che non c'entra con quello che si sta scrivendo; il client
+  arrotonda per ECCESSO come il server, o direbbe «va bene» a una
+  cifra che di là viene rifiutata. E SOTTO IL MINIMO SPARISCE IL
+  TOTALE: calcolare il totale di un'offerta che non si può inviare è
+  rumore, e affianca due righe dove ne serve una sola. Torna da sé
+  appena la cifra risale.
+  Toggle €/₿ in testata (`.sheet-testa`, col titolo che
   cede coi puntini): governa la LETTURA — listino, minimo e riga
   dell'offerta, che sono i tre numeri da confrontare e in due lingue
   diverse non si confrontano affatto (visto a schermo) — mentre il
@@ -3777,6 +3892,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   di un «× N» ma non di tutto quello di prima.
   Piu' il titolo scappato in `fai_offerta`, che mancava mentre i tre
   fratelli ce l'avevano (la famiglia di B6).
+  LA TASTIERA NON COPRE PIÙ QUEL CHE SI SCRIVE (ago 2026, dal campo:
+  nel foglio dell'offerta si digitava alla cieca), e il perché non è
+  ovvio: la tastiera del telefono NON rimpicciolisce il layout
+  viewport — un `position:fixed; bottom:0` resta ancorato al fondo
+  dello SCHERMO, cioè sotto i tasti — e nemmeno `100dvh` si accorcia
+  su iOS. L'unico che lo sa è `visualViewport`, e quanto copre è
+  `innerHeight - vv.height - vv.offsetTop`: l'offset serve perché a
+  pagina scrollata dalla tastiera il viewport visuale si sposta, e
+  senza quel termine il foglio si alzerebbe di troppo. La misura si
+  divide per `--fs-zoom`, che arriva in pixel di VIEWPORT e si spende
+  dentro `html`, che è zoomato (la ragione dei `calc(100vh / ...)`).
+  Vale per TUTTI i fogli, non solo per questo, e a tastiera chiusa la
+  variabile è 0 — cioè non cambia niente.
+  SI ALZA IL FOGLIO APERTO, COL TRANSFORM E NON COL `bottom`: alzando
+  il bottom si alzano anche i fogli CHIUSI — nascosti con
+  `translateY(100%)`, cioè la loro altezza sotto l'ancora — e con
+  l'ancora più in alto rientrano in vista. Difetto introdotto e visto
+  sullo screenshot: sotto il foglio dell'offerta spuntavano quello dei
+  distintivi e quello Nostr.
+  E MENTRE LA TASTIERA È SU LA TRANSIZIONE SI SPEGNE
+  (`html.con-tastiera .sheet.open{transition:none}`): i 220ms di ease
+  servono alla SCIVOLATA d'ingresso, ma il sollevamento passa dalla
+  stessa proprietà e `visualViewport` emette un resize a ogni passo
+  dell'animazione della tastiera — il foglio finiva a INSEGUIRE un
+  bersaglio che si muove, sempre in ritardo e sempre a ri-puntare, ed
+  è quello lo «scatto» visto nella PWA. Spegnendola il foglio È dove
+  il viewport dice, fotogramma per fotogramma: non si rallenta niente,
+  si toglie l'inseguimento. Più `preventScroll` sul fuoco del campo,
+  che uno scroll automatico su un foglio fisso è l'altro modo in cui
+  nasce uno scatto (la lezione del picker).
+  ONESTÀ SULLA VERIFICA, e va tenuta perché riguarda il METODO: in
+  headless lo scatto NON si può vedere — misurato, le transizioni non
+  avanzano (300px istantanei già a 20ms), quindi lì non si riproduce
+  né si esclude. Invece di scommettere su una causa sola si sono
+  tolte TUTTE quelle plausibili. Se un giorno ricomparisse, il
+  sospetto successivo è la `max-height` che cambia durante
+  l'animazione: il foglio è ancorato in basso, quindi accorciandosi
+  muove il bordo alto — e si vede solo sul telefono.
   LESSICO (deciso lug 2026): la scheda per gli utenti si chiama
   «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
   confirm); gli id interni (go('affari'), #nav-affari, view-affari)
@@ -7927,6 +8080,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   database opzionale (il pattern di `ripulisci_anello_nostr.py`);
   idempotente, e si può girare a server ACCESO — un file che non
   chiede nessuno non manca a nessuno.
+- `stima_coda_moderazione.py` (ago 2026) — quanto si allunga la coda
+  da quando l'AI segnala invece di decidere. NON stima: prende i
+  rifiuti VERI gia' registrati in `moderazione_log` e ci rifa' girare
+  sopra il giudice nuovo (`_vietato_bloccante`, letto dal TESTO di
+  server.py — mai importandolo, la lezione di ricategorizza.py),
+  quindi dice il numero esatto e l'elenco dei motivi che passano in
+  coda. È con QUEI motivi che il prompt si corregge a mano: se una
+  famiglia si ripete, o è un falso positivo o merita una regola.
+  LEGGE E BASTA — nessuna scrittura, si lancia a server acceso, e
+  c'è la prova che nel suo corpo non compaia un INSERT.
 - `anteprime.py` (ago 2026) — come si vede un link di Barattolo quando
   qualcuno lo incolla. Interroga un Barattolo (locale o vero) con gli
   User-Agent dei crawler di Telegram, WhatsApp, Facebook, Slack e dei
@@ -9882,6 +10045,59 @@ tutte le offerte gia' aperte — e non c'e' nessuna leva. DA GUARDARE al
 primo giro: la prima offerta vera con piu' di un pezzo dentro Telegram,
 e che il venditore legga nella notifica del bot sia il totale sia il
 fatto che accettare non blocca niente.
+
+L'AI segnala, non decide (ago 2026, giro urgente dal campo: un
+venditore vero fermo). «Sat's Oil 🫒 GENESIS EDITION» bloccato per
+impersonazione col motivo «il nome appare progettato per confondere
+con Barattolo (associando "sat")» — su un mercatino che incassa in
+satoshi. Due difetti e un cambio di rotta: la voce del prompt ora dice
+che i sats sono la MONETA e che una somiglianza di NOME non è mai un
+motivo; dice anche cosa fare quando il testo non c'è (lo stesso motivo
+sosteneva che titolo e descrizione mancassero, mentre il titolo
+c'era: il modello deduceva dal non detto); e la lista
+`PAROLE_IMPERSONAZIONE` aveva un buco separato, «confondere», per cui
+al venditore era arrivata pure la lista delle armi e delle droghe.
+IL CAMBIO DI ROTTA (decisione di Andrea): un VIETATO dell'AI non basta
+più a bloccare — ferma solo su QUATTRO famiglie (armi, droghe, sesso a
+pagamento e sfruttamento, documenti e credenziali), tutto il resto va
+in REVISIONE, dove non è pubblico e decide un umano. Vedi Architettura,
+«L'AI SEGNALA, NON DECIDE», per l'elenco completo, per cosa ne è FUORI
+e perché (refurtiva, contraffazione, farmaci, animali protetti: hanno
+tutti una lettura innocente che il modello può aver frainteso), e per
+la ragione che rende la scelta poco rischiosa — in revisione
+l'annuncio non è pubblico, quindi il costo è la coda e non il rischio.
+MISURATO, non stimato: il collaudo col modello vero dà **18/19 con
+ZERO falsi positivi** (i tre casi nuovi sui sats passano tutti; l'unico
+fuori posto è un «caso cattivo passato», il tipo meno grave, che ora
+finisce comunque in coda), e `stima_coda_moderazione.py` sui rifiuti
+veri di 30 giorni dice che la coda passa da **7 a 14, cioè 0,2 annunci
+in più al giorno**. 2171 prove verdi, nove mutazioni tutte rosse, e UNA
+prova che ha cambiato lato: chiedeva che «VIETATO: impersonazione»
+fosse un rifiuto secco, cioè certificava il comportamento che ha
+fermato il venditore. IN PRODUZIONE basta il deploy: nessuna colonna,
+nessuna migrazione, nessuna leva nuova — e `MODERAZIONE_REVISIONE`
+spenta resta il freno d'emergenza che rimette il binario di ieri.
+DA RIFARE quando il volume cresce: la stima della coda, che è il solo
+numero su cui questa scelta poggia.
+
+Il foglio dell'offerta, rifinito dal campo (ago 2026, tre giri): il
+campo del prezzo è sempre visibile e modificabile — le pillole lo
+riempiono, non lo nascondono — e la pillola accesa si DEDUCE dalla
+cifra invece di ricordarsi, o dopo un ritocco direbbe il falso; il
+campo dice «al pezzo» mentre si digita (solo coi pezzi >1: chi ne
+vuole tre ragiona sul totale e rischia di scrivere 120 intendendo il
+totale mentre ne offre 360); il minimo non è più un cartello
+permanente ma un avviso che compare solo sotto soglia, e lì sparisce
+anche la riga del totale — due righe dove ne serve una sola. Più la
+tastiera, che non copre più quel che si scrive: vedi Architettura, «LA
+TASTIERA NON COPRE PIÙ QUEL CHE SI SCRIVE», per il perché non basta
+`100dvh`, per il difetto introdotto e visto sullo screenshot (i fogli
+CHIUSI che rientravano in vista) e per l'ONESTÀ SULLA VERIFICA — in
+headless lo scatto non si riproduce né si esclude, quindi invece di
+scommettere su una causa sola si sono tolte tutte quelle plausibili.
+IN PRODUZIONE basta il deploy. DA GUARDARE dal telefono: che lo scatto
+sia sparito nella PWA — se sopravvive, il sospetto successivo è la
+`max-height` che cambia durante l'animazione.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
