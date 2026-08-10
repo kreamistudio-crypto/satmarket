@@ -756,8 +756,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`scegli_consegna_ordine` muove `aggiornato`, che qui non si
   guarda) — innocuo, è un promemoria e non una penale. Il titolo qui
   passa da `html.escape`: le notifiche sono HTML e un «<» spegnerebbe
-  il promemoria in silenzio. I quattro solleciti fratelli non lo fanno
-  ancora — buco piccolo, dichiarato, non chiuso qui.
+  il promemoria in silenzio. (I quattro solleciti fratelli non lo
+  facevano ancora — chiuso ad ago 2026, ed erano quindici siti e non
+  quattro: vedi «IL TITOLO NUDO NELLE NOTIFICHE».)
   LO STESSO «<» SPEGNEVA L'AVVISO DELLA SPEDIZIONE (ago 2026, B6
   dell'audit, chiuso): corriere e tracciamento sono testo di CHI
   SPEDISCE e finivano nudi nell'HTML — un «Bartolini <BRT>», che uno
@@ -780,6 +781,69 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore non può agire, e sarebbe un rimprovero a vuoto); 2) ordini
   fermi in 'refund', già noto nella docstring di
   `sollecita_rimborsi_puntate`.
+  IL TITOLO NUDO NELLE NOTIFICHE (ago 2026, il resto della famiglia di
+  B6): B6 aveva chiuso i due rami della spedizione, ma il TITOLO — che
+  è testo del venditore e passa dallo stesso tubo HTML — restava nudo
+  quasi ovunque. Il conto vero è **quindici siti**, non i «quattro
+  solleciti fratelli» che questo file dichiarava: il polso 🛒 ai
+  moderatori, quattro solleciti su sei, e altri otto che solo un
+  censimento ha tirato fuori (`_sblocca_sats`, `_rimborsa_compratore`,
+  `_racconta_chiusura`, `verifica_rilancio`, `rispondi_offerta`,
+  `scadenze_offerte`, `annulla_asta_admin`, `_paga_rimborso`). LA
+  LEZIONE DEL GIRO è quella: l'elenco a memoria di un buco dichiarato
+  invecchia e RIMPICCIOLISCE — a contare dev'essere una prova che
+  guarda il file, non una riga di CLAUDE.md.
+  IL PIÙ GRAVE ERA `_paga_rimborso`, e vale la pena saperlo: quel
+  titolo finisce nel 🧊 di `_congela_pagamento`, cioè l'avviso di un
+  pagamento INCERTO — quello che questo file dichiara non debba MAI
+  sparire, perché dice che dei sats possono essere usciti davvero.
+  LA REGOLA È UNA SOLA: si scappa ALL'ASSEGNAZIONE, una volta, e da lì
+  lo stesso valore serve le notifiche e il polso. LA STRADA SCARTATA,
+  scritta e poi tolta, va tenuta perché è quella che torna in mente:
+  l'escape DENTRO `polso_ordini_admin`, col segnaposto `{titolo}`
+  accanto a `{aperti}` — «un posto solo, e il sesto chiamante non può
+  dimenticarlo». Non regge: `_sblocca_sats` e `_rimborsa_compratore`
+  usano la STESSA variabile per le loro notifiche E per il polso,
+  quindi quella variabile vivrebbe in due regimi (grezza per uno,
+  scappata per gli altri) e il primo che li confonde scrive «&amp;lt;»
+  dentro un avviso. Il polso quindi NON scappa, e c'è la prova che non
+  lo faccia: un doppio escape non si vede finché qualcuno non legge un
+  titolo storto.
+  IL ROVESCIO — dove NON si scappa — è la metà che si dimentica, e qui
+  ha un caso vero: in `_compra_set` il nome del pezzo esaurito va nel
+  `detail` di un 404, cioè JSON che il client rende col SUO `esc()`;
+  un `html.escape` lì farebbe leggere «Cuffie &lt;b&gt;AKG&lt;/b&gt;»
+  a chi compra. La variabile si chiama `nome_pezzo` APPOSTA: così il
+  censimento non la pesca e chi legge vede subito che è un'altra cosa.
+  Stessa ragione per cui i tag NIP-99 continuano a portare il titolo
+  grezzo (lì è protocollo, non prosa).
+  E IL RIPIEGO «or …» NON È COSMESI: in `sollecita_incassi` il titolo
+  si assegnava senza, e quella riga sta FUORI dal `try` — un titolo
+  NULL non avrebbe saltato un promemoria, avrebbe ammazzato il giro per
+  tutti quelli dopo. Oggi è irraggiungibile (nessun `DELETE FROM
+  annunci` esiste), ma i quattro fratelli ora hanno la stessa forma.
+  L'ULTIMA RETE È IN FONDO AL TUBO (`_manda_telegram`), e non
+  sostituisce l'escape alla fonte: è quel che salva il sito che
+  qualcuno scriverà l'anno prossimo. LA RISPOSTA DI TELEGRAM NON LA
+  GUARDAVA NESSUNO — un `await c.post(...)` e via — ed è la parte
+  LETTERALE di «senza errore e senza traccia»: il 400 «can't parse
+  entities» finiva nel nulla. Ora su un rifiuto del PARSE (e solo su
+  quello: bot bloccato, chat inesistente e 429 non li ripara un
+  secondo invio) il messaggio si rimanda SPOGLIO — `spoglia_html`, lo
+  stesso ripiego dei DM Nostr — così arriva senza grassetti invece di
+  non arrivare. E si STAMPA, o sarebbe un guasto che si autoripara in
+  silenzio e nessuno andrebbe mai a scappare il sito che l'ha causato.
+  LA PROVA CHE CONTA È IL CENSIMENTO, non un elenco: guarda tutte le
+  funzioni del file, tiene quelle che notificano e chiede che ogni
+  `titolo = …` nasca scappato — così il sollecito nuovo di domani entra
+  nel conto da solo. Accanto, la prova che il censimento VEDE davvero
+  le quindici funzioni: a predicato rotto, uno «zero scoperti»
+  sembrerebbe una promozione invece che una cecità.
+  E UNA SENTINELLA NON POTEVA FALLIRE, per la seconda volta in due
+  giorni: «il ripiego stampa» cercava `print(` in tutta la funzione, e
+  il `print` del collaudo dieci righe più su la teneva verde anche
+  togliendo quello del ripiego. L'ha smascherata la tortura (0 rosse
+  su una mutazione che doveva farne una); ora guarda DENTRO il ramo.
   Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 27
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
   Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
@@ -9156,10 +9220,10 @@ nessuna leva. DA FARE PRIMA DEL DEPLOY, ed è il pezzo che in locale
 non si può fare perché vuole la chiave vera: `python
 collaudo_impersonazione.py` sul VPS — se un OK atteso finisce in
 VIETATO è un falso positivo, cioè annunci legittimi bloccati, e il
-prompt si corregge A MANO. IMPERFEZIONI DICHIARATE e non chiuse: i
-quattro solleciti fratelli hanno ancora il titolo nudo nell'HTML, e
+prompt si corregge A MANO. IMPERFEZIONE DICHIARATA che resta:
 l'immagine remota la scarica comunque il browser di chi APRE la
-scheda (è la regola della vetrina, dichiarata).
+scheda (è la regola della vetrina, dichiarata). Il titolo nudo dei
+solleciti è invece chiuso — vedi più sotto, ed erano quindici siti.
 Nessuna riga si cancella senza aver chiesto a LNbits (ago 2026,
 trovato di striscia rispondendo a un'altra domanda — «al pagamento il
 compratore riceve una notifica?» — e portato avanti prima di tutto il
@@ -9215,6 +9279,34 @@ l'ordine si apra lo stesso. IN PRODUZIONE basta il deploy: nessuna
 colonna, nessuna migrazione, nessuna leva, nessuna rotta. DA GUARDARE
 al primo giro: la prima ricevuta vera dentro Telegram — e soprattutto
 che chi compra un CODICE non si veda promettere un pacco.
+Il titolo nudo nelle notifiche (ago 2026, subito dopo: la stessa
+famiglia di B6, chiusa). Il conto vero era **quindici siti** e non i
+«quattro solleciti fratelli» che questo file dichiarava — il polso 🛒
+ai moderatori, quattro solleciti su sei, e altri otto che solo un
+censimento ha tirato fuori; il più grave è il 🧊 di un pagamento
+INCERTO, cioè l'avviso che dice che dei sats possono essere usciti
+davvero. La lezione è quella: l'elenco a memoria di un buco dichiarato
+rimpicciolisce, e a contare dev'essere una prova che guarda il file.
+Una regola sola — si scappa all'assegnazione — più l'ultima rete in
+fondo al tubo, che è la parte che risponde al danno vero: la risposta
+di Telegram non la guardava nessuno, quindi il 400 «can't parse
+entities» finiva nel nulla; ora il messaggio si rimanda SPOGLIO e la
+cosa si STAMPA. Vedi Architettura, «IL TITOLO NUDO NELLE NOTIFICHE»,
+per la strada scartata (l'escape dentro il polso, che avrebbe fatto
+vivere la stessa variabile in due regimi) e per il rovescio — il 404
+del carrello, dove scappare sarebbe stato il bug.
+Collaudato: 36 prove nuove (1784 verdi, erano 1748) — in testa il
+CENSIMENTO, che non è un elenco ma una passata su tutte le funzioni
+del file, così il sollecito nuovo di domani entra nel conto da solo —
+e NOVE mutazioni una per riga sorvegliata, di cui una ha smascherato
+una sentinella che non poteva fallire (il `print` del collaudo la
+teneva verde). Più il giro DAL VIVO con un titolo ostile
+(`Cuffie <b>AKG</b> & "K371" <script>`) su ricevuta, polso e tre
+solleciti: tutti scappati, `<b>` pari, e l'evento NIP-99 che tiene
+giustamente il titolo grezzo. IN PRODUZIONE basta il deploy: nessuna
+colonna, nessuna leva, nessuna rotta. DA GUARDARE al primo giro: nel
+journal non deve comparire nessun «⚠️ HTML rifiutato da Telegram» — se
+compare, quella riga dice il sito da scappare alla fonte.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
