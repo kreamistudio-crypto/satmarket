@@ -2919,8 +2919,16 @@ async def login_nostr_collega(req: Request, response: Response):
 
 # ------------------------- LNBITS (escrow) --------------------------
 
+# La vita della fattura d'ordine: 15 minuti. E' diventata un NOME (ago
+# 2026) perche' ora quel numero lo legge anche controlla_abbandonati,
+# che un ordine lo puo' guardare SOLO a fattura morta — e due copie a
+# mano dello stesso 900 sono due copie da tenere in pari, dove quella
+# sbagliata dichiarerebbe annullato un ordine ancora pagabile.
+INVOICE_EXPIRY = 900
+
+
 async def crea_invoice_escrow(sats: int, memo: str,
-                              expiry: int = 900) -> dict:
+                              expiry: int = INVOICE_EXPIRY) -> dict:
     """Crea la invoice che l'acquirente paghera': i sats finiscono
     nel wallet della piattaforma (la cassaforte). Di serie scade in
     15 minuti (se non viene pagata, l'ordine si autodistrugge poco
@@ -17490,23 +17498,24 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
 
 
 def pulisci_ordini_fantasma(con):
-    """Elimina gli ordini MAI PAGATI piu' vecchi di 30 minuti: la loro
-    invoice e' scaduta (15 min), quindi non possono piu' progredire.
-    Nessun sat e' coinvolto, e' solo pulizia."""
-    soglia = int(time.time()) - 1800
-    # L'offerta che aveva generato l'ordine si scioglie dal legame e
-    # resta 'accettata' fino alla SUA scadenza: il compratore puo'
-    # riprovare a pagare con una invoice nuova.
-    con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id IN "
-                "(SELECT id FROM ordini WHERE stato='creato' AND creato < ?)",
-                (soglia,))
-    # Le righe dei set muoiono con la testata (niente FK cascade:
-    # il progetto non ha mai acceso PRAGMA foreign_keys)
-    con.execute("DELETE FROM ordine_righe WHERE ordine_id IN "
-                "(SELECT id FROM ordini WHERE stato='creato' AND creato < ?)",
-                (soglia,))
-    con.execute("DELETE FROM ordini WHERE stato='creato' AND creato < ?",
-                (soglia,))
+    """La purga delle LAPIDI: solo righe che qualcuno ha gia' guardato.
+
+    Fino all'ago 2026 di suo c'era anche un DELETE secco sugli ordini
+    'creato' scaduti, col commento «nessun sat e' coinvolto, e' solo
+    pulizia» — vero SOLO se qualcuno ha chiesto a LNbits, e a chiedere
+    c'e' un poll che vive nel telefono del compratore. Chi pagava e
+    chiudeva l'app prima che rispondesse lasciava una riga mai
+    verificata, e il DELETE si portava via il payment_hash, cioe'
+    l'unico filo verso quel pagamento: i sats restavano in cassaforte
+    senza un ordine, e nemmeno LNbits sa a chi renderli. Era la stessa
+    regola che le lapidi difendono da sempre («un saldo deve avere una
+    riga su cui posarsi»), scavalcata dalla porta di servizio.
+    Ora quello sguardo lo da' controlla_abbandonati nell'orologio, che
+    e' async e a LNbits ci puo' parlare: qui si spazza solo cio' che
+    lui ha gia' dichiarato morto. NIENTE torna a cancellare un
+    'creato' da questa parte, o il buco si riapre in silenzio (c'e' la
+    sentinella in prove.py).
+    """
     # Le LAPIDI degli annulli espliciti (ago 2026): restano finche' un
     # pagamento potrebbe ancora atterrarci sopra (la invoice vive 15
     # minuti dalla NASCITA dell'ordine, quindi a un'ora dall'annullo il
@@ -17520,16 +17529,16 @@ def pulisci_ordini_fantasma(con):
                 "AND aggiornato < ?)", (soglia_lapidi,))
     con.execute("DELETE FROM ordini WHERE stato='annullato' "
                 "AND aggiornato < ?", (soglia_lapidi,))
-    # E le fatture di puntata mai saldate (vita 10 min, soglia 2x come
-    # per gli ordini): via la riga stantia, e via anche la puntata mai
-    # partita (versato 0, nessun rilancio rimasto) — cosi' la riga
+    # E le lapidi delle fatture di puntata (vita 10 min, soglia 2x come
+    # per gli ordini): utili finche' la fattura puo' ancora essere
+    # pagata — vedi controlla_annullati. Via con loro la puntata mai
+    # partita (versato 0, nessun rilancio rimasto), cosi' la riga
     # UNIQUE si libera e si puo' ripartire da capo. NON e' un ritiro:
     # nessun sat e' mai entrato.
-    # ('annullato' spazzato con la stessa soglia: e' la lapide
-    # dell'annullo esplicito, utile solo finche' la fattura da 10
-    # minuti puo' ancora essere pagata — vedi controlla_annullati)
-    con.execute("DELETE FROM rilanci WHERE stato IN ('creato','annullato') "
-                "AND creato < ?",
+    # I 'creato' NON si toccano piu', per la ragione degli ordini qui
+    # sopra: a dichiararli morti — dopo aver guardato — e'
+    # controlla_abbandonati, e da li' passano come lapidi.
+    con.execute("DELETE FROM rilanci WHERE stato='annullato' AND creato < ?",
                 (int(time.time()) - RILANCIO_STANTIO,))
     con.execute("DELETE FROM puntate WHERE stato='attiva' AND "
                 "versato_sats=0 AND NOT EXISTS "
@@ -17615,6 +17624,125 @@ async def controlla_annullati():
             await _paga_rimborso(rid)
         except Exception as e:
             print(f"⚠️ Riacciuffo rilancio #{ril['id']} saltato: {e}")
+
+
+async def controlla_abbandonati():
+    """L'ULTIMO SGUARDO prima di buttare via una riga (ago 2026).
+
+    Il gemello di controlla_annullati per chi non ha annullato niente:
+    ha pagato ed e' sparito. Il poll che porta un ordine a 'locked'
+    vive nel telefono del compratore (pollTimer, piu' il bottone «ho
+    pagato» nella lista): se paga da un wallet esterno e chiude l'app
+    — o Telegram gli uccide la WebView, o cade la rete — a quell'ordine
+    non chiede piu' niente nessuno, e il reaper lo cancellava insieme
+    al suo payment_hash. Vedi pulisci_ordini_fantasma per il perche'
+    era grave. (Mai successo in produzione: incrociati gli incassi di
+    LNbits coi payment_hash noti, zero orfani. Il buco era aperto lo
+    stesso.)
+
+    L'INVARIANTE che ne esce, ed e' la riga da non ammorbidire:
+    NESSUNA riga d'ordine o di rilancio si cancella senza che qualcuno
+    abbia chiesto a LNbits com'e' andata.
+
+    Si guarda SOLO a fattura morta (INVOICE_EXPIRY / RILANCIO_EXPIRY):
+    prima il compratore puo' ancora pagare, e dichiarargli l'ordine
+    annullato sarebbe una bugia — oltre che una corsa col suo poll.
+    Pagata -> il flusso di sempre (_incassa_ordine col suo CAS: se il
+    poll ha vinto un istante prima, qui rowcount 0 e nessuno
+    rinotifica). Non pagata -> la LAPIDE 'annullato', la stessa strada
+    di annulla_ordine, che la purga spazza un'ora dopo.
+
+    FAIL-OPEN NEL VERSO GIUSTO: se LNbits non risponde la riga RESTA
+    'creato' e si riprova al giro dopo — nessuno la cancella piu'
+    alle sue spalle. Meglio una riga che si attarda che un pagamento
+    buttato via.
+
+    IL RILANCIO PAGATO NON DIVENTA UNA PUNTATA, ed e' dichiarato: la
+    fattura e' scaduta da un pezzo e applicare adesso un rilancio
+    vecchio di dieci minuti falserebbe una gara che nel frattempo e'
+    andata avanti. Prende il binario del fuori-tempo di
+    verifica_rilancio — i sats nel registro «Da riscuotere», che e' la
+    risposta che il progetto da' gia' a ogni saldo su una puntata
+    fuori gara — e chi ha pagato lo viene a sapere."""
+    adesso = int(time.time())
+    con = db()
+    ordini = [dict(r) for r in con.execute(
+        "SELECT id, payment_hash FROM ordini WHERE stato='creato' "
+        "AND payment_hash != '' AND creato < ?",
+        (adesso - INVOICE_EXPIRY,))]
+    rilanci = [dict(r) for r in con.execute(
+        "SELECT * FROM rilanci WHERE stato='creato' AND payment_hash != '' "
+        "AND creato < ?", (adesso - RILANCIO_EXPIRY,))]
+    con.close()
+    for o in ordini:
+        try:
+            if await invoice_pagata(o["payment_hash"]):
+                print(f"⚠️ Ordine #{o['id']} pagato e mai verificato: "
+                      f"riacciuffato")
+                await _incassa_ordine(o["id"])
+                continue
+            con = db()
+            # Il CAS: se il poll del compratore ha portato l'ordine a
+            # 'locked' fra la nostra domanda a LNbits e adesso, qui
+            # rowcount 0 e non si tocca niente.
+            cur = con.execute(
+                "UPDATE ordini SET stato='annullato', aggiornato=? "
+                "WHERE id=? AND stato='creato'",
+                (int(time.time()), o["id"]))
+            if cur.rowcount:
+                # Come annulla_ordine: l'offerta si scioglie dal legame
+                # e resta 'accettata' fino alla SUA scadenza, cosi' si
+                # puo' ripagare. Le righe dei set RESTANO: le spazza la
+                # purga insieme alla lapide.
+                con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id=?",
+                            (o["id"],))
+            con.commit()
+            con.close()
+        except Exception as e:
+            print(f"⚠️ Ultimo sguardo sull'ordine #{o['id']} saltato: {e}")
+    for ril in rilanci:
+        try:
+            ora = int(time.time())
+            if not await invoice_pagata(ril["payment_hash"]):
+                con = db()
+                con.execute("UPDATE rilanci SET stato='annullato', "
+                            "aggiornato=? WHERE id=? AND stato='creato'",
+                            (ora, ril["id"]))
+                con.commit()
+                con.close()
+                continue
+            print(f"⚠️ Rilancio #{ril['id']} pagato e mai verificato: "
+                  f"fuori tempo, i sats vanno al registro")
+            con = db()
+            cur = con.execute(
+                "UPDATE rilanci SET stato='tardivo', aggiornato=? "
+                "WHERE id=? AND stato='creato'", (ora, ril["id"]))
+            if cur.rowcount == 0:
+                # il poll del puntatore ha vinto la corsa: la puntata e'
+                # entrata in gara per davvero, qui non c'e' piu' niente
+                con.commit()
+                con.close()
+                continue
+            # stessa cintura d'idempotenza del riacciuffo: l'indice
+            # parziale su rilancio_id, mai due rimborsi per un saldo
+            con.execute("INSERT OR IGNORE INTO rimborsi_asta(annuncio_id,"
+                        "tg_id,puntata_id,rilancio_id,importo_sats,motivo,"
+                        "stato,creato,aggiornato) "
+                        "VALUES(?,?,?,?,?,'tardivo','da_riscuotere',?,?)",
+                        (ril["annuncio_id"], ril["tg_id"], ril["puntata_id"],
+                         ril["id"], ril["delta_sats"], ora, ora))
+            rid = con.execute("SELECT id FROM rimborsi_asta WHERE "
+                              "rilancio_id=?", (ril["id"],)).fetchone()["id"]
+            con.commit()
+            con.close()
+            await notifica(ril["tg_id"],
+                           "⌛ <b>Il pagamento della puntata è arrivato "
+                           "quando la fattura era già scaduta</b>: la "
+                           "puntata non è entrata in gara, ma i sats sono "
+                           "al sicuro nel tuo «Da riscuotere», nel Profilo.")
+            await _paga_rimborso(rid)
+        except Exception as e:
+            print(f"⚠️ Ultimo sguardo sul rilancio #{ril['id']} saltato: {e}")
 
 
 @app.post("/api/orders/{ordine_id}/annulla")
@@ -20749,6 +20877,13 @@ async def orologio():
             await controlla_annullati()
         except Exception as e:
             print(f"⚠️ Riacciuffo annullati saltato: {e}")
+        try:
+            # l'ultimo sguardo su chi ha pagato ed e' sparito: gira DOPO
+            # il riacciuffo apposta, cosi' le lapidi che fabbrica lui
+            # aspettano il giro dopo per il secondo sguardo gratis
+            await controlla_abbandonati()
+        except Exception as e:
+            print(f"⚠️ Ultimo sguardo sugli abbandonati saltato: {e}")
         try:
             await sollecita_rimborsi_puntate()
         except Exception as e:

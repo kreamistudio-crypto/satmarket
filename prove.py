@@ -1086,8 +1086,13 @@ def prove_annullo():
     reaper = corpo("pulisci_ordini_fantasma")
     prova("reaper: purga delle lapidi ordini (dopo la finestra)", True,
           "stato='annullato'" in reaper and "3600" in reaper)
+    # ago 2026: questa ha CAMBIATO LATO. Prima chiedeva che il reaper
+    # spazzasse anche i 'creato' — cioe' certificava il buco: quel
+    # DELETE si portava via il payment_hash di fatture che nessuno
+    # aveva mai verificato. Ora i 'creato' li dichiara morti
+    # controlla_abbandonati, DOPO aver guardato (vedi prove_abbandonati).
     prova("reaper: purga delle lapidi rilanci", True,
-          "IN ('creato','annullato')" in reaper)
+          "DELETE FROM rilanci WHERE stato='annullato'" in reaper)
     ris = corpo("_riservati")
     prova("prenotazione: la lapide libera lo stock per costruzione",
           True, "stato='annullato'" not in ris
@@ -1123,6 +1128,170 @@ def prove_annullo():
           and "max-height:calc(100dvh - 16px)" in mini)
     prova("QR: la misura segue l'altezza disponibile (mai sotto i "
           "170px)", True, "max(170px, 30dvh)" in mini)
+
+
+def prove_abbandonati():
+    """L'ULTIMO SGUARDO (ago 2026). Il reaper cancellava gli ordini
+    'creato' scaduti con un DELETE secco — «nessun sat e' coinvolto,
+    e' solo pulizia», vero SOLO se qualcuno ha chiesto a LNbits, e a
+    chiedere c'e' un poll che vive nel telefono del compratore. Chi
+    pagava e chiudeva l'app lasciava dei sats in cassaforte senza un
+    ordine, e col payment_hash cancellato nemmeno LNbits sa a chi
+    renderli. Mai successo in produzione (incrociati gli incassi coi
+    payment_hash noti: zero orfani), ma il buco era aperto.
+    Qui si prova l'INVARIANTE — nessuna riga si cancella senza che
+    qualcuno abbia guardato — sulla forma E sul pezzo vero, con un
+    database in memoria e LNbits di cartone."""
+    print("\n[l'ultimo sguardo]")
+    import asyncio
+    import sqlite3
+    import time as _t
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    def pezzo_async(nome):
+        return "async " + pezzo(nome)
+
+    # --- L'invariante sulla FORMA: sono le righe che un riordino
+    #     rimetterebbe senza accorgersi di riaprire il buco ----------
+    reaper = pezzo("pulisci_ordini_fantasma")
+    prova("reaper: non cancella piu' nessun ordine 'creato'", False,
+          "stato='creato'" in reaper)
+    prova("reaper: non cancella piu' nessun rilancio 'creato'", False,
+          "'creato','annullato'" in reaper)
+    prova("reaper: le lapidi si spazzano ancora (quelle si', le ha "
+          "gia' guardate qualcuno)", True,
+          "DELETE FROM ordini WHERE stato='annullato'" in reaper
+          and "DELETE FROM rilanci WHERE stato='annullato'" in reaper)
+    # La RIGA intera e non la sottostringa: cercando il nome, un
+    # «pass  # await controlla_abbandonati()» lascerebbe la sentinella
+    # verde con la funzione mai chiamata — provato, restava verde.
+    prova("ultimo sguardo: agganciato all'orologio", True,
+          any(r.strip() == "await controlla_abbandonati()"
+              for r in pezzo("orologio").splitlines()))
+    # la vita della fattura vive in UN posto solo: due copie a mano, e
+    # quella sbagliata dichiara annullato un ordine ancora pagabile
+    prova("scadenza della fattura: un nome, non un numero a mano", True,
+          "expiry: int = INVOICE_EXPIRY" in _SORGENTE
+          and "adesso - INVOICE_EXPIRY" in _SORGENTE)
+
+    # --- Il giro VERO: i tre esiti su un database vero --------------
+    def mondo(muto=False):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                     "stato TEXT, payment_hash TEXT, creato INT, "
+                     "aggiornato INT)")
+        vero.execute("CREATE TABLE offerte(id INTEGER PRIMARY KEY, "
+                     "ordine_id INT, stato TEXT)")
+        vero.execute("CREATE TABLE rilanci(id INTEGER PRIMARY KEY, "
+                     "stato TEXT, payment_hash TEXT, creato INT, "
+                     "aggiornato INT, annuncio_id INT, tg_id INT, "
+                     "puntata_id INT, delta_sats INT)")
+        vero.execute("CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, "
+                     "annuncio_id INT, tg_id INT, puntata_id INT, "
+                     "rilancio_id INT, importo_sats INT, motivo TEXT, "
+                     "stato TEXT, creato INT, aggiornato INT)")
+        ora = int(_t.time())
+        vero.executemany("INSERT INTO ordini VALUES(?,?,?,?,?)", [
+            (1, "creato", "hash-pagato", ora - 2000, 0),   # pagato, mai visto
+            (2, "creato", "hash-muto",   ora - 2000, 0),   # abbandonato
+            (3, "creato", "hash-pagato", ora - 60,   0)])  # fattura ancora VIVA
+        vero.execute("INSERT INTO offerte VALUES(9,2,'accettata')")
+        vero.executemany("INSERT INTO rilanci VALUES(?,?,?,?,?,?,?,?,?)", [
+            (1, "creato", "hash-pagato", ora - 900, 0, 7, 111, 5, 300),
+            (2, "creato", "hash-muto",   ora - 900, 0, 7, 222, 6, 400),
+            (3, "creato", "hash-pagato", ora - 60,  0, 7, 333, 7, 500)])
+        vero.commit()
+
+        class Con:
+            """close() non chiude davvero: il :memory: deve
+            sopravvivere fra una chiamata e l'altra."""
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        incassati, avvisati, rimborsati = [], [], []
+
+        async def _pagata(h):
+            if muto:
+                raise RuntimeError("LNbits non risponde")
+            return h == "hash-pagato"
+
+        async def _incassa(oid):
+            incassati.append(oid)
+            return {"stato": "locked"}
+
+        async def _notifica(tg, testo):
+            avvisati.append(tg)
+
+        async def _rimborso(rid):
+            rimborsati.append(rid)
+
+        amb = {"db": Con, "time": _t, "invoice_pagata": _pagata,
+               "_incassa_ordine": _incassa, "notifica": _notifica,
+               "_paga_rimborso": _rimborso,
+               "print": lambda *a, **k: None,
+               "INVOICE_EXPIRY": 900, "RILANCIO_EXPIRY": 600}
+        exec(pezzo_async("controlla_abbandonati"), amb)
+        return (amb["controlla_abbandonati"], vero,
+                incassati, avvisati, rimborsati)
+
+    corri, vero, incassati, avvisati, rimborsati = mondo()
+    gira(corri())
+
+    def stato(tab, i):
+        return vero.execute(f"SELECT stato FROM {tab} WHERE id=?",
+                            (i,)).fetchone()["stato"]
+
+    # 1. pagato e mai verificato: si incassa. La riga NON diventa una
+    #    lapide (qui _incassa_ordine e' di cartone: quello vero la
+    #    porta a 'locked', e ha le sue prove)
+    prova("ordine pagato e mai verificato: passa da _incassa_ordine",
+          ([1], "creato"), (incassati, stato("ordini", 1)))
+    # 2. non pagato: LAPIDE, mai DELETE — un saldo deve avere sempre
+    #    una riga su cui posarsi (la regola di annulla_ordine)
+    prova("ordine abbandonato: lapide 'annullato', mai DELETE",
+          ("annullato", 3), (stato("ordini", 2),
+           vero.execute("SELECT COUNT(*) FROM ordini").fetchone()[0]))
+    prova("lapide: l'offerta si scioglie e resta ripagabile",
+          (0, "accettata"),
+          tuple(vero.execute("SELECT ordine_id, stato FROM offerte "
+                             "WHERE id=9").fetchone()))
+    # 3. fattura ancora viva: non si tocca, o si direbbe «annullato» a
+    #    chi sta per pagare
+    prova("ordine con la fattura ancora VIVA: non si guarda nemmeno",
+          "creato", stato("ordini", 3))
+
+    prova("rilancio pagato fuori tempo: 'tardivo', i sats al registro",
+          ("tardivo", 1, "tardivo"),
+          (stato("rilanci", 1),
+           vero.execute("SELECT COUNT(*) FROM rimborsi_asta").fetchone()[0],
+           vero.execute("SELECT motivo FROM rimborsi_asta").fetchone()[0]))
+    prova("rilancio pagato: chi ha pagato lo viene a sapere, e la "
+          "riscossione parte", ([111], 1), (avvisati, len(rimborsati)))
+    prova("rilancio abbandonato: lapide", "annullato", stato("rilanci", 2))
+    prova("rilancio con la fattura viva: non si tocca", "creato",
+          stato("rilanci", 3))
+
+    # --- FAIL-OPEN NEL VERSO GIUSTO --------------------------------
+    # LNbits muto: meglio una riga che si attarda che un pagamento
+    # buttato via. Nessuno la cancella piu' alle sue spalle.
+    corri, vero, incassati, _, _ = mondo(muto=True)
+    gira(corri())
+    prova("LNbits muto: nessuna riga si muove, si riprova al giro dopo",
+          (["creato"] * 3, ["creato"] * 3, []),
+          ([r["stato"] for r in vero.execute("SELECT stato FROM ordini "
+                                             "ORDER BY id")],
+           [r["stato"] for r in vero.execute("SELECT stato FROM rilanci "
+                                             "ORDER BY id")],
+           incassati))
 
 
 def prove_ritiro():
@@ -7385,7 +7554,7 @@ def main():
               prove_nome_nostr,
               prove_senza_condizione, prove_sottocategorie,
               prove_ricategorizza, prove_asta, prove_proxy_asta,
-              prove_annullo,
+              prove_annullo, prove_abbandonati,
               prove_ritiro, prove_disarmo, prove_importo_uscita,
               prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,
