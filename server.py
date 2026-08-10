@@ -1439,7 +1439,10 @@ def init_db():
         contro_sats INTEGER DEFAULT 0,   -- la controproposta (0 = nessuna)
         contro_eur REAL DEFAULT 0,
         stato TEXT DEFAULT 'proposta',   -- proposta | controproposta | accettata |
-                                         -- rifiutata | scaduta | decaduta | conclusa
+                                         -- rifiutata | scaduta | decaduta |
+                                         -- conclusa | ritirata (la lapide del
+                                         -- compratore che ci ripensa: la riga
+                                         -- resta, come per gli ordini annullati)
         scadenza INTEGER DEFAULT 0,      -- il prossimo appuntamento:
                                          -- risposta oppure pagamento
         ordine_id INTEGER DEFAULT 0,     -- l'ordine nato dall'offerta
@@ -11711,6 +11714,135 @@ async def rispondi_offerta(offerta_id: int, req: Request,
         f"(avevi offerto {avevi}). Accetta o rifiuta dalla scheda Ordini "
         f"entro {ORE_RISPOSTA_OFFERTA} ore.{link}")
     return {"ok": True, "stato": "controproposta"}
+
+
+@app.post("/api/offerte/{offerta_id}/ritira")
+async def ritira_offerta(offerta_id: int, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Il compratore ritira la sua offerta (ago 2026, da un caso vero:
+    un'offerta mandata per sbaglio non si poteva togliere in nessun
+    modo — si aspettava la scadenza o si chiedeva al venditore di
+    rifiutarla, e intanto la guardia `attive` di fai_offerta impediva
+    perfino di rifarla giusta).
+
+    E' il GEMELLO SPECULARE DEL RIFIUTO: quello e' la chiusura da parte
+    del destinatario, questo da parte del proponente. Per questo NON e'
+    un'azione di rispondi_offerta — il suo gate risponde alla domanda
+    «di chi e' il turno», e su una 'proposta' il turno e' del VENDITORE:
+    infilarcelo dentro vorrebbe dire un'eccezione al gate, cioe'
+    romperlo. Da endpoint suo, in piu', la guardia di proprieta' sta
+    dentro la WHERE col 400 dei fratelli (il patto dell'audit), che il
+    gemello non ha: lui legge per solo id e risponde 404.
+
+    QUI NON C'E' MAI ESCROW, ed e' la riga da non ammorbidire: un'offerta
+    e' la cedola che serve a FABBRICARE un ordine, e finche' l'ordine non
+    c'e' non si e' mosso un sat. Quando invece l'ordine c'e' gia', il
+    prezzo VIVE NELL'ORDINE (`ordini.prezzo_sats`, congelato alla
+    invoice) e da qui non si tocca — chi un domani volesse «sistemare»
+    dal ritiro un ordine appeso sta scrivendo il bug, non la cura.
+
+    Si ritira da 'proposta' e da 'accettata'. NON da 'controproposta':
+    li' il compratore ha gia' «Rifiuta», che fa la stessa identica cosa
+    e avvisa — due nomi per lo stesso gesto sarebbero un bivio senza
+    risposta giusta davanti a chi deve scegliere."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    # LA GUARDIA DI PROPRIETA' NELLA WHERE: mai un 404 che distingue
+    # «non e' tua» da «non esiste» — chi enumera non impara niente.
+    off = con.execute(
+        "SELECT o.*, a.titolo FROM offerte o "
+        "JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.id=? AND o.compratore_id=?",
+        (offerta_id, user["id"])).fetchone()
+    if not off:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    adesso = int(time.time())
+    # La scadenza si controlla anche qui, come nel gemello — e non e'
+    # pignoleria: senza, il ritiro di un'accettata gia' morta manderebbe
+    # al venditore «l'acquirente ha ritirato l'accordo» mentre
+    # scadenze_offerte gli dice «non ha completato il pagamento in
+    # tempo». Due messaggi contraddittori sullo stesso fatto, e il
+    # bugiardo sarebbe questo. (Imperfezione EREDITATA dai tre chiamanti
+    # che gia' fanno cosi': il timbro qui non notifica nessuno, e dopo
+    # il timbro l'orologio non ripesca piu' la riga — quindi la
+    # scadenza il venditore non la sentira'. E' preesistente, non nasce
+    # qui, e vale un cantiere suo.)
+    if off["stato"] in STATI_OFFERTA_VIVI and 0 < off["scadenza"] < adesso:
+        con.execute("UPDATE offerte SET stato='scaduta', aggiornato=? "
+                    "WHERE id=?", (adesso, offerta_id))
+        con.commit()
+        con.close()
+        raise HTTPException(400, "Questa offerta è scaduta")
+    if off["stato"] == "controproposta":
+        con.close()
+        raise HTTPException(400, "C'è una controproposta da valutare: per "
+                                 "chiudere qui la strada è «Rifiuta»")
+    if off["stato"] not in ("proposta", "accettata"):
+        con.close()
+        raise HTTPException(400, "Questa offerta è già chiusa")
+    if off["ordine_id"]:
+        # A bloccare e' l'ordine VIVO, non l'esistenza del numero: con
+        # un `if off["ordine_id"]` secco un id appeso a un ordine non
+        # piu' 'creato' darebbe per sempre «prima annulla l'ordine»,
+        # mentre annulla_ordine su un non-'creato' risponde
+        # «Operazione non permessa» — un vicolo cieco senza uscita. E'
+        # la forma gia' in casa in compra() e _compra_set().
+        viva = con.execute("SELECT id FROM ordini WHERE id=? AND "
+                           "stato='creato'",
+                           (off["ordine_id"],)).fetchone()
+        if viva:
+            con.close()
+            raise HTTPException(400, "Hai una fattura in corso su questa "
+                                     "offerta: pagala o annullala dagli "
+                                     "Ordini, poi potrai ritirarla")
+    # Il CAS sullo stato LETTO (mai un IN: se ho premuto guardando
+    # «proposta» e nel frattempo e' diventata un accordo, il 409 mi fa
+    # rileggere e ritirare consapevolmente). Il motivo vero non e' la
+    # concorrenza — qui non c'e' un await in mezzo — ma il DOPPIO TAP su
+    # rete lenta: senza, il secondo POST manda al venditore una SECONDA
+    # notifica. `scadenza=0` come fa il ramo `rifiuta`: senza, il client
+    # calcolerebbe un «~-3h» su una riga ormai chiusa.
+    cur = con.execute("UPDATE offerte SET stato='ritirata', scadenza=0, "
+                      "aggiornato=? WHERE id=? AND compratore_id=? AND "
+                      "stato=?",
+                      (adesso, offerta_id, user["id"], off["stato"]))
+    if cur.rowcount == 0:
+        con.commit()
+        con.close()
+        # Largo apposta: puo' essere il venditore che ha appena
+        # risposto, il tuo secondo tocco, o lo stock esaurito da un
+        # altro (che fa decadere le offerte vive).
+        raise HTTPException(409, "Questa offerta è appena cambiata: "
+                                 "ricarica e guarda com'è adesso")
+    con.commit()
+    con.close()
+    # Il venditore lo viene a sapere SEMPRE (decisione di Andrea): la
+    # proposta gliel'abbiamo gia' annunciata noi con «💰 Hai ricevuto
+    # un'offerta!», quindi il silenzio lo lascerebbe a rispondere a un
+    # fantasma — e nel progetto la chiusura unilaterale di una
+    # trattativa si dice sempre all'altra parte (il rifiuto lo fa nei
+    # due versi). Titolo scappato all'assegnazione, una volta sola.
+    titolo = html.escape(off["titolo"][:60])
+    cifra = _cifra_accordo(off["valuta"], *_importo_accordo(off),
+                           off["quantita"])
+    if off["stato"] == "accettata":
+        # Qui aveva detto si' e aspettava dei sats: «nessun sat si era
+        # mosso» e' la riga che conta, poteva credere di averli in
+        # arrivo.
+        await notifica(off["venditore_id"],
+            f"L'acquirente ha ritirato l'accordo su «{titolo}» ({cifra}): "
+            f"non pagherà. Nessun sat si era mosso — l'annuncio resta in "
+            f"vetrina e torna comprabile a prezzo pieno da chiunque."
+            f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}")
+    else:
+        # Asciutta: non e' un evento nuovo, e' la correzione di uno
+        # vecchio.
+        await notifica(off["venditore_id"],
+            f"L'offerta di {cifra} per «{titolo}» è stata ritirata: non "
+            f"c'è più niente a cui rispondere. L'annuncio resta in "
+            f"vetrina come sempre.")
+    return {"ok": True, "stato": "ritirata"}
 
 
 # ------------------------ API: OFFERTA LAMPO ------------------------

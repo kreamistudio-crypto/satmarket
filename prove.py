@@ -9500,6 +9500,300 @@ def prove_ai_segnala():
               parola in corpo)
 
 
+def prove_ritiro_offerta():
+    """Il compratore ritira la sua offerta (ago 2026, da un caso vero:
+    un'offerta mandata per sbaglio non si poteva togliere, e la guardia
+    `attive` impediva perfino di rifarla giusta). Qui si prova che il
+    gesto e' suo e di nessun altro, che non manda mai una notifica
+    doppia, e soprattutto CHE L'ESCROW NON C'ENTRA MAI."""
+    print("\n[il ritiro dell'offerta]")
+    import asyncio
+    import re
+    import sqlite3
+
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    # I giudici VERI, non stub: la lezione di _fmt_sats — uno stub
+    # scritto a mano finisce per imitare anche i bug dell'originale.
+    puro = {}
+    for f in ("_fmt_sats", "_fmt_eur", "_cifra_offerta", "_cifra_accordo",
+              "_importo_accordo"):
+        exec(pezzo(f), puro)
+
+    def mondo():
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute(
+            "CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT, "
+            "compratore_id INT, venditore_id INT, valuta TEXT, "
+            "importo_sats INT, importo_eur REAL, contro_sats INT, "
+            "contro_eur REAL, stato TEXT, scadenza INT, ordine_id INT, "
+            "quantita INT, creato INT, aggiornato INT)")
+        vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                     "titolo TEXT)")
+        vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                     "compratore_id INT, stato TEXT, prezzo_sats INT, "
+                     "payment_hash TEXT)")
+        vero.execute("INSERT INTO annunci VALUES(7,'Miele di castagno')")
+        vero.executemany("INSERT INTO ordini VALUES(?,?,?,?,?)", [
+            (50, 111, "creato", 210000, "hash50"),      # invoice viva
+            (51, 111, "annullato", 210000, "hash51")])  # lapide, fossile
+        futuro = 9_000_000_000
+        righe = [
+            # id, ann, compr, vend, val, imp_s, imp_e, ctr_s, ctr_e,
+            #     stato, scadenza, ordine_id, quantita
+            (1, 7, 111, 222, "sats", 70000, 0, 0, 0,
+             "proposta", futuro, 0, 3),
+            (2, 7, 111, 222, "sats", 70000, 0, 0, 0,
+             "accettata", futuro, 0, 3),
+            (3, 7, 111, 222, "sats", 70000, 0, 80000, 0,
+             "controproposta", futuro, 0, 1),
+            (4, 7, 111, 222, "sats", 70000, 0, 0, 0,
+             "rifiutata", 0, 0, 1),
+            (5, 7, 111, 222, "sats", 70000, 0, 0, 0,
+             "conclusa", 0, 0, 1),
+            (6, 7, 111, 222, "sats", 70000, 0, 0, 0,
+             "proposta", 1, 0, 1),                      # scaduta di fatto
+            (7, 7, 111, 222, "sats", 70000, 0, 0, 0,
+             "accettata", futuro, 50, 3),               # ordine VIVO
+            (8, 7, 111, 222, "sats", 70000, 0, 0, 0,
+             "accettata", futuro, 51, 3),               # ordine fossile
+            (9, 7, 333, 222, "sats", 70000, 0, 0, 0,
+             "proposta", futuro, 0, 1),                 # di un ALTRO
+        ]
+        vero.executemany(
+            "INSERT INTO offerte VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0,0)",
+            righe)
+        vero.commit()
+        return vero
+
+    def ritira(vero, offerta_id, chi):
+        """L'ambiente e' POVERO APPOSTA: non contiene NESSUNO dei nomi
+        che muovono sats. Se un domani il ritiro impara a toccarli, la
+        prova non diventa rossa — ESPLODE con NameError, che e' molto
+        piu' difficile da ignorare."""
+        detti = []
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        async def _notifica(tg_id, testo):
+            detti.append((tg_id, testo))
+
+        amb = {"db": Con, "HTTPException": _H, "notifica": _notifica,
+               "html": __import__("html"), "time": __import__("time"),
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "URL_PUBBLICO": "https://barattolo.store",
+               "STATI_OFFERTA_VIVI": ("proposta", "controproposta",
+                                      "accettata"),
+               "_cifra_accordo": puro["_cifra_accordo"],
+               "_importo_accordo": puro["_importo_accordo"]}
+        exec("async " + pezzo("ritira_offerta"), amb)
+        try:
+            esito = asyncio.new_event_loop().run_until_complete(
+                amb["ritira_offerta"](offerta_id))
+            return esito, detti
+        except _H as e:
+            return f"{e.code} {e.detail}", detti
+
+    def stato_di(vero, i):
+        r = vero.execute("SELECT stato, scadenza FROM offerte WHERE id=?",
+                         (i,)).fetchone()
+        return (r["stato"], r["scadenza"]) if r else None
+
+    # --- 1) il gesto suo, dai due stati che lo ammettono -------------
+    v = mondo()
+    esito, detti = ritira(v, 1, 111)
+    prova("il compratore ritira la sua proposta",
+          ({"ok": True, "stato": "ritirata"}, ("ritirata", 0)),
+          (esito, stato_di(v, 1)))
+    prova("...e il venditore lo viene a sapere", 1, len(detti))
+
+    esito, detti = ritira(v, 2, 111)
+    prova("il compratore ritira un accordo accettato",
+          ({"ok": True, "stato": "ritirata"}, ("ritirata", 0)),
+          (esito, stato_di(v, 2)))
+    prova("...con la riga che dice che nessun sat si era mosso", True,
+          len(detti) == 1 and "Nessun sat si era mosso" in detti[0][1])
+    prova("...e la cifra dell'accordo con le due facce", True,
+          "210.000 sats per 3 pezzi" in detti[0][1])
+
+    # --- 2) di chi NON e' -------------------------------------------
+    prova("il venditore non ritira l'offerta che ha ricevuto",
+          "400 Operazione non permessa", ritira(v, 9, 222)[0])
+    prova("un estraneo non ritira l'offerta altrui",
+          "400 Operazione non permessa", ritira(v, 9, 444)[0])
+    # L'ORACOLO: chi enumera gli id non deve imparare niente.
+    prova("offerta altrui e offerta inesistente rispondono UGUALE",
+          True, ritira(v, 9, 111)[0] == ritira(v, 99999, 111)[0])
+
+    # --- 3) gli stati che non si ritirano ---------------------------
+    esito, detti = ritira(v, 3, 111)
+    prova("dalla controproposta no: li' la strada e' «Rifiuta»", True,
+          esito.startswith("400") and "Rifiuta" in esito)
+    prova("...e la riga non si tocca", ("controproposta", 9_000_000_000),
+          stato_di(v, 3))
+    for i, nome in ((4, "rifiutata"), (5, "conclusa")):
+        prova(f"da {nome}: 400 «già chiusa»",
+              "400 Questa offerta è già chiusa", ritira(v, i, 111)[0])
+    prova("una ritirata non si ritira due volte",
+          "400 Questa offerta è già chiusa", ritira(v, 1, 111)[0])
+
+    # --- 4) la scadenza: si timbra 'scaduta', MAI 'ritirata' ---------
+    esito, detti = ritira(v, 6, 111)
+    prova("l'offerta scaduta di fatto: 400 onesto",
+          "400 Questa offerta è scaduta", esito)
+    prova("...timbrata 'scaduta' e non 'ritirata'", "scaduta",
+          stato_di(v, 6)[0])
+    prova("...e nessuno riceve un messaggio contraddittorio", 0,
+          len(detti))
+
+    # --- 5) l'ordine: blocca solo se e' VIVO -------------------------
+    esito, detti = ritira(v, 7, 111)
+    prova("con una fattura in corso non si ritira", True,
+          esito.startswith("400") and "annullala dagli Ordini" in esito)
+    prova("...e l'offerta resta accettata", "accettata", stato_di(v, 7)[0])
+    prova("...e il venditore non riceve niente", 0, len(detti))
+    # LA PROVA ANTI-VICOLO-CIECO: con la guardia secca
+    # `if off["ordine_id"]` questa diventa rossa, e il compratore
+    # resterebbe incastrato per sempre (annulla_ordine su un ordine non
+    # 'creato' risponde «Operazione non permessa»).
+    prova("con la lapide di un ordine annullato si ritira eccome",
+          {"ok": True, "stato": "ritirata"}, ritira(v, 8, 111)[0])
+
+    # --- 6) il doppio tap: una notifica sola ------------------------
+    v2 = mondo()
+    _, primi = ritira(v2, 1, 111)
+    esito, secondi = ritira(v2, 1, 111)
+    prova("il secondo tocco non manda una seconda notifica",
+          (1, 0), (len(primi), len(secondi)))
+
+    # --- 7) il tetto conta, la strada si riapre ---------------------
+    # Le due query VERE di fai_offerta, girate sullo stesso database:
+    # un mondo dove il compratore ha UNA sola offerta, appena ritirata.
+    v4 = sqlite3.connect(":memory:")
+    v4.row_factory = sqlite3.Row
+    v4.execute("CREATE TABLE offerte(id INTEGER PRIMARY KEY, "
+               "annuncio_id INT, compratore_id INT, stato TEXT)")
+    v4.execute("INSERT INTO offerte VALUES(1,7,111,'ritirata')")
+    attive = v4.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=? AND "
+        "compratore_id=? AND stato IN ('proposta','controproposta',"
+        "'accettata')", (7, 111)).fetchone()["n"]
+    totali = v4.execute(
+        "SELECT COUNT(*) AS n FROM offerte WHERE annuncio_id=? AND "
+        "compratore_id=?", (7, 111)).fetchone()["n"]
+    v4.close()
+    prova("dopo il ritiro non c'e' piu' un'offerta «attiva»: "
+          "si riprova SUBITO", 0, attive)
+    prova("...ma il tentativo resta CONTATO nel tetto", 1, totali)
+
+    # --- 8) L'ESCROW NON C'ENTRA MAI, tre livelli -------------------
+    v3 = mondo()
+    prima = [tuple(r) for r in v3.execute("SELECT * FROM ordini "
+                                          "ORDER BY id")]
+    ritira(v3, 2, 111)
+    ritira(v3, 8, 111)
+    dopo = [tuple(r) for r in v3.execute("SELECT * FROM ordini "
+                                         "ORDER BY id")]
+    prova("nessun ordine si muove di una virgola", prima, dopo)
+    v.close()
+    v2.close()
+    v3.close()
+
+    rit = pezzo("ritira_offerta")
+    # Le sentinelle guardano il CODICE, non la prosa: senza togliere
+    # docstring e commenti, un «risponde 404» scritto in italiano
+    # basterebbe a far sembrare presente un ramo che non c'e' (o
+    # assente uno che c'e'). E si RICUCIONO le stringhe spezzate a
+    # capo, o «AND stato=?» a cavallo di due righe si nasconde alla
+    # ricerca — e' la piega in cui gia' due siti si erano nascosti al
+    # censimento degli euro.
+    corpo = rit.split('"""', 2)[-1]
+    codice = "\n".join(r for r in corpo.split("\n")
+                       if not r.strip().startswith("#"))
+    codice = re.sub(r'"\s*\n\s*"', "", codice)
+    for nome in ("invoice_pagata", "crea_invoice_escrow", "paga_venditore",
+                 "_paga_rimborso", "_rimborsa_compratore", "_sblocca_sats",
+                 "_incassa_ordine", "payment_hash", "rimborsi_asta",
+                 "importo_invoice", "lnbits"):
+        prova(f"il ritiro non nomina mai {nome}", False, nome in codice)
+    # Il livello STRUTTURALE, il piu' forte: non deve indovinare i nomi
+    # di domani. Ogni scrittura del corpo colpisce `offerte` e basta —
+    # cattura anche un «UPDATE ordini SET stato='annullato'», che
+    # nessuna lista di nomi vedrebbe.
+    scritture = re.findall(r"(?:UPDATE|INSERT INTO|DELETE FROM)\s+(\w+)",
+                           codice)
+    prova("ogni scrittura del ritiro colpisce solo `offerte`",
+          {"offerte"}, set(scritture))
+    prova("...e almeno una scrittura c'e' (il predicato VEDE)", True,
+          len(scritture) >= 1)
+
+    # --- 9) le sentinelle di forma ----------------------------------
+    prova("la guardia di proprieta' e' nella WHERE", True,
+          "o.compratore_id=?" in codice)
+    prova("...e non c'e' nessun 404 che faccia da oracolo", False,
+          "HTTPException(404" in codice)
+    prova("il CAS sullo stato letto, col 409", True,
+          "AND stato=?" in codice and "rowcount == 0" in codice
+          and "HTTPException(409" in codice)
+    prova("la lapide, mai un DELETE", True,
+          "stato='ritirata'" in codice
+          and "DELETE FROM offerte" not in codice)
+    prova("la scadenza si azzera (mai un «~-3h» in pagina)", True,
+          "scadenza=0" in codice)
+    prova("il titolo nasce scappato", True, "html.escape(" in codice)
+    prova("la notifica parte DOPO il commit", True,
+          codice.rindex("con.close()") < codice.index("await notifica("))
+    # il patto anti-doppione: nessun await nella sezione critica
+    prova("nessun await prima dell'ultimo close", True,
+          "await" not in codice[:codice.rindex("con.close()")])
+    # Il gate di ruolo del gemello non deve aver imparato niente: il
+    # ritiro e' una rotta sua.
+    prova("rispondi_offerta non ha imparato un'azione «ritira»", False,
+          "ritira" in pezzo("rispondi_offerta"))
+    # «ritirata» vive in un posto solo: se qualcuno la infila in
+    # _incassa_ordine, in scadenze_offerte o in un elenco di stati, si
+    # sente da qui.
+    prova("«ritirata» quotata vive in UN posto solo", 1,
+          _SORGENTE.count("'ritirata'"))
+
+    # --- 10) le eredita' VOLUTE non si perdono ----------------------
+    # Ritirando, il compratore LIBERA il venditore: puo' lanciare la
+    # lampo e andare in ferie. Non e' solo un'uscita, e' anche una
+    # restituzione.
+    prova("il freno della lampo guarda ancora le sole accettate vive",
+          True, "stato='accettata' AND scadenza>?" in _SORGENTE)
+    orolo = pezzo("scadenze_offerte")
+    prova("l'orologio non ripesca le ritirate", True,
+          "'proposta','controproposta','accettata'" in orolo)
+
+    # --- 11) il client -----------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client ha la sua ritiraOfferta", True,
+          "async function ritiraOfferta(" in mini)
+    rend = pezzo_js(mini, "function renderOfferte()", "\nfunction toggleContro")
+    prova("il bottone Ritira compare in DUE rami (proposta e accettata)",
+          2, rend.count("ritiraOfferta("))
+    prova("la ritirata non entra fra le vive", False,
+          "'ritirata'" in rend)
+    rit_js = pezzo_js(mini, "async function ritiraOfferta(")
+    prova("il confirm non hardcoda il tetto: viene dalla busta", True,
+          "max_offerte" in rit_js)
+    prova("il client chiama la rotta giusta", True,
+          "/ritira`" in rit_js or "/ritira'" in rit_js)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -9530,6 +9824,7 @@ def main():
               prove_impersonazione, prove_avviso_spedizione,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
+              prove_ritiro_offerta,
               prove_sat_non_e_barattolo, prove_ai_segnala):
         try:
             f()

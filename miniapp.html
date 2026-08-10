@@ -10602,7 +10602,17 @@ function renderOfferte(){
       : '💰';
     let stato = '', azioni = '';
     if (o.stato==='proposta') {
-      if (compro) stato = `Hai offerto <b>${cifraPezzi(o.valuta,o.importo_sats,o.importo_eur,o.quantita||0)}</b> · risposta entro ~${ore}h`;
+      if (compro) {
+        stato = `Hai offerto <b>${cifraPezzi(o.valuta,o.importo_sats,o.importo_eur,o.quantita||0)}</b> · risposta entro ~${ore}h`;
+        /* Il ripensamento: fino a ieri questa riga era muta e chi
+           sbagliava cifra poteva solo aspettare 48 ore. Il bottone sta
+           a destra e compatto — e' l'unica azione della riga, ma e'
+           un'uscita, non un invito. */
+        azioni = `
+          <div style="display:flex;justify-content:flex-end;margin-top:10px">
+            <button class="btn danger-ghost" style="margin:0;width:auto;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
+          </div>`;
+      }
       else {
         daAgire++;
         stato = `Ti offre <b>${cifraPezzi(o.valuta,o.importo_sats,o.importo_eur,o.quantita||0)}</b> · rispondi entro ~${ore}h`;
@@ -10648,7 +10658,16 @@ function renderOfferte(){
       if (compro) {
         daAgire++;
         stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · paga entro ~${ore}h`;
-        azioni = `<button class="btn orange" style="margin-top:10px" onclick="pagaOfferta(${o.annuncio_id})">⚡ Paga ora</button>`;
+        /* «Paga ora» resta il protagonista e prende lo spazio che
+           avanza; «Ritira» compatto accanto — nessuno e' obbligato a
+           pagare, ma qui il venditore ha gia' detto si' e lo avvisiamo.
+           Il flex e' OBBLIGATORIO: .btn e' width:100%, e due bottoni
+           nudi si impilerebbero a tutta larghezza. */
+        azioni = `
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn orange" style="flex:1;margin:0" onclick="pagaOfferta(${o.annuncio_id})">⚡ Paga ora</button>
+            <button class="btn danger-ghost" style="margin:0;width:auto;flex:none;padding:12px 18px" onclick="ritiraOfferta(${o.id})">Ritira</button>
+          </div>`;
       } else stato = `🤝 Accordo a <b>${cifraAccordo(o)}</b> · in attesa del pagamento (~${ore}h)`;
     }
     return `<div class="order" style="cursor:default">
@@ -10715,6 +10734,46 @@ async function rispondiOfferta(id, azione){
     else toast(azione==='accetta' ? '🤝 Accordo fatto!'
              : azione==='rifiuta' ? 'Offerta rifiutata'
              : '↔ Controproposta inviata');
+  } catch(e) { toast('Rete assente: riprova'); }
+  loadOfferte().then(renderOfferte).catch(()=>{});
+}
+/* Il ritiro del PROPONENTE, gemello speculare del rifiuto: da qui si
+   chiude una trattativa che si e' aperta per sbaglio. Nessun sat e'
+   mai coinvolto — se c'e' gia' una fattura in corso il server dice di
+   no e manda agli Ordini, che e' l'altra strada. */
+async function ritiraOfferta(id){
+  haptic();
+  const o = offerteMie.find(x=>x.id===id); if (!o) return;
+  /* Il confirm e' testo NUDO: le cifre si scrivono a mano, che
+     cifraOff e i suoi gemelli portano dentro dell'HTML. */
+  const a = accordoDi(o), q = o.quantita||0;
+  const cifra = (o.valuta==='eur'
+      ? fmtEur(Math.round(a.eur*Math.max(1,q)*100)/100)+' €'
+      : fmt(a.sats*Math.max(1,q))+' sats');
+  /* Il tetto viene dalla busta di /api/me/offerte: il client non
+     hardcoda mai le cifre. E NIENTE «te ne restano N»: mie_offerte ha
+     un LIMIT, quindi un numero contato qui potrebbe essere falso — e
+     una promessa falsa e' peggio di un'informazione mancante. */
+  const max = (offerteDati && offerteDati.max_offerte) || 0;
+  const coda = max
+    ? `, e il tentativo resta contato: su ogni annuncio si può offrire `
+      + `${max} volte in tutto`
+    : ', e il tentativo resta contato';
+  if (!confirm(o.stato==='accettata'
+      ? `Vuoi ritirare l'accordo a ${cifra}?\n\nIl venditore ha già `
+        + `detto sì e sta aspettando il tuo pagamento: lo avvisiamo che `
+        + `hai ritirato. Nessun sat si è mosso${coda}.`
+      : `Vuoi ritirare la tua offerta di ${cifra}?\n\nIl venditore non `
+        + `potrà più accettarla${coda}. Subito dopo puoi farne una `
+        + `nuova, se te ne restano.`))
+    return;
+  try {
+    const r = await fetch(`${API_BASE}/offerte/${id}/ritira`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) toast(d.detail||'Operazione non riuscita', 5000);
+    else toast('Offerta ritirata');
   } catch(e) { toast('Rete assente: riprova'); }
   loadOfferte().then(renderOfferte).catch(()=>{});
 }
