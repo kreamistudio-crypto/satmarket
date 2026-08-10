@@ -1053,7 +1053,9 @@ def prove_annullo():
     # tagliato senza scroll — queste due righe sono la cura
     prova("foglio: scorre quando il contenuto eccede", True,
           "overflow-y:auto;overscroll-behavior:contain" in mini
-          and "max-height:calc(100dvh - 16px)" in mini)
+          # dall'ago 2026 l'altezza si divide per la scala del testo:
+          # le unita' di viewport non si zoomano (vedi --fs-zoom)
+          and "max-height:calc(100dvh / var(--fs-zoom,1) - 16px)" in mini)
     prova("QR: la misura segue l'altezza disponibile (mai sotto i "
           "170px)", True, "max(170px, 30dvh)" in mini)
 
@@ -4211,6 +4213,34 @@ def prove_pagina_acquisto():
           "me.spedizionieri" in mini)
     prova("...e il client non lo riempie mai da solo", 1,
           mini.count("spedizionieriCatalogo = ["))
+
+    # ---- LA MISURA DEL TESTO (ago 2026) ----
+    # Il cuore e' UNO: `zoom` sulla radice. La trappola che questa
+    # famiglia sorveglia e' l'altra meta' della ricetta — le unita' di
+    # VIEWPORT non si zoomano, quindi ogni altezza in vh/dvh dentro la
+    # radice DEVE dividersi per la scala, o le colonne alte uno
+    # schermo (pagina d'acquisto, riepilogo, fogli) sborderebbero e il
+    # fondo scivolerebbe sotto la piega. E' esattamente il tipo di
+    # riga che qualcuno riscrive «pulendo» un calc.
+    srv = open("server.py", encoding="utf-8").read()
+    prova("la scala del testo si applica in UN posto solo", 1,
+          mini.count("html{zoom:var(--fs-zoom,1)}"))
+    for riga_vh in re.findall(r"(?:min|max)-height:calc\([^;]*?d?vh[^;]*\)",
+                              mini):
+        prova("altezza di viewport divisa per la scala: "
+              + riga_vh[:44], True, "var(--fs-zoom,1)" in riga_vh)
+    prova("la misura vive anche in colonna (segue la persona)", True,
+          "font_scala INTEGER DEFAULT 100" in srv
+          and "SET font_scala=?" in srv)
+    prova("...e il server accetta solo le misure del catalogo", True,
+          "if scala not in SCALE_FONT" in srv)
+    prova("...con 100 nel catalogo: la misura di sempre resta a un "
+          "tocco", True,
+          bool(re.search(r"SCALE_FONT = \([^)]*\b100\b", srv)))
+    prova("le voci arrivano da /api/me, mai hardcodate", True,
+          '"scale_font"' in srv and "me.scale_font" in mini)
+    prova("la scala si accende prima del primo paint (anti-flash)",
+          True, "barattolo_font" in mini.split("</head>")[0])
 
 
 # ====================================================================

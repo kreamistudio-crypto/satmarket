@@ -251,7 +251,25 @@
   }
   .mono{font-family:'JetBrains Mono',monospace}
   .font-brand{font-family:'Baloo 2',sans-serif}
-  #app{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:84px}
+  #app{max-width:520px;margin:0 auto;
+    min-height:calc(100vh / var(--fs-zoom,1));padding-bottom:84px}
+
+  /* ---------- la misura del testo (ago 2026) ----------
+     Una preferenza sola, applicata in UN posto solo: `zoom` sulla
+     radice ingrandisce l'inchiostro insieme ai suoi spazi, e la
+     pagina resta esattamente quella di prima — nessun titolo va a
+     capo dove non andava, nessuna pillola si sfascia. L'alternativa
+     era riscrivere in rem le ~340 misure in px di questo foglio:
+     il diff piu' grande e piu' rischioso mai fatto qui, per una
+     preferenza. Chi non ha `zoom` (WebView vecchie) resta alla
+     misura di sempre: fail-open, non si rompe niente.
+     ATTENZIONE, ed e' la sola trappola: le unita' di VIEWPORT non si
+     zoomano — 100dvh resta l'altezza dello schermo in px veri, cioe'
+     DI PIU' di uno schermo una volta ingrandita. Ogni altezza in vh
+     dentro la radice si divide per la scala, o le colonne alte uno
+     schermo (pagina d'acquisto, riepilogo, fogli) sborderebbero e il
+     fondo scivolerebbe sotto la piega. */
+  html{zoom:var(--fs-zoom,1)}
 
   /* ---------- header ---------- */
   header{
@@ -1483,7 +1501,8 @@
      basso porta la safe-area della gesture bar. Su schermi corti i
      bottoni seguono il contenuto, mai coperti. */
   #view-controllapacco.active,#view-acquisto.active{display:flex;
-    flex-direction:column;min-height:100vh;min-height:100dvh}
+    flex-direction:column;min-height:calc(100vh / var(--fs-zoom,1));
+    min-height:calc(100dvh / var(--fs-zoom,1))}
   .ctrl-corpo{padding:6px var(--pad) calc(26px + env(safe-area-inset-bottom));
     max-width:520px;margin:0 auto;width:100%;
     display:flex;flex-direction:column;flex:1 1 auto}
@@ -1497,7 +1516,7 @@
     /* da desktop #app porta 76px di topbar sopra e 40 sotto: la
        colonna li sconta, o la pagina scrollerebbe sempre di 116px */
     #view-controllapacco.active,#view-acquisto.active{
-      min-height:calc(100vh - 116px)}
+      min-height:calc(100vh / var(--fs-zoom,1) - 116px)}
   }
   /* la testata: il conteggio a sinistra non si stringe mai, i
      francobolli scorrono di lato (overscroll contenuto: la lezione
@@ -2303,7 +2322,8 @@
     position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;
     background:var(--card);border-radius:22px 22px 0 0;padding:20px var(--pad) 28px;
     transform:translateY(100%);transition:transform .22s ease;
-    max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);
+    max-height:calc(100vh / var(--fs-zoom,1) - 16px);
+    max-height:calc(100dvh / var(--fs-zoom,1) - 16px);
     overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   }
   .sheet.open{transform:none}
@@ -2560,7 +2580,8 @@
     .sheet{
       left:50%;right:auto;top:50%;bottom:auto;width:min(560px,92vw);
       max-width:none;margin:0;border-radius:22px;
-      max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);
+      max-height:calc(100vh / var(--fs-zoom,1) - 40px);
+      max-height:calc(100dvh / var(--fs-zoom,1) - 40px);
       transform:translate(-50%,-46%);opacity:0;visibility:hidden;
       transition:transform .22s ease,opacity .22s ease,visibility .22s;
     }
@@ -2607,6 +2628,13 @@
     (tw && tw.initData) ? tw.colorScheme==='dark'
     : matchMedia('(prefers-color-scheme: dark)').matches));
   if (scuro) document.documentElement.dataset.tema = 'scuro';
+  /* e la misura del testo, per la stessa ragione: se la scala
+     arrivasse dopo il primo paint, l'app comparirebbe piccola e poi
+     scatterebbe. La logica completa vive in applicaFont(). */
+  try { const f = parseInt(localStorage.getItem('barattolo_font'), 10);
+        if (f >= 80 && f <= 200 && f !== 100)
+          document.documentElement.style.setProperty('--fs-zoom', f / 100);
+  } catch(e){}
 })();
 </script>
 </head>
@@ -3304,6 +3332,12 @@
             <button class="tema-pill" id="temaChiaro" onclick="setTema('chiaro')">☀️ Chiaro</button>
             <button class="tema-pill" id="temaScuro" onclick="setTema('scuro')">🌙 Scuro</button>
           </div>
+          <div style="font-size:12.5px;color:var(--muted);font-weight:600;
+                      line-height:1.4;margin-top:16px">
+            Quanto grande si legge Barattolo. La scelta ti segue su
+            <b style="color:var(--ink)">ogni dispositivo</b>.</div>
+          <div id="fontPillole"
+               style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"></div>
         </div>
       </div>
 
@@ -6263,6 +6297,69 @@ try { mqScuro.addEventListener('change', ()=>{ if (temaScelto==='auto') applicaT
 tg?.onEvent?.('themeChanged', ()=>{ if (temaScelto==='auto') applicaTema(); });
 if (tg?.initData) el('temaSegnale').textContent = 'il tema di Telegram';
 applicaTema();   // pillole e meta allineati alla preferenza salvata
+
+/* ---------------- la misura del testo ----------------
+   Gemello del tema, con UNA differenza che vale la voce: il tema e'
+   una preferenza del DISPOSITIVO (di sera il telefono e' scuro), la
+   misura del testo e' una preferenza della PERSONA — chi ha bisogno
+   di caratteri grandi ne ha bisogno su ogni schermo. Quindi vive in
+   due posti: localStorage, che l'accende prima del primo paint e
+   serve agli anonimi in vetrina, e la colonna `utenti.font_scala`,
+   che e' quella che la fa ritrovare sul secondo telefono. Il numero
+   e' una percentuale; le voci le manda il server (`scale_font`), il
+   client non ne tiene una copia a memoria. */
+const FONT_CHIAVE = 'barattolo_font';
+const FONT_NOMI = {90:'Piccolo', 100:'Normale', 115:'Grande',
+                   130:'Molto grande'};
+let fontScala = 100;
+let fontScale = [90, 100, 115, 130];   // ripiego finche' /api/me tace
+try { const f = parseInt(localStorage.getItem(FONT_CHIAVE), 10);
+      if (f >= 80 && f <= 200) fontScala = f; } catch(e){}
+function applicaFont(){
+  const r = document.documentElement.style;
+  if (fontScala === 100) r.removeProperty('--fs-zoom');
+  else r.setProperty('--fs-zoom', fontScala / 100);
+  const box = el('fontPillole');
+  if (box) box.innerHTML = fontScale.map(s =>
+    `<button class="tema-pill${s===fontScala?' active':''}" `
+    + `onclick="setFont(${s})">${esc(FONT_NOMI[s] || s + '%')}</button>`
+  ).join('');
+}
+/* Il gesto scrive SUBITO (la scala si vede prima che la rete
+   risponda) e poi lo racconta al server, fail-open: se la chiamata
+   non passa resta comunque giusta su questo dispositivo, e il giro
+   dopo la riscrive. In DEMO e in vetrina il server non c'e' e va
+   bene cosi': la preferenza vale lo stesso. */
+async function setFont(s){
+  if (s !== fontScala) haptic();
+  fontScala = s;
+  try { localStorage.setItem(FONT_CHIAVE, String(s)); } catch(e){}
+  applicaFont();
+  if (DEMO || VETRINA) return;
+  try {
+    await fetch('/api/me/font-scala', {method:'POST',
+      headers:{'Content-Type':'application/json', ...authHdr()},
+      body: JSON.stringify({scala: s})});
+  } catch(e){}
+}
+/* Il valore del server vince su quello locale SOLO al primo sguardo
+   di questa apertura: e' li' che «l'ho scelto sull'altro telefono»
+   diventa vero. Dopo comanda il gesto, che il server l'ha gia'
+   saputo. */
+let fontAdottato = false;
+function adottaFont(me){
+  if (Array.isArray(me?.scale_font) && me.scale_font.length)
+    fontScale = me.scale_font;
+  const s = parseInt(me?.font_scala, 10);
+  if (!fontAdottato && s && s !== fontScala) {
+    fontAdottato = true;
+    fontScala = s;
+    try { localStorage.setItem(FONT_CHIAVE, String(s)); } catch(e){}
+  }
+  fontAdottato = true;
+  applicaFont();
+}
+applicaFont();
 
 /* ---------------- onboarding contestuale ----------------
    Suggerimenti a una riga, mai bloccanti. Tre regole ferree:
@@ -10064,7 +10161,8 @@ function renderProfilo(){
         <div class="rep">${rep}</div>
       </div>
     </div>
-    ${(myUsername||myNegozio)?`<button class="btn ghost" style="margin-top:0" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}`;
+    ${(myUsername||myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" style="margin-top:0" onclick="apriMioNegozio()">👁 Guarda il tuo negozio come lo vedono tutti</button>`:''}
+    ${(myUsername||myNegozio)?`<button class="btn ghost" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}`;
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
   renderLnAddress();
   renderLivello();
@@ -10337,7 +10435,12 @@ async function condividiAnnuncio(){
   const link = `${location.origin}/annuncio/${l.id}`;
   const prezzo = (l.valuta==='eur' && l.priceEur>0)
     ? `${fmtEur(l.priceEur)} €` : `${fmt(l.price)} sats`;
-  const testo = `${l.title} — ${prezzo} su Barattolo 🫙`;
+  /* chi vende, nell'ordine in cui esiste: username Telegram, nome,
+     npub. Uno solo, mai due modi di dire la stessa persona. */
+  const chi = l.username ? `@${l.username}` : (l.seller && l.seller!=='—' ? l.seller : (l.sellerNpub || ''));
+  const testo = `${l.title} — ${prezzo} su Barattolo 🫙`
+    + (chi ? `\nAnnuncio di ${chi}` : '')
+    + `\nPagamento in satoshi`;
   /* Dentro Telegram (initData vero: nel browser lo stub mentirebbe)
      la WebView NON ha navigator.share — si usa il canale di
      Telegram, a scalare: shareURL se il client lo offre, altrimenti
@@ -10360,6 +10463,20 @@ async function condividiAnnuncio(){
     .then(()=>toast('Link copiato 🔗'))
     .catch(()=>toast(link, 5000));
   else toast(link, 5000);
+}
+
+/* «Come mi vedono gli altri»: NON una vista nuova — si apre la
+   STESSA pagina del negozio che vedono tutti, con lo stesso endpoint
+   pubblico. Duplicarla in una versione «anteprima» sarebbe un secondo
+   posto da tenere allineato per sempre, e la prima volta che
+   divergesse l'anteprima direbbe una bugia. `renderNegozio` riconosce
+   gia' che il negozio e' il proprio (niente ponti: non ci si scrive
+   da soli) e il resto — badge, distintivi, promesse, feedback — e'
+   identico byte per byte a quello che legge un estraneo. */
+function apriMioNegozio(){
+  const chi = myNegozio || myUsername;
+  if (!chi) { toast('Non hai ancora un negozio'); return; }
+  apriNegozio(chi);
 }
 
 function condividiMioNegozio(){
@@ -14928,6 +15045,7 @@ async function avvia(){
     myCanaleNotifiche = me.canale_notifiche || '';
     mySuggerimenti = !!me.suggerimenti_annunci;
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
+    adottaFont(me);   // la misura scelta sull'altro telefono
     mySpedizioniere = me.spedizioniere || '';
     spedizionieriCatalogo = me.spedizionieri || [];
     myFerieFino = me.ferie_fino || 0;
