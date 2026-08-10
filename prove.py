@@ -8874,6 +8874,223 @@ def _time_seo():
 
 
 # ====================================================================
+# ====================================================================
+def prove_offerta_quantita():
+    """I PEZZI DELL'ACCORDO (ago 2026). Prima il venditore accettava un
+    prezzo unitario a quantita' INDETERMINATA: articolo = unitario *
+    richiesti, e `richiesti` arrivava dal client senza nessun legame
+    con l'offerta — poteva quindi vendersi tutto lo stock alla cifra
+    scontata e scoprirlo con l'ordine.
+
+    Qui si prova che la quantita' viaggia con l'offerta e COMANDA nei
+    quattro percorsi del conto, che la cifra resta l'UNITARIO (o la
+    divisione a ritroso di _righe_ordine si romperebbe in silenzio),
+    e che le offerte nate prima del cantiere — quantita 0 — restano il
+    mondo di ieri byte per byte."""
+    print("\n[i pezzi dell'accordo]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1. Il giudice puro: le due facce, e solo quando servono -----
+    amb = {}
+    for f in ("_fmt_sats", "_fmt_eur", "_cifra_offerta", "_cifra_accordo"):
+        exec(pezzo(f), amb)
+    cif = amb["_cifra_accordo"]
+    # quantita' NON dichiarata (le offerte di ieri): la cifra e basta
+    prova("accordo senza quantita': la cifra e basta", "40.000 sats",
+          cif("sats", 40_000, 0.0, 0))
+    prova("un pezzo solo: nessuna faccia in piu'", "40.000 sats",
+          cif("sats", 40_000, 0.0, 1))
+    # ...e con piu' pezzi ENTRAMBE, che e' tutto il cantiere
+    prova("piu' pezzi: unitario E totale", "40.000 sats al pezzo × 3 = "
+          "120.000 sats", cif("sats", 40_000, 0.0, 3))
+    prova("in euro il totale e' una moltiplicazione esatta",
+          "15,50 € al pezzo × 3 = 46,50 €", cif("eur", 0, 15.50, 3))
+    # il numero dei pezzi passa dal formattatore di casa: «1.200», mai
+    # un muro di cifre (la lezione di MAX_QUANTITA_ANNUNCIO)
+    prova("anche i pezzi si scrivono leggibili", True,
+          "× 1.200 =" in cif("sats", 10, 0.0, 1200))
+    # e a un pezzo la frase NON deve contenere «al pezzo»: e' il
+    # rumore che il giudice esiste per non fare
+    for q in (0, 1):
+        prova(f"q={q}: la frase non dice «al pezzo»", False,
+              "al pezzo" in cif("eur", 0, 9.99, q))
+
+    # --- 2. L'aritmetica: l'unitario comanda, e la divisione a
+    #        ritroso dell'ordine resta ESATTA ------------------------
+    amb2 = {}
+    for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
+              "_conto_ordine", "_righe_ordine"):
+        exec(pezzo(f), amb2)
+    ann = {"prezzo_sats": 100_000, "prezzo_eur": 0.0, "valuta": "sats",
+           "lampo_percento": 0, "lampo_scadenza": 0}
+    off = {"contro_sats": 0, "contro_eur": 0.0,
+           "importo_sats": 30_000, "importo_eur": 0.0, "quantita": 3}
+    unit = amb2["_unitario_effettivo"](ann, off, 1000, 0.0)
+    prova("l'accordo da' l'UNITARIO, non il totale", 30_000, unit)
+    conto = amb2["_conto_ordine"](unit * 3, 500, 0, 0)
+    prova("articolo = unitario × pezzi", 90_000, conto["articolo"])
+    prova("totale = articolo + spedizione", 90_500, conto["totale"])
+
+    class _Fila:
+        def __init__(self, d): self.d = d
+        def __getitem__(self, k): return self.d[k]
+
+    class _Con:
+        def execute(self, q, p):
+            self.r = _Fila({"titolo": "Vasetti di miele"})
+            return self
+        def fetchone(self): return self.r
+
+    o = {"annuncio_id": 7, "quantita": 3, "prezzo_sats": conto["totale"],
+         "spedizione_sats": 500, "protezione_sats": 0}
+    riga = amb2["_righe_ordine"](_Con(), o)[0]
+    # E' QUI che un accordo sul TOTALE si romperebbe in silenzio: la
+    # divisione a ritroso non tornerebbe piu', e l'unitario sarebbe
+    # sbagliato nell'ordine, nelle notifiche e nel CSV.
+    prova("ordine dell'accordo: unitario esatto a ritroso", 30_000,
+          riga["unitario_sats"])
+    prova("...e i pezzi sono quelli dell'accordo", 3, riga["quantita"])
+
+    # --- 3. La quantita' COMANDA nei quattro percorsi del conto ------
+    # (il patto di _sped_gratis(misura_eur: quattro chiamanti e
+    # quattro soli — i due compratori e i due preventivi)
+    prova("la quantita' dell'accordo comanda nei QUATTRO percorsi", 4,
+          src.count('off["quantita"] > 0'))
+    # il `> 0` e non un `or`: `richiesti = off["quantita"] or 1`
+    # forzerebbe UN pezzo sulle offerte di ieri, cioe' riscriverebbe un
+    # accordo che nessuno ha mai stretto su un numero
+    prova("...col > 0, mai un `or` che confonde lo zero di ieri", False,
+          '= off["quantita"] or' in src)
+    # e il numero del client non si guarda piu' quando l'accordo parla
+    for chi, fine in (("compra", "def crea_ordine_pagato("),
+                      ("_compra_set", "async def _preventivo_set(")):
+        corpo = src[src.index(f"async def {chi}("):src.index(fine)]
+        prova(f"{chi}: la quantita' dell'accordo si IMPONE", True,
+              'off["quantita"] > 0' in corpo)
+
+    # --- 4. L'ORDINE DELLE GUARDIE, che e' la riga da non ammorbidire.
+    # Portare il blocco dell'offerta SOPRA la ripresa sembra la mossa
+    # pulita ed e' una regressione: la guardia `ordine_id` scatterebbe
+    # prima che la ripresa faccia il suo lavoro, e il compratore che
+    # ritenta con la sua stessa offerta prenderebbe un 400 invece di
+    # ritrovarsi la sua fattura.
+    i0 = src.index("async def compra(")
+    prova("compra: il blocco offerta resta DOPO la ripresa", True,
+          src.index("mio = con.execute(", i0)
+          < src.index('if d.get("offerta_id"):', i0))
+    # ...e DOPO il fail-fast dello stock, che e' cio' che rende
+    # necessario il ricontrollo di cortesia quando il numero cambia
+    prova("compra: e dopo il fail-fast dello stock", True,
+          src.index("disponibile = a[\"quantita\"] - _riservati", i0)
+          < src.index('if d.get("offerta_id"):', i0))
+
+    # --- 5. La scrittura: la colonna, e la PRESENZA della chiave -----
+    fai = pezzo("fai_offerta", "\n\n\n@app")
+    prova("fai_offerta: la colonna si scrive", True,
+          "scadenza,quantita," in fai)
+    prova("fai_offerta: dichiarare e' la PRESENZA della chiave", True,
+          'd.get("quantita") not in (None, "")' in fai)
+    prova("fai_offerta: il numero si LIMA allo stock, mai uno scarto",
+          True, 'min(pezzi, max(1, a["quantita"]))' in fai)
+    # il giudice della quantita' dell'ANNUNCIO qui non c'entra: quello
+    # solleva 400 sopra MAX_QUANTITA_ANNUNCIO, e il tetto vero e' lo
+    # stock, che e' piu' stretto
+    prova("fai_offerta: non CHIAMA quantita_da_payload", False,
+          "quantita_da_payload(" in fai)
+    # il titolo nasce SCAPPATO (mancava, mentre i tre fratelli ce
+    # l'avevano): le notifiche sono HTML
+    prova("fai_offerta: il titolo nasce scappato", True,
+          "titolo = html.escape(" in fai)
+    prova("fai_offerta: la notifica dice le due facce", True,
+          "_cifra_accordo(" in fai)
+    # la migrazione c'e' (la PRIMA su `offerte`) e NON inventa un
+    # passato: nessun DEFAULT 1, nessun backfill
+    prova("la migrazione nasce a 0, mai a 1", True,
+          "ALTER TABLE offerte ADD COLUMN quantita INTEGER DEFAULT 0"
+          in src)
+    prova("...e nessun backfill riscrive le offerte di ieri", False,
+          "UPDATE offerte SET quantita" in src)
+
+    # --- 6. Il gemello CLIENT: se diverge, meta' dell'app dice una
+    #        cosa e meta' un'altra sullo stesso accordo --------------
+    prova("il client ha il gemello di _cifra_accordo", True,
+          "function cifraPezzi(" in mini)
+    prova("...e dice la stessa frase", True,
+          "al pezzo × " in mini)
+    prova("cifraAccordo passa i pezzi al gemello", True,
+          "cifraPezzi(o.valuta, a.sats, a.eur, o.quantita||0)" in mini)
+    prova("il foglio manda la quantita' al server", True,
+          "quantita: offQta" in mini)
+    # la quantita' si fotografa all'APERTURA: dentro il foglio non si
+    # cambia, e leggere qtaScelta all'invio la lascerebbe scivolare
+    prova("i pezzi si fotografano all'apertura del foglio", True,
+          "offQta = Math.max(1, Math.min(qtaScelta" in mini)
+
+    # --- 7. Il foglio rifatto: tre pillole, toggle, ✕ ---------------
+    fog = mini[mini.index('id="offertaSheet"'):
+               mini.index('id="puntaSheet"')]
+    prova("il foglio ha la ✕ e non piu' «Annulla»", True,
+          'class="pacco-x"' in fog and ">Annulla<" not in fog)
+    prova("...e il toggle valuta dei suoi fratelli", True,
+          'class="cur-seg inriga"' in fog)
+    prova("la ✕ chiude col motore di navigazione", True,
+          'class="pacco-x" onclick="navIndietro()"' in fog)
+    prova("la terza pillola e' «Personalizzato»", True,
+          ">Personalizzato<" in mini)
+    # le pillole non portano piu' il controvalore: erano due cifre in
+    # concorrenza con quella che conta
+    prova("le pillole dicono la sola percentuale", True,
+          ">−${p}%</button>" in mini)
+    # la riga «se accetta pagheresti» e' morta: diceva un totale senza
+    # la spedizione, cioe' una cosa incompleta
+    prova("la vecchia stima incompleta non c'e' piu'", False,
+          "Se accettata pagheresti" in mini)
+    # il toggle governa la LETTURA: ridisegna il foglio, mai la cifra
+    prova("setValuta ridisegna il foglio aperto", True,
+          "if (el('offertaSheet')?.classList.contains('open')) "
+          "aggiornaFoglioOfferta();" in mini)
+
+    # --- 8. Il tasto offerta porta la quantita', e le DUE superfici
+    #        non possono divergere (giudice unico) -------------------
+    prova("l'etichetta del tasto offerta ha un giudice solo", 1,
+          mini.count("function etichettaOfferta("))
+    # ...e la usano tutte e due le superfici: la barra su mobile e il
+    # gemello in pagina da 768px in su. Sono la stessa cosa vista da
+    # due larghezze e non devono poter dire due numeri.
+    prova("...e la usano tutte e due le superfici", True,
+          "el('bcOfferta').innerHTML = etichettaOfferta(l);" in mini
+          and 'tasto-offerta" onclick="apriOfferta()">'
+              '${etichettaOfferta(l)}' in mini)
+    # tre volte: i due tasti piu' il giro di setQta che li riallinea
+    prova("le due superfici portano la stessa classe", 3,
+          mini.count("tasto-offerta"))
+    prova("setQta riscrive l'etichetta, non solo una cifra", True,
+          "q('.tasto-offerta').forEach(b => b.innerHTML = "
+          "etichettaOfferta(l));" in mini)
+    # con l'accordo la quantita' non si sceglie piu': lo stepper
+    # sparisce, o prometterebbe una scelta che il server non accetta
+    prova("con l'accordo lo stepper di Acquista sparisce", True,
+          "if (off && off.quantita > 0)" in mini)
+    # ...e nel carrello la cella si pinna, o la composizione direbbe 5
+    # mentre il riepilogo e la invoice dicono 3
+    prova("nel carrello la cella si pinna all'accordo", True,
+          "const pinnato = qta && acc && acc.quantita > 0;" in mini)
+
+    # --- 9. ACCETTARE NON RISERVA NIENTE, e col numero scritto il
+    # venditore si sente piu' impegnato di quanto sia: con 4 pezzi puo'
+    # accettare tre offerte da 3 e credersi impegnato per 9. E' il
+    # meccanismo di sempre — l'annuncio non si e' mai bloccato — ma va
+    # ridetto dove il numero si vede.
+    prova("il confirm del venditore lo dice ancora", True,
+          "Accettare non riserva l'oggetto: l'annuncio resta in vetrina"
+          .replace("'", "\\'") in mini)
+    prova("...e ora lo dice anche il pannello", True,
+          "Accettare non blocca i pezzi" in mini)
+    prova("...e la notifica del bot, da cui si accetta di piu'", True,
+          "Accettare non blocca l'oggetto" in src)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -8903,7 +9120,7 @@ def main():
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,
               prove_ricevuta_compratore, prove_titoli_scappati,
-              prove_timbri_periodici):
+              prove_timbri_periodici, prove_offerta_quantita):
         try:
             f()
         except Exception as e:

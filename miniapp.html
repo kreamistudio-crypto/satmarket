@@ -1398,9 +1398,18 @@
      piu' spazio, l'offerta cede — a 360px tutto intero. Si spostano le
      BASI (60/40), che con basi uguali il grow non avrebbe voce: lo
      spazio e' gia' tutto occupato e a decidere e' lo shrink, che segue
-     la base. */
-  #barraCompra.con-qta .bc-recinto{flex-basis:60%}
-  #barraCompra.con-qta #bcOfferta{flex-basis:40%;font-size:14px;padding:8px 6px 9px}
+     la base.
+     Dall'ago 2026 anche l'offerta porta un numero, e il 60/40 nato
+     quando l'altro lato era nudo si e' rimisurato a schermo: 56/44 —
+     lo stepper «− N +» resta piu' largo di un «× N», quindi il lato
+     Acquista tiene il vantaggio, ma non tutto quello di prima. */
+  #barraCompra.con-qta .bc-recinto{flex-basis:56%}
+  #barraCompra.con-qta #bcOfferta{flex-basis:44%;font-size:14px;padding:8px 6px 9px}
+  /* Il numero statico dentro un bottone: sul tasto offerta, e su
+     «Acquista» quando un accordo ha gia' fissato i pezzi. Non cede
+     MAI — a stringersi e' la parola, come nella riga meta della
+     card. */
+  .off-qta{margin-left:6px;white-space:nowrap}
   /* Nella barra lo stepper si accosta alla scritta (margine 0: resta
      solo il gap di 8px del bottone). Col margine di 8 il gruppo era
      largo 16px in piu' e, restando centrato, spingeva «Acquista» a 7px
@@ -2461,6 +2470,12 @@
   .sheet.open{transform:none}
   .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--field-line);margin:0 auto 14px}
   .sheet h3{font-family:'Baloo 2',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
+  /* La testata di un foglio: titolo, e a destra gli inquilini di
+     servizio (toggle valuta, ✕). A 320px stanno in tre su una riga
+     sola, e a stringersi dev'essere il TITOLO — mai la via d'uscita. */
+  .sheet-testa{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .sheet-testa h3{flex:1;min-width:0;margin-bottom:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* il foglio-picker di categoria e condizioni */
   .picker-lista{max-height:56vh;overflow-y:auto;margin:6px 0 4px}
   .picker-voce{width:100%;display:flex;align-items:center;gap:12px;border:0;background:none;
@@ -3605,7 +3620,7 @@ document.getElementById('cartello')?.remove();</script>
          Attorno SOLO a lui il richiamo dell'escrow: contorno
          tratteggiato verde col lucchettino a cavallo del bordo, la
          firma del recinto che si ripete dove si compra. -->
-    <button class="btn ghost" id="bcOfferta" onclick="apriOfferta()">Fai un'offerta</button>
+    <button class="btn ghost tasto-offerta" id="bcOfferta" onclick="apriOfferta()">Fai un'offerta</button>
     <div class="bc-recinto">
       <span class="bc-lucchetto" aria-hidden="true">🔒</span>
       <button class="btn orange" id="bcCompra" onclick="compraDaBarra()">Acquista</button>
@@ -3768,22 +3783,36 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- ============ SHEET OFFERTA (contrattazione sul prezzo) ============ -->
-  <div class="sheet" id="offertaSheet">
+  <div class="sheet" id="offertaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="offTitolo">
     <div class="grab"></div>
-    <h3>💰 Fai un'offerta</h3>
-    <!-- La testata (miniatura + titolo + listino) la scrive apriOfferta() -->
+    <!-- La testata: titolo, il toggle valuta dei suoi fratelli e la ✕
+         di casa. `.pacco-x` e' nata nella testata del carrello ma e'
+         IL ✕ dell'app: un secondo nome per la stessa forma sarebbe
+         peggio del nome che invecchia. Chiude con navIndietro(), mai
+         closeSheet() — il patto del motore di navigazione. -->
+    <div class="sheet-testa">
+      <h3 id="offTitolo">💰 Fai un'offerta</h3>
+      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+      </div>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <!-- Miniatura + titolo + i pezzi + listino: la scrive il render -->
     <div id="offTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
-    <!-- Le scorciatoie ancorano su sconti ragionevoli; il campo libero
-         parla la valuta del listino -->
+    <!-- Tre scorciatoie: due sconti ancorati e il campo libero. Le
+         cifre NON stanno sulle pillole — a dire quanto si offre e'
+         la riga qui sotto, che e' una sola e non si contraddice. -->
     <div class="consegna-scelta" id="offChips" style="margin:0 0 10px"></div>
-    <div class="field" style="display:flex;gap:10px;align-items:center">
+    <div class="field" id="offCampo" style="display:none;gap:10px;align-items:center">
       <input id="offImporto" autocomplete="off" placeholder="La tua cifra" style="flex:1" oninput="offertaDigitata()">
       <span id="offSuffisso" style="font-weight:800;color:var(--muted)">sats</span>
     </div>
     <div id="offMinimo" style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px"></div>
-    <div id="offStima" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <div id="offRiga" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <button class="btn orange" style="margin-top:12px" onclick="inviaOfferta(this)">💰 Offri</button>
-    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
   <!-- ============ SHEET PUNTATA D'ASTA (ago 2026) ============ -->
@@ -6311,6 +6340,11 @@ function setValuta(v){
   /* e la pagina d'acquisto: si ridisegna dal preventivo in CACHE —
      il toggle e' una conversione di vista, mai un secondo fetch */
   if (el('view-acquisto')?.classList.contains('active')) renderAcquisto();
+  /* e il foglio dell'offerta, se e' aperto: li' il toggle governa la
+     LETTURA (listino e riga dell'offerta), mai la valuta in cui si
+     offre — quella e' del listino, ed e' l'unica in cui l'accordo
+     esiste. Per questo la cifra scritta non si tocca mai. */
+  if (el('offertaSheet')?.classList.contains('open')) aggiornaFoglioOfferta();
 }
 /* I toggle valuta sono due (searchbar e dettaglio) e vanno accesi
    insieme: si pescano per `data-cur`, non per id */
@@ -6631,8 +6665,31 @@ function stepperMini(n, meno, piu, offMeno, offPiu, etMeno){
    nella barra, due istanze gemelle aggiornate insieme per classe. */
 function stepperAcquista(l){
   if ((l.quantita||1) <= 1) return '';
+  /* Con un accordo che dichiara i pezzi la quantita' non si sceglie
+     piu': si dice. Uno stepper li' prometterebbe una scelta che il
+     server non accetta — la quantita' dell'accordo comanda, ed e'
+     esatta, non un tetto. Il numero pero' resta visibile. */
+  const off = offertaAccettataPer(l.id);
+  if (off && off.quantita > 0)
+    return `<span class="off-qta mono">× ${fmt(qtaScelta)}</span>`;
   return stepperMini(qtaScelta, 'setQta(-1)', 'setQta(1)',
                      qtaScelta <= 1, qtaScelta >= (l.quantita||1));
+}
+/* L'ETICHETTA DEL TASTO OFFERTA (ago 2026): porta la quantita' come
+   il suo gemello, cosi' i pezzi si vedono PRIMA di aprire il foglio.
+   Non uno stepper — da li' la quantita' non si cambia, e due stepper
+   in fila litigherebbero: un numero statico, l'eco del × N del conto.
+   L'etichetta si ACCORCIA quando porta il numero, e la ragione e'
+   misurata: a 320px la barra concede a questo tasto ~118px, «Fai
+   un'offerta» ne chiede gia' ~110 e il numero sfora. «Offri» non e'
+   una parola nuova — e' il verbo del bottone d'invio del foglio.
+   Giudice UNICO delle DUE superfici (la barra su mobile, il gemello
+   in pagina da 768px in su): sono la stessa cosa vista da due
+   larghezze, e non devono poter dire due numeri. */
+function etichettaOfferta(l){
+  const n = Math.min(qtaScelta, l.quantita||1);
+  return n <= 1 ? 'Fai un\'offerta'
+                : `Offri<span class="off-qta mono">× ${fmt(n)}</span>`;
 }
 function setQta(d){
   const l = currentListing; if (!l) return;
@@ -6647,6 +6704,11 @@ function setQta(d){
   q('.qta-mini .qm-num').forEach(n => n.textContent = fmt(qtaScelta));
   q('.qta-mini .qm-meno').forEach(b => b.classList.toggle('off', qtaScelta <= 1));
   q('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= (l.quantita||1)));
+  /* Il tasto offerta segue lo stesso giro: qui non si sostituisce una
+     cifra ma si RISCRIVE l'etichetta, che a un pezzo torna «Fai
+     un'offerta» — e si riscrivono tutte e due le superfici, o quella
+     nascosta ricomparirebbe col numero di prima. */
+  q('.tasto-offerta').forEach(b => b.innerHTML = etichettaOfferta(l));
   haptic();
 }
 function sceltaConsegna(l){
@@ -7252,6 +7314,7 @@ function aggiornaBarraCompra(view){
   el('barraCompra').classList.toggle('con-qta', (l.quantita||1) > 1);
   /* con un accordo stretto l'offerta non si rifa': come in pagina */
   el('bcOfferta').style.display = offertaAccettataPer(l.id) ? 'none' : '';
+  el('bcOfferta').innerHTML = etichettaOfferta(l);
 }
 
 /* --------- «Altri oggetti di questo venditore» (lug 2026) ----------
@@ -7830,6 +7893,13 @@ function renderAcquisto(){
       <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}</span>
     </div>`;
   }
+  /* L'accordo che fissa i pezzi: si dice, invece di far scoprire da un
+     numero che non si puo' toccare perche' non c'e' piu' lo stepper.
+     Il numero viene dal PREVENTIVO (p.quantita), che e' quello che il
+     server ha imposto — mai da qtaScelta, che il client puo' avere
+     vecchio. */
+  const accQta = (d.offertaId && (p.quantita||1) > 1)
+    ? `<div class="acq-nota">🤝 Accordo per <b>${fmt(p.quantita)} pezzi</b> al prezzo pattuito.</div>` : '';
   /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
      (decisione di Andrea, ago 2026: il totale con dentro l'oggetto
      si leggeva come «costo di spedizione» — il totale lo dice IL
@@ -7954,7 +8024,7 @@ function renderAcquisto(){
   const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
-  box.innerHTML = `${articoli}${vie}${campoPunto}${note}
+  box.innerHTML = `${articoli}${accQta}${vie}${campoPunto}${note}
     <div class="section-label">Il conto</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
@@ -8127,7 +8197,21 @@ function cellaPacco(x){
         ? `il carrello è pieno: ${MAX_PACCO} oggetti diversi` : '');
   const segno = !qta ? ''
     : `<span class="pacco-spunta${qta>1?' conta':''}" aria-hidden="true">${qta>1?fmt(qta):'✓'}</span>`;
-  const comando = qta
+  /* L'ACCORDO PINNA LA CELLA (ago 2026): se su questo pezzo c'e'
+     un'offerta accettata che dichiara i pezzi, la quantita' non si
+     tocca — il server impone quella, e uno stepper qui direbbe 5
+     mentre il riepilogo e la invoice dicono 3. Resta il numero e il
+     modo di togliere il pezzo dal carrello. */
+  const acc = offertaAccettataPer(x.id);
+  const pinnato = qta && acc && acc.quantita > 0;
+  const comando = pinnato
+    /* stesso chip, ma il «+» e' spento e il «−» toglie la RIGA intera:
+       un accordo si prende o si lascia, non si lima. Cosi' resta la
+       via d'uscita — senza, il pezzo non si potrebbe piu' togliere. */
+    ? `<div class="btn ghost pacco-btn dentro">${stepperMini(qta,
+         `setQtaPacco(${x.id},${-qta})`, '', false, true,
+         'Togli dal carrello')}</div>`
+    : qta
     ? `<div class="btn ghost pacco-btn dentro">${stepperMini(qta,
          `setQtaPacco(${x.id},-1)`, `setQtaPacco(${x.id},1)`,
          false, qta >= (x.quantita||1),
@@ -8344,7 +8428,13 @@ function aggiungiAlPacco(id){
   if (motivoEsclusione(x)) return;      /* cintura: il bottone era spento */
   if (setScelte.size >= MAX_PACCO)      /* il tetto conta le RIGHE, vedi MAX_PACCO */
     { toast(`Il carrello è pieno: al massimo ${MAX_PACCO} oggetti diversi`); return; }
-  setScelte.set(id, 1); haptic();
+  /* con un accordo che dichiara i pezzi si entra gia' con QUELLI: e'
+     la quantita' che il server impone, e partire da 1 farebbe vedere
+     un numero che al conto non sopravvive */
+  const acc = offertaAccettataPer(id);
+  setScelte.set(id, (acc && acc.quantita > 0)
+    ? Math.min(acc.quantita, x.quantita||1) : 1);
+  haptic();
   /* si ridisegna TUTTA la griglia, non la sola cella: l'intersezione
      delle strade puo' aver spento (o riacceso) altri candidati */
   rinfrescaViste();
@@ -8534,7 +8624,12 @@ function openDetail(id){
   const esa = esaurito(l);
   const ferie = !mio && !esa && inFerie(l);
   consegnaScelta = 'spedizione';   // ogni dettaglio riparte dal default
-  qtaScelta = 1;                   // e i pezzi ripartono da uno
+  /* I pezzi ripartono da uno — TRANNE con un accordo che li dichiara:
+     li' la quantita' non e' piu' una scelta, e' il patto. Il server la
+     impone comunque (il numero del client si ignora): qui si fa in
+     modo che a schermo si veda quella vera, invece di uno stepper che
+     promette una scelta che non c'e' piu'. */
+  qtaScelta = (offAcc && offAcc.quantita > 0) ? offAcc.quantita : 1;
   /* Sulla foto (o sul segnaposto emoji) fluttuano i cerchietti di
      carta: il ritorno al mercatino a sinistra — c'e' SEMPRE, anche in
      DEMO — e il condividi a destra (in DEMO no: il link punterebbe
@@ -8676,7 +8771,7 @@ function openDetail(id){
                   tempi e Lightning si leggono di la' — e «(escrow)»
                   con loro, che la prima spiegazione lunga ora vive li'. -->
              <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
-             ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b> — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
+             ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b>${offAcc.quantita > 1 ? ` — l'accordo è per ${fmt(offAcc.quantita)} pezzi` : ''} — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
              ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai ${TEMPI.confermaDig} ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              <!-- Il ⚡ «Compra subito» NWC non vive piu' qui (ago
                   2026): l'ordine nasce SOLO dalla pagina d'acquisto,
@@ -8690,7 +8785,7 @@ function openDetail(id){
                   qui sopra. Invoice, wallet, NWC e conti si raccontano
                   nella pagina dedicata. -->
            </div>
-           ${offAcc ? '' : `<button class="btn ghost offerta-pagina" onclick="apriOfferta()">Fai un'offerta</button>`}`}
+           ${offAcc ? '' : `<button class="btn ghost offerta-pagina tasto-offerta" onclick="apriOfferta()">${etichettaOfferta(l)}</button>`}`}
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
     </div>`;
@@ -9884,15 +9979,39 @@ function accordoDi(o){
   const c = o.contro_sats>0 || o.contro_eur>0;
   return {sats: c?o.contro_sats:o.importo_sats, eur: c?o.contro_eur:o.importo_eur};
 }
-function cifraAccordo(o){ const a = accordoDi(o); return cifraOff(o.valuta, a.sats, a.eur); }
+/* Il gemello client di _cifra_accordo: con UN pezzo (o con la
+   quantita' non dichiarata) la cifra e basta; con piu' pezzi ENTRAMBE
+   le facce — l'unitario, che si confronta col listino, e il totale,
+   che e' quello che si incassa. Se i due gemelli divergessero, meta'
+   dell'app direbbe una cosa e meta' un'altra sullo stesso accordo. */
+function cifraPezzi(valuta, sats, eur, q){
+  const unitaria = cifraOff(valuta, sats, eur);
+  if (!(q > 1)) return unitaria;
+  return `${unitaria} al pezzo × ${fmt(q)} = `
+    + cifraOff(valuta, sats*q, Math.round(eur*q*100)/100);
+}
+function cifraAccordo(o){
+  const a = accordoDi(o);
+  return cifraPezzi(o.valuta, a.sats, a.eur, o.quantita||0);
+}
 function offertaAccettataPer(annuncioId){
   if (DEMO || VETRINA) return null;
   return offerteMie.find(o => o.annuncio_id===annuncioId
     && o.stato==='accettata' && o.compratore_id===myTgId) || null;
 }
 
-/* Il foglio: scorciatoie -10%/-20%, campo libero nella valuta del
-   listino, stima live del totale. Le guardie dentro, come startBuy. */
+/* I pezzi che l'offerta si porta dietro: fotografati all'apertura dal
+   numero scelto accanto ad «Acquista», e da li' in poi immutabili —
+   dentro il foglio la quantita' non si cambia, si tratta soltanto. */
+let offQta = 1;
+/* Quale scorciatoia e' accesa: '10' | '20' | 'libero' | '' (nessuna).
+   E' lei a decidere anche se il campo si vede: con uno sconto ancorato
+   la cifra la dice la riga, il campo servirebbe solo a confondere. */
+let offScelta = '';
+
+/* Il foglio: tre scorciatoie (−10%, −20%, Personalizzato), la riga che
+   dice quanto si sta offrendo e per quanti pezzi, e il toggle valuta
+   dei suoi fratelli. Le guardie dentro, come startBuy. */
 function apriOfferta(){
   haptic();
   if (VETRINA) {
@@ -9907,30 +10026,13 @@ function apriOfferta(){
     toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
     return;
   }
-  const inEur = l.valuta==='eur' && l.priceEur>0;
-  el('offTestata').innerHTML = `
-    ${l.thumbs && l.thumbs[0]
-      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
-      : `<span style="font-size:28px">${l.emoji}</span>`}
-    <div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
-    <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${inEur ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span></div>`;
-  el('offChips').innerHTML = [10,20].map(p => {
-    const v = offertaSconto(l, p);
-    return `<button class="consegna-pill" data-p="${p}" onclick="offertaChip(${p})">−${p}% · ${inEur ? fmtEur(v) : fmt(v)}</button>`;
-  }).join('');
-  const campo = el('offImporto');
-  campo.value = '';
-  campo.inputMode = inEur ? 'decimal' : 'numeric';
-  campo.placeholder = inEur ? '15,50' : fmt(offertaSconto(l, 15));
-  el('offSuffisso').textContent = inEur ? '€' : 'sats';
-  el('offMinimo').textContent = offertaMinPercento > 0
-    ? `Le offerte partono da ${inEur
-        ? fmtEur(Math.round(l.priceEur*offertaMinPercento)/100)+' €'
-        : fmt(Math.ceil(l.price*offertaMinPercento/100))+' sats'} `
-      + `(${offertaMinPercento}% del listino)` : '';
-  offertaDigitata();
+  offQta = Math.max(1, Math.min(qtaScelta, l.quantita||1));
+  offScelta = '';
+  el('offImporto').value = '';
+  aggiornaFoglioOfferta();
   el('sheetBg').classList.add('open');
   el('offertaSheet').classList.add('open');
+  aggiornaCurToggle();   // il toggle appena nato dice la verita'
 }
 /* il listino meno p%: EUR a 2 decimali, sats interi */
 function offertaSconto(l, p){
@@ -9938,43 +10040,99 @@ function offertaSconto(l, p){
     ? Math.round(l.priceEur*(100-p))/100
     : Math.round(l.price*(100-p)/100);
 }
-function offertaChip(p){
-  haptic();
+/* La cifra dell'offerta nella valuta LETTA, con la regola del ≈ di
+   cifraCtrl. Ma se la vista chiede una conversione e il cambio non e'
+   vivo si parla la valuta del LISTINO, che e' sempre esatta: qui il
+   numero conta davvero, e un «≈» calcolato sul valore di riserva
+   sarebbe un numero inventato in faccia a chi sta per impegnarsi. */
+function cifraOfferta(l, sats, eurNativo){
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  if (((valutaVista==='eur') !== inEur) && !cambioVivo)
+    return inEur ? fmtEur(eurNativo)+'<span class="unit eur">€</span>'
+                 : fmt(sats)+'<span class="unit">sats</span>';
+  return cifraCtrl(sats, inEur ? '≈ ' : '', eurNativo);
+}
+/* Il render del foglio: testata, scorciatoie, campo e riga. Lo
+   richiama anche setValuta — il toggle e' una conversione di VISTA e
+   non tocca ne' la cifra scritta ne' la valuta in cui si offre. */
+function aggiornaFoglioOfferta(){
   const l = currentListing; if (!l) return;
-  const v = offertaSconto(l, p);
-  el('offImporto').value = (l.valuta==='eur' && l.priceEur>0)
-    ? String(v.toFixed(2)).replace('.', ',') : String(v);
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  el('offTestata').innerHTML = `
+    ${l.thumbs && l.thumbs[0]
+      ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
+      : `<span style="font-size:28px">${l.emoji}</span>`}
+    <div style="min-width:0;flex:1">
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <b style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
+        ${offQta > 1 ? `<span class="mono" style="flex:none;font-size:12.5px;font-weight:800;color:var(--muted)">× ${fmt(offQta)}</span>` : ''}
+      </div>
+      <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${cifraOfferta(l, satsAnnuncio(l), inEur ? l.priceEur : 0)}${offQta > 1 ? ' al pezzo' : ''}</span>
+    </div>`;
+  /* Le pillole non portano piu' il controvalore: erano due cifre in
+     concorrenza con quella che conta, che e' la riga qui sotto. */
+  el('offChips').innerHTML =
+    [10,20].map(p => `<button class="consegna-pill${offScelta===String(p)?' attiva':''}" data-p="${p}" onclick="offertaChip('${p}')">−${p}%</button>`).join('')
+    + `<button class="consegna-pill${offScelta==='libero'?' attiva':''}" onclick="offertaChip('libero')">Personalizzato</button>`;
+  const campo = el('offImporto');
+  campo.inputMode = inEur ? 'decimal' : 'numeric';
+  campo.placeholder = inEur ? '15,50' : fmt(offertaSconto(l, 15));
+  el('offCampo').style.display = offScelta==='libero' ? 'flex' : 'none';
+  /* Il campo scrive SEMPRE nella valuta del listino: e' l'unica in cui
+     l'accordo esiste, e l'unica che il server accetta. */
+  el('offSuffisso').textContent = inEur ? '€' : 'sats';
+  /* Il minimo segue il toggle come il listino e la riga: sono i tre
+     numeri che si confrontano, e in due lingue diverse non si
+     confrontano affatto (visto a schermo: «partono da 90 000 sats»
+     sopra «Offri ≈ 80,09 €»). La valuta in cui SCRIVERE la dice il
+     suffisso del campo, che non cambia mai. */
+  const minEur = inEur ? Math.round(l.priceEur*offertaMinPercento)/100 : 0;
+  const minSats = inEur ? Math.round(minEur/eurPerSat)
+                        : Math.ceil(l.price*offertaMinPercento/100);
+  el('offMinimo').innerHTML = offertaMinPercento > 0
+    ? `Le offerte partono da ${cifraOfferta(l, minSats, minEur)} `
+      + `(${offertaMinPercento}% del listino${offQta > 1 ? ', al pezzo' : ''})` : '';
   offertaDigitata();
 }
-/* La stima live sotto il campo: la matematica di totaleStima con
-   l'articolo offerto. Cambio assente sui listini EUR = onesta' e basta. */
+function offertaChip(scelta){
+  haptic();
+  const l = currentListing; if (!l) return;
+  offScelta = scelta;
+  if (scelta !== 'libero') {
+    const v = offertaSconto(l, Number(scelta));
+    el('offImporto').value = (l.valuta==='eur' && l.priceEur>0)
+      ? String(v.toFixed(2)).replace('.', ',') : String(v);
+  }
+  aggiornaFoglioOfferta();
+  if (scelta === 'libero') el('offImporto').focus({preventScroll:true});
+}
+/* LA RIGA DELL'OFFERTA, che ha preso il posto del «se accetta
+   pagheresti…»: quel totale non comprendeva la spedizione — che si
+   calcola dopo — quindi diceva una cosa incompleta. Questa dice
+   l'unica cosa che qui e' certa: quanto si offre, e per quanti pezzi.
+   Con piu' di un pezzo dice ENTRAMBE le facce, che e' il punto di
+   tutto il cantiere: la cifra e' il prezzo AL PEZZO. */
 function offertaDigitata(){
   const l = currentListing; if (!l) return;
   const inEur = l.valuta==='eur' && l.priceEur>0;
   const grezzo = String(el('offImporto').value||'').trim();
   const v = inEur ? (parseFloat(grezzo.replace(',','.'))||0)
                   : (parseInt(grezzo.replace(/[.\s]/g,''),10)||0);
-  document.querySelectorAll('#offChips .consegna-pill').forEach(b => {
-    const vChip = offertaSconto(l, Number(b.dataset.p));
-    b.classList.toggle('attiva', v>0 && Math.abs(v-vChip)<0.005);
-  });
-  const st = el('offStima');
-  if (v<=0) { st.textContent = ''; return; }
-  if (inEur && !cambioVivo) {
-    st.textContent = `Offri ${fmtEur(v)} € — l'equivalente in sats si vedrà al pagamento`;
-    return;
-  }
-  const artS = inEur ? Math.round(v/eurPerSat) : v;
-  const spedS = sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0;
-  const protS = Math.floor(artS * protPercento / 100);
-  st.innerHTML = `Se accettata pagheresti ≈ <b class="mono" style="color:var(--sats-deep)">${fmt(artS+spedS+protS)}</b> sats totali`
-    + ((spedS>0||protS>0) ? ' (con spedizione e protezione)' : '');
+  const riga = el('offRiga');
+  if (v<=0) { riga.textContent = ''; return; }
+  const sats = inEur ? Math.round(v/eurPerSat) : v;
+  const unitaria = cifraOfferta(l, sats, inEur ? v : 0);
+  if (offQta <= 1) { riga.innerHTML = `Offri <b class="mono">${unitaria}</b>`; return; }
+  const totale = cifraOfferta(l, sats*offQta,
+                              inEur ? Math.round(v*offQta*100)/100 : 0);
+  riga.innerHTML = `Offri <b class="mono">${unitaria}</b> al pezzo `
+    + `× ${fmt(offQta)} = <b class="mono">${totale}</b>`;
 }
 async function inviaOfferta(btn){
   haptic();
   const l = currentListing; if (!l) return;
   const grezzo = String(el('offImporto').value||'').trim();
-  if (!grezzo) { toast('Scrivi la tua cifra'); return; }
+  if (!grezzo) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
   const inEur = l.valuta==='eur' && l.priceEur>0;
   const importo = inEur ? grezzo : grezzo.replace(/[.\s]/g,'');
   const ripristina = bottoneInAttesa(btn, '💰 Invio offerta…');
@@ -9982,7 +10140,7 @@ async function inviaOfferta(btn){
     const r = await fetch(`${API_BASE}/listings/${l.id}/offerta`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({importo})});
+      body: JSON.stringify({importo, quantita: offQta})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail||'Offerta non inviata', 5000); return; }
     closeSheet();
@@ -10203,11 +10361,17 @@ function renderOfferte(){
       : '💰';
     let stato = '', azioni = '';
     if (o.stato==='proposta') {
-      if (compro) stato = `Hai offerto <b>${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}</b> · risposta entro ~${ore}h`;
+      if (compro) stato = `Hai offerto <b>${cifraPezzi(o.valuta,o.importo_sats,o.importo_eur,o.quantita||0)}</b> · risposta entro ~${ore}h`;
       else {
         daAgire++;
-        stato = `Ti offre <b>${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}</b> · rispondi entro ~${ore}h`;
+        stato = `Ti offre <b>${cifraPezzi(o.valuta,o.importo_sats,o.importo_eur,o.quantita||0)}</b> · rispondi entro ~${ore}h`;
+        /* Da quando l'accordo porta un NUMERO il venditore si sente
+           piu' impegnato di quanto sia: un negozio con 4 pezzi puo'
+           accettare tre offerte da 3 e credersi impegnato per 9. Il
+           meccanismo e' quello di sempre — l'annuncio non si e' mai
+           bloccato — ma ora va ridetto dove il numero si vede. */
         azioni = `
+          ${(o.quantita||0) > 1 ? `<div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:10px">Accettare non blocca i pezzi: l'annuncio resta in vetrina e vince chi paga per primo.</div>` : ''}
           <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <button class="btn primary" style="flex:1;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
             <button class="btn ghost" style="flex:1;margin:0" onclick="toggleContro(${o.id})">↔ Controproponi</button>
@@ -10229,13 +10393,16 @@ function renderOfferte(){
     } else if (o.stato==='controproposta') {
       if (compro) {
         daAgire++;
-        stato = `Il venditore propone <b>${cifraOff(o.valuta,o.contro_sats,o.contro_eur)}</b> (avevi offerto ${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}) · entro ~${ore}h`;
+        /* nella parentesi la sola cifra AL PEZZO: la prima meta' ha
+           appena detto per quanti pezzi si tratta, e ripetere le due
+           facce due volte renderebbe la riga illeggibile */
+        stato = `Il venditore propone <b>${cifraPezzi(o.valuta,o.contro_sats,o.contro_eur,o.quantita||0)}</b> (avevi offerto ${cifraOff(o.valuta,o.importo_sats,o.importo_eur)}${(o.quantita||0)>1?' al pezzo':''}) · entro ~${ore}h`;
         azioni = `
           <div style="display:flex;gap:8px;margin-top:10px">
             <button class="btn primary" style="flex:1;margin:0" onclick="rispondiOfferta(${o.id},'accetta')">✓ Accetta</button>
             <button class="btn danger-ghost" style="margin:0" onclick="rispondiOfferta(${o.id},'rifiuta')">Rifiuta</button>
           </div>`;
-      } else stato = `Hai controproposto <b>${cifraOff(o.valuta,o.contro_sats,o.contro_eur)}</b> · in attesa dell'acquirente (~${ore}h)`;
+      } else stato = `Hai controproposto <b>${cifraPezzi(o.valuta,o.contro_sats,o.contro_eur,o.quantita||0)}</b> · in attesa dell'acquirente (~${ore}h)`;
     } else {   /* accettata: si aspetta solo il pagamento */
       if (compro) {
         daAgire++;
@@ -10271,10 +10438,27 @@ async function rispondiOfferta(id, azione){
     if (!importo) { toast('Scrivi la tua controproposta'); return; }
     if (o.valuta!=='eur') importo = importo.replace(/[.\s]/g,'');
   }
+  /* Il confirm e' testo NUDO: qui le cifre si scrivono a mano, che
+     cifraOff e i suoi gemelli portano dentro dell'HTML. */
+  const a = accordoDi(o), q = o.quantita||0;
+  const totale = o.valuta==='eur'
+    ? fmtEur(Math.round(a.eur*q*100)/100)+' €'
+    : fmt(a.sats*q)+' sats';
   if (azione==='accetta' && !confirm(o.venditore_id===myTgId
+      /* La prima riga non cambia MAI, ed e' quella che conta: da
+         quando l'accordo porta un numero il venditore si sente piu'
+         impegnato di quanto sia. Con 4 pezzi puo' accettare tre
+         offerte da 3 e credersi impegnato per 9: e' il meccanismo di
+         sempre, ma il numero scritto lo fa sembrare un vincolo. */
       ? 'Accettare non riserva l\'oggetto: l\'annuncio resta in vetrina '
-        + 'e vince chi paga per primo. Se l\'annuncio ha più pezzi, la '
-        + 'cifra vale come prezzo AL PEZZO per la quantità che sceglierà.'
+        + 'e vince chi paga per primo.'
+        + (q > 1
+            ? `\n\nL'accordo è per ${fmt(q)} pezzi al prezzo offerto: se `
+              + `paga, incassi ${totale}.`
+            : q === 1
+            ? '\n\nL\'accordo è per un pezzo solo.'
+            : ' Se l\'annuncio ha più pezzi, la cifra vale come prezzo '
+              + 'AL PEZZO per la quantità che sceglierà.')
         + '\n\nAccetti l\'offerta?'
       : 'Accetti la controproposta? Avrai un tempo limitato per pagare.'))
     return;

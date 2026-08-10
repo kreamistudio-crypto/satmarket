@@ -1425,6 +1425,10 @@ def init_db():
         -- entro la scadenza. L'annuncio NON si blocca mai: vince chi
         -- paga per primo. L'accordo riguarda il SOLO articolo:
         -- spedizione e protezione si sommano sopra come sempre.
+        -- LA CIFRA E' L'UNITARIO, il prezzo AL PEZZO: si confronta col
+        -- listino (che e' unitario, come il minimo e la controproposta)
+        -- e moltiplica alla fine, cosi' la divisione a ritroso di
+        -- _righe_ordine resta esatta. Quanti pezzi lo dice `quantita`.
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         annuncio_id INTEGER NOT NULL,
         compratore_id INTEGER NOT NULL,
@@ -1439,6 +1443,10 @@ def init_db():
         scadenza INTEGER DEFAULT 0,      -- il prossimo appuntamento:
                                          -- risposta oppure pagamento
         ordine_id INTEGER DEFAULT 0,     -- l'ordine nato dall'offerta
+        quantita INTEGER DEFAULT 0,      -- i pezzi dell'accordo (0 = non
+                                         -- dichiarata: le offerte nate
+                                         -- prima del cantiere, quantita
+                                         -- libera come allora)
         creato INTEGER, aggiornato INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_offerte_annuncio
@@ -2194,6 +2202,16 @@ def init_db():
     # al saldo (mai 0: l'esposto parte dalla base, che e' > 0).
     con.execute("UPDATE rilanci SET esposto_sats=offerto_sats "
                 "WHERE esposto_sats=0 AND stato='saldato'")
+    # I pezzi dell'accordo (ago 2026): la PRIMA migrazione su `offerte`,
+    # che era nata completa. Niente backfill e nessun DEFAULT 1: lo zero
+    # dice «quantita' non dichiarata», che per le offerte gia' aperte al
+    # deploy e' la verita' — nessuno ha mai concordato un numero, e
+    # scriverne uno riscriverebbe un accordo stretto in due. Il residuo
+    # si esaurisce da se' in ≤72 ore (48 di risposta + 24 di pagamento).
+    try:
+        con.execute("ALTER TABLE offerte ADD COLUMN quantita INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # Migrazioni per spedizione, consegna e resi
     for colonna in ("corriere TEXT DEFAULT ''", "tracking TEXT DEFAULT ''",
                     "corriere_reso TEXT DEFAULT ''",
@@ -9404,6 +9422,28 @@ def _cifra_offerta(valuta: str, sats: int, eur: float) -> str:
             else f"{_fmt_sats(sats)} sats")
 
 
+def _cifra_accordo(valuta: str, sats: int, eur: float, quantita: int) -> str:
+    """La cifra di un'offerta detta senza equivoci, e il punto dove si
+    toglie l'unico malinteso che qui costa soldi veri.
+
+    Con UN pezzo solo — o con la quantita' non dichiarata (0: le offerte
+    nate prima del cantiere) — e' la cifra e basta: non c'e' ambiguita',
+    e aggiungere sarebbe rumore. Con PIU' pezzi dice ENTRAMBE le facce:
+    l'unitario, che e' quello che si confronta col listino, e il totale,
+    che e' quello che si incassa. Mai una sola delle due.
+
+    PURA e coi CAMPI, non con la riga (il patto di in_ferie): cosi' la
+    stessa funzione serve la riga di `offerte`, il payload appena letto
+    e la prova in CI. Il totale in euro e' round(eur*q, 2): una
+    moltiplicazione esatta, mai una conversione."""
+    unitaria = _cifra_offerta(valuta, sats, eur)
+    if quantita <= 1:
+        return unitaria
+    totale = _cifra_offerta(valuta, sats * quantita,
+                            round(eur * quantita, 2))
+    return f"{unitaria} al pezzo × {_fmt_sats(quantita)} = {totale}"
+
+
 # ------------------ IL CONTO D'ACQUISTO: matematica pura -------------
 # (ago 2026, pagina d'acquisto). Il giudice UNICO del conto: lo usano
 # compra(), _compra_set() e il preventivo della pagina d'acquisto — se
@@ -11298,6 +11338,24 @@ async def fai_offerta(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Le offerte per questo annuncio partono "
                                  f"da {_cifra_offerta(a['valuta'], minimo, minimo)}")
+    # I PEZZI DELL'ACCORDO (ago 2026): la dichiarazione e' la PRESENZA
+    # della chiave, mai il valore — il patto di
+    # spedizione_punto_dichiarata. Chiave assente (il client di ieri non
+    # la manda) = 0, cioe' «non dichiarata», e all'acquisto la quantita'
+    # resta libera com'e' sempre stata. Presente: almeno 1, e LIMATA
+    # allo stock — si lima e non si scarta (il patto di
+    # quantita_tollerante), che un numero fuori scala non deve far
+    # fallire una trattativa. Qui NON serve quantita_da_payload: quello
+    # e' il giudice della quantita' dell'ANNUNCIO e solleva 400 sopra
+    # MAX_QUANTITA_ANNUNCIO, mentre il tetto vero e' lo stock, che e'
+    # piu' stretto.
+    pezzi = 0
+    if d.get("quantita") not in (None, ""):
+        try:
+            pezzi = max(1, int(d["quantita"]))
+        except (TypeError, ValueError):
+            pezzi = 1
+        pezzi = min(pezzi, max(1, a["quantita"]))
     # Le due guardie di conteggio: una offerta attiva alla volta, e un
     # numero chiuso di tentativi totali. Niente await tra i COUNT e
     # l'INSERT: nel server mono-processo il blocco e' atomico (il
@@ -11323,21 +11381,34 @@ async def fai_offerta(annuncio_id: int, req: Request,
     scadenza = adesso + ORE_RISPOSTA_OFFERTA * 3600
     con.execute(
         "INSERT INTO offerte(annuncio_id,compratore_id,venditore_id,"
-        "valuta,importo_sats,importo_eur,stato,scadenza,creato,aggiornato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?)",
+        "valuta,importo_sats,importo_eur,stato,scadenza,quantita,"
+        "creato,aggiornato) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         (annuncio_id, user["id"], a["venditore_id"], a["valuta"],
-         imp_sats, imp_eur, "proposta", scadenza, adesso, adesso))
+         imp_sats, imp_eur, "proposta", scadenza, pezzi, adesso, adesso))
     con.commit()
     offerta_id = con.execute(
         "SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.close()
-    # La notifica DOPO il commit, come sempre
+    # La notifica DOPO il commit, come sempre. Il titolo nasce SCAPPATO
+    # (le notifiche sono HTML e un «<» spegnerebbe l'avviso in
+    # silenzio): qui mancava, mentre i tre fratelli ce l'avevano.
+    titolo = html.escape((a["titolo"] or "?")[:60])
+    # ACCETTARE NON RISERVA NIENTE, e va ridetto proprio qui: da quando
+    # l'accordo porta un NUMERO il venditore si sente piu' impegnato di
+    # quanto sia — un negozio con 4 pezzi puo' accettare tre offerte da
+    # 3 e trovarsi impegnato per 9. Il meccanismo e' identico a ieri
+    # (l'annuncio non si e' mai bloccato); a cambiare e' che ora il
+    # numero e' scritto. La riga compare solo dove il numero c'e': col
+    # pezzo singolo il messaggio resta quello di sempre.
     await notifica(a["venditore_id"],
         f"💰 <b>Hai ricevuto un'offerta!</b> Qualcuno ti offre "
-        f"{_cifra_offerta(a['valuta'], imp_sats, imp_eur)} per "
-        f"«{a['titolo'][:60]}» (listino "
+        f"{_cifra_accordo(a['valuta'], imp_sats, imp_eur, pezzi)} per "
+        f"«{titolo}» (listino "
         f"{_cifra_offerta(a['valuta'], a['prezzo_sats'], a['prezzo_eur'])}). "
-        f"Rispondi dalla scheda Ordini: puoi accettare, rifiutare o fare "
+        + (f"Accettare non blocca l'oggetto: l'annuncio resta in vetrina "
+           f"e vince chi paga per primo. " if pezzi > 1 else "")
+        + f"Rispondi dalla scheda Ordini: puoi accettare, rifiutare o fare "
         f"una controproposta. Senza risposta entro "
         f"{ORE_RISPOSTA_OFFERTA} ore l'offerta scade da sola."
         f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
@@ -11416,8 +11487,14 @@ async def rispondi_offerta(offerta_id: int, req: Request,
 
     titolo = html.escape(off["titolo"][:60])
     link = f"\n{URL_PUBBLICO}/annuncio/{off['annuncio_id']}"
-    cifra_proposta = _cifra_offerta(off["valuta"], off["importo_sats"],
-                                    off["importo_eur"])
+    # I pezzi dell'accordo: 0 (le offerte di ieri) e 1 dicono la sola
+    # cifra, com'e' sempre stato — vedi _cifra_accordo. Niente «or 0»:
+    # la colonna e' un INTEGER DEFAULT 0 e l'ALTER ha riempito le righe
+    # vecchie, quindi NULL non ce n'e' — e un `or` qui insegnerebbe a
+    # scriverne uno dove invece confonderebbe lo zero con un ripiego.
+    pezzi = off["quantita"]
+    cifra_proposta = _cifra_accordo(off["valuta"], off["importo_sats"],
+                                    off["importo_eur"], pezzi)
 
     if azione == "accetta":
         # L'annuncio deve essere ancora in vetrina: su uno gia' venduto
@@ -11449,8 +11526,8 @@ async def rispondi_offerta(offerta_id: int, req: Request,
                 f"resta in vetrina, se qualcuno paga il prezzo pieno prima "
                 f"di te l'offerta decade.{link}")
         else:
-            contro = _cifra_offerta(off["valuta"], off["contro_sats"],
-                                    off["contro_eur"])
+            contro = _cifra_accordo(off["valuta"], off["contro_sats"],
+                                    off["contro_eur"], pezzi)
             await notifica(off["venditore_id"],
                 f"🤝 La tua controproposta di {contro} per «{titolo}» è "
                 f"stata accettata: l'acquirente ha "
@@ -11507,10 +11584,16 @@ async def rispondi_offerta(offerta_id: int, req: Request,
                  adesso + ORE_RISPOSTA_OFFERTA * 3600, adesso, offerta_id))
     con.commit()
     con.close()
+    # Nella parentesi la sola cifra AL PEZZO: la prima meta' ha appena
+    # detto per quanti pezzi si sta trattando, e ripetere le due facce
+    # due volte nella stessa riga la renderebbe illeggibile.
+    avevi = (_cifra_offerta(off["valuta"], off["importo_sats"],
+                            off["importo_eur"])
+             + (" al pezzo" if pezzi > 1 else ""))
     await notifica(off["compratore_id"],
         f"🤝 <b>Controproposta!</b> Per «{titolo}» il venditore ti propone "
-        f"{_cifra_offerta(off['valuta'], contro_sats, contro_eur)} (avevi "
-        f"offerto {cifra_proposta}). Accetta o rifiuta dalla scheda Ordini "
+        f"{_cifra_accordo(off['valuta'], contro_sats, contro_eur, pezzi)} "
+        f"(avevi offerto {avevi}). Accetta o rifiuta dalla scheda Ordini "
         f"entro {ORE_RISPOSTA_OFFERTA} ore.{link}")
     return {"ok": True, "stato": "controproposta"}
 
@@ -12041,6 +12124,24 @@ async def _compra_set(user: dict, d: dict) -> dict:
                                          "per una di queste offerte: "
                                          "pagala, oppure annulla "
                                          "quell'ordine e riprova")
+        # La quantita' dell'accordo comanda anche qui, riga per riga (il
+        # patto del mono): il numero del client si ignora, e il
+        # fail-fast di cortesia si rifa' per QUESTA riga se cambia.
+        if off["quantita"] > 0 and off["quantita"] != richieste[aid]:
+            richieste[aid] = off["quantita"]
+            a = tutti[aid]
+            disponibile = a["quantita"] - _riservati(con, aid)
+            if richieste[aid] > disponibile:
+                con.close()
+                if disponibile < 1:
+                    raise HTTPException(409, f"Qualcun altro sta già pagando "
+                        f"«{a['titolo'][:40]}»: togli quel pezzo dal set o "
+                        f"riprova tra pochi minuti")
+                raise HTTPException(400, f"L'accordo su «{a['titolo'][:40]}» "
+                                         f"è per {richieste[aid]} pezzi e ne "
+                                         f"restano solo {disponibile}: "
+                                         f"riprova se il venditore "
+                                         f"rifornisce")
         offerte[aid] = off
 
     # --- La regola dello sconto carrello del venditore, letta QUI:
@@ -12446,6 +12547,25 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             raise HTTPException(400, "Il tempo per pagare questa offerta "
                                      "è finito: l'offerta è scaduta")
+        # La quantita' dell'accordo comanda, come in compra: senza
+        # questa riga la pagina d'acquisto direbbe un conto e la
+        # invoice un altro — e «preventivo == compra al sat» e' il
+        # patto che regge la pagina.
+        if off["quantita"] > 0 and off["quantita"] != richiesti:
+            richiesti = off["quantita"]
+            disponibile = a["quantita"] - _riservati(con, a["id"])
+            if richiesti > disponibile:
+                con.close()
+                if disponibile < 1:
+                    raise HTTPException(409, "Qualcun altro sta già pagando "
+                                             "questo oggetto: se il suo "
+                                             "pagamento non va in porto "
+                                             "tornerà disponibile tra pochi "
+                                             "minuti")
+                raise HTTPException(400, f"L'accordo è per {richiesti} pezzi "
+                                         f"e ne restano solo {disponibile}: "
+                                         f"riprova se il venditore "
+                                         f"rifornisce")
     # la riga del venditore: lo spedizioniere e la promessa della
     # spedizione gratis, dalla SELECT che c'era gia' — zero query in
     # piu' (il patto del ramo set con lo sconto)
@@ -12638,6 +12758,24 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             raise HTTPException(400, f"Il tempo per pagare l'offerta su "
                                      f"«{tutti[aid]['titolo'][:40]}» è "
                                      f"finito: l'offerta è scaduta")
+        # La quantita' dell'accordo comanda, riga per riga: il quarto
+        # percorso del conto, e senza questa riga il riepilogo del
+        # carrello direbbe una cifra e la invoice un'altra.
+        if off["quantita"] > 0 and off["quantita"] != richieste[aid]:
+            richieste[aid] = off["quantita"]
+            a = tutti[aid]
+            disponibile = a["quantita"] - _riservati(con, aid)
+            if richieste[aid] > disponibile:
+                con.close()
+                if disponibile < 1:
+                    raise HTTPException(409, f"Qualcun altro sta già pagando "
+                        f"«{a['titolo'][:40]}»: togli quel pezzo dal set o "
+                        f"riprova tra pochi minuti")
+                raise HTTPException(400, f"L'accordo su «{a['titolo'][:40]}» "
+                                         f"è per {richieste[aid]} pezzi e ne "
+                                         f"restano solo {disponibile}: "
+                                         f"riprova se il venditore "
+                                         f"rifornisce")
         offerte[aid] = off
     # la riga del venditore: lo spedizioniere e la regola dello sconto
     # carrello, dalla SELECT che c'era gia' — zero query in piu'
@@ -12992,6 +13130,42 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                          "per questa offerta: pagala, "
                                          "oppure annulla quell'ordine e "
                                          "riprova")
+        # LA QUANTITA' DELL'ACCORDO COMANDA (ago 2026): il numero del
+        # client si IGNORA — puo' venire da una cache di ieri, e i pezzi
+        # concordati sono un fatto del database. Quantita' ESATTA e non
+        # un tetto (decisione di Andrea): un significato solo da
+        # spiegare, e il venditore sa cosa ha accettato. Con `quantita`
+        # a 0 (le offerte di ieri) non si tocca niente: comportamento
+        # di allora, byte per byte.
+        # L'ORDINE DELLE GUARDIE NON SI TOCCA, ed e' la parte da non
+        # ammorbidire: portare questo blocco sopra la RIPRESA sembra la
+        # mossa pulita ed e' una regressione — la guardia `ordine_id`
+        # qui sopra scatterebbe PRIMA che la ripresa faccia il suo
+        # lavoro, e il compratore che ritenta con la sua stessa offerta
+        # prenderebbe un 400 invece di ritrovarsi la sua fattura.
+        # Quindi il fail-fast di cortesia ha guardato il numero del
+        # client: se quello dell'accordo e' diverso si rifa', qui, con
+        # una LETTURA e nessun DML (il patto del ricontrollo resta
+        # intatto). Serve al caso «client manda 1, accordo 3, ne
+        # restano 2», che altrimenti prenderebbe il 409 secco del
+        # ricontrollo invece del 400 che dice quanti ne restano.
+        if off["quantita"] > 0 and off["quantita"] != richiesti:
+            richiesti = off["quantita"]
+            disponibile = a["quantita"] - _riservati(con, a["id"])
+            if richiesti > disponibile:
+                con.close()
+                if disponibile < 1:
+                    raise HTTPException(409, "Qualcun altro sta già pagando "
+                                             "questo oggetto: se il suo "
+                                             "pagamento non va in porto "
+                                             "tornerà disponibile tra pochi "
+                                             "minuti")
+                # L'accordo resta 'accettata' fino alla SUA scadenza: se
+                # il venditore rifornisce entro quelle ore, si paga.
+                raise HTTPException(400, f"L'accordo è per {richiesti} pezzi "
+                                         f"e ne restano solo {disponibile}: "
+                                         f"riprova se il venditore "
+                                         f"rifornisce")
 
     # Per gli annunci in EUR i sats si decidono ADESSO, al cambio
     # corrente: la invoice vive 15 minuti, e quella e' la durata del
@@ -20922,8 +21096,8 @@ async def scadenze_offerte():
                     f"«{titolo}» non è più disponibile: la tua offerta "
                     f"decade.")
             elif r["stato"] == "proposta":
-                cifra = _cifra_offerta(r["valuta"], r["importo_sats"],
-                                       r["importo_eur"])
+                cifra = _cifra_accordo(r["valuta"], r["importo_sats"],
+                                       r["importo_eur"], r["quantita"])
                 await notifica(r["compratore_id"],
                     f"⏳ La tua offerta di {cifra} per «{titolo}» è "
                     f"scaduta senza risposta. L'annuncio è ancora in "
@@ -20933,7 +21107,8 @@ async def scadenze_offerte():
                     f"⏳ La tua controproposta per «{titolo}» è scaduta "
                     f"senza risposta dell'acquirente.")
             else:  # accettata, ma il pagamento non e' mai arrivato
-                cifra = _cifra_offerta(r["valuta"], *_importo_accordo(r))
+                cifra = _cifra_accordo(r["valuta"], *_importo_accordo(r),
+                                       r["quantita"])
                 await notifica(r["compratore_id"],
                     f"⏳ Il tempo per comprare «{titolo}» a {cifra} è "
                     f"finito: l'offerta è scaduta.")
