@@ -13115,6 +13115,60 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
     return await _incassa_ordine(ordine_id)
 
 
+# --------------- LA RICEVUTA DEL COMPRATORE (ago 2026) ---------------
+# Chi paga non riceveva NIENTE dal server: al venditore partiva «Hai
+# venduto», ai moderatori il polso, a lui il solo toast in-app, che
+# dura tre secondi. Nel caso normale e' il suo stesso dito a innescare
+# tutto ed e' li' davanti, ma sulle strade dell'orologio (il riacciuffo
+# di controlla_annullati, l'ultimo sguardo di controlla_abbandonati)
+# non lo e' affatto: l'ordine si concludeva in silenzio e lo scopriva
+# rientrando. Era l'imperfezione dichiarata di quei due cantieri, e la
+# cura non e' un ramo per l'orologio ma la notifica SEMPRE: il toast
+# sparisce, la ricevuta resta — ed e' quella che ritrova domani
+# cercando cosa ha comprato.
+#
+# LA CODA DEV'ESSERE QUELLA DELLA STRADA SCELTA, o si dice il falso a
+# meta' degli ordini: promettere un tracciamento a chi ritira a mano, o
+# «i sats partono quando confermi» a chi compra un codice, dove le
+# finestre corte scattano da sole (ORE_CONFERMA_DIGITALE dalla
+# rivelazione, ORE_SILENZIO_DIGITALE dalla consegna mai letta). Il
+# giudice e' PURO e prende i campi, non la riga (il patto di in_ferie):
+# cosi' serve l'ordine vero e la prova in CI.
+def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool) -> str:
+    """Cosa succede ADESSO, secondo la strada che il compratore ha
+    scelto. Statica: nessun testo dell'utente ci entra mai — il punto
+    di ritiro lo si guarda solo per sapere SE c'e', il suo contenuto
+    resta nell'ordine, dove passa da esc()."""
+    if consegna == "digitale":
+        # MAI «i sats partono solo quando confermi»: sul digitale il
+        # tempo cammina da solo. Il come e il quando li dice la
+        # notifica della consegna, che arriva col contenuto.
+        return ("il venditore ti consegna il contenuto qui dentro, e "
+                "ti avvisiamo appena è pronto da rivelare.")
+    if consegna == "ritiro":
+        return ("mettetevi d'accordo con il venditore per il ritiro. "
+                "Quando hai l'oggetto in mano, confermalo nella Mini "
+                "App e i sats vanno a lui.")
+    if consegna == "spedizione" and via_punto:
+        if not punto_scritto:
+            # Il residuo del quarto giro (ordini nati da un client di
+            # ieri, che il server tollera senza punto): qui la palla e'
+            # SUA, e il venditore non puo' spedire finche' non scrive.
+            return ("indica il punto di ritiro nell'ordine, che al "
+                    "venditore serve per spedire il pacco.")
+        return ("il venditore spedisce al punto di ritiro che hai "
+                "scelto. Ti avvisiamo appena il pacco ti aspetta là.")
+    if consegna == "spedizione":
+        return ("il venditore prepara il pacco e ti manderà il "
+                "tracciamento. Quando arriva, confermalo nella Mini "
+                "App e i sats vanno a lui.")
+    # Consegna non dichiarata: gli annunci storici e gli importati da
+    # Nostr, dove il tag `delivery` non c'era. Nessuna promessa su una
+    # strada che nessuno ha scelto.
+    return ("il venditore ora si occupa della consegna e ti aggiorna "
+            "nella Mini App.")
+
+
 async def _incassa_ordine(ordine_id: int) -> dict:
     """I sats sono in cassaforte: l'ordine passa a LOCKED, lo stock
     scala, le offerte si chiudono, le notifiche partono. Estratto da
@@ -13251,6 +13305,18 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                 "di ritiro</b>: indicherà il punto nell'ordine — se "
                 "serve, accordatevi in chat sul corriere.")
     await notifica(o["venditore_id"], msg)
+    # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
+    # ci passano il poll della Mini App e le due funzioni dell'orologio,
+    # e proprio in quelle lui non e' davanti allo schermo. Il titolo e'
+    # testo del VENDITORE e le notifiche sono HTML: si tronca PRIMA e si
+    # escapa DOPO, o un «<» spegne la ricevuta in silenzio (la lezione
+    # dell'avviso di spedizione).
+    await notifica(o["compratore_id"],
+                   f"🔒 <b>Ordine pagato!</b> «"
+                   f"{html.escape(_titolo_ordine(righe)[:60])}» — i sats "
+                   f"sono nel deposito di garanzia: "
+                   + _coda_ricevuta(o["consegna_scelta"], o["via_punto"],
+                                    bool(o["punto_ritiro"])))
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
         f"🛒 <b>Nuovo ordine:</b> «{_titolo_ordine(righe)[:60]}» — "

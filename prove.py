@@ -7126,6 +7126,233 @@ def prove_avviso_spedizione():
 
 
 # ====================================================================
+def prove_ricevuta_compratore():
+    """LA RICEVUTA DEL COMPRATORE (ago 2026). Chi pagava non riceveva
+    niente dal server: al venditore «Hai venduto», ai moderatori il
+    polso, a lui il solo toast in-app. Ora la notifica parte SEMPRE da
+    _incassa_ordine, che e' il punto da cui passano tutte e tre le
+    strade dell'accredito (il poll della Mini App, il riacciuffo di
+    controlla_annullati, l'ultimo sguardo di controlla_abbandonati) —
+    e sulle ultime due lui non e' davanti allo schermo.
+
+    ESEGUIBILE dove conta: si chiama _incassa_ordine VERA su un
+    database vero e si guarda il testo che esce. Il resto e' il giudice
+    puro della coda, che e' dove vive la bugia possibile — promettere
+    un tracciamento a chi ritira a mano, o «i sats partono quando
+    confermi» a chi compra un codice."""
+    print("\n[la ricevuta del compratore]")
+    import asyncio as _aio
+    import html as _html
+    import sqlite3
+    import time as _time
+    import types
+
+    coda = reale("_coda_ricevuta")
+
+    # --- 1) IL GIUDICE DELLA CODA, strada per strada ---------------
+    sped = coda("spedizione", 0, False)
+    prova("spedizione a casa: promette il tracciamento", True,
+          "tracciamento" in sped)
+    prova("...e dice che a chiudere e' la sua conferma", True,
+          "confermalo nella Mini App" in sped)
+
+    punto = coda("spedizione", 1, True)
+    prova("punto di ritiro: niente tracciamento da aspettare", True,
+          "tracciamento" not in punto)
+    prova("...si aspetta l'avviso che il pacco e' arrivato la'", True,
+          "punto di ritiro" in punto and "avvisiamo" in punto)
+
+    # Il residuo del quarto giro: via punto scelta, punto mai scritto
+    # (gli ordini nati da un client di ieri). Qui la palla e' SUA, e
+    # senza il punto il venditore non puo' nemmeno spedire.
+    orfano = coda("spedizione", 1, False)
+    prova("via punto senza punto: gli si chiede di indicarlo", True,
+          "indica il punto" in orfano)
+    prova("...e non gli si promette nessun avviso", True,
+          "avvisiamo" not in orfano)
+
+    ritiro = coda("ritiro", 0, False)
+    prova("ritiro a mano: nessuna spedizione promessa", True,
+          "tracciamento" not in ritiro and "pacco" not in ritiro)
+    prova("...ci si accorda col venditore", True,
+          "accordo con il venditore" in ritiro)
+
+    # LA RIGA CHE NON SI PUO' AMMORBIDIRE: sul digitale le finestre
+    # corte scattano DA SOLE (ORE_CONFERMA_DIGITALE dalla rivelazione,
+    # ORE_SILENZIO_DIGITALE dalla consegna mai letta), quindi «i sats
+    # partono quando confermi» sarebbe falso — e sarebbe falso proprio
+    # verso chi ha comprato la cosa che non torna indietro.
+    dig = coda("digitale", 0, False)
+    prova("digitale: MAI la promessa della conferma", True,
+          "conferm" not in dig)
+    prova("...niente spedizione, niente pacco", True,
+          "spedi" not in dig and "pacco" not in dig)
+    prova("...si dice che il contenuto arriva qui dentro", True,
+          "qui dentro" in dig)
+
+    # Gli annunci storici e gli importati da Nostr: consegna ''. Non si
+    # inventa una strada che nessuno ha scelto.
+    ignota = coda("", 0, False)
+    prova("consegna non dichiarata: nessuna strada promessa", True,
+          "tracciamento" not in ignota and "conferm" not in ignota)
+    prova("...ma qualcosa si dice lo stesso", True, len(ignota) > 20)
+
+    # Nessuna coda e' vuota: una ricevuta che finisce coi due punti e
+    # basta e' peggio di nessuna ricevuta.
+    for c, nome in ((sped, "casa"), (punto, "punto"), (orfano, "orfano"),
+                    (ritiro, "ritiro"), (dig, "digitale"),
+                    (ignota, "ignota")):
+        prova(f"la coda «{nome}» dice qualcosa e finisce col punto",
+              True, bool(c.strip()) and c.rstrip().endswith("."))
+
+    # --- 2) _incassa_ordine VERA, su un database vero --------------
+    def gira(titolo="Cuffie AKG", **extra):
+        """Chiama _incassa_ordine davvero e restituisce chi e' stato
+        avvisato, con che testo."""
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+              compratore_id INT, venditore_id INT, prezzo_sats INT,
+              stato TEXT, quantita INT, consegna_scelta TEXT,
+              via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
+              spedizione_sats INT DEFAULT 0, protezione_sats INT DEFAULT 0,
+              aggiornato INT DEFAULT 0);
+            CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+              annuncio_id INT, quantita INT, unitario_sats INT, titolo TEXT);
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
+              quantita INT, stato TEXT, contatto_nostr TEXT DEFAULT '',
+              taglia_pacco TEXT DEFAULT '');
+            CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
+              compratore_id INT, ordine_id INT, stato TEXT,
+              aggiornato INT DEFAULT 0);
+        """)
+        con.execute("INSERT INTO annunci(id,titolo,quantita,stato) "
+                    "VALUES(3,?,1,'attivo')", (titolo,))
+        riga = {"id": 7, "annuncio_id": 3, "compratore_id": 111,
+                "venditore_id": 222, "prezzo_sats": 50000,
+                "stato": "creato", "quantita": 1,
+                "consegna_scelta": "spedizione", "via_punto": 0,
+                "punto_ritiro": ""}
+        riga.update(extra)
+        con.execute(
+            "INSERT INTO ordini(id,annuncio_id,compratore_id,venditore_id,"
+            "prezzo_sats,stato,quantita,consegna_scelta,via_punto,"
+            "punto_ritiro) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            tuple(riga[k] for k in
+                  ("id", "annuncio_id", "compratore_id", "venditore_id",
+                   "prezzo_sats", "stato", "quantita", "consegna_scelta",
+                   "via_punto", "punto_ritiro")))
+        con.commit()
+
+        class ConFinta:
+            """Il close() e' un no-op: su :memory: chiuderebbe il
+            database a meta' funzione."""
+            def __getattr__(self, n): return getattr(con, n)
+
+            def close(self): pass
+
+        detto = []
+
+        async def notifica_finta(chi, testo, *a, **k):
+            detto.append((chi, testo))
+
+        async def polso_finto(*a, **k): pass
+
+        amb = {"html": _html, "time": _time, "db": lambda: ConFinta(),
+               "notifica": notifica_finta,
+               "polso_ordini_admin": polso_finto,
+               "asyncio": types.SimpleNamespace(create_task=lambda c: None),
+               "annuncio_su_nostr": lambda *a, **k: None,
+               "promo_venduto": lambda *a, **k: None,
+               "stima_taglia_set": lambda t: "",
+               "_righe_ordine": reale("_righe_ordine"),
+               "_titolo_ordine": reale("_titolo_ordine"),
+               "_coda_ricevuta": coda, "_fmt_sats": reale("_fmt_sats")}
+        exec("async " + pezzo("_incassa_ordine"), amb)
+        _aio.run(amb["_incassa_ordine"](7))
+        return detto
+
+    detto = gira()
+    destinatari = [chi for chi, _ in detto]
+    prova("l'incasso avvisa il COMPRATORE", True, 111 in destinatari)
+    prova("...e il venditore continua a ricevere il suo", True,
+          222 in destinatari)
+    ric = [t for chi, t in detto if chi == 111][0]
+    prova("la ricevuta e' UNA sola", 1, destinatari.count(111))
+    prova("la ricevuta dice che l'ordine e' pagato", True,
+          "Ordine pagato" in ric)
+    prova("...nomina il deposito di garanzia", True,
+          "deposito di garanzia" in ric)
+    prova("...dice cosa ha comprato", True, "Cuffie AKG" in ric)
+    prova("...e la coda e' quella della sua strada", True,
+          "tracciamento" in ric)
+
+    # La coda segue la STRADA, non l'ordine generico: e' tutto il punto
+    ric_dig = [t for chi, t in gira(consegna_scelta="digitale")
+               if chi == 111][0]
+    prova("ordine digitale: la ricevuta non promette un pacco", True,
+          "tracciamento" not in ric_dig and "qui dentro" in ric_dig)
+    ric_rit = [t for chi, t in gira(consegna_scelta="ritiro")
+               if chi == 111][0]
+    prova("ordine col ritiro: ci si accorda, non si aspetta un corriere",
+          True, "accordo con il venditore" in ric_rit)
+    ric_pun = [t for chi, t in gira(via_punto=1,
+                                    punto_ritiro="Bar Centrale")
+               if chi == 111][0]
+    prova("ordine al punto: si aspetta l'avviso d'arrivo", True,
+          "punto di ritiro" in ric_pun)
+    prova("...e il punto che ha scritto LUI non entra nel messaggio",
+          False, "Bar Centrale" in ric_pun)
+
+    # --- 3) IL TITOLO E' TESTO DEL VENDITORE -----------------------
+    # Le notifiche sono HTML: un «<» nel titolo fa fallire il parse di
+    # Telegram e la ricevuta non arriva — senza errore e senza traccia.
+    # E' la lezione dell'avviso di spedizione, sullo stesso tubo.
+    ric = [t for chi, t in gira(titolo="Cuffie <b>AKG</b> K371")
+           if chi == 111][0]
+    prova("il titolo cattivo non entra nudo nella ricevuta", False,
+          "<b>AKG</b>" in ric)
+    prova("...ci entra scappato", True, "&lt;b&gt;AKG&lt;/b&gt;" in ric)
+    import re as _re
+    tag = _re.findall(r"</?b>", ric)
+    prova("...e i grassetti restano pari, cioe' la ricevuta parte",
+          tag.count("<b>"), tag.count("</b>"))
+
+    # --- 4) le sentinelle ------------------------------------------
+    inc = pezzo("_incassa_ordine")
+    # La ricevuta vive nel FUNNEL e non nei chiamanti: e' cio' che la fa
+    # ereditare alle strade dell'orologio senza un ramo apposta. Chi la
+    # sposta su verifica_pagamento rimette il silenzio esattamente dove
+    # faceva piu' male.
+    prova("la ricevuta parte da _incassa_ordine, il funnel", True,
+          'notifica(o["compratore_id"]' in inc)
+    prova("...e la coda la decide il giudice, mai un if a mano", True,
+          "_coda_ricevuta(" in inc)
+    prova("il titolo si tronca PRIMA e si escapa DOPO", True,
+          'html.escape(_titolo_ordine(righe)[:60])' in inc)
+    prova("il giudice della coda ha UN solo chiamante", 1,
+          _SORGENTE.count("_coda_ricevuta(o["))
+    # Il punto di ritiro e' testo del COMPRATORE e nella coda non ci
+    # entra mai: il giudice ne riceve un bool, non la stringa.
+    prova("al giudice il punto arriva come bool, mai il testo", True,
+          'bool(o["punto_ritiro"])' in inc)
+    cod = pezzo("_coda_ricevuta")
+    prova("il giudice della coda non tocca ne' database ne' rete", True,
+          "con." not in cod and "await" not in cod)
+
+    # Il toast se n'e' andato: durava tre secondi e non lasciava niente
+    # da ritrovare. In DEMO resta, che li' non c'e' server che notifichi.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = mini.index("async function verificaOrdine(")
+    ver_js = mini[i:mini.index("\n}", i)]
+    prova("nel poll non c'e' piu' il toast del pagamento", False,
+          "Sats al sicuro" in ver_js)
+    prova("...ma in DEMO il toast resta", True,
+          "Sats al sicuro" in mini[mini.index("function simulatePaid("):])
+
+
+# ====================================================================
 def prove_anteprime():
     """LE ANTEPRIME DEI LINK (ago 2026). La famiglia difende tre cose,
     e la prima e' quella che conta: UN ANNUNCIO NON ATTIVO NON RACCONTA
@@ -7572,7 +7799,8 @@ def main():
               prove_libro_mastro, prove_leve, prove_cambio,
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime,
-              prove_impersonazione, prove_avviso_spedizione):
+              prove_impersonazione, prove_avviso_spedizione,
+              prove_ricevuta_compratore):
         try:
             f()
         except Exception as e:

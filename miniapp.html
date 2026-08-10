@@ -9201,7 +9201,11 @@ async function verificaOrdine(oid){
          stessa ragione */
       paccoDati = null; setScelte = new Map();
       acqDati = null; ctrlPrev = null;
-      toast('⚡ Sats al sicuro nel deposito!');
+      /* niente toast (ago 2026): durava tre secondi e non lasciava
+         niente da ritrovare. Adesso la ricevuta la manda il SERVER da
+         _incassa_ordine — su questa strada come su quelle
+         dell'orologio — e qui sotto si apre comunque l'ordine. In DEMO
+         il toast resta: li' non c'e' nessun server che notifichi. */
       await loadOrders(); renderOrders();
       setTimeout(()=>openOrder(oid), 400);
     }
