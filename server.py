@@ -1633,6 +1633,21 @@ def init_db():
         valore REAL DEFAULT 0,        -- euro per BTC
         quando INTEGER DEFAULT 0      -- quando l'abbiamo letto (unix)
     );
+    CREATE TABLE IF NOT EXISTS timbri(
+        -- QUANDO UN AVVISO PERIODICO HA SUONATO L'ULTIMA VOLTA (ago
+        -- 2026, da un caso vero: il termometro delle sottocategorie e'
+        -- arrivato TRE volte in cinquanta minuti, agli orari dei tre
+        -- deploy di quel lunedi'). Il timbro viveva in un globale, e un
+        -- globale muore a ogni riavvio: il gate non era un gate, era
+        -- una deduplica valida quanto il processo. Qui invece
+        -- sopravvive, ed e' l'unica cosa che rende vera la promessa
+        -- «una volta a settimana» — o «una al giorno».
+        -- NON e' un dato di denaro e nessun conto ci poggia sopra: al
+        -- peggio si perde o si raddoppia un avviso di cortesia.
+        nome TEXT PRIMARY KEY,        -- 'termometro_sotto', 'libro_mastro'...
+        valore TEXT DEFAULT '',       -- il giorno, o quel che il chiamante timbra
+        quando INTEGER DEFAULT 0      -- quando l'abbiamo scritto (unix)
+    );
     """)
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
@@ -3888,6 +3903,47 @@ async def notifica(tg_id: int, testo: str):
         await _manda_telegram(tg_id, testo)
     elif not via_nostr and MODALITA_COLLAUDO:
         print(f"🔕 [utente {tg_id}: nessun canale per la notifica] {testo}")
+
+
+# ---------- I TIMBRI DEGLI AVVISI PERIODICI (ago 2026) --------------
+# «Ogni lunedi'», «una al giorno»: promesse che valgono solo se il
+# timbro sopravvive a un riavvio. Vivevano in globali, e un globale
+# muore a ogni deploy — quindi non erano gate, erano dedupliche valide
+# quanto il processo. Il caso che l'ha tirato fuori: il termometro
+# delle sottocategorie arrivato TRE volte in cinquanta minuti, agli
+# orari dei tre deploy di quel lunedi'.
+#
+# FAIL-OPEN NEL VERSO DEL PARLARE, ed e' una scelta: se la lettura non
+# riesce si risponde «mai timbrato», cioe' l'avviso PARTE. Fra un
+# doppione e un allarme che non arriva, il doppione — un timbro
+# illeggibile non deve poter zittire per sempre una segnalazione.
+def timbro_letto(nome: str) -> str:
+    """L'ultimo valore timbrato per quell'avviso ('' = mai)."""
+    try:
+        con = db()
+        r = con.execute("SELECT valore FROM timbri WHERE nome=?",
+                        (nome,)).fetchone()
+        con.close()
+        return (r["valore"] if r else "") or ""
+    except Exception as e:
+        print(f"⚠️ Timbro «{nome}» illeggibile ({e}): l'avviso parte")
+        return ""
+
+
+def timbro_scrivi(nome: str, valore: str):
+    """Timbra, SEMPRE prima di mandare l'avviso: un errore di rete puo'
+    perdere un avviso di cortesia, mai raddoppiarlo (il patto delle
+    campagne una-tantum)."""
+    try:
+        con = db()
+        con.execute("INSERT OR REPLACE INTO timbri(nome, valore, quando) "
+                    "VALUES(?,?,?)", (nome, valore, int(time.time())))
+        con.commit()
+        con.close()
+    except Exception as e:
+        # Non si alza: il giro dell'orologio non si ferma per un
+        # timbro. Il prezzo e' che quell'avviso puo' ripetersi.
+        print(f"⚠️ Timbro «{nome}» non scritto ({e}): l'avviso puo' ripetersi")
 
 
 async def notifica_admin(testo: str):
@@ -21091,19 +21147,27 @@ async def orologio():
         await asyncio.sleep(600)
 
 
-_ultimo_sollecito_revisioni = 0.0
+TIMBRO_REVISIONI = "sollecito_revisioni"   # il giorno dell'ultimo squillo
 
 
 async def sollecita_revisioni():
     """Il promemoria della terza via: annunci in revisione da almeno
     REVISIONE_SOLLECITO_GIORNI = UNA notifica aggregata ai moderatori,
     al massimo una al giorno. L'attesa NON pubblica e NON rifiuta mai
-    da sola: la macchina ricorda, l'umano decide."""
-    global _ultimo_sollecito_revisioni
+    da sola: la macchina ricorda, l'umano decide.
+
+    IL TIMBRO STA NEL DATABASE (ago 2026, il fratello del termometro):
+    qui il gate era «adesso - _ultimo < 86400» contato da un globale,
+    cioe' esattamente l'antipattern che la docstring del termometro
+    gia' additava — a ogni riavvio riparte da zero e l'avviso torna. E
+    qui era peggio che la', perche' manca perfino il gate del
+    calendario: bastavano due deploy a distanza di un minuto. Ora e' il
+    GIORNO nel database, come i fratelli."""
     if not REVISIONE_SOLLECITO_GIORNI:
         return
     adesso = time.time()
-    if adesso - _ultimo_sollecito_revisioni < 86400:
+    oggi = time.strftime("%Y-%m-%d")
+    if timbro_letto(TIMBRO_REVISIONI) == oggi:
         return
     soglia = int(adesso - REVISIONE_SOLLECITO_GIORNI * 86400)
     con = db()
@@ -21113,8 +21177,10 @@ async def sollecita_revisioni():
     con.close()
     if not fermi:
         return
-    _ultimo_sollecito_revisioni = adesso
+    timbro_scrivi(TIMBRO_REVISIONI, oggi)
     plurale = "annunci aspettano" if fermi > 1 else "annuncio aspetta"
+    print(f"⏳ Sollecito revisioni ({oggi}): {fermi} in attesa da almeno "
+          f"{REVISIONE_SOLLECITO_GIORNI} giorni — avviso mandato")
     await notifica_admin(
         f"⏳ <b>{fermi} {plurale} una decisione</b> da almeno "
         f"{REVISIONE_SOLLECITO_GIORNI} giorni (Profilo → Statistiche → "
@@ -21142,31 +21208,39 @@ def _termometro_conta(con):
     return sum(per_cat.values()), per_cat, colmabili
 
 
-_ultimo_termometro_sotto = ""            # il giorno dell'ultimo report
+TIMBRO_TERMOMETRO = "termometro_sotto"   # il giorno dell'ultimo report
 
 
 async def termometro_sottocategorie():
     """Il --conta che non si dimentica (ago 2026, chiesto da Andrea):
-    UNA notifica aggregata agli admin, il LUNEDI'. L'ancora e' il
-    calendario e non un conteggio di secondi in memoria, ed e' una
-    scelta: il gate in RAM muore a ogni deploy, e un «ogni 7 giorni»
-    contato da li' suonerebbe a ogni riavvio — ancorato al lunedi',
-    un riavvio puo' al piu' far suonare due volte QUEL lunedi', caso
-    raro e limitato. Una coda ferma non suona: sotto
-    TERMOMETRO_SOTTOCATEGORIE_MINIMO si tace, a vetrina piena si
-    tace, con la leva spenta si tace per sempre."""
-    global _ultimo_termometro_sotto
+    UNA notifica aggregata agli admin, il LUNEDI'. Una coda ferma non
+    suona: sotto TERMOMETRO_SOTTOCATEGORIE_MINIMO si tace, a vetrina
+    piena si tace, con la leva spenta si tace per sempre.
+
+    L'ANCORA E' IL CALENDARIO, MA IL TIMBRO STA NEL DATABASE (ago 2026,
+    dal campo: tre notifiche in cinquanta minuti, agli orari dei tre
+    deploy di quel lunedi'). Il calendario era giusto e resta — un
+    «ogni 7 giorni» contato in RAM suonerebbe a ogni riavvio — ma da
+    solo NON basta: dentro il lunedi' a distinguere il primo giro dal
+    centoquarantesimo c'era un globale, e un globale muore col
+    processo. Quindi «un riavvio puo' al piu' far suonare due volte»,
+    che questa docstring prometteva, non era garantito da niente: era
+    una volta PER RIAVVIO, senza tetto. Adesso il timbro sopravvive, e
+    il lunedi' l'avviso e' uno qualunque sia il numero di deploy.
+    IL TIMBRO NON SI SCRIVE SE NON SI PARLA: sotto il minimo si esce
+    PRIMA di timbrare, cosi' una settimana silenziosa non si consuma e
+    il lunedi' successivo si ricontrolla da capo."""
     if not TERMOMETRO_SOTTOCATEGORIE:
         return
     oggi = time.strftime("%Y-%m-%d")
-    if time.localtime().tm_wday != 0 or _ultimo_termometro_sotto == oggi:
+    if time.localtime().tm_wday != 0 or timbro_letto(TIMBRO_TERMOMETRO) == oggi:
         return
     con = db()
     totale, per_cat, colmabili = _termometro_conta(con)
     con.close()
     if totale < TERMOMETRO_SOTTOCATEGORIE_MINIMO:
         return
-    _ultimo_termometro_sotto = oggi
+    timbro_scrivi(TIMBRO_TERMOMETRO, oggi)
     scoperte = ", ".join(f"{c} ({n})" for c, n in sorted(
         per_cat.items(), key=lambda kv: -kv[1])[:3])
     plurale = "annunci" if totale > 1 else "annuncio"
@@ -21177,6 +21251,11 @@ async def termometro_sottocategorie():
     elif colmabili:
         riga_colmabili = (f"\n{colmabili} sono già coperti dal dizionario "
                           f"di oggi: basta un rilancio con --scrivi.")
+    # La riga nel journal: senza, un avviso che parte troppo (o che non
+    # parte) non si puo' nemmeno diagnosticare — e' stato il secondo
+    # difetto del caso dal campo, dopo il timbro.
+    print(f"🗂 Termometro sottocategorie ({oggi}): {totale} senza "
+          f"sottocategoria, {colmabili} colmabili — avviso mandato")
     await notifica_admin(
         f"🗂 <b>{totale} {plurale} senza sottocategoria</b> — le "
         f"categorie più scoperte: {scoperte}.{riga_colmabili}\n"
@@ -21354,7 +21433,7 @@ CONTROLLI_LIBRO_MASTRO = (
      "AND stato NOT IN ('released','refunded')"),
 )
 
-_ultimo_libro_mastro = ""                # il giorno dell'ultima ronda
+TIMBRO_LIBRO_MASTRO = "libro_mastro"     # il giorno dell'ultima ronda
 
 
 async def controlla_libro_mastro():
@@ -21365,23 +21444,27 @@ async def controlla_libro_mastro():
     quotidiano e' rumore, e il rumore e' il modo in cui gli allarmi
     muoiono.
     NON CORREGGE NULLA, ed e' il punto: legge e basta.
-    Il timbro e' il GIORNO, in memoria, e si scrive PRIMA delle query
-    (il patto delle campagne). Qui la ragione e' sua: senza, l'allarme
-    tornerebbe a OGNI battito — 144 volte al giorno — e in una settimana
-    nessuno lo leggerebbe piu'. Il prezzo dichiarato e' che un riavvio
-    fa rifare la ronda (al piu' un avviso doppio nello stesso giorno,
-    e per un guasto al libro mastro e' il verso giusto in cui
-    sbagliare) e che un errore di rete costa un giorno di ritardo su
-    un allarme che comunque si ripete domani.
+    Il timbro e' il GIORNO e si scrive PRIMA delle query (il patto
+    delle campagne). Senza, l'allarme tornerebbe a OGNI battito — 144
+    volte al giorno — e in una settimana nessuno lo leggerebbe piu'.
+    E STA NEL DATABASE (ago 2026, il terzo fratello del termometro):
+    in memoria «un riavvio fa rifare la ronda» sembrava un prezzo
+    piccolo e dichiarato, ma il caso dal campo ha mostrato che il
+    conto vero e' UNA VOLTA PER DEPLOY — tre in cinquanta minuti, la
+    mattina che si lavora. Su un libro mastro sano non si vedeva,
+    perche' a database sano questa tace; il giorno che qualcosa non
+    torna, e cioe' l'unico giorno in cui parla, avrebbe parlato a ogni
+    riavvio proprio mentre qualcuno stava deployando per riparare.
+    Resta vero che un errore di rete costa un giorno di ritardo su un
+    allarme che comunque si ripete domani.
     Una query che ESPLODE conta come un controllo fallito: se lo
     schema e' cambiato sotto, e' esattamente una cosa da sapere."""
-    global _ultimo_libro_mastro
     if not CONTROLLO_LIBRO_MASTRO:
         return
     oggi = time.strftime("%Y-%m-%d")
-    if _ultimo_libro_mastro == oggi:
+    if timbro_letto(TIMBRO_LIBRO_MASTRO) == oggi:
         return
-    _ultimo_libro_mastro = oggi
+    timbro_scrivi(TIMBRO_LIBRO_MASTRO, oggi)
     con = db()
     rotti = []
     for nome, perche, sql in CONTROLLI_LIBRO_MASTRO:
@@ -21411,6 +21494,8 @@ async def controlla_libro_mastro():
                      f"{html.escape(perche, False)}"
                      + (f"\n  <code>{html.escape(elenco)}</code>" if ids else ""))
     quanti = len(rotti)
+    print(f"🧊 Libro mastro ({oggi}): {quanti} controlli non tornano "
+          f"({', '.join(n for n, _, _ in rotti)}) — avviso mandato")
     await notifica_admin(
         f"🧊 <b>Libro mastro: {quanti} controll{'o' if quanti == 1 else 'i'} "
         f"non torna{'' if quanti == 1 else 'no'}</b>\n"

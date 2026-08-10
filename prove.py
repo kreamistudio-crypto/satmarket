@@ -5521,7 +5521,7 @@ def prove_libro_mastro():
     src = open("server.py", encoding="utf-8").read()
     amb = {}
     i = src.index("CONTROLLI_LIBRO_MASTRO = (")
-    exec(src[i:src.index("\n_ultimo_libro_mastro", i)], amb)
+    exec(src[i:src.index("\nTIMBRO_LIBRO_MASTRO", i)], amb)
     controlli = amb["CONTROLLI_LIBRO_MASTRO"]
 
     # --- la FORMA del catalogo --------------------------------------
@@ -5735,8 +5735,10 @@ def prove_libro_mastro():
     prova("a libro mastro sano esce senza dire niente", True,
           "if not rotti:" in corpo and "return" in corpo)
     prova("il timbro e' il GIORNO e si scrive PRIMA delle query", True,
-          corpo.index("_ultimo_libro_mastro = oggi")
+          corpo.index("timbro_scrivi(TIMBRO_LIBRO_MASTRO, oggi)")
           < corpo.index("for nome, perche, sql"))
+    prova("...e sta nel DATABASE, non in un globale che muore al deploy",
+          True, "timbro_letto(TIMBRO_LIBRO_MASTRO)" in corpo)
     prova("la leva puo' spegnerla", True,
           "if not CONTROLLO_LIBRO_MASTRO:" in corpo)
     prova("una query che esplode conta come guasto", True,
@@ -7546,6 +7548,194 @@ def prove_titoli_scappati():
     prova("...e non puo' fare catena (un solo invio spoglio)",
           1, corpo.count("spoglia_html("))
 # ====================================================================
+def prove_timbri_periodici():
+    """IL TIMBRO CHE NON TENEVA (ago 2026, caso dal campo: il termometro
+    delle sottocategorie arrivato TRE volte in cinquanta minuti — 12:35,
+    13:04, 13:25 — agli orari dei tre deploy di quel lunedi').
+
+    LA DIAGNOSI: il timbro era un globale, e un globale muore col
+    processo. Il gate del calendario (il lunedi') restringeva il
+    GIORNO ma dentro il giorno non contava niente: a distinguere il
+    primo battito dal centoquarantesimo c'era solo la RAM. Quindi
+    «un riavvio puo' al piu' far suonare due volte», che la docstring
+    prometteva, non era garantito da nulla — era una volta PER
+    RIAVVIO, senza tetto.
+
+    LA PROVA E' ESEGUIBILE e simula proprio quello: si fa girare la
+    funzione VERA tre volte su tre ambienti DIVERSI — che e' cosa
+    succede a tre deploy — con lo stesso database sotto. Una
+    sentinella sulla forma non basterebbe: qui il difetto non e' una
+    riga mancante, e' uno stato che non sopravvive."""
+    print("\n[i timbri degli avvisi periodici]")
+    import asyncio as _aio
+    import sqlite3
+    import time as _time
+
+    # Il database vero dei timbri, in memoria: e' il pezzo che deve
+    # sopravvivere ai «riavvii».
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE timbri(nome TEXT PRIMARY KEY, "
+                "valore TEXT DEFAULT '', quando INTEGER DEFAULT 0)")
+    con.commit()
+
+    class ConFinta:
+        """close() no-op: su :memory: chiuderebbe il database."""
+
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+
+    def ambiente(**extra):
+        """UN PROCESSO: ambiente nuovo, database vecchio. E' quel che
+        cambia fra un deploy e l'altro."""
+        amb = {"db": lambda: ConFinta(), "time": _time,
+               "print": lambda *a, **k: None}
+        amb.update(extra)
+        exec(pezzo("timbro_letto"), amb)
+        exec(pezzo("timbro_scrivi"), amb)
+        return amb
+
+    # --- 1) i due giudici, andata e ritorno ------------------------
+    a = ambiente()
+    prova("timbro mai scritto: stringa vuota", "", a["timbro_letto"]("x"))
+    a["timbro_scrivi"]("x", "2026-08-10")
+    prova("...scritto e riletto", "2026-08-10", a["timbro_letto"]("x"))
+    a["timbro_scrivi"]("x", "2026-08-17")
+    prova("...si sovrascrive, non si accumula", "2026-08-17",
+          a["timbro_letto"]("x"))
+    prova("un timbro non parla per un altro", "", a["timbro_letto"]("y"))
+    # IL PUNTO DI TUTTO: un ambiente NUOVO (= un deploy) lo rilegge
+    prova("e SOPRAVVIVE a un processo nuovo", "2026-08-17",
+          ambiente()["timbro_letto"]("x"))
+
+    # --- 2) IL CASO DAL CAMPO, riprodotto --------------------------
+    # Tre deploy nello stesso lunedi', vetrina con la coda piena.
+    detti = []
+
+    async def notifica_admin_finta(t):
+        detti.append(t)
+
+    def deploy(lunedi=True):
+        """Un giro d'orologio in un processo APPENA partito."""
+        amb = ambiente(
+            TERMOMETRO_SOTTOCATEGORIE=True,
+            TERMOMETRO_SOTTOCATEGORIE_MINIMO=5,
+            TIMBRO_TERMOMETRO="termometro_sotto",
+            notifica_admin=notifica_admin_finta,
+            _termometro_conta=lambda c: (12, {"Informatica": 7,
+                                              "Telefonia": 5}, 3))
+        # il calendario si finge: lunedi' o no
+        amb["time"] = _types_orologio(_time, lunedi)
+        exec("async " + pezzo("termometro_sottocategorie"), amb)
+        _aio.run(amb["termometro_sottocategorie"]())
+
+    detti.clear()
+    deploy(); deploy(); deploy()
+    prova("tre deploy nello stesso lunedi': UNA notifica sola",
+          1, len(detti))
+    prova("...e dice la coda che ha trovato", True,
+          "12" in detti[0] and "Informatica" in detti[0])
+
+    # il lunedi' DOPO si ricomincia (il timbro e' il giorno, non «mai
+    # piu'»): si sposta il giorno cancellando la riga, che e' quel che
+    # fa il calendario passando a un altro lunedi'
+    con.execute("DELETE FROM timbri WHERE nome='termometro_sotto'")
+    con.commit()
+    detti.clear()
+    deploy()
+    prova("il lunedi' dopo torna a suonare", 1, len(detti))
+
+    # e in un giorno che non e' lunedi' non suona comunque
+    con.execute("DELETE FROM timbri WHERE nome='termometro_sotto'")
+    con.commit()
+    detti.clear()
+    deploy(lunedi=False)
+    prova("di martedi' tace, timbro o non timbro", 0, len(detti))
+
+    # --- 3) LA CODA FERMA NON CONSUMA LA SETTIMANA -----------------
+    # Sotto il minimo si esce PRIMA di timbrare: se timbrasse, una
+    # settimana silenziosa brucerebbe il turno e il lunedi' dopo
+    # ricontrollerebbe... mai.
+    con.execute("DELETE FROM timbri")
+    con.commit()
+    detti.clear()
+    amb = ambiente(
+        TERMOMETRO_SOTTOCATEGORIE=True, TERMOMETRO_SOTTOCATEGORIE_MINIMO=5,
+        TIMBRO_TERMOMETRO="termometro_sotto",
+        notifica_admin=notifica_admin_finta,
+        _termometro_conta=lambda c: (2, {"Informatica": 2}, 0))
+    amb["time"] = _types_orologio(_time, True)
+    exec("async " + pezzo("termometro_sottocategorie"), amb)
+    _aio.run(amb["termometro_sottocategorie"]())
+    prova("coda sotto il minimo: non suona", 0, len(detti))
+    prova("...e NON timbra, o brucerebbe il turno", "",
+          ambiente()["timbro_letto"]("termometro_sotto"))
+
+    # --- 4) FAIL-OPEN NEL VERSO DEL PARLARE ------------------------
+    # Un timbro illeggibile non deve poter zittire per sempre un
+    # avviso: la lettura che esplode risponde «mai timbrato».
+    rotto = {"db": _esplode, "time": _time, "print": lambda *a, **k: None}
+    exec(pezzo("timbro_letto"), rotto)
+    prova("database muto in lettura: l'avviso PARTE", "",
+          rotto["timbro_letto"]("termometro_sotto"))
+    # e la scrittura che esplode non ferma il giro dell'orologio
+    rotto2 = {"db": _esplode, "time": _time, "print": lambda *a, **k: None}
+    exec(pezzo("timbro_scrivi"), rotto2)
+    rotto2["timbro_scrivi"]("x", "y")      # non deve sollevare
+    prova("database muto in scrittura: non alza, il giro continua",
+          True, True)
+
+    # --- 5) IL CENSIMENTO: nessun avviso periodico torna alla RAM ---
+    # E' la prova che tiene: chi aggiunge un avviso periodico domani
+    # non deve poter reintrodurre il globale che muore al deploy.
+    src = _SORGENTE
+    for f in ("termometro_sottocategorie", "sollecita_revisioni",
+              "controlla_libro_mastro"):
+        c = pezzo(f)
+        prova(f"{f}: legge il timbro dal database", True,
+              "timbro_letto(" in c)
+        prova(f"{f}: lo scrive nel database", True, "timbro_scrivi(" in c)
+        prova(f"{f}: nessun globale di gate rimasto", False, "global _" in c)
+    prova("i vecchi globali non esistono piu'", True,
+          "_ultimo_termometro_sotto" not in src
+          and "_ultimo_sollecito_revisioni" not in src
+          and "_ultimo_libro_mastro" not in src)
+
+    # --- 6) E OGNUNO LASCIA UNA RIGA NEL JOURNAL -------------------
+    # Il secondo difetto del caso dal campo: l'invio non si trovava da
+    # nessuna parte, quindi un avviso che parte troppo non si poteva
+    # nemmeno diagnosticare. La riga si stampa PRIMA della notifica.
+    for f in ("termometro_sottocategorie", "sollecita_revisioni",
+              "controlla_libro_mastro"):
+        c = pezzo(f)
+        prova(f"{f}: lascia una riga nel journal quando manda", True,
+              "avviso mandato" in c)
+        prova(f"{f}: la riga viene PRIMA dell'invio", True,
+              c.index("avviso mandato") < c.index("notifica_admin("))
+
+
+def _esplode():
+    raise sqlite3_errore("database bloccato")
+
+
+def sqlite3_errore(m):
+    import sqlite3
+    return sqlite3.OperationalError(m)
+
+
+def _types_orologio(vero, lunedi):
+    """Un `time` che mente sul giorno della settimana e basta."""
+    import types
+    return types.SimpleNamespace(
+        strftime=lambda f, *a: "2026-08-10" if f == "%Y-%m-%d"
+        else vero.strftime(f, *a),
+        localtime=lambda *a: types.SimpleNamespace(tm_wday=0 if lunedi else 1),
+        time=vero.time)
+
+# ====================================================================
 def prove_anteprime():
     """LE ANTEPRIME DEI LINK (ago 2026). La famiglia difende tre cose,
     e la prima e' quella che conta: UN ANNUNCIO NON ATTIVO NON RACCONTA
@@ -7993,7 +8183,8 @@ def main():
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime,
               prove_impersonazione, prove_avviso_spedizione,
-              prove_ricevuta_compratore, prove_titoli_scappati):
+              prove_ricevuta_compratore, prove_titoli_scappati,
+              prove_timbri_periodici):
         try:
             f()
         except Exception as e:
