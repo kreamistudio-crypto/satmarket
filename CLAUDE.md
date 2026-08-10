@@ -365,6 +365,83 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   consegna in compra() sta ora PRIMA del fail-fast dello stock: la
   ripresa confronta la scelta.) I set restano fuori dalla ripresa,
   dichiarato.
+  E NESSUNA RIGA SI CANCELLA SENZA AVER CHIESTO A LNBITS (ago 2026):
+  è l'invariante, ed è la stessa regola delle lapidi arrivata fino in
+  fondo. Il reaper buttava via gli ordini 'creato' scaduti con un
+  DELETE secco — «nessun sat è coinvolto, è solo pulizia», vero SOLO
+  se qualcuno ha guardato, e a guardare c'è un poll che vive nel
+  TELEFONO DEL COMPRATORE (`pollTimer`, più il bottone «ho pagato»
+  nella lista). Chi paga da un wallet esterno e chiude l'app — o
+  Telegram gli uccide la WebView, o cade la rete — lascia una riga mai
+  verificata, e il DELETE si portava via il `payment_hash`, cioè
+  l'UNICO filo verso quel pagamento: i sats restavano in cassaforte
+  senza un ordine, e nemmeno LNbits sa a chi renderli (registra che
+  qualcuno ha pagato, non CHI). La finestra è vera e vale fra i 15 e i
+  30 minuti: la fattura muore a `INVOICE_EXPIRY` (900s), la riga a
+  1800s. `annulla_ordine` la regola la rispettava già; il reaper la
+  scavalcava dalla porta di servizio — ed è il modo in cui muoiono le
+  regole, non abrogate ma aggirate da un'altra strada.
+  MAI SUCCESSO IN PRODUZIONE, e il METODO per dirlo va tenuto perché
+  da SQL non si può: le righe cancellate non esistono più, e l'unico
+  posto dove il fatto resta scritto è LNbits. Si incrociano i suoi
+  incassi (`GET /api/v1/payments`, entrate riuscite) coi
+  `payment_hash` noti a `ordini` + `rilanci` — devono combaciare per
+  costruzione, `crea_invoice_escrow` è l'unica cosa che emette fatture
+  in entrata — e ogni incasso senza riga è un orfano. Il `memo` dice
+  quale annuncio (`Barattolo escrow #{id}`), mai chi ha pagato. Fatto
+  ad ago 2026: zero orfani, i soli col nostro memo erano sei collaudi
+  di luglio.
+  IL REAPER NON POTEVA GUARDARE DA SÉ, ed è ciò che ha deciso la
+  forma: è SINCRONO e vive dentro `GET /api/orders` (unico chiamante,
+  il «reaper pigro»), quindi a LNbits non ci può parlare. Ora lui i
+  'creato' non li tocca più — né ordini né rilanci — e a guardarli c'è
+  `controlla_abbandonati` nell'orologio, gemella di
+  `controlla_annullati` per chi non ha annullato niente: ha pagato ed
+  è sparito. Pagata → il flusso di sempre da `_incassa_ordine` col suo
+  CAS (se il poll ha vinto un istante prima, rowcount 0 e nessuno
+  rinotifica); non pagata → la LAPIDE 'annullato', da cui la purga
+  passa un'ora dopo. SOLO A FATTURA MORTA
+  (`INVOICE_EXPIRY`/`RILANCIO_EXPIRY`): prima il compratore può ancora
+  pagare, e dichiarargli l'ordine annullato sarebbe una bugia oltre
+  che una corsa col suo poll — per questo il 900 è diventato un NOME e
+  non è più un numero nella firma di `crea_invoice_escrow`, che due
+  copie a mano sono due copie da tenere in pari e quella sbagliata
+  dichiara annullato un ordine ancora pagabile.
+  FAIL-OPEN NEL VERSO GIUSTO: LNbits muto = la riga RESTA 'creato' e
+  si riprova al giro dopo, e nessuno la cancella più alle sue spalle.
+  Il prezzo dichiarato è che a LNbits giù quelle righe si accumulano
+  invece di autopulirsi — meglio una riga che si attarda che un
+  pagamento buttato via.
+  IL RILANCIO PAGATO NON ENTRA IN GARA, dichiarato: la fattura è
+  scaduta da un pezzo e applicare adesso un rilancio vecchio di dieci
+  minuti falserebbe una gara che è andata avanti. Prende il binario
+  del fuori-tempo di `verifica_rilancio` — i sats nel registro «Da
+  riscuotere», la risposta che il progetto dà già a ogni saldo su una
+  puntata fuori gara — e chi ha pagato lo viene a sapere.
+  DUE CONSEGUENZE: un checkout abbandonato compare come «Annullato»
+  negli Ordini per un'ora invece di sparire a 30 minuti (è la riga che
+  l'annullo esplicito produce già, col suo «nessun pagamento è stato
+  trattenuto»: più onesta di una riga che svanisce); e stock e guardia
+  «affare in corso» si liberano PRIMA — verificato che tutti e sei i
+  chiamanti di `_ordini_vivi_annuncio` trattano 'annullato' come
+  terminale.
+  IMPERFEZIONE DICHIARATA E NON CHIUSA QUI: `_incassa_ordine` non
+  avvisa MAI il compratore — al pagamento partono «Hai venduto» al
+  venditore, il polso 🛒 ai moderatori e il 🕊 a chi resta in
+  trattativa, e per chi ha appena pagato c'è il solo toast in-app,
+  perché nel caso normale è il suo stesso poll a innescare tutto ed
+  è lì davanti. Ma su QUESTA strada non lo è (e nemmeno sul riacciuffo
+  di `controlla_annullati`): l'ordine si conclude in silenzio e lui lo
+  scopre rientrando. La cura è una notifica al compratore sul ramo che
+  parte dall'orologio, non su quello che parte dal suo dito.
+  Nelle prove UNA SENTINELLA HA CAMBIATO LATO — chiedeva che il reaper
+  spazzasse anche i 'creato', cioè certificava il buco (il precedente
+  è la gemella degli avatar) — e la tortura a nove mutazioni ne ha
+  trovata una CHE NON POTEVA FALLIRE: cercava il nome della funzione
+  nell'orologio, e un «pass  # await controlla_abbandonati()» la
+  lasciava verde con la funzione mai chiamata. Ora chiede la RIGA
+  intera. È la lezione da portarsi dietro: una sentinella si scrive
+  rompendo il codice, non rileggendola.
   IL RITIRO SI CONFERMA DA 'LOCKED' (ago 2026, dal campo: il
   compratore non trovava il bottone). Il server accettava già la
   conferma da locked — mancava nel CLIENT: ora a locked-ritiro il
@@ -9035,6 +9112,32 @@ prompt si corregge A MANO. IMPERFEZIONI DICHIARATE e non chiuse: i
 quattro solleciti fratelli hanno ancora il titolo nudo nell'HTML, e
 l'immagine remota la scarica comunque il browser di chi APRE la
 scheda (è la regola della vetrina, dichiarata).
+Nessuna riga si cancella senza aver chiesto a LNbits (ago 2026,
+trovato di striscia rispondendo a un'altra domanda — «al pagamento il
+compratore riceve una notifica?» — e portato avanti prima di tutto il
+resto): il reaper buttava via gli ordini 'creato' scaduti con un
+DELETE secco, e con loro il `payment_hash`, cioè l'unico filo verso un
+pagamento che nessuno aveva mai verificato. LA DIAGNOSI HA CAMBIATO LA
+DOMANDA, ed è la parte da tenere: la fattura NON sopravvive alla riga
+(muore a 900s, la riga a 1800s) — quindi il pericolo non era «paga
+dopo la cancellazione» ma «paga prima, nessuno guarda, la riga sparisce
+coi sats dentro». MAI SUCCESSO in produzione, verificato prima di
+toccare qualunque cosa incrociando gli incassi di LNbits coi
+payment_hash noti (zero orfani; il metodo è nella voce in
+Architettura, e da SQL non si può fare). La cura è la regola delle
+lapidi arrivata fino in fondo: il reaper i 'creato' non li tocca più e
+a guardarli — solo a fattura morta — c'è `controlla_abbandonati`
+nell'orologio, che è async e a LNbits ci può parlare. Vedi
+Architettura, «E NESSUNA RIGA SI CANCELLA SENZA AVER CHIESTO A
+LNBITS», per il fail-open nel verso giusto, il rilancio pagato che non
+entra in gara e le due conseguenze — collaudata con 14 prove nuove
+(1707 verdi), una sentinella ROVESCIATA e nove mutazioni del codice
+una per riga sorvegliata, di cui la nona ha smascherato una sentinella
+che non poteva fallire. IN PRODUZIONE basta il deploy: nessuna
+colonna, nessuna migrazione, nessuna leva. DA GUARDARE al primo giro:
+nel journal non deve comparire niente — un «⚠️ Ordine #N pagato e mai
+verificato» vuol dire che il caso è appena successo per davvero, e
+quello è il momento di guardare l'ordine, non la funzione.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
