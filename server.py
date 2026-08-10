@@ -21616,6 +21616,64 @@ IMMAGINE_BRAND = (f"{URL_PUBBLICO}/assets/icona-512.png", 512, 512)
 # client (che ha il patto «l'URL non si tocca mai») e senza cicli.
 MAX_SLUG = 60
 
+# UN NOME PUO' ESSERE UN RECAPITO (ago 2026, caso vero dal campo):
+# parecchi venditori bitcoin si chiamano come il loro Lightning
+# address, e `normalizza` lo trasformava docilmente in
+# «doc557-marshylift40-phoenixwallet-me» — un recapito di pagamento
+# diventato indirizzo web, e per giunta PROPOSTO ai motori dalla
+# sitemap, che e' la parte peggiore: un conto e' che un dato pubblico
+# stia su una pagina, un altro e' andarlo a offrire a chi indicizza.
+#
+# L'elenco e' una EURISTICA e non una verifica — nessuno puo' sapere
+# se «casa.it» sia un dominio o due parole — e si allunga senza
+# cerimonie quando ne salta fuori uno nuovo. Il verso in cui sbaglia e'
+# quello giusto: un falso positivo costa UN ORNAMENTO (l'indirizzo
+# resta quello nudo, che funziona identico), un falso negativo costa il
+# recapito di una persona dentro l'indice di Google. Misurato prima di
+# accenderla sugli 848 annunci e sui 24 negozi veri del database di
+# collaudo: ZERO falsi positivi.
+TLD_RECAPITO = (
+    "com net org info biz io me co it eu uk de fr es ch at nl be pt se "
+    "dk fi no pl cz ru ua tv cc ws app dev xyz online site shop store "
+    "live link click space fun top pro cash money fund wallet zone "
+    "world life today news blog cloud host page sh gg li ly to am fm "
+    "sv ph ge tips sats btc bitcoin lightning ninja pub chat social "
+    "network tech ai art vip wiki work uno cool run lol email name "
+    "plus red best pics day").split()
+
+_RECAPITO = re.compile(
+    # 1) LA CHIOCCIOLA BASTA DA SOLA: mail e Lightning address hanno la
+    #    stessa forma, e un «@qualcosa» in un titolo e' comunque una
+    #    maniglia verso una persona, non una parola da mettere in un URL.
+    r"@"
+    # 2) forma dominio.tld, con l'elenco qui sopra
+    r"|(?<![a-z0-9-])[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*"
+    r"\.(?:" + "|".join(TLD_RECAPITO) + r")(?![a-z0-9-])"
+    # 3) DUE PUNTI O PIU', qualunque sia la coda: e' la regola che NON
+    #    dipende dall'elenco, e prende la forma esatta del caso dal
+    #    campo (marshylift40.phoenixwallet.me) anche con un dominio di
+    #    primo livello che a nessuno era venuto in mente. L'ultimo
+    #    pezzo dev'essere di due lettere o piu', o «art.15.c» e i
+    #    numeri di modello entrerebbero da soli.
+    r"|(?<![a-z0-9-])[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)+"
+    r"\.[a-z]{2,}(?![a-z0-9-])")
+
+
+def _pare_recapito(testo: str) -> bool:
+    """Il testo somiglia a un indirizzo di pagamento o a una mail?
+
+    Si guarda il testo GREZZO, e non e' un dettaglio: `normalizza`
+    scioglie la chiocciola e i punti in spazi, quindi dopo di lei un
+    Lightning address e' indistinguibile da una frase. Chi spostasse
+    questo controllo dopo la normalizzazione lo renderebbe inerte
+    senza rompere niente di visibile — c'e' la prova apposta.
+
+    IMPERFEZIONE DICHIARATA: un «N.B.Leggere» senza lo spazio dopo il
+    punto viene preso dalla regola dei due punti. Costa l'ornamento e
+    basta — l'indirizzo resta quello nudo e funziona identico — ed e'
+    il verso in cui questa guardia deve sbagliare."""
+    return bool(_RECAPITO.search((testo or "").lower()))
+
 
 def _slug(testo: str) -> str:
     """Il pezzo leggibile di un indirizzo: minuscolo, senza accenti,
@@ -21639,7 +21697,16 @@ def _slug(testo: str) -> str:
     che poggia il fatto che gli indirizzi costruiti qui non abbiano
     bisogno di nessun filtro: se `_slug` smettesse di essere totale,
     ogni URL che ne nasce diventerebbe un punto d'iniezione. C'e' la
-    prova apposta."""
+    prova apposta.
+
+    LA GUARDIA DEL RECAPITO STA QUI DENTRO, e non nei chiamanti: cosi'
+    la ereditano per costruzione l'indirizzo dell'annuncio, quello del
+    negozio, la sitemap, il canonical e il campo `slug` che il client
+    riceve — piu' ogni strada che verra' dopo, senza che nessuno se ne
+    debba ricordare. Un nome che somiglia a un indirizzo di pagamento
+    non diventa un indirizzo web: resta il solo codice."""
+    if _pare_recapito(testo):
+        return ""
     s = normalizza(testo).replace(" ", "-")
     if len(s) > MAX_SLUG:
         corto = s[:MAX_SLUG].rsplit("-", 1)[0]

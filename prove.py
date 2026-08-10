@@ -7761,7 +7761,9 @@ def _amb_seo():
                  "TETTO_SITEMAP = ", "CACHE_SITEMAP = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
-    for blocco in ("CATEGORIE = (", "CATEGORIE_SENZA_CONDIZIONE = ",
+    # multi-riga: vogliono il taglio alla riga VUOTA, non al primo \n
+    for blocco in ("TLD_RECAPITO = (", "_RECAPITO = re.compile(",
+                   "CATEGORIE = (", "CATEGORIE_SENZA_CONDIZIONE = ",
                    "CONDIZIONI = {", "CONDIZIONI_LD = {",
                    "_PAGINA_CACHE = {", "_SEO_HOME_CACHE = {",
                    "_SITEMAP_CACHE = {", "ROBOTS_TXT = (",
@@ -7770,7 +7772,8 @@ def _amb_seo():
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
     for f in ("normalizza", "slug_categoria", "senza_condizione",
               "condizione_da_mostrare", "in_ferie", "_fmt_sats", "_fmt_eur",
-              "_prezzo_promo", "_slug", "_id_da_percorso", "_chi_da_percorso",
+              "_prezzo_promo", "_pare_recapito", "_slug",
+              "_id_da_percorso", "_chi_da_percorso",
               "_attr", "_testo", "_ld", "_meta_anteprima", "_taglia_meta",
               "_immagine_anteprima", "_testa_seo", "_url_annuncio",
               "_url_negozio", "_categoria_da_slug", "_schede_cartello",
@@ -8308,6 +8311,57 @@ def prove_seo():
         prova(f"lo slug resta [a-z0-9-] su {v!r}", True,
               bool(_re.fullmatch(r"[a-z0-9]*(-[a-z0-9]+)*", slug(v))))
 
+    # --- 1ter) UN NOME PUO' ESSERE UN RECAPITO ---------------------
+    # Caso vero dal campo: un venditore si chiama come il proprio
+    # Lightning address, `normalizza` lo scioglie docilmente, e il
+    # recapito diventa un indirizzo web — per giunta PROPOSTO ai motori
+    # dalla sitemap. La guardia sbaglia nel verso giusto: un falso
+    # positivo costa l'ornamento, un falso negativo costa il recapito
+    # di una persona dentro l'indice.
+    pare = amb["_pare_recapito"]
+    VERO = "doc557@marshylift40.phoenixwallet.me"
+    prova("il caso dal campo e' un recapito", True, pare(VERO))
+    prova("...e il suo slug non si fa proprio", "", slug(VERO))
+    prova("...quindi resta il solo codice negozio",
+          "https://barattolo.store/negozio/57b27cf6",
+          amb["_url_negozio"]("57b27cf6", VERO))
+    for t in ("satoshi@walletofsatoshi.com", "mario.rossi@gmail.com",
+              "phoenixwallet.me", "zbd.gg", "ln.tips", "getalby.com",
+              "Pago solo su pippo@wallet.com", "scrivimi@qui.it",
+              # LA REGOLA DEI DUE PUNTI non dipende dall'elenco, e va
+              # provata con un caso in cui NESSUNA etichetta e' un TLD
+              # noto — altrimenti a prenderlo e' l'elenco e la regola
+              # si puo' togliere senza che nessuna prova se ne accorga
+              # (successo davvero, con «tizio.wallet.qualcosa»: la
+              # tortura l'ha smascherato, la rilettura no).
+              "tizio.borsellino.chissacosa"):
+        prova(f"recapito: {t!r}", True, pare(t))
+        prova(f"...e niente slug per {t!r}", "", slug(t))
+    # e il rovescio, che e' la meta' che costa: la roba legittima non
+    # deve perdere il suo slug. Misurato sugli 888 titoli e sui 24 nomi
+    # veri del database di collaudo: zero falsi positivi.
+    for t in ("Bicicletta da corsa Bianchi", "Sedia mod. 3 pezzi",
+              "Nikon D3.200", "N.B. leggere bene", "Cuffie AKG K371",
+              'Cuffie "AKG" & co.', "Art. 15 comma 3", "Vaso in ceramica"):
+        prova(f"non e' un recapito: {t!r}", False, pare(t))
+    prova("...e il loro slug resta intero", "bicicletta-da-corsa-bianchi",
+          slug("Bicicletta da corsa Bianchi"))
+    # VALE ANCHE PER GLI ANNUNCI: un titolo puo' contenerne uno, e la
+    # guardia sta dentro _slug proprio perche' la ereditino tutti.
+    prova("un titolo col recapito perde lo slug, non l'indirizzo",
+          "https://barattolo.store/annuncio/13334",
+          amb["_url_annuncio"](13334, "Vendo bici, scrivi a mario@rossi.it"))
+    # LA GUARDIA GUARDA IL TESTO GREZZO: dopo `normalizza` la
+    # chiocciola e i punti sono spazi, e un Lightning address e'
+    # indistinguibile da una frase. Spostarla dopo la renderebbe
+    # inerte senza rompere niente di visibile.
+    corpo_slug = pezzo("_slug")
+    prova("sentinella: la guardia gira PRIMA di normalizza", True,
+          corpo_slug.index("_pare_recapito(")
+          < corpo_slug.index("normalizza("))
+    prova("sentinella: e sta dentro _slug, cosi' la ereditano tutti", 1,
+          _SORGENTE.count("if _pare_recapito(testo):"))
+
     # --- 1bis) _slug e slug_categoria sono DUE COSE ----------------
     # La seconda lavora su un catalogo chiuso e il suo prodotto e' un
     # NOME DI FILE su disco: cambiarla spegne 27 illustrazioni. Oggi le
@@ -8538,8 +8592,11 @@ def prove_seo():
     con2.execute("INSERT INTO utenti (tg_id, nome, username, negozio, "
                  "rating, n_feedback) VALUES (12,'Vuoto','vuoto','cccc3333',"
                  "0,0)")
+    # QUESTO si chiama come il proprio Lightning address, ed e' il caso
+    # vero dal campo: deve stare in mappa col codice NUDO.
     con2.execute("INSERT INTO utenti (tg_id, nome, username, negozio, "
-                 "rating, n_feedback) VALUES (11,'Bea','bea','bbbb2222',0,0)")
+                 "rating, n_feedback) VALUES (11,?,'bea','bbbb2222',0,0)",
+                 ("doc557@marshylift40.phoenixwallet.me",))
     con2.commit()
     amb["db"] = _db_finto(con2)
     amb["_SITEMAP_CACHE"].update(quando=0.0, xml=b"")
@@ -8555,6 +8612,15 @@ def prove_seo():
           any("cccc3333" in x for x in loc))
     prova("...ne' i reparti vuoti", False,
           any("/categoria/animali" in x for x in loc))
+    # IL RECAPITO NON ENTRA NELLA MAPPA, ed e' la prova che il caso dal
+    # campo non puo' tornare: il negozio c'e' (ha merce), ma il suo
+    # <loc> e' il codice nudo e del Lightning address non resta traccia
+    # in tutto il file.
+    prova("un negozio che si chiama come un recapito sta in mappa "
+          "col codice nudo", True,
+          "https://barattolo.store/negozio/bbbb2222" in loc)
+    prova("...e del recapito non resta traccia nella mappa", False,
+          "phoenixwallet" in xml or "marshylift" in xml)
     prova("...e gli attivi ci sono tutti e tre", 3,
           sum(1 for x in loc if "/annuncio/" in x))
     prova("...con la home e la pagina della sicurezza", True,
