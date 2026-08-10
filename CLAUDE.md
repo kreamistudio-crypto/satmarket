@@ -1719,6 +1719,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   cambiarla spegne 27 illustrazioni), e il legame si dichiara con una
   prova che oggi passa e diventerà rossa il giorno che qualcuno
   aggiunge una categoria con dentro una «&».
+  UN NOME PUÒ ESSERE UN RECAPITO (ago 2026, caso vero dal campo visto
+  da Andrea nella sitemap): parecchi venditori bitcoin si chiamano come
+  il loro Lightning address, e `normalizza` lo scioglieva docilmente in
+  `doc557-marshylift40-phoenixwallet-me` — un recapito di pagamento
+  diventato indirizzo web. E la parte peggiore non è l'URL: è che la
+  SITEMAP lo **proponeva attivamente** ai motori. Un conto è che un
+  dato pubblico stia su una pagina, un altro è andarlo a offrire a chi
+  indicizza.
+  `_pare_recapito` guarda il testo GREZZO — dopo `normalizza` chiocciola
+  e punti sono spazi, e un Lightning address è indistinguibile da una
+  frase, quindi chi spostasse il controllo dopo lo renderebbe INERTE
+  senza rompere niente di visibile (c'è la sentinella) — e ha tre
+  trigger: la chiocciola da sola (mail e LN address hanno la stessa
+  forma, e un «@qualcosa» è comunque una maniglia verso una persona);
+  la forma `dominio.tld` contro un elenco di TLD; e **due punti o più**,
+  che è la regola che NON dipende dall'elenco e prende la forma esatta
+  del caso dal campo anche con un dominio di primo livello mai visto.
+  LA GUARDIA STA DENTRO `_slug`, non nei chiamanti, e la ereditano per
+  costruzione l'indirizzo dell'annuncio, quello del negozio, la
+  sitemap, il canonical e il campo `slug` che il client riceve — più
+  ogni strada futura. Vale per i TITOLI come per i nomi: un annuncio
+  può contenerne uno.
+  L'ELENCO È UN'EURISTICA, non una verifica — nessuno può sapere se
+  «casa.it» sia un dominio o due parole — e si allunga senza cerimonie.
+  Il verso in cui sbaglia è quello giusto: un falso positivo costa UN
+  ORNAMENTO (l'indirizzo resta nudo e funziona identico), un falso
+  negativo costa il recapito di una persona dentro l'indice. Misurato
+  prima di accenderla sugli 888 annunci e sui 24 negozi veri: ZERO
+  falsi positivi. IMPERFEZIONE DICHIARATA: un «N.B.Leggere» senza lo
+  spazio dopo il punto viene preso dalla regola dei due punti.
+  E il vecchio indirizzo già indicizzato non muore né si redirige: il
+  canonical lo consolida sul codice nudo — è precisamente il motivo per
+  cui il canonical era la scelta giusta invece del 301.
+  LA LEZIONE DELLA TORTURA, che vale più della regola: il primo caso di
+  prova per i «due punti» era `tizio.wallet.qualcosa`, e a prenderlo
+  era l'ELENCO (`wallet` è un TLD) — togliere la regola dei due punti
+  non faceva diventare rossa nessuna prova. Un caso di prova va scelto
+  in modo che possa fallire solo per la ragione che si vuole
+  sorvegliare, e a dirlo è stata la mutazione, non la rilettura.
   IL CANONICO DEL NEGOZIO È IL CODICE, non lo username: quello è
   dell'utente, che può cambiarlo o perderlo, e un canonical che si
   muove butta via il segnale lasciandosi dietro un 404. È anche già
