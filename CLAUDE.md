@@ -425,15 +425,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «affare in corso» si liberano PRIMA — verificato che tutti e sei i
   chiamanti di `_ordini_vivi_annuncio` trattano 'annullato' come
   terminale.
-  IMPERFEZIONE DICHIARATA E NON CHIUSA QUI: `_incassa_ordine` non
-  avvisa MAI il compratore — al pagamento partono «Hai venduto» al
-  venditore, il polso 🛒 ai moderatori e il 🕊 a chi resta in
-  trattativa, e per chi ha appena pagato c'è il solo toast in-app,
-  perché nel caso normale è il suo stesso poll a innescare tutto ed
-  è lì davanti. Ma su QUESTA strada non lo è (e nemmeno sul riacciuffo
-  di `controlla_annullati`): l'ordine si conclude in silenzio e lui lo
-  scopre rientrando. La cura è una notifica al compratore sul ramo che
-  parte dall'orologio, non su quello che parte dal suo dito.
+  L'IMPERFEZIONE DICHIARATA QUI È STATA CHIUSA (ago 2026): era
+  «`_incassa_ordine` non avvisa MAI il compratore», e la cura ipotizzata
+  allora — una notifica sul solo ramo dell'orologio — è stata SCARTATA
+  in favore della notifica SEMPRE. Vedi «LA RICEVUTA DEL COMPRATORE».
   Nelle prove UNA SENTINELLA HA CAMBIATO LATO — chiedeva che il reaper
   spazzasse anche i 'creato', cioè certificava il buco (il precedente
   è la gemella degli avatar) — e la tortura a nove mutazioni ne ha
@@ -442,6 +437,59 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   lasciava verde con la funzione mai chiamata. Ora chiede la RIGA
   intera. È la lezione da portarsi dietro: una sentinella si scrive
   rompendo il codice, non rileggendola.
+  LA RICEVUTA DEL COMPRATORE (ago 2026): chi paga riceve una notifica
+  SEMPRE, appena i sats sono in cassaforte. Prima non gli arrivava
+  niente dal server — al venditore «Hai venduto», ai moderatori il
+  polso 🛒, a chi restava in trattativa il 🕊, e a lui il solo toast
+  in-app, che dura tre secondi e non lascia niente da ritrovare. Il
+  toast è morto; la notifica resta ed è la ricevuta che ritrova domani
+  cercando cosa ha comprato (in DEMO il toast RESTA: lì non c'è nessun
+  server che notifichi, ed è l'unico riscontro).
+  LA CURA È «SEMPRE» E NON «SOLO DALL'OROLOGIO», ed è la strada
+  scartata da tenere: l'imperfezione era dichiarata sul ramo che parte
+  dall'orologio (`controlla_abbandonati`, il riacciuffo di
+  `controlla_annullati`) perché lì il compratore non è davanti allo
+  schermo, e la cura ovvia era un ramo apposta. Notificare SEMPRE
+  costa un messaggio in più nel caso normale e in cambio toglie il
+  ramo: la ricevuta vive in `_incassa_ordine`, cioè nel FUNNEL da cui
+  passano tutte e tre le strade dell'accredito, e ogni strada futura
+  la eredita senza che nessuno se ne debba ricordare. Chi la spostasse
+  su `verifica_pagamento` rimetterebbe il silenzio esattamente dove
+  faceva più male: c'è la sentinella.
+  LA CODA DEV'ESSERE QUELLA DELLA STRADA SCELTA, o si dice il falso a
+  metà degli ordini — giudice PURO `_coda_ricevuta(consegna, via_punto,
+  punto_scritto)`, che prende i campi e non la riga (il patto di
+  `in_ferie`) e si tortura in CI. Cinque code: spedizione a casa (il
+  tracciamento in arrivo), punto di ritiro (nessun tracciamento da
+  aspettare, si aspetta l'avviso che il pacco è arrivato — il gemello
+  di `MSG_BUSTA_PRONTA`), ritiro a mano (ci si accorda col venditore),
+  codice online, e il ripiego della consegna non dichiarata (gli
+  storici e gli importati da Nostr: nessuna promessa su una strada che
+  nessuno ha scelto). Più il caso del residuo del quarto giro — via
+  punto scelta e punto MAI scritto, cioè gli ordini nati da un client
+  di ieri: lì la palla è SUA e la coda glielo chiede, perché senza
+  quel testo il venditore non può nemmeno spedire.
+  SUL DIGITALE NON SI PROMETTE LA CONFERMA, ed è la riga da non
+  ammorbidire: lì le finestre corte scattano DA SOLE
+  (`ORE_CONFERMA_DIGITALE` dalla rivelazione, `ORE_SILENZIO_DIGITALE`
+  dalla consegna mai letta), quindi «i sats partono quando confermi»
+  sarebbe falso — e falso verso chi ha comprato proprio la cosa che
+  non torna indietro. La ricevuta dice solo che il contenuto arriva
+  dentro Barattolo; il come e il quando li dice la notifica della
+  consegna, che arriva col contenuto. C'è la prova che quella coda non
+  contiene «conferm».
+  Le altre code invece la nominano, e restano vere anche a
+  `AUTO_SBLOCCO_ATTIVO` riacceso: dicono «confermalo e i sats vanno a
+  lui», mai «SOLO se confermi» — quindi questa notifica NON entra
+  nell'elenco dei testi da rimettere il giorno del rientro.
+  Il PUNTO DI RITIRO è testo del compratore e al giudice arriva come
+  BOOL, mai la stringa: nel messaggio non ci entra per costruzione. Il
+  TITOLO invece ci entra, ed è testo del VENDITORE su un tubo HTML: si
+  tronca PRIMA e si escapa DOPO, o un «<» spegne la ricevuta in
+  silenzio — la lezione dell'avviso di spedizione, sullo stesso tubo.
+  Le ASTE restano fuori per costruzione: il vincitore ha già pagato e
+  il suo ordine nasce da `crea_ordine_pagato`, che non passa di qui (e
+  il 🏆 ce l'ha già).
   IL RITIRO SI CONFERMA DA 'LOCKED' (ago 2026, dal campo: il
   compratore non trovava il bottone). Il server accettava già la
   conferma da locked — mancava nel CLIENT: ora a locked-ritiro il
@@ -9138,6 +9186,35 @@ colonna, nessuna migrazione, nessuna leva. DA GUARDARE al primo giro:
 nel journal non deve comparire niente — un «⚠️ Ordine #N pagato e mai
 verificato» vuol dire che il caso è appena successo per davvero, e
 quello è il momento di guardare l'ordine, non la funzione.
+La ricevuta del compratore (ago 2026, il giorno dopo — chiude
+l'imperfezione che quel cantiere aveva dichiarato): chi paga riceve una
+notifica appena i sats sono in cassaforte, e la riceve SEMPRE, non solo
+quando l'accredito arriva dall'orologio. Il toast in-app se n'è andato:
+durava tre secondi e non lasciava niente da ritrovare. La decisione che
+governa il resto è «sempre» invece di «un ramo per l'orologio»: costa un
+messaggio in più nel caso normale e in cambio la ricevuta vive nel
+FUNNEL (`_incassa_ordine`), quindi tutte e tre le strade dell'accredito
+la ereditano — e anche quelle di domani. La coda segue la STRADA SCELTA
+o si dice il falso a metà degli ordini, e sul digitale non si promette
+mai la conferma, che lì le finestre corte scattano da sole. Vedi
+Architettura, «LA RICEVUTA DEL COMPRATORE».
+Collaudata: 42 prove nuove (1748 verdi, erano 1706) — il giudice puro
+strada per strada più `_incassa_ordine` chiamata DAVVERO su un database
+vero, col titolo cattivo e i grassetti che restano pari — e DODICI
+mutazioni del codice una per riga sorvegliata (ricevuta tolta, titolo
+nudo, escape prima del troncamento, digitale che promette la conferma,
+i tre rami della coda tolti a uno a uno, punto passato come testo,
+toast rimesso, destinatario sbagliato, coda scritta a mano, e la
+ricevuta traslocata sul poll — la regressione che rimetterebbe muto
+l'orologio): ognuna diventa rossa da sola. Più il giro DAL VIVO sulle
+sette strade con un database usa-e-getta — le cinque code, il titolo
+con un «<» dentro, `controlla_abbandonati` e il riacciuffo di
+`controlla_annullati`, che sono i due casi per cui il cantiere esiste —
+e il controllo nel browser vero che il toast non si accenda più e
+l'ordine si apra lo stesso. IN PRODUZIONE basta il deploy: nessuna
+colonna, nessuna migrazione, nessuna leva, nessuna rotta. DA GUARDARE
+al primo giro: la prima ricevuta vera dentro Telegram — e soprattutto
+che chi compra un CODICE non si veda promettere un pacco.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
