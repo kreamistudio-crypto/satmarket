@@ -844,6 +844,56 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il `print` del collaudo dieci righe più su la teneva verde anche
   togliendo quello del ripiego. L'ha smascherata la tortura (0 rosse
   su una mutazione che doveva farne una); ora guarda DENTRO il ramo.
+  I TIMBRI DEGLI AVVISI PERIODICI (ago 2026, caso dal campo: il
+  termometro arrivato TRE volte in cinquanta minuti — 12:35, 13:04,
+  13:25 — agli orari dei tre deploy di quel lunedì). «Ogni lunedì»,
+  «una al giorno»: promesse che valgono solo se il timbro sopravvive a
+  un riavvio, e i tre timbri vivevano in GLOBALI. Un globale muore col
+  processo, quindi non erano gate: erano dedupliche valide quanto il
+  processo, e su una macchina dove si deploya tre volte in un'ora
+  quella garanzia vale zero. Tabella `timbri` (nome, valore, quando) +
+  `timbro_letto`/`timbro_scrivi`, e i tre chiamanti sono
+  `termometro_sottocategorie`, `sollecita_revisioni` e
+  `controlla_libro_mastro`.
+  IL PEGGIORE ERA `sollecita_revisioni`, non quello che si è visto: il
+  suo gate era `adesso - _ultimo < 86400` contato da un globale — cioè
+  ESATTAMENTE l'antipattern che la docstring del termometro additava,
+  tre funzioni più giù — e lì manca perfino il gate del calendario,
+  quindi bastavano due deploy a un minuto di distanza. Si è visto
+  quello del termometro solo perché il lunedì li concentra.
+  FAIL-OPEN NEL VERSO DEL PARLARE: se la lettura non riesce si
+  risponde «mai timbrato», cioè l'avviso PARTE. Fra un doppione e un
+  allarme che non arriva si sceglie il doppione — un timbro
+  illeggibile non deve poter zittire per sempre una segnalazione — e
+  la scrittura che fallisce non alza: il giro dell'orologio non si
+  ferma per un timbro (il prezzo è che quell'avviso può ripetersi).
+  IL TIMBRO NON SI SCRIVE SE NON SI PARLA, ed è la riga che si sbaglia
+  per prima: nel termometro si esce PRIMA di timbrare quando la coda è
+  sotto il minimo, o una settimana silenziosa brucerebbe il turno e il
+  lunedì dopo non ricontrollerebbe. Quando invece si parla, il timbro
+  va PRIMA dell'invio: il patto delle campagne — un errore di rete può
+  perdere un avviso di cortesia, mai raddoppiarlo.
+  E OGNUNO LASCIA UNA RIGA NEL JOURNAL quando manda (il secondo
+  difetto del caso dal campo: l'invio non si trovava né su 24 ore né
+  su tre giorni, quindi un avviso che parte troppo non si poteva
+  nemmeno diagnosticare). La riga sta PRIMA della notifica e c'è la
+  prova che ci resti.
+  GLI ALTRI QUATTRO GATE IN RAM RESTANO, e il perché è la parte da non
+  rovesciare: `_ultimo_giro_iscritti` non è un gate ma un FILO
+  DELL'ACQUA — al riavvio ARMA e basta, cioè salta un battito invece
+  di rifare una raffica: sbaglia già nel verso giusto. Gli altri tre
+  (`_prossimo_import_nostr`, `_prossima_scoperta_nostr`,
+  `_prossimo_rinfresco_nostr`) programmano LAVORO e non avvisi: un
+  riavvio li fa partire prima, e il lavoro è idempotente — il
+  benvenuto della scoperta è gated da un fatto del database
+  (`crea_utente_nostr` gira solo se la riga non c'è), i suggerimenti
+  dal timbro `suggerito_il`. Chi aggiunge un avviso PERIODICO invece
+  usi `timbri`: c'è la prova che i tre non tornino a un globale.
+  LA PROVA È ESEGUIBILE e non una sentinella: fa girare la funzione
+  vera tre volte su tre AMBIENTI diversi con lo stesso database sotto
+  — che è cosa succede a tre deploy — e chiede UNA notifica sola. Una
+  sentinella sulla forma non basterebbe: qui il difetto non era una
+  riga mancante, era uno stato che non sopravviveva.
   Categorie (lug 2026): catalogo unico `CATEGORIE` in server.py, 27
   voci — le 9 di sempre (Elettronica · Casa e giardino ·
   Abbigliamento · Sport e hobby · Motori · Bambini · Animali · Libri e
@@ -1013,8 +1063,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il secondo modo di dimenticarsene). L'ancora è il CALENDARIO e non
   un conteggio in memoria, ed è deliberato: il gate in RAM muore a
   ogni deploy e un «ogni 7 giorni» contato da lì suonerebbe a ogni
-  riavvio — col lunedì, un riavvio può al più far suonare due volte
-  quel lunedì. Conta come il --conta (soli attivi, «Altro» escluso:
+  riavvio. MA IL SOLO CALENDARIO NON BASTAVA, e qui c'era scritto il
+  contrario — «un riavvio può al più far suonare due volte quel
+  lunedì»: non era garantito da niente, ed è arrivato il caso dal
+  campo a smentirlo (TRE notifiche in cinquanta minuti, agli orari di
+  tre deploy). Dentro il lunedì a distinguere il primo battito dal
+  centoquarantesimo c'era un globale, cioè una deduplica valida
+  quanto il processo. Dall'ago 2026 il timbro sta nella tabella
+  `timbri` — vedi «I TIMBRI DEGLI AVVISI PERIODICI».
+  Conta come il --conta (soli attivi, «Altro» escluso:
   è piatta per forza, non è «scoperta»); tace sotto
   TERMOMETRO_SOTTOCATEGORIE_MINIMO (5), tace a vetrina piena, e la
   leva TERMOMETRO_SOTTOCATEGORIE (True di serie) la spegne — una coda
@@ -4746,12 +4803,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   moderatori col nome del controllo, il perché e gli id (tetto di 10,
   poi «+N altri»: in chat deve restare leggibile, e per guardarli
   tutti c'è lo strumento a mano).
-  IL TIMBRO È IL GIORNO, in memoria, e si scrive PRIMA delle query (il
-  patto delle campagne, ma qui la ragione è sua): senza, l'allarme
-  tornerebbe a ogni battito — 144 volte al giorno — e in una settimana
-  nessuno lo leggerebbe più. Il prezzo dichiarato è che un riavvio fa
-  rifare la ronda, cioè al più un avviso doppio nello stesso giorno —
-  e per un guasto al libro mastro è il verso giusto in cui sbagliare.
+  IL TIMBRO È IL GIORNO e si scrive PRIMA delle query (il patto delle
+  campagne, ma qui la ragione è sua): senza, l'allarme tornerebbe a
+  ogni battito — 144 volte al giorno — e in una settimana nessuno lo
+  leggerebbe più. STA NELLA TABELLA `timbri` dall'ago 2026: era in
+  memoria, e qui c'era scritto che il prezzo era «al più un avviso
+  doppio nello stesso giorno» — falso, era uno PER DEPLOY. Su un
+  libro mastro sano non si vedeva (a database sano questa tace); si
+  sarebbe visto l'unico giorno in cui parla, cioè quello in cui
+  qualcosa non torna e qualcuno sta deployando per ripararlo.
   Una query che ESPLODE conta come un controllo fallito: se lo schema
   è cambiato sotto, è esattamente una cosa da sapere.
   QUALI INVARIANTI CI SONO (15, tutti già dichiarati altrove in questo
@@ -9307,6 +9367,36 @@ giustamente il titolo grezzo. IN PRODUZIONE basta il deploy: nessuna
 colonna, nessuna leva, nessuna rotta. DA GUARDARE al primo giro: nel
 journal non deve comparire nessun «⚠️ HTML rifiutato da Telegram» — se
 compare, quella riga dice il sito da scappare alla fonte.
+
+I timbri degli avvisi periodici (ago 2026, caso dal campo: il
+termometro delle sottocategorie arrivato TRE volte in cinquanta minuti,
+agli orari dei tre deploy di quel lunedì). Il timbro viveva in un
+globale: un globale muore col processo, quindi non era un gate ma una
+deduplica valida quanto il processo — e questo file prometteva «al più
+due volte quel lunedì», che non era garantito da niente. Ora sta nella
+tabella `timbri`. Erano TRE le funzioni con lo stesso ancoraggio, e la
+peggiore non è quella che si è vista: `sollecita_revisioni` contava
+24 ore da un globale SENZA nemmeno il gate del calendario — due deploy
+a un minuto di distanza e suonava due volte. Più la riga nel journal su
+tutti e tre, che era il secondo difetto: l'invio non si trovava da
+nessuna parte, quindi un avviso che parte troppo non si poteva neanche
+diagnosticare. Vedi Architettura, «I TIMBRI DEGLI AVVISI PERIODICI»,
+per il fail-open nel verso del parlare e per i quattro gate in RAM che
+RESTANO col loro perché.
+Collaudato: 29 prove nuove (1814 verdi, erano 1785) — in testa quella
+ESEGUIBILE che simula tre deploy (tre ambienti diversi, un database
+solo) e chiede una notifica sola — più NOVE mutazioni una per riga
+sorvegliata, ognuna rossa da sola. Più il giro DAL VIVO con tre
+subprocess veri sullo stesso file di database: una notifica, la riga di
+journal sul primo giro, e la tabella con dentro il suo timbro. E la
+migrazione provata su una COPIA del database esistente: una tabella in
+più, nessuna persa, `timbri` vuota.
+IN PRODUZIONE basta il deploy (la tabella nasce da sola). ⚠️ DA SAPERE:
+oggi è lunedì e la tabella nasce vuota, quindi il primo riavvio dopo il
+deploy manda UN'ULTIMA notifica del termometro — dal secondo in poi
+silenzio. Non si semina il timbro apposta: sarebbe un trucco una-tantum
+dentro una migrazione, e su un'installazione nuova salterebbe il primo
+lunedì per davvero.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
