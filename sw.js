@@ -8,7 +8,7 @@
    REGOLA OPERATIVA: se cambi un file dell'elenco PRECACHE (o il file
    stesso), alza VERSIONE — le dispense vecchie si svuotano da sole. */
 
-const VERSIONE = 'barattolo-v3';
+const VERSIONE = 'barattolo-v4';
 const CACHE_STATICA = `statica-${VERSIONE}`;
 const CACHE_FONT = `font-${VERSIONE}`;
 

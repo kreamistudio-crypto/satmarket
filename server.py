@@ -6703,8 +6703,19 @@ def arricchisci_righe_vetrina(righe):
     alla domanda. Si calcola qui e non in SQL — il dizionario dei
     ~7.900 comuni vive in RAM, non nel database — ed e' per riga una
     manciata di lookup su un dict: nulla, anche sulle 300 righe della
-    shortlist AI. Il testo INTERO resta in `zona` per il dettaglio."""
+    shortlist AI. Il testo INTERO resta in `zona` per il dettaglio.
+
+    3) `slug` (ago 2026): il pezzo leggibile dell'indirizzo, quello che
+    fa di ogni card un COLLEGAMENTO VERO. Lo calcola il server e non il
+    client, ed e' una decisione: un gemello di `_slug` in miniapp.html
+    sarebbe un secondo posto da tenere allineato per sempre, e questo
+    progetto sa quanto costa (slugCat/slug_categoria ha dovuto pagarsi
+    una prova incrociata in CI). Li' il gemello e' giustificato — serve
+    a calcolare offline il nome di 27 file di illustrazione —, qui no.
+    Un client che non lo trova (server di ieri) fa il link senza coda,
+    che continua a funzionare: fail-open senza un ramo d'errore."""
     for r in righe:
+        r["slug"] = _slug(r.get("titolo") or "")
         presi = set((r.pop("venditore_distintivi", "") or "").split(","))
         r["venditore_distintivi"] = [
             dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
@@ -7498,8 +7509,18 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     col codice pubblico del negozio: mai col tg_id, che agli anonimi
     resta invisibile come in tutta la vetrina. Con limit gli annunci
     arrivano a pagine (chiavi cursore/totale IN PIU' nella risposta:
-    i client vecchi le ignorano e vivono felici)."""
+    i client vecchi le ignorano e vivono felici).
+
+    IL `chi` SI SPACCA SUL PRIMO TRATTINO, ed e' la meta' server del
+    rimedio a una regressione che le prove del server da sole non
+    vedrebbero: da quando gli indirizzi parlano, il client atterra su
+    /negozio/ab12cd34-la-bottega e passerebbe di qui la stringa intera
+    — che non combacia ne' con uno username ne' con un codice, quindi
+    404, quindi IL NEGOZIO NON SI APRE PER UNA PERSONA VERA mentre i
+    meta sul crawler erano perfetti. Allargare qui l'input accettato e'
+    totale e idempotente: nessuna risposta esistente cambia."""
     user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    chi = _chi_da_percorso(chi)
     con = db()
     campi_profilo = ("SELECT tg_id, nome, username, npub, npub_verificata, "
                      "rating, n_feedback, n_recensori, vendite_ok, negozio, "
@@ -7614,6 +7635,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     _g = _sped_gratis_pubblico(v["sped_gratis_soglia_eur"])
     venditore["sped_gratis_soglia"] = _g["soglia"]
     venditore["sped_gratis_eur"] = _g["eur"]
+    # Il pezzo leggibile dell'indirizzo del negozio: lo calcola il
+    # server, come per gli annunci, cosi' il client non ha un secondo
+    # `_slug` da tenere in pari.
+    venditore["slug"] = _slug(v["nome"] or "")
     del venditore["xp"], venditore["acquisti_ok"]
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
     risposta = {"venditore": venditore, "annunci": annunci,
@@ -21576,6 +21601,80 @@ HEADER_NO_CACHE = {
 IMMAGINE_BRAND = (f"{URL_PUBBLICO}/assets/icona-512.png", 512, 512)
 
 
+# ---------------- GLI INDIRIZZI PARLANTI (ago 2026) -----------------
+# /annuncio/13334-bicicletta-da-corsa invece di /annuncio/13334. L'ID
+# VIENE PRIMA e lo slug e' ornamento, ed e' quella forma a rispondere
+# da sola alle quattro domande: il titolo puo' cambiare (cambia solo lo
+# slug, l'id no), due annunci omonimi non litigano, e i vecchi
+# indirizzi senza coda continuano a servire la pagina giusta.
+#
+# NON con un 301, e vale la pena scriverlo: i browser lo cachano in
+# modo aggressivo — Chrome anche per sempre — e su un titolo che si
+# puo' modificare un 301 cachato punterebbe a uno slug morto. Il
+# rel=canonical consolida lo stesso segnale senza toccare la barra
+# degli indirizzi, senza interagire col motore di navigazione del
+# client (che ha il patto «l'URL non si tocca mai») e senza cicli.
+MAX_SLUG = 60
+
+
+def _slug(testo: str) -> str:
+    """Il pezzo leggibile di un indirizzo: minuscolo, senza accenti,
+    parole unite dal trattino. Si appoggia a `normalizza`, che fa gia'
+    NFKD, toglie gli accenti e collassa TUTTO cio' che non e' [a-z0-9]
+    in uno spazio solo — quindi emoji, apostrofi, virgolette
+    tipografiche e «&» sono gia' risolti, e risolti nello stesso modo
+    del filtro parole, cioe' in un posto solo.
+
+    Un titolo di sole emoji (o in cirillico, o in giapponese) da'
+    stringa VUOTA, e l'indirizzo resta `/annuncio/13334` senza il
+    trattino in coda: non si traslittera niente, l'identita' la porta
+    l'id.
+
+    NON riusare `_taglia_meta` per il troncamento: aggiunge il puntino
+    di sospensione, che in un URL non ci va. Sembra lo stesso mestiere
+    e non lo e' — ed e' l'errore che farebbe chiunque legga il file
+    dall'alto.
+
+    L'uscita e' `[a-z0-9-]` per COSTRUZIONE, ed e' su quella totalita'
+    che poggia il fatto che gli indirizzi costruiti qui non abbiano
+    bisogno di nessun filtro: se `_slug` smettesse di essere totale,
+    ogni URL che ne nasce diventerebbe un punto d'iniezione. C'e' la
+    prova apposta."""
+    s = normalizza(testo).replace(" ", "-")
+    if len(s) > MAX_SLUG:
+        corto = s[:MAX_SLUG].rsplit("-", 1)[0]
+        s = corto or s[:MAX_SLUG]
+    return s.strip("-")
+
+
+_ID_PERCORSO = re.compile(r"[0-9]{1,9}")
+
+
+def _id_da_percorso(pezzo: str):
+    """L'id da `13334-bicicletta-da-corsa`, oppure None.
+
+    La regex e non `int()`, e i motivi sono tutti veri: `int("١٣")` fa
+    13 (cifre arabo-indiane), `int("1_3")` fa 13 (il trattino basso e'
+    un separatore legale in Python), `" 5"` e `"+5"` passano, e
+    `"9"*30` diventa un intero enorme che sqlite3 rifiuta con
+    OverflowError. Il tetto a NOVE cifre chiude anche la superficie
+    «URL infinita che consuma query»: da quando la rotta accetta
+    testo lo spazio degli indirizzi e' illimitato, e cio' che non e'
+    un id torna indietro a ZERO letture del database."""
+    testa = (pezzo or "").split("-", 1)[0]
+    return int(testa) if _ID_PERCORSO.fullmatch(testa) else None
+
+
+def _chi_da_percorso(chi: str) -> str:
+    """Il negozio da `ab12cd34-la-bottega-di-rosa`. Lo spacco sul
+    PRIMO trattino e' senza perdita, e non e' una speranza: il codice
+    pubblico e' `token_hex(4)` — otto esadecimali — e gli username
+    Telegram sono [A-Za-z0-9_]. Ne' l'uno ne' l'altro puo' contenere
+    un trattino, e a legarlo al fatto c'e' la sentinella sul
+    generatore."""
+    return (chi or "").split("-", 1)[0]
+
+
 def _meta_anteprima(titolo: str, descrizione: str, url: str,
                     immagine=IMMAGINE_BRAND) -> str:
     """Il blocchetto che i crawler leggono: og:* per tutti quelli che
@@ -21608,41 +21707,141 @@ def _meta_anteprima(titolo: str, descrizione: str, url: str,
         for attr, chiave, valore in righe)
 
 
-META_GENERICI = _meta_anteprima(
-    "Barattolo — il mercatino in sats",
+# I testi vivono in costanti loro perche' adesso li leggono in due: il
+# blocco dei meta e il CORPO pre-renderizzato della pagina. Due copie
+# a mano sarebbero due copie da tenere in pari.
+TITOLO_HOME = "Barattolo — il mercatino in sats"
+META_TESTO_HOME = (
     "Compra e vendi in bitcoin: i sats restano nel deposito di garanzia "
-    "finché chi compra non conferma di aver ricevuto l'oggetto.",
-    URL_PUBBLICO)
+    "finché chi compra non conferma di aver ricevuto l'oggetto.")
 
-META_SICUREZZA = _meta_anteprima(
-    "Il pagamento protetto — Barattolo",
+TITOLO_SICUREZZA = "Il pagamento protetto — Barattolo"
+META_TESTO_SICUREZZA = (
     "Come funziona il deposito di garanzia: i sats restano bloccati "
     "finché chi compra non conferma. Cosa copre, cosa no, e dove "
-    "stanno i sats.",
-    f"{URL_PUBBLICO}/sicurezza")
+    "stanno i sats.")
+
+META_GENERICI = _meta_anteprima(TITOLO_HOME, META_TESTO_HOME, URL_PUBBLICO)
+
+META_SICUREZZA = _meta_anteprima(TITOLO_SICUREZZA, META_TESTO_SICUREZZA,
+                                 f"{URL_PUBBLICO}/sicurezza")
 
 
 # Il segno NON porta il fine-riga: sul VPS il file ha \n e sul portatile
 # di chi lo scrive \r\n, e un marcatore che li nomina ne mancherebbe uno
 # dei due. Ci si infila subito dopo il «>», col fine-riga che resta dov'e'.
 SEGNO_META = b'<meta charset="UTF-8">'
+# Gli altri due segni sono COPPIE: si sostituisce cio' che sta in
+# mezzo. Il titolo scritto nel file resta il RIPIEGO — passare `titolo=""`
+# vuol dire «non toccarlo», non «titolo vuoto», ed e' cio' che fa
+# ricadere ogni cintura fail-open esattamente sul comportamento di ieri.
+#
+# Il cartello e' un elemento VUOTO, e l'invariante che rende sicuro il
+# taglio e' che il tag di chiusura siano i byte IMMEDIATAMENTE
+# successivi all'apertura. Tre cose gratis: «</div>» compare migliaia
+# di volte nel file ma qui non serve cercarlo (si sa gia' dov'e');
+# senza iniezione l'uscita e' LETTERALMENTE il file, non «il file meno
+# un segnaposto»; e il giorno che qualcuno ci mette dentro qualcosa a
+# mano la fessura si chiude e la pagina esce intatta, invece di uscire
+# mescolata.
+SEGNO_TITOLO = (b'<title>', b'</title>')
+SEGNO_CORPO = (b'<div id="cartello">', b'</div>')
 # timbro False (e non None) e' il «mai letto»: nessuna coppia
 # (mtime, size) puo' esserci uguale, nemmeno quella di uno stat fallito
-_PAGINA_CACHE = {"timbro": False, "prima": b"", "dopo": b"", "taglio": False}
+_PAGINA_CACHE = {"timbro": False, "p0": b"", "p1": b"", "titolo": b"",
+                 "p2": b"", "p3": b"", "ha_meta": False,
+                 "ha_titolo": False, "ha_corpo": False}
 
 
-def _pagina_con_meta(meta: str) -> HTMLResponse:
-    """miniapp.html col blocchetto infilato in testa. Il file si legge
-    UNA volta e resta in memoria spezzato in due: sono quasi 900 KB, e
-    rileggerli a ogni richiesta su un VPS piccolo mono-processo si
-    sentirebbe. Il timbro e' (mtime, size), cosi' in sviluppo basta
-    salvare il file perche' la pagina cambi senza riavviare nulla.
+def _spezza_pagina(grezzo: bytes) -> dict:
+    """miniapp.html tagliato nelle sue tre fessure. PURA: byte dentro,
+    segmenti fuori — cosi' si prova senza toccare il disco.
+
+    La pagina montata e':
+        p0 [meta] p1 titolo p2 [corpo] p3
+
+    Le fessure si validano IN ORDINE DI FILE, e quando qualcosa non
+    torna si spegne sempre quella piu' A VALLE: un template riscritto
+    deve poter perdere un ornamento, mai produrre una pagina
+    scombinata. Una fessura spenta fonde i suoi segmenti vicini e
+    lascia il suo flag a False — la pagina esce lo stesso, che e' la
+    regola di tutto questo blocco."""
+    p = {"p0": grezzo, "p1": b"", "titolo": b"", "p2": b"", "p3": b"",
+         "ha_meta": False, "ha_titolo": False, "ha_corpo": False}
+
+    i_meta = grezzo.find(SEGNO_META)
+    if i_meta < 0:
+        # Il segno non c'e' piu' — qualcuno ha ritoccato le prime
+        # righe di miniapp.html. I meta si perdono e la PAGINA VIVE:
+        # un'anteprima e' un ornamento, e un ornamento non deve poter
+        # mandare giu' il mercatino. A tenere allineati i due file c'e'
+        # la prova, che lo dice in CI prima che succeda davvero.
+        print("⚠️ Anteprime spente: <meta charset> non trovato "
+              "in miniapp.html", flush=True)
+        return p
+    i_meta += len(SEGNO_META)
+    p.update(p0=grezzo[:i_meta], p1=grezzo[i_meta:], ha_meta=True)
+
+    apre, chiude = SEGNO_TITOLO
+    i_a = grezzo.find(apre, i_meta)
+    i_c = grezzo.find(chiude, i_a + len(apre)) if i_a >= 0 else -1
+    if i_c < 0:
+        print("⚠️ Titolo per pagina spento: <title> non trovato "
+              "in miniapp.html", flush=True)
+        return p
+    i_a += len(apre)
+    p.update(p1=grezzo[i_meta:i_a], titolo=grezzo[i_a:i_c],
+             p2=grezzo[i_c:], ha_titolo=True)
+
+    apre, chiude = SEGNO_CORPO
+    i_a = grezzo.find(apre, i_c)
+    if i_a < 0 or grezzo[i_a:i_a + len(apre) + len(chiude)] != apre + chiude:
+        print('⚠️ Cartello spento: <div id="cartello"></div> non '
+              "trovato VUOTO in miniapp.html", flush=True)
+        return p
+    i_a += len(apre)
+    p.update(p2=grezzo[i_c:i_a], p3=grezzo[i_a:], ha_corpo=True)
+    return p
+
+
+def _monta_pagina(p: dict, meta: str, titolo: str, corpo: str) -> bytes:
+    """I segmenti piu' cio' che ci va in mezzo. PURA.
+
+    `b"".join` e non `+=`, e non e' estetica: con `+=` su bytes si
+    pagano quattro copie da 900 KB per richiesta invece di una. E' la
+    sola voce di costo CPU che questo cantiere puo' introdurre."""
+    fette = [p["p0"]]
+    if p["ha_meta"] and meta:
+        fette.append(b"\n" + meta.rstrip("\n").encode("utf-8"))
+    fette.append(p["p1"])
+    fette.append(titolo.encode("utf-8") if (p["ha_titolo"] and titolo)
+                 else p["titolo"])
+    fette.append(p["p2"])
+    if p["ha_corpo"] and corpo:
+        fette.append(corpo.encode("utf-8"))
+    fette.append(p["p3"])
+    return b"".join(fette)
+
+
+def _pagina_con_meta(meta: str, titolo: str = "",
+                     corpo: str = "") -> HTMLResponse:
+    """miniapp.html coi suoi pezzi infilati nelle tre fessure. Il file
+    si legge UNA volta e resta in memoria gia' spezzato: sono quasi
+    900 KB, e rileggerli a ogni richiesta su un VPS piccolo
+    mono-processo si sentirebbe. Il timbro e' (mtime, size), cosi' in
+    sviluppo basta salvare il file perche' la pagina cambi senza
+    riavviare nulla.
 
     Si lavora sui BYTE e non sul testo: la pagina deve uscire IDENTICA
     a com'e' sul disco, e la modalita' testo normalizzerebbe i
     fine-riga — quindici KB di differenza su cio' che scarica ogni
     utente, come effetto collaterale di un ornamento. Nemmeno per
-    sbaglio."""
+    sbaglio.
+
+    IL NOME NON CAMBIA anche adesso che gli argomenti sono tre, ed e'
+    voluto: la sentinella delle rotte pubbliche in prove.py cerca
+    proprio «_pagina_con_meta(» dentro il corpo di ognuna, e tenere il
+    nome vale una regressione risparmiata."""
     try:
         s = os.stat("miniapp.html")
         timbro = (s.st_mtime, s.st_size)
@@ -21651,26 +21850,11 @@ def _pagina_con_meta(meta: str) -> HTMLResponse:
     if timbro != _PAGINA_CACHE["timbro"]:
         with open("miniapp.html", "rb") as f:
             grezzo = f.read()
-        i = grezzo.find(SEGNO_META)
-        if i < 0:
-            # Il segno non c'e' piu' — qualcuno ha ritoccato le prime
-            # righe di miniapp.html. I meta si perdono e la PAGINA
-            # VIVE: un'anteprima e' un ornamento, e un ornamento non
-            # deve poter mandare giu' il mercatino. A tenere allineati
-            # i due file c'e' la prova, che lo dice in CI prima che
-            # succeda davvero.
-            print("⚠️ Anteprime spente: <meta charset> non trovato "
-                  "in miniapp.html", flush=True)
-            _PAGINA_CACHE.update(timbro=timbro, prima=grezzo, dopo=b"",
-                                 taglio=False)
-        else:
-            i += len(SEGNO_META)
-            _PAGINA_CACHE.update(timbro=timbro, prima=grezzo[:i],
-                                 dopo=grezzo[i:], taglio=True)
-    corpo = b""
-    if _PAGINA_CACHE["taglio"] and meta:
-        corpo = b"\n" + meta.rstrip("\n").encode("utf-8")
-    return HTMLResponse(_PAGINA_CACHE["prima"] + corpo + _PAGINA_CACHE["dopo"],
+        # Le print di allarme vivono dentro _spezza_pagina, cioe'
+        # dentro QUESTO ramo: fuori sarebbero una riga di log per
+        # richiesta.
+        _PAGINA_CACHE.update(_spezza_pagina(grezzo), timbro=timbro)
+    return HTMLResponse(_monta_pagina(_PAGINA_CACHE, meta, titolo, corpo),
                         headers=HEADER_NO_CACHE)
 
 
@@ -21721,12 +21905,276 @@ def _immagine_anteprima(foto_json: str):
     return IMMAGINE_BRAND
 
 
-def _meta_annuncio(aid: int) -> str:
-    """L'anteprima di un annuncio: prezzo, comune e le prime righe
-    della descrizione. Il prezzo e' il LISTINO anche con una lampo
-    viva, ed e' deliberato: l'anteprima resta in cache per giorni,
-    quindi una cifra a tempo ci sopravviverebbe — meglio dire il
-    prezzo che non scade che promettere uno sconto finito."""
+# ------------- I TRE REGIMI DI ESCAPE (ago 2026) --------------------
+# Fino a ieri ce n'era UNO, in linea dentro _meta_anteprima: il testo
+# dell'utente finiva solo dentro un attributo. Da quando la pagina
+# porta anche un CORPO e dei DATI STRUTTURATI sono tre, e il nome di
+# ognuno dice la DESTINAZIONE e non la tecnica — la lezione di
+# `nome_pezzo` in _compra_set, che si chiama cosi' apposta perche' il
+# censimento non lo peschi.
+#
+# IL ROVESCIO, che e' la meta' che si dimentica: l'uscita di `_slug` e'
+# `[a-z0-9-]` per costruzione, quindi gli indirizzi che ne nascono non
+# hanno bisogno di nessun filtro. Tutto questo poggia su quella
+# totalita', e c'e' la prova che la tiene in piedi.
+
+def _attr(v) -> str:
+    """Dentro un attributo quotato: content=, href=, src=, alt=. Una
+    virgoletta non scappata non «si vede male»: chiude l'attributo e
+    sputa il resto del titolo come markup."""
+    return html.escape(str(v), quote=True)
+
+
+def _testo(v) -> str:
+    """Dentro un nodo di testo: <h1>, <p>, <title>. Un «<» in un titolo
+    aprirebbe un elemento che nessuno chiude, e un «</title>» uscirebbe
+    dall'elemento portandosi dietro mezza pagina."""
+    return html.escape(str(v), quote=False)
+
+
+def _ld(dati) -> str:
+    """Dentro <script type="application/ld+json">, ed e' quello che si
+    sbaglia sempre: LI' DENTRO LE ENTITA' HTML NON VENGONO DECODIFICATE.
+    Un html.escape non protegge niente e in piu' CORROMPE il dato — nel
+    valore JSON comparirebbe letteralmente «&amp;». L'unica cosa da
+    neutralizzare e' la sequenza che chiude l'elemento raw-text, e
+    scrivere il minore come \\u003c e' JSON valido, invisibile dopo il
+    parse, e rende «</script>» impossibile da comporre. Una riga, ed e'
+    tutto il regime."""
+    return json.dumps(dati, ensure_ascii=False).replace("<", "\\u003c")
+
+
+META_NOINDEX = '<meta name="robots" content="noindex,follow">\n'
+
+
+def _testa_seo(titolo: str, descrizione: str, url: str,
+               immagine=IMMAGINE_BRAND, indicizza: bool = True,
+               ld=None) -> str:
+    """Il blocco del <head>: i meta delle anteprime social piu' il
+    canonical, il meta robots e i dati strutturati.
+
+    NOINDEX E CANONICAL NON CONVIVONO, ed e' la riga da non
+    ammorbidire: su una pagina deindicizzata un rel=canonical che punta
+    ALTROVE puo' propagare il noindex all'URL canonico. Quindi o si
+    indicizza — e allora il canonical c'e' ed e' auto-referenziale — o
+    non si indicizza, e allora non c'e' nessun canonical e nessun dato
+    strutturato (un Product su un annuncio rimosso sarebbe il bug della
+    resurrezione in smoking)."""
+    fuori = _meta_anteprima(titolo, descrizione, url, immagine)
+    if not indicizza:
+        return fuori + META_NOINDEX
+    fuori += f'<link rel="canonical" href="{_attr(url)}">\n'
+    if ld:
+        fuori += f'<script type="application/ld+json">{_ld(ld)}</script>\n'
+    return fuori
+
+
+def _url_annuncio(aid: int, titolo: str) -> str:
+    """L'indirizzo canonico di un annuncio. Senza slug — titolo di sole
+    emoji — resta quello di sempre, mai con un trattino orfano in coda."""
+    s = _slug(titolo)
+    return f"{URL_PUBBLICO}/annuncio/{aid}-{s}" if s else \
+        f"{URL_PUBBLICO}/annuncio/{aid}"
+
+
+def _url_negozio(codice: str, nome: str) -> str:
+    """L'indirizzo canonico di un negozio: IL CODICE, non lo username.
+
+    Lo username Telegram e' dell'utente, che puo' cambiarlo o perderlo,
+    e un canonical che si muove sotto i piedi butta via il segnale
+    accumulato lasciandosi dietro un 404. Il codice e' immutabile — ed
+    e' gia' quello che _meta_negozio metteva nell'og:url, quindi
+    canonical e og:url restano una cosa sola. Lo slug recupera la
+    leggibilita' che al codice manca, che e' precisamente il motivo per
+    cui lo slug esiste.
+    Bonus gratis: la ricerca per username e' COLLATE NOCASE, quindi
+    /negozio/Rosina e /negozio/rosina erano gia' oggi due indirizzi con
+    lo stesso contenuto. Il canonical chiude un doppione preesistente
+    senza una riga in piu'."""
+    if not codice:
+        return URL_PUBBLICO
+    s = _slug(nome)
+    return f"{URL_PUBBLICO}/negozio/{codice}-{s}" if s else \
+        f"{URL_PUBBLICO}/negozio/{codice}"
+
+
+def _categoria_da_slug(slug: str) -> str:
+    """Il nome di reparto da `casa-e-giardino`. Vocabolario CHIUSO: cio'
+    che non e' in catalogo non e' una categoria, e non diventa una
+    query."""
+    return next((c for c in CATEGORIE if slug_categoria(c) == slug), "")
+
+
+# La pagina della sicurezza e' UNA e non ha parametri: la sua testa e'
+# una costante come lo erano i suoi meta. Si indicizza — e' la pagina
+# che si manda a chi chiede «mi fido?», cioe' esattamente il genere di
+# domanda che si fa a un motore di ricerca.
+TESTA_SICUREZZA = _testa_seo(TITOLO_SICUREZZA, META_TESTO_SICUREZZA,
+                             f"{URL_PUBBLICO}/sicurezza")
+
+
+# Quante schede entrano nel cartello di una pagina-elenco. Non e' una
+# vetrina: e' la strada da cui un crawler scopre le schede, e la
+# sitemap ce l'ha comunque tutto quanto.
+TETTO_CARTELLO = 24
+CACHE_SEO_HOME = 60
+_SEO_HOME_CACHE = {"quando": 0.0, "roba": None}
+# Corte apposta: nel cartello di un elenco non compaiono ne' i badge
+# ne' i comuni derivati, quindi CAMPI_VETRINA (con la sottoquery dei
+# distintivi e i lookup dei ~7.900 comuni riga per riga) sarebbe un
+# collo di bottiglia pagato per campi che non si stampano.
+CAMPI_CARTELLO = "a.id, a.titolo, a.prezzo_sats, a.prezzo_eur, a.valuta, a.zona"
+
+
+def _schede_cartello(con, dove: str, valori: tuple,
+                     quanti: int = TETTO_CARTELLO) -> str:
+    """L'elenco di collegamenti che porta dalle pagine-elenco alle
+    schede. E' META' DEL VALORE di tutto il cantiere: e' il modo in cui
+    un crawler scopre ottocento annunci, ed e' l'unica ragione per cui
+    le pagine categoria esistono."""
+    righe = con.execute(
+        f"SELECT {CAMPI_CARTELLO} FROM annunci a WHERE {dove} "
+        "ORDER BY a.creato DESC, a.id DESC LIMIT ?",
+        valori + (quanti,)).fetchall()
+    cambio = cambio_noto_ora()
+    fuori = []
+    for r in righe:
+        a = dict(r)
+        comune = comune_da_zona(a["zona"] or "")
+        fuori.append(
+            f'<li><a href="{_attr(_url_annuncio(a["id"], a["titolo"]))}">'
+            f'{_testo(a["titolo"])}</a> — {_testo(_prezzo_promo(a, cambio))}'
+            + (f" · {_testo(comune)}" if comune else "") + "</li>")
+    return f"<ul>{''.join(fuori)}</ul>" if fuori else ""
+
+
+def _link_categorie() -> str:
+    """I 27 reparti come collegamenti veri: e' da qui che si scende nel
+    catalogo senza eseguire una riga di JavaScript."""
+    return "<ul>" + "".join(
+        f'<li><a href="{_attr(URL_PUBBLICO)}/categoria/'
+        f'{_attr(slug_categoria(c))}">{_testo(c)}</a></li>'
+        for c in CATEGORIE) + "</ul>"
+
+
+def _seo_niente():
+    """Cio' che non e' pubblico non racconta niente di se' E non entra
+    nell'indice: tag generici, noindex, corpo vuoto, e titolo VUOTO —
+    che vuol dire «lascia quello del file», cioe' la degradazione piu'
+    conservativa possibile."""
+    return "", META_GENERICI + META_NOINDEX, ""
+
+
+# ------------------- I DATI STRUTTURATI (ago 2026) ------------------
+# come_nuovo -> UsedCondition e NON RefurbishedCondition: «ricondizionato»
+# significa rimesso a nuovo professionalmente e rimesso in vendita, non
+# «sembra nuovo». E' la mappatura sbagliata che verrebbe naturale.
+CONDIZIONI_LD = {"nuovo": "NewCondition",
+                 "come_nuovo": "UsedCondition",
+                 "buono": "UsedCondition",
+                 "accettabile": "UsedCondition",
+                 "da_sistemare": "DamagedCondition"}
+
+
+def _prezzo_ld(a: dict):
+    """(prezzo, valuta) per i dati strutturati.
+
+    sats -> BTC e' una conversione ESATTA di unita' — una divisione per
+    cento milioni — e non un tasso di cambio: schema.org ammette
+    esplicitamente i codici delle criptovalute, quindi qui non si
+    inventa nessun numero. Ma il valore va prodotto SENZA virgola
+    mobile: `sats / 1e8` fa uscire 0.0008000000000000001 per ottantamila
+    sats, e quella cifra finirebbe nell'indice.
+
+    L'euro solo per i listini NATI in euro, dove prezzo_eur e' il
+    listino vero. Il «≈» dell'anteprima e' un aiuto per una persona;
+    qui sarebbe un'affermazione su un prezzo che non e' il prezzo, e
+    cambio_noto_ora() puo' valere zero.
+
+    COMPROMESSO A VERBALE: i risultati arricchiti «merchant» di Google
+    validano su una lista di valute e BTC non c'e' — i listini in sats
+    potranno essere mostrati senza prezzo. Si sceglie l'onesta', e i
+    listini in euro restano pienamente idonei."""
+    if a.get("valuta") == "eur" and a.get("prezzo_eur"):
+        return f"{a['prezzo_eur']:.2f}", "EUR"
+    sats = int(a.get("prezzo_sats") or 0)
+    return f"{sats // 100_000_000}.{sats % 100_000_000:08d}", "BTC"
+
+
+def _disponibilita_ld(a: dict):
+    """(availability, availabilityStarts) — e le ferie sono il caso che
+    merita il paio: l'oggetto c'e' e il prezzo e' vero, ma oggi non si
+    compra, e chi arriva da un motore deve saperlo PRIMA di cliccare.
+    `LimitedAvailability` e' vago, `PreOrder` dice un'altra cosa;
+    OutOfStock piu' la data di rientro dice la verita' intera. Il
+    giudice e' `in_ferie`, che e' un gate in LETTURA: il negozio riapre
+    da solo, come ovunque."""
+    if a.get("stato") == "venduto":
+        return "SoldOut", ""
+    ferie = int(a.get("venditore_ferie") or 0)
+    if in_ferie(ferie, int(time.time())):
+        return "OutOfStock", time.strftime("%Y-%m-%d", time.gmtime(ferie))
+    if int(a.get("quantita") or 0) <= 0:
+        return "OutOfStock", ""
+    return "InStock", ""
+
+
+def _ld_annuncio(a: dict, url: str, img: str) -> dict:
+    """Product + Offer.
+
+    MAI aggregateRating qui dentro. Abbiamo u.rating ed e' forte la
+    tentazione, ma quel voto e' del VENDITORE, non dell'oggetto:
+    attaccarlo al prodotto e' lo schema delle recensioni
+    auto-attribuite che Google sanziona, ed e' un'affermazione falsa.
+    Se un giorno lo si vuole, sta sulla pagina del negozio come
+    Person + aggregateRating, dove e' legittimo."""
+    prezzo, valuta = _prezzo_ld(a)
+    disp, riparte = _disponibilita_ld(a)
+    offerta = {"@type": "Offer", "url": url, "price": prezzo,
+               "priceCurrency": valuta,
+               "availability": f"https://schema.org/{disp}"}
+    if riparte:
+        offerta["availabilityStarts"] = riparte
+    if a.get("venditore"):
+        # Person e non Organization: e' un mercatino fra privati, ed e'
+        # la cosa vera. Il tg_id non esce mai.
+        venditore = {"@type": "Person", "name": a["venditore"]}
+        if a.get("venditore_negozio"):
+            venditore["url"] = _url_negozio(a["venditore_negozio"],
+                                            a["venditore"])
+        offerta["seller"] = venditore
+    dati = {"@context": "https://schema.org", "@type": "Product",
+            "@id": url, "name": a["titolo"], "offers": offerta}
+    if a.get("descrizione"):
+        dati["description"] = _taglia_meta(a["descrizione"], 500)
+    if img:
+        dati["image"] = [img]
+    if a.get("categoria"):
+        dati["category"] = a["categoria"]
+    # Il giudice e' condizione_da_mostrare, lo stesso di form, vetrina,
+    # NIP-99 e import: dove la scala non dice niente (alimenti,
+    # bellezza, buoni, digitale esclusivo) la proprieta' SI OMETTE.
+    # Dichiarare UsedCondition per riempimento sarebbe falso, e su un
+    # vasetto di marmellata anche disgustoso.
+    cond = CONDIZIONI_LD.get(condizione_da_mostrare(a))
+    if cond:
+        dati["itemCondition"] = f"https://schema.org/{cond}"
+    return dati
+
+
+def _seo_annuncio(aid):
+    """(titolo, testa, corpo) di un annuncio, da UNA riga di database:
+    la stessa che ieri serviva i soli meta. Sbagliarlo porterebbe la
+    rotta piu' condivisa del mercatino da una query a due.
+
+    Il prezzo e' il LISTINO anche con una lampo viva, ed e' deliberato:
+    l'anteprima resta in cache per giorni, quindi una cifra a tempo ci
+    sopravviverebbe — meglio dire il prezzo che non scade che
+    promettere uno sconto finito. Il modo di garantirlo e' NON
+    SELEZIONARE le colonne lampo: non averle in mano e' il modo piu'
+    economico di non usarle, e c'e' la sentinella."""
+    if aid is None:
+        return _seo_niente()
     con = db()
     try:
         # ATTIVI E VENDUTI (punto 1 qui sopra), la stessa coppia di
@@ -21738,15 +22186,25 @@ def _meta_annuncio(aid: int) -> str:
         # sono la riga che tiene l'anteprima dentro il patto dello
         # scudo anti-resurrezione: una card cachata e inoltrata li
         # farebbe vivere in giro per giorni.
+        # IL LEFT JOIN NON E' UN DETTAGLIO: fino a ieri questa query
+        # interrogava la sola `annunci` e non poteva fallire per colpa
+        # del venditore. Con un INNER un annuncio ORFANO — riga utente
+        # sparita — perderebbe l'anteprima social che ha oggi: una
+        # regressione silenziosa su cio' che funziona. C'e' una riga
+        # orfana nella prova apposta.
         r = con.execute(
-            "SELECT titolo, descrizione, zona, valuta, prezzo_sats, "
-            "prezzo_eur, foto, stato FROM annunci "
-            "WHERE id=? AND stato IN ('attivo','venduto')",
+            "SELECT a.id, a.titolo, a.descrizione, a.zona, a.valuta, "
+            "a.prezzo_sats, a.prezzo_eur, a.foto, a.stato, a.categoria, "
+            "a.consegna, a.condizione, a.quantita, "
+            "u.nome AS venditore, u.negozio AS venditore_negozio, "
+            "u.ferie_fino AS venditore_ferie "
+            "FROM annunci a LEFT JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
             (aid,)).fetchone()
     finally:
         con.close()
     if not r:
-        return META_GENERICI
+        return _seo_niente()
     a = dict(r)
     # Il ✅ davanti a tutto e' il patto di _caption_canale, che al
     # venduto riscrive la caption del canale: IL POST NON DEVE MENTIRE.
@@ -21759,20 +22217,49 @@ def _meta_annuncio(aid: int) -> str:
     if comune:
         testa += f" · {comune}"
     coda = _taglia_meta(a["descrizione"], 150)
-    return _meta_anteprima(_taglia_meta(a["titolo"], 90),
-                           f"{testa} — {coda}" if coda else testa,
-                           f"{URL_PUBBLICO}/annuncio/{aid}",
-                           _immagine_anteprima(a["foto"]))
+    corto = _taglia_meta(a["titolo"], 90)
+    img = _immagine_anteprima(a["foto"])
+    url = _url_annuncio(a["id"], a["titolo"])
+    testa_html = _testa_seo(corto, f"{testa} — {coda}" if coda else testa,
+                            url, img, ld=_ld_annuncio(a, url, img[0]))
+
+    corpo = [f"<h1>{_testo(a['titolo'])}</h1>", f"<p>{_testo(testa)}</p>"]
+    if img[0]:
+        # Niente width/height: non li sappiamo (_immagine_anteprima
+        # torna 0,0 apposta), ed e' la stessa regola per cui
+        # og:image:width si omette — un numero sbagliato e' peggio di
+        # un numero assente.
+        corpo.append(f'<img src="{_attr(img[0])}" alt="{_attr(corto)}">')
+    if a["descrizione"]:
+        corpo.append(f"<p>{_testo(a['descrizione'])}</p>")
+    if a["venditore_negozio"]:
+        corpo.append(
+            "<p>Venduto da <a href="
+            f'"{_attr(_url_negozio(a["venditore_negozio"], a["venditore"]))}">'
+            f"{_testo(a['venditore'] or 'il negozio')}</a></p>")
+    if a["categoria"]:
+        corpo.append(
+            f'<p><a href="{_attr(URL_PUBBLICO)}/categoria/'
+            f'{_attr(slug_categoria(a["categoria"]))}">'
+            f"{_testo(a['categoria'])}</a></p>")
+    # Il titolo e' un NODO DI TESTO come il resto del corpo: un
+    # «</title>» in un titolo d'annuncio uscirebbe dall'elemento
+    # portandosi dietro mezza pagina. Si scappa qui, all'assegnazione,
+    # una volta sola.
+    return f"{_testo(corto)} — Barattolo", testa_html, "".join(corpo)
 
 
-def _meta_negozio(chi: str) -> str:
-    """L'anteprima di un negozio: nome, quanti oggetti, le stelle.
+def _seo_negozio(chi: str):
+    """(titolo, testa, corpo) di un negozio: nome, quanti oggetti, le
+    stelle, e l'elenco della merce come collegamenti veri.
     L'avatar NON ci va — e' un francobollo da 128px, sotto la misura
     minima delle card — quindi l'immagine e' quella del brand.
     Il tg_id serve solo a contare gli annunci e non esce da qui, come
-    in tutta la vetrina; l'og:url porta il CODICE del negozio letto dal
-    database e mai il `chi` arrivato dall'URL, che potrebbe essere
-    qualunque cosa."""
+    in tutta la vetrina; il canonical porta il CODICE del negozio letto
+    dal database e mai il `chi` arrivato dall'URL, che potrebbe essere
+    qualunque cosa: un canonical che riecheggia l'input e' un'iniezione
+    a spese proprie."""
+    chi = _chi_da_percorso(chi)
     con = db()
     try:
         campi = ("SELECT tg_id, nome, negozio, rating, n_feedback "
@@ -21783,10 +22270,12 @@ def _meta_negozio(chi: str) -> str:
             v = con.execute(campi + "WHERE negozio=? LIMIT 1",
                             (chi,)).fetchone()
         if not v:
-            return META_GENERICI
+            return _seo_niente()
         quanti = con.execute("SELECT COUNT(*) FROM annunci WHERE "
                              "venditore_id=? AND stato='attivo'",
                              (v["tg_id"],)).fetchone()[0]
+        schede = _schede_cartello(
+            con, "a.venditore_id=? AND a.stato='attivo'", (v["tg_id"],))
     finally:
         con.close()
     conto = ("Ancora nessun oggetto in vetrina" if not quanti else
@@ -21796,34 +22285,239 @@ def _meta_negozio(chi: str) -> str:
         stelle = f"{v['rating']:.1f}".replace(".", ",")
         conto += f" · ⭐ {stelle} ({v['n_feedback']})"
     nome = _taglia_meta(v["nome"], 60) or "Un negozio"
-    return _meta_anteprima(
+    # Un negozio senza codice non ha niente di stabile a cui puntare, e
+    # uno senza merce e' una pagina sottile: fuori dall'indice entrambi.
+    indicizza = bool(v["negozio"]) and quanti > 0
+    url = _url_negozio(v["negozio"], v["nome"] or "")
+    testa = _testa_seo(
         f"{nome} su Barattolo",
         f"{conto} — paghi in sats, e restano nel deposito di garanzia "
-        f"finché la merce non è arrivata.",
-        f"{URL_PUBBLICO}/negozio/{v['negozio']}" if v["negozio"]
-        else URL_PUBBLICO)
+        f"finché la merce non è arrivata.", url, indicizza=indicizza)
+    corpo = f"<h1>{_testo(nome)}</h1><p>{_testo(conto)}</p>{schede}"
+    return f"{_testo(nome)} — il negozio su Barattolo", testa, corpo
 
 
-def _meta_o_generici(costruisci, *dati) -> str:
+def _seo_categoria(slug: str):
+    """(titolo, testa, corpo) di un reparto. Vocabolario chiuso: uno
+    slug sconosciuto non diventa mai una query. Il noindex sulla
+    categoria vuota si toglie DA SOLO quando si riempie — e' lo stesso
+    gate in lettura di `in_ferie` e delle lampo, nessun orologio da far
+    girare."""
+    nome = _categoria_da_slug(slug)
+    if not nome:
+        return _seo_niente()
+    con = db()
+    try:
+        quanti = con.execute(
+            "SELECT COUNT(*) FROM annunci WHERE categoria=? "
+            "AND stato='attivo'", (nome,)).fetchone()[0]
+        schede = _schede_cartello(
+            con, "a.categoria=? AND a.stato='attivo'", (nome,))
+    finally:
+        con.close()
+    conto = ("Ancora nessun oggetto in questo reparto" if not quanti else
+             "1 oggetto in questo reparto" if quanti == 1 else
+             f"{quanti} oggetti in questo reparto")
+    url = f"{URL_PUBBLICO}/categoria/{slug}"
+    testa = _testa_seo(
+        f"{nome} — Barattolo",
+        f"{conto}: si paga in satoshi, e i sats restano nel deposito di "
+        f"garanzia finché la merce non è arrivata.",
+        url, indicizza=quanti > 0)
+    corpo = (f"<h1>{_testo(nome)}</h1><p>{_testo(conto)}</p>{schede}"
+             f"{_link_categorie()}")
+    # Il nome viene dal catalogo chiuso, quindi oggi non ha niente da
+    # scappare — ci passa lo stesso, che una voce nuova con una «&»
+    # dentro non deve poter uscire cruda in un titolo.
+    return f"{_testo(nome)} — annunci in sats su Barattolo", testa, corpo
+
+
+def _seo_home():
+    """(titolo, testa, corpo) della home, DIETRO UNA CACHE DI 60
+    SECONDI (il pattern di conta_pionieri). E' la rotta piu' colpita di
+    tutte — ogni apertura della Mini App — e fino a ieri non toccava il
+    database: la cache e' cio' che rende accettabile il cambio di
+    natura. Con un solo processo uvicorn non c'e' mandria da temere;
+    con piu' worker ognuno avra' la sua cache, che va bene ma va
+    saputo."""
+    adesso = time.time()
+    if (_SEO_HOME_CACHE["roba"] is not None
+            and adesso - _SEO_HOME_CACHE["quando"] < CACHE_SEO_HOME):
+        return _SEO_HOME_CACHE["roba"]
+    con = db()
+    try:
+        schede = _schede_cartello(con, "a.stato='attivo'", ())
+    finally:
+        con.close()
+    corpo = (f"<h1>Barattolo</h1><p>{_testo(META_TESTO_HOME)}</p>"
+             f"{schede}{_link_categorie()}")
+    roba = ("", _testa_seo(TITOLO_HOME, META_TESTO_HOME, URL_PUBBLICO), corpo)
+    _SEO_HOME_CACHE.update(quando=adesso, roba=roba)
+    return roba
+
+
+def _seo_o_generici(costruisci, *dati):
     """La cintura: un'anteprima e' un ornamento, e nessun ornamento
     deve poter impedire a una pagina di aprirsi. Qualunque cosa vada
     storta — database occupato, riga strana — si ricade sui tag
-    generici, che e' esattamente il ripiego di sempre."""
+    generici col TITOLO VUOTO, che vuol dire «lascia quello del file»:
+    la degradazione piu' conservativa che ci sia, cioe' esattamente il
+    comportamento di ieri."""
     try:
         return costruisci(*dati)
     except Exception as e:
         print(f"⚠️ Anteprima non costruita: {e}", flush=True)
-        return META_GENERICI
+        return "", META_GENERICI, ""
+
+
+# --------------------- LA MAPPA DEL SITO ----------------------------
+# ROBOTS.TXT E META ROBOTS SONO DUE LEVE SU DUE COSE DIVERSE, e si
+# confondono ogni volta: robots.txt governa la SCANSIONE («posso
+# scaricare questo indirizzo?»), il meta robots l'INDICIZZAZIONE
+# («posso mostrarlo fra i risultati?»).
+#
+# Da cui la regola che non ha eccezioni: NON SI BLOCCA IN ROBOTS.TXT
+# CIO' CHE SI VUOLE DEINDICIZZARE. Una pagina vietata qui non viene mai
+# scaricata, quindi il suo noindex non viene mai letto — e Google
+# indicizza lo stesso l'indirizzo nudo se qualcuno ci linka, mostrandolo
+# senza titolo e senza descrizione. Bloccare in robots.txt e' l'unico
+# modo affidabile per rendere una pagina NON DEINDICIZZABILE: ci si
+# tappa la bocca proprio sul canale con cui si sarebbe potuto dire
+# «non indicizzarmi».
+#
+# Percio' qui dentro c'e' solo /api/ (e' JSON: non lo vogliamo
+# indicizzato E non potrebbe portare un meta tag comunque). NON si
+# vietano /annuncio/, /negozio/, /categoria/ e /miniapp.html, che sono
+# esattamente quelli che deindicizziamo col meta; e NON si vieta
+# /foto/, che bloccarle uccide l'indicizzazione delle immagini e, su
+# alcune piattaforme, la card social stessa.
+#
+# MAI «Disallow: /» perche' siamo in rodaggio: il recupero si misura in
+# settimane, ed e' il guasto piu' costoso e piu' stupido di tutto
+# questo cantiere.
+ROBOTS_TXT = (f"User-agent: *\nAllow: /\nDisallow: /api/\n\n"
+              f"Sitemap: {URL_PUBBLICO}/sitemap.xml\n")
+
+
+@app.get("/robots.txt")
+def robots_txt():
+    """Costante pura: NIENTE database, e nessun modo di sollevare. Un
+    5xx qui fa sospendere la scansione dell'intero sito per ore, e
+    sarebbe il guasto piu' stupido possibile — c'e' la prova che lo
+    verifica rompendo `db` sotto i piedi."""
+    return Response(ROBOTS_TXT, media_type="text/plain; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=3600"})
+
+
+TETTO_SITEMAP = 50000
+CACHE_SITEMAP = 600
+_SITEMAP_CACHE = {"quando": 0.0, "xml": b""}
+
+
+def _riga_sitemap(loc: str, quando: int) -> str:
+    """Un indirizzo con la sua data. Il formato e' W3C; changefreq e
+    priority si OMETTONO — Google dichiara di ignorarli, e sarebbero
+    byte e manutenzione."""
+    riga = f"<url><loc>{_attr(loc)}</loc>"
+    if quando:
+        d = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(quando))
+        riga += f"<lastmod>{d}</lastmod>"
+    return riga + "</url>"
+
+
+def _sitemap() -> bytes:
+    """La mappa: home, la pagina della sicurezza, i reparti che hanno
+    almeno un annuncio, tutti gli attivi, e i negozi con almeno un
+    attivo.
+
+    NIENTE DI CIO' CHE E' ELENCATO QUI PUO' PORTARE NOINDEX — e' una
+    contraddizione che Search Console segnala — quindi le clausole
+    qui sotto e le condizioni di `indicizza` nei costruttori nascono
+    dallo stesso fatto: stato attivo, e almeno un annuncio. C'e' una
+    prova che lo verifica pagina per pagina, ed e' quella di maggior
+    valore del cantiere.
+    Restano fuori i VENDUTI (decisione presa: il loro link non muore e
+    la pagina si indicizza se un motore la conosce, ma non siamo noi a
+    proporla), i rimossi, quelli in revisione, /miniapp.html e i
+    negozi vuoti.
+
+    Il <loc> e' l'indirizzo CANONICO, con lo slug: quello nudo
+    consegnerebbe a Google un rapporto di contenuti duplicati scritto
+    di nostro pugno."""
+    adesso = time.time()
+    if (_SITEMAP_CACHE["xml"]
+            and adesso - _SITEMAP_CACHE["quando"] < CACHE_SITEMAP):
+        return _SITEMAP_CACHE["xml"]
+    con = db()
+    try:
+        annunci = con.execute(
+            "SELECT id, titolo, creato, modificato FROM annunci "
+            "WHERE stato='attivo' ORDER BY id LIMIT ?",
+            (TETTO_SITEMAP,)).fetchall()
+        negozi = con.execute(
+            "SELECT u.negozio, u.nome, MAX(a.creato) AS ultimo FROM utenti u "
+            "JOIN annunci a ON a.venditore_id = u.tg_id "
+            "WHERE a.stato='attivo' AND u.negozio!='' "
+            "GROUP BY u.tg_id LIMIT ?", (TETTO_SITEMAP,)).fetchall()
+        reparti = {r[0]: r[1] for r in con.execute(
+            "SELECT categoria, MAX(creato) FROM annunci "
+            "WHERE stato='attivo' GROUP BY categoria").fetchall()}
+    finally:
+        con.close()
+    if len(annunci) >= TETTO_SITEMAP:
+        # IL TETTO SI DICHIARA, NON SI COSTRUISCE: siamo a meno del due
+        # per cento, e un indice di sitemap oggi sarebbe codice morto a
+        # guardia di una soglia lontanissima. La via d'uscita, gia'
+        # scritta perche' il prossimo non debba riscoprirla:
+        # /sitemap.xml diventa un <sitemapindex> che elenca
+        # /sitemap-1.xml…, e la riga «Sitemap:» di robots.txt non
+        # cambia. Meglio scoprirlo dai log che da Search Console.
+        print("⚠️ sitemap al tetto: servono le sitemap multiple",
+              flush=True)
+    # `modificato` e' 0 su quasi tutte le righe (nessuno le ha ancora
+    # ritoccate): un <lastmod> ingenuo daterebbe l'intero catalogo al
+    # 1970, cioe' direbbe al crawler «qui non cambia niente da
+    # cinquant'anni».
+    piu_recente = max([max(a["creato"], a["modificato"]) for a in annunci],
+                      default=0)
+    righe = [_riga_sitemap(URL_PUBBLICO, piu_recente),
+             _riga_sitemap(f"{URL_PUBBLICO}/sicurezza", 0)]
+    for nome, quando in reparti.items():
+        if nome in CATEGORIE:
+            righe.append(_riga_sitemap(
+                f"{URL_PUBBLICO}/categoria/{slug_categoria(nome)}", quando))
+    for v in negozi:
+        righe.append(_riga_sitemap(_url_negozio(v["negozio"], v["nome"] or ""),
+                                   v["ultimo"]))
+    for a in annunci:
+        righe.append(_riga_sitemap(_url_annuncio(a["id"], a["titolo"]),
+                                   max(a["creato"], a["modificato"])))
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+           + "".join(righe) + "</urlset>").encode("utf-8")
+    _SITEMAP_CACHE.update(quando=adesso, xml=xml)
+    return xml
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    return Response(_sitemap(), media_type="application/xml",
+                    headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/")
 def home():
-    return _pagina_con_meta(META_GENERICI)
+    titolo, testa, corpo = _seo_o_generici(_seo_home)
+    return _pagina_con_meta(testa, titolo, corpo)
 
 
 @app.get("/miniapp.html")
 def pagina_miniapp():
-    return _pagina_con_meta(META_GENERICI)
+    """Lo stesso identico contenuto di «/», e quindi un DOPPIONE: qui va
+    il noindex e NON il canonical verso «/» — su una pagina
+    deindicizzata un canonical che punta altrove puo' propagare il
+    noindex all'indirizzo canonico, cioe' proprio alla home."""
+    return _pagina_con_meta(META_GENERICI + META_NOINDEX)
 
 
 @app.get("/negozio/{chi}")
@@ -21831,17 +22525,47 @@ def pagina_negozio(chi: str):
     """Link condivisibile del negozio: e' sempre la stessa Mini App,
     il JS legge /negozio/... dall'URL e apre la vista giusta. In testa
     ci vanno i meta di QUEL negozio, per chi il link lo riceve e non
-    lo apre (vedi le anteprime dei link, qui sopra)."""
-    return _pagina_con_meta(_meta_o_generici(_meta_negozio, chi))
+    lo apre (vedi le anteprime dei link, qui sopra), e nel corpo la sua
+    merce come collegamenti veri, per chi non esegue JavaScript.
+    ATTENZIONE all'ordine delle rotte: questa e' parametrica, quindi un
+    domani un «/negozio/nuovo» letterale registrato DOPO verrebbe
+    mangiato — la lezione gia' pagata con /api/listings/miei."""
+    titolo, testa, corpo = _seo_o_generici(_seo_negozio, chi)
+    return _pagina_con_meta(testa, titolo, corpo)
 
 
 @app.get("/annuncio/{aid}")
-def pagina_annuncio(aid: int):
+def pagina_annuncio(aid: str):
     """Link condivisibile di un annuncio (bottone condividi del
     dettaglio): stessa Mini App, il JS legge /annuncio/{id} dall'URL
     e apre il dettaglio — in vetrina anonima per chi non e' entrato.
-    I meta in testa raccontano l'annuncio SOLO se e' ancora attivo."""
-    return _pagina_con_meta(_meta_o_generici(_meta_annuncio, aid))
+    I meta in testa raccontano l'annuncio SOLO se e' ancora attivo.
+
+    Il parametro e' TESTO e non un intero: da qui passa anche
+    `13334-bicicletta-da-corsa`. Cio' che non e' un id torna indietro da
+    `_id_da_percorso` a ZERO letture del database, e la pagina esce
+    generica col noindex. Cambio dichiarato: `/annuncio/pippo` era un
+    422 di FastAPI e adesso e' una pagina che si apre — nessuno
+    dipendeva da quel 422, e un 404 qui sarebbe contro la costituzione
+    fail-open di questo blocco (un database lento non deve poter
+    trasformare una pagina che funziona in un «non trovato»).
+    ATTENZIONE all'ordine delle rotte, come per il negozio."""
+    titolo, testa, corpo = _seo_o_generici(_seo_annuncio,
+                                           _id_da_percorso(aid))
+    return _pagina_con_meta(testa, titolo, corpo)
+
+
+@app.get("/categoria/{slug}")
+def pagina_categoria(slug: str):
+    """Il reparto come pagina vera: 27 indirizzi tematici, ed e' cio'
+    che chiude il grafo dei collegamenti — home, reparto, scheda. Il
+    client legge /categoria/{slug} dall'URL e apre la vetrina gia'
+    filtrata.
+    Vocabolario CHIUSO su SLUG_CATEGORIE: uno slug inventato non
+    diventa mai una query, esce generico col noindex.
+    ATTENZIONE all'ordine delle rotte, come per le due gemelle."""
+    titolo, testa, corpo = _seo_o_generici(_seo_categoria, slug)
+    return _pagina_con_meta(testa, titolo, corpo)
 
 
 @app.get("/sicurezza")
@@ -21858,7 +22582,7 @@ def pagina_sicurezza():
     la stessa ragione i suoi meta sono una costante: e' il link che si
     manda a chi chiede «mi fido?», cioe' quello dove un'anteprima nuda
     faceva il danno peggiore."""
-    return _pagina_con_meta(META_SICUREZZA)
+    return _pagina_con_meta(TESTA_SICUREZZA, TITOLO_SICUREZZA)
 
 
 @app.get("/vendor/nostr.js")

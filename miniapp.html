@@ -252,6 +252,14 @@
   .mono{font-family:'JetBrains Mono',monospace}
   .font-brand{font-family:'Baloo 2',sans-serif}
   #app{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:84px}
+  /* IL CARTELLO del server (vedi il markup): vive una frazione di
+     secondo, ma se il server non ha iniettato niente resta vuoto — e un
+     blocco vuoto non deve lasciare un buco ne' un margine spurio.
+     MAI un display:none permanente: sarebbe testo nascosto, che e'
+     un'altra cosa da un pre-render. */
+  #cartello{padding:var(--pad);color:var(--ink)}
+  #cartello:empty{display:none}
+  #cartello img{max-width:100%;height:auto;border-radius:var(--radius)}
 
   /* ---------- header ---------- */
   header{
@@ -440,8 +448,29 @@
   .card{
     background:var(--card);border-radius:18px;box-shadow:var(--shadow-card);
     overflow:hidden;cursor:pointer;transition:transform .12s ease;
+    /* OBBLIGATORIA (ago 2026, cantiere «farsi trovare»): da quando la
+       card e' un COLLEGAMENTO VERO, il barattolino e il rifornimento
+       stanno FUORI dall'<a> — un <button> dentro un <a> e' HTML non
+       valido — e si ancorano a lei. Senza questa riga risalgono fino
+       al blocco iniziale e TUTTI i barattolini della pagina si
+       accatastano in alto a destra dello schermo.
+       LA TRAPPOLA: nel carrello .pacco-cella e' gia' relative, quindi
+       li' sembrerebbe tutto giusto. Si prova nel pacco, si conclude
+       che va bene, e la vetrina e' devastata. C'e' la prova. */
+    position:relative;
   }
   .card:active{transform:scale(.97)}
+  /* L'<a> che avvolge foto e testo. `display:block` non e' cosmetica:
+     un <a> inline con figli block si spezza in frammenti e l'interlinea
+     aggiunge spazio spurio sotto .info. Colore e sottolineatura si
+     azzerano perche' nel foglio NON esiste nessun reset `a{}` globale.
+     MAI dargli overflow:hidden: il cartellino del prezzo sporge di
+     proposito, e verrebbe tagliato a meta'. */
+  .card-link{display:block;color:inherit;text-decoration:none}
+  /* .card non aveva nessuno stile di fuoco perche' non era
+     focalizzabile; adesso lo e'. Offset NEGATIVO come .picker-voce:
+     .card ha overflow:hidden e uno positivo verrebbe tagliato. */
+  .card-link:focus-visible{outline:2px solid var(--sats);outline-offset:-2px}
   /* La foto vive in un wrapper relativo: l'etichetta del prezzo le
      sta a cavallo del bordo inferiore, storta come al mercatino */
   .ph-wrap{position:relative}
@@ -509,6 +538,10 @@
     display:flex;flex-direction:column;
     border:0;padding:0;cursor:pointer;overflow:hidden;
     border-radius:16px;background:var(--cat-fondo);
+    /* dall'ago 2026 e' un <a> e non piu' un <button>: nel foglio non
+       esiste nessun reset `a{}`, quindi la sottolineatura va tolta a
+       mano (il colore ce l'ha gia' .cat-nome) */
+    text-decoration:none;
   }
   .cat-tile:active{transform:translateY(1px)}
   /* NIENTE VELO SOTTO IL NOME, e vale la pena dire perche' non c'e'.
@@ -2708,6 +2741,24 @@
 </head>
 <body>
 <div id="app">
+<!-- IL CARTELLO (ago 2026): il server ci infila dentro titolo, prezzo,
+     descrizione e foto della pagina richiesta. Non e' testo nascosto —
+     e' un pre-render vero, che dice esattamente quel che dice l'app —
+     e serve a chi non esegue JavaScript: i motori di ricerca, le
+     anteprime, i bot degli assistenti.
+     DEVE restare VUOTO nel file, coi due tag adiacenti: il server
+     taglia proprio li', e se ci finisce dentro qualcosa a mano la
+     fessura si chiude e la pagina esce intatta invece che mescolata.
+     Sta dentro #app per ereditarne la larghezza, e non usa nessuno dei
+     nomi di casa (.view, .sheet, .card, .grid): li vedrebbero navPila,
+     l'osservatore del motore, il tour e il conto delle card. -->
+<div id="cartello"></div>
+<script>/* Il cartello ha gia' fatto il suo mestiere: da qui in poi
+   comanda l'app. Si toglie DURANTE il parse, adiacente al marcatore e
+   non in fondo al file, o su rete lenta resterebbe a schermo per
+   decine di ms. Niente ramo d'errore: se il server non ha iniettato
+   nulla (la DEMO da file://) non c'e' niente da togliere. */
+document.getElementById('cartello')?.remove();</script>
   <!-- Riempito da avvia(): banner della demo dal browser, oppure la
        barra del collaudo. Dentro Telegram resta nascosto. -->
   <div class="demo-banner" id="demoBanner" style="display:none"></div>
@@ -4140,6 +4191,10 @@ function mapListing(a){
     thumbs = nomi.map(n => fotoUrl(fotoMini(n)));
   } catch(e) {}
   return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
+    /* il pezzo leggibile dell'indirizzo, calcolato dal SERVER: qui non
+       si ricalcola mai da a.titolo, sarebbe un gemello da tenere
+       allineato per sempre (vedi linkAnnuncio) */
+    slug:a.slug||'',
     price:a.prezzo_sats, valuta:a.valuta||'sats', priceEur:a.prezzo_eur||0,
     cat:a.categoria, zone:a.zona||'—',
     /* la regione: derivata dalla sigla lato server, '' se non c'e' */
@@ -5488,15 +5543,20 @@ function icoCategoria(c){
 function renderSfoglia(){
   /* il nome va in data-cat e MAI dentro la stringa JS dell'onclick:
      e' la lezione gia' pagata sul picker con «Valle d'Aosta» */
+  /* Piastrelle come COLLEGAMENTI VERI (ago 2026): l'indirizzo del
+     reparto lo fa slugCat, il gemello di slug_categoria del server —
+     quello si', giustificato: serve a calcolare offline anche il nome
+     del file dell'illustrazione, ed e' gia' sorvegliato in CI. */
   el('sfogliaGriglia').innerHTML = CATS.slice(1).map(c => `
-    <button class="cat-tile" data-cat="${esc(c)}"
-            onclick="apriCategoria(this.dataset.cat)">
+    <a class="cat-tile" data-cat="${esc(c)}"
+       href="/categoria/${slugCat(c)}"
+       onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
       <span class="cat-nome" lang="it">${esc(c)}</span>
       <span class="cat-fig"><img src="/assets/categorie/${slugCat(c)}.webp?b=2"
            alt="" loading="lazy" decoding="async"
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>
-    </button>`).join('');
+    </a>`).join('');
 }
 
 /* Dalla piastrella alla vetrina filtrata. setCat resta il giudice
@@ -5661,6 +5721,55 @@ function renderPionieri(){
     + `pionier${pionieri===1?'e':'i'}`;
 }
 
+/* ============ I COLLEGAMENTI VERI (ago 2026) ====================
+   Le card e le piastrelle erano `onclick` puri: un crawler entrava
+   dalla home, non trovava un solo link da seguire, e usciva. Adesso
+   sono <a href> veri — ma la SPA resta quella di sempre, e l'URL non
+   si tocca (il patto del motore di navigazione).
+
+   UN CLICK E' NOSTRO quando non porta i tasti di chi naviga:
+   ctrl/cmd = scheda nuova, shift = finestra nuova, tasto non-sinistro
+   = roba del browser. La ROTELLINA non arriva nemmeno qui — i browser
+   mandano `auxclick`, non `click` — quindi apre davvero una scheda
+   nuova, ed e' il guadagno voluto: NON «aggiustarlo».
+   ALT non passa apposta: in Chrome scarica il bersaglio, e scaricare
+   910 KB di app non e' mai cio' che qualcuno intendeva.
+   Su file:// (la DEMO a mano) l'href non viene nemmeno scritto: li'
+   ogni click e' nostro. */
+const clickNostro = e => !STORIA
+  || !(e.ctrlKey || e.metaKey || e.shiftKey || e.button);
+
+/* L'href di un annuncio. Lo slug arriva dal SERVER (`l.slug`) e non si
+   ricalcola in casa: sarebbe un secondo posto da tenere allineato per
+   sempre, e divergerebbe il giorno che il server cambia la
+   traslitterazione. Server di ieri = niente slug = link senza coda,
+   che continua a funzionare (la regex non e' ancorata) e il canonical
+   rimette le cose a posto: fail-open senza un ramo d'errore. */
+const linkAnnuncio = l => {
+  if (!STORIA) return '';
+  const s = String(l.slug || '').replace(/[^a-z0-9-]/g, '');
+  return ` href="/annuncio/${l.id}${s ? '-' + s : ''}"`;
+};
+
+/* PRIMA si spegne la navigazione, POI si apre: invertirli significa
+   che un'eccezione dentro openDetail manda la pagina a ricaricarsi per
+   davvero — 910 KB, boot da capo, e per terra il carrello a meta',
+   l'identita' di collaudo e la posizione della vetrina. */
+function apriCard(e, id){
+  if (!clickNostro(e)) return;
+  e.preventDefault();
+  openDetail(id);
+}
+
+/* La piastrella di Sfoglia: toccarla e' una DISCESA verso il reparto,
+   quindi passa da apriCategoria, che alza navSpingi. Atterrarci da un
+   motore di ricerca e' un'altra cosa — vedi apriCategoriaDaUrl. */
+function apriCategoriaDaTocco(e, c){
+  if (!clickNostro(e)) return;
+  e.preventDefault();
+  apriCategoria(c);
+}
+
 /* La card di un annuncio, stile "Etichetta": foto pulita e il prezzo
    su un cartellino storto a cavallo del bordo, come al mercatino.
    La stessa card serve vetrina e vista negozio. */
@@ -5736,19 +5845,29 @@ const cardHTML = l => {
      motivo per cui questo bottone puo' esistere senza dare alla card
      un terzo bersaglio. */
   const rif = bottoneRifornisci(l);
+  /* LA CARD E' UN COLLEGAMENTO VERO (ago 2026): l'<a> avvolge foto e
+     testo, i due BOTTONI restano fuori — contenuto interattivo dentro
+     un <a> e' HTML non valido — mentre il badge di stato ${flash}, che
+     e' un <div>, resta DENTRO: cosi' le sue cinque regole CSS non si
+     toccano di un carattere.
+     L'href esiste perche' un crawler lo segua e perche' la rotellina
+     apra una scheda nuova; il tocco normale lo spegne e apre in pagina
+     come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':''}" onclick="openDetail(${l.id})">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':''}">
+      <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
         <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
-        ${flash}${jar}${rif}
+        ${flash}
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
         <div class="meta"><span class="luogo">${luogoTesto(l)}</span>${iconeCard(l)}</div>
       </div>
+      </a>${jar}${rif}
     </div>`; };
 
 async function doSearch(){
@@ -11033,7 +11152,12 @@ function condividiAnnuncio(){
   const l = currentListing; if (!l) return;
   const prezzo = (l.valuta==='eur' && l.priceEur>0)
     ? `${fmtEur(l.priceEur)} €` : `${fmt(l.price)} sats`;
-  return condividiLink(`${location.origin}/annuncio/${l.id}`,
+  /* Si condivide l'indirizzo PARLANTE: lo slug arriva dal server nel
+     payload (mai ricalcolato qui) e senza di lui il link resta quello
+     di sempre, che continua a funzionare. */
+  const s = String(l.slug || '').replace(/[^a-z0-9-]/g, '');
+  return condividiLink(
+    `${location.origin}/annuncio/${l.id}${s ? '-' + s : ''}`,
                        `${l.title} — ${prezzo} su Barattolo 🫙`, l.title);
 }
 
@@ -15891,8 +16015,18 @@ function renderWallet(){
 /* Link diretto a un negozio (barattolo.store/negozio/...): il server
    serve sempre la stessa Mini App, qui leggiamo l'URL e apriamo la
    vista giusta. Una volta sola: cambiando identità nel collaudo non
-   deve riaprirsi da capo. */
-const NEGOZIO_URL = location.pathname.match(/^\/negozio\/([^/]+)/);
+   deve riaprirsi da capo.
+
+   IL TRATTINO DENTRO LA CLASSE NEGATA (ago 2026) e' lo spacco degli
+   indirizzi parlanti: /negozio/ab12cd34-la-bottega deve dare
+   «ab12cd34», perche' `chi` non contiene MAI un trattino — o e' il
+   codice pubblico (token_hex, otto esadecimali) o uno username
+   Telegram ([A-Za-z0-9_]). ATTENZIONE: il trattino deve restare in
+   FONDO alla classe (o in testa), o diventa un intervallo e la regex
+   si rompe in silenzio. `apriNegozio` deve ricevere il `chi` PULITO:
+   finisce in /api/negozio/{chi}, dove il confronto e' esatto, e
+   diventa la chiave della entry di cronologia e della paginazione. */
+const NEGOZIO_URL = location.pathname.match(/^\/negozio\/([^/-]+)/);
 let negozioAperto = false;
 function apriNegozioDaUrl(){
   if (!NEGOZIO_URL || negozioAperto) return;
@@ -15903,7 +16037,12 @@ function apriNegozioDaUrl(){
    apre il dettaglio appena la vetrina e' carica. Con la vetrina a
    pagine l'annuncio puo' essere oltre le pagine caricate: se manca
    dal catalogo lo si chiede al server, uno solo. Se non c'e' piu',
-   openDetail avvisa col toast e si resta in Esplora. */
+   openDetail avvisa col toast e si resta in Esplora.
+
+   LA REGEX NON E' ANCORATA IN CODA, ed e' cio' che fa funzionare gli
+   indirizzi parlanti senza toccare una riga qui: /annuncio/13334-bici
+   cattura gia' «13334». Chi la «stringe» con un $ ammazza in silenzio
+   ogni link parlante — c'e' la prova che la esercita. */
 const ANNUNCIO_URL = location.pathname.match(/^\/annuncio\/(\d+)/);
 let annuncioAperto = false;
 async function apriAnnuncioDaUrl(){
@@ -15939,6 +16078,48 @@ function apriSicurezzaDaUrl(){
   apriSicurezza(anc ? 'sicu-' + anc : '');
 }
 
+/* /categoria/{slug} — il reparto come pagina vera (ago 2026). Il nome
+   si ricava da CATS con slugCat, il gemello di slug_categoria: nessun
+   secondo elenco da tenere allineato. Slug sconosciuto = `undefined`,
+   e le due funzioni qui sotto non fanno NIENTE: mai svuotare la
+   vetrina per una parola che non conosciamo. */
+const CATEGORIA_URL = location.pathname.match(/^\/categoria\/([a-z0-9-]+)\/?$/);
+const CATEGORIA_DA_URL = CATEGORIA_URL
+  && CATS.find(c => slugCat(c) === CATEGORIA_URL[1]);
+let categoriaAperta = false;
+
+/* PRIMA della prima pagina, e sincrona: paramsVetrina() legge
+   activeCat, quindi loadListings scarica SUBITO il reparto giusto in
+   una richiesta sola. Chiamare setCat() dopo il boot costerebbe una
+   vetrina intera scaricata per buttarla via — proprio sulla pagina che
+   deve essere veloce per chi arriva da un motore di ricerca. */
+function preparaCategoriaDaUrl(){
+  if (!CATEGORIA_DA_URL) return;
+  activeCat = CATEGORIA_DA_URL;
+  ramoVetrina = 'sfoglia';   /* la nav dice il reparto, non «Esplora» */
+}
+
+/* ATTERRARE SU UN REPARTO NON E' UNA DISCESA, ed e' la distinzione che
+   conta: toccare una piastrella viene DA Sfoglia (e alza navSpingi,
+   perche' l'indietro deve riportare allo scaffale), ma arrivarci da
+   Google non viene da nessun posto nostro — e l'indietro deve
+   riportare a chi ci ha mandati. Quindi qui navSpingi non si tocca
+   MAI, o si intrappola chi arriva dai motori dentro un gradino
+   inventato.
+   navRiflette() a mano invece e' OBBLIGATORIO: cambiare ramoVetrina e
+   activeCat non tocca nessuna classe, quindi l'osservatore del motore
+   non scatta e la cronologia continuerebbe a raccontare il mercatino
+   intero — al primo avanti/indietro si tornerebbe alla vetrina piena
+   con la nav accesa su Sfoglia. E' la stessa riga in coda a setCat e a
+   openDetail, per la stessa ragione. */
+function apriCategoriaDaUrl(){
+  if (!CATEGORIA_DA_URL || categoriaAperta) return;
+  categoriaAperta = true;
+  renderChips();
+  go('esplora');
+  navRiflette();
+}
+
 /* Browser senza identità Telegram: si prova la vetrina vera, cioè gli
    annunci pubblici in sola lettura. Niente header di autenticazione:
    siamo anonimi e il backend non deve sapere nulla di noi. */
@@ -15954,6 +16135,7 @@ async function avviaVetrina(){
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
     apriSicurezzaDaUrl();
+    apriCategoriaDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
        guardie interne decidono comunque se comparire */
     modaleTest(bannerInstallaPwa);
@@ -15968,6 +16150,10 @@ async function avviaVetrina(){
 }
 
 async function avvia(){
+  /* PRIMA di ogni fetch: se si atterra su /categoria/{slug}, la prima
+     pagina dev'essere gia' quella del reparto — una richiesta sola
+     invece di una vetrina intera scaricata per buttarla via. */
+  preparaCategoriaDaUrl();
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
     DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderGrid(); renderOrders(); return;
@@ -16088,6 +16274,7 @@ async function avvia(){
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
     apriSicurezzaDaUrl();
+    apriCategoriaDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour
        one-shot (e poi il banner installa) partono alla sua chiusura */
     modaleTest(() => { tourBenvenuto(); bannerInstallaPwa(); });

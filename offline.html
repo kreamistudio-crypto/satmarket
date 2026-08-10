@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Barattolo — sei senza rete</title>
+<!-- Fuori dall'indice, e scritto qui a mano: questa pagina NON passa
+     da _pagina_con_meta (e' un file suo, servito tale e quale), quindi
+     il noindex delle altre non la copre. Un «sei senza rete» fra i
+     risultati di ricerca sarebbe la peggiore prima impressione
+     possibile. Deve restare CRAWLABILE — non si vieta in robots.txt
+     cio' che si vuole deindicizzare, o il noindex non lo legge mai
+     nessuno. -->
+<meta name="robots" content="noindex,follow">
 <meta name="theme-color" content="#FAF4E4">
 <style>
   /* Pagina di cortesia servita dal service worker a rete morta.

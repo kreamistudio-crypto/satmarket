@@ -7736,6 +7736,87 @@ def _types_orologio(vero, lunedi):
         time=vero.time)
 
 # ====================================================================
+def _amb_seo():
+    """L'ambiente condiviso delle prove sulle anteprime e sul cantiere
+    «farsi trovare»: i pezzi VERI di server.py montati senza importarlo
+    (che vorrebbe config.py, anthropic e mezzo mondo). I due soli stub
+    sono quelli che chiedono il dataset dei comuni e la rete — qui non
+    si collauda ne' la geografia ne' CoinGecko."""
+    import html as _html
+    import json as _json
+    import re as _re
+    import time as _time
+    import unicodedata as _ud
+
+    amb = {"html": _html, "json": _json, "os": os, "re": _re,
+           "time": _time, "unicodedata": _ud,
+           "URL_PUBBLICO": "https://barattolo.store", "FOTO_DIR": "foto",
+           "comune_da_zona": lambda z: "Carmagnola (TO)" if "Carmagnola" in z
+           else "",
+           "cambio_noto_ora": lambda *a: 0.0}
+    for riga in ("IMMAGINE_BRAND = (", "SEGNO_META = ", "SEGNO_TITOLO = ",
+                 "SEGNO_CORPO = ", "MAX_SLUG = ", "_ID_PERCORSO = ",
+                 "META_NOINDEX = ", "TETTO_CARTELLO = ",
+                 "CACHE_SEO_HOME = ", "CAMPI_CARTELLO = ",
+                 "TETTO_SITEMAP = ", "CACHE_SITEMAP = "):
+        i = _SORGENTE.index(riga)
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    for blocco in ("CATEGORIE = (", "CATEGORIE_SENZA_CONDIZIONE = ",
+                   "CONDIZIONI = {", "CONDIZIONI_LD = {",
+                   "_PAGINA_CACHE = {", "_SEO_HOME_CACHE = {",
+                   "_SITEMAP_CACHE = {", "ROBOTS_TXT = (",
+                   "TITOLO_HOME = ", "TITOLO_SICUREZZA = "):
+        i = _SORGENTE.index(blocco)
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for f in ("normalizza", "slug_categoria", "senza_condizione",
+              "condizione_da_mostrare", "in_ferie", "_fmt_sats", "_fmt_eur",
+              "_prezzo_promo", "_slug", "_id_da_percorso", "_chi_da_percorso",
+              "_attr", "_testo", "_ld", "_meta_anteprima", "_taglia_meta",
+              "_immagine_anteprima", "_testa_seo", "_url_annuncio",
+              "_url_negozio", "_categoria_da_slug", "_schede_cartello",
+              "_link_categorie", "_seo_niente", "_prezzo_ld",
+              "_disponibilita_ld", "_ld_annuncio", "_seo_annuncio",
+              "_seo_negozio", "_seo_categoria", "_seo_home",
+              "_seo_o_generici", "_spezza_pagina", "_monta_pagina",
+              "_riga_sitemap", "_sitemap"):
+        exec(pezzo(f), amb)
+    i = _SORGENTE.index("META_GENERICI = _meta_anteprima(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    i = _SORGENTE.index("META_SICUREZZA = _meta_anteprima(")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    return amb
+
+
+def _db_finto(con):
+    """La connessione di cartone: i costruttori la chiudono nel
+    finally, e chiudere davvero un :memory: sarebbe buttare via il
+    database fra una prova e l'altra."""
+    class ConFinta:
+        def execute(self, *a):
+            return con.execute(*a)
+
+        def close(self):
+            pass
+    return lambda: ConFinta()
+
+
+def _vetrina_finta(con):
+    """Le due tabelle che i costruttori SEO leggono, con le colonne che
+    servono a loro."""
+    import sqlite3
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci (id INTEGER PRIMARY KEY, titolo TEXT, "
+                "descrizione TEXT, zona TEXT, valuta TEXT, prezzo_sats INT, "
+                "prezzo_eur REAL, foto TEXT, stato TEXT, venditore_id INT, "
+                "categoria TEXT DEFAULT '', consegna TEXT DEFAULT '', "
+                "condizione TEXT DEFAULT '', quantita INT DEFAULT 1, "
+                "creato INT DEFAULT 0, modificato INT DEFAULT 0)")
+    con.execute("CREATE TABLE utenti (tg_id INT, nome TEXT, username TEXT, "
+                "negozio TEXT, rating REAL, n_feedback INT, "
+                "ferie_fino INT DEFAULT 0)")
+    return con
+
+
 def prove_anteprime():
     """LE ANTEPRIME DEI LINK (ago 2026). La famiglia difende tre cose,
     e la prima e' quella che conta: UN ANNUNCIO NON ATTIVO NON RACCONTA
@@ -7754,23 +7835,12 @@ def prove_anteprime():
     import sqlite3
     import tempfile
 
-    amb = {"html": _html, "json": _json, "os": os,
-           "URL_PUBBLICO": "https://barattolo.store", "FOTO_DIR": "foto",
-           # i due che vogliono il dataset dei comuni e la rete: qui
-           # non si collauda la geografia ne' CoinGecko
-           "comune_da_zona": lambda z: "Carmagnola (TO)" if "Carmagnola" in z
-           else "",
-           "cambio_noto_ora": lambda *a: 0.0}
-    for costante in ("IMMAGINE_BRAND = (", "SEGNO_META = "):
-        i = _SORGENTE.index(costante)
-        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
-    for f in ("_meta_anteprima", "_taglia_meta", "_immagine_anteprima",
-              "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_meta_annuncio",
-              "_meta_negozio", "_meta_o_generici"):
-        exec(pezzo(f), amb)
-    i = _SORGENTE.index("META_GENERICI = _meta_anteprima(")
-    exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    amb = _amb_seo()
     GEN = amb["META_GENERICI"]
+    # Cio' che non e' pubblico ricade sui generici PIU' il noindex: e'
+    # la stessa condizione, letta due volte — l'anteprima tace e il
+    # motore non indicizza, e la seconda meta' non e' un secondo «if».
+    MUTO = GEN + amb["META_NOINDEX"]
 
     # --- 1) il taglio: una riga sola, mai a meta' parola ------------
     taglia = amb["_taglia_meta"]
@@ -7858,10 +7928,14 @@ def prove_anteprime():
     # li accompagnano — campi di protocollo che importa_nostr rilegge,
     # dove il punto e' la specifica e non una nostra scelta —, la riga
     # del catalogo che va all'AI (non la legge una persona), _fmt_eur
-    # stesso e il CSV, che la virgola ce l'ha gia' per conto suo.
+    # stesso, il CSV (che la virgola ce l'ha gia' per conto suo) e —
+    # dall'ago 2026 — il prezzo dei DATI STRUTTURATI in _prezzo_ld, che
+    # e' della stessa famiglia dei tag NIP-99: schema.org vuole il
+    # punto decimale, e una virgola li' dentro non sarebbe uno stile
+    # italiano ma un numero illeggibile per chi lo consuma.
     # Se questo numero cambia: o e' nato un campo di protocollo nuovo,
     # o qualcuno ha ricominciato a scrivere un euro a mano.
-    prova("...e gli otto superstiti sono tutti censiti", 8,
+    prova("...e i nove superstiti sono tutti censiti", 9,
           _SORGENTE.count(":.2f}"))
 
     # LA SENTINELLA DEI SATS, gemella. Le stringhe spezzate su piu'
@@ -7980,36 +8054,37 @@ def prove_anteprime():
           pezzo_js(mini_js, "function fotoMini(nome){", "\n}\n"))
 
     # --- 5) LA PROVA REGINA: solo gli attivi parlano ----------------
-    con = sqlite3.connect(":memory:")
-    con.row_factory = sqlite3.Row
-    con.execute("CREATE TABLE annunci (id INTEGER PRIMARY KEY, titolo TEXT, "
-                "descrizione TEXT, zona TEXT, valuta TEXT, prezzo_sats INT, "
-                "prezzo_eur REAL, foto TEXT, stato TEXT, venditore_id INT)")
-    con.execute("CREATE TABLE utenti (tg_id INT, nome TEXT, username TEXT, "
-                "negozio TEXT, rating REAL, n_feedback INT)")
+    con = _vetrina_finta(sqlite3.connect(":memory:"))
     for aid, stato in ((1, "attivo"), (2, "rimosso"), (3, "revisione"),
                        (4, "venduto")):
-        con.execute("INSERT INTO annunci VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (aid, f"SEGRETO{aid} cuffie da studio",
-                     f"RISERVATO{aid} in ottimo stato, poco usate.",
-                     "Frazione Salsasio, Carmagnola (TO)", "sats",
-                     80000, 0.0, "[]", stato, 777888999))
-    con.execute("INSERT INTO utenti VALUES (777888999, 'Rosa', 'rosina', "
-                "'ab12cd34', 4.75, 12)")
+        con.execute(
+            "INSERT INTO annunci (id, titolo, descrizione, zona, valuta, "
+            "prezzo_sats, prezzo_eur, foto, stato, venditore_id, categoria, "
+            "condizione) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (aid, f"SEGRETO{aid} cuffie da studio",
+             f"RISERVATO{aid} in ottimo stato, poco usate.",
+             "Frazione Salsasio, Carmagnola (TO)", "sats",
+             80000, 0.0, "[]", stato, 777888999, "Audio e video", "buono"))
+    # L'ORFANO: riga utente sparita. Fino a ieri questa query
+    # interrogava la sola `annunci` e non poteva fallire per colpa del
+    # venditore — con un INNER JOIN la sua anteprima si spegnerebbe, ed
+    # e' una regressione silenziosa su cio' che funziona.
+    con.execute(
+        "INSERT INTO annunci (id, titolo, descrizione, zona, valuta, "
+        "prezzo_sats, prezzo_eur, foto, stato, venditore_id, categoria) "
+        "VALUES (5,'SEGRETO5 orfano','senza padrone','','sats',9000,0.0,"
+        "'[]','attivo',424242,'Altro')")
+    con.execute(
+        "INSERT INTO utenti (tg_id, nome, username, negozio, rating, "
+        "n_feedback) VALUES (777888999, 'Rosa', 'rosina', 'ab12cd34', "
+        "4.75, 12)")
     con.commit()
 
-    class ConFinta:
-        """La connessione di cartone: _meta_annuncio la chiude nel
-        finally, e chiudere davvero un :memory: sarebbe buttare via il
-        database fra una prova e l'altra."""
-        def execute(self, *a):
-            return con.execute(*a)
-
-        def close(self):
-            pass
-
-    amb["db"] = lambda: ConFinta()
-    ma, mn = amb["_meta_annuncio"], amb["_meta_negozio"]
+    amb["db"] = _db_finto(con)
+    # I costruttori tornano (titolo, testa, corpo): qui si guarda la
+    # TESTA, che e' il blocco che i crawler leggono.
+    ma = lambda aid: amb["_seo_annuncio"](aid)[1]        # noqa: E731
+    mn = lambda chi: amb["_seo_negozio"](chi)[1]         # noqa: E731
 
     attivo = ma(1)
     prova("l'annuncio attivo racconta il suo titolo", True,
@@ -8019,9 +8094,14 @@ def prove_anteprime():
           "Carmagnola (TO)" in attivo and "Frazione Salsasio" not in attivo)
     prova("...e le prime righe della descrizione", True,
           "RISERVATO1" in attivo)
-    prova("...e l'og:url canonico", True,
-          'content="https://barattolo.store/annuncio/1"' in attivo)
+    prova("...e l'og:url canonico, con lo slug", True,
+          'content="https://barattolo.store/annuncio/'
+          '1-segreto1-cuffie-da-studio"' in attivo)
     prova("...e non si spaccia per venduto", False, "Venduto" in attivo)
+    # L'ORFANO HA COMUNQUE LA SUA CARD: e' la prova che cade con un
+    # INNER JOIN al posto del LEFT.
+    prova("un annuncio senza venditore ha comunque la sua anteprima",
+          True, "SEGRETO5 orfano" in ma(5))
 
     # IL VENDUTO E' UNO SCAFFALE VUOTO, non un annuncio che non c'e':
     # la scheda esiste ancora (/api/listings/{id} la serve dal cantiere
@@ -8034,16 +8114,26 @@ def prove_anteprime():
     prova("...e lo DICE, in testa alla descrizione", True,
           'content="✅ Venduto · ' in venduto)
     prova("...senza perdere il link al suo scaffale", True,
-          'content="https://barattolo.store/annuncio/4"' in venduto)
+          'content="https://barattolo.store/annuncio/'
+          '4-segreto4-cuffie-da-studio"' in venduto)
+    prova("...e resta indicizzabile: il link non muore con le scorte",
+          False, "noindex" in venduto)
 
     # ECCO IL PUNTO: togliendo lo stato dalla WHERE, queste quattro
     # diventano rosse tutte insieme.
     for aid, stato in ((2, "rimosso"), (3, "revisione")):
         m = ma(aid)
-        prova(f"un annuncio {stato} ricade sui tag generici", GEN, m)
+        prova(f"un annuncio {stato} ricade sui generici, col noindex",
+              MUTO, m)
         prova(f"...e di lui non trapela una parola ({stato})", True,
               f"SEGRETO{aid}" not in m and f"RISERVATO{aid}" not in m)
-    prova("un annuncio che non esiste: tag generici", GEN, ma(999))
+        # niente canonical su una pagina deindicizzata: puntando
+        # ALTROVE propagherebbe il noindex all'indirizzo canonico
+        prova(f"...e nessun canonical se ne va in giro ({stato})", False,
+              "canonical" in m)
+    prova("un annuncio che non esiste: generici e noindex", MUTO, ma(999))
+    prova("...e uno il cui id non e' un id nemmeno lo cerca", MUTO,
+          amb["_seo_annuncio"](amb["_id_da_percorso"]("pippo"))[1])
 
     # e i due elenchi non possono divergere: quello che la scheda
     # serve e' quello di cui l'anteprima puo' parlare, o si manda un
@@ -8052,7 +8142,7 @@ def prove_anteprime():
                                             '{annuncio_id}")'):]
     corpo_rotta = corpo_rotta[:corpo_rotta.index("\n\n\n")]
     stati_scheda = _re.findall(r"stato IN \(([^)]+)\)", corpo_rotta)
-    stati_meta = _re.findall(r"stato IN \(([^)]+)\)", pezzo("_meta_annuncio"))
+    stati_meta = _re.findall(r"stato IN \(([^)]+)\)", pezzo("_seo_annuncio"))
     prova("l'anteprima parla degli stessi stati che la scheda serve",
           stati_scheda, stati_meta)
 
@@ -8064,18 +8154,23 @@ def prove_anteprime():
           "1 oggetto in vetrina" in neg)
     prova("...mostra le stelle all'italiana", True, "4,8 (12)" in neg)
     prova("...porta il CODICE nell'og:url, mai il `chi` dell'URL", True,
-          'content="https://barattolo.store/negozio/ab12cd34"' in neg)
+          'content="https://barattolo.store/negozio/ab12cd34-rosa"' in neg)
     # il tg_id non esce mai in vetrina: qui serve solo a contare
     prova("...e il tg_id del venditore non esce da nessuna parte", True,
           "777888999" not in neg)
-    prova("un negozio che non esiste: tag generici", GEN, mn("nessuno"))
+    prova("un negozio che non esiste: generici e noindex", MUTO,
+          mn("nessuno"))
+    # LO SPACCO SUL PRIMO TRATTINO: username, codice e codice con lo
+    # slug appiccicato devono dire tutti la stessa cosa.
+    prova("...e le tre strade portano allo stesso canonical", True,
+          mn("rosina") == mn("ab12cd34") == mn("ab12cd34-la-bottega-di-rosa"))
 
     # --- 7) la cintura: un ornamento non manda giu' il mercatino ----
     def esplode(*a):
         raise RuntimeError("database in fiamme")
 
-    prova("un'anteprima che esplode ricade sui generici", GEN,
-          amb["_meta_o_generici"](esplode, 1))
+    prova("un'anteprima che esplode ricade sui generici", ("", GEN, ""),
+          amb["_seo_o_generici"](esplode, 1))
 
     # --- 8) i due file restano allineati ---------------------------
     # Il segno e' il punto in cui i meta si infilano. Se qualcuno
@@ -8100,8 +8195,6 @@ def prove_anteprime():
     amb["HTMLResponse"] = lambda corpo, headers=None: corpo
     amb["HEADER_NO_CACHE"] = {}
     exec(pezzo("_pagina_con_meta"), amb)
-    i = _SORGENTE.index("_PAGINA_CACHE = {")
-    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
     pagina = amb["_pagina_con_meta"]("<!--SEGNAPOSTO-->\n")
     prova("il charset resta il primo tag della pagina", True,
           0 < pagina.index(amb["SEGNO_META"]) < pagina.index(b"<!--SEGNAPOSTO"))
@@ -8138,20 +8231,550 @@ def prove_anteprime():
     # E' la riga che sparisce in un riordino senza rompere niente di
     # visibile: la pagina si aprirebbe uguale, e a mancare sarebbe
     # solo l'anteprima — cioe' proprio la cosa che nessuno guarda.
-    for rotta in ('@app.get("/")', '@app.get("/miniapp.html")',
-                  '@app.get("/negozio/{chi}")', '@app.get("/annuncio/{aid}")',
-                  '@app.get("/sicurezza")'):
+    ROTTE_PAGINA = ('@app.get("/")', '@app.get("/miniapp.html")',
+                    '@app.get("/negozio/{chi}")',
+                    '@app.get("/annuncio/{aid}")',
+                    '@app.get("/categoria/{slug}")',
+                    '@app.get("/sicurezza")')
+    for rotta in ROTTE_PAGINA:
         i = _SORGENTE.index(rotta)
         corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
         prova(f"{rotta} passa dai meta e non dal file nudo", True,
               "_pagina_con_meta(" in corpo and "FileResponse(" not in corpo)
-    # e le due che portano dati passano dalla cintura
-    for rotta, quale in (('@app.get("/negozio/{chi}")', "_meta_negozio"),
-                         ('@app.get("/annuncio/{aid}")', "_meta_annuncio")):
+    # e le tre che portano dati passano dalla cintura
+    for rotta, quale in (('@app.get("/negozio/{chi}")', "_seo_negozio"),
+                         ('@app.get("/annuncio/{aid}")', "_seo_annuncio"),
+                         ('@app.get("/categoria/{slug}")', "_seo_categoria")):
         i = _SORGENTE.index(rotta)
         corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
         prova(f"{quale} passa dalla cintura fail-open", True,
-              f"_meta_o_generici({quale}" in corpo)
+              f"_seo_o_generici({quale}" in corpo)
+    # E IL BUCO CHE QUESTA LISTA AVEVA: era scritta a mano, quindi una
+    # rotta pubblica NUOVA non la sorvegliava nessuno finche' qualcuno
+    # non si ricordava di aggiungerla qui. Adesso il conto deve tornare:
+    # chi ne aggiunge una senza elencarla trova la CI rossa.
+    prova("le rotte che servono la pagina sono tutte in elenco",
+          len(ROTTE_PAGINA), _SORGENTE.count("return _pagina_con_meta("))
+
+
+def prove_seo():
+    """FARSI TROVARE (ago 2026): indirizzi parlanti, un titolo per
+    pagina, la mappa del sito, il contenuto anche nel corpo.
+
+    La prova che vale di piu' e' quella di COERENZA fra sitemap e
+    noindex: niente di cio' che elenchiamo puo' portare noindex — e'
+    una contraddizione che Search Console segnala — e le due condizioni
+    devono nascere dallo stesso fatto, non da due «if» gemelli che un
+    giorno divergono."""
+    print("\n[farsi trovare]")
+    import html as _html
+    import json as _json
+    import re as _re
+    import sqlite3
+
+    amb = _amb_seo()
+    slug = amb["_slug"]
+
+    # --- 1) LO SLUG ------------------------------------------------
+    casi = [("Bicicletta da corsa Bianchi", "bicicletta-da-corsa-bianchi"),
+            ("Città dei ragazzi", "citta-dei-ragazzi"),
+            ("Cuffie \"AKG\" & co.", "cuffie-akg-co"),
+            ("L'ombrello di Sant'Angelo", "l-ombrello-di-sant-angelo"),
+            ("🔥🔥", ""), ("自転車", ""), ("!!! ???", ""),
+            ("", ""), (None, "")]
+    for testo, atteso in casi:
+        prova(f"slug di {testo!r}", atteso, slug(testo))
+    lungo = slug("parola " * 40)
+    prova("un titolo lungo si taglia sotto la misura", True,
+          len(lungo) <= amb["MAX_SLUG"])
+    prova("...a parola intera", True, lungo.endswith("parola"))
+    prova("...senza trattino orfano in coda", False, lungo.endswith("-"))
+    # NON e' _taglia_meta: il puntino di sospensione in un URL non ci va
+    prova("...e senza il puntino di sospensione", False, "…" in lungo)
+    prova("una parola unica piu' lunga del tetto si taglia comunque",
+          amb["MAX_SLUG"], len(slug("a" * 200)))
+    # L'IDEMPOTENZA cattura da sola quasi ogni futuro errore qui dentro
+    for testo, _ in casi:
+        prova(f"slug idempotente su {testo!r}", slug(testo),
+              slug(slug(testo)))
+    # LA TOTALITA': e' su questa che poggia il fatto che gli indirizzi
+    # costruiti da qui non abbiano bisogno di nessun filtro. Se _slug
+    # smettesse di essere totale, ogni URL diventerebbe un punto
+    # d'iniezione.
+    velenosi = ['"><script>alert(1)</script>', "../../config.py",
+                "a?b=1&c=2#frammento", "%2e%2e%2f", "Valle d'Aosta",
+                "‮ordine rovesciato", "a\nb\tc"]
+    for v in velenosi + [c[0] for c in casi if c[0]]:
+        prova(f"lo slug resta [a-z0-9-] su {v!r}", True,
+              bool(_re.fullmatch(r"[a-z0-9]*(-[a-z0-9]+)*", slug(v))))
+
+    # --- 1bis) _slug e slug_categoria sono DUE COSE ----------------
+    # La seconda lavora su un catalogo chiuso e il suo prodotto e' un
+    # NOME DI FILE su disco: cambiarla spegne 27 illustrazioni. Oggi le
+    # due combaciano; il giorno che qualcuno aggiunge «Musica & film»
+    # slug_categoria darebbe «musica-&-film» — file rotto E indirizzo
+    # rotto — e questa diventa rossa, che e' quando serve saperlo.
+    storte = [c for c in amb["CATEGORIE"]
+              if slug(c) != amb["slug_categoria"](c)]
+    prova("ogni categoria ha lo stesso slug nelle due funzioni", [], storte)
+
+    # --- 2) L'ID DAL PERCORSO --------------------------------------
+    idp = amb["_id_da_percorso"]
+    for testo, atteso in (("13334", 13334), ("13334-bici", 13334),
+                          ("13334-", 13334), ("0", 0),
+                          ("pippo", None), ("", None), (None, None),
+                          ("-13", None), (" 13", None), ("+13", None),
+                          ("1_3", None), ("١٣", None), ("13.0", None),
+                          ("9" * 30, None)):
+        prova(f"id da {testo!r}", atteso, idp(testo))
+
+    # --- 3) IL NEGOZIO DAL PERCORSO --------------------------------
+    chip = amb["_chi_da_percorso"]
+    for testo, atteso in (("rosina", "rosina"), ("mario_rossi", "mario_rossi"),
+                          ("ab12cd34", "ab12cd34"),
+                          ("ab12cd34-la-bottega", "ab12cd34"),
+                          ("", ""), (None, "")):
+        prova(f"chi da {testo!r}", atteso, chip(testo))
+
+    # --- 4) LE TRE FESSURE, su byte sintetici ----------------------
+    spezza, monta = amb["_spezza_pagina"], amb["_monta_pagina"]
+    FINTA = (b'<html><head><meta charset="UTF-8">\r\n<title>X</title>\r\n'
+             b'</head><body><div id="cartello"></div><div id="app">'
+             b"</div></body></html>")
+    p = spezza(FINTA)
+    prova("le tre fessure si trovano tutte", (True, True, True),
+          (p["ha_meta"], p["ha_titolo"], p["ha_corpo"]))
+    prova("senza niente da infilare esce il file, byte per byte", FINTA,
+          monta(p, "", "", ""))
+    pieno = monta(p, "<meta name=x>", "NUOVO", "<h1>ciao</h1>")
+    prova("...il titolo si sostituisce, e resta uno solo",
+          (1, 1), (pieno.count(b"<title>"), pieno.count(b"</title>")))
+    prova("...ed e' quello nuovo", True, b"<title>NUOVO</title>" in pieno)
+    prova("...il cartello si riempie", True,
+          b'<div id="cartello"><h1>ciao</h1></div>' in pieno)
+    prova("...e i fine-riga di Windows sopravvivono", 2, pieno.count(b"\r\n"))
+    # ogni fessura si spegne per conto suo, e sempre da VALLE
+    senza_c = FINTA.replace(b'<div id="cartello"></div>', b"")
+    prova("senza il cartello, le altre due vivono",
+          (True, True, False), tuple(spezza(senza_c)[k] for k in
+                                     ("ha_meta", "ha_titolo", "ha_corpo")))
+    senza_t = FINTA.replace(b"<title>X</title>", b"")
+    prova("senza il titolo si spegne anche il cartello, mai il contrario",
+          (True, False, False), tuple(spezza(senza_t)[k] for k in
+                                      ("ha_meta", "ha_titolo", "ha_corpo")))
+    # IL CARTELLO DEVE ESSERE VUOTO: se qualcuno ci mette dentro
+    # qualcosa a mano la fessura si chiude e la pagina esce INTATTA,
+    # invece di uscire mescolata
+    sporco = FINTA.replace(b'<div id="cartello"></div>',
+                           b'<div id="cartello">roba</div>')
+    p2 = spezza(sporco)
+    prova("un cartello non vuoto spegne la sua fessura", False,
+          p2["ha_corpo"])
+    prova("...e la pagina esce comunque intera", sporco,
+          monta(p2, "", "", "<h1>x</h1>"))
+
+    # --- 4bis) e il segno del cartello esiste nel file VERO ---------
+    mini = open("miniapp.html", "rb").read()
+    apre, chiude = amb["SEGNO_CORPO"]
+    prova("il cartello esiste in miniapp.html, una volta sola", 1,
+          mini.count(apre))
+    prova("...ed e' VUOTO, coi due tag adiacenti", 1,
+          mini.count(apre + chiude))
+    prova("...e sta dentro #app", True,
+          mini.index(b'<div id="app">') < mini.index(apre))
+
+    # --- 5) L'ESCAPING, coi tre regimi in un colpo -----------------
+    CATTIVO = ('Cuffie "AKG" <b> & </title></div><script>alert(1)</script>'
+               " l'amico")
+    con = _vetrina_finta(sqlite3.connect(":memory:"))
+    con.execute(
+        "INSERT INTO annunci (id, titolo, descrizione, zona, valuta, "
+        "prezzo_sats, prezzo_eur, foto, stato, venditore_id, categoria, "
+        "condizione, quantita) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (1, CATTIVO, CATTIVO, "", "sats", 80000, 0.0, "[]", "attivo",
+         777, "Audio e video", "nuovo", 1))
+    con.execute("INSERT INTO utenti (tg_id, nome, username, negozio, "
+                "rating, n_feedback) VALUES (777, ?, 'rosina', 'ab12cd34', "
+                "0, 0)", (CATTIVO,))
+    con.commit()
+    amb["db"] = _db_finto(con)
+    amb["HTMLResponse"] = lambda corpo, headers=None: corpo
+    amb["HEADER_NO_CACHE"] = {}
+    exec(pezzo("_pagina_con_meta"), amb)
+    amb["_PAGINA_CACHE"].update(timbro=False)
+    titolo, testa, corpo = amb["_seo_annuncio"](1)
+    pagina = amb["_pagina_con_meta"](testa, titolo, corpo).decode("utf-8")
+
+    prova("il carico non diventa mai markup", False,
+          "<script>alert(1)" in pagina)
+    prova("...e la pagina ha UN titolo solo",
+          (1, 1), (pagina.count("<title>"), pagina.count("</title>")))
+    # IL TITOLO E' UN NODO DI TESTO, ed e' il posto in cui questo
+    # cantiere aveva gia' sbagliato una volta: usciva crudo, e un
+    # «</title>» in un titolo d'annuncio si portava dietro mezza pagina.
+    prova("...perche' anche il titolo passa dall'escape", False,
+          "<" in titolo)
+    prova("...e UN cartello solo", 1, pagina.count('<div id="cartello">'))
+    # la prova vera dell'escaping non e' cercare le entita': e' che gli
+    # attributi restino INTERI e rileggibili
+    for chiave in ("content", "href", "src", "alt"):
+        valori = _re.findall(rf'{chiave}="([^"]*)"', pagina)
+        rotti = [v for v in valori if "<" in _html.unescape(v)
+                 and "</title>" not in _html.unescape(v)]
+        prova(f"ogni {chiave}= si rilegge com'era", [], rotti)
+    prova("il titolo cattivo si rilegge intero da un attributo", True,
+          CATTIVO in [_html.unescape(v)
+                      for v in _re.findall(r'content="([^"]*)"', pagina)])
+    # IL TERZO REGIME: se qualcuno ci mette un html.escape, il valore
+    # riletto contiene «&amp;» e questa diventa rossa. E' l'asserzione
+    # che distingue il JSON-LD dagli attributi.
+    grezzo = _re.search(r'application/ld\+json">(.*?)</script>',
+                        pagina, _re.S)
+    prova("il blocco dei dati strutturati c'e'", True, bool(grezzo))
+    dati = _json.loads(grezzo.group(1))
+    prova("...ed e' JSON valido col titolo VERO, carattere per carattere",
+          CATTIVO, dati["name"])
+    prova("...senza entita' HTML dentro", False, "&amp;" in grezzo.group(1))
+    prova("...e senza poter chiudere il proprio <script>", False,
+          "</script>" in grezzo.group(1)[:-1])
+
+    # --- 6) I DATI STRUTTURATI -------------------------------------
+    pl = amb["_prezzo_ld"]
+    # sats -> BTC e' una conversione ESATTA: la virgola mobile e' il
+    # modo di sbagliarla, e 0.0008000000000000001 finirebbe nell'indice
+    for sats, atteso in ((1, "0.00000001"), (80_000, "0.00080000"),
+                         (100_000_000, "1.00000000"),
+                         (2_100_000_000_000_000, "21000000.00000000")):
+        prova(f"{sats} sats in BTC", (atteso, "BTC"),
+              pl({"valuta": "sats", "prezzo_sats": sats}))
+    prova("...e mai col residuo della virgola mobile", False,
+          "0.0008000000000000001" == pl({"prezzo_sats": 80_000})[0])
+    prova("un listino nato in euro parla euro", ("38.50", "EUR"),
+          pl({"valuta": "eur", "prezzo_eur": 38.5, "prezzo_sats": 70000}))
+
+    dl = amb["_disponibilita_ld"]
+    prova("un attivo con pezzi e' disponibile", ("InStock", ""),
+          dl({"stato": "attivo", "quantita": 3}))
+    prova("un venduto e' uno scaffale vuoto", ("SoldOut", ""),
+          dl({"stato": "venduto", "quantita": 0}))
+    prova("un attivo a zero pezzi non finge", ("OutOfStock", ""),
+          dl({"stato": "attivo", "quantita": 0}))
+    domani = int(_time_seo() + 86400)
+    disp, riparte = dl({"stato": "attivo", "quantita": 1,
+                        "venditore_ferie": domani})
+    prova("in ferie non si compra, e si dice DA QUANDO si potra'",
+          ("OutOfStock", True), (disp, bool(riparte)))
+    # al filo esatto il negozio e' APERTO, come _asta_viva
+    filo = int(_time_seo())
+    prova("...e al secondo esatto del rientro e' gia' aperto", "InStock",
+          dl({"stato": "attivo", "quantita": 1, "venditore_ferie": filo})[0])
+
+    LD = amb["CONDIZIONI_LD"]
+    prova("le cinque condizioni sono mappate", 5, len(LD))
+    prova("«come nuovo» NON e' «ricondizionato»", "UsedCondition",
+          LD["come_nuovo"])
+    prova("il nuovo e' nuovo", "NewCondition", LD["nuovo"])
+    prova("il da sistemare e' danneggiato", "DamagedCondition",
+          LD["da_sistemare"])
+    # dove la scala non dice niente la proprieta' SI OMETTE, e il
+    # giudice e' condizione_da_mostrare: dichiarare UsedCondition per
+    # riempimento su un vasetto di marmellata sarebbe falso
+    miele = {"titolo": "Miele", "categoria": "Alimenti e bevande",
+             "consegna": "", "condizione": "buono", "prezzo_sats": 1000,
+             "stato": "attivo", "quantita": 1}
+    prova("una categoria esente non dichiara nessuna condizione", False,
+          "itemCondition" in amb["_ld_annuncio"](miele, "u", ""))
+    prova("...anche col residuo in colonna", "",
+          amb["condizione_da_mostrare"](miele))
+
+    # --- 7) MAI il voto del VENDITORE sul prodotto -----------------
+    # E' forte la tentazione (u.rating ce l'abbiamo), ma quel voto e'
+    # della persona, non dell'oggetto: sul Product sarebbe lo schema
+    # delle recensioni auto-attribuite che Google sanziona.
+    # Si cerca la CHIAVE fra virgolette, non la parola: il commento qui
+    # sopra la nomina apposta, e una sentinella che inciampa nella
+    # propria documentazione non sorveglia niente.
+    testo_ld = pezzo("_ld_annuncio")
+    prova("nessun aggregateRating sul prodotto", True,
+          '"aggregateRating"' not in testo_ld and '"review"' not in testo_ld)
+
+    # --- 8) ROBOTS.TXT: indistruttibile e prudente -----------------
+    esploso = dict(amb)
+    esploso["db"] = lambda: 1 / 0
+    prova("robots.txt non tocca il database", True,
+          "db(" not in _SORGENTE[_SORGENTE.index("def robots_txt("):
+                                 _SORGENTE.index("TETTO_SITEMAP")])
+    robots = amb["ROBOTS_TXT"]
+    prova("robots.txt dichiara la sitemap", True, "Sitemap: " in robots)
+    prova("...e vieta le API", True, "Disallow: /api/" in robots)
+    # TRE RIGHE A GUARDIA DELL'ERRORE PIU' COSTOSO DEL CANTIERE: non si
+    # blocca in robots.txt cio' che si vuole deindicizzare (il noindex
+    # non verrebbe mai letto), e «Disallow: /» si recupera in settimane.
+    for quale in ("/annuncio", "/negozio", "/categoria", "/miniapp.html",
+                  "/foto"):
+        prova(f"...e NON vieta {quale}", False,
+              f"Disallow: {quale}" in robots)
+    prova("...e non c'e' nessun Disallow secco", False,
+          "Disallow: /\n" in robots)
+
+    # --- 9) LA MAPPA E IL NOINDEX NON SI CONTRADDICONO -------------
+    con2 = _vetrina_finta(sqlite3.connect(":memory:"))
+    for aid, stato, cat, ven in ((1, "attivo", "Biciclette", 10),
+                                 (2, "attivo", "Biciclette", 10),
+                                 (3, "venduto", "Bitcoin", 10),
+                                 (4, "rimosso", "Bitcoin", 10),
+                                 (5, "revisione", "Motori", 11),
+                                 (6, "attivo", "Motori", 11)):
+        con2.execute(
+            "INSERT INTO annunci (id, titolo, descrizione, zona, valuta, "
+            "prezzo_sats, prezzo_eur, foto, stato, venditore_id, categoria, "
+            "quantita, creato) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)",
+            (aid, f"Oggetto {aid}", "descrizione", "", "sats", 1000, 0.0,
+             "[]", stato, ven, cat, 1_700_000_000 + aid))
+    con2.execute("INSERT INTO utenti (tg_id, nome, username, negozio, "
+                 "rating, n_feedback) VALUES (10,'Rosa','rosina','aaaa1111',"
+                 "0,0)")
+    # un negozio con SOLO roba non pubblica: pagina sottile, fuori
+    con2.execute("INSERT INTO utenti (tg_id, nome, username, negozio, "
+                 "rating, n_feedback) VALUES (12,'Vuoto','vuoto','cccc3333',"
+                 "0,0)")
+    con2.execute("INSERT INTO utenti (tg_id, nome, username, negozio, "
+                 "rating, n_feedback) VALUES (11,'Bea','bea','bbbb2222',0,0)")
+    con2.commit()
+    amb["db"] = _db_finto(con2)
+    amb["_SITEMAP_CACHE"].update(quando=0.0, xml=b"")
+    xml = amb["_sitemap"]().decode("utf-8")
+    loc = _re.findall(r"<loc>(.*?)</loc>", xml)
+    prova("la sitemap non elenca i rimossi", False,
+          any("/annuncio/4-" in x for x in loc))
+    prova("...ne' quelli in revisione", False,
+          any("/annuncio/5-" in x for x in loc))
+    prova("...ne' i venduti (il link vive, ma non lo proponiamo noi)",
+          False, any("/annuncio/3-" in x for x in loc))
+    prova("...ne' i negozi senza merce", False,
+          any("cccc3333" in x for x in loc))
+    prova("...ne' i reparti vuoti", False,
+          any("/categoria/animali" in x for x in loc))
+    prova("...e gli attivi ci sono tutti e tre", 3,
+          sum(1 for x in loc if "/annuncio/" in x))
+    prova("...con la home e la pagina della sicurezza", True,
+          "https://barattolo.store" in loc
+          and "https://barattolo.store/sicurezza" in loc)
+    prova("nessuna data del 1970 nella mappa", False, "1970" in xml)
+
+    # LA PROVA DI COERENZA: si chiama il costruttore di OGNI indirizzo
+    # elencato, e nessuno deve dire noindex; e il suo canonical deve
+    # essere identico al <loc>, o si consegna a Google un rapporto di
+    # contenuti duplicati scritto di proprio pugno.
+    contraddizioni = []
+    for x in loc:
+        if "/annuncio/" in x:
+            _, t, _c = amb["_seo_annuncio"](
+                amb["_id_da_percorso"](x.rsplit("/", 1)[1]))
+        elif "/negozio/" in x:
+            _, t, _c = amb["_seo_negozio"](x.rsplit("/", 1)[1])
+        elif "/categoria/" in x:
+            _, t, _c = amb["_seo_categoria"](x.rsplit("/", 1)[1])
+        else:
+            continue
+        can = _re.search(r'rel="canonical" href="([^"]*)"', t)
+        if "noindex" in t or not can or can.group(1) != x:
+            contraddizioni.append(x)
+    prova("niente di cio' che e' nella mappa porta noindex", [],
+          contraddizioni)
+    # e il rovescio: cio' che NON e' nella mappa lo dice col noindex
+    for chi, atteso in ((amb["_seo_negozio"]("cccc3333"), "negozio vuoto"),
+                        (amb["_seo_categoria"]("animali"), "reparto vuoto"),
+                        (amb["_seo_categoria"]("inventata"), "reparto finto")):
+        prova(f"un {atteso} resta fuori dall'indice", True,
+              "noindex" in chi[1])
+
+    # --- 10) IL CARTELLO PORTA I COLLEGAMENTI ----------------------
+    _, _, corpo_cat = amb["_seo_categoria"]("biciclette")
+    prova("il reparto elenca la sua merce come link veri", 2,
+          corpo_cat.count("/annuncio/"))
+    prova("...e porta ai 27 reparti", len(amb["CATEGORIE"]),
+          corpo_cat.count("/categoria/"))
+    _, _, corpo_neg = amb["_seo_negozio"]("rosina")
+    prova("il negozio elenca la sua merce", 2, corpo_neg.count("/annuncio/"))
+    amb["_SEO_HOME_CACHE"].update(quando=0.0, roba=None)
+    _, _, corpo_home = amb["_seo_home"]()
+    prova("la home porta agli annunci", 3, corpo_home.count("/annuncio/"))
+    prova("...e ai reparti", len(amb["CATEGORIE"]),
+          corpo_home.count("/categoria/"))
+    # LA CACHE della home: e' cio' che rende accettabile il cambio di
+    # natura della rotta piu' colpita di tutte (fino a ieri non toccava
+    # il database).
+    amb["db"] = lambda: 1 / 0
+    prova("la home in cache non ribussa al database", corpo_home,
+          amb["_seo_home"]()[2])
+
+    # --- 11) LE SENTINELLE -----------------------------------------
+    # Ognuna cerca il CODICE e mai la parola: i commenti qui accanto
+    # nominano apposta cio' che vietano, e una sentinella che inciampa
+    # nella propria documentazione non sorveglia niente — e' l'errore
+    # che ho fatto scrivendole la prima volta.
+    testa_seo = pezzo("_testa_seo")
+    prova("sentinella: nessun canonical su una pagina deindicizzata",
+          True, testa_seo.index("if not indicizza")
+          < testa_seo.index('rel="canonical"'))
+    prova("sentinella: i meta non portano un <title> (ne uscirebbero due)",
+          False, "<title" in pezzo("_meta_anteprima"))
+    # IL LISTINO CONTRO LA LAMPO: il modo di garantirlo e' non avere le
+    # colonne in mano (si cercano i NOMI di colonna, non la parola)
+    prova("sentinella: la query SEO non pesca la lampo", False,
+          "lampo_" in pezzo("_seo_annuncio"))
+    prova("sentinella: il JSON-LD non passa da html.escape", False,
+          "html.escape(" in pezzo("_ld"))
+    prova("sentinella: il LEFT JOIN, o l'orfano perde la sua card", True,
+          "LEFT JOIN utenti" in pezzo("_seo_annuncio"))
+    prova("sentinella: la pagina si monta con join, mai con +=", True,
+          'b"".join(' in pezzo("_monta_pagina"))
+    prova("sentinella: l'id si legge col giudice, mai con int()", True,
+          "_id_da_percorso(" in _SORGENTE[
+              _SORGENTE.index('@app.get("/annuncio/{aid}")'):
+              _SORGENTE.index('@app.get("/categoria/{slug}")')])
+    prova("sentinella: il reparto passa dal catalogo chiuso", True,
+          "_categoria_da_slug(" in pezzo("_seo_categoria"))
+    # anche l'API del negozio deve spaccare sul trattino, o il negozio
+    # non si apre per una persona vera mentre i meta erano perfetti
+    corpo_api = _SORGENTE[_SORGENTE.index('@app.get("/api/negozio/{chi}")'):]
+    prova("sentinella: anche /api/negozio spacca sul primo trattino", True,
+          "_chi_da_percorso(chi)" in corpo_api[:corpo_api.index("\n\n\n")])
+    prova("sentinella: offline.html resta fuori dall'indice", True,
+          'name="robots" content="noindex' in open(
+              "offline.html", encoding="utf-8").read())
+
+    # --- 12) IL CLIENT: la card e' un collegamento vero -------------
+    # Si rilegge in modalita' TESTO, come fanno tutte le altre prove sul
+    # client, e non si decodifica il `mini` binario di sopra: sul disco
+    # di chi scrive i fine-riga sono \r\n, e pezzo_js cerca "\n\n" —
+    # decodificando i byte grezzi non troverebbe mai una riga vuota. Le
+    # due letture servono due mestieri diversi: quella binaria l'uscita
+    # byte per byte, questa il testo.
+    testo_mini = open("miniapp.html", encoding="utf-8").read()
+    card = pezzo_js(testo_mini, "const cardHTML = l => {")
+    i_a, i_fine = card.index('<a class="card-link'), card.index("</a>")
+    prova("il contenitore .card non porta piu' un onclick", False,
+          "onclick" in card[card.index('<div class="card'):i_a])
+    # UN <button> DENTRO UN <a> E' HTML NON VALIDO: i due bottoni
+    # stanno fuori, il badge di stato (che e' un <div>) resta dentro —
+    # cosi' le sue cinque regole CSS non si toccano.
+    prova("il barattolino sta FUORI dall'<a>", True,
+          card.index("${jar}") > i_fine)
+    prova("...e il bottone del rifornimento pure", True,
+          card.index("${rif}") > i_fine)
+    prova("il badge di stato invece resta DENTRO", True,
+          card.index("${flash}") < i_fine)
+    # LA RIGA CHE, SE MANCA, SFREGIA L'APP: senza, i bottoni risalgono
+    # fino al blocco iniziale e tutti i barattolini si accatastano in
+    # alto a destra. E nel carrello sembrerebbe giusto (.pacco-cella e'
+    # gia' relative): e' l'unica prova che vede la differenza.
+    prova("la card e' il riferimento dei bottoni sulla foto", True,
+          ".card{" in testo_mini.replace(" ", "").replace("\n", "")
+          and "position:relative;\n  }" in testo_mini[
+              testo_mini.index("  .card{"):
+              testo_mini.index("  .card:active")])
+
+    gest = pezzo_js(testo_mini, "function apriCard(", "\n}\n")
+    prova("il click normale non naviga davvero", True,
+          "preventDefault" in gest)
+    # PRIMA si spegne la navigazione, POI si apre: invertirli vuol dire
+    # che un'eccezione dentro openDetail ricarica 910 KB per davvero.
+    prova("...e si spegne PRIMA di aprire", True,
+          gest.index("preventDefault") < gest.index("openDetail"))
+    prova("i modificatori restano al browser", True,
+          all(k in testo_mini for k in ("ctrlKey", "metaKey", "shiftKey")))
+    prova("un giudice solo per card e piastrelle", 1,
+          testo_mini.count("const clickNostro"))
+
+    # --- 13) L'ATTERRAGGIO NON E' UNA DISCESA ----------------------
+    dc = pezzo_js(testo_mini, "function apriCategoriaDaUrl(", "\n}\n")
+    prova("atterrare su un reparto NON alza navSpingi", False,
+          "navSpingi" in dc)
+    prova("...e la entry si allinea a mano (nessuna classe cambia)", True,
+          "navRiflette()" in dc)
+    prova("...una volta sola", True, "categoriaAperta" in dc)
+    pc = pezzo_js(testo_mini, "function preparaCategoriaDaUrl(", "\n}\n")
+    prova("il reparto si sceglie PRIMA della prima pagina", True,
+          "activeCat" in pc and "setCat" not in pc)
+    # DENTRO avvia(), e prima del PRIMO giro di rete: altrimenti si
+    # scarica una vetrina intera per buttarla via, proprio sulla pagina
+    # che deve essere veloce per chi arriva da un motore.
+    corpo_avvia = pezzo_js(testo_mini, "async function avvia(){", "\n}\n")
+    prova("...e la chiamata sta prima del primo giro di rete", True,
+          corpo_avvia.index("preparaCategoriaDaUrl();")
+          < corpo_avvia.index("await fetch"))
+    # LA TRAPPOLA PEGGIORE: dimenticare la chiamata in avviaVetrina()
+    # vuol dire che funziona in Telegram e in collaudo e NON funziona
+    # esattamente per chi arriva dai motori.
+    for f in ("apriNegozioDaUrl", "apriAnnuncioDaUrl", "apriSicurezzaDaUrl",
+              "apriCategoriaDaUrl"):
+        prova(f"{f} si chiama da avvia() E da avviaVetrina()", 2,
+              testo_mini.count(f"{f}();"))
+
+    # --- 14) NESSUN GEMELLO CLIENT DI _slug ------------------------
+    # E' la sentinella d'ARCHITETTURA: lo slug arriva dal server, e chi
+    # lo ricalcolasse in casa creerebbe il secondo posto da tenere
+    # allineato per sempre — quello che divergerebbe il giorno che il
+    # server cambia la traslitterazione.
+    prova("lo slug dell'annuncio arriva dal server", True,
+          "l.slug" in pezzo_js(testo_mini, "const linkAnnuncio = l => {",
+                               "\n};\n"))
+    prova("...e la card lo usa per il suo href", True,
+          "linkAnnuncio(l)" in card)
+    prova("...e nessuno lo ricalcola dal titolo", None,
+          _re.search(r"\.title[^\n]*toLowerCase\(\)[^\n]*replace",
+                     testo_mini))
+
+    # --- 15) IL CARTELLO SI TOGLIE, E PRIMA DI TUTTO ---------------
+    prova("il cartello si toglie prima che il motore parta", True,
+          testo_mini.index("getElementById('cartello')")
+          < testo_mini.index("navMotore();"))
+    prova("...e senza un ramo d'errore, se il server non ha iniettato",
+          True, "?.remove()" in testo_mini)
+    prova("...e un cartello vuoto non lascia un buco", True,
+          "#cartello:empty" in testo_mini)
+    # non deve rubare i nomi di casa: li vedrebbero navPila,
+    # l'osservatore del motore, il tour e il conto delle card
+    prova("il cartello non si chiama come le cose dell'app", True,
+          all(x not in "".join(_re.findall(r'id="cartello"[^>]*', testo_mini))
+              for x in ("view", "sheet", "card", "grid")))
+
+    # --- 16) LE PIASTRELLE SONO LINK VERI --------------------------
+    sf = pezzo_js(testo_mini, "function renderSfoglia(){", "\n}\n")
+    prova("le piastrelle sono collegamenti veri", True,
+          '<a class="cat-tile"' in sf and 'href="/categoria/' in sf)
+    prova("...e l'indirizzo lo fa slugCat, non un elenco", True,
+          "slugCat(c)" in sf)
+    prova("...senza <button> rimasti in Sfoglia", False, "<button" in sf)
+    prova("...e il nome resta in data-cat, mai dentro l'onclick", True,
+          "this.dataset.cat" in sf)
+
+    # --- 17) I DUE FILE RESTANO ALLINEATI --------------------------
+    # La regex degli annunci NON e' ancorata in coda, ed e' cio' che fa
+    # funzionare gli indirizzi parlanti senza toccare il client: chi la
+    # «stringe» con un $ li ammazza tutti in silenzio.
+    for nome, prova_su, atteso in (
+            ("ANNUNCIO_URL", "/annuncio/13334-bici-da-corsa", "13334"),
+            ("NEGOZIO_URL", "/negozio/ab12cd34-la-bottega", "ab12cd34"),
+            ("NEGOZIO_URL", "/negozio/mario_rossi", "mario_rossi"),
+            ("CATEGORIA_URL", "/categoria/casa-e-giardino",
+             "casa-e-giardino")):
+        m = _re.search(rf"const {nome} = location\.pathname\.match\("
+                       r"/(.+?)/\);", testo_mini)
+        if not m:
+            prova_fallita = f"{nome} non si trova in miniapp.html"
+            prova(prova_fallita, True, False)
+            continue
+        vero = _re.compile(m.group(1)).match(prova_su)
+        prova(f"{nome} legge {prova_su}", atteso, vero.group(1) if vero
+              else None)
+
+
+def _time_seo():
+    import time
+    return time.time()
 
 
 # ====================================================================
@@ -8181,7 +8804,7 @@ def main():
               prove_sped_gratis, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_cambio,
               prove_consegna_payload_punto, prove_pagina_acquisto,
-              prove_posizione_vetrina, prove_anteprime,
+              prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici):
