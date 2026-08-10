@@ -10337,7 +10337,12 @@ async function condividiAnnuncio(){
   const link = `${location.origin}/annuncio/${l.id}`;
   const prezzo = (l.valuta==='eur' && l.priceEur>0)
     ? `${fmtEur(l.priceEur)} €` : `${fmt(l.price)} sats`;
-  const testo = `${l.title} — ${prezzo} su Barattolo 🫙`;
+  /* chi vende, nell'ordine in cui esiste: username Telegram, nome,
+     npub. Uno solo, mai due modi di dire la stessa persona. */
+  const chi = l.username ? `@${l.username}` : (l.seller && l.seller!=='—' ? l.seller : (l.sellerNpub || ''));
+  const testo = `${l.title} — ${prezzo} su Barattolo 🫙`
+    + (chi ? `\nAnnuncio di ${chi}` : '')
+    + `\nPagamento in satoshi`;
   /* Dentro Telegram (initData vero: nel browser lo stub mentirebbe)
      la WebView NON ha navigator.share — si usa il canale di
      Telegram, a scalare: shareURL se il client lo offre, altrimenti
