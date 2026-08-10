@@ -1677,9 +1677,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   di chi ha APERTO una scheda, non quello di chiunque riceva un link.
   C'è una prova per lato, così nessuna delle due si sposta per
   distrazione credendo di allinearsi all'altra.
-  Il `<title>` NON si tocca: dove conta og:title ha comunque la
-  precedenza, e la pagina resta una sola con un titolo solo. L'og:url
-  del negozio porta il CODICE letto dal database e mai il `chi`
+  IL `<title>` ORA SI TOCCA, e questa riga ROVESCIA quella che stava
+  qui («non si tocca: dove conta og:title ha comunque la precedenza»).
+  Era giusta quando l'unico pubblico erano i crawler social — lì
+  og:title vince davvero — ed è diventata falsa il giorno in cui il
+  pubblico sono anche i motori di ricerca, per cui il `<title>` è il
+  segnale più forte che una pagina abbia. Vedi «FARSI TROVARE».
+  L'og:url del negozio porta il CODICE letto dal database e mai il `chi`
   arrivato dall'URL; il tg_id serve solo a contare gli annunci e non
   esce (prova apposta). Tutto passa da `html.escape(quote=True)` — qui
   il testo dell'utente sta in un ATTRIBUTO, non in un nodo — e la prova
@@ -1689,6 +1693,223 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'anteprima resta in cache per giorni, quindi una cifra a tempo ci
   sopravviverebbe — meglio dire il prezzo che non scade che promettere
   uno sconto finito.
+  FARSI TROVARE (ago 2026): l'Open Graph qui sopra risolve un problema
+  VICINO MA DIVERSO — fa la card quando qualcuno incolla un link in
+  chat, cioè serve un crawler GIÀ INVITATO. Chi cercava «bici usata
+  Carmagnola» su un motore non ci trovava, e non ci avrebbe trovati
+  mai: le card erano `<div onclick>` (nessun collegamento da seguire),
+  il `<title>` era la stessa riga su tutto il sito, e il corpo della
+  pagina era vuoto per chi non esegue JavaScript.
+  1) INDIRIZZI PARLANTI `/annuncio/{id}-{slug}` e
+  `/negozio/{chi}-{slug}`, con **l'id PRIMA** e lo slug come ornamento:
+  è quella forma a rispondere da sola alle quattro domande — il titolo
+  può cambiare (cambia lo slug, non l'id), due omonimi non litigano, e
+  i vecchi indirizzi continuano a servire la pagina giusta. NON con un
+  301 (i browser lo cachano, Chrome anche per sempre, e su un titolo
+  modificabile punterebbe a uno slug morto) ma con un `rel=canonical`,
+  che consolida lo stesso segnale senza toccare la barra degli
+  indirizzi né il motore di navigazione. `_slug` si appoggia a
+  `normalizza`, che scioglie già accenti, emoji e «&» — e lo fa NELLO
+  STESSO MODO del filtro parole, cioè in un posto solo; un titolo di
+  sole emoji dà stringa VUOTA e l'indirizzo resta quello di sempre,
+  mai con un trattino orfano in coda. NON riusare `_taglia_meta` per il
+  troncamento: aggiunge il puntino di sospensione, che in un URL non ci
+  va — sembra lo stesso mestiere e non lo è. `_slug` e `slug_categoria`
+  restano DUE COSE (la seconda è il nome di un file su disco:
+  cambiarla spegne 27 illustrazioni), e il legame si dichiara con una
+  prova che oggi passa e diventerà rossa il giorno che qualcuno
+  aggiunge una categoria con dentro una «&».
+  IL CANONICO DEL NEGOZIO È IL CODICE, non lo username: quello è
+  dell'utente, che può cambiarlo o perderlo, e un canonical che si
+  muove butta via il segnale lasciandosi dietro un 404. È anche già
+  quello che l'og:url usava. Bonus gratis: la ricerca username è
+  COLLATE NOCASE, quindi `/negozio/Rosina` e `/negozio/rosina` erano
+  già oggi due indirizzi con lo stesso contenuto, e il canonical chiude
+  un doppione preesistente senza una riga in più.
+  LO SPACCO SUL PRIMO TRATTINO è senza perdita e non è una speranza:
+  il codice è `token_hex(4)` e gli username Telegram sono
+  `[A-Za-z0-9_]` — nessuno dei due può contenere un trattino.
+  `/annuncio/{aid}` è passata da `int` a TESTO con `_id_da_percorso`,
+  che usa una regex e non `int()`: `int("١٣")` fa 13 (cifre
+  arabo-indiane), `int("1_3")` pure (il trattino basso è un separatore
+  legale), `" 5"` e `"+5"` passano, e `"9"*30` diventa un intero che
+  sqlite3 rifiuta con OverflowError. Il tetto a nove cifre chiude anche
+  la superficie «URL infinita che consuma query»: da quando la rotta
+  accetta testo lo spazio degli indirizzi è illimitato, e ciò che non è
+  un id torna indietro a ZERO letture del database. Cambio dichiarato:
+  `/annuncio/pippo` era un 422 di FastAPI e ora è una pagina che si
+  apre col noindex — un 404 sarebbe contro la costituzione fail-open
+  del blocco.
+  LA REGRESSIONE PIÙ GRAVE ERA INVISIBILE ALLE PROVE DEL SERVER: il
+  client leggeva `/^\/negozio\/([^/]+)/` e avrebbe passato
+  `ab12cd34-la-bottega` intero all'API, che confronta ESATTO — 404,
+  cioè IL NEGOZIO NON SI APRE PER UNA PERSONA VERA mentre i meta sul
+  crawler erano perfetti. Rimedio DOPPIO e vanno fatti tutt'e due:
+  `/api/negozio/{chi}` spacca lato server (totale e idempotente) e la
+  regex client diventa `([^/-]+)` — col trattino in FONDO alla classe,
+  o diventa un intervallo e si rompe in silenzio. Per `/annuncio/` non
+  serviva niente: `(\d+)` **non è ancorata in coda**, quindi digeriva
+  già lo slug — ma è congelata da una sentinella, perché chi la
+  «stringe» con un `$` ammazza ogni link parlante senza un errore.
+  2) UN TITOLO PER PAGINA (vedi il rovesciamento qui sopra), e col
+  titolo il canonical e il meta robots. `_pagina_con_meta` è passata a
+  TRE FESSURE — meta, titolo, corpo — col nome INVARIATO, perché la
+  sentinella delle rotte pubbliche cerca proprio quel nome. Il
+  marcatore del corpo è un `<div id="cartello"></div>` VUOTO fra
+  `<body>` e la prima vista, e l'invariante che rende sicuro il taglio
+  è che **il tag di chiusura siano i byte immediatamente successivi
+  all'apertura**: così senza iniezione l'uscita è LETTERALMENTE il
+  file, e il giorno che qualcuno ci mette dentro qualcosa a mano la
+  fessura si chiude e la pagina esce intatta invece che mescolata.
+  Fail-open per fessura e IN ORDINE DI FILE: quando l'ordine si rompe
+  si spegne sempre quella più a valle. `b"".join` e non `+=`: con `+=`
+  su bytes si pagano quattro copie da 900 KB a richiesta, ed è la sola
+  voce di costo CPU del cantiere. `titolo=""` vuol dire «non toccare il
+  titolo», non «titolo vuoto» — è ciò che fa ricadere ogni cintura
+  esattamente sul comportamento di ieri.
+  3) COLLEGAMENTI VERI E MAPPA. Le card sono `<a>`: l'`<a>` avvolge
+  foto e testo, i due BOTTONI (barattolino e rifornimento) restano
+  FUORI — contenuto interattivo dentro un `<a>` è HTML non valido —
+  mentre il badge di stato, che è un `<div>`, resta DENTRO, così le sue
+  cinque regole CSS non si toccano. `.card{position:relative}` è
+  OBBLIGATORIA: senza, i bottoni risalgono fino al blocco iniziale e
+  TUTTI i barattolini della pagina si accatastano in alto a destra —
+  e la trappola crudele è che **nel carrello sembrerebbe giusto**
+  (`.pacco-cella` è già relative), quindi si prova lì, si conclude che
+  va bene, e la vetrina è devastata. C'è la prova.
+  IL CLICK: ctrl/cmd/shift e i tasti non-sinistri restano al browser
+  (scheda nuova: è il guadagno voluto), il tocco normale fa
+  `preventDefault` e apre in pagina. La ROTELLINA non passa nemmeno di
+  qui — i browser mandano `auxclick`, non `click` — e NON va
+  «aggiustata». `preventDefault` PRIMA di `openDetail`: invertirli vuol
+  dire che un'eccezione ricarica 910 KB per davvero. Gestore INLINE e
+  non delegato, perché `cardHTML` è la fabbrica unica e copre da sola i
+  SETTE posti che disegnano card, compreso «Esauriti di recente» che
+  vive in una griglia creata al volo.
+  LO SLUG ARRIVA DAL SERVER (`arricchisci_righe_vetrina`, il collo di
+  bottiglia di tutte e sei le rotte-card) e NON si ricalcola nel
+  client: sarebbe il secondo posto da tenere allineato per sempre, e
+  divergerebbe il giorno che il server cambia la traslitterazione.
+  `slugCat` invece resta, ed è giustificato: serve a calcolare offline
+  il nome di 27 file di illustrazione. C'è la sentinella d'architettura
+  che vieta il gemello.
+  4) IL CARTELLO nel corpo: titolo, prezzo, descrizione, foto e i
+  COLLEGAMENTI INTERNI, che sono metà del valore — sono il modo in cui
+  un crawler scopre ottocento annunci, ed è l'unica ragione per cui le
+  pagine categoria esistono. Non è testo nascosto: è un pre-render
+  vero, tolto dal client DURANTE il parse con uno scriptino adiacente
+  al marcatore (non in fondo a 910 KB, o su rete lenta resterebbe a
+  schermo per decine di ms). `?.remove()` senza ramo d'errore, più
+  `#cartello:empty{display:none}` come cintura. MAI un `display:none`
+  permanente: sarebbe un'altra cosa. IMPERFEZIONE DICHIARATA: Google
+  indicizza il DOM RENDERIZZATO, quindi se un domani l'app non
+  riuscisse a disegnare, il DOM sarebbe vuoto — oggi non può
+  succedere (`avvia` cade in `avviaVetrina`, che cade in DEMO, e tutte
+  e tre disegnano), e la via d'uscita è una riga: legare la rimozione
+  al primo `go()` invece che al parse.
+  27 PAGINE `/categoria/{slug}`, vocabolario CHIUSO su `SLUG_CATEGORIE`
+  (uno slug inventato non diventa mai una query). Le piastrelle di
+  Sfoglia sono `<a>`, e ATTERRARE SU UN REPARTO NON È UNA DISCESA: il
+  tocco sulla piastrella viene DA Sfoglia e alza `navSpingi`, ma
+  arrivarci da un motore non viene da nessun posto nostro e l'indietro
+  deve riportare a chi ci ha mandati — quindi `apriCategoriaDaUrl` non
+  tocca MAI `navSpingi`. `navRiflette()` a mano invece è OBBLIGATORIO:
+  cambiare `ramoVetrina` e `activeCat` non tocca nessuna classe, quindi
+  l'osservatore del motore non scatta e la cronologia continuerebbe a
+  raccontare il mercatino intero. E servono DUE funzioni:
+  `preparaCategoriaDaUrl` è SINCRONA e sta prima del primo giro di rete
+  (così `paramsVetrina` scarica subito il reparto giusto, una richiesta
+  sola invece di una vetrina intera buttata via), `apriCategoriaDaUrl`
+  è il finale e va chiamata in ENTRAMBI gli avvii — dimenticarla in
+  `avviaVetrina` vuol dire che funziona in Telegram e in collaudo e
+  NON funziona esattamente per chi arriva dai motori.
+  5) COSA RESTA FUORI. ROBOTS.TXT GOVERNA LA SCANSIONE, IL META ROBOTS
+  L'INDICIZZAZIONE, e si confondono ogni volta: da cui la regola senza
+  eccezioni — **non si blocca in robots.txt ciò che si vuole
+  deindicizzare**, perché una pagina vietata non viene mai scaricata,
+  quindi il suo noindex non viene mai letto, e Google indicizza lo
+  stesso l'indirizzo nudo se qualcuno ci linka. Bloccare è l'unico modo
+  affidabile di rendere una pagina NON deindicizzabile. In robots.txt
+  c'è solo `/api/` (è JSON e non potrebbe portare un meta tag); NON si
+  vietano `/annuncio/`, `/negozio/`, `/categoria/`, `/miniapp.html` né
+  `/foto/`, e MAI «Disallow: /» perché siamo in rodaggio — il recupero
+  si misura in settimane. La rotta è una costante PURA, senza database
+  e senza modo di sollevare: un 5xx lì sospende la scansione di tutto
+  il sito per ore. `noindex,follow` (mai `nofollow`) va su
+  `/miniapp.html`, sugli annunci assenti/rimossi/in revisione — dalla
+  STESSA condizione che produce già i meta generici, mai da un secondo
+  «if» —, sui negozi vuoti o senza codice, sui reparti vuoti o finti, e
+  su `offline.html`, che non passa da `_pagina_con_meta` e se lo scrive
+  a mano. NOINDEX E CANONICAL NON CONVIVONO: su una pagina
+  deindicizzata un canonical che punta ALTROVE può propagare il noindex
+  all'indirizzo canonico — quindi `/miniapp.html` porta solo il
+  noindex, mai un canonical verso «/».
+  LA SITEMAP e il noindex NON POSSONO CONTRADDIRSI (Search Console lo
+  segnala), quindi le due condizioni nascono dallo stesso fatto e c'è
+  una prova che lo verifica pagina per pagina, chiamando il costruttore
+  di ogni `<loc>`: è quella di maggior valore del cantiere. Dentro:
+  home, `/sicurezza`, i reparti e i negozi con almeno un attivo, e
+  tutti gli attivi. Fuori i VENDUTI (decisione di Andrea: il loro link
+  non muore e la pagina resta indicizzabile, ma non siamo noi a
+  proporla), i rimossi, quelli in revisione. Il `<loc>` è l'indirizzo
+  CANONICO con lo slug, o si consegna a Google un rapporto di contenuti
+  duplicati scritto di proprio pugno. `<lastmod>` = max(modificato,
+  creato): `modificato` è 0 su quasi tutte le righe, e uno ingenuo
+  daterebbe l'intero catalogo al 1970. `changefreq` e `priority` si
+  omettono (Google dichiara di ignorarli). Il tetto dei 50.000 SI
+  DICHIARA e non si costruisce: siamo sotto il 2%, c'è il `LIMIT`, un
+  print d'allarme e la via d'uscita già scritta nel commento.
+  GLI IMPORTATI DA NOSTR SI INDICIZZANO COME TUTTI (decisione di
+  Andrea): nessuna eccezione e nessun ramo. Chi pubblica sui relay ha
+  già scelto la propagazione, e se cancella l'evento la riga si spegne
+  anche qui — il meccanismo esiste già, è quello delle lapidi NIP-09,
+  e porta l'annuncio a `rimosso`, cioè dentro il noindex e fuori dalla
+  sitemap SENZA una riga nuova. Il canonical di un importato punta alla
+  NOSTRA pagina, mai all'esterno: siamo canonici del nostro URL, non
+  della merce.
+  6) JSON-LD `Product` + `Offer`, solo sugli annunci pubblici (su un
+  rimosso sarebbe il bug della resurrezione in smoking). **sats → BTC è
+  una conversione ESATTA di unità**, non un tasso — schema.org ammette
+  i codici delle criptovalute — quindi qui non si inventa nessun
+  numero; ma il valore va prodotto SENZA virgola mobile, che `sats/1e8`
+  fa uscire `0.0008000000000000001` per ottantamila sats. L'euro solo
+  per i listini NATI in euro. Compromesso a verbale: i risultati
+  «merchant» di Google validano su una lista di valute e BTC non c'è —
+  i listini in sats potranno essere mostrati senza prezzo, quelli in
+  euro sono pienamente idonei. `come_nuovo` → `UsedCondition` e NON
+  `RefurbishedCondition`: «ricondizionato» significa rimesso a nuovo
+  professionalmente, ed è la mappatura sbagliata che verrebbe naturale;
+  dove la scala non dice niente la proprietà SI OMETTE, e il giudice è
+  `condizione_da_mostrare`. Ferie → `OutOfStock` + `availabilityStarts`
+  con la data di rientro: l'oggetto c'è e il prezzo è vero, ma oggi non
+  si compra, e chi arriva da un motore deve saperlo PRIMA di cliccare.
+  MAI `aggregateRating` sul Product: quel voto è del VENDITORE, non
+  dell'oggetto, ed è lo schema delle recensioni auto-attribuite che
+  Google sanziona.
+  I TRE REGIMI DI ESCAPE, che è la parte da non confondere: `_attr`
+  (attributo), `_testo` (nodo: `<h1>`, `<p>`, **e il `<title>`**), `_ld`
+  (dati strutturati). Il nome dice la DESTINAZIONE e non la tecnica, la
+  lezione di `nome_pezzo`. Il terzo è quello che si sbaglia sempre:
+  **dentro un `<script>` le entità HTML non vengono decodificate**, un
+  `html.escape` lì non protegge niente e CORROMPE il dato (nel JSON
+  comparirebbe `&amp;`), e l'unica cosa da neutralizzare è la sequenza
+  che chiude l'elemento raw-text. IL TITOLO USCIVA CRUDO nella prima
+  stesura — l'ha preso la prova, non la rilettura — e adesso c'è
+  l'asserzione apposta.
+  IL COSTO, misurato: +1,5 KB su un annuncio (+0,17%) e +6 KB su home e
+  reparto (+0,66%) sopra i 910 KB di partenza. Query: `/annuncio` resta
+  a UNA (stessa riga per meta, titolo e corpo — sbagliarlo la porta a
+  due), `/miniapp.html` e `/sicurezza` restano a ZERO, `/robots.txt` a
+  zero per costruzione, e la HOME passa da 0 a 2 dietro una cache di
+  60s — è l'unico cambio di NATURA, sulla rotta più colpita di tutte.
+  LA VOCE CHE NESSUNO GUARDA è la banda di scansione: con
+  `HEADER_NO_CACHE` nessuno può conservare la pagina, quindi ~900 URL ×
+  910 KB fanno **~820 MB per passata completa di Googlebot**. La cura
+  tentante — `no-cache` con rivalidazione più un ETag sulla pagina —
+  NON può riusare `_file_con_etag`: i byte ora dipendono dalla rotta E
+  dal database, e `mtime-size` servirebbe un 304 su una scheda ormai
+  cambiata; sarebbe una seconda formula, cioè la sentinella dell'ETag
+  unico che si mette a urlare. Rimandata, e scritto qui.
   E DA QUI È NATO `_fmt_eur` (ago 2026): **un euro si scrive in un modo
   solo in tutta l'app**. Gemello di `_fmt_sats`, con la VIRGOLA dei
   decimali — col punto una cifra grande si legge per un fattore mille —
@@ -7727,9 +7948,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
 3. Il server pubblico serve SOLO `/`, `/miniapp.html`, `/negozio/*`,
-   `/annuncio/*`, `/sicurezza` (la pagina «Il pagamento protetto», link
-   condivisibile con l'ancora facoltativa `#limiti`: si manda a chi
-   chiede «mi fido?», cioè a chi Barattolo non ce l'ha ancora),
+   `/annuncio/*`, `/categoria/{slug}` (i 27 reparti, vocabolario CHIUSO
+   su `SLUG_CATEGORIE`), `/sicurezza` (la pagina «Il pagamento
+   protetto», link condivisibile con l'ancora facoltativa `#limiti`: si
+   manda a chi chiede «mi fido?», cioè a chi Barattolo non ce l'ha
+   ancora), `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
+   trovare»: la prima è una costante PURA che non tocca il database e
+   non può sollevare — un 5xx lì sospende la scansione di tutto il sito
+   per ore),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
@@ -7747,6 +7973,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
    Architettura. La regola è verificabile e non solo raccomandata:
    una sentinella di `prove.py` fallisce se in server.py ricompare
    `app.mount(` o l'import di StaticFiles.
+   E L'ELENCO DELLE ROTTE-PAGINA SI CONTA (ago 2026): la lista in
+   `prove_anteprime` era scritta a mano, quindi una rotta pubblica
+   NUOVA non la sorvegliava nessuno finché qualcuno non si ricordava
+   di aggiungerla. Adesso una prova confronta la sua lunghezza col
+   numero di `return _pagina_con_meta(` nel sorgente: chi ne aggiunge
+   una senza elencarla trova la CI rossa.
 4. Stati ordine: creato | locked | shipped | delivered | confirmed |
    released | dispute | return_pending | return_shipped | refund |
    refunded | annullato. Non inventarne di nuovi senza aggiornare
@@ -9397,6 +9629,39 @@ deploy manda UN'ULTIMA notifica del termometro — dal secondo in poi
 silenzio. Non si semina il timbro apposta: sarebbe un trucco una-tantum
 dentro una migrazione, e su un'installazione nuova salterebbe il primo
 lunedì per davvero.
+
+Farsi trovare (ago 2026): Barattolo diventa indicizzabile. Indirizzi
+parlanti `/annuncio/{id}-{slug}` e `/negozio/{chi}-{slug}` (i vecchi non
+muoiono e non redirigono: rispondono 200 col canonical), un `<title>`
+per pagina — che ROVESCIA una regola scritta in CLAUDE.md —, le card e
+le piastrelle diventate collegamenti VERI, 27 pagine `/categoria/{slug}`,
+il contenuto pre-renderizzato nel corpo dentro il «cartello», più
+`robots.txt`, `sitemap.xml` (~900 URL) e il JSON-LD Product/Offer col
+prezzo in BTC, che è una conversione esatta e non un cambio inventato.
+Vedi Architettura, «FARSI TROVARE», per i tre regimi di escape, la
+regola robots-vs-noindex e le imperfezioni dichiarate.
+Collaudato: 1995 prove verdi (211 nuove) e — la parte che conta —
+QUINDICI MUTAZIONI del codice, una per sentinella, che diventano rosse
+tutte e quindici: card senza `position:relative`, bottoni rimessi dentro
+l'`<a>`, `preventDefault` dopo `openDetail`, `navSpingi` all'atterraggio,
+la chiamata tolta da `avviaVetrina`, la regex ancorata col `$`, lo spacco
+del negozio tolto, `html.escape` dentro `_ld`, INNER JOIN al posto del
+LEFT, un rimosso rimesso nella WHERE, «Disallow: /», `int(aid)`, il
+titolo crudo, la lampo nella query, il canonical su una pagina
+deindicizzata. Più il confronto PIXEL prima/dopo su cinque viste
+(vetrina chiara e scura, negozio, Sfoglia chiara e scura) con un
+worktree al commit precedente: **identiche byte per byte**, che è la
+prova vera del «zero pixel di differenza» sulla card ristrutturata. E
+`anteprime.py`: le anteprime social non cambiano, tutti e cinque i
+crawler vedono la stessa cosa e l'ultimo meta sta al byte 1868.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva. `sw.js` passa a v4 perché `offline.html` (in dispensa) ha
+guadagnato il suo noindex. DA FARE DOPO IL DEPLOY, ed è il pezzo che in
+locale non si può fare: inviare la sitemap a Search Console, e tenere
+d'occhio la BANDA la prima settimana (~820 MB per passata completa: vedi
+la voce del costo). DA GUARDARE: che `/robots.txt` risponda 200 sul
+dominio vero, e che la prima card social condivisa dopo il deploy sia
+identica a prima.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
