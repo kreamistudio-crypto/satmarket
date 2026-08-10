@@ -3738,6 +3738,94 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con l'accordo mostra il banner 🤝 e i totali pattuiti (`artStima`
   dentro totaleStima) — pillole consegna, NWC, nota EUR ereditati
   gratis; startBuy e compraSubito mandano `offerta_id` (0 = ignorato).
+  IL COMPRATORE RITIRA (ago 2026, caso vero: un'offerta mandata per
+  sbaglio non si poteva togliere in nessun modo — si aspettava la
+  scadenza o si chiedeva al venditore di rifiutarla, e intanto la
+  guardia `attive` impediva perfino di rifarla giusta).
+  `POST /api/offerte/{id}/ritira` + lo stato `ritirata`, che è una
+  LAPIDE: la riga resta, come per gli ordini annullati.
+  È IL GEMELLO SPECULARE DEL RIFIUTO — quello chiude dal lato del
+  destinatario, questo dal lato del proponente — e per questo NON è
+  un'azione di `rispondi_offerta`: il suo gate risponde alla domanda
+  «di chi è il turno», e su una 'proposta' il turno è del VENDITORE,
+  quindi infilarcelo dentro sarebbe un'eccezione al gate, cioè
+  romperlo. Da rotta sua, in più, la guardia di proprietà sta dentro
+  la WHERE col 400 dei fratelli (il patto dell'audit), che il gemello
+  non ha: lui legge per solo id e risponde 404.
+  SI RITIRA DA 'proposta' E DA 'accettata', mai da 'controproposta' —
+  lì il compratore ha già «Rifiuta», che fa la stessa identica cosa e
+  avvisa: due nomi per lo stesso gesto sarebbero un bivio senza
+  risposta giusta davanti a chi deve scegliere.
+  QUI NON C'È MAI ESCROW, ed è la riga da non ammorbidire: un'offerta
+  è la cedola che serve a FABBRICARE un ordine, e finché l'ordine non
+  c'è non si è mosso un sat. Quando l'ordine c'è già, IL PREZZO VIVE
+  NELL'ORDINE (`ordini.prezzo_sats`, congelato alla invoice) e da qui
+  non si tocca — chi un domani volesse «sistemare» dal ritiro un
+  ordine appeso starebbe scrivendo il bug, non la cura. La prova più
+  forte non elenca nomi: estrae con una regex TUTTE le scritture del
+  corpo e chiede che il bersaglio sia sempre `offerte` (cattura anche
+  un `UPDATE ordini` che nessuna lista vedrebbe), e l'ambiente della
+  prova NON fornisce affatto i nomi dell'escrow — chi li tocca non fa
+  una prova rossa, fa esplodere un NameError.
+  A BLOCCARE È L'ORDINE VIVO, NON IL NUMERO, ed è la correzione che il
+  cantiere ha fatto al proprio piano: con un `if off["ordine_id"]`
+  secco un id appeso a un ordine non più 'creato' darebbe per sempre
+  «prima annulla l'ordine», mentre `annulla_ordine` su un non-'creato'
+  risponde «Operazione non permessa» — un vicolo cieco senza uscita.
+  Si guarda `stato='creato'`, la forma già in casa in `compra()` e
+  `_compra_set()`; così le due strade COMPONGONO SENZA CONOSCERSI
+  (annulla l'ordine → `ordine_id=0`, plurale, che copre anche i set →
+  l'offerta ridiventa ritirabile). C'è la prova apposta, e diventa
+  rossa da sola se qualcuno rimette la guardia secca.
+  IL CAS SULLO STATO LETTO serve, e il motivo NON è la concorrenza (qui
+  non c'è un await in mezzo) ma il DOPPIO TAP su rete lenta: senza, il
+  secondo POST manda al venditore una SECONDA notifica. Si confronta
+  lo stato LETTO e mai un `IN (...)`: chi ha premuto guardando
+  «proposta» mentre diventava un accordo prende il 409, rilegge e
+  ritira consapevolmente. 409 e non 400 — nel progetto il 400 è «non
+  ti è permesso», il 409 «il mondo si è mosso».
+  IL GATE DELLA SCADENZA INLINE è copiato dal gemello e non è
+  pignoleria: senza, il ritiro di un'accettata già morta manderebbe al
+  venditore «ha ritirato l'accordo» mentre `scadenze_offerte` gli dice
+  «non ha completato il pagamento in tempo» — due messaggi
+  contraddittori sullo stesso fatto, e il bugiardo sarebbe questo.
+  (Imperfezione EREDITATA dai tre chiamanti che già fanno così: quel
+  timbro non notifica nessuno e l'orologio non ripesca più la riga,
+  quindi la scadenza il venditore non la sente. Preesistente, non nasce
+  qui, vale un cantiere suo.)
+  IL VENDITORE LO SA SEMPRE (decisione di Andrea), con due testi: sulla
+  proposta asciutto — non è un evento nuovo, è la correzione di uno
+  vecchio, e lui la proposta l'aveva già ricevuta con «💰 Hai ricevuto
+  un'offerta!», quindi il silenzio lo lascerebbe a rispondere a un
+  fantasma; sull'accettata la riga che conta è «Nessun sat si era
+  mosso», perché poteva credere di averli in arrivo.
+  IL TETTO `MAX_OFFERTE_ANNUNCIO` CONTA LE RITIRATE, ed è già così per
+  costruzione (`COUNT(*)` senza filtro di stato): non contarle
+  aprirebbe uno spam illimitato — proponi 1 sat, il venditore riceve la
+  notifica, ritiri, riproponi. E non toglie niente a nessuno: oggi chi
+  sbaglia brucia comunque il tentativo E deve aspettare 48 ore, col
+  ritiro ha gli stessi tentativi residui SUBITO. Il confirm lo dice, col
+  numero preso dalla busta di `/api/me/offerte` e MAI un «te ne restano
+  N» (quella busta ha un LIMIT: un numero contato lì potrebbe essere
+  falso, e una promessa falsa è peggio di un'informazione mancante).
+  NIENTE `guardia_ferie`: le accettate non decadono quando il venditore
+  parte ma non si possono pagare, quindi il ritiro è l'unica via
+  d'uscita pulita — vale il principio di `ritira_puntata`, «uscire coi
+  propri sats non dipende da una leva». E ritirando il compratore
+  LIBERA il venditore (il freno della lampo e la voce «stretta di mano
+  già data» di `guardia_ferie` guardano `stato='accettata'`): non è
+  solo un'uscita, è anche una restituzione — c'è la prova che quelle
+  due eredità non si perdano.
+  ZERO MIGRAZIONI: la colonna è TEXT, cambia solo il commento dello
+  schema. Ereditano gratis `attive` e `totali` di fai_offerta,
+  `offerte_da_agire`, `scadenze_offerte`, `_incassa_ordine`, i due
+  preventivi e il filtro delle vive del client; e `rispondi_offerta` su
+  una ritirata cade nel suo `else` col 400 «già chiusa».
+  Frontend: «Ritira» (`.btn danger-ghost`, la veste di «Rifiuta») nei
+  due rami del compratore — nel ramo accettata dentro un flex, che
+  `.btn` è `width:100%` e due bottoni nudi si impilerebbero a tutta
+  larghezza: è l'unico punto in cui il markup di `renderOfferte` cambia,
+  e la card resta della stessa altezza (misurato prima/dopo).
   L'OFFERTA SI PORTA DIETRO I PEZZI (ago 2026): il venditore accettava
   un prezzo unitario a quantita' INDETERMINATA — `articolo = unitario
   * richiesti` e `richiesti` arrivava dal client senza nessun legame
@@ -10152,6 +10240,34 @@ scommettere su una causa sola si sono tolte tutte quelle plausibili.
 IN PRODUZIONE basta il deploy. DA GUARDARE dal telefono: che lo scatto
 sia sparito nella PWA — se sopravvive, il sospetto successivo è la
 `max-height` che cambia durante l'animazione.
+Il compratore ritira un'offerta (ago 2026, caso vero dal campo): chi ne
+manda una per sbaglio non doveva più aspettare 48 ore o chiedere al
+venditore di rifiutarla — e intanto non poteva nemmeno rifarla giusta,
+che la guardia `attive` glielo impediva. Rotta sua
+(`POST /api/offerte/{id}/ritira`), stato `ritirata` che è una lapide,
+da 'proposta' e da 'accettata' ma mai da 'controproposta' (lì c'è già
+«Rifiuta»). Le decisioni di Andrea: il venditore lo sa SEMPRE, e il
+tetto dei 3 tentativi conta anche le ritirate — non contarle aprirebbe
+uno spam illimitato, e il ritiro non toglie niente perché oggi chi
+sbaglia brucia comunque il tentativo e in più aspetta due giorni. Vedi
+Architettura, «IL COMPRATORE RITIRA», per il perché non è un'azione di
+`rispondi_offerta` e per la correzione che il cantiere ha fatto al
+proprio piano: a bloccare è l'ordine VIVO e non l'esistenza del numero,
+o si apre un vicolo cieco da cui nessuna azione dell'utente esce.
+Collaudato: 54 prove nuove (2246 verdi, erano 2192) e — la parte che
+conta — DODICI MUTAZIONI del codice, una per riga sorvegliata (il CAS
+tolto, la guardia di proprietà fuori dalla WHERE, il 404 rimesso, la
+guardia dell'ordine riportata alla forma secca, il gate della scadenza
+tolto, la controproposta ammessa, `'ritirata'` in un secondo posto, un
+`UPDATE ordini` infilato nel ritiro, la scadenza non azzerata, il
+titolo nudo, il bottone tolto dal client, il tetto hardcodato): ognuna
+diventa rossa da sola. Più il giro dal vivo sul server locale — il
+venditore respinto, l'anti-oracolo verificato sul database vero
+(altrui e inesistente rispondono identico), il ritiro che libera
+`attive` e permette di riprovare SUBITO, l'ordine vivo che blocca e la
+lapide che non blocca, e gli ordini immobili prima e dopo — e il gesto
+nel browser coi due confirm e zero errori JS. IN PRODUZIONE basta il
+deploy: nessuna colonna, nessuna migrazione, nessuna leva.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
