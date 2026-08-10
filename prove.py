@@ -9064,7 +9064,7 @@ def prove_offerta_quantita():
     # comportamento al limite, invece di una seconda guardia da tenere
     # in pari (l'anchor sta dentro il render del foglio, non altrove)
     fogjs = mini[mini.index("function aggiornaFoglioOfferta("):
-                 mini.index("function offertaChip(")]
+                 mini.index("function offertaScritta(")]
     prova("lo stepper del foglio e' la STESSA funzione del gemello",
           True, "stepperMini(qtaScelta," in fogjs
           and "'setQta(-1)', 'setQta(1)'," in fogjs
@@ -9109,7 +9109,7 @@ def prove_offerta_quantita():
     prova("nessuna pillola memorizzata: si deduce dal valore", False,
           "offScelta" in mini)
     prova("...e a dedurla e' offertaDigitata", True,
-          "b.classList.toggle('attiva', v > 0 && (p === 'libero'" in mini)
+          "b.classList.toggle('attiva', vv > 0 && (p === 'libero'" in mini)
     # IL MINIMO NON E' UN CARTELLO PERMANENTE: compare solo quando la
     # cifra scritta ci finisce sotto. Dirlo prima che serva e' rumore,
     # e affianca un numero che non c'entra con quello che si scrive.
@@ -9220,6 +9220,87 @@ def prove_offerta_quantita():
           "Accettare non blocca i pezzi" in mini)
     prova("...e la notifica del bot, da cui si accetta di piu'", True,
           "Accettare non blocca l'oggetto" in src)
+
+    # --- 10. IL CAMPO CONVERTE COL TOGGLE (ago 2026, dal campo: si
+    # scriveva 40.000 in sats, si passava a euro e il campo diceva
+    # ancora 40.000 — la riga sotto convertiva, lui no).
+    prova("l'oninput del campo pianta l'ancora", True,
+          'oninput="offertaScritta()"' in fog)
+    prova("...e il campo segue il toggle", True,
+          "campo.value = offTestoCampo(offCifraIn(vc), vc);" in fogjs)
+    # la valuta del campo e' quella che si GUARDA, non quella del
+    # listino: senza questa riga il campo tornerebbe muto al toggle
+    # ed e' precisamente il bug che il cantiere chiude
+    prova("...e la valuta del campo e' quella che si guarda", True,
+          "const vc = valutaOfferta(l);" in fogjs
+          and "return valutaVista==='eur' ? 'eur' : 'sats';" in mini)
+    prova("...portando il simbolo della valuta MOSTRATA", True,
+          "el('offSuffisso').innerHTML = (vc==='eur' ? '€' : 'sats')"
+          in fogjs)
+    # L'ANCORA E' QUELLO CHE IMPEDISCE ALLA CIFRA DI DERIVARE: si
+    # tiene la cifra com'e' stata scritta e la valuta in cui lo e'
+    # stata, e il toggle la RILEGGE convertita. Cosi' dieci toggle di
+    # fila costano sempre UNA conversione sull'originale, invece di
+    # una catena in cui ognuna parte dal risultato della precedente.
+    prova("la conversione parte SEMPRE dall'ancora", True,
+          "return offConverti(offCifra, offCifraValuta || valuta, valuta);"
+          in mini)
+    # ...e a scriverla e' un posto SOLO. Il render non deve toccarla:
+    # se la riscrivesse con la propria conversione, l'originale
+    # sparirebbe e la cifra deriverebbe a ogni tocco del toggle.
+    prova("il render non riscrive l'ancora", False,
+          "offCifra =" in fogjs)
+    prova("...e nemmeno la riga che la legge", False,
+          "offCifra =" in odig)
+    # ...che infatti il campo non lo guarda proprio: legge l'ancora,
+    # o tornerebbe a dipendere da un numero gia' convertito
+    prova("...e non rilegge il campo", False,
+          "el('offImporto').value" in odig)
+    # tre soli scrittori piu' la dichiarazione: l'apertura che azzera,
+    # la pillola, e l'oninput. Chi ne aggiunge un quarto lo dichiari.
+    prova("gli scrittori dell'ancora sono tre", 4,
+          mini.count("offCifra = "))
+    # il campo si riscrive SOLO quando la valuta cambia davvero, o un
+    # tocco sullo stepper normalizzerebbe sotto le dita una cifra che
+    # si sta ancora scrivendo
+    prova("il campo si riscrive solo a valuta cambiata", True,
+          "if (vc !== offCampoValuta) {" in fogjs)
+    # l'apertura azzera l'ANCORA e non il solo campo: e' lei la cifra
+    prova("l'apertura azzera l'ancora, non il campo", True,
+          "offCifra = 0; offCifraValuta = ''; offCampoValuta = '';" in mini)
+    # senza cambio vivo il campo resta sulla valuta del listino, che e'
+    # sempre esatta: mai una conversione fatta col valore di riserva
+    prova("senza cambio il campo resta sul listino", True,
+          "if (!cambioVivo) return inEur ? 'eur' : 'sats';" in mini)
+    # LE PILLOLE si confrontano nella valuta MOSTRATA — e' il numero
+    # che si vede — ma piantano l'ancora in quella del LISTINO, cosi'
+    # il −10% che parte e' esattamente −10% al sat
+    prova("le pillole si confrontano in quel che si vede", True,
+          "Math.abs(vv - offertaScontoIn(l, x, vc)) < tol" in odig)
+    prova("...e piantano l'ancora nella valuta del listino", True,
+          "offCifra = offertaSconto(l, Number(scelta));" in fog2
+          and "offCifraValuta = inEur ? 'eur' : 'sats';" in fog2)
+    # IL MINIMO: si CONFRONTA nella valuta del listino, che e' quella
+    # su cui giudica il server, e si DICE in quella del campo,
+    # arrotondato per ECCESSO — chi scrive esattamente la cifra che
+    # legge dev'essere ammesso, mai rifiutato per un centesimo.
+    prova("il minimo si confronta come il server", True,
+          "const v = offCifraIn(inEur ? 'eur' : 'sats');" in odig)
+    prova("...e si dice nella valuta del campo", True,
+          "offCifraTesto(offMinimoIn(l, min, vc), vc," in odig)
+    prova("...arrotondato per eccesso, o rifiuterebbe cio' che mostra",
+          True, "Math.ceil(min.sats*eurPerSat*100)/100" in mini
+          and "Math.ceil(min.eur/eurPerSat)" in mini)
+    # L'INVIO parla la valuta del LISTINO, l'unica in cui l'accordo
+    # esiste e l'unica che il server accetta: la conversione avviene
+    # li', una volta sola, e sull'ANCORA — mai su quel che il campo
+    # mostra adesso, che puo' essere un'altra valuta.
+    i_inv = mini.index("async function inviaOfferta(")
+    inv = mini[i_inv:mini.index("function apriLampo(", i_inv)]
+    prova("l'invio converte verso il listino", True,
+          "const cifra = offCifraIn(inEur ? 'eur' : 'sats');" in inv)
+    prova("...e non legge piu' il campo", False,
+          "el('offImporto').value" in inv)
 
 
 # ====================================================================

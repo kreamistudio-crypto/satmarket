@@ -3843,8 +3843,13 @@ document.getElementById('cartello')?.remove();</script>
          Le pillole RIEMPIONO il campo, non lo nascondono: chi parte
          da −10% e poi ritocca dev'essere libero di farlo. -->
     <div class="consegna-scelta" id="offChips" style="margin:0 0 10px"></div>
+    <!-- Il campo parla la valuta CHE SI STA GUARDANDO, e porta
+         accanto il suo simbolo: si vede sempre in cosa si scrive.
+         L'oninput non si limita a rileggere — pianta l'ANCORA
+         (offertaScritta), che e' cio' che rende il toggle una
+         rilettura invece di una catena di conversioni. -->
     <div class="field" id="offCampo" style="display:flex;gap:10px;align-items:center">
-      <input id="offImporto" autocomplete="off" placeholder="La tua cifra" style="flex:1" oninput="offertaDigitata()">
+      <input id="offImporto" autocomplete="off" placeholder="La tua cifra" style="flex:1" oninput="offertaScritta()">
       <span id="offSuffisso" style="font-weight:800;color:var(--muted)">sats</span>
     </div>
     <!-- Il minimo NON e' un cartello permanente: compare solo quando
@@ -6381,10 +6386,11 @@ function setValuta(v){
   /* e la pagina d'acquisto: si ridisegna dal preventivo in CACHE —
      il toggle e' una conversione di vista, mai un secondo fetch */
   if (el('view-acquisto')?.classList.contains('active')) renderAcquisto();
-  /* e il foglio dell'offerta, se e' aperto: li' il toggle governa la
-     LETTURA (listino e riga dell'offerta), mai la valuta in cui si
-     offre — quella e' del listino, ed e' l'unica in cui l'accordo
-     esiste. Per questo la cifra scritta non si tocca mai. */
+  /* e il foglio dell'offerta, se e' aperto: li' il toggle cambia
+     anche la valuta del CAMPO — la cifra si converte con lui, o si
+     scriverebbe 40.000 in sats e si leggerebbe 40.000 euro, che e'
+     un'altra offerta. A non derivare ci pensa l'ancora: la cifra
+     resta quella scritta, e il toggle la RILEGGE convertita. */
   if (el('offertaSheet')?.classList.contains('open')) aggiornaFoglioOfferta();
 }
 /* I toggle valuta sono due (searchbar e dettaglio) e vanno accesi
@@ -10061,6 +10067,62 @@ function offertaAccettataPer(annuncioId){
    una cifra che −10% non e' piu'. Derivata, non puo' mentire: se il
    valore non e' nessuno dei due sconti si accende «Personalizzato». */
 
+/* IL CAMPO CONVERTE COL TOGGLE (ago 2026, dal campo: si scriveva
+   40.000 in sats, si passava a euro e il campo diceva ancora 40.000,
+   che in euro e' tutta un'altra offerta — la riga sotto convertiva,
+   lui no). Adesso il campo parla la valuta che si sta guardando e ne
+   porta il simbolo accanto.
+   L'ANCORA E' QUELLO CHE IMPEDISCE ALLA CIFRA DI DERIVARE, ed e' la
+   riga da non ammorbidire: si tiene la cifra COM'E' STATA SCRITTA
+   (`offCifra`) insieme alla valuta in cui lo e' stata
+   (`offCifraValuta`), e il toggle non la riscrive MAI — la rilegge.
+   Cosi' andare e tornare cento volte costa sempre UNA conversione
+   sull'originale, invece di una catena di conversioni ognuna sul
+   risultato della precedente, che e' il modo in cui un numero se ne
+   va di centesimo in centesimo a ogni tocco. Il campo si riscrive
+   solo quando la valuta cambia DAVVERO (`offCampoValuta`): cosi' un
+   tocco sullo stepper non normalizza sotto le dita quel che si sta
+   ancora scrivendo. */
+let offCifra = 0;          // la cifra scritta, com'e' stata scritta
+let offCifraValuta = '';   // 'sats' | 'eur': la valuta in cui lo e' stata
+let offCampoValuta = '';   // la valuta che il campo mostra ADESSO
+/* La valuta del campo: quella che si guarda, se il cambio e' vivo —
+   senza cambio resta quella del listino, che e' sempre esatta (mai
+   una conversione fatta col valore di riserva: qui il numero conta
+   davvero, ed e' la stessa regola di cifraOfferta). */
+function valutaOfferta(l){
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  if (!cambioVivo) return inEur ? 'eur' : 'sats';
+  return valutaVista==='eur' ? 'eur' : 'sats';
+}
+/* UNA conversione, sempre dall'originale: gli euro a 2 decimali, i
+   sats interi — come li vuole il server. */
+function offConverti(v, da, a){
+  if (!(v > 0) || da === a) return v;
+  return a==='eur' ? Math.round(v*eurPerSat*100)/100
+                   : Math.round(v/eurPerSat);
+}
+/* La cifra scritta, letta in una valuta qualsiasi. Sempre dall'ANCORA:
+   e' questo, e non il numero che si vede, il punto fermo. */
+function offCifraIn(valuta){
+  return offConverti(offCifra, offCifraValuta || valuta, valuta);
+}
+/* Il testo del campo: quello che si scriverebbe a mano, senza
+   separatori delle migliaia (li' dentro si digita, non si legge). */
+function offTestoCampo(v, valuta){
+  if (!(v > 0)) return '';
+  return valuta==='eur' ? String(v.toFixed(2)).replace('.', ',') : String(v);
+}
+/* Una cifra detta nella valuta del campo, col ≈ quando e' una
+   conversione: il minimo va detto nella lingua in cui si sta
+   scrivendo, o si confronta con un numero che non e' quello sotto le
+   dita. */
+function offCifraTesto(v, valuta, convertita){
+  const circa = convertita ? '≈ ' : '';
+  return valuta==='eur'
+    ? `${circa}${fmtEur(v)}<span class="unit eur">€</span>`
+    : `${circa}${fmt(v)}<span class="unit">sats</span>`;
+}
 /* Il foglio: tre scorciatoie (−10%, −20%, Personalizzato), la riga che
    dice quanto si sta offrendo e per quanti pezzi, e il toggle valuta
    dei suoi fratelli. Le guardie dentro, come startBuy. */
@@ -10079,6 +10141,8 @@ function apriOfferta(){
     return;
   }
   qtaScelta = Math.max(1, Math.min(qtaScelta, l.quantita||1));
+  /* si azzera l'ANCORA, non il solo campo: e' lei la cifra */
+  offCifra = 0; offCifraValuta = ''; offCampoValuta = '';
   el('offImporto').value = '';
   aggiornaFoglioOfferta();
   el('sheetBg').classList.add('open');
@@ -10090,6 +10154,13 @@ function offertaSconto(l, p){
   return (l.valuta==='eur' && l.priceEur>0)
     ? Math.round(l.priceEur*(100-p))/100
     : Math.round(l.price*(100-p)/100);
+}
+/* ...lo stesso sconto, letto nella valuta del campo: serve al
+   segnaposto e a capire quale pillola e' accesa, che si guardano
+   tutt'e due in quello che si VEDE. */
+function offertaScontoIn(l, p, valuta){
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  return offConverti(offertaSconto(l, p), inEur ? 'eur' : 'sats', valuta);
 }
 /* La cifra dell'offerta nella valuta LETTA, con la regola del ≈ di
    cifraCtrl. Ma se la vista chiede una conversione e il cambio non e'
@@ -10139,17 +10210,46 @@ function aggiornaFoglioOfferta(){
     [10,20].map(p => `<button class="consegna-pill" data-p="${p}" onclick="offertaChip('${p}')">−${p}%</button>`).join('')
     + `<button class="consegna-pill" data-p="libero" onclick="offertaChip('libero')">Personalizzato</button>`;
   const campo = el('offImporto');
-  campo.inputMode = inEur ? 'decimal' : 'numeric';
-  campo.placeholder = inEur ? '15,50' : fmt(offertaSconto(l, 15));
-  /* Il campo scrive SEMPRE nella valuta del listino: e' l'unica in cui
-     l'accordo esiste, e l'unica che il server accetta.
+  /* IL CAMPO SEGUE IL TOGGLE, e si riscrive SOLO quando la valuta
+     cambia davvero: se lo riscrivessimo a ogni render (lo stepper
+     chiama questa funzione) normalizzeremmo sotto le dita una cifra
+     che si sta ancora scrivendo. E il valore viene dall'ANCORA, mai
+     da quello che c'e' scritto adesso: e' cio' che fa costare a
+     dieci toggle di fila la stessa conversione del primo. */
+  const vc = valutaOfferta(l);
+  if (vc !== offCampoValuta) {
+    offCampoValuta = vc;
+    campo.value = offTestoCampo(offCifraIn(vc), vc);
+  }
+  campo.inputMode = vc==='eur' ? 'decimal' : 'numeric';
+  campo.placeholder = vc==='eur' ? fmtEur(offertaScontoIn(l, 15, vc))
+                                 : fmt(offertaScontoIn(l, 15, vc));
+  /* Il simbolo accanto e' quello della valuta MOSTRATA: si vede
+     sempre in cosa si sta scrivendo — era il secondo mezzo bug, che
+     un campo muto lasciava indovinare. Al server la cifra ci arriva
+     comunque nella valuta del listino, l'unica in cui l'accordo
+     esiste: a convertirla e' inviaOfferta, una volta sola.
      E DICE «AL PEZZO» MENTRE SI DIGITA (ago 2026): la cifra e'
      l'unitario, ma chi vuole tre pezzi ragiona sul TOTALE e rischia
      di scrivere 120 intendendo il totale mentre ne sta offrendo 360.
      Prima lo si scopriva dalla riga sotto, cioe' DOPO aver scritto.
      Solo coi pezzi scelti >1: col pezzo singolo sarebbe rumore. */
-  el('offSuffisso').innerHTML = (inEur ? '€' : 'sats')
+  el('offSuffisso').innerHTML = (vc==='eur' ? '€' : 'sats')
     + (qtaScelta > 1 ? '<span class="off-alpezzo">al pezzo</span>' : '');
+  offertaDigitata();
+}
+/* L'oninput del campo: pianta l'ANCORA e poi lascia rendere. E' il
+   SOLO posto che la scrive — se la scrivesse anche il render, un
+   toggle riscriverebbe l'originale con la propria conversione e la
+   cifra deriverebbe a ogni tocco: e' esattamente il difetto che
+   l'ancora esiste per non avere. */
+function offertaScritta(){
+  const l = currentListing; if (!l) return;
+  const vc = offCampoValuta || valutaOfferta(l);
+  const grezzo = String(el('offImporto').value||'').trim();
+  offCifra = vc==='eur' ? (parseFloat(grezzo.replace(',','.'))||0)
+                        : (parseInt(grezzo.replace(/[.\s]/g,''),10)||0);
+  offCifraValuta = vc;
   offertaDigitata();
 }
 /* Il minimo, nelle due valute: (sats, eur) come lo vuole cifraOfferta.
@@ -10161,14 +10261,30 @@ function offertaMinimo(l){
   return {eur, sats: inEur ? Math.round(eur/eurPerSat)
                            : Math.ceil(l.price*offertaMinPercento/100)};
 }
+/* Il minimo come va DETTO: nella valuta del campo, e arrotondato per
+   ECCESSO quando e' una conversione — chi scrive esattamente la cifra
+   che legge dev'essere ammesso, mai rifiutato per un centesimo. Il
+   CONFRONTO invece resta nella valuta del listino, che e' quella su
+   cui giudica il server. */
+function offMinimoIn(l, min, valuta){
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  if (valuta === (inEur ? 'eur' : 'sats')) return inEur ? min.eur : min.sats;
+  return valuta==='eur' ? Math.ceil(min.sats*eurPerSat*100)/100
+                        : Math.ceil(min.eur/eurPerSat);
+}
 function offertaChip(scelta){
   haptic();
   const l = currentListing; if (!l) return;
   const campo = el('offImporto');
   if (scelta !== 'libero') {
-    const v = offertaSconto(l, Number(scelta));
-    campo.value = (l.valuta==='eur' && l.priceEur>0)
-      ? String(v.toFixed(2)).replace('.', ',') : String(v);
+    /* L'ancora si pianta nella valuta del LISTINO, cosi' il −10% e'
+       esattamente −10% qualunque cosa il campo stia mostrando: la
+       cifra che parte e' quella giusta al sat, e a convertirla per
+       gli occhi ci pensa il render. */
+    const inEur = l.valuta==='eur' && l.priceEur>0;
+    offCifra = offertaSconto(l, Number(scelta));
+    offCifraValuta = inEur ? 'eur' : 'sats';
+    campo.value = offTestoCampo(offCifraIn(offCampoValuta), offCampoValuta);
     offertaDigitata();
     return;   /* il campo RESTA li', pronto a essere ritoccato */
   }
@@ -10195,16 +10311,25 @@ function offertaChip(scelta){
 function offertaDigitata(){
   const l = currentListing; if (!l) return;
   const inEur = l.valuta==='eur' && l.priceEur>0;
-  const grezzo = String(el('offImporto').value||'').trim();
-  const v = inEur ? (parseFloat(grezzo.replace(',','.'))||0)
-                  : (parseInt(grezzo.replace(/[.\s]/g,''),10)||0);
+  /* Si legge l'ANCORA e non il campo, e in DUE letture che servono a
+     due cose diverse: `v` e' la cifra nella valuta del LISTINO —
+     quella su cui giudicano il minimo e il server — e `vv` quella
+     nella valuta del CAMPO, che e' l'unica con cui ha senso
+     confrontare le pillole, perche' e' il numero che si vede. */
+  const vc = offCampoValuta || valutaOfferta(l);
+  const v = offCifraIn(inEur ? 'eur' : 'sats');
+  const vv = offCifraIn(vc);
   /* La pillola accesa si DEDUCE dalla cifra: «Personalizzato» quando
      non e' nessuno dei due sconti. Cosi' chi parte da −10% e poi
-     ritocca vede la verita' invece di un'etichetta rimasta indietro. */
+     ritocca vede la verita' invece di un'etichetta rimasta indietro.
+     Il confronto e' nella valuta MOSTRATA, con la tolleranza di
+     quella valuta: nei sats un'unita' (una conversione non torna mai
+     al sat esatto), negli euro il centesimo. */
   document.querySelectorAll('#offChips .consegna-pill').forEach(b => {
     const p = b.dataset.p;
-    const suo = x => Math.abs(v - offertaSconto(l, x)) < 0.005;
-    b.classList.toggle('attiva', v > 0 && (p === 'libero'
+    const tol = vc==='eur' ? 0.005 : 0.5;
+    const suo = x => Math.abs(vv - offertaScontoIn(l, x, vc)) < tol;
+    b.classList.toggle('attiva', vv > 0 && (p === 'libero'
       ? !(suo(10) || suo(20)) : suo(Number(p))));
   });
   /* L'avviso del minimo compare SOLO quando serve — cioe' quando la
@@ -10215,7 +10340,9 @@ function offertaDigitata(){
   el('offMinimo').style.display = sotto ? '' : 'none';
   if (sotto)
     el('offMinimo').innerHTML = `Troppo bassa: il minimo è `
-      + `${cifraOfferta(l, min.sats, min.eur)} (${offertaMinPercento}% `
+      + `${offCifraTesto(offMinimoIn(l, min, vc), vc,
+                         vc !== (inEur ? 'eur' : 'sats'))} `
+      + `(${offertaMinPercento}% `
       + `del listino${qtaScelta > 1 ? ', al pezzo' : ''})`;
   /* SOTTO IL MINIMO NIENTE TOTALE: calcolare il totale di un'offerta
      che non si puo' inviare e' rumore, e affianca due righe nel
@@ -10223,21 +10350,32 @@ function offertaDigitata(){
      risale sopra la soglia. */
   const riga = el('offRiga');
   if (v<=0 || sotto) { riga.textContent = ''; return; }
-  const sats = inEur ? Math.round(v/eurPerSat) : v;
-  const unitaria = cifraOfferta(l, sats, inEur ? v : 0);
+  /* La riga ECHEGGIA il campo, e non riconverte la cifra del listino:
+     su un listino in euro «50000 sats» vale 27,70 €, che riletto in
+     sats fa 50.008 — e un campo che dice 50.000 con sotto un
+     «≈ 50 008» si legge come un guasto, non come i centesimi che
+     sono. La cifra vera che parte resta quella del listino: la dice
+     il paySheet, dove il numero e' definitivo. */
+  const conv = vc !== (inEur ? 'eur' : 'sats');
+  const unitaria = offCifraTesto(vv, vc, conv);
   if (qtaScelta <= 1) { riga.innerHTML = `Offri <b class="mono">${unitaria}</b>`; return; }
-  const totale = cifraOfferta(l, sats*qtaScelta,
-                              inEur ? Math.round(v*qtaScelta*100)/100 : 0);
+  const totale = offCifraTesto(
+    vc==='eur' ? Math.round(vv*qtaScelta*100)/100 : vv*qtaScelta, vc, conv);
   riga.innerHTML = `Offri <b class="mono">${totale}</b> per ${fmt(qtaScelta)} pezzi`
     + ` <span class="off-unitario">(${unitaria} al pezzo)</span>`;
 }
 async function inviaOfferta(btn){
   haptic();
   const l = currentListing; if (!l) return;
-  const grezzo = String(el('offImporto').value||'').trim();
-  if (!grezzo) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  /* Si manda SEMPRE la valuta del LISTINO: e' l'unica in cui
+     l'accordo esiste, e l'unica che il server accetta. Il campo puo'
+     parlarne un'altra — la conversione avviene QUI, una volta sola e
+     sull'ancora, mai su quel che il campo mostra adesso. */
   const inEur = l.valuta==='eur' && l.priceEur>0;
-  const importo = inEur ? grezzo : grezzo.replace(/[.\s]/g,'');
+  const cifra = offCifraIn(inEur ? 'eur' : 'sats');
+  if (!(cifra > 0)) { toast('Scegli uno sconto o scrivi la tua cifra'); return; }
+  const importo = inEur ? String(cifra.toFixed(2)).replace('.', ',')
+                        : String(cifra);
   const ripristina = bottoneInAttesa(btn, '💰 Invio offerta…');
   try {
     const r = await fetch(`${API_BASE}/listings/${l.id}/offerta`, {
