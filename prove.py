@@ -9144,6 +9144,31 @@ def prove_offerta_quantita():
     # dentro `html`, che e' zoomato (la ragione dei calc(100vh/...))
     prova("...e si divide per lo zoom di casa", True,
           "coperto / z" in mini)
+    # LO SCATTO (ago 2026, dalla PWA): la transizione di 220ms serve
+    # alla scivolata d'ingresso, ma il sollevamento passa dalla stessa
+    # proprieta' — e visualViewport emette un resize a ogni passo
+    # dell'animazione della tastiera. Il foglio finiva a INSEGUIRE un
+    # bersaglio che si muove. Mentre la tastiera e' su, niente
+    # transizione: il foglio E' dove il viewport dice.
+    prova("mentre la tastiera e' su i fogli non inseguono", True,
+          "html.con-tastiera .sheet.open{transition:none}" in mini)
+    prova("...e la classe la mette chi misura", True,
+          "classList.toggle('con-tastiera', su)" in mini)
+    # e il fuoco non trascina: uno scroll automatico su un foglio
+    # fisso e' l'altro modo in cui nasce uno scatto (lezione picker)
+    prova("il fuoco sul campo non trascina niente", True,
+          "campo.focus({preventScroll:true})" in mini)
+    # IL CAMPO DICE «AL PEZZO» mentre si digita, e solo coi pezzi >1:
+    # chi ne vuole tre ragiona sul TOTALE e rischia di scrivere 120
+    # intendendo il totale mentre ne sta offrendo 360
+    prova("il campo dice «al pezzo» mentre si scrive", True,
+          "qtaScelta > 1 ? '<span class=\"off-alpezzo\">al pezzo</span>'"
+          in mini)
+    prova("...e col pezzo singolo tace", True,
+          ".off-alpezzo{display:block" in mini)
+    # SOTTO IL MINIMO NIENTE TOTALE: due righe dove ne serve una
+    prova("sotto il minimo la riga del totale sparisce", True,
+          "if (v<=0 || sotto) { riga.textContent = ''; return; }" in mini)
     # le pillole non portano piu' il controvalore: erano due cifre in
     # concorrenza con quella che conta
     prova("le pillole dicono la sola percentuale", True,
