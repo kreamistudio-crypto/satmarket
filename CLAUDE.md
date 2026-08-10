@@ -3636,6 +3636,117 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con l'accordo mostra il banner 🤝 e i totali pattuiti (`artStima`
   dentro totaleStima) — pillole consegna, NWC, nota EUR ereditati
   gratis; startBuy e compraSubito mandano `offerta_id` (0 = ignorato).
+  L'OFFERTA SI PORTA DIETRO I PEZZI (ago 2026): il venditore accettava
+  un prezzo unitario a quantita' INDETERMINATA — `articolo = unitario
+  * richiesti` e `richiesti` arrivava dal client senza nessun legame
+  con l'accordo, quindi poteva ritrovarsi a vendere un pezzo o TUTTO
+  LO STOCK alla cifra scontata, e scoprirlo con l'ordine. Era
+  dichiarato nel confirm dell'app ma NON nella notifica del bot, che
+  e' il posto da cui si accetta piu' spesso. Colonna
+  `offerte.quantita`, la PRIMA migrazione su quella tabella.
+  LA CIFRA RESTA L'UNITARIO, ed e' la decisione che governa tutto il
+  resto: 1) si confronta col LISTINO, che e' unitario come il minimo
+  (`OFFERTA_MINIMA_PERCENTO`) e come i due estremi della
+  controproposta — col totale quelle quattro comparazioni cambiano
+  significato, e «offro 120.000 su un listino di 50.000» si legge come
+  un errore; 2) un totale andrebbe DIVISO, e romperebbe in silenzio la
+  divisione a ritroso di `_righe_ordine` — la stessa trappola per cui
+  il mono non sconta; 3) nel set le righe portano `unitario_sats`, e un
+  totale per riga sarebbe l'unica cifra non unitaria del sistema.
+  L'equivoco si toglie dicendo ENTRAMBE le facce ovunque i pezzi siano
+  piu' di uno: giudice puro `_cifra_accordo(valuta, sats, eur,
+  quantita)` («40.000 sats al pezzo × 3 = 120.000 sats»), che prende i
+  CAMPI e non la riga (il patto di `in_ferie`) e ha il gemello client
+  `cifraPezzi` — se i due divergessero, meta' dell'app direbbe una cosa
+  e meta' un'altra sullo stesso accordo. Con UN pezzo, o con la
+  quantita' non dichiarata, la cifra e basta: aggiungere sarebbe
+  rumore, e c'e' la prova che quella frase non contenga «al pezzo».
+  0 = NON DICHIARATA, ed e' il mondo di ieri byte per byte: nessun
+  DEFAULT 1 e nessun backfill, perche' sulle offerte gia' aperte al
+  deploy nessuno ha mai concordato un numero e scriverne uno
+  riscriverebbe un accordo stretto in due (il residuo si esaurisce da
+  se' in ≤72 ore: 48 di risposta + 24 di pagamento). In scrittura la
+  dichiarazione e' la PRESENZA della chiave nel payload e mai il valore
+  — il patto di `spedizione_punto_dichiarata` — e il numero si LIMA
+  allo stock (il patto di `quantita_tollerante`: un numero fuori scala
+  non deve far fallire una trattativa). NON si usa
+  `quantita_da_payload`: quello e' il giudice della quantita'
+  dell'ANNUNCIO e solleva 400 sopra `MAX_QUANTITA_ANNUNCIO`, mentre qui
+  il tetto vero e' lo stock, che e' piu' stretto.
+  LA QUANTITA' COMANDA NEI QUATTRO PERCORSI del conto (`compra`,
+  `_compra_set`, `preventivo_ordine`, `_preventivo_set`): il numero del
+  client si IGNORA — puo' venire da una cache di ieri — ed e' ESATTA e
+  non un tetto (decisione di Andrea: un significato solo da spiegare, e
+  il venditore sa cosa ha accettato). Conseguenza in vetrina: lo
+  stepper sparisce da «Acquista», che porta un `× N` statico, e la
+  cella del carrello si PINNA (col «−» che toglie la riga intera: un
+  accordo si prende o si lascia, non si lima — senza, il pezzo non si
+  potrebbe piu' togliere).
+  L'ORDINE DELLE GUARDIE NON SI TOCCA, ed e' la riga da non
+  ammorbidire: portare il blocco dell'offerta SOPRA la RIPRESA sembra
+  la mossa pulita ed e' una REGRESSIONE — la guardia `off["ordine_id"]`
+  scatterebbe prima che la ripresa faccia il suo lavoro, e il
+  compratore che ritenta con la sua stessa offerta prenderebbe un 400
+  invece di ritrovarsi la sua fattura (provato: spostandolo, due
+  sentinelle diventano rosse). Quindi il fail-fast di cortesia guarda
+  ancora il numero del CLIENT, e subito dopo aver fissato `richiesti`
+  si rifa' il controllo sul disponibile — una LETTURA e nessun DML,
+  prima della invoice: il patto del ricontrollo resta intatto. Serve al
+  caso «client manda 1, accordo 3, ne restano 2», che altrimenti
+  prenderebbe il 409 secco del ricontrollo invece del 400 che dice
+  quanti ne restano. CORNER DICHIARATO: un client che chiede PIU' pezzi
+  dell'accordo con lo stock in mezzo fra i due prende il 400 del primo
+  fail-fast — col client nuovo non puo' succedere (lo stepper non c'e'
+  piu'), e l'esito e' comunque un rifiuto con un messaggio vero.
+  STOCK SCESO SOTTO L'ACCORDO: il 400 onesto, e l'offerta resta
+  'accettata' fino alla SUA scadenza — se il venditore rifornisce entro
+  quelle ore, si paga. Mai un cambio silenzioso di un accordo stretto
+  in due. NESSUNA guardia nuova su `rispondi_offerta`: accettare non
+  riserva niente e l'accettazione non ha mai guardato lo stock, e non
+  si aggiunge una regola al percorso dei soldi per questo.
+  ACCETTARE NON RISERVA NIENTE, e va RIDETTO dove il numero si vede: un
+  negozio con 4 pezzi puo' accettare tre offerte da 3 e trovarsi
+  impegnato per 9. Il meccanismo e' identico a ieri — l'annuncio non si
+  e' mai bloccato — ma col numero SCRITTO il venditore si sente piu'
+  impegnato di quanto sia. Quindi la riga compare in tre posti e solo
+  coi pezzi >1: il confirm (che gia' lo diceva), il pannello delle
+  offerte (che non lo diceva) e la notifica del bot, da cui si accetta
+  di piu'. Col pezzo singolo i testi restano quelli di sempre.
+  IL FOGLIO RIFATTO nello stesso giro: tre pillole («−10%», «−20%»,
+  «Personalizzato») SENZA il controvalore — erano due cifre in
+  concorrenza con quella che conta — e il campo libero si vede solo
+  sulla terza. Toggle €/₿ in testata (`.sheet-testa`, col titolo che
+  cede coi puntini): governa la LETTURA — listino, minimo e riga
+  dell'offerta, che sono i tre numeri da confrontare e in due lingue
+  diverse non si confrontano affatto (visto a schermo) — mentre il
+  CAMPO resta nella valuta del listino, l'unica in cui l'accordo esiste
+  e l'unica che il server accetta; `cifraOfferta` applica la regola del
+  ≈ di `cifraCtrl` ma parla la valuta del listino quando servirebbe una
+  conversione e il cambio non e' vivo (qui il numero conta davvero, e
+  un ≈ sul valore di riserva sarebbe un numero inventato in faccia a
+  chi sta per impegnarsi). Via la riga «se accetta pagheresti…», che
+  diceva un totale SENZA la spedizione — cioe' una cosa incompleta —
+  al suo posto la riga «Offri X al pezzo × 3 = Y». Via «Annulla», al
+  suo posto la ✕ in alto a destra (`.pacco-x`, il ✕ di casa: un secondo
+  nome per la stessa forma sarebbe peggio del nome che invecchia), che
+  chiude con `navIndietro()` e mai `closeSheet()`.
+  IL TASTO OFFERTA PORTA LA QUANTITA' come il suo gemello, cosi' i
+  pezzi si vedono PRIMA di aprire il foglio. Non uno stepper — da li'
+  la quantita' non si cambia, e due stepper in fila litigherebbero: un
+  numero statico. L'etichetta si ACCORCIA quando lo porta, e la ragione
+  e' misurata: a 320px la barra concede a quel tasto ~118px e «Fai
+  un'offerta» ne chiede gia' ~110, quindi diventa «Offri × 3» —
+  «Offri» non e' una parola nuova, e' il verbo del bottone d'invio del
+  foglio. Giudice UNICO `etichettaOfferta(l)` delle DUE superfici (la
+  barra su mobile, il gemello `.offerta-pagina` da 768px in su): sono
+  la stessa cosa vista da due larghezze e non devono poter dire due
+  numeri, e `setQta` le RISCRIVE entrambe (a un pezzo l'etichetta torna
+  «Fai un'offerta»: non e' una cifra da sostituire). La ripartizione
+  `.con-qta` e' passata da 60/40 a 56/44, rimisurata a schermo: nasceva
+  quando l'altro lato era nudo, e lo stepper «− N +» resta piu' largo
+  di un «× N» ma non di tutto quello di prima.
+  Piu' il titolo scappato in `fai_offerta`, che mancava mentre i tre
+  fratelli ce l'avevano (la famiglia di B6).
   LESSICO (deciso lug 2026): la scheda per gli utenti si chiama
   «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
   confirm); gli id interni (go('affari'), #nav-affari, view-affari)
@@ -9701,6 +9812,40 @@ d'occhio la BANDA la prima settimana (~820 MB per passata completa: vedi
 la voce del costo). DA GUARDARE: che `/robots.txt` risponda 200 sul
 dominio vero, e che la prima card social condivisa dopo il deploy sia
 identica a prima.
+
+L'offerta si porta dietro i pezzi (ago 2026): il venditore accettava un
+prezzo unitario a quantita' INDETERMINATA e poteva ritrovarsi a vendere
+tutto lo stock alla cifra scontata, scoprendolo con l'ordine — e il
+compratore che aveva scelto tre pezzi li perdeva per strada. Ora la
+quantita' scelta accanto ad «Acquista» viaggia con l'offerta e comanda
+nei quattro percorsi del conto. La cifra resta l'UNITARIO (si confronta
+col listino, e un totale romperebbe la divisione a ritroso di
+`_righe_ordine`) e le due facce si dicono INSIEME ovunque i pezzi siano
+piu' di uno. Nello stesso giro il foglio si rifa': tre pillole senza
+controvalore, toggle €/₿ che governa la lettura, la riga «Offri X al
+pezzo × 3 = Y» al posto del totale incompleto di prima, la ✕ al posto di
+«Annulla», e il tasto offerta che porta la quantita' come il suo
+gemello. Vedi Architettura, «L'OFFERTA SI PORTA DIETRO I PEZZI», per la
+decisione unitario-vs-totale coi suoi tre perche', per l'ordine delle
+guardie che NON si tocca (spostare il blocco dell'offerta sopra la
+ripresa e' una regressione, non una pulizia) e per il corner dichiarato
+del client che chiede piu' pezzi dell'accordo. Collaudata: 2091 prove
+verdi (52 nuove — il giudice puro, l'aritmetica con la divisione a
+ritroso esatta, i quattro percorsi, l'ordine delle guardie, il gemello
+client, il foglio e le due superfici del tasto) piu' UNDICI mutazioni
+del codice una per riga sorvegliata, ognuna rossa da sola; e il giro
+vero su database usa-e-getta col server acceso: offerta per 3 pezzi →
+accordo → il client che chiede 5 e ottiene 3, preventivo == compra al
+sat (215.000), unitario esatto a ritroso, stock sceso a 2 col 400
+onesto e l'offerta ancora viva, offerta «di ieri» che si comporta come
+allora, 99 pezzi limati a 2. Piu' gli screenshot a 320 e 375px nei due
+temi (testata del foglio senza collisioni, barra coi due tasti a 3
+pezzi, pannello del venditore, pagina d'acquisto). IN PRODUZIONE basta
+il deploy: la colonna nasce a 0 — cioe' quantita' non dichiarata per
+tutte le offerte gia' aperte — e non c'e' nessuna leva. DA GUARDARE al
+primo giro: la prima offerta vera con piu' di un pezzo dentro Telegram,
+e che il venditore legga nella notifica del bot sia il totale sia il
+fatto che accettare non blocca niente.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
