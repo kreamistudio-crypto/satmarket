@@ -9781,17 +9781,42 @@ def prove_ritiro_offerta():
     # --- 11) il client -----------------------------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("il client ha la sua ritiraOfferta", True,
-          "async function ritiraOfferta(" in mini)
+          "function ritiraOfferta(" in mini)
     rend = pezzo_js(mini, "function renderOfferte()", "\nfunction toggleContro")
     prova("il bottone Ritira compare in DUE rami (proposta e accettata)",
           2, rend.count("ritiraOfferta("))
     prova("la ritirata non entra fra le vive", False,
           "'ritirata'" in rend)
-    rit_js = pezzo_js(mini, "async function ritiraOfferta(")
-    prova("il confirm non hardcoda il tetto: viene dalla busta", True,
-          "max_offerte" in rit_js)
+    # Le due meta' del gesto: chi APRE il foglio e chi ESEGUE. Le
+    # ancore sono esplicite perche' fra le due funzioni non c'e' una
+    # riga vuota, e pezzo_js taglia proprio li'.
+    apre = mini[mini.index("function ritiraOfferta("):
+                mini.index("async function confermaRitiroOfferta(")]
+    esegue = mini[mini.index("async function confermaRitiroOfferta("):
+                  mini.index("/* «Paga ora»: si riapre il dettaglio")]
+    prova("il tetto non si hardcoda: viene dalla busta", True,
+          "max_offerte" in apre)
     prova("il client chiama la rotta giusta", True,
-          "/ritira`" in rit_js or "/ritira'" in rit_js)
+          "/ritira`" in esegue)
+    # IL PUNTO DEL CANTIERE: la domanda si fa col foglio di casa, mai
+    # col dialogo del sistema operativo.
+    prova("nessun confirm() di sistema nel ritiro", False,
+          "confirm(" in apre or "confirm(" in esegue)
+    prova("...e nemmeno un alert()", False,
+          "alert(" in apre or "alert(" in esegue)
+    prova("il foglio esiste nel markup", True,
+          'id="ritiroSheet"' in mini)
+    # Un foglio non registrato in closeSheet resta aperto sotto il velo
+    # quando qualcun altro chiude la pila: e' il difetto classico.
+    chiudi = pezzo_js(mini, "function closeSheet()")
+    prova("il foglio e' registrato in closeSheet", True,
+          "ritiroSheet" in chiudi)
+    prova("i due bottoni del foglio: quello che chiude e il "
+          "ripensamento", True,
+          "confermaRitiroOfferta(this)" in mini
+          and 'id="ritiroSheet"' in mini)
+    # Il titolo dell'annuncio e' testo del VENDITORE dentro innerHTML.
+    prova("il titolo passa da esc()", True, "esc(o.titolo)" in apre)
 
 
 def main():

@@ -3789,6 +3789,32 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET RITIRO DELL'OFFERTA (ago 2026) ============
+       Foglio nostro invece del confirm() di sistema. Sta QUI e non
+       accanto a #offertaSheet perche' il suo parente vero e' quello
+       sopra — la conferma di una cosa che non si annulla, con quello
+       che chiude sopra e il ripensamento sotto — mentre il foglio
+       dell'offerta e' un modulo da compilare. (E una prova di quel
+       cantiere legge la fetta «da offertaSheet a puntaSheet»: un
+       foglio infilato in mezzo gliela allargava.)
+       Il testo cambia coi DUE casi — una proposta che il venditore non
+       ha ancora visto e un accordo che sta aspettando i sats non sono
+       lo stesso gesto — e li scrive ritiraOfferta(), che e' anche
+       l'unica a sapere quale offerta si sta ritirando. -->
+  <div class="sheet" id="ritiroSheet" role="dialog" aria-modal="true"
+       aria-labelledby="ritiroTit">
+    <div class="grab"></div>
+    <h3 id="ritiroTit">Vuoi ritirare la tua offerta?</h3>
+    <!-- La testata (miniatura + titolo dell'annuncio) e il corpo li
+         scrive ritiraOfferta(): il titolo e' testo del venditore e
+         passa da esc(), come ovunque. -->
+    <div id="ritiroTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <div id="ritiroCorpo" style="font-size:13px;color:var(--muted);font-weight:600;
+      line-height:1.5;margin-bottom:14px"></div>
+    <button class="btn orange" onclick="confermaRitiroOfferta(this)">Sì, ritira</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
   <!-- ============ SHEET: LA PRIMA SPEDIZIONE ============ -->
   <!-- Si legge PRIMA di andare all'ufficio postale, e per questo si
        apre quando il venditore vede il pannello di spedizione — non al
@@ -9794,6 +9820,7 @@ function closeSheet(){
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
+  el('ritiroSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
@@ -10740,12 +10767,19 @@ async function rispondiOfferta(id, azione){
 /* Il ritiro del PROPONENTE, gemello speculare del rifiuto: da qui si
    chiude una trattativa che si e' aperta per sbaglio. Nessun sat e'
    mai coinvolto — se c'e' gia' una fattura in corso il server dice di
-   no e manda agli Ordini, che e' l'altra strada. */
-async function ritiraOfferta(id){
+   no e manda agli Ordini, che e' l'altra strada.
+   La domanda si fa col FOGLIO di casa e non col confirm() di sistema
+   (la strada di #paccoSvuotaSheet e del rifornimento): quale offerta
+   si sta ritirando vive in ritiroId, che e' anche la guardia del
+   bottone di conferma. */
+let ritiroId = 0;
+function ritiraOfferta(id){
   haptic();
   const o = offerteMie.find(x=>x.id===id); if (!o) return;
-  /* Il confirm e' testo NUDO: le cifre si scrivono a mano, che
-     cifraOff e i suoi gemelli portano dentro dell'HTML. */
+  ritiroId = id;
+  /* Il corpo del foglio e' testo NUDO come il confirm di prima: le
+     cifre si scrivono a mano, che cifraOff e i suoi gemelli portano
+     dentro dell'HTML. */
   const a = accordoDi(o), q = o.quantita||0;
   const cifra = (o.valuta==='eur'
       ? fmtEur(Math.round(a.eur*Math.max(1,q)*100)/100)+' €'
@@ -10759,22 +10793,50 @@ async function ritiraOfferta(id){
     ? `, e il tentativo resta contato: su ogni annuncio si può offrire `
       + `${max} volte in tutto`
     : ', e il tentativo resta contato';
-  if (!confirm(o.stato==='accettata'
-      ? `Vuoi ritirare l'accordo a ${cifra}?\n\nIl venditore ha già `
-        + `detto sì e sta aspettando il tuo pagamento: lo avvisiamo che `
-        + `hai ritirato. Nessun sat si è mosso${coda}.`
-      : `Vuoi ritirare la tua offerta di ${cifra}?\n\nIl venditore non `
-        + `potrà più accettarla${coda}. Subito dopo puoi farne una `
-        + `nuova, se te ne restano.`))
-    return;
+  const acc = o.stato==='accettata';
+  el('ritiroTit').textContent = acc
+    ? `Vuoi ritirare l'accordo a ${cifra}?`
+    : `Vuoi ritirare la tua offerta di ${cifra}?`;
+  /* La miniatura dell'annuncio, che nel confirm non ci poteva stare:
+     dice SU COSA si sta per agire, ed e' la stessa testata dei fogli
+     fratelli (offerta, puntata, rifornimento). */
+  let thumb = '';
+  try { const nomi = o.foto ? JSON.parse(o.foto) : [];
+        if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
+  el('ritiroTestata').innerHTML = (thumb
+      ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
+      : '<span style="font-size:28px">💰</span>')
+    + `<b style="font-size:14px">${esc(o.titolo)}</b>`;
+  el('ritiroCorpo').textContent = acc
+    ? `Il venditore ha già detto sì e sta aspettando il tuo pagamento: `
+      + `lo avvisiamo che hai ritirato. Nessun sat si è mosso${coda}.`
+    : `Il venditore non potrà più accettarla${coda}. Subito dopo puoi `
+      + `farne una nuova, se te ne restano.`;
+  el('sheetBg').classList.add('open');
+  el('ritiroSheet').classList.add('open');
+}
+async function confermaRitiroOfferta(btn){
+  haptic();
+  const id = ritiroId; if (!id) return;
+  const ripristina = bottoneInAttesa(btn, 'Ritiro…');
   try {
     const r = await fetch(`${API_BASE}/offerte/${id}/ritira`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()}});
     const d = await r.json().catch(()=>({}));
-    if (!r.ok) toast(d.detail||'Operazione non riuscita', 5000);
-    else toast('Offerta ritirata');
+    /* Il foglio si chiude comunque: a differenza del rifornimento qui
+       non c'e' NIENTE da correggere dentro — il 400 dice «paga o
+       annulla l'ordine» e il 409 «ricarica», e tutti e due si agiscono
+       altrove. Chiusura MIRATA, mai closeSheet: il pollTimer non e'
+       roba di questo foglio, ma la regola vale per tutti. */
+    el('ritiroSheet').classList.remove('open');
+    if (!document.querySelector('.sheet.open'))
+      el('sheetBg').classList.remove('open');
+    ritiroId = 0;
+    toast(r.ok ? 'Offerta ritirata'
+               : (d.detail || 'Operazione non riuscita'), r.ok ? 3000 : 5000);
   } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
   loadOfferte().then(renderOfferte).catch(()=>{});
 }
 /* «Paga ora»: si riapre il dettaglio, che con l'offerta accettata

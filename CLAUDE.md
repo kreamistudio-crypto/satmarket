@@ -3804,7 +3804,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   aprirebbe uno spam illimitato — proponi 1 sat, il venditore riceve la
   notifica, ritiri, riproponi. E non toglie niente a nessuno: oggi chi
   sbaglia brucia comunque il tentativo E deve aspettare 48 ore, col
-  ritiro ha gli stessi tentativi residui SUBITO. Il confirm lo dice, col
+  ritiro ha gli stessi tentativi residui SUBITO. Il foglio lo dice, col
   numero preso dalla busta di `/api/me/offerte` e MAI un «te ne restano
   N» (quella busta ha un LIMIT: un numero contato lì potrebbe essere
   falso, e una promessa falsa è peggio di un'informazione mancante).
@@ -3826,6 +3826,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `.btn` è `width:100%` e due bottoni nudi si impilerebbero a tutta
   larghezza: è l'unico punto in cui il markup di `renderOfferte` cambia,
   e la card resta della stessa altezza (misurato prima/dopo).
+  LA DOMANDA SI FA COL FOGLIO DI CASA, `#ritiroSheet` — mai il
+  `confirm()` del sistema operativo: la strada di `#paccoSvuotaSheet` e
+  del rifornimento, con quello che chiude sopra e il ripensamento
+  sotto. Il gesto è spezzato in due — `ritiraOfferta` APRE (e scrive i
+  testi, che restano i due distinti: una proposta mai vista e un
+  accordo che aspetta i sats non sono lo stesso gesto), `conferma
+  RitiroOfferta` ESEGUE — con l'id in `ritiroId`, che è anche la
+  guardia del bottone. Il foglio si chiude SEMPRE dopo la risposta, al
+  contrario del rifornimento: lì il 400 lascia un numero da correggere
+  DENTRO, qui il 400 dice «paga o annulla l'ordine» e il 409
+  «ricarica», che si agiscono altrove. Chiusura MIRATA e mai
+  `closeSheet`, e la registrazione in `closeSheet` c'è (un foglio che
+  se la dimentica resta appeso sotto il velo: c'è la prova).
   L'OFFERTA SI PORTA DIETRO I PEZZI (ago 2026): il venditore accettava
   un prezzo unitario a quantita' INDETERMINATA — `articolo = unitario
   * richiesti` e `richiesti` arrivava dal client senza nessun legame
