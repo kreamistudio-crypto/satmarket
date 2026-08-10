@@ -163,20 +163,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   netto del VIETATO è che nomina un ordine, un account o un pagamento
   CHE ESISTEREBBERO GIÀ — cosa impossibile in un annuncio che chi
   legge sta guardando per la prima volta.
-  SUL PRIMO DEI DUE ESEMPI IL MODELLO È PIÙ SEVERO DEL PROMPT, ed è
-  registrato invece che nascosto (decisione di Andrea): «Assistenza
-  Barattolo — supporto agli utenti» esce VIETATO benché il prompt gli
-  insegni DUBBIO su quella riga esatta — chi si mette «Assistenza»
-  davanti al nostro nome e si offre di risolvere problemi con gli
-  ordini fa già un passo dentro il parlare a nome nostro. Si accetta
-  perché sbaglia dalla parte SEVERA su un caso che la severità la
-  merita, e nel collaudo l'atteso è stato portato a VIETATO — stretto,
-  mai «VIETATO o DUBBIO», o i giri non tornerebbero mai pieni e una
-  regressione vera si perderebbe nel rumore. Il prompt NON si tocca:
-  la sua riga DUBBIO è ancora viva e la tiene in piedi «Barattolo
-  Ufficiale — store», che DUBBIO lo prende davvero. Se un domani
-  cadessero tutt'e due, la voce è scivolata verso il rifiuto e va
-  guardata.
+  «ASSISTENZA BARATTOLO — SUPPORTO AGLI UTENTI», e la storia vale più
+  del caso: è l'esempio di come NON si tiene un collaudo.
+  Per tre giorni il modello ha risposto VIETATO dove il prompt gli
+  insegna DUBBIO su quella riga esatta, e l'atteso del collaudo fu
+  ALZATO a VIETATO per inseguirlo — con la motivazione, allora
+  ragionevole, che sbagliava dalla parte severa su un caso che la
+  severità la merita. Ad ago 2026 il modello si è ri-allineato al
+  prompt e risponde DUBBIO, e l'atteso è tornato DUBBIO: quello che
+  il prompt insegna, e che non era mai cambiato.
+  LA REGOLA CHE NE ESCE (decisione di Andrea): **un atteso che cambia
+  due volte non è più un atteso**. L'atteso segue il PROMPT, non il
+  modello — se un domani quel caso oscillasse ancora si dichiara come
+  CASO INSTABILE nel collaudo, e non lo si rincorre una terza volta:
+  un valore che si riscrive a ogni giro non prova più niente, e
+  intanto il conto smette di essere leggibile. La stessa ragione per
+  cui l'atteso resta STRETTO (mai «VIETATO o DUBBIO»): i giri devono
+  poter tornare pieni, o una regressione vera si perde nel rumore.
+  Il prompt NON si è mai toccato in tutta questa storia, ed è ciò che
+  ha reso possibile il ritorno: la sua riga DUBBIO è sempre stata
+  viva, tenuta in piedi anche da «Barattolo Ufficiale — store».
+  Se un domani cadessero tutt'e due, la voce è scivolata verso il
+  rifiuto e va guardata.
   DUE CONTRO-REGOLE, e sono la metà che conta: quelle che un riordino
   toglie per prime perché sembrano un ripensamento. 1) **Nominare
   Barattolo è lecito e non è MAI di per sé un motivo** («gadget di
@@ -251,13 +259,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   VUOTA, che mette insieme i due difetti.
   Il collaudo col MODELLO vero è `collaudo_impersonazione.py` (19
   casi, ago 2026: **18/19 e ZERO falsi positivi**, i tre nuovi sui
-  sats passano tutti; l'unico fuori posto è un «caso cattivo
-  passato», cioè il tipo meno grave — e da quando l'AI segnala e non
-  decide quel caso finisce comunque in coda, sotto gli occhi di un
-  moderatore. CHI LO RILANCIA SCRIVA QUI QUALE È: un 18/19 senza nome
-  è un numero su cui fra sei mesi nessuno può agire, ed è
-  esattamente il rumore in cui una regressione vera si perde), che
-  vuole la chiave e VA RILANCIATO A OGNI RITOCCO DEL PROMPT — è
+  sats passano tutti). L'unico fuori posto era **«Assistenza
+  Barattolo — supporto agli utenti»**, atteso VIETATO e risposta
+  DUBBIO: non un falso positivo ma un «caso cattivo passato», il tipo
+  meno grave — e da quando l'AI segnala e non decide quel caso finisce
+  comunque in coda, sotto gli occhi di un moderatore. L'atteso è stato
+  RIMESSO a DUBBIO (vedi la voce sua, sopra): col prossimo giro il
+  conto deve tornare **19/19**. CHI LO RILANCIA SCRIVA QUI IL NOME di
+  quel che cade: un «18/19» senza nome è un numero su cui fra sei mesi
+  nessuno può agire, ed è esattamente il rumore in cui una regressione
+  vera si perde. Vuole la chiave e VA RILANCIATO A OGNI RITOCCO DEL
+  PROMPT — è
   l'unica cosa che dice se il modello ha capito, e il falso positivo
   della bici è saltato fuori da lì e non dalla lettura. `prove.py`
   difende la FORMA (la voce, le due contro-regole, la regola sovrana
@@ -10068,8 +10080,11 @@ la ragione che rende la scelta poco rischiosa — in revisione
 l'annuncio non è pubblico, quindi il costo è la coda e non il rischio.
 MISURATO, non stimato: il collaudo col modello vero dà **18/19 con
 ZERO falsi positivi** (i tre casi nuovi sui sats passano tutti; l'unico
-fuori posto è un «caso cattivo passato», il tipo meno grave, che ora
-finisce comunque in coda), e `stima_coda_moderazione.py` sui rifiuti
+fuori posto era «Assistenza Barattolo — supporto agli utenti», atteso
+VIETATO e risposta DUBBIO — un «caso cattivo passato», il tipo meno
+grave, che ora finisce comunque in coda. L'atteso è stato rimesso a
+DUBBIO, che è quello che il prompt insegna: col prossimo giro il conto
+torna 19/19), e `stima_coda_moderazione.py` sui rifiuti
 veri di 30 giorni dice che la coda passa da **7 a 14, cioè 0,2 annunci
 in più al giorno**. 2171 prove verdi, nove mutazioni tutte rosse, e UNA
 prova che ha cambiato lato: chiedeva che «VIETATO: impersonazione»

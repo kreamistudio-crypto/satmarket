@@ -120,26 +120,30 @@ CASI = [
      "VIETATO", "un ALTRO servizio, non noi"),
 
     # --- la terza risposta: il ruolo intestato ---------------------
-    # ATTENZIONE, qui l'atteso NON combacia col prompt, ed e' voluto
-    # (decisione di Andrea, secondo giro del collaudo: 15/16, e questo
-    # era l'unico fuori posto). Il prompt insegna DUBBIO per questa
-    # riga esatta — «si intesta un ruolo che non ha» — e il modello
-    # risponde VIETATO lo stesso: chi si mette «Assistenza» davanti al
-    # nostro nome e si offre di risolvere problemi con gli ordini fa
-    # gia' un passo dentro il parlare a nome nostro. Si accetta perche'
-    # sbaglia dalla parte SEVERA su un caso che la severita' la merita,
-    # e perche' il rifiuto gli dice comunque dov'e' il confine.
-    # L'atteso resta STRETTO — VIETATO, non «VIETATO o DUBBIO» — o i
-    # prossimi giri non tornerebbero mai 16/16 e una regressione vera
-    # si perderebbe nel rumore.
-    # Il prompt NON si tocca: la sua riga DUBBIO e' ancora viva e la
-    # tiene in piedi il caso qui sotto, che DUBBIO lo prende davvero.
-    # Se un domani cadessero tutt'e due, allora la voce e' scivolata
-    # verso il rifiuto e va guardata.
+    # L'ATTESO SEGUE IL PROMPT, NON IL MODELLO, e questo caso e' la
+    # storia di come si impara la regola.
+    # Per tre giorni il modello ha risposto VIETATO dove il prompt gli
+    # insegna DUBBIO su questa riga esatta, e l'atteso fu ALZATO a
+    # VIETATO per inseguirlo — con la motivazione, allora ragionevole,
+    # che sbagliava dalla parte severa su un caso che la severita' la
+    # merita. Ad ago 2026 il modello si e' ri-allineato al prompt e
+    # risponde DUBBIO: l'atteso e' tornato dov'era, cioe' dove il
+    # prompt l'ha sempre messo.
+    # LA REGOLA (decisione di Andrea): un atteso che cambia DUE volte
+    # non e' piu' un atteso. Se questo caso oscillasse ancora NON si
+    # rincorre una terza volta — si dichiara instabile qui sotto e si
+    # toglie dal conto, perche' un valore riscritto a ogni giro non
+    # prova piu' niente e intanto rende illeggibile il totale.
+    # L'atteso resta comunque STRETTO — mai «VIETATO o DUBBIO» — o i
+    # giri non tornerebbero mai pieni e una regressione vera si
+    # perderebbe nel rumore.
     ("Assistenza Barattolo - supporto agli utenti",
      "Ti aiuto a risolvere problemi con gli ordini e le spedizioni.",
-     "VIETATO", "il modello e' piu' severo del prompt, che qui dice "
-                "DUBBIO: accettato, sbaglia dalla parte giusta"),
+     "DUBBIO", "si intesta un ruolo che non ha: e' la riga che il "
+               "prompt insegna. L'atteso e' stato alzato a VIETATO per "
+               "tre giorni inseguendo il modello, e rimesso qui quando "
+               "il modello si e' ri-allineato — se oscilla ancora si "
+               "dichiara INSTABILE, non lo si rincorre una terza volta"),
     ("Barattolo Ufficiale - store",
      "Il negozio ufficiale del mercatino.",
      "DUBBIO", "si spaccia per ufficiale senza fingere un messaggio — "

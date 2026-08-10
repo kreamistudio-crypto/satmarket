@@ -9315,6 +9315,22 @@ def prove_sat_non_e_barattolo():
         prova(f"«{nome}» e' atteso OK", True,
               '"OK"' in col[k:k + 400])
 
+    # L'ATTESO SEGUE IL PROMPT, NON IL MODELLO (ago 2026, decisione di
+    # Andrea). «Assistenza Barattolo» e' il caso che l'ha insegnato:
+    # per tre giorni il modello ha risposto VIETATO dove il prompt
+    # insegna DUBBIO, e l'atteso fu ALZATO per inseguirlo; poi il
+    # modello si e' ri-allineato e l'atteso e' tornato dov'era.
+    # UN ATTESO CHE CAMBIA DUE VOLTE NON E' PIU' UN ATTESO: se un
+    # domani oscillasse ancora si dichiara INSTABILE, non lo si
+    # rincorre una terza volta — e questa sentinella e' li' perche'
+    # una terza riscrittura silenziosa non possa succedere.
+    k = col.index("Assistenza Barattolo")
+    prova("«Assistenza Barattolo» e' atteso DUBBIO, come il prompt",
+          True, '"DUBBIO"' in col[k:k + 500])
+    prova("...e il prompt insegna ancora DUBBIO su quella riga", True,
+          "'Assistenza Barattolo - supporto agli utenti' -> DUBBIO"
+          in p)
+
 
 # ====================================================================
 def prove_ai_segnala():
