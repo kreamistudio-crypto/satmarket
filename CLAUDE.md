@@ -3857,13 +3857,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Toggle €/₿ in testata (`.sheet-testa`, col titolo che
   cede coi puntini): governa la LETTURA — listino, minimo e riga
   dell'offerta, che sono i tre numeri da confrontare e in due lingue
-  diverse non si confrontano affatto (visto a schermo) — mentre il
-  CAMPO resta nella valuta del listino, l'unica in cui l'accordo esiste
-  e l'unica che il server accetta; `cifraOfferta` applica la regola del
-  ≈ di `cifraCtrl` ma parla la valuta del listino quando servirebbe una
-  conversione e il cambio non e' vivo (qui il numero conta davvero, e
-  un ≈ sul valore di riserva sarebbe un numero inventato in faccia a
-  chi sta per impegnarsi).
+  diverse non si confrontano affatto (visto a schermo).
+  E DAL 10 AGO 2026 GOVERNA ANCHE IL CAMPO, che ROVESCIA la riga che
+  stava qui («il CAMPO resta nella valuta del listino»): era un mezzo
+  bug e si è visto dal campo — si scriveva 40.000 in sats, si passava
+  a euro, la riga sotto convertiva e il campo diceva ancora 40.000,
+  che in euro è tutta un'altra offerta. Adesso il campo parla la
+  valuta MOSTRATA e ne porta il simbolo accanto (`offSuffisso`), così
+  si vede sempre in cosa si sta scrivendo. Resta vero il perché di
+  allora — l'accordo esiste solo nella valuta del LISTINO, l'unica che
+  il server accetta — e quindi la conversione avviene in `inviaOfferta`,
+  UNA volta sola: il campo è una vista, il listino è la sostanza.
+  L'ANCORA È CIÒ CHE IMPEDISCE ALLA CIFRA DI DERIVARE, ed è la riga da
+  non ammorbidire: si tiene la cifra COM'È STATA SCRITTA (`offCifra`)
+  insieme alla valuta in cui lo è stata (`offCifraValuta`), e il
+  toggle non la riscrive MAI — la RILEGGE convertita (`offCifraIn`).
+  Così dieci toggle di fila costano sempre UNA moltiplicazione
+  sull'originale, invece di una catena in cui ognuna parte dal
+  risultato della precedente, che è il modo in cui un numero se ne va
+  di centesimo in centesimo a ogni tocco. A scrivere l'ancora sono TRE
+  posti soli — l'apertura che azzera, la pillola, l'oninput
+  (`offertaScritta`) — e il render NON è fra questi: se riscrivesse
+  l'ancora con la propria conversione, l'originale sparirebbe e la
+  deriva tornerebbe (c'è la sentinella, e la mutazione che la rimette
+  fa rossa la prova). Per la stessa ragione il campo si riscrive SOLO
+  quando la valuta cambia davvero (`offCampoValuta`): un tocco sullo
+  stepper chiama lo stesso render, e senza quel confronto
+  normalizzerebbe sotto le dita una cifra che si sta ancora scrivendo.
+  LE PILLOLE si CONFRONTANO nella valuta MOSTRATA — è il numero che si
+  vede, e con la tolleranza di quella valuta (il centesimo in euro,
+  l'unità nei sats: una conversione non torna mai al sat esatto) — ma
+  PIANTANO l'ancora in quella del LISTINO, così il −10% che parte è
+  esattamente −10% al sat qualunque cosa il campo stia mostrando.
+  IL MINIMO fa il contrario, e la coppia è il punto: si CONFRONTA nella
+  valuta del listino, che è quella su cui giudica il server, e si DICE
+  in quella del campo arrotondato per ECCESSO (`offMinimoIn`) — chi
+  scrive esattamente la cifra che legge dev'essere ammesso, mai
+  rifiutato per un centesimo di conversione.
+  E LA RIGA ECHEGGIA IL CAMPO invece di riconvertire la cifra del
+  listino: su un listino in euro «50000 sats» vale 27,70 €, che
+  riletto in sats fa 50.008 — e un campo che dice 50.000 con sotto un
+  «≈ 50 008» si legge come un guasto, non come i centesimi che sono.
+  Senza cambio vivo il campo resta sulla valuta del listino, che è
+  sempre esatta: mai una conversione fatta col valore di riserva (è la
+  stessa regola che `cifraOfferta` aveva già per la lettura — qui il
+  numero conta davvero, e un ≈ su un valore di riserva sarebbe un
+  numero inventato in faccia a chi sta per impegnarsi).
   LA QUANTITA' SI CAMBIA NEL FOGLIO, con uno stepper sotto il toggle —
   al posto del numero statico accanto al titolo, non in aggiunta: due
   numeri per la stessa cosa nello stesso foglio sarebbero il difetto
