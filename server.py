@@ -1821,6 +1821,12 @@ def init_db():
                     # differenza del dismiss del wallet NWC, che il
                     # wallet ce l'ha solo quel telefono).
                     "avvisato_trasporto INTEGER DEFAULT 0",
+                    # LA DIMENSIONE DEL TESTO (ago 2026): percentuale
+                    # scelta dal lettore, valida su ogni dispositivo
+                    # (vedi SCALE_FONT). 100 = la misura di sempre,
+                    # quindi il DEFAULT e' anche la migrazione: nessuno
+                    # si ritrova l'app cambiata sotto gli occhi.
+                    "font_scala INTEGER DEFAULT 100",
                     # IL NEGOZIO IN FERIE (ago 2026): 0 = aperto,
                     # altrimenti il timestamp del rientro. UNA colonna
                     # e non un booleano piu' una data, ed e' la scelta
@@ -6474,6 +6480,17 @@ TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 # CORRIERI_SENTINELLA: qui si dice la rete dei punti, non chi porta
 # il pacco. Il client riceve le voci da /api/me: mai hardcodate.
 SPEDIZIONIERI = ("InPost", "Poste Italiane", "Altro")
+
+# La dimensione del testo (ago 2026): chi ha bisogno di caratteri piu'
+# grandi la sceglie una volta e la ritrova OVUNQUE, perche' e' una
+# preferenza della PERSONA e non del telefono — per questo vive in
+# colonna (`utenti.font_scala`) e non solo in localStorage, dove resta
+# la copia veloce che accende la scala prima del primo paint e serve
+# agli anonimi in vetrina. Sono PERCENTUALI e non nomi: l'etichetta
+# («Grande») la scrive il client, il dato e' il numero — e come per
+# LAMPO_SCONTI le voci arrivano da /api/me, mai hardcodate di la'.
+# 100 = la misura di sempre, quindi ogni utente di ieri nasce identico.
+SCALE_FONT = (90, 100, 115, 130)
 
 # La stima della taglia del pacco di un SET (lug 2026): punti
 # ~volumetrici per taglia — i rapporti tra i riferimenti del form
@@ -14428,6 +14445,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il catalogo degli spedizionieri per il cassetto «📦 Come
     # spedisci» (stesso patto: le voci non si hardcodano nel client).
     profilo["spedizionieri"] = list(SPEDIZIONIERI)
+    # Le misure del testo per il cassetto «🌗 Aspetto»: il valore
+    # scelto esce gia' dal SELECT * (`font_scala`), le voci no — e il
+    # client non le hardcoda mai (il patto di max_barattolo).
+    profilo["scale_font"] = list(SCALE_FONT)
     # Il negozio in ferie, per il cassetto «🌴»: lo stato di adesso e
     # le sue leve — il client non hardcoda mai un tetto (il patto di
     # max_barattolo). `ferie_fino` esce gia' dal SELECT *, ma il
@@ -14781,6 +14802,37 @@ async def scegli_spedizioniere(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "spedizioniere": scelta}
+
+
+@app.post("/api/me/font-scala")
+async def scegli_font_scala(req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """«🌗 Aspetto»: quanto grande si legge Barattolo. E' il pattern di
+    spedizioniere — una preferenza, non una credenziale — con la sola
+    differenza che qui il dato viaggia DUE volte: subito in
+    localStorage (che accende la scala prima del primo paint, anche
+    offline e anche per chi non e' entrato) e poi qui, che e' cio' che
+    la fa ritrovare sul secondo telefono. Si accetta solo una misura
+    del catalogo: una percentuale scritta a mano potrebbe rendere
+    l'app illeggibile — cioe' inutilizzabile — su ogni dispositivo,
+    che e' proprio il verso in cui una preferenza non deve poter
+    sbagliare."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        scala = int(d.get("scala") or 0)
+    except (TypeError, ValueError):
+        scala = 0
+    if scala not in SCALE_FONT:
+        raise HTTPException(400, "Misura sconosciuta: "
+                            + ", ".join(str(s) for s in SCALE_FONT))
+    con = db()
+    con.execute("UPDATE utenti SET font_scala=? WHERE tg_id=?",
+                (scala, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "scala": scala}
 
 
 @app.post("/api/me/sconto-pacco")
