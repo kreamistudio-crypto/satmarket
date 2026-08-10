@@ -1126,8 +1126,11 @@ def prove_annullo():
     prova("foglio: scorre quando il contenuto eccede", True,
           "overflow-y:auto;overscroll-behavior:contain" in mini
           # dall'ago 2026 l'altezza si divide per la scala del testo:
-          # le unita' di viewport non si zoomano (vedi --fs-zoom)
-          and "max-height:calc(100dvh / var(--fs-zoom,1) - 16px)" in mini)
+          # le unita' di viewport non si zoomano (vedi --fs-zoom) — e
+          # si sottrae la TASTIERA, che il layout viewport non vede e
+          # 100dvh su iOS non accorcia
+          and "max-height:calc(100dvh / var(--fs-zoom,1) - 16px "
+              "- var(--tastiera,0px))" in mini)
     prova("QR: la misura segue l'altezza disponibile (mai sotto i "
           "170px)", True, "max(170px, 30dvh)" in mini)
 
@@ -9083,6 +9086,8 @@ def prove_offerta_quantita():
     # --- 7. Il foglio rifatto: tre pillole, toggle, ✕ ---------------
     fog = mini[mini.index('id="offertaSheet"'):
                mini.index('id="puntaSheet"')]
+    fog2 = mini[mini.index("function offertaChip("):
+                mini.index("function offertaDigitata(")]
     prova("il foglio ha la ✕ e non piu' «Annulla»", True,
           'class="pacco-x"' in fog and ">Annulla<" not in fog)
     prova("...e il toggle valuta dei suoi fratelli", True,
@@ -9091,6 +9096,54 @@ def prove_offerta_quantita():
           'class="pacco-x" onclick="navIndietro()"' in fog)
     prova("la terza pillola e' «Personalizzato»", True,
           ">Personalizzato<" in mini)
+    # IL CAMPO E' SEMPRE VISIBILE E MODIFICABILE (ago 2026, dal campo):
+    # le pillole lo RIEMPIONO, non lo nascondono — chi parte da −10% e
+    # poi ritocca dev'essere libero di farlo.
+    prova("il campo del prezzo non si nasconde piu'", True,
+          'id="offCampo" style="display:flex' in fog)
+    prova("...e la pillola percentuale lo lascia dov'e'", True,
+          "/* il campo RESTA li', pronto a essere ritoccato */" in fog2)
+    # la pillola accesa si DEDUCE dalla cifra: una scelta memorizzata
+    # direbbe il falso dopo un ritocco («−10%» su una cifra che non lo
+    # e' piu'), e non c'e' piu' nessuna variabile che possa mentire
+    prova("nessuna pillola memorizzata: si deduce dal valore", False,
+          "offScelta" in mini)
+    prova("...e a dedurla e' offertaDigitata", True,
+          "b.classList.toggle('attiva', v > 0 && (p === 'libero'" in mini)
+    # IL MINIMO NON E' UN CARTELLO PERMANENTE: compare solo quando la
+    # cifra scritta ci finisce sotto. Dirlo prima che serva e' rumore,
+    # e affianca un numero che non c'entra con quello che si scrive.
+    prova("il minimo nasce nascosto", True,
+          'id="offMinimo" style="display:none' in fog)
+    prova("...e compare solo sotto soglia", True,
+          "const sotto = offertaMinPercento > 0 && v > 0" in mini)
+    prova("...e il testo dice che e' troppo bassa", True,
+          "Troppo bassa: il minimo" in mini)
+    prova("la vecchia riga permanente non c'e' piu'", False,
+          "Le offerte partono da" in mini)
+    # e il minimo del client arrotonda come il SERVER (per eccesso sui
+    # sats), o direbbe «va bene» a una cifra che di la' viene rifiutata
+    prova("il minimo si arrotonda come il server", True,
+          "Math.ceil(l.price*offertaMinPercento/100)" in mini)
+    # LA TASTIERA NON COPRE QUEL CHE SI SCRIVE: i fogli sono ancorati
+    # al fondo dello schermo, e il layout viewport non si accorcia —
+    # l'unico che lo sa e' visualViewport.
+    # sul solo `.open` e col TRANSFORM: alzando il `bottom` si
+    # alzerebbero anche i fogli CHIUSI (nascosti con translateY(100%),
+    # cioe' la loro altezza sotto l'ancora) e rientrerebbero in vista
+    prova("i fogli si alzano con la tastiera", True,
+          ".sheet.open{transform:translateY(calc(-1 * "
+          "var(--tastiera,0px)))}" in mini)
+    prova("...e il foglio CHIUSO resta ancorato al fondo", True,
+          "position:fixed;left:0;right:0;bottom:0;" in mini)
+    prova("...e si accorciano, che 100dvh su iOS non basta", True,
+          "- var(--tastiera,0px))" in mini)
+    prova("la misura viene da visualViewport", True,
+          "window.innerHeight - vv.height - vv.offsetTop" in mini)
+    # divisa per lo zoom: arriva in pixel di VIEWPORT e si spende
+    # dentro `html`, che e' zoomato (la ragione dei calc(100vh/...))
+    prova("...e si divide per lo zoom di casa", True,
+          "coperto / z" in mini)
     # le pillole non portano piu' il controvalore: erano due cifre in
     # concorrenza con quella che conta
     prova("le pillole dicono la sola percentuale", True,

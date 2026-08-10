@@ -2465,15 +2465,29 @@
      ne' al pull-to-refresh (che comunque a foglio aperto e' gia'
      disarmato: navPila > 1). Vale per TUTTI i fogli: e' il male del
      piu' alto, ma la cintura non costa niente agli altri. */
+  /* `--tastiera` e' quanto la tastiera del telefono copre dal basso
+     (la scrive tastieraSegue, 0 quando e' chiusa). I fogli sono
+     ancorati LI', e senza questo si scrive alla cieca: la cifra che
+     si sta digitando finisce sotto i tasti. Da 768px in su il foglio
+     e' centrato (bottom:auto) e la riga qui sotto non lo tocca. */
   .sheet{
-    position:fixed;left:0;right:0;bottom:0;z-index:41;max-width:520px;margin:0 auto;
+    position:fixed;left:0;right:0;bottom:0;
+    z-index:41;max-width:520px;margin:0 auto;
     background:var(--card);border-radius:22px 22px 0 0;padding:20px var(--pad) 28px;
     transform:translateY(100%);transition:transform .22s ease;
-    max-height:calc(100vh / var(--fs-zoom,1) - 16px);
-    max-height:calc(100dvh / var(--fs-zoom,1) - 16px);
+    max-height:calc(100vh / var(--fs-zoom,1) - 16px - var(--tastiera,0px));
+    max-height:calc(100dvh / var(--fs-zoom,1) - 16px - var(--tastiera,0px));
     overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   }
-  .sheet.open{transform:none}
+  /* Il foglio APERTO si alza di quanto la tastiera copre. Sul solo
+     `.open`, e col TRANSFORM invece che col `bottom`: alzando il
+     bottom si alzerebbero anche i fogli CHIUSI, che stanno nascosti
+     con translateY(100%) — cioe' esattamente la loro altezza sotto
+     l'ancora — e con l'ancora piu' in alto rientrerebbero in vista
+     (visto a schermo: sotto il foglio dell'offerta spuntavano quello
+     dei distintivi e quello Nostr). Col transform il chiuso non si
+     muove, e da 768px in su la regola centrata piu' sotto vince. */
+  .sheet.open{transform:translateY(calc(-1 * var(--tastiera,0px)))}
   .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--field-line);margin:0 auto 14px}
   .sheet h3{font-family:'Baloo 2',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
   /* La testata di un foglio: titolo, e a destra gli inquilini di
@@ -3810,13 +3824,19 @@ document.getElementById('cartello')?.remove();</script>
     <div id="offTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
     <!-- Tre scorciatoie: due sconti ancorati e il campo libero. Le
          cifre NON stanno sulle pillole — a dire quanto si offre e'
-         la riga qui sotto, che e' una sola e non si contraddice. -->
+         la riga qui sotto, che e' una sola e non si contraddice.
+         Le pillole RIEMPIONO il campo, non lo nascondono: chi parte
+         da −10% e poi ritocca dev'essere libero di farlo. -->
     <div class="consegna-scelta" id="offChips" style="margin:0 0 10px"></div>
-    <div class="field" id="offCampo" style="display:none;gap:10px;align-items:center">
+    <div class="field" id="offCampo" style="display:flex;gap:10px;align-items:center">
       <input id="offImporto" autocomplete="off" placeholder="La tua cifra" style="flex:1" oninput="offertaDigitata()">
       <span id="offSuffisso" style="font-weight:800;color:var(--muted)">sats</span>
     </div>
-    <div id="offMinimo" style="font-size:12px;color:var(--muted);font-weight:600;margin-top:6px"></div>
+    <!-- Il minimo NON e' un cartello permanente: compare solo quando
+         la cifra scritta ci finisce sotto. Dirlo prima che serva e'
+         rumore, e affianca un numero che non c'entra con quello che
+         si sta scrivendo. Veste da avviso inline, come #zonaHint. -->
+    <div id="offMinimo" style="display:none;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--sats-text);line-height:1.45"></div>
     <div id="offRiga" style="font-size:13px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <button class="btn orange" style="margin-top:12px" onclick="inviaOfferta(this)">💰 Offri</button>
   </div>
@@ -10020,10 +10040,11 @@ function offertaAccettataPer(annuncioId){
    il numero nuovo: due numeri che dicono cose diverse nella stessa
    schermata sono il difetto che questo cantiere esiste per togliere,
    e l'unico modo di non averli e' non averne due. */
-/* Quale scorciatoia e' accesa: '10' | '20' | 'libero' | '' (nessuna).
-   E' lei a decidere anche se il campo si vede: con uno sconto ancorato
-   la cifra la dice la riga, il campo servirebbe solo a confondere. */
-let offScelta = '';
+/* QUALE PILLOLA E' ACCESA NON SI RICORDA, SI DEDUCE dalla cifra
+   scritta (ago 2026): il campo e' sempre modificabile, quindi dopo un
+   ritocco una scelta MEMORIZZATA direbbe il falso — «−10%» acceso su
+   una cifra che −10% non e' piu'. Derivata, non puo' mentire: se il
+   valore non e' nessuno dei due sconti si accende «Personalizzato». */
 
 /* Il foglio: tre scorciatoie (−10%, −20%, Personalizzato), la riga che
    dice quanto si sta offrendo e per quanti pezzi, e il toggle valuta
@@ -10043,7 +10064,6 @@ function apriOfferta(){
     return;
   }
   qtaScelta = Math.max(1, Math.min(qtaScelta, l.quantita||1));
-  offScelta = '';
   el('offImporto').value = '';
   aggiornaFoglioOfferta();
   el('sheetBg').classList.add('open');
@@ -10097,41 +10117,45 @@ function aggiornaFoglioOfferta(){
            qtaScelta <= 1, qtaScelta >= (l.quantita||1))}</span>`
       : ''}`;
   /* Le pillole non portano piu' il controvalore: erano due cifre in
-     concorrenza con quella che conta, che e' la riga qui sotto. */
+     concorrenza con quella che conta, che e' la riga qui sotto.
+     Nascono SPENTE: ad accenderne una e' offertaDigitata, che la
+     deduce dalla cifra. */
   el('offChips').innerHTML =
-    [10,20].map(p => `<button class="consegna-pill${offScelta===String(p)?' attiva':''}" data-p="${p}" onclick="offertaChip('${p}')">−${p}%</button>`).join('')
-    + `<button class="consegna-pill${offScelta==='libero'?' attiva':''}" onclick="offertaChip('libero')">Personalizzato</button>`;
+    [10,20].map(p => `<button class="consegna-pill" data-p="${p}" onclick="offertaChip('${p}')">−${p}%</button>`).join('')
+    + `<button class="consegna-pill" data-p="libero" onclick="offertaChip('libero')">Personalizzato</button>`;
   const campo = el('offImporto');
   campo.inputMode = inEur ? 'decimal' : 'numeric';
   campo.placeholder = inEur ? '15,50' : fmt(offertaSconto(l, 15));
-  el('offCampo').style.display = offScelta==='libero' ? 'flex' : 'none';
   /* Il campo scrive SEMPRE nella valuta del listino: e' l'unica in cui
      l'accordo esiste, e l'unica che il server accetta. */
   el('offSuffisso').textContent = inEur ? '€' : 'sats';
-  /* Il minimo segue il toggle come il listino e la riga: sono i tre
-     numeri che si confrontano, e in due lingue diverse non si
-     confrontano affatto (visto a schermo: «partono da 90 000 sats»
-     sopra «Offri ≈ 80,09 €»). La valuta in cui SCRIVERE la dice il
-     suffisso del campo, che non cambia mai. */
-  const minEur = inEur ? Math.round(l.priceEur*offertaMinPercento)/100 : 0;
-  const minSats = inEur ? Math.round(minEur/eurPerSat)
-                        : Math.ceil(l.price*offertaMinPercento/100);
-  el('offMinimo').innerHTML = offertaMinPercento > 0
-    ? `Le offerte partono da ${cifraOfferta(l, minSats, minEur)} `
-      + `(${offertaMinPercento}% del listino${(l.quantita||1) > 1 ? ', al pezzo' : ''})` : '';
   offertaDigitata();
+}
+/* Il minimo, nelle due valute: (sats, eur) come lo vuole cifraOfferta.
+   Sui sats si arrotonda per ECCESSO, come fa il server — o il client
+   direbbe «va bene» a una cifra che di la' viene rifiutata. */
+function offertaMinimo(l){
+  const inEur = l.valuta==='eur' && l.priceEur>0;
+  const eur = inEur ? Math.round(l.priceEur*offertaMinPercento)/100 : 0;
+  return {eur, sats: inEur ? Math.round(eur/eurPerSat)
+                           : Math.ceil(l.price*offertaMinPercento/100)};
 }
 function offertaChip(scelta){
   haptic();
   const l = currentListing; if (!l) return;
-  offScelta = scelta;
+  const campo = el('offImporto');
   if (scelta !== 'libero') {
     const v = offertaSconto(l, Number(scelta));
-    el('offImporto').value = (l.valuta==='eur' && l.priceEur>0)
+    campo.value = (l.valuta==='eur' && l.priceEur>0)
       ? String(v.toFixed(2)).replace('.', ',') : String(v);
+    offertaDigitata();
+    return;   /* il campo RESTA li', pronto a essere ritoccato */
   }
-  aggiornaFoglioOfferta();
-  if (scelta === 'libero') el('offImporto').focus({preventScroll:true});
+  /* «Personalizzato»: il campo c'e' gia', si va a scrivere — col
+     testo selezionato, cosi' si sovrascrive senza cancellare */
+  campo.focus();
+  try { campo.select(); } catch(e) {}
+  offertaDigitata();
 }
 /* LA RIGA DELL'OFFERTA, che ha preso il posto del «se accetta
    pagheresti…»: quel totale non comprendeva la spedizione — che si
@@ -10149,6 +10173,25 @@ function offertaDigitata(){
   const grezzo = String(el('offImporto').value||'').trim();
   const v = inEur ? (parseFloat(grezzo.replace(',','.'))||0)
                   : (parseInt(grezzo.replace(/[.\s]/g,''),10)||0);
+  /* La pillola accesa si DEDUCE dalla cifra: «Personalizzato» quando
+     non e' nessuno dei due sconti. Cosi' chi parte da −10% e poi
+     ritocca vede la verita' invece di un'etichetta rimasta indietro. */
+  document.querySelectorAll('#offChips .consegna-pill').forEach(b => {
+    const p = b.dataset.p;
+    const suo = x => Math.abs(v - offertaSconto(l, x)) < 0.005;
+    b.classList.toggle('attiva', v > 0 && (p === 'libero'
+      ? !(suo(10) || suo(20)) : suo(Number(p))));
+  });
+  /* L'avviso del minimo compare SOLO quando serve — cioe' quando la
+     cifra ci finisce sotto. A leva 0 non esiste nessuna soglia. */
+  const min = offertaMinimo(l);
+  const sotto = offertaMinPercento > 0 && v > 0
+                && (inEur ? v < min.eur : v < min.sats);
+  el('offMinimo').style.display = sotto ? '' : 'none';
+  if (sotto)
+    el('offMinimo').innerHTML = `Troppo bassa: il minimo è `
+      + `${cifraOfferta(l, min.sats, min.eur)} (${offertaMinPercento}% `
+      + `del listino${(l.quantita||1) > 1 ? ', al pezzo' : ''})`;
   const riga = el('offRiga');
   if (v<=0) { riga.textContent = ''; return; }
   const sats = inEur ? Math.round(v/eurPerSat) : v;
@@ -16633,6 +16676,36 @@ osservaSentinella('gridSentinella', caricaAltri);
 osservaSentinella('negozioSentinella', caricaAltriNegozio);
 osservaSentinella('mieiSentinella', caricaAltriMiei);
 
+/* LA TASTIERA NON DEVE COPRIRE QUEL CHE SI SCRIVE (ago 2026, dal
+   campo: nel foglio dell'offerta si digitava alla cieca). Il perche'
+   non e' ovvio: la tastiera del telefono NON rimpicciolisce il layout
+   viewport — `position:fixed; bottom:0` resta ancorato al fondo dello
+   SCHERMO, cioe' sotto i tasti — e nemmeno `100dvh` si accorcia su
+   iOS. L'unico che lo sa e' visualViewport, e quanto copre e'
+   `innerHeight - vv.height - vv.offsetTop`: l'offset serve perche' a
+   pagina scrollata dalla tastiera il viewport visuale si sposta, e
+   senza quel termine il foglio si alzerebbe di troppo.
+   Si divide per --fs-zoom: la misura arriva in pixel di VIEWPORT e
+   viene spesa dentro `html`, che e' zoomato (la stessa ragione dei
+   `calc(100vh / var(--fs-zoom,1))` sparsi nel foglio di stile).
+   Vale per TUTTI i fogli, non solo per questo: ovunque ci sia un
+   campo dentro un `.sheet` il problema e' lo stesso, e a tastiera
+   chiusa la variabile e' 0 — cioe' non cambia niente. */
+function tastieraSegue(){
+  const vv = window.visualViewport;
+  if (!vv) return;            /* browser vecchio: come prima */
+  const applica = () => {
+    const z = parseFloat(getComputedStyle(document.documentElement)
+                .getPropertyValue('--fs-zoom')) || 1;
+    const coperto = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty(
+      '--tastiera', (coperto > 80 ? coperto / z : 0) + 'px');
+  };
+  vv.addEventListener('resize', applica);
+  vv.addEventListener('scroll', applica);
+  applica();
+}
+tastieraSegue();
 navMotore();   /* il gesto indietro, prima che parta qualunque vista */
 avvia();
 
