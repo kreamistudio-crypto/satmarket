@@ -3655,12 +3655,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   totale per riga sarebbe l'unica cifra non unitaria del sistema.
   L'equivoco si toglie dicendo ENTRAMBE le facce ovunque i pezzi siano
   piu' di uno: giudice puro `_cifra_accordo(valuta, sats, eur,
-  quantita)` («40.000 sats al pezzo × 3 = 120.000 sats»), che prende i
+  quantita)`, che prende i
   CAMPI e non la riga (il patto di `in_ferie`) e ha il gemello client
   `cifraPezzi` — se i due divergessero, meta' dell'app direbbe una cosa
   e meta' un'altra sullo stesso accordo. Con UN pezzo, o con la
   quantita' non dichiarata, la cifra e basta: aggiungere sarebbe
   rumore, e c'e' la prova che quella frase non contenga «al pezzo».
+  IL TOTALE VIENE PRIMO (decisione di Andrea): «120.000 sats per 3
+  pezzi (144.000 sats al pezzo)» e non «X al pezzo × 3 = Y», che si
+  leggeva come un CALCOLO — la prima cosa che si vuole sapere e' quanto
+  si paga (o si incassa) in tutto, e l'unitario resta in coda perche' e'
+  la cifra che si confronta col listino. Nella riga del foglio le due
+  cifre hanno anche una GERARCHIA (`.off-unitario`: il totale in
+  grassetto, la parentesi piu' piccola e muted). L'unita' resta anche
+  dentro la parentesi, ed e' l'unico punto in cui il testo di Andrea
+  non si segue alla lettera: un numero nudo vorrebbe una seconda
+  implementazione della regola del ≈ accanto a `cifraCtrl` — che ha
+  apposta la sentinella «un solo `function cifraCtrl`» — oppure uno
+  strip dell'HTML con una regex.
   0 = NON DICHIARATA, ed e' il mondo di ieri byte per byte: nessun
   DEFAULT 1 e nessun backfill, perche' sulle offerte gia' aperte al
   deploy nessuno ha mai concordato un numero e scriverne uno
@@ -3724,7 +3736,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ≈ di `cifraCtrl` ma parla la valuta del listino quando servirebbe una
   conversione e il cambio non e' vivo (qui il numero conta davvero, e
   un ≈ sul valore di riserva sarebbe un numero inventato in faccia a
-  chi sta per impegnarsi). Via la riga «se accetta pagheresti…», che
+  chi sta per impegnarsi).
+  LA QUANTITA' SI CAMBIA NEL FOGLIO, con uno stepper sotto il toggle —
+  al posto del numero statico accanto al titolo, non in aggiunta: due
+  numeri per la stessa cosa nello stesso foglio sarebbero il difetto
+  che il cantiere esiste per togliere. E' lo STESSO `stepperMini` e la
+  STESSA `setQta` del gemello, quindi il tetto (lo stock) e il
+  comportamento al limite arrivano gratis invece che da una seconda
+  guardia da tenere in pari. Soprattutto NON C'E' UNA SECONDA
+  VARIABILE: il foglio scrive in `qtaScelta`, quella del numero accanto
+  ad «Acquista» — chiudendo il foglio la barra dice gia' il numero
+  nuovo, e i due non possono divergere perche' sono uno. `setQta`
+  richiama `aggiornaFoglioOfferta()` se il foglio e' aperto, cosi' riga
+  e totale si riscrivono al volo (la sentinella guarda DENTRO `setQta`:
+  cercare quella riga nel file intero non poteva fallire, perche' la
+  stessa vive in `setValuta` — l'ha detto la tortura). E il listino
+  nella testata ha perso il suo «al pezzo»: lo stepper accanto gli
+  rubava la riga e il testo andava a capo (visto a schermo), ed era
+  ridondante — a dirlo resta la parentesi della riga.
+  Via la riga «se accetta pagheresti…», che
   diceva un totale SENZA la spedizione — cioe' una cosa incompleta —
   al suo posto la riga «Offri X al pezzo × 3 = Y». Via «Annulla», al
   suo posto la ✕ in alto a destra (`.pacco-x`, il ✕ di casa: un secondo
@@ -9822,18 +9852,24 @@ nei quattro percorsi del conto. La cifra resta l'UNITARIO (si confronta
 col listino, e un totale romperebbe la divisione a ritroso di
 `_righe_ordine`) e le due facce si dicono INSIEME ovunque i pezzi siano
 piu' di uno. Nello stesso giro il foglio si rifa': tre pillole senza
-controvalore, toggle €/₿ che governa la lettura, la riga «Offri X al
-pezzo × 3 = Y» al posto del totale incompleto di prima, la ✕ al posto di
+controvalore, toggle €/₿ che governa la lettura, la riga «Offri 120.000
+sats per 3 pezzi (40.000 sats al pezzo)» al posto del totale incompleto
+di prima — col TOTALE davanti, che e' quello che si vuole sapere per
+primo —, lo stepper della quantita' dentro il foglio (che scrive nella
+STESSA variabile del gemello: due numeri divergenti sono il difetto che
+il cantiere toglie), la ✕ al posto di
 «Annulla», e il tasto offerta che porta la quantita' come il suo
 gemello. Vedi Architettura, «L'OFFERTA SI PORTA DIETRO I PEZZI», per la
 decisione unitario-vs-totale coi suoi tre perche', per l'ordine delle
 guardie che NON si tocca (spostare il blocco dell'offerta sopra la
 ripresa e' una regressione, non una pulizia) e per il corner dichiarato
-del client che chiede piu' pezzi dell'accordo. Collaudata: 2091 prove
-verdi (52 nuove — il giudice puro, l'aritmetica con la divisione a
+del client che chiede piu' pezzi dell'accordo. Collaudata: 2095 prove
+verdi (56 nuove — il giudice puro, l'aritmetica con la divisione a
 ritroso esatta, i quattro percorsi, l'ordine delle guardie, il gemello
-client, il foglio e le due superfici del tasto) piu' UNDICI mutazioni
-del codice una per riga sorvegliata, ognuna rossa da sola; e il giro
+client, il foglio, lo stepper e le due superfici del tasto) piu' SEDICI
+mutazioni del codice una per riga sorvegliata, ognuna rossa da sola —
+e due sentinelle sono state riscritte proprio perche' la tortura le ha
+trovate VACUE (cercavano una stringa che vive anche altrove); e il giro
 vero su database usa-e-getta col server acceso: offerta per 3 pezzi →
 accordo → il client che chiede 5 e ottiene 3, preventivo == compra al
 sat (215.000), unitario esatto a ritroso, stock sceso a 2 col 400

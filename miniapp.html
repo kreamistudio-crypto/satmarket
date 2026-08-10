@@ -1405,6 +1405,9 @@
      Acquista tiene il vantaggio, ma non tutto quello di prima. */
   #barraCompra.con-qta .bc-recinto{flex-basis:56%}
   #barraCompra.con-qta #bcOfferta{flex-basis:44%;font-size:14px;padding:8px 6px 9px}
+  /* L'unitario in coda alla riga dell'offerta: piu' piccolo del
+     totale, che e' quello che si legge per primo. */
+  .off-unitario{font-size:12px;font-weight:600;color:var(--muted)}
   /* Il numero statico dentro un bottone: sul tasto offerta, e su
      «Acquista» quando un accordo ha gia' fissato i pezzi. Non cede
      MAI — a stringersi e' la parola, come nella riga meta della
@@ -1536,14 +1539,17 @@
   .pacco-cella .btn.pacco-btn.dentro{padding:3px 8px 4px;cursor:default}
   .pacco-cella .btn.pacco-btn.dentro:active{transform:none;
     box-shadow:0 2px 0 var(--ink)}
-  /* Lo stesso vestito serve il foglio del rifornimento: fuori
-     dall'arancio il traslucido bianco sparirebbe sulla carta. */
+  /* Lo stesso vestito serve i fogli del rifornimento e dell'offerta:
+     fuori dall'arancio il traslucido bianco sparirebbe sulla carta. */
   .pacco-btn .qta-mini,
-  #rifornisciSheet .qta-mini{margin-left:0;background:var(--chip-bg)}
+  #rifornisciSheet .qta-mini,
+  #offertaSheet .qta-mini{margin-left:0;background:var(--chip-bg)}
   .pacco-btn .qta-mini .qm-btn,
-  #rifornisciSheet .qta-mini .qm-btn{color:var(--sats-text)}
+  #rifornisciSheet .qta-mini .qm-btn,
+  #offertaSheet .qta-mini .qm-btn{color:var(--sats-text)}
   .pacco-btn .qta-mini .qm-btn:active,
-  #rifornisciSheet .qta-mini .qm-btn:active{background:var(--sats-soft)}
+  #rifornisciSheet .qta-mini .qm-btn:active,
+  #offertaSheet .qta-mini .qm-btn:active{background:var(--sats-soft)}
   /* spento col motivo scritto sotto: il perche' non sta mai nel bottone */
   .pacco-cella .btn.pacco-btn[disabled]{opacity:.45;box-shadow:none}
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
@@ -6709,6 +6715,11 @@ function setQta(d){
      un'offerta» — e si riscrivono tutte e due le superfici, o quella
      nascosta ricomparirebbe col numero di prima. */
   q('.tasto-offerta').forEach(b => b.innerHTML = etichettaOfferta(l));
+  /* e il foglio dell'offerta, se e' aperto: lo stepper li' dentro
+     chiama QUESTA funzione, quindi la riga e il totale si riscrivono
+     al volo — e per costruzione dicono lo stesso numero della barra,
+     che e' la stessa variabile. */
+  if (el('offertaSheet')?.classList.contains('open')) aggiornaFoglioOfferta();
   haptic();
 }
 function sceltaConsegna(l){
@@ -9987,8 +9998,11 @@ function accordoDi(o){
 function cifraPezzi(valuta, sats, eur, q){
   const unitaria = cifraOff(valuta, sats, eur);
   if (!(q > 1)) return unitaria;
-  return `${unitaria} al pezzo × ${fmt(q)} = `
-    + cifraOff(valuta, sats*q, Math.round(eur*q*100)/100);
+  /* il TOTALE per primo: quello che si vuole sapere e' quanto si paga
+     (o si incassa) in tutto — l'unitario resta in coda perche' e' la
+     cifra che si confronta col listino */
+  return `${cifraOff(valuta, sats*q, Math.round(eur*q*100)/100)} `
+    + `per ${fmt(q)} pezzi (${unitaria} al pezzo)`;
 }
 function cifraAccordo(o){
   const a = accordoDi(o);
@@ -10000,10 +10014,12 @@ function offertaAccettataPer(annuncioId){
     && o.stato==='accettata' && o.compratore_id===myTgId) || null;
 }
 
-/* I pezzi che l'offerta si porta dietro: fotografati all'apertura dal
-   numero scelto accanto ad «Acquista», e da li' in poi immutabili —
-   dentro il foglio la quantita' non si cambia, si tratta soltanto. */
-let offQta = 1;
+/* I pezzi dell'offerta sono `qtaScelta`, LA STESSA variabile del
+   numero accanto ad «Acquista» — non una copia. Il foglio ha il suo
+   stepper e scrive li' dentro, quindi chiudendolo la barra dice gia'
+   il numero nuovo: due numeri che dicono cose diverse nella stessa
+   schermata sono il difetto che questo cantiere esiste per togliere,
+   e l'unico modo di non averli e' non averne due. */
 /* Quale scorciatoia e' accesa: '10' | '20' | 'libero' | '' (nessuna).
    E' lei a decidere anche se il campo si vede: con uno sconto ancorato
    la cifra la dice la riga, il campo servirebbe solo a confondere. */
@@ -10026,7 +10042,7 @@ function apriOfferta(){
     toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
     return;
   }
-  offQta = Math.max(1, Math.min(qtaScelta, l.quantita||1));
+  qtaScelta = Math.max(1, Math.min(qtaScelta, l.quantita||1));
   offScelta = '';
   el('offImporto').value = '';
   aggiornaFoglioOfferta();
@@ -10063,12 +10079,23 @@ function aggiornaFoglioOfferta(){
       ? `<img src="${esc(l.thumbs[0])}" alt="" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 auto" onerror="this.remove()">`
       : `<span style="font-size:28px">${l.emoji}</span>`}
     <div style="min-width:0;flex:1">
-      <div style="display:flex;align-items:baseline;gap:6px">
-        <b style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
-        ${offQta > 1 ? `<span class="mono" style="flex:none;font-size:12.5px;font-weight:800;color:var(--muted)">× ${fmt(offQta)}</span>` : ''}
-      </div>
-      <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${cifraOfferta(l, satsAnnuncio(l), inEur ? l.priceEur : 0)}${offQta > 1 ? ' al pezzo' : ''}</span>
-    </div>`;
+      <b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
+      ${/* niente «al pezzo» qui: lo stepper accanto ruba la riga e il
+            testo andava a capo (visto a schermo). E' anche ridondante —
+            il listino e' per definizione al pezzo, e a dirlo esplicito
+            resta la parentesi della riga dell'offerta. */''}
+      <span style="font-size:12.5px;color:var(--muted);font-weight:700">listino ${cifraOfferta(l, satsAnnuncio(l), inEur ? l.priceEur : 0)}</span>
+    </div>
+    ${/* LO STEPPER, non un numero statico (ago 2026): la quantita' si
+          cambia QUI, e siccome scrive in qtaScelta — la stessa
+          variabile del gemello sotto — non puo' nascere un secondo
+          numero. Ha lo stesso tetto e lo stesso comportamento al
+          limite perche' e' la stessa funzione, setQta. */''}
+    ${(l.quantita||1) > 1
+      ? `<span style="flex:0 0 auto">${stepperMini(qtaScelta,
+           'setQta(-1)', 'setQta(1)',
+           qtaScelta <= 1, qtaScelta >= (l.quantita||1))}</span>`
+      : ''}`;
   /* Le pillole non portano piu' il controvalore: erano due cifre in
      concorrenza con quella che conta, che e' la riga qui sotto. */
   el('offChips').innerHTML =
@@ -10091,7 +10118,7 @@ function aggiornaFoglioOfferta(){
                         : Math.ceil(l.price*offertaMinPercento/100);
   el('offMinimo').innerHTML = offertaMinPercento > 0
     ? `Le offerte partono da ${cifraOfferta(l, minSats, minEur)} `
-      + `(${offertaMinPercento}% del listino${offQta > 1 ? ', al pezzo' : ''})` : '';
+      + `(${offertaMinPercento}% del listino${(l.quantita||1) > 1 ? ', al pezzo' : ''})` : '';
   offertaDigitata();
 }
 function offertaChip(scelta){
@@ -10110,8 +10137,12 @@ function offertaChip(scelta){
    pagheresti…»: quel totale non comprendeva la spedizione — che si
    calcola dopo — quindi diceva una cosa incompleta. Questa dice
    l'unica cosa che qui e' certa: quanto si offre, e per quanti pezzi.
-   Con piu' di un pezzo dice ENTRAMBE le facce, che e' il punto di
-   tutto il cantiere: la cifra e' il prezzo AL PEZZO. */
+   IL TOTALE VIENE PRIMA e in evidenza (decisione di Andrea): la forma
+   «X al pezzo × 3 = Y» si leggeva come un CALCOLO, e la prima cosa che
+   si vuole sapere e' quanto si paga in tutto. L'unitario resta in
+   coda, piu' piccolo, perche' e' la cifra che si confronta col
+   listino. Si riscrive a ogni tocco dello stepper: ci pensa setQta,
+   che richiama il render del foglio. */
 function offertaDigitata(){
   const l = currentListing; if (!l) return;
   const inEur = l.valuta==='eur' && l.priceEur>0;
@@ -10122,11 +10153,11 @@ function offertaDigitata(){
   if (v<=0) { riga.textContent = ''; return; }
   const sats = inEur ? Math.round(v/eurPerSat) : v;
   const unitaria = cifraOfferta(l, sats, inEur ? v : 0);
-  if (offQta <= 1) { riga.innerHTML = `Offri <b class="mono">${unitaria}</b>`; return; }
-  const totale = cifraOfferta(l, sats*offQta,
-                              inEur ? Math.round(v*offQta*100)/100 : 0);
-  riga.innerHTML = `Offri <b class="mono">${unitaria}</b> al pezzo `
-    + `× ${fmt(offQta)} = <b class="mono">${totale}</b>`;
+  if (qtaScelta <= 1) { riga.innerHTML = `Offri <b class="mono">${unitaria}</b>`; return; }
+  const totale = cifraOfferta(l, sats*qtaScelta,
+                              inEur ? Math.round(v*qtaScelta*100)/100 : 0);
+  riga.innerHTML = `Offri <b class="mono">${totale}</b> per ${fmt(qtaScelta)} pezzi`
+    + ` <span class="off-unitario">(${unitaria} al pezzo)</span>`;
 }
 async function inviaOfferta(btn){
   haptic();
@@ -10140,7 +10171,7 @@ async function inviaOfferta(btn){
     const r = await fetch(`${API_BASE}/listings/${l.id}/offerta`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify({importo, quantita: offQta})});
+      body: JSON.stringify({importo, quantita: qtaScelta})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail||'Offerta non inviata', 5000); return; }
     closeSheet();

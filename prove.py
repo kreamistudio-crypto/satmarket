@@ -8902,14 +8902,23 @@ def prove_offerta_quantita():
     prova("un pezzo solo: nessuna faccia in piu'", "40.000 sats",
           cif("sats", 40_000, 0.0, 1))
     # ...e con piu' pezzi ENTRAMBE, che e' tutto il cantiere
-    prova("piu' pezzi: unitario E totale", "40.000 sats al pezzo × 3 = "
-          "120.000 sats", cif("sats", 40_000, 0.0, 3))
+    # IL TOTALE VIENE PRIMO (decisione di Andrea): la forma «X al pezzo
+    # × 3 = Y» si leggeva come un calcolo, e la prima cosa che si vuole
+    # sapere e' quanto si paga in tutto. L'unitario resta in coda,
+    # perche' e' la cifra che si confronta col listino.
+    prova("piu' pezzi: prima il TOTALE, poi l'unitario",
+          "120.000 sats per 3 pezzi (40.000 sats al pezzo)",
+          cif("sats", 40_000, 0.0, 3))
     prova("in euro il totale e' una moltiplicazione esatta",
-          "15,50 € al pezzo × 3 = 46,50 €", cif("eur", 0, 15.50, 3))
+          "46,50 € per 3 pezzi (15,50 € al pezzo)",
+          cif("eur", 0, 15.50, 3))
+    # e la vecchia formula non deve tornare da nessuna porta
+    prova("...e la forma a calcolo non c'e' piu'", False,
+          " = " in cif("sats", 40_000, 0.0, 3))
     # il numero dei pezzi passa dal formattatore di casa: «1.200», mai
     # un muro di cifre (la lezione di MAX_QUANTITA_ANNUNCIO)
     prova("anche i pezzi si scrivono leggibili", True,
-          "× 1.200 =" in cif("sats", 10, 0.0, 1200))
+          "per 1.200 pezzi" in cif("sats", 10, 0.0, 1200))
     # e a un pezzo la frase NON deve contenere «al pezzo»: e' il
     # rumore che il giudice esiste per non fare
     for q in (0, 1):
@@ -9016,16 +9025,41 @@ def prove_offerta_quantita():
     #        cosa e meta' un'altra sullo stesso accordo --------------
     prova("il client ha il gemello di _cifra_accordo", True,
           "function cifraPezzi(" in mini)
-    prova("...e dice la stessa frase", True,
-          "al pezzo × " in mini)
+    prova("...e dice la stessa frase, col totale davanti", True,
+          "per ${fmt(q)} pezzi (${unitaria} al pezzo)" in mini)
     prova("cifraAccordo passa i pezzi al gemello", True,
           "cifraPezzi(o.valuta, a.sats, a.eur, o.quantita||0)" in mini)
+    # LA QUANTITA' E' UNA SOLA VARIABILE, e non una copia: il foglio ha
+    # il suo stepper e scrive in qtaScelta, la stessa del numero
+    # accanto ad «Acquista». Due numeri che dicono cose diverse nella
+    # stessa schermata sono il difetto che questo cantiere esiste per
+    # togliere, e l'unico modo di non averli e' non averne due.
     prova("il foglio manda la quantita' al server", True,
-          "quantita: offQta" in mini)
-    # la quantita' si fotografa all'APERTURA: dentro il foglio non si
-    # cambia, e leggere qtaScelta all'invio la lascerebbe scivolare
-    prova("i pezzi si fotografano all'apertura del foglio", True,
-          "offQta = Math.max(1, Math.min(qtaScelta" in mini)
+          "quantita: qtaScelta" in mini)
+    prova("...e non ne tiene una copia sua", False, "offQta" in mini)
+    # lo stepper del foglio e' lo STESSO chip e la STESSA funzione del
+    # gemello: da li' vengono gratis il tetto sullo stock e il
+    # comportamento al limite, invece di una seconda guardia da tenere
+    # in pari (l'anchor sta dentro il render del foglio, non altrove)
+    fogjs = mini[mini.index("function aggiornaFoglioOfferta("):
+                 mini.index("function offertaChip(")]
+    prova("lo stepper del foglio e' la STESSA funzione del gemello",
+          True, "stepperMini(qtaScelta," in fogjs
+          and "'setQta(-1)', 'setQta(1)'," in fogjs
+          and "qtaScelta >= (l.quantita||1)" in fogjs)
+    # DENTRO setQta, non «da qualche parte nel file»: la stessa riga
+    # vive anche in setValuta, quindi cercarla nel file intero era una
+    # sentinella che non poteva fallire (l'ha detto la tortura).
+    setq = mini[mini.index("function setQta("):
+                mini.index("function sceltaConsegna(")]
+    prova("setQta riscrive il foglio se e' aperto", True,
+          "aggiornaFoglioOfferta();" in setq)
+    # ...e la riga dice il TOTALE per primo, non un calcolo
+    odig = mini[mini.index("function offertaDigitata("):
+                mini.index("async function inviaOfferta(")]
+    prova("la riga dell'offerta mette il totale davanti", True,
+          '<b class="mono">${totale}</b> per ${fmt(qtaScelta)} pezzi' in odig
+          and '(${unitaria} al pezzo)' in odig)
 
     # --- 7. Il foglio rifatto: tre pillole, toggle, ✕ ---------------
     fog = mini[mini.index('id="offertaSheet"'):

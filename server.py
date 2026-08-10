@@ -9432,6 +9432,13 @@ def _cifra_accordo(valuta: str, sats: int, eur: float, quantita: int) -> str:
     l'unitario, che e' quello che si confronta col listino, e il totale,
     che e' quello che si incassa. Mai una sola delle due.
 
+    IL TOTALE VIENE PRIMA (decisione di Andrea): «120.000 sats per 3
+    pezzi (40.000 sats al pezzo)». La forma di prima — «40.000 al pezzo
+    × 3 = 120.000» — si leggeva come un CALCOLO, e chi legge vuole
+    sapere per prima cosa quanto paga (o quanto incassa) in tutto.
+    L'unitario resta, in coda e fra parentesi, perche' e' la cifra che
+    si confronta col listino.
+
     PURA e coi CAMPI, non con la riga (il patto di in_ferie): cosi' la
     stessa funzione serve la riga di `offerte`, il payload appena letto
     e la prova in CI. Il totale in euro e' round(eur*q, 2): una
@@ -9441,7 +9448,8 @@ def _cifra_accordo(valuta: str, sats: int, eur: float, quantita: int) -> str:
         return unitaria
     totale = _cifra_offerta(valuta, sats * quantita,
                             round(eur * quantita, 2))
-    return f"{unitaria} al pezzo × {_fmt_sats(quantita)} = {totale}"
+    return (f"{totale} per {_fmt_sats(quantita)} pezzi "
+            f"({unitaria} al pezzo)")
 
 
 # ------------------ IL CONTO D'ACQUISTO: matematica pura -------------
