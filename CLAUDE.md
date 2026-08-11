@@ -7580,6 +7580,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   corriere del caso che ha aperto il cantiere delle spedizioni ai
   punti. Per quelli la strada è che trackbot allarghi il
   riconoscimento, non che noi tagliamo un codice.
+  MISURATO sui codici veri di produzione (ago 2026, una passata in
+  sola lettura sul VPS): 3 InPost su 3 fuori — tutti a 24
+  cifre, es. `820123387637068013332765` — e 3 Poste su 3 dentro; il
+  resto del registro erano codici di prova. RICHIESTA PENDENTE: ad
+  ago 2026 Andrea ha chiesto a trackbot di allargare il
+  riconoscimento a `^[A-Z0-9]{10,24}$`, e la risposta non è ancora
+  arrivata. Sta scritto qui perché il segnale è una prova che diventa
+  ROSSA — «i 24 dell'InPost restano fuori dal filtro» — e senza
+  queste righe fra sei mesi si leggerebbe come un capriccio di
+  trackbot invece che come una risposta a noi: se il filtro si
+  allarga davvero, si aggiorna quella prova e non si tocca nient'altro
+  (la normalizzazione va bene com'è, e il bottone non ha mai escluso
+  nessuno).
   LA RIGA SOTTO IL BOTTONE E IL TOAST NON CAMBIANO: dicono che il
   codice sta negli appunti e va incollato, che è quel che facciamo
   per davvero e resta vero anche per chi il filtro lo passa — un giro
