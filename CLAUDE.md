@@ -3826,19 +3826,62 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `.btn` è `width:100%` e due bottoni nudi si impilerebbero a tutta
   larghezza: è l'unico punto in cui il markup di `renderOfferte` cambia,
   e la card resta della stessa altezza (misurato prima/dopo).
-  LA DOMANDA SI FA COL FOGLIO DI CASA, `#ritiroSheet` — mai il
-  `confirm()` del sistema operativo: la strada di `#paccoSvuotaSheet` e
-  del rifornimento, con quello che chiude sopra e il ripensamento
-  sotto. Il gesto è spezzato in due — `ritiraOfferta` APRE (e scrive i
-  testi, che restano i due distinti: una proposta mai vista e un
-  accordo che aspetta i sats non sono lo stesso gesto), `conferma
-  RitiroOfferta` ESEGUE — con l'id in `ritiroId`, che è anche la
-  guardia del bottone. Il foglio si chiude SEMPRE dopo la risposta, al
-  contrario del rifornimento: lì il 400 lascia un numero da correggere
-  DENTRO, qui il 400 dice «paga o annulla l'ordine» e il 409
-  «ricarica», che si agiscono altrove. Chiusura MIRATA e mai
-  `closeSheet`, e la registrazione in `closeSheet` c'è (un foglio che
-  se la dimentica resta appeso sotto il velo: c'è la prova).
+  LA DOMANDA SI FA COL FOGLIO DI CASA — mai il `confirm()` del sistema
+  operativo — e il foglio è quello UNICO, `#confermaSheet`: vedi «LA
+  DOMANDA, UNA VOLTA SOLA» più sotto. Il gesto è spezzato in due:
+  `ritiraOfferta` prepara i testi (che restano i due distinti: una
+  proposta mai vista e un accordo che aspetta i sats non sono lo
+  stesso gesto) e `inviaRitiro` esegue.
+  LA DOMANDA, UNA VOLTA SOLA (ago 2026, `#confermaSheet`): i dialoghi
+  del sistema operativo escono dall'app un gesto alla volta, e il
+  foglio della conferma è UNO — chi apre passa titolo, testata
+  facoltativa, corpo, etichetta del bottone e l'AZIONE, e
+  `chiediConferma` fa il resto. Nasce col ritiro dell'offerta e serve
+  subito accetta e rifiuta: tre fogli quasi identici sarebbero stati
+  il difetto che il cantiere esiste per togliere, e i gesti che
+  aspettano ancora (quelli sui sats) da qui costano una CHIAMATA e non
+  un foglio. `confermaAzione` è anche la GUARDIA del bottone: si
+  azzera prima di agire, o un doppio tocco manderebbe l'azione due
+  volte (provato dal vivo). Il corpo si scrive con `textContent`,
+  quindi i testi vanno NUDI — niente HTML da ricordarsi di scappare —
+  mentre la testata è innerHTML e il titolo dell'annuncio ci passa da
+  `esc()` dentro `testataOfferta`, che è un posto solo perché la
+  vogliono tutti i chiamanti.
+  IL FOGLIO SI CHIUDE PRIMA DI AGIRE, e ciò che l'azione ha da dire lo
+  dice il toast. È il contrario del RIFORNIMENTO, ed è la distinzione
+  da tenere quando si sceglie quale forma dare a un gesto: là dentro
+  c'è un numero da CORREGGERE, quindi sull'errore il foglio resta
+  aperto col valore dentro; qui non c'è niente da correggere (il 400
+  del ritiro dice «paga o annulla l'ordine», il 409 «ricarica») e
+  tenerlo aperto sarebbe solo un ostacolo in più.
+  `#paccoSvuotaSheet` NON si è fuso dentro il generico, ed è
+  deliberato: la ✕ del carrello ha una liturgia sua (svuota, chiude la
+  pagina, più la guardia «niente da buttare») che dentro un generico
+  diventerebbe un caso particolare — un generico serve dove i gesti si
+  somigliano DAVVERO. La CONTROPROPOSTA non chiede niente: si sta già
+  scrivendo una cifra in un campo, e una domanda in più sarebbe un
+  ostacolo, non una tutela.
+  E I DUE `prompt()` SONO MORTI nello stesso giro. Il primo era la
+  durata del rilancio d'asta — un PICKER TRAVESTITO, cioè la cosa che
+  questo progetto ha già tolto da ogni tendina: ora è `#rilancioSheet`
+  con le pillole `consegna-pill` del form Vendi e le durate dalle
+  leve, ma con una variabile SUA (`rilancioGiorni`) perché un rilancio
+  non deve riscrivere la durata che il venditore ha impostato nel form
+  per il prossimo annuncio — c'è la prova che non tocchi
+  `sellAstaGiorni`. Il secondo era la riscossione col bolt11
+  (`#riscuotiSheet`), e lì il guadagno è tutto nel comportamento
+  d'errore: dentro si incolla una invoice di duecento caratteri e il
+  rifiuto tipico è «l'importo non corrisponde», cioè una invoice da
+  rifare — col `prompt()` si perdeva tutto, ora il foglio RESTA APERTO
+  col testo dentro e il motivo scritto sotto (la ricetta del
+  rifornimento). Campo `textarea`, che una bolt11 non sta su una riga.
+  LA PROVA CHE VALE PIÙ DI TUTTE è il censimento: **zero `prompt()` di
+  sistema in tutto il client**, con un predicato che esclude
+  `ev.prompt()` (l'API d'installazione PWA, che ci deve restare) e i
+  commenti che raccontano la storia — e che si tortura su un finto
+  prompt, o certificherebbe una pulizia senza aver guardato.
+  RESTANO i `confirm()` dei gesti sui sats e quelli admin: sono
+  dichiarati e si affrontano a gruppi, non tutti insieme.
   L'OFFERTA SI PORTA DIETRO I PEZZI (ago 2026): il venditore accettava
   un prezzo unitario a quantita' INDETERMINATA — `articolo = unitario
   * richiesti` e `richiesti` arrivava dal client senza nessun legame
