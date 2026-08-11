@@ -3789,29 +3789,34 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
-  <!-- ============ SHEET RITIRO DELL'OFFERTA (ago 2026) ============
-       Foglio nostro invece del confirm() di sistema. Sta QUI e non
-       accanto a #offertaSheet perche' il suo parente vero e' quello
-       sopra — la conferma di una cosa che non si annulla, con quello
-       che chiude sopra e il ripensamento sotto — mentre il foglio
-       dell'offerta e' un modulo da compilare. (E una prova di quel
-       cantiere legge la fetta «da offertaSheet a puntaSheet»: un
-       foglio infilato in mezzo gliela allargava.)
-       Il testo cambia coi DUE casi — una proposta che il venditore non
-       ha ancora visto e un accordo che sta aspettando i sats non sono
-       lo stesso gesto — e li scrive ritiraOfferta(), che e' anche
-       l'unica a sapere quale offerta si sta ritirando. -->
-  <div class="sheet" id="ritiroSheet" role="dialog" aria-modal="true"
-       aria-labelledby="ritiroTit">
+  <!-- ============ SHEET CONFERMA (ago 2026) ============
+       LA DOMANDA, una volta sola. Nasce col ritiro dell'offerta e
+       serve subito anche accetta e rifiuta: tre fogli quasi identici
+       sarebbero stati il difetto che questo cantiere esiste per
+       togliere — e i gesti che aspettano ancora il loro foglio (quelli
+       sui sats) da qui costano una CHIAMATA, non un foglio.
+       Sta accanto a #paccoSvuotaSheet, che e' il suo parente: la
+       conferma di una cosa che non si annulla, con quello che chiude
+       sopra e il ripensamento sotto. Quel foglio li' NON si fonde
+       dentro questo, ed e' deliberato: la ✕ del carrello ha una sua
+       liturgia (svuota, chiude la pagina, e la sua guardia «niente da
+       buttare») che dentro un generico diventerebbe un caso
+       particolare. Un generico serve dove i gesti si somigliano
+       DAVVERO.
+       Chi apre riempie titolo, testata (facoltativa) e corpo, e passa
+       l'azione: la tiene `confermaAzione`, che e' anche la guardia del
+       bottone. -->
+  <div class="sheet" id="confermaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="confTit">
     <div class="grab"></div>
-    <h3 id="ritiroTit">Vuoi ritirare la tua offerta?</h3>
+    <h3 id="confTit"></h3>
     <!-- La testata (miniatura + titolo dell'annuncio) e il corpo li
-         scrive ritiraOfferta(): il titolo e' testo del venditore e
-         passa da esc(), come ovunque. -->
-    <div id="ritiroTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
-    <div id="ritiroCorpo" style="font-size:13px;color:var(--muted);font-weight:600;
+         scrive chi apre: il titolo e' testo dell'utente e passa da
+         esc(), come ovunque. -->
+    <div id="confTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <div id="confCorpo" style="font-size:13px;color:var(--muted);font-weight:600;
       line-height:1.5;margin-bottom:14px"></div>
-    <button class="btn orange" onclick="confermaRitiroOfferta(this)">Sì, ritira</button>
+    <button class="btn orange" id="confOk" onclick="eseguiConferma(this)">Conferma</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -3959,6 +3964,47 @@ document.getElementById('cartello')?.remove();</script>
     <div id="rifNota" style="font-size:12.5px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:4px;line-height:1.4">È il numero che hai <b>adesso</b>, non quanti ne aggiungi. Non tocca nient'altro: gli affari in corso restano dove sono.</div>
     <button class="btn orange" style="margin-top:12px" onclick="inviaRifornimento(this)">🔄 Rifornisci</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET RILANCIO DELL'ASTA (ago 2026) ============
+       Era un prompt() del sistema che chiedeva «Per quanti giorni?
+       (1 / 3 / 7 / 14 / 30)» e si aspettava un numero battuto a mano:
+       un PICKER TRAVESTITO, cioe' la cosa che questo progetto ha
+       gia' tolto da ogni tendina. Le pillole sono le STESSE del form
+       Vendi — `consegna-pill` e le durate dalle leve del server — ma
+       la scelta vive in una variabile SUA: il rilancio di un'asta
+       deserta non deve sporcare la durata che il venditore ha
+       impostato nel form. -->
+  <div class="sheet" id="rilancioSheet">
+    <div class="grab"></div>
+    <h3>🔨 Rilancia l'asta</h3>
+    <div id="rilancioTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <div class="qta-lab" style="margin-bottom:6px">Per quanto tempo</div>
+    <div class="consegna-scelta" id="rilancioDurate"></div>
+    <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:8px;line-height:1.4">L'asta riparte dalla stessa base, col cronometro a nuovo. Chi guardava riceve l'avviso quando manca un'ora.</div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaRilancio(this)">🔨 Rilancia</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET RISCOSSIONE COL BOLT11 (ago 2026) ============
+       L'altro prompt() del sistema, e il piu' scomodo dei due: dentro
+       si incolla una bolt11 di duecento caratteri, e all'errore —
+       «l'importo non corrisponde», che e' il rifiuto tipico — il
+       prompt buttava via tutto e bisognava reincollarla.
+       Qui vale in pieno la ricetta del rifornimento: IL FOGLIO RESTA
+       APERTO col testo ancora dentro e il motivo scritto sotto. Il
+       campo e' una textarea perche' una bolt11 non sta su una riga. -->
+  <div class="sheet" id="riscuotiSheet">
+    <div class="grab"></div>
+    <h3 id="riscuotiTit">↩️ Riscuoti i tuoi sats</h3>
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:10px">Incolla una invoice Lightning dell'importo <b>esatto</b>. Se hai un Lightning address nel Profilo, i rimborsi arrivano da soli e questo foglio non serve.</div>
+    <div class="field">
+      <textarea id="riscuotiInv" rows="3" autocomplete="off" spellcheck="false"
+        placeholder="lnbc..." style="width:100%;resize:vertical;font-family:var(--mono);font-size:12.5px" oninput="riscuotiDigitata()"></textarea>
+    </div>
+    <div id="riscuotiNota" style="font-size:12.5px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaRiscossione(this)">↩️ Riscuoti</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -9474,19 +9520,59 @@ async function ritiraEccedenza(){
                    : '💰 L\'eccedenza è in «Da riscuotere»', 6000);
   caricaAsta(l.id);
 }
-async function rilanciaAsta(id){
+/* Il rilancio di un'asta deserta: si scegli la durata a pillole, come
+   nel form Vendi. La variabile e' SUA e non `sellAstaGiorni`: un
+   rilancio non deve riscrivere la durata che il venditore ha
+   impostato nel form per il prossimo annuncio. */
+let rilancioId = 0, rilancioGiorni = 0;
+function rilanciaAsta(id){
+  haptic();
+  rilancioId = id;
+  rilancioGiorni = 0;                   /* la preselezione la fa il render */
+  const l = listings.find(x => x.id === id)
+         || myListings.find(x => x.id === id) || currentListing;
+  el('rilancioTestata').innerHTML = l
+    ? `<span style="font-size:28px">🔨</span><b style="font-size:14px">${esc(l.title||'')}</b>`
+    : '';
+  renderRilancioDurate();
+  el('sheetBg').classList.add('open');
+  el('rilancioSheet').classList.add('open');
+}
+function renderRilancioDurate(){
+  const box = el('rilancioDurate'); if (!box) return;
   const giorni = (astaLeve && astaLeve.durate_giorni) || [1, 3, 7, 14, 30];
-  const g = parseInt(prompt(`Per quanti giorni? (${giorni.join(' / ')})`,
-                            String(giorni.includes(7) ? 7 : giorni[0])) || '', 10);
-  if (!g) return;
-  const r = await fetch(`${API_BASE}/aste/${id}/rilancia`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-    body: JSON.stringify({durata_giorni: g})});
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) { toast(d.detail || 'Rilancio non riuscito', 6000); return; }
-  toast('🔨 L\'asta è ripartita!');
-  await loadListings(); openDetail(id);
+  /* la stessa preselezione del form: 7 giorni, la durata di mezzo */
+  if (!rilancioGiorni || !giorni.includes(rilancioGiorni))
+    rilancioGiorni = giorni.includes(7) ? 7 : giorni[0];
+  box.innerHTML = giorni.map(g =>
+    `<button type="button" class="consegna-pill${g===rilancioGiorni?' attiva':''}" onclick="setRilancioGiorni(${g})">${g===1?'24h':g+'g'}</button>`).join('');
+}
+function setRilancioGiorni(g){
+  haptic(); rilancioGiorni = g; renderRilancioDurate();
+}
+async function inviaRilancio(btn){
+  haptic();
+  const id = rilancioId, g = rilancioGiorni; if (!id || !g) return;
+  const ripristina = bottoneInAttesa(btn, '🔨 Rilancio…');
+  try {
+    const r = await fetch(`${API_BASE}/aste/${id}/rilancia`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({durata_giorni: g})});
+    const d = await r.json().catch(() => ({}));
+    /* Il foglio si chiude comunque: il rifiuto tipico («sei in ferie»,
+       «hai gia' N aste attive») non si ripara cambiando la durata,
+       quindi non c'e' niente da correggere qui dentro — la ricetta del
+       ritiro, non quella del rifornimento. */
+    el('rilancioSheet').classList.remove('open');
+    if (!document.querySelector('.sheet.open'))
+      el('sheetBg').classList.remove('open');
+    rilancioId = 0;
+    if (!r.ok) { toast(d.detail || 'Rilancio non riuscito', 6000); return; }
+    toast('🔨 L\'asta è ripartita!');
+    await loadListings(); openDetail(id);
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
 }
 async function convertiAsta(id){
   if (!confirm('Converti a prezzo fisso alla base? L\'asta finisce qui.'))
@@ -9820,10 +9906,12 @@ function closeSheet(){
   el('installSheet').classList.remove('open');
   el('distintiviSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
-  el('ritiroSheet').classList.remove('open');
+  el('confermaSheet').classList.remove('open');
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
+  el('rilancioSheet').classList.remove('open');
+  el('riscuotiSheet').classList.remove('open');
   el('paccoSvuotaSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
@@ -10591,18 +10679,66 @@ async function apriAnnuncioPuntata(aid){
   if (!l) { toast('Annuncio non trovato'); return; }
   openDetail(aid);
 }
-async function riscuotiRimborso(rid, sats){
-  const inv = prompt(`Incolla una invoice Lightning di ESATTAMENTE ${fmt(sats)} sats:`);
-  if (!inv) return;
-  const r = await fetch(`${API_BASE}/rimborsi/${rid}/invoice`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({invoice: inv.trim()})});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail||'Riscossione non riuscita', 6000); return; }
-  toast(d.stato==='riscosso' ? '↩️ Rimborso in arrivo sul tuo wallet!'
-                             : 'Il pagamento non è riuscito: riprova', 6000);
-  await loadPuntate(); renderPuntate();
+/* La riscossione col bolt11 incollato a mano. Il campo e' una
+   textarea (una invoice non sta su una riga) e l'importo esatto lo
+   dice il titolo: e' il numero contro cui il server confronta, e
+   sbagliarlo e' il rifiuto piu' comune. */
+let riscuotiId = 0;
+function riscuotiRimborso(rid, sats){
+  haptic();
+  riscuotiId = rid;
+  el('riscuotiTit').textContent = `↩️ Riscuoti ${fmt(sats)} sats`;
+  el('riscuotiInv').value = '';
+  el('riscuotiNota').textContent = '';
+  el('sheetBg').classList.add('open');
+  el('riscuotiSheet').classList.add('open');
+  /* preventScroll: il fuoco su un campo dentro un foglio fisso
+     trascinerebbe la pagina — la lezione del picker */
+  try { el('riscuotiInv').focus({preventScroll:true}); } catch(e) {}
+}
+/* Scrivendo si spegne l'errore di prima: un motivo che resta acceso
+   mentre si corregge il campo parla di una cosa che non c'e' piu'. */
+function riscuotiDigitata(){
+  const n = el('riscuotiNota');
+  if (n && n.textContent) n.textContent = '';
+}
+async function inviaRiscossione(btn){
+  haptic();
+  const rid = riscuotiId; if (!rid) return;
+  const inv = (el('riscuotiInv').value || '').trim();
+  const nota = el('riscuotiNota');
+  if (!inv) {
+    nota.style.color = 'var(--danger)';
+    nota.textContent = 'Incolla la invoice, poi riprova';
+    return;
+  }
+  const ripristina = bottoneInAttesa(btn, '↩️ Riscuoto…');
+  try {
+    const r = await fetch(`${API_BASE}/rimborsi/${rid}/invoice`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({invoice: inv})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      /* IL FOGLIO RESTA APERTO COL TESTO DENTRO, ed e' tutto il
+         guadagno sul prompt(): il rifiuto tipico e' «l'importo non
+         corrisponde», cioe' una invoice da rifare — e col prompt si
+         perdevano duecento caratteri appena incollati. */
+      nota.style.color = 'var(--danger)';
+      nota.textContent = d.detail || 'Riscossione non riuscita';
+      return;
+    }
+    el('riscuotiSheet').classList.remove('open');
+    if (!document.querySelector('.sheet.open'))
+      el('sheetBg').classList.remove('open');
+    riscuotiId = 0;
+    toast(d.stato==='riscosso' ? '↩️ Rimborso in arrivo sul tuo wallet!'
+                               : 'Il pagamento non è riuscito: riprova', 6000);
+    await loadPuntate(); renderPuntate();
+  } catch(e) {
+    nota.style.color = 'var(--danger)';
+    nota.textContent = 'Rete assente: riprova';
+  } finally { ripristina(); }
 }
 
 /* La sezione in testa alla scheda Ordini: solo le trattative VIVE
@@ -10716,7 +10852,7 @@ function toggleContro(id){
   const box = el('controBox_'+id);
   if (box) box.style.display = box.style.display==='none' ? '' : 'none';
 }
-async function rispondiOfferta(id, azione){
+function rispondiOfferta(id, azione){
   haptic();
   const o = offerteMie.find(x=>x.id===id); if (!o) return;
   let importo = '';
@@ -10725,32 +10861,49 @@ async function rispondiOfferta(id, azione){
     if (!importo) { toast('Scrivi la tua controproposta'); return; }
     if (o.valuta!=='eur') importo = importo.replace(/[.\s]/g,'');
   }
-  /* Il confirm e' testo NUDO: qui le cifre si scrivono a mano, che
-     cifraOff e i suoi gemelli portano dentro dell'HTML. */
+  /* I testi sono NUDI: qui le cifre si scrivono a mano, che cifraOff
+     e i suoi gemelli portano dentro dell'HTML. */
   const a = accordoDi(o), q = o.quantita||0;
   const totale = o.valuta==='eur'
     ? fmtEur(Math.round(a.eur*q*100)/100)+' €'
     : fmt(a.sats*q)+' sats';
-  if (azione==='accetta' && !confirm(o.venditore_id===myTgId
-      /* La prima riga non cambia MAI, ed e' quella che conta: da
-         quando l'accordo porta un numero il venditore si sente piu'
-         impegnato di quanto sia. Con 4 pezzi puo' accettare tre
-         offerte da 3 e credersi impegnato per 9: e' il meccanismo di
-         sempre, ma il numero scritto lo fa sembrare un vincolo. */
-      ? 'Accettare non riserva l\'oggetto: l\'annuncio resta in vetrina '
-        + 'e vince chi paga per primo.'
-        + (q > 1
-            ? `\n\nL'accordo è per ${fmt(q)} pezzi al prezzo offerto: se `
-              + `paga, incassi ${totale}.`
-            : q === 1
-            ? '\n\nL\'accordo è per un pezzo solo.'
-            : ' Se l\'annuncio ha più pezzi, la cifra vale come prezzo '
-              + 'AL PEZZO per la quantità che sceglierà.')
-        + '\n\nAccetti l\'offerta?'
-      : 'Accetti la controproposta? Avrai un tempo limitato per pagare.'))
+  if (azione==='accetta') {
+    /* La prima riga non cambia MAI, ed e' quella che conta: da quando
+       l'accordo porta un numero il venditore si sente piu' impegnato
+       di quanto sia. Con 4 pezzi puo' accettare tre offerte da 3 e
+       credersi impegnato per 9: e' il meccanismo di sempre, ma il
+       numero scritto lo fa sembrare un vincolo. */
+    const mio = o.venditore_id===myTgId;
+    chiediConferma({
+      titolo: mio ? 'Accetti l\'offerta?' : 'Accetti la controproposta?',
+      testata: testataOfferta(o),
+      corpo: mio
+        ? 'Accettare non riserva l\'oggetto: l\'annuncio resta in '
+          + 'vetrina e vince chi paga per primo.'
+          + (q > 1
+              ? ` L'accordo è per ${fmt(q)} pezzi al prezzo offerto: se `
+                + `paga, incassi ${totale}.`
+              : q === 1
+              ? ' L\'accordo è per un pezzo solo.'
+              : ' Se l\'annuncio ha più pezzi, la cifra vale come prezzo '
+                + 'AL PEZZO per la quantità che sceglierà.')
+        : 'Avrai un tempo limitato per pagare.',
+      etichetta: '✓ Accetta',
+      poi: () => inviaRisposta(id, azione, importo)});
     return;
-  if (azione==='rifiuta' && !confirm('Vuoi rifiutare? La decisione è definitiva.'))
+  }
+  if (azione==='rifiuta') {
+    chiediConferma({
+      titolo: 'Vuoi rifiutare?',
+      testata: testataOfferta(o),
+      corpo: 'La decisione è definitiva.',
+      etichetta: 'Sì, rifiuta',
+      poi: () => inviaRisposta(id, azione, importo)});
     return;
+  }
+  inviaRisposta(id, azione, importo);   /* la controproposta non chiede */
+}
+async function inviaRisposta(id, azione, importo){
   try {
     const r = await fetch(`${API_BASE}/offerte/${id}/rispondi`, {
       method:'POST',
@@ -10764,22 +10917,62 @@ async function rispondiOfferta(id, azione){
   } catch(e) { toast('Rete assente: riprova'); }
   loadOfferte().then(renderOfferte).catch(()=>{});
 }
+/* LA DOMANDA DI CASA, al posto del confirm() del sistema operativo.
+   Chi chiama passa i testi e l'AZIONE; qui si apre il foglio e la si
+   esegue al tocco. `confermaAzione` e' anche la guardia del bottone:
+   senza, un doppio tocco la manderebbe due volte.
+   La testata (miniatura + titolo) e' facoltativa e dice SU COSA si sta
+   per agire — una cosa che in un dialogo di sistema non ci poteva
+   stare. Il corpo si scrive con textContent, quindi il testo va NUDO:
+   niente HTML da ricordarsi di scappare. */
+let confermaAzione = null;
+function chiediConferma(c){
+  haptic();
+  confermaAzione = c.poi;
+  el('confTit').textContent = c.titolo || 'Confermi?';
+  const testata = el('confTestata');
+  testata.innerHTML = c.testata || '';
+  testata.style.display = c.testata ? '' : 'none';
+  el('confCorpo').textContent = c.corpo || '';
+  el('confOk').textContent = c.etichetta || 'Conferma';
+  el('sheetBg').classList.add('open');
+  el('confermaSheet').classList.add('open');
+}
+/* La testata standard di un annuncio: la miniatura se c'e', il 💰 se
+   manca. Sta qui perche' la vogliono tutti i chiamanti che parlano di
+   un'offerta, e ricopiarla sarebbe il secondo posto da tenere in pari. */
+function testataOfferta(o){
+  let thumb = '';
+  try { const nomi = o.foto ? JSON.parse(o.foto) : [];
+        if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
+  return (thumb
+      ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
+      : '<span style="font-size:28px">💰</span>')
+    + `<b style="font-size:14px">${esc(o.titolo)}</b>`;
+}
+async function eseguiConferma(btn){
+  haptic();
+  const poi = confermaAzione; if (!poi) return;
+  confermaAzione = null;
+  /* Si chiude PRIMA di agire: il foglio ha gia' fatto il suo mestiere,
+     e cio' che l'azione ha da dire lo dice col toast. Chiusura MIRATA
+     e mai closeSheet — il pollTimer non e' roba di questo foglio, ma
+     la regola vale per tutti. */
+  el('confermaSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open'))
+    el('sheetBg').classList.remove('open');
+  const ripristina = bottoneInAttesa(btn, '…');
+  try { await poi(); }
+  finally { ripristina(); }
+}
 /* Il ritiro del PROPONENTE, gemello speculare del rifiuto: da qui si
    chiude una trattativa che si e' aperta per sbaglio. Nessun sat e'
    mai coinvolto — se c'e' gia' una fattura in corso il server dice di
-   no e manda agli Ordini, che e' l'altra strada.
-   La domanda si fa col FOGLIO di casa e non col confirm() di sistema
-   (la strada di #paccoSvuotaSheet e del rifornimento): quale offerta
-   si sta ritirando vive in ritiroId, che e' anche la guardia del
-   bottone di conferma. */
-let ritiroId = 0;
+   no e manda agli Ordini, che e' l'altra strada. */
 function ritiraOfferta(id){
-  haptic();
   const o = offerteMie.find(x=>x.id===id); if (!o) return;
-  ritiroId = id;
-  /* Il corpo del foglio e' testo NUDO come il confirm di prima: le
-     cifre si scrivono a mano, che cifraOff e i suoi gemelli portano
-     dentro dell'HTML. */
+  /* I testi sono NUDI: le cifre si scrivono a mano, che cifraOff e i
+     suoi gemelli portano dentro dell'HTML. */
   const a = accordoDi(o), q = o.quantita||0;
   const cifra = (o.valuta==='eur'
       ? fmtEur(Math.round(a.eur*Math.max(1,q)*100)/100)+' €'
@@ -10794,49 +10987,27 @@ function ritiraOfferta(id){
       + `${max} volte in tutto`
     : ', e il tentativo resta contato';
   const acc = o.stato==='accettata';
-  el('ritiroTit').textContent = acc
-    ? `Vuoi ritirare l'accordo a ${cifra}?`
-    : `Vuoi ritirare la tua offerta di ${cifra}?`;
-  /* La miniatura dell'annuncio, che nel confirm non ci poteva stare:
-     dice SU COSA si sta per agire, ed e' la stessa testata dei fogli
-     fratelli (offerta, puntata, rifornimento). */
-  let thumb = '';
-  try { const nomi = o.foto ? JSON.parse(o.foto) : [];
-        if (nomi[0]) thumb = fotoUrl(fotoMini(nomi[0])); } catch(e) {}
-  el('ritiroTestata').innerHTML = (thumb
-      ? `<img src="${esc(thumb)}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.replaceWith('💰')">`
-      : '<span style="font-size:28px">💰</span>')
-    + `<b style="font-size:14px">${esc(o.titolo)}</b>`;
-  el('ritiroCorpo').textContent = acc
-    ? `Il venditore ha già detto sì e sta aspettando il tuo pagamento: `
-      + `lo avvisiamo che hai ritirato. Nessun sat si è mosso${coda}.`
-    : `Il venditore non potrà più accettarla${coda}. Subito dopo puoi `
-      + `farne una nuova, se te ne restano.`;
-  el('sheetBg').classList.add('open');
-  el('ritiroSheet').classList.add('open');
+  chiediConferma({
+    titolo: acc ? `Vuoi ritirare l'accordo a ${cifra}?`
+                : `Vuoi ritirare la tua offerta di ${cifra}?`,
+    testata: testataOfferta(o),
+    corpo: acc
+      ? `Il venditore ha già detto sì e sta aspettando il tuo pagamento: `
+        + `lo avvisiamo che hai ritirato. Nessun sat si è mosso${coda}.`
+      : `Il venditore non potrà più accettarla${coda}. Subito dopo puoi `
+        + `farne una nuova, se te ne restano.`,
+    etichetta: 'Sì, ritira',
+    poi: () => inviaRitiro(id)});
 }
-async function confermaRitiroOfferta(btn){
-  haptic();
-  const id = ritiroId; if (!id) return;
-  const ripristina = bottoneInAttesa(btn, 'Ritiro…');
+async function inviaRitiro(id){
   try {
     const r = await fetch(`${API_BASE}/offerte/${id}/ritira`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()}});
     const d = await r.json().catch(()=>({}));
-    /* Il foglio si chiude comunque: a differenza del rifornimento qui
-       non c'e' NIENTE da correggere dentro — il 400 dice «paga o
-       annulla l'ordine» e il 409 «ricarica», e tutti e due si agiscono
-       altrove. Chiusura MIRATA, mai closeSheet: il pollTimer non e'
-       roba di questo foglio, ma la regola vale per tutti. */
-    el('ritiroSheet').classList.remove('open');
-    if (!document.querySelector('.sheet.open'))
-      el('sheetBg').classList.remove('open');
-    ritiroId = 0;
     toast(r.ok ? 'Offerta ritirata'
                : (d.detail || 'Operazione non riuscita'), r.ok ? 3000 : 5000);
   } catch(e) { toast('Rete assente: riprova'); }
-  finally { ripristina(); }
   loadOfferte().then(renderOfferte).catch(()=>{});
 }
 /* «Paga ora»: si riapre il dettaglio, che con l'offerta accettata

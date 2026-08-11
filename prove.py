@@ -9213,9 +9213,14 @@ def prove_offerta_quantita():
     # accettare tre offerte da 3 e credersi impegnato per 9. E' il
     # meccanismo di sempre — l'annuncio non si e' mai bloccato — ma va
     # ridetto dove il numero si vede.
-    prova("il confirm del venditore lo dice ancora", True,
+    # (ago 2026: non e' piu' un confirm ma il foglio di casa, e la
+    # frase vive spezzata su due righe di sorgente — quindi si RICUCE
+    # prima di cercarla, o la sentinella direbbe che e' sparita mentre
+    # e' li'. La stessa piega del censimento degli euro.)
+    cucito = re.sub(r"'\s*\n\s*\+ '", "", mini)
+    prova("il foglio del venditore lo dice ancora", True,
           "Accettare non riserva l'oggetto: l'annuncio resta in vetrina"
-          .replace("'", "\\'") in mini)
+          .replace("'", "\\'") in cucito)
     prova("...e ora lo dice anche il pannello", True,
           "Accettare non blocca i pezzi" in mini)
     prova("...e la notifica del bot, da cui si accetta di piu'", True,
@@ -9787,36 +9792,178 @@ def prove_ritiro_offerta():
           2, rend.count("ritiraOfferta("))
     prova("la ritirata non entra fra le vive", False,
           "'ritirata'" in rend)
-    # Le due meta' del gesto: chi APRE il foglio e chi ESEGUE. Le
+    # Le due meta' del gesto: chi APRE la domanda e chi ESEGUE. Le
     # ancore sono esplicite perche' fra le due funzioni non c'e' una
     # riga vuota, e pezzo_js taglia proprio li'.
     apre = mini[mini.index("function ritiraOfferta("):
-                mini.index("async function confermaRitiroOfferta(")]
-    esegue = mini[mini.index("async function confermaRitiroOfferta("):
+                mini.index("async function inviaRitiro(")]
+    esegue = mini[mini.index("async function inviaRitiro("):
                   mini.index("/* «Paga ora»: si riapre il dettaglio")]
     prova("il tetto non si hardcoda: viene dalla busta", True,
           "max_offerte" in apre)
     prova("il client chiama la rotta giusta", True,
           "/ritira`" in esegue)
     # IL PUNTO DEL CANTIERE: la domanda si fa col foglio di casa, mai
-    # col dialogo del sistema operativo.
+    # col dialogo del sistema operativo. (Le prove sul foglio in se'
+    # — che esista, che sia in closeSheet, che nessuno lo scavalchi —
+    # stanno in prove_fogli_di_casa: qui si guarda che il RITIRO ci
+    # passi.)
     prova("nessun confirm() di sistema nel ritiro", False,
           "confirm(" in apre or "confirm(" in esegue)
     prova("...e nemmeno un alert()", False,
           "alert(" in apre or "alert(" in esegue)
-    prova("il foglio esiste nel markup", True,
-          'id="ritiroSheet"' in mini)
-    # Un foglio non registrato in closeSheet resta aperto sotto il velo
-    # quando qualcun altro chiude la pila: e' il difetto classico.
+    prova("il ritiro passa dal foglio di casa", True,
+          "chiediConferma({" in apre)
+    prova("...e gli passa la sua azione", True, "poi: () =>" in apre)
+    # Il titolo dell'annuncio e' testo del VENDITORE dentro innerHTML,
+    # e ora la testata la fabbrica un posto solo.
+    prova("il titolo passa da esc()", True,
+          "esc(o.titolo)" in pezzo_js(mini, "function testataOfferta("))
+
+
+def prove_fogli_di_casa():
+    """I dialoghi del sistema operativo che sono diventati fogli
+    nostri (ago 2026). Il prompt() era il piu' stridente dei due —
+    un'app che ha sostituito ogni tendina nativa non puo' chiedere
+    una durata a un campo di sistema — e la riscossione era il caso
+    peggiore: dentro ci si incolla una bolt11 di duecento caratteri, e
+    all'errore il prompt buttava via tutto."""
+    print("\n[i fogli di casa al posto dei dialoghi]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- LA PROVA CHE VALE PIU' DI TUTTE: nessun prompt() di sistema
+    # in tutto il client. Il predicato: `prompt(` non preceduto da un
+    # punto (esclude `ev.prompt()`, che e' l'API d'installazione PWA e
+    # ci deve restare) e non seguito subito da `)` — le chiamate vere
+    # hanno sempre un argomento, mentre i COMMENTI che raccontano la
+    # storia scrivono «prompt()» a parentesi vuota.
+    veri = re.findall(r"(?<!\.)\bprompt\((?!\))", mini)
+    prova("nessun prompt() di sistema nel client", 0, len(veri))
+    # e il predicato VEDE: su un finto prompt scritto apposta deve
+    # contare (o certificherebbe una pulizia che non ha guardato)
+    prova("...e il predicato sa riconoscerne uno", 1,
+          len(re.findall(r"(?<!\.)\bprompt\((?!\))",
+                         "const g = prompt('quanti giorni?');")))
+    prova("l'API d'installazione PWA non e' un dialogo di sistema",
+          True, "ev.prompt()" in mini)
+
+    def solo_codice(js):
+        """Via i commenti di blocco e le righe di commento: senza,
+        una sentinella che cerca «prompt(» pesca la PROSA che
+        racconta il cantiere invece del programma — ed e' successo
+        subito, qui e nel ritiro. La stessa lezione della sentinella
+        che ricuce le stringhe spezzate."""
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                         if not r.strip().startswith("//"))
+
+    def fetta(firma, fine):
+        return solo_codice(mini[mini.index(firma):mini.index(fine)])
+
     chiudi = pezzo_js(mini, "function closeSheet()")
-    prova("il foglio e' registrato in closeSheet", True,
-          "ritiroSheet" in chiudi)
-    prova("i due bottoni del foglio: quello che chiude e il "
-          "ripensamento", True,
-          "confermaRitiroOfferta(this)" in mini
-          and 'id="ritiroSheet"' in mini)
-    # Il titolo dell'annuncio e' testo del VENDITORE dentro innerHTML.
-    prova("il titolo passa da esc()", True, "esc(o.titolo)" in apre)
+
+    # --- 1) il rilancio dell'asta: era un PICKER TRAVESTITO ---------
+    prova("il foglio del rilancio esiste", True,
+          'id="rilancioSheet"' in mini)
+    prova("...ed e' registrato in closeSheet", True,
+          "rilancioSheet" in chiudi)
+    ril = fetta("function rilanciaAsta(", "function renderRilancioDurate(")
+    # la fine e' convertiAsta e non il foglio dopo: fra le due c'e' un
+    # confirm() ancora vivo (uno dei gesti sui sats, non di questo
+    # cantiere) e la fetta larga se lo pescava — l'ha detto la prova
+    inv = fetta("async function inviaRilancio(", "async function convertiAsta(")
+    prova("il rilancio non chiede piu' niente al sistema", False,
+          "prompt(" in ril or "confirm(" in ril
+          or "prompt(" in inv or "confirm(" in inv)
+    prova("le durate vengono dalle leve, mai da un elenco a mano",
+          True, "astaLeve && astaLeve.durate_giorni" in
+          fetta("function renderRilancioDurate(",
+                "function setRilancioGiorni("))
+    prova("le pillole sono quelle di casa", True,
+          "consegna-pill" in fetta("function renderRilancioDurate(",
+                                   "function setRilancioGiorni("))
+    # LA RIGA DELICATA: il rilancio ha una variabile SUA. Con
+    # `sellAstaGiorni` un rilancio riscriverebbe la durata che il
+    # venditore ha impostato nel form Vendi per il prossimo annuncio.
+    # Si guarda TUTTA l'area del rilancio, dalla DICHIARAZIONE in giu':
+    # con le sole tre funzioni la sentinella era cieca proprio sulla
+    # riga dove il difetto e' piu' facile da scrivere — un
+    # `let rilancioGiorni = sellAstaGiorni` non la faceva fiatare, e
+    # l'ha detto la tortura, non la rilettura.
+    area = fetta("let rilancioId = 0", "async function convertiAsta(")
+    prova("il rilancio non tocca la durata del form Vendi", False,
+          "sellAstaGiorni" in area)
+    prova("...e l'area sorvegliata comprende la dichiarazione", True,
+          "rilancioGiorni = 0;" in area)
+
+    # --- 2) la riscossione: il foglio RESTA APERTO sull'errore ------
+    prova("il foglio della riscossione esiste", True,
+          'id="riscuotiSheet"' in mini)
+    prova("...ed e' registrato in closeSheet", True,
+          "riscuotiSheet" in chiudi)
+    apre = fetta("function riscuotiRimborso(", "function riscuotiDigitata(")
+    esegue = fetta("async function inviaRiscossione(",
+                   "\n/* La sezione in testa alla scheda Ordini")
+    prova("la riscossione non chiede piu' niente al sistema", False,
+          "prompt(" in apre or "confirm(" in apre
+          or "prompt(" in esegue or "confirm(" in esegue)
+    # IL GUADAGNO VERO sul prompt(): sull'errore non si chiude e non si
+    # perde la bolt11 appena incollata. La prova e' che nel ramo
+    # dell'errore ci sia il `return` PRIMA di qualunque chiusura.
+    ramo = esegue[esegue.index("if (!r.ok)"):]
+    ramo = ramo[:ramo.index("return;")]
+    prova("sull'errore il foglio NON si chiude", False,
+          "classList.remove('open')" in ramo)
+    prova("...e il motivo si scrive dentro", True,
+          "nota.textContent" in ramo)
+    prova("il campo non si svuota sull'errore", False,
+          "riscuotiInv').value = ''" in esegue)
+    prova("una bolt11 non sta su una riga: e' una textarea", True,
+          'id="riscuotiInv"' in mini
+          and "<textarea id=\"riscuotiInv\"" in mini)
+    prova("il fuoco non trascina la pagina", True,
+          "preventScroll" in apre)
+
+    # --- 3) LA DOMANDA, una volta sola -----------------------------
+    # Tre gesti quasi identici volevano tre fogli: il generico e' cio'
+    # che rende i prossimi una CHIAMATA invece di un foglio.
+    prova("il foglio della domanda esiste", True,
+          'id="confermaSheet"' in mini)
+    prova("...ed e' registrato in closeSheet", True,
+          "confermaSheet" in chiudi)
+    chiedi = fetta("function chiediConferma(", "function testataOfferta(")
+    esegui = fetta("async function eseguiConferma(",
+                   "/* Il ritiro del PROPONENTE")
+    prova("l'azione e' anche la GUARDIA del bottone: senza, un doppio "
+          "tocco la manda due volte", True,
+          "confermaAzione = null;" in esegui
+          and "const poi = confermaAzione; if (!poi) return;" in esegui)
+    prova("il corpo si scrive con textContent (testo NUDO, niente "
+          "HTML da scappare)", True, "confCorpo').textContent" in chiedi)
+    prova("la testata e' facoltativa e sparisce se non c'e'", True,
+          "testata.style.display" in chiedi)
+    prova("chiusura MIRATA, mai closeSheet", True,
+          "confermaSheet').classList.remove('open')" in esegui
+          and "closeSheet()" not in esegui)
+    # I TRE CHIAMANTI di oggi. Il conto e' la prova che il generico e'
+    # davvero condiviso: se qualcuno si scrive un foglio suo, cala.
+    prova("i gesti che passano dalla domanda unica sono tre", 3,
+          solo_codice(mini).count("chiediConferma({"))
+    for chi, dove in (("il ritiro", "function ritiraOfferta("),
+                      ("accetta e rifiuta", "function rispondiOfferta(")):
+        f = fetta(dove, "async function invia")
+        prova(f"{chi}: niente dialoghi di sistema", False,
+              "confirm(" in f or "prompt(" in f or "alert(" in f)
+    # La controproposta NON chiede: si sta gia' scrivendo una cifra in
+    # un campo, e una domanda in piu' sarebbe un ostacolo.
+    risp = fetta("function rispondiOfferta(", "async function inviaRisposta(")
+    # il commento qui NON si puo' cercare: `fetta` toglie i commenti
+    # apposta. Si guarda il CODICE — i due rami che chiedono escono
+    # con un return, e la coda della funzione manda dritto.
+    prova("la controproposta non passa dalla domanda", True,
+          risp.count("chiediConferma({") == 2
+          and risp.rstrip().rstrip("}").rstrip().endswith(
+              "inviaRisposta(id, azione, importo);"))
 
 
 def main():
@@ -9849,7 +9996,7 @@ def main():
               prove_impersonazione, prove_avviso_spedizione,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
-              prove_ritiro_offerta,
+              prove_ritiro_offerta, prove_fogli_di_casa,
               prove_sat_non_e_barattolo, prove_ai_segnala):
         try:
             f()
