@@ -5162,10 +5162,9 @@ function go(view){
      pagina */
   document.body.classList.toggle('senza-nav',
     view==='controllapacco' || view==='acquisto');
-  /* la griglia si rifa' SOLO quando la firma delle fasce e' cambiata
-     (una categoria svuotata o riempita: raro) — rifarla a ogni
-     entrata ricreerebbe 27 <img> per nulla, e mentre la si guarda
-     non si riordina mai */
+  /* la griglia si rifa' SOLO quando l'ordine per numero e' cambiato
+     — rifarla a ogni entrata ricreerebbe 27 <img> per nulla, e
+     mentre la si guarda non si riordina mai */
   if (view==='sfoglia' && sfogliaDaRifare()) renderSfoglia();
   /* la riga «nessuno puo' scriverti» compare solo a chi e' davvero
      senza canali: si rivaluta a ogni ingresso, perche' nel frattempo
@@ -5840,18 +5839,26 @@ function icoCategoria(c){
     ><span class="cat-ico-em" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>`;
 }
 
-/* Le piastrelle del catalogo, a DUE FASCE (ago 2026, decisione di
-   Andrea): le categorie PIENE sopra, le vuote in fondo, e DENTRO ogni
-   fascia l'ordine fisso del catalogo. E' la via di mezzo fra la mappa
-   che non si riordina (la decisione di ieri, che resta viva dentro le
-   fasce) e la parte viva della griglia in cima: una categoria si
-   sposta solo quando si svuota o si riempie, che e' raro — la
-   memoria muscolare regge quasi intera. I conteggi sono gli stessi di
+/* Le piastrelle ORDINATE PER NUMERO DI ANNUNCI (ago 2026, decisione
+   di Andrea che ROVESCIA la regola scritta alla nascita della pagina,
+   «l'ordine e' FISSO, mai per numero»): la categoria piu' piena in
+   cima, poi a scendere, le vuote in fondo. IL PERCHE' DI ALLORA VA
+   TENUTO, perche' resta vero: una mappa che si riordina non si
+   impara, e ai nostri numeri si riordina SPESSO — le categorie piene
+   hanno pochi annunci ciascuna, e un annuncio in piu' basta a far
+   saltare una piastrella di posto. Andrea l'ha scelto sapendolo: la
+   parte viva della griglia in cima vale piu' della mappa (in mezzo
+   c'e' stata, per qualche ora, la via delle DUE FASCE — piene sopra
+   in ordine di catalogo — superata nello stesso giorno).
+   IL PAREGGIO E' L'ORDINE DI CATALOGO, e non e' un dettaglio: due
+   categorie con lo stesso conteggio non devono ballare a ogni
+   apertura — lo garantisce la stabilita' del sort, che a pari merito
+   conserva l'ordine d'ingresso. I conteggi sono gli stessi di
    renderChips (globali dal server, dal locale in DEMO) e NON si
-   mostrano: decidono solo la fascia. Senza conteggi (apertura
-   precoce, server muto) sono tutti «vuoti» e la partizione stabile
-   restituisce da sola l'ordine pieno di catalogo: il ripiego e' il
-   comportamento di ieri, senza un ramo apposta.
+   mostrano sulle piastrelle. Senza conteggi (apertura precoce,
+   server muto) sono tutti a zero e il sort stabile restituisce da
+   solo l'ordine pieno di catalogo: il ripiego e' il comportamento
+   della nascita, senza un ramo apposta.
    Il ?b=2 sugli URL (qui e in icoCategoria) e' il timbro UNA TANTUM
    che ha ripulito le cache scritte quando la rotta prometteva max-age
    di un giorno: la PWA mostrava generazioni vecchie miste — il
@@ -5895,21 +5902,22 @@ function scaldaSfoglia(){
 const caldaOk = c => (sfogliaCalde[c]?.complete && sfogliaCalde[c].naturalWidth > 0)
   ? ' data-ok="1"' : '';
 
-/* L'ordine delle piastrelle: partizione STABILE del catalogo — prima
-   chi ha annunci, poi chi non ne ha, ognuno nell'ordine di sempre.
-   La fonte dei conteggi e' la stessa di renderChips. */
+/* L'ordine delle piastrelle: per numero di annunci, a scendere, col
+   catalogo come pareggio (sort STABILE: a pari conteggio l'ordine
+   d'ingresso si conserva, e le vuote — tutte a zero — chiudono in
+   ordine di catalogo). La fonte dei conteggi e' la stessa di
+   renderChips. */
 function ordineSfoglia(){
   const conta = {};
   if (!DEMO && conteggiServer) Object.assign(conta, conteggiServer);
   else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
-  const tutte = CATS.slice(1);
-  return [...tutte.filter(c=>conta[c]), ...tutte.filter(c=>!conta[c])];
+  return CATS.slice(1).sort((a,b)=>(conta[b]||0)-(conta[a]||0));
 }
-/* La griglia si ridisegna SOLO quando la firma delle fasce cambia —
-   cioe' quando una categoria si e' svuotata o riempita, mai mentre la
-   si guarda (il render vive sull'ENTRATA nella vista). Cosi' il costo
-   resta quello di ieri: quasi sempre zero, e col calore delle
-   illustrazioni un ridisegno non rifa' nessuna richiesta. */
+/* La griglia si ridisegna SOLO quando la firma dell'ordine cambia —
+   e MAI mentre la si guarda: il render vive sull'ENTRATA nella vista,
+   quindi la mappa puo' cambiare fra una visita e l'altra ma non balla
+   sotto gli occhi. Col calore delle illustrazioni un ridisegno non
+   rifa' nessuna richiesta. */
 let sfogliaFirma = '';
 const sfogliaDaRifare = () => !el('sfogliaGriglia').children.length
   || ordineSfoglia().join('|') !== sfogliaFirma;
