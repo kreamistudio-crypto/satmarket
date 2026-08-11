@@ -861,6 +861,51 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il promemoria in silenzio. (I quattro solleciti fratelli non lo
   facevano ancora — chiuso ad ago 2026, ed erano quindici siti e non
   quattro: vedi «IL TITOLO NUDO NELLE NOTIFICHE».)
+  E CHI HA PAGATO PUÒ BUSSARE PRIMA (ago 2026, `sollecita_venditore`,
+  `POST /api/orders/{id}/sollecita-venditore`): il promemoria qui
+  sopra parte a giorni, e fino ad allora chi aveva pagato guardava un
+  ordine fermo senza NESSUNA maniglia in mano. Il bottone non aggiunge
+  la funzione — quella c'era già —, aggiunge il PRIMA e l'A COMANDO,
+  ed è il gemello speculare di `sollecita_acquirente`: là bussa chi
+  vende, qui chi compra.
+  I DUE CONTATORI CONVIVONO E NON SI TOCCANO, ed è la decisione da non
+  rovesciare: colonne SUE (`sollecito_manuale_il`,
+  `solleciti_manuali`, «manuale» come le leve) e l'ancora è `creato`,
+  che il bottone non scrive — quindi bussare a mano non sposta di un
+  minuto il 🧊 ai moderatori. Il contrario sarebbe il rovescio esatto
+  di quel che serve: chi bussa spesso allontanerebbe il momento in cui
+  un umano guarda il caso. Il prezzo è che nella stessa giornata
+  possono partire un manuale e un automatico — accettato: sono lo
+  stesso messaggio nello stesso registro.
+  L'ANCORA È `creato` anche qui, per la trappola della gemella:
+  `deposita_invoice` accetta il venditore proprio su 'locked' e scrive
+  `aggiornato`, quindi con `aggiornato` sarebbe il VENDITORE a
+  rimandare all'infinito il promemoria di chi lo aspetta, ri-salvando
+  la propria invoice d'incasso.
+  IL TETTO È LA METÀ CHE CONTA, o il bottone diventa un modo per
+  tempestare qualcuno: `SOLLECITO_MANUALE_ORE` (48) e
+  `SOLLECITO_MANUALE_DIGITALE_ORE` (24) dicono da quando si può — mai
+  subito —, `SOLLECITO_MANUALE_PAUSA_ORE` (24) ogni quanto si ripete,
+  `SOLLECITO_MANUALE_MAX` (3) quante volte in tutto: oltre non c'è più
+  niente da dire e la maniglia diventa la disputa, e il 400 lo dice
+  con quelle parole. Le due finestre stanno COMODAMENTE prima
+  dell'automatico (5 giorni e 48 ore): un venditore che spedisce nel
+  fine settimana non sente mai niente, e un codice si manda in minuti
+  ma una giornata intera la merita chiunque. A 0 la finestra spegne la
+  sua popolazione, MAX a 0 spegne il gesto.
+  IL TESTO È UN PROMEMORIA, NON UN RIMPROVERO, e non è cortesia ma la
+  verità statistica: chi non ha spedito ha quasi sempre solo avuto una
+  giornata storta, e il messaggio lo dice prima di chiedere qualcosa.
+  Il ritiro in zona resta fuori (ha `sollecita_ritiri_fermi`, e lì chi
+  ha comprato può già confermare da solo) e così la strada non
+  dichiarata. La guardia di proprietà sta DENTRO la WHERE col 400 dei
+  fratelli, e c'è la prova che venditore, estraneo e ordine
+  inesistente ricevano la STESSA risposta: chi enumera non impara
+  niente. Lato client il giudice è `puoiSollecitareVenditore` e le
+  quattro leve si ripetono a mano in `SOLLECITO`, col patto di `TEMPI`
+  — chi le cambia nel config le cambia anche lì; il server resta
+  comunque il giudice. Col sedicesimo sito il censimento dei titoli
+  scappati sale a sedici funzioni.
   LO STESSO «<» SPEGNEVA L'AVVISO DELLA SPEDIZIONE (ago 2026, B6
   dell'audit, chiuso): corriere e tracciamento sono testo di CHI
   SPEDISCE e finivano nudi nell'HTML — un «Bartolini <BRT>», che uno
@@ -7424,6 +7469,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore, i bottoni del moderatore, i ponti di contatto, che della
   CONTROPARTE parlano apposta) e le frasi simmetriche («Vi incontrate
   e l'oggetto passa di mano»).
+  E LA PRIMA RIGA DEL RIQUADRO DICE UN GESTO (ago 2026): «Sats nel
+  deposito di garanzia» raccontava un fatto della piattaforma, non
+  quel che è successo a chi legge. La riga è CONDIVISA, quindi vale la
+  regola qui sopra e il verso in cui si sbaglia è dare l'«hai
+  depositato» anche a chi VENDE: lui i sats non li ha depositati, ce
+  li ha in garanzia. Quindi `passoDeposito` — «Hai depositato i sats»
+  a chi compra, «Hai il pagamento in garanzia» a chi vende, la frase
+  neutra di sempre al moderatore che guarda da fuori — e la riga
+  sotto («Il pagamento è custodito dalla piattaforma») NON si tocca:
+  è vera per tutti e due, ed è anche ciò che impedisce di leggere
+  «garanzia» come «è nel tuo wallet». Il giudice è UNO e lo usano
+  ENTRAMBI i rami del riquadro, quello normale e quello della
+  disputa, che la stessa riga non può raccontare due storie.
+  LA TESTA DEL RIQUADRO invece resta «Sats nel deposito di garanzia»,
+  ed è deliberato: quella dice lo STATO dell'affare, il passo dice
+  la storia di chi lo guarda.
   LA MODALITÀ NON SI RIPETE (stesso giro): la riga sotto il prezzo
   diceva «🚚 con spedizione» / «📦 spedizione a un punto di ritiro»,
   che è già scritto due righe più sotto — dal punto di ritiro, dal
@@ -7538,6 +7599,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   che è dei badge spedizione: un colore che significa una cosa non se
   ne prende un'altra. Misurati, testo su fondo: Telegram 5,36 e 7,81,
   Nostr 4,91 e 7,88 — AA pieno in entrambi i temi.
+  E L'USCITA DI SICUREZZA HA LA STESSA RICETTA (ago 2026): «⚠️ C'è un
+  problema — apri disputa» era un testuale sottolineato
+  (`.danger-ghost`) e in fila coi due ponti colorati spariva — proprio
+  il bottone che deve farsi trovare quando qualcosa va storto. Ora è
+  `.btn.allarme`: la forma di tutti, fondo VELATO `--warn-bg`, testo e
+  bordo `--danger` (4,83 di giorno, 5,28 di sera, AA in entrambi i
+  temi). Il fondo resta una velatura e non il rosso pieno, ed è la
+  riga da non ammorbidire: tre blocchi saturi in fila — rosso,
+  azzurro, viola — sarebbero un semaforo, e questo non è un invito ma
+  un'uscita. Più il `margin-bottom` che stacca il rosso dalla coppia
+  dei ponti: guardati a schermo, tre blocchi colorati a filo l'uno
+  sull'altro erano precisamente quel semaforo.
   ATTENZIONE se un domani si vorrà sbiadirli ancora: il fondo è già al
   livello «soft» di casa (contro la pagina fa 1,05–1,18, cioè si legge
   come una velatura e basta) ed è il CONTORNO a dire che è un bottone.
@@ -10645,6 +10718,31 @@ vivo via CDP a 390px nei due temi e dai due lati, con i casi che lo
 screenshot non copre verificati a parte (spedizione gratis, rimborso,
 sola spedizione su una riga). IN PRODUZIONE basta il deploy: nessuna
 colonna, nessuna rotta, nessuna leva — solo client.
+
+Chi ha pagato può bussare, e la disputa si vede (ago 2026): il bottone
+«🔔 Ricorda al venditore di spedire» sull'ordine pagato e non ancora
+partito — 48 ore dal pagamento (24 sul codice online), uno al giorno,
+tre in tutto, poi resta la disputa — col testo che è un promemoria e
+non un rimprovero, perché chi non ha spedito ha quasi sempre solo
+avuto una giornata storta. I contatori dell'automatico non si toccano:
+colonne sue e ancora `creato`, o chi bussa spesso allontanerebbe il 🧊
+ai moderatori. E «⚠️ C'è un problema — apri disputa» prende la forma
+di tutti gli altri col rosso velato dei ponti: era un testuale
+sottolineato e in fila coi due blocchi colorati spariva. Vedi
+Architettura, «E CHI HA PAGATO PUÒ BUSSARE PRIMA» e «E L'USCITA DI
+SICUREZZA HA LA STESSA RICETTA». Più la prima riga del riquadro verde,
+che ora dice un GESTO e lo gira a chi legge («Hai depositato i sats» /
+«Hai il pagamento in garanzia»). Collaudati: 2485 prove verdi (52
+nuove — l'endpoint girato DAVVERO su sqlite in memoria, con l'ambiente
+POVERO che esplode con NameError se un domani imparasse a toccare i
+sats) e DICIOTTO mutazioni del codice, una per riga sorvegliata,
+ognuna rossa da sola; più il giro dal vivo sul server locale (le tre
+finestre, la pausa, il tetto, l'anti-oracolo verificato sul database
+vero) e gli screenshot dei quattro bottoni in fila nei due temi.
+IN PRODUZIONE basta il deploy: le due colonne nascono a 0 e le quattro
+leve hanno il default nel codice. DA GUARDARE al primo giro: il primo
+promemoria vero dentro Telegram — che al venditore arrivi UN messaggio
+e che si legga come un promemoria.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
