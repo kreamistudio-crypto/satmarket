@@ -2646,6 +2646,27 @@ def prove_dettaglio_ordine():
           True, "🚚 Spedizione <b>gratuita</b>" in det
           and "sats di spedizione" in det)
 
+    # ---- 5-bis: IL PUNTO NON SI DICE DUE VOLTE ----
+    # Sotto il prezzo c'era anche il punto GIA' scelto, mentre due dita
+    # piu' sotto lo stesso testo si puo' ancora CORREGGERE. Via di li';
+    # e a spedizione fatta — campo chiuso, pannello del venditore
+    # sparito — ricompare nel banner del pacco, che e' dove si guarda
+    # «dov'e' la mia roba».
+    pb = pezzo_js(mini, "function puntoBanner(o){")
+    prova("il punto non si ripete piu' sotto il prezzo", False,
+          "Il punto di ritiro che hai indicato" in det)
+    prova("...ma resta l'invito quando ancora non c'e'", True,
+          "Spedizione a un punto di ritiro: indica il punto qui sotto."
+          in det)
+    prova("il banner del pacco lo ridice a chi compra", True,
+          "'Il tuo punto di ritiro'" in pb)
+    prova("...e all'altro lato in terza persona", True,
+          "'Punto di ritiro dell\\'acquirente'" in pb)
+    prova("...col testo del compratore sempre scappato", True,
+          "esc(o.puntoRitiro)" in pb)
+    prova("il banner nasce anche senza tracciamento (via punto)", True,
+          "(o.tracking || o.puntoRitiro)" in det)
+
     # ---- 6-8: la modalita' non si ripete ----
     for detto in ("📦 spedizione a un punto di ritiro",
                   "🚚 con spedizione", "💾 codice online"):
@@ -2658,8 +2679,6 @@ def prove_dettaglio_ordine():
     # ogni voce: (nome, il testo girato a chi legge, quello che
     # l'altro lato deve continuare a leggere)
     for nome, mio, suo in (
-            ("il punto di ritiro", "Il punto di ritiro che hai indicato",
-             "Punto di ritiro indicato dall\\'acquirente"),
             ("il reso da rispedire", "Devi rispedire l\\'oggetto al venditore",
              "L\\'acquirente deve rispedire l\\'oggetto al venditore"),
             ("la disputa vinta", "Disputa risolta a tuo favore",
@@ -10843,7 +10862,9 @@ def prove_sollecito_a_comando():
             "sollecito_manuale_il INT DEFAULT 0, "
             "solleciti_manuali INT DEFAULT 0, "
             "sollecito_venditore_il INT DEFAULT 0, "
-            "solleciti_venditore INT DEFAULT 0)")
+            "solleciti_venditore INT DEFAULT 0, "
+            # il timbro del bottone GEMELLO, quello del venditore
+            "sollecito_il INT DEFAULT 0)")
         vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
                      "titolo TEXT)")
         vero.execute("CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, "
@@ -10883,9 +10904,19 @@ def prove_sollecito_a_comando():
              ORA - g, 0, 0, 0, 0),                    # titolo cattivo
             (60, 111, 222, 0, "locked", "spedizione", ORA - 49 * g,
              ORA - g, 0, 0, 0, 0),                    # un SET
+            # stesso compratore, un ALTRO venditore: il caso che ha
+            # aperto la voce — sollecitarne uno non deve zittire
+            # l'altro
+            (11, 111, 333, 7, "locked", "spedizione", ORA - 49 * g,
+             ORA - g, 0, 0, 0, 0),
+            # e il gemello del venditore: due compratori diversi
+            (30, 111, 222, 7, "shipped", "spedizione", ORA - 49 * g,
+             ORA - g, 0, 0, 0, 0),
+            (31, 444, 222, 7, "shipped", "spedizione", ORA - 49 * g,
+             ORA - g, 0, 0, 0, 0),
         ]
         vero.executemany(
-            "INSERT INTO ordini VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", righe)
+            "INSERT INTO ordini VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0)", righe)
         vero.commit()
         return vero
 
@@ -11045,6 +11076,81 @@ def prove_sollecito_a_comando():
     prova("il bottone del venditore non ha cambiato colonna", True,
           "sollecito_il=?" in pezzo("sollecita_acquirente"))
 
+    # --- 10-bis) DUE ORDINI NON SI BLOCCANO A VICENDA ------------
+    # Il caso dal campo: sollecitato un venditore, il bottone su un
+    # ALTRO ordine rispondeva «aspetta 24 ore». La pausa e il tetto
+    # sono di ogni ORDINE, mai della persona — qui si prova sul pezzo
+    # vero, due righe di fila, e non su una rilettura del codice.
+    v = mondo()
+    e1, d1, x1 = bussa(v, 1)              # ordine 1, venditore 222
+    e2, d2, x2 = bussa(v, 11)             # ordine 11, venditore 333
+    prova("il primo ordine passa", ({"ok": True}, None), (e1, x1))
+    prova("...e il secondo pure, subito dopo", ({"ok": True}, None),
+          (e2, x2))
+    prova("...con due destinatari diversi", [222, 333],
+          [t for t, _ in d1 + d2])
+    conti = {r["id"]: (r["solleciti_manuali"], r["sollecito_manuale_il"])
+             for r in v.execute("SELECT * FROM ordini WHERE id IN (1,11,60)")}
+    prova("...e ogni riga ha il SUO conto, a uno per uno",
+          {1: (1, ORA), 11: (1, ORA), 60: (0, 0)}, conti)
+    # il terzo tocco sullo stesso ordine invece si ferma: e' li' che
+    # la pausa deve mordere
+    e3, d3, x3 = bussa(v, 1)
+    prova("...mentre sullo STESSO ordine la pausa morde", 400,
+          x3 and x3.code)
+
+    # --- 10-ter) e lo stesso vale per il bottone del VENDITORE ----
+    def sollecita_come_venditore(vero, ordine_id, chi=222):
+        detti = []
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        async def _notifica(tg_id, testo):
+            detti.append((tg_id, testo))
+
+        amb = {"db": Con, "HTTPException": _H, "notifica": _notifica,
+               "time": type("t", (), {"time": staticmethod(lambda: ORA)}),
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi}}
+        exec("async " + pezzo("sollecita_acquirente"), amb)
+        try:
+            esito = asyncio.new_event_loop().run_until_complete(
+                amb["sollecita_acquirente"](ordine_id))
+            return esito, detti, None
+        except _H as e:
+            return None, detti, e
+
+    v2 = mondo()
+    g1, n1, y1 = sollecita_come_venditore(v2, 30)
+    g2, n2, y2 = sollecita_come_venditore(v2, 31)
+    prova("il gemello: il primo ordine passa", ({"ok": True}, None),
+          (g1, y1))
+    prova("...e il secondo pure, con un altro compratore",
+          ({"ok": True}, None), (g2, y2))
+    prova("...e sono arrivati a due persone diverse", [111, 444],
+          [t for t, _ in n1 + n2])
+    g3, n3, y3 = sollecita_come_venditore(v2, 30)
+    prova("...mentre sullo STESSO ordine la pausa morde", 400,
+          y3 and y3.code)
+
+    # --- 10-quater) il conto sta sulla RIGA, non sulla persona ----
+    for nome, c2 in (("il promemoria a comando", corpo),
+                     ("il gemello del venditore",
+                      pezzo("sollecita_acquirente"))):
+        agg = c2[c2.index("UPDATE ordini"):]
+        agg = agg[:agg.index(")")]
+        prova(f"{nome}: l'UPDATE timbra UNA riga", True,
+              "WHERE id=?" in agg
+              and "compratore_id" not in agg and "venditore_id" not in agg)
+
     # --- 11) il giudice del client -------------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
     g = mini[mini.index("function puoiSollecitareVenditore("):]
@@ -11055,6 +11161,16 @@ def prove_sollecito_a_comando():
           "['spedizione','digitale'].includes(o.consegnaScelta)" in g)
     prova("...e il tetto non e' scritto a mano", True,
           "SOLLECITO.max" in g and not re.search(r">=\s*3\b", g))
+    # IL DOPPIO TOCCO: finche' la risposta e' per strada il bottone
+    # dev'essere spento, o il secondo tocco si becca il 400 della
+    # pausa e si legge come un tetto sbagliato.
+    for f, chi in (("sollecitaVenditore", "il compratore"),
+                   ("sollecita", "il venditore")):
+        c3 = mini[mini.index(f"async function {f}(btn){{"):]
+        c3 = c3[:c3.index("\n}")]
+        prova(f"il bottone di {chi} si spegne durante l'invio", True,
+              "btn.disabled = true" in c3
+              and c3.index("btn.disabled = true") < c3.index("await fetch"))
     prova("il bottone della disputa ha la forma di casa", True,
           'class="btn allarme" onclick="openDispute()"' in mini
           and 'class="btn danger-ghost" onclick="openDispute()"' not in mini)

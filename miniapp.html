@@ -6432,6 +6432,21 @@ function pontiContatto(username, npub, chi, cls){
   if (npub) b.push(`<button class="${c} nostr" onclick="apriNostrProfilo('${npub}')">🟣 Scrivi ${chi} su Nostr</button>`);
   return b.join('');
 }
+/* IL PUNTO DI RITIRO NEL BANNER DEL PACCO (ago 2026): finche'
+   l'ordine e' 'locked' il punto vive nel campo del compratore (dove
+   si corregge) e nel pannello «Spedisci» del venditore; appena il
+   venditore spedisce spariscono tutti e due, e senza questa riga chi
+   ha comprato non avrebbe piu' da nessuna parte l'indirizzo dove
+   andare a ritirare il pacco. Sta nel banner del tracciamento perche'
+   e' li' che si guarda «dov'e' il mio pacco», e la frase e' girata a
+   chi legge — la regola del riquadro verde. Il testo e' del
+   compratore: esc() sempre. */
+function puntoBanner(o){
+  if (!o.puntoRitiro) return '';
+  return `${o.role==='buyer' ? 'Il tuo punto di ritiro'
+                             : 'Punto di ritiro dell\'acquirente'}: `
+       + `<b>${esc(o.puntoRitiro)}</b>`;
+}
 /* Il ponte dentro l'ordine: come sopra, ma senza canali la riga
    ricorda che l'escrow protegge comunque l'affare */
 function pontiOrdine(username, npub, chi, soggetto){
@@ -11434,8 +11449,17 @@ function openOrder(id){
             e il costo e' ormai l'inciso accanto alla cifra. Qui resta
             il solo conto dei pezzi, che non lo dice nessun altro. */
         (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats</div>` : ''}
-      ${o.puntoRitiro ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer'?'Il punto di ritiro che hai indicato':'Punto di ritiro indicato dall\'acquirente'}: <b>${esc(o.puntoRitiro)}</b></div>`
-        : (o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
+      ${/* IL PUNTO NON SI DICE DUE VOLTE (ago 2026): qui sotto il
+            prezzo c'era anche il punto GIA' scelto, che pero' vive
+            gia' dov'e' utile — nel campo del compratore, dove finche'
+            il venditore non spedisce si puo' ancora CORREGGERE, e nel
+            pannello «Spedisci» del venditore. Resta il solo invito a
+            indicarlo quando ancora non c'e': quello non e' il dato,
+            e' il cartello che ci porta. A spedizione fatta il punto
+            ricompare nel banner del pacco (vedi `puntoBanner`), che a
+            campo ormai chiuso e' l'unico posto dove chi ha comprato
+            ritrova DOVE andare a prenderlo. */''}
+      ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
       ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
       <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
            RETE DI SICUREZZA della scelta anticipata — il punto si
@@ -11466,7 +11490,7 @@ function openOrder(id){
         </div>
       </div>
       ${s==='dispute' ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
-      ${o.tracking && ['shipped','delivered'].includes(s) ? `<div class="trust-note">📦 <span>Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a>${rigaCorretto(o.trackingCorretto)}</span></div>`:''}
+      ${(['shipped','delivered'].includes(s) && (o.tracking || o.puntoRitiro)) ? `<div class="trust-note">📦 <span>${o.tracking ? `Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a>${rigaCorretto(o.trackingCorretto)}` : ''}${(o.tracking && o.puntoRitiro) ? ' · ' : ''}${puntoBanner(o)}</span></div>`:''}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${isAdmin && s==='dispute' ? `
@@ -11543,13 +11567,13 @@ function openOrder(id){
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
       ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — mi prendo ${TEMPI.conferma}h per controllarlo`:`📬 È arrivato — mi prendo ${TEMPI.conferma}h per controllarlo`}</button>`:''}
-      ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita()">🔔 Sollecita l'acquirente a confermare</button>`:''}
+      ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
-      ${puoiSollecitareVenditore(o) ? `<button class="btn ghost" onclick="sollecitaVenditore()">🔔 ${o.consegnaScelta==='digitale'?'Ricorda al venditore di mandarti il codice':'Ricorda al venditore di spedire'}</button>`:''}
+      ${puoiSollecitareVenditore(o) ? `<button class="btn ghost" onclick="sollecitaVenditore(this)">🔔 ${o.consegnaScelta==='digitale'?'Ricorda al venditore di mandarti il codice':'Ricorda al venditore di spedire'}</button>`:''}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
       ${o.role==='admin'
@@ -14168,25 +14192,42 @@ function puoiSollecitareVenditore(o){
    guarda il caso. Dopo l'invio si ridisegna l'ordine, cosi' il
    bottone sparisce da solo invece di restare li' a invitare un
    secondo tocco che il server rifiuterebbe. */
-async function sollecitaVenditore(){
+async function sollecitaVenditore(btn){
   haptic();
   if (DEMO) { toast('🔔 Promemoria inviato (simulato)'); return; }
-  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/sollecita-venditore`,
+  /* IL DOPPIO TOCCO NON MANDA DUE PROMEMORIA: finche' la risposta e'
+     per strada il bottone e' spento. Senza, il secondo tocco su rete
+     lenta prende il 400 della pausa — «hai già mandato un promemoria
+     nelle ultime 24 ore» — che si legge come un tetto sbagliato. */
+  if (btn) btn.disabled = true;
+  const id = currentOrder.id;
+  const r = await fetch(`${API_BASE}/orders/${id}/sollecita-venditore`,
     {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
   const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
-  currentOrder.sollecitiManuali++;
-  currentOrder.sollecitoManualeIl = Math.floor(Date.now()/1000);
-  openOrder(currentOrder.id);
+  if (!r.ok) {
+    if (btn) btn.disabled = false;
+    toast(d.detail||'Operazione non riuscita'); return;
+  }
+  /* il conto si scrive sulla riga di `orders`, non su una copia:
+     currentOrder puo' essere un oggetto DETACHED se nel frattempo la
+     lista si e' ricaricata, e la patch andrebbe persa */
+  const o = orders.find(x=>x.id===id) || currentOrder;
+  o.sollecitiManuali++;
+  o.sollecitoManualeIl = Math.floor(Date.now()/1000);
+  openOrder(id);
   toast('🔔 Promemoria inviato al venditore');
 }
 
-async function sollecita(){
+async function sollecita(btn){
   haptic();
   if (DEMO) { toast('🔔 Promemoria inviato (simulato)'); return; }
+  /* come il gemello qui sopra: spento finche' la risposta non torna,
+     o il secondo tocco si becca il 400 della pausa */
+  if (btn) btn.disabled = true;
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/sollecita`,
     {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
   const d = await r.json().catch(()=>({}));
+  if (btn) btn.disabled = false;
   if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
   toast('🔔 Promemoria inviato all\'acquirente');
 }
