@@ -7469,6 +7469,18 @@ CAMPI_MIEI = (
     "u.npub AS venditore_npub, "
     "u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
+    # le ferie e le due promesse di negozio viaggiano anche qui, e non
+    # e' un di piu': la scheda di un annuncio aperta da «I tuoi
+    # annunci» passa da questa SELECT, e senza questi alias il
+    # proprietario era l'unico a NON vedere la riga della spedizione
+    # gratis sul proprio oggetto. Costo ZERO, il JOIN su `u` c'e' gia',
+    # e li normalizza `arricchisci_righe_vetrina` come per la vetrina.
+    "u.ferie_fino AS venditore_ferie, "
+    "u.sconto_pacco_criterio AS venditore_sconto_criterio, "
+    "u.sconto_pacco_soglia AS venditore_sconto_soglia, "
+    "u.sconto_pacco_valore_eur AS venditore_sconto_valore_eur, "
+    "u.sconto_pacco_percento AS venditore_sconto_percento, "
+    "u.sped_gratis_soglia_eur AS venditore_sped_gratis_eur, "
     "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
