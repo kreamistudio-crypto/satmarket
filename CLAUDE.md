@@ -7547,23 +7547,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `--trust-note`, l'inchiostro di quella superficie — 8,1 di giorno e
   10,5 di sera —, e a dire che si tocca sono il grassetto e la
   sottolineatura, l'unica della pagina.
-  IL CODICE NON GLIELO SAPPIAMO CONSEGNARE, ed è la riga che qui
-  diceva il falso («verificato dal vivo: `?start={codice}` precompila
-  il bot, che risponde col tracciamento»): dal campo il link apre la
-  chat, si preme start e il codice va incollato A MANO. La
-  documentazione di trackbot.eu conosce UNA strada sola per aggiungere
-  una spedizione — incollare il codice in chat — e nessun payload,
-  nessuna integrazione per chi manda i link: cosa faccia il bot di un
+  IL PAYLOAD CADEVA SUL FILTRO DI TRACKBOT (ago 2026, risposta loro,
+  e questa voce ROVESCIA quella di ieri — «cosa faccia il bot di un
   `/start CODICE` non è documentato da nessuna parte, e dalla nostra
-  parte non c'è niente da riparare. Il payload resta attaccato al link
-  perché non costa niente e il giorno che trackbot lo capisse
-  funzionerebbe da solo, ma NON si promette più: la riga sotto il
-  bottone dice quel che facciamo per davvero — «il codice te lo
-  copiamo negli appunti, **incollalo nel bot**» — e il toast la
-  ripete. Se la copia NON riesce lo si dice, invece di far credere che
-  il codice sia negli appunti. Se un domani il bot rispondesse col
-  tracciamento senza incollare niente, l'unica cosa da cambiare sono
-  quelle righe.
+  parte non c'è niente da riparare»): la funzione c'è dal 2018, e il
+  payload lo guarda contro `^[A-Z0-9]{10,22}$`. Da riparare dalla
+  nostra parte c'era eccome — si passava il codice con
+  `[^A-Z0-9_-]`, cioè tenendo trattini e trattini bassi perché li
+  ammette TELEGRAM nel payload, e su quel filtro cadevano in SILENZIO
+  (la chat si apre lo stesso e non succede niente: esattamente quel
+  che si vedeva dal campo). Ora si toglie tutto ciò che non è
+  maiuscola o cifra, e SI NORMALIZZA SOLO QUEL CHE VIAGGIA NEL LINK:
+  quello che si mostra, si copia e sta nel database resta il codice
+  come l'ha scritto il venditore, che è anche una prova in disputa.
+  IL FILTRO NON DIVENTA UNA GUARDIA DEL BOTTONE, ed è la riga da non
+  ammorbidire: chi non ci rientra nemmeno normalizzato ha comunque la
+  strada di sempre — incollare a mano — e togliergli il bottone
+  vorrebbe dire chiudere l'unica porta che gli resta. QUALI SONO, e
+  si sanno per FORMA e non per caso: sotto i 10 caratteri i GLS/SDA/
+  UPS a 9 cifre, sopra i 22 i DHL eCommerce lunghi e soprattutto
+  **l'InPost, 24 cifre, che non ci rientra MAI** — cioè proprio il
+  corriere del caso che ha aperto il cantiere delle spedizioni ai
+  punti. Per quelli la strada è che trackbot allarghi il
+  riconoscimento, non che noi tagliamo un codice.
+  LA RIGA SOTTO IL BOTTONE E IL TOAST NON CAMBIANO: dicono che il
+  codice sta negli appunti e va incollato, che è quel che facciamo
+  per davvero e resta vero anche per chi il filtro lo passa — un giro
+  di `/start` andato a buon fine dal vivo non l'abbiamo ancora visto,
+  e finché non lo si vede non si promette. Il giorno che lo si vede,
+  quelle due righe sono l'unica cosa da cambiare.
+  La prova non rilegge la riga: ESTRAE dal sorgente la classe di
+  caratteri della normalizzazione e la applica ai codici come la
+  gente li scrive (minuscole, spazi, trattini, trattino basso),
+  chiedendo che il payload rientri nel filtro — chi rimette il
+  trattino nella classe la fa rossa. E una prova dichiara che i 24
+  dell'InPost restano fuori: il giorno che trackbot allarga, è quella
+  la riga da cambiare.
   `POST /api/orders/{id}/punto-ritiro` è la RETE DI SICUREZZA: solo
   il COMPRATORE, solo su 'locked', solo sulla via punto — il punto
   scelto in pagina si CORREGGE finché il venditore non spedisce (un
