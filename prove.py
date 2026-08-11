@@ -2612,6 +2612,22 @@ def prove_lista_ordini():
           "movimento", True,
           "new Date(o.creato*1000)" in mp
           and "new Date(o.aggiornato*1000)" not in mp)
+    # ...e la SOLA data: a colpo d'occhio in lista l'orario non serve
+    # a nessuno, e ruba spazio al titolo. Dove serve davvero — la
+    # busta di ritiro e la rivelazione del codice — resta, e li' e'
+    # una scelta: vedi i pannelli dell'ordine.
+    prova("...e senza l'orario", True,
+          "toLocaleDateString" in mp
+          and "hour:'2-digit'" not in mp)
+    # IL BADGE E LA TESTA DEL RIQUADRO NON SONO LA STESSA COSA (ago
+    # 2026): l'etichetta dice cosa e' SUCCESSO («Sats depositati»), la
+    # testa dice DOVE sono adesso («Sats nel deposito di garanzia»).
+    # Uniformarle e' l'errore che verrebbe naturale.
+    prova("il badge della lista dice il fatto", True,
+          "label:'Sats depositati'" in mini
+          and "label:'Sats in deposito'" not in mini)
+    prova("...e la testa del riquadro resta il posto", True,
+          "b:'Sats nel deposito di garanzia'" in mini)
 
     vo = solo_codice(pezzo_js(mini, "function verboOrdine(o){"))
     prova("il concluso e' CONCLUSI, non una seconda lista", True,

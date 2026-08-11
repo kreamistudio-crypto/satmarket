@@ -4580,8 +4580,8 @@ function mapOrder(o){
        pagamento e non si muove piu': gli unici a scriverlo sono
        l'INSERT e la resurrezione di `controlla_annullati`, che
        avviene entro la mezz'ora del reaper. */
-    when:new Date(o.creato*1000).toLocaleString('it-IT',
-      {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})};
+    when:new Date(o.creato*1000).toLocaleDateString('it-IT',
+      {day:'numeric', month:'short'})};
 }
 /* Vetrina a pagine (lug 2026): la prima pagina arriva subito, le
    altre allo scroll. Due contenitori DISTINTI:
@@ -11155,7 +11155,7 @@ async function pagaOfferta(aid){
 
 const STATES = {
   creato:   {label:'Da pagare',       badge:'locked'},
-  locked:   {label:'Sats in deposito', badge:'locked'},
+  locked:   {label:'Sats depositati',  badge:'locked'},
   shipped:  {label:'Spedito',         badge:'shipped'},
   delivered:{label:'Consegnato',      badge:'confirmed'},
   confirmed:{label:'Da incassare',    badge:'confirmed'},
