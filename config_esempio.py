@@ -93,6 +93,14 @@ SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot
                              # (0 = solleciti spenti)
 SOLLECITO_INCASSO_MAX = 4    # solleciti ignorati prima che il caso
                              # venga segnalato ai moderatori
+CODA_FERMI_GIORNI = 10       # da quanti giorni un ordine coi sats in
+                             # cassaforte entra nella sezione «Ordini
+                             # fermi» del pannello admin. Dieci
+                             # precedono TUTTI i 🧊 delle leve qui
+                             # sopra: se la segnalazione e' partita, la
+                             # riga c'e'. (0 = coda spenta, e dopo il
+                             # 🧊 quell'ordine torna raggiungibile solo
+                             # per numero)
 TERMOMETRO_SOTTOCATEGORIE = True  # il lunedi' UNA notifica agli admin
                                   # con gli annunci senza sottocategoria
                                   # (False = mai; tace comunque sotto il

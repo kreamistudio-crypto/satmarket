@@ -4576,6 +4576,10 @@ function mapOrder(o){
     creato:o.creato||0,
     sollecitiManuali:o.solleciti_manuali||0,
     sollecitoManualeIl:o.sollecito_manuale_il||0,
+    /* la memoria della disputa: resta 1 per sempre anche a
+       disputa risolta, ed e' cio' che rende un ordine finito in
+       'confirmed'/'refund' ancora DECIDIBILE da un moderatore */
+    disputata:o.disputata||0,
     /* il conto scomposto (lug 2026): listing.price resta il TOTALE
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
@@ -11662,10 +11666,21 @@ function openOrder(id){
       ${(['shipped','delivered'].includes(s) && o.puntoRitiro) ? `<div class="trust-note">📦 <span>${puntoBanner(o)}</span></div>`:''}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
-      ${isAdmin && s==='dispute' ? `
+      ${/* IL CASO INCAGLIATO (ago 2026): quando lo sblocco o il
+           rimborso non riescono a pagare l'ordine passa a
+           'confirmed'/'refund', e risolvi_disputa lo accetta
+           ancora finche' «disputata» e' 1 — ma qui i bottoni
+           comparivano solo su 'dispute', quindi il caso era
+           decidibile dal server e non offerto dal client. La
+           coda degli ordini fermi ce lo porta davanti, e senza
+           questa riga sarebbe un vicolo cieco visibile. */''}
+      ${isAdmin && (s==='dispute' ||
+          (o.disputata && ['confirmed','refund'].includes(s))) ? `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
-          <div class="hint">I sats sono congelati nel deposito di garanzia. Ascolta le due parti, poi decidi: la scelta è definitiva.</div>
+          <div class="hint">${s==='dispute'
+            ? 'I sats sono congelati nel deposito di garanzia. Ascolta le due parti, poi decidi: la scelta è definitiva.'
+            : 'Questa disputa era stata decisa, ma il pagamento non è riuscito: i sats sono ancora nel deposito. Puoi confermare la stessa strada o cambiarla.'}</div>
           <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>
           <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
           <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">⚡ Dai i sats al venditore</button>
@@ -11742,6 +11757,7 @@ function openOrder(id){
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
+      ${notaFermo(o)}
       ${bottoneSollecito(o)}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
@@ -14417,6 +14433,48 @@ function statoSollecito(o){
   if (!(o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso)) return 'pausa';
   return 'ok';
 }
+/* LA RIGA CHE RESTA (ago 2026): chi ha pagato riceve UNA sola
+   notifica, al primo squillo automatico, e se non la legge nessuno gli
+   ripete che i suoi sats sono fermi e che la disputa e' aperta dal
+   primo minuto. Una notifica in piu' non chiuderebbe il buco — chiude
+   solo la meta' di chi legge Telegram in quel momento —, e messaggi
+   identici che non chiedono nessun gesto sono la famiglia che fa
+   BLOCCARE IL BOT, col quale si perdono le notifiche degli ordini.
+   La riga invece c'e' per chi apre al giorno 2, per chi apre al giorno
+   40 — quando i promemoria hanno smesso — e per chi la notifica non
+   l'ha mai vista.
+   E' SCRITTA PER RESTARE VERA PER SEMPRE: niente «glielo stiamo
+   ricordando», che al tetto dei promemoria diventerebbe una bugia; e
+   «nessun timer li muove» regge anche se AUTO_SBLOCCO_ATTIVO
+   tornasse acceso, perche' su 'locked' non e' mai esistito nessun
+   timer.
+   NON e' un riuso di statoSollecito, che ha due esclusioni sbagliate
+   qui: il tetto raggiunto (la riga non e' il bottone) e la leva a
+   zero (una leva che spegne il promemoria non deve spegnere le
+   parole). Condivide invece la FINESTRA, cosi' la riga e la maniglia
+   gentile arrivano insieme e raccontano la stessa storia — prima di
+   allora un ordine che aspetta e' normale e non va fatto sembrare un
+   problema. La finestra si scrive col NOT della forma positiva per la
+   ragione della gemella: in DEMO `creato` non c'e' e NaN deve cadere
+   sul ramo «non c'e'». */
+function notaFermo(o){
+  if (o.role!=='buyer' || o.state!=='locked') return '';
+  /* il ritiro ha gia' la sua nota verde e li' chi ha comprato conferma
+     da solo; sull'asta senza strada scelta la palla e' SUA, e dire
+     «il venditore non ha spedito» sarebbe falso */
+  if (o.consegnaScelta==='ritiro') return '';
+  if (!o.consegnaScelta && o.asta) return '';
+  const ore = o.consegnaScelta==='digitale' ? SOLLECITO.daDig : SOLLECITO.da;
+  if (!(o.creato + ore*3600 <= Date.now()/1000)) return '';
+  /* AMBRA e non il rosso di «disputa aperta»: qui non c'e' ancora
+     nessun problema conclamato, c'e' un venditore in ritardo — e il
+     rosso resta al bottone qui sotto, che e' l'uscita. E' la coppia
+     gia' in uso due righe piu' giu' per l'attesa della conferma. */
+  return `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>Il venditore non ha ancora `
+    + (o.consegnaScelta==='digitale' ? 'consegnato il codice.'
+                                     : 'segnato la spedizione.')
+    + `</b> I tuoi sats sono nel deposito di garanzia e <b>nessun timer li muove</b>. Se non vuoi più aspettare, qui sotto puoi aprire una disputa e chiedere il rimborso.</span></div>`;
+}
 /* Il bottone nei suoi tre stati. Da spento NON ha un onclick — non
    basta `disabled` a dormire tranquilli — e porta il PERCHE' al posto
    dell'etichetta: e' quello il motivo per cui resta in pagina. */
@@ -15072,14 +15130,27 @@ async function loadAdminStats(){
       if (rd.ok) decisi = await rd.json();
     } catch(e) {}
     /* i pagamenti di cui non sappiamo l'esito: si chiedono SEMPRE e
-       stanno in cima a tutto — sono sats fermi che aspettano un
-       occhio umano, e nient'altro in questa pagina lo è */
+       stanno in cima a tutto — sono sats già USCITI di cui non
+       sappiamo la sorte, e in questa pagina non c'è niente di più
+       urgente (gli ordini fermi, subito sotto, sono sats ancora
+       al sicuro in cassaforte) */
     let incerti = [];
     try {
       const rp = await fetch(`${API_BASE}/admin/pagamenti`,
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rp.ok) incerti = await rp.json();
     } catch(e) {}
+    /* gli ordini coi sats in cassaforte su cui non si muove più
+       nessuno: si chiedono SEMPRE — dopo il 🧊 questa è l'unica
+       vista che li mostra, e una coda vuota è essa stessa la
+       risposta */
+    fermi = [];
+    try {
+      const rf = await fetch(`${API_BASE}/admin/fermi`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rf.ok) fermi = await rf.json();
+    } catch(e) {}
+    fermiTutti = false;
     /* le proposte di ricategorizzazione, raggruppate per spostamento */
     gruppiCat = [];
     try {
@@ -15108,6 +15179,7 @@ async function loadAdminStats(){
       <div class="section-label" style="padding:26px 0 0">🧊 Pagamenti da verificare (${incerti.length})</div>
       <div class="sub" style="margin-top:6px">Il nodo non ha risposto: <b>non sappiamo</b> se questi sats sono usciti. Cerca il payment_hash su LNbits e dì com'è andata — finché non lo fai, nessun pagamento riparte da solo.</div>
       <div style="margin-top:10px">${incerti.map(rigaPagamento).join('')}</div>` : ''}
+      ${boxFermi()}
       ${rev.length ? `
       <div class="section-label" style="padding:26px 0 0">⏳ In revisione (${rev.length})</div>
       <div style="margin-top:10px">${rev.map(rigaRevisione).join('')}</div>` : ''}
@@ -15175,9 +15247,12 @@ async function loadAdminStats(){
    lista di sempre col parametro `ordine`: nessuna vista nuova,
    nessuna seconda strada — si atterra sull'ordine e il pannello di
    correzione e' li' dentro dove sta il contesto. */
-async function apriOrdinePerId(){
+async function apriOrdinePerId(numero){
   haptic();
-  const id = +(el('admOrdineId')?.value || 0);
+  /* l'argomento e' facoltativo apposta: le righe della coda dei
+     fermi passano il numero, il campo qui sotto resta il ripiego,
+     e il gesto per aprire un ordine resta UNO */
+  const id = +(numero || el('admOrdineId')?.value || 0);
   if (!id) { toast('Scrivi il numero dell\'ordine'); return; }
   try {
     await loadOrders(id); renderOrders();
@@ -15251,6 +15326,83 @@ async function inviaMessaggioAdmin(){
     if (el('admUtenteCerca')) el('admUtenteCerca').value = '';
     el('admUtenteEsiti').innerHTML = '';
   } catch(e) { toast('Rete assente: riprova'); }
+}
+
+/* --- Gli ordini fermi (ago 2026) --------------------------------
+   Ogni sollecito bussa N volte, manda UN 🧊 e poi tace per sempre: da
+   li' in poi un ordine con sats in cassaforte non compariva in
+   NESSUNA lista e si raggiungeva solo sapendone il numero. Qui
+   atterra, e ci resta finche' il caso non si chiude.
+   I badge sono SOLO navigazione: niente che agisca sull'ordine da
+   qui — quello vive dentro l'ordine, dove c'e' il contesto. */
+let fermi = [], fermiTutti = false;
+const FERMI_VISIBILI = 8;      // righe mostrate prima del «più vecchi»
+
+const NOMI_STATO_FERMO = {
+  locked:'pagato, mai partito', shipped:'spedito, mai confermato',
+  delivered:'consegnato, mai confermato', confirmed:'incasso non riuscito',
+  refund:'rimborso non riuscito', dispute:'disputa aperta',
+  return_pending:'reso da spedire', return_shipped:'reso in viaggio'};
+
+const NOMI_VIA_FERMO = {spedizione:'🚚 spedizione', ritiro:'🤝 ritiro in zona',
+                        digitale:'💾 codice online'};
+
+function boxFermi(){
+  if (!fermi.length) return '';
+  const mostrati = fermiTutti ? fermi : fermi.slice(0, FERMI_VISIBILI);
+  return `
+    <div id="boxFermi">
+    <div class="section-label" style="padding:26px 0 0">⏸ Ordini fermi (${fermi.length})</div>
+    <div class="sub" style="margin-top:6px">Sats <b>in cassaforte</b> e nessuno si muove da giorni. Nessun timer li sbloccherà: apri l'ordine, o scrivi alla parte che aspettiamo.</div>
+    <div style="margin-top:10px">${mostrati.map(rigaFermo).join('')}</div>
+    ${fermi.length > FERMI_VISIBILI && !fermiTutti ? `
+      <a href="#" style="font-size:12.5px;font-weight:700"
+         onclick="apriTuttiFermi();return false">mostra i più vecchi (${fermi.length})</a>` : ''}
+    </div>`;
+}
+
+/* Ridisegna la SOLA sezione, il pattern di apriTuttiCat: rifare il
+   giro delle fetch per allungare una lista che e' gia' in memoria
+   costerebbe cinque richieste e farebbe sparire i cassetti aperti. */
+function apriTuttiFermi(){
+  fermiTutti = true;
+  const n = el('boxFermi');
+  if (n) n.outerHTML = boxFermi();
+}
+
+/* Il titolo e la strada passano da esc(): arrivano dal database, e il
+   server li manda GREZZI apposta. */
+const rigaFermo = o => {
+  const g = Math.floor((Date.now()/1000 - o.fermo_da) / 86400);
+  const via = o.via_punto ? '📦 punto di ritiro'
+            : (NOMI_VIA_FERMO[o.consegna_scelta] || '❓ strada non scelta');
+  return `
+    <div class="order">
+      <div class="row">
+        <b style="min-width:0;overflow:hidden;text-overflow:ellipsis">📦 Ordine #${o.id}${o.titolo ? ` — ${esc(o.titolo)}` : ''}</b>
+        <span class="mono" style="white-space:nowrap;font-weight:800;color:var(--sats-deep)">${fmt(o.importo)} sats</span>
+      </div>
+      <div class="sub" style="margin-top:4px">${esc(NOMI_STATO_FERMO[o.stato] || o.stato)} · ${via} · fermo da <b>${o.fermo_da ? `${g} giorni` : 'sempre (data assente)'}</b></div>
+      <div class="sub" style="margin-top:2px">${o.promemoria
+        ? `🔔 ${o.promemoria} promemoria, l'ultimo il ${new Date(o.promemoria_il*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}`
+        : '🔕 <b>mai sollecitato</b>: nessun promemoria copre questo caso'}${
+        o.disputata && ['confirmed','refund'].includes(o.stato)
+          ? ' · ⚖️ <b>decidibile</b>' : ''}</div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge" onclick="apriOrdinePerId(${o.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">Apri l'ordine</span>
+        ${o.venditore_ok ? `<span class="badge" onclick="scriviAParte(${o.venditore_id})" style="cursor:pointer;background:var(--card);color:var(--muted)">✉️ venditore</span>` : `<span class="badge" style="background:var(--off-bg);color:var(--muted)">🔇 venditore</span>`}
+        ${o.compratore_ok ? `<span class="badge" onclick="scriviAParte(${o.compratore_id})" style="cursor:pointer;background:var(--card);color:var(--muted)">✉️ compratore</span>` : `<span class="badge" style="background:var(--off-bg);color:var(--muted)">🔇 compratore</span>`}
+      </div>
+    </div>`;
+};
+
+/* Il ponte verso «Scrivi a un utente», che vive in fondo alla pagina:
+   senza lo scroll il moderatore tocca il badge e non vede succedere
+   niente. Negli onclick viaggia solo il tg_id numerico. */
+function scriviAParte(tg){
+  scegliUtenteAdmin(tg);
+  if (admMsgDest === tg) el('admUtenteCerca')?.scrollIntoView({block:'center'});
+  else toast('Utente non trovato nella lista');
 }
 
 /* La riga di un pagamento incerto: cos'era, quanto, e il payment_hash

@@ -11579,6 +11579,346 @@ def prove_sollecito_a_comando():
           and 'class="btn danger-ghost" onclick="openDispute()"' not in mini)
 
 
+# ====================================================================
+def prove_ordini_fermi():
+    """LA CODA DEGLI ORDINI FERMI (ago 2026) e la riga che resta.
+
+    Ogni sollecito bussa N volte, manda UN 🧊 e poi tace per sempre: da
+    li' in poi un ordine coi sats in cassaforte non compariva in
+    nessuna lista e si raggiungeva solo sapendone il numero.
+    Si prova DAVVERO — l'endpoint girato su un database gemello in
+    memoria, ermetico — perche' una query di coda sbagliata non
+    fallisce, TACE, che e' il peggior modo di fallire per un allarme:
+    la stessa ragione per cui esiste prove_libro_mastro."""
+    print("\n[la coda degli ordini fermi]")
+    import re
+    import sqlite3
+    import time as _t
+
+    corpo = pezzo("coda_fermi")
+    c = codice(corpo)
+    i = _SORGENTE.index("_SQL_FERMI = (")
+    sql_src = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+    amb_sql = {}
+    exec(sql_src, amb_sql)
+    SQL = amb_sql["_SQL_FERMI"]
+
+    # --- 1) LEGGE E BASTA -------------------------------------------
+    # E' il vincolo del cantiere, e sparirebbe in silenzio il giorno
+    # che qualcuno «ripara» al volo una riga ferma.
+    for vietato in ("INSERT", "UPDATE", "DELETE", "DROP", "REPLACE"):
+        prova(f"la coda non fa {vietato}", False, vietato in c.upper())
+    for nome in ("_sblocca_sats", "_rimborsa_compratore", "_paga_rimborso",
+                 "paga_venditore", "notifica"):
+        prova(f"...e non chiama {nome}", False, nome in c)
+    # `def` e non `async def`: non c'e' niente da aspettare, e l'async
+    # e' il primo passo per infilarci dentro un await notifica(...)
+    prova("e' sincrona", True, "async def coda_fermi" not in _SORGENTE)
+    prova("la guardia e' quella delle sorelle", True,
+          'if not e_admin(user["id"])' in c
+          and 'HTTPException(403, "Riservato ai moderatori")' in c)
+    # non e' un giro periodico: nell'orologio non ci deve entrare
+    orologio = pezzo("orologio")
+    prova("non e' agganciata all'orologio", True,
+          "coda_fermi" not in orologio and "_SQL_FERMI" not in orologio)
+
+    # --- 2) LE ANCORE -----------------------------------------------
+    # Uno zero deve far comparire la riga in CIMA, mai sparire: in
+    # SQLite «NULL < x» vale NULL, quindi una guardia sull'ancora
+    # nasconderebbe l'ordine dalla coda degli ordini spariti. E' il
+    # difetto che i due solleciti di 'shipped' hanno davvero, col loro
+    # «AND spedito_il > 0».
+    prova("nessuna guardia di confronto sulle ancore", None,
+          re.search(r"o\.(creato|spedito_il|consegnato|aggiornato)\s*[><]",
+                    SQL))
+    # ogni ramo dell'ancora DEVE cominciare con un COALESCE: e' quello
+    # che trasforma un NULL in uno zero, cioe' in una riga che compare
+    # in cima invece di sparire
+    case = SQL[SQL.index("CASE o.stato"):SQL.index("END AS fermo_da")]
+    prova("ogni ramo dell'ancora e' un COALESCE", 4,
+          len(re.findall(r"(?:WHEN '\w+' THEN|ELSE)\s*COALESCE\(", case)))
+    prova("l'ancora di 'locked' e' `creato`, mai `aggiornato`", True,
+          "WHEN 'locked' THEN COALESCE(o.creato, 0)" in SQL)
+    # i terminali stanno fuori, e 'creato' con loro: li' i sats non
+    # sono ancora in cassaforte, e se ne occupa controlla_abbandonati
+    prova("la porta e' il complemento dei terminali", True,
+          "NOT IN ('creato','released','refunded','annullato')" in SQL)
+    prova("dal piu' fermo, con l'id a pareggiare", True,
+          "ORDER BY fermo_da ASC, id ASC" in SQL)
+    prova("nessun LIMIT: la coda non nasconde le righe piu' vecchie",
+          False, "LIMIT" in SQL.upper())
+    prova("i JOIN sono LEFT (i set, e la riga utenti che manca)", 3,
+          SQL.count("LEFT JOIN"))
+
+    # --- 3) L'INVARIANTE DELLA SOGLIA -------------------------------
+    # «Se il 🧊 e' partito, la riga c'e'»: la coda non puo' mai essere
+    # piu' povera delle notifiche gia' mandate. Dipende dalle leve,
+    # quindi si RIFA' IL CONTO invece di ricordarselo — chi stringe un
+    # passo trova questa riga rossa.
+    def leva(nome):
+        m = re.search(rf"^    {nome} = (\d+)", _SORGENTE, re.M)
+        return int(m.group(1))
+
+    passo, tetto = leva("PROMEMORIA_CONFERMA_GIORNI"), leva(
+        "PROMEMORIA_CONFERMA_MAX")
+    inc_passo, inc_tetto = leva("SOLLECITO_INCASSO_GIORNI"), leva(
+        "SOLLECITO_INCASSO_MAX")
+    ghiacci = {
+        "merce mai partita": leva("PROMEMORIA_SPEDIZIONE_GIORNI") + tetto * passo,
+        "codice mai consegnato": leva("PROMEMORIA_DIGITALE_ORE") // 24
+                                 + tetto * passo,
+        "busta mai depositata": leva("PROMEMORIA_BUSTA_GIORNI") + tetto * passo,
+        "ritiro fermo": inc_passo * (inc_tetto + 1),
+        "incasso fermo": inc_passo * (inc_tetto + 1)}
+    soglia = leva("CODA_FERMI_GIORNI")
+    for nome, giorno in ghiacci.items():
+        prova(f"la coda apre PRIMA del 🧊 «{nome}» (g.{giorno})", True,
+              0 < soglia < giorno)
+    # ORE_CONFERMA e GIORNI_AUTO_SBLOCCO vivono solo nel config, quindi
+    # le due famiglie di 'shipped'/'delivered' restano fuori dal conto:
+    # dichiarato, non dimenticato.
+    prova("le due leve senza default restano fuori dal conto", True,
+          not re.search(r"^    (ORE_CONFERMA|GIORNI_AUTO_SBLOCCO) = ",
+                        _SORGENTE, re.M))
+    prova("la leva e' anche nel config d'esempio", True,
+          "CODA_FERMI_GIORNI" in open("config_esempio.py",
+                                      encoding="utf-8").read())
+    prova("...e censita nel pannello delle leve", True,
+          '"CODA_FERMI_GIORNI", CODA_FERMI_GIORNI' in _SORGENTE)
+
+    # --- 4) L'ENDPOINT, GIRATO DAVVERO ------------------------------
+    ORA, G = 1_800_000_000, 86400
+
+    class _Errore(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    class _SenzaClose:
+        """close() non chiude: un :memory: chiuso sparisce, e qui la
+        connessione la riusano tutte le chiamate del giro."""
+        def __init__(self, con): self._c = con
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    def apparecchia():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+          compratore_id INT, venditore_id INT, stato TEXT,
+          prezzo_sats INT, creato INT, aggiornato INT,
+          spedito_il INT DEFAULT 0, consegnato INT DEFAULT 0,
+          consegna_scelta TEXT DEFAULT '', via_punto INT DEFAULT 0,
+          disputata INT DEFAULT 0,
+          solleciti_venditore INT DEFAULT 0,
+          sollecito_venditore_il INT DEFAULT 0,
+          solleciti_ritiro INT DEFAULT 0, sollecito_ritiro_il INT DEFAULT 0,
+          solleciti_conferma INT DEFAULT 0,
+          sollecito_conferma_il INT DEFAULT 0,
+          solleciti_incasso INT DEFAULT 0, sollecito_incasso_il INT DEFAULT 0,
+          solleciti_busta INT DEFAULT 0, sollecito_busta_il INT DEFAULT 0);
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT);
+        CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+          titolo TEXT, quantita INT);
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+          npub_accesso TEXT DEFAULT '', npub_verificata INT DEFAULT 0);
+        INSERT INTO annunci VALUES(7,'Bici da corsa');
+        INSERT INTO utenti VALUES(111,'',0),(222,'',0),(-9,'',0);
+        """)
+        return con
+
+    def metti(con, id, stato, **kw):
+        d = dict(annuncio_id=7, compratore_id=111, venditore_id=222,
+                 prezzo_sats=50000, creato=ORA - 30 * G,
+                 aggiornato=ORA - 30 * G, consegna_scelta='spedizione')
+        d.update(kw)
+        con.execute("INSERT INTO ordini(id,stato," + ",".join(d) +
+                    ") VALUES(?,?," + ",".join("?" * len(d)) + ")",
+                    [id, stato] + list(d.values()))
+
+    def gira(con, admin=True, giorni=None, ora=ORA):
+        amb = {"Header": lambda d: d, "Cookie": lambda d: d,
+               "HTTPException": _Errore, "db": lambda: _SenzaClose(con),
+               "e_admin": lambda i: admin,
+               "verifica_utente": lambda *a: {"id": 999},
+               "_titolo_ordine": reale("_titolo_ordine"),
+               "time": type("t", (), {"time": staticmethod(lambda: ora)}),
+               "CODA_FERMI_GIORNI": soglia if giorni is None else giorni,
+               "_SQL_FERMI": SQL,
+               "app": type("a", (), {"get": lambda *a, **k: (lambda f: f)})()}
+        exec(corpo, amb)
+        return amb["coda_fermi"]("", "")
+
+    con = apparecchia()
+    metti(con, 1, 'locked', consegna_scelta='')          # nessuno lo chiama
+    metti(con, 2, 'locked', aggiornato=ORA - G)          # ancora immobile
+    metti(con, 3, 'locked', creato=ORA - 3 * G, aggiornato=ORA - 3 * G)
+    metti(con, 4, 'shipped', spedito_il=0)               # ancora vuota
+    metti(con, 5, 'delivered', consegnato=0, spedito_il=ORA - 40 * G)
+    metti(con, 6, 'locked', creato=None)                 # creato NULL
+    metti(con, 7, 'locked', annuncio_id=0)               # un set
+    metti(con, 8, 'confirmed', disputata=1)
+    metti(con, 9, 'refund')
+    metti(con, 10, 'released')
+    metti(con, 11, 'refunded')
+    metti(con, 12, 'annullato')
+    metti(con, 13, 'creato')
+    metti(con, 14, 'dispute')
+    metti(con, 15, 'locked', venditore_id=-9, solleciti_venditore=4,
+          sollecito_venditore_il=ORA - 2 * G)
+    metti(con, 16, 'locked', consegna_scelta='ritiro', solleciti_ritiro=5)
+    con.execute("INSERT INTO ordine_righe VALUES(1,7,'Miele',2),(2,7,'Cera',1)")
+    con.commit()
+
+    prima = con.execute("SELECT * FROM ordini ORDER BY id").fetchall()
+    righe = gira(con)
+    visti = [r["id"] for r in righe]
+
+    prova("l'ordine che nessun sollecito copre c'e'", True, 1 in visti)
+    prova("...e quello che il venditore ha ri-toccato ieri pure", True,
+          2 in visti)
+    prova("lo 'shipped' senza `spedito_il` non sparisce", True, 4 in visti)
+    prova("...ne' il 'delivered' senza `consegnato`", True, 5 in visti)
+    prova("...ne' la riga con `creato` NULL", True, 6 in visti)
+    prova("il set c'e', col titolo sintetizzato", "Miele + 1 altri",
+          next(r["titolo"] for r in righe if r["id"] == 7))
+    prova("il 'refund', che nessuno sollecita mai, c'e'", True, 9 in visti)
+    prova("...e la disputa dimenticata da un mese", True, 14 in visti)
+    prova("l'ordine fresco resta fuori", False, 3 in visti)
+    for id, stato in ((10, 'released'), (11, 'refunded'),
+                      (12, 'annullato'), (13, 'creato')):
+        prova(f"'{stato}' resta fuori", False, id in visti)
+    prova("l'ancora vuota sta in CIMA, non sparisce", 6, visti[0])
+    prova("...e il resto e' dal piu' fermo", True,
+          [r["fermo_da"] for r in righe] ==
+          sorted(r["fermo_da"] for r in righe))
+    r15 = next(r for r in righe if r["id"] == 15)
+    prova("il nativo Nostr senza chiave e' irraggiungibile", 0,
+          r15["venditore_ok"])
+    prova("...ma il compratore Telegram no", 1, r15["compratore_ok"])
+    prova("il contatore dice quante volte ha bussato la macchina", 4,
+          r15["promemoria"])
+    prova("...e a zero dice che non l'ha chiamato nessuno", 0,
+          next(r["promemoria"] for r in righe if r["id"] == 1))
+    prova("il ritiro fermo entra come tutti", True, 16 in visti)
+    prova("la disputa gia' decisa porta il suo flag", 1,
+          next(r["disputata"] for r in righe if r["id"] == 8))
+
+    # LEGGE E BASTA, provato e non sperato
+    prova("il database non si e' mosso di un byte",
+          [tuple(r) for r in prima],
+          [tuple(r) for r in
+           con.execute("SELECT * FROM ordini ORDER BY id")])
+
+    # due righe ferme dallo stesso secondo non devono ballare: a
+    # sorvegliare l'ORDER BY c'e' la sentinella sul testo, qui si
+    # guarda la proprieta' che si vede da fuori
+    pari = [r["id"] for r in righe
+            if r["fermo_da"] == righe[-1]["fermo_da"]]
+    prova("a parita' di attesa gli id sono crescenti", sorted(pari), pari)
+
+    # la leva spenta spegne, e il database non si tocca NEMMENO
+    def _mai():
+        raise AssertionError("a leva spenta il database non si tocca")
+    amb = {"Header": lambda d: d, "Cookie": lambda d: d,
+           "HTTPException": _Errore, "db": _mai, "e_admin": lambda i: True,
+           "verifica_utente": lambda *a: {"id": 999},
+           "_titolo_ordine": reale("_titolo_ordine"), "time": _t,
+           "CODA_FERMI_GIORNI": 0, "_SQL_FERMI": SQL,
+           "app": type("a", (), {"get": lambda *a, **k: (lambda f: f)})()}
+    exec(corpo, amb)
+    prova("a leva spenta la coda e' vuota", [], amb["coda_fermi"]("", ""))
+
+    # e chi non modera non entra
+    try:
+        gira(con, admin=False)
+        prova("chi non modera prende il 403", True, False)
+    except _Errore as e:
+        prova("chi non modera prende il 403", 403, e.code)
+
+    # un mercatino tutto fresco non deve pescare niente
+    con2 = apparecchia()
+    metti(con2, 1, 'locked', creato=ORA - G, aggiornato=ORA - G)
+    metti(con2, 2, 'shipped', spedito_il=ORA - 2 * G)
+    con2.commit()
+    prova("col mercatino in movimento la coda tace", [], gira(con2))
+
+    # --- 5) IL CLIENT -----------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    g = pezzo_js(mini, "function notaFermo(o){", "\n}")
+    prova("la riga e' del compratore, su 'locked'", True,
+          "o.role!=='buyer' || o.state!=='locked'" in g)
+    prova("...fuori il ritiro, che ha gia' la sua nota", True,
+          "o.consegnaScelta==='ritiro'" in g)
+    prova("...e l'asta in cui la palla e' del compratore", True,
+          "!o.consegnaScelta && o.asta" in g)
+    # la riga NON e' il bottone: il tetto e la leva a zero non la
+    # devono spegnere, o si toglierebbero le parole insieme allo squillo
+    prova("il tetto dei promemoria non la spegne", False,
+          "sollecitiManuali" in g)
+    prova("...ne' la leva a zero", False, "SOLLECITO.max" in g)
+    prova("condivide pero' la finestra del bottone", True,
+          "SOLLECITO.daDig" in g and "SOLLECITO.da" in g)
+    # in DEMO `creato` non c'e': la somma fa NaN e il NOT della forma
+    # positiva la fa cadere sul ramo «non c'e'»
+    prova("la finestra e' scritta a prova di NaN", True,
+          "if (!(o.creato + ore*3600 <= Date.now()/1000)) return '';" in g)
+    # deve restare vera anche al giorno 40, quando i promemoria hanno
+    # smesso: niente promesse su cosa sta facendo la macchina
+    prova("non promette che qualcuno stia sollecitando", True,
+          "stiamo ricordando" not in g and "solleciter" not in g)
+    prova("...e dice che nessun timer li muove", True,
+          "nessun timer li muove" in g)
+    prova("il dettaglio la disegna sopra i due bottoni", True,
+          mini.index("${notaFermo(o)}")
+          < mini.index("${bottoneSollecito(o)}")
+          < mini.index('onclick="openDispute()"'))
+
+    prova("il pannello non impara a fare fetch di nascosto", 1,
+          mini.count("/admin/fermi"))
+    # «⏳ In revisione» vive anche nel badge dei PROPRI annunci,
+    # molto piu' su nel file: l'ancora e' quella del pannello
+    prova("la coda sta fra i pagamenti e la revisione", True,
+          mini.index("🧊 Pagamenti da verificare (${incerti.length})")
+          < mini.index("${boxFermi()}")
+          < mini.index("⏳ In revisione (${rev.length})"))
+    # il pallino resta com'era: una coda che puo' restare piena per
+    # settimane accenderebbe un cartello sempre acceso, e un cartello
+    # sempre acceso non lo guarda nessuno
+    chiamate = [r for r in mini.split("\n") if "aggiornaAdmDot(" in r
+                and "function aggiornaAdmDot" not in r]
+    prova("il pallino ha ancora due soli chiamanti", 2, len(chiamate))
+    prova("...e nessuno dei due ha imparato la coda dei fermi", True,
+          all("fermi" not in r for r in chiamate))
+    riga = pezzo_js(mini, "const rigaFermo = o => {", "\n};")
+    prova("il titolo dal database passa da esc()", True,
+          "esc(o.titolo)" in riga)
+    prova("negli onclick viaggia solo il numero", True,
+          "apriOrdinePerId(${o.id})" in riga
+          and "scriviAParte(${o.venditore_id})" in riga)
+    prova("chi non e' raggiungibile non ha il bottone «scrivi»", 2,
+          riga.count("🔇"))
+    prova("«mostra i piu' vecchi» ridisegna e non rifa' le fetch", True,
+          "apriTuttiFermi();return false" in mini
+          and "loadAdminStats" not in pezzo_js(
+              mini, "function apriTuttiFermi(){", "\n}"))
+
+    # --- 6) IL CASO INCAGLIATO --------------------------------------
+    # risolvi_disputa accetta confirmed/refund con disputata=1, ma i
+    # bottoni comparivano solo su 'dispute': la coda ci portava davanti
+    # a un caso decidibile senza dare il modo di deciderlo.
+    prova("il server accetta ancora il caso incagliato", True,
+          "disputata=1 AND stato IN ('confirmed','refund')"
+          in _SORGENTE.replace("\n", " ").replace("  ", " ")
+          or "(disputata=1 AND stato IN ('confirmed','refund'))" in _SORGENTE)
+    prova("...e ora il client offre i bottoni", True,
+          "isAdmin && (s==='dispute' ||" in mini
+          and "(o.disputata && ['confirmed','refund'].includes(s)))" in mini)
+    prova("...con `disputata` che arriva fino al client", True,
+          "disputata:o.disputata||0," in mini)
+
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -11613,7 +11953,8 @@ def main():
               prove_timbri_periodici, prove_offerta_quantita,
               prove_ritiro_offerta, prove_fogli_di_casa,
               prove_sollecito_a_comando,
-              prove_sat_non_e_barattolo, prove_ai_segnala):
+              prove_sat_non_e_barattolo, prove_ai_segnala,
+              prove_ordini_fermi):
         try:
             f()
         except Exception as e:

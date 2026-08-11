@@ -693,6 +693,22 @@ except ImportError:
                                        # terzo o il pacco e' lento o il
                                        # codice e' nel dimenticatoio
 
+# LA CODA DEI FERMI (ago 2026): la soglia oltre la quale un ordine coi
+# sats in cassaforte, e su cui nessuno si muove, entra nella sezione
+# «Ordini fermi» del pannello admin.
+# DIECI GIORNI PRECEDONO TUTTI I 🧊 con le leve di serie (locked
+# spedizione g.14 e digitale g.11, ritiro g.35, conferme g.12 da
+# 'delivered' e g.19 da 'shipped', busta g.12, incassi g.35), ed e'
+# l'invariante che si compra: SE IL 🧊 E' PARTITO, LA RIGA C'E' — la
+# coda non puo' mai essere piu' povera delle notifiche gia' mandate.
+# Dipende dalle leve qui sopra, quindi non ce lo si ricorda: una prova
+# in CI rifa' il conto e diventa rossa se qualcuno stringe un passo.
+# 0 = coda spenta.
+try:
+    from config import CODA_FERMI_GIORNI
+except ImportError:
+    CODA_FERMI_GIORNI = 10
+
 # Le Offerte (lug 2026, contrattazione stile Vinted): il compratore
 # propone una cifra, il venditore accetta/rifiuta/contropropone UNA
 # volta, l'accordo da' il diritto di comprare a quel prezzo entro la
@@ -8945,6 +8961,138 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
     return await _sblocca_sats(riga_id)
 
 
+# --- La coda degli ordini fermi (ago 2026) ---------------------------
+# Ogni sollecito bussa N volte, manda UN 🧊 ai moderatori e poi tace
+# per sempre — e quel 🧊 e' un messaggio Telegram e basta: dopo,
+# l'ordine non compare in NESSUNA lista del pannello e si raggiunge
+# solo sapendone il numero. Qui atterra, e ci resta.
+#
+# LA REGOLA E' UNA FRASE: «i sats sono in cassaforte e nessuno si
+# muove da CODA_FERMI_GIORNI giorni», cioe' il COMPLEMENTO dei
+# terminali e non l'elenco degli invisibili — cosi' si dice ad alta
+# voce senza andare a leggere la WHERE di miei_ordini, e se un domani
+# qualcuno restringe la lista dei moderatori la coda non sviluppa un
+# buco in silenzio. Ci entrano anche 'refund' (sats dovuti al
+# COMPRATORE e ZERO solleciti: il buco e' dichiarato nella docstring
+# di sollecita_rimborsi_puntate) e le dispute, che i moderatori vedono
+# gia' ma in una lista NON ordinata per attesa — una disputa aperta da
+# quaranta giorni si confonde con una di ieri. 'creato' resta fuori:
+# li' i sats non sono ancora in cassaforte, e se ne occupa
+# controlla_abbandonati.
+#
+# LE ANCORE sono una per stato, e la regola che le governa e' questa:
+# ognuna finisce in COALESCE(..., 0) e NESSUNA guardia «> 0» entra
+# nella WHERE. In SQLite «NULL < x» vale NULL, quindi un'ancora vuota
+# non darebbe un falso allarme: farebbe SPARIRE l'ordine dalla coda
+# degli ordini spariti, che e' il solo modo in cui questa funzione puo'
+# fallire davvero. Uno zero fa comparire la riga in cima, mai sparire,
+# e le catene di ripiego vanno all'indietro nel tempo per la stessa
+# ragione. Non e' teorico: `ordini.creato` e' dichiarato senza NOT NULL
+# e senza DEFAULT, e uno 'shipped' con `spedito_il=0` oggi non riceve
+# nessun promemoria e nessun 🧊 proprio perche' i due solleciti che lo
+# guardano hanno quel «> 0».
+#
+# 'locked' si ancora a `creato` e MAI ad `aggiornato`: su quello stato
+# scrivono `aggiornato` sia deposita_invoice sia
+# scegli_consegna_ordine, quindi il venditore potrebbe tenersi fuori
+# dalla coda da solo ri-salvando la propria invoice d'incasso — e' la
+# trappola gia' pagata in sollecita_venditori_fermi.
+# IMPERFEZIONE DICHIARATA su 'confirmed', ereditata da
+# sollecita_incassi: li' `aggiornato` e' l'ultimo tentativo di
+# pagamento fallito, quindi chi ri-deposita ogni settimana una invoice
+# che non paga rimanda il proprio ingresso in coda. Si tiene lo stesso,
+# cosi' coda e sollecito restano d'accordo su «da quando aspetta»
+# invece di litigare, e il contatore dei promemoria nella riga lo
+# tradisce comunque.
+#
+# LEGGE E BASTA, come controlla_libro_mastro: nessuna riga si scrive e
+# nessun sat si muove — c'e' la prova che nel corpo non compaia un
+# INSERT/UPDATE/DELETE ne' una delle funzioni d'uscita.
+_SQL_FERMI = (
+    # il filtro sull'ancora sta FUORI dal sottoinsieme, o il CASE
+    # andrebbe ripetuto nella WHERE e la seconda copia sarebbe quella
+    # che un giorno diverge
+    "SELECT * FROM ("
+    "  SELECT o.id, o.stato, o.annuncio_id, o.prezzo_sats AS importo, "
+    "    o.consegna_scelta, o.via_punto, o.disputata, "
+    "    o.venditore_id, o.compratore_id, a.titolo, "
+    "    CASE o.stato "
+    "      WHEN 'locked' THEN COALESCE(o.creato, 0) "
+    "      WHEN 'shipped' THEN COALESCE(NULLIF(o.spedito_il,0), o.creato, 0) "
+    "      WHEN 'delivered' THEN COALESCE(NULLIF(o.consegnato,0), "
+    "                             NULLIF(o.spedito_il,0), o.creato, 0) "
+    "      ELSE COALESCE(NULLIF(o.aggiornato,0), o.creato, 0) "
+    "    END AS fermo_da, "
+    # quante volte la macchina ha bussato, al massimo: dice se sta
+    # ancora lavorando, se ha gia' alzato le mani, o — a zero — che
+    # quell'ordine non l'ha mai chiamato nessuno, che e' il caso
+    # scoperto e il piu' importante da vedere
+    "    MAX(COALESCE(o.solleciti_venditore,0), "
+    "        COALESCE(o.solleciti_ritiro,0), "
+    "        COALESCE(o.solleciti_conferma,0), "
+    "        COALESCE(o.solleciti_incasso,0), "
+    "        COALESCE(o.solleciti_busta,0)) AS promemoria, "
+    "    MAX(COALESCE(o.sollecito_venditore_il,0), "
+    "        COALESCE(o.sollecito_ritiro_il,0), "
+    "        COALESCE(o.sollecito_conferma_il,0), "
+    "        COALESCE(o.sollecito_incasso_il,0), "
+    "        COALESCE(o.sollecito_busta_il,0)) AS promemoria_il, "
+    # raggiungibile = la regola di notifica(): Telegram se il tg_id e'
+    # positivo, Nostr solo da una chiave del possesso DIMOSTRATO. Un
+    # nativo Nostr che ha perso la chiave non lo sente nessuno, e
+    # notifica() e' fail-open totale: senza questo il moderatore lo
+    # scopre scrivendo nel vuoto.
+    "    CASE WHEN o.venditore_id > 0 OR uv.npub_accesso != '' "
+    "           OR uv.npub_verificata = 1 THEN 1 ELSE 0 END AS venditore_ok, "
+    "    CASE WHEN o.compratore_id > 0 OR uc.npub_accesso != '' "
+    "           OR uc.npub_verificata = 1 THEN 1 ELSE 0 END AS compratore_ok "
+    "  FROM ordini o "
+    # LEFT dappertutto: i set hanno annuncio_id=0, e una riga di utenti
+    # che mancasse farebbe sparire l'ordine — che e' esattamente il
+    # fallimento contro cui questa coda esiste
+    "  LEFT JOIN annunci a ON a.id = o.annuncio_id "
+    "  LEFT JOIN utenti uv ON uv.tg_id = o.venditore_id "
+    "  LEFT JOIN utenti uc ON uc.tg_id = o.compratore_id "
+    "  WHERE o.stato NOT IN ('creato','released','refunded','annullato')"
+    ") WHERE fermo_da < ? "
+    # dal piu' fermo; l'id in coda e' il pareggio, o due righe ferme
+    # dallo stesso secondo si scambierebbero di posto a ogni richiesta
+    "ORDER BY fermo_da ASC, id ASC")
+
+
+@app.get("/api/admin/fermi")
+def coda_fermi(x_tg_init_data: str = Header(""),
+               barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: gli ordini coi sats in cassaforte e fermi da piu' di
+    CODA_FERMI_GIORNI giorni, dal piu' fermo.
+
+    NESSUN LIMIT: una coda che tronca nasconde le righe piu' VECCHIE,
+    cioe' proprio quelle per cui esiste — e il numero totale e' esso
+    stesso l'informazione (se sono quaranta, il problema non e' un
+    ordine, e' il mercatino). A tenere corta la pagina ci pensa il
+    client, che ne mostra otto e offre «i piu' vecchi»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if CODA_FERMI_GIORNI <= 0:
+        return []                    # leva a zero: coda spenta, e il
+                                     # database non si tocca nemmeno
+    con = db()
+    soglia = int(time.time()) - CODA_FERMI_GIORNI * 86400
+    righe = [dict(r) for r in con.execute(_SQL_FERMI, (soglia,))]
+    for r in righe:
+        # i set non hanno un annuncio da cui pescare il titolo: si
+        # sintetizza dalle righe, la forma dei solleciti
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+    con.close()
+    # il titolo esce GREZZO: lo scappa esc() del client, e un
+    # html.escape qui farebbe leggere «&lt;b&gt;» al moderatore
+    return righe
+
+
 # --- La coda delle categorie (lug 2026) ------------------------------
 # Quando il catalogo e' passato da 9 voci a 25, gli annunci di ieri
 # sono rimasti nelle caselle di ieri e quelli che arrivano da Nostr
@@ -9298,6 +9446,11 @@ def _leve_stato():
                          "sollecitato: i sats restano fermi in silenzio"),
             _leva("Solleciti prima dei moderatori", "SOLLECITO_INCASSO_MAX",
                   SOLLECITO_INCASSO_MAX),
+            _leva("Ordini fermi: da quanti giorni (coda admin)",
+                  "CODA_FERMI_GIORNI", CODA_FERMI_GIORNI,
+                  spento="la sezione «Ordini fermi» del pannello resta "
+                         "vuota: dopo il 🧊 un ordine con sats in "
+                         "cassaforte torna raggiungibile solo per numero"),
         ]},
         {"gruppo": "🔨 Aste", "voci": [
             _leva("Aste", "ASTA_ABILITATA", bool(ASTA_ABILITATA),
