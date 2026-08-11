@@ -1,0 +1,39 @@
+# I fine-riga li decide il REPO, non la configurazione di chi clona.
+#
+# Fino a oggi il repo era pulito (zero CRLF su 102 file) solo perche'
+# chi committava aveva `core.autocrlf=true`: una impostazione locale,
+# invisibile, che nessuno garantisce sulla macchina successiva. Con
+# `text=auto` la normalizzazione a LF avviene in INGRESSO qualunque
+# cosa dica la config di chi lavora — quindi un CRLF non puo' piu'
+# entrare nella storia nemmeno per sbaglio.
+#
+# NIENTE `eol=`, ed e' deliberato: senza, il checkout continua a
+# rispettare la config di ognuno (su Windows con autocrlf=true i file
+# restano CRLF nella working copy, esattamente come adesso). Aggiungere
+# `eol=lf` renderebbe il checkout deterministico per tutti ma
+# cambierebbe la working copy di chi oggi ha CRLF, e non serve a
+# proteggere la storia — che e' il problema vero. Se un domani lo si
+# vorra', e' una riga sola e un checkout.
+* text=auto
+
+# I BINARI NON SI TOCCANO MAI: una conversione di fine-riga dentro un
+# PNG o un WebP lo corrompe in silenzio, e qui le illustrazioni delle
+# categorie sono 54 file su cui poggia mezza vetrina. `text=auto` li
+# riconoscerebbe gia' da solo (cerca i byte NUL), ma dichiararli toglie
+# di mezzo l'euristica: la cintura sta dove il danno sarebbe invisibile
+# finche' qualcuno non apre la pagina Sfoglia.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.apk  binary
+*.keystore binary
+*.jks  binary
+
+# Il database non e' tracciato (sta in .gitignore) — la riga c'e' come
+# rete se un giorno qualcuno lo aggiungesse per sbaglio: un .db passato
+# per una conversione di fine-riga e' un database rotto.
+*.db   binary
