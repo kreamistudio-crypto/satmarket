@@ -896,9 +896,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL TESTO È UN PROMEMORIA, NON UN RIMPROVERO, e non è cortesia ma la
   verità statistica: chi non ha spedito ha quasi sempre solo avuto una
   giornata storta, e il messaggio lo dice prima di chiedere qualcosa.
-  Il ritiro in zona resta fuori (ha `sollecita_ritiri_fermi`, e lì chi
-  ha comprato può già confermare da solo) e così la strada non
-  dichiarata. La guardia di proprietà sta DENTRO la WHERE col 400 dei
+  IL RITIRO IN ZONA RESTA FUORI (ha `sollecita_ritiri_fermi`, e lì chi
+  ha comprato può già confermare da solo). LA VIA NON DICHIARATA NO,
+  ed è una correzione dal campo (ago 2026): il bottone non compariva
+  su ordini pagati da settimane, e il discriminante era `consegna_
+  scelta=''` — gli STORICI e quelli nati da un annuncio importato da
+  Nostr. La regola l'aveva ereditata dal promemoria automatico col
+  motivo «lì il venditore non può agire», che però vale per UNA sola
+  delle tre cose che quel vuoto raccoglie: `segna_spedito` rifiuta la
+  via vuota SOLO se l'annuncio è all'ASTA e il vincitore non ha ancora
+  scelto — sugli altri il venditore spedisce eccome, e il suo pannello
+  «Spedisci» è lì.
+  QUINDI SI FA LA STESSA IDENTICA DOMANDA di `segna_spedito` (la
+  lettura di `asta_base_sats`), e c'è la prova che la facciano
+  entrambe: due strade che rispondono diverso sulla stessa condizione
+  sono una che promette quel che l'altra nega. Sull'asta in attesa il
+  400 NON è quello anti-oracolo — l'ordine è suo, e la cosa utile da
+  dirgli è che la palla è sua: «prima scegli come vuoi riceverlo».
+  ASIMMETRIA DICHIARATA con l'automatico, che la via vuota continua a
+  NON guardarla: estenderlo è un'altra decisione, e ha un costo che si
+  vede solo al primo giro — squillerebbe in un colpo su ogni ordine
+  storico fermo in 'locked' da mesi, compresi quelli di cui nessuno si
+  ricorda più. Il bottone no: parte solo se qualcuno lo tocca.
+  La guardia di proprietà sta DENTRO la WHERE col 400 dei
   fratelli, e c'è la prova che venditore, estraneo e ordine
   inesistente ricevano la STESSA risposta: chi enumera non impara
   niente. Lato client il giudice è `puoiSollecitareVenditore` e le
