@@ -2389,6 +2389,7 @@ def prove_nascondi_ordine():
         compratore_id INT, venditore_id INT, stato TEXT,
         prezzo_sats INT DEFAULT 1000, quantita INT DEFAULT 1,
         consegna_scelta TEXT DEFAULT '', aggiornato INT DEFAULT 42,
+        creato INT DEFAULT 7,
         contenuto_digitale TEXT DEFAULT '',
         busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
         nascosto_compratore INT DEFAULT 0,
@@ -2582,9 +2583,30 @@ def prove_lista_ordini():
           in pezzo("miei_ordini"))
 
     # ---- 8-14: i verbi ----
-    # LA DATA E' QUELLA DELL'AFFARE (ago 2026, dal campo): con
-    # `aggiornato` un ordine di una settimana fa sembrava di oggi
-    # appena il venditore segnava la spedizione.
+    # LA DATA E L'ORDINE SONO QUELLI DELL'AFFARE (ago 2026, dal
+    # campo): con `aggiornato` un ordine di una settimana fa sembrava
+    # di oggi appena il venditore segnava la spedizione — e saltava
+    # anche in cima alla lista. Le due cose vanno insieme: la data
+    # corretta sopra un ordinamento per movimento farebbe sembrare la
+    # lista disordinata.
+    mo2 = pezzo("miei_ordini")
+    prova("la lista si ordina per data dell'affare", True,
+          'ORDER BY o.creato DESC, o.id DESC' in mo2
+          and "ORDER BY o.aggiornato DESC" not in mo2)
+    # ...e l'id in coda: `creato` e' al secondo, e due ordini nati
+    # nello stesso istante altrimenti si scambiano di posto a ogni
+    # richiesta (la lista «balla» senza che nulla sia cambiato)
+    prova("...con l'id a fare il pareggio", True,
+          "o.id DESC" in mo2)
+    # L'EXPORT invece tiene `aggiornato`, ed e' la scelta giusta: li'
+    # escono solo released/refunded e per la contabilita' conta il
+    # giorno in cui i sats si sono mossi, non quello dell'acquisto.
+    ex = pezzo("scarica_export")
+    if ex:
+        prova("il CSV della contabilita' resta all'ultimo movimento",
+              True, "ORDER BY o.aggiornato DESC" in ex
+              and 'time.localtime(r["aggiornato"])' in ex)
+
     mp = solo_codice(pezzo_js(mini, "function mapOrder(o){"))
     prova("la riga mostra la data dell'affare, non dell'ultimo "
           "movimento", True,
@@ -11249,7 +11271,7 @@ def prove_sollecito_a_comando():
     prova("...e «è presto» resta il NIENTE", True,
           "return '';   // è ancora presto" in g)
     prova("la pausa lo lascia in pagina, spento e col perché", True,
-          "Già ricordato oggi — potrai rifarlo domani" in b)
+          "Già ricordato oggi — riprova domani" in b)
     prova("...e il tetto pure, col numero della leva", True,
           "Hai già ricordato ${SOLLECITO.max} volte" in b)
     prova("da spento NON c'e' nessun onclick", 1, b.count("onclick="))

@@ -19064,8 +19064,18 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
             # parametri, che qui sono posizionali
             q += " OR o.id=?"
             par.append(ordine)
-    righe = [dict(r) for r in con.execute(q + " ORDER BY o.aggiornato DESC",
-                                          par)]
+    # DAL PIÙ RECENTE, PER DATA DELL'AFFARE (ago 2026, decisione di
+    # Andrea): era `aggiornato`, quindi un ordine vecchio che si
+    # muoveva saltava in cima — e da quando la riga mostra `creato` ci
+    # saltava esibendo una data vecchia, cioè con la lista che sembra
+    # disordinata. Che qualcosa si sia mosso lo dice già il badge di
+    # stato, e a tenere su quel che aspetta chi guarda c'è il filtro
+    # «solo attivi».
+    # L'id in coda è il pareggio: `creato` è al secondo, e due ordini
+    # nati nello stesso secondo (un carrello e il suo gemello, le
+    # prove) altrimenti si scambierebbero di posto a ogni richiesta.
+    righe = [dict(r) for r in con.execute(
+        q + " ORDER BY o.creato DESC, o.id DESC", par)]
     # I SET escono col titolo sintetizzato e l'elenco delle righe
     # (UNA query per tutti); i mono non portano la chiave 'righe' e
     # restano identici a ieri — il client vecchio in cache legge il
