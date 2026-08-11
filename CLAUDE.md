@@ -7416,7 +7416,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   filtro.
   LA FOTO: il server manda SOLO `foto0` (primo nome della lista JSON,
   pattern scheda() dei doppioni; la lista intera si poppa nello
-  strip). Per i SET è la foto del PRIMO pezzo — LEFT JOIN sulla query
+  strip). Dall'ago 2026 la stessa foto sta anche IN TESTA AL
+  DETTAGLIO, accanto al titolo, al posto del 📦 — stesso dato, stessa
+  miniatura versionata, stessa catena: la fabbrica è UNA
+  (`fotoOrdine(o, grande)`), perché la parte delicata è il RIPIEGO e
+  due copie divergono al primo ritocco. Il raggio dell'`<img>` è
+  `inherit`, così il quadratino da 38 della lista e quello da 48 del
+  dettaglio non hanno una seconda misura da tenere in pari; e il
+  titolo, che lì è un figlio flex, porta `min-width:0` — senza, una
+  parola lunga senza spazi allargherebbe la PAGINA (la lezione del
+  riquadro venditore). La catena degli ordini si riconosce dal 📦
+  finale, e c'è la prova che di `replaceWith('📦')` ce ne sia UNO in
+  tutto il file: le miniature delle altre liste hanno la loro, a due
+  gradini e senza emoji. Per i SET è la foto del PRIMO pezzo — LEFT JOIN sulla query
   delle righe, coerente con _titolo_ordine che lo nomina; il mosaico è
   stato scartato (in 38px non si legge). Ripiego a catena nel client:
   _min → foto piena → il 📦 di sempre, mai un'immagine rotta; annuncio
