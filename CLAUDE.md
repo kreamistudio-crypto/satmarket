@@ -1458,11 +1458,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   modello Vinted. Vista `view-sfoglia` (niente header, come Ordini e
   Profilo; niente barra di ricerca, che vive in Esplora e duplicarla
   sarebbe un secondo posto da tenere allineato per sempre).
-  `renderSfoglia` disegna le voci del catalogo (27 dall'ago 2026) in ordine FISSO, mai
-  per numero (una mappa che si riordina ogni giorno non si impara), e
-  la griglia è STATICA: si disegna UNA volta sola, e per questo non
-  serve nessun dato dal server — zero endpoint nuovi e nessun
-  conteggio da rileggere. Il nome va in `data-cat` e mai dentro la
+  `renderSfoglia` disegna le voci del catalogo (27 dall'ago 2026)
+  ORDINATE PER NUMERO DI ANNUNCI (ago 2026, decisione di Andrea che
+  ROVESCIA la regola della nascita — «in ordine FISSO, mai per
+  numero»): la più piena in cima, poi a scendere, le vuote in fondo.
+  IL PERCHÉ DI ALLORA VA TENUTO perché resta vero: una mappa che si
+  riordina non si impara, e ai nostri numeri si riordina SPESSO — le
+  categorie piene hanno pochi annunci ciascuna, e un annuncio in più
+  basta a far saltare una piastrella di posto. Andrea l'ha scelto
+  sapendolo: la parte viva della griglia in cima vale più della mappa.
+  (In mezzo c'è stata, per qualche ora, la via delle DUE FASCE — piene
+  sopra e vuote sotto, catalogo dentro ogni fascia — superata nello
+  stesso giorno.) IL PAREGGIO È L'ORDINE DI CATALOGO, garantito dalla
+  stabilità del sort: due categorie con lo stesso conteggio non
+  ballano a ogni apertura. I conteggi sono quelli che viaggiano GIÀ
+  nella busta di prima pagina (la fonte di `renderChips`: zero query
+  nuove, zero endpoint) e NON si mostrano sulle piastrelle; senza
+  conteggi (apertura precoce, server muto) sono tutti a zero e il
+  sort stabile restituisce da solo l'ordine di catalogo — il ripiego
+  è il comportamento della nascita, senza un ramo apposta. La griglia
+  non è più «statica una volta per sempre»: si ridisegna SOLO quando
+  la firma dell'ordine cambia (`sfogliaDaRifare`), sull'ENTRATA nella
+  vista — mai mentre la si guarda. E LO SFARFALLIO DELLE ICONE è
+  chiuso (ago 2026, visto da Andrea): all'apertura si vedevano per un
+  attimo le EMOJI di ripiego, poi le illustrazioni — non un ritardo
+  del render ma la rotta no-cache, che obbliga ogni `<img>` a
+  rivalidare (un giro di rete per il 304) prima che l'onload spenga
+  l'emoji. La cura è `scaldaSfoglia` (le 27 illustrazioni scaldate a
+  riposo 2,5s dopo l'avvio: dentro la sessione il browser riusa la
+  risorsa senza rivalidare, con l'URL IDENTICO byte per byte —
+  helper unico `urlIllustrazione`) più il `data-ok` COTTO nell'HTML
+  quando la figura scaldata è già arrivata: le ufficiali dal primo
+  fotogramma, zero richieste al render, e chi apre prima del calore
+  ha il giro di prima — degradazione, non regressione. ~805 KB una
+  volta per sessione, l'ordine di grandezza della prima pagina di
+  vetrina. Il nome va in `data-cat` e mai dentro la
   stringa JS dell'onclick — la lezione di «Valle d'Aosta» sul picker.
   LE CATEGORIE VUOTE SONO PIASTRELLE NORMALI (lug 2026, deciso da
   Andrea guardando la pagina vera). Erano nate spente a metà opacità,
