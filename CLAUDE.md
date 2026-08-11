@@ -935,6 +935,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   vero, e la stessa per il bottone GEMELLO del venditore (due
   compratori diversi). La mutazione che sposta il timbro sulla persona
   fa rosse quattro righe.
+  IL BOTTONE SPENTO RESTA IN PAGINA E DICE PERCHÉ (ago 2026, dal
+  campo — è sembrato un guasto proprio a chi l'aveva appena usato):
+  il giudice `statoSollecito` ha TRE esiti e non due — '' non c'è,
+  'ok' si può bussare, e in mezzo 'pausa' e 'tetto', che sono il
+  bottone spento con «Già ricordato oggi — potrai rifarlo domani» e
+  «Hai già ricordato N volte» al posto dell'etichetta.
+  MA «È ANCORA PRESTO» RESTA IL NIENTE, ed è la riga da non
+  uniformare: prima delle 48 ore non è ancora il momento di bussare, e
+  un bottone spento lì sarebbe un invito a farlo appena si accende —
+  trasformerebbe un'attesa normale in un conto alla rovescia. Sparire
+  è sbagliato solo DOPO che il bottone c'è stato.
+  Da spento NON ha un onclick (non basta `disabled` per dormire
+  tranquilli) e il numero del tetto viene dalla leva.
+  E LA FINESTRA SI SCRIVE COL NOT DELLA FORMA POSITIVA
+  (`if (!(o.creato + ore*3600 <= adesso))`), che non è un vezzo: in
+  DEMO gli ordini finti non hanno `creato`, la somma fa NaN e ogni
+  confronto è falso — così NaN cade sul ramo «non c'è» invece che su
+  'ok'. C'è la prova, e la mutazione che rimette la forma diretta la
+  fa rossa.
   E IL DOPPIO TOCCO NON MANDA DUE PROMEMORIA: finché la risposta è per
   strada il bottone è spento. Senza, su rete lenta il secondo tocco
   prende il 400 della pausa — «hai già mandato un promemoria nelle
