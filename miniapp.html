@@ -4453,17 +4453,24 @@ function mapListing(a){
        (lo garantisce _sconto_pubblico lato server): a criterio valore
        `scontoSoglia` e' 0, ed e' cio' che impedisce a un client fermo
        a ieri di leggere degli euro come se fossero pezzi.
-       La soglia a valore e' in EURO e arriva nella chiave *_eur: la
-       vecchia, che portava sats, il server la manda a zero per sempre. */
+       La soglia a valore ha la sua VALUTA (ago 2026) e arriva nella
+       chiave della SUA unita': `*_valore` in sats, `*_valore_eur` in
+       euro, e l'altra a zero. Cosi' l'unita' non si puo' sbagliare
+       nemmeno volendo — la sceglie il server, non un «if» qui. */
     scontoCriterio:a.venditore_sconto_criterio||'',
+    scontoValuta:a.venditore_sconto_valuta||'',
     scontoSoglia:a.venditore_sconto_soglia||0,
+    scontoValoreSats:a.venditore_sconto_valore||0,
     scontoValoreEur:a.venditore_sconto_valore_eur||0,
     scontoPct:a.venditore_sconto_percento||0,
-    /* e la spedizione gratis sopra soglia (ago 2026): gli euro di
+    /* e la spedizione gratis sopra soglia (ago 2026): il valore di
        articoli da cui il negozio la offre; 0 = nessuna promessa, o
        server di ieri. E' la sorella dello sconto — arriva gia'
-       normalizzata dal suo giudice — ma vale anche su un oggetto solo,
-       ed e' per questo che la sua riga compare anche nella scheda. */
+       normalizzata dal suo giudice, valuta compresa — ma vale anche su
+       un oggetto solo, ed e' per questo che la sua riga compare anche
+       nella scheda. */
+    spedGratisValuta:a.venditore_sped_gratis_valuta||'',
+    spedGratisSats:a.venditore_sped_gratis||0,
     spedGratisEur:a.venditore_sped_gratis_eur||0,
     distintivi:a.venditore_distintivi||[],
     /* il titolo arriva GIA' col suo nome dal server: qui e' testo */
@@ -6255,7 +6262,8 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
      Number() e' la cintura, la stessa di v.rating. */
   const scontoNegozioRiga = w => {
     const r = regolaSconto(w.sconto_pacco_criterio, w.sconto_pacco_soglia,
-                           w.sconto_pacco_valore_eur, w.sconto_pacco_percento);
+                           w.sconto_pacco_valore, w.sconto_pacco_valore_eur,
+                           w.sconto_pacco_valuta, w.sconto_pacco_percento);
     return r
       ? `<div class="trust-note" style="margin-top:12px">🎁 <span>Questo
            negozio fa ${frasePromessaSconto(r)}.</span></div>` : '';
@@ -6266,7 +6274,8 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
      se il venditore spedisce: e' la sua vetrina intera, e un negozio
      che promette la spedizione gratis qualcosa da spedire ce l'ha. */
   const spedGratisNegozioRiga = w => {
-    const r = regolaSpedGratis(w.sped_gratis_eur);
+    const r = regolaSpedGratis(w.sped_gratis_soglia, w.sped_gratis_eur,
+                               w.sped_gratis_valuta);
     return r
       ? `<div class="trust-note" style="margin-top:12px">🚚 <span>Questo
            negozio offre la ${frasePromessaSpedGratis(r)}.</span></div>`
@@ -6989,7 +6998,8 @@ function spedBadge(l){
    l'equivoco da evitare. */
 function rigaSpedGratis(l){
   if (!spedisce(l) || spedGratis(l) || inFerie(l)) return '';
-  const r = regolaSpedGratis(l.spedGratisEur);
+  const r = regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
+                             l.spedGratisValuta);
   return r ? `<div class="acq-nota">🚚 Questo negozio offre la
     ${frasePromessaSpedGratis(r)}.</div>` : '';
 }
@@ -7494,12 +7504,13 @@ async function sezioneAltriOggetti(l){
      carrello non esiste. */
   const promoOk = !(DEMO || astaE(l) || tuttoDigitale || inFerie(l));
   const scOk = promoOk
-    ? regolaSconto(l.scontoCriterio, l.scontoSoglia, l.scontoValoreEur,
-                   l.scontoPct) : null;
+    ? regolaSconto(l.scontoCriterio, l.scontoSoglia, l.scontoValoreSats,
+                   l.scontoValoreEur, l.scontoValuta, l.scontoPct) : null;
   /* La seconda promessa, alle stesse condizioni: un carrello che non
      esiste non ha nemmeno una spedizione da offrire. Le due si
      leggono una sotto l'altra quando ci sono tutte e due. */
-  const sgOk = promoOk ? regolaSpedGratis(l.spedGratisEur) : null;
+  const sgOk = promoOk ? regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
+                                          l.spedGratisValuta) : null;
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
@@ -8105,19 +8116,26 @@ function renderAcquisto(){
      codice online sarebbe rumore. */
   const spedisceQui = (p.strade||[]).some(
     s => s.via==='casa' || s.via==='punto');
-  if ((p.sped_gratis_eur||0) > 0 && spedisceQui)
+  /* La soglia arriva nella chiave della SUA unita' e l'altra a zero
+     (la regola d'oro del server): qui si prende quella piena, invece
+     di guardarne una sola — con `sped_gratis_eur` da solo, su un
+     negozio in sats spariva TUTTO il blocco, invito compreso. */
+  const sgVal = p.sped_gratis_valuta
+             || ((p.sped_gratis_soglia||0) > 0 ? 'sats' : 'eur');
+  const sgSoglia = (p.sped_gratis_eur||0) || (p.sped_gratis_soglia||0);
+  const sgManca = (p.mancano_sped_eur||0) || (p.mancano_sped_sats||0);
+  if (sgSoglia > 0 && spedisceQui)
     note += (p.promesse_sospese
       ? `<div class="acq-nota">🚚 Il negozio offre la spedizione da
-           ${fmt(p.sped_gratis_eur)}<span class="unit eur">€</span> di
+           ${fmt(sgSoglia)}${unitaSoglia(sgVal)} di
            articoli, ma adesso non riusciamo a fare il cambio: per
            questo acquisto la spedizione si paga.</div>`
-      : p.mancano_sped_eur > 0
-      ? `<div class="acq-nota">🚚 Ancora ${fmt(p.mancano_sped_eur)}<span
-           class="unit eur">€</span> di articoli e la <b>spedizione è
-           gratis</b>.</div>`
+      : sgManca > 0
+      ? `<div class="acq-nota">🚚 Ancora ${fmt(sgManca)}${unitaSoglia(sgVal)}
+           di articoli e la <b>spedizione è gratis</b>.</div>`
       : `<div class="trust-note">🚚 <span><b>Spedizione gratis:</b> il
-           negozio la offre da ${fmt(p.sped_gratis_eur)}<span class="unit
-           eur">€</span> di articoli.</span></div>`);
+           negozio la offre da ${fmt(sgSoglia)}${unitaSoglia(sgVal)} di
+           articoli.</span></div>`);
   /* --- il conto della strada scelta, riga per riga --- */
   const viaOk = stradaSel && !stradaSel.cambio_assente;
   const sped = viaOk ? (stradaSel.spedizione_sats||0) : 0;
@@ -8419,31 +8437,46 @@ function aggiornaBarraPacco(){
    invito del carrello, cassetto), basterebbe che una se lo dimenticasse
    perche' degli euro si leggano come pezzi. Null-safe sulle chiavi
    mancanti: DEMO e server di ieri passano di qui e ottengono `null`.
-   A criterio valore la cifra e' in EURO (ago 2026): il server la manda
-   in `valoreEur`, e la vecchia chiave in sats esce a zero apposta. */
-function regolaSconto(criterio, soglia, valoreEur, pct){
+   A criterio valore la cifra ha la sua VALUTA (ago 2026): il server
+   riempie SOLO la chiave dell'unita' dichiarata — `valoreSats` in sats,
+   `valoreEur` in euro — e l'altra la manda a zero. Qui non si sceglie
+   niente: si prende quella piena, e l'unita' la dice `valuta`. */
+function regolaSconto(criterio, soglia, valoreSats, valoreEur, valuta, pct){
   const p = Number(pct) || 0;
   if (p <= 0) return null;
   const c = criterio || (Number(soglia) > 0 ? 'pezzi' : '');
-  const q = Number(c === 'valore' ? valoreEur : soglia) || 0;
+  const v = valuta || 'eur';
+  const q = Number(c === 'valore'
+    ? (v === 'sats' ? valoreSats : valoreEur) : soglia) || 0;
   return q > 0 && (c === 'pezzi' || c === 'valore')
-    ? {criterio: c, quanto: q, pct: p} : null;
+    ? {criterio: c, quanto: q, valuta: c === 'valore' ? v : '', pct: p}
+    : null;
+}
+/* L'unita' di una soglia a valore, in UN posto: le due promesse la
+   scrivono uguale, e il giorno che ne nascesse una terza pure. Il
+   simbolo € sta nello `<span class="unit">` come ovunque nell'app —
+   l'unita' non prende mai il colore del numero. */
+function unitaSoglia(valuta){
+  return valuta === 'sats'
+    ? ` <span class="unit">sats</span>` : `<span class="unit eur">€</span>`;
 }
 /* La promessa scritta a parole, e in UN posto solo: due copie
    divergono al primo ritocco. Dice sempre «nello stesso carrello», ed
    e' deliberato: a criterio valore «da 25 €» si legge come «da 25 € di
    spesa», e chi compra UNA cosa cara non sconta mai (il mono non
    sconta, vedi _righe_ordine).
-   NIENTE «≈» e niente cambioVivo da quando la soglia e' in euro: la
-   cifra e' quella che il venditore ha scritto, non una conversione —
-   ed e' per questo che la riga si disegna anche a cambio muto. */
+   NIENTE «≈» e niente cambioVivo, in NESSUNA delle due valute: la cifra
+   e' quella che il venditore ha scritto, non una conversione — ed e'
+   per questo che la riga si disegna anche a cambio muto. Il
+   controvalore nell'altra valuta non torna: sarebbe due numeri per la
+   stessa promessa, cioe' la domanda «quale delle due vale?». */
 function frasePromessaSconto(r){
   if (!r) return '';
   if (r.criterio === 'pezzi')
     return `<b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi nello stesso
       carrello`;
   return `<b>−${r.pct}%</b> da ${fmt(r.quanto)}`
-    + `<span class="unit eur">€</span> di articoli nello stesso carrello`;
+    + `${unitaSoglia(r.valuta)} di articoli nello stesso carrello`;
 }
 /* ---- LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026) ----
    La seconda promessa di negozio, e il suo giudice unico: la soglia
@@ -8452,9 +8485,10 @@ function frasePromessaSconto(r){
    la mostrano sono quattro (testata negozio, «Altri oggetti», scheda
    annuncio, cassetto) e basta che una se lo dimentichi. Null-safe: la
    DEMO e i server di ieri passano di qui e ottengono `null`. */
-function regolaSpedGratis(sogliaEur){
-  const q = Number(sogliaEur) || 0;
-  return q > 0 ? {quanto: q} : null;
+function regolaSpedGratis(sogliaSats, sogliaEur, valuta){
+  const v = valuta || 'eur';
+  const q = Number(v === 'sats' ? sogliaSats : sogliaEur) || 0;
+  return q > 0 ? {quanto: q, valuta: v} : null;
 }
 /* La promessa scritta a parole, e in UN posto solo (il patto di
    frasePromessaSconto: due copie divergono al primo ritocco).
@@ -8468,7 +8502,7 @@ function regolaSpedGratis(sogliaEur){
 function frasePromessaSpedGratis(r){
   if (!r) return '';
   return `spedizione <b>gratis</b> da ${fmt(r.quanto)}`
-    + `<span class="unit eur">€</span> di articoli`;
+    + `${unitaSoglia(r.valuta)} di articoli`;
 }
 /* ---- L'INVITO DELLO SCONTO SUL CARRELLO (ago 2026) ----
    La regola del negozio in una riga: quanto manca e di quanto scende
@@ -8488,7 +8522,8 @@ function scontoNegozio(){
   const x = listings.find(t => t.id===paccoDati?.origineId)
          || annunciPacco()[0];
   return x ? regolaSconto(x.scontoCriterio, x.scontoSoglia,
-                          x.scontoValoreEur, x.scontoPct) : null;
+                          x.scontoValoreSats, x.scontoValoreEur,
+                          x.scontoValuta, x.scontoPct) : null;
 }
 function aggiornaInvitoSconto(tot){
   const box = el('paccoSconto');
@@ -8512,9 +8547,16 @@ function aggiornaInvitoSconto(tot){
      arriva invece dal server e la fascia non esiste.
      Senza cambio vivo la riga non compare: meglio un'assenza che una
      cifra inventata (il patto del ≈). */
-  if (s.criterio === 'valore' && !cambioVivo) { box.innerHTML = ''; return; }
-  const ora = s.criterio === 'valore'
-    ? Math.floor((tot || 0) * eurPerSat) : pezzi;
+  /* ...e SOLO in euro: a soglia in SATS il confronto e' sats contro
+     sats, esatto e senza cambio, quindi la fascia stretta non esiste e
+     la riga compare anche a CoinGecko muto. E' il guadagno della
+     scelta, e si vede proprio qui — dove viveva l'unica conversione
+     che il client fa su una promessa. */
+  const inEuro = s.criterio === 'valore' && s.valuta !== 'sats';
+  if (inEuro && !cambioVivo) { box.innerHTML = ''; return; }
+  const ora = s.criterio !== 'valore' ? pezzi
+    : (s.valuta === 'sats' ? (tot || 0)
+                           : Math.floor((tot || 0) * eurPerSat));
   if (ora >= s.quanto){
     /* SCATTATO: la riga non sparisce, si TRASFORMA in conferma. Se
        sparisse, chi ha appena guadagnato lo sconto non vedrebbe
@@ -8528,7 +8570,7 @@ function aggiornaInvitoSconto(tot){
   }
   const n = s.quanto - ora;
   const manca = s.criterio === 'valore'
-    ? `${fmt(n)}<span class="unit eur">€</span>`
+    ? `${fmt(n)}${unitaSoglia(s.valuta)}`
     : `${fmt(n)} articol${n===1?'o':'i'}`;
   box.innerHTML = `<div class="acq-nota">🎁 Ancora ${manca}: il negozio
     fa <b>−${s.pct}%</b> su tutto il carrello.</div>`;
@@ -11607,12 +11649,13 @@ let myFerieFino = 0, ferieLeve = null;
    sono UNA regola, e non deve esistere l'istante in cui il negozio ne
    ha una a meta' (in quel mezzo secondo qualcuno puo' comprare). */
 let myScontoPacco = null, scontoPaccoLeve = null, scontoPaccoBozza = null;
-/* La spedizione gratis sopra soglia: i sats salvati (0 = spenta), le
-   leve del server e la bozza, con lo stesso patto del gemello — qui
-   pero' il numero e' UNO, quindi le pillole salvano davvero e non
-   esiste il mezzo secondo con una regola a meta'. La bozza resta per
-   il campo euro, che scrive sats mentre si digita. */
-let mySpedGratis = 0, spedGratisLeve = null, spedGratisBozza = null;
+/* La spedizione gratis sopra soglia: un OGGETTO {sats, eur, valuta}
+   come la gemella (ago 2026, la scelta della valuta) — le due cifre
+   convivono perche' il toggle CONSERVA, e a dire quale vale e' la
+   valuta. Piu' le leve del server e la bozza, con lo stesso patto del
+   gemello: le pillole scelgono e il bottone salva, che qui i numeri da
+   tenere in pari sono due (la soglia e la sua unita'). */
+let mySpedGratis = null, spedGratisLeve = null, spedGratisBozza = null;
 /* «💡 Suggerimenti sui miei annunci»: lo STATO EFFETTIVO (il server ci
    mette il giudice, che sa distinguere «mai toccato» da «spento da
    lui») e il RITMO in giorni, che e' del config e non si hardcoda —
@@ -12293,12 +12336,58 @@ async function setSpedizioniere(v){
    AVVISO_INTERMEDIARIO, che sta in casa proprio perche' due copie
    della stessa avvertenza un giorno divergono.
    La prima frase e' anche la risposta a «perche' euro?», che e' la
-   domanda che il venditore si fa comunque. */
-const NOTA_SOGLIA_EURO = `
+   domanda che il venditore si fa comunque.
+   E DALL'AGO 2026 SONO DUE, una per valuta, perche' la scelta e' del
+   venditore e il compromesso va detto in tutte e due le direzioni
+   invece di deciderlo al posto suo: in euro la soglia non deriva col
+   cambio, in sats non ha bisogno del cambio per scattare. Restano UNA
+   funzione — il patto vale ancora: due copie della stessa avvertenza
+   un giorno divergono — e tutte e due finiscono con «incassi in sats»,
+   che e' vero comunque. */
+function notaSoglia(valuta){
+  const testo = valuta === 'sats'
+    ? `La soglia è fissa in <b style="color:var(--ink)">sats</b>: se il
+       cambio si muove, in euro vale di più (o di meno). In compenso
+       non ha bisogno del cambio per scattare.`
+    : `La soglia si misura in <b style="color:var(--ink)">euro</b>, così
+       non cambia da sola col cambio.`;
+  return `
   <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-    La soglia si misura in <b style="color:var(--ink)">euro</b>, così non
-    cambia da sola col cambio. Tu incassi sempre in
+    ${testo} Tu incassi sempre in
     <b style="color:var(--ink)">sats</b>.</div>`;
+}
+
+/* ---- IL TOGGLE €/₿ DELLA SOGLIA (ago 2026) ----
+   CONSERVA, NON CONVERTE, ed e' la decisione da non rovesciare: ogni
+   valuta ha la sua colonna, e il toggle mostra cio' che il venditore ha
+   scritto IN QUELLA valuta (vuota la prima volta → pillole). Tre
+   ragioni: 85 € → 92.391 sats e' un numero che nessuno ha scelto e va
+   riarrotondato a mano; ovunque nell'app il toggle €/₿ e' una VISTA —
+   cambia come si legge un numero, mai cosa E' — mentre qui cambia la
+   SOSTANZA della promessa, e convertire confonderebbe le due cose (piu'
+   la deriva di centesimi a ogni tocco, gia' pagata nel foglio
+   dell'offerta); e il toggle del criterio, un centimetro sopra, conserva
+   gia' cosi'.
+   LA CIFRA CONSERVATA PUO' ESSERE STALE: chi e' passato per il travaso
+   di venerdi ha entrambe le colonne piene, e la sua cifra in sats e'
+   quella di mesi fa, al cambio di allora. L'anteprima la fa leggere
+   PRIMA di salvare, e a salvare e' il bottone: niente cambia in
+   silenzio. */
+function toggleValutaSoglia(quale, valuta){
+  const q = SOGLIE_LIBERE[quale], b = q && q.bozza();
+  if (!b) return;
+  haptic();
+  b.valuta = valuta;
+  if (quale === 'sconto') renderScontoPacco(); else renderSpedGratis();
+}
+function pillValuta(quale, attiva, valute){
+  if (!(valute || []).length || valute.length < 2) return '';
+  const uno = v => `<button onclick="toggleValutaSoglia('${quale}','${v}')"
+    style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${attiva===v?'var(--sats)':'var(--line)'};background:${attiva===v?'var(--sats)':'transparent'};color:${attiva===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${v==='sats'?'₿ sats':'€ euro'}</button>`;
+  return `<div class="section-label" style="margin-top:12px">In che valuta</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${valute.map(uno).join('')}</div>`;
+}
 
 /* ---- IL CAMPO LIBERO DELLE DUE SOGLIE (ago 2026) ----
    Le pillole propongono, il campo lascia scrivere: «15», «35», «40».
@@ -12314,44 +12403,61 @@ const NOTA_SOGLIA_EURO = `
    re-render toglierebbe il fuoco al campo a ogni tasto. Si riscrivono
    in place le due cose che dipendono dal numero — l'anteprima e le
    pillole — e l'anteprima passa dalla STESSA funzione che usa il
-   render, o le due frasi divergerebbero al primo ritocco. */
+   render, o le due frasi divergerebbero al primo ritocco.
+   IL CAMPO DIPENDE DALLA VALUTA (ago 2026) ed e' una FUNZIONE, non una
+   stringa: con `campo` fisso, chi scrive 50.000 pensando sats se li
+   ritroverebbe in `valoreEur`, cioe' una soglia da cinquantamila euro —
+   una promessa morta in silenzio. E' il posto piu' facile del cantiere
+   in cui un'unita' diventa un'altra. */
 const SOGLIE_LIBERE = {
-  sconto: {campo: 'valoreEur', box: 'scontoPaccoBlocco',
-           bozza: () => scontoPaccoBozza},
-  sped:   {campo: 'soglia', box: 'spedGratisBlocco',
-           bozza: () => spedGratisBozza}};
+  sconto: {box: 'scontoPaccoBlocco', bozza: () => scontoPaccoBozza,
+           campo: b => b.valuta === 'sats' ? 'valoreSats' : 'valoreEur'},
+  sped:   {box: 'spedGratisBlocco', bozza: () => spedGratisBozza,
+           campo: b => b.valuta === 'sats' ? 'sogliaSats' : 'sogliaEur'}};
+
+/* la cifra della bozza NELL'UNITA' scelta, e il nome della sua unita':
+   due righe che servono a tutti e quattro i punti qui sotto */
+function sogliaBozza(quale){
+  const q = SOGLIE_LIBERE[quale], b = q.bozza() || {};
+  return {b, campo: q.campo(b), valore: b[q.campo(b)] || 0,
+          valuta: b.valuta || 'eur'};
+}
 
 function anteprimaSoglia(quale){
   /* la frase dell'anteprima, in UN posto: la scrive il render e la
      riscrive il campo libero. A cifra mancante NON si finge un «da
      0 €» — si dice che manca, che e' anche cio' che il bottone poi
-     rifiuta di salvare. */
+     rifiuta di salvare. L'unita' e' quella scelta col toggle: e' anche
+     il modo in cui il venditore SI ACCORGE che il numero conservato
+     nell'altra valuta e' vecchio, prima di salvarlo. */
+  const {b, valore, valuta} = sogliaBozza(quale);
+  const u = valuta === 'sats' ? 'sats' : '€';
+  const chiedi = valuta === 'sats' ? 'quanti sats' : 'quanti euro';
   if (quale === 'sconto'){
-    const b = scontoPaccoBozza;
     if (b.criterio !== 'valore')
       return `Da ${b.soglia} pezzi in su, −${b.pct}% su tutto il carrello.`;
-    return b.valoreEur > 0
-      ? `Da ${fmt(b.valoreEur)} € di articoli in su, −${b.pct}% su tutto
+    return valore > 0
+      ? `Da ${fmt(valore)} ${u} di articoli in su, −${b.pct}% su tutto
          il carrello.`
-      : 'Scrivi da quanti euro parte lo sconto.';
+      : `Scrivi da ${chiedi} parte lo sconto.`;
   }
-  const b = spedGratisBozza;
-  return b.soglia > 0
-    ? `Da ${fmt(b.soglia)} € di articoli in su, spedizione gratis.`
-    : 'Scrivi da quanti euro offri la spedizione.';
+  return valore > 0
+    ? `Da ${fmt(valore)} ${u} di articoli in su, spedizione gratis.`
+    : `Scrivi da ${chiedi} offri la spedizione.`;
 }
 
-function campoSogliaLibera(quale, valore, minimo){
+function campoSogliaLibera(quale, valore, minimo, valuta){
   /* `value` vuoto quando la cifra non c'e': un «0» scritto nel campo
      si leggerebbe come una scelta, e non lo e'. */
+  const u = valuta === 'sats' ? 'sats' : '€';
   return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;font-weight:700;color:var(--muted)">
       <span>oppure</span>
       <input id="soglia-${quale}" type="number" inputmode="numeric"
         min="${minimo || 1}" step="1" value="${valore > 0 ? valore : ''}"
         oninput="sogliaLibera('${quale}', this.value)"
-        aria-label="Soglia in euro"
+        aria-label="Soglia in ${u}"
         style="font:inherit;width:88px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink)">
-      <span>€</span></div>`;
+      <span>${u}</span></div>`;
 }
 
 function sogliaLibera(quale, v){
@@ -12361,16 +12467,17 @@ function sogliaLibera(quale, v){
      49,90» — e la colonna del server e' un INTEGER. Cifra illeggibile
      o vuota = 0, cioe' «manca»: NON si lima al minimo qui, che sarebbe
      un clamp muto — a dire la cifra e' il 400 del server. */
+  const campo = q.campo(b);
   const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
-  b[q.campo] = n > 0 ? n : 0;
+  b[campo] = n > 0 ? n : 0;
   const nota = el(q.box) && el(q.box).querySelector('.acq-nota b');
   if (nota) nota.innerHTML = anteprimaSoglia(quale);
   /* e le pillole tornano a dire la verita': scrivendo una cifra libera
      quasi mai una combacia, e una pillola accesa su un numero diverso
      da quello scritto sopra e' la stessa bugia del campo che mente */
-  document.querySelectorAll(`#${q.box} [data-campo="${q.campo}"]`)
+  document.querySelectorAll(`#${q.box} [data-campo="${campo}"]`)
     .forEach(p => {
-      const on = Number(p.dataset.v) === b[q.campo];
+      const on = Number(p.dataset.v) === b[campo];
       p.style.borderColor = on ? 'var(--sats)' : 'var(--line)';
       p.style.background = on ? 'var(--sats)' : 'transparent';
       p.style.color = on ? '#fff' : 'var(--muted)';
@@ -12383,13 +12490,14 @@ function sogliaMancante(quale, idErrore){
      SPEGNIMENTO senza guardie, quindi salvare un campo vuoto
      toglierebbe la promessa in silenzio. A spegnere c'e' il suo
      bottone, che lo dice. */
-  const q = SOGLIE_LIBERE[quale], b = q.bozza() || {};
-  if (b[q.campo] > 0) return false;
+  const {valore, valuta} = sogliaBozza(quale);
+  if (valore > 0) return false;
   const dove = el(idErrore);
   if (dove) dove.innerHTML =
     `<div class="trust-note" style="margin-top:10px">⚠️ <span>Scrivi da
-      quanti euro parte, o scegli una delle cifre qui sotto. Per
-      togliere la promessa c'è il bottone apposta.</span></div>`;
+      ${valuta === 'sats' ? 'quanti sats' : 'quanti euro'} parte, o scegli
+      una delle cifre qui sotto. Per togliere la promessa c'è il bottone
+      apposta.</span></div>`;
   return true;
 }
 
@@ -12417,26 +12525,35 @@ function renderScontoPacco(){
   const criteri = scontoPaccoLeve.criteri || ['pezzi'];
   el('scontoPaccoConta').textContent = attivo
     ? (myScontoPacco.criterio === 'valore'
-        ? `−${myScontoPacco.percento}% da ${fmt(myScontoPacco.valoreEur)} €`
+        ? `−${myScontoPacco.percento}% da ${fmt(
+             myScontoPacco.valuta === 'sats' ? myScontoPacco.valoreSats
+                                             : myScontoPacco.valoreEur)} ${
+             myScontoPacco.valuta === 'sats' ? 'sats' : '€'}`
         : `−${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`)
     : '';
   /* la bozza parte da cio' che c'e' gia' (o dalla prima voce utile per
      chi non ha ancora niente): il cassetto si apre con una proposta.
-     Porta ENTRAMBE le soglie, cosi' chi prova l'altro criterio e torna
-     indietro ritrova la sua — e il server le conserva a vicenda */
+     Porta TUTTE E TRE le soglie, cosi' chi prova l'altro criterio — o
+     l'altra valuta — e torna indietro ritrova la sua: e' il toggle che
+     CONSERVA, e il server le tiene a vicenda col COALESCE */
   if (!scontoPaccoBozza)
     scontoPaccoBozza = {
       criterio: (attivo && myScontoPacco.criterio) || criteri[0] || 'pezzi',
+      valuta: (attivo && myScontoPacco.valuta) || 'eur',
       soglia: (attivo && myScontoPacco.soglia)
               || (scontoPaccoLeve.soglie||[])[0] || 2,
       valoreEur: (attivo && myScontoPacco.valoreEur)
               || (scontoPaccoLeve.valori_eur||[])[0] || 25,
+      valoreSats: (attivo && myScontoPacco.valoreSats)
+              || (scontoPaccoLeve.valori_sats||[])[0] || 25000,
       pct: (attivo && myScontoPacco.percento)
            || (scontoPaccoLeve.sconti||[])[0] || 5};
   const b = scontoPaccoBozza, aValore = b.criterio === 'valore';
+  const inSats = b.valuta === 'sats';
   const pill = (v, testo, campo) =>
     `<button data-campo="${campo}" data-v="${v}" onclick="scontoPaccoPill('${campo}',${typeof v==='string'?`'${v}'`:v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
-  const pillValore = v => pill(v, `${fmt(v)} €`, 'valoreEur');
+  const pillValore = v => pill(v, inSats ? `${fmt(v)} sats` : `${fmt(v)} €`,
+                              inSats ? 'valoreSats' : 'valoreEur');
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
       Premia chi prende più cose in una volta: il prezzo degli
@@ -12451,12 +12568,16 @@ function renderScontoPacco(){
         ${pill('pezzi', 'A pezzi', 'criterio')}
         ${pill('valore', 'A valore', 'criterio')}</div>` : ''}
     ${aValore ? `
-      <div class="section-label" style="margin-top:12px">Da quanti euro di articoli</div>
+      ${pillValuta('sconto', b.valuta, scontoPaccoLeve.valute)}
+      <div class="section-label" style="margin-top:12px">Da quanti ${
+        inSats ? 'sats' : 'euro'} di articoli</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-        ${(scontoPaccoLeve.valori_eur||[]).map(pillValore).join('')}</div>
-      ${campoSogliaLibera('sconto', b.valoreEur,
-                          scontoPaccoLeve.min_valore_eur)}
-      ${NOTA_SOGLIA_EURO}
+        ${((inSats ? scontoPaccoLeve.valori_sats
+                   : scontoPaccoLeve.valori_eur)||[]).map(pillValore).join('')}</div>
+      ${campoSogliaLibera('sconto', inSats ? b.valoreSats : b.valoreEur,
+                          inSats ? scontoPaccoLeve.min_valore_sats
+                                 : scontoPaccoLeve.min_valore_eur, b.valuta)}
+      ${notaSoglia(b.valuta)}
     ` : `
       <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
@@ -12489,12 +12610,16 @@ async function setScontoPacco(spegni){
      a criterio valore si ferma qui invece di mandare uno zero */
   if (!spegni && b.criterio === 'valore'
       && sogliaMancante('sconto', 'scontoPaccoErrore')) return;
-  /* si mandano SEMPRE tutte e due le soglie: il server le conserva a
+  /* si mandano SEMPRE tutte e tre le soglie: il server le conserva a
      vicenda (chiave assente = conserva), e cosi' quella dell'altro
-     criterio resta com'era invece di sparire a ogni salvataggio */
+     criterio — e dell'altra valuta — resta com'era invece di sparire a
+     ogni salvataggio. E' anche cio' che rende il toggle una scelta
+     reversibile senza chiedere niente a nessuno. */
   const corpo = spegni ? {percento: 0}
                        : {criterio: b.criterio || 'pezzi',
-                          soglia: b.soglia, valore_eur: b.valoreEur,
+                          valuta: b.valuta || 'eur',
+                          soglia: b.soglia, valore_sats: b.valoreSats,
+                          valore_eur: b.valoreEur,
                           percento: b.pct};
   const box = el('scontoPaccoErrore');
   if (box) box.innerHTML = '';
@@ -12515,14 +12640,18 @@ async function setScontoPacco(spegni){
        mandato: col COALESCE la soglia dell'altro criterio non si
        deduce dal body */
     myScontoPacco = d.percento > 0
-      ? {criterio: d.criterio, soglia: d.soglia, valoreEur: d.valore_eur,
+      ? {criterio: d.criterio, valuta: d.valuta, soglia: d.soglia,
+         valoreSats: d.valore_sats, valoreEur: d.valore_eur,
          percento: d.percento} : null;
   } catch(e) { toast('Rete assente: riprova'); return; }
   scontoPaccoBozza = null;     /* la bozza riparte da cio' che e' salvato */
   renderScontoPacco();
   toast(myScontoPacco
     ? (myScontoPacco.criterio === 'valore'
-        ? `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${fmt(myScontoPacco.valoreEur)} €`
+        ? `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${fmt(
+             myScontoPacco.valuta === 'sats' ? myScontoPacco.valoreSats
+                                             : myScontoPacco.valoreEur)} ${
+             myScontoPacco.valuta === 'sats' ? 'sats' : '€'}`
         : `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`)
     : 'Sconto spento: da adesso il prezzo è pieno per tutti');
   /* e la riga sotto il Prezzo nel form segue la regola appena
@@ -12547,16 +12676,31 @@ function renderSpedGratis(){
     box.innerHTML = ''; return;
   }
   if (sez) sez.style.display = '';
-  const ora = Number(mySpedGratis) || 0;
+  /* la promessa passa dal giudice unico anche qui — e' l'unico modo di
+     sapere QUALE delle due cifre e' quella viva */
+  const reg = regolaSpedGratis(mySpedGratis && mySpedGratis.sats,
+                               mySpedGratis && mySpedGratis.eur,
+                               mySpedGratis && mySpedGratis.valuta);
+  const ora = reg ? reg.quanto : 0;
   /* «da N €» e non «gratis da N €»: il titolo del cassetto dice
      gia' «gratis», e la parola in piu' mandava il titolo a capo —
      misurato a 375px contro il gemello «−15% da 3 pezzi» */
-  el('spedGratisConta').textContent = ora ? `da ${fmt(ora)} €` : '';
+  el('spedGratisConta').textContent = ora
+    ? `da ${fmt(ora)} ${reg.valuta === 'sats' ? 'sats' : '€'}` : '';
+  /* la bozza porta TUTTE E DUE le unita': il toggle conserva, e chi
+     torna indietro ritrova la cifra che ci aveva scritto */
   if (!spedGratisBozza)
-    spedGratisBozza = {soglia: ora || (spedGratisLeve.soglie_eur||[])[0] || 25};
+    spedGratisBozza = {
+      valuta: (mySpedGratis && mySpedGratis.valuta) || 'eur',
+      sogliaEur: (mySpedGratis && mySpedGratis.eur)
+                 || (spedGratisLeve.soglie_eur||[])[0] || 25,
+      sogliaSats: (mySpedGratis && mySpedGratis.sats)
+                 || (spedGratisLeve.soglie_sats||[])[0] || 25000};
   const b = spedGratisBozza;
+  const inSats = b.valuta === 'sats';
+  const campo = inSats ? 'sogliaSats' : 'sogliaEur';
   const pill = v =>
-    `<button data-campo="soglia" data-v="${v}" onclick="spedGratisPill(${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b.soglia===v?'var(--sats)':'var(--line)'};background:${b.soglia===v?'var(--sats)':'transparent'};color:${b.soglia===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${fmt(v)} €</button>`;
+    `<button data-campo="${campo}" data-v="${v}" onclick="spedGratisPill(${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${fmt(v)} ${inSats?'sats':'€'}</button>`;
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
       Da una certa spesa in su la spedizione la offri tu: chi compra
@@ -12565,11 +12709,16 @@ function renderSpedGratis(){
       <b style="color:var(--ink)">tutti i tuoi annunci</b> che
       spediscono.</div>
     <div id="spedGratisErrore"></div>
-    <div class="section-label" style="margin-top:14px">Da quanti euro di articoli</div>
+    ${pillValuta('sped', b.valuta, spedGratisLeve.valute)}
+    <div class="section-label" style="margin-top:12px">Da quanti ${
+      inSats ? 'sats' : 'euro'} di articoli</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${(spedGratisLeve.soglie_eur||[]).map(pill).join('')}</div>
-    ${campoSogliaLibera('sped', b.soglia, spedGratisLeve.min_eur)}
-    ${NOTA_SOGLIA_EURO}
+      ${((inSats ? spedGratisLeve.soglie_sats
+                 : spedGratisLeve.soglie_eur)||[]).map(pill).join('')}</div>
+    ${campoSogliaLibera('sped', b[campo],
+                        inSats ? spedGratisLeve.min_sats
+                               : spedGratisLeve.min_eur, b.valuta)}
+    ${notaSoglia(b.valuta)}
     <div class="acq-nota">🚚 <b>${anteprimaSoglia('sped')}</b>
       La soglia guarda il carrello <b>dopo</b> le
       tue offerte lampo e gli accordi: una lampo generosa può farlo
@@ -12586,7 +12735,10 @@ function renderSpedGratis(){
 }
 function spedGratisPill(v){
   haptic();
-  spedGratisBozza.soglia = v;
+  /* nel campo dell'unita' scelta, mai in quello fisso: con la valuta
+     una pillola da 50.000 sats finirebbe in `sogliaEur` */
+  spedGratisBozza[spedGratisBozza.valuta === 'sats'
+                  ? 'sogliaSats' : 'sogliaEur'] = v;
   renderSpedGratis();   /* l'anteprima e' una frase: si riscrive intera */
 }
 async function setSpedGratis(spegni){
@@ -12596,13 +12748,20 @@ async function setSpedGratis(spegni){
      SPEGNIMENTO senza guardie, quindi un campo svuotato per sbaglio
      toglierebbe la promessa in SILENZIO. A spegnere c'e' il bottone. */
   if (!spegni && sogliaMancante('sped', 'spedGratisErrore')) return;
-  const soglia = spegni ? 0 : (spedGratisBozza || {}).soglia || 0;
+  const b = spedGratisBozza || {};
+  const valuta = b.valuta || 'eur';
+  /* la chiave dell'unita' DICHIARATA c'e' sempre: e' esattamente cio'
+     che il server pretende, e a mandarne una sola si spegnerebbe la
+     promessa senza volerlo (il difetto del client vecchio) */
+  const corpo = spegni
+    ? {valuta, soglia_sats: 0, soglia_eur: 0}
+    : {valuta, soglia_sats: b.sogliaSats, soglia_eur: b.sogliaEur};
   const box = el('spedGratisErrore');
   if (box) box.innerHTML = '';
   try {
     const r = await fetch(`${API_BASE}/me/spedizione-gratis`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({soglia_eur: soglia})});
+       body: JSON.stringify(corpo)});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) {
       /* il 400 si rende DENTRO il cassetto, la ricetta delle ferie:
@@ -12614,12 +12773,18 @@ async function setSpedGratis(spegni){
       else toast(d.detail || 'Non ci sono riuscito, riprova', 6000);
       return;
     }
-    mySpedGratis = d.soglia_eur || 0;
+    /* si adotta cio' che il server ha RILETTO: col COALESCE la cifra
+       dell'altra valuta non si deduce dal body */
+    mySpedGratis = {sats: d.soglia_sats || 0, eur: d.soglia_eur || 0,
+                    valuta: d.valuta || 'eur'};
   } catch(e) { toast('Rete assente: riprova'); return; }
   spedGratisBozza = null;    /* la bozza riparte da cio' che e' salvato */
   renderSpedGratis();
-  toast(mySpedGratis
-    ? `🚚 Spedizione gratis da ${fmt(mySpedGratis)} € di articoli`
+  const dopo = regolaSpedGratis(mySpedGratis.sats, mySpedGratis.eur,
+                                mySpedGratis.valuta);
+  toast(dopo
+    ? `🚚 Spedizione gratis da ${fmt(dopo.quanto)} ${
+        dopo.valuta === 'sats' ? 'sats' : '€'} di articoli`
     : 'Spedizione gratis spenta: da adesso la paga chi compra');
   /* la riga del form segue la promessa appena cambiata (il gemello
      dello spedizioniere) */
@@ -15150,7 +15315,9 @@ function aggiornaHintPolitiche(){
     const r = DEMO ? null : regolaSconto(
       myScontoPacco && myScontoPacco.criterio,
       myScontoPacco && myScontoPacco.soglia,
+      myScontoPacco && myScontoPacco.valoreSats,
       myScontoPacco && myScontoPacco.valoreEur,
+      myScontoPacco && myScontoPacco.valuta,
       myScontoPacco && myScontoPacco.percento);
     sc.style.display = r ? '' : 'none';
     if (r) sc.innerHTML = `💡 Il tuo negozio fa ${frasePromessaSconto(r)}
@@ -15159,11 +15326,22 @@ function aggiornaHintPolitiche(){
   }
   const sg = el('sellSpedGratisHint');
   if (sg) {
-    const mostra = !DEMO && mySpedGratis > 0;
-    sg.style.display = mostra ? '' : 'none';
-    if (mostra) sg.innerHTML = `💡 Il tuo negozio spedisce <b>gratis</b> da
-      ${fmt(mySpedGratis)} € di articoli: sopra quella cifra questo
-      costo lo metti tu. Cambia nel Profilo ›
+    /* LA QUINTA SUPERFICIE, e fino all'ago 2026 era l'unica che la
+       promessa se la scriveva a mano — con l'euro cotto dentro. Col
+       toggle avrebbe detto «gratis da 50.000 €» al venditore, sul suo
+       negozio: la bugia peggiore del lotto, e proprio a chi la cifra
+       l'ha appena scritta. Adesso passa dal giudice unico come le
+       altre quattro. */
+    const r = DEMO ? null : regolaSpedGratis(
+      mySpedGratis && mySpedGratis.sats, mySpedGratis && mySpedGratis.eur,
+      mySpedGratis && mySpedGratis.valuta);
+    sg.style.display = r ? '' : 'none';
+    /* «offre la …», come le righe pubbliche: la frase del giudice
+       comincia con «spedizione gratis da …», quindi un «Il tuo negozio
+       spedizione gratis da» sarebbe sgrammaticato (visto dal vivo) */
+    if (r) sg.innerHTML = `💡 Il tuo negozio offre la
+      ${frasePromessaSpedGratis(r)}: sopra quella cifra questo costo lo
+      metti tu. Cambia nel Profilo ›
       <span style="white-space:nowrap">🚚&nbsp;Spedizione gratis</span>.`;
   }
 }
@@ -17028,9 +17206,13 @@ async function avvia(){
     spedizionieriCatalogo = me.spedizionieri || [];
     myFerieFino = me.ferie_fino || 0;
     ferieLeve = me.ferie_leve || null;   // server di ieri = cassetto assente
+    /* le cifre arrivano GREZZE, tutte e tre: e' il suo negozio, e il
+       toggle deve poter ritrovare quella dell'altra valuta */
     myScontoPacco = (me.sconto_pacco_percento > 0)
       ? {criterio: me.sconto_pacco_criterio || 'pezzi',
+         valuta: me.sconto_pacco_valore_valuta || 'eur',
          soglia: me.sconto_pacco_soglia,
+         valoreSats: me.sconto_pacco_valore || 0,
          valoreEur: me.sconto_pacco_valore_eur || 0,
          percento: me.sconto_pacco_percento}
       : null;
@@ -17040,7 +17222,11 @@ async function avvia(){
        cassetto si aprirebbe proponendo i valori di partenza invece di
        cio' che il negozio promette davvero */
     scontoPaccoBozza = null;
-    mySpedGratis = me.sped_gratis_soglia_eur || 0;
+    /* un OGGETTO come la gemella, e per la stessa ragione: le due
+       cifre convivono e a dire quale vale e' la valuta */
+    mySpedGratis = {sats: me.sped_gratis_soglia || 0,
+                    eur: me.sped_gratis_soglia_eur || 0,
+                    valuta: me.sped_gratis_valuta || 'eur'};
     spedGratisLeve = me.sped_gratis_leve || null;   // idem
     spedGratisBozza = null;                         // idem, stessa ragione
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;

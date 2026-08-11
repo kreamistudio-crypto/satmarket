@@ -235,33 +235,46 @@ try:
     from config import SCONTO_PACCO_MAX_PERCENTO
 except ImportError:
     SCONTO_PACCO_MAX_PERCENTO = 30   # un guardrail, non un giudizio
-# Le pillole del criterio a VALORE, e sono in EURO (ago 2026, decisione
-# di Andrea che ROVESCIA la riga che stava qui — «in sats, ed e' la
-# decisione da non rovesciare»). Il motivo del rovesciamento e' che una
-# soglia in sats DERIVA COL CAMBIO: il venditore scrive 100.000
-# pensando «una cinquantina di euro» e fra sei mesi la stessa riga ne
-# vale il doppio — la sua promessa e' cambiata senza che lui abbia
-# toccato niente. Le
-# spedizioni nel mondo vero si pagano in euro, e la tariffa di un
-# annuncio puo' gia' essere ancorata all'euro (spedizione_eur): il
-# precedente e' in casa.
-# L'ARGOMENTO PERDENTE, che va tenuto perche' era buono: in sats
-# _sconto_pacco non vedeva il cambio, e non esisteva il caso «promessa
-# non mantenuta perche' CoinGecko tace». Resta vero, e il prezzo si
-# paga a cambio muto — dove la promessa NON scatta e lo si dice. Ma
-# «muto» vuol dire pochissimo: cambio_btc_eur e' fail-open e tiene
-# l'ultimo valore noto, che dall'ago 2026 sopravvive anche ai RIAVVII
-# (vive nel database, vedi ORE_CAMBIO_VALIDO), quindi lo 0 esce solo al
-# primissimo avvio di un database nuovo o quando l'ultimo cambio noto
-# ha piu' di ORE_CAMBIO_VALIDO. Una promessa che deriva da sola per
-# mesi e' un guasto piu' grande di uno che dura un riavvio.
-# E LE PURE RESTANO PURE: guadagnano un ARGOMENTO (articolo_eur), non
-# una chiamata — il cambio lo prende il chiamante, dove lo prende gia'.
+# Le pillole del criterio a VALORE, e LA VALUTA DELLA SOGLIA LA SCEGLIE
+# IL VENDITORE (ago 2026, decisione di Andrea chiesta dalla comunita',
+# che SUPERA quella di due giorni prima — «la soglia a valore e' in
+# euro» — la quale a sua volta aveva rovesciato il «sempre in sats»
+# della nascita. Vanno tenuti tutti e due i perche', perche' sono tutti
+# e due veri e nessuno dei due e' stato smentito).
+# IL PERCHE' DELL'EURO, che RESTA VERO: una soglia in sats DERIVA COL
+# CAMBIO — il venditore scrive 100.000 pensando «una cinquantina di
+# euro» e fra sei mesi la stessa riga ne vale il doppio, cioe' la sua
+# promessa e' cambiata senza che lui abbia toccato niente. Le spedizioni
+# nel mondo vero si pagano in euro, e la tariffa di un annuncio puo'
+# gia' essere ancorata all'euro (spedizione_eur).
+# IL PERCHE' CHE LO SUPERA: quel difetto ce l'ha gia' il PREZZO di ogni
+# annuncio in sats, e nessuno se ne lamenta; e la valuta in cui uno
+# ragiona e' una scelta sua, non nostra. Da qui la forma del cantiere:
+# NON si torna ai sats — si AGGIUNGE la scelta, e accanto al toggle si
+# dice cosa comporta in tutte e due le direzioni (vedi notaSoglia nel
+# client) invece di deciderlo al posto suo.
+# IL GUADAGNO CHE L'EURO NON POTEVA DARE, ed e' la parte che rende la
+# scelta piu' che un gusto: con la soglia in SATS la promessa NON HA
+# BISOGNO DEL CAMBIO. Scatta anche a CoinGecko muto, l'invito del
+# carrello smette di convertire (era l'unico posto dell'app dove il
+# client converte una promessa, con la sua imperfezione dichiarata), e
+# un negozio tutto-sats non paga piu' un giro di rete che non gli serve.
+# E' la stessa famiglia del criterio a PEZZI, che il cambio non l'ha mai
+# guardato.
+# LE DUE PROMESSE GUARDANO LO STESSO ARTICOLO, ognuna nell'unita' che ha
+# dichiarato: restano indipendenti, e nessuna puo' spegnere l'altra.
+# E LE PURE RESTANO PURE: guadagnano ARGOMENTI (articolo_eur, valuta),
+# non una chiamata — il cambio lo prende il chiamante, dove lo prende
+# gia'. La conversione resta UNA, in _eur_interi.
 # LE LEVE SI CHIAMANO *_EUR, e non e' cosmesi: una riga
 # `SCONTO_PACCO_VALORI = (25_000, ...)` gia' scritta in un config
 # verrebbe letta come EURO e la promessa non scatterebbe piu', in
 # silenzio. Col nome nuovo la riga vecchia diventa inerte, che e' la
 # stessa regola delle colonne — un nome non cambia mai significato.
+# ...E LA STESSA REGOLA VALE PER LE GEMELLE IN SATS (ago 2026, il
+# cantiere della scelta): si chiamano *_SATS, e i nomi NUDI restano
+# inerti per sempre. Chi ne rianimasse uno rimetterebbe in piedi
+# esattamente l'ambiguita' che il suffisso esiste per togliere.
 # I CRITERI sono una leva perche' sia possibile spegnere il criterio
 # nuovo dal config invece di tornare indietro con un deploy: chi resta
 # fuori dall'elenco non sconta piu' (fail-closed), e la sua promessa
@@ -280,12 +293,23 @@ except ImportError:
     # vetrina senza effetto
     SCONTO_PACCO_VALORI_EUR = (10, 25, 50, 100)
 try:
+    from config import SCONTO_PACCO_VALORI_SATS
+except ImportError:
+    # le gemelle in sats: numeri TONDI, non la conversione delle
+    # sorelle in euro — un bitcoiner legge «50.000 sats» a colpo
+    # d'occhio e «28.000» no. Basse per la stessa ragione delle altre.
+    SCONTO_PACCO_VALORI_SATS = (10_000, 25_000, 50_000, 100_000)
+try:
     from config import SCONTO_PACCO_MIN_VALORE_EUR
 except ImportError:
     # gemella di MIN_SOGLIA: sotto, «da un carrello qualunque» sarebbe
     # un ribasso di listino travestito. Un euro e' una cintura contro
     # lo zero travestito, non un giudizio su quanto valga un carrello
     SCONTO_PACCO_MIN_VALORE_EUR = 1
+try:
+    from config import SCONTO_PACCO_MIN_VALORE_SATS
+except ImportError:
+    SCONTO_PACCO_MIN_VALORE_SATS = 1
 
 # LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026, richiesta dal campo
 # subito dopo lo sconto carrello: «si puo' fare come negli
@@ -321,6 +345,10 @@ try:
 except ImportError:
     SPED_GRATIS_SOGLIE_EUR = (10, 25, 50, 100)
 try:
+    from config import SPED_GRATIS_SOGLIE_SATS
+except ImportError:
+    SPED_GRATIS_SOGLIE_SATS = (10_000, 25_000, 50_000, 100_000)
+try:
     from config import SPED_GRATIS_MIN_EUR
 except ImportError:
     # la cintura del server anche se la lista cambia, gemella di
@@ -329,6 +357,23 @@ except ImportError:
     # MAX_QUANTITA_ANNUNCIO — quanto vale il suo negozio lo sa il
     # venditore, non noi)
     SPED_GRATIS_MIN_EUR = 1
+try:
+    from config import SPED_GRATIS_MIN_SATS
+except ImportError:
+    SPED_GRATIS_MIN_SATS = 1
+
+# LE VALUTE in cui una soglia a valore si puo' dichiarare, e vale per
+# TUTTE E DUE le promesse (ago 2026). E' una LEVA col patto di
+# SCONTO_PACCO_CRITERI: toglierne una la spegne per chi l'aveva scelta
+# — fail-closed, la promessa sparisce dalle vetrine finche' non si
+# rimette a posto. E' un freno d'emergenza, non una taratura.
+# NON e' un catalogo per ogni valuta del mondo: sono le due unita' in
+# cui Barattolo sa contare un carrello, i sats (nativi: e' la cifra
+# della invoice) e gli euro (derivati da _eur_interi).
+try:
+    from config import VALUTE_SOGLIA
+except ImportError:
+    VALUTE_SOGLIA = ("eur", "sats")
 
 # I SUGGERIMENTI DAL BOT (ago 2026, decisione di Andrea che ROVESCIA
 # l'opt-in di luglio): «💡 Suggerimenti sui miei annunci» nasce ACCESO.
@@ -1883,33 +1928,52 @@ def init_db():
                     # a valore e torna indietro ritrova la sua soglia a
                     # pezzi. E' il patto delle due tariffe di
                     # spedizione, tenute separate.
-                    # QUESTA E' IN SATS ED E' MORTA (ago 2026, il
-                    # passaggio all'euro): non la legge piu' nessuno.
-                    # Resta perche' una colonna non cambia mai
-                    # significato — e perche' e' da qui che
-                    # converti_soglie_euro.py pesca. Precedenti in
-                    # casa: utenti.comune e avatar_visibile.
+                    # LA SOGLIA A VALORE VIVE IN DUE COLONNE, una per
+                    # unita', e a dire QUALE vale e' `_valuta` (ago
+                    # 2026, la scelta al venditore). Questa e' in SATS
+                    # ed e' tornata VIVA col significato che ha sempre
+                    # avuto: per due giorni — dal passaggio all'euro a
+                    # qui — non l'ha letta nessuno, ma non ha mai
+                    # cambiato senso, ed e' precisamente cio' che
+                    # permette di riaccenderla invece di migrare dei
+                    # dati. Un nome non cambia mai significato.
                     "sconto_pacco_valore INTEGER DEFAULT 0",
-                    # ...e la sua erede, in EURO INTERI. Interi e non
+                    # ...e la gemella, in EURO INTERI. Interi e non
                     # centesimi ne' REAL: il filo della soglia resta
                     # esatto senza inventare una convenzione nuova, la
                     # colonna ha la stessa forma delle sorelle, e una
                     # soglia e' una promessa di bottega — «da 50 €»,
                     # non «da 49,90», che e' un trucco da listino.
                     "sconto_pacco_valore_eur INTEGER DEFAULT 0",
+                    # QUALE DELLE DUE E' LA PROMESSA. Il DEFAULT 'eur'
+                    # E' LA MIGRAZIONE, ed e' tutto il costo del
+                    # cantiere: SQLite riempie le righe di ieri e ogni
+                    # soglia impostata oggi continua a significare
+                    # quello che significa adesso, byte per byte —
+                    # nessuno script da lanciare, nessuna promessa che
+                    # cambia sotto i piedi di nessuno (il precedente e'
+                    # sconto_pacco_criterio, due righe piu' su).
+                    # LE DUE COLONNE NON SI TENGONO IN PARI, ed e'
+                    # voluto: ognuna e' l'ultima cifra che il venditore
+                    # ha scritto in quell'unita', e il toggle CONSERVA
+                    # invece di convertire (il patto delle due tariffe
+                    # di spedizione e delle due soglie pezzi/valore).
+                    "sconto_pacco_valore_valuta TEXT DEFAULT 'eur'",
                     # LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026): il
                     # valore di articoli da cui il negozio non fa pagare
-                    # la spedizione; 0 = promessa spenta. UNA colonna e
-                    # basta — niente criterio (il criterio E' il
-                    # valore) e niente percentuale (gratis e' gratis) —
-                    # e nessuna «dichiarata», per la stessa ragione
-                    # dello sconto: una soglia a zero e nessuna
-                    # promessa sono la stessa cosa per chi guarda.
-                    # Anche qui la prima e' in sats ed e' MORTA, e la
-                    # seconda in euro interi: le ragioni sono le stesse
-                    # della gemella qui sopra.
+                    # la spedizione; 0 = promessa spenta. Niente
+                    # criterio (il criterio E' il valore) e niente
+                    # percentuale (gratis e' gratis) — e nessuna
+                    # «dichiarata», per la stessa ragione dello sconto:
+                    # una soglia a zero e nessuna promessa sono la
+                    # stessa cosa per chi guarda.
+                    # Le tre colonne sono le gemelle esatte di quelle
+                    # dello sconto, valuta compresa: stessa forma,
+                    # stesse ragioni, e una valuta PROPRIA perche' le
+                    # due promesse restano indipendenti.
                     "sped_gratis_soglia INTEGER DEFAULT 0",
-                    "sped_gratis_soglia_eur INTEGER DEFAULT 0"):
+                    "sped_gratis_soglia_eur INTEGER DEFAULT 0",
+                    "sped_gratis_valuta TEXT DEFAULT 'eur'"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -5574,13 +5638,22 @@ def avvisa_soglie_da_convertire():
     volta, al deploy, che e' il momento in cui si agisce.
     NON converte da sola: init_db e' sincrona e senza rete, e una
     migrazione che dipende da CoinGecko puo' restare a meta' — non su
-    una riga che decide del denaro. Legge e basta."""
+    una riga che decide del denaro. Legge e basta.
+    LA VALUTA E' NELLA WHERE, e non e' un dettaglio (ago 2026, il
+    cantiere della scelta): «soglia in sats piena e soglia in euro a
+    zero» ha smesso di voler dire «promessa spenta» — adesso e'
+    ESATTAMENTE la firma di chi ha SCELTO i sats. Senza quel filtro
+    questa riga direbbe il falso a ogni avvio, per sempre, e il patto
+    «si vede una volta, al deploy» si romperebbe: e' cosi' che si
+    imparano a ignorare gli avvisi."""
     try:
         con = db()
         n = con.execute(
             "SELECT COUNT(*) c FROM utenti WHERE "
-            "(sconto_pacco_valore>0 AND sconto_pacco_valore_eur=0) OR "
-            "(sped_gratis_soglia>0 AND sped_gratis_soglia_eur=0)"
+            "(sconto_pacco_valore>0 AND sconto_pacco_valore_eur=0 "
+            " AND sconto_pacco_valore_valuta='eur') OR "
+            "(sped_gratis_soglia>0 AND sped_gratis_soglia_eur=0 "
+            " AND sped_gratis_valuta='eur')"
         ).fetchone()["c"]
         con.close()
         if n:
@@ -6804,18 +6877,26 @@ CAMPI_VETRINA = (
     # pubblica per natura, come il percento della lampo — e' scritta in
     # vetrina. Costo ZERO, il JOIN su `u` c'era gia', e da qui arriva
     # in un colpo alle sei rotte che diventano card.
-    # Il CRITERIO viaggia con loro: senza, il client non saprebbe se
-    # quel numero sono pezzi o sats. La regola d'oro della
-    # retrocompatibilita' la applica _sconto_pubblico, piu' sotto.
+    # Il CRITERIO viaggia con loro, e dall'ago 2026 anche la VALUTA:
+    # senza, il client non saprebbe se quel numero sono pezzi, sats o
+    # euro. La regola d'oro della retrocompatibilita' la applica
+    # _sconto_pubblico, piu' sotto — ed e' lei a decidere QUALE delle
+    # chiavi porta il numero, cosi' nessuna superficie puo' leggere
+    # un'unita' per un'altra.
     "u.sconto_pacco_criterio AS venditore_sconto_criterio, "
+    "u.sconto_pacco_valore_valuta AS venditore_sconto_valuta, "
     "u.sconto_pacco_soglia AS venditore_sconto_soglia, "
+    "u.sconto_pacco_valore AS venditore_sconto_valore, "
     "u.sconto_pacco_valore_eur AS venditore_sconto_valore_eur, "
     "u.sconto_pacco_percento AS venditore_sconto_percento, "
     # e la SECONDA promessa di negozio (ago 2026): il valore di articoli
     # da cui la spedizione la offre il venditore. Stesso costo zero,
     # stessa natura pubblica — e a differenza dello sconto vale anche su
     # un oggetto solo, che e' il motivo per cui la sua riga compare anche
-    # nella scheda dell'annuncio.
+    # nella scheda dell'annuncio. Anche lei con la sua valuta, che e'
+    # PROPRIA: le due promesse restano indipendenti.
+    "u.sped_gratis_valuta AS venditore_sped_gratis_valuta, "
+    "u.sped_gratis_soglia AS venditore_sped_gratis, "
     "u.sped_gratis_soglia_eur AS venditore_sped_gratis_eur, "
     # il francobollo esce solo con la levetta «Mostra la mia foto»
     # accesa: spenta, il nome file non lascia proprio il server
@@ -6898,24 +6979,33 @@ def arricchisci_righe_vetrina(righe):
         # anche il lucchetto del client vecchio rimasto in cache.
         if "venditore_sconto_percento" in r:
             p = _sconto_pubblico(r.get("venditore_sconto_criterio"),
+                                 r.get("venditore_sconto_valuta"),
                                  r.get("venditore_sconto_soglia"),
+                                 r.get("venditore_sconto_valore"),
                                  r.get("venditore_sconto_valore_eur"),
                                  r.get("venditore_sconto_percento"))
             r["venditore_sconto_criterio"] = p["criterio"]
+            r["venditore_sconto_valuta"] = p["valuta"]
             r["venditore_sconto_soglia"] = p["soglia"]
-            # la chiave in SATS esce a zero per sempre (il dente nuovo
-            # del lucchetto: un client di ieri la legge in sats)
+            # ogni chiave porta il numero SOLO nella sua unita', e le
+            # altre restano a zero: e' il lucchetto che rende
+            # impossibile leggere dei sats come euro, e che tiene onesti
+            # anche i client vecchi (vedi _sconto_pubblico)
             r["venditore_sconto_valore"] = p["valore"]
             r["venditore_sconto_valore_eur"] = p["valore_eur"]
             r["venditore_sconto_percento"] = p["percento"]
         # 5) E la spedizione gratis sopra soglia, dallo stesso posto e
-        # per la stessa ragione: una soglia sotto il minimo o la leva
-        # spenta escono come 0, cioe' «nessuna promessa», e le quattro
-        # superfici che la mostrano non devono saperne niente.
+        # per la stessa ragione: una soglia sotto il minimo, una valuta
+        # fuori catalogo o la leva spenta escono come 0, cioe' «nessuna
+        # promessa», e le cinque superfici che la mostrano non devono
+        # saperne niente.
         if "venditore_sped_gratis_eur" in r:
-            g = _sped_gratis_pubblico(r.get("venditore_sped_gratis_eur"))
+            g = _sped_gratis_pubblico(r.get("venditore_sped_gratis"),
+                                      r.get("venditore_sped_gratis_eur"),
+                                      r.get("venditore_sped_gratis_valuta"))
             r["venditore_sped_gratis"] = g["soglia"]
             r["venditore_sped_gratis_eur"] = g["eur"]
+            r["venditore_sped_gratis_valuta"] = g["valuta"]
     # 3) L'asta (ago 2026): puntata in testa e numero di puntate,
     # pubblici per regola — gli OFFERENTI restano anonimi, qui non
     # esce nessun nome. UNA query per pagina, e solo se nella pagina
@@ -7671,8 +7761,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
                      "rating, n_feedback, n_recensori, vendite_ok, negozio, "
                      "titolo, xp, acquisti_ok, ferie_fino, "
                      "sconto_pacco_criterio, sconto_pacco_soglia, "
-                     "sconto_pacco_valore_eur, sconto_pacco_percento, "
-                     "sped_gratis_soglia_eur, "
+                     "sconto_pacco_valore, sconto_pacco_valore_eur, "
+                     "sconto_pacco_valore_valuta, sconto_pacco_percento, "
+                     "sped_gratis_soglia, sped_gratis_soglia_eur, "
+                     "sped_gratis_valuta, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
     v = con.execute(campi_profilo + "WHERE username=? COLLATE NOCASE "
@@ -7768,18 +7860,24 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     # stessa ragione: la leva spenta lo spegne anche qui, e la soglia
     # in pezzi non esce mai a criterio valore
     _p = _sconto_pubblico(v["sconto_pacco_criterio"],
+                          v["sconto_pacco_valore_valuta"],
                           v["sconto_pacco_soglia"],
+                          v["sconto_pacco_valore"],
                           v["sconto_pacco_valore_eur"],
                           v["sconto_pacco_percento"])
     venditore["sconto_pacco_criterio"] = _p["criterio"]
+    venditore["sconto_pacco_valuta"] = _p["valuta"]
     venditore["sconto_pacco_soglia"] = _p["soglia"]
     venditore["sconto_pacco_valore"] = _p["valore"]
     venditore["sconto_pacco_valore_eur"] = _p["valore_eur"]
     venditore["sconto_pacco_percento"] = _p["percento"]
     # e la spedizione gratis, dal suo giudice: stessa ragione
-    _g = _sped_gratis_pubblico(v["sped_gratis_soglia_eur"])
+    _g = _sped_gratis_pubblico(v["sped_gratis_soglia"],
+                               v["sped_gratis_soglia_eur"],
+                               v["sped_gratis_valuta"])
     venditore["sped_gratis_soglia"] = _g["soglia"]
     venditore["sped_gratis_eur"] = _g["eur"]
+    venditore["sped_gratis_valuta"] = _g["valuta"]
     # Il pezzo leggibile dell'indirizzo del negozio: lo calcola il
     # server, come per gli annunci, cosi' il client non ha un secondo
     # `_slug` da tenere in pari.
@@ -9176,14 +9274,26 @@ def _leve_stato():
                          "vetrine finché non la rifà"),
             _leva("Soglie proposte (articoli)", "SCONTO_PACCO_SOGLIE",
                   _elenco(SCONTO_PACCO_SOGLIE)),
+            _leva("Valute della soglia a valore", "VALUTE_SOGLIA",
+                  _elenco(VALUTE_SOGLIA),
+                  acceso="vale per TUTTE E DUE le promesse; chi ha "
+                         "scelto una valuta tolta da qui smette di "
+                         "scontare, e la promessa sparisce dalle "
+                         "vetrine finché non la rifà"),
             _leva("Soglie proposte a valore (€)",
                   "SCONTO_PACCO_VALORI_EUR", _elenco(SCONTO_PACCO_VALORI_EUR)),
+            _leva("Soglie proposte a valore (sats)",
+                  "SCONTO_PACCO_VALORI_SATS",
+                  _elenco(SCONTO_PACCO_VALORI_SATS)),
             _leva("Sconti proposti (%)", "SCONTO_PACCO_SCONTI",
                   _elenco(SCONTO_PACCO_SCONTI)),
             _leva("Soglia minima (articoli)", "SCONTO_PACCO_MIN_SOGLIA",
                   SCONTO_PACCO_MIN_SOGLIA),
             _leva("Soglia minima a valore (€)",
                   "SCONTO_PACCO_MIN_VALORE_EUR", SCONTO_PACCO_MIN_VALORE_EUR),
+            _leva("Soglia minima a valore (sats)",
+                  "SCONTO_PACCO_MIN_VALORE_SATS",
+                  SCONTO_PACCO_MIN_VALORE_SATS),
             _leva("Sconto massimo (%)", "SCONTO_PACCO_MAX_PERCENTO",
                   SCONTO_PACCO_MAX_PERCENTO),
         ]},
@@ -9195,8 +9305,12 @@ def _leve_stato():
                          "non scattano"),
             _leva("Soglie proposte (€)", "SPED_GRATIS_SOGLIE_EUR",
                   _elenco(SPED_GRATIS_SOGLIE_EUR)),
+            _leva("Soglie proposte (sats)", "SPED_GRATIS_SOGLIE_SATS",
+                  _elenco(SPED_GRATIS_SOGLIE_SATS)),
             _leva("Soglia minima (€)", "SPED_GRATIS_MIN_EUR",
                   SPED_GRATIS_MIN_EUR),
+            _leva("Soglia minima (sats)", "SPED_GRATIS_MIN_SATS",
+                  SPED_GRATIS_MIN_SATS),
         ]},
         {"gruppo": "💰 Offerte e 🌴 ferie", "voci": [
             _leva("Offerta minima (% del listino)",
@@ -9738,17 +9852,29 @@ def _eur_interi(sats: int, cambio: float):
     return int(sats * cambio // 100_000_000)
 
 
-def _sped_gratis(articolo_eur, soglia: int) -> bool:
+def _sped_gratis(articolo: int, articolo_eur, soglia: int,
+                 valuta: str) -> bool:
     """LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026): la seconda
-    promessa di negozio — «da N € di articoli la spedizione la offro
+    promessa di negozio — «da N di articoli la spedizione la offro
     io» — che azzera la tariffa della via scelta. Ritiro e digitale
     sono gia' a zero e non passano di qui.
-    RICEVE GLI EURO, NON IL CAMBIO, ed e' cosi' che resta pura pur
+    LA VALUTA DELLA SOGLIA LA SCEGLIE IL VENDITORE, e qui cambia solo
+    QUALE dei due numeri si guarda: `articolo` sono i SATS — la cifra
+    che finisce nella invoice, che ESISTE SEMPRE per costruzione — e
+    `articolo_eur` sono gli euro interi di _eur_interi, che a cambio
+    muto arrivano None. Le due promesse guardano lo STESSO articolo,
+    ognuna nell'unita' che ha dichiarato.
+    A SOGLIA IN SATS LA PROMESSA NON HA BISOGNO DEL CAMBIO e scatta
+    anche a CoinGecko muto: e' la stessa famiglia del criterio a PEZZI
+    dello sconto, che il cambio non l'ha mai guardato. E' il guadagno
+    che la soglia in euro non poteva dare.
+    RICEVE I NUMERI, NON IL CAMBIO, ed e' cosi' che resta pura pur
     giudicando una soglia in euro: la conversione la fa _eur_interi nel
     chiamante, che il cambio ce l'ha gia'. Il None arriva fin qui e si
-    ferma qui — a cambio muto la promessa NON scatta, fail-closed dentro
-    il giudice come importo_invoice, invece che con un «if» da ricordare
-    nei quattro percorsi del conto.
+    ferma qui — su una soglia in euro senza conversione la promessa NON
+    scatta, fail-closed dentro il giudice come importo_invoice, invece
+    che con un «if» da ricordare nei quattro percorsi del conto. Stessa
+    sorte per una valuta che non sappiamo misurare: si tace.
     LA MISURA E' LA STESSA DELLO SCONTO (decisione di Andrea): il LORDO
     del conto, cioe' l'articolo dopo lampo e accordo
     (_unitario_effettivo li ha gia' applicati) e PRIMA dello sconto
@@ -9767,12 +9893,24 @@ def _sped_gratis(articolo_eur, soglia: int) -> bool:
     per quello che il mono non sconta — mentre qui si azzera una
     TARIFFA, cioe' si scrive spedizione_sats=0, che e' lo stato di ogni
     annuncio con spedizione gratuita dichiarata. La divisione a ritroso
-    dell'unitario resta esatta senza un ramo nuovo."""
-    return soglia > 0 and articolo_eur is not None and articolo_eur >= soglia
+    dell'unitario resta esatta senza un ramo nuovo.
+    IMPERFEZIONE DICHIARATA, ed e' lo SPECCHIO di una gia' accettata:
+    la promessa e' esatta quando l'unita' della soglia combacia con
+    quella del listino, e deriva ai bordi altrimenti. Una soglia in
+    sats su un listino in EURO guarda un `articolo` che si ricalcola a
+    ogni tick, quindi al filo esatto preventivo e invoice possono non
+    essere d'accordo; il caso opposto — soglia in euro su listino in
+    sats — esiste da sempre ed e' accettato. La novita' e' che adesso
+    un negozio tutto-sats puo' essere ESATTO, cosa che prima non
+    poteva."""
+    if soglia <= 0 or valuta not in ("sats", "eur"):
+        return False
+    misura = articolo if valuta == "sats" else articolo_eur
+    return misura is not None and misura >= soglia
 
 
 def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
-                  soglia: int, percento: int) -> int:
+                  soglia: int, percento: int, valuta: str) -> int:
     """LO SCONTO CARRELLO in sats (ago 2026): la regola del negozio —
     «da N articoli, −X%» oppure «da N € di articoli, −X%» — applicata
     alla somma degli articoli. Zero quando la regola e' spenta, quando
@@ -9786,15 +9924,22 @@ def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
     sconta in euro un conto che si paga in sats.
     IL CRITERIO lo sceglie il venditore, e qui cambia solo COSA si
     misura: i PEZZI (tre cose nella scatola sono tre cose, ed e' quello
-    che legge chi guarda il carrello) o il VALORE degli articoli in
-    euro — che e' l'unica cosa che serviva al venditore di computer per
-    dare lo sconto da due pezzi e a quello di cianfrusaglie per
-    chiederne venti, senza due regole diverse.
-    A cambio muto `articolo_eur` arriva None e la promessa NON scatta,
-    fail-closed dentro il giudice: e' un posto solo dove sbagliare
-    invece di quattro «if» da ricordare nei percorsi del conto. Il
-    criterio a PEZZI non guarda l'euro e continua a scattare: non ha
-    mai avuto bisogno del cambio e non deve cominciare adesso.
+    che legge chi guarda il carrello) o il VALORE degli articoli — che
+    e' l'unica cosa che serviva al venditore di computer per dare lo
+    sconto da due pezzi e a quello di cianfrusaglie per chiederne
+    venti, senza due regole diverse.
+    E A VALORE LA SCEGLIE ANCHE LA VALUTA (ago 2026): `articolo` sono i
+    SATS — la cifra che finisce nella invoice, che esiste SEMPRE per
+    costruzione — e `articolo_eur` sono gli euro interi di _eur_interi.
+    Chi le scambia sconta in euro un conto che si paga in sats.
+    Senza conversione `articolo_eur` arriva None e la promessa in euro
+    NON scatta, fail-closed dentro il giudice: e' un posto solo dove
+    sbagliare invece di quattro «if» da ricordare nei percorsi del
+    conto. La soglia in SATS invece scatta sempre, anche a CoinGecko
+    muto — come il criterio a PEZZI, che di conversioni non ha mai
+    avuto bisogno e non deve cominciare adesso.
+    Una valuta che non sappiamo misurare NON ripiega su nessuna delle
+    due: si tace, per la stessa ragione del criterio ignoto qui sotto.
     Il minimo e' diverso per i due, e per la stessa ragione: «da 1
     articolo» non e' uno sconto carrello ma un ribasso di listino, e
     quello si fa sul prezzo; a valore invece anche una soglia bassa e'
@@ -9827,9 +9972,12 @@ def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
     conto apposta, cosi' e' una garanzia strutturale e non un «if» da
     ricordare (vedi _righe_ordine)."""
     if criterio == "valore":
-        if articolo_eur is None:
-            return 0    # cambio muto: una promessa in euro non si valuta
-        misura, minimo = articolo_eur, 1
+        if valuta not in ("sats", "eur"):
+            return 0    # valuta che nessun ramo sa misurare: si tace
+        misura = articolo if valuta == "sats" else articolo_eur
+        if misura is None:
+            return 0    # soglia in euro e nessuna conversione: non si valuta
+        minimo = 1
     elif criterio == "pezzi":
         misura, minimo = pezzi, 2
     else:
@@ -9886,24 +10034,44 @@ def _conto_ordine(articolo: int, sped: int, prot_percento: int,
 
 # Fuori dal blocco puro perche' guarda le LEVE: la regola dello sconto
 # carrello, normalizzata.
-def _regola_sconto(criterio, soglia_pezzi, soglia_valore_eur,
-                   percento) -> tuple:
-    """(criterio, soglia, percento) validi dello sconto carrello, o
-    ('', 0, 0) se non c'e' una regola vera. E' il lettore UNICO: la leva
-    spenta, un criterio che non sappiamo applicare, una soglia non seria
-    o una percentuale a zero danno tutte lo stesso «niente sconto»,
-    cosi' nessun chiamante deve ricordarsi i casi — e la `soglia` che
-    esce e' GIA' quella del criterio scelto, cioe' un numero solo da
-    guardare (i due parametri si chiamano per esteso proprio perche' in
-    uscita il nome torna generico: l'unita' la dice il criterio —
-    PEZZI a 'pezzi', EURO INTERI a 'valore').
-    Prende quattro campi e non una riga — il patto di in_ferie: cosi' lo
+def _valuta_soglia(valuta) -> str:
+    """La valuta di una soglia a valore, normalizzata: 'eur' | 'sats',
+    oppure '' quando non e' una valuta che sappiamo misurare.
+    Il VUOTO vale 'eur', ed e' la retrocompatibilita' a costo zero: e'
+    letteralmente il mondo di ieri, quando l'euro era l'unica unita' —
+    e la colonna nasce con quel DEFAULT proprio per questo. Una valuta
+    SCRITTA ma fuori catalogo invece spegne la promessa (il '' in
+    uscita), come il criterio fuori catalogo: ripiegare vorrebbe dire
+    misurare un carrello in un'unita' che il venditore non ha scelto.
+    Il catalogo e' una LEVA: toglierne una la spegne per chi l'aveva
+    scelta — fail-closed, ed e' un freno d'emergenza (il patto di
+    SCONTO_PACCO_CRITERI)."""
+    v = (str(valuta).strip().lower() if valuta else "eur")
+    return v if v in VALUTE_SOGLIA else ""
+
+
+def _regola_sconto(criterio, valuta, soglia_pezzi, soglia_valore_sats,
+                   soglia_valore_eur, percento) -> tuple:
+    """(criterio, soglia, percento, valuta) validi dello sconto
+    carrello, o ('', 0, 0, '') se non c'e' una regola vera. E' il
+    lettore UNICO: la leva spenta, un criterio o una valuta che non
+    sappiamo applicare, una soglia non seria o una percentuale a zero
+    danno tutte lo stesso «niente sconto», cosi' nessun chiamante deve
+    ricordarsi i casi — e la `soglia` che esce e' GIA' quella del
+    criterio E della valuta scelti, cioe' un numero solo da guardare
+    (i tre parametri si chiamano per esteso proprio perche' in uscita
+    il nome torna generico: l'unita' la dicono il criterio e la valuta
+    — PEZZI a 'pezzi', SATS o EURO INTERI a 'valore').
+    Prende sei campi e non una riga — il patto di in_ferie: cosi' lo
     stesso giudice serve la riga di `utenti`, gli alias
     `venditore_sconto_*` della vetrina e la prova in CI.
     Il criterio VUOTO vale 'pezzi', ed e' la retrocompatibilita': e'
     letteralmente il mondo di ieri, quando i pezzi erano l'unica misura.
     Un criterio SCRITTO ma fuori catalogo invece spegne tutto — vedi
     _sconto_pacco per il perche' non ripiega sui pezzi.
+    La `valuta` esce SEMPRE a '' quando il criterio e' 'pezzi': li' non
+    c'e' nessuna valuta da dichiarare, e farne uscire una darebbe da
+    leggere un'unita' a un numero che e' un conteggio.
     Il '' in uscita non e' mai un criterio scritto in tabella: e' solo
     il modo in cui questo lettore dice no.
     Il tappo sul percento e' una CINTURA contro una colonna scritta a
@@ -9913,55 +10081,72 @@ def _regola_sconto(criterio, soglia_pezzi, soglia_valore_eur,
     protestare."""
     criterio = (str(criterio).strip().lower() if criterio else "pezzi")
     percento = int(percento or 0)
+    val = ""
     if criterio == "valore":
-        soglia = int(soglia_valore_eur or 0)
-        minimo = SCONTO_PACCO_MIN_VALORE_EUR
+        val = _valuta_soglia(valuta)
+        if val == "sats":
+            soglia = int(soglia_valore_sats or 0)
+            minimo = SCONTO_PACCO_MIN_VALORE_SATS
+        else:
+            soglia = int(soglia_valore_eur or 0)
+            minimo = SCONTO_PACCO_MIN_VALORE_EUR
     else:
         soglia, minimo = int(soglia_pezzi or 0), SCONTO_PACCO_MIN_SOGLIA
     if not SCONTO_PACCO_ATTIVO or criterio not in SCONTO_PACCO_CRITERI \
-            or percento <= 0 or soglia < minimo:
-        return "", 0, 0
-    return criterio, soglia, min(percento, SCONTO_PACCO_MAX_PERCENTO)
+            or percento <= 0 or soglia < minimo \
+            or (criterio == "valore" and not val):
+        return "", 0, 0, ""
+    return criterio, soglia, min(percento, SCONTO_PACCO_MAX_PERCENTO), val
 
 
-def _regola_sped_gratis(soglia_eur) -> int:
-    """La soglia valida della spedizione gratis IN EURO INTERI, o 0 se
-    non c'e' una promessa vera. Gemella di _regola_sconto e per la
-    stessa ragione: la leva spenta, una soglia sotto il minimo e un
-    numero illeggibile danno tutti lo stesso «niente promessa», cosi'
-    nessun chiamante deve ricordarsi i casi — e la normalizzazione vive
-    in un posto solo invece che nelle quattro superfici che la promessa
-    la mostrano.
-    Prende il campo e non la riga (il patto di in_ferie): serve la riga
-    di `utenti`, l'alias `venditore_sped_gratis_eur` della vetrina e la
+def _regola_sped_gratis(soglia_sats, soglia_eur, valuta) -> tuple:
+    """(soglia, valuta) validi della spedizione gratis, o (0, '') se non
+    c'e' una promessa vera. Gemella di _regola_sconto e per la stessa
+    ragione: la leva spenta, una valuta che non sappiamo misurare, una
+    soglia sotto il minimo e un numero illeggibile danno tutti lo stesso
+    «niente promessa», cosi' nessun chiamante deve ricordarsi i casi —
+    e la normalizzazione vive in un posto solo invece che nelle CINQUE
+    superfici che la promessa la mostrano.
+    La soglia che esce e' GIA' quella della valuta scelta: un numero
+    solo da guardare, con accanto l'unita' per leggerlo.
+    Prende i campi e non la riga (il patto di in_ferie): serve la riga
+    di `utenti`, gli alias `venditore_sped_gratis_*` della vetrina e la
     prova in CI."""
+    val = _valuta_soglia(valuta)
     try:
-        soglia_eur = int(soglia_eur or 0)
+        soglia = int((soglia_sats if val == "sats" else soglia_eur) or 0)
     except (TypeError, ValueError):
-        return 0
-    if not SPED_GRATIS_ATTIVO or soglia_eur < SPED_GRATIS_MIN_EUR:
-        return 0
-    return soglia_eur
+        return 0, ""
+    minimo = SPED_GRATIS_MIN_SATS if val == "sats" else SPED_GRATIS_MIN_EUR
+    if not SPED_GRATIS_ATTIVO or not val or soglia < minimo:
+        return 0, ""
+    return soglia, val
 
 
-def _sped_gratis_pubblico(soglia_eur) -> dict:
+def _sped_gratis_pubblico(soglia_sats, soglia_eur, valuta) -> dict:
     """La promessa della spedizione gratis COM'ESCE IN PUBBLICO.
-    Finche' la soglia era in sats questo gemello di _sconto_pubblico
-    NON serviva, ed era scritto qui che non era una dimenticanza: il
-    campo era UNO e un client di ieri non lo conosceva affatto, quindi
-    non disegnava niente — un'assenza, non una bugia.
-    Col passaggio all'EURO i campi diventano due, e la nota si rovescia:
-    un client rimasto in cache legge `venditore_sped_gratis` e ci
-    scrive «sats», quindi servirlo col numero nuovo direbbe «spedizione
-    gratis da 50 sats» — una bugia, e delle peggiori, perche' sembra
-    una promessa generosissima. Esce a ZERO, e il client vecchio torna
-    a non disegnare niente; il numero vero viaggia nella chiave nuova.
-    E' la regola d'oro di _sconto_pubblico, parola per parola."""
-    return {"soglia": 0, "eur": _regola_sped_gratis(soglia_eur)}
+    LA REGOLA D'ORO, ed e' quella di _sconto_pubblico parola per parola:
+    ogni chiave porta il numero SOLO quando e' l'unita' in cui la
+    promessa e' davvero dichiarata, e zero altrimenti. Le due si
+    escludono per costruzione, quindi il client sceglie quale guardare
+    senza poter sbagliare unita' — e nel database, dove le due colonne
+    coesistono perche' si conservano a vicenda, a dirlo c'e' invece una
+    colonna esplicita.
+    E' anche cio' che tiene onesti i client vecchi, in TUTTE E DUE le
+    direzioni: quello di prima del passaggio all'euro legge `soglia` in
+    sats e la trova giusta su un negozio in sats, vuota altrove; quello
+    nato in mezzo legge `eur` e la trova giusta su un negozio in euro.
+    Nessuno dei due puo' leggere «da 50 sats» dove ci sono 50 euro, che
+    non e' una promessa piu' avara — e' una promessa assurda, e chi la
+    legge pensa a un guasto."""
+    sog, val = _regola_sped_gratis(soglia_sats, soglia_eur, valuta)
+    return {"soglia": sog if val == "sats" else 0,
+            "eur": sog if val == "eur" else 0,
+            "valuta": val}
 
 
-def _sconto_pubblico(criterio, soglia_pezzi, soglia_valore_eur,
-                     percento) -> dict:
+def _sconto_pubblico(criterio, valuta, soglia_pezzi, soglia_valore_sats,
+                     soglia_valore_eur, percento) -> dict:
     """La regola dello sconto carrello COM'ESCE IN PUBBLICO, gia'
     retrocompatibile. Esiste per una riga sola, ed e' la regola d'oro
     del cantiere del criterio: `soglia` (i pezzi) esce maggiore di zero
@@ -9970,22 +10155,27 @@ def _sconto_pubblico(criterio, soglia_pezzi, soglia_valore_eur,
     `soglia>0 && percento>0` prima di disegnare la promessa —: con la
     soglia a zero non disegna niente, e un'assenza non e' una bugia,
     mentre un «−10% da 100000 pezzi» lo sarebbe.
-    COL PASSAGGIO ALL'EURO il lucchetto guadagna un secondo dente:
-    `valore` — che il client di IERI leggeva in sats — esce sempre a
-    ZERO, e il numero vero viaggia in `valore_eur`. Senza, un client
-    rimasto in cache scriverebbe «da 25 sats», che non e' una promessa
-    piu' avara: e' una promessa assurda, e chi la legge pensa a un
-    guasto. Stessa ragione, dente nuovo.
+    COL PASSAGGIO ALL'EURO il lucchetto ha guadagnato un secondo dente,
+    e COL RITORNO DELLA SCELTA (ago 2026) quel dente si generalizza:
+    ogni chiave porta il numero SOLO quando e' l'unita' in cui la
+    promessa e' davvero dichiarata. Cosi' `valore` (che i client di
+    prima dell'euro leggono in SATS) torna a dire la verita' su un
+    negozio in sats ed esce a zero su uno in euro, e `valore_eur` fa
+    l'opposto: le tre chiavi si escludono per costruzione, e nessuno
+    puo' leggere un'unita' per un'altra.
     Vive qui e non a mano nelle due superfici (la vetrina e il profilo
     del negozio) perche' quella regola ripetuta in due posti e' una
     regola che un giorno uno dei due dimentica; e stando in una pura si
     puo' torturare in CI invece che sperarci."""
-    crit, sog, pct = _regola_sconto(criterio, soglia_pezzi,
-                                    soglia_valore_eur, percento)
+    crit, sog, pct, val = _regola_sconto(criterio, valuta, soglia_pezzi,
+                                         soglia_valore_sats,
+                                         soglia_valore_eur, percento)
+    a_valore = crit == "valore"
     return {"criterio": crit,
             "soglia": sog if crit == "pezzi" else 0,
-            "valore": 0,
-            "valore_eur": sog if crit == "valore" else 0,
+            "valore": sog if a_valore and val == "sats" else 0,
+            "valore_eur": sog if a_valore and val == "eur" else 0,
+            "valuta": val,
             "percento": pct}
 
 
@@ -12398,24 +12588,30 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # dell'acquisto, come per il prezzo e per la lampo — e da questo
     # punto in poi la cifra e' congelata nell'ordine.
     ven = con.execute("SELECT sconto_pacco_criterio, sconto_pacco_soglia, "
-                      "sconto_pacco_valore_eur, sconto_pacco_percento, "
-                      "sped_gratis_soglia_eur "
+                      "sconto_pacco_valore, sconto_pacco_valore_eur, "
+                      "sconto_pacco_valore_valuta, sconto_pacco_percento, "
+                      "sped_gratis_soglia, sped_gratis_soglia_eur, "
+                      "sped_gratis_valuta "
                       "FROM utenti WHERE tg_id=?", (venditore_id,)).fetchone()
-    crit, sog, pct = _regola_sconto(
+    crit, sog, pct, val_sc = _regola_sconto(
         ven["sconto_pacco_criterio"] if ven else "",
+        ven["sconto_pacco_valore_valuta"] if ven else "",
         ven["sconto_pacco_soglia"] if ven else 0,
+        ven["sconto_pacco_valore"] if ven else 0,
         ven["sconto_pacco_valore_eur"] if ven else 0,
         ven["sconto_pacco_percento"] if ven else 0)
-    sog_gratis = _regola_sped_gratis(
-        ven["sped_gratis_soglia_eur"] if ven else 0)
+    sog_gratis, val_sg = _regola_sped_gratis(
+        ven["sped_gratis_soglia"] if ven else 0,
+        ven["sped_gratis_soglia_eur"] if ven else 0,
+        ven["sped_gratis_valuta"] if ven else "")
 
     # --- Il cambio, UNA volta per tutto il set (prima della invoice:
     # da li' in poi niente await). Serve se un listino e' in EUR, se
     # la tariffa DELLA VIA scelta e' ancorata all'euro, o se una
-    # PROMESSA IN EURO e' accesa — da quando le due soglie parlano
-    # euro, il conto ha bisogno del cambio anche su un carrello
-    # tutto-sats. Solo se serve davvero: un negozio senza promesse non
-    # lo chiede, esattamente come ieri.
+    # PROMESSA e' accesa E DICHIARATA IN EURO — a soglia in SATS non
+    # serve niente, che quel numero e' l'articolo stesso: un negozio
+    # tutto-sats non paga piu' un giro di rete per una promessa che sa
+    # gia' misurare da solo (ago 2026, il guadagno della scelta).
     # DUE bisogni diversi, e tenerli distinti E' la regola: senza il
     # cambio un listino in euro o una tariffa ancorata non si sanno
     # convertire e l'ordine NON puo' nascere (503, come sempre); una
@@ -12439,7 +12635,9 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # funzione ha una cache): a cambiare e' cosa si racconta al database.
     cambio_ordine = 0.0
     cambio_misura = 0.0
-    if serve_cambio_duro or crit == "valore" or sog_gratis > 0:
+    if (serve_cambio_duro
+            or (crit == "valore" and val_sc == "eur")
+            or (sog_gratis > 0 and val_sg == "eur")):
         cambio_misura = await cambio_btc_eur()
         if serve_cambio_duro:
             if cambio_misura <= 0:
@@ -12496,15 +12694,19 @@ async def _compra_set(user: dict, d: dict) -> dict:
     sped = sp["sats"]
 
     # La MISURA delle due promesse, contata UNA volta sola: e' cosi'
-    # che «guardano lo stesso numero» resta vero per costruzione invece
-    # che per disciplina. None a cambio muto, e le due pure lo sanno.
+    # che «guardano lo stesso ARTICOLO» resta vero per costruzione
+    # invece che per disciplina. Le due pure ricevono TUTTE E DUE le
+    # facce dello stesso numero — i sats, che ci sono sempre, e gli
+    # euro, che sono None senza conversione — e ognuna guarda quella
+    # dell'unita' che il venditore ha dichiarato.
     misura_eur = _eur_interi(articolo, cambio_misura)
     # Lo sconto carrello, sulla somma degli articoli e mai sulla
     # spedizione. Il tetto di rodaggio qui sopra ha gia' giudicato il
     # LORDO, ed e' l'ordine giusto: e' un vincolo del listino, non del
     # checkout — altrimenti si pubblicherebbe sopra il tetto e ci si
     # rientrerebbe dietro una regola di sconto.
-    sconto = _sconto_pacco(articolo, misura_eur, pezzi, crit, sog, pct)
+    sconto = _sconto_pacco(articolo, misura_eur, pezzi, crit, sog, pct,
+                           val_sc)
     # La spedizione gratis sopra soglia, sullo STESSO lordo dello
     # sconto: le due promesse sono indipendenti apposta, e
     # l'ordine fra queste due righe non conta — nessuna delle due
@@ -12513,7 +12715,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # _strade_preventivo: preventivo e invoice devono dire la stessa
     # cifra per costruzione.
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
-    if sped and _sped_gratis(misura_eur, sog_gratis):
+    if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
         # la promessa offre la spedizione INTERA, supplemento compreso
         sped_gratis_sats, sped, supplemento = sped, 0, 0
     conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
@@ -12816,22 +13018,28 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # la riga del venditore: lo spedizioniere e la promessa della
     # spedizione gratis, dalla SELECT che c'era gia' — zero query in
     # piu' (il patto del ramo set con lo sconto)
-    sp = con.execute("SELECT spedizioniere, sped_gratis_soglia_eur "
+    sp = con.execute("SELECT spedizioniere, sped_gratis_soglia, "
+                     "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (a["venditore_id"],)).fetchone()
     spedizioniere = sp["spedizioniere"] if sp else ""
-    sog_gratis = _regola_sped_gratis(
-        sp["sped_gratis_soglia_eur"] if sp else 0)
+    sog_gratis, val_sg = _regola_sped_gratis(
+        sp["sped_gratis_soglia"] if sp else 0,
+        sp["sped_gratis_soglia_eur"] if sp else 0,
+        sp["sped_gratis_valuta"] if sp else "")
     con.close()
     # Il cambio, UNA volta: obbligatorio per il listino EUR (503 come
     # in compra), facoltativo per le sole tariffe ancorate (la strada
     # esce spenta col motivo, le altre vivono) e per la PROMESSA in
     # euro (che senza cambio non si valuta e semplicemente non scatta).
+    # A promessa in SATS il cambio non serve affatto: la misura e'
+    # l'articolo stesso.
     listino_eur = a["valuta"] == "eur" and a["prezzo_eur"] > 0
     cambio = 0.0
     if (listino_eur or a["spedizione_eur"] > 0
             or a["spedizione_punto_eur"] > 0
-            or a["spedizione_extra_eur"] > 0 or sog_gratis > 0):
+            or a["spedizione_extra_eur"] > 0
+            or (sog_gratis > 0 and val_sg == "eur")):
         cambio = await cambio_btc_eur()
         if listino_eur and cambio <= 0:
             raise HTTPException(503, "Il cambio euro non è disponibile in "
@@ -12870,7 +13078,15 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # `mancano_sped_eur` lo conta il server anche se il client potrebbe:
     # e' esattamente il numero dove vive un off-by-one (mancano_pezzi).
     misura_eur = _eur_interi(articolo, cambio)
-    gratis = _sped_gratis(misura_eur, sog_gratis)
+    gratis = _sped_gratis(articolo, misura_eur, sog_gratis, val_sg)
+    # quanto manca, NELL'UNITA' DELLA PROMESSA: la chiave dell'altra
+    # unita' resta a zero, cosi' il client non puo' leggere dei sats
+    # come euro (la regola d'oro di _sped_gratis_pubblico, applicata
+    # anche al preventivo). A soglia in sats la misura e' l'articolo,
+    # che c'e' sempre: quella riga non tace mai.
+    _misura_sg = articolo if val_sg == "sats" else misura_eur
+    _mancano = (max(0, sog_gratis - _misura_sg)
+                if sog_gratis and _misura_sg is not None else 0)
     return {"set": False, "quantita": richiesti,
             "articolo_sats": articolo, "articolo_unitario_sats": unitario,
             "articolo_eur": articolo_eur,
@@ -12879,19 +13095,21 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
             "spedizioniere": spedizioniere,
-            # la chiave VECCHIA esce a zero: un client rimasto in cache
-            # la legge in sats e scriverebbe «gratis da 50 sats» (vedi
-            # _sped_gratis_pubblico). Il numero vero sta in quella nuova
-            "sped_gratis_soglia": 0,
-            "sped_gratis_eur": sog_gratis,
-            "mancano_sped_sats": 0,
-            "mancano_sped_eur": (max(0, sog_gratis - misura_eur)
-                                 if sog_gratis and misura_eur is not None
-                                 else 0),
-            # il motivo, mai un silenzio: a cambio muto le promesse del
-            # negozio non si sanno valutare e la pagina lo dice invece
-            # di far sparire una riga senza spiegazione
-            "promesse_sospese": sog_gratis > 0 and misura_eur is None,
+            # ogni chiave porta il numero SOLO nella sua unita': la
+            # `sped_gratis_soglia` e' in SATS e i client di prima del
+            # passaggio all'euro la leggono cosi' — su un negozio in
+            # sats e' finalmente giusta, su uno in euro resta a zero
+            "sped_gratis_soglia": sog_gratis if val_sg == "sats" else 0,
+            "sped_gratis_eur": sog_gratis if val_sg == "eur" else 0,
+            "sped_gratis_valuta": val_sg,
+            "mancano_sped_sats": _mancano if val_sg == "sats" else 0,
+            "mancano_sped_eur": _mancano if val_sg == "eur" else 0,
+            # il motivo, mai un silenzio: senza conversione una promessa
+            # in EURO non si sa valutare e la pagina lo dice invece di
+            # far sparire una riga senza spiegazione. In sats non
+            # succede mai — quella misura non ha bisogno di niente.
+            "promesse_sospese": (sog_gratis > 0 and val_sg == "eur"
+                                 and misura_eur is None),
             # [(annuncio, QUANTI)]: la quantita' e' la meta' del conto
             # della spedizione, e passarla e' l'unico modo di dire la
             # stessa cifra che dira' la invoice
@@ -13027,26 +13245,34 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # la riga del venditore: lo spedizioniere e la regola dello sconto
     # carrello, dalla SELECT che c'era gia' — zero query in piu'
     sp = con.execute("SELECT spedizioniere, sconto_pacco_criterio, "
-                     "sconto_pacco_soglia, sconto_pacco_valore_eur, "
-                     "sconto_pacco_percento, sped_gratis_soglia_eur "
+                     "sconto_pacco_soglia, sconto_pacco_valore, "
+                     "sconto_pacco_valore_eur, sconto_pacco_valore_valuta, "
+                     "sconto_pacco_percento, sped_gratis_soglia, "
+                     "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (venditore_id,)).fetchone()
     spedizioniere = sp["spedizioniere"] if sp else ""
-    crit, sog, pct = _regola_sconto(
+    crit, sog, pct, val_sc = _regola_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
+        sp["sconto_pacco_valore_valuta"] if sp else "",
         sp["sconto_pacco_soglia"] if sp else 0,
+        sp["sconto_pacco_valore"] if sp else 0,
         sp["sconto_pacco_valore_eur"] if sp else 0,
         sp["sconto_pacco_percento"] if sp else 0)
-    sog_gratis = _regola_sped_gratis(
-        sp["sped_gratis_soglia_eur"] if sp else 0)
+    sog_gratis, val_sg = _regola_sped_gratis(
+        sp["sped_gratis_soglia"] if sp else 0,
+        sp["sped_gratis_soglia_eur"] if sp else 0,
+        sp["sped_gratis_valuta"] if sp else "")
     con.close()
     listino_eur = any(a["valuta"] == "eur" and a["prezzo_eur"] > 0
                       for a in tutti.values())
     cambio = 0.0
     # ...e le due PROMESSE in euro: senza cambio non si valutano, e
     # allora non scattano — mai un 503, che qui non si sta convertendo
-    # un prezzo ma decidendo se regalare qualcosa
-    if (listino_eur or crit == "valore" or sog_gratis > 0
+    # un prezzo ma decidendo se regalare qualcosa. Quelle in SATS non
+    # lo chiedono affatto: la loro misura e' l'articolo stesso.
+    if (listino_eur or (crit == "valore" and val_sc == "eur")
+            or (sog_gratis > 0 and val_sg == "eur")
             or any(a["spedizione_eur"] > 0
                    or a["spedizione_punto_eur"] > 0
                    or a["spedizione_extra_eur"] > 0
@@ -13086,7 +13312,13 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # set (0 se una riga sola e' nata in sats) e serve al ≈: questa
     # invece c'e' sempre, purche' il cambio ci sia.
     misura_eur = _eur_interi(articolo, cambio)
-    sconto = _sconto_pacco(articolo, misura_eur, pezzi, crit, sog, pct)
+    # quanto manca a ognuna delle due promesse, NELL'UNITA' IN CUI E'
+    # DICHIARATA: la chiave dell'altra unita' resta a zero, cosi'
+    # nessuno puo' leggere dei sats come euro
+    _misura_sc = articolo if val_sc == "sats" else misura_eur
+    _misura_sg = articolo if val_sg == "sats" else misura_eur
+    sconto = _sconto_pacco(articolo, misura_eur, pezzi, crit, sog, pct,
+                           val_sc)
     # il gemello in euro si aziona SOLO dietro al fratello in sats: la
     # decisione e' una sola, e sta di la' (vedi _sconto_pacco_eur)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
@@ -13114,23 +13346,30 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # soglia in pezzi non esce mai a criterio valore, e
             # viceversa — cosi' nessuno puo' leggere degli euro come se
             # fossero pezzi (la regola d'oro di _sconto_pubblico).
-            # `mancano_eur` misura il LORDO, lo stesso numero che la
-            # soglia confronta. Le chiavi in SATS (`sconto_valore`,
-            # `mancano_sats`) escono a ZERO per sempre: un client
-            # rimasto in cache le legge in sats, e col numero nuovo
-            # scriverebbe «da 25 sats», che non e' una promessa avara —
-            # e' una promessa assurda, e sembra un guasto.
+            # `mancano_*` misurano il LORDO, lo stesso numero che la
+            # soglia confronta. Ogni chiave porta il numero SOLO nella
+            # sua unita' — `sconto_valore`/`mancano_sats` in SATS,
+            # `sconto_valore_eur`/`mancano_eur` in EURO — e le altre
+            # restano a zero: e' la regola d'oro di _sconto_pubblico, e
+            # rende impossibile leggere «da 25 sats» dove ci sono 25
+            # euro. I client di prima del passaggio all'euro leggono le
+            # chiavi in sats, e su un negozio in sats le trovano giuste.
             "sconto_percento": pct,
             "sconto_criterio": crit,
+            "sconto_valuta": val_sc,
             "sconto_soglia": sog if crit == "pezzi" else 0,
-            "sconto_valore": 0,
-            "sconto_valore_eur": sog if crit == "valore" else 0,
+            "sconto_valore": (sog if crit == "valore"
+                              and val_sc == "sats" else 0),
+            "sconto_valore_eur": (sog if crit == "valore"
+                                  and val_sc == "eur" else 0),
             "mancano_pezzi": (max(0, sog - pezzi)
                               if crit == "pezzi" else 0),
-            "mancano_sats": 0,
-            "mancano_eur": (max(0, sog - misura_eur)
-                            if crit == "valore" and misura_eur is not None
-                            else 0),
+            "mancano_sats": (max(0, sog - _misura_sc)
+                             if crit == "valore" and val_sc == "sats"
+                             else 0),
+            "mancano_eur": (max(0, sog - _misura_sc)
+                            if crit == "valore" and val_sc == "eur"
+                            and _misura_sc is not None else 0),
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
@@ -13138,16 +13377,20 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # la seconda promessa del negozio, che guarda lo STESSO
             # lordo della prima: le due sono indipendenti
             # per costruzione, e nessuna delle due misura l'altra
-            "sped_gratis_soglia": 0,
-            "sped_gratis_eur": sog_gratis,
-            "mancano_sped_sats": 0,
-            "mancano_sped_eur": (max(0, sog_gratis - misura_eur)
-                                 if sog_gratis and misura_eur is not None
-                                 else 0),
-            # il motivo, mai un silenzio: a cambio muto le promesse in
-            # euro non si sanno valutare, e la pagina lo dice invece di
-            # far sparire una riga senza spiegazione
-            "promesse_sospese": ((crit == "valore" or sog_gratis > 0)
+            "sped_gratis_soglia": sog_gratis if val_sg == "sats" else 0,
+            "sped_gratis_eur": sog_gratis if val_sg == "eur" else 0,
+            "sped_gratis_valuta": val_sg,
+            "mancano_sped_sats": (max(0, sog_gratis - _misura_sg)
+                                  if sog_gratis and val_sg == "sats" else 0),
+            "mancano_sped_eur": (max(0, sog_gratis - _misura_sg)
+                                 if sog_gratis and val_sg == "eur"
+                                 and _misura_sg is not None else 0),
+            # il motivo, mai un silenzio: senza conversione le promesse
+            # in EURO non si sanno valutare, e la pagina lo dice invece
+            # di far sparire una riga senza spiegazione. Quelle in sats
+            # non ci finiscono mai: la loro misura c'e' sempre.
+            "promesse_sospese": (((crit == "valore" and val_sc == "eur")
+                                  or (sog_gratis > 0 and val_sg == "eur"))
                                  and misura_eur is None),
             # si cammina su `richieste`, MAI zippando tutti.values() con
             # richieste.values(): l'ordine di `tutti` viene dalla SELECT
@@ -13157,7 +13400,8 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                                           in richieste.items()], articolo,
                                          cambio, strade, articolo_eur,
                                          sconto, sconto_eur,
-                                         _sped_gratis(misura_eur, sog_gratis)),
+                                         _sped_gratis(articolo, misura_eur,
+                                                      sog_gratis, val_sg)),
             "righe": righe}
 
 
@@ -13443,12 +13687,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # silenzio, sul mono; _compra_set non aveva il difetto perche' la
     # regola la legge sempre. Guardare la STRADA e non il suo prezzo
     # e' anche cio' che tiene la riga vera quando la tariffa e' 0.
-    sog_gratis = 0
+    sog_gratis, val_sg = 0, ""
     if scelta == "spedizione":
-        vg = con.execute("SELECT sped_gratis_soglia_eur FROM utenti "
+        vg = con.execute("SELECT sped_gratis_soglia, sped_gratis_soglia_eur, "
+                         "sped_gratis_valuta FROM utenti "
                          "WHERE tg_id=?", (a["venditore_id"],)).fetchone()
-        sog_gratis = _regola_sped_gratis(
-            vg["sped_gratis_soglia_eur"] if vg else 0)
+        sog_gratis, val_sg = _regola_sped_gratis(
+            vg["sped_gratis_soglia"] if vg else 0,
+            vg["sped_gratis_soglia_eur"] if vg else 0,
+            vg["sped_gratis_valuta"] if vg else "")
     # Spedizione ANCORATA all'euro su listino sats (tariffa in euro
     # piena): i sats si decidono ADESSO, col cambio corrente. Senza
     # cambio l'ordine con spedizione non puo' partire — 503 onesto,
@@ -13471,15 +13718,17 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                      "questo momento: riprova tra qualche "
                                      "minuto")
     # Il cambio serve anche solo per SAPERE se la promessa scatta, su
-    # un annuncio che di suo non ne avrebbe bisogno. In una variabile
-    # SUA e non in cambio_ordine: quella colonna dichiara «0 = nessuna
-    # conversione», e qui non si converte niente — ci si limita a
-    # misurare. NIENTE 503: se il cambio non risponde la promessa non
-    # scatta e l'ordine parte a prezzo pieno, che far fallire un
-    # acquisto perche' non si riesce a regalare la spedizione sarebbe
-    # curare un male causandone uno peggiore.
+    # un annuncio che di suo non ne avrebbe bisogno — ma SOLO se la
+    # soglia e' dichiarata in EURO: in sats la misura e' l'articolo
+    # stesso, e questo giro di rete non si fa piu' (ago 2026). In una
+    # variabile SUA e non in cambio_ordine: quella colonna dichiara
+    # «0 = nessuna conversione», e qui non si converte niente — ci si
+    # limita a misurare. NIENTE 503: se il cambio non risponde la
+    # promessa non scatta e l'ordine parte a prezzo pieno, che far
+    # fallire un acquisto perche' non si riesce a regalare la
+    # spedizione sarebbe curare un male causandone uno peggiore.
     cambio_misura = cambio_ordine
-    if sog_gratis > 0 and cambio_misura <= 0:
+    if sog_gratis > 0 and val_sg == "eur" and cambio_misura <= 0:
         cambio_misura = await cambio_btc_eur()
     # Il conto lavora sull'UNITARIO (offerte e lampo parlano il prezzo
     # del singolo pezzo, come il listino) e moltiplica alla fine:
@@ -13534,7 +13783,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # cifra per costruzione.
     misura_eur = _eur_interi(articolo, cambio_misura)
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
-    if sped and _sped_gratis(misura_eur, sog_gratis):
+    if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
         # intera, supplemento compreso: e' quello che il venditore
         # promette quando dice «la spedizione la offro io»
         sped_gratis_sats, sped, supplemento = sped, 0, 0
@@ -14884,22 +15133,30 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["sconto_pacco_leve"] = {
         "attivo": bool(SCONTO_PACCO_ATTIVO),
         "criteri": list(SCONTO_PACCO_CRITERI),
+        "valute": list(VALUTE_SOGLIA),
         "soglie": list(SCONTO_PACCO_SOGLIE),
         "valori_eur": list(SCONTO_PACCO_VALORI_EUR),
+        "valori_sats": list(SCONTO_PACCO_VALORI_SATS),
         "sconti": list(SCONTO_PACCO_SCONTI),
         "min_soglia": SCONTO_PACCO_MIN_SOGLIA,
         "min_valore_eur": SCONTO_PACCO_MIN_VALORE_EUR,
+        "min_valore_sats": SCONTO_PACCO_MIN_VALORE_SATS,
         "max_percento": SCONTO_PACCO_MAX_PERCENTO}
     # E la spedizione gratis sopra soglia, per il cassetto «🚚»: le
-    # soglie proposte sono le pillole del venditore, il minimo serve al
-    # messaggio del 400. `sped_gratis_soglia_eur` esce gia' dal
-    # SELECT *, e qui esce GREZZA di proposito — e' il suo negozio,
-    # deve vedere cosa ha scritto; a spegnerla nelle vetrine ci pensa
-    # il giudice, e il cassetto si nasconde da solo su `attivo`.
+    # soglie proposte sono le pillole del venditore, i minimi servono
+    # ai messaggi del 400. Le colonne escono gia' dal SELECT *, e qui
+    # escono GREZZE di proposito — e' il suo negozio, deve vedere cosa
+    # ha scritto in OGNUNA delle due unita', che e' anche cio' che il
+    # toggle ritrova senza chiedere niente; a spegnerla nelle vetrine
+    # ci pensa il giudice, e il cassetto si nasconde da solo su
+    # `attivo`.
     profilo["sped_gratis_leve"] = {
         "attivo": bool(SPED_GRATIS_ATTIVO),
+        "valute": list(VALUTE_SOGLIA),
         "soglie_eur": list(SPED_GRATIS_SOGLIE_EUR),
-        "min_eur": SPED_GRATIS_MIN_EUR}
+        "soglie_sats": list(SPED_GRATIS_SOGLIE_SATS),
+        "min_eur": SPED_GRATIS_MIN_EUR,
+        "min_sats": SPED_GRATIS_MIN_SATS}
     # I SUGGERIMENTI escono come STATO EFFETTIVO e non come valore
     # grezzo: `suggerimenti_annunci` esce dal SELECT * ed e' 0 anche
     # per chi non ha mai toccato niente — cioe' per chi li riceve. Un
@@ -15256,26 +15513,56 @@ async def scegli_font_scala(req: Request,
     return {"ok": True, "scala": scala}
 
 
+# IL SALVATAGGIO CHE NON SALVA E' PEGGIO DI UN ERRORE (ago 2026): un
+# client rimasto in cache manda le chiavi di ieri, il server non le
+# riconosce, e chi ha premuto Salva crede di aver cambiato la sua
+# promessa. Il difetto e' nato col passaggio all'euro e si presentava
+# in due modi — un salvataggio a vuoto sullo sconto, uno SPEGNIMENTO
+# SILENZIOSO sulla spedizione gratis (dove `soglia` assente valeva 0,
+# che li' e' lo spegnimento). Adesso la chiave del valore nell'unita'
+# dichiarata dev'esserci, e se manca si risponde COSA FARE: un 400 che
+# dice la cosa sbagliata manda a cercare il guasto dalla parte opposta,
+# ed e' quasi dannoso quanto il silenzio.
+# UNA costante e non due stringhe: il patto di AVVISO_INTERMEDIARIO.
+MSG_CLIENT_VECCHIO = (
+    "Questa versione dell'app non sa più salvare la soglia: chiudi e "
+    "riapri Barattolo, poi riprova. Intanto la tua promessa è rimasta "
+    "com'era."
+)
+
+
 @app.post("/api/me/sconto-pacco")
 async def imposta_sconto_pacco(req: Request,
                                x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
-    """«🎁 Sconto sul carrello»: «da 3 articoli, −10%» — o «da 25 €,
-    −10%» — su tutto il negozio. UNA regola sola, niente
-    scaglioni: cambia il CRITERIO, non il numero di regole. E' il
-    pattern di spedizioniere: una dichiarazione di negozio, non una
-    credenziale.
-    Body {criterio, soglia, valore_eur, percento}. `percento <= 0` e' lo
-    SPEGNIMENTO e non ha NESSUNA guardia, criterio compreso (il patto
-    del rientro dalle ferie: togliere una promessa non e' mai un
-    problema, e chi spegne non deve saper compilare un campo).
-    LE DUE SOGLIE SI CONSERVANO A VICENDA: la chiave assente non
+    """«🎁 Sconto sul carrello»: «da 3 articoli, −10%» — o «da 25 €»,
+    o «da 50.000 sats» — su tutto il negozio. UNA regola sola, niente
+    scaglioni: cambia il CRITERIO (e a valore la VALUTA), non il numero
+    di regole. E' il pattern di spedizioniere: una dichiarazione di
+    negozio, non una credenziale.
+    Body {criterio, valuta, soglia, valore_sats, valore_eur, percento}.
+    `percento <= 0` e' lo SPEGNIMENTO e non ha NESSUNA guardia,
+    criterio e valuta compresi (il patto del rientro dalle ferie:
+    togliere una promessa non e' mai un problema, e chi spegne non deve
+    saper compilare un campo) — e azzera TUTTE le soglie, o resterebbe
+    una promessa a mezz'aria.
+    LE TRE SOGLIE SI CONSERVANO A VICENDA: la chiave assente non
     azzera, come per lo stock. Cosi' chi prova il criterio a valore e
-    torna ai pezzi ritrova il suo 3, e un client vecchio — che di
-    `valore` non sa niente — non cancella una soglia che non ha mai
-    visto. Il COALESCE tiene tutto in UN solo UPDATE: una SELECT prima
-    aprirebbe una finestra in cui la regola e' letta e non ancora
-    scritta.
+    torna ai pezzi ritrova il suo 3, chi passa dai sats agli euro
+    ritrova la sua cifra tornando indietro, e un client vecchio non
+    cancella una soglia che non ha mai visto. Il COALESCE tiene tutto in
+    UN solo UPDATE: una SELECT prima aprirebbe una finestra in cui la
+    regola e' letta e non ancora scritta.
+    MA «CONSERVA» NON DEVE DIVENTARE «SALVA A VUOTO», ed e' il difetto
+    che questo endpoint aveva dal passaggio all'euro: un client vecchio
+    a criterto valore manda `valore` (sats) e nessun `valore_eur`,
+    quindi la chiave dichiarata e' ASSENTE e la promessa non si sposta
+    di un euro — mentre lui crede di aver salvato. Il caso peggiore
+    sarebbe uno spegnimento silenzioso, ed e' quello che succedeva al
+    gemello della spedizione. Adesso la chiave del valore NELL'UNITA'
+    DICHIARATA dev'esserci: assente = 400 che dice cosa fare. E' il
+    patto di spedizione_punto_dichiarata — la dichiarazione e' la
+    PRESENZA della chiave, mai il suo valore — arrivato anche qui.
     NON c'e' un _impegni_aperti, e non e' una dimenticanza: le ferie lo
     hanno perche' chiudere il negozio toglie una via d'uscita a chi ha
     gia' pagato — qui non si toglie niente a nessuno. Gli ordini gia'
@@ -15300,22 +15587,30 @@ async def imposta_sconto_pacco(req: Request,
         # patto dello stock, ed e' cio' che protegge la soglia
         # dell'altro criterio da un client che non la conosce
         soglia = None if d.get("soglia") is None else int(d["soglia"] or 0)
-        # `valore_eur` e non `valore`: la chiave vecchia portava dei
-        # SATS e si IGNORA per sempre. Scriverla in una colonna che ora
-        # parla euro farebbe di «50.000» una soglia da cinquantamila
-        # euro — cioe' una promessa che non scatta mai, in silenzio. Un
-        # client rimasto in cache che salva a criterio valore prende
-        # invece un 400 onesto, perche' la colonna nuova resta a zero.
+        # `valore_sats`/`valore_eur` e non `valore`: la chiave vecchia
+        # portava dei SATS senza dire di che unita' fosse, e si IGNORA
+        # per sempre. Scriverla oggi metterebbe una cifra in una colonna
+        # che la promessa magari non guarda — e il guaio si vedrebbe
+        # mesi dopo, al primo tocco del toggle. Chi la manda ancora
+        # prende un 400 onesto qui sotto.
+        val_sats = (None if d.get("valore_sats") is None
+                    else int(d["valore_sats"] or 0))
         valore = (None if d.get("valore_eur") is None
                   else int(d["valore_eur"] or 0))
         percento = int(d.get("percento") or 0)
     except (TypeError, ValueError):
         raise HTTPException(400, "Numeri dello sconto non leggibili")
     criterio = str(d.get("criterio") or "").strip().lower()
+    # valuta assente = 'eur': e' il client di prima della scelta, che
+    # in euro parlava per forza — la stessa retrocompatibilita' del
+    # DEFAULT della colonna
+    valuta = str(d.get("valuta") or "").strip().lower() or "eur"
     if percento <= 0:
-        # lo spegnimento, senza guardie: le due soglie si azzerano
-        # entrambe, o resterebbe una promessa a mezz'aria
-        criterio, soglia, valore, percento = "pezzi", 0, 0, 0
+        # lo spegnimento, senza guardie: TUTTE le soglie si azzerano, o
+        # resterebbe una promessa a mezz'aria — e la valuta torna al
+        # suo default, che «spento» dev'essere uno stato solo
+        criterio, valuta = "pezzi", "eur"
+        soglia, val_sats, valore, percento = 0, 0, 0, 0
     else:
         # criterio assente = 'pezzi': e' letteralmente il mondo di ieri,
         # ed e' il body di un client vecchio, che di pezzi parla per
@@ -15332,37 +15627,64 @@ async def imposta_sconto_pacco(req: Request,
                 f"{SCONTO_PACCO_MIN_SOGLIA} articoli: sotto non è uno "
                 f"sconto sul carrello, è un ribasso di listino — e quello "
                 f"si fa sul prezzo.")
-        if (criterio == "valore"
-                and (valore or 0) < SCONTO_PACCO_MIN_VALORE_EUR):
-            raise HTTPException(400,
-                f"Lo sconto sul carrello a valore parte da almeno "
-                f"{SCONTO_PACCO_MIN_VALORE_EUR} € di merce: sotto non è "
-                f"uno sconto sul carrello, è un ribasso di listino — e "
-                f"quello si fa sul prezzo.")
+        if criterio == "valore":
+            if valuta not in VALUTE_SOGLIA:
+                raise HTTPException(400,
+                    "La soglia a valore si può dichiarare in euro o in "
+                    "sats.")
+            # LA CHIAVE DELL'UNITA' DICHIARATA DEV'ESSERCI: assente
+            # vuol dire che chi ha mandato il body non la conosce, e un
+            # salvataggio che non salva niente e' il difetto che si
+            # scopre settimane dopo. Il valore invece puo' essere
+            # qualunque cosa: a dirne il minimo c'e' la riga qui sotto.
+            scritta = val_sats if valuta == "sats" else valore
+            if scritta is None:
+                raise HTTPException(400, MSG_CLIENT_VECCHIO)
+            minimo = (SCONTO_PACCO_MIN_VALORE_SATS if valuta == "sats"
+                      else SCONTO_PACCO_MIN_VALORE_EUR)
+            if scritta < minimo:
+                raise HTTPException(400,
+                    f"Lo sconto sul carrello a valore parte da almeno "
+                    f"{_fmt_sats(minimo)} sats di merce: sotto non è uno "
+                    f"sconto sul carrello, è un ribasso di listino — e "
+                    f"quello si fa sul prezzo."
+                    if valuta == "sats" else
+                    f"Lo sconto sul carrello a valore parte da almeno "
+                    f"{minimo} € di merce: sotto non è uno sconto sul "
+                    f"carrello, è un ribasso di listino — e quello si fa "
+                    f"sul prezzo.")
         if percento > SCONTO_PACCO_MAX_PERCENTO:
             raise HTTPException(400,
                 f"Lo sconto sul carrello arriva al massimo al "
                 f"{SCONTO_PACCO_MAX_PERCENTO}%.")
     con = db()
     con.execute("UPDATE utenti SET sconto_pacco_criterio=?, "
-                "sconto_pacco_percento=?, "
+                "sconto_pacco_valore_valuta=?, sconto_pacco_percento=?, "
                 "sconto_pacco_soglia=COALESCE(?, sconto_pacco_soglia), "
+                "sconto_pacco_valore=COALESCE(?, sconto_pacco_valore), "
                 "sconto_pacco_valore_eur=COALESCE(?,sconto_pacco_valore_eur) "
                 "WHERE tg_id=?",
-                (criterio, percento, soglia, valore, user["id"]))
+                (criterio, valuta, percento, soglia, val_sats, valore,
+                 user["id"]))
     con.commit()
     # si rilegge cio' che e' rimasto scritto: col COALESCE la risposta
     # non si puo' dedurre dal body, e il client deve poter riallineare
-    # le sue pillole a colpo sicuro
+    # le sue pillole a colpo sicuro — comprese quelle dell'altra
+    # valuta, che il toggle ritrova senza chiedere niente
     r = con.execute("SELECT sconto_pacco_soglia AS s, "
+                    "sconto_pacco_valore AS vs, "
                     "sconto_pacco_valore_eur AS v FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
     con.close()
-    # `valore` esce a zero e il numero vero sta in `valore_eur`: e' la
-    # regola d'oro di _sconto_pubblico applicata anche alla risposta
-    return {"ok": True, "criterio": criterio, "percento": percento,
+    # LA RISPOSTA E' PER IL PROPRIETARIO, quindi porta TUTTE E DUE le
+    # cifre grezze: e' il suo negozio e deve vedere cosa ha scritto in
+    # ognuna delle due unita' (il patto di sped_gratis_leve). La regola
+    # d'oro di _sconto_pubblico vale in VETRINA, dove chi guarda non
+    # deve poter confondere le unita'; qui a distinguerle c'e' `valuta`.
+    return {"ok": True, "criterio": criterio, "valuta": valuta,
+            "percento": percento,
             "soglia": r["s"] if r else (soglia or 0),
-            "valore": 0,
+            "valore_sats": r["vs"] if r else (val_sats or 0),
             "valore_eur": r["v"] if r else (valore or 0)}
 
 
@@ -15370,20 +15692,30 @@ async def imposta_sconto_pacco(req: Request,
 async def imposta_sped_gratis(req: Request,
                               x_tg_init_data: str = Header(""),
                               barattolo_sessione: str = Cookie("")):
-    """«🚚 Spedizione gratis»: «da N € di articoli la spedizione la
-    offro io», su tutto il negozio. E' la sorella dello sconto carrello
-    — una dichiarazione di bottega, non una credenziale — ma molto piu'
+    """«🚚 Spedizione gratis»: «da N di articoli la spedizione la offro
+    io», su tutto il negozio. E' la sorella dello sconto carrello — una
+    dichiarazione di bottega, non una credenziale — ma molto piu'
     corta, perche' i numeri da decidere sono UNO: niente criterio (il
-    criterio E' il valore) e niente percentuale (gratis e' gratis).
-    Body {soglia_eur}. `soglia_eur <= 0` e' lo SPEGNIMENTO e non ha
-    NESSUNA guardia (il patto del rientro dalle ferie: togliere una
-    promessa non e' mai un problema).
-    La chiave si chiama `soglia_eur` e la vecchia `soglia` si IGNORA:
-    portava dei sats, e scriverla in una colonna che ora parla euro
-    farebbe di «50.000» una soglia da cinquantamila euro, cioe' una
-    promessa che non scatta mai — in silenzio. Un client rimasto in
-    cache non salva piu' niente, che e' il verso giusto in cui
-    rompersi.
+    criterio E' il valore) e niente percentuale (gratis e' gratis). La
+    VALUTA invece si sceglie, come nella gemella, ed e' PROPRIA: le due
+    promesse restano indipendenti.
+    Body {valuta, soglia_sats, soglia_eur}. La soglia dell'unita'
+    dichiarata a <= 0 e' lo SPEGNIMENTO e non ha NESSUNA guardia (il
+    patto del rientro dalle ferie: togliere una promessa non e' mai un
+    problema) — e azzera TUTTE E DUE le soglie, o resterebbe una
+    promessa a mezz'aria nell'altra unita'. Le due si conservano a
+    vicenda come le tre del gemello: chi torna sull'altra valuta
+    ritrova la cifra che ci aveva scritto.
+    LE CHIAVI VECCHIE (`soglia`, che portava sats senza dirlo) restano
+    IGNORATE per sempre. Ma «ignorata» NON deve voler dire «letta come
+    zero», ed e' il difetto che questo endpoint aveva dal passaggio
+    all'euro: `int(d.get("soglia_eur") or 0)` faceva 0 su un body
+    vecchio, e zero qui e' lo SPEGNIMENTO — il venditore premeva
+    «Aggiorna la soglia» e la promessa si spegneva in silenzio. Adesso
+    la chiave dell'unita' dichiarata dev'essere PRESENTE: assente = 400
+    che dice cosa fare (MSG_CLIENT_VECCHIO). E' il patto di
+    spedizione_punto_dichiarata — la dichiarazione e' la presenza della
+    chiave, mai il suo valore — arrivato anche qui.
     Niente _impegni_aperti e niente guardia_ferie_venditore, per le due
     ragioni scritte per esteso nello sconto: qui non si toglie niente a
     nessuno — gli ordini gia' nati hanno la loro escrow fissata e la
@@ -15396,25 +15728,59 @@ async def imposta_sped_gratis(req: Request,
     if not SPED_GRATIS_ATTIVO:
         raise HTTPException(400, "La spedizione gratis sopra soglia non "
                                  "è attiva")
+    valuta = str(d.get("valuta") or "").strip().lower() or "eur"
+    if valuta not in VALUTE_SOGLIA:
+        raise HTTPException(400, "La soglia si può dichiarare in euro o "
+                                 "in sats.")
+    chiave = "soglia_sats" if valuta == "sats" else "soglia_eur"
+    if d.get(chiave) is None:
+        raise HTTPException(400, MSG_CLIENT_VECCHIO)
     try:
-        soglia = int(d.get("soglia_eur") or 0)
+        soglia = int(d.get(chiave) or 0)
     except (TypeError, ValueError):
         raise HTTPException(400, "Soglia non leggibile")
-    if soglia < 0:
-        soglia = 0
-    if 0 < soglia < SPED_GRATIS_MIN_EUR:
+    if soglia <= 0:
+        # lo spegnimento: si azzerano entrambe le unita' e la valuta
+        # torna al default — «spento» dev'essere uno stato solo
+        con = db()
+        con.execute("UPDATE utenti SET sped_gratis_soglia=0, "
+                    "sped_gratis_soglia_eur=0, sped_gratis_valuta='eur' "
+                    "WHERE tg_id=?", (user["id"],))
+        con.commit()
+        con.close()
+        return {"ok": True, "valuta": "eur", "soglia_sats": 0,
+                "soglia_eur": 0}
+    minimo = SPED_GRATIS_MIN_SATS if valuta == "sats" else SPED_GRATIS_MIN_EUR
+    if soglia < minimo:
         raise HTTPException(400,
-            f"La spedizione gratis parte da almeno {SPED_GRATIS_MIN_EUR} € "
+            f"La spedizione gratis parte da almeno {_fmt_sats(minimo)} sats "
             f"di merce: sotto, la spedizione sarebbe gratis sempre — e "
             f"quella si dichiara nel prezzo dell'annuncio, che è già "
-            f"previsto (costo 0).")
+            f"previsto (costo 0)."
+            if valuta == "sats" else
+            f"La spedizione gratis parte da almeno {minimo} € di merce: "
+            f"sotto, la spedizione sarebbe gratis sempre — e quella si "
+            f"dichiara nel prezzo dell'annuncio, che è già previsto "
+            f"(costo 0).")
     con = db()
-    con.execute("UPDATE utenti SET sped_gratis_soglia_eur=? WHERE tg_id=?",
-                (soglia, user["id"]))
+    # la soglia dell'ALTRA unita' si conserva (il patto delle tre dello
+    # sconto): chi torna indietro col toggle ritrova la sua cifra
+    con.execute("UPDATE utenti SET sped_gratis_valuta=?, "
+                "sped_gratis_soglia=COALESCE(?, sped_gratis_soglia), "
+                "sped_gratis_soglia_eur=COALESCE(?, sped_gratis_soglia_eur) "
+                "WHERE tg_id=?",
+                (valuta, soglia if valuta == "sats" else None,
+                 soglia if valuta == "eur" else None, user["id"]))
     con.commit()
+    r = con.execute("SELECT sped_gratis_soglia AS s, "
+                    "sped_gratis_soglia_eur AS e FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
     con.close()
-    # `soglia` a zero e il numero vero in `soglia_eur`, come nel gemello
-    return {"ok": True, "soglia": 0, "soglia_eur": soglia}
+    # la risposta e' per il PROPRIETARIO e porta tutte e due le cifre
+    # grezze: e' il suo negozio, e il toggle deve poterle ritrovare
+    return {"ok": True, "valuta": valuta,
+            "soglia_sats": r["s"] if r else 0,
+            "soglia_eur": r["e"] if r else 0}
 
 
 @app.post("/api/me/ferie")
@@ -20847,11 +21213,18 @@ SUGGERIMENTI_FUNZIONE = (
         "leva": lambda: SPED_GRATIS_ATTIVO,
         # solo a chi SPEDISCE davvero: al ritiro e al codice online una
         # spedizione da offrire non c'e'
+        # LE DUE SOGLIE, non solo quella in euro (ago 2026): da quando
+        # la valuta si sceglie, `sped_gratis_soglia_eur=0` non vuol piu'
+        # dire «promessa spenta» — un negozio che l'ha accesa in SATS
+        # ha quella colonna a zero, e riceverebbe l'invito ad accendere
+        # una cosa che ha gia'. Il gemello dello sconto e' immune
+        # perche' guarda `percento`, che di unita' non ne ha.
         "sql": "SELECT DISTINCT u.tg_id FROM utenti u JOIN annunci a "
                "ON a.venditore_id=u.tg_id "
                "WHERE a.stato='attivo' "
                "AND a.consegna IN ('spedizione','entrambe') "
-               "AND u.sped_gratis_soglia_eur=0 AND u.suggerito_sped=0",
+               "AND u.sped_gratis_soglia=0 AND u.sped_gratis_soglia_eur=0 "
+               "AND u.suggerito_sped=0",
         # La cifra e' passata dai sats agli euro (ago 2026). I 12
         # venditori che hanno gia' ricevuto questo messaggio l'hanno
         # letto con «100.000 sats» e NON lo ricevono di nuovo: il
@@ -21813,13 +22186,35 @@ CONTROLLI_LIBRO_MASTRO = (
     # sotto il minimo STRUTTURALE. I numeri sono 2 e 1 e non le leve
     # SCONTO_PACCO_MIN_*: un allarme agganciato a una leva suona al
     # primo ritocco della leva, ed e' cosi' che gli allarmi muoiono.
+    # DALLA SCELTA DELLA VALUTA (ago 2026) il ramo a valore guarda
+    # l'unita' dichiarata: senza il CASE questa riga suonerebbe su OGNI
+    # negozio in sats, che ha legittimamente `valore_eur=0` — un
+    # allarme che suona su uno stato normale e' peggio di nessun
+    # allarme, ed e' il difetto che il cantiere ha dovuto chiudere in
+    # tre posti («soglia euro a zero» ha smesso di voler dire «promessa
+    # spenta»).
     ("promessa di sconto che non puo' scattare",
      "il negozio dichiara uno sconto che nessun carrello raggiungera': "
      "la vetrina tace e il venditore non lo sa",
      "SELECT tg_id FROM utenti WHERE sconto_pacco_percento>0 AND ("
      "sconto_pacco_criterio NOT IN ('pezzi','valore') "
      "OR (sconto_pacco_criterio='pezzi' AND sconto_pacco_soglia<2) "
-     "OR (sconto_pacco_criterio='valore' AND sconto_pacco_valore_eur<1))"),
+     "OR (sconto_pacco_criterio='valore' AND ("
+     "sconto_pacco_valore_valuta NOT IN ('eur','sats') "
+     "OR (sconto_pacco_valore_valuta='eur' AND sconto_pacco_valore_eur<1) "
+     "OR (sconto_pacco_valore_valuta='sats' AND sconto_pacco_valore<1))))"),
+    # ...e il GEMELLO, che fino a ieri non aveva ragione di esistere:
+    # qui c'era scritto che la spedizione gratis ha «un intero >= 0
+    # dove 0 significa spenta, quindi non esiste un valore rotto da
+    # trovare». Con la valuta non e' piu' vero — una `sped_gratis_
+    # valuta` fuori catalogo ('usd', scritta a mano o lasciata da un
+    # rollback) e' una promessa accesa che non scatta mai, in silenzio.
+    ("promessa di spedizione gratis che non puo' scattare",
+     "il negozio promette la spedizione sopra una soglia dichiarata in "
+     "un'unita' che nessun ramo sa misurare: la vetrina tace",
+     "SELECT tg_id FROM utenti "
+     "WHERE sped_gratis_valuta NOT IN ('eur','sats') AND "
+     "(sped_gratis_soglia>0 OR sped_gratis_soglia_eur>0)"),
     # La spedizione gratis sopra soglia (ago 2026). Non aggiunge
     # nessuna riga all'aritmetica — `prezzo_sats = merce - sconto +
     # spedizione + protezione` resta vera con la spedizione a zero, ed
@@ -21829,11 +22224,6 @@ CONTROLLI_LIBRO_MASTRO = (
     # «esiste uno stato transitorio legittimo in cui sono false?» No,
     # perche' le due colonne si scrivono nello stesso INSERT e si
     # escludono per costruzione.
-    # NON c'e' il gemello di «promessa che non puo' scattare»: li' il
-    # criterio poteva finire fuori catalogo, qui c'e' un intero >= 0
-    # dove 0 significa «spenta» — non esiste un valore rotto da
-    # trovare, e un allarme che non puo' suonare e' peggio di nessun
-    # allarme.
     ("spedizione risparmiata e pagata insieme",
      "la tariffa risulta insieme offerta e incassata: uno dei due "
      "numeri e' falso, e uno dei due e' la ricevuta di qualcuno",

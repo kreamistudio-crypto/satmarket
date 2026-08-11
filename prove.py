@@ -4308,18 +4308,28 @@ def prove_sconto_pacco():
     def sc(art, pezzi, soglia, pct, art_eur=None):
         """il criterio a PEZZI. `art_eur` sta a None di proposito: cosi'
         ogni prova qui sotto dimostra anche che i pezzi non guardano
-        mai l'euro — cioe' che a cambio muto continuano a scattare."""
+        mai l'euro — cioe' che a cambio muto continuano a scattare.
+        La valuta e' 'eur' e non conta: a criterio pezzi non si guarda."""
         return amb["_sconto_pacco"](art, art_eur, pezzi, "pezzi",
-                                    soglia, pct)
+                                    soglia, pct, "eur")
 
     def scv(art, soglia_eur, pct, pezzi=2, art_eur=...):
-        """il gemello a VALORE: i pezzi restano 2 (un carrello vero) e
-        non contano mai — la misura e' l'articolo, in EURO. `art_eur`
-        si deriva dal cambio, come fa il conto vero; passarlo a mano
-        serve al caso del cambio muto."""
+        """il gemello a VALORE in EURO: i pezzi restano 2 (un carrello
+        vero) e non contano mai — la misura e' l'articolo, in EURO.
+        `art_eur` si deriva dal cambio, come fa il conto vero; passarlo
+        a mano serve al caso del cambio muto."""
         return amb["_sconto_pacco"](
             art, eur(art) if art_eur is ... else art_eur,
-            pezzi, "valore", soglia_eur, pct)
+            pezzi, "valore", soglia_eur, pct, "eur")
+
+    def scs(art, soglia_sats, pct, pezzi=2, art_eur=None):
+        """il gemello a VALORE in SATS (ago 2026, la scelta della
+        valuta): la misura e' l'articolo COM'E', senza conversione.
+        `art_eur` sta a None apposta — cosi' ogni prova qui sotto
+        dimostra anche che la soglia in sats non guarda l'euro, cioe'
+        che scatta anche a cambio muto."""
+        return amb["_sconto_pacco"](art, art_eur, pezzi, "valore",
+                                    soglia_sats, pct, "sats")
 
     def sceur(art_eur, pezzi, soglia, pct):
         """il gemello in euro NON decide piu' da solo: la porta la apre
@@ -4542,7 +4552,35 @@ def prove_sconto_pacco():
     # futuro, farebbero scontare a caso)
     for storto in ("", "peso", "PEZZI", "Valore", None, 0):
         prova(f"criterio {storto!r}: nessuno sconto, mai",
-              0, amb["_sconto_pacco"](500_000, 500, 9, storto, 3, 10))
+              0, amb["_sconto_pacco"](500_000, 500, 9, storto, 3, 10, "eur"))
+
+    # ...E NEMMENO UNA VALUTA CHE NON CONOSCIAMO (ago 2026): stessa
+    # ragione, un piano piu' sotto — misurerebbe il carrello in
+    # un'unita' che il venditore non ha scelto. Il ripiego naturale
+    # («sara' euro») e' proprio quello che non si deve fare.
+    for storto in ("", "usd", "EUR", "Sats", None, 0):
+        prova(f"valuta {storto!r} a criterio valore: nessuno sconto",
+              0, amb["_sconto_pacco"](500_000, 500, 2, "valore", 100, 10,
+                                      storto))
+
+    # --- LA SOGLIA IN SATS: la stessa porta, un'altra unita' ---------
+    # e soprattutto SENZA CONVERSIONE, cioe' senza bisogno del cambio
+    prova("in sats, sopra soglia: scatta", 10_000, scs(100_000, 50_000, 10))
+    prova("in sats, al filo esatto: scatta", 5_000, scs(50_000, 50_000, 10))
+    prova("in sats, un sat sotto: non scatta", 0, scs(49_999, 50_000, 10))
+    # LA PROVA CHE VALE PIU' DELLE ALTRE, ed e' il guadagno del
+    # cantiere: `art_eur` e' None (cambio muto) e la promessa scatta
+    # lo stesso — mentre la gemella in euro, sotto, tace.
+    prova("in sats scatta ANCHE a cambio muto (art_eur None)",
+          10_000, scs(100_000, 50_000, 10, art_eur=None))
+    prova("...mentre in euro, a cambio muto, non scatta",
+          0, scv(100_000, 100, 10, art_eur=None))
+    # e le due unita' NON si confondono: 100 (euro) e 100 (sats) sullo
+    # stesso carrello danno esiti opposti, che e' tutto il punto
+    prova("100 come soglia in EURO su 100.000 sats: scatta",
+          10_000, scv(100_000, 100, 10))
+    prova("...e 100 come soglia in SATS scatta anche su 200 sats",
+          20, scs(200, 100, 10))
 
     # LA MISURA E' IL LORDO DOPO LAMPO E ACCORDO (decisione di Andrea,
     # e la prova esiste perche' sembra un bug quando un venditore la
@@ -4621,67 +4659,467 @@ def prove_sconto_pacco():
     # ================================================================
     amb3 = {"SCONTO_PACCO_ATTIVO": True,
             "SCONTO_PACCO_CRITERI": ("pezzi", "valore"),
+            "VALUTE_SOGLIA": ("eur", "sats"),
             "SCONTO_PACCO_MIN_SOGLIA": 2,
             "SCONTO_PACCO_MIN_VALORE_EUR": 1,
+            "SCONTO_PACCO_MIN_VALORE_SATS": 1,
             "SCONTO_PACCO_MAX_PERCENTO": 30}
+    exec(pezzo("_valuta_soglia"), amb3)
     exec(pezzo("_regola_sconto"), amb3)
     exec(pezzo("_sconto_pubblico"), amb3)
     reg, pub = amb3["_regola_sconto"], amb3["_sconto_pubblico"]
+    # firma: (criterio, valuta, soglia_pezzi, valore_sats, valore_eur, pct)
 
-    prova("regola a pezzi: esce la soglia in pezzi", ("pezzi", 3, 10),
-          reg("pezzi", 3, 50_000, 10))
-    prova("regola a valore: esce la soglia in EURO", ("valore", 50, 10),
-          reg("valore", 3, 50, 10))
-    prova("criterio vuoto = pezzi: e' il mondo di ieri", ("pezzi", 3, 10),
-          reg("", 3, 0, 10))
-    prova("criterio None = pezzi (colonna mai scritta)", ("pezzi", 3, 10),
-          reg(None, 3, 0, 10))
-    prova("criterio fuori catalogo: niente sconto", ("", 0, 0),
-          reg("peso", 3, 50, 10))
-    prova("soglia sotto il minimo: niente sconto", ("", 0, 0),
-          reg("pezzi", 1, 0, 10))
+    prova("regola a pezzi: esce la soglia in pezzi", ("pezzi", 3, 10, ""),
+          reg("pezzi", "eur", 3, 9_999, 50_000, 10))
+    prova("regola a valore in EURO: esce la soglia in euro",
+          ("valore", 50, 10, "eur"), reg("valore", "eur", 3, 9_999, 50, 10))
+    prova("regola a valore in SATS: esce la soglia in sats",
+          ("valore", 9_999, 10, "sats"),
+          reg("valore", "sats", 3, 9_999, 50, 10))
+    prova("criterio vuoto = pezzi: e' il mondo di ieri", ("pezzi", 3, 10, ""),
+          reg("", "eur", 3, 0, 0, 10))
+    prova("criterio None = pezzi (colonna mai scritta)", ("pezzi", 3, 10, ""),
+          reg(None, "eur", 3, 0, 0, 10))
+    # LA RETROCOMPATIBILITA' DEL DEFAULT: valuta vuota = euro, cioe'
+    # letteralmente il mondo di prima della scelta. E' lei che rende la
+    # migrazione un DEFAULT invece di uno script.
+    prova("valuta vuota = euro (il mondo di prima della scelta)",
+          ("valore", 50, 10, "eur"), reg("valore", "", 3, 9_999, 50, 10))
+    prova("valuta None = euro (colonna mai scritta)",
+          ("valore", 50, 10, "eur"), reg("valore", None, 3, 9_999, 50, 10))
+    prova("criterio fuori catalogo: niente sconto", ("", 0, 0, ""),
+          reg("peso", "eur", 3, 0, 50, 10))
+    prova("valuta fuori catalogo: niente sconto", ("", 0, 0, ""),
+          reg("valore", "usd", 3, 9_999, 50, 10))
+    prova("soglia sotto il minimo: niente sconto", ("", 0, 0, ""),
+          reg("pezzi", "eur", 1, 0, 0, 10))
     prova("valore sotto il minimo (mezzo euro non e' una soglia)",
-          ("", 0, 0), reg("valore", 3, 0, 10))
-    prova("percento a zero: niente sconto", ("", 0, 0),
-          reg("pezzi", 3, 0, 0))
+          ("", 0, 0, ""), reg("valore", "eur", 3, 9_999, 0, 10))
+    prova("...e lo stesso in sats: la cifra dell'altra unita' non salva",
+          ("", 0, 0, ""), reg("valore", "sats", 3, 0, 50, 10))
+    prova("percento a zero: niente sconto", ("", 0, 0, ""),
+          reg("pezzi", "eur", 3, 0, 0, 0))
     prova("il percento si tappa al massimo della leva",
-          ("pezzi", 3, 30), reg("pezzi", 3, 0, 99))
+          ("pezzi", 3, 30, ""), reg("pezzi", "eur", 3, 0, 0, 99))
     prova("la soglia dell'altro criterio non lo disturba mai",
-          ("valore", 50, 10), reg("valore", 0, 50, 10))
+          ("valore", 50, 10, "eur"), reg("valore", "eur", 0, 0, 50, 10))
     amb3["SCONTO_PACCO_ATTIVO"] = False
     prova("leva generale spenta: niente sconto in nessun criterio",
-          [("", 0, 0), ("", 0, 0)],
-          [reg("pezzi", 3, 0, 10), reg("valore", 0, 50, 10)])
+          [("", 0, 0, ""), ("", 0, 0, "")],
+          [reg("pezzi", "eur", 3, 0, 0, 10),
+           reg("valore", "eur", 0, 0, 50, 10)])
     amb3["SCONTO_PACCO_ATTIVO"] = True
     amb3["SCONTO_PACCO_CRITERI"] = ("pezzi",)
     prova("criterio tolto dalla leva: chi l'aveva scelto non sconta piu'",
-          ("", 0, 0), reg("valore", 0, 50, 10))
+          ("", 0, 0, ""), reg("valore", "eur", 0, 0, 50, 10))
     amb3["SCONTO_PACCO_CRITERI"] = ("pezzi", "valore")
+    # ...e lo stesso per la VALUTA: e' una leva col patto dei criteri,
+    # cioe' un freno d'emergenza che spegne chi l'aveva scelta
+    amb3["VALUTE_SOGLIA"] = ("eur",)
+    prova("valuta tolta dalla leva: chi l'aveva scelta non sconta piu'",
+          ("", 0, 0, ""), reg("valore", "sats", 0, 9_999, 0, 10))
+    prova("...ma l'altra valuta continua a scattare",
+          ("valore", 50, 10, "eur"), reg("valore", "eur", 0, 0, 50, 10))
+    amb3["VALUTE_SOGLIA"] = ("eur", "sats")
 
-    # LA REGOLA D'ORO, torturata: la soglia in PEZZI non esce MAI
-    # maggiore di zero a criterio valore. E' lei il lucchetto del
-    # client vecchio rimasto in cache, che di campi ne legge uno solo —
-    # senza, direbbe «−10% da 100000 pezzi».
-    prova("pubblico a pezzi: il valore tace",
-          {"criterio": "pezzi", "soglia": 3, "valore": 0,
-           "valore_eur": 0, "percento": 10}, pub("pezzi", 3, 50, 10))
-    prova("pubblico a valore: la soglia in PEZZI tace",
-          {"criterio": "valore", "soglia": 0, "valore": 0,
-           "valore_eur": 50, "percento": 10}, pub("valore", 3, 50, 10))
+    # LA REGOLA D'ORO, torturata: ogni chiave porta il numero SOLO
+    # nella sua unita', e le altre restano a zero. E' il lucchetto dei
+    # client vecchi, che di campi ne leggono uno solo — senza, uno
+    # direbbe «−10% da 100000 pezzi» e un altro «da 25 sats» dove ci
+    # sono 25 euro: non promesse piu' avare, promesse assurde.
+    prova("pubblico a pezzi: le due cifre a valore tacciono",
+          {"criterio": "pezzi", "soglia": 3, "valore": 0, "valore_eur": 0,
+           "valuta": "", "percento": 10},
+          pub("pezzi", "eur", 3, 9_999, 50, 10))
+    prova("pubblico a valore in EURO: pezzi e sats tacciono",
+          {"criterio": "valore", "soglia": 0, "valore": 0, "valore_eur": 50,
+           "valuta": "eur", "percento": 10},
+          pub("valore", "eur", 3, 9_999, 50, 10))
+    prova("pubblico a valore in SATS: pezzi ed euro tacciono",
+          {"criterio": "valore", "soglia": 0, "valore": 9_999,
+           "valore_eur": 0, "valuta": "sats", "percento": 10},
+          pub("valore", "sats", 3, 9_999, 50, 10))
     prova("pubblico a regola spenta: tacciono tutti",
           {"criterio": "", "soglia": 0, "valore": 0, "valore_eur": 0,
-           "percento": 0}, pub("peso", 3, 50, 10))
+           "valuta": "", "percento": 0}, pub("peso", "eur", 3, 9_999, 50, 10))
     prova("MAI degli euro nel campo dei PEZZI", True,
-          all(pub("valore", p, v, 10)["soglia"] == 0
+          all(pub("valore", "eur", p, 0, v, 10)["soglia"] == 0
               for p in (0, 3, 99) for v in (1, 50, 9_999)))
-    # Il DENTE NUOVO del lucchetto (ago 2026): `valore` portava dei
-    # SATS, e un client rimasto in cache lo scrive «sats». Col numero
-    # in euro direbbe «da 25 sats», che non e' una promessa avara —
-    # e' assurda, e sembra un guasto. Esce a zero SEMPRE.
-    prova("MAI un numero nel campo che il client vecchio legge in sats",
-          True, all(pub(c, p, v, 10)["valore"] == 0
+    # IL DENTE CHE HA CAMBIATO LATO (ago 2026): fino a ieri `valore`
+    # usciva a zero SEMPRE, e quella prova certificava il mondo in cui
+    # i sats non erano piu' una soglia possibile. Adesso la regola e'
+    # piu' forte e vale in tutte e due le direzioni: il numero esce SE
+    # E SOLO SE quella e' l'unita' dichiarata. Un client di prima del
+    # passaggio all'euro, che `valore` lo legge in sats, su un negozio
+    # in sats la trova finalmente GIUSTA — e altrove non trova niente.
+    prova("`valore` porta un numero SE E SOLO SE la valuta e' sats",
+          True, all((pub(c, va, p, 500, 50, 10)["valore"] > 0)
+                    == (c == "valore" and va == "sats")
                     for c in ("pezzi", "valore", "peso")
-                    for p in (0, 3) for v in (0, 1, 50, 9_999)))
+                    for va in ("eur", "sats", "usd", "")
+                    for p in (0, 3)))
+    prova("...e `valore_eur` SE E SOLO SE la valuta e' euro",
+          True, all((pub(c, va, p, 500, 50, 10)["valore_eur"] > 0)
+                    == (c == "valore" and va in ("eur", ""))
+                    for c in ("pezzi", "valore", "peso")
+                    for va in ("eur", "sats", "usd", "")
+                    for p in (0, 3)))
+    # ...e le tre chiavi non possono MAI parlare insieme: e' cio' che
+    # permette al client di prendere «quella piena» senza un «if»
+    prova("le tre cifre si escludono sempre a vicenda", True,
+          all(sum(1 for k in ("soglia", "valore", "valore_eur")
+                  if pub(c, va, p, s, e, 10)[k] > 0) <= 1
+              for c in ("pezzi", "valore", "peso")
+              for va in ("eur", "sats", "usd", "")
+              for p in (0, 3) for s in (0, 500) for e in (0, 50)))
+
+
+# ====================================================================
+def prove_valuta_soglia():
+    """LA VALUTA DELLA SOGLIA LA SCEGLIE IL VENDITORE (ago 2026), e qui
+    si tortura la meta' che vive negli ENDPOINT — quella che le pure non
+    possono difendere.
+    IL CUORE E' IL CLIENT VECCHIO: le chiavi di ieri restano ignorate
+    per sempre, ma «ignorata» NON deve voler dire «letta come zero».
+    Il difetto e' nato col passaggio all'euro e si presentava in due
+    modi — un salvataggio a vuoto sullo sconto, uno SPEGNIMENTO
+    SILENZIOSO sulla spedizione gratis, dove `soglia` assente valeva 0,
+    che li' e' lo spegnimento. Un venditore che crede di aver salvato e
+    non ha salvato e' il difetto che si scopre settimane dopo, quindi
+    queste prove asseriscono il NON FATTO: 400, e la colonna RILETTA
+    dal database ancora quella di prima."""
+    print("\n[la valuta della soglia: gli endpoint]")
+    import asyncio
+    import sqlite3
+
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+        sconto_pacco_criterio TEXT DEFAULT 'pezzi',
+        sconto_pacco_soglia INT DEFAULT 0,
+        sconto_pacco_valore INT DEFAULT 0,
+        sconto_pacco_valore_eur INT DEFAULT 0,
+        sconto_pacco_valore_valuta TEXT DEFAULT 'eur',
+        sconto_pacco_percento INT DEFAULT 0,
+        sped_gratis_soglia INT DEFAULT 0,
+        sped_gratis_soglia_eur INT DEFAULT 0,
+        sped_gratis_valuta TEXT DEFAULT 'eur');
+      -- il negozio di partenza: sconto a valore in EURO da 25, e la
+      -- spedizione gratis in EURO da 50. E' esattamente lo stato in cui
+      -- il passaggio all'euro ha lasciato i negozi.
+      INSERT INTO utenti(tg_id, sconto_pacco_criterio, sconto_pacco_soglia,
+        sconto_pacco_valore, sconto_pacco_valore_eur,
+        sconto_pacco_valore_valuta, sconto_pacco_percento,
+        sped_gratis_soglia, sped_gratis_soglia_eur, sped_gratis_valuta)
+        VALUES(1, 'valore', 3, 90000, 25, 'eur', 10, 80000, 50, 'eur');
+    """)
+    vero.commit()
+
+    class Con:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    def _amb():
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": 1},
+               "leggi_json": _leggi, "_fmt_sats": lambda n: str(n),
+               "SCONTO_PACCO_ATTIVO": True, "SPED_GRATIS_ATTIVO": True,
+               "SCONTO_PACCO_CRITERI": ("pezzi", "valore"),
+               "VALUTE_SOGLIA": ("eur", "sats"),
+               "SCONTO_PACCO_MIN_SOGLIA": 2,
+               "SCONTO_PACCO_MIN_VALORE_EUR": 1,
+               "SCONTO_PACCO_MIN_VALORE_SATS": 1,
+               "SCONTO_PACCO_MAX_PERCENTO": 30,
+               "SPED_GRATIS_MIN_EUR": 1, "SPED_GRATIS_MIN_SATS": 1,
+               "MSG_CLIENT_VECCHIO": "RIAPRI"}
+        return amb
+
+    def corri(nome, body):
+        amb = _amb()
+        exec("async " + pezzo(nome), amb)
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb[nome](_Req(body)))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    def stato():
+        r = vero.execute("SELECT * FROM utenti WHERE tg_id=1").fetchone()
+        return dict(r)
+
+    prima = stato()
+
+    # ================================================================
+    # IL CLIENT VECCHIO: 400 esplicito, e la colonna NON si tocca
+    # ================================================================
+    # Lo sconto: il body di prima del passaggio all'euro porta `valore`
+    # (sats) e nessun `valore_eur`. Prima di questo cantiere prendeva un
+    # 400 col messaggio SBAGLIATO («parte da almeno 1 €» a chi ne ha
+    # scritti novantamila), che manda a cercare il guasto dalla parte
+    # opposta.
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "valore", "soglia": 3, "valore": 90000,
+               "percento": 10})
+    prova("sconto, client vecchio: 400 che dice cosa fare", "400 RIAPRI", r)
+    prova("...e la promessa e' rimasta ESATTAMENTE com'era", prima, stato())
+
+    # La spedizione gratis: il caso peggiore. `soglia` (sats) senza
+    # `soglia_eur` valeva 0, e zero li' e' lo SPEGNIMENTO — il venditore
+    # premeva «Aggiorna la soglia» e la promessa si spegneva in silenzio.
+    r = corri("imposta_sped_gratis", {"soglia": 80000})
+    prova("spedizione, client vecchio: 400 che dice cosa fare",
+          "400 RIAPRI", r)
+    prova("...e la promessa NON si e' spenta", prima, stato())
+    # ...e nemmeno un body vuoto la spegne: e' lo stesso caso, ed e'
+    # quello che arriva da un client a cui e' sfuggito il campo
+    r = corri("imposta_sped_gratis", {})
+    prova("spedizione, body vuoto: 400 e niente si muove",
+          ("400 RIAPRI", prima), (r, stato()))
+    # LA VARIANTE NUOVA, che la valuta porta con se': la cifra c'e' ma
+    # nella chiave dell'ALTRA unita'. Senza la guardia finirebbe in una
+    # colonna che la promessa non guarda, e la promessa morirebbe zitta.
+    r = corri("imposta_sped_gratis", {"valuta": "sats", "soglia_eur": 50})
+    prova("spedizione, cifra nell'unita' sbagliata: 400", "400 RIAPRI", r)
+    prova("...e niente si e' mosso", prima, stato())
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "valore", "valuta": "sats", "valore_eur": 25,
+               "percento": 10})
+    prova("sconto, cifra nell'unita' sbagliata: 400", "400 RIAPRI", r)
+    prova("...e niente si e' mosso", prima, stato())
+
+    # ================================================================
+    # LO SPEGNIMENTO ESPLICITO CONTINUA A FUNZIONARE: e' la regressione
+    # che la guardia qui sopra poteva rompere.
+    # ================================================================
+    r = corri("imposta_sconto_pacco", {"percento": 0})
+    prova("sconto: `percento: 0` resta lo spegnimento",
+          (True, 0, "pezzi", "eur"),
+          (isinstance(r, dict), stato()["sconto_pacco_percento"],
+           stato()["sconto_pacco_criterio"],
+           stato()["sconto_pacco_valore_valuta"]))
+    prova("...e azzera TUTTE le soglie, mai una promessa a mezz'aria",
+          (0, 0, 0),
+          (stato()["sconto_pacco_soglia"], stato()["sconto_pacco_valore"],
+           stato()["sconto_pacco_valore_eur"]))
+    r = corri("imposta_sped_gratis", {"soglia_eur": 0})
+    prova("spedizione: uno zero in una chiave RICONOSCIUTA spegne",
+          (True, 0, 0, "eur"),
+          (isinstance(r, dict), stato()["sped_gratis_soglia"],
+           stato()["sped_gratis_soglia_eur"],
+           stato()["sped_gratis_valuta"]))
+
+    # ================================================================
+    # IL TOGGLE CONSERVA: salvare in una valuta non tocca la cifra
+    # dell'altra. E' la promessa che il cassetto fa al venditore —
+    # «torni indietro e ritrovi la tua cifra» — e senza il COALESCE
+    # sarebbe una bugia.
+    # ================================================================
+    corri("imposta_sped_gratis", {"valuta": "eur", "soglia_eur": 30,
+                                  "soglia_sats": 70000})
+    corri("imposta_sped_gratis", {"valuta": "sats", "soglia_sats": 60000,
+                                  "soglia_eur": 30})
+    d = stato()
+    prova("spedizione: la valuta scelta comanda", ("sats", 60000),
+          (d["sped_gratis_valuta"], d["sped_gratis_soglia"]))
+    prova("...e la cifra in EURO e' rimasta dov'era", 30,
+          d["sped_gratis_soglia_eur"])
+    # e il client che NON conosce la valuta nuova non la cancella: manda
+    # la sola chiave che sa, e l'altra resta (il patto dello stock)
+    corri("imposta_sped_gratis", {"soglia_eur": 45})
+    d = stato()
+    prova("un client che manda una sola unita' non cancella l'altra",
+          (45, 60000, "eur"),
+          (d["sped_gratis_soglia_eur"], d["sped_gratis_soglia"],
+           d["sped_gratis_valuta"]))
+
+    corri("imposta_sconto_pacco",
+          {"criterio": "valore", "valuta": "sats", "soglia": 4,
+           "valore_sats": 55000, "valore_eur": 20, "percento": 15})
+    d = stato()
+    prova("sconto: le TRE soglie convivono", (4, 55000, 20, "sats"),
+          (d["sconto_pacco_soglia"], d["sconto_pacco_valore"],
+           d["sconto_pacco_valore_eur"], d["sconto_pacco_valore_valuta"]))
+    # ...e tornando in euro si ritrova la cifra di prima, non una
+    # conversione: e' la decisione «conserva, non converte»
+    corri("imposta_sconto_pacco",
+          {"criterio": "valore", "valuta": "eur", "valore_eur": 20,
+           "valore_sats": 55000, "percento": 15})
+    d = stato()
+    prova("...e il ritorno in euro ritrova la SUA cifra, non un cambio",
+          (20, 55000, "eur"),
+          (d["sconto_pacco_valore_eur"], d["sconto_pacco_valore"],
+           d["sconto_pacco_valore_valuta"]))
+    # IL COALESCE si vede SOLO da un body che porta UNA chiave sola:
+    # col client di casa, che le manda tutte, un UPDATE secco darebbe
+    # lo stesso risultato — ed e' precisamente il motivo per cui questa
+    # riga esiste (la mutazione «COALESCE tolto» sopravviveva senza).
+    corri("imposta_sconto_pacco",
+          {"criterio": "valore", "valuta": "eur", "valore_eur": 18,
+           "percento": 15})
+    d = stato()
+    prova("un body con UNA chiave sola non cancella le altre soglie",
+          (18, 55000, 4),
+          (d["sconto_pacco_valore_eur"], d["sconto_pacco_valore"],
+           d["sconto_pacco_soglia"]))
+
+    # una valuta fuori catalogo si rifiuta alla PORTA, col suo messaggio
+    r = corri("imposta_sped_gratis", {"valuta": "usd", "soglia_eur": 50})
+    prova("valuta fuori catalogo: 400 alla porta", True,
+          str(r).startswith("400 La soglia si può dichiarare"))
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "valore", "valuta": "usd", "valore_eur": 50,
+               "percento": 10})
+    prova("...e lo stesso nel gemello", True,
+          str(r).startswith("400 La soglia a valore"))
+
+    # ================================================================
+    # LA FORMA: le righe che un riordino toglie per prime
+    # ================================================================
+    src = open("server.py", encoding="utf-8").read()
+    # LE CHIAVI VECCHIE restano ignorate PER SEMPRE: rianimarle vorrebbe
+    # dire scrivere una cifra senza sapere in che unita' sia — la stessa
+    # trappola dei nomi delle leve senza suffisso.
+    ep_sc = src[src.index("async def imposta_sconto_pacco("):
+                src.index("async def imposta_sped_gratis(")]
+    ep_sg = src[src.index("async def imposta_sped_gratis("):
+                src.index("async def imposta_ferie(")]
+    prova("lo sconto non legge piu' la chiave `valore` nuda", False,
+          'd.get("valore")' in ep_sc or 'd["valore"]' in ep_sc)
+    prova("la spedizione non legge piu' la chiave `soglia` nuda", False,
+          'd.get("soglia")' in ep_sg or 'd["soglia"]' in ep_sg)
+    # LA GUARDIA DELLA CHIAVE ASSENTE, in tutti e due: e' la riga che
+    # trasforma un salvataggio muto in un errore che dice cosa fare
+    for chi, c2 in (("sconto", ep_sc), ("spedizione", ep_sg)):
+        prova(f"{chi}: la chiave assente e' un 400, non uno zero", True,
+              "MSG_CLIENT_VECCHIO" in c2)
+    prova("il messaggio del client vecchio e' scritto UNA volta", 1,
+          src.count("MSG_CLIENT_VECCHIO = ("))
+    prova("...e lo usano tutti e due gli endpoint", 2,
+          src.count("raise HTTPException(400, MSG_CLIENT_VECCHIO)"))
+    # ...e dice cosa fare, che un 400 che dice la cosa sbagliata manda a
+    # cercare il guasto dalla parte opposta
+    prova("...e dice di riaprire l'app", True,
+          "riapri Barattolo" in src[src.index("MSG_CLIENT_VECCHIO = ("):
+                                    src.index("MSG_CLIENT_VECCHIO = (") + 400])
+
+    # «SOGLIA EURO A ZERO» NON VUOL PIU' DIRE «PROMESSA SPENTA», ed e'
+    # la lezione strutturale del cantiere: TRE posti lo codificavano, e
+    # tutti e tre sarebbero diventati bugiardi su ogni negozio in sats.
+    # Il censimento batte l'elenco (la lezione del titolo nudo): si
+    # cerca ogni confronto con zero su quelle colonne e si pretende la
+    # valuta accanto, cosi' il quarto posto di fra sei mesi entra nel
+    # conto da solo.
+    # DUE forme sono ammesse, e sono le due che dicono la verita':
+    # nominare la VALUTA (cioe' «e' spenta in quella dichiarata»),
+    # oppure chiedere lo zero anche all'ALTRA unita' (cioe' «e' spenta
+    # in tutte e due»). Quel che non passa piu' e' il solo euro a zero,
+    # che su un negozio in sats e' semplicemente falso.
+    # E si guarda LA STESSA FAMIGLIA, non «una valuta qualsiasi qui
+    # intorno»: le due promesse vivono spesso nella stessa WHERE, e con
+    # un contorno generico la valuta della spedizione copriva il buco
+    # dello sconto (provato con la mutazione: sopravviveva).
+    import re
+    FAMIGLIE = {
+        "sped_gratis_soglia_eur": ("sped_gratis_valuta",
+                                   "sped_gratis_soglia="),
+        "sconto_pacco_valore_eur": ("sconto_pacco_valore_valuta",
+                                    "sconto_pacco_valore<",
+                                    "sconto_pacco_valore >"),
+    }
+    sospetti = []
+    for m in re.finditer(r"[^\n]*(sped_gratis_soglia_eur|"
+                         r"sconto_pacco_valore_eur)\s*(=|<)\s*(0|1)[^\n]*",
+                         src):
+        riga, col = m.group(0), m.group(1)
+        if riga.strip().startswith("#"):
+            continue     # i commenti raccontano il difetto, non lo fanno
+        # il contorno stretto: le WHERE del progetto vanno a capo, e la
+        # valuta (o la colonna gemella in sats) sta nella riga accanto
+        intorno = src[max(0, m.start() - 120):m.end() + 120]
+        if not any(k in intorno for k in FAMIGLIE[col]):
+            sospetti.append(riga.strip()[:70])
+    prova("nessun «euro a zero» senza la valuta accanto", [], sospetti)
+    # e la prova che il censimento VEDE davvero qualcosa: a predicato
+    # rotto uno «zero sospetti» sembrerebbe una promozione invece che
+    # una cecita'
+    prova("...e il censimento guarda davvero delle righe", True,
+          len(re.findall(r"(sped_gratis_soglia_eur|sconto_pacco_valore_eur)"
+                         r"\s*(=|<)\s*(0|1)", src)) >= 4)
+
+    # ================================================================
+    # IL CLIENT: dove un'unita' puo' diventare un'altra in silenzio
+    # ================================================================
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # IL CAMPO LIBERO scrive nel campo dell'unita' SCELTA, e per questo
+    # `campo` e' una FUNZIONE della bozza: con una stringa fissa, chi
+    # scrive 50.000 pensando sats se li ritroverebbe in `valoreEur` —
+    # una soglia da cinquantamila euro, cioe' una promessa morta zitta.
+    # E' il posto piu' facile del cantiere in cui sbagliare unita'.
+    _sl = mini[mini.index("const SOGLIE_LIBERE = {"):
+               mini.index("function sogliaBozza(")]
+    prova("il campo libero dipende dalla VALUTA, non e' fisso", 2,
+          _sl.count("campo: b => b.valuta === 'sats'"))
+    prova("...e nessuna delle due mappe ha un campo fisso", False,
+          "campo: '" in _sl)
+    # e le pillole scrivono nello stesso campo del campo libero: una
+    # pillola da 50.000 sats in `sogliaEur` sarebbe lo stesso danno
+    prova("le pillole della spedizione scelgono il campo dalla valuta",
+          True, "spedGratisBozza.valuta === 'sats'"
+          in pezzo_js(mini, "function spedGratisPill"))
+    # LA QUINTA SUPERFICIE (la riga nel form Vendi) passa dal giudice
+    # unico come le altre quattro: era l'unica che la promessa se la
+    # scriveva a mano, con l'euro cotto dentro — col toggle avrebbe
+    # detto «gratis da 50.000 €» al venditore, sul suo negozio.
+    _hp = pezzo_js(mini, "function aggiornaHintPolitiche")
+    prova("la riga del form passa dal giudice della promessa", True,
+          "regolaSpedGratis(" in _hp
+          and "frasePromessaSpedGratis(" in _hp)
+    # ...e nel CODICE non c'e' piu' un euro scritto a mano (i commenti
+    # si tolgono: quello che racconta il difetto lo nomina apposta)
+    prova("...e non scrive piu' l'euro a mano", False,
+          "€" in re.sub(r"/\*.*?\*/", "", _hp, flags=re.S))
+    # L'UNITA' si scrive in UN posto solo: cinque superfici che se la
+    # scrivono da se' sono cinque posti dove un giorno una dice «€» su
+    # una soglia in sats
+    prova("l'unita' della soglia ha UNA fonte sola", 1,
+          mini.count("function unitaSoglia("))
+    prova("...e la usano tutte le frasi pubbliche", 3,
+          mini.count("unitaSoglia(r.valuta)")
+          + mini.count("unitaSoglia(s.valuta)"))
+    # L'INVITO DEL CARRELLO non converte piu' a soglia in SATS: li' il
+    # confronto e' sats contro sats, esatto, e la riga compare anche a
+    # cambio muto. E' il guadagno della scelta, e vive proprio dove
+    # stava l'unica conversione che il client fa su una promessa.
+    _inv = pezzo_js(mini, "function aggiornaInvitoSconto")
+    prova("l'invito converte SOLO in euro", True,
+          "const inEuro = s.criterio === 'valore' && s.valuta !== 'sats'"
+          in _inv)
+    prova("...e a soglia in sats non chiede il cambio", True,
+          "s.valuta === 'sats' ? (tot || 0)" in _inv)
+    # la cintura di ieri resta intatta: senza cambio vivo, in EURO, la
+    # riga non compare (meglio un'assenza che una cifra inventata)
+    prova("...ma in euro senza cambio vivo tace ancora", True,
+          "!cambioVivo) { box.innerHTML = ''; return; }" in _inv)
 
 
 # ====================================================================
@@ -4876,17 +5314,41 @@ def prove_sped_gratis():
     vedersi, e se un domani una cominciasse a misurare l'altra queste
     prove diventerebbero rosse tutte insieme."""
     print("\n[la spedizione gratis sopra soglia]")
-    amb = {"SPED_GRATIS_ATTIVO": True, "SPED_GRATIS_MIN_EUR": 1}
+    amb = {"SPED_GRATIS_ATTIVO": True, "SPED_GRATIS_MIN_EUR": 1,
+           "SPED_GRATIS_MIN_SATS": 1, "VALUTE_SOGLIA": ("eur", "sats")}
     for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
               "_eur_interi", "_sped_gratis", "_sconto_pacco",
-              "_conto_ordine", "_regola_sped_gratis"):
+              "_conto_ordine", "_valuta_soglia", "_regola_sped_gratis"):
         exec(pezzo(f), amb)
-    gratis, conto = amb["_sped_gratis"], amb["_conto_ordine"]
-    reg, unit = amb["_regola_sped_gratis"], amb["_unitario_effettivo"]
+    conto, unit = amb["_conto_ordine"], amb["_unitario_effettivo"]
+    _sg, _rg = amb["_sped_gratis"], amb["_regola_sped_gratis"]
     CAMBIO = 100_000.0        # 1 BTC = 100.000 €, cioe' 1.000 sats = 1 €
 
     def eur(sats):
         return amb["_eur_interi"](sats, CAMBIO)
+
+    def gratis(misura_eur, soglia):
+        """lo shim a valuta EURO (ago 2026, la scelta della valuta): le
+        prove di ieri girano identiche riga per riga, ed e' la
+        regressione dei negozi in euro a costo zero. `articolo` sta a 0
+        apposta — a valuta 'eur' non si guarda mai, e se un domani lo
+        guardasse queste diventerebbero rosse."""
+        return _sg(0, misura_eur, soglia, "eur")
+
+    def gratis_sats(articolo, soglia):
+        """il gemello in SATS: la misura e' l'articolo COM'E', e
+        `articolo_eur` sta a None — cosi' ogni prova dimostra anche che
+        quella soglia non ha bisogno di nessuna conversione."""
+        return _sg(articolo, None, soglia, "sats")
+
+    def reg(soglia_eur):
+        """lo shim del lettore in EURO: esce la sola soglia, come ieri"""
+        return _rg(0, soglia_eur, "eur")[0]
+
+    def sconta(art, soglia, pct, valuta="eur"):
+        """lo sconto carrello a valore, per i quadranti qui sotto"""
+        return amb["_sconto_pacco"](art, eur(art), 2, "valore", soglia,
+                                    pct, valuta)
 
     # --- LA SOGLIA E' UNA PORTA, e al filo esatto e' APERTA -----------
     # La soglia e' in EURO dall'ago 2026, e la misura arriva gia'
@@ -4913,6 +5375,27 @@ def prove_sped_gratis():
     prova("None non si legge come uno zero qualunque", False,
           gratis(None, 0))
 
+    # --- LA SOGLIA IN SATS: la stessa porta, senza conversione --------
+    prova("in sats, al filo esatto: gratis", True,
+          gratis_sats(100_000, 100_000))
+    prova("in sats, un sat sotto: si paga", False,
+          gratis_sats(99_999, 100_000))
+    prova("in sats, ben sopra: gratis", True,
+          gratis_sats(9_000_000, 100_000))
+    # LA PROVA CHE VALE PIU' DELLE ALTRE, ed e' il guadagno del
+    # cantiere: `articolo_eur` e' None — cioe' CoinGecko muto — e la
+    # promessa scatta lo stesso, perche' la sua misura non ha mai avuto
+    # bisogno di una conversione. La gemella in euro, sopra, tace.
+    prova("in sats la promessa scatta ANCHE a cambio muto", True,
+          gratis_sats(9_000_000, 100_000))
+    prova("soglia 0 in sats: spenta come in euro", False,
+          gratis_sats(9_000_000, 0))
+    # e una valuta che non sappiamo misurare non regala niente: il
+    # ripiego naturale («sara' euro») e' proprio quello da non fare
+    for storto in ("", "usd", "EUR", "Sats", None, 0):
+        prova(f"valuta {storto!r}: la spedizione non e' gratis", False,
+              _sg(9_000_000, eur(9_000_000), 100, storto))
+
     # --- IL LETTORE DELLE LEVE ---------------------------------------
     prova("regola normale: la soglia passa", 100, reg(100))
     prova("sotto il minimo: nessuna promessa", 0, reg(0))
@@ -4923,6 +5406,41 @@ def prove_sped_gratis():
     amb["SPED_GRATIS_ATTIVO"] = False
     prova("leva generale spenta: nessuna promessa scatta", 0, reg(100))
     amb["SPED_GRATIS_ATTIVO"] = True
+    # LA VALUTA nel lettore: esce accanto alla soglia, ed e' GIA'
+    # quella dell'unita' scelta — un numero solo da guardare
+    prova("lettore in euro: (soglia, valuta)", (25, "eur"),
+          _rg(50_000, 25, "eur"))
+    prova("lettore in sats: esce l'ALTRA cifra", (50_000, "sats"),
+          _rg(50_000, 25, "sats"))
+    prova("valuta vuota = euro (il mondo di prima della scelta)",
+          (25, "eur"), _rg(50_000, 25, ""))
+    prova("valuta None = euro (colonna mai scritta)", (25, "eur"),
+          _rg(50_000, 25, None))
+    prova("valuta fuori catalogo: nessuna promessa", (0, ""),
+          _rg(50_000, 25, "usd"))
+    prova("in sats sotto il minimo: nessuna promessa", (0, ""),
+          _rg(0, 25, "sats"))
+    amb["VALUTE_SOGLIA"] = ("eur",)
+    prova("valuta tolta dalla leva: chi l'aveva scelta non promette piu'",
+          (0, ""), _rg(50_000, 25, "sats"))
+    prova("...ma l'altra continua", (25, "eur"), _rg(50_000, 25, "eur"))
+    amb["VALUTE_SOGLIA"] = ("eur", "sats")
+
+    # --- IL PUBBLICO: ogni chiave nella sua unita' --------------------
+    exec(pezzo("_sped_gratis_pubblico"), amb)
+    pubg = amb["_sped_gratis_pubblico"]
+    prova("pubblico in euro: la chiave in sats tace",
+          {"soglia": 0, "eur": 25, "valuta": "eur"},
+          pubg(50_000, 25, "eur"))
+    prova("pubblico in sats: la chiave in euro tace",
+          {"soglia": 50_000, "eur": 0, "valuta": "sats"},
+          pubg(50_000, 25, "sats"))
+    prova("pubblico a promessa spenta: tacciono tutte",
+          {"soglia": 0, "eur": 0, "valuta": ""}, pubg(0, 0, "eur"))
+    prova("le due cifre non parlano MAI insieme", True,
+          all(not (pubg(s, e, v)["soglia"] > 0 and pubg(s, e, v)["eur"] > 0)
+              for s in (0, 50_000) for e in (0, 25)
+              for v in ("eur", "sats", "usd", "")))
 
     # ================================================================
     # LE DUE PROMESSE SONO INDIPENDENTI (decisione 3 di Andrea), ed e'
@@ -4944,9 +5462,8 @@ def prove_sped_gratis():
     for nome, art, att_g, att_s in quadranti:
         g = gratis(eur(art),
                    sog_sped if att_g or nome == "nessuna delle due" else 0)
-        s = amb["_sconto_pacco"](art, eur(art), 2, "valore",
-                                 sog_sconto if att_s or
-                                 nome == "nessuna delle due" else 0, pct)
+        s = sconta(art, sog_sconto if att_s or
+                   nome == "nessuna delle due" else 0, pct)
         if nome == "nessuna delle due":
             prova("quadrante: sotto soglia non scatta niente", (False, 0),
                   (g, s))
@@ -4957,11 +5474,15 @@ def prove_sped_gratis():
     # viceversa. Se un domani la spedizione misurasse il NETTO, questo
     # carrello — 120.000 lordi, 108.000 netti — smetterebbe di avere la
     # spedizione gratis, e la riga qui sotto diventerebbe rossa.
-    sconto = amb["_sconto_pacco"](lordo, eur(lordo), 2, "valore",
-                                  sog_sconto, pct)
+    sconto = sconta(lordo, sog_sconto, pct)
     prova("lo sconto NON fa scendere la spedizione sotto soglia", True,
           gratis(eur(lordo), sog_sped) and sconto > 0
           and eur(lordo - sconto) < sog_sped)
+    # ...e vale anche a VALUTE MISTE (ago 2026): un negozio puo' avere
+    # lo sconto in euro e la spedizione gratis in sats, e le due
+    # restano indipendenti — guardano lo stesso lordo, in due unita'
+    prova("valute miste: le due promesse restano indipendenti", True,
+          gratis_sats(lordo, 100_000) and sconta(lordo, 100, pct) > 0)
     prova("...e la spedizione gratis non tocca lo sconto", 10_500, sconto)
     c = conto(lordo, 0, 0, 0, sconto)      # la spedizione gia' azzerata
     prova("il totale col carrello scontato E la spedizione offerta",
@@ -5019,6 +5540,11 @@ def prove_sped_gratis():
     # deciderebbe in un posto che nessuno ha confrontato con gli altri
     # (il -1 e' la definizione, che porta lo stesso testo)
     prova("...e i chiamanti sono i quattro percorsi del conto", 4,
+          src.count("_sped_gratis(articolo, misura_eur"))
+    # ...e ricevono TUTTE E DUE le facce dell'articolo, sempre nello
+    # stesso ordine: se un domani un percorso passasse solo l'euro, la
+    # sua soglia in sats smetterebbe di scattare in silenzio
+    prova("...e nessuno passa una faccia sola", 0,
           src.count("_sped_gratis(misura_eur"))
     # ...e la MISURA si conta una volta sola per percorso: e' cosi' che
     # «le due promesse guardano lo stesso numero» resta vero per
@@ -5059,7 +5585,7 @@ def prove_sped_gratis():
     # passerebbe col bug ancora dentro — provato rimettendolo.
     prova("compra: la promessa si legge sulla STRADA, non sulla cifra",
           True, ('if scelta == "spedizione":\n        vg = con.execute('
-                 '"SELECT sped_gratis_soglia_eur') in corpo_mono)
+                 '"SELECT sped_gratis_soglia') in corpo_mono)
     prova("compra: il gate a cifra non torna", False,
           "\n    if sped:\n" in corpo_mono)
 
@@ -5086,18 +5612,41 @@ def prove_sped_gratis():
     for nome in ("tag_commercio", "evento_annuncio"):
         prova(f"{nome}: cieco alla spedizione gratis", False,
               "sped_gratis" in pezzo(nome))
-    prova("un solo UPDATE scrive la soglia", 1,
-          src.count("sped_gratis_soglia_eur=?"))
-    # ...e la colonna VECCHIA in sats non la scrive piu' nessuno: e'
-    # inerte, e resta solo perche' un nome non cambia significato
-    prova("la colonna in sats non si scrive piu'", 0,
-          src.count("sped_gratis_soglia=?"))
+    # UN SOLO ENDPOINT scrive le soglie, e le scrive TUTTE E DUE nello
+    # stesso UPDATE: lo spegnimento (che azzera entrambe) e il
+    # salvataggio (che conserva l'altra col COALESCE). Due UPDATE in
+    # due punti sarebbero il mezzo secondo con la promessa a meta'.
+    corpo_epg = src[src.index("async def imposta_sped_gratis("):
+                    src.index("async def imposta_ferie(")]
+    # (fuori dall'endpoint le due colonne compaiono solo in LETTURA —
+    # le WHERE dell'avviso, del suggerimento e del libro mastro —
+    # quindi si contano gli UPDATE, non le occorrenze del nome)
+    # DUE: lo spegnimento (che azzera tutto) e il salvataggio (che
+    # conserva l'altra unita'), e non uno di piu'
+    prova("le soglie si scrivono SOLO nel loro endpoint", 2,
+          src.count("UPDATE utenti SET sped_gratis_"))
+    prova("...e tutti e due gli UPDATE stanno li' dentro", 2,
+          corpo_epg.count("UPDATE utenti SET sped_gratis_"))
+    prova("lo spegnimento azzera TUTTE E DUE le unita'", True,
+          "sped_gratis_soglia=0" in corpo_epg
+          and "sped_gratis_soglia_eur=0" in corpo_epg)
+    # LA PROVA CHE HA CAMBIATO LATO (ago 2026): fino a ieri diceva «la
+    # colonna in sats non si scrive piu'», e certificava il mondo in cui
+    # i sats non erano piu' una soglia possibile. Adesso si scrive
+    # eccome — dietro il COALESCE, cosi' salvare in una valuta non
+    # cancella la cifra dell'altra, che e' cio' che rende il toggle
+    # reversibile senza chiedere niente a nessuno.
+    prova("la colonna in sats si scrive, dietro COALESCE", True,
+          "sped_gratis_soglia=COALESCE(?, sped_gratis_soglia)" in corpo_epg)
+    prova("...e mai secca, che cancellerebbe l'altra unita'", 0,
+          corpo_epg.count("sped_gratis_soglia=?"))
     # LA DECISIONE STA NELLO STESSO PUNTO nei tre percorsi: DOPO il
     # conto della tariffa. Se il preventivo decidesse prima, la pagina
     # direbbe «gratuita» dove la invoice risponde 503.
     for chi, c2 in (("_compra_set", corpo_set), ("compra", corpo_mono)):
         prova(f"{chi}: si decide DOPO aver contato la tariffa", True,
-              c2.index("_sped_gratis(misura_eur") < c2.index("_conto_ordine("))
+              c2.index("_sped_gratis(articolo, misura_eur")
+              < c2.index("_conto_ordine("))
 
     # ================================================================
     # IL PASSAGGIO ALL'EURO (ago 2026)
@@ -5116,8 +5665,45 @@ def prove_sped_gratis():
               vietato in corpo_eur)
     # IL CAMBIO SI CHIEDE SOLO SE SERVE: un negozio senza promesse in
     # euro non deve pagare un giro di rete che ieri non faceva.
+    # ...e dall'ago 2026 la guardia nomina anche la VALUTA: a soglia in
+    # SATS quel giro di rete non si fa affatto, perche' la misura e'
+    # l'articolo stesso. E' il guadagno della scelta, e senza questa
+    # riga un riordino lo rimetterebbe in piedi senza rompere niente.
     prova("compra: il cambio per la promessa ha una guardia", True,
-          "if sog_gratis > 0 and cambio_misura <= 0:" in corpo_mono)
+          'if sog_gratis > 0 and val_sg == "eur" and cambio_misura <= 0:'
+          in corpo_mono)
+    # LE QUATTRO GUARDIE del cambio nominano tutte la valuta: se una se
+    # ne dimenticasse, quel percorso pagherebbe un giro di rete che non
+    # gli serve — e su un negozio tutto-sats a CoinGecko muto la
+    # promessa continuerebbe a scattare, quindi il difetto sarebbe
+    # invisibile fino alla bolletta.
+    # Si guarda PERCORSO PER PERCORSO e non con un conteggio: un
+    # numero direbbe «quattro» anche se tre stessero nella stessa
+    # funzione e una mancasse del tutto.
+    # LE FETTE QUI SONO STRETTE, e non e' pignoleria: `corpo_set` qui
+    # sopra arriva fino a _preventivo_set, quindi si porta dentro anche
+    # preventivo_ordine — e una guardia tolta al SET passerebbe
+    # inosservata perche' quella del preventivo e' ancora li' (provato
+    # con la mutazione: sopravviveva).
+    corpo_cset = src[src.index("async def _compra_set("):
+                     src.index("def _strade_preventivo(")]
+    corpo_prev = src[src.index("async def preventivo_ordine("):
+                     src.index("async def _preventivo_set(")]
+    corpo_pset = src[src.index("async def _preventivo_set("):
+                     src.index("async def compra(")]
+    for chi, c2 in (("_compra_set", corpo_cset), ("compra", corpo_mono),
+                    ("preventivo_ordine", corpo_prev),
+                    ("_preventivo_set", corpo_pset)):
+        prova(f"{chi}: la guardia del cambio nomina la valuta", True,
+              'sog_gratis > 0 and val_sg == "eur"' in c2)
+    # e lo sconto ne ha due (i due percorsi che il carrello tocca): il
+    # mono non lo sconta mai, quindi li' non c'e' niente da guardare
+    for chi, c2 in (("_compra_set", corpo_cset),
+                    ("_preventivo_set", corpo_pset)):
+        prova(f"{chi}: ...e quella dello sconto pure", True,
+              'or (crit == "valore" and val_sc == "eur")' in c2)
+    prova("compra (mono): lo sconto non lo guarda proprio", False,
+          "val_sc" in corpo_mono)
     # ...e a cambio muto NON nasce un 503 nuovo: si rinuncia alla
     # promessa, non all'acquisto. Il 503 resta dei due casi di sempre.
     prova("compra: i 503 restano due (listino EUR, tariffa ancorata)",
@@ -5181,10 +5767,25 @@ def prove_sped_gratis():
     # perche' col passaggio all'euro la parola «sats» era sparita dal
     # cassetto del venditore, e una soglia in euro accanto a un negozio
     # che incassa in bitcoin si legge come «mi pagano in euro».
+    # Dall'ago 2026 e' una FUNZIONE e i testi sono due, uno per valuta:
+    # il compromesso va detto in tutte e due le direzioni invece di
+    # deciderlo al posto del venditore. Il patto pero' non cambia — una
+    # sola definizione, e la portano tutti e due i cassetti.
     prova("la nota «incassi in sats» e' scritta UNA volta", 1,
-          mini.count("const NOTA_SOGLIA_EURO"))
+          mini.count("function notaSoglia("))
     prova("...e la portano tutti e due i cassetti", 2,
-          mini.count("${NOTA_SOGLIA_EURO}"))
+          mini.count("${notaSoglia("))
+    # ...e dice sempre che l'incasso e' in sats, in TUTTE E DUE le
+    # valute: e' la riga che tiene onesto il cassetto di un negozio
+    # che promette in euro ma incassa in bitcoin
+    _ns = mini[mini.index("function notaSoglia("):
+               mini.index("function toggleValutaSoglia(")]
+    prova("...e nomina i sats una volta sola, per tutte e due", 1,
+          _ns.count("Tu incassi sempre in"))
+    prova("la nota in sats avverte della deriva", True,
+          "se il\n       cambio si muove" in _ns)
+    prova("...e quella in euro dice che non deriva", True,
+          "non cambia da sola col cambio" in _ns)
 
     # IL CAMPO LIBERO delle due soglie (ago 2026): le pillole non
     # riproducono le cifre nate dal travaso (14 €, 56 €), e chi se le
@@ -5608,8 +6209,13 @@ def prove_libro_mastro():
         CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
           sconto_pacco_criterio TEXT DEFAULT 'pezzi',
           sconto_pacco_soglia INT DEFAULT 0,
+          sconto_pacco_valore INT DEFAULT 0,
           sconto_pacco_valore_eur INT DEFAULT 0,
-          sconto_pacco_percento INT DEFAULT 0);
+          sconto_pacco_valore_valuta TEXT DEFAULT 'eur',
+          sconto_pacco_percento INT DEFAULT 0,
+          sped_gratis_soglia INT DEFAULT 0,
+          sped_gratis_soglia_eur INT DEFAULT 0,
+          sped_gratis_valuta TEXT DEFAULT 'eur');
         CREATE UNIQUE INDEX idx_rimborso_chiusura ON rimborsi_asta(puntata_id)
           WHERE motivo IN ('perdente','annullo_admin');
         CREATE UNIQUE INDEX idx_rimborso_tardivo ON rimborsi_asta(rilancio_id)
@@ -5652,13 +6258,21 @@ def prove_libro_mastro():
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,
           nascosto_compratore)
           VALUES(5, 9, 1000, 'released', 1);
-        -- TRE NEGOZI SANI: uno sconta a pezzi, uno a valore, uno e'
-        -- spento (e uno spento non deve suonare mai)
+        -- CINQUE NEGOZI SANI: uno sconta a pezzi, uno a valore in
+        -- EURO, uno a valore in SATS, uno e' spento (e uno spento non
+        -- deve suonare mai), e uno offre la spedizione in sats.
+        -- I DUE IN SATS sono la ragione per cui questi controlli hanno
+        -- dovuto imparare la valuta: hanno legittimamente la colonna
+        -- in euro a ZERO, e senza il CASE suonerebbero per sempre.
         INSERT INTO utenti(tg_id,sconto_pacco_criterio,sconto_pacco_soglia,
-          sconto_pacco_valore_eur,sconto_pacco_percento)
-          VALUES(222, 'pezzi', 3, 0, 10),
-                (333, 'valore', 0, 100, 15),
-                (444, 'pezzi', 0, 0, 0);
+          sconto_pacco_valore,sconto_pacco_valore_eur,
+          sconto_pacco_valore_valuta,sconto_pacco_percento,
+          sped_gratis_soglia,sped_gratis_soglia_eur,sped_gratis_valuta)
+          VALUES(222, 'pezzi',  3, 0,     0,   'eur',  10, 0,     0,  'eur'),
+                (333, 'valore', 0, 0,     100, 'eur',  15, 0,     25, 'eur'),
+                (555, 'valore', 0, 50000, 0,   'sats', 12, 0,     0,  'eur'),
+                (666, 'pezzi',  2, 0,     0,   'eur',  10, 50000, 0,  'sats'),
+                (444, 'pezzi',  0, 0,     0,   'eur',  0,  0,     0,  'eur');
         """)
         return con
 
@@ -5724,6 +6338,19 @@ def prove_libro_mastro():
          "promessa di sconto che non puo' scattare", "222"),
         ("UPDATE utenti SET sconto_pacco_valore_eur=0 WHERE tg_id=333",
          "promessa di sconto che non puo' scattare", "333"),
+        # ...e i due modi NUOVI, che la valuta porta con se': la cifra
+        # a zero NELL'UNITA' DICHIARATA (in sats, dove prima nessuno
+        # guardava) e una valuta che nessun ramo sa misurare
+        ("UPDATE utenti SET sconto_pacco_valore=0 WHERE tg_id=555",
+         "promessa di sconto che non puo' scattare", "555"),
+        ("UPDATE utenti SET sconto_pacco_valore_valuta='usd' "
+         "WHERE tg_id=555",
+         "promessa di sconto che non puo' scattare", "555"),
+        # il gemello della spedizione gratis, che prima della valuta
+        # non aveva ragione di esistere: una promessa accesa in
+        # un'unita' che nessuno sa misurare e' spenta in silenzio
+        ("UPDATE utenti SET sped_gratis_valuta='usd' WHERE tg_id=666",
+         "promessa di spedizione gratis che non puo' scattare", "666"),
         # la spedizione gratis: le due colonne si escludono per
         # costruzione (stesso INSERT), quindi una riga qui vuol dire
         # che una delle due cifre e' falsa
@@ -6561,8 +7188,9 @@ def _censimento(acceso):
     # Le leve che sono LISTE: _elenco ci itera sopra.
     for nome in ("ASTA_DURATE_GIORNI", "LAMPO_SCONTI", "ORE_LAMPO_OPZIONI",
                  "SCONTO_PACCO_SOGLIE", "SCONTO_PACCO_SCONTI",
-                 "SCONTO_PACCO_VALORI_EUR", "SCONTO_PACCO_CRITERI",
-                 "SPED_GRATIS_SOGLIE_EUR"):
+                 "SCONTO_PACCO_VALORI_EUR", "SCONTO_PACCO_VALORI_SATS",
+                 "SCONTO_PACCO_CRITERI", "VALUTE_SOGLIA",
+                 "SPED_GRATIS_SOGLIE_EUR", "SPED_GRATIS_SOGLIE_SATS"):
         amb[nome] = [1, 2, 3]
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
@@ -9989,7 +10617,7 @@ def main():
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
-              prove_sped_gratis, prove_suggerimenti,
+              prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_cambio,
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,

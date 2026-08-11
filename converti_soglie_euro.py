@@ -41,11 +41,12 @@ import urllib.request
 MIN_EUR = 1
 
 COLONNE = (
-    # (vecchia in sats, nuova in euro, come si chiama per un umano)
+    # (in sats, in euro, la colonna della valuta, come si chiama per un
+    # umano)
     ("sconto_pacco_valore", "sconto_pacco_valore_eur",
-     "sconto carrello a valore"),
+     "sconto_pacco_valore_valuta", "sconto carrello a valore"),
     ("sped_gratis_soglia", "sped_gratis_soglia_eur",
-     "spedizione gratis"),
+     "sped_gratis_valuta", "spedizione gratis"),
 )
 
 
@@ -94,12 +95,20 @@ def main():
     # Chi ha una soglia vecchia piena e la nuova ancora a zero: e'
     # esattamente la popolazione che in questo momento ha una promessa
     # in vetrina che NON scatta piu'.
+    # LA VALUTA E' NELLA WHERE (ago 2026, il cantiere della scelta), e
+    # senza sarebbe un danno vero: «soglia in sats piena e soglia in
+    # euro a zero» adesso e' la firma di chi ha SCELTO i sats, e questo
+    # script gli sovrascriverebbe la cifra in euro — cioe' gli
+    # cancellerebbe in silenzio quello che aveva scritto nell'altra
+    # unita', proprio la cifra che il toggle serve a ritrovare. Si
+    # tocca solo chi la promessa ce l'ha dichiarata in EURO.
     da_fare = []
-    for vecchia, nuova, _ in COLONNE:
+    for vecchia, nuova, valuta, _ in COLONNE:
         try:
             righe = con.execute(
                 f"SELECT tg_id, nome, {vecchia} AS sats FROM utenti "
-                f"WHERE {vecchia} > 0 AND {nuova} = 0").fetchall()
+                f"WHERE {vecchia} > 0 AND {nuova} = 0 "
+                f"AND {valuta} = 'eur'").fetchall()
         except sqlite3.OperationalError as e:
             print(f"⚠️  Colonna assente ({e}): il database non ha ancora "
                   f"fatto la migrazione — avvia il server una volta.")
@@ -128,7 +137,7 @@ def main():
     per_colonna = {}
     for vecchia, nuova, tg_id, nome, sats in da_fare:
         eur = in_euro(sats, cambio)
-        etichetta = next(e for v, _, e in COLONNE if v == vecchia)
+        etichetta = next(e for v, _, _c, e in COLONNE if v == vecchia)
         limato = "  ← limato al minimo" if eur == MIN_EUR and sats else ""
         print(f"  {etichetta:26} {(nome or '')[:20]:20} "
               f"{sats:>10,} sats → {eur:>5} €{limato}".replace(",", "."))

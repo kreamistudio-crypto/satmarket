@@ -174,15 +174,17 @@ CONTROLLO_LIBRO_MASTRO = True   # False = ronda spenta
 # articoli») o a VALORE degli articoli («da 100.000 sats nel
 # carrello»), che e' il modo di dare lo sconto da due pezzi su un
 # computer e da venti su una scatola di cianfrusaglie, con una regola
-# sola. La soglia a valore e' in EURO (ago 2026: prima era in sats, e
-# derivava col cambio — chi scriveva 100.000 pensando «una cinquantina
-# di euro» si ritrovava una promessa del doppio senza aver toccato
-# niente). A cambio muto la promessa non scatta e la pagina lo dice;
-# l'incasso resta sempre in sats.
+# sola. E la VALUTA della soglia a valore la sceglie sempre lui, in
+# EURO o in SATS (ago 2026): in euro non deriva col cambio — chi scrive
+# 100.000 sats pensando «una cinquantina di euro» si ritrova una
+# promessa del doppio senza aver toccato niente — mentre in sats non ha
+# bisogno del cambio, e scatta anche quando il cambio non risponde. Il
+# cassetto lo dice, e sceglie il venditore. L'incasso resta sempre in
+# sats.
 # ATTENZIONE se questo file lo copi su un config gia' esistente: le
-# leve si chiamano *_EUR apposta, cosi' una riga vecchia in sats resta
-# INERTE invece di essere letta come euro (che sarebbe una promessa da
-# venticinquemila euro, cioe' spenta in silenzio).
+# leve si chiamano *_EUR e *_SATS apposta, cosi' una riga vecchia dal
+# nome nudo resta INERTE invece di essere letta nell'unita' sbagliata
+# (che sarebbe una promessa spenta in silenzio).
 # Si cumula con la lampo e con le offerte accettate: e' una promessa di
 # negozio, e un pezzo che non la mantenesse non avrebbe un posto onesto
 # dove dirlo. Il tetto qui sotto e' il guardrail della cascata — e
@@ -192,9 +194,17 @@ SCONTO_PACCO_ATTIVO = True      # interruttore generale (False = spento)
 SCONTO_PACCO_CRITERI = ("pezzi", "valore")   # togliere un criterio da
                                 # qui lo spegne per chi l'aveva scelto
 SCONTO_PACCO_SOGLIE = (2, 3, 4, 5)      # le soglie proposte al venditore
+# LA VALUTA DELLA SOGLIA A VALORE LA SCEGLIE IL VENDITORE (ago 2026,
+# chiesto dalla comunita'). Vale per TUTTE E DUE le promesse, e ognuna
+# ha la sua: sono indipendenti. Togliere una valuta da qui la spegne per
+# chi l'aveva scelta — freno d'emergenza, non una taratura.
+VALUTE_SOGLIA = ("eur", "sats")
 SCONTO_PACCO_VALORI_EUR = (10, 25, 50, 100)  # a valore, in euro: basse
                                 # apposta, che il carrello di un
                                 # mercatino dell'usato e' piccolo
+SCONTO_PACCO_VALORI_SATS = (10_000, 25_000, 50_000, 100_000)  # le
+                                # gemelle in sats: numeri TONDI, non la
+                                # conversione delle sorelle in euro
 SCONTO_PACCO_SCONTI = (5, 10, 15, 20)   # le percentuali proposte
 SCONTO_PACCO_MIN_SOGLIA = 2     # sotto non e' uno sconto carrello: e'
                                 # un ribasso di listino, e quello si fa
@@ -203,13 +213,14 @@ SCONTO_PACCO_MIN_VALORE_EUR = 1  # la gemella a valore: una cintura
                                 # contro lo zero travestito, non un
                                 # giudizio su quanto debba valere un
                                 # carrello
+SCONTO_PACCO_MIN_VALORE_SATS = 1  # idem, in sats
 SCONTO_PACCO_MAX_PERCENTO = 30  # sconto massimo consentito
 
 # --- Spedizione gratis sopra soglia ----------------------------------
-# La seconda promessa di negozio: «da N € di articoli la spedizione
-# la offro io». La soglia e' in EURO per le stesse ragioni dello sconto
-# qui sopra, e vale per tutte e due o non varrebbe per nessuna: due
-# promesse identiche in due valute diverse non si spiegano a chi compra.
+# La seconda promessa di negozio: «da N di articoli la spedizione la
+# offro io». Anche qui la VALUTA la sceglie il venditore, e ne ha una
+# SUA: le due promesse restano indipendenti, e un venditore puo'
+# dichiarare lo sconto in euro e la spedizione gratis in sats.
 # A DIFFERENZA DELLO SCONTO vale anche su un oggetto solo: azzerare una
 # tariffa scrive spedizione_sats=0, cioe' lo stato che gli annunci con
 # spedizione gratuita dichiarata hanno da sempre — mentre uno sconto di
@@ -222,10 +233,13 @@ SCONTO_PACCO_MAX_PERCENTO = 30  # sconto massimo consentito
 SPED_GRATIS_ATTIVO = True       # interruttore generale (False = spento)
 SPED_GRATIS_SOGLIE_EUR = (10, 25, 50, 100)  # le soglie proposte al
                                 # venditore, in euro
+SPED_GRATIS_SOGLIE_SATS = (10_000, 25_000, 50_000, 100_000)  # e in sats,
+                                # per chi dichiara la soglia cosi'
 SPED_GRATIS_MIN_EUR = 1         # una cintura contro lo zero travestito:
                                 # sotto, la spedizione sarebbe gratis
                                 # sempre — e quella si dichiara nel
                                 # prezzo dell'annuncio (costo 0)
+SPED_GRATIS_MIN_SATS = 1        # idem, in sats
 
 # --- Suggerimenti dal bot --------------------------------------------
 # I consigli che il bot manda al venditore: cosa manca a un annuncio, e
