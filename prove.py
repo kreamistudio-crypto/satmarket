@@ -2646,6 +2646,33 @@ def prove_dettaglio_ordine():
           True, "🚚 Spedizione <b>gratuita</b>" in det
           and "sats di spedizione" in det)
 
+    # ---- 4-bis: LA FOTO VERA, IN LISTA E NEL DETTAGLIO ----
+    # La catena di ripiego (miniatura versionata → foto piena → 📦) e'
+    # la parte delicata: una fabbrica SOLA, o le due copie divergono
+    # al primo ritocco e una delle due mostra un'immagine rotta.
+    fo = pezzo_js(mini, "function fotoOrdine(o, grande){")
+    # la catena degli ORDINI si riconosce dal 📦 finale: le miniature
+    # delle altre liste hanno la loro, a due gradini e senza emoji
+    prova("la catena di ripiego dell'ordine vive in un posto solo", 1,
+          mini.count("replaceWith('📦')"))
+    prova("...ed e' dentro fotoOrdine", True,
+          "this.src=this.dataset.full" in fo
+          and "replaceWith('📦')" in fo)
+    prova("la miniatura e' quella versionata", True,
+          "fotoMini(o.foto0)" in fo and "fotoUrl(o.foto0)" in fo)
+    prova("senza foto resta il 📦 (o l'emoji della DEMO)", True,
+          "o.listing.emoji || '📦'" in fo)
+    prova("il nome del file passa sempre da esc()", 2, fo.count("esc(foto"))
+    prova("la lista chiama la fabbrica", True, "${fotoOrdine(o)}" in mini)
+    prova("...e il dettaglio pure, col quadratino grande", True,
+          "${fotoOrdine(o, true)}" in det)
+    prova("...al posto del 📦 accanto al titolo", False,
+          "${o.listing.emoji} ${esc(o.listing.title)}" in det)
+    # il titolo e' un figlio flex: senza min-width:0 una parola lunga
+    # senza spazi allarga la PAGINA (la lezione del riquadro venditore)
+    prova("il titolo del dettaglio non può allargare la pagina", True,
+          ".ordine-testa h2{min-width:0" in mini)
+
     # ---- 5-bis: IL PUNTO NON SI DICE DUE VOLTE ----
     # Sotto il prezzo c'era anche il punto GIA' scelto, mentre due dita
     # piu' sotto lo stesso testo si puo' ancora CORREGGERE. Via di li';

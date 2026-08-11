@@ -2328,6 +2328,14 @@
   .order-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
   .order-ic{width:38px;height:38px;border-radius:12px;background:var(--chip-bg);
     display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
+  /* il gemello grande, in testa al dettaglio dell'ordine */
+  .order-ic.grande{width:48px;height:48px;font-size:22px}
+  /* La testa del dettaglio: foto e titolo in riga. `min-width:0` sul
+     titolo non e' cosmesi — un figlio flex non scende mai sotto il
+     proprio contenuto, e una parola lunga senza spazi allargherebbe
+     la PAGINA (la lezione del riquadro venditore). */
+  .ordine-testa{display:flex;align-items:center;gap:12px}
+  .ordine-testa h2{min-width:0;margin:0}
   .order-main{min-width:0}
   .order-main .sub{margin-top:2px}
   .csv-line{text-align:center;font-size:12px;color:var(--muted);font-weight:700;padding:6px var(--pad) 2px}
@@ -6431,6 +6439,26 @@ function pontiContatto(username, npub, chi, cls){
   if (username) b.push(`<button class="${c} tg" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
   if (npub) b.push(`<button class="${c} nostr" onclick="apriNostrProfilo('${npub}')">🟣 Scrivi ${chi} su Nostr</button>`);
   return b.join('');
+}
+/* LA FOTO VERA DELL'ARTICOLO (ago 2026): il quadratino a sinistra del
+   titolo, nella LISTA degli ordini e nel DETTAGLIO. Una fabbrica sola
+   perché la parte delicata è la CATENA DI RIPIEGO — miniatura
+   versionata → foto piena → il 📦 di sempre, mai un'immagine rotta —
+   e due copie divergono al primo ritocco. Per i SET il server manda
+   già la foto del PRIMO pezzo, quello che il titolo nomina; annuncio
+   sparito o lista vuota = '' e resta il 📦. In DEMO non ci sono nomi
+   di foto e resta l'emoji del listing.
+   Il raggio dell'immagine è `inherit`: così la stessa fabbrica serve
+   il quadratino da 38 della lista e quello da 48 del dettaglio senza
+   una seconda misura da tenere in pari. */
+function fotoOrdine(o, grande){
+  const c = 'order-ic' + (grande ? ' grande' : '');
+  if (!o.foto0) return `<span class="${c}">${o.listing.emoji || '📦'}</span>`;
+  return `<span class="${c}"><img src="${esc(fotoUrl(fotoMini(o.foto0)))}" `
+       + `data-full="${esc(fotoUrl(o.foto0))}" loading="lazy" decoding="async" `
+       + `alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" `
+       + `onerror="if(!this.dataset.p){this.dataset.p=1;this.src=this.dataset.full}`
+       + `else{this.replaceWith('📦')}"></span>`;
 }
 /* IL PUNTO DI RITIRO NEL BANNER DEL PACCO (ago 2026): finche'
    l'ordine e' 'locked' il punto vive nel campo del compratore (dove
@@ -11269,12 +11297,6 @@ function renderOrders(){
     return;
   }
   el('ordersList').innerHTML = vista.map(o=>{
-    /* la foto vera al posto del 📦 (pattern delle Offerte qui sopra):
-       prima la _min, sul suo errore l'originale, poi il 📦 di sempre
-       — mai un'immagine rotta. In DEMO resta l'emoji del listing. */
-    const ic = o.foto0
-      ? `<img src="${esc(fotoUrl(fotoMini(o.foto0)))}" data-full="${esc(fotoUrl(o.foto0))}" loading="lazy" decoding="async" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px" onerror="if(!this.dataset.p){this.dataset.p=1;this.src=this.dataset.full}else{this.replaceWith('📦')}">`
-      : (o.listing.emoji || '📦');
     const puoNascondere = !DEMO && o.role!=='admin' && NASCONDIBILI.includes(o.state);
     const x = !puoNascondere ? ''
       : o.nascosto
@@ -11284,7 +11306,7 @@ function renderOrders(){
     <div class="order${o.nascosto?' nascosta':''}" onclick="openOrder(${o.id})">
       <div class="row">
         <div class="order-left">
-          <span class="order-ic">${ic}</span>
+          ${fotoOrdine(o)}
           <div class="order-main">
             <b>${esc(o.listing.title)}</b>
             <div class="sub">${verboOrdine(o)} · ${o.when}</div>
@@ -11431,7 +11453,7 @@ function openOrder(id){
     :                             {ic:'🔒', b:'Sats nel deposito di garanzia', d:'I sats sono al sicuro, nessuno può toccarli'};
   el('orderContent').innerHTML = `
     <div class="detail-body">
-      <h2 style="font-size:17px">${o.listing.emoji} ${esc(o.listing.title)}</h2>
+      <div class="ordine-testa">${fotoOrdine(o, true)}<h2 style="font-size:17px">${esc(o.listing.title)}</h2></div>
       <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span>${incisoConto(o)}</div>
       ${o.righe.length ? `<div class="eur-hint" style="margin-top:-6px">${
         /* il SET: l'elenco dei pezzi con gli unitari fotografati —
