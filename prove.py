@@ -2754,8 +2754,45 @@ def prove_dettaglio_ordine():
           "'Punto di ritiro dell\\'acquirente'" in pb)
     prova("...col testo del compratore sempre scappato", True,
           "esc(o.puntoRitiro)" in pb)
-    prova("il banner nasce anche senza tracciamento (via punto)", True,
-          "(o.tracking || o.puntoRitiro)" in det)
+    # IL BANNER E' DEL PUNTO, E DI NIENT'ALTRO (ago 2026): questa prova
+    # ha CAMBIATO LATO — chiedeva «il banner nasce anche senza
+    # tracciamento», cioe' certificava la meta' che diceva «Spedito con
+    # X — tracciamento Y», parola per parola il passo «Oggetto spedito»
+    # del recinto due dita piu' su. Il codice resta LI', dove ora si
+    # tocca; qui resta il punto, e senza punto il banner non nasce.
+    prova("il banner e' del punto, e di nient'altro", True,
+          "(['shipped','delivered'].includes(s) && o.puntoRitiro)" in det)
+    prova("...quindi il tracciamento non si ripete sotto il recinto",
+          False, "Spedito con <b>" in det)
+    # e il «segui il pacco» di 17track e' uscito dall'ordine: la strada
+    # delle notifiche e' @trackbot, e due strade per la stessa cosa
+    # sono un bivio davanti a chi aspetta un pacco. Ne resta UNO, quello
+    # del RESO (lato venditore, altro cantiere): il conto lo dice, cosi'
+    # se un domani ne ricompare uno qui la riga diventa rossa.
+    righe17 = [r for r in mini.splitlines() if "t.17track.net" in r]
+    prova("di 17track ne resta uno solo", 1, len(righe17))
+    prova("...ed e' quello del reso", True,
+          bool(righe17) and "trackingReso" in righe17[0])
+
+    # ---- 5-ter: LA TESTATA STA SOPRA IL RECINTO ----
+    # Lo stato dell'affare e' l'intestazione dell'ORDINE, non un
+    # contenuto della cassaforte: e' uscito dal riquadro, che comincia
+    # dritto coi passi e NON prende una seconda testata (ogni passo ha
+    # gia' il suo titolo). Il CSS ha dovuto perdere il discendente
+    # `.vault .vault-head`, o la testata resterebbe senza vestito.
+    prova("la testata sta FUORI dal recinto", True,
+          '<div class="vault-head">' in det and '<div class="vault">' in det
+          and det.index('<div class="vault-head">')
+              < det.index('<div class="vault">'))
+    prova("...e dentro il recinto ci sono solo i passi", True,
+          '<div class="vault">\n        <div class="steps">' in det)
+    prova("il CSS non cerca piu' la testata dentro .vault", False,
+          ".vault .vault-head" in mini)
+    prova("...ma la veste lo stesso", True, ".vault-head{" in mini)
+    # le monete della festa partono da li': se la classe cambiasse nome
+    # uscirebbero dal nulla
+    prova("la festa dei sats trova ancora la testata", True,
+          "#orderContent .vault-head" in mini)
 
     # ---- 6-8: la modalita' non si ripete ----
     for detto in ("📦 spedizione a un punto di ritiro",
@@ -4229,13 +4266,39 @@ def prove_forma_tracking():
     # della forma e' lo STESSO dell'euristica qui sopra — il codice
     # dell'intermediario, che per il corriere dichiarato ha la forma
     # storta, non arriva mai a trackbot.
-    bn = pezzo_js(src, "function bottoneNotifichePacco")
-    prova("trackbot: solo il compratore", True, "'buyer'" in bn)
-    prova("trackbot: solo col tracciamento", True, "!o.tracking" in bn)
+    # Dall'ago 2026 il giudice e' anche UNO SOLO per i due posti da cui
+    # ci si arriva — il bottone e il codice dentro il recinto: due
+    # strade che rispondessero diverso sullo stesso codice sarebbero
+    # una che promette quel che l'altra nega.
+    tp = pezzo_js(src, "function trackbotPossibile")
+    prova("trackbot: solo il compratore", True, "'buyer'" in tp)
+    prova("trackbot: solo col tracciamento", True, "!!o.tracking" in tp)
+    prova("trackbot: solo mentre il pacco viaggia", True,
+          "['shipped','delivered'].includes(s)" in tp)
     prova("trackbot: il giudice e' formaTracking, riusato", True,
-          "formaTracking(o.corriere, o.tracking)" in bn)
+          "formaTracking(o.corriere, o.tracking)" in tp)
     prova("...e formaTracking resta UNO", 1,
           src.count("function formaTracking"))
+    prova("il giudice serve tutti e due i posti", 2,
+          src.count("trackbotPossibile(o, s)")
+          - src.count("function trackbotPossibile(o, s)"))
+    prova("...e il bottone non ne tiene uno suo", 1,
+          pezzo_js(src, "function bottoneNotifichePacco").count("if ("))
+    # IL CODICE SI TOCCA DOVE SI LEGGE, dentro il passo «Oggetto
+    # spedito»; senza porta resta TESTO, che un link a vuoto e' peggio
+    # di nessun link — e in tutti e due i rami passa da esc(), che e'
+    # testo di chi vende su un tubo HTML.
+    ct = pezzo_js(src, "function codiceTracking")
+    prova("il codice cliccabile chiama attivaNotifichePacco", True,
+          "attivaNotifichePacco()" in ct)
+    prova("...e senza porta resta testo", 2, ct.count("esc(o.tracking)"))
+    prova("il passo «Oggetto spedito» usa la fabbrica", True,
+          "tracking ${codiceTracking(o, s)}" in src)
+    # la traccia della correzione del moderatore ha seguito il codice:
+    # stava nel banner sparito, e la vedono ENTRAMBE le parti come prima
+    prova("...e si porta dietro la traccia del moderatore", True,
+          "${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}"
+          in src)
     prova("trackbot: il deep link e' uno e vive nell'helper", 1,
           src.count("https://t.me/trackbot?start="))
     prova("trackbot: dentro Telegram passa da openTelegramLink", True,
@@ -4243,6 +4306,18 @@ def prove_forma_tracking():
           pezzo_js(src, "async function attivaNotifichePacco"))
     prova("trackbot: la riga dice CHI manda le notifiche", True,
           "te le manda @trackbot, non Barattolo" in src)
+    # IL CODICE NON GLIELO SAPPIAMO CONSEGNARE (ago 2026, dal campo):
+    # il payload resta attaccato al link — costa zero — ma la riga non
+    # promette piu' che il bot lo capisca: dice che il codice sta negli
+    # appunti e va incollato. Se un domani trackbot lo accettasse,
+    # queste tre righe sono l'unica cosa da cambiare.
+    an = pezzo_js(src, "async function attivaNotifichePacco")
+    prova("...e che il codice va INCOLLATO a mano", True,
+          "<b>incollalo nel bot</b>" in src)
+    prova("...il toast dice la stessa cosa", True,
+          "Codice copiato — incollalo nel bot" in an)
+    prova("...e se la copia non riesce non lo dice", True,
+          "copiato = false" in an and "Copia il codice qui sopra" in an)
     # IL FATTO su come arriva il codice (ago 2026): una costante, due
     # pannelli — la busta del venditore e il form di spedizione via
     # punto. Il fatto, mai l'istruzione.

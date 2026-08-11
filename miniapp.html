@@ -2238,15 +2238,22 @@
      barattolo", lo stesso sigillo della zona acquisto */
   .vault{
     position:relative;background:var(--trust-soft);border:2px dashed var(--trust);
-    border-radius:20px;padding:20px 16px 18px;margin:20px 0 16px;
+    border-radius:20px;padding:20px 16px 18px;margin:0 0 16px;
   }
-  .vault .vault-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-  .vault .vault-head .lock{
+  /* LO STATO STA SOPRA IL RECINTO (ago 2026): «Sats nel deposito di
+     garanzia» e' l'intestazione dell'ORDINE, non un contenuto della
+     cassaforte — quindi il markup e' uscito dal riquadro e questi tre
+     selettori non sono piu' discendenti di .vault. Il margine di sopra
+     e' quello che il recinto aveva prima (il suo ora e' 0: il respiro
+     fra testa e riquadro lo da' il margine di sotto, che senza il
+     collasso con un margin-top del vicino resta esattamente 12px). */
+  .vault-head{display:flex;align-items:center;gap:10px;margin:20px 0 12px}
+  .vault-head .lock{
     width:38px;height:38px;border-radius:12px;background:var(--card);
     display:flex;align-items:center;justify-content:center;font-size:19px;
   }
-  .vault .vault-head b{font-size:14.5px}
-  .vault .vault-head small{display:block;color:var(--muted);font-weight:600;font-size:12px}
+  .vault-head b{font-size:14.5px}
+  .vault-head small{display:block;color:var(--muted);font-weight:600;font-size:12px}
   .steps{position:relative;margin-left:7px}
   .steps::before{content:'';position:absolute;left:8px;top:8px;bottom:8px;width:2px;background:var(--step-line)}
   .step{position:relative;padding:0 0 18px 32px}
@@ -2263,6 +2270,14 @@
   .step b{font-size:13.5px;display:block}
   .step small{color:var(--muted);font-size:12px;font-weight:600}
   .step.todo{opacity:.45}
+  /* Il codice del tracciamento dentro il recinto si TOCCA e porta a
+     @trackbot. NON il verde-link del vecchio «segui il pacco» (--trust
+     sul fondo della fiducia rende 3,84: passa per un ornamento, non
+     per una cifra da leggere) ma --trust-note, che e' l'INCHIOSTRO di
+     questa superficie — 8,1 di giorno e 10,5 di sera, e qui si legge
+     un codice a ventiquattro cifre. A dire che si tocca sono il
+     grassetto e la sottolineatura, l'unica della pagina. */
+  .step .trackbot{color:var(--trust-note);font-weight:800;text-decoration:underline;cursor:pointer}
 
   /* ---------- vendi (form) ---------- */
   .form{padding:18px var(--pad)}
@@ -11499,7 +11514,7 @@ function openOrder(id){
             : (o.contenutoPresente?'Il venditore ha consegnato il contenuto in piattaforma':'Il venditore consegna il contenuto in piattaforma')}
         : ritiro
         ? {t:'Consegna a mano',     d:'Vi incontrate e l\'oggetto passa di mano'}
-        : {t:'Oggetto spedito',     d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`
+        : {t:'Oggetto spedito',     d:o.tracking?`${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}`
             :(o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')},
       {t:s==='delivered' ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
@@ -11609,12 +11624,20 @@ function openOrder(id){
         <button class="btn orange" onclick="salvaPuntoRitiro()">${o.puntoRitiro ? 'Aggiorna il punto' : 'Salva il punto'}</button>
       </div>` : ''}
 
+      ${/* LA TESTATA STA SOPRA IL RECINTO (ago 2026, decisione di
+            Andrea): dice lo STATO dell'affare, che e' l'intestazione
+            dell'ordine e non un contenuto della cassaforte. Il
+            riquadro comincia dritto coi passi e NON prende una
+            seconda testata: ogni passo ha gia' il suo titolo, e una
+            riga in piu' li' dentro ripeterebbe la frase appena letta
+            un centimetro piu' su. Il recinto tratteggiato resta il
+            sigillo dell'escrow — non era la testata a dirlo. */''}
+      <div class="vault-head">
+        <div class="lock">${testa.ic}</div>
+        <div><b>${testa.b}</b>
+        <small>${testa.d}</small></div>
+      </div>
       <div class="vault">
-        <div class="vault-head">
-          <div class="lock">${testa.ic}</div>
-          <div><b>${testa.b}</b>
-          <small>${testa.d}</small></div>
-        </div>
         <div class="steps">
           ${steps.map((st,i)=>`
             <div class="step ${i<progress?'done':i===progress?'now':'todo'}">
@@ -11623,7 +11646,20 @@ function openOrder(id){
         </div>
       </div>
       ${s==='dispute' ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
-      ${(['shipped','delivered'].includes(s) && (o.tracking || o.puntoRitiro)) ? `<div class="trust-note">📦 <span>${o.tracking ? `Spedito con <b>${esc(o.corriere)}</b> — tracciamento <b class="mono" style="font-size:12px">${esc(o.tracking)}</b> · <a href="https://t.17track.net/it#nums=${encodeURIComponent(o.tracking)}" target="_blank" style="color:var(--trust)">segui il pacco →</a>${rigaCorretto(o.trackingCorretto)}` : ''}${(o.tracking && o.puntoRitiro) ? ' · ' : ''}${puntoBanner(o)}</span></div>`:''}
+      ${/* IL BANNER E' DEL PUNTO, E DI NIENT'ALTRO (ago 2026): diceva
+            anche «Spedito con X — tracciamento Y», che e' parola per
+            parola il passo «Oggetto spedito» dentro il recinto, due
+            dita piu' su — un doppione, e per giunta quello che si
+            legge dopo. Il codice resta LI', dove adesso si tocca; qui
+            resta il punto di ritiro, che a campo ormai chiuso e
+            pannello del venditore sparito e' l'unico posto dove chi
+            ha comprato ritrova DOVE andare a prenderlo. Con la riga
+            se n'e' andato il link a 17track: la strada delle notifiche
+            e' @trackbot, e due strade per la stessa cosa sono un
+            bivio davanti a chi aspetta un pacco. La traccia della
+            correzione del moderatore ha seguito il codice: sta nel
+            passo, dove la vedono ENTRAMBE le parti come prima. */''}
+      ${(['shipped','delivered'].includes(s) && o.puntoRitiro) ? `<div class="trust-note">📦 <span>${puntoBanner(o)}</span></div>`:''}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${isAdmin && s==='dispute' ? `
@@ -13903,26 +13939,56 @@ function trackingDaControllare(corriere, tracking, idAvviso){
 }
 
 /* LE NOTIFICHE DEL PACCO (ago 2026): il compratore le attiva su
-   @trackbot col deep link t.me — verificato dal vivo: ?start={codice}
-   precompila il bot, che risponde col tracciamento. Le notifiche le
-   manda LUI, non Barattolo, e la riga sotto il bottone lo dice; il
-   codice intanto finisce negli appunti, la rete se qualcosa non
-   funzionasse. Il giudice della forma e' formaTracking, lo STESSO
-   dell'euristica della spedizione: il codice di un intermediario
-   (Packlink & co.) ha la forma storta per il corriere dichiarato e
-   il bottone NON compare — a trackbot serve il codice del CORRIERE,
-   ed e' l'errore gia' successo. Dove l'euristica si astiene per
-   regola («Altro corriere») il bottone c'e': non sappiamo dire che
-   il codice e' sbagliato, e al peggio trackbot dira' che non lo
-   conosce. Solo il compratore (e' il suo pacco), solo col
-   tracciamento — le sentinelle 'Consegna a mano'/'Ritiro in zona'
-   restano fuori da sole, il tracking non ce l'hanno. */
+   @trackbot, che e' un bot di TERZI — le notifiche le manda lui, non
+   Barattolo, e la riga sotto il bottone lo dice.
+   IL CODICE NON GLIELO SAPPIAMO CONSEGNARE, ed e' la riga che qui
+   diceva il falso: c'era scritto «verificato dal vivo: ?start={codice}
+   precompila il bot, che risponde col tracciamento», e dal campo
+   invece il link apre la chat, preme start e il codice va incollato a
+   mano. La documentazione di trackbot.eu conosce UNA strada sola per
+   aggiungere una spedizione — incollare il codice in chat — e nessun
+   payload, nessuna integrazione per chi manda i link: quel che il bot
+   fa di un `/start CODICE` non e' documentato da nessuna parte, e
+   dalla nostra parte non c'e' niente da riparare.
+   Il payload resta attaccato al link perche' non costa niente e il
+   giorno che trackbot lo capisse funzionerebbe da solo — ma NON si
+   promette: a promettere e' la riga sotto il bottone, che dice quel
+   che facciamo per davvero, cioe' copiare il codice negli appunti. Se
+   un domani il bot rispondesse col tracciamento senza incollare
+   niente, l'unica cosa da cambiare e' quella riga. */
+/* Il giudice UNICO del deep link, e lo usano TUTTI E DUE i posti da
+   cui si arriva a trackbot — il bottone e il codice dentro il recinto:
+   due strade che rispondessero diverso sullo stesso codice sarebbero
+   una che promette quel che l'altra nega.
+   Solo il compratore (e' il suo pacco), solo mentre il pacco viaggia,
+   solo col tracciamento — le sentinelle 'Consegna a mano'/'Ritiro in
+   zona' restano fuori da sole, il tracking non ce l'hanno — e solo se
+   il codice ha la FORMA del corriere dichiarato: il giudice e'
+   formaTracking, lo STESSO dell'euristica della spedizione, perche' a
+   trackbot serve il codice del CORRIERE e quello dell'intermediario
+   (Packlink & co.) e' l'errore gia' successo. Dove l'euristica si
+   astiene per regola («Altro corriere») si passa: non sappiamo dire
+   che il codice e' sbagliato, e al peggio trackbot dira' che non lo
+   conosce. */
+function trackbotPossibile(o, s){
+  return o.role === 'buyer' && !!o.tracking
+      && ['shipped','delivered'].includes(s)
+      && !formaTracking(o.corriere, o.tracking);
+}
+
+/* Il codice dentro il passo «Oggetto spedito» si tocca dove si legge.
+   Quando la porta non c'e' resta TESTO, che un link a vuoto e' peggio
+   di nessun link. */
+function codiceTracking(o, s){
+  return trackbotPossibile(o, s)
+    ? `<span class="trackbot" role="button" onclick="attivaNotifichePacco()">${esc(o.tracking)}</span>`
+    : esc(o.tracking);
+}
+
 function bottoneNotifichePacco(o, s){
-  if (o.role !== 'buyer' || !o.tracking) return '';
-  if (!['shipped','delivered'].includes(s)) return '';
-  if (formaTracking(o.corriere, o.tracking)) return '';
+  if (!trackbotPossibile(o, s)) return '';
   return `<button class="btn ghost" style="margin-top:0" onclick="attivaNotifichePacco()">📦 Attiva le notifiche del pacco</button>
-    <div class="hint" style="margin-top:2px;text-align:center">Le notifiche te le manda @trackbot, non Barattolo. Il codice te lo copiamo negli appunti, se servisse incollarlo.</div>`;
+    <div class="hint" style="margin-top:2px;text-align:center">Le notifiche te le manda @trackbot, non Barattolo: il codice te lo copiamo negli appunti, <b>incollalo nel bot</b>.</div>`;
 }
 
 async function attivaNotifichePacco(){
@@ -13932,10 +13998,13 @@ async function attivaNotifichePacco(){
      nudo di spazi e trattini, come nel confronto di formaTracking */
   const nudo = vero.toUpperCase().replace(/[^A-Z0-9_-]/g, '');
   if (!nudo) return;
-  try {
-    await navigator.clipboard?.writeText(vero);
-    toast('📋 Codice copiato negli appunti');
-  } catch(e) {}
+  /* la copia e' l'unica cosa che promettiamo, quindi se non riesce lo
+     si dice invece di far credere che il codice sia negli appunti */
+  let copiato = true;
+  try { await navigator.clipboard.writeText(vero); }
+  catch(e) { copiato = false; }
+  toast(copiato ? '📋 Codice copiato — incollalo nel bot'
+                : '📋 Copia il codice qui sopra e incollalo nel bot');
   const url = `https://t.me/trackbot?start=${nudo}`;
   if (tg?.initData && tg.openTelegramLink) tg.openTelegramLink(url);
   else window.open(url, '_blank', 'noopener');
