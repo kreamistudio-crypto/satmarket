@@ -2713,6 +2713,18 @@ def prove_dettaglio_ordine():
           "Il reso è in viaggio: al rientro ti rimborsiamo" in det
           and "L\\'acquirente ha rispedito l\\'oggetto" in det)
 
+    # ---- 24-26: il passo del reso parla a TRE, non a due ----
+    # Qui acquirente e venditore sono nominati TUTTI E DUE nella
+    # stessa frase, quindi il taglio buyer/non-buyer non basta: al
+    # venditore restava una terza persona su SE' STESSO.
+    prova("chi vende non si sente più chiamare «il venditore»", True,
+          "L\\'acquirente deve rispedirti l\\'oggetto" in det)
+    prova("...e il reso in viaggio arriva «verso di te»", True,
+          "Il reso è in viaggio verso di te" in det)
+    prova("...mentre il moderatore tiene le due terze persone", True,
+          "L\\'acquirente deve rispedire l\\'oggetto al venditore" in det
+          and "Il reso è in viaggio verso il venditore" in det)
+
 
 def _notifica_admin_spia(avvisi):
     async def _n(testo):

@@ -11314,10 +11314,20 @@ function openOrder(id){
          chi acquirente non e' (il venditore, e il moderatore che
          guarda da fuori). */
       conReso
+        /* IL PASSO DEL RESO PARLA A TRE, non a due (ago 2026): qui
+           l'«acquirente» e il «venditore» sono nominati TUTTI E DUE
+           nella stessa frase, quindi il taglio buyer/non-buyer non
+           basta — al venditore restava una terza persona su SE'
+           STESSO («deve rispedire l'oggetto al venditore»), lo stesso
+           difetto tolto un centimetro piu' su. Tre letture come in
+           `passoDeposito`: chi compra, chi vende, e il moderatore che
+           guarda da fuori e tiene la frase neutra. */
         ? {t:'Restituzione dell\'oggetto', d:s==='return_pending'
-            ? (o.role==='buyer' ? 'Devi rispedire l\'oggetto al venditore'
-                                : 'L\'acquirente deve rispedire l\'oggetto al venditore')
-            : 'Il reso è in viaggio verso il venditore'}
+            ? (o.role==='buyer'  ? 'Devi rispedire l\'oggetto al venditore'
+             : o.role==='seller' ? 'L\'acquirente deve rispedirti l\'oggetto'
+             :                     'L\'acquirente deve rispedire l\'oggetto al venditore')
+            : (o.role==='seller' ? 'Il reso è in viaggio verso di te'
+                                 : 'Il reso è in viaggio verso il venditore')}
         : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso'
             : (o.role==='buyer' ? 'Disputa risolta a tuo favore'
                                 : 'Disputa risolta a favore dell\'acquirente')},
