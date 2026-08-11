@@ -79,6 +79,15 @@ PROMEMORIA_SPEDIZIONE_GIORNI = 5  # ordine 'locked' col pacco mai partito:
                              # primo squillo al venditore (0 = spento)
 PROMEMORIA_DIGITALE_ORE = 48 # idem per il codice online mai consegnato:
                              # ore, non giorni — un codice si manda subito
+SOLLECITO_MANUALE_ORE = 48   # il promemoria A COMANDO: dopo quante ore
+                             # dal pagamento chi ha comprato puo'
+                             # sollecitare lui la spedizione (0 = mai)
+SOLLECITO_MANUALE_DIGITALE_ORE = 24  # idem per il codice online
+SOLLECITO_MANUALE_PAUSA_ORE = 24  # e ogni quante ore puo' ripeterlo
+SOLLECITO_MANUALE_MAX = 3    # quanti in tutto: oltre resta la disputa
+                             # (0 = il bottone non compare mai). I
+                             # contatori dell'automatico qui sopra non
+                             # si toccano: i due convivono
 SOLLECITO_INCASSO_GIORNI = 7 # ordine «Da incassare» fermo: ogni tot
                              # giorni un promemoria al venditore
                              # (0 = solleciti spenti)

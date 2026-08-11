@@ -2192,6 +2192,21 @@
   .btn.ponte.nostr{background:var(--nostr-soft);color:var(--nostr-text);
     border-color:var(--nostr-text);box-shadow:0 3px 0 var(--nostr-text)}
   .btn.ponte:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  /* L'USCITA DI SICUREZZA (ago 2026): «C'è un problema — apri
+     disputa» era un testuale sottolineato (.danger-ghost), e in fila
+     coi due ponti colorati spariva — proprio il bottone che deve
+     farsi trovare quando qualcosa va storto. Ora ha la FORMA di tutti
+     gli altri e la ricetta dei ponti qui sopra: fondo VELATO, testo e
+     bordo del colore che significa.
+     Il fondo resta una velatura e non il rosso pieno, ed e' la riga
+     da non ammorbidire: tre blocchi saturi in fila — rosso, azzurro,
+     viola — sarebbero un semaforo, e questo non e' un invito ma
+     un'uscita di sicurezza. Contrasti misurati sul testo: 4,83 di
+     giorno e 5,28 di sera, AA in entrambi i temi. */
+  .btn.allarme{background:var(--warn-bg);color:var(--danger);
+    border:2px solid var(--danger);box-shadow:0 3px 0 var(--danger);
+    margin-top:10px;margin-bottom:10px}
+  .btn.allarme:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   /* Il ghost vestito di cartone. NON LO PORTA PIU' NESSUNO dall'ago
      2026 (decisione di Andrea): l'aveva «📦 Aggiungi al pacco», che
      e' tornato al ghost di casa come ogni altro secondario — un
@@ -4499,6 +4514,13 @@ function mapOrder(o){
     trackingCorretto:o.tracking_corretto_il||0,
     trackingResoCorretto:o.tracking_reso_corretto_il||0,
     consegnato:o.consegnato||0, speditoIl:o.spedito_il||0,
+    /* il PAGAMENTO (ago 2026): su un ordine locked `creato` e'
+       immutabile ed e' l'ancora del promemoria a comando — mai
+       `aggiornato`, che il venditore sposta ri-salvando la sua
+       invoice d'incasso (la trappola della gemella automatica) */
+    creato:o.creato||0,
+    sollecitiManuali:o.solleciti_manuali||0,
+    sollecitoManualeIl:o.sollecito_manuale_il||0,
     /* il conto scomposto (lug 2026): listing.price resta il TOTALE
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
@@ -6700,6 +6722,17 @@ const TEMPI = {
   silenzioDig: 48,   // ore dalla consegna digitale mai rivelata
   invoice:     15,   // minuti di vita della invoice Lightning
 };
+/* IL PROMEMORIA A COMANDO al venditore (ago 2026): le stesse leve del
+   server, scritte a mano qui col patto di TEMPI — se cambiano nel
+   config, cambiano anche qui. Il GIUDICE resta il server (risponde
+   400): questi numeri decidono soltanto se il bottone ha senso.
+
+   config.py                        →  SOLLECITO
+   SOLLECITO_MANUALE_ORE               da
+   SOLLECITO_MANUALE_DIGITALE_ORE      daDig
+   SOLLECITO_MANUALE_PAUSA_ORE         pausa
+   SOLLECITO_MANUALE_MAX               max      */
+const SOLLECITO = {da:48, daDig:24, pausa:24, max:3};
 /* Il markup fisso della pagina «Il pagamento protetto» porta segnaposto
    vuoti invece dei numeri: li riempie questa, una volta all'avvio. Cosi'
    anche li' i tempi vengono da TEMPI e non possono divergere. */
@@ -11253,12 +11286,27 @@ function openOrder(id){
   currentOrder = orders.find(o=>o.id===id);
   const o = currentOrder, s = o.state;
   stellaScelta = 0;   // il voto non inviato non sopravvive al cambio d'ordine
+  /* LA PRIMA RIGA DICE UN GESTO (ago 2026): «Sats nel deposito di
+     garanzia» raccontava un fatto della piattaforma, non quel che e'
+     successo a chi sta leggendo — e la riga e' CONDIVISA fra i due
+     lati, quindi vale la regola delle terze persone: si gira a chi la
+     guarda. Chi ha comprato i sats li ha DEPOSITATI; chi vende non li
+     ha depositati, ce li ha in garanzia — e il titolo non dice
+     «ricevuti», che suonerebbe come «sono nel tuo wallet» quando
+     invece li custodisce ancora la piattaforma (lo dice la riga
+     sotto, che resta vera per tutti e due). Il moderatore, che guarda
+     da fuori, tiene la frase neutra di sempre. */
+  const passoDeposito = {
+    t: o.role==='buyer'  ? 'Hai depositato i sats'
+     : o.role==='seller' ? 'Hai il pagamento in garanzia'
+     :                     'Sats nel deposito di garanzia',
+    d: 'Il pagamento è custodito dalla piattaforma'};
   let steps, progress;
   if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
     /* Storia della disputa: la cassaforte racconta il congelamento */
     const conReso = ['return_pending','return_shipped'].includes(s);
     steps = [
-      {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
+      passoDeposito,
       {t:'Disputa aperta',          d:'I sats sono congelati: nessuno può toccarli'},
       /* I TESTI PARLANO A CHI LEGGE (ago 2026): la vista e' UNA per
          tutti e due i lati, quindi ogni frase che nomina una parte va
@@ -11291,7 +11339,7 @@ function openOrder(id){
       ? Math.max(0, Math.ceil((o.consegnato + TEMPI.confermaDig*3600 - Date.now()/1000)/3600)) : 0;
     const ritiro = o.consegnaScelta==='ritiro';
     steps = [
-      {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
+      passoDeposito,
       /* vedi «I TESTI PARLANO A CHI LEGGE» nel ramo della disputa: qui
          a essere nominato e' il VENDITORE, quindi si gira a lui */
       digitale
@@ -11465,7 +11513,8 @@ function openOrder(id){
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
-      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn danger-ghost" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
+      ${puoiSollecitareVenditore(o) ? `<button class="btn ghost" onclick="sollecitaVenditore()">🔔 ${o.consegnaScelta==='digitale'?'Ricorda al venditore di mandarti il codice':'Ricorda al venditore di spedire'}</button>`:''}
+      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
       ${o.role==='admin'
         ? pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")
@@ -14054,6 +14103,46 @@ async function markDelivered(){
   if (!r.ok) { const d = await r.json().catch(()=>({})); toast(d.detail||'Operazione non riuscita'); return; }
   currentOrder.state='delivered'; currentOrder.consegnato=Math.floor(Date.now()/1000);
   toast('📬 Consegna registrata: controlla con calma, i sats ti aspettano'); openOrder(currentOrder.id);
+}
+
+/* IL PROMEMORIA A COMANDO (ago 2026): il bottone ha senso solo su un
+   ordine PAGATO e non ancora partito, e non prima che il venditore
+   abbia avuto il suo tempo — nella maggior parte dei casi chi non ha
+   spedito ha solo avuto una giornata storta.
+   L'ANCORA E' `creato`, mai `aggiornato`: su un ordine locked il
+   venditore sposterebbe `aggiornato` ri-salvando la propria invoice
+   d'incasso, cioe' rimanderebbe all'infinito il promemoria di chi lo
+   aspetta (la trappola gia' pagata dalla gemella automatica).
+   Il ritiro in zona resta fuori — li' chi ha comprato puo' gia'
+   confermare da solo — e cosi' la strada non dichiarata.
+   Il server resta il giudice: qui si decide solo cosa mostrare. */
+function puoiSollecitareVenditore(o){
+  if (o.role!=='buyer' || o.state!=='locked') return false;
+  if (!['spedizione','digitale'].includes(o.consegnaScelta)) return false;
+  if (SOLLECITO.max<=0 || o.sollecitiManuali>=SOLLECITO.max) return false;
+  const ore = o.consegnaScelta==='digitale' ? SOLLECITO.daDig : SOLLECITO.da;
+  if (ore<=0) return false;
+  const adesso = Date.now()/1000;
+  return o.creato + ore*3600 <= adesso
+      && o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso;
+}
+/* Il gemello di sollecita(), dall'altra parte del tavolo. I due
+   contatori dell'automatico non si toccano: sono altre colonne, e
+   bussare a mano non deve allontanare il momento in cui un moderatore
+   guarda il caso. Dopo l'invio si ridisegna l'ordine, cosi' il
+   bottone sparisce da solo invece di restare li' a invitare un
+   secondo tocco che il server rifiuterebbe. */
+async function sollecitaVenditore(){
+  haptic();
+  if (DEMO) { toast('🔔 Promemoria inviato (simulato)'); return; }
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/sollecita-venditore`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+  currentOrder.sollecitiManuali++;
+  currentOrder.sollecitoManualeIl = Math.floor(Date.now()/1000);
+  openOrder(currentOrder.id);
+  toast('🔔 Promemoria inviato al venditore');
 }
 
 async function sollecita(){

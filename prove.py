@@ -2674,6 +2674,24 @@ def prove_dettaglio_ordine():
             prova(f"...e l'altro lato non si rompe: resta «{suo[:28]}…»",
                   True, suo in det)
 
+    # ---- 17-21: la prima riga del riquadro dice un GESTO ----
+    # (ago 2026) «Sats nel deposito di garanzia» raccontava un fatto
+    # della piattaforma, non quel che e' successo a chi legge. La riga
+    # e' CONDIVISA, quindi vale la regola qui sopra — e il verso in
+    # cui si sbaglia e' dare l'«hai depositato» anche a chi VENDE, che
+    # i sats non li ha depositati: ce li ha in garanzia.
+    prova("chi ha comprato ha DEPOSITATO i sats", True,
+          "'Hai depositato i sats'" in det)
+    prova("...chi vende ce li ha IN GARANZIA, non in tasca", True,
+          "'Hai il pagamento in garanzia'" in det
+          and "o.role==='seller' ? 'Hai depositato" not in det)
+    prova("...e il moderatore, che guarda da fuori, resta neutro", True,
+          "'Sats nel deposito di garanzia'" in det)
+    prova("la riga sotto resta vera per tutti e due", True,
+          "d: 'Il pagamento è custodito dalla piattaforma'" in det)
+    prova("e la dicono ENTRAMBI i rami del riquadro (disputa compresa)",
+          2, det.count("passoDeposito,"))
+
 
 def _notifica_admin_spia(avvisi):
     async def _n(testo):
@@ -8262,7 +8280,8 @@ def prove_titoli_scappati():
               "sollecita_venditori_fermi", "sollecita_buste_ferme",
               "_paga_rimborso", "_sblocca_sats", "_rimborsa_compratore",
               "_incassa_ordine", "_racconta_chiusura", "verifica_rilancio",
-              "rispondi_offerta", "scadenze_offerte", "annulla_asta_admin"):
+              "rispondi_offerta", "scadenze_offerte", "annulla_asta_admin",
+              "sollecita_venditore"):
         prova(f"il censimento vede «{f}»", True, f in visti)
 
     # --- 2) IL ROVESCIO: non si scappa dove non e' HTML ------------
@@ -10757,6 +10776,257 @@ def prove_fogli_di_casa():
               "inviaRisposta(id, azione, importo);"))
 
 
+# ====================================================================
+def prove_sollecito_a_comando():
+    """IL PROMEMORIA A COMANDO (ago 2026): chi ha pagato puo' bussare
+    al venditore fermo PRIMA che scatti l'automatico. La funzione non
+    e' nuova — sollecita_venditori_fermi la fa gia' —, quindi le prove
+    guardano quel che il bottone AGGIUNGE e soprattutto quel che NON
+    deve toccare: i sats (mai), i contatori dell'automatico (mai, o
+    chi bussa spesso allontanerebbe il 🧊 ai moderatori) e `aggiornato`
+    (l'ancora e' `creato`, la trappola gia' pagata dalla gemella)."""
+    print("\n[il promemoria a comando al venditore]")
+    import asyncio
+    import re
+    import sqlite3
+
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    ORA = 1_700_000_000
+    LEVE = {"SOLLECITO_MANUALE_ORE": 48,
+            "SOLLECITO_MANUALE_DIGITALE_ORE": 24,
+            "SOLLECITO_MANUALE_PAUSA_ORE": 24,
+            "SOLLECITO_MANUALE_MAX": 3}
+
+    def mondo():
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute(
+            "CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INT, "
+            "venditore_id INT, annuncio_id INT, stato TEXT, "
+            "consegna_scelta TEXT, creato INT, aggiornato INT, "
+            "sollecito_manuale_il INT DEFAULT 0, "
+            "solleciti_manuali INT DEFAULT 0, "
+            "sollecito_venditore_il INT DEFAULT 0, "
+            "solleciti_venditore INT DEFAULT 0)")
+        vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                     "titolo TEXT)")
+        vero.execute("CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, "
+                     "ordine_id INT, annuncio_id INT, quantita INT, "
+                     "unitario_sats INT, titolo TEXT)")
+        vero.execute("INSERT INTO annunci VALUES(7,'Miele di castagno')")
+        vero.execute("INSERT INTO annunci VALUES(8,'Cuffie <b>AKG</b>')")
+        vero.executemany(
+            "INSERT INTO ordine_righe(ordine_id, annuncio_id, quantita, "
+            "unitario_sats, titolo) VALUES(?,?,?,?,?)",
+            [(60, 7, 1, 1000, "Miele di castagno"),
+             (60, 8, 2, 2000, "Cuffie AKG")])
+        g = 3600
+        righe = [
+            # id, compr, vend, ann, stato, strada, creato, aggiornato,
+            #     sollecito_manuale_il, solleciti_manuali,
+            #     sollecito_venditore_il, solleciti_venditore
+            (1, 111, 222, 7, "locked", "spedizione", ORA - 49 * g,
+             ORA - g, 0, 0, ORA - 5 * g, 2),          # pronto da bussare
+            (2, 111, 222, 7, "locked", "spedizione", ORA - g,
+             ORA - g, 0, 0, 0, 0),                    # troppo presto
+            (3, 111, 222, 7, "locked", "digitale", ORA - 25 * g,
+             ORA - g, 0, 0, 0, 0),                    # codice: 24h bastano
+            (4, 111, 222, 7, "locked", "spedizione", ORA - 25 * g,
+             ORA - g, 0, 0, 0, 0),                    # pacco: 24h no
+            (5, 111, 222, 7, "locked", "ritiro", ORA - 99 * g,
+             ORA - g, 0, 0, 0, 0),                    # il ritiro sta fuori
+            (6, 111, 222, 7, "locked", "", ORA - 99 * g,
+             ORA - g, 0, 0, 0, 0),                    # strada non dichiarata
+            (7, 111, 222, 7, "shipped", "spedizione", ORA - 99 * g,
+             ORA - g, 0, 0, 0, 0),                    # gia' partito
+            (8, 111, 222, 7, "locked", "spedizione", ORA - 99 * g,
+             ORA - g, ORA - 99 * g, 3, 0, 0),         # al tetto
+            (9, 111, 222, 7, "locked", "spedizione", ORA - 99 * g,
+             ORA - g, ORA - 2 * g, 1, 0, 0),          # pausa non passata
+            (10, 111, 222, 8, "locked", "spedizione", ORA - 49 * g,
+             ORA - g, 0, 0, 0, 0),                    # titolo cattivo
+            (60, 111, 222, 0, "locked", "spedizione", ORA - 49 * g,
+             ORA - g, 0, 0, 0, 0),                    # un SET
+        ]
+        vero.executemany(
+            "INSERT INTO ordini VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", righe)
+        vero.commit()
+        return vero
+
+    def bussa(vero, ordine_id, chi=111, **leve):
+        """L'ambiente e' POVERO APPOSTA: non contiene NESSUNO dei nomi
+        che muovono sats. Se un domani questo bottone imparasse a
+        toccarli la prova non diventa rossa — ESPLODE con NameError,
+        che e' molto piu' difficile da ignorare."""
+        detti = []
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        async def _notifica(tg_id, testo):
+            detti.append((tg_id, testo))
+
+        amb = {"db": Con, "HTTPException": _H, "notifica": _notifica,
+               "html": __import__("html"),
+               "time": type("t", (), {"time": staticmethod(lambda: ORA)}),
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "_titolo_ordine": reale("_titolo_ordine")}
+        amb.update(LEVE)
+        amb.update(leve)
+        exec("async " + pezzo("sollecita_venditore"), amb)
+        try:
+            esito = asyncio.new_event_loop().run_until_complete(
+                amb["sollecita_venditore"](ordine_id))
+            return esito, detti, None
+        except _H as e:
+            return None, detti, e
+
+    def riga(vero, i):
+        return vero.execute("SELECT * FROM ordini WHERE id=?", (i,)).fetchone()
+
+    # --- 1) il giro che funziona ----------------------------------
+    v = mondo()
+    prima = dict(riga(v, 1))
+    esito, detti, err = bussa(v, 1)
+    dopo = riga(v, 1)
+    prova("il promemoria parte", {"ok": True}, esito)
+    prova("...e arriva al VENDITORE", [222], [t for t, _ in detti])
+    prova("...una volta sola", 1, len(detti))
+    prova("...il contatore sale", 1, dopo["solleciti_manuali"])
+    prova("...e il timbro e' adesso", ORA, dopo["sollecito_manuale_il"])
+    # LA PROVA DELLA CONVIVENZA: l'automatico non si sposta di un
+    # minuto — se no chi bussa spesso allontanerebbe il momento in cui
+    # un moderatore guarda il caso.
+    prova("i contatori dell'automatico non si toccano",
+          (prima["sollecito_venditore_il"], prima["solleciti_venditore"]),
+          (dopo["sollecito_venditore_il"], dopo["solleciti_venditore"]))
+    # ...e nemmeno l'ancora: `creato` e `aggiornato` restano dov'erano
+    prova("l'ordine non si muove (creato, aggiornato, stato)",
+          (prima["creato"], prima["aggiornato"], prima["stato"]),
+          (dopo["creato"], dopo["aggiornato"], dopo["stato"]))
+    prova("il testo non e' un rimprovero", True,
+          "giornata storta" in detti[0][1]
+          and "promemoria gentile" in detti[0][1])
+
+    # --- 2) subito dopo: la pausa ---------------------------------
+    esito, detti2, err = bussa(v, 1)
+    prova("il secondo tocco non passa", 400, err and err.code)
+    prova("...e dice la pausa", True, "24 ore" in (err.detail or ""))
+    prova("...senza mandare niente", [], detti2)
+    prova("...e senza toccare il contatore", 1,
+          riga(v, 1)["solleciti_manuali"])
+
+    # --- 3) le due finestre ---------------------------------------
+    for oid, ok, che in ((2, False, "un'ora dal pagamento"),
+                         (3, True, "il codice a 25 ore"),
+                         (4, False, "il pacco a 25 ore")):
+        v2 = mondo()
+        esito, detti3, err = bussa(v2, oid)
+        prova(f"finestra: {che}", ok, esito is not None)
+        if not ok:
+            prova(f"...e il 400 dice di aspettare ({che})", True,
+                  "presto" in (err.detail or ""))
+
+    # --- 4) chi resta fuori ---------------------------------------
+    for oid, che in ((5, "il ritiro in zona"),
+                     (6, "la strada non dichiarata"),
+                     (7, "l'ordine gia' spedito")):
+        v2 = mondo()
+        esito, detti4, err = bussa(v2, oid)
+        prova(f"fuori: {che}", (400, "Operazione non permessa"),
+              (err and err.code, err and err.detail))
+        prova(f"...e nessuno riceve niente ({che})", [], detti4)
+
+    # --- 5) il tetto ----------------------------------------------
+    v2 = mondo()
+    esito, detti5, err = bussa(v2, 8)
+    prova("al tetto non si bussa piu'", 400, err and err.code)
+    prova("...e la strada che resta e' la disputa", True,
+          "disputa" in (err.detail or ""))
+    esito, _, err = bussa(mondo(), 9)
+    prova("la pausa vale anche sotto il tetto", 400, err and err.code)
+
+    # --- 6) di chi e' il gesto ------------------------------------
+    # ANTI-ORACOLO: il venditore, un estraneo e un ordine che non
+    # esiste devono ricevere la STESSA risposta, o in fila si impara
+    # quali ordini esistono.
+    risposte = []
+    for chi, oid in ((222, 1), (333, 1), (111, 999)):
+        v2 = mondo()
+        esito, detti6, err = bussa(v2, oid, chi=chi)
+        risposte.append((err and err.code, err and err.detail))
+        prova(f"niente notifiche (chi={chi}, ordine={oid})", [], detti6)
+    prova("venditore, estraneo e ordine inesistente: stessa risposta",
+          1, len(set(risposte)))
+    prova("...ed e' il 400 dei fratelli",
+          (400, "Operazione non permessa"), risposte[0])
+
+    # --- 7) il titolo, scappato all'assegnazione ------------------
+    v2 = mondo()
+    esito, detti7, err = bussa(v2, 10)
+    testo = detti7[0][1]
+    prova("il titolo cattivo esce scappato", True, "&lt;b&gt;" in testo)
+    prova("...e i grassetti restano PARI", testo.count("<b>"),
+          testo.count("</b>"))
+
+    # --- 8) il SET ha il suo titolo -------------------------------
+    v2 = mondo()
+    esito, detti8, err = bussa(v2, 60)
+    prova("il set porta il titolo sintetizzato", True,
+          "Miele di castagno + 1 altri" in detti8[0][1])
+
+    # --- 9) le leve spente ----------------------------------------
+    esito, _, err = bussa(mondo(), 1, SOLLECITO_MANUALE_MAX=0)
+    prova("MAX a 0 spegne il gesto", 400, err and err.code)
+    esito, _, err = bussa(mondo(), 1, SOLLECITO_MANUALE_ORE=0)
+    prova("finestra a 0 spegne la sua popolazione", 400, err and err.code)
+    esito, _, err = bussa(mondo(), 3, SOLLECITO_MANUALE_DIGITALE_ORE=0)
+    prova("...e vale per il digitale separatamente", 400, err and err.code)
+
+    # --- 10) le sentinelle sulla forma ---------------------------
+    c = pezzo("sollecita_venditore")
+    # il CORPO, senza la docstring: li' dentro `aggiornato` compare
+    # apposta, a raccontare la trappola che si sta evitando
+    corpo = c.split('"""')[2]
+    prova("l'ancora e' `creato`, mai `aggiornato`", True,
+          'o["creato"] + finestra' in corpo and "aggiornato" not in corpo)
+    prova("la guardia di proprieta' sta dentro la WHERE", True,
+          "o.compratore_id=?" in c and "o.stato='locked'" in c)
+    prova("il titolo nasce scappato", True,
+          "titolo = html.escape(" in c)
+    prova("la notifica parte DOPO il commit", True,
+          c.index("con.commit()") < c.index("await notifica("))
+    # il gemello del venditore resta quello che era: questo cantiere
+    # non lo tocca (le due colonne sono diverse apposta)
+    prova("il bottone del venditore non ha cambiato colonna", True,
+          "sollecito_il=?" in pezzo("sollecita_acquirente"))
+
+    # --- 11) il giudice del client -------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    g = mini[mini.index("function puoiSollecitareVenditore("):]
+    g = g[:g.index("\n}")]
+    prova("il client guarda `creato` e non `aggiornato`", True,
+          "o.creato" in g and "aggiornato" not in g)
+    prova("...e tiene fuori ritiro e strada non dichiarata", True,
+          "['spedizione','digitale'].includes(o.consegnaScelta)" in g)
+    prova("...e il tetto non e' scritto a mano", True,
+          "SOLLECITO.max" in g and not re.search(r">=\s*3\b", g))
+    prova("il bottone della disputa ha la forma di casa", True,
+          'class="btn allarme" onclick="openDispute()"' in mini
+          and 'class="btn danger-ghost" onclick="openDispute()"' not in mini)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -10789,6 +11059,7 @@ def main():
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,
               prove_ritiro_offerta, prove_fogli_di_casa,
+              prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala):
         try:
             f()

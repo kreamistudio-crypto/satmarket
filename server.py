@@ -645,6 +645,39 @@ except ImportError:
                                        # e' ORE_SILENZIO_DIGITALE, l'altra
                                        # finestra di silenzio di quella
                                        # strada
+# IL PROMEMORIA A COMANDO (ago 2026): il gemello MANUALE della
+# funzione qui sopra — chi ha pagato puo' bussare al venditore PRIMA
+# che scatti l'automatico, invece di guardare un ordine fermo senza
+# nessuna maniglia in mano. Non aggiunge la funzione (quella c'e'
+# gia'): aggiunge il poterlo fare ADESSO.
+# Le finestre dicono da quando si puo' — mai subito, perche' chi non
+# ha spedito ha quasi sempre solo avuto una giornata storta —, la
+# pausa ogni quanto si puo' ripetere, il tetto quante volte in tutto:
+# oltre non c'e' piu' niente da dire, e la maniglia diventa la
+# disputa. Senza tetto sarebbe un modo per tempestare qualcuno.
+# A 0 la finestra spegne la sua popolazione; MAX a 0 spegne il gesto.
+try:
+    from config import SOLLECITO_MANUALE_ORE
+except ImportError:
+    SOLLECITO_MANUALE_ORE = 48         # due giorni: un venditore che
+                                       # spedisce nel fine settimana
+                                       # non sente mai niente
+try:
+    from config import SOLLECITO_MANUALE_DIGITALE_ORE
+except ImportError:
+    SOLLECITO_MANUALE_DIGITALE_ORE = 24  # un codice si manda in
+                                         # minuti, ma una giornata
+                                         # intera la merita chiunque
+try:
+    from config import SOLLECITO_MANUALE_PAUSA_ORE
+except ImportError:
+    SOLLECITO_MANUALE_PAUSA_ORE = 24   # uno al giorno, come il bottone
+                                       # gemello del venditore
+try:
+    from config import SOLLECITO_MANUALE_MAX
+except ImportError:
+    SOLLECITO_MANUALE_MAX = 3          # tre in tutto, poi la strada
+                                       # onesta e' la disputa
 # La busta di consegna (ago 2026): sugli ordini verso un punto di
 # ritiro il codice arriva al venditore quando il pacco e' GIA' al
 # punto — quindi NESSUN gate su segna_spedito (decisione di Andrea:
@@ -2371,6 +2404,17 @@ def init_db():
                     # compratore col suo bottone.)
                     "sollecito_venditore_il INTEGER DEFAULT 0",
                     "solleciti_venditore INTEGER DEFAULT 0",
+                    # ...e il promemoria A COMANDO che il COMPRATORE
+                    # manda allo stesso venditore (ago 2026). Colonne
+                    # SUE: l'automatico qui sopra non deve spostarsi
+                    # di un minuto quando qualcuno bussa a mano — se
+                    # no chi bussa spesso allontanerebbe il 🧊 ai
+                    # moderatori, cioe' il momento in cui un umano
+                    # guarda il caso. «manuale» come le sue leve
+                    # SOLLECITO_MANUALE_*; da non confondere con
+                    # `sollecito_il`, che e' il bottone del VENDITORE.
+                    "sollecito_manuale_il INTEGER DEFAULT 0",
+                    "solleciti_manuali INTEGER DEFAULT 0",
                     # il pagamento in uscita di cui non sappiamo l'esito
                     # (ago 2026, audit): '' = normale, 'incerto' =
                     # congelato, nessuna strada puo' ritentare finche'
@@ -9216,6 +9260,21 @@ def _leve_stato():
             _leva("Codice mai consegnato: primo squillo (ore)",
                   "PROMEMORIA_DIGITALE_ORE", PROMEMORIA_DIGITALE_ORE,
                   spento="il codice mai consegnato non squilla a nessuno"),
+            _leva("Promemoria a comando: da quando (ore)",
+                  "SOLLECITO_MANUALE_ORE", SOLLECITO_MANUALE_ORE,
+                  spento="chi ha pagato non può sollecitare a mano la "
+                         "spedizione: resta solo l'automatico, a giorni"),
+            _leva("Promemoria a comando sul codice: da quando (ore)",
+                  "SOLLECITO_MANUALE_DIGITALE_ORE",
+                  SOLLECITO_MANUALE_DIGITALE_ORE,
+                  spento="chi ha pagato non può sollecitare a mano il "
+                         "codice: resta solo l'automatico"),
+            _leva("Promemoria a comando: pausa fra uno e l'altro (ore)",
+                  "SOLLECITO_MANUALE_PAUSA_ORE", SOLLECITO_MANUALE_PAUSA_ORE),
+            _leva("Promemoria a comando: quanti in tutto",
+                  "SOLLECITO_MANUALE_MAX", SOLLECITO_MANUALE_MAX,
+                  spento="il bottone non compare mai: chi ha pagato "
+                         "aspetta l'automatico o apre una disputa"),
             _leva("Busta di ritiro mai depositata: primo squillo (giorni)",
                   "PROMEMORIA_BUSTA_GIORNI", PROMEMORIA_BUSTA_GIORNI,
                   spento="il venditore che non deposita il codice di "
@@ -14655,6 +14714,104 @@ async def sollecita_acquirente(ordine_id: int, x_tg_init_data: str = Header(""),
                    "🔔 <b>Promemoria dal venditore:</b> se il pacco è arrivato, "
                    "apri l'ordine nella Mini App e conferma la ricezione (o "
                    "segnala un problema). Grazie! 🙏")
+    return {"ok": True}
+
+
+@app.post("/api/orders/{ordine_id}/sollecita-venditore")
+async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """IL PROMEMORIA A COMANDO (ago 2026), speculare a
+    sollecita_acquirente: qui a bussare e' CHI HA PAGATO, e dall'altra
+    parte c'e' un ordine 'locked' che non e' ancora partito.
+    NON aggiunge una funzione che non c'era — sollecita_venditori_fermi
+    lo fa gia' da sola —, ma il primo squillo automatico arriva a
+    giorni, e fino ad allora chi ha pagato guardava un ordine fermo
+    senza nessuna maniglia in mano. Questo aggiunge il PRIMA e il A
+    COMANDO, non il promemoria.
+    I DUE CONTATORI CONVIVONO E NON SI TOCCANO, ed e' dichiarato:
+    l'automatico ha le sue colonne (`sollecito_venditore_il`,
+    `solleciti_venditore`) e la sua ancora e' `creato`, che questo
+    bottone non scrive — quindi bussare a mano non sposta di un minuto
+    il 🧊 ai moderatori. Il contrario sarebbe il rovescio esatto di
+    quel che serve: chi bussa spesso allontanerebbe il momento in cui
+    un umano guarda il caso.
+    L'ANCORA E' `creato` anche qui, ed e' la stessa trappola della
+    gemella: `deposita_invoice` accetta il venditore proprio su
+    'locked' e scrive `aggiornato`, quindi con `aggiornato` il
+    venditore potrebbe rimandare all'infinito il promemoria del
+    compratore ri-salvando la propria invoice d'incasso.
+    Il ritiro in zona resta fuori (ha la sua sollecita_ritiri_fermi, e
+    li' il compratore puo' gia' confermare da solo) e cosi' la strada
+    non dichiarata: sarebbe un rimprovero a vuoto.
+    Qui i sats non si muovono mai, solo parole; la notifica parte DOPO
+    il commit."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if SOLLECITO_MANUALE_MAX <= 0:
+        raise HTTPException(400, "Operazione non permessa")
+    con = db()
+    # La guardia di proprieta' sta DENTRO la WHERE col 400 dei
+    # fratelli: chi enumera non impara la differenza fra «non e' tuo»
+    # e «non esiste».  LEFT JOIN: anche i SET (annuncio_id=0) hanno un
+    # venditore che non fa partire la merce.
+    o = con.execute("SELECT o.*, a.titolo FROM ordini o "
+                    "LEFT JOIN annunci a ON a.id=o.annuncio_id "
+                    "WHERE o.id=? AND o.compratore_id=? "
+                    "AND o.stato='locked' "
+                    "AND o.consegna_scelta IN ('spedizione','digitale')",
+                    (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    adesso = int(time.time())
+    digitale = o["consegna_scelta"] == "digitale"
+    finestra = (SOLLECITO_MANUALE_DIGITALE_ORE if digitale
+                else SOLLECITO_MANUALE_ORE) * 3600
+    if finestra <= 0 or o["creato"] + finestra > adesso:
+        con.close()
+        raise HTTPException(400, "È ancora presto: dai al venditore un "
+                                 "po' di tempo, poi potrai sollecitarlo "
+                                 "da qui")
+    if o["solleciti_manuali"] >= SOLLECITO_MANUALE_MAX:
+        con.close()
+        raise HTTPException(400, f"Hai già mandato {SOLLECITO_MANUALE_MAX} "
+                                 "promemoria. Se il venditore non si fa "
+                                 "vivo, apri una disputa: i tuoi sats sono "
+                                 "al sicuro")
+    if o["sollecito_manuale_il"] > adesso - SOLLECITO_MANUALE_PAUSA_ORE * 3600:
+        con.close()
+        raise HTTPException(400, "Hai già mandato un promemoria nelle "
+                                 f"ultime {SOLLECITO_MANUALE_PAUSA_ORE} ore")
+    # il titolo GREZZO si chiama apposta in un altro modo: quello che
+    # finisce nella notifica nasce scappato una riga piu' sotto (vedi
+    # «IL TITOLO NUDO NELLE NOTIFICHE»)
+    grezzo = o["titolo"]
+    if not o["annuncio_id"]:
+        grezzo = _titolo_ordine([dict(x) for x in con.execute(
+            "SELECT titolo, quantita FROM ordine_righe "
+            "WHERE ordine_id=? ORDER BY id", (ordine_id,))])
+    titolo = html.escape((grezzo or "il tuo affare")[:60])
+    con.execute("UPDATE ordini SET sollecito_manuale_il=?, "
+                "solleciti_manuali=solleciti_manuali+1 WHERE id=?",
+                (adesso, ordine_id))
+    con.commit()
+    con.close()
+    # UN PROMEMORIA, NON UN RIMPROVERO: nella maggior parte dei casi
+    # chi non ha spedito ha solo avuto una giornata storta, e il testo
+    # deve dirlo — non e' cortesia, e' la verita' statistica.
+    await notifica(o["venditore_id"],
+                   f"👋 <b>Un promemoria gentile per «{titolo}»</b>\n"
+                   + ("Chi ha comprato aspetta ancora il codice."
+                      if digitale else
+                      "Chi ha comprato aspetta ancora il pacco.")
+                   + " Nessun problema se è stata una giornata storta: "
+                     "quando puoi, apri l'ordine nella Mini App e "
+                   + ("<b>consegna il contenuto</b>."
+                      if digitale else
+                      "<b>segna la spedizione</b> col tracciamento.")
+                   + " I sats sono già nel deposito di garanzia e "
+                     "aspettano te. Se non riesci più a portarlo a "
+                     "termine, dillo a chi ha comprato: potrà farsi "
+                     "rimborsare.")
     return {"ok": True}
 
 
