@@ -4573,7 +4573,14 @@ function mapOrder(o){
        la decide il server); bech32: a-z0-9 e basta */
     nostrCompratore:(o.compratore_nostr||'').replace(/[^a-z0-9]/g,''),
     nostrVenditore:(o.venditore_nostr||'').replace(/[^a-z0-9]/g,''),
-    when:new Date(o.aggiornato*1000).toLocaleString('it-IT',
+    /* LA DATA E' QUELLA DELL'AFFARE (ago 2026, dal campo): era
+       `aggiornato`, cioe' il timbro dell'ULTIMO MOVIMENTO — e cosi'
+       un ordine del 7 agosto sembrava di oggi appena il venditore
+       segnava la spedizione. `creato` invece e' il momento del
+       pagamento e non si muove piu': gli unici a scriverlo sono
+       l'INSERT e la resurrezione di `controlla_annullati`, che
+       avviene entro la mezz'ora del reaper. */
+    when:new Date(o.creato*1000).toLocaleString('it-IT',
       {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})};
 }
 /* Vetrina a pagine (lug 2026): la prima pagina arriva subito, le

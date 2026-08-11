@@ -2582,6 +2582,15 @@ def prove_lista_ordini():
           in pezzo("miei_ordini"))
 
     # ---- 8-14: i verbi ----
+    # LA DATA E' QUELLA DELL'AFFARE (ago 2026, dal campo): con
+    # `aggiornato` un ordine di una settimana fa sembrava di oggi
+    # appena il venditore segnava la spedizione.
+    mp = solo_codice(pezzo_js(mini, "function mapOrder(o){"))
+    prova("la riga mostra la data dell'affare, non dell'ultimo "
+          "movimento", True,
+          "new Date(o.creato*1000)" in mp
+          and "new Date(o.aggiornato*1000)" not in mp)
+
     vo = solo_codice(pezzo_js(mini, "function verboOrdine(o){"))
     prova("il concluso e' CONCLUSI, non una seconda lista", True,
           "CONCLUSI.includes(o.state)" in vo
