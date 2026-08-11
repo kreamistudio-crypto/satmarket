@@ -4318,6 +4318,41 @@ def prove_forma_tracking():
           "Codice copiato — incollalo nel bot" in an)
     prova("...e se la copia non riesce non lo dice", True,
           "copiato = false" in an and "Copia il codice qui sopra" in an)
+    # IL FILTRO DI TRACKBOT (ago 2026, detto da loro): la funzione
+    # /start c'e' dal 2018, ma il payload lo guarda contro
+    # ^[A-Z0-9]{10,22}$ — una minuscola, uno spazio o un trattino lo
+    # fanno cadere, e cade in SILENZIO. La prova non rilegge la riga:
+    # ESTRAE la classe di caratteri dal sorgente, la applica ai codici
+    # come la gente li scrive e chiede che il payload ci rientri —
+    # chi rimette il trattino (o il trattino basso, che ammetteva
+    # Telegram e non trackbot) nella classe la fa rossa.
+    classe = re.search(r"vero\.toUpperCase\(\)\.replace\(/(\[[^/]+\])/g",
+                       an)
+    prova("trackbot: il payload si normalizza nel link", True,
+          bool(classe))
+    nudo = ((lambda t: re.sub(classe.group(1), '', t.upper()))
+            if classe else (lambda t: t))
+    FILTRO = re.compile(r"^[A-Z0-9]{10,22}$")
+    for come, scritto in (("minuscole",       "rr123456789it"),
+                          ("spazi",           "RR 123 456 789 IT"),
+                          ("trattini",        "1Z-999AA1-0123-456784"),
+                          ("trattino basso",  "JJD_01_4600_0035_2246")):
+        prova("trackbot: il payload passa il filtro con " + come, True,
+              bool(FILTRO.match(nudo(scritto))))
+    # E QUEL CHE SI MOSTRA E SI COPIA NON SI TOCCA: e' il codice come
+    # l'ha scritto chi spedisce, che e' anche una prova in disputa.
+    prova("trackbot: negli appunti va il codice del venditore", True,
+          "writeText(vero)" in an)
+    # I 24 DELL'INPOST NON CI RIENTRANO NEMMENO NORMALIZZATI, ed e' il
+    # corriere del caso che ha aperto il cantiere delle spedizioni ai
+    # punti: la strada e' che trackbot allarghi il riconoscimento, non
+    # che noi tagliamo un codice. Il giorno che lo allarga, questa
+    # riga e' quella da cambiare.
+    prova("trackbot: i 24 dell'InPost restano fuori dal filtro", False,
+          bool(FILTRO.match(nudo("6300 0123 4567 8901 2345 6789"))))
+    # ...e il filtro NON e' una guardia del bottone: chi non ci rientra
+    # ha comunque la strada di sempre, incollare a mano.
+    prova("...ma il bottone non li esclude", True, "10,22" not in tp)
     # IL FATTO su come arriva il codice (ago 2026): una costante, due
     # pannelli — la busta del venditore e il form di spedizione via
     # punto. Il fatto, mai l'istruzione.

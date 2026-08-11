@@ -14254,9 +14254,21 @@ function bottoneNotifichePacco(o, s){
 async function attivaNotifichePacco(){
   haptic();
   const vero = currentOrder?.tracking || '';
-  /* il payload di /start ammette [A-Za-z0-9_-]: il codice viaggia
-     nudo di spazi e trattini, come nel confronto di formaTracking */
-  const nudo = vero.toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+  /* IL FILTRO DI TRACKBOT (ago 2026, detto da loro): il payload di
+     /start la funzione ce l'ha dal 2018, ma lo guarda contro
+     ^[A-Z0-9]{10,22}$ — una minuscola, uno spazio o un trattino lo
+     fanno cadere, e cade in SILENZIO (la chat si apre lo stesso e non
+     succede niente, che e' esattamente quel che si vedeva dal campo).
+     Quindi si toglie tutto quel che non e' maiuscola o cifra: il
+     trattino basso lo ammetteva TELEGRAM nel payload, non trackbot, e
+     tenerlo voleva dire spedire un codice che il bot butta via.
+     Si normalizza SOLO quel che viaggia nel link: `vero` — quello che
+     si mostra, si copia e sta nel database — resta il codice come
+     l'ha scritto il venditore, che e' anche una prova in disputa.
+     Il filtro NON e' una condizione per aprire il bot: i codici che
+     non ci rientrano nemmeno normalizzati (InPost, 24 cifre) hanno
+     comunque la strada di sempre, cioe' incollare a mano. */
+  const nudo = vero.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!nudo) return;
   /* la copia e' l'unica cosa che promettiamo, quindi se non riesce lo
      si dice invece di far credere che il codice sia negli appunti */
