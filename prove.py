@@ -11215,7 +11215,7 @@ def prove_sollecito_a_comando():
 
     # --- 11) il giudice del client -------------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
-    g = mini[mini.index("function puoiSollecitareVenditore("):]
+    g = mini[mini.index("function statoSollecito("):]
     g = g[:g.index("\n}")]
     prova("il client guarda `creato` e non `aggiornato`", True,
           "o.creato" in g and "aggiornato" not in g)
@@ -11227,6 +11227,35 @@ def prove_sollecito_a_comando():
           "['spedizione','digitale'].includes(o.consegnaScelta)" in g)
     prova("...e il tetto non e' scritto a mano", True,
           "SOLLECITO.max" in g and not re.search(r">=\s*3\b", g))
+
+    # --- 12) IL BOTTONE SPENTO DICE PERCHE' ----------------------
+    # Sparire non e' gratis: dal campo, un bottone che c'era e un
+    # attimo dopo non c'e' piu' si legge come un guasto. Tre stati,
+    # non due — e quello che NON deve esserci resta il «e' presto»,
+    # o l'attesa normale diventa un conto alla rovescia.
+    b = pezzo_js(mini, "function bottoneSollecito(o){")
+    prova("il giudice ha tre esiti, non due", True,
+          "return 'tetto'" in g and "return 'pausa'" in g
+          and "return 'ok'" in g)
+    prova("...e «è presto» resta il NIENTE", True,
+          "return '';   // è ancora presto" in g)
+    prova("la pausa lo lascia in pagina, spento e col perché", True,
+          "Già ricordato oggi — potrai rifarlo domani" in b)
+    prova("...e il tetto pure, col numero della leva", True,
+          "Hai già ricordato ${SOLLECITO.max} volte" in b)
+    prova("da spento NON c'e' nessun onclick", 1, b.count("onclick="))
+    prova("...ed e' quello dello stato 'ok'", True,
+          "st === 'ok'" in b
+          and b.index("st === 'ok'") < b.index("onclick="))
+    # la DEMO non ha `creato`: la somma fa NaN, e il NOT della forma
+    # positiva la fa cadere sul ramo «non c'e'» invece che su 'ok'
+    prova("la finestra e' scritta a prova di NaN", True,
+          "if (!(o.creato + ore*3600 <= adesso))" in g)
+    prova("...e cosi' la pausa", True,
+          "if (!(o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso))"
+          in g)
+    prova("il dettaglio chiama la fabbrica del bottone", True,
+          "${bottoneSollecito(o)}" in mini)
     # IL DOPPIO TOCCO: finche' la risposta e' per strada il bottone
     # dev'essere spento, o il secondo tocco si becca il 400 della
     # pausa e si legge come un tetto sbagliato.

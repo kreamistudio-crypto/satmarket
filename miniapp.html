@@ -11595,7 +11595,7 @@ function openOrder(id){
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
-      ${puoiSollecitareVenditore(o) ? `<button class="btn ghost" onclick="sollecitaVenditore(this)">🔔 ${o.consegnaScelta==='digitale'?'Ricorda al venditore di mandarti il codice':'Ricorda al venditore di spedire'}</button>`:''}
+      ${bottoneSollecito(o)}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
       ${o.role==='admin'
@@ -14187,32 +14187,58 @@ async function markDelivered(){
   toast('📬 Consegna registrata: controlla con calma, i sats ti aspettano'); openOrder(currentOrder.id);
 }
 
-/* IL PROMEMORIA A COMANDO (ago 2026): il bottone ha senso solo su un
-   ordine PAGATO e non ancora partito, e non prima che il venditore
-   abbia avuto il suo tempo — nella maggior parte dei casi chi non ha
-   spedito ha solo avuto una giornata storta.
+/* IL PROMEMORIA A COMANDO (ago 2026): TRE STATI E NON DUE — '' il
+   bottone non c'e', 'ok' si puo' bussare, e in mezzo 'pausa' e
+   'tetto', che sono il bottone SPENTO COL PERCHE'.
+   SPARIRE NON E' GRATIS (dal campo: e' sembrato un guasto proprio a
+   chi l'aveva appena usato). Un bottone che c'era e un attimo dopo
+   non c'e' piu' si legge come un'app rotta; uno spento che dice «già
+   ricordato oggi» racconta cos'e' successo, ed e' la stessa cosa
+   detta in un modo che non spaventa.
+   PRIMA DELLE 48 ORE invece NON deve esserci, e la differenza e'
+   questa: li' non e' ancora il momento di bussare, e un bottone
+   spento sarebbe un invito a farlo appena si accende — cioe'
+   trasformerebbe un'attesa normale in un conto alla rovescia.
    L'ANCORA E' `creato`, mai `aggiornato`: su un ordine locked il
    venditore sposterebbe `aggiornato` ri-salvando la propria invoice
    d'incasso, cioe' rimanderebbe all'infinito il promemoria di chi lo
    aspetta (la trappola gia' pagata dalla gemella automatica).
-   Il ritiro in zona resta fuori — li' chi ha comprato puo' gia'
-   confermare da solo — e cosi' la strada non dichiarata.
-   Il server resta il giudice: qui si decide solo cosa mostrare. */
-function puoiSollecitareVenditore(o){
-  if (o.role!=='buyer' || o.state!=='locked') return false;
+   Il server resta il giudice: qui si decide solo cosa mostrare.
+   La finestra si scrive col NOT della forma positiva, e non e' un
+   vezzo: in DEMO gli ordini finti non hanno `creato`, la somma fa NaN
+   e ogni confronto e' falso — cosi' NaN cade sul ramo «non c'e'», che
+   e' il verso giusto. */
+function statoSollecito(o){
+  if (o.role!=='buyer' || o.state!=='locked') return '';
   /* il ritiro in zona sta fuori (chi ha comprato conferma da solo);
      la via NON DICHIARATA invece entra — storici e importati da Nostr
      si spediscono eccome —, tranne sull'asta il cui vincitore non ha
      ancora scelto: li' il venditore non puo' spedire, ed e' la stessa
      domanda che si fa `segna_spedito` */
-  if (o.consegnaScelta==='ritiro') return false;
-  if (!o.consegnaScelta && o.asta) return false;
-  if (SOLLECITO.max<=0 || o.sollecitiManuali>=SOLLECITO.max) return false;
+  if (o.consegnaScelta==='ritiro') return '';
+  if (!o.consegnaScelta && o.asta) return '';
+  if (SOLLECITO.max<=0) return '';
   const ore = o.consegnaScelta==='digitale' ? SOLLECITO.daDig : SOLLECITO.da;
-  if (ore<=0) return false;
+  if (ore<=0) return '';
   const adesso = Date.now()/1000;
-  return o.creato + ore*3600 <= adesso
-      && o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso;
+  if (!(o.creato + ore*3600 <= adesso)) return '';   // è ancora presto
+  if (o.sollecitiManuali >= SOLLECITO.max) return 'tetto';
+  if (!(o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso)) return 'pausa';
+  return 'ok';
+}
+/* Il bottone nei suoi tre stati. Da spento NON ha un onclick — non
+   basta `disabled` a dormire tranquilli — e porta il PERCHE' al posto
+   dell'etichetta: e' quello il motivo per cui resta in pagina. */
+function bottoneSollecito(o){
+  const st = statoSollecito(o);
+  if (!st) return '';
+  if (st === 'ok')
+    return `<button class="btn ghost" onclick="sollecitaVenditore(this)">🔔 `
+         + `Ricorda al venditore ${o.consegnaScelta==='digitale'
+             ? 'di mandarti il codice' : 'di spedire'}</button>`;
+  return `<button class="btn ghost" disabled>🔔 ${st === 'tetto'
+    ? `Hai già ricordato ${SOLLECITO.max} volte`
+    : 'Già ricordato oggi — potrai rifarlo domani'}</button>`;
 }
 /* Il gemello di sollecita(), dall'altra parte del tavolo. I due
    contatori dell'automatico non si toccano: sono altre colonne, e
