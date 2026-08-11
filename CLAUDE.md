@@ -5221,11 +5221,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL MONO NON SCONTA NEMMENO A VALORE, ed è la cosa che a valore si
   fraintende di più: «da 100.000 sats» si legge come «da 100.000 sats
   di spesa», e chi compra UN oggetto da 200.000 dalla sua scheda non
-  sconta. L'antidoto è testuale e sta in tre posti: la riga fissa del
-  cassetto («vale solo nel carrello, da due oggetti diversi in su»), e
-  le due frasi pubbliche, che dicono sempre «nello stesso carrello».
+  sconta. L'antidoto è testuale e sta in QUATTRO posti: la riga fissa
+  del cassetto («vale solo nel carrello, da due oggetti diversi in
+  su»), le due frasi pubbliche che dicono sempre «nello stesso
+  carrello», e — dall'ago 2026 — l'ANTEPRIMA del cassetto.
+  I TRE POSTI NON BASTAVANO, e a dirlo è stato Andrea stupendosi lui
+  stesso che non scattasse su un articolo da 14.000 con la soglia a
+  10.000. La ragione è che erano tutti e tre FUORI dalla frase della
+  promessa — in fondo, in grigio, dopo il bottone — mentre una soglia
+  espressa in CIFRA si legge «sopra 10.000 e basta». Ora la riga in
+  GRASSETTO che il venditore rilegge per controllare di aver capito
+  dice anche cosa NON fa: «Da 10 € di articoli in un carrello, −15%.
+  Un oggetto solo paga pieno, per quanto costi». Due scelte di parole
+  che valgono la voce: «in un carrello» mette il requisito DENTRO la
+  frase invece che dopo (e ACCORCIA, sostituendo «in su … su tutto il
+  carrello»), e «per quanto costi» è ciò che chiude il ragionamento
+  «sì, ma il mio è da 14.000». Costo misurato: ZERO pixel — la frase
+  più lunga entra nelle stesse quattro righe.
+  E NON È UNA FORMA NUOVA: il ramo a PEZZI ce l'aveva già («Chi ne
+  prende 2 paga pieno»), ed era il ramo a valore l'unico senza
+  controesempio. Per la stessa ragione la spedizione gratis NON la
+  dice: lì sul singolo scatta davvero, e uniformare i due cassetti —
+  che è l'errore che viene naturale — la renderebbe una bugia. C'è la
+  sentinella per tutt'e due i versi.
   Per la stessa ragione la decisione 3 si RICONFERMA con più forza: mai
   nelle card, mai nelle pillole del dettaglio.
+  E LA STRADA DI FARLO SCATTARE SUL MONO è stata valutata e SCARTATA
+  (ago 2026, decisione di Andrea): l'asimmetria fra valore e pezzi
+  sarebbe peggio della confusione che si toglie — lo stesso criterio si
+  comporterebbe in due modi secondo il tipo d'ordine. Da tenere però il
+  censimento, perché la premessa tecnica era più debole di come suona:
+  la divisione a ritroso resterebbe ESATTA con un `+ sconto_sats` (la
+  docstring di `_righe_ordine` lo prescrive già) e NON servirebbe
+  nessuna colonna; ma quella divisione vive in TRE posti e non uno —
+  `_righe_ordine`, la RIPRESA del pentito in `compra()` che la rifà a
+  mano, e il CLIENT nella riga «N pezzi × unitario» — e oggi quel
+  numero non lo legge nessuno, quindi una riga sbagliata non farebbe
+  fallire niente: mostrerebbe solo una cifra storta. Più la chiave
+  `articolo_sats`, che nel mono è il LORDO e nel set il NETTO (oggi
+  coincidono perché il mono non sconta).
   IL MODELLO: `utenti.sconto_pacco_soglia`/`sconto_pacco_percento`
   (0/0 = spento; nessun flag «dichiarata» come per la tariffa punto —
   lì lo zero era ambiguo, qui uno sconto dello 0% e nessuno sconto

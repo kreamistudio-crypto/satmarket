@@ -12436,9 +12436,26 @@ function anteprimaSoglia(quale){
   if (quale === 'sconto'){
     if (b.criterio !== 'valore')
       return `Da ${b.soglia} pezzi in su, −${b.pct}% su tutto il carrello.`;
+    /* A VALORE L'ANTEPRIMA DICE ANCHE COSA NON FA (ago 2026, da uno
+       stupore di Andrea su un articolo da 14.000 con la soglia a
+       10.000). Una soglia espressa in CIFRA si legge «sopra 10.000 e
+       basta», e i tre posti che dicevano «vale solo nel carrello» non
+       bastavano: erano tutti FUORI dalla frase della promessa — in
+       fondo, in grigio, dopo il bottone. Qui invece sta dentro
+       l'anteprima, che e' la riga in GRASSETTO che il venditore
+       rilegge per controllare di aver capito, subito sotto le pillole
+       che ha appena toccato.
+       «in un carrello» dice il requisito DENTRO la frase invece che
+       dopo (e accorcia: sostituisce «in su ... su tutto il
+       carrello»), e «per quanto costi» e' la parola che chiude il
+       ragionamento «si', ma il mio e' da 14.000».
+       SOLO a criterio valore: a pezzi l'equivoco non esiste — «da 3
+       pezzi» non si legge come un articolo — e il cassetto della
+       spedizione gratis non si tocca, che li' sul singolo scatta
+       davvero (vedi _sped_gratis: e' la forma a deciderlo). */
     return valore > 0
-      ? `Da ${fmt(valore)} ${u} di articoli in su, −${b.pct}% su tutto
-         il carrello.`
+      ? `Da ${fmt(valore)} ${u} di articoli in un carrello, −${b.pct}%.
+         Un oggetto solo paga pieno, per quanto costi.`
       : `Scrivi da ${chiedi} parte lo sconto.`;
   }
   return valore > 0

@@ -5805,6 +5805,27 @@ def prove_sped_gratis():
     # riscrive il campo a ogni tasto).
     prova("l'anteprima ha UNA fonte sola", 2,
           mini.count("anteprimaSoglia('"))
+    # ...E A VALORE DICE ANCHE COSA NON FA (ago 2026, da uno stupore di
+    # Andrea su un articolo da 14.000 con la soglia a 10.000): una
+    # soglia espressa in CIFRA si legge «sopra 10.000 e basta», e i tre
+    # posti che dicevano «vale solo nel carrello» erano tutti FUORI
+    # dalla frase della promessa. Adesso sta DENTRO l'anteprima, che e'
+    # la riga in grassetto che il venditore rilegge — ed e' la riga che
+    # un riordino toglierebbe per prima, perche' sembra una ripetizione.
+    _ap = pezzo_js(mini, "function anteprimaSoglia")
+    _ramo_sc = _ap[:_ap.index("Scrivi da ${chiedi} parte lo sconto")]
+    prova("l'anteprima a valore nomina il CARRELLO", True,
+          "di articoli in un carrello" in _ramo_sc)
+    prova("...e dice che un oggetto solo non basta, per quanto costi",
+          True, "Un oggetto solo paga pieno, per quanto costi" in _ramo_sc)
+    # ...e NON lo dice la spedizione gratis, dove sul singolo scatta
+    # davvero: la stessa frase li' sarebbe una bugia (ed e' l'errore
+    # che verrebbe naturale, «uniformiamo i due cassetti»)
+    # l'ULTIMO `return valore > 0` e' il ramo della spedizione: un
+    # offset a mano risalirebbe dentro quello dello sconto (provato)
+    _ramo_sg = _ap[_ap.rindex("return valore > 0"):]
+    prova("la spedizione gratis NON la dice (li' sul singolo scatta)",
+          False, "paga pieno" in _ramo_sg)
     # NIENTE CLAMP MUTO: a limare al minimo sarebbe il client, e il
     # venditore vedrebbe un numero che non ha scritto. A dire la cifra
     # e' il 400 del server, che il cassetto rende dentro di se'.
