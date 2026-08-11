@@ -14272,10 +14272,15 @@ async function attivaNotifichePacco(){
   haptic();
   const vero = currentOrder?.tracking || '';
   /* IL FILTRO DI TRACKBOT (ago 2026, detto da loro): il payload di
-     /start la funzione ce l'ha dal 2018, ma lo guarda contro
-     ^[A-Z0-9]{10,22}$ — una minuscola, uno spazio o un trattino lo
+     /start la funzione ce l'ha dal 2018, e lo guarda contro
+     ^[A-Z0-9]{10,26}$ — una minuscola, uno spazio o un trattino lo
      fanno cadere, e cade in SILENZIO (la chat si apre lo stesso e non
      succede niente, che e' esattamente quel che si vedeva dal campo).
+     IL TETTO ERA 22 e trackbot l'ha alzato a 26 l'11 ago 2026, su
+     nostra richiesta: da allora ci rientrano anche l'InPost (24
+     cifre, provato dal vivo su un codice vero) e i DHL eCommerce
+     lunghi. Sotto i 10 restano fuori i GLS/SDA/UPS a 9 cifre, e
+     sono gli ultimi.
      Quindi si toglie tutto quel che non e' maiuscola o cifra: il
      trattino basso lo ammetteva TELEGRAM nel payload, non trackbot, e
      tenerlo voleva dire spedire un codice che il bot butta via.
@@ -14284,8 +14289,8 @@ async function attivaNotifichePacco(){
      DATABASE restano il codice come l'ha scritto il venditore, che e'
      anche una prova in disputa.
      Il filtro NON e' una condizione per aprire il bot: i codici che
-     non ci rientrano nemmeno normalizzati (InPost, 24 cifre) hanno
-     comunque la strada di sempre, cioe' incollare a mano. */
+     non ci rientrano nemmeno normalizzati hanno comunque la strada
+     di sempre, cioe' incollare a mano. */
   const nudo = vero.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!nudo) return;
   /* NEGLI APPUNTI VA IL NUDO, non `vero`, e la ragione e' che quel

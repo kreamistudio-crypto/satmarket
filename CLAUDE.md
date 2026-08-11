@@ -7551,10 +7551,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e questa voce ROVESCIA quella di ieri — «cosa faccia il bot di un
   `/start CODICE` non è documentato da nessuna parte, e dalla nostra
   parte non c'è niente da riparare»): la funzione c'è dal 2018, e il
-  payload lo guarda contro `^[A-Z0-9]{10,22}$`. Da riparare dalla
+  payload lo guarda contro `^[A-Z0-9]{10,26}$` (era `{10,22}`, vedi
+  sotto). Da riparare dalla
   nostra parte c'era eccome — si passava il codice con
   `[^A-Z0-9_-]`, cioè tenendo trattini e trattini bassi perché li
-  ammette TELEGRAM nel payload, e su quel filtro cadevano in SILENZIO
+  ammette TELEGRAM nel payload, e sul filtro cadevano in SILENZIO
   (la chat si apre lo stesso e non succede niente: esattamente quel
   che si vedeva dal campo). Ora si toglie tutto ciò che non è
   maiuscola o cifra, e SI NORMALIZZA SOLO QUEL CHE VA A TRACKBOT:
@@ -7574,25 +7575,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ammorbidire: chi non ci rientra nemmeno normalizzato ha comunque la
   strada di sempre — incollare a mano — e togliergli il bottone
   vorrebbe dire chiudere l'unica porta che gli resta. QUALI SONO, e
-  si sanno per FORMA e non per caso: sotto i 10 caratteri i GLS/SDA/
-  UPS a 9 cifre, sopra i 22 i DHL eCommerce lunghi e soprattutto
-  **l'InPost, 24 cifre, che non ci rientra MAI** — cioè proprio il
-  corriere del caso che ha aperto il cantiere delle spedizioni ai
-  punti. Per quelli la strada è che trackbot allarghi il
-  riconoscimento, non che noi tagliamo un codice.
-  MISURATO sui codici veri di produzione (ago 2026, una passata in
-  sola lettura sul VPS): 3 InPost su 3 fuori — tutti a 24
-  cifre, es. `820123387637068013332765` — e 3 Poste su 3 dentro; il
-  resto del registro erano codici di prova. RICHIESTA PENDENTE: ad
-  ago 2026 Andrea ha chiesto a trackbot di allargare il
-  riconoscimento a `^[A-Z0-9]{10,24}$`, e la risposta non è ancora
-  arrivata. Sta scritto qui perché il segnale è una prova che diventa
-  ROSSA — «i 24 dell'InPost restano fuori dal filtro» — e senza
-  queste righe fra sei mesi si leggerebbe come un capriccio di
-  trackbot invece che come una risposta a noi: se il filtro si
-  allarga davvero, si aggiorna quella prova e non si tocca nient'altro
-  (la normalizzazione va bene com'è, e il bottone non ha mai escluso
-  nessuno).
+  si sanno per FORMA e non per caso: oggi solo chi sta sotto i 10
+  caratteri, cioè i GLS/SDA/UPS a 9 cifre.
+  IL TETTO ERA 22 E TRACKBOT L'HA ALZATO A 26 (11 ago 2026), ed è la
+  storia da tenere perché è il modello per la prossima volta: il
+  cantiere aveva MISURATO sui codici veri di produzione (una passata
+  in sola lettura sul VPS: 3 InPost su 3 fuori, tutti a 24 cifre, e
+  3 Poste su 3 dentro — il resto erano codici di prova), Andrea ha
+  scritto a trackbot con quel numero in mano chiedendo `{10,24}`, e
+  loro hanno alzato a **26**, cioè più di quanto si chiedeva: così
+  rientrano anche i DHL eCommerce lunghi (`JVGL` + 22 = 26 tondi),
+  che erano l'altra famiglia trovata fuori. Provato dal vivo su un
+  codice InPost vero: funziona. NON si è toccato nient'altro — la
+  normalizzazione andava già bene e il bottone non aveva mai escluso
+  nessuno — e a cambiare è stata UNA prova, che ha CAMBIATO LATO
+  («i 24 dell'InPost restano fuori» → «ci rientrano»). Era il segnale
+  armato apposta, ed è servito.
+  LA LEZIONE DEL GIRO, che vale oltre trackbot: davanti a un filtro
+  di TERZI che ci taglia fuori, la leva non è sempre adattarsi —
+  qui adattarsi avrebbe voluto dire tagliare un codice, cioè
+  spedirne uno sbagliato. Si misura sui dati veri, si chiede con il
+  numero in mano, e intanto si tiene la strada di sempre aperta per
+  chi resta fuori. Il costo dell'attesa era zero perché il bottone
+  non è mai stato gatato dal filtro.
   LA RIGA SOTTO IL BOTTONE E IL TOAST NON CAMBIANO: dicono che il
   codice sta negli appunti e va incollato, che è quel che facciamo
   per davvero e resta vero anche per chi il filtro lo passa — un giro
