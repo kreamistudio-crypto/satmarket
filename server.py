@@ -388,6 +388,20 @@ try:
     from config import POST_MAX_ORA
 except ImportError:
     POST_MAX_ORA = 6
+# UN POST PER VENDITORE ALLA SETTIMANA (ago 2026, decisione di
+# Andrea). Il canale non e' la vetrina: e' una selezione, e un negozio
+# che pubblica trenta cose in un pomeriggio non deve poterselo
+# prendere tutto. Il ritmo e' quello dei suggerimenti dal bot, e per
+# la stessa ragione — chi si stufa se ne va, e da un canale ci si
+# esce con un tocco solo. Il post esce SUBITO (l'annuncio non aspetta
+# una settimana per farsi vedere) e da li' il timbro del venditore si
+# chiude per N giorni; se nella finestra di raggruppamento ne ha
+# pubblicati tre, esce il PIU' RECENTE. 0 = nessun freno, cioe' il
+# comportamento di ieri: freno d'emergenza, non una taratura.
+try:
+    from config import PROMO_GIORNI_VENDITORE
+except ImportError:
+    PROMO_GIORNI_VENDITORE = 7
 
 # Il cartello «siamo in fase di test»: interruttore, testo e link del
 # canale vivono nel config, cosi' si cambiano senza cantieri e a
@@ -807,6 +821,79 @@ def db():
     con = sqlite3.connect(DB)
     con.row_factory = sqlite3.Row
     return con
+
+
+# ------------- IL CANALE TELEGRAM, DECISO DAL BOT -------------------
+# Fino all'ago 2026 il canale del mercatino viveva SOLO in
+# `TELEGRAM_CANALE_ID`, cioe' cambiarlo voleva dire entrare nel VPS,
+# ritoccare il config e riavviare. Adesso lo si dice al bot
+# (`/canale @nome`) e la scelta finisce nella tabella `impostazioni`,
+# che vince sul config.
+#
+# PERCHE' IL CONFIG NON BASTA PIU', e perche' questa NON e' una deroga
+# alla regola «le leve si guardano e basta» del pannello admin: quella
+# regola difende gli interruttori che muovono denaro — ASTA_ABILITATA,
+# IMPORT_NOSTR_APERTO, AUTO_SBLOCCO_ATTIVO nascono spenti apposta
+# perche' accenderli costi un gesto dal VPS. Un id di canale non
+# accende niente: dice DOVE il bot parla, e sbagliarlo si vede subito
+# e si corregge con un altro comando. Il config resta il valore di
+# PARTENZA (e quindi il modo di ripulire: si svuota la riga e si
+# torna a lui).
+#
+# La cache in memoria e' un tantum all'avvio: `_CANALE` = None vuol
+# dire «non ancora letto», e da li' in poi si rilegge solo quando
+# qualcuno lo cambia. Il processo e' uno solo (uvicorn mono-processo,
+# lo stesso patto di SFIDE_LOGIN e CODICI_FUSIONE), quindi non esiste
+# una seconda copia da tenere allineata.
+
+_CANALE = None          # None = mai letto; str = il valore che vale
+
+
+def impostazione(chiave: str, ripiego: str = "") -> str:
+    """Legge una riga di `impostazioni`. Fail-open: al primo avvio la
+    tabella puo' non esistere ancora e vale il ripiego."""
+    try:
+        con = db()
+        r = con.execute("SELECT valore FROM impostazioni WHERE chiave=?",
+                        (chiave,)).fetchone()
+        con.close()
+        return r["valore"] if r else ripiego
+    except sqlite3.OperationalError:
+        return ripiego
+
+
+def scrivi_impostazione(chiave: str, valore: str):
+    """Scrive (o riscrive) una riga di `impostazioni`."""
+    con = db()
+    con.execute("INSERT INTO impostazioni(chiave, valore) VALUES(?,?) "
+                "ON CONFLICT(chiave) DO UPDATE SET valore=excluded.valore",
+                (chiave, valore))
+    con.commit()
+    con.close()
+
+
+def canale_id() -> str:
+    """IL GIUDICE UNICO di «dove parla il bot». Vuoto = nessun canale,
+    e allora i post automatici semplicemente non escono (fail-open di
+    sempre). Da qui passano TUTTI i punti che scrivono, editano o
+    cancellano nel canale: se un giorno divergessero, il ✅ Venduto
+    finirebbe in un canale e il post originale in un altro."""
+    global _CANALE
+    if _CANALE is None:
+        _CANALE = impostazione("canale_telegram", TELEGRAM_CANALE_ID)
+    return _CANALE
+
+
+def imposta_canale(valore: str) -> str:
+    """Cambia il canale e riallinea la cache. Stringa vuota = spento
+    (e NON «torna al config»: chi spegne dal bot vuole il silenzio,
+    non il canale di ieri — per tornare al config si svuota la riga a
+    mano, che e' un gesto da VPS come lo era prima)."""
+    global _CANALE
+    valore = (valore or "").strip()
+    scrivi_impostazione("canale_telegram", valore)
+    _CANALE = valore
+    return valore
 
 
 def nuovo_codice_negozio(con) -> str:
@@ -1596,6 +1683,22 @@ def init_db():
         ON rimborsi_asta(puntata_id) WHERE motivo = 'eccedenza_ritiro';
     CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_eccedenza
         ON rimborsi_asta(puntata_id) WHERE motivo = 'eccedenza';
+    CREATE TABLE IF NOT EXISTS impostazioni(
+        -- Le poche cose che si cambiano DA FUORI senza un deploy
+        -- (ago 2026): oggi solo `canale_telegram`, il canale in cui il
+        -- bot annuncia i nuovi arrivi, che si dice al bot stesso con
+        -- `/canale`. Chiave-valore e non colonne perche' qui non c'e'
+        -- niente su cui interrogare: si legge una riga per nome, e
+        -- l'alternativa (una tabella a una riga con N colonne) vuole
+        -- una migrazione per ogni impostazione futura.
+        -- ATTENZIONE, e' il recinto da non allargare: qui NON vanno i
+        -- segreti (chiavi LNbits, token, nsec: vivono nel config e non
+        -- devono stare in un database che finisce nei backup) ne' le
+        -- leve che muovono denaro, che nascono spente nel CODICE
+        -- apposta perche' accenderle costi un gesto dal VPS.
+        chiave TEXT PRIMARY KEY,
+        valore TEXT DEFAULT ''
+    );
     CREATE TABLE IF NOT EXISTS moderazione_log(
         -- il REGISTRO della moderazione (lug 2026): ogni esito, della
         -- macchina e dell'umano, per correggere il prompt A MANO sui
@@ -1832,6 +1935,15 @@ def init_db():
                     # differenza del dismiss del wallet NWC, che il
                     # wallet ce l'ha solo quel telefono).
                     "avvisato_trasporto INTEGER DEFAULT 0",
+                    # UN POST IN CANALE A SETTIMANA (ago 2026): il
+                    # timbro dell'ultimo annuncio di questo venditore
+                    # finito nel canale Telegram. 0 = mai, quindi il
+                    # DEFAULT e' anche la migrazione — nessuno resta
+                    # zitto per una settimana solo perche' la colonna
+                    # e' nata oggi. Colonna e non memoria: un riavvio
+                    # non deve riaprire la porta a chi ha appena
+                    # avuto il suo turno.
+                    "promo_canale_il INTEGER DEFAULT 0",
                     # LA DIMENSIONE DEL TESTO (ago 2026): percentuale
                     # scelta dal lettore, valida su ogni dispositivo
                     # (vedi SCALE_FONT). 100 = la misura di sempre,
@@ -4422,6 +4534,214 @@ async def avvia_fusione(id_telegram: int, codice: str):
         ]]}})
 
 
+# ------------- IL BOT CHE SFOGLIA (e che spinge la Mini App) --------
+# Regola di prodotto (ago 2026, decisione di Andrea): LA MINI APP
+# VIENE PRIMA. Chi apre il bot deve trovare l'invito ad aprire
+# Barattolo, non un menu di comandi — nella Mini App si compra, si
+# paga, si tratta, e il bot quelle cose non le sa fare. Ma chi
+# smanetta non deve sbattere contro un muro: al primo messaggio che
+# non e' un comando compaiono i bottoni, e il bottone verso la Mini
+# App resta SEMPRE il primo, in ogni tastiera di questo blocco.
+# Per questo il bottone della Mini App si costruisce in un posto solo
+# (`_riga_webapp`): e' la riga che non deve mancare da nessuna parte,
+# ed e' esattamente il tipo di riga che si dimentica nella tastiera
+# aggiunta fra sei mesi.
+
+ADMIN_BOT_USERNAME = ("alanbimbati", "aandreaiita")
+SFOGLIA_PER_PAGINA = 5      # annunci per schermata nel bot
+
+# Il cappello della griglia. Dice in una riga che questa e' la vista
+# povera: si guarda, e per fare le cose si apre Barattolo.
+TESTO_SFOGLIA = ("🗂 <b>Sfoglia il mercatino</b>\n"
+                 "Scegli un reparto e ti mostro gli ultimi arrivi.\n"
+                 "Per comprare, trattare e pagare in satoshi apri "
+                 "Barattolo 👇")
+
+
+def e_admin_bot(mittente: dict) -> bool:
+    """Chi puo' dare i comandi di servizio al bot: i moderatori di
+    sempre (ADMIN_IDS) piu' i due username scritti qui sopra.
+    L'username arriva dal MESSAGGIO e non dal database, ed e' la cosa
+    da non allentare: e' Telegram a dirci chi ha scritto, mentre la
+    riga `utenti` la scriviamo noi e potrebbe portare uno username
+    vecchio di mesi — quello di uno che nel frattempo l'ha cambiato,
+    o peggio quello che qualcun altro si e' preso dopo di lui."""
+    if e_admin(mittente.get("id") or 0):
+        return True
+    return (mittente.get("username") or "").lower() in ADMIN_BOT_USERNAME
+
+
+def _riga_webapp() -> list:
+    """La riga che porta a Barattolo. Sta in cima a OGNI tastiera del
+    bot, e non e' una web_app button ma un link normale: la
+    `web_app` di Telegram apre la Mini App solo dentro l'app di
+    Telegram e in chat private, mentre il link funziona ovunque —
+    desktop, browser, client alternativi — e dentro Telegram il bot
+    e' comunque configurato col suo bottone di menu."""
+    return [{"text": "🫙 Apri Barattolo", "url": URL_PUBBLICO}]
+
+
+def tastiera_bot(righe: list = None) -> dict:
+    return {"inline_keyboard": [_riga_webapp()] + (righe or [])}
+
+
+def tastiera_categorie() -> dict:
+    """La griglia «Sfoglia», la stessa che si vede nella Mini App: due
+    colonne, ORDINE FISSO del catalogo (mai per numero di annunci —
+    una mappa che si riordina ogni giorno non si impara, e' la regola
+    di renderSfoglia) e l'icona del reparto davanti al nome.
+    Nel `callback_data` viaggia l'INDICE e non il nome: il campo ha 64
+    byte scarsi e «Console e videogiochi» in UTF-8 se ne mangia gia'
+    un terzo — piu' il fatto che un indice non puo' contenere il ':'
+    che separa i pezzi."""
+    voci = [{"text": f"{EMOJI_CATEGORIA.get(c, '📦')} {c}",
+             "callback_data": f"sfo:{i}:0"}
+            for i, c in enumerate(CATEGORIE)]
+    griglia = [voci[i:i + 2] for i in range(0, len(voci), 2)]
+    return {"inline_keyboard": [_riga_webapp()] + griglia}
+
+
+def _riga_sfoglia(a: dict, cambio: float) -> str:
+    """Un annuncio nell'elenco del bot: la forma corta del post di
+    canale — titolo, prezzo, il link nascosto dietro l'ancora."""
+    riga = (f"🫙 <b>{html.escape(a['titolo'])}</b>\n"
+            f"💰 {_prezzo_promo(dict(a), cambio)}")
+    if a["zona_comune"]:
+        riga += f" · 📍 {html.escape(a['zona_comune'])}"
+    riga += (f"\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+             "Apri su Barattolo</a>")
+    return riga
+
+
+async def mostra_categoria(chat: int, indice: int, pagina: int,
+                           message_id: int = 0):
+    """Una pagina di annunci di una categoria. Un messaggio solo, che
+    si RIEDITA a ogni tocco invece di accodarne uno nuovo: sfogliare
+    non deve lasciare in chat la scia di quel che si e' gia' visto.
+
+    Legge SOLO gli annunci attivi e non in ferie — le stesse guardie
+    della vetrina, che un elenco nel bot e' una vetrina anche lui — e
+    l'hashtag della categoria in coda e' quello dei post del canale
+    (`_hashtag_promo`), cosi' toccando l'hashtag di un post si ritrova
+    la stessa roba che il bot elenca qui."""
+    if not (0 <= indice < len(CATEGORIE)):
+        return
+    cat = CATEGORIE[indice]
+    pagina = max(0, pagina)
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        f"SELECT {CAMPI_VETRINA} FROM annunci a "
+        "JOIN utenti u ON u.tg_id=a.venditore_id "
+        "WHERE a.stato='attivo' AND a.categoria=? "
+        "ORDER BY a.creato DESC, a.id DESC LIMIT ? OFFSET ?",
+        (cat, SFOGLIA_PER_PAGINA + 1, pagina * SFOGLIA_PER_PAGINA))]
+    con.close()
+    righe = arricchisci_righe_vetrina(righe)
+    adesso = int(time.time())
+    righe = [r for r in righe if not in_ferie(r.get("venditore_ferie"), adesso)]
+    ancora = len(righe) > SFOGLIA_PER_PAGINA
+    righe = righe[:SFOGLIA_PER_PAGINA]
+    icona = EMOJI_CATEGORIA.get(cat, "📦")
+    if not righe:
+        testo = (f"{icona} <b>{html.escape(cat)}</b>\n\n"
+                 "Qui dentro non c'è ancora niente. Su Barattolo puoi "
+                 "farti avvisare quando arriva quello che cerchi 🔔")
+    else:
+        cambio = await cambio_btc_eur()
+        testo = (f"{icona} <b>{html.escape(cat)}</b>"
+                 + (f" · pagina {pagina + 1}" if pagina else "") + "\n\n"
+                 + "\n\n".join(_riga_sfoglia(r, cambio) for r in righe)
+                 + f"\n\n⚡ Tutto pagabile in Satoshi\n"
+                 + _hashtag_promo({"categoria": cat}))
+    frecce = []
+    if pagina:
+        frecce.append({"text": "◀️ Indietro",
+                       "callback_data": f"sfo:{indice}:{pagina - 1}"})
+    if ancora:
+        frecce.append({"text": "Avanti ▶️",
+                       "callback_data": f"sfo:{indice}:{pagina + 1}"})
+    righe_tastiera = ([frecce] if frecce else []) + [
+        [{"text": "🗂 Tutte le categorie", "callback_data": "sfo:menu:0"}]]
+    dati = {"chat_id": chat, "text": testo, "parse_mode": "HTML",
+            "reply_markup": tastiera_bot(righe_tastiera),
+            "disable_web_page_preview": True}
+    if message_id:
+        r = await bot_api("editMessageText", {**dati,
+                                              "message_id": message_id})
+        if r and r.get("ok"):
+            return
+        # il messaggio puo' non essere piu' modificabile (troppo
+        # vecchio, o cancellato a mano): si ripiega su uno nuovo invece
+        # di lasciare il tocco senza risposta
+    await bot_api("sendMessage", dati)
+
+
+async def comando_canale(mittente: dict, testo: str):
+    """`/canale` — dove il bot annuncia i nuovi arrivi. Solo admin.
+
+    Senza argomenti DICE quello attuale (e come si cambia): un comando
+    che si limita a scrivere, e che per sapere cosa c'e' scritto
+    obbliga a entrare nel VPS, e' meta' comando.
+    IL SILENZIO NON E' UNA RISPOSTA per chi non e' admin, ed e'
+    deliberato: rispondere «non sei autorizzato» direbbe a un curioso
+    che quel comando ESISTE, e da li' si va a indovinare chi lo puo'
+    dare. Chi non e' admin riceve la risposta di un messaggio
+    qualunque, cioe' i bottoni — che e' anche quel che gli serve."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "Non conosco questo comando 🤔 — ma posso "
+                    "mostrarti il mercatino 👇",
+            "reply_markup": tastiera_bot(
+                [[{"text": "🗂 Sfoglia le categorie",
+                   "callback_data": "sfo:menu:0"}]])})
+    arg = testo.split(maxsplit=1)
+    arg = arg[1].strip() if len(arg) == 2 else ""
+    if not arg:
+        ora = canale_id()
+        stato = (f"Adesso scrivo in <code>{html.escape(ora)}</code>."
+                 if ora else "Adesso non scrivo in nessun canale.")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"📣 <b>Canale del mercatino</b>\n{stato}\n\n"
+                    "Per cambiarlo: <code>/canale @nomecanale</code> "
+                    "(oppure l'id numerico, che per i canali comincia "
+                    "con <code>-100</code>).\n"
+                    "Per spegnerlo: <code>/canale spento</code>.\n\n"
+                    "⚠️ Il bot dev'essere <b>amministratore</b> del "
+                    "canale, o non riuscirà a pubblicare.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if arg.lower() in ("spento", "off", "-", "nessuno"):
+        imposta_canale("")
+        await notifica_admin(f"📣 Canale spento da tg {chat}")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "🔕 Fatto: da adesso non pubblico più in nessun "
+                    "canale. I post già fatti restano dove sono."})
+    # SI PROVA PRIMA DI CREDERCI: un id sbagliato lo si scoprirebbe
+    # altrimenti solo al prossimo annuncio pubblicato, cioe' con un
+    # post perso e nessuno che se ne accorge. Il messaggio di prova
+    # e' anche la conferma visiva che il bot ha i diritti giusti.
+    r = await bot_api("sendMessage", {
+        "chat_id": arg, "parse_mode": "HTML",
+        "text": "🫙 <b>Barattolo è collegato a questo canale.</b>\n"
+                "Da adesso i nuovi annunci del mercatino compaiono qui."})
+    if not (r and r.get("ok")):
+        motivo = (r or {}).get("description") or "nessuna risposta"
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"❌ Non riesco a scrivere in <code>"
+                    f"{html.escape(arg)}</code>.\nTelegram dice: "
+                    f"<i>{html.escape(str(motivo))}</i>\n\n"
+                    "Controlla che il bot sia amministratore del "
+                    "canale e che il nome sia scritto giusto.",
+            "parse_mode": "HTML"})
+    imposta_canale(arg)
+    await notifica_admin(f"📣 Canale del mercatino cambiato in {arg} "
+                         f"(da tg {chat})")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ Fatto: da adesso pubblico in <code>"
+                f"{html.escape(arg)}</code>.",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
 async def gestisci_callback(cb: dict):
     """Il tocco sulla tastiera di conferma. Il token vale solo per il
     Telegram a cui era destinato: il tocco di chiunque altro non conta."""
@@ -4430,6 +4750,23 @@ async def gestisci_callback(cb: dict):
     if azione == "rev":
         # la tastiera ✅/❌ della revisione (solo moderatori)
         return await callback_revisione(cb, token)
+    if azione == "sfo":
+        # la griglia «Sfoglia»: aperta a tutti, non tocca niente e non
+        # dice niente di privato — nessun token da controllare
+        msg = cb.get("message") or {}
+        chat = (msg.get("chat") or {}).get("id")
+        if not chat:
+            return
+        indice, _, pagina = token.partition(":")
+        if indice == "menu":
+            return await bot_api("editMessageText", {
+                "chat_id": chat, "message_id": msg.get("message_id"),
+                "text": TESTO_SFOGLIA, "parse_mode": "HTML",
+                "reply_markup": tastiera_categorie()})
+        if not indice.isdigit() or not (pagina or "0").isdigit():
+            return
+        return await mostra_categoria(chat, int(indice), int(pagina or 0),
+                                      msg.get("message_id"))
     if azione not in ("fondi", "annulla"):
         return
     msg = cb.get("message") or {}
@@ -4487,18 +4824,44 @@ async def gestisci_update(update: dict):
     upsert_utente({"id": mittente["id"],
                    "first_name": mittente.get("first_name", ""),
                    "username": mittente.get("username", "")})
+    chat = mittente["id"]
     if testo.startswith("/start"):
         parti = testo.split(maxsplit=1)
         if len(parti) == 2:
-            return await avvia_fusione(mittente["id"], parti[1].strip())
-        return await bot_api("sendMessage", {"chat_id": mittente["id"],
-            "text": "🫙 Ciao! Sono il campanello del Barattolo: ti "
-                    "avviso quando succede qualcosa nei tuoi ordini. "
-                    "Il mercatino vero e' nella Mini App: aprila dal "
-                    f"bottone del menu qui sotto, o su {URL_PUBBLICO}"})
-    await bot_api("sendMessage", {"chat_id": mittente["id"],
-        "text": "Non sono un bot chiacchierone 😅 — tutto il mercatino "
-                "vive nella Mini App: aprila dal bottone del menu!"})
+            return await avvia_fusione(chat, parti[1].strip())
+        # IL PRIMO SGUARDO E' TUTTO PER LA MINI APP: niente elenco di
+        # comandi, un invito solo e il bottone che lo esaudisce. I
+        # bottoni dello sfoglia arrivano dopo, a chi li cerca — e
+        # arrivano da soli (vedi il ramo in fondo).
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "🫙 <b>Ciao, benvenuto nel Barattolo!</b>\n\n"
+                    "Il mercatino vive qui dentro: si sfoglia, si "
+                    "tratta e si paga in <b>satoshi</b>, coi sats al "
+                    "sicuro nel deposito di garanzia finché non "
+                    "confermi di aver ricevuto la roba.\n\n"
+                    "Da questa chat ti avviso quando succede qualcosa "
+                    "nei tuoi ordini. Per tutto il resto, apri "
+                    "Barattolo 👇",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if testo.startswith("/canale"):
+        return await comando_canale(mittente, testo)
+    if testo.startswith("/sfoglia") or testo.startswith("/categorie"):
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": TESTO_SFOGLIA, "parse_mode": "HTML",
+            "reply_markup": tastiera_categorie()})
+    # CHI SMANETTA NON SBATTE CONTRO UN MURO (ago 2026): prima qui
+    # c'era la sola riga «non sono un bot chiacchierone», che dice a
+    # una persona curiosa che ha sbagliato posto. Adesso al primo
+    # messaggio qualunque compaiono i bottoni — con quello della Mini
+    # App sempre per primo, che resta la strada buona.
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": "Non sono un bot chiacchierone 😅 — il mercatino vero, "
+                "con gli acquisti e le trattative, vive nella Mini "
+                "App.\n\nSe però vuoi solo dare un'occhiata da qui, "
+                "posso mostrarti i reparti 👇",
+        "reply_markup": tastiera_bot(
+            [[{"text": "🗂 Sfoglia le categorie",
+               "callback_data": "sfo:menu:0"}]])})
 
 
 @app.post("/api/telegram/aggiornamenti")
@@ -5896,6 +6259,28 @@ CATEGORIE = ("Elettronica", "Informatica", "Telefonia", "Audio e video",
              # commento — prove.py estrae la tupla per testo e taglia
              # alla prima tonda chiusa.
              "Buoni ed esperienze", "Altro")
+
+
+# Le icone del reparto, gemelle di EMOJI_CAT nel client (ago 2026,
+# nate con la griglia «Sfoglia» dentro il bot). Sono un'OTTAVA copia
+# del catalogo e quindi un posto in piu' da tenere allineato: a farlo
+# non e' la buona volonta' ma `prove.py`, che incrocia questo dict con
+# quello di miniapp.html voce per voce e diventa rosso se divergono —
+# la stessa rete di CATEGORIE_SENZA_CONDIZIONE e del suo gemello.
+# Il ripiego e' il 📦 di «Altro», come nel client.
+EMOJI_CATEGORIA = {
+    "Elettronica": "🔌", "Informatica": "💻", "Telefonia": "📱",
+    "Audio e video": "🎧", "Console e videogiochi": "🎮",
+    "Foto e ottica": "📷", "Bitcoin": "₿", "Casa e giardino": "🏡",
+    "Elettrodomestici": "🍳", "Fai da te e utensili": "🔧",
+    "Alimenti e bevande": "🍎", "Bellezza e benessere": "🧴",
+    "Abbigliamento": "👕", "Scarpe e accessori": "👟",
+    "Orologi e gioielli": "⌚", "Bambini": "🧸", "Sport e hobby": "⚽",
+    "Biciclette": "🚲", "Motori": "🚗", "Animali": "🐾",
+    "Libri e media": "📚", "Musica e film": "🎬",
+    "Strumenti musicali": "🎸", "Collezionismo": "🏺",
+    "Arte e artigianato": "🎨", "Buoni ed esperienze": "🎟️",
+    "Altro": "📦"}
 
 
 def categoria_valida(c) -> str:
@@ -9269,11 +9654,22 @@ def _leve_stato():
                   spento="i nuovi annunci non vengono raccontati da nessuna "
                          "parte (il ciclo di vita dei post già fatti "
                          "continua)"),
+            # il FATTO e non il valore, la regola dei segreti: qui
+            # basta sapere se il bot ha un canale dove parlare. E si
+            # chiede al giudice, non alla costante: dall'ago 2026 il
+            # canale lo decide il bot con `/canale` e la riga del
+            # config e' solo il valore di partenza — leggere la
+            # costante direbbe lo stato di ieri, che e' la trappola
+            # che questo pannello esiste per non far ricadere.
             _leva("Canale Telegram", "TELEGRAM_CANALE_ID",
-                  bool(TELEGRAM_CANALE_ID),
+                  bool(canale_id()),
                   spento="niente post sul canale; la nota Nostr vive lo "
                          "stesso"),
             _leva("Post singoli all'ora", "POST_MAX_ORA", POST_MAX_ORA),
+            _leva("Un post per venditore ogni (giorni)",
+                  "PROMO_GIORNI_VENDITORE", PROMO_GIORNI_VENDITORE,
+                  spento="nessun freno: un negozio che pubblica venti "
+                         "cose si prende venti post"),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
@@ -16954,18 +17350,87 @@ def _nota_promo(a: dict, cambio: float) -> str:
     return testo
 
 
+def _firma_venditore(a: dict) -> str:
+    """La riga «Annuncio da …» col ponte verso il negozio.
+
+    L'@username si mostra solo se c'e' DAVVERO: i nativi Nostr non ce
+    l'hanno, e scrivere «@» davanti a un nome proprio farebbe nascere
+    una menzione che Telegram non sa risolvere — cioe' un link morto
+    su ogni loro annuncio. Il negozio invece c'e' sempre (il codice si
+    assegna alla prima riga di `utenti` e non cambia mai), ma la
+    guardia resta: senza codice si scrive la sola firma, mai un link
+    a `/negozio/` che porterebbe a un 404."""
+    nome = a.get("venditore_username") or ""
+    chi = f"@{html.escape(nome)}" if nome else html.escape(
+        a.get("venditore") or "un venditore")
+    riga = f"Annuncio da <b>{chi}</b>"
+    if a.get("venditore_negozio"):
+        riga += (f" — <a href=\"{URL_PUBBLICO}/negozio/"
+                 f"{a['venditore_negozio']}\">vedi il suo negozio</a>")
+    return riga
+
+
 def _caption_canale(a: dict, cambio: float, venduto: bool = False) -> str:
     """La caption HTML del post nel canale Telegram (usata anche per
     RICOSTRUIRE il testo quando si edita col ✅ Venduto: cosi' non
-    serve salvarlo da nessuna parte)."""
-    testo = f"🫙 <b>{html.escape(a['titolo'])}</b>\n{_prezzo_promo(a, cambio)}"
+    serve salvarlo da nessuna parte — ed e' il motivo per cui questa
+    funzione dev'essere PURA rispetto alla riga che riceve).
+
+    IL LINK NON SI VEDE (ago 2026, decisione di Andrea): al posto
+    dell'URL nudo c'e' l'ancora «🫙 Apri su Barattolo». Non e' solo
+    estetica — un URL in chiaro in mezzo a un post e' anche la riga
+    che la gente copia e incolla altrove, mentre l'ancora tiene il
+    lettore dentro il messaggio; e la caption di Telegram ha 1024
+    caratteri, che i link lunghi si mangiano.
+    ATTENZIONE a chi la ritocca: `a` DEVE arrivare con le tre chiavi
+    del venditore (venditore, venditore_username, venditore_negozio),
+    cioe' letta col JOIN su `utenti` — senza, la firma esce anonima e
+    il post NUOVO e quello RIEDITATO col ✅ direbbero cose diverse."""
+    link = f"{URL_PUBBLICO}/annuncio/{a['id']}"
+    testo = f"🫙 <b>{html.escape(a['titolo'])}</b>"
+    testo += f"\n💰 {_prezzo_promo(a, cambio)}"
     if a.get("zona"):
         testo += f"\n📍 {html.escape(a['zona'])}"
-    testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    testo += f"\n\n<a href=\"{link}\">🫙 Apri su Barattolo</a>"
+    testo += "\n⚡ Pagabile in Satoshi"
+    testo += f"\n\n{_firma_venditore(a)}"
     testo += f"\n\n{_hashtag_promo(a)}"
     if venduto:
         testo += "\n\n✅ Venduto"
     return testo
+
+
+def _un_post_per_venditore(annunci: list[dict], adesso: int = 0) -> list[dict]:
+    """Il freno del canale: al massimo UN annuncio per venditore, e
+    solo se il suo ultimo post e' vecchio di PROMO_GIORNI_VENDITORE.
+    Fra i suoi vince il PIU' RECENTE (`creato`, poi `id` — lo stesso
+    tie-break dell'ordine della vetrina: due annunci pubblicati nello
+    stesso secondo esistono davvero, e senza il secondo campo la
+    scelta dipenderebbe dall'ordine di arrivo nella coda).
+
+    PURA APPOSTA, come le pure del conto: prende righe e restituisce
+    righe, non tocca ne' rete ne' database — cosi' si tortura in CI
+    invece di sperarci. A scrivere il timbro e' chi posta.
+    Leva a 0 = nessun freno, cioe' il comportamento di ieri: si
+    riconosce che e' un freno d'emergenza e non una taratura, quindi
+    non si limita nemmeno a un annuncio per venditore."""
+    if PROMO_GIORNI_VENDITORE <= 0:
+        return annunci
+    adesso = adesso or int(time.time())
+    soglia = adesso - PROMO_GIORNI_VENDITORE * 86400
+    migliori: dict[int, dict] = {}
+    for a in annunci:
+        if (a.get("promo_canale_il") or 0) > soglia:
+            continue          # ha gia' avuto il suo turno questa settimana
+        v = a["venditore_id"]
+        vecchio = migliori.get(v)
+        if not vecchio or (a.get("creato") or 0, a["id"]) > \
+                (vecchio.get("creato") or 0, vecchio["id"]):
+            migliori[v] = a
+    # l'ordine di arrivo si conserva: la coda e' cronologica, e un
+    # post che scavalca l'altro senza motivo si nota
+    scelti = set(id(a) for a in migliori.values())
+    return [a for a in annunci if id(a) in scelti]
 
 
 def accoda_promo(annuncio_id: int):
@@ -17000,13 +17465,17 @@ async def _drena_promo():
             # il ferie_fino del venditore viaggia col giro: un negozio
             # chiuso non si annuncia in piazza — sarebbe una vetrina
             # che promette una cosa che non si puo' comprare
-            a = con.execute("SELECT a.*, u.ferie_fino FROM annunci a "
-                            "JOIN utenti u ON u.tg_id=a.venditore_id "
-                            "WHERE a.id=?", (i,)).fetchone()
+            a = con.execute(
+                "SELECT a.*, u.ferie_fino, u.promo_canale_il, "
+                "u.nome AS venditore, u.username AS venditore_username, "
+                "u.negozio AS venditore_negozio "
+                "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+                "WHERE a.id=?", (i,)).fetchone()
             if a and a["stato"] == "attivo" and not a["contatto_nostr"] \
                     and not in_ferie(a["ferie_fino"], adesso_f):
                 annunci.append(dict(a))
         con.close()
+        annunci = _un_post_per_venditore(annunci)
         if not annunci:
             return
         adesso = time.time()
@@ -17032,6 +17501,18 @@ async def _posta_promo_singolo(a: dict):
     suo; i riferimenti (message_id, event id) si salvano per il ciclo
     di vita (✅ Venduto, cancellazione)."""
     cambio = await cambio_btc_eur()
+    # Il timbro del turno settimanale si scrive PRIMA dell'invio, il
+    # patto delle campagne: un errore di rete puo' far perdere un post
+    # di vetrina, mai raddoppiarlo — e qui il doppio sarebbe proprio la
+    # cosa che il freno esiste per togliere. Chi salta il turno per un
+    # guasto ha comunque il suo annuncio in vetrina, che e' il posto
+    # dove si compra.
+    if PROMO_GIORNI_VENDITORE > 0 and a.get("venditore_id"):
+        con = db()
+        con.execute("UPDATE utenti SET promo_canale_il=? WHERE tg_id=?",
+                    (int(time.time()), a["venditore_id"]))
+        con.commit()
+        con.close()
     post_nostr_id, post_canale_id = "", 0
     if _NOSTR:
         try:
@@ -17043,17 +17524,17 @@ async def _posta_promo_singolo(a: dict):
                 post_nostr_id = evento["id"]
         except Exception as e:
             print(f"⚠️ Nota promo Nostr #{a['id']} saltata: {e}")
-    if TELEGRAM_CANALE_ID:
+    if canale_id():
         caption = _caption_canale(a, cambio)
         foto = _foto_url_nostr(a.get("foto", ""))
         r = None
         if foto:
             r = await bot_api("sendPhoto", {
-                "chat_id": TELEGRAM_CANALE_ID, "photo": foto[0],
+                "chat_id": canale_id(), "photo": foto[0],
                 "caption": caption, "parse_mode": "HTML"})
         if not (r and r.get("ok")):
             r = await bot_api("sendMessage", {
-                "chat_id": TELEGRAM_CANALE_ID, "text": caption,
+                "chat_id": canale_id(), "text": caption,
                 "parse_mode": "HTML"})
         if r and r.get("ok"):
             post_canale_id = r["result"]["message_id"]
@@ -17077,9 +17558,9 @@ async def _posta_promo_aggregato(n: int):
                 firma_evento(1, [["t", "barattolo"]], testo))
         except Exception as e:
             print(f"⚠️ Nota promo aggregata saltata: {e}")
-    if TELEGRAM_CANALE_ID:
+    if canale_id():
         await bot_api("sendMessage",
-                      {"chat_id": TELEGRAM_CANALE_ID, "text": testo})
+                      {"chat_id": canale_id(), "text": testo})
 
 
 # ---------- IL CAMPANELLO DEI NUOVI ISCRITTI (solo moderatori) -------
@@ -17440,14 +17921,21 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
     vetrina e il post non deve mentire)."""
     try:
         con = db()
-        a = con.execute("SELECT * FROM annunci WHERE id=?",
-                        (annuncio_id,)).fetchone()
+        # il JOIN sul venditore NON e' un di piu': _caption_canale
+        # RICOSTRUISCE il testo da capo, e senza queste tre chiavi il
+        # post riscritto col ✅ perderebbe la firma che aveva da nuovo
+        a = con.execute(
+            "SELECT a.*, u.nome AS venditore, "
+            "u.username AS venditore_username, "
+            "u.negozio AS venditore_negozio "
+            "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+            "WHERE a.id=?", (annuncio_id,)).fetchone()
         con.close()
-        if not a or not a["post_canale_id"] or not TELEGRAM_CANALE_ID:
+        if not a or not a["post_canale_id"] or not canale_id():
             return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
                                   venduto=venduto)
-        dati = {"chat_id": TELEGRAM_CANALE_ID,
+        dati = {"chat_id": canale_id(),
                 "message_id": a["post_canale_id"], "parse_mode": "HTML"}
         # Con la foto il testo vive nella caption, senza nel body — ma
         # il ripiego sendMessage di _posta_promo_singolo rende il tipo
@@ -17476,9 +17964,9 @@ async def promo_rimuovi(annuncio_id: int):
         con.close()
         if not a or not (a["post_canale_id"] or a["post_nostr_id"]):
             return
-        if a["post_canale_id"] and TELEGRAM_CANALE_ID:
+        if a["post_canale_id"] and canale_id():
             await bot_api("deleteMessage",
-                          {"chat_id": TELEGRAM_CANALE_ID,
+                          {"chat_id": canale_id(),
                            "message_id": a["post_canale_id"]})
         if a["post_nostr_id"] and _NOSTR:
             await _spedisci_ai_relay(

@@ -2526,6 +2526,80 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   message_id; in collaudo un finto id negativo da contatore, così
   anche edit e delete si collaudano). Fail-open totale, ganci DOPO i
   commit, coda in memoria (un riavvio la perde, accettato).
+  IL CANALE LO DECIDE IL BOT (ago 2026): `/canale @nome` (o l'id
+  numerico) lo cambia da Telegram, `/canale` senza argomenti dice
+  quello in uso, `/canale spento` lo spegne. Tabella `impostazioni`
+  (chiave-valore) + giudice unico `canale_id()`, che vince sul config:
+  `TELEGRAM_CANALE_ID` resta il valore di PARTENZA. NON è una deroga
+  alla regola «le leve si guardano e basta» del pannello admin: quella
+  difende gli interruttori che muovono DENARO (ASTA_ABILITATA,
+  IMPORT_NOSTR_APERTO, AUTO_SBLOCCO_ATTIVO nascono spenti perché
+  accenderli costi un gesto dal VPS); un id di canale non accende
+  niente, dice dove il bot parla, e sbagliarlo si vede subito. Il
+  recinto della tabella è da NON allargare: mai segreti (finiscono nei
+  backup) e mai leve del denaro. SI PROVA PRIMA DI CREDERCI — il
+  comando manda un messaggio di collaudo nel canale e salva solo se
+  Telegram risponde ok, col motivo vero in caso di no: altrimenti
+  l'errore si scoprirebbe al prossimo annuncio, cioè con un post perso
+  e nessuno che se ne accorge. Da qui passano TUTTI i punti che
+  scrivono, editano o cancellano nel canale, con la sentinella: se
+  divergessero, il ✅ Venduto finirebbe in un canale e il post
+  originale in un altro.
+  IL POST NON MOSTRA IL LINK (ago 2026, decisione di Andrea): titolo ·
+  💰 prezzo · 📍 zona · l'ancora «🫙 Apri su Barattolo» · «⚡ Pagabile
+  in Satoshi» · «Annuncio da @username — vedi il suo negozio» (ancora
+  su `/negozio/{codice}`) · gli hashtag. L'@ si scrive SOLO se lo
+  username c'è davvero: sui nativi Nostr nascerebbe una menzione che
+  Telegram non sa risolvere, cioè un link morto su ogni loro annuncio.
+  `_caption_canale` RICOSTRUISCE il testo per l'edit del ✅, quindi
+  deve ricevere la riga col JOIN su `utenti` (venditore,
+  venditore_username, venditore_negozio) — senza, il post riscritto
+  perderebbe la firma che aveva da nuovo, e `promo_venduto` legge di
+  conseguenza.
+  UN POST PER VENDITORE A SETTIMANA (ago 2026, decisione di Andrea):
+  il canale è una SELEZIONE, non la vetrina. Leva
+  `PROMO_GIORNI_VENDITORE` (7; 0 = nessun freno, emergenza e non
+  taratura), colonna `utenti.promo_canale_il` (0 = mai, quindi il
+  default È la migrazione), giudice PURO `_un_post_per_venditore` —
+  righe in, righe out, si tortura in CI. Il post esce SUBITO e da lì
+  il venditore tace: la strada «coda fino a fine settimana» è stata
+  scartata perché un annuncio può restare invisibile in canale per
+  sette giorni. Fra i suoi vince il più recente (`creato`, poi `id`:
+  due annunci nello stesso secondo esistono davvero). Il timbro si
+  scrive PRIMA dell'invio, il patto delle campagne — chi salta il
+  turno per un guasto ha comunque il suo annuncio in vetrina, che è
+  dove si compra. L'AGGREGATO non consuma il turno di nessuno: non
+  nomina nessuno.
+  IL BOT CHE SFOGLIA, MA LA MINI APP VIENE PRIMA (ago 2026, decisione
+  di Andrea): `/start` non elenca comandi — un invito solo e il
+  bottone che lo esaudisce, perché nella Mini App si compra e si paga
+  e il bot quelle cose non le sa fare; ma chi SMANETTA non sbatte
+  contro un muro, e al primo messaggio qualunque compaiono i bottoni.
+  Il bottone verso Barattolo sta in cima a OGNI tastiera e si
+  costruisce in un posto solo (`_riga_webapp`, chiamata da
+  `tastiera_bot` e `tastiera_categorie`): è esattamente la riga che si
+  dimentica nella tastiera aggiunta fra sei mesi, e c'è la prova.
+  È un link e non un `web_app` button: quello apre solo dentro
+  Telegram e in chat private, il link funziona ovunque.
+  `/sfoglia` apre la GRIGLIA delle categorie — le stesse della pagina
+  Sfoglia, due colonne, ORDINE FISSO del catalogo (mai per numero: una
+  mappa che si riordina non si impara) e l'icona del reparto. Le emoji
+  sono l'OTTAVA copia del catalogo (`EMOJI_CATEGORIA` in server.py) e
+  a tenerle allineate a `EMOJI_CAT` del client è `prove.py`, voce per
+  voce. Nel `callback_data` viaggia l'INDICE e non il nome: il campo
+  ha 64 byte scarsi. La pagina di annunci RIEDITA lo stesso messaggio
+  invece di accodarne uno nuovo (sfogliare non deve lasciare la scia
+  di quel che si è già visto), con ripiego su un messaggio nuovo se
+  non è più modificabile; guardie della vetrina (solo attivi, niente
+  negozi in ferie) e l'hashtag della categoria in coda, lo stesso dei
+  post — toccandolo si ritrova la stessa roba.
+  I COMANDI DI SERVIZIO sono dei moderatori di sempre più i due
+  username scritti nel CODICE (`ADMIN_BOT_USERNAME`: alanbimbati,
+  aandreaiita). L'username si legge dal MESSAGGIO e non dalla riga
+  `utenti`: quella potrebbe portarne uno vecchio di mesi, magari già
+  preso da qualcun altro. A chi non è admin NON si dice «non sei
+  autorizzato» — direbbe a un curioso che quel comando esiste: riceve
+  la risposta di un messaggio qualunque, cioè i bottoni.
   Negozio del venditore: colonna `utenti.negozio` = codice pubblico
   casuale di 8 caratteri (migrazione per chi c'era, `verifica_utente`
   per i nuovi; stabile per sempre, NON deriva dal tg_id).

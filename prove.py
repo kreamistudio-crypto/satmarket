@@ -6584,8 +6584,15 @@ def _censimento(acceso):
                  "GIORNI_DATA_ANNUNCIO", "ORE_CAMBIO_VALIDO",
                  "CAMBIO_RINFRESCO_S", "TETTO_DIGITALE_NUOVI",
                  "DIGITALE_MIN_VENDITE", "SUGGERIMENTI_DI_SERIE",
-                 "SUGGERIMENTI_OGNI_GIORNI"):
+                 "SUGGERIMENTI_OGNI_GIORNI", "PROMO_GIORNI_VENDITORE"):
         amb[nome] = acceso and 24
+    # Il canale non si legge piu' dalla costante: dall'ago 2026 lo
+    # decide il bot e il giudice e' `canale_id()`, che va a leggere il
+    # database. Qui si stuba — al pannello interessa il FATTO, e
+    # trascinare dentro una connessione renderebbe questa prova
+    # dipendente da un file su disco, che e' esattamente il tipo di
+    # prova che diventa rossa per conto suo.
+    amb["canale_id"] = (lambda: "@canale_finto") if acceso else (lambda: "")
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
     amb["_NOSTR"] = ("chiave", "pubkey") if acceso else None
@@ -6599,6 +6606,229 @@ def _censimento(acceso):
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
     return gruppi, voci, json.dumps(gruppi, default=str, ensure_ascii=False)
+
+
+def prove_canale_bot():
+    """IL CANALE E IL BOT CHE SFOGLIA (ago 2026).
+
+    Quattro famiglie, e la prima e' quella che decide: il freno del
+    canale — un post per venditore a settimana, e fra i suoi il piu'
+    recente — perche' e' l'unico pezzo di questo cantiere che DECIDE
+    qualcosa invece di limitarsi a scrivere del testo."""
+    print("\n[il canale e il bot che sfoglia]")
+    import html
+
+    # --- 1) UN POST PER VENDITORE A SETTIMANA --------------------
+    import time as _time
+    amb = {"time": _time}
+    amb["PROMO_GIORNI_VENDITORE"] = 7
+    exec(pezzo("_un_post_per_venditore"), amb)
+    filtro = amb["_un_post_per_venditore"]
+    ora = 1_000_000_000
+
+    def ann(i, v, creato, ultimo=0):
+        return {"id": i, "venditore_id": v, "creato": creato,
+                "promo_canale_il": ultimo}
+
+    uno = filtro([ann(1, 10, 100), ann(2, 10, 200), ann(3, 10, 150)], ora)
+    prova("tre annunci dello stesso venditore diventano uno", 1, len(uno))
+    prova("e vince il PIU' RECENTE", 2, uno[0]["id"])
+    due = filtro([ann(1, 10, 100), ann(2, 20, 100)], ora)
+    prova("venditori diversi non si tolgono il posto", 2, len(due))
+    # il tie-break: due annunci nello stesso secondo esistono davvero
+    pari = filtro([ann(7, 10, 100), ann(9, 10, 100)], ora)
+    prova("a pari secondo comanda l'id piu' alto", 9, pari[0]["id"])
+    # il timbro: chi ha gia' avuto il turno tace fino alla scadenza
+    ieri = ora - 86400
+    prova("chi ha postato ieri resta fuori",
+          [], filtro([ann(1, 10, 100, ieri)], ora))
+    otto = ora - 8 * 86400
+    prova("chi ha postato otto giorni fa rientra",
+          1, len(filtro([ann(1, 10, 100, otto)], ora)))
+    filo = ora - 7 * 86400
+    prova("al filo esatto dei sette giorni rientra",
+          1, len(filtro([ann(1, 10, 100, filo)], ora)))
+    prova("chi non ha mai postato entra sempre",
+          1, len(filtro([ann(1, 10, 100, 0)], ora)))
+    # l'ordine di arrivo si conserva: la coda e' cronologica
+    misto = filtro([ann(1, 10, 100), ann(2, 20, 300), ann(3, 10, 500)], ora)
+    prova("l'ordine della coda si conserva", [2, 3],
+          [a["id"] for a in misto])
+    # LA LEVA A ZERO: il mondo di ieri, senza nemmeno il freno del
+    # «uno per venditore» — si riconosce che e' un'emergenza, non
+    # una taratura
+    amb["PROMO_GIORNI_VENDITORE"] = 0
+    exec(pezzo("_un_post_per_venditore"), amb)
+    prova("leva a 0: nessun freno, passa tutto",
+          3, len(amb["_un_post_per_venditore"](
+              [ann(1, 10, 100, ora), ann(2, 10, 200), ann(3, 10, 300)], ora)))
+
+    # --- 2) LA CAPTION DEL CANALE --------------------------------
+    cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store"}
+    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
+              "_hashtag_promo", "_firma_venditore", "_caption_canale"):
+        exec(pezzo(f), cap)
+    a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
+         "valuta": "sats", "zona": "Torino (TO)", "categoria": "Strumenti musicali",
+         "venditore": "Alan", "venditore_username": "AlanBimbati",
+         "venditore_negozio": "abc12345"}
+    t = cap["_caption_canale"](a, 0)
+    prova("il titolo c'e' in grassetto", True,
+          "<b>Chitarra classica</b>" in t)
+    prova("il prezzo c'e'", True, "80.000 sats" in t)
+    prova("«Pagabile in Satoshi» c'e'", True, "Pagabile in Satoshi" in t)
+    prova("il link e' un'ancora «Apri su Barattolo»", True,
+          '<a href="https://barattolo.store/annuncio/42">🫙 Apri su '
+          'Barattolo</a>' in t)
+    # IL PUNTO DEL CANTIERE: l'URL non si vede in chiaro da nessuna
+    # parte. Si contano le occorrenze fuori dagli href — un URL nudo
+    # rimasto in coda sarebbe passato dalla prova qui sopra.
+    nudi = re.sub(r'href="[^"]*"', "", t)
+    prova("nessun URL nudo nel post", False, "https://" in nudi)
+    prova("la firma nomina l'@username", True,
+          "Annuncio da <b>@AlanBimbati</b>" in t)
+    prova("e porta al negozio con un'ancora", True,
+          '<a href="https://barattolo.store/negozio/abc12345">vedi il '
+          'suo negozio</a>' in t)
+    prova("la categoria esce come hashtag", True,
+          "#strumentimusicali" in t and "#barattolo" in t)
+    prova("il ✅ Venduto si aggiunge in coda", True,
+          cap["_caption_canale"](a, 0, venduto=True).endswith("✅ Venduto"))
+
+    # Il venditore SENZA username (i nativi Nostr): niente «@», o
+    # nascerebbe una menzione che Telegram non sa risolvere.
+    b = dict(a, venditore_username="", venditore="Soddisfatto Cliente")
+    t2 = cap["_caption_canale"](b, 0)
+    prova("senza username niente chiocciola", False, "@" in t2)
+    prova("e si usa il nome", True,
+          "Annuncio da <b>Soddisfatto Cliente</b>" in t2)
+    # senza codice negozio niente link: porterebbe a un 404
+    t3 = cap["_caption_canale"](dict(a, venditore_negozio=""), 0)
+    prova("senza codice negozio niente ponte", False, "/negozio/" in t3)
+
+    # L'ESCAPE, che qui non e' pignoleria: il titolo lo scrive
+    # l'utente e la caption e' HTML — un «<» spegnerebbe il post in
+    # silenzio, ed e' la lezione gia' pagata coi promemoria.
+    cattivo = cap["_caption_canale"](
+        dict(a, titolo="<b>SVENDO</b> & fuggo",
+             venditore_username="", venditore="<i>Tizio</i>"), 0)
+    prova("il titolo dell'utente passa da escape", True,
+          "&lt;b&gt;SVENDO&lt;/b&gt; &amp; fuggo" in cattivo)
+    prova("e cosi' il nome del venditore", True,
+          "&lt;i&gt;Tizio&lt;/i&gt;" in cattivo)
+
+    # --- 3) LA GRIGLIA DELLE CATEGORIE ---------------------------
+    # L'OTTAVA COPIA del catalogo: le emoji del bot devono dire le
+    # stesse cose di quelle della Mini App, o la griglia di Telegram e
+    # quella di Sfoglia mostrerebbero due reparti diversi con lo
+    # stesso nome. E' la rete di CATEGORIE_SENZA_CONDIZIONE.
+    amb2 = {}
+    i = _SORGENTE.index("EMOJI_CATEGORIA = {")
+    exec(_SORGENTE[i:_SORGENTE.index("}", i) + 1], amb2)
+    server_em = amb2["EMOJI_CATEGORIA"]
+    mini = open("miniapp.html", encoding="utf-8").read()
+    j = mini.index("const EMOJI_CAT = {")
+    client_em = dict(re.findall(r"'([^']+)':'([^']+)'",
+                                mini[j:mini.index("};", j)]))
+    prova("le emoji del bot e quelle della Mini App combaciano",
+          client_em, server_em)
+    i = _SORGENTE.index("CATEGORIE = (")
+    amb2["CATEGORIE"] = None
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb2)
+    prova("e coprono tutto il catalogo",
+          sorted(amb2["CATEGORIE"]), sorted(server_em))
+
+    # La tastiera: due colonne, ordine FISSO del catalogo, e l'INDICE
+    # nel callback_data (64 byte scarsi, e il nome ci starebbe stretto).
+    amb2["EMOJI_CATEGORIA"] = server_em
+    amb2["URL_PUBBLICO"] = "https://barattolo.store"
+    exec(pezzo("_riga_webapp"), amb2)
+    exec(pezzo("tastiera_categorie"), amb2)
+    tast = amb2["tastiera_categorie"]()["inline_keyboard"]
+    prova("la Mini App e' la PRIMA riga di tastiera", True,
+          tast[0][0]["url"] == "https://barattolo.store")
+    griglia = tast[1:]
+    prova("due colonne", True, all(len(r) <= 2 for r in griglia))
+    prova("c'e' ogni categoria", len(amb2["CATEGORIE"]),
+          sum(len(r) for r in griglia))
+    prova("nell'ordine del catalogo", amb2["CATEGORIE"][0],
+          griglia[0][0]["text"].split(" ", 1)[1])
+    dati = [v["callback_data"] for r in griglia for v in r]
+    prova("il callback_data sta nei 64 byte", True,
+          all(len(d.encode()) <= 64 for d in dati))
+    prova("e porta l'INDICE, non il nome", "sfo:0:0", dati[0])
+
+    # --- 4) LA MINI APP VIENE PRIMA ------------------------------
+    # La regola di prodotto, e per questo e' una prova e non una
+    # buona intenzione: il bottone verso Barattolo e' esattamente la
+    # riga che si dimentica nella tastiera aggiunta fra sei mesi.
+    exec(pezzo("tastiera_bot"), amb2)
+    for nome, t in (("vuota", amb2["tastiera_bot"]()),
+                    ("con altre righe", amb2["tastiera_bot"](
+                        [[{"text": "x", "callback_data": "y"}]]))):
+        prova(f"tastiera {nome}: la Mini App e' in cima", True,
+              t["inline_keyboard"][0][0]["url"] == "https://barattolo.store")
+    sorgente_bot = pezzo("gestisci_update")
+    prova("/start non elenca comandi, invita ad aprire", True,
+          "tastiera_bot()" in sorgente_bot and "/canale" not in
+          sorgente_bot.split("if testo.startswith(\"/canale\")")[0]
+          .split("return await bot_api")[1])
+    prova("chi scrive altro riceve comunque i bottoni", True,
+          "sfo:menu:0" in sorgente_bot.rsplit("reply_markup", 1)[1]
+          or "sfo:menu:0" in sorgente_bot)
+
+    # --- 5) IL CANALE HA UN GIUDICE SOLO -------------------------
+    # Se un giorno divergessero, il ✅ Venduto finirebbe in un canale
+    # e il post originale in un altro. Nelle funzioni che parlano col
+    # canale la costante del config non si nomina mai.
+    for f in ("_posta_promo_singolo", "_posta_promo_aggregato",
+              "promo_venduto", "promo_rimuovi"):
+        prova(f"{f} passa dal giudice, non dalla costante",
+              False, "TELEGRAM_CANALE_ID" in pezzo(f))
+    prova("il canale si legge da canale_id()", True,
+          'chat_id": canale_id()' in pezzo("_posta_promo_singolo"))
+    # La caption RICOSTRUITA deve avere la firma: senza il JOIN il
+    # post riscritto col ✅ perderebbe il venditore che aveva da nuovo.
+    prova("promo_venduto rilegge anche il venditore", True,
+          "venditore_username" in pezzo("promo_venduto"))
+    prova("e cosi' il drenatore", True,
+          "venditore_negozio" in pezzo("_drena_promo"))
+    # Il timbro PRIMA dell'invio, il patto delle campagne.
+    corpo = pezzo("_posta_promo_singolo")
+    prova("il timbro del turno si scrive PRIMA di postare", True,
+          corpo.index("promo_canale_il") < corpo.index("bot_api"))
+
+    # --- 6) I COMANDI DI SERVIZIO SONO DEI DUE ADMIN -------------
+    amb3 = {}
+    exec(pezzo("e_admin"), amb3)
+    amb3.update(ADMIN_IDS=[555], MODALITA_COLLAUDO=False)
+    exec("ADMIN_BOT_USERNAME = " + repr(("alanbimbati", "aandreaiita")), amb3)
+    exec(pezzo("e_admin_bot"), amb3)
+    ok = amb3["e_admin_bot"]
+    prova("i due username passano", True,
+          ok({"id": 1, "username": "AlanBimbati"})
+          and ok({"id": 2, "username": "aandreaiita"}))
+    prova("maiuscole comprese", True, ok({"id": 1, "username": "ALANBIMBATI"}))
+    prova("i moderatori di sempre passano", True, ok({"id": 555}))
+    prova("un estraneo no", False, ok({"id": 3, "username": "tizio"}))
+    prova("e nemmeno chi non ha username", False, ok({"id": 3}))
+    # l'username si prende dal MESSAGGIO e non dalla riga `utenti`:
+    # quella potrebbe portarne uno vecchio, magari gia' preso da un
+    # altro. La firma dice tutto: riceve il mittente, non un tg_id.
+    prova("giudica il mittente, non un id", True,
+          "mittente" in pezzo("e_admin_bot").split("\n")[0])
+    # la risposta al non-admin non deve MAI dire «non sei
+    # autorizzato»: direbbe a un curioso che quel comando esiste. Si
+    # guarda il corpo, non la docstring, che la parola la spiega.
+    corpo_canale = pezzo("comando_canale").split('"""')[2]
+    prova("chi non e' admin non impara che il comando esiste", False,
+          "autorizzat" in corpo_canale.lower())
+    prova("il canale si prova prima di crederci", True,
+          pezzo("comando_canale").index('"chat_id": arg')
+          < pezzo("comando_canale").index("imposta_canale(arg)"))
+    # I SEGRETI NON VANNO nel database delle impostazioni.
+    prova("nel recinto delle impostazioni c'e' solo il canale", True,
+          _SORGENTE.count('impostazione("') <= 2)
 
 
 def prove_leve():
@@ -9990,7 +10220,7 @@ def main():
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_sped_gratis, prove_suggerimenti,
-              prove_libro_mastro, prove_leve, prove_cambio,
+              prove_libro_mastro, prove_leve, prove_canale_bot, prove_cambio,
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,
