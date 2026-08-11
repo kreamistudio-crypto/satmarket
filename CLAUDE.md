@@ -7361,6 +7361,90 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   esiste transitorio legittimo) — anche in query_libro_mastro.sql
   (16d). Empty state SUO per i filtri a vuoto («Niente qui con questi
   filtri»), distinto dall'«Ancora nessun ordine».
+  LE LAPIDI NON SI VEDONO (ago 2026, decisione di Andrea): gli ordini
+  'annullato' spariscono dalla LISTA, e da nient'altro — il database
+  e la scopa del reaper non si toccano, perché la lapide ha un
+  mestiere: un saldo atterrato nella corsa annulla-vs-saldo deve
+  avere una riga su cui posarsi (`controlla_annullati` la ripesca).
+  Si nasconde la vista in UNA riga, `const vivi` in cima a
+  `renderOrders`, e tutto il resto — filtri, conteggio dei nascosti,
+  stato vuoto — parte da lì.
+  SPARISCONO DEL TUTTO, anche dal velo dei nascosti, ed è la parte
+  decisa e non ovvia: quel «mostrali» significa «le righe che HO
+  nascosto io» (una colonna per-parte che l'utente scrive con la ✕),
+  e mescolarci una lapide che nessuno ha nascosto farebbe mentire il
+  conteggio e trasformerebbe un gesto dell'utente in un contenitore
+  misto. In più la lapide vive al più un'ora, quindi «raggiungibile»
+  sarebbe una promessa che scade da sola. Il fatto non si perde nel
+  momento in cui conta: chi annulla ha già il suo confirm e la sua
+  riga «nessun pagamento è stato trattenuto», e il riacciuffo avvisa.
+  L'ANCORA DELLO STATO VUOTO si sposta con loro (`if (!vivi.length)`),
+  o chi ha un checkout abbandonato e nient'altro leggerebbe «niente
+  qui con questi filtri» senza aver acceso nessun filtro. Sorvegliato
+  da una prova che conta gli `orders.filter` dentro renderOrders: UNO
+  solo, quello che deriva i vivi — l'errore che verrebbe naturale è
+  rileggere `orders` in una delle tre righe sotto, e non romperebbe
+  niente di visibile finché non si guarda proprio quel caso.
+  I VERBI SEGUONO IL TEMPO DELL'AFFARE (stessa decisione): finché è
+  vivo «Stai comprando / Stai vendendo · X sats», quando è finito
+  «Hai comprato per X» / «Hai venduto per X» — e la cifra entra nella
+  frase invece di stare accanto, o si direbbe due volte. LA CIFRA È
+  QUELLA CHE OGNUNO HA DAVVERO MOSSO: il TOTALE a chi paga, il NETTO
+  a chi incassa (`nettoVenditore`, cioè il totale meno la protezione,
+  che è della piattaforma). Sono numeri diversi e ognuno vede il suo:
+  è già la regola della testa dell'ordine, e da qui in poi il netto
+  ha UN giudice solo — la riga, la testa e il pannello d'incasso lo
+  chiamano, così il giorno che la commissione si accende c'è un posto
+  da correggere invece di tre.
+  SUL RIMBORSO NON SI PORTA NESSUNA CIFRA («Acquisto non concluso» /
+  «Vendita non conclusa»): lì nessuno ha comprato e nessuno ha
+  venduto — il compratore ha riavuto tutto, il venditore non ha
+  incassato niente — e un numero sarebbe l'unica bugia possibile in
+  quella riga. E non si scrive «Rimborsato», che è il badge lì
+  accanto: si aggiunge, non si ripete. Lo stesso ramo copre la lapide
+  dell'annullato, che in lista non si vede ma resta onesta se un
+  domani ci tornasse. IL CONCLUSO È `CONCLUSI`, la stessa lista del
+  filtro «solo attivi»: una seconda definizione che oggi dice la
+  stessa cosa, un giorno ne direbbe un'altra.
+  IL DETTAGLIO PARLA A CHI LEGGE (ago 2026): la vista dell'ordine è
+  UNA per tutti e due i lati, quindi ogni frase che nomina una parte
+  va girata a chi la sta leggendo — «l'acquirente» resta solo per chi
+  acquirente non è (il venditore, e il moderatore che guarda da
+  fuori). Sistemati: il punto di ritiro («Il punto di ritiro che hai
+  indicato» al compratore), i due passi che parlano al compratore (il
+  reso da rispedire, la disputa vinta «a tuo favore»), i due che
+  parlano al venditore (la consegna al corriere e quella del
+  contenuto digitale) e la spedizione offerta («hai offerto N sats»).
+  LA PROVA TIENE I DUE LATI INSIEME: per ogni testo girato chiede
+  ANCHE che l'altro ramo continui a leggere la terza persona — con
+  una vista condivisa il modo tipico di sbagliare non è dimenticare
+  la correzione, è applicarla a tutti e due.
+  RESTANO in terza persona, e non è una svista: i testi dentro
+  pannelli già gatati per ruolo (il pannello «📦 Spedisci» del
+  venditore, i bottoni del moderatore, i ponti di contatto, che della
+  CONTROPARTE parlano apposta) e le frasi simmetriche («Vi incontrate
+  e l'oggetto passa di mano»).
+  LA MODALITÀ NON SI RIPETE (stesso giro): la riga sotto il prezzo
+  diceva «🚚 con spedizione» / «📦 spedizione a un punto di ritiro»,
+  che è già scritto due righe più sotto — dal punto di ritiro, dal
+  pannello del ritiro in zona, dalla rivelazione del codice. Via.
+  Resta il solo conto dei pezzi, che non lo dice nessun altro.
+  E LA SPEDIZIONE È UN INCISO ACCANTO ALLA CIFRA, non una riga a sé
+  (`incisoConto`): «130 000 sats · di cui 5 000 di spedizione» — è un
+  dettaglio di com'è fatto quel totale, non un fatto suo. Con la
+  protezione accesa entra anche lei nello stesso inciso, con la
+  stessa forma. QUANDO LA SPEDIZIONE È GRATIS PER LA PROMESSA DEL
+  NEGOZIO l'inciso TACE: «di cui 0» non direbbe niente, e a
+  raccontarlo c'è già la riga «🚚 Spedizione gratuita», che in più
+  dice quanto ha offerto chi vende. Il font si rimette a mano perché
+  il prezzo è in mono e un inciso di prosa in mono si legge male.
+  LA STRADA SCARTATA, decisa da Andrea davanti alle due rese: mettere
+  nel dettaglio la frase col VERBO e la cifra del lato («Hai venduto
+  per 128 800 sats, di cui…»). Sarebbe stata la stessa lingua della
+  lista, ma sotto il prezzo grande — che è e resta il totale in
+  cassaforte — avrebbe messo due numeri diversi a un centimetro di
+  distanza. Il verbo resta della lista, il dettaglio dice la cifra
+  dell'escrow col suo inciso.
   «CONTROLLA IL PACCO» HA PERSO LE PILLOLE DI SCELTA (decisione 3 di
   Andrea, stile Vinted): la scelta vive nella pagina d'acquisto
   (`#ctrlAcquista` → `apriAcquistoSet`), al loro posto la riga onesta
@@ -10538,6 +10622,29 @@ venditore respinto, l'anti-oracolo verificato sul database vero
 lapide che non blocca, e gli ordini immobili prima e dopo — e il gesto
 nel browser coi due confirm e zero errori JS. IN PRODUZIONE basta il
 deploy: nessuna colonna, nessuna migrazione, nessuna leva.
+
+Gli ordini si leggono meglio (ago 2026, due giri): gli ANNULLATI
+spariscono dalla lista — la lapide resta nel database, dove serve alla
+macchina — e i VERBI seguono il tempo dell'affare, con la cifra che
+ognuno ha davvero mosso (totale a chi paga, netto a chi incassa) e
+nessuna cifra sul rimborso, dove nessuno ha comprato e nessuno ha
+venduto. Nel DETTAGLIO: via la modalità, che era già scritta due righe
+sotto; la spedizione torna un inciso accanto alla cifra (muto quando la
+promessa del negozio l'ha resa gratis, che «di cui 0» non dice niente);
+e i testi parlano a chi legge — il compratore non si sente più chiamare
+«l'acquirente» a casa sua. Vedi Architettura, «LE LAPIDI NON SI VEDONO»
+e «IL DETTAGLIO PARLA A CHI LEGGE», per le decisioni di Andrea (dove
+finiscono gli annullati, quale cifra per quale lato, la strada scartata
+del verbo nel dettaglio) e per le terze persone che RESTANO tali.
+Collaudati: 2433 prove verdi (37 nuove) e DICIASSETTE mutazioni del
+codice, una per riga sorvegliata — annullati rimessi in lista, `orders`
+riletto in una delle tre righe, verbo che scavalca il giudice, netto
+ricopiato a mano, inciso che parla a spedizione gratis, terze persone
+girate a tutti e due i lati —, ognuna rossa da sola. Più il giro dal
+vivo via CDP a 390px nei due temi e dai due lati, con i casi che lo
+screenshot non copre verificati a parte (spedizione gratis, rimborso,
+sola spedizione su una riga). IN PRODUZIONE basta il deploy: nessuna
+colonna, nessuna rotta, nessuna leva — solo client.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
