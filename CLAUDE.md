@@ -7453,6 +7453,26 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   vista, non la risposta. Ai numeri di oggi va benissimo; chi un
   domani vedrà una lista lenta guardi qui invece di sospettare del
   filtro.
+  LA DATA DELLA RIGA È QUELLA DELL'AFFARE (ago 2026, dal campo): era
+  `aggiornato`, cioè il timbro dell'ULTIMO MOVIMENTO — e così un
+  ordine del 7 agosto sembrava di oggi appena il venditore segnava la
+  spedizione. Adesso è `creato`, che è il pagamento a meno di
+  mezz'ora e non si muove più (gli unici scrittori sono l'INSERT e la
+  resurrezione di `controlla_annullati`).
+  IL CENSIMENTO DELLE ALTRE DATE, perché non fosse un'eredità: il
+  DETTAGLIO non ne mostra nessuna (è un fatto, non una svista: lì il
+  quando lo raccontano lo stepper e i pannelli); nelle NOTIFICHE non
+  compare mai la data di un ordine — le uniche sono `_quando_scade`
+  (una scadenza futura) e il «Depositate il …» della busta, che
+  hanno colonne loro; nell'EXPORT CSV la colonna `data` resta
+  `aggiornato` ED È LA SCELTA GIUSTA, perché lì escono solo
+  released/refunded e per la contabilità conta il giorno in cui i
+  sats si sono mossi, non quello dell'acquisto.
+  RESTA APERTO L'ORDINE DELLA LISTA (`/api/orders`, `ORDER BY
+  o.aggiornato DESC`): un ordine vecchio che si muove salta in cima
+  e adesso ci salta MOSTRANDO la sua data vecchia — la lista sembra
+  disordinata. È l'unica cosa che questa correzione rende visibile e
+  non risolve; la decisione è di Andrea.
   LA FOTO: il server manda SOLO `foto0` (primo nome della lista JSON,
   pattern scheda() dei doppioni; la lista intera si poppa nello
   strip). Dall'ago 2026 la stessa foto sta anche IN TESTA AL
