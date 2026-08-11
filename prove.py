@@ -4339,10 +4339,22 @@ def prove_forma_tracking():
                           ("trattino basso",  "JJD_01_4600_0035_2246")):
         prova("trackbot: il payload passa il filtro con " + come, True,
               bool(FILTRO.match(nudo(scritto))))
-    # E QUEL CHE SI MOSTRA E SI COPIA NON SI TOCCA: e' il codice come
-    # l'ha scritto chi spedisce, che e' anche una prova in disputa.
-    prova("trackbot: negli appunti va il codice del venditore", True,
-          "writeText(vero)" in an)
+    # QUESTA PROVA HA CAMBIATO LATO (ago 2026): chiedeva che negli
+    # appunti andasse `vero`, cioe' il codice con gli spazi che il
+    # corriere ci stampa sopra — e quel testo ha UN mestiere solo,
+    # essere incollato in trackbot, quindi con un parser di chat
+    # severo quanto quello del payload la copia falliva per la stessa
+    # ragione del link. Ora negli appunti va il nudo.
+    prova("trackbot: negli appunti va il codice nudo", True,
+          "writeText(nudo)" in an)
+    # E QUEL CHE SI MOSTRA NON SI TOCCA, che e' l'altra meta': in
+    # pagina il codice resta quello del venditore (lo dice gia'
+    # `esc(o.tracking)` nei due rami di codiceTracking, sopra) e nel
+    # database non lo tocca nessuno — di qui non parte nessuna POST.
+    prova("...ma quel che si mostra resta il codice del venditore",
+          True, "esc(o.tracking)" in ct and "vero" not in ct)
+    prova("...e la copia non riscrive niente", 0,
+          an.count("fetch(") + an.count("POST"))
     # I 24 DELL'INPOST NON CI RIENTRANO NEMMENO NORMALIZZATI, ed e' il
     # corriere del caso che ha aperto il cantiere delle spedizioni ai
     # punti: la strada e' che trackbot allarghi il riconoscimento, non

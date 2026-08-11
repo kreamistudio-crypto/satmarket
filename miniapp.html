@@ -14262,18 +14262,26 @@ async function attivaNotifichePacco(){
      Quindi si toglie tutto quel che non e' maiuscola o cifra: il
      trattino basso lo ammetteva TELEGRAM nel payload, non trackbot, e
      tenerlo voleva dire spedire un codice che il bot butta via.
-     Si normalizza SOLO quel che viaggia nel link: `vero` — quello che
-     si mostra, si copia e sta nel database — resta il codice come
-     l'ha scritto il venditore, che e' anche una prova in disputa.
+     Si normalizza quel che va A TRACKBOT e nient'altro: quello che si
+     MOSTRA (dentro il passo, nel banner) e quello che sta nel
+     DATABASE restano il codice come l'ha scritto il venditore, che e'
+     anche una prova in disputa.
      Il filtro NON e' una condizione per aprire il bot: i codici che
      non ci rientrano nemmeno normalizzati (InPost, 24 cifre) hanno
      comunque la strada di sempre, cioe' incollare a mano. */
   const nudo = vero.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!nudo) return;
-  /* la copia e' l'unica cosa che promettiamo, quindi se non riesce lo
-     si dice invece di far credere che il codice sia negli appunti */
+  /* NEGLI APPUNTI VA IL NUDO, non `vero`, e la ragione e' che quel
+     testo ha UN mestiere solo: essere incollato in trackbot. Se il
+     parser della chat e' severo quanto quello del payload — e non
+     abbiamo motivo di credere il contrario — copiare il codice con
+     gli spazi che il corriere ci STAMPA sopra farebbe fallire la
+     copia per la stessa ragione per cui falliva il link. E' lo stesso
+     codice: cambia solo che non porta la punteggiatura.
+     La copia e' l'unica cosa che promettiamo, quindi se non riesce lo
+     si dice invece di far credere che il codice sia negli appunti. */
   let copiato = true;
-  try { await navigator.clipboard.writeText(vero); }
+  try { await navigator.clipboard.writeText(nudo); }
   catch(e) { copiato = false; }
   toast(copiato ? '📋 Codice copiato — incollalo nel bot'
                 : '📋 Copia il codice qui sopra e incollalo nel bot');

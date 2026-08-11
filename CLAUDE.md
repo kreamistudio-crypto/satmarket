@@ -7557,9 +7557,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ammette TELEGRAM nel payload, e su quel filtro cadevano in SILENZIO
   (la chat si apre lo stesso e non succede niente: esattamente quel
   che si vedeva dal campo). Ora si toglie tutto ciò che non è
-  maiuscola o cifra, e SI NORMALIZZA SOLO QUEL CHE VIAGGIA NEL LINK:
-  quello che si mostra, si copia e sta nel database resta il codice
+  maiuscola o cifra, e SI NORMALIZZA SOLO QUEL CHE VA A TRACKBOT:
+  quello che si MOSTRA e quello che sta nel DATABASE restano il codice
   come l'ha scritto il venditore, che è anche una prova in disputa.
+  GLI APPUNTI STANNO COL LINK E NON CON LA PAGINA (decisione di
+  Andrea), ed è la riga che si sbaglia leggendo «non si tocca quel che
+  si mostra»: quel testo non lo legge nessuno, ha UN mestiere solo —
+  essere incollato in trackbot — quindi con un parser di chat severo
+  quanto quello del payload la copia fallirebbe per la stessa ragione
+  per cui falliva il link, e sarebbe lo stesso difetto entrato da
+  un'altra porta. È lo stesso codice: cambia solo che non porta la
+  punteggiatura che il corriere ci stampa sopra. La prova ha CAMBIATO
+  LATO — chiedeva `writeText(vero)` — e accanto ne è nata una che
+  tiene l'altra metà: in pagina il codice resta quello del venditore.
   IL FILTRO NON DIVENTA UNA GUARDIA DEL BOTTONE, ed è la riga da non
   ammorbidire: chi non ci rientra nemmeno normalizzato ha comunque la
   strada di sempre — incollare a mano — e togliergli il bottone
