@@ -11142,9 +11142,12 @@ def prove_fogli_di_casa():
     prova("chiusura MIRATA, mai closeSheet", True,
           "confermaSheet').classList.remove('open')" in esegui
           and "closeSheet()" not in esegui)
-    # I TRE CHIAMANTI di oggi. Il conto e' la prova che il generico e'
-    # davvero condiviso: se qualcuno si scrive un foglio suo, cala.
-    prova("i gesti che passano dalla domanda unica sono tre", 3,
+    # I QUATTRO CHIAMANTI di oggi (i tre delle offerte + l'annullo
+    # della modifica, ago 2026). Il conto e' la prova che il generico
+    # e' davvero condiviso: se qualcuno si scrive un foglio suo, CALA
+    # — ed e' quello il verso da sorvegliare. Cresce a mano quando un
+    # gesto nuovo lo adotta, come il censimento delle leve-lista.
+    prova("i gesti che passano dalla domanda unica sono quattro", 4,
           solo_codice(mini).count("chiediConferma({"))
     for chi, dove in (("il ritiro", "function ritiraOfferta("),
                       ("accetta e rifiuta", "function rispondiOfferta(")):

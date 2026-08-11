@@ -2353,16 +2353,13 @@
      spezzava in VERTICALE, una lettera per riga). Due cause insieme:
      le pillole non si stringono mai e a 320px al titolo restavano
      ~20px, e l'ellipsis senza white-space:nowrap non tronca — manda a
-     capo. La cura e' strutturale: la riga puo' ANDARE A CAPO, il
-     titolo pretende un minimo leggibile (180px) e quando titolo e
-     pillole non ci stanno insieme le pillole scendono su una riga
-     loro, a destra. Il min-width vale per ogni riga alla stessa
-     larghezza, quindi le card restano tutte della stessa forma —
-     mai una wrappata e una no secondo la lunghezza del titolo. */
-  .mio-riga{flex-wrap:wrap}
-  .mio-riga .mio-tit{display:flex;align-items:center;gap:8px;flex:1;min-width:180px}
+     capo. Ora il titolo ha la riga tutta per se' (le azioni sono
+     scese in fondo alla card, vedi .mio-azioni) e tronca coi puntini
+     come deve: `min-width:0` sul figlio flex resta la cintura della
+     lezione di sempre — senza, una parola lunga senza spazi
+     allargherebbe la pagina. */
+  .mio-riga .mio-tit{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
   .mio-riga .mio-tit>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .mio-riga .mio-azioni{white-space:nowrap;margin-left:auto}
   /* Il quadratino con l'emoji dell'oggetto, a sinistra della riga */
   .order-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
   .order-ic{width:38px;height:38px;border-radius:12px;background:var(--chip-bg);
@@ -2388,6 +2385,33 @@
   /* l'annuncio in attesa dei moderatori (terza via della moderazione) */
   .badge.revisione{background:var(--sats-soft);color:var(--sats-text)}
   .badge.annullato{background:var(--off-bg);color:var(--muted)}
+  /* Le azioni di «I tuoi annunci» (ago 2026, dal campo): stavano
+     incollate sotto il titolo, col prezzo a filo del tasto Modifica.
+     Ora sono un BLOCCO in fondo alla card, staccato dal prezzo, e
+     sono BOTTONI e non piu' etichette da 25px — 42px di altezza
+     VERA, un bersaglio comodo col pollice senza pseudo-elementi
+     invisibili (che qui si mangerebbero il vuoto fra i due). Il gap
+     e' vero: prima a separarli c'era lo spazio del markup, che
+     collassava a 0-5px — i due bersagli si toccavano.
+     Le etichette di STATO («Venduto», «⏳ In revisione») restano
+     badge piccoli: non si toccano, e vestirle da bottone sarebbe una
+     bugia. Stanno a `center` cosi' il badge si allinea al mezzo del
+     bottone accanto. */
+  /* La testata del form: il titolo e, in modifica, la ✕ a destra.
+     L'h2 porta gia' il suo margine, quindi qui si allinea e basta. */
+  .vendi-testa{display:flex;align-items:flex-start;gap:10px}
+  .vendi-testa h2{flex:1;min-width:0}
+  .vendi-testa .pacco-x{margin-top:2px}
+  .mio-azioni{display:flex;flex-wrap:wrap;align-items:center;
+    justify-content:flex-end;gap:10px;margin-top:14px}
+  /* 42px di altezza (il bersaglio) e il fianco a 12px, che e' la
+     taratura di 320: li' la riga concede 196px e la coppia col
+     fianco a 16 ne chiedeva 206 — andava a capo, e la card cresceva
+     di 60px. Cosi' ne chiede 190 e resta su una riga sola; il
+     flex-wrap sopra e' la rete se un domani un'etichetta si allunga
+     — va a capo invece di sbordare. */
+  .az-btn{font-size:13px;padding:0 12px;min-height:42px;
+    display:inline-flex;align-items:center}
   /* La ✕ del nascondere (ago 2026): compare SOLO sugli stati
      nascondibili (released/refunded). Cerchietto discreto, bersaglio
      largo via ::after — il trucco del barattolino in card */
@@ -3337,8 +3361,23 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ VISTA: VENDI ============ -->
   <div class="view" id="view-vendi">
     <div class="form">
-      <h2>Metti in vendita</h2>
-      <div class="sub">3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.</div>
+      <!-- La testata segue la faccia del form (ago 2026, dal campo):
+           in modifica «Metti in vendita» e i 3 minuti parlano a chi
+           pubblica, e chi modifica non ha bisogno di essere convinto
+           — ha bisogno di sapere cosa succede quando salva. I testi
+           li scrive aggiornaFormVendi. -->
+      <div class="vendi-testa">
+        <h2 id="sellTitolo">Metti in vendita</h2>
+        <!-- La ✕ di casa (`.pacco-x`), SOLO in modifica: fa la stessa
+             identica cosa del bottone in fondo — chiede col foglio e,
+             se si conferma, torna indietro ritrovando la posizione.
+             In pubblicazione non c'e': Vendi e' una radice, e non si
+             chiude un tab con una ✕. -->
+        <button type="button" class="pacco-x" id="sellChiudi" style="display:none"
+                onclick="annullaModificaChiedendo()" title="Chiudi la modifica"
+                aria-label="Chiudi la modifica">✕</button>
+      </div>
+      <div class="sub" id="sellSottotitolo">3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.</div>
       <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
       <div class="field">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
@@ -3460,7 +3499,7 @@ document.getElementById('cartello')?.remove();</script>
            disegno dei secondari di casa (ghost: stessa forma e
            stessa altezza del salva), non un link testuale —
            decisione di Andrea al secondo giro. -->
-      <button class="btn ghost" id="sellAnnulla" style="display:none" onclick="annullaModifica()">Annulla la modifica</button>
+      <button class="btn ghost" id="sellAnnulla" style="display:none" onclick="annullaModificaChiedendo()">Annulla la modifica</button>
       <div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
@@ -4715,6 +4754,21 @@ function inCatalogo(arr){
   });
 }
 
+/* La posizione di «I tuoi annunci» (ago 2026, dal campo: chi entrava
+   in modifica dal quindicesimo annuncio tornava in cima al cassetto).
+   E' il gemello di `vetrinaPos`, con UNA differenza che ne decide la
+   forma — e che il commento di posizioneDaRendere dichiarava come lo
+   sbarramento: la vetrina RESTA nel DOM, questa lista si RIFA' a ogni
+   ingresso nel Profilo (loadMyListings + renderMyListings, verificato:
+   un marchio messo sul primo nodo non sopravvive al ritorno). Quindi
+   la posizione NON si puo' rimettere in go(): li' la lista e' ancora
+   quella vecchia e un istante dopo viene sostituita. Si rimette DOPO
+   il render, e solo se il conto delle righe e' quello di prima — la
+   stessa cintura della vetrina, per la stessa ragione: atterrare nel
+   vuoto e' peggio che ripartire dalla cima. */
+let mieiPos = null;         // {y, n} — dove si era, e con quante righe
+let mieiRipristina = false; // il RITORNO l'ha chiesto: lo consuma il render
+
 /* Ordinamento e filtro prezzo della vetrina: vivono per la sessione
    (niente localStorage) e sopravvivono al cambio di categoria, come
    nelle app di mercatino note; "Azzera" pulisce il filtro. Il filtro
@@ -5144,6 +5198,12 @@ function go(view){
   if (document.querySelector('.view.active')?.id === 'view-esplora')
     vetrinaPos = {y: Math.round(window.scrollY),
                   n: el('grid').children.length};
+  /* stessa fotografia per il Profilo, e per la stessa ragione: un
+     istante dopo il display:none accorcia il documento e il browser
+     clampa lo scorrimento a zero */
+  if (document.querySelector('.view.active')?.id === 'view-profilo')
+    mieiPos = {y: Math.round(window.scrollY),
+               n: el('myListings').children.length};
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
@@ -5184,7 +5244,11 @@ function go(view){
       loadPuntate().then(renderPuntate).catch(()=>{});
     } else { renderOrders(); renderOfferte(); renderPuntate(); }
   }
-  if (view==='profilo') { renderProfilo(); loadMyListings().then(renderMyListings).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
+  /* Il ritorno lo dice `navApplicando`, come per la vetrina — ma qui
+     la posizione non si puo' rimettere adesso: la lista arriva dopo
+     la fetch, e si rimette in coda al render (vedi mieiPos). */
+  if (view==='profilo') mieiRipristina = navApplicando && !!mieiPos;
+  if (view==='profilo') { renderProfilo(); loadMyListings().then(()=>{ renderMyListings(); ripristinaMieiPos(); }).catch(()=>{}); loadAdminStats(); renderWallet(); renderIdentita();
     /* il barattolo si rilegge dal server: un annuncio salvato puo'
        essere stato venduto nel frattempo, e il cassetto deve dirlo */
     caricaPreferiti().then(renderPreferiti); }
@@ -5223,6 +5287,19 @@ function posizioneDaRendere(view){
   if (view === 'esplora' && navApplicando && vetrinaPos
       && vetrinaPos.n === el('grid').children.length) return vetrinaPos.y;
   return 0;
+}
+
+/* «I tuoi annunci» torna dov'era, ma DOPO che le righe ci sono: la
+   chiama il `.then` di loadMyListings, che e' l'unico momento in cui
+   la lista e' quella nuova. Il conto delle righe e' la cintura — un
+   annuncio venduto o rimosso nel frattempo accorcia la pagina, e
+   allora si riparte dalla cima. La bandierina si consuma comunque:
+   vale per il ritorno che l'ha chiesta, non per il prossimo giro. */
+function ripristinaMieiPos(){
+  if (!mieiRipristina) return;
+  mieiRipristina = false;
+  if (mieiPos && mieiPos.n === el('myListings').children.length)
+    window.scrollTo(0, mieiPos.y);
 }
 
 /* ---------------- il gesto indietro ----------------
@@ -5293,6 +5370,10 @@ const RADICE_MADRE = 'esplora';
 let navSpingi = false;
 /* Acceso mentre navApplica ricostruisce: vedi navRiflette */
 let navApplicando = false;
+/* Chiesto dall'annullo della modifica: il foglio della conferma costa
+   una entry, e uscire dal form ne vuole due — vedi la coda di
+   navApplica, dove si consuma. */
+let uscitaDopoAnnullo = false;
 /* Su file:// (la DEMO aperta a mano) la storia non si puo' toccare: il
    motore resta spento e tutto si comporta come ieri. Stessa guardia di
    protocollo del service worker. */
@@ -5505,6 +5586,22 @@ function navApplica(s){
     queueMicrotask(() => { navApplicando = false; });
   }
   navFreccia(bersaglio);
+  /* L'USCITA DALL'ANNULLO COSTA DUE GRADINI, non uno: il foglio della
+     conferma e' uno STRATO, quindi ha una entry sua, e il primo passo
+     indietro se la mangia lasciando chi ha confermato ancora sul
+     form. Invece di CONTARE i gradini — il debito di history.go(-n),
+     che questo motore rifiuta apposta perche' e' asincrono e
+     coalescente — si dichiara l'INTENZIONE e la si consuma
+     sull'approdo VERO: «smontato il foglio, esci anche dal form».
+     La bandierina si spegne al primo approdo qualunque esso sia,
+     quindi non puo' restare accesa a scaricarsi su una navigazione
+     che non l'ha chiesta (il patto di navSpingi); e se un domani il
+     foglio smettesse di costare una entry, il primo passo porterebbe
+     gia' a destinazione e questa riga non farebbe niente. */
+  if (uscitaDopoAnnullo) {
+    uscitaDopoAnnullo = false;
+    if (bersaglio[0]?.t === 'v' && bersaglio[0].v === 'vendi') history.back();
+  }
 }
 
 /* L'unico modo di scendere di un gradino: lo chiamano la freccia ←, la
@@ -14823,18 +14920,21 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
         <b class="mio-tit"${apre?` onclick="openDetail(${l.id})" style="cursor:pointer"`:''}>${l.photos&&l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento?';filter:grayscale(1);opacity:.6':''}">`
           : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span></b>
-        <span class="mio-azioni">
-          ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
-            /* Qui la parola resta «Venduto» ed e' voluto: questo e' il
-               libro mastro del venditore, e la vendita e' successa
-               davvero. «Esaurito» e' la parola PUBBLICA, per chi
-               guarda da fuori uno scaffale vuoto. */
-            :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge" onclick="apriRifornisci(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">🔄 Rifornisci</span>`
-            :`<span class="badge" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
-          ${esa?'':`<span class="badge" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
-        </span>
       </div>
       <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}</div>
+      ${/* le azioni chiudono la card, sotto il prezzo e staccate da
+           lui: il posto dove il pollice arriva senza coprire quello
+           che sta leggendo */''}
+      <div class="mio-azioni">
+        ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
+          /* Qui la parola resta «Venduto» ed e' voluto: questo e' il
+             libro mastro del venditore, e la vendita e' successa
+             davvero. «Esaurito» e' la parola PUBBLICA, per chi
+             guarda da fuori uno scaffale vuoto. */
+          :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge az-btn" onclick="apriRifornisci(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">🔄 Rifornisci</span>`
+          :`<span class="badge az-btn" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
+        ${esa?'':`<span class="badge az-btn" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>`}
+      </div>
     </div>`; };
 
 /* ---------------- il rifornimento (ago 2026) ----------------
@@ -16254,6 +16354,32 @@ function editListing(id){
   go('vendi'); window.scrollTo(0, 0);
 }
 
+/* LE DUE STRADE CHE BUTTANO VIA chiedono, e chiedono UGUALE: la ✕ in
+   testata e il bottone in fondo sono lo stesso gesto — si perde quel
+   che si e' scritto — quindi passano dallo stesso foglio di casa e
+   dalla stessa uscita. Confermato: si svuota il form e si torna
+   indietro come farebbe lo swipe (navIndietro, l'unica strada che
+   smonta i livelli), quindi anche la posizione si ritrova.
+   LO SWIPE INVECE NON CHIEDE, ed e' una regola e non una
+   dimenticanza: uscendo dal form NON si perde niente — editandoId, i
+   campi e il banner restano come sono, e rientrando da Vendi si
+   continua a modificare (verificato dal vivo). Non c'e' lavoro da
+   salvare, quindi non c'e' niente da confermare; e una domanda a ogni
+   uscita sarebbe il fastidio senza il guadagno. In piu' nella PWA il
+   gesto e' di SISTEMA e non passa da qui: una conferma agganciata a
+   lui vivrebbe dentro Telegram e non altrove — meta' garanzia, che e'
+   la trappola gia' dichiarata per la ✕ del carrello. */
+function annullaModificaChiedendo(){
+  if (!editandoId) { navIndietro(); return; }
+  chiediConferma({
+    titolo: 'Annullare la modifica?',
+    corpo: 'Le modifiche che non hai salvato si perdono. '
+         + 'L\'annuncio resta com\'è adesso in vetrina.',
+    etichetta: 'Annulla la modifica',
+    poi: () => { annullaModifica(); uscitaDopoAnnullo = true; navIndietro(); }
+  });
+}
+
 function annullaModifica(){
   editandoId = null; editandoTitolo = ''; fotoAttuali = [];
   editandoNostr = false;
@@ -16282,6 +16408,16 @@ function aggiornaFormVendi(){
   const drop = document.querySelector('#view-vendi .photo-drop');
   if (editandoId){
     b.style.display = 'block';
+    /* La testata parla a chi MODIFICA: «Metti in vendita» e i «3
+       minuti» sono l'invito a chi pubblica, e chi sta ritoccando non
+       ha bisogno di essere convinto — ha bisogno di sapere cosa
+       succede quando salva. Le due strade sono vere entrambe e si
+       dicono in una riga: la modifica e' subito in vetrina, ma
+       ripassa dalla moderazione come un annuncio nuovo. */
+    if (el('sellTitolo')) el('sellTitolo').textContent = 'Modifica annuncio';
+    if (el('sellSottotitolo')) el('sellSottotitolo').textContent = editandoNostr
+      ? 'Le modifiche vanno anche sui relay Nostr, firmate con la tua chiave. Ripassano dalla moderazione come un annuncio nuovo.'
+      : 'Salvi e l\'annuncio è aggiornato in vetrina. Ripassa dalla moderazione come uno nuovo: se qualcosa non convince resta in attesa di un moderatore.';
     /* l'annulla non vive piu' qui: e' il bottone in fondo, sotto il
        salva — il banner dice soltanto cosa si sta facendo */
     b.innerHTML = editandoNostr
@@ -16293,8 +16429,14 @@ function aggiornaFormVendi(){
   } else {
     b.style.display = 'none';
     btn.textContent = '⚡ Pubblica annuncio';
+    if (el('sellTitolo')) el('sellTitolo').textContent = 'Metti in vendita';
+    if (el('sellSottotitolo')) el('sellSottotitolo').textContent =
+      '3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.';
   }
+  /* le due uscite della modifica compaiono e spariscono insieme:
+     sono lo stesso gesto in due posti */
   if (el('sellAnnulla')) el('sellAnnulla').style.display = editandoId ? '' : 'none';
+  if (el('sellChiudi')) el('sellChiudi').style.display = editandoId ? '' : 'none';
   /* Le foto degli importati vivono sui relay: qui non si cambiano.
      E la consegna nemmeno: la modifica firmata rispecchia l'evento
      NIP-99, che non la porta — il form non deve fingere. */
