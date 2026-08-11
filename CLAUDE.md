@@ -7468,11 +7468,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `aggiornato` ED È LA SCELTA GIUSTA, perché lì escono solo
   released/refunded e per la contabilità conta il giorno in cui i
   sats si sono mossi, non quello dell'acquisto.
-  RESTA APERTO L'ORDINE DELLA LISTA (`/api/orders`, `ORDER BY
-  o.aggiornato DESC`): un ordine vecchio che si muove salta in cima
-  e adesso ci salta MOSTRANDO la sua data vecchia — la lista sembra
-  disordinata. È l'unica cosa che questa correzione rende visibile e
-  non risolve; la decisione è di Andrea.
+E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
+  dopo): `/api/orders` ordina per `o.creato DESC, o.id DESC` e non
+  più per `aggiornato`. Le due cose vanno INSIEME — la data
+  dell'affare sopra un ordinamento per movimento fa sembrare la lista
+  disordinata, perché un ordine vecchio che si muove salta in cima
+  esibendo la sua data vecchia. Così invece la lista è «i tuoi
+  affari, dal più recente», e a dire che qualcosa si è mosso c'è già
+  il badge di stato; a tenere su quel che aspetta chi guarda, il
+  filtro «solo attivi».
+  L'ID IN CODA È IL PAREGGIO e non un ornamento: `creato` è al
+  secondo, e due ordini nati nello stesso istante (un carrello, le
+  prove, un import) si scambierebbero di posto a ogni richiesta — la
+  lista «balla» senza che sia cambiato niente. È il pattern del
+  cursore keyset della vetrina, `creato DESC, id DESC`.
   LA FOTO: il server manda SOLO `foto0` (primo nome della lista JSON,
   pattern scheda() dei doppioni; la lista intera si poppa nello
   strip). Dall'ago 2026 la stessa foto sta anche IN TESTA AL
