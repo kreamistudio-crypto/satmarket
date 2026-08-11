@@ -14200,7 +14200,13 @@ async function markDelivered(){
    Il server resta il giudice: qui si decide solo cosa mostrare. */
 function puoiSollecitareVenditore(o){
   if (o.role!=='buyer' || o.state!=='locked') return false;
-  if (!['spedizione','digitale'].includes(o.consegnaScelta)) return false;
+  /* il ritiro in zona sta fuori (chi ha comprato conferma da solo);
+     la via NON DICHIARATA invece entra — storici e importati da Nostr
+     si spediscono eccome —, tranne sull'asta il cui vincitore non ha
+     ancora scelto: li' il venditore non puo' spedire, ed e' la stessa
+     domanda che si fa `segna_spedito` */
+  if (o.consegnaScelta==='ritiro') return false;
+  if (!o.consegnaScelta && o.asta) return false;
   if (SOLLECITO.max<=0 || o.sollecitiManuali>=SOLLECITO.max) return false;
   const ore = o.consegnaScelta==='digitale' ? SOLLECITO.daDig : SOLLECITO.da;
   if (ore<=0) return false;

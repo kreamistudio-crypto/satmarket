@@ -14757,11 +14757,32 @@ async def sollecita_venditore(ordine_id: int, x_tg_init_data: str = Header(""),
                     "LEFT JOIN annunci a ON a.id=o.annuncio_id "
                     "WHERE o.id=? AND o.compratore_id=? "
                     "AND o.stato='locked' "
-                    "AND o.consegna_scelta IN ('spedizione','digitale')",
+                    # il ritiro in zona ha la sua sollecita_ritiri_fermi
+                    # e li' chi ha comprato conferma da solo
+                    "AND o.consegna_scelta != 'ritiro'",
                     (ordine_id, user["id"])).fetchone()
     if not o:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
+    if not o["consegna_scelta"]:
+        # LA STESSA DOMANDA CHE SI FA `segna_spedito` (ago 2026, dal
+        # campo: il bottone non compariva su ordini vecchi e pagati da
+        # settimane). La via non dichiarata NON vuol dire «il venditore
+        # non puo' agire»: sugli ordini STORICI e su quelli nati da un
+        # annuncio importato da Nostr lui puo' spedire eccome — il
+        # rifiuto di segna_spedito scatta SOLO se l'annuncio e'
+        # all'asta e il vincitore non ha ancora scelto come riceverlo.
+        # Le due strade devono rispondere alla stessa domanda, o una
+        # promette quel che l'altra nega.
+        a_asta = con.execute("SELECT asta_base_sats FROM annunci "
+                             "WHERE id=?", (o["annuncio_id"],)).fetchone()
+        if a_asta and a_asta["asta_base_sats"] > 0:
+            con.close()
+            # qui l'oracolo non c'entra — l'ordine e' suo: si dice la
+            # cosa utile, cioe' che la palla e' sua
+            raise HTTPException(400, "Prima scegli come vuoi riceverlo: "
+                                     "finché non glielo dici, il venditore "
+                                     "non può spedire")
     adesso = int(time.time())
     digitale = o["consegna_scelta"] == "digitale"
     finestra = (SOLLECITO_MANUALE_DIGITALE_ORE if digitale

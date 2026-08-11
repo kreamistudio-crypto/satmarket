@@ -10893,12 +10893,14 @@ def prove_sollecito_a_comando():
             # il timbro del bottone GEMELLO, quello del venditore
             "sollecito_il INT DEFAULT 0)")
         vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
-                     "titolo TEXT)")
+                     "titolo TEXT, asta_base_sats INT DEFAULT 0)")
         vero.execute("CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, "
                      "ordine_id INT, annuncio_id INT, quantita INT, "
                      "unitario_sats INT, titolo TEXT)")
-        vero.execute("INSERT INTO annunci VALUES(7,'Miele di castagno')")
-        vero.execute("INSERT INTO annunci VALUES(8,'Cuffie <b>AKG</b>')")
+        vero.execute("INSERT INTO annunci VALUES(7,'Miele di castagno',0)")
+        vero.execute("INSERT INTO annunci VALUES(8,'Cuffie <b>AKG</b>',0)")
+        # un annuncio ALL'ASTA: il vincitore deve ancora scegliere
+        vero.execute("INSERT INTO annunci VALUES(9,'Jade all''asta',50000)")
         vero.executemany(
             "INSERT INTO ordine_righe(ordine_id, annuncio_id, quantita, "
             "unitario_sats, titolo) VALUES(?,?,?,?,?)",
@@ -10935,6 +10937,13 @@ def prove_sollecito_a_comando():
             # aperto la voce — sollecitarne uno non deve zittire
             # l'altro
             (11, 111, 333, 7, "locked", "spedizione", ORA - 49 * g,
+             ORA - g, 0, 0, 0, 0),
+            # la via NON DICHIARATA su un annuncio normale: storici e
+            # importati da Nostr si spediscono eccome
+            (12, 111, 222, 7, "locked", "", ORA - 49 * g,
+             ORA - g, 0, 0, 0, 0),
+            # ...e su un'ASTA il cui vincitore non ha ancora scelto
+            (13, 111, 222, 9, "locked", "", ORA - 49 * g,
              ORA - g, 0, 0, 0, 0),
             # e il gemello del venditore: due compratori diversi
             (30, 111, 222, 7, "shipped", "spedizione", ORA - 49 * g,
@@ -11031,13 +11040,39 @@ def prove_sollecito_a_comando():
 
     # --- 4) chi resta fuori ---------------------------------------
     for oid, che in ((5, "il ritiro in zona"),
-                     (6, "la strada non dichiarata"),
                      (7, "l'ordine gia' spedito")):
         v2 = mondo()
         esito, detti4, err = bussa(v2, oid)
         prova(f"fuori: {che}", (400, "Operazione non permessa"),
               (err and err.code, err and err.detail))
         prova(f"...e nessuno riceve niente ({che})", [], detti4)
+
+    # --- 4-bis) LA VIA NON DICHIARATA (ago 2026, dal campo) -------
+    # Il bottone non compariva su ordini pagati da settimane: la via
+    # vuota — storici e annunci importati da Nostr — era esclusa
+    # insieme al ritiro. Ma li' il venditore PUO' spedire: il rifiuto
+    # di segna_spedito scatta solo sull'ASTA che aspetta la scelta del
+    # vincitore, ed e' quella la domanda da fare.
+    v2 = mondo()
+    esito, dv, err = bussa(v2, 12)
+    prova("la via non dichiarata adesso passa", {"ok": True}, esito)
+    prova("...e il promemoria parte davvero", [222], [t for t, _ in dv])
+    v2 = mondo()
+    esito, dv2, err = bussa(v2, 13)
+    prova("...ma l'asta che aspetta la scelta resta fuori", 400,
+          err and err.code)
+    prova("...e il 400 dice a chi legge cosa deve fare", True,
+          "scegli come vuoi riceverlo" in (err.detail or ""))
+    prova("...senza mandare niente a nessuno", [], dv2)
+    prova("il ritiro in zona invece resta fuori davvero", 400,
+          bussa(mondo(), 5)[2].code)
+    # LE DUE STRADE FANNO LA STESSA DOMANDA, o una promette quel che
+    # l'altra nega: entrambe leggono `asta_base_sats` sul ramo vuoto.
+    for f in ("sollecita_venditore", "segna_spedito"):
+        c4 = pezzo(f)
+        prova(f"{f} chiede dell'asta sulla via vuota", True,
+              'if not o["consegna_scelta"]:' in c4
+              and "SELECT asta_base_sats FROM annunci" in c4)
 
     # --- 5) il tetto ----------------------------------------------
     v2 = mondo()
@@ -11184,7 +11219,11 @@ def prove_sollecito_a_comando():
     g = g[:g.index("\n}")]
     prova("il client guarda `creato` e non `aggiornato`", True,
           "o.creato" in g and "aggiornato" not in g)
-    prova("...e tiene fuori ritiro e strada non dichiarata", True,
+    prova("...e tiene fuori il ritiro in zona", True,
+          "o.consegnaScelta==='ritiro'" in g)
+    prova("...e l'asta che aspetta la scelta del vincitore", True,
+          "!o.consegnaScelta && o.asta" in g)
+    prova("...ma non la sola via non dichiarata", False,
           "['spedizione','digitale'].includes(o.consegnaScelta)" in g)
     prova("...e il tetto non e' scritto a mano", True,
           "SOLLECITO.max" in g and not re.search(r">=\s*3\b", g))
