@@ -3456,10 +3456,11 @@ document.getElementById('cartello')?.remove();</script>
       <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
       <!-- L'annulla della modifica sta SOTTO il salva (ago 2026, dal
            campo: era solo un link nel banner in cima, cioe' dalla
-           parte opposta del gesto che chiude). Stile dei secondari
-           testuali di casa, il gemello di «Annulla la modifica»
-           degli avvisi di ricerca. -->
-      <button class="btn link" id="sellAnnulla" style="display:none" onclick="annullaModifica()">Annulla la modifica</button>
+           parte opposta del gesto che chiude). Bottone VERO col
+           disegno dei secondari di casa (ghost: stessa forma e
+           stessa altezza del salva), non un link testuale —
+           decisione di Andrea al secondo giro. -->
+      <button class="btn ghost" id="sellAnnulla" style="display:none" onclick="annullaModifica()">Annulla la modifica</button>
       <div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
@@ -5161,10 +5162,11 @@ function go(view){
      pagina */
   document.body.classList.toggle('senza-nav',
     view==='controllapacco' || view==='acquisto');
-  /* la griglia e' STATICA — le stesse 26 voci del catalogo, senza piu'
-     conteggi da rileggere — quindi si disegna una volta sola: rifarla
-     a ogni entrata ricreerebbe 26 <img> per nulla */
-  if (view==='sfoglia' && !el('sfogliaGriglia').children.length) renderSfoglia();
+  /* la griglia si rifa' SOLO quando la firma delle fasce e' cambiata
+     (una categoria svuotata o riempita: raro) — rifarla a ogni
+     entrata ricreerebbe 27 <img> per nulla, e mentre la si guarda
+     non si riordina mai */
+  if (view==='sfoglia' && sfogliaDaRifare()) renderSfoglia();
   /* la riga «nessuno puo' scriverti» compare solo a chi e' davvero
      senza canali: si rivaluta a ogni ingresso, perche' nel frattempo
      l'utente puo' aver verificato la npub */
@@ -5838,11 +5840,18 @@ function icoCategoria(c){
     ><span class="cat-ico-em" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>`;
 }
 
-/* Le piastrelle del catalogo. I conteggi sono gli stessi di renderChips
-   (globali dal server, dal locale in DEMO) ma qui NON si mostrano:
-   servono solo a decidere chi e' spento. E l'ordine e' quello del
-   catalogo, non per numero — Sfoglia e' una mappa, e una mappa non si
-   riordina da sola.
+/* Le piastrelle del catalogo, a DUE FASCE (ago 2026, decisione di
+   Andrea): le categorie PIENE sopra, le vuote in fondo, e DENTRO ogni
+   fascia l'ordine fisso del catalogo. E' la via di mezzo fra la mappa
+   che non si riordina (la decisione di ieri, che resta viva dentro le
+   fasce) e la parte viva della griglia in cima: una categoria si
+   sposta solo quando si svuota o si riempie, che e' raro — la
+   memoria muscolare regge quasi intera. I conteggi sono gli stessi di
+   renderChips (globali dal server, dal locale in DEMO) e NON si
+   mostrano: decidono solo la fascia. Senza conteggi (apertura
+   precoce, server muto) sono tutti «vuoti» e la partizione stabile
+   restituisce da sola l'ordine pieno di catalogo: il ripiego e' il
+   comportamento di ieri, senza un ramo apposta.
    Il ?b=2 sugli URL (qui e in icoCategoria) e' il timbro UNA TANTUM
    che ha ripulito le cache scritte quando la rotta prometteva max-age
    di un giorno: la PWA mostrava generazioni vecchie miste — il
@@ -5886,6 +5895,25 @@ function scaldaSfoglia(){
 const caldaOk = c => (sfogliaCalde[c]?.complete && sfogliaCalde[c].naturalWidth > 0)
   ? ' data-ok="1"' : '';
 
+/* L'ordine delle piastrelle: partizione STABILE del catalogo — prima
+   chi ha annunci, poi chi non ne ha, ognuno nell'ordine di sempre.
+   La fonte dei conteggi e' la stessa di renderChips. */
+function ordineSfoglia(){
+  const conta = {};
+  if (!DEMO && conteggiServer) Object.assign(conta, conteggiServer);
+  else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
+  const tutte = CATS.slice(1);
+  return [...tutte.filter(c=>conta[c]), ...tutte.filter(c=>!conta[c])];
+}
+/* La griglia si ridisegna SOLO quando la firma delle fasce cambia —
+   cioe' quando una categoria si e' svuotata o riempita, mai mentre la
+   si guarda (il render vive sull'ENTRATA nella vista). Cosi' il costo
+   resta quello di ieri: quasi sempre zero, e col calore delle
+   illustrazioni un ridisegno non rifa' nessuna richiesta. */
+let sfogliaFirma = '';
+const sfogliaDaRifare = () => !el('sfogliaGriglia').children.length
+  || ordineSfoglia().join('|') !== sfogliaFirma;
+
 function renderSfoglia(){
   /* il nome va in data-cat e MAI dentro la stringa JS dell'onclick:
      e' la lezione gia' pagata sul picker con «Valle d'Aosta» */
@@ -5893,7 +5921,9 @@ function renderSfoglia(){
      reparto lo fa slugCat, il gemello di slug_categoria del server —
      quello si', giustificato: serve a calcolare offline anche il nome
      del file dell'illustrazione, ed e' gia' sorvegliato in CI. */
-  el('sfogliaGriglia').innerHTML = CATS.slice(1).map(c => `
+  const voci = ordineSfoglia();
+  sfogliaFirma = voci.join('|');
+  el('sfogliaGriglia').innerHTML = voci.map(c => `
     <a class="cat-tile" data-cat="${esc(c)}"
        href="/categoria/${slugCat(c)}"
        onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
@@ -16613,6 +16643,14 @@ async function publish(){
 async function salvaModifica(t, p){
   const id = editandoId;
   if (editandoNostr) { await salvaModificaFirmata(t, p); return; }
+  /* Lo scudo del gemello di pubblica, con l'etichetta ONESTA: qui si
+     salva, non si pubblica. Prima non c'era proprio — il fetch lento
+     (foto in base64 + moderazione AI) girava senza nessun segno e col
+     bottone ancora vivo sotto il dito. La strada FIRMATA resta fuori
+     apposta: apre il foglio della firma, e un overlay che blocca
+     tutto la congelerebbe. */
+  const ripristina = bottoneInAttesa(el('sellSubmit'), 'Salvo le modifiche…');
+  try {
   const cns = consegnaPayload();
   let avvisoFotoTesto = '';
   if (DEMO) {
@@ -16669,6 +16707,7 @@ async function salvaModifica(t, p){
   /* Come per la pubblicazione: l'annuncio aggiornato si apre subito */
   if (listings.find(x=>x.id===id) || myListings.find(x=>x.id===id)) openDetail(id);
   else go('esplora');
+  } finally { ripristina(); }
 }
 
 /* ------- Modifica FIRMATA di un annuncio importato da Nostr -------
