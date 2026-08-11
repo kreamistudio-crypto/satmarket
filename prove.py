@@ -2533,6 +2533,148 @@ def prove_nascondi_ordine():
     vero.close()
 
 
+def prove_lista_ordini():
+    """LA LISTA ORDINI: LE LAPIDI NON SI VEDONO, E I VERBI SEGUONO IL
+    TEMPO (ago 2026). L'annullato sparisce dalla VISTA e da nient'altro
+    — la lapide serve alla macchina (un saldo che atterra nella corsa
+    annulla-vs-saldo deve trovare una riga) e la spazza il reaper a
+    un'ora: qui si prova che il database e la scopa restano intatti.
+    E che la riga dice «stai comprando» finche' l'affare e' vivo e
+    «hai comprato per X» quando e' finito, con la cifra che ognuno ha
+    davvero mosso: il TOTALE a chi paga, il NETTO a chi incassa."""
+    print("\n[la lista ordini: lapidi e verbi]")
+
+    def solo_codice(js):
+        """Via i commenti: senza, una sentinella che cerca 'annullato'
+        pesca la PROSA che racconta il cantiere invece del programma
+        (la lezione dei fogli di casa)."""
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                         if not r.strip().startswith("//"))
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ro = solo_codice(pezzo_js(mini, "function renderOrders(){"))
+
+    # ---- 1-4: la lapide fuori dalla vista, e solo da li' ----
+    prova("la vista parte dai vivi, l'annullato ne resta fuori", True,
+          "o.state !== 'annullato'" in ro)
+    # TORTURA: se vista o nNascosti tornassero a leggere `orders`, il
+    # conteggio salirebbe a 2 e questa diventerebbe rossa da sola —
+    # ed e' l'errore che verrebbe naturale, perche' non rompe nulla
+    # di visibile finche' non si guarda un checkout abbandonato.
+    prova("...e `orders` si legge UNA volta sola, per derivarli", 1,
+          ro.count("orders.filter"))
+    prova("il velo dei nascosti conta sui vivi, mai sulle lapidi", True,
+          "const nNascosti = vivi.filter(" in ro)
+    prova("«ancora nessun ordine» guarda i vivi: un checkout "
+          "abbandonato non e' un filtro acceso", True,
+          "if (!vivi.length)" in ro and "if (!orders.length)" not in ro)
+
+    # ---- 5-7: il database e la scopa non si toccano ----
+    pf = pezzo("pulisci_ordini_fantasma")
+    prova("il reaper spazza ancora le lapidi a un'ora", True,
+          "DELETE FROM ordini WHERE stato='annullato' " in pf
+          and "aggiornato < ?" in pf)
+    prova("il riacciuffo cerca ancora i pagamenti sulle lapidi", True,
+          "WHERE stato='annullato' " in pezzo("controlla_annullati"))
+    prova("il server non ha imparato a filtrare la lista", True,
+          "WHERE o.compratore_id=? OR o.venditore_id=?"
+          in pezzo("miei_ordini"))
+
+    # ---- 8-14: i verbi ----
+    vo = solo_codice(pezzo_js(mini, "function verboOrdine(o){"))
+    prova("il concluso e' CONCLUSI, non una seconda lista", True,
+          "CONCLUSI.includes(o.state)" in vo
+          and "'released'," not in vo)
+    prova("chi compra legge il TOTALE in cassaforte", True,
+          "Hai comprato per ${cifra(o.listing.price)}" in vo)
+    prova("chi vende legge il NETTO, che e' un altro numero", True,
+          "Hai venduto per ${cifra(nettoVenditore(o))}" in vo)
+    # il rimborso (e la lapide, che in lista non si vede) non porta
+    # cifra: li' nessuno ha comprato e nessuno ha venduto
+    ramo = vo[vo.index("if (CONCLUSI.includes"):
+              vo.index("return `${compra")]
+    prova("il non-concluso NON porta nessuna cifra", False,
+          "cifra(" in ramo)
+    prova("...e non ripete il «Rimborsato» del badge accanto", True,
+          "non conclus" in ramo and "imborsat" not in ramo)
+    prova("finche' e' vivo il verbo e' al presente, con la sua cifra",
+          True, "'Stai comprando' : 'Stai vendendo'" in vo
+          and "cifra(o.listing.price)}`" in vo)
+    prova("il moderatore non compra e non vende", True,
+          "'⚖️ Da moderare'" in vo)
+    prova("la riga della lista passa dal giudice", True,
+          "${verboOrdine(o)} · ${o.when}" in ro)
+
+    # ---- 15-16: il netto e' UNO (il giorno della commissione) ----
+    prova("nettoVenditore e' definito una volta sola", 1,
+          mini.count("function nettoVenditore(o)"))
+    prova("...e la formula del netto non ha copie: la dicono la riga, "
+          "la testa dell'ordine e il pannello d'incasso", (1, 3),
+          (mini.count("o.listing.price - (o.protSats||0)"),
+           mini.count("nettoVenditore(o)") - 1))
+
+
+def prove_dettaglio_ordine():
+    """IL DETTAGLIO PARLA A CHI LEGGE (ago 2026): la vista e' UNA per
+    tutti e due i lati, quindi ogni frase che nomina una parte va
+    girata a chi la sta leggendo — e correggere per uno non deve
+    rompere per l'altro: qui si prova che dove nasce un «hai» resta la
+    terza persona sull'altro ramo. Piu' la modalita' che non si ripete
+    (la diceva la riga in alto e la dice gia' quella sotto) e la
+    spedizione che torna INCISO accanto alla cifra invece che riga a
+    se' — muta quando la promessa del negozio l'ha resa gratis, che
+    «di cui 0» non direbbe niente."""
+    print("\n[il dettaglio dell'ordine: chi legge e chi paga]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    det = mini[mini.index("function openOrder(id){"):
+               mini.index("function trasportoScopri()")]
+    ic = pezzo_js(mini, "function incisoConto(o){")
+
+    # ---- 1-5: l'inciso ----
+    prova("l'inciso sta ACCANTO alla cifra, dentro la riga del prezzo",
+          True, '<span class="unit">sats</span>${incisoConto(o)}</div>'
+          in det)
+    prova("...e non e' rimasta una riga a se' col «di cui»", 1,
+          det.count("di cui ") + ic.count("di cui "))
+    prova("l'inciso porta la spedizione e, quando c'e', la protezione",
+          True, "di spedizione" in ic and "di protezione" in ic)
+    prova("TACE se la spedizione non si e' pagata (promessa del "
+          "negozio compresa: «di cui 0» sarebbe muto)", True,
+          "o.spedSats>0 ?" in ic and "spedGratis" not in ic)
+    prova("la riga «Spedizione gratuita» resta a dirlo, con la cifra",
+          True, "🚚 Spedizione <b>gratuita</b>" in det
+          and "sats di spedizione" in det)
+
+    # ---- 6-8: la modalita' non si ripete ----
+    for detto in ("📦 spedizione a un punto di ritiro",
+                  "🚚 con spedizione", "💾 codice online"):
+        prova(f"la riga in alto non ripete piu' «{detto}»", False,
+              detto in det)
+    prova("il conto dei pezzi resta: non lo dice nessun altro", True,
+          "pezzi × ${fmt((o.listing.price" in det)
+
+    # ---- 9-16: le terze persone, e la PARITA' fra i due lati ----
+    # ogni voce: (nome, il testo girato a chi legge, quello che
+    # l'altro lato deve continuare a leggere)
+    for nome, mio, suo in (
+            ("il punto di ritiro", "Il punto di ritiro che hai indicato",
+             "Punto di ritiro indicato dall\\'acquirente"),
+            ("il reso da rispedire", "Devi rispedire l\\'oggetto al venditore",
+             "L\\'acquirente deve rispedire l\\'oggetto al venditore"),
+            ("la disputa vinta", "Disputa risolta a tuo favore",
+             "Disputa risolta a favore dell\\'acquirente"),
+            ("la consegna al corriere", "Hai consegnato al corriere",
+             "Il venditore ha consegnato al corriere"),
+            ("il contenuto digitale", "Hai consegnato il contenuto",
+             "Il venditore ha consegnato il contenuto"),
+            ("la spedizione offerta", "'hai':'il venditore ha'", "")):
+        prova(f"{nome}: chi legge si sente dare del tu", True, mio in det)
+        if suo:
+            prova(f"...e l'altro lato non si rompe: resta «{suo[:28]}…»",
+                  True, suo in det)
+
+
 def _notifica_admin_spia(avvisi):
     async def _n(testo):
         avvisi.append(("admin", testo))
@@ -10630,6 +10772,7 @@ def main():
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_nascondi_ordine,
+              prove_lista_ordini, prove_dettaglio_ordine,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_messaggio_admin, prove_avviso_contatto,

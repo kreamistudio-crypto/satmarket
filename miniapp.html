@@ -11107,6 +11107,52 @@ function setOrdiniRuolo(r){
   renderOrders();
 }
 function toggleNascosti(){ ordiniMostraNascosti = !ordiniMostraNascosti; renderOrders(); }
+/* Quanto incassa DAVVERO chi vende: il totale in cassaforte meno la
+   protezione acquisti, che e' della piattaforma (la commissione resta
+   sospesa, a 0). Giudice unico — la stessa cifra la dicono la riga
+   della lista, la testa dell'ordine e il pannello d'incasso, e il
+   giorno che la commissione si accendera' ci sara' UN posto solo da
+   correggere invece di tre. */
+function nettoVenditore(o){ return o.listing.price - (o.protSats||0); }
+/* L'INCISO DEL CONTO (ago 2026): la spedizione — e la protezione,
+   quando c'e' — si dicono ACCANTO alla cifra e non su una riga
+   propria: sono un dettaglio di com'e' fatto quel totale, non un
+   fatto a se'. Quando la spedizione e' GRATIS per la promessa del
+   negozio l'inciso TACE: «di cui 0» sarebbe muto, e a raccontarlo
+   c'e' gia' la riga «🚚 Spedizione gratuita», che in piu' dice
+   quanto ha offerto chi vende. Il font si rimette a mano perche' il
+   prezzo e' in mono, e un inciso di prosa in mono si legge male. */
+function incisoConto(o){
+  const voci = [
+    o.spedSats>0 ? `${fmt(o.spedSats)} di spedizione` : '',
+    o.protSats>0 ? `${fmt(o.protSats)} di protezione` : ''
+  ].filter(Boolean);
+  return voci.length ? `<span class="eur-hint" style="margin:0 0 0 6px;font-family:'Nunito',sans-serif">· di cui ${voci.join(' e ')}</span>` : '';
+}
+/* I VERBI SEGUONO IL TEMPO DELL'AFFARE (ago 2026): mentre e' vivo si
+   sta facendo qualcosa, quando e' finito si e' fatta. La CIFRA della
+   chiusura e' quella che ognuno ha davvero mosso — il TOTALE pagato
+   per chi compra, il NETTO incassato per chi vende: sono numeri
+   diversi e ognuno vede il suo, che e' gia' la regola della testa
+   dell'ordine. Sul rimborso (e sulla lapide dell'annullato, che in
+   lista non si vede) NON si porta nessuna cifra: li' nessuno ha
+   comprato e nessuno ha venduto, e un numero sarebbe l'unica bugia
+   possibile in questa riga. «Non conclusa» invece del «Rimborsato»
+   del badge, che e' li' accanto: si aggiunge, non si ripete.
+   Il concluso e' CONCLUSI, la stessa definizione del filtro «solo
+   attivi» — una seconda lista che dice la stessa cosa un giorno
+   direbbe qualcos'altro. */
+function verboOrdine(o){
+  if (o.role === 'admin') return '⚖️ Da moderare';
+  const compra = o.role === 'buyer';
+  const cifra = n => `<span class="mono" style="color:var(--sats-deep)">${fmt(n)}</span> sats`;
+  if (o.state === 'released')
+    return compra ? `Hai comprato per ${cifra(o.listing.price)}`
+                  : `Hai venduto per ${cifra(nettoVenditore(o))}`;
+  if (CONCLUSI.includes(o.state))
+    return compra ? 'Acquisto non concluso' : 'Vendita non conclusa';
+  return `${compra ? 'Stai comprando' : 'Stai vendendo'} · ${cifra(o.listing.price)}`;
+}
 /* Nascondere non e' cancellare: il server tiene la riga e accende il
    flag della MIA parte, solo su released/refunded. Il toast dice dove
    ritrovarlo — una riga che sparisce in silenzio la prima volta e'
@@ -11137,12 +11183,25 @@ function renderOrders(){
   const filtri = o =>
     (!ordiniRuolo || o.role === ordiniRuolo) &&
     (!ordiniSoloAttivi || !CONCLUSI.includes(o.state));
-  const vista = orders.filter(o => filtri(o) &&
+  /* GLI ANNULLATI NON SI VEDONO (ago 2026): la lapide ha un mestiere,
+     ma e' della MACCHINA — un saldo atterrato nella corsa
+     annulla-vs-saldo deve avere una riga su cui posarsi — e vive al
+     piu' un'ora, finche' il reaper non la spazza. Qui si nasconde la
+     VISTA: il database e la scopa non si toccano. Spariscono DEL
+     TUTTO, anche dal velo dei nascosti, perche' quel «mostrali»
+     significa «le righe che HO nascosto io»: mescolarci una lapide
+     che nessuno ha nascosto farebbe mentire il conteggio e
+     trasformerebbe un gesto dell'utente in un contenitore misto.
+     E il conto degli ordini parte da qui, o chi ha un checkout
+     abbandonato e nient'altro leggerebbe «niente con questi filtri»
+     senza aver acceso nessun filtro. */
+  const vivi = orders.filter(o => o.state !== 'annullato');
+  const vista = vivi.filter(o => filtri(o) &&
     (!o.nascosto || ordiniMostraNascosti));
   /* il conteggio dice i nascosti che i filtri correnti coprirebbero:
      con «solo attivi» acceso i nascosti (tutti conclusi) non ci sono
      e la riga non compare */
-  const nNascosti = orders.filter(o => filtri(o) && o.nascosto).length;
+  const nNascosti = vivi.filter(o => filtri(o) && o.nascosto).length;
   const rigaNascosti = nNascosti
     ? `<div style="text-align:center;margin:2px var(--pad) 8px">
          <button class="btn link" style="margin:0" onclick="toggleNascosti()">${
@@ -11150,7 +11209,7 @@ function renderOrders(){
            : `${nNascosti} ordin${nNascosti===1?'e nascosto':'i nascosti'} — mostrali`}</button>
        </div>`
     : '';
-  if (!orders.length) {
+  if (!vivi.length) {
     el('ordersList').innerHTML = `<div class="empty"><div class="big">🤝</div>Ancora nessun ordine.<br>Quando compri o vendi, <b>lo seguirai da qui</b>.</div>`;
     return;
   }
@@ -11180,7 +11239,7 @@ function renderOrders(){
           <span class="order-ic">${ic}</span>
           <div class="order-main">
             <b>${esc(o.listing.title)}</b>
-            <div class="sub">${o.role==='buyer'?'Stai comprando':o.role==='seller'?'Stai vendendo':'⚖️ Da moderare'} · <span class="mono" style="color:var(--sats-deep)">${fmt(o.listing.price)}</span> sats · ${o.when}</div>
+            <div class="sub">${verboOrdine(o)} · ${o.when}</div>
           </div>
         </div>
         <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>${x}
@@ -11201,9 +11260,19 @@ function openOrder(id){
     steps = [
       {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
       {t:'Disputa aperta',          d:'I sats sono congelati: nessuno può toccarli'},
+      /* I TESTI PARLANO A CHI LEGGE (ago 2026): la vista e' UNA per
+         tutti e due i lati, quindi ogni frase che nomina una parte va
+         girata a chi la sta leggendo — «l'acquirente» resta solo per
+         chi acquirente non e' (il venditore, e il moderatore che
+         guarda da fuori). */
       conReso
-        ? {t:'Restituzione dell\'oggetto', d:s==='return_pending'?'L\'acquirente deve rispedire l\'oggetto al venditore':'Il reso è in viaggio verso il venditore'}
-        : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso':'Disputa risolta a favore dell\'acquirente'},
+        ? {t:'Restituzione dell\'oggetto', d:s==='return_pending'
+            ? (o.role==='buyer' ? 'Devi rispedire l\'oggetto al venditore'
+                                : 'L\'acquirente deve rispedire l\'oggetto al venditore')
+            : 'Il reso è in viaggio verso il venditore'}
+        : {t:'Decisione del moderatore', d:s==='dispute'?'Il moderatore sta esaminando il caso'
+            : (o.role==='buyer' ? 'Disputa risolta a tuo favore'
+                                : 'Disputa risolta a favore dell\'acquirente')},
       o.role==='buyer'
         ? {t:'Ti abbiamo rimborsato i sats', d:'Rimborso integrale, nessuna commissione'}
         : {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, l\'annuncio torna in vetrina'},
@@ -11223,11 +11292,16 @@ function openOrder(id){
     const ritiro = o.consegnaScelta==='ritiro';
     steps = [
       {t:'Sats nel deposito di garanzia', d:'Il pagamento è custodito dalla piattaforma'},
+      /* vedi «I TESTI PARLANO A CHI LEGGE» nel ramo della disputa: qui
+         a essere nominato e' il VENDITORE, quindi si gira a lui */
       digitale
-        ? {t:'Contenuto consegnato',d:o.contenutoPresente?'Il venditore ha consegnato il contenuto in piattaforma':'Il venditore consegna il contenuto in piattaforma'}
+        ? {t:'Contenuto consegnato',d:o.role==='seller'
+            ? (o.contenutoPresente?'Hai consegnato il contenuto in piattaforma':'Consegni il contenuto qui in piattaforma')
+            : (o.contenutoPresente?'Il venditore ha consegnato il contenuto in piattaforma':'Il venditore consegna il contenuto in piattaforma')}
         : ritiro
         ? {t:'Consegna a mano',     d:'Vi incontrate e l\'oggetto passa di mano'}
-        : {t:'Oggetto spedito',     d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`:'Il venditore ha consegnato al corriere'},
+        : {t:'Oggetto spedito',     d:o.tracking?`${esc(o.corriere)} — tracking ${esc(o.tracking)}`
+            :(o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')},
       {t:s==='delivered' ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
        d:s==='delivered'?(digitale?`Restano ~${oreRestanti} ore per confermare o aprire disputa`
@@ -11241,9 +11315,9 @@ function openOrder(id){
   }
   /* Le frasi di chiusura parlano a CHI legge: il venditore incassa,
      l'acquirente viene rimborsato, gli altri osservano */
-  /* al venditore va il totale meno la protezione (della piattaforma) */
+  /* al venditore va il netto del giudice unico (vedi nettoVenditore) */
   const testa = s==='released'  ? {ic:'🔓', b:'Deposito sbloccato',
-      d:o.role==='seller' ? `Hai incassato ${fmt(o.listing.price-(o.protSats||0))} sats`
+      d:o.role==='seller' ? `Hai incassato ${fmt(nettoVenditore(o))} sats`
                           : 'I sats sono stati consegnati al venditore'}
     : s==='refunded'            ? {ic:'↩️', b:'Deposito rimborsato',
       d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${fmt(o.listing.price)} sats (integrale)`
@@ -11259,7 +11333,7 @@ function openOrder(id){
   el('orderContent').innerHTML = `
     <div class="detail-body">
       <h2 style="font-size:17px">${o.listing.emoji} ${esc(o.listing.title)}</h2>
-      <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span></div>
+      <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span>${incisoConto(o)}</div>
       ${o.righe.length ? `<div class="eur-hint" style="margin-top:-6px">${
         /* il SET: l'elenco dei pezzi con gli unitari fotografati —
            qui la media «pezzi × unitario» mentirebbe */
@@ -11269,17 +11343,14 @@ function openOrder(id){
             senza dirlo (la riga qui sotto non nomina nessuna
             spedizione), ma chi ha visto un costo nella scheda deve
             poter capire dove e' finito */
-        o.spedGratisSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🚚 Spedizione <b>gratuita</b>: il venditore ha offerto ${fmt(o.spedGratisSats)} sats di spedizione</div>` : ''}
-      ${(o.consegnaScelta || o.spedSats>0 || o.protSats>0 || (o.qta>1 && !o.righe.length)) ? `<div class="eur-hint" style="margin-top:-6px">${
-        (o.qta>1 && !o.righe.length) ? `${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats` : ''}${
-        (o.qta>1 && !o.righe.length) && o.consegnaScelta ? ' — ' : ''}${
-        o.consegnaScelta ? (o.consegnaScelta==='ritiro' ? '🤝 ritiro in zona' : o.consegnaScelta==='digitale' ? '💾 codice online' : (o.viaPunto || o.puntoRitiro) ? '📦 spedizione a un punto di ritiro' : '🚚 con spedizione') : ''}${
-        ((o.qta>1||o.consegnaScelta) && (o.spedSats>0||o.protSats>0)) ? ' — ' : ''}${
-        (o.spedSats>0||o.protSats>0) ? 'di cui ' + [
-          o.spedSats>0 ? fmt(o.spedSats)+' sats di spedizione' : '',
-          o.protSats>0 ? fmt(o.protSats)+' sats di protezione acquisti' : ''
-        ].filter(Boolean).join(' e ') : ''}</div>` : ''}
-      ${o.puntoRitiro ? `<div class="eur-hint" style="margin-top:-2px">📦 Punto di ritiro indicato dall'acquirente: <b>${esc(o.puntoRitiro)}</b></div>`
+        o.spedGratisSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🚚 Spedizione <b>gratuita</b>: ${o.role==='seller'?'hai':'il venditore ha'} offerto ${fmt(o.spedGratisSats)} sats di spedizione</div>` : ''}
+      ${/* LA MODALITA' NON SI RIPETE (ago 2026): la diceva questa riga
+            e la dice gia' quella sotto — il punto di ritiro, il
+            pannello del ritiro in zona, la rivelazione del codice —,
+            e il costo e' ormai l'inciso accanto alla cifra. Qui resta
+            il solo conto dei pezzi, che non lo dice nessun altro. */
+        (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats</div>` : ''}
+      ${o.puntoRitiro ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer'?'Il punto di ritiro che hai indicato':'Punto di ritiro indicato dall\'acquirente'}: <b>${esc(o.puntoRitiro)}</b></div>`
         : (o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
       ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
       <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
@@ -11509,9 +11580,8 @@ function trasportoScopri(){
 let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
 
 function payoutPanel(o){
-  // il totale in cassaforte meno la protezione (della piattaforma):
-  // articolo + spedizione — la commissione resta sospesa (a 0)
-  const net = o.listing.price - (o.protSats||0);
+  // articolo + spedizione, dal giudice unico (vedi nettoVenditore)
+  const net = nettoVenditore(o);
 
   /* Incasso automatico già attivo */
   if (myLnAddress && o.state!=='confirmed') return `
