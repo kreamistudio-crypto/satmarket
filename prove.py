@@ -11628,6 +11628,35 @@ def prove_sollecito_a_comando():
           'class="btn allarme" onclick="openDispute()"' in mini
           and 'class="btn danger-ghost" onclick="openDispute()"' not in mini)
 
+    # --- 13) LO SPAZIO E' DELLA COPPIA, NON DEL BOTTONE ----------
+    # La regola di ieri (`#orderContent .btn + .btn`) non aveva una
+    # sentinella, e nel frattempo tre margini scritti a mano la
+    # scavalcavano ancora — misurati dal vivo: il gesto principale a
+    # 0px dalla didascalia di @trackbot. Qui si sorveglia che quei
+    # margini non tornino: sono righe che un riordino rimette senza
+    # rompere niente di visibile a chi legge il codice.
+    prova("lo spazio fra bottoni e' detto fra FRATELLI", True,
+          "#orderContent .btn + .btn{margin-top:10px}" in mini)
+    prova("...e la disputa resta staccata, DOPO di lui", True,
+          "#orderContent .btn.allarme{margin-top:18px}" in mini
+          and mini.index("#orderContent .btn + .btn{")
+              < mini.index("#orderContent .btn.allarme{"))
+    for f, chi in (("bottoneNotifichePacco(o, s){", "le notifiche del pacco"),
+                   ("o.role==='seller' && s==='shipped' ?",
+                    "il sollecito del venditore")):
+        b2 = mini[mini.index(f):]
+        b2 = b2[:b2.index("</button>")]
+        # il solo TAG, o il commento che racconta la storia (e nomina
+        # il margine tolto) terrebbe rossa una prova gia' verde
+        b2 = b2[b2.rindex("<button"):]
+        prova(f"{chi}: nessun margine suo sul bottone", False,
+              "margin-top:0" in b2)
+    # la didascalia si infila FRA due bottoni: senza il margine sotto,
+    # quel che viene dopo le si incolla (e' il difetto misurato)
+    d2 = pezzo_js(mini, "function bottoneNotifichePacco(o, s){")
+    prova("la didascalia porta lo spazio della coppia sotto", True,
+          'style="margin:2px 0 10px;text-align:center"' in d2)
+
 
 # ====================================================================
 def prove_ordini_fermi():

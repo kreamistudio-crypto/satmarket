@@ -2227,7 +2227,15 @@
      ne aggiungesse un altro. Detto fra FRATELLI il buco si chiude per
      sempre: chi mette il prossimo bottone non deve ricordarsi niente.
      Scoped al dettaglio dell'ordine, che e' dove i bottoni si
-     impilano davvero. */
+     impilano davvero.
+     E CHI HA ANCORA UN MARGINE SUO LA SCAVALCA (ago 2026, il giro
+     dopo): erano rimasti due `margin-top:0` scritti a mano — il
+     sollecito del venditore e le notifiche del pacco — piu' la
+     didascalia di @trackbot, che si infila FRA due bottoni e a zero
+     sotto incollava il gesto principale al testo (misurato: 0px).
+     Tolti tutti e tre; l'unica distanza diversa che resta e' quella
+     della disputa, qui sotto. Chi ne rimette uno lo sente da
+     prove.py, che li conta. */
   #orderContent .btn + .btn{margin-top:10px}
   /* L'uscita di sicurezza resta STACCATA: adesso e' l'ultima, dopo i
      ponti, e senza questo respiro in piu' sarebbe il terzo blocco
@@ -11988,7 +11996,7 @@ function openOrder(id){
             gia' dice «prenditi il tempo di controllare»; il «lo
             controllo» resta perche' e' cio' che lo distingue dal
             «libera i sats» qui sotto. */''}
-      ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
+      ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
@@ -14247,8 +14255,17 @@ function codiceTracking(o, s){
 
 function bottoneNotifichePacco(o, s){
   if (!trackbotPossibile(o, s)) return '';
-  return `<button class="btn ghost" style="margin-top:0" onclick="attivaNotifichePacco()">📦 Attiva le notifiche del pacco</button>
-    <div class="hint" style="margin-top:2px;text-align:center">Le notifiche te le manda @trackbot, non Barattolo: il codice te lo copiamo negli appunti, <b>incollalo nel bot</b>.</div>`;
+  /* LA DIDASCALIA PORTA LO SPAZIO DELLA COPPIA (ago 2026, misurato):
+     il bottone aveva un `margin-top:0` suo — l'eccezione scritta prima
+     che lo spazio fosse dei FRATELLI — e la didascalia stava attaccata
+     sopra (2px) e a ZERO sotto, quindi il gesto principale che viene
+     dopo («Ho ricevuto l'oggetto») le si incollava. Il margine sopra
+     se n'e' andato: lo mette la regola dei fratelli. Quello sotto resta
+     qui, ed e' l'unico scritto a mano di questa colonna, perche' la
+     didascalia e' del bottone SOPRA e si infila in mezzo alla coppia:
+     il 10 e' quello della coppia, non un valore suo. */
+  return `<button class="btn ghost" onclick="attivaNotifichePacco()">📦 Attiva le notifiche del pacco</button>
+    <div class="hint" style="margin:2px 0 10px;text-align:center">Le notifiche te le manda @trackbot, non Barattolo: il codice te lo copiamo negli appunti, <b>incollalo nel bot</b>.</div>`;
 }
 
 async function attivaNotifichePacco(){
