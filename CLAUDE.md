@@ -7328,16 +7328,61 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`puntoBanner`), perché lì il campo si chiude e il pannello del
   venditore sparisce: senza quella riga chi ha comprato non avrebbe
   più da NESSUNA PARTE l'indirizzo dove andare a ritirare. Sta nel
-  banner del tracciamento e non altrove perché è lì che si guarda
-  «dov'è il mio pacco», e la frase è girata a chi legge («Il tuo punto
-  di ritiro» / «Punto di ritiro dell'acquirente»), la regola del
+  banner del pacco e non altrove perché è lì che si guarda «dov'è il
+  mio pacco», e la frase è girata a chi legge («Il tuo punto di
+  ritiro» / «Punto di ritiro dell'acquirente»), la regola del
   riquadro verde.
-  IL BANNER NASCE ANCHE SENZA TRACCIAMENTO, ed è la riga che si
-  dimentica: la sua condizione era `o.tracking &&`, quindi un ordine
-  spedito senza codice (corriere-sentinella, o un venditore che lo
-  salta) si sarebbe portato via il punto insieme al banner. Ora è
-  `(o.tracking || o.puntoRitiro)` e il pezzo del tracciamento è
-  interno — c'è la prova, e il caso è collaudato dal vivo.
+  E IL BANNER È DEL PUNTO, E DI NIENT'ALTRO (ago 2026, dal campo):
+  diceva anche «Spedito con X — tracciamento Y», che è parola per
+  parola il passo «Oggetto spedito» dentro il recinto due dita più su
+  — un doppione, e per giunta quello che si legge dopo. Ora nasce sul
+  solo `o.puntoRitiro`, e la prova che chiedeva «il banner nasce anche
+  senza tracciamento» ha CAMBIATO LATO: senza punto non nasce affatto
+  (la riga di ieri esisteva perché un ordine spedito senza codice non
+  si portasse via il punto insieme al banner — oggi il punto è l'unica
+  cosa che lo fa nascere, quindi quel caso è coperto per costruzione).
+  LA TRACCIA DELLA CORREZIONE DEL MODERATORE HA SEGUITO IL CODICE, ed
+  è la riga che si perde per distrazione svuotando un banner: sta nel
+  passo, dove la vedono ENTRAMBE le parti come prima.
+  IL CODICE SI TOCCA DOVE SI LEGGE (ago 2026): dentro quel passo il
+  tracciamento è cliccabile e porta a @trackbot, e il link a 17track
+  è USCITO dall'ordine — ne resta uno solo, quello del RESO (lato
+  venditore: là chi aspetta è lui e il bottone di trackbot non è suo),
+  e il conto in `prove.py` lo dichiara, così se un domani ne ricompare
+  uno qui la riga diventa rossa. Due strade per seguire lo stesso
+  pacco sono un bivio davanti a chi lo aspetta.
+  IL GIUDICE È UNO, `trackbotPossibile(o, s)`, e lo usano tutti e due
+  i posti da cui ci si arriva — il bottone e il codice: due strade che
+  rispondessero diverso sullo stesso codice sarebbero una che promette
+  quel che l'altra nega. Le sue quattro domande sono quelle di sempre
+  (solo il compratore, solo mentre il pacco viaggia, solo col
+  tracciamento, solo con la FORMA del corriere dichiarato — il giudice
+  è `formaTracking`, lo stesso dell'euristica della spedizione, perché
+  a trackbot serve il codice del CORRIERE e non quello
+  dell'intermediario). Dove la porta non c'è il codice resta TESTO:
+  un link a vuoto è peggio di nessun link. Il colore NON è il
+  verde-link di casa (`--trust` sul fondo della fiducia rende 3,84: va
+  bene per un ornamento, non per ventiquattro cifre da leggere) ma
+  `--trust-note`, l'inchiostro di quella superficie — 8,1 di giorno e
+  10,5 di sera —, e a dire che si tocca sono il grassetto e la
+  sottolineatura, l'unica della pagina.
+  IL CODICE NON GLIELO SAPPIAMO CONSEGNARE, ed è la riga che qui
+  diceva il falso («verificato dal vivo: `?start={codice}` precompila
+  il bot, che risponde col tracciamento»): dal campo il link apre la
+  chat, si preme start e il codice va incollato A MANO. La
+  documentazione di trackbot.eu conosce UNA strada sola per aggiungere
+  una spedizione — incollare il codice in chat — e nessun payload,
+  nessuna integrazione per chi manda i link: cosa faccia il bot di un
+  `/start CODICE` non è documentato da nessuna parte, e dalla nostra
+  parte non c'è niente da riparare. Il payload resta attaccato al link
+  perché non costa niente e il giorno che trackbot lo capisse
+  funzionerebbe da solo, ma NON si promette più: la riga sotto il
+  bottone dice quel che facciamo per davvero — «il codice te lo
+  copiamo negli appunti, **incollalo nel bot**» — e il toast la
+  ripete. Se la copia NON riesce lo si dice, invece di far credere che
+  il codice sia negli appunti. Se un domani il bot rispondesse col
+  tracciamento senza incollare niente, l'unica cosa da cambiare sono
+  quelle righe.
   `POST /api/orders/{id}/punto-ritiro` è la RETE DI SICUREZZA: solo
   il COMPRATORE, solo su 'locked', solo sulla via punto — il punto
   scelto in pagina si CORREGGE finché il venditore non spedisce (un
@@ -7703,6 +7748,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Chi un domani vorrà girare anche la testa tolga prima la
   distinzione, o si ritroverà due volte la stessa frase in prima
   persona a un centimetro di distanza.
+  E DALL'AGO 2026 QUELLA TESTA STA SOPRA IL RECINTO, non dentro
+  (decisione di Andrea): dice lo STATO dell'affare, che è
+  l'intestazione dell'ORDINE e non un contenuto della cassaforte. Il
+  riquadro comincia dritto coi PASSI e NON prende una seconda testata,
+  nemmeno più corta — ogni passo ha già il suo titolo, e una riga lì
+  dentro ripeterebbe la frase appena letta un centimetro più su
+  (che è, alla lettera, la ripetizione dichiarata qui sopra: adesso i
+  due testi non sono più adiacenti e si legge meglio). Il sigillo
+  dell'escrow resta il tratteggio verde, non era la testata a dirlo.
+  DUE COSE DA NON DIMENTICARE quando si tocca: il CSS ha perso il
+  discendente (`.vault .vault-head` → `.vault-head`, tre selettori) o
+  la testata uscita dal recinto resterebbe senza vestito; e le monete
+  della FESTA partono da `#orderContent .vault-head`, quindi la classe
+  non si rinomina — c'è la prova per tutte e due. Il respiro fra i due
+  lo dà il margine SOTTO la testata (il recinto ha perso il suo
+  margin-top, o i due collasserebbero al più grande).
   E CON LEI LE ALTRE TRE RIGHE DEL RIQUADRO (ago 2026, stesso giro):
   1) l'attesa della conferma diceva «I sats restano nel deposito
   finché non confermi» — e «Restano ~N ore per confermare o aprire
