@@ -7514,6 +7514,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Disputa aperta — I sats sono congelati: nessuno può toccarli», due
   righe più sotto nello stesso riquadro. È l'unica ragione per cui
   quella mezza frase si poteva togliere dalla testa.
+  3) e il PASSO del reso parla a TRE, non a due — è l'ultima riga di
+  questa famiglia e la più insidiosa, perché lì l'acquirente e il
+  venditore sono nominati TUTTI E DUE nella stessa frase: col taglio
+  buyer/non-buyer al venditore restava «L'acquirente deve rispedire
+  l'oggetto **al venditore**», cioè una terza persona su SÉ STESSO —
+  esattamente il difetto tolto un centimetro più su. Tre letture come
+  in `passoDeposito`: «Devi rispedire l'oggetto al venditore» a chi
+  compra, «L'acquirente deve rispedirti l'oggetto» a chi vende, la
+  frase con tutti e due i nomi al moderatore che guarda da fuori (e,
+  a reso partito, «Il reso è in viaggio verso di te» / «…verso il
+  venditore»).
+  LA REGOLA CHE NE ESCE, e vale per la riga che qualcuno scriverà
+  domani: il taglio a DUE (`buyer ? tu : terza persona`) basta finché
+  la frase nomina UNA parte sola; quando le nomina tutte e due servono
+  TRE letture, o una delle due si ritrova a leggersi in terza persona.
+  A dire quali righe sono a rischio è un censimento sulle righe dei
+  passi e della testa che contengono «venditore» — fatto, e quella era
+  l'ultima.
   LA MODALITÀ NON SI RIPETE (stesso giro): la riga sotto il prezzo
   diceva «🚚 con spedizione» / «📦 spedizione a un punto di ritiro»,
   che è già scritto due righe più sotto — dal punto di ritiro, dal
