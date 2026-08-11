@@ -906,6 +906,26 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   — chi le cambia nel config le cambia anche lì; il server resta
   comunque il giudice. Col sedicesimo sito il censimento dei titoli
   scappati sale a sedici funzioni.
+  LA PAUSA E IL TETTO SONO DELL'ORDINE, MAI DELLA PERSONA (ago 2026,
+  segnalato dal campo): sollecitare un venditore non deve zittire il
+  bottone su un ordine diverso. Vale per costruzione — i due timbri
+  sono COLONNE della riga e l'UPDATE è `WHERE id=?` — ma «per
+  costruzione» non è una garanzia finché non c'è una prova che lo
+  dica: adesso ce n'è una ESEGUIBILE, due ordini di fila sul pezzo
+  vero, e la stessa per il bottone GEMELLO del venditore (due
+  compratori diversi). La mutazione che sposta il timbro sulla persona
+  fa rosse quattro righe.
+  E IL DOPPIO TOCCO NON MANDA DUE PROMEMORIA: finché la risposta è per
+  strada il bottone è spento. Senza, su rete lenta il secondo tocco
+  prende il 400 della pausa — «hai già mandato un promemoria nelle
+  ultime 24 ore» — che è la stessa frase che si leggerebbe se il tetto
+  fosse davvero per persona: il difetto vero e quello immaginato si
+  raccontano identici, ed è la ragione per cui questa riga vale più
+  della comodità che sembra. Il gemello del venditore aveva la stessa
+  finestra aperta e si è chiusa insieme.
+  Il client scrive il conto sulla riga di `orders` e non su
+  `currentOrder`, che può essere un oggetto DETACHED se nel frattempo
+  la lista si è ricaricata.
   LO STESSO «<» SPEGNEVA L'AVVISO DELLA SPEDIZIONE (ago 2026, B6
   dell'audit, chiuso): corriere e tracciamento sono testo di CHI
   SPEDISCE e finivano nudi nell'HTML — un «Bartolini <BRT>», che uno
@@ -7258,6 +7278,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ramo con rete dichiarata per tolleranza verso il client di ieri,
   sentinella sul conteggio x2; il patto del ricontrollo senza await
   ha la sua sentinella in CI).
+  IL PUNTO SI DICE UNA VOLTA SOLA, E DOVE SERVE (ago 2026): sotto il
+  prezzo c'era anche il punto GIÀ scelto, mentre due dita più sotto lo
+  stesso testo si può ancora CORREGGERE (e il venditore ce l'ha nel
+  suo pannello «Spedisci») — quella riga era il dato ripetuto accanto
+  al posto in cui si tocca. Via; resta il solo INVITO a indicarlo
+  quando ancora non c'è, che non è il dato ma il cartello che ci
+  porta.
+  E RICOMPARE NEL BANNER DEL PACCO appena il venditore spedisce
+  (`puntoBanner`), perché lì il campo si chiude e il pannello del
+  venditore sparisce: senza quella riga chi ha comprato non avrebbe
+  più da NESSUNA PARTE l'indirizzo dove andare a ritirare. Sta nel
+  banner del tracciamento e non altrove perché è lì che si guarda
+  «dov'è il mio pacco», e la frase è girata a chi legge («Il tuo punto
+  di ritiro» / «Punto di ritiro dell'acquirente»), la regola del
+  riquadro verde.
+  IL BANNER NASCE ANCHE SENZA TRACCIAMENTO, ed è la riga che si
+  dimentica: la sua condizione era `o.tracking &&`, quindi un ordine
+  spedito senza codice (corriere-sentinella, o un venditore che lo
+  salta) si sarebbe portato via il punto insieme al banner. Ora è
+  `(o.tracking || o.puntoRitiro)` e il pezzo del tracciamento è
+  interno — c'è la prova, e il caso è collaudato dal vivo.
   `POST /api/orders/{id}/punto-ritiro` è la RETE DI SICUREZZA: solo
   il COMPRATORE, solo su 'locked', solo sulla via punto — il punto
   scelto in pagina si CORREGGE finché il venditore non spedisce (un
