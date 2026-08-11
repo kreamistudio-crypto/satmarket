@@ -4326,13 +4326,32 @@ def prove_forma_tracking():
     # come la gente li scrive e chiede che il payload ci rientri —
     # chi rimette il trattino (o il trattino basso, che ammetteva
     # Telegram e non trackbot) nella classe la fa rossa.
-    classe = re.search(r"vero\.toUpperCase\(\)\.replace\(/(\[[^/]+\])/g",
-                       an)
-    prova("trackbot: il payload si normalizza nel link", True,
-          bool(classe))
+    # I DUE GIUDICI VIVONO IN UN POSTO SOLO, e la prova li LEGGE di
+    # li' invece di ricopiarli: il numero del filtro e' di TRACKBOT,
+    # e una copia in prove.py sarebbe il secondo posto dove tenerlo
+    # in pari — cioe' quello che un giorno dice un'altra cosa.
+    nt = pezzo_js(src, "function nudoTrackbot")
+    classe = re.search(r"\.replace\(/(\[[^/]+\])/g", nt)
+    prova("trackbot: il payload si normalizza in un posto solo", True,
+          bool(classe) and "toUpperCase()" in nt)
     nudo = ((lambda t: re.sub(classe.group(1), '', t.upper()))
             if classe else (lambda t: t))
-    FILTRO = re.compile(r"^[A-Z0-9]{10,26}$")
+    tetto = re.search(r"const FILTRO_TRACKBOT = /(\^\[A-Z0-9\]"
+                      r"\{\d+,\d+\}\$)/", src)
+    prova("trackbot: il filtro vive nel client, non qui", True,
+          bool(tetto))
+    FILTRO = re.compile(tetto.group(1) if tetto else r"$^")
+    # IL NUMERO E' LORO: se questa riga diventa rossa, o trackbot ha
+    # mosso il tetto (e allora si aggiorna qui, con la data) o
+    # qualcuno l'ha allargato per conto suo, che e' la cosa da non
+    # fare — un filtro nostro piu' largo del loro rimette il
+    # fallimento silenzioso da cui e' partito tutto.
+    # SI GUARDA LA COSTANTE E NON IL FILE: scritta come «"{10,26}" in
+    # src» questa prova NON POTEVA FALLIRE, perche' il numero compare
+    # anche nel commento due righe sopra la costante — l'ha detto la
+    # tortura, non la rilettura.
+    prova("trackbot: il tetto e' quello che dicono loro (11 ago 2026)",
+          "^[A-Z0-9]{10,26}$", tetto.group(1) if tetto else '')
     for come, scritto in (("minuscole",       "rr123456789it"),
                           ("spazi",           "RR 123 456 789 IT"),
                           ("trattini",        "1Z-999AA1-0123-456784"),
@@ -4375,7 +4394,35 @@ def prove_forma_tracking():
     # ha comunque la strada di sempre, incollare a mano. Si guarda la
     # FORMA della ripetizione e non il numero, o alla prossima volta
     # che trackbot muove il tetto questa riga passa senza dire niente.
-    prova("...ma il bottone non li esclude", True, "{10," not in tp)
+    prova("...ma il bottone non li esclude", True,
+          "{10," not in tp and "passaTrackbot" not in tp)
+    # IL FILTRO DECIDE LE PAROLE, MAI LA PRESENZA DEL BOTTONE (11 ago
+    # 2026): la didascalia si sdoppia — a chi il codice il bot lo
+    # prende si dice che ci pensiamo noi, a chi resta fuori resta
+    # l'istruzione di ieri. Dire «apri e ci pensa lui» a chi il bot
+    # non lo prende sarebbe il fallimento silenzioso riscritto in
+    # italiano.
+    bn = pezzo_js(src, "function bottoneNotifichePacco")
+    prova("la didascalia si sdoppia sul filtro", True,
+          "passaTrackbot(o.tracking)" in bn)
+    prova("...un ramo dice che il codice glielo passiamo noi", True,
+          "apri e il codice glielo passiamo noi" in bn)
+    prova("...l'altro resta l'istruzione di ieri", True,
+          "<b>incollalo nel bot</b>" in bn)
+    # «te le manda @trackbot, non Barattolo» sta nei DUE rami: e'
+    # l'onesta' sul terzo, e non dipende da come e' fatto il codice.
+    # Si contano i due TESTI e non le occorrenze — il commento qui
+    # sopra la nomina, e conterebbe tre.
+    prova("...e tutti e due dicono CHI manda le notifiche", 2,
+          bn.count("te le manda @trackbot, non Barattolo: "))
+    # IL TOAST SEGUE LE PAROLE: dove il bot prende il codice non si
+    # dice niente — un toast che invita a incollare a mano una cosa
+    # appena consegnata e' peggio del silenzio. Ma la COPIA si fa
+    # sempre: e' la rete, e non costa niente.
+    prova("il toast parla solo a chi resta fuori dal filtro", True,
+          "if (!passaTrackbot(vero)) {" in an)
+    prova("...ma la copia si fa comunque", True,
+          an.index("writeText(nudo)") < an.index("passaTrackbot(vero)"))
     # IL FATTO su come arriva il codice (ago 2026): una costante, due
     # pannelli — la busta del venditore e il form di spedizione via
     # punto. Il fatto, mai l'istruzione.

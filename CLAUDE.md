@@ -7598,19 +7598,51 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   numero in mano, e intanto si tiene la strada di sempre aperta per
   chi resta fuori. Il costo dell'attesa era zero perché il bottone
   non è mai stato gatato dal filtro.
-  LA RIGA SOTTO IL BOTTONE E IL TOAST NON CAMBIANO: dicono che il
-  codice sta negli appunti e va incollato, che è quel che facciamo
-  per davvero e resta vero anche per chi il filtro lo passa — un giro
-  di `/start` andato a buon fine dal vivo non l'abbiamo ancora visto,
-  e finché non lo si vede non si promette. Il giorno che lo si vede,
-  quelle due righe sono l'unica cosa da cambiare.
+  IL FILTRO DECIDE LE PAROLE, MAI LA PRESENZA DEL BOTTONE (11 ago
+  2026, decisione di Andrea, ed è la riga da non ammorbidire — la
+  frase è la stessa del giorno prima, cambia solo cosa governa). La
+  didascalia sotto il bottone si SDOPPIA su `passaTrackbot`: a chi il
+  bot il codice lo prende dice «apri e il codice glielo passiamo
+  noi», a chi resta fuori resta l'istruzione di ieri — «il codice te
+  lo copiamo negli appunti, **incollalo nel bot**». Il perché è che
+  un testo unico avrebbe mentito comunque, in un verso o nell'altro:
+  dire «incollalo» a tutti racconta come strada principale quella di
+  riserva, e dire «ci pensiamo noi» a tutti è il fallimento
+  silenzioso di ieri riscritto in italiano — e fallirebbe allo stesso
+  modo, cioè senza che nessuno se ne accorga. Scartato per questo il
+  testo unico che nomina tutte e due le strade: renderebbe più
+  confuso il caso normale per proteggere quello raro.
+  «Le notifiche te le manda @trackbot, non Barattolo» sta nei DUE
+  rami: è l'onestà sul terzo, e non dipende da com'è fatto il codice.
+  IL TOAST SEGUE LE PAROLE e la COPIA no: la copia si fa sempre — è
+  la rete se il bot fa i capricci, e non costa niente — ma la annuncia
+  solo chi ne ha bisogno. Dove il bot prende il codice non si dice
+  niente: il bot che si apre col codice dentro è già la risposta, e
+  un toast lì inviterebbe a fare a mano una cosa appena fatta. Dove
+  resta fuori la copia È la strada, quindi si dice, e se non riesce
+  si dice anche quello.
+  I DUE GIUDICI VIVONO IN UN POSTO SOLO — `nudoTrackbot` (la
+  normalizzazione) e `passaTrackbot` (il filtro) — e sono due perché
+  i posti che li chiedono vogliono cose diverse (le PAROLE e il
+  LINK), ma la normalizzazione dev'essere la stessa o si direbbe una
+  cosa e se ne farebbe un'altra. `FILTRO_TRACKBOT` è una costante e
+  IL SUO NUMERO È LORO: la prova lo confronta col letterale, quindi
+  se qualcuno lo allarga per conto suo diventa rossa — un filtro
+  nostro più largo del loro rimette esattamente il fallimento
+  silenzioso da cui è partito tutto.
   La prova non rilegge la riga: ESTRAE dal sorgente la classe di
   caratteri della normalizzazione e la applica ai codici come la
   gente li scrive (minuscole, spazi, trattini, trattino basso),
   chiedendo che il payload rientri nel filtro — chi rimette il
-  trattino nella classe la fa rossa. E una prova dichiara che i 24
-  dell'InPost restano fuori: il giorno che trackbot allarga, è quella
-  la riga da cambiare.
+  trattino nella classe la fa rossa. E la LEGGE dal client anche il
+  filtro, invece di ricopiarlo: una seconda copia in `prove.py`
+  sarebbe il posto che un giorno dice un'altra cosa.
+  LA TORTURA HA TROVATO UNA SENTINELLA CHE NON POTEVA FALLIRE, ed è
+  la terza volta che capita così: «il tetto è quello che dicono
+  loro» era scritta come `"{10,26}" in src` e trovava il numero
+  DENTRO IL COMMENTO due righe sopra la costante — allargare il
+  filtro non la faceva rossa. Ora guarda la costante. Una sentinella
+  si scrive rompendo il codice, non rileggendola.
   `POST /api/orders/{id}/punto-ritiro` è la RETE DI SICUREZZA: solo
   il COMPRATORE, solo su 'locked', solo sulla via punto — il punto
   scelto in pagina si CORREGGE finché il venditore non spedisce (un

@@ -14238,6 +14238,37 @@ function trackingDaControllare(corriere, tracking, idAvviso){
    astiene per regola («Altro corriere») si passa: non sappiamo dire
    che il codice e' sbagliato, e al peggio trackbot dira' che non lo
    conosce. */
+
+/* IL FILTRO DI TRACKBOT (ago 2026, detto da loro): la funzione
+   /start ce l'ha dal 2018, e il payload lo guarda contro
+   ^[A-Z0-9]{10,26}$ — una minuscola, uno spazio o un trattino lo
+   fanno cadere, e cade in SILENZIO (la chat si apre lo stesso e non
+   succede niente, che e' esattamente quel che si vedeva dal campo).
+   IL TETTO ERA 22 e trackbot l'ha alzato a 26 l'11 ago 2026, su
+   nostra richiesta: da allora ci rientrano anche l'InPost (24 cifre,
+   provato dal vivo su un codice vero) e i DHL eCommerce lunghi.
+   Sotto i 10 restano fuori i GLS/SDA/UPS a 9 cifre, e sono gli
+   ultimi. IL NUMERO E' LORO, non nostro: se cambia qui, e' perche'
+   l'hanno cambiato loro — c'e' la prova che lo dice.
+   `nudoTrackbot` toglie tutto quel che non e' maiuscola o cifra: il
+   trattino basso lo ammetteva TELEGRAM nel payload, non trackbot, e
+   tenerlo voleva dire spedire un codice che il bot butta via. Si
+   normalizza quel che va A TRACKBOT e nient'altro: quello che si
+   MOSTRA (dentro il passo, nel banner) e quello che sta nel DATABASE
+   restano il codice come l'ha scritto il venditore, che e' anche una
+   prova in disputa.
+   Sono due funzioni e non una perche' i posti che le chiedono sono
+   due e vogliono cose diverse — le PAROLE del bottone e il LINK — ma
+   la normalizzazione dev'essere la stessa, o si direbbe una cosa e se
+   ne farebbe un'altra. */
+const FILTRO_TRACKBOT = /^[A-Z0-9]{10,26}$/;
+function nudoTrackbot(tracking){
+  return (tracking || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+function passaTrackbot(tracking){
+  return FILTRO_TRACKBOT.test(nudoTrackbot(tracking));
+}
+
 function trackbotPossibile(o, s){
   return o.role === 'buyer' && !!o.tracking
       && ['shipped','delivered'].includes(s)
@@ -14264,34 +14295,27 @@ function bottoneNotifichePacco(o, s){
      qui, ed e' l'unico scritto a mano di questa colonna, perche' la
      didascalia e' del bottone SOPRA e si infila in mezzo alla coppia:
      il 10 e' quello della coppia, non un valore suo. */
+  /* IL FILTRO DECIDE LE PAROLE, MAI LA PRESENZA DEL BOTTONE (11 ago
+     2026, decisione di Andrea, ed e' la riga da non ammorbidire): chi
+     resta fuori dal filtro — i 9 cifre di GLS/SDA/UPS — ha comunque
+     la sua strada, incollare a mano, e togliergli il bottone sarebbe
+     chiudergli l'unica porta. A cambiare e' solo quel che gli si
+     promette: dire «apri e ci pensa lui» a chi il bot il codice non
+     lo prende sarebbe il difetto di ieri riscritto in italiano, e
+     fallirebbe nello stesso modo, cioe' in silenzio.
+     «te le manda @trackbot, non Barattolo» sta nei DUE rami: e'
+     l'onesta' sul terzo, e non dipende da come il codice e' fatto. */
+  const riga = passaTrackbot(o.tracking)
+    ? 'Le notifiche te le manda @trackbot, non Barattolo: apri e il codice glielo passiamo noi.'
+    : 'Le notifiche te le manda @trackbot, non Barattolo: il codice te lo copiamo negli appunti, <b>incollalo nel bot</b>.';
   return `<button class="btn ghost" onclick="attivaNotifichePacco()">📦 Attiva le notifiche del pacco</button>
-    <div class="hint" style="margin:2px 0 10px;text-align:center">Le notifiche te le manda @trackbot, non Barattolo: il codice te lo copiamo negli appunti, <b>incollalo nel bot</b>.</div>`;
+    <div class="hint" style="margin:2px 0 10px;text-align:center">${riga}</div>`;
 }
 
 async function attivaNotifichePacco(){
   haptic();
   const vero = currentOrder?.tracking || '';
-  /* IL FILTRO DI TRACKBOT (ago 2026, detto da loro): il payload di
-     /start la funzione ce l'ha dal 2018, e lo guarda contro
-     ^[A-Z0-9]{10,26}$ — una minuscola, uno spazio o un trattino lo
-     fanno cadere, e cade in SILENZIO (la chat si apre lo stesso e non
-     succede niente, che e' esattamente quel che si vedeva dal campo).
-     IL TETTO ERA 22 e trackbot l'ha alzato a 26 l'11 ago 2026, su
-     nostra richiesta: da allora ci rientrano anche l'InPost (24
-     cifre, provato dal vivo su un codice vero) e i DHL eCommerce
-     lunghi. Sotto i 10 restano fuori i GLS/SDA/UPS a 9 cifre, e
-     sono gli ultimi.
-     Quindi si toglie tutto quel che non e' maiuscola o cifra: il
-     trattino basso lo ammetteva TELEGRAM nel payload, non trackbot, e
-     tenerlo voleva dire spedire un codice che il bot butta via.
-     Si normalizza quel che va A TRACKBOT e nient'altro: quello che si
-     MOSTRA (dentro il passo, nel banner) e quello che sta nel
-     DATABASE restano il codice come l'ha scritto il venditore, che e'
-     anche una prova in disputa.
-     Il filtro NON e' una condizione per aprire il bot: i codici che
-     non ci rientrano nemmeno normalizzati hanno comunque la strada
-     di sempre, cioe' incollare a mano. */
-  const nudo = vero.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const nudo = nudoTrackbot(vero);
   if (!nudo) return;
   /* NEGLI APPUNTI VA IL NUDO, non `vero`, e la ragione e' che quel
      testo ha UN mestiere solo: essere incollato in trackbot. Se il
@@ -14300,13 +14324,20 @@ async function attivaNotifichePacco(){
      gli spazi che il corriere ci STAMPA sopra farebbe fallire la
      copia per la stessa ragione per cui falliva il link. E' lo stesso
      codice: cambia solo che non porta la punteggiatura.
-     La copia e' l'unica cosa che promettiamo, quindi se non riesce lo
-     si dice invece di far credere che il codice sia negli appunti. */
+     LA COPIA SI FA SEMPRE, ma la ANNUNCIA solo chi ne ha bisogno:
+     per chi il filtro lo passa e' la rete se il bot fa i capricci, e
+     il bot che si apre col codice dentro e' gia' la risposta — un
+     toast li' direbbe di fare a mano una cosa appena fatta. Per chi
+     resta fuori la copia E' la strada, quindi si dice, e se non
+     riesce si dice anche quello invece di far credere che il codice
+     sia negli appunti. */
   let copiato = true;
   try { await navigator.clipboard.writeText(nudo); }
   catch(e) { copiato = false; }
-  toast(copiato ? '📋 Codice copiato — incollalo nel bot'
-                : '📋 Copia il codice qui sopra e incollalo nel bot');
+  if (!passaTrackbot(vero)) {
+    toast(copiato ? '📋 Codice copiato — incollalo nel bot'
+                  : '📋 Copia il codice qui sopra e incollalo nel bot');
+  }
   const url = `https://t.me/trackbot?start=${nudo}`;
   if (tg?.initData && tg.openTelegramLink) tg.openTelegramLink(url);
   else window.open(url, '_blank', 'noopener');
