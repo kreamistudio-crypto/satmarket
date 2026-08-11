@@ -7458,7 +7458,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ordine del 7 agosto sembrava di oggi appena il venditore segnava la
   spedizione. Adesso è `creato`, che è il pagamento a meno di
   mezz'ora e non si muove più (gli unici scrittori sono l'INSERT e la
-  resurrezione di `controlla_annullati`).
+  resurrezione di `controlla_annullati`) — e senza ORARIO: a colpo
+  d'occhio in una lista non serve a nessuno e ruba spazio al titolo.
+  L'ORARIO RESTA DOVE MISURA UNA FINESTRA, ed è il criterio: la
+  RIVELAZIONE del codice digitale («Rivelato il 10 ago, 14:32»), da
+  cui contano le ORE_CONFERMA_DIGITALE, e il DEPOSITO della busta di
+  ritiro, da cui si conta la giacenza al punto — più, in disputa, la
+  prova di quando è successo. Il «tracciamento corretto il …» invece
+  ha già la sola data, e va bene: lì non parte nessun conto.
+  E IL BADGE DELLA LISTA DICE IL FATTO, non il posto: «Sats
+  depositati» (`STATES.locked.label`, l'unico sito), mentre la testa
+  del riquadro verde resta «Sats nel deposito di garanzia», che
+  risponde a un'altra domanda — cos'è successo contro dove sono
+  adesso. Uniformarle è l'errore che verrebbe naturale: c'è la prova
+  che restino due.
   IL CENSIMENTO DELLE ALTRE DATE, perché non fosse un'eredità: il
   DETTAGLIO non ne mostra nessuna (è un fatto, non una svista: lì il
   quando lo raccontano lo stepper e i pannelli); nelle NOTIFICHE non
