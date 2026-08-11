@@ -7495,6 +7495,86 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   prove, un import) si scambierebbero di posto a ogni richiesta — la
   lista «balla» senza che sia cambiato niente. È il pattern del
   cursore keyset della vetrina, `creato DESC, id DESC`.
+  E IL CONTROVALORE È QUELLO DEL SUO GIORNO (ago 2026, la stessa
+  famiglia: di un affare concluso non si muove più niente, nemmeno
+  quanto valeva). Il toggle €/₿ c'è anche negli Ordini — lista e
+  scheda, stessa preferenza dei fratelli — ma l'euro NON è quello di
+  oggi: un ordine di luglio dice quanto valeva a luglio.
+  IL DATO C'ERA GIÀ A METÀ, ed è la parte che ha ridotto il cantiere:
+  `ordini.cambio_ordine` esiste da sempre e vuol dire «EUR per BTC
+  alla creazione della invoice» — solo che si riempiva SOLO dove
+  serviva a convertire qualcosa (listino in EUR, tariffa ancorata),
+  quindi di un ordine tutto-sats non restava scritto niente. Ora si
+  scrive SEMPRE, nelle tre strade che creano un ordine.
+  LA COLONNA SI ALLARGA, NON CAMBIA SIGNIFICATO, e per questo non ne
+  nasce una seconda: dov'era piena era già il cambio di quel giorno,
+  dov'era 0 non lo sappiamo — nessuna riga vecchia si rilegge male.
+  Censito prima di toccare: quel valore non lo legge NESSUNO (né
+  server, né client, né script, né libro mastro) e nessuno usa il suo
+  zero come proxy. ATTENZIONE al vicino di casa, che il pattern ce
+  l'ha davvero: `cambio_eur` (il cambio alla CHIUSURA) usa lo zero
+  come segnale in due punti — il CSV e `xp_ordine` — e non si tocca.
+  TRE COSE DA NON AMMORBIDIRE nel server. 1) La variabile che alimenta
+  la MATEMATICA resta quella di prima: il cambio del giorno si congela
+  in una riga sola (`cambio_ordine = cambio_misura or
+  cambio_noto_ora()`), DOPO l'ultima riga di conto e prima
+  dell'INSERT — spostata più su, il conto vedrebbe un cambio dove
+  nessun 503 ne ha garantito il valore, e c'è la prova che l'ordine si
+  rispetti. 2) DALLA CACHE E MAI DALLA RETE: `cambio_noto_ora` non
+  attende, quindi il patto «niente await fra il ricontrollo e
+  l'INSERT» resta intatto e un acquisto tutto-sats non si lega a
+  CoinGecko per un dato che serve solo a raccontarlo. 3) Muto = 0,
+  cioè «non lo sappiamo», mai un numero inventato.
+  IN VETRINA il giudice è UNO, `_resaCifraOrdine` (lista e scheda sono
+  la stessa cifra vista da due posti), e la prova regina è che non
+  nomini `eurPerSat`: il cambio vivo lì dentro rimetterebbe l'affare
+  che cambia valore ogni mattina. L'EURO PORTA SEMPRE IL «≈», e non è
+  pigrizia: la valuta NATIVA di un ordine sono i SATS — l'escrow è in
+  sats anche quando il listino era in euro, e il totale comprende
+  spedizione e protezione — quindi non esiste il caso in cui quella
+  cifra sia un prezzo che qualcuno ha pattuito.
+  IL TOGGLE RISCRIVE LA SCHEDA IN PLACE (`aggiornaCifreOrdine`, il
+  `data-sats` sugli involucri) e NON la riapre: `openOrder` butterebbe
+  via il tracciamento a metà o il codice appena incollato — è la
+  ragione per cui il dettaglio annuncio ha `aggiornaPrezzoDettaglio`,
+  qui alla seconda volta.
+  PARLA EURO CIÒ CHE RACCONTA, RESTANO SATS LE CIFRE CON CUI SI
+  AGISCE: il pannello d'incasso non passa dal toggle, perché quel
+  numero è l'importo della invoice da incollare e la cintura di
+  `paga_venditore` lo confronta al sat.
+  SENZA CAMBIO restano i sats più la riga «di questo giorno non
+  abbiamo il cambio» (che nasce nascosta e la accende il giro delle
+  cifre): non si ripiega su quello di oggi, che sarebbe il difetto
+  rimesso proprio nel caso residuo, cioè dove non lo controlla
+  nessuno.
+  GLI ORDINI DI PRIMA li ha recuperati `recupera_cambi_ordini.py` dal
+  prezzo STORICO di CoinGecko (16 ordini su 8 giorni in produzione,
+  ago 2026): anteprima di serie e a ZERO chiamate — una per GIORNO
+  distinto, non per ordine —, `--scrivi` per farla, commit giorno per
+  giorno quindi interrompibile e ripartibile, e scrive solo
+  `cambio_ordine` e solo dov'è a zero (quindi non ricopre mai il
+  cambio VERO di un ordine in euro con lo snapshot, che è meno
+  preciso). MISURATO su CoinGecko prima di sceglierlo, e da rimisurare
+  se un domani si inceppa: l'endpoint storico è PUBBLICO e senza
+  chiave, è deterministico (stesso giorno = stesso numero), arriva
+  indietro 365 GIORNI e non oltre (oggi copre tutto; fra un anno no, e
+  lo script lo dice invece di lasciare un buco in silenzio) e il rate
+  limit è STRETTO — quattro chiamate di fila e arriva un 429.
+  IMPERFEZIONE DICHIARATA: il prezzo storico è quello del GIORNO e non
+  dell'istante, quindi su una giornata mossa il recuperato può
+  scostarsi. Resta un fatto vero e fermo, vale solo per gli ordini di
+  prima, e il «≈» lo dichiara già; i recuperati NON si distinguono in
+  vetrina dagli esatti — sarebbe una seconda etichetta da spiegare per
+  una differenza che sta dentro il «≈».
+  DIVERGENZA DICHIARATA COL CSV, e le due non si uniformano: la vista
+  dice il valore del giorno dell'ACQUISTO, il CSV quello del giorno
+  della CHIUSURA (`cambio_eur`). Sono due domande diverse — «quanto
+  valeva l'affare» e «quanto ho mosso in contabilità» — e ognuna ha il
+  suo numero, tutti e due congelati. Fuori dal cantiere per la stessa
+  ragione: notifiche (parlano sats e basta), XP, libro mastro (lo 0 è
+  uno stato legittimo: un allarme che suona sul normale è peggio di
+  nessun allarme) e la pagina d'acquisto, dove il ≈ è live perché lì
+  si sta pagando ADESSO.
   LA FOTO: il server manda SOLO `foto0` (primo nome della lista JSON,
   pattern scheda() dei doppioni; la lista intera si poppa nello
   strip). Dall'ago 2026 la stessa foto sta anche IN TESTA AL
