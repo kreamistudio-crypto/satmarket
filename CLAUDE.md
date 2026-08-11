@@ -7483,8 +7483,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ENTRAMBI i rami del riquadro, quello normale e quello della
   disputa, che la stessa riga non può raccontare due storie.
   LA TESTA DEL RIQUADRO invece resta «Sats nel deposito di garanzia»,
-  ed è deliberato: quella dice lo STATO dell'affare, il passo dice
-  la storia di chi lo guarda.
+  ed è deliberato (decisione di Andrea, guardando le due rese): quella
+  dice lo STATO dell'affare, il passo dice la storia di chi lo guarda,
+  e la ripetizione è il PREZZO di quella distinzione, non un difetto.
+  Chi un domani vorrà girare anche la testa tolga prima la
+  distinzione, o si ritroverà due volte la stessa frase in prima
+  persona a un centimetro di distanza.
+  E CON LEI LE ALTRE TRE RIGHE DEL RIQUADRO (ago 2026, stesso giro):
+  1) l'attesa della conferma diceva «I sats restano nel deposito
+  finché non confermi» — e «Restano ~N ore per confermare o aprire
+  disputa» sul digitale — anche a CHI VENDE, cioè gli attribuiva un
+  gesto che non ha: ora a lui e al moderatore vanno «finché
+  l'acquirente non conferma» e «L'acquirente ha ~N ore…». Il taglio è
+  `o.role==='buyer' ? tu : terza persona`, lo stesso della riga
+  immediatamente sotto («Hai verificato che è tutto ok»), così il
+  moderatore ci ricade da solo senza un ramo suo.
+  2) la testa del RESO diceva «Rimborso alla restituzione: i sats
+  restano congelati»: vera, ma muta proprio verso chi deve fare
+  qualcosa. Ora è «Rispedisci l'oggetto: al rientro ti rimborsiamo» a
+  chi ha comprato e «L'acquirente sta rispedendo l'oggetto» agli
+  altri.
+  MA I DUE STATI DEL RESO NON SI DICONO CON LA STESSA FRASE, ed è la
+  correzione che il cantiere ha fatto alla proposta: a pacco già
+  partito (`return_shipped`) «Rispedisci» sarebbe una bugia detta a
+  chi ha appena fatto quel che gli si chiedeva — quindi lì diventa
+  «Il reso è in viaggio: al rientro ti rimborsiamo» / «L'acquirente ha
+  rispedito l'oggetto», e c'è la prova che i due stati restino
+  distinti.
+  CHE I SATS SIANO FERMI NON SI PERDE, cambia posto: lo dice il passo
+  «Disputa aperta — I sats sono congelati: nessuno può toccarli», due
+  righe più sotto nello stesso riquadro. È l'unica ragione per cui
+  quella mezza frase si poteva togliere dalla testa.
   LA MODALITÀ NON SI RIPETE (stesso giro): la riga sotto il prezzo
   diceva «🚚 con spedizione» / «📦 spedizione a un punto di ritiro»,
   che è già scritto due righe più sotto — dal punto di ritiro, dal
