@@ -2692,8 +2692,11 @@ def prove_dettaglio_ordine():
     ic = pezzo_js(mini, "function incisoConto(o){")
 
     # ---- 1-5: l'inciso ----
+    # (dall'ago 2026 la cifra passa dal giudice del cambio congelato:
+    #  quello che si sorveglia qui resta lo stesso — l'inciso attaccato
+    #  alla cifra, dentro la sua riga, e non una riga a se')
     prova("l'inciso sta ACCANTO alla cifra, dentro la riga del prezzo",
-          True, '<span class="unit">sats</span>${incisoConto(o)}</div>'
+          True, '${cifraOrdine(o, o.listing.price)}${incisoConto(o)}</div>'
           in det)
     prova("...e non e' rimasta una riga a se' col «di cui»", 1,
           det.count("di cui ") + ic.count("di cui "))
@@ -2704,7 +2707,7 @@ def prove_dettaglio_ordine():
           "o.spedSats>0 ?" in ic and "spedGratis" not in ic)
     prova("la riga «Spedizione gratuita» resta a dirlo, con la cifra",
           True, "🚚 Spedizione <b>gratuita</b>" in det
-          and "sats di spedizione" in det)
+          and "cifraOrdine(o, o.spedGratisSats)} di spedizione" in det)
 
     # ---- 4-bis: LA FOTO VERA, IN LISTA E NEL DETTAGLIO ----
     # La catena di ripiego (miniatura versionata → foto piena → 📦) e'
@@ -2760,7 +2763,7 @@ def prove_dettaglio_ordine():
         prova(f"la riga in alto non ripete piu' «{detto}»", False,
               detto in det)
     prova("il conto dei pezzi resta: non lo dice nessun altro", True,
-          "pezzi × ${fmt((o.listing.price" in det)
+          "pezzi × ${cifraOrdine(o, (o.listing.price" in det)
 
     # ---- 9-16: le terze persone, e la PARITA' fra i due lati ----
     # ogni voce: (nome, il testo girato a chi legge, quello che
@@ -7513,6 +7516,64 @@ def prove_cambio():
     prova("il cambio assente non diventa un numero inventato", True,
           "if (v <= 0) return;"
           in pezzo_js(mini, "function impostaCambio(", "\n}\n"))
+
+    # --- 5) IL CONTROVALORE DI UN ORDINE E' QUELLO DEL SUO GIORNO
+    #        (ago 2026). Un affare di luglio dice quanto valeva a
+    #        luglio: il cambio se lo porta l'ordine, e il cambio di
+    #        OGGI qui dentro non deve entrare mai.
+    resa = pezzo_js(mini, "function _resaCifraOrdine(", "\n}\n")
+    # LA PROVA REGINA, e non nomina nessun caso: se in questa funzione
+    # comparisse `eurPerSat` — il cambio vivo della vetrina — un affare
+    # concluso cambierebbe valore ogni mattina. E' il difetto che tutto
+    # il cantiere esiste per togliere, in una riga sola.
+    prova("la cifra di un ordine non guarda il cambio di oggi", False,
+          "eurPerSat" in resa)
+    prova("...guarda quello che l'ordine si porta dietro", True,
+          "o.cambioOrdine" in resa)
+    # ...e senza, restano i sats: mai un ripiego su oggi
+    prova("...e senza cambio non converte", True,
+          "!(o.cambioOrdine > 0)" in resa)
+    # LA RESA VIVE IN UN POSTO SOLO: la lista e la scheda sono la
+    # stessa cifra vista da due posti, e due rese un giorno direbbero
+    # due numeri (il patto di `cifraCtrl`).
+    prova("la resa e' una sola", 1, mini.count("function _resaCifraOrdine("))
+    # i due chiamanti si nominano per esteso e non si CONTANO: la
+    # definizione contiene la stessa forma della chiamata, e a contare
+    # la prova guardava tre cose credendo di guardarne due
+    prova("...e la usa l'involucro", True,
+          "${_resaCifraOrdine(o, sats, nuda)}" in mini)
+    prova("...e la usa il toggle", True,
+          "_resaCifraOrdine(o, +n.dataset.sats" in mini)
+    # L'INVOLUCRO AVVOLGE, NON RENDE: una seconda strada per scrivere
+    # la cifra qui dentro non la vedrebbe il conto delle rese — e' la
+    # mutazione che era rimasta verde, e il modo piu' facile di far
+    # divergere lista e scheda e' proprio un ramo in piu' qui.
+    prova("l'involucro non scrive cifre per conto suo", False,
+          "fmt" in pezzo_js(mini, "function cifraOrdine(", "\n}\n"))
+    # IL TOGGLE NON RIAPRE L'ORDINE: riaprirlo butterebbe via il
+    # tracciamento a meta' o il codice appena incollato — la ragione
+    # per cui esiste aggiornaCifreOrdine invece di un openOrder.
+    agg = pezzo_js(mini, "function aggiornaCifreOrdine(", "\n}\n")
+    prova("il toggle riscrive in place, non riapre", False, "openOrder" in agg)
+    prova("...e setValuta se ne ricorda", True,
+          "aggiornaCifreOrdine();" in pezzo_js(mini, "function setValuta(", "\n}\n"))
+    # LA CIFRA OPERATIVA RESTA IN SATS: nel pannello d'incasso il
+    # numero e' l'importo della invoice da incollare, e la cintura di
+    # paga_venditore lo confronta al sat. In euro si incollerebbe
+    # l'importo sbagliato.
+    prova("il pannello d'incasso non passa dal toggle", False,
+          "cifraOrdine(" in pezzo_js(mini, "function payoutPanel(", "\n}\n"))
+    # e il dato dev'esserci: senza, ogni ordine sarebbe «senza cambio»
+    prova("mapOrder porta il cambio dell'ordine", True,
+          "cambioOrdine:o.cambio_ordine" in mini)
+    # la riga onesta esiste nel markup (nasce nascosta: la accende il
+    # giro delle cifre, che e' anche quello che la rispegne)
+    prova("la riga «non abbiamo il cambio» esiste", True,
+          'id="ordineSenzaCambio"' in mini)
+    # e la cifra non si spezza: «≈», numero e unita' sono un gruppo
+    # solo, o il simbolo resta appeso in fondo alla riga di sopra
+    prova("la cifra di un ordine non va a capo a meta'", True,
+          ".cifra-ord{white-space:nowrap}" in mini)
 
 
 def prove_recupero_cambi():

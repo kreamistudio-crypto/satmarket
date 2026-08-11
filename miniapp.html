@@ -2384,6 +2384,12 @@
   .payout .okline{display:flex;gap:6px;align-items:center;color:var(--trust);
     font-weight:800;font-size:13px;margin-top:10px}
   .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
+  /* La cifra di un ordine non si spezza MAI: «≈», numero e unita'
+     sono un gruppo solo, e a cedere e' il testo attorno. Senza, la
+     riga andava a capo proprio dopo il «≈» e lasciava il simbolo
+     appeso in fondo alla riga di sopra (visto a schermo). E' la
+     stessa regola delle righe del conto in `.ctrl-riga`. */
+  .cifra-ord{white-space:nowrap}
 
   /* ---------- onboarding contestuale: una riga discreta, mai un popup ---------- */
   .hintline{
@@ -3437,7 +3443,18 @@ document.getElementById('cartello')?.remove();</script>
          aggiornamento riscrive solo #ordersList, quindi spunta e
          pillole sopravvivono da sole. -->
     <div id="ordiniControlli" style="margin:12px var(--pad) 0">
-      <label class="filtro-check"><input type="checkbox" id="ordiniAttiviCheck" onchange="setOrdiniAttivi(this.checked)"> Solo attivi</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <label class="filtro-check"><input type="checkbox" id="ordiniAttiviCheck" onchange="setOrdiniAttivi(this.checked)"> Solo attivi</label>
+        <!-- Il toggle €/₿ degli ordini (ago 2026): stessa preferenza
+             di tutti i suoi fratelli, si accendono insieme via
+             data-cur. Qui pero' l'euro NON e' quello di oggi — ogni
+             ordine porta il cambio del giorno in cui e' nato, vedi
+             cifraOrdine. -->
+        <div class="cur-seg inriga" title="Mostra le cifre in euro o in sats">
+          <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+          <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+        </div>
+      </div>
       <div class="consegna-scelta" id="ordiniRuoloPills" style="margin:10px 0 0">
         <button class="consegna-pill attiva" data-ruolo="" onclick="setOrdiniRuolo('')">Tutti</button>
         <button class="consegna-pill" data-ruolo="buyer" onclick="setOrdiniRuolo('buyer')">Acquisti</button>
@@ -3449,7 +3466,17 @@ document.getElementById('cartello')?.remove();</script>
 
   <!-- ============ VISTA: ESCROW / ORDINE ============ -->
   <div class="view" id="view-ordine">
-    <button class="back" onclick="navIndietro()">← I tuoi ordini</button>
+    <div style="display:flex;align-items:center;padding-right:var(--pad)">
+      <button class="back" onclick="navIndietro()">← I tuoi ordini</button>
+      <!-- il gemello del toggle della lista: qui si sceglie in che
+           valuta LEGGERE questo affare, e la scelta e' la stessa. Le
+           cifre si riscrivono IN PLACE (aggiornaCifreOrdine): riaprire
+           l'ordine butterebbe via il testo gia' digitato nei pannelli -->
+      <div class="cur-seg inriga" style="margin:14px 0 0 auto" title="Mostra le cifre in euro o in sats">
+        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+      </div>
+    </div>
     <div id="orderContent"></div>
   </div>
 
@@ -4513,6 +4540,11 @@ function mapOrder(o){
     nascosto:o.nascosto||0,
     /* i pezzi dell'ordine: l'articolo unitario si ricava per divisione */
     qta:o.quantita||1,
+    /* IL CAMBIO DEL GIORNO (ago 2026): quanto valeva un euro in BTC
+       quando questo ordine e' nato, congelato dal server. 0 = non lo
+       sappiamo (gli ordini di prima che il recupero non ha raggiunto,
+       e i rari casi di cambio muto): li' l'euro non si mostra. */
+    cambioOrdine:o.cambio_ordine||0,
     sellerInvoice:o.invoice_venditore||'',
     corriere:o.corriere||'', tracking:o.tracking||'',
     corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
@@ -6545,6 +6577,12 @@ function setValuta(v){
      un'altra offerta. A non derivare ci pensa l'ancora: la cifra
      resta quella scritta, e il toggle la RILEGGE convertita. */
   if (el('offertaSheet')?.classList.contains('open')) aggiornaFoglioOfferta();
+  /* e gli ORDINI (ago 2026): la lista si ridisegna intera — li' non
+     c'e' niente di digitato da perdere e i filtri vivono in variabili
+     —, la scheda invece si riscrive IN PLACE, o si porterebbe via il
+     tracciamento a meta' o il codice appena incollato. */
+  if (el('view-affari')?.classList.contains('active')) renderOrders();
+  aggiornaCifreOrdine();
 }
 /* I toggle valuta sono due (searchbar e dettaglio) e vanno accesi
    insieme: si pescano per `data-cur`, non per id */
@@ -11197,6 +11235,57 @@ function toggleNascosti(){ ordiniMostraNascosti = !ordiniMostraNascosti; renderO
    giorno che la commissione si accendera' ci sara' UN posto solo da
    correggere invece di tre. */
 function nettoVenditore(o){ return o.listing.price - (o.protSats||0); }
+/* IL CONTROVALORE DI UN ORDINE E' QUELLO DEL SUO GIORNO (ago 2026):
+   un affare di luglio dice quanto valeva a luglio, e non cambia piu'.
+   Il cambio se lo porta l'ordine (`ordini.cambio_ordine`, congelato
+   dal server quando l'ordine nasce) e non arriva MAI da `eurPerSat`,
+   che e' il cambio di OGGI — quello serve alla vetrina, dove anche il
+   prezzo e' di oggi. Metterlo qui vorrebbe dire un affare concluso
+   che cambia valore ogni mattina.
+   GIUDICE UNICO della lista e della scheda: sono la stessa cifra
+   vista da due posti, e due rese un giorno direbbero due numeri.
+   L'EURO PORTA SEMPRE IL «≈», e non e' pigrizia: la valuta NATIVA di
+   un ordine sono i SATS — l'escrow e' in sats anche quando il listino
+   era in euro, e il totale in cassaforte comprende spedizione e
+   protezione. Non esiste il caso in cui quell'euro sia una cifra che
+   qualcuno ha pattuito: e' sempre una conversione.
+   SENZA CAMBIO restano i sats. Non si ripiega su quello di oggi, che
+   sarebbe il numero-che-cambia rimesso proprio nel caso residuo,
+   cioe' dove non lo controlla nessuno; a dirlo c'e' la riga sotto il
+   prezzo nella scheda.
+   `nuda` toglie unita' e «≈»: serve agli incisi, dove l'unita' l'ha
+   gia' detta la cifra grande un centimetro sopra (il patto di
+   `cifraCtrl`, che ha lo stesso interruttore per il meno). */
+function _resaCifraOrdine(o, sats, nuda){
+  if (valutaVista !== 'eur' || !(o.cambioOrdine > 0))
+    return fmt(sats) + (nuda ? '' : '<span class="unit">sats</span>');
+  return (nuda ? '' : '≈ ') + fmtEur(sats * o.cambioOrdine / 100000000)
+         + (nuda ? '' : '<span class="unit eur">€</span>');
+}
+/* La cifra col suo involucro: il `data-sats` e' quello che permette
+   al toggle di riscrivere la scheda IN PLACE invece di riaprirla —
+   riaprire un ordine butterebbe via il testo gia' digitato nei
+   pannelli (tracciamento, codice, punto di ritiro), che e' la stessa
+   ragione per cui il dettaglio annuncio ha `aggiornaPrezzoDettaglio`. */
+function cifraOrdine(o, sats, nuda){
+  return `<span class="cifra-ord" data-sats="${sats}"`
+       + `${nuda ? ' data-nuda="1"' : ''}>`
+       + `${_resaCifraOrdine(o, sats, nuda)}</span>`;
+}
+/* Il toggle sulla scheda aperta: riscrive le sole cifre, in place.
+   La riga «di quel giorno non abbiamo il cambio» compare e sparisce
+   con loro — un cartello che resta quando non serve piu' e' peggio
+   di nessun cartello. */
+function aggiornaCifreOrdine(){
+  const o = currentOrder;
+  if (!o || !el('view-ordine')?.classList.contains('active')) return;
+  document.querySelectorAll('#orderContent .cifra-ord').forEach(n => {
+    n.innerHTML = _resaCifraOrdine(o, +n.dataset.sats, n.dataset.nuda);
+  });
+  const nota = el('ordineSenzaCambio');
+  if (nota) nota.style.display =
+    (valutaVista === 'eur' && !(o.cambioOrdine > 0)) ? '' : 'none';
+}
 /* L'INCISO DEL CONTO (ago 2026): la spedizione — e la protezione,
    quando c'e' — si dicono ACCANTO alla cifra e non su una riga
    propria: sono un dettaglio di com'e' fatto quel totale, non un
@@ -11206,9 +11295,12 @@ function nettoVenditore(o){ return o.listing.price - (o.protSats||0); }
    quanto ha offerto chi vende. Il font si rimette a mano perche' il
    prezzo e' in mono, e un inciso di prosa in mono si legge male. */
 function incisoConto(o){
+  /* cifre NUDE: l'unita' e il «≈» li ha gia' detti il prezzo grande
+     un centimetro sopra, e ripeterli qui farebbe «≈ 8,50 € · di cui
+     ≈ 4,20 € di spedizione» — tre simboli per un dettaglio */
   const voci = [
-    o.spedSats>0 ? `${fmt(o.spedSats)} di spedizione` : '',
-    o.protSats>0 ? `${fmt(o.protSats)} di protezione` : ''
+    o.spedSats>0 ? `${cifraOrdine(o, o.spedSats, 1)} di spedizione` : '',
+    o.protSats>0 ? `${cifraOrdine(o, o.protSats, 1)} di protezione` : ''
   ].filter(Boolean);
   return voci.length ? `<span class="eur-hint" style="margin:0 0 0 6px;font-family:'Nunito',sans-serif">· di cui ${voci.join(' e ')}</span>` : '';
 }
@@ -11228,7 +11320,12 @@ function incisoConto(o){
 function verboOrdine(o){
   if (o.role === 'admin') return '⚖️ Da moderare';
   const compra = o.role === 'buyer';
-  const cifra = n => `<span class="mono" style="color:var(--sats-deep)">${fmt(n)}</span> sats`;
+  /* la cifra dal giudice unico, col colore addosso al solo NUMERO:
+     l'unita' resta muted da se' — `.unit` ha il suo colore e vince
+     sull'ereditarieta', ed e' la regola «l'unita' non si colora mai»
+     che qui arriva gratis (prima «sats» era testo nudo dentro un
+     `.sub` gia' muted: stesso grigio, stesso posto) */
+  const cifra = n => `<span class="mono" style="color:var(--sats-deep)">${cifraOrdine(o, n)}</span>`;
   if (o.state === 'released')
     return compra ? `Hai comprato per ${cifra(o.listing.price)}`
                   : `Hai venduto per ${cifra(nettoVenditore(o))}`;
@@ -11432,10 +11529,10 @@ function openOrder(id){
      l'acquirente viene rimborsato, gli altri osservano */
   /* al venditore va il netto del giudice unico (vedi nettoVenditore) */
   const testa = s==='released'  ? {ic:'🔓', b:'Deposito sbloccato',
-      d:o.role==='seller' ? `Hai incassato ${fmt(nettoVenditore(o))} sats`
+      d:o.role==='seller' ? `Hai incassato ${cifraOrdine(o, nettoVenditore(o))}`
                           : 'I sats sono stati consegnati al venditore'}
     : s==='refunded'            ? {ic:'↩️', b:'Deposito rimborsato',
-      d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${fmt(o.listing.price)} sats (integrale)`
+      d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${cifraOrdine(o, o.listing.price)} (integrale)`
                           : 'I sats sono tornati all\'acquirente'}
     : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',
       d:o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
@@ -11461,23 +11558,30 @@ function openOrder(id){
   el('orderContent').innerHTML = `
     <div class="detail-body">
       <div class="ordine-testa">${fotoOrdine(o, true)}<h2 style="font-size:17px">${esc(o.listing.title)}</h2></div>
-      <div class="detail-price" style="font-size:20px">${fmt(o.listing.price)} <span class="unit">sats</span>${incisoConto(o)}</div>
+      <div class="detail-price" style="font-size:20px">${cifraOrdine(o, o.listing.price)}${incisoConto(o)}</div>
+      ${/* SENZA IL CAMBIO DI QUEL GIORNO non si mostra un euro: la
+           riga lo dice, e vive nel DOM anche quando tace — a
+           mostrarla e nasconderla e' aggiornaCifreOrdine, insieme
+           alle cifre. Dopo il recupero storico questo caso in
+           produzione non c'e' piu': resta per i rari ordini nati con
+           CoinGecko muto, ed e' li' che uno se lo chiede. */''}
+      <div class="eur-hint" id="ordineSenzaCambio" style="margin-top:-6px;display:none">Di questo giorno non abbiamo il cambio: qui restano i sats.</div>
       ${o.righe.length ? `<div class="eur-hint" style="margin-top:-6px">${
         /* il SET: l'elenco dei pezzi con gli unitari fotografati —
            qui la media «pezzi × unitario» mentirebbe */
-        o.righe.map(r=>`${esc(r.titolo)}${r.quantita>1?` × ${fmt(r.quantita)}`:''} — ${fmt(r.unitario_sats*r.quantita)} sats`).join('<br>')}</div>` : ''}
-      ${o.scontoSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🎁 Sconto carrello${o.scontoPct?` −${o.scontoPct}%`:''}: <b>−${fmt(o.scontoSats)} sats</b> sul prezzo qui sopra</div>` : ''}
+        o.righe.map(r=>`${esc(r.titolo)}${r.quantita>1?` × ${fmt(r.quantita)}`:''} — ${cifraOrdine(o, r.unitario_sats*r.quantita)}`).join('<br>')}</div>` : ''}
+      ${o.scontoSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🎁 Sconto carrello${o.scontoPct?` −${o.scontoPct}%`:''}: <b>−${cifraOrdine(o, o.scontoSats)}</b> sul prezzo qui sopra</div>` : ''}
       ${/* la tariffa che il negozio ha offerto: il conto quadra anche
             senza dirlo (la riga qui sotto non nomina nessuna
             spedizione), ma chi ha visto un costo nella scheda deve
             poter capire dove e' finito */
-        o.spedGratisSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🚚 Spedizione <b>gratuita</b>: ${o.role==='seller'?'hai':'il venditore ha'} offerto ${fmt(o.spedGratisSats)} sats di spedizione</div>` : ''}
+        o.spedGratisSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🚚 Spedizione <b>gratuita</b>: ${o.role==='seller'?'hai':'il venditore ha'} offerto ${cifraOrdine(o, o.spedGratisSats)} di spedizione</div>` : ''}
       ${/* LA MODALITA' NON SI RIPETE (ago 2026): la diceva questa riga
             e la dice gia' quella sotto — il punto di ritiro, il
             pannello del ritiro in zona, la rivelazione del codice —,
             e il costo e' ormai l'inciso accanto alla cifra. Qui resta
             il solo conto dei pezzi, che non lo dice nessun altro. */
-        (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${fmt((o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)} sats</div>` : ''}
+        (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${cifraOrdine(o, (o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)}</div>` : ''}
       ${/* IL PUNTO NON SI DICE DUE VOLTE (ago 2026): qui sotto il
             prezzo c'era anche il punto GIA' scelto, che pero' vive
             gia' dov'e' utile — nel campo del compratore, dove finche'
@@ -11613,6 +11717,11 @@ function openOrder(id){
           : pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")}
     </div>`;
   go('ordine');
+  /* le cifre le ha gia' scritte il giudice qui sopra; questo giro
+     serve alla RIGA «di questo giorno non abbiamo il cambio», che
+     nasce nascosta e si accende solo dove serve (e va DOPO go(), che
+     e' quello che rende attiva la vista) */
+  aggiornaCifreOrdine();
   /* il varco del vincitore d'asta: le strade offerte arrivano dal
      server (fail-open: senza rete la scritta invita a riaprire) */
   if (o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta)
@@ -11719,6 +11828,12 @@ let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
 
 function payoutPanel(o){
   // articolo + spedizione, dal giudice unico (vedi nettoVenditore)
+  /* QUI I SATS RESTANO SATS, e il toggle non ci arriva (ago 2026):
+     questa e' la cifra OPERATIVA — l'importo della invoice che il
+     venditore deve incollare, e che la cintura di paga_venditore
+     confronta al sat. In euro si incollerebbe l'importo sbagliato.
+     La regola del cantiere del cambio congelato: parla euro cio' che
+     RACCONTA l'affare, restano sats le cifre con cui si AGISCE. */
   const net = nettoVenditore(o);
 
   /* Incasso automatico già attivo */
