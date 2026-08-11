@@ -965,6 +965,157 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Il client scrive il conto sulla riga di `orders` e non su
   `currentOrder`, che può essere un oggetto DETACHED se nel frattempo
   la lista si è ricaricata.
+  E DOPO IL 🧊 C'È UNA CODA (ago 2026): ogni sollecito bussa N volte,
+  manda UNA segnalazione ai moderatori e poi tace per sempre — e quel
+  🧊 era un messaggio Telegram e basta. Da lì in poi un ordine coi sats
+  in cassaforte non compariva in NESSUNA lista del pannello e si
+  raggiungeva solo sapendone il numero (`/api/orders?ordine=N` mostra
+  ai moderatori i soli `dispute`/`return_*`/`refund`). `GET
+  /api/admin/fermi` + sezione «⏸ Ordini fermi» nel Profilo admin, fra
+  i pagamenti incerti e la revisione: aperta, perché aspetta una
+  decisione.
+  LA REGOLA È UNA FRASE — «i sats sono in cassaforte e nessuno si
+  muove da CODA_FERMI_GIORNI giorni» — cioè il COMPLEMENTO dei
+  terminali (`stato NOT IN ('creato','released','refunded',
+  'annullato')`) e NON l'elenco degli invisibili. Si dice ad alta voce
+  senza andare a leggere la WHERE di `miei_ordini`, e se un domani
+  qualcuno restringe la lista dei moderatori la coda non sviluppa un
+  buco in silenzio. Ci entrano anche `refund` — sats dovuti al
+  COMPRATORE e ZERO solleciti, buco già dichiarato in
+  `sollecita_rimborsi_puntate` — e le dispute, che i moderatori vedono
+  già ma in una lista NON ordinata per attesa: una disputa aperta da
+  quaranta giorni si confonde con una di ieri. `creato` resta fuori: lì
+  i sats non sono ancora in cassaforte, e se ne occupa
+  `controlla_abbandonati`.
+  DIECI GIORNI, ed è l'invariante che si compra: precedono TUTTI e sei
+  i 🧊 con le leve di serie (spedizione g.14, digitale g.11, ritiro
+  g.35, conferme g.12 da 'delivered' e g.19 da 'shipped', busta g.12,
+  incassi g.35), quindi **se il 🧊 è partito, la riga c'è** — la coda
+  non può mai essere più povera delle notifiche già mandate. Dipende
+  dalle leve, quindi NON ce lo si ricorda: una prova in CI rifà il
+  conto dai default del codice e diventa rossa se qualcuno stringe un
+  passo (`PROMEMORIA_DIGITALE_ORE` a 24 la fa rossa). `ORE_CONFERMA` e
+  `GIORNI_AUTO_SBLOCCO` vivono solo nel config e restano fuori dal
+  conto: dichiarato, non dimenticato. Il contatore esaurito
+  (`solleciti_* > MAX`) è stato valutato e SCARTATO — sembra gratis
+  perché non ha numeri da tarare, ma è cieco proprio sulla popolazione
+  che ha motivato il cantiere (chi non ha un sollecito non ha un
+  contatore), si spegne insieme alle leve, e sono cinque rami invece
+  di una frase.
+  LE ANCORE sono una per stato e la regola che le governa è che
+  ognuna finisce in `COALESCE(..., 0)` e NESSUNA guardia «> 0» entra
+  nella WHERE: in SQLite «NULL < x» vale NULL, quindi un'ancora vuota
+  non darebbe un falso allarme — **farebbe sparire l'ordine dalla coda
+  degli ordini spariti**, che è il solo modo in cui questa funzione può
+  fallire davvero. Uno zero fa comparire la riga in CIMA, e le catene
+  di ripiego vanno all'indietro nel tempo per la stessa ragione. NON È
+  TEORICO, ed è la scoperta del cantiere: `ordini.creato` è dichiarato
+  senza NOT NULL e senza DEFAULT, e uno `shipped` con `spedito_il=0`
+  oggi non riceve nessun promemoria e nessun 🧊 — le due funzioni che
+  lo guardano hanno proprio quel «> 0», ed è la sorella mai nominata
+  del `locked` con `consegna_scelta=''`. `locked` si ancora a `creato`
+  e MAI ad `aggiornato`: lì scrivono `aggiornato` sia
+  `deposita_invoice` sia `scegli_consegna_ordine`, quindi il venditore
+  potrebbe tenersi fuori dalla coda da solo ri-salvando la propria
+  invoice d'incasso (la trappola già pagata in
+  `sollecita_venditori_fermi`). IMPERFEZIONE DICHIARATA su
+  `confirmed`, ereditata da `sollecita_incassi`: lì `aggiornato` è
+  l'ultimo tentativo di pagamento fallito, quindi chi ri-deposita ogni
+  settimana una invoice che non paga rimanda il proprio ingresso — si
+  tiene lo stesso, così coda e sollecito restano d'accordo su «da
+  quando aspetta» invece di litigare, e il contatore nella riga lo
+  tradisce comunque.
+  LA RIGA dice il totale in cassaforte (su un ordine fermo non si sa
+  chi lo prende: la scelta già motivata nel 🧊), lo stato e la strada
+  (`''` non è un vuoto ma LA DIAGNOSI: asta senza scelta, o ordine
+  storico), da quanti giorni, e due cose che cambiano la decisione di
+  chi guarda: **quante volte la macchina ha bussato** — a zero, «🔕 mai
+  sollecitato», che è il caso scoperto e dev'essere il più rumoroso —
+  e **se le due parti sono raggiungibili** (la regola di `notifica()`:
+  Telegram col tg_id positivo, Nostr solo da chiave del possesso
+  dimostrato; un nativo che ha perso la chiave non lo sente nessuno, e
+  `notifica()` è fail-open, quindi senza quel campo il moderatore lo
+  scopre scrivendo nel vuoto). I badge sono SOLO navigazione —
+  «Apri l'ordine» riusa `apriOrdinePerId`, che guadagna un argomento
+  facoltativo così il gesto per aprire un ordine resta UNO, e «✉️»
+  riusa `scegliUtenteAdmin` — perché ciò che AGISCE vive dentro
+  l'ordine, dove c'è il contesto.
+  NIENTE PALLINO (`aggiornaAdmDot` riceve ancora solo `in_revisione`,
+  e nemmeno i pagamenti incerti lo accendono): una coda che può restare
+  piena per settimane accenderebbe un cartello sempre acceso, e un
+  cartello sempre acceso non lo guarda nessuno. NIENTE LIMIT sul
+  server: una coda che tronca nasconde le righe più VECCHIE, cioè
+  proprio quelle per cui esiste, e il numero totale è esso stesso
+  l'informazione — a tenere corta la pagina c'è il tetto di 8 col
+  «mostra i più vecchi», che ridisegna la SOLA sezione (il pattern di
+  `apriTuttiCat`: rifare le cinque fetch per allungare una lista già in
+  memoria chiuderebbe pure i cassetti aperti). NIENTE archiviazione:
+  quelli sono sats di qualcuno, ogni stato non terminale ha una strada
+  d'uscita in mano a una persona, e un «archivia» sarebbe l'unico modo
+  di rendere un ordine invisibile DUE volte. LEGGE E BASTA, come
+  `controlla_libro_mastro`, e la prova non è una sentinella sulla
+  forma: il dump di `ordini` prima e dopo dev'essere identico.
+  E CHI HA PAGATO SE LO SENTE DIRE SEMPRE, non una volta sola: il
+  compratore riceveva UNA notifica al primo squillo automatico e, se
+  non la leggeva, nessuno gli ripeteva che i suoi sats erano fermi e
+  che la disputa è aperta dal primo minuto. La cura è una RIGA
+  nell'ordine (`notaFermo`) e non una ripetizione, ed è una decisione:
+  una notifica in più chiude solo la metà di chi legge Telegram in quel
+  momento, mentre la riga c'è per chi apre al giorno 2, al giorno 40 —
+  quando i promemoria hanno smesso — e per chi la notifica non l'ha
+  mai vista; e messaggi identici che non chiedono NESSUN gesto sono la
+  famiglia che fa bloccare il bot, col quale si perdono le notifiche
+  degli ordini, che sono portanti. Sta sopra i due bottoni che c'erano
+  già, così si legge come una storia sola: il fatto → la maniglia
+  gentile (🔔) → l'uscita (⚠️).
+  È SCRITTA PER RESTARE VERA PER SEMPRE: niente «glielo stiamo
+  ricordando», che al tetto dei promemoria diventerebbe una bugia, e
+  «nessun timer li muove» regge anche a `AUTO_SBLOCCO_ATTIVO`
+  riacceso, perché su `locked` non è mai esistito nessun timer. NON è
+  un riuso di `statoSollecito`, che ha due esclusioni sbagliate qui —
+  il tetto raggiunto (la riga non è il bottone) e la leva a zero (una
+  leva che spegne il promemoria non deve spegnere le PAROLE) — ma ne
+  condivide la FINESTRA (48h, 24h sul digitale), così la riga e la
+  maniglia gentile arrivano insieme: prima di allora un ordine che
+  aspetta è normale e non va fatto sembrare un problema. Fuori il
+  ritiro (ha già la sua nota verde e lì si conferma da soli) e l'asta
+  senza strada scelta (lì la palla è del compratore). La finestra col
+  NOT della forma positiva, per il NaN della DEMO.
+  AMBRA E NON ROSSO (guardata a schermo): `--warn-bg` nell'ordine è il
+  registro di «disputa aperta», e qui non c'è ancora nessun problema
+  conclamato — c'è un venditore in ritardo. Si usa la coppia
+  `--sats-soft`/`--sats-text` già in uso due righe più giù, e il rosso
+  resta al bottone sotto, che è l'uscita: verde (al sicuro) → ambra (in
+  ritardo) → rosso (via d'uscita).
+  IL CASO INCAGLIATO ERA UN VICOLO CIECO (ago 2026, chiuso qui perché
+  la coda ce lo porta davanti): `risolvi_disputa` accetta
+  `confirmed`/`refund` con `disputata=1` — è la cura della «disputa
+  decisa che resta in mano al moderatore» — ma nel client il pannello
+  «⚖️ Decisione del moderatore» compariva SOLO su `s==='dispute'`.
+  Quindi il caso era decidibile dal server e non offerto dal client:
+  un buco latente che la coda avrebbe trasformato in una riga su cui
+  non si può fare niente. Ora la condizione guarda anche `disputata`
+  (che entra in `mapOrder`) e il testo dice cos'è successo — «era stata
+  decisa, ma il pagamento non è riuscito» — invece di ripetere quello
+  della disputa fresca.
+  DUE LEZIONI DEL CANTIERE, e sono di metodo. 1) Il testo della riga
+  diceva «non si sbloccano da soli» e ha fatto scattare una sentinella
+  del DISARMO, che vieta la stringa «si sbloccano da soli» in tutto il
+  client: la conteneva NELLA NEGAZIONE. La sentinella non si è
+  allentata per far passare della prosa nuova — è così che muoiono le
+  regole, aggirate da un'altra strada — e la frase è diventata quella
+  della regola cardinale, «nessun timer li muove». 2) La tortura a 21
+  mutazioni (una per riga sorvegliata: terminali rimessi dentro, ancora
+  spostata su `aggiornato`, COALESCE tolto, guardia «> 0» rimessa,
+  ORDER BY rovesciato, LEFT JOIN secco, leva che non spegne, guardia
+  admin caduta, UPDATE infilato nella coda, soglia alzata a 12, riga
+  del compratore tolta, forma diretta rimessa, pallino che impara la
+  coda, pannello del moderatore tornato indietro…) ha trovato DUE
+  SENTINELLE CHE NON POTEVANO FALLIRE, tutte e due mie: una regex che
+  si fermava alla prima parentesi e quindi non vedeva
+  `aggiornaAdmDot((s.in_revisione||0)+fermi.length)`, e un confronto
+  fra due giri della STESSA query, cioè una tautologia. Zero
+  sopravvissute solo dopo averle riscritte.
   LO STESSO «<» SPEGNEVA L'AVVISO DELLA SPEDIZIONE (ago 2026, B6
   dell'audit, chiuso): corriere e tracciamento sono testo di CHI
   SPEDISCE e finivano nudi nell'HTML — un «Bartolini <BRT>», che uno
@@ -11065,6 +11216,38 @@ IN PRODUZIONE basta il deploy: le due colonne nascono a 0 e le quattro
 leve hanno il default nel codice. DA GUARDARE al primo giro: il primo
 promemoria vero dentro Telegram — che al venditore arrivi UN messaggio
 e che si legga come un promemoria.
+
+La coda degli ordini fermi, e la riga per chi ha pagato (ago 2026): il
+🧊 ai moderatori era un messaggio Telegram e basta — dopo, un ordine
+coi sats in cassaforte non compariva in nessuna lista e si raggiungeva
+solo sapendone il numero; e il compratore veniva avvisato UNA volta
+sola, al primo squillo. Adesso c'è la sezione «⏸ Ordini fermi» nel
+pannello admin (regola in una frase: «i sats sono in cassaforte e
+nessuno si muove da 10 giorni», il complemento dei terminali) e una
+riga permanente nell'ordine di chi ha pagato. Nessun automatismo
+nuovo: la coda LEGGE e basta, la riga racconta, e i sats continuano a
+muoverli solo le persone. Vedi Architettura, «E DOPO IL 🧊 C'È UNA
+CODA», per l'invariante della soglia, la regola dello zero sulle
+ancore e le due popolazioni scoperte trovate costruendola (il `locked`
+con `consegna_scelta=''` e lo `shipped` con `spedito_il=0`, che non
+ricevono nessun promemoria e nessun 🧊). Incluso, su decisione di
+Andrea, il buco latente che la coda avrebbe reso un vicolo cieco: il
+pannello del moderatore sul caso incagliato.
+Collaudato: 2674 prove verdi (73 nuove — l'endpoint girato DAVVERO su
+un database gemello, col dump di `ordini` identico prima e dopo) e
+VENTUNO MUTAZIONI del codice una per riga sorvegliata, ognuna rossa da
+sola; la tortura ha trovato due sentinelle mie che non potevano
+fallire, riscritte. Più il giro dal vivo sul server locale, che ha
+mostrato la coda coi due `locked` veri fermi da 24 e 22 giorni,
+entrambi «🔕 mai sollecitato» — cioè la popolazione scoperta si è
+presentata al primo giro — il 403 al non-moderatore, la riga nell'ordine
+del compratore nei due temi e il pannello del caso incagliato, con zero
+errori JS e il database di collaudo intatto.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuno stato nuovo, e la leva ha il default nel codice. DA GUARDARE
+al primo giro: chi c'è già dentro la coda — se compare un ordine che
+nessuno ha mai sollecitato, quello è il caso per cui il cantiere
+esiste.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
