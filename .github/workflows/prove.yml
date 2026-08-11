@@ -55,7 +55,7 @@ jobs:
              presenta_release.py config_esempio.py
              assegna_sottocategorie.py ripulisci_avatar_min.py
              anteprime.py collaudo_impersonazione.py
-             converti_soglie_euro.py
+             converti_soglie_euro.py recupera_cambi_ordini.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.

@@ -2344,10 +2344,22 @@ def init_db():
                     # storici restano cosi', e nel CSV il campo e' vuoto.
                     "cambio_eur REAL DEFAULT 0",
                     # cambio_ordine: EUR per BTC al momento della
-                    # CREAZIONE della invoice — annunci in EUR, e dal
-                    # lug 2026 anche i listini sats con la spedizione
-                    # ancorata all'euro (e' il cambio che ha fissato i
-                    # sats dell'ordine). 0 = nessuna conversione.
+                    # CREAZIONE della invoice — quanto valeva in euro
+                    # questo affare il giorno in cui e' nato.
+                    # SI SCRIVE SEMPRE (ago 2026): fino a ieri si
+                    # riempiva SOLO dove si era convertito qualcosa
+                    # (listino in EUR, tariffa ancorata), quindi un
+                    # ordine tutto-sats non sapeva piu' dire quanto
+                    # era valso e l'unico modo di raccontarlo era il
+                    # cambio di OGGI, cioe' un numero che cambia ogni
+                    # giorno. Il nome non ha cambiato significato e
+                    # nessuna riga vecchia si rilegge male: dov'e'
+                    # pieno e' gia' il cambio di quel giorno, dov'e'
+                    # 0 semplicemente non lo sappiamo — che e' la
+                    # verita', prima e dopo.
+                    # 0 = sconosciuto (gli ordini di prima, e i rari
+                    # casi di cambio muto): non si mostra un euro che
+                    # non abbiamo, mai uno inventato.
                     "cambio_ordine REAL DEFAULT 0",
                     # il conto scomposto (lug 2026, modello Vinted):
                     # prezzo_sats resta il TOTALE in cassaforte (invoice
@@ -12687,11 +12699,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
                  # 500 invece di un 503 onesto
                  or a["spedizione_extra_eur"] > 0))
         for a in tutti.values())
-    # DUE variabili e non una: `cambio_ordine` finisce in colonna e
-    # dichiara «0 = nessuna conversione», quindi resta zero quando non
-    # si e' convertito niente; `cambio_misura` e' solo il metro delle
+    # DUE variabili e non una: `cambio_ordine` e' il metro della
+    # CONVERSIONE — resta zero quando non si converte niente, e le
+    # pure del conto lo guardano solo dove un 503 ne ha gia'
+    # garantito il valore; `cambio_misura` e' il metro delle
     # promesse. Sono lo stesso numero quando servono entrambe (la
-    # funzione ha una cache): a cambiare e' cosa si racconta al database.
+    # funzione ha una cache). ATTENZIONE: quello che finisce in
+    # COLONNA e' il cambio del GIORNO e si decide piu' in basso,
+    # subito prima dell'INSERT — vedi li'.
     cambio_ordine = 0.0
     cambio_misura = 0.0
     if (serve_cambio_duro
@@ -12800,6 +12815,19 @@ async def _compra_set(user: dict, d: dict) -> dict:
                                      f"stato soffiato mentre componevi il "
                                      f"set: toglilo e riprova")
     adesso = int(time.time())
+    # IL CAMBIO DEL GIORNO SI CONGELA QUI (ago 2026), ed e' la stessa
+    # riga del mono: quanto valeva in euro questo affare e' un FATTO
+    # dell'affare, come il prezzo. La variabile si ALLARGA — da «il
+    # cambio con cui ho convertito» a «il cambio di adesso» — perche'
+    # quando la conversione c'e' stata i due numeri sono lo stesso, e
+    # la colonna vuole il secondo. VA DOPO l'ultima riga di conto
+    # (_sped_pacco), o il conto userebbe un cambio dove il 503 non ne
+    # ha garantito nessuno; c'e' la prova che l'ordine si rispetti.
+    # DALLA CACHE E MAI DALLA RETE: `cambio_noto_ora` non ha await —
+    # il patto «niente await fra il ricontrollo e l'INSERT» resta
+    # intatto — e un carrello tutto-sats non deve diventare
+    # dipendente da CoinGecko per un dato che serve a raccontarlo.
+    cambio_ordine = cambio_misura or cambio_noto_ora()
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
@@ -13780,9 +13808,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # un annuncio che di suo non ne avrebbe bisogno — ma SOLO se la
     # soglia e' dichiarata in EURO: in sats la misura e' l'articolo
     # stesso, e questo giro di rete non si fa piu' (ago 2026). In una
-    # variabile SUA e non in cambio_ordine: quella colonna dichiara
-    # «0 = nessuna conversione», e qui non si converte niente — ci si
-    # limita a misurare. NIENTE 503: se il cambio non risponde la
+    # variabile SUA e non in cambio_ordine: quello e' il metro della
+    # CONVERSIONE e resta zero finche' non si converte davvero — qui
+    # ci si limita a misurare. NIENTE 503: se il cambio non risponde la
     # promessa non scatta e l'ordine parte a prezzo pieno, che far
     # fallire un acquisto perche' non si riesce a regalare la
     # spedizione sarebbe curare un male causandone uno peggiore.
@@ -13885,6 +13913,24 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         con.close()
         raise HTTPException(409, "Qualcun altro ti ha preceduto su questo "
                                  "annuncio: riprova tra qualche minuto")
+    # IL CAMBIO DEL GIORNO SI CONGELA QUI (ago 2026): quanto valeva in
+    # euro questo affare e' un FATTO dell'affare, come il prezzo, e va
+    # fissato adesso — domani il cambio sara' un altro e la ricevuta
+    # racconterebbe il valore di domani. Fino a ieri la colonna si
+    # riempiva SOLO dove si era convertito qualcosa, quindi di un
+    # ordine tutto-sats non restava scritto niente.
+    # LA VARIABILE SI ALLARGA e non se ne aggiunge una seconda: quando
+    # la conversione c'e' stata i due numeri sono lo stesso (stessa
+    # cache), e la colonna vuole «il cambio di quando l'ordine e'
+    # nato», che il nome dice gia'. VA DOPO l'ultima riga di conto
+    # (_sped_pacco), o il conto vedrebbe un cambio dove nessun 503 ne
+    # ha garantito il valore: c'e' la prova che l'ordine si rispetti.
+    # DALLA CACHE E MAI DALLA RETE: `cambio_noto_ora` non ha await —
+    # il patto «niente await fra il ricontrollo e l'INSERT» resta
+    # intatto — e un ordine tutto-sats non deve diventare dipendente
+    # da CoinGecko per un dato che serve solo a raccontarlo. Muto = 0,
+    # cioe' «non lo sappiamo», mai un numero inventato.
+    cambio_ordine = cambio_misura or cambio_noto_ora()
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"

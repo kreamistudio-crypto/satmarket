@@ -59,6 +59,19 @@ def pezzo(nome, fine="\n\n\n"):
     return src[i:src.index(fine, i)]
 
 
+def codice(testo):
+    """Le sole righe di CODICE: via i commenti. Serve alle sentinelle
+    che cercano una parola-spia (`await `, `INSERT`...) dentro una
+    fetta di sorgente — in un progetto che commenta molto, quella
+    parola finisce prima o poi in una riga di prosa che la spiega, e
+    la sentinella diventa rossa per il motivo sbagliato. Peggio: chi
+    la vede rossa impara a riscrivere la frase invece di guardare il
+    codice. Le stringhe non si toccano (qui non servono, e togliere
+    un `#` da dentro una stringa sarebbe un altro genere di bugia)."""
+    return "\n".join(r for r in testo.split("\n")
+                     if not r.strip().startswith("#"))
+
+
 _SORGENTE = open("server.py", encoding="utf-8").read()
 
 
@@ -5997,23 +6010,78 @@ def prove_sped_gratis():
     prova("_compra_set: il 503 scatta solo sul bisogno DURO", True,
           "if serve_cambio_duro and cambio_misura <= 0:" in corpo_set
           or "if serve_cambio_duro:" in corpo_set)
-    # `cambio_ordine` FINISCE IN COLONNA e dichiara «0 = nessuna
-    # conversione»: la misura della promessa vive in una variabile SUA,
-    # o quella riga del database comincerebbe a dire un'altra cosa.
-    # In compra() il cambio si scrive in `cambio_ordine` SOLO sui due
-    # rami che convertono davvero (listino EUR, tariffa ancorata); il
-    # terzo giro — quello che serve alla sola promessa — finisce in
-    # `cambio_misura`. Se un domani diventassero tre, la colonna
-    # comincerebbe a dire «ho convertito» su ordini tutti-sats.
-    prova("compra: cambio_ordine si scrive solo dove si converte", 2,
+    # `cambio_ordine` HA DUE MESTIERI, in quest'ordine (ago 2026):
+    # prima e' il metro della CONVERSIONE — e le pure del conto lo
+    # guardano SOLO dove un 503 ne ha gia' garantito il valore, quindi
+    # deve restare zero dove non si converte niente — e poi, subito
+    # prima dell'INSERT, si allarga al cambio del GIORNO, che e' quel
+    # che finisce in colonna. La misura delle promesse resta in una
+    # variabile SUA: se quel giro di rete in piu' finisse dentro
+    # `cambio_ordine`, a cambiare non sarebbe un racconto ma il CONTO.
+    prova("compra: la conversione viene dai due rami veri", 2,
           corpo_mono.count("cambio_ordine = await cambio_btc_eur()"))
     prova("...e la misura della promessa ha il suo giro", 1,
           corpo_mono.count("cambio_misura = await cambio_btc_eur()"))
-    prova("_compra_set: idem, un giro solo e la colonna dietro guardia",
+    prova("_compra_set: idem, un giro solo e la conversione dietro guardia",
           (1, 1), (corpo_set.count("cambio_misura = await cambio_btc_eur()"),
-                   corpo_set.count("cambio_ordine = cambio_misura")))
+                   corpo_set.count("cambio_ordine = cambio_misura")
+                   - corpo_set.count("cambio_ordine = cambio_misura or ")))
     prova("_compra_set: cambio_ordine non si scrive mai dalla rete", 0,
           corpo_set.count("cambio_ordine = await"))
+
+    # IL CAMBIO DEL GIORNO SI SCRIVE SEMPRE, e in colonna ci va QUELLO
+    # (ago 2026). Senza, di un ordine tutto-sats non resta scritto
+    # quanto valeva, e l'unico modo di raccontarlo dopo sarebbe il
+    # cambio di OGGI: un numero che cambia ogni giorno su un fatto che
+    # non cambia piu'.
+    # (la fetta del set e' `corpo_cset`, quella STRETTA: `corpo_set`
+    # arriva fino al preventivo e si porta dentro il suo _sped_pacco e
+    # il suo giro di rete — con quella, due di queste righe restavano
+    # verdi guardando codice di un'altra funzione)
+    RIGA_GIORNO = "cambio_ordine = cambio_misura or cambio_noto_ora()"
+    for chi, c2 in (("compra", corpo_mono), ("_compra_set", corpo_cset)):
+        pos = c2.find(RIGA_GIORNO)
+        prova(f"{chi}: il cambio del giorno si scrive sempre", 1,
+              c2.count(RIGA_GIORNO))
+        # ...e il METRO DELLA CONVERSIONE nasce a zero: scritto con un
+        # cambio gia' dentro, il conto ne avrebbe uno anche dove
+        # nessun 503 ne ha garantito il valore. Oggi non cambierebbe
+        # una cifra (le pure lo guardano solo nei rami che il 503
+        # copre), ma e' la riga che tiene vera quella frase.
+        prova(f"{chi}: ...e il metro della conversione nasce a zero", 1,
+              c2.count("cambio_ordine = 0.0"))
+        # DALLA CACHE E MAI DALLA RETE: `cambio_noto_ora` non ha await,
+        # o salterebbe il patto «niente await fra il ricontrollo e
+        # l'INSERT» — e un ordine tutto-sats si legherebbe a CoinGecko
+        # per un dato che serve solo a raccontarlo. (Riga assente = si
+        # guarda tutto il corpo, cioe' rossa: mai un verde per finta.)
+        prova(f"{chi}: ...e viene dalla cache, mai dalla rete", False,
+              "await cambio_btc_eur()" in (c2[pos:] if pos >= 0 else c2))
+        # E STA DOPO L'ULTIMA RIGA DI CONTO: spostata piu' su, il conto
+        # vedrebbe un cambio dove nessun 503 ne ha garantito il valore
+        # — cioe' una tariffa ancorata all'euro convertita con un
+        # numero che potrebbe non esserci.
+        prova(f"{chi}: ...dopo l'ultima riga di conto", True,
+              pos > c2.rfind("_sped_pacco("))
+        # ...e prima dell'INSERT, o la colonna prenderebbe lo zero
+        prova(f"{chi}: ...e prima dell'INSERT", True,
+              0 <= pos < c2.find("INSERT INTO ordini"))
+
+    # TUTTE E TRE LE STRADE che creano un ordine scrivono il cambio
+    # (la terza e' crea_ordine_pagato, l'asta gia' aggiudicata: il
+    # cambio glielo passa chiudi_aste, una volta per giro). Chi ne
+    # aprisse una quarta senza quella colonna lascerebbe un buco che
+    # si vede solo mesi dopo, guardando un ordine che non sa dire
+    # quanto valeva.
+    teste = [m.start() for m in re.finditer(r"INSERT INTO ordini", _SORGENTE)]
+    prova("le strade che creano un ordine sono tre", 3, len(teste))
+    # si guarda l'ELENCO DELLE COLONNE, non «i primi N caratteri»: con
+    # la finestra a caratteri togliere la colonna lasciava la riga
+    # verde, perche' `cambio_ordine` ricompare poco sotto nella tupla
+    # dei valori — l'ha detto la mutazione, non la rilettura.
+    prova("...e tutte e tre scrivono il cambio del giorno", 3,
+          sum("cambio_ordine" in _SORGENTE[i:_SORGENTE.index("VALUES", i)]
+              for i in teste))
 
     # OGNI TARIFFA ANCORABILE ALL'EURO DEV'ESSERE NOMINATA NEI DUE
     # BLOCCHI DEL CAMBIO, e questa e' la prova che sostituisce un ramo
@@ -6252,7 +6320,7 @@ def prove_pagina_acquisto():
         i = src.index("crea_invoice_escrow(", src.index(f"def {chi}("))
         j = src.index("INSERT INTO ordini", i)
         prova(f"{chi}: zero await tra invoice e INSERT", False,
-              "await " in src[i:j])
+              "await " in codice(src[i:j]))
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
     #    imperfezione dichiarata): ne' il costo ne' il testo.
@@ -6808,7 +6876,7 @@ def prove_forma_sconto_pacco():
     i = corpo_set.index("crea_invoice_escrow(")
     j = corpo_set.index("INSERT INTO ordini", i)
     prova("_compra_set: zero await tra invoice e INSERT", False,
-          "await " in corpo_set[i:j])
+          "await " in codice(corpo_set[i:j]))
     prova("_compra_set: il totale non si riscrive li' in mezzo", 0,
           corpo_set[i:j].count("totale ="))
     prova("_compra_set: la invoice si conia sul TOTALE", True,
@@ -7445,6 +7513,63 @@ def prove_cambio():
     prova("il cambio assente non diventa un numero inventato", True,
           "if (v <= 0) return;"
           in pezzo_js(mini, "function impostaCambio(", "\n}\n"))
+
+
+def prove_recupero_cambi():
+    """Lo strumento che recupera il cambio del giorno degli ordini di
+    prima (ago 2026). Gira A MANO sul VPS, su `ordini`, cioe' la
+    tabella dei soldi: qui si sorveglia il PERIMETRO — cosa tocca e
+    cosa no — che e' l'unica cosa che una prova puo' dire di uno
+    script che parla con l'esterno."""
+    src = open("recupera_cambi_ordini.py", encoding="utf-8").read()
+    corpo = src.split('"""', 2)[-1]
+
+    # SCRIVE UNA COLONNA SOLA, e non lo si verifica con un elenco di
+    # nomi: si estraggono TUTTE le scritture del corpo e si guarda
+    # dove vanno a finire. Cosi' un `UPDATE ordini SET stato=...`
+    # infilato qui dentro fra sei mesi non ha bisogno di essere
+    # previsto per essere preso (la lezione della prova regina del
+    # ritiro offerta).
+    scritture = re.findall(r"UPDATE\s+(\w+)\s+SET\s+(\w+)", corpo)
+    prova("il recupero scrive in un posto solo", [("ordini", "cambio_ordine")],
+          scritture)
+    for parola in ("INSERT", "DELETE", "DROP"):
+        prova(f"il recupero non {parola.lower()}", False, parola in corpo)
+
+    # ...e solo dove il cambio non c'e': e' cio' che lo rende
+    # ripetibile e interrompibile, e che gli impedisce di riscrivere
+    # un cambio VERO (quello di un ordine in euro) con lo snapshot
+    # del giorno, che e' meno preciso.
+    prova("...e solo dove il cambio manca ancora", True,
+          "WHERE cambio_ordine = 0" in corpo)
+
+    # L'ANTEPRIMA NON SPENDE CHIAMATE: e' la promessa scritta nella
+    # docstring, ed e' verificabile per POSIZIONE — l'unica chiamata a
+    # CoinGecko sta dopo l'uscita anticipata di `if not scrivi`.
+    # (si cerca la CHIAMATA e non il nome: la definizione della
+    # funzione contiene la stessa stringa, e con quella la prova
+    # guardava la riga sbagliata — e non poteva che essere rossa)
+    chiamata = corpo.find("= cambio_del_giorno(")
+    uscita = corpo.find("if not scrivi:")
+    prova("la chiamata a CoinGecko e' una sola",
+          1, corpo.count("= cambio_del_giorno("))
+    prova("...e sta dopo l'uscita dell'anteprima", True,
+          0 < uscita < chiamata)
+
+    # LA CINTURA sulla cifra: una risposta malformata non entra nella
+    # tabella dei soldi. Zero compreso — `if not eur` sopra — ma qui
+    # si guarda la scala.
+    prova("una cifra fuori scala non si scrive", True,
+          "MIN_PLAUSIBILE <= eur <= MAX_PLAUSIBILE" in corpo)
+
+    # NON IMPORTA server.py, la lezione di ricategorizza: l'import
+    # farebbe partire init_db e le migrazioni, magari su un database
+    # diverso da quello passato a mano.
+    prova("il recupero non importa il server", False, "import server" in corpo)
+    # il config si chiede DENTRO main(), o in CI (dove config.py non
+    # c'e' per progetto) il modulo non si potrebbe nemmeno leggere
+    prova("...e il config non lo chiede all'avvio", True,
+          "    from config import DB" in corpo)
 
 
 # ====================================================================
@@ -11344,6 +11469,7 @@ def main():
               prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_cambio,
+              prove_recupero_cambi,
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,
