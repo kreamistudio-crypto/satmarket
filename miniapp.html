@@ -1982,6 +1982,16 @@
     display:flex;gap:10px;background:var(--trust-soft);border-radius:var(--radius);
     padding:12px 14px;font-size:13px;color:var(--trust);font-weight:600;margin-bottom:16px;
   }
+  /* La riga del punto di ritiro nell'ordine (ago 2026, dal campo): la
+     forma della trust-note ma NEUTRA — il verde a filo del riquadro
+     verde sembrava un suo pezzo staccato. Non arancio (e' il prezzo)
+     ne' ambra (e' «serve la tua attenzione»): questa e' informazione
+     di servizio, e la superficie neutra di casa e' chip-bg+ink, che
+     regge nei due temi. L'icona e' 📍 — il segno dei LUOGHI, gia' in
+     card — perche' il 📦 e' del pacco/spedizione e sta gia' sul
+     bottone sotto. STA DOPO .trust-note: a pari specificita' vince
+     l'ultima, e prima verrebbe ricoperta dal verde. */
+  .trust-note.nota-punto{background:var(--chip-bg);color:var(--ink)}
   /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
@@ -2339,6 +2349,20 @@
   }
   .order .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .order b{font-size:14px}
+  /* La riga di «I tuoi annunci» (ago 2026, dal campo: il titolo si
+     spezzava in VERTICALE, una lettera per riga). Due cause insieme:
+     le pillole non si stringono mai e a 320px al titolo restavano
+     ~20px, e l'ellipsis senza white-space:nowrap non tronca — manda a
+     capo. La cura e' strutturale: la riga puo' ANDARE A CAPO, il
+     titolo pretende un minimo leggibile (180px) e quando titolo e
+     pillole non ci stanno insieme le pillole scendono su una riga
+     loro, a destra. Il min-width vale per ogni riga alla stessa
+     larghezza, quindi le card restano tutte della stessa forma —
+     mai una wrappata e una no secondo la lunghezza del titolo. */
+  .mio-riga{flex-wrap:wrap}
+  .mio-riga .mio-tit{display:flex;align-items:center;gap:8px;flex:1;min-width:180px}
+  .mio-riga .mio-tit>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mio-riga .mio-azioni{white-space:nowrap;margin-left:auto}
   /* Il quadratino con l'emoji dell'oggetto, a sinistra della riga */
   .order-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
   .order-ic{width:38px;height:38px;border-radius:12px;background:var(--chip-bg);
@@ -3430,6 +3454,12 @@ document.getElementById('cartello')?.remove();</script>
            mettersi in vetrina: il pattern degli hint contestuali. -->
       <div id="sellContattoHint" style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--sats-text);font-weight:700;line-height:1.45">🔕 Nessuno può scriverti: aggiungi uno <b>username</b> su Telegram (Impostazioni&nbsp;→&nbsp;Nome utente) per farti contattare da chi compra — o collega una npub nel Profilo.</div>
       <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
+      <!-- L'annulla della modifica sta SOTTO il salva (ago 2026, dal
+           campo: era solo un link nel banner in cima, cioe' dalla
+           parte opposta del gesto che chiude). Stile dei secondari
+           testuali di casa, il gemello di «Annulla la modifica»
+           degli avvisi di ricerca. -->
+      <button class="btn link" id="sellAnnulla" style="display:none" onclick="annullaModifica()">Annulla la modifica</button>
       <div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
@@ -5819,6 +5849,43 @@ function icoCategoria(c){
    biglietto con l'alone, Animali senza pareggio — e sembrava un render
    diverso dalla Mini App. Da allora la rotta risponde no-cache e
    comanda la revalidazione ETag: questo numero NON va piu' toccato. */
+/* LO SFARFALLIO DELLE ICONE, e la sua cura (ago 2026, visto da
+   Andrea): aprendo Sfoglia si vedevano per un attimo le EMOJI — le
+   icone vecchie, che qui fanno da ripiego — e poi arrivavano le
+   illustrazioni. La causa non e' un ritardo del render: la griglia si
+   disegna alla PRIMA entrata, ogni <img> parte da zero, e la rotta
+   risponde no-cache — quindi anche a cache piena il browser DEVE
+   rivalidare (un giro di rete per il 304) prima che l'onload accenda
+   `data-ok` e spenga l'emoji. Un giro di rete di emoji, a ogni
+   sessione.
+   La cura e' in due meta': si SCALDANO le 27 illustrazioni a riposo,
+   dopo che la vetrina ha gia' la sua prima pagina (dentro la stessa
+   sessione il browser riusa la risorsa dalla memory cache senza
+   rivalidare: e' il motivo per cui il cache-busting vuole URL
+   diversi, qui gioca a favore — l'URL dev'essere IDENTICO byte per
+   byte, da cui l'helper unico urlIllustrazione); e il render COCE
+   `data-ok` nell'HTML quando la figura scaldata e' gia' arrivata,
+   cosi' l'emoji non esiste nemmeno per un fotogramma. Se l'utente
+   apre Sfoglia prima che il calore arrivi (o su rete morta), vale il
+   giro di ieri: emoji finche' la figura non c'e' — degradazione, non
+   regressione. ~805 KB una volta per sessione, l'ordine di grandezza
+   della prima pagina di vetrina; su file:// (la DEMO) non si scalda
+   niente, la' le figure non esistono comunque. */
+const urlIllustrazione = c => `/assets/categorie/${slugCat(c)}.webp?b=2`;
+const sfogliaCalde = {};
+function scaldaSfoglia(){
+  if (!location.protocol.startsWith('http')) return;
+  CATS.slice(1).forEach(c => {
+    const im = new Image();
+    im.src = urlIllustrazione(c);
+    sfogliaCalde[c] = im;
+  });
+}
+/* arrivata DAVVERO: complete e' vero anche su un errore, naturalWidth
+   no — un 404 scaldato non deve spegnere il ripiego */
+const caldaOk = c => (sfogliaCalde[c]?.complete && sfogliaCalde[c].naturalWidth > 0)
+  ? ' data-ok="1"' : '';
+
 function renderSfoglia(){
   /* il nome va in data-cat e MAI dentro la stringa JS dell'onclick:
      e' la lezione gia' pagata sul picker con «Valle d'Aosta» */
@@ -5831,8 +5898,8 @@ function renderSfoglia(){
        href="/categoria/${slugCat(c)}"
        onclick="apriCategoriaDaTocco(event, this.dataset.cat)">
       <span class="cat-nome" lang="it">${esc(c)}</span>
-      <span class="cat-fig"><img src="/assets/categorie/${slugCat(c)}.webp?b=2"
-           alt="" loading="lazy" decoding="async"
+      <span class="cat-fig"><img src="${urlIllustrazione(c)}"
+           alt="" loading="lazy" decoding="async"${caldaOk(c)}
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span>
     </a>`).join('');
@@ -11663,7 +11730,7 @@ function openOrder(id){
             bivio davanti a chi aspetta un pacco. La traccia della
             correzione del moderatore ha seguito il codice: sta nel
             passo, dove la vedono ENTRAMBE le parti come prima. */''}
-      ${(['shipped','delivered'].includes(s) && o.puntoRitiro) ? `<div class="trust-note">📦 <span>${puntoBanner(o)}</span></div>`:''}
+      ${(['shipped','delivered'].includes(s) && o.puntoRitiro) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span></div>`:''}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${/* IL CASO INCAGLIATO (ago 2026): quando lo sblocco o il
@@ -11750,7 +11817,13 @@ function openOrder(id){
       ${pannelloBustaRitiro(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
-      ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — mi prendo ${TEMPI.conferma}h per controllarlo`:`📬 È arrivato — mi prendo ${TEMPI.conferma}h per controllarlo`}</button>`:''}
+      ${/* Il bottone dice la RICEZIONE e basta (ago 2026, dal campo:
+            «mi prendo 72h per controllarlo» lo mandava a capo a
+            320px). Il tempo e' un dettaglio e vive nel confirm, che
+            gia' dice «prenditi il tempo di controllare»; il «lo
+            controllo» resta perche' e' cio' che lo distingue dal
+            «libera i sats» qui sotto. */''}
+      ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — lo controllo`:`📬 È arrivato — lo controllo`}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
@@ -14708,11 +14781,11 @@ async function caricaAltriMiei(){
 const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
   esa = l.stato==='venduto', spento = rev || esa, apre = !rev; return `
     <div class="order">
-      <div class="row">
-        <b ${apre?'onclick="openDetail('+l.id+')" style="cursor:pointer;':'style="'}display:flex;align-items:center;gap:8px;min-width:0">${l.photos&&l.photos[0]
+      <div class="row mio-riga">
+        <b class="mio-tit"${apre?` onclick="openDetail(${l.id})" style="cursor:pointer"`:''}>${l.photos&&l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento?';filter:grayscale(1);opacity:.6':''}">`
-          : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span style="overflow:hidden;text-overflow:ellipsis${spento?';color:var(--muted)':''}">${esc(l.title)}</span></b>
-        <span style="white-space:nowrap">
+          : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span></b>
+        <span class="mio-azioni">
           ${rev?'<span class="badge revisione" title="Un moderatore lo sta controllando">⏳ In revisione</span>'
             /* Qui la parola resta «Venduto» ed e' voluto: questo e' il
                libro mastro del venditore, e la vendita e' successa
@@ -16133,6 +16206,13 @@ function editListing(id){
   aggiornaSpedCampo();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
   renderFotoPreview(); aggiornaFormVendi();
+  /* Entrare in modifica e' una DISCESA, non un cambio di tab: Vendi e'
+     una radice e senza la bandierina l'entry SOSTITUIREBBE quella di
+     partenza — lo swipe indietro atterrava in Esplora invece che su
+     «I tuoi annunci» (o sul dettaglio, per l'altra porta). Stessa
+     eccezione della piastrella di Sfoglia, alzata subito prima del
+     go() che la consuma. */
+  navSpingi = true;
   go('vendi'); window.scrollTo(0, 0);
 }
 
@@ -16164,17 +16244,19 @@ function aggiornaFormVendi(){
   const drop = document.querySelector('#view-vendi .photo-drop');
   if (editandoId){
     b.style.display = 'block';
-    b.innerHTML = (editandoNostr
+    /* l'annulla non vive piu' qui: e' il bottone in fondo, sotto il
+       salva — il banner dice soltanto cosa si sta facendo */
+    b.innerHTML = editandoNostr
       ? `🟣 Stai modificando «${esc(editandoTitolo)}», importato da Nostr: `
         + `al salvataggio la modifica si <b>firma con la tua chiave</b> e `
-        + `aggiorna anche i relay. `
-      : `✏️ Stai modificando «${esc(editandoTitolo)}» — `)
-      + `<a href="#" onclick="annullaModifica();return false">annulla</a>`;
+        + `aggiorna anche i relay.`
+      : `✏️ Stai modificando «${esc(editandoTitolo)}»`;
     btn.textContent = editandoNostr ? '🟣 Firma e salva' : '✏️ Salva le modifiche';
   } else {
     b.style.display = 'none';
     btn.textContent = '⚡ Pubblica annuncio';
   }
+  if (el('sellAnnulla')) el('sellAnnulla').style.display = editandoId ? '' : 'none';
   /* Le foto degli importati vivono sui relay: qui non si cambiano.
      E la consegna nemmeno: la modifica firmata rispecchia l'evento
      NIP-99, che non la porta — il form non deve fingere. */
@@ -18007,6 +18089,10 @@ function tastieraSegue(){
 tastieraSegue();
 navMotore();   /* il gesto indietro, prima che parta qualunque vista */
 avvia();
+/* Il calore delle illustrazioni di Sfoglia (vedi scaldaSfoglia): a
+   riposo, DOPO che la vetrina ha avuto la rete per se'. Una volta per
+   sessione — setCollaudo rilancia avvia(), non questo. */
+setTimeout(scaldaSfoglia, 2500);
 
 /* PWA: il service worker si registra SOLO fuori da Telegram — dentro
    la Mini App nulla deve cambiare, nemmeno di un byte (vincolo di
