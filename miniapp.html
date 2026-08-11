@@ -2217,6 +2217,24 @@
     border:2px solid var(--danger);box-shadow:0 3px 0 var(--danger);
     margin-top:10px;margin-bottom:10px}
   .btn.allarme:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  /* LO SPAZIO FRA DUE BOTTONI E' DELLA COPPIA, NON DEL BOTTONE (ago
+     2026, dal campo: nel dettaglio dell'ordine «È arrivato» e «Ho
+     ricevuto» si toccavano — misurati a 0px di distanza). La causa e'
+     strutturale e non un margine dimenticato: `.btn` di base NON ha
+     margine, ce l'hanno solo .ghost e .allarme, quindi due bottoni
+     adiacenti stanno staccati solo se il PRIMO e' uno di quei due. Ha
+     gia' morso i ponti (che si toccavano fra loro) e mordeva chiunque
+     ne aggiungesse un altro. Detto fra FRATELLI il buco si chiude per
+     sempre: chi mette il prossimo bottone non deve ricordarsi niente.
+     Scoped al dettaglio dell'ordine, che e' dove i bottoni si
+     impilano davvero. */
+  #orderContent .btn + .btn{margin-top:10px}
+  /* L'uscita di sicurezza resta STACCATA: adesso e' l'ultima, dopo i
+     ponti, e senza questo respiro in piu' sarebbe il terzo blocco
+     colorato a filo degli altri due — il semaforo gia' evitato una
+     volta. Sta DOPO la regola dei fratelli: pari specificita', vince
+     l'ultima. */
+  #orderContent .btn.allarme{margin-top:18px}
   /* Il ghost vestito di cartone. NON LO PORTA PIU' NESSUNO dall'ago
      2026 (decisione di Andrea): l'aveva «📦 Aggiungi al pacco», che
      e' tornato al ghost di casa come ogni altro secondario — un
@@ -3386,9 +3404,16 @@ document.getElementById('cartello')?.remove();</script>
         <div class="photo-drop" onclick="el('sellPhotos').click()"
              ondragenter="fotoSopra(event,true)" ondragover="fotoSopra(event,true)"
              ondragleave="fotoSopra(event,false)" ondrop="fotoLasciate(event)">
-          <span class="big">📸</span>Aggiungi foto (fino a 5)
+          <span class="big">📸</span><span id="sellFotoEtichetta">Aggiungi foto (fino a 5)</span>
           <span class="trascina">o trascinale qui</span>
         </div>
+        <!-- LA REGOLA DELLE FOTO IN MODIFICA (ago 2026): o tutte o
+             nessuna — se ne carichi di nuove sostituiscono in blocco
+             quelle attuali, e se non ne tocchi nessuna restano quelle.
+             E' come ha sempre funzionato il server, e non era scritta
+             da nessuna parte: il riquadro diceva «Aggiungi», cioe' la
+             cosa che NON fa. La riga la accende aggiornaFormVendi. -->
+        <div id="sellFotoNota" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Le foto che carichi <b>sostituiscono tutte</b> quelle attuali. Non toccarle e restano com'erano.</div>
         <div id="photoPreview"></div>
       </div>
       <div class="field"><label>Titolo</label>
@@ -3500,7 +3525,12 @@ document.getElementById('cartello')?.remove();</script>
            stessa altezza del salva), non un link testuale —
            decisione di Andrea al secondo giro. -->
       <button class="btn ghost" id="sellAnnulla" style="display:none" onclick="annullaModificaChiedendo()">Annulla la modifica</button>
-      <div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      <!-- La coda del divieto parlava solo a chi PUBBLICA («gli
+           annunci vengono moderati»): in modifica la frase da dire e'
+           che la moderazione ripassa anche sulle modifiche — la lista
+           delle cose vietate e' la stessa. La scrive
+           aggiornaFormVendi. -->
+      <div id="sellDivieto" style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
         protetti. Gli annunci vengono moderati.</div>
@@ -11958,16 +11988,21 @@ function openOrder(id){
             gia' dice «prenditi il tempo di controllare»; il «lo
             controllo» resta perche' e' cio' che lo distingue dal
             «libera i sats» qui sotto. */''}
-      ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" style="margin-top:0" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — lo controllo`:`📬 È arrivato — lo controllo`}</button>`:''}
       ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" style="margin-top:0" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
       ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
+      ${/* L'ORDINE DEI BOTTONI del compratore (ago 2026, decisione di
+            Andrea): prima il gesto PRINCIPALE — libera i sats, che e'
+            l'unico pieno e si legge per primo —, poi il passo
+            intermedio, poi le strade per parlarsi, e in fondo
+            l'uscita di sicurezza staccata. Prima «È arrivato» stava
+            SOPRA a «Ho ricevuto» e i ponti dopo la disputa. */''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
+      ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — lo controllo`:`📬 È arrivato — lo controllo`}</button>`:''}
       ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${notaFermo(o)}
       ${bottoneSollecito(o)}
-      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
       ${o.role==='admin'
         ? pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")
@@ -11975,6 +12010,7 @@ function openOrder(id){
         : o.role==='buyer'
           ? pontiOrdine(o.usernameVenditore, o.nostrVenditore, 'al venditore', 'Il venditore')
           : pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")}
+      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
     </div>`;
   go('ordine');
   /* le cifre le ha gia' scritte il giudice qui sopra; questo giro
@@ -16415,6 +16451,14 @@ function aggiornaFormVendi(){
        dicono in una riga: la modifica e' subito in vetrina, ma
        ripassa dalla moderazione come un annuncio nuovo. */
     if (el('sellTitolo')) el('sellTitolo').textContent = 'Modifica annuncio';
+    if (el('sellFotoEtichetta'))
+      el('sellFotoEtichetta').textContent = 'Sostituisci le foto (fino a 5)';
+    if (el('sellFotoNota')) el('sellFotoNota').style.display = '';
+    if (el('sellDivieto')) el('sellDivieto').textContent =
+      'Anche le modifiche vengono moderate: vale la stessa lista di cose '
+      + 'che non si possono vendere — armi, droghe, servizi sessuali, '
+      + 'refurtiva, contraffazioni, documenti, dati personali, farmaci, '
+      + 'animali protetti.';
     if (el('sellSottotitolo')) el('sellSottotitolo').textContent = editandoNostr
       ? 'Le modifiche vanno anche sui relay Nostr, firmate con la tua chiave. Ripassano dalla moderazione come un annuncio nuovo.'
       : 'Salvi e l\'annuncio è aggiornato in vetrina. Ripassa dalla moderazione come uno nuovo: se qualcosa non convince resta in attesa di un moderatore.';
@@ -16430,6 +16474,13 @@ function aggiornaFormVendi(){
     b.style.display = 'none';
     btn.textContent = '⚡ Pubblica annuncio';
     if (el('sellTitolo')) el('sellTitolo').textContent = 'Metti in vendita';
+    if (el('sellFotoEtichetta'))
+      el('sellFotoEtichetta').textContent = 'Aggiungi foto (fino a 5)';
+    if (el('sellFotoNota')) el('sellFotoNota').style.display = 'none';
+    if (el('sellDivieto')) el('sellDivieto').textContent =
+      'È vietato vendere: armi, droghe, servizi sessuali, refurtiva, '
+      + 'contraffazioni, documenti, dati personali, farmaci, animali '
+      + 'protetti. Gli annunci vengono moderati.';
     if (el('sellSottotitolo')) el('sellSottotitolo').textContent =
       '3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.';
   }
