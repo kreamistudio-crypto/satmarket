@@ -372,11 +372,23 @@ POST_AUTOMATICI = True
 # Il canale Telegram di Barattolo: "@nomecanale" oppure l'id numerico
 # (-100...). Il bot deve esserne AMMINISTRATORE. Vuoto = niente post
 # sul canale (la nota Nostr vive comunque).
+# ATTENZIONE (ago 2026): questo e' solo il valore di PARTENZA. Il
+# canale si cambia dal bot con «/canale @nomecanale» (lo possono dare
+# i moderatori e i due username in ADMIN_BOT_USERNAME), e da quel
+# momento comanda la scelta salvata nel database — questa riga non la
+# tocca piu'. «/canale» senza argomenti dice qual e' quello in uso.
 TELEGRAM_CANALE_ID = ""
 # Anti-spam: quanti post SINGOLI al massimo in un'ora. Oltre (o per le
 # raffiche, es. un import CSV) esce un solo post aggregato
 # ("N nuovi annunci nel barattolo").
 POST_MAX_ORA = 6
+# UN POST PER VENDITORE OGNI N GIORNI: il canale e' una selezione, non
+# la vetrina — un negozio che pubblica venti cose in un pomeriggio non
+# deve prendersi venti post. Il post esce SUBITO (l'annuncio non
+# aspetta una settimana per farsi vedere) e da li' il venditore tace
+# per N giorni; se in quel momento ne ha pubblicati piu' d'uno, esce il
+# piu' recente. 0 = nessun freno.
+PROMO_GIORNI_VENDITORE = 7
 
 # --- Avviso "fase di test" (il cartello all'apertura) ----------------
 # Il cartello che accoglie chi apre l'app durante il rodaggio: si
