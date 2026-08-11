@@ -2668,7 +2668,18 @@ def prove_dettaglio_ordine():
              "Il venditore ha consegnato al corriere"),
             ("il contenuto digitale", "Hai consegnato il contenuto",
              "Il venditore ha consegnato il contenuto"),
-            ("la spedizione offerta", "'hai':'il venditore ha'", "")):
+            ("la spedizione offerta", "'hai':'il venditore ha'", ""),
+            # l'attesa della conferma: il gesto e' di chi compra, e
+            # questa riga la leggono tutti e due
+            ("l'attesa del fisico",
+             "I sats restano nel deposito finché non confermi",
+             "I sats restano nel deposito finché l\\'acquirente non conferma"),
+            ("la finestra del digitale",
+             "Restano ~${oreRestanti} ore per confermare o aprire disputa",
+             "L'acquirente ha ~${oreRestanti} ore per confermare o aprire disputa"),
+            ("il reso ancora da spedire",
+             "Rispedisci l\\'oggetto: al rientro ti rimborsiamo",
+             "L\\'acquirente sta rispedendo l\\'oggetto")):
         prova(f"{nome}: chi legge si sente dare del tu", True, mio in det)
         if suo:
             prova(f"...e l'altro lato non si rompe: resta «{suo[:28]}…»",
@@ -2691,6 +2702,16 @@ def prove_dettaglio_ordine():
           "d: 'Il pagamento è custodito dalla piattaforma'" in det)
     prova("e la dicono ENTRAMBI i rami del riquadro (disputa compresa)",
           2, det.count("passoDeposito,"))
+
+    # ---- 22-23: il reso gia' in viaggio non si fa rispedire ----
+    # I due stati del reso NON si possono dire con la stessa frase: a
+    # pacco gia' partito «Rispedisci» sarebbe una bugia a chi ha
+    # appena fatto quel che gli si chiedeva.
+    prova("la testa del reso distingue i due stati", True,
+          "d:s==='return_pending'" in det)
+    prova("...e a reso partito dice che e' in viaggio", True,
+          "Il reso è in viaggio: al rientro ti rimborsiamo" in det
+          and "L\\'acquirente ha rispedito l\\'oggetto" in det)
 
 
 def _notifica_admin_spia(avvisi):

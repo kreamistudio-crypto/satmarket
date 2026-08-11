@@ -11352,9 +11352,22 @@ function openOrder(id){
             :(o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')},
       {t:s==='delivered' ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
-       d:s==='delivered'?(digitale?`Restano ~${oreRestanti} ore per confermare o aprire disputa`
-                                  :'I sats restano nel deposito finché non confermi')
-                        :(o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
+       /* L'ATTESA E' DI CHI COMPRA (ago 2026): la finestra per
+          confermare o aprire disputa e' un gesto SUO, e questa riga
+          la leggono tutti e due — al venditore diceva «finché non
+          confermi» e «restano ~N ore per confermare», cioe' gli
+          attribuiva un gesto che non ha. La regola e' quella della
+          riga sotto: a chi compra si da' del tu, a tutti gli altri
+          (venditore e moderatore) la terza persona. */
+       d:s==='delivered'
+         ? (digitale
+             ? (o.role==='buyer'
+                 ? `Restano ~${oreRestanti} ore per confermare o aprire disputa`
+                 : `L'acquirente ha ~${oreRestanti} ore per confermare o aprire disputa`)
+             : (o.role==='buyer'
+                 ? 'I sats restano nel deposito finché non confermi'
+                 : 'I sats restano nel deposito finché l\'acquirente non conferma'))
+         : (o.role==='buyer'?'Hai verificato che è tutto ok':'L\'acquirente ha verificato che è tutto ok')},
       o.role==='seller'
         ? {t:'Hai incassato i tuoi sats', d:'Affare concluso: i sats sono nel tuo wallet'}
         : {t:'Sats sbloccati al venditore', d:'Affare concluso, feedback reciproco'},
@@ -11374,7 +11387,20 @@ function openOrder(id){
       d:o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
                           : 'Disputa decisa: i sats tornano all\'acquirente'}
     : ['return_pending','return_shipped'].includes(s)
-                                ? {ic:'↩️', b:'Reso in corso',      d:'Rimborso alla restituzione: i sats restano congelati'}
+      /* IL RESO E' UN GESTO, e finche' non e' partito e' di chi ha
+         comprato: la riga diceva «Rimborso alla restituzione: i sats
+         restano congelati» a tutti e due — vera, ma muta proprio a
+         chi deve fare qualcosa. I due stati NON si possono dire con
+         la stessa frase: a reso gia' in viaggio «Rispedisci» sarebbe
+         una bugia. Che i sats siano fermi lo dice il passo qui sopra,
+         due righe sotto («I sats sono congelati: nessuno può
+         toccarli»): non si perde, cambia posto. */
+                                ? {ic:'↩️', b:'Reso in corso',
+      d:s==='return_pending'
+        ? (o.role==='buyer' ? 'Rispedisci l\'oggetto: al rientro ti rimborsiamo'
+                            : 'L\'acquirente sta rispedendo l\'oggetto')
+        : (o.role==='buyer' ? 'Il reso è in viaggio: al rientro ti rimborsiamo'
+                            : 'L\'acquirente ha rispedito l\'oggetto')}
     : s==='dispute'             ? {ic:'⚖️', b:'Deposito congelato', d:'Disputa in corso: i sats restano fermi fino alla decisione'}
     : s==='annullato'           ? {ic:'✖️', b:'Ordine annullato',   d:'Nessun pagamento è stato trattenuto'}
     :                             {ic:'🔒', b:'Sats nel deposito di garanzia', d:'I sats sono al sicuro, nessuno può toccarli'};
