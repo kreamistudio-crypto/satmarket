@@ -7500,6 +7500,50 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Andrea: da quel bottone parte la fattura, e il nome lo dice —
   «Acquista» resta sui varchi che PORTANO alla pagina: barra, recinto
   e il riepilogo del pacco).
+  LO STEPPER NELLA PAGINA (12 ago 2026, chiesto da Andrea: l'invito
+  dice «ancora 1 pezzo → −10%» e il pezzo si deve poter aggiungere LÌ,
+  non tornando alla scheda). Il ± sta nella card articoli
+  (`stepperMini` con chiamate SUE, `acqPasso` — il modello del foglio
+  rifornimento, mai `setQta(±1)`), e le quattro dichiarazioni:
+  1) OGNI TOCCO RIFÀ IL CONTO SUL SERVER — quella pagina È il conto —
+  e l'anti-raffica NON è un debounce (scartato nel carrello: litiga
+  con chi sale in fretta) ma la RIASSEGNAZIONE di `acqDati`:
+  l'oggetto nuovo è il token, le risposte dei tocchi precedenti
+  muoiono sulla guardia `acqDati !== d0` che `caricaPreventivo` aveva
+  GIÀ — mai `acqDati.qta = n`, la mutazione in place farebbe vincere
+  l'ultima risposta ad ARRIVARE invece dell'ultima CHIESTA (c'è la
+  sentinella). Cinque tocchi = cinque preventivi (SELECT pure): costo
+  accettato, provato in raffica — vince l'ultimo.
+  2) FATTURA GIÀ GENERATA: il paySheet resta SENZA stepper e mostra le
+  cifre congelate; chi chiude il foglio, tocca ± e ripreme «Paga»
+  incontra la RIPRESA di sempre — quantità diversa = richiesta
+  diversa → lapide e fattura nuova, zero righe nuove su quel percorso.
+  3) IL TETTO È LO STOCK, il clamp della scheda, e al limite SILENZIO:
+  il bottone è `.off` e non si tocca, mai un toast.
+  4) I BADGE SEGUONO coi numeri del SERVER, e l'attesa SI DICHIARA:
+  `.acq-attesa` (opacity .55) su conto, badge e vie — le cifre che la
+  quantità muove, supplemento compreso — mentre lo stepper resta
+  vivo. IL VELO È RITARDATO di ~180ms, ed è la scelta guardata a
+  schermo (la riserva di Andrea era giusta): secco, lampeggerebbe a
+  OGNI tocco su rete viva; così sul caso normale non si vede mai, su
+  rete lenta compare una volta — 180ms dopo l'ULTIMO tocco della
+  salita, perché ogni tocco riarma il timer — e resta fermo finché il
+  conto vero non arriva. Mai numeri vecchi spacciati per freschi, mai
+  un lampeggio. Il timer muore in testa a `renderAcquisto`: il render
+  È la risposta.
+  IN PIÙ, trovato dal vivo e non dal piano: l'indietro RI-MOSTRA la
+  scheda senza ri-renderizzarla, e lo stepper di là restava al numero
+  vecchio — `setQta(0)` è il SINCRONIZZATORE (a delta zero riusa la
+  regia in-place della scheda — stepper del dettaglio e della barra,
+  badge spedizione, etichetta offerta — senza duplicarne i selettori),
+  e `qtaScelta` resta UN solo stato. E L'ERRORE SU UN ± NON BUTTA LA
+  PAGINA: il ramo distruttivo («← Torna») resta al solo primo carico;
+  a conto buono già in mano si RIPIEGA (`acqRipiega`) — toast onesto e
+  la quantità TORNA a quella dell'ultimo preventivo vero, mai numeri
+  nuovi su un conto vecchio. Un ± non azzera la via già scelta (si
+  conserva se ancora viva). Con l'ACCORDO lo stepper non nasce (la
+  quantità è pinnata, resta il «× N»), con stock 1 nemmeno; in DEMO
+  il ± ricalcola `preventivoDemo` sul posto, senza rete.
   IL GIUDICE DEL «≈» È UNO, `cifraCtrl` (ago 2026, bug visto dal
   telefono: il ≈ compariva su ENTRAMBE le valute — le condizioni
   sparse sono il modo in cui è nato). La regola: il ≈ sta SOLO sulla
@@ -11900,6 +11944,19 @@ mentre si scorre — misurato PRIMA di lasciarlo, com'era chiesto:
 137px a 375 (17%) e 158px a 320 (19%) collo stato più alto, sotto i
 178 (23%) del precedente scartato in «Altri oggetti». 5 sentinelle
 nuove (2843 verdi), screenshot chiaro/scuro in cima e a metà scroll.
+E LO STEPPER NELLA PAGINA PAGA (12 ago 2026, a chiudere la giornata):
+il ± accanto al titolo dell'articolo — l'invito dice «ancora 1 pezzo»
+e il pezzo si aggiunge lì. Ogni tocco rifà il preventivo; l'anti-race
+è la riassegnazione di `acqDati` sulla guardia che c'era già (mai un
+debounce), il velo d'attesa è RITARDATO di ~180ms (secco lampeggiava:
+la riserva di Andrea, guardata a schermo con 800ms di latenza
+artificiale), l'errore su un ± ripiega sull'ultimo conto buono invece
+di buttare la pagina, e `setQta(0)` sincronizza la scheda al ritorno
+(il difetto trovato dal vivo: l'indietro non ri-renderizza). 12
+sentinelle nuove (2855 verdi), la raffica da 5 tocchi provata dal
+vivo — vince l'ultima chiesta — e il limite dello stock in silenzio,
+come nella scheda. Vedi «LO STEPPER NELLA PAGINA» nella voce della
+pagina d'acquisto.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
