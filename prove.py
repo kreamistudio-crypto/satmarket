@@ -5761,9 +5761,11 @@ def prove_valuta_soglia():
           mini.count("unitaSoglia("))
     # ...e tutte le superfici della promessa passano da li': le due
     # frasi lunghe, le due etichette corte, i due inviti del carrello e
-    # i tre siti della pagina Paga — nove chiamate piu' la definizione
+    # i CINQUE siti della pagina Paga (i tre della spedizione piu' i
+    # due dell'invito dello sconto, 12 ago 2026) — undici chiamate
+    # piu' la definizione
     prova("...e tutte le superfici della promessa passano da cifraSoglia",
-          10, mini.count("cifraSoglia("))
+          12, mini.count("cifraSoglia("))
     # L'INVITO DEL CARRELLO non converte piu' a soglia in SATS: li' il
     # confronto e' sats contro sats, esatto, e la riga compare anche a
     # cambio muto. E' il guadagno della scelta, e vive proprio dove
@@ -12593,13 +12595,21 @@ def prove_promesse_badge():
     # UNA cosa cara sopra la soglia a valore pure. Le due etichette
     # parlano uguale, ed e' la verita' e non piu' una bugia: il
     # perimetro delle due promesse ora e' lo stesso.
-    _es = pezzo_js(mini, "function etichettaSconto(r){")
-    _esg = pezzo_js(mini, "function etichettaSpedGratis(r){")
+    # le fette si chiudono alla graffa della funzione: fino alla riga
+    # vuota inghiottirebbero i commenti-dottrina dei vicini, che
+    # nominano apposta le parole vietate (la lezione della prosa lunga)
+    _es = pezzo_js(mini, "function etichettaSconto(r){", fine="\n}")
+    _esg = pezzo_js(mini, "function etichettaSpedGratis(r){", fine="\n}")
     prova("lo sconto NON dice piu' «nel carrello»", 0,
           _es.count("nel carrello"))
     prova("...e nemmeno la spedizione", False, "nel carrello" in _esg)
-    prova("...e a valore dicono tutte e due «di articoli»", True,
-          "di articoli" in _es and "di articoli" in _esg)
+    # «DI ARTICOLI» E' USCITO DALLE ETICHETTE (12 ago 2026, decisione
+    # di Andrea): vivono solo in «Altri oggetti», che parla del
+    # NEGOZIO — li' l'equivoco col prezzo dell'oggetto non esiste e
+    # basta la cifra. La parola resta nelle PROSE e nella pagina Paga,
+    # dove distingue la merce dal totale con la spedizione dentro.
+    prova("...e nei badge del negozio basta la cifra", False,
+          "di articoli" in _es or "di articoli" in _esg)
 
     # ---- 3. LA PROSA LUNGA sopravvive solo dove non e' diventata
     # badge: testata negozio e hint del form Vendi (piu' la
@@ -12662,6 +12672,28 @@ def prove_promesse_badge():
           _ao.count("tuttoDigitale || inFerie(l)"))
     prova("...e nessuna fila vuota se il negozio non promette niente",
           True, "badge ? `<div class=\"pills altri-promo\">" in _ao)
+
+    # ---- 4bis. L'INVITO DELLO SCONTO NELLA PAGINA PAGA (12 ago 2026,
+    # chiesto da Andrea col mono che sconta): la stessa forma del
+    # carrello — la pillola «Ancora N → −X%» e il verde «nel conto» —
+    # ma coi numeri del SERVER (mancano_*), quindi senza la fascia
+    # stretta del cambio; e a cambio muto la promessa non si applica e
+    # la riga lo DICE invece di sparire.
+    _ra = pezzo_js(mini, "function renderAcquisto(){", "\n}")
+    _blocco_sc = _ra[_ra.index("L'INVITO DELLO SCONTO"):
+                     _ra.index("L'INVITO DELLA SPEDIZIONE GRATIS")]
+    prova("la pagina Paga invita allo sconto coi numeri del server",
+          True, "p.mancano_pezzi" in _blocco_sc
+          and "p.mancano_sats" in _blocco_sc
+          and "p.mancano_eur" in _blocco_sc)
+    prova("...col verde di conferma quando scatta", True,
+          'pill pill-trust">✅ Sconto' in _blocco_sc)
+    prova("...e a cambio muto lo dice, non sparisce", True,
+          "lo sconto non si applica" in _blocco_sc)
+    prova("...senza mai convertire in proprio", False,
+          "eurPerSat" in _blocco_sc or "artStima" in _blocco_sc)
+    prova("...e la cifra del quanto manca passa dal giudice unico",
+          True, "cifraSoglia(scManca, scVal)" in _blocco_sc)
 
     # ---- 5. IL CARRELLO: due promesse, due scatole. Con un
     # contenitore solo la prima che tace cancellerebbe la sorella
