@@ -7514,7 +7514,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in cache, per cui il server tiene il default silenzioso di sempre.
   Dall'alto: gli articoli (card singola o strip del set) · la
   CONSEGNA a vie-radio — 🤝 ritiro · 🏠 spedizione a casa ·
-  📦 spedizione a un punto di ritiro · 💾 codice online, SOLO le
+  🚚 spedizione a un punto di ritiro (il camioncino dall'ago 2026: il
+  punto È una spedizione, e la scatola qui diceva la taglia del
+  pacco; niente collisione con la casa, che ha la casetta) ·
+  💾 codice online, SOLO le
   offerte, ordine fisso di PRESENTAZIONE (il default lo dice
   `viaDefault`, vedi sotto) — dove la cifra a
   destra è il SOLO COSTO DI SPEDIZIONE (decisione di Andrea, ago
@@ -7522,8 +7525,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   spedizione» con dentro l'oggetto — il totale lo dice IL CONTO, che
   segue la via scelta: mai due totali in pagina; ritiro e codice
   online non spediscono e non portano cifra, lo 0 di casa/punto dice
-  «gratuita» in grassetto, il patto della spedizione gratuita) · il
-  campo del punto (sotto, il VARCO MAPPA — dal quarto giro c'è
+  «gratuita» in grassetto, il patto della spedizione gratuita).
+  E LE CIFRE COMPAIONO SOLO QUANDO DICONO QUALCOSA (ago 2026,
+  decisione di Andrea): casa e punto che costano UGUALE = cifre
+  MUTE, il costo lo dice già il conto sotto; diverse = restano,
+  perché sono l'informazione che fa scegliere. Il giudice è
+  `costiVieUguali`, e le sue regole sono la parte da non
+  ammorbidire: si confronta il costo FINALE (la promessa gratis che
+  azzera, o una tariffa dichiarata 0, riaccende le cifre da sola —
+  «gratuita» contro una cifra si mostra anche a tariffe di base
+  uguali) e SOLO nella stessa unità NATIVA — euro con euro
+  (`spedizione_eur` su tutt'e due), sats puri con sats puri (niente
+  `stima`): MAI attraverso una conversione, perché un'uguaglianza al
+  cambio di adesso è di un istante e la invoice riconverte (5000
+  sats e 2,75 € possono fare «≈ 5003» oggi e divergere domani — le
+  cifre restano, col loro ≈). Lo zero è zero in ogni valuta (due
+  gratis = mute), `fallback_casa` è un'IDENTITÀ e non un confronto
+  (stessa tariffa per costruzione: è il caso comune, ed è quello che
+  si voleva ripulire), e una via `cambio_assente` non si confronta —
+  la viva mostra la sua cifra, il verso in cui sbagliare è mostrare
+  · il campo del punto (DENTRO il riquadro della sua via, vedi il
+  sesto giro sotto; il VARCO MAPPA — dal quarto giro c'è
   SEMPRE: con la rete dichiarata la sua mappa, senza tutte e due più
   la riga onesta) · le note
   oneste («Spedisce con InPost», la regola asimmetrica del digitale,
@@ -7887,6 +7909,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tastiera: il default preseleziona il punto ma la digitazione arriva
   solo quando serve. Il campo DENTRO l'ordine (`puntoRitiroInp`) è
   una regione separata e non è cambiato di una riga.
+  E DAL SESTO GIRO IL CASSETTO VIVE DENTRO IL RIQUADRO della via
+  punto, sotto il «Consigliato» (ago 2026, decisione di Andrea): sta
+  attaccato alla scelta a cui appartiene, e scegliendo un'altra via
+  se ne va con lei — si disegna solo a via punto SELEZIONATA, e
+  tutti e tre gli stati abitano lì dentro, una casa sola (anche la
+  riga compatta: due case per lo stesso cassetto sarebbero il
+  difetto che il trasloco toglie). LA MECCANICA da non rompere: la
+  radio che lo ospita è un DIV `role="radio"` e non più un
+  `<button>` — HTML vieta interattivi annidati, la lezione dello
+  stepper dentro Acquista — e i tocchi restano separati per
+  PROPAGAZIONE: il tocco sul riquadro seleziona la via, il cassetto
+  (`#acqPuntoCampo`) la ferma con stopPropagation sul suo
+  contenitore, così bottone, input e link mappe non riselezionano
+  mai — un click dentro l'input, senza quel freno, rifarebbe il
+  render sotto le dita di chi scrive. La tastiera ha la guardia
+  gemella (`event.target===this` nell'onkeydown del DIV): l'Invio
+  sul bottone interno non deve anche scegliere la via. Il layout: il
+  riquadro ospite va in colonna (`.con-cassetto`) e la riga
+  nome+cifra (`.via-riga`) tiene il layout dei fratelli, che restano
+  `<button>` a una riga — le regole di `.via-opzione` non si
+  toccano. Sentinelle in CI su tutte e quattro le righe.
   E LA NOTIFICA UNA-TANTUM (`avvisa_spedizioniere_mancante`,
   nell'orologio): ai venditori con annunci attivi che spediscono e
   senza spedizioniere — «da oggi i compratori possono scegliere il
