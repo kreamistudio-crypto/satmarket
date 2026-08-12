@@ -5590,7 +5590,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   pagina Paga, che dal 12 ago 2026 ha L'INVITO DELLE DUE PROMESSE
   (chiesto da Andrea in due tempi: prima lo sconto — nel carrello
   c'era, lì no — poi la spedizione, che deve parlargli uguale): la
-  stessa forma del carrello, in UNA fila di pillole AFFIANCATE dove
+  stessa forma del carrello, in UNA fila dove
   ognuna ha il suo stato — sono indipendenti, quindi una verde e una
   no è uno stato normale. Sotto soglia «🚚 Ancora 12 € → spedizione
   gratis» e «🎁 Ancora N pezzi → −X%» (a valore la CIFRA che manca,
@@ -5599,7 +5599,34 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (12 ago 2026, decisione di Andrea — è un fatto del negozio, si
   legge prima di scegliere la strada) e il suo ordine è quello di
   casa: vedi «L'ORDINE DELLA FILA È UNO SOLO», sotto «LE PROMESSE
-  DIVENTANO BADGE». IL VERDE DELLA SPEDIZIONE CONVIVE con la
+  DIVENTANO BADGE».
+  LA VESTE DELLA FILA DI PAGA È A RIGHE PIENE (ago 2026, decisione
+  di Andrea): non più chip affiancati di larghezze diverse — che si
+  leggevano come bottoni randagi fra la card e la Consegna — ma
+  righe a tutta larghezza, tono quieto, angoli da riquadro come le
+  vie sotto. Solo CSS (`#acqCorpo > .pills`): il MARKUP non si
+  tocca, la sentinella della fila conta proprio quel template, e il
+  verde della conferma resta verde. LA STRADA SCARTATA, costruita e
+  guardata a schermo prima di decidere: i badge DENTRO la card
+  dell'articolo — stava più in ordine, ma costava il rovesciamento
+  della decisione del 12 ago («la fila sopra la consegna»), spezzava
+  l'uniformità della fila fra le quattro superfici, e nel SET non
+  c'è una card sola che li ospiti; per un problema che era
+  d'aspetto, la cura è stata la veste e non la posizione.
+  E QUANDO LO SCONTO SCATTA SI VEDE ANCHE SULL'UNITARIO (ago 2026,
+  decisione di Andrea — la via (c) fra le tre proposte):
+  l'unitario nella card resta il PIENO, mai barrato, e accanto gli
+  compare il tag verde «−X%» (`.sconto-tag`, la lingua della pillola
+  di conferma). MAI un numero unitario scontato, ed è la riga da non
+  ammorbidire: lo sconto è di TESTATA sul totale (floor, resto a chi
+  paga) e un unitario scontato non esiste come intero — 10% su
+  14.001 non torna — quindi un numero lì mentirebbe a chi rifà
+  unitario × pezzi, e un ≈ gli darebbe un TERZO significato (oggi
+  dice solo «convertito col cambio»). La percentuale è la REGOLA ed
+  è esatta per definizione; le cifre vere le dice il conto, che non
+  mente mai. Il tag è gated su `sconto_sats>0` (mai sull'invito), i
+  SET non hanno un unitario in card e restano fuori per costruzione,
+  la DEMO non simula lo sconto e tace da sola. Sentinelle in CI. IL VERDE DELLA SPEDIZIONE CONVIVE con la
   riga «Spedizione: gratuita» del conto, ed è deciso guardando lo
   schermo: la riga dice il COSA, il verde dice il PERCHÉ (è la
   promessa del negozio a essere scattata) — e senza, nello stato
