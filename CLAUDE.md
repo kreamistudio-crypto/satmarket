@@ -7558,6 +7558,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   un codice fuori filtro si vede comunque anche nel ramo che qualcuno
   aggiungerà fra sei mesi. La mutazione che nasconde il codice fuori
   filtro fa rosse quattro righe.
+  E UN CODICE SI LEGGE COME UN CODICE (11 ago 2026, dal caso di
+  Luca): quando il riquadro `📦 Spedito con … · segui il pacco →` è
+  sparito — vedi il giro del punto di ritiro — la motivazione era
+  giusta sul CONTENUTO (era il doppione del passo due dita più su) e
+  sbagliata sul PESO: quel che restava non era lo stesso testo in un
+  altro posto, era lo stesso testo senza più niente addosso, quindici
+  pixel di grigio in mezzo alla prosa. Due parti di un ordine vero
+  hanno cercato il tracciamento e non l'hanno trovato, pur avendolo
+  davanti. Ora il codice è `<b class="mono">` nei DUE rami — mono e
+  grassetto come l'aveva nel riquadro — e il doppione non torna: si
+  dà peso a dov'è, non si rimette dov'era. Il peso è uguale nei due
+  rami per regola CSS (`.step .mono`), o il `<b>` nudo verrebbe 900 e
+  quello toccabile 800: lo stesso codice con due pesi secondo chi
+  guarda.
   IL CODICE SI TOCCA DOVE SI LEGGE (ago 2026): dentro quel passo il
   tracciamento è cliccabile e porta a @trackbot, e il link a 17track
   è USCITO dall'ordine — ne resta uno solo, quello del RESO (lato
@@ -7568,13 +7582,66 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL GIUDICE È UNO, `trackbotPossibile(o, s)`, e lo usano tutti e due
   i posti da cui ci si arriva — il bottone e il codice: due strade che
   rispondessero diverso sullo stesso codice sarebbero una che promette
-  quel che l'altra nega. Le sue quattro domande sono quelle di sempre
-  (solo il compratore, solo mentre il pacco viaggia, solo col
-  tracciamento, solo con la FORMA del corriere dichiarato — il giudice
-  è `formaTracking`, lo stesso dell'euristica della spedizione, perché
-  a trackbot serve il codice del CORRIERE e non quello
-  dell'intermediario). Dove la porta non c'è il codice resta TESTO:
-  un link a vuoto è peggio di nessun link. Il colore NON è il
+  quel che l'altra nega. Le sue domande sono tre (solo il
+  compratore, solo mentre il pacco viaggia, solo col tracciamento) più
+  la quarta, che l'11 ago 2026 SI È ROVESCIATA — qui sotto. Dove la
+  porta non c'è il codice resta TESTO: un link a vuoto è peggio di
+  nessun link.
+  UN'EURISTICA INCOMPLETA NON DEVE MAI TOGLIERE NIENTE (11 ago 2026,
+  decisione di Andrea da un caso vero, e questa voce ROVESCIA la
+  quarta domanda di ieri — «solo con la FORMA del corriere
+  dichiarato»). Il motivo di allora era buono e resta vero: a trackbot
+  serve il codice del CORRIERE, e quello dell'intermediario (Packlink
+  & co.) è l'errore già successo. Ma IL PREZZO LO PAGAVANO I CODICI
+  CHE NON CONOSCIAMO, che sono esattamente quelli su cui sbagliamo
+  noi: su un Poste `281665J056083` — vero, e fuori dalle nostre due
+  forme di allora — al compratore sparivano insieme il grassetto e il
+  bottone, in silenzio. E `FORME_TRACKING` è dichiarata «un'euristica,
+  non una verifica» che «non blocca MAI»: attraverso quella guardia
+  bloccava lo stesso, per interposta persona — è il modo in cui
+  muoiono le regole, non abrogate ma aggirate da un'altra strada.
+  ADESSO SI TOGLIE SU QUEL CHE SAPPIAMO, NON SU QUEL CHE NON SAPPIAMO:
+  il bottone c'è SEMPRE, tranne dove riconosciamo un intermediario.
+  L'ASIMMETRIA DEI DANNI è tutta la ragione — un bottone che porta
+  trackbot a dire «non conosco questo codice» è un fallimento
+  VISIBILE, che chi legge capisce da solo e semmai ci segnala; un
+  bottone che non compare è un fallimento invisibile, e non lo segnala
+  nessuno. È la stessa forma del fail-safe verso la coda di
+  `_vietato_bloccante`: si sbaglia dalla parte in cui l'errore si
+  vede.
+  `intermediarioNoto` RICONOSCE PER NOME e non per forma, che è la
+  sola cosa che sappiamo con certezza: un codice di corriere non
+  contiene mai la parola «packlink». Si guardano le lettere dopo aver
+  tolto cifre e punteggiatura, così «PACKLINK-4471» si riconosce; il
+  catalogo è tutto MINUSCOLO o la voce è morta in silenzio (il
+  tracciamento si abbassa, le voci si confrontano così come sono
+  scritte), e c'è la prova che lo dice.
+  ONESTÀ SU COSA NON PRENDE, ed è la metà da leggere: il caso vero —
+  il venditore che incolla il NUMERO D'ORDINE nudo dell'intermediario,
+  senza il nome — qui NON si riconosce, e non si prova nemmeno.
+  Indovinarlo dalla forma è precisamente la mossa che è costata il
+  caso Poste. A intercettarlo restano l'avviso nel form della
+  spedizione e la domanda di `formaTracking`, tutti e due rivolti a
+  CHI IL CODICE LO STA SCRIVENDO: è lì che l'errore si ripara — con
+  chi l'ha fatto e col codice sotto le dita — non togliendo qualcosa
+  a chi legge. L'euristica non ha perso il suo mestiere, ha perso solo
+  quello che non era suo.
+  LE FORME DI POSTE SI SONO ALLARGATE SUI CODICI VERI del registro
+  (`^\d{6}[A-Z]\d{6}$` e `^[A-Z]{2}\d{11}$`, da 281665J055082,
+  281665J056083, JF40001609169 — tutti e tre a 13 caratteri e tutti e
+  tre fuori dalle forme di prima, che conoscevano solo le cifre e
+  l'S10). Scritte STRETTE sui campioni e non allargate a intuito: da
+  quando l'euristica non gatea più il bottone, il suo unico mestiere è
+  CHIEDERE, e una domanda in più costa un tocco mentre una forma
+  inventata insegna una cosa falsa. I tre codici stanno nel collaudo,
+  ed è la tortura ad averlo chiesto: senza, togliere le forme nuove
+  non faceva rossa nessuna prova.
+  E IL LETTORE DEL CATALOGO IN `prove.py` LEGGE A VOCI, NON A RIGHE:
+  prendeva una riga alla volta, e la prima voce che ha avuto bisogno
+  di due righe — Poste, appunto — è sparita dal conto senza che
+  nessuna prova sui suoi codici diventasse rossa. Erano semplicemente
+  smesse di girare. Adesso si taglia fra una chiave e l'altra, e una
+  prova in più chiede che nessuna voce sia rimasta VUOTA. Il colore NON è il
   verde-link di casa (`--trust` sul fondo della fiducia rende 3,84: va
   bene per un ornamento, non per ventiquattro cifre da leggere) ma
   `--trust-note`, l'inchiostro di quella superficie — 8,1 di giorno e
