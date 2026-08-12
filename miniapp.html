@@ -2314,6 +2314,10 @@
      un codice a ventiquattro cifre. A dire che si tocca sono il
      grassetto e la sottolineatura, l'unica della pagina. */
   .step .trackbot{color:var(--trust-note);font-weight:800;text-decoration:underline;cursor:pointer}
+  /* il codice pesa uguale nei due rami: il <b> nudo del ramo non
+     toccabile veniva 900 e quello toccabile 800, cioe' lo stesso
+     codice con due pesi secondo chi guarda */
+  .step .mono{font-weight:800}
 
   /* ---------- vendi (form) ---------- */
   .form{padding:18px var(--pad)}
@@ -14192,8 +14196,17 @@ const RIGA_CODICE_CORRIERE = 'Il codice di ritiro te lo manda il '
    partito non deve restare in ostaggio del nostro elenco.
    'Altro corriere' non ha forma per definizione e non si controlla. */
 const FORME_TRACKING = {
-  /* S10 universale (RR123456789IT) o i numerici di Poste Delivery */
-  'Poste Italiane': [/^[A-Z]{2}\d{9}[A-Z]{2}$/, /^\d{12,13}$/],
+  /* S10 universale (RR123456789IT), i numerici di Poste Delivery, e
+     le due forme prese dai codici VERI del registro (ago 2026, dal
+     caso dal campo: 281665J055082, 281665J056083, JF40001609169 —
+     tutti e tre a 13 caratteri, tutti e tre fuori dalle due forme di
+     prima, che conoscevano solo cifre o l'S10). Scritte STRETTE sui
+     campioni e non allargate a intuito: da quando l'euristica non
+     gatea piu' il bottone (vedi `intermediarioNoto`) il suo unico
+     mestiere e' CHIEDERE al venditore, e una domanda in piu' costa
+     un tocco mentre una forma inventata insegna una cosa falsa. */
+  'Poste Italiane': [/^[A-Z]{2}\d{9}[A-Z]{2}$/, /^\d{12,13}$/,
+                     /^\d{6}[A-Z]\d{6}$/, /^[A-Z]{2}\d{11}$/],
   'BRT':            [/^\d{10,14}$/],
   'GLS':            [/^\d{9,14}$/, /^[A-Z]{2}\d{9,12}$/],
   'SDA':            [/^\d{9,14}$/, /^[A-Z]{2}\d{9}[A-Z]{2}$/],
@@ -14260,13 +14273,29 @@ function trackingDaControllare(corriere, tracking, idAvviso){
    Solo il compratore (e' il suo pacco), solo mentre il pacco viaggia,
    solo col tracciamento — le sentinelle 'Consegna a mano'/'Ritiro in
    zona' restano fuori da sole, il tracking non ce l'hanno — e solo se
-   il codice ha la FORMA del corriere dichiarato: il giudice e'
-   formaTracking, lo STESSO dell'euristica della spedizione, perche' a
-   trackbot serve il codice del CORRIERE e quello dell'intermediario
-   (Packlink & co.) e' l'errore gia' successo. Dove l'euristica si
-   astiene per regola («Altro corriere») si passa: non sappiamo dire
-   che il codice e' sbagliato, e al peggio trackbot dira' che non lo
-   conosce. */
+   non riconosciamo con CERTEZZA un codice di intermediario.
+   LA LOGICA E' ROVESCIATA (ago 2026, decisione di Andrea, da un caso
+   vero): prima serviva che il codice avesse la FORMA del corriere
+   dichiarato — il giudice era `formaTracking` — e il motivo era buono,
+   a trackbot serve il codice del CORRIERE e quello dell'intermediario
+   (Packlink & co.) e' l'errore gia' successo. Ma il prezzo lo pagavano
+   i codici che NON conosciamo, che sono esattamente quelli su cui
+   sbagliamo noi: su un Poste `281665J056083` — vero, e fuori dalle
+   nostre forme di allora — al compratore sparivano insieme il codice
+   in grassetto e il bottone, in silenzio. E `FORME_TRACKING` e'
+   dichiarata «un'euristica, non una verifica» che «non blocca MAI»:
+   attraverso questa guardia bloccava lo stesso, per interposta
+   persona.
+   Adesso SI TOGLIE SU QUEL CHE SAPPIAMO, NON SU QUEL CHE NON
+   SAPPIAMO: il bottone c'e' sempre, tranne dove riconosciamo un
+   intermediario per NOME. L'asimmetria dei danni e' tutta qui — un
+   bottone che porta trackbot a dire «non conosco questo codice» e'
+   un fallimento VISIBILE, che chi legge capisce da solo; un bottone
+   che non compare e' un fallimento invisibile, e nessuno lo segnala.
+   L'euristica NON perde il suo mestiere: continua a chiedere «sei
+   sicuro?» al VENDITORE mentre scrive, che e' il momento in cui
+   l'errore si ripara davvero — con chi l'ha fatto e col codice sotto
+   le dita — invece che togliere qualcosa a chi legge. */
 
 /* IL FILTRO DI TRACKBOT (ago 2026, detto da loro): la funzione
    /start ce l'ha dal 2018, e il payload lo guarda contro
@@ -14298,10 +14327,31 @@ function passaTrackbot(tracking){
   return FILTRO_TRACKBOT.test(nudoTrackbot(tracking));
 }
 
+/* GLI INTERMEDIARI SI RICONOSCONO PER NOME, che e' la sola cosa che
+   sappiamo con certezza: un codice di un corriere non contiene mai la
+   parola «packlink». Le lettere si guardano dopo aver tolto cifre e
+   punteggiatura, cosi' «PACKLINK-4471» si riconosce come «Packlink».
+   ONESTA' SU COSA QUESTA LISTA NON PRENDE, ed e' la meta' da leggere:
+   il caso vero — il venditore che incolla il NUMERO D'ORDINE nudo
+   dell'intermediario, senza il nome — qui NON si riconosce, e non si
+   prova nemmeno: indovinarlo dalla forma e' precisamente la mossa che
+   costava il caso Poste. Quel codice ora prende il bottone e trackbot
+   dira' che non lo conosce, che e' un no visibile; a intercettarlo
+   davvero c'e' l'avviso nel form della spedizione e la domanda di
+   `formaTracking`, tutti e due rivolti a chi il codice lo sta
+   scrivendo. La lista si allunga solo dai nomi VERI che si vedono nel
+   registro, mai a intuito. */
+const INTERMEDIARI = ['packlink', 'sendcloud', 'spedirecomodo',
+                      'shippypro', 'sendabox', 'qapla'];
+function intermediarioNoto(tracking){
+  const lettere = (tracking || '').toLowerCase().replace(/[^a-z]/g, '');
+  return INTERMEDIARI.find(n => lettere.includes(n)) || '';
+}
+
 function trackbotPossibile(o, s){
   return o.role === 'buyer' && !!o.tracking
       && ['shipped','delivered'].includes(s)
-      && !formaTracking(o.corriere, o.tracking);
+      && !intermediarioNoto(o.tracking);
 }
 
 /* Il codice dentro il passo «Oggetto spedito» si tocca dove si legge.
@@ -14309,8 +14359,8 @@ function trackbotPossibile(o, s){
    di nessun link. */
 function codiceTracking(o, s){
   return trackbotPossibile(o, s)
-    ? `<span class="trackbot" role="button" onclick="attivaNotifichePacco()">${esc(o.tracking)}</span>`
-    : esc(o.tracking);
+    ? `<b class="trackbot mono" role="button" onclick="attivaNotifichePacco()">${esc(o.tracking)}</b>`
+    : `<b class="mono">${esc(o.tracking)}</b>`;
 }
 
 function bottoneNotifichePacco(o, s){

@@ -4252,12 +4252,25 @@ def prove_forma_tracking():
     blocco = src[i:src.index("\n};", i) + 3]
     # le regex di questo catalogo sono compatibili con Python: si
     # leggono dal client e si eseguono, invece di ricopiarle qui
+    # SI LEGGE A VOCI E NON A RIGHE (ago 2026): il lettore vecchio
+    # prendeva una riga alla volta, e la prima voce che ha avuto
+    # bisogno di due righe — Poste, coi formati veri del registro —
+    # e' sparita dal conto senza che nessuna prova sui suoi codici
+    # diventasse rossa: erano semplicemente smesse di girare. Adesso
+    # si taglia fra una chiave e l'altra e si pescano le regex, che
+    # cominciano tutte per ^ e finiscono per $.
+    chiavi = [(m.start(), m.group(1))
+              for m in re.finditer(r"'([^']+)':\s*\[", blocco)]
     forme = {}
-    for riga in re.finditer(r"'([^']+)':\s*\[(.+?)\],?\s*$", blocco, re.M):
-        forme[riga.group(1)] = [re.compile(x)
-                                for x in re.findall(r"/(.+?)/(?=,|\s*$)",
-                                                    riga.group(2))]
+    for k, (pos, nome) in enumerate(chiavi):
+        fine = chiavi[k + 1][0] if k + 1 < len(chiavi) else len(blocco)
+        forme[nome] = [re.compile(x) for x in
+                       re.findall(r"/(\^.+?\$)/", blocco[pos:fine])]
     prova("il catalogo delle forme si e' letto tutto", 7, len(forme))
+    # ...e nessuna voce e' rimasta VUOTA: una voce senza forme non fa
+    # rossa nessuna prova, si limita a non controllare piu' niente.
+    prova("...e nessuna voce e' rimasta senza forme", [],
+          [n for n, f in forme.items() if not f])
 
     def storto(corriere, codice):
         """True se la forma NON combacia (cioe' si chiede conferma)."""
@@ -4275,6 +4288,13 @@ def prove_forma_tracking():
     # gli altri corrieri, sui formati che si incontrano davvero
     buoni = [("Poste Italiane", "RR123456789IT"),
              ("Poste Italiane", "123456789012"),
+             # I TRE CODICI VERI del registro (ago 2026, dal caso dal
+             # campo): stavano tutti fuori dalle due forme di prima, e
+             # senza di loro togliere le forme nuove non faceva rossa
+             # nessuna prova — l'ha detto la tortura.
+             ("Poste Italiane", "281665J055082"),
+             ("Poste Italiane", "281665J056083"),
+             ("Poste Italiane", "JF40001609169"),
              ("BRT", "0123456789012"),
              ("GLS", "123456789012"),
              ("SDA", "0123456789"),
@@ -4320,10 +4340,59 @@ def prove_forma_tracking():
     prova("trackbot: solo col tracciamento", True, "!!o.tracking" in tp)
     prova("trackbot: solo mentre il pacco viaggia", True,
           "['shipped','delivered'].includes(s)" in tp)
-    prova("trackbot: il giudice e' formaTracking, riusato", True,
-          "formaTracking(o.corriere, o.tracking)" in tp)
+    # QUESTA PROVA HA CAMBIATO LATO (ago 2026, decisione di Andrea):
+    # chiedeva che il giudice del bottone fosse `formaTracking`, cioe'
+    # che il codice avesse la FORMA del corriere dichiarato. Il motivo
+    # era buono — a trackbot serve il codice del CORRIERE — ma il
+    # prezzo lo pagavano i codici che NON conosciamo, che sono quelli
+    # su cui sbagliamo noi: un Poste `281665J056083` vero, fuori dalle
+    # nostre forme, perdeva il grassetto e il bottone IN SILENZIO. E
+    # `FORME_TRACKING` e' dichiarata un'euristica che «non blocca
+    # MAI»: di qui bloccava lo stesso, per interposta persona.
+    # SI TOGLIE SU QUEL CHE SAPPIAMO, non su quel che non sappiamo.
+    prova("trackbot: il giudice NON e' piu' l'euristica delle forme",
+          True, "formaTracking" not in tp)
+    prova("...e' il riconoscimento dell'intermediario", True,
+          "!intermediarioNoto(o.tracking)" in tp)
     prova("...e formaTracking resta UNO", 1,
           src.count("function formaTracking"))
+    # L'EURISTICA NON PERDE IL SUO MESTIERE: continua a chiedere «sei
+    # sicuro?» al VENDITORE mentre scrive, che e' dove l'errore si
+    # ripara — con chi l'ha fatto e col codice sotto le dita.
+    prova("...e continua a chiedere al venditore quando spedisce", True,
+          "formaTracking(corriere, tracking)" in
+          pezzo_js(src, "function trackingDaControllare"))
+    # GLI INTERMEDIARI SI RICONOSCONO PER NOME, la sola cosa certa: un
+    # codice di corriere non contiene mai la parola «packlink». Le
+    # regex non c'entrano — si guardano le lettere.
+    ino = pezzo_js(src, "function intermediarioNoto")
+    prova("l'intermediario si riconosce per nome, non per forma", True,
+          "INTERMEDIARI.find" in ino and "toLowerCase()" in ino)
+    prova("...e le cifre non nascondono il nome", True,
+          "replace(/[^a-z]/g, '')" in ino)
+    # LA PROVA CHE IL CASO HA CHIESTO: il codice che non conosciamo
+    # tiene il bottone. Si esegue il giudice VERO, tradotto dal
+    # sorgente, sui codici veri del registro.
+    nomi = re.search(r"const INTERMEDIARI = \[(.+?)\];", src, re.S)
+    prova("il catalogo degli intermediari si e' letto", True, bool(nomi))
+    # IL CATALOGO E' TUTTO MINUSCOLO, o la voce e' MORTA: il client
+    # abbassa il tracciamento e confronta le voci COSI' COME SONO,
+    # quindi una scritta in maiuscolo non matcherebbe mai — e non lo
+    # direbbe nessuno.
+    voci = re.findall(r"'([^']*)'", nomi.group(1) if nomi else "")
+    prova("...e le sue voci sono tutte minuscole", [],
+          [v for v in voci if v != v.lower() or not v.isalpha()])
+    elenco = re.findall(r"'([a-z]+)'", nomi.group(1) if nomi else "")
+    def noto(t):
+        lettere = re.sub(r"[^a-z]", "", (t or "").lower())
+        return next((n for n in elenco if n in lettere), "")
+    for codice in ("281665J055082", "281665J056083", "JF40001609169",
+                   "RR123456789IT", "820123387637068013332765",
+                   "IT2026COM8891"):
+        prova("il codice che non conosciamo tiene il bottone: " + codice,
+              "", noto(codice))
+    prova("...e quello che si dichiara Packlink no", "packlink",
+          noto("PACKLINK-4471-0093"))
     prova("il giudice serve tutti e due i posti", 2,
           src.count("trackbotPossibile(o, s)")
           - src.count("function trackbotPossibile(o, s)"))
@@ -4337,6 +4406,16 @@ def prove_forma_tracking():
     prova("il codice cliccabile chiama attivaNotifichePacco", True,
           "attivaNotifichePacco()" in ct)
     prova("...e senza porta resta testo", 2, ct.count("esc(o.tracking)"))
+    # UN CODICE SI LEGGE COME UN CODICE (ago 2026, dal caso di un
+    # ordine vero): quando il riquadro col tracciamento e' sparito, il
+    # codice e' rimasto in una riga grigia di prosa e non lo trovava
+    # piu' nessuno. Mono e grassetto in TUTTI E DUE i rami, come
+    # l'aveva nel riquadro — senza la tortura questa riga tornava
+    # prosa senza far rossa nessuna prova.
+    prova("il codice si legge come un codice, non come prosa", 2,
+          ct.count('mono"'))
+    prova("...anche dove non e' toccabile", True,
+          '`<b class="mono">${esc(o.tracking)}</b>`' in ct)
     prova("il passo «Oggetto spedito» usa la fabbrica", True,
           "tracking ${codiceTracking(o, s)}" in src)
     # la traccia della correzione del moderatore ha seguito il codice:
