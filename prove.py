@@ -4340,13 +4340,19 @@ def prove_forma_tracking():
     # strade che rispondessero diverso sullo stesso codice sarebbero
     # una che promette quel che l'altra nega.
     tp = pezzo_js(src, "function trackbotPossibile")
-    # QUESTA PROVA HA CAMBIATO LATO (ago 2026, dal campo): chiedeva
-    # «solo il compratore», ma il venditore segue la STESSA spedizione
-    # e verso un punto di ritiro deve sapere quando il pacco arriva
-    # per mandare la busta. Il moderatore resta fuori: nei suoi stati
-    # (le dispute) il codice e' gia' testo per la regola dello stato.
-    prova("trackbot: le due parti, mai il moderatore", True,
-          "['buyer','seller'].includes(o.role)" in tp)
+    # QUESTA PROVA HA CAMBIATO LATO DUE VOLTE NELLO STESSO GIORNO
+    # (12 ago 2026, decisione di Andrea): chiedeva «solo il
+    # compratore», poi «le due parti» — il venditore segue la stessa
+    # spedizione e verso un punto di ritiro deve sapere quando il
+    # pacco arriva per mandare la busta — e infine il ruolo e' sparito
+    # del tutto: il moderatore incontra uno shipped solo da «apri un
+    # ordine per numero», che esiste proprio per i tracciamenti
+    # storti, e li' il tocco sul codice e' una diagnosi. In disputa il
+    # codice resta testo per TUTTI: e' la regola dello STATO, non del
+    # ruolo, e questa riga chiede che il ruolo non rientri di
+    # soppiatto.
+    prova("trackbot: il ruolo non decide — la porta e' dello stato",
+          True, "o.role" not in tp)
     prova("trackbot: solo col tracciamento", True, "!!o.tracking" in tp)
     prova("trackbot: solo mentre il pacco viaggia", True,
           "['shipped','delivered'].includes(s)" in tp)
