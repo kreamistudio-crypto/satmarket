@@ -3299,10 +3299,13 @@ document.getElementById('cartello')?.remove();</script>
          si risparmia lo dice il conto del server, nel riepilogo.
          DUE SCATOLE e non una: le riempiono due funzioni gemelle che
          si spengono con box.innerHTML='', e con un contenitore solo la
-         prima che tace cancellerebbe la sorella. -->
+         prima che tace cancellerebbe la sorella. La 🚚 viene PRIMA
+         della 🎁 (12 ago 2026, decisione di Andrea): lo stesso ordine
+         della pagina Paga, di «Altri oggetti» e della testata del
+         negozio — l'occhio impara UNA fila. -->
     <div id="paccoPromesse">
-      <span id="paccoSconto"></span>
       <span id="paccoSpedGratis"></span>
+      <span id="paccoSconto"></span>
     </div>
     </div><!-- /.pacco-appiccicato -->
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
@@ -6689,11 +6692,14 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       ? `<div class="trust-note" style="margin-top:12px">🎁 <span>Questo
            negozio fa ${frasePromessaSconto(r)}.</span></div>` : '';
   };
-  /* E la seconda promessa, sotto la prima: le due sono INDIPENDENTI —
-     guardano lo stesso numero senza vedersi — quindi un negozio puo'
-     averle tutte e due e si leggono una per riga. Qui non si guarda
-     se il venditore spedisce: e' la sua vetrina intera, e un negozio
-     che promette la spedizione gratis qualcosa da spedire ce l'ha. */
+  /* E la seconda promessa: le due sono INDIPENDENTI — guardano lo
+     stesso numero senza vedersi — quindi un negozio puo' averle tutte
+     e due e si leggono una per riga, con la 🚚 PRIMA della 🎁 nel
+     montaggio (12 ago 2026, decisione di Andrea: lo stesso ordine di
+     Paga, «Altri oggetti» e carrello — l'occhio impara UNA fila). Qui
+     non si guarda se il venditore spedisce: e' la sua vetrina intera,
+     e un negozio che promette la spedizione gratis qualcosa da
+     spedire ce l'ha. */
   const spedGratisNegozioRiga = w => {
     const r = regolaSpedGratis(w.sped_gratis_soglia, w.sped_gratis_eur,
                                w.sped_gratis_valuta);
@@ -6716,7 +6722,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       </div>
     </div>
     ${ponti}
-    ${scontoNegozioRiga(v)}${spedGratisNegozioRiga(v)}
+    ${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}
     ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
   /* Gli ultimi feedback ricevuti: stelle, commento, ruolo, data — e
      CHI li ha scritti, con nome e faccia (ago 2026). Un voto senza un
@@ -8052,8 +8058,11 @@ async function sezioneAltriOggetti(l){
      carrello. L'idioma `(p => p ? … : '')` e' quello del dettaglio: un
      venditore senza regole non deve emettere una fila vuota, che
      varrebbe comunque il suo margine. */
-  const badge = (scOk ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '')
-              + (sgOk ? `<span class="pill">${etichettaSpedGratis(sgOk)}</span>` : '');
+  /* 🚚 prima della 🎁 (12 ago 2026, decisione di Andrea): lo stesso
+     ordine della pagina Paga, del carrello e della testata del
+     negozio — l'occhio impara UNA fila. */
+  const badge = (sgOk ? `<span class="pill">${etichettaSpedGratis(sgOk)}</span>` : '')
+              + (scOk ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '');
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
@@ -8776,7 +8785,7 @@ function renderAcquisto(){
   const scVal = p.sconto_valuta||'eur';
   const scSogliaPag = scCrit === 'pezzi' ? (p.sconto_soglia||0)
                     : ((p.sconto_valore||0) || (p.sconto_valore_eur||0));
-  let pillole = '';
+  let pillaSc = '';
   if (scPct > 0 && scSogliaPag > 0){
     const scManca = scCrit === 'pezzi' ? (p.mancano_pezzi||0)
                   : ((p.mancano_sats||0) || (p.mancano_eur||0));
@@ -8785,9 +8794,9 @@ function renderAcquisto(){
     if (scSospeso)
       note += `<div class="acq-nota">🎁 Il negozio fa −${scPct}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
     else if ((p.sconto_sats||0) > 0)
-      pillole += `<span class="pill pill-trust">✅ Sconto <b>−${scPct}%</b> nel conto</span>`;
+      pillaSc = `<span class="pill pill-trust">✅ Sconto <b>−${scPct}%</b> nel conto</span>`;
     else if (scManca > 0)
-      pillole += `<span class="pill">🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
+      pillaSc = `<span class="pill">🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
   }
   /* L'INVITO DELLA SPEDIZIONE GRATIS: compare solo dove una
      spedizione c'e' davvero — su un ritiro o un codice online
@@ -8801,6 +8810,7 @@ function renderAcquisto(){
              || ((p.sped_gratis_soglia||0) > 0 ? 'sats' : 'eur');
   const sgSoglia = (p.sped_gratis_eur||0) || (p.sped_gratis_soglia||0);
   const sgManca = (p.mancano_sped_eur||0) || (p.mancano_sped_sats||0);
+  let pillaSg = '';
   if (sgSoglia > 0 && spedisceQui){
     if (p.promesse_sospese && sgVal === 'eur')
       note += `<div class="acq-nota">🚚 Il negozio offre la spedizione da
@@ -8808,11 +8818,20 @@ function renderAcquisto(){
            articoli, ma adesso non riusciamo a fare il cambio: per
            questo acquisto la spedizione si paga.</div>`;
     else if (sgManca > 0)
-      pillole += `<span class="pill">🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
+      pillaSg = `<span class="pill">🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
     else
-      pillole += `<span class="pill pill-trust">✅ Spedizione <b>gratis</b> nel conto</span>`;
+      pillaSg = `<span class="pill pill-trust">✅ Spedizione <b>gratis</b> nel conto</span>`;
   }
-  if (pillole) note += `<div class="pills">${pillole}</div>`;
+  /* LA FILA: 🚚 PRIMA della 🎁 (12 ago 2026, decisione di Andrea) —
+     lo stesso ordine di «Altri oggetti», del carrello e della testata
+     del negozio: l'occhio impara UNA fila, mai due. I due blocchi qui
+     sopra restano sconto-poi-spedizione (le prove li affettano coi
+     marcatori dei commenti): a decidere l'ordine RESO e' solo questa
+     riga. E la fila sta SOPRA la riga della consegna, non in coda
+     alle note — e' un fatto del negozio, si legge prima di scegliere
+     la strada (vedi il montaggio di box.innerHTML). */
+  const pillole = pillaSg + pillaSc;
+  const fila = pillole ? `<div class="pills">${pillole}</div>` : '';
   /* --- il conto della strada scelta, riga per riga --- */
   const viaOk = stradaSel && !stradaSel.cambio_assente;
   const sped = viaOk ? (stradaSel.spedizione_sats||0) : 0;
@@ -8843,7 +8862,7 @@ function renderAcquisto(){
   const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
-  box.innerHTML = `${articoli}${accQta}${vie}${campoPunto}${note}
+  box.innerHTML = `${articoli}${accQta}${fila}${vie}${campoPunto}${note}
     <div class="section-label">Il conto</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}

@@ -12705,6 +12705,23 @@ def prove_promesse_badge():
           and "✅ Spedizione <b>gratis</b> nel conto" in _blocco_sg)
     prova("...nella stessa fila, affiancate", 1,
           _ra.count('`<div class="pills">${pillole}</div>`'))
+    # L'ORDINE DELLA FILA E' UNO SOLO (12 ago 2026, decisione di
+    # Andrea): 🚚 prima della 🎁, ovunque le due promesse compaiano
+    # insieme — pagina Paga, «Altri oggetti», carrello, testata del
+    # negozio. L'occhio impara UNA fila: una superficie che la
+    # rovescia gliene fa trovare un'altra. In Paga i BLOCCHI sorgente
+    # restano sconto-poi-spedizione (le prove qui sopra li affettano
+    # coi marcatori): l'ordine reso lo decide la sola composizione.
+    prova("la fila di Paga dice PRIMA la spedizione", True,
+          "pillaSg + pillaSc" in _ra)
+    prova("...e sta SOPRA la riga della consegna", True,
+          "${fila}${vie}" in _ra)
+    prova("in «Altri oggetti» la spedizione viene prima", True,
+          _ao.index("sgOk ? `<span") < _ao.index("scOk ? `<span"))
+    prova("nel carrello la scatola della spedizione sta sopra", True,
+          mini.index('id="paccoSpedGratis"') < mini.index('id="paccoSconto"'))
+    prova("e la testata del negozio dice lo stesso ordine", True,
+          "${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}" in mini)
     # le SOSPESE restano prosa e ognuna guarda la SUA valuta:
     # promesse_sospese e' un flag combinato, e senza il filtro una
     # spedizione in SATS si direbbe sospesa per colpa di uno sconto
