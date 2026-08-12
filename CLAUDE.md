@@ -7498,7 +7498,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Dall'alto: gli articoli (card singola o strip del set) · la
   CONSEGNA a vie-radio — 🤝 ritiro · 🏠 spedizione a casa ·
   📦 spedizione a un punto di ritiro · 💾 codice online, SOLO le
-  offerte, ordine fisso = precedenza del default — dove la cifra a
+  offerte, ordine fisso di PRESENTAZIONE (il default lo dice
+  `viaDefault`, vedi sotto) — dove la cifra a
   destra è il SOLO COSTO DI SPEDIZIONE (decisione di Andrea, ago
   2026: le pillole col totale si leggevano come «costo di
   spedizione» con dentro l'oggetto — il totale lo dice IL CONTO, che
@@ -7516,6 +7517,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Andrea: da quel bottone parte la fattura, e il nome lo dice —
   «Acquista» resta sui varchi che PORTANO alla pagina: barra, recinto
   e il riepilogo del pacco).
+  IL DEFAULT DELLA VIA È SPEDIZIONE (12 ago 2026, correzione
+  d'eredità coi numeri): alla nascita della pagina il default era «la
+  prima strada viva», cioè il RITIRO — ma era l'ordine di
+  PRESENTAZIONE delle radio colato nel default, non una decisione:
+  prima della pagina il default era spedizione due volte (le pillole
+  di scelta del recinto e il default legacy del server, «spedizione
+  batte ritiro»), e la pagina l'aveva rovesciato in silenzio.
+  Misurato in produzione: 51 attivi su 82 erano «entrambe» e 35
+  mostravano il badge 🚚 sopra un ritiro preselezionato che nessuno
+  aveva scelto. Il giudice è `viaDefault` — precedenza casa → punto →
+  ritiro → digitale: punto subito dopo casa perché è la gemella di
+  famiglia, e con la tariffa di casa morta per cambio muto la
+  spedizione resta il default; il ripiego sulla prima viva copre lo
+  storico (pseudo-via '') e ogni via futura fuori elenco — coi DUE
+  chiamanti, la pagina vera e il ramo DEMO, così demo e vera non
+  divergono (sentinelle su giudice e chiamanti, torturate). La via
+  già scelta si conserva sui ± come sempre; l'ordine di PRESENTAZIONE
+  delle radio NON cambia, quindi su «entrambe» la selezionata è la
+  SECONDA della lista — guardato a schermo a 320/360/375 nei due
+  temi: la selezione è il riquadro pieno arancio e non si legge come
+  un difetto. LA STRADA SCARTATA, e va tenuta perché torna in mente:
+  «nessuna preselezione con Paga spento finché non scegli». Costava
+  un conto senza via che mente (articolo+protezione, il totale di
+  nessuna strada), il gate sul ⚡ NWC (senza, `corpoConsegna()` vuoto
+  fa nascere l'ordine col default del server, mai scelto) e un tocco
+  in più su ogni acquisto multi-via — per un problema che il default
+  giusto toglie da solo.
   LO STEPPER NELLA PAGINA (12 ago 2026, chiesto da Andrea: l'invito
   dice «ancora 1 pezzo → −10%» e il pezzo si deve poter aggiungere LÌ,
   non tornando alla scheda). Il ± sta nella card articoli
