@@ -5761,11 +5761,11 @@ def prove_valuta_soglia():
           mini.count("unitaSoglia("))
     # ...e tutte le superfici della promessa passano da li': le due
     # frasi lunghe, le due etichette corte, i due inviti del carrello e
-    # i CINQUE siti della pagina Paga (i tre della spedizione piu' i
-    # due dell'invito dello sconto, 12 ago 2026) — undici chiamate
-    # piu' la definizione
+    # i QUATTRO siti della pagina Paga (le due sospese e i due «quanto
+    # manca», 12 ago 2026 — i verdi non portano cifra) — dieci
+    # chiamate piu' la definizione
     prova("...e tutte le superfici della promessa passano da cifraSoglia",
-          12, mini.count("cifraSoglia("))
+          11, mini.count("cifraSoglia("))
     # L'INVITO DEL CARRELLO non converte piu' a soglia in SATS: li' il
     # confronto e' sats contro sats, esatto, e la riga compare anche a
     # cambio muto. E' il guadagno della scelta, e vive proprio dove
@@ -12694,6 +12694,24 @@ def prove_promesse_badge():
           "eurPerSat" in _blocco_sc or "artStima" in _blocco_sc)
     prova("...e la cifra del quanto manca passa dal giudice unico",
           True, "cifraSoglia(scManca, scVal)" in _blocco_sc)
+    # ...e la SPEDIZIONE parla la stessa lingua (12 ago 2026, il
+    # secondo tempo): pillola «Ancora N → spedizione gratis» sotto
+    # soglia, verde «nel conto» quando scatta — nella STESSA fila
+    # dello sconto, ognuna col suo stato (sono indipendenti: una
+    # verde e una no e' uno stato normale, come nel carrello).
+    _blocco_sg = _ra[_ra.index("L'INVITO DELLA SPEDIZIONE GRATIS"):]
+    prova("la spedizione in pagina Paga parla la lingua dello sconto",
+          True, "→ <b>spedizione gratis</b>" in _blocco_sg
+          and "✅ Spedizione <b>gratis</b> nel conto" in _blocco_sg)
+    prova("...nella stessa fila, affiancate", 1,
+          _ra.count('`<div class="pills">${pillole}</div>`'))
+    # le SOSPESE restano prosa e ognuna guarda la SUA valuta:
+    # promesse_sospese e' un flag combinato, e senza il filtro una
+    # spedizione in SATS si direbbe sospesa per colpa di uno sconto
+    # in euro (il bug tolto con questo riordino)
+    prova("le sospese sono gated sulla LORO valuta", True,
+          "p.promesse_sospese && scCrit === 'valore'" in _ra
+          and "p.promesse_sospese && sgVal === 'eur'" in _ra)
 
     # ---- 5. IL CARRELLO: due promesse, due scatole. Con un
     # contenitore solo la prima che tace cancellerebbe la sorella

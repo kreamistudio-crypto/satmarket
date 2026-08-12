@@ -8606,23 +8606,31 @@ function renderAcquisto(){
     note += `<div class="acq-nota">≈ convertito ora al cambio: il totale definitivo si fissa con la invoice (${TEMPI.invoice} minuti).</div>`;
   if (p.demo)
     note += `<div class="acq-nota">🧪 Stima dimostrativa: in demo il conto del server non c'è.</div>`;
-  /* L'INVITO DELLO SCONTO (12 ago 2026, chiesto da Andrea col mono
-     che sconta): la stessa forma del carrello — la pillola «Ancora
-     N → −X%» sotto soglia, il verde «nel conto» quando scatta (la
-     riga della CIFRA sta gia' nel conto qui sotto: questo e' il
-     cartello, quello e' il fatto) — ma coi numeri del SERVER:
-     `mancano_*` li conta lui, quindi la fascia stretta del cambio
-     del carrello qui non esiste. A VALORE il quanto manca e' una
-     CIFRA nell'unita' della promessa (cifraSoglia su mancano_sats O
-     mancano_eur, mai una conversione); a CAMBIO MUTO la promessa non
-     si applica affatto e la riga lo DICE, invece di far sparire lo
-     sconto senza spiegazione — il pattern della spedizione sospesa
-     qui sotto. Vale su ogni via (lo sconto e' sugli articoli), e in
-     DEMO le chiavi non arrivano: il blocco tace da solo. */
+  /* LE DUE PROMESSE DEL NEGOZIO, NELLA STESSA LINGUA (12 ago 2026,
+     chiesto da Andrea in due tempi: prima L'INVITO DELLO SCONTO col
+     mono che sconta, poi la spedizione che deve parlargli uguale).
+     Pillole AFFIANCATE in una fila sola, ognuna col suo stato — le
+     promesse sono indipendenti, quindi una puo' essere verde e
+     l'altra no, come nel carrello. Sotto soglia «Ancora N → …»,
+     quando scatta il verde «nel conto» (la riga della CIFRA sta gia'
+     nel conto qui sotto: la pillola e' il cartello, il conto e' il
+     fatto — e per la spedizione la riga dice «gratuita», che dice il
+     COSA ma non il perche': il verde dice che e' la promessa del
+     negozio a essere scattata). Coi numeri del SERVER: `mancano_*`
+     li conta lui, quindi la fascia stretta del cambio del carrello
+     qui non esiste. A VALORE il quanto manca e' una CIFRA nell'unita'
+     della promessa (cifraSoglia, mai una conversione).
+     A CAMBIO MUTO la promessa non si applica affatto e resta PROSA
+     che lo DICE — ognuna gated sulla SUA valuta: `promesse_sospese`
+     e' un flag combinato, e senza il filtro una spedizione in SATS
+     si direbbe sospesa per colpa di uno sconto in euro (il bug che
+     questo riordino ha tolto). In DEMO le chiavi non arrivano e
+     tutto tace da solo. */
   const scPct = p.sconto_percento||0, scCrit = p.sconto_criterio||'';
   const scVal = p.sconto_valuta||'eur';
   const scSogliaPag = scCrit === 'pezzi' ? (p.sconto_soglia||0)
                     : ((p.sconto_valore||0) || (p.sconto_valore_eur||0));
+  let pillole = '';
   if (scPct > 0 && scSogliaPag > 0){
     const scManca = scCrit === 'pezzi' ? (p.mancano_pezzi||0)
                   : ((p.mancano_sats||0) || (p.mancano_eur||0));
@@ -8631,44 +8639,34 @@ function renderAcquisto(){
     if (scSospeso)
       note += `<div class="acq-nota">🎁 Il negozio fa −${scPct}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
     else if ((p.sconto_sats||0) > 0)
-      note += `<div class="pills"><span class="pill pill-trust">✅ Sconto <b>−${scPct}%</b> nel conto</span></div>`;
+      pillole += `<span class="pill pill-trust">✅ Sconto <b>−${scPct}%</b> nel conto</span>`;
     else if (scManca > 0)
-      note += `<div class="pills"><span class="pill">🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span></div>`;
+      pillole += `<span class="pill">🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
   }
-  /* L'INVITO DELLA SPEDIZIONE GRATIS (ago 2026): quanto manca, e poi
-     la CONFERMA — che non sparisce quando scatta, o chi l'ha appena
-     guadagnata non vedrebbe cambiare niente (la lezione dell'invito
-     dello sconto). Non calcola: `mancano_sped_eur` lo conta il
-     server, che e' l'unico a sapere com'e' fatto l'articolo — lampo,
-     accordi e pezzi compresi. E' il posto GIUSTO e unico per questa
-     riga: da qui passano sia il pezzo singolo sia il carrello, mentre
-     la pagina del carrello per un mono non esiste. Ed e' anche il
-     motivo per cui QUI la fascia di disaccordo non esiste: il numero
-     e' del server, non del cambio del client.
-     Compare solo dove una spedizione c'e' davvero: su un ritiro o un
-     codice online sarebbe rumore. */
+  /* L'INVITO DELLA SPEDIZIONE GRATIS: compare solo dove una
+     spedizione c'e' davvero — su un ritiro o un codice online
+     sarebbe rumore. La soglia arriva nella chiave della SUA unita' e
+     l'altra a zero (la regola d'oro del server): si prende quella
+     piena — con `sped_gratis_eur` da solo, su un negozio in sats
+     spariva TUTTO il blocco, invito compreso. */
   const spedisceQui = (p.strade||[]).some(
     s => s.via==='casa' || s.via==='punto');
-  /* La soglia arriva nella chiave della SUA unita' e l'altra a zero
-     (la regola d'oro del server): qui si prende quella piena, invece
-     di guardarne una sola — con `sped_gratis_eur` da solo, su un
-     negozio in sats spariva TUTTO il blocco, invito compreso. */
   const sgVal = p.sped_gratis_valuta
              || ((p.sped_gratis_soglia||0) > 0 ? 'sats' : 'eur');
   const sgSoglia = (p.sped_gratis_eur||0) || (p.sped_gratis_soglia||0);
   const sgManca = (p.mancano_sped_eur||0) || (p.mancano_sped_sats||0);
-  if (sgSoglia > 0 && spedisceQui)
-    note += (p.promesse_sospese
-      ? `<div class="acq-nota">🚚 Il negozio offre la spedizione da
+  if (sgSoglia > 0 && spedisceQui){
+    if (p.promesse_sospese && sgVal === 'eur')
+      note += `<div class="acq-nota">🚚 Il negozio offre la spedizione da
            ${cifraSoglia(sgSoglia, sgVal)} di
            articoli, ma adesso non riusciamo a fare il cambio: per
-           questo acquisto la spedizione si paga.</div>`
-      : sgManca > 0
-      ? `<div class="acq-nota">🚚 Ancora ${cifraSoglia(sgManca, sgVal)}
-           di articoli e la <b>spedizione è gratis</b>.</div>`
-      : `<div class="trust-note">🚚 <span><b>Spedizione gratis:</b> il
-           negozio la offre da ${cifraSoglia(sgSoglia, sgVal)} di
-           articoli.</span></div>`);
+           questo acquisto la spedizione si paga.</div>`;
+    else if (sgManca > 0)
+      pillole += `<span class="pill">🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
+    else
+      pillole += `<span class="pill pill-trust">✅ Spedizione <b>gratis</b> nel conto</span>`;
+  }
+  if (pillole) note += `<div class="pills">${pillole}</div>`;
   /* --- il conto della strada scelta, riga per riga --- */
   const viaOk = stradaSel && !stradaSel.cambio_assente;
   const sped = viaOk ? (stradaSel.spedizione_sats||0) : 0;
