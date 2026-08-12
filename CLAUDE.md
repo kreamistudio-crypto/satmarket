@@ -7544,6 +7544,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   conserva se ancora viva). Con l'ACCORDO lo stepper non nasce (la
   quantità è pinnata, resta il «× N»), con stock 1 nemmeno; in DEMO
   il ± ricalcola `preventivoDemo` sul posto, senza rete.
+  E STA FUORI DAL TITOLO (12 ago 2026, bug dal campo il giorno stesso
+  del deploy — annuncio 192): `.acq-tit` è un line-clamp a DUE righe
+  con `overflow:hidden`, e stepper e «× N» dell'accordo — appesi in
+  coda al titolo DENTRO quel div — finivano sulla terza riga,
+  tagliata: nel DOM coi loro onclick vivi, ma invisibili. Ora titolo
+  e `qtaUi` vivono nella colonna `.acq-col`: il titolo tiene tutta la
+  sua larghezza col suo clamp — che NON si allenta, fa il suo lavoro
+  sul testo — e lo stepper scende su una riga sua sotto (la strada
+  «fratello in riga» è stata scartata misurando: avrebbe ristretto il
+  titolo a ~67px a 360). LA LEZIONE È LA MISURA: si vedeva a 360px e
+  NON a 375 — il collaudo del cantiere aveva guardato 320 e 375, e il
+  difetto abitava esattamente nella larghezza saltata, che è pure
+  quella di mezzo mondo Android. Il 360 era già «la larghezza di
+  riferimento del progetto» per i conti di layout: da oggi (decisione
+  di Andrea) ENTRA anche nel giro degli screenshot di ogni cantiere,
+  accanto a 320 e 375 — tre misure, mai più due. E la regola generale
+  è quella già pagata in «Altri oggetti»: un contenuto ATOMICO e
+  interattivo non si appende mai in coda a un testo clampato.
   IL GIUDICE DEL «≈» È UNO, `cifraCtrl` (ago 2026, bug visto dal
   telefono: il ≈ compariva su ENTRAMBE le valute — le condizioni
   sparse sono il modo in cui è nato). La regola: il ≈ sta SOLO sulla
