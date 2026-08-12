@@ -7272,6 +7272,12 @@ function setQta(d){
      un'offerta» — e si riscrivono tutte e due le superfici, o quella
      nascosta ricomparirebbe col numero di prima. */
   q('.tasto-offerta').forEach(b => b.innerHTML = etichettaOfferta(l));
+  /* e il badge della spedizione, che dall'ago 2026 dice un ESITO e non
+     una regola: la quantita' sposta l'articolo, e tre pezzi possono
+     scavalcare la soglia della spedizione gratis. Si riscrive il
+     CONTENUTO e non il guscio, o il nodo sparirebbe da sotto i piedi
+     al giro dopo. */
+  q('[data-sped]').forEach(b => b.innerHTML = testoSpedBadge(l));
   /* e il foglio dell'offerta, se e' aperto: lo stepper li' dentro
      chiama QUESTA funzione, quindi la riga e il totale si riscrivono
      al volo — e per costruzione dicono lo stesso numero della barra,
@@ -7402,44 +7408,83 @@ const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0)
    spedizione l'hanno sempre inclusa.
    SFOLLAMENTO COLORI (ago 2026, decisione di Andrea): la gratuita' si
    evidenzia col GRASSETTO, mai col colore — le pillole di consegna
-   sono TUTTE neutre, un solo cuore (.pill). Il chip azzurro pieno e'
-   morto qui, e il verde non ci entra: qui la promessa e' una REGOLA e
-   non un fatto compiuto (il verde vive solo nel carrello).
+   sono TUTTE neutre, un solo cuore (.pill).
 
-   LA PROMESSA DEL NEGOZIO CI E' ENTRATA DENTRO (ago 2026, decisione di
-   Andrea), e questo ROVESCIA la regola che stava scritta qui sotto —
-   «riga discreta e mai una pillola». La regola vecchia difendeva da un
-   equivoco vero: nella fila delle pillole una cifra si legge come
-   proprieta' di QUEST'oggetto. Il rimedio nuovo non e' nasconderla ma
-   NOMINARLA — «da 25 € DI ARTICOLI», che e' la parola che distingue il
-   totale della merce dal prezzo che si ha davanti — e tenere il
-   verdetto fuori di qui. Cio' che resta intatto della regola vecchia:
-   si dice la REGOLA e mai «questo e' gia' sopra soglia», perche' il
-   prezzo qui accanto non e' il numero che il server confronta (una
-   lampo viva, un accordo accettato o la quantita' scelta lo spostano).
-   Il verdetto arriva nella pagina Paga, dove c'e' il totale che lo
-   dimostra.
-   L'ORDINE DEI RAMI E' LA SPECIFICA, e sono le due trappole del
-   travaso: 1) `spedGratis` si guarda PRIMA della regola, o un annuncio
-   gia' gratis senza condizioni mostrerebbe «gratis da 25 €», cioe' una
-   condizione su una gratuita' piena; 2) `inFerie` viene dalla riga di
-   prosa che questo badge ha sostituito, e si perde se si travasa a
-   occhio — il badge prometterebbe la spedizione di un negozio chiuso
-   (che e' anche il caso in cui NON si compra). E lo stato con la
-   promessa SOSTITUISCE «disponibile», non si somma: mai due 🚚. */
+   DUE STATI SOLI, E LA SOGLIA NON SI NOMINA (ago 2026, decisione di
+   Andrea, e ROVESCIA il giro del giorno prima che ci aveva messo
+   dentro la promessa scritta). «da 200 € di articoli» accanto al
+   prezzo dell'ARTICOLO si legge come una proprieta' di quell'articolo
+   — l'equivoco per cui la promessa era stata tenuta fuori dai badge
+   fino a ieri, e che nominare «di articoli» attenuava senza toglierlo.
+   E su un pezzo che la spedizione gratis ce l'ha GIA', dirla
+   condizionata e' una promessa piu' povera del vero.
+   Quindi il badge non dice piu' la REGOLA, dice l'ESITO: sopra soglia
+   riusa lo stato che c'era gia' («Spedizione gratuita», lo stesso dei
+   negozi che spediscono gratis senza condizioni — non uno stato
+   nuovo), sotto soglia torna «Spedizione disponibile», nudo. Il
+   «quanto manca» si legge dopo, quando si compone l'ordine: nel
+   carrello e nella pagina Paga, dove c'e' gia'. E la promessa COL
+   NUMERO resta in «Altri oggetti», che e' il posto giusto — parla del
+   NEGOZIO e sta accanto al bottone del carrello.
+   IL VERDETTO SI PUO' DARE PERCHE' QUI IL CLIENT IL CONTO LO CONOSCE:
+   sul mono l'articolo e' `artStima × pezzi`, e `artStima` e' il
+   gemello di `_unitario_effettivo` del server (il MIN fra lampo e
+   accordo accettato). L'unica cosa che il client non sa e' il cambio,
+   e li' si tace — vedi spedGratisQui. */
 function spedBadge(l){
   if (!spedisce(l)) return '';
-  if (spedGratis(l))
-    return '<span class="pill">🚚 Spedizione <b>gratuita</b></span>';
-  const r = inFerie(l) ? null
-    : regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
-                       l.spedGratisValuta);
-  return r ? `<span class="pill">${etichettaSpedGratis(r)}</span>`
-           : '<span class="pill">🚚 Spedizione disponibile</span>';
+  return `<span class="pill" data-sped>${testoSpedBadge(l)}</span>`;
 }
-/* (La riga di prosa «Questo negozio offre la spedizione gratis da …»
-   non esiste piu': e' entrata DENTRO spedBadge, qui sopra, che di quel
-   giudizio e' ora il posto unico — guardie comprese.) */
+/* Il contenuto del badge, staccato dal guscio perche' si RISCRIVE a
+   ogni ± dello stepper (vedi setQta): la quantita' scelta sposta
+   l'articolo, e con lui l'esito. */
+function testoSpedBadge(l){
+  return (spedGratis(l) || spedGratisQui(l, qtaScelta))
+    ? '🚚 Spedizione <b>gratuita</b>'
+    : '🚚 Spedizione disponibile';
+}
+/* SU QUESTO PEZZO, A QUESTA QUANTITA', LA SPEDIZIONE VIENE GRATIS?
+   Il giudice del verdetto della scheda, e le sue tre decisioni (ago
+   2026, tutte e tre di Andrea):
+   1) LA CIFRA E' QUELLA DEL SERVER — `artStima`, cioe' DOPO la lampo e
+      dopo l'accordo accettato (ne fa il MIN), moltiplicata per i pezzi
+      scelti. CONSEGUENZA ACCETTATA, ed e' la stessa gia' dichiarata
+      per lo sconto carrello: una lampo generosa puo' far SCENDERE
+      sotto soglia e togliere la spedizione gratis. E' corretto — la
+      soglia guarda quel che si paga davvero per la merce — ed e' il
+      caso che sembra un bug a chi lo nota: c'e' la prova apposta.
+   2) A CAMBIO MUTO SI TACE, cioe' «disponibile». Non e' solo prudenza:
+      senza cambio il SERVER la promessa non la applica affatto
+      (`promesse_sospese`) e la spedizione si paga, quindi «disponibile»
+      e' la risposta VERA e non un ripiego. La regola sta in una riga —
+      serve il cambio A MENO CHE soglia e listino siano tutti e due in
+      sats — e copre anche il listino in EURO, che il client porta in
+      sats con `satsAnnuncio`, cioe' col cambio (senza, userebbe quello
+      di PUBBLICAZIONE, che puo' essere vecchio di mesi).
+      Un filo conservativa nel caso soglia-euro + listino-euro, dove il
+      confronto si potrebbe fare in euro puri: si preferisce UNA regola
+      da dire a voce a una matrice di quattro caselle, e il verso in cui
+      sbaglia e' quello di non promettere.
+   3) LA QUANTITA' E' QUELLA DELLO STEPPER, perche' e' quella che il
+      server misura: tre pezzi che superano la soglia la superano
+      davvero, e dire «disponibile» sarebbe una promessa piu' povera
+      del vero.
+   IN FERIE NON SI DA' NESSUN VERDETTO (guardia ereditata dalla riga di
+   prosa): li' non si compra, quindi non c'e' nessun conto con cui
+   essere d'accordo. La gratuita' PIENA invece resta visibile anche in
+   ferie, ed e' l'asimmetria giusta — quella e' una proprieta'
+   dell'annuncio, questa e' un verdetto su un acquisto. */
+function spedGratisQui(l, qta){
+  if (!spedisce(l) || inFerie(l)) return false;
+  const r = regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
+                             l.spedGratisValuta);
+  if (!r) return false;
+  const serveCambio = r.valuta !== 'sats' || l.valuta === 'eur';
+  if (serveCambio && !cambioVivo) return false;
+  const art = artStima(l) * Math.max(1, qta || 1);
+  const ora = r.valuta === 'sats' ? art : Math.floor(art * eurPerSat);
+  return ora >= r.quanto;
+}
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
 /* ---------------- tema: chiaro / scuro / auto ----------------

@@ -12357,38 +12357,78 @@ def prove_promesse_badge():
     print("\n[le promesse come badge]")
     mini = open("miniapp.html", encoding="utf-8").read()
 
-    # ---- 1. IL BADGE DELLA SCHEDA ha assorbito la promessa, guardie
-    # comprese. La riga di prosa non deve tornare da nessuna parte: due
-    # posti che dicono la stessa cosa a due dita di distanza sono il
-    # difetto che questo cantiere esiste per togliere.
-    _sb = pezzo_js(mini, "function spedBadge(l){")
-    prova("il badge porta la promessa", True, "regolaSpedGratis(" in _sb)
-    prova("...e l'etichetta corta viene dal giudice unico", True,
-          "etichettaSpedGratis(r)" in _sb)
+    # ---- 1. IL BADGE DELLA SCHEDA: DUE STATI, E LA SOGLIA NON SI
+    # NOMINA (ago 2026, decisione di Andrea che ROVESCIA il giro del
+    # giorno prima). Tre prove hanno CAMBIATO LATO qui — chiedevano che
+    # il badge portasse la promessa SCRITTA, cioe' certificavano
+    # l'equivoco che questo giro toglie: «da 200 €» accanto al prezzo
+    # dell'articolo si legge come una proprieta' di quell'articolo.
+    # Si taglia sul `\n}` e non sulla riga vuota: le tre funzioni del
+    # badge stanno attaccate senza righe bianche, quindi la finestra di
+    # default le avrebbe prese tutte e le prove avrebbero guardato il
+    # pezzo sbagliato senza dirlo.
+    _sb = pezzo_js(mini, "function spedBadge(l){", "\n}")
+    _tsb = pezzo_js(mini, "function testoSpedBadge(l){", "\n}")
+    _sq = pezzo_js(mini, "function spedGratisQui(l, qta){", "\n}")
     prova("la riga di prosa del dettaglio non esiste piu'", False,
           "rigaSpedGratis" in mini)
-    # LA GUARDIA CHE SI PERDE PER PRIMA nel travaso: `inFerie` viveva
-    # nella riga di prosa e non nel badge — senza, un negozio chiuso
-    # promette la spedizione gratis.
-    prova("...e il negozio in ferie non promette niente", True,
-          "inFerie(l) ? null" in _sb)
-    # L'ORDINE DEI RAMI E' LA SPECIFICA: `spedGratis` PRIMA della
-    # regola, o un annuncio gia' gratis senza condizioni mostrerebbe
-    # «gratis da 25 €» — una condizione su una gratuita' piena.
-    prova("la gratuita' piena si guarda PRIMA della soglia", True,
-          _sb.index("spedGratis(l)") < _sb.index("regolaSpedGratis("))
-    # e lo stato con la promessa SOSTITUISCE «disponibile»: mai due 🚚
-    # nella stessa fila
+    # LA PROVA REGINA DEL GIRO: nel badge non entra nessuna CIFRA. Non
+    # basta togliere l'etichetta — a rimetterci un numero si fa in
+    # fretta, ed e' precisamente il difetto.
+    prova("nel badge non si nomina nessuna soglia", True,
+          not any(x in _tsb for x in
+                  ("cifraSoglia", "etichettaSpedGratis", "regolaSpedGratis",
+                   "r.quanto", "fmt(")))
+    # DUE STATI SOLI, e quello «sopra soglia» RIUSA lo stato che c'era
+    # gia' (i negozi che spediscono gratis senza condizioni): uno stato
+    # nuovo direbbe la stessa cosa con parole diverse.
+    prova("...e gli stati sono due", 2, _tsb.count("🚚"))
+    prova("...col riuso di «gratuita», non uno stato nuovo", True,
+          "🚚 Spedizione <b>gratuita</b>" in _tsb
+          and "🚚 Spedizione disponibile" in _tsb)
     prova("un solo «Spedizione disponibile» in tutto il file", 1,
           mini.count("🚚 Spedizione disponibile"))
-    # ...e i due rami sono le facce di UN ternario: la promessa
-    # SOSTITUISCE «disponibile», non ci si somma accanto. Il conto
-    # secco dei 🚚 non basterebbe — il terzo vive nell'etichetta, e una
-    # somma dei due rami lo lascerebbe fermo a due.
-    prova("...e la promessa SOSTITUISCE «disponibile»", True,
-          'r ? `<span class="pill">${etichettaSpedGratis(r)}</span>`' in _sb
-          and ': \'<span class="pill">🚚 Spedizione disponibile</span>\''
-              in _sb)
+    # A decidere sono DUE soli giudici: la gratuita' piena (proprieta'
+    # dell'annuncio) e il verdetto sulla soglia. Un terzo «if» qui
+    # dentro e' una regola che non passa da nessuno dei due.
+    prova("i giudici della gratuita' sono due e non tre", True,
+          "spedGratis(l) || spedGratisQui(l, qtaScelta)" in _tsb)
+
+    # ---- 1-bis. IL GIUDICE DEL VERDETTO, e le tre decisioni di Andrea
+    prova("il verdetto ha un giudice solo", 1,
+          mini.count("function spedGratisQui("))
+    # 1) la cifra e' quella del SERVER: artStima (MIN fra lampo e
+    # accordo) per i pezzi scelti. Col listino pieno il badge direbbe
+    # «gratuita» dove il conto fa pagare la spedizione.
+    prova("la cifra e' quella del server, per i pezzi scelti", True,
+          "artStima(l) * Math.max(1, qta || 1)" in _sq)
+    # 2) a cambio muto si tace, ed e' la risposta VERA: senza cambio il
+    # server la promessa non la applica affatto (promesse_sospese)
+    prova("serve il cambio a meno che siano tutti e due in sats", True,
+          "r.valuta !== 'sats' || l.valuta === 'eur'" in _sq)
+    prova("...e senza cambio il verdetto non si da'", True,
+          "if (serveCambio && !cambioVivo) return false;" in _sq)
+    # AL FILO ESATTO E' GRATIS, come il giudice del server
+    # (`_sped_gratis`, e come _asta_viva e in_ferie): col «>» un
+    # carrello esattamente a 200 € pagherebbe qui e non di la'
+    prova("al filo esatto la spedizione e' gratis", True,
+          "return ora >= r.quanto;" in _sq)
+    # 3) in ferie nessun verdetto: li' non si compra, e non c'e' nessun
+    # conto con cui essere d'accordo
+    prova("in ferie non si da' nessun verdetto", True,
+          "if (!spedisce(l) || inFerie(l)) return false;" in _sq)
+    # ...ma la gratuita' PIENA resta visibile anche in ferie: e' una
+    # proprieta' dell'annuncio, non un verdetto su un acquisto
+    prova("...mentre la gratuita' piena non guarda le ferie", False,
+          "inFerie" in pezzo_js(mini, "const spedGratis =", ";\n"))
+    # LA QUANTITA' SPOSTA L'ESITO, quindi il badge si riscrive a ogni ±
+    # insieme alle cifre di Acquista — e si riscrive il CONTENUTO, o il
+    # nodo sparirebbe da sotto i piedi al giro dopo
+    prova("il badge si riscrive a ogni ± dello stepper", True,
+          "q('[data-sped]').forEach(b => b.innerHTML = testoSpedBadge(l));"
+          in pezzo_js(mini, "function setQta(d){", "\n}"))
+    prova("...e il guscio porta l'aggancio", True,
+          '<span class="pill" data-sped>' in _sb)
 
     # ---- 2. LE DUE ETICHETTE CORTE: un registro diverso dalla prosa,
     # ma un giudice solo per la CIFRA (cifraSoglia, provato nel blocco
@@ -12397,7 +12437,10 @@ def prove_promesse_badge():
     # letteralmente lo stesso.
     prova("l'etichetta corta della spedizione e' UNA", 1,
           mini.count("function etichettaSpedGratis("))
-    prova("...e la usano tutte e due le superfici neutre", 3,
+    # UNA superficie sola dall'ago 2026 (era due): la scheda ha smesso
+    # di nominare la soglia, e la promessa COL NUMERO vive solo dove
+    # parla del NEGOZIO — accanto al bottone del carrello.
+    prova("...e la usa la sola «Altri oggetti»", 2,
           mini.count("etichettaSpedGratis("))
     prova("l'etichetta corta dello sconto e' UNA", 1,
           mini.count("function etichettaSconto("))
@@ -12507,7 +12550,12 @@ def prove_promesse_badge():
     # non un fatto compiuto — e nella fila del dettaglio il verde e'
     # gia' preso dalla pillola della CONDIZIONE, che vuol dire
     # un'altra cosa.
-    prova("il verde non entra nella scheda", False, "pill-trust" in _sb)
+    # ...e si guardano TUTTE E TRE le funzioni del badge, non il solo
+    # guscio: da quando il testo vive in `testoSpedBadge` una sentinella
+    # sul solo `spedBadge` lascia passare il verde messo dov'e' comodo
+    # (l'ha detto la tortura, non la rilettura).
+    prova("il verde non entra nella scheda", False,
+          "pill-trust" in _sb + _tsb + _sq)
     prova("...ne' in «Altri oggetti»", False, "pill-trust" in _ao)
     _in = pezzo_js(mini, "function aggiornaInvitoSconto(tot){")
     prova("...e nel carrello lo portano tutti e due i badge scattati",
