@@ -2849,6 +2849,51 @@ def prove_dettaglio_ordine():
     prova("e la dicono ENTRAMBI i rami del riquadro (disputa compresa)",
           2, det.count("passoDeposito,"))
 
+    # ---- IL TRACCIAMENTO NON SPARISCE QUANDO SERVE (ago 2026, dal
+    # campo: su un ordine SDA da 9 cifre il codice non lo vedeva piu'
+    # nessuno, ne' chi compra ne' chi vende). IL SOSPETTO ERA IL
+    # FILTRO DI TRACKBOT, E NON ERA LUI: riprodotto, in disputa il
+    # codice spariva con QUALUNQUE corriere — anche con quelli che il
+    # filtro lo passano — perche' questo ramo ha una storia sua e non
+    # ha mai avuto un passo per la spedizione. Il ramo e' identico
+    # byte per byte a prima del cantiere trackbot: un buco vecchio,
+    # visto il giorno in cui qualcuno e' andato a cercare il codice
+    # proprio dove serve come prova.
+    passi = mini[mini.index("const rigaSpedizione"):
+                 mini.index("progress = {creato:")]
+    disputa = passi[:passi.index("progress = {dispute")]
+    prova("in disputa il passo della spedizione c'e'", True,
+          "{t:'Oggetto spedito', d:rigaSpedizione()}" in disputa)
+    # LA GUARDIA E' LA PRESENZA DEL CODICE E NIENTE ALTRO: una
+    # disputa aperta da 'locked', o una consegna a mano, non hanno
+    # niente da mostrare — ma la FORMA del codice non deve entrarci
+    # mai, o si ricompra il difetto che questa prova sorveglia.
+    prova("...e la guardia e' il solo tracciamento", True,
+          "...(o.tracking ? [{t:'Oggetto spedito'" in disputa)
+    # LA PROVA CHE IL CAMPO HA CHIESTO, e si scrive come CENSIMENTO
+    # invece che come elenco: nella strada che RENDE il codice il
+    # filtro non deve comparire mai — cosi' un codice fuori filtro si
+    # vede comunque, oggi e il giorno che qualcuno aggiungera' un
+    # ramo nuovo allo stepper.
+    ct = pezzo_js(mini, "function codiceTracking")
+    for nome, corpo in (("lo stepper", passi),
+                        ("la fabbrica del codice", ct)):
+        prova("un codice fuori filtro si vede comunque: " + nome, True,
+              "passaTrackbot" not in corpo
+              and "FILTRO_TRACKBOT" not in corpo)
+    # LA RIGA E' UNA SOLA per i due rami: due copie sono due che un
+    # giorno divergono, con la traccia del moderatore appresso a una
+    # sola.
+    prova("la riga della spedizione e' una fabbrica sola", 1,
+          mini.count("const rigaSpedizione"))
+    prova("...e la usano tutti e due i rami", 2,
+          passi.count("rigaSpedizione()"))
+    # `progress` E' UN INDICE dentro `steps`: il passo in piu' sposta
+    # di uno tutti quelli dopo, o il pallino «adesso» si accende sul
+    # passo sbagliato — un difetto che non si vede leggendo.
+    prova("il passo in piu' sposta il progress della disputa", True,
+          "+ (o.tracking ? 1 : 0)" in passi)
+
     # ---- 22-23: il reso gia' in viaggio non si fa rispedire ----
     # I due stati del reso NON si possono dire con la stessa frase: a
     # pacco gia' partito «Rispedisci» sarebbe una bugia a chi ha

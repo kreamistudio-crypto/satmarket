@@ -11701,12 +11701,35 @@ function openOrder(id){
      : o.role==='seller' ? 'Hai il pagamento in garanzia'
      :                     'Sats nel deposito di garanzia',
     d: 'Il pagamento è custodito dalla piattaforma'};
+  /* IL TRACCIAMENTO E' UNA PROVA, e la riga che lo scrive e' UNA per
+     tutti i rami dello stepper: in disputa serve piu' che altrove —
+     e' quello che dice se il pacco e' partito e dov'e' finito — e due
+     copie della stessa riga sono due che un giorno divergono, con la
+     traccia della correzione del moderatore appresso a una sola. */
+  const rigaSpedizione = () =>
+    `${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}`;
   let steps, progress;
   if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
     /* Storia della disputa: la cassaforte racconta il congelamento */
     const conReso = ['return_pending','return_shipped'].includes(s);
     steps = [
       passoDeposito,
+      /* IL TRACCIAMENTO NON SPARISCE QUANDO SERVE (ago 2026, dal
+         campo: su un ordine in disputa il codice non lo vedeva piu'
+         nessuno, ne' chi compra ne' chi vende). Questo ramo ha una
+         storia SUA e non ha mai avuto un passo per la spedizione:
+         non e' una regressione, e' un buco che si e' visto il
+         giorno in cui qualcuno e' andato a cercare il codice
+         proprio dove serve come prova. Sta DOPO il deposito e PRIMA
+         della disputa perche' e' l'ordine in cui le cose sono
+         successe, e c'e' solo se un tracciamento esiste — una
+         disputa aperta da 'locked', o una consegna a mano, non
+         hanno niente da mostrare.
+         Il bottone di @trackbot resta fuori da solo:
+         `trackbotPossibile` guarda shipped/delivered, quindi qui il
+         codice esce come TESTO. Giusto cosi' — a pacco contestato
+         non si offre di iscriversi alle notifiche. */
+      ...(o.tracking ? [{t:'Oggetto spedito', d:rigaSpedizione()}] : []),
       {t:'Disputa aperta',          d:'I sats sono congelati: nessuno può toccarli'},
       /* I TESTI PARLANO A CHI LEGGE (ago 2026): la vista e' UNA per
          tutti e due i lati, quindi ogni frase che nomina una parte va
@@ -11735,7 +11758,13 @@ function openOrder(id){
         ? {t:'Ti abbiamo rimborsato i sats', d:'Rimborso integrale, nessuna commissione'}
         : {t:'Sats rimborsati all\'acquirente', d:'Rimborso integrale, l\'annuncio torna in vetrina'},
     ];
-    progress = {dispute:2, return_pending:2, return_shipped:2, refund:3, refunded:4}[s];
+    /* `progress` e' un INDICE dentro `steps` (vedi il render piu'
+       sotto), quindi il passo della spedizione, quando c'e', sposta
+       di uno tutti quelli che vengono dopo. Chi aggiunge un passo
+       qui e si dimentica questa riga accende il pallino sul passo
+       sbagliato, che e' un difetto che non si vede leggendo. */
+    progress = {dispute:2, return_pending:2, return_shipped:2, refund:3, refunded:4}[s]
+             + (o.tracking ? 1 : 0);
   } else {
     /* la finestra di conferma del digitale e' corta: il codice si
        prova subito (il gemello delle 72 ore del fisico). I numeri
@@ -11758,7 +11787,7 @@ function openOrder(id){
             : (o.contenutoPresente?'Il venditore ha consegnato il contenuto in piattaforma':'Il venditore consegna il contenuto in piattaforma')}
         : ritiro
         ? {t:'Consegna a mano',     d:'Vi incontrate e l\'oggetto passa di mano'}
-        : {t:'Oggetto spedito',     d:o.tracking?`${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}`
+        : {t:'Oggetto spedito',     d:o.tracking?rigaSpedizione()
             :(o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')},
       {t:s==='delivered' ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
