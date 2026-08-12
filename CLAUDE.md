@@ -7886,6 +7886,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `aggiornato` ED È LA SCELTA GIUSTA, perché lì escono solo
   released/refunded e per la contabilità conta il giorno in cui i
   sats si sono mossi, non quello dell'acquisto.
+  IL NUMERO DELL'ORDINE SI VEDE (ago 2026, dal campo: un utente
+  segnala un problema e per ritrovare il suo ordine bisognava
+  chiedergli il nome dell'oggetto e cercarlo nel database). È
+  `ordini.id`, cioè LO STESSO numero che il moderatore batte in «Apri
+  un ordine per numero» e lo stesso che il bot scrive già in qualche
+  notifica («ordine #88») — un'identità sola, o mostrarlo non
+  servirebbe a niente, ed è la prima cosa da riverificare se un
+  domani nascesse un secondo riferimento.
+  NEL DETTAGLIO sopra il titolo, dentro la stessa colonna della foto
+  (`numeroOrdine`, `.ordine-testa .ord-col`): a titolo di una riga
+  costa ZERO pixel di pagina — la foto è alta 48 e il titolo ne
+  occupa 23, quindi lo spazio c'era già. Porta LA PAROLA («Ordine
+  #88»), che è quel che dice cos'è quel numero a chi lo legge la
+  prima volta; nella RIGA della lista resta NUDO («#88»), in testa
+  alla meta, che lì il contesto lo dice il posto e incolonnato sotto
+  le foto fa una colonna di riferimenti che si scorre con l'occhio.
+  SI TOCCA SOLO NEL DETTAGLIO, ed è la regola di sempre: ciò che
+  AGISCE vive dentro l'ordine, e la riga ha già il suo tocco (apri) e
+  la sua ✕ — un terzo bersaglio su una card alta 60px si sbaglia e
+  basta.
+  NEGLI APPUNTI VA IL NUDO «#88» e non la frase intera: chi copia lo
+  incolla dentro un messaggio che sta già scrivendo, e «…con l'ordine
+  Ordine #88» è il modo in cui una comodità diventa un intoppo; il
+  cancelletto invece resta, che un numero solo in mezzo a una chat
+  non si riconosce come un riferimento. Se la copia non riesce
+  (contesti non sicuri, permessi negati) il numero va NEL TOAST: mai
+  far credere che sia negli appunti quando non c'è — la regola del
+  codice di @trackbot, e il ramo si prova per davvero, in headless la
+  clipboard è negata di default.
+  IL COSTO IN LISTA È MISURATO e non stimato, sui 19 ordini veri del
+  database di collaudo: **zero righe in più a 360, 375 e 390**, una
+  riga in più a 320 — dove la meta era già a tre righe, perché la
+  colonna del testo lì è larga 98px — e sulle 4 righe corte a 430.
+  Il numero non allunga mai la riga da solo: la allunga il fatto che
+  quella colonna è strettissima, che è una condizione preesistente.
+  E IL `min-width:0` DELLA TESTA È TRASLOCATO SULLA COLONNA, che ora
+  è lei il figlio flex: sull'h2, che flex non vede più, non farebbe
+  niente, e senza una parola lunga senza spazi allarga la PAGINA
+  (misurato: 375 → 780px). La sentinella storica si è spostata con
+  lui invece di sdoppiarsi — una riga, una guardia.
+  DUE «#N» CONVIVONO NEL MONDO, e va saputo prima di uniformarli: il
+  MEMO della invoice LNbits è `Barattolo escrow #{id}` e quell'id è
+  l'ANNUNCIO, non l'ordine — lo vede chi paga, nel suo wallet, e lo
+  vede l'admin nel registro di LNbits, dove è anche il filo con cui
+  si riconciliano gli incassi orfani. Non si tocca: cambiarlo
+  spezzerebbe quel metodo.
 E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   dopo): `/api/orders` ordina per `o.creato DESC, o.id DESC` e non
   più per `aggiornato`. Le due cose vanno INSIEME — la data
