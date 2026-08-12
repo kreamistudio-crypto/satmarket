@@ -8406,7 +8406,8 @@ function apriAcquisto(l){
   renderAcquisto();                 /* lo scheletro, subito */
   if (DEMO) {
     acqDati.preventivo = preventivoDemo(l);
-    acqDati.via = (acqDati.preventivo.strade[0] || {}).via || '';
+    /* lo stesso giudice della pagina vera: demo e vera non divergono */
+    acqDati.via = viaDefault(acqDati.preventivo.strade);
     renderAcquisto();
     return;
   }
@@ -8507,6 +8508,27 @@ function preventivoDemo(l){
           commissione_sats:0, stima:l.valuta==='eur', spedizioniere:'',
           strade};
 }
+/* IL DEFAULT DELLA VIA E' SPEDIZIONE (12 ago 2026, correzione
+   d'eredita' coi numeri). Alla nascita della pagina il default era
+   «la prima strada viva», cioe' il RITIRO — ma era l'ordine di
+   PRESENTAZIONE delle radio colato nel default, non una decisione:
+   prima della pagina il default era spedizione due volte (le pillole
+   del recinto e il default legacy del server, «spedizione batte
+   ritiro»), e la pagina l'aveva rovesciato in silenzio. Misurato in
+   produzione: 51 attivi su 82 erano «entrambe» e 35 mostravano il
+   badge 🚚 sopra un ritiro preselezionato che nessuno aveva scelto.
+   La precedenza e' casa → punto → ritiro → digitale: punto subito
+   dopo casa perche' e' la gemella di famiglia — con la tariffa di
+   casa morta per cambio muto la spedizione resta il default. L'ordine
+   di PRESENTAZIONE delle radio NON cambia (su «entrambe» la
+   selezionata e' la seconda della lista); la via gia' scelta si
+   conserva sui ± come sempre. Il ripiego vive[0] copre lo storico
+   (pseudo-via '') e ogni via futura fuori elenco. */
+function viaDefault(vive){
+  for (const v of ['casa','punto','ritiro','digitale'])
+    if (vive.some(s => s.via === v)) return v;
+  return vive.length ? vive[0].via : '';
+}
 async function caricaPreventivo(){
   const d0 = acqDati; if (!d0) return;
   const body = d0.tipo==='set'
@@ -8529,14 +8551,13 @@ async function caricaPreventivo(){
       renderAcquisto(); return;
     }
     acqDati.preventivo = d;
-    /* il default e' la PRIMA strada viva (l'ordine del server e' la
-       precedenza: ritiro → casa → punto → codice online) — ma una via
-       GIA' SCELTA si conserva se e' ancora viva (12 ago 2026, con lo
-       stepper): un ± non deve riportare chi aveva scelto «a casa»
-       sul ritiro */
+    /* il default lo dice viaDefault (spedizione prima, vedi sopra) —
+       ma una via GIA' SCELTA si conserva se e' ancora viva (12 ago
+       2026, con lo stepper): un ± non deve riportare chi aveva
+       scelto «a casa» sul ritiro */
     const vive = (d.strade||[]).filter(s => !s.cambio_assente);
     acqDati.via = vive.some(s => s.via === d0.via) ? d0.via
-      : (vive.length ? vive[0].via : '');
+      : viaDefault(vive);
     renderAcquisto();
   } catch(e) {
     if (acqDati !== d0) return;

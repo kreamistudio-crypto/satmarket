@@ -6816,6 +6816,21 @@ def prove_pagina_acquisto():
     # guarda che il catalogo SPEDIZIONIERI arrivi dal server)
     prova("il bottone finale della pagina dice «Paga»", True,
           'id="acqCompra" onclick="ctaAcquisto()">Paga<' in mini)
+    # IL DEFAULT DELLA VIA E' SPEDIZIONE (12 ago 2026, correzione
+    # d'eredita': il «prima strada viva» era l'ordine di presentazione
+    # delle radio — ritiro primo — colato nel default, non una
+    # decisione; misurato in produzione, 35 schede su 82 mostravano il
+    # badge 🚚 sopra un ritiro preselezionato che nessuno aveva
+    # scelto). Il giudice e' UNO — precedenza casa → punto → ritiro →
+    # digitale — e i chiamanti DUE, la pagina vera e il ramo DEMO: chi
+    # torna a vive[0] o a strade[0] fa rosse queste righe.
+    prova("il default della via e' una precedenza, spedizione prima",
+          True,
+          "for (const v of ['casa','punto','ritiro','digitale'])" in mini)
+    prova("...il giudice e' uno coi suoi due chiamanti", 3,
+          mini.count("viaDefault("))
+    prova("...e il ramo DEMO non fa piu' da se'", False,
+          ".strade[0] || {}).via" in mini)
     # IL GIUDICE DEL ≈ (bug dal telefono: ≈ su ENTRAMBE le valute).
     # La regola vive in UNA funzione: il ≈ solo sulla valuta
     # convertita — l'euro nativo dal server la spegne in vista €, e
