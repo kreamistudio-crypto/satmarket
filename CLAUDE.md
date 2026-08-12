@@ -6337,15 +6337,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nato dopo (ago 2026): i testi verso gli utenti dicono tutti
   «carrello» — cassetto, invito, riga del conto, riga dell'ordine — e
   i nomi interni restano `sconto_pacco_*` (colonne, leve, endpoint,
-  funzioni), che è la stessa famiglia. Il MODELLO si dichiara in una riga
-  corta nel sottotitolo della pagina («un venditore alla volta,
-  spedizione unica» — SENZA il «di {venditore}» davanti: misurato a
-  375px, col nome la riga si troncava proprio sulla parte che deve
-  dire, e il venditore è già su ogni card e nel riepilogo), e il
-  CAMBIO VENDITORE si DICE: apriPacco da un altro venditore con una
-  spesa in corso svuota come sempre ma ora col toast «Carrello nuovo:
-  è di un venditore alla volta…» — è il modello, non un errore, e in
-  silenzio sembrava roba sparita.
+  funzioni), che è la stessa famiglia. IL SOTTOTITOLO dice il
+  PERIMETRO e non più il modello (12 ago 2026, decisione di Andrea:
+  via «un venditore alla volta, spedizione unica»): «articoli dello
+  stesso venditore» — è il carrello di QUEL negozio, non del mercatino
+  intero; la spedizione unica la racconta già il riepilogo, che ha la
+  sua riga. Resta vero il perché storico del niente-nome: «di
+  {venditore}» davanti troncava la riga a 375px, e il venditore è già
+  su ogni card e nel riepilogo. Il CAMBIO VENDITORE si DICE:
+  apriPacco da un altro venditore con una spesa in corso svuota come
+  sempre ma col toast «Carrello nuovo: è di un venditore alla
+  volta…» — è il modello, non un errore, e in silenzio sembrava roba
+  sparita (il toast tiene la frase del modello: lì È la spiegazione).
+  LA TESTATA E I BADGE RESTANO IN CIMA (12 ago 2026, decisione di
+  Andrea, MISURATA prima di lasciarla): `.pacco-appiccicato` — un
+  blocco sticky solo con dentro testata («Il carrello» + ✕ + toggle)
+  e la fila dei badge, così i numeri che cambiano a ogni «Aggiungi»
+  restano sotto gli occhi mentre si scorre la griglia. UN blocco e
+  non due: la coppia è atomica per costruzione, la lezione di «Altri
+  oggetti». IL COSTO, misurato collo stato più alto (i due inviti
+  lunghi): 137px a 375 (17% dello schermo) e 158px a 320 (19%) —
+  sotto i 178px (23%) giudicati troppi in «Altri oggetti», e coi
+  verdi o senza promesse il blocco scende da solo; qui in più il
+  blocco è il quadro di lavoro della pagina, non un cartello sopra la
+  merce di un dettaglio. La griglia sta FUORI dal blocco (le card
+  devono passarci sotto), il fondo è pieno, e da desktop si ferma
+  sotto la topbar come `.altri-azione`. Sentinelle su ordine del
+  markup e sottotitolo.
   IL CARRELLO A UNA RIGA VA FINO IN FONDO (ago 2026, decisione di
   Andrea): «Controlla e paga» con un solo articolo non blocca più con
   l'invito a comprare dalla scheda. Il set a una riga resta
@@ -11875,6 +11893,13 @@ MISURANDO dopo un tentativo vero di rovesciarla (il difetto dello
 sticky torna, fotogramma agli atti — vedi la voce). Verificato con 9
 sentinelle nuove (2838 verdi) e gli screenshot 320/375 × chiaro/scuro,
 sotto/sopra soglia e stato misto.
+E il ritocco del CARRELLO (12 ago 2026, sempre quel giorno): il
+sottotitolo dice il perimetro («articoli dello stesso venditore»)
+invece del modello, e testata+badge restano appiccicati in cima
+mentre si scorre — misurato PRIMA di lasciarlo, com'era chiesto:
+137px a 375 (17%) e 158px a 320 (19%) collo stato più alto, sotto i
+178 (23%) del precedente scartato in «Altri oggetti». 5 sentinelle
+nuove (2843 verdi), screenshot chiaro/scuro in cima e a metà scroll.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
