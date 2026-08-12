@@ -320,14 +320,16 @@ except ImportError:
 # promesse identiche in due valute diverse non si spiegano a chi
 # compra, e il venditore ne salverebbe una per abitudine e una per
 # sbaglio.
-# MA NON E' UNA COPIA DELLO SCONTO, e la differenza e' quella che le
-# permette di valere anche sull'ACQUISTO SINGOLO: lo sconto sottrae dal
-# TOTALE senza toccare le colonne che _righe_ordine sottrae, e per
-# questo il mono non sconta mai; la spedizione gratis non sottrae —
+# MA NON E' UNA COPIA DELLO SCONTO, e la differenza e' di FORMA: lo
+# sconto sottrae dal TOTALE come voce di testata, la spedizione gratis
 # AZZERA UNA TARIFFA, cioe' scrive lo stato che gli annunci con
-# spedizione gratuita dichiarata hanno da sempre. La divisione a
-# ritroso dell'unitario resta esatta per costruzione, senza un ramo
-# nuovo. Stessa verifica sull'uscita dei sats: il venditore incassa
+# spedizione gratuita dichiarata hanno da sempre. (Fino all'ago 2026
+# la forma decideva anche il perimetro — il mono non scontava perche'
+# uno sconto di testata rompeva la divisione a ritroso di
+# _righe_ordine; da quando la divisione riaggiunge sconto_sats, tutte
+# e due le promesse valgono anche sull'acquisto singolo.) La divisione
+# resta esatta per costruzione, senza un ramo nuovo.
+# Stessa verifica sull'uscita dei sats: il venditore incassa
 # prezzo_sats - protezione_sats, quindi con la spedizione gratis
 # incassa meno — che e' precisamente cosa vuol dire «la offro io».
 # LE DUE PROMESSE GUARDANO LO STESSO NUMERO (decisione di Andrea):
@@ -1364,12 +1366,15 @@ def init_db():
         -- prezzo del singolo pezzo GIA' scontato (lampo/accordo).
         -- LO SCONTO CARRELLO NON LE TOCCA (ago 2026): e' una voce di
         -- TESTATA (ordini.sconto_sats), perche' e' una proprieta' del
-        -- CARRELLO e non della cosa — l'unitario resta la FOTOGRAFIA
+        -- l'ORDINE e non della cosa — l'unitario resta la FOTOGRAFIA
         -- del listino di quel giorno, e limarlo vorrebbe dire
         -- distribuire un resto su N righe e poi litigarci in disputa.
         -- L'invariante e' della testata:
         --   prezzo_sats = somma(unitario x quantita) - sconto_sats
         --                 + spedizione_sats + protezione_sats
+        -- e dall'ago 2026 vale anche per il MONO (il mono sconta),
+        -- dove la «somma» e' la riga sintetizzata: la divisione a
+        -- ritroso di _righe_ordine riaggiunge sconto_sats apposta.
         -- Il titolo si fotografa all'acquisto — il patto delle quote
         -- fissate: l'annuncio puo' cambiare o sparire, l'ordine e la
         -- contabilita' no.
@@ -10111,13 +10116,13 @@ def _sped_gratis(articolo: int, articolo_eur, soglia: int,
     ed e' scritto nel cassetto del venditore.
     Al filo esatto la spedizione E' gratis, come _asta_viva e in_ferie:
     chi promette «da 50 €» intende «50 € compresi».
-    A DIFFERENZA DELLO SCONTO VALE ANCHE SUL MONO, e non e' una scelta
-    di prodotto ma una proprieta' della forma: lo sconto sottrae dal
-    TOTALE senza toccare le colonne che _righe_ordine sottrae — ed e'
-    per quello che il mono non sconta — mentre qui si azzera una
-    TARIFFA, cioe' si scrive spedizione_sats=0, che e' lo stato di ogni
-    annuncio con spedizione gratuita dichiarata. La divisione a ritroso
-    dell'unitario resta esatta senza un ramo nuovo.
+    VALE ANCHE SUL MONO, da sempre e per una proprieta' della forma:
+    qui si azzera una TARIFFA, cioe' si scrive spedizione_sats=0, che
+    e' lo stato di ogni annuncio con spedizione gratuita dichiarata —
+    la divisione a ritroso dell'unitario resta esatta senza un ramo
+    nuovo. (Dall'ago 2026 anche lo sconto vale sul mono: li' la
+    divisione riaggiunge sconto_sats, vedi _righe_ordine — quindi
+    l'asimmetria fra le due promesse non esiste piu'.)
     IMPERFEZIONE DICHIARATA, ed e' lo SPECCHIO di una gia' accettata:
     la promessa e' esatta quando l'unita' della soglia combacia con
     quella del listino, e deriva ai bordi altrimenti. Una soglia in
@@ -10192,9 +10197,11 @@ def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
     promessa di NEGOZIO scritta in vetrina, e un pezzo che non la
     mantenesse non avrebbe un posto onesto dove dirlo — servirebbe una
     riga «questo no» per riga. Il guardrail e' il tetto della leva.
-    NON la chiama MAI il ramo mono: la decisione vive qui fuori dal
-    conto apposta, cosi' e' una garanzia strutturale e non un «if» da
-    ricordare (vedi _righe_ordine)."""
+    DALL'AGO 2026 LA CHIAMANO I QUATTRO PERCORSI DEL CONTO (compra
+    mono, _compra_set e i due preventivi — il mono sconta, decisione
+    di Andrea che rovescia il 6 ago): sul mono `pezzi` e' la quantita'
+    richiesta — tre copie della stessa cosa sono tre pezzi — e la
+    divisione a ritroso di _righe_ordine riaggiunge sconto_sats."""
     if criterio == "valore":
         if valuta not in ("sats", "eur"):
             return 0    # valuta che nessun ramo sa misurare: si tace
@@ -12439,18 +12446,22 @@ def _righe_ordine(con, o) -> list:
     per costruzione (il patto della colonna quantita). Ogni punto che
     deve ciclare sugli oggetti dell'ordine passa da qui: nessuno
     puo' dimenticarsi dei set."""
-    # Lo sconto carrello e' del SET e non passa MAI di qui: il mono non
-    # ne ha (decisione di Andrea), ed e' anche il motivo per cui non ne
-    # ha — uno sconto di testata romperebbe questa divisione in
-    # silenzio, sbagliando l'unitario nell'ordine, nelle notifiche e
-    # nel CSV. Se un giorno il mono lo avesse, qui va
-    # (prezzo - spedizione - protezione + sconto_sats) // qta.
+    # DALL'AGO 2026 IL MONO SCONTA (decisione di Andrea, che rovescia
+    # il 6 ago): prezzo_sats nasce gia' scontato, quindi la divisione
+    # RIAGGIUNGE sconto_sats per dire l'unitario LORDO — e' la ricetta
+    # che questo commento prescriveva da sempre per quel giorno. Una
+    # copia di questa divisione senza lo sconto non fa fallire niente:
+    # mostra un unitario storto in ordine, notifiche e CSV, in
+    # silenzio — per questo le copie (qui, la ripresa in compra(), la
+    # riga «N pezzi x unitario» del client) le conta un CENSIMENTO in
+    # prove.py, non un elenco a memoria.
     if o["annuncio_id"]:
         t = con.execute("SELECT titolo FROM annunci WHERE id=?",
                         (o["annuncio_id"],)).fetchone()
         qta = o["quantita"] or 1
         unitario = (o["prezzo_sats"] - o["spedizione_sats"]
-                    - o["protezione_sats"]) // qta
+                    - o["protezione_sats"]
+                    + (o["sconto_sats"] or 0)) // qta
         return [{"annuncio_id": o["annuncio_id"], "quantita": qta,
                  "unitario_sats": unitario,
                  "titolo": t["titolo"] if t else "?"}]
@@ -13255,14 +13266,25 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                                          f"e ne restano solo {disponibile}: "
                                          f"riprova se il venditore "
                                          f"rifornisce")
-    # la riga del venditore: lo spedizioniere e la promessa della
-    # spedizione gratis, dalla SELECT che c'era gia' — zero query in
-    # piu' (il patto del ramo set con lo sconto)
-    sp = con.execute("SELECT spedizioniere, sped_gratis_soglia, "
+    # la riga del venditore: spedizioniere e TUTTE E DUE le promesse
+    # del negozio, dalla SELECT che c'era gia' — zero query in piu'
+    # (il patto del ramo set; dall'ago 2026 il mono sconta, quindi
+    # anche qui la regola dello sconto si legge sempre)
+    sp = con.execute("SELECT spedizioniere, sconto_pacco_criterio, "
+                     "sconto_pacco_soglia, sconto_pacco_valore, "
+                     "sconto_pacco_valore_eur, sconto_pacco_valore_valuta, "
+                     "sconto_pacco_percento, sped_gratis_soglia, "
                      "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (a["venditore_id"],)).fetchone()
     spedizioniere = sp["spedizioniere"] if sp else ""
+    crit, sog, pct, val_sc = _regola_sconto(
+        sp["sconto_pacco_criterio"] if sp else "",
+        sp["sconto_pacco_valore_valuta"] if sp else "",
+        sp["sconto_pacco_soglia"] if sp else 0,
+        sp["sconto_pacco_valore"] if sp else 0,
+        sp["sconto_pacco_valore_eur"] if sp else 0,
+        sp["sconto_pacco_percento"] if sp else 0)
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
         sp["sped_gratis_soglia_eur"] if sp else 0,
@@ -13270,15 +13292,16 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     con.close()
     # Il cambio, UNA volta: obbligatorio per il listino EUR (503 come
     # in compra), facoltativo per le sole tariffe ancorate (la strada
-    # esce spenta col motivo, le altre vivono) e per la PROMESSA in
-    # euro (che senza cambio non si valuta e semplicemente non scatta).
-    # A promessa in SATS il cambio non serve affatto: la misura e'
-    # l'articolo stesso.
+    # esce spenta col motivo, le altre vivono) e per le PROMESSE in
+    # euro (che senza cambio non si valutano e semplicemente non
+    # scattano). A promessa in SATS il cambio non serve affatto: la
+    # misura e' l'articolo stesso.
     listino_eur = a["valuta"] == "eur" and a["prezzo_eur"] > 0
     cambio = 0.0
     if (listino_eur or a["spedizione_eur"] > 0
             or a["spedizione_punto_eur"] > 0
             or a["spedizione_extra_eur"] > 0
+            or (crit == "valore" and val_sc == "eur")
             or (sog_gratis > 0 and val_sg == "eur")):
         cambio = await cambio_btc_eur()
         if listino_eur and cambio <= 0:
@@ -13300,8 +13323,6 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # conversione col suo falso ≈
     unitario_eur = _eur_effettivo(a, off, adesso)
     articolo_eur = round(unitario_eur * richiesti, 2) if unitario_eur else 0.0
-    conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
-                          COMMISSIONE_PERCENTO)
     disponibili = set()
     if a["consegna"] in ("spedizione", "entrambe"):
         disponibili.add("spedizione")
@@ -13319,6 +13340,16 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # e' esattamente il numero dove vive un off-by-one (mancano_pezzi).
     misura_eur = _eur_interi(articolo, cambio)
     gratis = _sped_gratis(articolo, misura_eur, sog_gratis, val_sg)
+    # LO SCONTO, come nel set (ago 2026, il mono sconta): `pezzi` e' la
+    # quantita' richiesta, la misura a valore e' lo stesso lordo della
+    # promessa gemella. Il gemello in euro si aziona SOLO dietro al
+    # fratello in sats: la decisione e' una sola (vedi _sconto_pacco).
+    _misura_sc = articolo if val_sc == "sats" else misura_eur
+    sconto = _sconto_pacco(articolo, misura_eur, richiesti, crit, sog, pct,
+                           val_sc)
+    sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
+    conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
+                          COMMISSIONE_PERCENTO, sconto)
     # quanto manca, NELL'UNITA' DELLA PROMESSA: la chiave dell'altra
     # unita' resta a zero, cosi' il client non puo' leggere dei sats
     # come euro (la regola d'oro di _sped_gratis_pubblico, applicata
@@ -13327,9 +13358,35 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     _misura_sg = articolo if val_sg == "sats" else misura_eur
     _mancano = (max(0, sog_gratis - _misura_sg)
                 if sog_gratis and _misura_sg is not None else 0)
+    # `articolo_sats` e' il NETTO, come nel set: lordo e sconto sono
+    # chiavi in piu' e si sommano da sole. La REGOLA esce anche quando
+    # non e' scattata (serve all'invito), con le coppie speculari che
+    # si spengono a vicenda — la regola d'oro di _sconto_pubblico.
     return {"set": False, "quantita": richiesti,
-            "articolo_sats": articolo, "articolo_unitario_sats": unitario,
-            "articolo_eur": articolo_eur,
+            "articolo_sats": conto["netto"],
+            "articolo_lordo_sats": articolo,
+            "sconto_sats": sconto,
+            "articolo_eur": (round(articolo_eur - sconto_eur, 2)
+                             if articolo_eur else 0.0),
+            "articolo_lordo_eur": articolo_eur,
+            "sconto_eur": sconto_eur,
+            "sconto_percento": pct,
+            "sconto_criterio": crit,
+            "sconto_valuta": val_sc,
+            "sconto_soglia": sog if crit == "pezzi" else 0,
+            "sconto_valore": (sog if crit == "valore"
+                              and val_sc == "sats" else 0),
+            "sconto_valore_eur": (sog if crit == "valore"
+                                  and val_sc == "eur" else 0),
+            "mancano_pezzi": (max(0, sog - richiesti)
+                              if crit == "pezzi" else 0),
+            "mancano_sats": (max(0, sog - _misura_sc)
+                             if crit == "valore" and val_sc == "sats"
+                             else 0),
+            "mancano_eur": (max(0, sog - _misura_sc)
+                            if crit == "valore" and val_sc == "eur"
+                            and _misura_sc is not None else 0),
+            "articolo_unitario_sats": unitario,
             "articolo_unitario_eur": unitario_eur,
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
@@ -13348,13 +13405,15 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # in EURO non si sa valutare e la pagina lo dice invece di
             # far sparire una riga senza spiegazione. In sats non
             # succede mai — quella misura non ha bisogno di niente.
-            "promesse_sospese": (sog_gratis > 0 and val_sg == "eur"
+            "promesse_sospese": (((crit == "valore" and val_sc == "eur")
+                                  or (sog_gratis > 0 and val_sg == "eur"))
                                  and misura_eur is None),
             # [(annuncio, QUANTI)]: la quantita' e' la meta' del conto
             # della spedizione, e passarla e' l'unico modo di dire la
             # stessa cifra che dira' la invoice
             "strade": _strade_preventivo([(a, richiesti)], articolo, cambio,
                                          disponibili, articolo_eur,
+                                         sconto, sconto_eur,
                                          sped_gratis=gratis)}
 
 
@@ -13779,19 +13838,31 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
         if stessa and viva and mio["invoice"]:
             con.close()
+            # La divisione a ritroso RIAGGIUNGE lo sconto (ago 2026, il
+            # mono sconta): prezzo_sats nasce gia' scontato, quindi
+            # art e' il NETTO e l'unitario si ricava dal LORDO — e'
+            # la copia n.2 della divisione, in pari con _righe_ordine
+            # per il censimento delle prove. Le cifre restano quelle
+            # CONGELATE nell'ordine: la invoice viva E' il lock del
+            # prezzo, una regola cambiata nel frattempo non riscrive.
+            sc = mio["sconto_sats"] or 0
             art = (mio["prezzo_sats"] - mio["spedizione_sats"]
                    - mio["protezione_sats"])
             return {"ordine_id": mio["id"], "invoice": mio["invoice"],
                     "payment_hash": mio["payment_hash"],
                     "prezzo_sats": mio["prezzo_sats"],
                     "articolo_sats": art,
+                    "articolo_lordo_sats": art + sc,
+                    "sconto_sats": sc,
+                    "sconto_percento": mio["sconto_percento"] or 0,
                     "spedizione_sats": mio["spedizione_sats"],
                     "protezione_sats": mio["protezione_sats"],
                     "consegna": mio["consegna_scelta"],
                     "punto_ritiro": mio["punto_ritiro"],
                     "via_punto": mio["via_punto"] or 0,
                     "quantita": mio["quantita"],
-                    "articolo_unitario_sats": art // (mio["quantita"] or 1),
+                    "articolo_unitario_sats":
+                        (art + sc) // (mio["quantita"] or 1),
                     "offerta_id": legame["id"] if legame else 0,
                     "ripresa": True}
         # Rinnovo: prima il controllo del pagamento — e l'await impone
@@ -13911,12 +13982,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     t_eur = (_tariffa_dichiarata(a, via)[1]
              if scelta == "spedizione" else 0.0)
     cambio_ordine = 0.0
-    # LA PROMESSA DEL VENDITORE SI LEGGE QUI, e la posizione e' il solo
-    # riordino di questo cantiere: da quando la soglia e' in EURO e' il
-    # suo valore a dire se serve il cambio, quindi deve arrivare PRIMA
-    # del blocco qui sotto. E' una LETTURA e nessun DML — il vincolo
-    # «niente DML fra le guardie e il ricontrollo» resta intatto, ed e'
-    # la stessa ragione per cui era lecita dove stava prima.
+    # LE PROMESSE DEL VENDITORE SI LEGGONO QUI, e la posizione e' il
+    # solo riordino di quel cantiere: da quando la soglia e' in EURO e'
+    # il suo valore a dire se serve il cambio, quindi deve arrivare
+    # PRIMA del blocco qui sotto. E' una LETTURA e nessun DML — il
+    # vincolo «niente DML fra le guardie e il ricontrollo» resta
+    # intatto, ed e' la stessa ragione per cui era lecita dove stava.
     # LA GUARDIA E' LA SCELTA, NON LA CIFRA (ago 2026, bug trovato col
     # cantiere del supplemento). Qui c'era «if sped:», cioe' i soli
     # sats: su un listino in SATS con la tariffa ancorata all'EURO
@@ -13927,15 +13998,29 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # silenzio, sul mono; _compra_set non aveva il difetto perche' la
     # regola la legge sempre. Guardare la STRADA e non il suo prezzo
     # e' anche cio' che tiene la riga vera quando la tariffa e' 0.
+    # LO SCONTO invece si legge SEMPRE (ago 2026, il mono sconta): e'
+    # sugli articoli e vale anche su ritiro e codice online — solo la
+    # spedizione gratis resta gated sulla strada che spedisce.
+    ven = con.execute("SELECT sconto_pacco_criterio, sconto_pacco_soglia, "
+                      "sconto_pacco_valore, sconto_pacco_valore_eur, "
+                      "sconto_pacco_valore_valuta, sconto_pacco_percento, "
+                      "sped_gratis_soglia, sped_gratis_soglia_eur, "
+                      "sped_gratis_valuta "
+                      "FROM utenti WHERE tg_id=?",
+                      (a["venditore_id"],)).fetchone()
+    crit, sog, pct, val_sc = _regola_sconto(
+        ven["sconto_pacco_criterio"] if ven else "",
+        ven["sconto_pacco_valore_valuta"] if ven else "",
+        ven["sconto_pacco_soglia"] if ven else 0,
+        ven["sconto_pacco_valore"] if ven else 0,
+        ven["sconto_pacco_valore_eur"] if ven else 0,
+        ven["sconto_pacco_percento"] if ven else 0)
     sog_gratis, val_sg = 0, ""
     if scelta == "spedizione":
-        vg = con.execute("SELECT sped_gratis_soglia, sped_gratis_soglia_eur, "
-                         "sped_gratis_valuta FROM utenti "
-                         "WHERE tg_id=?", (a["venditore_id"],)).fetchone()
         sog_gratis, val_sg = _regola_sped_gratis(
-            vg["sped_gratis_soglia"] if vg else 0,
-            vg["sped_gratis_soglia_eur"] if vg else 0,
-            vg["sped_gratis_valuta"] if vg else "")
+            ven["sped_gratis_soglia"] if ven else 0,
+            ven["sped_gratis_soglia_eur"] if ven else 0,
+            ven["sped_gratis_valuta"] if ven else "")
     # Spedizione ANCORATA all'euro su listino sats (tariffa in euro
     # piena): i sats si decidono ADESSO, col cambio corrente. Senza
     # cambio l'ordine con spedizione non puo' partire — 503 onesto,
@@ -13968,7 +14053,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # fallire un acquisto perche' non si riesce a regalare la
     # spedizione sarebbe curare un male causandone uno peggiore.
     cambio_misura = cambio_ordine
-    if sog_gratis > 0 and val_sg == "eur" and cambio_misura <= 0:
+    if cambio_misura <= 0 and ((sog_gratis > 0 and val_sg == "eur")
+                               or (crit == "valore" and val_sc == "eur")):
         cambio_misura = await cambio_btc_eur()
     # Il conto lavora sull'UNITARIO (offerte e lampo parlano il prezzo
     # del singolo pezzo, come il listino) e moltiplica alla fine:
@@ -14011,24 +14097,27 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     sp = _sped_pacco([(a, richiesti)],
                      via if scelta == "spedizione" else "", cambio_ordine)
     sped = sp["sats"]
-    # LA SPEDIZIONE GRATIS SOPRA SOGLIA, e qui c'e' anche sul MONO —
-    # lo sconto carrello no, ed e' la forma a deciderlo, non il gusto:
-    # azzerare una tariffa scrive spedizione_sats=0, cioe' uno stato
-    # che _righe_ordine gia' sottrae, mentre uno sconto di testata
-    # romperebbe la sua divisione a ritroso (vedi _sped_gratis).
-    # La regola l'ha gia' letta il blocco del cambio qui sopra (e' lei
-    # a dire se il cambio serviva); qui resta la sola decisione. Si
-    # azzera DOPO aver contato la tariffa, lo stesso punto di
+    # LE DUE PROMESSE, sullo stesso LORDO — e dall'ago 2026 tutte e
+    # due anche sul MONO (decisione di Andrea, che ROVESCIA il «il
+    # mono non sconta mai» del 6 ago): tre copie dello stesso articolo
+    # sono tre pezzi, e una soglia a valore superata e' superata. La
+    # divisione a ritroso di _righe_ordine resta esatta riaggiungendo
+    # sconto_sats — la ricetta che il suo commento prescriveva gia'.
+    # Le regole le ha lette il blocco del cambio qui sopra (sono loro
+    # a dire se il cambio serviva); qui resta la sola decisione. La
+    # tariffa si azzera DOPO essere stata contata, lo stesso punto di
     # _strade_preventivo — preventivo e invoice devono dire la stessa
     # cifra per costruzione.
     misura_eur = _eur_interi(articolo, cambio_misura)
+    sconto = _sconto_pacco(articolo, misura_eur, richiesti, crit, sog, pct,
+                           val_sc)
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
     if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
         # intera, supplemento compreso: e' quello che il venditore
         # promette quando dice «la spedizione la offro io»
         sped_gratis_sats, sped, supplemento = sped, 0, 0
     conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
-                          COMMISSIONE_PERCENTO)
+                          COMMISSIONE_PERCENTO, sconto)
     prot, totale = conto["protezione"], conto["totale"]
 
     # La leva anti-frode del digitale (SPENTA di serie, come il tetto
@@ -14088,13 +14177,14 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,punto_ritiro,via_punto,spedizione_sats,"
-        "protezione_sats,quantita,sped_gratis_sats) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "protezione_sats,quantita,sconto_sats,sconto_percento,"
+        "sped_gratis_sats) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
          cambio_ordine, scelta, punto, via_punto, sped, prot, richiesti,
-         sped_gratis_sats))
+         sconto, pct if sconto else 0, sped_gratis_sats))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
@@ -14107,7 +14197,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # le quote scomposte sono in piu', per il conto in chiaro.
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
             "payment_hash": inv["payment_hash"], "prezzo_sats": totale,
-            "articolo_sats": articolo, "spedizione_sats": sped,
+            # articolo_sats e' il NETTO dall'ago 2026, come nel set e
+            # nel preventivo: lordo e sconto sono chiavi in piu' e si
+            # sommano da sole (netto+sped+prot = totale anche per il
+            # client di ieri, a cui manca solo la riga del risparmio)
+            "articolo_sats": conto["netto"],
+            "articolo_lordo_sats": articolo,
+            "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
+            "sconto_criterio": crit if sconto else "",
+            "spedizione_sats": sped,
             # la parte per-pezzo e i pezzi: le due chiavi che tengono
             # viva nel paySheet la riga «spedizione per N pezzi» gia'
             # vista nella pagina d'acquisto (sparire li' si legge come
@@ -22279,6 +22377,78 @@ async def avvisa_spedizioniere_mancante():
           f"venditori")
 
 
+TIMBRO_CAMPAGNA_SCONTO_MONO = "campagna_sconto_mono"
+
+
+async def avvisa_sconto_su_mono():
+    """LA CAMPAGNA DEL ROVESCIAMENTO (ago 2026, il mono sconta): chi
+    aveva GIA' lo sconto carrello acceso l'ha impostato sotto la
+    regola vecchia — «solo nel carrello, da due oggetti diversi in
+    su» — e da oggi scattera' in casi in cui prima non scattava. Un
+    significato che cambia sotto una leva gia' girata non si tace.
+    E' UNA TANTUM GLOBALE, col timbro nella tabella `timbri` e NON una
+    colonna per utente: e' un evento del deploy, non una condizione
+    per-utente che ricorre — una colonna lascerebbe la campagna armata
+    per sempre verso chi accende lo sconto il mese prossimo, che le
+    regole nuove le trova gia' scritte nel cassetto. Il timbro si
+    scrive PRIMA degli invii (il patto delle campagne: un errore di
+    rete puo' perdere un avviso di cortesia, mai raddoppiarlo);
+    l'imperfezione dichiarata e' che un crash a meta' loop perde i
+    restanti — sui numeri di oggi (cinque negozi) si verifica dal
+    journal, che dice a chi e' partita."""
+    if timbro_letto(TIMBRO_CAMPAGNA_SCONTO_MONO):
+        return
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id, sconto_pacco_criterio, sconto_pacco_soglia, "
+        "sconto_pacco_valore, sconto_pacco_valore_eur, "
+        "sconto_pacco_valore_valuta, sconto_pacco_percento "
+        "FROM utenti WHERE sconto_pacco_percento > 0").fetchall()
+    con.close()
+    timbro_scrivi(TIMBRO_CAMPAGNA_SCONTO_MONO, "fatto")
+    mandati = []
+    for r in righe:
+        crit, sog, pct, val = _regola_sconto(
+            r["sconto_pacco_criterio"], r["sconto_pacco_valore_valuta"],
+            r["sconto_pacco_soglia"], r["sconto_pacco_valore"],
+            r["sconto_pacco_valore_eur"], r["sconto_pacco_percento"])
+        if not pct:
+            continue        # regola che non scatta: per lui non cambia niente
+        # IL TAGLIO DEL TESTO (chiesto da Andrea): dev'essere chiaro al
+        # primo colpo d'occhio che CAMBIA UNA REGOLA gia' sua — lo
+        # sconto scattera' piu' spesso, cioe' su quegli ordini incassa
+        # meno — non che arriva una funzione in piu' da festeggiare.
+        if crit == "pezzi":
+            mezzo = (f"Finora il tuo «da {sog} pezzi, −{pct}%» scattava "
+                     f"solo nel carrello, con oggetti diversi. Da oggi "
+                     f"scatta su OGNI acquisto: anche {sog} copie dello "
+                     f"stesso articolo, comprate dalla scheda, sono "
+                     f"{sog} pezzi.")
+        else:
+            cifra = (f"{_fmt_sats(sog)} sats" if val == "sats"
+                     else f"{_fmt_eur(sog)} €")
+            mezzo = (f"Finora il tuo «da {cifra} di articoli, −{pct}%» "
+                     f"scattava solo nel carrello, con oggetti diversi. "
+                     f"Da oggi scatta su OGNI acquisto che supera la "
+                     f"soglia, anche con un oggetto solo.")
+        try:
+            await notifica(r["tg_id"], (
+                f"🎁 <b>Cambia la regola del tuo sconto carrello.</b>\n\n"
+                f"{mezzo}\n\n"
+                f"In pratica sconterai più spesso — e su quegli ordini "
+                f"incassi meno. Se la regola ti va bene così non devi "
+                f"fare niente; per ritoccare soglia e percentuale, o "
+                f"spegnerla, vai nel Profilo → 🎁 Sconto sul carrello."))
+            mandati.append(r["tg_id"])
+        except Exception as e:
+            print(f"⚠️ Avviso sconto-su-mono saltato per {r['tg_id']}: {e}")
+        await asyncio.sleep(0.2)
+    # la riga nel journal, SEMPRE quando la campagna gira: e' il modo
+    # di sapere a chi e' arrivata (il patto dei timbri)
+    print(f"🎁 Campagna «il mono sconta»: avvisati {len(mandati)} "
+          f"venditori {mandati}")
+
+
 async def orologio():
     while True:
         # Il cambio NON si rinfresca qui: ha un giro suo da un minuto
@@ -22397,6 +22567,12 @@ async def orologio():
             await avvisa_spedizioniere_mancante()
         except Exception as e:
             print(f"⚠️ Avviso spedizioniere saltato: {e}")
+        try:
+            # una-tantum GLOBALE (timbro in `timbri`): il rovesciamento
+            # del 6 ago detto a chi aveva gia' lo sconto acceso
+            await avvisa_sconto_su_mono()
+        except Exception as e:
+            print(f"⚠️ Campagna sconto-su-mono saltata: {e}")
         try:
             # la ronda degli invarianti: legge e avvisa, non corregge
             # mai niente — e a libro mastro sano non dice nulla
@@ -22551,16 +22727,28 @@ CONTROLLI_LIBRO_MASTRO = (
      "GROUP BY o.id HAVING o.prezzo_sats <> "
      "SUM(r.unitario_sats*r.quantita) - o.sconto_sats "
      "+ o.spedizione_sats + o.protezione_sats"),
-    ("mono scontato",
-     "lo sconto carrello e' del CARRELLO: su un ordine a un annuncio "
-     "solo rompe la divisione a ritroso dell'unitario",
-     "SELECT id FROM ordini WHERE annuncio_id<>0 "
-     "AND (sconto_sats<>0 OR sconto_percento<>0)"),
+    # «mono scontato» e' morto qui (ago 2026, il mono sconta): sarebbe
+    # diventato un falso allarme permanente su ogni ordine legittimo.
+    # Al suo posto l'invariante VERO che al mono mancava:
+    ("aritmetica del mono",
+     "la divisione a ritroso dell'unitario non torna: "
+     "(prezzo - spedizione - protezione + sconto) deve dividersi "
+     "esatta per i pezzi",
+     "SELECT id FROM ordini WHERE annuncio_id<>0 AND quantita>1 "
+     "AND (prezzo_sats - spedizione_sats - protezione_sats "
+     "+ sconto_sats) % quantita <> 0"),
     ("sconto fuori scala",
      "sconto negativo, o piu' grande della merce che sconta",
      "SELECT o.id FROM ordini o JOIN ordine_righe r ON r.ordine_id=o.id "
      "GROUP BY o.id HAVING o.sconto_sats < 0 "
      "OR o.sconto_sats >= SUM(r.unitario_sats*r.quantita)"),
+    # il gemello per la testata mono (il JOIN qui sopra non lo vede
+    # mai): sconto >= lordo equivale a prezzo <= sped + prot
+    ("sconto fuori scala (mono)",
+     "sconto negativo, o piu' grande della merce che sconta",
+     "SELECT id FROM ordini WHERE annuncio_id<>0 AND (sconto_sats < 0 "
+     "OR (sconto_sats > 0 AND prezzo_sats - spedizione_sats "
+     "- protezione_sats <= 0))"),
     ("sconto e percentuale scordati",
      "la ricevuta dichiara uno sconto che non c'e', o tace su uno che c'e'",
      "SELECT id FROM ordini "

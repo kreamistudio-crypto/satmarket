@@ -32,17 +32,31 @@ SELECT o.id, o.prezzo_sats, SUM(r.unitario_sats*r.quantita) AS lordo,
 HAVING o.prezzo_sats <> SUM(r.unitario_sats*r.quantita) - o.sconto_sats
                         + o.spedizione_sats + o.protezione_sats;
 
-SELECT '2) MONO SCONTATI (deve essere vuoto)' AS controllo;
--- lo sconto carrello è del CARRELLO: su un ordine a un annuncio solo
--- romperebbe la divisione a ritroso dell'unitario di _righe_ordine
-SELECT id, annuncio_id, sconto_sats, sconto_percento FROM ordini
- WHERE annuncio_id <> 0 AND (sconto_sats <> 0 OR sconto_percento <> 0);
+SELECT '2) ARITMETICA DEL MONO (deve essere vuoto)' AS controllo;
+-- dall'ago 2026 il mono sconta («2) MONO SCONTATI» è morto qui: sarebbe
+-- un falso allarme su ogni ordine legittimo). L'invariante vero è la
+-- divisione a ritroso di _righe_ordine, che riaggiunge sconto_sats:
+-- (prezzo − spedizione − protezione + sconto) si divide esatta per i pezzi
+SELECT id, quantita, sconto_sats, prezzo_sats FROM ordini
+ WHERE annuncio_id <> 0 AND quantita > 1
+   AND (prezzo_sats - spedizione_sats - protezione_sats + sconto_sats)
+       % quantita <> 0;
 
 SELECT '3) SCONTI FUORI SCALA (deve essere vuoto)' AS controllo;
 SELECT o.id, o.sconto_sats, SUM(r.unitario_sats*r.quantita) AS lordo
   FROM ordini o JOIN ordine_righe r ON r.ordine_id = o.id
  GROUP BY o.id
 HAVING o.sconto_sats < 0 OR o.sconto_sats >= SUM(r.unitario_sats*r.quantita);
+
+SELECT '3b) SCONTI FUORI SCALA SUL MONO (deve essere vuoto)' AS controllo;
+-- il gemello per la testata (il JOIN qui sopra non vede mai i mono):
+-- sconto >= lordo equivale a prezzo <= spedizione + protezione
+SELECT id, sconto_sats, prezzo_sats - spedizione_sats - protezione_sats
+         + sconto_sats AS lordo
+  FROM ordini
+ WHERE annuncio_id <> 0 AND (sconto_sats < 0
+    OR (sconto_sats > 0
+        AND prezzo_sats - spedizione_sats - protezione_sats <= 0));
 
 SELECT '4) SCONTO E PERCENTUALE SCORDATI (deve essere vuoto)' AS controllo;
 SELECT id, sconto_sats, sconto_percento FROM ordini
@@ -263,9 +277,13 @@ SELECT COUNT(*) AS ordini, SUM(sconto_sats) AS sats_scontati,
 SELECT '19) GLI ULTIMI DIECI SCONTATI' AS polso;
 -- il lordo accanto ai pezzi: a criterio valore è LUI il numero che ha
 -- fatto scattare la soglia, e senza non si capisce perché quell'ordine
--- ha scontato e quello sopra no
+-- ha scontato e quello sopra no. Il COALESCE è per i MONO (ago 2026,
+-- il mono sconta): il LEFT JOIN a vuoto darebbe lordo NULL proprio
+-- sui casi nuovi, e il lordo della testata è netto + sconto
 SELECT o.id, o.stato, o.quantita AS pezzi,
-       SUM(r.unitario_sats*r.quantita) AS lordo,
+       COALESCE(SUM(r.unitario_sats*r.quantita),
+                o.prezzo_sats - o.spedizione_sats - o.protezione_sats
+                  + o.sconto_sats) AS lordo,
        o.sconto_percento AS pct, o.sconto_sats, o.prezzo_sats,
        datetime(o.creato, 'unixepoch', 'localtime') AS quando
   FROM ordini o LEFT JOIN ordine_righe r ON r.ordine_id = o.id
