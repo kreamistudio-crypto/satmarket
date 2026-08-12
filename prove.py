@@ -2072,8 +2072,17 @@ def prove_busta_ritiro():
     pacco e' GIA' al punto."""
     print("\n[la busta di consegna]")
     import asyncio
+    import shutil
     import sqlite3
+    import tempfile
     import time as _t
+
+    # la whitelist delle firme e' una costante, non una funzione:
+    # si estrae per testo come tutto il resto, o la prova giudicherebbe
+    # una tabella scritta a mano invece di quella vera
+    _i = _SORGENTE.index("FIRME_DOC_BUSTA = (")
+    _firme_doc = _SORGENTE[_i:_SORGENTE.index("\n)\n", _i) + 3]
+    buste_dir = tempfile.mkdtemp(prefix="buste-prove-")
 
     # --- le sentinelle di forma: la SEPARAZIONE dall'escrow ---------
     dep = pezzo("deposita_busta_ritiro").split('"""')[-1]
@@ -2164,6 +2173,8 @@ def prove_busta_ritiro():
         busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
         busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
         busta_correzioni INT DEFAULT 0,
+        busta_file TEXT DEFAULT '', busta_file_tipo TEXT DEFAULT '',
+        busta_file_nome TEXT DEFAULT '',
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0);
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
         asta_base_sats INT DEFAULT 0);
@@ -2212,9 +2223,21 @@ def prove_busta_ritiro():
                "hashlib": __import__("hashlib"), "time": _t,
                "html": __import__("html"),   # segna_spedito scappa i suoi
                "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
-               "MSG_BUSTA_PRONTA": "TI-ASPETTA"}
+               "MSG_BUSTA_PRONTA": "TI-ASPETTA",
+               # il documento di ritiro: cartella usa-e-getta, cosi'
+               # la prova scrive davvero un file e lo si puo' guardare
+               "os": __import__("os"), "re": __import__("re"),
+               "base64": __import__("base64"),
+               "secrets": __import__("secrets"),
+               "BUSTE_DIR": buste_dir, "MAX_DOC_BUSTA": 15 * 1024 * 1024,
+               "_e_immagine": lambda raw: True}
         exec(pezzo("_cifra_contenuto"), amb)
         exec(pezzo("_decifra_contenuto"), amb)
+        exec(pezzo("_cifra_blob"), amb)
+        exec(pezzo("_decifra_blob"), amb)
+        exec(_firme_doc, amb)
+        exec(pezzo("_documento_busta"), amb)
+        exec(pezzo("_etichetta_documento"), amb)
         return amb
 
     def corri(amb, nome, *args):
@@ -2241,9 +2264,12 @@ def prove_busta_ritiro():
           deposita(999, 1, busta))
     prova("niente busta fuori dalla via punto", True,
           str(deposita(222, 2, busta)).startswith("400 Questo ordine"))
-    prova("i due campi servono insieme", True,
+    prova("il nome serve sempre", True,
+          str(deposita(222, 1, {"codice": "PIN"})).startswith(
+              "400 Serve il nome"))
+    prova("...e poi una strada: senza codice ne' documento, no", True,
           str(deposita(222, 1, {"nome": "Mario"})).startswith(
-              "400 Servono entrambi"))
+              "400 Serve il codice"))
     prima = [tuple(r) for r in vero.execute(
         "SELECT stato, spedito_il, consegnato, aggiornato FROM ordini")]
     r1 = deposita(222, 1, busta)
@@ -2303,6 +2329,161 @@ def prove_busta_ritiro():
     prova("la lettura non scrive NIENTE (la prova regina)", dump,
           [tuple(r) for r in vero.execute(
               "SELECT * FROM ordini ORDER BY id")])
+
+    # --- il documento di ritiro: l'altra strada per il codice --------
+    # (ago 2026: un PIN si trascrive, un QR no)
+    import base64 as _b64
+    import os as _os
+    PDF = "data:application/pdf;base64," + _b64.b64encode(
+        b"%PDF-1.4 finto ma con la firma giusta").decode()
+    JPG = "data:image/jpeg;base64," + _b64.b64encode(
+        b"\xff\xd8\xff finto").decode()
+    prova("il tipo lo dicono i BYTE, non l'etichetta", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "P",
+                                "file": "data:image/jpeg;base64," +
+                                _b64.b64encode(b"%PDF- travestito"
+                                               ).decode()})
+              ).startswith("400") is False
+          # il PDF travestito da jpeg entra COME PDF, non come foto
+          and vero.execute("SELECT busta_file_tipo FROM ordini WHERE "
+                           "id=1").fetchone()[0] == "application/pdf")
+    prova("cio' che non si riconosce non entra", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "P",
+                                "file": "data:text/plain;base64," +
+                                _b64.b64encode(b"ciao").decode()})
+              ).startswith("400 Si possono caricare"))
+    prova("il troppo pesante lo dice, non tronca", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "P",
+                                "file": "data:image/jpeg;base64," +
+                                _b64.b64encode(b"\xff\xd8\xff" +
+                                               b"x" * (16 * 1024 * 1024)
+                                               ).decode()})
+              ).startswith("400 Il documento è troppo pesante"))
+    avvisi.clear()
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "",
+                      # il nome del file lo scrive il telefono del
+                      # venditore e finisce nel Content-Disposition:
+                      # il percorso lo toglie il basename, la
+                      # VIRGOLETTA e l'a-capo solo la ripulitura — e
+                      # una virgoletta li' dentro spezza l'header
+                      "file": JPG,
+                      "file_nome": '../etc/qr "locker"\n.jpg'})
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("il documento basta da solo: niente codice, e passa", True,
+          bool(o1["busta_file"]) and o1["busta_codice"] == "plain:")
+    prova("il nome del file e' ripulito (percorso, virgolette, a capo)",
+          "qr locker.jpg", o1["busta_file_nome"])
+    prova("il nome sul disco non si indovina dall'ordine", True,
+          o1["busta_file"].startswith("b1_")
+          and len(o1["busta_file"]) > 12)
+    su_disco = _os.path.join(buste_dir, o1["busta_file"])
+    grezzi = open(su_disco, "rb").read()
+    prova("sul disco NON c'e' un JPEG nudo: c'e' il trasporto di casa",
+          True, grezzi.startswith(b"plain:")
+          and not grezzi.startswith(b"\xff\xd8\xff"))
+    prova("...e i byte tornano indietro interi", True,
+          _amb(222)["_decifra_blob"](grezzi).startswith(b"\xff\xd8\xff"))
+    letto = leggi(111, 1)
+    prova("la lettura dice che c'e', il nome e il tipo", True,
+          letto["documento"] is True and letto["documento_tipo"]
+          == "image/jpeg" and letto["documento_nome"] == "qr locker.jpg")
+    prova("...ma MAI il nome sul disco (e' la maniglia, non un dato)",
+          [], [k for k, v in letto.items()
+               if isinstance(v, str) and v == o1["busta_file"]])
+    vecchio = o1["busta_file"]
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "", "file": PDF})
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("il documento nuovo si porta via il vecchio", True,
+          o1["busta_file"] != vecchio
+          and not _os.path.exists(_os.path.join(buste_dir, vecchio)))
+    prova("...e il tipo lo segue", "application/pdf",
+          o1["busta_file_tipo"])
+    resta = o1["busta_file"]
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "PIN 1"})
+    prova("chiave assente = si CONSERVA (il patto dello stock)", resta,
+          vero.execute("SELECT busta_file FROM ordini "
+                       "WHERE id=1").fetchone()[0])
+    prova("togliere e' un gesto ESPLICITO", "",
+          (deposita(222, 1, {"nome": "Mario Rossi", "codice": "PIN 1",
+                             "file_togli": 1}),
+           vero.execute("SELECT busta_file FROM ordini "
+                        "WHERE id=1").fetchone()[0])[1])
+    prova("...e col documento tolto il file sparisce dal disco", False,
+          _os.path.exists(_os.path.join(buste_dir, resta)))
+    prova("togliere l'ultima strada rimasta, no", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "",
+                                "file_togli": 1})
+              ).startswith("400 Serve il codice"))
+
+    # --- la rotta dei byte, girata PER DAVVERO -----------------------
+    # e' la rotta che consegna la credenziale di ritiro: una sentinella
+    # sul testo dice che le righe ci sono, non che escono i byte giusti
+    # a chi di dovere. `Response` di cartone, il resto e' il pezzo vero.
+    class _Resp:
+        def __init__(self, content=None, media_type="", headers=None):
+            self.content, self.media_type = content, media_type
+            self.headers = headers or {}
+
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "",
+                      "file": JPG, "file_nome": "qr.jpg"})
+
+    def byte(chi, oid):
+        amb = _amb(chi)
+        amb["Response"] = _Resp
+        exec("async " + pezzo("leggi_documento_busta"), amb)
+        return corri(amb, "leggi_documento_busta", oid)
+
+    veri = _b64.b64decode(JPG.split(",", 1)[1])
+    r = byte(111, 1)
+    prova("il compratore riceve i byte VERI, decifrati", True,
+          isinstance(r, _Resp) and r.content == veri)
+    prova("...col tipo che il venditore ha caricato", "image/jpeg",
+          r.media_type)
+    prova("...e senza cache: una copia e' una copia del codice", True,
+          "no-store" in r.headers.get("Cache-Control", ""))
+    prova("il venditore rilegge il suo", True,
+          isinstance(byte(222, 1), _Resp))
+    prova("l'estraneo e l'ordine inesistente rispondono UGUALE", True,
+          byte(999, 1) == byte(111, 777) == "400 Operazione non permessa")
+    prova("l'ordine senza documento e' un 404 onesto", True,
+          str(byte(111, 2)).startswith("404"))
+    dump = [tuple(x) for x in vero.execute(
+        "SELECT * FROM ordini ORDER BY id")]
+    byte(111, 1); byte(111, 1)
+    prova("aprire il documento non scrive NIENTE (non e' una ricevuta)",
+          dump, [tuple(x) for x in vero.execute(
+              "SELECT * FROM ordini ORDER BY id")])
+    # il file sparito da sotto: si dice, non si consegnano byte rotti
+    _os.remove(_os.path.join(buste_dir, vero.execute(
+        "SELECT busta_file FROM ordini WHERE id=1").fetchone()[0]))
+    prova("documento sparito dal disco: 503 onesto, mai byte a caso",
+          True, str(byte(111, 1)).startswith("503"))
+    shutil.rmtree(buste_dir, ignore_errors=True)
+    avvisi.clear()   # i depositi qui sopra hanno avvisato: chi viene
+                     # dopo conta i SUOI squilli, non i nostri
+
+    # la rotta dei byte: le stesse regole della busta, riga per riga
+    fil = pezzo("leggi_documento_busta").split('"""')[-1]
+    prova("i byte: solo le due parti, mai l'admin", True,
+          "(compratore_id=? OR venditore_id=?)" in fil
+          and "e_admin" not in fil)
+    prova("i byte: l'autorizzazione PRIMA dell'esistenza", True,
+          fil.index("Operazione non permessa")
+          < fil.index("Nessun documento"))
+    prova("i byte: GET puro, nessuna scrittura", [],
+          [x for x in ("UPDATE", "INSERT", "commit()") if x in fil])
+    prova("i byte non si mettono MAI in cache", True,
+          "no-store" in fil)
+    prova("...e non si eseguono: nosniff e sandbox", True,
+          "nosniff" in fil and "sandbox" in fil)
+    prova("i documenti NON stanno in foto/", True,
+          "BUSTE_DIR" in fil and "FOTO_DIR" not in fil
+          and "BUSTE_DIR" in dep and "FOTO_DIR" not in dep)
+    prova("nessuna rotta serve la cartella dei documenti", 0,
+          _SORGENTE.count('"/buste'))
+    prova("dal client il documento viaggia col flag e basta", True,
+          'r.pop("busta_file_tipo"' in mo and 'r.pop("busta_file_nome"'
+          in mo and 'r.pop("busta_file", "")' in mo)
 
     # --- il promemoria al posto del gate -----------------------------
     vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "

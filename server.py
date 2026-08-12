@@ -2667,6 +2667,17 @@ def init_db():
                     # Fatti, mai il contenuto.
                     "busta_corretta_il INTEGER DEFAULT 0",
                     "busta_correzioni INTEGER DEFAULT 0",
+                    # IL DOCUMENTO DI RITIRO (ago 2026): un PIN si
+                    # trascrive, un QR no — al locker il corriere manda
+                    # un PDF o un'immagine, e trascriverli a mano o non
+                    # si puo' o si sbaglia. Il file NON sta in foto/ e
+                    # non ha un URL pubblico: chi ce l'ha RITIRA IL
+                    # PACCO, quindi vive in buste/ coi byte CIFRATI e
+                    # lo serve una rotta autenticata. In colonna solo
+                    # il nome sul disco, il tipo e il nome originale.
+                    "busta_file TEXT DEFAULT ''",
+                    "busta_file_tipo TEXT DEFAULT ''",
+                    "busta_file_nome TEXT DEFAULT ''",
                     # il promemoria al venditore che non deposita la
                     # busta: colonne SUE, come per le sorelle — un
                     # contatore ereditato salterebbe al tetto
@@ -3892,6 +3903,37 @@ def _decifra_contenuto(blob: str) -> str:
     return blob
 
 
+# I gemelli sui BYTE, per il documento di ritiro. Stessa chiave e
+# stessi prefissi del testo — cosi' un database scritto ieri resta
+# leggibile domani e non c'e' una seconda ricetta da tenere in pari —
+# ma il prefisso vive nei BYTE del file, non in una colonna: chi
+# guarda buste/ da fuori non vede ne' un PDF ne' un JPEG.
+def _cifra_blob(raw: bytes) -> bytes:
+    if CHIAVE_CONTENUTI_DIGITALI and Fernet is not None:
+        return b"f2:" + Fernet(_chiave_fernet()).encrypt(raw)
+    return b"plain:" + raw
+
+
+def _decifra_blob(blob: bytes) -> bytes | None:
+    """None quando i byte non si sanno leggere, ed e' la differenza
+    col gemello del testo: li' si torna una frase onesta al posto del
+    codice, qui una frase non e' un PDF — chi chiama risponde 503 e
+    dice al venditore di ricaricare il documento."""
+    if blob.startswith(b"plain:"):
+        return blob[len(b"plain:"):]
+    for prefisso, versione in ((b"f2:", "f2"), (b"f:", "f")):
+        if not blob.startswith(prefisso):
+            continue
+        if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
+            return None
+        try:
+            return Fernet(_chiave_fernet(versione)).decrypt(
+                blob[len(prefisso):])
+        except Exception:
+            return None
+    return None
+
+
 async def consegna_da_payload(d: dict, valuta: str):
     """Il giudice unico dei campi di consegna (lug 2026): legge il
     payload di pubblica/modifica e ritorna la 10-tupla
@@ -5086,6 +5128,18 @@ async def registra_webhook_telegram():
 FOTO_DIR = "foto"
 os.makedirs(FOTO_DIR, exist_ok=True)
 
+# I documenti di ritiro NON stanno in foto/, ed e' la riga da non
+# ammorbidire: la' dentro i nomi si servono a chiunque li indovini o
+# li riceva, e un QR di ritiro pubblico vuol dire che il pacco lo
+# prende chi passa di li'. Cartella sua, byte cifrati, nessuna rotta
+# che serva la cartella (regola ferrea 3): si esce solo da
+# /api/orders/{id}/busta-ritiro/file, che chiede chi sei.
+BUSTE_DIR = "buste"
+os.makedirs(BUSTE_DIR, exist_ok=True)
+
+# 15 MB (decisione di Andrea) sui byte VERI, mai sulla stringa base64.
+MAX_DOC_BUSTA = 15 * 1024 * 1024
+
 
 def converti_in_jpeg(raw: bytes):
     """Riporta ai ranghi qualsiasi formato che Pillow sa leggere
@@ -5181,6 +5235,56 @@ def _e_immagine(raw: bytes) -> bool:
         return True
     except Exception:
         return False
+
+
+# Il documento di ritiro: il tipo lo dicono i BYTE e non l'etichetta
+# — e' la lezione gia' pagata col PDF rinominato .jpg, e qui pesa di
+# piu' perche' quel tipo torna indietro come Content-Type. Whitelist
+# di FORME, come NOME_FOTO: cio' che non si riconosce non entra.
+FIRME_DOC_BUSTA = (
+    (b"%PDF-", "application/pdf", "pdf"),
+    (b"\xff\xd8\xff", "image/jpeg", "jpg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png", "png"),
+    (b"GIF8", "image/gif", "gif"),
+)
+
+
+def _documento_busta(dataurl: str) -> tuple[bytes, str, str]:
+    """Dal data URL del client ai byte veri, col tipo riconosciuto.
+    Solleva un 400 che DICE cosa non va: qui l'utente ripara da solo
+    (cambia file, o ne carica uno piu' leggero). Il WebP e' l'unico
+    riconosciuto in due pezzi (RIFF....WEBP), e sta fuori dalla
+    tabella per questo."""
+    m = re.match(r"^data:([\w.+/-]*);base64,(.+)$", dataurl or "", re.S)
+    if not m:
+        raise HTTPException(400, "Documento non leggibile: riprova a "
+                                 "sceglierlo")
+    try:
+        raw = base64.b64decode(m.group(2), validate=True)
+    except Exception:
+        raise HTTPException(400, "Documento non leggibile: riprova a "
+                                 "sceglierlo")
+    if not raw:
+        raise HTTPException(400, "Il documento è vuoto")
+    if len(raw) > MAX_DOC_BUSTA:
+        raise HTTPException(400, "Il documento è troppo pesante "
+                                 f"(massimo {MAX_DOC_BUSTA // (1024*1024)} "
+                                 "MB): carica un PDF più leggero o uno "
+                                 "screenshot del codice")
+    for firma, tipo, est in FIRME_DOC_BUSTA:
+        if raw.startswith(firma):
+            break
+    else:
+        if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+            tipo, est = "image/webp", "webp"
+        else:
+            raise HTTPException(400, "Si possono caricare solo PDF e "
+                                     "immagini (JPG, PNG, GIF, WebP)")
+    # cintura: un JPEG che Pillow non sa aprire non e' un JPEG
+    if tipo != "application/pdf" and not _e_immagine(raw):
+        raise HTTPException(400, "Questa immagine non si riesce a "
+                                 "leggere: riprova con un'altra")
+    return raw, tipo, est
 
 
 def salva_foto(annuncio_id: int, foto_lista: list,
@@ -15417,6 +15521,19 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
 # deposito a pacco gia' dichiarato in viaggio (il caso normale) e
 # segna_spedito nel caso raro del codice immediato — e le due non
 # devono divergere.
+def _etichetta_documento(grezzo, estensione: str) -> str:
+    """Il nome che il compratore LEGGE, e che finisce anche nel
+    Content-Disposition del download. Lo scrive il venditore (glielo
+    manda il suo telefono col nome del file), quindi si ripulisce
+    duro: solo il basename, niente caratteri di controllo, niente
+    virgolette — una virgoletta in quell'header spezza il nome del
+    file scaricato, che e' la stessa famiglia del «<» che spegneva
+    l'avviso di spedizione, su un altro tubo."""
+    nome = os.path.basename(str(grezzo or "")).strip()
+    nome = re.sub(r'[\x00-\x1f\x7f"\\/]', "", nome)[:100].strip()
+    return nome or f"ritiro.{estensione}"
+
+
 MSG_BUSTA_PRONTA = (
     "📦 <b>Il tuo pacco ti aspetta al punto di ritiro!</b> Nell'ordine "
     "trovi il <b>nome del destinatario</b> e il <b>codice</b> per "
@@ -15452,9 +15569,15 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
     d = await leggi_json(req)
     nome = " ".join(str(d.get("nome") or "").split())
     codice = (d.get("codice") or "").strip()
-    if not nome or not codice:
-        raise HTTPException(400, "Servono entrambi: il nome del "
-                                 "destinatario e il codice di ritiro")
+    # Il DOCUMENTO e' l'altra strada per dare il codice (decisione di
+    # Andrea): un PIN si trascrive, un QR no. Chiave assente = si
+    # CONSERVA quello che c'e' (il patto dello stock: un client di
+    # ieri non sa che il campo esiste e non deve cancellarlo);
+    # `file_togli` e' il gesto esplicito per levarlo.
+    doc = d.get("file")
+    togli_doc = bool(d.get("file_togli"))
+    if not nome:
+        raise HTTPException(400, "Serve il nome del destinatario")
     # 400 espliciti, MAI il troncamento silenzioso del punto_ritiro:
     # un PIN troncato e' un PIN rotto, e il nome deve combaciare con
     # quello scritto sull'etichetta.
@@ -15464,6 +15587,12 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
     if len(codice) > 1000:
         raise HTTPException(400, "Il codice di ritiro è troppo lungo "
                                  "(massimo 1000 caratteri)")
+    # Il vaglio del documento sta PRIMA della connessione, che e' puro
+    # e non ha bisogno del database: cosi' il 400 non lascia mai un
+    # `con` aperto dietro di se'.
+    raw = est = ""
+    if doc and not togli_doc:
+        raw, tipo_doc, est = _documento_busta(doc)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
                     "AND stato IN ('locked','shipped','dispute')",
@@ -15475,25 +15604,74 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo ordine non è una spedizione a "
                                  "un punto di ritiro")
+    vecchio = o["busta_file"]
+    if togli_doc:
+        file_nome = tipo_doc = etichetta = ""
+    elif raw:
+        # nome IMPREVEDIBILE (token_hex) e non derivato dall'ordine: la
+        # cartella non e' servita da nessuna rotta, ma un nome che si
+        # indovina invita a provarci — e chi indovina, ritira il pacco.
+        file_nome = f"b{ordine_id}_{secrets.token_hex(8)}.{est}"
+        etichetta = _etichetta_documento(d.get("file_nome"), est)
+    else:
+        # chiave assente: si CONSERVA (il patto dello stock)
+        file_nome = vecchio
+        tipo_doc = o["busta_file_tipo"]
+        etichetta = o["busta_file_nome"]
+    # La regola nuova: il nome serve sempre, e poi basta UNA delle due
+    # strade — il codice scritto o il documento. Non si resta mai con
+    # una busta vuota, che per il compratore sarebbe un vicolo cieco.
+    if not codice and not file_nome:
+        con.close()
+        raise HTTPException(400, "Serve il codice di ritiro, oppure "
+                                 "carica il documento del corriere")
+    # Il file si scrive PRIMA della colonna: se il disco dice di no,
+    # il database resta com'era e il venditore riprova su una busta
+    # intatta, invece di ritrovarsi una colonna che punta al nulla.
+    if raw:
+        try:
+            with open(os.path.join(BUSTE_DIR, file_nome), "wb") as out:
+                out.write(_cifra_blob(raw))
+        except Exception as e:
+            con.close()
+            print(f"⚠️ Ordine #{ordine_id}: documento di ritiro non "
+                  f"scritto: {e}")
+            raise HTTPException(503, "Non riesco a salvare il documento "
+                                     "adesso: riprova fra poco")
     adesso = int(time.time())
     correzione = o["busta_il"] > 0
     con.execute("UPDATE ordini SET busta_nome=?, busta_codice=?, "
+                "busta_file=?, busta_file_tipo=?, busta_file_nome=?, "
                 "busta_il=?, busta_corretta_il=?, busta_correzioni=? "
                 "WHERE id=?",
                 (_cifra_contenuto(nome), _cifra_contenuto(codice),
+                 file_nome, tipo_doc, etichetta,
                  o["busta_il"] or adesso,
                  adesso if correzione else o["busta_corretta_il"],
                  o["busta_correzioni"] + (1 if correzione else 0),
                  ordine_id))
     con.commit()
     con.close()
+    # il vecchio se ne va DOPO il commit, e solo se non e' piu' quello
+    # buono: il pattern di _scrivi_avatar, o si accumulano orfani
+    if vecchio and vecchio != file_nome:
+        try:
+            os.remove(os.path.join(BUSTE_DIR, vecchio))
+        except OSError:
+            pass
     # Il journal dice COSA (impronta, mai il testo: nel journal non
     # entrano segreti) e QUANDO — il pattern della consegna digitale.
     impronta = hashlib.sha256(codice.encode("utf-8")).hexdigest()[:16]
+    if raw:
+        stato_doc = f"{tipo_doc} da {len(raw)} byte"
+    elif togli_doc:
+        stato_doc = "tolto"
+    else:
+        stato_doc = "confermato" if file_nome else "assente"
     print(f"📦 Ordine #{ordine_id}: busta di consegna "
           f"{'corretta' if correzione else 'depositata'} "
           f"(nome {len(nome)} caratteri, codice {len(codice)}, "
-          f"impronta {impronta})")
+          f"impronta {impronta}, documento {stato_doc})")
     # La dedup del segnale d'arrivo: su 'locked' SILENZIO (parlera'
     # segna_spedito col suo ramo via_punto), sul primo deposito a
     # pacco gia' in viaggio parte il «ti aspetta», sulla correzione
@@ -15541,9 +15719,64 @@ async def leggi_busta_ritiro(ordine_id: int,
     return {"ok": True,
             "nome": _decifra_contenuto(o["busta_nome"]),
             "codice": _decifra_contenuto(o["busta_codice"]),
+            # del documento qui esce solo la SCHEDA — c'e', come si
+            # chiama, di che tipo e': i byte stanno di la', dietro la
+            # loro rotta, e non si trascinano in ogni lettura
+            "documento": bool(o["busta_file"]),
+            "documento_nome": o["busta_file_nome"],
+            "documento_tipo": o["busta_file_tipo"],
             "depositata_il": o["busta_il"],
             "corretta_il": o["busta_corretta_il"],
             "correzioni": o["busta_correzioni"]}
+
+
+@app.get("/api/orders/{ordine_id}/busta-ritiro/file")
+async def leggi_documento_busta(ordine_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """I byte del documento di ritiro, decifrati al volo. NON e' un
+    file statico e non lo diventera' mai: chi ha questo documento
+    RITIRA IL PACCO, quindi non esiste un URL che funzioni senza dire
+    chi sei — niente cartella montata (regola ferrea 3), niente nome
+    indovinabile, niente cache (`no-store`: su un telefono prestato o
+    condiviso, una copia in cache e' una copia del codice).
+    Le regole sono quelle della busta, riga per riga: SOLO le due
+    parti, il moderatore MAI, e l'autorizzazione PRIMA dell'esistenza
+    perche' l'estraneo non impari niente. GET PURO come il gemello:
+    aprire il documento non e' una ricevuta."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["busta_file"]:
+        raise HTTPException(404, "Nessun documento di ritiro su questo "
+                                 "ordine")
+    try:
+        with open(os.path.join(BUSTE_DIR, o["busta_file"]), "rb") as f:
+            raw = _decifra_blob(f.read())
+    except OSError:
+        raw = None
+    if raw is None:
+        # una frase non e' un PDF: qui si dice che non si puo' aprire,
+        # invece di consegnare byte che nessun lettore capirebbe
+        raise HTTPException(503, "Il documento non si riesce ad aprire: "
+                                 "chiedi al venditore di ricaricarlo")
+    etichetta = _etichetta_documento(o["busta_file_nome"], "pdf")
+    return Response(
+        content=raw,
+        media_type=o["busta_file_tipo"] or "application/octet-stream",
+        headers={"Content-Disposition":
+                 f'inline; filename="{etichetta}"',
+                 "Cache-Control": "no-store, private",
+                 # il documento non e' MAI una pagina: se un domani
+                 # ci finisse dentro un SVG o un HTML travestito, il
+                 # browser non deve eseguirlo sul nostro dominio
+                 "X-Content-Type-Options": "nosniff",
+                 "Content-Security-Policy": "sandbox; default-src 'none'"})
 
 
 @app.post("/api/orders/{ordine_id}/nascondi")
@@ -19924,6 +20157,12 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             quando = time.strftime("%d/%m/%Y %H:%M",
                                    time.localtime(o["busta_il"]))
             stato_busta = f"istruzioni di ritiro depositate il {quando}"
+            # il documento e' un fatto quanto la data: al moderatore
+            # dice se il venditore ha dato al compratore qualcosa di
+            # inquadrabile o solo un codice a mano. Il contenuto no —
+            # nemmeno di quello, e da nessuna strada.
+            if o["busta_file"]:
+                stato_busta += " (con un documento allegato)"
             n = o["busta_correzioni"]
             if n:
                 ultima = time.strftime(
@@ -20376,6 +20615,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # QUANDO — per il compratore, e per il moderatore in disputa.
         r.pop("busta_nome", "")
         r.pop("busta_codice", "")
+        # e del documento non esce nemmeno il NOME DEL FILE: e' la
+        # maniglia sul disco, e non serve a nessun client — resta il
+        # flag, come per il contenuto digitale
+        r["busta_documento"] = bool(r.pop("busta_file", ""))
+        r.pop("busta_file_tipo", "")
+        r.pop("busta_file_nome", "")
         # La foto per la riga della lista: SOLO il primo nome (il
         # pattern di scheda() dei doppioni) — la galleria intera qui
         # non serve e gonfierebbe il payload. Per i set e' gia' la
