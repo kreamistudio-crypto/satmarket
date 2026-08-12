@@ -7748,8 +7748,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   e questa voce ROVESCIA quella di ieri — «cosa faccia il bot di un
   `/start CODICE` non è documentato da nessuna parte, e dalla nostra
   parte non c'è niente da riparare»): la funzione c'è dal 2018, e il
-  payload lo guarda contro `^[A-Z0-9]{10,26}$` (era `{10,22}`, vedi
-  sotto). Da riparare dalla
+  payload lo guarda contro `^[A-Z0-9]{8,26}$` (era `{10,22}`, e i
+  due bordi si sono mossi tutti e due — vedi sotto). Da riparare dalla
   nostra parte c'era eccome — si passava il codice con
   `[^A-Z0-9_-]`, cioè tenendo trattini e trattini bassi perché li
   ammette TELEGRAM nel payload, e sul filtro cadevano in SILENZIO
@@ -7772,8 +7772,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ammorbidire: chi non ci rientra nemmeno normalizzato ha comunque la
   strada di sempre — incollare a mano — e togliergli il bottone
   vorrebbe dire chiudere l'unica porta che gli resta. QUALI SONO, e
-  si sanno per FORMA e non per caso: oggi solo chi sta sotto i 10
-  caratteri, cioè i GLS/SDA/UPS a 9 cifre.
+  si sanno per FORMA e non per caso: dal 12 ago 2026 NESSUNA forma
+  del nostro catalogo sta sotto il minimo (la più corta è 9 contro un
+  pavimento di 8), quindi restano fuori solo i codici liberi di
+  «Altro corriere» sotto gli 8 caratteri. Il ramo «resta fuori» della
+  didascalia è diventato raro e NON si toglie: un ramo che non
+  promette è meglio di uno che mente, e i bordi del filtro non sono
+  nostri.
   IL TETTO ERA 22 E TRACKBOT L'HA ALZATO A 26 (11 ago 2026), ed è la
   storia da tenere perché è il modello per la prossima volta: il
   cantiere aveva MISURATO sui codici veri di produzione (una passata
@@ -7788,6 +7793,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nessuno — e a cambiare è stata UNA prova, che ha CAMBIATO LATO
   («i 24 dell'InPost restano fuori» → «ci rientrano»). Era il segnale
   armato apposta, ed è servito.
+  E IL 12 AGO 2026 HANNO ABBASSATO ANCHE IL PAVIMENTO, da 10 a **8**,
+  SENZA CHE GLIELO CHIEDESSIMO — quindi la storia intera è MISURATO →
+  CHIESTO → ACCOLTO DUE VOLTE, e tutte e due le volte più larga della
+  richiesta. Ci rientrano i GLS Europe a 9 cifre, che erano l'ultima
+  famiglia di corriere rimasta fuori: il filtro ha smesso di tagliare
+  qualcuno. Anche qui a cambiare è stata UNA prova che ha CAMBIATO
+  LATO («i 9 cifre restano fuori» → «ci rientrano»), e accanto ne è
+  nata una NUOVA sotto il pavimento (sette caratteri): un bordo che si
+  muove va sorvegliato dai due lati, o il giorno che qualcuno lo
+  abbassa per conto nostro non se ne accorge nessuno. La sentinella
+  che guarda i numeri nel giudice del bottone è passata dal letterale
+  a una regex (`\{\d+,`): scritta col numero, alla seconda volta che
+  i bordi si muovono smette di dire qualcosa.
+  IL RAPPORTO CON UN TERZO SI COLTIVA COSÌ, ed è la parte che vale
+  oltre trackbot: si misura sui dati veri, si chiede con il numero in
+  mano, si tiene aperta la strada di chi resta fuori, e si scrive nel
+  file cosa si è chiesto e quando — perché la prova che diventa rossa
+  dica «hanno risposto» e non «trackbot ha avuto un capriccio».
   LA LEZIONE DEL GIRO, che vale oltre trackbot: davanti a un filtro
   di TERZI che ci taglia fuori, la leva non è sempre adattarsi —
   qui adattarsi avrebbe voluto dire tagliare un codice, cioè
