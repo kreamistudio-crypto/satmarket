@@ -1570,17 +1570,26 @@
   .pacco-cella .btn.pacco-btn.dentro{padding:3px 8px 4px;cursor:default}
   .pacco-cella .btn.pacco-btn.dentro:active{transform:none;
     box-shadow:0 2px 0 var(--ink)}
-  /* Lo stesso vestito serve i fogli del rifornimento e dell'offerta:
-     fuori dall'arancio il traslucido bianco sparirebbe sulla carta. */
+  /* Lo stesso vestito serve i fogli del rifornimento e dell'offerta —
+     e dal 12 ago 2026 la card articoli della pagina Paga: fuori
+     dall'arancio il traslucido bianco sparirebbe sulla carta. */
   .pacco-btn .qta-mini,
   #rifornisciSheet .qta-mini,
-  #offertaSheet .qta-mini{margin-left:0;background:var(--chip-bg)}
+  #offertaSheet .qta-mini,
+  .acq-art .qta-mini{margin-left:0;background:var(--chip-bg)}
   .pacco-btn .qta-mini .qm-btn,
   #rifornisciSheet .qta-mini .qm-btn,
-  #offertaSheet .qta-mini .qm-btn{color:var(--sats-text)}
+  #offertaSheet .qta-mini .qm-btn,
+  .acq-art .qta-mini .qm-btn{color:var(--sats-text)}
   .pacco-btn .qta-mini .qm-btn:active,
   #rifornisciSheet .qta-mini .qm-btn:active,
-  #offertaSheet .qta-mini .qm-btn:active{background:var(--sats-soft)}
+  #offertaSheet .qta-mini .qm-btn:active,
+  .acq-art .qta-mini .qm-btn:active{background:var(--sats-soft)}
+  .acq-art .qta-mini{margin-left:8px;vertical-align:middle}
+  /* il velo d'attesa del ± (12 ago 2026): RITARDATO di ~180ms da
+     acqPasso — su rete viva non si vede mai, su rete lenta e' fermo e
+     onesto. La transizione evita il gradino quando compare. */
+  .acq-attesa{opacity:.55;transition:opacity .2s}
   /* spento col motivo scritto sotto: il perche' non sta mai nel bottone */
   .pacco-cella .btn.pacco-btn[disabled]{opacity:.45;box-shadow:none}
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
@@ -8496,25 +8505,113 @@ async function caricaPreventivo(){
     const d = await r.json().catch(()=>({}));
     if (acqDati !== d0) return;   /* nel frattempo la pagina e' un'altra */
     if (!r.ok) {
+      if (d0.preventivo) {
+        acqRipiega(d0, d.detail || 'Non riesco a rifare il conto: riprova');
+        return;
+      }
       acqDati.errore = d.detail || 'Non riesco a fare il conto: riprova';
       renderAcquisto(); return;
     }
     acqDati.preventivo = d;
     /* il default e' la PRIMA strada viva (l'ordine del server e' la
-       precedenza: ritiro → casa → punto → codice online) */
+       precedenza: ritiro → casa → punto → codice online) — ma una via
+       GIA' SCELTA si conserva se e' ancora viva (12 ago 2026, con lo
+       stepper): un ± non deve riportare chi aveva scelto «a casa»
+       sul ritiro */
     const vive = (d.strade||[]).filter(s => !s.cambio_assente);
-    acqDati.via = vive.length ? vive[0].via : '';
+    acqDati.via = vive.some(s => s.via === d0.via) ? d0.via
+      : (vive.length ? vive[0].via : '');
     renderAcquisto();
   } catch(e) {
     if (acqDati !== d0) return;
+    if (d0.preventivo) { acqRipiega(d0, 'Rete assente: riprova'); return; }
     acqDati.errore = 'Rete assente: riprova';
     renderAcquisto();
   }
+}
+/* L'ERRORE SU UN ± NON BUTTA LA PAGINA (12 ago 2026): il ramo
+   d'errore di sempre sostituisce tutto con «← Torna», che al primo
+   carico e' giusto — ma su un ritocco della quantita' cancellerebbe
+   lo stepper stesso. Se un conto buono c'era gia', si RIPIEGA: toast
+   onesto, la quantita' torna a quella dell'ultimo preventivo vero
+   (mai numeri nuovi su un conto vecchio), e la pagina si ridisegna
+   senza velo. */
+function acqRipiega(d0, msg){
+  toast(msg, 5000);
+  const n = d0.preventivo.quantita || d0.qta;
+  qtaScelta = n;
+  acqDati = {...d0, qta: n};
+  renderAcquisto();
+}
+/* IL ± DELLA PAGINA PAGA (12 ago 2026, chiesto da Andrea). Ogni tocco
+   RIFA' il conto sul server — quella pagina E' il conto — e
+   l'anti-raffica non e' un debounce (scartato nel carrello: litiga
+   con chi sale in fretta) ma la RIASSEGNAZIONE di acqDati: l'oggetto
+   nuovo e' il token, e le risposte dei tocchi precedenti muoiono
+   sulla guardia `acqDati !== d0` che caricaPreventivo ha gia'. MAI
+   `acqDati.qta = n`: la mutazione in place farebbe passare le
+   risposte vecchie, e vincerebbe l'ultima ad ARRIVARE invece
+   dell'ultima CHIESTA. Chi preme cinque volte fa cinque preventivi
+   (SELECT pure, niente AI ne' invoice): costo accettato, vince
+   sempre l'ultimo.
+   IL VELO D'ATTESA E' RITARDATO (~180ms): secco, lampeggerebbe a
+   ogni tocco su rete viva; cosi' compare solo quando l'attesa si
+   sente davvero, ed e' fermo — mai numeri vecchi spacciati per
+   freschi, mai un lampeggio sul caso normale. Il velo copre conto,
+   badge e vie (le cifre che dipendono dalla quantita': col
+   supplemento cambia anche la spedizione); lo stepper resta vivo.
+   qtaScelta si sincronizza: tornando alla scheda lo stepper di la'
+   dice lo stesso numero — un solo stato, mai due che divergono. */
+let acqAttesaTimer = null;
+function acqPasso(delta){
+  const d0 = acqDati;
+  if (!d0 || d0.tipo !== 'mono' || d0.offertaId || !d0.preventivo) return;
+  const l = listings.find(t=>t.id===d0.annuncioId)
+        || myListings.find(t=>t.id===d0.annuncioId);
+  const stock = (l && l.quantita) || 1;
+  /* il clamp della scheda: stock come tetto, silenzio al limite (il
+     bottone e' gia' .off e non si puo' toccare) */
+  const n = Math.min(stock, Math.max(1, d0.qta + delta));
+  if (n === d0.qta) return;
+  qtaScelta = n;
+  /* setQta(0) e' il SINCRONIZZATORE della scheda (trovato dal vivo:
+     tornando indietro lo stepper di la' diceva ancora il numero
+     vecchio — l'indietro ri-mostra la vista senza ri-renderizzarla).
+     La regia degli aggiornamenti in-place della scheda e' SUA —
+     stepper del dettaglio e della barra, badge spedizione, etichetta
+     offerta, haptic — e chiamarla a delta zero la riusa senza
+     duplicarne i selettori. Il clamp interno e' un no-op: qtaScelta
+     e' appena stata fissata dentro lo stesso stock. */
+  setQta(0);
+  acqDati = {...d0, qta: n};
+  const box = el('acqCorpo');
+  if (box){
+    box.querySelectorAll('.qta-mini .qm-num').forEach(e=>{ e.textContent = fmt(n); });
+    box.querySelectorAll('.qta-mini .qm-meno').forEach(e=>e.classList.toggle('off', n <= 1));
+    box.querySelectorAll('.qta-mini .qm-piu').forEach(e=>e.classList.toggle('off', n >= stock));
+    clearTimeout(acqAttesaTimer);
+    acqAttesaTimer = setTimeout(()=>{
+      box.querySelectorAll('.ctrl-conto, .pills, [role="radiogroup"]')
+        .forEach(e=>e.classList.add('acq-attesa'));
+    }, 180);
+  }
+  if (DEMO) {
+    /* niente rete in demo: preventivoDemo legge qtaScelta, appena
+       sincronizzata — il conto si rifa' sul posto */
+    acqDati.preventivo = preventivoDemo(l);
+    renderAcquisto();
+    return;
+  }
+  caricaPreventivo();
 }
 /* Tutto si disegna da acqDati, MAI un fetch qui dentro: il toggle
    valuta e il cambio di pillola ridisegnano dal preventivo in cache. */
 function renderAcquisto(){
   const box = el('acqCorpo'); if (!box || !acqDati) return;
+  /* il velo d'attesa muore qui: il render E' la risposta (o un
+     ridisegno che lo rende comunque stantio), e l'innerHTML nuovo
+     nasce senza la classe */
+  clearTimeout(acqAttesaTimer);
   const d = acqDati, p = d.preventivo;
   /* il sottotitolo: di chi si sta comprando */
   const primo = d.tipo==='set'
@@ -8548,9 +8645,24 @@ function renderAcquisto(){
   } else {
     const x = primo;
     const t = x && ((x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '');
+    /* LO STEPPER NELLA PAGINA (12 ago 2026, chiesto da Andrea:
+       l'invito dice «ancora 1 pezzo» e il pezzo si deve poter
+       aggiungere QUI, non tornando alla scheda). stepperMini con
+       chiamate SUE (acqPasso), mai setQta — il modello del foglio
+       rifornimento. Con l'ACCORDO la quantita' e' pinnata e resta il
+       «× N» di sempre (la regola di stepperAcquista); con stock 1 non
+       c'e' niente da scegliere. Il numero e' d.qta — la scelta
+       corrente — che dopo ogni risposta coincide con p.quantita. */
+    const stock = (x && x.quantita) || 1;
+    const qtaUi = d.offertaId
+      ? ((p.quantita||1)>1 ? ` <span class="mono">× ${fmt(p.quantita)}</span>` : '')
+      : (stock > 1
+         ? ' ' + stepperMini(d.qta, 'acqPasso(-1)', 'acqPasso(1)',
+                             d.qta <= 1, d.qta >= stock)
+         : '');
     articoli = `<div class="acq-art">
       <div class="ctrl-mini">${t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}</div>
-      <div class="acq-tit">${esc(x ? x.title : '')}${(p.quantita||1)>1 ? ` <span class="mono">× ${fmt(p.quantita)}</span>` : ''}</div>
+      <div class="acq-tit">${esc(x ? x.title : '')}${qtaUi}</div>
       <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}</span>
     </div>`;
   }

@@ -12713,6 +12713,57 @@ def prove_promesse_badge():
           "p.promesse_sospese && scCrit === 'valore'" in _ra
           and "p.promesse_sospese && sgVal === 'eur'" in _ra)
 
+    # ---- 4quater. LO STEPPER DELLA PAGINA PAGA (12 ago 2026): il ±
+    # rifa' il conto sul server — quella pagina E' il conto — e
+    # l'anti-raffica NON e' un debounce (scartato nel carrello:
+    # litiga con chi sale in fretta) ma la RIASSEGNAZIONE di acqDati:
+    # l'oggetto nuovo e' il token, le risposte dei tocchi precedenti
+    # muoiono sulla guardia `acqDati !== d0` che caricaPreventivo ha
+    # gia'. La mutazione in place farebbe vincere l'ultima risposta
+    # ad ARRIVARE invece dell'ultima CHIESTA.
+    _ap2 = pezzo_js(mini, "function acqPasso(delta){", "\n}")
+    prova("il ± della pagina Paga riassegna acqDati (il token)", True,
+          "acqDati = {...d0, qta: n}" in _ap2)
+    prova("...e non muta mai la quantita' in place", False,
+          "acqDati.qta =" in _ap2)
+    prova("...col clamp allo stock, come la scheda", True,
+          "Math.min(stock, Math.max(1, d0.qta + delta))" in _ap2)
+    prova("...e con l'accordo lo stepper non parte (quantita' pinnata)",
+          True, "d0.offertaId" in _ap2)
+    prova("...sincronizzando qtaScelta (un solo stato con la scheda)",
+          True, "qtaScelta = n;" in _ap2)
+    # setQta(0) e' il SINCRONIZZATORE della scheda (trovato dal vivo:
+    # l'indietro ri-mostra la vista senza ri-renderizzarla, e lo
+    # stepper di la' restava al numero vecchio): a delta ZERO riusa la
+    # regia in-place di setQta senza duplicarne i selettori — ma il
+    # conteggio del ± resta di acqPasso, mai di setQta(±1)
+    prova("...e la scheda si sincronizza con setQta(0), mai col ±",
+          True, "setQta(0);" in _ap2
+          and "setQta(1)" not in _ap2 and "setQta(-1)" not in _ap2)
+    prova("lo stepper in pagina passa da stepperMini con chiamate sue",
+          True, "stepperMini(d.qta, 'acqPasso(-1)', 'acqPasso(1)'" in _ra)
+    # IL VELO D'ATTESA E' RITARDATO: secco lampeggerebbe a ogni tocco
+    # su rete viva; cosi' compare solo quando l'attesa si sente — mai
+    # numeri vecchi spacciati per freschi, mai un lampeggio sul caso
+    # normale. E muore a ogni render, che E' la risposta.
+    prova("il velo d'attesa e' ritardato (niente lampeggi)", True,
+          "setTimeout(" in _ap2 and "acq-attesa" in _ap2)
+    prova("...e muore a ogni render", True,
+          "clearTimeout(acqAttesaTimer);" in pezzo_js(
+              mini, "function renderAcquisto(){", "\n}"))
+    # L'ERRORE SU UN ± NON BUTTA LA PAGINA: si ripiega sull'ultimo
+    # conto buono — la quantita' TORNA a quella del preventivo vero,
+    # mai numeri nuovi su un conto vecchio — e il ramo distruttivo
+    # («← Torna») resta al solo primo carico.
+    _rip = pezzo_js(mini, "function acqRipiega(d0, msg){", "\n}")
+    prova("l'errore su un ± ripiega sull'ultimo conto buono", True,
+          "d0.preventivo.quantita" in _rip and "renderAcquisto();" in _rip)
+    _cp = pezzo_js(mini, "async function caricaPreventivo(){", "\n}")
+    prova("...da TUTTI E DUE i rami d'errore", 2,
+          _cp.count("acqRipiega(d0,"))
+    prova("un ± non azzera la via gia' scelta", True,
+          "vive.some(s => s.via === d0.via)" in _cp)
+
     # ---- 4ter. LA PAGINA DEL CARRELLO (12 ago 2026): testata e badge
     # APPICCICATI in cima — i numeri dei badge cambiano a ogni
     # «Aggiungi» e chi scorre non deve perderseli. UN blocco solo,
