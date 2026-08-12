@@ -1793,6 +1793,35 @@
     overflow:hidden;text-overflow:ellipsis;display:-webkit-box;
     -webkit-line-clamp:2;-webkit-box-orient:vertical}
   .acq-art .mono{flex:0 0 auto}
+  /* la colonna del prezzo: l'unitario e, quando lo sconto del
+     carrello scatta, il tag della regola qui sotto */
+  .acq-art .acq-prezzo{flex:0 0 auto;display:flex;flex-direction:column;
+    align-items:flex-end;gap:2px}
+  /* IL TAG «−X%» SULL'UNITARIO (ago 2026, decisione di Andrea, la
+     via (c)): l'unitario resta il PIENO, mai barrato e mai un numero
+     scontato — lo sconto e' di TESTATA sul totale e un unitario
+     scontato non esiste come intero (10% su 14.001...): un numero
+     che non torna moltiplicando si legge come un bug, e il ≈ ha gia'
+     un significato suo (la conversione). La percentuale e' la REGOLA
+     ed e' esatta per definizione; le cifre vere le dice il conto.
+     La lingua e' quella della pillola verde della conferma. */
+  .sconto-tag{background:var(--trust-soft);color:var(--trust);
+    border-radius:999px;padding:1px 8px 2px;font-size:11px;font-weight:800}
+  /* LA FILA DELLE PROMESSE IN PAGA: righe a tutta larghezza e tono
+     quieto (ago 2026, decisione di Andrea — la POSIZIONE resta sopra
+     la Consegna: il modo «dentro la card dell'articolo» e' stato
+     costruito, guardato e SCARTATO, perche' costava il rovesciamento
+     del 12 ago e l'uniformita' della fila fra quattro superfici per
+     un problema che era d'aspetto). Il markup non si tocca — la
+     sentinella della fila conta proprio quel template — e le pillole
+     si stendono via CSS: larghezza piena, angoli da riquadro come le
+     vie qui sotto, peso normale col grassetto lasciato alla parte
+     che conta. Il verde della conferma resta verde. */
+  #acqCorpo > .pills{flex-direction:column;gap:6px;align-items:stretch}
+  #acqCorpo > .pills .pill{width:100%;border-radius:var(--radius-btn);
+    border-color:var(--line);font-weight:600;padding:8px 12px}
+  #acqCorpo > .pills .pill b{font-weight:800}
+  #acqCorpo > .pills .pill-trust{border-color:var(--trust-soft)}
   /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
      768 sparisce come nella pagina del pacco, ma senza barra propria */
   @media (max-width:767.98px){
@@ -8761,10 +8790,17 @@ function renderAcquisto(){
          ? stepperMini(d.qta, 'acqPasso(-1)', 'acqPasso(1)',
                        d.qta <= 1, d.qta >= stock)
          : '');
+    /* L'UNITARIO RESTA IL PIENO, col tag «−X%» quando lo sconto del
+       carrello scatta (ago 2026, decisione di Andrea — la via (c)):
+       la percentuale e' la regola ed e' esatta per definizione,
+       mentre un unitario scontato non esiste come intero e un ≈ qui
+       significherebbe una terza cosa. Vedi il CSS di .sconto-tag. */
+    const scontoTag = ((p.sconto_sats||0) > 0 && (p.sconto_percento||0) > 0)
+      ? `<span class="sconto-tag">−${p.sconto_percento}%</span>` : '';
     articoli = `<div class="acq-art">
       <div class="ctrl-mini">${t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}</div>
       <div class="acq-col"><div class="acq-tit">${esc(x ? x.title : '')}</div>${qtaUi}</div>
-      <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}</span>
+      <span class="acq-prezzo"><span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}</span>${scontoTag}</span>
     </div>`;
   }
   /* L'accordo che fissa i pezzi: si dice, invece di far scoprire da un

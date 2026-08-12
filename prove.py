@@ -6840,6 +6840,22 @@ def prove_pagina_acquisto():
           'onkeydown="if(event.target===this' in mini3)
     prova("la via punto parla col camioncino (e' una spedizione)", True,
           "v==='punto' ? '🚚 Spedizione a un punto di ritiro'" in mini3)
+    #    LA VESTE DELLA FILA (ago 2026, decisione di Andrea: la
+    #    POSIZIONE resta sopra la Consegna — il modo «dentro la card»
+    #    e' stato costruito, guardato e scartato — e a cambiare e' la
+    #    veste: righe a tutta larghezza, tono quieto, markup INTATTO,
+    #    che la sentinella della fila conta proprio quel template).
+    prova("la fila di Paga si stende via CSS, markup intatto", True,
+          "#acqCorpo > .pills{flex-direction:column" in mini3)
+    #    E L'UNITARIO RESTA IL PIENO col tag della regola quando lo
+    #    sconto scatta (la via (c)): mai un numero unitario scontato —
+    #    non esiste come intero e non torna moltiplicando — e mai un
+    #    ≈, che significa gia' un'altra cosa (la conversione).
+    prova("il tag −X% compare solo a sconto scattato", True,
+          "((p.sconto_sats||0) > 0 && (p.sconto_percento||0) > 0)"
+          in mini3)
+    prova("...e dice la PERCENTUALE, mai un unitario scontato", True,
+          'class="sconto-tag">−${p.sconto_percento}%' in mini3)
 
     # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
     #    Nostr non le porta: le azzererebbe a ogni sync). L'unico
