@@ -2410,12 +2410,26 @@
     display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
   /* il gemello grande, in testa al dettaglio dell'ordine */
   .order-ic.grande{width:48px;height:48px;font-size:22px}
-  /* La testa del dettaglio: foto e titolo in riga. `min-width:0` sul
-     titolo non e' cosmesi — un figlio flex non scende mai sotto il
-     proprio contenuto, e una parola lunga senza spazi allargherebbe
-     la PAGINA (la lezione del riquadro venditore). */
+  /* La testa del dettaglio: foto e titolo in riga. `min-width:0` non
+     e' cosmesi — un figlio flex non scende mai sotto il proprio
+     contenuto, e una parola lunga senza spazi allargherebbe la PAGINA
+     (la lezione del riquadro venditore). Dall'ago 2026 il figlio flex
+     e' la COLONNA (numero + titolo), quindi il min-width e' TRASLOCATO
+     li': sul titolo, che flex non lo vede piu', non farebbe niente. */
   .ordine-testa{display:flex;align-items:center;gap:12px}
-  .ordine-testa h2{min-width:0;margin:0}
+  .ordine-testa .ord-col{min-width:0;flex:1}
+  .ordine-testa h2{margin:0}
+  /* IL NUMERO DELL'ORDINE (ago 2026): sopra il titolo, nella stessa
+     colonna — a titolo di una riga non costa un pixel di pagina,
+     perche' la foto e' alta 48 e il titolo ne occupa 23. Si TOCCA per
+     copiarlo (e' il gesto vero: chi lo cerca lo deve incollare in una
+     chat), quindi porta il sottolineato del tracciamento toccabile e
+     il bersaglio largo dello pseudo-elemento, che non occupa layout e
+     non sposta nulla. */
+  .ordine-num{position:relative;display:inline-block;font-size:12.5px;
+    font-weight:800;color:var(--muted);text-decoration:underline;
+    cursor:pointer;margin-bottom:1px}
+  .ordine-num::after{content:'';position:absolute;inset:-10px}
   .order-main{min-width:0}
   .order-main .sub{margin-top:2px}
   .csv-line{text-align:center;font-size:12px;color:var(--muted);font-weight:700;padding:6px var(--pad) 2px}
@@ -11593,6 +11607,35 @@ function incisoConto(o){
   ].filter(Boolean);
   return voci.length ? `<span class="eur-hint" style="margin:0 0 0 6px;font-family:'Nunito',sans-serif">· di cui ${voci.join(' e ')}</span>` : '';
 }
+/* IL NUMERO DELL'ORDINE (ago 2026, caso dal campo: un utente segnala
+   un problema e per ritrovare il suo ordine bisognava chiedergli il
+   nome dell'oggetto e andarlo a cercare nel database). E' `ordini.id`
+   — lo STESSO numero che il moderatore batte in «Apri un ordine per
+   numero» e lo stesso che il bot scrive gia' in qualche notifica
+   («ordine #88»): un'identita' sola, o mostrarlo non servirebbe.
+   Nel DETTAGLIO porta la parola, che e' quel che dice COS'E' il
+   numero a chi lo legge la prima volta; nella riga della lista resta
+   nudo, che li' il contesto lo dice il posto. */
+function numeroOrdine(o){
+  return `<span class="ordine-num" role="button" title="Tocca per copiarlo"`
+       + ` onclick="copiaNumeroOrdine(${o.id})">Ordine`
+       + ` <span class="mono">#${o.id}</span></span>`;
+}
+/* NEGLI APPUNTI VA IL NUDO «#88» e non la frase intera: chi copia lo
+   incolla dentro un messaggio che sta gia' scrivendo, e «...con
+   l'ordine Ordine #88» e' il modo in cui una comodita' diventa un
+   intoppo. Il cancelletto invece resta: un numero solo, in mezzo a
+   una chat, non si riconosce come un riferimento.
+   Se la copia non riesce (contesti non sicuri, permessi negati) il
+   numero va NEL TOAST: mai far credere che sia negli appunti quando
+   non c'e' — e' la regola del codice di @trackbot. */
+async function copiaNumeroOrdine(id){
+  haptic();
+  try {
+    await navigator.clipboard.writeText(`#${id}`);
+    toast(`📋 Copiato: #${id}`);
+  } catch(e) { toast(`Il numero di quest'ordine è #${id}`); }
+}
 /* I VERBI SEGUONO IL TEMPO DELL'AFFARE (ago 2026): mentre e' vivo si
    sta facendo qualcosa, quando e' finito si e' fatta. La CIFRA della
    chiusura e' quella che ognuno ha davvero mosso — il TOTALE pagato
@@ -11702,7 +11745,14 @@ function renderOrders(){
           ${fotoOrdine(o)}
           <div class="order-main">
             <b>${esc(o.listing.title)}</b>
-            <div class="sub">${verboOrdine(o)} · ${o.when}</div>
+            ${/* IL NUMERO IN TESTA alla riga meta, e nudo: incolonnato
+                 sotto le foto fa una colonna di riferimenti che si
+                 scorre con l'occhio, che e' il gesto di chi un numero
+                 lo sta cercando. Qui NON si tocca — quel che agisce
+                 vive dentro l'ordine, e la riga ha gia' il suo tocco
+                 (apri) e la sua ✕: un terzo bersaglio su una card
+                 alta 60px si sbaglia e basta. */''}
+            <div class="sub"><span class="mono">#${o.id}</span> · ${verboOrdine(o)} · ${o.when}</div>
           </div>
         </div>
         <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>${x}
@@ -11875,7 +11925,7 @@ function openOrder(id){
     :                             {ic:'🔒', b:'Sats nel deposito di garanzia', d:'I sats sono al sicuro, nessuno può toccarli'};
   el('orderContent').innerHTML = `
     <div class="detail-body">
-      <div class="ordine-testa">${fotoOrdine(o, true)}<h2 style="font-size:17px">${esc(o.listing.title)}</h2></div>
+      <div class="ordine-testa">${fotoOrdine(o, true)}<div class="ord-col">${numeroOrdine(o)}<h2 style="font-size:17px">${esc(o.listing.title)}</h2></div></div>
       <div class="detail-price" style="font-size:20px">${cifraOrdine(o, o.listing.price)}${incisoConto(o)}</div>
       ${/* SENZA IL CAMBIO DI QUEL GIORNO non si mostra un euro: la
            riga lo dice, e vive nel DOM anche quando tace — a

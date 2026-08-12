@@ -2731,10 +2731,14 @@ def prove_dettaglio_ordine():
           "${fotoOrdine(o, true)}" in det)
     prova("...al posto del 📦 accanto al titolo", False,
           "${o.listing.emoji} ${esc(o.listing.title)}" in det)
-    # il titolo e' un figlio flex: senza min-width:0 una parola lunga
-    # senza spazi allarga la PAGINA (la lezione del riquadro venditore)
+    # Senza min-width:0 sul figlio flex, una parola lunga senza spazi
+    # allarga la PAGINA (la lezione del riquadro venditore; misurato
+    # ago 2026: 375 → 780px). Da quando la testa porta anche il numero
+    # dell'ordine il figlio flex e' la COLONNA e non piu' il titolo,
+    # quindi la guardia si e' TRASLOCATA li' — sull'h2, che flex non
+    # vede piu', non farebbe niente.
     prova("il titolo del dettaglio non può allargare la pagina", True,
-          ".ordine-testa h2{min-width:0" in mini)
+          ".ordine-testa .ord-col{min-width:0" in mini)
 
     # ---- 5-bis: IL PUNTO NON SI DICE DUE VOLTE ----
     # Sotto il prezzo c'era anche il punto GIA' scelto, mentre due dita
@@ -12216,6 +12220,92 @@ def prove_ordini_fermi():
           "disputata:o.disputata||0," in mini)
 
 
+# ====================================================================
+def prove_numero_ordine():
+    """IL NUMERO DELL'ORDINE SI VEDE (ago 2026, caso dal campo: un
+    utente segnala un problema e per ritrovare il suo ordine bisognava
+    chiedergli il nome dell'oggetto e cercarlo nel database).
+    Le due cose da sorvegliare non sono la resa — quella si guarda a
+    schermo — ma: che il numero sia UNO SOLO, cioe' `ordini.id`, lo
+    stesso che il moderatore batte in «Apri un ordine per numero»; e
+    che il gesto della copia non possa diventare silenzioso."""
+    print("\n[il numero dell'ordine]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def solo_codice(js):
+        """Via i commenti, o una sentinella pesca la prosa che
+        racconta il cantiere invece del programma."""
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                         if not r.strip().startswith("//"))
+
+    # --- 1) UN'IDENTITA' SOLA ---------------------------------------
+    # E' il cuore della richiesta di Andrea: se il numero mostrato non
+    # fosse `o.id`, chi lo legge e chi lo cerca parlerebbero di due
+    # cose diverse — che e' peggio di non mostrarlo affatto.
+    prova("il numero mostrato e' `o.id`, e la fabbrica e' una sola", 1,
+          mini.count("function numeroOrdine("))
+    # ATTENZIONE all'estrazione: `pezzo_js` di serie si ferma alla
+    # prima riga VUOTA, e queste due funzioni non ne hanno — cosi' il
+    # pezzo arrivava fino dentro renderOrders e le sentinelle qui
+    # sotto trovavano il `#${o.id}` della RIGA anche quando quello del
+    # dettaglio non c'era piu' (una sentinella che non puo' fallire:
+    # l'ha detto la tortura, non la rilettura). Ci si ferma alla
+    # graffa di chiusura.
+    num = solo_codice(pezzo_js(mini, "function numeroOrdine(o){", "\n}\n"))
+    prova("...e non inventa nessuna numerazione sua", True,
+          "#${o.id}" in num
+          and not re.search(r"o\.(numero|codice|riferimento)", num))
+    # Lo stesso numero comanda le due strade del moderatore: il campo
+    # lo passa cosi' com'e' a loadOrders/openOrder, e il server filtra
+    # la colonna `id`. Chi cambiasse una delle due farebbe divergere
+    # cio' che si legge da cio' che si cerca.
+    apri = solo_codice(pezzo_js(
+        mini, "async function apriOrdinePerId(numero){", "\n}\n"))
+    prova("il campo admin apre proprio quel numero", True,
+          "await loadOrders(id)" in apri and "openOrder(id)" in apri)
+    prova("...e il server lo cerca nella colonna id", True,
+          'q += " OR o.id=?"' in pezzo("miei_ordini"))
+
+    # --- 2) LA COPIA NON PUO' DIVENTARE MUTA ------------------------
+    # Negli appunti va il NUDO «#88» e non la frase: chi copia lo
+    # incolla dentro un messaggio che sta gia' scrivendo. E se la
+    # copia non riesce — contesti non sicuri, permessi negati — il
+    # numero deve finire nel TOAST: far credere che sia negli appunti
+    # quando non c'e' e' il modo in cui questo gesto fallisce in
+    # silenzio (la regola del codice di @trackbot).
+    cop = solo_codice(pezzo_js(
+        mini, "async function copiaNumeroOrdine(id){", "\n}\n"))
+    prova("negli appunti va il numero nudo, mai la frase", True,
+          "writeText(`#${id}`)" in cop and "Ordine #" not in cop)
+    prova("...e se la copia non riesce il numero lo dice il toast", True,
+          "catch" in cop and "${id}" in cop.split("catch")[1])
+
+    # --- 3) IL BERSAGLIO, E LA LEZIONE DEL FIGLIO FLEX --------------
+    # Il numero e' alto 18px: senza lo pseudo-elemento il bersaglio
+    # sarebbe quello, e lo pseudo non occupa layout — toglierlo non
+    # sposta un pixel, quindi non lo vedrebbe nessuno.
+    prova("il bersaglio del tocco e' allargato", True,
+          ".ordine-num::after{content:'';position:absolute;inset:-10px}"
+          in mini)
+    # (Il `min-width:0` della colonna — la lezione del figlio flex —
+    # lo guarda la sentinella storica in prove_dettaglio_ordine, che
+    # si e' TRASLOCATA sull'elemento nuovo: una riga, una guardia.)
+    prova("il dettaglio lo chiede alla fabbrica, una volta sola", 1,
+          mini.count("${numeroOrdine(o)}"))
+
+    # --- 4) NELLA LISTA SI LEGGE, NON SI TOCCA ----------------------
+    # La riga ha gia' il suo tocco (apri l'ordine) e la sua ✕: un
+    # terzo bersaglio su una card alta 60px si sbaglia e basta — cio'
+    # che AGISCE vive dentro l'ordine, dove c'e' il contesto.
+    ro = solo_codice(pezzo_js(mini, "function renderOrders(){"))
+    riga_sub = ro[ro.index('<div class="sub">'):]
+    riga_sub = riga_sub[:riga_sub.index("</div>")]
+    prova("nella riga il numero c'e'...", True,
+          '<span class="mono">#${o.id}</span>' in riga_sub)
+    prova("...e non si tocca", True,
+          "onclick" not in riga_sub and "ordine-num" not in riga_sub)
+
 
 def main():
     print("=" * 58)
@@ -12252,7 +12342,7 @@ def main():
               prove_ritiro_offerta, prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
-              prove_ordini_fermi):
+              prove_ordini_fermi, prove_numero_ordine):
         try:
             f()
         except Exception as e:
