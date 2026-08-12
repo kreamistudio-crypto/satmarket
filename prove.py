@@ -5265,7 +5265,11 @@ def prove_sconto_pacco():
     prova("la leva del minimo a valore ha un default nel sorgente",
           True, "SCONTO_PACCO_MIN_VALORE_EUR = 1" in _SORGENTE)
 
-    # --- IL MONO non sconta mai: la divisione a ritroso resta esatta -
+    # --- IL MONO SCONTA (ago 2026): la divisione a ritroso RIAGGIUNGE
+    # lo sconto e resta esatta. Il caso a sconto zero e' la regressione
+    # (il mondo di ieri, byte per byte); quello con lo sconto e' il
+    # gemello nuovo — prezzo_sats nasce gia' scontato, e l'unitario
+    # deve tornare al LORDO del listino.
     amb2 = {}
     exec(pezzo("_righe_ordine"), amb2)
 
@@ -5280,9 +5284,18 @@ def prove_sconto_pacco():
         def fetchone(self): return self.r
 
     o = {"annuncio_id": 7, "quantita": 3, "prezzo_sats": 90_500,
-         "spedizione_sats": 500, "protezione_sats": 0}
+         "spedizione_sats": 500, "protezione_sats": 0, "sconto_sats": 0}
     prova("mono: la divisione a ritroso resta esatta (30.000 a pezzo)",
           30_000, amb2["_righe_ordine"](_Con(), o)[0]["unitario_sats"])
+    o2 = {"annuncio_id": 7, "quantita": 3, "prezzo_sats": 81_500,
+          "spedizione_sats": 500, "protezione_sats": 0,
+          "sconto_sats": 9_000}
+    prova("mono scontato: l'unitario torna al LORDO (30.000 a pezzo)",
+          30_000, amb2["_righe_ordine"](_Con(), o2)[0]["unitario_sats"])
+    # e su un ordine di ieri sconto_sats puo' essere NULL: l'or 0
+    o3 = dict(o, sconto_sats=None)
+    prova("mono con sconto NULL: come a zero",
+          30_000, amb2["_righe_ordine"](_Con(), o3)[0]["unitario_sats"])
 
     # ================================================================
     # IL LETTORE DELLA REGOLA e la sua faccia PUBBLICA. La docstring di
@@ -6148,11 +6161,13 @@ def prove_sped_gratis():
     prova("con la lampo −50% ci scende sotto: la spedizione si paga",
           False, gratis(scontato, 100_000))
 
-    # --- IL MONO: la forma che rende possibile tutto questo ----------
+    # --- IL MONO: la forma della promessa --------------------------
     # spedizione azzerata = spedizione_sats 0 in colonna, cioe' lo
     # stato di ogni annuncio con tariffa gratis dichiarata: la
-    # divisione a ritroso di _righe_ordine resta esatta, che e' il
-    # motivo per cui il mono puo' averla mentre lo sconto no.
+    # divisione a ritroso di _righe_ordine resta esatta senza un ramo
+    # nuovo. (Dall'ago 2026 anche lo sconto vale sul mono — li' la
+    # divisione riaggiunge sconto_sats, e l'asimmetria fra le due
+    # promesse non esiste piu'.)
     amb2 = {}
     exec(pezzo("_righe_ordine"), amb2)
 
@@ -6167,7 +6182,7 @@ def prove_sped_gratis():
         def fetchone(self): return self.r
 
     o = {"annuncio_id": 7, "quantita": 3, "prezzo_sats": 90_000,
-         "spedizione_sats": 0, "protezione_sats": 0}
+         "spedizione_sats": 0, "protezione_sats": 0, "sconto_sats": 0}
     prova("mono con spedizione offerta: unitario esatto (30.000)",
           30_000, amb2["_righe_ordine"](_Con(), o)[0]["unitario_sats"])
 
@@ -6228,9 +6243,13 @@ def prove_sped_gratis():
     # La sentinella nomina il gate INSIEME a cio' che protegge: il solo
     # 'if scelta == "spedizione":' compare tre volte in compra() e
     # passerebbe col bug ancora dentro — provato rimettendolo.
+    # (Dall'ago 2026 la SELECT e' unica e incondizionata — porta anche
+    # la regola dello SCONTO, che vale su ogni strada — e sotto il gate
+    # della strada resta la sola lettura della promessa di spedizione.)
     prova("compra: la promessa si legge sulla STRADA, non sulla cifra",
-          True, ('if scelta == "spedizione":\n        vg = con.execute('
-                 '"SELECT sped_gratis_soglia') in corpo_mono)
+          True, ('if scelta == "spedizione":\n'
+                 '        sog_gratis, val_sg = _regola_sped_gratis(')
+          in corpo_mono)
     prova("compra: il gate a cifra non torna", False,
           "\n    if sped:\n" in corpo_mono)
 
@@ -6314,9 +6333,12 @@ def prove_sped_gratis():
     # SATS quel giro di rete non si fa affatto, perche' la misura e'
     # l'articolo stesso. E' il guadagno della scelta, e senza questa
     # riga un riordino lo rimetterebbe in piedi senza rompere niente.
+    # (Col mono che sconta la guardia copre le DUE promesse insieme:
+    # spedizione gratis in euro, o soglia dello sconto a valore in
+    # euro — e a tutte e due in sats il giro di rete non parte.)
     prova("compra: il cambio per la promessa ha una guardia", True,
-          'if sog_gratis > 0 and val_sg == "eur" and cambio_misura <= 0:'
-          in corpo_mono)
+          ('if cambio_misura <= 0 and ((sog_gratis > 0 and '
+           'val_sg == "eur")') in corpo_mono)
     # LE QUATTRO GUARDIE del cambio nominano tutte la valuta: se una se
     # ne dimenticasse, quel percorso pagherebbe un giro di rete che non
     # gli serve — e su un negozio tutto-sats a CoinGecko muto la
@@ -6341,14 +6363,13 @@ def prove_sped_gratis():
                     ("_preventivo_set", corpo_pset)):
         prova(f"{chi}: la guardia del cambio nomina la valuta", True,
               'sog_gratis > 0 and val_sg == "eur"' in c2)
-    # e lo sconto ne ha due (i due percorsi che il carrello tocca): il
-    # mono non lo sconta mai, quindi li' non c'e' niente da guardare
-    for chi, c2 in (("_compra_set", corpo_cset),
+    # e lo sconto la nomina su TUTTI E QUATTRO i percorsi (ago 2026,
+    # il mono sconta): a valore in euro il cambio serve anche a lui
+    for chi, c2 in (("_compra_set", corpo_cset), ("compra", corpo_mono),
+                    ("preventivo_ordine", corpo_prev),
                     ("_preventivo_set", corpo_pset)):
         prova(f"{chi}: ...e quella dello sconto pure", True,
-              'or (crit == "valore" and val_sc == "eur")' in c2)
-    prova("compra (mono): lo sconto non lo guarda proprio", False,
-          "val_sc" in corpo_mono)
+              'crit == "valore" and val_sc == "eur"' in c2)
     # ...e a cambio muto NON nasce un 503 nuovo: si rinuncia alla
     # promessa, non all'acquisto. Il 503 resta dei due casi di sempre.
     prova("compra: i 503 restano due (listino EUR, tariffa ancorata)",
@@ -6505,27 +6526,26 @@ def prove_sped_gratis():
     # riscrive il campo a ogni tasto).
     prova("l'anteprima ha UNA fonte sola", 2,
           mini.count("anteprimaSoglia('"))
-    # ...E A VALORE DICE ANCHE COSA NON FA (ago 2026, da uno stupore di
-    # Andrea su un articolo da 14.000 con la soglia a 10.000): una
-    # soglia espressa in CIFRA si legge «sopra 10.000 e basta», e i tre
-    # posti che dicevano «vale solo nel carrello» erano tutti FUORI
-    # dalla frase della promessa. Adesso sta DENTRO l'anteprima, che e'
-    # la riga in grassetto che il venditore rilegge — ed e' la riga che
-    # un riordino toglierebbe per prima, perche' sembra una ripetizione.
+    # ...E DICE IL PERIMETRO NUOVO DENTRO LA FRASE (ago 2026, il mono
+    # sconta — il rovesciamento del 6 ago). La lezione dello stupore
+    # di Andrea sul 14.000 resta: cio' che la promessa fa e non fa si
+    # dice DENTRO l'anteprima, la riga in grassetto che il venditore
+    # rilegge — ed e' la riga che un riordino toglierebbe per prima,
+    # perche' sembra una ripetizione. «Un oggetto solo paga pieno, per
+    # quanto costi» e' MORTO ed e' vietato: e' diventato falso.
     _ap = pezzo_js(mini, "function anteprimaSoglia")
     _ramo_sc = _ap[:_ap.index("Scrivi da ${chiedi} parte lo sconto")]
-    prova("l'anteprima a valore nomina il CARRELLO", True,
-          "di articoli in un carrello" in _ramo_sc)
-    prova("...e dice che un oggetto solo non basta, per quanto costi",
-          True, "Un oggetto solo paga pieno, per quanto costi" in _ramo_sc)
-    # ...e NON lo dice la spedizione gratis, dove sul singolo scatta
-    # davvero: la stessa frase li' sarebbe una bugia (ed e' l'errore
-    # che verrebbe naturale, «uniformiamo i due cassetti»)
-    # l'ULTIMO `return valore > 0` e' il ramo della spedizione: un
-    # offset a mano risalirebbe dentro quello dello sconto (provato)
-    _ramo_sg = _ap[_ap.rindex("return valore > 0"):]
-    prova("la spedizione gratis NON la dice (li' sul singolo scatta)",
-          False, "paga pieno" in _ramo_sg)
+    # «anche un oggetto solo» vive SOLO nel ramo a valore: un'ancora
+    # che matcha anche l'altro ramo sarebbe la sentinella che non puo'
+    # fallire (la lezione della tortura)
+    prova("l'anteprima a valore dice che anche un oggetto solo sconta",
+          True, "anche un oggetto solo" in _ramo_sc)
+    prova("...e «un oggetto solo paga pieno» non torna da nessuna porta",
+          False, "paga pieno, per quanto costi" in _ap)
+    # ...e il ramo a pezzi dice che le copie contano: e' IL caso del
+    # rovesciamento (tre copie della stessa cosa sono tre pezzi)
+    prova("...e a pezzi nomina le copie dello stesso articolo", True,
+          "copie dello stesso articolo" in _ramo_sc)
     # NIENTE CLAMP MUTO: a limare al minimo sarebbe il client, e il
     # venditore vedrebbe un numero che non ha scritto. A dire la cifra
     # e' il 400 del server, che il cassetto rende dentro di se'.
@@ -6955,6 +6975,12 @@ def prove_libro_mastro():
         -- UN MONO SANO: nessuna riga, nessuno sconto
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita)
           VALUES(2, 9, 50000, 5);
+        -- UN MONO SCONTATO SANO (ago 2026, il mono sconta): 3 pezzi,
+        -- lordo 30.000, sconto 3.000, spedizione 500 -> 27.500. La
+        -- divisione a ritroso torna esatta, e nessuno deve fiatare.
+        INSERT INTO ordini(id,annuncio_id,prezzo_sats,sconto_sats,
+          sconto_percento,spedizione_sats,quantita)
+          VALUES(6, 9, 27500, 3000, 10, 500, 3);
         -- UN'ASTA CHIUSA SANA: entrati 140, vincitrice espone 100,
         -- registro 40 (un perdente rimborsato + l'eccedenza)
         INSERT INTO puntate(id,annuncio_id,tg_id,offerto_sats,versato_sats,stato)
@@ -7019,10 +7045,18 @@ def prove_libro_mastro():
     casi = [
         ("UPDATE ordini SET prezzo_sats=29299 WHERE id=1",
          "aritmetica della testata", "1"),
-        ("UPDATE ordini SET sconto_sats=500, sconto_percento=10 WHERE id=2",
-         "mono scontato", "2"),
+        # «mono scontato» e' morto col rovesciamento (ago 2026, il mono
+        # sconta): al suo posto i due invarianti veri della testata.
+        # (27500-500+2999) = 29999, che per 3 non si divide:
+        ("UPDATE ordini SET sconto_sats=2999 WHERE id=6",
+         "aritmetica del mono", "6"),
         ("UPDATE ordini SET sconto_sats=99999 WHERE id=1",
          "sconto fuori scala", "1"),
+        # prezzo 497 < sped 500: il netto e' negativo, cioe' lo sconto
+        # supera la merce — e (497-500+3000)=2997 si divide per 3, cosi'
+        # a svegliarsi e' SOLO il controllo giusto
+        ("UPDATE ordini SET prezzo_sats=497 WHERE id=6",
+         "sconto fuori scala (mono)", "6"),
         ("UPDATE ordini SET sconto_percento=0 WHERE id=1",
          "sconto e percentuale scordati", "1"),
         ("UPDATE ordini SET quantita=4 WHERE id=1",
@@ -7140,21 +7174,82 @@ def prove_libro_mastro():
 
 
 # ====================================================================
+def prove_divisione_a_ritroso():
+    """IL CENSIMENTO DELLE DIVISIONI A RITROSO (ago 2026, il mono
+    sconta): l'unitario del mono si ricava dalla testata in TRE copie
+    — _righe_ordine, la ripresa del pentito in compra(), e la riga
+    «N pezzi x unitario» del client — e una copia che dimentica di
+    riaggiungere sconto_sats non fa fallire niente: mostra un unitario
+    storto in ordine, notifiche e CSV, in silenzio. Percio' qui non
+    c'e' un elenco a memoria ma un CENSIMENTO che guarda i file (la
+    lezione del titolo nudo): la quarta copia di domani entra nel
+    conto da sola, e ogni copia ha la sua prova che il + dello sconto
+    ci sia davvero. Le ancore si confrontano a spazi COLLASSATI, cosi'
+    gli a-capo (e i CRLF dei due file) non le spezzano."""
+    print("\n[le divisioni a ritroso: il censimento]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda s: re.sub(r"\s+", "", s)
+
+    # --- il censimento: la forma della sottrazione dalla testata ----
+    # server: prezzo - spedizione - protezione coi nomi tra parentesi
+    # quadre (l'SQL del libro mastro, che e' senza quadre, resta fuori
+    # da se'; netto_venditore non ha la spedizione e non matcha)
+    forma_srv = re.compile(
+        r'\w+\["prezzo_sats"\]-\w+\["spedizione_sats"\]'
+        r'-\w+\["protezione_sats"\]')
+    srv_nudo = nudo(codice(src))
+    prova("server: le copie della sottrazione sono DUE", 2,
+          len(forma_srv.findall(srv_nudo)))
+    # client: la stessa sottrazione coi nomi di mapOrder
+    mini_vivo = re.sub(r"/\*.*?\*/", "", mini, flags=re.S)
+    forma_cli = re.compile(
+        r"\.price-\(\w+\.spedSats\|\|0\)-\(\w+\.protSats\|\|0\)")
+    prova("client: la copia della sottrazione e' UNA", 1,
+          len(forma_cli.findall(nudo(mini_vivo))))
+
+    # --- copia n.1: _righe_ordine riaggiunge lo sconto --------------
+    prova("copia 1 (_righe_ordine): +sconto_sats nella divisione", True,
+          nudo('(o["prezzo_sats"]-o["spedizione_sats"]'
+               '-o["protezione_sats"]+(o["sconto_sats"]or0))//qta')
+          in nudo(codice(pezzo("_righe_ordine"))))
+
+    # --- copia n.2: la ripresa del pentito in compra() --------------
+    # (qui la sottrazione da sola e' GIUSTA — art e' il netto, che e'
+    # cio' che articolo_sats promette — ed e' la DIVISIONE a dover
+    # riaggiungere lo sconto)
+    corpo_mono = src[src.index("async def compra("):
+                     src.index("def crea_ordine_pagato(")]
+    mono_nudo = nudo(codice(corpo_mono))
+    prova("copia 2 (ripresa): lo sconto si legge dall'ordine", True,
+          nudo('sc = mio["sconto_sats"] or 0') in mono_nudo)
+    prova("...e la divisione lo riaggiunge", True,
+          nudo('(art + sc) // (mio["quantita"] or 1)') in mono_nudo)
+
+    # --- copia n.3: la riga «N pezzi x unitario» del client ---------
+    prova("copia 3 (client): +scontoSats nella divisione", True,
+          nudo("(o.listing.price-(o.spedSats||0)-(o.protSats||0)"
+               "+(o.scontoSats||0))/o.qta") in nudo(mini_vivo))
+
+
+# ====================================================================
 def prove_forma_sconto_pacco():
     """Le righe che un riordino farebbe sparire senza rompere nessuna
     prova funzionale — e che sono tutto cio' che tiene lo sconto
-    carrello dove deve stare: fuori dal mono, fuori dal payload del
-    compratore, e fuori da ogni strada del denaro in USCITA."""
+    carrello dove deve stare: nei quattro percorsi del conto (dall'ago
+    2026 il mono sconta), fuori dal payload del compratore, e fuori da
+    ogni strada del denaro in USCITA."""
     print("\n[lo sconto carrello: la forma]")
     src = open("server.py", encoding="utf-8").read()
 
-    # 1) UN giudice solo, e due chiamanti soli (i due rami SET): il
-    # preventivo e la invoice devono dire la stessa cifra per
-    # costruzione, non per disciplina.
+    # 1) UN giudice solo, e i chiamanti sono i quattro percorsi del
+    # conto (compra mono, compra set, i due preventivi — ago 2026, il
+    # mono sconta): il preventivo e la invoice devono dire la stessa
+    # cifra per costruzione, non per disciplina.
     prova("lo sconto ha UN giudice solo", 1, src.count("def _sconto_pacco("))
     # (si contano le CHIAMATE, non le occorrenze del nome: l'endpoint
     # si chiama imposta_sconto_pacco e finirebbe nel conto)
-    prova("...e due chiamanti soli (compra set, preventivo set)", 2,
+    prova("...e i chiamanti sono i quattro percorsi del conto", 4,
           src.count("= _sconto_pacco("))
     prova("il gemello in euro e' UNO", 1,
           src.count("def _sconto_pacco_eur("))
@@ -7164,8 +7259,9 @@ def prove_forma_sconto_pacco():
     # criterio): a valore la porta la apre un numero in SATS, che
     # l'euro non ha. Quindi ogni sua chiamata e' dietro al fratello —
     # se un domani qualcuno lo invocasse nudo, l'euro sconterebbe un
-    # carrello che in sats non ha raggiunto la soglia.
-    prova("...e si aziona SOLO dietro al fratello in sats", 1,
+    # carrello che in sats non ha raggiunto la soglia. La riga e'
+    # LETTERALE apposta: i due preventivi devono usare la stessa.
+    prova("...e si aziona SOLO dietro al fratello in sats (x2)", 2,
           src.count("_sconto_pacco_eur(articolo_eur, pct) if sconto"))
     prova("la regola pubblica passa da UNA pura sola", 1,
           src.count("def _sconto_pubblico("))
@@ -7190,27 +7286,49 @@ def prove_forma_sconto_pacco():
     # furto con la ricevuta.
     corpo_set = src[src.index("async def _compra_set("):
                     src.index("async def _preventivo_set(")]
-    prova("_compra_set: lo sconto non si legge dal payload", False,
-          any(k in corpo_set for k in ('d.get("sconto', 'd.get("soglia',
-                                       'd.get("percento', 'd.get("totale')))
-    prova("_compra_set: la regola arriva dalla riga del VENDITORE", True,
-          "_regola_sconto(" in corpo_set and "WHERE tg_id=?" in corpo_set)
-
-    # 4) IL MONO NON SCONTA MAI, in nessun ramo (decisione di Andrea).
-    # _righe_ordine e' il punto in cui si romperebbe in silenzio: la
-    # divisione a ritroso dell'unitario non tornerebbe piu'.
     corpo_mono = src[src.index("async def compra("):
                      src.index("def crea_ordine_pagato(")]
-    prova("compra (mono): la parola sconto non esiste", False,
-          "_sconto_pacco" in corpo_mono or "sconto_sats" in corpo_mono)
-    # (si guarda il CODICE e non i commenti: dentro _righe_ordine c'e'
-    # apposta la nota che dice cosa servirebbe SE un giorno il mono
-    # scontasse — quella riga deve poter restare)
+    for chi, corpo in (("_compra_set", corpo_set),
+                       ("compra (mono)", corpo_mono)):
+        prova(f"{chi}: lo sconto non si legge dal payload", False,
+              any(k in corpo for k in ('d.get("sconto', 'd.get("soglia',
+                                       'd.get("percento', 'd.get("totale')))
+        prova(f"{chi}: la regola arriva dalla riga del VENDITORE", True,
+              "_regola_sconto(" in corpo and "WHERE tg_id=?" in corpo)
+
+    # 4) IL MONO SCONTA (ago 2026, decisione di Andrea che ROVESCIA il
+    # 6 ago: tre copie della stessa cosa sono tre pezzi). La divisione
+    # a ritroso di _righe_ordine RIAGGIUNGE sconto_sats — una copia
+    # senza non fa fallire niente: mostra un unitario storto in
+    # ordine, notifiche e CSV, in silenzio. Il censimento delle copie
+    # sta in prove_divisione_a_ritroso; qui la forma dei due rami.
+    prova("compra (mono): lo sconto c'e'", True,
+          "_sconto_pacco" in corpo_mono and "sconto_sats" in corpo_mono)
+    # ...FINISCE IN COLONNA (senza, la ricevuta e la divisione a
+    # ritroso leggerebbero uno sconto che non e' mai stato scritto,
+    # e l'ordine racconterebbe un prezzo che il conto non spiega)
+    prova("compra (mono): l'INSERT scrive sconto_sats e percento", True,
+          "protezione_sats,quantita,sconto_sats,sconto_percento,"
+          in corpo_mono)
+    # ...e `articolo_sats` e' il NETTO su tutti e due i percorsi mono,
+    # come nel set: lordo e sconto sono chiavi in piu' che si sommano
+    # da sole — lasciato lordo, il client sottrarrebbe lo sconto DUE
+    # volte a occhio e il totale non tornerebbe
+    for chi, corpo in (("compra (mono)", corpo_mono),
+                       ("preventivo_ordine", pezzo("preventivo_ordine"))):
+        prova(f"{chi}: articolo_sats e' il netto", True,
+              '"articolo_sats": conto["netto"]' in corpo)
+    # ...e la regola si legge FUORI dal gate della spedizione: lo
+    # sconto vale anche su ritiro e codice online, e una SELECT
+    # rimessa dentro quell'if lo spegnerebbe li' in silenzio
+    prova("compra (mono): la regola si legge PRIMA del gate spedizione",
+          True, corpo_mono.index("_regola_sconto(")
+          < corpo_mono.index('if scelta == "spedizione":'))
     codice_righe = "\n".join(
         r for r in pezzo("_righe_ordine").splitlines()
         if not r.strip().startswith("#"))
-    prova("_righe_ordine: la divisione a ritroso non sconta", False,
-          "sconto_sats" in codice_righe)
+    prova("_righe_ordine: la divisione a ritroso riaggiunge lo sconto",
+          True, "sconto_sats" in codice_righe)
     prova("crea_ordine_pagato (asta) non sconta", False,
           "sconto" in pezzo("crea_ordine_pagato").split('"""')[-1])
 
@@ -7218,21 +7336,27 @@ def prove_forma_sconto_pacco():
     # cui uscirebbero i sats DI ALTRI ORDINI: se la bolt11 chiedesse il
     # netto e prezzo_sats finisse col lordo, il payout pretenderebbe
     # dalla cassaforte piu' di quanto quell'ordine ha versato — e la
-    # cintura di paga_venditore non lo vedrebbe.
-    i = corpo_set.index("crea_invoice_escrow(")
-    j = corpo_set.index("INSERT INTO ordini", i)
-    prova("_compra_set: zero await tra invoice e INSERT", False,
-          "await " in codice(corpo_set[i:j]))
-    prova("_compra_set: il totale non si riscrive li' in mezzo", 0,
-          corpo_set[i:j].count("totale ="))
-    prova("_compra_set: la invoice si conia sul TOTALE", True,
-          "crea_invoice_escrow(\n        totale," in corpo_set)
+    # cintura di paga_venditore non lo vedrebbe. Su TUTTI E DUE i rami
+    # che coniano (il mono sconta anche lui).
+    for chi, corpo in (("_compra_set", corpo_set),
+                       ("compra (mono)", corpo_mono)):
+        i = corpo.index("crea_invoice_escrow(")
+        j = corpo.index("INSERT INTO ordini", i)
+        prova(f"{chi}: zero await tra invoice e INSERT", False,
+              "await " in codice(corpo[i:j]))
+        prova(f"{chi}: il totale non si riscrive li' in mezzo", 0,
+              corpo[i:j].count("totale ="))
+        prova(f"{chi}: la invoice si conia sul TOTALE", True,
+              "crea_invoice_escrow(\n        totale," in corpo)
 
     # 6) Il tetto di rodaggio giudica il LORDO, PRIMA dello sconto: e'
     # un vincolo del listino, non del checkout — altrimenti si
     # pubblicherebbe sopra il tetto rientrandoci con una regola.
+    # Sui QUATTRO percorsi, da quando sono quattro.
     for chi, corpo in (("_compra_set", corpo_set),
-                       ("_preventivo_set", pezzo("_preventivo_set"))):
+                       ("_preventivo_set", pezzo("_preventivo_set")),
+                       ("compra (mono)", corpo_mono),
+                       ("preventivo_ordine", pezzo("preventivo_ordine"))):
         prova(f"{chi}: il tetto giudica PRIMA dello sconto", True,
               corpo.index("TETTO_SATS_ANNUNCIO") < corpo.index("_sconto_pacco("))
 
@@ -7309,6 +7433,24 @@ def prove_forma_sconto_pacco():
           mini.count("function cifraCtrl"))
     prova("...e il meno sta DENTRO di lui", True,
           "const m = meno ? '−' : '';" in mini)
+
+    # 10) LA CAMPAGNA DEL ROVESCIAMENTO (ago 2026): chi aveva lo sconto
+    # acceso viene avvisato che ora vale anche sul mono — una tantum
+    # GLOBALE col timbro nella tabella `timbri`, mai un globale in RAM
+    # (il patto dei timbri: tre deploy in un'ora, tre notifiche).
+    campagna = pezzo("avvisa_sconto_su_mono", fine="\n\n\nasync def")
+    prova("la campagna esiste e gira nell'orologio", True,
+          "await avvisa_sconto_su_mono()" in src)
+    prova("il timbro sta nella tabella timbri", True,
+          "timbro_letto(TIMBRO_CAMPAGNA_SCONTO_MONO)" in campagna
+          and "timbro_scrivi(TIMBRO_CAMPAGNA_SCONTO_MONO" in campagna)
+    prova("...e si scrive PRIMA degli invii (il patto delle campagne)",
+          True, campagna.index("timbro_scrivi(")
+          < campagna.index("await notifica("))
+    prova("la campagna lascia la riga nel journal", True,
+          "Campagna «il mono sconta»" in campagna)
+    prova("...e bussa solo a chi ha la regola accesa", True,
+          "sconto_pacco_percento > 0" in campagna)
 
 
 def _codice_rifiuto(funzione, init, errore):
@@ -8739,6 +8881,7 @@ def prove_ricevuta_compratore():
               stato TEXT, quantita INT, consegna_scelta TEXT,
               via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
               spedizione_sats INT DEFAULT 0, protezione_sats INT DEFAULT 0,
+              sconto_sats INT DEFAULT 0,
               aggiornato INT DEFAULT 0);
             CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
               annuncio_id INT, quantita INT, unitario_sats INT, titolo TEXT);
@@ -10439,7 +10582,7 @@ def prove_offerta_quantita():
         def fetchone(self): return self.r
 
     o = {"annuncio_id": 7, "quantita": 3, "prezzo_sats": conto["totale"],
-         "spedizione_sats": 500, "protezione_sats": 0}
+         "spedizione_sats": 500, "protezione_sats": 0, "sconto_sats": 0}
     riga = amb2["_righe_ordine"](_Con(), o)[0]
     # E' QUI che un accordo sul TOTALE si romperebbe in silenzio: la
     # divisione a ritroso non tornerebbe piu', e l'unitario sarebbe
@@ -12444,17 +12587,19 @@ def prove_promesse_badge():
           mini.count("etichettaSpedGratis("))
     prova("l'etichetta corta dello sconto e' UNA", 1,
           mini.count("function etichettaSconto("))
-    # «NEL CARRELLO» e' la parola portante dello sconto (il mono non
-    # sconta mai: chi compra UNA cosa cara non deve credere il
-    # contrario), mentre la spedizione gratis vale anche su un oggetto
-    # solo — quindi li' «nel carrello» sarebbe FALSO e a portare la
-    # precisione e' «di articoli». L'asimmetria e' voluta: e' il caso
-    # in cui uniformare i due testi introdurrebbe una bugia.
+    # «NEL CARRELLO» E' MORTO in tutte e due (ago 2026, il mono
+    # sconta): la parola che restringeva e' diventata la parola che
+    # mente — chi compra tre copie dalla scheda sconta, e chi compra
+    # UNA cosa cara sopra la soglia a valore pure. Le due etichette
+    # parlano uguale, ed e' la verita' e non piu' una bugia: il
+    # perimetro delle due promesse ora e' lo stesso.
     _es = pezzo_js(mini, "function etichettaSconto(r){")
     _esg = pezzo_js(mini, "function etichettaSpedGratis(r){")
-    prova("lo sconto dice «nel carrello»", 2, _es.count("nel carrello"))
-    prova("...e la spedizione NON lo dice", False, "nel carrello" in _esg)
-    prova("...e dice invece «di articoli»", True, "di articoli" in _esg)
+    prova("lo sconto NON dice piu' «nel carrello»", 0,
+          _es.count("nel carrello"))
+    prova("...e nemmeno la spedizione", False, "nel carrello" in _esg)
+    prova("...e a valore dicono tutte e due «di articoli»", True,
+          "di articoli" in _es and "di articoli" in _esg)
 
     # ---- 3. LA PROSA LUNGA sopravvive solo dove non e' diventata
     # badge: testata negozio e hint del form Vendi (piu' la
@@ -12464,6 +12609,18 @@ def prove_promesse_badge():
           mini.count("frasePromessaSpedGratis("))
     prova("...e quella dello sconto pure", 3,
           mini.count("frasePromessaSconto("))
+    # ...e il TESTO della prosa lunga ha finalmente una sentinella (il
+    # buco trovato col rovesciamento: si poteva riscrivere la frase
+    # senza che nulla diventasse rosso). Dice il perimetro nuovo:
+    # niente carrello, le stesse parole della gemella. La fetta si
+    # chiude alla graffa della funzione — fino alla riga vuota
+    # inghiottirebbe 18mila caratteri di vicini, «carrello» compreso.
+    _fps = pezzo_js(mini, "function frasePromessaSconto(r){",
+                    fine="\n}")
+    prova("la prosa lunga dello sconto non nomina il carrello", False,
+          "carrello" in _fps)
+    prova("...e dice «da N pezzi in su» / «di articoli»", True,
+          "pezzi in su" in _fps and "di articoli" in _fps)
 
     # ---- 4. «ALTRI OGGETTI»: i badge SOTTO il bottone e SORELLI del
     # blocco sticky. Dentro `.altri-azione` diventerebbero sticky anche
@@ -12643,6 +12800,7 @@ def main():
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
+              prove_divisione_a_ritroso,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_cambio,
               prove_recupero_cambi,
