@@ -7525,6 +7525,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   LA TRACCIA DELLA CORREZIONE DEL MODERATORE HA SEGUITO IL CODICE, ed
   è la riga che si perde per distrazione svuotando un banner: sta nel
   passo, dove la vedono ENTRAMBE le parti come prima.
+  MA IN DISPUTA IL CODICE NON SI LEGGEVA AFFATTO (ago 2026, dal
+  campo, e va PRIMA della voce qui sotto perché la corregge): lo
+  stepper ha DUE array di passi — il corso normale e la disputa — e
+  quello della disputa non ha mai avuto un passo per la spedizione,
+  quindi da `dispute` in poi il tracciamento spariva per tutti e tre
+  (chi compra, chi vende, e il moderatore, che è quello che ne ha più
+  bisogno: lì il codice è una PROVA). Ora c'è, dopo il deposito e
+  prima dell'apertura — l'ordine in cui le cose sono successe — e solo
+  se un tracciamento esiste: una disputa aperta da 'locked' o una
+  consegna a mano non hanno niente da mostrare. Il bottone di
+  @trackbot resta fuori da solo (`trackbotPossibile` guarda
+  shipped/delivered), quindi lì il codice esce come TESTO: a pacco
+  contestato non si offre di iscriversi alle notifiche.
+  `progress` È UN INDICE dentro `steps`, quindi il passo in più sposta
+  di uno tutti quelli dopo (`+ (o.tracking ? 1 : 0)`): chi ne aggiunge
+  un altro e si dimentica quella riga accende il pallino «adesso» sul
+  passo sbagliato, che è un difetto che leggendo non si vede.
+  IL SOSPETTO ERA IL FILTRO DI TRACKBOT E NON ERA LUI, ed è la parte
+  di METODO da tenere: il caso arrivava come «un codice SDA da 9 cifre
+  non si vede più», cioè con una causa già scritta dentro la
+  segnalazione — e il filtro era nato il giorno prima, quindi
+  combaciava. Riprodotto invece di dedotto: in disputa il codice
+  spariva con QUALUNQUE corriere, anche con quelli che il filtro lo
+  passano (InPost 24, Poste S10), e la regione dello stepper è
+  identica BYTE PER BYTE a prima del cantiere trackbot. Un buco
+  vecchio, visto il giorno in cui qualcuno è andato a cercare il
+  codice dove serve.
+  LA PROVA CHE NE RESTA È UN CENSIMENTO e non un elenco: nella strada
+  che RENDE il codice — `codiceTracking` e i due rami dello stepper —
+  `passaTrackbot` e `FILTRO_TRACKBOT` non devono comparire MAI, così
+  un codice fuori filtro si vede comunque anche nel ramo che qualcuno
+  aggiungerà fra sei mesi. La mutazione che nasconde il codice fuori
+  filtro fa rosse quattro righe.
   IL CODICE SI TOCCA DOVE SI LEGGE (ago 2026): dentro quel passo il
   tracciamento è cliccabile e porta a @trackbot, e il link a 17track
   è USCITO dall'ordine — ne resta uno solo, quello del RESO (lato
