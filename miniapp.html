@@ -1766,8 +1766,15 @@
      punto scritto ha un indirizzo che puo' fare 120 caratteri — cede
      LUI coi puntini (figlio flex: min-width:0, la lezione del comune
      in card), il «Cambia» non si stringe mai e resta raggiungibile
-     anche a 320px */
+     anche a 320px. Dall'ago 2026 il cassetto vive DENTRO il riquadro
+     della via punto: il contenitore ospite va in COLONNA
+     (.con-cassetto) e la riga nome+cifra (.via-riga) tiene il layout
+     dei fratelli — cosi' le regole di .via-opzione non si toccano. */
+  #acqPuntoCampo{margin-top:10px}
   #acqPuntoCampo .btn{margin-top:0}
+  .via-opzione.con-cassetto{flex-direction:column;align-items:stretch}
+  .via-opzione .via-riga{display:flex;justify-content:space-between;
+    align-items:center;gap:12px;min-width:0}
   .punto-riga{justify-content:flex-start;text-align:left}
   .punto-riga .punto-testo{flex:1 1 auto;min-width:0;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
@@ -8395,10 +8402,43 @@ let acqDati = null;
     renderAcquisto ricostruisce l'HTML da zero a ogni ±/toggle/via.
     I ± e il ripiego riassegnano con {...d0}: il flag sopravvive. */
 
+/* Il punto parla col 🚚 (ago 2026, decisione di Andrea): e' una
+   SPEDIZIONE, e il camioncino e' il suo segno in tutta l'app — la
+   scatola qui diceva la taglia del pacco, che e' un'altra cosa.
+   Niente collisione con «a casa», che in questa lista ha la casetta:
+   i due segni dicono DOVE arriva, il verbo lo dice la parola. */
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
-  : v==='punto' ? '📦 Spedizione a un punto di ritiro'
+  : v==='punto' ? '🚚 Spedizione a un punto di ritiro'
   : v==='digitale' ? '💾 Codice online' : '';
+
+/* LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA (ago 2026,
+   decisione di Andrea): se casa e punto costano UGUALE la cifra non
+   fa scegliere niente — il costo lo dice gia' il conto sotto — e se
+   costano diverso resta, perche' e' l'informazione che fa scegliere.
+   Si confronta il costo FINALE (post promessa gratis: se una via e'
+   gratis e l'altra no le cifre tornano da sole, anche a tariffe di
+   base uguali) e SOLO nella stessa unita' NATIVA: euro con euro,
+   sats puri con sats puri — mai attraverso una conversione, che
+   un'uguaglianza al cambio di adesso e' di un istante e la invoice
+   riconverte (valute diverse o tariffe miste = mai «uguali», le
+   cifre restano: il verso in cui sbagliare e' mostrare). Lo zero fa
+   eccezione perche' e' zero in ogni valuta, e il fallback_casa e'
+   un'IDENTITA', non un confronto: stessa tariffa per costruzione.
+   A cambio muto la via ancorata all'euro e' cambio_assente, cioe'
+   senza numeri: non confrontabile, e la via viva mostra la sua. */
+function costiVieUguali(strade){
+  const c = strade.find(s=>s.via==='casa');
+  const p = strade.find(s=>s.via==='punto');
+  if (!c || !p || c.cambio_assente || p.cambio_assente) return false;
+  if (p.fallback_casa) return true;
+  const cS = c.spedizione_sats||0, pS = p.spedizione_sats||0;
+  if (!cS && !pS) return true;
+  const cE = c.spedizione_eur||0, pE = p.spedizione_eur||0;
+  if (cE>0 && pE>0) return cE === pE;
+  if (!cE && !pE && !c.stima && !p.stima) return cS === pS;
+  return false;
+}
 
 function apriAcquisto(l){
   haptic();
@@ -8734,40 +8774,6 @@ function renderAcquisto(){
      vecchio. */
   const accQta = (d.offertaId && (p.quantita||1) > 1)
     ? `<div class="acq-nota">🤝 Accordo per <b>${fmt(p.quantita)} pezzi</b> al prezzo pattuito.</div>` : '';
-  /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
-     (decisione di Andrea, ago 2026: il totale con dentro l'oggetto
-     si leggeva come «costo di spedizione» — il totale lo dice IL
-     CONTO qui sotto, che segue la via scelta; mai due totali in
-     pagina). Ritiro e codice online non spediscono: niente cifra. */
-  const strade = (p.strade||[]).filter(s => s.via !== '');
-  const stradaSel = (p.strade||[]).find(s => s.via === d.via) || null;
-  let vie = '';
-  if (strade.length) {
-    vie = `<div class="section-label">Consegna</div>
-      <div role="radiogroup" aria-label="Come vuoi riceverlo">` + strade.map(s => {
-      if (s.cambio_assente)
-        return `<div class="via-opzione off"><span class="via-nome">${nomeVia(s.via)}
-          <span class="via-sped">il cambio euro non è disponibile: riprova tra poco</span></span></div>`;
-      /* «Consigliato» sulla via punto (ago 2026, decisione di Andrea):
-         la pillola CONSIGLIA la strada, non spiega la tariffa — il
-         «come a casa» del fallback e' sparito, e per chi compra la
-         verita' e' gia' la cifra mostrata (che con la tariffa unica
-         E' quella di casa). Il flag fallback_casa resta nel payload
-         del preventivo: e' un fatto del server, non piu' un testo. */
-      const nota = s.via==='punto'
-        ? `<span class="via-sped">Consigliato</span>` : '';
-      const cifra = (s.via==='casa' || s.via==='punto')
-        ? (s.spedizione_sats>0
-            ? `<span class="via-tot">${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'', s.spedizione_eur)}</span>`
-            /* la gratuita' parla col grassetto, mai col colore */
-            : `<span class="via-gratis">gratuita</span>`)
-        : '';
-      return `<button type="button" role="radio" aria-checked="${s.via===d.via}"
-        class="via-opzione" data-via="${s.via}" onclick="setViaAcquisto(this.dataset.via)">
-        <span class="via-nome">${nomeVia(s.via)}${nota}</span>${cifra}
-      </button>`;
-    }).join('') + `</div>`;
-  }
   /* --- il campo del punto di ritiro: la SCELTA resta sempre PRIMA di
      «Paga» (quarto giro, come su Subito e Vinted), ma dal QUINTO
      (ago 2026, col punto diventato il DEFAULT della via) il campo non
@@ -8780,7 +8786,22 @@ function renderAcquisto(){
      capo. Con la rete dichiarata la sua mappa, senza tutte e due piu'
      la riga onesta qui sotto; la rete di sicurezza resta il campo
      dell'ordine, dove il punto si corregge finche' il venditore non
-     spedisce. --- */
+     spedisce.
+     E DALL'AGO 2026 IL CASSETTO VIVE DENTRO IL RIQUADRO della via
+     punto, sotto il «Consigliato» (decisione di Andrea): sta
+     attaccato alla scelta a cui appartiene, e scegliendo un'altra
+     via se ne va con lei — si disegna solo a via punto SELEZIONATA,
+     e tutti e tre i suoi stati (bottone / campo aperto / riga
+     compatta) abitano li' dentro, una casa sola. La radio che lo
+     ospita diventa un DIV role="radio" — HTML vieta interattivi
+     annidati, la lezione dello stepper dentro Acquista — e i tocchi
+     restano separati per PROPAGAZIONE: il tocco sul riquadro
+     seleziona la via, il cassetto la ferma con stopPropagation sul
+     suo contenitore (#acqPuntoCampo), cosi' bottone, input e link
+     mappe non riselezionano mai — un click dentro l'input, senza
+     quel freno, rifarebbe il render sotto le dita di chi scrive.
+     La tastiera ha la stessa guardia (event.target===this): l'Invio
+     sul bottone interno non deve anche scegliere la via. --- */
   /* VARCO MAPPA (futuro, API corriere): questo contenitore verra'
      sostituito dal selettore dei punti (ricerca/mappa) dello
      spedizioniere dichiarato. Il contratto non cambia: un testo in
@@ -8796,10 +8817,56 @@ function renderAcquisto(){
         onclick="apriPuntoAcquisto()">📍 <span class="punto-testo">${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriPuntoAcquisto()">📍 Indica il punto di ritiro</button>`;
-  const campoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
-      style="margin-top:10px;display:${d.via==='punto'?'':'none'}">
+  const cassettoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
+      onclick="event.stopPropagation()">
     ${d.puntoAperto ? campoAperto : campoChiuso}
   </div>`;
+  /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
+     (decisione di Andrea, ago 2026: il totale con dentro l'oggetto
+     si leggeva come «costo di spedizione» — il totale lo dice IL
+     CONTO qui sotto, che segue la via scelta; mai due totali in
+     pagina). Ritiro e codice online non spediscono: niente cifra,
+     da sempre e per costruzione. E le cifre di casa e punto
+     compaiono solo quando DIVERGONO (costiVieUguali, sopra):
+     uguali = mute, il costo lo dice gia' il conto. */
+  const strade = (p.strade||[]).filter(s => s.via !== '');
+  const stradaSel = (p.strade||[]).find(s => s.via === d.via) || null;
+  const cifreMute = costiVieUguali(strade);
+  let vie = '';
+  if (strade.length) {
+    vie = `<div class="section-label">Consegna</div>
+      <div role="radiogroup" aria-label="Come vuoi riceverlo">` + strade.map(s => {
+      if (s.cambio_assente)
+        return `<div class="via-opzione off"><span class="via-nome">${nomeVia(s.via)}
+          <span class="via-sped">il cambio euro non è disponibile: riprova tra poco</span></span></div>`;
+      /* «Consigliato» sulla via punto (ago 2026, decisione di Andrea):
+         la pillola CONSIGLIA la strada, non spiega la tariffa — il
+         «come a casa» del fallback e' sparito, e per chi compra la
+         verita' e' gia' la cifra mostrata (che con la tariffa unica
+         E' quella di casa). Il flag fallback_casa resta nel payload
+         del preventivo: e' un fatto del server, non piu' un testo. */
+      const nota = s.via==='punto'
+        ? `<span class="via-sped">Consigliato</span>` : '';
+      const cifra = (s.via==='casa' || s.via==='punto') && !cifreMute
+        ? (s.spedizione_sats>0
+            ? `<span class="via-tot">${cifraCtrl(s.spedizione_sats, s.stima?'≈ ':'', s.spedizione_eur)}</span>`
+            /* la gratuita' parla col grassetto, mai col colore */
+            : `<span class="via-gratis">gratuita</span>`)
+        : '';
+      if (s.via==='punto')
+        return `<div role="radio" tabindex="0" aria-checked="${s.via===d.via}"
+          class="via-opzione con-cassetto" data-via="punto"
+          onclick="setViaAcquisto(this.dataset.via)"
+          onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setViaAcquisto('punto')}">
+          <span class="via-riga"><span class="via-nome">${nomeVia(s.via)}${nota}</span>${cifra}</span>
+          ${s.via===d.via ? cassettoPunto : ''}
+        </div>`;
+      return `<button type="button" role="radio" aria-checked="${s.via===d.via}"
+        class="via-opzione" data-via="${s.via}" onclick="setViaAcquisto(this.dataset.via)">
+        <span class="via-nome">${nomeVia(s.via)}${nota}</span>${cifra}
+      </button>`;
+    }).join('') + `</div>`;
+  }
   /* --- le note oneste --- */
   let note = '';
   if (p.spedizioniere && (d.via==='casa' || d.via==='punto'))
@@ -8926,7 +8993,7 @@ function renderAcquisto(){
   const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
-  box.innerHTML = `${articoli}${accQta}${fila}${vie}${campoPunto}${note}
+  box.innerHTML = `${articoli}${accQta}${fila}${vie}${note}
     <div class="section-label">Il conto</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}

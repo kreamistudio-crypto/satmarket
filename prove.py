@@ -6799,6 +6799,48 @@ def prove_pagina_acquisto():
           _nwc.index("apriPuntoAcquisto()")
           < _nwc.index("Indica il punto di ritiro"))
 
+    # 5quinquies. LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA e IL
+    #    CASSETTO DENTRO IL RIQUADRO (ago 2026, decisioni di Andrea).
+    #    Le cifre di casa/punto compaiono solo quando DIVERGONO — il
+    #    giudice e' uno (costiVieUguali) e confronta il costo FINALE
+    #    nella stessa unita' NATIVA: mai attraverso una conversione
+    #    (un'uguaglianza al cambio di adesso e' di un istante, la
+    #    invoice riconverte), fallback_casa = identita' e non
+    #    confronto, cambio muto = non confrontabile e la via viva
+    #    mostra la sua.
+    prova("il giudice delle cifre delle vie e' UNO", 1,
+          mini3.count("function costiVieUguali"))
+    prova("...e le cifre di casa/punto ci passano", True,
+          "&& !cifreMute" in mini3)
+    prova("...fallback_casa e' un'identita', non un confronto", True,
+          "if (p.fallback_casa) return true;" in mini3)
+    prova("...mai «uguali» attraverso una conversione", True,
+          "if (cE>0 && pE>0) return cE === pE;" in mini3
+          and "!c.stima && !p.stima" in mini3)
+    prova("...e a cambio muto non si confronta niente", True,
+          "c.cambio_assente || p.cambio_assente" in mini3)
+    #    Il cassetto del punto vive DENTRO il riquadro della via punto
+    #    e si disegna solo a via selezionata; la radio che lo ospita
+    #    e' un DIV role="radio" (HTML vieta interattivi annidati, la
+    #    lezione dello stepper dentro Acquista) e i tocchi restano
+    #    separati per propagazione: il cassetto la ferma, o un click
+    #    nell'input rifarebbe il render sotto le dita; la tastiera ha
+    #    la guardia event.target===this.
+    prova("il cassetto del punto vive dentro la radio della via", True,
+          "${s.via===d.via ? cassettoPunto : ''}" in mini3)
+    prova("...la radio ospite e' un DIV, mai un button annidato", True,
+          '<div role="radio" tabindex="0"' in mini3)
+    _i_cass = mini3.index('id="acqPuntoCampo"')
+    prova("...e il cassetto ferma la propagazione del tocco", True,
+          "event.stopPropagation()" in mini3[_i_cass:_i_cass + 120])
+    # (ancorata al frammento dell'onkeydown: «event.target===this» nudo
+    # vive anche altrove e la sentinella sarebbe vacua — la lezione
+    # della tortura)
+    prova("...con la guardia gemella sulla tastiera", True,
+          'onkeydown="if(event.target===this' in mini3)
+    prova("la via punto parla col camioncino (e' una spedizione)", True,
+          "v==='punto' ? '🚚 Spedizione a un punto di ritiro'" in mini3)
+
     # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
     #    Nostr non le porta: le azzererebbe a ogni sync). L'unico
     #    UPDATE che le scrive e' quello di modifica().
