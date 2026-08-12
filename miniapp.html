@@ -1585,7 +1585,9 @@
   #rifornisciSheet .qta-mini .qm-btn:active,
   #offertaSheet .qta-mini .qm-btn:active,
   .acq-art .qta-mini .qm-btn:active{background:var(--sats-soft)}
-  .acq-art .qta-mini{margin-left:8px;vertical-align:middle}
+  /* sulla riga sua sotto il titolo: il margine sinistro resta 0
+     (la regola del gruppo qui sopra), l'aria la da' il margin-top */
+  .acq-art .qta-mini{margin-top:6px}
   /* il velo d'attesa del ± (12 ago 2026): RITARDATO di ~180ms da
      acqPasso — su rete viva non si vede mai, su rete lenta e' fermo e
      onesto. La transizione evita il gradino quando compare. */
@@ -1763,7 +1765,12 @@
   .acq-art{display:flex;align-items:center;gap:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:var(--radius);
     padding:10px 12px;margin-top:4px}
-  .acq-art .acq-tit{min-width:0;flex:1;font-weight:800;font-size:14.5px;
+  /* titolo e stepper in COLONNA: lo stepper (e il «× N» dell'accordo)
+     NON stanno dentro il titolo — il clamp qui sotto taglia la terza
+     riga, e col titolo lungo su due righe se li mangiava interi
+     (caso vero dal campo, 12 ago 2026: si vedeva a 360px, non a 375) */
+  .acq-art .acq-col{min-width:0;flex:1}
+  .acq-art .acq-tit{font-weight:800;font-size:14.5px;
     overflow:hidden;text-overflow:ellipsis;display:-webkit-box;
     -webkit-line-clamp:2;-webkit-box-orient:vertical}
   .acq-art .mono{flex:0 0 auto}
@@ -8652,17 +8659,22 @@ function renderAcquisto(){
        rifornimento. Con l'ACCORDO la quantita' e' pinnata e resta il
        «× N» di sempre (la regola di stepperAcquista); con stock 1 non
        c'e' niente da scegliere. Il numero e' d.qta — la scelta
-       corrente — che dopo ogni risposta coincide con p.quantita. */
+       corrente — che dopo ogni risposta coincide con p.quantita.
+       E STA FUORI DA .acq-tit, sotto il titolo nella colonna
+       .acq-col (12 ago 2026, dal campo: annuncio 192): il titolo e'
+       un line-clamp a DUE righe con overflow:hidden, e un titolo
+       lungo spingeva stepper E «× N» dell'accordo sulla terza riga,
+       tagliata — nel DOM ma invisibili, a 360px e non a 375. */
     const stock = (x && x.quantita) || 1;
     const qtaUi = d.offertaId
-      ? ((p.quantita||1)>1 ? ` <span class="mono">× ${fmt(p.quantita)}</span>` : '')
+      ? ((p.quantita||1)>1 ? `<span class="mono">× ${fmt(p.quantita)}</span>` : '')
       : (stock > 1
-         ? ' ' + stepperMini(d.qta, 'acqPasso(-1)', 'acqPasso(1)',
-                             d.qta <= 1, d.qta >= stock)
+         ? stepperMini(d.qta, 'acqPasso(-1)', 'acqPasso(1)',
+                       d.qta <= 1, d.qta >= stock)
          : '');
     articoli = `<div class="acq-art">
       <div class="ctrl-mini">${t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}</div>
-      <div class="acq-tit">${esc(x ? x.title : '')}${qtaUi}</div>
+      <div class="acq-col"><div class="acq-tit">${esc(x ? x.title : '')}</div>${qtaUi}</div>
       <span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}</span>
     </div>`;
   }
