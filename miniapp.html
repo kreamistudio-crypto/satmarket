@@ -14494,8 +14494,15 @@ function trackingDaControllare(corriere, tracking, idAvviso){
    cui si arriva a trackbot — il bottone e il codice dentro il recinto:
    due strade che rispondessero diverso sullo stesso codice sarebbero
    una che promette quel che l'altra nega.
-   Solo il compratore (e' il suo pacco), solo mentre il pacco viaggia,
-   solo col tracciamento — le sentinelle 'Consegna a mano'/'Ritiro in
+   Le DUE PARTI (ago 2026, dal campo — prima era il solo compratore,
+   con la motivazione «e' il suo pacco»): il venditore segue la
+   STESSA spedizione, e verso un punto di ritiro deve sapere quando
+   il pacco arriva — e' il momento in cui manda la busta — senza
+   nessun'altra maniglia in mano. Il MODERATORE resta fuori: nei
+   suoi stati (le dispute) il codice e' gia' TESTO per la regola
+   dello stato qui sotto, quindi la porta gli mancherebbe solo sullo
+   shipped aperto per numero. Solo mentre il pacco viaggia, solo col
+   tracciamento — le sentinelle 'Consegna a mano'/'Ritiro in
    zona' restano fuori da sole, il tracking non ce l'hanno — e solo se
    non riconosciamo con CERTEZZA un codice di intermediario.
    LA LOGICA E' ROVESCIATA (ago 2026, decisione di Andrea, da un caso
@@ -14579,7 +14586,7 @@ function intermediarioNoto(tracking){
 }
 
 function trackbotPossibile(o, s){
-  return o.role === 'buyer' && !!o.tracking
+  return ['buyer','seller'].includes(o.role) && !!o.tracking
       && ['shipped','delivered'].includes(s)
       && !intermediarioNoto(o.tracking);
 }
