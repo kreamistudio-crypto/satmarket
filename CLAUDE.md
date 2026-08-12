@@ -5592,10 +5592,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   c'era, lì no — poi la spedizione, che deve parlargli uguale): la
   stessa forma del carrello, in UNA fila di pillole AFFIANCATE dove
   ognuna ha il suo stato — sono indipendenti, quindi una verde e una
-  no è uno stato normale. Sotto soglia «🎁 Ancora N pezzi → −X%» e
-  «🚚 Ancora 12 € → spedizione gratis» (a valore la CIFRA che manca,
+  no è uno stato normale. Sotto soglia «🚚 Ancora 12 € → spedizione
+  gratis» e «🎁 Ancora N pezzi → −X%» (a valore la CIFRA che manca,
   via `cifraSoglia`, nell'unità della promessa); quando scatta il
-  verde «✅ … nel conto». IL VERDE DELLA SPEDIZIONE CONVIVE con la
+  verde «✅ … nel conto». La fila sta SOPRA la riga della consegna
+  (12 ago 2026, decisione di Andrea — è un fatto del negozio, si
+  legge prima di scegliere la strada) e il suo ordine è quello di
+  casa: vedi «L'ORDINE DELLA FILA È UNO SOLO», sotto «LE PROMESSE
+  DIVENTANO BADGE». IL VERDE DELLA SPEDIZIONE CONVIVE con la
   riga «Spedizione: gratuita» del conto, ed è deciso guardando lo
   schermo: la riga dice il COSA, il verde dice il PERCHÉ (è la
   promessa del negozio a essere scattata) — e senza, nello stato
@@ -6128,8 +6132,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   **Non la si rigira una terza volta senza un meccanismo nuovo**: la
   gerarchia titolo → azione → perché è stata giudicata valere meno
   del difetto.
-  NEL CARRELLO il badge porta il CONTO VIVO — «🎁 Ancora 2 pezzi →
-  −15%», «🚚 Ancora 145 € → spedizione gratis» — e quando la soglia
+  L'ORDINE DELLA FILA È UNO SOLO (12 ago 2026, decisione di Andrea):
+  🚚 PRIMA della 🎁, ovunque le due promesse compaiano insieme —
+  pagina Paga (dove la fila sta anche SOPRA la riga della consegna),
+  «Altri oggetti», carrello e testata del negozio, che era il quarto
+  posto e l'ha trovato il censimento: l'occhio impara UNA fila, e una
+  superficie che la rovescia gliene fa trovare un'altra. In
+  `renderAcquisto` i BLOCCHI sorgente restano sconto-poi-spedizione
+  (le prove li affettano coi marcatori dei commenti): l'ordine reso
+  lo decide la sola composizione `pillaSg + pillaSc`, e cinque
+  sentinelle tengono fila, posizione e le quattro superfici. Chi
+  aggiunge una QUINTA superficie con le due promesse la mette in
+  quell'ordine e nel conto delle sentinelle.
+  NEL CARRELLO il badge porta il CONTO VIVO — «🚚 Ancora 145 € →
+  spedizione gratis», «🎁 Ancora 2 pezzi → −15%» — e quando la soglia
   scatta diventa la conferma. «NEL CONTO» nel badge dello sconto non è
   ornamento: la barra lì sotto è al LORDO di proposito, e senza quella
   coda chi legge «−15%» aspetterebbe che il totale scenda.
