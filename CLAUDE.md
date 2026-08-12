@@ -7215,6 +7215,61 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `bustaLetta`, «👁 Mostra» SENZA confirm (non è la rivelazione:
   leggere un bigliettino non muove niente), tutto sotto esc(), admin
   senza nemmeno il bottone.
+  IL DOCUMENTO DI RITIRO (ago 2026, dal campo: al locker il corriere
+  manda un PDF o un QR — un PIN si trascrive, un QR NO). È L'ALTRA
+  STRADA PER IL CODICE e non un'aggiunta (decisione di Andrea): il
+  nome del destinatario serve sempre, poi basta UNA delle due — codice
+  scritto o documento — e il 400 lo dice. Colonne `busta_file`
+  (il nome sul disco), `busta_file_tipo`, `busta_file_nome`
+  (l'etichetta che il compratore legge). PDF e immagini, 15 MB.
+  IL FILE NON STA IN `foto/`, ed è la riga da non ammorbidire: là
+  dentro i nomi si servono a chiunque li riceva, e **chi ha questo
+  documento RITIRA IL PACCO** — non è una foto, è una credenziale.
+  Quindi cartella sua (`buste/`, in .gitignore), byte CIFRATI col
+  trasporto dei contenuti digitali (`_cifra_blob`/`_decifra_blob`,
+  stessa chiave e stessi prefissi del testo, ma dentro i BYTE: chi
+  guarda la cartella da fuori non vede né un PDF né un JPEG), NESSUNA
+  rotta che serva la cartella (regola ferrea 3, con la prova che conta
+  zero occorrenze di `"/buste`), e nome di file IMPREVEDIBILE
+  (`token_hex`) e non derivato dall'ordine — la cartella non è servita
+  da nessuno, ma un nome che si indovina invita a provarci.
+  Si esce SOLO da `GET /api/orders/{id}/busta-ritiro/file`, che ha le
+  regole del gemello riga per riga: solo le due parti, il moderatore
+  MAI, autorizzazione PRIMA dell'esistenza (estraneo e ordine
+  inesistente rispondono uguale), e GET PURO — aprire il documento non
+  è una ricevuta. Più `no-store` (su un telefono prestato una copia in
+  cache è una copia del codice) e `nosniff` + `sandbox`, che se un
+  domani ci finisse dentro un HTML travestito non deve eseguirsi sul
+  nostro dominio.
+  IL TIPO LO DICONO I BYTE, non l'etichetta — `FIRME_DOC_BUSTA` è una
+  whitelist di FORME come `NOME_FOTO`, e qui la lezione del PDF
+  rinominato `.jpg` pesa il doppio perché quel tipo torna indietro
+  come `Content-Type`. Un PDF etichettato `image/jpeg` entra come PDF;
+  ciò che non si riconosce non entra affatto. E `_etichetta_documento`
+  ripulisce duro il nome del file (basename, niente controlli, niente
+  virgolette): quel nome finisce nel `Content-Disposition`, ed è la
+  famiglia del «<» che spegneva l'avviso di spedizione, su un altro
+  tubo. Il caso di prova porta apposta una virgoletta E un a-capo, non
+  un percorso: col solo percorso a passare sarebbe `basename`, e la
+  ripulitura vera resterebbe non sorvegliata (l'ha detto la tortura).
+  CHIAVE ASSENTE = SI CONSERVA (il patto dello stock: un client di
+  ieri non sa che il campo esiste e non deve cancellarlo); `file_togli`
+  è il gesto esplicito, e togliere l'ULTIMA strada rimasta si rifiuta.
+  Il file si scrive PRIMA della colonna (disco che dice di no = busta
+  intatta, mai una colonna che punta al nulla) e il vecchio si cancella
+  DOPO il commit, il pattern di `_scrivi_avatar`. Da `/api/orders` esce
+  il solo FLAG `busta_documento`: nemmeno il nome del file, che è la
+  maniglia sul disco e non serve a nessun client. In disputa il
+  moderatore legge «(con un documento allegato)» — un fatto, come la
+  data — e il contenuto MAI, da nessuna strada.
+  CLIENT: il venditore sceglie il file e lo vede come chip
+  (`campoDocumentoBusta`, `bustaDoc` azzerato al cambio ordine); chi
+  legge trova l'IMMAGINE disegnata IN PAGINA — al banco del locker si
+  inquadra, e mandare qualcuno a cercare un download è il modo di
+  perdere il codice — mentre il PDF si scarica e LO SI DICE. Il PDF non
+  si apre in una scheda nuova, ed è una limitazione vera: un objectURL
+  vive solo in quella pagina e `tg.openLink` lo passerebbe a un browser
+  che non lo sa leggere. Per questo il testo del form consiglia il QR.
   LA PAGINA ORDINI RISTRUTTURATA (ago 2026): filtro «Solo attivi»,
   pillole [Tutti|Acquisti|Vendite], la foto vera al posto del 📦, e il
   NASCONDERE degli affari conclusi. Le definizioni, dichiarate:
@@ -10398,6 +10453,40 @@ venditore respinto, l'anti-oracolo verificato sul database vero
 lapide che non blocca, e gli ordini immobili prima e dopo — e il gesto
 nel browser coi due confirm e zero errori JS. IN PRODUZIONE basta il
 deploy: nessuna colonna, nessuna migrazione, nessuna leva.
+
+Il documento di ritiro nella busta (ago 2026, dal campo): al locker il
+corriere manda un PDF o un QR, e un PIN si trascrive mentre un QR no —
+il venditore lo carica dentro l'ordine. È l'ALTRA strada per dare il
+codice e non un'aggiunta (decisione di Andrea): il nome del
+destinatario serve sempre, poi basta uno dei due. La riga che governa
+tutto il resto: **chi ha quel file ritira il pacco**, quindi non è una
+foto ma una credenziale — niente `foto/`, niente URL pubblico, byte
+cifrati in `buste/` e una rotta autenticata che decifra al volo, con le
+regole della busta riga per riga (solo le due parti, il moderatore mai,
+GET puro, `no-store`). Vedi Architettura, «IL DOCUMENTO DI RITIRO»,
+per la whitelist di FORME (il tipo lo dicono i byte, e qui quel tipo
+torna indietro come Content-Type) e per la limitazione dichiarata sul
+PDF, che si scarica invece di aprirsi in una scheda.
+Collaudato: 2311 prove verdi (33 nuove, erano 2278 — le stesse 3
+rosse di prima e di dopo, che sono `websocket` non installato qui) e
+soprattutto DODICI MUTAZIONI del codice, una per riga sorvegliata:
+cache rimessa, documento scritto in `foto/`, byte nudi sul disco,
+guardia allentata sulla rotta dei byte, whitelist tolta, «si conserva»
+tolto, vecchio file non cancellato, busta vuota ammessa, ripulitura del
+nome tolta, byte serviti ancora cifrati, 503 tolto, tipo sbagliato —
+ognuna diventa rossa da sola. La rotta dei byte GIRA per davvero nel
+banco di prova (Response di cartone, il resto è il pezzo vero): byte
+identici a quelli caricati, estraneo e inesistente indistinguibili, e
+il dump del database uguale prima e dopo due letture. UNA PROVA ERA
+VACUA e l'ha detto la tortura, non la rilettura: il caso della
+ripulitura del nome usava un percorso, che lo toglie già `basename` —
+ora porta una virgoletta e un a-capo, che solo la regex leva.
+NON COLLAUDATO QUI, e va detto: su questa macchina non ci sono
+`fastapi` né `anthropic`, quindi il giro end-to-end col server acceso e
+la prova in browser NON sono stati fatti. DA FARE al primo deploy: un
+ordine vero al punto con un QR caricato dentro Telegram — che
+l'immagine si veda in pagina sul telefono del compratore, e che il PDF
+finisca fra i suoi file.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

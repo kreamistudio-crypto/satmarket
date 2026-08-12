@@ -4517,6 +4517,9 @@ function mapOrder(o){
        /busta-ritiro alle sole parti, MAI all'admin */
     bustaIl:o.busta_il||0, bustaCorrettaIl:o.busta_corretta_il||0,
     bustaCorrezioni:o.busta_correzioni||0,
+    /* del documento arriva il solo FLAG: il nome del file e' la
+       maniglia sul disco e non esce mai, i byte men che meno */
+    bustaDocumento:!!o.busta_documento,
     /* l'ordine nato da un'asta (ago 2026): con la scelta di consegna
        ancora vuota il vincitore sceglie dal varco e il venditore
        aspetta (niente bottoni di spedizione) */
@@ -11149,6 +11152,11 @@ function renderOrders(){
 }
 
 function openOrder(id){
+  /* il documento scelto e non ancora depositato non passa da un
+     ordine all'altro; il confronto con l'id serve perche' qui si
+     RIENTRA anche solo per ridisegnare lo stesso ordine (e' cosi'
+     che il chip del file compare) */
+  if (!currentOrder || currentOrder.id !== id) bustaDoc = null;
   currentOrder = orders.find(o=>o.id===id);
   const o = currentOrder, s = o.state;
   stellaScelta = 0;   // il voto non inviato non sopravvive al cambio d'ordine
@@ -13671,7 +13679,14 @@ async function consegnaContenuto(btn){
    non la legge mai (il server glielo nega; qui non gli si disegna
    nemmeno il bottone). Il testo non viaggia in /api/orders: si
    carica solo da /busta-ritiro, e questa e' la copia di pagina. ---- */
-let bustaLetta = {};          // ordineId -> {nome, codice}
+let bustaLetta = {};          // ordineId -> {nome, codice, doc…}
+/* il documento scelto e non ancora depositato: data URL + nome, e
+   `togli` per il gesto esplicito di levare quello che c'e' gia'
+   (chiave assente = si conserva, il patto dello stock lato server) */
+let bustaDoc = null;
+/* l'objectURL dei byte gia' scaricati, per ordine: si riusa invece
+   di richiedere quindici mega a ogni riapertura del pannello */
+let bustaDocVisto = {};
 
 function pannelloBustaRitiro(o){
   if (!o.viaPunto || o.role==='admin') return '';
@@ -13692,9 +13707,10 @@ function pannelloBustaRitiro(o){
         <h4>📦 Istruzioni per il ritiro</h4>
         <div class="hint">Nome del destinatario sul pacco (lo ha scelto il venditore — se al banco te lo chiedono, è questo):</div>
         <div class="hint mono" style="user-select:all">${esc(b.nome)}</div>
-        <div class="hint" style="margin-top:8px">Codice di ritiro:</div>
+        ${b.codice ? `<div class="hint" style="margin-top:8px">Codice di ritiro:</div>
         <div class="hint mono" style="user-select:all;white-space:pre-wrap;word-break:break-word">${esc(b.codice)}</div>
-        <button class="btn ghost" style="margin-top:10px" onclick="copiaBusta()">📋 Copia il codice</button>
+        <button class="btn ghost" style="margin-top:10px" onclick="copiaBusta()">📋 Copia il codice</button>` : ''}
+        ${bloccoDocumentoBusta(o, b)}
         <div class="hint" style="margin-top:8px">Leggerle non conferma nulla: i sats restano nel deposito di garanzia finché non confermi tu il ritiro, coi bottoni qui sotto.</div>
       </div>`;
     return `
@@ -13722,6 +13738,7 @@ function pannelloBustaRitiro(o){
         <div class="hint" style="margin-top:6px">Scrivi il <b>nome che hai messo come destinatario</b> (anche di fantasia: serve all'acquirente se glielo chiedono al banco, e a tutti e due se il pacco non viene ritirato e torna indietro) e il <b>codice di ritiro</b> (PIN o link del QR). Restano cifrati e li legge solo l'acquirente; aprirli non sblocca nulla — i sats si muovono solo quando conferma il ritiro.</div>
         <textarea id="bustaNome" maxlength="80" style="min-height:38px" placeholder="Nome del destinatario (es. Mario Rossi)">${b?esc(b.nome):''}</textarea>
         <textarea id="bustaCodice" maxlength="1000" style="min-height:38px" placeholder="Codice di ritiro (PIN o link del QR)">${b?esc(b.codice):''}</textarea>
+        ${campoDocumentoBusta(o, b)}
         ${o.bustaIl && !b ? `<button class="btn ghost" style="margin-top:8px" onclick="mostraBusta(this)">👁 Rileggi ciò che hai depositato</button>` : ''}
         <button class="btn orange" style="margin-top:10px" onclick="depositaBusta(this)">📦 ${o.bustaIl?'Aggiorna le istruzioni':'Deposita le istruzioni'}</button>
       </div>`;
@@ -13731,9 +13748,107 @@ function pannelloBustaRitiro(o){
     <div class="payout">
       <h4>📦 Istruzioni di ritiro</h4>
       <div class="hint">Depositate il ${quando}${corr}. Puoi rileggere ciò che hai depositato:</div>
+      ${b ? bloccoDocumentoBusta(o, b) : ''}
       <button class="btn ghost" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra</button>
     </div>`;
   return '';
+}
+
+/* ---- il documento di ritiro (ago 2026): un PIN si trascrive, un QR
+   no. E' l'ALTRA strada per dare il codice, non un'aggiunta: il nome
+   del destinatario serve sempre, poi basta uno dei due. I byte non
+   hanno un URL pubblico — chi ha il documento ritira il pacco —
+   quindi si scaricano autenticati e si mostrano da un objectURL. ---- */
+
+/* il venditore: sceglie il file, lo vede come chip, lo puo' togliere */
+function campoDocumentoBusta(o, b){
+  const gia = (b && b.documento) || (!b && o.bustaDocumento);
+  const nomeGia = (b && b.documentoNome) || 'il documento che hai caricato';
+  let riga;
+  if (bustaDoc && bustaDoc.togli)
+    riga = `<span class="hint">🗑 il documento verrà tolto al salvataggio</span>
+            <button class="btn link" onclick="annullaDocBusta()">annulla</button>`;
+  else if (bustaDoc)
+    riga = `<span class="hint mono">📄 ${esc(bustaDoc.nome)}</span>
+            <button class="btn link" onclick="annullaDocBusta()">togli</button>`;
+  else if (gia)
+    riga = `<span class="hint mono">📄 ${esc(nomeGia)}</span>
+            <button class="btn link" onclick="togliDocBusta()">togli</button>`;
+  else
+    riga = '';
+  return `
+    <div style="margin-top:10px">
+      <div class="hint">📄 Oppure, se il corriere ti manda l'etichetta o il <b>QR</b> del locker, caricalo qui: un PIN si riscrive, un QR no. PDF o immagine, fino a 15 MB.</div>
+      <input type="file" id="bustaFile" accept="application/pdf,image/*" style="display:none" onchange="scegliDocBusta(this)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn ghost" onclick="el('bustaFile').click()">${gia||bustaDoc?'Scegli un altro file':'📎 Scegli un file'}</button>
+        ${riga}
+      </div>
+    </div>`;
+}
+
+/* chi legge: l'immagine si apre IN PAGINA — al banco del locker si
+   inquadra o si mostra, e mandare qualcuno a cercare un download e'
+   il modo di perdere il codice; il PDF, che in pagina non si puo'
+   disegnare, si apre in una scheda sua */
+function bloccoDocumentoBusta(o, b){
+  if (!b || !b.documento) return '';
+  const visto = bustaDocVisto[o.id];
+  const immagine = (b.documentoTipo||'').startsWith('image/');
+  if (visto && immagine) return `
+    <div class="hint" style="margin-top:8px">📄 ${esc(b.documentoNome||'Documento di ritiro')}:</div>
+    <img src="${visto}" alt="Documento di ritiro" style="width:100%;border-radius:var(--radius);margin-top:6px;background:#fff">`;
+  return `
+    <div class="hint" style="margin-top:8px">📄 Il venditore ha allegato un documento${b.documentoNome?': '+esc(b.documentoNome):''}.</div>
+    <button class="btn ghost" style="margin-top:6px" onclick="apriDocBusta(this)">${immagine?'🖼 Mostra il documento':'📄 Apri il documento'}</button>`;
+}
+
+function scegliDocBusta(input){
+  const f = input.files && input.files[0];
+  input.value = '';                    // o riscegliere lo stesso file tace
+  if (!f) return;
+  if (f.size > 15*1024*1024) { toast('Il documento è troppo pesante (massimo 15 MB)'); return; }
+  const r = new FileReader();
+  /* il silenzio e' il difetto gia' pagato con le foto: un lettore che
+     fallisce lo dice */
+  r.onerror = ()=> toast('Non riesco a leggere questo file: riprova');
+  r.onload = ()=>{
+    bustaDoc = {dati:r.result, nome:f.name||'documento'};
+    openOrder(currentOrder.id);
+  };
+  r.readAsDataURL(f);
+}
+
+function togliDocBusta(){ bustaDoc = {togli:true}; openOrder(currentOrder.id); }
+function annullaDocBusta(){ bustaDoc = null; openOrder(currentOrder.id); }
+
+async function apriDocBusta(btn){
+  haptic();
+  const o = currentOrder, b = bustaLetta[o.id];
+  let url = bustaDocVisto[o.id];
+  if (!url){
+    const ripristina = bottoneInAttesa(btn);
+    const r = await fetch(`${API_BASE}/orders/${o.id}/busta-ritiro/file`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    if (!r.ok){
+      const d = await r.json().catch(()=>({}));
+      ripristina(); toast(d.detail||'Non riesco ad aprire il documento'); return;
+    }
+    url = URL.createObjectURL(await r.blob());
+    bustaDocVisto[o.id] = url;
+    ripristina();
+  }
+  /* l'immagine la disegna il pannello e finisce li'. Il PDF no, e
+     dentro Telegram nemmeno una scheda nuova aiuta: un objectURL vive
+     solo in QUESTA pagina, e `tg.openLink` lo passerebbe a un browser
+     che non lo sa leggere. Quindi lo si SCARICA, e lo si dice — un
+     file che compare fra i download senza che nessuno lo annunci si
+     legge come «non è successo niente». */
+  if ((b?.documentoTipo||'').startsWith('image/')) { openOrder(o.id); return; }
+  const a = document.createElement('a');
+  a.href = url; a.download = b?.documentoNome || 'ritiro.pdf';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('📄 Documento scaricato: lo trovi fra i tuoi file');
 }
 
 async function caricaBusta(){
@@ -13741,7 +13856,9 @@ async function caricaBusta(){
     {headers:{'X-Tg-Init-Data':authHdr()}});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return null; }
-  bustaLetta[currentOrder.id] = {nome:d.nome||'', codice:d.codice||''};
+  bustaLetta[currentOrder.id] = {nome:d.nome||'', codice:d.codice||'',
+    documento:!!d.documento, documentoNome:d.documento_nome||'',
+    documentoTipo:d.documento_tipo||''};
   return d;
 }
 
@@ -13769,7 +13886,15 @@ async function depositaBusta(btn){
   haptic();
   const nome = (el('bustaNome').value||'').trim();
   const codice = (el('bustaCodice').value||'').trim();
-  if (!nome || !codice) { toast('Servono entrambi: nome del destinatario e codice di ritiro'); return; }
+  if (!nome) { toast('Serve il nome del destinatario'); return; }
+  /* il documento e' l'altra strada per il codice: il giudice vero e'
+     il server, questa e' la cortesia che evita il viaggio coi
+     quindici mega addosso per farsi dire di no */
+  const b = bustaLetta[currentOrder.id];
+  const docResta = bustaDoc ? !bustaDoc.togli
+    : (b ? b.documento : currentOrder.bustaDocumento);
+  if (!codice && !docResta) {
+    toast('Serve il codice di ritiro, oppure carica il documento del corriere'); return; }
   const correzione = currentOrder.bustaIl > 0;
   if (!confirm(correzione
       ? 'Aggiornare le istruzioni di ritiro?\n\nL\'acquirente riceve un avviso e userà il nome e il codice nuovi.'
@@ -13781,13 +13906,29 @@ async function depositaBusta(btn){
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/busta-ritiro`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({nome, codice})});
+    /* chiave `file` assente = si conserva quello che c'e', il patto
+       dello stock: si manda solo quando c'e' un gesto */
+    body: JSON.stringify(Object.assign({nome, codice},
+      bustaDoc && bustaDoc.togli ? {file_togli:1} :
+      bustaDoc ? {file:bustaDoc.dati, file_nome:bustaDoc.nome} : {}))});
   const d = await r.json().catch(()=>({}));
   ripristina();
   if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return; }
   currentOrder.bustaIl = d.busta_il || Math.floor(Date.now()/1000);
   currentOrder.bustaCorrezioni = d.busta_correzioni || 0;
-  bustaLetta[currentOrder.id] = {nome, codice};
+  currentOrder.bustaDocumento = docResta;
+  bustaLetta[currentOrder.id] = {nome, codice, documento:docResta,
+    documentoNome: bustaDoc && !bustaDoc.togli ? bustaDoc.nome
+      : (docResta && b ? b.documentoNome : ''),
+    documentoTipo: bustaDoc && !bustaDoc.togli
+      ? (bustaDoc.dati.slice(5).split(';')[0] || '')
+      : (docResta && b ? b.documentoTipo : '')};
+  /* il documento e' cambiato: la copia scaricata non vale piu' */
+  if (bustaDoc && bustaDocVisto[currentOrder.id]) {
+    URL.revokeObjectURL(bustaDocVisto[currentOrder.id]);
+    delete bustaDocVisto[currentOrder.id];
+  }
+  bustaDoc = null;
   openOrder(currentOrder.id);
   toast(correzione ? '📦 Istruzioni aggiornate: l\'acquirente è stato avvisato'
                    : '📦 Istruzioni depositate');
