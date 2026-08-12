@@ -3641,8 +3641,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Spedizione gratuita» è morto: le pillole di consegna sono TUTTE
   neutre (.pill, un solo cuore) con «gratuita» in grassetto, e il
   «🚚 gratis» in card parla l'inchiostro di casa (var(--ink), token:
-  di notte è crema) in grassetto. I token --ship-* restano definiti ma
-  senza più chi vestire. La storia sotto resta per i perché.
+  di notte è crema) in grassetto. E dall'ago 2026 la REGOLA CSS
+  `.sped-badge` non c'è più: restava orfana a far credere a chi legge
+  il foglio che qualcosa la usasse. I token --ship-soft/--ship-soft-on
+  restano definiti — come --ship-card — ma senza più chi vestire: sono
+  vestiti appesi, e toglierli è una decisione di palette e non la
+  pulizia di una regola morta. La famiglia --ship VIVA è
+  --ship-bg/--ship-text, che vestono il badge di stato «spedito».
+  La storia sotto resta per i perché.
   ATTENZIONE al € del dettaglio d'asta: `.detail-price .unit.eur` sta
   PIÙ IN BASSO nel foglio a pari specificità — il token dell'asta lo
   vince nominando `.asta` E `.unit.eur` insieme, per specificità e non
@@ -5941,8 +5947,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la riga direbbe una cosa che il conto poi non fa. Fuori in due casi:
   annuncio che NON spedisce, e spedizione già gratis SENZA condizioni
   (lì la pillola lo dice meglio, e una soglia accanto farebbe dubitare
-  di una gratuità che è piena). Mai in card, mai fra le pillole: là una
-  cifra si legge come proprietà di quell'oggetto. Più l'INVITO nella
+  di una gratuità che è piena). Mai in card. [«MAI FRA LE PILLOLE»
+  ROVESCIATO ad ago 2026 — vedi «LE PROMESSE DIVENTANO BADGE»: la
+  promessa è entrata DENTRO il badge della spedizione, nominata «di
+  articoli». Resta vero per lo SCONTO, che nelle pillole del dettaglio
+  non entra: nel mono non sconta.] Più l'INVITO nella
   pagina Paga («Ancora N sats e la spedizione è gratis»), che si
   TRASFORMA in conferma invece di sparire (la lezione dell'invito dello
   sconto) e non calcola, riceve — ed è il posto unico e giusto, perché
@@ -5957,6 +5966,94 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   della valuta i numeri da tenere in pari sono due (la soglia e la sua
   unità), cioè lo stesso mezzo secondo con una regola a metà che nello
   sconto è il motivo del bottone unico.
+  LE PROMESSE DIVENTANO BADGE (ago 2026, decisione di Andrea): le due
+  righe di prosa grigia passano a PILLOLE su tre superfici — scheda
+  annuncio, «Altri oggetti», carrello. Erano righe che si leggono una
+  volta e poi si smette di vederle, e soprattutto NON SI MUOVEVANO
+  mentre il carrello cresce: non dicevano mai «ci sei quasi».
+  NELLA SCHEDA la promessa entra DENTRO il badge della spedizione, che
+  diventa il giudice unico di quella riga e ha CINQUE stati esaustivi:
+  niente (non spedisce) · «Spedizione gratuita» (gratis senza
+  condizioni) · «Spedizione disponibile» (in ferie, o nessuna regola
+  dichiarata) · «Spedizione gratis da 25 € di articoli». L'ORDINE DEI
+  RAMI È LA SPECIFICA e sono le due trappole del travaso: `spedGratis`
+  si guarda PRIMA della regola — o un annuncio già gratis senza
+  condizioni mostrerebbe «gratis da 25 €», cioè una condizione su una
+  gratuità piena — e `inFerie` viene dalla riga di prosa e si perde se
+  si travasa a occhio. E la promessa SOSTITUISCE «disponibile», non si
+  somma: mai due 🚚 nella stessa fila.
+  QUESTO ROVESCIA «riga discreta e mai una pillola», e il perché va
+  tenuto: la regola vecchia difendeva da un equivoco vero — nella fila
+  delle pillole una cifra si legge come proprietà di QUELL'oggetto. Il
+  rimedio nuovo non è nasconderla ma NOMINARLA, «da 25 € DI ARTICOLI»,
+  che è la parola che distingue il totale della merce dal prezzo che si
+  ha davanti. Resta intatto ciò che contava: si dice la REGOLA e mai
+  «questo è già sopra soglia».
+  IN «ALTRI OGGETTI» I BADGE STANNO SOPRA IL BOTTONE — «prima il
+  perché, poi l'azione», che è l'ordine che la sezione aveva già con le
+  righe di prosa. CI SI È ARRIVATI DOPO UN GIRO, e il motivo va tenuto
+  perché non si vede leggendo il codice: SOTTO il bottone si
+  SPEZZAVANO. Quel bottone è `position:sticky` col fondo opaco, quindi
+  scorrendo i badge gli passano sotto UNO ALLA VOLTA — a 90px di scroll
+  resta il solo badge della spedizione, cioè un negozio che promette
+  due cose ne mostra una. Una mezza verità è peggio del silenzio, ed è
+  anche il fotogramma su cui si atterra scorrendo piano. Sopra, i due
+  scorrono via INSIEME al titolo di sezione: un normale scroll, niente
+  che venga mangiato da una superficie. LE DUE STRADE SCARTATE,
+  misurate a 375×760 e guardate a schermo: dentro `.altri-azione`
+  (appiccicati anche loro) la coppia non si spezza mai, ma il cartello
+  fisso passa da 84 a 178px — il 23% dello schermo sopra la merce, più
+  gli 86 della barra d'acquisto; e lasciarli sotto non-appiccicati è
+  proprio il difetto qui sopra. LA LEZIONE, che vale oltre questo
+  caso: **contenuto corto e ATOMICO non va messo sotto un elemento
+  sticky** — le card ci passano sotto e va bene, una coppia che si
+  legge insieme no.
+  NEL CARRELLO il badge porta il CONTO VIVO — «🎁 Ancora 2 pezzi →
+  −15%», «🚚 Ancora 145 € → spedizione gratis» — e quando la soglia
+  scatta diventa la conferma. «NEL CONTO» nel badge dello sconto non è
+  ornamento: la barra lì sotto è al LORDO di proposito, e senza quella
+  coda chi legge «−15%» aspetterebbe che il totale scenda.
+  IL VERDE VIVE SOLO NEL CARRELLO (decisione di Andrea): è la coppia di
+  `.trust-note` (`.pill.pill-trust`), cioè il vestito che la riga di
+  prosa aveva già lì — non un colore nuovo e non un significato nuovo.
+  In scheda e in «Altri oggetti» i badge restano NEUTRI, perché lì la
+  promessa è una REGOLA e non un fatto compiuto; e nella fila del
+  dettaglio il verde è già preso da `cond-nuovo`/`cond-come_nuovo`, che
+  vuol dire un'altra cosa.
+  DUE FUNZIONI E DUE SCATOLE nel carrello (`aggiornaInvitoSconto` e
+  `aggiornaInvitoSpedGratis`, `#paccoSconto` e `#paccoSpedGratis`), e
+  non è simmetria per il gusto: le due soglie hanno UNITÀ INDIPENDENTI
+  — un negozio può promettere lo sconto in euro e la spedizione in
+  SATS. Con una funzione sola il `return` di `!cambioVivo`, deciso
+  dallo sconto, spegnerebbe anche un badge che di cambio non ha
+  bisogno; e un `box.innerHTML=''` su un contenitore condiviso
+  cancellerebbe la sorella. Il respiro sta sui FIGLI e non sul
+  wrapper: a carrello vuoto sono tutti e due `display:none` e la fila
+  non produce un pixel. Guardia in più sulla spedizione: un carrello di
+  soli RITIRI non ha una spedizione da rendere gratis
+  (`stradeSet().includes('spedizione')`), e la guardia va DOPO quella
+  del vuoto — a carrello vuoto `stradeSet()` non filtra niente e messa
+  sopra sarebbe vacuamente vera.
+  LA CIFRA HA UN GIUDICE SOLO, `cifraSoglia(quanto, valuta)`: la prosa
+  lunga e l'etichetta corta restano DUE funzioni (sono due registri, e
+  derivare l'una dall'altra sarebbe chirurgia di stringhe su HTML), ma
+  quello che non deve poter divergere non sono le parole — sono la
+  cifra e la sua unità, che erano scritte a mano in sette posti e coi
+  badge sarebbero diventate dieci. Porta anche il nowrap, che SI METTE
+  SULLA CIFRA E MAI SULLA PILLOLA: misurato, «🚚 Spedizione gratis da
+  25 € di articoli» fa ~293px contro i 288 disponibili a 320px, e un
+  flex item con nowrap non scende sotto il min-content — farebbe
+  scorrere di lato la PAGINA.
+  DUE TESTI ASIMMETRICI, e uniformarli introdurrebbe una bugia: lo
+  sconto dice «nel carrello» (il mono non sconta mai, e chi compra UNA
+  cosa cara non deve credere il contrario), la spedizione NO — quella
+  vale anche su un oggetto solo — e porta invece «di articoli».
+  NEL CARRELLO IL CONTO È DEL CLIENT, come già prima: i badge non
+  calcolano, RICEVONO il totale che la barra mostra due centimetri più
+  sotto, quindi i due non possono divergere. L'imperfezione è quella
+  già dichiarata (solo a soglia in EURO si converte col cambio del
+  client, e senza cambio si tace); a soglia in SATS il confronto è
+  esatto e il badge compare anche a CoinGecko muto.
   NEL FORM VENDI DUE RIGHE DELLE POLITICHE (ago 2026, chieste da
   Andrea): lo sconto sotto il Prezzo, la spedizione gratis sotto il
   Costo di spedizione. Non sono informazioni sul negozio, sono
@@ -8288,7 +8385,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pannello Filtri (Applica/Azzera), i bottoni del negozio, «← Torna»
   (`.back`) e il bottone delle celle del pacco, che aveva un 10px suo.
   RESTANO TONDI DI PROPOSITO, e sono classi loro, non `.btn`: `.pill`,
-  `.chip`, `.badge`, `.sped-badge`, `.escrow-flag`, i badge lampo/asta
+  `.chip`, `.badge`, `.escrow-flag`, i badge lampo/asta
   in card, il toggle €/₿, la nav col tondo del Vendi, le pillole
   «Ordina»/«Filtri» sopra la griglia (sono chip di filtro, famiglia
   delle categorie), più `.tour-avanti` e `.demo-cta`. Quelle non sono
