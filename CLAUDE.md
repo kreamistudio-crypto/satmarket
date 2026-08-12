@@ -7679,9 +7679,24 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL GIUDICE È UNO, `trackbotPossibile(o, s)`, e lo usano tutti e due
   i posti da cui ci si arriva — il bottone e il codice: due strade che
   rispondessero diverso sullo stesso codice sarebbero una che promette
-  quel che l'altra nega. Le sue domande sono tre (solo il
-  compratore, solo mentre il pacco viaggia, solo col tracciamento) più
-  la quarta, che l'11 ago 2026 SI È ROVESCIATA — qui sotto. Dove la
+  quel che l'altra nega. Le sue domande sono tre (LE DUE PARTI — dal
+  12 ago 2026 anche il VENDITORE: segue la stessa spedizione e verso
+  un punto di ritiro deve sapere quando il pacco arriva per mandare
+  la busta, e prima non aveva nessuna maniglia; era «solo il
+  compratore» con la motivazione «è il suo pacco», che valeva per le
+  notifiche e non per il bisogno —, solo mentre il pacco viaggia,
+  solo col tracciamento) più la quarta, che l'11 ago 2026 SI È
+  ROVESCIATA — qui sotto. IL MODERATORE RESTA FUORI, e per lui la
+  domanda è APERTA (12 ago 2026): nei suoi stati (le dispute) il
+  codice è già TESTO per la regola dello stato — «a pacco contestato
+  non si offre di iscriversi alle notifiche», che vale per tutti e
+  tre i ruoli e non si tocca — quindi la porta gli mancherebbe solo
+  sullo shipped aperto per numero. Che è però la superficie nata
+  proprio per i tracciamenti storti: lì un tocco sul codice sarebbe
+  una DIAGNOSI (trackbot che risponde «non lo conosco» conferma il
+  codice sbagliato). Se si decide di dargliela, la leva è togliere
+  la condizione sul ruolo dal giudice — la prova «le due parti, mai
+  il moderatore» cambia lato con lei. Dove la
   porta non c'è il codice resta TESTO: un link a vuoto è peggio di
   nessun link.
   UN'EURISTICA INCOMPLETA NON DEVE MAI TOGLIERE NIENTE (11 ago 2026,
