@@ -1761,6 +1761,18 @@
   .via-opzione.off{opacity:.55;cursor:default}
   .acq-nota{font-size:12.5px;color:var(--muted);font-weight:600;
     line-height:1.45;margin-top:10px}
+  /* Il cassetto del punto (quinto giro): il margine del bottone lo
+     porta gia' il contenitore #acqPuntoCampo, e la riga compatta del
+     punto scritto ha un indirizzo che puo' fare 120 caratteri — cede
+     LUI coi puntini (figlio flex: min-width:0, la lezione del comune
+     in card), il «Cambia» non si stringe mai e resta raggiungibile
+     anche a 320px */
+  #acqPuntoCampo .btn{margin-top:0}
+  .punto-riga{justify-content:flex-start;text-align:left}
+  .punto-riga .punto-testo{flex:1 1 auto;min-width:0;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .punto-riga .punto-cambia{flex:0 0 auto;font-weight:800;
+    text-decoration:underline}
   /* la card del singolo articolo: francobollo + titolo + unitario */
   .acq-art{display:flex;align-items:center;gap:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:var(--radius);
@@ -8377,7 +8389,11 @@ function ctrlChiediInfo(){
    totali, quindi cambiare pillola non rifa' la rete. */
 let acqDati = null;
 /* {tipo:'mono'|'set', annuncioId, qta, offertaId,
-    preventivo:null|risposta del server, via:'', punto:'', errore:''} */
+    preventivo:null|risposta del server, via:'', punto:'',
+    puntoAperto:false, errore:''} — puntoAperto e' lo stato del
+    cassetto del punto (quinto giro): vive QUI e non nel DOM, perche'
+    renderAcquisto ricostruisce l'HTML da zero a ogni ±/toggle/via.
+    I ± e il ripiego riassegnano con {...d0}: il flag sopravvive. */
 
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
@@ -8401,7 +8417,8 @@ function apriAcquisto(l){
   currentListing = l;
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id)?.id || 0,
-             preventivo:null, via:'', punto:'', errore:''};
+             preventivo:null, via:'', punto:'', puntoAperto:false,
+             errore:''};
   go('acquisto');
   renderAcquisto();                 /* lo scheletro, subito */
   if (DEMO) {
@@ -8447,7 +8464,8 @@ function apriAcquistoSet(){
     return;
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
-             preventivo:null, via:'', punto:'', errore:''};
+             preventivo:null, via:'', punto:'', puntoAperto:false,
+             errore:''};
   go('acquisto');
   renderAcquisto();
   caricaPreventivo();
@@ -8508,24 +8526,25 @@ function preventivoDemo(l){
           commissione_sats:0, stima:l.valuta==='eur', spedizioniere:'',
           strade};
 }
-/* IL DEFAULT DELLA VIA E' SPEDIZIONE (12 ago 2026, correzione
-   d'eredita' coi numeri). Alla nascita della pagina il default era
-   «la prima strada viva», cioe' il RITIRO — ma era l'ordine di
-   PRESENTAZIONE delle radio colato nel default, non una decisione:
-   prima della pagina il default era spedizione due volte (le pillole
-   del recinto e il default legacy del server, «spedizione batte
-   ritiro»), e la pagina l'aveva rovesciato in silenzio. Misurato in
-   produzione: 51 attivi su 82 erano «entrambe» e 35 mostravano il
-   badge 🚚 sopra un ritiro preselezionato che nessuno aveva scelto.
-   La precedenza e' casa → punto → ritiro → digitale: punto subito
-   dopo casa perche' e' la gemella di famiglia — con la tariffa di
-   casa morta per cambio muto la spedizione resta il default. L'ordine
-   di PRESENTAZIONE delle radio NON cambia (su «entrambe» la
-   selezionata e' la seconda della lista); la via gia' scelta si
-   conserva sui ± come sempre. Il ripiego vive[0] copre lo storico
-   (pseudo-via '') e ogni via futura fuori elenco. */
+/* IL DEFAULT DELLA VIA E' IL PUNTO DI RITIRO (ago 2026, decisione di
+   Andrea che AFFINA il 12 ago). Lo strato di allora resta vero e va
+   tenuto: alla nascita della pagina il default era «la prima strada
+   viva», cioe' il RITIRO — l'ordine di PRESENTAZIONE delle radio
+   colato nel default, non una decisione — e misurato in produzione 51
+   attivi su 82 erano «entrambe», con 35 badge 🚚 sopra un ritiro
+   preselezionato che nessuno aveva scelto: la spedizione batte il
+   ritiro. Lo strato nuovo: fra le due spedizioni vince il PUNTO,
+   perche' e' la via gia' marcata «Consigliato» — default e consiglio
+   devono dire la stessa cosa, non indicare due strade diverse (e la
+   casa espone l'indirizzo, il contrario di cio' per cui esiste la
+   busta di consegna). Con la tariffa punto morta per cambio muto
+   subentra casa: la spedizione resta il default. L'ordine di
+   PRESENTAZIONE delle radio NON cambia (su «entrambe» la selezionata
+   e' la TERZA della lista — guardato a schermo a 320/360/375); la via
+   gia' scelta si conserva sui ± come sempre. Il ripiego vive[0] copre
+   lo storico (pseudo-via '') e ogni via futura fuori elenco. */
 function viaDefault(vive){
-  for (const v of ['casa','punto','ritiro','digitale'])
+  for (const v of ['punto','casa','ritiro','digitale'])
     if (vive.some(s => s.via === v)) return v;
   return vive.length ? vive[0].via : '';
 }
@@ -8749,23 +8768,37 @@ function renderAcquisto(){
       </button>`;
     }).join('') + `</div>`;
   }
-  /* --- il campo del punto di ritiro: c'e' SEMPRE (quarto giro,
-     decisione di Andrea che ROVESCIA il terzo: la scelta del punto
-     torna sempre PRIMA di «Paga», come su Subito e Vinted — con la
-     rete dichiarata la sua mappa, senza tutte e due piu' la riga
-     onesta qui sotto; la rete di sicurezza e' il campo dell'ordine,
-     dove il punto si corregge finche' il venditore non spedisce) --- */
+  /* --- il campo del punto di ritiro: la SCELTA resta sempre PRIMA di
+     «Paga» (quarto giro, come su Subito e Vinted), ma dal QUINTO
+     (ago 2026, col punto diventato il DEFAULT della via) il campo non
+     sta piu' aperto in pagina: lo espande il bottone «📍 Indica il
+     punto di ritiro» — cosi' la pagina apre su un conto da leggere e
+     non su un modulo da compilare, che era l'argomento contro il
+     punto come default. Lo stato e' acqDati.puntoAperto (mai il DOM:
+     si ridisegna); col punto gia' scritto il bottone lo MOSTRA con
+     «Cambia» e il campo riapre precompilato, mai ricominciare da
+     capo. Con la rete dichiarata la sua mappa, senza tutte e due piu'
+     la riga onesta qui sotto; la rete di sicurezza resta il campo
+     dell'ordine, dove il punto si corregge finche' il venditore non
+     spedisce. --- */
   /* VARCO MAPPA (futuro, API corriere): questo contenitore verra'
      sostituito dal selettore dei punti (ricerca/mappa) dello
      spedizioniere dichiarato. Il contratto non cambia: un testo in
      acqDati.punto che viaggia come punto_ritiro nel body. */
-  const campoPunto = `<div class="field" id="acqPuntoCampo"
-      style="margin-top:10px;display:${d.via==='punto'?'':'none'}">
-    <label>Indica il punto di ritiro (nome o indirizzo del punto${p.spedizioniere?' '+esc(p.spedizioniere):''})</label>
+  const puntoScritto = d.punto.trim();
+  const campoAperto = `<label>Indica il punto di ritiro (nome o indirizzo del punto${p.spedizioniere?' '+esc(p.spedizioniere):''})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
-    ${linkMappePunti(p.spedizioniere)}
+    ${linkMappePunti(p.spedizioniere)}`;
+  const campoChiuso = puntoScritto
+    ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
+        onclick="apriPuntoAcquisto()">📍 <span class="punto-testo">${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
+    : `<button type="button" class="btn ghost" aria-expanded="false"
+        onclick="apriPuntoAcquisto()">📍 Indica il punto di ritiro</button>`;
+  const campoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
+      style="margin-top:10px;display:${d.via==='punto'?'':'none'}">
+    ${d.puntoAperto ? campoAperto : campoChiuso}
   </div>`;
   /* --- le note oneste --- */
   let note = '';
@@ -8820,11 +8853,20 @@ function renderAcquisto(){
       pillaSc = `<span class="pill">🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
   }
   /* L'INVITO DELLA SPEDIZIONE GRATIS: compare solo dove una
-     spedizione c'e' davvero — su un ritiro o un codice online
-     sarebbe rumore. La soglia arriva nella chiave della SUA unita' e
-     l'altra a zero (la regola d'oro del server): si prende quella
-     piena — con `sped_gratis_eur` da solo, su un negozio in sats
-     spariva TUTTO il blocco, invito compreso. */
+     spedizione c'e' davvero — spedisceQui dice se il NEGOZIO spedisce
+     — e, dall'ago 2026, solo se anche la VIA SCELTA spedisce: il gate
+     su ritiro e codice online ROVESCIA la decisione del 12 ago, ed e'
+     legato al DEFAULT. Allora il ritiro era il preselezionato-di-fatto
+     e la pillola serviva a far cambiare idea; ora che il default e'
+     il punto, chi sta su ritiro o codice online ci e' arrivato
+     toccando, e li' un cartello sulla spedizione e' rumore (con lui
+     tace anche la prosa del cambio muto, stessa ragione). Se il
+     default della via cambia ancora, questo gate va riguardato. La
+     🎁 dello sconto invece vale su ogni via e NON prende nessun gate.
+     La soglia arriva nella chiave della SUA unita' e l'altra a zero
+     (la regola d'oro del server): si prende quella piena — con
+     `sped_gratis_eur` da solo, su un negozio in sats spariva TUTTO il
+     blocco, invito compreso. */
   const spedisceQui = (p.strade||[]).some(
     s => s.via==='casa' || s.via==='punto');
   const sgVal = p.sped_gratis_valuta
@@ -8832,7 +8874,8 @@ function renderAcquisto(){
   const sgSoglia = (p.sped_gratis_eur||0) || (p.sped_gratis_soglia||0);
   const sgManca = (p.mancano_sped_eur||0) || (p.mancano_sped_sats||0);
   let pillaSg = '';
-  if (sgSoglia > 0 && spedisceQui){
+  if (sgSoglia > 0 && spedisceQui
+      && d.via !== 'ritiro' && d.via !== 'digitale'){
     if (p.promesse_sospese && sgVal === 'eur')
       note += `<div class="acq-nota">🚚 Il negozio offre la spedizione da
            ${cifraSoglia(sgSoglia, sgVal)} di
@@ -8897,8 +8940,26 @@ function setViaAcquisto(v){
   /* il testo del punto gia' digitato si conserva: sta in acqDati,
      e il re-render lo riscrive nel campo */
   acqDati.via = v;
+  /* il cassetto del punto segue la scelta (quinto giro): la scelta
+     ESPLICITA del punto a campo vuoto apre e mette il fuoco — si
+     scrive subito, il focus di sempre — mentre col punto gia' scritto
+     resta la riga compatta, niente tastiera; lasciando la via il
+     cassetto si richiude, cosi' tornandoci si trova la riga (o il
+     bottone), mai un campo spalancato */
+  if (v !== 'punto') acqDati.puntoAperto = false;
+  else if (!acqDati.punto.trim()) acqDati.puntoAperto = true;
   renderAcquisto();
-  if (v === 'punto') el('acqPunto')?.focus();
+  if (v === 'punto' && acqDati.puntoAperto) el('acqPunto')?.focus();
+}
+/* Il cassetto del punto si apre da UN posto solo — il bottone, la
+   radio del punto a campo vuoto (via setViaAcquisto) e le due guardie
+   di «Paga»/⚡ passano tutti di qui: mai il fuoco su un campo che non
+   e' in pagina. */
+function apriPuntoAcquisto(){
+  if (!acqDati) return;
+  acqDati.puntoAperto = true;
+  renderAcquisto();
+  el('acqPunto')?.focus();
 }
 /* Il corpo della consegna per i varchi POST: la via scelta nella
    pagina, nel vocabolario del server. Via '' = annuncio storico,
@@ -8921,10 +8982,13 @@ function ctaAcquisto(){
   /* il punto e' obbligatorio SEMPRE sulla via punto (quarto giro):
      il server lo esige solo con la rete dichiarata — tolleranza per
      il client di ieri, che senza rete non ha il campo — quindi la
-     regola del prodotto vive qui */
+     regola del prodotto vive qui. Dal quinto giro il campo puo'
+     essere chiuso dietro il bottone: si APRE prima del fuoco, mai il
+     fuoco su un campo nascosto */
   if (d.via==='punto' && !d.punto.trim()){
+    apriPuntoAcquisto();
     toast('Indica il punto di ritiro: al venditore serve per spedire');
-    el('acqPunto')?.focus(); return;
+    return;
   }
   if (d.tipo==='set') startBuySet(); else startBuy();
 }
@@ -10595,8 +10659,11 @@ function compraSubito(){
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
   if (!p || !via || via.cambio_assente) { startBuy(); return; }
   if (acqDati.via==='punto' && !acqDati.punto.trim()){
+    /* la gemella della guardia di ctaAcquisto: il campo puo' essere
+       chiuso dietro il bottone — si APRE prima del fuoco */
+    apriPuntoAcquisto();
     toast('Indica il punto di ritiro: al venditore serve per spedire');
-    el('acqPunto')?.focus(); return;
+    return;
   }
   const circaS = (p.stima || via.stima) ? '≈ ' : '';
   el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);

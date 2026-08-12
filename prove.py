@@ -6763,6 +6763,42 @@ def prove_pagina_acquisto():
     prova("client: il campo dentro l'ordine esiste", True,
           "salvaPuntoRitiro" in mini3 and "puntoRitiroInp" in mini3)
 
+    # 5quater. IL QUINTO GIRO (ago 2026, col punto diventato il
+    #    DEFAULT della via): il campo del punto non sta piu' aperto in
+    #    pagina — lo espande il bottone «📍 Indica il punto di
+    #    ritiro», cosi' la pagina apre su un conto da leggere e non su
+    #    un modulo da compilare (l'argomento contro il punto come
+    #    default). Lo stato vive in acqDati e mai nel DOM (il corpo si
+    #    ridisegna a ogni ±); col punto scritto la riga compatta lo
+    #    MOSTRA con «Cambia» — mai ricominciare da capo — e le due
+    #    guardie di «Paga»/⚡ APRONO il cassetto prima del fuoco: mai
+    #    il fuoco su un campo nascosto.
+    prova("quinto giro: il bottone del punto esiste", True,
+          "📍 Indica il punto di ritiro" in mini3)
+    prova("...lo stato del cassetto nasce in acqDati (due costruttori)",
+          2, mini3.count("punto:'', puntoAperto:false"))
+    prova("...il campo riapre PRECOMPILATO, mai ricominciare da capo",
+          True, 'value="${esc(d.punto)}"' in mini3)
+    prova("...la riga compatta mostra il punto SCAPPATO, col Cambia",
+          True,
+          '<span class="punto-testo">${esc(puntoScritto)}</span>' in mini3)
+    prova("...e a cedere coi puntini e' l'indirizzo, mai il Cambia",
+          True, ".punto-testo{flex:1 1 auto;min-width:0;" in mini3)
+    prova("le due guardie del punto vuoto APRONO il cassetto (x2)", 2,
+          mini3.count("apriPuntoAcquisto();"))
+    prova("...col toast identico nelle due copie", 2,
+          mini3.count("Indica il punto di ritiro: al venditore serve "
+                      "per spedire"))
+    prova("...e nessuna mette piu' il fuoco su un campo nascosto",
+          False, "el('acqPunto')?.focus(); return;" in mini3)
+    _cta = pezzo_js(mini3, "function ctaAcquisto(){", "\n}")
+    prova("...in ctaAcquisto l'apertura sta PRIMA del toast", True,
+          _cta.index("apriPuntoAcquisto()") < _cta.index("toast("))
+    _nwc = pezzo_js(mini3, "function compraSubito(){", "\n}")
+    prova("...e in compraSubito idem", True,
+          _nwc.index("apriPuntoAcquisto()")
+          < _nwc.index("Indica il punto di ritiro"))
+
     # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
     #    Nostr non le porta: le azzererebbe a ogni sync). L'unico
     #    UPDATE che le scrive e' quello di modifica().
@@ -6816,17 +6852,19 @@ def prove_pagina_acquisto():
     # guarda che il catalogo SPEDIZIONIERI arrivi dal server)
     prova("il bottone finale della pagina dice «Paga»", True,
           'id="acqCompra" onclick="ctaAcquisto()">Paga<' in mini)
-    # IL DEFAULT DELLA VIA E' SPEDIZIONE (12 ago 2026, correzione
-    # d'eredita': il «prima strada viva» era l'ordine di presentazione
-    # delle radio — ritiro primo — colato nel default, non una
-    # decisione; misurato in produzione, 35 schede su 82 mostravano il
-    # badge 🚚 sopra un ritiro preselezionato che nessuno aveva
-    # scelto). Il giudice e' UNO — precedenza casa → punto → ritiro →
-    # digitale — e i chiamanti DUE, la pagina vera e il ramo DEMO: chi
-    # torna a vive[0] o a strade[0] fa rosse queste righe.
-    prova("il default della via e' una precedenza, spedizione prima",
+    # IL DEFAULT DELLA VIA E' IL PUNTO DI RITIRO (ago 2026, che AFFINA
+    # il 12 ago: la spedizione batte il ritiro — i numeri di
+    # produzione, 35 schede su 82 col badge 🚚 sopra un ritiro
+    # preselezionato che nessuno aveva scelto, restano veri — e fra le
+    # due spedizioni vince il PUNTO, perche' e' la via marcata
+    # «Consigliato»: default e consiglio devono dire la stessa cosa,
+    # non indicare due strade diverse). Il giudice e' UNO — precedenza
+    # punto → casa → ritiro → digitale — e i chiamanti DUE, la pagina
+    # vera e il ramo DEMO: chi torna a vive[0], a strade[0] o a
+    # casa-prima fa rosse queste righe.
+    prova("il default della via e' una precedenza, punto prima",
           True,
-          "for (const v of ['casa','punto','ritiro','digitale'])" in mini)
+          "for (const v of ['punto','casa','ritiro','digitale'])" in mini)
     prova("...il giudice e' uno coi suoi due chiamanti", 3,
           mini.count("viaDefault("))
     prova("...e il ramo DEMO non fa piu' da se'", False,
@@ -12744,6 +12782,18 @@ def prove_promesse_badge():
     prova("le sospese sono gated sulla LORO valuta", True,
           "p.promesse_sospese && scCrit === 'valore'" in _ra
           and "p.promesse_sospese && sgVal === 'eur'" in _ra)
+    # IL GATE DEL 🚚 SULLA VIA SCELTA (ago 2026, ROVESCIA il 12 ago —
+    # ed e' legato al DEFAULT: allora il ritiro era il
+    # preselezionato-di-fatto e la pillola serviva a far cambiare
+    # idea; ora che il default e' il punto, chi sta su ritiro o
+    # codice online ci e' arrivato toccando, e li' un cartello sulla
+    # spedizione e' rumore. Se il default cambia ancora, questo gate
+    # va riguardato). La 🎁 dello sconto invece vale su ogni via: il
+    # gate NON deve comparire nel suo blocco.
+    prova("la 🚚 di Paga tace sulla via che non spedisce", True,
+          "&& d.via !== 'ritiro' && d.via !== 'digitale'" in _blocco_sg)
+    prova("...e la 🎁 dello sconto non guarda MAI la via", False,
+          "d.via" in _blocco_sc)
 
     # ---- 4quater. LO STEPPER DELLA PAGINA PAGA (12 ago 2026): il ±
     # rifa' il conto sul server — quella pagina E' il conto — e
