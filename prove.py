@@ -11,6 +11,7 @@ che dipende da un server altrui non e' una prova, e' un oroscopo.
 USO:  python prove.py          (esce 1 se qualcosa e' rotto)
 """
 
+import ast
 import os
 import re
 import sys
@@ -12524,6 +12525,52 @@ def prove_promesse_badge():
           "nel conto" in _in)
 
 
+def prove_guardia_is_bot():
+    """LA GUARDIA is_bot DEL CAMPANELLO (ago 2026). Dal bot-to-bot
+    (Bot API 10.0, maggio 2026) un altro bot puo' DAVVERO scriverci:
+    la vecchia certezza «i bot non si vedono fra loro» non e' piu' del
+    protocollo — e' solo questa riga di gestisci_update. Oggi la
+    modalita' e' spenta su BotFather (trackbot ha detto no, scelta di
+    posizionamento), ma se un domani qualcuno la riaccende — o
+    Telegram cambia ancora i default, com'e' appena successo — la
+    guardia torna a essere l'unica difesa attiva contro i loop e le
+    righe fantasma in anagrafe.
+    TRE MODI di perderla, ognuno col codice apparentemente sano: la
+    guardia sparisce dalla condizione; resta ma il return trasloca tre
+    righe piu' giu'; scivola sotto upsert_utente, che intanto la riga
+    fantasma l'ha gia' scritta. UNA PROVA PER MODO, e le altre due
+    restano verdi apposta (vacuamente, sulle liste vuote): cosi'
+    quella che parla dice QUALE dei tre e' successo.
+    Si guarda l'ALBERO (ast) e non il testo: una regex qui si
+    romperebbe al primo riordino della condizione — la lezione delle
+    sentinelle che non potevano fallire."""
+    print("\n[la guardia is_bot del campanello]")
+    # pezzo() cerca `def gestisci_update(` e lo trova DENTRO
+    # `async def`: il testo estratto parte da «def», e senza il
+    # rattoppo gli await del corpo sarebbero un SyntaxError.
+    fn = ast.parse("async " + pezzo("gestisci_update")).body[0]
+    guardie = [n for n in ast.walk(fn) if isinstance(n, ast.If)
+               and "'is_bot'" in ast.dump(n.test)]
+    # 1) LA GUARDIA C'E' — e una sola: due copie sarebbero due posti
+    #    da tenere in pari, e quella dimenticata e' quella che mente.
+    prova("la guardia is_bot esiste, una volta sola", 1, len(guardie))
+    # 2) ...E DAL SUO if SI ESCE: il return dev'essere figlio DIRETTO
+    #    della guardia, non un flag raccolto e speso tre righe piu'
+    #    giu' — che lascia il codice apparentemente sano e il bot
+    #    dentro.
+    prova("...e il return sta nello stesso if", True,
+          all(any(isinstance(s, ast.Return) for s in g.body)
+              for g in guardie))
+    # 3) ...E STA PRIMA DELL'ANAGRAFE: sotto upsert_utente la riga
+    #    fantasma del bot si crea comunque, guardia o no.
+    anagrafe = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                and getattr(n.func, "id", "") == "upsert_utente"]
+    prova("l'anagrafe del campanello e' una", 1, len(anagrafe))
+    prova("...e la guardia sta prima di lei", True,
+          bool(anagrafe) and all(g.lineno < anagrafe[0].lineno
+                                 for g in guardie))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -12560,7 +12607,7 @@ def main():
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
               prove_ordini_fermi, prove_numero_ordine,
-              prove_promesse_badge):
+              prove_promesse_badge, prove_guardia_is_bot):
         try:
             f()
         except Exception as e:

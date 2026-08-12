@@ -4617,14 +4617,7 @@ async def gestisci_update(update: dict):
     msg = update.get("message") or {}
     testo = (msg.get("text") or "").strip()
     mittente = msg.get("from") or {}
-    if mittente.get("is_bot"):
-        # Un bot non entra in anagrafe e non riceve risposte (anti-loop),
-        # ma la sua voce si STAMPA: dal bot-to-bot (Bot API 10.0) un altro
-        # bot puo' davvero scriverci, e senza questa riga una risposta di
-        # @trackbot morirebbe qui in silenzio.
-        print(f"🤖→🤖 da @{mittente.get('username', '?')}: {testo[:200]!r}")
-        return
-    if (not testo or not mittente.get("id")
+    if (not testo or not mittente.get("id") or mittente.get("is_bot")
             or (msg.get("chat") or {}).get("type") != "private"):
         return
     upsert_utente({"id": mittente["id"],
