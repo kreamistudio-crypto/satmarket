@@ -11864,6 +11864,14 @@ def prove_sollecito_a_comando():
           det.count('class="btn allarme" onclick="deleteListing('))
     prova("...e non e' piu' un testuale sottolineato", False,
           'danger-ghost" onclick="deleteListing(' in mini)
+    # il gemello del moderatore fa la STESSA cosa su un annuncio
+    # altrui: due bottoni cosi' non possono avere due vestiti, anche
+    # se non si vedono mai insieme
+    prova("anche il Rimuovi del moderatore porta lo stesso vestito",
+          True, 'class="btn allarme" onclick="rimuoviModerazione('
+          in det)
+    prova("...e nella colonna non resta un solo rosso testuale",
+          False, "danger-ghost" in det)
     prova("...e il testo dice solo cosa fa", True,
           "🗑 Elimina l'annuncio</button>" in det
           and "Questo è un tuo annuncio — eliminalo" not in mini)

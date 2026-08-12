@@ -9356,8 +9356,14 @@ function openDetail(id){
                   nella pagina dedicata. -->
            </div>
            ${offAcc ? '' : `<button class="btn ghost offerta-pagina tasto-offerta" onclick="apriOfferta()">${etichettaOfferta(l)}</button>`}`}
+      <!-- Il gemello del moderatore: fa la stessa cosa di «Elimina
+           l'annuncio» su un annuncio altrui, quindi porta lo stesso
+           vestito. I due non si vedono MAI insieme (uno e' del
+           proprietario, l'altro di chi modera l'altrui) — ma due
+           bottoni che fanno la stessa cosa non possono avere due
+           forme, o la seconda diventa quella che si dimentica. -->
       ${(!DEMO && isAdmin && !mio)
-        ? `<button class="btn danger-ghost" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
+        ? `<button class="btn allarme" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
     </div>`;
   aggiornaCurToggle();   // il toggle valuta appena nato dice la verita'
   /* lo stato personale dell'asta arriva dopo, dal server: il recinto
