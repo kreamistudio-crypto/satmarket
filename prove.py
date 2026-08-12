@@ -12713,6 +12713,29 @@ def prove_promesse_badge():
           "p.promesse_sospese && scCrit === 'valore'" in _ra
           and "p.promesse_sospese && sgVal === 'eur'" in _ra)
 
+    # ---- 4ter. LA PAGINA DEL CARRELLO (12 ago 2026): testata e badge
+    # APPICCICATI in cima — i numeri dei badge cambiano a ogni
+    # «Aggiungi» e chi scorre non deve perderseli. UN blocco solo,
+    # quindi la coppia e' atomica per costruzione (la lezione di
+    # «Altri oggetti»); il costo e' misurato nel commento CSS. E il
+    # sottotitolo dice il PERIMETRO («articoli dello stesso
+    # venditore»), non piu' il modello.
+    prova("la testata del carrello e' appiccicata", True,
+          ".pacco-appiccicato{position:sticky" in mini)
+    _vp = mini[mini.index('id="view-pacco"'):mini.index('id="view-controllapacco"')]
+    prova("...e testata e badge stanno DENTRO il blocco", True,
+          _vp.index('class="pacco-appiccicato"')
+          < _vp.index('class="pacco-testa"')
+          < _vp.index('id="paccoPromesse"')
+          < _vp.index("/.pacco-appiccicato"))
+    prova("...con la griglia FUORI (le card devono passarci sotto)",
+          True, _vp.index("/.pacco-appiccicato")
+          < _vp.index('id="paccoGrid"'))
+    prova("il sottotitolo dice il perimetro, non il modello", True,
+          "'articoli dello stesso venditore'" in mini)
+    prova("...e la riga vecchia non e' piu' il sottotitolo", False,
+          "'un venditore alla volta, spedizione unica'" in mini)
+
     # ---- 5. IL CARRELLO: due promesse, due scatole. Con un
     # contenitore solo la prima che tace cancellerebbe la sorella
     # (tutte e due si spengono con box.innerHTML='').

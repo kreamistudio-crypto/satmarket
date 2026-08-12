@@ -1476,6 +1476,22 @@
      spunta il verde della conferma. La barra fissa e' gemella di
      #barraCompra ma esiste anche da desktop: e' l'unica strada verso
      il riepilogo, e la topbar di lassu' non la sostituisce. */
+  /* LA TESTATA E I BADGE RESTANO IN CIMA (12 ago 2026, decisione di
+     Andrea): i numeri dei badge cambiano a ogni «Aggiungi» e chi
+     scorre non deve perderseli. Sticky nel VIEW, quindi non esce mai
+     dalla pagina del carrello; il fondo pieno copre le card che ci
+     passano sotto (la colonna non ha padding laterale suo, quindi
+     niente margini negativi: il blocco la copre gia' tutta). La
+     coppia testata+badge e' ATOMICA per costruzione — un solo blocco
+     appiccicato, niente da spezzare (la lezione di «Altri oggetti»).
+     Il COSTO e' misurato, non stimato: coi due inviti lunghi (lo
+     stato piu' alto) il blocco fa 137px a 375 (17%) e 158px a 320
+     (19%) — sotto il cartello da 178px (23%) giudicato troppo la',
+     e coi verdi o senza promesse scende da solo. Da desktop si ferma
+     sotto la topbar, come .altri-azione. */
+  .pacco-appiccicato{position:sticky;top:0;z-index:5;
+    background:var(--bg);padding-bottom:8px}
+  @media (min-width:768px){.pacco-appiccicato{top:60px}}
   .pacco-testa{display:flex;align-items:center;gap:12px;padding:14px var(--pad) 0}
   /* La ✕ e' NUDA (ago 2026, decisione di Andrea): era un cerchietto
      col bordo e l'ombra piena, cioe' aveva il peso di un bottone
@@ -3243,6 +3259,11 @@ document.getElementById('cartello')?.remove();</script>
        dall'ago 2026 apre la PAGINA del riepilogo (view-controllapacco):
        consegna, spedizione al MAX, stima taglia e conto vivono la'. -->
   <div class="view" id="view-pacco">
+    <!-- Testata e badge APPICCICATI in cima (12 ago 2026, decisione di
+         Andrea): i numeri dei badge cambiano a ogni «Aggiungi», e chi
+         scorre la griglia non deve perderseli. Misurato prima di
+         lasciarlo: vedi .pacco-appiccicato nel CSS. -->
+    <div class="pacco-appiccicato">
     <div class="pacco-testa">
       <button type="button" class="pacco-x" onclick="chiudiPagPacco()" title="Chiudi" aria-label="Chiudi il carrello">✕</button>
       <div class="pacco-tit"><b>🛒 Il carrello</b><span class="eur-hint" id="paccoSub"></span></div>
@@ -3267,6 +3288,7 @@ document.getElementById('cartello')?.remove();</script>
       <span id="paccoSconto"></span>
       <span id="paccoSpedGratis"></span>
     </div>
+    </div><!-- /.pacco-appiccicato -->
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
   </div>
 
@@ -8917,8 +8939,12 @@ function renderPacco(){
      alla volta, ed e' quel che permette la spedizione unica. SENZA il
      «di {venditore}» di prima: misurato a 375px, col nome davanti la
      riga si tronca coi puntini proprio sulla parte che deve dire — e
-     il venditore e' gia' su ogni card e nel riepilogo. */
-  el('paccoSub').textContent = 'un venditore alla volta, spedizione unica';
+     il venditore e' gia' su ogni card e nel riepilogo.
+     Dal 12 ago 2026 (decisione di Andrea) la riga dice il PERIMETRO e
+     non il modello: «articoli dello stesso venditore» — e' il
+     carrello di QUEL negozio, non del mercatino intero. La spedizione
+     unica la racconta gia' il riepilogo, dove c'e' la sua riga. */
+  el('paccoSub').textContent = 'articoli dello stesso venditore';
   aggiornaBarraPacco();
 }
 /* Il totale della barra: i SOLI articoli, in valuta dello spettatore.
