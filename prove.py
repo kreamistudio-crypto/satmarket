@@ -4448,7 +4448,7 @@ def prove_forma_tracking():
           "copiato = false" in an and "Copia il codice qui sopra" in an)
     # IL FILTRO DI TRACKBOT (ago 2026, detto da loro): la funzione
     # /start c'e' dal 2018, e il payload lo guarda contro
-    # ^[A-Z0-9]{10,26}$ — una minuscola, uno spazio o un trattino lo
+    # ^[A-Z0-9]{8,26}$ — una minuscola, uno spazio o un trattino lo
     # fanno cadere, e cade in SILENZIO. La prova non rilegge la riga:
     # ESTRAE la classe di caratteri dal sorgente, la applica ai codici
     # come la gente li scrive e chiede che il payload ci rientri —
@@ -4478,8 +4478,9 @@ def prove_forma_tracking():
     # src» questa prova NON POTEVA FALLIRE, perche' il numero compare
     # anche nel commento due righe sopra la costante — l'ha detto la
     # tortura, non la rilettura.
-    prova("trackbot: il tetto e' quello che dicono loro (11 ago 2026)",
-          "^[A-Z0-9]{10,26}$", tetto.group(1) if tetto else '')
+    prova("trackbot: i due bordi sono quelli che dicono loro "
+          "(12 ago 2026)",
+          "^[A-Z0-9]{8,26}$", tetto.group(1) if tetto else '')
     for come, scritto in (("minuscole",       "rr123456789it"),
                           ("spazi",           "RR 123 456 789 IT"),
                           ("trattini",        "1Z-999AA1-0123-456784"),
@@ -4514,16 +4515,26 @@ def prove_forma_tracking():
           bool(FILTRO.match(nudo("6300 0123 4567 8901 2345 6789"))))
     prova("...e i DHL eCommerce lunghi arrivano a 26 tondi", True,
           bool(FILTRO.match(nudo("JVGL-0123456789-0123456789-12"))))
-    # CHI RESTA FUORI ORA E' SOLO CHI STA SOTTO I 10: i GLS/SDA/UPS a
-    # 9 cifre. Il tetto lo si e' alzato, il pavimento no.
-    prova("trackbot: i 9 cifre restano fuori", False,
+    # QUESTA PROVA HA CAMBIATO LATO (12 ago 2026): chiedeva che i 9
+    # cifre di GLS/SDA/UPS restassero FUORI — trackbot ha abbassato il
+    # pavimento da 10 a 8 di sua iniziativa, e ci sono rientrati. Era
+    # l'ultima famiglia di corriere che restava fuori: adesso nessuna
+    # forma del nostro catalogo sta sotto il minimo (la piu' corta e'
+    # 9), e sotto gli 8 ci finiscono solo i codici liberi di «Altro
+    # corriere».
+    prova("trackbot: i 9 cifre dei GLS Europe ci rientrano", True,
           bool(FILTRO.match(nudo("1234-56789"))))
+    # ...e IL PAVIMENTO VA SORVEGLIATO LO STESSO, o un domani lo si
+    # alza senza che nessuno lo veda: sette caratteri restano fuori.
+    prova("trackbot: sotto il pavimento si resta fuori", False,
+          bool(FILTRO.match(nudo("12-34567"))))
     # ...e il filtro NON e' una guardia del bottone: chi non ci rientra
     # ha comunque la strada di sempre, incollare a mano. Si guarda la
-    # FORMA della ripetizione e non il numero, o alla prossima volta
-    # che trackbot muove il tetto questa riga passa senza dire niente.
+    # FORMA della ripetizione e non i numeri, o alla prossima volta
+    # che trackbot muove un bordo questa riga passa senza dire niente
+    # (e i bordi si sono gia' mossi due volte in due giorni).
     prova("...ma il bottone non li esclude", True,
-          "{10," not in tp and "passaTrackbot" not in tp)
+          not re.search(r"\{\d+,", tp) and "passaTrackbot" not in tp)
     # IL FILTRO DECIDE LE PAROLE, MAI LA PRESENZA DEL BOTTONE (11 ago
     # 2026): la didascalia si sdoppia — a chi il codice il bot lo
     # prende si dice che ci pensiamo noi, a chi resta fuori resta
