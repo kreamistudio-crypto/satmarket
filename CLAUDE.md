@@ -8297,6 +8297,47 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   livello «soft» di casa (contro la pagina fa 1,05–1,18, cioè si legge
   come una velatura e basta) ed è il CONTORNO a dire che è un bottone.
   La leva che resta è l'ombra piena, non il fondo.
+  LO SPAZIO FRA DUE BOTTONI È DELLA COPPIA, NON DEL BOTTONE (ago
+  2026): `.btn` di base NON ha margine — ce l'hanno solo `.ghost` e
+  `.allarme` — quindi due bottoni adiacenti stanno staccati soltanto
+  se il PRIMO è uno di quei due, e chi ne aggiunge uno di un'altra
+  famiglia si ricompra il difetto senza accorgersene. Detto fra
+  FRATELLI il buco si chiude per sempre — un `margin-top:10px` su
+  `.btn + .btn`, scoped a `#orderContent` e `#detailContent` — più
+  l'unica distanza diversa che esiste: l'USCITA, 18px, staccata
+  apposta perché non è un'azione in fila con le altre.
+  UN SELETTORE PER LE DUE COLONNE e non due regole gemelle: sono i
+  due soli posti dove i bottoni si impilano davvero, e due numeri da
+  tenere in pari divergono al primo ritocco.
+  È INCIAMPATA DUE VOLTE IN DUE GIORNI, ed è la parte da tenere:
+  nell'ordine (due `margin-top:0` più la didascalia di @trackbot, col
+  gesto principale incollato al testo) e il giorno dopo nel dettaglio
+  di un annuncio proprio, dove la regola non arrivava affatto e cinque
+  margini a mano tenevano «Lancia un'offerta lampo» e «Modifica» a
+  ZERO px. La causa è sempre la stessa e non è distrazione: sono righe
+  scritte PRIMA che la regola esistesse, che un riordino non rompe e
+  una rilettura non vede — si trovano solo MISURANDO la pagina vera.
+  Per questo `prove.py` li CONTA invece di fidarsi: nel dettaglio non
+  ne resta nessuno, nell'ordine uno solo — la didascalia di @trackbot,
+  che appartiene al bottone SOPRA e si infila in mezzo alla coppia,
+  quindi è lei a dover portare il 10 (e il commento dice che non è un
+  valore suo).
+  E IL ROSSO VELATO È IL VESTITO DI CHI TOGLIE (ago 2026): `.allarme`
+  lo portano tutti e tre i bottoni che tolgono qualcosa e non si torna
+  indietro — «⚠️ C'è un problema» nell'ordine, «🗑 Elimina l'annuncio»
+  del proprietario e «🛡 Rimuovi (moderazione)» di chi modera l'altrui.
+  Gli ultimi due fanno LA STESSA COSA su annunci di persone diverse e
+  non si vedono MAI insieme: è proprio per questo che erano rimasti
+  con due vestiti — la divergenza che nessuno vede è quella che
+  sopravvive. Il testo dice solo cosa fa («Elimina l'annuncio»: che
+  sia suo lo raccontano già la riga verde sopra e i bottoni accanto, e
+  la frase lunga a 320px andava su due righe).
+  IL VELATO È LA METÀ CHE CONTA: nella colonna del proprietario il
+  pieno non ce l'ha nessuno, quindi un rosso saturo sarebbe il colore
+  più forte della pagina per il gesto che si fa meno; e dove il pieno
+  c'è — l'«Acquista» arancio del recinto, sopra il Rimuovi del
+  moderatore — il velato tiene la sua distanza senza fargli
+  concorrenza. Guardato a schermo nei due temi, mai dedotto.
   Col colore è venuto fuori un difetto che il ghost bianco
   nascondeva: `#negozioHeader` non aveva MARGINI su mobile (li metteva
   solo la media query da 768 in su) e i due blocchi pieni arrivavano a
