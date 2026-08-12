@@ -4187,8 +4187,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   controproposta — col totale quelle quattro comparazioni cambiano
   significato, e «offro 120.000 su un listino di 50.000» si legge come
   un errore; 2) un totale andrebbe DIVISO, e romperebbe in silenzio la
-  divisione a ritroso di `_righe_ordine` — la stessa trappola per cui
-  il mono non sconta; 3) nel set le righe portano `unitario_sats`, e un
+  divisione a ritroso di `_righe_ordine` — la trappola che dal 12 ago
+  2026 è sorvegliata dal censimento delle divisioni (il mono sconta, e
+  la divisione riaggiunge sconto_sats); 3) nel set le righe portano
+  `unitario_sats`, e un
   totale per riga sarebbe l'unica cifra non unitaria del sistema.
   L'equivoco si toglie dicendo ENTRAMBE le facce ovunque i pezzi siano
   piu' di uno: giudice puro `_cifra_accordo(valuta, sats, eur,
@@ -5268,18 +5270,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   MAI sulla spedizione (il pacco costa quello che costa), e il conto è
   del SERVER: l'escrow nasce già scontata.
   LE QUATTRO DECISIONI DI ANDREA, che governano tutto il resto.
-  1) IL MONO NON SCONTA MAI: tre copie dello stesso annuncio comprate
-  dalla scheda non sono un carrello. Non è solo prodotto — è anche
-  strutturale: `_righe_ordine` sintetizza l'unitario del mono per
-  DIVISIONE A RITROSO (`(prezzo − spedizione − protezione) // qta`,
-  «esatta per costruzione»), e uno sconto di testata la romperebbe in
-  silenzio, sbagliando l'unitario nell'ordine, nelle notifiche e nel
-  CSV. CONSEGUENZA VINCOLANTE: il badge non compare MAI su una pagina
-  d'acquisto mono, o si promette ciò che il conto non mantiene. La
-  garanzia è che `_sconto_pacco` la chiamano SOLO i due rami set — la
-  decisione vive fuori dal conto apposta, così è strutturale e non un
-  «if» da ricordare. Se un giorno lo si volesse anche per il mono, la
-  ricetta è nel commento dentro `_righe_ordine`.
+  1) [ROVESCIATA il 12 ago 2026 — vedi «IL MONO SCONTA, PUNTO», più
+  sotto; il perché di ALLORA resta qui perché era vero e ha deciso la
+  forma della cura.] IL MONO NON SCONTA MAI: tre copie dello stesso
+  annuncio comprate dalla scheda non sono un carrello. Non era solo
+  prodotto — era anche strutturale: `_righe_ordine` sintetizza
+  l'unitario del mono per DIVISIONE A RITROSO
+  (`(prezzo − spedizione − protezione) // qta`, «esatta per
+  costruzione»), e uno sconto di testata l'avrebbe rotta in silenzio,
+  sbagliando l'unitario nell'ordine, nelle notifiche e nel CSV. La
+  garanzia era che `_sconto_pacco` la chiamassero SOLO i due rami set,
+  e la ricetta per il giorno del rovesciamento stava già nel commento
+  dentro `_righe_ordine` — ed è esattamente quella applicata.
   2) SI CUMULA con lampo e accordo accettato: è una promessa di
   NEGOZIO scritta in vetrina, e un pezzo che non la mantenesse non
   avrebbe un posto onesto dove dirlo — servirebbe una riga «questo no»
@@ -5301,8 +5303,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tolto da quella fila.
   4) LA SOGLIA CONTA I PEZZI (Σ quantità), non gli oggetti diversi:
   tre cose nella scatola sono tre cose, ed è già il significato di
-  `ordini.quantita`. Il carrello richiede comunque ≥2 righe, quindi la
-  soglia non si raggiunge mai con un pezzo solo.
+  `ordini.quantita`. (Dal 12 ago 2026 vale fino in fondo: anche il
+  mono conta i suoi — vedi «IL MONO SCONTA, PUNTO».)
   IL CRITERIO LO SCEGLIE IL VENDITORE, LA SOGLIA RESTA UNA (ago 2026,
   e questa voce EMENDA la 4: i pezzi restano il criterio di serie, non
   sono più l'unico). Nasce da un venditore vero: «se vendo un computer
@@ -5311,8 +5313,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   lo sconto è del carrello e vale sul totale, quindi con un computer
   (soglia 2) e cinque cianfrusaglie (soglia 10) nello stesso carrello
   nessuna regola sarebbe spiegabile a chi paga; e una soglia per riga
-  romperebbe la divisione a ritroso dell'unitario di `_righe_ordine`,
-  che è la stessa ragione per cui il mono non sconta (decisione 1).
+  romperebbe la divisione a ritroso dell'unitario di `_righe_ordine`
+  (la stessa ragione che allora teneva fuori il mono — la soglia per
+  PRODOTTO resta scartata anche dopo il rovesciamento: è la soglia
+  UNICA, non il perimetro, a renderla insostenibile).
   Col CRITERIO l'asimmetria si ottiene lo stesso, con UNA regola sola:
   a PEZZI come sempre, o a VALORE degli articoli («da 100.000 sats nel
   carrello») — un computer ci arriva da solo, di cianfrusaglie ne
@@ -5509,48 +5513,96 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nessuno — e scontare ancora un carrello che la soglia non la
   raggiunge più sarebbe la vera incoerenza. C'è la prova apposta, e il
   cassetto lo dice al venditore sotto l'anteprima.
-  IL MONO NON SCONTA NEMMENO A VALORE, ed è la cosa che a valore si
-  fraintende di più: «da 100.000 sats» si legge come «da 100.000 sats
-  di spesa», e chi compra UN oggetto da 200.000 dalla sua scheda non
-  sconta. L'antidoto è testuale e sta in QUATTRO posti: la riga fissa
-  del cassetto («vale solo nel carrello, da due oggetti diversi in
-  su»), le due frasi pubbliche che dicono sempre «nello stesso
-  carrello», e — dall'ago 2026 — l'ANTEPRIMA del cassetto.
-  I TRE POSTI NON BASTAVANO, e a dirlo è stato Andrea stupendosi lui
-  stesso che non scattasse su un articolo da 14.000 con la soglia a
-  10.000. La ragione è che erano tutti e tre FUORI dalla frase della
-  promessa — in fondo, in grigio, dopo il bottone — mentre una soglia
-  espressa in CIFRA si legge «sopra 10.000 e basta». Ora la riga in
-  GRASSETTO che il venditore rilegge per controllare di aver capito
-  dice anche cosa NON fa: «Da 10 € di articoli in un carrello, −15%.
-  Un oggetto solo paga pieno, per quanto costi». Due scelte di parole
-  che valgono la voce: «in un carrello» mette il requisito DENTRO la
-  frase invece che dopo (e ACCORCIA, sostituendo «in su … su tutto il
-  carrello»), e «per quanto costi» è ciò che chiude il ragionamento
-  «sì, ma il mio è da 14.000». Costo misurato: ZERO pixel — la frase
-  più lunga entra nelle stesse quattro righe.
-  E NON È UNA FORMA NUOVA: il ramo a PEZZI ce l'aveva già («Chi ne
-  prende 2 paga pieno»), ed era il ramo a valore l'unico senza
-  controesempio. Per la stessa ragione la spedizione gratis NON la
-  dice: lì sul singolo scatta davvero, e uniformare i due cassetti —
-  che è l'errore che viene naturale — la renderebbe una bugia. C'è la
-  sentinella per tutt'e due i versi.
-  Per la stessa ragione la decisione 3 si RICONFERMA con più forza: mai
-  nelle card, mai nelle pillole del dettaglio.
-  E LA STRADA DI FARLO SCATTARE SUL MONO è stata valutata e SCARTATA
-  (ago 2026, decisione di Andrea): l'asimmetria fra valore e pezzi
-  sarebbe peggio della confusione che si toglie — lo stesso criterio si
-  comporterebbe in due modi secondo il tipo d'ordine. Da tenere però il
-  censimento, perché la premessa tecnica era più debole di come suona:
-  la divisione a ritroso resterebbe ESATTA con un `+ sconto_sats` (la
-  docstring di `_righe_ordine` lo prescrive già) e NON servirebbe
-  nessuna colonna; ma quella divisione vive in TRE posti e non uno —
+  IL MONO SCONTA, PUNTO (12 ago 2026, decisione di Andrea che
+  ROVESCIA PER INTERO la decisione 1 e le due voci che la
+  presidiavano — e vanno tenuti TUTTI E DUE i perché, perché quello di
+  allora era vero e ha deciso la forma della cura).
+  LA REGOLA NUOVA in una frase: lo sconto vale su OGNI acquisto del
+  negozio — tre copie dello stesso articolo comprate dalla scheda sono
+  tre pezzi, e una soglia a valore superata è superata, anche con un
+  pezzo solo. Tutti e due i criteri, tutte e due le valute.
+  IL PERCHÉ DI ADESSO: è quello che la gente si aspetta (Andrea ci si
+  è stupito lui stesso, due volte in due giorni), e la mezza regola
+  era già una BUGIA IN VETRINA — l'invito del carrello conta Σ
+  quantità, quindi un carrello con UNA riga × 10 mostrava «✅ Sconto
+  −X% nel conto», poi `apriAcquistoSet` dirottava sul binario mono e
+  la riga non nasceva. Il rovesciamento sana un disallineamento che
+  esisteva già.
+  IL PERCHÉ DI ALLORA, che resta a verbale: si temeva il malinteso
+  «da 100.000 sats» letto come «di spesa» (curato coi testi, ora
+  riscritti sul perimetro nuovo), e soprattutto la divisione a ritroso
+  dell'unitario, che uno sconto di testata avrebbe rotto IN SILENZIO.
+  Quel timore ha dettato la cura: la divisione ora RIAGGIUNGE
+  `sconto_sats` (la ricetta che il commento di `_righe_ordine`
+  prescriveva dal primo giorno) e le sue copie sono TRE —
   `_righe_ordine`, la RIPRESA del pentito in `compra()` che la rifà a
-  mano, e il CLIENT nella riga «N pezzi × unitario» — e oggi quel
-  numero non lo legge nessuno, quindi una riga sbagliata non farebbe
-  fallire niente: mostrerebbe solo una cifra storta. Più la chiave
-  `articolo_sats`, che nel mono è il LORDO e nel set il NETTO (oggi
-  coincidono perché il mono non sconta).
+  mano, la riga «N pezzi × unitario» del client — sorvegliate da un
+  CENSIMENTO in `prove_divisione_a_ritroso` (la lezione del titolo
+  nudo: estrae dal sorgente la FORMA della sottrazione dalla testata,
+  chiede che le copie siano esattamente quelle e che ognuna riaggiunga
+  lo sconto — la quarta di domani entra nel conto da sola). Una copia
+  dimenticata non fa fallire niente: mostra un unitario storto in
+  ordine, notifiche e CSV, in silenzio — per questo il censimento e
+  non un elenco.
+  LA MEZZA VIA È QUELLA SCARTATA, e va tenuta perché torna in mente:
+  «nel carrello sì, dalla scheda no» NON è applicabile — il carrello a
+  una riga e la scheda sono la STESSA porta server-side (stesso body
+  mono), e costruire la differenza vorrebbe dire far dipendere un
+  prezzo da quale JSON manda il client. O il mono sconta, o non
+  sconta: la decisione è per intero, mai a metà.
+  COSA È CAMBIATO, il censimento del cantiere: 1) i chiamanti di
+  `_sconto_pacco` sono QUATTRO (compra mono, compra set, i due
+  preventivi) e la regola nel mono si legge FUORI dal gate della
+  spedizione — vale anche su ritiro e codice online, e sul DIGITALE
+  (è sugli articoli, non sulla strada); 2) `articolo_sats` nella
+  risposta del mono è diventato il NETTO come nel set, con
+  `articolo_lordo_sats` e le chiavi sconto accanto (il client di ieri
+  somma comunque giusto, gli manca solo la riga del risparmio);
+  3) il controllo «mono scontato» della ronda È MORTO (sarebbe un
+  falso allarme permanente) e al suo posto ci sono DUE invarianti veri
+  che al mono mancavano — «aritmetica del mono» (la divisibilità
+  esatta) e «sconto fuori scala (mono)», coi loro casi rotti e il mono
+  scontato SANO in db_sano; i controlli della ronda salgono a 16;
+  4) i quattro testi-antidoto sono riscritti sul perimetro nuovo e le
+  loro sentinelle ROVESCIATE («nello stesso carrello» è morto in
+  frase, etichetta, cassetto e riga fissa; «Un oggetto solo paga
+  pieno, per quanto costi» è vietato da una prova — e la sentinella
+  legge anche i commenti, non citarcelo), più la sentinella NUOVA sul
+  contenuto di `frasePromessaSconto`, che era il buco; 5) a cambio
+  muto la promessa a valore in euro non scatta e l'ordine NASCE (mai
+  un 503 nuovo, `promesse_sospese` lo dice — il pattern della
+  spedizione gratis); 6) la RIPRESA porta le chiavi sconto con le
+  cifre CONGELATE dell'ordine (la invoice viva è il lock del prezzo:
+  una regola cambiata nel frattempo non riscrive).
+  L'ANTEPRIMA DEL CASSETTO dice il perimetro nuovo dentro la frase in
+  grassetto (la lezione dello stupore sul 14.000 resta: ciò che la
+  promessa fa e non fa si dice DENTRO la frase, mai in grigio dopo il
+  bottone): a pezzi «Da 3 pezzi in su, −10% — su ogni acquisto, anche
+  più copie dello stesso articolo. Chi ne prende 2 paga pieno.» (il
+  controesempio sotto soglia resta VERO e resta), a valore «Da 10 € di
+  articoli, −15%. Vale su ogni acquisto, anche un oggetto solo.»
+  L'ASIMMETRIA CON LA SPEDIZIONE GRATIS NON ESISTE PIÙ: le due
+  promesse hanno lo stesso perimetro, e uniformare i testi — che ieri
+  era l'errore da non fare — oggi è la verità. La decisione 3 invece
+  RESTA: la promessa si dice in pubblico negli stessi posti di prima
+  (testata negozio e «Altri oggetti»), mai nelle card né nelle pillole
+  del dettaglio, e NIENTE badge nuovo in scheda — il verdetto lo dà il
+  conto della pagina Paga, dove la riga «Sconto carrello» nasce da
+  sola. Restano invariati per scelta: il suggerimento del bot (chiede
+  ancora ≥2 annunci — allargarlo è un'altra decisione), la DEMO
+  (asciutta, non simula lo sconto), le ASTE (`crea_ordine_pagato` non
+  sconta: il vincitore paga l'esposto) e la barra del carrello al
+  lordo.
+  E I VENDITORI CHE AVEVANO GIÀ LA REGOLA ACCESA LO SANNO
+  (`avvisa_sconto_su_mono`, campagna UNA-TANTUM GLOBALE col timbro
+  nella tabella `timbri` e NON una colonna per utente: è un evento del
+  deploy, non una condizione che ricorre — una colonna lascerebbe la
+  campagna armata verso chi accende lo sconto il mese prossimo, che le
+  regole nuove le trova già nel cassetto). Timbro PRIMA degli invii, il
+  messaggio dice la LORO regola con le loro cifre e come spegnerla;
+  imperfezione dichiarata: un crash a metà loop perde i restanti — sui
+  cinque negozi di oggi si verifica dal journal, che nomina i
+  destinatari.
   IL MODELLO: `utenti.sconto_pacco_soglia`/`sconto_pacco_percento`
   (0/0 = spento; nessun flag «dichiarata» come per la tariffa punto —
   lì lo zero era ambiguo, qui uno sconto dello 0% e nessuno sconto
@@ -5822,14 +5874,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dello sconto, per intero, e vale per tutte e due o non varrebbe per
   nessuna. `_sped_gratis` resta pura: riceve gli euro da
   `_eur_interi`, non va a prendere il cambio.
-  NON È UNA COPIA DELLO SCONTO, E LA DIFFERENZA È QUELLA CHE LE PERMETTE
-  DI VALERE ANCHE SULL'ACQUISTO SINGOLO — è la prima cosa da capire, e
-  non è una scelta di prodotto ma una proprietà della FORMA. Lo sconto
-  sottrae dal TOTALE senza toccare le colonne che `_righe_ordine`
-  sottrae, ed è per quello che il mono non sconta mai; la spedizione
-  gratis non sottrae, AZZERA UNA TARIFFA: scrive `spedizione_sats=0`,
-  cioè lo stato che ogni annuncio con tariffa gratis dichiarata (e ogni
-  ritiro) ha da sempre. La divisione a ritroso dell'unitario resta
+  NON È UNA COPIA DELLO SCONTO, E LA DIFFERENZA È DI FORMA: lo sconto
+  sottrae dal TOTALE come voce di testata, la spedizione gratis
+  AZZERA UNA TARIFFA — scrive `spedizione_sats=0`, cioè lo stato che
+  ogni annuncio con tariffa gratis dichiarata (e ogni ritiro) ha da
+  sempre. (Fino al 12 ago 2026 la forma decideva anche il perimetro:
+  il mono non scontava perché uno sconto di testata rompeva la
+  divisione a ritroso di `_righe_ordine`, mentre questa valeva anche
+  sul singolo; da quando la divisione riaggiunge `sconto_sats` le due
+  promesse hanno lo stesso perimetro.) La divisione a ritroso resta
   esatta per costruzione, senza un ramo nuovo. Stessa verifica
   sull'uscita dei sats: il venditore incassa `prezzo_sats −
   protezione_sats`, quindi con la spedizione offerta incassa MENO — che
@@ -6075,10 +6128,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   25 € di articoli» fa ~293px contro i 288 disponibili a 320px, e un
   flex item con nowrap non scende sotto il min-content — farebbe
   scorrere di lato la PAGINA.
-  DUE TESTI ASIMMETRICI, e uniformarli introdurrebbe una bugia: lo
-  sconto dice «nel carrello» (il mono non sconta mai, e chi compra UNA
-  cosa cara non deve credere il contrario), la spedizione NO — quella
-  vale anche su un oggetto solo — e porta invece «di articoli».
+  DUE TESTI che dal 12 ago 2026 parlano UGUALE (il mono sconta, e
+  l'asimmetria che qui era «voluta» non esiste più): «nel carrello» è
+  morto in tutte e due le famiglie di testi — era la parola che
+  restringeva, è diventata la parola che mente — e a valore dicono
+  entrambe «di articoli», che distingue il totale della merce da
+  quello con la spedizione dentro. C'è la sentinella nei due versi.
   NEL CARRELLO IL CONTO È DEL CLIENT, come già prima: i badge non
   calcolano, RICEVONO il totale che la barra mostra due centimetri più
   sotto, quindi i due non possono divergere. L'imperfezione è quella
@@ -6135,9 +6190,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   qualcosa non torna e qualcuno sta deployando per ripararlo.
   Una query che ESPLODE conta come un controllo fallito: se lo schema
   è cambiato sotto, è esattamente una cosa da sapere.
-  QUALI INVARIANTI CI SONO (15, tutti già dichiarati altrove in questo
-  file): l'aritmetica della testata col suo sconto e i suoi pezzi, il
-  mono che non sconta mai, gli sconti fuori scala e la coppia
+  QUALI INVARIANTI CI SONO (16, tutti già dichiarati altrove in questo
+  file): l'aritmetica della testata col suo sconto e i suoi pezzi,
+  l'aritmetica del MONO (la divisione a ritroso che si divide esatta —
+  dal 12 ago 2026 ha preso il posto di «mono scontato», morto col
+  rovesciamento: sarebbe un falso allarme su ogni ordine legittimo),
+  gli sconti fuori scala nei due gusti (set e testata mono) e la coppia
   sconto/percentuale; la forma di `ordine_righe` (mono con righe,
   righe orfane, carrello senza merce); l'asta — la cassa della chiusa
   (Σ saldi = esposto della vincitrice + registro), la puntata chiusa
@@ -11710,6 +11768,52 @@ nessuno stato nuovo, e la leva ha il default nel codice. DA GUARDARE
 al primo giro: chi c'è già dentro la coda — se compare un ordine che
 nessuno ha mai sollecitato, quello è il caso per cui il cantiere
 esiste.
+
+Il mono sconta, punto (12 ago 2026, decisione di Andrea che ROVESCIA
+PER INTERO il «il mono non sconta mai» del 6 ago): lo sconto carrello
+vale su ogni acquisto — tre copie dello stesso articolo dalla scheda
+sono tre pezzi, una soglia a valore superata è superata anche con un
+oggetto solo, tutti e due i criteri e tutte e due le valute. Il motivo:
+è quello che la gente si aspetta (Andrea ci si è stupito due volte in
+due giorni), e l'invito del carrello diceva già «✅ Sconto nel conto»
+su un carrello a una riga che poi non scontava — la mezza regola era
+una bugia in vetrina, e la mezza via «carrello sì, scheda no» è quella
+SCARTATA: le due porte sono lo stesso endpoint, e costruire la
+differenza farebbe dipendere un prezzo da quale JSON manda il client.
+Vedi Architettura, «IL MONO SCONTA, PUNTO», per il censimento completo:
+i quattro chiamanti di `_sconto_pacco`, la divisione a ritroso che
+riaggiunge `sconto_sats` nelle sue TRE copie (`_righe_ordine`, la
+ripresa, la riga client) sorvegliate dal CENSIMENTO
+`prove_divisione_a_ritroso`, `articolo_sats` diventato NETTO anche sul
+mono, il controllo «mono scontato» della ronda sostituito da due
+invarianti veri (i controlli salgono a 16), i quattro testi-antidoto
+riscritti con le sentinelle rovesciate, e la campagna una-tantum
+`avvisa_sconto_su_mono` ai venditori con la regola già accesa (timbro
+globale in `timbri`, il testo dice la LORO regola e come spegnerla).
+Collaudato: 2830 prove verdi in CI (erano 2793 prima del cantiere, con
+le rovesciate e le estese 2→4 percorsi), DODICI MUTAZIONI una per riga
+sorvegliata — ognuna rossa da sola, e una ha smascherato una mutazione
+che sbagliava bersaglio (il replace prendeva la SELECT identica di
+`_compra_set`: la tortura va mirata quanto le sentinelle) — più il
+collaudo eseguibile su DB usa-e-getta (117 verdi, con LNbits VERO e le
+bolt11 decodificate al sat): LA PROVA REGINA preventivo == compra sul
+mono scontato al filo della soglia nei due criteri e nelle due valute,
+l'identità di bilancio riletta dal database, la divisione a ritroso
+esatta anche sul ramo della RIPRESA, il digitale che sconta, la lampo
+che fa scendere sotto soglia, il cambio muto senza 503 nuovi, la
+regola cambiata fra preventivo e acquisto nei due versi, la ronda che
+tace e la regressione del venditore senza regola. Più il giro visivo
+via CDP a 375px: pagina Paga e paySheet con la riga «Sconto carrello»
+e i totali che quadrano a mano (30.000 → −3.000 → 27.000), il cassetto
+e la riga del negozio coi testi nuovi.
+IN PRODUZIONE basta il deploy: ZERO colonne, ZERO migrazioni, ZERO
+leve nuove (`sconto_sats`/`sconto_percento` esistevano già su `ordini`
+a DEFAULT 0). Al primo battito dell'orologio parte la campagna — una
+volta sola, il journal nomina i destinatari — e DA GUARDARE sono: quel
+journal (i ~5 negozi con la regola accesa), il primo mono scontato
+vero dentro Telegram con la bolt11 confrontata su LNbits, e che la
+ronda TACCIA — se «aritmetica del mono» suona, si guarda l'ordine
+prima della funzione.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
