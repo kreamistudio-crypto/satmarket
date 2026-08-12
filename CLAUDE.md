@@ -5947,11 +5947,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   la riga direbbe una cosa che il conto poi non fa. Fuori in due casi:
   annuncio che NON spedisce, e spedizione già gratis SENZA condizioni
   (lì la pillola lo dice meglio, e una soglia accanto farebbe dubitare
-  di una gratuità che è piena). Mai in card. [«MAI FRA LE PILLOLE»
-  ROVESCIATO ad ago 2026 — vedi «LE PROMESSE DIVENTANO BADGE»: la
-  promessa è entrata DENTRO il badge della spedizione, nominata «di
-  articoli». Resta vero per lo SCONTO, che nelle pillole del dettaglio
-  non entra: nel mono non sconta.] Più l'INVITO nella
+  di una gratuità che è piena). Mai in card, e MAI FRA LE PILLOLE COL
+  NUMERO — la regola tiene, e ha resistito a un giro che l'aveva
+  rovesciata per un giorno: ad ago 2026 la promessa scritta è entrata
+  nel badge e ne è subito riuscita, perché «da 200 €» accanto al prezzo
+  dell'articolo si legge come una proprietà di quell'articolo anche
+  quando si nomina «di articoli». Quel che nelle pillole c'è adesso è
+  un ESITO senza cifra («Spedizione gratuita»), che è un'altra cosa —
+  vedi «LE PROMESSE DIVENTANO BADGE». Più l'INVITO nella
   pagina Paga («Ancora N sats e la spedizione è gratis»), che si
   TRASFORMA in conferma invece di sparire (la lezione dell'invito dello
   sconto) e non calcola, riceve — ed è il posto unico e giusto, perché
@@ -5971,24 +5974,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   annuncio, «Altri oggetti», carrello. Erano righe che si leggono una
   volta e poi si smette di vederle, e soprattutto NON SI MUOVEVANO
   mentre il carrello cresce: non dicevano mai «ci sei quasi».
-  NELLA SCHEDA la promessa entra DENTRO il badge della spedizione, che
-  diventa il giudice unico di quella riga e ha CINQUE stati esaustivi:
-  niente (non spedisce) · «Spedizione gratuita» (gratis senza
-  condizioni) · «Spedizione disponibile» (in ferie, o nessuna regola
-  dichiarata) · «Spedizione gratis da 25 € di articoli». L'ORDINE DEI
-  RAMI È LA SPECIFICA e sono le due trappole del travaso: `spedGratis`
-  si guarda PRIMA della regola — o un annuncio già gratis senza
-  condizioni mostrerebbe «gratis da 25 €», cioè una condizione su una
-  gratuità piena — e `inFerie` viene dalla riga di prosa e si perde se
-  si travasa a occhio. E la promessa SOSTITUISCE «disponibile», non si
-  somma: mai due 🚚 nella stessa fila.
-  QUESTO ROVESCIA «riga discreta e mai una pillola», e il perché va
-  tenuto: la regola vecchia difendeva da un equivoco vero — nella fila
-  delle pillole una cifra si legge come proprietà di QUELL'oggetto. Il
-  rimedio nuovo non è nasconderla ma NOMINARLA, «da 25 € DI ARTICOLI»,
-  che è la parola che distingue il totale della merce dal prezzo che si
-  ha davanti. Resta intatto ciò che contava: si dice la REGOLA e mai
-  «questo è già sopra soglia».
+  NELLA SCHEDA IL BADGE HA DUE STATI E NON NOMINA LA SOGLIA: sopra
+  soglia «🚚 Spedizione gratuita» — che RIUSA lo stato dei negozi che
+  spediscono gratis senza condizioni, non uno stato nuovo — e sotto
+  «🚚 Spedizione disponibile», nudo. Il «quanto manca» si legge dopo,
+  quando si compone l'ordine (carrello e pagina Paga, dove c'è già), e
+  la promessa COL NUMERO resta in «Altri oggetti», che parla del
+  NEGOZIO e sta accanto al bottone del carrello.
+  CI SI È ARRIVATI IN DUE GIRI, e il primo va tenuto perché è l'errore
+  che torna in mente: per un giorno la promessa SCRITTA è stata dentro
+  il badge («Spedizione gratis da 200 € di articoli»), col
+  ragionamento che l'equivoco si toglie NOMINANDO — «di articoli»
+  distingue il totale della merce dal prezzo che si ha davanti. Non
+  basta: accanto al prezzo dell'articolo quella cifra si legge lo
+  stesso come una proprietà di quell'articolo. E su un pezzo che la
+  spedizione gratis ce l'ha già, dirla condizionata è una promessa più
+  povera del vero. Quindi la regola «mai una CIFRA fra le pillole»
+  tiene; quel che è cambiato è che adesso il badge dà un ESITO.
+  IL VERDETTO SI PUÒ DARE PERCHÉ QUI IL CLIENT IL CONTO LO CONOSCE, ed
+  è la sola cosa che rende lecito il rovesciamento: sul mono l'articolo
+  è `artStima × pezzi`, e `artStima` è il gemello di
+  `_unitario_effettivo` del server (il MIN fra lampo e accordo). Il
+  giudice è `spedGratisQui(l, qta)`, e le sue tre decisioni (Andrea):
+  1) LA CIFRA È QUELLA DEL SERVER, quindi DOPO lampo e accordo.
+  Conseguenza accettata, la stessa già dichiarata per lo sconto: una
+  lampo generosa può far scendere sotto soglia e TOGLIERE la spedizione
+  gratis — corretto, e il caso che sembra un bug a chi lo nota.
+  2) A CAMBIO MUTO SI TACE, cioè «disponibile», e non è prudenza: senza
+  cambio il server la promessa non la applica affatto
+  (`promesse_sospese`) e la spedizione si paga, quindi è la risposta
+  VERA. Una riga sola da dire a voce — serve il cambio A MENO CHE
+  soglia e listino siano tutti e due in sats — che copre anche il
+  listino in EURO, portato in sats da `satsAnnuncio` col cambio (senza,
+  userebbe quello di PUBBLICAZIONE, vecchio di mesi). Un filo
+  conservativa su soglia-euro + listino-euro: si preferisce una regola
+  a una matrice di quattro caselle, e sbaglia nel verso di non
+  promettere.
+  3) LA QUANTITÀ È QUELLA DELLO STEPPER, perché è quella che il server
+  misura — e il badge si riscrive in `setQta`, dove già si riscrivono
+  le cifre di Acquista e l'etichetta del tasto offerta. Si riscrive il
+  CONTENUTO (`testoSpedBadge`, agganciato da `data-sped`) e non il
+  guscio, o il nodo sparirebbe da sotto i piedi al giro dopo.
+  AL FILO ESATTO È GRATIS, come `_sped_gratis` del server. IN FERIE
+  nessun verdetto (lì non si compra, non c'è un conto con cui essere
+  d'accordo), mentre la gratuità PIENA resta visibile anche in ferie:
+  quella è una proprietà dell'annuncio, questo è un verdetto su un
+  acquisto.
   IN «ALTRI OGGETTI» I BADGE STANNO SOPRA IL BOTTONE — «prima il
   perché, poi l'azione», che è l'ordine che la sezione aveva già con le
   righe di prosa. CI SI È ARRIVATI DOPO UN GIRO, e il motivo va tenuto
