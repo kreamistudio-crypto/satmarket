@@ -11817,12 +11817,18 @@ def prove_sollecito_a_comando():
     # 0px dalla didascalia di @trackbot. Qui si sorveglia che quei
     # margini non tornino: sono righe che un riordino rimette senza
     # rompere niente di visibile a chi legge il codice.
+    # UN SELETTORE PER LE DUE COLONNE (ago 2026): il dettaglio
+    # dell'annuncio aveva lo stesso difetto e la stessa causa, e due
+    # regole gemelle sarebbero due numeri da tenere in pari.
+    FRATELLI = "#orderContent .btn + .btn,#detailContent .btn + .btn"
+    USCITA = "#orderContent .btn.allarme,#detailContent .btn.allarme"
     prova("lo spazio fra bottoni e' detto fra FRATELLI", True,
-          "#orderContent .btn + .btn{margin-top:10px}" in mini)
-    prova("...e la disputa resta staccata, DOPO di lui", True,
-          "#orderContent .btn.allarme{margin-top:18px}" in mini
-          and mini.index("#orderContent .btn + .btn{")
-              < mini.index("#orderContent .btn.allarme{"))
+          FRATELLI + "{margin-top:10px}" in mini)
+    prova("...e vale nelle DUE colonne, con un selettore solo", 1,
+          mini.count("#detailContent .btn + .btn"))
+    prova("...e l'uscita resta staccata, DOPO di lui", True,
+          USCITA + "{margin-top:18px}" in mini and FRATELLI in mini
+          and mini.index(FRATELLI) < mini.index(USCITA))
     for f, chi in (("bottoneNotifichePacco(o, s){", "le notifiche del pacco"),
                    ("o.role==='seller' && s==='shipped' ?",
                     "il sollecito del venditore")):
@@ -11838,6 +11844,29 @@ def prove_sollecito_a_comando():
     d2 = pezzo_js(mini, "function bottoneNotifichePacco(o, s){")
     prova("la didascalia porta lo spazio della coppia sotto", True,
           'style="margin:2px 0 10px;text-align:center"' in d2)
+
+    # --- 14) LA COLONNA DEL PROPRIETARIO -------------------------
+    # Stesso difetto dell'ordine, stessa causa: nel dettaglio di un
+    # annuncio proprio lampo e Modifica si toccavano (0px), tenuti li'
+    # da tre `margin-top:0` scritti prima che una regola esistesse.
+    # Qui si guarda che NESSUNO torni: la regola dei fratelli sopra
+    # non serve a niente se un inline la scavalca.
+    det = mini[mini.index("function openDetail(id){"):]
+    det = det[:det.index("aggiornaCurToggle();")]
+    prova("nel dettaglio nessun bottone si ricompra un margine suo",
+          0, det.count("margin-top:0"))
+    prova("...nemmeno il Rifornisci dell'esaurito", False,
+          'margin-top:0" onclick="apriRifornisci' in mini)
+    # IL BOTTONE CHE ELIMINA: il testuale sottolineato spariva fra due
+    # ghost — il gesto piu' consequenziale della colonna era anche il
+    # meno visibile. Stessa ricetta della disputa: velato, mai pieno.
+    prova("eliminare ha la forma di casa, col rosso velato", 2,
+          det.count('class="btn allarme" onclick="deleteListing('))
+    prova("...e non e' piu' un testuale sottolineato", False,
+          'danger-ghost" onclick="deleteListing(' in mini)
+    prova("...e il testo dice solo cosa fa", True,
+          "🗑 Elimina l'annuncio</button>" in det
+          and "Questo è un tuo annuncio — eliminalo" not in mini)
 
 
 # ====================================================================

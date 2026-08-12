@@ -2212,7 +2212,13 @@
      da non ammorbidire: tre blocchi saturi in fila — rosso, azzurro,
      viola — sarebbero un semaforo, e questo non e' un invito ma
      un'uscita di sicurezza. Contrasti misurati sul testo: 4,83 di
-     giorno e 5,28 di sera, AA in entrambi i temi. */
+     giorno e 5,28 di sera, AA in entrambi i temi.
+     LO PORTA ANCHE «Elimina l'annuncio» (ago 2026): stessa famiglia —
+     un gesto che non si torna indietro, in fondo alla colonna del
+     proprietario — quindi stessa ricetta e nessun rosso nuovo. Il
+     velato e' la meta' che conta: quel bottone non deve diventare il
+     colore piu' forte di una pagina dove il pieno non ce l'ha
+     nessuno. */
   .btn.allarme{background:var(--warn-bg);color:var(--danger);
     border:2px solid var(--danger);box-shadow:0 3px 0 var(--danger);
     margin-top:10px;margin-bottom:10px}
@@ -2235,14 +2241,22 @@
      sotto incollava il gesto principale al testo (misurato: 0px).
      Tolti tutti e tre; l'unica distanza diversa che resta e' quella
      della disputa, qui sotto. Chi ne rimette uno lo sente da
-     prove.py, che li conta. */
-  #orderContent .btn + .btn{margin-top:10px}
+     prove.py, che li conta.
+     E VALE ANCHE NEL DETTAGLIO DELL'ANNUNCIO (ago 2026): li' la
+     colonna del proprietario aveva lo STESSO difetto — lampo e
+     Modifica incollati (misurati: 0px) — e per la stessa causa, tre
+     `margin-top:0` scritti a mano prima che una regola esistesse. Un
+     selettore solo per le due colonne: due regole gemelle sono due
+     numeri da tenere in pari, e chi ne cambia uno scopre l'altro un
+     mese dopo. */
+  #orderContent .btn + .btn,#detailContent .btn + .btn{margin-top:10px}
   /* L'uscita di sicurezza resta STACCATA: adesso e' l'ultima, dopo i
      ponti, e senza questo respiro in piu' sarebbe il terzo blocco
      colorato a filo degli altri due — il semaforo gia' evitato una
      volta. Sta DOPO la regola dei fratelli: pari specificita', vince
-     l'ultima. */
-  #orderContent .btn.allarme{margin-top:18px}
+     l'ultima. Nel dettaglio dell'annuncio la stessa distanza tocca a
+     «Elimina l'annuncio», che e' l'uscita di quella colonna. */
+  #orderContent .btn.allarme,#detailContent .btn.allarme{margin-top:18px}
   /* Il ghost vestito di cartone. NON LO PORTA PIU' NESSUNO dall'ago
      2026 (decisione di Andrea): l'aveva «📦 Aggiungi al pacco», che
      e' tornato al ghost di casa come ogni altro secondario — un
@@ -7003,7 +7017,7 @@ const bloccoMioEsaurito = l => `
   <div class="trust-note">🔄 <span><b>Questo annuncio è esaurito.</b> Resta tuo e non è sparito da nessuna parte: torna in vetrina appena gli rimetti dei pezzi.</span></div>
   ${l.nostr
     ? `<div class="trust-note">🟣 <span>Arriva da Nostr: la quantità vive sui relay, non qui.</span></div>`
-    : `<button class="btn orange" style="margin-top:0" onclick="apriRifornisci(${l.id})">🔄 Rifornisci</button>`}`;
+    : `<button class="btn orange" onclick="apriRifornisci(${l.id})">🔄 Rifornisci</button>`}`;
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
    contatore «Scade tra 2h 14m» vive SOLO nella scheda (in griglia il
    badge dice la sola percentuale), quindi qui si aggiorna in-place
@@ -9226,15 +9240,15 @@ function openDetail(id){
              <div class="trust-note"><span>Punti versando i sats nel <b>deposito di garanzia</b>: se vinci sono già il pagamento, se non vinci tornano <span class="fine-frase">indietro. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
              <div id="astaStato"></div>
              <button class="btn asta acquista-cta" id="astaCta" onclick="apriPunta()">🔨 Punta</button>
-             <button class="btn ghost" id="astaRitiro" style="display:none;margin-top:0" onclick="ritiraPuntata()">🕊 Ritirati dall'asta (definitivo)</button>
+             <button class="btn ghost" id="astaRitiro" style="display:none" onclick="ritiraPuntata()">🕊 Ritirati dall'asta (definitivo)</button>
            </div>`;
   const astaDeserta = asta && !astaViva(l) && (l.stato||'attivo')==='attivo';
   const mioAstaBlocco = `<div class="trust-note">🔨 <span>${astaViva(l)
         ? `<b>La tua asta è in corso</b> e si chiude da sola alla scadenza. Con puntate salde è vincolante: base, durata e testo restano bloccati.`
         : `<b>L'asta si è chiusa senza offerte.</b> Puoi rilanciarla o convertirla a prezzo fisso alla base.`}</span></div>
-           ${astaDeserta ? `<button class="btn ghost" style="margin-top:0" onclick="rilanciaAsta(${l.id})">🔨 Rilancia l'asta</button>
-           <button class="btn ghost" style="margin-top:0" onclick="convertiAsta(${l.id})">🏷 Converti a prezzo fisso</button>` : ''}
-           <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`;
+           ${astaDeserta ? `<button class="btn ghost" onclick="rilanciaAsta(${l.id})">🔨 Rilancia l'asta</button>
+           <button class="btn ghost" onclick="convertiAsta(${l.id})">🏷 Converti a prezzo fisso</button>` : ''}
+           <button class="btn allarme" onclick="deleteListing(${l.id}, true)">🗑 Elimina l'annuncio</button>`;
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
@@ -9295,10 +9309,16 @@ function openDetail(id){
         : `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
            ${inFerie(l) ? `<div class="trust-note">🌴 <span><b>Il tuo negozio è in ferie fino al ${ferieData(l.ferie)}:</b> questo annuncio si vede ma non si compra. Rientri quando vuoi dal Profilo.</span></div>` : ''}
            ${!(lampoLeve && lampoLeve.attive) || inFerie(l) ? '' : (lampoAttiva(l)
-             ? `<button class="btn ghost" style="margin-top:0" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
-             : `<button class="btn ghost" style="margin-top:0" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
-           <button class="btn ghost" style="margin-top:0" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
-           <button class="btn danger-ghost" onclick="deleteListing(${l.id}, true)">🗑 Questo è un tuo annuncio — eliminalo</button>`
+             ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
+             : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
+           <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
+           <!-- L'uscita della colonna, e ora un bottone vero: il
+                testuale sottolineato spariva fra due ghost — proprio
+                il gesto che non si torna indietro. Il testo dice solo
+                cosa fa: «Questo è un tuo annuncio» lo diceva gia' la
+                riga verde sopra, e in mezzo a Modifica e Lampo non
+                serviva ripeterlo. -->
+           <button class="btn allarme" onclick="deleteListing(${l.id}, true)">🗑 Elimina l'annuncio</button>`
         : esa
             ? `<div class="trust-note"><span><b>Per ora è esaurito.</b> L'annuncio resta qui e non va da nessuna parte: se il venditore rimette dei pezzi torna comprabile da solo. Intanto puoi metterlo nel barattolo 🫙 per ritrovarlo al volo.</span></div>`
         : ferie
