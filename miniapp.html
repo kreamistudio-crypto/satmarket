@@ -1096,6 +1096,13 @@
      e non ci pensi più. */
   .unit{margin-left:4px;color:var(--muted)}
   .unit.eur{margin-left:2px}
+  /* La cifra di una soglia (numero + unità) non si spezza mai a capo:
+     «25 / €» su due righe si legge come due cose. La emette
+     il giudice cifraSoglia, quindi il vestito lo porta lui e non i sette
+     posti che lo chiamano. STA SULLA CIFRA e mai sulla pillola intera:
+     un flex item con nowrap non scende sotto il suo min-content, e un
+     badge da ~300px a 320px farebbe scorrere di lato la PAGINA. */
+  .cifra-soglia{white-space:nowrap}
   .price-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);
     font-weight:600;margin-top:1px}
   /* La riga meta della card: la zona a sinistra, le icone in un
@@ -1491,16 +1498,20 @@
   .pacco-testa .cur-seg{margin-left:auto;flex:0 0 auto}
   .pacco-testa .pacco-tit .eur-hint{overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap}
-  /* L'invito dello sconto: una riga sola allineata alla griglia (che
-     porta gia' il suo respiro sotto, qui non serve un secondo
-     margine). Vestiti di casa e nessun token nuovo: il muto di
-     .acq-nota mentre manca qualcosa, il verde di .trust-note quando
-     lo sconto e' scattato — lo stesso verde della spunta sulla foto,
-     che e' la conferma. A carrello vuoto il div e' vuoto e sparisce. */
-  #paccoSconto{padding:12px var(--pad) 0}
-  #paccoSconto:empty{display:none}
-  #paccoSconto .acq-nota{margin-top:0}
-  #paccoSconto .trust-note{margin-bottom:0}
+  /* LE DUE PROMESSE DEL NEGOZIO, affiancate sopra la griglia: e' qui
+     che il carrello si compone, ed e' qui che l'invito serve. Vestiti
+     di casa e nessun token nuovo: la pillola neutra mentre manca
+     qualcosa, il verde di .pill-trust quando la soglia scatta.
+     OGNUNA HA LA SUA SCATOLA, e non e' un vezzo: con un contenitore
+     solo, la prima che tace cancellerebbe la sorella (le due funzioni
+     si spengono con box.innerHTML='').
+     IL RESPIRO STA SUI FIGLI e non sul wrapper: a carrello vuoto sono
+     tutti e due display:none, il flex resta senza item e non produce
+     un pixel di altezza — senza bisogno di :has(), che in questo file
+     non si usa da nessuna parte. */
+  #paccoPromesse{display:flex;gap:8px;flex-wrap:wrap;padding:0 var(--pad)}
+  #paccoPromesse > span{margin-top:12px}
+  #paccoSconto:empty,#paccoSpedGratis:empty{display:none}
   /* La cella: card di vetrina + bottone sotto. Il barattolino dei
      preferiti si spegne QUI (e solo qui): l'angolo in alto a destra
      della foto e' della spunta del pacco — lampo e asta stanno a
@@ -1793,6 +1804,10 @@
        del fondo. I margini negativi si annullano col padding gemello. */
     margin:0 calc(-1 * var(--pad));padding-left:var(--pad);padding-right:var(--pad)}
   .altri-azione .btn{margin-top:0}
+  /* i badge delle promesse, SOPRA il bottone: la fila delle pillole
+     senza respiro sotto — quello lo porta gia' il padding del blocco
+     appiccicato qui sopra */
+  .altri-promo{margin:8px 0 0}
   .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
   /* (Il foglio del set — #setLista, .set-riga, .set-check — non esiste
      piu': il riepilogo e' la PAGINA «Controlla il pacco», vedi il suo
@@ -1871,27 +1886,17 @@
      puo' togliere in altro modo. */
   s .unit, s .circa{display:inline-block}
   .circa{margin-right:5px}
-  /* UN SOLO badge colorato nella fila (lug 2026, decisione di Andrea
-     dopo averne provati due): il colore dice l'unica cosa che e' un
-     VANTAGGIO — «non paghi la spedizione». Che un annuncio spedisca e
-     basta e' un dato di fatto come il ritiro e il codice online, e
-     sta con loro in una `.pill` normale: due chip colorati in fila si
-     facevano concorrenza, e quello che voleva dire meno era anche
-     quello che compariva piu' spesso.
-     L'azzurro e' quello che era del tenue (--ship-soft): chiaro, con
-     la sua taratura notturna, uguale nei due temi come segno — vedi il
-     commento lungo sui token, in cima. Non fa concorrenza all'arancio
-     del prezzo ne' al verde dell'escrow.
-     inline-flex e non block: `.pills` e' un flex ad align-items
-     STRETCH, e le pillole vicine sono piu' alte di 3px (hanno 1.5px di
-     bordo per lato, il badge no). Da block il badge veniva stirato a
-     quell'altezza e il testo restava appeso in alto — 6px sopra contro
-     8.8 sotto, lo scentramento che si vedeva. Cosi' la scatola si
-     stira lo stesso, ma il testo sta al centro di quel che diventa. */
-  .sped-badge{background:var(--ship-soft);color:var(--ship-soft-on);
-    display:inline-flex;align-items:center;justify-content:center;
-    border-radius:999px;padding:6px 12px;font-size:13px;font-weight:800;
-    white-space:nowrap}
+  /* (`.sped-badge` — il chip azzurro della spedizione — non c'e' piu':
+     lo SFOLLAMENTO COLORI dell'ago 2026 l'ha sostituito con una `.pill`
+     neutra col «gratuita» in grassetto, e la regola era rimasta orfana
+     a far credere a chi legge il CSS che qualcosa la usasse.
+     I TOKEN RESTANO, ed e' dichiarato: --ship-soft e --ship-soft-on
+     adesso non li porta piu' nessuno, come --ship-card da quando il
+     «gratis» in card e' passato a --ink. Sono vestiti appesi, come
+     .btn.carton: la coppia azzurra e' documentata in CLAUDE.md come il
+     colore della spedizione, e toglierla e' una decisione di palette,
+     non la pulizia di una regola morta. La famiglia --ship VIVA e'
+     --ship-bg/--ship-text, che vestono il badge di stato «spedito».) */
   .desc-tit{font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.1em;color:var(--muted);margin-top:14px}
   /* Le due pillole spedizione/ritiro quando l'annuncio offre entrambe */
@@ -2011,6 +2016,18 @@
   .pill.cond-accettabile{background:var(--sats-soft);border-color:var(--sats-soft);color:var(--gold-text)}
   html[data-tema="scuro"] .pill.cond-accettabile{color:var(--sats-text)}
   .pill.cond-da_sistemare{background:var(--off-bg);border-color:var(--off-bg);color:var(--ink-soft)}
+  /* IL VERDE DELLA PROMESSA SCATTATA, e vive SOLO nel carrello
+     (decisione di Andrea): e' la coppia di .trust-note, cioe' la
+     conferma — lo stesso vestito della riga di prosa che questo badge
+     ha sostituito. Nel dettaglio e in «Altri oggetti» i badge restano
+     NEUTRI, perche' li' la promessa e' una REGOLA e non un fatto
+     compiuto: un verde direbbe «ce l'hai» a chi non ce l'ha ancora, e
+     nel dettaglio finirebbe a un centimetro dalla pillola verde della
+     CONDIZIONE, che vuol dire un'altra cosa.
+     STA DOPO il blocco cond-*: pari specificita', vince l'ultima — la
+     regola di casa gia' scritta su .trust-note.nota-punto. */
+  .pill.pill-trust{background:var(--trust-soft);border-color:var(--trust-soft);
+    color:var(--trust)}
   /* La zona escrow: il recinto verde tratteggiato — il "sigillo" del
      barattolo, l'unico tratteggio del sistema insieme alla cassaforte */
   .escrow-zone{position:relative;background:var(--trust-soft);border:2px dashed var(--trust);
@@ -3237,13 +3254,19 @@ document.getElementById('cartello')?.remove();</script>
         <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
       </div>
     </div>
-    <!-- L'INVITO DELLO SCONTO (ago 2026): la REGOLA del negozio detta
-         in una riga, sotto la testata e sopra la griglia — e' qui che
-         il carrello si compone, ed e' qui che l'invito serve. Non
-         porta MAI una cifra in sats: dice pezzi e percentuale, cioe'
-         la regola e non il conto (che resta del server, nel
-         riepilogo). Lo riempie aggiornaInvitoSconto(), a ogni ±. -->
-    <div id="paccoSconto"></div>
+    <!-- LE DUE PROMESSE DEL NEGOZIO (ago 2026), sotto la testata e
+         sopra la griglia — e' qui che il carrello si compone, ed e'
+         qui che l'invito serve. Badge col CONTO VIVO: quanto manca
+         mentre si aggiungono pezzi, e la conferma in verde quando la
+         soglia scatta. Non portano MAI il RISPARMIO in cifra: quanto
+         si risparmia lo dice il conto del server, nel riepilogo.
+         DUE SCATOLE e non una: le riempiono due funzioni gemelle che
+         si spengono con box.innerHTML='', e con un contenitore solo la
+         prima che tace cancellerebbe la sorella. -->
+    <div id="paccoPromesse">
+      <span id="paccoSconto"></span>
+      <span id="paccoSpedGratis"></span>
+    </div>
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
   </div>
 
@@ -7366,55 +7389,57 @@ const spedisce = l => l.consegna==='spedizione' || l.consegna==='entrambe';
 const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0)
   && !(l.spedExtra > 0) && !(l.spedExtraEur > 0);
 /* Il badge della spedizione accanto al prezzo (lug 2026, stile
-   Subito.it): sfondo evidenziato — la coppia azzurra --ship dei badge
-   di stato «spedito», AA nei due temi — solo se la spedizione e'
-   davvero offerta. Dice SE si spedisce, e quando la spedizione e'
-   GRATUITA lo dice subito, in versione piena: e' un argomento di
-   vendita e non puo' aspettare il fondo pagina.
+   Subito.it): dice SE si spedisce, e quando la spedizione e' GRATUITA
+   lo dice subito, in versione piena — e' un argomento di vendita e non
+   puo' aspettare il fondo pagina.
    E' l'UNICO posto in cui la spedizione si nomina in pagina: il badge
    gemello col costo, che per un giorno e' vissuto sotto il bottone
    Acquista, e' stato tolto (lug 2026, deciso da Andrea). Il recinto e'
    il posto della fiducia, non del listino, e una cifra li' dentro
    chiedeva «di che totale fa parte?» senza rispondere; il QUANTO lo
-   dicono i posti che portano un totale vero — il foglio «Come vuoi
-   riceverlo?» del varco, la riga «Spedizione» del conto scomposto e i
-   bottoni compra, che la spedizione l'hanno sempre inclusa. */
+   dicono i posti che portano un totale vero — la pagina d'acquisto, la
+   riga «Spedizione» del conto scomposto e i bottoni compra, che la
+   spedizione l'hanno sempre inclusa.
+   SFOLLAMENTO COLORI (ago 2026, decisione di Andrea): la gratuita' si
+   evidenzia col GRASSETTO, mai col colore — le pillole di consegna
+   sono TUTTE neutre, un solo cuore (.pill). Il chip azzurro pieno e'
+   morto qui, e il verde non ci entra: qui la promessa e' una REGOLA e
+   non un fatto compiuto (il verde vive solo nel carrello).
+
+   LA PROMESSA DEL NEGOZIO CI E' ENTRATA DENTRO (ago 2026, decisione di
+   Andrea), e questo ROVESCIA la regola che stava scritta qui sotto —
+   «riga discreta e mai una pillola». La regola vecchia difendeva da un
+   equivoco vero: nella fila delle pillole una cifra si legge come
+   proprieta' di QUEST'oggetto. Il rimedio nuovo non e' nasconderla ma
+   NOMINARLA — «da 25 € DI ARTICOLI», che e' la parola che distingue il
+   totale della merce dal prezzo che si ha davanti — e tenere il
+   verdetto fuori di qui. Cio' che resta intatto della regola vecchia:
+   si dice la REGOLA e mai «questo e' gia' sopra soglia», perche' il
+   prezzo qui accanto non e' il numero che il server confronta (una
+   lampo viva, un accordo accettato o la quantita' scelta lo spostano).
+   Il verdetto arriva nella pagina Paga, dove c'e' il totale che lo
+   dimostra.
+   L'ORDINE DEI RAMI E' LA SPECIFICA, e sono le due trappole del
+   travaso: 1) `spedGratis` si guarda PRIMA della regola, o un annuncio
+   gia' gratis senza condizioni mostrerebbe «gratis da 25 €», cioe' una
+   condizione su una gratuita' piena; 2) `inFerie` viene dalla riga di
+   prosa che questo badge ha sostituito, e si perde se si travasa a
+   occhio — il badge prometterebbe la spedizione di un negozio chiuso
+   (che e' anche il caso in cui NON si compra). E lo stato con la
+   promessa SOSTITUISCE «disponibile», non si somma: mai due 🚚. */
 function spedBadge(l){
   if (!spedisce(l)) return '';
-  /* SFOLLAMENTO COLORI (ago 2026, decisione di Andrea): la gratuita'
-     si evidenzia col GRASSETTO, mai col colore — le pillole di
-     consegna sono TUTTE neutre, un solo cuore (.pill). Il chip
-     azzurro pieno e' morto qui. */
-  return spedGratis(l)
-    ? '<span class="pill">🚚 Spedizione <b>gratuita</b></span>'
-    : '<span class="pill">🚚 Spedizione disponibile</span>';
+  if (spedGratis(l))
+    return '<span class="pill">🚚 Spedizione <b>gratuita</b></span>';
+  const r = inFerie(l) ? null
+    : regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
+                       l.spedGratisValuta);
+  return r ? `<span class="pill">${etichettaSpedGratis(r)}</span>`
+           : '<span class="pill">🚚 Spedizione disponibile</span>';
 }
-/* LA PROMESSA DEL NEGOZIO NELLA SCHEDA (ago 2026): la spedizione
-   gratis sopra soglia e' l'unica delle due promesse che vale anche su
-   un oggetto solo, quindi qui ci sta — mentre lo sconto carrello, che
-   nel mono non esiste, resta fuori.
-   DICE LA REGOLA, MAI UN VERDETTO SU QUESTO OGGETTO, ed e' il punto
-   dove e' piu' facile scivolare: verrebbe da scrivere «questo e' gia'
-   sopra soglia» leggendo il prezzo qui accanto, ma quel prezzo non e'
-   il numero che il server confronta — una lampo viva, un accordo
-   accettato o la quantita' scelta lo spostano, e la riga direbbe una
-   cosa che il conto poi non fa. Il verdetto arriva nella pagina Paga,
-   dove c'e' anche il totale che lo dimostra.
-   Fuori da qui in due casi: se l'annuncio NON spedisce (su un ritiro o
-   un codice online sarebbe una promessa su una cosa che non succede) e
-   se la spedizione e' gia' gratis SENZA condizioni — li' la pillola
-   qui sopra lo dice meglio, e una soglia accanto farebbe dubitare di
-   una gratuita' che invece e' piena.
-   Riga discreta e mai una pillola: nella fila delle pillole una cifra
-   si legge come proprieta' di quest'oggetto, che e' esattamente
-   l'equivoco da evitare. */
-function rigaSpedGratis(l){
-  if (!spedisce(l) || spedGratis(l) || inFerie(l)) return '';
-  const r = regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
-                             l.spedGratisValuta);
-  return r ? `<div class="acq-nota">🚚 Questo negozio offre la
-    ${frasePromessaSpedGratis(r)}.</div>` : '';
-}
+/* (La riga di prosa «Questo negozio offre la spedizione gratis da …»
+   non esiste piu': e' entrata DENTRO spedBadge, qui sopra, che di quel
+   giudizio e' ora il posto unico — guardie comprese.) */
 aggiornaCurToggle();   // la preferenza salvata si vede subito sul bottone
 
 /* ---------------- tema: chiaro / scuro / auto ----------------
@@ -7910,25 +7935,47 @@ async function sezioneAltriOggetti(l){
      settimo e' un caso raro, e al piu' si nasconde un bottone in piu'. */
   const tuttoDigitale = l.consegna==='digitale'
     && altri.every(x => x.consegna==='digitale');
-  /* La promessa del negozio, DOVE il carrello si comincia a comporre:
-     fra il titolo di sezione e il bottone — prima il perche', poi
-     l'azione. Stesse condizioni del bottone: mai una promessa dove il
-     carrello non esiste. */
+  /* Le promesse del negozio, DOVE il carrello si comincia a comporre.
+     Stesse condizioni del bottone — mai una promessa dove il carrello
+     non esiste — e il predicato e' UNO SOLO: prima era ripetuto a mano
+     sul bottone, e con badge e bottone ormai attaccati il giorno che
+     si aggiunge una condizione si sfaserebbero. */
   const promoOk = !(DEMO || astaE(l) || tuttoDigitale || inFerie(l));
   const scOk = promoOk
     ? regolaSconto(l.scontoCriterio, l.scontoSoglia, l.scontoValoreSats,
                    l.scontoValoreEur, l.scontoValuta, l.scontoPct) : null;
   /* La seconda promessa, alle stesse condizioni: un carrello che non
-     esiste non ha nemmeno una spedizione da offrire. Le due si
-     leggono una sotto l'altra quando ci sono tutte e due. */
+     esiste non ha nemmeno una spedizione da offrire. */
   const sgOk = promoOk ? regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
                                           l.spedGratisValuta) : null;
+  /* I BADGE STANNO SOPRA IL BOTTONE — «prima il perche', poi
+     l'azione», che e' l'ordine che la sezione aveva gia' con le due
+     righe di prosa che hanno sostituito.
+     CI SONO ARRIVATI DOPO UN GIRO, e il motivo va tenuto perche' non
+     si vede leggendo: SOTTO il bottone si spezzavano. Il bottone e'
+     `position:sticky` con fondo opaco, quindi scorrendo i badge gli
+     passano sotto UNO ALLA VOLTA — a 90px di scroll resta il solo
+     badge della spedizione, cioe' un negozio che promette due cose ne
+     mostra una. Una mezza verita' e' peggio del silenzio, e quello e'
+     anche il fotogramma su cui si atterra scorrendo piano. Sopra, i
+     due scorrono via INSIEME al titolo di sezione: un normale scroll,
+     niente che venga mangiato da una superficie.
+     LE DUE STRADE SCARTATE, misurate a 375×760: dentro `.altri-azione`
+     (sticky anche loro) la coppia non si spezza mai ma il cartello
+     fisso passa da 84 a 178px, il 23% dello schermo, sopra la merce e
+     con la barra d'acquisto che se ne prende altri 86; e lasciarli
+     sotto non-sticky e' proprio il difetto qui sopra.
+     Neutri: qui la promessa e' una REGOLA, e il verde vive solo nel
+     carrello. L'idioma `(p => p ? … : '')` e' quello del dettaglio: un
+     venditore senza regole non deve emettere una fila vuota, che
+     varrebbe comunque il suo margine. */
+  const badge = (scOk ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '')
+              + (sgOk ? `<span class="pill">${etichettaSpedGratis(sgOk)}</span>` : '');
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
-      ${scOk ? `<div class="acq-nota" style="margin-top:6px">🎁 Questo negozio fa ${frasePromessaSconto(scOk)}.</div>` : ''}
-      ${sgOk ? `<div class="acq-nota" style="margin-top:6px">🚚 Questo negozio offre la ${frasePromessaSpedGratis(sgOk)}.</div>` : ''}
-      ${DEMO || astaE(l) || tuttoDigitale || inFerie(l) ? '' : `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>`}
+      ${badge ? `<div class="pills altri-promo">${badge}</div>` : ''}
+      ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>` : ''}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
 }
@@ -8539,14 +8586,14 @@ function renderAcquisto(){
   if (sgSoglia > 0 && spedisceQui)
     note += (p.promesse_sospese
       ? `<div class="acq-nota">🚚 Il negozio offre la spedizione da
-           ${fmt(sgSoglia)}${unitaSoglia(sgVal)} di
+           ${cifraSoglia(sgSoglia, sgVal)} di
            articoli, ma adesso non riusciamo a fare il cambio: per
            questo acquisto la spedizione si paga.</div>`
       : sgManca > 0
-      ? `<div class="acq-nota">🚚 Ancora ${fmt(sgManca)}${unitaSoglia(sgVal)}
+      ? `<div class="acq-nota">🚚 Ancora ${cifraSoglia(sgManca, sgVal)}
            di articoli e la <b>spedizione è gratis</b>.</div>`
       : `<div class="trust-note">🚚 <span><b>Spedizione gratis:</b> il
-           negozio la offre da ${fmt(sgSoglia)}${unitaSoglia(sgVal)} di
+           negozio la offre da ${cifraSoglia(sgSoglia, sgVal)} di
            articoli.</span></div>`);
   /* --- il conto della strada scelta, riga per riga --- */
   const viaOk = stradaSel && !stradaSel.cambio_assente;
@@ -8833,12 +8880,16 @@ function aggiornaBarraPacco(){
      titolo «Il carrello», e a 375px la coda si troncava coi puntini */
   el('paccoConta').textContent = pezzi
     ? `${pezzi} pezz${pezzi===1?'o':'i'}` : 'il carrello è vuoto';
-  /* l'invito parla dello stesso conteggio, e a criterio valore dello
-     stesso TOTALE in sats: glielo passiamo invece di farglielo rifare,
-     cosi' i due numeri della pagina non possono divergere. A convertirlo
-     in euro ci pensa lui, ed e' l'unica conversione del client su una
-     promessa (vedi aggiornaInvitoSconto per la fascia dichiarata). */
+  /* i due inviti parlano dello stesso conteggio, e a criterio valore
+     dello stesso TOTALE in sats: glielo passiamo invece di farglielo
+     rifare, cosi' i numeri della pagina non possono divergere. A
+     convertirlo in euro ci pensano loro, ed e' l'unica conversione del
+     client su una promessa (vedi aggiornaInvitoSconto per la fascia
+     dichiarata). Le due promesse guardano lo STESSO lordo ma con
+     soglie e unita' proprie: sono indipendenti, e una puo' essere
+     scattata mentre l'altra no. */
   aggiornaInvitoSconto(tot);
+  aggiornaInvitoSpedGratis(tot);
 }
 /* ---- LA REGOLA DELLO SCONTO, GIUDICE UNICO DEL CLIENT (ago 2026) ----
    Il criterio arriva dal server insieme alle due soglie, che si
@@ -8872,6 +8923,18 @@ function unitaSoglia(valuta){
   return valuta === 'sats'
     ? ` <span class="unit">sats</span>` : `<span class="unit eur">€</span>`;
 }
+/* LA CIFRA DI UNA SOGLIA — numero e unita' insieme, e in UN posto
+   solo. E' QUESTO il giudice che tiene in pari la prosa lunga e
+   l'etichetta corta del badge: le due restano funzioni separate
+   apposta (sono due registri, e derivare l'una dall'altra vorrebbe
+   dire chirurgia di stringhe su HTML), ma quello che non deve poter
+   divergere non sono le PAROLE — sono la cifra e la sua unita'. Erano
+   scritte a mano in sette posti; coi badge sarebbero diventate dieci,
+   e la decima e' quella che un giorno scrive «€» su una soglia in
+   sats. Porta anche il nowrap a tutti, gratis. */
+function cifraSoglia(quanto, valuta){
+  return `<span class="cifra-soglia">${fmt(quanto)}${unitaSoglia(valuta)}</span>`;
+}
 /* La promessa scritta a parole, e in UN posto solo: due copie
    divergono al primo ritocco. Dice sempre «nello stesso carrello», ed
    e' deliberato: a criterio valore «da 25 €» si legge come «da 25 € di
@@ -8887,8 +8950,26 @@ function frasePromessaSconto(r){
   if (r.criterio === 'pezzi')
     return `<b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi nello stesso
       carrello`;
-  return `<b>−${r.pct}%</b> da ${fmt(r.quanto)}`
-    + `${unitaSoglia(r.valuta)} di articoli nello stesso carrello`;
+  return `<b>−${r.pct}%</b> da ${cifraSoglia(r.quanto, r.valuta)}`
+    + ` di articoli nello stesso carrello`;
+}
+/* L'ETICHETTA CORTA, cioe' la stessa promessa nel registro del CHIP:
+   una frase autoportante, non un complemento che si incastra in
+   «Questo negozio fa …». Le due convivono APPOSTA e non si derivano
+   l'una dall'altra — sarebbe chirurgia di stringhe su HTML — e a non
+   farle divergere sui NUMERI c'e' cifraSoglia, l'unico posto dove una
+   soglia diventa testo.
+   «NEL CARRELLO» RESTA, ed e' la parola portante: a criterio valore
+   «da 25 €» si legge come «da 25 € di spesa», e chi compra UNA cosa
+   cara non sconta mai (il mono non sconta, vedi _righe_ordine). A
+   cedere e' semmai «di articoli», che nella prosa lunga della testata
+   negozio resta intero: qui i pixel sono contati e quella e' la
+   precisione che costa meno perderla. */
+function etichettaSconto(r){
+  if (!r) return '';
+  return r.criterio === 'pezzi'
+    ? `🎁 <b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi nel carrello`
+    : `🎁 <b>−${r.pct}%</b> da ${cifraSoglia(r.quanto, r.valuta)} nel carrello`;
 }
 /* ---- LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026) ----
    La seconda promessa di negozio, e il suo giudice unico: la soglia
@@ -8913,8 +8994,23 @@ function regolaSpedGratis(sogliaSats, sogliaEur, valuta){
    lo dimostra. */
 function frasePromessaSpedGratis(r){
   if (!r) return '';
-  return `spedizione <b>gratis</b> da ${fmt(r.quanto)}`
-    + `${unitaSoglia(r.valuta)} di articoli`;
+  return `spedizione <b>gratis</b> da ${cifraSoglia(r.quanto, r.valuta)}`
+    + ` di articoli`;
+}
+/* L'ETICHETTA CORTA, gemella di etichettaSconto — stesso patto: due
+   registri, una cifra sola (cifraSoglia).
+   QUI «DI ARTICOLI» NON SI TOGLIE, ed e' l'asimmetria voluta con lo
+   sconto: questa promessa vale anche su UN oggetto solo, quindi «nel
+   carrello» sarebbe falso, mentre «di articoli» e' proprio la parola
+   che distingue il totale della merce da quello con la spedizione
+   dentro. Accanto al prezzo di un annuncio e' anche l'unica cosa che
+   impedisce di leggere «da 25 €» come una proprieta' di quell'oggetto
+   — l'equivoco per cui questa promessa era stata tenuta fuori dalle
+   pillole (decisione di Andrea, ago 2026: ci rientra, ma nominata). */
+function etichettaSpedGratis(r){
+  if (!r) return '';
+  return `🚚 Spedizione <b>gratis</b> da `
+    + `${cifraSoglia(r.quanto, r.valuta)} di articoli`;
 }
 /* ---- L'INVITO DELLO SCONTO SUL CARRELLO (ago 2026) ----
    La regola del negozio in una riga: quanto manca e di quanto scende
@@ -8928,14 +9024,25 @@ function frasePromessaSpedGratis(r){
    dice la cosa vecchia — e' peggio di nessun invito.
    Vive in aggiornaBarraPacco perche' e' LEI a girare a ogni ±:
    renderPacco riscrive tutto solo quando una riga entra o esce. */
+/* L'annuncio da cui si leggono le politiche: la regola e' del NEGOZIO,
+   quindi la porta ogni suo annuncio — basta guardare il primo che
+   c'e'. LA SCELTA STA QUI e non dentro le due promesse: se ognuna si
+   prendesse il suo annuncio, un giorno direbbero la regola di due
+   negozi diversi. */
+function annuncioNegozio(){
+  return listings.find(t => t.id===paccoDati?.origineId)
+      || annunciPacco()[0];
+}
 function scontoNegozio(){
-  /* la regola e' del NEGOZIO, quindi la porta ogni suo annuncio:
-     basta guardare il primo che c'e' */
-  const x = listings.find(t => t.id===paccoDati?.origineId)
-         || annunciPacco()[0];
+  const x = annuncioNegozio();
   return x ? regolaSconto(x.scontoCriterio, x.scontoSoglia,
                           x.scontoValoreSats, x.scontoValoreEur,
                           x.scontoValuta, x.scontoPct) : null;
+}
+function spedGratisNegozio(){
+  const x = annuncioNegozio();
+  return x ? regolaSpedGratis(x.spedGratisSats, x.spedGratisEur,
+                              x.spedGratisValuta) : null;
 }
 function aggiornaInvitoSconto(tot){
   const box = el('paccoSconto');
@@ -8970,22 +9077,64 @@ function aggiornaInvitoSconto(tot){
     : (s.valuta === 'sats' ? (tot || 0)
                            : Math.floor((tot || 0) * eurPerSat));
   if (ora >= s.quanto){
-    /* SCATTATO: la riga non sparisce, si TRASFORMA in conferma. Se
+    /* SCATTATO: il badge non sparisce, si TRASFORMA in conferma. Se
        sparisse, chi ha appena guadagnato lo sconto non vedrebbe
        cambiare niente — la barra qui sotto e' al lordo, di proposito —
-       e la promessa sembrerebbe evaporata. Percio' dice anche DOVE
-       sono finiti i sats: e' il conto del server a decidere, non
-       questa riga. */
-    box.innerHTML = `<div class="trust-note">✅ <span>Sconto attivo:
-      <b>−${s.pct}%</b> su tutto il carrello, lo vedi nel conto.</span></div>`;
+       e la promessa sembrerebbe evaporata. E «NEL CONTO» non e'
+       ornamento, e' la stessa ragione: senza, chi legge «−15%»
+       aspetterebbe che il totale qui sotto scenda. E' il conto del
+       server a decidere, non questo badge. */
+    box.innerHTML = `<span class="pill pill-trust">✅ Sconto
+      <b>−${s.pct}%</b> nel conto</span>`;
     return;
   }
   const n = s.quanto - ora;
   const manca = s.criterio === 'valore'
-    ? `${fmt(n)}${unitaSoglia(s.valuta)}`
-    : `${fmt(n)} articol${n===1?'o':'i'}`;
-  box.innerHTML = `<div class="acq-nota">🎁 Ancora ${manca}: il negozio
-    fa <b>−${s.pct}%</b> su tutto il carrello.</div>`;
+    ? cifraSoglia(n, s.valuta)
+    : `${fmt(n)} pezz${n===1?'o':'i'}`;
+  box.innerHTML = `<span class="pill">🎁 Ancora ${manca} →
+    <b>−${s.pct}%</b></span>`;
+}
+/* IL GEMELLO PER LA SECONDA PROMESSA (ago 2026). Due funzioni e due
+   scatole e non una sola, e non e' simmetria per il gusto: le due
+   soglie hanno UNITA' INDIPENDENTI — un negozio puo' promettere lo
+   sconto in euro e la spedizione in SATS. Con una funzione sola il
+   `return` di `!cambioVivo`, che e' deciso dallo sconto, spegnerebbe
+   anche un badge che di cambio non ha bisogno; e un box.innerHTML=''
+   su un contenitore condiviso cancellerebbe la promessa sorella.
+   Tutto il resto e' il patto del gemello: non CALCOLA, riceve il
+   totale che la barra mostra due centimetri piu' sotto, quindi i due
+   non possono divergere; il dato viene dall'ANNUNCIO e non dal
+   preventivo, che ha una firma e arriva in ritardo. */
+function aggiornaInvitoSpedGratis(tot){
+  const box = el('paccoSpedGratis');
+  if (!box) return;
+  const r = spedGratisNegozio(), pezzi = pezziSet();
+  if (!r || !pezzi) { box.innerHTML = ''; return; }
+  /* UN CARRELLO DI SOLI RITIRI non ha una spedizione da rendere
+     gratis: la promessa sarebbe vera e inutile insieme. stradeSet() e'
+     gia' l'intersezione delle strade fisiche dei pezzi scelti — lo
+     stesso giudice delle pillole del riepilogo.
+     VA DOPO `!pezzi` e non prima: a carrello vuoto stradeSet() parte
+     da ['spedizione','ritiro'] e non filtra niente, quindi messa
+     sopra sarebbe vacuamente vera. */
+  if (!stradeSet().includes('spedizione')) { box.innerHTML = ''; return; }
+  /* la fascia stretta del cambio vale qui come nel gemello: in EURO si
+     converte il lordo col cambio del client (e senza cambio si tace,
+     il patto del ≈), in SATS il confronto e' esatto e il badge compare
+     anche a CoinGecko muto */
+  const inEuroSg = r.valuta !== 'sats';
+  if (inEuroSg && !cambioVivo) { box.innerHTML = ''; return; }
+  const ora = r.valuta === 'sats' ? (tot || 0)
+                                  : Math.floor((tot || 0) * eurPerSat);
+  if (ora >= r.quanto){
+    box.innerHTML = `<span class="pill pill-trust">🚚 Spedizione
+      <b>gratis</b></span>`;
+    return;
+  }
+  box.innerHTML = `<span class="pill">🚚 Ancora
+    ${cifraSoglia(r.quanto - ora, r.valuta)} → spedizione
+    <b>gratis</b></span>`;
 }
 /* GRIGLIA E RIEPILOGO SONO DUE VISTE DELLO STESSO STATO (`setScelte`,
    che e' il conteggio UNICO): la quantita' toccata in una si vede
@@ -9299,7 +9448,6 @@ function openDetail(id){
               sfollamento, la stessa di «spedizione gratuita». Zero CSS
               nuovo, e la fila resta una fila di fatti. */
            : ultimoPezzo(l)?`<span class="pill"><b>Ultimo</b> disponibile</span>`:''))}
-      ${rigaSpedGratis(l)}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${esc(l.desc)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">

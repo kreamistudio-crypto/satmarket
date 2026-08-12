@@ -5708,14 +5708,25 @@ def prove_valuta_soglia():
     # si tolgono: quello che racconta il difetto lo nomina apposta)
     prova("...e non scrive piu' l'euro a mano", False,
           "€" in re.sub(r"/\*.*?\*/", "", _hp, flags=re.S))
-    # L'UNITA' si scrive in UN posto solo: cinque superfici che se la
-    # scrivono da se' sono cinque posti dove un giorno una dice «€» su
-    # una soglia in sats
+    # L'UNITA' si scrive in UN posto solo: sette superfici che se la
+    # scrivono da se' sono sette posti dove un giorno una dice «€» su
+    # una soglia in sats.
+    # DALL'AGO 2026 (le promesse a badge) la sentinella non e' piu' un
+    # numero magico ma BINARIA: nessuna superficie mette in fila un
+    # numero e la sua unita' per conto suo — lo fa cifraSoglia, e
+    # unitaSoglia ha un chiamante solo. Col conto a mano ogni badge
+    # nuovo faceva alzare il numero, che e' il modo in cui una
+    # sentinella smette di sorvegliare e diventa un promemoria.
     prova("l'unita' della soglia ha UNA fonte sola", 1,
           mini.count("function unitaSoglia("))
-    prova("...e la usano tutte le frasi pubbliche", 3,
-          mini.count("unitaSoglia(r.valuta)")
-          + mini.count("unitaSoglia(s.valuta)"))
+    prova("...e la cifra pure", 1, mini.count("function cifraSoglia("))
+    prova("...e unitaSoglia la chiama solo cifraSoglia", 2,
+          mini.count("unitaSoglia("))
+    # ...e tutte le superfici della promessa passano da li': le due
+    # frasi lunghe, le due etichette corte, i due inviti del carrello e
+    # i tre siti della pagina Paga — nove chiamate piu' la definizione
+    prova("...e tutte le superfici della promessa passano da cifraSoglia",
+          10, mini.count("cifraSoglia("))
     # L'INVITO DEL CARRELLO non converte piu' a soglia in SATS: li' il
     # confronto e' sats contro sats, esatto, e la riga compare anche a
     # cambio muto. E' il guadagno della scelta, e vive proprio dove
@@ -12307,6 +12318,189 @@ def prove_numero_ordine():
           "onclick" not in riga_sub and "ordine-num" not in riga_sub)
 
 
+def prove_promesse_badge():
+    """LE PROMESSE DEL NEGOZIO DIVENTANO BADGE (ago 2026, decisione di
+    Andrea). Le due righe di prosa grigia — lo sconto carrello e la
+    spedizione gratis sopra soglia — passano a pillole su tre
+    superfici: la scheda annuncio (dove la promessa entra DENTRO il
+    badge della spedizione), «Altri oggetti» (sotto il bottone) e il
+    carrello, dove il badge porta il CONTO VIVO e diventa verde quando
+    la soglia scatta.
+    Qui si guardano le righe che un riordino toglie per prime: l'ordine
+    dei rami del badge (che e' la specifica), le guardie travasate, il
+    verde che non deve uscire dal carrello, e le due scatole che
+    tengono separate due promesse con unita' indipendenti."""
+    print("\n[le promesse come badge]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. IL BADGE DELLA SCHEDA ha assorbito la promessa, guardie
+    # comprese. La riga di prosa non deve tornare da nessuna parte: due
+    # posti che dicono la stessa cosa a due dita di distanza sono il
+    # difetto che questo cantiere esiste per togliere.
+    _sb = pezzo_js(mini, "function spedBadge(l){")
+    prova("il badge porta la promessa", True, "regolaSpedGratis(" in _sb)
+    prova("...e l'etichetta corta viene dal giudice unico", True,
+          "etichettaSpedGratis(r)" in _sb)
+    prova("la riga di prosa del dettaglio non esiste piu'", False,
+          "rigaSpedGratis" in mini)
+    # LA GUARDIA CHE SI PERDE PER PRIMA nel travaso: `inFerie` viveva
+    # nella riga di prosa e non nel badge — senza, un negozio chiuso
+    # promette la spedizione gratis.
+    prova("...e il negozio in ferie non promette niente", True,
+          "inFerie(l) ? null" in _sb)
+    # L'ORDINE DEI RAMI E' LA SPECIFICA: `spedGratis` PRIMA della
+    # regola, o un annuncio gia' gratis senza condizioni mostrerebbe
+    # «gratis da 25 €» — una condizione su una gratuita' piena.
+    prova("la gratuita' piena si guarda PRIMA della soglia", True,
+          _sb.index("spedGratis(l)") < _sb.index("regolaSpedGratis("))
+    # e lo stato con la promessa SOSTITUISCE «disponibile»: mai due 🚚
+    # nella stessa fila
+    prova("un solo «Spedizione disponibile» in tutto il file", 1,
+          mini.count("🚚 Spedizione disponibile"))
+    # ...e i due rami sono le facce di UN ternario: la promessa
+    # SOSTITUISCE «disponibile», non ci si somma accanto. Il conto
+    # secco dei 🚚 non basterebbe — il terzo vive nell'etichetta, e una
+    # somma dei due rami lo lascerebbe fermo a due.
+    prova("...e la promessa SOSTITUISCE «disponibile»", True,
+          'r ? `<span class="pill">${etichettaSpedGratis(r)}</span>`' in _sb
+          and ': \'<span class="pill">🚚 Spedizione disponibile</span>\''
+              in _sb)
+
+    # ---- 2. LE DUE ETICHETTE CORTE: un registro diverso dalla prosa,
+    # ma un giudice solo per la CIFRA (cifraSoglia, provato nel blocco
+    # della valuta). L'etichetta della spedizione ha DUE superfici
+    # neutre — scheda e «Altri oggetti» — e quel testo dev'essere
+    # letteralmente lo stesso.
+    prova("l'etichetta corta della spedizione e' UNA", 1,
+          mini.count("function etichettaSpedGratis("))
+    prova("...e la usano tutte e due le superfici neutre", 3,
+          mini.count("etichettaSpedGratis("))
+    prova("l'etichetta corta dello sconto e' UNA", 1,
+          mini.count("function etichettaSconto("))
+    # «NEL CARRELLO» e' la parola portante dello sconto (il mono non
+    # sconta mai: chi compra UNA cosa cara non deve credere il
+    # contrario), mentre la spedizione gratis vale anche su un oggetto
+    # solo — quindi li' «nel carrello» sarebbe FALSO e a portare la
+    # precisione e' «di articoli». L'asimmetria e' voluta: e' il caso
+    # in cui uniformare i due testi introdurrebbe una bugia.
+    _es = pezzo_js(mini, "function etichettaSconto(r){")
+    _esg = pezzo_js(mini, "function etichettaSpedGratis(r){")
+    prova("lo sconto dice «nel carrello»", 2, _es.count("nel carrello"))
+    prova("...e la spedizione NON lo dice", False, "nel carrello" in _esg)
+    prova("...e dice invece «di articoli»", True, "di articoli" in _esg)
+
+    # ---- 3. LA PROSA LUNGA sopravvive solo dove non e' diventata
+    # badge: testata negozio e hint del form Vendi (piu' la
+    # definizione). Se il conto sale, qualcuno ha rimesso una riga di
+    # prosa sotto le pillole.
+    prova("la prosa lunga della spedizione resta in due superfici", 3,
+          mini.count("frasePromessaSpedGratis("))
+    prova("...e quella dello sconto pure", 3,
+          mini.count("frasePromessaSconto("))
+
+    # ---- 4. «ALTRI OGGETTI»: i badge SOTTO il bottone e SORELLI del
+    # blocco sticky. Dentro `.altri-azione` diventerebbero sticky anche
+    # loro, e il blocco incollato in cima coprirebbe due dita di card
+    # per tutto lo scroll.
+    # I BADGE STANNO SOPRA IL BOTTONE, e non e' una preferenza: sotto,
+    # il bottone e' `position:sticky` col fondo opaco e se li mangia UNO
+    # ALLA VOLTA — a mezzo scroll resta la sola spedizione, cioe' un
+    # negozio che promette due cose ne mostra una. Sopra scorrono via
+    # insieme al titolo di sezione, e la coppia resta atomica.
+    # SI MISURA IL MARKUP e non il nome della classe: scritta col nome
+    # nudo, questa sentinella non poteva fallire — il commento della
+    # funzione nomina `.altri-azione` PRIMA del template, quindi
+    # l'indice cadeva sul commento e lo scambio delle due righe passava
+    # liscio (l'ha detto la tortura, non la rilettura).
+    _ao = pezzo_js(mini, "async function sezioneAltriOggetti(l){")
+    prova("i badge stanno SOPRA il bottone", True,
+          _ao.index('<div class="pills altri-promo">')
+          < _ao.index('<div class="altri-azione">'))
+    # ...e fuori dal blocco appiccicato: dentro, il cartello fisso
+    # passerebbe da 84 a 178px, il 23% dello schermo sopra la merce
+    prova("...e fuori dal blocco appiccicato", True,
+          _ao.index('<div class="altri-azione">')
+          < _ao.index('<div class="grid altri-griglia">')
+          and 'altri-promo">${badge}</div>`' in _ao)
+    # Il chip azzurro della spedizione e' morto con lo sfollamento
+    # colori: la regola CSS restava orfana a far credere che vivesse.
+    # Si guardano la REGOLA e l'USO e non il nome nudo, che vive ancora
+    # nella lapide a commento — spiega perche' i token --ship-soft
+    # restano definiti, e vale piu' della comodita' di un `in mini`.
+    prova("la regola del chip .sped-badge non c'e' piu'", False,
+          ".sped-badge{" in mini)
+    prova("...e nessuno emette piu' quella classe", None,
+          re.search(r'class="[^"]*sped-badge', mini))
+    # il predicato del bottone era ripetuto a mano accanto a quello dei
+    # badge: adesso che sono attaccati, due copie si sfasano al primo
+    # ritocco
+    prova("bottone e badge hanno UN giudice solo", 1,
+          _ao.count("tuttoDigitale || inFerie(l)"))
+    prova("...e nessuna fila vuota se il negozio non promette niente",
+          True, "badge ? `<div class=\"pills altri-promo\">" in _ao)
+
+    # ---- 5. IL CARRELLO: due promesse, due scatole. Con un
+    # contenitore solo la prima che tace cancellerebbe la sorella
+    # (tutte e due si spengono con box.innerHTML='').
+    prova("due scatole nella vista", True,
+          'id="paccoSconto"' in mini and 'id="paccoSpedGratis"' in mini)
+    prova("...e ognuna e' scritta da una funzione sola", (1, 1),
+          (mini.count("el('paccoSconto')"),
+           mini.count("el('paccoSpedGratis')")))
+    _sg = pezzo_js(mini, "function aggiornaInvitoSpedGratis(tot){")
+    prova("il gemello riceve il totale, non lo ricalcola", True,
+          "function aggiornaInvitoSpedGratis(tot){" in mini
+          and "artStima" not in _sg)
+    # UN CARRELLO DI SOLI RITIRI non ha una spedizione da rendere
+    # gratis: la promessa sarebbe vera e inutile insieme
+    prova("...e tace su un carrello che non spedisce", True,
+          "stradeSet().includes('spedizione')" in _sg)
+    # ...e la guardia sta DOPO `!pezzi`: a carrello vuoto stradeSet()
+    # parte da ['spedizione','ritiro'] e non filtra niente, quindi
+    # messa sopra sarebbe vacuamente vera
+    prova("...con la guardia delle strade DOPO quella del vuoto", True,
+          _sg.index("!r || !pezzi") < _sg.index("stradeSet()"))
+    # la fascia del cambio, come nel gemello: in euro senza cambio si
+    # tace (il patto del ≈), in sats il confronto e' esatto
+    prova("in euro senza cambio vivo tace", True,
+          "!cambioVivo) { box.innerHTML = ''; return; }" in _sg)
+    prova("...e in sats non chiede il cambio", True,
+          "r.valuta === 'sats' ? (tot || 0)" in _sg)
+    prova("...col floor, come il giudice del server", True,
+          "Math.floor((tot || 0) * eurPerSat)" in _sg)
+    # LE DUE PROMESSE SONO INDIPENDENTI, ed e' il motivo per cui sono
+    # due funzioni: una puo' essere scattata mentre l'altra no, e una
+    # soglia in euro col cambio muto non deve spegnere una promessa
+    # dichiarata in sats
+    _bp = pezzo_js(mini, "function aggiornaBarraPacco(){")
+    prova("la barra chiama tutti e due gli inviti", True,
+          "aggiornaInvitoSconto(tot);" in _bp
+          and "aggiornaInvitoSpedGratis(tot);" in _bp)
+
+    # ---- 6. IL VERDE VIVE SOLO NEL CARRELLO (decisione di Andrea):
+    # li' e' la CONFERMA, cioe' il vestito che la riga di prosa aveva
+    # gia'. In scheda e in «Altri oggetti» la promessa e' una REGOLA e
+    # non un fatto compiuto — e nella fila del dettaglio il verde e'
+    # gia' preso dalla pillola della CONDIZIONE, che vuol dire
+    # un'altra cosa.
+    prova("il verde non entra nella scheda", False, "pill-trust" in _sb)
+    prova("...ne' in «Altri oggetti»", False, "pill-trust" in _ao)
+    _in = pezzo_js(mini, "function aggiornaInvitoSconto(tot){")
+    prova("...e nel carrello lo portano tutti e due i badge scattati",
+          (True, True),
+          ("pill-trust" in _in, "pill-trust" in _sg))
+    # ...e non e' un colore nuovo: e' la coppia di .trust-note
+    _css = mini[mini.index(".pill.pill-trust{"):]
+    _css = _css[:_css.index("}")]
+    prova("il verde e' quello di casa, non un token nuovo", True,
+          "var(--trust-soft)" in _css and "var(--trust)" in _css)
+    # LA CLAUSOLA D'ONESTA' resta dentro il badge scattato: la barra
+    # qui sotto e' al LORDO di proposito, e senza «nel conto» chi legge
+    # «−15%» aspetterebbe che il totale scenda.
+    prova("il badge scattato dice DOVE si vede lo sconto", True,
+          "nel conto" in _in)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -12342,7 +12536,8 @@ def main():
               prove_ritiro_offerta, prove_fogli_di_casa,
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
-              prove_ordini_fermi, prove_numero_ordine):
+              prove_ordini_fermi, prove_numero_ordine,
+              prove_promesse_badge):
         try:
             f()
         except Exception as e:
