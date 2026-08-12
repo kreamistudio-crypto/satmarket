@@ -3781,8 +3781,8 @@ document.getElementById('cartello')?.remove();</script>
       <!-- La spedizione gratis sopra soglia (ago 2026): la seconda
            promessa di negozio, sorella dello sconto qui sopra e
            indipendente da lui — le due guardano lo stesso numero
-           senza vedersi. A differenza dello sconto vale anche su un
-           oggetto solo. Le soglie proposte arrivano da /api/me.
+           senza vedersi — e dall'ago 2026 con lo stesso perimetro:
+           il mono sconta. Le soglie proposte arrivano da /api/me.
            In DEMO il cassetto sparisce, il patto del wallet. -->
       <div class="acc" id="accSpedGratis">
         <button class="acc-h" onclick="toggleAcc('accSpedGratis')"><span class="em">🚚</span>Spedizione gratis <span class="conta" id="spedGratisConta"></span><span class="fr">▾</span></button>
@@ -4750,7 +4750,7 @@ function mapOrder(o){
     /* lo sconto carrello FOTOGRAFATO (ago 2026): serve perche' le
        righe qui sotto sono LORDE — senza questa cifra il compratore
        farebbe la somma a mano e concluderebbe di essere stato
-       derubato. Sui mono e' sempre 0 e la riga non nasce. */
+       derubato. Dall'ago 2026 anche sui mono: il mono sconta. */
     scontoSats:o.sconto_sats||0, scontoPct:o.sconto_percento||0,
     /* la tariffa di spedizione che il negozio ha offerto (ago 2026):
        qui l'aritmetica quadrerebbe anche senza — spedizione 0 e' tutta
@@ -8648,8 +8648,8 @@ function renderAcquisto(){
   const circa = (p.stima || (stradaSel && stradaSel.stima)) ? '≈ ' : '';
   const conto = contoRighe({/* «Prezzo» e' il LORDO, lo sconto la riga
                                sotto: il ripiego copre il server di
-                               ieri. Sul MONO lo sconto e' sempre 0 e
-                               la riga non nasce mai. */
+                               ieri. Dall'ago 2026 anche sul MONO —
+                               il mono sconta, e la riga nasce da se'. */
                             art: p.articolo_lordo_sats || p.articolo_sats,
                             sped, prot: p.protezione_sats||0,
                             tot, circa, spedLabel: 'Spedizione',
@@ -8981,10 +8981,14 @@ function cifraSoglia(quanto, valuta){
   return `<span class="cifra-soglia">${fmt(quanto)}${unitaSoglia(valuta)}</span>`;
 }
 /* La promessa scritta a parole, e in UN posto solo: due copie
-   divergono al primo ritocco. Dice sempre «nello stesso carrello», ed
-   e' deliberato: a criterio valore «da 25 €» si legge come «da 25 € di
-   spesa», e chi compra UNA cosa cara non sconta mai (il mono non
-   sconta, vedi _righe_ordine).
+   divergono al primo ritocco. «Nello stesso carrello» E' MORTO QUI
+   (ago 2026, il mono sconta — decisione di Andrea che rovescia il 6
+   ago): la promessa vale su ogni acquisto, anche piu' copie dello
+   stesso articolo comprate dalla scheda, e nominare il carrello
+   direbbe a chi compra una cosa in tre copie che lo sconto non e'
+   suo. «Di articoli» a valore e' la stessa parola della spedizione
+   gratis: da quando le due promesse hanno lo stesso perimetro,
+   uniformarle e' la verita' e non piu' una bugia.
    NIENTE «≈» e niente cambioVivo, in NESSUNA delle due valute: la cifra
    e' quella che il venditore ha scritto, non una conversione — ed e'
    per questo che la riga si disegna anche a cambio muto. Il
@@ -8993,28 +8997,23 @@ function cifraSoglia(quanto, valuta){
 function frasePromessaSconto(r){
   if (!r) return '';
   if (r.criterio === 'pezzi')
-    return `<b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi nello stesso
-      carrello`;
+    return `<b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi in su`;
   return `<b>−${r.pct}%</b> da ${cifraSoglia(r.quanto, r.valuta)}`
-    + ` di articoli nello stesso carrello`;
+    + ` di articoli`;
 }
 /* L'ETICHETTA CORTA, cioe' la stessa promessa nel registro del CHIP:
    una frase autoportante, non un complemento che si incastra in
    «Questo negozio fa …». Le due convivono APPOSTA e non si derivano
    l'una dall'altra — sarebbe chirurgia di stringhe su HTML — e a non
    farle divergere sui NUMERI c'e' cifraSoglia, l'unico posto dove una
-   soglia diventa testo.
-   «NEL CARRELLO» RESTA, ed e' la parola portante: a criterio valore
-   «da 25 €» si legge come «da 25 € di spesa», e chi compra UNA cosa
-   cara non sconta mai (il mono non sconta, vedi _righe_ordine). A
-   cedere e' semmai «di articoli», che nella prosa lunga della testata
-   negozio resta intero: qui i pixel sono contati e quella e' la
-   precisione che costa meno perderla. */
+   soglia diventa testo. «Nel carrello» e' uscito anche da qui (ago
+   2026, il mono sconta): la parola che restringeva e' diventata la
+   parola che mente. */
 function etichettaSconto(r){
   if (!r) return '';
   return r.criterio === 'pezzi'
-    ? `🎁 <b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi nel carrello`
-    : `🎁 <b>−${r.pct}%</b> da ${cifraSoglia(r.quanto, r.valuta)} nel carrello`;
+    ? `🎁 <b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi`
+    : `🎁 <b>−${r.pct}%</b> da ${cifraSoglia(r.quanto, r.valuta)} di articoli`;
 }
 /* ---- LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026) ----
    La seconda promessa di negozio, e il suo giudice unico: la soglia
@@ -9044,14 +9043,14 @@ function frasePromessaSpedGratis(r){
 }
 /* L'ETICHETTA CORTA, gemella di etichettaSconto — stesso patto: due
    registri, una cifra sola (cifraSoglia).
-   QUI «DI ARTICOLI» NON SI TOGLIE, ed e' l'asimmetria voluta con lo
-   sconto: questa promessa vale anche su UN oggetto solo, quindi «nel
-   carrello» sarebbe falso, mentre «di articoli» e' proprio la parola
-   che distingue il totale della merce da quello con la spedizione
-   dentro. Accanto al prezzo di un annuncio e' anche l'unica cosa che
-   impedisce di leggere «da 25 €» come una proprieta' di quell'oggetto
-   — l'equivoco per cui questa promessa era stata tenuta fuori dalle
-   pillole (decisione di Andrea, ago 2026: ci rientra, ma nominata). */
+   QUI «DI ARTICOLI» NON SI TOGLIE: e' la parola che distingue il
+   totale della merce da quello con la spedizione dentro, e accanto al
+   prezzo di un annuncio e' anche l'unica cosa che impedisce di
+   leggere «da 25 €» come una proprieta' di quell'oggetto — l'equivoco
+   per cui questa promessa era stata tenuta fuori dalle pillole
+   (decisione di Andrea, ago 2026: ci rientra, ma nominata). Da quando
+   il mono sconta l'asimmetria con lo sconto non esiste piu': anche
+   lui vale su un oggetto solo, e le due etichette parlano uguale. */
 function etichettaSpedGratis(r){
   if (!r) return '';
   return `🚚 Spedizione <b>gratis</b> da `
@@ -10264,18 +10263,24 @@ async function startBuy(){
   const offAcc = offertaAccettataPer(l.id);
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
-  const artS = p ? p.articolo_sats : artStima(l) * qtaScelta,
+  /* «Articolo» dice il LORDO e lo sconto ha la sua riga (ago 2026, il
+     mono sconta): la stima di ripiego resta senza sconto, dichiarato —
+     senza preventivo la regola non si conosce, e i sats veri arrivano
+     comunque dalla risposta qui sotto */
+  const artS = p ? (p.articolo_lordo_sats || p.articolo_sats)
+             : artStima(l) * qtaScelta,
+        scS = p ? (p.sconto_sats||0) : 0,
         spedS = via ? (via.spedizione_sats||0)
               : (sceltaConsegna(l)==='spedizione' ? satsSpedizione(l) : 0),
         protS = p ? (p.protezione_sats||0)
               : Math.floor(artS * protPercento / 100),
-        totS = via ? via.totale_sats : artS + spedS + protS,
+        totS = via ? via.totale_sats : artS - scS + spedS + protS,
         circaS = p ? ((p.stima || (via && via.stima)) ? '≈ ' : '')
                : stimaCirca(l);
   el('payAmount').textContent = circaS + fmt(totS);
   el('payScomposto').innerHTML = contoScomposto(artS, spedS, protS, totS,
                                                 (p && p.quantita) || qtaScelta,
-                                                0,
+                                                scS,
                                                 (via && via.supplemento_sats)||0,
                                                 (via && via.pezzi)||0);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
@@ -10304,9 +10309,10 @@ async function startBuy(){
   currentOrderId = d.ordine_id;
   if (d.prezzo_sats) el('payAmount').textContent = fmt(d.prezzo_sats);
   if (d.prezzo_sats !== undefined)
-    el('payScomposto').innerHTML = contoScomposto(d.articolo_sats||d.prezzo_sats,
+    el('payScomposto').innerHTML = contoScomposto(
+      d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1, 0, d.supplemento_sats||0, d.pezzi||0);
+      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0);
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
@@ -10378,9 +10384,10 @@ function compraSubito(){
   }
   const circaS = (p.stima || via.stima) ? '≈ ' : '';
   el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);
-  el('nwcScomposto').innerHTML = contoScomposto(p.articolo_sats,
+  el('nwcScomposto').innerHTML = contoScomposto(
+    p.articolo_lordo_sats||p.articolo_sats,
     via.spedizione_sats||0, p.protezione_sats||0, via.totale_sats,
-    p.quantita||1, 0, via.supplemento_sats||0, via.pezzi||0);
+    p.quantita||1, p.sconto_sats||0, via.supplemento_sats||0, via.pezzi||0);
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -10410,9 +10417,10 @@ async function confermaCompraSubito(btn){
     currentOrderId = d.ordine_id;
     invoice = d.invoice;
     satsOrdine = d.prezzo_sats || null;   /* per i listini EUR: i sats veri */
-    scompOrdine = d.prezzo_sats ? contoScomposto(d.articolo_sats||d.prezzo_sats,
+    scompOrdine = d.prezzo_sats ? contoScomposto(
+      d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1, 0, d.supplemento_sats||0, d.pezzi||0) : '';
+      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0) : '';
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);
@@ -12142,7 +12150,11 @@ function openOrder(id){
             pannello del ritiro in zona, la rivelazione del codice —,
             e il costo e' ormai l'inciso accanto alla cifra. Qui resta
             il solo conto dei pezzi, che non lo dice nessun altro. */
-        (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${cifraOrdine(o, (o.listing.price-(o.spedSats||0)-(o.protSats||0))/o.qta)}</div>` : ''}
+        /* la divisione a ritroso RIAGGIUNGE lo sconto (ago 2026, il
+           mono sconta): price e' il totale gia' scontato, e l'unitario
+           deve tornare al LORDO del listino — e' la copia n.3 della
+           divisione, in pari con _righe_ordine per il censimento */
+        (o.qta>1 && !o.righe.length) ? `<div class="eur-hint" style="margin-top:-6px">${fmt(o.qta)} pezzi × ${cifraOrdine(o, (o.listing.price-(o.spedSats||0)-(o.protSats||0)+(o.scontoSats||0))/o.qta)}</div>` : ''}
       ${/* IL PUNTO NON SI DICE DUE VOLTE (ago 2026): qui sotto il
             prezzo c'era anche il punto GIA' scelto, che pero' vive
             gia' dov'e' utile — nel campo del compratore, dove finche'
@@ -13363,28 +13375,23 @@ function anteprimaSoglia(quale){
   const u = valuta === 'sats' ? 'sats' : '€';
   const chiedi = valuta === 'sats' ? 'quanti sats' : 'quanti euro';
   if (quale === 'sconto'){
+    /* L'ANTEPRIMA DICE IL PERIMETRO NUOVO (ago 2026, il mono sconta —
+       decisione di Andrea che rovescia il 6 ago): la vecchia chiusa
+       sull'oggetto solo che pagava pieno e' morta qui, perche' e'
+       diventata falsa — un oggetto solo sopra la soglia a valore
+       ADESSO sconta, e tre copie della stessa cosa sono tre pezzi. La
+       riga in grassetto e' quella che il venditore rilegge per
+       controllare di aver capito (la lezione dello stupore sul 14.000
+       resta: cio' che la promessa fa e non fa si dice DENTRO la
+       frase, mai in grigio dopo il bottone), quindi e' lei a dire che
+       vale su ogni acquisto. C'e' la sentinella che la chiusa vecchia
+       non torni, e legge anche i commenti: non citarla qui. */
     if (b.criterio !== 'valore')
-      return `Da ${b.soglia} pezzi in su, −${b.pct}% su tutto il carrello.`;
-    /* A VALORE L'ANTEPRIMA DICE ANCHE COSA NON FA (ago 2026, da uno
-       stupore di Andrea su un articolo da 14.000 con la soglia a
-       10.000). Una soglia espressa in CIFRA si legge «sopra 10.000 e
-       basta», e i tre posti che dicevano «vale solo nel carrello» non
-       bastavano: erano tutti FUORI dalla frase della promessa — in
-       fondo, in grigio, dopo il bottone. Qui invece sta dentro
-       l'anteprima, che e' la riga in GRASSETTO che il venditore
-       rilegge per controllare di aver capito, subito sotto le pillole
-       che ha appena toccato.
-       «in un carrello» dice il requisito DENTRO la frase invece che
-       dopo (e accorcia: sostituisce «in su ... su tutto il
-       carrello»), e «per quanto costi» e' la parola che chiude il
-       ragionamento «si', ma il mio e' da 14.000».
-       SOLO a criterio valore: a pezzi l'equivoco non esiste — «da 3
-       pezzi» non si legge come un articolo — e il cassetto della
-       spedizione gratis non si tocca, che li' sul singolo scatta
-       davvero (vedi _sped_gratis: e' la forma a deciderlo). */
+      return `Da ${b.soglia} pezzi in su, −${b.pct}% — su ogni acquisto,
+        anche più copie dello stesso articolo.`;
     return valore > 0
-      ? `Da ${fmt(valore)} ${u} di articoli in un carrello, −${b.pct}%.
-         Un oggetto solo paga pieno, per quanto costi.`
+      ? `Da ${fmt(valore)} ${u} di articoli, −${b.pct}%. Vale su ogni
+         acquisto, anche un oggetto solo.`
       : `Scrivi da ${chiedi} parte lo sconto.`;
   }
   return valore > 0
@@ -13532,13 +13539,13 @@ function renderScontoPacco(){
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(scontoPaccoLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
     <div class="acq-nota">🎁 <b>${anteprimaSoglia('sconto')}</b> ${aValore
-      ? `La soglia guarda il carrello <b>dopo</b> le tue offerte lampo e
+      ? `La soglia guarda l'acquisto <b>dopo</b> le tue offerte lampo e
          gli accordi: una lampo generosa può farlo scendere sotto.`
       : `Chi ne prende ${b.soglia-1} paga pieno.`}</div>
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-      Vale solo nel <b style="color:var(--ink)">carrello</b>, da due
-      oggetti diversi in su: chi ne prende uno solo paga pieno, per
-      quanto costi.</div>
+      Vale su <b style="color:var(--ink)">ogni acquisto</b> del tuo
+      negozio: nel carrello, dalla scheda, anche più copie dello stesso
+      articolo.</div>
     <button class="btn orange" onclick="setScontoPacco()">
       ${attivo ? '🎁 Aggiorna lo sconto' : '🎁 Attiva lo sconto'}</button>
     ${attivo ? `<button class="btn ghost" onclick="setScontoPacco(true)">Spegni lo sconto</button>` : ''}`;
@@ -13670,8 +13677,8 @@ function renderSpedGratis(){
       tue offerte lampo e gli accordi: una lampo generosa può farlo
       scendere sotto.</div>
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-      A differenza dello sconto sul carrello vale anche su
-      <b style="color:var(--ink)">un oggetto solo</b>, se costa abbastanza.
+      Vale anche su <b style="color:var(--ink)">un oggetto solo</b>,
+      se costa abbastanza — come lo sconto.
       E si somma allo sconto: le due promesse guardano lo stesso numero —
       il prezzo degli articoli prima dello sconto — quindi nessuna delle
       due può spegnere l'altra.</div>
