@@ -5586,9 +5586,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   era l'errore da non fare — oggi è la verità. La decisione 3 invece
   RESTA: la promessa si dice in pubblico negli stessi posti di prima
   (testata negozio e «Altri oggetti»), mai nelle card né nelle pillole
-  del dettaglio, e NIENTE badge nuovo in scheda — il verdetto lo dà il
-  conto della pagina Paga, dove la riga «Sconto carrello» nasce da
-  sola. Restano invariati per scelta: il suggerimento del bot (chiede
+  del dettaglio, e NIENTE badge nuovo in scheda — il verdetto lo dà la
+  pagina Paga, che dal 12 ago 2026 ha anche L'INVITO DELLO SCONTO
+  (chiesto da Andrea: nel carrello c'era, lì no): la stessa forma del
+  carrello — sotto soglia la pillola «🎁 Ancora N pezzi → −X%» (a
+  valore la CIFRA che manca, via `cifraSoglia`, nell'unità della
+  promessa), quando scatta il verde «✅ Sconto −X% nel conto» sopra la
+  riga della cifra, che nel conto nasce da sola. MA COI NUMERI DEL
+  SERVER (`mancano_pezzi`/`mancano_sats`/`mancano_eur`): qui il
+  preventivo c'è, quindi la fascia stretta del cambio che l'invito del
+  carrello dichiara non esiste — e a CAMBIO MUTO la promessa a valore
+  in euro non si applica affatto e la riga lo DICE («…ma adesso non
+  riusciamo a fare il cambio: su questo acquisto lo sconto non si
+  applica»), il pattern della spedizione sospesa lì accanto. Vale su
+  ogni via (lo sconto è sugli articoli); in DEMO le chiavi non
+  arrivano e il blocco tace da solo. Restano invariati per scelta: il
+  suggerimento del bot (chiede
   ancora ≥2 annunci — allargarlo è un'altra decisione), la DEMO
   (asciutta, non simula lo sconto), le ASTE (`crea_ordine_pagato` non
   sconta: il vincitore paga l'esposto) e la barra del carrello al
@@ -6131,9 +6144,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   DUE TESTI che dal 12 ago 2026 parlano UGUALE (il mono sconta, e
   l'asimmetria che qui era «voluta» non esiste più): «nel carrello» è
   morto in tutte e due le famiglie di testi — era la parola che
-  restringeva, è diventata la parola che mente — e a valore dicono
-  entrambe «di articoli», che distingue il totale della merce da
-  quello con la spedizione dentro. C'è la sentinella nei due versi.
+  restringeva, è diventata la parola che mente. E NELLE ETICHETTE dei
+  badge è morto anche «DI ARTICOLI» (12 ago 2026, decisione di
+  Andrea): «🎁 −15% da 25 €» e «🚚 Spedizione gratis da 25 €», la
+  cifra e basta — le etichette vivono SOLO in «Altri oggetti», che
+  parla del NEGOZIO, e lì l'equivoco col prezzo dell'oggetto non
+  esiste. La parola RESTA dove è una parola di MISURA e non un
+  ornamento: le prose lunghe (testata negozio e hint del form Vendi,
+  che stanno accanto a un prezzo vero), le righe della pagina Paga
+  (dove c'è un «Totale da pagare» a un centimetro) e l'anteprima del
+  cassetto — in tutti quei posti distingue la merce dal totale con la
+  spedizione dentro, ed è per questo che non si toglie ovunque per
+  simmetria. C'è la sentinella nei due versi.
   NEL CARRELLO IL CONTO È DEL CLIENT, come già prima: i badge non
   calcolano, RICEVONO il totale che la barra mostra due centimetri più
   sotto, quindi i due non possono divergere. L'imperfezione è quella
@@ -11814,6 +11836,13 @@ journal (i ~5 negozi con la regola accesa), il primo mono scontato
 vero dentro Telegram con la bolt11 confrontata su LNbits, e che la
 ronda TACCIA — se «aritmetica del mono» suona, si guarda l'ordine
 prima della funzione.
+E lo stesso giorno L'INVITO DELLO SCONTO nella pagina Paga (chiesto da
+Andrea appena visto il buco: nel carrello c'era, lì no): la pillola
+«Ancora N → −X%» sotto soglia e il verde «nel conto» quando scatta —
+coi numeri del SERVER, la cifra a valore da `cifraSoglia`, e il cambio
+muto detto invece che taciuto (vedi la voce in Architettura).
+Verificato con 5 sentinelle nuove (2835 verdi) e gli screenshot
+chiaro/scuro sotto e sopra soglia, più il caso a valore.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
