@@ -5587,21 +5587,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   RESTA: la promessa si dice in pubblico negli stessi posti di prima
   (testata negozio e «Altri oggetti»), mai nelle card né nelle pillole
   del dettaglio, e NIENTE badge nuovo in scheda — il verdetto lo dà la
-  pagina Paga, che dal 12 ago 2026 ha anche L'INVITO DELLO SCONTO
-  (chiesto da Andrea: nel carrello c'era, lì no): la stessa forma del
-  carrello — sotto soglia la pillola «🎁 Ancora N pezzi → −X%» (a
-  valore la CIFRA che manca, via `cifraSoglia`, nell'unità della
-  promessa), quando scatta il verde «✅ Sconto −X% nel conto» sopra la
-  riga della cifra, che nel conto nasce da sola. MA COI NUMERI DEL
-  SERVER (`mancano_pezzi`/`mancano_sats`/`mancano_eur`): qui il
-  preventivo c'è, quindi la fascia stretta del cambio che l'invito del
-  carrello dichiara non esiste — e a CAMBIO MUTO la promessa a valore
-  in euro non si applica affatto e la riga lo DICE («…ma adesso non
-  riusciamo a fare il cambio: su questo acquisto lo sconto non si
-  applica»), il pattern della spedizione sospesa lì accanto. Vale su
-  ogni via (lo sconto è sugli articoli); in DEMO le chiavi non
-  arrivano e il blocco tace da solo. Restano invariati per scelta: il
-  suggerimento del bot (chiede
+  pagina Paga, che dal 12 ago 2026 ha L'INVITO DELLE DUE PROMESSE
+  (chiesto da Andrea in due tempi: prima lo sconto — nel carrello
+  c'era, lì no — poi la spedizione, che deve parlargli uguale): la
+  stessa forma del carrello, in UNA fila di pillole AFFIANCATE dove
+  ognuna ha il suo stato — sono indipendenti, quindi una verde e una
+  no è uno stato normale. Sotto soglia «🎁 Ancora N pezzi → −X%» e
+  «🚚 Ancora 12 € → spedizione gratis» (a valore la CIFRA che manca,
+  via `cifraSoglia`, nell'unità della promessa); quando scatta il
+  verde «✅ … nel conto». IL VERDE DELLA SPEDIZIONE CONVIVE con la
+  riga «Spedizione: gratuita» del conto, ed è deciso guardando lo
+  schermo: la riga dice il COSA, il verde dice il PERCHÉ (è la
+  promessa del negozio a essere scattata) — e senza, nello stato
+  misto la coppia si spezzerebbe e la promessa appena guadagnata
+  sembrerebbe evaporata, la lezione dell'invito del carrello. MA COI
+  NUMERI DEL SERVER (`mancano_*`): qui il preventivo c'è, quindi la
+  fascia stretta del cambio che l'invito del carrello dichiara non
+  esiste — e a CAMBIO MUTO la promessa in euro non si applica affatto
+  e resta PROSA che lo dice («…ma adesso non riusciamo a fare il
+  cambio: …»), OGNUNA gated sulla SUA valuta: `promesse_sospese` è un
+  flag combinato, e senza il filtro una spedizione in SATS si sarebbe
+  detta sospesa per colpa di uno sconto in euro — il bug preesistente
+  del ramo spedizione, tolto col riordino. Vale su ogni via lo
+  sconto (è sugli articoli), solo dove si spedisce la spedizione; in
+  DEMO le chiavi non arrivano e il blocco tace da solo. Restano
+  invariati per scelta: il suggerimento del bot (chiede
   ancora ≥2 annunci — allargarlo è un'altra decisione), la DEMO
   (asciutta, non simula lo sconto), le ASTE (`crea_ordine_pagato` non
   sconta: il vincitore paga l'esposto) e la barra del carrello al
@@ -6105,6 +6115,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   caso: **contenuto corto e ATOMICO non va messo sotto un elemento
   sticky** — le card ci passano sotto e va bene, una coppia che si
   legge insieme no.
+  RIMESSA IN DISCUSSIONE E RICONFERMATA MISURANDO (12 ago 2026,
+  decisione di Andrea, che l'aveva chiesta rovesciata — titolo →
+  bottone → badge — e l'ha ritirata davanti ai numeri): il riordino è
+  stato COSTRUITO e provato via CDP su 320/375 × chiaro/scuro, e il
+  difetto torna in tutte e quattro le combinazioni — le pillole vanno
+  su due righe e a metà scroll la 🎁 è interamente sotto il bottone
+  mentre la 🚚 resta visibile, col fotogramma agli atti. La riga
+  scorrevole di lato è stata valutata e scartata da Andrea nello
+  stesso giro: nasconderebbe un badge in un altro modo — di lato
+  invece che sotto — e nessuno scorre lateralmente una fila di due.
+  **Non la si rigira una terza volta senza un meccanismo nuovo**: la
+  gerarchia titolo → azione → perché è stata giudicata valere meno
+  del difetto.
   NEL CARRELLO il badge porta il CONTO VIVO — «🎁 Ancora 2 pezzi →
   −15%», «🚚 Ancora 145 € → spedizione gratis» — e quando la soglia
   scatta diventa la conferma. «NEL CONTO» nel badge dello sconto non è
@@ -11836,13 +11859,22 @@ journal (i ~5 negozi con la regola accesa), il primo mono scontato
 vero dentro Telegram con la bolt11 confrontata su LNbits, e che la
 ronda TACCIA — se «aritmetica del mono» suona, si guarda l'ordine
 prima della funzione.
-E lo stesso giorno L'INVITO DELLO SCONTO nella pagina Paga (chiesto da
-Andrea appena visto il buco: nel carrello c'era, lì no): la pillola
-«Ancora N → −X%» sotto soglia e il verde «nel conto» quando scatta —
-coi numeri del SERVER, la cifra a valore da `cifraSoglia`, e il cambio
-muto detto invece che taciuto (vedi la voce in Architettura).
-Verificato con 5 sentinelle nuove (2835 verdi) e gli screenshot
-chiaro/scuro sotto e sopra soglia, più il caso a valore.
+E lo stesso giorno L'INVITO DELLE DUE PROMESSE nella pagina Paga
+(chiesto da Andrea in due tempi: prima lo sconto — nel carrello c'era,
+lì no — poi la spedizione gratis, che deve parlargli uguale): pillole
+affiancate in una fila, ognuna col suo stato — «Ancora N → …» sotto
+soglia, il verde «nel conto» quando scatta — coi numeri del SERVER, la
+cifra a valore da `cifraSoglia`, il cambio muto detto invece che
+taciuto e gated sulla valuta di OGNUNA (chiuso il bug preesistente del
+flag combinato che sospendeva una spedizione in sats per colpa di uno
+sconto in euro). Il verde della spedizione convive con la riga
+«gratuita» del conto: il perché e il cosa, deciso a schermo. Più i
+badge di «Altri oggetti» a cifra nuda («di articoli» resta dov'è una
+misura), e la posizione dei badge sopra il bottone RICONFERMATA
+MISURANDO dopo un tentativo vero di rovesciarla (il difetto dello
+sticky torna, fotogramma agli atti — vedi la voce). Verificato con 9
+sentinelle nuove (2838 verdi) e gli screenshot 320/375 × chiaro/scuro,
+sotto/sopra soglia e stato misto.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
