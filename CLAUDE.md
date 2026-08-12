@@ -5614,7 +5614,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   detta sospesa per colpa di uno sconto in euro — il bug preesistente
   del ramo spedizione, tolto col riordino. Vale su ogni via lo
   sconto (è sugli articoli), solo dove si spedisce la spedizione; in
-  DEMO le chiavi non arrivano e il blocco tace da solo. Restano
+  DEMO le chiavi non arrivano e il blocco tace da solo.
+  E DALL'AGO 2026 LA 🚚 GUARDA ANCHE LA VIA SCELTA: sulla via
+  «Ritiro in zona» o «Codice online» la pillola della spedizione
+  gratis SPARISCE (e con lei la prosa del cambio muto, stesso if,
+  stessa ragione), mentre la 🎁 dello sconto resta su ogni via e non
+  prende NESSUN gate — c'è la sentinella nei due versi. ROVESCIA la
+  decisione del 12 ago, e il motivo è che è cambiato il DEFAULT:
+  allora il ritiro era il preselezionato-di-fatto e il badge serviva
+  a far cambiare idea a chi non aveva scelto niente; ora che il
+  default è il punto, chi sta su ritiro o codice online ci è
+  arrivato TOCCANDO — e a quel punto un cartello sulla spedizione è
+  rumore. LA CONDIZIONE CHE LEGA LE DUE DECISIONI, ed è quella da
+  ricordare: il gate del 🚚 dipende da quale via è il default — se
+  il default cambia ancora, questo gate va riguardato insieme.
+  Restano
   invariati per scelta: il suggerimento del bot (chiede
   ancora ≥2 annunci — allargarlo è un'altra decisione), la DEMO
   (asciutta, non simula lo sconto), le ASTE (`crea_ordine_pagato` non
@@ -6143,7 +6157,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   lo decide la sola composizione `pillaSg + pillaSc`, e cinque
   sentinelle tengono fila, posizione e le quattro superfici. Chi
   aggiunge una QUINTA superficie con le due promesse la mette in
-  quell'ordine e nel conto delle sentinelle.
+  quell'ordine e nel conto delle sentinelle. (In Paga, dall'ago 2026,
+  sulla via ritiro/digitale la 🚚 può MANCARE per il gate della via —
+  vedi la voce dell'invito: è la pillola che tace, mai la fila
+  rovesciata.)
   NEL CARRELLO il badge porta il CONTO VIVO — «🚚 Ancora 145 € →
   spedizione gratis», «🎁 Ancora 2 pezzi → −15%» — e quando la soglia
   scatta diventa la conferma. «NEL CONTO» nel badge dello sconto non è
@@ -7517,27 +7534,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Andrea: da quel bottone parte la fattura, e il nome lo dice —
   «Acquista» resta sui varchi che PORTANO alla pagina: barra, recinto
   e il riepilogo del pacco).
-  IL DEFAULT DELLA VIA È SPEDIZIONE (12 ago 2026, correzione
-  d'eredità coi numeri): alla nascita della pagina il default era «la
-  prima strada viva», cioè il RITIRO — ma era l'ordine di
-  PRESENTAZIONE delle radio colato nel default, non una decisione:
-  prima della pagina il default era spedizione due volte (le pillole
-  di scelta del recinto e il default legacy del server, «spedizione
-  batte ritiro»), e la pagina l'aveva rovesciato in silenzio.
-  Misurato in produzione: 51 attivi su 82 erano «entrambe» e 35
-  mostravano il badge 🚚 sopra un ritiro preselezionato che nessuno
-  aveva scelto. Il giudice è `viaDefault` — precedenza casa → punto →
-  ritiro → digitale: punto subito dopo casa perché è la gemella di
-  famiglia, e con la tariffa di casa morta per cambio muto la
-  spedizione resta il default; il ripiego sulla prima viva copre lo
-  storico (pseudo-via '') e ogni via futura fuori elenco — coi DUE
-  chiamanti, la pagina vera e il ramo DEMO, così demo e vera non
-  divergono (sentinelle su giudice e chiamanti, torturate). La via
-  già scelta si conserva sui ± come sempre; l'ordine di PRESENTAZIONE
-  delle radio NON cambia, quindi su «entrambe» la selezionata è la
-  SECONDA della lista — guardato a schermo a 320/360/375 nei due
-  temi: la selezione è il riquadro pieno arancio e non si legge come
-  un difetto. LA STRADA SCARTATA, e va tenuta perché torna in mente:
+  IL DEFAULT DELLA VIA È IL PUNTO DI RITIRO (ago 2026, decisione di
+  Andrea che AFFINA il 12 ago — precedenza punto → casa → ritiro →
+  digitale). DUE STRATI DI PERCHÉ, e vanno tenuti tutti e due. Il
+  primo (12 ago, correzione d'eredità coi numeri): alla nascita della
+  pagina il default era «la prima strada viva», cioè il RITIRO —
+  l'ordine di PRESENTAZIONE delle radio colato nel default, non una
+  decisione — e misurato in produzione 51 attivi su 82 erano
+  «entrambe», con 35 badge 🚚 sopra un ritiro preselezionato che
+  nessuno aveva scelto: la SPEDIZIONE batte il ritiro, e resta vero
+  (il punto È spedizione). Il secondo (ago 2026): fra le due
+  spedizioni vince il PUNTO, perché è la via già marcata
+  «Consigliato» — default e consiglio devono dire la stessa cosa,
+  invece di indicare due strade diverse — e la casa espone
+  l'indirizzo, il contrario di ciò per cui esiste la busta di
+  consegna. Con la tariffa PUNTO morta per cambio muto subentra casa:
+  la spedizione resta il default. Il giudice è `viaDefault`, il
+  ripiego sulla prima viva copre lo storico (pseudo-via '') e ogni
+  via futura fuori elenco — coi DUE chiamanti, la pagina vera e il
+  ramo DEMO, così demo e vera non divergono (sentinelle su giudice e
+  chiamanti, torturate). La via già scelta si conserva sui ± come
+  sempre; l'ordine di PRESENTAZIONE delle radio NON cambia, quindi su
+  «entrambe» la selezionata è la TERZA della lista — guardato a
+  schermo a 320/360/375 nei due temi: la selezione è il riquadro
+  pieno arancio e non si legge come un difetto. L'ARGOMENTO-CONTRO,
+  trovato in sola lettura prima di decidere e RISOLTO dal cassetto
+  (vedi il quinto giro del punto, sotto): col campo del punto sempre
+  aperto, punto-default avrebbe trasformato la pagina da «conto da
+  leggere» in «modulo da compilare» — per pagare col default serviva
+  digitare un indirizzo a mano. Il campo chiuso dietro il bottone è
+  ciò che rende il default sostenibile: chi cambia default riguardi
+  anche il cassetto, sono UNA decisione in due pezzi.
+  LA STRADA SCARTATA (12 ago), e va tenuta perché torna in mente:
   «nessuna preselezione con Paga spento finché non scegli». Costava
   un conto senza via che mente (articolo+protezione, il totale di
   nessuna strada), il gate sul ⚡ NWC (senza, `corpoConsegna()` vuoto
@@ -7827,6 +7855,38 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dirlo (la riga onesta) e rendere la scelta correggibile. La riga
   «il punto preciso lo indicherai dopo l'acquisto» è morta col suo
   flusso, e la sentinella in CI è rovesciata: non deve tornare.
+  E DAL QUINTO GIRO IL CAMPO STA DIETRO UN BOTTONE (ago 2026, col
+  punto diventato il DEFAULT della via): il campo a testo libero non
+  sta più aperto in pagina — lo espande «📍 Indica il punto di
+  ritiro», così la pagina apre su un conto da leggere e non su un
+  modulo da compilare, che era l'argomento contro il punto come
+  default. È una RIGA ESPANSA e non un foglio, deliberato: niente
+  registrazione in closeSheet né pila di navigazione, il campo resta
+  adiacente a vie e conto, e il commento VARCO MAPPA resta vero
+  parola per parola (il selettore futuro sostituirà lo stesso
+  contenitore, il contratto — un testo in `acqDati.punto` — non
+  cambia). LO STATO È `acqDati.puntoAperto`, MAI il DOM: il corpo si
+  ridisegna a ogni ±/toggle/cambio via, e uno stato solo-DOM si
+  richiuderebbe sotto le dita (i ± riassegnano con `{...d0}`, il flag
+  sopravvive gratis). TRE STATI del contenitore `#acqPuntoCampo` su
+  via punto: chiuso e vuoto = il bottone; chiuso col punto SCRITTO =
+  la riga compatta «📍 {punto} — Cambia», che lo MOSTRA e riapre il
+  campo PRECOMPILATO — mai ricominciare da capo; aperto = il campo di
+  sempre con label, mappa e hint locker. L'indirizzo lungo nella riga
+  compatta cede LUI coi puntini (figlio flex con `min-width:0`, la
+  lezione del comune in card) e il «Cambia» non si stringe mai:
+  misurato a 320 coi 120 caratteri pieni, zero overflow. LE
+  TRANSIZIONI: la scelta ESPLICITA della radio punto a campo vuoto
+  apre e mette il fuoco (si scrive subito, il focus di sempre), col
+  punto già scritto resta la riga compatta senza tastiera; lasciando
+  la via il cassetto si richiude. E LE DUE GUARDIE di «Paga»/⚡ a
+  punto vuoto APRONO il cassetto PRIMA del fuoco (`apriPuntoAcquisto`,
+  l'apertura vive in un posto solo): mai il fuoco su un campo
+  nascosto — la vecchia forma `focus(); return;` è vietata da una
+  sentinella. All'APERTURA della pagina invece NESSUN fuoco e nessuna
+  tastiera: il default preseleziona il punto ma la digitazione arriva
+  solo quando serve. Il campo DENTRO l'ordine (`puntoRitiroInp`) è
+  una regione separata e non è cambiato di una riga.
   E LA NOTIFICA UNA-TANTUM (`avvisa_spedizioniere_mancante`,
   nell'orologio): ai venditori con annunci attivi che spediscono e
   senza spedizioniere — «da oggi i compratori possono scegliere il
@@ -12019,6 +12079,43 @@ sentinelle nuove (2855 verdi), la raffica da 5 tocchi provata dal
 vivo — vince l'ultima chiesta — e il limite dello stock in silenzio,
 come nella scheda. Vedi «LO STEPPER NELLA PAGINA» nella voce della
 pagina d'acquisto.
+
+Il punto di ritiro diventa il default, e il campo diventa un bottone
+(ago 2026, cambio di rotta di Andrea in due tempi: prima «il default
+è il punto — default e "Consigliato" devono dire la stessa cosa», poi,
+davanti all'argomento-contro trovato in sola lettura PRIMA di toccare
+— col campo sempre aperto la pagina diventava un modulo da compilare —
+il bottone che rende il default sostenibile). Tre pezzi: la precedenza
+di `viaDefault` passa a punto → casa → ritiro → digitale (la
+selezionata su «entrambe» diventa la TERZA della lista); il campo a
+testo libero esce dalla pagina e lo espande «📍 Indica il punto di
+ritiro» — riga espansa e non foglio, stato in `acqDati.puntoAperto`,
+col punto scritto la riga compatta lo mostra col «Cambia» e il campo
+riapre PRECOMPILATO, e le due guardie di «Paga»/⚡ a punto vuoto
+APRONO il cassetto prima del fuoco; e la pillola 🚚 della spedizione
+gratis tace sulla via ritiro/codice online — rovescia il 12 ago, ed è
+legato al default: chi ci sta ci è arrivato toccando, la 🎁 resta su
+ogni via. Il campo dentro l'ordine non cambia di una riga, e il VARCO
+MAPPA resta vero parola per parola. Vedi Architettura: «IL DEFAULT
+DELLA VIA È IL PUNTO DI RITIRO», «E DAL QUINTO GIRO IL CAMPO STA
+DIETRO UN BOTTONE», e il gate nella voce dell'invito delle due
+promesse. Collaudato: 2875 prove verdi (13 nuove, più la sentinella
+della precedenza riscritta), SETTE mutazioni una per riga sorvegliata
+— precedenza rigirata, gate tolto, gate copiato sulla 🎁, apertura
+dopo il toast, esc() tolto dalla riga compatta, flag perso da un
+costruttore, campo non più precompilato — ognuna rossa da sola; e il
+giro dal vivo via CDP sul server locale, 71 verifiche su 320/360/375 ×
+chiaro/scuro: default punto con la radio terza della lista, campo
+chiuso senza autofocus e senza overflow, bottone→campo→riga
+compatta→«Cambia» con l'indirizzo da 120 caratteri che cede coi
+puntini e il «Cambia» in vista anche a 320, «Paga» a vuoto che apre il
+cassetto senza NESSUN POST, gate 🚚 nei quattro stati delle vie, zero
+errori JS e zero ordini nati dal giro. La guardia NWC a punto vuoto è
+coperta dalle sentinelle ma non provata dal vivo (nessun wallet nel
+collaudo), dichiarato. IN PRODUZIONE basta il deploy: nessuna colonna,
+nessuna leva, nessuna rotta — solo client. DA GUARDARE dal vivo dentro
+Telegram: che all'apertura della pagina la tastiera NON si alzi, e il
+primo ordine al punto nato passando dal bottone.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
