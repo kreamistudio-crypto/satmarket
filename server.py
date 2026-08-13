@@ -1506,7 +1506,11 @@ def init_db():
         -- «nel tuo barattolo»: gli annunci messi da parte col 🫙.
         -- CHI ha salvato non esce MAI (i preferiti restano privati);
         -- QUANTI si', anonimo e pubblico dall'ago 2026 — il numero
-        -- accanto al barattolino in vetrina e nel dettaglio.
+        -- accanto al barattolino in vetrina e nel dettaglio, e sui
+        -- PROPRI annunci senza il barattolino (che li' non nasce):
+        -- il conteggio esce per tutte le righe, la soglia da cui
+        -- mostrarlo la sceglie il client (due in pubblico, uno al
+        -- proprietario).
         tg_id INTEGER NOT NULL,
         annuncio_id INTEGER NOT NULL,
         creato INTEGER,

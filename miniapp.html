@@ -1170,6 +1170,20 @@
     text-overflow:ellipsis;white-space:nowrap}
   .card .meta .ico{flex:0 0 auto;display:flex;align-items:center;gap:3px;
     line-height:1}
+  /* Il conteggio dei barattoli sui PROPRI annunci (ago 2026): sta nello
+     slot del comune, a sinistra, e non e' un'aggiunta — e' uno scambio
+     (vedi cardHTML). NON SI STRINGE MAI, ed e' la riga da non
+     ammorbidire: un numero troncato non e' un numero abbreviato, e'
+     un numero SBAGLIATO («🫙 12…» per 128). Se un giorno lo spazio
+     manca davvero, a cedere dev'essere altro — mai la cifra.
+     E non e' toccabile: qui il vetro e' testo, non bottone (il
+     cerchietto di carta e' l'altro registro). La cifra in mono come
+     tutte le cifre di casa, un filo piu' piccola del testo della
+     riga: e' un dato, non il protagonista. */
+  .card .meta .savers{flex:0 0 auto;display:flex;align-items:center;
+    gap:2px;line-height:1;white-space:nowrap;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;font-weight:700}
   /* La spedizione gratuita in card: la 🚚 di sempre con accanto la
      parola «gratis», nel BLU DEL TESTO del badge (--ship-soft-on:
      stessa famiglia, e in card il testo si legge dove un fondo chiaro
@@ -2266,7 +2280,12 @@
      card — perche' il 📦 e' del pacco/spedizione e sta gia' sul
      bottone sotto. STA DOPO .trust-note: a pari specificita' vince
      l'ultima, e prima verrebbe ricoperta dal verde. */
-  .trust-note.nota-punto{background:var(--chip-bg);color:var(--ink)}
+  /* La stessa superficie neutra la porta la riga dei barattoli nella
+     scheda del PROPRIETARIO (saversFrase): non e' fiducia — quella e'
+     il verde dell'escrow — ma un fatto sul suo annuncio. Un selettore
+     solo per due nomi: due regole gemelle sarebbero due valori da
+     tenere in pari. */
+  .trust-note.nota-punto,.trust-note.nota-savers{background:var(--chip-bg);color:var(--ink)}
   /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
@@ -6871,7 +6890,22 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        <div class="meta"><span class="luogo">${luogoTesto(l)}</span>${iconeCard(l)}</div>
+        ${/* SULLA TUA CARD IL POSTO DEL COMUNE LO PRENDE IL CONTEGGIO
+             (ago 2026), e non si aggiunge un terzo elemento: la riga
+             meta e' per CHI COMPRA — «e' vicino a me?» — e il comune
+             sulla propria card l'ha scritto lui, quindi non gli dice
+             niente. Cosi' la riga non guadagna un pixel e non puo'
+             stare peggio di oggi per nessuno.
+             MISURATO prima di sceglierlo: come TERZO elemento, a 320px
+             il comune scendeva a 15px (illeggibile) gia' con due
+             strade, e col caso pieno — tre strade + «gratis» — la riga
+             sforava di 19px fuori dalla card. Le icone restano: sono
+             l'unica cosa di quella riga che al venditore dice ancora
+             qualcosa a colpo d'occhio (ho messo la spedizione su
+             questo?). Sugli annunci altrui saversCard torna vuoto e la
+             riga e' quella di sempre, comune compreso. */''}
+        <div class="meta">${saversCard(l)
+          || `<span class="luogo">${luogoTesto(l)}</span>`}${iconeCard(l)}</div>
       </div>
       </a>${jar}${rif}
     </div>`; };
@@ -10580,7 +10614,14 @@ function openDetail(id){
         </div>
         <span style="color:var(--muted);font-size:20px;font-weight:700">›</span>
       </div>
-      ${mio
+      ${/* LA FRASE STA IN TESTA AL BLOCCO DEL PROPRIETARIO, prima dei
+           tre rami: cosi' la ereditano tutti e tre — normale, asta ed
+           esaurito — e non c'e' un quarto posto da ricordarsi il
+           giorno che i rami diventano quattro.
+           Sull'ESAURITO e' anche l'ordine che racconta meglio: N
+           persone lo vogliono → e' finito → [🔄 Rifornisci]. Il
+           numero arriva PRIMA della ragione, non dopo. */''}
+      ${mio ? saversFrase(l) : ''}${mio
         ? asta ? mioAstaBlocco
         : esa ? bloccoMioEsaurito(l)
         : `<div class="trust-note">🔒 <span>I sats dei tuoi acquirenti restano <b>bloccati nel deposito di garanzia</b> e ti vengono sbloccati solo quando confermano di aver ricevuto l'oggetto.</span></div>
@@ -16485,7 +16526,10 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento?';filter:grayscale(1);opacity:.6':''}">`
           : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span></b>
       </div>
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}</div>
+      ${/* in coda alla meta il conteggio dei barattoli, nudo (saversPunto):
+           qui il venditore i suoi annunci li guarda in fila, ed e' il
+           posto dove quel numero si confronta a colpo d'occhio */''}
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}${saversPunto(l)}</div>
       ${/* le azioni chiudono la card, sotto il prezzo e staccate da
            lui: il posto dove il pollice arriva senza coprire quello
            che sta leggendo */''}
@@ -16693,6 +16737,54 @@ function bottoneRifornisci(l){
    privacy (chi ha salvato non esce da nessuna parte, mai). */
 const SOGLIA_SAVERS = 2;
 const contaSavers = n => (n|0) >= SOGLIA_SAVERS ? (n|0) : 0;
+
+/* ---- LO STESSO NUMERO, VISTO DAL PROPRIETARIO (ago 2026) ----
+   Il barattolino non nasce sui propri annunci (bottoneJar), e col
+   bottone se ne andava anche il conteggio — cioe' proprio il dato che
+   al venditore interessa. Qui il numero torna, SENZA il gesto: si
+   legge quante persone l'hanno messo via, ma nel proprio barattolo
+   non ci si puo' mettere niente.
+   LA SOGLIA E' UNO, e non due: le due ragioni della soglia pubblica
+   qui non valgono — «1» non deve essere una prova sociale (e' un
+   fatto suo) e non si moltiplica per trenta in una griglia di
+   estranei. Lo ZERO non scrive niente: uno «0» su ogni riga e' rumore,
+   e l'assenza lo dice da se'.
+   Guardie ROVESCIATE rispetto a bottoneJar, come in bottoneRifornisci:
+   e' un GIUDICE, e vale ovunque questa card o questa riga capiti di
+   essere disegnata. In DEMO myListings non passa dal server e
+   `barattoli` non c'e': la riga sparisce da sola, senza un ramo. */
+function saversMio(l){
+  if (DEMO || VETRINA || !myTgId || !l || l.sellerId !== myTgId) return 0;
+  return l.barattoli | 0;
+}
+/* Tre rese per lo stesso fatto, il patto di luogoTesto/Punto/Riga —
+   e NESSUNA di loro e' un bottone: il vetro dentro un cerchietto di
+   carta (.card-jar/.jar-btn) E' il registro di cio' che si tocca,
+   la stessa icona come testo nudo in una riga meta e' un fatto, come
+   il « · 📍 Carmagnola (TO)» di luogoPunto. Niente cerchio, niente
+   ombra, niente onclick, niente cursor: un'icona che sembra toccabile
+   e non lo e' sarebbe peggio di niente. */
+function saversPunto(l){                  // coda delle righe elenco
+  const n = saversMio(l);
+  return n ? ` · 🫙 ${fmt(n)}` : '';
+}
+function saversCard(l){                   // il gruppo a destra in card
+  const n = saversMio(l);
+  return n ? `<span class="savers" title="Persone che l'hanno messo `
+    + `nel barattolo">🫙 ${fmt(n)}</span>` : '';
+}
+/* La FRASE INTERA vive nella scheda, dove c'e' posto: e' lei a
+   insegnare cosa vuol dire il numero, sennò il « · 🫙 N» delle righe
+   e delle card resta muto la prima volta che lo si incontra.
+   Neutra e non verde: il verde e' della fiducia (l'escrow), questa e'
+   informazione di servizio — la stessa superficie della nota-punto. */
+function saversFrase(l){
+  const n = saversMio(l);
+  if (!n) return '';
+  return `<div class="trust-note nota-savers">🫙 <span><b>${fmt(n)} `
+    + `${n === 1 ? 'persona' : 'persone'}</b> l'${n === 1 ? 'ha' : 'hanno'}`
+    + ` messo nel barattolo.</span></div>`;
+}
 
 /* La regia unica del riempimento: porta ogni barattolo in pagina al
    livello giusto e aggiorna il conteggio (N/tetto) nell'header del

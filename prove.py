@@ -3717,6 +3717,85 @@ def prove_barattolo():
               visti, sorted(visti))
 
 
+def prove_savers_proprietario():
+    """LO STESSO NUMERO, VISTO DAL PROPRIETARIO (ago 2026): sui propri
+    annunci il barattolino non nasce, e col bottone se ne andava il
+    conteggio — cioe' il dato che al venditore interessa. Le cinque
+    cose che questa famiglia difende, ognuna torturata rompendo il
+    codice:
+    1) la soglia e' UNO (le due ragioni della soglia pubblica qui non
+       valgono) e lo ZERO non scrive niente;
+    2) le guardie sono ROVESCIATE: e' un dato del PROPRIETARIO, e a
+       chiunque altro il giudice risponde zero;
+    3) NESSUNA delle tre rese e' un bottone — un'icona che sembra
+       toccabile e non lo e' e' peggio di niente;
+    4) in card e' uno SCAMBIO col comune e non un'aggiunta (misurato:
+       come terzo elemento, a 320px la riga sforava fuori dalla card);
+    5) il numero NON SI STRINGE MAI: un numero troncato non e' un
+       numero abbreviato, e' un numero sbagliato."""
+    print("\n[il conteggio visto dal proprietario]")
+    src = open("miniapp.html", encoding="utf-8").read()
+
+    def fun(nome):
+        i = src.index(f"function {nome}(")
+        return src[i:src.index("\n}", i)]
+
+    g = fun("saversMio")
+    prova("il giudice risponde zero a chi non e' il proprietario", True,
+          "l.sellerId !== myTgId" in g)
+    prova("...e in DEMO e in vetrina non risponde affatto", True,
+          "DEMO || VETRINA || !myTgId" in g)
+    prova("la soglia del proprietario NON e' quella pubblica", True,
+          "contaSavers" not in g and "SOGLIA_SAVERS" not in g)
+    # lo zero non scrive niente: tutte e tre le rese sono gated su `n`
+    for nome in ("saversPunto", "saversCard", "saversFrase"):
+        c = fun(nome)
+        prova(f"{nome}: lo zero non scrive niente", True,
+              "n ?" in c or "if (!n) return ''" in c)
+        prova(f"{nome}: non e' un bottone", [],
+              [s for s in ("onclick", "<button", "cursor:pointer")
+               if s in c])
+    # la frase e' l'unica che insegna cosa vuol dire il numero
+    f = fun("saversFrase")
+    prova("la frase nomina il barattolo", True,
+          "messo nel barattolo" in f)
+    prova("...e concorda al singolare con una persona sola", True,
+          "'persona' : 'persone'" in f and "'ha' : 'hanno'" in f)
+    prova("...e veste la superficie NEUTRA, non il verde della fiducia",
+          True, "trust-note nota-savers" in f)
+
+    # IN CARD E' UNO SCAMBIO: o il conteggio o il comune, mai i due
+    i = src.find('<div class="meta">')
+    riga = src[i:i + 200] if i >= 0 else ""
+    prova("in card il conteggio prende il POSTO del comune", True,
+          '${saversCard(l)\n          || `<span class="luogo">' in riga)
+    prova("...e la riga meta resta a due figli", 1,
+          riga.count('class="luogo"'))
+    # il numero non si stringe: se un giorno lo spazio manca davvero,
+    # a cedere dev'essere altro — mai la cifra
+    i = src.index(".card .meta .savers{")
+    css = src[i:src.index("}", i)]
+    prova("il numero non si stringe mai", True, "flex:0 0 auto" in css)
+    prova("...e non va a capo dentro la sua scatola", True,
+          "white-space:nowrap" in css)
+
+    # la riga di «I tuoi annunci» e la scheda del proprietario
+    prova("«I tuoi annunci» porta il conteggio in coda alla meta", True,
+          "${luogoPunto(l)}${saversPunto(l)}</div>" in src)
+    prova("la frase sta in testa al blocco del proprietario, fuori dai "
+          "tre rami", True, "${mio ? saversFrase(l) : ''}${mio" in src)
+    prova("...e si chiama una volta sola (la ereditano tutti e tre)", 1,
+          src.count("saversFrase(l)") - src.count("function saversFrase(l)"))
+
+    # LA REGRESSIONE DEL CANTIERE: il commento CSS scritto con «\\*»
+    # invece di «/*» non apre niente, e il parser si mangia la regola
+    # che segue — qui si e' portato via .nota-punto, che esisteva da
+    # prima. Il selettore le veste tutte e due.
+    i = src.index(".trust-note.nota-punto")
+    prova("la superficie neutra veste il punto E il conteggio", True,
+          ".trust-note.nota-punto,.trust-note.nota-savers{" in src[i - 40:i + 90])
+
+
 def prove_ferie():
     """IL NEGOZIO IN FERIE (ago 2026): si guarda, non si compra.
     Le due cose che questa famiglia difende: il gate e' in LETTURA
@@ -13964,6 +14043,41 @@ def prove_sintassi_client():
     prova("ogni <script> del client passa il parse di node", [], rotti)
     r = _sp.run([node, "--check", "sw.js"], capture_output=True, text=True)
     prova("...e sw.js pure", 0, r.returncode)
+    prove_commenti_css(mini)
+
+
+def prove_commenti_css(mini=None):
+    """IL GEMELLO CSS DEL PARSE (ago 2026, da un guasto vero fatto
+    scrivendo il conteggio dei barattoli): un commento aperto con
+    «\\*» invece di «/*» non apre niente, e il parser si mangia IN
+    SILENZIO la regola che segue — quella volta si e' portato via
+    anche `.nota-punto`, che esisteva da prima e non c'entrava niente.
+    Nessuna prova sulla forma se ne accorge: il selettore c'e', il
+    valore e' giusto, semplicemente non lo applica nessuno. Lo si vede
+    solo a schermo, o da qui.
+    Si contano le aperture e le chiusure: un `*/` che non chiude
+    niente e' la firma esatta di quell'errore."""
+    if mini is None:
+        mini = open("miniapp.html", encoding="utf-8").read()
+    import re as _re
+    blocchi = _re.findall(r"<style[^>]*>(.*?)</style>", mini, _re.S)
+    prova("il client ha il suo blocco di stile", True, len(blocchi) >= 1)
+    orfani, aperti = [], 0
+    for css in blocchi:
+        i, dentro = 0, False
+        while i < len(css) - 1:
+            if not dentro and css[i:i + 2] == "/*":
+                dentro = True; i += 2; continue
+            if css[i:i + 2] == "*/":
+                if not dentro:
+                    orfani.append(css[max(0, i - 60):i + 2].splitlines()[-1])
+                dentro = False; i += 2; continue
+            i += 1
+        if dentro:
+            aperti += 1
+    prova("nessun «*/» che non chiude niente (il commento aperto male "
+          "si mangia la regola dopo)", [], orfani)
+    prova("...e nessun commento resta aperto in fondo al foglio", 0, aperti)
 
 
 def main():
@@ -13984,6 +14098,7 @@ def main():
               prove_lista_ordini, prove_dettaglio_ordine,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
+              prove_savers_proprietario,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
               prove_ferie, prove_stock_raccontato,

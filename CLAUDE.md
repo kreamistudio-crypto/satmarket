@@ -9638,11 +9638,74 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   decide il CLIENT (`SOGLIA_SAVERS`, da 2 in su): il server dice
   sempre la verità, la soglia è una scelta di lettura e non di
   privacy — un «1» non è una prova sociale, è un numero che occupa
-  spazio, e in griglia si moltiplica per trenta. IMPERFEZIONE
-  DICHIARATA: il contatore vive attaccato al barattolino, quindi sui
-  PROPRI annunci non compare (lì l'icona non c'è) — al venditore lo
-  racconta già «ha fatto colpo»; per mostrarglielo servirebbe un
-  secondo posto dove disegnare quel numero.
+  spazio, e in griglia si moltiplica per trenta.
+  E IL PROPRIETARIO LO VEDE SENZA IL GESTO (ago 2026, e questa voce
+  CHIUDE l'imperfezione che stava qui — «il contatore vive attaccato
+  al barattolino, quindi sui propri annunci non compare»): il numero
+  torna, il bottone no. Giudice `saversMio(l)` con le guardie
+  ROVESCIATE di `bottoneJar` (il pattern di `bottoneRifornisci`: è un
+  GIUDICE, e vale ovunque quella card o quella riga capiti di essere
+  disegnata) e TRE RESE, il patto di luogoTesto/Punto/Riga —
+  `saversPunto` (la coda « · 🫙 N» delle righe elenco), `saversCard`
+  (il gruppo in card) e `saversFrase` (la frase intera nella scheda).
+  IL DATO NON COSTA NIENTE: `arricchisci_righe_vetrina` conta su
+  TUTTE le righe senza guardare il venditore, e ci passano anche
+  `/api/listings/miei` e `/api/listings/{id}` — era già in mano al
+  client, mancava solo un posto dove disegnarlo. Zero query, zero
+  campi, zero server: il cantiere è solo client.
+  LA SOGLIA È UNO, e non è una svista: le due ragioni della soglia
+  pubblica qui non valgono — «1» non deve essere una prova sociale
+  (è un fatto suo) e non si moltiplica per trenta in una griglia di
+  estranei. Lo ZERO non scrive niente, che uno «0» su ogni riga è
+  rumore e l'assenza lo dice da sé.
+  NESSUNA DELLE TRE RESE È UN BOTTONE, ed è la riga da non
+  ammorbidire: il vetro dentro un cerchietto di carta
+  (`.card-jar`/`.jar-btn`) È il registro di ciò che si tocca, la
+  stessa icona come testo nudo in una riga meta è un fatto — come il
+  « · 📍 Carmagnola (TO)» di `luogoPunto`. Niente cerchio, niente
+  ombra, niente onclick, niente cursor: un'icona che sembra toccabile
+  e non lo è è peggio di niente.
+  IN CARD È UNO SCAMBIO COL COMUNE, NON UN'AGGIUNTA (decisione presa
+  MISURANDO, e il numero è la parte da tenere): come TERZO elemento,
+  a 320px il comune scendeva a 15px — illeggibile — già con due
+  strade, e col caso pieno (tre strade + «gratis») la riga sforava di
+  19px FUORI dalla card. Lo scambio non costa un pixel e non può
+  stare peggio di oggi per nessuno; il perché è che la riga meta è
+  per CHI COMPRA — «è vicino a me?» — e il comune sulla propria card
+  l'ha scritto il venditore. Le ICONE restano: sono l'unica cosa di
+  quella riga che gli dice ancora qualcosa a colpo d'occhio (ho messo
+  la spedizione su questo?). Il comune cede il posto SOLO quando c'è
+  un numero da dire: a zero salvataggi la card è quella di sempre.
+  IL NUMERO NON SI STRINGE MAI (`flex:0 0 auto` + nowrap): un numero
+  troncato non è un numero abbreviato, è un numero SBAGLIATO —
+  «🫙 12…» per 128. Se un giorno lo spazio manca davvero, a cedere
+  dev'essere altro.
+  IMPERFEZIONE DICHIARATA, misurata: nel caso pieno a 320px — tre
+  strade + «gratis» + un conteggio a tre cifre — il gruppo delle
+  icone finisce 1,3px oltre il bordo della card (la riga resta UNA,
+  la pagina non scorre di lato). Guardato a schermo: non si vede. È
+  raro per costruzione (zero annunci su 858 in locale hanno quella
+  combinazione), e la leva se un giorno mordesse è togliere la parola
+  «gratis» sulle sole card proprie, che vale 24px ed è un'altra cosa
+  che il venditore sa già.
+  LA FRASE INTERA vive nella scheda del proprietario e sta IN TESTA
+  al blocco, prima dei tre rami (normale, asta, esaurito): così la
+  ereditano tutti e tre e non c'è un quarto posto da ricordarsi il
+  giorno che i rami diventano quattro. È lei a insegnare cosa vuol
+  dire il numero, sennò il « · 🫙 N» delle righe resta muto la prima
+  volta. Sull'ESAURITO è anche l'ordine che racconta meglio — N
+  persone lo vogliono → è finito → «🔄 Rifornisci» — cioè il numero
+  arriva PRIMA della ragione. Superficie NEUTRA (`nota-savers`, lo
+  stesso selettore di `nota-punto`: un posto solo per due nomi) e non
+  il verde, che è della fiducia.
+  E IL COMMENTO CSS SI APRE CON «/*», che sembra un'ovvietà e ha
+  mangiato una regola in questo stesso cantiere: scritto «\*» non
+  apre niente, il parser salta la regola che segue — qui si è portato
+  via `.nota-punto`, che esisteva da prima e non c'entrava — e
+  NESSUNA prova sulla forma se ne accorge (il selettore c'è, il
+  valore è giusto, non lo applica nessuno). Da qui
+  `prove_commenti_css`, il gemello CSS di `prove_sintassi_client`:
+  ogni `*/` deve chiudere un `/*` vero.
   Frontend: cerchietto `.jar-btn` sulla foto — dall'ago 2026 in BASSO
   A DESTRA e non più in alto accanto al condividi (modello Vinted,
   decisione di Andrea), un filo più grande (40 contro i 34 delle
@@ -12876,6 +12939,31 @@ IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva nuova. DA GUARDARE al primo giro: un negozio con lo sconto
 a VALORE acceso — le sue card sopra soglia cambiano prezzo in vetrina,
 ed è la cosa più visibile del cantiere.
+
+Il conteggio dei barattoli torna al proprietario (ago 2026): sui propri
+annunci il barattolino non nasce, e col bottone se ne andava il numero —
+cioè proprio il dato che al venditore interessa. Adesso c'è in tre
+posti — la riga di «📋 I tuoi annunci», la scheda del proprio annuncio
+(la frase intera, che insegna cosa vuol dire il numero) e la card in
+vetrina — senza il gesto: si legge quante persone l'hanno messo via, ma
+nel proprio barattolo non ci si può mettere niente. Soglia UNO (decisione
+di Andrea: al proprietario «1 persona» è un dato vero) e lo zero non
+scrive niente. IL DATO ERA GIÀ IN MANO AL CLIENT — il server lo conta su
+tutte le righe senza guardare il venditore — quindi zero query, zero
+campi, zero server. In card è uno SCAMBIO col comune e non un'aggiunta,
+e la ragione è misurata: come terzo elemento a 320px la riga sforava di
+19px fuori dalla card. Vedi Architettura, «E IL PROPRIETARIO LO VEDE
+SENZA IL GESTO», per la regola del numero che non si tronca mai e per
+l'imperfezione dichiarata che resta (1,3px oltre il bordo nel caso pieno
+a 320px, zero annunci su 858). Collaudato: 3053 prove verdi (23 nuove) e
+DODICI mutazioni una per riga sorvegliata, ognuna rossa da sola; più il
+giro dal vivo via CDP a 320/360/375 nei due temi, dai due lati (col
+compratore la vetrina è quella di ieri, comune e pastiglia pubblica
+comprese) — ed è lì che è saltato fuori il difetto del cantiere: un
+commento CSS aperto con «\*» invece di «/*» che si era mangiato la
+regola dopo, `.nota-punto` compresa. Da quel guasto è nata
+`prove_commenti_css`. IN PRODUZIONE basta il deploy: nessuna colonna,
+nessuna migrazione, nessuna leva, nessuna rotta.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 E l'ORDINA torna a TRE VOCI (ago 2026, decisione di Andrea): più
