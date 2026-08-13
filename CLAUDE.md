@@ -5685,7 +5685,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   non aspetta, si aggiorna secco al render. In discesa vale il
   simmetrico (da 100 e acceso); chi nasce senza un «da» non corre;
   reduced-motion spegne la transizione dal CSS e i bersagli arrivano
-  comunque. ONESTÀ SULLA VERIFICA, per la seconda volta (la lezione
+  comunque.
+  E LA SCATOLA DELLA MISURA È clientWidth, MAI getBoundingClientRect
+  (13 ago 2026, lo «scattino indietro a ogni tocco» visto dal
+  telefono e trovato CAMPIONANDO i valori di partenza, non deducendo):
+  il % del ::before si risolve sul PADDING BOX della pillola — il
+  containing block di un absolute — mentre il rect porta anche il
+  bordo (3px): ogni cattura usciva fino a ~1% del progresso più
+  bassa del vero — 2-3px ad alto progresso, ridipinti INDIETRO secchi
+  e ri-percorsi in avanti in 350ms, che è esattamente lo scattino —
+  e la scattata reduce dal suo scatto si misurava 99,4 invece di 100
+  e rifaceva una mini-corsa a ogni tocco: il rimbalzo del bordo
+  destro. Con la scatola giusta la cattura a riposo È il valore di
+  prima (misurato: 10,99982 contro 11) e la corsa che non serve non
+  parte. ONESTÀ SULLA VERIFICA, per la seconda volta (la lezione
   della tastiera): in headless le transizioni NON AVANZANO — la
   corsa non si campiona né si fotografa, si prova la STRUTTURA
   (partenze in blocco, niente flush, bersagli a fotogramma reso) e
