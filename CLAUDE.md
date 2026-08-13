@@ -3851,6 +3851,23 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   pixel e le rese scartate stanno nella sezione della spedizione, sotto
   «UN SOLO CHIP COLORATO»: qui basti che a cedere resta il comune, mai
   il gruppo di icone.
+  E LA PAROLA DICE IL FATTO, NON IL PERCHÉ (ago 2026, decisione di
+  Andrea): «🚚 gratis» compare in TUTTI E DUE i casi — gratuità
+  dichiarata dal venditore, o soglia del negozio raggiunta da un pezzo
+  solo — e resta NERA. Chi sfoglia la vetrina vuole sapere se paga la
+  spedizione, non perché: il fatto è lo stesso, quindi si dice allo
+  stesso modo, e il verde resta libero di dire un'altra cosa (lo
+  sconto, vedi «IL VERDE DELLO SCONTO IN CARD»). Nessuna delle due
+  promesse si ripete in due lingue.
+  Da qui `iconeCard` passa dal GIUDICE UNICO `spedGratis(l) ||
+  spedGratisQui(l, 1)` invece del test a mano — che è anche ciò che
+  quel giudice dichiarava di essere «da sempre»: «il giudice unico dei
+  due badge E DELL'ICONA IN CARD», e l'icona non ci passava.
+  ⚠️ EFFETTO COLLATERALE CHE È UNA CORREZIONE: il test di prima non
+  guardava il SUPPLEMENTO per pezzo, quindi un annuncio con base 0 e
+  supplemento pieno («il primo pezzo lo offro io») scriveva «gratis» in
+  card MENTENDO — su due pezzi si paga. Era il difetto che il cantiere
+  del supplemento aveva chiuso sulla scheda e non qui.
   Consegna digitale 💾 (lug 2026, quarta voce di MODALITA_CONSEGNA):
   per buoni regalo, codici, licenze — il PRINCIPIO CARDINE è che il
   contenuto passa DENTRO Barattolo, mai fuori. La modalità è LIBERA
@@ -4796,6 +4813,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   regola di stato deve mai nominare `.unit` — se ne aggiungi una,
   falla finire sul solo `.price`. Verificato su 12 combinazioni
   (3 stati × 2 valute × 2 temi) in vetrina e nel dettaglio.
+  IL VERDE DELLO SCONTO IN CARD (ago 2026, decisione di Andrea):
+  quando un articolo raggiunge DA SOLO la soglia del carrello, il
+  prezzo lo dice — verde col contorno, il calco di lampo e asta:
+  `.card.in-sconto` più `--sconto-prezzo`. È l'unica delle due
+  promesse che prende un colore, e la ragione è che era l'unica SENZA
+  voce in card: la spedizione gratis ce l'ha già, ed è una PAROLA.
+  NIENTE BADGE sulla foto: quello slot è degli stati che ACCADONO
+  (⚡ 🔨 🌴), e qui non è successo niente — è una proprietà del prezzo,
+  quindi la dice il prezzo. E niente cifra: la soglia in card non si
+  nomina mai, la regola già pagata due volte.
+  IL GIUDICE È `scontoQui(l, qta)`, gemello di `spedGratisQui` — stessa
+  forma, stesse decisioni: la cifra è `artStima` (il MIN fra lampo e
+  accordo, il gemello di `_unitario_effettivo`), a cambio muto si tace,
+  in ferie e sull'esaurito nessun verdetto. L'unica differenza che
+  conta è che NON guarda `spedisce(l)`: lo sconto vale su ogni via — è
+  sugli articoli, non sulla strada — e il gate della via lo prende la
+  🚚 e non la 🎁.
+  A CRITERIO PEZZI IN CARD NON SCATTA MAI, e non è un'eccezione da
+  scrivere ma la formula che lo dice da sé: la card vale UN pezzo e il
+  minimo di una soglia a pezzi è 2. Il verde è di fatto delle sole
+  soglie a VALORE — e chi un giorno abbassasse quel minimo se lo
+  ritroverebbe acceso senza toccare niente, che è il verso giusto.
+  PRECEDENZA: il prezzo porta UN colore solo, e questo è l'ultimo della
+  catena (esaurito > ferie > asta > lampo > sconto). Con la lampo non
+  convive per costruzione — quel prezzo è già rosso, e per giunta
+  `artStima` applica la lampo, che può far SCENDERE sotto soglia — e
+  «Ne resta 1» invece CONVIVE: quello è un badge sulla foto, questo il
+  colore del prezzo, due slot diversi.
+  IL TOKEN È FISSO e vive solo lì: sul cartellino, che è di carta
+  chiara nei due temi — vale parola per parola la ragione di
+  `--lampo-tag` e `--asta-tag`, e il tema scuro non lo tocca. La
+  CORNICE invece riusa `--trust-text`, che l'inchiostro dei due temi ce
+  l'ha già: zero token nuovi. Il verde non è una tinta nuova nel
+  vocabolario — è già la lingua della PROMESSA SCATTATA nelle
+  `pill-trust` di Paga e del carrello.
+  GUARDATO A SCHERMO, ed è la coppia da tenere d'occhio: asta e sconto
+  sono i due unici scuri FREDDI del sistema (petrolio ~196°, verde
+  ~151°: 45° di distanza). Ingranditi non si confondono in nessuno dei
+  due temi, e di sera si separano da soli (azzurro contro verde menta);
+  di giorno è la coppia più stretta delle tre, ma l'asta porta comunque
+  il suo badge 🔨 sulla foto, che lo sconto non ha — c'è un secondo
+  segnale che non dipende dal colore. Chi aggiungerà un quarto stato al
+  prezzo lo misuri contro QUESTI due, non contro l'arancio.
+  I colori del prezzo in card restano QUATTRO regole per cinque stati
+  (ferie ed esaurito se ne dividono una), e il numero è un censimento:
+  chi ne aggiunge una lo sente dalla CI.
   L'ASTA PARLA PETROLIO (ago 2026, ritocchi di Andrea: prima blu, poi
   verde-blu scuro tenuto sul lato BLU della famiglia — tinta ~195°,
   col verde della protezione a ~151°: si toccano nel punto più
@@ -6439,6 +6502,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   cassetto — in tutti quei posti distingue la merce dal totale con la
   spedizione dentro, ed è per questo che non si toglie ovunque per
   simmetria. C'è la sentinella nei due versi.
+  L'INVITO CHE NON SI PUÒ ACCETTARE (ago 2026, decisione di Andrea):
+  «🎁 Ancora 2 pezzi → −10%» su un annuncio che ne ha UNO SOLO chiede
+  una cosa che non si può fare. Le due pillole SOTTO soglia della
+  pagina Paga spariscono quando NESSUNA quantità acquistabile arriva
+  alla soglia — un pezzo unico che non ci arriva, 3 disponibili contro
+  5 pezzi, 3 pezzi che sommati restano sotto una soglia a valore.
+  LA PILLOLA SCATTATA NON SI TOCCA, ed è la metà da non ammorbidire:
+  quello è un FATTO, non un invito, quindi con stock 1 sopra soglia il
+  verde resta. C'è una prova che conta la GUARDIA e non la parola —
+  due volte in tutto renderAcquisto, i due inviti e mai i due verdi.
+  IL CONTO È DEL SERVER (`sconto_raggiungibile`,
+  `sped_gratis_raggiungibile` nel preventivo MONO), il patto di
+  `mancano_*`: è esattamente il posto dove vive un off-by-one, e il
+  client riceve.
+  ZERO GIUDICI NUOVI, ed è la parte che ha ridotto il cantiere: la
+  domanda «esiste una quantità che la fa scattare?» si risponde
+  chiamando i due giudici DEL DENARO (`_sconto_pacco`, `_sped_gratis`)
+  al MASSIMO acquistabile. Sono monotoni nella quantità — più pezzi =
+  più articolo = più vicino alla soglia — quindi «il massimo scatta»
+  ⟺ «qualcosa scatta»; un terzo giudice sarebbe il posto da cui un
+  giorno la pagina dice una cosa e la invoice un'altra.
+  IL TETTO È LO STOCK, o l'ACCORDO quando c'è: la quantità di
+  un'offerta accettata è ESATTA e non un tetto (la regola di
+  `stepperAcquista`). E IL CASO «UNA SOLA UNITÀ» ESCE GRATIS dalla
+  formula invece di essere un ramo suo: lì il massimo è la quantità
+  richiesta, quindi raggiungibile ⟺ già scattato — o la pillola è
+  verde, o non c'è.
+  NEL SET LE CHIAVI NON ESCONO, dichiarato: là la composizione può
+  sempre crescere di un altro articolo del negozio, quindi «non
+  raggiungibile» non si può affermare. Il client legge `!== false` e
+  non `&&`: chiave assente = invito come oggi (set, DEMO, server di
+  ieri). La PROSA del cambio muto resta dov'è — senza conversione la
+  raggiungibilità in euro non si sa, e si dice quel che si sa.
+  ATTENZIONE alla riga che legge la quantità pinnata: ha una forma SUA,
+  diversa da quella dei quattro percorsi del conto, perché quella la
+  conta una sentinella che si aspetta QUATTRO chiamanti — un quinto la
+  renderebbe cieca al giorno in cui qualcuno ne togliesse uno vero. E
+  il conteggio guarda il sorgente NUDO, commenti compresi: nel commento
+  la forma non si cita nemmeno a parole (ci si è inciampati scrivendola).
   NEL CARRELLO IL CONTO È DEL CLIENT, come già prima: i badge non
   calcolano, RICEVONO il totale che la barra mostra due centimetri più
   sotto, quindi i due non possono divergere (a calcolare, dal 13 ago,
@@ -12495,6 +12597,41 @@ ne chiede ~264) — e RITIRATA davanti alla misura: due righe a 320 per
 due spazi non le valgono, e uniformare gli altri otto siti di prosa
 della formula costerebbe più di quanto renda. Chi la riproponesse
 rimisuri prima a 320, che è la larghezza dove la via si gioca la riga.
+
+L'invito che non si può accettare, e il verde in vetrina (ago 2026, due
+difetti opposti sulla stessa famiglia di badge). Nella pagina PAGA
+l'invito «Ancora 2 pezzi → −10%» compariva anche su un annuncio che ne
+ha uno solo: adesso la pillola sotto soglia sparisce quando nessuna
+quantità acquistabile arriva alla soglia, e quella SCATTATA non si
+tocca — un fatto non è un invito. In VETRINA il contrario: un articolo
+che da solo fa scattare lo sconto carrello non lo diceva da nessuna
+parte, e adesso il prezzo parla verde col contorno. Le due decisioni di
+Andrea: «🚚 gratis» dice il FATTO in tutti e due i casi (gratuità
+dichiarata o soglia raggiunta) e resta NERA — chi sfoglia vuole sapere
+se paga la spedizione, non perché — e il verde è dello SCONTO e basta,
+l'unica promessa che in card non aveva voce. Vedi Architettura, «IL
+VERDE DELLO SCONTO IN CARD» per la precedenza e la coppia da tenere
+d'occhio, e «L'INVITO CHE NON SI PUÒ ACCETTARE» per la formula che
+risponde con i giudici del denaro invece che con un terzo giudice.
+Collaudato: 2967 prove verdi (30 nuove) e QUATTORDICI mutazioni una per
+riga sorvegliata — ognuna rossa da sola, e la tortura ha smascherato
+una sentinella MIA che non poteva fallire (guardava la riga della
+pillola mentre una guardia di troppo si aggiunge a quella della
+condizione: adesso è un censimento, e conta la FORMA della guardia e
+non la parola, che vive anche nei commenti). Più un collaudo eseguibile
+su DB usa-e-getta col server VERO via TestClient (23 verdi): stock 1
+sotto e sopra soglia, 3 contro 5 pezzi, l'accordo che abbassa il tetto,
+il set che non afferma niente, e la regressione che il conto non si
+sposta di un sat. E il giro visivo via CDP a 320/360/375 nei due temi —
+le quattro card in fila, i tre segni ingranditi, e la pagina Paga dal
+vivo nei tre casi — con zero errori JS.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta, e il client vecchio in cache non vede le
+due chiavi nuove e si comporta come oggi. DA GUARDARE al primo giro: le
+card che il supplemento faceva mentire — quelle con base 0 e
+supplemento pieno perdono il «🚚 gratis», ed è la correzione — e il
+primo annuncio che da solo fa scattare lo sconto, guardato accanto a
+un'asta.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
