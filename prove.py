@@ -11178,13 +11178,44 @@ def prove_seo():
           < testo_mini.index("navMotore();"))
     prova("...e senza un ramo d'errore, se il server non ha iniettato",
           True, "?.remove()" in testo_mini)
-    prova("...e un cartello vuoto non lascia un buco", True,
-          "#cartello:empty" in testo_mini)
+    # E NON SI DIPINGE MAI (ago 2026): il cartello e' il primo contenuto
+    # del corpo, quindi su rete vera e' anche il primo fotogramma —
+    # registrato, 5 giri su 6. La rimozione al parse tiene pulito il DOM
+    # renderizzato, questa riga tiene pulito lo SCHERMO: servono
+    # entrambe, e questa prova ha preso il posto di quella sul
+    # `#cartello:empty`, che il display:none copre a maggior ragione.
+    prova("il cartello non si dipinge mai", True,
+          "#cartello{display:none}" in testo_mini.replace(" ", ""))
     # non deve rubare i nomi di casa: li vedrebbero navPila,
     # l'osservatore del motore, il tour e il conto delle card
     prova("il cartello non si chiama come le cose dell'app", True,
           all(x not in "".join(_re.findall(r'id="cartello"[^>]*', testo_mini))
               for x in ("view", "sheet", "card", "grid")))
+
+    # --- 15bis) E L'AVVIO NON MOSTRA IL SEME DELLA DEMO ------------
+    # `avvia()` chiama renderChips PRIMA del primo fetch: senza la
+    # guardia la fila delle pillole conta il seme finto e mostra per
+    # ~280 ms categorie che in vetrina non esistono.
+    conta_cat = pezzo_js(testo_mini, "function contaCategorie(){", "\n}\n")
+    prova("dal locale si conta solo se i dati sono veri", True,
+          "DEMO || datiVivi" in conta_cat)
+    prova("...e senza conteggi si torna a mani vuote, non col seme",
+          True, "return conta" in conta_cat)
+    # un solo giudice: due copie direbbero due ordini diversi sullo
+    # stesso catalogo (le pillole e le piastrelle di Sfoglia)
+    prova("la conta delle categorie vive in un posto solo", 1,
+          testo_mini.count("function contaCategorie("))
+    # esatto e non «almeno due»: chi ne aggiunge un terzo lo sente
+    # dalla CI e va a rileggere questa voce, che e' il punto
+    prova("...e la chiamano tutti e due i chiamanti", 2,
+          testo_mini.count("contaCategorie();"))
+    for quale, corpo in (("le pillole non se lo ricontano da sole",
+                          pezzo_js(testo_mini, "function renderChips(){",
+                                   "\n}\n")),
+                         ("Sfoglia non se lo riconta da sola",
+                          pezzo_js(testo_mini, "function ordineSfoglia(){",
+                                   "\n}\n"))):
+        prova(f"...e {quale}", None, _re.search(r"listings\.forEach", corpo))
 
     # --- 16) LE PIASTRELLE SONO LINK VERI --------------------------
     sf = pezzo_js(testo_mini, "function renderSfoglia(){", "\n}\n")

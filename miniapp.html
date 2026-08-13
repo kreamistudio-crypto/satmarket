@@ -273,17 +273,29 @@
   .font-brand{font-family:'Baloo 2',sans-serif}
   #app{max-width:520px;margin:0 auto;
     min-height:calc(100vh / var(--fs-zoom,1));padding-bottom:84px}
-  /* IL CARTELLO del server (vedi il markup): vive una frazione di
-     secondo, ma se il server non ha iniettato niente resta vuoto — e un
-     blocco vuoto non deve lasciare un buco ne' un margine spurio.
-     MAI un display:none permanente: sarebbe testo nascosto, che e'
-     un'altra cosa da un pre-render.
-     Nessuna altezza in viewport qui dentro, ed e' voluto: la scala del
-     testo qui sotto non zooma le unita' di viewport, e questo blocco
-     non deve diventare il caso che le sfugge. */
-  #cartello{padding:var(--pad);color:var(--ink)}
-  #cartello:empty{display:none}
-  #cartello img{max-width:100%;height:auto;border-radius:var(--radius)}
+  /* IL CARTELLO del server (vedi il markup) NON SI DIPINGE MAI, e la
+     riga qui sotto diceva il contrario: «mai un display:none
+     permanente, sarebbe testo nascosto». La distinzione, misurata ad
+     ago 2026: quella regola vieta di NASCONDERE del testo a chi
+     guarda, qui si evita di DIPINGERE un nodo che muore 100 ms dopo.
+     Il DOM RENDERIZZATO non cambia di niente — chi esegue JS trova il
+     nodo rimosso esattamente come prima, chi non lo esegue legge
+     l'HTML e del CSS non sa nulla — quindi non c'e' nessuno a cui
+     questa riga nasconda qualcosa.
+     PERCHE' SERVE: il cartello e' il primo contenuto del corpo, e con
+     tutto il CSS in linea nella testa il primo pezzo di corpo che
+     arriva e' anche il primo che si dipinge. Su rete vera il parser si
+     ferma DENTRO il cartello aspettando il pezzo dopo, e in quella
+     pausa il browser disegna — registrato coi fotogrammi: 5 giri su 6
+     a 8 Mbps il primo fotogramma della home era l'elenco puntato dei
+     24 annunci, per ~110 ms, con un'altezza diversa ogni volta (206 →
+     1642 px, dipende da dove cade il pezzo di rete). In locale non si
+     riproduce: il documento arriva tutto insieme e il primo fotogramma
+     ha gia' la griglia piena.
+     La rimozione resta dov'e' — adiacente al marcatore, durante il
+     parse — e questa riga non la sostituisce: la copre nei
+     millisecondi in cui il nodo esiste ancora. */
+  #cartello{display:none}
 
   /* ---------- la misura del testo (ago 2026) ----------
      Una preferenza sola, applicata in UN posto solo: `zoom` sulla
@@ -3320,15 +3332,20 @@
      DEVE restare VUOTO nel file, coi due tag adiacenti: il server
      taglia proprio li', e se ci finisce dentro qualcosa a mano la
      fessura si chiude e la pagina esce intatta invece che mescolata.
-     Sta dentro #app per ereditarne la larghezza, e non usa nessuno dei
-     nomi di casa (.view, .sheet, .card, .grid): li vedrebbero navPila,
-     l'osservatore del motore, il tour e il conto delle card. -->
+     Sta dentro #app e non usa nessuno dei nomi di casa (.view, .sheet,
+     .card, .grid): li vedrebbero navPila, l'osservatore del motore, il
+     tour e il conto delle card.
+     A SCHERMO NON CI ARRIVA MAI: lo tiene fuori il display:none del
+     foglio (vedi #cartello, e li' c'e' il perche' per esteso). -->
 <div id="cartello"></div>
 <script>/* Il cartello ha gia' fatto il suo mestiere: da qui in poi
    comanda l'app. Si toglie DURANTE il parse, adiacente al marcatore e
-   non in fondo al file, o su rete lenta resterebbe a schermo per
-   decine di ms. Niente ramo d'errore: se il server non ha iniettato
-   nulla (la DEMO da file://) non c'e' niente da togliere. */
+   non in fondo al file: cosi' il DOM che chiunque renderizzi e' quello
+   dell'app, non un ibrido. A tenerlo fuori dallo SCHERMO nel frattempo
+   ci pensa il CSS — le due cose non si sostituiscono, e chi togliesse
+   questa riga lascerebbe il cartello nel DOM renderizzato.
+   Niente ramo d'errore: se il server non ha iniettato nulla (la DEMO
+   da file://) non c'e' niente da togliere. */
 document.getElementById('cartello')?.remove();</script>
   <!-- Riempito da avvia(): banner della demo dal browser, oppure la
        barra del collaudo. Dentro Telegram resta nascosto. -->
@@ -6402,13 +6419,30 @@ async function aggiornaVista(){
    categorie con piu' annunci attivi; quelle vuote non compaiono
    proprio ("Tutto" e la ricerca coprono la scoperta). I conteggi
    vengono dai listings caricati, quindi si rifanno a ogni giro. */
-function renderChips(){
-  /* Coi dati vivi contano i numeri GLOBALI del server: la griglia
-     tiene solo le pagine caricate e conterebbe il falso. In demo
-     (o se il server non li ha mandati) si conta dal locale. */
+/* I conteggi per categoria, in un posto solo: li vogliono le pillole e
+   l'ordine delle piastrelle di Sfoglia, e due copie direbbero due
+   ordini diversi sullo stesso catalogo.
+   Coi dati vivi contano i numeri GLOBALI del server: la griglia tiene
+   solo le pagine caricate e conterebbe il falso. Dal locale si conta
+   solo quando `listings` e' roba VERA — in DEMO, o dopo che la prima
+   pagina ha buttato il seme (`datiVivi`), che e' anche il ripiego per
+   un server di ieri che i conteggi non li manda.
+   PRIMA DI ALLORA SI TORNA A MANI VUOTE, ed e' la correzione di ago
+   2026: `avvia()` chiama renderChips PRIMA del primo fetch, quando
+   `listings` e' ancora il seme della DEMO — e per ~280 ms misurati la
+   fila mostrava le categorie degli annunci finti, che poi si
+   riordinavano da sole sotto gli occhi. Un'assenza non e' una bugia:
+   resta «Tutto» (sempre vero) piu' la categoria scelta, che e' la
+   regola del campo che non mente. */
+function contaCategorie(){
   const conta = {};
   if (!DEMO && conteggiServer) Object.assign(conta, conteggiServer);
-  else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
+  else if (DEMO || datiVivi)
+    listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
+  return conta;
+}
+function renderChips(){
+  const conta = contaCategorie();
   const cats = CATS.slice(1).filter(c=>conta[c])
     .sort((a,b)=>conta[b]-conta[a]);   // sort stabile: pari merito in ordine di catalogo
   /* La categoria SCELTA resta in elenco anche a zero annunci, ed e' la
@@ -6536,12 +6570,12 @@ const caldaOk = c => (sfogliaCalde[c]?.complete && sfogliaCalde[c].naturalWidth 
 /* L'ordine delle piastrelle: per numero di annunci, a scendere, col
    catalogo come pareggio (sort STABILE: a pari conteggio l'ordine
    d'ingresso si conserva, e le vuote — tutte a zero — chiudono in
-   ordine di catalogo). La fonte dei conteggi e' la stessa di
-   renderChips. */
+   ordine di catalogo). La fonte dei conteggi e' la stessa delle
+   pillole, ed e' la STESSA FUNZIONE: senza conteggi sono tutti a zero
+   e il sort stabile restituisce da solo l'ordine di catalogo, che e'
+   il ripiego dichiarato qui. */
 function ordineSfoglia(){
-  const conta = {};
-  if (!DEMO && conteggiServer) Object.assign(conta, conteggiServer);
-  else listings.forEach(l => conta[l.cat] = (conta[l.cat]||0)+1);
+  const conta = contaCategorie();
   return CATS.slice(1).sort((a,b)=>(conta[b]||0)-(conta[a]||0));
 }
 /* La griglia si ridisegna SOLO quando la firma dell'ordine cambia —
