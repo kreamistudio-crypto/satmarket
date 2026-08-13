@@ -4649,8 +4649,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   proprietario (chip dalle leve, durate a pillole, anteprima
   barrato→scontato con l'ora di fine; nel dettaglio owner «⚡ Lancia
   un'offerta lampo» che con la lampo viva diventa «annullala» con
-  confirm); filtro «⚡ Solo in offerta» + voce «⚡ In offerta» in
-  Ordina, in DEMO client-side col seme dimostrativo (Cuffie Sony,
+  confirm); filtro «⚡ Offerta a tempo» — la voce di Ordina non c'è
+  più dall'ago 2026: l'ordine per scadenza lo EREDITA il filtro, vedi
+  «L'ORDINA DELLA VETRINA HA TRE VOCI» — in DEMO client-side col seme
+  dimostrativo (Cuffie Sony,
   scadenza calcolata al carico).
   L'ASTA 🔨 (ago 2026, «vendita al miglior offerente»): base + durata
   (1/3/7/14/30 giorni, in collaudo anche minuti), chi vuole comprare PUNTA
@@ -4765,8 +4767,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   solo sats; solo annunci nativi (l'import orario riscrive il
   prezzo); NIENTE NOSTR né promo né match (i loro testi direbbero un
   prezzo a cui non si può comprare — la scoperta è la vetrina col
-  filtro «🔨 All'asta», l'ordinamento «chi scade prima» su
-  idx_annunci_asta, il badge in card col tempo a grana grossa e il
+  filtro «🔨 All'asta», che dall'ago 2026 si porta dietro da solo
+  l'ordinamento «chi scade prima» su idx_annunci_asta (la voce di
+  Ordina non c'è più: l'urgenza la eredita il filtro), il badge in card col tempo a grana grossa e il
   countdown vivo solo nel dettaglio, sul battito unico).
   LA LAMPO PARLA ROSSO DAPPERTUTTO (ago 2026, decisione di Andrea):
   prima il rosso era solo il badge ⚡ e la cornice della card era
@@ -4903,6 +4906,54 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   I colori del prezzo in card restano QUATTRO regole per cinque stati
   (ferie ed esaurito se ne dividono una), e il numero è un censimento:
   chi ne aggiunge una lo sente dalla CI.
+  L'ORDINA DELLA VETRINA HA TRE VOCI (ago 2026, decisione di Andrea):
+  più recenti, prezzo dal più basso, prezzo dal più alto. «⚡ Offerta a
+  tempo» e «🔨 All'asta» sono uscite — quelli sono FILTRI, e ci sono
+  già fra le spunte: la stessa cosa si faceva in due posti, che è un
+  bivio davanti a chi sceglie senza una risposta giusta.
+  MA NON ERANO FILTRI TRAVESTITI, ed è la domanda che è stata fatta
+  prima di toglierle: ordinavano DAVVERO, per `lampo_scadenza ASC` e
+  `asta_scadenza ASC` — chi finisce prima in testa — col keyset che
+  pagina proprio su quella colonna. Il filtro implicito serviva a una
+  ragione tecnica precisa: senza, tutti gli annunci a scadenza 0
+  affollerebbero la testa, perché l'ordine è crescente.
+  QUINDI L'URGENZA LA EREDITA IL FILTRO (decisione di Andrea): spuntata
+  UNA SOLA occasione, la vetrina si ordina da sé per la sua scadenza —
+  che su un'offerta a tempo è precisamente la notizia. Con DUE spunte
+  insieme no, e non è una dimenticanza: lì non esiste una scadenza
+  sola da guardare, e l'ordine di sempre è l'unica risposta onesta.
+  LA SCELTA ESPLICITA VINCE SEMPRE (`ordinaEffettivo`, giudice unico
+  dei tre chiamanti: il parametro al server, il campo-bottone e il
+  ramo DEMO): l'eredità vale solo sul DEFAULT.
+  CONSEGUENZA DICHIARATA: con un'occasione spuntata «Più recenti» non
+  è più raggiungibile — `''` vale sia «non ho scelto» sia «voglio i
+  più recenti», e distinguerli vorrebbe dire un secondo stato per un
+  caso che nessuno ha chiesto.
+  IL CAMPO NON MENTE: mostra l'ordine EFFETTIVO e non il valore del
+  select, con due etichette che si LEGGONO e non si scelgono («⚡ Chi
+  scade prima», «🔨 Chi chiude prima»). È la regola del pannello
+  Filtri, dove la regione scelta resta in elenco anche a zero annunci.
+  DUE DIFETTI TROVATI DAL VIVO e non leggendo, ed è la parte da
+  ricordare: 1) il campo non si ridisegnava al cambio delle SPUNTE —
+  `applicaFiltri`/`azzeraFiltri` non chiamavano `aggiornaPicker`, e
+  quindi diceva «Più recenti» su una vetrina in scadenza; 2) la radice
+  🔨 Aste si faceva SCAVALCARE da una scelta esplicita rimasta in
+  memoria (nel giudice la scelta vince sempre), e la pagina della gara
+  finiva ordinata per prezzo. Adesso `vaiAste` azzera la scelta e
+  EREDITA l'ordine dalla sua spunta, invece di impostarlo a mano: così
+  il campo dice la verità senza un ramo apposta, e la pagina delle
+  aste resta ordinata per chi chiude prima — decisione di Andrea, è
+  una gara e lì il tempo È il criterio.
+  IL SERVER NON CAMBIA DI UNA RIGA: `ORDINAMENTI` tiene le sue cinque
+  voci, e le due per scadenza sono ancora raggiungibili — adesso le
+  chiede il client quando eredita, e un client vecchio in cache
+  continua a mandarle come sempre. Toglierle avrebbe rotto lui, non
+  noi.
+  LO STATO È DI SESSIONE: `ordinaVista` è una variabile JS e non
+  finisce MAI in localStorage (là vivono solo valuta, tema, corpo del
+  testo, hint, cartello test, festa, sessione bunker e wallet NWC).
+  Al deploy la pagina si ricarica e riparte da «Più recenti»: nessuno
+  è rimasto bloccato su una voce che non esiste più.
   I DUE FILTRI DELLE PROMESSE (ago 2026): «🚚 Spedizione gratis» e
   «🎁 In sconto» nel pannello Filtri, e «⚡ In offerta» che diventa
   «⚡ Offerta a tempo» — con due sconti in elenco la parola «offerta»
@@ -12827,6 +12878,19 @@ a VALORE acceso — le sue card sopra soglia cambiano prezzo in vetrina,
 ed è la cosa più visibile del cantiere.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
+E l'ORDINA torna a TRE VOCI (ago 2026, decisione di Andrea): più
+recenti e i due prezzi. «Offerta a tempo» e «All'asta» erano
+ordinamenti VERI — per scadenza, chi finisce prima in testa — ma
+implicavano il filtro, che c'è già fra le spunte: la stessa cosa in due
+posti. L'urgenza non si perde, la EREDITA il filtro quando l'occasione
+spuntata è UNA sola, e il campo dice l'ordine effettivo invece di
+mentire. Il server non cambia di una riga. Due difetti trovati DAL VIVO
+e non leggendo: il campo non si ridisegnava al cambio delle spunte, e
+la radice 🔨 Aste si faceva scavalcare da una scelta esplicita rimasta
+in memoria — la pagina della gara finiva ordinata per prezzo. Otto
+mutazioni su otto rosse, e lo stato dell'ordinamento vive per la
+SESSIONE: al deploy si riparte da «Più recenti», nessuno resta bloccato
+su una voce che non esiste più.
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
