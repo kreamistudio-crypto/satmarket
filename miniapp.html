@@ -3808,7 +3808,7 @@ document.getElementById('cartello')?.remove();</script>
         </select>
         <button type="button" class="campo-scelta" id="sellCondBtn" onclick="apriPicker('sellCond')" aria-haspopup="dialog"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
       <div class="field"><label>Prezzo</label>
-        <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
+        <div class="sats-input"><input id="sellPrice" type="number" inputmode="numeric" placeholder="80 000" oninput="scontoHintFraPoco()"><button type="button" class="suffix" id="sellCur" onclick="toggleSellCur()" title="Scegli la valuta del listino">sats ⇄</button></div>
         <div id="sellCurHint" style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4"></div>
         <!-- La promessa del carrello, DOVE il prezzo si scrive (ago
              2026, chiesto da Andrea): la cifra che il venditore sta
@@ -7421,11 +7421,9 @@ function lampoAttiva(l){
    al server). Senza lampo torna l cosi' com'e'. */
 function conLampo(l){
   if (!lampoAttiva(l)) return l;
-  const k = (100 - l.lampoPct) / 100;
   const s = Object.assign({}, l);
-  s.price = Math.max(1, Math.floor(l.price * k));
-  if (l.priceEur > 0)
-    s.priceEur = Math.max(0.01, Math.round(l.priceEur * k * 100) / 100);
+  s.price = scontaSats(l.price, l.lampoPct);
+  if (l.priceEur > 0) s.priceEur = scontaEur(l.priceEur, l.lampoPct);
   return s;
 }
 /* IL PREZZO COLLO SCONTO CARRELLO GIA' DENTRO (ago 2026, decisione di
@@ -7441,16 +7439,34 @@ function conLampo(l){
    non c'e' nessun totale accanto con cui fare la verifica: e la lampo,
    che sconta da sempre col floor, non ha mai avuto un ramo di
    esattezza. */
+/* IL NETTO DI UNA CIFRA SCONTATA, un posto solo per unita': lo
+   chiedono conLampo, conSconto (che scontano le due facce di un
+   annuncio) e la riga viva del form Vendi. LAMPO E SCONTO CARRELLO
+   ARROTONDANO UGUALE, e fino all'ago 2026 a garantirlo era una
+   sentinella che cercava la STESSA riga nei due corpi: adesso la riga
+   e' una sola e non c'e' piu' niente da tenere in pari — la
+   sentinella ha cambiato lato e chiede che nei due corpi
+   l'aritmetica non ci sia affatto. I due arrotondamenti sono diversi
+   APPOSTA e non sono intercambiabili — i sats sono interi col floor
+   e mai sotto 1, l'euro ha i centesimi — ed e' la ricetta del server
+   (_sconto_pacco, che prende il netto col floor e lascia il sat di
+   dubbio a chi paga). I nomi dicono l'UNITA', la lezione di
+   `nome_pezzo`: chi ne scambia uno se ne accorge leggendo. */
+function scontaSats(v, pct){
+  return Math.max(1, Math.floor(v * ((100 - pct) / 100)));
+}
+function scontaEur(v, pct){
+  const k = (100 - pct) / 100;
+  return Math.max(0.01, Math.round(v * k * 100) / 100);
+}
 function conSconto(l){
   const r = regolaSconto(l.scontoCriterio, l.scontoSoglia,
                          l.scontoValoreSats, l.scontoValoreEur,
                          l.scontoValuta, l.scontoPct);
   if (!r) return l;
-  const k = (100 - r.pct) / 100;
   const s = Object.assign({}, l);
-  s.price = Math.max(1, Math.floor(l.price * k));
-  if (l.priceEur > 0)
-    s.priceEur = Math.max(0.01, Math.round(l.priceEur * k * 100) / 100);
+  s.price = scontaSats(l.price, r.pct);
+  if (l.priceEur > 0) s.priceEur = scontaEur(l.priceEur, r.pct);
   return s;
 }
 /* IL PREZZO CHE LA VETRINA MOSTRA, in un posto solo: lo chiamano la
@@ -8018,11 +8034,23 @@ function scontoQui(l, qta){
                          l.scontoValoreSats, l.scontoValoreEur,
                          l.scontoValuta, l.scontoPct);
   if (!r) return false;
-  const pezzi = Math.max(1, qta || 1);
-  if (r.criterio === 'pezzi') return pezzi >= r.quanto;
-  const serveCambio = r.valuta !== 'sats' || l.valuta === 'eur';
+  return scontoScatta(r, artStima(l), l.valuta, qta);
+}
+/* SCATTA? — il cuore del verdetto, senza l'annuncio attorno: presi la
+   regola, l'articolo in SATS, la valuta del listino e i pezzi, dice
+   si' o no. Vive FUORI da scontoQui perche' i chiamanti sono due e
+   hanno in mano cose diverse: la vetrina ha un annuncio, il form di
+   Vendi ha solo un numero che si sta digitando. Due copie di questa
+   aritmetica direbbero prima o poi due cose diverse sullo stesso
+   prezzo — la riga del form che promette lo sconto e la card che poi
+   non lo mostra e' il difetto piu' brutto possibile, perche' a
+   scoprirlo sarebbe proprio chi ha appena pubblicato. */
+function scontoScatta(r, artSats, valutaListino, pezzi){
+  const n = Math.max(1, pezzi || 1);
+  if (r.criterio === 'pezzi') return n >= r.quanto;
+  const serveCambio = r.valuta !== 'sats' || valutaListino === 'eur';
   if (serveCambio && !cambioVivo) return false;
-  const art = artStima(l) * pezzi;
+  const art = artSats * n;
   const ora = r.valuta === 'sats' ? art : Math.floor(art * eurPerSat);
   return ora >= r.quanto;
 }
@@ -10054,7 +10082,18 @@ function unitaSoglia(valuta){
    e la decima e' quella che un giorno scrive «€» su una soglia in
    sats. Porta anche il nowrap a tutti, gratis. */
 function cifraSoglia(quanto, valuta){
-  return `<span class="cifra-soglia">${fmt(quanto)}${unitaSoglia(valuta)}</span>`;
+  return cifraConUnita(fmt(quanto), valuta);
+}
+/* UN NUMERO E LA SUA UNITA' IN FILA, e questo e' l'unico posto che li
+   mette insieme — ci passano cifraSoglia (le dieci superfici della
+   promessa, che formattano con `fmt` perche' una soglia e' intera) e
+   la riga viva del form Vendi, che invece scrive un PREZZO e in euro
+   ha i centesimi. E' quella la ragione per cui la fessura sta qui e
+   non dentro cifraSoglia: cambiare `fmt` in `fmtEur` la' vorrebbe
+   dire «25,00 €» al posto di «25 €» su tutte e dieci. Il nowrap
+   arriva gratis a chiunque passi di qui. */
+function cifraConUnita(numero, valuta){
+  return `<span class="cifra-soglia">${numero}${unitaSoglia(valuta)}</span>`;
 }
 /* La promessa scritta a parole, e in UN posto solo: due copie
    divergono al primo ritocco. «Nello stesso carrello» E' MORTO QUI
@@ -17681,6 +17720,13 @@ function impostaSellValuta(v){
      riporta il campo alla sua valuta di default */
   spedValuta = v==='eur' ? 'eur' : 'sats';
   aggiornaSpedCampo();
+  /* la riga dello sconto confronta il prezzo con la soglia, e la
+     valuta cambia il confronto: «80 000» in sats e in euro sono due
+     annunci diversi. Immediata e non in differita — un toggle e' un
+     gesto, non digitazione — e ci passano anche i due AZZERAMENTI
+     del form (annullaModifica e il reset dopo la pubblicazione), che
+     chiamano questa con 'sats' a campo gia' svuotato. */
+  aggiornaHintPolitiche();
 }
 /* Sul listino sats il toggle del costo decide la SEMANTICA (deciso
    lug 2026): sats = costo FISSO, qualunque cosa faccia il cambio;
@@ -17805,6 +17851,10 @@ function aggiornaAstaForm(){
     renderAstaDurate();
   }
   aggiornaConsegnaForm();   /* quantita' e costo seguono il toggle */
+  /* e la riga dello sconto, che su un'asta tace: spegnendo il toggle
+     nessuno la riaccenderebbe (accendendolo ci pensa gia'
+     impostaSellValuta, ma solo dal listino in euro) */
+  aggiornaHintPolitiche();
 }
 function renderAstaDurate(){
   const box = el('sellAstaDurate'); if (!box) return;
@@ -17876,8 +17926,77 @@ const asteAccese = () => astaLeve ? !!astaLeve.abilitata
    niente, e chi le ha tutte e due le legge in due punti diversi del
    modulo, mai una sopra l'altra.
    La riga della spedizione vive DENTRO #sellSpedField, quindi si
-   nasconde da sola col suo campo: qui non si guardano le caselle. */
+   nasconde da sola col suo campo: qui non si guardano le caselle.
+   DALL'AGO 2026 QUELLA DELLO SCONTO E' VIVA (chiesto da Andrea, dopo
+   il rovesciamento del mono): diceva che la regola esiste, adesso
+   dice anche quando QUESTO prezzo la fa scattare da solo, con le due
+   cifre. Il caso e' nato col mono che sconta — prima un articolo
+   solo non scattava mai, e la dimenticanza costava poco. */
+const SCONTO_HINT_QUIETE = 400;
+let scontoHintTimer = null;
+/* IL MOMENTO DI QUIETE (chiesto da Andrea): la riga si riscriverebbe
+   a ogni carattere, e digitando «80 000» attraverserebbe la soglia
+   sotto le dita — un lampeggio invece di un avviso. Quindi mentre si
+   digita non si tocca niente e la riga si rifa' quando la tastiera
+   sta ferma. Vale nei DUE versi, o cancellare una cifra per
+   correggersi lampeggerebbe uguale.
+   Le chiamate IMMEDIATE — ingresso nella vista, toggle della valuta,
+   precompilazione della modifica, salvataggio della regola — non
+   aspettano: non sono digitazione. E SPENGONO IL TIMER IN SOSPESO,
+   che e' la riga da non togliere: senza, un render vecchio si
+   riscriverebbe addosso a quello nuovo mezzo secondo dopo. */
+function scontoHintFraPoco(){
+  clearTimeout(scontoHintTimer);
+  scontoHintTimer = setTimeout(aggiornaHintPolitiche, SCONTO_HINT_QUIETE);
+}
+/* Il prezzo del form in SATS, con la ricetta di satsAnnuncio: un
+   listino in euro si converte al cambio vivo, e senza cambio vale 0
+   — cioe' «non lo so», che e' anche il modo in cui la riga tace. Il
+   giudice del carrello ragiona in sats, e passando di qui la riga
+   del form e la card diranno la stessa cosa sullo stesso annuncio:
+   gli stessi due arrotondamenti, nello stesso ordine. */
+function prezzoFormSats(){
+  if (sellValuta === 'eur'){
+    const e = prezzoEurForm();
+    return (e > 0 && cambioVivo) ? Math.round(e / eurPerSat) : 0;
+  }
+  return parseInt(el('sellPrice').value, 10) || 0;
+}
+/* La cifra del listino nella valuta in cui la si sta scrivendo.
+   `unita` falso sulla seconda: in una frase l'unita' si dice una
+   volta sola, e il simbolo sta nel suo <span class="unit"> come
+   ovunque nell'app — l'unita' non prende mai il colore del numero. */
+function cifraForm(v, unita){
+  const n = sellValuta === 'eur' ? fmtEur(v) : fmt(v);
+  return unita ? cifraConUnita(n, sellValuta) : n;
+}
+/* La riga dello sconto nei suoi DUE stati: la REGOLA quando il
+   prezzo non la tocca, il suo EFFETTO quando questo prezzo la fa
+   scattare da solo. Il verdetto e' a QUANTITA' 1 — «questo articolo,
+   DA SOLO» — perche' i pezzi li sceglie chi compra, e la domanda del
+   venditore e' un'altra: «questa cifra basta gia'?».
+   A criterio PEZZI non scatta mai, e non e' un'eccezione scritta ma
+   la formula di scontoScatta che lo dice da se': il minimo di una
+   soglia a pezzi e' 2 e qui i pezzi sono uno. A cambio muto lo stato
+   specifico non compare, ed e' la risposta VERA e non prudenza:
+   senza cambio la promessa il server non la applica affatto. */
+function rigaScontoForm(r){
+  const coda = `Cambia nel Profilo ›
+    <span style="white-space:nowrap">🎁&nbsp;Sconto sul carrello</span>.`;
+  const art = prezzoFormSats();
+  if (art > 0 && scontoScatta(r, art, sellValuta, 1)){
+    const pieno = sellValuta === 'eur' ? prezzoEurForm() : art;
+    const netto = sellValuta === 'eur'
+      ? scontaEur(pieno, r.pct) : scontaSats(pieno, r.pct);
+    return `💡 Con questo prezzo il tuo <b>−${r.pct}%</b> scatta da
+      solo: chi lo compra paga <b>${cifraForm(netto, true)}</b> invece
+      di ${cifraForm(pieno, false)}. ${coda}`;
+  }
+  return `💡 Il tuo negozio fa ${frasePromessaSconto(r)}
+    — anche su questo prezzo. ${coda}`;
+}
 function aggiornaHintPolitiche(){
+  clearTimeout(scontoHintTimer);
   const sc = el('sellScontoHint');
   if (sc) {
     const r = DEMO ? null : regolaSconto(
@@ -17887,10 +18006,17 @@ function aggiornaHintPolitiche(){
       myScontoPacco && myScontoPacco.valoreEur,
       myScontoPacco && myScontoPacco.valuta,
       myScontoPacco && myScontoPacco.percento);
-    sc.style.display = r ? '' : 'none';
-    if (r) sc.innerHTML = `💡 Il tuo negozio fa ${frasePromessaSconto(r)}
-      — anche su questo prezzo. Cambia nel Profilo ›
-      <span style="white-space:nowrap">🎁&nbsp;Sconto sul carrello</span>.`;
+    /* SU UN'ASTA LA RIGA TACE, ed e' cio' che tiene onesto il resto:
+       l'ordine di un'asta nasce da crea_ordine_pagato, che NON
+       sconta — il vincitore paga l'esposto. Senza questa condizione
+       lo stato specifico direbbe «chi lo compra paga X» di una cifra
+       che nessuno paghera' mai, e quello generico prometterebbe uno
+       sconto che su quell'annuncio non esiste. (Il generico lo
+       prometteva gia': un difetto di prima, chiuso qui perche'
+       scriverci dentro delle cifre l'avrebbe reso clamoroso.) */
+    const asta = astaAccesa();
+    sc.style.display = (r && !asta) ? '' : 'none';
+    if (r && !asta) sc.innerHTML = rigaScontoForm(r);
   }
   const sg = el('sellSpedGratisHint');
   if (sg) {

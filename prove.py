@@ -5949,6 +5949,97 @@ def prove_valuta_soglia():
     # si tolgono: quello che racconta il difetto lo nomina apposta)
     prova("...e non scrive piu' l'euro a mano", False,
           "€" in re.sub(r"/\*.*?\*/", "", _hp, flags=re.S))
+
+    # ---- LA RIGA DELLO SCONTO E' VIVA (ago 2026, chiesto da Andrea):
+    # diceva che la regola esiste, adesso dice anche quando QUESTO
+    # prezzo la fa scattare DA SOLO. Il caso e' nato col mono che
+    # sconta: prima un articolo solo non scattava mai.
+    _rs = pezzo_js(mini, "function rigaScontoForm(r){", "\n}")
+    prova("la riga ha un giudice solo", 1,
+          mini.count("function rigaScontoForm("))
+    prova("...e a chiamarla e' aggiornaHintPolitiche", True,
+          "rigaScontoForm(r)" in _hp)
+    # I DUE STATI: la regola quando il prezzo non la tocca, l'EFFETTO
+    # quando la fa scattare. Il generico e' quello di sempre.
+    prova("...e gli stati sono due", (True, True),
+          ("Il tuo negozio fa " in _rs, "scatta da" in _rs))
+    # IL VERDETTO PASSA DAL GIUDICE CONDIVISO, mai un confronto scritto
+    # qui: la riga del form e la card devono dire la stessa cosa sullo
+    # stesso prezzo — promettere lo sconto e poi non mostrarlo e' il
+    # difetto peggiore, perche' a scoprirlo e' chi ha appena pubblicato.
+    prova("il verdetto viene da scontoScatta", True,
+          "scontoScatta(r, art, sellValuta, 1)" in _rs)
+    prova("...e la riga non confronta niente per conto suo", False,
+          ">= r.quanto" in _rs)
+    # A QUANTITA' 1: i pezzi li sceglie chi compra, e la domanda del
+    # venditore e' «questa cifra basta gia'?»
+    prova("...a quantita' UNO, l'articolo da solo", False,
+          "qtaForm(" in _rs)
+    # IL NETTO passa dalle funzioni condivise, mai l'aritmetica a mano
+    prova("il netto lo fanno scontaSats/scontaEur", (True, True),
+          ("scontaEur(pieno, r.pct)" in _rs, "scontaSats(pieno, r.pct)" in _rs))
+    prova("...e la riga non sconta per conto suo", False,
+          "100 -" in _rs.replace("−", ""))
+    # IL PREZZO IN SATS con la ricetta di satsAnnuncio, o la riga del
+    # form e la card convertirebbero diverso lo stesso listino in euro
+    _pf = pezzo_js(mini, "function prezzoFormSats(){", "\n}")
+    prova("il listino in euro si converte come in vetrina", True,
+          "Math.round(e / eurPerSat)" in _pf)
+    prova("...e a cambio muto vale 0, cioe' «non lo so»", True,
+          "(e > 0 && cambioVivo) ?" in _pf)
+    # SU UN'ASTA LA RIGA TACE: l'ordine nasce da crea_ordine_pagato,
+    # che NON sconta. Senza, lo stato specifico direbbe «chi lo compra
+    # paga X» di una cifra che nessuno paghera' mai.
+    prova("su un'asta la riga tace", True,
+          "const asta = astaAccesa();" in _hp
+          and "sc.style.display = (r && !asta) ? '' : 'none';" in _hp)
+    # LE DUE CHIAMATE SI GUARDANO IN CODA e non «da qualche parte nel
+    # corpo»: la tortura ha smascherato la forma debole — un
+    # `if (0) aggiornaHintPolitiche();` messo davanti lasciava la
+    # sentinella verde con la chiamata vera tolta. E' la lezione del
+    # reaper, terza volta: una sentinella si scrive rompendo il codice.
+    prova("...e il toggle dell'asta la rifa', per ultima cosa", True,
+          pezzo_js(mini, "function aggiornaAstaForm(){", "\n}")
+          .rstrip().endswith("\n  aggiornaHintPolitiche();"))
+    # IL MOMENTO DI QUIETE (chiesto da Andrea): digitando «80 000» la
+    # riga attraverserebbe la soglia sotto le dita — un lampeggio
+    # invece di un avviso. Mentre si digita non si tocca niente.
+    prova("il campo prezzo non riscrive la riga a ogni carattere", True,
+          'id="sellPrice"' in mini
+          and 'oninput="scontoHintFraPoco()"' in mini)
+    prova("...e la differita e' una sola", 1,
+          mini.count("function scontoHintFraPoco("))
+    _fp = pezzo_js(mini, "function scontoHintFraPoco(){", "\n}")
+    prova("...e aspetta la quiete invece di riscrivere subito", True,
+          "setTimeout(aggiornaHintPolitiche, SCONTO_HINT_QUIETE)" in _fp)
+    # LA RIGA DA NON TOGLIERE: la chiamata immediata SPEGNE il timer in
+    # sospeso, o un render vecchio si riscriverebbe addosso a quello
+    # nuovo mezzo secondo dopo.
+    prova("...e la chiamata immediata spegne quella in sospeso", True,
+          _hp.split("{", 1)[1].lstrip()
+             .startswith("clearTimeout(scontoHintTimer);"))
+    # IL TOGGLE DELLA VALUTA e' immediato — un gesto, non digitazione —
+    # e da li' passano anche i due AZZERAMENTI del form
+    prova("il toggle della valuta rifa' la riga subito", True,
+          pezzo_js(mini, "function impostaSellValuta(v){", "\n}")
+          .rstrip().endswith("\n  aggiornaHintPolitiche();"))
+    # E IN MODIFICA LA RIGA PARLA UGUALE, che e' il caso in cui serve
+    # di piu': l'annuncio esiste gia' e puo' gia' star scontando. Vale
+    # solo se il prezzo E' GIA' NEL CAMPO quando il ricalcolo parte —
+    # editListing riempie e POI chiama go('vendi'), che e' l'unico
+    # posto da cui la riga si rifa' entrando nella vista.
+    # `rfind` e non `find`: col primo, una seconda scrittura del campo
+    # infilata DOPO il go() lasciava la sentinella verde (l'ha detto la
+    # tortura). Quello che deve valere e' che quando il ricalcolo parte
+    # NESSUNA scrittura del prezzo sia ancora in arrivo.
+    _ed = pezzo_js(mini, "function editListing(id){", "\n}")
+    prova("la modifica precompila il prezzo PRIMA di aprire il form",
+          True,
+          0 < _ed.rfind("el('sellPrice').value")
+            < _ed.find("go('vendi')"))
+    prova("...e entrando in Vendi la riga si rifa'", True,
+          "aggiornaHintPolitiche();"
+          in pezzo_js(mini, "if (view==='vendi') {", "\n  }"))
     # L'UNITA' si scrive in UN posto solo: sette superfici che se la
     # scrivono da se' sono sette posti dove un giorno una dice «€» su
     # una soglia in sats.
@@ -5961,8 +6052,15 @@ def prove_valuta_soglia():
     prova("l'unita' della soglia ha UNA fonte sola", 1,
           mini.count("function unitaSoglia("))
     prova("...e la cifra pure", 1, mini.count("function cifraSoglia("))
-    prova("...e unitaSoglia la chiama solo cifraSoglia", 2,
+    # DALL'AGO 2026 il posto che li mette in fila e' cifraConUnita: la
+    # riga viva del form Vendi scrive un PREZZO, che in euro ha i
+    # centesimi, e non poteva passare da cifraSoglia (che formatta con
+    # `fmt` perche' una soglia e' intera). La fessura si e' spostata di
+    # un gradino, il conto NO: unitaSoglia ha ancora un chiamante solo.
+    prova("...e unitaSoglia la chiama solo cifraConUnita", 2,
           mini.count("unitaSoglia("))
+    prova("...e il posto che mette numero e unita' in fila e' uno", 1,
+          mini.count("function cifraConUnita("))
     # ...e tutte le superfici della promessa passano da li': le due
     # frasi lunghe, le due etichette corte, i due inviti del carrello e
     # i QUATTRO siti della pagina Paga (le due sospese e i due «quanto
@@ -13581,17 +13679,28 @@ def prove_promesse_raggiungibili():
     prova("in ferie, sull'esaurito e in asta nessun verdetto", True,
           "if (inFerie(l) || esaurito(l) || astaE(l)) return false;"
           in _sc)
-    # la cifra e' quella del server (artStima: il MIN fra lampo e
-    # accordo), a cambio muto si tace, al filo esatto scatta
-    prova("la cifra e' quella del server, per i pezzi scelti", True,
-          "artStima(l) * pezzi" in _sc)
-    prova("...senza cambio il verdetto non si da'", True,
-          "if (serveCambio && !cambioVivo) return false;" in _sc)
-    prova("...e al filo esatto la promessa scatta", True,
-          "return ora >= r.quanto;" in _sc)
     # la regola arriva dal giudice unico, mai letta a mano dai campi
     prova("...e la regola la legge regolaSconto", True,
           "regolaSconto(l.scontoCriterio" in _sc)
+    # IL CUORE DEL VERDETTO E' TRASLOCATO (ago 2026, la riga viva del
+    # form Vendi): la cifra e' quella del server, a cambio muto si
+    # tace, al filo esatto scatta — le stesse tre righe di sempre, in
+    # una funzione sola che ora hanno in comune la vetrina (che ha un
+    # annuncio in mano) e il form (che ha solo un numero che si sta
+    # digitando). Due copie direbbero, prima o poi, due cose diverse
+    # sullo stesso prezzo.
+    _ss = pezzo_js(mini, "function scontoScatta(", "\n}")
+    prova("il cuore del verdetto e' uno", 1,
+          mini.count("function scontoScatta("))
+    prova("...e lo chiamano la vetrina e il form", 3,
+          mini.count("scontoScatta("))   # la definizione piu' i due
+    prova("la cifra e' quella del server, per i pezzi scelti", True,
+          "scontoScatta(r, artStima(l), l.valuta, qta)" in _sc
+          and "const art = artSats * n;" in _ss)
+    prova("...senza cambio il verdetto non si da'", True,
+          "if (serveCambio && !cambioVivo) return false;" in _ss)
+    prova("...e al filo esatto la promessa scatta", True,
+          "return ora >= r.quanto;" in _ss)
 
     # ---- 4. IL SEGNO IN CARD: il calco di lampo e asta, e la
     # PRECEDENZA — il prezzo porta UN colore solo, e questo e' l'ultimo
@@ -13694,13 +13803,33 @@ def prove_verde_e_filtri():
     prova("...e lo sconto viene dopo, a quantita' 1", True,
           "return scontoQui(l, 1) ? conSconto(l) : l;" in _pm)
     # la ricetta e' quella del server (_sconto_pacco: netto col FLOOR,
-    # mai sotto 1 sat) ed e' identica a conLampo
+    # mai sotto 1 sat) ed e' identica a conLampo.
+    # LA SENTINELLA HA CAMBIATO LATO (ago 2026, la riga viva del form
+    # Vendi): cercava la STESSA riga di aritmetica nei due corpi —
+    # cioe' certificava che due copie fossero in pari. Adesso la copia
+    # e' UNA (scontaSats/scontaEur, che serve anche il form, dove
+    # sarebbe stata la terza) e la sentinella chiede l'opposto: che
+    # nei due corpi l'aritmetica non ci sia PIU'. Il verso e' piu'
+    # forte — quella di prima passava anche con due copie sbagliate
+    # nello stesso modo.
     _cs = pezzo_js(mini, "function conSconto(l){", "\n}")
     _cl = pezzo_js(mini, "function conLampo(l){", "\n}")
-    for _r in ("s.price = Math.max(1, Math.floor(l.price * k));",
-               "s.priceEur = Math.max(0.01,"):
-        prova("lo sconto e la lampo arrotondano uguale", (True, True),
-              (_r in _cs, _r in _cl))
+    prova("il netto scontato ha un posto solo, per unita'", (1, 1),
+          (mini.count("function scontaSats("),
+           mini.count("function scontaEur(")))
+    for _n, _c in (("conSconto", _cs), ("conLampo", _cl)):
+        prova(f"...e {_n} non se lo calcola per conto suo", (True, False),
+              ("scontaSats(" in _c, "Math.floor(" in _c))
+    # i due arrotondamenti restano DIVERSI: i sats interi col floor e
+    # mai sotto 1, l'euro coi centesimi. Scambiarli e' il modo silenzioso
+    # di sbagliare, e i nomi dicono l'unita' apposta (la lezione di
+    # `nome_pezzo`).
+    _sa = pezzo_js(mini, "function scontaSats(", "\n}")
+    _se = pezzo_js(mini, "function scontaEur(", "\n}")
+    prova("i sats: interi col floor, mai sotto 1", True,
+          "Math.max(1, Math.floor(" in _sa)
+    prova("l'euro: centesimi, mai sotto un centesimo", True,
+          "Math.max(0.01, Math.round(" in _se)
     # la percentuale la legge il GIUDICE, mai il campo nudo: un pct
     # senza soglia non e' una regola
     prova("...e la regola la legge regolaSconto", True,
