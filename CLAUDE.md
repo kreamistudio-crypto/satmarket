@@ -6302,38 +6302,36 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   d'accordo), mentre la gratuità PIENA resta visibile anche in ferie:
   quella è una proprietà dell'annuncio, questo è un verdetto su un
   acquisto.
-  IN «ALTRI OGGETTI» I BADGE STANNO SOPRA IL BOTTONE — «prima il
-  perché, poi l'azione», che è l'ordine che la sezione aveva già con le
-  righe di prosa. CI SI È ARRIVATI DOPO UN GIRO, e il motivo va tenuto
-  perché non si vede leggendo il codice: SOTTO il bottone si
-  SPEZZAVANO. Quel bottone è `position:sticky` col fondo opaco, quindi
-  scorrendo i badge gli passano sotto UNO ALLA VOLTA — a 90px di scroll
-  resta il solo badge della spedizione, cioè un negozio che promette
-  due cose ne mostra una. Una mezza verità è peggio del silenzio, ed è
-  anche il fotogramma su cui si atterra scorrendo piano. Sopra, i due
-  scorrono via INSIEME al titolo di sezione: un normale scroll, niente
-  che venga mangiato da una superficie. LE DUE STRADE SCARTATE,
-  misurate a 375×760 e guardate a schermo: dentro `.altri-azione`
-  (appiccicati anche loro) la coppia non si spezza mai, ma il cartello
-  fisso passa da 84 a 178px — il 23% dello schermo sopra la merce, più
-  gli 86 della barra d'acquisto; e lasciarli sotto non-appiccicati è
-  proprio il difetto qui sopra. LA LEZIONE, che vale oltre questo
-  caso: **contenuto corto e ATOMICO non va messo sotto un elemento
-  sticky** — le card ci passano sotto e va bene, una coppia che si
-  legge insieme no.
-  RIMESSA IN DISCUSSIONE E RICONFERMATA MISURANDO (12 ago 2026,
-  decisione di Andrea, che l'aveva chiesta rovesciata — titolo →
-  bottone → badge — e l'ha ritirata davanti ai numeri): il riordino è
-  stato COSTRUITO e provato via CDP su 320/375 × chiaro/scuro, e il
-  difetto torna in tutte e quattro le combinazioni — le pillole vanno
-  su due righe e a metà scroll la 🎁 è interamente sotto il bottone
-  mentre la 🚚 resta visibile, col fotogramma agli atti. La riga
-  scorrevole di lato è stata valutata e scartata da Andrea nello
-  stesso giro: nasconderebbe un badge in un altro modo — di lato
-  invece che sotto — e nessuno scorre lateralmente una fila di due.
-  **Non la si rigira una terza volta senza un meccanismo nuovo**: la
-  gerarchia titolo → azione → perché è stata giudicata valere meno
-  del difetto.
+  IN «ALTRI OGGETTI» L'ORDINE È TITOLO → BOTTONE → BADGE, COL BLOCCO
+  BOTTONE+BADGE APPICCICATO (13 ago 2026, TERZA rigirata chiesta da
+  Andrea — e stavolta È PASSATA, perché il verbale chiedeva «un
+  meccanismo nuovo» e il meccanismo c'è: la fila a RIGHE PIENE).
+  LA STORIA INTERA, che è il modello di come si rigira una decisione
+  misurata: i badge nacquero SOPRA il bottone perché sotto si
+  SPEZZAVANO — il bottone è `position:sticky` col fondo opaco e li
+  mangiava UNO ALLA VOLTA, a 90px di scroll restava la sola
+  spedizione — e la strada «dentro `.altri-azione`» era stata
+  scartata coi numeri: coi CHIP che vanno a capo il cartello fisso
+  passava da 84 a 178px, il 23%, giudicato troppo. La seconda
+  rigirata (12 ago) fu costruita, rimisurata e RITIRATA da Andrea
+  davanti agli stessi numeri, col verbale «non rigirare una terza
+  volta senza un meccanismo nuovo». Le righe piene SONO il
+  meccanismo: in colonna non vanno mai a capo, e DENTRO il blocco
+  appiccicato la coppia non può spezzarsi per costruzione —
+  RIVERIFICATO a metà scorrimento su 320/360/375: due badge su due,
+  interi, sempre.
+  IL COSTO, MISURATO E DETTO COL NUMERO (la condizione posta da
+  Andrea): il blocco ancorato fa **180px (24%) con due promesse** —
+  DUE px sopra i 178 scartati allora, e la differenza è che stavolta
+  le righe si leggono invece di essere chip accalcati — 135px con
+  una, 84px senza (il valore di ieri, solo bottone); identico alle
+  tre larghezze, perché le righe piene non vanno a capo. Se il
+  numero un giorno non reggesse, le leve oneste sono i respiri del
+  blocco, mai la veste della fila. Col giro è cresciuto il TITOLO
+  della sezione (`.altri-tit`, 13px contro gli 11 del section-label
+  di serie). LA LEZIONE di ieri resta vera dove è nata: **contenuto
+  corto e ATOMICO non va messo sotto un elemento sticky** — dentro,
+  o sopra; sotto viene mangiato un pezzo alla volta.
   L'ORDINE DELLA FILA È UNO SOLO (12 ago 2026, decisione di Andrea):
   🚚 PRIMA della 🎁, ovunque le due promesse compaiano insieme —
   pagina Paga (dove la fila sta anche SOPRA la riga della consegna),
@@ -6367,9 +6365,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   oggetti» vestono `.fila-promesse` — righe a tutta larghezza come in
   Paga: SOLO la veste, niente barra e niente verde, perché lì non c'è
   una soglia da riempire (non è un verdetto sul carrello corrente);
-  il costo dichiarato è che i due stanno sempre uno sotto l'altro, e
-  con tutte e due le promesse il blocco sopra il bottone sticky
-  cresce di una trentina di px.
+  il costo dichiarato è che i due stanno sempre uno sotto l'altro —
+  e dal terzo giro dello stesso 13 ago vivono DENTRO il blocco
+  appiccicato, sotto il bottone: la storia e i numeri stanno nella
+  voce «IN "ALTRI OGGETTI" L'ORDINE È TITOLO → BOTTONE → BADGE».
   DUE FUNZIONI E DUE SCATOLE nel carrello (`aggiornaInvitoSconto` e
   `aggiornaInvitoSpedGratis`, `#paccoSconto` e `#paccoSpedGratis`), e
   non è simmetria per il gusto: le due soglie hanno UNITÀ INDIPENDENTI
