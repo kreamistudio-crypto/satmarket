@@ -13549,6 +13549,7 @@ def prove_verde_e_filtri():
     # a cambio muto il ramo in euro non si scrive proprio
     prova("a cambio muto la soglia in euro non scatta", True,
           "if cambio > 0:" in _sq)
+    _wo0, _wsg0 = pezzo("_where_occasioni"), pezzo("_where_sped_gratis")
     _lista = src[src.index("async def lista_annunci("):
                  src.index("async def pubblica(")]
     # NIENTE LAMPO VIVA nei due filtri: il suo badge occupa lo stesso
@@ -13556,24 +13557,25 @@ def prove_verde_e_filtri():
     # si guarda il CONTENUTO e non il nome: contare `_no_lampo`
     # sopravvive a un `_no_lampo = ""`, cioe' proprio alla mutazione
     # che questa riga esiste per prendere (l'ha detto la tortura).
-    prova("i due filtri saltano le lampo vive", (True, 2),
-          ('_no_lampo = " AND NOT (a.lampo_percento>0'
-           ' AND a.lampo_scadenza>?)"' in _lista,
-           _lista.count("{_no_lampo}")))
+    prova("il ramo dello sconto salta le lampo vive", (True, 1),
+          ("NOT (a.lampo_percento>0" in _wo0
+           and 'AND a.lampo_scadenza>?) AND' in _wo0,
+           _wo0.count("NOT (a.lampo_percento>0")))
     # NIENTE ASTE nei rami che misurano una SOGLIA: li' il prezzo e'
     # una puntata in corso. Due volte — lo sconto e il ramo soglia
     # della spedizione — mentre la gratuita' DICHIARATA resta vera
     # anche su un'asta (trovato dal vivo col filtro nuovo).
-    prova("i rami della soglia saltano le aste", 2,
-          _lista.count("a.asta_base_sats=0"))
+    prova("i rami della soglia saltano le aste", (1, 1),
+          (_wo0.count("a.asta_base_sats=0"),
+           _wsg0.count("a.asta_base_sats=0")))
     # LE LEVE: a sconto spento nessun annuncio ha il badge, quindi il
     # filtro non deve dare niente — mai una vetrina senza il segno che
     # la spunta prometteva. La spedizione gratis DICHIARATA invece non
     # dipende da nessuna promessa e resta.
     prova("a leva spenta il filtro sconto non da' niente", True,
-          'dove += " AND 0"' in _lista)
+          'rami.append("0")' in _wo0)
     prova("...mentre la gratuita' dichiarata resta anche a leva spenta",
-          True, "a.spedizione_extra_eur=0)" in _lista)
+          True, "a.spedizione_extra_eur=0)" in _wsg0)
 
     # ---- 5. LA PROVA CHE CONTA: il predicato SQL e il giudice Python
     # devono dire la STESSA cosa. Il predicato gira su un database
@@ -13590,7 +13592,8 @@ def prove_verde_e_filtri():
     con.row_factory = sqlite3.Row
     con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
                 "venditore_id INT, prezzo_sats INT, prezzo_eur REAL, "
-                "valuta TEXT)")
+                "valuta TEXT, lampo_percento INT DEFAULT 0, "
+                "lampo_scadenza INT DEFAULT 0)")
     con.execute("CREATE TABLE utenti(tg_id INT, ferie_fino INT, "
                 "sped_gratis_soglia INT, sped_gratis_soglia_eur INT, "
                 "sped_gratis_valuta TEXT)")
@@ -13604,10 +13607,11 @@ def prove_verde_e_filtri():
              (14, 2, 50_000, 0.0, "sats"),
              (15, 2, 0, 25.0, "eur"), (16, 2, 0, 24.99, "eur"),
              (17, 3, 90_000, 0.0, "sats")]
-    con.executemany("INSERT INTO annunci VALUES(?,?,?,?,?)", righe)
+    con.executemany("INSERT INTO annunci(id,venditore_id,prezzo_sats,"
+                    "prezzo_eur,valuta) VALUES(?,?,?,?,?)", righe)
     sql, par = amb["_sql_soglia_negozio"](
         "sped_gratis_soglia", "sped_gratis_soglia_eur",
-        "sped_gratis_valuta", CAMBIO, 0)
+        "sped_gratis_valuta", CAMBIO, 1_000_000)
     da_sql = {r["id"] for r in con.execute(
         "SELECT a.id FROM annunci a WHERE" + sql, par)}
     # ...e adesso la stessa domanda in Python, coi giudici veri
@@ -13649,9 +13653,131 @@ def prove_verde_e_filtri():
     # in DEMO rispondono coi GIUDICI del client, gli stessi che
     # disegnano la parola e il badge: demo e vetrina non divergono
     _rg = pezzo_js(mini, "function renderGrid(", "\n}")
+    # in DEMO le occasioni si uniscono come sul server, e la
+    # spedizione gratis resta un filtro a se'
     prova("in DEMO filtrano coi giudici che disegnano", (True, True),
           ("data.filter(l => spedGratis(l) || spedGratisQui(l, 1))" in _rg,
-           "data.filter(l => scontoQui(l, 1))" in _rg))
+           "(filtroSconto && scontoQui(l, 1))" in _rg))
+    prova("...e in DEMO le occasioni si uniscono come sul server", True,
+          "if (filtroLampo || filtroAsta || filtroSconto)" in _rg)
+
+    # ---- 8. LE COMBINAZIONI, TUTTE (ago 2026, bug dal campo: due
+    # spunte insieme e la vetrina restava vuota). UN FILTRO SOLO CHE
+    # FUNZIONA NON GARANTISCE CHE DUE INSIEME FUNZIONINO, ed e'
+    # letteralmente quello che era successo: le prove di ieri
+    # guardavano un filtro alla volta e passavano tutte.
+    # La causa non era aritmetica ma STRUTTURALE — lampo, asta e sconto
+    # sono stati MUTUAMENTE ESCLUSIVI (la precedenza dei badge), quindi
+    # in AND l'intersezione e' vuota PER DEFINIZIONE. Qui si girano le
+    # 16 combinazioni dei quattro filtri sul database gemello, con le
+    # funzioni VERE che compongono la WHERE.
+    amb2 = {}
+    exec(pezzo("_eur_interi"), amb2)
+    exec(pezzo("_sql_articolo_sats"), amb2)
+    exec(pezzo("_sql_soglia_negozio"), amb2)
+    amb2["SCONTO_PACCO_ATTIVO"] = True
+    amb2["SPED_GRATIS_ATTIVO"] = True
+    exec(pezzo("_where_occasioni"), amb2)
+    exec(pezzo("_where_sped_gratis"), amb2)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                "venditore_id INT, prezzo_sats INT, prezzo_eur REAL, "
+                "valuta TEXT, consegna TEXT, spedizione_sats INT, "
+                "spedizione_eur REAL, spedizione_extra_sats INT, "
+                "spedizione_extra_eur REAL, lampo_percento INT, "
+                "lampo_scadenza INT, asta_base_sats INT, asta_scadenza INT)")
+    con.execute("CREATE TABLE utenti(tg_id INT, ferie_fino INT, "
+                "sped_gratis_soglia INT, sped_gratis_soglia_eur INT, "
+                "sped_gratis_valuta TEXT, sconto_pacco_percento INT, "
+                "sconto_pacco_criterio TEXT, sconto_pacco_valore INT, "
+                "sconto_pacco_valore_eur INT, "
+                "sconto_pacco_valore_valuta TEXT)")
+    ORA = 1_000_000
+    con.execute("INSERT INTO utenti VALUES(1,0,45000,0,'sats',"
+                "15,'valore',45000,0,'sats')")
+    # (id, prezzo, sped, lampo%, asta_base) e cosa DEVE avere ognuno:
+    # e' l'atteso scritto a mano, non una seconda copia della regola
+    CASI = [
+        # id, prezzo, sped, lampo, asta,  lampo? asta? sconto? gratis?
+        (1, 10_000, 1500, 0, 0,           False, False, False, False),
+        (2, 60_000, 1500, 0, 0,           False, False, True,  True),
+        (3,  8_000,    0, 0, 0,           False, False, False, True),
+        # la lampo lo porta a 80.000: sopra soglia spedizione, ma il
+        # badge verde non ce l'ha (il rosso vince) — e' il caso del
+        # SECONDO difetto, quello che il filtro saltava
+        (4, 100_000, 1500, 20, 0,         True,  False, False, True),
+        # lampo che scende SOTTO tutte e due le soglie
+        (5, 50_000, 1500, 20, 0,          True,  False, False, False),
+        # un'asta: niente sconto e niente soglia spedizione, mai
+        (6, 90_000, 1500, 0, 90_000,      False, True,  False, False),
+    ]
+    for (i, p, sp, lp, ab, *_r) in CASI:
+        con.execute("INSERT INTO annunci VALUES(?,1,?,0,'sats',"
+                    "'spedizione',?,0,0,0,?,?,?,?)",
+                    (i, p, sp, lp, ORA + 999 if lp else 0, ab,
+                     ORA + 999 if ab else 0))
+    ATT = {c[0]: {"lampo": c[5], "asta": c[6], "sconto": c[7],
+                  "gratis": c[8]} for c in CASI}
+
+    def _chiedi(fl, fa, fs, fg):
+        sql, par = amb2["_where_occasioni"](fl, fa, fs, 55_000.0, ORA)
+        dove, p = "1=1" + sql, list(par)
+        if fg:
+            s2, p2 = amb2["_where_sped_gratis"](55_000.0, ORA)
+            dove += s2
+            p += p2
+        return {r["id"] for r in con.execute(
+            "SELECT a.id FROM annunci a WHERE " + dove, p)}
+
+    guai = []
+    for fl in (0, 1):
+        for fa in (0, 1):
+            for fs in (0, 1):
+                for fg in (0, 1):
+                    occ = [n for n, v in (("lampo", fl), ("asta", fa),
+                                          ("sconto", fs)) if v]
+                    att = {i for i, d in ATT.items()
+                           if (not occ or any(d[n] for n in occ))
+                           and (not fg or d["gratis"])}
+                    avuto = _chiedi(fl, fa, fs, fg)
+                    if avuto != att:
+                        guai.append((fl, fa, fs, fg, sorted(att),
+                                     sorted(avuto)))
+    prova("le 16 combinazioni dei filtri dicono tutte il vero", [], guai)
+    # LA PROVA REGINA DEL GIRO: le coppie che davano il VUOTO. Se
+    # qualcuno rimette l'AND fra le occasioni, queste tre righe cadono
+    # insieme — ed e' l'unico modo di accorgersene, perche' una vetrina
+    # vuota non e' un errore: e' una vetrina vuota.
+    prova("lampo + sconto non e' piu' il vuoto", {2, 4, 5},
+          _chiedi(1, 0, 1, 0))
+    prova("asta + sconto non e' piu' il vuoto", {2, 6}, _chiedi(0, 1, 1, 0))
+    prova("lampo + asta non e' piu' il vuoto", {4, 5, 6},
+          _chiedi(1, 1, 0, 0))
+    # ...e la spedizione gratis resta un'INTERSEZIONE, non si unisce:
+    # e' un asse ortogonale, e chi la spunta vuole l'incrocio
+    prova("la spedizione gratis incrocia, non unisce", {2},
+          _chiedi(0, 0, 1, 1))
+    # IL SECONDO DIFETTO, che si vedeva solo riproducendo: una lampo il
+    # cui prezzo SCONTATO supera la soglia ha la parola «gratis» sulla
+    # card, e il filtro la saltava perche' escludeva le lampo.
+    prova("la lampo sopra soglia e' spedizione gratis", True,
+          4 in _chiedi(0, 0, 0, 1))
+    prova("...e quella che scende sotto, no", False,
+          5 in _chiedi(0, 0, 0, 1))
+    con.close()
+    # LA STRUTTURA, perche' il giorno che qualcuno rimette l'AND lo
+    # dica anche una sentinella e non solo i numeri qui sopra
+    _wo = pezzo("_where_occasioni")
+    prova("le occasioni si uniscono in OR", True,
+          ' OR ".join(rami)' in _wo)
+    prova("...e la spedizione gratis non e' fra loro", False,
+          "sped_gratis" in _wo)
+    # e l'ORDINAMENTO resta un vincolo DURO: il keyset pagina su quella
+    # colonna, e un annuncio senza scadenza in mezzo romperebbe la
+    # paginazione, non solo la vista
+    prova("l'ordinamento resta in AND, fuori dall'unione", True,
+          'if ordina in ("lampo", "asta"):' in _lista)
 
     # ---- 7. LE ETICHETTE: «In offerta» non basta piu' a distinguere.
     # e la rinomina vale anche per la VOCE di Ordina, che sta a un
@@ -13661,6 +13787,17 @@ def prove_verde_e_filtri():
           (mini.count("⚡ Offerta a tempo"), "⚡ In offerta" in mini))
     prova("...e accanto ci sono le due nuove", (True, True),
           ("🚚 Spedizione gratis" in mini, "🎁 In sconto" in mini))
+    # E «Spedizione gratis» sta ATTACCATA a «Spedizione» (ago 2026,
+    # decisione di Andrea): sono la stessa famiglia, e un filtro
+    # della spedizione in fondo all'elenco fra le occasioni si
+    # cerca dove non e'. L'ordine del pannello e' contenuto, non
+    # forma: se nessuno lo guarda, il prossimo riordino lo sposta.
+    _pan = mini[mini.index('id="filtroSpedInp"'):
+                mini.index('id="filtroAstaInp"')]
+    _spunte = re.findall(r'id="filtro(\w+?)Inp"', _pan)
+    prova("«Spedizione gratis» sta accanto a «Spedizione»",
+          ["Sped", "SpedGratis", "Ritiro", "Dig", "Lampo", "Sconto"],
+          _spunte)
 
 
 def prove_guardia_is_bot():

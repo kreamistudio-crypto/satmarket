@@ -3400,6 +3400,11 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <div class="filtri-riga">
         <label class="filtro-check">
+          <input type="checkbox" id="filtroSpedGratisInp">
+          🚚 Spedizione gratis</label>
+      </div>
+      <div class="filtri-riga">
+        <label class="filtro-check">
           <input type="checkbox" id="filtroRitiroInp">
           🤝 Ritiro in zona</label>
       </div>
@@ -3407,11 +3412,6 @@ document.getElementById('cartello')?.remove();</script>
         <label class="filtro-check">
           <input type="checkbox" id="filtroDigInp">
           💾 Codice online</label>
-      </div>
-      <div class="filtri-riga">
-        <label class="filtro-check">
-          <input type="checkbox" id="filtroSpedGratisInp">
-          🚚 Spedizione gratis</label>
       </div>
       <!-- «Offerta a tempo» e non piu' «In offerta» (ago 2026,
            decisione di Andrea): da quando accanto c'e' «In sconto», la
@@ -6563,17 +6563,23 @@ function renderGrid(items){
                            && l.condizione===filtroCond);
     if (filtroReg)
       data = data.filter(l => l.regione===filtroReg);
-    if (filtroLampo)
-      data = data.filter(lampoAttiva);
-    if (filtroAsta)
-      data = data.filter(astaViva);
+    /* I FILTRI DELL'OCCASIONE stanno fra loro in «O», come sul
+       server (ago 2026): lampo, asta e sconto sono stati MUTUAMENTE
+       ESCLUSIVI — la precedenza dei badge dice che un annuncio non
+       puo' averne due — quindi in AND darebbero sempre il vuoto.
+       La spedizione gratis resta in AND: e' un asse della
+       SPEDIZIONE, ortogonale, e chi spunta anche quella vuole
+       l'incrocio. */
+    if (filtroLampo || filtroAsta || filtroSconto)
+      data = data.filter(l => (filtroLampo && lampoAttiva(l))
+                           || (filtroAsta && astaViva(l))
+                           || (filtroSconto && scontoQui(l, 1)));
     /* in DEMO i due filtri delle promesse rispondono coi GIUDICI
        del client — gli stessi che disegnano la parola e il badge —
        cosi' demo e vetrina vera non possono divergere */
     if (filtroSpedGratis)
       data = data.filter(l => spedGratis(l) || spedGratisQui(l, 1));
-    if (filtroSconto)
-      data = data.filter(l => scontoQui(l, 1));
+
     if (ordinaVista === 'lampo')
       /* come sul server: solo le lampo vive, chi scade prima in testa */
       data = data.filter(lampoAttiva).sort((a,b) => a.lampoFine - b.lampoFine);
