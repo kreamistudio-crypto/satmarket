@@ -7354,10 +7354,49 @@ def prove_pagina_acquisto():
     #    giusta — `t` nella cattura, `!da.t` nella guardia — che e' un
     #    fatto del DOM di prima e non cambia sotto le dita.
     prova("...parte solo allo scatto: la guardia e' lo STATO di prima",
-          (1, True, True),
-          (mini3.count("classList.add('barra-impulso')"),
-           "if (scatto && !da.t && IMPULSO_SCATTO){" in _cor,
+          (True, True),
+          ("} else if (scatto && !da.t){" in _cor,
            "t: trust," in _cat))
+    #    ...E UNA VOLTA PARTITO ARRIVA IN FONDO (13 ago 2026, il
+    #    rovescio della cura di stamattina, difetto dal campo):
+    #    l'anello vive sul NODO, e ogni render lo rifa' — a raffica
+    #    l'animazione moriva col nodo vecchio, misurata a 60ms su 500.
+    #    La cura e' il giro FLIP che la barra fa da sempre, applicato
+    #    all'impulso: la cattura registra QUANTO E' AVANZATO e la corsa
+    #    lo rimette sul nodo nuovo con un ritardo NEGATIVO, cioe' lo
+    #    CONTINUA. Misurato dopo: avanzamento monotono (67, 117, 167,
+    #    217, 267, 317, 367) e «finished» a 500 — vivo a ogni tocco
+    #    entro la mezza corsa, e mai ripartito da capo.
+    #    L'AVANZAMENTO SI PRENDE SOLO DA UN'ANIMAZIONE IN VOLO
+    #    (`playState === 'running'`): quella finita non si riporta, o
+    #    l'anello rinascerebbe morto a ogni tocco per sempre.
+    prova("...e una volta partito arriva in fondo, sul nodo nuovo",
+          (True, True, True),
+          ("a.playState === 'running'" in _cat,
+           "i: inVolo ? inVolo.currentTime" in _cat,
+           "`${-Math.round(da.i)}ms`" in _cor))
+    #    CONTINUARE NON E' RIPARTIRE, ed e' la riga che tiene insieme
+    #    le due richieste: il ramo della continuazione NON incrementa
+    #    `impulsi` (un anello che continua non deve sfasare un vero
+    #    scatto che partisse nello stesso giro) e i due rami non
+    #    possono sovrapporsi — l'anello esiste solo su una pillola gia'
+    #    scattata, quindi `da.i` pieno implica `da.t` vero, che e'
+    #    esattamente cio' che il ramo di partenza nega.
+    prova("...ma continuare non e' ripartire: un solo conteggio",
+          (1, True),
+          (_cor.count("impulsi++"), "if (da.i != null && scatto){" in _cor))
+    #    E IL BLOCCO STA SOPRA IL FILTRO DELLA CORSA: sotto, un tocco
+    #    che non fa correre la barra — la cattura gia' a 100, il caso
+    #    normale a raffica larga — uscirebbe dal giro senza riportare
+    #    l'anello, che morirebbe li'. Sono due cose che capitano
+    #    insieme, non una dentro l'altra.
+    prova("...e l'impulso non dipende dal filtro della corsa", True,
+          _cor.index("barra-impulso") < _cor.index("< 0.5) return"))
+    #    IL GUARDIANO SU getAnimations non e' pignoleria: barreCattura
+    #    sta nel mezzo del render, e una WebView che non ce l'ha
+    #    alzerebbe li' dentro — una pagina bianca per un ornamento.
+    prova("...e la cattura non alza dove getAnimations non c'e'", True,
+          "el.getAnimations ? el.getAnimations() : []" in _cat)
     #    DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea):
     #    la seconda parte quando la prima e' a meta' corsa — un gesto in
     #    due battute invece di un doppio colpo. Il ritardo si scrive

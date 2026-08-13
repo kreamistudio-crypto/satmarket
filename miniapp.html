@@ -9356,7 +9356,24 @@ function barreCattura(box){
     const w = parseFloat(ps.width);
     const largo = el.clientWidth;
     const trust = el.classList.contains('pill-trust');
+    /* L'IMPULSO IN VOLO (13 ago 2026, il rovescio della cura di
+       stamattina): l'anello vive sul NODO, e ogni render lo rifa' —
+       cosi' una raffica sullo stepper lo troncava a meta' corsa
+       (misurato: muore dopo esattamente la pausa fra un tocco e
+       l'altro, 60ms su 500 a raffica stretta). Qui si cattura QUANTO
+       E' AVANZATO, in ms, e barreCorri lo rimette sul nodo nuovo da
+       li' — lo stesso giro FLIP che la barra fa da sempre. Si toglie
+       il ritardo perche' l'avanzamento sia nella FASE ATTIVA: cosi'
+       la seconda pillola, che il ritardo lo sta ancora aspettando, da'
+       un numero negativo e riprende ad aspettare il resto, senza un
+       ramo suo. `getAnimations` si chiede col guardiano: una WebView
+       che non ce l'ha alzerebbe qui dentro, e questa funzione sta nel
+       mezzo del render — sarebbe una pagina bianca per un ornamento. */
+    const inVolo = (el.getAnimations ? el.getAnimations() : []).find(
+      a => a.animationName === 'impulsoScatto' && a.playState === 'running');
     barraDa[el.dataset.barra] = {
+      i: inVolo ? inVolo.currentTime
+                  - (inVolo.effect.getComputedTiming().delay || 0) : null,
       /* `t` E' LO STATO DI PRIMA, e non si deduce da `p` (13 ago 2026,
          il difetto della raffica): dice se la promessa era GIA'
          scattata quando il giro e' partito — l'unica domanda che
@@ -9439,19 +9456,45 @@ function barreCorri(box, barraDa){
     const da = barraDa[el.dataset.barra];
     if (!da) return;
     const scatto = el.classList.contains('pill-trust');
+    /* L'IMPULSO STA SOPRA IL FILTRO DELLA CORSA, e non e' una
+       questione di ordine ma di indipendenza: sotto, un tocco che non
+       fa correre la barra — la cattura gia' a 100, cioe' proprio il
+       caso normale a raffica larga — uscirebbe dal giro senza
+       riportare l'anello, che morirebbe li'. L'anello e la barra sono
+       due cose che capitano insieme, non una dentro l'altra.
+       DUE RAMI CHE NON POSSONO SOVRAPPORSI, ed e' cio' che tiene
+       insieme le due richieste: l'impulso in volo si CONTINUA (mai
+       riparte), un impulso nuovo PARTE solo passando da «non
+       scattata» a «scattata». Non serve escluderli a mano — l'anello
+       esiste solo su una pillola gia' scattata, quindi `da.i` pieno
+       implica `da.t` vero, che e' esattamente cio' che il secondo
+       ramo nega.
+       IL RITARDO NEGATIVO E' LA CONTINUAZIONE: l'animazione nuova
+       nasce gia' avanti di quanto era la vecchia, invece di ricominciare
+       — e siccome `impulsi` NON si incrementa qui, un anello che
+       continua non sfasa un vero scatto che partisse nello stesso
+       giro. Se nel frattempo la promessa e' CADUTA (non piu'
+       pill-trust) l'anello non si riporta: e' l'ornamento dello stato
+       scattato, e senza lo stato non ha piu' niente da dire. */
+    if (IMPULSO_SCATTO){
+      if (da.i != null && scatto){
+        el.style.setProperty('--impulso-ritardo',
+                             `${-Math.round(da.i)}ms`);
+        el.classList.add('barra-impulso');
+      } else if (scatto && !da.t){
+        /* `!da.t` E' LA GUARDIA: lo STATO di prima, non la corsa */
+        if (impulsi)
+          el.style.setProperty('--impulso-ritardo', `${IMPULSO_PASSO}ms`);
+        el.classList.add('barra-impulso');
+        impulsi++;
+      }
+    }
     const aP = scatto ? 100
       : (parseFloat(el.style.getPropertyValue('--barra-p')) || 0);
     if (Math.abs(aP - da.p) < 0.5) return;
     const aC = scatto ? 'var(--barra-a)'
       : (el.style.getPropertyValue('--barra-c') || 'var(--barra-da)');
     if (scatto) el.classList.add('barra-scatto');
-    /* `!da.t` E' LA GUARDIA: lo STATO di prima, non la corsa */
-    if (scatto && !da.t && IMPULSO_SCATTO){
-      if (impulsi)
-        el.style.setProperty('--impulso-ritardo', `${IMPULSO_PASSO}ms`);
-      el.classList.add('barra-impulso');
-      impulsi++;
-    }
     el.style.setProperty('--barra-p', `${da.p}%`);
     el.style.setProperty('--barra-c', da.c);
     corse.push([el, `${aP}%`, aC]);
