@@ -7541,9 +7541,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in cache, per cui il server tiene il default silenzioso di sempre.
   Dall'alto: gli articoli (card singola o strip del set) · la
   CONSEGNA a vie-radio — 🤝 ritiro · 🏠 spedizione a casa ·
-  🚚 spedizione a un punto di ritiro (il camioncino dall'ago 2026: il
-  punto È una spedizione, e la scatola qui diceva la taglia del
-  pacco; niente collisione con la casa, che ha la casetta) ·
+  «Spedizione a un LOCKER» con l'armadietto disegnato (13 ago 2026,
+  decisione di Andrea che SUPERA il camioncino del 12: il 🚚 diceva la
+  famiglia ma non la differenza con «a casa», che qui è tutta la
+  scelta — prima ancora c'era la scatola, che diceva la taglia del
+  pacco. Non esiste un'emoji del locker: `ICO_LOCKER` è un SVG a
+  currentColor come le icone della nav, inchiostro in [2,22], e va
+  AVVOLTO in uno `<span>` con l'etichetta perché `.via-nome` è un
+  flex in COLONNA — nudo, il disegno finirebbe SOPRA il testo. NOME
+  PIÙ STRETTO DEL VERO, dichiarato: la via serve QUALUNQUE punto
+  della rete del corriere, anche quelli col banco — Punto Poste in
+  tabaccheria — e «locker» è la parola che chi compra conosce, non
+  una promessa che il punto sia automatico. La formula è stata
+  rinominata OVUNQUE nomini la via — ordine lato compratore e
+  venditore, notifica «Hai venduto» e gemella, nota ai moderatori in
+  disputa, campagna spedizioniere, riga della coda fermi — mentre
+  «punto di ritiro» RESTA dove indica il POSTO fisico: il bottone e
+  il campo «Indica il punto di ritiro», la tariffa del form Vendi, il
+  banner del pacco, la busta di consegna — lì «locker» sarebbe più
+  falso, non più chiaro) ·
   💾 codice online, SOLO le
   offerte, ordine fisso di PRESENTAZIONE (il default lo dice
   `viaDefault`, vedi sotto) — dove la cifra a
@@ -7583,6 +7599,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Andrea: da quel bottone parte la fattura, e il nome lo dice —
   «Acquista» resta sui varchi che PORTANO alla pagina: barra, recinto
   e il riepilogo del pacco).
+  E IL FONDO È APPICCICATO (13 ago 2026, decisione di Andrea): «Paga»
+  resta in vista mentre si scorre — `#view-acquisto .ctrl-fondo` è
+  STICKY e mai fixed, ed è la parte da non rovesciare: niente
+  matematica di viewport (dentro Telegram le misure mentono, la
+  lezione della tastiera dei fogli), e un elemento sticky OCCUPA il
+  suo spazio in layout, quindi a fine scorrimento l'ultima riga del
+  conto non è mai coperta — il fiato sopra la barra lo dà già il
+  margin-bottom del conto. Fondo opaco con blur, riga di confine e
+  safe-area sono DELLA BARRA (il pattern di #barraPacco e della nav)
+  e il padding-bottom del corpo passa a lei, o a fine pagina ci
+  sarebbero due safe-area impilate. SOLO la pagina Paga: il riepilogo
+  del pacco tiene il fondo di sempre (sentinelle su tutte e tre le
+  righe). Col ⚡ NWC collegato si appiccica il fondo INTERO — è
+  atomico, la lezione di «Altri oggetti» — e costa più schermo:
+  dichiarato.
   IL DEFAULT DELLA VIA È IL PUNTO DI RITIRO (ago 2026, decisione di
   Andrea che AFFINA il 12 ago — precedenza punto → casa → ritiro →
   digitale). DUE STRATI DI PERCHÉ, e vanno tenuti tutti e due. Il
@@ -7906,10 +7937,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   flusso, e la sentinella in CI è rovesciata: non deve tornare.
   E DAL QUINTO GIRO IL CAMPO STA DIETRO UN BOTTONE (ago 2026, col
   punto diventato il DEFAULT della via): il campo a testo libero non
-  sta più aperto in pagina — lo espande «📍 Indica il punto di
-  ritiro», così la pagina apre su un conto da leggere e non su un
-  modulo da compilare, che era l'argomento contro il punto come
-  default. È una RIGA ESPANSA e non un foglio, deliberato: niente
+  sta più aperto in pagina — lo espande «Indica il punto di
+  ritiro» (dal 13 ago 2026 NUDO, senza il 📍: il riquadro che lo
+  ospita ha già il locker della via, e due icone nello stesso
+  riquadro sono una di troppo — l'ha perso anche la riga compatta
+  del punto scritto), così la pagina apre su un conto da leggere e
+  non su un modulo da compilare, che era l'argomento contro il punto
+  come default. È una RIGA ESPANSA e non un foglio, deliberato: niente
   registrazione in closeSheet né pila di navigazione, il campo resta
   adiacente a vie e conto, e il commento VARCO MAPPA resta vero
   parola per parola (il selettore futuro sostituirà lo stesso
