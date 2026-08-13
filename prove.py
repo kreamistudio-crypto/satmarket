@@ -6939,6 +6939,18 @@ def prove_pagina_acquisto():
     #    prova la STRUTTURA, il movimento lo dice il telefono.
     prova("la corsa recupera il «da» dal computed del fill", True,
           "getComputedStyle(el, '::before')" in mini3)
+    #    LA SCATOLA DELLA MISURA (13 ago 2026, lo «scattino indietro»
+    #    visto dal telefono e trovato campionando): il % del ::before
+    #    si risolve sul PADDING BOX — clientWidth — mentre il rect
+    #    porta anche il bordo: ogni cattura usciva fino a ~1% piu'
+    #    bassa (2-3px ad alto progresso, ridipinti indietro e
+    #    ri-percorsi in avanti), e la scattata reduce dallo scatto
+    #    rifaceva una mini-corsa 99→100 a ogni tocco.
+    _i_cat = mini3.index("const barraDa")
+    _cat = mini3[_i_cat:mini3.index("box.innerHTML", _i_cat)]
+    prova("...e misura sulla scatola del ::before (clientWidth)", True,
+          "el.clientWidth" in _cat
+          and "getBoundingClientRect" not in _cat)
     prova("...e parte in due fotogrammi, mai con un reflow", True,
           "requestAnimationFrame(()=>requestAnimationFrame(" in mini3
           and "void el.offsetWidth" not in mini3)

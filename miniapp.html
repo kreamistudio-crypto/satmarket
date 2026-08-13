@@ -9222,11 +9222,21 @@ function renderAcquisto(){
      che dal quarto giro corre anche lui. La scattata senza fill vale
      100 e acceso (e' cosi' che la discesa riparte da dov'era), la
      barra mai misurata vale 0. */
+  /* LA SCATOLA DELLA MISURA E' clientWidth, MAI getBoundingClientRect
+     (13 ago 2026, trovato campionando lo «scattino indietro» visto
+     dal telefono): il % del ::before si risolve sul PADDING BOX della
+     pillola — il containing block di un absolute — mentre il rect
+     porta anche il BORDO (3px): ogni cattura usciva ~1% piu' bassa
+     del vero, la barra ripartiva qualche px INDIETRO a ogni tocco, e
+     la scattata reduce dal suo scatto rifaceva una mini-corsa 99→100
+     — il rimbalzo del bordo destro. Con la scatola giusta la cattura
+     a riposo E' il valore di prima, e la corsa che non serve non
+     parte (il filtro dei 0.5 sotto). */
   const barraDa = {};
   box.querySelectorAll('[data-barra]').forEach(el=>{
     const ps = getComputedStyle(el, '::before');
     const w = parseFloat(ps.width);
-    const largo = el.getBoundingClientRect().width;
+    const largo = el.clientWidth;
     const trust = el.classList.contains('pill-trust');
     barraDa[el.dataset.barra] = {
       p: (Number.isFinite(w) && largo > 0)
