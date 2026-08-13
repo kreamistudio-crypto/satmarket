@@ -5629,16 +5629,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il rosso è problema, e una promessa in corsa è un invito, non un
   fallimento) e MAI dal grigio, prototipato e SCARTATO a schermo: la
   mescola di mezzo fa un olivastro spento, e si perde la famiglia
-  della fiducia. La tinta cambia a GRADINI fra un render e l'altro
-  (un gradiente non si transiziona): a correre morbida è la
-  larghezza. Contrasto dell'inchiostro sull'acceso pieno: 8,1 di
-  giorno, 5,3 di sera. LA DISTINZIONE dalla scattata resta di FORMA,
-  non di tinta: il tetto a 99 lascia sempre la fetta di carta col
-  bordo netto (una barra, mai un fondo), il testo cambia natura
-  («Ancora N» contro «✅ nel conto»), e la scattata è la pillola
-  INTERA nel verde tenue con bordo e testo trust — più quieta della
-  barra accesa, ed è il verso giusto: la corsa chiama, il traguardo
-  riposa.
+  della fiducia. DAL QUARTO GIRO anche la tinta corre: il fill è un
+  ::before ASSOLUTO — larghezza in `--barra-p`, colore in
+  `--barra-c`, scritti da `barraPromessa` — perché width e
+  background-color si transizionano davvero, mentre un gradiente no
+  (prima il colore cambiava a scatti fra un render e l'altro).
+  z-index:0 sul guscio e -1 sul fill, tutti e due necessari, e
+  overflow:hidden per gli angoli. Contrasto dell'inchiostro
+  sull'acceso pieno: 8,1 di giorno, 5,3 di sera.
+  E LA SCATTATA È PIENA E ACCESA (quarto giro, visto da Andrea a
+  schermo nei due temi — ROVESCIA il «la corsa chiama, il traguardo
+  riposa» di mezza giornata prima): la barra si accendeva salendo e
+  allo scatto la pillola tornava al verde tenue, cioè il traguardo
+  PERDEVA forza — sembrava che qualcosa si fosse spento proprio nel
+  momento più forte, e di sera l'inverso. Ora la pill-trust di Paga
+  (e SOLO di Paga: il carrello e le altre superfici tengono la tenue
+  di sempre) veste l'acceso pieno `--barra-a` con l'inchiostro sopra,
+  e lo scatto corre l'ultimo tratto nello STESSO acceso
+  (`.barra-scatto`: guscio a carta, fill al 100%): la tinta non
+  salta, il traguardo guadagna. LA DISTINZIONE dalla barra quasi
+  piena, ora che la tinta è una, è di FORMA e di TESTO: il tetto a
+  99 lascia sempre la fetta di carta col bordo netto — una barra,
+  mai un fondo — contro la pillola INTERA bordo a bordo, e
+  «Ancora N → …» contro «✅ … nel conto».
   Il progresso è `(soglia − mancano)/soglia`, coi numeri che il
   preventivo porta GIÀ e nell'unità della promessa: il client riceve,
   non calcola. A pezzi sale a gradini, a VALORE è continuo — la barra
@@ -5652,21 +5665,31 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   primo pezzo); e LA CORSA MORBIDA (chiesta da Andrea, che rovescia
   il «niente transizione» della nascita): il «da» che a un nodo
   ricostruito manca si RECUPERA — prima del render si legge il
-  computed `backgroundSize` delle pillole vive, che a metà corsa è il
-  valore INTERPOLATO; il nodo nuovo nasce alla larghezza vecchia, un
-  reflow la fissa e lo style corre al bersaglio (il giro FLIP in
-  fondo a renderAcquisto). È ciò che tiene onesti i + veloci: le
-  transizioni CSS non si accodano mai — ritargeting nativo, la barra
-  devia in corsa verso l'ultimo bersaglio — e il NUMERO non aspetta,
-  si aggiorna secco al render. ALLO SCATTO la pill-trust fa la
-  stessa corsa nel SUO verde (`.barra-scatto`, --trust-soft): a fine
-  corsa il fondo è quello di riposo della scattata — visivamente
-  identico, nessun secondo stato da mantenere — e lo scarto residuo
-  DICHIARATO è il cambio di tinta della parte già piena nell'istante
-  dello scatto, il segno che è successo qualcosa. In discesa vale il
-  simmetrico (da 100 alla misura); chi nasce senza un «da» (primo
-  render, pillola appena comparsa) non corre; reduced-motion spegne
-  la transizione dal CSS e lo style finisce comunque sul bersaglio.
+  computed del ::before delle pillole vive, larghezza E colore, che
+  a metà corsa sono i valori INTERPOLATI — e i bersagli arrivano al
+  SECONDO requestAnimationFrame, a fotogramma reso.
+  LA DIAGNOSI DEL «SI ANIMA SOLO LA SPEDIZIONE» (caso dal campo,
+  quarto giro, ed è la riga da rileggere prima di toccare qualunque
+  FLIP a più elementi): la prima stesura faceva il giro PER PILLOLA
+  con un `void offsetWidth` fra il «da» e il bersaglio — e il reflow
+  della PRIMA pillola computava lo stile anche della SECONDA, che in
+  quell'istante aveva ancora il bersaglio inline: il suo stile
+  «prima» restava fissato al bersaglio e il suo FLIP diventava
+  bersaglio→da→bersaglio, un no-op. Animava solo la prima della
+  fila, la spedizione. Da qui la regola: PRIMA tutti i «da», POI
+  tutti i bersagli in un colpo solo, mai un flush in mezzo — e il
+  doppio rAF copre anche il nodo appena inserito, che senza un
+  fotogramma reso può non far partire la transizione affatto. È
+  anche ciò che tiene onesti i + veloci (le transizioni CSS non si
+  accodano: ritargeting nativo dal valore interpolato) e il NUMERO
+  non aspetta, si aggiorna secco al render. In discesa vale il
+  simmetrico (da 100 e acceso); chi nasce senza un «da» non corre;
+  reduced-motion spegne la transizione dal CSS e i bersagli arrivano
+  comunque. ONESTÀ SULLA VERIFICA, per la seconda volta (la lezione
+  della tastiera): in headless le transizioni NON AVANZANO — la
+  corsa non si campiona né si fotografa, si prova la STRUTTURA
+  (partenze in blocco, niente flush, bersagli a fotogramma reso) e
+  il movimento lo dice il telefono.
   LA STRADA SCARTATA, prototipata e fotografata: il colore
   che si SATURA (color-mix verso il verde) — 67% e 73% si vedevano
   uguali, e il quasi-verde si leggeva come promessa già scattata. I
