@@ -5595,7 +5595,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   no è uno stato normale. Sotto soglia «🚚 Ancora 12 € → spedizione
   gratis» e «🎁 Ancora N pezzi → −X%» (a valore la CIFRA che manca,
   via `cifraSoglia`, nell'unità della promessa); quando scatta il
-  verde «✅ … nel conto». La fila sta SOPRA la riga della consegna
+  verde NUDO — «✅ Sconto −X%», «✅ Spedizione gratis»: la coda «nel
+  conto» è caduta il 13 ago 2026 (deciso da Andrea con l'unitario
+  scontato in pagina — lo sconto si vede da solo sul prezzo, e la
+  spedizione ce l'ha la riga «gratuita» del conto due dita sotto: la
+  pillola è il cartello, il conto è il fatto). NEL CARRELLO la coda
+  dello sconto RESTA, ed è portante — là la barra è al LORDO di
+  proposito, e senza «nel conto» chi legge «−15%» aspetterebbe che il
+  totale scenda; la spedizione del carrello è nuda da sempre. Non
+  sono due nomi per la stessa cosa ma due superfici con due verità
+  (il patto dei separatori dei sats: un formato per superficie, con
+  un motivo), e una sentinella conta che di code ne resti UNA in
+  tutto il client. La fila sta SOPRA la riga della consegna
   (12 ago 2026, decisione di Andrea — è un fatto del negozio, si
   legge prima di scegliere la strada) e il suo ordine è quello di
   casa: vedi «L'ORDINE DELLA FILA È UNO SOLO», sotto «LE PROMESSE
@@ -5651,7 +5662,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   piena, ora che la tinta è una, è di FORMA e di TESTO: il tetto a
   99 lascia sempre la fetta di carta col bordo netto — una barra,
   mai un fondo — contro la pillola INTERA bordo a bordo, e
-  «Ancora N → …» contro «✅ … nel conto».
+  «Ancora N → …» contro «✅ …».
   Il progresso è `(soglia − mancano)/soglia`, coi numeri che il
   preventivo porta GIÀ e nell'unità della promessa: il client riceve,
   non calcola. A pezzi sale a gradini, a VALORE è continuo — la barra
