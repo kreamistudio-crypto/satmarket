@@ -6762,6 +6762,79 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore può essere passato dal Profilo a cambiarle) e dopo ognuno
   dei due salvataggi; la riga della spedizione vive DENTRO
   `#sellSpedField` e si nasconde da sola col suo campo.
+  E QUELLA DELLO SCONTO È VIVA (ago 2026, chiesto da Andrea): diceva
+  che la regola esiste, adesso dice anche quando QUESTO prezzo la fa
+  scattare DA SOLO, con le due cifre — «Con questo prezzo il tuo −20%
+  scatta da solo: chi lo compra paga 144 000 sats invece di 180 000».
+  IL CASO È NATO COL MONO CHE SCONTA: prima un articolo solo non
+  scattava mai e la dimenticanza costava poco, adesso sono soldi veri.
+  NON UN BLOCCO, UN AVVISO: la scelta resta sua — si dice mentre
+  scrive il prezzo, dove correggere costa zero, e non dopo, dove
+  costerebbe una Modifica (che ripassa la moderazione ed è bloccata da
+  un ordine non terminale). Il segnale dopo la pubblicazione c'era già
+  ed è MUTO: si apre il dettaglio e `prezzoMostrato` mostra il prezzo
+  scontato col barrato — ma è il segno pensato per CHI COMPRA, e non
+  dice «è la tua regola».
+  IL VERDETTO NON SI RICALCOLA QUI: `scontoScatta(r, artSats,
+  valutaListino, pezzi)` è il cuore ESTRATTO da `scontoQui`, e i due
+  chiamanti hanno in mano cose diverse — la vetrina un annuncio, il
+  form un numero che si sta digitando. Due copie direbbero prima o poi
+  due cose diverse sullo stesso prezzo, e la riga che promette uno
+  sconto che la card poi non mostra è il difetto peggiore possibile:
+  a scoprirlo sarebbe proprio chi ha appena pubblicato. Per la stessa
+  ragione `prezzoFormSats` converte l'euro con la ricetta di
+  `satsAnnuncio` — gli stessi due arrotondamenti, nello stesso ordine.
+  È A QUANTITÀ 1, la domanda di `scontoQui` in card: «questo articolo,
+  DA SOLO». I pezzi li sceglie chi compra, e la domanda del venditore
+  è un'altra. A criterio PEZZI non scatta MAI, e non è un'eccezione
+  scritta ma la formula che lo dice da sé (il minimo è 2, i pezzi qui
+  sono uno): la riga viva è di fatto delle sole soglie a VALORE.
+  IL MOMENTO DI QUIETE (`SCONTO_HINT_QUIETE`, 400ms), e il numero che
+  lo giustifica è MISURATO e non stimato: sull'esitazione al filo
+  (99999/100000/99999/100000) la riga si riscrive **5 volte senza
+  quiete e 1 con**. LA SCOPERTA CHE ROVESCIA L'INTUIZIONE: digitando
+  «180000» da zero le riscritture sono UNA anche senza quiete, e anche
+  a un tasto ogni mezzo secondo — perché scrivendo da sinistra a
+  destra il numero CRESCE SEMPRE, quindi la soglia si attraversa una
+  volta sola per costruzione. Il lampeggio vero non è la digitazione:
+  è la CORREZIONE, chi cancella una cifra e la riscrive attorno alla
+  soglia. Vale nei due versi, o tornare indietro lampeggerebbe uguale.
+  LE CHIAMATE IMMEDIATE SPENGONO IL TIMER IN SOSPESO, ed è la riga da
+  non togliere: senza, un render vecchio si riscriverebbe addosso a
+  quello nuovo mezzo secondo dopo. Sono l'ingresso nella vista, il
+  toggle della valuta (un gesto, non digitazione — e da lì passano
+  anche i due AZZERAMENTI del form) e il toggle dell'asta.
+  SU UN'ASTA LA RIGA TACE: l'ordine nasce da `crea_ordine_pagato`, che
+  NON sconta. Il generico lo prometteva già — difetto di prima, chiuso
+  qui perché scriverci dentro delle cifre l'avrebbe reso clamoroso.
+  A CAMBIO MUTO tace in euro (la risposta VERA: senza cambio il server
+  la promessa non la applica affatto) ma con soglia in SATS parla lo
+  stesso, che è il guadagno dichiarato di quella valuta.
+  IN MODIFICA PARLA UGUALE, ed è il caso in cui serve di più — lì
+  l'annuncio esiste già e può già star scontando. Regge per un
+  ordine: `editListing` riempie il prezzo e POI chiama `go('vendi')`,
+  che è l'unico posto da cui la riga si rifà entrando nella vista.
+  C'è la prova, e guarda l'ULTIMA scrittura del campo e non la prima —
+  una seconda infilata dopo il `go()` lasciava verde quella di prima.
+  IL NETTO HA UN POSTO SOLO PER UNITÀ (`scontaSats`/`scontaEur`), e
+  ci passano conLampo, conSconto e la riga: la sentinella che teneva
+  in pari i due corpi cercando la STESSA riga in tutti e due HA
+  CAMBIATO LATO — adesso chiede che l'aritmetica lì dentro non ci sia
+  PIÙ, che è l'affermazione più forte (quella di prima passava anche
+  con due copie sbagliate nello stesso modo). I due arrotondamenti
+  restano DIVERSI e i nomi dicono l'unità apposta.
+  E LA FESSURA DI «NUMERO + UNITÀ» SI È SPOSTATA DI UN GRADINO
+  (`cifraConUnita`): la riga scrive un PREZZO, che in euro ha i
+  centesimi, quindi non poteva passare da `cifraSoglia`, che formatta
+  con `fmt` perché una soglia è intera — cambiarlo lì vorrebbe dire
+  «25,00 €» al posto di «25 €» su tutte e dieci le superfici della
+  promessa. Il conto non cambia: `unitaSoglia` ha ancora UN chiamante.
+  LA LEZIONE DELLA TORTURA, per la terza volta in questo file: due
+  sentinelle mie erano ingannabili da una COPIA MORTA — cercavano
+  `aggiornaHintPolitiche();` nel corpo, e un `if (0) …` messo al suo
+  posto le lasciava verdi con la chiamata vera tolta. Adesso guardano
+  la RIGA INTERA in coda alla funzione. Una sentinella si scrive
+  rompendo il codice, non rileggendola.
   LA RONDA DEL LIBRO MASTRO (ago 2026): gli invarianti già dichiarati
   in questo file diventano un controllo dell'orologio invece di query
   da lanciare a mano — perché un controllo che dipende da qualcuno che
@@ -13033,6 +13106,37 @@ in memoria — la pagina della gara finiva ordinata per prezzo. Otto
 mutazioni su otto rosse, e lo stato dell'ordinamento vive per la
 SESSIONE: al deploy si riparte da «Più recenti», nessuno resta bloccato
 su una voce che non esiste più.
+
+La riga dello sconto nel form diventa viva (ago 2026, chiesto da
+Andrea): chi pubblica un articolo che da solo supera la soglia del suo
+sconto carrello lo legge mentre scrive il prezzo, con le due cifre,
+invece di scoprirlo da una vendita. Non un blocco, un avviso. Il caso è
+nato col mono che sconta — prima un articolo solo non scattava mai. Il
+verdetto NON si ricalcola nel form: `scontoScatta` è il cuore estratto
+da `scontoQui`, così la riga e la card non possono dire due cose
+diverse sullo stesso prezzo. Vedi Architettura, «E QUELLA DELLO SCONTO
+È VIVA», per il momento di quiete coi suoi numeri, per la riga che tace
+sull'asta e per la risposta alla domanda sulla modifica (parla uguale,
+ed è lì che serve di più).
+Collaudato: 3097 prove verdi (25 nuove) e **DICIASSETTE MUTAZIONI** una
+per riga sorvegliata, ognuna rossa da sola — e sono state loro a
+trovare due sentinelle MIE ingannabili da una copia morta, riscritte.
+Più il giro DAL VIVO col server locale, che è la parte che il testo non
+poteva dire: digitando davvero, carattere per carattere, la riga si
+riscrive UNA volta sola a 425ms dall'ultimo tasto, e resta una sola
+anche a un tasto ogni mezzo secondo, correggendosi all'indietro e
+esitando sul filo — dove senza quiete sarebbero state cinque. Più il
+listino in euro (79,20 € invece di 99,00), il cambio muto nei due versi,
+l'asta che la fa tacere, e il giro pubblica → riapri in modifica, che è
+il caso della domanda. Screenshot a 320/360/375 nei due temi: tre righe,
+nessun overflow. UNA LEZIONE DI METODO: il primo giro di sonde diceva
+che la riga non scattava MAI — era rotta la sonda, che non normalizzava
+gli spazi mentre il testo va a capo a metà frase. Una verifica che
+fallisce va guardata prima di crederle.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client. DA GUARDARE al primo giro:
+il primo venditore con lo sconto a VALORE acceso che pubblica sopra
+soglia.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
