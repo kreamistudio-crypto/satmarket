@@ -4925,8 +4925,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   LE RIGHE DA NON AMMORBIDIRE nei due predicati: la soglia si chiede
   in una **EXISTS** e mai con un JOIN (la query del TOTALE di
   `/api/listings` non ha il JOIN su `utenti`, e un `u.` la farebbe
-  esplodere); niente LAMPO VIVA (il suo badge occupa lo stesso angolo,
-  quindi quel segno la card non ce l'ha); niente ASTE nei rami che
+  esplodere); niente LAMPO VIVA nel ramo dello SCONTO (il suo badge
+  occupa lo stesso angolo, quindi quel segno la card non ce l'ha) e
+  invece SÌ nella spedizione gratis, che con la lampo convive — vedi
+  «I FILTRI DELL'OCCASIONE» qui sotto; niente ASTE nei rami che
   misurano una soglia (lì il prezzo è una PUNTATA in corso, e al
   vincitore la spedizione è inclusa per costruzione); e in ferie
   nessun verdetto, come nel client. A cambio muto il ramo in euro non
@@ -4942,6 +4944,53 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   gli ACCORDI individuali (sono per-compratore, e `artStima` invece li
   applica) — quindi una card col verde per un accordo accettato il
   filtro non la pesca. Rara, e per una persona sola.
+  I FILTRI DELL'OCCASIONE STANNO FRA LORO IN «O» (ago 2026, bug dal
+  campo: spuntandone due la vetrina restava vuota). LA CAUSA NON ERA
+  ARITMETICA MA STRUTTURALE, ed è la riga da ricordare: lampo, asta e
+  sconto sono stati MUTUAMENTE ESCLUSIVI per costruzione — la
+  precedenza dei badge dice che un annuncio non può averne due —
+  quindi sommarli in AND chiede «tutti e due i segni sullo stesso
+  annuncio», che è l'insieme vuoto per definizione. In OR dicono
+  quello che uno si aspetta spuntandoli: «mostrami le occasioni».
+  RESTANO IN AND COL RESTO (categoria, strade, prezzo, regione, e la
+  spedizione gratis): quelli sono assi diversi, e chi cerca «in sconto
+  E che si ritiri» vuole l'intersezione. Solo le OCCASIONI si
+  uniscono, perché solo loro si escludono a vicenda.
+  L'ORDINAMENTO resta fuori dall'unione: «lampo»/«asta» implicano il
+  loro filtro come VINCOLO DURO, perché il keyset pagina su quella
+  colonna — un annuncio senza `lampo_scadenza` in mezzo a un
+  ordinamento per scadenza romperebbe la paginazione, non solo la
+  vista. Conseguenza dichiarata: «ordina per lampo» + «in sconto» dà
+  giustamente il vuoto.
+  LA COMPOSIZIONE VIVE IN DUE FUNZIONE PURE (`_where_occasioni`,
+  `_where_sped_gratis`) e non in tre righe dentro l'endpoint, e la
+  ragione è la prova: le 16 combinazioni dei quattro filtri si girano
+  DAVVERO su un database gemello, e l'atteso è scritto a mano riga per
+  riga (quali segni ha ogni annuncio) invece di essere una seconda
+  copia della regola. UN FILTRO SOLO CHE FUNZIONA NON GARANTISCE CHE
+  DUE INSIEME FUNZIONINO — le prove del giro prima guardavano un
+  filtro alla volta e passavano tutte.
+  E IL SECONDO DIFETTO SI VEDEVA SOLO RIPRODUCENDO: il filtro
+  «Spedizione gratis» escludeva le LAMPO, e sbagliava due volte —
+  quella parola convive benissimo con una lampo (è in riga meta, non
+  è un badge che occupa un angolo), e sulla card la soglia si misura
+  sul prezzo SCONTATO. Quindi il filtro saltava proprio gli annunci su
+  cui il segno c'era. Ora `_sql_articolo_sats` applica la lampo come
+  `artStima` — prima la percentuale nella valuta del listino, poi la
+  conversione al cambio — e il `NOT lampo` resta solo sullo SCONTO,
+  dove serve davvero: lì il badge verde non convive col rosso.
+  La verifica che conta è la coerenza CARD↔FILTRO guardata dal vivo:
+  le card che scrivono «🚚 gratis» devono essere ESATTAMENTE quelle
+  che il filtro pesca, e su un catalogo di prova lo sono.
+  IMPERFEZIONE DICHIARATA che resta: l'ACCORDO individuale non entra
+  nel predicato SQL e non può — è per compratore, mentre la vetrina è
+  di tutti — quindi una card resa verde da un accordo accettato il
+  filtro non la pesca.
+  E «SPEDIZIONE GRATIS» STA ACCANTO A «SPEDIZIONE» nel pannello
+  (decisione di Andrea): sono la stessa famiglia, e un filtro della
+  spedizione in fondo all'elenco fra le occasioni si cerca dove non è.
+  L'ordine delle spunte è contenuto e non forma — c'è una prova che lo
+  fissa, o il prossimo riordino lo sposta senza che nessuno lo veda.
   E `spedGratisQui` HA GUADAGNATO LA GUARDIA DELL'ASTA con questo giro
   (correzione trovata DAL VIVO, non leggendo il codice: il filtro
   nuovo pescava un'asta il cui prezzo di base superava la soglia).
@@ -12752,6 +12801,26 @@ due filtri chiesti al server vero — ed è lì che è saltato fuori il caso
 che leggendo il codice non si vedeva: il filtro «Spedizione gratis»
 pescava un'ASTA il cui prezzo di base superava la soglia. Da lì la
 guardia dell'asta è entrata anche in `spedGratisQui`.
+E il giorno dopo il BUG DELLE COMBINAZIONI (segnalato da Andrea):
+spuntandone due la vetrina restava vuota. La causa non era aritmetica
+ma STRUTTURALE — lampo, asta e sconto sono stati mutuamente esclusivi
+per costruzione, quindi in AND l'intersezione è vuota per definizione
+— e adesso le OCCASIONI si uniscono in «o», mentre la spedizione
+gratis resta un asse ortogonale in AND. Riproducendo è saltato fuori
+un secondo difetto che leggendo non si vedeva: il filtro «Spedizione
+gratis» escludeva le LAMPO, e sbagliava due volte, perché quella
+parola convive con la lampo e sulla card la soglia si misura sul
+prezzo SCONTATO — quindi saltava proprio gli annunci su cui il segno
+c'era. Più lo spostamento della spunta accanto a «Spedizione», che
+è la sua famiglia. La composizione della WHERE vive ora in due
+funzioni pure, e la prova gira le 16 combinazioni dei quattro filtri
+su un database gemello: UN FILTRO SOLO CHE FUNZIONA NON GARANTISCE CHE
+DUE INSIEME FUNZIONINO, ed è esattamente quello che era successo — le
+prove del giro prima ne guardavano uno alla volta e passavano tutte.
+3015 verdi, sette mutazioni su sette rosse (l'ultima ha fatto nascere
+la sentinella sull'ORDINE delle spunte, che non c'era), e la
+coerenza card↔filtro verificata dal vivo: le card che scrivono
+«🚚 gratis» sono esattamente quelle che il filtro pesca.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva nuova. DA GUARDARE al primo giro: un negozio con lo sconto
 a VALORE acceso — le sue card sopra soglia cambiano prezzo in vetrina,
