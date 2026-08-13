@@ -5615,9 +5615,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   d'aspetto, la cura è stata la veste e non la posizione.
   E LE RIGHE SI RIEMPIONO COL PROGRESSO (13 ago 2026, decisione di
   Andrea, scelta su DUE prototipi guardati a schermo): la pillola
-  sotto soglia si riempie del verde tenue da sinistra, con un bordo
+  sotto soglia si riempie di verde da sinistra, con un bordo
   NETTO, man mano che il carrello sale — `barraPromessa` in
   renderAcquisto scrive `background-size` sulla classe `.pill-barra`.
+  IL COLORE È `--barra-fill`, token a doppio valore (#BFE0D0 di
+  giorno, #2E5237 di sera — secondo giro dello stesso 13 ago, visto
+  da Andrea: col `--trust-soft` nudo la barra non si notava, perché
+  quello è il FONDO della pill-trust, nato per stare sotto un testo e
+  non per staccare da una carta quasi uguale). Stessa TINTA della
+  fiducia, più luce — si abbassa la luce, non si cambia il segno — e
+  può essere PIÙ carica del fondo della conferma senza mentire: a
+  distinguere la barra dalla promessa scattata è la FORMA, parziale
+  col bordo netto contro pillola intera con ✅ e il testo che lo
+  dice. Misurati sull'inchiostro che ci sta sopra: 10,5 di giorno,
+  7,2 di sera.
   Il progresso è `(soglia − mancano)/soglia`, coi numeri che il
   preventivo porta GIÀ e nell'unità della promessa: il client riceve,
   non calcola. A pezzi sale a gradini, a VALORE è continuo — la barra
@@ -7564,21 +7575,33 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in cache, per cui il server tiene il default silenzioso di sempre.
   Dall'alto: gli articoli (card singola o strip del set) · la
   CONSEGNA a vie-radio — 🤝 ritiro · 🏠 spedizione a casa ·
-  «Spedizione a un LOCKER» con l'armadietto disegnato (13 ago 2026,
-  decisione di Andrea che SUPERA il camioncino del 12: il 🚚 diceva la
-  famiglia ma non la differenza con «a casa», che qui è tutta la
-  scelta — prima ancora c'era la scatola, che diceva la taglia del
-  pacco. Non esiste un'emoji del locker: `ICO_LOCKER` è un SVG a
+  «Spedizione a locker/punto di ritiro» con l'armadietto disegnato
+  (13 ago 2026, decisione di Andrea in DUE giri: prima «locker»
+  secco, che superava il camioncino del 12 — il 🚚 diceva la famiglia
+  ma non la differenza con «a casa», che qui è tutta la scelta; prima
+  ancora c'era la scatola, che diceva la taglia del pacco — poi la
+  CORREZIONE: «locker» era PIÙ STRETTO DEL VERO, la via serve
+  QUALUNQUE punto della rete e con Poste la rete è in gran parte
+  tabaccherie col banco. I MARCHI sono stati scartati: Fermopoint è
+  di BRT, Punto Poste di Poste, InPost ha i suoi — nominarne uno
+  confonderebbe gli altri due terzi dei venditori. La doppia formula
+  dice il caso migliore, il locker che si apre col solo codice, senza
+  escludere nessuno — ed è quella che usa Subito.
+  L'ETICHETTA della via è SENZA l'articolo, ed è una misura e non
+  sciatteria: col «un» fa 276px nel font della via e a 320 la colonna
+  ne dà 258, cioè due righe; senza fa 255 e sta su UNA riga a
+  320/360/375, misurato — la PROSA delle notifiche tiene «a un», che
+  lì è grammatica e non larghezza. Quando le cifre di casa/punto
+  divergono la colonna si stringe e il nome può andare a capo lo
+  stesso: a-capo pulito, dichiarato, mai un overflow.
+  Non esiste un'emoji del locker: `ICO_LOCKER` è un SVG a
   currentColor come le icone della nav, inchiostro in [2,22], e va
   AVVOLTO in uno `<span>` con l'etichetta perché `.via-nome` è un
-  flex in COLONNA — nudo, il disegno finirebbe SOPRA il testo. NOME
-  PIÙ STRETTO DEL VERO, dichiarato: la via serve QUALUNQUE punto
-  della rete del corriere, anche quelli col banco — Punto Poste in
-  tabaccheria — e «locker» è la parola che chi compra conosce, non
-  una promessa che il punto sia automatico. La formula è stata
-  rinominata OVUNQUE nomini la via — ordine lato compratore e
-  venditore, notifica «Hai venduto» e gemella, nota ai moderatori in
-  disputa, campagna spedizioniere, riga della coda fermi — mentre
+  flex in COLONNA — nudo, il disegno finirebbe SOPRA il testo.
+  La formula vive in NOVE siti — pagina Paga, i tre hint dell'ordine
+  (compratore senza punto, venditore col punto, venditore in attesa)
+  più la riga della coda fermi, notifica «Hai venduto» e gemella,
+  nota ai moderatori in disputa, campagna spedizioniere — mentre
   «punto di ritiro» RESTA dove indica il POSTO fisico: il bottone e
   il campo «Indica il punto di ritiro», la tariffa del form Vendi, il
   banner del pacco, la busta di consegna — lì «locker» sarebbe più
