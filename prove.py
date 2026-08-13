@@ -6865,6 +6865,24 @@ def prove_pagina_acquisto():
     #    che la sentinella della fila conta proprio quel template).
     prova("la fila di Paga si stende via CSS, markup intatto", True,
           "#acqCorpo > .pills{flex-direction:column" in mini3)
+    #    LA BARRA DI RIEMPIMENTO delle promesse (13 ago 2026, decisione
+    #    di Andrea sui prototipi: la saturazione del colore e' stata
+    #    scartata — 67% e 73% indistinguibili, e il quasi-verde si
+    #    leggeva come promessa gia' scattata). Il progresso viene dai
+    #    numeri del SERVER nell'unita' della promessa; il TETTO A 99
+    #    tiene la barra piena SOLO alla pill-trust — chi lo alza fa
+    #    dire «scattata» a una promessa che non lo e'; e lo style c'e'
+    #    SEMPRE, anche a 0%, o il background-image coprirebbe la
+    #    pillola intera.
+    prova("la barra delle promesse esiste, col tetto a 99", True,
+          "const barraPromessa" in mini3 and "Math.min(99," in mini3)
+    prova("...si riempie del verde TENUE, mai del verde pieno", True,
+          "linear-gradient(90deg,var(--trust-soft),var(--trust-soft))"
+          in mini3)
+    prova("...le DUE pillole sotto soglia la portano", 2,
+          mini3.count('class="pill pill-barra"'))
+    prova("...e lo style della larghezza c'e' sempre, anche a 0%", True,
+          'return ` style="background-size:${p}% 100%"`;' in mini3)
     #    IL FONDO DI PAGA E' APPICCICATO (ago 2026): «Paga» resta in
     #    vista mentre si scorre — STICKY e mai fixed (dentro Telegram
     #    le misure di viewport mentono, e sticky occupa layout: a fine
