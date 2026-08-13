@@ -5766,20 +5766,22 @@ def prove_valuta_soglia():
     # chiamate piu' la definizione
     prova("...e tutte le superfici della promessa passano da cifraSoglia",
           11, mini.count("cifraSoglia("))
-    # L'INVITO DEL CARRELLO non converte piu' a soglia in SATS: li' il
-    # confronto e' sats contro sats, esatto, e la riga compare anche a
-    # cambio muto. E' il guadagno della scelta, e vive proprio dove
-    # stava l'unica conversione che il client fa su una promessa.
-    _inv = pezzo_js(mini, "function aggiornaInvitoSconto")
-    prova("l'invito converte SOLO in euro", True,
+    # IL CONFRONTO DEL CARRELLO non converte piu' a soglia in SATS:
+    # li' e' sats contro sats, esatto, e la riga compare anche a
+    # cambio muto. E' il guadagno della scelta. Dal 13 ago 2026 il
+    # confronto vive nel giudice statoScontoPacco (lo chiamano badge
+    # E totale scontato), non piu' dentro l'invito.
+    _gsp = pezzo_js(mini, "function statoScontoPacco(tot){", "\n}")
+    prova("il confronto del carrello converte SOLO in euro", True,
           "const inEuro = s.criterio === 'valore' && s.valuta !== 'sats'"
-          in _inv)
+          in _gsp)
     prova("...e a soglia in sats non chiede il cambio", True,
-          "s.valuta === 'sats' ? (tot || 0)" in _inv)
-    # la cintura di ieri resta intatta: senza cambio vivo, in EURO, la
-    # riga non compare (meglio un'assenza che una cifra inventata)
+          "s.valuta === 'sats' ? (tot || 0)" in _gsp)
+    # la cintura di ieri resta intatta: senza cambio vivo, in EURO, il
+    # giudice risponde null e la riga non compare (meglio un'assenza
+    # che una cifra inventata)
     prova("...ma in euro senza cambio vivo tace ancora", True,
-          "!cambioVivo) { box.innerHTML = ''; return; }" in _inv)
+          "if (inEuro && !cambioVivo) return null;" in _gsp)
 
 
 # ====================================================================
@@ -6867,11 +6869,23 @@ def prove_pagina_acquisto():
           mini3.count("Spedizione a un punto di ritiro"))
     #    LA VESTE DELLA FILA (ago 2026, decisione di Andrea: la
     #    POSIZIONE resta sopra la Consegna — il modo «dentro la card»
-    #    e' stato costruito, guardato e scartato — e a cambiare e' la
-    #    veste: righe a tutta larghezza, tono quieto, markup INTATTO,
-    #    che la sentinella della fila conta proprio quel template).
-    prova("la fila di Paga si stende via CSS, markup intatto", True,
-          "#acqCorpo > .pills{flex-direction:column" in mini3)
+    #    e' stato costruito, guardato e scartato). Dal 13 ago 2026 la
+    #    veste e' CONDIVISA: la classe .fila-promesse la portano Paga,
+    #    il carrello e «Altri oggetti» — un posto solo, e la quarta
+    #    superficie di domani mette la classe e ha finito, invece di
+    #    allungare sei liste di selettori.
+    prova("la veste della fila e' una classe sola", True,
+          ".fila-promesse{flex-direction:column" in mini3)
+    prova("...e la portano tutte e tre le superfici", (True, True, True),
+          ('`<div class="pills fila-promesse">${pillole}</div>`' in mini3,
+           '<div id="paccoPromesse" class="fila-promesse">' in mini3,
+           '<div class="pills altri-promo fila-promesse">' in mini3))
+    #    display:block sulla pillola non e' ozioso: nel carrello vive
+    #    dentro lo span-scatola e resterebbe INLINE — e width:100% su
+    #    un inline non fa niente; in Paga e «Altri oggetti» era gia'
+    #    blockificata dal flex.
+    prova("...e la pillola della fila e' un blocco a tutta larghezza",
+          True, ".fila-promesse .pill{display:block;width:100%" in mini3)
     #    LA BARRA DI RIEMPIMENTO delle promesse (13 ago 2026, decisione
     #    di Andrea sui prototipi: la saturazione del colore e' stata
     #    scartata — 67% e 73% indistinguibili, e il quasi-verde si
@@ -6909,18 +6923,25 @@ def prove_pagina_acquisto():
     prova("...che transiziona larghezza E colore insieme", True,
           "transition:width .35s ease,background-color .35s ease"
           in mini3)
-    prova("...le DUE pillole sotto soglia la portano", 2,
+    prova("...le QUATTRO pillole sotto soglia la portano (Paga e "
+          "carrello, 13 ago 2026)", 4,
           mini3.count('class="pill pill-barra"'))
     prova("...e lo style del progresso c'e' sempre, anche a 0%", True,
           'style="--barra-p:${p}%;--barra-c:${c}"' in mini3)
     #    LA SCATTATA E' PIENA E ACCESA (quarto giro, visto da Andrea a
     #    schermo nei due temi: la barra si accendeva salendo e allo
     #    scatto la pillola tornava al tenue — il traguardo perdeva
-    #    forza). SOLO in Paga, con l'inchiostro sopra; il carrello
-    #    tiene la pill-trust tenue di sempre.
-    prova("la scattata di Paga e' piena e ACCESA, con l'inchiostro",
+    #    forza). Dal 13 ago 2026 vale ANCHE nel carrello, che corre la
+    #    stessa barra (ROVESCIA il «solo in Paga» di mezza giornata
+    #    prima: due traguardi diversi per la stessa promessa erano una
+    #    divergenza senza motivo) — quindi la regola vive sulla BASE
+    #    .pill.pill-trust, una volta sola, e il tenue di .trust-soft
+    #    non lo veste piu' nessuno.
+    prova("la scattata e' piena e ACCESA, con l'inchiostro",
           1, mini3.count("background:var(--barra-a);color:var(--ink)"))
-    prova("...e il carrello tiene la conferma tenue di sempre", True,
+    prova("...sulla base .pill.pill-trust, una regola sola", True,
+          ".pill.pill-trust{border-color:var(--barra-a)" in mini3)
+    prova("...e la conferma tenue non la veste piu' nessuno", False,
           ".pill.pill-trust{background:var(--trust-soft)" in mini3)
     #    LA CORSA MORBIDA (13 ago 2026, chiesta da Andrea): il «da» si
     #    RECUPERA dal computed — che a meta' corsa e' il valore
@@ -6946,15 +6967,34 @@ def prove_pagina_acquisto():
     #    bassa (2-3px ad alto progresso, ridipinti indietro e
     #    ri-percorsi in avanti), e la scattata reduce dallo scatto
     #    rifaceva una mini-corsa 99→100 a ogni tocco.
-    _i_cat = mini3.index("const barraDa")
-    _cat = mini3[_i_cat:mini3.index("box.innerHTML", _i_cat)]
+    #    Dal 13 ago 2026 cattura e via sono FERRI CONDIVISI
+    #    (barreCattura/barreCorri): li corre anche il carrello, e una
+    #    seconda stesura della corsa e' il posto dove il prossimo «si
+    #    anima solo la spedizione» tornerebbe a nascondersi.
+    _cat = pezzo_js(mini3, "function barreCattura(box){", "\n}")
     prova("...e misura sulla scatola del ::before (clientWidth)", True,
           "el.clientWidth" in _cat
           and "getBoundingClientRect" not in _cat)
+    _cor = pezzo_js(mini3, "function barreCorri(box, barraDa){", "\n}")
     prova("...e parte in due fotogrammi, mai con un reflow", True,
-          "requestAnimationFrame(()=>requestAnimationFrame(" in mini3
+          "requestAnimationFrame(()=>requestAnimationFrame(" in _cor
           and "void el.offsetWidth" not in mini3)
-    prova("...le quattro pillole portano la chiave della corsa", 4,
+    prova("...i ferri sono UNO: mai una seconda cattura o corsa",
+          (1, 1), (mini3.count("function barreCattura"),
+                   mini3.count("function barreCorri")))
+    #    ...e a chiamarli sono in TRE: renderAcquisto e le due scatole
+    #    del carrello. SI CHIEDE LA RIGA INTERA, ancorata all'a-capo e
+    #    all'indentazione — un conteggio di sottostringhe restava
+    #    verde con la chiamata COMMENTATA (l'ha detto la tortura, per
+    #    la seconda volta: e' la lezione del reaper).
+    prova("...e Paga e carrello chiamano i ferri, mai una copia",
+          (True, 2, True, 2),
+          ("\n  const barraDa = barreCattura(box);" in mini3,
+           mini3.count("\n  const da = barreCattura(box);"),
+           "\n  barreCorri(box, barraDa);" in mini3,
+           mini3.count("\n  barreCorri(box, da);")))
+    prova("...le OTTO pillole portano la chiave della corsa "
+          "(quattro di Paga, quattro del carrello)", 8,
           mini3.count('data-barra="s'))
     prova("...allo scatto l'ultimo tratto corre nell'ACCESO", True,
           "barra-scatto" in mini3 and "'var(--barra-a)'" in mini3
@@ -7674,14 +7714,16 @@ def prove_forma_sconto_pacco():
           "s.pct" in _inv and "* s.pct" not in _inv and "/ 100" not in _inv)
     prova("...e riceve il totale per parametro", True,
           "function aggiornaInvitoSconto(tot){" in mini)
-    # L'UNICA conversione del client su una promessa, ed e' qui: la
-    # soglia e' in euro e il totale della barra in sats. Guardata da
-    # `cambioVivo`, o la riga direbbe una cifra inventata (il patto
-    # del ≈). E il floor, come _eur_interi: nel verso prudente.
-    prova("l'invito converte in euro solo col cambio vivo", True,
-          "!cambioVivo) { box.innerHTML = ''; return; }" in _inv)
+    # L'UNICA conversione del client su una promessa, e dal 13 ago
+    # 2026 vive nel GIUDICE statoScontoPacco (lo chiamano badge e
+    # totale scontato). Guardata da `cambioVivo`, o la riga direbbe
+    # una cifra inventata (il patto del ≈). E il floor, come
+    # _eur_interi: nel verso prudente.
+    _gsc = pezzo_js(mini, "function statoScontoPacco(tot){", "\n}")
+    prova("il confronto converte in euro solo col cambio vivo", True,
+          "if (inEuro && !cambioVivo) return null;" in _gsc)
     prova("...col floor, come il giudice del server", True,
-          "Math.floor((tot || 0) * eurPerSat)" in _inv)
+          "Math.floor((tot || 0) * eurPerSat)" in _gsc)
     # IL GIUDICE DELLA REGOLA E' UNO ANCHE NEL CLIENT: sono quattro le
     # superfici che la promessa la mostrano, e basta che una guardi la
     # soglia sbagliata perche' dei sats si leggano come pezzi
@@ -12908,14 +12950,14 @@ def prove_promesse_badge():
     # liscio (l'ha detto la tortura, non la rilettura).
     _ao = pezzo_js(mini, "async function sezioneAltriOggetti(l){")
     prova("i badge stanno SOPRA il bottone", True,
-          _ao.index('<div class="pills altri-promo">')
+          _ao.index('<div class="pills altri-promo fila-promesse">')
           < _ao.index('<div class="altri-azione">'))
     # ...e fuori dal blocco appiccicato: dentro, il cartello fisso
     # passerebbe da 84 a 178px, il 23% dello schermo sopra la merce
     prova("...e fuori dal blocco appiccicato", True,
           _ao.index('<div class="altri-azione">')
           < _ao.index('<div class="grid altri-griglia">')
-          and 'altri-promo">${badge}</div>`' in _ao)
+          and 'fila-promesse">${badge}</div>`' in _ao)
     # Il chip azzurro della spedizione e' morto con lo sfollamento
     # colori: la regola CSS restava orfana a far credere che vivesse.
     # Si guardano la REGOLA e l'USO e non il nome nudo, che vive ancora
@@ -12931,7 +12973,9 @@ def prove_promesse_badge():
     prova("bottone e badge hanno UN giudice solo", 1,
           _ao.count("tuttoDigitale || inFerie(l)"))
     prova("...e nessuna fila vuota se il negozio non promette niente",
-          True, "badge ? `<div class=\"pills altri-promo\">" in _ao)
+          True,
+          "badge ? `<div class=\"pills altri-promo fila-promesse\">"
+          in _ao)
 
     # ---- 4bis. L'INVITO DELLO SCONTO NELLA PAGINA PAGA (12 ago 2026,
     # chiesto da Andrea col mono che sconta): la stessa forma del
@@ -12963,20 +13007,20 @@ def prove_promesse_badge():
     prova("la spedizione in pagina Paga parla la lingua dello sconto",
           True, "→ <b>spedizione gratis</b>" in _blocco_sg
           and "✅ Spedizione <b>gratis</b></span>" in _blocco_sg)
-    # LE PILLOLE SCATTATE DI PAGA SONO NUDE (13 ago 2026, deciso da
-    # Andrea con l'unitario scontato in pagina): la coda «nel conto»
-    # era diventata un doppione — lo sconto si vede da solo sul
-    # prezzo, la spedizione ce l'ha la riga «gratuita» del conto. Nel
-    # CARRELLO la coda dello sconto RESTA, ed e' portante (la barra
-    # la' e' al LORDO): la sentinella sua sta piu' sotto, e questa
-    # conta che di code ne sia rimasta UNA in tutto il client.
+    # LE PILLOLE SCATTATE SONO NUDE, OVUNQUE (13 ago 2026, deciso da
+    # Andrea in due tempi: prima Paga con l'unitario scontato in
+    # pagina, poi il CARRELLO col totale che mostra lo scontato): la
+    # coda «nel conto» diceva di aspettare il conto perche' il totale
+    # del carrello restava al lordo — adesso scende da solo, col
+    # lordo barrato, e la coda direbbe di cercare altrove una cosa
+    # gia' in vista. Di code non ne resta NESSUNA in tutto il client.
     prova("le pillole scattate di Paga sono nude", True,
           '>✅ Sconto <b>−${scPct}%</b></span>' in mini
           and '>✅ Spedizione <b>gratis</b></span>' in mini)
-    prova("...e la coda «nel conto» resta SOLO al carrello", 1,
+    prova("...e la coda «nel conto» e' morta anche al carrello", 0,
           mini.count("nel conto</span>"))
-    prova("...nella stessa fila, affiancate", 1,
-          _ra.count('`<div class="pills">${pillole}</div>`'))
+    prova("...nella stessa fila, righe piene", 1,
+          _ra.count('`<div class="pills fila-promesse">${pillole}</div>`'))
     # L'ORDINE DELLA FILA E' UNO SOLO (12 ago 2026, decisione di
     # Andrea): 🚚 prima della 🎁, ovunque le due promesse compaiano
     # insieme — pagina Paga, «Altri oggetti», carrello, testata del
@@ -13143,16 +13187,58 @@ def prove_promesse_badge():
     prova("...e nel carrello lo portano tutti e due i badge scattati",
           (True, True),
           ("pill-trust" in _in, "pill-trust" in _sg))
-    # ...e non e' un colore nuovo: e' la coppia di .trust-note
+    # ...e non e' un colore nuovo: e' l'acceso della barra (--barra-a,
+    # famiglia della fiducia), lo stesso traguardo di Paga — dal 13
+    # ago 2026 la scattata e' piena e accesa anche qui, vedi la
+    # sentinella della base .pill.pill-trust nella suite di Paga.
     _css = mini[mini.index(".pill.pill-trust{"):]
     _css = _css[:_css.index("}")]
-    prova("il verde e' quello di casa, non un token nuovo", True,
-          "var(--trust-soft)" in _css and "var(--trust)" in _css)
-    # LA CLAUSOLA D'ONESTA' resta dentro il badge scattato: la barra
-    # qui sotto e' al LORDO di proposito, e senza «nel conto» chi legge
-    # «−15%» aspetterebbe che il totale scenda.
-    prova("il badge scattato dice DOVE si vede lo sconto", True,
-          "nel conto" in _in)
+    prova("il verde della scattata e' l'acceso della barra", True,
+          "var(--barra-a)" in _css and "var(--ink)" in _css)
+    # LA CODA «NEL CONTO» E' MORTA QUI (13 ago 2026, ROVESCIA la
+    # clausola d'onesta' di ieri): il totale della barra ora mostra lo
+    # scontato col lordo barrato, quindi il badge scattato e' NUDO —
+    # ripetere «nel conto» direbbe di cercare altrove una cosa gia'
+    # in vista due dita sotto.
+    # (si guarda la stringa EMESSA e non un «"nel conto" not in», che
+    # inciamperebbe nel commento che racconta la morte della coda: se
+    # la coda tornasse, il </span> subito dopo il % sparirebbe e
+    # questa riga diventerebbe rossa da sola — piu' il conteggio
+    # globale a zero, qui sopra.)
+    prova("il badge scattato del carrello e' nudo", True,
+          '>✅ Sconto <b>−${s.pct}%</b></span>' in _in)
+    # ---- 6bis. LA BARRA E IL TOTALE SCONTATO DEL CARRELLO (13 ago
+    # 2026, decisione di Andrea: il carrello parla la lingua di Paga
+    # per intero). Il giudice dello scatto e' UNO (statoScontoPacco):
+    # lo interrogano il badge e il totale, e due copie del confronto
+    # divergerebbero al primo ritocco.
+    # (il conteggio comprende la definizione: 2 chiamanti + 1)
+    prova("il giudice dello scatto e' uno, e lo chiamano in due", 3,
+          mini.count("statoScontoPacco(tot)"))
+    prova("...i badge del carrello corrono la barra dei ferri comuni",
+          (True, True),
+          ("pill-barra" in _in and "barreCorri" in _in,
+           "pill-barra" in _sg and "barreCorri" in _sg))
+    # IL TOTALE DICE IL NETTO col lordo barrato, con la formula del
+    # server (_sconto_pacco: floor sul netto, il sat di dubbio a chi
+    # paga); il barrato compare SOLO a sconto scattato.
+    prova("il totale scontato usa la formula del server (floor)", True,
+          "Math.floor(tot * (100 - st.pct) / 100)" in _bp)
+    prova("...col lordo barrato solo a sconto scattato", True,
+          "el('paccoPieno').textContent = (st && st.scattato)"
+          " ? resa(tot) : ''" in _bp)
+    prova("...e il barrato ha la sua riga nel markup e nel CSS",
+          (True, True), ('<s class="mono" id="paccoPieno"></s>' in mini,
+                         "#paccoPieno:empty{display:none}" in mini))
+    # LA MISURA RESTA AL LORDO, ed e' la meta' da non rovesciare: la
+    # soglia guarda gli articoli PRIMA dello sconto (la regola del
+    # server), o lo sconto si spegnerebbe da solo facendo scendere il
+    # totale sotto la soglia che l'ha acceso. Ai due inviti e al
+    # giudice va `tot` cosi' com'e' — mai il netto.
+    prova("la misura resta al LORDO: il netto non entra mai", False,
+          "aggiornaInvitoSconto(netto" in mini
+          or "aggiornaInvitoSpedGratis(netto" in mini
+          or "statoScontoPacco(netto" in mini)
 
 
 def prove_guardia_is_bot():

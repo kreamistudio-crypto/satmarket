@@ -1518,19 +1518,24 @@
   .pacco-testa .cur-seg{margin-left:auto;flex:0 0 auto}
   .pacco-testa .pacco-tit .eur-hint{overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap}
-  /* LE DUE PROMESSE DEL NEGOZIO, affiancate sopra la griglia: e' qui
-     che il carrello si compone, ed e' qui che l'invito serve. Vestiti
-     di casa e nessun token nuovo: la pillola neutra mentre manca
-     qualcosa, il verde di .pill-trust quando la soglia scatta.
+  /* LE DUE PROMESSE DEL NEGOZIO sopra la griglia: e' qui che il
+     carrello si compone, ed e' qui che l'invito serve. Dal 13 ago
+     2026 la veste e' quella di Paga — .fila-promesse sul contenitore:
+     righe piene, barra che si riempie, scattata accesa (vedi il
+     blocco della fila nel CSS di Paga).
      OGNUNA HA LA SUA SCATOLA, e non e' un vezzo: con un contenitore
      solo, la prima che tace cancellerebbe la sorella (le due funzioni
      si spengono con box.innerHTML='').
      IL RESPIRO STA SUI FIGLI e non sul wrapper: a carrello vuoto sono
      tutti e due display:none, il flex resta senza item e non produce
      un pixel di altezza — senza bisogno di :has(), che in questo file
-     non si usa da nessuna parte. */
-  #paccoPromesse{display:flex;gap:8px;flex-wrap:wrap;padding:0 var(--pad)}
-  #paccoPromesse > span{margin-top:12px}
+     non si usa da nessuna parte. Ed e' anche il motivo del gap:0
+     QUI (l'ID vince sulla classe): il respiro fra le righe lo danno
+     i margin-top degli span, che spaziano anche dalla testata — un
+     gap del contenitore si sommerebbe, e un margine sul contenitore
+     resterebbe in piedi pure a carrello vuoto. */
+  #paccoPromesse{display:flex;gap:0;padding:0 var(--pad)}
+  #paccoPromesse > span{margin-top:10px}
   #paccoSconto:empty,#paccoSpedGratis:empty{display:none}
   /* La cella: card di vetrina + bottone sotto. Il barattolino dei
      preferiti si spegne QUI (e solo qui): l'angolo in alto a destra
@@ -1628,6 +1633,13 @@
     max-width:100%;line-height:1.2}
   #paccoTot{font-size:17px;font-weight:800;white-space:nowrap}
   #paccoTot.lungo{font-size:14.5px}
+  /* il LORDO barrato sotto il totale, solo a sconto scattato (13 ago
+     2026): la resa dell'unitario di Paga e del listino in lampo —
+     piccolo, muto, con la riga sopra. Vuoto = nessuna riga (il
+     pattern delle due scatole delle promesse). */
+  #paccoPieno{font-size:11.5px;color:var(--muted);font-weight:600;
+    white-space:nowrap}
+  #paccoPieno:empty{display:none}
   /* la riga «N pezzi» non decide la larghezza della colonna (width:0 +
      min-width:100% = larga quanto il totale) e coi puntini se non ci
      sta: e' un conteggio, non denaro */
@@ -1840,44 +1852,42 @@
   .acq-prezzo .acq-barrato{font-size:11.5px;color:var(--muted);
     font-weight:600;text-decoration:line-through}
   .acq-prezzo .acq-barrato .unit{display:inline-block}
-  /* LA FILA DELLE PROMESSE IN PAGA: righe a tutta larghezza e tono
-     quieto (ago 2026, decisione di Andrea — la POSIZIONE resta sopra
-     la Consegna: il modo «dentro la card dell'articolo» e' stato
-     costruito, guardato e SCARTATO, perche' costava il rovesciamento
-     del 12 ago e l'uniformita' della fila fra quattro superfici per
-     un problema che era d'aspetto). Il markup non si tocca — la
-     sentinella della fila conta proprio quel template — e le pillole
-     si stendono via CSS: larghezza piena, angoli da riquadro come le
-     vie qui sotto, peso normale col grassetto lasciato alla parte
-     che conta. Il verde della conferma resta verde. */
-  #acqCorpo > .pills{flex-direction:column;gap:6px;align-items:stretch}
-  #acqCorpo > .pills .pill{width:100%;border-radius:var(--radius-btn);
+  /* LA FILA DELLE PROMESSE — UNA VESTE SOLA (ago 2026, decisione di
+     Andrea; nata in Paga, dal 13 ago 2026 la portano ANCHE il
+     carrello e «Altri oggetti»: la classe e' .fila-promesse sui tre
+     contenitori, e la quarta superficie di domani la mette e ha
+     finito, invece di allungare sei liste di selettori). Righe a
+     tutta larghezza e tono quieto: angoli da riquadro come le vie di
+     Paga, peso normale col grassetto lasciato alla parte che conta.
+     La POSIZIONE di ognuna non cambia (in Paga sopra la Consegna, in
+     «Altri oggetti» sopra il bottone sticky, nel carrello sotto la
+     testata appiccicata). display:block sulla pillola NON e' ozioso:
+     nel carrello vive dentro lo span-scatola e resterebbe inline —
+     e width:100% su un inline non fa niente; in Paga e «Altri
+     oggetti» e' gia' blockificata dal flex, quindi non cambia nulla. */
+  .fila-promesse{flex-direction:column;gap:6px;align-items:stretch}
+  .fila-promesse .pill{display:block;width:100%;border-radius:var(--radius-btn);
     border-color:var(--line);font-weight:600;padding:8px 12px}
-  #acqCorpo > .pills .pill b{font-weight:800}
+  .fila-promesse .pill b{font-weight:800}
   /* LA SCATTATA E' PIENA E ACCESA (quarto giro, 13 ago 2026, visto da
      Andrea a schermo nei due temi — e ROVESCIA il «la corsa chiama,
      il traguardo riposa» di mezza giornata prima: la barra si
      accendeva salendo e allo scatto la pillola tornava al verde
-     tenue, cioe' il traguardo PERDEVA forza — sembrava che qualcosa
-     si fosse spento proprio nel momento piu' forte, e di sera
-     l'inverso). Qui, e SOLO qui, la pill-trust veste l'acceso pieno
-     (--barra-a) con l'inchiostro sopra (8,1 di giorno, 5,3 di sera);
-     il carrello e le altre superfici tengono la pill-trust tenue di
-     sempre. Ora che la tinta e' la stessa, a distinguere la barra
-     quasi piena dalla scattata bastano la FORMA e il TESTO: il tetto
-     a 99 lascia sempre la fetta di carta col bordo netto — una
-     barra, mai un fondo — contro la pillola INTERA bordo a bordo, e
-     «Ancora N → …» contro «✅ …». */
-  #acqCorpo > .pills .pill-trust{border-color:var(--barra-a);
-    background:var(--barra-a);color:var(--ink)}
+     tenue, cioe' il traguardo PERDEVA forza). La regola vive ora
+     sulla BASE .pill.pill-trust (vedi il suo blocco, piu' sotto):
+     dal 13 ago 2026 anche il carrello corre la barra, e due
+     traguardi diversi per la stessa promessa erano una divergenza
+     senza motivo. Qui restano i ferri della barra, che vestono ogni
+     .fila-promesse — «Altri oggetti» resta neutro per contenuto, non
+     per CSS: quelle pillole non emettono mai pill-barra/pill-trust. */
   /* LA BARRA DI RIEMPIMENTO delle promesse (13 ago 2026, decisione di
      Andrea sui prototipi): il verde riempie la pillola da sinistra
      fino al progresso, con un bordo NETTO — la saturazione del colore
      e' stata prototipata e SCARTATA: 67% e 73% si vedevano uguali, e
      il quasi-verde si leggeva come promessa gia' scattata. Piena non
      lo e' mai: il 100% e' la pill-trust verde di oggi, e il client si
-     ferma a 99. La larghezza la scrive renderAcquisto in
-     background-size, sempre (anche 0%).
+     ferma a 99. La larghezza la scrive barraPromessa in --barra-p,
+     sempre (anche 0%).
      IL COLORE VIRA COL PROGRESSO (terzo giro, 13 ago 2026, chiesto da
      Andrea): la coppia `--barra-da`/`--barra-a` — verde SLAVATO che
      si accende salendo, mescolato dal progresso stesso col color-mix
@@ -1899,30 +1909,33 @@
      davvero, mentre un gradiente no: e' cosi' che il viraggio e'
      morbido quanto la corsa (prima il colore cambiava a scatti fra un
      render e l'altro, e la corsa stessa non partiva mai — vedi il
-     doppio rAF in renderAcquisto). z-index:0 sul guscio e -1 sul
+     doppio rAF in barreCorri). z-index:0 sul guscio e -1 sul
      fill, tutti e due necessari: il positioned nudo coprirebbe il
      TESTO, e il -1 senza lo stacking context del guscio finirebbe
      SOTTO il fondo della pillola, cioe' invisibile. overflow:hidden
      lo fa tagliare dagli angoli tondi. Il tetto a 99 resta: piena e'
      solo la scattata. */
-  #acqCorpo > .pills .pill-barra,
-  #acqCorpo > .pills .barra-scatto{position:relative;z-index:0;
+  .fila-promesse .pill-barra,
+  .fila-promesse .barra-scatto{position:relative;z-index:0;
     overflow:hidden}
-  #acqCorpo > .pills .pill-barra::before,
-  #acqCorpo > .pills .barra-scatto::before{content:'';position:absolute;
+  .fila-promesse .pill-barra::before,
+  .fila-promesse .barra-scatto::before{content:'';position:absolute;
     z-index:-1;left:0;top:0;bottom:0;width:var(--barra-p,0%);
     background:var(--barra-c,var(--barra-da));
     transition:width .35s ease,background-color .35s ease}
   /* lo scatto: l'ultimo tratto corre nell'ACCESO — il guscio torna
      carta e il fill va al 100% in --barra-a, che e' anche il fondo di
-     riposo della scattata qui sopra: la tinta non salta piu', il
-     traguardo GUADAGNA. Sta DOPO la regola della scattata, a pari
-     specificita': l'ordine decide. */
-  #acqCorpo > .pills .barra-scatto{background:var(--card);
+     riposo della scattata: la tinta non salta piu', il traguardo
+     GUADAGNA. Il .pill in piu' nel selettore NON e' un vezzo: deve
+     battere la base .pill.pill-trust (0,2,0) per SPECIFICITA' e non
+     per ordine — quella regola vive piu' in basso nel foglio, e a
+     pari peso vincerebbe lei, cioe' guscio acceso durante la corsa
+     e scatto invisibile. */
+  .fila-promesse .pill.barra-scatto{background:var(--card);
     color:var(--ink)}
   @media (prefers-reduced-motion:reduce){
-    #acqCorpo > .pills .pill-barra::before,
-    #acqCorpo > .pills .barra-scatto::before{transition:none}
+    .fila-promesse .pill-barra::before,
+    .fila-promesse .barra-scatto::before{transition:none}
   }
   /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
      768 sparisce come nella pagina del pacco, ma senza barra propria */
@@ -2198,18 +2211,23 @@
   .pill.cond-accettabile{background:var(--sats-soft);border-color:var(--sats-soft);color:var(--gold-text)}
   html[data-tema="scuro"] .pill.cond-accettabile{color:var(--sats-text)}
   .pill.cond-da_sistemare{background:var(--off-bg);border-color:var(--off-bg);color:var(--ink-soft)}
-  /* IL VERDE DELLA PROMESSA SCATTATA, e vive SOLO nel carrello
-     (decisione di Andrea): e' la coppia di .trust-note, cioe' la
-     conferma — lo stesso vestito della riga di prosa che questo badge
-     ha sostituito. Nel dettaglio e in «Altri oggetti» i badge restano
-     NEUTRI, perche' li' la promessa e' una REGOLA e non un fatto
-     compiuto: un verde direbbe «ce l'hai» a chi non ce l'ha ancora, e
-     nel dettaglio finirebbe a un centimetro dalla pillola verde della
-     CONDIZIONE, che vuol dire un'altra cosa.
+  /* IL VERDE DELLA PROMESSA SCATTATA: PIENO E ACCESO (--barra-a con
+     l'inchiostro sopra: 8,1 di giorno, 5,3 di sera — misurati per
+     Paga il 13 ago 2026, e da quel giorno vale anche nel CARRELLO,
+     che corre la stessa barra: due traguardi diversi per la stessa
+     promessa erano una divergenza senza motivo, e il tenue di
+     .trust-soft qui non lo veste piu' nessuno). Vive SOLO dove la
+     promessa e' un FATTO — il carrello e Paga, le due superfici che
+     emettono pill-trust. Nella scheda e in «Altri oggetti» i badge
+     restano NEUTRI per contenuto (mai pill-trust li'): la promessa
+     e' una REGOLA, un verde direbbe «ce l'hai» a chi non ce l'ha
+     ancora, e nel dettaglio finirebbe a un centimetro dalla pillola
+     verde della CONDIZIONE, che vuol dire un'altra cosa.
      STA DOPO il blocco cond-*: pari specificita', vince l'ultima — la
-     regola di casa gia' scritta su .trust-note.nota-punto. */
-  .pill.pill-trust{background:var(--trust-soft);border-color:var(--trust-soft);
-    color:var(--trust)}
+     regola di casa gia' scritta su .trust-note.nota-punto. Lo scatto
+     della corsa la batte per specificita' (.fila-promesse
+     .pill.barra-scatto), non per ordine: vedi il blocco della fila. */
+  .pill.pill-trust{border-color:var(--barra-a);background:var(--barra-a);color:var(--ink)}
   /* La zona escrow: il recinto verde tratteggiato — il "sigillo" del
      barattolo, l'unico tratteggio del sistema insieme alla cassaforte */
   .escrow-zone{position:relative;background:var(--trust-soft);border:2px dashed var(--trust);
@@ -3444,16 +3462,21 @@ document.getElementById('cartello')?.remove();</script>
     <!-- LE DUE PROMESSE DEL NEGOZIO (ago 2026), sotto la testata e
          sopra la griglia — e' qui che il carrello si compone, ed e'
          qui che l'invito serve. Badge col CONTO VIVO: quanto manca
-         mentre si aggiungono pezzi, e la conferma in verde quando la
-         soglia scatta. Non portano MAI il RISPARMIO in cifra: quanto
-         si risparmia lo dice il conto del server, nel riepilogo.
+         mentre si aggiungono pezzi, e dal 13 ago 2026 nella veste
+         PIENA di Paga (.fila-promesse): righe a tutta larghezza,
+         barra che si riempie col viraggio, conferma piena e accesa
+         allo scatto — e il badge scattato e' NUDO, perche' il
+         risparmio ora lo dice il totale della barra qui sotto, col
+         lordo barrato (vedi aggiornaBarraPacco). La percentuale
+         applicata resta una RESA: il conto vero e' del server, nel
+         riepilogo.
          DUE SCATOLE e non una: le riempiono due funzioni gemelle che
          si spengono con box.innerHTML='', e con un contenitore solo la
          prima che tace cancellerebbe la sorella. La 🚚 viene PRIMA
          della 🎁 (12 ago 2026, decisione di Andrea): lo stesso ordine
          della pagina Paga, di «Altri oggetti» e della testata del
          negozio — l'occhio impara UNA fila. -->
-    <div id="paccoPromesse">
+    <div id="paccoPromesse" class="fila-promesse">
       <span id="paccoSpedGratis"></span>
       <span id="paccoSconto"></span>
     </div>
@@ -4088,7 +4111,7 @@ document.getElementById('cartello')?.remove();</script>
        €/₿ sta in testa alla pagina (deciso da Andrea, qui rubava
        spazio al numero). -->
   <div id="barraPacco">
-    <div class="pacco-somma"><b class="mono" id="paccoTot"></b><span id="paccoConta"></span></div>
+    <div class="pacco-somma"><b class="mono" id="paccoTot"></b><s class="mono" id="paccoPieno"></s><span id="paccoConta"></span></div>
     <!-- «Controlla e paga» (ago 2026, decisione di Andrea): il bottone
          porta al riepilogo PRIMA di pagare, e il nome dice la sequenza —
          Aggiungi al carrello → Controlla e paga → Paga. -->
@@ -8204,8 +8227,12 @@ async function sezioneAltriOggetti(l){
      fisso passa da 84 a 178px, il 23% dello schermo, sopra la merce e
      con la barra d'acquisto che se ne prende altri 86; e lasciarli
      sotto non-sticky e' proprio il difetto qui sopra.
-     Neutri: qui la promessa e' una REGOLA, e il verde vive solo nel
-     carrello. L'idioma `(p => p ? … : '')` e' quello del dettaglio: un
+     Neutri: qui la promessa e' una REGOLA, e il verde vive solo dove
+     e' un fatto (carrello e Paga). Dal 13 ago 2026 la fila veste
+     .fila-promesse — righe a tutta larghezza come in Paga: SOLO la
+     veste, niente barra e niente verde, perche' qui non c'e' una
+     soglia da riempire — non e' un verdetto sul carrello corrente.
+     L'idioma `(p => p ? … : '')` e' quello del dettaglio: un
      venditore senza regole non deve emettere una fila vuota, che
      varrebbe comunque il suo margine. */
   /* 🚚 prima della 🎁 (12 ago 2026, decisione di Andrea): lo stesso
@@ -8216,7 +8243,7 @@ async function sezioneAltriOggetti(l){
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label">Altri oggetti di questo venditore</div>
-      ${badge ? `<div class="pills altri-promo">${badge}</div>` : ''}
+      ${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}
       ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>` : ''}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
@@ -8862,6 +8889,136 @@ function acqPasso(delta){
   }
   caricaPreventivo();
 }
+/* ---- LA FILA DELLE PROMESSE: I FERRI CONDIVISI (13 ago 2026) ----
+   Barra, viraggio e corsa nascono in Paga e da oggi li corre anche
+   il CARRELLO (decisione di Andrea): i ferri sono QUESTI e mai una
+   copia — una seconda stesura della corsa e' esattamente il posto
+   dove il prossimo «si anima solo la spedizione» tornerebbe a
+   nascondersi. Chi apre una quarta superficie con la barra chiama
+   barreCattura PRIMA che l'innerHTML porti via i nodi e barreCorri
+   dopo, e ha finito.
+   LA BARRA DI RIEMPIMENTO (13 ago 2026, decisione di Andrea sui
+   prototipi): la pillola sotto soglia si riempie del verde man mano
+   che si sale. Il progresso e' (soglia − manca)/soglia, nell'unita'
+   della promessa: in Paga coi numeri del SERVER (mancano_*), nel
+   carrello coi numeri del CLIENT — gli stessi che il testo «Ancora
+   N» dice gia', quindi la barra non aggiunge nessuna pretesa nuova
+   (la fascia del cambio a soglia in euro e' quella dichiarata sul
+   giudice statoScontoPacco; a cambio muto la pillola non esiste, e
+   con lei la barra). A pezzi sale a gradini, a valore e' continua:
+   dice la verita' in tutti e due i casi senza un ramo. IL TETTO A
+   99 e' deliberato: una barra piena su una pillola non-verde
+   direbbe «scattata» a chi guarda solo il colore — piena e' solo la
+   pill-trust. Lo style c'e' SEMPRE (anche 0%): il fill e' un
+   ::before con larghezza in --barra-p, e senza il valore esplicito
+   il ripiego della custom property farebbe da falso (vedi il CSS
+   della fila). */
+const barraPromessa = (soglia, manca) => {
+  const p = Math.min(99, Math.max(0,
+    Math.round((soglia - manca) / soglia * 100)));
+  /* IL VIRAGGIO (13 ago 2026, chiesto da Andrea): la tinta segue il
+     progresso — verde SLAVATO vicino alla partenza, ACCESO vicino
+     alla soglia (--barra-da → --barra-a, mescolati dal progresso
+     stesso). MAI dal rosso: nell'app il rosso vuol dire problema, e
+     una promessa non raggiunta e' un invito, non un fallimento. Il
+     grigio neutro come partenza e' stato prototipato e scartato:
+     nel mezzo la mescola verso il verde fa un olivastro spento, e
+     si perde la famiglia della fiducia. Larghezza e tinta corrono
+     INSIEME: il fill e' un ::before, e width e background-color si
+     transizionano davvero — il doppio rAF di barreCorri. */
+  const c = `color-mix(in srgb, var(--barra-a) ${p}%, var(--barra-da))`;
+  return ` style="--barra-p:${p}%;--barra-c:${c}"`;
+};
+/* IL «DA» DELLA CORSA MORBIDA (13 ago 2026, chiesta da Andrea): non
+   si conserva, si RECUPERA — il computed dell'istante, che a meta'
+   corsa e' il valore INTERPOLATO. E' cio' che tiene onesti i +
+   veloci: le transizioni CSS non si accodano mai, ritargeting
+   nativo — la barra devia in corsa verso l'ultimo bersaglio, e il
+   NUMERO («Ancora N») non aspetta nessuno, si aggiorna secco al
+   render. Si cattura PRIMA che l'innerHTML porti via i nodi: la
+   larghezza del ::before in px, riportata a percento, e il COLORE,
+   che dal quarto giro corre anche lui. La scattata senza fill vale
+   100 e acceso (e' cosi' che la discesa riparte da dov'era), la
+   barra mai misurata vale 0.
+   LA SCATOLA DELLA MISURA E' clientWidth, MAI getBoundingClientRect
+   (13 ago 2026, trovato campionando lo «scattino indietro» visto
+   dal telefono): il % del ::before si risolve sul PADDING BOX della
+   pillola — il containing block di un absolute — mentre il rect
+   porta anche il BORDO (3px): ogni cattura usciva ~1% piu' bassa
+   del vero, la barra ripartiva qualche px INDIETRO a ogni tocco, e
+   la scattata reduce dal suo scatto rifaceva una mini-corsa 99→100
+   — il rimbalzo del bordo destro. Con la scatola giusta la cattura
+   a riposo E' il valore di prima, e la corsa che non serve non
+   parte (il filtro dei 0.5 in barreCorri). */
+function barreCattura(box){
+  const barraDa = {};
+  box.querySelectorAll('[data-barra]').forEach(el=>{
+    const ps = getComputedStyle(el, '::before');
+    const w = parseFloat(ps.width);
+    const largo = el.clientWidth;
+    const trust = el.classList.contains('pill-trust');
+    barraDa[el.dataset.barra] = {
+      p: (Number.isFinite(w) && largo > 0)
+         ? Math.min(100, w / largo * 100) : (trust ? 100 : 0),
+      c: (ps.backgroundColor && ps.backgroundColor !== 'rgba(0, 0, 0, 0)')
+         ? ps.backgroundColor
+         : (trust ? 'var(--barra-a)' : 'var(--barra-da)')
+    };
+  });
+  return barraDa;
+}
+/* ...e il via, in DUE FOTOGRAMMI e A PARTENZE RIUNITE — la diagnosi
+   vera del «si anima solo la spedizione» visto dal campo: la prima
+   stesura faceva il giro PER PILLOLA (set del «da», void
+   offsetWidth, set del bersaglio), e il reflow della PRIMA pillola
+   computava lo stile anche della SECONDA, che in quell'istante
+   aveva ancora il bersaglio inline — il suo stile «prima» restava
+   fissato al bersaglio, e il suo FLIP diventava
+   bersaglio→da→bersaglio, cioe' un no-op: animava solo la prima
+   della fila, che e' la spedizione. Quindi: PRIMA tutti i «da», POI
+   tutti i bersagli in un colpo solo — e i bersagli arrivano al
+   secondo requestAnimationFrame, che copre anche il nodo appena
+   inserito (senza un fotogramma reso la transizione puo' non
+   partire; un reflow non e' un fotogramma). Le due scatole del
+   carrello passano di qui UNA alla volta e la regola tiene lo
+   stesso: la cattura della seconda trova la prima gia' TUTTA alle
+   partenze — i suoi bersagli aspettano il rAF — mai a meta'.
+   ONESTA' SULLA VERIFICA, di nuovo (la lezione della tastiera): in
+   headless le transizioni NON AVANZANO, quindi la corsa non si
+   campiona ne' si fotografa — si prova la STRUTTURA (partenze in
+   blocco, niente flush in mezzo, bersagli a fotogramma reso), il
+   movimento lo dice il telefono.
+   ALLO SCATTO la pill-trust corre l'ultimo tratto nell'ACCESO
+   (.barra-scatto: guscio a carta, fill al 100% in --barra-a, che
+   e' il fondo di riposo della scattata): la tinta non salta, il
+   traguardo guadagna. In discesa il simmetrico — si riparte da 100
+   e acceso. Chi nasce senza un «da» (primo render, pillola appena
+   comparsa) non corre; reduced-motion spegne la transizione dal
+   CSS e i bersagli arrivano comunque, secchi. */
+function barreCorri(box, barraDa){
+  const corse = [];
+  box.querySelectorAll('[data-barra]').forEach(el=>{
+    const da = barraDa[el.dataset.barra];
+    if (!da) return;
+    const scatto = el.classList.contains('pill-trust');
+    const aP = scatto ? 100
+      : (parseFloat(el.style.getPropertyValue('--barra-p')) || 0);
+    if (Math.abs(aP - da.p) < 0.5) return;
+    const aC = scatto ? 'var(--barra-a)'
+      : (el.style.getPropertyValue('--barra-c') || 'var(--barra-da)');
+    if (scatto) el.classList.add('barra-scatto');
+    el.style.setProperty('--barra-p', `${da.p}%`);
+    el.style.setProperty('--barra-c', da.c);
+    corse.push([el, `${aP}%`, aC]);
+  });
+  if (corse.length)
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      for (const [el, p2, c2] of corse){
+        el.style.setProperty('--barra-p', p2);
+        el.style.setProperty('--barra-c', c2);
+      }
+    }));
+}
 /* Tutto si disegna da acqDati, MAI un fetch qui dentro: il toggle
    valuta e il cambio di pillola ridisegnano dal preventivo in cache. */
 function renderAcquisto(){
@@ -9077,11 +9234,12 @@ function renderAcquisto(){
      col pieno barrato, e la spedizione ce l'ha la riga «gratuita»
      del conto due dita sotto (la pillola e' il cartello, il conto e'
      il fatto: la riga dice il COSA, il verde dice il PERCHE' — e' la
-     promessa del negozio a essere scattata). NEL CARRELLO la coda
-     dello sconto RESTA, ed e' portante: la' la barra e' al LORDO di
-     proposito, e senza «nel conto» chi legge «−15%» aspetterebbe che
-     il totale scenda — la spedizione del carrello invece e' nuda da
-     sempre. Coi numeri del SERVER: `mancano_*`
+     promessa del negozio a essere scattata). Dal 13 ago 2026 anche
+     NEL CARRELLO le scattate sono nude: la coda «nel conto» e' morta
+     con il totale della barra che mostra lo scontato col lordo
+     barrato (vedi aggiornaBarraPacco) — diceva di aspettare il conto
+     perche' la' il totale restava al lordo, e adesso scende da solo.
+     Coi numeri del SERVER: `mancano_*`
      li conta lui, quindi la fascia stretta del cambio del carrello
      qui non esiste. A VALORE il quanto manca e' una CIFRA nell'unita'
      della promessa (cifraSoglia, mai una conversione).
@@ -9091,40 +9249,13 @@ function renderAcquisto(){
      si direbbe sospesa per colpa di uno sconto in euro (il bug che
      questo riordino ha tolto). In DEMO le chiavi non arrivano e
      tutto tace da solo. */
-  /* LA BARRA DI RIEMPIMENTO delle promesse (13 ago 2026, decisione di
-     Andrea, scelta sui prototipi): la pillola sotto soglia si riempie
-     del verde tenue man mano che il carrello sale. Il progresso e'
-     (soglia − mancano)/soglia, coi numeri che il preventivo porta
-     GIA' e nell'unita' della promessa — il client riceve, non
-     calcola, il patto dell'invito. A pezzi sale a gradini, a valore
-     e' continuo: la barra dice la verita' in tutti e due i casi senza
-     un ramo (a cambio muto la promessa in euro non e' una pillola ma
-     prosa, quindi la barra li' non esiste per costruzione). IL TETTO
-     A 99 e' deliberato: una barra piena su una pillola non-verde
-     direbbe «scattata» a chi guarda solo il colore — piena e' solo la
-     pill-trust. LA CORSA MORBIDA e' del secondo giro (13 ago,
-     chiesta da Andrea): il «da» che a un nodo ricostruito manca si
-     RECUPERA dal computed prima del render — il giro FLIP in fondo a
-     renderAcquisto. Lo style c'e' SEMPRE (anche 0%): .pill-barra porta un
-     background-image, e senza background-size esplicito il gradiente
-     coprirebbe la pillola intera — cioe' il falso al primo pezzo. */
-  const barraPromessa = (soglia, manca) => {
-    const p = Math.min(99, Math.max(0,
-      Math.round((soglia - manca) / soglia * 100)));
-    /* IL VIRAGGIO (13 ago 2026, chiesto da Andrea): la tinta segue il
-       progresso — verde SLAVATO vicino alla partenza, ACCESO vicino
-       alla soglia (--barra-da → --barra-a, mescolati dal progresso
-       stesso). MAI dal rosso: nell'app il rosso vuol dire problema, e
-       una promessa non raggiunta e' un invito, non un fallimento. Il
-       grigio neutro come partenza e' stato prototipato e scartato:
-       nel mezzo la mescola verso il verde fa un olivastro spento, e
-       si perde la famiglia della fiducia. Larghezza e tinta corrono
-       INSIEME: il fill e' un ::before, e width e background-color si
-       transizionano davvero — il doppio rAF in fondo a
-       renderAcquisto. */
-    const c = `color-mix(in srgb, var(--barra-a) ${p}%, var(--barra-da))`;
-    return ` style="--barra-p:${p}%;--barra-c:${c}"`;
-  };
+  /* LA BARRA DI RIEMPIMENTO: qui coi numeri del SERVER (mancano_*,
+     il patto dell'invito — il client riceve, non calcola), e a
+     cambio muto la promessa in euro non e' una pillola ma prosa,
+     quindi la barra li' non esiste per costruzione. Dal 13 ago 2026
+     barraPromessa e il giro FLIP sono i FERRI CONDIVISI qui sopra
+     (barreCattura/barreCorri): li corre anche il carrello, e una
+     copia sarebbe il posto dove la prossima divergenza si nasconde. */
   const scPct = p.sconto_percento||0, scCrit = p.sconto_criterio||'';
   const scVal = p.sconto_valuta||'eur';
   const scSogliaPag = scCrit === 'pezzi' ? (p.sconto_soglia||0)
@@ -9185,7 +9316,7 @@ function renderAcquisto(){
      alle note — e' un fatto del negozio, si legge prima di scegliere
      la strada (vedi il montaggio di box.innerHTML). */
   const pillole = pillaSg + pillaSc;
-  const fila = pillole ? `<div class="pills">${pillole}</div>` : '';
+  const fila = pillole ? `<div class="pills fila-promesse">${pillole}</div>` : '';
   /* --- il conto della strada scelta, riga per riga --- */
   const viaOk = stradaSel && !stradaSel.cambio_assente;
   const sped = viaOk ? (stradaSel.spedizione_sats||0) : 0;
@@ -9216,94 +9347,21 @@ function renderAcquisto(){
   const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
-  /* LA CORSA MORBIDA DELLA BARRA (13 ago 2026, chiesta da Andrea): il
-     «da» non si conserva, si RECUPERA — il computed dell'istante, che
-     a meta' corsa e' il valore INTERPOLATO. E' cio' che tiene onesti
-     i + veloci: le transizioni CSS non si accodano mai, ritargeting
-     nativo — la barra devia in corsa verso l'ultimo bersaglio, e il
-     NUMERO («Ancora N») non aspetta nessuno, si aggiorna secco al
-     render. Si cattura PRIMA che l'innerHTML porti via i nodi: la
-     larghezza del ::before in px, riportata a percento, e il COLORE,
-     che dal quarto giro corre anche lui. La scattata senza fill vale
-     100 e acceso (e' cosi' che la discesa riparte da dov'era), la
-     barra mai misurata vale 0. */
-  /* LA SCATOLA DELLA MISURA E' clientWidth, MAI getBoundingClientRect
-     (13 ago 2026, trovato campionando lo «scattino indietro» visto
-     dal telefono): il % del ::before si risolve sul PADDING BOX della
-     pillola — il containing block di un absolute — mentre il rect
-     porta anche il BORDO (3px): ogni cattura usciva ~1% piu' bassa
-     del vero, la barra ripartiva qualche px INDIETRO a ogni tocco, e
-     la scattata reduce dal suo scatto rifaceva una mini-corsa 99→100
-     — il rimbalzo del bordo destro. Con la scatola giusta la cattura
-     a riposo E' il valore di prima, e la corsa che non serve non
-     parte (il filtro dei 0.5 sotto). */
-  const barraDa = {};
-  box.querySelectorAll('[data-barra]').forEach(el=>{
-    const ps = getComputedStyle(el, '::before');
-    const w = parseFloat(ps.width);
-    const largo = el.clientWidth;
-    const trust = el.classList.contains('pill-trust');
-    barraDa[el.dataset.barra] = {
-      p: (Number.isFinite(w) && largo > 0)
-         ? Math.min(100, w / largo * 100) : (trust ? 100 : 0),
-      c: (ps.backgroundColor && ps.backgroundColor !== 'rgba(0, 0, 0, 0)')
-         ? ps.backgroundColor
-         : (trust ? 'var(--barra-a)' : 'var(--barra-da)')
-    };
-  });
+  /* il «da» della corsa morbida si cattura PRIMA che l'innerHTML
+     porti via i nodi — la meccanica intera (clientWidth, il computed
+     interpolato, le partenze riunite) vive nei ferri condivisi
+     barreCattura/barreCorri, qui sopra */
+  const barraDa = barreCattura(box);
   box.innerHTML = `${articoli}${accQta}${fila}${vie}${note}
     <div class="section-label">Il conto</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
       <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>
     </div>`;
-  /* ...e il via, in DUE FOTOGRAMMI e A PARTENZE RIUNITE — la
-     diagnosi vera del «si anima solo la spedizione» visto dal campo:
-     la prima stesura faceva il giro PER PILLOLA (set del «da», void
-     offsetWidth, set del bersaglio), e il reflow della PRIMA pillola
-     computava lo stile anche della SECONDA, che in quell'istante
-     aveva ancora il bersaglio inline — il suo stile «prima» restava
-     fissato al bersaglio, e il suo FLIP diventava
-     bersaglio→da→bersaglio, cioe' un no-op: animava solo la prima
-     della fila, che e' la spedizione. Quindi: PRIMA tutti i «da»,
-     POI tutti i bersagli in un colpo solo — e i bersagli arrivano al
-     secondo requestAnimationFrame, che copre anche il nodo appena
-     inserito (senza un fotogramma reso la transizione puo' non
-     partire; un reflow non e' un fotogramma).
-     ONESTA' SULLA VERIFICA, di nuovo (la lezione della tastiera): in
-     headless le transizioni NON AVANZANO, quindi la corsa non si
-     campiona ne' si fotografa — si prova la STRUTTURA (partenze in
-     blocco, niente flush in mezzo, bersagli a fotogramma reso), il
-     movimento lo dice il telefono.
-     ALLO SCATTO la pill-trust corre l'ultimo tratto nell'ACCESO
-     (.barra-scatto: guscio a carta, fill al 100% in --barra-a, che
-     e' il fondo di riposo della scattata): la tinta non salta, il
-     traguardo guadagna. In discesa il simmetrico — si riparte da 100
-     e acceso. Chi nasce senza un «da» (primo render, pillola appena
-     comparsa) non corre; reduced-motion spegne la transizione dal
-     CSS e i bersagli arrivano comunque, secchi. */
-  const corse = [];
-  box.querySelectorAll('[data-barra]').forEach(el=>{
-    const da = barraDa[el.dataset.barra];
-    if (!da) return;
-    const scatto = el.classList.contains('pill-trust');
-    const aP = scatto ? 100
-      : (parseFloat(el.style.getPropertyValue('--barra-p')) || 0);
-    if (Math.abs(aP - da.p) < 0.5) return;
-    const aC = scatto ? 'var(--barra-a)'
-      : (el.style.getPropertyValue('--barra-c') || 'var(--barra-da)');
-    if (scatto) el.classList.add('barra-scatto');
-    el.style.setProperty('--barra-p', `${da.p}%`);
-    el.style.setProperty('--barra-c', da.c);
-    corse.push([el, `${aP}%`, aC]);
-  });
-  if (corse.length)
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      for (const [el, p2, c2] of corse){
-        el.style.setProperty('--barra-p', p2);
-        el.style.setProperty('--barra-c', c2);
-      }
-    }));
+  /* ...e il via: partenze e bersagli li mette barreCorri, il ferro
+     condiviso — due fotogrammi, partenze riunite, lo scatto
+     nell'acceso. La storia intera sta sul ferro. */
+  barreCorri(box, barraDa);
   aggiornaCurToggle();   /* il toggle in testata dice la verita' */
 }
 function setViaAcquisto(v){
@@ -9550,15 +9608,22 @@ function renderPacco(){
 /* Il totale della barra: i SOLI articoli, in valuta dello spettatore.
    Niente consegna e niente spedizione qui — entrano nel riepilogo,
    dove c'e' un totale vero da raccontare. Il «≈» sta sul convertito.
-   E NEMMENO LO SCONTO CARRELLO, di proposito (ago 2026): questa non e'
-   gia' oggi il totale da pagare, e' la somma degli articoli in
-   vetrina — che non porti lo sconto e' coerente con quello che E'.
-   Le due alternative sono peggio: far arrivare qui il preventivo
-   vorrebbe dire una chiamata a ogni tocco dello stepper (la firma
-   cambia ogni volta, e un debounce litigherebbe proprio con chi sale
-   in fretta), e calcolarlo nel client sarebbe il primo conto sul
-   denaro fuori dalla DEMO, proprio sul numero piu' carico. La
-   notizia la porta l'invito qui sopra, che dice anche dove guardare. */
+   E DAL 13 AGO 2026 LO SCONTO SI VEDE (decisione di Andrea, come
+   l'unitario in Paga): a soglia scattata il totale dice il NETTO col
+   lordo barrato sotto — prima restava al lordo e a spiegarlo c'era
+   la coda «nel conto» del badge, che lasciava chi legge «−15%» ad
+   aspettare che il totale scendesse. LA MISURA RESTA AL LORDO, ed e'
+   la meta' da non rovesciare: al giudice e ai due inviti va `tot`
+   cosi' com'e' — la soglia guarda gli articoli PRIMA dello sconto,
+   la regola del server («LA MISURA E' IL LORDO»), o lo sconto
+   potrebbe spegnersi da solo facendo scendere il totale sotto la
+   soglia che l'ha acceso. Il netto e' solo RESA, con la formula del
+   server (_sconto_pacco: floor sul netto, il sat di dubbio a chi
+   paga) — l'ordine nasce sempre dal conto del server, e la sua
+   onesta' e' quella del ✅ che c'era gia': stesso scatto, stessa
+   fascia dichiarata del cambio a soglia in euro. Il preventivo a
+   ogni tocco dello stepper resta scartato (il debounce litiga con
+   chi sale in fretta). */
 function aggiornaBarraPacco(){
   let tot = 0, pezzi = 0, circa = '';
   for (const [id, qta] of setScelte){
@@ -9567,10 +9632,17 @@ function aggiornaBarraPacco(){
     tot += artStima(x) * qta; pezzi += qta;
     if (x.valuta==='eur') circa = '≈ ';
   }
+  const st = statoScontoPacco(tot);
+  const netto = (st && st.scattato)
+    ? Math.floor(tot * (100 - st.pct) / 100) : 0;
+  const resa = n => valutaVista==='eur'
+    ? `≈ ${fmtEur(n * eurPerSat)} €`
+    : `${circa}${fmt(n)} sats`;
   const t = el('paccoTot');
-  t.textContent = valutaVista==='eur'
-    ? `≈ ${fmtEur(tot * eurPerSat)} €`
-    : `${circa}${fmt(tot)} sats`;
+  t.textContent = resa((st && st.scattato) ? netto : tot);
+  /* il lordo barrato compare SOLO a sconto scattato: vuoto = niente
+     riga (il :empty del CSS) */
+  el('paccoPieno').textContent = (st && st.scattato) ? resa(tot) : '';
   /* sui numeri lunghi il corpo scala (vedi il CSS della barra): oltre
      le 6 cifre in sats la riga piena non regge i 375px */
   t.classList.toggle('lungo', t.textContent.length > 12);
@@ -9582,7 +9654,7 @@ function aggiornaBarraPacco(){
      dello stesso TOTALE in sats: glielo passiamo invece di farglielo
      rifare, cosi' i numeri della pagina non possono divergere. A
      convertirlo in euro ci pensano loro, ed e' l'unica conversione del
-     client su una promessa (vedi aggiornaInvitoSconto per la fascia
+     client su una promessa (vedi statoScontoPacco per la fascia
      dichiarata). Le due promesse guardano lo STESSO lordo ma con
      soglie e unita' proprie: sono indipendenti, e una puo' essere
      scattata mentre l'altra no. */
@@ -9712,9 +9784,11 @@ function etichettaSpedGratis(r){
    La regola del negozio in una riga: quanto manca e di quanto scende
    il carrello. NON e' un conto: l'invito non CALCOLA, riceve — il
    totale glielo passa aggiornaBarraPacco, che quel numero lo mostra
-   gia' due centimetri piu' sotto. Quindi i due non possono divergere,
-   e la percentuale non si applica mai qui: quanto si risparmia lo dice
-   il conto del server, nel riepilogo.
+   gia' due centimetri piu' sotto. Quindi i due non possono divergere.
+   (La PERCENTUALE, dal 13 ago 2026, si applica invece nel totale
+   della barra — e' la RESA dello scontato col lordo barrato, vedi
+   aggiornaBarraPacco: il badge resta il cartello, il totale il
+   fatto. Il conto vero resta del server, nel riepilogo.)
    Il dato viene dall'ANNUNCIO e non dal preventivo, che ha una firma e
    arriva in ritardo: un invito che risponde mezzo secondo dopo — o che
    dice la cosa vecchia — e' peggio di nessun invito.
@@ -9740,56 +9814,63 @@ function spedGratisNegozio(){
   return x ? regolaSpedGratis(x.spedGratisSats, x.spedGratisEur,
                               x.spedGratisValuta) : null;
 }
+/* IL GIUDICE DELLO SCATTO NEL CARRELLO (13 ago 2026): la stessa
+   domanda la fanno in DUE — il badge dell'invito e il totale della
+   barra, che mostra lo scontato — e due copie del confronto
+   divergerebbero al primo ritocco (la ragione di _sconto_pacco sul
+   server). Riceve il LORDO e risponde sul LORDO: la soglia misura
+   gli articoli PRIMA dello sconto, la regola del server.
+   A VALORE IN EURO il confronto lo fa il CLIENT col suo cambio —
+   l'unico posto dell'app dove succede: il preventivo in questa
+   pagina non c'e', e chiamarlo a ogni tocco dello stepper e' gia'
+   stato valutato e scartato (il debounce litiga con chi sale in
+   fretta). IMPERFEZIONE DICHIARATA: in una fascia stretta attorno
+   alla soglia il cambio del client e quello del server possono non
+   combaciare, e badge E totale scontato possono dire «attivo» dove
+   il conto del server non sconta — e' la fascia che il ✅ aveva gia',
+   il netto la eredita e non ne aggiunge una sua; il verdetto resta
+   del server, nel riepilogo. Senza cambio vivo si tace: meglio
+   un'assenza che una cifra inventata (il patto del ≈).
+   ...e SOLO in euro: a soglia in SATS il confronto e' sats contro
+   sats, esatto e senza cambio — la riga (e il netto) vivono anche a
+   CoinGecko muto. A pezzi il cambio non c'entra proprio. */
+function statoScontoPacco(tot){
+  const s = scontoNegozio();
+  /* a carrello vuoto la promessa non ha ancora un destinatario: la
+     riga nasce col primo pezzo, quando c'e' qualcosa da far crescere */
+  if (!s || !pezziSet()) return null;
+  const inEuro = s.criterio === 'valore' && s.valuta !== 'sats';
+  if (inEuro && !cambioVivo) return null;
+  const ora = s.criterio !== 'valore' ? pezziSet()
+    : (s.valuta === 'sats' ? (tot || 0)
+                           : Math.floor((tot || 0) * eurPerSat));
+  return {...s, ora, scattato: ora >= s.quanto};
+}
 function aggiornaInvitoSconto(tot){
   const box = el('paccoSconto');
   if (!box) return;
-  const s = scontoNegozio(), pezzi = pezziSet();
-  /* a carrello vuoto la promessa non ha ancora un destinatario: la
-     riga nasce col primo pezzo, quando c'e' qualcosa da far crescere */
-  if (!s || !pezzi) { box.innerHTML = ''; return; }
-  /* A VALORE SI MISURA IN EURO (ago 2026), e qui il confronto lo fa il
-     CLIENT — l'unico posto dell'app dove succede. Il preventivo in
-     questa pagina non c'e', e chiamarlo a ogni tocco dello stepper e'
-     gia' stato valutato e scartato (il debounce litiga con chi sale in
-     fretta). Quindi si converte il lordo della barra col cambio del
-     client.
-     IMPERFEZIONE DICHIARATA: in una fascia stretta attorno alla soglia
-     il cambio del client e quello del server possono non combaciare, e
-     questa riga puo' dire «attivo» dove il conto non sconta. E'
-     tollerabile perche' e' un INVITO durante la composizione, non un
-     verdetto — lo dice da se', «lo vedi nel conto» — e il conto e' del
-     server. Nella pagina Paga, un tocco prima di pagare, il numero
-     arriva invece dal server e la fascia non esiste.
-     Senza cambio vivo la riga non compare: meglio un'assenza che una
-     cifra inventata (il patto del ≈). */
-  /* ...e SOLO in euro: a soglia in SATS il confronto e' sats contro
-     sats, esatto e senza cambio, quindi la fascia stretta non esiste e
-     la riga compare anche a CoinGecko muto. E' il guadagno della
-     scelta, e si vede proprio qui — dove viveva l'unica conversione
-     che il client fa su una promessa. */
-  const inEuro = s.criterio === 'valore' && s.valuta !== 'sats';
-  if (inEuro && !cambioVivo) { box.innerHTML = ''; return; }
-  const ora = s.criterio !== 'valore' ? pezzi
-    : (s.valuta === 'sats' ? (tot || 0)
-                           : Math.floor((tot || 0) * eurPerSat));
-  if (ora >= s.quanto){
-    /* SCATTATO: il badge non sparisce, si TRASFORMA in conferma. Se
-       sparisse, chi ha appena guadagnato lo sconto non vedrebbe
-       cambiare niente — la barra qui sotto e' al lordo, di proposito —
-       e la promessa sembrerebbe evaporata. E «NEL CONTO» non e'
-       ornamento, e' la stessa ragione: senza, chi legge «−15%»
-       aspetterebbe che il totale qui sotto scenda. E' il conto del
-       server a decidere, non questo badge. */
-    box.innerHTML = `<span class="pill pill-trust">✅ Sconto
-      <b>−${s.pct}%</b> nel conto</span>`;
-    return;
+  /* il «da» della corsa si cattura PRIMA che l'innerHTML porti via i
+     nodi: il giro FLIP dei ferri condivisi (barreCattura/barreCorri),
+     lo stesso di Paga */
+  const da = barreCattura(box);
+  const s = statoScontoPacco(tot);
+  if (!s) { box.innerHTML = ''; return; }
+  if (s.scattato){
+    /* SCATTATO: il badge non sparisce, si TRASFORMA in conferma —
+       piena e accesa come in Paga, e NUDA dal 13 ago 2026: la coda
+       «nel conto» diceva di aspettare il conto perche' il totale qui
+       sotto restava al lordo, e adesso il totale scende da solo, col
+       lordo barrato (aggiornaBarraPacco). Ripeterla direbbe di
+       cercare altrove una cosa gia' in vista. */
+    box.innerHTML = `<span class="pill pill-trust" data-barra="sc">✅ Sconto <b>−${s.pct}%</b></span>`;
+  } else {
+    const n = s.quanto - s.ora;
+    const manca = s.criterio === 'valore'
+      ? cifraSoglia(n, s.valuta)
+      : `${fmt(n)} pezz${n===1?'o':'i'}`;
+    box.innerHTML = `<span class="pill pill-barra" data-barra="sc"${barraPromessa(s.quanto, n)}>🎁 Ancora ${manca} → <b>−${s.pct}%</b></span>`;
   }
-  const n = s.quanto - ora;
-  const manca = s.criterio === 'valore'
-    ? cifraSoglia(n, s.valuta)
-    : `${fmt(n)} pezz${n===1?'o':'i'}`;
-  box.innerHTML = `<span class="pill">🎁 Ancora ${manca} →
-    <b>−${s.pct}%</b></span>`;
+  barreCorri(box, da);
 }
 /* IL GEMELLO PER LA SECONDA PROMESSA (ago 2026). Due funzioni e due
    scatole e non una sola, e non e' simmetria per il gusto: le due
@@ -9805,6 +9886,8 @@ function aggiornaInvitoSconto(tot){
 function aggiornaInvitoSpedGratis(tot){
   const box = el('paccoSpedGratis');
   if (!box) return;
+  /* la cattura del «da» prima di ogni innerHTML, come nel gemello */
+  const da = barreCattura(box);
   const r = spedGratisNegozio(), pezzi = pezziSet();
   if (!r || !pezzi) { box.innerHTML = ''; return; }
   /* UN CARRELLO DI SOLI RITIRI non ha una spedizione da rendere
@@ -9824,13 +9907,11 @@ function aggiornaInvitoSpedGratis(tot){
   const ora = r.valuta === 'sats' ? (tot || 0)
                                   : Math.floor((tot || 0) * eurPerSat);
   if (ora >= r.quanto){
-    box.innerHTML = `<span class="pill pill-trust">🚚 Spedizione
-      <b>gratis</b></span>`;
-    return;
+    box.innerHTML = `<span class="pill pill-trust" data-barra="sg">🚚 Spedizione <b>gratis</b></span>`;
+  } else {
+    box.innerHTML = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(r.quanto, r.quanto - ora)}>🚚 Ancora ${cifraSoglia(r.quanto - ora, r.valuta)} → spedizione <b>gratis</b></span>`;
   }
-  box.innerHTML = `<span class="pill">🚚 Ancora
-    ${cifraSoglia(r.quanto - ora, r.valuta)} → spedizione
-    <b>gratis</b></span>`;
+  barreCorri(box, da);
 }
 /* GRIGLIA E RIEPILOGO SONO DUE VISTE DELLO STESSO STATO (`setScelte`,
    che e' il conteggio UNICO): la quantita' toccata in una si vede
