@@ -6320,14 +6320,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   appiccicato la coppia non può spezzarsi per costruzione —
   RIVERIFICATO a metà scorrimento su 320/360/375: due badge su due,
   interi, sempre.
-  IL COSTO, MISURATO E DETTO COL NUMERO (la condizione posta da
-  Andrea): il blocco ancorato fa **180px (24%) con due promesse** —
-  DUE px sopra i 178 scartati allora, e la differenza è che stavolta
-  le righe si leggono invece di essere chip accalcati — 135px con
-  una, 84px senza (il valore di ieri, solo bottone); identico alle
-  tre larghezze, perché le righe piene non vanno a capo. Se il
-  numero un giorno non reggesse, le leve oneste sono i respiri del
-  blocco, mai la veste della fila. Col giro è cresciuto il TITOLO
+  IL COSTO, MISURATO E DETTO COL NUMERO IN DUE TEMPI (la condizione
+  posta da Andrea): alla nascita il blocco ancorato faceva **180px
+  (24%) con due promesse** — due px sopra i 178 scartati allora —
+  riportati col numero e ACCETTATI (le righe si leggono invece di
+  essere chip accalcati, e i badge si vedono tutti e due a ogni
+  scorrimento, che era il difetto d'origine), con la richiesta di
+  stringere i SOLI respiri se si trovavano senza toccare la veste.
+  Trovati — padding del blocco 10→8, margine dei badge 8→6, mai il
+  gap della fila che è della veste — e il blocco fa **176px (23%)
+  misurati**, con l'aria guardata a schermo prima di tenerla; 135 e
+  84 (una promessa / nessuna) scendono degli stessi 4px; identico
+  alle tre larghezze, perché le righe piene non vanno a capo. Se il
+  numero un giorno non reggesse ancora, di respiri onesti ne restano
+  pochi: la leva successiva è una decisione, non un ritocco. Col
+  giro è cresciuto il TITOLO
   della sezione (`.altri-tit`, 13px contro gli 11 del section-label
   di serie). LA LEZIONE di ieri resta vera dove è nata: **contenuto
   corto e ATOMICO non va messo sotto un elemento sticky** — dentro,
@@ -10205,6 +10212,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   aggiunge una prova che dipende da un pacchetto usi `salta()`, mai
   un `print` o un `return` muto: è quello il modo in cui una prova
   smette di esistere senza che nessuno lo sappia.
+  IL PARSE DEL CLIENT È UNA PROVA (13 ago 2026, nata da un guasto
+  VERO arrivato fino a main con la CI verde: un `*/` doppio in un
+  commento JS — chiuso il commento a metà, la coda di prosa è
+  diventata codice — ha ucciso l'INTERO script di miniapp.html al
+  parse. App morta: niente card, niente barra collaudo, solo il
+  markup statico. Le prove leggono miniapp.html come TESTO, quindi
+  ~2900 sentinelle sulla forma erano verdi mentre il client non
+  eseguiva UNA riga; l'ha visto il giro CDP successivo, non la CI).
+  `prove_sintassi_client`: ogni `<script>` inline passa da
+  `node --check`, e sw.js pure — parse puro, zero esecuzione, node
+  c'è di serie sui runner GitHub; senza node in locale si SALTA
+  contando, e in CI con PROVE_SEVERE una saltata vale una fallita,
+  che per questa prova è esattamente il punto. Torturata rimettendo
+  il `*/` doppio: rossa da sola. LA LEZIONE: una suite che legge un
+  file come testo può certificare qualunque cosa TRANNE che quel
+  file sia un programma — la prova più importante su un sorgente è
+  che si lasci leggere dal suo motore.
   LO SCANNER DEI SEGRETI GUARDA ANCHE INDIETRO (ago 2026, audit):
   usava `git ls-files`, cioè i file tracciati ALLO STATO ATTUALE, e il
   checkout era shallow — un segreto committato e poi tolto passava per
