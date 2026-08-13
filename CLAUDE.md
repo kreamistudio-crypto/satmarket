@@ -6054,7 +6054,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   IL TOTALE DELLA BARRA DEL CARRELLO MOSTRA LO SCONTATO (13 ago
   2026, decisione di Andrea che ROVESCIA il «resta al lordo,
   dichiarato» — come l'unitario in Paga): a soglia scattata
-  `paccoTot` dice il NETTO e sotto compare il lordo barrato
+  `paccoTot` dice il NETTO col tag «−X%» accanto (secondo giro dello
+  stesso 13 ago, visto da Andrea: in Paga c'era e qui no — stessa
+  classe `.sconto-tag`, mai una copia, e la prima riga della somma è
+  un flex suo perché `.pacco-somma` è una colonna) e sotto compare
+  il lordo barrato
   (`#paccoPieno`, la resa della lampo e dell'unitario di Paga; il
   badge scattato torna NUDO, che «nel conto» direbbe di cercare
   altrove una cosa in vista due dita sotto). LE DUE METÀ DA NON
