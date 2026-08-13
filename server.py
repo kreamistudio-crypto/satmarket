@@ -13358,6 +13358,27 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     _misura_sg = articolo if val_sg == "sats" else misura_eur
     _mancano = (max(0, sog_gratis - _misura_sg)
                 if sog_gratis and _misura_sg is not None else 0)
+    # L'UNITARIO SCONTATO, SOLO QUANDO LA DIVISIONE E' ESATTA (13 ago
+    # 2026, decisione di Andrea sulla misura vera: in produzione ZERO
+    # inesatti su 52 annunci scontati — il ramo senza cifra e' una
+    # cintura, non il caso). Lo calcola il SERVER e il client lo
+    # MOSTRA (mai un ≈ per l'arrotondamento: in quella casella il ≈
+    # della conversione compare gia', e due significati sulla stessa
+    # cifra nello stesso posto sono peggio di nessuna cifra).
+    # L'esattezza si giudica sulla faccia NATIVA — i sats per i
+    # listini in sats, i CENTESIMI per quelli in euro, la cui faccia
+    # sats e' convertita e porta gia' il ≈ del cambio. Zero = niente
+    # cifra: vale «non scattato» e «non esatto» insieme.
+    unit_netto = 0
+    unit_netto_eur = 0.0
+    if sconto > 0 and pct > 0:
+        if listino_eur and unitario_eur > 0:
+            _cents = round(unitario_eur * 100)
+            if (_cents * pct) % 100 == 0:
+                unit_netto_eur = _cents * (100 - pct) // 100 / 100
+                unit_netto = round(unitario * (100 - pct) / 100)
+        elif (unitario * pct) % 100 == 0:
+            unit_netto = unitario * (100 - pct) // 100
     # `articolo_sats` e' il NETTO, come nel set: lordo e sconto sono
     # chiavi in piu' e si sommano da sole. La REGOLA esce anche quando
     # non e' scattata (serve all'invito), con le coppie speculari che
@@ -13388,6 +13409,8 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                             and _misura_sc is not None else 0),
             "articolo_unitario_sats": unitario,
             "articolo_unitario_eur": unitario_eur,
+            "articolo_unitario_netto_sats": unit_netto,
+            "articolo_unitario_netto_eur": unit_netto_eur,
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,

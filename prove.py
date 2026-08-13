@@ -6883,20 +6883,47 @@ def prove_pagina_acquisto():
     #    pillola intera.
     prova("la barra delle promesse esiste, col tetto a 99", True,
           "const barraPromessa" in mini3 and "Math.min(99," in mini3)
-    prova("...si riempie del suo token, mai del fondo della conferma",
-          True,
-          "linear-gradient(90deg,var(--barra-fill),var(--barra-fill))"
+    #    IL COLORE VIRA COL PROGRESSO (terzo giro, 13 ago 2026,
+    #    chiesto da Andrea): la coppia --barra-da/--barra-a — verde
+    #    SLAVATO che si accende salendo, mescolato dal progresso col
+    #    color-mix nello style. MAI dal rosso (nell'app e' problema, e
+    #    una promessa in corsa e' un invito) e mai dal grigio,
+    #    prototipato e SCARTATO: la mescola di mezzo fa un olivastro
+    #    spento e si perde la famiglia della fiducia. Ogni token ha i
+    #    suoi due valori (chiaro/scuro): si abbassa la luce, non si
+    #    cambia il segno.
+    prova("...la tinta vira col progresso, dentro la famiglia", True,
+          "color-mix(in srgb, var(--barra-a) ${p}%, var(--barra-da))"
           in mini3)
-    #    il colore e' un token a DOPPIO valore (secondo giro: col
-    #    --trust-soft nudo la barra non si notava — e' il fondo della
-    #    pill-trust, nato per stare sotto un testo): si abbassa la
-    #    luce di sera, non si cambia il segno
-    prova("...e il token della barra ha i suoi due valori", 2,
-          mini3.count("--barra-fill:"))
+    prova("...e la coppia del viraggio ha i suoi due valori", True,
+          mini3.count("--barra-da:") == 2
+          and mini3.count("--barra-a:") == 2)
+    prova("...il ripiego della classe resta sul verde slavato", True,
+          "linear-gradient(90deg,var(--barra-da),var(--barra-da))"
+          in mini3)
     prova("...le DUE pillole sotto soglia la portano", 2,
           mini3.count('class="pill pill-barra"'))
     prova("...e lo style della larghezza c'e' sempre, anche a 0%", True,
-          'return ` style="background-size:${p}% 100%"`;' in mini3)
+          'background-size:${p}% 100%"`;' in mini3)
+    #    LA CORSA MORBIDA (13 ago 2026, chiesta da Andrea): il «da» si
+    #    RECUPERA dal computed — che a meta' corsa e' il valore
+    #    INTERPOLATO, quindi i + veloci ritargetizzano e non si
+    #    accodano mai — e il nodo nuovo nasce alla larghezza vecchia,
+    #    reflow, bersaglio (il giro FLIP). Allo scatto la pill-trust
+    #    corre nel SUO verde e a fine corsa il fondo e' quello di
+    #    riposo della scattata: nessun secondo stato da mantenere.
+    prova("la corsa recupera il «da» dal computed", True,
+          "getComputedStyle(el).backgroundSize" in mini3)
+    prova("...col reflow che lo fissa (FLIP)", True,
+          "void el.offsetWidth;" in mini3)
+    prova("...le quattro pillole portano la chiave della corsa", 4,
+          mini3.count('data-barra="s'))
+    prova("...allo scatto si corre nel verde della conferma", True,
+          "barra-scatto" in mini3
+          and "linear-gradient(90deg,var(--trust-soft),var(--trust-soft))"
+          in mini3)
+    prova("...e reduced-motion la spegne", 1,
+          mini3.count(".barra-scatto{transition:none}"))
     #    IL FONDO DI PAGA E' APPICCICATO (ago 2026): «Paga» resta in
     #    vista mentre si scorre — STICKY e mai fixed (dentro Telegram
     #    le misure di viewport mentono, e sticky occupa layout: a fine
@@ -6919,8 +6946,28 @@ def prove_pagina_acquisto():
     prova("il tag −X% compare solo a sconto scattato", True,
           "((p.sconto_sats||0) > 0 && (p.sconto_percento||0) > 0)"
           in mini3)
-    prova("...e dice la PERCENTUALE, mai un unitario scontato", True,
+    prova("...e dice la PERCENTUALE", True,
           'class="sconto-tag">−${p.sconto_percento}%' in mini3)
+    #    E LA CIFRA SCONTATA, SOLO QUANDO E' ESATTA (13 ago 2026,
+    #    rovesciamento di Andrea sulla misura vera: ZERO divisioni
+    #    inesatte su 52 annunci scontati in produzione — il ramo
+    #    solo-tag e' una cintura, non il caso). La cifra la calcola il
+    #    SERVER sulla faccia NATIVA (sats, o CENTESIMI per i listini
+    #    in euro) e il client la MOSTRA solo se c'e'; MAI un ≈ da
+    #    arrotondamento — in quella casella il ≈ della conversione
+    #    compare gia', e due significati sulla stessa cifra nello
+    #    stesso posto sono peggio di nessuna cifra.
+    prova("la cifra scontata arriva dal server, il client mostra",
+          True, "p.articolo_unitario_netto_sats || 0" in mini3)
+    prova("...col pieno BARRATO sotto, la resa della lampo", True,
+          'class="mono acq-barrato"' in mini3)
+    prova("...e la barratura non taglia l'unita'", True,
+          ".acq-barrato .unit{display:inline-block}" in mini3)
+    prova("server: la cifra nasce solo dalla divisione esatta", True,
+          "(unitario * pct) % 100 == 0" in src
+          and "(_cents * pct) % 100 == 0" in src)
+    prova("server: la chiave esiste, a zero quando non e' vera", True,
+          '"articolo_unitario_netto_sats": unit_netto' in src)
 
     # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
     #    Nostr non le porta: le azzererebbe a ogni sync). L'unico
@@ -12863,7 +12910,7 @@ def prove_promesse_badge():
           and "p.mancano_sats" in _blocco_sc
           and "p.mancano_eur" in _blocco_sc)
     prova("...col verde di conferma quando scatta", True,
-          'pill pill-trust">✅ Sconto' in _blocco_sc)
+          'pill pill-trust" data-barra="sc">✅ Sconto' in _blocco_sc)
     prova("...e a cambio muto lo dice, non sparisce", True,
           "lo sconto non si applica" in _blocco_sc)
     prova("...senza mai convertire in proprio", False,

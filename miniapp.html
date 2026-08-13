@@ -16,7 +16,8 @@
     color-scheme:light;
     --bg:#FAF4E4; --card:#FFFFFF; --ink:#23282C; --muted:#8A8271;
     --line:#E8DFC8; --sats:#F7931A; --sats-soft:#FDEBD3;
-    --trust:#1B8B54; --trust-soft:#E7F5EC; --barra-fill:#BFE0D0;
+    --trust:#1B8B54; --trust-soft:#E7F5EC;
+    --barra-da:#DCEEE4; --barra-a:#8FCBAB;
     --danger:#C2410C;
     --radius:16px; --pad:16px;
     /* la curva dei bottoni-oggetto: quella di «Acquista» (vedi
@@ -162,7 +163,8 @@
     color-scheme:dark;
     --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87;
     --line:#3E3623; --sats-soft:#3E2B12;
-    --trust:#34B47A; --trust-soft:#1B2C20; --barra-fill:#2E5237;
+    --trust:#34B47A; --trust-soft:#1B2C20;
+    --barra-da:#243B2C; --barra-a:#35684A;
     --danger:#F07A47;
     --sats-text:#FFB25C;
     /* l'asta di sera: si alza la LUCE, non si cambia il segno —
@@ -1821,16 +1823,23 @@
      carrello scatta, il tag della regola qui sotto */
   .acq-art .acq-prezzo{flex:0 0 auto;display:flex;flex-direction:column;
     align-items:flex-end;gap:2px}
-  /* IL TAG «−X%» SULL'UNITARIO (ago 2026, decisione di Andrea, la
-     via (c)): l'unitario resta il PIENO, mai barrato e mai un numero
-     scontato — lo sconto e' di TESTATA sul totale e un unitario
-     scontato non esiste come intero (10% su 14.001...): un numero
-     che non torna moltiplicando si legge come un bug, e il ≈ ha gia'
-     un significato suo (la conversione). La percentuale e' la REGOLA
-     ed e' esatta per definizione; le cifre vere le dice il conto.
-     La lingua e' quella della pillola verde della conferma. */
+  /* IL TAG «−X%» SULL'UNITARIO (ago 2026, la via (c)) dice la REGOLA,
+     esatta per definizione; dal 13 ago 2026 accanto c'e' anche LA
+     CIFRA scontata, ma SOLO quando la divisione e' esatta (decisione
+     di Andrea sulla misura vera: zero inesatti su 52 in produzione).
+     Il perche' di allora resta vero per il caso inesatto — un numero
+     che non torna moltiplicando si legge come un bug, e il ≈ qui ha
+     gia' il significato della conversione — ed e' il motivo per cui
+     senza esattezza la cifra NON compare: mai un ≈ da arrotondamento.
+     La lingua e' quella della pillola verde della conferma; il pieno
+     scende sotto, BARRATO, la resa della lampo — e la barratura
+     taglia la cifra ma non l'unita': il .unit inline-block la ferma,
+     la lezione del listino barrato della scheda. */
   .sconto-tag{background:var(--trust-soft);color:var(--trust);
     border-radius:999px;padding:1px 8px 2px;font-size:11px;font-weight:800}
+  .acq-prezzo .acq-barrato{font-size:11.5px;color:var(--muted);
+    font-weight:600;text-decoration:line-through}
+  .acq-prezzo .acq-barrato .unit{display:inline-block}
   /* LA FILA DELLE PROMESSE IN PAGA: righe a tutta larghezza e tono
      quieto (ago 2026, decisione di Andrea — la POSIZIONE resta sopra
      la Consegna: il modo «dentro la card dell'articolo» e' stato
@@ -1854,19 +1863,42 @@
      lo e' mai: il 100% e' la pill-trust verde di oggi, e il client si
      ferma a 99. La larghezza la scrive renderAcquisto in
      background-size, sempre (anche 0%).
-     IL COLORE E' `--barra-fill`, token a doppio valore (secondo giro,
-     13 ago 2026: col --trust-soft nudo la barra non si notava — e' il
-     fondo della pill-trust, nato per stare SOTTO un testo, non per
-     staccare da una carta quasi uguale). Stessa TINTA della fiducia,
-     piu' luce: a distinguere la barra dalla promessa scattata non e'
-     la saturazione ma la FORMA — parziale con bordo netto contro
-     pillola intera con ✅ e testo che lo dice — quindi il fill puo'
-     essere piu' carico del fondo della conferma senza mentire.
-     Misurati sull'inchiostro che ci sta sopra: 10,5 di giorno,
-     7,2 di sera. Si abbassa la luce, non si cambia il segno. */
+     IL COLORE VIRA COL PROGRESSO (terzo giro, 13 ago 2026, chiesto da
+     Andrea): la coppia `--barra-da`/`--barra-a` — verde SLAVATO che
+     si accende salendo, mescolato dal progresso stesso col color-mix
+     nello style di barraPromessa (il primo giro col --trust-soft nudo
+     non si notava: e' il fondo della pill-trust, nato per stare SOTTO
+     un testo). Mai dal rosso (il rosso e' problema, una promessa in
+     corsa e' un invito) e mai dal grigio, prototipato e scartato: la
+     mescola di mezzo fa un olivastro spento e si perde la famiglia
+     della fiducia. A distinguere la barra quasi piena dalla promessa
+     scattata resta la FORMA, non la tinta: il tetto a 99 lascia
+     sempre la fetta di carta col bordo netto (una barra, mai un
+     fondo), il testo cambia natura («Ancora N» contro «✅ nel
+     conto»), e la scattata e' la pillola INTERA nel verde tenue con
+     bordo e testo trust — piu' QUIETA della barra accesa, che e' il
+     verso giusto: la corsa chiama, il traguardo riposa. Contrasto
+     dell'inchiostro sull'acceso pieno: 8,1 di giorno, 5,3 di sera. */
   #acqCorpo > .pills .pill-barra{background-image:
-    linear-gradient(90deg,var(--barra-fill),var(--barra-fill));
+    linear-gradient(90deg,var(--barra-da),var(--barra-da));
     background-repeat:no-repeat}
+  /* LA CORSA MORBIDA (13 ago 2026): la transizione vive qui, il «da»
+     lo recupera renderAcquisto dal computed (il giro FLIP: un nodo
+     appena nato non ne avrebbe). Lo SCATTO e' la stessa corsa nel
+     verde DELLA CONFERMA: background-color a carta + fill in
+     --trust-soft che corre al 100% — a fine corsa il fondo e' quello
+     di riposo della pill-trust, visivamente identico (la regola
+     .pill.pill-trust ha lo shorthand `background`, e questa la vince
+     per specificita': l'id davanti e' il punto). */
+  #acqCorpo > .pills .pill-barra,
+  #acqCorpo > .pills .barra-scatto{transition:background-size .3s ease}
+  #acqCorpo > .pills .barra-scatto{background-color:var(--card);
+    background-image:linear-gradient(90deg,var(--trust-soft),var(--trust-soft));
+    background-repeat:no-repeat}
+  @media (prefers-reduced-motion:reduce){
+    #acqCorpo > .pills .pill-barra,
+    #acqCorpo > .pills .barra-scatto{transition:none}
+  }
   /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
      768 sparisce come nella pagina del pacco, ma senza barra propria */
   @media (max-width:767.98px){
@@ -8866,17 +8898,29 @@ function renderAcquisto(){
          ? stepperMini(d.qta, 'acqPasso(-1)', 'acqPasso(1)',
                        d.qta <= 1, d.qta >= stock)
          : '');
-    /* L'UNITARIO RESTA IL PIENO, col tag «−X%» quando lo sconto del
-       carrello scatta (ago 2026, decisione di Andrea — la via (c)):
-       la percentuale e' la regola ed e' esatta per definizione,
-       mentre un unitario scontato non esiste come intero e un ≈ qui
-       significherebbe una terza cosa. Vedi il CSS di .sconto-tag. */
+    /* IL TAG «−X%» dice la regola; dal 13 ago 2026 accanto c'e' anche
+       LA CIFRA — l'unitario scontato — ma SOLO quando la divisione e'
+       esatta (rovesciamento di Andrea sulla misura vera: in
+       produzione ZERO inesatti su 52 annunci scontati, quindi la
+       cifra si vede sempre e il ramo solo-tag e' una cintura). La
+       cifra arriva dal SERVER (`articolo_unitario_netto_sats`, zero =
+       niente cifra): qui si MOSTRA, mai si calcola — e MAI un ≈ per
+       l'arrotondamento, perche' in questa casella il ≈ della
+       conversione compare gia' (p.stima) e due significati sulla
+       stessa cifra nello stesso posto sono peggio di nessuna cifra.
+       La resa e' quella della lampo: scontato grande, pieno BARRATO
+       piccolo sotto. Vedi il CSS di .sconto-tag e .acq-barrato. */
     const scontoTag = ((p.sconto_sats||0) > 0 && (p.sconto_percento||0) > 0)
       ? `<span class="sconto-tag">−${p.sconto_percento}%</span>` : '';
+    const nettoU = p.articolo_unitario_netto_sats || 0;
+    const cifraPiena = `${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}`;
+    const prezzoArt = nettoU
+      ? `<span class="mono">${cifraCtrl(nettoU, p.stima?'≈ ':'', p.articolo_unitario_netto_eur||0)}</span><span class="mono acq-barrato">${cifraPiena}</span>`
+      : `<span class="mono">${cifraPiena}</span>`;
     articoli = `<div class="acq-art">
       <div class="ctrl-mini">${t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}</div>
       <div class="acq-col"><div class="acq-tit">${esc(x ? x.title : '')}</div>${qtaUi}</div>
-      <span class="acq-prezzo"><span class="mono">${cifraCtrl(p.articolo_unitario_sats||p.articolo_sats, p.stima?'≈ ':'', p.articolo_unitario_eur||p.articolo_eur)}</span>${scontoTag}</span>
+      <span class="acq-prezzo">${prezzoArt}${scontoTag}</span>
     </div>`;
   }
   /* L'accordo che fissa i pezzi: si dice, invece di far scoprire da un
@@ -9028,16 +9072,28 @@ function renderAcquisto(){
      prosa, quindi la barra li' non esiste per costruzione). IL TETTO
      A 99 e' deliberato: una barra piena su una pillola non-verde
      direbbe «scattata» a chi guarda solo il colore — piena e' solo la
-     pill-trust. NIENTE transizione, e non e' pigrizia: renderAcquisto
-     ricostruisce l'HTML a ogni ±, il nodo nuovo nasce gia' alla
-     larghezza giusta e un'animazione non avrebbe mai un «da» da cui
-     partire. Lo style c'e' SEMPRE (anche 0%): .pill-barra porta un
+     pill-trust. LA CORSA MORBIDA e' del secondo giro (13 ago,
+     chiesta da Andrea): il «da» che a un nodo ricostruito manca si
+     RECUPERA dal computed prima del render — il giro FLIP in fondo a
+     renderAcquisto. Lo style c'e' SEMPRE (anche 0%): .pill-barra porta un
      background-image, e senza background-size esplicito il gradiente
      coprirebbe la pillola intera — cioe' il falso al primo pezzo. */
   const barraPromessa = (soglia, manca) => {
     const p = Math.min(99, Math.max(0,
       Math.round((soglia - manca) / soglia * 100)));
-    return ` style="background-size:${p}% 100%"`;
+    /* IL VIRAGGIO (13 ago 2026, chiesto da Andrea): la tinta segue il
+       progresso — verde SLAVATO vicino alla partenza, ACCESO vicino
+       alla soglia (--barra-da → --barra-a, mescolati dal progresso
+       stesso). MAI dal rosso: nell'app il rosso vuol dire problema, e
+       una promessa non raggiunta e' un invito, non un fallimento. Il
+       grigio neutro come partenza e' stato prototipato e scartato:
+       nel mezzo la mescola verso il verde fa un olivastro spento, e
+       si perde la famiglia della fiducia. La tinta cambia a gradini
+       fra un render e l'altro (un gradiente non si transiziona), a
+       correre morbida e' la LARGHEZZA — il giro FLIP. */
+    const c = `color-mix(in srgb, var(--barra-a) ${p}%, var(--barra-da))`;
+    return ` style="background-image:linear-gradient(90deg,${c},${c});`
+         + `background-size:${p}% 100%"`;
   };
   const scPct = p.sconto_percento||0, scCrit = p.sconto_criterio||'';
   const scVal = p.sconto_valuta||'eur';
@@ -9052,9 +9108,9 @@ function renderAcquisto(){
     if (scSospeso)
       note += `<div class="acq-nota">🎁 Il negozio fa −${scPct}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
     else if ((p.sconto_sats||0) > 0)
-      pillaSc = `<span class="pill pill-trust">✅ Sconto <b>−${scPct}%</b> nel conto</span>`;
+      pillaSc = `<span class="pill pill-trust" data-barra="sc">✅ Sconto <b>−${scPct}%</b> nel conto</span>`;
     else if (scManca > 0)
-      pillaSc = `<span class="pill pill-barra"${barraPromessa(scSogliaPag, scManca)}>🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
+      pillaSc = `<span class="pill pill-barra" data-barra="sc"${barraPromessa(scSogliaPag, scManca)}>🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
   }
   /* L'INVITO DELLA SPEDIZIONE GRATIS: compare solo dove una
      spedizione c'e' davvero — spedisceQui dice se il NEGOZIO spedisce
@@ -9086,9 +9142,9 @@ function renderAcquisto(){
            articoli, ma adesso non riusciamo a fare il cambio: per
            questo acquisto la spedizione si paga.</div>`;
     else if (sgManca > 0)
-      pillaSg = `<span class="pill pill-barra"${barraPromessa(sgSoglia, sgManca)}>🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
+      pillaSg = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(sgSoglia, sgManca)}>🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
     else
-      pillaSg = `<span class="pill pill-trust">✅ Spedizione <b>gratis</b> nel conto</span>`;
+      pillaSg = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b> nel conto</span>`;
   }
   /* LA FILA: 🚚 PRIMA della 🎁 (12 ago 2026, decisione di Andrea) —
      lo stesso ordine di «Altri oggetti», del carrello e della testata
@@ -9130,12 +9186,51 @@ function renderAcquisto(){
   const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
+  /* LA CORSA MORBIDA DELLA BARRA (13 ago 2026, chiesta da Andrea): il
+     «da» non si conserva, si RECUPERA — il computed dell'istante, che
+     a meta' corsa e' il valore INTERPOLATO. E' cio' che tiene onesti
+     i + veloci: le transizioni CSS non si accodano mai, ritargeting
+     nativo — la barra devia in corsa verso l'ultimo bersaglio, e il
+     NUMERO («Ancora N») non aspetta nessuno, si aggiorna secco al
+     render. Si cattura PRIMA che l'innerHTML porti via i nodi; la
+     scattata vale 100 (piena per definizione), il computed senza
+     misura («auto») vale 0. */
+  const barraDa = {};
+  box.querySelectorAll('[data-barra]').forEach(el=>{
+    const m = /([\d.]+)%/.exec(getComputedStyle(el).backgroundSize);
+    barraDa[el.dataset.barra] = m ? parseFloat(m[1])
+      : (el.classList.contains('pill-trust') ? 100 : 0);
+  });
   box.innerHTML = `${articoli}${accQta}${fila}${vie}${note}
     <div class="section-label">Il conto</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
       <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>
     </div>`;
+  /* ...e il via: il nodo nuovo nasce alla larghezza VECCHIA, un
+     reflow la fissa (il giro FLIP: e' il «da» che alla transizione
+     mancava — renderAcquisto ricostruisce l'HTML e un nodo nuovo non
+     ne avrebbe), poi lo style corre al bersaglio. ALLO SCATTO la
+     pill-trust fa la stessa corsa nel SUO verde (.barra-scatto,
+     --trust-soft): a fine corsa il fondo e' quello di riposo della
+     scattata — visivamente identico, nessun secondo stato da
+     mantenere — e lo scarto residuo dichiarato e' il cambio di tinta
+     della parte gia' piena nell'istante dello scatto, il segno che
+     e' successo qualcosa. In discesa vale il simmetrico (da 100 alla
+     misura). Chi nasce senza un «da» (primo render, pillola appena
+     comparsa) NON corre; reduced-motion spegne la transizione dal
+     CSS e lo style finisce comunque sul bersaglio. */
+  box.querySelectorAll('[data-barra]').forEach(el=>{
+    const da = barraDa[el.dataset.barra];
+    if (da === undefined) return;
+    const scatto = el.classList.contains('pill-trust');
+    const a = scatto ? 100 : (parseFloat(el.style.backgroundSize) || 0);
+    if (Math.abs(a - da) < 0.5) return;
+    if (scatto) el.classList.add('barra-scatto');
+    el.style.backgroundSize = `${da}% 100%`;
+    void el.offsetWidth;                    /* il reflow che fissa il «da» */
+    el.style.backgroundSize = `${a}% 100%`;
+  });
   aggiornaCurToggle();   /* il toggle in testata dice la verita' */
 }
 function setViaAcquisto(v){
