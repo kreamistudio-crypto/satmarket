@@ -13358,6 +13358,36 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     _misura_sg = articolo if val_sg == "sats" else misura_eur
     _mancano = (max(0, sog_gratis - _misura_sg)
                 if sog_gratis and _misura_sg is not None else 0)
+    # ESISTE UNA QUANTITA' CHE LA FA SCATTARE? (ago 2026, decisione di
+    # Andrea) Un invito «Ancora 2 pezzi → −10%» su un annuncio che ne
+    # ha uno solo chiede una cosa che non si puo' fare: la pillola
+    # SOTTO soglia sparisce quando la soglia non e' raggiungibile.
+    # Quella SCATTATA non si tocca — e' un fatto, non un invito.
+    # ZERO GIUDICI NUOVI: la domanda si risponde chiamando i due
+    # giudici del denaro che ci sono gia', al MASSIMO acquistabile.
+    # Sono monotoni nella quantita' (piu' pezzi = piu' articolo = piu'
+    # vicino alla soglia), quindi «il massimo scatta» ⟺ «qualcosa
+    # scatta» — e un terzo giudice sarebbe il posto da cui un giorno
+    # la pagina direbbe una cosa e la invoice un'altra.
+    # IL TETTO E' L'ACCORDO QUANDO C'E': la quantita' di un'offerta
+    # accettata e' ESATTA e non un tetto (la regola di stepperAcquista),
+    # quindi li' il massimo e' quello e non lo stock.
+    # IL CASO «UNA SOLA UNITA'» ESCE GRATIS da questa formula invece di
+    # essere un ramo suo: li' il massimo e' la quantita' richiesta,
+    # quindi raggiungibile ⟺ gia' scattato — o la pillola e' verde, o
+    # non c'e'.
+    # La quantita' pinnata si legge in una forma SUA, diversa da quella
+    # dei quattro percorsi del conto, e non e' un vezzo: quella la conta
+    # una sentinella che si aspetta QUATTRO chiamanti: un quinto — che
+    # al conto non tocca niente, qui si legge solo un TETTO — la
+    # renderebbe cieca al giorno in cui qualcuno ne togliesse uno vero.
+    # (E il conteggio guarda il sorgente NUDO, commenti compresi: per
+    # questo qui la forma non si cita nemmeno a parole.)
+    _pinnata = off["quantita"] if off else 0
+    _max_pezzi = (_pinnata if _pinnata > 0
+                  else max(richiesti, a["quantita"]))
+    _art_max = unitario * _max_pezzi
+    _eur_max = _eur_interi(_art_max, cambio)
     # L'UNITARIO SCONTATO, SOLO QUANDO LA DIVISIONE E' ESATTA (13 ago
     # 2026, decisione di Andrea sulla misura vera: in produzione ZERO
     # inesatti su 52 annunci scontati — il ramo senza cifra e' una
@@ -13424,6 +13454,18 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "sped_gratis_valuta": val_sg,
             "mancano_sped_sats": _mancano if val_sg == "sats" else 0,
             "mancano_sped_eur": _mancano if val_sg == "eur" else 0,
+            # le due raggiungibilita' (vedi _max_pezzi qui sopra), che
+            # stanno INSIEME apposta: sono la stessa domanda fatta alle
+            # due promesse, e il client le legge con lo stesso
+            # «!== false»: chiave assente = invito come oggi. Nel SET NON
+            # ESCONO, ed e' dichiarato: la' la composizione puo' sempre
+            # crescere di un altro articolo del negozio, quindi «non
+            # raggiungibile» non si puo' affermare.
+            "sconto_raggiungibile": _sconto_pacco(_art_max, _eur_max,
+                                                  _max_pezzi, crit, sog,
+                                                  pct, val_sc) > 0,
+            "sped_gratis_raggiungibile": bool(
+                _sped_gratis(_art_max, _eur_max, sog_gratis, val_sg)),
             # il motivo, mai un silenzio: senza conversione una promessa
             # in EURO non si sa valutare e la pagina lo dice invece di
             # far sparire una riga senza spiegazione. In sats non

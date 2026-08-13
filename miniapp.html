@@ -60,6 +60,15 @@
                     giusta, e il segno resta rosso in tutti e due i
                     temi. Si abbassa la luce, non si cambia il segno. */
     --lampo:#C0392B; --lampo-tag:#A6301F; --lampo-text:#A6301F;
+    /* IL VERDE DELLO SCONTO CARRELLO IN CARD (ago 2026): un token
+       solo, e FISSO — vive sul CARTELLINO, che e' di carta chiara nei
+       due temi, quindi vale parola per parola la ragione di
+       --lampo-tag e --asta-tag. La cornice della card invece riusa
+       --trust-text, che l'inchiostro dei due temi ce l'ha gia'.
+       E' il verde profondo di casa (lo stesso valore di --trust-deep
+       nel tema chiaro), tenuto qui e non preso in prestito da li'
+       proprio perche' quello di sera si scurisce e questo no. */
+    --sconto-prezzo:#10603A;
     /* I DUE PONTI (ago 2026, decisione di Andrea): «Scrivi su
        Telegram» e «Scrivi su Nostr» prendono il colore del loro
        MONDO — è l'unico posto dell'app dove un bottone porta fuori,
@@ -176,6 +185,9 @@
        resta rosso. --lampo e --lampo-tag NON si toccano: vivono sulla
        foto e sul cartellino di carta, che al buio non cambiano. */
     --lampo-text:#FF8A6B;
+    /* --sconto-prezzo NON si tocca, per la stessa ragione dei suoi due
+       gemelli: sta sul cartellino di carta, che al buio resta chiaro.
+       A muoversi e' la sola CORNICE, che è --trust-text qui sotto. */
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
     --nostr:#A78BFA; --nostr-soft:#2C2344; --nostr-text:#C7B3FC;
     /* il ponte Telegram di sera: la velatura si scurisce e il testo
@@ -678,6 +690,20 @@
      scontato e' rosso, non arancio. Il barrato sopra resta grigio —
      e' il prezzo che NON si paga piu'. */
   .card.in-lampo .tag-price .price{color:var(--lampo-tag)}
+  /* LA CARD CHE FA SCATTARE LO SCONTO CARRELLO DA SOLA (ago 2026): il
+     calco di lampo e asta — cornice piu' prezzo colorato, nessuna
+     forma nuova. Niente badge sulla foto: quello slot e' degli stati
+     che ACCADONO, e qui non e' successo niente — e' una proprieta'
+     del prezzo, quindi la dice il prezzo.
+     LA CORNICE riusa --trust-text, l'inchiostro della fiducia, che i
+     due temi ce l'ha gia' (nessun token nuovo). IL PREZZO invece vuole
+     un valore FISSO — gemello esatto di --lampo-tag e --asta-tag, e
+     per la stessa ragione: il cartellino e' di carta chiara nei DUE
+     temi, e un token che si schiarisce di notte li' sparirebbe.
+     Il verde non e' una tinta nuova nel vocabolario: e' gia' la lingua
+     della PROMESSA SCATTATA nelle pill-trust di Paga e del carrello. */
+  .card.in-sconto{outline:1.5px solid var(--trust-text);outline-offset:-1.5px}
+  .card.in-sconto .tag-price .price{color:var(--sconto-prezzo)}
   /* Il badge dell'asta (ago 2026): stesso linguaggio del badge lampo
      ma identita' propria — il rosso e' della lampo, il martello parla
      inchiostro (e crema al buio, gratis coi token). In card il tempo
@@ -4826,8 +4852,23 @@ function iconeCard(l){
        a 360px: la parola costa ~21px al comune, che nel caso a tre
        strade scende da 69 a 47px e si tronca prima («Carma…»). Prezzo
        accettato: «gratis» dice al compratore qualcosa che gli fa
-       cambiare idea, le ultime lettere di un paese no. */
-    i += (!(l.sped > 0) && !(l.spedEur > 0))
+       cambiare idea, le ultime lettere di un paese no.
+       LA PAROLA DICE IL FATTO, NON IL PERCHE' (ago 2026, decisione di
+       Andrea): compare in TUTTI E DUE i casi — gratuita' dichiarata
+       dal venditore, o soglia del negozio raggiunta da un pezzo solo
+       — e resta NERA. Chi sfoglia vuole sapere se paga la spedizione;
+       il fatto e' lo stesso, quindi si dice allo stesso modo, e il
+       verde resta libero di dire un'altra cosa (lo sconto, vedi
+       cardHTML). Da qui il giudice UNICO invece del test a mano:
+       `spedGratis` e' dichiarato da sempre «il giudice unico dei due
+       badge e dell'icona in card», e l'icona non ci passava.
+       ⚠️ EFFETTO COLLATERALE, ed e' una CORREZIONE: il test di prima
+       non guardava il SUPPLEMENTO per pezzo, quindi un annuncio con
+       base 0 e supplemento pieno («il primo pezzo lo offro io»)
+       scriveva «gratis» in card mentendo — su due pezzi si paga. Il
+       giudice lo guarda (fail-closed), quindi da oggi quelle card
+       dicono la verita'. */
+    i += (spedGratis(l) || spedGratisQui(l, 1))
       ? '<span class="gratis" title="Spedizione gratuita">🚚<b>gratis</b></span>'
       : '<span title="Spedizione disponibile">🚚</span>';
   if (l.consegna === 'ritiro' || l.consegna === 'entrambe')
@@ -6621,6 +6662,19 @@ const cardHTML = l => {
      li' vince la lampo — lo sconto e' il motivo piu' forte per
      toccare, e la scarsita' si dice comunque nella scheda. */
   const ultimo = !esa && !ferie && !asta && !lampo && ultimoPezzo(l);
+  /* IL VERDE DELLO SCONTO CARRELLO (ago 2026, decisione di Andrea):
+     quando un articolo raggiunge DA SOLO la soglia del negozio, il
+     prezzo lo dice — verde col contorno, la resa di lampo e asta.
+     E' l'unica delle due promesse che prende un colore: la spedizione
+     gratis parla con la sua PAROLA in riga meta («🚚 gratis», nera in
+     tutti e due i casi, vedi iconeCard), quindi nessuna si ripete.
+     PRECEDENZA: il prezzo porta UN colore solo, e questo e' l'ultimo
+     della catena. Con la lampo non convive per costruzione — quel
+     prezzo e' gia' rosso, e per giunta artStima applica la lampo, che
+     puo' far SCENDERE l'articolo sotto la soglia. Con «Ne resta 1»
+     invece convive: quello e' un badge sulla foto, questo e' il colore
+     del prezzo — due slot diversi, e `ultimo` non lo guarda. */
+  const sconto = !esa && !ferie && !asta && !lampo && scontoQui(l, 1);
   const p = prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)})
                              : conLampo(l));
   /* Il badge dice lo STATO, la data la dice la scheda: insieme in una
@@ -6669,7 +6723,7 @@ const cardHTML = l => {
      apra una scheda nuova; il tocco normale lo spegne e apre in pagina
      come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':''}">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}">
       <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
@@ -7726,6 +7780,37 @@ function spedGratisQui(l, qta){
   const serveCambio = r.valuta !== 'sats' || l.valuta === 'eur';
   if (serveCambio && !cambioVivo) return false;
   const art = artStima(l) * Math.max(1, qta || 1);
+  const ora = r.valuta === 'sats' ? art : Math.floor(art * eurPerSat);
+  return ora >= r.quanto;
+}
+/* SU QUESTO PEZZO, A QUESTA QUANTITA', LO SCONTO CARRELLO SCATTA?
+   Il gemello di spedGratisQui, e ne eredita le tre decisioni parola
+   per parola: la cifra e' `artStima` (il MIN fra lampo e accordo, il
+   gemello di _unitario_effettivo del server), a cambio muto si tace,
+   la quantita' e' quella che il server misurera'.
+   NIENTE `spedisce(l)`, ed e' la sola differenza che conta: lo sconto
+   vale su OGNI via — e' sugli articoli, non sulla strada — ed e' la
+   regola del server (il gate della via lo prende la 🚚 e non la 🎁).
+   In FERIE e su un ESAURITO nessun verdetto: li' non si compra,
+   quindi non c'e' nessun conto con cui essere d'accordo, e il prezzo
+   porta gia' il grigio del suo stato.
+   A CRITERIO PEZZI IN CARD NON SCATTA MAI, e non e' un'eccezione da
+   scrivere ma la formula che lo dice da se': la card vale UN pezzo e
+   il minimo di una soglia a pezzi e' 2 (SCONTO_PACCO_MIN_SOGLIA).
+   Il verde in vetrina e' di fatto delle sole soglie a VALORE — chi un
+   giorno abbassasse quel minimo a 1 se lo ritroverebbe acceso senza
+   toccare niente qui, ed e' il verso giusto. */
+function scontoQui(l, qta){
+  if (inFerie(l) || esaurito(l)) return false;
+  const r = regolaSconto(l.scontoCriterio, l.scontoSoglia,
+                         l.scontoValoreSats, l.scontoValoreEur,
+                         l.scontoValuta, l.scontoPct);
+  if (!r) return false;
+  const pezzi = Math.max(1, qta || 1);
+  if (r.criterio === 'pezzi') return pezzi >= r.quanto;
+  const serveCambio = r.valuta !== 'sats' || l.valuta === 'eur';
+  if (serveCambio && !cambioVivo) return false;
+  const art = artStima(l) * pezzi;
   const ora = r.valuta === 'sats' ? art : Math.floor(art * eurPerSat);
   return ora >= r.quanto;
 }
@@ -9289,6 +9374,23 @@ function renderAcquisto(){
      barraPromessa e il giro FLIP sono i FERRI CONDIVISI qui sopra
      (barreCattura/barreCorri): li corre anche il carrello, e una
      copia sarebbe il posto dove la prossima divergenza si nasconde. */
+  /* L'INVITO CHE NON SI PUO' ACCETTARE (ago 2026, decisione di
+     Andrea): «Ancora 2 pezzi → −10%» su un annuncio che ne ha uno
+     solo chiede una cosa che non si puo' fare, e lo stesso vale
+     quando NESSUNA quantita' acquistabile arriva alla soglia (3
+     disponibili contro 5 pezzi, o 3 pezzi che sommati non ci
+     arrivano). Le due pillole SOTTO soglia spariscono; quelle
+     SCATTATE non si toccano — un fatto non e' un invito, e con
+     stock 1 sopra soglia il verde resta.
+     IL CONTO E' DEL SERVER (`*_raggiungibile`, il patto di
+     `mancano_*`: il client riceve, non calcola — e' lo stesso posto
+     dove vivrebbe un off-by-one). `!== false` e non `&&`: chiave
+     assente = invito come oggi, che e' il SET — dove la
+     composizione puo' sempre crescere di un altro articolo, quindi
+     «non raggiungibile» non si puo' affermare — piu' la DEMO e i
+     server di ieri. Fail-open, il patto di sempre.
+     La PROSA del cambio muto resta dov'e': senza conversione la
+     raggiungibilita' in euro non si sa, e si dice quel che si sa. */
   const scPct = p.sconto_percento||0, scCrit = p.sconto_criterio||'';
   const scVal = p.sconto_valuta||'eur';
   const scSogliaPag = scCrit === 'pezzi' ? (p.sconto_soglia||0)
@@ -9303,7 +9405,7 @@ function renderAcquisto(){
       note += `<div class="acq-nota">🎁 Il negozio fa −${scPct}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
     else if ((p.sconto_sats||0) > 0)
       pillaSc = `<span class="pill pill-trust" data-barra="sc">✅ Sconto <b>−${scPct}%</b></span>`;
-    else if (scManca > 0)
+    else if (scManca > 0 && p.sconto_raggiungibile !== false)
       pillaSc = `<span class="pill pill-barra" data-barra="sc"${barraPromessa(scSogliaPag, scManca)}>🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
   }
   /* L'INVITO DELLA SPEDIZIONE GRATIS: compare solo dove una
@@ -9335,7 +9437,7 @@ function renderAcquisto(){
            ${cifraSoglia(sgSoglia, sgVal)} di
            articoli, ma adesso non riusciamo a fare il cambio: per
            questo acquisto la spedizione si paga.</div>`;
-    else if (sgManca > 0)
+    else if (sgManca > 0 && p.sped_gratis_raggiungibile !== false)
       pillaSg = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(sgSoglia, sgManca)}>🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
     else
       pillaSg = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b></span>`;

@@ -13272,6 +13272,176 @@ def prove_promesse_badge():
           or "statoScontoPacco(netto" in mini)
 
 
+def prove_promesse_raggiungibili():
+    """L'INVITO CHE NON SI PUO' ACCETTARE, E IL VERDE IN VETRINA (ago
+    2026, decisione di Andrea). Due difetti opposti sulla stessa
+    famiglia di badge.
+    Nella pagina PAGA l'invito «Ancora 2 pezzi → −10%» compariva anche
+    su un annuncio che ne ha uno solo: chiedeva una cosa che non si
+    puo' fare. Adesso la pillola SOTTO soglia sparisce quando nessuna
+    quantita' acquistabile arriva alla soglia — e quella SCATTATA non
+    si tocca, perche' un fatto non e' un invito.
+    In VETRINA il contrario: un articolo che da solo fa scattare lo
+    sconto carrello non lo diceva da nessuna parte. Adesso il prezzo
+    parla verde col contorno, la resa di lampo e asta.
+    E «🚚 gratis» in card dice il FATTO in tutti e due i casi —
+    gratuita' dichiarata o soglia raggiunta — e resta NERA: chi
+    sfoglia vuole sapere se paga la spedizione, non perche'."""
+    print("\n[le promesse raggiungibili, e il verde in vetrina]")
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. IL SERVER CONTA LA RAGGIUNGIBILITA' (il patto di
+    # `mancano_*`: il client riceve, non calcola — e' lo stesso posto
+    # dove vivrebbe un off-by-one).
+    prova("le due chiavi escono dal preventivo", (1, 1),
+          (src.count('"sconto_raggiungibile":'),
+           src.count('"sped_gratis_raggiungibile":')))
+    # ZERO GIUDICI NUOVI: la domanda «esiste una quantita' che la fa
+    # scattare?» si risponde chiamando i due giudici DEL DENARO al
+    # massimo acquistabile. Sono monotoni nella quantita', quindi «il
+    # massimo scatta» ⟺ «qualcosa scatta» — e un terzo giudice sarebbe
+    # il posto da cui un giorno la pagina direbbe una cosa e la invoice
+    # un'altra.
+    _rag = src[src.index('"sconto_raggiungibile":'):
+               src.index('"promesse_sospese":')]
+    prova("...chiamando i giudici del denaro, non un terzo", (True, True),
+          ("_sconto_pacco(_art_max, _eur_max," in _rag,
+           "_sped_gratis(_art_max, _eur_max, sog_gratis, val_sg)" in _rag))
+    # IL TETTO E' LO STOCK, o l'ACCORDO quando c'e': la quantita' di
+    # un'offerta accettata e' ESATTA e non un tetto (la regola di
+    # stepperAcquista), quindi li' il massimo e' quella.
+    prova("il tetto e' lo stock", True,
+          'else max(richiesti, a["quantita"])' in src)
+    prova("...e l'accordo, quando c'e', lo abbassa", True,
+          "_max_pezzi = (_pinnata if _pinnata > 0" in src)
+    # E il massimo si misura sull'unitario EFFETTIVO (lampo e accordo
+    # gia' dentro), o si prometterebbe una soglia sul listino pieno
+    prova("...misurato sull'unitario effettivo", True,
+          "_art_max = unitario * _max_pezzi" in src)
+    prova("...e in euro con la conversione di casa", True,
+          "_eur_max = _eur_interi(_art_max, cambio)" in src)
+    # NEL SET NON ESCONO, ed e' dichiarato: la' la composizione puo'
+    # sempre crescere di un altro articolo del negozio, quindi «non
+    # raggiungibile» non si puo' affermare. Si guarda il corpo del
+    # preventivo del set, non il file intero.
+    _pset = src[src.index("async def _preventivo_set("):]
+    _pset = _pset[:_pset.index("\ndef ") if "\ndef " in _pset else len(_pset)]
+    prova("nel SET la raggiungibilita' non si afferma", False,
+          "raggiungibile" in _pset)
+
+    # ---- 2. IL CLIENT LE LEGGE FAIL-OPEN. `!== false` e non `&&`:
+    # chiave assente = invito come oggi (il set, la DEMO, i server di
+    # ieri). Col `&&` secco l'invito sparirebbe proprio dove non si
+    # puo' concludere niente.
+    _ra = pezzo_js(mini, "function renderAcquisto(){", "\n}")
+    prova("l'invito dello sconto guarda la raggiungibilita'", True,
+          "scManca > 0 && p.sconto_raggiungibile !== false" in _ra)
+    prova("...e quello della spedizione pure", True,
+          "sgManca > 0 && p.sped_gratis_raggiungibile !== false" in _ra)
+    prova("...tutti e due FAIL-OPEN, mai un && secco", (False, False),
+          ("&& p.sconto_raggiungibile)" in mini,
+           "&& p.sped_gratis_raggiungibile)" in mini))
+    # LA PILLOLA SCATTATA NON SI TOCCA: e' un fatto, non un invito, e
+    # con stock 1 sopra soglia il verde deve restare.
+    # E' UN CENSIMENTO E NON UN ELENCO, e la ragione e' che la prima
+    # stesura di questa riga NON POTEVA FALLIRE: guardava la riga della
+    # PILLOLA, mentre una guardia di troppo si aggiunge alla riga della
+    # CONDIZIONE, un rigo sopra — la tortura l'ha smascherata (0 rosse
+    # su una mutazione che doveva farne una). Contare le occorrenze
+    # prende tutti e due i rami del verde insieme, e prendera' da sola
+    # anche la terza promessa di domani.
+    # (si conta la FORMA della guardia e non la parola nuda: quella
+    # vive anche nei commenti qui accanto, e una sentinella che li
+    # conta certifica la prosa invece del codice)
+    prova("la guardia si scrive DUE volte: i due inviti, mai i due"
+          " verdi", 2, _ra.count("raggiungibile !== false"))
+
+    # ---- 3. IL GIUDICE DEL VERDE IN CARD: il gemello di spedGratisQui,
+    # e ne eredita le decisioni parola per parola.
+    _sc = pezzo_js(mini, "function scontoQui(l, qta){", "\n}")
+    prova("il verdetto dello sconto ha un giudice solo", 1,
+          mini.count("function scontoQui("))
+    # NIENTE `spedisce(l)`, ed e' la sola differenza che conta: lo
+    # sconto vale su OGNI via — e' sugli articoli, non sulla strada —
+    # ed e' la regola del server (il gate della via lo prende la 🚚).
+    prova("...e non guarda la strada: lo sconto vale su ogni via",
+          False, "spedisce(" in _sc)
+    # in ferie e sull'esaurito nessun verdetto: li' non si compra
+    prova("in ferie e sull'esaurito non si da' nessun verdetto", True,
+          "if (inFerie(l) || esaurito(l)) return false;" in _sc)
+    # la cifra e' quella del server (artStima: il MIN fra lampo e
+    # accordo), a cambio muto si tace, al filo esatto scatta
+    prova("la cifra e' quella del server, per i pezzi scelti", True,
+          "artStima(l) * pezzi" in _sc)
+    prova("...senza cambio il verdetto non si da'", True,
+          "if (serveCambio && !cambioVivo) return false;" in _sc)
+    prova("...e al filo esatto la promessa scatta", True,
+          "return ora >= r.quanto;" in _sc)
+    # la regola arriva dal giudice unico, mai letta a mano dai campi
+    prova("...e la regola la legge regolaSconto", True,
+          "regolaSconto(l.scontoCriterio" in _sc)
+
+    # ---- 4. IL SEGNO IN CARD: il calco di lampo e asta, e la
+    # PRECEDENZA — il prezzo porta UN colore solo, e questo e' l'ultimo
+    # della catena (con la lampo non convive: quel prezzo e' gia' rosso
+    # e artStima applica la lampo, che puo' far SCENDERE sotto soglia).
+    _ch = pezzo_js(mini, "const cardHTML = l => {", "\n};")
+    prova("la card sa quando lo sconto scatta da solo", True,
+          "const sconto = !esa && !ferie && !asta && !lampo"
+          " && scontoQui(l, 1);" in _ch)
+    prova("...e il colore e' l'ultimo della catena", True,
+          "lampo?' in-lampo':sconto?' in-sconto':''" in _ch)
+    # «Ne resta 1» CONVIVE: e' un badge sulla foto, questo e' il colore
+    # del prezzo — due slot diversi, e `ultimo` non lo guarda.
+    prova("...mentre «Ne resta 1» non si spegne per lo sconto", False,
+          "!sconto && ultimoPezzo" in _ch or "sconto && ultimoPezzo" in _ch)
+    # NIENTE BADGE sulla foto: quello slot e' degli stati che ACCADONO
+    prova("lo sconto non prende un badge sulla foto", False,
+          "card-sconto" in mini)
+    # le due regole CSS, gemelle di quelle della lampo
+    prova("la cornice e il prezzo hanno le loro due regole", (1, 1),
+          (mini.count(".card.in-sconto{outline:1.5px solid"
+                      " var(--trust-text);outline-offset:-1.5px}"),
+           mini.count(".card.in-sconto .tag-price"
+                      " .price{color:var(--sconto-prezzo)}")))
+    # IL TOKEN E' FISSO, come i suoi due gemelli: vive sul cartellino,
+    # che e' di carta chiara nei DUE temi — uno che si schiarisce di
+    # notte li' sparirebbe. Quindi si dichiara UNA volta sola e il
+    # blocco scuro non lo tocca.
+    prova("il token del prezzo e' dichiarato una volta sola", 1,
+          mini.count("--sconto-prezzo:"))
+    _scuro = mini[mini.index('html[data-tema="scuro"]'):]
+    prova("...e il tema scuro non lo tocca", False,
+          "--sconto-prezzo:" in _scuro[:_scuro.index("}")])
+    # e nessun'altra regola colora quel prezzo. Sono QUATTRO per CINQUE
+    # stati: lampo, sconto, asta, e la quarta che ferie ed esaurito si
+    # dividono («e' qui, non si compra» detto per due ragioni: una
+    # frase, un posto solo da tarare). Il numero e' il censimento — chi
+    # ne aggiunge una lo sente, e il posto giusto per un colore nuovo
+    # e' questa lista, non una regola sparsa altrove nel foglio.
+    prova("i colori del prezzo in card restano quattro", 4,
+          len(re.findall(r"\.tag-price[^{]*\.price\{color:", mini)))
+
+    # ---- 5. «🚚 GRATIS» DICE IL FATTO, NON IL PERCHE' (decisione di
+    # Andrea): la parola compare in tutti e due i casi — gratuita'
+    # dichiarata o soglia raggiunta da un pezzo solo — e resta NERA.
+    # Da qui il GIUDICE UNICO al posto del test a mano, che `spedGratis`
+    # dichiara di essere da sempre «anche dell'icona in card».
+    # ⚠️ E' anche una CORREZIONE: il test di prima non guardava il
+    # SUPPLEMENTO per pezzo, quindi «base 0 + supplemento pieno»
+    # scriveva «gratis» mentendo — su due pezzi si paga.
+    _ic = pezzo_js(mini, "function iconeCard(l){", "\n}")
+    prova("la parola passa dal giudice unico", True,
+          "(spedGratis(l) || spedGratisQui(l, 1))" in _ic)
+    prova("...e non dal test a mano che scavalcava il supplemento",
+          False, "!(l.sped > 0) && !(l.spedEur > 0)" in _ic)
+    # NERA: il colore resta l'inchiostro di sempre, e il verde non
+    # entra qui — o le due promesse direbbero la stessa cosa due volte
+    prova("...restando nera: nessun verde sulla parola", False,
+          "trust" in _ic or "sconto-prezzo" in _ic)
+
+
 def prove_guardia_is_bot():
     """LA GUARDIA is_bot DEL CAMPANELLO (ago 2026). Dal bot-to-bot
     (Bot API 10.0, maggio 2026) un altro bot puo' DAVVERO scriverci:
@@ -13396,7 +13566,8 @@ def main():
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
               prove_ordini_fermi, prove_numero_ordine,
-              prove_promesse_badge, prove_guardia_is_bot,
+              prove_promesse_badge, prove_promesse_raggiungibili,
+              prove_guardia_is_bot,
               prove_sintassi_client):
         try:
             f()
