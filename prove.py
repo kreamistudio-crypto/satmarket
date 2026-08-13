@@ -7336,16 +7336,28 @@ def prove_pagina_acquisto():
     #    sono il posto dove fra sei mesi si sbaglia riga.
     prova("...e non si chiama «lampo», che qui e' l'offerta a tempo",
           False, "barra-lampo" in mini3 or "--lampo-ritardo" in mini3)
-    #    PARTE SOLO ALLO SCATTO, e non serve una guardia nuova: la
-    #    classe si attacca DENTRO il ramo `scatto` di barreCorri, cioe'
-    #    dove la pillola e' pill-trust E la corsa avviene davvero — su
-    #    una verde a riposo la cattura vale 100 e il filtro dei 0.5 ha
-    #    gia' fatto uscire il giro. Chi la porta fuori da quel ramo la
-    #    fa ripartire a ogni tocco su una promessa gia' scattata.
-    prova("...parte solo allo scatto, dentro il ramo dei ferri",
-          (1, True),
+    #    PARTE SOLO ALLO SCATTO, E LA GUARDIA E' LO STATO DI PRIMA
+    #    (`!da.t`) E NON LA CORSA (13 ago 2026, difetto dal campo:
+    #    premendo veloce lo stepper l'anello ripartiva a ogni tocco).
+    #    Qui c'era scritto che bastava il filtro dei 0.5 — «su una verde
+    #    a riposo la cattura vale 100» — ed era FALSO: campionando
+    #    durante una raffica, la cattura vale 100 solo a corsa FINITA.
+    #    Nei primi due fotogrammi vale ancora la PARTENZA appena
+    #    scritta (il render successivo arriva prima del doppio rAF che
+    #    mette il bersaglio) e per i 350ms dopo vale l'INTERPOLATO:
+    #    misurati 82, 82, 83,57, 87,91, 94,26, 99,06 — il filtro morde
+    #    solo oltre i 350ms, cioe' dove il difetto non c'era.
+    #    LA LEZIONE STA NELLA SENTINELLA DI IERI, che chiedeva la classe
+    #    «dentro il ramo dello scatto»: era VERA e certificava comunque
+    #    il difetto, perche' guardava dove sta la riga e non cosa la
+    #    riapre. Adesso si chiede il DATO che risponde alla domanda
+    #    giusta — `t` nella cattura, `!da.t` nella guardia — che e' un
+    #    fatto del DOM di prima e non cambia sotto le dita.
+    prova("...parte solo allo scatto: la guardia e' lo STATO di prima",
+          (1, True, True),
           (mini3.count("classList.add('barra-impulso')"),
-           "if (scatto && IMPULSO_SCATTO){" in _cor))
+           "if (scatto && !da.t && IMPULSO_SCATTO){" in _cor,
+           "t: trust," in _cat))
     #    DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea):
     #    la seconda parte quando la prima e' a meta' corsa — un gesto in
     #    due battute invece di un doppio colpo. Il ritardo si scrive

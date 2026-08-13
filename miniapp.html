@@ -9357,6 +9357,14 @@ function barreCattura(box){
     const largo = el.clientWidth;
     const trust = el.classList.contains('pill-trust');
     barraDa[el.dataset.barra] = {
+      /* `t` E' LO STATO DI PRIMA, e non si deduce da `p` (13 ago 2026,
+         il difetto della raffica): dice se la promessa era GIA'
+         scattata quando il giro e' partito — l'unica domanda che
+         distingue lo scatto dal ridisegno di una promessa gia' verde.
+         La corsa non lo sa: durante i suoi 350ms `p` vale il valore
+         interpolato, e nei primi due fotogrammi vale ancora la
+         PARTENZA. Vedi la guardia dell'impulso in barreCorri. */
+      t: trust,
       p: (Number.isFinite(w) && largo > 0)
          ? Math.min(100, w / largo * 100) : (trust ? 100 : 0),
       c: (ps.backgroundColor && ps.backgroundColor !== 'rgba(0, 0, 0, 0)')
@@ -9397,12 +9405,21 @@ function barreCattura(box){
 /* L'IMPULSO DELLO SCATTO (13 ago 2026, chiesto da Andrea): l'anello
    che si allarga dalla pillola quando la promessa scatta. Sta QUI e
    non in un giro suo perche' il momento dello scatto lo conosce solo
-   questa funzione: e' la riga dove la pillola e' pill-trust E la
-   corsa avviene davvero — cioe' viene da sotto il 100. Su una
-   pillola gia' verde e a riposo la cattura vale 100 e il filtro dei
-   0.5 ha gia' fatto uscire il giro, quindi un tocco qualunque non lo
-   riaccende: e' una proprieta' del filtro che c'era gia', non una
-   guardia in piu' da tenere in pari.
+   questa funzione. LA GUARDIA E' LO STATO DI PRIMA (`!da.t`) E NON LA
+   CORSA, e la riga qui sotto diceva il contrario per un giorno: «su
+   una verde a riposo la cattura vale 100 e il filtro dei 0.5 fa
+   uscire il giro, quindi un tocco non lo riaccende». Falso, e
+   smentito CAMPIONANDO durante una raffica sullo stepper (difetto dal
+   campo: premendo veloce l'anello ripartiva a ogni tocco). La cattura
+   vale 100 solo a corsa FINITA: nei primi due fotogrammi vale ancora
+   la PARTENZA appena scritta — il render successivo arriva prima del
+   doppio rAF che mette il bersaglio — e per i 350ms dopo vale
+   l'INTERPOLATO (misurati: 82, 82, 83,57, 87,91, 94,26, 99,06). Il
+   filtro dei 0.5 morde solo oltre i 350ms, cioe' proprio dove il
+   difetto non c'era. `da.t` invece e' un FATTO del DOM di prima e non
+   cambia sotto le dita: si passa da «non scattata» a «scattata» una
+   volta sola, e il ridisegno di una promessa gia' verde non e' uno
+   scatto per quanto in fretta lo si chieda.
    DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea): la
    seconda parte quando la prima e' a meta' corsa, cosi' si legge
    come un gesto in due battute invece di un doppio colpo — e
@@ -9428,7 +9445,8 @@ function barreCorri(box, barraDa){
     const aC = scatto ? 'var(--barra-a)'
       : (el.style.getPropertyValue('--barra-c') || 'var(--barra-da)');
     if (scatto) el.classList.add('barra-scatto');
-    if (scatto && IMPULSO_SCATTO){
+    /* `!da.t` E' LA GUARDIA: lo STATO di prima, non la corsa */
+    if (scatto && !da.t && IMPULSO_SCATTO){
       if (impulsi)
         el.style.setProperty('--impulso-ritardo', `${IMPULSO_PASSO}ms`);
       el.classList.add('barra-impulso');
