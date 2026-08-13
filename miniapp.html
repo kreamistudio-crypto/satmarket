@@ -2001,7 +2001,12 @@
        il bottone si ferma sotto di lei, vedi la media query. */
     top:0;
     background:var(--bg);
-    padding:calc(10px + env(safe-area-inset-top)) 0 10px;
+    /* 8px e non 10 (13 ago 2026, il giro dopo i 180 accettati da
+       Andrea: «stringi solo i respiri, senza toccare la veste») —
+       insieme al margine dei badge a 6 porta il blocco a due
+       promesse da 180 a 176px MISURATI, sotto i 178 del vecchio
+       verbale. Guardato a schermo prima di tenerlo: l'aria regge. */
+    padding:calc(8px + env(safe-area-inset-top)) 0 8px;
     /* fino ai bordi della vista: .detail-body ha il suo padding
        laterale, e senza questo le card si vedrebbero passare ai lati
        del fondo. I margini negativi si annullano col padding gemello. */
@@ -2013,9 +2018,9 @@
   /* i badge delle promesse, DENTRO il blocco appiccicato e SOTTO il
      bottone (terza rigirata, 13 ago 2026 — il perche' e i numeri
      stanno sul template, in sezioneAltriOggetti): il margine sopra
-     li stacca dal bottone, il respiro sotto lo porta gia' il
-     padding del blocco */
-  .altri-promo{margin:8px 0 0}
+     li stacca dal bottone (6px, stretto col giro dei respiri), il
+     respiro sotto lo porta gia' il padding del blocco */
+  .altri-promo{margin:6px 0 0}
   .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
   /* (Il foglio del set — #setLista, .set-riga, .set-check — non esiste
      piu': il riepilogo e' la PAGINA «Controlla il pacco», vedi il suo
@@ -8235,14 +8240,18 @@ async function sezioneAltriOggetti(l){
      schermo, giudicato troppo. In colonna e DENTRO il blocco la
      coppia non puo' spezzarsi per costruzione — verificato a meta'
      scorrimento su 320/360/375: due badge su due, interi, sempre.
-     L'altezza MISURATA e riportata ad Andrea col numero: 180px (24%)
-     con DUE promesse — due px SOPRA i 178 scartati allora, e la
-     differenza rispetto ad allora e' che le righe si leggono invece
-     di essere chip accalcati; 135px con una promessa, 84px senza (il
-     valore di ieri, solo bottone). Identica alle tre larghezze,
-     perche' le righe piene non vanno mai a capo. Se il numero non
-     regge, le leve oneste sono i respiri del blocco, mai la veste
-     della fila. */
+     L'altezza MISURATA e detta col numero, in due tempi: alla
+     nascita 180px (24%) con DUE promesse — due px sopra i 178
+     scartati allora, riportati ad Andrea, che li ha ACCETTATI (le
+     righe si leggono invece di essere chip accalcati) chiedendo di
+     stringere i soli respiri se si trovavano senza toccare la
+     veste. Trovati: padding del blocco 10→8 e margine dei badge
+     8→6, e il blocco fa 176px (23%) misurati, con l'aria guardata a
+     schermo prima di tenerla; 135 e 84 di ieri (una promessa /
+     nessuna) scendono degli stessi 4px. Identica alle tre
+     larghezze, perche' le righe piene non vanno mai a capo. Il gap
+     fra le due righe (6px) e' della VESTE (.fila-promesse) e non si
+     tocca.
      Neutri: qui la promessa e' una REGOLA, e il verde vive solo dove
      e' un fatto (carrello e Paga). Dal 13 ago 2026 la fila veste
      .fila-promesse — righe a tutta larghezza come in Paga: SOLO la

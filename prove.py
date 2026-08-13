@@ -13301,6 +13301,47 @@ def prove_guardia_is_bot():
                                  for g in guardie))
 
 
+def prove_sintassi_client():
+    """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
+    arrivato fino a main: un `*/` doppio in un commento di
+    sezioneAltriOggetti ha trasformato in codice la coda del commento
+    e ha ucciso l'INTERO script al parse — niente card, niente barra
+    collaudo, un'app morta — mentre la CI era VERDE, perche' queste
+    prove leggono miniapp.html come TESTO e non l'hanno mai fatto
+    leggere a un motore JS. Duemilanovecento sentinelle sulla forma e
+    nessuna sulla sintassi: questa e' quella che mancava.
+    Ogni <script> inline passa da `node --check`; sw.js pure. Node
+    sta sui runner di GitHub di serie e il check e' un parse puro,
+    zero esecuzione — niente rete, niente DOM. Senza node in locale
+    si SALTA contando (il patto di salta): in CI, con PROVE_SEVERE,
+    una saltata vale una fallita, che e' giusto cosi' — questa prova
+    esiste proprio per non essere sussurrata."""
+    print("\n[la sintassi del client]")
+    import re as _re, shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("il client passa dal parser JS", "node non installato")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read()
+    blocchi = _re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>",
+                          mini, _re.S)
+    prova("gli <script> inline del client sono almeno due "
+          "(anti-flash + app)", True, len(blocchi) >= 2)
+    rotti = []
+    for i, b in enumerate(blocchi):
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as f:
+            f.write(b); percorso = f.name
+        r = _sp.run([node, "--check", percorso],
+                    capture_output=True, text=True)
+        if r.returncode != 0:
+            rotti.append(f"blocco {i}: {(r.stderr or '').splitlines()[:2]}")
+        os.unlink(percorso)
+    prova("ogni <script> del client passa il parse di node", [], rotti)
+    r = _sp.run([node, "--check", "sw.js"], capture_output=True, text=True)
+    prova("...e sw.js pure", 0, r.returncode)
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -13338,7 +13379,8 @@ def main():
               prove_sollecito_a_comando,
               prove_sat_non_e_barattolo, prove_ai_segnala,
               prove_ordini_fermi, prove_numero_ordine,
-              prove_promesse_badge, prove_guardia_is_bot):
+              prove_promesse_badge, prove_guardia_is_bot,
+              prove_sintassi_client):
         try:
             f()
         except Exception as e:
