@@ -60,15 +60,19 @@
                     giusta, e il segno resta rosso in tutti e due i
                     temi. Si abbassa la luce, non si cambia il segno. */
     --lampo:#C0392B; --lampo-tag:#A6301F; --lampo-text:#A6301F;
-    /* IL VERDE DELLO SCONTO CARRELLO IN CARD (ago 2026): un token
-       solo, e FISSO — vive sul CARTELLINO, che e' di carta chiara nei
-       due temi, quindi vale parola per parola la ragione di
-       --lampo-tag e --asta-tag. La cornice della card invece riusa
-       --trust-text, che l'inchiostro dei due temi ce l'ha gia'.
+    /* IL VERDE DELLO SCONTO CARRELLO IN CARD (ago 2026): UN token
+       solo per DUE superfici — il badge sulla foto e il prezzo sul
+       cartellino — e per questo e' FISSO: nessuna delle due cambia di
+       notte (la regola di --lampo/--lampo-tag e di --asta-tag). La
+       lampo di token ne ha due perche' il suo badge vuole un rosso
+       meno cupo del cartellino; questo verde regge tutte e due —
+       misurati: 7,7 col bianco del badge e 7,3 sulla carta.
+       La CORNICE della card invece riusa --trust-text, che
+       l'inchiostro dei due temi ce l'ha gia': zero token in piu'.
        E' il verde profondo di casa (lo stesso valore di --trust-deep
        nel tema chiaro), tenuto qui e non preso in prestito da li'
        proprio perche' quello di sera si scurisce e questo no. */
-    --sconto-prezzo:#10603A;
+    --sconto:#10603A;
     /* I DUE PONTI (ago 2026, decisione di Andrea): «Scrivi su
        Telegram» e «Scrivi su Nostr» prendono il colore del loro
        MONDO — è l'unico posto dell'app dove un bottone porta fuori,
@@ -185,7 +189,7 @@
        resta rosso. --lampo e --lampo-tag NON si toccano: vivono sulla
        foto e sul cartellino di carta, che al buio non cambiano. */
     --lampo-text:#FF8A6B;
-    /* --sconto-prezzo NON si tocca, per la stessa ragione dei suoi due
+    /* --sconto NON si tocca, per la stessa ragione dei suoi due
        gemelli: sta sul cartellino di carta, che al buio resta chiaro.
        A muoversi e' la sola CORNICE, che è --trust-text qui sotto. */
     --trust-deep:#0C4A2C; --trust-text:#63CB96;
@@ -703,7 +707,16 @@
      Il verde non e' una tinta nuova nel vocabolario: e' gia' la lingua
      della PROMESSA SCATTATA nelle pill-trust di Paga e del carrello. */
   .card.in-sconto{outline:1.5px solid var(--trust-text);outline-offset:-1.5px}
-  .card.in-sconto .tag-price .price{color:var(--sconto-prezzo)}
+  .card.in-sconto .tag-price .price{color:var(--sconto)}
+  /* IL BADGE DELLO SCONTO: la forma del badge lampo — stesso angolo,
+     stessa pillola, stessa ombra — e SENZA il fulmine (decisione di
+     Andrea): ⚡ vuol dire «a tempo», e questo non scade. Sta nello
+     stesso angolo della lampo, che e' anche il motivo per cui i due
+     non convivono mai (la precedenza in cardHTML). */
+  .card-sconto{position:absolute;top:8px;left:8px;z-index:2;
+    background:var(--sconto);color:#fff;border-radius:999px;
+    padding:3px 9px;font-size:11.5px;font-weight:800;
+    display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
   /* Il badge dell'asta (ago 2026): stesso linguaggio del badge lampo
      ma identita' propria — il rosso e' della lampo, il martello parla
      inchiostro (e crema al buio, gratis coi token). In card il tempo
@@ -732,6 +745,12 @@
      della sua card — l'identita' non si spezza sulla soglia
      card→dettaglio, la stessa regola dell'asta. */
   .detail-price.lampo{color:var(--lampo-text)}
+  /* il numero grande di un annuncio in sconto: l'INCHIOSTRO verde dei
+     due temi (--trust-text: 5,5 su crema, 8,6 su bruno) e non il token
+     fisso del badge — qui il numero sta sulla PAGINA, e l'inchiostro
+     segue la carta come ovunque nell'app. E' la stessa asimmetria
+     della lampo, che in card usa --lampo-tag e qui --lampo-text. */
+  .detail-price.sconto{color:var(--trust-text)}
   /* NESSUNA DELLE DUE NOMINA .unit, ed e' la regola (ago 2026): il
      colore dello stato veste il NUMERO e basta — il € e la parola
      «sats» restano nel colore del testo, che qui lo mette
@@ -845,6 +864,9 @@
     font-size:14.5px;margin-bottom:-6px}
   .lampo-was .lampo-badge{background:var(--lampo);color:#fff;
     border-radius:999px;padding:2px 9px;font-size:12px;font-weight:800}
+  /* lo stesso chip in verde per lo sconto carrello: cambia il solo
+     fondo, la forma resta quella (una regola invece di una copia) */
+  .lampo-was .lampo-badge.sconto-badge{background:var(--sconto)}
   /* «Scade tra 2h 14m» accanto al badge, FUORI da lui: stesso colore
      della vecchia riga lampo, che diceva la stessa cosa due righe
      piu' sotto (lug 2026: ripeterla era rumore). Dall'ago 2026 dice
@@ -3328,7 +3350,7 @@ document.getElementById('cartello')?.remove();</script>
         <option value="">Più recenti</option>
         <option value="prezzo_su">Prezzo: dal più basso</option>
         <option value="prezzo_giu">Prezzo: dal più alto</option>
-        <option value="lampo">⚡ In offerta</option>
+        <option value="lampo">⚡ Offerta a tempo</option>
         <option value="asta">🔨 All'asta</option>
       </select>
       <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
@@ -3388,8 +3410,22 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <div class="filtri-riga">
         <label class="filtro-check">
+          <input type="checkbox" id="filtroSpedGratisInp">
+          🚚 Spedizione gratis</label>
+      </div>
+      <!-- «Offerta a tempo» e non piu' «In offerta» (ago 2026,
+           decisione di Andrea): da quando accanto c'e' «In sconto», la
+           parola «offerta» da sola non distingue piu' niente — ed e'
+           il tempo la differenza fra le due. -->
+      <div class="filtri-riga">
+        <label class="filtro-check">
           <input type="checkbox" id="filtroLampoInp">
-          ⚡ In offerta</label>
+          ⚡ Offerta a tempo</label>
+      </div>
+      <div class="filtri-riga">
+        <label class="filtro-check">
+          <input type="checkbox" id="filtroScontoInp">
+          🎁 In sconto</label>
       </div>
       <div class="filtri-riga">
         <label class="filtro-check">
@@ -5155,6 +5191,9 @@ let filtroSped = false;      // «solo con spedizione» (stato di sessione)
 let filtroRitiro = false;    // «ritiro in zona» (stesso patto)
 let filtroDig = false;       // «codice online» (stesso patto)
 let filtroLampo = false;     // «solo in offerta» (stesso patto)
+let filtroSpedGratis = false;// «spedizione gratis» (ago 2026: la
+                             // parola che la card scrive gia')
+let filtroSconto = false;    // «in sconto» (ago 2026: il badge verde)
 let filtroAsta = false;      // «solo all'asta» (ago 2026, stesso patto)
 let filtroCond = '';         // condizione dell'oggetto ('' = qualsiasi)
 let filtroReg = '';          // regione ('' = tutta l'Italia)
@@ -5175,6 +5214,12 @@ function paramsVetrina(){
   if (filtroDig) p.set('solo_digitale', '1');
   if (filtroLampo) p.set('solo_lampo', '1');
   if (filtroAsta) p.set('solo_asta', '1');
+  /* I DUE FILTRI DELLE PROMESSE: promettono quello che la card
+     MOSTRA — la parola «gratis» in riga meta e il badge verde — e a
+     dare il verdetto e' il SERVER, l'unico che possa farlo dentro la
+     WHERE su cui vive la paginazione. */
+  if (filtroSpedGratis) p.set('solo_sped_gratis', '1');
+  if (filtroSconto) p.set('solo_sconto', '1');
   if (filtroCond && condFiltrabile()) p.set('condizione', filtroCond);
   if (filtroReg) p.set('regione', filtroReg);
   return p;
@@ -5248,7 +5293,8 @@ const numeroFiltro = v => {
    vetrina quando non c'era niente da azzerare). Ogni filtro nuovo si
    aggiunge QUI e i due lo sanno insieme. */
 const filtriVivi = () => !!filtroPrezzo || filtroSped || filtroRitiro
-  || filtroDig || filtroLampo || filtroAsta || !!filtroCond || !!filtroReg;
+  || filtroDig || filtroLampo || filtroAsta || filtroSpedGratis
+  || filtroSconto || !!filtroCond || !!filtroReg;
 
 function applicaFiltri(){
   haptic();
@@ -5260,6 +5306,8 @@ function applicaFiltri(){
   filtroDig = !!el('filtroDigInp').checked;
   filtroLampo = !!el('filtroLampoInp').checked;
   filtroAsta = !!el('filtroAstaInp').checked;
+  filtroSpedGratis = !!el('filtroSpedGratisInp').checked;
+  filtroSconto = !!el('filtroScontoInp').checked;
   filtroCond = el('filtroCondSel').value;
   filtroReg = el('filtroRegSel').value;
   el('filtriBtn').classList.toggle('attivo', filtriVivi());
@@ -5276,6 +5324,8 @@ function azzeraFiltri(){
   el('filtroDigInp').checked = false;
   el('filtroLampoInp').checked = false;
   el('filtroAstaInp').checked = false;
+  el('filtroSpedGratisInp').checked = false;
+  el('filtroScontoInp').checked = false;
   el('filtroCondSel').value = '';
   aggiornaPicker('filtroCondSel');
   el('filtroRegSel').value = '';
@@ -5283,6 +5333,7 @@ function azzeraFiltri(){
   const cera = filtriVivi();
   filtroPrezzo = null; filtroSped = false; filtroRitiro = false;
   filtroDig = false; filtroLampo = false; filtroAsta = false;
+  filtroSpedGratis = false; filtroSconto = false;
   filtroCond = ''; filtroReg = '';
   el('filtriBtn').classList.remove('attivo');
   el('filtriBox').style.display = 'none';
@@ -6516,6 +6567,13 @@ function renderGrid(items){
       data = data.filter(lampoAttiva);
     if (filtroAsta)
       data = data.filter(astaViva);
+    /* in DEMO i due filtri delle promesse rispondono coi GIUDICI
+       del client — gli stessi che disegnano la parola e il badge —
+       cosi' demo e vetrina vera non possono divergere */
+    if (filtroSpedGratis)
+      data = data.filter(l => spedGratis(l) || spedGratisQui(l, 1));
+    if (filtroSconto)
+      data = data.filter(l => scontoQui(l, 1));
     if (ordinaVista === 'lampo')
       /* come sul server: solo le lampo vive, chi scade prima in testa */
       data = data.filter(lampoAttiva).sort((a,b) => a.lampoFine - b.lampoFine);
@@ -6656,27 +6714,38 @@ const cardHTML = l => {
   const ferie = !esa && inFerie(l);
   const asta = astaE(l);
   const lampo = !esa && !asta && !ferie && lampoAttiva(l);
+  /* IL VERDE DELLO SCONTO CARRELLO (ago 2026, decisione di Andrea):
+     quando un articolo raggiunge DA SOLO la soglia del negozio la card
+     lo dice — prezzo SCONTATO col listino barrato e badge verde in
+     alto a sinistra, cioe' lo stesso meccanismo della lampo, senza il
+     fulmine. E' l'unica delle due promesse che prende un segno: la
+     spedizione gratis parla con la sua PAROLA in riga meta («🚚
+     gratis», nera in tutti e due i casi, vedi iconeCard), quindi
+     nessuna si ripete.
+     PRECEDENZA: LA LAMPO VINCE, e non e' un pareggio arbitrario — e'
+     la regola del conto, dove artStima applica la lampo e lo sconto
+     misura QUEL prezzo, quindi una lampo generosa puo' far scendere
+     l'articolo sotto la soglia. Quando la lampo finisce, l'articolo
+     torna al prezzo scontato normale: lo fa da solo il re-render
+     della scadenza, senza un ramo apposta. */
+  const sconto = !esa && !ferie && !asta && !lampo && scontoQui(l, 1);
   /* Ultimo posto in fila, ed e' la sua misura giusta: uno stato che
      dice «sbrigati» non deve mai coprirne uno che dice «non si puo'
-     comprare». Puo' convivere con la lampo (ultimo pezzo scontato) e
-     li' vince la lampo — lo sconto e' il motivo piu' forte per
-     toccare, e la scarsita' si dice comunque nella scheda. */
-  const ultimo = !esa && !ferie && !asta && !lampo && ultimoPezzo(l);
-  /* IL VERDE DELLO SCONTO CARRELLO (ago 2026, decisione di Andrea):
-     quando un articolo raggiunge DA SOLO la soglia del negozio, il
-     prezzo lo dice — verde col contorno, la resa di lampo e asta.
-     E' l'unica delle due promesse che prende un colore: la spedizione
-     gratis parla con la sua PAROLA in riga meta («🚚 gratis», nera in
-     tutti e due i casi, vedi iconeCard), quindi nessuna si ripete.
-     PRECEDENZA: il prezzo porta UN colore solo, e questo e' l'ultimo
-     della catena. Con la lampo non convive per costruzione — quel
-     prezzo e' gia' rosso, e per giunta artStima applica la lampo, che
-     puo' far SCENDERE l'articolo sotto la soglia. Con «Ne resta 1»
-     invece convive: quello e' un badge sulla foto, questo e' il colore
-     del prezzo — due slot diversi, e `ultimo` non lo guarda. */
-  const sconto = !esa && !ferie && !asta && !lampo && scontoQui(l, 1);
+     comprare».
+     SI SPEGNE ANCHE PER LO SCONTO, ed e' cambiato dal giorno in cui il
+     verde ha preso un BADGE (ago 2026): finche' era solo un colore del
+     prezzo i due slot erano diversi e convivevano, adesso vorrebbero
+     lo stesso angolo — e due badge nello stesso angolo non si fanno.
+     Vince lo sconto, per la stessa ragione per cui vince la lampo: un
+     prezzo piu' basso e' un motivo piu' forte per toccare, e la
+     scarsita' si dice comunque nella scheda. */
+  const ultimo = !esa && !ferie && !asta && !lampo && !sconto
+    && ultimoPezzo(l);
+  /* il prezzo mostrato viene dal giudice unico (prezzoMostrato): la
+     lampo o lo sconto, mai i due insieme — e il dettaglio legge lo
+     stesso, cosi' card e scheda non possono dire due cifre */
   const p = prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)})
-                             : conLampo(l));
+                             : prezzoMostrato(l));
   /* Il badge dice lo STATO, la data la dice la scheda: insieme in una
      pillola sola facevano 117px contro i 108 che la card concede a
      360px, e il barattolino — che sta a destra e non si stringe mai —
@@ -6694,6 +6763,11 @@ const cardHTML = l => {
     ? `<div class="card-asta">🔨 ${astaViva(l) ? astaResta(l.astaFine)
                                                : 'conclusa'}</div>`
     : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>`
+    /* il badge dello sconto: la forma della lampo SENZA il fulmine
+       (decisione di Andrea) — ⚡ vuol dire «a tempo», e questo non
+       scade. La percentuale la porta la regola del negozio, non
+       l'annuncio: la legge il giudice, che qui ha gia' detto di si'. */
+    : sconto ? `<div class="card-sconto">−${l.scontoPct}%</div>`
     /* «Ne resta 1» e non «Ultimo pezzo», e la ragione e' MISURATA:
        a 320px «Ultimo pezzo» fa 89px e tocca il barattolino (−1px di
        aria), «Ultimo rimasto» lo scavalca di 12. Questo ne fa 74 e
@@ -6729,7 +6803,7 @@ const cardHTML = l => {
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
-        <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${lampo?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${(lampo||sconto)?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
         ${flash}
       </div>
       <div class="info">
@@ -7208,7 +7282,7 @@ function aggiornaCurToggle(){
 function aggiornaPrezzoDettaglio(){
   const l = currentListing;
   if (!l || !el('view-dettaglio')?.classList.contains('active')) return;
-  const p = prezzoParte(conLampo(l));
+  const p = prezzoParte(prezzoMostrato(l));   /* lampo O sconto: un giudice solo */
   const grande = document.querySelector('#detailContent .detail-price');
   if (grande) grande.innerHTML = p.big;
   const piccolo = document.querySelector('#detailContent .eur-hint');
@@ -7264,6 +7338,48 @@ function conLampo(l){
   if (l.priceEur > 0)
     s.priceEur = Math.max(0.01, Math.round(l.priceEur * k * 100) / 100);
   return s;
+}
+/* IL PREZZO COLLO SCONTO CARRELLO GIA' DENTRO (ago 2026, decisione di
+   Andrea: la card verde mostra il prezzo scontato, «stesso meccanismo»
+   della lampo). Gemello esatto di conLampo, e la ricetta e' la stessa
+   del server (_sconto_pacco: netto col FLOOR e mai sotto 1 sat) —
+   percentuale diversa, aritmetica identica.
+   SI MOSTRA SEMPRE, anche quando la divisione non e' esatta, e qui la
+   differenza con la pagina Paga e' voluta: la' la cifra e' un UNITARIO
+   scritto accanto a un TOTALE scontato, e se moltiplicando non torna
+   si legge come un guasto — per questo il server la manda solo quando
+   e' intera. In vetrina il prezzo mostrato E' il prezzo di un pezzo e
+   non c'e' nessun totale accanto con cui fare la verifica: e la lampo,
+   che sconta da sempre col floor, non ha mai avuto un ramo di
+   esattezza. */
+function conSconto(l){
+  const r = regolaSconto(l.scontoCriterio, l.scontoSoglia,
+                         l.scontoValoreSats, l.scontoValoreEur,
+                         l.scontoValuta, l.scontoPct);
+  if (!r) return l;
+  const k = (100 - r.pct) / 100;
+  const s = Object.assign({}, l);
+  s.price = Math.max(1, Math.floor(l.price * k));
+  if (l.priceEur > 0)
+    s.priceEur = Math.max(0.01, Math.round(l.priceEur * k * 100) / 100);
+  return s;
+}
+/* IL PREZZO CHE LA VETRINA MOSTRA, in un posto solo: lo chiamano la
+   card, il dettaglio e il riscrittore del toggle valuta, e tre copie
+   della precedenza divergerebbero al primo ritocco.
+   LA LAMPO VINCE SULLO SCONTO (decisione di Andrea), e non e' un
+   pareggio arbitrario: e' la stessa regola del conto, dove `artStima`
+   applica la lampo e lo sconto misura QUEL prezzo — cioe' una lampo
+   generosa puo' far scendere l'articolo sotto la soglia. Quando la
+   lampo finisce, l'articolo torna al prezzo scontato normale, che e'
+   esattamente cio' che questa riga fa da sola al primo re-render.
+   Il verdetto e' a QUANTITA' 1 anche nel dettaglio, dove i pezzi si
+   scelgono: la domanda e' «questo articolo, DA SOLO, fa scattare lo
+   sconto?», il numero grande e' un unitario, e cosi' il prezzo non
+   balla sotto le dita a ogni ±. Il conto del carrello resta di Paga. */
+function prezzoMostrato(l){
+  if (lampoAttiva(l)) return conLampo(l);
+  return scontoQui(l, 1) ? conSconto(l) : l;
 }
 /* Quanto manca, detto in breve: «2h 14m», «14m», «40s» */
 function lampoResta(fine){
@@ -7771,9 +7887,16 @@ function testoSpedBadge(l){
    prosa): li' non si compra, quindi non c'e' nessun conto con cui
    essere d'accordo. La gratuita' PIENA invece resta visibile anche in
    ferie, ed e' l'asimmetria giusta — quella e' una proprieta'
-   dell'annuncio, questa e' un verdetto su un acquisto. */
+   dell'annuncio, questa e' un verdetto su un acquisto.
+   E NEMMENO IN ASTA, come il gemello dello sconto: li' il prezzo e'
+   una PUNTATA in corso, e misurare contro una puntata la soglia di
+   un negozio non vuol dire niente — per giunta al vincitore la
+   spedizione e' inclusa per costruzione (le strade dell'asta sono a
+   costo zero), quindi la promessa non c'entra proprio. Trovato dal
+   vivo col filtro nuovo, che pescava un'asta il cui prezzo di base
+   superava la soglia. */
 function spedGratisQui(l, qta){
-  if (!spedisce(l) || inFerie(l)) return false;
+  if (!spedisce(l) || inFerie(l) || astaE(l)) return false;
   const r = regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
                              l.spedGratisValuta);
   if (!r) return false;
@@ -7801,7 +7924,7 @@ function spedGratisQui(l, qta){
    giorno abbassasse quel minimo a 1 se lo ritroverebbe acceso senza
    toccare niente qui, ed e' il verso giusto. */
 function scontoQui(l, qta){
-  if (inFerie(l) || esaurito(l)) return false;
+  if (inFerie(l) || esaurito(l) || astaE(l)) return false;
   const r = regolaSconto(l.scontoCriterio, l.scontoSoglia,
                          l.scontoValoreSats, l.scontoValoreEur,
                          l.scontoValuta, l.scontoPct);
@@ -10336,8 +10459,8 @@ function openDetail(id){
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">
-          <div class="detail-price${esa?' esaurito':ferie?' ferie':asta?' asta':lampoAttiva(l)?' lampo':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).big}</div>
-          <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : conLampo(l)).small}</div>
+          <div class="detail-price${esa?' esaurito':ferie?' ferie':asta?' asta':lampoAttiva(l)?' lampo':scontoQui(l,1)?' sconto':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : prezzoMostrato(l)).big}</div>
+          <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : prezzoMostrato(l)).small}</div>
           ${esa?`<div class="esaurito-riga"><b>Esaurito</b> — al momento non c'è nessun pezzo disponibile</div>`:''}
           ${ferie?`<div class="ferie-riga">🌴 <b>Il negozio è in ferie</b> — torna il ${ferieData(l.ferie)}</div>`:''}
           ${!ferie && asta?`<div class="asta-riga">🔨 <b>${l.astaTop>0?'puntata in testa':"base d'asta"}</b>${l.astaPuntate>0?` · ${l.astaPuntate} offerent${l.astaPuntate===1?'e':'i'}`:''} · ${astaViva(l)?`si chiude tra <b class="asta-count mono" data-fine="${l.astaFine}">${astaResta(l.astaFine)}</b>`:'asta chiusa'}</div>`:''}
@@ -10346,6 +10469,19 @@ function openDetail(id){
                2h» su una cosa che non si compra e' l'unica riga di
                questa pagina che direbbe il falso -->
           ${!esa && !ferie && !asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
+          <!-- lo sconto carrello nella scheda: la stessa riga «prezzo
+               di prima» della lampo, col suo chip verde e SENZA il
+               countdown — questo non scade. La CLASSE resta lampo-was
+               apposta: e' il vestito della riga (barrato + chip), non
+               il nome di una promessa, e sdoppiarla vorrebbe dire
+               tenere in pari due copie di quattro regole CSS piu' il
+               riscrittore del toggle valuta, che quel barrato lo pesca
+               proprio da li'. E' il patto dei nomi interni del
+               carrello, che si chiamano ancora pacco.
+               ATTENZIONE: questo commento vive DENTRO un template
+               literal, quindi niente apici inversi qui — chiuderebbero
+               la stringa e ammazzerebbero l'intero script al parse. -->
+          ${!esa && !ferie && !asta && !lampoAttiva(l) && scontoQui(l,1)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge sconto-badge">−${l.scontoPct}%</span></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
              valuta LEGGERE questo annuncio, e la scelta e' la stessa -->

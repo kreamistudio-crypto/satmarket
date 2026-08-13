@@ -12862,8 +12862,12 @@ def prove_promesse_badge():
           "return ora >= r.quanto;" in _sq)
     # 3) in ferie nessun verdetto: li' non si compra, e non c'e' nessun
     # conto con cui essere d'accordo
-    prova("in ferie non si da' nessun verdetto", True,
-          "if (!spedisce(l) || inFerie(l)) return false;" in _sq)
+    # e nemmeno in ASTA (ago 2026): li' il prezzo e' una puntata in
+    # corso e la spedizione e' inclusa per costruzione — trovato dal
+    # vivo col filtro nuovo, che pescava un'asta sopra soglia
+    prova("in ferie e in asta non si da' nessun verdetto", True,
+          "if (!spedisce(l) || inFerie(l) || astaE(l)) return false;"
+          in _sq)
     # ...ma la gratuita' PIENA resta visibile anche in ferie: e' una
     # proprieta' dell'annuncio, non un verdetto su un acquisto
     prova("...mentre la gratuita' piena non guarda le ferie", False,
@@ -13368,8 +13372,9 @@ def prove_promesse_raggiungibili():
     prova("...e non guarda la strada: lo sconto vale su ogni via",
           False, "spedisce(" in _sc)
     # in ferie e sull'esaurito nessun verdetto: li' non si compra
-    prova("in ferie e sull'esaurito non si da' nessun verdetto", True,
-          "if (inFerie(l) || esaurito(l)) return false;" in _sc)
+    prova("in ferie, sull'esaurito e in asta nessun verdetto", True,
+          "if (inFerie(l) || esaurito(l) || astaE(l)) return false;"
+          in _sc)
     # la cifra e' quella del server (artStima: il MIN fra lampo e
     # accordo), a cambio muto si tace, al filo esatto scatta
     prova("la cifra e' quella del server, per i pezzi scelti", True,
@@ -13396,24 +13401,32 @@ def prove_promesse_raggiungibili():
     # del prezzo — due slot diversi, e `ultimo` non lo guarda.
     prova("...mentre «Ne resta 1» non si spegne per lo sconto", False,
           "!sconto && ultimoPezzo" in _ch or "sconto && ultimoPezzo" in _ch)
-    # NIENTE BADGE sulla foto: quello slot e' degli stati che ACCADONO
-    prova("lo sconto non prende un badge sulla foto", False,
-          "card-sconto" in mini)
+    # IL BADGE C'E' (ago 2026, decisione di Andrea): la forma della
+    # lampo SENZA il fulmine — il fulmine vuol dire «a tempo», e
+    # questo non scade. Questa prova ha CAMBIATO LATO: chiedeva che
+    # il badge non esistesse, cioe' certificava la vetrina di ieri.
+    prova("lo sconto ha il suo badge, e senza fulmine", (True, False),
+          ('<div class="card-sconto">−${l.scontoPct}%</div>' in _ch,
+           'card-sconto">⚡' in mini))
+    # nello stesso angolo della lampo, che e' anche il motivo per cui
+    # i due non convivono mai
+    prova("...nell'angolo della lampo, con la sua forma", True,
+          ".card-sconto{position:absolute;top:8px;left:8px;" in mini)
     # le due regole CSS, gemelle di quelle della lampo
     prova("la cornice e il prezzo hanno le loro due regole", (1, 1),
           (mini.count(".card.in-sconto{outline:1.5px solid"
                       " var(--trust-text);outline-offset:-1.5px}"),
            mini.count(".card.in-sconto .tag-price"
-                      " .price{color:var(--sconto-prezzo)}")))
+                      " .price{color:var(--sconto)}")))
     # IL TOKEN E' FISSO, come i suoi due gemelli: vive sul cartellino,
     # che e' di carta chiara nei DUE temi — uno che si schiarisce di
     # notte li' sparirebbe. Quindi si dichiara UNA volta sola e il
     # blocco scuro non lo tocca.
-    prova("il token del prezzo e' dichiarato una volta sola", 1,
-          mini.count("--sconto-prezzo:"))
+    prova("il token del verde e' dichiarato una volta sola", 1,
+          mini.count("--sconto:"))
     _scuro = mini[mini.index('html[data-tema="scuro"]'):]
     prova("...e il tema scuro non lo tocca", False,
-          "--sconto-prezzo:" in _scuro[:_scuro.index("}")])
+          "--sconto:" in _scuro[:_scuro.index("}")])
     # e nessun'altra regola colora quel prezzo. Sono QUATTRO per CINQUE
     # stati: lampo, sconto, asta, e la quarta che ferie ed esaurito si
     # dividono («e' qui, non si compra» detto per due ragioni: una
@@ -13440,6 +13453,214 @@ def prove_promesse_raggiungibili():
     # entra qui — o le due promesse direbbero la stessa cosa due volte
     prova("...restando nera: nessun verde sulla parola", False,
           "trust" in _ic or "sconto-prezzo" in _ic)
+
+
+def prove_verde_e_filtri():
+    """IL PREZZO SCONTATO IN VETRINA E I DUE FILTRI (ago 2026,
+    decisioni di Andrea). La card in sconto mostra il prezzo SCONTATO
+    col listino barrato e un badge verde in alto a sinistra — lo stesso
+    meccanismo della lampo, senza il fulmine — e lo stesso vale nella
+    scheda. Nei filtri nascono «Spedizione gratis» e «In sconto», e
+    «In offerta» diventa «Offerta a tempo»: con due sconti in elenco la
+    parola da sola non distingueva piu' niente.
+    LA REGOLA IN UNA FRASE, ed e' quella da tenere: e' il CRITERIO a
+    dire dove vale lo sconto — a VALORE conta la cifra, quindi vale
+    anche su un articolo solo; a PEZZI conta il numero, quindi serve
+    arrivare a piu' pezzi. Nessuna eccezione da ricordare."""
+    print("\n[il prezzo scontato in vetrina, e i due filtri]")
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. IL PREZZO MOSTRATO HA UN GIUDICE SOLO: lo chiamano la
+    # card, la scheda e il riscrittore del toggle valuta, e tre copie
+    # della precedenza divergerebbero al primo ritocco.
+    _pm = pezzo_js(mini, "function prezzoMostrato(l){", "\n}")
+    prova("il prezzo mostrato ha un giudice solo", 1,
+          mini.count("function prezzoMostrato("))
+    # 5 = la definizione piu' i QUATTRO chiamanti (card, i due del
+    # prezzo nella scheda, il riscrittore del toggle valuta)
+    prova("...e lo chiamano card, scheda e toggle valuta", 5,
+          mini.count("prezzoMostrato(l)"))
+    # LA LAMPO VINCE, ed e' la regola del conto: artStima applica la
+    # lampo e lo sconto misura QUEL prezzo.
+    prova("la lampo vince sullo sconto", True,
+          "if (lampoAttiva(l)) return conLampo(l);" in _pm)
+    prova("...e lo sconto viene dopo, a quantita' 1", True,
+          "return scontoQui(l, 1) ? conSconto(l) : l;" in _pm)
+    # la ricetta e' quella del server (_sconto_pacco: netto col FLOOR,
+    # mai sotto 1 sat) ed e' identica a conLampo
+    _cs = pezzo_js(mini, "function conSconto(l){", "\n}")
+    _cl = pezzo_js(mini, "function conLampo(l){", "\n}")
+    for _r in ("s.price = Math.max(1, Math.floor(l.price * k));",
+               "s.priceEur = Math.max(0.01,"):
+        prova("lo sconto e la lampo arrotondano uguale", (True, True),
+              (_r in _cs, _r in _cl))
+    # la percentuale la legge il GIUDICE, mai il campo nudo: un pct
+    # senza soglia non e' una regola
+    prova("...e la regola la legge regolaSconto", True,
+          "regolaSconto(l.scontoCriterio" in _cs)
+
+    # ---- 2. IL SEGNO IN CARD: badge nell'angolo della lampo e listino
+    # barrato. I due badge non convivono MAI — stesso angolo.
+    _ch = pezzo_js(mini, "const cardHTML = l => {", "\n};")
+    prova("il barrato compare per la lampo E per lo sconto", True,
+          "${(lampo||sconto)?" in _ch)
+    prova("il prezzo della card viene dal giudice", True,
+          ": prezzoMostrato(l));" in _ch)
+    # «Ne resta 1» si spegne anche per lo sconto: da quando il verde ha
+    # un badge, i due vorrebbero lo stesso angolo
+    prova("«Ne resta 1» si spegne per lo sconto", True,
+          "const ultimo = !esa && !ferie && !asta && !lampo && !sconto"
+          in _ch)
+    # ...e lo sconto si spegne per la lampo, non il contrario
+    prova("...e lo sconto si spegne per la lampo", True,
+          "const sconto = !esa && !ferie && !asta && !lampo"
+          " && scontoQui(l, 1);" in _ch)
+
+    # ---- 3. LA SCHEDA dice la stessa cosa: prezzo dal giudice, chip
+    # verde e NIENTE countdown (questo non scade).
+    prova("la scheda colora il numero grande", True,
+          "lampoAttiva(l)?' lampo':scontoQui(l,1)?' sconto':''" in mini)
+    prova("...con l'inchiostro dei due temi, non col token fisso", True,
+          ".detail-price.sconto{color:var(--trust-text)}" in mini)
+    # solo il MARKUP, non la regola CSS che porta gli stessi due nomi
+    _riga = [r for r in mini.split("\n") if "sconto-badge" in r
+             and '<div class="lampo-was">' in r]
+    prova("la riga «prezzo di prima» esiste anche per lo sconto",
+          1, len(_riga))
+    prova("...senza countdown: questo non scade", False,
+          "lampo-resta" in (_riga[0] if _riga else "lampo-resta"))
+    prova("...e il chip riusa la forma, cambiando il solo fondo", True,
+          ".lampo-was .lampo-badge.sconto-badge{background:var(--sconto)}"
+          in mini)
+
+    # ---- 4. I DUE FILTRI, SERVER. L'aritmetica sta in UN posto solo:
+    # chi la copia fa mentire il filtro (la invoice non passa di qui).
+    prova("l'aritmetica dei filtri e' in un posto solo", (1, 1),
+          (src.count("def _sql_articolo_sats("),
+           src.count("def _sql_soglia_negozio(")))
+    # SUBQUERY e non JOIN: la query del TOTALE di /api/listings non ha
+    # il JOIN su `utenti`, e un `u.` la farebbe esplodere
+    _sq = pezzo("_sql_soglia_negozio")
+    prova("la soglia si chiede in una EXISTS, mai con un JOIN", True,
+          "EXISTS (SELECT 1 FROM utenti us" in _sq)
+    prova("...e in ferie nessun verdetto, come nel client", True,
+          "us.ferie_fino<=?" in _sq)
+    # a cambio muto il ramo in euro non si scrive proprio
+    prova("a cambio muto la soglia in euro non scatta", True,
+          "if cambio > 0:" in _sq)
+    _lista = src[src.index("async def lista_annunci("):
+                 src.index("async def pubblica(")]
+    # NIENTE LAMPO VIVA nei due filtri: il suo badge occupa lo stesso
+    # angolo, quindi quel segno la card non ce l'ha
+    # si guarda il CONTENUTO e non il nome: contare `_no_lampo`
+    # sopravvive a un `_no_lampo = ""`, cioe' proprio alla mutazione
+    # che questa riga esiste per prendere (l'ha detto la tortura).
+    prova("i due filtri saltano le lampo vive", (True, 2),
+          ('_no_lampo = " AND NOT (a.lampo_percento>0'
+           ' AND a.lampo_scadenza>?)"' in _lista,
+           _lista.count("{_no_lampo}")))
+    # NIENTE ASTE nei rami che misurano una SOGLIA: li' il prezzo e'
+    # una puntata in corso. Due volte — lo sconto e il ramo soglia
+    # della spedizione — mentre la gratuita' DICHIARATA resta vera
+    # anche su un'asta (trovato dal vivo col filtro nuovo).
+    prova("i rami della soglia saltano le aste", 2,
+          _lista.count("a.asta_base_sats=0"))
+    # LE LEVE: a sconto spento nessun annuncio ha il badge, quindi il
+    # filtro non deve dare niente — mai una vetrina senza il segno che
+    # la spunta prometteva. La spedizione gratis DICHIARATA invece non
+    # dipende da nessuna promessa e resta.
+    prova("a leva spenta il filtro sconto non da' niente", True,
+          'dove += " AND 0"' in _lista)
+    prova("...mentre la gratuita' dichiarata resta anche a leva spenta",
+          True, "a.spedizione_extra_eur=0)" in _lista)
+
+    # ---- 5. LA PROVA CHE CONTA: il predicato SQL e il giudice Python
+    # devono dire la STESSA cosa. Il predicato gira su un database
+    # gemello, il giudice sugli stessi numeri: se un giorno divergono,
+    # questa riga lo dice — ed e' l'unico modo di accorgersene, perche'
+    # un filtro che sbaglia non fallisce: mostra la card sbagliata.
+    import sqlite3
+    amb = {}
+    exec(pezzo("_eur_interi"), amb)
+    exec(pezzo("_sped_gratis"), amb)
+    exec(pezzo("_sql_articolo_sats"), amb)
+    exec(pezzo("_sql_soglia_negozio"), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                "venditore_id INT, prezzo_sats INT, prezzo_eur REAL, "
+                "valuta TEXT)")
+    con.execute("CREATE TABLE utenti(tg_id INT, ferie_fino INT, "
+                "sped_gratis_soglia INT, sped_gratis_soglia_eur INT, "
+                "sped_gratis_valuta TEXT)")
+    CAMBIO = 55_000.0
+    NEG = {1: (0, 40_000, 0, "sats"), 2: (0, 0, 25, "eur"),
+           3: (9_999_999_999, 40_000, 0, "sats")}   # il terzo e' in ferie
+    con.executemany("INSERT INTO utenti VALUES(?,?,?,?,?)",
+                    [(k,) + v for k, v in NEG.items()])
+    righe = [(10, 1, 39_999, 0.0, "sats"), (11, 1, 40_000, 0.0, "sats"),
+             (12, 1, 90_000, 0.0, "sats"), (13, 2, 40_000, 0.0, "sats"),
+             (14, 2, 50_000, 0.0, "sats"),
+             (15, 2, 0, 25.0, "eur"), (16, 2, 0, 24.99, "eur"),
+             (17, 3, 90_000, 0.0, "sats")]
+    con.executemany("INSERT INTO annunci VALUES(?,?,?,?,?)", righe)
+    sql, par = amb["_sql_soglia_negozio"](
+        "sped_gratis_soglia", "sped_gratis_soglia_eur",
+        "sped_gratis_valuta", CAMBIO, 0)
+    da_sql = {r["id"] for r in con.execute(
+        "SELECT a.id FROM annunci a WHERE" + sql, par)}
+    # ...e adesso la stessa domanda in Python, coi giudici veri
+    da_py = set()
+    for (aid, vend, psats, peur, val) in righe:
+        u = NEG[vend]
+        if u[0] > 0:            # in ferie: nessun verdetto
+            continue
+        art = (round(peur * 100_000_000 / CAMBIO)
+               if val == "eur" and peur > 0 else psats)
+        sog = u[1] if u[3] == "sats" else u[2]
+        if amb["_sped_gratis"](art, amb["_eur_interi"](art, CAMBIO),
+                               sog, u[3]):
+            da_py.add(aid)
+    prova("il filtro SQL e il giudice Python dicono la stessa cosa",
+          da_py, da_sql)
+    prova("...e non e' una tautologia: qualcosa scatta e qualcosa no",
+          True, 0 < len(da_sql) < len(righe))
+    # al filo esatto scatta, come _sped_gratis e in_ferie
+    prova("al filo esatto la soglia e' raggiunta", (True, False),
+          (11 in da_sql, 10 in da_sql))
+    prova("...e il negozio in ferie non da' nessun verdetto", False,
+          17 in da_sql)
+    con.close()
+
+    # ---- 6. I DUE FILTRI, CLIENT: params, stato, azzera e DEMO.
+    prova("i due filtri viaggiano al server", (True, True),
+          ("p.set('solo_sped_gratis', '1')" in mini,
+           "p.set('solo_sconto', '1')" in mini))
+    for _n, _v in (("SpedGratis", "filtroSpedGratis"),
+                   ("Sconto", "filtroSconto")):
+        prova("il filtro " + _n + " si accende e si azzera",
+              (True, True),
+              (_v + " = !!el('filtro" + _n + "Inp').checked;" in mini,
+               "el('filtro" + _n + "Inp').checked = false;" in mini))
+    prova("...e i due entrano in filtriVivi", True,
+          "|| filtroDig || filtroLampo || filtroAsta || filtroSpedGratis"
+          in mini)
+    # in DEMO rispondono coi GIUDICI del client, gli stessi che
+    # disegnano la parola e il badge: demo e vetrina non divergono
+    _rg = pezzo_js(mini, "function renderGrid(", "\n}")
+    prova("in DEMO filtrano coi giudici che disegnano", (True, True),
+          ("data.filter(l => spedGratis(l) || spedGratisQui(l, 1))" in _rg,
+           "data.filter(l => scontoQui(l, 1))" in _rg))
+
+    # ---- 7. LE ETICHETTE: «In offerta» non basta piu' a distinguere.
+    # e la rinomina vale anche per la VOCE di Ordina, che sta a un
+    # centimetro dalla spunta: due nomi per la stessa cosa nella
+    # stessa schermata sono il difetto che la rinomina toglie
+    prova("«In offerta» e' diventata «Offerta a tempo»", (2, False),
+          (mini.count("⚡ Offerta a tempo"), "⚡ In offerta" in mini))
+    prova("...e accanto ci sono le due nuove", (True, True),
+          ("🚚 Spedizione gratis" in mini, "🎁 In sconto" in mini))
 
 
 def prove_guardia_is_bot():
@@ -13567,6 +13788,7 @@ def main():
               prove_sat_non_e_barattolo, prove_ai_segnala,
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,
+              prove_verde_e_filtri,
               prove_guardia_is_bot,
               prove_sintassi_client):
         try:

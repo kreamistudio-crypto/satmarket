@@ -7215,6 +7215,53 @@ def banner_test():
             "link": (BANNER_TEST_LINK or "").strip()}
 
 
+def _sql_articolo_sats(cambio: float):
+    """I SATS CHE IL COMPRATORE VEDE su un annuncio, scritti in SQL —
+    l'aritmetica dei due filtri delle promesse, in UN posto solo.
+    E' il gemello di `satsAnnuncio` del client: per un listino in euro
+    la cifra si riconverte al cambio VIVO (col cambio di pubblicazione,
+    `prezzo_sats`, come ripiego quando il cambio non c'e'), perche' e'
+    quella che la card mostra e quindi quella su cui la card decide il
+    badge. Chi le fa divergere fa mentire il filtro, non il conto: la
+    invoice non passa mai di qui.
+    LA LAMPO NON ENTRA, e non e' una dimenticanza: gli annunci con una
+    lampo VIVA sono esclusi dai due filtri a monte — la lampo vince
+    sullo sconto e il suo badge occupa lo stesso angolo — quindi qui
+    non c'e' nessun prezzo scontato da calcolare."""
+    if cambio > 0:
+        return ("CASE WHEN a.valuta='eur' AND a.prezzo_eur>0 "
+                "THEN CAST(a.prezzo_eur*100000000.0/? + 0.5 AS INTEGER) "
+                "ELSE a.prezzo_sats END"), [cambio]
+    return "a.prezzo_sats", []
+
+
+def _sql_soglia_negozio(col_sats: str, col_eur: str, col_val: str,
+                        cambio: float, adesso: int, extra: str = ""):
+    """«L'ARTICOLO, DA SOLO, ARRIVA ALLA SOGLIA DEL NEGOZIO?» in SQL —
+    la stessa domanda che `scontoQui`/`spedGratisQui` fanno nel client,
+    e la stessa forma per tutte e due le promesse (cambiano solo i nomi
+    delle colonne). Sta in una EXISTS e non in un JOIN apposta: la
+    query del TOTALE di /api/listings non ha il JOIN su `utenti`, e un
+    `u.` la farebbe esplodere.
+    A CAMBIO MUTO il ramo in euro non si scrive proprio: una soglia che
+    non si sa valutare non scatta — la regola di `_eur_interi`, e il
+    client tace allo stesso modo (`cambioVivo`).
+    IN FERIE NESSUN VERDETTO, come nel client: li' non si compra."""
+    art, par = _sql_articolo_sats(cambio)
+    rami = [f"(us.{col_val}='sats' AND us.{col_sats}>0 "
+            f"AND {art} >= us.{col_sats})"]
+    p = list(par)
+    if cambio > 0:
+        rami.append(f"(us.{col_val}='eur' AND us.{col_eur}>0 "
+                    f"AND CAST({art}*?/100000000.0 AS INTEGER)"
+                    f" >= us.{col_eur})")
+        p += par + [cambio]
+    return (" EXISTS (SELECT 1 FROM utenti us WHERE us.tg_id=a.venditore_id"
+            " AND us.ferie_fino<=?"
+            + (f" AND {extra}" if extra else "")
+            + f" AND ({' OR '.join(rami)}))"), [adesso] + p
+
+
 @app.get("/api/listings")
 async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         cursore: str = "", ordina: str = "",
@@ -7222,7 +7269,8 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         valuta_filtro: str = "sats",
                         solo_spedizione: int = 0, solo_ritiro: int = 0,
                         solo_digitale: int = 0, solo_lampo: int = 0,
-                        solo_asta: int = 0,
+                        solo_asta: int = 0, solo_sped_gratis: int = 0,
+                        solo_sconto: int = 0,
                         condizione: str = "", regione: str = "",
                         x_tg_init_data: str = Header(""),
                         barattolo_sessione: str = Cookie("")):
@@ -7283,6 +7331,71 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # filtro. L'ordinamento «asta» implica il filtro.
         dove += " AND a.asta_base_sats>0 AND a.asta_scadenza>?"
         par.append(int(time.time()))
+    if solo_sped_gratis or solo_sconto:
+        # I DUE FILTRI DELLE PROMESSE (ago 2026): promettono ESATTAMENTE
+        # quello che la card mostra — «🚚 gratis» in riga meta e il
+        # badge verde dello sconto — o sarebbero due spunte che portano
+        # a una vetrina dove il segno non c'e'.
+        # Il cambio dalla CACHE e mai dalla rete: chi sfoglia il
+        # mercatino non deve aspettare CoinGecko (il patto della busta
+        # di prima pagina). A cambio muto le soglie in euro non
+        # scattano, esattamente come tace il client.
+        _ora, _camb = int(time.time()), cambio_noto_ora()
+        # Niente lampo VIVA: il suo badge occupa lo stesso angolo e il
+        # suo rosso lo stesso prezzo, quindi un annuncio in lampo il
+        # segno dello sconto non ce l'ha — e il filtro non deve darlo.
+        _no_lampo = " AND NOT (a.lampo_percento>0 AND a.lampo_scadenza>?)"
+    if solo_sped_gratis:
+        # «La spedizione su questo articolo non la paghi»: o il
+        # venditore l'ha dichiarata gratis (tutte le tariffe a zero, il
+        # giudice `spedGratis` — che guarda ANCHE il supplemento, o
+        # «base 0 + supplemento pieno» prometterebbe una gratuita' che
+        # regge per un pezzo solo), o la soglia del negozio la copre.
+        # La gratuita' DICHIARATA vale anche in ferie (e' una proprieta'
+        # dell'annuncio); il ramo della soglia no, ed e' dentro
+        # _sql_soglia_negozio.
+        _piena = ("(a.spedizione_sats=0 AND a.spedizione_eur=0"
+                  " AND a.spedizione_extra_sats=0"
+                  " AND a.spedizione_extra_eur=0)")
+        if SPED_GRATIS_ATTIVO:
+            _sg, _sgp = _sql_soglia_negozio(
+                "sped_gratis_soglia", "sped_gratis_soglia_eur",
+                "sped_gratis_valuta", _camb, _ora)
+            # e mai su un'ASTA nel ramo della soglia: li' il prezzo
+            # e' una puntata in corso, e al vincitore la spedizione e'
+            # inclusa per costruzione — la promessa del negozio non
+            # c'entra. La gratuita' DICHIARATA invece resta vera.
+            dove += (" AND a.consegna IN ('spedizione','entrambe')"
+                     f" AND ({_piena} OR ({_sg}{_no_lampo}"
+                     " AND a.asta_base_sats=0))")
+            par += _sgp + [_ora]
+        else:
+            # leva spenta: resta la sola gratuita' dichiarata, che non
+            # dipende da nessuna promessa di negozio
+            dove += (" AND a.consegna IN ('spedizione','entrambe')"
+                     f" AND {_piena}")
+    if solo_sconto:
+        # «Questo articolo, DA SOLO, fa scattare lo sconto carrello»:
+        # il filtro del badge verde. Solo il criterio a VALORE puo'
+        # arrivarci con un pezzo — a pezzi la soglia parte da 2 — e non
+        # e' un'eccezione da ricordare: e' il CRITERIO a dire dove vale
+        # lo sconto, e qui il pezzo e' uno.
+        # A leva spenta il badge non esiste su nessuna card, quindi il
+        # filtro non deve dare niente: mai una vetrina di annunci senza
+        # il segno che la spunta prometteva.
+        if SCONTO_PACCO_ATTIVO:
+            _sc, _scp = _sql_soglia_negozio(
+                "sconto_pacco_valore", "sconto_pacco_valore_eur",
+                "sconto_pacco_valore_valuta", _camb, _ora,
+                extra=("us.sconto_pacco_percento>0"
+                       " AND us.sconto_pacco_criterio='valore'"))
+            # e mai su un'asta: li' il prezzo e' una puntata in corso e
+            # lo sconto non esiste per costruzione (la guardia di
+            # scontoQui)
+            dove += f" AND a.asta_base_sats=0 AND{_sc}{_no_lampo}"
+            par += _scp + [_ora]
+        else:
+            dove += " AND 0"
     if q.strip():
         # Ricerca semplice per la vetrina anonima (l'AI resta riservata
         # agli autenticati): LIKE su titolo, descrizione e zona.
