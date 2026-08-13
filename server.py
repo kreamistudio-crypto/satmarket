@@ -7881,6 +7881,11 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
 # dispositivo. CHI ha salvato resta privato per sempre — il nome non
 # esce da nessuna parte —, ma QUANTI e' pubblico e anonimo dall'ago
 # 2026 (vedi _conta_savers piu' sotto).
+# IL PROPRIO ANNUNCIO NON CI ENTRA (ago 2026): il barattolino serve a
+# chi COMPRA per ritrovare le cose al volo, e il conteggio dei savers
+# e' una prova sociale — che il venditore non deve potersi dare da
+# solo. Il client lo dice col foglio, qui si rifiuta.
+MSG_BARATTOLO_MIO = "Non puoi mettere un tuo annuncio nel barattolo 🫙"
 # IL TETTO E' UNA LEVA (ago 2026, da 20 a 10 per decisione di Andrea):
 # il barattolo e' piccolo apposta, e il numero si tara dal config del
 # VPS senza un cantiere. Il client lo riceve da /api/me
@@ -7932,6 +7937,19 @@ async def toggle_preferito(annuncio_id: int, x_tg_init_data: str = Header(""),
         if not a:
             con.close()
             raise HTTPException(404, "Annuncio non trovato")
+        # IL PROPRIO ANNUNCIO NON ENTRA NEL PROPRIO BARATTOLO (ago
+        # 2026, decisione di Andrea): il client lo dice gia' col
+        # foglio (avvisoBarattoloMio), ma una regola che vale solo di
+        # la' e' mezza regola — l'API resterebbe aperta a un
+        # salvataggio che non deve esistere, e quel salvataggio
+        # gonfierebbe di uno il conteggio pubblico dei savers, cioe'
+        # una prova sociale che il venditore si e' dato da solo.
+        # STA NEL RAMO DELL'INSERT, e non prima del DELETE: cosi' una
+        # riga nata da un client di ieri si puo' ancora TOGLIERE — il
+        # patto della riga sopra, «il barattolo si svuota comunque».
+        if a["venditore_id"] == user["id"]:
+            con.close()
+            raise HTTPException(400, MSG_BARATTOLO_MIO)
         # Limite: niente await tra COUNT e INSERT, nel server
         # mono-processo il blocco e' atomico (il patto anti-doppione).
         if _conta_barattolo(con, user["id"]) >= MAX_PREFERITI:

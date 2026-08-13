@@ -3803,6 +3803,90 @@ def prove_savers_proprietario():
     coda = src[i:i + 160]
     prova("sui propri esauriti l'angolo resta del rifornimento", True,
           "const jar = rif ? ''" in coda)
+
+    # ---- E LA REGOLA VALE ANCHE DALL'API (ago 2026, decisione di
+    # Andrea: una regola che vive solo nel client e' mezza regola).
+    # ESEGUIBILE e non una sentinella sulla forma: il corpo VERO gira
+    # su un database di cartone, e si guarda la RIGA — che il rifiuto
+    # non abbia scritto niente, e che il proprio annuncio si possa
+    # ancora TOGLIERE se una riga di ieri esiste davvero.
+    import sqlite3
+
+    class _Err(Exception):
+        def __init__(self, codice, testo=""):
+            self.codice, self.testo = codice, testo
+            super().__init__(f"{codice}: {testo}")
+
+    class _SenzaClose:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    def apparecchia():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
+          stato TEXT);
+        CREATE TABLE preferiti(tg_id INT, annuncio_id INT, creato INT,
+          PRIMARY KEY(tg_id, annuncio_id));
+        INSERT INTO annunci VALUES(7,222,'attivo'),(8,333,'attivo');
+        """)
+        return con
+
+    def gira(con, chi, annuncio):
+        colpi = []
+        amb = {"Header": lambda d: d, "Cookie": lambda d: d,
+               "HTTPException": _Err, "db": lambda: _SenzaClose(con),
+               "verifica_utente": lambda *a: {"id": chi},
+               "_conta_barattolo": reale("_conta_barattolo"),
+               "_conta_savers": reale("_conta_savers"),
+               "MAX_PREFERITI": 10, "MSG_BARATTOLO_MIO": "MIO!",
+               "accoda_colpo": lambda a: colpi.append(a),
+               "time": type("t", (), {"time": staticmethod(lambda: 1)}),
+               "app": type("a", (), {"post": lambda *a, **k:
+                                     (lambda f: f)})()}
+        exec(corpo_api, amb)
+        # si chiama LISCIA: `pezzo` taglia da «def», quindi l'`async`
+        # resta fuori — e il corpo non ha un solo await (vedi la prova
+        # qui sotto: e' il patto anti-doppione, niente await fra il
+        # COUNT del tetto e l'INSERT)
+        return amb["toggle_preferito"](annuncio), colpi
+
+    corpo_api = pezzo("toggle_preferito")
+    # senza i commenti, o la riga che VIETA l'await lo fa trovare (ci
+    # si e' inciampati scrivendo questa prova: il commento nomina
+    # apposta quel che proibisce)
+    codice_api = "\n".join(r.split("#")[0] for r in corpo_api.splitlines())
+    prova("nel toggle non c'e' un solo await (il blocco resta atomico)",
+          False, "await " in codice_api)
+
+    con = apparecchia()
+    righe = lambda: con.execute("SELECT COUNT(*) FROM preferiti").fetchone()[0]
+    try:
+        gira(con, 222, 7)                      # il proprio: rifiutato
+        prova("l'API rifiuta il proprio annuncio", True, False)
+    except _Err as e:
+        prova("l'API rifiuta il proprio annuncio", (400, "MIO!"),
+              (e.codice, e.testo))
+    prova("...e il rifiuto non scrive NIENTE", 0, righe())
+    d, colpi = gira(con, 111, 7)               # un altro: passa
+    prova("l'annuncio altrui si salva come sempre", True, d["salvato"])
+    prova("...e il colpo parte solo per lui", [7], colpi)
+    prova("...e la riga c'e'", 1, righe())
+    # la riga di un client di ieri si toglie ANCORA: il rifiuto sta
+    # nel ramo dell'INSERT, dopo il DELETE
+    con.execute("INSERT INTO preferiti VALUES(222,7,1)")
+    try:
+        d, _ = gira(con, 222, 7)
+        esito = (d["ok"], d["salvato"])
+    except _Err as e:
+        # se il rifiuto salisse sopra il DELETE, quella riga
+        # resterebbe li' per sempre: nessuno potrebbe piu' toglierla
+        esito = f"rifiutato ({e.codice}): la riga non si toglie piu'"
+    prova("una riga vecchia sul proprio si puo' ancora togliere",
+          (True, False), esito)
+    prova("...e a toglierla resta solo quella dell'altro", 1, righe())
     # la frase e' l'unica che insegna cosa vuol dire il numero
     f = fun("saversFrase")
     prova("la frase nomina il barattolo", True,

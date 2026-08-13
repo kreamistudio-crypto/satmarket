@@ -9675,10 +9675,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che il tocco poi nega. Più la CINTURA in `togglePreferito` per le
   altre strade (il cassetto, un id da un'altra vista): stesso avviso,
   nessuna richiesta al server.
-  ASIMMETRIA DICHIARATA: la regola è del CLIENT. `toggle_preferito`
-  sul server accetta ancora il proprio annuncio (esclude solo l'avviso
-  «ha fatto colpo»), e nessun client la produce — se un giorno la si
-  vuole vera, sono due righe.
+  E LA REGOLA VALE ANCHE DALL'API (ago 2026, decisione di Andrea:
+  «una regola che vale solo nel client è mezza regola»):
+  `toggle_preferito` rifiuta il proprio annuncio con `MSG_BARATTOLO_
+  MIO`, e il motivo che la rende una regola vera e non una cortesia è
+  che quel salvataggio gonfierebbe di uno il conteggio PUBBLICO dei
+  savers — cioè una prova sociale che il venditore si dà da solo.
+  IL RIFIUTO STA NEL RAMO DELL'INSERT, e non prima del DELETE: così
+  una riga nata da un client di ieri si può ancora TOGLIERE — è il
+  patto della prima riga della funzione, «il barattolo si svuota
+  comunque». Rovesciare quell'ordine la incastrerebbe lì per sempre,
+  e c'è la prova ESEGUIBILE che lo dice (il corpo vero su un database
+  di cartone: il rifiuto non scrive niente, l'annuncio altrui si
+  salva come sempre, e la riga vecchia sul proprio si toglie).
+  Il corpo NON ha un solo await, ed è il patto anti-doppione fra il
+  COUNT del tetto e l'INSERT: c'è la sentinella, e la prova eseguibile
+  può chiamare la funzione liscia proprio per quello.
   L'ANGOLO IN ALTO A DESTRA DELLA CARD È DI UNO SOLO DEI DUE: sui
   propri ESAURITI vince il RIFORNIMENTO (`const jar = rif ? '' : …`),
   perché lì è l'unica cosa che si può fare e la card resta a DUE
@@ -12993,9 +13005,11 @@ bottone il numero è tornato nella sua pastiglia e la riga meta della card
 non serve più, e con lui è sparito il residuo di 1,3px oltre il bordo.
 Restano la riga di «I tuoi annunci» e la frase nella scheda. Vedi
 Architettura, «E IL PROPRIETARIO LO VEDE», anche per l'angolo della card
-che sui propri esauriti resta del rifornimento, e per l'asimmetria
-dichiarata (la regola è del client: il server accetta ancora il proprio
-annuncio nel proprio barattolo).
+che sui propri esauriti resta del rifornimento. E la regola vale ANCHE
+DALL'API (decisione di Andrea: una regola che vale solo nel client è
+mezza regola) — `toggle_preferito` rifiuta il proprio annuncio, ma nel
+ramo dell'INSERT, così una riga nata da un client di ieri si può ancora
+togliere.
 Collaudato: 3064 prove verdi (34 nuove) e mutazioni una per riga
 sorvegliata; più il giro dal vivo via CDP a 320/360/375 nei due temi e
 dai due lati — col compratore la vetrina è quella di ieri, e sul proprio
@@ -13006,7 +13020,6 @@ regola dopo, `.nota-punto` compresa — da lì è nata `prove_commenti_css`.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta.
 
-Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 E l'ORDINA torna a TRE VOCI (ago 2026, decisione di Andrea): più
 recenti e i due prezzi. «Offerta a tempo» e «All'asta» erano
 ordinamenti VERI — per scadenza, chi finisce prima in testa — ma
@@ -13020,6 +13033,8 @@ in memoria — la pagina della gara finiva ordinata per prezzo. Otto
 mutazioni su otto rosse, e lo stato dell'ordinamento vive per la
 SESSIONE: al deploy si riparte da «Più recenti», nessuno resta bloccato
 su una voce che non esiste più.
+
+Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
 varco-mappa della pagina), escrow on-chain 2-di-3, parere legale
 MiCA prima di crescere.
