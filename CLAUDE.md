@@ -12435,11 +12435,15 @@ intera, la lezione del reaper, terza volta). Più il giro CDP a
 scattata accesa, totale 14,89 € col 16,54 barrato (−10% al floor),
 doppio verde a carrello pieno, Paga byte-per-byte uguale e zero
 errori JS. IN PRODUZIONE basta il deploy: nessuna colonna, nessuna
-leva, nessuna rotta — solo client. RESTA DA DECIDERE (misurato, non
-applicato): la via del locker con la barra spaziata («Spedizione a
-locker / punto di ritiro») sta su UNA riga a 360/375 e va a capo a
-320 (21→43px) — la scelta fra barra spaziata e riga singola è di
-Andrea.
+leva, nessuna rotta — solo client. E LA VIA DEL LOCKER RESTA SENZA
+SPAZI (13 ago 2026, decisione di Andrea presa sui numeri): la barra
+spaziata («Spedizione a locker / punto di ritiro») era stata chiesta,
+MISURATA prima di applicarla — sta su una riga a 360/375, ma a 320 va
+a capo (21→43px: la colonna lì è tappata a 258px e il testo spaziato
+ne chiede ~264) — e RITIRATA davanti alla misura: due righe a 320 per
+due spazi non le valgono, e uniformare gli altri otto siti di prosa
+della formula costerebbe più di quanto renda. Chi la riproponesse
+rimisuri prima a 320, che è la larghezza dove la via si gioca la riga.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
