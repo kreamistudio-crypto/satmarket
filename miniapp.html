@@ -1854,7 +1854,22 @@
   #acqCorpo > .pills .pill{width:100%;border-radius:var(--radius-btn);
     border-color:var(--line);font-weight:600;padding:8px 12px}
   #acqCorpo > .pills .pill b{font-weight:800}
-  #acqCorpo > .pills .pill-trust{border-color:var(--trust-soft)}
+  /* LA SCATTATA E' PIENA E ACCESA (quarto giro, 13 ago 2026, visto da
+     Andrea a schermo nei due temi — e ROVESCIA il «la corsa chiama,
+     il traguardo riposa» di mezza giornata prima: la barra si
+     accendeva salendo e allo scatto la pillola tornava al verde
+     tenue, cioe' il traguardo PERDEVA forza — sembrava che qualcosa
+     si fosse spento proprio nel momento piu' forte, e di sera
+     l'inverso). Qui, e SOLO qui, la pill-trust veste l'acceso pieno
+     (--barra-a) con l'inchiostro sopra (8,1 di giorno, 5,3 di sera);
+     il carrello e le altre superfici tengono la pill-trust tenue di
+     sempre. Ora che la tinta e' la stessa, a distinguere la barra
+     quasi piena dalla scattata bastano la FORMA e il TESTO: il tetto
+     a 99 lascia sempre la fetta di carta col bordo netto — una
+     barra, mai un fondo — contro la pillola INTERA bordo a bordo, e
+     «Ancora N → …» contro «✅ … nel conto». */
+  #acqCorpo > .pills .pill-trust{border-color:var(--barra-a);
+    background:var(--barra-a);color:var(--ink)}
   /* LA BARRA DI RIEMPIMENTO delle promesse (13 ago 2026, decisione di
      Andrea sui prototipi): il verde riempie la pillola da sinistra
      fino al progresso, con un bordo NETTO — la saturazione del colore
@@ -1872,32 +1887,42 @@
      corsa e' un invito) e mai dal grigio, prototipato e scartato: la
      mescola di mezzo fa un olivastro spento e si perde la famiglia
      della fiducia. A distinguere la barra quasi piena dalla promessa
-     scattata resta la FORMA, non la tinta: il tetto a 99 lascia
-     sempre la fetta di carta col bordo netto (una barra, mai un
-     fondo), il testo cambia natura («Ancora N» contro «✅ nel
-     conto»), e la scattata e' la pillola INTERA nel verde tenue con
-     bordo e testo trust — piu' QUIETA della barra accesa, che e' il
-     verso giusto: la corsa chiama, il traguardo riposa. Contrasto
-     dell'inchiostro sull'acceso pieno: 8,1 di giorno, 5,3 di sera. */
-  #acqCorpo > .pills .pill-barra{background-image:
-    linear-gradient(90deg,var(--barra-da),var(--barra-da));
-    background-repeat:no-repeat}
-  /* LA CORSA MORBIDA (13 ago 2026): la transizione vive qui, il «da»
-     lo recupera renderAcquisto dal computed (il giro FLIP: un nodo
-     appena nato non ne avrebbe). Lo SCATTO e' la stessa corsa nel
-     verde DELLA CONFERMA: background-color a carta + fill in
-     --trust-soft che corre al 100% — a fine corsa il fondo e' quello
-     di riposo della pill-trust, visivamente identico (la regola
-     .pill.pill-trust ha lo shorthand `background`, e questa la vince
-     per specificita': l'id davanti e' il punto). */
+     scattata — che dal quarto giro veste lo STESSO acceso — restano
+     la FORMA e il TESTO: il tetto a 99 lascia sempre la fetta di
+     carta col bordo netto (una barra, mai un fondo) contro la
+     pillola intera bordo a bordo, e «Ancora N» contro «✅ nel
+     conto». Contrasto dell'inchiostro sull'acceso pieno: 8,1 di
+     giorno, 5,3 di sera. */
+  /* IL FILL VIVE SU UN ::before ASSOLUTO (quarto giro, 13 ago 2026):
+     larghezza in --barra-p e colore in --barra-c, scritti da
+     barraPromessa — perche' width e background-color SI TRANSIZIONANO
+     davvero, mentre un gradiente no: e' cosi' che il viraggio e'
+     morbido quanto la corsa (prima il colore cambiava a scatti fra un
+     render e l'altro, e la corsa stessa non partiva mai — vedi il
+     doppio rAF in renderAcquisto). z-index:0 sul guscio e -1 sul
+     fill, tutti e due necessari: il positioned nudo coprirebbe il
+     TESTO, e il -1 senza lo stacking context del guscio finirebbe
+     SOTTO il fondo della pillola, cioe' invisibile. overflow:hidden
+     lo fa tagliare dagli angoli tondi. Il tetto a 99 resta: piena e'
+     solo la scattata. */
   #acqCorpo > .pills .pill-barra,
-  #acqCorpo > .pills .barra-scatto{transition:background-size .3s ease}
-  #acqCorpo > .pills .barra-scatto{background-color:var(--card);
-    background-image:linear-gradient(90deg,var(--trust-soft),var(--trust-soft));
-    background-repeat:no-repeat}
+  #acqCorpo > .pills .barra-scatto{position:relative;z-index:0;
+    overflow:hidden}
+  #acqCorpo > .pills .pill-barra::before,
+  #acqCorpo > .pills .barra-scatto::before{content:'';position:absolute;
+    z-index:-1;left:0;top:0;bottom:0;width:var(--barra-p,0%);
+    background:var(--barra-c,var(--barra-da));
+    transition:width .35s ease,background-color .35s ease}
+  /* lo scatto: l'ultimo tratto corre nell'ACCESO — il guscio torna
+     carta e il fill va al 100% in --barra-a, che e' anche il fondo di
+     riposo della scattata qui sopra: la tinta non salta piu', il
+     traguardo GUADAGNA. Sta DOPO la regola della scattata, a pari
+     specificita': l'ordine decide. */
+  #acqCorpo > .pills .barra-scatto{background:var(--card);
+    color:var(--ink)}
   @media (prefers-reduced-motion:reduce){
-    #acqCorpo > .pills .pill-barra,
-    #acqCorpo > .pills .barra-scatto{transition:none}
+    #acqCorpo > .pills .pill-barra::before,
+    #acqCorpo > .pills .barra-scatto::before{transition:none}
   }
   /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
      768 sparisce come nella pagina del pacco, ma senza barra propria */
@@ -9088,12 +9113,12 @@ function renderAcquisto(){
        una promessa non raggiunta e' un invito, non un fallimento. Il
        grigio neutro come partenza e' stato prototipato e scartato:
        nel mezzo la mescola verso il verde fa un olivastro spento, e
-       si perde la famiglia della fiducia. La tinta cambia a gradini
-       fra un render e l'altro (un gradiente non si transiziona), a
-       correre morbida e' la LARGHEZZA — il giro FLIP. */
+       si perde la famiglia della fiducia. Larghezza e tinta corrono
+       INSIEME: il fill e' un ::before, e width e background-color si
+       transizionano davvero — il doppio rAF in fondo a
+       renderAcquisto. */
     const c = `color-mix(in srgb, var(--barra-a) ${p}%, var(--barra-da))`;
-    return ` style="background-image:linear-gradient(90deg,${c},${c});`
-         + `background-size:${p}% 100%"`;
+    return ` style="--barra-p:${p}%;--barra-c:${c}"`;
   };
   const scPct = p.sconto_percento||0, scCrit = p.sconto_criterio||'';
   const scVal = p.sconto_valuta||'eur';
@@ -9192,14 +9217,24 @@ function renderAcquisto(){
      i + veloci: le transizioni CSS non si accodano mai, ritargeting
      nativo — la barra devia in corsa verso l'ultimo bersaglio, e il
      NUMERO («Ancora N») non aspetta nessuno, si aggiorna secco al
-     render. Si cattura PRIMA che l'innerHTML porti via i nodi; la
-     scattata vale 100 (piena per definizione), il computed senza
-     misura («auto») vale 0. */
+     render. Si cattura PRIMA che l'innerHTML porti via i nodi: la
+     larghezza del ::before in px, riportata a percento, e il COLORE,
+     che dal quarto giro corre anche lui. La scattata senza fill vale
+     100 e acceso (e' cosi' che la discesa riparte da dov'era), la
+     barra mai misurata vale 0. */
   const barraDa = {};
   box.querySelectorAll('[data-barra]').forEach(el=>{
-    const m = /([\d.]+)%/.exec(getComputedStyle(el).backgroundSize);
-    barraDa[el.dataset.barra] = m ? parseFloat(m[1])
-      : (el.classList.contains('pill-trust') ? 100 : 0);
+    const ps = getComputedStyle(el, '::before');
+    const w = parseFloat(ps.width);
+    const largo = el.getBoundingClientRect().width;
+    const trust = el.classList.contains('pill-trust');
+    barraDa[el.dataset.barra] = {
+      p: (Number.isFinite(w) && largo > 0)
+         ? Math.min(100, w / largo * 100) : (trust ? 100 : 0),
+      c: (ps.backgroundColor && ps.backgroundColor !== 'rgba(0, 0, 0, 0)')
+         ? ps.backgroundColor
+         : (trust ? 'var(--barra-a)' : 'var(--barra-da)')
+    };
   });
   box.innerHTML = `${articoli}${accQta}${fila}${vie}${note}
     <div class="section-label">Il conto</div>
@@ -9207,30 +9242,53 @@ function renderAcquisto(){
     <div class="ctrl-fondo">${nwc}
       <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>
     </div>`;
-  /* ...e il via: il nodo nuovo nasce alla larghezza VECCHIA, un
-     reflow la fissa (il giro FLIP: e' il «da» che alla transizione
-     mancava — renderAcquisto ricostruisce l'HTML e un nodo nuovo non
-     ne avrebbe), poi lo style corre al bersaglio. ALLO SCATTO la
-     pill-trust fa la stessa corsa nel SUO verde (.barra-scatto,
-     --trust-soft): a fine corsa il fondo e' quello di riposo della
-     scattata — visivamente identico, nessun secondo stato da
-     mantenere — e lo scarto residuo dichiarato e' il cambio di tinta
-     della parte gia' piena nell'istante dello scatto, il segno che
-     e' successo qualcosa. In discesa vale il simmetrico (da 100 alla
-     misura). Chi nasce senza un «da» (primo render, pillola appena
-     comparsa) NON corre; reduced-motion spegne la transizione dal
-     CSS e lo style finisce comunque sul bersaglio. */
+  /* ...e il via, in DUE FOTOGRAMMI e A PARTENZE RIUNITE — la
+     diagnosi vera del «si anima solo la spedizione» visto dal campo:
+     la prima stesura faceva il giro PER PILLOLA (set del «da», void
+     offsetWidth, set del bersaglio), e il reflow della PRIMA pillola
+     computava lo stile anche della SECONDA, che in quell'istante
+     aveva ancora il bersaglio inline — il suo stile «prima» restava
+     fissato al bersaglio, e il suo FLIP diventava
+     bersaglio→da→bersaglio, cioe' un no-op: animava solo la prima
+     della fila, che e' la spedizione. Quindi: PRIMA tutti i «da»,
+     POI tutti i bersagli in un colpo solo — e i bersagli arrivano al
+     secondo requestAnimationFrame, che copre anche il nodo appena
+     inserito (senza un fotogramma reso la transizione puo' non
+     partire; un reflow non e' un fotogramma).
+     ONESTA' SULLA VERIFICA, di nuovo (la lezione della tastiera): in
+     headless le transizioni NON AVANZANO, quindi la corsa non si
+     campiona ne' si fotografa — si prova la STRUTTURA (partenze in
+     blocco, niente flush in mezzo, bersagli a fotogramma reso), il
+     movimento lo dice il telefono.
+     ALLO SCATTO la pill-trust corre l'ultimo tratto nell'ACCESO
+     (.barra-scatto: guscio a carta, fill al 100% in --barra-a, che
+     e' il fondo di riposo della scattata): la tinta non salta, il
+     traguardo guadagna. In discesa il simmetrico — si riparte da 100
+     e acceso. Chi nasce senza un «da» (primo render, pillola appena
+     comparsa) non corre; reduced-motion spegne la transizione dal
+     CSS e i bersagli arrivano comunque, secchi. */
+  const corse = [];
   box.querySelectorAll('[data-barra]').forEach(el=>{
     const da = barraDa[el.dataset.barra];
-    if (da === undefined) return;
+    if (!da) return;
     const scatto = el.classList.contains('pill-trust');
-    const a = scatto ? 100 : (parseFloat(el.style.backgroundSize) || 0);
-    if (Math.abs(a - da) < 0.5) return;
+    const aP = scatto ? 100
+      : (parseFloat(el.style.getPropertyValue('--barra-p')) || 0);
+    if (Math.abs(aP - da.p) < 0.5) return;
+    const aC = scatto ? 'var(--barra-a)'
+      : (el.style.getPropertyValue('--barra-c') || 'var(--barra-da)');
     if (scatto) el.classList.add('barra-scatto');
-    el.style.backgroundSize = `${da}% 100%`;
-    void el.offsetWidth;                    /* il reflow che fissa il «da» */
-    el.style.backgroundSize = `${a}% 100%`;
+    el.style.setProperty('--barra-p', `${da.p}%`);
+    el.style.setProperty('--barra-c', da.c);
+    corse.push([el, `${aP}%`, aC]);
   });
+  if (corse.length)
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      for (const [el, p2, c2] of corse){
+        el.style.setProperty('--barra-p', p2);
+        el.style.setProperty('--barra-c', c2);
+      }
+    }));
   aggiornaCurToggle();   /* il toggle in testata dice la verita' */
 }
 function setViaAcquisto(v){

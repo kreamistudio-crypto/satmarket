@@ -6898,13 +6898,30 @@ def prove_pagina_acquisto():
     prova("...e la coppia del viraggio ha i suoi due valori", True,
           mini3.count("--barra-da:") == 2
           and mini3.count("--barra-a:") == 2)
-    prova("...il ripiego della classe resta sul verde slavato", True,
-          "linear-gradient(90deg,var(--barra-da),var(--barra-da))"
+    #    Il fill vive su un ::before (quarto giro): larghezza in
+    #    --barra-p e colore in --barra-c, perche' width e
+    #    background-color si transizionano davvero e un gradiente no —
+    #    e' cosi' che ANCHE il viraggio e' morbido. Il ripiego della
+    #    custom property resta sul verde slavato.
+    prova("...il fill e' un ::before con larghezza e colore", True,
+          "width:var(--barra-p,0%)" in mini3
+          and "background:var(--barra-c,var(--barra-da))" in mini3)
+    prova("...che transiziona larghezza E colore insieme", True,
+          "transition:width .35s ease,background-color .35s ease"
           in mini3)
     prova("...le DUE pillole sotto soglia la portano", 2,
           mini3.count('class="pill pill-barra"'))
-    prova("...e lo style della larghezza c'e' sempre, anche a 0%", True,
-          'background-size:${p}% 100%"`;' in mini3)
+    prova("...e lo style del progresso c'e' sempre, anche a 0%", True,
+          'style="--barra-p:${p}%;--barra-c:${c}"' in mini3)
+    #    LA SCATTATA E' PIENA E ACCESA (quarto giro, visto da Andrea a
+    #    schermo nei due temi: la barra si accendeva salendo e allo
+    #    scatto la pillola tornava al tenue — il traguardo perdeva
+    #    forza). SOLO in Paga, con l'inchiostro sopra; il carrello
+    #    tiene la pill-trust tenue di sempre.
+    prova("la scattata di Paga e' piena e ACCESA, con l'inchiostro",
+          1, mini3.count("background:var(--barra-a);color:var(--ink)"))
+    prova("...e il carrello tiene la conferma tenue di sempre", True,
+          ".pill.pill-trust{background:var(--trust-soft)" in mini3)
     #    LA CORSA MORBIDA (13 ago 2026, chiesta da Andrea): il «da» si
     #    RECUPERA dal computed — che a meta' corsa e' il valore
     #    INTERPOLATO, quindi i + veloci ritargetizzano e non si
@@ -6912,18 +6929,26 @@ def prove_pagina_acquisto():
     #    reflow, bersaglio (il giro FLIP). Allo scatto la pill-trust
     #    corre nel SUO verde e a fine corsa il fondo e' quello di
     #    riposo della scattata: nessun secondo stato da mantenere.
-    prova("la corsa recupera il «da» dal computed", True,
-          "getComputedStyle(el).backgroundSize" in mini3)
-    prova("...col reflow che lo fissa (FLIP)", True,
-          "void el.offsetWidth;" in mini3)
+    #    La partenza e' in DUE FOTOGRAMMI e A PARTENZE RIUNITE: la
+    #    prima stesura faceva il giro per pillola (void offsetWidth
+    #    fra il «da» e il bersaglio), e il reflow della PRIMA pillola
+    #    fissava lo stile «prima» della SECONDA al suo bersaglio — il
+    #    suo FLIP era un no-op, e animava solo la prima della fila
+    #    (la spedizione: e' il caso visto dal campo). In headless le
+    #    transizioni non avanzano (la lezione della tastiera): si
+    #    prova la STRUTTURA, il movimento lo dice il telefono.
+    prova("la corsa recupera il «da» dal computed del fill", True,
+          "getComputedStyle(el, '::before')" in mini3)
+    prova("...e parte in due fotogrammi, mai con un reflow", True,
+          "requestAnimationFrame(()=>requestAnimationFrame(" in mini3
+          and "void el.offsetWidth" not in mini3)
     prova("...le quattro pillole portano la chiave della corsa", 4,
           mini3.count('data-barra="s'))
-    prova("...allo scatto si corre nel verde della conferma", True,
-          "barra-scatto" in mini3
-          and "linear-gradient(90deg,var(--trust-soft),var(--trust-soft))"
-          in mini3)
+    prova("...allo scatto l'ultimo tratto corre nell'ACCESO", True,
+          "barra-scatto" in mini3 and "'var(--barra-a)'" in mini3
+          and ".barra-scatto{background:var(--card)" in mini3)
     prova("...e reduced-motion la spegne", 1,
-          mini3.count(".barra-scatto{transition:none}"))
+          mini3.count(".barra-scatto::before{transition:none}"))
     #    IL FONDO DI PAGA E' APPICCICATO (ago 2026): «Paga» resta in
     #    vista mentre si scorre — STICKY e mai fixed (dentro Telegram
     #    le misure di viewport mentono, e sticky occupa layout: a fine
