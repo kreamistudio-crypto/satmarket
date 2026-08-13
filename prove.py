@@ -7303,6 +7303,68 @@ def prove_pagina_acquisto():
           and ".barra-scatto{background:var(--card)" in mini3)
     prova("...e reduced-motion la spegne", 1,
           mini3.count(".barra-scatto::before{transition:none}"))
+    #    L'IMPULSO DELLO SCATTO (13 ago 2026, chiesto da Andrea): quando
+    #    la promessa scatta, un anello del suo stesso verde si allarga
+    #    dalla pillola e svanisce — mezzo secondo, una volta sola,
+    #    perche' fino a ieri quel momento lo diceva il solo colore e un
+    #    colore lo vede solo chi in quell'istante stava guardando.
+    #    E' UN ANELLO E NON UNA BANDA DI LUCE CHE ATTRAVERSA LA
+    #    PILLOLA, ed e' una MISURA e non un gusto: la banda e' stata
+    #    costruita e fotografata, e in tema chiaro era perfino un
+    #    guadagno (l'inchiostro e' scuro: 8,01 → 12,60), ma di sera
+    #    l'inchiostro e' CREMA e la stessa banda lo portava da 5,34 a
+    #    1,25 — le parole sparivano per un decimo di secondo, proprio
+    #    nell'istante che l'animazione esiste per far notare. Al buio
+    #    QUALUNQUE schiarita del fondo abbassa il contrasto di un testo
+    #    chiaro, e da 5,34 il margine finisce prima di vedersi: non c'e'
+    #    taratura che salvi quel verso, e una forma che cambia col tema
+    #    e' proprio cio' che qui non si fa. L'anello le parole non le
+    #    tocca MAI (sta fuori dalla pillola) e vale identico nei due
+    #    temi. L'ultimo fotogramma e' un anello TRASPARENTE: la pillola
+    #    a riposo resta identica a ieri senza ripulire niente.
+    prova("l'impulso dello scatto e' un anello FUORI dalla pillola",
+          (True, True, False),
+          ("@keyframes impulsoScatto" in mini3,
+           "to{box-shadow:0 0 0 9px transparent}" in mini3,
+           ".barra-impulso::after" in mini3))
+    prova("...mezzo secondo, una volta sola, senza residuo", True,
+          "animation:impulsoScatto .5s ease-out "
+          "var(--impulso-ritardo,0ms) 1 both}" in mini3)
+    #    SI CHIAMA «IMPULSO» E NON «LAMPO» APPOSTA: in questo progetto
+    #    la lampo e' l'offerta a tempo (--lampo, .lampo-was, il rosso
+    #    ⚡), e due significati per la stessa parola nello stesso foglio
+    #    sono il posto dove fra sei mesi si sbaglia riga.
+    prova("...e non si chiama «lampo», che qui e' l'offerta a tempo",
+          False, "barra-lampo" in mini3 or "--lampo-ritardo" in mini3)
+    #    PARTE SOLO ALLO SCATTO, e non serve una guardia nuova: la
+    #    classe si attacca DENTRO il ramo `scatto` di barreCorri, cioe'
+    #    dove la pillola e' pill-trust E la corsa avviene davvero — su
+    #    una verde a riposo la cattura vale 100 e il filtro dei 0.5 ha
+    #    gia' fatto uscire il giro. Chi la porta fuori da quel ramo la
+    #    fa ripartire a ogni tocco su una promessa gia' scattata.
+    prova("...parte solo allo scatto, dentro il ramo dei ferri",
+          (1, True),
+          (mini3.count("classList.add('barra-impulso')"),
+           "if (scatto && IMPULSO_SCATTO){" in _cor))
+    #    DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea):
+    #    la seconda parte quando la prima e' a meta' corsa — un gesto in
+    #    due battute invece di un doppio colpo. Il ritardo si scrive
+    #    dalla SECONDA in poi: senza quel `if (impulsi)` partirebbero
+    #    insieme, e scritto al rovescio ritarderebbe anche la prima.
+    prova("...e la seconda e' sfalsata, mai insieme alla prima", True,
+          "if (impulsi)" in _cor
+          and "'--impulso-ritardo', `${IMPULSO_PASSO}ms`" in _cor)
+    #    LA LEVA E' UNA RIGA: IMPULSO_SCATTO a false e si torna
+    #    ESATTAMENTE a ieri — la classe non si attacca piu' e il blocco
+    #    CSS resta inerte perche' non veste piu' nessuno.
+    prova("...e la leva per toglierlo e' una riga sola", 1,
+          mini3.count("const IMPULSO_SCATTO = true;"))
+    #    ...e reduced-motion lo SPEGNE, non lo ferma: con
+    #    animation-play-state resterebbe un anello piantato attorno alla
+    #    pillola per sempre.
+    prova("...reduced-motion lo spegne, non lo ferma", (1, False),
+          (mini3.count(".barra-impulso{animation:none}"),
+           "barra-impulso{animation-play-state" in mini3))
     #    IL FONDO DI PAGA E' APPICCICATO (ago 2026): «Paga» resta in
     #    vista mentre si scorre — STICKY e mai fixed (dentro Telegram
     #    le misure di viewport mentono, e sticky occupa layout: a fine

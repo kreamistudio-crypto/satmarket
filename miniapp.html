@@ -1991,9 +1991,50 @@
      e scatto invisibile. */
   .fila-promesse .pill.barra-scatto{background:var(--card);
     color:var(--ink)}
+  /* L'IMPULSO DELLO SCATTO (13 ago 2026, chiesto da Andrea): quando la
+     promessa scatta, un anello del suo stesso verde si allarga dalla
+     pillola e svanisce — mezzo secondo, una volta sola. Fino a ieri
+     quel momento lo diceva il solo colore, e un colore lo vede solo
+     chi in quell'istante stava guardando.
+     SI CHIAMA «IMPULSO» E NON «LAMPO» APPOSTA: in questo progetto la
+     lampo e' l'offerta a tempo (--lampo, .lampo-was, il rosso ⚡), e
+     due significati per la stessa parola nello stesso foglio sono il
+     posto dove fra sei mesi si sbaglia riga.
+     E' UN ANELLO E NON UNA LUCE CHE ATTRAVERSA LA PILLOLA, ed e' una
+     MISURA e non un gusto — la banda di luce e' stata costruita,
+     fotografata e scartata sul contrasto del TESTO: in tema chiaro
+     l'inchiostro e' scuro e schiarire il fondo lo aiuta perfino
+     (8,01 → 12,60), ma di sera l'inchiostro e' CREMA e la stessa
+     banda lo porta da 5,34 a 1,25 — le parole spariscono per un
+     decimo di secondo, proprio nel momento che l'animazione esiste
+     per far notare. Non c'e' taratura che salvi quel verso: al buio
+     QUALUNQUE schiarita del fondo abbassa il contrasto di un testo
+     chiaro, e partendo da 5,34 il margine sotto la soglia AA e'
+     finito prima di vedersi. Una forma che cambia col tema e' proprio
+     cio' che qui non si fa (si abbassa la luce, non si cambia il
+     segno), e l'anello invece le parole non le tocca MAI: sta fuori
+     dalla pillola, e vale identico nei due temi.
+     L'overflow:hidden del guscio non lo taglia — quello ritaglia i
+     FIGLI, e l'ombra e' della scatola — e nessun contenitore lungo la
+     strada (la fila, il blocco appiccicato del carrello, il fondo di
+     Paga) ha un overflow che la mangi: verificato prima, non sperato.
+     NIENTE RESIDUO PER COSTRUZIONE: `both` tiene il fotogramma
+     iniziale durante l'eventuale ritardo (anello a spessore zero,
+     cioe' nascosto dietro la pillola) e quello finale dopo (anello
+     TRASPARENTE), quindi la pillola a riposo e' identica a ieri senza
+     che nessuno debba ripulire niente. */
+  .fila-promesse .barra-impulso{
+    animation:impulsoScatto .5s ease-out var(--impulso-ritardo,0ms) 1 both}
+  @keyframes impulsoScatto{
+    from{box-shadow:0 0 0 0 var(--barra-a)}
+    to{box-shadow:0 0 0 9px transparent}
+  }
   @media (prefers-reduced-motion:reduce){
     .fila-promesse .pill-barra::before,
     .fila-promesse .barra-scatto::before{transition:none}
+    /* e l'impulso si SPEGNE, non si ferma: con `animation-play-state`
+       resterebbe un anello piantato attorno alla pillola */
+    .fila-promesse .barra-impulso{animation:none}
   }
   /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
      768 sparisce come nella pagina del pacco, ma senza barra propria */
@@ -9353,8 +9394,30 @@ function barreCattura(box){
    e acceso. Chi nasce senza un «da» (primo render, pillola appena
    comparsa) non corre; reduced-motion spegne la transizione dal
    CSS e i bersagli arrivano comunque, secchi. */
+/* L'IMPULSO DELLO SCATTO (13 ago 2026, chiesto da Andrea): l'anello
+   che si allarga dalla pillola quando la promessa scatta. Sta QUI e
+   non in un giro suo perche' il momento dello scatto lo conosce solo
+   questa funzione: e' la riga dove la pillola e' pill-trust E la
+   corsa avviene davvero — cioe' viene da sotto il 100. Su una
+   pillola gia' verde e a riposo la cattura vale 100 e il filtro dei
+   0.5 ha gia' fatto uscire il giro, quindi un tocco qualunque non lo
+   riaccende: e' una proprieta' del filtro che c'era gia', non una
+   guardia in piu' da tenere in pari.
+   DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea): la
+   seconda parte quando la prima e' a meta' corsa, cosi' si legge
+   come un gesto in due battute invece di un doppio colpo — e
+   l'ordine e' quello della fila, 🚚 e poi 🎁.
+   LA LEVA E' UNA RIGA: `IMPULSO_SCATTO` a false e si torna
+   ESATTAMENTE a ieri — la classe non si attacca piu', il blocco CSS
+   resta inerte perche' non veste piu' nessuno, e la pillola a riposo
+   non ha comunque mai niente addosso da ripulire (il `both`
+   dell'animazione tiene il fotogramma finale su un anello
+   trasparente). */
+const IMPULSO_SCATTO = true;
+const IMPULSO_PASSO = 260;   /* ms: meta' della corsa dell'impulso */
 function barreCorri(box, barraDa){
   const corse = [];
+  let impulsi = 0;
   box.querySelectorAll('[data-barra]').forEach(el=>{
     const da = barraDa[el.dataset.barra];
     if (!da) return;
@@ -9365,6 +9428,12 @@ function barreCorri(box, barraDa){
     const aC = scatto ? 'var(--barra-a)'
       : (el.style.getPropertyValue('--barra-c') || 'var(--barra-da)');
     if (scatto) el.classList.add('barra-scatto');
+    if (scatto && IMPULSO_SCATTO){
+      if (impulsi)
+        el.style.setProperty('--impulso-ritardo', `${IMPULSO_PASSO}ms`);
+      el.classList.add('barra-impulso');
+      impulsi++;
+    }
     el.style.setProperty('--barra-p', `${da.p}%`);
     el.style.setProperty('--barra-c', da.c);
     corse.push([el, `${aP}%`, aC]);
