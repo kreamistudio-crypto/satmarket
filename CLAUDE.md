@@ -6055,6 +6055,46 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   essere onesta e insufficiente insieme; quella che vale chiede il
   DATO su cui la decisione poggia. Adesso rimettere la guardia di ieri
   fa rossa una prova.
+  E UNA VOLTA PARTITO ARRIVA IN FONDO (13 ago 2026, il ROVESCIO della
+  cura qui sopra, difetto dal campo lo stesso giorno): l'impulso
+  partiva una volta sola, ma ogni tocco successivo RICOSTRUISCE la
+  pillola e l'anello moriva col nodo vecchio — l'animazione si
+  interrompeva a metà. Campionato: l'anello vive esattamente quanto la
+  pausa fra un tocco e l'altro (60ms su 500 a raffica stretta, e
+  perfino a 400ms di pausa muore a 4/5 della corsa).
+  LA CURA È IL GIRO FLIP CHE LA BARRA FA DA SEMPRE, applicato
+  all'impulso: `barreCattura` registra `i` — quanto è AVANZATO
+  l'anello in volo, in ms — e `barreCorri` lo rimette sul nodo nuovo
+  con un `--impulso-ritardo` NEGATIVO, cioè lo CONTINUA da dov'era.
+  Misurato dopo: avanzamento monotono (67, 117, 167, 217, 267, 317,
+  367) e `finished` a 500 — vivo a ogni tocco entro la mezza corsa, su
+  tutte le cadenze da 0 a 400ms, e mai ripartito da capo.
+  LA STRADA SCARTATA, che era l'altra proposta di Andrea: far vivere
+  l'anello FUORI dal nodo che si ricostruisce (un elemento sovrapposto
+  alla pillola). Vorrebbe dire una seconda geometria da tenere in pari
+  con una pillola che cambia larghezza e casa (Paga, il carrello, la
+  quarta superficie di domani) più un nodo in più da ripulire: più
+  macchina per lo stesso effetto, mentre il FLIP era già lì.
+  TRE RIGHE DA NON AMMORBIDIRE. 1) L'avanzamento si prende SOLO da
+  un'animazione in volo (`playState === 'running'`): riportare anche
+  quella finita farebbe rinascere l'anello morto a ogni tocco, per
+  sempre. 2) Il blocco dell'impulso sta SOPRA il filtro della corsa —
+  sotto, un tocco che non fa correre la barra (la cattura già a 100,
+  cioè il caso normale a raffica larga) uscirebbe dal giro senza
+  riportare l'anello, che morirebbe lì: sono due cose che capitano
+  insieme, non una dentro l'altra. 3) CONTINUARE NON È RIPARTIRE, ed è
+  ciò che tiene insieme questa cura e quella di stamattina: il ramo
+  della continuazione non incrementa `impulsi` (un anello che continua
+  non deve sfasare un vero scatto che partisse nello stesso giro), e i
+  due rami non possono sovrapporsi senza che nessuno lo scriva — un
+  anello esiste solo su una pillola già scattata, quindi `da.i` pieno
+  implica `da.t` vero, che è esattamente ciò che il ramo di partenza
+  nega. Se nel frattempo la promessa CADE, l'anello non si riporta: è
+  l'ornamento dello stato scattato, e senza lo stato non ha più niente
+  da dire.
+  E `getAnimations` SI CHIEDE COL GUARDIANO: `barreCattura` sta nel
+  mezzo del render, e una WebView che non ce l'ha alzerebbe lì dentro
+  — una pagina bianca per un ornamento.
   DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea): la
   seconda parte quando la prima è a metà corsa
   (`IMPULSO_PASSO` 260ms), così si legge come un gesto in due battute
