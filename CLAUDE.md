@@ -5618,17 +5618,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sotto soglia si riempie di verde da sinistra, con un bordo
   NETTO, man mano che il carrello sale — `barraPromessa` in
   renderAcquisto scrive `background-size` sulla classe `.pill-barra`.
-  IL COLORE È `--barra-fill`, token a doppio valore (#BFE0D0 di
-  giorno, #2E5237 di sera — secondo giro dello stesso 13 ago, visto
-  da Andrea: col `--trust-soft` nudo la barra non si notava, perché
-  quello è il FONDO della pill-trust, nato per stare sotto un testo e
-  non per staccare da una carta quasi uguale). Stessa TINTA della
-  fiducia, più luce — si abbassa la luce, non si cambia il segno — e
-  può essere PIÙ carica del fondo della conferma senza mentire: a
-  distinguere la barra dalla promessa scattata è la FORMA, parziale
-  col bordo netto contro pillola intera con ✅ e il testo che lo
-  dice. Misurati sull'inchiostro che ci sta sopra: 10,5 di giorno,
-  7,2 di sera.
+  IL COLORE VIRA COL PROGRESSO (terzo giro dello stesso 13 ago,
+  chiesto da Andrea): la coppia `--barra-da`/`--barra-a` — slavato
+  #DCEEE4 → acceso #8FCBAB di giorno, #243B2C → #35684A di sera —
+  mescolata dal progresso stesso col color-mix nello style di
+  `barraPromessa`. Il primo giro col `--trust-soft` nudo non si
+  notava (è il FONDO della pill-trust, nato per stare sotto un testo,
+  non per staccare da una carta quasi uguale); il secondo, a tinta
+  fissa più carica, è durato mezza giornata. MAI dal rosso (nell'app
+  il rosso è problema, e una promessa in corsa è un invito, non un
+  fallimento) e MAI dal grigio, prototipato e SCARTATO a schermo: la
+  mescola di mezzo fa un olivastro spento, e si perde la famiglia
+  della fiducia. La tinta cambia a GRADINI fra un render e l'altro
+  (un gradiente non si transiziona): a correre morbida è la
+  larghezza. Contrasto dell'inchiostro sull'acceso pieno: 8,1 di
+  giorno, 5,3 di sera. LA DISTINZIONE dalla scattata resta di FORMA,
+  non di tinta: il tetto a 99 lascia sempre la fetta di carta col
+  bordo netto (una barra, mai un fondo), il testo cambia natura
+  («Ancora N» contro «✅ nel conto»), e la scattata è la pillola
+  INTERA nel verde tenue con bordo e testo trust — più quieta della
+  barra accesa, ed è il verso giusto: la corsa chiama, il traguardo
+  riposa.
   Il progresso è `(soglia − mancano)/soglia`, coi numeri che il
   preventivo porta GIÀ e nell'unità della promessa: il client riceve,
   non calcola. A pezzi sale a gradini, a VALORE è continuo — la barra
@@ -5639,28 +5649,56 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chi guarda solo il colore — piena è solo la pill-trust); lo style
   che c'è SEMPRE, anche a 0% (senza background-size esplicito il
   background-image coprirebbe la pillola intera, cioè il falso al
-  primo pezzo); e NIENTE transizione, perché renderAcquisto
-  ricostruisce l'HTML a ogni ± e il nodo nuovo non ha un «da» da cui
-  animarsi. LA STRADA SCARTATA, prototipata e fotografata: il colore
+  primo pezzo); e LA CORSA MORBIDA (chiesta da Andrea, che rovescia
+  il «niente transizione» della nascita): il «da» che a un nodo
+  ricostruito manca si RECUPERA — prima del render si legge il
+  computed `backgroundSize` delle pillole vive, che a metà corsa è il
+  valore INTERPOLATO; il nodo nuovo nasce alla larghezza vecchia, un
+  reflow la fissa e lo style corre al bersaglio (il giro FLIP in
+  fondo a renderAcquisto). È ciò che tiene onesti i + veloci: le
+  transizioni CSS non si accodano mai — ritargeting nativo, la barra
+  devia in corsa verso l'ultimo bersaglio — e il NUMERO non aspetta,
+  si aggiorna secco al render. ALLO SCATTO la pill-trust fa la
+  stessa corsa nel SUO verde (`.barra-scatto`, --trust-soft): a fine
+  corsa il fondo è quello di riposo della scattata — visivamente
+  identico, nessun secondo stato da mantenere — e lo scarto residuo
+  DICHIARATO è il cambio di tinta della parte già piena nell'istante
+  dello scatto, il segno che è successo qualcosa. In discesa vale il
+  simmetrico (da 100 alla misura); chi nasce senza un «da» (primo
+  render, pillola appena comparsa) non corre; reduced-motion spegne
+  la transizione dal CSS e lo style finisce comunque sul bersaglio.
+  LA STRADA SCARTATA, prototipata e fotografata: il colore
   che si SATURA (color-mix verso il verde) — 67% e 73% si vedevano
   uguali, e il quasi-verde si leggeva come promessa già scattata. I
   badge gemelli del CARRELLO restano senza barra, dichiarato: lì il
   conto a valore in euro è client-side col cambio (l'imperfezione già
   dichiarata dell'invito), estenderli è un secondo passo.
   E QUANDO LO SCONTO SCATTA SI VEDE ANCHE SULL'UNITARIO (ago 2026,
-  decisione di Andrea — la via (c) fra le tre proposte):
-  l'unitario nella card resta il PIENO, mai barrato, e accanto gli
-  compare il tag verde «−X%» (`.sconto-tag`, la lingua della pillola
-  di conferma). MAI un numero unitario scontato, ed è la riga da non
-  ammorbidire: lo sconto è di TESTATA sul totale (floor, resto a chi
-  paga) e un unitario scontato non esiste come intero — 10% su
-  14.001 non torna — quindi un numero lì mentirebbe a chi rifà
-  unitario × pezzi, e un ≈ gli darebbe un TERZO significato (oggi
-  dice solo «convertito col cambio»). La percentuale è la REGOLA ed
-  è esatta per definizione; le cifre vere le dice il conto, che non
-  mente mai. Il tag è gated su `sconto_sats>0` (mai sull'invito), i
-  SET non hanno un unitario in card e restano fuori per costruzione,
-  la DEMO non simula lo sconto e tace da sola. Sentinelle in CI. IL VERDE DELLA SPEDIZIONE CONVIVE con la
+  decisione di Andrea — la via (c) fra le tre proposte): accanto
+  all'unitario compare il tag verde «−X%» (`.sconto-tag`, la lingua
+  della pillola di conferma), che dice la REGOLA, esatta per
+  definizione. E DAL 13 AGO 2026 ANCHE LA CIFRA — l'unitario
+  scontato, ripensamento di Andrea: il tag dice che lo sconto c'è,
+  ma la cifra è quello che uno cerca — però SOLO QUANDO LA DIVISIONE
+  È ESATTA, misurato PRIMA di decidere: in produzione ZERO inesatte
+  su 52 annunci scontati (i prezzi veri sono tondi: al 10% basta un
+  multiplo di 10, al 5/15% di 20, al 20% di 5), quindi la cifra si
+  vede sempre e il ramo solo-tag è una CINTURA che oggi non scatta
+  mai. La calcola il SERVER sulla faccia NATIVA — sats, o CENTESIMI
+  per i listini in euro, la cui faccia sats è convertita e porta già
+  il ≈ del cambio — nelle chiavi `articolo_unitario_netto_sats/_eur`
+  (zero = niente cifra), e il client la MOSTRA col pieno BARRATO
+  piccolo sotto, la resa della lampo (`.acq-barrato`, col `.unit`
+  inline-block che ferma la barratura: la lezione del listino
+  barrato). MAI UN ≈ DA ARROTONDAMENTO, ed è il motivo che ha chiuso
+  la questione (Andrea): in quella casella il ≈ della conversione
+  compare GIÀ, e due significati sulla stessa cifra nello stesso
+  posto sono peggio di nessuna cifra — il perché di ieri («un numero
+  che non torna moltiplicando si legge come un bug») resta vero e
+  governa il caso inesatto, dove la cifra semplicemente non compare.
+  Il tag resta gated su `sconto_sats>0` (mai sull'invito), i SET non
+  hanno un unitario in card e restano fuori per costruzione, la DEMO
+  non simula lo sconto e tace da sola. Sentinelle in CI. IL VERDE DELLA SPEDIZIONE CONVIVE con la
   riga «Spedizione: gratuita» del conto, ed è deciso guardando lo
   schermo: la riga dice il COSA, il verde dice il PERCHÉ (è la
   promessa del negozio a essere scattata) — e senza, nello stato
