@@ -1867,7 +1867,7 @@
      quasi piena dalla scattata bastano la FORMA e il TESTO: il tetto
      a 99 lascia sempre la fetta di carta col bordo netto — una
      barra, mai un fondo — contro la pillola INTERA bordo a bordo, e
-     «Ancora N → …» contro «✅ … nel conto». */
+     «Ancora N → …» contro «✅ …». */
   #acqCorpo > .pills .pill-trust{border-color:var(--barra-a);
     background:var(--barra-a);color:var(--ink)}
   /* LA BARRA DI RIEMPIMENTO delle promesse (13 ago 2026, decisione di
@@ -9072,11 +9072,16 @@ function renderAcquisto(){
      Pillole AFFIANCATE in una fila sola, ognuna col suo stato — le
      promesse sono indipendenti, quindi una puo' essere verde e
      l'altra no, come nel carrello. Sotto soglia «Ancora N → …»,
-     quando scatta il verde «nel conto» (la riga della CIFRA sta gia'
-     nel conto qui sotto: la pillola e' il cartello, il conto e' il
-     fatto — e per la spedizione la riga dice «gratuita», che dice il
-     COSA ma non il perche': il verde dice che e' la promessa del
-     negozio a essere scattata). Coi numeri del SERVER: `mancano_*`
+     quando scatta il verde NUDO — la coda «nel conto» e' caduta il
+     13 ago 2026: lo sconto si vede da solo sull'unitario scontato
+     col pieno barrato, e la spedizione ce l'ha la riga «gratuita»
+     del conto due dita sotto (la pillola e' il cartello, il conto e'
+     il fatto: la riga dice il COSA, il verde dice il PERCHE' — e' la
+     promessa del negozio a essere scattata). NEL CARRELLO la coda
+     dello sconto RESTA, ed e' portante: la' la barra e' al LORDO di
+     proposito, e senza «nel conto» chi legge «−15%» aspetterebbe che
+     il totale scenda — la spedizione del carrello invece e' nuda da
+     sempre. Coi numeri del SERVER: `mancano_*`
      li conta lui, quindi la fascia stretta del cambio del carrello
      qui non esiste. A VALORE il quanto manca e' una CIFRA nell'unita'
      della promessa (cifraSoglia, mai una conversione).
@@ -9133,7 +9138,7 @@ function renderAcquisto(){
     if (scSospeso)
       note += `<div class="acq-nota">🎁 Il negozio fa −${scPct}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
     else if ((p.sconto_sats||0) > 0)
-      pillaSc = `<span class="pill pill-trust" data-barra="sc">✅ Sconto <b>−${scPct}%</b> nel conto</span>`;
+      pillaSc = `<span class="pill pill-trust" data-barra="sc">✅ Sconto <b>−${scPct}%</b></span>`;
     else if (scManca > 0)
       pillaSc = `<span class="pill pill-barra" data-barra="sc"${barraPromessa(scSogliaPag, scManca)}>🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
   }
@@ -9169,7 +9174,7 @@ function renderAcquisto(){
     else if (sgManca > 0)
       pillaSg = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(sgSoglia, sgManca)}>🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
     else
-      pillaSg = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b> nel conto</span>`;
+      pillaSg = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b></span>`;
   }
   /* LA FILA: 🚚 PRIMA della 🎁 (12 ago 2026, decisione di Andrea) —
      lo stesso ordine di «Altri oggetti», del carrello e della testata

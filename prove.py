@@ -12956,13 +12956,25 @@ def prove_promesse_badge():
           True, "cifraSoglia(scManca, scVal)" in _blocco_sc)
     # ...e la SPEDIZIONE parla la stessa lingua (12 ago 2026, il
     # secondo tempo): pillola «Ancora N → spedizione gratis» sotto
-    # soglia, verde «nel conto» quando scatta — nella STESSA fila
-    # dello sconto, ognuna col suo stato (sono indipendenti: una
-    # verde e una no e' uno stato normale, come nel carrello).
+    # soglia, verde NUDO quando scatta — nella STESSA fila dello
+    # sconto, ognuna col suo stato (sono indipendenti: una verde e
+    # una no e' uno stato normale, come nel carrello).
     _blocco_sg = _ra[_ra.index("L'INVITO DELLA SPEDIZIONE GRATIS"):]
     prova("la spedizione in pagina Paga parla la lingua dello sconto",
           True, "→ <b>spedizione gratis</b>" in _blocco_sg
-          and "✅ Spedizione <b>gratis</b> nel conto" in _blocco_sg)
+          and "✅ Spedizione <b>gratis</b></span>" in _blocco_sg)
+    # LE PILLOLE SCATTATE DI PAGA SONO NUDE (13 ago 2026, deciso da
+    # Andrea con l'unitario scontato in pagina): la coda «nel conto»
+    # era diventata un doppione — lo sconto si vede da solo sul
+    # prezzo, la spedizione ce l'ha la riga «gratuita» del conto. Nel
+    # CARRELLO la coda dello sconto RESTA, ed e' portante (la barra
+    # la' e' al LORDO): la sentinella sua sta piu' sotto, e questa
+    # conta che di code ne sia rimasta UNA in tutto il client.
+    prova("le pillole scattate di Paga sono nude", True,
+          '>✅ Sconto <b>−${scPct}%</b></span>' in mini
+          and '>✅ Spedizione <b>gratis</b></span>' in mini)
+    prova("...e la coda «nel conto» resta SOLO al carrello", 1,
+          mini.count("nel conto</span>"))
     prova("...nella stessa fila, affiancate", 1,
           _ra.count('`<div class="pills">${pillole}</div>`'))
     # L'ORDINE DELLA FILA E' UNO SOLO (12 ago 2026, decisione di
