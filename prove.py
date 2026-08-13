@@ -12958,9 +12958,26 @@ def prove_promesse_badge():
           _ao.index('<div class="altri-azione">')
           < _ao.index('<div class="grid altri-griglia">')
           and 'fila-promesse">${badge}</div>`' in _ao)
+    # IL TITOLO STA SU UNA RIGA (13 ago 2026, dal campo: col gradino
+    # a 13px andava a capo). MISURATO prima di scegliere, ed e' il
+    # numero che ha deciso: a 320 il titolo andava a capo ANCHE agli
+    # 11px di serie (250px di testo contro 246 di budget) — il
+    # difetto era PREESISTENTE e il gradino l'ha solo reso evidente,
+    # quindi «tornare al corpo di prima» non era una cura. La cura ha
+    # due gambe: il padding laterale DOPPIO tolto (32px restituiti, e
+    # il titolo si allinea a bottone e card) e la formula piu' corta
+    # («questo» via). Il testo INTERO a 13px non ci sta a 320 in
+    # nessun modo che non mangi il letter-spacing del maiuscoletto.
     prova("...e il titolo della sezione ha il suo gradino", True,
           'class="section-label altri-tit"' in _ao
-          and ".altri-tit{font-size:13px}" in mini)
+          and ".altri-tit{font-size:13px;" in mini)
+    prova("...senza il padding laterale doppio (che lo mandava a capo"
+          " e lo disallineava)", True,
+          ".altri-tit{font-size:13px;padding-left:0;padding-right:0}"
+          in mini)
+    prova("...e con la formula corta, quella che ci sta a 320", True,
+          ">Altri oggetti del venditore</div>" in _ao
+          and "Altri oggetti di questo venditore" not in _ao)
     # Il chip azzurro della spedizione e' morto con lo sfollamento
     # colori: la regola CSS restava orfana a far credere che vivesse.
     # Si guardano la REGOLA e l'USO e non il nome nudo, che vive ancora

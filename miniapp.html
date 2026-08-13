@@ -2013,8 +2013,17 @@
     margin:0 calc(-1 * var(--pad));padding-left:var(--pad);padding-right:var(--pad)}
   .altri-azione .btn{margin-top:0}
   /* il titolo della sezione, un gradino sopra gli 11px del
-     section-label di serie (13 ago 2026, chiesto da Andrea) */
-  .altri-tit{font-size:13px}
+     section-label di serie (13 ago 2026, chiesto da Andrea) — e
+     SENZA il padding laterale, che qui era DOPPIO: `.section-label`
+     porta il suo `var(--pad)` perche' di solito vive attaccato al
+     bordo della vista, ma dentro `.detail-body` quel padding c'e'
+     gia' e i due si sommavano — il titolo rientrava di 16px
+     rispetto al bottone e alle card, che partono dal bordo del
+     corpo. Toglierlo allinea la colonna (misurato: left 32 → 16,
+     come `.altri-azione` e `.altri-griglia`) e restituisce 32px al
+     testo, che e' il motivo per cui il titolo ci sta su una riga.
+     Il padding SOPRA resta: e' il fiato della sezione. */
+  .altri-tit{font-size:13px;padding-left:0;padding-right:0}
   /* i badge delle promesse, DENTRO il blocco appiccicato e SOTTO il
      bottone (terza rigirata, 13 ago 2026 — il perche' e i numeri
      stanno sul template, in sezioneAltriOggetti): il margine sopra
@@ -8267,7 +8276,7 @@ async function sezioneAltriOggetti(l){
               + (scOk ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '');
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
-      <div class="section-label altri-tit">Altri oggetti di questo venditore</div>
+      <div class="section-label altri-tit">Altri oggetti del venditore</div>
       ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button>${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}</div>` : ''}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
