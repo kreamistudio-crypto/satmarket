@@ -5599,14 +5599,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   conto» è caduta il 13 ago 2026 (deciso da Andrea con l'unitario
   scontato in pagina — lo sconto si vede da solo sul prezzo, e la
   spedizione ce l'ha la riga «gratuita» del conto due dita sotto: la
-  pillola è il cartello, il conto è il fatto). NEL CARRELLO la coda
-  dello sconto RESTA, ed è portante — là la barra è al LORDO di
-  proposito, e senza «nel conto» chi legge «−15%» aspetterebbe che il
-  totale scenda; la spedizione del carrello è nuda da sempre. Non
-  sono due nomi per la stessa cosa ma due superfici con due verità
-  (il patto dei separatori dei sats: un formato per superficie, con
-  un motivo), e una sentinella conta che di code ne resti UNA in
-  tutto il client. La fila sta SOPRA la riga della consegna
+  pillola è il cartello, il conto è il fatto). E dal 13 ago 2026
+  (secondo tempo, chiesto da Andrea) sono nude ANCHE NEL CARRELLO:
+  la coda «nel conto» era portante finché il totale della barra
+  restava al lordo — adesso il totale mostra lo scontato col lordo
+  barrato (vedi la voce della barra del carrello) e la coda direbbe
+  di cercare altrove una cosa già in vista; la sentinella ora conta
+  che di code non ne resti NESSUNA. La fila sta SOPRA la riga della consegna
   (12 ago 2026, decisione di Andrea — è un fatto del negozio, si
   legge prima di scegliere la strada) e il suo ordine è quello di
   casa: vedi «L'ORDINE DELLA FILA È UNO SOLO», sotto «LE PROMESSE
@@ -5615,9 +5614,14 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   di Andrea): non più chip affiancati di larghezze diverse — che si
   leggevano come bottoni randagi fra la card e la Consegna — ma
   righe a tutta larghezza, tono quieto, angoli da riquadro come le
-  vie sotto. Solo CSS (`#acqCorpo > .pills`): il MARKUP non si
-  tocca, la sentinella della fila conta proprio quel template, e il
-  verde della conferma resta verde. LA STRADA SCARTATA, costruita e
+  vie sotto. Nacque solo-CSS su `#acqCorpo > .pills`; dal 13 ago
+  2026 la veste è la CLASSE `.fila-promesse` sui TRE contenitori —
+  Paga, carrello e «Altri oggetti» — un posto solo, e la quarta
+  superficie di domani mette la classe e ha finito (le sentinelle
+  contano i tre template e il display:block della pillola, che nel
+  carrello vive dentro lo span-scatola e da inline non prenderebbe
+  la larghezza). Il verde della conferma resta verde.
+  LA STRADA SCARTATA, costruita e
   guardata a schermo prima di decidere: i badge DENTRO la card
   dell'articolo — stava più in ordine, ma costava il rovesciamento
   della decisione del 12 ago («la fila sopra la consegna»), spezzava
@@ -5627,8 +5631,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   E LE RIGHE SI RIEMPIONO COL PROGRESSO (13 ago 2026, decisione di
   Andrea, scelta su DUE prototipi guardati a schermo): la pillola
   sotto soglia si riempie di verde da sinistra, con un bordo
-  NETTO, man mano che il carrello sale — `barraPromessa` in
-  renderAcquisto scrive `background-size` sulla classe `.pill-barra`.
+  NETTO, man mano che il carrello sale — `barraPromessa` scrive
+  `--barra-p`/`--barra-c` sulla classe `.pill-barra` (dal 13 ago è
+  un ferro CONDIVISO fuori da renderAcquisto, vedi sotto).
   IL COLORE VIRA COL PROGRESSO (terzo giro dello stesso 13 ago,
   chiesto da Andrea): la coppia `--barra-da`/`--barra-a` — slavato
   #DCEEE4 → acceso #8FCBAB di giorno, #243B2C → #35684A di sera —
@@ -5653,19 +5658,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   riposa» di mezza giornata prima): la barra si accendeva salendo e
   allo scatto la pillola tornava al verde tenue, cioè il traguardo
   PERDEVA forza — sembrava che qualcosa si fosse spento proprio nel
-  momento più forte, e di sera l'inverso. Ora la pill-trust di Paga
-  (e SOLO di Paga: il carrello e le altre superfici tengono la tenue
-  di sempre) veste l'acceso pieno `--barra-a` con l'inchiostro sopra,
-  e lo scatto corre l'ultimo tratto nello STESSO acceso
-  (`.barra-scatto`: guscio a carta, fill al 100%): la tinta non
+  momento più forte, e di sera l'inverso. Ora la pill-trust veste
+  l'acceso pieno `--barra-a` con l'inchiostro sopra — nata «solo di
+  Paga», dal 13 ago 2026 (secondo tempo) vale ANCHE nel carrello,
+  che corre la stessa barra: due traguardi diversi per la stessa
+  promessa erano una divergenza senza motivo, la regola vive sulla
+  BASE `.pill.pill-trust` e il tenue di `.trust-soft` non lo veste
+  più nessuno — e lo scatto corre l'ultimo tratto nello STESSO
+  acceso (`.barra-scatto`: guscio a carta, fill al 100%; il suo
+  selettore porta un `.pill` in più APPOSTA, deve battere la base
+  per specificità e non per ordine): la tinta non
   salta, il traguardo guadagna. LA DISTINZIONE dalla barra quasi
   piena, ora che la tinta è una, è di FORMA e di TESTO: il tetto a
   99 lascia sempre la fetta di carta col bordo netto — una barra,
   mai un fondo — contro la pillola INTERA bordo a bordo, e
   «Ancora N → …» contro «✅ …».
-  Il progresso è `(soglia − mancano)/soglia`, coi numeri che il
-  preventivo porta GIÀ e nell'unità della promessa: il client riceve,
-  non calcola. A pezzi sale a gradini, a VALORE è continuo — la barra
+  Il progresso è `(soglia − mancano)/soglia`, nell'unità della
+  promessa: in Paga coi numeri che il preventivo porta GIÀ (il
+  client riceve, non calcola), nel carrello — dal 13 ago — coi
+  numeri del CLIENT, gli stessi che il testo «Ancora N» diceva già:
+  la barra non aggiunge nessuna pretesa nuova, e la fascia del
+  cambio a soglia in euro è quella dichiarata sul giudice
+  `statoScontoPacco`. A pezzi sale a gradini, a VALORE è continuo — la barra
   dice la verità in tutti e due i casi senza un ramo, e a cambio muto
   la promessa in euro non è una pillola ma prosa, quindi lì la barra
   non esiste per costruzione. TRE righe da non ammorbidire: il TETTO
@@ -5716,10 +5730,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il movimento lo dice il telefono.
   LA STRADA SCARTATA, prototipata e fotografata: il colore
   che si SATURA (color-mix verso il verde) — 67% e 73% si vedevano
-  uguali, e il quasi-verde si leggeva come promessa già scattata. I
-  badge gemelli del CARRELLO restano senza barra, dichiarato: lì il
-  conto a valore in euro è client-side col cambio (l'imperfezione già
-  dichiarata dell'invito), estenderli è un secondo passo.
+  uguali, e il quasi-verde si leggeva come promessa già scattata.
+  IL SECONDO PASSO È STATO FATTO (13 ago 2026, chiesto da Andrea):
+  i badge del carrello corrono la STESSA barra — qui c'era scritto
+  «restano senza barra, dichiarato» — coi ferri CONDIVISI
+  `barraPromessa`/`barreCattura`/`barreCorri`, estratti da
+  renderAcquisto proprio per questo: una seconda stesura della corsa
+  è il posto dove il prossimo «si anima solo la spedizione»
+  tornerebbe a nascondersi. Le due scatole del carrello passano dai
+  ferri UNA alla volta e le partenze riunite reggono lo stesso: la
+  cattura della seconda trova la prima già tutta alle partenze (i
+  bersagli aspettano il rAF), mai a metà.
   E QUANDO LO SCONTO SCATTA SI VEDE ANCHE SULL'UNITARIO (ago 2026,
   decisione di Andrea — la via (c) fra le tre proposte): accanto
   all'unitario compare il tag verde «−X%» (`.sconto-tag`, la lingua
@@ -5777,9 +5798,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Restano
   invariati per scelta: il suggerimento del bot (chiede
   ancora ≥2 annunci — allargarlo è un'altra decisione), la DEMO
-  (asciutta, non simula lo sconto), le ASTE (`crea_ordine_pagato` non
-  sconta: il vincitore paga l'esposto) e la barra del carrello al
-  lordo.
+  (asciutta, non simula lo sconto) e le ASTE (`crea_ordine_pagato`
+  non sconta: il vincitore paga l'esposto). La barra del carrello,
+  che qui stava «al lordo», dal 13 ago 2026 mostra lo scontato col
+  lordo barrato — vedi la voce sua, sotto lo sconto carrello.
   E I VENDITORI CHE AVEVANO GIÀ LA REGOLA ACCESA LO SANNO
   (`avvisa_sconto_su_mono`, campagna UNA-TANTUM GLOBALE col timbro
   nella tabella `timbri` e NON una colonna per utente: è un evento del
@@ -6000,9 +6022,11 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ritardo). A criterio VALORE una cifra la porta, e il patto si
   riformula onestamente: L'INVITO NON CALCOLA IL RISPARMIO, RICEVE il
   totale — glielo passa `aggiornaBarraPacco`, che quel numero lo mostra
-  già due centimetri più sotto, quindi i due non possono divergere;
-  quel che resta VIETATO è la percentuale, cioè quanto si risparmia,
-  che lo dice solo il conto del server.
+  già due centimetri più sotto, quindi i due non possono divergere.
+  (Il «resta VIETATO applicare la percentuale» che stava qui è
+  ROVESCIATO dal 13 ago 2026: la percentuale si applica nel TOTALE
+  della barra, come RESA e con la formula del server — vedi la voce
+  della barra, sotto. L'invito continua a non calcolare niente.)
   MA COL PASSAGGIO ALL'EURO L'INVITO DEL CARRELLO CONVERTE (ago 2026),
   ed è l'UNICO posto dell'app dove il client fa una conversione su una
   promessa: il preventivo in quella pagina non c'è, e chiamarlo a ogni
@@ -6027,13 +6051,27 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dall'ago 2026 lo stesso vale per la SECONDA promessa
   (`regolaSpedGratis`/`frasePromessaSpedGratis`), che quella sentinella
   non ce l'aveva: buco trovato proprio con questo cantiere.
-  LA BARRA DEL CARRELLO RESTA AL
-  LORDO, dichiarato: non è già oggi il totale da pagare (non ha
-  spedizione né protezione), e le alternative sono peggio — una
-  chiamata a ogni tocco dello stepper (con un debounce che litiga
-  proprio con chi sale in fretta, e una sentinella che conta DUE
-  lettori del preventivo) o il primo calcolo di denaro nel client
-  fuori dalla DEMO. Cassetto «🎁 Sconto sul carrello» nel Profilo fra
+  IL TOTALE DELLA BARRA DEL CARRELLO MOSTRA LO SCONTATO (13 ago
+  2026, decisione di Andrea che ROVESCIA il «resta al lordo,
+  dichiarato» — come l'unitario in Paga): a soglia scattata
+  `paccoTot` dice il NETTO e sotto compare il lordo barrato
+  (`#paccoPieno`, la resa della lampo e dell'unitario di Paga; il
+  badge scattato torna NUDO, che «nel conto» direbbe di cercare
+  altrove una cosa in vista due dita sotto). LE DUE METÀ DA NON
+  CONFONDERE: la MISURA delle promesse resta al LORDO — al giudice
+  `statoScontoPacco` e ai due inviti va il totale così com'è, la
+  regola del server («LA MISURA È IL LORDO»), o lo sconto si
+  spegnerebbe da solo facendo scendere il totale sotto la soglia che
+  l'ha acceso — e il netto è solo RESA, con la formula del server
+  (`_sconto_pacco`: floor sul netto, il sat di dubbio a chi paga).
+  L'onestà è quella del ✅ che c'era già: stesso scatto, stessa
+  fascia dichiarata del cambio a soglia in euro — il netto la
+  eredita e non ne aggiunge una sua; l'ordine nasce sempre dal conto
+  del server. Il preventivo a ogni tocco dello stepper resta
+  SCARTATO (il debounce litiga con chi sale in fretta), e resta vero
+  che quel numero non è il totale da pagare (niente spedizione né
+  protezione): a cambiare è solo che ora dice la merce al prezzo
+  VERO. Cassetto «🎁 Sconto sul carrello» nel Profilo fra
   spedizioniere e ferie (due politiche sempre accese, poi
   l'interruzione): pillole dalle liste del server, e le pillole
   SCELGONO mentre a salvare è un bottone solo — soglia e percentuale
@@ -6309,16 +6347,25 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   rovesciata.)
   NEL CARRELLO il badge porta il CONTO VIVO — «🚚 Ancora 145 € →
   spedizione gratis», «🎁 Ancora 2 pezzi → −15%» — e quando la soglia
-  scatta diventa la conferma. «NEL CONTO» nel badge dello sconto non è
-  ornamento: la barra lì sotto è al LORDO di proposito, e senza quella
-  coda chi legge «−15%» aspetterebbe che il totale scenda.
-  IL VERDE VIVE SOLO NEL CARRELLO (decisione di Andrea): è la coppia di
-  `.trust-note` (`.pill.pill-trust`), cioè il vestito che la riga di
-  prosa aveva già lì — non un colore nuovo e non un significato nuovo.
+  scatta diventa la conferma, dal 13 ago 2026 NUDA e piena e accesa
+  come in Paga: la coda «nel conto» è morta col totale che mostra lo
+  scontato (vedi la voce della barra del carrello), e i badge corrono
+  la stessa barra col viraggio, sui ferri condivisi.
+  IL VERDE VIVE SOLO DOVE LA PROMESSA È UN FATTO — carrello e Paga,
+  le due superfici che emettono `pill-trust`, e dal 13 ago è l'ACCESO
+  `--barra-a` sulla base `.pill.pill-trust` (il tenue di
+  `.trust-note` non lo veste più nessuno: due traguardi diversi per
+  la stessa promessa erano una divergenza senza motivo).
   In scheda e in «Altri oggetti» i badge restano NEUTRI, perché lì la
   promessa è una REGOLA e non un fatto compiuto; e nella fila del
   dettaglio il verde è già preso da `cond-nuovo`/`cond-come_nuovo`, che
-  vuol dire un'altra cosa.
+  vuol dire un'altra cosa. E dal 13 ago 2026 anche i badge di «Altri
+  oggetti» vestono `.fila-promesse` — righe a tutta larghezza come in
+  Paga: SOLO la veste, niente barra e niente verde, perché lì non c'è
+  una soglia da riempire (non è un verdetto sul carrello corrente);
+  il costo dichiarato è che i due stanno sempre uno sotto l'altro, e
+  con tutte e due le promesse il blocco sopra il bottone sticky
+  cresce di una trentina di px.
   DUE FUNZIONI E DUE SCATOLE nel carrello (`aggiornaInvitoSconto` e
   `aggiornaInvitoSpedGratis`, `#paccoSconto` e `#paccoSpedGratis`), e
   non è simmetria per il gusto: le due soglie hanno UNITÀ INDIPENDENTI
@@ -6360,9 +6407,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   simmetria. C'è la sentinella nei due versi.
   NEL CARRELLO IL CONTO È DEL CLIENT, come già prima: i badge non
   calcolano, RICEVONO il totale che la barra mostra due centimetri più
-  sotto, quindi i due non possono divergere. L'imperfezione è quella
+  sotto, quindi i due non possono divergere (a calcolare, dal 13 ago,
+  è solo il TOTALE della barra: il netto a soglia scattata, formula
+  del server, vedi la voce sua). L'imperfezione è quella
   già dichiarata (solo a soglia in EURO si converte col cambio del
-  client, e senza cambio si tace); a soglia in SATS il confronto è
+  client, e senza cambio si tace — e allora niente badge, niente
+  barra e niente netto insieme); a soglia in SATS il confronto è
   esatto e il badge compare anche a CoinGecko muto.
   NEL FORM VENDI DUE RIGHE DELLE POLITICHE (ago 2026, chieste da
   Andrea): lo sconto sotto il Prezzo, la spedizione gratis sotto il
@@ -12351,6 +12401,45 @@ collaudo), dichiarato. IN PRODUZIONE basta il deploy: nessuna colonna,
 nessuna leva, nessuna rotta — solo client. DA GUARDARE dal vivo dentro
 Telegram: che all'apertura della pagina la tastiera NON si alzi, e il
 primo ordine al punto nato passando dal bottone.
+
+La fila delle promesse parla una lingua sola (13 ago 2026, chiesto da
+Andrea in tre punti): la veste di Paga — righe a tutta larghezza —
+arriva su «Altri oggetti» e sul carrello; il carrello corre la STESSA
+barra di Paga (riempimento, viraggio, scattata piena e accesa: tre
+«solo di Paga» rovesciati in un giro solo); e il totale della barra
+del carrello mostra lo SCONTATO col lordo barrato, come l'unitario in
+Paga. Le tre cose da tenere: 1) la MISURA resta al LORDO — al giudice
+`statoScontoPacco` (nuovo, unico: lo chiamano badge e totale) va il
+totale così com'è, o lo sconto si spegnerebbe da solo — e il netto è
+solo RESA con la formula del server; con lui è morta la coda «nel
+conto» (diceva di aspettare il conto perché il totale restava al
+lordo, e ora scende da solo: la sentinella conta ZERO code). 2) La
+barra del carrello corre coi numeri del CLIENT — gli stessi del testo
+«Ancora N», nessuna pretesa nuova, la fascia del cambio dichiarata sul
+giudice — sui FERRI CONDIVISI `barraPromessa`/`barreCattura`/
+`barreCorri`, estratti da renderAcquisto: una seconda stesura della
+corsa è il posto dove il prossimo «si anima solo la spedizione»
+tornerebbe a nascondersi. 3) In «Altri oggetti» cambia SOLO la veste
+(classe `.fila-promesse` sui tre contenitori, un posto solo): niente
+barra e niente verde — lì la promessa è una regola, non un verdetto
+sul carrello corrente — e il costo dichiarato è la coppia sempre in
+colonna, ~30px in più col negozio che promette due cose.
+Collaudato: 2928 prove verdi (erano 2923 prima del cantiere, con le
+rovesciate — «nel conto» a zero, la tenue che non veste più nessuno,
+le OTTO pillole con la chiave della corsa) e NOVE mutazioni una per
+riga sorvegliata, ognuna rossa da sola — la tortura ha trovato una
+sentinella che non poteva fallire (il conteggio dei chiamanti dei
+ferri contava anche la chiamata COMMENTATA: riscritta sulla riga
+intera, la lezione del reaper, terza volta). Più il giro CDP a
+320/375 nei due temi: fill 33%/10% misurati sulle pillole vere,
+scattata accesa, totale 14,89 € col 16,54 barrato (−10% al floor),
+doppio verde a carrello pieno, Paga byte-per-byte uguale e zero
+errori JS. IN PRODUZIONE basta il deploy: nessuna colonna, nessuna
+leva, nessuna rotta — solo client. RESTA DA DECIDERE (misurato, non
+applicato): la via del locker con la barra spaziata («Spedizione a
+locker / punto di ritiro») sta su UNA riga a 360/375 e va a capo a
+320 (21→43px) — la scelta fra barra spaziata e riga singola è di
+Andrea.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
