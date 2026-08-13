@@ -9639,15 +9639,56 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   sempre la verità, la soglia è una scelta di lettura e non di
   privacy — un «1» non è una prova sociale, è un numero che occupa
   spazio, e in griglia si moltiplica per trenta.
-  E IL PROPRIETARIO LO VEDE SENZA IL GESTO (ago 2026, e questa voce
-  CHIUDE l'imperfezione che stava qui — «il contatore vive attaccato
-  al barattolino, quindi sui propri annunci non compare»): il numero
-  torna, il bottone no. Giudice `saversMio(l)` con le guardie
-  ROVESCIATE di `bottoneJar` (il pattern di `bottoneRifornisci`: è un
-  GIUDICE, e vale ovunque quella card o quella riga capiti di essere
-  disegnata) e TRE RESE, il patto di luogoTesto/Punto/Riga —
-  `saversPunto` (la coda « · 🫙 N» delle righe elenco), `saversCard`
-  (il gruppo in card) e `saversFrase` (la frase intera nella scheda).
+  E IL PROPRIETARIO LO VEDE (ago 2026, e questa voce CHIUDE
+  l'imperfezione che stava qui — «il contatore vive attaccato al
+  barattolino, quindi sui propri annunci non compare»). Giudice
+  `saversMio(l)` — è un GIUDICE e non un flag di render, vale ovunque
+  quella riga capiti di essere disegnata — con DUE rese, il patto di
+  luogoTesto/Punto/Riga: `saversPunto` (la coda « · 🫙 N» delle righe
+  elenco) e `saversFrase` (la frase intera nella scheda).
+  IL BARATTOLINO TORNA IL BOTTONE DI SEMPRE ANCHE SUI PROPRI ANNUNCI
+  (decisione di Andrea che ROVESCIA la guardia storica di
+  `bottoneJar`, e con lei metà di questa voce: il primo giro il numero
+  l'aveva vestito da DATO apposta, e la ragione resta buona — un
+  cerchietto che non fa niente si legge come rotto). La risposta nuova
+  non è togliere il gesto, è SPIEGARLO: stesso cerchietto e stessa
+  resa degli annunci altrui, e al tocco `avvisoBarattoloMio()` apre il
+  foglio di casa in modo AVVISO — «non puoi mettere un tuo annuncio
+  nel barattolo», più cos'è il numero lì accanto. Il vetro resta VUOTO
+  per costruzione (nel proprio barattolo quell'annuncio non entra, e
+  `preferiti` non lo contiene), cioè esattamente la resa di un
+  annuncio altrui non ancora salvato.
+  L'AVVISO È LA CONFERMA DEGENERE, e vive dentro `#confermaSheet`
+  invece di essere un quarto foglio: `avviso:true` nasconde il
+  ripensamento (due bottoni per lo stesso niente sono un bivio senza
+  risposta giusta) e dà all'azione un NIENTE VERO — `eseguiConferma`
+  esce subito su un'azione mancante, quindi senza quel `()=>{}` il
+  bottone non chiuderebbe il foglio. Il censimento dei chiamanti sale
+  a cinque.
+  LA SOGLIA VIVE IN UN GIUDICE SOLO, `contaJar(l)` = `saversMio(l) ||
+  contaSavers(l.barattoli)`: il proprio conta da UNO, quello degli
+  altri da DUE. Due soglie in due posti direbbero due numeri diversi
+  sullo stesso annuncio.
+  E IL BARATTOLINO PROPRIO NON SI FA RISCRIVERE ADDOSSO: porta
+  `data-mio` e `aggiornaJarCards` lo SALTA — quel ripasso rimette a
+  tutti il titolo «Metti nel barattolo», che qui sarebbe una promessa
+  che il tocco poi nega. Più la CINTURA in `togglePreferito` per le
+  altre strade (il cassetto, un id da un'altra vista): stesso avviso,
+  nessuna richiesta al server.
+  ASIMMETRIA DICHIARATA: la regola è del CLIENT. `toggle_preferito`
+  sul server accetta ancora il proprio annuncio (esclude solo l'avviso
+  «ha fatto colpo»), e nessun client la produce — se un giorno la si
+  vuole vera, sono due righe.
+  L'ANGOLO IN ALTO A DESTRA DELLA CARD È DI UNO SOLO DEI DUE: sui
+  propri ESAURITI vince il RIFORNIMENTO (`const jar = rif ? '' : …`),
+  perché lì è l'unica cosa che si può fare e la card resta a DUE
+  bersagli, mai tre. Il conteggio non si perde: lo dicono la riga di
+  «I tuoi annunci» e la frase nella scheda, che è anche dove vive
+  «Rifornisci». La regola sta nella CARD e non dentro `bottoneJar`,
+  perché è la card ad avere un angolo solo — nel dettaglio il
+  rifornimento è un bottone della colonna e il barattolino sta sulla
+  foto, e convivono (verificato dal vivo: pastiglia «24», bottone e
+  frase insieme).
   IL DATO NON COSTA NIENTE: `arricchisci_righe_vetrina` conta su
   TUTTE le righe senza guardare il venditore, e ci passano anche
   `/api/listings/miei` e `/api/listings/{id}` — era già in mano al
@@ -9658,42 +9699,34 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (è un fatto suo) e non si moltiplica per trenta in una griglia di
   estranei. Lo ZERO non scrive niente, che uno «0» su ogni riga è
   rumore e l'assenza lo dice da sé.
-  NESSUNA DELLE TRE RESE È UN BOTTONE, ed è la riga da non
-  ammorbidire: il vetro dentro un cerchietto di carta
-  (`.card-jar`/`.jar-btn`) È il registro di ciò che si tocca, la
-  stessa icona come testo nudo in una riga meta è un fatto — come il
-  « · 📍 Carmagnola (TO)» di `luogoPunto`. Niente cerchio, niente
-  ombra, niente onclick, niente cursor: un'icona che sembra toccabile
-  e non lo è è peggio di niente.
-  IN CARD È UNO SCAMBIO COL COMUNE, NON UN'AGGIUNTA (decisione presa
-  MISURANDO, e il numero è la parte da tenere): come TERZO elemento,
-  a 320px il comune scendeva a 15px — illeggibile — già con due
-  strade, e col caso pieno (tre strade + «gratis») la riga sforava di
-  19px FUORI dalla card. Lo scambio non costa un pixel e non può
-  stare peggio di oggi per nessuno; il perché è che la riga meta è
-  per CHI COMPRA — «è vicino a me?» — e il comune sulla propria card
-  l'ha scritto il venditore. Le ICONE restano: sono l'unica cosa di
-  quella riga che gli dice ancora qualcosa a colpo d'occhio (ho messo
-  la spedizione su questo?). Il comune cede il posto SOLO quando c'è
-  un numero da dire: a zero salvataggi la card è quella di sempre.
-  IL NUMERO NON SI STRINGE MAI (`flex:0 0 auto` + nowrap): un numero
-  troncato non è un numero abbreviato, è un numero SBAGLIATO —
-  «🫙 12…» per 128. Se un giorno lo spazio manca davvero, a cedere
-  dev'essere altro.
-  IMPERFEZIONE DICHIARATA, misurata: nel caso pieno a 320px — tre
-  strade + «gratis» + un conteggio a tre cifre — il gruppo delle
-  icone finisce 1,3px oltre il bordo della card (la riga resta UNA,
-  la pagina non scorre di lato). Guardato a schermo: non si vede. È
-  raro per costruzione (zero annunci su 858 in locale hanno quella
-  combinazione), e la leva se un giorno mordesse è togliere la parola
-  «gratis» sulle sole card proprie, che vale 24px ed è un'altra cosa
-  che il venditore sa già.
+  LE DUE RESE FUORI DAL BOTTONE NON SONO TOCCABILI, e adesso il
+  confine è netto: il vetro dentro un cerchietto di carta
+  (`.card-jar`/`.jar-btn`) È il bottone — e sui propri annunci
+  risponde col foglio, invece di non fare niente —, la stessa icona
+  come testo nudo in una riga di elenco è un fatto, come il
+  « · 📍 Carmagnola (TO)» di `luogoPunto`.
+  LA RIGA META DELLA CARD NON SA NIENTE DEL CONTEGGIO, e il comune
+  resta al suo posto per tutti. Vale la pena tenere il giro
+  precedente, perché è la misura che dice PERCHÉ nella riga meta quel
+  numero non ci sta: come TERZO elemento, a 320px il comune scendeva
+  a 15px — illeggibile — già con due strade, e col caso pieno (tre
+  strade + «gratis») la riga sforava di 19px FUORI dalla card. Si era
+  risolto scambiandolo col comune (la riga meta è per CHI COMPRA, e
+  il comune sulla propria card l'ha scritto il venditore), ed era una
+  soluzione onesta con un residuo di 1,3px oltre il bordo. Col
+  barattolino rimesso il problema NON ESISTE PIÙ: il numero è tornato
+  dentro la sua pastiglia sulla foto, dove sta da sempre per gli
+  annunci altrui, e la riga meta non guadagna né perde un pixel. Chi
+  un domani volesse rimettere una cifra là dentro rilegga quei
+  numeri prima.
   LA FRASE INTERA vive nella scheda del proprietario e sta IN TESTA
   al blocco, prima dei tre rami (normale, asta, esaurito): così la
   ereditano tutti e tre e non c'è un quarto posto da ricordarsi il
   giorno che i rami diventano quattro. È lei a insegnare cosa vuol
-  dire il numero, sennò il « · 🫙 N» delle righe resta muto la prima
-  volta. Sull'ESAURITO è anche l'ordine che racconta meglio — N
+  dire il numero — il « · 🫙 N» delle righe e la pastiglia sul
+  proprio annuncio restano muti la prima volta che li si incontra —
+  e per questo RESTA anche adesso che il barattolino è tornato: nella
+  scheda le due cose si vedono insieme, e la seconda spiega la prima. Sull'ESAURITO è anche l'ordine che racconta meglio — N
   persone lo vogliono → è finito → «🔄 Rifornisci» — cioè il numero
   arriva PRIMA della ragione. Superficie NEUTRA (`nota-savers`, lo
   stesso selettore di `nota-punto`: un posto solo per due nomi) e non
@@ -12941,29 +12974,37 @@ a VALORE acceso — le sue card sopra soglia cambiano prezzo in vetrina,
 ed è la cosa più visibile del cantiere.
 
 Il conteggio dei barattoli torna al proprietario (ago 2026): sui propri
-annunci il barattolino non nasce, e col bottone se ne andava il numero —
-cioè proprio il dato che al venditore interessa. Adesso c'è in tre
-posti — la riga di «📋 I tuoi annunci», la scheda del proprio annuncio
-(la frase intera, che insegna cosa vuol dire il numero) e la card in
-vetrina — senza il gesto: si legge quante persone l'hanno messo via, ma
-nel proprio barattolo non ci si può mettere niente. Soglia UNO (decisione
-di Andrea: al proprietario «1 persona» è un dato vero) e lo zero non
-scrive niente. IL DATO ERA GIÀ IN MANO AL CLIENT — il server lo conta su
-tutte le righe senza guardare il venditore — quindi zero query, zero
-campi, zero server. In card è uno SCAMBIO col comune e non un'aggiunta,
-e la ragione è misurata: come terzo elemento a 320px la riga sforava di
-19px fuori dalla card. Vedi Architettura, «E IL PROPRIETARIO LO VEDE
-SENZA IL GESTO», per la regola del numero che non si tronca mai e per
-l'imperfezione dichiarata che resta (1,3px oltre il bordo nel caso pieno
-a 320px, zero annunci su 858). Collaudato: 3053 prove verdi (23 nuove) e
-DODICI mutazioni una per riga sorvegliata, ognuna rossa da sola; più il
-giro dal vivo via CDP a 320/360/375 nei due temi, dai due lati (col
-compratore la vetrina è quella di ieri, comune e pastiglia pubblica
-comprese) — ed è lì che è saltato fuori il difetto del cantiere: un
-commento CSS aperto con «\*» invece di «/*» che si era mangiato la
-regola dopo, `.nota-punto` compresa. Da quel guasto è nata
-`prove_commenti_css`. IN PRODUZIONE basta il deploy: nessuna colonna,
-nessuna migrazione, nessuna leva, nessuna rotta.
+annunci il barattolino non nasceva, e col bottone se ne andava il numero
+— cioè proprio il dato che al venditore interessa. Adesso c'è in tre
+posti: la riga di «📋 I tuoi annunci», la scheda del proprio annuncio (la
+frase intera, che insegna cosa vuol dire il numero) e la CARD, dentro la
+pastiglia del barattolino. Soglia UNO (decisione di Andrea: al
+proprietario «1 persona» è un dato vero) e lo zero non scrive niente. IL
+DATO ERA GIÀ IN MANO AL CLIENT — il server lo conta su tutte le righe
+senza guardare il venditore — quindi zero query, zero campi, zero
+server: il cantiere è solo client.
+IN DUE GIRI, e il secondo va letto col primo. Nato col numero vestito da
+DATO e il barattolino ancora assente (un cerchietto che non fa niente si
+legge come rotto), è stato ROVESCIATO da Andrea: **il bottone c'è, e il
+tocco SPIEGA** — stessa resa degli annunci altrui, e il foglio di casa in
+modo AVVISO dice «non puoi mettere un tuo annuncio nel barattolo». Col
+bottone il numero è tornato nella sua pastiglia e la riga meta della card
+è quella di sempre, comune compreso: lo scambio col comune del primo giro
+non serve più, e con lui è sparito il residuo di 1,3px oltre il bordo.
+Restano la riga di «I tuoi annunci» e la frase nella scheda. Vedi
+Architettura, «E IL PROPRIETARIO LO VEDE», anche per l'angolo della card
+che sui propri esauriti resta del rifornimento, e per l'asimmetria
+dichiarata (la regola è del client: il server accetta ancora il proprio
+annuncio nel proprio barattolo).
+Collaudato: 3064 prove verdi (34 nuove) e mutazioni una per riga
+sorvegliata; più il giro dal vivo via CDP a 320/360/375 nei due temi e
+dai due lati — col compratore la vetrina è quella di ieri, e sul proprio
+il tocco apre il foglio con **zero POST** partite e i preferiti
+invariati. Nel primo giro è saltato fuori il difetto che ha insegnato di
+più: un commento CSS aperto con «\*» invece di «/*» si era mangiato la
+regola dopo, `.nota-punto` compresa — da lì è nata `prove_commenti_css`.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 E l'ORDINA torna a TRE VOCI (ago 2026, decisione di Andrea): più

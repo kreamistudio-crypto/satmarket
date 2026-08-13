@@ -3727,12 +3727,14 @@ def prove_savers_proprietario():
        valgono) e lo ZERO non scrive niente;
     2) le guardie sono ROVESCIATE: e' un dato del PROPRIETARIO, e a
        chiunque altro il giudice risponde zero;
-    3) NESSUNA delle tre rese e' un bottone — un'icona che sembra
-       toccabile e non lo e' e' peggio di niente;
-    4) in card e' uno SCAMBIO col comune e non un'aggiunta (misurato:
-       come terzo elemento, a 320px la riga sforava fuori dalla card);
-    5) il numero NON SI STRINGE MAI: un numero troncato non e' un
-       numero abbreviato, e' un numero sbagliato."""
+    3) sui PROPRI annunci il barattolino C'E' (decisione di Andrea che
+       ha rovesciato la guardia di sempre) e il tocco SPIEGA col foglio
+       di casa invece di non fare niente;
+    4) le due rese fuori dal bottone non sono toccabili — un'icona che
+       sembra toccabile e non lo e' e' peggio di niente;
+    5) l'angolo in alto a destra della card resta di UNO solo: sui
+       propri esauriti vince il rifornimento, e la card non guadagna
+       mai un terzo bersaglio."""
     print("\n[il conteggio visto dal proprietario]")
     src = open("miniapp.html", encoding="utf-8").read()
 
@@ -3747,14 +3749,60 @@ def prove_savers_proprietario():
           "DEMO || VETRINA || !myTgId" in g)
     prova("la soglia del proprietario NON e' quella pubblica", True,
           "contaSavers" not in g and "SOGLIA_SAVERS" not in g)
-    # lo zero non scrive niente: tutte e tre le rese sono gated su `n`
-    for nome in ("saversPunto", "saversCard", "saversFrase"):
+    # lo zero non scrive niente: tutte e due le rese sono gated su `n`
+    for nome in ("saversPunto", "saversFrase"):
         c = fun(nome)
         prova(f"{nome}: lo zero non scrive niente", True,
               "n ?" in c or "if (!n) return ''" in c)
         prova(f"{nome}: non e' un bottone", [],
               [s for s in ("onclick", "<button", "cursor:pointer")
                if s in c])
+    prova("la resa in card e' morta col ritorno del barattolino", True,
+          "function saversCard" not in src and ".card .meta .savers" not in src)
+
+    # IL BOTTONE C'E' ANCHE SUI PROPRI ANNUNCI, e il tocco spiega
+    b = fun("bottoneJar")
+    prova("il barattolino nasce anche sui propri annunci", True,
+          "l.sellerId===myTgId) return ''" not in b
+          and "l.sellerId === myTgId) return ''" not in b)
+    prova("...e in DEMO e in vetrina continua a non nascere", True,
+          "if (DEMO || VETRINA || !myTgId) return ''" in b)
+    prova("sul proprio il tocco apre l'avviso, non il toggle", True,
+          "mio ? 'avvisoBarattoloMio()'" in b)
+    prova("...e il titolo non promette un gesto che non c'e'", True,
+          "mio ? 'Quante persone" in b)
+    a = fun("avvisoBarattoloMio")
+    prova("l'avviso passa dal foglio di casa", True, "chiediConferma(" in a)
+    prova("...in modo avviso: un bottone solo, niente da confermare",
+          True, "avviso: true" in a)
+    prova("...e non da un dialogo di sistema", [],
+          [s for s in ("alert(", "confirm(", "prompt(") if s in a])
+    cc = fun("chiediConferma")
+    prova("il foglio in modo avviso nasconde il ripensamento", True,
+          "el('confNo').style.display = c.avviso ? 'none' : ''" in cc)
+    prova("...e l'azione vuota esiste davvero (o il bottone non "
+          "chiuderebbe)", True, "c.avviso ? (()=>{}) : null" in cc)
+    # la cintura: le altre strade dicono la stessa cosa
+    t = fun("togglePreferito")
+    prova("togglePreferito non parte sul proprio annuncio", True,
+          "avvisoBarattoloMio(); return;" in t)
+    # una soglia sola per il bottone e per la riga
+    cj = fun("contaJar")
+    prova("il numero del bottone passa dal giudice del proprietario",
+          True, "saversMio(l) || contaSavers(" in cj)
+    prova("...e il bottone chiama LUI, non contaSavers a mano", True,
+          "const n = contaJar(l);" in b and "contaSavers" not in b)
+    # il barattolino proprio non si fa riscrivere il titolo addosso
+    aj = fun("aggiornaJarCards")
+    prova("il ripasso dei barattolini salta i propri", True,
+          "if (b.dataset.mio) return;" in aj)
+    prova("...e il bottone si marca da se'", True, 'data-mio="1"' in b)
+
+    # L'ANGOLO DELLA CARD E' DI UNO SOLO DEI DUE
+    i = src.index("const rif = bottoneRifornisci(l);")
+    coda = src[i:i + 160]
+    prova("sui propri esauriti l'angolo resta del rifornimento", True,
+          "const jar = rif ? ''" in coda)
     # la frase e' l'unica che insegna cosa vuol dire il numero
     f = fun("saversFrase")
     prova("la frase nomina il barattolo", True,
@@ -3764,20 +3812,13 @@ def prove_savers_proprietario():
     prova("...e veste la superficie NEUTRA, non il verde della fiducia",
           True, "trust-note nota-savers" in f)
 
-    # IN CARD E' UNO SCAMBIO: o il conteggio o il comune, mai i due
+    # la riga meta della card e' tornata quella di sempre: il comune
+    # resta al suo posto per tutti, e il numero vive nella pastiglia
     i = src.find('<div class="meta">')
     riga = src[i:i + 200] if i >= 0 else ""
-    prova("in card il conteggio prende il POSTO del comune", True,
-          '${saversCard(l)\n          || `<span class="luogo">' in riga)
-    prova("...e la riga meta resta a due figli", 1,
-          riga.count('class="luogo"'))
-    # il numero non si stringe: se un giorno lo spazio manca davvero,
-    # a cedere dev'essere altro — mai la cifra
-    i = src.index(".card .meta .savers{")
-    css = src[i:src.index("}", i)]
-    prova("il numero non si stringe mai", True, "flex:0 0 auto" in css)
-    prova("...e non va a capo dentro la sua scatola", True,
-          "white-space:nowrap" in css)
+    prova("in card il comune non cede il posto a nessuno", True,
+          '<div class="meta"><span class="luogo">${luogoTesto(l)}'
+          '</span>${iconeCard(l)}</div>' in riga)
 
     # la riga di «I tuoi annunci» e la scheda del proprietario
     prova("«I tuoi annunci» porta il conteggio in coda alla meta", True,
@@ -11936,12 +11977,14 @@ def prove_fogli_di_casa():
     prova("chiusura MIRATA, mai closeSheet", True,
           "confermaSheet').classList.remove('open')" in esegui
           and "closeSheet()" not in esegui)
-    # I QUATTRO CHIAMANTI di oggi (i tre delle offerte + l'annullo
-    # della modifica, ago 2026). Il conto e' la prova che il generico
-    # e' davvero condiviso: se qualcuno si scrive un foglio suo, CALA
-    # — ed e' quello il verso da sorvegliare. Cresce a mano quando un
-    # gesto nuovo lo adotta, come il censimento delle leve-lista.
-    prova("i gesti che passano dalla domanda unica sono quattro", 4,
+    # I CINQUE CHIAMANTI di oggi (i tre delle offerte, l'annullo della
+    # modifica, e dall'ago 2026 l'AVVISO del barattolino sul proprio
+    # annuncio — che e' la conferma degenere: un bottone solo e niente
+    # da confermare). Il conto e' la prova che il generico e' davvero
+    # condiviso: se qualcuno si scrive un foglio suo, CALA — ed e'
+    # quello il verso da sorvegliare. Cresce a mano quando un gesto
+    # nuovo lo adotta, come il censimento delle leve-lista.
+    prova("i gesti che passano dalla domanda unica sono cinque", 5,
           solo_codice(mini).count("chiediConferma({"))
     for chi, dove in (("il ritiro", "function ritiraOfferta("),
                       ("accetta e rifiuta", "function rispondiOfferta(")):

@@ -842,9 +842,11 @@
     padding:3px 9px;font-size:11.5px;font-weight:800;
     display:flex;align-items:center;gap:5px;
     box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  /* Il rifornimento sulla card: prende posto e materia dal
-     barattolino che li' non c'e' (vedi bottoneRifornisci) — pastiglia
-     e non cerchietto perche' porta una parola. */
+  /* Il rifornimento sulla card: stesso posto e stessa materia del
+     barattolino — pastiglia e non cerchietto perche' porta una
+     parola. Da quando il barattolino c'e' anche sui propri annunci
+     (ago 2026) quel posto se lo contendono in due, e li' vince il
+     rifornimento: la regola sta in cardHTML. */
   .card-rifornisci{position:absolute;top:8px;right:8px;z-index:2;
     border:0;cursor:pointer;border-radius:999px;padding:5px 10px;
     background:rgba(255,248,234,.92);color:#23282C;
@@ -1170,20 +1172,6 @@
     text-overflow:ellipsis;white-space:nowrap}
   .card .meta .ico{flex:0 0 auto;display:flex;align-items:center;gap:3px;
     line-height:1}
-  /* Il conteggio dei barattoli sui PROPRI annunci (ago 2026): sta nello
-     slot del comune, a sinistra, e non e' un'aggiunta — e' uno scambio
-     (vedi cardHTML). NON SI STRINGE MAI, ed e' la riga da non
-     ammorbidire: un numero troncato non e' un numero abbreviato, e'
-     un numero SBAGLIATO («🫙 12…» per 128). Se un giorno lo spazio
-     manca davvero, a cedere dev'essere altro — mai la cifra.
-     E non e' toccabile: qui il vetro e' testo, non bottone (il
-     cerchietto di carta e' l'altro registro). La cifra in mono come
-     tutte le cifre di casa, un filo piu' piccola del testo della
-     riga: e' un dato, non il protagonista. */
-  .card .meta .savers{flex:0 0 auto;display:flex;align-items:center;
-    gap:2px;line-height:1;white-space:nowrap;
-    font-family:'JetBrains Mono',monospace;
-    font-size:10.5px;font-weight:700}
   /* La spedizione gratuita in card: la 🚚 di sempre con accanto la
      parola «gratis», nel BLU DEL TESTO del badge (--ship-soft-on:
      stessa famiglia, e in card il testo si legge dove un fondo chiaro
@@ -4365,7 +4353,12 @@ document.getElementById('cartello')?.remove();</script>
     <div id="confCorpo" style="font-size:13px;color:var(--muted);font-weight:600;
       line-height:1.5;margin-bottom:14px"></div>
     <button class="btn orange" id="confOk" onclick="eseguiConferma(this)">Conferma</button>
-    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+    <!-- L'AVVISO E' LA CONFERMA DEGENERE (ago 2026): un foglio che non
+         chiede niente — un bottone solo, e chiudere E' l'azione. Il
+         ripensamento qui sparisce, che due bottoni per lo stesso
+         niente sono un bivio senza risposta giusta. Un modo del foglio
+         che c'e', non un quarto foglio: e' il patto di questa sezione. -->
+    <button class="btn ghost" id="confNo" onclick="navIndietro()">Annulla</button>
   </div>
 
   <!-- ============ SHEET: LA PRIMA SPEDIZIONE ============ -->
@@ -6864,12 +6857,20 @@ const cardHTML = l => {
      (bottoneJar, ago 2026) — «stessa icona delle card, non una
      copia». stopPropagation: il tocco sul barattolino non apre il
      dettaglio. */
-  const jar = bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
-  /* Sui PROPRI esauriti il barattolino tace per costruzione (bottoneJar
-     esce sui propri annunci), quindi quel posto e' libero: e' il
-     motivo per cui questo bottone puo' esistere senza dare alla card
-     un terzo bersaglio. */
+  /* L'ANGOLO IN ALTO A DESTRA E' DI UNO SOLO DEI DUE, e da quando il
+     barattolino c'e' anche sui propri annunci (ago 2026) la regola va
+     detta qui invece di cadere da se': sui propri ESAURITI vince il
+     RIFORNIMENTO — quello e' l'unica cosa che li' si puo' fare, e la
+     card resta a DUE bersagli, mai tre. Il conteggio non si perde: sul
+     proprio esaurito lo dicono la riga di «I tuoi annunci» e la frase
+     nella scheda, che e' anche dove vive «Rifornisci».
+     La regola sta nella CARD e non dentro bottoneJar, perche' e' la
+     card ad avere un angolo solo: nel dettaglio il rifornimento e' un
+     bottone della colonna e il barattolino sta sulla foto — li'
+     convivono senza pestarsi. */
   const rif = bottoneRifornisci(l);
+  const jar = rif ? ''
+    : bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
   /* LA CARD E' UN COLLEGAMENTO VERO (ago 2026): l'<a> avvolge foto e
      testo, i due BOTTONI restano fuori — contenuto interattivo dentro
      un <a> e' HTML non valido — mentre il badge di stato ${flash}, che
@@ -6890,22 +6891,13 @@ const cardHTML = l => {
       </div>
       <div class="info">
         <div class="title">${esc(l.title)}</div>
-        ${/* SULLA TUA CARD IL POSTO DEL COMUNE LO PRENDE IL CONTEGGIO
-             (ago 2026), e non si aggiunge un terzo elemento: la riga
-             meta e' per CHI COMPRA — «e' vicino a me?» — e il comune
-             sulla propria card l'ha scritto lui, quindi non gli dice
-             niente. Cosi' la riga non guadagna un pixel e non puo'
-             stare peggio di oggi per nessuno.
-             MISURATO prima di sceglierlo: come TERZO elemento, a 320px
-             il comune scendeva a 15px (illeggibile) gia' con due
-             strade, e col caso pieno — tre strade + «gratis» — la riga
-             sforava di 19px fuori dalla card. Le icone restano: sono
-             l'unica cosa di quella riga che al venditore dice ancora
-             qualcosa a colpo d'occhio (ho messo la spedizione su
-             questo?). Sugli annunci altrui saversCard torna vuoto e la
-             riga e' quella di sempre, comune compreso. */''}
-        <div class="meta">${saversCard(l)
-          || `<span class="luogo">${luogoTesto(l)}</span>`}${iconeCard(l)}</div>
+        ${/* La riga meta non sa niente del conteggio, ed e' tornata
+             quella di sempre (ago 2026): col barattolino rimesso sui
+             propri annunci il numero vive dentro la sua PASTIGLIA
+             sulla foto — dove sta da sempre per gli annunci altrui —
+             e qui non c'e' piu' niente da scambiare. Il comune resta
+             al suo posto per tutti. */''}
+        <div class="meta"><span class="luogo">${luogoTesto(l)}</span>${iconeCard(l)}</div>
       </div>
       </a>${jar}${rif}
     </div>`; };
@@ -12717,13 +12709,18 @@ async function inviaRisposta(id, azione, importo){
 let confermaAzione = null;
 function chiediConferma(c){
   haptic();
-  confermaAzione = c.poi;
+  /* Con `avviso` non c'e' niente da eseguire: l'azione e' un niente
+     che chiude, e serve VERA — `eseguiConferma` esce subito su
+     un'azione mancante, quindi senza questa riga il bottone di un
+     avviso non farebbe nulla e il foglio non si chiuderebbe piu'. */
+  confermaAzione = c.poi || (c.avviso ? (()=>{}) : null);
   el('confTit').textContent = c.titolo || 'Confermi?';
   const testata = el('confTestata');
   testata.innerHTML = c.testata || '';
   testata.style.display = c.testata ? '' : 'none';
   el('confCorpo').textContent = c.corpo || '';
   el('confOk').textContent = c.etichetta || 'Conferma';
+  el('confNo').style.display = c.avviso ? 'none' : '';
   el('sheetBg').classList.add('open');
   el('confermaSheet').classList.add('open');
 }
@@ -16698,18 +16695,56 @@ function jarSVG(livello, misura){
    vetro vuoto da salvare, pieno da salvato — e mai quello del
    barattolo intero: il riempimento a scatti nel dettaglio non si
    capiva, e adesso l'icona dice la stessa cosa dappertutto.
-   Guardie: mai in DEMO/VETRINA, mai sui propri annunci. */
+   SUI PROPRI ANNUNCI IL BOTTONE C'E' (ago 2026, decisione di Andrea
+   che ROVESCIA la guardia di sempre — e il perche' di ieri resta
+   buono, tanto che era stato il motivo di vestire il numero da dato:
+   un cerchietto che non fa niente si legge come rotto. La risposta
+   nuova non e' toglierlo, e' SPIEGARLO: il gesto c'e', stessa resa
+   degli annunci altrui, e al tocco il foglio dice perche' non si
+   puo'. Il numero cosi' torna dov'e' sempre stato — dentro la
+   pastiglia — invece di cercarsi un posto suo nella riga meta.
+   Il vetro resta VUOTO per costruzione: il proprio annuncio nel
+   proprio barattolo non ci finisce mai, quindi `preferiti` non lo
+   contiene e il livello e' lv0 — cioe' esattamente la resa di un
+   annuncio altrui non ancora salvato, che e' quel che si voleva.
+   Guardie rimaste: mai in DEMO/VETRINA. */
 function bottoneJar(l, classe, misura, prima){
-  if (DEMO || VETRINA || !myTgId || l.sellerId===myTgId) return '';
+  if (DEMO || VETRINA || !myTgId) return '';
+  const mio = l.sellerId === myTgId;
   const sal = preferiti.has(l.id);
-  const n = contaSavers(l.barattoli);
+  const n = contaJar(l);
+  const t = mio ? 'Quante persone l\'hanno messo nel barattolo'
+    : sal ? 'Togli dal barattolo' : 'Metti nel barattolo';
   return `<button class="${classe}${sal?' salvato':''}${n?' con-conta':''}"`
-    + ` data-id="${l.id}" onclick="${prima||''}togglePreferito(${l.id})"`
-    + ` title="${sal?'Togli dal barattolo':'Metti nel barattolo'}"`
-    + ` aria-label="${sal?'Togli dai preferiti':'Salva tra i preferiti'}">`
+    + ` data-id="${l.id}"${mio ? ' data-mio="1"' : ''} onclick="${prima||''}`
+    + `${mio ? 'avvisoBarattoloMio()' : `togglePreferito(${l.id})`}"`
+    + ` title="${t}" aria-label="${t}">`
     + jarSVG(sal?4:0, misura)
     + (n ? `<span class="jar-conta">${fmt(n)}</span>` : '')
     + `</button>`;
+}
+/* Il numero dentro la pastiglia, con le DUE soglie in una riga sola:
+   il proprio conta da UNO (e' un fatto suo), quello degli altri da
+   DUE (una prova sociale, che a «1» non e' ancora tale e in griglia
+   si moltiplica per trenta). Un giudice solo, o il bottone e la riga
+   di «I tuoi annunci» direbbero due numeri diversi sullo stesso
+   annuncio. */
+function contaJar(l){
+  return saversMio(l) || contaSavers(l.barattoli);
+}
+/* Il tocco sul proprio barattolino: NON un dialogo di sistema ma il
+   foglio di casa, in modo AVVISO — un bottone solo, niente da
+   confermare. Dice le due cose insieme: perche' il gesto non si puo'
+   fare, e che cos'e' il numero li' accanto. */
+function avvisoBarattoloMio(){
+  chiediConferma({
+    avviso: true,
+    titolo: '🫙 È il tuo annuncio',
+    corpo: "Non puoi mettere un tuo annuncio nel barattolo: il 🫙 "
+      + "serve a chi compra per ritrovare al volo le cose che gli "
+      + "piacciono. Il numero qui accanto dice quante persone hanno "
+      + "messo questo annuncio nel loro.",
+    etichetta: 'Ho capito'});
 }
 /* IL RIFORNIMENTO SULLA CARD (ago 2026), gemello di bottoneJar e con
    le sue stesse guardie ROVESCIATE: il barattolino tace sui PROPRI
@@ -16739,39 +16774,37 @@ const SOGLIA_SAVERS = 2;
 const contaSavers = n => (n|0) >= SOGLIA_SAVERS ? (n|0) : 0;
 
 /* ---- LO STESSO NUMERO, VISTO DAL PROPRIETARIO (ago 2026) ----
-   Il barattolino non nasce sui propri annunci (bottoneJar), e col
-   bottone se ne andava anche il conteggio — cioe' proprio il dato che
-   al venditore interessa. Qui il numero torna, SENZA il gesto: si
-   legge quante persone l'hanno messo via, ma nel proprio barattolo
-   non ci si puo' mettere niente.
+   Quante persone hanno messo via un MIO annuncio: il dato che al
+   venditore interessa e che prima non si vedeva da nessuna parte,
+   perche' il conteggio viveva attaccato al barattolino e li' il
+   barattolino non nasceva. Ora il bottone c'e' (vedi bottoneJar) e
+   questo giudice serve i due posti dove il numero si legge SENZA di
+   lui: la riga di «I tuoi annunci» e la frase nella scheda. Piu'
+   contaJar, che da qui prende la soglia del proprietario.
    LA SOGLIA E' UNO, e non due: le due ragioni della soglia pubblica
    qui non valgono — «1» non deve essere una prova sociale (e' un
    fatto suo) e non si moltiplica per trenta in una griglia di
    estranei. Lo ZERO non scrive niente: uno «0» su ogni riga e' rumore,
    e l'assenza lo dice da se'.
-   Guardie ROVESCIATE rispetto a bottoneJar, come in bottoneRifornisci:
-   e' un GIUDICE, e vale ovunque questa card o questa riga capiti di
-   essere disegnata. In DEMO myListings non passa dal server e
-   `barattoli` non c'e': la riga sparisce da sola, senza un ramo. */
+   E' un GIUDICE e non un flag di render: vale ovunque quella riga
+   capiti di essere disegnata. In DEMO myListings non passa dal server
+   e `barattoli` non c'e': la riga sparisce da sola, senza un ramo. */
 function saversMio(l){
   if (DEMO || VETRINA || !myTgId || !l || l.sellerId !== myTgId) return 0;
   return l.barattoli | 0;
 }
-/* Tre rese per lo stesso fatto, il patto di luogoTesto/Punto/Riga —
-   e NESSUNA di loro e' un bottone: il vetro dentro un cerchietto di
-   carta (.card-jar/.jar-btn) E' il registro di cio' che si tocca,
-   la stessa icona come testo nudo in una riga meta e' un fatto, come
-   il « · 📍 Carmagnola (TO)» di luogoPunto. Niente cerchio, niente
-   ombra, niente onclick, niente cursor: un'icona che sembra toccabile
-   e non lo e' sarebbe peggio di niente. */
+/* DUE rese e non piu' tre (ago 2026): quella della card e' morta col
+   ritorno del barattolino, che il numero se l'e' ripreso dentro la
+   sua pastiglia — vedi bottoneJar. Restano la coda delle righe
+   elenco e la frase della scheda, il patto di luogoTesto/Punto/Riga.
+   Nessuna delle due e' toccabile, e adesso il confine e' netto: il
+   vetro dentro un cerchietto di carta E' il bottone (e sui propri
+   annunci risponde col foglio, invece di non fare niente), la stessa
+   icona come testo nudo in una riga di elenco e' un fatto — come il
+   « · 📍 Carmagnola (TO)» di luogoPunto. */
 function saversPunto(l){                  // coda delle righe elenco
   const n = saversMio(l);
   return n ? ` · 🫙 ${fmt(n)}` : '';
-}
-function saversCard(l){                   // il gruppo a destra in card
-  const n = saversMio(l);
-  return n ? `<span class="savers" title="Persone che l'hanno messo `
-    + `nel barattolo">🫙 ${fmt(n)}</span>` : '';
 }
 /* La FRASE INTERA vive nella scheda, dove c'e' posto: e' lei a
    insegnare cosa vuol dire il numero, sennò il « · 🫙 N» delle righe
@@ -16829,6 +16862,12 @@ async function caricaPreferiti(){
    mai, qualunque sia il punto da cui si e' toccato. */
 function aggiornaJarCards(){
   document.querySelectorAll('.card-jar,.jar-btn').forEach(b=>{
+    /* il barattolino di un annuncio PROPRIO non cambia mai: non entra
+       nel barattolo, quindi resta vuoto per sempre — e soprattutto il
+       suo titolo dice un'altra cosa («quante persone…»), che senza
+       questa riga verrebbe riscritto in «Metti nel barattolo», cioe'
+       una promessa che il tocco poi nega */
+    if (b.dataset.mio) return;
     const sal = preferiti.has(+b.dataset.id);
     b.classList.toggle('salvato', sal);
     b.title = sal ? 'Togli dal barattolo' : 'Metti nel barattolo';
@@ -16843,10 +16882,13 @@ function aggiornaJarCards(){
    somma a occhio. Tocca tutte le istanze di quell'id — la card in
    griglia e il cerchietto della scheda dicono lo stesso numero. */
 function aggiornaContaSavers(id, n){
-  const mostra = contaSavers(n);
   const l = listings.find(x=>x.id===id);
   if (l) l.barattoli = n|0;               // il catalogo resta in pari
   if (currentListing && currentListing.id===id) currentListing.barattoli = n|0;
+  /* la soglia dal giudice unico quando l'annuncio si conosce: oggi qui
+     ci arrivano solo gli ALTRUI (sul proprio il toggle non parte), ma
+     due soglie in due posti divergono al primo ramo nuovo */
+  const mostra = l ? contaJar(l) : contaSavers(n);
   document.querySelectorAll(
     `.card-jar[data-id="${id}"],.jar-btn[data-id="${id}"]`).forEach(b=>{
     b.classList.toggle('con-conta', !!mostra);
@@ -16863,6 +16905,15 @@ function aggiornaContaSavers(id, n){
 
 async function togglePreferito(id){
   haptic();
+  /* CINTURA: il proprio annuncio non entra nel proprio barattolo, e
+     chi tocca il barattolino di un suo annuncio passa gia' dall'avviso
+     (bottoneJar). Questa riga copre le altre strade — il cassetto dei
+     preferiti, un id arrivato da un'altra vista — e dice la stessa
+     cosa invece di far partire una richiesta che non ha senso. */
+  const suo = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
+  if (!DEMO && myTgId && suo && suo.sellerId === myTgId) {
+    avvisoBarattoloMio(); return;
+  }
   /* guardia di cortesia: da pieno non si parte nemmeno (la verita'
      resta la guardia del server, che copre gli altri dispositivi) */
   if (!preferiti.has(id) && contaBarattolo() >= MAX_PREFERITI) {
