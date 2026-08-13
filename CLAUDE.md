@@ -6022,12 +6022,39 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   due significati per la stessa parola nello stesso foglio sono il
   posto dove fra sei mesi si sbaglia riga. C'è la prova che «lampo»
   non ricompaia da questa parte.
-  PARTE SOLO ALLO SCATTO, e non serve una guardia nuova: la classe si
-  attacca DENTRO il ramo `scatto` di `barreCorri`, cioè dove la
-  pillola è `pill-trust` E la corsa avviene davvero — su una verde a
-  riposo la cattura vale 100 e il filtro dei 0.5 ha già fatto uscire
-  il giro. È una proprietà del filtro che c'era già; chi porta la
-  classe fuori da quel ramo la fa ripartire a ogni tocco.
+  PARTE SOLO ALLO SCATTO, E LA GUARDIA È LO STATO DI PRIMA (`!da.t`)
+  E NON LA CORSA (13 ago 2026, difetto dal campo: premendo lo stepper
+  VELOCE, una volta raggiunto il massimo, l'anello ripartiva a ogni
+  tocco finché non si mollava il dito). Qui c'era scritto il
+  contrario — «su una verde a riposo la cattura vale 100 e il filtro
+  dei 0,5 ha già fatto uscire il giro, è una proprietà del filtro che
+  c'era già» — ed era FALSO: quel corner l'avevo visto costruendo,
+  archiviato come accettabile, e poi la voce ha dichiarato l'opposto.
+  Una riga sbagliata in questo file è peggio di una riga che manca.
+  I NUMERI, CAMPIONATI e non dedotti (una raffica sullo stepper, la
+  cattura registrata a ogni tocco): la cattura vale 100 solo a corsa
+  FINITA. Nei primi due fotogrammi vale ancora la **PARTENZA** appena
+  scritta — il render successivo arriva prima del doppio rAF che mette
+  il bersaglio, quindi la corsa non è nemmeno cominciata — e per i
+  350ms dopo vale l'**INTERPOLATO**: misurati 82, 82, 83,57, 87,91,
+  94,26, 99,06 su tocchi a 0/16/50/120ms. Il filtro dei 0,5 morde solo
+  oltre i 350ms, cioè esattamente dove il difetto non c'era (a 300ms
+  di distanza l'impulso era già uno solo).
+  LA CURA È IL DATO CHE MANCAVA: `barreCattura` registra `t` — la
+  pillola di prima era `pill-trust`? — e la guardia diventa
+  `scatto && !da.t`. È un FATTO del DOM di prima e non cambia sotto le
+  dita: si passa da «non scattata» a «scattata» una volta sola, e il
+  ridisegno di una promessa già verde non è uno scatto per quanto in
+  fretta lo si chieda. Misurato dopo: UN impulso su tutte e sei le
+  cadenze, da 0 a 600ms. `t` NON si deduce da `p`, ed è tutto il
+  punto: `p` è la corsa, `t` è lo stato.
+  LA LEZIONE STA NELLA SENTINELLA DI IERI, che chiedeva la classe
+  «dentro il ramo dello scatto»: era VERA, è rimasta verde per tutto
+  il tempo, e certificava comunque il difetto — perché guardava DOVE
+  STA la riga e non COSA LA RIAPRE. Una sentinella sulla forma può
+  essere onesta e insufficiente insieme; quella che vale chiede il
+  DATO su cui la decisione poggia. Adesso rimettere la guardia di ieri
+  fa rossa una prova.
   DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea): la
   seconda parte quando la prima è a metà corsa
   (`IMPULSO_PASSO` 260ms), così si legge come un gesto in due battute
