@@ -3857,7 +3857,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   solo — e resta NERA. Chi sfoglia la vetrina vuole sapere se paga la
   spedizione, non perché: il fatto è lo stesso, quindi si dice allo
   stesso modo, e il verde resta libero di dire un'altra cosa (lo
-  sconto, vedi «IL VERDE DELLO SCONTO IN CARD»). Nessuna delle due
+  sconto, vedi «LO SCONTO CARRELLO SI VEDE IN VETRINA»). Nessuna delle due
   promesse si ripete in due lingue.
   Da qui `iconeCard` passa dal GIUDICE UNICO `spedGratis(l) ||
   spedGratisQui(l, 1)` invece del test a mano — che è anche ciò che
@@ -4813,52 +4813,142 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   regola di stato deve mai nominare `.unit` — se ne aggiungi una,
   falla finire sul solo `.price`. Verificato su 12 combinazioni
   (3 stati × 2 valute × 2 temi) in vetrina e nel dettaglio.
-  IL VERDE DELLO SCONTO IN CARD (ago 2026, decisione di Andrea):
-  quando un articolo raggiunge DA SOLO la soglia del carrello, il
-  prezzo lo dice — verde col contorno, il calco di lampo e asta:
-  `.card.in-sconto` più `--sconto-prezzo`. È l'unica delle due
-  promesse che prende un colore, e la ragione è che era l'unica SENZA
-  voce in card: la spedizione gratis ce l'ha già, ed è una PAROLA.
-  NIENTE BADGE sulla foto: quello slot è degli stati che ACCADONO
-  (⚡ 🔨 🌴), e qui non è successo niente — è una proprietà del prezzo,
-  quindi la dice il prezzo. E niente cifra: la soglia in card non si
-  nomina mai, la regola già pagata due volte.
-  IL GIUDICE È `scontoQui(l, qta)`, gemello di `spedGratisQui` — stessa
-  forma, stesse decisioni: la cifra è `artStima` (il MIN fra lampo e
-  accordo, il gemello di `_unitario_effettivo`), a cambio muto si tace,
-  in ferie e sull'esaurito nessun verdetto. L'unica differenza che
-  conta è che NON guarda `spedisce(l)`: lo sconto vale su ogni via — è
-  sugli articoli, non sulla strada — e il gate della via lo prende la
-  🚚 e non la 🎁.
-  A CRITERIO PEZZI IN CARD NON SCATTA MAI, e non è un'eccezione da
-  scrivere ma la formula che lo dice da sé: la card vale UN pezzo e il
-  minimo di una soglia a pezzi è 2. Il verde è di fatto delle sole
-  soglie a VALORE — e chi un giorno abbassasse quel minimo se lo
-  ritroverebbe acceso senza toccare niente, che è il verso giusto.
-  PRECEDENZA: il prezzo porta UN colore solo, e questo è l'ultimo della
-  catena (esaurito > ferie > asta > lampo > sconto). Con la lampo non
-  convive per costruzione — quel prezzo è già rosso, e per giunta
-  `artStima` applica la lampo, che può far SCENDERE sotto soglia — e
-  «Ne resta 1» invece CONVIVE: quello è un badge sulla foto, questo il
-  colore del prezzo, due slot diversi.
-  IL TOKEN È FISSO e vive solo lì: sul cartellino, che è di carta
-  chiara nei due temi — vale parola per parola la ragione di
-  `--lampo-tag` e `--asta-tag`, e il tema scuro non lo tocca. La
-  CORNICE invece riusa `--trust-text`, che l'inchiostro dei due temi ce
-  l'ha già: zero token nuovi. Il verde non è una tinta nuova nel
-  vocabolario — è già la lingua della PROMESSA SCATTATA nelle
-  `pill-trust` di Paga e del carrello.
+  LO SCONTO CARRELLO SI VEDE IN VETRINA (ago 2026, decisioni di
+  Andrea in due giri). Quando un articolo raggiunge DA SOLO la soglia
+  del negozio la card lo dice con lo STESSO MECCANISMO della lampo:
+  prezzo SCONTATO col listino barrato e badge verde in alto a
+  sinistra — «−15%», senza il fulmine, perché ⚡ vuol dire «a tempo» e
+  questo non scade. Lo stesso nella scheda. È l'unica delle due
+  promesse che prende un segno: la spedizione gratis ha già la sua
+  PAROLA in riga meta, e nessuna si ripete.
+  LA REGOLA, NELLA FORMA PIÙ SEMPLICE CHE ABBIAMO TROVATO (Andrea):
+  **è il CRITERIO a dire dove vale lo sconto — a VALORE conta la
+  cifra, quindi vale anche su un articolo solo; a PEZZI conta il
+  numero, quindi serve arrivare a più pezzi.** Nessuna eccezione da
+  ricordare, e in particolare nessuna regola speciale della vetrina:
+  la card vale un pezzo, e a un pezzo il criterio a pezzi non può
+  scattare perché il suo minimo è 2. Chi un giorno abbassasse quel
+  minimo se lo ritroverebbe acceso senza toccare niente.
+  IL PREZZO MOSTRATO HA UN GIUDICE SOLO, `prezzoMostrato(l)`: lo
+  chiamano la card, la scheda e il riscrittore del toggle valuta, e
+  tre copie della precedenza divergerebbero al primo ritocco.
+  `conSconto` è il gemello esatto di `conLampo` e ne copia
+  l'aritmetica, che è quella del server (`_sconto_pacco`: netto col
+  FLOOR, mai sotto 1 sat).
+  SI MOSTRA SEMPRE, anche quando la divisione non è esatta, e la
+  differenza con la pagina Paga è VOLUTA: là la cifra è un UNITARIO
+  scritto accanto a un TOTALE scontato, e se moltiplicando non torna
+  si legge come un guasto — per questo il server la manda solo quando
+  è intera. In vetrina il prezzo mostrato È il prezzo di un pezzo e
+  non c'è nessun totale accanto con cui fare la verifica; e la lampo,
+  che sconta da sempre col floor, non ha mai avuto un ramo di
+  esattezza. IMPERFEZIONE DICHIARATA: nella scheda con quantità >1
+  l'unitario scontato × pezzi può scostarsi di qualche sat dal netto
+  che Paga calcola sul totale (floor sull'unitario ≠ floor sul
+  totale) — invisibile, perché nella scheda non c'è un totale e in
+  Paga la cifra dell'unitario ha già il suo ramo di esattezza.
+  IL VERDETTO È A QUANTITÀ 1 anche nella scheda, dove i pezzi si
+  scelgono: la domanda è «questo articolo, DA SOLO, fa scattare lo
+  sconto?», il numero grande è un unitario, e così il prezzo non balla
+  sotto le dita a ogni ±. Il conto del carrello resta di Paga.
+  IL GIUDICE È `scontoQui(l, qta)`, gemello di `spedGratisQui` —
+  stessa forma, stesse decisioni: la cifra è `artStima` (il MIN fra
+  lampo e accordo), a cambio muto si tace, in ferie, sull'esaurito e
+  in ASTA nessun verdetto. L'unica differenza che conta è che NON
+  guarda `spedisce(l)`: lo sconto vale su ogni via — è sugli
+  articoli, non sulla strada — e il gate della via lo prende la 🚚.
+  PRECEDENZA: LA LAMPO VINCE, e non è un pareggio arbitrario — è la
+  regola del conto, dove `artStima` applica la lampo e lo sconto
+  misura QUEL prezzo, quindi una lampo generosa può far SCENDERE
+  l'articolo sotto la soglia. Quando la lampo finisce, l'articolo
+  torna al prezzo scontato normale: lo fa da solo il re-render della
+  scadenza, senza un ramo apposta. La catena intera è
+  esaurito > ferie > asta > lampo > sconto.
+  «NE RESTA 1» SI SPEGNE PER LO SCONTO, e questa riga ROVESCIA quella
+  del giro prima («convivono: due slot diversi»): era vera finché il
+  verde era solo un colore del prezzo, e ha smesso di esserlo il
+  giorno in cui ha preso un BADGE — adesso vorrebbero lo stesso
+  angolo, e due badge nello stesso angolo non si fanno. Vince lo
+  sconto, per la ragione della lampo: un prezzo più basso è un motivo
+  più forte per toccare, e la scarsità si dice comunque nella scheda.
+  I COLORI: il token `--sconto` è UNO e FISSO per DUE superfici — il
+  badge sulla foto e il prezzo sul cartellino — e per questo non si
+  tocca di notte (la regola di `--lampo`/`--lampo-tag` e
+  `--asta-tag`). La lampo di token ne ha due perché il suo badge vuole
+  un rosso meno cupo del cartellino; questo verde regge tutte e due
+  (7,7 col bianco del badge, 7,3 sulla carta). La CORNICE della card
+  riusa `--trust-text`, e il NUMERO GRANDE della scheda pure: lì il
+  numero sta sulla pagina e l'inchiostro segue la carta — la stessa
+  asimmetria della lampo, che in card usa `--lampo-tag` e nella scheda
+  `--lampo-text`. Il verde non è una tinta nuova nel vocabolario: è
+  già la lingua della PROMESSA SCATTATA nelle `pill-trust`.
+  LA RIGA «PREZZO DI PRIMA» DELLA SCHEDA È LA STESSA della lampo, e la
+  CLASSE resta `lampo-was` apposta: è il vestito della riga (barrato +
+  chip), non il nome di una promessa, e sdoppiarla vorrebbe dire
+  tenere in pari due copie di quattro regole CSS più il riscrittore
+  del toggle valuta, che quel barrato lo pesca proprio da lì. È il
+  patto dei nomi interni del carrello, che si chiamano ancora `pacco`.
+  ⚠️ Quel commento vive DENTRO un template literal: niente apici
+  inversi là dentro — chiudono la stringa e ammazzano l'intero script
+  al parse (ci si è inciampati scrivendolo, e l'ha preso `node
+  --check`, non la rilettura).
   GUARDATO A SCHERMO, ed è la coppia da tenere d'occhio: asta e sconto
   sono i due unici scuri FREDDI del sistema (petrolio ~196°, verde
   ~151°: 45° di distanza). Ingranditi non si confondono in nessuno dei
-  due temi, e di sera si separano da soli (azzurro contro verde menta);
-  di giorno è la coppia più stretta delle tre, ma l'asta porta comunque
-  il suo badge 🔨 sulla foto, che lo sconto non ha — c'è un secondo
-  segnale che non dipende dal colore. Chi aggiungerà un quarto stato al
-  prezzo lo misuri contro QUESTI due, non contro l'arancio.
+  due temi, e di sera si separano da soli (azzurro contro verde
+  menta); di giorno è la coppia più stretta delle tre, ma l'asta porta
+  il suo badge 🔨 e lo sconto il suo «−N%» — c'è un secondo segnale
+  che non dipende dal colore. Chi aggiungerà un quarto stato al prezzo
+  lo misuri contro QUESTI due, non contro l'arancio.
   I colori del prezzo in card restano QUATTRO regole per cinque stati
   (ferie ed esaurito se ne dividono una), e il numero è un censimento:
   chi ne aggiunge una lo sente dalla CI.
+  I DUE FILTRI DELLE PROMESSE (ago 2026): «🚚 Spedizione gratis» e
+  «🎁 In sconto» nel pannello Filtri, e «⚡ In offerta» che diventa
+  «⚡ Offerta a tempo» — con due sconti in elenco la parola «offerta»
+  da sola non distingueva più niente, ed è il TEMPO la differenza. La
+  rinomina vale anche per la voce di Ordina, che sta a un centimetro:
+  due nomi per la stessa cosa nella stessa schermata sono il difetto
+  che la rinomina esiste per togliere.
+  I DUE FILTRI PROMETTONO QUELLO CHE LA CARD MOSTRA — la parola
+  «gratis» e il badge verde — o sarebbero due spunte che portano a una
+  vetrina dove il segno non c'è. Quindi il verdetto lo rifà il SERVER,
+  l'unico che possa farlo dentro la WHERE su cui vive la paginazione,
+  e l'aritmetica sta in DUE funzioni sole: `_sql_articolo_sats` (il
+  gemello di `satsAnnuncio`: per un listino in euro la cifra si
+  riconverte al cambio VIVO, perché è quella che la card mostra) e
+  `_sql_soglia_negozio`. Chi le fa divergere dai giudici del client fa
+  mentire il filtro, non il conto: la invoice non passa mai di lì — e
+  a dirlo c'è una prova che gira il predicato SQL e il giudice Python
+  sugli STESSI dati e chiede lo stesso verdetto, perché un filtro che
+  sbaglia non fallisce: mostra la card sbagliata.
+  LE RIGHE DA NON AMMORBIDIRE nei due predicati: la soglia si chiede
+  in una **EXISTS** e mai con un JOIN (la query del TOTALE di
+  `/api/listings` non ha il JOIN su `utenti`, e un `u.` la farebbe
+  esplodere); niente LAMPO VIVA (il suo badge occupa lo stesso angolo,
+  quindi quel segno la card non ce l'ha); niente ASTE nei rami che
+  misurano una soglia (lì il prezzo è una PUNTATA in corso, e al
+  vincitore la spedizione è inclusa per costruzione); e in ferie
+  nessun verdetto, come nel client. A cambio muto il ramo in euro non
+  si scrive proprio, la regola di `_eur_interi`.
+  LE LEVE: a `SCONTO_PACCO_ATTIVO` spenta il filtro non dà NIENTE — su
+  nessuna card c'è il badge, e una vetrina senza il segno che la
+  spunta prometteva è peggio di una vetrina vuota. La spedizione
+  gratis invece tiene il ramo della gratuità DICHIARATA anche a leva
+  spenta: quella non dipende da nessuna promessa di negozio.
+  In DEMO i due filtri rispondono coi GIUDICI del client, gli stessi
+  che disegnano la parola e il badge: demo e vetrina non divergono.
+  IMPERFEZIONE DICHIARATA: il filtro guarda il listino e non conosce
+  gli ACCORDI individuali (sono per-compratore, e `artStima` invece li
+  applica) — quindi una card col verde per un accordo accettato il
+  filtro non la pesca. Rara, e per una persona sola.
+  E `spedGratisQui` HA GUADAGNATO LA GUARDIA DELL'ASTA con questo giro
+  (correzione trovata DAL VIVO, non leggendo il codice: il filtro
+  nuovo pescava un'asta il cui prezzo di base superava la soglia).
+  Misurare contro una puntata in corso la soglia di un negozio non
+  vuol dire niente, e al vincitore la spedizione è inclusa per
+  costruzione — la promessa non c'entra proprio. La gratuità
+  DICHIARATA invece resta vera anche su un'asta.
   L'ASTA PARLA PETROLIO (ago 2026, ritocchi di Andrea: prima blu, poi
   verde-blu scuro tenuto sul lato BLU della famiglia — tinta ~195°,
   col verde della protezione a ~151°: si toccano nel punto più
@@ -12632,6 +12722,40 @@ card che il supplemento faceva mentire — quelle con base 0 e
 supplemento pieno perdono il «🚚 gratis», ed è la correzione — e il
 primo annuncio che da solo fa scattare lo sconto, guardato accanto a
 un'asta.
+
+Lo sconto carrello si vede in vetrina (ago 2026, quattro cose chieste da
+Andrea in un colpo): la card in sconto mostra il prezzo SCONTATO col
+listino barrato e un badge verde in alto a sinistra — lo stesso
+meccanismo della lampo, senza il fulmine, perché ⚡ vuol dire «a tempo»
+e questo non scade — e lo stesso vale nella scheda; nei Filtri nascono
+«🚚 Spedizione gratis» e «🎁 In sconto», e «In offerta» diventa
+«Offerta a tempo» (con due sconti in elenco quella parola da sola non
+distingueva più niente). LA REGOLA, nella forma più semplice trovata
+(Andrea): è il CRITERIO a dire dove vale lo sconto — a VALORE conta la
+cifra, quindi vale anche su un articolo solo; a PEZZI conta il numero,
+quindi serve arrivare a più pezzi. Nessuna eccezione da ricordare. Il
+prezzo mostrato ha un giudice solo (`prezzoMostrato`) e la lampo vince,
+che è la regola del conto; «Ne resta 1» adesso si spegne per lo sconto,
+e quella riga ROVESCIA il giro prima — era vera finché il verde era
+solo un colore, ha smesso di esserlo quando ha preso un badge. Vedi
+Architettura, «LO SCONTO CARRELLO SI VEDE IN VETRINA», anche per i due
+filtri, che promettono quello che la card mostra e per questo rifanno
+il verdetto lato SERVER — l'aritmetica in due funzioni sole, incrociata
+in CI col giudice Python, perché un filtro che sbaglia non fallisce:
+mostra la card sbagliata.
+Collaudato: 3003 prove verdi (36 nuove) e DICIOTTO mutazioni una per
+riga sorvegliata, tutte rosse — la tortura ha trovato l'ennesima
+sentinella cieca (contava il NOME `_no_lampo` invece del suo contenuto,
+quindi un `_no_lampo = ""` la lasciava verde). Più il giro dal vivo a
+320/360/375 nei due temi con le quattro card in fila, la scheda, e i
+due filtri chiesti al server vero — ed è lì che è saltato fuori il caso
+che leggendo il codice non si vedeva: il filtro «Spedizione gratis»
+pescava un'ASTA il cui prezzo di base superava la soglia. Da lì la
+guardia dell'asta è entrata anche in `spedGratisQui`.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva nuova. DA GUARDARE al primo giro: un negozio con lo sconto
+a VALORE acceso — le sue card sopra soglia cambiano prezzo in vetrina,
+ed è la cosa più visibile del cantiere.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
