@@ -1724,6 +1724,26 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   anonima e DEMO (dati finti già rimappati). Dal cantiere «tenuta al
   volume» (sotto) i conteggi delle pillole coi dati vivi vengono dal
   server (`conteggi` in prima pagina), il locale resta per la demo.
+  IL LOCALE SI CONTA SOLO SE È ROBA VERA (ago 2026, trovato coi
+  fotogrammi dell'avvio insieme al lampo del cartello): `avvia()`
+  chiama `renderChips` PRIMA del primo fetch, quando `conteggiServer`
+  è ancora nullo e `listings` è ancora IL SEME DELLA DEMO — e il ramo
+  di ripiego lo contava, quindi per **~280 ms misurati** la fila
+  mostrava le categorie degli annunci finti («Elettronica ·
+  Biciclette…») che poi si riordinavano da sole sotto gli occhi. Più
+  a lungo del cartello, e nello stesso avvio. Il giudice
+  `contaCategorie()` conta dal locale solo in DEMO o dopo che la prima
+  pagina ha buttato il seme (`datiVivi`, la bandierina che esisteva
+  già in `loadListings`) — così il ripiego per un server di ieri che i
+  conteggi non li manda resta intatto — e PRIMA DI ALLORA TORNA A MANI
+  VUOTE: resta «Tutto», sempre vero, più la categoria scelta, che è la
+  regola del campo che non mente. Un'assenza non è una bugia.
+  È UN GIUDICE SOLO perché i conteggi li vogliono in due, le pillole e
+  l'ordine delle piastrelle di Sfoglia (`ordineSfoglia`, che il
+  commento dichiarava già «la stessa fonte» e ne teneva una copia):
+  due copie direbbero due ordini diversi sullo stesso catalogo. Il
+  conto dei chiamanti è ESATTO in `prove.py`, così il terzo di domani
+  fa rossa la riga e viene a rileggere questa voce.
   Condizioni dell'oggetto (lug 2026): scala a 5 livelli — catalogo
   `CONDIZIONI` in server.py (nuovo | come_nuovo | buono | accettabile |
   da_sistemare, id → etichetta breve; il catalogo JS `CONDIZIONI` del
@@ -2224,15 +2244,54 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   un crawler scopre ottocento annunci, ed è l'unica ragione per cui le
   pagine categoria esistono. Non è testo nascosto: è un pre-render
   vero, tolto dal client DURANTE il parse con uno scriptino adiacente
-  al marcatore (non in fondo a 910 KB, o su rete lenta resterebbe a
-  schermo per decine di ms). `?.remove()` senza ramo d'errore, più
-  `#cartello:empty{display:none}` come cintura. MAI un `display:none`
-  permanente: sarebbe un'altra cosa. IMPERFEZIONE DICHIARATA: Google
-  indicizza il DOM RENDERIZZATO, quindi se un domani l'app non
-  riuscisse a disegnare, il DOM sarebbe vuoto — oggi non può
-  succedere (`avvia` cade in `avviaVetrina`, che cade in DEMO, e tutte
-  e tre disegnano), e la via d'uscita è una riga: legare la rimozione
-  al primo `go()` invece che al parse.
+  al marcatore (non in fondo a 910 KB) — `?.remove()` senza ramo
+  d'errore.
+  E NON SI DIPINGE MAI, `#cartello{display:none}` (ago 2026), che
+  ROVESCIA la riga che stava qui: «MAI un display:none permanente:
+  sarebbe un'altra cosa». LA DISTINZIONE, ed è tutta la voce: quella
+  regola vieta di NASCONDERE del testo a chi guarda, qui si evita di
+  DIPINGERE un nodo che muore 100 ms dopo. **Il DOM RENDERIZZATO non
+  cambia di niente** — chi esegue JS trova il nodo rimosso esattamente
+  come prima (la rimozione al parse resta dov'è), chi non lo esegue
+  legge l'HTML e del CSS non sa nulla — quindi non c'è NESSUNO a cui
+  questa riga nasconda qualcosa, ed è ciò che la separa dal testo
+  nascosto. Le due cose non si sostituiscono e servono tutt'e due: la
+  rimozione tiene pulito il DOM, il CSS tiene pulito lo SCHERMO.
+  IL DIFETTO CHE L'HA CHIESTA, misurato e non dedotto (fotogrammi
+  registrati con Chrome headless via CDP): il cartello è il primo
+  contenuto del corpo, e con tutto il CSS in linea nella testa il
+  primo pezzo di corpo che arriva è anche il primo che si dipinge.
+  Su rete vera il parser si ferma DENTRO il cartello aspettando il
+  pezzo dopo, e in quella pausa il browser disegna — **5 giri su 6 a
+  8 Mbps il primo fotogramma della home era l'elenco puntato dei 24
+  annunci**, per ~110 ms, con un'altezza diversa ogni volta (206 →
+  1642 px: dipende da dove cade il pezzo di rete, ed è per questo che
+  si vedeva «un po' diverso» a ogni apertura). Poi bianco, poi la
+  testata dell'app, poi le card. Il commento della rimozione lo
+  prevedeva alla lettera («su rete lenta resterebbe a schermo per
+  decine di ms») e la rimozione adiacente non bastava, perché è
+  adiacente nel FILE e non nel TEMPO.
+  IN LOCALE NON SI RIPRODUCE, ed è il motivo per cui è vissuto un
+  mese: senza strozzatura il documento arriva tutto insieme, il primo
+  fotogramma cade a 3,4 s e ha già la griglia piena. Chi lo ricontrolla
+  strozzi la rete a 3-8 Mbps, o non vedrà niente.
+  Dettaglio che spiega il «sono oggetti che non c'entrano»: il
+  cartello scrive il LISTINO (`_prezzo_promo` legge `prezzo_sats`), la
+  card scrive lo scontato — stesso oggetto, due prezzi.
+  IMPERFEZIONE DICHIARATA: Google indicizza il DOM RENDERIZZATO,
+  quindi se un domani l'app non riuscisse a disegnare, il DOM sarebbe
+  vuoto — oggi non può succedere (`avvia` cade in `avviaVetrina`, che
+  cade in DEMO, e tutte e tre disegnano). LA VIA D'USCITA DICHIARATA
+  QUI ERA SBAGLIATA, e va scritto perché è quella che torna in mente:
+  «legare la rimozione al primo `go()`» — provato, e **`go()` non
+  viene mai chiamato all'apertura della home**: zero chiamate in 20
+  secondi, perché la vista di partenza è già attiva nel markup e
+  nessun ramo di `avvia()` su `/` lo tocca. Il cartello resterebbe lì
+  per sempre: misurato, a 6,4 secondi l'app era carica (nav e 30 card)
+  con lo schermo tutto cartello e l'app spinta giù di 1.729 px. Chi
+  volesse davvero ritardare la rimozione peschi un gancio che scatta
+  DA SOLO (la fine di `avvia()`, o il primo `renderGrid` con delle
+  card dentro), mai `go()`.
   27 PAGINE `/categoria/{slug}`, vocabolario CHIUSO su `SLUG_CATEGORIE`
   (uno slug inventato non diventa mai una query). Le piastrelle di
   Sfoglia sono `<a>`, e ATTERRARE SU UN REPARTO NON È UNA DISCESA: il
@@ -13264,6 +13323,34 @@ IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta — solo client. DA GUARDARE al primo giro:
 il primo venditore con lo sconto a VALORE acceso che pubblica sopra
 soglia.
+L'avvio non mostra più roba che non c'entra (ago 2026, segnalato da
+Andrea: «aprendo l'app si vede per un istante una vetrina con oggetti
+che non c'entrano»). Due difetti nello stesso mezzo secondo, tutti e
+due REGISTRATI prima di toccare qualcosa — Chrome headless via CDP,
+screencast fotogramma per fotogramma più un diario in pagina che a
+ogni rAF dice cosa c'è nel DOM: 1) il primo fotogramma della home ERA
+IL CARTELLO (5 giri su 6 a 8 Mbps, ~110 ms, l'elenco puntato dei 24
+annunci coi prezzi di listino); 2) le pillole delle categorie
+nascevano dal SEME DELLA DEMO e duravano ~280 ms, cioè più a lungo.
+La griglia invece era pulita — passa da 0 a 30 in un colpo coi dati
+veri — quindi il secondo sospetto («la vetrina del giro precedente»)
+è stato ESCLUSO, non curato a caso. Vedi le voci loro per le due cure
+(`#cartello{display:none}` con la distinzione dal testo nascosto, e
+il giudice unico `contaCategorie`) e per la VIA D'USCITA DICHIARATA
+CHE ERA SBAGLIATA — «legare la rimozione al primo `go()`»: provata, e
+`go()` sulla home non viene chiamato mai.
+Collaudato: 3114 prove verdi (11 nuove, una ROVESCIATA — quella sul
+`#cartello:empty`, che il display:none copre a maggior ragione) e
+CINQUE MUTAZIONI del codice una per riga sorvegliata — cartello che
+torna a dipingersi, guardia della conta tolta, le due superfici che
+si ricontano il seme per conto loro, rimozione al parse sparita —
+ognuna rossa da sola. Più i fotogrammi rifatti dopo la cura: nessun
+frame con l'elenco (3 giri su 3), e le pillole che vanno da «Tutto»
+a quelle vere senza passare dalle finte. IN PRODUZIONE basta il
+deploy: nessuna colonna, nessuna leva, nessuna rotta, e sw.js non si
+tocca (nessun HTML sta in dispensa). DA GUARDARE dal telefono, che è
+l'unico posto dove il difetto si vedeva: l'apertura dentro Telegram e
+in PWA installata.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
