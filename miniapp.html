@@ -1668,6 +1668,24 @@
   .ctrl-corpo .ctrl-fondo{margin-top:auto;display:flex;
     flex-direction:column;gap:10px}
   .ctrl-fondo .btn,.ctrl-fondo .ctrl-secondari{margin-top:0}
+  /* IL FONDO DELLA PAGINA PAGA E' APPICCICATO (ago 2026, decisione di
+     Andrea): «Paga» resta in vista mentre si scorre, invece di stare
+     solo in fondo alla pagina. STICKY e non fixed, ed e' la parte che
+     conta: niente matematica di viewport (dentro Telegram le misure
+     mentono — la lezione della tastiera), e il bottone OCCUPA il suo
+     spazio in layout, quindi a fine scorrimento l'ultima riga del
+     conto non e' mai coperta: sopra la barra c'e' gia' il fiato del
+     margin-bottom del conto. Fondo opaco con blur, riga di confine e
+     safe-area sono DELLA BARRA (il pattern di #barraPacco e della
+     nav), e il padding-bottom del corpo passa a lei — o a fine pagina
+     ci sarebbero due safe-area impilate. SOLO la pagina Paga: il
+     riepilogo del pacco tiene il fondo di sempre. */
+  #view-acquisto .ctrl-corpo{padding-bottom:0}
+  #view-acquisto .ctrl-fondo{position:sticky;bottom:0;z-index:5;
+    background:var(--nav-bg);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+    margin-left:calc(-1 * var(--pad));margin-right:calc(-1 * var(--pad));
+    padding:10px var(--pad) calc(12px + env(safe-area-inset-bottom))}
   @media (min-width:768px){
     /* da desktop #app porta 76px di topbar sopra e 40 sotto: la
        colonna li sconta, o la pagina scrollerebbe sempre di 116px */
@@ -1750,6 +1768,10 @@
   /* «gratuita» e' una parola, non un numero: niente mono, grassetto
      per il patto della spedizione gratuita (mai col colore) */
   .via-opzione .via-gratis{flex:0 0 auto;font-weight:800;font-size:13.5px}
+  /* il locker della via punto (ago 2026): SVG a currentColor, si
+     accende col testo della via nei due temi; la misura e' quella di
+     un'emoji nella stessa riga, l'allineamento e' alla riga di base */
+  .ico-locker{width:17px;height:17px;vertical-align:-3.5px}
   /* la stessa parola nella riga «Spedizione» del conto: li' sta dentro
      lo `.mono` della colonna delle cifre, e senza questa riga
      erediterebbe il monospazio — cioe' verrebbe scritta come un
@@ -8431,14 +8453,34 @@ let acqDati = null;
     renderAcquisto ricostruisce l'HTML da zero a ogni ±/toggle/via.
     I ± e il ripiego riassegnano con {...d0}: il flag sopravvive. */
 
-/* Il punto parla col 🚚 (ago 2026, decisione di Andrea): e' una
-   SPEDIZIONE, e il camioncino e' il suo segno in tutta l'app — la
-   scatola qui diceva la taglia del pacco, che e' un'altra cosa.
-   Niente collisione con «a casa», che in questa lista ha la casetta:
-   i due segni dicono DOVE arriva, il verbo lo dice la parola. */
+/* Il punto parla col LOCKER e si chiama cosi' (ago 2026, decisione di
+   Andrea, che SUPERA il camioncino del 12 ago): «Spedizione a un
+   locker», e l'armadietto a sportelli lo dice al primo sguardo — il
+   🚚 diceva la famiglia (e' una spedizione) ma non la differenza con
+   «a casa», che qui e' tutta la scelta. Non esiste un'emoji del
+   locker: SVG inline a currentColor come le icone della nav, cosi'
+   si accende col testo della via nei due temi (inchiostro dentro
+   [2,22] col tratto compreso, la regola del ritaglio della nav).
+   NOME PIU' STRETTO DEL VERO, dichiarato: la via serve QUALUNQUE
+   punto della rete del corriere, anche quelli col banco (Punto Poste
+   in tabaccheria) — «locker» e' la parola che chi compra conosce,
+   non una promessa che il punto sia automatico.
+   Il wrapper <span> non e' ornamento: .via-nome e' un flex in
+   COLONNA, e un SVG nudo finirebbe SOPRA il testo invece che in riga. */
+const ICO_LOCKER = '<svg class="ico-locker" viewBox="2 2 20 20" aria-hidden="true">'
+  + '<g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">'
+  + '<rect x="4.5" y="3" width="15" height="17" rx="1.8"/>'
+  + '<line x1="12" y1="3" x2="12" y2="20"/>'
+  + '<line x1="4.5" y1="8.6" x2="19.5" y2="8.6"/>'
+  + '<line x1="4.5" y1="14.3" x2="19.5" y2="14.3"/>'
+  + '<line x1="7" y1="20" x2="7" y2="21.2"/>'
+  + '<line x1="17" y1="20" x2="17" y2="21.2"/></g>'
+  + '<circle cx="9.8" cy="5.8" r="1" fill="currentColor"/>'
+  + '<circle cx="14.2" cy="11.4" r="1" fill="currentColor"/>'
+  + '<circle cx="9.8" cy="17.1" r="1" fill="currentColor"/></svg>';
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
-  : v==='punto' ? '🚚 Spedizione a un punto di ritiro'
+  : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a un locker</span>`
   : v==='digitale' ? '💾 Codice online' : '';
 
 /* LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA (ago 2026,
@@ -8813,7 +8855,7 @@ function renderAcquisto(){
   /* --- il campo del punto di ritiro: la SCELTA resta sempre PRIMA di
      «Paga» (quarto giro, come su Subito e Vinted), ma dal QUINTO
      (ago 2026, col punto diventato il DEFAULT della via) il campo non
-     sta piu' aperto in pagina: lo espande il bottone «📍 Indica il
+     sta piu' aperto in pagina: lo espande il bottone «Indica il
      punto di ritiro» — cosi' la pagina apre su un conto da leggere e
      non su un modulo da compilare, che era l'argomento contro il
      punto come default. Lo stato e' acqDati.puntoAperto (mai il DOM:
@@ -8848,11 +8890,14 @@ function renderAcquisto(){
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
     ${linkMappePunti(p.spedizioniere)}`;
+  /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
+     decisione di Andrea): il riquadro che li ospita ha gia' il locker
+     della via, e due icone nello stesso riquadro sono una di troppo. */
   const campoChiuso = puntoScritto
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
-        onclick="apriPuntoAcquisto()">📍 <span class="punto-testo">${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
+        onclick="apriPuntoAcquisto()"><span class="punto-testo">${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
-        onclick="apriPuntoAcquisto()">📍 Indica il punto di ritiro</button>`;
+        onclick="apriPuntoAcquisto()">Indica il punto di ritiro</button>`;
   const cassettoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
       onclick="event.stopPropagation()">
     ${d.puntoAperto ? campoAperto : campoChiuso}
@@ -12551,7 +12596,7 @@ function openOrder(id){
             ricompare nel banner del pacco (vedi `puntoBanner`), che a
             campo ormai chiuso e' l'unico posto dove chi ha comprato
             ritrova DOVE andare a prenderlo. */''}
-      ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
+      ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un locker: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
       ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
       <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
            RETE DI SICUREZZA della scelta anticipata — il punto si
@@ -12676,8 +12721,8 @@ function openOrder(id){
                utile per comprare la copertura. La regola per esteso sta
                nella pagina «Il pagamento protetto». -->
           <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto <span class="fine-frase">bassa. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Scopri di più</button></span></div>
-          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
-          ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
+          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>locker</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
+          ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${selettoreCorriere('shipCorriere')}
@@ -16454,7 +16499,7 @@ function apriTuttiFermi(){
    server li manda GREZZI apposta. */
 const rigaFermo = o => {
   const g = Math.floor((Date.now()/1000 - o.fermo_da) / 86400);
-  const via = o.via_punto ? '📦 punto di ritiro'
+  const via = o.via_punto ? '📦 locker'
             : (NOMI_VIA_FERMO[o.consegna_scelta] || '❓ strada non scelta');
   return `
     <div class="order">

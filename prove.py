@@ -2751,7 +2751,7 @@ def prove_dettaglio_ordine():
     prova("il punto non si ripete piu' sotto il prezzo", False,
           "Il punto di ritiro che hai indicato" in det)
     prova("...ma resta l'invito quando ancora non c'e'", True,
-          "Spedizione a un punto di ritiro: indica il punto qui sotto."
+          "Spedizione a un locker: indica il punto qui sotto."
           in det)
     prova("il banner del pacco lo ridice a chi compra", True,
           "'Il tuo punto di ritiro'" in pb)
@@ -6774,7 +6774,15 @@ def prove_pagina_acquisto():
     #    guardie di «Paga»/⚡ APRONO il cassetto prima del fuoco: mai
     #    il fuoco su un campo nascosto.
     prova("quinto giro: il bottone del punto esiste", True,
+          '>Indica il punto di ritiro</button>' in mini3)
+    # NUDO, senza 📍 (ago 2026, decisione di Andrea): il riquadro che
+    # lo ospita ha gia' il locker della via, e due icone nello stesso
+    # riquadro sono una di troppo — vale per il bottone E per la riga
+    # compatta del punto scritto
+    prova("...nudo: il riquadro ha gia' il locker della via", False,
           "📍 Indica il punto di ritiro" in mini3)
+    prova("...e anche la riga compatta ha perso il 📍", False,
+          '>📍 <span class="punto-testo">' in mini3)
     prova("...lo stato del cassetto nasce in acqDati (due costruttori)",
           2, mini3.count("punto:'', puntoAperto:false"))
     prova("...il campo riapre PRECOMPILATO, mai ricominciare da capo",
@@ -6838,8 +6846,18 @@ def prove_pagina_acquisto():
     # della tortura)
     prova("...con la guardia gemella sulla tastiera", True,
           'onkeydown="if(event.target===this' in mini3)
-    prova("la via punto parla col camioncino (e' una spedizione)", True,
-          "v==='punto' ? '🚚 Spedizione a un punto di ritiro'" in mini3)
+    #    La via punto parla col LOCKER e si chiama cosi' (ago 2026,
+    #    decisione di Andrea, che SUPERA il camioncino del 12 ago):
+    #    SVG a currentColor, e il wrapper <span> tiene icona e testo
+    #    in riga dentro .via-nome, che e' un flex in COLONNA — chi lo
+    #    toglie mette il disegno SOPRA il testo.
+    prova("la via punto parla col locker, e si chiama cosi'", True,
+          "${ICO_LOCKER} Spedizione a un locker</span>" in mini3)
+    prova("...il locker e' inchiostro che si accende (currentColor)",
+          True, 'class="ico-locker"' in mini3
+          and 'stroke="currentColor"' in mini3)
+    prova("...e il nome vecchio della via non torna", 0,
+          mini3.count("Spedizione a un punto di ritiro"))
     #    LA VESTE DELLA FILA (ago 2026, decisione di Andrea: la
     #    POSIZIONE resta sopra la Consegna — il modo «dentro la card»
     #    e' stato costruito, guardato e scartato — e a cambiare e' la
@@ -6847,6 +6865,21 @@ def prove_pagina_acquisto():
     #    che la sentinella della fila conta proprio quel template).
     prova("la fila di Paga si stende via CSS, markup intatto", True,
           "#acqCorpo > .pills{flex-direction:column" in mini3)
+    #    IL FONDO DI PAGA E' APPICCICATO (ago 2026): «Paga» resta in
+    #    vista mentre si scorre — STICKY e mai fixed (dentro Telegram
+    #    le misure di viewport mentono, e sticky occupa layout: a fine
+    #    scorrimento l'ultima riga del conto non e' mai coperta) — con
+    #    la safe-area SUA e il padding-bottom del corpo a zero, o a
+    #    fine pagina ci sarebbero due safe-area impilate. SOLO la
+    #    pagina Paga: il riepilogo del pacco tiene il fondo di sempre.
+    prova("il fondo di Paga e' appiccicato (sticky, mai fixed)", True,
+          "#view-acquisto .ctrl-fondo{position:sticky" in mini3)
+    prova("...con la safe-area sua e il corpo senza doppio fondo", True,
+          "#view-acquisto .ctrl-corpo{padding-bottom:0}" in mini3
+          and mini3.count("#view-acquisto .ctrl-fondo{position:sticky;"
+                          "bottom:0") == 1)
+    prova("...e il riepilogo del pacco tiene il fondo di sempre", False,
+          "#view-controllapacco .ctrl-fondo{position:sticky" in mini3)
     #    E L'UNITARIO RESTA IL PIENO col tag della regola quando lo
     #    sconto scatta (la via (c)): mai un numero unitario scontato —
     #    non esiste come intero e non torna moltiplicando — e mai un

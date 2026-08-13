@@ -14461,14 +14461,14 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         # della notifica (parse_mode HTML: un «<» la spegnerebbe).
         # Il punto scritto si legge nell'ordine, dove passa da esc().
         msg += ("\n\n📦 Il compratore ha scelto la <b>spedizione a un "
-                "punto di ritiro</b>: trovi il punto nell'ordine.")
+                "locker</b>: trovi il punto nell'ordine.")
     elif o["via_punto"]:
         # Il residuo del quarto giro: via scelta senza punto — solo
         # ordini nati da un client di ieri (il server tollera il
         # punto assente senza rete). Va detto SUBITO, e con la via
         # d'uscita: la chat, se serve accordarsi.
-        msg += ("\n\n📦 Il compratore vuole la <b>spedizione a un punto "
-                "di ritiro</b>: indicherà il punto nell'ordine — se "
+        msg += ("\n\n📦 Il compratore vuole la <b>spedizione a un "
+                "locker</b>: indicherà il punto nell'ordine — se "
                 "serve, accordatevi in chat sul corriere.")
     await notifica(o["venditore_id"], msg)
     # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
@@ -18985,7 +18985,7 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         else:
             stato_busta = "istruzioni di ritiro MAI depositate"
         nota_punto = (
-            f"\n📦 Spedizione a un PUNTO DI RITIRO: {stato_busta}. "
+            f"\n📦 Spedizione a un LOCKER: {stato_busta}. "
             f"Il contenuto della busta lo leggono solo le parti: la "
             f"piattaforma non può verificarlo.")
     con.close()
@@ -22366,7 +22366,7 @@ async def avvisa_spedizioniere_mancante():
             await notifica(tg, (
                 "📦 <b>Novità: il ritiro al punto (locker).</b> Da oggi "
                 "i compratori possono scegliere la spedizione a un "
-                "punto di ritiro sui tuoi annunci. Indica nel Profilo → "
+                "locker sui tuoi annunci. Indica nel Profilo → "
                 "«📦 Come spedisci» se spedisci con InPost o Poste "
                 "Italiane: chi compra saprà di che rete cercare il "
                 "punto, ed eviti gli accordi in chat."))
