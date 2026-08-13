@@ -1636,7 +1636,15 @@
   /* il LORDO barrato sotto il totale, solo a sconto scattato (13 ago
      2026): la resa dell'unitario di Paga e del listino in lampo —
      piccolo, muto, con la riga sopra. Vuoto = nessuna riga (il
-     pattern delle due scatole delle promesse). */
+     pattern delle due scatole delle promesse). E accanto al netto il
+     tag «−X%» (secondo giro dello stesso 13 ago, visto da Andrea):
+     in Paga c'era e qui no, e due superfici che mostrano lo stesso
+     scontato devono dirlo con la stessa forma — .sconto-tag, la
+     stessa classe, mai una copia. La prima riga e' un flex suo
+     (.pacco-viva): .pacco-somma e' una colonna, e il tag nudo
+     finirebbe su una riga sua. */
+  .pacco-viva{display:flex;align-items:center;gap:6px;max-width:100%}
+  #paccoTag:empty{display:none}
   #paccoPieno{font-size:11.5px;color:var(--muted);font-weight:600;
     white-space:nowrap}
   #paccoPieno:empty{display:none}
@@ -4111,7 +4119,7 @@ document.getElementById('cartello')?.remove();</script>
        €/₿ sta in testa alla pagina (deciso da Andrea, qui rubava
        spazio al numero). -->
   <div id="barraPacco">
-    <div class="pacco-somma"><b class="mono" id="paccoTot"></b><s class="mono" id="paccoPieno"></s><span id="paccoConta"></span></div>
+    <div class="pacco-somma"><span class="pacco-viva"><b class="mono" id="paccoTot"></b><span class="sconto-tag" id="paccoTag"></span></span><s class="mono" id="paccoPieno"></s><span id="paccoConta"></span></div>
     <!-- «Controlla e paga» (ago 2026, decisione di Andrea): il bottone
          porta al riepilogo PRIMA di pagare, e il nome dice la sequenza —
          Aggiungi al carrello → Controlla e paga → Paga. -->
@@ -9640,9 +9648,13 @@ function aggiornaBarraPacco(){
     : `${circa}${fmt(n)} sats`;
   const t = el('paccoTot');
   t.textContent = resa((st && st.scattato) ? netto : tot);
-  /* il lordo barrato compare SOLO a sconto scattato: vuoto = niente
-     riga (il :empty del CSS) */
+  /* il lordo barrato e il tag «−X%» compaiono SOLO a sconto
+     scattato: vuoti = niente riga e niente tag (i :empty del CSS).
+     Il tag e' la stessa forma di Paga — il meno tipografico e la
+     classe .sconto-tag — cosi' le due superfici dicono lo scontato
+     con una lingua sola. */
   el('paccoPieno').textContent = (st && st.scattato) ? resa(tot) : '';
+  el('paccoTag').textContent = (st && st.scattato) ? `−${st.pct}%` : '';
   /* sui numeri lunghi il corpo scala (vedi il CSS della barra): oltre
      le 6 cifre in sats la riga piena non regge i 375px */
   t.classList.toggle('lungo', t.textContent.length > 12);

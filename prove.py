@@ -13227,6 +13227,17 @@ def prove_promesse_badge():
     prova("...col lordo barrato solo a sconto scattato", True,
           "el('paccoPieno').textContent = (st && st.scattato)"
           " ? resa(tot) : ''" in _bp)
+    # E IL TAG «−X%» ACCANTO AL NETTO (secondo giro del 13 ago 2026,
+    # visto da Andrea: in Paga c'era e nel carrello no — due superfici
+    # che mostrano lo stesso scontato lo dicono con la stessa forma).
+    # Stessa classe di Paga, mai una copia: la regola CSS resta UNA.
+    prova("il tag −X% della barra compare solo a sconto scattato",
+          True, "el('paccoTag').textContent = (st && st.scattato)"
+          " ? `−${st.pct}%` : ''" in _bp)
+    prova("...con la classe di Paga, nelle due sole superfici", 2,
+          mini.count('class="sconto-tag"'))
+    prova("...e la regola CSS del tag resta una", 1,
+          mini.count(".sconto-tag{"))
     prova("...e il barrato ha la sua riga nel markup e nel CSS",
           (True, True), ('<s class="mono" id="paccoPieno"></s>' in mini,
                          "#paccoPieno:empty{display:none}" in mini))
