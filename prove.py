@@ -2751,8 +2751,8 @@ def prove_dettaglio_ordine():
     prova("il punto non si ripete piu' sotto il prezzo", False,
           "Il punto di ritiro che hai indicato" in det)
     prova("...ma resta l'invito quando ancora non c'e'", True,
-          "Spedizione a un locker: indica il punto qui sotto."
-          in det)
+          "Spedizione a un locker/punto di ritiro: indica il punto "
+          "qui sotto." in det)
     prova("il banner del pacco lo ridice a chi compra", True,
           "'Il tuo punto di ritiro'" in pb)
     prova("...e all'altro lato in terza persona", True,
@@ -6846,13 +6846,20 @@ def prove_pagina_acquisto():
     # della tortura)
     prova("...con la guardia gemella sulla tastiera", True,
           'onkeydown="if(event.target===this' in mini3)
-    #    La via punto parla col LOCKER e si chiama cosi' (ago 2026,
-    #    decisione di Andrea, che SUPERA il camioncino del 12 ago):
-    #    SVG a currentColor, e il wrapper <span> tiene icona e testo
-    #    in riga dentro .via-nome, che e' un flex in COLONNA — chi lo
-    #    toglie mette il disegno SOPRA il testo.
-    prova("la via punto parla col locker, e si chiama cosi'", True,
-          "${ICO_LOCKER} Spedizione a un locker</span>" in mini3)
+    #    La via punto parla col LOCKER e si chiama «Spedizione a un
+    #    locker/punto di ritiro» (13 ago 2026, secondo giro: «locker»
+    #    secco era piu' stretto del vero — con Poste la rete e' in gran
+    #    parte banchi — e i MARCHI sono stati scartati, ogni corriere
+    #    ha i suoi). SVG a currentColor, e il wrapper <span> tiene
+    #    icona e testo in riga dentro .via-nome, che e' un flex in
+    #    COLONNA — chi lo toglie mette il disegno SOPRA il testo.
+    #    L'etichetta e' SENZA articolo per la misura (a 320 la colonna
+    #    da' 258px e col «un» il nome ne chiede 276: due righe); la
+    #    prosa delle notifiche tiene «a un», che li' e' grammatica.
+    prova("la via punto parla col locker, e si chiama con la doppia "
+          "formula", True,
+          "${ICO_LOCKER} Spedizione a locker/punto di ritiro</span>"
+          in mini3)
     prova("...il locker e' inchiostro che si accende (currentColor)",
           True, 'class="ico-locker"' in mini3
           and 'stroke="currentColor"' in mini3)
@@ -6876,9 +6883,16 @@ def prove_pagina_acquisto():
     #    pillola intera.
     prova("la barra delle promesse esiste, col tetto a 99", True,
           "const barraPromessa" in mini3 and "Math.min(99," in mini3)
-    prova("...si riempie del verde TENUE, mai del verde pieno", True,
-          "linear-gradient(90deg,var(--trust-soft),var(--trust-soft))"
+    prova("...si riempie del suo token, mai del fondo della conferma",
+          True,
+          "linear-gradient(90deg,var(--barra-fill),var(--barra-fill))"
           in mini3)
+    #    il colore e' un token a DOPPIO valore (secondo giro: col
+    #    --trust-soft nudo la barra non si notava — e' il fondo della
+    #    pill-trust, nato per stare sotto un testo): si abbassa la
+    #    luce di sera, non si cambia il segno
+    prova("...e il token della barra ha i suoi due valori", 2,
+          mini3.count("--barra-fill:"))
     prova("...le DUE pillole sotto soglia la portano", 2,
           mini3.count('class="pill pill-barra"'))
     prova("...e lo style della larghezza c'e' sempre, anche a 0%", True,

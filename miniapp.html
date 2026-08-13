@@ -16,7 +16,8 @@
     color-scheme:light;
     --bg:#FAF4E4; --card:#FFFFFF; --ink:#23282C; --muted:#8A8271;
     --line:#E8DFC8; --sats:#F7931A; --sats-soft:#FDEBD3;
-    --trust:#1B8B54; --trust-soft:#E7F5EC; --danger:#C2410C;
+    --trust:#1B8B54; --trust-soft:#E7F5EC; --barra-fill:#BFE0D0;
+    --danger:#C2410C;
     --radius:16px; --pad:16px;
     /* la curva dei bottoni-oggetto: quella di «Acquista» (vedi
        l'elenco dei contesti accanto a .btn) */
@@ -161,7 +162,8 @@
     color-scheme:dark;
     --bg:#211A10; --card:#2C2517; --ink:#F1E8D5; --muted:#A99F87;
     --line:#3E3623; --sats-soft:#3E2B12;
-    --trust:#34B47A; --trust-soft:#1B2C20; --danger:#F07A47;
+    --trust:#34B47A; --trust-soft:#1B2C20; --barra-fill:#2E5237;
+    --danger:#F07A47;
     --sats-text:#FFB25C;
     /* l'asta di sera: si alza la LUCE, non si cambia il segno —
        misurati: --asta vs bruno 3,77 (component ok) col bianco sopra
@@ -1845,15 +1847,25 @@
   #acqCorpo > .pills .pill b{font-weight:800}
   #acqCorpo > .pills .pill-trust{border-color:var(--trust-soft)}
   /* LA BARRA DI RIEMPIMENTO delle promesse (13 ago 2026, decisione di
-     Andrea sui prototipi): il verde tenue riempie la pillola da
-     sinistra fino al progresso, con un bordo NETTO — la saturazione
-     del colore e' stata prototipata e SCARTATA: 67% e 73% si
-     vedevano uguali, e il quasi-verde si leggeva come promessa gia'
-     scattata. Piena non lo e' mai: il 100% e' la pill-trust verde di
-     oggi, e il client si ferma a 99. La larghezza la scrive
-     renderAcquisto in background-size, sempre (anche 0%). */
+     Andrea sui prototipi): il verde riempie la pillola da sinistra
+     fino al progresso, con un bordo NETTO — la saturazione del colore
+     e' stata prototipata e SCARTATA: 67% e 73% si vedevano uguali, e
+     il quasi-verde si leggeva come promessa gia' scattata. Piena non
+     lo e' mai: il 100% e' la pill-trust verde di oggi, e il client si
+     ferma a 99. La larghezza la scrive renderAcquisto in
+     background-size, sempre (anche 0%).
+     IL COLORE E' `--barra-fill`, token a doppio valore (secondo giro,
+     13 ago 2026: col --trust-soft nudo la barra non si notava — e' il
+     fondo della pill-trust, nato per stare SOTTO un testo, non per
+     staccare da una carta quasi uguale). Stessa TINTA della fiducia,
+     piu' luce: a distinguere la barra dalla promessa scattata non e'
+     la saturazione ma la FORMA — parziale con bordo netto contro
+     pillola intera con ✅ e testo che lo dice — quindi il fill puo'
+     essere piu' carico del fondo della conferma senza mentire.
+     Misurati sull'inchiostro che ci sta sopra: 10,5 di giorno,
+     7,2 di sera. Si abbassa la luce, non si cambia il segno. */
   #acqCorpo > .pills .pill-barra{background-image:
-    linear-gradient(90deg,var(--trust-soft),var(--trust-soft));
+    linear-gradient(90deg,var(--barra-fill),var(--barra-fill));
     background-repeat:no-repeat}
   /* qui la tab bar non serve (e' una cassa, non una vetrina): sotto i
      768 sparisce come nella pagina del pacco, ma senza barra propria */
@@ -8464,18 +8476,29 @@ let acqDati = null;
     renderAcquisto ricostruisce l'HTML da zero a ogni ±/toggle/via.
     I ± e il ripiego riassegnano con {...d0}: il flag sopravvive. */
 
-/* Il punto parla col LOCKER e si chiama cosi' (ago 2026, decisione di
-   Andrea, che SUPERA il camioncino del 12 ago): «Spedizione a un
-   locker», e l'armadietto a sportelli lo dice al primo sguardo — il
-   🚚 diceva la famiglia (e' una spedizione) ma non la differenza con
-   «a casa», che qui e' tutta la scelta. Non esiste un'emoji del
-   locker: SVG inline a currentColor come le icone della nav, cosi'
-   si accende col testo della via nei due temi (inchiostro dentro
-   [2,22] col tratto compreso, la regola del ritaglio della nav).
-   NOME PIU' STRETTO DEL VERO, dichiarato: la via serve QUALUNQUE
-   punto della rete del corriere, anche quelli col banco (Punto Poste
-   in tabaccheria) — «locker» e' la parola che chi compra conosce,
-   non una promessa che il punto sia automatico.
+/* Il punto parla col LOCKER e si chiama «Spedizione a un
+   locker/punto di ritiro» (13 ago 2026, decisione di Andrea in DUE
+   giri: prima «locker» secco, che superava il camioncino del 12 —
+   il 🚚 diceva la famiglia ma non la differenza con «a casa» — poi
+   la CORREZIONE: «locker» era piu' stretto del vero, la via serve
+   QUALUNQUE punto della rete e con Poste la rete e' in gran parte
+   tabaccherie col banco. I MARCHI sono stati scartati: Fermopoint e'
+   di BRT, Punto Poste di Poste, InPost ha i suoi — nominarne uno
+   confonderebbe gli altri due terzi dei venditori. La doppia formula
+   dice il caso migliore, il locker che si apre col solo codice,
+   senza escludere nessuno — ed e' quella che usa Subito).
+   L'ETICHETTA E' SENZA ARTICOLO, e non e' sciatteria ma una misura:
+   «Spedizione a un locker/punto di ritiro» fa 276px nel font della
+   via e a 320px la colonna ne da' 258 — andava su DUE righe; senza
+   il solo «un» fa 255 e sta su una. Le due parole restano tutte; la
+   PROSA delle notifiche tiene l'articolo, che li' e' grammatica e
+   non larghezza. Quando le cifre di casa/punto DIVERGONO la colonna
+   si stringe ancora e il nome puo' andare a capo comunque: e' il
+   ripiego dichiarato, un a-capo pulito e mai un overflow.
+   L'armadietto resta: non esiste un'emoji del locker — SVG inline a
+   currentColor come le icone della nav, cosi' si accende col testo
+   nei due temi (inchiostro dentro [2,22] col tratto compreso, la
+   regola del ritaglio della nav).
    Il wrapper <span> non e' ornamento: .via-nome e' un flex in
    COLONNA, e un SVG nudo finirebbe SOPRA il testo invece che in riga. */
 const ICO_LOCKER = '<svg class="ico-locker" viewBox="2 2 20 20" aria-hidden="true">'
@@ -8491,7 +8514,7 @@ const ICO_LOCKER = '<svg class="ico-locker" viewBox="2 2 20 20" aria-hidden="tru
   + '<circle cx="9.8" cy="17.1" r="1" fill="currentColor"/></svg>';
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
-  : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a un locker</span>`
+  : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a locker/punto di ritiro</span>`
   : v==='digitale' ? '💾 Codice online' : '';
 
 /* LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA (ago 2026,
@@ -12629,7 +12652,7 @@ function openOrder(id){
             ricompare nel banner del pacco (vedi `puntoBanner`), che a
             campo ormai chiuso e' l'unico posto dove chi ha comprato
             ritrova DOVE andare a prenderlo. */''}
-      ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un locker: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
+      ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un locker/punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
       ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
       <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
            RETE DI SICUREZZA della scelta anticipata — il punto si
@@ -12754,8 +12777,8 @@ function openOrder(id){
                utile per comprare la copertura. La regola per esteso sta
                nella pagina «Il pagamento protetto». -->
           <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto <span class="fine-frase">bassa. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Scopri di più</button></span></div>
-          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>locker</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
-          ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
+          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>locker/punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
+          ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${selettoreCorriere('shipCorriere')}
@@ -16532,7 +16555,7 @@ function apriTuttiFermi(){
    server li manda GREZZI apposta. */
 const rigaFermo = o => {
   const g = Math.floor((Date.now()/1000 - o.fermo_da) / 86400);
-  const via = o.via_punto ? '📦 locker'
+  const via = o.via_punto ? '📦 locker/punto di ritiro'
             : (NOMI_VIA_FERMO[o.consegna_scelta] || '❓ strada non scelta');
   return `
     <div class="order">
