@@ -2007,9 +2007,14 @@
        del fondo. I margini negativi si annullano col padding gemello. */
     margin:0 calc(-1 * var(--pad));padding-left:var(--pad);padding-right:var(--pad)}
   .altri-azione .btn{margin-top:0}
-  /* i badge delle promesse, SOPRA il bottone: la fila delle pillole
-     senza respiro sotto — quello lo porta gia' il padding del blocco
-     appiccicato qui sopra */
+  /* il titolo della sezione, un gradino sopra gli 11px del
+     section-label di serie (13 ago 2026, chiesto da Andrea) */
+  .altri-tit{font-size:13px}
+  /* i badge delle promesse, DENTRO il blocco appiccicato e SOTTO il
+     bottone (terza rigirata, 13 ago 2026 — il perche' e i numeri
+     stanno sul template, in sezioneAltriOggetti): il margine sopra
+     li stacca dal bottone, il respiro sotto lo porta gia' il
+     padding del blocco */
   .altri-promo{margin:8px 0 0}
   .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
   /* (Il foglio del set — #setLista, .set-riga, .set-check — non esiste
@@ -8218,23 +8223,26 @@ async function sezioneAltriOggetti(l){
      esiste non ha nemmeno una spedizione da offrire. */
   const sgOk = promoOk ? regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
                                           l.spedGratisValuta) : null;
-  /* I BADGE STANNO SOPRA IL BOTTONE — «prima il perche', poi
-     l'azione», che e' l'ordine che la sezione aveva gia' con le due
-     righe di prosa che hanno sostituito.
-     CI SONO ARRIVATI DOPO UN GIRO, e il motivo va tenuto perche' non
-     si vede leggendo: SOTTO il bottone si spezzavano. Il bottone e'
-     `position:sticky` con fondo opaco, quindi scorrendo i badge gli
-     passano sotto UNO ALLA VOLTA — a 90px di scroll resta il solo
-     badge della spedizione, cioe' un negozio che promette due cose ne
-     mostra una. Una mezza verita' e' peggio del silenzio, e quello e'
-     anche il fotogramma su cui si atterra scorrendo piano. Sopra, i
-     due scorrono via INSIEME al titolo di sezione: un normale scroll,
-     niente che venga mangiato da una superficie.
-     LE DUE STRADE SCARTATE, misurate a 375×760: dentro `.altri-azione`
-     (sticky anche loro) la coppia non si spezza mai ma il cartello
-     fisso passa da 84 a 178px, il 23% dello schermo, sopra la merce e
-     con la barra d'acquisto che se ne prende altri 86; e lasciarli
-     sotto non-sticky e' proprio il difetto qui sopra.
+  /* TITOLO → BOTTONE → BADGE, E IL BLOCCO BOTTONE+BADGE E'
+     APPICCICATO (13 ago 2026, TERZO giro chiesto da Andrea — e il
+     verbale diceva «non rigirare una terza volta senza un meccanismo
+     nuovo»: il meccanismo c'e', ed e' la fila a RIGHE PIENE. Il
+     difetto delle prime due rigirate nasceva dai chip affiancati:
+     sotto il bottone sticky, non appiccicati, venivano mangiati UNO
+     ALLA VOLTA a meta' scorrimento — a 90px restava la sola
+     spedizione, la mezza verita' —; e dentro il blocco, da chip che
+     vanno a capo, gonfiavano il cartello fisso a 178px, il 23% dello
+     schermo, giudicato troppo. In colonna e DENTRO il blocco la
+     coppia non puo' spezzarsi per costruzione — verificato a meta'
+     scorrimento su 320/360/375: due badge su due, interi, sempre.
+     L'altezza MISURATA e riportata ad Andrea col numero: 180px (24%)
+     con DUE promesse — due px SOPRA i 178 scartati allora, e la
+     differenza rispetto ad allora e' che le righe si leggono invece
+     di essere chip accalcati; 135px con una promessa, 84px senza (il
+     valore di ieri, solo bottone). Identica alle tre larghezze,
+     perche' le righe piene non vanno mai a capo. Se il numero non
+     regge, le leve oneste sono i respiri del blocco, mai la veste
+     della fila. */
      Neutri: qui la promessa e' una REGOLA, e il verde vive solo dove
      e' un fatto (carrello e Paga). Dal 13 ago 2026 la fila veste
      .fila-promesse — righe a tutta larghezza come in Paga: SOLO la
@@ -8250,9 +8258,8 @@ async function sezioneAltriOggetti(l){
               + (scOk ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '');
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
-      <div class="section-label">Altri oggetti di questo venditore</div>
-      ${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}
-      ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button></div>` : ''}
+      <div class="section-label altri-tit">Altri oggetti di questo venditore</div>
+      ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button>${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}</div>` : ''}
       <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
     </div>`);
 }

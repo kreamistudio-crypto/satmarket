@@ -12934,30 +12934,33 @@ def prove_promesse_badge():
     prova("...e dice «da N pezzi in su» / «di articoli»", True,
           "pezzi in su" in _fps and "di articoli" in _fps)
 
-    # ---- 4. «ALTRI OGGETTI»: i badge SOTTO il bottone e SORELLI del
-    # blocco sticky. Dentro `.altri-azione` diventerebbero sticky anche
-    # loro, e il blocco incollato in cima coprirebbe due dita di card
-    # per tutto lo scroll.
-    # I BADGE STANNO SOPRA IL BOTTONE, e non e' una preferenza: sotto,
-    # il bottone e' `position:sticky` col fondo opaco e se li mangia UNO
-    # ALLA VOLTA — a mezzo scroll resta la sola spedizione, cioe' un
-    # negozio che promette due cose ne mostra una. Sopra scorrono via
-    # insieme al titolo di sezione, e la coppia resta atomica.
+    # ---- 4. «ALTRI OGGETTI»: TITOLO → BOTTONE → BADGE, col blocco
+    # bottone+badge APPICCICATO (13 ago 2026, TERZA rigirata chiesta
+    # da Andrea — il verbale la vietava «senza un meccanismo nuovo»,
+    # e il meccanismo e' la fila a RIGHE PIENE: il difetto delle prime
+    # due nasceva dai chip affiancati — mangiati uno alla volta sotto
+    # il bottone, o gonfiati a 178px dentro il blocco. In colonna e
+    # DENTRO il blocco la coppia non si spezza per costruzione, e
+    # l'altezza rimisurata sta nel commento del template).
     # SI MISURA IL MARKUP e non il nome della classe: scritta col nome
     # nudo, questa sentinella non poteva fallire — il commento della
     # funzione nomina `.altri-azione` PRIMA del template, quindi
-    # l'indice cadeva sul commento e lo scambio delle due righe passava
-    # liscio (l'ha detto la tortura, non la rilettura).
+    # l'indice cadeva sul commento (l'ha detto la tortura, non la
+    # rilettura).
     _ao = pezzo_js(mini, "async function sezioneAltriOggetti(l){")
-    prova("i badge stanno SOPRA il bottone", True,
-          _ao.index('<div class="pills altri-promo fila-promesse">')
-          < _ao.index('<div class="altri-azione">'))
-    # ...e fuori dal blocco appiccicato: dentro, il cartello fisso
-    # passerebbe da 84 a 178px, il 23% dello schermo sopra la merce
-    prova("...e fuori dal blocco appiccicato", True,
+    prova("il bottone viene PRIMA dei badge (terza rigirata)", True,
+          _ao.index('🛒 Aggiungi al carrello</button>')
+          < _ao.index('<div class="pills altri-promo fila-promesse">'))
+    prova("...e i badge stanno DENTRO il blocco appiccicato", True,
+          '</button>${badge ? `<div class="pills altri-promo'
+          ' fila-promesse">' in _ao)
+    prova("...che precede la griglia", True,
           _ao.index('<div class="altri-azione">')
           < _ao.index('<div class="grid altri-griglia">')
           and 'fila-promesse">${badge}</div>`' in _ao)
+    prova("...e il titolo della sezione ha il suo gradino", True,
+          'class="section-label altri-tit"' in _ao
+          and ".altri-tit{font-size:13px}" in mini)
     # Il chip azzurro della spedizione e' morto con lo sfollamento
     # colori: la regola CSS restava orfana a far credere che vivesse.
     # Si guardano la REGOLA e l'USO e non il nome nudo, che vive ancora
