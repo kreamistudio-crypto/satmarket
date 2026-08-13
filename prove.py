@@ -11217,6 +11217,43 @@ def prove_seo():
                                    "\n}\n"))):
         prova(f"...e {quale}", None, _re.search(r"listings\.forEach", corpo))
 
+    # --- 15ter) LA FASCIA PRIMA DELLE CARD, E LE CARD SUBITO -------
+    # (ago 2026, registrato coi fotogrammi su barattolo.store: la
+    # fascia del rodaggio si infilava sopra la griglia a card gia'
+    # dipinte — ~56px di salto, layout-shift v=0.035-0.044 — e la
+    # griglia aspettava anche ordini, preferiti, offerte e puntate:
+    # quattro giri di rete che alla vetrina non servono a disegnare)
+    avvia_js = pezzo_js(testo_mini, "async function avvia(){", "\n}\n")
+    prova("la fascia si disegna PRIMA della griglia, nei due avvii", 2,
+          testo_mini.count("await fasciaPrima();\n    renderGrid();"))
+    prova("...e il banner del rodaggio parte in testa, in parallelo",
+          True, avvia_js.index("caricaBannerTest();")
+          < avvia_js.index("${API_BASE}/me"))
+    prova("le card non aspettano ordini/preferiti/offerte/puntate",
+          True, avvia_js.index("await fasciaPrima()")
+          < avvia_js.index("await loadOrders()"))
+    # esatto, non «almeno»: il demo-path, quello dopo la fascia, e il
+    # ridisegno dell'accordo — un quarto (o un ritorno del render in
+    # coda) deve farsi vedere qui
+    prova("...e i renderGrid di avvia sono tre", 3,
+          avvia_js.count("renderGrid()"))
+    # l'accordo accettato e' l'unico dato tardivo che cambia una card
+    # intera (il verde di scontoQui via artStima legge offerteMie):
+    # senza questo ramo sparirebbe dal primo render e nessuno lo
+    # ridisegnerebbe mai
+    prova("un accordo vivo sulla vetrina ridisegna la griglia", True,
+          "o.stato==='accettata'" in avvia_js
+          and avvia_js.index("o.stato==='accettata'")
+          > avvia_js.index("await loadOfferte()"))
+    # la cache del banner-test e' la PROMESSA, non il risultato: col
+    # gate booleano il secondo chiamante in corsa prendeva null, e
+    # quel giorno niente fascia e niente cartello, in silenzio
+    prova("la cache del banner-test e' la promessa", True,
+          "if (!bannerTestPromessa)" in pezzo_js(
+              testo_mini, "async function caricaBannerTest(){", "\n}\n"))
+    prova("...e il vecchio gate sul risultato non esiste piu'", False,
+          "bannerTestLetto" in testo_mini)
+
     # --- 16) LE PIASTRELLE SONO LINK VERI --------------------------
     sf = pezzo_js(testo_mini, "function renderSfoglia(){", "\n}\n")
     prova("le piastrelle sono collegamenti veri", True,

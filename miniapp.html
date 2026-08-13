@@ -8415,31 +8415,53 @@ const TEST_CHIAVE = 'barattolo_test';
 let testModaleInCorso = false;
 let dopoModaleTest = null;    // chi aspetta il suo turno: il tour
 let bannerTest = null;        // la risposta del server: null = niente rodaggio
-let bannerTestLetto = false;  // si chiede UNA volta per apertura dell'app
+let bannerTestPromessa = null;  // il fetch, UNO per apertura (cache della promessa)
 function giornoOggi(){
   const d = new Date();       // giorno LOCALE, non UTC: le 2 di notte
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;   // sono ancora ieri sera
 }
 /* L'interruttore, il testo e il link arrivano tutti da qui: li usano
    sia il cartello (una volta al giorno) sia la fascia fissa in
-   vetrina (sempre). Un solo giro di rete per apertura. */
+   vetrina (sempre). Un solo giro di rete per apertura — e la cache e'
+   la PROMESSA, non il risultato (ago 2026): la chiamata parte in
+   testa ad `avvia()`, in parallelo col primo /me, e chi arriva mentre
+   la risposta e' ancora per strada deve ASPETTARLA. Con la cache sul
+   risultato il secondo chiamante prendeva un null in corsa, e quel
+   giorno niente fascia e niente cartello, in silenzio. */
 async function caricaBannerTest(){
-  if (bannerTestLetto) return bannerTest;
-  bannerTestLetto = true;
-  if (DEMO || !API_BASE) return bannerTest;    // nella demo non esiste
-  try {
-    /* endpoint pubblico: nessun header, lo legge anche l'anonimo */
-    const r = await fetch(`${API_BASE}/banner-test`);
-    if (r.ok) {
-      const d = await r.json();
-      if (d && d.attivo && d.testo) bannerTest = {
-        testo: String(d.testo),
-        /* solo http(s): il link e' nostro, ma non deve poter aprire
-           schemi strani */
-        link: /^https?:\/\//.test(d.link || '') ? d.link : ''};
-    }
-  } catch(e){}
-  return bannerTest;
+  if (!bannerTestPromessa) bannerTestPromessa = (async () => {
+    if (DEMO || !API_BASE) return bannerTest;  // nella demo non esiste
+    try {
+      /* endpoint pubblico: nessun header, lo legge anche l'anonimo */
+      const r = await fetch(`${API_BASE}/banner-test`);
+      if (r.ok) {
+        const d = await r.json();
+        if (d && d.attivo && d.testo) bannerTest = {
+          testo: String(d.testo),
+          /* solo http(s): il link e' nostro, ma non deve poter aprire
+             schemi strani */
+          link: /^https?:\/\//.test(d.link || '') ? d.link : ''};
+      }
+    } catch(e){}
+    return bannerTest;
+  })();
+  return bannerTestPromessa;
+}
+/* LA FASCIA PRIMA DELLE CARD (ago 2026, registrato coi fotogrammi):
+   `renderFasciaTest` viveva solo dentro `modaleTest`, in coda
+   all'avvio — quindi si infilava SOPRA la griglia a card gia'
+   dipinte, e ogni card scendeva di ~56px (misurato su
+   barattolo.store: layout-shift v=0.035-0.044, 170ms dopo le card).
+   Era il pezzo grosso dello «scatto» all'apertura. Ora la fascia si
+   disegna QUI, prima di renderGrid, aspettando la risposta partita
+   in testa ad avvia(): a quel punto e' gia' arrivata da un pezzo,
+   quindi l'attesa non costa niente — e se il server tace, tace anche
+   la fascia, senza trattenere le card piu' del suo fetch.
+   `modaleTest` in coda la ridisegna identica (stesso innerHTML:
+   nessun movimento) e tiene il suo mestiere, il cartello del giorno. */
+async function fasciaPrima(){
+  await caricaBannerTest();
+  renderFasciaTest();
 }
 function finiscoModaleTest(){
   const poi = dopoModaleTest; dopoModaleTest = null;
@@ -20074,6 +20096,9 @@ async function avviaVetrina(){
     mostraBanner(BANNER_VETRINA);
     bottoneLoginTelegram();
     bottoneLoginNostr();
+    /* la fascia del rodaggio PRIMA delle card, come in avvia(): la
+       risposta e' in volo dalla testa di avvia, l'attesa e' ~zero */
+    await fasciaPrima();
     renderGrid();
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
@@ -20101,6 +20126,12 @@ async function avvia(){
   if (!API_BASE) {                          // nessun backend configurato
     DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderGrid(); renderOrders(); return;
   }
+  /* Il banner del rodaggio parte SUBITO, in parallelo col primo /me:
+     quando le card saranno pronte la risposta e' gia' arrivata, e la
+     fascia si disegna PRIMA della griglia invece di infilarcisi sopra
+     (vedi fasciaPrima). Fire-and-forget: la promessa e' in cache e
+     chi la vorra' la aspettera' li'. */
+  caricaBannerTest();
   let scaduta = false;
   try {
     /* Primo sondaggio: initData se siamo dentro Telegram, altrimenti
@@ -20197,6 +20228,20 @@ async function avvia(){
     } else if (WEB) barraWeb(me.nome || 'amico');
     else b.style.display = 'none';
     await loadListings();
+    /* LE CARD SUBITO (ago 2026, registrato coi fotogrammi): la
+       griglia si disegnava dopo ANCHE ordini, preferiti, offerte e
+       puntate — quattro giri di rete sequenziali che alla vetrina non
+       servono a disegnare, cioe' 0,5-1,5s di griglia vuota su un
+       telefono vero. Ora si disegna appena la prima pagina c'e', con
+       la fascia del rodaggio davanti (fasciaPrima: gia' in volo dalla
+       testa di avvia, quindi l'attesa e' ~zero). Chi arriva dopo
+       riallinea IN PLACE, ed e' il pattern gia' dichiarato dei
+       barattolini («le card possono nascere prima del Set»:
+       caricaPreferiti chiama aggiornaJarCards); l'unico dato che puo'
+       cambiare una card intera e' un ACCORDO accettato su un annuncio
+       in vetrina — raro, per-compratore — e li' si ridisegna, sotto. */
+    await fasciaPrima();
+    renderGrid();
     await loadOrders();
     /* il barattolo dei preferiti segue l'identita': si azzera e si
        rilegge (fail-open: senza risposta resta vuoto) */
@@ -20206,10 +20251,18 @@ async function avvia(){
        (servono anche a openDetail per il banner dell'accordo) */
     offerteMie = [];
     await loadOfferte(); renderOfferte();
+    /* il verde dell'accordo in card (scontoQui via artStima) legge
+       offerteMie, che al render qui sopra era vuota: se un accordo
+       vivo tocca la vetrina si ridisegna — altrimenti il render resta
+       UNO, e nessuna foto lampeggia per niente */
+    if (offerteMie.some(o => o.stato==='accettata'
+        && o.compratore_id===myTgId
+        && vetrina.some(l => l.id===o.annuncio_id)))
+      renderGrid();
     await loadPuntate(); renderPuntate();
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
     if (editandoId) annullaModifica();   // una modifica a metà non segue l'identità nuova
-    renderGrid(); renderOrders();
+    renderOrders();
     /* Se eri dentro un ordine o una scheda annuncio (es. cambiando
        identità nel collaudo), la pagina si aggiorna con i dati freschi
        invece di restare quella di prima */
