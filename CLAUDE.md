@@ -7906,17 +7906,34 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nelle guardie di `bannerInstallaPwa()`; server muto o interruttore
   spento = il giorno NON si consuma e il seguito parte comunque.
   Il cartello passa una volta al giorno, ma la porta al canale resta:
-  fascia `#fasciaTest` sotto la trust-line di Esplora
-  (`renderFasciaTest`, chiamata da `modaleTest`) — «🚧 Barattolo è in
-  fase di test — 💬 Dicci la tua ›», stesso interruttore e stesso
+  fascia `#fasciaTest` sotto la trust-line di Esplora — «🚧 Barattolo
+  è in fase di test — 💬 Dicci la tua ›», stesso interruttore e stesso
   link, anche per gli anonimi, mai in DEMO, e senza link nel config
   resta un `<div>` che non finge di essere toccabile. Volutamente NON
   un CTA pieno: fondo `--sats-soft` col bordo ₿ da 1.5px e testo
   `--sats-text` (token, quindi chiaro e scuro gratis), niente ombra
   piena — l'arancione pieno resta del «+ Vendi» e dei bottoni
-  d'acquisto, che non devono avere rivali. La risposta del server la
-  legge `caricaBannerTest()` UNA volta per apertura e la tengono in
-  comune cartello e fascia.
+  d'acquisto, che non devono avere rivali.
+  LA FASCIA SI DISEGNA PRIMA DELLE CARD (ago 2026, registrato coi
+  fotogrammi su barattolo.store): `renderFasciaTest` viveva SOLO
+  dentro `modaleTest`, in coda all'avvio, quindi si infilava sopra la
+  griglia a card già dipinte — ogni card scendeva di ~56px, 170 ms
+  dopo le card (layout-shift v=0.035-0.044, sorgenti `#grid` +
+  `.strumenti`), ed era il pezzo grosso dello «scatto» all'apertura.
+  Ora il fetch di `/api/banner-test` PARTE IN TESTA ad `avvia()`, in
+  parallelo col primo /me, e `fasciaPrima()` — aspetta la risposta e
+  disegna la fascia — sta subito PRIMA di `renderGrid()` nei due
+  avvii: quando le card sono pronte la risposta è arrivata da un
+  pezzo, quindi l'attesa è ~zero (è il nostro stesso server: se
+  tacesse lui, tacerebbero anche le card). `modaleTest` in coda
+  ridisegna la fascia identica (nessun movimento) e tiene il suo
+  mestiere, il cartello del giorno.
+  E LA CACHE DI `caricaBannerTest()` È LA PROMESSA, NON IL RISULTATO,
+  ed è la trappola aperta dal parallelismo: col gate booleano di
+  prima (`bannerTestLetto`) il secondo chiamante arrivato mentre la
+  risposta era in volo prendeva un null — e quel giorno niente fascia
+  e niente cartello, in silenzio. Un solo giro di rete per apertura,
+  come sempre; cambia solo su COSA si aspetta.
   Contatore dei pionieri (lug 2026): «830 oggetti» e «24 pionieri»
   sono un BLOCCO in colonna (`.conta-blocco`) DENTRO la riga di
   ordina+filtri, accanto ai controlli — il select è alto il triplo di
@@ -13351,6 +13368,38 @@ deploy: nessuna colonna, nessuna leva, nessuna rotta, e sw.js non si
 tocca (nessun HTML sta in dispensa). DA GUARDARE dal telefono, che è
 l'unico posto dove il difetto si vedeva: l'apertura dentro Telegram e
 in PWA installata.
+E IL SECONDO GIRO, dal telefono di Andrea («lo scatto c'è ancora,
+identico a prima»): rifatti i fotogrammi sul codice nuovo, IN
+PRODUZIONE — il cartello era morto davvero (altezza 0 a ogni giro),
+e a dipingersi era un'altra coppia: la FASCIA del rodaggio che si
+infilava sopra la griglia a card già dipinte (~56px di salto, 170 ms
+dopo le card) e le card che nascevano SENZA foto per poi riempirsi —
+due ricambi nello stesso quinto di secondo, ed erano lì da prima del
+cartello: due difetti sovrapposti, se n'era tolto uno. Le due cure
+(decisione di Andrea: queste due, e NIENTE sagome-fantasma alla
+Vinted finché l'attesa non torna a dare fastidio): la fascia si
+disegna PRIMA delle card col fetch partito in testa all'avvio (vedi
+la voce sua, con la trappola della cache-promessa), e `renderGrid`
+parte SUBITO dopo `loadListings` invece che dopo anche ordini,
+preferiti, offerte e puntate — quattro giri di rete sequenziali che
+alla vetrina non servivano a disegnare, misurati −271 ms in locale a
+40 ms di RTT (su un telefono ~0,5-1,5 s). Chi arriva dopo riallinea
+IN PLACE (il pattern dichiarato dei barattolini); l'unico dato
+tardivo che cambia una card intera è un ACCORDO accettato su un
+annuncio in vetrina, e lì — e solo lì — la griglia si ridisegna.
+Il pop-in delle foto resta e non ha una cura da questo lato: la
+`.ph` ha già la sua altezza (zero shift, solo il contenuto che
+arriva) e dalla seconda apertura la cache HTTP di un giorno lo rende
+istantaneo — con la fascia ferma smette di leggersi come un
+ricambio. Collaudato: 3121 prove verdi (7 nuove) e SEI mutazioni una
+per riga sorvegliata, tutte rosse; fotogrammi rifatti sui DUE avvii
+(autenticato, e anonimo forzando un 401 su /api/me via CDP): il
+primo fotogramma con la griglia ha già la fascia sopra, e dopo le
+card non si muove più niente (`#grid` sparito dalle sorgenti di
+layout-shift). IN PRODUZIONE basta il deploy: solo client. DA
+GUARDARE dal telefono: se la griglia vuota che resta (~1-1,5 s) dà
+ancora fastidio, il passo dichiarato sono le sagome-fantasma
+(~40-60 righe, stimate e non fatte apposta).
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
