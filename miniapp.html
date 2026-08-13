@@ -3350,8 +3350,6 @@ document.getElementById('cartello')?.remove();</script>
         <option value="">Più recenti</option>
         <option value="prezzo_su">Prezzo: dal più basso</option>
         <option value="prezzo_giu">Prezzo: dal più alto</option>
-        <option value="lampo">⚡ Offerta a tempo</option>
-        <option value="asta">🔨 All'asta</option>
       </select>
       <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       <button id="filtriBtn" type="button" onclick="toggleFiltri()">Filtri</button>
@@ -5185,7 +5183,10 @@ let mieiRipristina = false; // il RITORNO l'ha chiesto: lo consuma il render
    nelle app di mercatino note; "Azzera" pulisce il filtro. Il filtro
    si scrive nella valuta del toggle attivo al momento di Applica:
    se guardi in euro scrivi euro, la conversione la fa il server. */
-let ordinaVista = '';        // '' = piu' recenti | prezzo_su | prezzo_giu | lampo
+let ordinaVista = '';        // la scelta ESPLICITA: '' | prezzo_su |
+                             // prezzo_giu. Le due per scadenza non si
+                             // scelgono piu': si ereditano dalla
+                             // spunta (vedi ordinaEffettivo)
 let filtroPrezzo = null;     // {min, max, valuta} applicato, o null
 let filtroSped = false;      // «solo con spedizione» (stato di sessione)
 let filtroRitiro = false;    // «ritiro in zona» (stesso patto)
@@ -5203,7 +5204,10 @@ function paramsVetrina(){
   /* La ricerca semplice lato server e' della vetrina anonima:
      dentro Telegram il campo Cerca parla con l'AI */
   if (VETRINA) { const q = el('q').value.trim(); if (q) p.set('q', q); }
-  if (ordinaVista) p.set('ordina', ordinaVista);
+  /* l'ordine EFFETTIVO: quello scelto, o quello ereditato dalla
+     spunta dell'occasione (vedi ordinaEffettivo) */
+  const _ord = ordinaEffettivo();
+  if (_ord) p.set('ordina', _ord);
   if (filtroPrezzo) {
     if (filtroPrezzo.min) p.set('prezzo_min', filtroPrezzo.min);
     if (filtroPrezzo.max) p.set('prezzo_max', filtroPrezzo.max);
@@ -5231,6 +5235,41 @@ function paramsVetrina(){
    che sopravvivono al cambio categoria. */
 const condFiltrabile = () => !senzaCondizione(activeCat, '');
 
+/* L'ORDINE EFFETTIVO DELLA VETRINA, in un posto solo (ago 2026,
+   decisione di Andrea: «l'urgenza la eredita il filtro»).
+   «Offerta a tempo» e «All'asta» erano DUE VOCI dell'Ordina, e
+   ordinavano DAVVERO — per scadenza crescente, chi finisce prima in
+   testa — implicando il filtro. Ma quel filtro c'e' gia' fra le
+   spunte, quindi la stessa cosa si faceva in due posti: un bivio
+   davanti a chi sceglie, senza una risposta giusta.
+   Adesso le voci sono TRE e il criterio non si perde: spuntata UNA
+   SOLA occasione, la vetrina si ordina da se' per la sua scadenza —
+   che su un'offerta a tempo e' precisamente la notizia. Con DUE
+   spunte insieme no, e non e' una dimenticanza: li' non esiste una
+   scadenza sola da guardare, e l'ordine di sempre e' l'unica risposta
+   onesta.
+   LA SCELTA ESPLICITA VINCE SEMPRE: chi tocca «Prezzo dal piu' basso»
+   ottiene quello, spunte o non spunte. L'eredita' vale solo sul
+   DEFAULT — che e' anche l'unico stato in cui il campo non stava
+   dicendo niente di suo.
+   CONSEGUENZA DICHIARATA: con un'occasione spuntata «Piu' recenti»
+   non e' piu' raggiungibile — '' vale sia «non ho scelto» sia «voglio
+   i piu' recenti», e distinguerli vorrebbe dire un secondo stato per
+   un caso che nessuno ha chiesto. */
+function ordinaEffettivo(){
+  if (ordinaVista) return ordinaVista;
+  if (filtroLampo && !filtroAsta) return 'lampo';
+  if (filtroAsta && !filtroLampo) return 'asta';
+  return '';
+}
+/* ...e l'etichetta che il campo-bottone mostra: l'ordine EFFETTIVO e
+   non il valore del select, o il campo direbbe «Piu' recenti» mentre
+   la vetrina e' in scadenza — la bugia che il pannello Filtri ha gia'
+   una regola per non dire (la regione che resta in elenco anche a
+   zero annunci). Le due etichette ereditate NON sono voci del menu:
+   si leggono, non si scelgono. */
+const ETICHETTE_ORDINE = {lampo: '⚡ Chi scade prima',
+                          asta: '🔨 Chi chiude prima'};
 function setOrdina(v){
   ordinaVista = v; haptic();
   if (el('ordinaSel')) el('ordinaSel').value = v;   // sincrono anche da codice
@@ -5311,6 +5350,10 @@ function applicaFiltri(){
   filtroCond = el('filtroCondSel').value;
   filtroReg = el('filtroRegSel').value;
   el('filtriBtn').classList.toggle('attivo', filtriVivi());
+  /* l'ordine puo' essere EREDITATO dalle spunte appena cambiate: il
+     campo-bottone va riallineato qui, o direbbe «Piu' recenti» su una
+     vetrina in scadenza (trovato dal vivo, non leggendo il codice) */
+  aggiornaPicker('ordinaSel');
   el('filtriBox').style.display = 'none';
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
@@ -5336,6 +5379,7 @@ function azzeraFiltri(){
   filtroSpedGratis = false; filtroSconto = false;
   filtroCond = ''; filtroReg = '';
   el('filtriBtn').classList.remove('attivo');
+  aggiornaPicker('ordinaSel');   /* l'eredita' e' appena caduta */
   el('filtriBox').style.display = 'none';
   if (!cera) return;
   if (DEMO) { renderGrid(); return; }
@@ -5597,8 +5641,19 @@ function vaiAste(){
   ramoVetrina = 'aste';
   filtroAsta = true;
   if (el('filtroAstaInp')) el('filtroAstaInp').checked = true;
-  ordinaVista = 'asta';
-  if (el('ordinaSel')) { el('ordinaSel').value = 'asta'; aggiornaPicker('ordinaSel'); }
+  /* ...e la scelta esplicita di prima si azzera: nel giudice vince
+     sempre lei, quindi un «prezzo dal piu' basso» rimasto in memoria
+     terrebbe la pagina delle aste fuori dall'ordine per scadenza —
+     che e' l'unica cosa che quella pagina deve garantire. */
+  ordinaVista = '';
+  if (el('ordinaSel')) el('ordinaSel').value = '';
+  /* l'ordine per scadenza NON si imposta piu' a mano: lo EREDITA
+     dalla spunta «All'asta» qui sopra (ordinaEffettivo), e cosi' il
+     campo-bottone dice la verita' da solo invece di mostrare «Piu'
+     recenti» su una vetrina in scadenza. La pagina delle aste resta
+     ordinata per chi chiude prima — decisione di Andrea: e' una gara,
+     e li' il tempo E' il criterio. */
+  aggiornaPicker('ordinaSel');
   go('esplora');
   if (typeof navRiflette === 'function') navRiflette();
   if (DEMO) { renderGrid(); return; }
@@ -6508,10 +6563,9 @@ function vaiEsplora(){
   if (ramoVetrina === 'aste') {
     filtroAsta = false;
     if (el('filtroAstaInp')) el('filtroAstaInp').checked = false;
-    if (ordinaVista === 'asta') {
-      ordinaVista = '';
-      if (el('ordinaSel')) { el('ordinaSel').value = ''; aggiornaPicker('ordinaSel'); }
-    }
+    /* l'ordinamento non c'e' piu' da spegnere: era ereditato dalla
+       spunta, che la riga qui sopra ha appena tolto */
+    aggiornaPicker('ordinaSel');
     if (!DEMO && activeCat === 'Tutto')
       loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
   }
@@ -6580,13 +6634,16 @@ function renderGrid(items){
     if (filtroSpedGratis)
       data = data.filter(l => spedGratis(l) || spedGratisQui(l, 1));
 
-    if (ordinaVista === 'lampo')
+    /* lo STESSO giudice della vetrina vera, o demo e vetrina
+       ordinerebbero diverso */
+    const ord = ordinaEffettivo();
+    if (ord === 'lampo')
       /* come sul server: solo le lampo vive, chi scade prima in testa */
       data = data.filter(lampoAttiva).sort((a,b) => a.lampoFine - b.lampoFine);
-    else if (ordinaVista === 'asta')
+    else if (ord === 'asta')
       data = data.filter(astaViva).sort((a,b) => a.astaFine - b.astaFine);
-    else if (ordinaVista)
-      data.sort((a,b) => ordinaVista==='prezzo_su' ? a.price-b.price : b.price-a.price);
+    else if (ord)
+      data.sort((a,b) => ord==='prezzo_su' ? a.price-b.price : b.price-a.price);
   }
   /* Il conteggio arancione in fondo alla linea puntinata: data.length
      e' un numero, mai testo utente. Coi dati vivi dice il totale VERO
@@ -11648,8 +11705,15 @@ const PICKER = {
   ordinaSel: {titolo:'Ordina la vetrina',
     voci: () => [...el('ordinaSel').options].map(o => ({val:o.value,
       resa:`<span>${esc(o.text)}</span>`})),
-    campo: v => `<span>${esc([...el('ordinaSel').options]
-      .find(o => o.value === v)?.text || '')}</span>`,
+    campo: () => {
+      /* il campo dice l'ordine EFFETTIVO, non il valore del select:
+         con un'occasione spuntata l'ordine e' ereditato, e «Piu'
+         recenti» sarebbe falso */
+      const e = ordinaEffettivo();
+      return `<span>${esc(ETICHETTE_ORDINE[e]
+        || [...el('ordinaSel').options].find(o => o.value === e)?.text
+        || '')}</span>`;
+    },
     poi: v => setOrdina(v)},
 };
 let pickerTrigger = null;      /* il campo-bottone da rimettere a fuoco */

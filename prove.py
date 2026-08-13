@@ -13779,11 +13779,90 @@ def prove_verde_e_filtri():
     prova("l'ordinamento resta in AND, fuori dall'unione", True,
           'if ordina in ("lampo", "asta"):' in _lista)
 
+    # ---- 9. L'ORDINA TORNA A TRE VOCI (ago 2026, decisione di Andrea).
+    # «Offerta a tempo» e «All'asta» erano ordinamenti VERI — per
+    # scadenza crescente, chi finisce prima in testa — ma implicavano
+    # il filtro, che c'e' gia' fra le spunte: la stessa cosa si faceva
+    # in due posti. Il criterio pero' NON si perde, e non doveva:
+    # spuntata UNA SOLA occasione, la vetrina lo eredita.
+    _voci = re.findall(r'<option value="([^"]*)">([^<]*)</option>',
+                       mini[mini.index('id="ordinaSel"'):
+                            mini.index("</select>",
+                                       mini.index('id="ordinaSel"'))])
+    prova("l'Ordina della vetrina ha TRE voci", 3, len(_voci))
+    prova("...e sono queste", ["", "prezzo_su", "prezzo_giu"],
+          [v for v, _ in _voci])
+    # IL GIUDICE UNICO dell'ordine effettivo: lo chiedono il parametro
+    # al server, il campo-bottone e il ramo DEMO — tre copie della
+    # regola divergerebbero al primo ritocco.
+    _oe = pezzo_js(mini, "function ordinaEffettivo(){", "\n}")
+    prova("l'ordine effettivo ha un giudice solo", 1,
+          mini.count("function ordinaEffettivo("))
+    # 4 = la definizione piu' i TRE chiamanti (parametro al server,
+    # campo-bottone, ramo DEMO)
+    prova("...e lo chiedono in tre", 4, mini.count("ordinaEffettivo()"))
+    # LA SCELTA ESPLICITA VINCE: l'eredita' vale solo sul default
+    prova("la scelta esplicita vince sull'eredita'", True,
+          "if (ordinaVista) return ordinaVista;" in _oe)
+    # UNA SOLA occasione eredita: con due spunte non esiste una
+    # scadenza sola da guardare, e l'ordine di sempre e' l'unica
+    # risposta onesta
+    prova("eredita solo con UNA occasione spuntata", (True, True),
+          ("if (filtroLampo && !filtroAsta) return 'lampo';" in _oe,
+           "if (filtroAsta && !filtroLampo) return 'asta';" in _oe))
+    # IL CAMPO NON MENTE: mostra l'ordine EFFETTIVO e non il valore del
+    # select — che con un'occasione spuntata direbbe «Piu' recenti» su
+    # una vetrina in scadenza (la regola del pannello Filtri, dove la
+    # regione resta in elenco anche a zero annunci)
+    _cmp = mini[mini.index("  ordinaSel: {titolo:"):
+                mini.index("poi: v => setOrdina(v)}")]
+    prova("il campo dice l'ordine effettivo", True,
+          "const e = ordinaEffettivo();" in _cmp)
+    prova("...con le etichette dell'ordine ereditato", True,
+          "ETICHETTE_ORDINE[e]" in _cmp)
+    prova("...che non sono voci del menu", 0,
+          sum(1 for v, _ in _voci if v in ("lampo", "asta")))
+    # LA RADICE ASTE tiene l'ordine per scadenza (decisione di Andrea:
+    # e' una gara, e li' il tempo E' il criterio) ma non lo imposta
+    # piu' a mano: lo eredita dalla sua spunta, e cosi' il campo dice
+    # la verita' senza un ramo apposta.
+    _va = pezzo_js(mini, "function vaiAste(){", "\n}")
+    prova("la radice Aste accende la spunta", True,
+          "filtroAsta = true;" in _va)
+    prova("...e NON imposta piu' l'ordinamento a mano", False,
+          "ordinaVista = 'asta'" in mini)
+    # e uscendo non c'e' piu' niente da spegnere: l'ordine era
+    # ereditato dalla spunta, che vaiEsplora toglie
+    # 2 = la DICHIARAZIONE piu' la radice Aste, che azzera la scelta
+    # esplicita per poter EREDITARE l'ordine per scadenza (nel
+    # giudice la scelta vince sempre, e una rimasta in memoria
+    # terrebbe la pagina delle aste fuori dal suo ordine).
+    # vaiEsplora invece non spegne piu' niente: l'ordine era
+    # ereditato dalla spunta, che lui toglie.
+    prova("...e l'unico che lo azzera e' la radice Aste",
+          (2, True), (mini.count("ordinaVista = '';"),
+                      "ordinaVista = '';" in _va))
+    # il DEMO ordina con lo STESSO giudice, o demo e vetrina vera
+    # ordinerebbero diverso
+    prova("in DEMO l'ordine viene dallo stesso giudice", True,
+          "const ord = ordinaEffettivo();" in _rg)
+    prova("...e il DEMO non guarda piu' ordinaVista a mano", False,
+          "ordinaVista === 'lampo'" in mini)
+    # IL SERVER NON CAMBIA: gli ordinamenti restano cinque, e i due per
+    # scadenza sono ancora raggiungibili — adesso li chiede il client
+    # quando eredita, e un client vecchio in cache continua a mandarli
+    # come sempre. Toglierli avrebbe rotto lui, non noi.
+    prova("il server tiene i cinque ordinamenti", (True, True),
+          ('"lampo":      ("lampo_scadenza", "ASC", ">")' in src,
+           '"asta":       ("asta_scadenza", "ASC", ">")' in src))
+
     # ---- 7. LE ETICHETTE: «In offerta» non basta piu' a distinguere.
-    # e la rinomina vale anche per la VOCE di Ordina, che sta a un
-    # centimetro dalla spunta: due nomi per la stessa cosa nella
-    # stessa schermata sono il difetto che la rinomina toglie
-    prova("«In offerta» e' diventata «Offerta a tempo»", (2, False),
+    # La voce di Ordina non esiste piu' (ago 2026, decisione di
+    # Andrea): quelli erano ordinamenti VERI — per scadenza — ma la
+    # stessa cosa si faceva coi filtri, e due strade per una cosa
+    # sola sono un bivio. Resta UNA sola «Offerta a tempo», la
+    # spunta; l'urgenza la eredita il filtro (ordinaEffettivo).
+    prova("«Offerta a tempo» e' rimasta la sola spunta", (1, False),
           (mini.count("⚡ Offerta a tempo"), "⚡ In offerta" in mini))
     prova("...e accanto ci sono le due nuove", (True, True),
           ("🚚 Spedizione gratis" in mini, "🎁 In sconto" in mini))
