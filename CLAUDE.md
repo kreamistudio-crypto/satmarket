@@ -6333,8 +6333,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   84 (una promessa / nessuna) scendono degli stessi 4px; identico
   alle tre larghezze, perché le righe piene non vanno a capo. Se il
   numero un giorno non reggesse ancora, di respiri onesti ne restano
-  pochi: la leva successiva è una decisione, non un ritocco. Col
-  giro è cresciuto il TITOLO
+  pochi: la leva successiva è una decisione, non un ritocco.
+  IL TITOLO STA SU UNA RIGA, E IL DIFETTO ERA PREESISTENTE (13 ago
+  2026, dal campo: col gradino a 13px «Altri oggetti di questo
+  venditore» andava a capo). MISURATO prima di scegliere, ed è la
+  misura che ha deciso: a 320 quel testo andava a capo **anche agli
+  11px di serie** (250px di testo contro 246 di budget) — il gradino
+  non ha creato niente, ha solo reso visibile una cosa che c'era, e
+  «tornare al corpo di prima» non sarebbe stata una cura. Anche a
+  375 il 13px ci stava con 5px di puntini, cioè con la linea
+  praticamente sparita. LA CURA HA DUE GAMBE, tutte e due dentro le
+  leve concesse da Andrea («un corpo più piccolo, meno spazio ai
+  lati, o una formula più corta»): 1) il PADDING LATERALE DOPPIO
+  tolto — `.section-label` porta il suo `var(--pad)` perché di
+  solito vive attaccato al bordo della vista, ma dentro
+  `.detail-body` quel padding c'è già e i due si sommavano: il
+  titolo rientrava di 16px rispetto a bottone e card, e toglierlo
+  ALLINEA la colonna (left 32 → 16, verificato uguale ai tre) oltre
+  a restituire 32px; 2) la FORMULA PIÙ CORTA, «Altri oggetti del
+  venditore» — via il solo «questo», l'informazione resta intera.
+  Risultato misurato: una riga a 320/360/375 nei due temi, con 36 /
+  76 / 91px di linea puntinata. IL TESTO INTERO A 13px NON CI STA a
+  320 in nessun modo onesto: nemmeno senza padding (296 contro 278),
+  e le vie che lo farebbero entrare mangiano il letter-spacing del
+  maiuscoletto (a `normal` entra, ma quel `.1em` è il tratto di
+  famiglia di TUTTI i section-label) o riportano il corpo a 11,5px,
+  cioè annullano il gradino. Col giro è cresciuto il TITOLO
   della sezione (`.altri-tit`, 13px contro gli 11 del section-label
   di serie). LA LEZIONE di ieri resta vera dove è nata: **contenuto
   corto e ATOMICO non va messo sotto un elemento sticky** — dentro,
