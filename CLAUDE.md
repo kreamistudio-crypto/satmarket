@@ -5994,6 +5994,66 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ferri UNA alla volta e le partenze riunite reggono lo stesso: la
   cattura della seconda trova la prima già tutta alle partenze (i
   bersagli aspettano il rAF), mai a metà.
+  E ALLO SCATTO C'È UN IMPULSO (13 ago 2026, chiesto da Andrea): un
+  anello del verde della promessa si allarga dalla pillola e svanisce
+  — mezzo secondo, una volta sola. Fino a ieri quel momento lo diceva
+  il solo colore, e un colore lo vede solo chi in quell'istante stava
+  guardando.
+  È UN ANELLO E NON UNA BANDA DI LUCE CHE ATTRAVERSA LA PILLOLA, ed è
+  la parte da tenere perché la banda è la forma che viene in mente per
+  prima: costruita, fotografata e SCARTATA sul contrasto del TESTO. In
+  tema chiaro era perfino un guadagno — l'inchiostro è scuro e
+  schiarire il fondo lo aiuta, 8,01 → 12,60 — ma di sera l'inchiostro
+  è CREMA e la stessa banda lo portava **da 5,34 a 1,25**: le parole
+  sparivano per un decimo di secondo, proprio nell'istante che
+  l'animazione esiste per far notare. E non è una taratura mancata: al
+  buio QUALUNQUE schiarita del fondo abbassa il contrasto di un testo
+  chiaro, e partendo da 5,34 il margine sotto la soglia AA finisce
+  prima che la banda si veda — mentre una forma diversa nei due temi è
+  precisamente ciò che qui non si fa (si abbassa la luce, non si cambia
+  il segno). L'anello invece le parole non le tocca MAI, perché sta
+  FUORI dalla pillola: è un `box-shadow`, e l'`overflow:hidden` del
+  guscio non lo taglia — quello ritaglia i FIGLI, e l'ombra è della
+  scatola. Nessun contenitore lungo la strada (la fila, il blocco
+  appiccicato del carrello, il fondo di Paga) ha un overflow che la
+  mangi: verificato prima, non sperato.
+  SI CHIAMA «IMPULSO» E NON «LAMPO» APPOSTA: in questo progetto la
+  lampo è l'offerta a tempo (`--lampo`, `.lampo-was`, il rosso ⚡), e
+  due significati per la stessa parola nello stesso foglio sono il
+  posto dove fra sei mesi si sbaglia riga. C'è la prova che «lampo»
+  non ricompaia da questa parte.
+  PARTE SOLO ALLO SCATTO, e non serve una guardia nuova: la classe si
+  attacca DENTRO il ramo `scatto` di `barreCorri`, cioè dove la
+  pillola è `pill-trust` E la corsa avviene davvero — su una verde a
+  riposo la cattura vale 100 e il filtro dei 0.5 ha già fatto uscire
+  il giro. È una proprietà del filtro che c'era già; chi porta la
+  classe fuori da quel ramo la fa ripartire a ogni tocco.
+  DUE PROMESSE INSIEME NON PULSANO INSIEME (decisione di Andrea): la
+  seconda parte quando la prima è a metà corsa
+  (`IMPULSO_PASSO` 260ms), così si legge come un gesto in due battute
+  invece di un doppio colpo — e l'ordine è quello della fila, 🚚 poi
+  🎁. Il ritardo si scrive dalla SECONDA in poi: scritto al rovescio
+  ritarderebbe anche la prima.
+  NIENTE RESIDUO PER COSTRUZIONE: `both` tiene il fotogramma iniziale
+  durante l'eventuale ritardo (anello a spessore zero, nascosto dietro
+  la pillola) e quello finale dopo (anello TRASPARENTE), quindi la
+  pillola a riposo è identica a ieri senza che nessuno ripulisca
+  niente — ed è ciò che rende vera la LEVA DA UNA RIGA che Andrea ha
+  chiesto: `IMPULSO_SCATTO` a false e si torna esattamente a prima, la
+  classe non si attacca più e il blocco CSS resta inerte perché non
+  veste nessuno. Reduced-motion lo SPEGNE (`animation:none`) e non lo
+  ferma: con `animation-play-state` resterebbe un anello piantato
+  attorno alla pillola per sempre.
+  E LA SCOPERTA È ARRIVATA DA UN BUG, che è la lezione di metodo del
+  giro: la prima infornata di fotogrammi è uscita senza animazione
+  perché **Chrome headless dichiara `prefers-reduced-motion: reduce`
+  DI SERIE** — cioè si stava fotografando il ramo che spegne, e la
+  guardia si è verificata gratis. Chi fotografa un'animazione passi da
+  `Emulation.setEmulatedMedia` con `no-preference`, o crederà di aver
+  scritto una cosa che non si vede. Il moto in headless non avanza
+  comunque (la lezione della tastiera, e già quella della corsa): i
+  fotogrammi si CONGELANO con `animation-play-state:paused` più un
+  `animation-delay` negativo, che è l'istante e non il movimento.
   E QUANDO LO SCONTO SCATTA SI VEDE ANCHE SULL'UNITARIO (ago 2026,
   decisione di Andrea — la via (c) fra le tre proposte): accanto
   all'unitario compare il tag verde «−X%» (`.sconto-tag`, la lingua
