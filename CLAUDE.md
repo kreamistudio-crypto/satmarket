@@ -5613,6 +5613,29 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'uniformità della fila fra le quattro superfici, e nel SET non
   c'è una card sola che li ospiti; per un problema che era
   d'aspetto, la cura è stata la veste e non la posizione.
+  E LE RIGHE SI RIEMPIONO COL PROGRESSO (13 ago 2026, decisione di
+  Andrea, scelta su DUE prototipi guardati a schermo): la pillola
+  sotto soglia si riempie del verde tenue da sinistra, con un bordo
+  NETTO, man mano che il carrello sale — `barraPromessa` in
+  renderAcquisto scrive `background-size` sulla classe `.pill-barra`.
+  Il progresso è `(soglia − mancano)/soglia`, coi numeri che il
+  preventivo porta GIÀ e nell'unità della promessa: il client riceve,
+  non calcola. A pezzi sale a gradini, a VALORE è continuo — la barra
+  dice la verità in tutti e due i casi senza un ramo, e a cambio muto
+  la promessa in euro non è una pillola ma prosa, quindi lì la barra
+  non esiste per costruzione. TRE righe da non ammorbidire: il TETTO
+  A 99 (una barra piena su una pillola non-verde direbbe «scattata» a
+  chi guarda solo il colore — piena è solo la pill-trust); lo style
+  che c'è SEMPRE, anche a 0% (senza background-size esplicito il
+  background-image coprirebbe la pillola intera, cioè il falso al
+  primo pezzo); e NIENTE transizione, perché renderAcquisto
+  ricostruisce l'HTML a ogni ± e il nodo nuovo non ha un «da» da cui
+  animarsi. LA STRADA SCARTATA, prototipata e fotografata: il colore
+  che si SATURA (color-mix verso il verde) — 67% e 73% si vedevano
+  uguali, e il quasi-verde si leggeva come promessa già scattata. I
+  badge gemelli del CARRELLO restano senza barra, dichiarato: lì il
+  conto a valore in euro è client-side col cambio (l'imperfezione già
+  dichiarata dell'invito), estenderli è un secondo passo.
   E QUANDO LO SCONTO SCATTA SI VEDE ANCHE SULL'UNITARIO (ago 2026,
   decisione di Andrea — la via (c) fra le tre proposte):
   l'unitario nella card resta il PIENO, mai barrato, e accanto gli
