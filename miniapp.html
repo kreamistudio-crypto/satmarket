@@ -14868,15 +14868,20 @@ function renderScontoPacco(){
   const inSats = b.valuta === 'sats';
   const pill = (v, testo, campo) =>
     `<button data-campo="${campo}" data-v="${v}" onclick="scontoPaccoPill('${campo}',${typeof v==='string'?`'${v}'`:v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
-  const pillValore = v => pill(v, inSats ? `${fmt(v)} sats` : `${fmt(v)} €`,
+  /* il «da» sta su TUTTE E DUE le famiglie di pillole — «da 3 pezzi» e
+     «da 25 €» — o i due criteri si scriverebbero in due modi, e si
+     nota. Costa 70px alla fila, che a 320px va su due righe: accettato
+     (decisione di Andrea), che in sats due righe sono gia' lo stato
+     normale di questo cassetto. */
+  const pillValore = v => pill(v, inSats ? `da ${fmt(v)} sats` : `da ${fmt(v)} €`,
                               inSats ? 'valoreSats' : 'valoreEur');
+  /* NIENTE SOTTOTITOLO (ago 2026, decisione di Andrea): la regola la
+     dicono le SCELTE — le due pillole del criterio, l'etichetta sopra
+     le soglie, le pillole col «da» davanti e l'anteprima in
+     grassetto, che il perimetro lo dice gia' per criterio. Un
+     paragrafo che ripete quel che si sta toccando si smette di
+     leggere al secondo giro. */
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      ${aValore
-        ? `Conta <b style="color:var(--ink)">quanto si spende</b>: basta
-           la cifra, anche con un oggetto solo.`
-        : `Conta <b style="color:var(--ink)">quanti pezzi</b>: serve
-           prenderne più d'uno, anche copie dello stesso articolo.`}</div>
     <div id="scontoPaccoErrore"></div>
     ${criteri.length > 1 ? `
       <div class="section-label" style="margin-top:14px">Come si conta</div>
@@ -14897,7 +14902,7 @@ function renderScontoPacco(){
     ` : `
       <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-        ${(scontoPaccoLeve.soglie||[]).map(s => pill(s, `${s} pezzi`, 'soglia')).join('')}</div>`}
+        ${(scontoPaccoLeve.soglie||[]).map(s => pill(s, `da ${s} pezzi`, 'soglia')).join('')}</div>`}
     <div class="section-label" style="margin-top:12px">Quanto sconto</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(scontoPaccoLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
@@ -14905,9 +14910,12 @@ function renderScontoPacco(){
       ? `La soglia guarda l'acquisto <b>dopo</b> le tue offerte lampo e
          gli accordi: una lampo generosa può farlo scendere sotto.`
       : `Chi ne prende ${b.soglia-1} paga pieno.`}</div>
+    ${/* UNA riga sola, e cambia col criterio: la spedizione fuori dal
+          conto vale sempre, «anche su un oggetto solo» e' la
+          conseguenza che solo il criterio a valore ha. */''}
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-      Sconta gli <b style="color:var(--ink)">articoli</b>: la spedizione
-      non si tocca.</div>
+      La spedizione è a parte.${aValore
+        ? ' Vale anche su un oggetto solo.' : ''}</div>
     <button class="btn orange" onclick="setScontoPacco()">
       ${attivo ? '🎁 Aggiorna lo sconto' : '🎁 Attiva lo sconto'}</button>
     ${attivo ? `<button class="btn ghost" onclick="setScontoPacco(true)">Spegni lo sconto</button>` : ''}`;
@@ -15015,11 +15023,10 @@ function renderSpedGratis(){
   const inSats = b.valuta === 'sats';
   const campo = inSats ? 'sogliaSats' : 'sogliaEur';
   const pill = v =>
-    `<button data-campo="${campo}" data-v="${v}" onclick="spedGratisPill(${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${fmt(v)} ${inSats?'sats':'€'}</button>`;
+    `<button data-campo="${campo}" data-v="${v}" onclick="spedGratisPill(${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">da ${fmt(v)} ${inSats?'sats':'€'}</button>`;
+  /* NIENTE SOTTOTITOLO, come nel gemello (ago 2026): la regola la
+     dicono le scelte e l'anteprima in grassetto. */
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      Conta <b style="color:var(--ink)">quanto si spende</b>: basta la
-      cifra, anche con un oggetto solo. Sugli annunci che spedisci.</div>
     <div id="spedGratisErrore"></div>
     ${pillValuta('sped', b.valuta, spedGratisLeve.valute)}
     <div class="section-label" style="margin-top:12px">Da quanti ${
@@ -15036,11 +15043,9 @@ function renderSpedGratis(){
       tue offerte lampo e gli accordi: una lampo generosa può farlo
       scendere sotto.</div>
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-      Offre la <b style="color:var(--ink)">spedizione</b>: il prezzo
-      degli articoli resta intero. E si somma allo sconto: le due
-      promesse guardano lo stesso numero — il prezzo degli articoli
-      prima dello sconto — quindi nessuna delle due può spegnere
-      l'altra.</div>
+      Vale sugli annunci che spedisci, anche su un oggetto solo. Si
+      somma allo sconto: guardano lo stesso numero, quindi nessuna
+      delle due spegne l'altra.</div>
     <button class="btn orange" onclick="setSpedGratis()">
       ${ora ? '🚚 Aggiorna la soglia' : '🚚 Attiva la spedizione gratis'}</button>
     ${ora ? `<button class="btn ghost" onclick="setSpedGratis(true)">Spegni la spedizione gratis</button>` : ''}`;
