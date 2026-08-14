@@ -6819,39 +6819,33 @@ def prove_sped_gratis():
     # ritrova non potrebbe piu' rimetterle. UNA funzione per tutti e
     # due i cassetti: erano gia' due gemelle una volta, e sono
     # divergute.
-    for f in ("sogliaLibera", "anteprimaSoglia", "campoSogliaLibera",
-              "sogliaMancante"):
+    for f in ("sogliaLibera", "campoSogliaLibera", "sogliaMancante"):
         prova(f"il campo libero: {f} e' scritta UNA volta", 1,
               mini.count(f"function {f}("))
     prova("...e il campo lo montano tutti e due i cassetti", 2,
           mini.count("campoSogliaLibera('"))
     prova("...e tutti e due si fermano sul campo vuoto", 2,
           mini.count("sogliaMancante('"))
-    # L'ANTEPRIMA passa dalla stessa funzione del render: due frasi
-    # scritte in due posti divergono al primo ritocco (e qui una la
-    # riscrive il campo a ogni tasto).
-    prova("l'anteprima ha UNA fonte sola", 2,
-          mini.count("anteprimaSoglia('"))
-    # ...E DICE IL PERIMETRO NUOVO DENTRO LA FRASE (ago 2026, il mono
-    # sconta — il rovesciamento del 6 ago). La lezione dello stupore
-    # di Andrea sul 14.000 resta: cio' che la promessa fa e non fa si
-    # dice DENTRO l'anteprima, la riga in grassetto che il venditore
-    # rilegge — ed e' la riga che un riordino toglierebbe per prima,
-    # perche' sembra una ripetizione. «Un oggetto solo paga pieno, per
-    # quanto costi» e' MORTO ed e' vietato: e' diventato falso.
-    _ap = pezzo_js(mini, "function anteprimaSoglia")
-    _ramo_sc = _ap[:_ap.index("Scrivi da ${chiedi} parte lo sconto")]
-    # «anche un oggetto solo» vive SOLO nel ramo a valore: un'ancora
-    # che matcha anche l'altro ramo sarebbe la sentinella che non puo'
-    # fallire (la lezione della tortura)
-    prova("l'anteprima a valore dice che anche un oggetto solo sconta",
-          True, "anche un oggetto solo" in _ramo_sc)
+    # L'ANTEPRIMA IN GRASSETTO NON C'E' PIU' (ago 2026, decisione di
+    # Andrea: «guardando il cassetto le pillole mi sembrano gia'
+    # chiare»). La prova CAMBIA LATO — chiedeva che l'anteprima avesse
+    # una fonte sola, adesso chiede che non ci sia piu' nessuna fonte:
+    # e' l'affermazione piu' forte, e impedisce che rientri a meta'.
+    prova("l'anteprima in grassetto non c'e' piu'", 0,
+          mini.count("anteprimaSoglia"))
+    # ...E QUEL CHE DICEVA SOLO LEI E' SALITO NELLA RIGA IN CIMA, che
+    # e' l'unica prosa rimasta nel cassetto: il perimetro per criterio.
+    # Senza queste due la riga si accorcia in un riordino e nessuno se
+    # ne accorge — sono le stesse asserzioni di prima, spostate.
+    _rs = pezzo_js(mini, "function renderScontoPacco")
+    _riga = _rs[_rs.index("La spedizione è a parte"):]
+    _riga = _riga[:_riga.index("</div>")]
+    prova("la riga in cima dice che a valore basta un oggetto solo",
+          True, "anche su un oggetto solo" in _riga)
+    prova("...e a pezzi che le copie contano", True,
+          "copie dello stesso articolo" in _riga)
     prova("...e «un oggetto solo paga pieno» non torna da nessuna porta",
-          False, "paga pieno, per quanto costi" in _ap)
-    # ...e il ramo a pezzi dice che le copie contano: e' IL caso del
-    # rovesciamento (tre copie della stessa cosa sono tre pezzi)
-    prova("...e a pezzi nomina le copie dello stesso articolo", True,
-          "copie dello stesso articolo" in _ramo_sc)
+          False, "paga pieno, per quanto costi" in mini)
     # NIENTE CLAMP MUTO: a limare al minimo sarebbe il client, e il
     # venditore vedrebbe un numero che non ha scritto. A dire la cifra
     # e' il 400 del server, che il cassetto rende dentro di se'.
