@@ -7201,18 +7201,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   cui questi numeri stanno scritti qui: chi allunga un'etichetta di
   `contoRighe` MISURA PRIMA, a 320px e in vista SATS (la cifra in mono
   è la più larga: 88px contro i 69 dell'euro). I margini misurati là,
-  nel caso peggiore — supplemento su 12 pezzi, totale a sette cifre:
-  Prezzo +108 · **Sconto sugli articoli +24** · Spedizione per N pezzi
-  +16 · Protezione +63 · **Totale da pagare +1**. A 360 e 375 stanno
-  tutte comode (il più stretto sale a +15 e +30).
-  DUE COSE DA SAPERE, e sono PREESISTENTI — nessuna delle due nasce
-  col rinome, e nessuna delle due è stata toccata: «Commissione
-  Barattolo» TRONCA GIÀ OGGI a 320 (−25px, si legge «Commissione
-  Baratt…») perché il suo valore porta la pillola «in promo» accanto
-  allo zero, e non dipende dalle cifre dell'ordine — è sempre così; e
-  «Totale da pagare» sta dentro per UN pixel con un totale a sette
-  cifre, quindi a otto cifre tronca. Il posto dove si tronca per primo
-  è quello, non lo sconto.
+  nel caso peggiore — supplemento su 12 pezzi, totale a sette cifre —
+  DOPO il respiro dell'ago 2026 (padding del riquadro 14→10, gap della
+  riga 12→8, cioè +12px a ogni etichetta): Prezzo +120 · **Sconto
+  sugli articoli +36** · Spedizione per N pezzi +28 · Protezione +75 ·
+  **Totale da pagare +13** (era +1: adesso regge un totale a nove
+  cifre invece che a sette). A 360 e 375 lo stesso conto sale di 40 e
+  di 55. Sotto i 10px di padding le cifre cominciano a toccare il
+  bordo del riquadro: quella è la fine della leva.
+  LA LEVA DEL RESPIRO VALE PER TUTTE LE RIGHE INSIEME, ed è il suo
+  pregio e il suo limite: dà +12px a chiunque, e non può dare di più
+  a chi ne ha bisogno. Misurato su tutta la scala (14/12 → 4/4): il
+  massimo onesto è quello, e per arrivare a +25 il padding dovrebbe
+  scendere a 4.
+  ⚠️ «COMMISSIONE BARATTOLO» TRONCA ANCORA, ed è l'unica: −13px a 320
+  dopo il respiro (era −25), si legge «Commissione Baratt…» su OGNI
+  acquisto — il suo valore porta sempre la pillola «in promo» accanto
+  allo zero, quindi non dipende dalle cifre dell'ordine. Difetto
+  PREESISTENTE, che non nasce col rinome dello sconto. La sola leva
+  che ci arriva è l'ETICHETTA: «Commissione» da sola avanza 50px, e
+  dentro il nostro checkout di chi altri sarebbe la commissione? — ma
+  è un testo, e i testi in questo progetto si decidono, non si
+  accorciano di straforo. Il commento accanto alla riga lo dice.
   Le altre due superfici del conto stanno larghe e non hanno mai avuto
   il problema: nel paySheet `.conto-scomposto` l'etichetta fa 117px su
   254 (una riga sola, 39 di margine, e lì la percentuale non c'è mai
