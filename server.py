@@ -9681,8 +9681,8 @@ def _leve_stato():
             _leva("Cooldown «ha fatto colpo» (giorni)", "GIORNI_COLPO",
                   GIORNI_COLPO),
         ]},
-        {"gruppo": "🎁 Sconto carrello", "voci": [
-            _leva("Sconto carrello", "SCONTO_PACCO_ATTIVO",
+        {"gruppo": "🎁 Sconto sugli articoli", "voci": [
+            _leva("Sconto sugli articoli", "SCONTO_PACCO_ATTIVO",
                   bool(SCONTO_PACCO_ATTIVO),
                   spento="nessun venditore può premiare chi compra più "
                          "cose, e le regole già salvate non scattano"),
@@ -16266,7 +16266,7 @@ MSG_CLIENT_VECCHIO = (
 async def imposta_sconto_pacco(req: Request,
                                x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
-    """«🎁 Sconto sul carrello»: «da 3 articoli, −10%» — o «da 25 €»,
+    """«🎁 Sconto sugli articoli»: «da 3 articoli, −10%» — o «da 25 €»,
     o «da 50.000 sats» — su tutto il negozio. UNA regola sola, niente
     scaglioni: cambia il CRITERIO (e a valore la VALUTA), non il numero
     di regole. E' il pattern di spedizioniere: una dichiarazione di
@@ -16312,7 +16312,7 @@ async def imposta_sconto_pacco(req: Request,
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     if not SCONTO_PACCO_ATTIVO:
-        raise HTTPException(400, "Lo sconto sul carrello non è attivo")
+        raise HTTPException(400, "Lo sconto sugli articoli non è attivo")
     try:
         # None = «non me ne occupo», e la colonna resta com'era: e' il
         # patto dello stock, ed e' cio' che protegge la soglia
@@ -16354,9 +16354,9 @@ async def imposta_sconto_pacco(req: Request,
                 "«a valore».")
         if criterio == "pezzi" and (soglia or 0) < SCONTO_PACCO_MIN_SOGLIA:
             raise HTTPException(400,
-                f"Lo sconto sul carrello parte da almeno "
-                f"{SCONTO_PACCO_MIN_SOGLIA} articoli: sotto non è uno "
-                f"sconto sul carrello, è un ribasso di listino — e quello "
+                f"Lo sconto sugli articoli parte da almeno "
+                f"{SCONTO_PACCO_MIN_SOGLIA} pezzi: sotto non premia chi "
+                f"ne prende di più, è un ribasso di listino — e quello "
                 f"si fa sul prezzo.")
         if criterio == "valore":
             if valuta not in VALUTE_SOGLIA:
@@ -16375,18 +16375,18 @@ async def imposta_sconto_pacco(req: Request,
                       else SCONTO_PACCO_MIN_VALORE_EUR)
             if scritta < minimo:
                 raise HTTPException(400,
-                    f"Lo sconto sul carrello a valore parte da almeno "
+                    f"La soglia a valore parte da almeno "
                     f"{_fmt_sats(minimo)} sats di merce: sotto non è uno "
-                    f"sconto sul carrello, è un ribasso di listino — e "
+                    f"sconto sugli articoli, è un ribasso di listino — e "
                     f"quello si fa sul prezzo."
                     if valuta == "sats" else
-                    f"Lo sconto sul carrello a valore parte da almeno "
-                    f"{minimo} € di merce: sotto non è uno sconto sul "
-                    f"carrello, è un ribasso di listino — e quello si fa "
+                    f"La soglia a valore parte da almeno "
+                    f"{minimo} € di merce: sotto non è uno sconto sugli "
+                    f"articoli, è un ribasso di listino — e quello si fa "
                     f"sul prezzo.")
         if percento > SCONTO_PACCO_MAX_PERCENTO:
             raise HTTPException(400,
-                f"Lo sconto sul carrello arriva al massimo al "
+                f"Lo sconto sugli articoli arriva al massimo al "
                 f"{SCONTO_PACCO_MAX_PERCENTO}%.")
     con = db()
     con.execute("UPDATE utenti SET sconto_pacco_criterio=?, "
@@ -21946,8 +21946,8 @@ SUGGERIMENTI_FUNZIONE = (
             "Puoi fare uno sconto su tutto il carrello — «da 3 articoli, "
             "−10%» — che vale su tutti i tuoi annunci. Chi riempie il "
             "carrello spende di più e tu spedisci una volta sola.\n\n"
-            "Si accende in mezzo minuto dal Profilo → 🎁 Sconto sul "
-            "carrello."),
+            "Si accende in mezzo minuto dal Profilo → 🎁 Sconto "
+            "sugli articoli."),
     },
     {
         "timbro": "suggerito_sped",
@@ -22690,12 +22690,14 @@ async def avvisa_sconto_su_mono():
                      f"soglia, anche con un oggetto solo.")
         try:
             await notifica(r["tg_id"], (
-                f"🎁 <b>Cambia la regola del tuo sconto carrello.</b>\n\n"
+                f"🎁 <b>Cambia la regola del tuo sconto sugli "
+                f"articoli.</b>\n\n"
                 f"{mezzo}\n\n"
                 f"In pratica sconterai più spesso — e su quegli ordini "
                 f"incassi meno. Se la regola ti va bene così non devi "
                 f"fare niente; per ritoccare soglia e percentuale, o "
-                f"spegnerla, vai nel Profilo → 🎁 Sconto sul carrello."))
+                f"spegnerla, vai nel Profilo → 🎁 Sconto sugli "
+                f"articoli."))
             mandati.append(r["tg_id"])
         except Exception as e:
             print(f"⚠️ Avviso sconto-su-mono saltato per {r['tg_id']}: {e}")

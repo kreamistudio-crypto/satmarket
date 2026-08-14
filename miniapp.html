@@ -4131,8 +4131,9 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
       </div>
 
-      <!-- Lo sconto sul carrello (ago 2026): UNA regola per tutto il
-           negozio — tanti pezzi, tanto sconto — che vale sui soli
+      <!-- Lo sconto sugli articoli (ago 2026): UNA regola per tutto il
+           negozio — a pezzi conta QUANTI, a valore conta QUANTO, ed e'
+           il criterio a dire dove vale — che cade sui soli
            ARTICOLI e mai sulla spedizione. Le soglie e le percentuali
            possibili arrivano da /api/me, mai hardcodate qui (il patto
            della lampo). Sta accanto allo spedizioniere perche' sono
@@ -4140,7 +4141,7 @@ document.getElementById('cartello')?.remove();</script>
            l'interruzione, chiudono il gruppo.
            In DEMO il cassetto sparisce, il patto del wallet. -->
       <div class="acc" id="accScontoPacco">
-        <button class="acc-h" onclick="toggleAcc('accScontoPacco')"><span class="em">🎁</span>Sconto sul carrello <span class="conta" id="scontoPaccoConta"></span><span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accScontoPacco')"><span class="em">🎁</span>Sconto sugli articoli <span class="conta" id="scontoPaccoConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="scontoPaccoBlocco"></div></div>
       </div>
 
@@ -7939,7 +7940,7 @@ function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped){
           sarebbe un mistero. La cifra arriva POSITIVA e il meno lo
           mette la riga: fmt() di un negativo scriverebbe il trattino
           ASCII invece del meno tipografico. */
-       + (sconto>0 ? r(sconto, 'Sconto carrello', 0, 1) : '')
+       + (sconto>0 ? r(sconto, 'Sconto sugli articoli', 0, 1) : '')
        /* «per N pezzi» viaggia fin qui apposta: la pagina d'acquisto
           l'ha appena mostrata, e una riga che compare e sparisce
           sullo stesso schermo si legge come «il prezzo e' cambiato»
@@ -8965,7 +8966,7 @@ function contoRighe(c){
        spedizione resta intera, sempre. La cifra arriva POSITIVA e il
        meno lo mette il giudice (l'ultimo argomento). */
     + (c.sconto>0
-        ? r(`Sconto carrello${c.scontoPct?` −${c.scontoPct}%`:''}`,
+        ? r(`Sconto sugli articoli${c.scontoPct?` −${c.scontoPct}%`:''}`,
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
     + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
@@ -13483,7 +13484,7 @@ function openOrder(id){
         /* il SET: l'elenco dei pezzi con gli unitari fotografati —
            qui la media «pezzi × unitario» mentirebbe */
         o.righe.map(r=>`${esc(r.titolo)}${r.quantita>1?` × ${fmt(r.quantita)}`:''} — ${cifraOrdine(o, r.unitario_sats*r.quantita)}`).join('<br>')}</div>` : ''}
-      ${o.scontoSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🎁 Sconto carrello${o.scontoPct?` −${o.scontoPct}%`:''}: <b>−${cifraOrdine(o, o.scontoSats)}</b> sul prezzo qui sopra</div>` : ''}
+      ${o.scontoSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🎁 Sconto sugli articoli${o.scontoPct?` −${o.scontoPct}%`:''}: <b>−${cifraOrdine(o, o.scontoSats)}</b> sul prezzo qui sopra</div>` : ''}
       ${/* la tariffa che il negozio ha offerto: il conto quadra anche
             senza dirlo (la riga qui sotto non nomina nessuna
             spedizione), ma chi ha visto un costo nella scheda deve
@@ -14798,7 +14799,7 @@ function sogliaMancante(quale, idErrore){
   return true;
 }
 
-/* ---- «🎁 Sconto sul carrello» (ago 2026) ----
+/* ---- «🎁 Sconto sugli articoli» (ago 2026) ----
    Il venditore premia chi prende piu' cose: UNA regola per tutto il
    negozio — soglia di pezzi + percentuale — sui soli ARTICOLI, che la
    spedizione non si tocca mai. I valori possibili li dice il server (il
@@ -14853,11 +14854,11 @@ function renderScontoPacco(){
                               inSats ? 'valoreSats' : 'valoreEur');
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      Premia chi prende più cose in una volta: il prezzo degli
-      <b style="color:var(--ink)">articoli</b> scende della percentuale
-      che scegli, quando il carrello arriva alla soglia. La
-      <b style="color:var(--ink)">spedizione non si tocca</b> — ed è già
-      una sola per tutto il carrello.</div>
+      ${aValore
+        ? `Conta <b style="color:var(--ink)">quanto si spende</b>: basta
+           la cifra, anche con un oggetto solo.`
+        : `Conta <b style="color:var(--ink)">quanti pezzi</b>: serve
+           prenderne più d'uno, anche copie dello stesso articolo.`}</div>
     <div id="scontoPaccoErrore"></div>
     ${criteri.length > 1 ? `
       <div class="section-label" style="margin-top:14px">Come si conta</div>
@@ -14887,9 +14888,8 @@ function renderScontoPacco(){
          gli accordi: una lampo generosa può farlo scendere sotto.`
       : `Chi ne prende ${b.soglia-1} paga pieno.`}</div>
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-      Vale su <b style="color:var(--ink)">ogni acquisto</b> del tuo
-      negozio: nel carrello, dalla scheda, anche più copie dello stesso
-      articolo.</div>
+      Sconta gli <b style="color:var(--ink)">articoli</b>: la spedizione
+      non si tocca.</div>
     <button class="btn orange" onclick="setScontoPacco()">
       ${attivo ? '🎁 Aggiorna lo sconto' : '🎁 Attiva lo sconto'}</button>
     ${attivo ? `<button class="btn ghost" onclick="setScontoPacco(true)">Spegni lo sconto</button>` : ''}`;
@@ -15000,11 +15000,8 @@ function renderSpedGratis(){
     `<button data-campo="${campo}" data-v="${v}" onclick="spedGratisPill(${v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${fmt(v)} ${inSats?'sats':'€'}</button>`;
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      Da una certa spesa in su la spedizione la offri tu: chi compra
-      non la paga, e tu incassi il prezzo degli
-      <b style="color:var(--ink)">articoli</b> e basta. Vale su
-      <b style="color:var(--ink)">tutti i tuoi annunci</b> che
-      spediscono.</div>
+      Conta <b style="color:var(--ink)">quanto si spende</b>: basta la
+      cifra, anche con un oggetto solo. Sugli annunci che spedisci.</div>
     <div id="spedGratisErrore"></div>
     ${pillValuta('sped', b.valuta, spedGratisLeve.valute)}
     <div class="section-label" style="margin-top:12px">Da quanti ${
@@ -15021,11 +15018,11 @@ function renderSpedGratis(){
       tue offerte lampo e gli accordi: una lampo generosa può farlo
       scendere sotto.</div>
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-      Vale anche su <b style="color:var(--ink)">un oggetto solo</b>,
-      se costa abbastanza — come lo sconto.
-      E si somma allo sconto: le due promesse guardano lo stesso numero —
-      il prezzo degli articoli prima dello sconto — quindi nessuna delle
-      due può spegnere l'altra.</div>
+      Offre la <b style="color:var(--ink)">spedizione</b>: il prezzo
+      degli articoli resta intero. E si somma allo sconto: le due
+      promesse guardano lo stesso numero — il prezzo degli articoli
+      prima dello sconto — quindi nessuna delle due può spegnere
+      l'altra.</div>
     <button class="btn orange" onclick="setSpedGratis()">
       ${ora ? '🚚 Aggiorna la soglia' : '🚚 Attiva la spedizione gratis'}</button>
     ${ora ? `<button class="btn ghost" onclick="setSpedGratis(true)">Spegni la spedizione gratis</button>` : ''}`;
@@ -18168,7 +18165,7 @@ function cifraForm(v, unita){
    senza cambio la promessa il server non la applica affatto. */
 function rigaScontoForm(r){
   const coda = `Cambia nel Profilo ›
-    <span style="white-space:nowrap">🎁&nbsp;Sconto sul carrello</span>.`;
+    <span style="white-space:nowrap">🎁&nbsp;Sconto sugli articoli</span>.`;
   const art = prezzoFormSats();
   if (art > 0 && scontoScatta(r, art, sellValuta, 1)){
     const pieno = sellValuta === 'eur' ? prezzoEurForm() : art;
