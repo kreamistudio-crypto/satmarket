@@ -6846,6 +6846,37 @@ def prove_sped_gratis():
           "copie dello stesso articolo" in _riga)
     prova("...e «un oggetto solo paga pieno» non torna da nessuna porta",
           False, "paga pieno, per quanto costi" in mini)
+    # LA LAMPO ABBASSA LA CIFRA MISURATA (ago 2026): e' l'unica delle
+    # tre cose che l'anteprima diceva da sola a non essere implicata da
+    # nient'altro — lancia un −50%, il carrello scende sotto soglia, la
+    # promessa non scatta, e senza questa riga sembra un guasto. Vive in
+    # UN posto e la montano tutti e due i cassetti.
+    prova("la nota della lampo e' scritta UNA volta", 1,
+          mini.count("function notaLampo("))
+    prova("...e la montano tutti e due i cassetti", 2,
+          mini.count("notaLampo()}"))
+    # ...E DICE LA LAMPO, non «una nota» qualunque: le due prove qui
+    # sopra guardano DOVE sta la riga e non COSA dice, e da sole
+    # restano verdi svuotandola (l'ha detto la tortura, non la
+    # rilettura). Si affetta il corpo della funzione, o la parola
+    # «lampo» la si troverebbe altrove nel file.
+    _nl = pezzo_js(mini, "function notaLampo")
+    prova("...e dice la lampo e la cifra misurata", True,
+          "lampo" in _nl and "misura" in _nl)
+
+    # ...E SOLO DOVE UNA CIFRA C'E': a criterio pezzi la lampo non puo'
+    # far scendere niente sotto soglia — li' si contano pezzi — quindi
+    # dirlo sarebbe FALSO. La sentinella affetta il ternario del
+    # criterio invece di cercare la stringa nel file, o passerebbe
+    # anche con la riga sul ramo sbagliato.
+    _rs2 = pezzo_js(mini, "function renderScontoPacco")
+    _dopo = _rs2[_rs2.index("${aValore ? `"):]
+    _val, _pez = _dopo.split("` : `", 1)
+    prova("la nota della lampo vive nel ramo a VALORE", True,
+          "notaLampo()" in _val)
+    prova("...e non in quello a pezzi, dove sarebbe falsa", False,
+          "notaLampo()" in _pez)
+
     # NIENTE CLAMP MUTO: a limare al minimo sarebbe il client, e il
     # venditore vedrebbe un numero che non ha scritto. A dire la cifra
     # e' il 400 del server, che il cassetto rende dentro di se'.

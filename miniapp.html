@@ -14661,6 +14661,21 @@ function notaSoglia(valuta){
     <b style="color:var(--ink)">sats</b>.</div>`;
 }
 
+/* LA LAMPO ABBASSA LA CIFRA MISURATA (ago 2026, decisione di Andrea):
+   e' l'unica delle tre cose che l'anteprima diceva da sola a NON essere
+   implicata da nient'altro, ed e' il caso che sembra un guasto quando
+   un venditore lo nota — lancia un −50%, il carrello scende sotto
+   soglia, la promessa non scatta. Sta sotto le pillole della cifra
+   perche' e' un caveat sulla MISURA e non sul perimetro: la riga in
+   cima dice dove vale, questa con che numero si confronta.
+   Solo dove una CIFRA c'e': a criterio pezzi la lampo non puo' far
+   scendere niente — li' si contano pezzi — e dirlo sarebbe falso. */
+function notaLampo(){
+  return `
+  <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
+    Le offerte lampo abbassano la cifra su cui si misura.</div>`;
+}
+
 /* ---- IL TOGGLE €/₿ DELLA SOGLIA (ago 2026) ----
    CONSERVA, NON CONVERTE, ed e' la decisione da non rovesciare: ogni
    valuta ha la sua colonna, e il toggle mostra cio' che il venditore ha
@@ -14888,7 +14903,7 @@ function renderScontoPacco(){
                                  : scontoPaccoLeve.min_valore_eur, b.valuta,
                           (inSats ? scontoPaccoLeve.valori_sats
                                   : scontoPaccoLeve.valori_eur)||[])}
-      ${notaSoglia(b.valuta)}
+      ${notaSoglia(b.valuta)}${notaLampo()}
     ` : `
       <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
@@ -15025,7 +15040,7 @@ function renderSpedGratis(){
                                : spedGratisLeve.min_eur, b.valuta,
                         (inSats ? spedGratisLeve.soglie_sats
                                 : spedGratisLeve.soglie_eur)||[])}
-    ${notaSoglia(b.valuta)}
+    ${notaSoglia(b.valuta)}${notaLampo()}
     <button class="btn orange" onclick="setSpedGratis()">
       ${ora ? '🚚 Aggiorna la soglia' : '🚚 Attiva la spedizione gratis'}</button>
     ${ora ? `<button class="btn ghost" onclick="setSpedGratis(true)">Spegni la spedizione gratis</button>` : ''}`;
