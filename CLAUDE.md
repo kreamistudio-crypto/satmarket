@@ -7188,11 +7188,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sta per salvare. 2) «Chi ne prende N−1 paga pieno», il
   controesempio: si accetta di perderlo perché «da 2 pezzi» sulla
   pillola dice già che sotto non scatta — è l'unica delle tre che il
-  resto del cassetto implica. 3) LA LAMPO — «la soglia guarda
-  l'acquisto DOPO le tue offerte lampo e gli accordi» — che NON è
-  implicata da niente e adesso non sta più da nessuna parte, in
-  nessuno dei due cassetti: è il caso che questo file dichiara
-  «sembra un bug quando un venditore lo nota», e resta da collocare.
+  resto del cassetto implica. 3) LA LAMPO, l'unica delle tre
+  che non è implicata da niente: è tornata come riga sua
+  (`notaLampo`, «Le offerte lampo abbassano la cifra su cui si
+  misura»), SOTTO le pillole della cifra, perché è un caveat sulla
+  MISURA e non sul perimetro — la riga in cima dice dove vale, questa
+  con che numero si confronta. In UN posto e montata dai due
+  cassetti; SOLO dove una cifra c'è, che a criterio pezzi la lampo non
+  può far scendere niente e dirlo sarebbe falso. È il caso che questo
+  file dichiara «sembra un bug quando un venditore lo nota»: si lancia
+  un −50%, il carrello scende sotto soglia, la promessa non scatta.
   E IL CAMPO LIBERO SI ACCENDE COME UNA PILLOLA quando porta una
   cifra che nessuna pillola dice (bordo `--sats`, grassetto 800): con
   l'anteprima via, quello è l'UNICO riscontro che il numero scritto è
