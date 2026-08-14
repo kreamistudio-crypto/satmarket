@@ -20014,11 +20014,18 @@ async function infoNwc(stringa){
     preferita = (ev.tags || []).some(tag=>tag[0]==='encryption' && /nip44/.test(tag[1]||''))
       ? 'nip44' : 'nip04';
     console.log('🟪 [nwc] evento info trovato, cifratura dichiarata:', preferita);
+    /* L'evento info e' un SUGGERIMENTO, non un verdetto: il tag e'
+       una LISTA («nip04 nip44_v2») e chi la pubblica spesso parla
+       tutt'e due. Se la preferita non risponde si prova comunque
+       l'altra, o un wallet solo si porta via l'unico tentativo —
+       ed e' esattamente il caso in cui non sapremmo perche'. */
   } catch(e){
     console.log('🟪 [nwc] niente evento info (' + e.message + '): stringo la mano direttamente');
     if (/relay/.test(e.message || '')) throw e;   // relay giù: inutile insistere
   }
-  const daProvare = preferita ? [preferita] : ['nip04', 'nip44'];
+  const daProvare = preferita
+    ? [preferita, preferita === 'nip44' ? 'nip04' : 'nip44']
+    : ['nip04', 'nip44'];
   let ultimo = null;
   for (const cifratura of daProvare) {
     let cliente = null;
@@ -20080,8 +20087,18 @@ async function clientNwc(dati){
   }});
   function chiama(metodo, params, timeoutMs){
     return new Promise((ok, no)=>{
+      /* IL TAG `encryption` NON E' UN ORNAMENTO: per la NIP-47 una
+         richiesta che non lo porta si assume cifrata in nip04. Senza,
+         un wallet che parla nip44 prova a decifrare col metodo
+         sbagliato e NON RISPONDE — non un errore, silenzio, cioe' il
+         modo peggiore di fallire (successo con Primal, ago 2026).
+         Il tag si mette SOLO in nip44: in nip04 il default e' gia'
+         quello, e i wallet vecchi che il tag non lo conoscono lo
+         devono trovare assente. */
       const ev = NT.finalizeEvent({kind:23194,
-        created_at: Math.floor(Date.now()/1000), tags:[['p', walletPub]],
+        created_at: Math.floor(Date.now()/1000),
+        tags: con44 ? [['p', walletPub], ['encryption', 'nip44_v2']]
+                    : [['p', walletPub]],
         content: cifra(JSON.stringify({method:metodo, params}))}, sk);
       attese[ev.id] = {ok, no};
       relay.publish(ev).catch(()=>{});
