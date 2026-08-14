@@ -6253,7 +6253,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   restava al lordo — adesso il totale mostra lo scontato col lordo
   barrato (vedi la voce della barra del carrello) e la coda direbbe
   di cercare altrove una cosa già in vista; la sentinella ora conta
-  che di code non ne resti NESSUNA. La fila sta SOPRA la riga della consegna
+  che di code non ne resti NESSUNA.
+  E DALL'AGO 2026 IL CARRELLO PARLA LA LINGUA DELLA CASSA anche nelle
+  due righe che erano rimaste indietro (decisione di Andrea col
+  cantiere della cassa): la spedizione SCATTATA portava il 🚚 dove la
+  gemella dello sconto porta il ✅ — due emoji per lo stesso grado di
+  fatto, nella stessa fila — e l'invito spezzava il grassetto
+  («→ spedizione **gratis**» contro il «→ **spedizione gratis**» di
+  Paga). Le due superfici divergono nella FORMA, mai nella lingua: è
+  la stessa promessa, e si dice con le stesse parole. C'è la
+  sentinella nei due versi (il 🚚 della scattata non deve tornare).
+  La fila sta SOPRA la riga della consegna
   (12 ago 2026, decisione di Andrea — è un fatto del negozio, si
   legge prima di scegliere la strada) e il suo ordine è quello di
   casa: vedi «L'ORDINE DELLA FILA È UNO SOLO», sotto «LE PROMESSE
@@ -7586,9 +7596,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'icona 🛒 ovunque (che in card non compare mai: nessuna collisione
   con 🚚 🤝 💾; l'unico altro 🛒 del progetto è la notifica admin del
   bot, superficie diversa). La sequenza dei bottoni dice il flusso:
-  «🛒 Aggiungi al carrello» → «Controlla e paga» (la barra: porta al
-  riepilogo «Controlla il carrello» PRIMA di pagare) → «Paga». I NOMI
-  INTERNI restano «pacco» (paccoDati, view-controllapacco, .pacco-*,
+  «🛒 Aggiungi al carrello» → «Controlla e paga» (la barra), e DA LÌ
+  SI PAGA: dall'ago 2026 sono DUE passi e non tre — quel bottone
+  portava a un riepilogo che rimandava, e adesso apre la cassa, dove
+  si sceglie la consegna, si legge il conto e c'è «Paga». L'etichetta
+  non è cambiata ed è più vera di prima: porta alla pagina dove si
+  controlla E si paga. I NOMI
+  INTERNI restano «pacco» (paccoDati, .pacco-*,
   le chiavi di navigazione…), dichiarato: rinominarli sarebbe un
   refactor di massa contro la regola dei diff piccoli, e il commento
   in testa ad apriPacco lo dice. E vale, ROVESCIATO, per lo SCONTO:
@@ -7794,11 +7808,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   il testimone ad `apriAcquisto` (qtaScelta dal carrello, il passamano
   dello stepper del dettaglio) e da lì pagina Paga, ordine e invoice
   sono quelli di sempre — offerte, lampo, ripresa del pentito e NWC
-  funzionano gratis. `caricaPreventivoPacco` con una riga manda il
-  body MONO (le chiavi della risposta sono le stesse e renderControlla
-  non se ne accorge): il riepilogo dice comunque il conto del SERVER,
-  mai la stima. La guardia `< 2` di startBuySet resta come cintura di
-  un varco che con una riga non si imbocca più.
+  funzionano gratis. La guardia `< 2` di startBuySet resta come
+  cintura di un varco che con una riga non si imbocca più.
+  DALL'AGO 2026 LA DEVIAZIONE SI VEDE SUBITO, ed è l'imperfezione
+  dichiarata del cantiere della cassa: prima si atterrava sul binario
+  mono DOPO il riepilogo, adesso al posto suo — quindi col carrello a
+  un articolo si vedono lo stepper e nessuno dei due secondari. La ←
+  in testata riporta al carrello comunque.
   I SOLO-DIGITALI SONO FUORI DALLA GRIGLIA di composizione (ago 2026):
   non entreranno mai nel carrello per regola, e una cella spenta per
   sempre non è un'informazione — è rumore. renderPacco li filtra
@@ -7812,13 +7828,15 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'imperfezione dichiarata sotto, che col tetto tolto si può VEDERE
   invece di restare teorica).
   LE CIFRE DEL CONTO NON SI SPEZZANO MAI (ago 2026, bug visto in
-  vista sats: con l'etichetta «Spedizione (dalla più economica)» il ≈
-  andava a capo SOPRA il numero): nella grammatica `.ctrl-riga` la
+  vista sats con l'etichetta più lunga che il conto abbia avuto —
+  «Spedizione (dalla più economica)», del riepilogo che non esiste
+  più: il ≈ andava a capo SOPRA il numero): nella grammatica
+  `.ctrl-riga` la
   cifra col suo ≈ e la sua unità è un gruppo indivisibile
   (white-space:nowrap sul `.mono`) e a cedere, coi puntini, è
-  l'ETICHETTA a sinistra — vale per riepilogo E pagina Paga, che
-  vestono le stesse righe di contoRighe (verificato a 320/375/430
-  nelle due valute).
+  l'ETICHETTA a sinistra — la regola vale per ogni riga di
+  `contoRighe`, e resta viva col conto della cassa (verificato a
+  320/375/430 nelle due valute).
   DA STRISCIA A GRIGLIA (ago 2026, decisione di Andrea): era una fila
   che si scorreva di LATO (`.altri-strip`) — un gesto che nessun'altra
   parte dell'app chiede, e che nasconde tutto quello che non ci sta
@@ -7964,63 +7982,115 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nella PWA, cioè la stessa ✕ farebbe due cose diverse sui due
   telefoni. Fra una garanzia che c'è solo a metà e una regola onesta,
   la regola.
-  LA PAGINA «CONTROLLA IL PACCO» (ago 2026): il riepilogo del set da
-  foglio a pagina intera — il foglio `#setSheet` NON ESISTE PIÙ, e
-  con lui spunte e stepper del riepilogo: la composizione si tocca
-  SOLO nella pagina del pacco, e il gesto indietro ci riporta con la
-  selezione intatta. Vista `view-controllapacco`, contenuto da
-  `renderControlla()`, aperta da `controllaPacco()` (che riallinea
-  currentListing alla provenienza: serve alla rilettura del negozio
-  dopo un 409). Dall'alto: testata con ← (navIndietro), titolo, «di
-  {venditore}» e il toggle €/₿ in alto a destra (stessa preferenza di
-  sempre, `setValuta` ridisegna anche questa pagina); «N articoli»
-  (N = pezzi totali) coi FRANCOBOLLI degli scelti in striscia
-  scorrevole (`.ctrl-mini`, ×N in mono sui multipli); CONSEGNA a
-  pillole sull'intersezione di `stradeSet()` — una strada sola = UNA
-  pillola già accesa, l'altra non compare (il campo non mente) —
-  SENZA la stima taglia (decisione di Andrea al primo sguardo: resta
-  nell'ordine, dove la scrive il server; `stimaTagliaSet` è il
-  gemello client che aspetta, il vestito appeso di .carton); IL CONTO
-  in righe (`contoControlla`/`cifraCtrl`, nella valuta del toggle: in
-  euro sempre ≈, in sats il circa di `setCirca`, lo zero mai col ≈):
-  Prezzo, «Commissione — 0 sats» con la pillolina «in
-  promo» (`.promo-tag`: la riga esiste per DIRE che oggi è gratis, ed
-  è il posto già pronto per la cifra il giorno che la commissione si
-  accenderà), Spedizione (il MAX di sempre; col ritiro vale 0 e la
-  riga RESTA, non sparisce), Protezione solo se >0, e TOTALE DA
-  PAGARE evidenziato (`.ctrl-riga.tot`, numero in --sats-text, unità
-  sempre in `.unit`); niente trust-note (stessa decisione della
-  taglia: la pagina dice il conto e basta); IN FONDO ALLO SCHERMO
-  «Acquista» arancio (→ `startBuySet`, stesso paySheet sopra la
-  pagina: la pagina post-acquisto è un cantiere futuro) e i due
-  secondari gemelli (basi al 50%): «Chiedi info» → pagina del
-  venditore (`ctrlChiediInfo` → apriNegozio), «Fai un'offerta» →
-  `view-offertapresto`, il «presto disponibile» in stile astepresto
-  (l'offerta sull'intero set è un cantiere futuro, NON costruita).
-  I bottoni stanno in FONDO ALLA PAGINA per costruzione (secondo
-  giro, dal feedback di Andrea: la prima versione sottraeva una
-  costante stimata dall'altezza e restavano a mezz'aria): la VISTA
-  attiva è la colonna alta uno schermo (dvh con ripiego vh; da
-  desktop sconta i 116px di #app), il corpo prende il resto con
-  flex:1, Acquista porta `margin-top:auto`, e con la tab bar nascosta
-  `body.senza-nav #app` azzera anche il padding-bottom dei suoi 84px
-  — il fondo è quello VERO (misurato: 26px dal bordo, il padding del
-  corpo, che in basso porta anche la safe-area). Su schermi corti i
-  bottoni seguono il contenuto, mai coperti; il fiato minimo sopra
-  Acquista lo dà il margin-bottom del conto.
-  Navigazione: vista interna (spinge) con la chiave del pacco
-  (origineId); la ricostruzione esige paccoDati suo E setScelte non
-  vuoto, o si ripiega sulla vetrina; `body.senza-nav` nasconde la tab
-  bar sotto i 768 (è una cassa, non una vetrina) senza barra propria.
-  Sull'errore di startBuySet si chiude il paySheet e si resta sulla
-  pagina rinfrescata; se la potatura ha svuotato il pacco,
-  `rinfrescaSet` torna indietro da solo. CONSEGUENZA DICHIARATA: col
-  foglio è morto anche il suo «⚡ Compra subito» NWC
-  (`confermaSetSubito`, che del foglio era l'unico chiamante) — dal
-  riepilogo si passa dal paySheet, dove il wallet paga la stessa
-  invoice; sul singolo annuncio l'NWC vive come sempre. Con meno di
-  due articoli Acquista risponde col toast onesto («per uno solo c'è
-  l'acquisto di sempre»), come il vecchio foglio.
+  IL CARRELLO SI PAGA DOVE SI CONTROLLA (ago 2026, decisione di
+  Andrea): la pagina del RIEPILOGO non esiste più — né il foglio
+  `#setSheet` che l'aveva preceduta, né la vista
+  `view-controllapacco` che l'aveva sostituito. Il carrello pagava in
+  TRE pagine (composizione → riepilogo → cassa) e quella di mezzo non
+  decideva niente: mostrava il conto della strada PIÙ ECONOMICA, lo
+  dichiarava («la scegli al passo dopo»), e rimandava. Adesso
+  «Controlla e paga» porta DIRITTO alla cassa (`view-acquisto` in
+  modalità set), che è anche la sua ultima pagina prima del
+  pagamento, e il bottone dice «Paga».
+  È UNA FUSIONE E NON UNA COSTRUZIONE, ed è la ragione per cui il
+  cantiere è piccolo: `renderAcquisto` serviva GIÀ il set — striscia
+  dei francobolli, vie di consegna, cassetto del punto, cassetto
+  dell'indirizzo, conto, promesse, `ctaAcquisto` → `startBuySet` — e
+  girava in produzione da settimane. Il cantiere sposta DA DOVE ci si
+  arriva, non cosa quella pagina fa. Muoiono `renderControlla`,
+  `caricaPreventivoPacco`, `ctrlPrev` e `controllaPacco`; nascono
+  TRE `const` dentro `renderAcquisto` — il titolo dinamico, i due
+  secondari, il bottone che riporta al carrello.
+  LA PAGINA PAGA RESTA PER IL SINGOLO, e il motivo va scritto perché
+  è quello che impedisce di fondere anche quella: lì serve anche a
+  COMPORRE (c'è lo stepper della quantità e i badge invitano ad
+  alzarla), mentre nel carrello quella fase è già avvenuta — da lì
+  gli articoli non si aggiungono, sarebbero troppi e comporre in una
+  cassa sarebbe confuso.
+  IL TITOLO LO SCRIVE IL RENDER (`#acqTit`): «Controlla il carrello»
+  sul carrello — è quel che il bottone della barra promette, e la
+  pagina fa davvero tutte e due le cose — «Acquista» sul singolo.
+  IL CONTO NON SI RIFÀ A OGNI CAMBIO DI STRADA, e non nasce un
+  secondo posto che calcola: NE MUORE UNO. Il preventivo risponde con
+  TUTTE le strade in una chiamata (`strade[]`, ognuna col suo
+  `totale_sats`), quindi cambiare pillola è `acqDati.via = v;
+  renderAcquisto()` — ZERO rete, misurato. I lettori del preventivo
+  passano da due a UNO, e la sentinella che diceva «restano due» ora
+  dice «resta uno»: è lei a certificare che non rinasca un secondo
+  conto.
+  IL BOTTONE CHE RIPORTA AL CARRELLO (`.torna-carrello`) sta SOTTO la
+  fila delle promesse — è la risposta all'invito che si legge appena
+  sopra, «il badge dice la cosa, il bottone dà la strada» — e compare
+  SOLO col carrello e SOLO con un invito APERTO (una `.pill-barra`):
+  sotto un «✅ Sconto −10%» sarebbe un invito a fare una cosa che non
+  serve, e a promesse assenti non c'è niente a cui rispondere. La
+  strada resta comunque: la ← in testata riporta al carrello.
+  I DUE SECONDARI vivono nel `.ctrl-fondo` dopo «Paga» e solo sul set
+  («Chiedi info» → `ctrlChiediInfo`; «Fai un'offerta» →
+  `view-offertapresto`, che resta il «presto disponibile» non
+  costruito). Sul singolo non ci sono: l'offerta ce l'ha la scheda col
+  suo bottone in barra. Il ⚡ NWC resta del solo mono — regola che
+  esisteva nel codice SENZA una sentinella, e dopo la fusione è una
+  riga che si può rompere senza accorgersene.
+  IL FONDO È APPICCICATO ANCHE PER IL CARRELLO, che se lo prende
+  dalla cassa: qui c'era scritto «SOLO la pagina Paga: il riepilogo
+  del pacco tiene il fondo di sempre», e quella riga è morta con la
+  vista che nominava. MISURATO coi tre bottoni: **146px** — 25,7% a
+  320×568, 22,8% a 360, 18% a 375×812 — sotto i **176px** del fondo
+  col ⚡ NWC che gira già oggi, che è anche la cifra accettata per
+  «Altri oggetti». «Fai un'offerta» NON va a capo a nessuna delle tre
+  larghezze, e a fine scorrimento restano 27px fra l'ultima riga del
+  conto e la barra (lo sticky OCCUPA layout: non copre mai).
+  LO SCHELETRO MENTRE IL CONTO ARRIVA: nel ramo `!p` si disegnano gli
+  articoli (si conoscono senza server) e un «Paga» SPENTO, invece
+  della sola riga «Calcolo il conto…». Il carrello questa pagina la
+  apre e la chiude mentre compone, e una pagina che nasce vuota si
+  legge come rotta; sul singolo NON è una regressione, lì oggi c'è il
+  vuoto. Il bottone spento non porta l'id `acqCompra`, ed è voluto:
+  quello è il bottone che PAGA, e ne esiste uno solo.
+  IL RIENTRO È ISTANTANEO: `acqDati.firma` (da `firmaSet`, che a
+  `ctrlPrev` è sopravvissuta) dice se la composizione è ancora quella,
+  e in quel caso si ridisegna dalla cache senza un secondo fetch —
+  cioè esattamente quel che la cache del riepilogo dava già.
+  IL «RIPROVA» nel ramo d'errore: il riepilogo era fail-open (conto
+  storto = restava la stima col ≈) mentre qui l'errore si prende la
+  pagina intera. Sul pezzo venduto è un GUADAGNO (l'errore lo NOMINA,
+  e arriva un tocco prima); sulla rete caduta no, e senza una strada
+  per riprovare l'unica uscita sarebbe uscire e rientrare.
+  TRE BUCHI CHIUSI col cantiere, e nessuno era nel piano — li ha
+  trovati la validazione. 1) `currentListing` NON SI RIALLINEAVA PIÙ:
+  la riga viveva in `controllaPacco`, e `rinfrescaSet` legge proprio
+  lui per rileggere il negozio — girando per l'app può essere rimasto
+  su un annuncio di un ALTRO venditore (le celle del carrello sono
+  card, e il tocco apre il dettaglio), quindi dopo un 409 si poterebbe
+  il pacco col catalogo sbagliato. Trapiantata in `apriAcquistoSet`
+  COL PERCHÉ, o fra sei mesi qualcuno la toglie come riga inutile.
+  2) IL CARRELLO POTATO NON RIFACEVA IL CONTO: `rileggiVenditore`
+  MUTA `setScelte` mentre `renderAcquisto` disegna dalla CACHE — due
+  articoli a schermo e tre nel totale, e `startBuySet` posterebbe le
+  righe potate contro un conto vecchio. Prima era la cache per firma
+  del riepilogo a salvare la faccia. Ora `rinfrescaSet` richiama
+  `caricaPreventivo`, e la soglia d'uscita è **DUE** e non uno (il set
+  a una riga il server lo rifiuta: restare lì è un vicolo cieco).
+  3) il fail-open perso, sopra.
+  IMPERFEZIONE DICHIARATA: col carrello a UN articolo si atterra
+  sulla pagina del SINGOLO — con lo stepper, senza i secondari e
+  senza il «torna al carrello». La deviazione esisteva già (il set a
+  una riga non esiste per regola del server), ma si vedeva DOPO il
+  riepilogo; adesso al posto suo.
+  CONSEGUENZA DICHIARATA di ieri, ancora vera: col foglio è morto
+  anche il suo «⚡ Compra subito» NWC (`confermaSetSubito`) — il
+  carrello paga dal paySheet, dove il wallet paga la stessa invoice.
+  E I NOMI INTERNI RESTANO `ctrl-*` (`ctrl-corpo`, `ctrl-fondo`,
+  `ctrl-mini`, `ctrlChiediInfo`): sono il vestito della cassa, non il
+  nome di una vista — il patto dei nomi interni del carrello, che si
+  chiamano «pacco» da sempre. Si rinominano i testi, mai le chiavi.
+  Navigazione: la cassa è una vista interna (spinge) con la chiave
+  `'set|origineId'`; la ricostruzione esige `acqDati` suo e
+  `setScelte.size >= 2`, o si ripiega sulla vetrina. `body.senza-nav`
+  nasconde la tab bar sotto i 768 (è una cassa, non una vetrina).
+  Sull'errore di `startBuySet` si chiude il paySheet e si resta sulla
+  pagina rinfrescata.
   Doppia valuta (lug 2026): il venditore sceglie la valuta del listino
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
@@ -8979,8 +9049,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   creazione) — una scelta lì arriverebbe dopo la invoice, ed è per
   questo che la scelta vive PRIMA, nella pagina.
   LA PAGINA D'ACQUISTO (ago 2026, il cantiere che chiude la lacuna
-  del costo invisibile): `view-acquisto`, la cassa dell'app — senza
-  tab bar come il riepilogo del pacco, colonna 100dvh col fondo vero
+  del costo invisibile): `view-acquisto`, la cassa dell'app — e
+  dall'ago 2026 la cassa DEI DUE acquisti, che il carrello ci arriva
+  diritto (vedi «IL CARRELLO SI PAGA DOVE SI CONTROLLA») — senza
+  tab bar, colonna 100dvh col fondo vero
   (`.ctrl-fondo` col margin-top:auto: il primo bottone può anche non
   esserci — il ⚡ senza wallet — e il fondo resta il fondo).
   L'ORDINE NASCE SOLO DA QUI: `compraDaBarra` (barra e recinto) porta
@@ -9058,11 +9130,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   oneste («Spedisce con InPost», la regola asimmetrica del digitale,
   il ≈ dei listini EUR) · IL CONTO in righe (Prezzo · Commissione
   «in promo» · Spedizione della via scelta · Protezione se >0 ·
-  Totale, la grammatica `.ctrl-riga`/`contoRighe` condivisa col
-  riepilogo del pacco) · «PAGA» in fondo (secondo giro, decisione di
+  Totale, la grammatica `.ctrl-riga`/`contoRighe`, che dall'ago 2026
+  veste i due acquisti della cassa e non più due pagine) · «PAGA» in
+  fondo (secondo giro, decisione di
   Andrea: da quel bottone parte la fattura, e il nome lo dice —
-  «Acquista» resta sui varchi che PORTANO alla pagina: barra, recinto
-  e il riepilogo del pacco).
+  «Acquista» resta sui varchi che PORTANO alla pagina, cioè barra e
+  recinto del dettaglio; dal carrello ci porta «Controlla e paga»).
   E IL FONDO È APPICCICATO (13 ago 2026, decisione di Andrea): «Paga»
   resta in vista mentre si scorre — `#view-acquisto .ctrl-fondo` è
   STICKY e mai fixed, ed è la parte da non rovesciare: niente
@@ -9073,11 +9146,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   margin-bottom del conto. Fondo opaco con blur, riga di confine e
   safe-area sono DELLA BARRA (il pattern di #barraPacco e della nav)
   e il padding-bottom del corpo passa a lei, o a fine pagina ci
-  sarebbero due safe-area impilate. SOLO la pagina Paga: il riepilogo
-  del pacco tiene il fondo di sempre (sentinelle su tutte e tre le
-  righe). Col ⚡ NWC collegato si appiccica il fondo INTERO — è
-  atomico, la lezione di «Altri oggetti» — e costa più schermo:
-  dichiarato.
+  sarebbero due safe-area impilate. È l'UNICO fondo appiccicato del
+  client, e dall'ago 2026 LO EREDITA ANCHE IL CARRELLO, che questa
+  pagina se l'è presa: qui c'era scritto «SOLO la pagina Paga: il
+  riepilogo del pacco tiene il fondo di sempre», e quella riga è morta
+  con la vista che nominava — la sentinella che la difendeva è stata
+  SOSTITUITA e non rovesciata (una prova su una vista che non esiste
+  non può fallire), e adesso conta che di fondi appiccicati ce ne sia
+  UNO in tutto il foglio. Col ⚡ NWC collegato si appiccica il fondo
+  INTERO — è atomico, la lezione di «Altri oggetti» — e costa più
+  schermo: dichiarato. Col CARRELLO i bottoni diventano tre (Paga più
+  i due secondari) e il fondo misura 146px, sotto i 176 del ⚡.
   IL DEFAULT DELLA VIA È IL PUNTO DI RITIRO (ago 2026, decisione di
   Andrea che AFFINA il 12 ago — precedenza punto → casa → ritiro →
   digitale). DUE STRATI DI PERCHÉ, e vanno tenuti tutti e due. Il
@@ -9214,12 +9293,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SUA strada col motivo (`cambio_assente`), mai un 503 che spegne
   anche il ritiro — quello resta solo per l'articolo EUR. Annuncio
   storico (consegna '') = pseudo-via '' e il body non porta consegna.
-  Errore del preventivo = pagina col messaggio e «← Torna», mai muta;
+  Errore del preventivo = pagina col messaggio, «Riprova» e «← Torna»,
+  mai muta (il «Riprova» è dell'ago 2026: senza, sulla rete caduta
+  l'unica uscita sarebbe uscire e rientrare — vedi la voce della
+  cassa); mentre il conto arriva si vedono gli articoli e un «Paga»
+  spento, mai una pagina vuota;
   in DEMO vale `preventivoDemo` (stima client, DICHIARATA in pagina);
   in VETRINA l'invito di sempre. Navigazione da vista interna:
   chiave = annuncio (mono) o 'set|origineId', ricostruzione con
   guardia e ripiego su Esplora; `verificaOrdine` a pagamento riuscito
-  azzera `acqDati` e `ctrlPrev` col pacco.
+  azzera `acqDati` col pacco.
   LE DUE TARIFFE DI SPEDIZIONE (decisioni di Andrea): il venditore
   dichiara il costo verso casa (le colonne di sempre) e quello verso
   un PUNTO DI RITIRO — colonne `annunci.spedizione_punto_sats/_eur`
@@ -10513,12 +10596,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   distanza. Il verbo resta della lista, il dettaglio dice la cifra
   dell'escrow col suo inciso.
   «CONTROLLA IL PACCO» HA PERSO LE PILLOLE DI SCELTA (decisione 3 di
-  Andrea, stile Vinted): la scelta vive nella pagina d'acquisto
-  (`#ctrlAcquista` → `apriAcquistoSet`), al loro posto la riga onesta
-  «la scegli al passo dopo». Il conto arriva dallo STESSO preventivo
-  (cache `ctrlPrev` per firma della composizione: mai due conti che
-  divergono) con l'anteprima sulla strada PIÙ ECONOMICA, e la riga lo
-  DICE («Spedizione (dalla più economica)»); in DEMO resta la stima
+  Andrea, stile Vinted): la scelta viveva nella pagina d'acquisto
+  (`#ctrlAcquista` → `apriAcquistoSet`), e al loro posto c'era la riga
+  onesta «la scegli al passo dopo». DALL'AGO 2026 QUELLA PAGINA NON
+  ESISTE PIÙ (vedi «IL CARRELLO SI PAGA DOVE SI CONTROLLA»): non c'è
+  più un passo dopo, e la scelta è tornata dov'era la riga — cioè
+  nell'unica pagina rimasta. Con lei sono morte la cache `ctrlPrev`
+  per firma della composizione e l'anteprima sulla strada PIÙ
+  ECONOMICA («Spedizione (dalla più economica)»), che esisteva solo
+  perché lì la strada non si sceglieva; in DEMO resta la stima
   client di `totaleSet` (per questo `consegnaSetScelta` sopravvive
   CONGELATA a 'spedizione'). `startBuy`/`startBuySet`/
   `confermaCompraSubito` restano i soli varchi POST (sentinella sul
