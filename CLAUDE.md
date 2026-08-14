@@ -5633,6 +5633,88 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   a PEZZI come sempre, o a VALORE degli articoli («da 100.000 sats nel
   carrello») — un computer ci arriva da solo, di cianfrusaglie ne
   servono venti.
+  E I DUE CRITERI POSSONO STARE ACCESI INSIEME (ago 2026, decisione di
+  Andrea, terzo valore `'entrambi'`): «da 3 pezzi **O** da 25 € di
+  articoli», e basta che ne scatti uno. Chi vende sia cose care sia
+  cianfrusaglie non deve più rinunciare a metà della promessa.
+  UNA SOLA PERCENTUALE (decisione di Andrea), ed è la scelta che regge
+  tutto il resto: le due gambe sono DUE STRADE PER LO STESSO SCONTO,
+  non due sconti. Da lì la domanda «si sommano o vince il maggiore?»
+  non si pone nemmeno — e la SOMMA andava respinta comunque, per due
+  ragioni che non dipendono dai gusti: 20+20 buca
+  `SCONTO_PACCO_MAX_PERCENTO`, che è una cintura vera, e sposta il
+  FONDO della cascata lampo+carrello (il 21% del listino) che una
+  prova dichiara ad alta voce. Il calcolo passa da un `max()` apposta:
+  se un domani si volessero due percentuali, «vince il maggiore» è già
+  scritto.
+  PERCHÉ UN TERZO VALORE DEL CRITERIO e non due colonne o due flag: 1)
+  le due soglie devono continuare a CONSERVARSI a vicenda (il patto del
+  COALESCE — chi prova un criterio e torna indietro ritrova la sua
+  cifra), e se la soglia fosse l'interruttore «conservata» e «accesa»
+  sarebbero la stessa cosa; 2) `SCONTO_PACCO_CRITERI` è già il
+  kill-switch senza deploy, ed è già una leva-LISTA, quindi il
+  censimento delle leve in CI non cambia; 3) la migrazione resta il
+  DEFAULT della colonna — zero script, zero backfill, e i negozi a
+  criterio singolo non si toccano.
+  LA FORMA: `_regola_sconto` resta il giudice di UNA gamba (con tutte
+  le sue prove) e sopra di lui c'è `_regole_sconto`, che a 'entrambi'
+  lo chiama due volte per NOME — così il kill-switch vale PER GAMBA, e
+  la guardia di 'entrambi' sta PRIMA del giro o si scavalcherebbe il
+  suo. ⚠️ E il lettore singolo RIFIUTA esplicitamente 'entrambi': da
+  quando quel valore è in catalogo, il solo `not in
+  SCONTO_PACCO_CRITERI` lo lascerebbe passare e, non essendo 'valore',
+  cadrebbe nel ramo dei PEZZI — misurando una soglia che il venditore
+  non ha promesso da sola (`avvisa_sconto_su_mono` gliela passa
+  grezza). Il conto passa da `_sconto_regole` (il MAX) nei QUATTRO
+  percorsi di sempre, e la guardia del cambio da `_sconto_vuole_cambio`
+  — la domanda non è più «di che criterio è la regola» ma «ce n'è UNA
+  che lo chiede», e scritta a mano quattro volte è il posto in cui una
+  resta indietro.
+  L'INVITO MOSTRA LA GAMBA PIÙ VICINA, UNA SOLA (decisione di Andrea),
+  ed è ciò che ha reso il cantiere piccolo: `_gamba_invito` (server) e
+  `gambaInvito`/`statoScontoPacco` (client) restituiscono la STESSA
+  FORMA di prima, quindi invito, barra, badge del carrello, conto,
+  `.sconto-tag` e `renderAcquisto` non cambiano di una riga. Il
+  progresso si confronta in PROPORZIONE (`misura/soglia`), o «1 pezzo
+  su 3» e «12 € su 25» non si confrontano; chi è già SCATTATA vince
+  subito. Due pillole 🎁 per lo stesso −10% si leggerebbero come due
+  sconti, e la fila è a righe piene: la terza riga sfonderebbe il tetto
+  d'altezza già misurato per il blocco appiccicato del carrello.
+  Nel MONO la scelta è fra le gambe RAGGIUNGIBILI (il filtro viene
+  PRIMA), o si inviterebbe verso la strada che quello stock non può
+  percorrere lasciando muta l'altra, più lontana ma possibile; nel SET
+  fra tutte, perché lì la composizione può sempre crescere.
+  LA FRASE PUBBLICA invece le nomina TUTTE E DUE — «−10% da 3 pezzi in
+  su o da 25 € di articoli» — perché lì è una REGOLA del negozio e non
+  un verdetto su questo carrello. La percentuale una volta sola, in
+  testa. MISURATO a 320px: l'etichetta corta di «Altri oggetti» resta
+  su UNA riga e il blocco appiccicato non cresce (176px, il 23% già
+  accettato).
+  IL VERDE IN VETRINA RESTA COM'ERA, e senza una riga di codice:
+  `scontoQui(l, 1)` misura a UN pezzo e il minimo a pezzi è 2, quindi
+  in card può accendersi solo la gamba a valore. È la formula che lo
+  dice da sé, non un'eccezione scritta.
+  LA REGOLA D'ORO DI `_sconto_pubblico` SI ESTENDE E NON SI ROMPE: a
+  'entrambi' le chiavi piene diventano DUE, ma MAI due nella stessa
+  unità — «quella piena» resta una domanda con una risposta sola per
+  ogni unità di misura, che è la proprietà su cui il client poggia. La
+  prova che diceva «le tre cifre si escludono SEMPRE» ha cambiato lato
+  apposta. IL CLIENT VECCHIO IN CACHE ne esce con un'OMISSIONE e non
+  con una bugia: legge `soglia`, disegna «−10% da 3 articoli», e quella
+  metà di promessa è vera — è la sola ragione per cui si poteva fare.
+  Il `criterio` esce 'entrambi' solo quando le gambe vive sono DAVVERO
+  due: se una si spegne, in pubblico si dichiara l'altra.
+  L'ENDPOINT valida TUTTE E DUE le soglie a 'entrambi', col messaggio
+  che dice QUALE manca; il libro mastro fa lo stesso (una gamba morta è
+  mezza promessa che nessuno vede); il filtro `solo_sconto` guadagna
+  `IN ('valore','entrambi')`, perché quella gamba il badge ce l'ha.
+  IL CASSETTO è l'unica superficie che cresce: terza pillola «Tutti e
+  due» e i due blocchi mostrati INSIEME (587px aperto, contro ~460 del
+  criterio singolo, dentro un accordion). Le variabili non dicono più
+  «quale criterio è» ma «questo blocco serve?» — se una torna a un
+  confronto secco, il venditore salva una promessa a metà senza
+  vederla. La riga in cima diventa «La spedizione è a parte. Basta che
+  scatti una delle due.»
   LA VALUTA DELLA SOGLIA A VALORE LA SCEGLIE IL VENDITORE (ago 2026,
   decisione di Andrea chiesta dalla comunità, che SUPERA quella di due
   giorni prima — «la soglia a valore è in euro» — la quale a sua volta
