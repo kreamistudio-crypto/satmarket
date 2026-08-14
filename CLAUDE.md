@@ -7002,12 +7002,30 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   disegna NIENTE — un'assenza non è una bugia — e la prosa del cambio
   muto resta al ramo di sopra, o quel `=== 0` direbbe il falso (lì
   `sgManca` vale 0 perché la misura non c'è, non perché la soglia sia
-  raggiunta). SCARTATA la forma robusta — agganciare il verde al
-  risparmio (`sped_gratis_sats` della strada), che allineerebbe la 🚚
-  alla 🎁 —: cambierebbe comportamento a chi ha la tariffa dichiarata
-  a ZERO, dove la promessa scatta ma non c'è niente da offrire. Si
-  potrà prendere il giorno che quel conto sarà zero, e la query che lo
-  misura è nel commit di questo cantiere.
+  raggiunta).
+  LA FORMA ROBUSTA È SCARTATA, E MISURATA (ago 2026, decisione di
+  Andrea): agganciare il verde al RISPARMIO (`sped_gratis_sats` della
+  strada) allineerebbe la 🚚 alla 🎁 e sembra la mossa pulita, ma
+  quella cifra vale zero quando la tariffa era GIÀ zero — cioè si
+  spegnerebbe il badge proprio dove la spedizione è davvero gratis.
+  **Corretta tecnicamente, sbagliata per chi guarda.** Il conto non è
+  ipotetico: **3 annunci di 2 venditori** hanno oggi la tariffa
+  dichiarata a zero con la promessa accesa (query in sola lettura nel
+  commit di questo cantiere: annunci attivi che spediscono, venditore
+  con la soglia accesa nella sua unità, tariffa a zero su almeno una
+  via — si rimisura così se un domani si volesse riaprire la
+  questione, ma il motivo non dipende dal numero: basta che non sia
+  zero).
+  QUINDI L'ASIMMETRIA FRA LE DUE PROMESSE RESTA, ed è dichiarata: il
+  verde della 🚚 si aggancia alla MISURA (`sgManca === 0`), quello
+  della 🎁 al FATTO (`sconto_sats > 0`). Due forme diverse per due
+  ragioni diverse — uno sconto che non sconta niente non è uno sconto,
+  una spedizione che non costa niente è gratis lo stesso — e chi le
+  uniforma per simmetria rimette in piedi proprio il caso qui sopra.
+  IMPERFEZIONE DICHIARATA che ne esce: su quei 3 annunci, SOTTO
+  soglia, il badge tace mentre la spedizione è gratuita comunque. È
+  un'omissione e non una bugia, e a dirlo resta la riga «gratuita» del
+  conto, che quella tariffa la copre già.
   E LA LEZIONE VALE PIÙ DELLA CURA, che è di una riga: una sentinella
   sulla POSIZIONE di una guardia dice che la guardia c'è, MAI che il
   ramo accanto sia onesto — quella di ieri era verde col difetto vivo,
