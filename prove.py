@@ -6756,6 +6756,44 @@ def prove_sped_gratis():
               for v in ("eur", "sats", "usd", "")))
 
     # ================================================================
+    # I DUE CATALOGHI DI SELECT DICONO LE STESSE PROMESSE
+    # ================================================================
+    # «I tuoi annunci» passa da CAMPI_MIEI e non da CAMPI_VETRINA:
+    # senza gli stessi alias, il PROPRIETARIO e' l'unico a non vedere
+    # la propria promessa sul proprio oggetto. E' successo davvero —
+    # la prima stesura portava il solo lato EURO, perche' era di prima
+    # che la valuta la scegliesse il venditore, e chi aveva messo la
+    # soglia in SATS restava fuori.
+    # E' un CENSIMENTO e non un elenco (la lezione del titolo nudo): si
+    # estraggono gli alias dai due cataloghi e si chiede che la vetrina
+    # non ne abbia uno in piu'. Il campo che qualcuno aggiungera' di la'
+    # fra sei mesi entra nel conto da solo, e il diff lo NOMINA invece
+    # di dire «due insiemi diversi».
+    def _alias(nome):
+        s = _SORGENTE[_SORGENTE.index(f"{nome} = ("):]
+        return set(re.findall(r"u\.(\w+) AS (venditore_\w+)",
+                              s[:s.index("\n\n")]))
+
+    def _promesse(alias):
+        return {a for c, a in alias
+                if c.startswith(("sconto_pacco", "sped_gratis", "ferie_fino"))}
+
+    in_vetrina = _promesse(_alias("CAMPI_VETRINA"))
+    in_miei = _promesse(_alias("CAMPI_MIEI"))
+    prova("CAMPI_MIEI porta tutte le promesse di CAMPI_VETRINA",
+          set(), in_vetrina - in_miei)
+    # ...e che il censimento VEDA davvero: con un predicato rotto, un
+    # insieme vuoto meno un insieme vuoto fa vuoto, e la riga qui sopra
+    # sembrerebbe una promozione invece che una cecita'.
+    prova("il censimento vede le promesse della vetrina", True,
+          len(in_vetrina) >= 9)
+    prova("...e i due lati della soglia, con la valuta che decide", True,
+          {"venditore_sconto_valore", "venditore_sconto_valore_eur",
+           "venditore_sconto_valuta", "venditore_sped_gratis",
+           "venditore_sped_gratis_eur",
+           "venditore_sped_gratis_valuta"} <= in_miei)
+
+    # ================================================================
     # LE DUE PROMESSE SONO INDIPENDENTI (decisione 3 di Andrea), ed e'
     # la parte che vale il cantiere: misurano ENTRAMBE l'articolo
     # LORDO, quindi nessuna delle due puo' spegnere l'altra. I quattro

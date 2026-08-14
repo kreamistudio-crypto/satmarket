@@ -8409,12 +8409,25 @@ CAMPI_MIEI = (
     # proprietario era l'unico a NON vedere la riga della spedizione
     # gratis sul proprio oggetto. Costo ZERO, il JOIN su `u` c'e' gia',
     # e li normalizza `arricchisci_righe_vetrina` come per la vetrina.
+    # CI VANNO TUTTE E DUE LE FACCE DELLA SOGLIA, euro E sats, con la
+    # VALUTA che dice quale delle due vale: la prima stesura portava il
+    # solo lato euro — era di prima che la valuta la scegliesse il
+    # venditore — e il risultato era che chi aveva messo la soglia in
+    # SATS restava l'unico a non vedere la propria promessa sul proprio
+    # annuncio. Cioe' il bug che questi alias esistono per chiudere,
+    # richiuso a meta'. A tenerli in pari adesso c'e' una sentinella
+    # che incrocia questo elenco con CAMPI_VETRINA: il campo che
+    # qualcuno aggiungera' di la' fra sei mesi si fa sentire da qui.
     "u.ferie_fino AS venditore_ferie, "
     "u.sconto_pacco_criterio AS venditore_sconto_criterio, "
     "u.sconto_pacco_soglia AS venditore_sconto_soglia, "
+    "u.sconto_pacco_valore AS venditore_sconto_valore, "
     "u.sconto_pacco_valore_eur AS venditore_sconto_valore_eur, "
+    "u.sconto_pacco_valore_valuta AS venditore_sconto_valuta, "
     "u.sconto_pacco_percento AS venditore_sconto_percento, "
+    "u.sped_gratis_soglia AS venditore_sped_gratis, "
     "u.sped_gratis_soglia_eur AS venditore_sped_gratis_eur, "
+    "u.sped_gratis_valuta AS venditore_sped_gratis_valuta, "
     "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
