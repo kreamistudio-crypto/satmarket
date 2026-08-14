@@ -378,17 +378,40 @@ POST_AUTOMATICI = True
 # momento comanda la scelta salvata nel database — questa riga non la
 # tocca piu'. «/canale» senza argomenti dice qual e' quello in uso.
 TELEGRAM_CANALE_ID = ""
+# ATTENZIONE (ago 2026): come per il canale, i tre numeri qui sotto
+# sono il valore di PARTENZA. Il ritmo si sceglie dal bot con
+# «/vetrina tutto | giorno | settimana» e da quel momento comanda la
+# posizione salvata nel database; «/vetrina» senza argomenti dice
+# dov'e' adesso, «/vetrina config» torna a queste righe.
 # Anti-spam: quanti post SINGOLI al massimo in un'ora. Oltre (o per le
 # raffiche, es. un import CSV) esce un solo post aggregato
 # ("N nuovi annunci nel barattolo").
 POST_MAX_ORA = 6
-# UN POST PER VENDITORE OGNI N GIORNI: il canale e' una selezione, non
-# la vetrina — un negozio che pubblica venti cose in un pomeriggio non
-# deve prendersi venti post. Il post esce SUBITO (l'annuncio non
-# aspetta una settimana per farsi vedere) e da li' il venditore tace
-# per N giorni; se in quel momento ne ha pubblicati piu' d'uno, esce il
-# piu' recente. 0 = nessun freno.
+# UN POST PER VENDITORE OGNI N GIORNI: se il canale e' una selezione,
+# un negozio che pubblica venti cose in un pomeriggio non deve
+# prendersi venti post. Il post esce SUBITO (l'annuncio non aspetta
+# una settimana per farsi vedere) e da li' il venditore tace per N
+# giorni; se in quel momento ne ha pubblicati piu' d'uno, esce il piu'
+# recente. 0 = nessun freno, cioe' la vetrina vera.
 PROMO_GIORNI_VENDITORE = 7
+# Gli SCONTI LAMPO nel canale: quando un venditore lancia uno sconto a
+# tempo, il canale lo racconta con un post suo (il post dell'annuncio
+# non si tocca — il listino e' ancora quello). Leva sua e non un ramo
+# di POST_AUTOMATICI, cosi' si spengono gli sconti senza spegnere
+# anche gli annunci nuovi. Consuma il budget di POST_MAX_ORA.
+POST_LAMPO_CANALE = True
+
+# --- Il riepilogo settimanale ----------------------------------------
+# Il LUNEDI' il canale racconta la settimana: quanti annunci nuovi,
+# quanti ordini e i tre articoli piu' venduti. Solo canale (su Nostr
+# il pubblico e' un altro). Una volta per lunedi', anche con dieci
+# deploy in mezzo.
+RIEPILOGO_SETTIMANALE = True
+# Sotto tanti annunci nuovi E senza nemmeno un ordine non esce niente:
+# un riepilogo che dice «0 ordini» fa piu' danno del silenzio. Il
+# turno della settimana si consuma lo stesso — il lunedi' dopo si
+# ricomincia da capo con una finestra nuova.
+RIEPILOGO_MINIMO = 3
 
 # --- Avviso "fase di test" (il cartello all'apertura) ----------------
 # Il cartello che accoglie chi apre l'app durante il rodaggio: si

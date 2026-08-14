@@ -448,12 +448,25 @@ except ImportError:
 # esce con un tocco solo. Il post esce SUBITO (l'annuncio non aspetta
 # una settimana per farsi vedere) e da li' il timbro del venditore si
 # chiude per N giorni; se nella finestra di raggruppamento ne ha
-# pubblicati tre, esce il PIU' RECENTE. 0 = nessun freno, cioe' il
-# comportamento di ieri: freno d'emergenza, non una taratura.
+# pubblicati tre, esce il PIU' RECENTE. 0 = nessun freno, cioe' la
+# vetrina vera.
+# DALL'AGO 2026 QUESTI TRE NUMERI SONO IL VALORE DI PARTENZA E NON
+# PIU' L'ULTIMA PAROLA: il ritmo lo decide `/vetrina` dal bot e il
+# giudice e' `ritmo_vetrina()` — chi legge queste costanti per sapere
+# come si comporta il canale legge lo stato di ieri.
 try:
     from config import PROMO_GIORNI_VENDITORE
 except ImportError:
     PROMO_GIORNI_VENDITORE = 7
+
+# LO SCONTO LAMPO NEL CANALE (ago 2026, chiesto da Andrea): quando un
+# venditore lancia una lampo, il canale lo dice. Leva sua e non un
+# ramo di POST_AUTOMATICI, cosi' in rodaggio si spengono gli sconti
+# senza spegnere anche gli annunci nuovi.
+try:
+    from config import POST_LAMPO_CANALE
+except ImportError:
+    POST_LAMPO_CANALE = True
 
 # Il cartello «siamo in fase di test»: interruttore, testo e link del
 # canale vivono nel config, cosi' si cambiano senza cantieri e a
@@ -881,6 +894,22 @@ try:
     from config import TERMOMETRO_SOTTOCATEGORIE_MINIMO
 except ImportError:
     TERMOMETRO_SOTTOCATEGORIE_MINIMO = 5  # sotto, non vale il disturbo
+
+# IL RIEPILOGO SETTIMANALE NEL CANALE (ago 2026, chiesto da Andrea):
+# il lunedi', quanti annunci nuovi, quanti ordini e i tre articoli
+# piu' venduti. E' l'unico post del canale che non racconta un fatto
+# singolo ma una settimana, ed e' anche il modo di far vedere che il
+# mercatino e' vivo a chi ci passa e trova la vetrina ferma.
+try:
+    from config import RIEPILOGO_SETTIMANALE
+except ImportError:
+    RIEPILOGO_SETTIMANALE = True
+try:
+    from config import RIEPILOGO_MINIMO
+except ImportError:
+    RIEPILOGO_MINIMO = 3   # sotto tanti annunci nuovi E senza nemmeno
+                           # un ordine si tace: un riepilogo che dice
+                           # «0 ordini» fa piu' danno del silenzio
 try:
     from config import CONTROLLO_LIBRO_MASTRO
 except ImportError:
@@ -4868,25 +4897,33 @@ async def mostra_categoria(chat: int, indice: int, pagina: int,
     await bot_api("sendMessage", dati)
 
 
+async def _comando_sconosciuto(chat: int):
+    """La risposta di chi non e' admin a un comando di servizio.
+
+    IL SILENZIO NON E' UNA RISPOSTA, ed e' deliberato: rispondere «non
+    sei autorizzato» direbbe a un curioso che quel comando ESISTE, e da
+    li' si va a indovinare chi lo puo' dare. Chi non e' admin riceve la
+    risposta di un messaggio qualunque, cioe' i bottoni — che e' anche
+    quel che gli serve. Vive in un posto solo perche' i comandi di
+    servizio sono piu' d'uno: due copie divergono, e la copia che
+    divergesse racconterebbe proprio quel che questa nasconde."""
+    return await bot_api("sendMessage", {"chat_id": chat,
+        "text": "Non conosco questo comando 🤔 — ma posso "
+                "mostrarti il mercatino 👇",
+        "reply_markup": tastiera_bot(
+            [[{"text": "🗂 Sfoglia le categorie",
+               "callback_data": "sfo:menu:0"}]])})
+
+
 async def comando_canale(mittente: dict, testo: str):
     """`/canale` — dove il bot annuncia i nuovi arrivi. Solo admin.
 
     Senza argomenti DICE quello attuale (e come si cambia): un comando
     che si limita a scrivere, e che per sapere cosa c'e' scritto
-    obbliga a entrare nel VPS, e' meta' comando.
-    IL SILENZIO NON E' UNA RISPOSTA per chi non e' admin, ed e'
-    deliberato: rispondere «non sei autorizzato» direbbe a un curioso
-    che quel comando ESISTE, e da li' si va a indovinare chi lo puo'
-    dare. Chi non e' admin riceve la risposta di un messaggio
-    qualunque, cioe' i bottoni — che e' anche quel che gli serve."""
+    obbliga a entrare nel VPS, e' meta' comando."""
     chat = mittente["id"]
     if not e_admin_bot(mittente):
-        return await bot_api("sendMessage", {"chat_id": chat,
-            "text": "Non conosco questo comando 🤔 — ma posso "
-                    "mostrarti il mercatino 👇",
-            "reply_markup": tastiera_bot(
-                [[{"text": "🗂 Sfoglia le categorie",
-                   "callback_data": "sfo:menu:0"}]])})
+        return await _comando_sconosciuto(chat)
     arg = testo.split(maxsplit=1)
     arg = arg[1].strip() if len(arg) == 2 else ""
     if not arg:
@@ -4931,6 +4968,65 @@ async def comando_canale(mittente: dict, testo: str):
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ Fatto: da adesso pubblico in <code>"
                 f"{html.escape(arg)}</code>.",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
+# Cosa vuol dire ogni posizione, a parole: il comando le deve poter
+# SPIEGARE, o «/vetrina giorno» resta una parola magica da ricordare a
+# memoria. Vive accanto a RITMI e non dentro, perche' RITMI e' il
+# catalogo dei numeri e si tortura in CI senza prosa intorno.
+SPIEGA_RITMO = {
+    "tutto": "ogni annuncio nuovo è un post",
+    "giorno": "al massimo un annuncio al giorno per venditore",
+    "settimana": "al massimo un annuncio a settimana per venditore",
+}
+
+
+async def comando_vetrina(mittente: dict, testo: str):
+    """`/vetrina` — quanto parla il canale. Solo admin.
+
+    E' il gemello di `/canale`: quello dice DOVE, questo QUANTO. Sono
+    due comandi e non uno perche' si cambiano in momenti diversi — il
+    canale una volta, il ritmo ogni volta che lo si guarda e sembra
+    troppo — e perche' un solo comando con due argomenti diversi e' il
+    genere di cosa che si sbaglia col telefono in mano."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    arg = testo.split(maxsplit=1)
+    arg = arg[1].strip().lower() if len(arg) == 2 else ""
+    giorni, max_ora, soglia = ritmo_vetrina()
+    numeri = (f"Adesso: <b>{giorni}</b> giorni fra due post dello stesso "
+              f"venditore, <b>{max_ora}</b> post singoli all'ora, e da "
+              f"<b>{soglia}</b> annunci in una volta esce un post solo "
+              f"«📦 N nuovi annunci».")
+    if arg not in RITMI and arg not in ("config", "auto"):
+        nome = nome_ritmo()
+        stato = (f"Sei su <b>{nome}</b> — {SPIEGA_RITMO[nome]}."
+                 if nome else
+                 "Nessuna posizione scelta: valgono i valori del config.")
+        voci = "\n".join(
+            f"<code>/vetrina {n}</code> — {SPIEGA_RITMO[n]}" for n in RITMI)
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"🪟 <b>Ritmo della vetrina</b>\n{stato}\n{numeri}\n\n"
+                    f"{voci}\n<code>/vetrina config</code> — torna ai "
+                    "valori scritti nel config del server.\n\n"
+                    "La valvola resta comunque: una raffica (un import "
+                    "in blocco) esce sempre come un post solo, che non "
+                    "nomina nessuno.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    nome = imposta_ritmo("" if arg in ("config", "auto") else arg)
+    giorni, max_ora, soglia = ritmo_vetrina()
+    if nome:
+        detto = f"vale <b>{nome}</b> — {SPIEGA_RITMO[nome]}"
+    else:
+        detto = "valgono i valori del <b>config</b> del server"
+    await notifica_admin(f"🪟 Ritmo della vetrina: {nome or 'config'} "
+                         f"(da tg {chat})")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ Fatto: da adesso {detto}.\n"
+                f"{giorni} giorni fra due post dello stesso venditore, "
+                f"{max_ora} post singoli all'ora, aggregato da {soglia}.",
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
@@ -5037,6 +5133,8 @@ async def gestisci_update(update: dict):
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
     if testo.startswith("/canale"):
         return await comando_canale(mittente, testo)
+    if testo.startswith("/vetrina"):
+        return await comando_vetrina(mittente, testo)
     if testo.startswith("/sfoglia") or testo.startswith("/categorie"):
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": TESTO_SFOGLIA, "parse_mode": "HTML",
@@ -10035,6 +10133,12 @@ def _leve_stato():
     """Il censimento, raggruppato per cantiere e ordinato per
     conseguenza: prima cio' che apre porte o muove soldi, poi le regole
     del mercatino, in fondo i limiti e gli avvisi di servizio."""
+    # Il ritmo del canale si chiede al GIUDICE e non alle costanti:
+    # dall'ago 2026 lo decide `/vetrina` dal bot e il config e' solo il
+    # valore di partenza — leggere le costanti direbbe lo stato di
+    # ieri, che e' esattamente la trappola che questo pannello esiste
+    # per non far ricadere (la stessa gia' dichiarata per il canale).
+    rit_giorni, rit_max_ora, rit_soglia = ritmo_vetrina()
     return [
         {"gruppo": "🚦 Sicurezza", "voci": [
             _leva("Modalità collaudo", "MODALITA_COLLAUDO",
@@ -10310,11 +10414,34 @@ def _leve_stato():
                   bool(canale_id()),
                   spento="niente post sul canale; la nota Nostr vive lo "
                          "stesso"),
-            _leva("Post singoli all'ora", "POST_MAX_ORA", POST_MAX_ORA),
+            # la chiave qui NON e' una costante del config ma il
+            # COMANDO, perche' e' da li' che si cambia — il nome serve
+            # «per andarla a cambiare», e mandare qualcuno sul VPS
+            # sarebbe un indirizzo sbagliato. La nota c'e' sempre: il
+            # valore e' una parola, e una parola vuole la sua glossa.
+            _leva("Ritmo della vetrina", "/vetrina",
+                  nome_ritmo() or "config",
+                  acceso=SPIEGA_RITMO.get(
+                      nome_ritmo(),
+                      "nessuna posizione scelta dal bot: valgono i "
+                      "numeri scritti nel config")),
+            _leva("Post singoli all'ora", "POST_MAX_ORA", rit_max_ora),
             _leva("Un post per venditore ogni (giorni)",
-                  "PROMO_GIORNI_VENDITORE", PROMO_GIORNI_VENDITORE,
+                  "PROMO_GIORNI_VENDITORE", rit_giorni,
                   spento="nessun freno: un negozio che pubblica venti "
                          "cose si prende venti post"),
+            _leva("Da quanti annunci esce un post solo", "SOGLIA_AGGREGA",
+                  rit_soglia),
+            _leva("Sconti lampo nel canale", "POST_LAMPO_CANALE",
+                  bool(POST_LAMPO_CANALE),
+                  spento="una lampo lanciata non viene raccontata nel "
+                         "canale (i barattoli la sentono lo stesso)"),
+            _leva("Riepilogo settimanale", "RIEPILOGO_SETTIMANALE",
+                  bool(RIEPILOGO_SETTIMANALE),
+                  acceso="il lunedì il canale racconta la settimana: "
+                         "annunci nuovi, ordini e i tre più venduti"),
+            _leva("Annunci minimi per il riepilogo", "RIEPILOGO_MINIMO",
+                  RIEPILOGO_MINIMO),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
@@ -13266,6 +13393,11 @@ async def lancia_lampo(annuncio_id: int, req: Request,
     if savers:
         asyncio.create_task(
             _avvisa_savers_lampo(dict(a), percento, scadenza, savers))
+    # Il canale lo racconta: gancio DOPO il commit e in create_task, il
+    # patto di accoda_promo — un post fallito non deve mai rompere il
+    # lancio di uno sconto. Rilegge la riga da solo (qui `a` e' quella
+    # di PRIMA dell'UPDATE, senza le colonne lampo_*).
+    asyncio.create_task(promo_lampo(annuncio_id, percento, scadenza))
     return {"ok": True, "percento": percento, "scadenza": scadenza}
 
 
@@ -18792,6 +18924,75 @@ SOGLIA_AGGREGA = 3         # piu' di cosi' in una finestra = aggregato
 PAUSA_TRA_PROMO = 2        # secondi tra un post singolo e l'altro
 
 
+# ---------- IL RITMO DELLA VETRINA, DECISO DAL BOT -------------------
+# Quanto parla il canale sta in tre numeri — ogni quanti giorni uno
+# stesso venditore puo' tornare in canale, quanti post singoli si
+# fanno in un'ora, e da quanti annunci in una finestra si passa
+# all'aggregato. Erano tre costanti del config, cioe' cambiare il
+# ritmo voleva dire entrare nel VPS e riavviare; e il ritmo e'
+# proprio la cosa che si tara GUARDANDO il canale, non a tavolino.
+#
+# NEL DATABASE VA IL NOME, NON I NUMERI, ed e' la scelta che tiene
+# semplice il resto: una riga, una parola, e le tre cifre restano
+# qui, dove hanno il loro commento accanto. Un nome fuori catalogo —
+# scritto a mano, o rimasto da una posizione che un domani si toglie
+# — ricade sul config: fail-safe, perche' sbagliare qui non deve
+# poter spegnere il canale.
+#
+# PERCHE' `impostazioni` E' IL POSTO GIUSTO, e non e' una deroga alla
+# regola «le leve si guardano e basta» del pannello admin: quella
+# difende gli interruttori che muovono DENARO (ASTA_ABILITATA,
+# IMPORT_NOSTR_APERTO, AUTO_SBLOCCO_ATTIVO nascono spenti apposta
+# perche' accenderli costi un gesto dal VPS). Un ritmo di
+# pubblicazione non accende niente, dice quanto il bot parla, e
+# sbagliarlo si vede subito nel canale. E' la stessa famiglia dell'id
+# del canale, che da lassu' passa gia' di qui.
+#
+# NIENTE CACHE, al contrario di `_CANALE`: e' una SELECT ogni finestra
+# di raggruppamento (90 secondi), e una seconda copia in RAM sarebbe
+# una copia da tenere allineata in cambio di niente.
+
+RITMI = {                     # (giorni fra due post dello stesso
+                              #  venditore, post singoli all'ora,
+                              #  soglia dell'aggregato)
+    "tutto":     (0, 30, 20),   # la vetrina: ogni annuncio un post
+    "giorno":    (1,  6,  3),   # uno per venditore al giorno
+    "settimana": (7,  6,  3),   # la selezione: uno a settimana
+}
+
+
+def nome_ritmo() -> str:
+    """Come si chiama la posizione di adesso, e l'UNICO posto che va a
+    leggere quella riga. '' = nessuna posizione scelta, cioe' vale il
+    config — che e' un'informazione diversa da «settimana» anche
+    quando i numeri combaciano: chi legge il pannello deve poter
+    distinguere «l'ha deciso qualcuno» da «e' il valore di partenza».
+    Un nome fuori catalogo vale come '': fail-safe, perche' sbagliare
+    qui non deve poter spegnere il canale."""
+    nome = impostazione("ritmo_vetrina", "")
+    return nome if nome in RITMI else ""
+
+
+def ritmo_vetrina() -> tuple[int, int, int]:
+    """IL GIUDICE UNICO di «quanto parla il canale». Nessuna posizione
+    scelta = i valori del config, cioe' il mondo di ieri byte per
+    byte."""
+    return RITMI.get(nome_ritmo()) or (PROMO_GIORNI_VENDITORE,
+                                       POST_MAX_ORA, SOGLIA_AGGREGA)
+
+
+def imposta_ritmo(nome: str) -> str:
+    """Cambia la posizione e la restituisce. Un nome fuori catalogo si
+    scrive come stringa vuota, cioe' «torna al config»: e' anche il
+    modo di annullare la scelta senza andare a cancellare una riga a
+    mano sul VPS."""
+    nome = (nome or "").strip().lower()
+    if nome not in RITMI:
+        nome = ""
+    scrivi_impostazione("ritmo_vetrina", nome)
+    return nome
+
+
 def _fmt_sats(n) -> str:
     """80000 -> '80.000': i puntini delle migliaia all'italiana.
 
@@ -18923,9 +19124,10 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False) -> str:
     return testo
 
 
-def _un_post_per_venditore(annunci: list[dict], adesso: int = 0) -> list[dict]:
+def _un_post_per_venditore(annunci: list[dict], giorni: int,
+                           adesso: int = 0) -> list[dict]:
     """Il freno del canale: al massimo UN annuncio per venditore, e
-    solo se il suo ultimo post e' vecchio di PROMO_GIORNI_VENDITORE.
+    solo se il suo ultimo post e' vecchio di `giorni`.
     Fra i suoi vince il PIU' RECENTE (`creato`, poi `id` — lo stesso
     tie-break dell'ordine della vetrina: due annunci pubblicati nello
     stesso secondo esistono davvero, e senza il secondo campo la
@@ -18934,13 +19136,17 @@ def _un_post_per_venditore(annunci: list[dict], adesso: int = 0) -> list[dict]:
     PURA APPOSTA, come le pure del conto: prende righe e restituisce
     righe, non tocca ne' rete ne' database — cosi' si tortura in CI
     invece di sperarci. A scrivere il timbro e' chi posta.
-    Leva a 0 = nessun freno, cioe' il comportamento di ieri: si
-    riconosce che e' un freno d'emergenza e non una taratura, quindi
-    non si limita nemmeno a un annuncio per venditore."""
-    if PROMO_GIORNI_VENDITORE <= 0:
+    `giorni` e' OBBLIGATORIO E SENZA DEFAULT apposta (la lezione di
+    `atteso_sats`): dall'ago 2026 il ritmo lo decide `ritmo_vetrina()`
+    e non piu' una costante, e chi aggiungera' un chiamante domani
+    deve scegliere il freno invece di ereditarne uno in silenzio.
+    A 0 = nessun freno, cioe' la vetrina vera: si riconosce che e' una
+    posizione e non una taratura, quindi non si limita nemmeno a un
+    annuncio per venditore."""
+    if giorni <= 0:
         return annunci
     adesso = adesso or int(time.time())
-    soglia = adesso - PROMO_GIORNI_VENDITORE * 86400
+    soglia = adesso - giorni * 86400
     migliori: dict[int, dict] = {}
     for a in annunci:
         if (a.get("promo_canale_il") or 0) > soglia:
@@ -18974,7 +19180,11 @@ async def _drena_promo():
     quel che si e' accumulato e applica la regola unica — post singoli
     se sono pochi e il budget orario regge, un solo aggregato
     altrimenti. Rilegge ogni annuncio dal database: chi e' stato
-    venduto o rimosso durante l'attesa non viene mai annunciato."""
+    venduto o rimosso durante l'attesa non viene mai annunciato.
+
+    I tre numeri del ritmo si leggono UNA VOLTA in cima al giro: cosi'
+    un `/vetrina` che arriva a meta' drenaggio non fa uscire una parte
+    del gruppo con una regola e il resto con un'altra."""
     global _drenatore_promo_avviato
     await asyncio.sleep(ATTESA_RAGGRUPPO)
     ids = list(dict.fromkeys(CODA_PROMO))   # senza doppioni, in ordine
@@ -18998,16 +19208,17 @@ async def _drena_promo():
                     and not in_ferie(a["ferie_fino"], adesso_f):
                 annunci.append(dict(a))
         con.close()
-        annunci = _un_post_per_venditore(annunci)
+        giorni, max_ora, soglia_aggrega = ritmo_vetrina()
+        annunci = _un_post_per_venditore(annunci, giorni)
         if not annunci:
             return
         adesso = time.time()
         _post_promo_recenti[:] = [t for t in _post_promo_recenti
                                   if adesso - t < 3600]
-        if (len(annunci) <= SOGLIA_AGGREGA and
-                len(_post_promo_recenti) + len(annunci) <= POST_MAX_ORA):
+        if (len(annunci) <= soglia_aggrega and
+                len(_post_promo_recenti) + len(annunci) <= max_ora):
             for a in annunci:
-                await _posta_promo_singolo(a)
+                await _posta_promo_singolo(a, giorni)
                 _post_promo_recenti.append(time.time())
                 await asyncio.sleep(PAUSA_TRA_PROMO)
         else:
@@ -19019,18 +19230,27 @@ async def _drena_promo():
         print(f"⚠️ Post automatici saltati: {e}")
 
 
-async def _posta_promo_singolo(a: dict):
+async def _posta_promo_singolo(a: dict, giorni: int):
     """Un annuncio, un post per canale. Ogni canale fallisce per conto
     suo; i riferimenti (message_id, event id) si salvano per il ciclo
-    di vita (✅ Venduto, cancellazione)."""
+    di vita (✅ Venduto, cancellazione).
+
+    `giorni` arriva dal chiamante — che l'ha gia' letto da
+    `ritmo_vetrina()` — e non si rilegge qui: a meta' drenaggio un
+    `/vetrina` cambierebbe il freno sotto i piedi al gruppo, e mezzo
+    gruppo timbrato e mezzo no e' il modo in cui questo freno diventa
+    difficile da spiegare."""
     cambio = await cambio_btc_eur()
-    # Il timbro del turno settimanale si scrive PRIMA dell'invio, il
-    # patto delle campagne: un errore di rete puo' far perdere un post
-    # di vetrina, mai raddoppiarlo — e qui il doppio sarebbe proprio la
-    # cosa che il freno esiste per togliere. Chi salta il turno per un
-    # guasto ha comunque il suo annuncio in vetrina, che e' il posto
-    # dove si compra.
-    if PROMO_GIORNI_VENDITORE > 0 and a.get("venditore_id"):
+    # Il timbro del turno si scrive PRIMA dell'invio, il patto delle
+    # campagne: un errore di rete puo' far perdere un post di vetrina,
+    # mai raddoppiarlo — e qui il doppio sarebbe proprio la cosa che il
+    # freno esiste per togliere. Chi salta il turno per un guasto ha
+    # comunque il suo annuncio in vetrina, che e' il posto dove si
+    # compra.
+    # A freno spento NON si timbra, ed e' deliberato: un timbro scritto
+    # mentre il ritmo e' «tutto» bloccherebbe per una settimana intera
+    # ogni venditore il giorno che qualcuno stringe a «settimana».
+    if giorni > 0 and a.get("venditore_id"):
         con = db()
         con.execute("UPDATE utenti SET promo_canale_il=? WHERE tg_id=?",
                     (int(time.time()), a["venditore_id"]))
@@ -19068,6 +19288,99 @@ async def _posta_promo_singolo(a: dict):
             "WHERE id=?", (post_nostr_id, post_canale_id, a["id"]))
         con.commit()
         con.close()
+
+
+def _riga_prezzo_lampo(a: dict, percento: int, cambio: float) -> str:
+    """Il prezzo del post della lampo: il listino BARRATO e accanto lo
+    scontato, ognuno reso da `_prezzo_promo` — cosi' la regola di come
+    si scrive un prezzo nel canale (quale valuta per prima, il ≈, il
+    caso col cambio muto) resta in un posto solo.
+
+    Sul listino in EURO lo sconto si applica anche all'equivalente in
+    sats, che per quei listini e' gia' «l'equivalente al cambio di
+    pubblicazione»: la stessa percentuale sulle due facce, o la riga
+    direbbe due sconti diversi."""
+    scontato = dict(a)
+    sats, eur = _prezzo_lampo(a, percento)
+    scontato["prezzo_sats"] = sats or (
+        a["prezzo_sats"] * (100 - percento) // 100)
+    scontato["prezzo_eur"] = eur
+    return (f"<s>{_prezzo_promo(a, cambio)}</s> → "
+            f"<b>{_prezzo_promo(scontato, cambio)}</b>")
+
+
+async def promo_lampo(annuncio_id: int, percento: int, scadenza: int):
+    """Lo sconto lampo raccontato nel canale (ago 2026, chiesto da
+    Andrea). Gancio in coda a `lancia_lampo`, in create_task e DOPO il
+    commit: il patto di `accoda_promo` — un post fallito non deve mai
+    rompere il lancio di uno sconto.
+
+    UN POST NUOVO, E L'ORIGINALE NON SI TOCCA. La lampo non cambia
+    `prezzo_sats` (il listino non si tocca MAI, e' la regola sua),
+    quindi il post di quando l'annuncio e' nato non mente: dice il
+    listino, che e' ancora vero. E' la differenza col ✅ Venduto, che
+    invece riscrive quel post — li' a cambiare era la DISPONIBILITA',
+    qui si aggiunge un'occasione a tempo. Cosi' non c'e' niente da
+    dis-editare alla scadenza.
+
+    SOLO CANALE, NIENTE NOSTR, ed e' una regola gia' scritta altrove:
+    lo sconto e' LOCALE, cioe' il vantaggio di chi compra dentro
+    Barattolo, e il NIP-99 parla il prezzo pieno per costruzione.
+
+    CONSUMA IL BUDGET ORARIO e a budget pieno SALTA invece di
+    aggregare (una lampo aggregata non direbbe niente di utile).
+    Senza, il tetto dei post si aggirerebbe lanciando sconti:
+    MAX_LAMPO_SETTIMANA e' 2 *per annuncio*, quindi chi ne ha cinquanta
+    puo' fare cento lampo a settimana. Una lampo persa e' un post
+    perso, non un ordine perso — chi la cerca ha la vetrina col filtro
+    «⚡ In offerta».
+
+    IMPERFEZIONE DICHIARATA: se l'annuncio si vende mentre la lampo e'
+    viva, questo post resta senza il ✅ (l'originale ce l'ha). Il testo
+    e' DATATO — «fino alle 18:00» — e il link apre la scheda vera, che
+    dice sempre la verita'; nessuno puo' pagare. Se in rodaggio dara'
+    fastidio la leva e' una colonna `post_lampo_id` piu' una riga in
+    `promo_venduto`: qui si e' scelto di non raddoppiare il ciclo di
+    vita per un post che si autodata."""
+    if not (POST_AUTOMATICI and POST_LAMPO_CANALE and canale_id()):
+        return
+    try:
+        con = db()
+        # si rilegge dal database e non ci si fida del payload, e con
+        # le guardie di _posta_promo_singolo: un negozio in ferie o un
+        # annuncio importato non si annunciano in piazza
+        a = con.execute(
+            "SELECT a.*, u.ferie_fino FROM annunci a "
+            "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.id=?",
+            (annuncio_id,)).fetchone()
+        con.close()
+        adesso = time.time()
+        if not a or a["stato"] != "attivo" or a["contatto_nostr"] \
+                or in_ferie(a["ferie_fino"], int(adesso)) \
+                or a["lampo_scadenza"] <= adesso:
+            return
+        _post_promo_recenti[:] = [t for t in _post_promo_recenti
+                                  if adesso - t < 3600]
+        if len(_post_promo_recenti) >= ritmo_vetrina()[1]:
+            print(f"⚡ Lampo #{annuncio_id} non annunciata: budget orario "
+                  f"dei post esaurito")
+            return
+        a = dict(a)
+        cambio = await cambio_btc_eur()
+        testo = (f"⚡ <b>-{percento}%</b> su "
+                 f"<b>{html.escape(a['titolo'])}</b>"
+                 f"\n💰 {_riga_prezzo_lampo(a, percento, cambio)}"
+                 f"\n⏳ solo fino {_quando_scade(scadenza)}"
+                 f"\n\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+                 "🫙 Apri su Barattolo</a>"
+                 f"\n\n{_hashtag_promo(a)}")
+        r = await bot_api("sendMessage", {
+            "chat_id": canale_id(), "text": testo,
+            "parse_mode": "HTML", "disable_web_page_preview": True})
+        if r and r.get("ok"):
+            _post_promo_recenti.append(time.time())
+    except Exception as e:
+        print(f"⚠️ Post della lampo #{annuncio_id} saltato: {e}")
 
 
 async def _posta_promo_aggregato(n: int):
@@ -23752,6 +24065,13 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Termometro sottocategorie saltato: {e}")
         try:
+            # il lunedi', nel canale: la settimana raccontata a chi
+            # guarda da fuori (e col turno che si consuma anche quando
+            # la settimana e' magra — vedi il cappello suo)
+            await riepilogo_settimana()
+        except Exception as e:
+            print(f"⚠️ Riepilogo settimanale saltato: {e}")
+        try:
             # DOPO l'import, ed e' la precedenza: chi ha appena
             # ricevuto il completamento ha il ritmo chiuso e qui non
             # passa (vedi suggerisci_funzioni)
@@ -23893,6 +24213,119 @@ async def termometro_sottocategorie():
         f"categorie più scoperte: {scoperte}.{riga_colmabili}\n"
         f"Sul VPS: <code>python assegna_sottocategorie.py --conta</code> "
         f"per i titoli, parole nuove nel dizionario per il resto.")
+
+
+# ============ IL RIEPILOGO SETTIMANALE (ago 2026) ===================
+# Il lunedi' il canale racconta la settimana: annunci nuovi, ordini e
+# i tre articoli piu' venduti. E' l'unico post che non racconta un
+# fatto singolo, ed e' anche quello che fa vedere che il mercatino e'
+# vivo a chi ci passa e trova la vetrina ferma.
+#
+# IL TIMBRO STA NEL DATABASE come per i fratelli, mai in un globale:
+# tre deploy in un'ora si sono gia' portati via tre volte lo stesso
+# avviso, e un lunedi' di lavoro sul VPS e' proprio il giorno in cui
+# succede.
+#
+# MA QUI SI TIMBRA ANCHE QUANDO SI TACE, ed e' la differenza col
+# termometro — che invece esce PRIMA di timbrare quando la coda e'
+# sotto il minimo. Li' il conto e' CUMULATIVO: saltare il turno lo
+# rimanda soltanto, e il lunedi' dopo ricontrolla. Qui il conto e' di
+# una SETTIMANA precisa, quindi ricontrollare martedi' darebbe una
+# finestra sfasata e un riepilogo fuori cadenza: il turno si consuma,
+# magro o no. Chi legge i due insieme e li uniforma rompe uno dei due.
+
+TIMBRO_RIEPILOGO = "riepilogo_settimana"   # il giorno dell'ultimo post
+
+
+def _conta_settimana(con, da: int) -> tuple[int, int, list]:
+    """(annunci nuovi, ordini, top 3) della finestra che parte da `da`.
+
+    PURA rispetto alla connessione che riceve — legge e basta, come i
+    controlli della ronda — cosi' si gira in CI su un database di
+    cartone invece di sperarci.
+
+    ANNUNCI NUOVI: gli stati che sono stati in vetrina davvero. Un
+    VENDUTO ci entra (e' stato un annuncio vero della settimana, e' solo
+    finito), un rimosso e uno in revisione no — il primo non c'e' piu',
+    il secondo non c'e' mai stato.
+
+    ORDINI: quelli in cui i sats sono ARRIVATI IN CASSAFORTE, cioe' il
+    complemento di 'creato' e 'annullato' — la stessa definizione della
+    coda «⏸ Ordini fermi», e si dice ad alta voce invece di elencare
+    gli stati vivi. Contare i soli 'released' direbbe quasi zero: la
+    maggior parte degli ordini di una settimana e' ancora in viaggio.
+
+    TOP 3: i pezzi per annuncio, con una UNION fra la TESTATA (i mono,
+    annuncio_id<>0) e `ordine_righe` (i set) — i mono non hanno righe
+    MAI, quindi guardare le sole righe perderebbe quasi tutto. Il
+    titolo delle righe e' quello FOTOGRAFATO all'acquisto; per i mono
+    arriva dal JOIN, e un annuncio sparito nel frattempo esce dal
+    conto invece di comparire senza nome. Pareggio su `annuncio_id`
+    DESC: senza, due articoli con gli stessi pezzi si scambierebbero
+    di posto a ogni chiamata."""
+    vivi = "o.stato NOT IN ('creato','annullato')"
+    nuovi = con.execute(
+        "SELECT COUNT(*) AS n FROM annunci WHERE creato>=? "
+        "AND stato IN ('attivo','venduto')", (da,)).fetchone()["n"]
+    ordini = con.execute(
+        f"SELECT COUNT(*) AS n FROM ordini o WHERE o.creato>=? AND {vivi}",
+        (da,)).fetchone()["n"]
+    top = con.execute(
+        "SELECT annuncio_id, titolo, SUM(pezzi) AS pezzi FROM ("
+        f"  SELECT o.annuncio_id, a.titolo AS titolo, o.quantita AS pezzi "
+        f"  FROM ordini o JOIN annunci a ON a.id=o.annuncio_id "
+        f"  WHERE o.creato>=? AND {vivi} AND o.annuncio_id<>0 "
+        "  UNION ALL "
+        f"  SELECT r.annuncio_id, r.titolo AS titolo, r.quantita AS pezzi "
+        f"  FROM ordine_righe r JOIN ordini o ON o.id=r.ordine_id "
+        f"  WHERE o.creato>=? AND {vivi}"
+        ") GROUP BY annuncio_id, titolo "
+        "ORDER BY pezzi DESC, annuncio_id DESC LIMIT 3", (da, da)).fetchall()
+    return nuovi, ordini, [dict(r) for r in top]
+
+
+async def riepilogo_settimana():
+    """Il post del lunedi' nel canale. Solo canale: su Nostr il
+    pubblico e' un altro e non e' stato chiesto."""
+    if not (RIEPILOGO_SETTIMANALE and canale_id()):
+        return
+    oggi = time.strftime("%Y-%m-%d")
+    if time.localtime().tm_wday != 0 or timbro_letto(TIMBRO_RIEPILOGO) == oggi:
+        return
+    con = db()
+    nuovi, ordini, top = _conta_settimana(con, int(time.time()) - 7 * 86400)
+    con.close()
+    # Il turno si consuma comunque, anche quando si tace: vedi il
+    # cappello qui sopra, e' la riga che si sbaglia per prima.
+    timbro_scrivi(TIMBRO_RIEPILOGO, oggi)
+    if nuovi < RIEPILOGO_MINIMO and not ordini:
+        print(f"📊 Riepilogo settimana ({oggi}): {nuovi} annunci, "
+              f"{ordini} ordini — settimana magra, non esce")
+        return
+    righe = [f"🫙 {nuovi} "
+             + ("nuovi annunci" if nuovi != 1 else "nuovo annuncio")]
+    if ordini:
+        righe.append(f"🛒 {ordini} "
+                     + ("ordini" if ordini != 1 else "ordine"))
+    if top:
+        # html.escape sul titolo: le notifiche sono HTML e un «<» spegne
+        # il messaggio in silenzio (la lezione dell'avviso di
+        # spedizione) — e qui i titoli sono tre in un colpo solo.
+        venduti = " · ".join(
+            html.escape(t["titolo"] or "") + (f" ×{t['pezzi']}"
+                                              if t["pezzi"] > 1 else "")
+            for t in top if t["titolo"])
+        if venduti:
+            righe.append(f"🏆 I più venduti: {venduti}")
+    print(f"📊 Riepilogo settimana ({oggi}): {nuovi} annunci, "
+          f"{ordini} ordini, {len(top)} in classifica — post mandato")
+    await bot_api("sendMessage", {
+        "chat_id": canale_id(), "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+        "text": "📊 <b>La settimana di Barattolo</b>\n\n"
+                + "\n".join(righe)
+                + f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Sfoglia il "
+                  "mercatino</a>"})
 
 
 # ============ LA RONDA DEL LIBRO MASTRO (ago 2026) ==================
@@ -25442,7 +25875,11 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
 # a-capo finale, e un nome che arriva da un URL puo' averlo)
 NOME_FOTO = re.compile(
     r"^(a\d+_\d+(_\d+)?(_min)?\.(jpg|png|webp|gif)"
-    r"|av_[0-9a-f]+_\d+\.jpg)\Z")
+    r"|av_[0-9a-f]+_\d+\.jpg"
+    # la vetrina del venditore su Nostr: il QUARTO scrittore di
+    # foto/, e la sua forma sta qui perche' senza, la figura
+    # pubblicata in piazza risponderebbe 404 a chiunque la apra
+    r"|v\d+_\d+\.jpg)\Z")
 TIPI_FOTO = {"jpg": "image/jpeg", "png": "image/png",
              "webp": "image/webp", "gif": "image/gif"}
 
