@@ -10292,6 +10292,90 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   si apre in una scheda nuova, ed è una limitazione vera: un objectURL
   vive solo in quella pagina e `tg.openLink` lo passerebbe a un browser
   che non lo sa leggere. Per questo il testo del form consiglia il QR.
+  IL CODICE COMPARE DENTRO IL BOTTONE (ago 2026, tre cose dal campo in
+  un cantiere solo). 1) IL SALTO: toccare «Mostra» riportava la pagina
+  in cima, e chi aveva appena chiesto il codice si ritrovava
+  all'inizio dell'ordine a cercarlo. 2) IL CODICE compariva SOPRA il
+  bottone che l'aveva rivelato — «svelarlo altrove» — e ora il bottone
+  si TRASFORMA: al suo posto, sotto il dito, c'è il piatto col codice.
+  3) TOCCANDO IL CODICE si copia, con la conferma di casa.
+  LE DUE CURE SONO LA STESSA CURA, ed è il pregio del giro: il salto
+  spariva solo non passando più da `openOrder`, e non passare da
+  `openOrder` è precisamente ciò che permette al piatto di nascere
+  nello slot del bottone.
+  IL SALTO NON ERA IL FUOCO, ed è la parte da non riscrivere a
+  memoria: i due sospetti erano il `focus()` che trascina (curato
+  altrove con `preventScroll`) e il ridisegno che ricomincia da capo.
+  A dirlo è stata una SPIA su `window.scrollTo` con lo stack di chi la
+  chiama, non la lettura del codice — `mostraBusta → openOrder → go →
+  scrollTo(0, 0)`, da y=578 a y=0, e di `focus()` NESSUNA. Quindi la
+  cura non è un `preventScroll`: è `ridisegnaBusta`, che riscrive il
+  solo `#bustaPannello` con `outerHTML` — il pattern di
+  `aggiornaCifreOrdine` e `aggiornaPrezzoDettaglio`, si ridisegna in
+  place e non si riapre. Verificato dopo: scrollY 578 → 578, zero
+  chiamate a scrollTo.
+  IL TESTO SOPRA IL BOTTONE NON CAMBIA, ed è ciò che fa atterrare il
+  codice DOVE STAVA IL DITO: la testa del pannello è UNA sola, uguale
+  prima e dopo, e il piatto vive nello slot del bottone (`${b ?
+  piattoCodice(...) : <button>}`). Con due return distinti — il nome
+  sopra e il codice sotto, com'era ieri — il piatto nascerebbe più in
+  basso e il gesto tornerebbe a rivelare altrove. Misurato alle tre
+  larghezze: top del bottone e top del piatto IDENTICI (315,2 · 309,8
+  · 332,8), e il piatto cresce verso il BASSO (50 → 69px). Da qui il
+  NOME esce DOPO il codice, che è anche l'ordine giusto al banco: il
+  codice serve sempre, il nome solo se te lo chiedono.
+  IL GESTO CAMBIA MESTIERE E LO DICE IN UNA PAROLA (la condizione di
+  Andrea): prima rivelava, dopo COPIA. Lo dicono l'icona (👁 → 📋) e
+  la riga sotto il codice, «Tocca per copiare»; l'`aria-label` passa a
+  «Copia il codice di ritiro» per chi l'icona non la vede. Il vecchio
+  bottone «📋 Copia il codice» è morto: era un secondo bottone per la
+  stessa cosa, e adesso a copiare è il codice.
+  IL PIATTO RESTA UN `<button>` e non un `<div>` travestito: è quello
+  che è diventato. Ricetta della FASCIA DEL RODAGGIO e non un vestito
+  nuovo — fondo `--sats-soft`, bordo ₿ 1.5px, niente ombra piena,
+  l'arancione pieno resta di «+ Vendi» e dei bottoni d'acquisto.
+  Il codice è `--ink` sul velato (12,75 di giorno, 11,06 di sera)
+  invece del bianco su arancio del bottone di prima, che su
+  ventiquattro cifre rendeva 2,3. ANCHE L'ETICHETTA è `--ink` (col
+  velo di opacità: 9,5 e 9,3) e non l'arancio che verrebbe da dare a
+  una riga d'azione: `--sats-text` sul velato rende 4,3, sotto AA per
+  un testo da 12px — quella coppia in casa esiste (`.hint.avviso-
+  tracking`) ma lì è un avviso che si legge una volta, non la parola
+  che spiega a cosa serve il bottone. La gerarchia la fa la
+  DIMENSIONE, 19px contro 12.
+  L'IMPULSO DELLA RIVELAZIONE è l'anello dell'impulso dello scatto:
+  mezzo secondo, una volta sola, spento — non fermato — da
+  `prefers-reduced-motion`. KEYFRAME SUO (`impulsoCodice`, arancio) e
+  non quello delle promesse, che è del verde dello scatto: un colore
+  preso in prestito direbbe un'altra cosa. Il «una volta sola» non sta
+  nell'animazione ma nella bandierina `bustaSvelata`, letta e AZZERATA
+  nel costruttore (il patto di `navSpingi`): un ridisegno qualunque
+  del pannello non lo rifà partire. E vale la lezione già pagata:
+  Chrome headless dichiara `reduced-motion: reduce` DI SERIE, quindi
+  chi lo fotografa senza `Emulation.setEmulatedMedia` guarda il ramo
+  che SPEGNE e conclude, sbagliando, che l'anello non c'è.
+  CODICE VUOTO = NIENTE PIATTO, e non è un caso di scuola: il
+  venditore può depositare il solo QR (la busta accetta codice OPPURE
+  documento). Lì il bottone dice «Mostra le istruzioni» invece di
+  «Mostra il codice di ritiro» — lo decide `o.bustaDocumento`, un
+  fatto che il client ha già — e dopo il tocco restano il nome e il
+  documento. Un piatto vuoto sarebbe un bottone che copia il nulla.
+  IL VENDITORE: sul pannello di scrittura non c'è piatto (lì la
+  rilettura riempie le sue textarea) e cambia solo che la pagina non
+  salta più. Sul pannello di RILETTURA il piatto c'è, ed è una
+  correzione e non un di più: prima quel ramo mostrava il solo
+  documento — il codice non lo disegnava nessuno — quindi col salto
+  tolto il tocco sarebbe diventato un tocco che non fa NIENTE. È il
+  suo codice: l'ha scritto lui, non gli si rivela niente di nuovo.
+  E L'ATTESA NON PARLA PIÙ DI SATS: `bottoneInAttesa` di serie dice
+  «Invio sats in corso…», che su una LETTURA è falso — qui non si
+  muove un sat, e il pannello lo ripete due righe più giù.
+  IMPERFEZIONE DICHIARATA: sul pannello del venditore che scrive, il
+  bottone «Rileggi» sparisce dopo la rilettura, quindi il pannello si
+  accorcia di ~63px; se si stava in fondo alla pagina il browser
+  CLAMPA lo scorrimento e la vista sale di altrettanto. Non è il salto
+  di ieri (`scrollTo` non viene chiamata affatto): è quel che fa
+  qualunque contenuto che si accorcia in fondo a un documento.
   L'INDIRIZZO DI CASA (ago 2026): lo SPECCHIO della busta — lì è il
   venditore a depositare per il compratore, qui il compratore per il
   venditore. Chi sceglie «🏠 Spedizione a casa» scrive l'indirizzo al
@@ -14891,6 +14975,33 @@ confermato, la riga «🏠 Indirizzi cancellati: 1 alla conferma» nel
 journal entro dieci minuti.
 DA PROVARE SUL TELEFONO, che qui non si può: se il riempimento
 automatico degli indirizzi funziona dentro la WebView di Telegram.
+
+Il codice di ritiro dentro il bottone (ago 2026, tre cose dal campo):
+la pagina non salta più toccando «Mostra», il codice nasce dove stava
+il dito invece che altrove, e toccandolo si copia. Le due prime sono
+la stessa cura — il salto era `openOrder` (verificato con una spia su
+`window.scrollTo`: lo stack diceva mostraBusta → openOrder → go →
+scrollTo(0,0), da y=578 a y=0, e di `focus()` NESSUNA, quindi il
+sospetto del `preventScroll` non c'entrava), e non passare più da lì è
+ciò che permette al piatto di nascere nello slot del bottone. Il
+gesto cambia mestiere e lo dice in una parola: 👁 → 📋, «Tocca per
+copiare», `aria-label` nuovo. Vedi Architettura, «IL CODICE COMPARE
+DENTRO IL BOTTONE», anche per l'anello della rivelazione (mezzo
+secondo, una volta sola, spento da reduced-motion) e per il piatto del
+venditore in rilettura, che chiude un tocco che prima non faceva
+niente. Collaudato: 3633 prove verdi (16 nuove, fra cui `piattoCodice`
+fatta GIRARE con node sui quattro casi) e SEDICI MUTAZIONI una per
+riga sorvegliata, ognuna rossa da sola — e la tortura ha trovato una
+sentinella che ESPLODEVA invece di essere rossa, portandosi dietro le
+prove dopo di lei. Più il giro dal vivo via CDP: scrollY 578 → 578 con
+zero chiamate a scrollTo, top del bottone e del piatto identici alle
+tre larghezze, il tocco che copia col suo toast, l'anello che parte
+una volta e non riparte a un ridisegno, e i tre rami (compratore,
+venditore che scrive, venditore che rilegge) più il caso del solo
+documento. Screenshot a 320/360/375 nei due temi, prima e dopo, più il
+codice LUNGO (il link di un QR), che va a capo senza sbordare.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna rotta, nessuna
+leva — solo client.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
