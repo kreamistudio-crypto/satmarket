@@ -163,15 +163,19 @@ SELECT '16) PROMESSE DI SCONTO CHE NON POSSONO SCATTARE (vuoto)' AS controllo;
 -- E dalla scelta della valuta il ramo a valore guarda l'unità
 -- dichiarata: senza, suonerebbe su OGNI negozio in sats, che ha
 -- legittimamente soglia_eur a zero.
+-- Col criterio 'entrambi' (ago 2026) devono essere serie TUTTE E DUE le
+-- gambe: chi ne accende due e ne ha una sola valida promette metà di
+-- quel che crede.
 SELECT tg_id, nome, sconto_pacco_criterio AS criterio,
        sconto_pacco_valore_valuta AS valuta,
        sconto_pacco_soglia AS soglia_pezzi,
        sconto_pacco_valore AS soglia_sats,
        sconto_pacco_valore_eur AS soglia_eur, sconto_pacco_percento AS pct
   FROM utenti WHERE sconto_pacco_percento > 0 AND (
-       sconto_pacco_criterio NOT IN ('pezzi','valore')
-    OR (sconto_pacco_criterio = 'pezzi'  AND sconto_pacco_soglia < 2)
-    OR (sconto_pacco_criterio = 'valore' AND (
+       sconto_pacco_criterio NOT IN ('pezzi','valore','entrambi')
+    OR (sconto_pacco_criterio IN ('pezzi','entrambi')
+        AND sconto_pacco_soglia < 2)
+    OR (sconto_pacco_criterio IN ('valore','entrambi') AND (
            sconto_pacco_valore_valuta NOT IN ('eur','sats')
         OR (sconto_pacco_valore_valuta = 'eur'  AND sconto_pacco_valore_eur < 1)
         OR (sconto_pacco_valore_valuta = 'sats' AND sconto_pacco_valore < 1))));

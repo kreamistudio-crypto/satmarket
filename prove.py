@@ -5509,7 +5509,7 @@ def prove_sconto_pacco():
     # comanda — e quale delle due esce in vetrina.
     # ================================================================
     amb3 = {"SCONTO_PACCO_ATTIVO": True,
-            "SCONTO_PACCO_CRITERI": ("pezzi", "valore"),
+            "SCONTO_PACCO_CRITERI": ("pezzi", "valore", "entrambi"),
             "VALUTE_SOGLIA": ("eur", "sats"),
             "SCONTO_PACCO_MIN_SOGLIA": 2,
             "SCONTO_PACCO_MIN_VALORE_EUR": 1,
@@ -5517,8 +5517,10 @@ def prove_sconto_pacco():
             "SCONTO_PACCO_MAX_PERCENTO": 30}
     exec(pezzo("_valuta_soglia"), amb3)
     exec(pezzo("_regola_sconto"), amb3)
+    exec(pezzo("_regole_sconto"), amb3)
     exec(pezzo("_sconto_pubblico"), amb3)
     reg, pub = amb3["_regola_sconto"], amb3["_sconto_pubblico"]
+    regs = amb3["_regole_sconto"]
     # firma: (criterio, valuta, soglia_pezzi, valore_sats, valore_eur, pct)
 
     prova("regola a pezzi: esce la soglia in pezzi", ("pezzi", 3, 10, ""),
@@ -5564,7 +5566,10 @@ def prove_sconto_pacco():
     amb3["SCONTO_PACCO_CRITERI"] = ("pezzi",)
     prova("criterio tolto dalla leva: chi l'aveva scelto non sconta piu'",
           ("", 0, 0, ""), reg("valore", "eur", 0, 0, 50, 10))
-    amb3["SCONTO_PACCO_CRITERI"] = ("pezzi", "valore")
+    # si rimette INTERA, 'entrambi' compreso: le prove sotto girano su
+    # questo stesso ambiente, e una leva lasciata a meta' le farebbe
+    # fallire per un motivo che non e' il loro
+    amb3["SCONTO_PACCO_CRITERI"] = ("pezzi", "valore", "entrambi")
     # ...e lo stesso per la VALUTA: e' una leva col patto dei criteri,
     # cioe' un freno d'emergenza che spegne chi l'aveva scelta
     amb3["VALUTE_SOGLIA"] = ("eur",)
@@ -5606,24 +5611,147 @@ def prove_sconto_pacco():
     # in sats la trova finalmente GIUSTA — e altrove non trova niente.
     prova("`valore` porta un numero SE E SOLO SE la valuta e' sats",
           True, all((pub(c, va, p, 500, 50, 10)["valore"] > 0)
-                    == (c == "valore" and va == "sats")
-                    for c in ("pezzi", "valore", "peso")
+                    == (c in ("valore", "entrambi") and va == "sats")
+                    for c in ("pezzi", "valore", "entrambi", "peso")
                     for va in ("eur", "sats", "usd", "")
                     for p in (0, 3)))
     prova("...e `valore_eur` SE E SOLO SE la valuta e' euro",
           True, all((pub(c, va, p, 500, 50, 10)["valore_eur"] > 0)
-                    == (c == "valore" and va in ("eur", ""))
-                    for c in ("pezzi", "valore", "peso")
+                    == (c in ("valore", "entrambi") and va in ("eur", ""))
+                    for c in ("pezzi", "valore", "entrambi", "peso")
                     for va in ("eur", "sats", "usd", "")
                     for p in (0, 3)))
-    # ...e le tre chiavi non possono MAI parlare insieme: e' cio' che
-    # permette al client di prendere «quella piena» senza un «if»
-    prova("le tre cifre si escludono sempre a vicenda", True,
+    # LA PROVA CHE HA CAMBIATO LATO (ago 2026, i due criteri insieme):
+    # diceva «le tre cifre si escludono SEMPRE a vicenda», e col criterio
+    # 'entrambi' non e' piu' vero — le piene diventano DUE. Quel che
+    # regge, ed e' la proprieta' su cui il client poggia davvero, e' che
+    # non siano mai due NELLA STESSA UNITA': «quella piena» resta una
+    # domanda con una risposta sola per ogni unita' di misura.
+    prova("le due cifre A VALORE non parlano mai insieme", True,
+          all(not (pub(c, va, p, s, e, 10)["valore"] > 0
+                   and pub(c, va, p, s, e, 10)["valore_eur"] > 0)
+              for c in ("pezzi", "valore", "entrambi", "peso")
+              for va in ("eur", "sats", "usd", "")
+              for p in (0, 3) for s in (0, 500) for e in (0, 50)))
+    prova("a criterio SINGOLO si escludono ancora tutte e tre", True,
           all(sum(1 for k in ("soglia", "valore", "valore_eur")
                   if pub(c, va, p, s, e, 10)[k] > 0) <= 1
               for c in ("pezzi", "valore", "peso")
               for va in ("eur", "sats", "usd", "")
               for p in (0, 3) for s in (0, 500) for e in (0, 50)))
+    prova("a 'entrambi' le piene sono DUE: i pezzi e una a valore",
+          {"criterio": "entrambi", "soglia": 3, "valore": 0,
+           "valore_eur": 50, "valuta": "eur", "percento": 10},
+          pub("entrambi", "eur", 3, 9_999, 50, 10))
+    prova("...e in sats la seconda e' quella in sats",
+          {"criterio": "entrambi", "soglia": 3, "valore": 9_999,
+           "valore_eur": 0, "valuta": "sats", "percento": 10},
+          pub("entrambi", "sats", 3, 9_999, 50, 10))
+    # IL CLIENT VECCHIO IN CACHE ne esce con un'OMISSIONE e non con una
+    # bugia: legge `soglia`, disegna «−10% da 3 articoli», e quella meta'
+    # di promessa e' vera. E' la sola ragione per cui si poteva fare.
+    prova("il client di ieri legge i PEZZI e non sbaglia unita'", 3,
+          pub("entrambi", "eur", 3, 9_999, 50, 10)["soglia"])
+    # una gamba morta non fa dichiarare 'entrambi' in pubblico: si
+    # promette quel che il negozio puo' mantenere
+    prova("a 'entrambi' con la gamba a valore morta esce 'pezzi'",
+          ("pezzi", 3, 0), tuple(pub("entrambi", "eur", 3, 0, 0, 10)[k]
+                                 for k in ("criterio", "soglia",
+                                           "valore_eur")))
+    prova("...e con la gamba a pezzi morta esce 'valore'",
+          ("valore", 0, 50), tuple(pub("entrambi", "eur", 1, 0, 50, 10)[k]
+                                   for k in ("criterio", "soglia",
+                                             "valore_eur")))
+
+    # ================================================================
+    # IL LETTORE PLURALE (_regole_sconto): zero, una o DUE gambe.
+    # ================================================================
+    prova("a criterio singolo la lista ha UNA gamba sola",
+          [("pezzi", 3, 10, "")], regs("pezzi", "eur", 3, 9_999, 50, 10))
+    prova("a 'entrambi' le gambe sono DUE, pezzi per primo",
+          [("pezzi", 3, 10, ""), ("valore", 50, 10, "eur")],
+          regs("entrambi", "eur", 3, 9_999, 50, 10))
+    prova("...e in sats la seconda porta la soglia in sats",
+          [("pezzi", 3, 10, ""), ("valore", 9_999, 10, "sats")],
+          regs("entrambi", "sats", 3, 9_999, 50, 10))
+    prova("una gamba sotto il minimo cade, l'altra resta",
+          [("valore", 50, 10, "eur")],
+          regs("entrambi", "eur", 1, 9_999, 50, 10))
+    prova("regola spenta: lista vuota", [],
+          regs("entrambi", "eur", 3, 9_999, 50, 0))
+    prova("criterio ignoto: lista vuota", [],
+          regs("peso", "eur", 3, 9_999, 50, 10))
+    # IL KILL-SWITCH di 'entrambi', e quello PER GAMBA: togliere il
+    # terzo valore dalla leva spegne tutto per chi l'aveva scelto —
+    # fail-closed, mai meta' promessa; togliere una GAMBA spegne quella
+    # e lascia l'altra, che e' il comportamento giusto.
+    amb3["SCONTO_PACCO_CRITERI"] = ("pezzi", "valore")
+    prova("'entrambi' fuori dalla leva: non sconta piu' niente", [],
+          regs("entrambi", "eur", 3, 9_999, 50, 10))
+    amb3["SCONTO_PACCO_CRITERI"] = ("valore", "entrambi")
+    prova("la gamba 'pezzi' tolta dalla leva cade da sola",
+          [("valore", 50, 10, "eur")],
+          regs("entrambi", "eur", 3, 9_999, 50, 10))
+    amb3["SCONTO_PACCO_CRITERI"] = ("pezzi", "valore", "entrambi")
+    amb3["SCONTO_PACCO_ATTIVO"] = False
+    prova("leva generale spenta: niente gambe", [],
+          regs("entrambi", "eur", 3, 9_999, 50, 10))
+    amb3["SCONTO_PACCO_ATTIVO"] = True
+    # 'entrambi' NON E' UNA GAMBA: il lettore singolo lo rifiuta, o
+    # cadrebbe nel ramo dei PEZZI e misurerebbe una soglia che il
+    # venditore non ha promesso da sola (e' il caso che
+    # avvisa_sconto_su_mono gli passa grezzo).
+    prova("il lettore SINGOLO rifiuta 'entrambi'", ("", 0, 0, ""),
+          reg("entrambi", "eur", 3, 9_999, 50, 10))
+
+    # ================================================================
+    # BASTA CHE NE SCATTI UNA (_sconto_regole) e LA PIU' VICINA
+    # (_gamba_invito): il calcolo e la scelta, che sono due mestieri.
+    # ================================================================
+    exec(pezzo("_sconto_regole"), amb)
+    exec(pezzo("_gamba_invito"), amb)
+    sreg, ginv = amb["_sconto_regole"], amb["_gamba_invito"]
+    DUE = [("pezzi", 3, 10, ""), ("valore", 50, 10, "eur")]
+    # articolo 30.000 sats = 30 € col cambio tondo delle prove
+    prova("nessuna gamba scatta: niente sconto", 0,
+          sreg(30_000, 30, 2, DUE))
+    prova("scatta la gamba a PEZZI: lo sconto c'e'", 3_000,
+          sreg(30_000, 30, 3, DUE))
+    prova("scatta la gamba a VALORE con un pezzo solo", 6_000,
+          sreg(60_000, 60, 1, DUE))
+    # LE DUE GAMBE SONO DUE STRADE PER LO STESSO SCONTO: quando
+    # scattano tutte e due la cifra e' la stessa di quando ne scatta
+    # una, mai la somma. E' la proprieta' che rende il max un «almeno
+    # una» — e la prova che si accorge di una somma travestita.
+    prova("scattano tutte e due: la cifra NON raddoppia", (6_000, 6_000),
+          (sreg(60_000, 60, 3, DUE), sreg(60_000, 60, 1, DUE)))
+    prova("lista vuota: nessuno sconto e nessuna esplosione", 0,
+          sreg(60_000, 60, 9, []))
+    # LA PIU' VICINA, in PROPORZIONE e non in valore assoluto: «1 pezzo
+    # su 3» e «30 € su 50» non si confrontano altrimenti.
+    prova("a parita' di gambe vince chi e' piu' avanti (valore)",
+          "valore", ginv(DUE, 2, 40_000, 40)[0])
+    prova("...e i pezzi quando sono loro i piu' vicini", "pezzi",
+          ginv(DUE, 2, 10_000, 10)[0])
+    # chi e' SCATTATA vince subito: li' non c'e' piu' un invito da fare
+    prova("la gamba scattata vince, e non manca niente",
+          ("valore", 0), (lambda g: (g[0], g[4]))(ginv(DUE, 1, 60_000, 60)))
+    prova("...anche quando l'altra e' piu' avanti in proporzione",
+          "pezzi", ginv(DUE, 3, 10_000, 10)[0])
+    # QUANTO MANCA, nell'unita' della gamba scelta
+    prova("quanto manca: pezzi", ("pezzi", 1), (lambda g: (g[0], g[4]))(
+        ginv([("pezzi", 3, 10, "")], 2, 10_000, 10)))
+    prova("quanto manca: euro", ("valore", 20), (lambda g: (g[0], g[4]))(
+        ginv([("valore", 50, 10, "eur")], 2, 30_000, 30)))
+    # LA GAMBA CHE NON SI SA MISURARE ESCE DAL GIRO, non vale zero: a
+    # cambio muto (articolo_eur None) un negozio con tutte e due
+    # continua a invitare sui PEZZI, dove prima la promessa spariva.
+    prova("a cambio muto resta la gamba a pezzi", "pezzi",
+          ginv(DUE, 2, 40_000, None)[0])
+    prova("...e con la sola gamba in euro non si dice niente", None,
+          ginv([("valore", 50, 10, "eur")], 2, 40_000, None))
+    prova("...mentre quella in SATS si misura sempre", "valore",
+          ginv([("valore", 9_999, 10, "sats")], 2, 40_000, None)[0])
 
 
 # ====================================================================
@@ -5695,7 +5823,7 @@ def prove_valuta_soglia():
                "verifica_utente": lambda h, s: {"id": 1},
                "leggi_json": _leggi, "_fmt_sats": lambda n: str(n),
                "SCONTO_PACCO_ATTIVO": True, "SPED_GRATIS_ATTIVO": True,
-               "SCONTO_PACCO_CRITERI": ("pezzi", "valore"),
+               "SCONTO_PACCO_CRITERI": ("pezzi", "valore", "entrambi"),
                "VALUTE_SOGLIA": ("eur", "sats"),
                "SCONTO_PACCO_MIN_SOGLIA": 2,
                "SCONTO_PACCO_MIN_VALORE_EUR": 1,
@@ -5778,6 +5906,43 @@ def prove_valuta_soglia():
           (isinstance(r, dict), stato()["sped_gratis_soglia"],
            stato()["sped_gratis_soglia_eur"],
            stato()["sped_gratis_valuta"]))
+
+    # ================================================================
+    # 'ENTRAMBI' VUOLE DUE SOGLIE SERIE (ago 2026): chi accende due
+    # gambe e ne ha una sola valida promette meta' di quel che crede, e
+    # in vetrina non se ne accorge nessuno. I due «if» dell'endpoint
+    # devono aprirsi tutti e due al terzo valore, e il messaggio dire
+    # QUALE delle due manca.
+    # ================================================================
+    prima = stato()
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "entrambi", "valuta": "eur", "soglia": 1,
+               "valore_eur": 25, "percento": 10})
+    prova("'entrambi' con la gamba PEZZI sotto il minimo: 400",
+          True, isinstance(r, str) and r.startswith("400")
+          and "pezzi" in r)
+    prova("...e niente si e' mosso", prima, stato())
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "entrambi", "valuta": "eur", "soglia": 3,
+               "valore_eur": 0, "percento": 10})
+    prova("'entrambi' con la gamba VALORE sotto il minimo: 400",
+          True, isinstance(r, str) and r.startswith("400")
+          and "valore" in r)
+    prova("...e niente si e' mosso", prima, stato())
+    # ...e con due soglie serie si salva, e si ritrovano ENTRAMBE
+    r = corri("imposta_sconto_pacco",
+              {"criterio": "entrambi", "valuta": "eur", "soglia": 3,
+               "valore_eur": 25, "percento": 10})
+    d = stato()
+    prova("'entrambi' con due soglie serie si salva",
+          ("entrambi", 3, 25, 10),
+          (d["sconto_pacco_criterio"], d["sconto_pacco_soglia"],
+           d["sconto_pacco_valore_eur"], d["sconto_pacco_percento"]))
+    # e lo spegnimento lo rimette a posto senza chiedere niente
+    corri("imposta_sconto_pacco", {"percento": 0})
+    prova("...e lo spegnimento vale anche per lui", ("pezzi", 0),
+          (stato()["sconto_pacco_criterio"],
+           stato()["sconto_pacco_percento"]))
 
     # ================================================================
     # IL TOGGLE CONSERVA: salvare in una valuta non tocca la cifra
@@ -5954,11 +6119,11 @@ def prove_valuta_soglia():
     # diceva che la regola esiste, adesso dice anche quando QUESTO
     # prezzo la fa scattare DA SOLO. Il caso e' nato col mono che
     # sconta: prima un articolo solo non scattava mai.
-    _rs = pezzo_js(mini, "function rigaScontoForm(r){", "\n}")
+    _rs = pezzo_js(mini, "function rigaScontoForm(rs){", "\n}")
     prova("la riga ha un giudice solo", 1,
           mini.count("function rigaScontoForm("))
     prova("...e a chiamarla e' aggiornaHintPolitiche", True,
-          "rigaScontoForm(r)" in _hp)
+          "rigaScontoForm(rs)" in _hp)
     # I DUE STATI: la regola quando il prezzo non la tocca, l'EFFETTO
     # quando la fa scattare. Il generico e' quello di sempre.
     prova("...e gli stati sono due", (True, True),
@@ -5977,7 +6142,7 @@ def prove_valuta_soglia():
           "qtaForm(" in _rs)
     # IL NETTO passa dalle funzioni condivise, mai l'aritmetica a mano
     prova("il netto lo fanno scontaSats/scontaEur", (True, True),
-          ("scontaEur(pieno, r.pct)" in _rs, "scontaSats(pieno, r.pct)" in _rs))
+          ("scontaEur(pieno, pct)" in _rs, "scontaSats(pieno, pct)" in _rs))
     prova("...e la riga non sconta per conto suo", False,
           "100 -" in _rs.replace("−", ""))
     # IL PREZZO IN SATS con la ricetta di satsAnnuncio, o la riga del
@@ -5992,7 +6157,7 @@ def prove_valuta_soglia():
     # paga X» di una cifra che nessuno paghera' mai.
     prova("su un'asta la riga tace", True,
           "const asta = astaAccesa();" in _hp
-          and "sc.style.display = (r && !asta) ? '' : 'none';" in _hp)
+          and "sc.style.display = (rs.length && !asta) ? '' : 'none';" in _hp)
     # LE DUE CHIAMATE SI GUARDANO IN CODA e non «da qualche parte nel
     # corpo»: la tortura ha smascherato la forma debole — un
     # `if (0) aggiornaHintPolitiche();` messo davanti lasciava la
@@ -6073,17 +6238,20 @@ def prove_valuta_soglia():
     # cambio muto. E' il guadagno della scelta. Dal 13 ago 2026 il
     # confronto vive nel giudice statoScontoPacco (lo chiamano badge
     # E totale scontato), non piu' dentro l'invito.
+    # ...e dai DUE CRITERI INSIEME (ago 2026) il confronto e' PER GAMBA:
+    # ognuna dice in che unita' sta contando, e quella che il cambio non
+    # sa misurare torna `null` — gambaInvito la salta invece di darle
+    # zero, cosi' l'altra continua a invitare.
     _gsp = pezzo_js(mini, "function statoScontoPacco(tot){", "\n}")
     prova("il confronto del carrello converte SOLO in euro", True,
-          "const inEuro = s.criterio === 'valore' && s.valuta !== 'sats'"
-          in _gsp)
+          "if (r.criterio !== 'valore') return pezziSet();" in _gsp)
     prova("...e a soglia in sats non chiede il cambio", True,
-          "s.valuta === 'sats' ? (tot || 0)" in _gsp)
-    # la cintura di ieri resta intatta: senza cambio vivo, in EURO, il
-    # giudice risponde null e la riga non compare (meglio un'assenza
-    # che una cifra inventata)
+          "if (r.valuta === 'sats') return tot || 0;" in _gsp)
+    # la cintura di ieri resta intatta: senza cambio vivo, in EURO, la
+    # gamba non si misura e non compare (meglio un'assenza che una cifra
+    # inventata) — ma adesso a cadere e' la sola gamba, non la promessa
     prova("...ma in euro senza cambio vivo tace ancora", True,
-          "if (inEuro && !cambioVivo) return null;" in _gsp)
+          "cambioVivo ? Math.floor((tot || 0) * eurPerSat) : null" in _gsp)
 
 
 # ====================================================================
@@ -6670,12 +6838,18 @@ def prove_sped_gratis():
         prova(f"{chi}: la guardia del cambio nomina la valuta", True,
               'sog_gratis > 0 and val_sg == "eur"' in c2)
     # e lo sconto la nomina su TUTTI E QUATTRO i percorsi (ago 2026,
-    # il mono sconta): a valore in euro il cambio serve anche a lui
+    # il mono sconta): a valore in euro il cambio serve anche a lui.
+    # Dai due criteri insieme la domanda non e' piu' «di che criterio e'
+    # la regola» ma «ce n'e' UNA che lo chiede», e vive in un giudice
+    # solo — scritta a mano quattro volte sarebbe il posto in cui un
+    # giorno una resta indietro.
     for chi, c2 in (("_compra_set", corpo_cset), ("compra", corpo_mono),
                     ("preventivo_ordine", corpo_prev),
                     ("_preventivo_set", corpo_pset)):
         prova(f"{chi}: ...e quella dello sconto pure", True,
-              'crit == "valore" and val_sc == "eur"' in c2)
+              "_sconto_vuole_cambio(regole_sc)" in c2)
+    prova("...e il giudice di quella domanda e' UNO", 1,
+          src.count("def _sconto_vuole_cambio("))
     # ...e a cambio muto NON nasce un 503 nuovo: si rinuncia alla
     # promessa, non all'acquisto. Il 503 resta dei due casi di sempre.
     prova("compra: i 503 restano due (listino EUR, tariffa ancorata)",
@@ -6857,8 +7031,27 @@ def prove_sped_gratis():
           True, "anche su un oggetto solo" in _riga)
     prova("...e a pezzi che le copie contano", True,
           "copie dello stesso articolo" in _riga)
+    prova("...e con tutti e due i criteri, che ne basta una", True,
+          "Basta che scatti una delle due" in _riga)
     prova("...e «un oggetto solo paga pieno» non torna da nessuna porta",
           False, "paga pieno, per quanto costi" in mini)
+    # I DUE BLOCCHI SONO INDIPENDENTI (ago 2026): a 'entrambi' si
+    # mostrano INSIEME, e le variabili non dicono piu' «quale criterio
+    # e'» ma «questo blocco serve?». Se una delle due torna a un
+    # confronto secco, il cassetto accende una gamba e ne nasconde
+    # l'altra — e il venditore salva una promessa a meta' senza vederla.
+    prova("il blocco dei PEZZI si apre anche a 'entrambi'", True,
+          "const aPezzi = b.criterio === 'pezzi' "
+          "|| b.criterio === 'entrambi';" in _rs)
+    prova("...e quello a VALORE pure", True,
+          "const aValore = b.criterio === 'valore' "
+          "|| b.criterio === 'entrambi';" in _rs)
+    prova("...e la terza pillola compare solo se la leva la offre", True,
+          "criteri.includes('entrambi')" in _rs)
+    # ...e il campo vuoto si ferma anche a 'entrambi', dove la gamba a
+    # valore c'e' lo stesso: senza, si salverebbe uno zero
+    prova("il campo vuoto ferma il salvataggio anche a 'entrambi'", True,
+          "(b.criterio === 'valore' || b.criterio === 'entrambi')" in mini)
     # NIENTE CLAMP MUTO: a limare al minimo sarebbe il client, e il
     # venditore vedrebbe un numero che non ha scritto. A dire la cifra
     # e' il 400 del server, che il cassetto rende dentro di se'.
@@ -7729,9 +7922,11 @@ def prove_libro_mastro():
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,
           nascosto_compratore)
           VALUES(5, 9, 1000, 'released', 1);
-        -- CINQUE NEGOZI SANI: uno sconta a pezzi, uno a valore in
-        -- EURO, uno a valore in SATS, uno e' spento (e uno spento non
-        -- deve suonare mai), e uno offre la spedizione in sats.
+        -- SEI NEGOZI SANI: uno sconta a pezzi, uno a valore in EURO,
+        -- uno a valore in SATS, uno e' spento (e uno spento non deve
+        -- suonare mai), uno offre la spedizione in sats, e uno (777)
+        -- ha TUTTI E DUE i criteri accesi — le sue due gambe sono
+        -- serie, quindi non deve fiatare nemmeno lui.
         -- I DUE IN SATS sono la ragione per cui questi controlli hanno
         -- dovuto imparare la valuta: hanno legittimamente la colonna
         -- in euro a ZERO, e senza il CASE suonerebbero per sempre.
@@ -7743,6 +7938,7 @@ def prove_libro_mastro():
                 (333, 'valore', 0, 0,     100, 'eur',  15, 0,     25, 'eur'),
                 (555, 'valore', 0, 50000, 0,   'sats', 12, 0,     0,  'eur'),
                 (666, 'pezzi',  2, 0,     0,   'eur',  10, 50000, 0,  'sats'),
+                (777, 'entrambi', 3, 0,   25,  'eur',  10, 0,     0,  'eur'),
                 (444, 'pezzi',  0, 0,     0,   'eur',  0,  0,     0,  'eur');
         """)
         return con
@@ -7825,6 +8021,16 @@ def prove_libro_mastro():
         ("UPDATE utenti SET sconto_pacco_valore_valuta='usd' "
          "WHERE tg_id=555",
          "promessa di sconto che non puo' scattare", "555"),
+        # ...e col criterio 'entrambi' (ago 2026) devono essere serie
+        # TUTTE E DUE le gambe: chi ne accende due e ne ha una sola
+        # valida promette meta' di quel che crede, e in vetrina non se
+        # ne accorge nessuno. Due casi, uno per gamba.
+        ("UPDATE utenti SET sconto_pacco_criterio='entrambi', "
+         "sconto_pacco_soglia=1 WHERE tg_id=333",
+         "promessa di sconto che non puo' scattare", "333"),
+        ("UPDATE utenti SET sconto_pacco_criterio='entrambi', "
+         "sconto_pacco_valore_eur=0 WHERE tg_id=222",
+         "promessa di sconto che non puo' scattare", "222"),
         # il gemello della spedizione gratis, che prima della valuta
         # non aveva ragione di esistere: una promessa accesa in
         # un'unita' che nessuno sa misurare e' spenta in silenzio
@@ -7971,14 +8177,45 @@ def prove_forma_sconto_pacco():
     # mono sconta): il preventivo e la invoice devono dire la stessa
     # cifra per costruzione, non per disciplina.
     prova("lo sconto ha UN giudice solo", 1, src.count("def _sconto_pacco("))
-    # (si contano le CHIAMATE, non le occorrenze del nome: l'endpoint
-    # si chiama imposta_sconto_pacco e finirebbe nel conto)
+    # I QUATTRO PERCORSI ORA PASSANO DALL'HELPER (ago 2026, i due
+    # criteri insieme): _sconto_regole prende la lista delle gambe vive
+    # e ne fa il MAX, cosi' «basta che ne scatti una» vive in un posto
+    # solo. La sentinella si e' spostata su di lui e il conto resta
+    # QUATTRO — chi ne aggiungesse un quinto, o tornasse a chiamare il
+    # giudice singolo dentro un percorso, lo sente dalla CI.
     prova("...e i chiamanti sono i quattro percorsi del conto", 4,
+          src.count("= _sconto_regole("))
+    prova("l'helper delle gambe e' UNO", 1,
+          src.count("def _sconto_regole("))
+    # nessun percorso del conto chiama piu' il giudice singolo: le sue
+    # due chiamate vive sono dentro _sconto_regole e nella
+    # raggiungibilita' del preventivo mono (che e' una LETTURA, non il
+    # conto), piu' quella di _regole_sconto sul lettore
+    prova("...e nessuno di loro chiama piu' il giudice a una gamba", 0,
           src.count("= _sconto_pacco("))
     prova("il gemello in euro e' UNO", 1,
           src.count("def _sconto_pacco_eur("))
     prova("la regola si legge da UN lettore solo", 1,
           src.count("def _regola_sconto("))
+    prova("...e il lettore plurale pure", 1,
+          src.count("def _regole_sconto("))
+    # 'entrambi' NON E' UNA GAMBA: senza questa riga il lettore singolo
+    # lo lascerebbe passare (e' in catalogo) e cadrebbe nel ramo dei
+    # PEZZI, misurando una soglia mai promessa da sola.
+    prova("il lettore singolo rifiuta esplicitamente i non-gamba", True,
+          'criterio not in ("pezzi", "valore")' in pezzo("_regola_sconto"))
+    # la guardia di 'entrambi' sta PRIMA del giro sulle gambe, o la sola
+    # presenza delle due in catalogo basterebbe a dichiararlo lecito
+    _rs = pezzo("_regole_sconto")
+    prova("...e la guardia di 'entrambi' viene prima delle gambe", True,
+          _rs.index('"entrambi" not in SCONTO_PACCO_CRITERI')
+          < _rs.index('gambe = ("pezzi", "valore")'))
+    # LA PERCENTUALE E' UNA SOLA: il max e' «almeno una», e il giorno
+    # che le percentuali fossero due sarebbe «vince il maggiore» — mai
+    # una somma, che bucherebbe SCONTO_PACCO_MAX_PERCENTO.
+    prova("le gambe si compongono col MAX, mai con una somma", (True, False),
+          ("max(" in pezzo("_sconto_regole"),
+           "sum(" in pezzo("_sconto_regole")))
     # IL GEMELLO IN EURO NON DECIDE MAI DA SOLO (ago 2026, col
     # criterio): a valore la porta la apre un numero in SATS, che
     # l'euro non ha. Quindi ogni sua chiamata e' dietro al fratello —
@@ -8018,7 +8255,7 @@ def prove_forma_sconto_pacco():
               any(k in corpo for k in ('d.get("sconto', 'd.get("soglia',
                                        'd.get("percento', 'd.get("totale')))
         prova(f"{chi}: la regola arriva dalla riga del VENDITORE", True,
-              "_regola_sconto(" in corpo and "WHERE tg_id=?" in corpo)
+              "_regole_sconto(" in corpo and "WHERE tg_id=?" in corpo)
 
     # 4) IL MONO SCONTA (ago 2026, decisione di Andrea che ROVESCIA il
     # 6 ago: tre copie della stessa cosa sono tre pezzi). La divisione
@@ -8027,7 +8264,7 @@ def prove_forma_sconto_pacco():
     # ordine, notifiche e CSV, in silenzio. Il censimento delle copie
     # sta in prove_divisione_a_ritroso; qui la forma dei due rami.
     prova("compra (mono): lo sconto c'e'", True,
-          "_sconto_pacco" in corpo_mono and "sconto_sats" in corpo_mono)
+          "_sconto_regole" in corpo_mono and "sconto_sats" in corpo_mono)
     # ...FINISCE IN COLONNA (senza, la ricevuta e la divisione a
     # ritroso leggerebbero uno sconto che non e' mai stato scritto,
     # e l'ordine racconterebbe un prezzo che il conto non spiega)
@@ -8046,7 +8283,7 @@ def prove_forma_sconto_pacco():
     # sconto vale anche su ritiro e codice online, e una SELECT
     # rimessa dentro quell'if lo spegnerebbe li' in silenzio
     prova("compra (mono): la regola si legge PRIMA del gate spedizione",
-          True, corpo_mono.index("_regola_sconto(")
+          True, corpo_mono.index("_regole_sconto(")
           < corpo_mono.index('if scelta == "spedizione":'))
     codice_righe = "\n".join(
         r for r in pezzo("_righe_ordine").splitlines()
@@ -8082,7 +8319,8 @@ def prove_forma_sconto_pacco():
                        ("compra (mono)", corpo_mono),
                        ("preventivo_ordine", pezzo("preventivo_ordine"))):
         prova(f"{chi}: il tetto giudica PRIMA dello sconto", True,
-              corpo.index("TETTO_SATS_ANNUNCIO") < corpo.index("_sconto_pacco("))
+              corpo.index("TETTO_SATS_ANNUNCIO")
+              < corpo.index("_sconto_regole("))
 
     # 7) IL DOVUTO IN USCITA NON CONOSCE LO SCONTO. La colonna e' un
     # TESTIMONE: chi ne facesse un netto_venditore(prezzo + sconto)
@@ -8142,15 +8380,47 @@ def prove_forma_sconto_pacco():
     # una cifra inventata (il patto del ≈). E il floor, come
     # _eur_interi: nel verso prudente.
     _gsc = pezzo_js(mini, "function statoScontoPacco(tot){", "\n}")
+    # LA GUARDIA DEL CAMBIO E' PASSATA PER-GAMBA (ago 2026, i due
+    # criteri insieme): torna `null` la gamba che non si sa misurare, e
+    # gambaInvito la salta invece di farla valere zero — cosi' a
+    # CoinGecko muto un negozio con tutte e due continua a invitare sui
+    # PEZZI, dove prima la promessa spariva del tutto. Un `return null`
+    # secco qui rimetterebbe quel silenzio.
     prova("il confronto converte in euro solo col cambio vivo", True,
-          "if (inEuro && !cambioVivo) return null;" in _gsc)
+          "cambioVivo ? Math.floor((tot || 0) * eurPerSat) : null" in _gsc)
     prova("...col floor, come il giudice del server", True,
           "Math.floor((tot || 0) * eurPerSat)" in _gsc)
+    prova("...e la gamba muta esce dal giro, non vale zero", False,
+          "!cambioVivo) return null" in _gsc)
     # IL GIUDICE DELLA REGOLA E' UNO ANCHE NEL CLIENT: sono quattro le
     # superfici che la promessa la mostrano, e basta che una guardi la
-    # soglia sbagliata perche' dei sats si leggano come pezzi
+    # soglia sbagliata perche' dei sats si leggano come pezzi. Dall'ago
+    # 2026 e' PLURALE e il nome singolare non deve tornare: un
+    # `regolaSconto` accanto a `regoleSconto` sarebbe il posto in cui
+    # una superficie mostra meta' promessa senza che nessuno lo veda.
     prova("il client ha UN giudice solo della regola", 1,
+          mini.count("function regoleSconto("))
+    prova("...e il nome singolare non e' tornato", 0,
           mini.count("function regolaSconto("))
+    # la scelta della gamba da mostrare vive in UN posto: due copie
+    # direbbero due strade diverse fra la pagina Paga e il carrello
+    prova("...e la scelta della gamba pure", 1,
+          mini.count("function gambaInvito("))
+    # ---- LE DUE GAMBE NEL CLIENT, riga per riga: sono tutte cose che
+    # un riordino toglie senza rompere niente di visibile, e la tortura
+    # le ha viste sopravvivere alla prima stesura di queste prove.
+    _rg = pezzo_js(mini, "function regoleSconto(", "\n}")
+    prova("a 'entrambi' il client apre TUTTE E DUE le gambe", True,
+          "c === 'entrambi' ? ['pezzi', 'valore']" in _rg)
+    prova("...e a criterio singolo resta quella sola", True,
+          "(c === 'pezzi' || c === 'valore') ? [c] : []" in _rg)
+    _gi = pezzo_js(mini, "function gambaInvito(", "\n}")
+    prova("la gamba SCATTATA vince subito", True,
+          "if (m >= r.quanto) return {...r, ora: m, scattato: true};" in _gi)
+    prova("...e fra le altre vince chi e' piu' AVANTI", True,
+          "const p = m / r.quanto;" in _gi and "if (p > progresso)" in _gi)
+    prova("...e la gamba che non si sa misurare ESCE dal giro", True,
+          "if (m === null || m === undefined" in _gi and "continue;" in _gi)
     prova("...e UNA sola frase pubblica", 1,
           mini.count("function frasePromessaSconto("))
     prova("i lettori del preventivo restano due", 2,
@@ -13396,7 +13666,7 @@ def prove_promesse_badge():
     # le fette si chiudono alla graffa della funzione: fino alla riga
     # vuota inghiottirebbero i commenti-dottrina dei vicini, che
     # nominano apposta le parole vietate (la lezione della prosa lunga)
-    _es = pezzo_js(mini, "function etichettaSconto(r){", fine="\n}")
+    _es = pezzo_js(mini, "function etichettaSconto(regole){", fine="\n}")
     _esg = pezzo_js(mini, "function etichettaSpedGratis(r){", fine="\n}")
     prova("lo sconto NON dice piu' «nel carrello»", 0,
           _es.count("nel carrello"))
@@ -13423,10 +13693,21 @@ def prove_promesse_badge():
     # niente carrello, le stesse parole della gemella. La fetta si
     # chiude alla graffa della funzione — fino alla riga vuota
     # inghiottirebbe 18mila caratteri di vicini, «carrello» compreso.
-    _fps = pezzo_js(mini, "function frasePromessaSconto(r){",
+    _fps = pezzo_js(mini, "function frasePromessaSconto(regole){",
                     fine="\n}")
     prova("la prosa lunga dello sconto non nomina il carrello", False,
           "carrello" in _fps)
+    # ...E CON DUE GAMBE LE NOMINA TUTTE E DUE (ago 2026): qui la
+    # promessa e' una REGOLA del negozio, non un verdetto su un
+    # carrello — e' il posto giusto per dirle entrambe, mentre l'invito
+    # e la barra mostrano la sola strada piu' vicina. La percentuale
+    # una volta sola, in testa: ripeterla farebbe leggere due sconti.
+    prova("la prosa lunga unisce le gambe con una «o»", True,
+          "rs.map(meta).join(' o da ')" in _fps)
+    prova("...e la percentuale la dice una volta sola", 1,
+          _fps.count("rs[0].pct"))
+    prova("...e l'etichetta corta fa lo stesso", True,
+          "rs.map(meta).join(' o ')" in _es)
     prova("...e dice «da N pezzi in su» / «di articoli»", True,
           "pezzi in su" in _fps and "di articoli" in _fps)
 
@@ -13549,7 +13830,7 @@ def prove_promesse_badge():
     prova("...e sta SOPRA la riga della consegna", True,
           "${fila}${vie}" in _ra)
     prova("in «Altri oggetti» la spedizione viene prima", True,
-          _ao.index("sgOk ? `<span") < _ao.index("scOk ? `<span"))
+          _ao.index("sgOk ? `<span") < _ao.index("scOk.length ? `<span"))
     prova("nel carrello la scatola della spedizione sta sopra", True,
           mini.index('id="paccoSpedGratis"') < mini.index('id="paccoSconto"'))
     prova("e la testata del negozio dice lo stesso ordine", True,
@@ -13799,11 +14080,24 @@ def prove_promesse_raggiungibili():
     # massimo scatta» ⟺ «qualcosa scatta» — e un terzo giudice sarebbe
     # il posto da cui un giorno la pagina direbbe una cosa e la invoice
     # un'altra.
-    _rag = src[src.index('"sconto_raggiungibile":'):
+    # (la fetta parte dal FILTRO delle gambe raggiungibili, che dall'ago
+    # 2026 e' il posto dove il giudice del denaro viene interrogato —
+    # una volta per gamba, al massimo acquistabile)
+    _rag = src[src.index("_sc_ragg = [r for r in regole_sc"):
                src.index('"promesse_sospese":')]
     prova("...chiamando i giudici del denaro, non un terzo", (True, True),
           ("_sconto_pacco(_art_max, _eur_max," in _rag,
            "_sped_gratis(_art_max, _eur_max, sog_gratis, val_sg)" in _rag))
+    # con due gambe basta che ne sia raggiungibile UNA, e la chiave lo
+    # dice leggendo la lista gia' filtrata invece di rifare il conto
+    prova("...e basta che ne sia raggiungibile UNA", True,
+          '"sconto_raggiungibile": bool(_sc_ragg)' in src)
+    # IL FILTRO VIENE PRIMA DELLA SCELTA: con due gambe, invitare verso
+    # quella col progresso maggiore quando e' proprio lei a non essere
+    # percorribile lascerebbe muta l'altra, piu' lontana ma possibile.
+    prova("...e il filtro precede la scelta della gamba", True,
+          src.index("_sc_ragg = [r for r in regole_sc")
+          < src.index("_g_sc = _gamba_invito(_sc_ragg,"))
     # IL TETTO E' LO STOCK, o l'ACCORDO quando c'e': la quantita' di
     # un'offerta accettata e' ESATTA e non un tetto (la regola di
     # stepperAcquista), quindi li' il massimo e' quella.
@@ -13867,9 +14161,12 @@ def prove_promesse_raggiungibili():
     prova("in ferie, sull'esaurito e in asta nessun verdetto", True,
           "if (inFerie(l) || esaurito(l) || astaE(l)) return false;"
           in _sc)
-    # la regola arriva dal giudice unico, mai letta a mano dai campi
-    prova("...e la regola la legge regolaSconto", True,
-          "regolaSconto(l.scontoCriterio" in _sc)
+    # la regola arriva dal giudice unico, mai letta a mano dai campi —
+    # e dall'ago 2026 le gambe possono essere due: basta che ne scatti
+    # UNA, che a un pezzo puo' essere solo quella a valore
+    prova("...e la regola la legge regoleSconto", True,
+          "regoleSconto(l.scontoCriterio" in _sc)
+    prova("...e basta che ne scatti una", True, ".some(r =>" in _sc)
     # IL CUORE DEL VERDETTO E' TRASLOCATO (ago 2026, la riga viva del
     # form Vendi): la cifra e' quella del server, a cambio muto si
     # tace, al filo esatto scatta — le stesse tre righe di sempre, in
@@ -14019,9 +14316,13 @@ def prove_verde_e_filtri():
     prova("l'euro: centesimi, mai sotto un centesimo", True,
           "Math.max(0.01, Math.round(" in _se)
     # la percentuale la legge il GIUDICE, mai il campo nudo: un pct
-    # senza soglia non e' una regola
-    prova("...e la regola la legge regolaSconto", True,
-          "regolaSconto(l.scontoCriterio" in _cs)
+    # senza soglia non e' una regola. Con due gambe basta la PRIMA:
+    # la percentuale e' una sola per negozio, e sommarle o sceglierne
+    # una piu' grande vorrebbe dire due sconti dove ce n'e' uno.
+    prova("...e la regola la legge regoleSconto", True,
+          "regoleSconto(l.scontoCriterio" in _cs)
+    prova("...e sconta con la percentuale della prima gamba", True,
+          "rs[0].pct" in _cs)
 
     # ---- 2. IL SEGNO IN CARD: badge nell'angolo della lampo e listino
     # barrato. I due badge non convivono MAI — stesso angolo.
@@ -14288,6 +14589,19 @@ def prove_verde_e_filtri():
           4 in _chiedi(0, 0, 0, 1))
     prova("...e quella che scende sotto, no", False,
           5 in _chiedi(0, 0, 0, 1))
+    # ...E UN NEGOZIO CON TUTTI E DUE I CRITERI (ago 2026): la gamba a
+    # valore ce l'ha, quindi sulle sue card il badge verde c'e' e il
+    # filtro DEVE pescarle. Dimenticare 'entrambi' nella WHERE vorrebbe
+    # dire una spunta che nasconde annunci su cui il segno e' acceso —
+    # il difetto piu' brutto di un filtro, perche' non fallisce: mostra
+    # la vetrina sbagliata. (Si semina in fondo, o cambierebbe gli
+    # insiemi attesi delle prove qui sopra.)
+    con.execute("INSERT INTO utenti VALUES(2,0,0,0,'eur',"
+                "15,'entrambi',45000,0,'sats')")
+    con.execute("INSERT INTO annunci VALUES(7,2,60000,0,'sats',"
+                "'spedizione',1500,0,0,0,0,0,0,0)")
+    prova("il filtro pesca anche chi ha TUTTI E DUE i criteri", True,
+          7 in _chiedi(0, 0, 1, 0))
     con.close()
     # LA STRUTTURA, perche' il giorno che qualcuno rimette l'AND lo
     # dica anche una sentinella e non solo i numeri qui sopra

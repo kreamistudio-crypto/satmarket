@@ -208,8 +208,13 @@ CONTROLLO_LIBRO_MASTRO = True   # False = ronda spenta
 # attenzione, a criterio valore la soglia guarda il carrello DOPO
 # lampo e accordo: una lampo generosa puo' farlo scendere sotto soglia.
 SCONTO_PACCO_ATTIVO = True      # interruttore generale (False = spento)
-SCONTO_PACCO_CRITERI = ("pezzi", "valore")   # togliere un criterio da
-                                # qui lo spegne per chi l'aveva scelto
+SCONTO_PACCO_CRITERI = ("pezzi", "valore", "entrambi")   # togliere un
+                                # criterio da qui lo spegne per chi
+                                # l'aveva scelto. 'entrambi' accende le
+                                # due gambe insieme — «da 3 pezzi O da
+                                # 25 € di articoli» — con UNA sola
+                                # percentuale: due strade per lo stesso
+                                # sconto, mai due sconti che si sommano.
 SCONTO_PACCO_SOGLIE = (2, 3, 4, 5)      # le soglie proposte al venditore
 # LA VALUTA DELLA SOGLIA A VALORE LA SCEGLIE IL VENDITORE (ago 2026,
 # chiesto dalla comunita'). Vale per TUTTE E DUE le promesse, e ognuna

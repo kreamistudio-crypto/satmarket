@@ -7199,12 +7199,12 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
      dal link pubblico. I due numeri finiscono in innerHTML senza esc:
      Number() e' la cintura, la stessa di v.rating. */
   const scontoNegozioRiga = w => {
-    const r = regolaSconto(w.sconto_pacco_criterio, w.sconto_pacco_soglia,
-                           w.sconto_pacco_valore, w.sconto_pacco_valore_eur,
-                           w.sconto_pacco_valuta, w.sconto_pacco_percento);
-    return r
+    const rs = regoleSconto(w.sconto_pacco_criterio, w.sconto_pacco_soglia,
+                            w.sconto_pacco_valore, w.sconto_pacco_valore_eur,
+                            w.sconto_pacco_valuta, w.sconto_pacco_percento);
+    return rs.length
       ? `<div class="trust-note" style="margin-top:12px">🎁 <span>Questo
-           negozio fa ${frasePromessaSconto(r)}.</span></div>` : '';
+           negozio fa ${frasePromessaSconto(rs)}.</span></div>` : '';
   };
   /* E la seconda promessa: le due sono INDIPENDENTI — guardano lo
      stesso numero senza vedersi — quindi un negozio puo' averle tutte
@@ -7557,13 +7557,15 @@ function scontaEur(v, pct){
   return Math.max(0.01, Math.round(v * k * 100) / 100);
 }
 function conSconto(l){
-  const r = regolaSconto(l.scontoCriterio, l.scontoSoglia,
-                         l.scontoValoreSats, l.scontoValoreEur,
-                         l.scontoValuta, l.scontoPct);
-  if (!r) return l;
+  /* la percentuale e' UNA per negozio anche quando le gambe sono due:
+     qui basta la prima, e non c'e' niente da comporre */
+  const rs = regoleSconto(l.scontoCriterio, l.scontoSoglia,
+                          l.scontoValoreSats, l.scontoValoreEur,
+                          l.scontoValuta, l.scontoPct);
+  if (!rs.length) return l;
   const s = Object.assign({}, l);
-  s.price = scontaSats(l.price, r.pct);
-  if (l.priceEur > 0) s.priceEur = scontaEur(l.priceEur, r.pct);
+  s.price = scontaSats(l.price, rs[0].pct);
+  if (l.priceEur > 0) s.priceEur = scontaEur(l.priceEur, rs[0].pct);
   return s;
 }
 /* IL PREZZO CHE LA VETRINA MOSTRA, in un posto solo: lo chiamano la
@@ -8127,11 +8129,12 @@ function spedGratisQui(l, qta){
    toccare niente qui, ed e' il verso giusto. */
 function scontoQui(l, qta){
   if (inFerie(l) || esaurito(l) || astaE(l)) return false;
-  const r = regolaSconto(l.scontoCriterio, l.scontoSoglia,
-                         l.scontoValoreSats, l.scontoValoreEur,
-                         l.scontoValuta, l.scontoPct);
-  if (!r) return false;
-  return scontoScatta(r, artStima(l), l.valuta, qta);
+  /* con due gambe basta che ne scatti UNA: sono due strade per lo
+     stesso sconto, e a un pezzo puo' essere solo quella a valore */
+  return regoleSconto(l.scontoCriterio, l.scontoSoglia,
+                      l.scontoValoreSats, l.scontoValoreEur,
+                      l.scontoValuta, l.scontoPct)
+    .some(r => scontoScatta(r, artStima(l), l.valuta, qta));
 }
 /* SCATTA? — il cuore del verdetto, senza l'annuncio attorno: presi la
    regola, l'articolo in SATS, la valuta del listino e i pezzi, dice
@@ -8675,8 +8678,8 @@ async function sezioneAltriOggetti(l){
      si aggiunge una condizione si sfaserebbero. */
   const promoOk = !(DEMO || astaE(l) || tuttoDigitale || inFerie(l));
   const scOk = promoOk
-    ? regolaSconto(l.scontoCriterio, l.scontoSoglia, l.scontoValoreSats,
-                   l.scontoValoreEur, l.scontoValuta, l.scontoPct) : null;
+    ? regoleSconto(l.scontoCriterio, l.scontoSoglia, l.scontoValoreSats,
+                   l.scontoValoreEur, l.scontoValuta, l.scontoPct) : [];
   /* La seconda promessa, alle stesse condizioni: un carrello che non
      esiste non ha nemmeno una spedizione da offrire. */
   const sgOk = promoOk ? regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
@@ -8717,7 +8720,7 @@ async function sezioneAltriOggetti(l){
      ordine della pagina Paga, del carrello e della testata del
      negozio — l'occhio impara UNA fila. */
   const badge = (sgOk ? `<span class="pill">${etichettaSpedGratis(sgOk)}</span>` : '')
-              + (scOk ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '');
+              + (scOk.length ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '');
   corpo.insertAdjacentHTML('beforeend', `
     <div class="altri-sez">
       <div class="section-label altri-tit">Altri oggetti del venditore</div>
@@ -10271,17 +10274,55 @@ function aggiornaBarraPacco(){
    A criterio valore la cifra ha la sua VALUTA (ago 2026): il server
    riempie SOLO la chiave dell'unita' dichiarata — `valoreSats` in sats,
    `valoreEur` in euro — e l'altra la manda a zero. Qui non si sceglie
-   niente: si prende quella piena, e l'unita' la dice `valuta`. */
-function regolaSconto(criterio, soglia, valoreSats, valoreEur, valuta, pct){
+   niente: si prende quella piena, e l'unita' la dice `valuta`.
+   E DALL'AGO 2026 LE REGOLE POSSONO ESSERE DUE: col criterio 'entrambi'
+   il venditore accende tutte e due le gambe — «da 3 pezzi O da 25 € di
+   articoli» — e questa funzione restituisce un ARRAY (vuoto quando non
+   c'e' nessuna promessa). La percentuale resta UNA per negozio, quindi
+   le due gambe sono due STRADE per lo stesso sconto e non due sconti:
+   chi ha in mano la lista puo' leggere la `pct` dalla prima.
+   A 'entrambi' le due soglie sono piene INSIEME, ed e' la sola cosa
+   cambiata nel patto di _sconto_pubblico: mai due nella stessa unita',
+   quindi «quella piena» resta una domanda con una risposta sola.
+   IL VECCHIO NOME NON SOPRAVVIVE APPOSTA: un `regolaSconto` singolare
+   accanto al plurale sarebbe il posto in cui un domani una superficie
+   mostra meta' promessa senza che nessuno se ne accorga. */
+function regoleSconto(criterio, soglia, valoreSats, valoreEur, valuta, pct){
   const p = Number(pct) || 0;
-  if (p <= 0) return null;
+  if (p <= 0) return [];
   const c = criterio || (Number(soglia) > 0 ? 'pezzi' : '');
   const v = valuta || 'eur';
-  const q = Number(c === 'valore'
-    ? (v === 'sats' ? valoreSats : valoreEur) : soglia) || 0;
-  return q > 0 && (c === 'pezzi' || c === 'valore')
-    ? {criterio: c, quanto: q, valuta: c === 'valore' ? v : '', pct: p}
-    : null;
+  const gambe = c === 'entrambi' ? ['pezzi', 'valore']
+              : (c === 'pezzi' || c === 'valore') ? [c] : [];
+  const fuori = [];
+  for (const g of gambe){
+    const q = Number(g === 'valore'
+      ? (v === 'sats' ? valoreSats : valoreEur) : soglia) || 0;
+    if (q > 0)
+      fuori.push({criterio: g, quanto: q,
+                  valuta: g === 'valore' ? v : '', pct: p});
+  }
+  return fuori;
+}
+/* La gamba da MOSTRARE fra quelle vive: la piu' vicina, cioe' quella
+   col progresso maggiore, e chi e' gia' SCATTATA vince subito. Gemella
+   di _gamba_invito del server e per la stessa ragione — due pillole che
+   promettono lo STESSO −10% si leggono come due sconti diversi, e la
+   fila delle promesse e' a righe piene. `misura(r)` la passa il
+   chiamante, che e' l'unico a sapere in che unita' sta contando; se
+   torna null quella gamba esce dal giro (cambio muto) invece di valere
+   zero, cosi' un negozio con tutte e due continua a invitare sui PEZZI
+   anche quando CoinGecko tace. */
+function gambaInvito(regole, misura){
+  let migliore = null, progresso = -1;
+  for (const r of (regole || [])){
+    const m = misura(r);
+    if (m === null || m === undefined || !(r.quanto > 0)) continue;
+    if (m >= r.quanto) return {...r, ora: m, scattato: true};
+    const p = m / r.quanto;
+    if (p > progresso){ migliore = {...r, ora: m, scattato: false}; progresso = p; }
+  }
+  return migliore;
 }
 /* L'unita' di una soglia a valore, in UN posto: le due promesse la
    scrivono uguale, e il giorno che ne nascesse una terza pure. Il
@@ -10327,13 +10368,20 @@ function cifraConUnita(numero, valuta){
    e' quella che il venditore ha scritto, non una conversione — ed e'
    per questo che la riga si disegna anche a cambio muto. Il
    controvalore nell'altra valuta non torna: sarebbe due numeri per la
-   stessa promessa, cioe' la domanda «quale delle due vale?». */
-function frasePromessaSconto(r){
-  if (!r) return '';
-  if (r.criterio === 'pezzi')
-    return `<b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi in su`;
-  return `<b>−${r.pct}%</b> da ${cifraSoglia(r.quanto, r.valuta)}`
-    + ` di articoli`;
+   stessa promessa, cioe' la domanda «quale delle due vale?».
+   CON DUE GAMBE LE NOMINA TUTTE E DUE, unite da una «o» (ago 2026): la
+   percentuale si dice UNA volta sola, in testa, perche' una sola e' —
+   e ripeterla farebbe leggere due sconti dove ce n'e' uno. Qui la
+   promessa e' una REGOLA del negozio e non un verdetto su un carrello:
+   e' il posto giusto per dirle entrambe, mentre l'invito e la barra
+   mostrano la sola strada piu' vicina. */
+function frasePromessaSconto(regole){
+  const rs = Array.isArray(regole) ? regole : (regole ? [regole] : []);
+  if (!rs.length) return '';
+  const meta = r => r.criterio === 'pezzi'
+    ? `${fmt(r.quanto)} pezzi in su`
+    : `${cifraSoglia(r.quanto, r.valuta)} di articoli`;
+  return `<b>−${rs[0].pct}%</b> da ${rs.map(meta).join(' o da ')}`;
 }
 /* L'ETICHETTA CORTA, cioe' la stessa promessa nel registro del CHIP:
    una frase autoportante, non un complemento che si incastra in
@@ -10343,11 +10391,12 @@ function frasePromessaSconto(r){
    soglia diventa testo. «Nel carrello» e' uscito anche da qui (ago
    2026, il mono sconta): la parola che restringeva e' diventata la
    parola che mente. */
-function etichettaSconto(r){
-  if (!r) return '';
-  return r.criterio === 'pezzi'
-    ? `🎁 <b>−${r.pct}%</b> da ${fmt(r.quanto)} pezzi`
-    : `🎁 <b>−${r.pct}%</b> da ${cifraSoglia(r.quanto, r.valuta)}`;
+function etichettaSconto(regole){
+  const rs = Array.isArray(regole) ? regole : (regole ? [regole] : []);
+  if (!rs.length) return '';
+  const meta = r => r.criterio === 'pezzi'
+    ? `${fmt(r.quanto)} pezzi` : cifraSoglia(r.quanto, r.valuta);
+  return `🎁 <b>−${rs[0].pct}%</b> da ${rs.map(meta).join(' o ')}`;
 }
 /* ---- LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026) ----
    La seconda promessa di negozio, e il suo giudice unico: la soglia
@@ -10414,9 +10463,9 @@ function annuncioNegozio(){
 }
 function scontoNegozio(){
   const x = annuncioNegozio();
-  return x ? regolaSconto(x.scontoCriterio, x.scontoSoglia,
+  return x ? regoleSconto(x.scontoCriterio, x.scontoSoglia,
                           x.scontoValoreSats, x.scontoValoreEur,
-                          x.scontoValuta, x.scontoPct) : null;
+                          x.scontoValuta, x.scontoPct) : [];
 }
 function spedGratisNegozio(){
   const x = annuncioNegozio();
@@ -10442,18 +10491,24 @@ function spedGratisNegozio(){
    un'assenza che una cifra inventata (il patto del ≈).
    ...e SOLO in euro: a soglia in SATS il confronto e' sats contro
    sats, esatto e senza cambio — la riga (e il netto) vivono anche a
-   CoinGecko muto. A pezzi il cambio non c'entra proprio. */
+   CoinGecko muto. A pezzi il cambio non c'entra proprio.
+   CON DUE GAMBE VIVE SCEGLIE LA PIU' VICINA (ago 2026) e restituisce
+   LA STESSA FORMA di sempre: e' cio' che tiene l'invito, la barra e il
+   totale scontato senza una riga di differenza — chi legge questo
+   giudice non sa nemmeno che i criteri possono essere due. Una gamba
+   che il cambio non sa misurare esce dal giro invece di valere zero,
+   quindi a CoinGecko muto un negozio con tutte e due continua a
+   invitare sui PEZZI: prima la promessa spariva del tutto. */
 function statoScontoPacco(tot){
-  const s = scontoNegozio();
+  const rs = scontoNegozio();
   /* a carrello vuoto la promessa non ha ancora un destinatario: la
      riga nasce col primo pezzo, quando c'e' qualcosa da far crescere */
-  if (!s || !pezziSet()) return null;
-  const inEuro = s.criterio === 'valore' && s.valuta !== 'sats';
-  if (inEuro && !cambioVivo) return null;
-  const ora = s.criterio !== 'valore' ? pezziSet()
-    : (s.valuta === 'sats' ? (tot || 0)
-                           : Math.floor((tot || 0) * eurPerSat));
-  return {...s, ora, scattato: ora >= s.quanto};
+  if (!rs.length || !pezziSet()) return null;
+  return gambaInvito(rs, r => {
+    if (r.criterio !== 'valore') return pezziSet();
+    if (r.valuta === 'sats') return tot || 0;
+    return cambioVivo ? Math.floor((tot || 0) * eurPerSat) : null;
+  });
 }
 function aggiornaInvitoSconto(tot){
   const box = el('paccoSconto');
@@ -14805,6 +14860,20 @@ function sogliaMancante(quale, idErrore){
    quel mezzo secondo qualcuno puo' comprare.
    Il 400 si rende DENTRO il cassetto (la ricetta delle ferie): e' li'
    che si e' appena toccato. */
+/* La regola in TESTO PURO — l'header del cassetto la scrive con
+   textContent e il toast e' un toast: niente <span>, quindi non si puo'
+   riusare etichettaSconto, che l'unita' la veste di HTML. Sta qui
+   perche' i due posti la dicevano gia' uguale a mano, e con due gambe
+   sarebbero diventate due copie di una frase piu' lunga. */
+function riassuntoSconto(m){
+  const rs = m ? regoleSconto(m.criterio, m.soglia, m.valoreSats,
+                              m.valoreEur, m.valuta, m.percento) : [];
+  if (!rs.length) return '';
+  const meta = r => r.criterio === 'pezzi'
+    ? `${fmt(r.quanto)} pezzi`
+    : `${fmt(r.quanto)} ${r.valuta === 'sats' ? 'sats' : '€'}`;
+  return `−${rs[0].pct}% da ${rs.map(meta).join(' o ')}`;
+}
 function renderScontoPacco(){
   const box = el('scontoPaccoBlocco');
   if (!box) return;
@@ -14816,14 +14885,7 @@ function renderScontoPacco(){
   if (sez) sez.style.display = '';
   const attivo = !!(myScontoPacco && myScontoPacco.percento > 0);
   const criteri = scontoPaccoLeve.criteri || ['pezzi'];
-  el('scontoPaccoConta').textContent = attivo
-    ? (myScontoPacco.criterio === 'valore'
-        ? `−${myScontoPacco.percento}% da ${fmt(
-             myScontoPacco.valuta === 'sats' ? myScontoPacco.valoreSats
-                                             : myScontoPacco.valoreEur)} ${
-             myScontoPacco.valuta === 'sats' ? 'sats' : '€'}`
-        : `−${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`)
-    : '';
+  el('scontoPaccoConta').textContent = riassuntoSconto(myScontoPacco);
   /* la bozza parte da cio' che c'e' gia' (o dalla prima voce utile per
      chi non ha ancora niente): il cassetto si apre con una proposta.
      Porta TUTTE E TRE le soglie, cosi' chi prova l'altro criterio — o
@@ -14841,7 +14903,13 @@ function renderScontoPacco(){
               || (scontoPaccoLeve.valori_sats||[])[0] || 25000,
       pct: (attivo && myScontoPacco.percento)
            || (scontoPaccoLeve.sconti||[])[0] || 5};
-  const b = scontoPaccoBozza, aValore = b.criterio === 'valore';
+  /* DUE GAMBE INDIPENDENTI (ago 2026): col criterio 'entrambi' i due
+     blocchi si mostrano INSIEME, e ognuno tiene la sua soglia. Le
+     variabili non dicono piu' «quale criterio e'» ma «questo blocco
+     serve?», che e' l'unica domanda che il markup qui sotto si fa. */
+  const b = scontoPaccoBozza;
+  const aPezzi = b.criterio === 'pezzi' || b.criterio === 'entrambi';
+  const aValore = b.criterio === 'valore' || b.criterio === 'entrambi';
   const inSats = b.valuta === 'sats';
   const pill = (v, testo, campo) =>
     `<button data-campo="${campo}" data-v="${v}" onclick="scontoPaccoPill('${campo}',${typeof v==='string'?`'${v}'`:v})" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
@@ -14865,7 +14933,9 @@ function renderScontoPacco(){
           venditore si fa per prima («mi mangia anche la spedizione?»).
           La seconda frase dipende dal criterio, che si sceglie SOTTO. */''}
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
-      La spedizione è a parte.${aValore
+      La spedizione è a parte.${aPezzi && aValore
+        ? ' Basta che scatti una delle due.'
+        : aValore
         ? ' Vale anche su un oggetto solo.'
         : ' Più copie dello stesso articolo contano come più pezzi.'}</div>
     <div id="scontoPaccoErrore"></div>
@@ -14873,7 +14943,13 @@ function renderScontoPacco(){
       <div class="section-label" style="margin-top:14px">Come si conta</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
         ${pill('pezzi', 'A pezzi', 'criterio')}
-        ${pill('valore', 'A valore', 'criterio')}</div>` : ''}
+        ${pill('valore', 'A valore', 'criterio')}
+        ${criteri.includes('entrambi')
+          ? pill('entrambi', 'Tutti e due', 'criterio') : ''}</div>` : ''}
+    ${aPezzi ? `
+      <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${(scontoPaccoLeve.soglie||[]).map(s => pill(s, `da ${s} pezzi`, 'soglia')).join('')}</div>` : ''}
     ${aValore ? `
       ${pillValuta('sconto', b.valuta, scontoPaccoLeve.valute)}
       <div class="section-label" style="margin-top:12px">Da quanti ${
@@ -14886,10 +14962,7 @@ function renderScontoPacco(){
                                  : scontoPaccoLeve.min_valore_eur, b.valuta,
                           (inSats ? scontoPaccoLeve.valori_sats
                                   : scontoPaccoLeve.valori_eur)||[])}${notaIncasso()}
-    ` : `
-      <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-        ${(scontoPaccoLeve.soglie||[]).map(s => pill(s, `da ${s} pezzi`, 'soglia')).join('')}</div>`}
+    ` : ''}
     <div class="section-label" style="margin-top:12px">Quanto sconto</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       ${(scontoPaccoLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
@@ -14907,8 +14980,9 @@ async function setScontoPacco(spegni){
   if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
   const b = scontoPaccoBozza || {};
   /* il campo libero puo' essere vuoto, e un vuoto non e' una scelta:
-     a criterio valore si ferma qui invece di mandare uno zero */
-  if (!spegni && b.criterio === 'valore'
+     dove la gamba a valore c'e' ci si ferma qui invece di mandare uno
+     zero — e a 'entrambi' la gamba a valore c'e' anche lei */
+  if (!spegni && (b.criterio === 'valore' || b.criterio === 'entrambi')
       && sogliaMancante('sconto', 'scontoPaccoErrore')) return;
   /* si mandano SEMPRE tutte e tre le soglie: il server le conserva a
      vicenda (chiave assente = conserva), e cosi' quella dell'altro
@@ -14946,13 +15020,9 @@ async function setScontoPacco(spegni){
   } catch(e) { toast('Rete assente: riprova'); return; }
   scontoPaccoBozza = null;     /* la bozza riparte da cio' che e' salvato */
   renderScontoPacco();
-  toast(myScontoPacco
-    ? (myScontoPacco.criterio === 'valore'
-        ? `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${fmt(
-             myScontoPacco.valuta === 'sats' ? myScontoPacco.valoreSats
-                                             : myScontoPacco.valoreEur)} ${
-             myScontoPacco.valuta === 'sats' ? 'sats' : '€'}`
-        : `🎁 Sconto attivo: −${myScontoPacco.percento}% da ${myScontoPacco.soglia} pezzi`)
+  const riass = riassuntoSconto(myScontoPacco);
+  toast(riass
+    ? `🎁 Sconto attivo: ${riass}`
     : 'Sconto spento: da adesso il prezzo è pieno per tutti');
   /* e la riga sotto il Prezzo nel form segue la regola appena
      cambiata, come la gemella della spedizione */
@@ -18161,26 +18231,29 @@ function cifraForm(v, unita){
    soglia a pezzi e' 2 e qui i pezzi sono uno. A cambio muto lo stato
    specifico non compare, ed e' la risposta VERA e non prudenza:
    senza cambio la promessa il server non la applica affatto. */
-function rigaScontoForm(r){
+function rigaScontoForm(rs){
   const coda = `Cambia nel Profilo ›
     <span style="white-space:nowrap">🎁&nbsp;Sconto sugli articoli</span>.`;
   const art = prezzoFormSats();
-  if (art > 0 && scontoScatta(r, art, sellValuta, 1)){
+  const pct = rs[0].pct;
+  /* con due gambe basta che ne scatti UNA — a un pezzo puo' essere
+     solo quella a valore, e la percentuale e' comunque la stessa */
+  if (art > 0 && rs.some(r => scontoScatta(r, art, sellValuta, 1))){
     const pieno = sellValuta === 'eur' ? prezzoEurForm() : art;
     const netto = sellValuta === 'eur'
-      ? scontaEur(pieno, r.pct) : scontaSats(pieno, r.pct);
-    return `💡 Con questo prezzo il tuo <b>−${r.pct}%</b> scatta da
+      ? scontaEur(pieno, pct) : scontaSats(pieno, pct);
+    return `💡 Con questo prezzo il tuo <b>−${pct}%</b> scatta da
       solo: chi lo compra paga <b>${cifraForm(netto, true)}</b> invece
       di ${cifraForm(pieno, false)}. ${coda}`;
   }
-  return `💡 Il tuo negozio fa ${frasePromessaSconto(r)}
+  return `💡 Il tuo negozio fa ${frasePromessaSconto(rs)}
     — anche su questo prezzo. ${coda}`;
 }
 function aggiornaHintPolitiche(){
   clearTimeout(scontoHintTimer);
   const sc = el('sellScontoHint');
   if (sc) {
-    const r = DEMO ? null : regolaSconto(
+    const rs = DEMO ? [] : regoleSconto(
       myScontoPacco && myScontoPacco.criterio,
       myScontoPacco && myScontoPacco.soglia,
       myScontoPacco && myScontoPacco.valoreSats,
@@ -18196,8 +18269,8 @@ function aggiornaHintPolitiche(){
        prometteva gia': un difetto di prima, chiuso qui perche'
        scriverci dentro delle cifre l'avrebbe reso clamoroso.) */
     const asta = astaAccesa();
-    sc.style.display = (r && !asta) ? '' : 'none';
-    if (r && !asta) sc.innerHTML = rigaScontoForm(r);
+    sc.style.display = (rs.length && !asta) ? '' : 'none';
+    if (rs.length && !asta) sc.innerHTML = rigaScontoForm(rs);
   }
   const sg = el('sellSpedGratisHint');
   if (sg) {

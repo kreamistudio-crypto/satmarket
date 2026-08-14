@@ -282,7 +282,12 @@ except ImportError:
 try:
     from config import SCONTO_PACCO_CRITERI
 except ImportError:
-    SCONTO_PACCO_CRITERI = ("pezzi", "valore")
+    # 'entrambi' (ago 2026) accende tutte e due le gambe insieme: e' un
+    # TERZO VALORE del criterio e non una colonna nuova, quindi si spegne
+    # da qui come gli altri due — e togliendolo i negozi che l'avevano
+    # scelto smettono di scontare (fail-closed), non ripiegano su meta'
+    # promessa.
+    SCONTO_PACCO_CRITERI = ("pezzi", "valore", "entrambi")
 try:
     from config import SCONTO_PACCO_VALORI_EUR
 except ImportError:
@@ -7329,8 +7334,11 @@ def _where_occasioni(solo_lampo: int, solo_asta: int, solo_sconto: int,
             sc, scp = _sql_soglia_negozio(
                 "sconto_pacco_valore", "sconto_pacco_valore_eur",
                 "sconto_pacco_valore_valuta", cambio, adesso,
-                extra=("us.sconto_pacco_percento>0"
-                       " AND us.sconto_pacco_criterio='valore'"))
+                # 'entrambi' ci entra perche' quella gamba ce l'ha: il
+                # filtro promette il badge, e il badge lo accende la
+                # gamba a valore qualunque altra cosa il negozio faccia
+                extra=("us.sconto_pacco_percento>0 AND "
+                       "us.sconto_pacco_criterio IN ('valore','entrambi')"))
             # niente ASTE (li' il prezzo e' una puntata in corso e lo
             # sconto non esiste per costruzione) e niente LAMPO VIVE: il
             # badge verde non convive col rosso, quindi su quelle card
@@ -10408,6 +10416,81 @@ def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
     return articolo - max(1, articolo * (100 - min(percento, 100)) // 100)
 
 
+def _sconto_regole(articolo: int, articolo_eur, pezzi: int, regole) -> int:
+    """Lo sconto carrello quando le regole vive sono PIU' DI UNA (ago
+    2026): il venditore puo' accendere tutti e due i criteri — «da 3
+    pezzi O da 25 € di articoli» — e basta che ne scatti uno.
+    LE DUE GAMBE SONO DUE STRADE PER LO STESSO SCONTO, NON DUE SCONTI:
+    la percentuale e' UNA SOLA per negozio (decisione di Andrea), quindi
+    tutte le gambe che scattano danno lo STESSO numero e questo max e'
+    di fatto un «almeno una». E' scritto come MAX e non come OR perche'
+    il giorno in cui si volessero due percentuali diverse la regola
+    «VINCE IL MAGGIORE» e' gia' qui — e la SOMMA resterebbe da
+    respingere anche allora, per due ragioni che non dipendono dai
+    gusti: 20+20 buca SCONTO_PACCO_MAX_PERCENTO, che e' una cintura
+    vera, e sposta il FONDO della cascata lampo+carrello (oggi il 21%
+    del listino) che una prova dichiara ad alta voce.
+    Le regole arrivano gia' validate da _regole_sconto: qui non si
+    giudica niente, si sceglie. `default=0` perche' un negozio senza
+    promesse e' il caso normale e non un errore — ed e' anche cio' che
+    rende questa funzione il rimpiazzo esatto della chiamata singola nei
+    quattro percorsi del conto."""
+    return max((_sconto_pacco(articolo, articolo_eur, pezzi, c, s, p, v)
+                for c, s, p, v in regole), default=0)
+
+
+def _sconto_vuole_cambio(regole) -> bool:
+    """Se fra le regole vive ce n'e' una da MISURARE in euro, e quindi
+    il conto ha bisogno di una conversione per sapere se scattera'.
+    Sostituisce il `crit == "valore" and val_sc == "eur"` che i quattro
+    percorsi del conto ripetevano: con due gambe la domanda non e' piu'
+    «di che criterio e' la regola» ma «ce n'e' UNA che lo chiede», e
+    scritta a mano quattro volte sarebbe il posto in cui un giorno una
+    resta indietro. Il bisogno resta MORBIDO: nessuno alza un 503 per
+    questo — una promessa che non si sa valutare non scatta e l'ordine
+    parte a prezzo pieno."""
+    return any(c == "valore" and v == "eur" for c, _s, _p, v in regole)
+
+
+def _gamba_invito(regole, pezzi: int, articolo: int, articolo_eur):
+    """La gamba da MOSTRARE a chi sta comprando: `(criterio, soglia,
+    percento, valuta, quanto_manca)`, o None se non c'e' niente da dire.
+    LA PIU' VICINA, cioe' quella col progresso maggiore (decisione di
+    Andrea), e una sola: due pillole che promettono lo STESSO −10% si
+    leggono come due sconti diversi, e la fila delle promesse e' a righe
+    piene — la terza riga sfonderebbe il tetto d'altezza gia' misurato
+    per il blocco appiccicato del carrello. Chi e' gia' SCATTATA vince
+    subito: li' non c'e' piu' un invito da fare, c'e' un fatto.
+    IL PROGRESSO E' IN PROPORZIONE (`misura/soglia`) e non in valore
+    assoluto: «un pezzo su tre» e «12 € su 25» non si confrontano
+    altrimenti, e il numero che ne esce e' lo stesso che disegna la
+    barra — quindi la pillola e la sua barra non possono dire due cose.
+    UNA GAMBA CHE NON SI PUO' MISURARE ESCE DAL GIRO (articolo_eur None
+    a cambio muto): non «vale zero», proprio non concorre — cosi' un
+    negozio con tutte e due i criteri continua a invitare sui PEZZI
+    anche quando CoinGecko tace, che e' un guadagno vero rispetto al
+    criterio singolo, dove la promessa spariva del tutto.
+    A decidere COSA si passa qui dentro sono i chiamanti: nel mono le
+    gambe si filtrano prima per RAGGIUNGIBILITA' — invitare verso una
+    strada che quello stock non puo' percorrere e' peggio del silenzio —
+    mentre nel set si passano tutte, perche' li' la composizione puo'
+    sempre crescere e «non raggiungibile» non si puo' affermare."""
+    migliore, progresso = None, -1.0
+    for crit, sog, pct, val in regole:
+        if sog <= 0:
+            continue
+        misura = (pezzi if crit == "pezzi"
+                  else (articolo if val == "sats" else articolo_eur))
+        if misura is None:
+            continue
+        if misura >= sog:
+            return crit, sog, pct, val, 0
+        p = misura / sog
+        if p > progresso:
+            migliore, progresso = (crit, sog, pct, val, sog - misura), p
+    return migliore
+
+
 def _sconto_pacco_eur(articolo_eur: float, percento: int) -> float:
     """Lo sconto carrello in EURO NATIVO, gemello del precedente:
     stesso arrotondamento per differenza. Si calcola in EURO e non
@@ -10513,11 +10596,69 @@ def _regola_sconto(criterio, valuta, soglia_pezzi, soglia_valore_sats,
             minimo = SCONTO_PACCO_MIN_VALORE_EUR
     else:
         soglia, minimo = int(soglia_pezzi or 0), SCONTO_PACCO_MIN_SOGLIA
+    # LE GAMBE SONO DUE, E 'entrambi' NON E' UNA GAMBA (ago 2026): da
+    # quando quel terzo valore esiste in catalogo, il solo `not in
+    # SCONTO_PACCO_CRITERI` lo lascerebbe passare — e siccome non e'
+    # 'valore' cadrebbe nel ramo dei PEZZI, cioe' misurerebbe una
+    # soglia che il venditore non ha promesso da sola. Qui si risponde
+    # sempre e solo di UNA gamba: a comporle e' _regole_sconto, che le
+    # chiede per nome. Fail-closed come tutto il resto di questo
+    # lettore, e c'e' la prova.
     if not SCONTO_PACCO_ATTIVO or criterio not in SCONTO_PACCO_CRITERI \
+            or criterio not in ("pezzi", "valore") \
             or percento <= 0 or soglia < minimo \
             or (criterio == "valore" and not val):
         return "", 0, 0, ""
     return criterio, soglia, min(percento, SCONTO_PACCO_MAX_PERCENTO), val
+
+
+def _regole_sconto(criterio, valuta, soglia_pezzi, soglia_valore_sats,
+                   soglia_valore_eur, percento) -> list:
+    """Le regole VIVE dello sconto carrello: zero, una o DUE (ago 2026).
+    Il venditore puo' accendere tutti e due i criteri — «da 3 pezzi O da
+    25 € di articoli» — e il modo in cui lo dice e' un TERZO VALORE del
+    criterio, 'entrambi', non due colonne nuove ne' due flag. Le ragioni,
+    che sono anche il perche' questa funzione sta SOPRA _regola_sconto
+    invece di sostituirlo:
+    1) LE DUE SOGLIE DEVONO CONTINUARE A CONSERVARSI A VICENDA — il
+       patto del COALESCE di imposta_sconto_pacco: chi prova un criterio
+       e torna indietro ritrova la cifra che aveva scritto. Se la soglia
+       fosse l'interruttore, «conservata» e «accesa» sarebbero la stessa
+       cosa e quel patto morirebbe.
+    2) SCONTO_PACCO_CRITERI e' gia' il kill-switch documentato: togliere
+       'entrambi' da li' lo spegne per chi l'aveva scelto, senza un
+       deploy — ed e' anche una leva-LISTA che esiste gia', quindi il
+       censimento delle leve in CI non cambia.
+    3) La migrazione resta il DEFAULT della colonna: nessuno script,
+       nessun backfill, e i negozi a criterio singolo non si toccano.
+    OGNI GAMBA PASSA DAL GIUDICE DI SEMPRE, e non e' pigrizia: cosi'
+    _regola_sconto resta la pura di UNA regola con tutte le sue prove, e
+    il kill-switch vale PER GAMBA — chi togliesse 'pezzi' dalla leva
+    spegnerebbe quella gamba anche a chi ha 'entrambi', che e' il
+    comportamento giusto. La guardia di 'entrambi' invece va PRIMA del
+    giro, o si scavalcherebbe il suo di kill-switch: la sola presenza
+    delle due gambe in catalogo non basta a dichiarare lecito il terzo
+    valore.
+    L'ORDINE E' (pezzi, valore) ED E' CONTENUTO: chi legge «la prima»
+    per la percentuale — che e' unica per costruzione — deve trovare
+    sempre la stessa. A scegliere QUALE mostrare a chi compra non e'
+    questo ordine ma il progresso, e sta nei chiamanti.
+    Una lista VUOTA e' il «niente sconto» di sempre: nessun chiamante
+    deve ricordarsi i casi, esattamente come per il lettore singolo."""
+    crit = (str(criterio).strip().lower() if criterio else "pezzi")
+    if crit == "entrambi":
+        if not SCONTO_PACCO_ATTIVO or "entrambi" not in SCONTO_PACCO_CRITERI:
+            return []
+        gambe = ("pezzi", "valore")
+    else:
+        gambe = (crit,)
+    vive = []
+    for g in gambe:
+        r = _regola_sconto(g, valuta, soglia_pezzi, soglia_valore_sats,
+                           soglia_valore_eur, percento)
+        if r[2]:            # percento > 0 = questa gamba e' viva
+            vive.append(r)
+    return vive
 
 
 def _regola_sped_gratis(soglia_sats, soglia_eur, valuta) -> tuple:
@@ -10587,17 +10728,35 @@ def _sconto_pubblico(criterio, valuta, soglia_pezzi, soglia_valore_sats,
     Vive qui e non a mano nelle due superfici (la vetrina e il profilo
     del negozio) perche' quella regola ripetuta in due posti e' una
     regola che un giorno uno dei due dimentica; e stando in una pura si
-    puo' torturare in CI invece che sperarci."""
-    crit, sog, pct, val = _regola_sconto(criterio, valuta, soglia_pezzi,
-                                         soglia_valore_sats,
-                                         soglia_valore_eur, percento)
-    a_valore = crit == "valore"
-    return {"criterio": crit,
-            "soglia": sog if crit == "pezzi" else 0,
-            "valore": sog if a_valore and val == "sats" else 0,
-            "valore_eur": sog if a_valore and val == "eur" else 0,
-            "valuta": val,
-            "percento": pct}
+    puo' torturare in CI invece che sperarci.
+    COI DUE CRITERI INSIEME (ago 2026) la regola d'oro si ESTENDE e non
+    si rompe, ed e' la riga da leggere due volte: le chiavi piene
+    diventano DUE — la soglia in pezzi e una delle due a valore — ma MAI
+    due nella stessa unita', che e' la proprieta' su cui il client
+    poggia per prendere «quella piena» senza un «if». La prova che
+    diceva «le tre cifre si escludono SEMPRE» ha cambiato lato apposta.
+    IL CLIENT VECCHIO IN CACHE ne esce con un'OMISSIONE e non con una
+    bugia, ed e' il motivo per cui si poteva fare: legge solo `soglia` e
+    disegnera' «−10% da 3 articoli» su un negozio che sconta anche a
+    valore — meta' della promessa, tutta vera.
+    Il `criterio` che esce e' 'entrambi' solo quando le gambe vive sono
+    DAVVERO due: se una si spegne (una riga scritta a mano, una gamba
+    tolta dalla leva) in pubblico si dichiara l'altra, perche' quella e'
+    la promessa che il negozio puo' mantenere."""
+    regole = _regole_sconto(criterio, valuta, soglia_pezzi,
+                            soglia_valore_sats, soglia_valore_eur, percento)
+    fuori = {"criterio": "", "soglia": 0, "valore": 0, "valore_eur": 0,
+             "valuta": "", "percento": 0}
+    for crit, sog, pct, val in regole:
+        fuori["percento"] = pct     # unica per costruzione: l'ultima vale
+        if crit == "pezzi":
+            fuori["soglia"] = sog
+        else:
+            fuori["valuta"] = val
+            fuori["valore" if val == "sats" else "valore_eur"] = sog
+    if regole:
+        fuori["criterio"] = "entrambi" if len(regole) > 1 else regole[0][0]
+    return fuori
 
 
 # ---------------------- ASTE: la matematica pura ---------------------
@@ -13018,13 +13177,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
                       "sped_gratis_soglia, sped_gratis_soglia_eur, "
                       "sped_gratis_valuta "
                       "FROM utenti WHERE tg_id=?", (venditore_id,)).fetchone()
-    crit, sog, pct, val_sc = _regola_sconto(
+    regole_sc = _regole_sconto(
         ven["sconto_pacco_criterio"] if ven else "",
         ven["sconto_pacco_valore_valuta"] if ven else "",
         ven["sconto_pacco_soglia"] if ven else 0,
         ven["sconto_pacco_valore"] if ven else 0,
         ven["sconto_pacco_valore_eur"] if ven else 0,
         ven["sconto_pacco_percento"] if ven else 0)
+    pct = regole_sc[0][2] if regole_sc else 0
     sog_gratis, val_sg = _regola_sped_gratis(
         ven["sped_gratis_soglia"] if ven else 0,
         ven["sped_gratis_soglia_eur"] if ven else 0,
@@ -13064,7 +13224,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     cambio_ordine = 0.0
     cambio_misura = 0.0
     if (serve_cambio_duro
-            or (crit == "valore" and val_sc == "eur")
+            or _sconto_vuole_cambio(regole_sc)
             or (sog_gratis > 0 and val_sg == "eur")):
         cambio_misura = await cambio_btc_eur()
         if serve_cambio_duro:
@@ -13133,8 +13293,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # LORDO, ed e' l'ordine giusto: e' un vincolo del listino, non del
     # checkout — altrimenti si pubblicherebbe sopra il tetto e ci si
     # rientrerebbe dietro una regola di sconto.
-    sconto = _sconto_pacco(articolo, misura_eur, pezzi, crit, sog, pct,
-                           val_sc)
+    sconto = _sconto_regole(articolo, misura_eur, pezzi, regole_sc)
     # La spedizione gratis sopra soglia, sullo STESSO lordo dello
     # sconto: le due promesse sono indipendenti apposta, e
     # l'ordine fra queste due righe non conta — nessuna delle due
@@ -13226,8 +13385,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
             # il criterio e' la fotografia di COSA e' scattato, gemella
             # della percentuale: su un ordine sotto soglia direbbe
-            # qualcosa che non c'e'
-            "sconto_criterio": crit if sconto else "",
+            # qualcosa che non c'e'. Con due gambe vive si nomina QUELLA
+            # che ha fatto scattare lo sconto — _gamba_invito restituisce
+            # per prima la gamba gia' scattata — e non 'entrambi', che
+            # direbbe la regola del negozio invece del fatto di questo
+            # ordine.
+            "sconto_criterio": (_gamba_invito(regole_sc, pezzi, articolo,
+                                              misura_eur) or ("",))[0]
+                               if sconto else "",
             "spedizione_sats": sped,
             # la parte per-pezzo, e i pezzi: sono le due chiavi con cui
             # il paySheet tiene la riga «spedizione per N pezzi» che la
@@ -13468,13 +13633,14 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                      "FROM utenti WHERE tg_id=?",
                      (a["venditore_id"],)).fetchone()
     spedizioniere = sp["spedizioniere"] if sp else ""
-    crit, sog, pct, val_sc = _regola_sconto(
+    regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
         sp["sconto_pacco_soglia"] if sp else 0,
         sp["sconto_pacco_valore"] if sp else 0,
         sp["sconto_pacco_valore_eur"] if sp else 0,
         sp["sconto_pacco_percento"] if sp else 0)
+    pct = regole_sc[0][2] if regole_sc else 0
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
         sp["sped_gratis_soglia_eur"] if sp else 0,
@@ -13491,7 +13657,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     if (listino_eur or a["spedizione_eur"] > 0
             or a["spedizione_punto_eur"] > 0
             or a["spedizione_extra_eur"] > 0
-            or (crit == "valore" and val_sc == "eur")
+            or _sconto_vuole_cambio(regole_sc)
             or (sog_gratis > 0 and val_sg == "eur")):
         cambio = await cambio_btc_eur()
         if listino_eur and cambio <= 0:
@@ -13534,9 +13700,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # quantita' richiesta, la misura a valore e' lo stesso lordo della
     # promessa gemella. Il gemello in euro si aziona SOLO dietro al
     # fratello in sats: la decisione e' una sola (vedi _sconto_pacco).
-    _misura_sc = articolo if val_sc == "sats" else misura_eur
-    sconto = _sconto_pacco(articolo, misura_eur, richiesti, crit, sog, pct,
-                           val_sc)
+    sconto = _sconto_regole(articolo, misura_eur, richiesti, regole_sc)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO, sconto)
@@ -13578,6 +13742,19 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
                   else max(richiesti, a["quantita"]))
     _art_max = unitario * _max_pezzi
     _eur_max = _eur_interi(_art_max, cambio)
+    # LE GAMBE RAGGIUNGIBILI, e fra quelle LA PIU' VICINA: e' lei a
+    # riempire le chiavi dello sconto qui sotto, cosi' il client
+    # continua a leggerne UNA e renderAcquisto non cambia di una riga.
+    # Il filtro per raggiungibilita' viene PRIMA della scelta, o con
+    # due gambe si inviterebbe verso quella col progresso maggiore
+    # anche quando e' proprio lei a non essere percorribile con questo
+    # stock, lasciando muta l'altra — che e' piu' lontana ma possibile.
+    _sc_ragg = [r for r in regole_sc
+                if _sconto_pacco(_art_max, _eur_max, _max_pezzi,
+                                 r[0], r[1], r[2], r[3]) > 0]
+    _g_sc = _gamba_invito(_sc_ragg, richiesti, articolo, misura_eur)
+    _crit_sc, _sog_sc, _val_sc, _manca_sc = (
+        (_g_sc[0], _g_sc[1], _g_sc[3], _g_sc[4]) if _g_sc else ("", 0, "", 0))
     # L'UNITARIO SCONTATO, SOLO QUANDO LA DIVISIONE E' ESATTA (13 ago
     # 2026, decisione di Andrea sulla misura vera: in produzione ZERO
     # inesatti su 52 annunci scontati — il ramo senza cifra e' una
@@ -13612,21 +13789,24 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "articolo_lordo_eur": articolo_eur,
             "sconto_eur": sconto_eur,
             "sconto_percento": pct,
-            "sconto_criterio": crit,
-            "sconto_valuta": val_sc,
-            "sconto_soglia": sog if crit == "pezzi" else 0,
-            "sconto_valore": (sog if crit == "valore"
-                              and val_sc == "sats" else 0),
-            "sconto_valore_eur": (sog if crit == "valore"
-                                  and val_sc == "eur" else 0),
-            "mancano_pezzi": (max(0, sog - richiesti)
-                              if crit == "pezzi" else 0),
-            "mancano_sats": (max(0, sog - _misura_sc)
-                             if crit == "valore" and val_sc == "sats"
-                             else 0),
-            "mancano_eur": (max(0, sog - _misura_sc)
-                            if crit == "valore" and val_sc == "eur"
-                            and _misura_sc is not None else 0),
+            # LA GAMBA PIU' VICINA fra le raggiungibili, e una sola: le
+            # chiavi sono quelle di sempre, quindi il client legge una
+            # promessa come quando i criteri erano alternativi. Con due
+            # gambe vive la frase PUBBLICA le nomina entrambe — la',
+            # pero', e' una regola del negozio e non un verdetto su
+            # questo carrello.
+            "sconto_criterio": _crit_sc,
+            "sconto_valuta": _val_sc,
+            "sconto_soglia": _sog_sc if _crit_sc == "pezzi" else 0,
+            "sconto_valore": (_sog_sc if _crit_sc == "valore"
+                              and _val_sc == "sats" else 0),
+            "sconto_valore_eur": (_sog_sc if _crit_sc == "valore"
+                                  and _val_sc == "eur" else 0),
+            "mancano_pezzi": _manca_sc if _crit_sc == "pezzi" else 0,
+            "mancano_sats": (_manca_sc if _crit_sc == "valore"
+                             and _val_sc == "sats" else 0),
+            "mancano_eur": (_manca_sc if _crit_sc == "valore"
+                            and _val_sc == "eur" else 0),
             "articolo_unitario_sats": unitario,
             "articolo_unitario_eur": unitario_eur,
             "articolo_unitario_netto_sats": unit_netto,
@@ -13651,16 +13831,16 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # ESCONO, ed e' dichiarato: la' la composizione puo' sempre
             # crescere di un altro articolo del negozio, quindi «non
             # raggiungibile» non si puo' affermare.
-            "sconto_raggiungibile": _sconto_pacco(_art_max, _eur_max,
-                                                  _max_pezzi, crit, sog,
-                                                  pct, val_sc) > 0,
+            # con due gambe basta che ne sia raggiungibile UNA: e' la
+            # lista filtrata qui sopra, gia' pronta
+            "sconto_raggiungibile": bool(_sc_ragg),
             "sped_gratis_raggiungibile": bool(
                 _sped_gratis(_art_max, _eur_max, sog_gratis, val_sg)),
             # il motivo, mai un silenzio: senza conversione una promessa
             # in EURO non si sa valutare e la pagina lo dice invece di
             # far sparire una riga senza spiegazione. In sats non
             # succede mai — quella misura non ha bisogno di niente.
-            "promesse_sospese": (((crit == "valore" and val_sc == "eur")
+            "promesse_sospese": ((_sconto_vuole_cambio(regole_sc)
                                   or (sog_gratis > 0 and val_sg == "eur"))
                                  and misura_eur is None),
             # [(annuncio, QUANTI)]: la quantita' e' la meta' del conto
@@ -13806,13 +13986,14 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                      "FROM utenti WHERE tg_id=?",
                      (venditore_id,)).fetchone()
     spedizioniere = sp["spedizioniere"] if sp else ""
-    crit, sog, pct, val_sc = _regola_sconto(
+    regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
         sp["sconto_pacco_soglia"] if sp else 0,
         sp["sconto_pacco_valore"] if sp else 0,
         sp["sconto_pacco_valore_eur"] if sp else 0,
         sp["sconto_pacco_percento"] if sp else 0)
+    pct = regole_sc[0][2] if regole_sc else 0
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
         sp["sped_gratis_soglia_eur"] if sp else 0,
@@ -13825,7 +14006,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # allora non scattano — mai un 503, che qui non si sta convertendo
     # un prezzo ma decidendo se regalare qualcosa. Quelle in SATS non
     # lo chiedono affatto: la loro misura e' l'articolo stesso.
-    if (listino_eur or (crit == "valore" and val_sc == "eur")
+    if (listino_eur or _sconto_vuole_cambio(regole_sc)
             or (sog_gratis > 0 and val_sg == "eur")
             or any(a["spedizione_eur"] > 0
                    or a["spedizione_punto_eur"] > 0
@@ -13869,10 +14050,14 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # quanto manca a ognuna delle due promesse, NELL'UNITA' IN CUI E'
     # DICHIARATA: la chiave dell'altra unita' resta a zero, cosi'
     # nessuno puo' leggere dei sats come euro
-    _misura_sc = articolo if val_sc == "sats" else misura_eur
     _misura_sg = articolo if val_sg == "sats" else misura_eur
-    sconto = _sconto_pacco(articolo, misura_eur, pezzi, crit, sog, pct,
-                           val_sc)
+    sconto = _sconto_regole(articolo, misura_eur, pezzi, regole_sc)
+    # LA GAMBA PIU' VICINA, e qui fra TUTTE: nel set la raggiungibilita'
+    # non si afferma (la composizione puo' sempre crescere di un altro
+    # articolo del negozio), quindi non c'e' niente da filtrare prima.
+    _g_sc = _gamba_invito(regole_sc, pezzi, articolo, misura_eur)
+    _crit_sc, _sog_sc, _val_sc, _manca_sc = (
+        (_g_sc[0], _g_sc[1], _g_sc[3], _g_sc[4]) if _g_sc else ("", 0, "", 0))
     # il gemello in euro si aziona SOLO dietro al fratello in sats: la
     # decisione e' una sola, e sta di la' (vedi _sconto_pacco_eur)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
@@ -13909,21 +14094,18 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # euro. I client di prima del passaggio all'euro leggono le
             # chiavi in sats, e su un negozio in sats le trovano giuste.
             "sconto_percento": pct,
-            "sconto_criterio": crit,
-            "sconto_valuta": val_sc,
-            "sconto_soglia": sog if crit == "pezzi" else 0,
-            "sconto_valore": (sog if crit == "valore"
-                              and val_sc == "sats" else 0),
-            "sconto_valore_eur": (sog if crit == "valore"
-                                  and val_sc == "eur" else 0),
-            "mancano_pezzi": (max(0, sog - pezzi)
-                              if crit == "pezzi" else 0),
-            "mancano_sats": (max(0, sog - _misura_sc)
-                             if crit == "valore" and val_sc == "sats"
-                             else 0),
-            "mancano_eur": (max(0, sog - _misura_sc)
-                            if crit == "valore" and val_sc == "eur"
-                            and _misura_sc is not None else 0),
+            "sconto_criterio": _crit_sc,
+            "sconto_valuta": _val_sc,
+            "sconto_soglia": _sog_sc if _crit_sc == "pezzi" else 0,
+            "sconto_valore": (_sog_sc if _crit_sc == "valore"
+                              and _val_sc == "sats" else 0),
+            "sconto_valore_eur": (_sog_sc if _crit_sc == "valore"
+                                  and _val_sc == "eur" else 0),
+            "mancano_pezzi": _manca_sc if _crit_sc == "pezzi" else 0,
+            "mancano_sats": (_manca_sc if _crit_sc == "valore"
+                             and _val_sc == "sats" else 0),
+            "mancano_eur": (_manca_sc if _crit_sc == "valore"
+                            and _val_sc == "eur" else 0),
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
@@ -13943,7 +14125,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # in EURO non si sanno valutare, e la pagina lo dice invece
             # di far sparire una riga senza spiegazione. Quelle in sats
             # non ci finiscono mai: la loro misura c'e' sempre.
-            "promesse_sospese": (((crit == "valore" and val_sc == "eur")
+            "promesse_sospese": ((_sconto_vuole_cambio(regole_sc)
                                   or (sog_gratis > 0 and val_sg == "eur"))
                                  and misura_eur is None),
             # si cammina su `richieste`, MAI zippando tutti.values() con
@@ -14263,13 +14445,14 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                       "sped_gratis_valuta "
                       "FROM utenti WHERE tg_id=?",
                       (a["venditore_id"],)).fetchone()
-    crit, sog, pct, val_sc = _regola_sconto(
+    regole_sc = _regole_sconto(
         ven["sconto_pacco_criterio"] if ven else "",
         ven["sconto_pacco_valore_valuta"] if ven else "",
         ven["sconto_pacco_soglia"] if ven else 0,
         ven["sconto_pacco_valore"] if ven else 0,
         ven["sconto_pacco_valore_eur"] if ven else 0,
         ven["sconto_pacco_percento"] if ven else 0)
+    pct = regole_sc[0][2] if regole_sc else 0
     sog_gratis, val_sg = 0, ""
     if scelta == "spedizione":
         sog_gratis, val_sg = _regola_sped_gratis(
@@ -14309,7 +14492,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # spedizione sarebbe curare un male causandone uno peggiore.
     cambio_misura = cambio_ordine
     if cambio_misura <= 0 and ((sog_gratis > 0 and val_sg == "eur")
-                               or (crit == "valore" and val_sc == "eur")):
+                               or _sconto_vuole_cambio(regole_sc)):
         cambio_misura = await cambio_btc_eur()
     # Il conto lavora sull'UNITARIO (offerte e lampo parlano il prezzo
     # del singolo pezzo, come il listino) e moltiplica alla fine:
@@ -14364,8 +14547,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # _strade_preventivo — preventivo e invoice devono dire la stessa
     # cifra per costruzione.
     misura_eur = _eur_interi(articolo, cambio_misura)
-    sconto = _sconto_pacco(articolo, misura_eur, richiesti, crit, sog, pct,
-                           val_sc)
+    sconto = _sconto_regole(articolo, misura_eur, richiesti, regole_sc)
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
     if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
         # intera, supplemento compreso: e' quello che il venditore
@@ -14459,7 +14641,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
             "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
-            "sconto_criterio": crit if sconto else "",
+            # la gamba che ha fatto scattare lo sconto, non la regola del
+            # negozio: la fotografia di questo ordine (vedi _compra_set)
+            "sconto_criterio": (_gamba_invito(regole_sc, richiesti, articolo,
+                                              misura_eur) or ("",))[0]
+                               if sconto else "",
             "spedizione_sats": sped,
             # la parte per-pezzo e i pezzi: le due chiavi che tengono
             # viva nel paySheet la riga «spedizione per N pezzi» gia'
@@ -16350,15 +16536,22 @@ async def imposta_sconto_pacco(req: Request,
         criterio = criterio or "pezzi"
         if criterio not in SCONTO_PACCO_CRITERI:
             raise HTTPException(400,
-                "Il criterio dello sconto può essere «a pezzi» o "
-                "«a valore».")
-        if criterio == "pezzi" and (soglia or 0) < SCONTO_PACCO_MIN_SOGLIA:
+                "Il criterio dello sconto può essere «a pezzi», "
+                "«a valore» o tutti e due.")
+        # A 'entrambi' SI VALIDANO TUTTE E DUE LE GAMBE (ago 2026): chi
+        # ne accende due deve avere due soglie serie, o ne accenderebbe
+        # una sola senza saperlo — e il libro mastro glielo direbbe
+        # settimane dopo. I due «if» sono gli stessi di prima, aperti al
+        # terzo valore: cosi' il messaggio dice sempre QUALE delle due
+        # manca, invece di un no generico su una regola in due pezzi.
+        if criterio in ("pezzi", "entrambi") \
+                and (soglia or 0) < SCONTO_PACCO_MIN_SOGLIA:
             raise HTTPException(400,
                 f"Lo sconto sugli articoli parte da almeno "
                 f"{SCONTO_PACCO_MIN_SOGLIA} pezzi: sotto non premia chi "
                 f"ne prende di più, è un ribasso di listino — e quello "
                 f"si fa sul prezzo.")
-        if criterio == "valore":
+        if criterio in ("valore", "entrambi"):
             if valuta not in VALUTE_SOGLIA:
                 raise HTTPException(400,
                     "La soglia a valore si può dichiarare in euro o in "
@@ -23030,10 +23223,17 @@ CONTROLLI_LIBRO_MASTRO = (
     ("promessa di sconto che non puo' scattare",
      "il negozio dichiara uno sconto che nessun carrello raggiungera': "
      "la vetrina tace e il venditore non lo sa",
+     # A 'entrambi' (ago 2026) devono essere serie TUTTE E DUE le gambe:
+     # chi ne accende due e ne ha una sola valida sta promettendo meta'
+     # di quel che crede, ed e' precisamente il caso che questo controllo
+     # esiste per pescare. L'endpoint le valida gia' entrambe alla porta,
+     # quindi qui si prendono solo le righe scritte a mano o rimaste
+     # indietro — che e' il mestiere della ronda.
      "SELECT tg_id FROM utenti WHERE sconto_pacco_percento>0 AND ("
-     "sconto_pacco_criterio NOT IN ('pezzi','valore') "
-     "OR (sconto_pacco_criterio='pezzi' AND sconto_pacco_soglia<2) "
-     "OR (sconto_pacco_criterio='valore' AND ("
+     "sconto_pacco_criterio NOT IN ('pezzi','valore','entrambi') "
+     "OR (sconto_pacco_criterio IN ('pezzi','entrambi') "
+     "    AND sconto_pacco_soglia<2) "
+     "OR (sconto_pacco_criterio IN ('valore','entrambi') AND ("
      "sconto_pacco_valore_valuta NOT IN ('eur','sats') "
      "OR (sconto_pacco_valore_valuta='eur' AND sconto_pacco_valore_eur<1) "
      "OR (sconto_pacco_valore_valuta='sats' AND sconto_pacco_valore<1))))"),
