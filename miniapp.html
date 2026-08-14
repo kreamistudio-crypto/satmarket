@@ -8880,7 +8880,6 @@ function renderControlla(){
       circa: (p.stima || (min && min.stima)) ? '≈ ' : '',
       artEur: p.articolo_lordo_eur || p.articolo_eur || 0,
       sconto: p.sconto_sats||0, scontoEur: p.sconto_eur||0,
-      scontoPct: p.sconto_percento||0,
       spedEur: min ? (min.spedizione_eur||0) : 0,
       totEur: min ? (min.totale_eur||0) : 0,
       suppl: min ? (min.supplemento_sats||0) : 0,
@@ -8966,7 +8965,7 @@ function contoRighe(c){
        spedizione resta intera, sempre. La cifra arriva POSITIVA e il
        meno lo mette il giudice (l'ultimo argomento). */
     + (c.sconto>0
-        ? r(`Sconto sugli articoli${c.scontoPct?` −${c.scontoPct}%`:''}`,
+        ? r('Sconto sugli articoli',
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
     + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
@@ -9895,7 +9894,6 @@ function renderAcquisto(){
                             artEur: p.articolo_lordo_eur || p.articolo_eur || 0,
                             sconto: p.sconto_sats||0,
                             scontoEur: p.sconto_eur||0,
-                            scontoPct: p.sconto_percento||0,
                             /* qui la via e' SCELTA, quindi il giudizio
                                e' esatto: spedisce e non si paga */
                             spedGratis: viaOk && !sped
