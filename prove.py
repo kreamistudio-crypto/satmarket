@@ -2746,6 +2746,16 @@ def prove_indirizzo_casa():
           "indirizzo fuori contratto" in src)
     prova("il numero dei giorni viaggia al CLIENT", True,
           'risposta["giorni_indirizzo"]' in src)
+    # LA STESSA REGOLA PER LA DEDUP DEGLI AVVISI (ago 2026): era un 30
+    # scritto a mano dentro la scopa, e da quando la pagina «I tuoi
+    # dati» dice per quanto teniamo le cose quel numero deve avere UN
+    # posto solo — se un domani cambia, la pagina non deve mentire.
+    scopa = pezzo("pulisci_avvisi")
+    prova("la dedup degli avvisi ha una durata con un nome", True,
+          "GIORNI_DEDUP_AVVISI = 30" in _SORGENTE
+          and "GIORNI_DEDUP_AVVISI * 86400" in scopa)
+    prova("...e nessun numero di giorni battuto a mano nella scopa",
+          None, re.search(r"\d+\s*\*\s*86400", scopa))
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("client: il pannello si gatea sull'attesa, mai sulla via",
           True, "o.indirizzoAtteso || o.indirizzoIl" in mini)
@@ -17301,6 +17311,85 @@ def prove_commenti_css(mini=None):
     prova("...e nessun commento resta aperto in fondo al foglio", 0, aperti)
 
 
+def prove_font():
+    """I font serviti da casa (ago 2026). Il cantiere ha tolto l'ultima
+    terza parte dal foglio: finche' la pagina li chiedeva a
+    fonts.googleapis.com, l'IP e lo user-agent di OGNI visitatore
+    arrivavano a Google a ogni apertura — e la pagina «I tuoi dati»
+    avrebbe dovuto dichiararlo.
+
+    LA PROVA CHE CONTA e' quella dei PESI. La resa non doveva cambiare
+    di un pixel, e a garantirlo e' che i pesi dichiarati siano ESATTI:
+    ne' uno di piu' ne' uno di meno. Sono font VARIABILI, quindi un peso
+    aggiunto non e' innocuo — cambia le regole che oggi ricadono su un
+    altro (`.sicu p{font-weight:500}` rende 400 solo perche' il 500 non
+    e' dichiarato)."""
+    mini = open("miniapp.html", encoding="utf-8").read()
+    swjs = open("sw.js", encoding="utf-8").read()
+
+    # 1) i sei file ci sono, e sono woff2 veri (la firma, non il nome)
+    FILE = ("baloo2-latin", "baloo2-latin-ext", "nunito-latin",
+            "nunito-latin-ext", "jetbrains-mono-latin",
+            "jetbrains-mono-latin-ext")
+    for nome in FILE:
+        p = os.path.join("vendor", "font", nome + ".woff2")
+        prova(f"font: {nome}.woff2 c'e' ed e' un woff2 vero", True,
+              os.path.exists(p) and open(p, "rb").read(4) == b"wOF2")
+    # l'OFL vuole che la licenza viaggi coi file, o non possiamo
+    # ridistribuirli
+    prova("font: la licenza OFL viaggia coi file", True,
+          os.path.exists("vendor/font/OFL.txt")
+          and os.path.exists("vendor/font/LICENZE.md"))
+
+    # 2) Google non compare piu' da nessuna parte: e' il cantiere
+    prova("font: Google non compare piu' nella pagina", True,
+          "fonts.googleapis" not in mini and "fonts.gstatic" not in mini)
+    prova("font: Google non compare piu' nel service worker", True,
+          "fonts.googleapis" not in swjs and "fonts.gstatic" not in swjs)
+
+    # 3) la rotta: esplicita e con whitelist, mai una directory montata
+    prova("font: la rotta e' esplicita e passa da una whitelist", True,
+          '@app.get("/vendor/font/{nome}")' in _SORGENTE
+          and "if nome not in FILE_FONT:" in _SORGENTE)
+    prova("font: i sei nomi sono nella whitelist del server", 6,
+          sum(1 for n in FILE if f'"{n}.woff2"' in _SORGENTE))
+
+    # 4) in dispensa i tre del latino, e nient'altro
+    for n in ("baloo2-latin", "nunito-latin", "jetbrains-mono-latin"):
+        prova(f"font: {n} e' in dispensa PWA", True,
+              f"'/vendor/font/{n}.woff2'," in swjs)
+    prova("font: i latin-ext NON gonfiano l'addAll atomico", True,
+          "latin-ext.woff2'," not in swjs)
+    prova("font: la VERSIONE del SW e' salita", True,
+          "barattolo-v5" in swjs)
+    prova("font: il ramo cache-first di Google e' codice morto tolto",
+          True, "fontDallaDispensa" not in swjs and "CACHE_FONT" not in swjs)
+
+    # 5) I PESI SONO QUELLI DI IERI, uno per uno
+    blocchi = re.findall(
+        r"@font-face\{font-family:'([^']+)';font-style:normal;"
+        r"font-weight:(\d+);", mini)
+    pesi = {}
+    for fam, w in blocchi:
+        pesi.setdefault(fam, set()).add(int(w))
+    prova("font: i pesi di Baloo 2 sono quelli di ieri", {700, 800},
+          pesi.get("Baloo 2"))
+    prova("font: i pesi di Nunito sono quelli di ieri",
+          {400, 600, 700, 800}, pesi.get("Nunito"))
+    prova("font: i pesi di JetBrains Mono sono quelli di ieri",
+          {500, 700}, pesi.get("JetBrains Mono"))
+    # Un peso dichiarato a INTERVALLO farebbe istanziare al browser il
+    # peso esatto richiesto: e' la riga che cambierebbe la resa senza
+    # che nessuno se ne accorga.
+    # Si guarda DENTRO i @font-face e non in tutto il file, o la
+    # sentinella prende il commento che la spiega — ci si e' inciampati
+    # scrivendola, ed e' la stessa trappola gia' pagata altrove.
+    prova("font: nessun peso dichiarato a intervallo", 0,
+          sum(1 for b in re.findall(r"@font-face\{[^}]*\}", mini)
+              if re.search(r"font-weight:\d+ \d+", b)))
+    prova("font: otto pesi per due sottoinsiemi", 16, len(blocchi))
+
+
 def prove_nwc_cifratura():
     """La cifratura NWC si DICHIARA (ago 2026, dal campo: «Primal non
     si collega»). NIP-47 dice che il client mette un tag `encryption`
@@ -17517,6 +17606,7 @@ def main():
               prove_altri_scorrimento,
               prove_script_nel_workflow,
               prove_nwc_cifratura,
+              prove_font,
               prove_sintassi_client):
         try:
             f()

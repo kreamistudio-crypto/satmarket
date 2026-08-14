@@ -8,9 +8,8 @@
    REGOLA OPERATIVA: se cambi un file dell'elenco PRECACHE (o il file
    stesso), alza VERSIONE — le dispense vecchie si svuotano da sole. */
 
-const VERSIONE = 'barattolo-v4';
+const VERSIONE = 'barattolo-v5';
 const CACHE_STATICA = `statica-${VERSIONE}`;
-const CACHE_FONT = `font-${VERSIONE}`;
 
 // La dispensa: solo asset di casa, immutabili o quasi. Mai pagine HTML
 // dell'app (restano sovrane con i loro header anti-cache), mai /api,
@@ -28,6 +27,15 @@ const PRECACHE = [
   '/assets/apple-touch-icon.png',
   '/vendor/nostr.js',
   '/vendor/qrcode.js',
+  // I font, da quando stanno in casa (ago 2026): SOLO i tre file del
+  // latino, che sono quelli che servono a chiunque scriva in italiano.
+  // I `latin-ext` passano dalla rete come ogni file non in dispensa: qui
+  // dentro finirebbero nell'addAll ATOMICO, e gonfiare un'installazione
+  // che o riesce tutta o non riesce non conviene per un alfabeto che
+  // quasi nessuno userà.
+  '/vendor/font/baloo2-latin.woff2',
+  '/vendor/font/nunito-latin.woff2',
+  '/vendor/font/jetbrains-mono-latin.woff2',
 ];
 const IN_DISPENSA = new Set(PRECACHE);
 
@@ -48,19 +56,6 @@ self.addEventListener('activate', (e) => {
     await self.clients.claim();
   })());
 });
-
-// cache-first sulla dispensa dei font: se c'e' si serve, altrimenti
-// si va in rete e si mette via per la prossima volta
-async function fontDallaDispensa(richiesta) {
-  const dispensa = await caches.open(CACHE_FONT);
-  const pronta = await dispensa.match(richiesta);
-  if (pronta) return pronta;
-  const fresca = await fetch(richiesta);
-  if (fresca.ok || fresca.type === 'opaque') {
-    dispensa.put(richiesta, fresca.clone());
-  }
-  return fresca;
-}
 
 self.addEventListener('fetch', (e) => {
   const r = e.request;
@@ -88,12 +83,10 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // fuori casa: SOLO i font di Google (URL versionati, di fatto
-  // immutabili: sono il vero buco offline della pagina). Tutto il
-  // resto — telegram.org in testa: script che gestiscono l'auth —
-  // passa oltre senza essere nemmeno sfiorato.
-  if (url.hostname === 'fonts.googleapis.com' ||
-      url.hostname === 'fonts.gstatic.com') {
-    e.respondWith(fontDallaDispensa(r));
-  }
+  // FUORI CASA NON SI TOCCA PIU' NIENTE (ago 2026). Qui c'era il ramo
+  // cache-first per i font di Google: da quando i font stanno in
+  // vendor/font/ cadono nel ramo di sopra, come ogni altro file
+  // nostro, e questo non serve piu'. Tutto il resto — telegram.org in
+  // testa: script che gestiscono l'auth — passa oltre senza essere
+  // nemmeno sfiorato, come e' sempre stato.
 });

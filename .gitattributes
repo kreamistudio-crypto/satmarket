@@ -32,6 +32,7 @@
 *.apk  binary
 *.keystore binary
 *.jks  binary
+*.woff2 binary
 
 # Il database non e' tracciato (sta in .gitignore) — la riga c'e' come
 # rete se un giorno qualcuno lo aggiungesse per sbaglio: un .db passato

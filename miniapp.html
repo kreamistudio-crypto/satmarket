@@ -5,13 +5,92 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Barattolo — il mercatino in sats</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/jpeg" href="/assets/barattolo.jpeg">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 <meta name="theme-color" id="metaTema" content="#FAF4E4">
 <style>
+  /* ---------- I FONT, DA CASA NOSTRA (ago 2026) ----------
+     Fino a ieri li chiedeva un <link> ai font di Google, e quel <link>
+     era l'ultima terza parte del foglio: l'IP e lo user-agent di OGNI
+     visitatore — anche di chi passa e non compra — arrivavano a un
+     terzo a ogni apertura. Ora i sei .woff2 stanno in vendor/font/ e li
+     serve una rotta nostra (provenienza, versioni e licenza OFL in
+     vendor/font/LICENZE.md).
+     Il dominio di Google non si nomina qui nemmeno in un commento: la
+     sentinella che lo vieta cerca la stringa in tutto il file ed e'
+     cieca ai commenti APPOSTA — cosi' prende anche chi un domani lo
+     rimettesse dentro una stringa JS o un attributo.
+
+     SONO FONT VARIABILI: un file solo porta tutti i pesi, ed e' il
+     motivo per cui sei file bastano per otto pesi (Baloo 2 700 e 800
+     leggono lo stesso file, Nunito 400/600/700/800 pure).
+     I PESI SI DICHIARANO UNO PER UNO, come faceva il CSS di Google, e
+     NON come intervallo (`font-weight:400 800`): con l'intervallo il
+     browser istanzia il peso esatto richiesto, e una regola come
+     `.sicu p{font-weight:500}` — che oggi ricade sul 400, perche' il
+     500 non e' dichiarato — cambierebbe aspetto. Qui si sposta da dove
+     arrivano i byte, non come si vede l'app: la resa e' identica a
+     ieri per costruzione.
+     Gli `unicode-range` sono copiati alla lettera da Google: sono loro
+     a far scaricare al browser il solo sottoinsieme che gli serve (in
+     pratica il latino, tre file). IMPERFEZIONE DICHIARATA: cirillico,
+     greco, vietnamita e devanagari non li serviamo piu' — un nome in
+     quegli alfabeti (puo' arrivare da Nostr) cade sul font di sistema.
+     E in DEMO da file:// questi URL non risolvono: si vede coi font di
+     sistema, che e' il prezzo di non avere piu' un host esterno. */
+  /* Baloo 2 — titoli e lockup */
+  @font-face{font-family:'Baloo 2';font-style:normal;font-weight:700;font-display:swap;
+    src:url(/vendor/font/baloo2-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Baloo 2';font-style:normal;font-weight:800;font-display:swap;
+    src:url(/vendor/font/baloo2-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Baloo 2';font-style:normal;font-weight:700;font-display:swap;
+    src:url(/vendor/font/baloo2-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  @font-face{font-family:'Baloo 2';font-style:normal;font-weight:800;font-display:swap;
+    src:url(/vendor/font/baloo2-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  /* Nunito — il corpo del testo di tutta l'app */
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:400;font-display:swap;
+    src:url(/vendor/font/nunito-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:600;font-display:swap;
+    src:url(/vendor/font/nunito-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:700;font-display:swap;
+    src:url(/vendor/font/nunito-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:800;font-display:swap;
+    src:url(/vendor/font/nunito-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:400;font-display:swap;
+    src:url(/vendor/font/nunito-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:600;font-display:swap;
+    src:url(/vendor/font/nunito-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:700;font-display:swap;
+    src:url(/vendor/font/nunito-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  @font-face{font-family:'Nunito';font-style:normal;font-weight:800;font-display:swap;
+    src:url(/vendor/font/nunito-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  /* JetBrains Mono — i numeri: prezzi, cifre, codici */
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;
+    src:url(/vendor/font/jetbrains-mono-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;
+    src:url(/vendor/font/jetbrains-mono-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;
+    src:url(/vendor/font/jetbrains-mono-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;
+    src:url(/vendor/font/jetbrains-mono-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+
   :root{
     color-scheme:light;
     --bg:#FAF4E4; --card:#FFFFFF; --ink:#23282C; --muted:#8A8271;

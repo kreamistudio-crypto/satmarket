@@ -760,6 +760,17 @@ try:
 except ImportError:
     GIORNI_INDIRIZZO = 10
 
+# Per quanto teniamo la memoria di QUALI avvisi di ricerca abbiamo gia'
+# mandato a una persona (la tabella `avvisi_notificati`): oltre, la riga
+# si cancella e quell'annuncio potrebbe risuonare — un mese e' piu' che
+# abbastanza, un annuncio non rinasce dopo trenta giorni.
+# ERA UN 30 SCRITTO A MANO dentro pulisci_avvisi. Ha un nome da quando
+# la pagina «I tuoi dati» dice per quanto teniamo le cose: quel numero
+# la pagina lo legge da qui, e se un domani cambia la pagina non mente.
+# E' il patto di GIORNI_INDIRIZZO qui sopra, applicato a una durata che
+# fino a ieri non doveva raccontarla nessuno.
+GIORNI_DEDUP_AVVISI = 30
+
 # LA CODA DEI FERMI (ago 2026): la soglia oltre la quale un ordine coi
 # sats in cassaforte, e su cui nessuno si muove, entra nella sezione
 # «Ordini fermi» del pannello admin.
@@ -20453,12 +20464,12 @@ def pulisci_indirizzi():
 
 def pulisci_avvisi():
     """La scopa degli avvisi, chiamata dall'orologio: via le righe di
-    dedup piu' vecchie di 30 giorni (un annuncio non rinasce dopo un
-    mese) e i contatori dei giorni passati."""
+    dedup piu' vecchie di GIORNI_DEDUP_AVVISI (un annuncio non rinasce
+    dopo un mese) e i contatori dei giorni passati."""
     try:
         con = db()
         con.execute("DELETE FROM avvisi_notificati WHERE creato < ?",
-                    (int(time.time()) - 30 * 86400,))
+                    (int(time.time()) - GIORNI_DEDUP_AVVISI * 86400,))
         con.commit()
         con.close()
     except Exception as e:
@@ -26614,6 +26625,34 @@ def vendor_qrcode():
     deve poter cambiare quel codice. Cache lunga col ?v= nel src."""
     return FileResponse("vendor/qrcode.js",
                         media_type="application/javascript",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+# I FONT, SERVITI DA CASA (ago 2026). Stesso patto delle due librerie
+# qui sopra, ma la ragione e' un'altra: finche' la pagina li chiedeva a
+# fonts.googleapis.com, l'IP e lo user-agent di OGNI visitatore — anche
+# di chi passa e non compra — arrivavano a un terzo a ogni apertura, e
+# la pagina «I tuoi dati» avrebbe dovuto dichiararlo. Erano l'ultima
+# terza parte del foglio.
+# Whitelist di NOMI e non sedici rotte fisse: il nome arriva dal
+# client, quindi passa da un elenco chiuso come le illustrazioni delle
+# categorie. Mai StaticFiles su una directory (regola ferrea 3).
+# Provenienza, versioni e licenza stanno in vendor/font/LICENZE.md.
+FILE_FONT = ("baloo2-latin.woff2", "baloo2-latin-ext.woff2",
+             "nunito-latin.woff2", "nunito-latin-ext.woff2",
+             "jetbrains-mono-latin.woff2",
+             "jetbrains-mono-latin-ext.woff2")
+
+
+@app.get("/vendor/font/{nome}")
+def vendor_font(nome: str):
+    """Un font del brand. Cache lunga come le altre due rotte vendor:
+    questi file cambiano solo quando li cambiamo apposta, e quel giorno
+    si alza la VERSIONE del service worker (stanno in dispensa)."""
+    if nome not in FILE_FONT:
+        raise HTTPException(404, "font non trovato")
+    return FileResponse(os.path.join("vendor", "font", nome),
+                        media_type="font/woff2",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
