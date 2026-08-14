@@ -14642,6 +14642,23 @@ async function setSpedizioniere(v){
   if (el('view-vendi')) aggiornaConsegnaForm();
 }
 
+/* «TU INCASSI SEMPRE IN SATS» (ago 2026, rimessa da Andrea il giorno
+   dopo averla persa col taglio delle note): e' l'unica riga di quelle
+   tolte a coprire un caso VERO — una soglia in EURO accanto a un
+   negozio che incassa in bitcoin si legge come «mi pagano in euro»,
+   e nel cassetto non c'e' nient'altro che dica il contrario. Era nata
+   apposta col passaggio all'euro, e vale in tutte e due le valute:
+   in sats e' ovvia, in euro e' la sola risposta.
+   In UN posto e portata dai due cassetti, il patto della nota sulla
+   valuta che l'ospitava — e che le sopravvive: due copie della stessa
+   avvertenza un giorno divergono. (La sentinella conta la PAROLA di
+   quella funzione, non la sua chiamata: non nominarla qui.) */
+function notaIncasso(){
+  return `
+  <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
+    Tu incassi sempre in <b style="color:var(--ink)">sats</b>.</div>`;
+}
+
 /* ---- IL TOGGLE €/₿ DELLA SOGLIA (ago 2026) ----
    CONSERVA, NON CONVERTE, ed e' la decisione da non rovesciare: ogni
    valuta ha la sua colonna, e il toggle mostra cio' che il venditore ha
@@ -14868,7 +14885,7 @@ function renderScontoPacco(){
                           inSats ? scontoPaccoLeve.min_valore_sats
                                  : scontoPaccoLeve.min_valore_eur, b.valuta,
                           (inSats ? scontoPaccoLeve.valori_sats
-                                  : scontoPaccoLeve.valori_eur)||[])}
+                                  : scontoPaccoLeve.valori_eur)||[])}${notaIncasso()}
     ` : `
       <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
@@ -15004,7 +15021,7 @@ function renderSpedGratis(){
                         inSats ? spedGratisLeve.min_sats
                                : spedGratisLeve.min_eur, b.valuta,
                         (inSats ? spedGratisLeve.soglie_sats
-                                : spedGratisLeve.soglie_eur)||[])}
+                                : spedGratisLeve.soglie_eur)||[])}${notaIncasso()}
     <button class="btn orange" onclick="setSpedGratis()">
       ${ora ? '🚚 Aggiorna la soglia' : '🚚 Attiva la spedizione gratis'}</button>
     ${ora ? `<button class="btn ghost" onclick="setSpedGratis(true)">Spegni la spedizione gratis</button>` : ''}`;

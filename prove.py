@@ -6799,12 +6799,22 @@ def prove_sped_gratis():
           mini.count("notaSoglia"))
     prova("...e nemmeno quella sulla lampo", 0,
           mini.count("notaLampo"))
-    # ⚠️ QUEL CHE SI E' PERSO, dichiarato: «Tu incassi sempre in sats»
-    # viveva li' dentro, ed era la riga che teneva onesto il cassetto
-    # di un negozio che promette in EURO ma incassa in bitcoin (era
-    # nata apposta, col passaggio all'euro). Se un giorno un venditore
-    # chiede «ma allora mi pagate in euro?», la risposta e' questa riga
-    # e il posto e' il cassetto.
+    # «TU INCASSI SEMPRE IN SATS» E' TORNATA (ago 2026, rimessa da
+    # Andrea il giorno dopo averla persa col taglio delle note): e'
+    # l'unica riga di quelle tolte a coprire un caso VERO — una soglia
+    # in EURO accanto a un negozio che incassa in bitcoin si legge come
+    # «mi pagano in euro», e nel cassetto non c'e' nient'altro che dica
+    # il contrario. Il patto della nota che l'ospitava le sopravvive:
+    # UN posto solo, e la portano tutti e due i cassetti.
+    prova("la riga «incassi in sats» e' scritta UNA volta", 1,
+          mini.count("function notaIncasso("))
+    prova("...e la portano tutti e due i cassetti", 2,
+          mini.count("notaIncasso()}"))
+    # ...e dice i SATS, non «una nota» qualunque: senza questa, svuotare
+    # la riga lascerebbe verdi le due qui sopra (la lezione della
+    # tortura sulla nota della lampo, due giorni fa).
+    _ni = pezzo_js(mini, "function notaIncasso")
+    prova("...e nomina i sats", True, "sats" in _ni)
 
     # L'ARIA SOPRA IL BOTTONE DEL CASSETTO (ago 2026, bug dal campo:
     # «Aggiorna lo sconto» tagliava le pillole delle percentuali).
