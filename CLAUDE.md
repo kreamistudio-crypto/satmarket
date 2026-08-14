@@ -7186,18 +7186,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SOLO a criterio valore, la sorella sempre. A criterio pezzi la lampo
   non può far scendere niente sotto soglia — lì si contano pezzi, non
   cifre — e allinearla sarebbe scrivere una cosa falsa per simmetria.
-  ⚠️ E LA RIGA DEL CONTO TRONCA A 320px, misurato e NON accorciato
-  (decisione di Andrea: dimmi il numero invece di accorciare lì).
-  In `contoRighe` l'etichetta ha 158px e «Sconto sugli articoli −10%»
-  ne chiede 168: si vede «Sconto sugli articoli −1…», cioè una
-  percentuale MOZZATA che si legge come un altro numero. Solo in vista
-  SATS (la cifra in mono è larga 88px) e solo a 320: in euro lo spazio
-  è 177 e a 360 già 198. Il vecchio «Sconto carrello −10%» ne chiedeva
-  138, cioè quella riga viveva con 20px di margine — era stretta da
-  prima, e il nome nuovo l'ha solo scoperta. Le altre due superfici
-  stanno larghe: nel paySheet `.conto-scomposto` l'etichetta fa 117px
-  su 254 (una riga sola, 39 di margine) e la riga dell'ordine è una
-  `.eur-hint` che va a capo. IL SOTTOTITOLO dice il
+  ⚠️ E LA RIGA DEL CONTO HA PERSO LA PERCENTUALE (ago 2026, decisione
+  di Andrea presa sul numero): col nome nuovo «Sconto sugli articoli
+  −10%» chiedeva 168px dove `contoRighe` ne dà 158 a 320px in vista
+  sats, e si vedeva «Sconto sugli articoli −1…» — non un'etichetta coi
+  puntini ma una PERCENTUALE MOZZATA, che si legge come un altro
+  numero. Via la percentuale: la cifra a destra dice già quanto si è
+  risparmiato, ed è il dato utile; il «−10%» resta dove c'è spazio per
+  leggerlo — la riga dell'ordine, il cassetto, il tag sull'unitario e
+  il badge in card. Con lei è sparito `scontoPct` dai due costruttori
+  del conto, che nessuno leggeva più: un campo morto lì dentro fa
+  credere a chi passa che la riga una percentuale la mostri.
+  IL CONTO È LA SUPERFICIE PIÙ STRETTA DELL'APP, ed è la ragione per
+  cui questi numeri stanno scritti qui: chi allunga un'etichetta di
+  `contoRighe` MISURA PRIMA, a 320px e in vista SATS (la cifra in mono
+  è la più larga: 88px contro i 69 dell'euro). I margini misurati là,
+  nel caso peggiore — supplemento su 12 pezzi, totale a sette cifre:
+  Prezzo +108 · **Sconto sugli articoli +24** · Spedizione per N pezzi
+  +16 · Protezione +63 · **Totale da pagare +1**. A 360 e 375 stanno
+  tutte comode (il più stretto sale a +15 e +30).
+  DUE COSE DA SAPERE, e sono PREESISTENTI — nessuna delle due nasce
+  col rinome, e nessuna delle due è stata toccata: «Commissione
+  Barattolo» TRONCA GIÀ OGGI a 320 (−25px, si legge «Commissione
+  Baratt…») perché il suo valore porta la pillola «in promo» accanto
+  allo zero, e non dipende dalle cifre dell'ordine — è sempre così; e
+  «Totale da pagare» sta dentro per UN pixel con un totale a sette
+  cifre, quindi a otto cifre tronca. Il posto dove si tronca per primo
+  è quello, non lo sconto.
+  Le altre due superfici del conto stanno larghe e non hanno mai avuto
+  il problema: nel paySheet `.conto-scomposto` l'etichetta fa 117px su
+  254 (una riga sola, 39 di margine, e lì la percentuale non c'è mai
+  stata) e la riga dell'ordine è una `.eur-hint` che va a capo.
+  LA GEMELLA DELLA SPEDIZIONE NON CAMBIA: quella riga una percentuale
+  non l'ha mai portata — dice «gratuita» o la cifra, più l'eventuale
+  «per N pezzi» in `.ctrl-nota` dentro lo stesso span — quindi il
+  taglio non la tocca, e le due restano coerenti senza fare niente. IL SOTTOTITOLO dice il
   PERIMETRO e non più il modello (12 ago 2026, decisione di Andrea:
   via «un venditore alla volta, spedizione unica»): «articoli dello
   stesso venditore» — è il carrello di QUEL negozio, non del mercatino
