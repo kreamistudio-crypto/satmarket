@@ -1800,9 +1800,16 @@
   /* il margin-bottom e' il fiato minimo sopra Acquista quando il
      contenuto riempie lo schermo e il suo margin-top:auto scende a 0 */
   .ctrl-conto{background:var(--card);border:1.5px solid var(--line);
-    border-radius:var(--radius);padding:4px 14px;margin:8px 0 22px}
+    border-radius:var(--radius);padding:4px 10px;margin:8px 0 22px}
+  /* IL RESPIRO E' MISURATO, non scelto a occhio (ago 2026): il conto e'
+     la superficie piu' stretta dell'app, e il gap e il padding del
+     riquadro sono l'unica leva che vale per TUTTE le righe insieme.
+     Da 12/14 a 8/10 ogni etichetta guadagna 12px a 320px in vista
+     sats — «Totale da pagare» passa da +1 a +13, cioe' regge un
+     totale a nove cifre invece che a sette. Piu' stretto di cosi' le
+     cifre cominciano a toccare il bordo del riquadro. */
   .ctrl-riga{display:flex;justify-content:space-between;align-items:baseline;
-    gap:12px;padding:9px 0;font-size:14px;font-weight:600}
+    gap:8px;padding:9px 0;font-size:14px;font-weight:600}
   /* LA CIFRA NON SI SPEZZA MAI (ago 2026, bug visto in vista sats:
      con l'etichetta lunga il «≈» andava a capo e finiva SOPRA il
      numero). La cifra col suo ≈ e la sua unita' e' un gruppo
@@ -8967,6 +8974,17 @@ function contoRighe(c){
     + (c.sconto>0
         ? r('Sconto sugli articoli',
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
+    /* ⚠️ QUESTA RIGA TRONCA A 320px, ed e' l'unica: l'etichetta ne
+       chiede 148 e ne ha 135, quindi si legge «Commissione
+       Baratt…» — su OGNI acquisto, perche' il suo valore porta
+       sempre la pillola «in promo» accanto allo zero e non dipende
+       dalle cifre dell'ordine. Difetto vecchio, misurato ad ago
+       2026. La leva del respiro qui NON arriva: per farcela stare il
+       padding del riquadro dovrebbe scendere da 14 a 4, cioe' le
+       cifre contro il bordo. L'unica leva che basta e' l'etichetta —
+       «Commissione» da sola avanza 50px, e dentro il nostro
+       checkout di chi altri sarebbe? — ma e' un testo, e i testi si
+       decidono, non si accorciano di straforo. */
     + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
