@@ -299,6 +299,18 @@ SUGGERIMENTI_OGNI_GIORNI = 7    # al massimo uno ogni N giorni PER
                                 # ieri, un freno d'emergenza e non una
                                 # taratura
 
+# --- L'invito a dichiarare i corrieri (ago 2026) ---------------------
+# Chi pubblica una spedizione senza aver detto con quali corrieri
+# spedisce trova un foglio al tocco di «Pubblica»: le reti da spuntare
+# li' dentro, e «Pubblica lo stesso» che pubblica davvero — insistente,
+# mai bloccante.
+# IL TETTO E' LA META' CHE CONTA: dopo N volte il foglio smette e resta
+# la riga nel form. Un cartello che compare SEMPRE uguale si impara a
+# scavalcare senza leggerlo, e in quel form ci sono gia' nove righe che
+# si contendono l'attenzione.
+INVITO_CORRIERI_MAX = 3         # quante volte al massimo. 0 = niente
+                                # foglio, resta la sola riga nel form
+
 # --- Offerta lampo (sconto a tempo su tutto l'annuncio) --------------
 # Modello Vinted «sconto ai follower»: quando qualcuno mette l'annuncio
 # nel suo barattolo il venditore riceve un avviso anonimo e puo' lanciare

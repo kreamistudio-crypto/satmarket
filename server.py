@@ -404,6 +404,17 @@ except ImportError:
     # 0 spegne il RITMO, non i suggerimenti: si torna alla raffica di
     # ieri, quindi e' un freno d'emergenza e non una taratura
     SUGGERIMENTI_OGNI_GIORNI = 7
+try:
+    from config import INVITO_CORRIERI_MAX
+except ImportError:
+    # Quante volte il foglio «con quali corrieri spedisci?» si apre a
+    # chi pubblica una spedizione senza reti dichiarate (ago 2026).
+    # Insistente nei primi giri — quando conta — e poi resta la riga
+    # nel form: un cartello che compare SEMPRE uguale si impara a
+    # scavalcare senza leggerlo, e nel form Vendi ci sono gia' nove
+    # righe che si contendono l'attenzione.
+    # 0 = niente foglio, resta la sola riga (freno d'emergenza).
+    INVITO_CORRIERI_MAX = 3
 
 # La protezione acquisti (lug 2026, modello Vinted): percentuale a
 # carico del COMPRATORE sul solo prezzo articolo, si aggiunge al conto
@@ -1452,6 +1463,23 @@ def riallinea_quantita_max(con):
                 "WHERE quantita>quantita_max")
 
 
+def riallinea_spedizionieri(con):
+    """Il BACKFILL della rete al plurale: chi aveva dichiarato una
+    rete sola la ritrova dentro `spedizionieri`, coi pipe.
+
+    Senza, il giorno del deploy i venditori che una rete l'avevano
+    dichiarata si ritroverebbero «non dichiarato» — e perderebbero la
+    mappa e la riga «Spedisce con X» in silenzio, che e' il modo
+    peggiore in cui questo cantiere poteva presentarsi. Sono 16
+    venditori veri, contati in produzione prima di cominciare.
+
+    Idempotente: tocca solo le righe dove la colonna nuova e' ancora
+    vuota, quindi un secondo giro non riscrive niente e non puo'
+    ricoprire una scelta multipla fatta nel frattempo."""
+    con.execute("UPDATE utenti SET spedizionieri = '|' || spedizioniere || '|' "
+                "WHERE spedizioniere <> '' AND spedizionieri = ''")
+
+
 def init_db():
     con = db()
     con.executescript("""
@@ -2071,7 +2099,40 @@ def init_db():
                     # dichiarato serve a dire al compratore la rete
                     # («Spedisce con InPost») invece della riga
                     # «accordatevi in chat».
+                    # DAL AGO 2026 E' LA PRIMA VOCE di `spedizionieri`,
+                    # e non cambia significato: un nome non lo fa mai
+                    # (il patto delle soglie in euro e della tariffa
+                    # punto). Si scrive nello STESSO update della
+                    # colonna nuova, e serve al client rimasto in
+                    # cache — che vede una rete vera invece di tutte:
+                    # un'omissione, mai una bugia.
                     "spedizioniere TEXT DEFAULT ''",
+                    # le reti di punti di ritiro, al PLURALE (ago 2026,
+                    # dal campo: il compratore sceglie un locker InPost,
+                    # il venditore spedisce con Poste e il punto piu'
+                    # vicino di quella rete e' a 50 km — l'affare si
+                    # blocca coi sats in cassaforte). Chi spedisce con
+                    # due corrieri li dichiara tutti e due, e col
+                    # plurale nasce la scelta della rete DA PARTE DEL
+                    # COMPRATORE (ordini.rete_punto), che e' cio' che
+                    # chiude davvero il caso.
+                    # Pipe ai bordi come avvisi_ricerca.categorie —
+                    # '|InPost|Poste Italiane|', '' = non dichiarato —
+                    # canonicalizzate contro il catalogo e NELL'ORDINE
+                    # del catalogo, cosi' deduplica e ordine stabile
+                    # vengono gratis. Il backfill dalla colonna
+                    # singolare gira all'avvio (riallinea_spedizionieri).
+                    "spedizionieri TEXT DEFAULT ''",
+                    # quante volte il foglio «con quali corrieri
+                    # spedisci?» si e' APERTO davanti a chi pubblica
+                    # una spedizione senza reti dichiarate (ago 2026).
+                    # Il tetto e' INVITO_CORRIERI_MAX: insistente nei
+                    # primi giri — quando conta — e poi silenzio, che
+                    # un cartello permanente si impara a scavalcare
+                    # senza leggerlo. Colonna e non localStorage: e' un
+                    # fatto della PERSONA, il patto di
+                    # avvisato_trasporto.
+                    "invito_corrieri INTEGER DEFAULT 0",
                     # il timbro della notifica una-tantum ai venditori
                     # che spediscono senza spedizioniere dichiarato
                     # (avvisa_spedizioniere_mancante): UNA volta per
@@ -2656,6 +2717,20 @@ def init_db():
                     # esistere: e' lo stato che blocca segna_spedito
                     # (dove spedirebbe?).
                     "via_punto INTEGER DEFAULT 0",
+                    # LA RETE del punto, scelta dal COMPRATORE (ago
+                    # 2026, cantiere «chi spedisce dichiara»): quando
+                    # il venditore ne dichiara piu' d'una, chi compra
+                    # dice anche CON QUALE viaggera' il pacco — ed e'
+                    # cio' che chiude il caso da cui nasce tutto (un
+                    # locker InPost scelto su un ordine che parte con
+                    # Poste, e il punto piu' vicino a 50 km).
+                    # '' = non dichiarata: ordini storici, venditore
+                    # senza reti, o via diversa dal punto. MAI un
+                    # valore nuovo di consegna_scelta, che resta
+                    # 'spedizione' — il patto di via_punto e di
+                    # anche_digitale: ortogonale, cosi' timer e
+                    # solleciti restano veri per costruzione.
+                    "rete_punto TEXT DEFAULT ''",
                     # LO SCONTO CARRELLO (ago 2026), voce di TESTATA.
                     # ATTENZIONE, ed e' la riga da leggere prima di
                     # toccare qualunque strada del denaro: questa e'
@@ -2825,6 +2900,10 @@ def init_db():
     # e nessun badge si accende finche' non ricarica. Non e' un guasto:
     # e' il prezzo di non inventare un passato.
     riallinea_quantita_max(con)
+    # Le reti al plurale (ago 2026): chi ne aveva dichiarata una la
+    # ritrova dentro la colonna nuova, o al deploy perderebbe mappa e
+    # riga «Spedisce con X» senza che nessuno gliel'abbia tolte.
+    riallinea_spedizionieri(con)
     # La prenotazione dello stock (lug 2026) conta gli ordini 'creato'
     # per annuncio a ogni acquisto: e' la prima query calda su ordini
     # (finora la tabella viveva senza indici).
@@ -7405,15 +7484,87 @@ def guardia_zona_condizione(d: dict, consegna: str) -> str:
 MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe", "digitale")
 TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 
-# Lo spedizioniere del NEGOZIO (ago 2026, pagina d'acquisto): con che
-# rete di punti di ritiro lavora il venditore. Si dichiara UNA volta
-# nel Profilo e vale per tutti i suoi annunci; senza, la strada
-# «spedizione a un punto di ritiro» resta spenta (il compratore non
-# saprebbe di che rete cercare il punto). NON e' il catalogo corrieri
-# del tracking (quello vive nel client, CORRIERI) ne' le sentinelle
-# CORRIERI_SENTINELLA: qui si dice la rete dei punti, non chi porta
-# il pacco. Il client riceve le voci da /api/me: mai hardcodate.
+# Le reti di punti di ritiro del NEGOZIO (ago 2026, pagina d'acquisto;
+# al PLURALE dal cantiere «chi spedisce dichiara»): con che corrieri
+# lavora il venditore. Si dichiarano nel Profilo e valgono per tutti i
+# suoi annunci; senza, la via punto resta OFFERTA lo stesso (secondo
+# giro, decisione di Andrea: meglio l'accordo in chat che la porta
+# chiusa) e il compratore sceglie il punto senza sapere la rete.
+# NON e' il catalogo corrieri del tracking (quello vive nel client,
+# CORRIERI, e ha sette voci) ne' le sentinelle CORRIERI_SENTINELLA:
+# qui si dice la rete dei PUNTI, non chi porta il pacco. Il client
+# riceve le voci da /api/me: mai hardcodate.
+# E' UNA LISTA APERTA (decisione di Andrea): se ne aggiunge una il
+# giorno che si trova la sua MAPPA — una voce senza mappa e' lo stato
+# «Altro», cioe' nessun link, e un link fuorviante e' peggio di
+# nessun link.
 SPEDIZIONIERI = ("InPost", "Poste Italiane", "Altro")
+
+
+def _reti_serializza(scelte) -> str:
+    """La lista delle reti come va in colonna: '|InPost|Poste Italiane|'.
+
+    Filtrata contro il catalogo e NELL'ORDINE del catalogo, il patto di
+    `salva_avviso_ricerca`: cosi' deduplica e ordine stabile vengono
+    gratis, e quel che arriva dal client non decide come si legge il
+    dato. Lista vuota = '' = non dichiarato."""
+    if not isinstance(scelte, list):
+        raise HTTPException(400, "Reti in formato sbagliato")
+    tenute = [s for s in SPEDIZIONIERI if s in scelte]
+    return ("|" + "|".join(tenute) + "|") if tenute else ""
+
+
+def reti_venditore(spedizionieri: str, spedizioniere: str = "") -> list:
+    """Le reti dichiarate da un venditore, come lista.
+
+    Giudice PURO: prende i CAMPI e non la riga (il patto di `in_ferie`),
+    cosi' serve la riga `utenti`, l'alias del preventivo e la prova in
+    CI senza che nessuno debba costruirsi un finto record.
+
+    Il RIPIEGO sulla colonna singolare non e' cortesia: e' quel che fa
+    vivere il dato di ieri il giorno del deploy, prima che il backfill
+    sia girato — e copre anche uno script lanciato a mano su un
+    database piu' vecchio. Le voci fuori catalogo si buttano, che una
+    rete che non sappiamo mappare non e' una rete."""
+    grezze = [s for s in (spedizionieri or "").split("|") if s]
+    if not grezze and spedizioniere:
+        grezze = [spedizioniere]
+    return [s for s in SPEDIZIONIERI if s in grezze]
+
+
+def rete_da_payload(grezza: str, reti: list) -> str:
+    """Con quale rete viaggera' il pacco: la sceglie CHI COMPRA, e qui
+    si valida contro le reti di QUEL venditore.
+
+    Le tre risposte, e sono la decisione del cantiere:
+    · NESSUNA rete dichiarata -> '' — il mondo di prima, byte per
+      byte: si sceglie il punto senza sapere la rete e lo dice la riga
+      onesta della pagina.
+    · UNA sola -> quella, senza chiedere niente a nessuno. E' il patto
+      delle strade dell'asta: una strada sola si fissa alla nascita.
+    · DUE o piu' -> la dice il compratore, e il 400 esiste SOLO qui.
+      Un client di ieri, che il campo non ce l'ha, incontra il rifiuto
+      soltanto sui venditori multi-rete — che il giorno del deploy non
+      esistono ancora: nessuno puo' averne dichiarate due prima che il
+      cassetto lo permetta.
+
+    Si valida contro le reti DEL VENDITORE e non contro SPEDIZIONIERI,
+    ed e' la riga da non ammorbidire: chi dichiara InPost e Poste non
+    deve poter ricevere un ordine per «Altro» — sarebbe una rete che
+    non ha, cioe' esattamente il caso che questo cantiere chiude."""
+    scelta = (grezza or "").strip()
+    if not reti:
+        return ""
+    if len(reti) == 1:
+        return reti[0]
+    if not scelta:
+        raise HTTPException(400, "Scegli con quale corriere vuoi "
+                                 "ricevere il pacco: "
+                                 + ", ".join(reti))
+    if scelta not in reti:
+        raise HTTPException(400, "Questo venditore non spedisce con "
+                                 "quel corriere: " + ", ".join(reti))
+    return scelta
 
 # La dimensione del testo (ago 2026): chi ha bisogno di caratteri piu'
 # grandi la sceglie una volta e la ritrova OVUNQUE, perche' e' una
@@ -10593,6 +10744,11 @@ def _leve_stato():
                          "annuncio pubblicato — chi si stufa blocca il "
                          "bot, e col bot bloccato perde le notifiche "
                          "degli ordini"),
+            _leva("Invito ai corrieri: quante volte",
+                  "INVITO_CORRIERI_MAX", INVITO_CORRIERI_MAX,
+                  spento="niente foglio a chi pubblica una spedizione "
+                         "senza corrieri dichiarati: resta la sola riga "
+                         "nel form"),
         ]},
     ]
 
@@ -13952,14 +14108,22 @@ async def _compra_set(user: dict, d: dict) -> dict:
         # (ordine nato senza punto) lo coprono il campo dell'ordine e
         # il gate di segna_spedito — la SELECT e' una lettura prima
         # della invoice, il patto del ricontrollo non si tocca.
-        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
-                         (venditore_id,)).fetchone()
-        if sp and sp["spedizioniere"] and not punto:
+        sp = con.execute("SELECT spedizionieri, spedizioniere FROM utenti "
+                         "WHERE tg_id=?", (venditore_id,)).fetchone()
+        reti = reti_venditore(sp["spedizionieri"],
+                              sp["spedizioniere"]) if sp else []
+        if reti and not punto:
             con.close()
             raise HTTPException(400, "Indica il punto di ritiro (nome o "
                                      "indirizzo del punto)")
+        try:
+            rete = rete_da_payload(d.get("rete_punto"), reti)
+        except HTTPException:
+            con.close()
+            raise
     else:
         punto = ""
+        rete = ""
     via_punto = 1 if via == "punto" else 0
 
     # L'INDIRIZZO DI CASA sta QUI, accanto alla via e PRIMA della
@@ -14222,14 +14386,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
-        "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,"
+        "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, ind, adesso if ind else 0, ind_atteso,
+         punto, via_punto, rete, ind, adesso if ind else 0, ind_atteso,
          sped, prot, pezzi,
          # la percentuale si fotografa SOLO se lo sconto e' scattato,
          # o la ricevuta di un ordine sotto soglia dichiarerebbe uno
@@ -14285,6 +14449,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "sped_gratis_sats": sped_gratis_sats,
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
+            "rete_punto": rete,
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
                        "titolo": r["titolo"], "quantita": r["quantita"],
@@ -14505,14 +14670,20 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # del negozio, dalla SELECT che c'era gia' — zero query in piu'
     # (il patto del ramo set; dall'ago 2026 il mono sconta, quindi
     # anche qui la regola dello sconto si legge sempre)
-    sp = con.execute("SELECT spedizioniere, sconto_pacco_criterio, "
+    sp = con.execute("SELECT spedizioniere, spedizionieri, "
+                     "sconto_pacco_criterio, "
                      "sconto_pacco_soglia, sconto_pacco_valore, "
                      "sconto_pacco_valore_eur, sconto_pacco_valore_valuta, "
                      "sconto_pacco_percento, sped_gratis_soglia, "
                      "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (a["venditore_id"],)).fetchone()
-    spedizioniere = sp["spedizioniere"] if sp else ""
+    reti = reti_venditore(sp["spedizionieri"],
+                          sp["spedizioniere"]) if sp else []
+    # la stringa resta per il client rimasto in cache, che di reti ne
+    # legge una sola: gli si da' la prima, che e' un'omissione e non
+    # una bugia (la regola d'oro di _sconto_pubblico)
+    spedizioniere = reti[0] if reti else ""
     regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
@@ -14694,7 +14865,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
-            "spedizioniere": spedizioniere,
+            "spedizioniere": spedizioniere, "reti": reti,
             # ogni chiave porta il numero SOLO nella sua unita': la
             # `sped_gratis_soglia` e' in SATS e i client di prima del
             # passaggio all'euro la leggono cosi' — su un negozio in
@@ -14858,14 +15029,17 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         offerte[aid] = off
     # la riga del venditore: lo spedizioniere e la regola dello sconto
     # carrello, dalla SELECT che c'era gia' — zero query in piu'
-    sp = con.execute("SELECT spedizioniere, sconto_pacco_criterio, "
+    sp = con.execute("SELECT spedizioniere, spedizionieri, "
+                     "sconto_pacco_criterio, "
                      "sconto_pacco_soglia, sconto_pacco_valore, "
                      "sconto_pacco_valore_eur, sconto_pacco_valore_valuta, "
                      "sconto_pacco_percento, sped_gratis_soglia, "
                      "sped_gratis_soglia_eur, sped_gratis_valuta "
                      "FROM utenti WHERE tg_id=?",
                      (venditore_id,)).fetchone()
-    spedizioniere = sp["spedizioniere"] if sp else ""
+    reti = reti_venditore(sp["spedizionieri"],
+                          sp["spedizioniere"]) if sp else []
+    spedizioniere = reti[0] if reti else ""
     regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
@@ -14989,7 +15163,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             "protezione_sats": conto["protezione"],
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
-            "spedizioniere": spedizioniere,
+            "spedizioniere": spedizioniere, "reti": reti,
             # la seconda promessa del negozio, che guarda lo STESSO
             # lordo della prima: le due sono indipendenti
             # per costruzione, e nessuna delle due misura l'altra
@@ -15117,14 +15291,22 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         # client di ieri, che senza rete non ha il campo. Il residuo
         # lo coprono il campo dell'ordine e il gate di segna_spedito.
         # (Lettura prima della invoice: il patto del ricontrollo.)
-        sp = con.execute("SELECT spedizioniere FROM utenti WHERE tg_id=?",
-                         (a["venditore_id"],)).fetchone()
-        if sp and sp["spedizioniere"] and not punto:
+        sp = con.execute("SELECT spedizionieri, spedizioniere FROM utenti "
+                         "WHERE tg_id=?", (a["venditore_id"],)).fetchone()
+        reti = reti_venditore(sp["spedizionieri"],
+                              sp["spedizioniere"]) if sp else []
+        if reti and not punto:
             con.close()
             raise HTTPException(400, "Indica il punto di ritiro (nome o "
                                      "indirizzo del punto)")
+        try:
+            rete = rete_da_payload(d.get("rete_punto"), reti)
+        except HTTPException:
+            con.close()
+            raise
     else:
         punto = ""
+        rete = ""
     via_punto = 1 if via == "punto" else 0
 
     # L'INDIRIZZO DI CASA, col patto del gemello nel set: il giudice
@@ -15526,15 +15708,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,punto_ritiro,via_punto,"
+        "consegna_scelta,punto_ritiro,via_punto,rete_punto,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
-         cambio_ordine, scelta, punto, via_punto,
+         cambio_ordine, scelta, punto, via_punto, rete,
          ind, int(time.time()) if ind else 0, ind_atteso,
          sped, prot, richiesti,
          sconto, pct if sconto else 0, sped_gratis_sats))
@@ -15573,6 +15755,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "sped_gratis_sats": sped_gratis_sats,
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
+            "rete_punto": rete,
             "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
 
@@ -17218,9 +17401,22 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il tetto del barattolo, che dall'ago 2026 e' una leva: il client
     # non ne tiene una copia a memoria (divergerebbe al primo ritocco).
     profilo["max_barattolo"] = MAX_PREFERITI
-    # Il catalogo degli spedizionieri per il cassetto «📦 Come
-    # spedisci» (stesso patto: le voci non si hardcodano nel client).
+    # LE RETI: le SUE, e il catalogo. Due chiavi e non una, ed e' la
+    # riga da non «semplificare»: `spedizionieri` E' IL CATALOGO da
+    # quando esiste, e il client rimasto in cache la legge cosi' —
+    # riusarla per le reti dell'utente gli farebbe disegnare due
+    # pillole invece di tre, in silenzio. Quindi il catalogo resta
+    # dov'era e le sue vanno in una chiave NUOVA.
+    # (La colonna omonima esce grezza dal SELECT *, coi pipe: qui la
+    # si sostituisce col catalogo, che e' il valore che quella chiave
+    # ha sempre avuto. Il dato dell'utente e' `spedizionieri_miei`.)
     profilo["spedizionieri"] = list(SPEDIZIONIERI)
+    profilo["spedizionieri_miei"] = reti_venditore(
+        u["spedizionieri"], u["spedizioniere"])
+    # il tetto del foglio: il client non hardcoda mai un numero che
+    # vive in una leva (il patto di max_barattolo). Il contatore esce
+    # gia' dal SELECT * come `invito_corrieri`.
+    profilo["invito_corrieri_max"] = INVITO_CORRIERI_MAX
     # Le misure del testo per il cassetto «🌗 Aspetto»: il valore
     # scelto esce gia' dal SELECT * (`font_scala`), le voci no — e il
     # client non le hardcoda mai (il patto di max_barattolo).
@@ -17567,25 +17763,48 @@ async def scegli_canale_notifiche(req: Request,
 async def scegli_spedizioniere(req: Request,
                                x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
-    """«📦 Come spedisci»: con che rete di punti di ritiro lavora il
-    negozio (catalogo SPEDIZIONIERI). '' = non dichiarato = la strada
-    «punto di ritiro» resta spenta sui suoi annunci — si accende
-    venditore per venditore, ed e' il pattern di canale-notifiche.
-    Qui non c'e' una «realta'» da controllare: e' una dichiarazione
-    di negozio, non una credenziale."""
+    """«📦 Come spedisci»: con quali reti di punti di ritiro lavora il
+    negozio (catalogo SPEDIZIONIERI). Lista vuota = non dichiarato —
+    la via punto resta offerta lo stesso, e chi compra sceglie il
+    punto senza sapere la rete. Qui non c'e' una «realta'» da
+    controllare: e' una dichiarazione di negozio, non una credenziale.
+
+    LE DUE COLONNE SI SCRIVONO INSIEME, in un UPDATE solo: la
+    singolare tiene la PRIMA voce per il client rimasto in cache, che
+    di reti ne legge una — un'omissione, mai una bugia. Divise in due
+    UPDATE esisterebbe l'istante in cui il negozio ne dichiara una e
+    l'altra no, e in quell'istante qualcuno compra.
+
+    LA CHIAVE VECCHIA SI ACCETTA ANCORA, ed e' il rovescio del patto
+    di MSG_CLIENT_VECCHIO: la' la chiave di ieri portava un'altra
+    UNITA' e leggerla sarebbe stato scrivere il falso, qui porta lo
+    stesso identico significato — una rete — e ignorarla vorrebbe dire
+    rompere un client che non ha fatto niente di male."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    scelta = (d.get("spedizioniere") or "").strip()
-    if scelta not in ("",) + SPEDIZIONIERI:
-        raise HTTPException(400, "Spedizioniere sconosciuto: "
+    if "spedizionieri" in d:
+        scelte = d.get("spedizionieri") or []
+    else:
+        # il client di ieri: una stringa sola, che vale come lista da uno
+        una = (d.get("spedizioniere") or "").strip()
+        scelte = [una] if una else []
+    if not isinstance(scelte, list):
+        raise HTTPException(400, "Reti in formato sbagliato")
+    ignote = [s for s in scelte if s not in SPEDIZIONIERI]
+    if ignote:
+        raise HTTPException(400, "Rete sconosciuta: "
                             + ", ".join(SPEDIZIONIERI)
-                            + " o vuoto (non dichiarato)")
+                            + " o niente (non dichiarato)")
+    serializzate = _reti_serializza(scelte)
+    reti = reti_venditore(serializzate)
     con = db()
-    con.execute("UPDATE utenti SET spedizioniere=? WHERE tg_id=?",
-                (scelta, user["id"]))
+    con.execute("UPDATE utenti SET spedizionieri=?, spedizioniere=? "
+                "WHERE tg_id=?",
+                (serializzate, reti[0] if reti else "", user["id"]))
     con.commit()
     con.close()
-    return {"ok": True, "spedizioniere": scelta}
+    return {"ok": True, "spedizionieri": reti,
+            "spedizioniere": reti[0] if reti else ""}
 
 
 @app.post("/api/me/font-scala")
@@ -18022,6 +18241,29 @@ async def timbra_avviso_trasporto(x_tg_init_data: str = Header(""),
     con = db()
     con.execute("UPDATE utenti SET avvisato_trasporto=1 WHERE tg_id=?",
                 (user["id"],))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
+@app.post("/api/me/invito-corrieri")
+async def timbra_invito_corrieri(x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """«Il foglio dei corrieri si e' aperto»: il contatore sale di uno.
+
+    Gemello del timbro qui sopra, con UNA differenza che e' tutto il
+    cantiere: quello e' un interruttore (visto/non visto), questo e' un
+    CONTATORE, perche' l'invito e' insistente e non una-tantum — e a
+    fermarlo e' INVITO_CORRIERI_MAX, non il primo sguardo.
+
+    Sale quando il foglio SI APRE e non quando si legge: il patto di
+    #trasportoSheet e del tour, «chiuderlo senza leggere e' una
+    scelta». Nessun body: l'unica cosa che si puo' dire e' «e'
+    successo»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    con.execute("UPDATE utenti SET invito_corrieri=invito_corrieri+1 "
+                "WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True}

@@ -2001,6 +2001,15 @@
   .fila-promesse{flex-direction:column;gap:6px;align-items:stretch}
   .fila-promesse .pill{display:block;width:100%;border-radius:var(--radius-btn);
     border-color:var(--line);font-weight:600;padding:8px 12px}
+  /* LA FILA DEI CORRIERI (ago 2026): la scelta della rete dentro il
+     cassetto del punto. Sta di fianco e non in colonna — le voci sono
+     due o tre e cortissime, e in colonna occuperebbero il posto del
+     campo che si deve compilare subito dopo; a tre voci va a capo da
+     sola. La scelta si vede col verde della promessa scattata
+     (.pill-trust), che qui vuol dire «questa e' la rete»: nessun
+     colore nuovo da spiegare. */
+  .fila-reti{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px}
+  .fila-reti .pill{cursor:pointer;font-weight:700}
   .fila-promesse .pill b{font-weight:800}
   /* LA SCATTATA E' PIENA E ACCESA (quarto giro, 13 ago 2026, visto da
      Andrea a schermo nei due temi — e ROVESCIA il «la corsa chiama,
@@ -3988,7 +3997,7 @@ document.getElementById('cartello')?.remove();</script>
              comunque, ma senza rete dichiarata chi compra deve
              accordarsi in chat — il promemoria vive dove il venditore
              sta gia' pensando alla spedizione -->
-        <div id="sellSpedizioniereHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) se spedisci con InPost o Poste: chi compra saprà che punto scegliere, senza accordi in chat.</div></div>
+        <div id="sellSpedizioniereHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4">💡 Indica nel Profilo (📦&nbsp;Come spedisci) <b>con quali corrieri spedisci</b>: chi compra sceglierà un punto della rete giusta, senza accordi in chat.</div></div>
       <!-- Il TERZO costo (ago 2026, dal campo: il riso da 4 kg venduto
            a sacchi con la spedizione di UNO dichiarata). Vale per
            tutte e due le strade qui sopra — dipende dall'oggetto, non
@@ -4196,13 +4205,15 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="avvisiBlocco"></div></div>
       </div>
 
-      <!-- Lo spedizioniere del negozio (ago 2026, pagina d'acquisto):
-           con che rete di punti di ritiro spedisci. Dichiarato,
-           accende la strada «punto di ritiro» su tutti i tuoi
-           annunci; le voci arrivano da /api/me (mai hardcodate).
-           In DEMO il cassetto sparisce, il patto del wallet. -->
+      <!-- I corrieri del negozio (ago 2026, al PLURALE dal cantiere
+           «chi spedisce dichiara»): con quali reti di punti di ritiro
+           spedisci. La via punto si offre COMUNQUE (secondo giro) —
+           dichiararli serve a far scegliere a chi compra un punto
+           della rete giusta, invece di accordarsi in chat. Le voci
+           arrivano da /api/me (mai hardcodate); in DEMO il cassetto
+           sparisce, il patto del wallet. -->
       <div class="acc" id="accSpedizioniere">
-        <button class="acc-h" onclick="toggleAcc('accSpedizioniere')"><span class="em">📦</span>Come spedisci<span class="fr">▾</span></button>
+        <button class="acc-h" onclick="toggleAcc('accSpedizioniere')"><span class="em">📦</span>Come spedisci <span class="conta" id="spedizioniereConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
       </div>
 
@@ -4523,6 +4534,37 @@ document.getElementById('cartello')?.remove();</script>
     </div>
     <button class="btn orange" onclick="navIndietro()">Ho capito</button>
     <button class="btn ghost" onclick="trasportoScopri()">Come funziona il deposito</button>
+  </div>
+
+  <!-- ============ SHEET: I CORRIERI DEL NEGOZIO ============ -->
+  <!-- L'invito a dichiarare i corrieri, a chi pubblica una spedizione
+       senza averli detti (ago 2026, dal campo: il compratore sceglie un
+       locker InPost, il venditore spedisce con Poste e il punto piu'
+       vicino di quella rete e' a 50 km — l'affare si blocca coi sats
+       dentro).
+       INSISTENTE MA MAI BLOCCANTE (decisione di Andrea): «Pubblica lo
+       stesso» pubblica davvero, e il foglio torna al massimo
+       INVITO_CORRIERI_MAX volte — poi resta la sola riga nel form. Il
+       tetto e' la meta' che conta: un cartello che compare SEMPRE
+       uguale si impara a scavalcare senza leggerlo, e in quel form ci
+       sono gia' nove righe che si contendono l'attenzione.
+       Il contatore sale quando il foglio SI APRE, il patto del
+       trasporto qui sopra: chiuderlo senza leggere e' una scelta. -->
+  <div class="sheet" id="corrieriSheet" role="dialog" aria-modal="true"
+       aria-labelledby="corrieriTit">
+    <div class="grab"></div>
+    <h3 id="corrieriTit">📦 Con quali corrieri spedisci?</h3>
+    <div style="font-size:13.5px;color:var(--desc);font-weight:600;
+      line-height:1.55;margin-bottom:12px">
+      Chi compra può farsi mandare il pacco a un <b>locker o punto di
+      ritiro</b>. Se sa con quale corriere spedisci, sceglie un punto
+      della rete giusta — altrimenti tocca accordarsi in chat, e il
+      punto più vicino della rete sbagliata può essere lontanissimo.
+    </div>
+    <div id="corrieriPillole" style="display:flex;gap:6px;flex-wrap:wrap;
+      margin-bottom:14px"></div>
+    <button class="btn orange" onclick="salvaCorrieriEPubblica()">Salva e pubblica</button>
+    <button class="btn ghost" onclick="pubblicaLoStesso()">Pubblica lo stesso</button>
   </div>
 
   <!-- ============ SHEET OFFERTA (contrattazione sul prezzo) ============ -->
@@ -5226,6 +5268,9 @@ function mapOrder(o){
        STRADA (terzo giro): puo' essere vera col punto ancora vuoto,
        ed e' lo stato che apre il campo nell'ordine */
     puntoRitiro:o.punto_ritiro||'', viaPunto:!!o.via_punto,
+    /* la rete scelta da chi compra ('' = non dichiarata: ordini
+       storici, venditore senza reti, o via diversa dal punto) */
+    retePunto:o.rete_punto||'',
     /* la busta di consegna (ago 2026): nome e codice NON viaggiano
        mai in /api/orders — qui arrivano solo il quando (bustaIl =
        PRIMO deposito, 0 = mai) e le correzioni; il testo lo serve
@@ -9246,7 +9291,7 @@ function apriAcquisto(l){
   currentListing = l;
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id)?.id || 0,
-             preventivo:null, via:'', punto:'', puntoAperto:false,
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -9322,7 +9367,7 @@ function apriAcquistoSet(){
     return;
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0, firma:f,
-             preventivo:null, via:'', punto:'', puntoAperto:false,
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -9950,17 +9995,40 @@ function renderAcquisto(){
      spedizioniere dichiarato. Il contratto non cambia: un testo in
      acqDati.punto che viaggia come punto_ritiro nel body. */
   const puntoScritto = d.punto.trim();
-  const campoAperto = `<label>Indica il punto di ritiro (nome o indirizzo del punto${p.spedizioniere?' '+esc(p.spedizioniere):''})</label>
+  /* LE RETI DEL VENDITORE, e la scelta di chi compra (ago 2026,
+     cantiere «chi spedisce dichiara»). Con DUE o piu' reti la scelta
+     e' un passo vero: il punto che si scrive appartiene a una rete
+     precisa, e senza dirlo il venditore parte col corriere sbagliato
+     — e' il caso che ha aperto il cantiere (un locker a 50 km).
+     Con UNA rete non si chiede niente: e' gia' fissata (il patto
+     delle strade dell'asta). Con NESSUNA vale il mondo di prima e lo
+     dice la riga onesta piu' sotto. */
+  const reti = p.reti || (p.spedizioniere ? [p.spedizioniere] : []);
+  const sceglieRete = reti.length >= 2;
+  const retePill = (r) =>
+    `<button type="button" class="pill${d.rete===r?' pill-trust':''}"
+       data-rete="${esc(r)}" onclick="setReteAcquisto(this.dataset.rete)"
+       style="cursor:pointer">${esc(r)}</button>`;
+  const scelteRete = sceglieRete
+    ? `<label>Con quale corriere?</label>
+       <div class="fila-reti">${reti.map(retePill).join('')}</div>`
+    : '';
+  /* la mappa segue la rete SCELTA quando c'e' una scelta da fare: e'
+     tutto il punto della fila qui sopra — una rete, una mappa */
+  const retiMappa = sceglieRete ? (d.rete ? [d.rete] : []) : reti;
+  const campoAperto = `${scelteRete}<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
-    ${linkMappePunti(p.spedizioniere)}`;
+    ${(sceglieRete && !d.rete)
+      ? '<div class="hint" style="margin-top:6px">Scegli prima il corriere: la mappa dei punti è diversa per ognuno.</div>'
+      : linkMappePunti(retiMappa)}`;
   /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
      decisione di Andrea): il riquadro che li ospita ha gia' il locker
      della via, e due icone nello stesso riquadro sono una di troppo. */
   const campoChiuso = puntoScritto
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
-        onclick="apriPuntoAcquisto()"><span class="punto-testo">${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
+        onclick="apriPuntoAcquisto()"><span class="punto-testo">${d.rete?esc(d.rete)+' — ':''}${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriPuntoAcquisto()">Indica il punto di ritiro</button>`;
   const cassettoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
@@ -10053,12 +10121,12 @@ function renderAcquisto(){
   }
   /* --- le note oneste --- */
   let note = '';
-  if (p.spedizioniere && (d.via==='casa' || d.via==='punto'))
-    note += `<div class="acq-nota">📦 Spedisce con <b>${esc(p.spedizioniere)}</b></div>`;
+  if (reti.length && (d.via==='casa' || d.via==='punto'))
+    note += `<div class="acq-nota">📦 Spedisce con <b>${reti.map(esc).join('</b> e <b>')}</b></div>`;
   /* la via punto SENZA rete dichiarata: la riga onesta del quarto
      giro — si sceglie un punto senza sapere la rete, e la rete di
      sicurezza e' la correzione dall'ordine */
-  if (!p.spedizioniere && d.via==='punto')
+  if (!reti.length && d.via==='punto')
     note += `<div class="acq-nota">📦 Il venditore non ha ancora dichiarato il corriere: stai scegliendo il punto senza sapere con che rete viaggerà il pacco — puoi correggerlo dall'ordine finché non spedisce.</div>`;
   if (d.via==='digitale')
     note += `<div class="acq-nota">💾 Un codice, una volta rivelato, non torna indietro: hai <b>${TEMPI.confermaDig} ore</b> per aprire una disputa, poi l'acquisto è definitivo.</div>`;
@@ -10317,6 +10385,18 @@ function apriPuntoAcquisto(){
   renderAcquisto();
   el('acqPunto')?.focus();
 }
+/* La rete scelta da chi compra: cambia la mappa che si apre e viaggia
+   nell'ordine, dove il venditore la legge per spedire col corriere
+   giusto. Il fuoco va al campo del punto — scelto il corriere, la
+   cosa da fare e' scrivere dove — ma solo se il punto e' ancora
+   vuoto: su una correzione la tastiera sarebbe un fastidio. */
+function setReteAcquisto(r){
+  if (!acqDati) return;
+  haptic();
+  acqDati.rete = r;
+  renderAcquisto();
+  if (!acqDati.punto.trim()) el('acqPunto')?.focus({preventScroll:true});
+}
 /* ---- L'INDIRIZZO DI CASA (ago 2026) ----
    Il gemello del cassetto del punto, sull'altra via. I CAMPI SONO
    SEPARATI PER IL TELEFONO e non per capriccio: il riempimento
@@ -10379,6 +10459,10 @@ function corpoConsegna(){
      prima di chiamare): il trim e' la cintura contro il vuoto */
   if (v==='punto' && acqDati.punto.trim())
     out.punto_ritiro = acqDati.punto.trim().slice(0,120);
+  /* la rete si manda solo quando c'e' stata una scelta: con una rete
+     sola la fissa il server (e il client non deve poterla
+     contraddire), con nessuna non esiste */
+  if (v==='punto' && acqDati.rete) out.rete_punto = acqDati.rete;
   /* LA CHIAVE VIAGGIA SEMPRE sulla via casa, anche a campi vuoti: per
      il server la sua PRESENZA e' la dichiarazione «questo ordine
      l'indirizzo lo aspetta» (indirizzo_atteso), che e' cio' che
@@ -10391,9 +10475,26 @@ function corpoConsegna(){
   }
   return out;
 }
+/* «Manca la scelta del corriere?»: giudice UNICO delle due strade che
+   pagano (il bottone e il ⚡ NWC), o una chiederebbe quel che l'altra
+   lascia passare. Vale solo con DUE o piu' reti: sotto non c'e'
+   niente da scegliere e il server la fissa da se'. */
+function reteMancante(d){
+  const reti = d?.preventivo?.reti || [];
+  return d?.via === 'punto' && reti.length >= 2 && !d.rete;
+}
+
 function ctaAcquisto(){
   haptic();
   const d = acqDati; if (!d || !d.preventivo) return;
+  /* il corriere PRIMA del punto: e' l'ordine in cui si decide — la
+     mappa da aprire dipende dalla rete — ed e' anche l'ordine in cui
+     il cassetto disegna le due cose */
+  if (reteMancante(d)){
+    apriPuntoAcquisto();
+    toast('Scegli con quale corriere vuoi ricevere il pacco');
+    return;
+  }
   /* il punto e' obbligatorio SEMPRE sulla via punto (quarto giro):
      il server lo esige solo con la rete dichiarata — tolleranza per
      il client di ieri, che senza rete non ha il campo — quindi la
@@ -12203,6 +12304,11 @@ function compraSubito(){
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
   if (!p || !via || via.cambio_assente) { startBuy(); return; }
+  if (reteMancante(acqDati)){
+    apriPuntoAcquisto();
+    toast('Scegli con quale corriere vuoi ricevere il pacco');
+    return;
+  }
   if (acqDati.via==='punto' && !acqDati.punto.trim()){
     /* la gemella della guardia di ctaAcquisto: il campo puo' essere
        chiuso dietro il bottone — si APRE prima del fuoco */
@@ -12415,6 +12521,7 @@ function closeSheet(){
   el('rilancioSheet').classList.remove('open');
   el('riscuotiSheet').classList.remove('open');
   el('paccoSvuotaSheet').classList.remove('open');
+  el('corrieriSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
      scelta, Annulla, Esc e tap fuori: la chiusura passa tutta di qui),
@@ -14017,7 +14124,11 @@ function openOrder(id){
             ricompare nel banner del pacco (vedi `puntoBanner`), che a
             campo ormai chiuso e' l'unico posto dove chi ha comprato
             ritrova DOVE andare a prenderlo. */''}
-      ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un locker/punto di ritiro: indica il punto qui sotto.' : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
+      ${/* «accordatevi in chat sul corriere» e' la frase che questo
+            cantiere esiste per far sparire: resta SOLO dove la rete
+            non c'e' davvero — con la rete scelta il venditore la
+            legge nell'ordine e non ha piu' niente da concordare. */''}
+      ${(!o.puntoRitiro && o.viaPunto && o.state==='locked') ? `<div class="eur-hint" style="margin-top:-2px">📦 ${o.role==='buyer' ? 'Spedizione a un locker/punto di ritiro: indica il punto qui sotto.' : (o.retePunto ? `Il compratore indicherà il punto <b>${esc(o.retePunto)}</b> qui nell'ordine.` : 'Il compratore indicherà il punto di ritiro qui nell\'ordine — se serve, accordatevi in chat sul corriere.')}</div>` : ''}
       ${(o.viaPunto && o.state==='locked' && o.role==='buyer') ? `
       <!-- Il campo del punto DENTRO l'ordine: dal quarto giro e' la
            RETE DI SICUREZZA della scelta anticipata — il punto si
@@ -14025,11 +14136,18 @@ function openOrder(id){
            il venditore non spedisce (e si scrive per gli ordini nati
            senza: i client di ieri, che il server tollera) -->
       <div class="payout">
-        <h4>📦 Il tuo punto di ritiro</h4>
+        <h4>📦 Il tuo punto di ritiro${o.retePunto ? ` ${esc(o.retePunto)}` : ''}</h4>
         <div class="hint">${o.puntoRitiro
           ? 'Puoi correggerlo finché il venditore non spedisce.'
-          : 'Nome o indirizzo del punto (locker o negozio convenzionato): il venditore lo vedrà qui e potrà spedire. Se non sai la rete del corriere, chiediglielo in chat.'}</div>
-        ${linkMappePunti('')}
+          : (o.retePunto
+             ? `Nome o indirizzo del punto <b>${esc(o.retePunto)}</b>: il venditore lo vedrà qui e potrà spedire.`
+             : 'Nome o indirizzo del punto (locker o negozio convenzionato): il venditore lo vedrà qui e potrà spedire. Se non sai la rete del corriere, chiediglielo in chat.')}</div>
+        ${/* LA MAPPA GIUSTA, e per un anno qui e' arrivato un ''
+              hardcodato: si vedevano SEMPRE tutte e due le mappe,
+              anche quando la rete era dichiarata, e il commento del
+              giudice diceva il contrario. Adesso la rete viaggia
+              nell'ordine e la si puo' chiedere davvero. */''}
+        ${linkMappePunti(o.retePunto ? [o.retePunto] : [])}
         <textarea id="puntoRitiroInp" style="min-height:38px" maxlength="120" placeholder="Es. Locker InPost — Via Roma 1">${esc(o.puntoRitiro)}</textarea>
         <button class="btn orange" onclick="salvaPuntoRitiro()">${o.puntoRitiro ? 'Aggiorna il punto' : 'Salva il punto'}</button>
       </div>` : ''}
@@ -14142,12 +14260,20 @@ function openOrder(id){
                utile per comprare la copertura. La regola per esteso sta
                nella pagina «Il pagamento protetto». -->
           <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto <span class="fine-frase">bassa. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Scopri di più</button></span></div>
-          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>locker/punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
-          ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
+          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''}: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
+          ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
           ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
-          ${selettoreCorriere('shipCorriere')}
+          ${/* IL CORRIERE ARRIVA GIA' SCELTO quando chi compra ha detto
+                la rete: il secondo argomento esisteva gia' (lo usa la
+                correzione del moderatore) e qui chiude il cerchio —
+                quel che si dichiara a monte preseleziona il codice a
+                valle. Vale solo dove il nome combacia con una voce di
+                CORRIERI: InPost e Poste Italiane ci sono entrambe,
+                'Altro' no, e li' il selettore resta com'era. */''}
+          ${selettoreCorriere('shipCorriere',
+              CORRIERI.includes(o.retePunto) ? o.retePunto : '')}
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
           <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
           <div class="hint avviso-tracking" id="shipAvviso" style="display:none"></div>
@@ -14295,6 +14421,108 @@ function trasportoScopri(){
   apriSicurezza('sicu-limiti');
 }
 
+/* ---- L'INVITO A DICHIARARE I CORRIERI (ago 2026) ----
+   Si apre al tocco di «Pubblica» quando chi vende offre la spedizione
+   e non ha detto con chi spedisce. Il gemello e' il foglio del
+   trasporto qui sopra, con UNA differenza: quello e' una-tantum,
+   questo torna fino a INVITO_CORRIERI_MAX volte — insistente, come
+   chiesto, e con un tetto perche' resti leggibile.
+
+   IL FLAG DI SESSIONE spezza la ricorsione: `publish()` richiama se
+   stessa dopo il foglio, e senza questo si riaprirebbe all'infinito.
+   Vive per la pagina e non in localStorage — non e' una preferenza,
+   e' «l'ho gia' chiesto in questo giro». */
+let corrieriChiesto = false;
+let retiFoglio = null;      // le spunte dentro il foglio
+
+/* «Va chiesto adesso?»: le stesse condizioni della riga nel form
+   (chi spedisce, non un'asta, non in DEMO, catalogo arrivato, nessuna
+   rete dichiarata) piu' il tetto e il flag di sessione.
+   Il ritiro e il codice online non ci entrano MAI, e per costruzione:
+   la prima domanda e' la spunta «Spedizione». */
+function serveInvitoCorrieri(){
+  return !DEMO && !VETRINA && !editandoNostr
+      && !corrieriChiesto
+      && invitoCorrieriMax > 0
+      && myInvitoCorrieri < invitoCorrieriMax
+      && spedizionieriCatalogo.length
+      && !mieRetiSped.length
+      && el('sellConsSped')?.checked && !astaAccesa();
+}
+
+function apriInvitoCorrieri(){
+  haptic();
+  corrieriChiesto = true;
+  retiFoglio = new Set();
+  disegnaPilloleCorrieri();
+  el('sheetBg').classList.add('open');
+  el('corrieriSheet').classList.add('open');
+  /* il timbro PRIMA dell'invio, il patto delle campagne: un errore di
+     rete puo' perdere un giro dell'invito, mai raddoppiarlo. E si
+     conta in memoria SUBITO, o due pubblicazioni nella stessa
+     sessione lo riaprirebbero col contatore vecchio. */
+  myInvitoCorrieri++;
+  fetch(`${API_BASE}/me/invito-corrieri`, {method:'POST',
+    headers:{'X-Tg-Init-Data':authHdr()}}).catch(()=>{});
+}
+
+function disegnaPilloleCorrieri(){
+  const box = el('corrieriPillole');
+  if (!box) return;
+  box.innerHTML = spedizionieriCatalogo.map(s => {
+    const on = retiFoglio.has(s);
+    return `<button data-rete="${esc(s)}" onclick="toggleReteFoglio(this)" style="font:inherit;font-size:13px;font-weight:700;border:1px solid ${on?'var(--sats)':'var(--line)'};background:${on?'var(--sats)':'transparent'};color:${on?'#fff':'var(--muted)'};border-radius:99px;padding:7px 14px;cursor:pointer">${esc(s)}</button>`;
+  }).join('');
+}
+
+/* Come nel cassetto: il toggle non fa re-render del foglio, ritocca
+   la pillola toccata — un render pieno e' inutile qui e rischia solo
+   di perdere lo stato. */
+function toggleReteFoglio(nodo){
+  haptic();
+  const v = nodo.dataset.rete;
+  if (retiFoglio.has(v)) retiFoglio.delete(v); else retiFoglio.add(v);
+  const on = retiFoglio.has(v);
+  nodo.style.borderColor = on ? 'var(--sats)' : 'var(--line)';
+  nodo.style.background = on ? 'var(--sats)' : 'transparent';
+  nodo.style.color = on ? '#fff' : 'var(--muted)';
+}
+
+function chiudiInvitoCorrieri(){
+  el('corrieriSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open'))
+    el('sheetBg').classList.remove('open');
+}
+
+/* «Pubblica lo stesso»: l'invito non blocca MAI — e' la meta' della
+   decisione, e senza di lei sarebbe un cancello. */
+function pubblicaLoStesso(){
+  haptic();
+  chiudiInvitoCorrieri();
+  publish();
+}
+
+async function salvaCorrieriEPubblica(){
+  haptic();
+  const scelte = spedizionieriCatalogo.filter(s => retiFoglio.has(s));
+  if (!scelte.length) { pubblicaLoStesso(); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/spedizioniere`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({spedizionieri: scelte})});
+    const d = await r.json().catch(()=>({}));
+    if (r.ok) {
+      mieRetiSped = d.spedizionieri || [];
+      mySpedizioniere = d.spedizioniere || '';
+      retiBozza = null;         // il cassetto si rifa' dal salvato
+      renderSpedizioniere();
+      aggiornaConsegnaForm();   // la riga del form cade da sola
+    }
+  } catch(e) { /* fail-open: un invito non deve fermare una pubblicazione */ }
+  chiudiInvitoCorrieri();
+  publish();
+}
+
 /* ---- pannello incasso del venditore ---- */
 let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
 
@@ -14430,9 +14658,15 @@ async function salvaLnAddressProfilo(btn){
    nsec, nessuna firma da consegnare, mai) ---- */
 let myNpub = '', myNpubVerified = false, npubCodice = '';
 let myNome = '', myUsername = '', myNpubAccesso = '', myCanaleNotifiche = '';
-/* Lo spedizioniere del negozio e il suo catalogo, da /api/me: le
-   voci non si hardcodano mai (il pattern di max_barattolo) */
-let mySpedizioniere = '', spedizionieriCatalogo = [];
+/* Le reti del negozio e il loro catalogo, da /api/me: le voci non si
+   hardcodano mai (il pattern di max_barattolo).
+   `mySpedizioniere` e' la PRIMA rete e resta perche' la legge ancora
+   chi guarda «ne ho dichiarata almeno una»; le reti vere sono
+   `mieRetiSped`, ed e' quella che decide mappe e scelta. */
+let mySpedizioniere = '', spedizionieriCatalogo = [], mieRetiSped = [];
+/* Quante volte il foglio dei corrieri si e' gia' aperto (colonna, non
+   localStorage: e' un fatto della persona) e il suo tetto. */
+let myInvitoCorrieri = 0, invitoCorrieriMax = 0;
 /* Il negozio in ferie: 0 = aperto, altrimenti la data del rientro.
    Le leve (attive, tetto in giorni) arrivano dal server come tutte le
    altre — il client non ne tiene una copia a memoria. */
@@ -15074,11 +15308,17 @@ async function setCanale(canale){
       : '✈️ Avvisi su Telegram');
 }
 
-/* «📦 Come spedisci» (ago 2026, pagina d'acquisto): con che rete di
-   punti di ritiro lavora il negozio. Dichiarato, accende la strada
-   «punto di ritiro» su tutti gli annunci del venditore; le voci
-   arrivano da /api/me — mai hardcodate (il pattern di max_barattolo).
-   In DEMO il cassetto sparisce, il patto del wallet. */
+/* «📦 Come spedisci» (ago 2026, pagina d'acquisto; al PLURALE dal
+   cantiere «chi spedisce dichiara»): con quali reti di punti di
+   ritiro lavora il negozio. Le voci arrivano da /api/me — mai
+   hardcodate (il pattern di max_barattolo). In DEMO il cassetto
+   sparisce, il patto del wallet.
+   LE PILLOLE SCELGONO E A SALVARE E' IL BOTTONE, come nei due
+   cassetti delle promesse: con la scelta multipla un POST per tocco
+   lascerebbe il negozio con mezza dichiarazione per il tempo di un
+   dito — e in quel mezzo secondo qualcuno compra. */
+let retiBozza = null;      // le spunte in corso; null = non aperto
+
 function renderSpedizioniere(){
   const box = el('spedizioniereBlocco');
   if (!box) return;
@@ -15088,33 +15328,62 @@ function renderSpedizioniere(){
     box.innerHTML = ''; return;
   }
   if (sez) sez.style.display = '';
-  const pill = (val, nome) =>
-    `<button onclick="setSpedizioniere('${esc(val)}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${mySpedizioniere===val?'var(--sats)':'var(--line)'};background:${mySpedizioniere===val?'var(--sats)':'transparent'};color:${mySpedizioniere===val?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${esc(nome)}</button>`;
+  /* il riepilogo nell'header, come i due cassetti delle promesse: si
+     legge senza aprire, e dice il SALVATO — mai la bozza, che a
+     cassetto aperto direbbe una cosa che non e' ancora vera */
+  const conta = el('spedizioniereConta');
+  if (conta) conta.textContent = mieRetiSped.join(' e ');
+  if (!retiBozza) retiBozza = new Set(mieRetiSped);
+  const pill = (val) => {
+    const on = retiBozza.has(val);
+    return `<button data-rete="${esc(val)}" onclick="toggleRete(this)" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${on?'var(--sats)':'var(--line)'};background:${on?'var(--sats)':'transparent'};color:${on?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${esc(val)}</button>`;
+  };
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      Con quale rete di punti di ritiro spedisci? Dichiarala e chi
-      sceglie la <b style="color:var(--ink)">consegna a un punto di
-      ritiro</b> (locker o negozio convenzionato) saprà di che rete
-      cercare il punto. Senza, dovrete accordarvi in chat sul punto.</div>
+      Con quali corrieri spedisci? Spuntali tutti: chi sceglie la
+      <b style="color:var(--ink)">consegna a un punto di ritiro</b>
+      (locker o negozio convenzionato) dirà con quale vuole il pacco,
+      e tu lo trovi scritto nell'ordine. Senza, dovrete accordarvi in
+      chat sul punto.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-      ${pill('', 'Non dichiarato')}${spedizionieriCatalogo.map(s => pill(s, s)).join('')}</div>`;
+      ${spedizionieriCatalogo.map(pill).join('')}</div>
+    <button class="btn orange" onclick="salvaReti()">Salva</button>`;
 }
 
-async function setSpedizioniere(v){
+/* Il toggle non fa re-render — il pattern delle categorie degli
+   avvisi: un render pieno rifarebbe la bozza dal salvato e si
+   perderebbero le spunte appena messe. */
+function toggleRete(nodo){
+  haptic();
+  const v = nodo.dataset.rete;
+  if (retiBozza.has(v)) retiBozza.delete(v); else retiBozza.add(v);
+  const on = retiBozza.has(v);
+  nodo.style.borderColor = on ? 'var(--sats)' : 'var(--line)';
+  nodo.style.background = on ? 'var(--sats)' : 'transparent';
+  nodo.style.color = on ? '#fff' : 'var(--muted)';
+}
+
+async function salvaReti(){
   haptic();
   if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  /* l'ordine del catalogo, non quello dei tocchi: il server
+     canonicalizza comunque, ma cosi' la lista che si manda e quella
+     che torna sono la stessa cosa */
+  const scelte = spedizionieriCatalogo.filter(s => retiBozza.has(s));
   try {
     const r = await fetch(`${API_BASE}/me/spedizioniere`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({spedizioniere: v})});
+       body: JSON.stringify({spedizionieri: scelte})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    mieRetiSped = d.spedizionieri || [];
     mySpedizioniere = d.spedizioniere || '';
   } catch(e) { toast('Rete assente: riprova'); return; }
+  retiBozza = new Set(mieRetiSped);
   renderSpedizioniere();
-  toast(mySpedizioniere
-    ? `📦 Spedisci con ${mySpedizioniere}: chi compra lo vedrà sulla pagina d'acquisto`
-    : 'Spedizioniere tolto: chi sceglie il punto si accorderà in chat');
+  toast(mieRetiSped.length
+    ? `📦 Spedisci con ${mieRetiSped.join(' e ')}: chi compra sceglierà il punto della rete giusta`
+    : 'Corrieri tolti: chi sceglie il punto si accorderà in chat');
   /* la riga del form segue la dichiarazione appena fatta */
   if (el('view-vendi')) aggiornaConsegnaForm();
 }
@@ -16627,19 +16896,29 @@ function apriMappaPunti(rete){
   else window.open(m.url, '_blank', 'noopener');
 }
 
-/* Il giudice unico dei link: con la rete dichiarata si mostra SOLO
-   la sua mappa (l'altra sarebbe una strada sbagliata: il venditore
-   spedisce con quella rete); con 'Altro' NESSUN link e niente nota
-   — la rete non e' nessuna delle due, e un link fuorviante e'
-   peggio di nessun link, dichiarato; senza rete dichiarata
-   entrambi, pari — in pagina d'acquisto (quarto giro) come nel
-   campo dentro l'ordine. */
-function linkMappePunti(spedizioniere){
-  const reti = spedizioniere === 'InPost' ? ['inpost']
-    : spedizioniere === 'Poste Italiane' ? ['poste']
-    : spedizioniere ? [] : ['inpost', 'poste'];
-  if (!reti.length) return '';
-  const link = reti.map(r =>
+/* Il giudice unico dei link, e dall'ago 2026 prende una LISTA di reti
+   (il cantiere «chi spedisce dichiara»): la trasformazione e' piccola
+   perche' dentro era gia' una lista — cambia solo come si riempie.
+   Le tre regole non si toccano: con le reti dichiarate si mostrano
+   SOLO le loro mappe (le altre sarebbero strade sbagliate); una rete
+   che una mappa non ce l'ha — oggi 'Altro' — non aggiunge NIENTE, che
+   un link fuorviante e' peggio di nessun link; senza reti dichiarate
+   tutte, pari, che e' il «non lo so» detto onestamente.
+   Chiamare con una LISTA e non con la stringa e' anche cio' che
+   chiude il difetto del campo dentro l'ordine, dove per un anno e'
+   arrivato un '' hardcodato e si vedevano sempre tutte e due le
+   mappe anche a rete dichiarata. */
+const RETE_MAPPA = {'InPost': 'inpost', 'Poste Italiane': 'poste'};
+
+function linkMappePunti(reti){
+  const dichiarate = Array.isArray(reti) ? reti : (reti ? [reti] : []);
+  /* niente reti = non si sa, quindi tutte; con le reti si tengono
+     solo quelle che una mappa ce l'hanno davvero */
+  const mappe = dichiarate.length
+    ? dichiarate.map(r => RETE_MAPPA[r]).filter(Boolean)
+    : ['inpost', 'poste'];
+  if (!mappe.length) return '';
+  const link = mappe.map(r =>
     `<button type="button" class="scopri-link" onclick="apriMappaPunti('${r}')">🔎 ${MAPPE_PUNTI[r].nome}</button>`
   ).join(' · ');
   return `<div class="hint" style="margin-top:6px">${link}<br>${NOTA_LOCKER}</div>`;
@@ -19006,12 +19285,16 @@ function aggiornaConsegnaForm(){
     el('sellSpedPuntoField').style.display = (sped && !asta) ? '' : 'none';
   if (el('sellSpedExtraField'))
     el('sellSpedExtraField').style.display = (sped && !asta) ? '' : 'none';
-  /* il promemoria dello spedizioniere: solo a chi spedisce e non
-     l'ha dichiarato (in DEMO il catalogo non arriva e la riga tace) */
+  /* il promemoria dei corrieri: solo a chi spedisce e non li ha
+     dichiarati (in DEMO il catalogo non arriva e la riga tace).
+     E' la stessa condizione del foglio, meno il tetto: quando il
+     foglio smette, la riga RESTA — derivata dai dati veri, quindi
+     senza dismiss e destinata a sparire da sola il giorno che il
+     venditore dichiara (la regola della checklist del Profilo). */
   if (el('sellSpedizioniereHint'))
     el('sellSpedizioniereHint').style.display =
       (sped && !asta && !DEMO && spedizionieriCatalogo.length
-       && !mySpedizioniere) ? '' : 'none';
+       && !mieRetiSped.length) ? '' : 'none';
   el('sellTagliaField').style.display = sped ? '' : 'none';
   if (el('sellQtaField') && !editandoNostr)
     el('sellQtaField').style.display = asta ? 'none' : '';
@@ -19493,6 +19776,13 @@ async function publish(){
   if (sellFoto.some(f=>f.startsWith('caricando:'))) {
     toast('Un attimo: sto ancora caricando le foto'); return;
   }
+  /* L'INVITO AI CORRIERI, ed e' l'ULTIMO punto pulito: dopo tutte le
+     validazioni — cosi' non si chiede il corriere a chi ha comunque
+     un titolo da correggere — e PRIMA di bottoneInAttesa, che qui
+     non e' ancora acceso e non resterebbe appeso.
+     Il foglio non blocca: ognuno dei suoi due bottoni richiama
+     publish(), e il flag di sessione fa passare il secondo giro. */
+  if (serveInvitoCorrieri()) { apriInvitoCorrieri(); return; }
   if (editandoId) { await salvaModifica(t, p); return; }
   /* Scudo anti-doppione: il bottone si spegne al primo tocco e
      l'overlay blocca tutto finche' il server non risponde — un fetch
@@ -20985,6 +21275,14 @@ async function avvia(){
     adottaFont(me);   // la misura scelta sull'altro telefono
     mySpedizioniere = me.spedizioniere || '';
     spedizionieriCatalogo = me.spedizionieri || [];
+    /* le SUE reti da una chiave nuova; un server di ieri non la manda
+       e si ripiega sulla stringa singolare, che dice la stessa cosa
+       quando la rete e' una — l'unico caso che quel server conosce */
+    mieRetiSped = me.spedizionieri_miei
+      || (mySpedizioniere ? [mySpedizioniere] : []);
+    retiBozza = null;      // la bozza si rifa' dal salvato appena arrivato
+    myInvitoCorrieri = me.invito_corrieri || 0;
+    invitoCorrieriMax = me.invito_corrieri_max || 0;
     myFerieFino = me.ferie_fino || 0;
     ferieLeve = me.ferie_leve || null;   // server di ieri = cassetto assente
     /* le cifre arrivano GREZZE, tutte e tre: e' il suo negozio, e il

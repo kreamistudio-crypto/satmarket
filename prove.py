@@ -7737,6 +7737,189 @@ def prove_consegna_payload_punto():
 
 
 # ====================================================================
+def prove_reti_corriere():
+    """CHI SPEDISCE DICHIARA, CHI COMPRA SCEGLIE (ago 2026).
+
+    Il caso da cui nasce: il compratore sceglie un locker InPost, il
+    venditore spedisce con Poste, il punto piu' vicino di quella rete
+    e' a 50 km e l'affare si blocca coi sats in cassaforte.
+
+    Le tre cose che questa famiglia difende, e sono quelle che un
+    riordino toglierebbe per prime:
+    · il RIPIEGO sulla colonna singolare — e' quel che fa vivere il
+      dato di ieri prima che il backfill sia girato;
+    · le DUE COLONNE scritte INSIEME, in un UPDATE solo;
+    · la rete validata contro le reti DI QUEL VENDITORE e non contro
+      il catalogo, che e' la riga in cui il cantiere sta tutto."""
+    print("\n[le reti del corriere]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # L'AMBIENTE: le tre pure vogliono il catalogo e HTTPException —
+    # chi estrae una funzione ne eredita le dipendenze (la lezione di
+    # _fmt_sats). Il catalogo si legge dal SORGENTE e non si ricopia,
+    # o la prova certificherebbe una lista che il server non ha.
+    class _HTTP(Exception):
+        def __init__(self, codice, detail=""):
+            self.status_code, self.detail = codice, detail
+            super().__init__(detail)
+    amb = {"HTTPException": _HTTP}
+    i = src.index('SPEDIZIONIERI = ("')
+    exec(src[i:src.index("\n", i)], amb)
+    for nome in ("_reti_serializza", "reti_venditore", "rete_da_payload"):
+        exec(pezzo(nome), amb)
+    reti_venditore = amb["reti_venditore"]
+    _reti_serializza = amb["_reti_serializza"]
+    rete_da_payload = amb["rete_da_payload"]
+    prova("il catalogo di prova e' quello VERO del server",
+          ("InPost", "Poste Italiane", "Altro"), amb["SPEDIZIONIERI"])
+
+    # --- il giudice puro delle reti ---------------------------------
+    prova("le reti si leggono dai pipe", ["InPost", "Poste Italiane"],
+          reti_venditore("|InPost|Poste Italiane|", ""))
+    prova("...nell'ordine del CATALOGO, non in quello scritto",
+          ["InPost", "Poste Italiane"],
+          reti_venditore("|Poste Italiane|InPost|", ""))
+    prova("colonna vuota: si ripiega sulla singolare (il dato di ieri)",
+          ["InPost"], reti_venditore("", "InPost"))
+    prova("...ma la nuova VINCE quando c'e'", ["Poste Italiane"],
+          reti_venditore("|Poste Italiane|", "InPost"))
+    prova("niente da nessuna parte = nessuna rete", [],
+          reti_venditore("", ""))
+    prova("una rete fuori catalogo si butta: non la sappiamo mappare",
+          [], reti_venditore("|Bartolini|", ""))
+    prova("il ripiego non inventa nulla da un valore storto", [],
+          reti_venditore("", "Bartolini"))
+
+    # --- la serializzazione ----------------------------------------
+    prova("in colonna vanno i pipe ai bordi", "|InPost|",
+          _reti_serializza(["InPost"]))
+    prova("...nell'ordine del catalogo", "|InPost|Poste Italiane|",
+          _reti_serializza(["Poste Italiane", "InPost"]))
+    prova("...senza doppioni", "|InPost|",
+          _reti_serializza(["InPost", "InPost"]))
+    prova("...e senza le voci fuori catalogo", "|InPost|",
+          _reti_serializza(["InPost", "Bartolini"]))
+    prova("lista vuota = '' = non dichiarato", "",
+          _reti_serializza([]))
+
+    # --- LA DECISIONE: chi valida la rete scelta --------------------
+    # e' la riga che chiude il caso del cantiere: chi dichiara InPost
+    # e Poste non deve poter ricevere un ordine per una terza rete
+    def rifiuta(grezza, reti):
+        try:
+            rete_da_payload(grezza, reti)
+            return False
+        except _HTTP:
+            return True
+
+    due = ["InPost", "Poste Italiane"]
+    prova("due reti: la scelta buona passa", "InPost",
+          rete_da_payload("InPost", due))
+    prova("...senza scelta si rifiuta", True, rifiuta("", due))
+    prova("...e una rete che il venditore NON ha si rifiuta", True,
+          rifiuta("Altro", due))
+    prova("una rete sola: si fissa, anche se il client tace", "InPost",
+          rete_da_payload("", ["InPost"]))
+    prova("...e il client non puo' contraddirla", "InPost",
+          rete_da_payload("Poste Italiane", ["InPost"]))
+    prova("nessuna rete: '' e nessun rifiuto (il mondo di ieri)", "",
+          rete_da_payload("", []))
+    prova("...nemmeno se il client manda qualcosa", "",
+          rete_da_payload("InPost", []))
+    corpo_rete = codice(pezzo("rete_da_payload").split('"""')[-1])
+    prova("la rete si valida contro le reti DEL VENDITORE", True,
+          "scelta not in reti" in corpo_rete)
+    prova("...e MAI contro il catalogo intero", False,
+          "SPEDIZIONIERI" in corpo_rete)
+    prova("una rete sola si fissa alla nascita, senza chiedere", True,
+          "len(reti) == 1" in corpo_rete)
+    prova("nessuna rete = nessuna scelta (il mondo di ieri)", True,
+          "if not reti:" in corpo_rete)
+
+    # --- le due colonne, un UPDATE solo ----------------------------
+    corpo_ep = codice(pezzo("scegli_spedizioniere").split('"""')[-1])
+    prova("il cassetto scrive le DUE colonne insieme", 1,
+          corpo_ep.count("UPDATE utenti SET spedizionieri=?, "
+                         "spedizioniere=?"))
+    prova("...e la singolare tiene la PRIMA voce", True,
+          'reti[0] if reti else ""' in corpo_ep)
+    prova("la chiave di IERI si accetta ancora (stesso significato)",
+          True, 'd.get("spedizioniere")' in corpo_ep)
+
+    # --- il backfill ------------------------------------------------
+    corpo_bf = codice(pezzo("riallinea_spedizionieri").split('"""')[-1])
+    prova("il backfill tocca solo le righe ancora vuote (idempotente)",
+          True, "spedizionieri = ''" in corpo_bf)
+    prova("...e solo chi una rete l'aveva davvero", True,
+          "spedizioniere <> ''" in corpo_bf)
+    # LA RIGA INTERA e non la stringa: un «pass  #
+    # riallinea_spedizionieri(con)» lascerebbe la parola nel file col
+    # backfill mai chiamato — e' la lezione del reaper, che una
+    # sentinella si scrive rompendo il codice e non rileggendola
+    # (questa mutazione e' sopravvissuta al primo giro di tortura)
+    prova("...e gira all'avvio, come RIGA e non come parola", True,
+          bool(re.search(r"^\s*riallinea_spedizionieri\(con\)\s*$",
+                         src, re.M)))
+
+    # --- il client ---------------------------------------------------
+    prova("il client riceve le SUE reti da una chiave nuova", True,
+          "me.spedizionieri_miei" in mini)
+    prova("...e il catalogo resta dov'era (il client in cache lo legge)",
+          True, 'profilo["spedizionieri"] = list(SPEDIZIONIERI)' in src)
+    prova("il giudice del «manca il corriere» e' UNO", 1,
+          mini.count("function reteMancante"))
+    prova("...e lo chiamano le DUE strade che pagano", 2,
+          mini.count("reteMancante(") - mini.count("function reteMancante("))
+    prova("...e vale solo da DUE reti in su", True,
+          "reti.length >= 2 && !d.rete" in mini)
+    prova("la rete viaggia nel body solo se scelta", True,
+          "out.rete_punto = acqDati.rete" in mini)
+
+    # --- il foglio dell'invito --------------------------------------
+    inv = pezzo_js(mini, "function apriInvitoCorrieri(){", "\n}")
+    prova("il contatore dell'invito sale all'APERTURA del foglio", True,
+          "myInvitoCorrieri++" in inv and "/me/invito-corrieri" in inv)
+    prova("...e il flag di sessione spezza la ricorsione di publish",
+          True, "corrieriChiesto = true" in inv)
+    serve = pezzo_js(mini, "function serveInvitoCorrieri(){", "\n}")
+    prova("l'invito guarda il TETTO", True,
+          "myInvitoCorrieri < invitoCorrieriMax" in serve)
+    prova("...e chi ha gia' dichiarato non lo vede mai", True,
+          "!mieRetiSped.length" in serve)
+    prova("...ne' chi non spedisce: ritiro e codice online fuori "
+          "per costruzione", True,
+          "el('sellConsSped')?.checked" in serve)
+    prova("...ne' un'asta", True, "!astaAccesa()" in serve)
+    prova("il tetto arriva dal server, mai un numero nel client", True,
+          "me.invito_corrieri_max" in mini)
+    # L'INVITO NON BLOCCA: e' la meta' della decisione di Andrea, e la
+    # prova e' che TUTTI E DUE i bottoni richiamino publish()
+    prova("«Pubblica lo stesso» pubblica davvero", True,
+          "publish();" in pezzo_js(mini, "function pubblicaLoStesso(){",
+                                   "\n}"))
+    prova("...e anche «Salva e pubblica» finisce in publish()", True,
+          "publish();" in pezzo_js(mini,
+              "async function salvaCorrieriEPubblica(){", "\n}"))
+    prova("il foglio si registra in closeSheet (o resta il velo)", True,
+          "el('corrieriSheet').classList.remove('open')" in
+          pezzo_js(mini, "function closeSheet(){", "\n}"))
+    # l'aggancio in publish: DOPO le validazioni e PRIMA dell'overlay
+    pub = pezzo_js(mini, "async function publish(){", "\n}")
+    prova("l'invito sta PRIMA dello scudo anti-doppione", True,
+          pub.index("serveInvitoCorrieri()")
+          < pub.index("bottoneInAttesa("))
+    prova("...e DOPO l'ultima validazione (la zona)", True,
+          pub.index("controllaZona()") < pub.index("serveInvitoCorrieri()"))
+
+    # --- la riga del form -------------------------------------------
+    prova("la riga del form guarda le RETI, non piu' la stringa", True,
+          "&& !mieRetiSped.length) ? '' : 'none'" in mini)
+    prova("...e resta senza dismiss (e' derivata dai dati veri)", False,
+          "dismettiHint('spedizioniere'" in mini)
+
+
+# ====================================================================
 def prove_pagina_acquisto():
     """Le sentinelle di FORMA del cantiere: righe che un riordino
     farebbe sparire senza rompere nessuna prova funzionale."""
@@ -7819,7 +8002,7 @@ def prove_pagina_acquisto():
     #    si rifiuta, un punto scritto si corregge e non si svuota mai.
     prova("server: il 400 del punto resta sul solo ramo con rete (x2, "
           "tolleranza per il client di ieri)", 2,
-          src.count('if sp and sp["spedizioniere"] and not punto:'))
+          src.count("if reti and not punto:"))
     corpo_sped = pezzo("segna_spedito").split('"""')[-1]
     prova("segna_spedito: bloccato sulla via punto senza punto", True,
           'o["via_punto"] and not o["punto_ritiro"]' in corpo_sped)
@@ -7867,13 +8050,23 @@ def prove_pagina_acquisto():
           2, mini3.count("punto:'', puntoAperto:false"))
     prova("...il campo riapre PRECOMPILATO, mai ricominciare da capo",
           True, 'value="${esc(d.punto)}"' in mini3)
+    # dal cantiere delle reti la riga compatta porta anche la rete
+    # scelta, quando c'e': il punto resta SCAPPATO e il Cambia al suo
+    # posto — cambia il prefisso, non la regola
     prova("...la riga compatta mostra il punto SCAPPATO, col Cambia",
           True,
-          '<span class="punto-testo">${esc(puntoScritto)}</span>' in mini3)
+          '<span class="punto-testo">${d.rete?esc(d.rete)+\' — \':\'\'}'
+          '${esc(puntoScritto)}</span>' in mini3)
+    prova("...e la rete accanto al punto passa anch'essa da esc()",
+          True, "${d.rete?esc(d.rete)" in mini3)
     prova("...e a cedere coi puntini e' l'indirizzo, mai il Cambia",
           True, ".punto-testo{flex:1 1 auto;min-width:0;" in mini3)
-    prova("le due guardie del punto vuoto APRONO il cassetto (x2)", 2,
-          mini3.count("apriPuntoAcquisto();"))
+    # QUATTRO ora, non due: dal cantiere delle reti ogni strada che
+    # paga ha DUE guardie — prima il corriere, poi il punto — e tutte
+    # e quattro aprono il cassetto invece di mettere il fuoco su un
+    # campo che non e' in pagina
+    prova("le guardie del cassetto lo APRONO (x4: due strade, "
+          "due domande)", 4, mini3.count("apriPuntoAcquisto();"))
     prova("...col toast identico nelle due copie", 2,
           mini3.count("Indica il punto di ritiro: al venditore serve "
                       "per spedire"))
@@ -8531,10 +8724,37 @@ def prove_pagina_acquisto():
           "tg.openLink(m.url)" in mini)
     prova("il giudice dei link e' UNO (linkMappePunti)", 1,
           mini.count("function linkMappePunti"))
+    # i CHIAMANTI, contati togliendo la definizione: col cantiere
+    # delle reti uno dei due e' finito dentro un ternario e non ha
+    # piu' il `${` davanti — cercare quello contava una superficie
+    # sola e la prova diceva il falso proprio mentre le due c'erano
     prova("...e lo chiamano le due superfici del punto", 2,
-          mini.count("${linkMappePunti("))
+          mini.count("linkMappePunti(")
+          - mini.count("function linkMappePunti("))
+    # DAL CANTIERE DELLE RETI il giudice prende una LISTA, e la regola
+    # «una rete senza mappa non aggiunge niente» vive nel filtro:
+    # 'Altro' non sta in RETE_MAPPA, quindi cade da se'. La sentinella
+    # ha cambiato FORMA, non lato — resta l'affermazione che un link
+    # fuorviante e' peggio di nessun link.
+    prova("il giudice delle mappe prende una LISTA di reti", True,
+          "function linkMappePunti(reti)" in mini)
     prova("con 'Altro' nessun link: la mappa sbagliata e' peggio di "
-          "nessuna", True, ": spedizioniere ? []" in mini)
+          "nessuna", True,
+          ".map(r => RETE_MAPPA[r]).filter(Boolean)" in mini)
+    prova("...e 'Altro' non ha una mappa nel catalogo", False,
+          "'Altro':" in mini.split("const RETE_MAPPA")[1][:200])
+    prova("nessuna rete dichiarata = tutte le mappe (il «non lo so» "
+          "detto onestamente)", True,
+          ": ['inpost', 'poste']" in mini)
+    # IL DIFETTO CHIUSO (ago 2026): per un anno il campo DENTRO
+    # l'ordine ha chiamato il giudice con un '' hardcodato, quindi
+    # mostrava sempre tutte e due le mappe anche a rete dichiarata —
+    # e il commento del giudice diceva il contrario. Adesso la rete
+    # viaggia nell'ordine e gliela si passa.
+    prova("il campo dell'ordine non passa piu' un '' hardcodato",
+          False, "linkMappePunti('')" in mini)
+    prova("...gli passa la rete dell'ordine", True,
+          "linkMappePunti(o.retePunto ? [o.retePunto] : [])" in mini)
     prova("la nota consiglia il locker automatico", True,
           "NOTA_LOCKER" in mini and "locker automatico" in mini)
 
@@ -16925,7 +17145,8 @@ def main():
               prove_libro_mastro, prove_leve, prove_canale_bot,
               prove_vetrina_canale,
               prove_cambio, prove_recupero_cambi,
-              prove_consegna_payload_punto, prove_pagina_acquisto,
+              prove_consegna_payload_punto, prove_reti_corriere,
+              prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,
               prove_ricevuta_compratore, prove_titoli_scappati,
