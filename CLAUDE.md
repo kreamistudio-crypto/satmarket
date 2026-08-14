@@ -7162,26 +7162,57 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Sconto sopra soglia» (a criterio pezzi la soglia non è una spesa:
   direbbe metà regola) e «Sconto del negozio» (vero ma muto — nel
   Profilo è del negozio anche tutto il resto).
-  IL SOTTOTITOLO DICE LA DIFFERENZA FRA I CRITERI, e nient'altro: «a
-  pezzi conta QUANTI, a valore conta QUANTO» è la regola nella forma
-  più corta che abbiamo trovato (decisione di Andrea), e il cassetto
-  si ridisegna a ogni tocco delle pillole, quindi la riga cambia sotto
-  le dita mentre si sceglie — è lei a insegnare il bivio. «Serve
-  prenderne più d'uno» / «basta la cifra» dicono la conseguenza in una
-  parola: sono loro a far capire che a valore la soglia si raggiunge
-  da fermi. Il fatto COSTANTE è sceso nella riga grigia in fondo
-  («Sconta gli articoli: la spedizione non si tocca»), che è il posto
-  dei fatti che non cambiano — e non si legge scegliendo il criterio.
-  LA SORELLA È A SPECCHIO, ed è il patto da tenere: il suo sottotitolo
-  è il ramo «a valore» dello sconto PAROLA PER PAROLA («Conta quanto
-  si spende: basta la cifra, anche con un oggetto solo») più il suo
-  vincolo («Sugli annunci che spedisci»), e la sua coda è il rovescio
-  esatto («Offre la spedizione: il prezzo degli articoli resta
-  intero»). Quell'identità è essa stessa un'informazione — dice che le
-  due promesse misurano lo stesso numero senza spiegarlo — ed è il
-  motivo per cui la riga «anche su un oggetto solo, come lo sconto»
-  che stava in coda alla sorella è sparita: adesso lo dice in cima, e
-  di lei resta la sola cosa che solo lei può dire, il cumulo.
+  I DUE CASSETTI NON HANNO PIÙ UN SOTTOTITOLO (ago 2026, decisione di
+  Andrea: «la regola si capisce dalle scelte stesse»). Erano nati con
+  una riga che diceva la differenza fra i criteri e cambiava sotto le
+  dita — «a pezzi conta QUANTI, a valore conta QUANTO» — ed è durata
+  un giorno: un paragrafo che ripete quel che si sta toccando si
+  smette di leggere al secondo giro. A dire la regola restano LE
+  SCELTE: le due pillole del criterio, l'etichetta sopra le soglie
+  («Da quanti pezzi» / «Da quanti euro di articoli»), le pillole col
+  «da» davanti, e soprattutto L'ANTEPRIMA IN GRASSETTO, che il
+  perimetro lo dice già per criterio e con le cifre vere.
+  COSA SI È PERSO, misurato invece che supposto: solo la coppia
+  «serve prenderne più d'uno» / «basta la cifra», cioè la conseguenza
+  detta in una parola mentre si sceglie. La metà che sorprende — che
+  a valore basta un oggetto — la tiene la riga nuova; la metà a pezzi
+  la diceva già l'anteprima («Chi ne prende N−1 paga pieno»). Non è
+  un buco: è una ripetizione in meno.
+  SOTTO RESTA UNA RIGA SOLA, e cambia col criterio: «La spedizione è
+  a parte.» a pezzi, più «Vale anche su un oggetto solo.» a valore.
+  IL «DA» STA SU TUTTE E DUE LE FAMIGLIE DI PILLOLE — «da 3 pezzi» e
+  «da 25 €» — e su TUTTI E DUE i cassetti: la sorella ha una `pill`
+  sua, e senza toccarla l'asimmetria si sarebbe solo spostata di un
+  cassetto (ci si è inciampati: il primo giro l'aveva dimenticata, e
+  l'ha presa il render vero, non la rilettura). Costa 70px alla fila e
+  MANDA LE PILLOLE SU DUE RIGHE — accettato da Andrea, perché in sats
+  due righe erano già lo stato normale di questo cassetto. Misurato
+  sul render vero, larghezza del contenitore 258/298/313 a
+  320/360/375: criterio e valuta 1 riga sempre; «da N pezzi» 2 righe
+  sempre (la fila fa 353); «da N €» 2 righe fino a 360 e 1 a 375 (304);
+  «da N sats» 2 righe sempre (472); gli sconti 1 riga sempre (252, a
+  6px dall'andare a capo a 320).
+  ⚠️ LA BARRA DI SCORRIMENTO RUBA 15px IN HEADLESS, e chi rimisura
+  questo cassetto ci casca: Chrome headless riserva una barra classica
+  (contenitore 243 invece di 258) mentre su un telefono vero è in
+  sovrimpressione e non occupa layout. Si neutralizza con
+  `document.documentElement.style.scrollbarWidth='none'`, o si
+  misurano due righe di troppo. Le misure del CONTO non ne soffrono:
+  quella pagina non scorre.
+  LA SORELLA TIENE UNA RIGA PIÙ LUNGA, ed è dichiarato e non una
+  dimenticanza: «Vale sugli annunci che spedisci, anche su un oggetto
+  solo. Si somma allo sconto: guardano lo stesso numero, quindi
+  nessuna delle due spegne l'altra.» Porta le DUE cose che la sua
+  anteprima non copre — il VINCOLO (vale solo dove si spedisce: senza,
+  un negozio da solo ritiro accende una promessa che non scatta mai) e
+  il CUMULO, che è l'unica cosa che solo lei può dire. Il taglio non
+  si applica a ciò che l'anteprima non copre, o si toglierebbe un dato
+  invece di una ripetizione.
+  E IL ROVESCIO «Offre la spedizione: il prezzo degli articoli resta
+  intero» è stato scritto e poi TOLTO: era il gemello esatto di «la
+  spedizione è a parte», ma nessuno teme che la spedizione gratis
+  sconti anche la merce — «gratis» dice già cosa è gratis. Parlare
+  uguale vuol dire stessa FORMA, non la stessa frase dove non serve.
   UNA DIVERGENZA RESTA E NON SI UNIFORMA: la lampo la nomina lo sconto
   SOLO a criterio valore, la sorella sempre. A criterio pezzi la lampo
   non può far scendere niente sotto soglia — lì si contano pezzi, non
