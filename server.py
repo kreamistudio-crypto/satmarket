@@ -727,6 +727,19 @@ except ImportError:
                                        # terzo o il pacco e' lento o il
                                        # codice e' nel dimenticatoio
 
+# L'INDIRIZZO NON RESTA (ago 2026): quanti giorni dopo la CHIUSURA
+# dell'ordine la scopa cancella l'indirizzo di casa del compratore.
+# NON C'E' UN VALORE CHE LA SPEGNE, ed e' voluto: questa e' una
+# promessa scritta nella pagina pubblica, e una promessa con un
+# interruttore che la revoca non e' una promessa. Si puo' allungare o
+# accorciare — 0 = alla prima passata dopo la chiusura — mai togliere.
+# La finestra di grazia serve ai casi storti: un reso tardivo, un
+# pacco tornato indietro, una coda dopo una disputa.
+try:
+    from config import GIORNI_INDIRIZZO
+except ImportError:
+    GIORNI_INDIRIZZO = 30
+
 # LA CODA DEI FERMI (ago 2026): la soglia oltre la quale un ordine coi
 # sats in cassaforte, e su cui nessuno si muove, entra nella sezione
 # «Ordini fermi» del pannello admin.
@@ -2723,6 +2736,44 @@ def init_db():
                     # refunded, gli unici stati ASSORBENTI: quindi
                     # «un nascosto che torna a muoversi» non esiste
                     # per costruzione (vedi nascondi_ordine).
+                    # L'INDIRIZZO DI CASA (ago 2026): il gemello
+                    # SPECULARE della busta — li' e' il venditore a
+                    # depositare per il compratore, qui il compratore
+                    # per il venditore. Fino a ieri l'indirizzo
+                    # viaggiava in chat privata, e chi non ha uno
+                    # username Telegram ne' una npub non poteva darlo
+                    # a NESSUNO: e' lo stesso caso vero che ha fatto
+                    # nascere la busta, sull'altra strada.
+                    # UNA colonna e non sei, ed e' la riga da non
+                    # rovesciare: i sei campi separati sono una scelta
+                    # della UI (servono al riempimento automatico del
+                    # telefono, che vuole ruoli distinti), non dello
+                    # schema — cifrato, quel dato non e' comunque
+                    # interrogabile da SQL, quindi sei colonne
+                    # sarebbero sei migrazioni e sei posti da tenere
+                    # in pari in cambio di niente. Dentro c'e' un JSON
+                    # (nome, via, cap, citta, provincia, telefono,
+                    # note), cifrato col TRASPORTO dei contenuti
+                    # digitali: _cifra_contenuto, la stessa della
+                    # busta.
+                    "indirizzo TEXT DEFAULT ''",
+                    # il PRIMO indirizzo (0 = mai): il flag E il quando
+                    "indirizzo_il INTEGER DEFAULT 0",
+                    "indirizzo_corretto_il INTEGER DEFAULT 0",
+                    "indirizzo_correzioni INTEGER DEFAULT 0",
+                    # QUANDO la scopa l'ha cancellato: e' cio' che
+                    # rende la promessa VERIFICABILE invece che
+                    # raccontata — il libro mastro guarda proprio
+                    # «purgato ma ancora scritto».
+                    "indirizzo_purgato_il INTEGER DEFAULT 0",
+                    # 1 = l'ordine e' NATO chiedendolo, cioe' da un
+                    # client che sa che il campo esiste. E' il patto di
+                    # spedizione_punto_dichiarata (la dichiarazione e'
+                    # la PRESENZA della chiave, mai il suo valore) ed
+                    # e' l'unica cosa che impedisce al gate di
+                    # segna_spedito di bloccare di colpo ogni ordine
+                    # 'locked' gia' in produzione.
+                    "indirizzo_atteso INTEGER DEFAULT 0",
                     "nascosto_compratore INTEGER DEFAULT 0",
                     "nascosto_venditore INTEGER DEFAULT 0"):
         try:
@@ -8126,6 +8177,14 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # La finestra della riga «pubblicato N giorni fa» del
         # dettaglio: oltre, la data non si mostra (stesso patto).
         risposta["giorni_data_annuncio"] = GIORNI_DATA_ANNUNCIO
+        # Fra quanti giorni dalla chiusura cancelliamo l'indirizzo di
+        # casa. VIENE DAL SERVER e non da una cifra scritta a mano nel
+        # client (dove pure vivono altri tempi, per il patto di TEMPI):
+        # qui il numero non decide se un bottone ha senso — E' LA
+        # PROMESSA che la pagina «Il pagamento protetto» fa su un dato
+        # personale. Se l'operatore mette 90 e la pagina dicesse 30,
+        # avremmo scritto il falso.
+        risposta["giorni_indirizzo"] = GIORNI_INDIRIZZO
         # La leva delle aste anche agli ANONIMI (ago 2026): il tasto
         # 🔨 in nav ora c'e' sempre, e a leva spenta apre il «coming
         # soon». In vetrina /api/me non esiste, quindi senza questa
@@ -9842,6 +9901,9 @@ _SQL_FERMI = (
     "SELECT * FROM ("
     "  SELECT o.id, o.stato, o.annuncio_id, o.prezzo_sats AS importo, "
     "    o.consegna_scelta, o.via_punto, o.disputata, "
+    # perche' un ordine e' fermo: la via punto lo diceva gia', e da
+    # oggi anche «aspetta l'indirizzo» e' una ragione che esiste
+    "    o.indirizzo_atteso, o.indirizzo_il, "
     "    o.venditore_id, o.compratore_id, a.titolo, "
     "    CASE o.stato "
     "      WHEN 'locked' THEN COALESCE(o.creato, 0) "
@@ -10279,6 +10341,12 @@ def _leve_stato():
                          "sollecitato: i sats restano fermi in silenzio"),
             _leva("Solleciti prima dei moderatori", "SOLLECITO_INCASSO_MAX",
                   SOLLECITO_INCASSO_MAX),
+            _leva("Indirizzo di casa: cancellato dopo la chiusura (giorni)",
+                  "GIORNI_INDIRIZZO", GIORNI_INDIRIZZO,
+                  spento="a 0 l'indirizzo sparisce alla prima passata "
+                         "dopo la chiusura. Non c'è un valore che "
+                         "spegne la scopa: è una promessa scritta "
+                         "nella pagina pubblica"),
             _leva("Ordini fermi: da quanti giorni (coda admin)",
                   "CODA_FERMI_GIORNI", CODA_FERMI_GIORNI,
                   spento="la sezione «Ordini fermi» del pannello resta "
@@ -10821,6 +10889,108 @@ def _eur_effettivo(a, off, adesso: int) -> float:
         l_eur = _prezzo_lampo(a, a["lampo_percento"])[1]
         p_eur = min(p_eur, l_eur) if p_eur > 0 else l_eur
     return round(p_eur, 2)
+
+
+# -------------------- L'INDIRIZZO DI CASA (ago 2026) -----------------
+# Il gemello SPECULARE della busta di consegna: li' e' il venditore a
+# depositare per il compratore, qui il compratore per il venditore.
+# Barattolo non lo CONSERVA, lo TRASPORTA: vive quanto l'ordine, e poi
+# pulisci_indirizzi lo cancella. Fino a ieri passava in chat privata,
+# e chi non ha uno username Telegram ne' una npub non poteva darlo a
+# NESSUNO — lo stesso caso vero che ha fatto nascere la busta.
+#
+# I CAMPI SONO SEPARATI PER IL TELEFONO, non per il database: il
+# riempimento automatico sa compilare solo campi con RUOLI distinti
+# (autocomplete="postal-code" e compagnia), mentre un campo unico lo
+# lascia indifferente. In colonna finiscono comunque insieme, in un
+# JSON cifrato: vedi il commento dello schema.
+CAMPI_INDIRIZZO = (
+    # campo,    come si chiama nel 400,   tetto, obbligatorio
+    ("nome",      "il nome e il cognome",   80,  True),
+    ("via",       "la via e il civico",     120, True),
+    ("cap",       "il CAP",                 10,  True),
+    ("citta",     "la citta",               60,  True),
+    ("provincia", "la provincia",           20,  False),
+    ("telefono",  "il telefono",            30,  False),
+    # il campo che i corrieri chiedono sempre e che nessun modulo
+    # prevede mai: citofono, scala, interno, orari
+    ("note",      "le note per il corriere", 120, False),
+)
+
+
+def _indirizzo_da_payload(d) -> tuple:
+    """(blob CIFRATO, atteso) dall'indirizzo scritto dal compratore.
+
+    ATTESO E' LA PRESENZA DELLA CHIAVE, mai il suo valore (il patto di
+    spedizione_punto_dichiarata): un client di ieri non la manda, e i
+    suoi ordini restano nel mondo di ieri senza nessun gate addosso.
+
+    CIFRA QUI, e non nei chiamanti: sono tre (i due compratori e la
+    correzione dall'ordine) e basta che uno se ne dimentichi perche' un
+    indirizzo di casa finisca in chiaro nel database. Un posto solo,
+    e la sentinella lo conta.
+
+    I 400 sono STATICI e non rimandano mai il valore: quei messaggi
+    finiscono nei log di uvicorn, e un CAP dentro un log e' un CAP
+    fuori dalla promessa. Nessun controllo di FORMA sul CAP (la
+    lezione di FORME_TRACKING: un'euristica nostra non ferma una
+    spedizione vera) — il client chiede, il server non impedisce."""
+    if "indirizzo" not in d:
+        return "", 0
+    grezzo = d.get("indirizzo") or {}
+    if not isinstance(grezzo, dict):
+        raise HTTPException(400, "Indirizzo non leggibile: riapri l'app "
+                                 "e riprova")
+    dati = {}
+    for campo, _etichetta, tetto, _serve in CAMPI_INDIRIZZO:
+        # normalizzato come il punto: spazi collassati, mai troncato in
+        # silenzio (la lezione della busta: un dato mozzato e' un dato
+        # rotto, e chi l'ha scritto non lo sa)
+        valore = " ".join(str(grezzo.get(campo) or "").split())
+        if len(valore) > tetto:
+            raise HTTPException(400, f"{_etichetta.capitalize()} e' troppo "
+                                     f"lungo: al massimo {tetto} caratteri")
+        dati[campo] = valore
+    if not any(dati.values()):
+        # dichiarato ma ancora vuoto: l'ordine nasce «in attesa
+        # dell'indirizzo» e il gate di segna_spedito fa il resto
+        return "", 1
+    for campo, etichetta, _tetto, serve in CAMPI_INDIRIZZO:
+        if serve and not dati[campo]:
+            raise HTTPException(400, f"Per la spedizione a casa serve "
+                                     f"anche {etichetta}")
+    if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
+        # IL FAIL-OPEN SI FERMA QUI, ed e' l'unica differenza vera con
+        # la busta: un PIN di ritiro in chiaro e' una degradazione
+        # accettabile, il nome e la via di una persona no. Senza chiave
+        # NON si scrive: si risponde 503 e chi compra ripiega sulla
+        # chat, che e' quel che fa gia' oggi. In collaudo si scrive
+        # 'plain:' come tutto il resto, o il mercatino di prova non
+        # potrebbe piu' vendere niente a casa.
+        if not MODALITA_COLLAUDO:
+            raise HTTPException(503, "La spedizione a casa non è "
+                                     "disponibile in questo momento: "
+                                     "scegli un'altra strada o riprova "
+                                     "più tardi")
+    return _cifra_contenuto(json.dumps(dati, ensure_ascii=False)), 1
+
+
+def _indirizzo_letto(blob: str):
+    """Il dizionario dell'indirizzo, o None se non si legge.
+
+    IL PARSE E' DIFENSIVO, ed e' il prezzo — pagato in un posto solo —
+    della colonna unica: _decifra_contenuto e' fail-open per
+    costruzione e su una chiave mancante o cambiata restituisce una
+    FRASE, che per la busta si stampa al posto del PIN e qui invece
+    non e' JSON. Senza questo try, riaprire un ordine 'locked' dopo un
+    cambio di chiave sarebbe un 500 per tutte e due le parti."""
+    if not blob:
+        return None
+    try:
+        dati = json.loads(_decifra_contenuto(blob))
+    except Exception:
+        return None
+    return dati if isinstance(dati, dict) else None
 
 
 def _tariffa_dichiarata(a, via: str) -> tuple:
@@ -12812,8 +12982,23 @@ async def scegli_consegna_ordine(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questa strada non è offerta "
                                  "dall'annuncio")
-    con.execute("UPDATE ordini SET consegna_scelta=?, aggiornato=? "
-                "WHERE id=?", (scelta, int(time.time()), ordine_id))
+    # L'INDIRIZZO ANCHE QUI, ed e' UNA riga (ago 2026): l'asta offre
+    # solo strade a costo zero e non ha la via del locker, ma la
+    # «spedizione» che il vincitore sceglie qui e' pur sempre una
+    # spedizione a CASA — senza questo timbro ogni ordine d'asta
+    # spedito tornerebbe alla chat privata, cioe' al problema che il
+    # cantiere esiste per chiudere, e in silenzio (il pannello
+    # nell'ordine si accende proprio su indirizzo_atteso). Il
+    # vincitore lo scrive da POST /indirizzo, che accetta la prima
+    # scrittura; il gate di segna_spedito aspetta lui. Il payload
+    # dell'asta non cambia: qui si dichiara l'attesa, non si legge un
+    # indirizzo. (Le sentinelle qui guardano i nomi delle colonne del
+    # locker: non si scrivono, nemmeno per nominarle in un commento.)
+    atteso_qui = 1 if scelta == "spedizione" else 0
+    con.execute("UPDATE ordini SET consegna_scelta=?, indirizzo_atteso=?, "
+                "aggiornato=? "
+                "WHERE id=?", (scelta, atteso_qui, int(time.time()),
+                               ordine_id))
     con.commit()
     con.close()
     NOMI = {"spedizione": "spedizione (inclusa nel prezzo)",
@@ -13768,6 +13953,21 @@ async def _compra_set(user: dict, d: dict) -> dict:
         punto = ""
     via_punto = 1 if via == "punto" else 0
 
+    # L'INDIRIZZO DI CASA sta QUI, accanto alla via e PRIMA della
+    # invoice, per due ragioni che valgono tutte e due: un 400 dopo
+    # crea_invoice_escrow lascerebbe una fattura viva senza un ordine
+    # su cui posarsi (la lezione lunga di pulisci_ordini_fantasma), e
+    # cifrare costa uno scrypt — decine di ms sincroni che nel blocco
+    # atomico fra il ricontrollo e l'INSERT non ci vanno. Piu' in
+    # basso si piazza una stringa gia' pronta, e basta.
+    ind, ind_atteso = "", 0
+    if scelta == "spedizione" and not via_punto:
+        try:
+            ind, ind_atteso = _indirizzo_da_payload(d)
+        except HTTPException:
+            con.close()
+            raise
+
     # --- Fail-fast di cortesia sullo stock, riga per riga (quello
     # che fa fede e' il ricontrollo dopo la invoice, come nel mono)
     for aid, qta in richieste.items():
@@ -14014,12 +14214,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,"
+        "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, sped, prot, pezzi,
+         punto, via_punto, ind, adesso if ind else 0, ind_atteso,
+         sped, prot, pezzi,
          # la percentuale si fotografa SOLO se lo sconto e' scattato,
          # o la ricevuta di un ordine sotto soglia dichiarerebbe uno
          # sconto che non c'e'
@@ -14916,6 +15118,18 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         punto = ""
     via_punto = 1 if via == "punto" else 0
 
+    # L'INDIRIZZO DI CASA, col patto del gemello nel set: il giudice
+    # sta qui, PRIMA della invoice (un 400 dopo lascerebbe una fattura
+    # senza ordine) e prima del blocco atomico, che di uno scrypt non
+    # ha bisogno.
+    ind, ind_atteso = "", 0
+    if scelta == "spedizione" and not via_punto:
+        try:
+            ind, ind_atteso = _indirizzo_da_payload(d)
+        except HTTPException:
+            con.close()
+            raise
+
     # LA RIPRESA (ago 2026): il compratore pentito che RITENTA non e'
     # un rivale — il messaggio d'attesa resta SOLO per gli altri, che
     # e' l'anti-doppio-acquisto e va bene cosi'. Se ha gia' un ordine
@@ -14943,6 +15157,27 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                   == int(d.get("offerta_id") or 0))
         viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
         if stessa and viva and mio["invoice"]:
+            # L'INDIRIZZO NON ENTRA NEL CONFRONTO QUI SOPRA, e non e'
+            # una svista: Fernet non e' deterministico (IV casuale a
+            # ogni cifratura), quindi due blob dello stesso indirizzo
+            # sono sempre DIVERSI — messo nel confronto renderebbe
+            # `stessa` falsa per sempre, e ogni secondo tocco su «Paga»
+            # conierebbe una fattura nuova. Peggio: senza chiave i
+            # blob sono 'plain:', quindi funzionerebbe in collaudo e si
+            # romperebbe in produzione.
+            # Ma va RISCRITTO, o chi corregge un refuso nel CAP si
+            # rivedrebbe la sua fattura con l'indirizzo di prima e
+            # crederebbe di aver corretto. Non tocca il prezzo, quindi
+            # la fattura resta quella: e' un DML su un ordine 'creato'
+            # in un ramo che esce subito, e nessun ricontrollo lo
+            # aspetta.
+            if ind and ind != mio["indirizzo"]:
+                con.execute(
+                    "UPDATE ordini SET indirizzo=?, indirizzo_il=?, "
+                    "indirizzo_atteso=1 WHERE id=? AND stato='creato'",
+                    (ind, mio["indirizzo_il"] or int(time.time()),
+                     mio["id"]))
+                con.commit()
             con.close()
             # La divisione a ritroso RIAGGIUNGE lo sconto (ago 2026, il
             # mono sconta): prezzo_sats nasce gia' scontato, quindi
@@ -15282,14 +15517,17 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,punto_ritiro,via_punto,spedizione_sats,"
+        "consegna_scelta,punto_ritiro,via_punto,"
+        "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
-         cambio_ordine, scelta, punto, via_punto, sped, prot, richiesti,
+         cambio_ordine, scelta, punto, via_punto,
+         ind, int(time.time()) if ind else 0, ind_atteso,
+         sped, prot, richiesti,
          sconto, pct if sconto else 0, sped_gratis_sats))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     if off:
@@ -15410,7 +15648,8 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
 # rivelazione, ORE_SILENZIO_DIGITALE dalla consegna mai letta). Il
 # giudice e' PURO e prende i campi, non la riga (il patto di in_ferie):
 # cosi' serve l'ordine vero e la prova in CI.
-def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool) -> str:
+def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool,
+                   ind_atteso: int, ind_scritto: bool) -> str:
     """Cosa succede ADESSO, secondo la strada che il compratore ha
     scelto. Statica: nessun testo dell'utente ci entra mai — il punto
     di ritiro lo si guarda solo per sapere SE c'e', il suo contenuto
@@ -15435,6 +15674,19 @@ def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool) -> str:
         return ("il venditore spedisce al punto di ritiro che hai "
                 "scelto. Ti avvisiamo appena il pacco ti aspetta là.")
     if consegna == "spedizione":
+        # TRE rami e non due, ed e' la stessa distinzione del punto:
+        # l'indirizzo SCRITTO si nomina, quello ATTESO si chiede, e
+        # l'ordine che non l'ha mai chiesto (i client di ieri, gli
+        # storici) resta col testo di sempre — mai mandare qualcuno a
+        # cercare un campo che sul suo schermo non esiste.
+        if ind_scritto:
+            return ("il venditore spedisce all'indirizzo che hai "
+                    "indicato e ti manda il tracciamento. Quando "
+                    "arriva, confermalo nella Mini App e i sats vanno "
+                    "a lui.")
+        if ind_atteso:
+            return ("indica l'indirizzo di spedizione nell'ordine, che "
+                    "al venditore serve per spedire il pacco.")
         return ("il venditore prepara il pacco e ti manderà il "
                 "tracciamento. Quando arriva, confermalo nella Mini "
                 "App e i sats vanno a lui.")
@@ -15581,6 +15833,16 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                 "locker/punto di ritiro</b>: indicherà il punto "
                 "nell'ordine — se serve, accordatevi in chat sul "
                 "corriere.")
+    elif o["indirizzo_il"]:
+        # Coda STATICA anche qui: l'indirizzo e' testo del compratore e
+        # nell'HTML di una notifica non ci entra mai — si legge
+        # nell'ordine, dove il client lo passa da esc().
+        msg += ("\n\n🏠 Il compratore ha scelto la <b>spedizione a "
+                "casa</b>: trovi l'indirizzo nell'ordine.")
+    elif o["indirizzo_atteso"]:
+        msg += ("\n\n🏠 Il compratore ha scelto la <b>spedizione a "
+                "casa</b>: indicherà l'indirizzo nell'ordine, e ti "
+                "avviseremo appena lo scrive.")
     await notifica(o["venditore_id"], msg)
     # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
     # ci passano il poll della Mini App e le due funzioni dell'orologio,
@@ -15593,7 +15855,9 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                    f"🔒 <b>Ordine pagato!</b> «{titolo}» — i sats "
                    f"sono nel deposito di garanzia: "
                    + _coda_ricevuta(o["consegna_scelta"], o["via_punto"],
-                                    bool(o["punto_ritiro"])))
+                                    bool(o["punto_ritiro"]),
+                                    o["indirizzo_atteso"],
+                                    bool(o["indirizzo_il"])))
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
         f"🛒 <b>Nuovo ordine:</b> «{titolo}» — "
@@ -15658,6 +15922,108 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
                        "ritiro</b>: lo trovi nell'ordine, ora puoi "
                        "spedire.")
     return {"ok": True, "punto_ritiro": punto}
+
+
+@app.post("/api/orders/{ordine_id}/indirizzo")
+async def indica_indirizzo(ordine_id: int, req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Il COMPRATORE scrive (o corregge) l'indirizzo di casa dentro
+    l'ordine. Gemello di indica_punto_ritiro: solo lui, solo su
+    'locked', solo su una spedizione a CASA — dopo la spedizione il
+    pacco e' partito e il campo si chiude.
+
+    IL VUOTO SI RIFIUTA, e non e' pignoleria: un indirizzo si
+    corregge, non si svuota — se si potesse svuotare, il gate di
+    segna_spedito tornerebbe a mordere su un ordine gia' compilato e
+    il venditore si ritroverebbe bloccato da una cosa che aveva.
+
+    Ci arrivano anche gli ordini nati SENZA (il vincitore d'asta, e i
+    client di ieri): qui si scrive la prima volta, e il timbro
+    indirizzo_il nasce adesso. La notifica al venditore e' STATICA —
+    il testo del compratore non entra MAI in un tubo HTML."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ind, _atteso = _indirizzo_da_payload(d)
+    if not ind:
+        raise HTTPException(400, "Scrivi l'indirizzo per la spedizione")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    if o["via_punto"] or o["consegna_scelta"] != "spedizione":
+        con.close()
+        raise HTTPException(400, "Questo ordine non è una spedizione a "
+                                 "casa")
+    adesso = int(time.time())
+    correzione = bool(o["indirizzo_il"])
+    con.execute("UPDATE ordini SET indirizzo=?, indirizzo_il=?, "
+                "indirizzo_atteso=1, indirizzo_corretto_il=?, "
+                "indirizzo_correzioni=? WHERE id=?",
+                (ind, o["indirizzo_il"] or adesso,
+                 adesso if correzione else 0,
+                 (o["indirizzo_correzioni"] or 0) + (1 if correzione else 0),
+                 ordine_id))
+    con.commit()
+    con.close()
+    # Il journal dice CHE e' successo e QUANDO, mai cosa: un indirizzo
+    # dentro i log del VPS sarebbe un indirizzo fuori dalla promessa e
+    # fuori dalla scopa (il patto della busta).
+    print(f"🏠 Ordine #{ordine_id}: indirizzo di casa "
+          f"{'corretto' if correzione else 'indicato'} dal compratore"
+          + (f" (correzione n. {(o['indirizzo_correzioni'] or 0) + 1})"
+             if correzione else ""))
+    await notifica(o["venditore_id"],
+                   "🏠 <b>L'acquirente ha "
+                   + ("aggiornato" if correzione else "indicato")
+                   + " l'indirizzo di spedizione</b>: lo trovi "
+                     "nell'ordine, nella Mini App.")
+    return {"ok": True, "indirizzo_il": o["indirizzo_il"] or adesso,
+            "indirizzo_correzioni":
+                (o["indirizzo_correzioni"] or 0) + (1 if correzione else 0)}
+
+
+@app.get("/api/orders/{ordine_id}/indirizzo")
+async def leggi_indirizzo(ordine_id: int,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """L'indirizzo si legge SOLO da qui, e solo le due parti.
+
+    IL MODERATORE MAI, da nessuna strada — la regola della busta: in
+    disputa gli arrivano i fatti (indicato, quando, quante correzioni)
+    e mai il contenuto. Autorizzazione PRIMA dell'esistenza, col 400
+    opaco: chi enumera gli id non impara niente.
+
+    GET PURO: leggere un indirizzo non e' una ricevuta e non sposta un
+    sat — nessuna scrittura, `consegnato` e lo stato non si toccano."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(400, "Operazione non permessa")
+    if o["indirizzo_purgato_il"]:
+        # la promessa mantenuta, detta a chi la incontra
+        quando = time.strftime("%d/%m/%Y",
+                               time.localtime(o["indirizzo_purgato_il"]))
+        raise HTTPException(404, f"L'indirizzo è stato cancellato il "
+                                 f"{quando}, alla chiusura dell'ordine")
+    if not o["indirizzo"]:
+        raise HTTPException(404, "Nessun indirizzo su questo ordine")
+    dati = _indirizzo_letto(o["indirizzo"])
+    if dati is None:
+        raise HTTPException(503, "L'indirizzo non si riesce a leggere: "
+                                 "chiedi all'acquirente di riscriverlo "
+                                 "dall'ordine")
+    return {"campi": {campo: dati.get(campo, "")
+                      for campo, _e, _t, _s in CAMPI_INDIRIZZO},
+            "indicato_il": o["indirizzo_il"],
+            "corretto_il": o["indirizzo_corretto_il"],
+            "correzioni": o["indirizzo_correzioni"]}
 
 
 # ------------------ LA BUSTA DI CONSEGNA (ago 2026) ------------------
@@ -16026,6 +16392,22 @@ async def segna_spedito(ordine_id: int, req: Request,
                                      "scegliendo come riceverlo: "
                                      "attendi la sua scelta prima di "
                                      "spedire")
+    if o["indirizzo_atteso"] and not o["indirizzo_il"]:
+        # Via casa dichiarata e indirizzo non ancora scritto: DOVE
+        # spedirebbe? E' il gemello del gate del punto qui sotto.
+        # ANCORATO A indirizzo_atteso E MAI ALLA VIA, o al primo
+        # riavvio bloccherebbe di colpo ogni ordine 'locked' gia' in
+        # corso, che un indirizzo in colonna non l'ha mai avuto.
+        # Il caso vero e' il vincitore d'asta, che la strada la sceglie
+        # DENTRO l'ordine (scegli_consegna_ordine timbra l'attesa) e
+        # l'indirizzo lo scrive dopo; sugli acquisti normali il client
+        # lo esige prima di «Paga», quindi qui e' una cintura.
+        con.close()
+        raise HTTPException(400, "L'acquirente non ha ancora indicato "
+                                 "l'indirizzo: appena lo scrive "
+                                 "nell'ordine potrai segnare la "
+                                 "spedizione (se serve, ricordaglielo "
+                                 "in chat)")
     if o["via_punto"] and not o["punto_ritiro"]:
         # Via punto senza punto indicato: DOVE spedirebbe? Dal quarto
         # giro il punto si sceglie in pagina e questo caso e' quasi
@@ -19668,6 +20050,45 @@ async def _notifica_match(tg_id: int, annunci: list, cambio: float):
     await notifica(tg_id, testo)
 
 
+def pulisci_indirizzi():
+    """LA SCOPA DEGLI INDIRIZZI (ago 2026): l'indirizzo di casa vive
+    quanto l'ordine, e GIORNI_INDIRIZZO giorni dopo la chiusura
+    sparisce. E' il pezzo che rende vera la parola «trasporta»: senza,
+    «non lo conserviamo» sarebbe una frase e basta.
+
+    TRE RIGHE DA NON AMMORBIDIRE.
+    1) La guardia `indirizzo<>''` non e' un'ottimizzazione: senza,
+       questo UPDATE riscriverebbe OGNI ordine chiuso a ogni battito
+       dell'orologio, e soprattutto timbrerebbe indirizzo_purgato_il
+       anche su righe che un indirizzo non l'hanno mai avuto — cioe'
+       farebbe perdere di senso l'unico controllo che rende la
+       promessa VERIFICABILE («purgato ma ancora scritto»).
+    2) NON si tocca `aggiornato`. E' l'ancora di _SQL_FERMI e delle
+       finestre dei promemoria: spostarla vorrebbe dire far ripartire
+       da capo l'attesa di qualcuno per una manutenzione — la trappola
+       gia' pagata altrove, e nascondi_ordine se l'e' negata per
+       iscritto.
+    3) Solo gli stati ASSORBENTI. 'annullato' NON serve e non c'e':
+       quelle lapidi le cancella per intero pulisci_ordini_fantasma
+       dopo un'ora, quindi l'indirizzo di chi non ha mai pagato se ne
+       va con la riga molto prima — ed e' la parte migliore del
+       meccanismo, non un buco."""
+    try:
+        con = db()
+        n = con.execute(
+            "UPDATE ordini SET indirizzo='', indirizzo_purgato_il=? "
+            "WHERE indirizzo<>'' AND indirizzo_purgato_il=0 "
+            "AND stato IN ('released','refunded') AND aggiornato < ?",
+            (int(time.time()),
+             int(time.time()) - GIORNI_INDIRIZZO * 86400)).rowcount
+        con.commit()
+        con.close()
+        if n:
+            print(f"🏠 Indirizzi cancellati alla chiusura: {n}")
+    except Exception as e:
+        print(f"⚠️ Pulizia indirizzi saltata: {e}")
+
+
 def pulisci_avvisi():
     """La scopa degli avvisi, chiamata dall'orologio: via le righe di
     dedup piu' vecchie di 30 giorni (un annuncio non rinasce dopo un
@@ -20514,11 +20935,38 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             f"\n📦 Spedizione a un LOCKER/PUNTO DI RITIRO: {stato_busta}. "
             f"Il contenuto della busta lo leggono solo le parti: la "
             f"piattaforma non può verificarlo.")
+    # E il gemello della spedizione a CASA: stessa regola, stessi
+    # fatti — indicato o no, quando, e quante volte corretto (magari
+    # proprio a disputa aperta: per questo si contano). MAI il
+    # contenuto, che nessun moderatore puo' leggere da nessuna strada:
+    # qui dentro non si decifra niente, e c'e' la sentinella che lo
+    # verifica (attenzione: legge anche i commenti — il nome della
+    # funzione che non si chiama non va scritto nemmeno qui).
+    nota_indirizzo = ""
+    if o["indirizzo_atteso"] or o["indirizzo_il"]:
+        if o["indirizzo_il"]:
+            quando_i = time.strftime("%d/%m/%Y %H:%M",
+                                     time.localtime(o["indirizzo_il"]))
+            stato_ind = f"indirizzo indicato il {quando_i}"
+            ni = o["indirizzo_correzioni"]
+            if ni:
+                ultima_i = time.strftime(
+                    "%d/%m/%Y %H:%M",
+                    time.localtime(o["indirizzo_corretto_il"]))
+                stato_ind += (f", poi corrett{'o' if ni == 1 else 'o'} "
+                              f"{ni} volt{'a' if ni == 1 else 'e'} "
+                              f"(ultima il {ultima_i})")
+        else:
+            stato_ind = "indirizzo MAI indicato dall'acquirente"
+        nota_indirizzo = (
+            f"\n🏠 Spedizione a CASA: {stato_ind}. L'indirizzo lo "
+            f"leggono solo le parti: non è mostrato ai moderatori.")
     con.close()
     for admin in ADMIN_IDS:
         await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
                               "I sats restano bloccati in attesa della tua "
-                              "decisione." + nota_digitale + nota_punto)
+                              "decisione." + nota_digitale + nota_punto
+                              + nota_indirizzo)
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
                    "vi contattera' entrambi. I sats restano nel deposito "
@@ -20953,6 +21401,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # QUANDO — per il compratore, e per il moderatore in disputa.
         r.pop("busta_nome", "")
         r.pop("busta_codice", "")
+        # E l'indirizzo di casa idem: si legge solo da /indirizzo, e
+        # solo le due parti (l'admin mai, nemmeno in disputa). Escono
+        # i FATTI — indirizzo_il, le correzioni, il timbro della
+        # cancellazione e indirizzo_atteso — che servono al client per
+        # sapere quale pannello disegnare senza poter sbirciare.
+        r.pop("indirizzo", "")
         # e del documento non esce nemmeno il NOME DEL FILE: e' la
         # maniglia sul disco, e non serve a nessun client — resta il
         # flag, come per il contenuto digitale
@@ -24078,6 +24532,12 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Pulizia avvisi saltata: {e}")
         try:
+            # la promessa mantenuta: l'indirizzo di casa non
+            # sopravvive all'ordine — legge e cancella, mai un sat
+            pulisci_indirizzi()
+        except Exception as e:
+            print(f"⚠️ Pulizia indirizzi saltata: {e}")
+        try:
             await avvisa_nuovi_iscritti()
         except Exception as e:
             print(f"⚠️ Campanello dei nuovi iscritti saltato: {e}")
@@ -24547,6 +25007,23 @@ CONTROLLI_LIBRO_MASTRO = (
      "OR (busta_il>0) <> (busta_codice<>'') "
      "OR (busta_il>0 AND via_punto=0) "
      "OR (busta_corretta_il>0 AND busta_il=0)"),
+    # L'INDIRIZZO DI CASA. Il terzo ramo e' quello che vale davvero:
+    # rende VERIFICABILE la promessa pubblica invece che raccontata —
+    # se la scopa ha timbrato ma il testo e' ancora li', quello che
+    # diciamo nella pagina e' falso e dev'essere un allarme.
+    # E il primo ramo si porta dietro la purga (indirizzo_purgato_il=0)
+    # apposta: copiare la forma della busta — «flag e testo si
+    # implicano» — farebbe scattare il 🧊 su OGNI ordine purgato, cioe'
+    # sullo stato normale del dopo-chiusura, ed e' cosi' che un allarme
+    # smette di essere letto.
+    ("indirizzo fuori contratto",
+     "l'indirizzo si scrive col suo timbro e solo sulla spedizione a "
+     "casa, e dopo la purga non deve restare niente",
+     "SELECT id FROM ordini "
+     "WHERE (indirizzo<>'' AND indirizzo_il=0) "
+     "OR (indirizzo='' AND indirizzo_il>0 AND indirizzo_purgato_il=0) "
+     "OR (indirizzo<>'' AND via_punto=1) "
+     "OR (indirizzo_purgato_il>0 AND indirizzo<>'')"),
     # Passa la domanda che decide: il gate di nascondi_ordine ammette
     # solo released/refunded, che sono ASSORBENTI — non esiste uno
     # stato transitorio legittimo in cui questa e' falsa.

@@ -213,6 +213,19 @@ SELECT id, stato, nascosto_compratore, nascosto_venditore
   FROM ordini WHERE (nascosto_compratore = 1 OR nascosto_venditore = 1)
    AND stato NOT IN ('released', 'refunded');
 
+SELECT '16e) INDIRIZZO FUORI CONTRATTO (vuoto)' AS controllo;
+-- l'indirizzo di casa (ago 2026) si scrive col suo timbro e solo sulla
+-- spedizione a casa. L'ultimo ramo è quello che conta davvero: se la
+-- scopa ha timbrato la cancellazione ma il testo è ancora lì, la
+-- promessa scritta nella pagina pubblica è falsa.
+SELECT id, stato, via_punto, indirizzo_il, indirizzo_purgato_il,
+       CASE WHEN indirizzo = '' THEN 'cancellato' ELSE 'presente' END AS testo
+  FROM ordini
+ WHERE (indirizzo <> '' AND indirizzo_il = 0)
+    OR (indirizzo = '' AND indirizzo_il > 0 AND indirizzo_purgato_il = 0)
+    OR (indirizzo <> '' AND via_punto = 1)
+    OR (indirizzo_purgato_il > 0 AND indirizzo <> '');
+
 -- =====================================================================
 -- Da qui in giù NON sono controlli: sono il polso, che l'orologio non
 -- racconta perché non è un allarme.

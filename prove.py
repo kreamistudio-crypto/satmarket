@@ -2175,6 +2175,8 @@ def prove_busta_ritiro():
         busta_correzioni INT DEFAULT 0,
         busta_file TEXT DEFAULT '', busta_file_tipo TEXT DEFAULT '',
         busta_file_nome TEXT DEFAULT '',
+        indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
+        indirizzo_atteso INT DEFAULT 0,
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0);
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
         asta_base_sats INT DEFAULT 0);
@@ -2514,6 +2516,311 @@ def prove_busta_ritiro():
     asyncio.new_event_loop().run_until_complete(
         amb["sollecita_buste_ferme"]())
     prova("la leva a 0 spegne la popolazione", [], avvisi)
+    vero.close()
+
+
+def prove_indirizzo_casa():
+    """L'INDIRIZZO DI CASA (ago 2026): lo SPECCHIO della busta — li'
+    scrive il venditore e legge il compratore, qui il contrario.
+    Barattolo non lo conserva, lo TRASPORTA: la scopa lo cancella una
+    finestra dopo la chiusura, ed e' quella riga a rendere vera la
+    promessa scritta nella pagina pubblica."""
+    print("\n[l'indirizzo di casa]")
+    import asyncio
+    import sqlite3
+    import time as _t
+
+    src = _SORGENTE
+    giu = pezzo("_indirizzo_da_payload").split('"""')[-1]
+    post = pezzo("indica_indirizzo").split('"""')[-1]
+    get = pezzo("leggi_indirizzo").split('"""')[-1]
+    sped = pezzo("segna_spedito").split('"""')[-1]
+    scopa = pezzo("pulisci_indirizzi").split('"""')[-1]
+
+    # --- le sentinelle di forma ------------------------------------
+    prova("il giudice CIFRA lui: un posto solo, tre chiamanti", 1,
+          giu.count("_cifra_contenuto("))
+    prova("...e la chiave manca = 503, mai un'anagrafica in chiaro",
+          True, "503" in giu and "MODALITA_COLLAUDO" in giu)
+    prova("...la dichiarazione e' la PRESENZA della chiave", True,
+          '"indirizzo" not in d' in giu)
+    prova("...e i 400 non rimandano mai il valore scritto", 0,
+          giu.count("{valore"))
+    # il lettore difensivo: _decifra_contenuto e' fail-open e su una
+    # chiave cambiata restituisce PROSA, che non e' JSON — senza il
+    # try, riaprire un ordine sarebbe un 500 per tutte e due le parti
+    prova("il lettore para il parse (la prosa non e' JSON)", True,
+          "except Exception" in pezzo("_indirizzo_letto"))
+    prova("il deposito e' del COMPRATORE, su 'locked'", True,
+          "compratore_id=?" in post and "'locked'" in post)
+    prova("...ed esige la spedizione a casa", True,
+          'o["via_punto"]' in post and "consegna_scelta" in post)
+    prova("...il vuoto si rifiuta: si corregge, non si svuota", True,
+          "if not ind:" in post)
+    prova("...UN solo UPDATE, e tocca solo le colonne indirizzo", 1,
+          post.count("UPDATE"))
+    # (si guarda l'UPDATE e non tutto il corpo: 'locked' nella SELECT
+    #  e' la GUARDIA, non una scrittura — la sentinella larga
+    #  scambiava le due cose)
+    _set = post[post.index("UPDATE ordini SET"):post.index("WHERE id=?")]
+    prova("...non tocca stato, aggiornato, consegnato", [],
+          [x for x in ("stato=", "aggiornato=", "consegnato=")
+           if x in _set])
+    prova("...e la notifica al venditore e' STATICA", [],
+          [x for x in ("{ind", "{corpo", "{dati") if x in post])
+    prova("...il journal non porta il testo, solo il fatto", False,
+          "{ind}" in post)
+    # il GET: puro, delle due parti, e l'admin mai
+    prova("lettura: GET puro, nessuna scrittura", [],
+          [x for x in ("UPDATE", "INSERT", "commit") if x in get])
+    prova("lettura: l'admin non ha strada", False, "e_admin" in get)
+    prova("lettura: autorizzazione PRIMA dell'esistenza", True,
+          "compratore_id=? OR venditore_id=?" in get
+          and get.index("Operazione non permessa")
+          < get.index("Nessun indirizzo"))
+    prova("lettura: il purgato lo DICE, non finge un vuoto", True,
+          "indirizzo_purgato_il" in get and "cancellato il" in get)
+    # il gate: ancorato all'attesa e MAI alla via, o al primo riavvio
+    # bloccherebbe ogni ordine 'locked' gia' in corso
+    prova("il gate guarda indirizzo_atteso, non la via", True,
+          'o["indirizzo_atteso"] and not o["indirizzo_il"]' in sped)
+    # LA RIPRESA: l'indirizzo NON entra nel confronto «stessa
+    # richiesta», e non e' una svista — Fernet non e' deterministico
+    # (IV casuale), quindi due blob dello stesso indirizzo sono sempre
+    # diversi e `stessa` sarebbe falsa per sempre: ogni secondo tocco
+    # su «Paga» conierebbe una fattura nuova. E senza chiave i blob
+    # sono 'plain:', quindi funzionerebbe in collaudo e si romperebbe
+    # in produzione. Ma va RISCRITTO, o chi corregge un refuso si
+    # rivede la fattura con l'indirizzo di prima.
+    _compra = pezzo("compra")
+    _rip = _compra[_compra.index("stessa = ("):_compra.index("# Rinnovo")]
+    prova("la ripresa non confronta il blob cifrato", False,
+          'mio["indirizzo"] ==' in _rip
+          or '== mio["indirizzo"]' in _rip)
+    prova("...ma riscrive l'indirizzo cambiato", True,
+          'ind != mio["indirizzo"]' in _rip
+          and "UPDATE ordini SET indirizzo=?" in _rip)
+    # la scopa
+    prova("la scopa non riscrive tutto il database ogni giro", True,
+          "indirizzo<>''" in scopa and "indirizzo_purgato_il=0" in scopa)
+    prova("...e NON tocca `aggiornato` (l'ancora dei fermi)", False,
+          "aggiornato=" in scopa)
+    prova("...solo gli stati assorbenti, mai un ordine vivo", True,
+          "('released','refunded')" in scopa)
+    # la RIGA intera e con la sua indentazione, o la definizione
+    # («def pulisci_indirizzi():») entrerebbe nel conto e un
+    # «pass  # pulisci_indirizzi()» la lascerebbe verde: la lezione
+    # della sentinella del reaper
+    prova("...ed e' agganciata all'orologio", 1,
+          src.count("\n            pulisci_indirizzi()"))
+    # le strade del denaro non sanno che esiste
+    for nome in ("_sblocca_sats", "_rimborsa_compratore"):
+        prova(f"{nome} e' cieco all'indirizzo", False,
+              "indirizzo" in pezzo(nome))
+    prova("lo strip di /api/orders copre l'indirizzo", True,
+          'r.pop("indirizzo"' in pezzo("miei_ordini"))
+    prova("la disputa racconta l'indirizzo senza aprirlo", True,
+          "nota_indirizzo" in pezzo("apri_disputa"))
+    prova("il libro mastro sorveglia la promessa mantenuta", True,
+          "indirizzo fuori contratto" in src)
+    prova("il numero dei giorni viaggia al CLIENT", True,
+          'risposta["giorni_indirizzo"]' in src)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("client: il pannello si gatea sull'attesa, mai sulla via",
+          True, "o.indirizzoAtteso || o.indirizzoIl" in mini)
+    prova("client: i campi hanno i token dell'autofill", True,
+          "address-line1" in mini and "postal-code" in mini
+          and "address-level2" in mini)
+    prova("client: e stanno in un <form>, che l'autofill preferisce",
+          True, 'onsubmit="return false" class="ind-form"' in mini)
+    prova("client: i sei campi si rendono sotto esc()", True,
+          "esc(v[c.k]||'')" in mini and "esc(iVal[c.k]||'')" in mini)
+    prova("client: la pagina non hardcoda i giorni", True,
+          "data-giorni-ind" in mini and "scriviGiorniIndirizzo" in mini)
+    prova("client: la guardia di «Paga» APRE prima del fuoco", True,
+          "apriIndirizzoAcquisto();" in mini)
+
+    # --- il funzionale: gli endpoint VERI su un database vero -------
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE ordini(
+        id INTEGER PRIMARY KEY, compratore_id INT, venditore_id INT,
+        stato TEXT, consegna_scelta TEXT DEFAULT 'spedizione',
+        via_punto INT DEFAULT 0, aggiornato INT DEFAULT 0,
+        spedito_il INT DEFAULT 0, consegnato INT DEFAULT 0,
+        indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
+        indirizzo_corretto_il INT DEFAULT 0,
+        indirizzo_correzioni INT DEFAULT 0,
+        indirizzo_purgato_il INT DEFAULT 0,
+        indirizzo_atteso INT DEFAULT 0);
+      -- 1: spedizione a casa, in attesa dell'indirizzo
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        indirizzo_atteso) VALUES(1, 111, 222, 'locked', 1);
+      -- 2: la via del locker, che di indirizzi non ne vuole
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        via_punto) VALUES(2, 111, 222, 'locked', 1);
+      -- 3: chiuso da un pezzo, con l'indirizzo ancora dentro
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        indirizzo, indirizzo_il, aggiornato)
+        VALUES(3, 111, 222, 'released', 'plain:{}', 500, 1000);
+      -- 4: chiuso IERI (rispetto all'adesso finto della scopa, che e'
+      --    9_000_000_000): la finestra di grazia non e' ancora passata
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        indirizzo, indirizzo_il, aggiornato)
+        VALUES(4, 111, 222, 'released', 'plain:{}', 500, 8999913600);
+    """)
+    vero.commit()
+
+    class Con:
+        def execute(self, q, p=()):
+            return vero.execute(q, p)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    avvisi = []
+
+    async def _notifica(tg, testo):
+        avvisi.append((tg, testo))
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    def _campi_ind():
+        """Il catalogo dei campi si estrae per TESTO come le altre
+        costanti (FIRME_DOC_BUSTA docet): una copia scritta a mano qui
+        giudicherebbe una tabella diversa da quella vera."""
+        i = src.index("CAMPI_INDIRIZZO = (")
+        return src[i:src.index("\n)\n", i) + 3]
+
+    def _amb(chi, collaudo=True):
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "leggi_json": _leggi, "notifica": _notifica,
+               "time": _t, "json": __import__("json"),
+               "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
+               "MODALITA_COLLAUDO": collaudo}
+        exec(pezzo("_cifra_contenuto"), amb)
+        exec(pezzo("_decifra_contenuto"), amb)
+        exec(_campi_ind(), amb)
+        exec(pezzo("_indirizzo_da_payload"), amb)
+        exec(pezzo("_indirizzo_letto"), amb)
+        return amb
+
+    def corri(amb, nome, *args):
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb[nome](*args))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    def scrivi(chi, oid, body, collaudo=True):
+        amb = _amb(chi, collaudo)
+        exec("async " + pezzo("indica_indirizzo"), amb)
+        return corri(amb, "indica_indirizzo", oid, _Req(body))
+
+    def leggi(chi, oid):
+        amb = _amb(chi)
+        exec("async " + pezzo("leggi_indirizzo"), amb)
+        return corri(amb, "leggi_indirizzo", oid)
+
+    pieno = {"indirizzo": {"nome": "Mario Rossi", "via": "Via Roma 1",
+                           "cap": "27100", "citta": "Pavia",
+                           "provincia": "PV", "telefono": "333 111",
+                           "note": "Citofono Rossi"}}
+    prova("il venditore non lo scrive", "400 Operazione non permessa",
+          scrivi(222, 1, pieno))
+    prova("l'estraneo nemmeno, e con la STESSA risposta",
+          "400 Operazione non permessa", scrivi(999, 1, pieno))
+    prova("niente indirizzo sulla via del locker", True,
+          str(scrivi(111, 2, pieno)).startswith("400 Questo ordine"))
+    prova("un indirizzo a meta' si rifiuta", True,
+          str(scrivi(111, 1, {"indirizzo": {"nome": "Mario"}}))
+          .startswith("400 Per la spedizione"))
+    prova("...e senza la chiave, fuori dal collaudo, e' un 503", True,
+          str(scrivi(111, 1, pieno, collaudo=False)).startswith("503"))
+
+    prima = [tuple(r) for r in vero.execute(
+        "SELECT stato, aggiornato, spedito_il, consegnato FROM ordini")]
+    r1 = scrivi(111, 1, pieno)
+    prova("il compratore lo scrive, e il timbro nasce", True,
+          isinstance(r1, dict) and r1["indirizzo_il"] > 0)
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("nel database non e' nudo: passa dal trasporto di casa",
+          True, o1["indirizzo"].startswith("plain:"))
+    prova("...e l'ordine non si e' mosso di un millimetro", prima,
+          [tuple(r) for r in vero.execute(
+              "SELECT stato, aggiornato, spedito_il, consegnato "
+              "FROM ordini")])
+    prova("il venditore riceve l'avviso, senza il testo dentro", True,
+          len(avvisi) == 1 and avvisi[0][0] == 222
+          and "Via Roma" not in avvisi[0][1])
+
+    letto = leggi(222, 1)
+    prova("il venditore lo legge", True,
+          isinstance(letto, dict)
+          and letto["campi"]["via"] == "Via Roma 1")
+    prova("...e anche il compratore", True,
+          isinstance(leggi(111, 1), dict))
+    prova("l'estraneo no, e non impara se l'ordine esiste",
+          "400 Operazione non permessa", leggi(999, 1))
+    prova("l'ordine che non c'e' risponde IDENTICO",
+          "400 Operazione non permessa", leggi(999, 4242))
+    dump = [tuple(r) for r in vero.execute("SELECT * FROM ordini")]
+    leggi(222, 1)
+    leggi(111, 1)
+    prova("leggere non scrive NIENTE (due letture, dump identico)",
+          dump, [tuple(r) for r in vero.execute("SELECT * FROM ordini")])
+
+    avvisi.clear()
+    scrivi(111, 1, {"indirizzo": dict(pieno["indirizzo"], cap="27011")})
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("la correzione si conta e timbra", True,
+          o1["indirizzo_correzioni"] == 1
+          and o1["indirizzo_corretto_il"] > 0)
+    prova("...ma il PRIMO timbro non si sposta", 1,
+          len({r1["indirizzo_il"], o1["indirizzo_il"]}))
+    prova("...e il venditore lo viene a sapere", 1, len(avvisi))
+
+    # --- LA SCOPA, girata davvero ----------------------------------
+    amb = {"db": Con, "time": _t, "GIORNI_INDIRIZZO": 30,
+           "print": lambda *a, **k: None}
+    exec(pezzo("pulisci_indirizzi"), amb)
+    _t_finto = type("T", (), {"time": staticmethod(lambda: 9_000_000_000)})
+    amb["time"] = _t_finto
+    amb["pulisci_indirizzi"]()
+    o3 = vero.execute("SELECT * FROM ordini WHERE id=3").fetchone()
+    o4 = vero.execute("SELECT * FROM ordini WHERE id=4").fetchone()
+    prova("l'ordine chiuso da un pezzo perde l'indirizzo", True,
+          o3["indirizzo"] == "" and o3["indirizzo_purgato_il"] > 0)
+    prova("...ma il resto della riga resta intero", True,
+          o3["indirizzo_il"] == 500 and o3["aggiornato"] == 1000
+          and o3["stato"] == "released")
+    prova("la finestra di grazia protegge il chiuso di ieri", True,
+          o4["indirizzo"] == "plain:{}"
+          and o4["indirizzo_purgato_il"] == 0)
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("e l'ordine VIVO non si tocca", True, bool(o1["indirizzo"]))
+    dopo = [tuple(r) for r in vero.execute("SELECT * FROM ordini")]
+    amb["pulisci_indirizzi"]()
+    prova("la scopa e' idempotente: il secondo giro non fa niente",
+          dopo, [tuple(r) for r in vero.execute("SELECT * FROM ordini")])
+    prova("il purgato lo dice a chi lo cerca", True,
+          str(leggi(111, 3)).startswith("404 L'indirizzo è stato "
+                                        "cancellato"))
     vero.close()
 
 
@@ -7432,11 +7739,18 @@ def prove_pagina_acquisto():
     prova("_compra_set: whitelist ('casa', 'punto')", True,
           '("casa", "punto")' in corpo_set)
 
-    # 5. L'asta resta fuori perimetro: il varco del vincitore non sa
-    #    niente di punti di ritiro
+    # 5. L'asta resta fuori dal perimetro del PUNTO: il varco del
+    #    vincitore non scrive ne' la via ne' il punto.
+    #    ⚠️ La prova cercava la PAROLA «punto» nel corpo, e bastava un
+    #    commento a farla rossa: dall'ago 2026 (l'indirizzo di casa,
+    #    che invece il varco dichiara) guarda i due NOMI VERI delle
+    #    colonne. Piu' stretta, non piu' larga: e' la scrittura che
+    #    non deve esserci, non la parola.
     corpo = pezzo("scegli_consegna_ordine").split('"""')[-1]
-    prova("scegli_consegna_ordine: niente punto", False,
-          "punto" in corpo)
+    prova("scegli_consegna_ordine: niente via_punto", False,
+          "via_punto" in corpo)
+    prova("scegli_consegna_ordine: niente punto_ritiro", False,
+          "punto_ritiro" in corpo)
 
     # 5bis. LA REGOLA ROVESCIATA (secondo giro, decisione di Andrea):
     #    la via punto si offre SEMPRE dove c'e' la spedizione — il
@@ -7557,8 +7871,13 @@ def prove_pagina_acquisto():
     #    separati per propagazione: il cassetto la ferma, o un click
     #    nell'input rifarebbe il render sotto le dita; la tastiera ha
     #    la guardia event.target===this.
+    # (ago 2026: le vie col cassetto sono diventate DUE — il punto e
+    #  la casa, che ospita l'indirizzo — quindi il ramo e' condiviso e
+    #  ognuna sceglie il suo. La prova resta la stessa: il cassetto si
+    #  disegna SOLO dentro la radio selezionata.)
     prova("il cassetto del punto vive dentro la radio della via", True,
-          "${s.via===d.via ? cassettoPunto : ''}" in mini3)
+          "cassettoPunto : cassettoIndirizzo" in mini3
+          and "${s.via===d.via ? cass : ''}" in mini3)
     prova("...la radio ospite e' un DIV, mai un button annidato", True,
           '<div role="radio" tabindex="0"' in mini3)
     _i_cass = mini3.index('id="acqPuntoCampo"')
@@ -8067,6 +8386,8 @@ def prove_libro_mastro():
           busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
           busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
           busta_correzioni INT DEFAULT 0,
+          indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
+          indirizzo_purgato_il INT DEFAULT 0,
           nascosto_compratore INT DEFAULT 0,
           nascosto_venditore INT DEFAULT 0);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
@@ -8281,6 +8602,21 @@ def prove_libro_mastro():
         # che una parte non vede piu'
         ("UPDATE ordini SET nascosto_venditore=1 WHERE id=2",
          "ordine nascosto su uno stato non finale", "2"),
+        # l'indirizzo di casa, nei suoi quattro modi. L'ULTIMO E'
+        # QUELLO CHE CONTA: se la scopa ha timbrato la cancellazione
+        # ma il testo e' ancora li', la promessa scritta nella pagina
+        # pubblica e' falsa — ed e' cio' che la rende verificabile
+        # invece che raccontata.
+        ("UPDATE ordini SET indirizzo='via Roma 1' WHERE id=4",
+         "indirizzo fuori contratto", "4"),
+        ("UPDATE ordini SET indirizzo_il=99 WHERE id=4",
+         "indirizzo fuori contratto", "4"),
+        ("UPDATE ordini SET indirizzo='via Roma 1', indirizzo_il=99, "
+         "via_punto=1 WHERE id=4",
+         "indirizzo fuori contratto", "4"),
+        ("UPDATE ordini SET indirizzo='via Roma 1', indirizzo_il=99, "
+         "indirizzo_purgato_il=100 WHERE id=4",
+         "indirizzo fuori contratto", "4"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -10465,7 +10801,10 @@ def prove_avviso_spedizione():
         d = {"id": 7, "compratore_id": 111, "venditore_id": 222,
              "stato": "locked", "consegna_scelta": "spedizione",
              "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
-             "busta_il": 0}
+             "busta_il": 0,
+             # l'ordine del mondo di ieri: l'indirizzo non l'ha mai
+             # chiesto, quindi il gate di segna_spedito non lo tocca
+             "indirizzo_atteso": 0, "indirizzo_il": 0}
         d.update(extra)
         return d
 
@@ -10659,7 +10998,12 @@ def prove_ricevuta_compratore():
     import time as _time
     import types
 
-    coda = reale("_coda_ricevuta")
+    _coda = reale("_coda_ricevuta")
+    # l'indirizzo di casa (ago 2026) ha allargato la firma di due
+    # bool: qui si chiama col MONDO DI IERI (mai chiesto, mai
+    # scritto), cosi' le prove storiche restano quelle di sempre e i
+    # rami nuovi hanno le loro, sotto.
+    coda = lambda c, vp, ps, ia=0, isc=False: _coda(c, vp, ps, ia, isc)
 
     # --- 1) IL GIUDICE DELLA CODA, strada per strada ---------------
     sped = coda("spedizione", 0, False)
@@ -10667,6 +11011,19 @@ def prove_ricevuta_compratore():
           "tracciamento" in sped)
     prova("...e dice che a chiudere e' la sua conferma", True,
           "confermalo nella Mini App" in sped)
+
+    # I DUE RAMI NUOVI della spedizione a casa: l'indirizzo scritto si
+    # NOMINA, quello atteso si CHIEDE — e l'ordine che non l'ha mai
+    # chiesto (sopra) resta col testo di sempre, o si manderebbe
+    # qualcuno a cercare un campo che sul suo schermo non esiste.
+    casa_ok = coda("spedizione", 0, False, 1, True)
+    prova("indirizzo scritto: il venditore ci spedisce", True,
+          "indirizzo che hai indicato" in casa_ok)
+    casa_no = coda("spedizione", 0, False, 1, False)
+    prova("indirizzo atteso e non scritto: gli si chiede", True,
+          "indica l'indirizzo" in casa_no)
+    prova("...e non gli si promette il tracciamento", True,
+          "tracciamento" not in casa_no)
 
     punto = coda("spedizione", 1, True)
     prova("punto di ritiro: niente tracciamento da aspettare", True,
@@ -10730,6 +11087,7 @@ def prove_ricevuta_compratore():
               via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
               spedizione_sats INT DEFAULT 0, protezione_sats INT DEFAULT 0,
               sconto_sats INT DEFAULT 0,
+              indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
               aggiornato INT DEFAULT 0);
             CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
               annuncio_id INT, quantita INT, unitario_sats INT, titolo TEXT);
@@ -14114,7 +14472,8 @@ def prove_ordini_fermi():
           solleciti_conferma INT DEFAULT 0,
           sollecito_conferma_il INT DEFAULT 0,
           solleciti_incasso INT DEFAULT 0, sollecito_incasso_il INT DEFAULT 0,
-          solleciti_busta INT DEFAULT 0, sollecito_busta_il INT DEFAULT 0);
+          solleciti_busta INT DEFAULT 0, sollecito_busta_il INT DEFAULT 0,
+          indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0);
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
           titolo TEXT, quantita INT);
@@ -15954,7 +16313,132 @@ def prove_sintassi_client():
     prova("ogni <script> del client passa il parse di node", [], rotti)
     r = _sp.run([node, "--check", "sw.js"], capture_output=True, text=True)
     prova("...e sw.js pure", 0, r.returncode)
+    prove_avvio_client(mini, node)
     prove_commenti_css(mini)
+
+
+def prove_avvio_client(mini=None, node=None):
+    """L'AVVIO del client, non il suo parse (ago 2026, da un guasto
+    VERO fatto scrivendo l'indirizzo di casa: `scriviTempi()` gira a
+    top-level e chiamava una funzione che legge una `let` dichiarata
+    PIU' IN BASSO — ReferenceError da temporal dead zone, lo script si
+    interrompe li' e l'app resta muta: niente card, niente barra
+    collaudo. Le 3400 sentinelle erano verdi e node --check pure,
+    perche' LA SINTASSI ERA PERFETTA: e' l'esecuzione che moriva.
+
+    Qui lo script si fa GIRARE per davvero, con un DOM di cartone: se
+    qualcosa alza prima dell'ultima riga, la prova e' rossa. Non
+    verifica che l'app funzioni — per quello ci vuole un browser — ma
+    che ARRIVI IN FONDO, che e' la differenza fra un'app viva e una
+    pagina bianca. `avvia()` in coda e' async: le sue promesse cadono
+    nel vuoto e non fermano niente, ed e' giusto cosi' — quel che si
+    prova qui e' il corpo sincrono."""
+    import shutil as _sh, subprocess as _sp, tempfile as _tf, re as _re
+    if mini is None:
+        mini = open("miniapp.html", encoding="utf-8").read()
+    if node is None:
+        node = _sh.which("node")
+    if not node:
+        salta("il client arriva in fondo allo script", "node non installato")
+        return
+    blocchi = _re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>",
+                          mini, _re.S)
+    # il DOM di cartone: solo quel che il client tocca prima di
+    # respirare. Non deve far FUNZIONARE niente — deve solo non
+    # mentire su un'assenza (mai `undefined` dove il client si aspetta
+    # un oggetto), o si fallirebbe per colpa dello stub.
+    stub = """
+    const noop = () => {};
+    const elFinto = () => new Proxy({
+      style:{setProperty:noop, removeProperty:noop,
+             getPropertyValue:()=>''},
+      classList:{add:noop, remove:noop, toggle:noop,
+                 contains:()=>false},
+      dataset:{}, children:[], value:'', textContent:'', innerHTML:'',
+      appendChild:noop, removeChild:noop, remove:noop, focus:noop,
+      addEventListener:noop, removeEventListener:noop, setAttribute:noop,
+      getAttribute:()=>null, querySelector:()=>elFinto(),
+      querySelectorAll:()=>[elFinto()],
+      closest:()=>null, insertAdjacentHTML:noop, scrollIntoView:noop,
+      getBoundingClientRect:()=>({top:0,left:0,width:0,height:0}),
+      play:noop, click:noop, submit:noop, reset:noop, checked:false,
+      files:[], options:[], selectedIndex:0, disabled:false,
+    }, {get:(t,k)=> k in t ? t[k] : undefined, set:()=>true});
+    globalThis.document = {
+      documentElement: elFinto(), body: elFinto(), head: elFinto(),
+      getElementById: () => elFinto(), querySelector: () => elFinto(),
+      // UN elemento e non zero, ed e' la riga che rende la prova
+      // capace di fallire: con la lista vuota ogni forEach gira a
+      // vuoto e il corpo — dove vivono i ReferenceError — non viene
+      // eseguito mai. La prima stesura passava anche col guasto
+      // dentro, e l'ha detto la tortura.
+      querySelectorAll: () => [elFinto()], createElement: () => elFinto(),
+      addEventListener: noop, removeEventListener: noop,
+      cookie:'', title:'', readyState:'complete', visibilityState:'visible',
+      scripts:[], forms:[], activeElement:null, hidden:false,
+      createTextNode: () => elFinto(), execCommand: noop,
+    };
+    globalThis.window = globalThis;
+    globalThis.self = globalThis;
+    globalThis.addEventListener = noop;
+    globalThis.removeEventListener = noop;
+    globalThis.dispatchEvent = noop;
+    globalThis.localStorage = {getItem:()=>null, setItem:noop,
+                               removeItem:noop, clear:noop, key:()=>null,
+                               length:0};
+    globalThis.sessionStorage = globalThis.localStorage;
+    globalThis.navigator = {userAgent:'prove', language:'it-IT',
+      clipboard:{writeText:()=>Promise.resolve()}, share:undefined,
+      serviceWorker:{register:()=>Promise.resolve(), ready:new Promise(noop)},
+      vibrate:noop, onLine:true, maxTouchPoints:0};
+    globalThis.location = {href:'http://localhost/', pathname:'/',
+      search:'', hash:'', origin:'http://localhost', hostname:'localhost',
+      protocol:'http:', reload:noop, replace:noop, assign:noop};
+    globalThis.history = {pushState:noop, replaceState:noop, back:noop,
+      go:noop, state:null, length:1, scrollRestoration:'auto'};
+    globalThis.matchMedia = () => ({matches:false, addEventListener:noop,
+      removeEventListener:noop, addListener:noop, removeListener:noop});
+    globalThis.fetch = () => new Promise(noop);   // mai risolta: zero rete
+    globalThis.requestAnimationFrame = () => 0;
+    globalThis.cancelAnimationFrame = noop;
+    globalThis.setInterval = () => 0;             // niente timer vivi
+    globalThis.clearInterval = noop;
+    globalThis.setTimeout = () => 0;
+    globalThis.clearTimeout = noop;
+    globalThis.IntersectionObserver = class { observe(){} unobserve(){}
+      disconnect(){} };
+    globalThis.MutationObserver = class { observe(){} disconnect(){}
+      takeRecords(){ return [] } };
+    globalThis.ResizeObserver = globalThis.MutationObserver;
+    globalThis.alert = noop; globalThis.confirm = () => false;
+    globalThis.prompt = () => null;
+    globalThis.getComputedStyle = () => new Proxy(
+      {getPropertyValue:()=>'', setProperty:noop, removeProperty:noop},
+      {get:(t,k)=> k in t ? t[k] : '', has:()=>true});
+    globalThis.Notification = {permission:'default', requestPermission:noop};
+    globalThis.scrollTo = noop; globalThis.scrollBy = noop;
+    globalThis.innerWidth = 390; globalThis.innerHeight = 844;
+    globalThis.visualViewport = {height:844, offsetTop:0,
+      addEventListener:noop};
+    globalThis.crypto = globalThis.crypto || {getRandomValues:(a)=>a,
+      randomUUID:()=>'x'};
+    process.on('unhandledRejection', noop);   // avvia() e' async
+    """
+    rotti = []
+    for i, b in enumerate(blocchi):
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as f:
+            f.write(stub + "\n" + b + "\n;globalThis.__fine = true;")
+            percorso = f.name
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    timeout=90)
+        if r.returncode != 0:
+            prima = [x for x in (r.stderr or "").splitlines()
+                     if "Error" in x or "error" in x][:2]
+            rotti.append(f"blocco {i}: {prima or (r.stderr or '')[:160]}")
+        os.unlink(percorso)
+    prova("ogni <script> del client arriva in fondo (niente "
+          "ReferenceError da temporal dead zone)", [], rotti)
 
 
 def prove_commenti_css(mini=None):
@@ -16005,7 +16489,8 @@ def main():
               prove_initdata, prove_foto, prove_foto_scarti, prove_avatar,
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
-              prove_busta_ritiro, prove_nascondi_ordine,
+              prove_busta_ritiro, prove_indirizzo_casa,
+              prove_nascondi_ordine,
               prove_lista_ordini, prove_dettaglio_ordine,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,

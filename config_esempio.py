@@ -142,6 +142,18 @@ ORE_SILENZIO_DIGITALE = 48   # consegnato ma mai rivelato: poi sblocco
 # e accenderla non ricifra il passato — le righe gia' scritte in
 # chiaro restano in chiaro, e vanno bene cosi' finche' esistono.
 CHIAVE_CONTENUTI_DIGITALI = ""
+# La stessa chiave cifra l'INDIRIZZO DI CASA che il compratore scrive
+# nell'ordine per la spedizione (ago 2026) — ma li' il fail-open non
+# c'e': senza chiave la spedizione a casa risponde 503 e chi compra
+# ripiega sulla chat, invece di lasciare un'anagrafica in chiaro nel
+# database. Un PIN di ritiro in chiaro e' una degradazione
+# accettabile, il nome e la via di una persona no.
+# Quanti giorni dopo la CHIUSURA dell'ordine l'indirizzo si cancella
+# da solo. Si puo' allungare o accorciare (0 = alla prima passata dopo
+# la chiusura), MAI spegnere: e' una promessa scritta nella pagina
+# «Il pagamento protetto», e il numero che la pagina mostra viene da
+# qui — se lo cambi, cambia anche la frase che leggono gli utenti.
+GIORNI_INDIRIZZO = 30
 # Leve anti-frode, SPENTE di serie (0 = nessun limite):
 TETTO_DIGITALE_NUOVI = 0     # es. 50_000: un compratore senza acquisti
                              # conclusi non compra digitale sopra questa

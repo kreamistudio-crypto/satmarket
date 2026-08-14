@@ -1909,6 +1909,18 @@
     text-overflow:ellipsis;white-space:nowrap}
   .punto-riga .punto-cambia{flex:0 0 auto;font-weight:800;
     text-decoration:underline}
+  /* Il cassetto dell'indirizzo di casa (ago 2026): stesso ospite e
+     stessa forma del punto — riusa .punto-riga per la riga compatta,
+     che e' il VESTITO di «un testo lungo col Cambia in fondo» e non
+     il nome di una promessa (il patto di .lampo-was). Il <form> non
+     porta stile suo: i campi sono quelli di .field, che il
+     contenitore ha gia'. */
+  #acqIndCampo{margin-top:10px}
+  #acqIndCampo .btn{margin-top:0}
+  #acqIndCampo .ind-form label{margin-top:8px}
+  #acqIndCampo .ind-form label:first-child{margin-top:0}
+  .ind-facolt{font-weight:600;text-transform:none;letter-spacing:0;
+    color:var(--muted)}
   /* la card del singolo articolo: francobollo + titolo + unitario */
   .acq-art{display:flex;align-items:center;gap:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:var(--radius);
@@ -2875,6 +2887,20 @@
     resize:vertical;outline:none;margin:12px 0 10px;word-break:break-all;
   }
   .payout textarea:focus{border-color:var(--sats)}
+  /* I campi dell'indirizzo dentro l'ordine (ago 2026): dentro .payout
+     le label non sono vestite da nessuno — sono nate INLINE, coi
+     campi sfasati a meta' riga (visto a schermo, non leggendo il
+     foglio). Qui si ricalca .field, che e' il vestito di casa dei
+     moduli, senza toccarlo: la .payout ospita anche le textarea del
+     wallet, che quel trattamento non lo vogliono. */
+  .ind-campi label{display:block;font-size:12px;font-weight:800;
+    text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+    margin:10px 0 4px}
+  .ind-campi input{width:100%;border:1.5px solid var(--line);
+    border-radius:10px;background:var(--bg);padding:10px 12px;
+    font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);
+    outline:none}
+  .ind-campi input:focus{border-color:var(--ink)}
   .payout .okline{display:flex;gap:6px;align-items:center;color:var(--trust);
     font-weight:800;font-size:13px;margin-top:10px}
   .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
@@ -3800,6 +3826,23 @@ document.getElementById('cartello')?.remove();</script>
       <h3>Il pagamento, in pratica</h3>
       <p>Su Barattolo si paga <b>solo in bitcoin</b>, sulla rete <b>Lightning</b>: trasferimenti immediati e con commissioni di rete quasi nulle, anche per pochi euro di valore. Il prezzo lo puoi leggere in sats o in euro con l'interruttore <b>€ / ₿</b> — quello che viaggia sono sempre sats.</p>
       <p>Ti serve un wallet Lightning: ne esistono tanti, gratuiti, e ne basta uno. Al pagamento Barattolo ti mostra una <b>invoice</b>: la copi, o inquadri il codice, e il wallet fa il resto. Se colleghi il wallet con <b>NWC</b> (Nostr Wallet Connect) dal tuo Profilo, il bottone «⚡ Compra subito» paga senza passaggi — la connessione resta <b>solo sul tuo dispositivo</b>, non arriva mai ai nostri server, e nel wallet puoi darle un tetto di spesa.</p>
+
+      <!-- L'INDIRIZZO DI CASA (ago 2026). Fino a ieri questa pagina non
+           nominava mai indirizzi, recapiti o dati personali — e non
+           serviva, perché nello schema non esisteva una sola colonna
+           di indirizzo. Da oggi c'è, ed è il primo dato personale
+           vero della piattaforma: si scrive qui invece di lasciarlo
+           implicito. Ogni riga dev'essere VERA e verificabile — il
+           numero dei giorni viene dal SERVER (giorni_indirizzo), non
+           da una cifra battuta a mano, e la cancellazione ha il suo
+           controllo nel libro mastro. La voce parla dell'INDIRIZZO e
+           non dei «dati della consegna»: le istruzioni di ritiro
+           della busta non si cancellano, e una frase che le
+           includesse sarebbe falsa. -->
+      <h3>L'indirizzo per la spedizione</h3>
+      <p>Se scegli la <b>spedizione a casa</b>, l'indirizzo lo scrivi al momento dell'acquisto e resta <b>dentro l'ordine</b>: lo vede <b>solo il venditore</b>, per stampare l'etichetta. Non lo pubblichiamo da nessuna parte, non lo usiamo per altro, e <b>i moderatori non lo leggono</b> — nemmeno per decidere una disputa: a loro risulta soltanto <i>se</i> l'hai indicato e quando.</p>
+      <p>E non lo conserviamo: <b>lo trasportiamo</b>. Nel database è cifrato, e <b><span data-giorni-ind></span> giorni dopo la chiusura dell'ordine</b> viene cancellato da solo. Finché l'ordine è aperto invece resta, perché è lì che serve: se un affare non si chiude mai, l'indirizzo lo aspetta.</p>
+      <p class="sicu-nota">La strada che ne chiede di meno è il <b>punto di ritiro</b>: lì un indirizzo tuo non c'è proprio — al banco basta il nome del destinatario, che sceglie il venditore.</p>
 
       <h3>Dove stanno i sats, e per quanto</h3>
       <!-- Testo pesato con attenzione (deciso con Andrea): niente la
@@ -5195,6 +5238,13 @@ function mapOrder(o){
     /* consegna digitale (lug 2026): il contenuto NON viaggia mai in
        /api/orders — solo il flag, il testo lo serve /contenuto */
     contenutoPresente:!!o.contenuto_presente,
+    /* l'indirizzo di casa (ago 2026): il testo non esce da qui — si
+       legge solo da /indirizzo, e solo le due parti. Qui arrivano i
+       FATTI: se e' atteso, se e quando e' stato scritto, quante volte
+       corretto, e se la scopa l'ha gia' cancellato. */
+    indirizzoAtteso:!!o.indirizzo_atteso, indirizzoIl:o.indirizzo_il||0,
+    indirizzoCorrezioni:o.indirizzo_correzioni||0,
+    indirizzoPurgatoIl:o.indirizzo_purgato_il||0,
     /* il feedback che ho lasciato io e quello che ho ricevuto */
     mioVoto:o.mio_voto||0, mioCommento:o.mio_commento||'',
     suoVoto:o.suo_voto||0, suoCommento:o.suo_commento||'',
@@ -5526,6 +5576,16 @@ async function loadListings(anonimo){
     offertaMinPercento = Number(j.offerta_minima_percento) || 0;
   if (j.giorni_data_annuncio !== undefined)
     giorniData = Number(j.giorni_data_annuncio) || 0;
+  /* Fra quanti giorni cancelliamo l'indirizzo di casa. VIENE DAL
+     SERVER e non e' scritto a mano qui come i tempi di TEMPI: quello
+     e' un numero che decide se un bottone ha senso, questo e' la
+     PROMESSA che la pagina «Il pagamento protetto» fa su un dato
+     personale — se l'operatore la allunga e la pagina dicesse ancora
+     30, avremmo scritto il falso. */
+  if (j.giorni_indirizzo !== undefined) {
+    GIORNI_IND = Number(j.giorni_indirizzo) || 0;
+    scriviGiorniIndirizzo();
+  }
   /* la leva delle aste per gli anonimi: decide se il 🔨 della nav
      porta alla vetrina delle aste o al «coming soon» */
   if (j.asta_abilitata !== undefined) {
@@ -7772,6 +7832,15 @@ function scriviTempi(){
     if (v !== undefined) s.textContent = v;
   });
 }
+/* La gemella per i giorni dell'indirizzo, che NON stanno in TEMPI:
+   quel numero non lo scriviamo a mano da nessuna parte — arriva dal
+   server e si riscrive quando arriva (la busta di prima pagina
+   atterra dopo l'avvio, e la pagina puo' essere gia' stata guardata
+   col ripiego). */
+function scriviGiorniIndirizzo(){
+  document.querySelectorAll('[data-giorni-ind]').forEach(
+    s => s.textContent = GIORNI_IND);
+}
 scriviTempi();
 
 /* La percentuale della protezione acquisti: arriva col server nella
@@ -7782,6 +7851,25 @@ let protPercento = 0;
    auto-denunciarsi). La leva vera arriva dal server con la prima
    pagina; 60 e' solo il ripiego per un server di ieri, 0 = spenta. */
 let giorniData = 60;
+/* Fra quanti giorni dalla chiusura dell'ordine cancelliamo
+   l'indirizzo di casa. Arriva dal SERVER (giorni_indirizzo, busta di
+   prima pagina) e NON e' uno specchio a mano come i tempi di TEMPI:
+   quei numeri decidono se un bottone ha senso, questo E' la promessa
+   scritta nella pagina «Il pagamento protetto». 30 e' il ripiego per
+   un server di ieri, e combacia col default del config. */
+let GIORNI_IND = 30;
+/* I segnaposto dei campi indirizzo: esempi, non istruzioni — il
+   formato vero lo conosce il corriere, non noi. */
+const SEGNAPOSTO_IND = {nome:'Mario Rossi', via:'Via Roma 1',
+  cap:'27100', citta:'Pavia', provincia:'PV', telefono:'333 1234567',
+  note:'Citofono, scala, orari'};
+/* ⚠️ QUI e non dentro scriviTempi(), che gira a top-level PRIMA di
+   questa riga: leggere GIORNI_IND da la' dentro alza un ReferenceError
+   (temporal dead zone) che INTERROMPE lo script — l'app resta muta,
+   e node --check non lo vede perche' la sintassi e' perfetta. Ci sono
+   cascato scrivendo questo cantiere: la prova che lo prende e'
+   prove_avvio_client. */
+scriviGiorniIndirizzo();
 /* I sats di spedizione: spedEur pieno = costo IN EURO (listino EUR,
    oppure l'ancora all'euro dei listini sats) e i sats sono una STIMA
    al cambio vivo — il valore vero si fissa alla creazione
@@ -9234,6 +9322,7 @@ function apriAcquisto(l){
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id)?.id || 0,
              preventivo:null, via:'', punto:'', puntoAperto:false,
+             indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
   renderAcquisto();                 /* lo scheletro, subito */
@@ -9281,6 +9370,7 @@ function apriAcquistoSet(){
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
              preventivo:null, via:'', punto:'', puntoAperto:false,
+             indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
   renderAcquisto();
@@ -9351,9 +9441,16 @@ function preventivoDemo(l){
    preselezionato che nessuno aveva scelto: la spedizione batte il
    ritiro. Lo strato nuovo: fra le due spedizioni vince il PUNTO,
    perche' e' la via gia' marcata «Consigliato» — default e consiglio
-   devono dire la stessa cosa, non indicare due strade diverse (e la
-   casa espone l'indirizzo, il contrario di cio' per cui esiste la
-   busta di consegna). Con la tariffa punto morta per cambio muto
+   devono dire la stessa cosa, non indicare due strade diverse.
+   ⚠️ LA SECONDA RAGIONE DI ALLORA E' SCADUTA, e si riscrive invece di
+   lasciarla li' a ingannare chi legge: diceva «e la casa espone
+   l'indirizzo, il contrario di cio' per cui esiste la busta». Dall'
+   ago 2026 la casa NON espone piu' niente — l'indirizzo vive dentro
+   l'ordine, cifrato, lo legge solo il venditore e si cancella dopo
+   la chiusura (vedi pannelloIndirizzoCasa). Il punto resta il
+   default perche' resta il CONSIGLIATO, e perche' e' la strada che
+   di dati ne chiede zero; ma non e' piu' vero che l'altra li
+   sparpaglia. Con la tariffa punto morta per cambio muto
    subentra casa: la spedizione resta il default. L'ordine di
    PRESENTAZIONE delle radio NON cambia (su «entrambe» la selezionata
    e' la TERZA della lista — guardato a schermo a 320/360/375); la via
@@ -9838,6 +9935,37 @@ function renderAcquisto(){
       onclick="event.stopPropagation()">
     ${d.puntoAperto ? campoAperto : campoChiuso}
   </div>`;
+  /* --- L'INDIRIZZO DI CASA (ago 2026): il cassetto gemello sull'altra
+     via, con la stessa liturgia — tre stati (bottone / campi aperti /
+     riga compatta col «Cambia»), lo stato in acqDati e mai nel DOM, e
+     la propagazione fermata sul contenitore, o un tocco dentro un
+     campo riselezionerebbe la via e ridisegnerebbe tutto sotto le
+     dita di chi scrive.
+     IL <form> C'E' PER IL TELEFONO: il riempimento automatico si fida
+     molto di piu' di campi che stanno dentro un form, con la loro
+     label associata. onsubmit="return false" perche' qui non si
+     invia niente: a mandare l'ordine e' «Paga», piu' in basso. */
+  const iVal = d.indirizzo || indirizzoVuoto();
+  const campiIndirizzo = `<form onsubmit="return false" class="ind-form">
+    ${CAMPI_IND.map(c => `<label for="acqInd_${c.k}">${c.et}${c.serve?'':' <span class="ind-facolt">(facoltativo)</span>'}</label>
+      <input id="acqInd_${c.k}" maxlength="${c.max}" value="${esc(iVal[c.k]||'')}"
+        ${c.ac ? `autocomplete="${c.ac}"` : 'autocomplete="off"'}
+        ${c.k==='cap' ? 'inputmode="numeric"' : ''}
+        ${c.k==='telefono' ? 'type="tel"' : ''}
+        placeholder="${esc(SEGNAPOSTO_IND[c.k]||'')}"
+        oninput="setCampoIndirizzo('${c.k}', this.value)">`).join('')}
+    <div class="acq-nota">Lo vede solo il venditore, per spedire. Lo cancelliamo ${GIORNI_IND} giorni dopo la chiusura dell'ordine.</div>
+  </form>`;
+  const indScritto = indirizzoCompleto(iVal);
+  const indChiuso = indScritto
+    ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
+        onclick="apriIndirizzoAcquisto()"><span class="punto-testo">${esc(indirizzoRiassunto(iVal))}</span><span class="punto-cambia">Cambia</span></button>`
+    : `<button type="button" class="btn ghost" aria-expanded="false"
+        onclick="apriIndirizzoAcquisto()">Indica l'indirizzo di spedizione</button>`;
+  const cassettoIndirizzo = `<div class="${d.indirizzoAperto?'field':''}" id="acqIndCampo"
+      onclick="event.stopPropagation()">
+    ${d.indirizzoAperto ? campiIndirizzo : indChiuso}
+  </div>`;
   /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
      (decisione di Andrea, ago 2026: il totale con dentro l'oggetto
      si leggeva come «costo di spedizione» — il totale lo dice IL
@@ -9870,14 +9998,21 @@ function renderAcquisto(){
             /* la gratuita' parla col grassetto, mai col colore */
             : `<span class="via-gratis">gratuita</span>`)
         : '';
-      if (s.via==='punto')
+      /* LE DUE VIE COL CASSETTO sono DIV e non <button>, ed e' un
+         obbligo dell'HTML e non una preferenza: un input (o un
+         bottone) dentro un <button> e' markup non valido — la lezione
+         dello stepper dentro «Acquista». Le altre vie restano
+         bottoni. */
+      if (s.via==='punto' || s.via==='casa'){
+        const cass = s.via==='punto' ? cassettoPunto : cassettoIndirizzo;
         return `<div role="radio" tabindex="0" aria-checked="${s.via===d.via}"
-          class="via-opzione con-cassetto" data-via="punto"
+          class="via-opzione con-cassetto" data-via="${s.via}"
           onclick="setViaAcquisto(this.dataset.via)"
-          onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setViaAcquisto('punto')}">
+          onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();setViaAcquisto('${s.via}')}">
           <span class="via-riga"><span class="via-nome">${nomeVia(s.via)}${nota}</span>${cifra}</span>
-          ${s.via===d.via ? cassettoPunto : ''}
+          ${s.via===d.via ? cass : ''}
         </div>`;
+      }
       return `<button type="button" role="radio" aria-checked="${s.via===d.via}"
         class="via-opzione" data-via="${s.via}" onclick="setViaAcquisto(this.dataset.via)">
         <span class="via-nome">${nomeVia(s.via)}${nota}</span>${cifra}
@@ -10106,8 +10241,14 @@ function setViaAcquisto(v){
      bottone), mai un campo spalancato */
   if (v !== 'punto') acqDati.puntoAperto = false;
   else if (!acqDati.punto.trim()) acqDati.puntoAperto = true;
+  /* il gemello sulla via casa, stessa regola */
+  if (v !== 'casa') acqDati.indirizzoAperto = false;
+  else if (!indirizzoCompleto(acqDati.indirizzo))
+    acqDati.indirizzoAperto = true;
   renderAcquisto();
   if (v === 'punto' && acqDati.puntoAperto) el('acqPunto')?.focus();
+  if (v === 'casa' && acqDati.indirizzoAperto)
+    el('acqInd_nome')?.focus({preventScroll:true});
 }
 /* Il cassetto del punto si apre da UN posto solo — il bottone, la
    radio del punto a campo vuoto (via setViaAcquisto) e le due guardie
@@ -10118,6 +10259,55 @@ function apriPuntoAcquisto(){
   acqDati.puntoAperto = true;
   renderAcquisto();
   el('acqPunto')?.focus();
+}
+/* ---- L'INDIRIZZO DI CASA (ago 2026) ----
+   Il gemello del cassetto del punto, sull'altra via. I CAMPI SONO
+   SEPARATI PER IL TELEFONO e non per capriccio: il riempimento
+   automatico sa compilare solo campi con RUOLI dichiarati
+   (autocomplete="postal-code" e compagnia), e davanti a un campo
+   unico non fa niente. Sono i PRIMI autocomplete positivi del client
+   — le altre dodici occorrenze del file sono tutte "off" difensivi —
+   e il patto e' che restino allineati al catalogo del server
+   (CAMPI_INDIRIZZO), che e' quello che valida davvero.
+   In colonna finiscono comunque insieme, in un JSON cifrato. */
+const CAMPI_IND = [
+  {k:'nome',      et:'Nome e cognome',      ac:'name',            max:80,  serve:true},
+  {k:'via',       et:'Via e civico',        ac:'address-line1',   max:120, serve:true},
+  {k:'cap',       et:'CAP',                 ac:'postal-code',     max:10,  serve:true},
+  {k:'citta',     et:'Città',               ac:'address-level2',  max:60,  serve:true},
+  {k:'provincia', et:'Provincia',           ac:'address-level1',  max:20,  serve:false},
+  {k:'telefono',  et:'Telefono',            ac:'tel',             max:30,  serve:false},
+  {k:'note',      et:'Note per il corriere', ac:'',               max:120, serve:false},
+];
+function indirizzoVuoto(){
+  const o = {}; CAMPI_IND.forEach(c => o[c.k] = ''); return o;
+}
+/* Completo = i quattro che servono al corriere. La provincia e il
+   telefono restano facoltativi: il server chiede gli stessi quattro,
+   e due giudici che chiedono cose diverse sono uno che promette quel
+   che l'altro nega. */
+function indirizzoCompleto(i){
+  return !!i && CAMPI_IND.every(c => !c.serve || (i[c.k]||'').trim());
+}
+/* La riga compatta: si legge come si scriverebbe su una busta. */
+function indirizzoRiassunto(i){
+  const p = (i.provincia||'').trim();
+  return [(i.nome||'').trim(), (i.via||'').trim(),
+          [(i.cap||'').trim(), (i.citta||'').trim()].filter(Boolean).join(' ')
+            + (p ? ` (${p})` : '')].filter(Boolean).join(' — ');
+}
+function setCampoIndirizzo(k, v){
+  if (acqDati && acqDati.indirizzo) acqDati.indirizzo[k] = v;
+}
+/* Il cassetto si apre da UN posto solo, come quello del punto: mai il
+   fuoco su un campo che non e' in pagina. */
+function apriIndirizzoAcquisto(){
+  if (!acqDati) return;
+  acqDati.indirizzoAperto = true;
+  renderAcquisto();
+  const primo = CAMPI_IND.find(c => c.serve
+    && !(acqDati.indirizzo[c.k]||'').trim()) || CAMPI_IND[0];
+  el('acqInd_' + primo.k)?.focus({preventScroll:true});
 }
 /* Il corpo della consegna per i varchi POST: la via scelta nella
    pagina, nel vocabolario del server. Via '' = annuncio storico,
@@ -10132,6 +10322,16 @@ function corpoConsegna(){
      prima di chiamare): il trim e' la cintura contro il vuoto */
   if (v==='punto' && acqDati.punto.trim())
     out.punto_ritiro = acqDati.punto.trim().slice(0,120);
+  /* LA CHIAVE VIAGGIA SEMPRE sulla via casa, anche a campi vuoti: per
+     il server la sua PRESENZA e' la dichiarazione «questo ordine
+     l'indirizzo lo aspetta» (indirizzo_atteso), che e' cio' che
+     distingue un ordine nato oggi da uno del mondo di ieri. */
+  if (v==='casa'){
+    const i = acqDati.indirizzo || indirizzoVuoto();
+    out.indirizzo = {};
+    CAMPI_IND.forEach(c =>
+      out.indirizzo[c.k] = (i[c.k]||'').trim().slice(0, c.max));
+  }
   return out;
 }
 function ctaAcquisto(){
@@ -10146,6 +10346,14 @@ function ctaAcquisto(){
   if (d.via==='punto' && !d.punto.trim()){
     apriPuntoAcquisto();
     toast('Indica il punto di ritiro: al venditore serve per spedire');
+    return;
+  }
+  /* e il gemello sulla via casa: senza indirizzo il venditore non sa
+     dove spedire. Stessa forma — si APRE il cassetto e poi si mette
+     il fuoco, mai il fuoco su un campo nascosto */
+  if (d.via==='casa' && !indirizzoCompleto(d.indirizzo)){
+    apriIndirizzoAcquisto();
+    toast('Scrivi l\'indirizzo: al venditore serve per spedire');
     return;
   }
   if (d.tipo==='set') startBuySet(); else startBuy();
@@ -11931,6 +12139,11 @@ function compraSubito(){
        chiuso dietro il bottone — si APRE prima del fuoco */
     apriPuntoAcquisto();
     toast('Indica il punto di ritiro: al venditore serve per spedire');
+    return;
+  }
+  if (acqDati.via==='casa' && !indirizzoCompleto(acqDati.indirizzo)){
+    apriIndirizzoAcquisto();
+    toast('Scrivi l\'indirizzo: al venditore serve per spedire');
     return;
   }
   const circaS = (p.stima || via.stima) ? '≈ ' : '';
@@ -13861,6 +14074,7 @@ function openOrder(id){
           ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>locker/punto di ritiro</b>: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b> ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione — se serve, accordatevi in chat sul corriere.</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
+          ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${selettoreCorriere('shipCorriere')}
           <textarea id="shipTracking" style="min-height:38px" placeholder="Numero di tracciamento"></textarea>
@@ -13869,6 +14083,7 @@ function openOrder(id){
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
         </div>`):''}
       ${pannelloContenutoDigitale(o)}
+      ${pannelloIndirizzoCasa(o)}
       ${pannelloBustaRitiro(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
@@ -16498,6 +16713,7 @@ async function consegnaContenuto(btn){
    nemmeno il bottone). Il testo non viaggia in /api/orders: si
    carica solo da /busta-ritiro, e questa e' la copia di pagina. ---- */
 let bustaLetta = {};          // ordineId -> {nome, codice, doc…}
+let indirizzoLetto = {};      // ordineId -> {nome, via, cap…}
 /* il documento scelto e non ancora depositato: data URL + nome, e
    `togli` per il gesto esplicito di levare quello che c'e' gia'
    (chiave assente = si conserva, il patto dello stock lato server) */
@@ -16570,6 +16786,154 @@ function pannelloBustaRitiro(o){
       <button class="btn ghost" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra</button>
     </div>`;
   return '';
+}
+
+/* ---- L'INDIRIZZO DI CASA nell'ordine (ago 2026) ----
+   Lo SPECCHIO di pannelloBustaRitiro: li' scrive il venditore e legge
+   il compratore, qui il contrario. Stesse regole — il testo non esce
+   mai da /api/orders, si chiede alla sua rotta, l'admin non ce l'ha
+   in nessuno stato, e tutto passa da esc().
+   IL GATE E' indirizzoAtteso || indirizzoIl, MAI la via: sulla via
+   nuda comparirebbe di colpo su ogni ordine 'locked' gia' in corso,
+   il compratore lo compilerebbe credendo di aver finito e il
+   venditore continuerebbe ad aspettarlo in chat — silenzio da tutte
+   e due le parti. E' la stessa ragione per cui la busta si gatea su
+   viaPunto, che e' un fatto scritto nell'ordine alla nascita. */
+function pannelloIndirizzoCasa(o){
+  if (o.role==='admin' || !(o.indirizzoAtteso || o.indirizzoIl)) return '';
+  /* prima che i sats siano in cassaforte non c'e' ancora un affare:
+     su 'creato' la pagina del pagamento e' ancora aperta, e sulla
+     lapide non c'e' piu' niente da spedire. Senza questa riga il
+     compratore leggeva «il pacco e' partito» su un ordine nemmeno
+     pagato — visto dal vivo, non leggendo il codice. */
+  if (o.state==='creato' || o.state==='annullato') return '';
+  const data = ts => new Date(ts*1000).toLocaleString('it-IT',
+    {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+  if (o.indirizzoPurgatoIl) return `
+    <div class="payout">
+      <h4>🏠 Indirizzo di spedizione</h4>
+      <div class="hint">Cancellato il ${data(o.indirizzoPurgatoIl)}, dopo la chiusura dell'ordine: l'indirizzo vive quanto l'affare, poi sparisce da Barattolo.</div>
+    </div>`;
+  const i = indirizzoLetto[o.id];
+  const corr = o.indirizzoCorrezioni
+    ? ` — aggiornato ${o.indirizzoCorrezioni===1?'una volta':o.indirizzoCorrezioni+' volte'}` : '';
+  if (o.role==='buyer'){
+    if (o.state==='locked'){
+      /* il campo si apre gia' pronto se l'indirizzo e' stato letto in
+         questa sessione; altrimenti si chiede, per non ricominciare
+         da capo (la lezione del «Cambia» in pagina d'acquisto) */
+      if (o.indirizzoIl && !i) return `
+        <div class="payout">
+          <h4>🏠 Il tuo indirizzo di spedizione</h4>
+          <div class="hint">Indicato il ${data(o.indirizzoIl)}${corr}. Puoi correggerlo finché il venditore non spedisce.</div>
+          <button class="btn ghost" style="margin-top:10px" onclick="mostraIndirizzo(this)">✏️ Mostra e correggi</button>
+        </div>`;
+      const v = i || {};
+      return `
+        <div class="payout">
+          <h4>🏠 ${o.indirizzoIl?'Il tuo indirizzo di spedizione':'Indica l\'indirizzo di spedizione'}</h4>
+          <div class="hint">${o.indirizzoIl
+            ? `Indicato il ${data(o.indirizzoIl)}${corr}. Se correggi, il venditore riceve un avviso.`
+            : 'Al venditore serve per spedire il pacco: lo vede solo lui, e lo cancelliamo ' + GIORNI_IND + ' giorni dopo la chiusura dell\'ordine.'}</div>
+          <form onsubmit="return false" class="ind-campi">
+          ${CAMPI_IND.map(c => `<label for="ordInd_${c.k}">${c.et}</label>
+            <input id="ordInd_${c.k}" maxlength="${c.max}" value="${esc(v[c.k]||'')}"
+              ${c.ac ? `autocomplete="${c.ac}"` : 'autocomplete="off"'}
+              ${c.k==='cap' ? 'inputmode="numeric"' : ''}
+              ${c.k==='telefono' ? 'type="tel"' : ''}
+              placeholder="${esc(SEGNAPOSTO_IND[c.k]||'')}">`).join('')}
+          </form>
+          <button class="btn orange" style="margin-top:10px" onclick="salvaIndirizzo(this)">🏠 ${o.indirizzoIl?'Aggiorna l\'indirizzo':'Salva l\'indirizzo'}</button>
+        </div>`;
+    }
+    if (!o.indirizzoIl) return '';
+    return `
+      <div class="payout">
+        <h4>🏠 Il tuo indirizzo di spedizione</h4>
+        <div class="hint">Indicato il ${data(o.indirizzoIl)}${corr}. Il pacco è partito: da qui non si cambia più.</div>
+      </div>`;
+  }
+  /* il VENDITORE: lo legge quando gli serve, cioe' mentre compila
+     l'etichetta — un tocco, e il testo resta selezionabile tutto
+     insieme come il nome della busta */
+  if (!o.indirizzoIl) return `
+    <div class="trust-note">🏠 <span><b>In attesa dell'indirizzo.</b> L'acquirente ha scelto la spedizione a casa e lo scriverà qui nell'ordine: ti avviseremo appena lo fa.</span></div>`;
+  if (i) return `
+    <div class="payout">
+      <h4>🏠 Indirizzo di spedizione</h4>
+      <div class="hint">Indicato dall'acquirente il ${data(o.indirizzoIl)}${corr}:</div>
+      <div class="hint mono" style="user-select:all;white-space:pre-wrap;word-break:break-word">${esc(indirizzoPerEtichetta(i))}</div>
+      <button class="btn ghost" style="margin-top:10px" onclick="copiaIndirizzo()">📋 Copia l'indirizzo</button>
+    </div>`;
+  return `
+    <div class="payout">
+      <h4>🏠 Indirizzo di spedizione</h4>
+      <div class="hint">L'acquirente l'ha indicato il ${data(o.indirizzoIl)}${corr}. Lo leggi solo tu, e sparisce ${GIORNI_IND} giorni dopo la chiusura dell'ordine.</div>
+      <button class="btn orange" style="margin-top:10px" onclick="mostraIndirizzo(this)">👁 Mostra l'indirizzo</button>
+    </div>`;
+}
+
+/* Come si scrive su un pacco, non come sta nel database: e' il testo
+   che il venditore copia sull'etichetta. */
+function indirizzoPerEtichetta(i){
+  const p = (i.provincia||'').trim();
+  const righe = [(i.nome||'').trim(), (i.via||'').trim(),
+    [(i.cap||'').trim(), (i.citta||'').trim()].filter(Boolean).join(' ')
+      + (p ? ` (${p})` : '')];
+  if ((i.telefono||'').trim()) righe.push('tel. ' + i.telefono.trim());
+  if ((i.note||'').trim()) righe.push(i.note.trim());
+  return righe.filter(r => r && r.trim()).join('\n');
+}
+
+async function caricaIndirizzo(){
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/indirizzo`,
+    {headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita, riprova'); return null; }
+  indirizzoLetto[currentOrder.id] = d.campi || {};
+  return d;
+}
+
+/* nessun confirm: leggere un indirizzo non muove niente — la stessa
+   ragione per cui non ne chiede uno mostraBusta */
+async function mostraIndirizzo(btn){
+  haptic();
+  const ripristina = bottoneInAttesa(btn);
+  const d = await caricaIndirizzo();
+  ripristina();
+  if (d) openOrder(currentOrder.id);
+}
+
+async function salvaIndirizzo(btn){
+  haptic();
+  const corpo = {};
+  CAMPI_IND.forEach(c => corpo[c.k] = (el('ordInd_'+c.k)?.value||'').trim());
+  if (!indirizzoCompleto(corpo)){
+    toast('Servono almeno nome, via, CAP e città');
+    return;
+  }
+  const ripristina = bottoneInAttesa(btn);
+  const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/indirizzo`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({indirizzo: corpo})});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail||'Indirizzo non salvato, ricontrolla'); return; }
+  /* quel che si e' appena scritto e' anche quel che si rilegge: cosi'
+     il pannello si riapre pieno senza un secondo giro di rete */
+  indirizzoLetto[currentOrder.id] = corpo;
+  toast('🏠 Indirizzo salvato');
+  loadOrders().then(()=> openOrder(currentOrder.id));
+}
+
+function copiaIndirizzo(){
+  haptic();
+  const i = indirizzoLetto[currentOrder?.id];
+  if (!i) return;
+  navigator.clipboard?.writeText(indirizzoPerEtichetta(i))
+    .then(()=>toast('📋 Indirizzo copiato'))
+    .catch(()=>toast('Tieni premuto sul testo per copiarlo'));
 }
 
 /* ---- il documento di ritiro (ago 2026): un PIN si trascrive, un QR
