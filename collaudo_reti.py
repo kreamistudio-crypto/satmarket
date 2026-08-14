@@ -118,9 +118,15 @@ def avvio():
     async def cambio_finto():
         return CAMBIO
 
+    async def zitta(*a, **k):
+        """Le notifiche non c'entrano con questo cantiere, ma vanno
+        ATTESE: `indica_punto_ritiro` fa `await notifica(...)`, e un
+        lambda che torna None non si puo' awaitare."""
+        return None
+
     server.crea_invoice_escrow = invoice_finta
     server.cambio_btc_eur = cambio_finto
-    server.notifica = lambda *a, **k: None
+    server.notifica = zitta
     server.polso_ordini_admin = lambda *a, **k: None
     server.verifica_utente = lambda *a, **k: UTENTE
     return db
@@ -332,6 +338,56 @@ def prove_scelta():
           ("", 0), (riga["rete_punto"], riga["via_punto"]))
 
 
+def prove_tipo_punto():
+    """LOCKER O PUNTO COL BANCO: la seconda meta' della domanda.
+    Un locker e una tabaccheria non sono la stessa consegna — chi
+    vende compra un'ETICHETTA DIVERSA, ed e' il costo da cui nasce il
+    cantiere."""
+    print("\n── LOCKER O PUNTO COL BANCO ──")
+    aid = semina("|InPost|")
+    r = compra(aid, {"punto_ritiro": "Locker A", "tipo_punto": "locker"})
+    prova("il tipo scelto finisce in colonna", "locker",
+          riga_ordine(r["ordine_id"])["tipo_punto"])
+    prova("...e torna nella risposta", "locker", r.get("tipo_punto"))
+
+    aid = semina("|InPost|")
+    r = compra(aid, {"punto_ritiro": "Tabaccheria Rossi",
+                     "tipo_punto": "banco"})
+    prova("...e vale anche per il banco", "banco",
+          riga_ordine(r["ordine_id"])["tipo_punto"])
+
+    aid = semina("|InPost|")
+    alza("un tipo inventato si rifiuta",
+         lambda: compra(aid, {"punto_ritiro": "X", "tipo_punto": "furgone"}),
+         "tipo di punto sconosciuto")
+
+    # IL CLIENT DI IERI non manda il campo: l'ordine nasce lo stesso
+    # ('' = non dichiarato) e il venditore legge la forma di prima.
+    # E' la stessa tolleranza della rete, e il 400 vive nel client.
+    aid = semina("|InPost|")
+    r = compra(aid, {"punto_ritiro": "Punto qualunque"})
+    prova("il client di ieri non manda il tipo: l'ordine nasce lo stesso",
+          "", riga_ordine(r["ordine_id"])["tipo_punto"])
+
+    # LA CORREZIONE DENTRO L'ORDINE, che e' la rete di sicurezza degli
+    # ordini nati senza: la chiave ASSENTE conserva quel che c'era
+    oid = r["ordine_id"]
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='locked' WHERE id=?", (oid,))
+    con.commit()
+    con.close()
+    UTENTE["id"] = 111
+    chiama(lambda _r: SRV.indica_punto_ritiro(oid, _r),
+           {"punto_ritiro": "Locker B", "tipo_punto": "locker"})
+    prova("nell'ordine il tipo si scrive col punto", ("Locker B", "locker"),
+          (riga_ordine(oid)["punto_ritiro"], riga_ordine(oid)["tipo_punto"]))
+    chiama(lambda _r: SRV.indica_punto_ritiro(oid, _r),
+           {"punto_ritiro": "Locker C"})
+    prova("...e la chiave assente CONSERVA il tipo (patto dello stock)",
+          ("Locker C", "locker"),
+          (riga_ordine(oid)["punto_ritiro"], riga_ordine(oid)["tipo_punto"]))
+
+
 def prove_libro_mastro():
     print("\n── LA RONDA DEVE TACERE ──")
     guasti = []
@@ -353,6 +409,7 @@ def main():
     prove_backfill()
     prove_endpoint()
     prove_scelta()
+    prove_tipo_punto()
     prove_libro_mastro()
     print("\n" + "=" * 66)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

@@ -5270,7 +5270,7 @@ function mapOrder(o){
     puntoRitiro:o.punto_ritiro||'', viaPunto:!!o.via_punto,
     /* la rete scelta da chi compra ('' = non dichiarata: ordini
        storici, venditore senza reti, o via diversa dal punto) */
-    retePunto:o.rete_punto||'',
+    retePunto:o.rete_punto||'', tipoPunto:o.tipo_punto||'',
     /* la busta di consegna (ago 2026): nome e codice NON viaggiano
        mai in /api/orders — qui arrivano solo il quando (bustaIl =
        PRIMO deposito, 0 = mai) e le correzioni; il testo lo serve
@@ -9291,7 +9291,7 @@ function apriAcquisto(l){
   currentListing = l;
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id)?.id || 0,
-             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'', tipo:'',
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -9367,7 +9367,7 @@ function apriAcquistoSet(){
     return;
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0, firma:f,
-             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'', tipo:'',
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -10016,7 +10016,31 @@ function renderAcquisto(){
   /* la mappa segue la rete SCELTA quando c'e' una scelta da fare: e'
      tutto il punto della fila qui sopra — una rete, una mappa */
   const retiMappa = sceglieRete ? (d.rete ? [d.rete] : []) : reti;
-  const campoAperto = `${scelteRete}<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
+  /* LA SECONDA DOMANDA: locker automatico o punto col banco (ago
+     2026, la meta' che mancava). Un locker e una tabaccheria non
+     sono la stessa consegna — chi vende compra un'ETICHETTA DIVERSA,
+     ed e' il costo da cui nasce il cantiere.
+     DUE FILE E NON UNA MATRICE «Locker InPost / Punto InPost / …»,
+     e le ragioni sono tre, misurate: la matrice occupa TRE righe a
+     320px contro le due delle file separate (ogni voce si porta
+     dietro il nome lungo della rete: «Locker Poste Italiane» da solo
+     fa 156px su 258); moltiplica invece di sommare, e con la lista
+     aperta delle reti diventerebbe sei pillole alla prima aggiunta;
+     e soprattutto il tipo si SA solo dopo aver guardato la mappa,
+     che dipende dalla rete — quindi rete→mappa→tipo non e' una
+     scelta d'interfaccia, e' l'ordine in cui l'informazione esiste.
+     SI CHIEDE SEMPRE sulla via punto, anche senza reti dichiarate: il
+     tipo e' indipendente dalla rete e serve al venditore comunque.
+     NIENTE DEFAULT (decisione di Andrea): preselezionare «locker»
+     perche' e' il caso comune farebbe comprare l'etichetta sbagliata
+     a chi sceglie una tabaccheria senza toccare niente. */
+  const tipoPill = (t) =>
+    `<button type="button" class="pill${d.tipo===t.id?' pill-trust':''}"
+       data-tipo="${t.id}" onclick="setTipoPuntoAcquisto(this.dataset.tipo)"
+       style="cursor:pointer">${t.emoji} ${esc(t.nome)}</button>`;
+  const scelteTipo = `<label>Che tipo di punto?</label>
+       <div class="fila-reti">${TIPI_PUNTO.map(tipoPill).join('')}</div>`;
+  const campoAperto = `${scelteRete}${scelteTipo}<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Locker — Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
@@ -10028,7 +10052,7 @@ function renderAcquisto(){
      della via, e due icone nello stesso riquadro sono una di troppo. */
   const campoChiuso = puntoScritto
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
-        onclick="apriPuntoAcquisto()"><span class="punto-testo">${d.rete?esc(d.rete)+' — ':''}${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
+        onclick="apriPuntoAcquisto()"><span class="punto-testo">${(d.tipo||d.rete)?esc(nomePunto(d.tipo, d.rete))+' — ':''}${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriPuntoAcquisto()">Indica il punto di ritiro</button>`;
   const cassettoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
@@ -10397,6 +10421,17 @@ function setReteAcquisto(r){
   renderAcquisto();
   if (!acqDati.punto.trim()) el('acqPunto')?.focus({preventScroll:true});
 }
+/* Locker automatico o punto col banco: al venditore serve per
+   comprare l'etichetta giusta. Il fuoco va al campo solo se il punto
+   e' ancora vuoto — su una correzione la tastiera sarebbe un
+   fastidio, la regola della gemella qui sopra. */
+function setTipoPuntoAcquisto(t){
+  if (!acqDati) return;
+  haptic();
+  acqDati.tipo = t;
+  renderAcquisto();
+  if (!acqDati.punto.trim()) el('acqPunto')?.focus({preventScroll:true});
+}
 /* ---- L'INDIRIZZO DI CASA (ago 2026) ----
    Il gemello del cassetto del punto, sull'altra via. I CAMPI SONO
    SEPARATI PER IL TELEFONO e non per capriccio: il riempimento
@@ -10463,6 +10498,10 @@ function corpoConsegna(){
      sola la fissa il server (e il client non deve poterla
      contraddire), con nessuna non esiste */
   if (v==='punto' && acqDati.rete) out.rete_punto = acqDati.rete;
+  /* il tipo viaggia SEMPRE sulla via punto, anche vuoto: per il
+     server la sua presenza dice «questo client il campo ce l'ha»,
+     il patto della chiave dell'indirizzo */
+  if (v==='punto') out.tipo_punto = acqDati.tipo || '';
   /* LA CHIAVE VIAGGIA SEMPRE sulla via casa, anche a campi vuoti: per
      il server la sua PRESENZA e' la dichiarazione «questo ordine
      l'indirizzo lo aspetta» (indirizzo_atteso), che e' cio' che
@@ -10483,6 +10522,12 @@ function reteMancante(d){
   const reti = d?.preventivo?.reti || [];
   return d?.via === 'punto' && reti.length >= 2 && !d.rete;
 }
+/* «Manca il tipo di punto?»: gemello del giudice qui sopra, e vale
+   SEMPRE sulla via punto — il tipo non dipende dalle reti e non si
+   deduce da niente. Uno solo per le due strade che pagano. */
+function tipoPuntoMancante(d){
+  return d?.via === 'punto' && !d.tipo;
+}
 
 function ctaAcquisto(){
   haptic();
@@ -10493,6 +10538,11 @@ function ctaAcquisto(){
   if (reteMancante(d)){
     apriPuntoAcquisto();
     toast('Scegli con quale corriere vuoi ricevere il pacco');
+    return;
+  }
+  if (tipoPuntoMancante(d)){
+    apriPuntoAcquisto();
+    toast('Dicci se è un locker automatico o un punto col banco');
     return;
   }
   /* il punto e' obbligatorio SEMPRE sulla via punto (quarto giro):
@@ -12307,6 +12357,11 @@ function compraSubito(){
   if (reteMancante(acqDati)){
     apriPuntoAcquisto();
     toast('Scegli con quale corriere vuoi ricevere il pacco');
+    return;
+  }
+  if (tipoPuntoMancante(acqDati)){
+    apriPuntoAcquisto();
+    toast('Dicci se è un locker automatico o un punto col banco');
     return;
   }
   if (acqDati.via==='punto' && !acqDati.punto.trim()){
@@ -14142,6 +14197,14 @@ function openOrder(id){
           : (o.retePunto
              ? `Nome o indirizzo del punto <b>${esc(o.retePunto)}</b>: il venditore lo vedrà qui e potrà spedire.`
              : 'Nome o indirizzo del punto (locker o negozio convenzionato): il venditore lo vedrà qui e potrà spedire. Se non sai la rete del corriere, chiediglielo in chat.')}</div>
+        ${/* IL TIPO anche qui, ed e' la rete di sicurezza degli ordini
+              nati senza (i client di ieri) e del refuso: al venditore
+              serve per comprare l'etichetta, e senza questo campo un
+              ordine gia' pagato non potrebbe piu' completarsi. */''}
+        <div class="fila-reti" style="margin-top:8px">${TIPI_PUNTO.map(t =>
+          `<button type="button" class="pill${o.tipoPunto===t.id?' pill-trust':''}"
+             data-tipo="${t.id}" onclick="setTipoPuntoOrdine(this.dataset.tipo)"
+             style="cursor:pointer">${t.emoji} ${esc(t.nome)}</button>`).join('')}</div>
         ${/* LA MAPPA GIUSTA, e per un anno qui e' arrivato un ''
               hardcodato: si vedevano SEMPRE tutte e due le mappe,
               anche quando la rete era dichiarata, e il commento del
@@ -14260,7 +14323,13 @@ function openOrder(id){
                utile per comprare la copertura. La regola per esteso sta
                nella pagina «Il pagamento protetto». -->
           <div class="hint" style="margin-top:6px">Il deposito garantisce l'affare, non il pacco: se il corriere lo perde o lo rovina, il reclamo lo apri tu con lui. Per le cose di valore vale la <b>copertura del corriere</b> — quella di base, verso i punti di ritiro, è molto <span class="fine-frase">bassa. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Scopri di più</button></span></div>
-          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''}: <b>${esc(o.puntoRitiro)}</b></div>` : ''}
+          ${/* LA FRASE CHE SERVE A COMPRARE L'ETICHETTA: «Locker InPost
+                — Via Roma 1», «Punto InPost — Tabaccheria, Via Roma 1».
+                Tipo e rete davanti, dal giudice unico `nomePunto`, e il
+                punto dopo — cosi' la prima parola dice gia' che tipo di
+                spedizione comprare. Gli ordini di ieri non hanno il
+                tipo e ricadono sulla forma di prima. */''}
+          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto <b>${esc(nomePunto(o.tipoPunto, o.retePunto))}</b> — <b>${esc(o.puntoRitiro)}</b>${o.tipoPunto ? '' : ' <span class="eur-hint">(tipo non indicato)</span>'}</div>` : ''}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
           ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
@@ -16910,6 +16979,27 @@ function apriMappaPunti(rete){
    mappe anche a rete dichiarata. */
 const RETE_MAPPA = {'InPost': 'inpost', 'Poste Italiane': 'poste'};
 
+/* CHE TIPO DI PUNTO (ago 2026): gemello del catalogo TIPI_PUNTO del
+   server — gli id sono per sempre, le etichette si ritoccano, e
+   `prove.py` fallisce se i due elenchi divergono.
+   `breve` e' il nome che il VENDITORE legge nella frase dell'ordine:
+   «Locker InPost — Via Roma 1» sta in una riga, «Locker automatico
+   InPost — Via Roma 1» no. */
+const TIPI_PUNTO = [
+  {id:'locker', emoji:'🔒', nome:'Locker automatico', breve:'Locker'},
+  {id:'banco',  emoji:'🏪', nome:'Punto di ritiro',   breve:'Punto'}];
+
+/* Il nome del punto come lo legge chi spedisce: «Locker InPost»,
+   «Punto Poste Italiane», «Locker» se la rete non c'e'. Giudice UNICO
+   delle superfici che lo scrivono (il pannello del venditore, la riga
+   compatta, il banner del pacco): tre composizioni a mano
+   direbbero tre cose diverse sullo stesso ordine. */
+function nomePunto(tipo, rete){
+  const t = TIPI_PUNTO.find(x => x.id === tipo);
+  const parti = [t ? t.breve : '', rete || ''].filter(Boolean);
+  return parti.join(' ') || 'Punto di ritiro';
+}
+
 function linkMappePunti(reti){
   const dichiarate = Array.isArray(reti) ? reti : (reti ? [reti] : []);
   /* niente reti = non si sa, quindi tutte; con le reti si tengono
@@ -16937,11 +17027,25 @@ async function salvaPuntoRitiro(){
   const r = await fetch(`${API_BASE}/orders/${o.id}/punto-ritiro`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({punto_ritiro: punto})});
+    body: JSON.stringify({punto_ritiro: punto, tipo_punto: o.tipoPunto || ''})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
   o.puntoRitiro = d.punto_ritiro || punto;
+  o.tipoPunto = d.tipo_punto || '';
   toast('📦 Punto salvato: il venditore lo vede nell\'ordine');
+  openOrder(o.id);
+}
+/* Il tipo dentro l'ordine si sceglie e basta: si salva col punto, col
+   bottone che c'e' gia' — un POST per tocco vorrebbe dire due strade
+   di scrittura per lo stesso riquadro. Si scrive sulla riga di
+   `orders` e non sul solo `currentOrder`, che puo' essere un oggetto
+   DETACHED se la lista si e' ricaricata (la lezione dei solleciti). */
+function setTipoPuntoOrdine(t){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  o.tipoPunto = t;
+  const viva = orders.find(x => x.id === o.id);
+  if (viva) viva.tipoPunto = t;
   openOrder(o.id);
 }
 async function markConsegnaMano(){

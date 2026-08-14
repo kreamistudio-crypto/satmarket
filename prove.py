@@ -7918,6 +7918,135 @@ def prove_reti_corriere():
     prova("...e resta senza dismiss (e' derivata dai dati veri)", False,
           "dismettiHint('spedizioniere'" in mini)
 
+    # ================================================================
+    # LA SECONDA META': LOCKER O PUNTO COL BANCO
+    # Un locker e una tabaccheria non sono la stessa consegna — chi
+    # vende compra un'ETICHETTA DIVERSA, ed e' il costo da cui nasce
+    # tutto il cantiere. La rete da sola non basta: InPost e Poste
+    # hanno tutt'e due sia i locker sia i negozi convenzionati.
+    print("  — il tipo di punto —")
+    i = src.index("TIPI_PUNTO = ((")
+    exec(src[i:src.index("\nID_TIPI_PUNTO", i)], amb)
+    exec(src[src.index("ID_TIPI_PUNTO = "):
+             src.index("\n", src.index("ID_TIPI_PUNTO = "))], amb)
+    exec(pezzo("tipo_punto_da_payload"), amb)
+    tipo_da_payload = amb["tipo_punto_da_payload"]
+
+    prova("i due tipi, cogli id per sempre e le etichette ritoccabili",
+          [("locker", "Locker automatico", "Locker"),
+           ("banco", "Punto di ritiro", "Punto")],
+          list(amb["TIPI_PUNTO"]))
+    prova("il tipo buono passa", "locker", tipo_da_payload("locker"))
+    prova("...e si normalizza", "banco", tipo_da_payload(" BANCO "))
+    prova("il vuoto passa: il 400 vive nel CLIENT (la tolleranza "
+          "verso il client di ieri, come per la rete)", "",
+          tipo_da_payload(""))
+
+    def rifiuta_tipo(v):
+        try:
+            tipo_da_payload(v)
+            return False
+        except _HTTP:
+            return True
+
+    prova("un tipo inventato si rifiuta", True, rifiuta_tipo("locker2"))
+    # NIENTE DEFAULT, ed e' la riga da non ammorbidire: preselezionare
+    # «locker» perche' e' il caso comune fa comprare l'etichetta
+    # sbagliata a chi sceglie una tabaccheria senza toccare niente
+    corpo_tipo = codice(pezzo("tipo_punto_da_payload").split('"""')[-1])
+    prova("nessun default nel giudice: il vuoto resta vuoto", False,
+          '"locker"' in corpo_tipo.replace('ID_TIPI_PUNTO', ''))
+    # E NON SI DEDUCE DAL TESTO DEL PUNTO, e la prova piu' forte non e'
+    # cercare «tabaccheria» nel sorgente (che sta nei commenti, dove
+    # spiega proprio questa regola): e' che il giudice NON RICEVE il
+    # punto — non puo' dedurlo nemmeno volendo
+    firma = re.search(r"def tipo_punto_da_payload\(([^)]*)\)", src).group(1)
+    prova("il giudice del tipo non vede nemmeno il testo del punto",
+          ["grezzo"],
+          [p.split(":")[0].strip() for p in firma.split(",")])
+
+    # il tipo si scrive in colonna nei due rami d'acquisto
+    prova("il tipo si legge dal payload nei due rami d'acquisto",
+          [1, 1],
+          [codice(pezzo(f)).count(
+              'tipo = tipo_punto_da_payload(d.get("tipo_punto"))')
+           for f in ("compra", "_compra_set")])
+    prova("...e finisce in colonna nei due INSERT", 2,
+          codice(src).count("tipo_punto,"))
+    # la correzione dentro l'ordine, che e' la rete di sicurezza degli
+    # ordini nati senza: chiave ASSENTE = si CONSERVA (patto dello stock)
+    corpo_pr2 = codice(pezzo("indica_punto_ritiro").split('"""')[-1])
+    prova("nell'ordine il tipo si corregge col punto", True,
+          "tipo_punto=?" in corpo_pr2)
+    prova("...e la chiave assente CONSERVA quel che c'era", True,
+          'if "tipo_punto" in d else (o["tipo_punto"] or "")' in corpo_pr2)
+
+    # --- il client ---------------------------------------------------
+    prova("il catalogo client e' il gemello del server (id per id)",
+          [t[0] for t in amb["TIPI_PUNTO"]],
+          re.findall(r"\{id:'(\w+)'", mini[mini.index("const TIPI_PUNTO"):
+                                           mini.index("function nomePunto")]))
+    prova("...e le etichette combaciano", True,
+          all(t[1] in mini and t[2] in mini for t in amb["TIPI_PUNTO"]))
+    prova("il nome che il venditore legge ha un giudice UNO", 1,
+          mini.count("function nomePunto"))
+    prova("...e lo chiamano le superfici che lo scrivono", 2,
+          mini.count("nomePunto(") - mini.count("function nomePunto("))
+    # E SI FA GIRARE, non si guarda soltanto: le sentinelle qui sopra
+    # dicono che il giudice ESISTE ed e' uno, mai che risponda giusto
+    # — la mutazione che gli toglie il tipo e lascia la sola rete le
+    # passava tutte (trovata dalla tortura, ed e' la sesta volta che
+    # una prova sulla FORMA certifica un ramo disonesto).
+    import json as _js, shutil as _sh2, subprocess as _sp2, tempfile as _tf2
+    _node = _sh2.which("node")
+    if not _node:
+        salta("nomePunto risponde giusto", "node non installato")
+    else:
+        _cat = mini[mini.index("const TIPI_PUNTO"):
+                    mini.index("function nomePunto")]
+        _fn = pezzo_js(mini, "function nomePunto(tipo, rete){", "\n}") + "\n}"
+        _casi = [("locker", "InPost", "Locker InPost"),
+                 ("banco", "InPost", "Punto InPost"),
+                 ("locker", "Poste Italiane", "Locker Poste Italiane"),
+                 ("locker", "", "Locker"),
+                 ("", "InPost", "InPost"),
+                 ("", "", "Punto di ritiro")]
+        _prog = (_cat + _fn + "\nconst esiti = "
+                 + _js.dumps([[t, r] for t, r, _a in _casi])
+                 + ".map(([t,r]) => nomePunto(t,r));"
+                 "console.log(JSON.stringify(esiti));")
+        _f = _tf2.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8")
+        _f.write(_prog)
+        _f.close()
+        _r = _sp2.run([_node, _f.name], capture_output=True, text=True,
+                      timeout=60, encoding="utf-8")
+        os.unlink(_f.name)
+        prova("nomePunto risponde giusto sui sei casi",
+              [a for _t, _r2, a in _casi],
+              _js.loads(_r.stdout.strip()) if _r.returncode == 0
+              else f"ERRORE: {_r.stderr[:120]}")
+    prova("il giudice del «manca il tipo» e' UNO", 1,
+          mini.count("function tipoPuntoMancante"))
+    prova("...e lo chiamano le DUE strade che pagano", 2,
+          mini.count("tipoPuntoMancante(")
+          - mini.count("function tipoPuntoMancante("))
+    prova("...e vale SEMPRE sulla via punto (non dipende dalle reti)",
+          True, "d?.via === 'punto' && !d.tipo" in mini)
+    prova("il tipo viaggia sempre nel body sulla via punto", True,
+          "out.tipo_punto = acqDati.tipo || ''" in mini)
+    prova("la scelta e' DUE FILE e non una matrice rete×tipo", True,
+          "Che tipo di punto?" in mini and "Con quale corriere?" in mini)
+    # e le pillole del tipo portano la SOLA etichetta del catalogo: se
+    # ci finisse dentro il nome della rete saremmo tornati alla
+    # matrice — tre righe a 320px invece di due, e sei voci alla prima
+    # rete aggiunta. (Si guarda la fabbrica della pillola, non il file
+    # intero: «Locker InPost» vive legittimamente nel placeholder del
+    # campo e nei commenti che spiegano questa scelta.)
+    fabbrica = pezzo_js(mini, "  const tipoPill = (t) =>", "`;")
+    prova("...e la pillola del tipo non nomina mai la rete", True,
+          "esc(t.nome)" in fabbrica and "rete" not in fabbrica)
+
 
 # ====================================================================
 def prove_pagina_acquisto():
@@ -8050,23 +8179,22 @@ def prove_pagina_acquisto():
           2, mini3.count("punto:'', puntoAperto:false"))
     prova("...il campo riapre PRECOMPILATO, mai ricominciare da capo",
           True, 'value="${esc(d.punto)}"' in mini3)
-    # dal cantiere delle reti la riga compatta porta anche la rete
-    # scelta, quando c'e': il punto resta SCAPPATO e il Cambia al suo
-    # posto — cambia il prefisso, non la regola
+    # dal cantiere delle reti la riga compatta porta anche il nome del
+    # punto (tipo + rete, dal giudice unico): il punto resta SCAPPATO
+    # e il Cambia al suo posto — cambia il prefisso, non la regola
     prova("...la riga compatta mostra il punto SCAPPATO, col Cambia",
           True,
-          '<span class="punto-testo">${d.rete?esc(d.rete)+\' — \':\'\'}'
-          '${esc(puntoScritto)}</span>' in mini3)
-    prova("...e la rete accanto al punto passa anch'essa da esc()",
-          True, "${d.rete?esc(d.rete)" in mini3)
+          "esc(nomePunto(d.tipo, d.rete))+' — '" in mini3
+          and '${esc(puntoScritto)}</span>' in mini3)
+    prova("...e il nome del punto passa anch'esso da esc()",
+          True, "esc(nomePunto(d.tipo, d.rete))" in mini3)
     prova("...e a cedere coi puntini e' l'indirizzo, mai il Cambia",
           True, ".punto-testo{flex:1 1 auto;min-width:0;" in mini3)
-    # QUATTRO ora, non due: dal cantiere delle reti ogni strada che
-    # paga ha DUE guardie — prima il corriere, poi il punto — e tutte
-    # e quattro aprono il cassetto invece di mettere il fuoco su un
-    # campo che non e' in pagina
-    prova("le guardie del cassetto lo APRONO (x4: due strade, "
-          "due domande)", 4, mini3.count("apriPuntoAcquisto();"))
+    # SEI ora: ogni strada che paga fa TRE domande in fila — il
+    # corriere, che tipo di punto, e dove — e tutte e sei aprono il
+    # cassetto invece di mettere il fuoco su un campo fuori pagina
+    prova("le guardie del cassetto lo APRONO (x6: due strade, "
+          "tre domande)", 6, mini3.count("apriPuntoAcquisto();"))
     prova("...col toast identico nelle due copie", 2,
           mini3.count("Indica il punto di ritiro: al venditore serve "
                       "per spedire"))

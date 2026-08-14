@@ -2731,6 +2731,17 @@ def init_db():
                     # anche_digitale: ortogonale, cosi' timer e
                     # solleciti restano veri per costruzione.
                     "rete_punto TEXT DEFAULT ''",
+                    # ...e CHE TIPO di punto (catalogo TIPI_PUNTO):
+                    # 'locker' | 'banco' | '' = non dichiarato. E' la
+                    # seconda meta' della stessa domanda, e senza di
+                    # lei la rete non basta: il venditore compra
+                    # un'etichetta diversa per un locker e per un
+                    # negozio convenzionato, ed e' il costo da cui
+                    # nasce tutto il cantiere.
+                    # Gli ordini di ieri restano '' e nessuno prova a
+                    # dedurlo dal testo del punto: «tabaccheria» in un
+                    # indirizzo non e' una prova.
+                    "tipo_punto TEXT DEFAULT ''",
                     # LO SCONTO CARRELLO (ago 2026), voce di TESTATA.
                     # ATTENZIONE, ed e' la riga da leggere prima di
                     # toccare qualunque strada del denaro: questa e'
@@ -7499,6 +7510,48 @@ TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 # «Altro», cioe' nessun link, e un link fuorviante e' peggio di
 # nessun link.
 SPEDIZIONIERI = ("InPost", "Poste Italiane", "Altro")
+
+
+# CHE TIPO DI PUNTO (ago 2026, la seconda meta' del cantiere dei
+# corrieri): un LOCKER automatico e un punto col banco non sono la
+# stessa consegna — il venditore compra un'etichetta DIVERSA, ed e' il
+# motivo per cui il cantiere e' nato. La rete da sola non basta:
+# InPost e Poste hanno tutt'e due sia i locker sia i negozi
+# convenzionati.
+# Gli id sono per SEMPRE e le etichette si ritoccano senza migrazioni
+# (il pattern di CONDIZIONI). La terza voce e' il nome BREVE, quello
+# che il venditore legge nella frase: «Locker InPost — Via Roma 1» sta
+# in una riga, «Locker automatico InPost — Via Roma 1» no.
+# '' = non dichiarato: gli ordini nati prima di oggi, e quelli dei
+# client rimasti in cache. NON si deduce dal testo del punto — una
+# «tabaccheria» nell'indirizzo non e' una prova, e indovinare qui
+# vuol dire far comprare l'etichetta sbagliata.
+TIPI_PUNTO = (("locker", "Locker automatico", "Locker"),
+              ("banco", "Punto di ritiro", "Punto"))
+ID_TIPI_PUNTO = tuple(t[0] for t in TIPI_PUNTO)
+
+
+def tipo_punto_da_payload(grezzo: str) -> str:
+    """Il tipo di punto scelto da chi compra: 'locker' | 'banco'.
+
+    NIENTE DEFAULT (decisione di Andrea), ed e' la riga da non
+    ammorbidire: preselezionare «locker» perche' e' il caso comune
+    vorrebbe dire che chi sceglie una tabaccheria e non tocca niente
+    fa comprare al venditore l'etichetta sbagliata — cioe' esattamente
+    il costo da cui nasce il cantiere. Chi non risponde non passa: il
+    client lo chiede prima di «Paga», come per la rete e per il punto.
+
+    Il vuoto si accetta qui e si rifiuta nel CLIENT, ed e' la stessa
+    tolleranza della rete: un client rimasto in cache il campo non ce
+    l'ha, e un 400 su un campo che non esiste sarebbe un vicolo
+    cieco."""
+    scelto = (grezzo or "").strip().lower()
+    if not scelto:
+        return ""
+    if scelto not in ID_TIPI_PUNTO:
+        raise HTTPException(400, "Tipo di punto sconosciuto: "
+                            + ", ".join(ID_TIPI_PUNTO))
+    return scelto
 
 
 def _reti_serializza(scelte) -> str:
@@ -14118,12 +14171,13 @@ async def _compra_set(user: dict, d: dict) -> dict:
                                      "indirizzo del punto)")
         try:
             rete = rete_da_payload(d.get("rete_punto"), reti)
+            tipo = tipo_punto_da_payload(d.get("tipo_punto"))
         except HTTPException:
             con.close()
             raise
     else:
         punto = ""
-        rete = ""
+        rete = tipo = ""
     via_punto = 1 if via == "punto" else 0
 
     # L'INDIRIZZO DI CASA sta QUI, accanto alla via e PRIMA della
@@ -14387,13 +14441,15 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
+        "tipo_punto,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, rete, ind, adesso if ind else 0, ind_atteso,
+         punto, via_punto, rete, tipo, ind, adesso if ind else 0,
+         ind_atteso,
          sped, prot, pezzi,
          # la percentuale si fotografa SOLO se lo sconto e' scattato,
          # o la ricevuta di un ordine sotto soglia dichiarerebbe uno
@@ -14449,7 +14505,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "sped_gratis_sats": sped_gratis_sats,
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
-            "rete_punto": rete,
+            "rete_punto": rete, "tipo_punto": tipo,
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
                        "titolo": r["titolo"], "quantita": r["quantita"],
@@ -15301,12 +15357,13 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                      "indirizzo del punto)")
         try:
             rete = rete_da_payload(d.get("rete_punto"), reti)
+            tipo = tipo_punto_da_payload(d.get("tipo_punto"))
         except HTTPException:
             con.close()
             raise
     else:
         punto = ""
-        rete = ""
+        rete = tipo = ""
     via_punto = 1 if via == "punto" else 0
 
     # L'INDIRIZZO DI CASA, col patto del gemello nel set: il giudice
@@ -15708,15 +15765,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     con.execute(
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
-        "consegna_scelta,punto_ritiro,via_punto,rete_punto,"
+        "consegna_scelta,punto_ritiro,via_punto,rete_punto,tipo_punto,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
-         cambio_ordine, scelta, punto, via_punto, rete,
+         cambio_ordine, scelta, punto, via_punto, rete, tipo,
          ind, int(time.time()) if ind else 0, ind_atteso,
          sped, prot, richiesti,
          sconto, pct if sconto else 0, sped_gratis_sats))
@@ -15755,7 +15812,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "sped_gratis_sats": sped_gratis_sats,
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
-            "rete_punto": rete,
+            "rete_punto": rete, "tipo_punto": tipo,
             "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
 
@@ -16103,9 +16160,17 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo ordine non è una spedizione a "
                                  "un punto di ritiro")
-    cambiato = (o["punto_ritiro"] or "") != punto
-    con.execute("UPDATE ordini SET punto_ritiro=? WHERE id=?",
-                (punto, ordine_id))
+    # IL TIPO SI CORREGGE COL PUNTO, e per la stessa ragione: e' la
+    # rete di sicurezza degli ordini nati senza (i client di ieri) e
+    # del refuso. Chiave ASSENTE = si CONSERVA (il patto dello stock):
+    # un client rimasto in cache manda solo il punto, e non deve
+    # cancellare un tipo che qualcuno aveva scelto.
+    tipo = tipo_punto_da_payload(d.get("tipo_punto")) \
+        if "tipo_punto" in d else (o["tipo_punto"] or "")
+    cambiato = ((o["punto_ritiro"] or "") != punto
+                or (o["tipo_punto"] or "") != tipo)
+    con.execute("UPDATE ordini SET punto_ritiro=?, tipo_punto=? WHERE id=?",
+                (punto, tipo, ordine_id))
     con.commit()
     con.close()
     if cambiato:
@@ -16113,7 +16178,7 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
                        "📦 <b>Il compratore ha indicato il punto di "
                        "ritiro</b>: lo trovi nell'ordine, ora puoi "
                        "spedire.")
-    return {"ok": True, "punto_ritiro": punto}
+    return {"ok": True, "punto_ritiro": punto, "tipo_punto": tipo}
 
 
 @app.post("/api/orders/{ordine_id}/indirizzo")
