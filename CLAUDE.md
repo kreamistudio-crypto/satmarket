@@ -9906,6 +9906,167 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   si apre in una scheda nuova, ed è una limitazione vera: un objectURL
   vive solo in quella pagina e `tg.openLink` lo passerebbe a un browser
   che non lo sa leggere. Per questo il testo del form consiglia il QR.
+  L'INDIRIZZO DI CASA (ago 2026): lo SPECCHIO della busta — lì è il
+  venditore a depositare per il compratore, qui il compratore per il
+  venditore. Chi sceglie «🏠 Spedizione a casa» scrive l'indirizzo al
+  momento dell'acquisto, viaggia cifrato col trasporto dei contenuti
+  digitali, e il venditore lo legge nel suo pannello. Fino a ieri
+  passava in CHAT PRIVATA, e **chi non ha username Telegram né npub
+  non poteva darlo a NESSUNO**: è alla lettera il caso vero che ha
+  fatto nascere la busta, sull'altra strada — e «le trattative non
+  sono necessarie» (`pontiOrdine`) era falsa proprio per loro.
+  L'ALTERNATIVA NON ERA «NIENTE INDIRIZZO», ed è l'argomento che ha
+  deciso il cantiere: era l'indirizzo in chiaro nella cronologia di
+  due chat Telegram, per sempre e senza scadenza.
+  IL MODELLO È «TRASPORTA, NON CONSERVA», e la parola diventa vera
+  solo grazie alla SCOPA: `pulisci_indirizzi` nell'orologio azzera la
+  colonna sugli ordini chiusi da `GIORNI_INDIRIZZO` giorni (30) e
+  timbra `indirizzo_purgato_il`. È il pezzo che alla busta MANCA — lì
+  nome, codice e documento non muoiono mai, e il suo GET non ha
+  nemmeno un gate di stato: la regola qui si è scritta da zero, e la
+  voce pubblica parla dell'INDIRIZZO e non dei «dati della consegna»,
+  o includerebbe la busta e sarebbe falsa.
+  UNA COLONNA E NON SEI (`ordini.indirizzo`, il JSON dei sette campi
+  cifrato, più `indirizzo_il`, `_corretto_il`, `_correzioni`,
+  `_purgato_il`, `_atteso`): i campi separati sono una scelta della
+  **UI** — il riempimento automatico del telefono sa compilare solo
+  campi con RUOLI dichiarati, e davanti a un campo unico non fa niente
+  — non dello schema, perché cifrato quel dato non è comunque
+  interrogabile da SQL. Sei colonne sarebbero sei migrazioni, sei
+  `pop` nello strip e sei posti da tenere in pari in cambio di niente.
+  IL PREZZO DELLA COLONNA UNICA SI PAGA IN UN POSTO SOLO,
+  `_indirizzo_letto`: `_decifra_contenuto` è fail-open per costruzione
+  e su una chiave mancante o cambiata restituisce una FRASE — che per
+  la busta si stampa al posto del PIN e qui non è JSON. Senza quel
+  `try`, riaprire un ordine 'locked' sarebbe un 500 per tutte e due le
+  parti; e `_decifra_contenuto("")` non matcha nessun prefisso e
+  torna '', che `json.loads` non digerisce: il caso PURGATO ha il suo
+  ramo esplicito, col 404 che dice quando è stato cancellato.
+  SENZA CHIAVE NON SI SCRIVE, ed è l'UNICA differenza vera con la
+  busta: `_indirizzo_da_payload` risponde **503** e chi compra ripiega
+  sulla chat, che è quel che fa già oggi. Un PIN di ritiro in chiaro è
+  una degradazione accettabile e dichiarata; il nome e la via di una
+  persona no — un `.db` accanto ai backup con dentro un'anagrafica è
+  un'altra cosa. In MODALITA_COLLAUDO si scrive `plain:` come tutto il
+  resto, o il mercatino di prova non potrebbe più vendere niente a
+  casa. (Verificato con Andrea: sul VPS la chiave c'è, quindi in
+  produzione i blob nascono `f2:` e la pagina può dire «cifrato».)
+  IL GIUDICE STA PRIMA DELLA INVOICE, accanto alla via, per due
+  ragioni che valgono tutte e due: un 400 dopo `crea_invoice_escrow`
+  lascerebbe una fattura viva senza un ordine su cui posarsi (la
+  lezione lunga di `pulisci_ordini_fantasma`), e cifrare costa uno
+  **scrypt** — decine di ms sincroni che nel blocco atomico fra il
+  ricontrollo e l'INSERT non ci vanno. Più in basso si piazza una
+  stringa già pronta. E CIFRA LUI, non i chiamanti: sono tre (i due
+  compratori e la correzione) e basta che uno se ne dimentichi perché
+  un indirizzo finisca in chiaro; c'è la sentinella che conta UNA
+  chiamata sola.
+  LA RIPRESA NON CONFRONTA IL BLOB, e non è una svista: **Fernet non è
+  deterministico** (IV casuale a ogni cifratura), quindi due blob
+  dello stesso indirizzo sono sempre DIVERSI — messo dentro `stessa`
+  la renderebbe falsa per sempre, e ogni secondo tocco su «Paga»
+  conierebbe una fattura nuova. Peggio: senza chiave i blob sono
+  `plain:`, quindi **funzionerebbe in collaudo e si romperebbe in
+  produzione**. Ma va RISCRITTO (un UPDATE nel ramo che esce subito),
+  o chi corregge un refuso nel CAP si rivede la sua fattura con
+  l'indirizzo di prima e crede di aver corretto.
+  IL GATE DI `segna_spedito` GUARDA `indirizzo_atteso` E MAI LA VIA:
+  ancorato alla via bloccherebbe al primo riavvio OGNI ordine 'locked'
+  già in corso, che un indirizzo in colonna non l'ha mai avuto.
+  `indirizzo_atteso` è il patto di `spedizione_punto_dichiarata` — la
+  dichiarazione è la PRESENZA della chiave nel body, mai il suo valore
+  — e sugli acquisti normali il client esige l'indirizzo prima di
+  «Paga», quindi lì il gate è una CINTURA. Il suo caso vero è l'ASTA.
+  L'ASTA COSTA UNA RIGA, e senza quella il cantiere sarebbe monco:
+  `_strade_asta` non ha la via del locker, ma la «spedizione» che il
+  vincitore sceglie *dentro* l'ordine è pur sempre una spedizione a
+  casa — quindi `scegli_consegna_ordine` timbra `indirizzo_atteso=1`,
+  il pannello si accende e il vincitore scrive l'indirizzo da
+  `POST /indirizzo`. Senza, ogni ordine d'asta spedito tornerebbe alla
+  chat privata, cioè al problema che il cantiere esiste per chiudere,
+  e IN SILENZIO (il pannello si gatea proprio su quel flag).
+  LA SCOPA HA DUE RIGHE DA NON AMMORBIDIRE. 1) La guardia
+  `indirizzo<>'' AND indirizzo_purgato_il=0` non è un'ottimizzazione:
+  senza, l'UPDATE riscriverebbe ogni ordine chiuso a ogni battito e —
+  peggio — timbrerebbe la cancellazione su righe che un indirizzo non
+  l'hanno mai avuto, togliendo senso all'unico controllo che rende la
+  promessa VERIFICABILE. 2) NON tocca `aggiornato`, che è l'ancora di
+  `_SQL_FERMI` e delle finestre dei promemoria (`nascondi_ordine` se
+  l'è già negata per iscritto): spostarla per una manutenzione
+  farebbe ripartire da capo l'attesa di qualcuno. `'annullato'` NON è
+  nella WHERE ed è dichiarato: quelle lapidi le cancella per intero
+  `pulisci_ordini_fantasma` dopo un'ORA — l'indirizzo di chi non ha
+  mai pagato se ne va con la riga molto prima, ed è la parte migliore
+  del meccanismo. La leva non ha un valore che la SPEGNE: una
+  promessa pubblica non ha un interruttore che la revoca.
+  IL LIBRO MASTRO ha «indirizzo fuori contratto», e il ramo che vale
+  è `indirizzo_purgato_il>0 AND indirizzo<>''`. ATTENZIONE a non
+  copiare la forma della busta (`(flag>0) <> (testo<>'')`): quella
+  regge perché la busta non si purga MAI, e qui farebbe scattare il 🧊
+  su OGNI ordine purgato, cioè sullo stato normale del dopo-chiusura —
+  ed è così che un allarme smette di essere letto.
+  IL MODERATORE NON LO LEGGE MAI, da nessuna strada: `nota_indirizzo`
+  in `apri_disputa` dice indicato sì/no, quando e quante correzioni,
+  come il gemello del punto. ⚠️ La sentinella che lo verifica cerca
+  `_decifra_contenuto` nel corpo e **legge anche i commenti**: il nome
+  della funzione che non si chiama non va scritto nemmeno lì (ci si è
+  inciampati due volte in questo cantiere, l'altra col «punto» nel
+  commento di `scegli_consegna_ordine` — che ha fatto stringere quella
+  prova ai due NOMI VERI delle colonne: è la scrittura che non deve
+  esserci, non la parola).
+  CLIENT: la radio della via «casa» diventa un `<div role="radio"
+  con-cassetto">` come quella del punto — un input dentro un
+  `<button>` è markup non valido, la lezione dello stepper dentro
+  «Acquista» — coi tre stati di sempre (bottone / campi aperti / riga
+  compatta col «Cambia»), lo stato in `acqDati` e mai nel DOM, e la
+  propagazione fermata sul contenitore. I sette campi stanno in un
+  `<form onsubmit="return false">` con le label associate e i primi
+  `autocomplete` POSITIVI del client (le altre dodici occorrenze del
+  file sono tutte `off` difensivi): `name`, `address-line1`,
+  `postal-code`, `address-level2`, `address-level1`, `tel`.
+  IMPERFEZIONE DICHIARATA: dentro la WebView di Telegram il
+  riempimento automatico può non esserci affatto — si marca bene, non
+  si promette. `corpoConsegna()` resta la fabbrica unica del payload e
+  la chiave viaggia SEMPRE sulla via casa, anche a campi vuoti: è la
+  sua presenza a dichiarare l'attesa.
+  `pannelloIndirizzoCasa` si gatea su `indirizzoAtteso ||
+  indirizzoIl` e MAI sulla via: sulla via nuda comparirebbe di colpo
+  su ogni ordine 'locked' già in corso, il compratore lo compilerebbe
+  credendo di aver finito e il venditore continuerebbe ad aspettarlo
+  in chat — silenzio da tutte e due le parti. E non si disegna su
+  'creato' né su 'annullato' (visto dal vivo: diceva «il pacco è
+  partito» su un ordine nemmeno pagato). Il venditore lo legge con un
+  tocco — `indirizzoPerEtichetta` lo rende come si scrive su una
+  busta, `user-select:all` e «📋 Copia» — e i campi dell'ordine hanno
+  la classe `.ind-campi`, che ricalca `.field`: dentro `.payout` le
+  label non sono vestite da nessuno e nascevano INLINE, coi campi
+  sfasati a metà riga (visto a schermo, non leggendo il foglio).
+  IL NUMERO DEI GIORNI VIENE DAL SERVER (`giorni_indirizzo` nella
+  busta di prima pagina) e NON è uno specchio a mano come i tempi di
+  `TEMPI`: quelli decidono se un bottone ha senso, questo È la frase
+  che la pagina pubblica dice su un dato personale — se l'operatore
+  mette 90 e la pagina promette 30, abbiamo scritto il falso.
+  LA PAGINA «IL PAGAMENTO PROTETTO» guadagna la sua voce, e va detto
+  perché non c'era: prima di questo cantiere le parole *recapito,
+  indirizzo, dati personali, privacy* **non comparivano MAI** in
+  `view-sicurezza` — la frase «noi non raccogliamo dati veri» viveva
+  solo in un commento di `server.py` e in questo file, e all'utente
+  arrivava un «anche di fantasia» senza il perché. Nessuna riga
+  pubblica è stata smentita; è entrato il PRIMO dato personale vero
+  della piattaforma, e lo si scrive invece di lasciarlo implicito. La
+  voce dice anche la metà scomoda: finché l'ordine è aperto
+  l'indirizzo resta, perché è lì che serve.
+  ⚠️ E UNA RIGA DI COMMENTO È DIVENTATA FALSA: quella che motivava il
+  default sulla via punto («e la casa espone l'indirizzo, il contrario
+  di ciò per cui esiste la busta»). È stata RISCRITTA e non tolta: il
+  punto resta il default perché resta il CONSIGLIATO e perché di dati
+  ne chiede zero, ma non è più vero che l'altra li sparpaglia.
+  IMPERFEZIONI DICHIARATE: gli ordini che non si chiudono MAI tengono
+  l'indirizzo finché un umano non li muove (è la popolazione della
+  coda «⏸ Ordini fermi», e il testo pubblico lo dice); e il reso dopo
+  disputa continua a mandare le parti in chat per l'indirizzo del
+  VENDITORE, che noi non abbiamo — l'asimmetria si vede solo adesso,
+  ed è dichiarata, non risolta.
   LA PAGINA ORDINI RISTRUTTURATA (ago 2026): filtro «Solo attivi»,
   pillole [Tutti|Acquisti|Vendite], la foto vera al posto del 📦, e il
   NASCONDERE degli affari conclusi. Le definizioni, dichiarate:
@@ -11693,6 +11854,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   file come testo può certificare qualunque cosa TRANNE che quel
   file sia un programma — la prova più importante su un sorgente è
   che si lasci leggere dal suo motore.
+  E IL PARSE NON BASTA: `prove_avvio_client` (ago 2026, dal cantiere
+  dell'indirizzo di casa) fa GIRARE lo script con un DOM di cartone.
+  Il guasto che l'ha chiesta è il gemello esatto di quello sopra e
+  arriva da un'altra porta: `scriviTempi()` gira a TOP-LEVEL e
+  chiamava una funzione che legge una `let` dichiarata più in basso —
+  ReferenceError da *temporal dead zone*, lo script si interrompe lì e
+  l'app resta muta. **3400 sentinelle verdi e `node --check` pulito**,
+  perché la sintassi era perfetta ed era l'ESECUZIONE a morire: il
+  parse dice che il file è un programma, non che quel programma arrivi
+  in fondo. La prova non verifica che l'app funzioni — per quello ci
+  vuole un browser — ma che nessuno `<script>` si fermi a metà, che è
+  la differenza fra un'app viva e una pagina bianca.
+  LA RIGA CHE LA RENDE CAPACE DI FALLIRE è nello stub, e l'ha trovata
+  la TORTURA: `querySelectorAll` deve tornare UN elemento e non zero —
+  con la lista vuota ogni `forEach` gira a vuoto e il corpo, dove
+  vivono i ReferenceError, non viene eseguito MAI. La prima stesura
+  passava anche col guasto rimesso dentro. Lo stub non deve mai
+  mentire su un'assenza (mai `undefined` dove il client si aspetta un
+  oggetto), o si fallirebbe per colpa sua; `avvia()` in coda è async e
+  le sue promesse cadono nel vuoto, ed è giusto — quel che si prova
+  qui è il corpo SINCRONO.
   LO SCANNER DEI SEGRETI GUARDA ANCHE INDIETRO (ago 2026, audit):
   usava `git ls-files`, cioè i file tracciati ALLO STATO ATTUALE, e il
   checkout era shallow — un segreto committato e poi tolto passava per
@@ -14238,6 +14420,44 @@ amministratore del canale, `/canale -1003975076313` (deve arrivare il
 messaggio di prova), `/vetrina` per vedere dov'è, `/vetrina tutto`, e
 un annuncio vero da guardare. DA GUARDARE il primo lunedì: il
 riepilogo, **una volta sola** anche con un deploy in mezzo.
+
+L'indirizzo di casa dentro l'ordine (ago 2026): chi sceglie la
+spedizione a casa scrive l'indirizzo al momento dell'acquisto, viaggia
+cifrato come il codice della busta, lo legge solo il venditore e una
+finestra dopo la chiusura una scopa lo cancella. Prima passava in chat
+privata — e chi non ha username Telegram né npub non poteva darlo a
+NESSUNO: lo stesso caso vero che ha fatto nascere la busta, sull'altra
+strada. Le quattro decisioni di Andrea (campi separati per il
+riempimento automatico, finestra di grazia, il moderatore che non
+legge mai, la voce nella pagina pubblica) e le sei righe da non
+ammorbidire stanno in Architettura, «L'INDIRIZZO DI CASA» — con la
+lezione che vale oltre il cantiere: **la pagina «Il pagamento
+protetto» non diceva quello che sembrava**, le parole *recapito,
+indirizzo, dati personali* non ci comparivano MAI, e la frase «noi non
+raccogliamo dati veri» viveva solo in un commento del codice. Nessuna
+promessa è stata smentita; ne è stata scritta una che non c'era.
+Collaudato: 3468 sentinelle (56 nuove) e DODICI mutazioni una per riga
+sorvegliata, ognuna rossa da sola; gli endpoint girati per davvero su
+sqlite in memoria (il GET non scrive niente, estraneo e ordine
+inesistente rispondono identico, la scopa è idempotente e non tocca né
+`aggiornato` né gli ordini vivi); `collaudo_conto.py` resta 55/55 e le
+funzioni del conto e delle tre uscite del denaro sono INTATTE byte per
+byte; più il giro dal vivo in Chrome headless dai due lati, che ha
+trovato quel che la lettura non vedeva — il pannello che diceva «il
+pacco è partito» su un ordine nemmeno pagato, e le label dei campi
+nate inline dentro `.payout`.
+E UNA PROVA NUOVA CHE MANCAVA, `prove_avvio_client`: scrivendo questo
+cantiere ho ucciso l'app intera con un ReferenceError da temporal dead
+zone — 3400 sentinelle verdi e `node --check` pulito, perché la
+sintassi era perfetta ed era l'esecuzione a morire. La prima stesura
+della prova passava anche col guasto dentro, e l'ha detto la tortura.
+IN PRODUZIONE basta il deploy: le sei colonne nascono da sole
+(additive, tutte a 0) e la leva ha il default nel codice. DA GUARDARE
+al primo giro: il primo ordine vero a casa dentro Telegram — che il
+venditore trovi l'indirizzo nel suo pannello — e, fra un mese, che la
+riga «🏠 Indirizzi cancellati alla chiusura: N» compaia nel journal.
+DA PROVARE SUL TELEFONO, che qui non si può: se il riempimento
+automatico degli indirizzi funziona dentro la WebView di Telegram.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
