@@ -6979,6 +6979,46 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   quello è un FATTO, non un invito, quindi con stock 1 sopra soglia il
   verde resta. C'è una prova che conta la GUARDIA e non la parola —
   due volte in tutto renderAcquisto, i due inviti e mai i due verdi.
+  MA IL VERDE VUOLE LA SUA CONDIZIONE, MAI UN `else` NUDO (ago 2026,
+  difetto vero dal campo, e questa voce è la seconda metà di quella
+  qui sopra): il badge diceva «Spedizione gratis» mentre il conto
+  sotto addebitava la spedizione — su OGNI annuncio del negozio che da
+  solo non arrivava alla soglia, non su un caso limite.
+  IL CONTO NON SBAGLIAVA, ed è la prima cosa da guardare quando
+  ricapita: `_sped_gratis` decide nello STESSO identico punto in
+  `_strade_preventivo` e in `compra()`, quindi preventivo, ordine e
+  fattura dicevano la stessa cifra. A mentire era il solo cartello, e
+  nessuno ha pagato una spedizione promessa gratis.
+  NON DIVERGEVA UN NUMERO MA UN RAMO — le due promesse guardano lo
+  stesso articolo LORDO, e il difetto era che nel ramo che si
+  accendeva il badge quel numero non lo guardava affatto: il verde
+  della 🚚 arrivava da un `else` NUDO, che raccoglieva due casi
+  diversi («soglia raggiunta» e «soglia NON raggiungibile con questo
+  stock») e al secondo prometteva. La 🎁 la stessa forma non ce
+  l'aveva: il suo verde è agganciato al FATTO (`sconto_sats > 0`) e
+  sta PRIMA dell'invito. Il cantiere qui sopra ha dato la guardia
+  all'invito senza togliere al verde il ramo che gliela scavalcava.
+  La cura è `else if (sgManca === 0)`: il caso non raggiungibile non
+  disegna NIENTE — un'assenza non è una bugia — e la prosa del cambio
+  muto resta al ramo di sopra, o quel `=== 0` direbbe il falso (lì
+  `sgManca` vale 0 perché la misura non c'è, non perché la soglia sia
+  raggiunta). SCARTATA la forma robusta — agganciare il verde al
+  risparmio (`sped_gratis_sats` della strada), che allineerebbe la 🚚
+  alla 🎁 —: cambierebbe comportamento a chi ha la tariffa dichiarata
+  a ZERO, dove la promessa scatta ma non c'è niente da offrire. Si
+  potrà prendere il giorno che quel conto sarà zero, e la query che lo
+  misura è nel commit di questo cantiere.
+  E LA LEZIONE VALE PIÙ DELLA CURA, che è di una riga: una sentinella
+  sulla POSIZIONE di una guardia dice che la guardia c'è, MAI che il
+  ramo accanto sia onesto — quella di ieri era verde col difetto vivo,
+  perché certificava un disegno vero per una promessa e falso per la
+  gemella. **È LA QUINTA VOLTA**, e da qui in poi quella classe di
+  prova va SEMPRE in coppia con una sul CONTENUTO del ramo. Le tre
+  nuove: le due condizioni per nome, più il CENSIMENTO — nessuna
+  pillola verde di renderAcquisto può nascere per esclusione, così la
+  terza promessa di domani ci entra da sola — col conteggio accanto,
+  che a zero verdi trovati direbbe una promozione invece di una
+  cecità. Torturate a cinque mutazioni, ognuna rossa da sola.
   IL CONTO È DEL SERVER (`sconto_raggiungibile`,
   `sped_gratis_raggiungibile` nel preventivo MONO), il patto di
   `mancano_*`: è esattamente il posto dove vive un off-by-one, e il
