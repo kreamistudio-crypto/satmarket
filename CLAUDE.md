@@ -8960,11 +8960,59 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   wallet — la UI consiglia di impostarlo). Al collegamento `infoNwc()`
   valida la stringa con una STRETTA DI MANO vera: chiamata `get_info`
   via NIP-47 (prova relay, secret e cifratura insieme), tentando
-  nip04 (default storico) e poi nip44; una risposta d'errore del
-  wallet conta comunque come connessione viva. L'evento info kind
+  nip04 (default storico) e poi nip44. L'evento info kind
   13194 è solo un suggerimento per la cifratura (tag `encryption`):
   Coinos e altri NON lo pubblicano (verificato lug 2026), mai
-  pretenderlo. Log diagnostici `🟪 [nwc]` in console. `clientNwc()` è il
+  pretenderlo — e dall'ago 2026 ORDINA i tentativi senza escluderli,
+  perché un wallet può dichiarare una cifratura e volerne un'altra, e
+  con un elenco di uno solo si resterebbe fuori per sempre.
+  LA CIFRATURA SI DICHIARA (ago 2026, dal campo: «Primal non si
+  collega»). NIP-47 dice che il client mette un tag `encryption` nella
+  richiesta e che **l'assenza del tag indica nip04**: noi il tag non lo
+  scrivevamo MAI, quindi il ripiego su nip44 spediva un contenuto
+  nip44 dentro un evento che si dichiarava nip04 — un wallet che segue
+  la specifica non lo decifra e TACE, e da fuori quel silenzio si
+  legge «il wallet non risponde», cioè «Barattolo non riconosce il mio
+  wallet». Il tag si mette SOLO per nip44 (`nip44_v2`), o si direbbe
+  una cosa nuova anche a chi parla nip04, che oggi funziona.
+  E `UNSUPPORTED_ENCRYPTION` NON È UNA CONNESSIONE VIVA, che era il
+  rovescio peggiore del rifiuto: il ramo «il wallet ha risposto, per
+  il collegamento basta e avanza» prendeva QUALUNQUE codice d'errore,
+  compreso quello con cui il wallet dice «questa lingua non la parlo»
+  — e lo salvavamo, cifratura sbagliata compresa. Risultato: «⚡ Wallet
+  collegato!» e poi ogni pagamento che fallisce, che è la forma di
+  guasto che costa di più da diagnosticare, perché il momento in cui
+  si rompe è lontano dal momento in cui si è deciso male. Ora quel
+  codice fa passare all'ALTRA cifratura, e se non ne resta nessuna il
+  messaggio lo dice («il wallet parla una cifratura che non
+  conosciamo») invece di incolpare il secret.
+  LA CHIAVE DEL WALLET HA UN GIUDICE, `chiaveNwc(con)`: 64 esadecimali
+  o non è una chiave. Due forme storte meritavano un messaggio invece
+  di un'esplosione — la BARRA FINALE dopo la pubkey
+  (`nostr+walletconnect://<chiave>/?…`), dove `parseConnectionString`
+  fa `pathname || host` e con un percorso «/» **la chiave diventa un
+  carattere solo**, e la chiave scritta in npub: in tutti e due i casi
+  a lamentarsi per primo era nip04, con un «hex string expected» che
+  manda a cercare il guasto nel secret. Il giudice è UNO e lo chiamano
+  tutti e due i posti che quella chiave la derivano (`infoNwc` e
+  `clientNwc`); a tenerlo collegato c'è un CENSIMENTO e non un elenco
+  — fuori da lui `con.pubkey` non si legge a mano da nessuna parte —
+  perché la tortura ha visto sopravvivere proprio la mutazione che
+  rimetteva la lettura a mano nei chiamanti: la guardia c'era, non la
+  chiamava nessuno, e tutte le prove restavano verdi.
+  LA PROVA È ESEGUIBILE e non una sentinella sulla forma: `infoNwc`
+  gira DAVVERO contro un wallet di cartone nip44-only che risponde
+  `UNSUPPORTED_ENCRYPTION` alla cifratura sbagliata, e si chiede che
+  si colleghi — e che si colleghi in nip44. Una sentinella direbbe che
+  il tag c'è, mai che la stretta di mano riesce.
+  RESTA PIÙ STRETTO DELLA LIBRERIA CHE SPEDIAMO, dichiarato: la
+  guardia di `collegaWallet` esige le due barre
+  (`nostr+walletconnect://`) mentre `parseConnectionString` digerisce
+  anche la forma senza (`nostr+walletconnect:<chiave>?…`). Le barre
+  sono nella specifica, quindi non siamo più stretti dello STANDARD;
+  ma rifiutiamo una forma che il nostro stesso parser leggerebbe. Se
+  in rodaggio si vedrà un wallet vero che la usa, la cura è allargare
+  la regex — non aggiungere un caso per quel wallet. Log diagnostici `🟪 [nwc]` in console. `clientNwc()` è il
   gemello NIP-47 del bunker NIP-46: richieste kind-23194 cifrate sul
   relay del wallet, risposte 23195 agganciate per tag `e` = id della
   richiesta (il bunker usa msg.id). `compraSubito()`: conferma
