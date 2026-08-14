@@ -5808,14 +5808,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   scelte — NON C'È PIÙ, e con lei la nota sulla lampo. A dire la
   valuta restano le due pillole «€ euro / ₿ sats» e l'etichetta sopra
   le soglie («Da quanti euro di articoli»).
-  ⚠️ QUEL CHE SE N'È ANDATO CON LEI, dichiarato perché era nato
-  apposta: «Tu incassi sempre in SATS», la riga che teneva onesto il
-  cassetto di un negozio che promette in EURO ma incassa in bitcoin —
-  col passaggio all'euro la parola «sats» era sparita da lì, e una
-  soglia in euro accanto a un negozio bitcoin si legge come «mi pagano
-  in euro». Se un venditore lo chiede, la risposta è quella riga e il
-  posto è il cassetto. Il campo d'aiuto in euro, i due `*DaEuro` e gli
-  `≈` sulle pillole restano CANCELLATI da prima. Per chi COMPRA non si aggiunge niente: le righe pubbliche
+  MA «TU INCASSI SEMPRE IN SATS» È TORNATA (ago 2026, rimessa da
+  Andrea il giorno dopo, ed è l'unica riga di quelle tolte a coprire un
+  caso VERO): una soglia in EURO accanto a un negozio che incassa in
+  bitcoin si legge come «mi pagano in euro», e nel cassetto non c'è
+  nient'altro che dica il contrario — la riga era nata apposta col
+  passaggio all'euro. Vive in `notaIncasso`, sotto le pillole della
+  cifra, e vale in TUTTE E DUE le valute: in sats è ovvia, in euro è la
+  sola risposta. UN posto solo e la portano tutti e due i cassetti —
+  il patto della nota sulla valuta, che le sopravvive.
+  ⚠️ ATTENZIONE al commento che la introduce: la sentinella della nota
+  tolta conta la PAROLA di quella funzione e non la sua chiamata,
+  quindi nominarla in un commento fa diventare rossa una prova (ci si
+  è inciampati rimettendo questa riga). Il campo d'aiuto in euro, i due
+  `*DaEuro` e gli `≈` sulle pillole restano CANCELLATI da prima. Per chi COMPRA non si aggiunge niente: le righe pubbliche
   restano una riga, e il momento in cui conta — il paySheet — parla sats
   da solo (`contoScomposto` scrive «sats» su ogni riga).
   LA MISURA È IL LORDO DEL CONTO, cioè l'articolo DOPO lampo e accordo
