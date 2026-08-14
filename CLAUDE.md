@@ -9585,6 +9585,102 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «📦 Come spedisci» nel Profilo con le voci da /api/me (mai
   hardcodate; in DEMO sparisce). Il compratore lo vede in pagina:
   «📦 Spedisce con InPost».
+  I CORRIERI SONO PIÙ D'UNO, E LA RETE LA SCEGLIE CHI COMPRA (ago
+  2026, caso vero dal campo): il compratore sceglie un locker InPost,
+  il venditore spedisce con Poste, il punto più vicino di QUELLA rete
+  è a 50 km — e l'affare resta fermo coi sats in cassaforte. Con una
+  dichiarazione sola il venditore che ne usa due doveva sceglierne
+  una e mentire, o lasciare vuoto; e il punto era testo libero legato
+  a nessuna rete, quindi nessuno dei due sapeva cosa avesse in mente
+  l'altro. Ora il venditore li spunta tutti e, quando sono ≥2, chi
+  compra dice CON QUALE vuole il pacco.
+  IL MODELLO È UNA COLONNA NUOVA E NON UNA RISCRITTA:
+  `utenti.spedizionieri` coi pipe ai bordi ('|InPost|Poste Italiane|',
+  il pattern di `avvisi_ricerca.categorie`), e `spedizioniere` resta
+  VIVA come PRIMA VOCE, scritta nello STESSO UPDATE. È il patto delle
+  soglie in euro e della tariffa punto — un nome non cambia mai
+  significato — e serve al client rimasto in cache, che di reti ne
+  legge una: vede una rete vera invece di tutte, cioè un'OMISSIONE e
+  mai una bugia (con la stringa coi pipe non accenderebbe nessuna
+  pillola e `linkMappePunti` cadrebbe nel ramo «Altro», cioè nessuna
+  mappa, in silenzio). Il BACKFILL è `riallinea_spedizionieri`
+  all'avvio, idempotente e senza il quale i 16 venditori che una rete
+  l'avevano dichiarata la perderebbero il giorno del deploy.
+  Canonicalizzazione contro il catalogo e NELL'ORDINE del catalogo
+  (`_reti_serializza`), così deduplica e ordine stabile vengono
+  gratis; `reti_venditore` è il giudice PURO che prende i CAMPI e non
+  la riga (il patto di `in_ferie`) e RIPIEGA sulla singolare quando la
+  nuova è vuota — è quel ripiego a far vivere il dato di ieri prima
+  che il backfill giri, e a coprire uno script lanciato a mano su un
+  database più vecchio.
+  LA RETE SCELTA VIVE IN `ordini.rete_punto` ('' = non dichiarata:
+  storici, venditore senza reti, via diversa dal punto), MAI un valore
+  nuovo di `consegna_scelta` — il patto di `via_punto` e di
+  `anche_digitale`: ortogonale, così timer e solleciti restano veri
+  per costruzione. Il giudice è `rete_da_payload`, e le sue tre
+  risposte sono la decisione: NESSUNA rete → '' e il mondo di prima;
+  UNA sola → quella, senza chiedere niente (il patto delle strade
+  dell'asta, «una strada sola si fissa alla nascita»); DUE o più → la
+  dice il compratore, e il 400 esiste SOLO lì. Si valida contro le
+  reti DI QUEL VENDITORE e non contro `SPEDIZIONIERI`, ed è la riga in
+  cui il cantiere sta tutto: chi dichiara InPost e Poste non deve
+  poter ricevere un ordine per «Altro» — sarebbe una rete che non ha,
+  cioè il caso da chiudere. La lettura è quella che c'era già (zero
+  query in più) e sta PRIMA della invoice, col patto del ricontrollo
+  intatto; `rete_da_payload` è pura e non fa await.
+  IL CERCHIO SI CHIUDE COL TRACKING: la rete arriva al pannello
+  «📦 Spedisci» e PRESELEZIONA `shipCorriere` col secondo argomento di
+  `selettoreCorriere`, che esisteva già per la correzione del
+  moderatore — quel che si dichiara a monte sceglie il codice a valle.
+  Vale dove il nome combacia con una voce di `CORRIERI` (InPost e
+  Poste ci sono, «Altro» no). E la riga «se serve, accordatevi in chat
+  sul corriere» resta SOLO dove la rete non c'è: è la frase che questo
+  cantiere esiste per far sparire.
+  IL DIFETTO CHIUSO STRADA FACENDO: nel campo del punto DENTRO
+  l'ordine `linkMappePunti` era chiamata con un `''` HARDCODATO — per
+  un anno si sono viste tutte e due le mappe anche a rete dichiarata,
+  mentre il commento del giudice diceva il contrario. Ora il giudice
+  prende una LISTA (dentro lo era già: cambia solo come si riempie) e
+  l'ordine gli passa la sua rete. Le tre regole non si toccano: reti
+  dichiarate → solo le loro mappe, nessuna rete → tutte, una rete
+  senza mappa («Altro») → NIENTE, che un link fuorviante è peggio di
+  nessun link.
+  L'INVITO È UN FOGLIO COL TETTO (decisione di Andrea): chi pubblica
+  con la spedizione e non ha dichiarato niente trova `#corrieriSheet`
+  al tocco di «Pubblica» — le pillole lì dentro, «Salva e pubblica» e
+  «Pubblica lo stesso». INSISTENTE MA MAI BLOCCANTE: tutti e due i
+  bottoni richiamano `publish()`, e c'è la prova. Il tetto è
+  `INVITO_CORRIERI_MAX` (3) col contatore in `utenti.invito_corrieri`
+  — colonna e non localStorage, è un fatto della PERSONA (il patto di
+  `avvisato_trasporto`) — e sale quando il foglio SI APRE, non quando
+  si legge: chiuderlo senza leggere è una scelta. Esaurito il tetto
+  RESTA LA RIGA nel form, che è derivata dai dati veri e sparisce da
+  sola il giorno che il venditore dichiara (quindi senza dismiss, la
+  regola della checklist). IL TETTO È LA METÀ CHE CONTA, ed è misurato:
+  nel form Vendi ci sono NOVE hint condizionali e nel caso peggiore se
+  ne accendono otto insieme — un cartello che compare sempre uguale si
+  impara a scavalcare senza leggerlo. Il ritiro e il codice online non
+  lo vedono MAI per costruzione: la prima domanda della condizione è la
+  spunta «Spedizione», la stessa della riga. L'aggancio in `publish()`
+  sta DOPO l'ultima validazione e PRIMA di `bottoneInAttesa` (l'ultimo
+  return a stato pulito, con l'overlay ancora spento), e un flag di
+  SESSIONE spezza la ricorsione — `chiediConferma` non è await-abile e
+  il pattern di casa è early-return + callback che richiama la
+  funzione, come `annullaModificaChiedendo`.
+  RESTA FUORI, dichiarato: il catalogo largo dei SETTE corrieri del
+  tracking (per BRT, GLS, SDA, DHL e UPS non abbiamo l'URL della loro
+  mappa dei punti, e una voce senza mappa è lo stato «Altro»); UNA
+  TARIFFA per rete (decisione di Andrea: `spedizione_punto_sats` resta
+  una sola, qualunque rete scelga chi compra); e una CAMPAGNA nuova in
+  chat — il timbro `avvisato_spedizioniere` è già bruciato e non
+  riparte, quindi chi ha annunci attivi ma non pubblica più non vedrà
+  mai il foglio. Raggiungerlo vorrebbe dire una una-tantum GLOBALE col
+  timbro in `timbri` (la regola di `avvisa_sconto_su_mono`): è una
+  decisione a parte, non è stata presa.
+  Il collaudo eseguibile è `collaudo_reti.py` (22 verdi su database
+  usa-e-getta: il backfill e la sua idempotenza, le due colonne che si
+  scrivono insieme, i tre casi della rete, il mondo di ieri intatto,
+  la ronda che tace).
   LA VIA PUNTO SI OFFRE SEMPRE dove c'è la spedizione (secondo giro,
   ago 2026 — la decisione di Andrea che SUPERA quella del primo
   giro, «punto solo con spedizioniere dichiarato»; il perché:
