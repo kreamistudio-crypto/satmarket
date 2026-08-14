@@ -7729,11 +7729,63 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sats, e si vedeva «Sconto sugli articoli −1…» — non un'etichetta coi
   puntini ma una PERCENTUALE MOZZATA, che si legge come un altro
   numero. Via la percentuale: la cifra a destra dice già quanto si è
-  risparmiato, ed è il dato utile; il «−10%» resta dove c'è spazio per
-  leggerlo — la riga dell'ordine, il cassetto, il tag sull'unitario e
-  il badge in card. Con lei è sparito `scontoPct` dai due costruttori
-  del conto, che nessuno leggeva più: un campo morto lì dentro fa
-  credere a chi passa che la riga una percentuale la mostri.
+  risparmiato, ed è il dato utile.
+  ...E POI SE L'È RIPRESA, PERCHÉ È CADUTA L'ETICHETTA (ago 2026,
+  decisione di Andrea, e la coppia va letta insieme): nel conto
+  l'etichetta è **«Sconto» secco** col tag verde della percentuale
+  accanto. «SUGLI ARTICOLI» LÌ NON SERVE, ed è la ragione che rende il
+  rovesciamento onesto invece di un ripensamento: la riga
+  «Spedizione» sta due righe più giù COL SUO IMPORTO, quindi si vede
+  da sola che sono due voci diverse — la formula lunga rispondeva a
+  una domanda che quella colonna non lascia aperta. E lo spazio
+  guadagnato è ESATTAMENTE quello che fa stare la percentuale.
+  MISURATO a 320px in vista sats, che è dove mozzava: il contenuto
+  chiede **95px su 178, con 83 di margine** (prima ~168 su 158). Il
+  tag è `.sconto-tag`, lo stesso vestito che la percentuale porta già
+  sull'unitario e nella barra del carrello — le superfici salgono a
+  TRE e il conto è una sentinella: un terzo verde sarebbe un colore in
+  più da spiegare. `scontoPct` è tornato nel costruttore del conto, e
+  viene dal SERVER (`sconto_percento`, la regola fotografata) mai
+  dedotto da sconto/articolo, che direbbe 9,99%.
+  LA FORMULA LUNGA RESTA dove risponde a una domanda VIVA, ed è il
+  censimento da tenere: il cassetto del venditore e l'hint del form
+  Vendi (lì «mi mangia anche la spedizione?» non gliela risponde
+  nessuno), e la RICEVUTA dell'ordine — che è una riga isolata sotto
+  il prezzo, senza nessuna «Spedizione» accanto a fare il contrasto,
+  quindi «Sconto» secco non direbbe su cosa. C'è la sentinella nei due
+  versi. RESTA ANCHE NEL paySheet (`contoScomposto`), e lì è una
+  DOMANDA APERTA e non una decisione: quel foglio ha le stesse righe
+  del conto, quindi il contrasto c'è e il ragionamento varrebbe
+  identico — non è stato allineato perché era fuori dal perimetro.
+  IL TOGGLE €/₿ STA ACCANTO AL CONTO (ago 2026, decisione di Andrea):
+  viveva in testata, in alto a destra, e da lì governava cifre che a
+  volte erano fuori schermo; adesso è accanto al titolo «Il conto»,
+  che pesa un gradino in più — **13px invece di 11**, e non è una
+  misura nuova ma quella che `.altri-tit` ha già in casa per lo stesso
+  mestiere. Il toggle ci sta a destra DOPO la linea puntinata, con
+  `order:2` sul `::after` che ha `order:1` (il pattern del `.conta`,
+  che quel posto lo occupa già). MISURATO a 320: titolo 72 + toggle 56
+  sulla riga da 256, con **108px di linea in mezzo** e i due centri
+  allineati — nessuno dei due va a capo.
+  COSA GOVERNA DAVVERO, misurato sui due acquisti prima di spostarlo:
+  ogni cifra che passa da `cifraCtrl` — il conto per intero, il prezzo
+  dell'articolo nella card e il costo delle vie quando si mostra (a
+  costi uguali le cifre sono mute, vedi `costiVieUguali`). NON governa
+  le pillole delle promesse, che parlano nella valuta in cui il
+  venditore ha scritto la soglia.
+  IMPERFEZIONE DICHIARATA, ed è la ragione per cui il fatto sta
+  scritto qui: nel CARRELLO il toggle cambia quasi sempre il solo
+  conto (la striscia dei francobolli i prezzi non li porta), quindi
+  accanto al conto è onesto; sul SINGOLO cambia anche il prezzo
+  dell'articolo, che sta in cima alla pagina — lì dice meno del vero.
+  Se un domani desse fastidio, la leva NON è rimetterlo in testata (da
+  lì governava le stesse cifre e si vedeva meno) ma un secondo toggle
+  sulla card, che però sarebbe due comandi per una preferenza sola.
+  La fabbrica è UNA (`toggleValuta`) e la chiamano i DUE rami del
+  render — lo scheletro e la pagina piena — o toccando ± sparirebbe
+  finché il conto non torna. Le superfici del toggle in tutto il
+  client sono OTTO, e il conto è una sentinella: `aggiornaCurToggle`
+  le pesca per `data-cur` e deve conoscerle tutte.
   IL CONTO È LA SUPERFICIE PIÙ STRETTA DELL'APP, ed è la ragione per
   cui questi numeri stanno scritti qui: chi allunga un'etichetta di
   `contoRighe` MISURA PRIMA, a 320px e in vista SATS (la cifra in mono
@@ -9065,7 +9117,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in cache, per cui il server tiene il default silenzioso di sempre.
   Dall'alto: gli articoli (card singola o strip del set) · la
   CONSEGNA a vie-radio — 🤝 ritiro · 🏠 spedizione a casa ·
-  «Spedizione a locker/punto di ritiro» con l'armadietto disegnato
+  «Spedizione a locker / punto» con l'armadietto disegnato
   (13 ago 2026, decisione di Andrea in DUE giri: prima «locker»
   secco, che superava il camioncino del 12 — il 🚚 diceva la famiglia
   ma non la differenza con «a casa», che qui è tutta la scelta; prima
@@ -9084,6 +9136,26 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   lì è grammatica e non larghezza. Quando le cifre di casa/punto
   divergono la colonna si stringe e il nome può andare a capo lo
   stesso: a-capo pulito, dichiarato, mai un overflow.
+  E DALL'AGO 2026 LA BARRA È SPAZIATA E LA CODA CADE (decisione di
+  Andrea, che ROVESCIA il «RESTA SENZA SPAZI» del 13 ago — quella
+  voce diceva che la barra spaziata era stata chiesta, MISURATA e
+  RITIRATA davanti al numero: «a locker / punto di ritiro» chiede
+  265px dove a 320 ce ne sono 258, e andava a capo per SETTE px).
+  Il numero non è cambiato: è cambiata l'etichetta. Cadendo «di
+  ritiro» il nome scende a **210px su 258, con 48 di margine**, e la
+  barra spaziata ci sta comoda a 320 come a 360 e 375.
+  LA PAROLA PER ESTESO NON SI PERDE, ed è la ragione del taglio: il
+  bottone che apre il campo dice «Indica il punto di ritiro» a un
+  centimetro, dentro lo stesso riquadro. La DOPPIA FORMULA invece
+  resta — è lei a dire che la via non è solo l'armadietto — e resta
+  anche il perché di ieri, che non è stato smentito da niente.
+  ATTENZIONE al perimetro: la barra spaziata vale per l'ETICHETTA
+  DELLA VIA e basta. Le prose che nominano il posto fisico (i tre
+  hint dell'ordine, il pannello del venditore, le notifiche del bot)
+  tengono «locker/punto di ritiro» come sempre: lì non è un'etichetta
+  da leggere in fretta dentro una colonna stretta, è una frase. C'è la
+  sentinella, e guarda dentro `nomeVia` e non tutto il file — larga,
+  sarebbe rossa per colpa delle prose.
   Non esiste un'emoji del locker: `ICO_LOCKER` è un SVG a
   currentColor come le icone della nav, inchiostro in [2,22], e va
   AVVOLTO in uno `<span>` con l'etichetta perché `.via-nome` è un

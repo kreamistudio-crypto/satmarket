@@ -7941,10 +7941,24 @@ def prove_pagina_acquisto():
     #    L'etichetta e' SENZA articolo per la misura (a 320 la colonna
     #    da' 258px e col «un» il nome ne chiede 276: due righe); la
     #    prosa delle notifiche tiene «a un», che li' e' grammatica.
+    #    E DALL'AGO 2026 LA BARRA E' SPAZIATA e la coda cade («a locker
+    #    / punto»): la doppia formula resta — e' lei a dire che la via
+    #    non e' solo l'armadietto — ma «di ritiro» non serve piu' qui,
+    #    perche' il bottone che apre il campo lo dice a un centimetro
+    #    («Indica il punto di ritiro»). MISURATO a 320 in sats: il nome
+    #    chiede 210px su 258, una riga con 48 di margine — mentre la
+    #    formula lunga spaziata ne chiedeva 265 e andava a capo.
     prova("la via punto parla col locker, e si chiama con la doppia "
           "formula", True,
-          "${ICO_LOCKER} Spedizione a locker/punto di ritiro</span>"
+          "${ICO_LOCKER} Spedizione a locker / punto</span>"
           in mini3)
+    #    la barra spaziata vale per l'ETICHETTA DELLA VIA e basta: le
+    #    prose che nominano il posto fisico (l'ordine, il pannello del
+    #    venditore, le notifiche del bot) tengono «locker/punto di
+    #    ritiro» come sempre — li' non e' un'etichetta da leggere in
+    #    fretta dentro una colonna stretta, e' una frase
+    prova("...con gli spazi attorno alla barra", 0,
+          pezzo_js(mini3, "const nomeVia = v =>", "\n").count("locker/punto"))
     prova("...il locker e' inchiostro che si accende (currentColor)",
           True, 'class="ico-locker"' in mini3
           and 'stroke="currentColor"' in mini3)
@@ -8218,6 +8232,72 @@ def prove_pagina_acquisto():
                           "bottom:0") == 1)
     prova("...ed e' l'unico fondo appiccicato del client", 1,
           mini3.count(".ctrl-fondo{position:sticky"))
+    #    «SCONTO» SECCO COL SUO TAG (ago 2026, decisione di Andrea che
+    #    ROVESCIA il taglio della percentuale): «sugli articoli» qui
+    #    non serve — la riga «Spedizione» sta due righe piu' giu' COL
+    #    SUO IMPORTO, quindi si vede da sola che sono voci diverse — e
+    #    lo spazio guadagnato fa stare la percentuale, che l'etichetta
+    #    lunga mozzava a 320 in sats. MISURATO dopo: 95px su 178, con
+    #    83 di margine (prima ne chiedeva ~168 su 158).
+    #    La formula lunga RESTA dove risponde a una domanda aperta: il
+    #    cassetto del venditore, l'hint del form Vendi e la ricevuta
+    #    dell'ordine, che e' una riga sola senza nessuna «Spedizione»
+    #    accanto a fare il contrasto.
+    #    il corpo si ripulisce dai COMMENTI prima di cercare: quello
+    #    che introduce la riga CITA la formula vecchia — è la storia
+    #    del rovesciamento, e vale più di una prova comoda — e senza
+    #    questo la sentinella sarebbe rossa sul codice buono (la
+    #    trappola già pagata col «punto» e con la nota della valuta)
+    _cr = re.sub(r"/\*[\s\S]*?\*/", "",
+                 pezzo_js(mini3, "function contoRighe(c){", "\n}"))
+    prova("nel conto l'etichetta dello sconto e' secca", (True, False),
+          ("r(`Sconto${c.scontoPct" in _cr,
+           "Sconto sugli articoli" in _cr))
+    prova("...e porta la percentuale, dal server e mai dedotta", True,
+          '<span class="sconto-tag">−${c.scontoPct}%</span>' in _cr
+          and "scontoPct: p.sconto_percento" in mini3)
+    prova("...e la formula lunga resta dov'e' una risposta", (True, True),
+          ("🎁 Sconto sugli articoli${o.scontoPct" in mini3,
+           ">Sconto sugli articoli <span class=\"conta\"" in mini3))
+    #    IL TOGGLE €/₿ VIVE ACCANTO AL CONTO (ago 2026, decisione di
+    #    Andrea): stava in testata, e da li' governava cifre che a
+    #    volte erano fuori schermo. La fabbrica e' UNA (toggleValuta) e
+    #    la chiamano i due rami del render — lo scheletro e la pagina
+    #    piena — o toccando ± sparirebbe finche' il conto non torna.
+    #    MISURATO a 320: titolo 72 + toggle 56 sulla riga da 256, con
+    #    108px di linea puntinata in mezzo e i due centri allineati.
+    prova("il toggle valuta e' uscito dalla testata della cassa", True,
+          '<div class="ctrl-corpo" id="acqCorpo"></div>' in mini3
+          and "pacco-tit\"><b id=\"acqTit\"" in mini3
+          and mini3.index('id="view-acquisto"')
+              < mini3.index('id="acqCorpo"'))
+    _testa = mini3[mini3.index('id="view-acquisto"'):
+                   mini3.index('id="acqCorpo"')]
+    prova("...e la sua testata non ne porta piu' uno", 0,
+          _testa.count("cur-seg"))
+    prova("...la fabbrica del toggle e' una sola", 1,
+          mini3.count("function toggleValuta("))
+    #    e il censimento delle SUPERFICI del toggle: otto in tutto il
+    #    client (searchbar, carrello, i due dell'offerta, il dettaglio,
+    #    LA CASSA — che e' l'unica a passare da una fabbrica invece che
+    #    dal markup — l'ordine e il pannello). Chi ne aggiunge una lo
+    #    sente da qui, invece di scoprirlo da un toggle che non si
+    #    accende: e' aggiornaCurToggle a doverli conoscere tutti.
+    prova("...e le superfici del toggle sono otto", 8,
+          mini3.count('class="cur-seg'))
+    prova("...tutte pescate per data-cur, mai per id", True,
+          "'.cur-seg button[data-cur]'" in mini3)
+    prova("...e la chiamano i due rami del render", 2,
+          pezzo_js(mini3, "function renderAcquisto(){",
+                   "\n}").count("${toggleValuta()}"))
+    prova("...accanto al titolo del conto, che pesa un gradino in piu'",
+          (True, True),
+          ('class="section-label conto-tit">Il conto${toggleValuta()}'
+           in mini3, ".conto-tit{font-size:13px}" in mini3))
+    prova("...e sta a destra DOPO la linea puntinata", True,
+          ".conto-tit .conto-cur{order:2}" in mini3
+          and ".section-label::after{" in mini3
+          and "order:1}" in mini3)
     #    LA CASSA E' UNA SOLA E SERVE I DUE ACQUISTI (ago 2026): il
     #    carrello ci arriva diritto, e quel che e' SUO — i due
     #    secondari e il bottone che riporta a comporre — vive gated su
@@ -15409,7 +15489,11 @@ def prove_promesse_badge():
     prova("il tag −X% della barra compare solo a sconto scattato",
           True, "el('paccoTag').textContent = (st && st.scattato)"
           " ? `−${st.pct}%` : ''" in _bp)
-    prova("...con la classe di Paga, nelle due sole superfici", 2,
+    # dall'ago 2026 le superfici sono TRE: l'unitario della cassa, la
+    # barra del carrello e la RIGA DEL CONTO, che si e' ripresa la
+    # percentuale quando l'etichetta e' passata a «Sconto» secco —
+    # sempre con la stessa classe, mai un terzo verde da spiegare
+    prova("...con la classe di Paga, nelle tre sole superfici", 3,
           mini.count('class="sconto-tag"'))
     prova("...e la regola CSS del tag resta una", 1,
           mini.count(".sconto-tag{"))

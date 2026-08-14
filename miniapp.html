@@ -1822,6 +1822,18 @@
     background:var(--ink);color:var(--on-ink);border-radius:999px;
     padding:1px 5px;font-weight:800;font-family:'JetBrains Mono',monospace}
   .ctrl-corpo .section-label{margin-top:16px}
+  /* IL TITOLO DEL CONTO PESA UN GRADINO IN PIU' (ago 2026, decisione
+     di Andrea): 13px invece degli 11 di serie — e non e' una misura
+     nuova, e' quella che .altri-tit ha gia' in casa per lo stesso
+     mestiere (un titolo di sezione che deve farsi notare). Il toggle
+     €/₿ gli sta accanto: la linea puntinata e' un ::after con order:1,
+     quindi al toggle basta order:2 per finire a destra DOPO di lei —
+     il pattern del .conta, che quel posto lo occupa gia'.
+     MISURATO a 320px: titolo 62 + toggle 70 su 288 di colonna, quindi
+     la linea puntinata resta e nessuno dei due va a capo. */
+  .conto-tit{font-size:13px}
+  .conto-tit .conto-cur{order:2}
+  .conto-cur button{padding:3px 9px;font-size:12px}
   /* il conto: righe nome/cifra, il totale staccato dal tratteggio —
      la grammatica di contoScomposto, cresciuta a pagina */
   /* il margin-bottom e' il fiato minimo sopra Acquista quando il
@@ -3737,10 +3749,9 @@ document.getElementById('cartello')?.remove();</script>
     <div class="pacco-testa">
       <button type="button" class="pacco-x" onclick="navIndietro()" title="Torna indietro" aria-label="Torna indietro">←</button>
       <div class="pacco-tit"><b id="acqTit">Acquista</b><span class="eur-hint" id="acqSub"></span></div>
-      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
-        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
-        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
-      </div>
+      <!-- il toggle €/₿ NON sta piu' qui (ago 2026, decisione di
+           Andrea): vive accanto al titolo «Il conto», dove le cifre
+           che governa si leggono. Lo scrive renderAcquisto. -->
     </div>
     <div class="ctrl-corpo" id="acqCorpo"></div>
   </div>
@@ -9056,8 +9067,23 @@ function contoRighe(c){
        attaccata al Prezzo perche' e' del PREZZO che parla: la
        spedizione resta intera, sempre. La cifra arriva POSITIVA e il
        meno lo mette il giudice (l'ultimo argomento). */
+    /* «SCONTO» SECCO, COL SUO TAG VERDE (ago 2026, decisione di
+       Andrea, e ROVESCIA il taglio di stamattina — che aveva tolto la
+       percentuale perche' l'etichetta lunga la mozzava a 320px in
+       sats: si leggeva «Sconto sugli articoli −1…», cioe' una cifra
+       tagliata a meta', che si legge come un altro numero).
+       «SUGLI ARTICOLI» QUI NON SERVE, ed e' la ragione che rende il
+       rovesciamento onesto invece di un ripensamento: la riga
+       «Spedizione» sta due righe piu' giu' COL SUO IMPORTO, quindi si
+       vede da sola che sono due voci diverse — la formula lunga
+       rispondeva a una domanda che questa colonna non lascia aperta.
+       E lo spazio che si guadagna e' proprio quello che fa stare la
+       percentuale, che e' il dato che mancava.
+       IL TAG E' `.sconto-tag`, lo stesso vestito che la percentuale
+       porta gia' sull'unitario e nella barra del carrello: un terzo
+       verde per la stessa cosa sarebbe un colore da spiegare. */
     + (c.sconto>0
-        ? r('Sconto sugli articoli',
+        ? r(`Sconto${c.scontoPct ? ` <span class="sconto-tag">−${c.scontoPct}%</span>` : ''}`,
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
     /* «COMMISSIONE» E BASTA (ago 2026, decisione di Andrea): con
        «Commissione Barattolo» questa riga TRONCAVA a 320px —
@@ -9161,7 +9187,7 @@ const ICO_LOCKER = '<svg class="ico-locker" viewBox="2 2 20 20" aria-hidden="tru
   + '<circle cx="9.8" cy="17.1" r="1" fill="currentColor"/></svg>';
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
-  : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a locker/punto di ritiro</span>`
+  : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a locker / punto</span>`
   : v==='digitale' ? '💾 Codice online' : '';
 
 /* LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA (ago 2026,
@@ -9725,6 +9751,30 @@ function barreCorri(box, barraDa){
       }
     }));
 }
+/* IL TOGGLE €/₿ ACCANTO AL CONTO (ago 2026, decisione di Andrea):
+   stava in testata, in alto a destra, e da li' governava delle cifre
+   che a volte erano fuori schermo. Adesso vive accanto al titolo «Il
+   conto», dove le cifre che cambia si leggono.
+   COSA GOVERNA DAVVERO, misurato sui due acquisti: ogni cifra che
+   passa da cifraCtrl — il conto per intero, il prezzo dell'articolo
+   nella card (solo il SINGOLO: nel carrello la striscia dei
+   francobolli i prezzi non li porta) e il costo delle vie, quando si
+   mostra (a costi uguali le cifre sono mute, vedi costiVieUguali).
+   NON governa le pillole delle promesse: quelle parlano nella valuta
+   in cui il venditore ha scritto la soglia, e non seguono la vista.
+   IMPERFEZIONE DICHIARATA, ed e' la ragione per cui questo commento
+   esiste: sul SINGOLO il toggle cambia anche il prezzo dell'articolo,
+   che sta in cima alla pagina — accanto al conto dice meno del vero.
+   Nel carrello e' onesto quasi sempre. Se un domani desse fastidio,
+   la leva non e' rimetterlo in testata (li' governava le stesse cifre
+   e si vedeva meno) ma un secondo toggle sulla card, che pero'
+   sarebbe due comandi per una preferenza sola. */
+function toggleValuta(){
+  return `<span class="cur-seg inriga conto-cur" title="Mostra i prezzi in euro o in sats">
+    <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+    <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+  </span>`;
+}
 /* La faccia di un articolo nel formato francobollo: la miniatura se
    c'e', l'emoji se no. Estratta perche' la vogliono in tre — la
    striscia del carrello, la card del singolo e lo scheletro che si
@@ -9792,7 +9842,7 @@ function renderAcquisto(){
     box.innerHTML = `${d.tipo==='set'
         ? `<div class="ctrl-articoli"><b>${fmt(pezzi)} articol${pezzi===1?'o':'i'}</b><div class="ctrl-strip">${strisciaSet()}</div></div>`
         : `<div class="acq-art">${facciaMini(primo, 0)}<div class="acq-col"><div class="acq-tit">${esc(primo ? primo.title : '')}</div></div></div>`}
-      <div class="section-label">Il conto</div>
+      <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
       <div class="acq-nota" style="margin-top:2px">Calcolo il conto…</div>
       <div class="ctrl-fondo"><button class="btn orange" disabled>Paga</button></div>`;
     return;
@@ -10168,6 +10218,10 @@ function renderAcquisto(){
                             artEur: p.articolo_lordo_eur || p.articolo_eur || 0,
                             sconto: p.sconto_sats||0,
                             scontoEur: p.sconto_eur||0,
+                            /* la percentuale e' la REGOLA fotografata
+                               dal server (mai dedotta da sconto/
+                               articolo, che direbbe 9,99%) */
+                            scontoPct: p.sconto_percento||0,
                             /* qui la via e' SCELTA, quindi il giudizio
                                e' esatto: spedisce e non si paga */
                             spedGratis: viaOk && !sped
@@ -10207,7 +10261,7 @@ function renderAcquisto(){
      barreCattura/barreCorri, qui sopra */
   const barraDa = barreCattura(box);
   box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}
-    <div class="section-label">Il conto</div>
+    <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
       <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>
