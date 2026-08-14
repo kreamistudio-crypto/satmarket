@@ -8046,7 +8046,8 @@ function artStima(l){
 let offertaMinPercento = 0;
 /* Le righe del conto scomposto per i fogli di pagamento: compaiono
    solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
-function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped){
+function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped,
+                        scontoPct){
   const pezzi = qta || 1;
   /* i pezzi della SPEDIZIONE sono un'altra cosa dalla quantita' della
      riga «Articolo × N»: in un carrello l'articolo non ha un numero
@@ -8059,8 +8060,18 @@ function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped){
           escano, e un totale piu' basso della somma delle righe sopra
           sarebbe un mistero. La cifra arriva POSITIVA e il meno lo
           mette la riga: fmt() di un negativo scriverebbe il trattino
-          ASCII invece del meno tipografico. */
-       + (sconto>0 ? r(sconto, 'Sconto sugli articoli', 0, 1) : '')
+          ASCII invece del meno tipografico.
+          «SCONTO» SECCO COL SUO TAG, come nel conto della cassa (ago
+          2026): qui le righe sono le STESSE — Articolo, Sconto,
+          Spedizione, Totale — quindi il contrasto c'e' e «sugli
+          articoli» risponde a una domanda che questa colonna non
+          lascia aperta. La percentuale e' il nono argomento e arriva
+          dal SERVER (sconto_percento), mai dedotta: chi la dimentica
+          degrada all'etichetta nuda, non rompe niente. */
+       + (sconto>0
+           ? r(sconto, `Sconto${scontoPct
+               ? ` <span class="sconto-tag">−${scontoPct}%</span>` : ''}`,
+               0, 1) : '')
        /* «per N pezzi» viaggia fin qui apposta: la pagina d'acquisto
           l'ha appena mostrata, e una riga che compare e sparisce
           sullo stesso schermo si legge come «il prezzo e' cambiato»
@@ -11123,7 +11134,8 @@ async function startBuySet(){
   el('payScomposto').innerHTML = contoScomposto(c.art, c.sped, c.prot, c.tot,
                                                 1, c.sconto||0,
                                                 (via && via.supplemento_sats)||0,
-                                                (via && via.pezzi)||0);
+                                                (via && via.pezzi)||0,
+                                                (p && p.sconto_percento)||0);
   el('payEurNota').style.display = 'none';
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
@@ -11150,7 +11162,8 @@ async function startBuySet(){
   el('payScomposto').innerHTML = contoScomposto(
     d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
     d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1,
-    d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0);
+    d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
+    d.sconto_percento||0);
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   if (pollTimer) clearInterval(pollTimer);
@@ -12093,7 +12106,8 @@ async function startBuy(){
                                                 (p && p.quantita) || qtaScelta,
                                                 scS,
                                                 (via && via.supplemento_sats)||0,
-                                                (via && via.pezzi)||0);
+                                                (via && via.pezzi)||0,
+                                                (p && p.sconto_percento)||0);
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
     `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale ${TEMPI.invoice} minuti`;
@@ -12123,7 +12137,8 @@ async function startBuy(){
     el('payScomposto').innerHTML = contoScomposto(
       d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0);
+      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
+      d.sconto_percento||0);
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
@@ -12205,7 +12220,8 @@ function compraSubito(){
   el('nwcScomposto').innerHTML = contoScomposto(
     p.articolo_lordo_sats||p.articolo_sats,
     via.spedizione_sats||0, p.protezione_sats||0, via.totale_sats,
-    p.quantita||1, p.sconto_sats||0, via.supplemento_sats||0, via.pezzi||0);
+    p.quantita||1, p.sconto_sats||0, via.supplemento_sats||0, via.pezzi||0,
+    p.sconto_percento||0);
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -12238,7 +12254,8 @@ async function confermaCompraSubito(btn){
     scompOrdine = d.prezzo_sats ? contoScomposto(
       d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
-      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0) : '';
+      d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
+      d.sconto_percento||0) : '';
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);

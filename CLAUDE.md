@@ -7743,8 +7743,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   chiede **95px su 178, con 83 di margine** (prima ~168 su 158). Il
   tag è `.sconto-tag`, lo stesso vestito che la percentuale porta già
   sull'unitario e nella barra del carrello — le superfici salgono a
-  TRE e il conto è una sentinella: un terzo verde sarebbe un colore in
-  più da spiegare. `scontoPct` è tornato nel costruttore del conto, e
+  QUATTRO (col paySheet, sotto) e il conto è una sentinella: un verde
+  nuovo sarebbe un colore in più da spiegare. `scontoPct` è tornato nel costruttore del conto, e
   viene dal SERVER (`sconto_percento`, la regola fotografata) mai
   dedotto da sconto/articolo, che direbbe 9,99%.
   LA FORMULA LUNGA RESTA dove risponde a una domanda VIVA, ed è il
@@ -7753,10 +7753,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nessuno), e la RICEVUTA dell'ordine — che è una riga isolata sotto
   il prezzo, senza nessuna «Spedizione» accanto a fare il contrasto,
   quindi «Sconto» secco non direbbe su cosa. C'è la sentinella nei due
-  versi. RESTA ANCHE NEL paySheet (`contoScomposto`), e lì è una
-  DOMANDA APERTA e non una decisione: quel foglio ha le stesse righe
-  del conto, quindi il contrasto c'è e il ragionamento varrebbe
-  identico — non è stato allineato perché era fuori dal perimetro.
+  versi.
+  E IL paySheet È ALLINEATO (ago 2026, il giro dopo — era rimasto una
+  domanda aperta per un'ora): `contoScomposto` ha le STESSE righe del
+  conto — Articolo, Sconto, Spedizione, Totale — quindi il contrasto
+  c'è e il ragionamento vale parola per parola. Lì la percentuale è il
+  NONO argomento posizionale, e il CENSIMENTO delle sue SEI chiamate è
+  la rete che conta: chi ne aggiunge una e la dimentica lascia
+  «Sconto» nudo, e quello è un difetto che non alza niente e non si
+  vede finché non lo guarda qualcuno col conto scontato aperto.
+  ⚠️ IL CENSIMENTO HA DUE TRAPPOLE, e le ho prese tutte e due
+  scrivendolo: le parentesi vanno contate DAVVERO (una chiamata ne ha
+  due annidate, `(via && via.pezzi)||0`, e una regex a un livello se
+  la perdeva), e la DEFINIZIONE si esclude guardando il «function» che
+  la precede e MAI il nome del primo argomento — `contoScomposto(artS,
+  …)` di startBuy comincia per «art» come lei. Con l'una o con l'altra
+  la rete avrebbe detto «tutte a posto» guardandone CINQUE su sei.
   IL TOGGLE €/₿ STA ACCANTO AL CONTO (ago 2026, decisione di Andrea):
   viveva in testata, in alto a destra, e da lì governava cifre che a
   volte erano fuori schermo; adesso è accanto al titolo «Il conto»,

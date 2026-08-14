@@ -8253,6 +8253,40 @@ def prove_pagina_acquisto():
     prova("nel conto l'etichetta dello sconto e' secca", (True, False),
           ("r(`Sconto${c.scontoPct" in _cr,
            "Sconto sugli articoli" in _cr))
+    #    E LO STESSO NEL paySheet (ago 2026): le righe sono le stesse
+    #    — Articolo, Sconto, Spedizione, Totale — quindi il contrasto
+    #    c'e' e vale lo stesso ragionamento. La percentuale e' il NONO
+    #    argomento posizionale, e il CENSIMENTO qui sotto e' la sua
+    #    rete: chi ne aggiunge una chiamata e la dimentica lascia
+    #    «Sconto» nudo, che e' un difetto che non alza niente e non si
+    #    vede finche' non lo guarda qualcuno col conto scontato aperto.
+    _cs = re.sub(r"/\*[\s\S]*?\*/", "",
+                 pezzo_js(mini3, "function contoScomposto(", "\n}"))
+    prova("anche nel paySheet l'etichetta e' secca", (True, False),
+          ("r(sconto, `Sconto${scontoPct" in _cs,
+           "Sconto sugli articoli" in _cs))
+    # le parentesi si contano DAVVERO invece di una regex annidata a
+    # un livello: una chiamata ne ha due (`(via && via.pezzi)||0`) e
+    # sfuggiva — cioe' il censimento avrebbe detto «tutte a posto»
+    # guardandone una in meno, che e' il modo in cui una rete mente
+    def _chiamata(js, dalla):
+        i, prof = dalla + len("contoScomposto("), 1
+        while i < len(js) and prof:
+            prof += (js[i] == "(") - (js[i] == ")")
+            i += 1
+        return js[dalla:i]
+    # la DEFINIZIONE si esclude guardando il «function» che la precede,
+    # mai il nome del primo argomento: `contoScomposto(artS, ...)` di
+    # startBuy comincia per «art» come lei, e un filtro sul prefisso se
+    # la portava via — il censimento avrebbe detto «tutte a posto»
+    # guardandone CINQUE su sei
+    _pulito = re.sub(r"/\*[\s\S]*?\*/", "", mini3)
+    _chiamate = [_chiamata(_pulito, m.start())
+                 for m in re.finditer(r"(?<!function )contoScomposto\(",
+                                      _pulito)]
+    prova("...e OGNI chiamata le passa la percentuale",
+          (6, []), (len(_chiamate),
+                    [c[:40] for c in _chiamate if "_percento" not in c]))
     prova("...e porta la percentuale, dal server e mai dedotta", True,
           '<span class="sconto-tag">−${c.scontoPct}%</span>' in _cr
           and "scontoPct: p.sconto_percento" in mini3)
@@ -15489,11 +15523,12 @@ def prove_promesse_badge():
     prova("il tag −X% della barra compare solo a sconto scattato",
           True, "el('paccoTag').textContent = (st && st.scattato)"
           " ? `−${st.pct}%` : ''" in _bp)
-    # dall'ago 2026 le superfici sono TRE: l'unitario della cassa, la
-    # barra del carrello e la RIGA DEL CONTO, che si e' ripresa la
-    # percentuale quando l'etichetta e' passata a «Sconto» secco —
-    # sempre con la stessa classe, mai un terzo verde da spiegare
-    prova("...con la classe di Paga, nelle tre sole superfici", 3,
+    # dall'ago 2026 le superfici sono QUATTRO: l'unitario della cassa,
+    # la barra del carrello, la RIGA DEL CONTO e quella del paySheet —
+    # le ultime due si sono riprese la percentuale quando l'etichetta
+    # e' passata a «Sconto» secco. Sempre con la stessa classe, mai un
+    # verde nuovo da spiegare.
+    prova("...con la classe di Paga, nelle quattro sole superfici", 4,
           mini.count('class="sconto-tag"'))
     prova("...e la regola CSS del tag resta una", 1,
           mini.count(".sconto-tag{"))
