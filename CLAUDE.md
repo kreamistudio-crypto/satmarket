@@ -7807,10 +7807,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   TEMPORANEI (asta, incompatibili, consegna '' degli storici) restano
   visibili e spenti col motivo, come sempre — motivoEsclusione non
   cambia e resta la cintura sul pezzo di partenza. E se il venditore
-  ha SOLO digitali la striscia non porta al carrello: `tuttoDigitale`
-  in sezioneAltriOggetti (giudica l + i 7 della striscia — un pezzo
-  fisico oltre il settimo al più nasconde un bottone in più,
-  dichiarato).
+  ha SOLO digitali la sezione non porta al carrello: `tuttoDigitale`
+  in sezioneAltriOggetti (giudica l + i primi ALTRI_PAGINA — vedi
+  l'imperfezione dichiarata sotto, che col tetto tolto si può VEDERE
+  invece di restare teorica).
   LE CIFRE DEL CONTO NON SI SPEZZANO MAI (ago 2026, bug visto in
   vista sats: con l'etichetta «Spedizione (dalla più economica)» il ≈
   andava a capo SOPRA il numero): nella grammatica `.ctrl-riga` la
@@ -7827,6 +7827,80 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (`.altri-griglia` toglie solo il padding orizzontale, che qui dentro
   lo mette già `.detail-body`). Tetto da 6 a 8 card, che con due
   colonne fanno quattro righe piene.
+  E DA GRIGLIA A SCORRIMENTO CONTINUO (ago 2026, decisione di Andrea):
+  la sezione mostra TUTTO il negozio, una pagina alla volta come la
+  vetrina. IL TETTO DI IERI NON ERA OTTO, ed è la prima cosa da
+  sapere: la fetch chiedeva `limit=7` e lo `slice(0,8)` non ha MAI
+  morso — si vedevano sei o sette card, e le «quattro righe piene»
+  promesse dalla riga qui sopra non sono mai arrivate. Ora il tetto
+  se n'è andato insieme al limit: prima pagina `ALTRI_PAGINA` (12,
+  sei righe su mobile), le altre le chiede la sentinella.
+  IL SERVER NON CAMBIA DI UNA RIGA per questo: `/api/negozio/{chi}`
+  accetta `limit` e `cursore` dal cantiere della tenuta al volume e
+  risponde col cursore della pagina dopo — cambia solo che adesso
+  quella paginazione la usa anche il dettaglio.
+  LA SENTINELLA STA FUORI DA `#detailContent`, ed è la riga da non
+  ammorbidire: `openDetail` ne riscrive l'`innerHTML` a ogni apertura,
+  quindi una sentinella lì dentro morirebbe a ogni giro portandosi
+  via il suo osservatore. Fuori — `#altriSentinella`, fratello di
+  `#detailContent` dentro `#view-dettaglio` — è armata una volta per
+  sempre come le altre tre, e una vista nascosta non interseca mai:
+  a dettaglio chiuso tace da sola. Le sentinelle dello scroll infinito
+  diventano QUATTRO, e il conto è una prova: la quinta di domani ci
+  entra da sola.
+  E VUOLE IL SUO GIRO (`altriGiro`), che è la regola già pagata in
+  vetrina applicata alla quarta vista paginata: il dettaglio si svuota
+  a ogni apertura, e le card di QUESTA sezione ne aprono un altro
+  restando nella stessa vista — una pagina 2 del venditore di prima,
+  arrivata in ritardo, si appiccicherebbe alla griglia di quello
+  nuovo. Il controllo d'identità che c'era (`currentListing.id !==
+  l.id`) NON basta: lo stesso annuncio si può riaprire. Tre righe da
+  non spostare — il giro si alza PRIMA della guardia `mio` (se una
+  pagina in volo atterrasse su un dettaglio proprio, dove la sezione
+  non nasce, il giro non sarebbe avanzato e la guardia non
+  morderebbe); si controlla PRIMA di scrivere `altriPag` (a dettaglio
+  cambiato quell'oggetto è già del venditore NUOVO, e scriverci il
+  cursore del vecchio gli darebbe una pagina 2 di un altro negozio);
+  e `caricando` si spegne solo a giro invariato, o sul ramo `catch`
+  si sbloccherebbe una pagina che il dettaglio nuovo non ha chiesto.
+  IL BLOCCO APPICCICATO RESTA ANCORATO PER TUTTA LA SCORSA, anche
+  dopo cinquanta card (decisione di Andrea: il CSS non si tocca). Lo
+  sticky si sgancia solo alla fine di `.altri-sez`, che ora è tutto il
+  negozio — e il motivo per cui era sticky, il carrello a portata
+  mentre si guardano le cose del venditore, con la lista lunga vale di
+  PIÙ e non di meno. IL PREZZO, MISURATO a metà scorsa su 46 card nei
+  due temi e a 320/360/375: i 176px del cartello più i 65 della barra
+  d'acquisto lasciano alle card **539px su 780, il 69% dello
+  schermo** — sulla pagina del NEGOZIO le stesse card hanno il 92%,
+  perché lì non ci sono né il cartello né la barra. È la differenza da
+  guardare il giorno in cui si vorrà stringere qualcosa, e la ragione
+  per cui le due superfici non si annullano: là si sfoglia, qui si
+  compone (il negozio il bottone del carrello e le due promesse non
+  ce li ha).
+  E LE DUE LISTE DEL NEGOZIO TACCIONO COL CURSORE: dalla seconda
+  pagina in poi `esauriti` e `feedback` non li legge nessuno — né
+  questa sezione né lo scorrimento della pagina negozio, che già oggi
+  si scaricava fino a 12 esauriti arricchiti e 10 feedback per pagina
+  e li buttava. LE CHIAVI RESTANO, vuote e mai assenti: un client in
+  cache che scriva `d.feedback.length` non deve esplodere, e
+  un'assenza si dice con una lista vuota, non togliendo la chiave.
+  IL COLLAUDO ESEGUIBILE è `collaudo_altri_oggetti.py`, che fa girare
+  la ROTTA vera su un database usa-e-getta e chiede la sola cosa che
+  conta davvero: l'unione delle pagine è ESATTAMENTE il negozio, senza
+  doppioni e nell'ordine di sempre. `prove.py` difende la forma; un
+  difetto di paginazione non fallisce da solo — non alza eccezioni e
+  non scrive log: fa sparire delle card, e se ne accorge solo chi
+  conta. (Il suo tetto ai giri sta in UN posto solo: il primo giro di
+  quel file aveva due cicli e il tetto su uno, e col cursore fermo la
+  prova non falliva — si piantava, che è peggio.)
+  IMPERFEZIONE DICHIARATA che il tetto tolto rende VISIBILE invece che
+  teorica: `tuttoDigitale` giudica sulla PRIMA pagina e non si rifà
+  quando ne arrivano altre — rifarlo vorrebbe dire far comparire il
+  blocco appiccicato a metà scorsa, che è peggio del caso che cura —
+  quindi un venditore di soli digitali col primo pezzo fisico oltre il
+  dodicesimo tiene il bottone nascosto anche quando quel pezzo compare
+  scorrendo. Chi compra quel pezzo trova comunque il carrello nel SUO
+  dettaglio, dove il giudizio riparte da lui.
   IL BOTTONE SI INCOLLA IN CIMA (modello Vinted) mentre gli oggetti
   scorrono sotto, ed è `position:sticky` dentro `.altri-sez` — la
   scelta è STRUTTURALE e vale più del comportamento: un elemento
