@@ -9180,7 +9180,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in cache, per cui il server tiene il default silenzioso di sempre.
   Dall'alto: gli articoli (card singola o strip del set) · la
   CONSEGNA a vie-radio — 🤝 ritiro · 🏠 spedizione a casa ·
-  «Spedizione a locker / punto» con l'armadietto disegnato
+  «Spedizione a un locker / punto» con l'armadietto disegnato
   (13 ago 2026, decisione di Andrea in DUE giri: prima «locker»
   secco, che superava il camioncino del 12 — il 🚚 diceva la famiglia
   ma non la differenza con «a casa», che qui è tutta la scelta; prima
@@ -9192,13 +9192,28 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   confonderebbe gli altri due terzi dei venditori. La doppia formula
   dice il caso migliore, il locker che si apre col solo codice, senza
   escludere nessuno — ed è quella che usa Subito.
-  L'ETICHETTA della via è SENZA l'articolo, ed è una misura e non
-  sciatteria: col «un» fa 276px nel font della via e a 320 la colonna
-  ne dà 258, cioè due righe; senza fa 255 e sta su UNA riga a
-  320/360/375, misurato — la PROSA delle notifiche tiene «a un», che
-  lì è grammatica e non larghezza. Quando le cifre di casa/punto
-  divergono la colonna si stringe e il nome può andare a capo lo
-  stesso: a-capo pulito, dichiarato, mai un overflow.
+  L'ARTICOLO È TORNATO (ago 2026, decisione di Andrea), e questa voce
+  ROVESCIA quella che stava qui — «l'etichetta della via è SENZA
+  l'articolo, ed è una misura e non sciatteria». IL PERCHÉ DI ALLORA
+  ERA VERO e va tenuto: «Spedizione a un locker/punto di ritiro»
+  chiedeva 276px nel font della via dove a 320 la colonna ne dà 258,
+  cioè DUE righe, e a cedere fu l'«un» perché era l'unico pezzo che si
+  poteva togliere senza perdere un'informazione. Quel numero non è
+  stato smentito: è cambiata l'etichetta, e cadendo «di ritiro» (sotto)
+  il posto c'è. RIMISURATO a 320 sulla pagina vera col font vero — mai
+  stimato dal vecchio numero — il nome chiede **230,8px su 258: una
+  riga, con 27 di margine**, e il solo «un» costa 21,5px. Così
+  l'etichetta e la PROSA, che «a un» l'ha sempre avuto, dicono la
+  stessa cosa: era l'ULTIMA delle nove superfici a dire la formula in
+  un altro modo, e la sentinella adesso lo chiede nei due versi
+  (l'etichetta con l'articolo, e il letterale senza che non torna:
+  un «un» che cade in un riordino non rompe niente di visibile).
+  RESTA IL RIPIEGO DICHIARATO, e la parte onesta è misurata anche
+  lei: quando le cifre di casa/punto divergono la colonna si stringe
+  — 183,8px a 320 — e il nome va a capo. Lì ci andava GIÀ senza
+  l'articolo, quindi l'«un» non peggiora niente; sposta di un gradino
+  il SOLO caso a 360 con le cifre divergenti (223,8 disponibili contro
+  230,8 chiesti, sette px). A-capo pulito, mai un overflow.
   E DALL'AGO 2026 LA BARRA È SPAZIATA E LA CODA CADE (decisione di
   Andrea, che ROVESCIA il «RESTA SENZA SPAZI» del 13 ago — quella
   voce diceva che la barra spaziata era stata chiesta, MISURATA e
@@ -9206,7 +9221,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   265px dove a 320 ce ne sono 258, e andava a capo per SETTE px).
   Il numero non è cambiato: è cambiata l'etichetta. Cadendo «di
   ritiro» il nome scende a **210px su 258, con 48 di margine**, e la
-  barra spaziata ci sta comoda a 320 come a 360 e 375.
+  barra spaziata ci sta comoda a 320 come a 360 e 375 — ed è in quei
+  48px che l'ARTICOLO è potuto tornare il giorno dopo (sopra).
   LA PAROLA PER ESTESO NON SI PERDE, ed è la ragione del taglio: il
   bottone che apre il campo dice «Indica il punto di ritiro» a un
   centimetro, dentro lo stesso riquadro. La DOPPIA FORMULA invece

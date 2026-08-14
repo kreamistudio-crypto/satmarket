@@ -8259,20 +8259,28 @@ def prove_pagina_acquisto():
     #    ha i suoi). SVG a currentColor, e il wrapper <span> tiene
     #    icona e testo in riga dentro .via-nome, che e' un flex in
     #    COLONNA — chi lo toglie mette il disegno SOPRA il testo.
-    #    L'etichetta e' SENZA articolo per la misura (a 320 la colonna
-    #    da' 258px e col «un» il nome ne chiede 276: due righe); la
-    #    prosa delle notifiche tiene «a un», che li' e' grammatica.
-    #    E DALL'AGO 2026 LA BARRA E' SPAZIATA e la coda cade («a locker
-    #    / punto»): la doppia formula resta — e' lei a dire che la via
-    #    non e' solo l'armadietto — ma «di ritiro» non serve piu' qui,
-    #    perche' il bottone che apre il campo lo dice a un centimetro
-    #    («Indica il punto di ritiro»). MISURATO a 320 in sats: il nome
-    #    chiede 210px su 258, una riga con 48 di margine — mentre la
-    #    formula lunga spaziata ne chiedeva 265 e andava a capo.
+    #    E DALL'AGO 2026 LA BARRA E' SPAZIATA e la coda cade («a un
+    #    locker / punto»): la doppia formula resta — e' lei a dire che
+    #    la via non e' solo l'armadietto — ma «di ritiro» non serve
+    #    piu' qui, perche' il bottone che apre il campo lo dice a un
+    #    centimetro («Indica il punto di ritiro»).
+    #    L'ARTICOLO E' TORNATO col posto che «di ritiro» ha liberato
+    #    (ago 2026): era caduto per la MISURA — chiedeva 276px dove a
+    #    320 la colonna ne da' 258 — e rimisurato col font vero il nome
+    #    ne chiede 230,8: una riga, con 27 di margine. Cosi' l'etichetta
+    #    dice la stessa cosa della prosa delle notifiche, che «a un»
+    #    l'ha sempre avuto — era l'ultima superficie fuori riga.
     prova("la via punto parla col locker, e si chiama con la doppia "
           "formula", True,
-          "${ICO_LOCKER} Spedizione a locker / punto</span>"
+          "${ICO_LOCKER} Spedizione a un locker / punto</span>"
           in mini3)
+    #    ...e l'articolo non si riperde: e' l'affermazione piu' forte
+    #    delle due, perche' un «un» che cade in un riordino non rompe
+    #    niente di visibile — la riga resta bella e dice un'altra cosa
+    #    dalle otto prose. (Il letterale senza articolo non va scritto
+    #    da nessun'altra parte del client, o questa diventa rossa.)
+    prova("...con l'articolo, come le prose che nominano il posto", 0,
+          mini3.count("Spedizione a locker"))
     #    la barra spaziata vale per l'ETICHETTA DELLA VIA e basta: le
     #    prose che nominano il posto fisico (l'ordine, il pannello del
     #    venditore, le notifiche del bot) tengono «locker/punto di

@@ -9216,14 +9216,20 @@ let acqDati = null;
    confonderebbe gli altri due terzi dei venditori. La doppia formula
    dice il caso migliore, il locker che si apre col solo codice,
    senza escludere nessuno — ed e' quella che usa Subito).
-   L'ETICHETTA E' SENZA ARTICOLO, e non e' sciatteria ma una misura:
-   «Spedizione a un locker/punto di ritiro» fa 276px nel font della
-   via e a 320px la colonna ne da' 258 — andava su DUE righe; senza
-   il solo «un» fa 255 e sta su una. Le due parole restano tutte; la
-   PROSA delle notifiche tiene l'articolo, che li' e' grammatica e
-   non larghezza. Quando le cifre di casa/punto DIVERGONO la colonna
-   si stringe ancora e il nome puo' andare a capo comunque: e' il
-   ripiego dichiarato, un a-capo pulito e mai un overflow.
+   L'ARTICOLO E' TORNATO (ago 2026, decisione di Andrea): era caduto
+   per una MISURA e non per gusto — «Spedizione a un locker/punto di
+   ritiro» chiedeva 276px dove a 320 la colonna ne da' 258, cioe' due
+   righe. Cadendo «di ritiro» quella misura non regge piu': RIMISURATO
+   a 320 col font vero, il nome chiede 230,8px su 258 — UNA riga, con
+   27 di margine — e il solo «un» costa 21,5px, non i 49 di allora.
+   Cosi' l'etichetta e la PROSA delle notifiche, che l'articolo l'ha
+   sempre avuto, dicono la stessa cosa: era l'ultima superficie che
+   diceva la formula in un altro modo.
+   Resta il ripiego dichiarato: quando le cifre di casa/punto
+   DIVERGONO la colonna si stringe (183,8px a 320) e il nome va a
+   capo — a-capo pulito, mai un overflow. A 320 ci andava GIA' senza
+   l'articolo; l'«un» sposta di un gradino il solo caso a 360 con le
+   cifre divergenti, che di quel ripiego fa parte.
    L'armadietto resta: non esiste un'emoji del locker — SVG inline a
    currentColor come le icone della nav, cosi' si accende col testo
    nei due temi (inchiostro dentro [2,22] col tratto compreso, la
@@ -9243,7 +9249,7 @@ const ICO_LOCKER = '<svg class="ico-locker" viewBox="2 2 20 20" aria-hidden="tru
   + '<circle cx="9.8" cy="17.1" r="1" fill="currentColor"/></svg>';
 const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
   : v==='casa' ? '🏠 Spedizione a casa'
-  : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a locker / punto</span>`
+  : v==='punto' ? `<span>${ICO_LOCKER} Spedizione a un locker / punto</span>`
   : v==='digitale' ? '💾 Codice online' : '';
 
 /* LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA (ago 2026,
