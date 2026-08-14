@@ -6514,7 +6514,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SCARTATO (il debounce litiga con chi sale in fretta), e resta vero
   che quel numero non è il totale da pagare (niente spedizione né
   protezione): a cambiare è solo che ora dice la merce al prezzo
-  VERO. Cassetto «🎁 Sconto sul carrello» nel Profilo fra
+  VERO. Cassetto «🎁 Sconto sugli articoli» nel Profilo fra
   spedizioniere e ferie (due politiche sempre accese, poi
   l'interruzione): pillole dalle liste del server, e le pillole
   SCELGONO mentre a salvare è un bottone solo — soglia e percentuale
@@ -7147,11 +7147,57 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   INTERNI restano «pacco» (paccoDati, view-controllapacco, .pacco-*,
   le chiavi di navigazione…), dichiarato: rinominarli sarebbe un
   refactor di massa contro la regola dei diff piccoli, e il commento
-  in testa ad apriPacco lo dice. Vale anche per lo SCONTO CARRELLO
-  nato dopo (ago 2026): i testi verso gli utenti dicono tutti
-  «carrello» — cassetto, invito, riga del conto, riga dell'ordine — e
-  i nomi interni restano `sconto_pacco_*` (colonne, leve, endpoint,
-  funzioni), che è la stessa famiglia. IL SOTTOTITOLO dice il
+  in testa ad apriPacco lo dice. E vale, ROVESCIATO, per lo SCONTO:
+  dall'ago 2026 quel cassetto si chiama «🎁 SCONTO SUGLI ARTICOLI» e
+  la parola «carrello» è uscita da TUTTI i suoi testi — titolo,
+  sottotitolo, riga del conto, riga dell'ordine, i 400 dell'endpoint,
+  il suggerimento del bot, la campagna, il pannello delle leve —
+  perché col criterio a valore lo sconto scatta anche su un acquisto
+  singolo, e «carrello» prometteva un carrello che può non esserci.
+  I nomi interni restano `sconto_pacco_*` (colonne, leve, endpoint,
+  funzioni, `renderScontoPacco`, `.sconto-tag`), che è esattamente la
+  stessa famiglia: si rinominano i testi, mai le chiavi.
+  IL NOME DICE DOVE CADE, E QUINDI ANCHE COSA NON TOCCA: la spedizione
+  non è un articolo, ed è la prima domanda del venditore. Scartati
+  «Sconto sopra soglia» (a criterio pezzi la soglia non è una spesa:
+  direbbe metà regola) e «Sconto del negozio» (vero ma muto — nel
+  Profilo è del negozio anche tutto il resto).
+  IL SOTTOTITOLO DICE LA DIFFERENZA FRA I CRITERI, e nient'altro: «a
+  pezzi conta QUANTI, a valore conta QUANTO» è la regola nella forma
+  più corta che abbiamo trovato (decisione di Andrea), e il cassetto
+  si ridisegna a ogni tocco delle pillole, quindi la riga cambia sotto
+  le dita mentre si sceglie — è lei a insegnare il bivio. «Serve
+  prenderne più d'uno» / «basta la cifra» dicono la conseguenza in una
+  parola: sono loro a far capire che a valore la soglia si raggiunge
+  da fermi. Il fatto COSTANTE è sceso nella riga grigia in fondo
+  («Sconta gli articoli: la spedizione non si tocca»), che è il posto
+  dei fatti che non cambiano — e non si legge scegliendo il criterio.
+  LA SORELLA È A SPECCHIO, ed è il patto da tenere: il suo sottotitolo
+  è il ramo «a valore» dello sconto PAROLA PER PAROLA («Conta quanto
+  si spende: basta la cifra, anche con un oggetto solo») più il suo
+  vincolo («Sugli annunci che spedisci»), e la sua coda è il rovescio
+  esatto («Offre la spedizione: il prezzo degli articoli resta
+  intero»). Quell'identità è essa stessa un'informazione — dice che le
+  due promesse misurano lo stesso numero senza spiegarlo — ed è il
+  motivo per cui la riga «anche su un oggetto solo, come lo sconto»
+  che stava in coda alla sorella è sparita: adesso lo dice in cima, e
+  di lei resta la sola cosa che solo lei può dire, il cumulo.
+  UNA DIVERGENZA RESTA E NON SI UNIFORMA: la lampo la nomina lo sconto
+  SOLO a criterio valore, la sorella sempre. A criterio pezzi la lampo
+  non può far scendere niente sotto soglia — lì si contano pezzi, non
+  cifre — e allinearla sarebbe scrivere una cosa falsa per simmetria.
+  ⚠️ E LA RIGA DEL CONTO TRONCA A 320px, misurato e NON accorciato
+  (decisione di Andrea: dimmi il numero invece di accorciare lì).
+  In `contoRighe` l'etichetta ha 158px e «Sconto sugli articoli −10%»
+  ne chiede 168: si vede «Sconto sugli articoli −1…», cioè una
+  percentuale MOZZATA che si legge come un altro numero. Solo in vista
+  SATS (la cifra in mono è larga 88px) e solo a 320: in euro lo spazio
+  è 177 e a 360 già 198. Il vecchio «Sconto carrello −10%» ne chiedeva
+  138, cioè quella riga viveva con 20px di margine — era stretta da
+  prima, e il nome nuovo l'ha solo scoperta. Le altre due superfici
+  stanno larghe: nel paySheet `.conto-scomposto` l'etichetta fa 117px
+  su 254 (una riga sola, 39 di margine) e la riga dell'ordine è una
+  `.eur-hint` che va a capo. IL SOTTOTITOLO dice il
   PERIMETRO e non più il modello (12 ago 2026, decisione di Andrea:
   via «un venditore alla volta, spedizione unica»): «articoli dello
   stesso venditore» — è il carrello di QUEL negozio, non del mercatino
