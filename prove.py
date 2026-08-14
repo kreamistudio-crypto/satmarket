@@ -2154,6 +2154,115 @@ def prove_busta_ritiro():
     prova("client: aprire la busta non chiede conferme", False,
           "confirm" in pezzo_js(mini, "async function mostraBusta"))
 
+    # --- IL CODICE DENTRO IL BOTTONE (ago 2026, dal campo) ---------
+    # Tre cose in un cantiere solo: la pagina non salta piu', il
+    # codice nasce DOVE STAVA IL DITO, e toccandolo si copia.
+    # IL SALTO NON ERA IL FUOCO, ed e' la parte da non riscrivere a
+    # memoria: si sospettavano due cause — il focus() che trascina
+    # (curato altrove con preventScroll) e il ridisegno che ricomincia
+    # da capo. La spia su window.scrollTo ha dato lo stack, e diceva
+    # mostraBusta -> openOrder -> go -> scrollTo(0, 0), da y=578 a
+    # y=0; di focus() non ce n'era NESSUNA. Quindi la cura non e' un
+    # preventScroll: e' non passare piu' da openOrder.
+    mb = pezzo_js(mini, "async function mostraBusta")
+    prova("il ridisegno della busta non passa da openOrder", False,
+          "openOrder" in mb)
+    prova("...e passa dal ridisegno del solo pannello", True,
+          "ridisegnaBusta()" in mb)
+    rb = pezzo_js(mini, "function ridisegnaBusta(){")
+    prova("ridisegnaBusta riscrive UN nodo, mai la vista", True,
+          "bustaPannello" in rb and "outerHTML" in rb
+          and "openOrder" not in rb and "go(" not in rb)
+    # l'ancora del nodo c'e' su TUTTI i pannelli che il costruttore
+    # sa restituire: senza, il ridisegno non trova casa e il tocco
+    # diventa muto proprio sul ramo che qualcuno aggiungera' domani
+    prova("ogni pannello della busta porta la sua ancora", 3,
+          mini.count('<div class="payout" id="bustaPannello">'))
+    # LA TESTA NON CAMBIA: e' cio' che fa atterrare il piatto dove
+    # stava il bottone. Se il ramo `b` avesse un return SUO — il nome
+    # sopra e il codice sotto, com'era ieri — il piatto nascerebbe
+    # piu' in basso e il gesto tornerebbe a «rivelare altrove».
+    _pb = pezzo_js(mini, "function pannelloBustaRitiro(o){")
+    _buy = _pb[_pb.index("if (o.role===\'buyer\'){"):_pb.index("/* venditore:")]
+    prova("compratore: una testa sola, prima e dopo la rivelazione", 1,
+          _buy.count("Depositate il ${quando}${corr}"))
+    prova("...e il piatto sta nello slot del bottone", True,
+          "${b ? piattoCodice(b, svelato)" in _buy)
+    # con find(), non index(): una sentinella che ESPLODE quando la
+    # riga sparisce e' rossa lo stesso, ma si porta dietro tutte le
+    # prove che vengono dopo — e allora non si sa piu' quale ha
+    # morso (visto in tortura, su due mutazioni su sedici)
+    _i_p, _i_n = _buy.find("piattoCodice"), _buy.find("Nome del destinatario")
+    prova("...col nome DOPO il codice (al banco serve prima il codice)",
+          True, 0 <= _i_p < _i_n)
+    # UN GESTO SOLO: il vecchio «Copia il codice» era un secondo
+    # bottone per la stessa cosa, e adesso a copiare e' il codice
+    prova("niente piu' un bottone-copia accanto al codice", False,
+          ">📋 Copia il codice</button>" in mini)
+    # L'ANELLO parte al GESTO e non a ogni ridisegno: la bandierina si
+    # legge e si AZZERA nel costruttore (il patto di navSpingi)
+    prova("l'impulso ha la sua bandierina, letta e azzerata", True,
+          "const svelato = bustaSvelata === o.id;" in _pb
+          and "if (svelato) bustaSvelata = 0;" in _pb)
+    prova("...e la alza il gesto, non il render", True,
+          "bustaSvelata = currentOrder.id;" in mb)
+    prova("l'anello e' un keyframe SUO, non il verde delle promesse",
+          True, "@keyframes impulsoCodice" in mini
+          and ".codice-svelato{animation:impulsoCodice .5s" in mini)
+    prova("...mezzo secondo, una volta sola", True,
+          ".5s ease-out 1 both}" in mini)
+    prova("...e reduced-motion lo SPEGNE, non lo ferma", (1, False),
+          (mini.count(".codice-svelato{animation:none}"),
+           "codice-svelato{animation-play-state" in mini))
+    # il ripiego di copiaBusta promette «tieni premuto sul testo»:
+    # senza la selezione dentro il bottone sarebbe una promessa falsa
+    prova("il codice resta selezionabile a mano dentro il bottone",
+          True, "user-select:all;-webkit-user-select:all}" in mini)
+    # l'overlay diceva «Invio sats in corso» su una LETTURA
+    prova("l'attesa non parla di sats: qui non se ne muove nessuno",
+          True, "bottoneInAttesa(btn, \'Apro le istruzioni…\')" in mb)
+
+    # E SI FA GIRARE, che le sentinelle qui sopra dicono che il piatto
+    # ESISTE, mai che risponda giusto (la lezione presa sette volte).
+    import json as _js3, shutil as _sh3, subprocess as _sp3, tempfile as _tf3
+    _node3 = _sh3.which("node")
+    if not _node3:
+        salta("piattoCodice risponde giusto", "node non installato")
+    else:
+        _esc = mini[mini.index("const esc = s =>"):
+                    mini.index("const el = id =>")]
+        _pc = pezzo_js(mini, "function piattoCodice(b, svelato){", "\n}") + "\n}"
+        _prog = (_esc + _pc + "\nconst casi = ["
+                 "piattoCodice({codice:'8842-7193'}, true),"
+                 "piattoCodice({codice:'8842-7193'}, false),"
+                 "piattoCodice({codice:''}, true),"
+                 "piattoCodice({codice:'<b>X</b>'}, false)];"
+                 "console.log(JSON.stringify(casi.map(h => ({"
+                 "  vuoto: h === '',"
+                 "  anello: h.includes('codice-svelato'),"
+                 "  copia: h.includes('onclick=\"copiaBusta()\"'),"
+                 "  parola: h.includes('Tocca per copiare'),"
+                 "  crudo: h.includes('<b>X')}))));")
+        _f3 = _tf3.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8")
+        _f3.write(_prog)
+        _f3.close()
+        _r3 = _sp3.run([_node3, _f3.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+        os.unlink(_f3.name)
+        prova("piattoCodice: anello solo al gesto, copia sempre, "
+              "codice vuoto = niente piatto",
+              [{"vuoto": False, "anello": True, "copia": True,
+                "parola": True, "crudo": False},
+               {"vuoto": False, "anello": False, "copia": True,
+                "parola": True, "crudo": False},
+               {"vuoto": True, "anello": False, "copia": False,
+                "parola": False, "crudo": False},
+               {"vuoto": False, "anello": False, "copia": True,
+                "parola": True, "crudo": False}],
+              _js3.loads(_r3.stdout.strip()) if _r3.returncode == 0
+              else f"ERRORE: {_r3.stderr[:160]}")
+
     # --- il funzionale su sqlite in memoria -------------------------
     class _H(Exception):
         def __init__(self, code, detail=""):

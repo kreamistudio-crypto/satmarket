@@ -2941,6 +2941,61 @@
     font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);
     outline:none}
   .ind-campi input:focus{border-color:var(--ink)}
+  /* ---- IL CODICE DENTRO IL BOTTONE (ago 2026, dal campo) ----
+     Il codice di ritiro compariva SOPRA il bottone che l'aveva
+     rivelato, e la pagina saltava in cima: chi toccava «Mostra» si
+     ritrovava all'inizio dell'ordine a cercare quello che aveva
+     appena chiesto. Adesso il bottone si TRASFORMA — al suo posto,
+     sotto il dito, c'e' il codice — e il salto non c'e' piu' perche'
+     il ridisegno non passa piu' da openOrder (vedi `ridisegnaBusta`).
+     IL GESTO CAMBIA MESTIERE, E VA DETTO IN UNA PAROLA: prima
+     rivelava, dopo COPIA. Lo dicono l'icona (👁 → 📋) e la riga sotto
+     il codice, «Tocca per copiare» — un bottone che fa due cose in
+     due momenti senza dirlo e' un bottone che si tocca per sbaglio.
+     LA RICETTA E' QUELLA DELLA FASCIA DEL RODAGGIO e non un vestito
+     nuovo: fondo --sats-soft, bordo ₿ da 1.5px, niente ombra piena —
+     l'arancione PIENO resta di «+ Vendi» e dei bottoni d'acquisto,
+     che non devono avere rivali. Qui in piu' serve la leggibilita' di
+     un codice che si batte a un banco: il testo e' --ink sul fondo
+     velato (12,75 di giorno, 11,06 di sera) invece del bianco su
+     arancio del bottone di prima, che su ventiquattro cifre in fila
+     rendeva 2,3 — sotto qualunque soglia.
+     ANCHE L'ETICHETTA E' --ink, e non l'arancio che verrebbe da dare
+     a una riga d'azione: e' MISURATO — --sats-text sul velato rende
+     4,3, cioe' sotto AA per un testo da 12px, e quella coppia in casa
+     esiste gia' (.hint.avviso-tracking) ma li' e' un avviso che si
+     legge una volta, non la parola che spiega a cosa serve il
+     bottone. La gerarchia la fa la DIMENSIONE — 19px contro 12 — come
+     nella riga dell'offerta: il colore non serve a dirla. Il velo
+     di opacita' la stacca dal codice senza toglierle leggibilita'
+     (9,5 di giorno, 9,3 di sera). */
+  .codice-piatto{
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    color:var(--ink);flex-direction:column;gap:3px;padding:11px 14px}
+  .codice-cifre{font-size:19px;font-weight:800;line-height:1.3;
+    letter-spacing:.02em;word-break:break-all;white-space:pre-wrap;
+    user-select:all;-webkit-user-select:all}
+  .codice-tocca{font-size:12px;font-weight:700;opacity:.9}
+  /* L'IMPULSO DELLA RIVELAZIONE: un anello arancio si allarga dal
+     piatto e svanisce — mezzo secondo, UNA VOLTA SOLA. E' l'anello
+     dell'impulso dello scatto, con la sua stessa ragione: sta FUORI
+     dal piatto e non tocca MAI le parole, quindi il codice resta
+     leggibile per tutta la corsa e in tutti e due i temi (una luce
+     che attraversa il piatto e' gia' stata scartata di la', sul
+     contrasto del testo di sera).
+     KEYFRAME SUO e non quello delle promesse: quello e' del verde
+     dello scatto, e un colore preso in prestito direbbe un'altra
+     cosa. Il «once» non e' nell'animazione ma nella bandierina
+     `bustaSvelata`, che si legge e si azzera nel costruttore: un
+     ridisegno qualunque del pannello non lo rifa' partire. */
+  .codice-svelato{animation:impulsoCodice .5s ease-out 1 both}
+  @keyframes impulsoCodice{
+    from{box-shadow:0 0 0 0 var(--sats)}
+    to{box-shadow:0 0 0 9px transparent}}
+  @media (prefers-reduced-motion:reduce){
+    /* si SPEGNE, non si ferma: con animation-play-state resterebbe un
+       anello piantato attorno al piatto per sempre */
+    .codice-svelato{animation:none}}
   .payout .okline{display:flex;gap:6px;align-items:center;color:var(--trust);
     font-weight:800;font-size:13px;margin-top:10px}
   .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
@@ -17181,6 +17236,10 @@ let bustaDoc = null;
 /* l'objectURL dei byte gia' scaricati, per ordine: si riusa invece
    di richiedere quindici mega a ogni riapertura del pannello */
 let bustaDocVisto = {};
+/* l'ordine appena svelato: la bandierina dell'impulso, che si legge e
+   si AZZERA nel costruttore del pannello (il patto di `navSpingi`) —
+   cosi' l'anello parte al gesto e non a ogni ridisegno */
+let bustaSvelata = 0;
 
 function pannelloBustaRitiro(o){
   if (!o.viaPunto || o.role==='admin') return '';
@@ -17190,28 +17249,31 @@ function pannelloBustaRitiro(o){
   const corr = o.bustaCorrezioni
     ? ` — aggiornate ${o.bustaCorrezioni===1?'una volta':o.bustaCorrezioni+' volte'}` : '';
   const b = bustaLetta[o.id];
+  /* l'anello parte una volta sola, e la bandierina si consuma QUI:
+     letta-e-azzerata prima di disegnare, come `navSpingi` */
+  const svelato = bustaSvelata === o.id;
+  if (svelato) bustaSvelata = 0;
   if (o.role==='buyer'){
     if (!o.bustaIl)
       /* lo stato d'attesa visibile (decisione di Andrea, al posto del
          gate): il venditore ha spedito, il codice arriva all'arrivo */
       return o.state==='shipped' ? `
       <div class="trust-note">📦 <span><b>In attesa del codice di ritiro.</b> Il venditore deposita qui il nome del destinatario e il codice appena il pacco arriva al punto: ti avviseremo.</span></div>` : '';
-    if (b) return `
-      <div class="payout">
-        <h4>📦 Istruzioni per il ritiro</h4>
-        <div class="hint">Nome del destinatario sul pacco (lo ha scelto il venditore — se al banco te lo chiedono, è questo):</div>
-        <div class="hint mono" style="user-select:all">${esc(b.nome)}</div>
-        ${b.codice ? `<div class="hint" style="margin-top:8px">Codice di ritiro:</div>
-        <div class="hint mono" style="user-select:all;white-space:pre-wrap;word-break:break-word">${esc(b.codice)}</div>
-        <button class="btn ghost" style="margin-top:10px" onclick="copiaBusta()">📋 Copia il codice</button>` : ''}
-        ${bloccoDocumentoBusta(o, b)}
-        <div class="hint" style="margin-top:8px">Leggerle non conferma nulla: i sats restano nel deposito di garanzia finché non confermi tu il ritiro, coi bottoni qui sotto.</div>
-      </div>`;
+    /* IL TESTO SOPRA IL BOTTONE NON CAMBIA, ed e' cio' che fa
+       atterrare il codice dove stava il dito: se il pannello si
+       riscrivesse per intero — il nome sopra, il codice sotto, come
+       faceva ieri — il piatto nascerebbe piu' in basso del bottone
+       che ha sostituito, e il gesto tornerebbe a «rivelare altrove».
+       Percio' la testa e' UNA, e il nome esce DOPO il codice: al
+       banco serve prima il codice, il nome solo se te lo chiedono. */
     return `
-      <div class="payout">
+      <div class="payout" id="bustaPannello">
         <h4>📦 Istruzioni per il ritiro</h4>
         <div class="hint">Depositate il ${quando}${corr}: il nome del destinatario e il codice per ritirare il pacco al punto. <b>Leggerle non conferma nulla</b> — i sats restano nel deposito di garanzia finché non confermi tu il ritiro. ⏳ Ricorda la giacenza: al punto il pacco aspetta pochi giorni (di solito circa 3).</div>
-        <button class="btn orange" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra le istruzioni</button>
+        ${b ? piattoCodice(b, svelato)
+            : `<button class="btn orange" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra ${o.bustaDocumento?'le istruzioni':'il codice di ritiro'}</button>`}
+        ${b ? `<div class="hint" style="margin-top:10px">Nome del destinatario sul pacco (lo ha scelto il venditore — se al banco te lo chiedono, è questo): <b class="mono" style="user-select:all">${esc(b.nome)}</b></div>
+        ${bloccoDocumentoBusta(o, b)}` : ''}
       </div>`;
   }
   /* venditore: deposito su 'locked' (il caso raro del codice
@@ -17225,7 +17287,7 @@ function pannelloBustaRitiro(o){
         ? 'Se hai già il codice di ritiro (capita spedendo da un punto: arriva subito), puoi depositarlo ora; altrimenti torna qui quando ti arriva.'
         : 'Appena hai il codice, depositalo qui: per l\'acquirente è il segnale «il tuo pacco ti aspetta», e senza non può ritirare.');
     return `
-      <div class="payout">
+      <div class="payout" id="bustaPannello">
         <h4>📦 Istruzioni di ritiro per l'acquirente</h4>
         <div class="hint">${testa}</div>
         <div class="hint" style="margin-top:6px">📮 ${RIGA_CODICE_CORRIERE}</div>
@@ -17237,15 +17299,39 @@ function pannelloBustaRitiro(o){
         <button class="btn orange" style="margin-top:10px" onclick="depositaBusta(this)">📦 ${o.bustaIl?'Aggiorna le istruzioni':'Deposita le istruzioni'}</button>
       </div>`;
   }
-  /* venditore fuori dagli stati di scrittura: rilettura e basta */
+  /* venditore fuori dagli stati di scrittura: rilettura e basta.
+     ANCHE QUI IL PIATTO, e non e' un di piu': prima questo ramo
+     rileggeva e mostrava il solo documento — il codice non lo
+     disegnava nessuno — quindi col salto in cima tolto il tocco
+     sarebbe diventato un tocco che non fa NIENTE. E' il suo codice:
+     l'ha scritto lui, non gli si rivela niente di nuovo. */
   if (o.role==='seller' && o.bustaIl) return `
-    <div class="payout">
+    <div class="payout" id="bustaPannello">
       <h4>📦 Istruzioni di ritiro</h4>
       <div class="hint">Depositate il ${quando}${corr}. Puoi rileggere ciò che hai depositato:</div>
+      ${b ? piattoCodice(b, svelato)
+          : `<button class="btn ghost" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra</button>`}
       ${b ? bloccoDocumentoBusta(o, b) : ''}
-      <button class="btn ghost" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra</button>
     </div>`;
   return '';
+}
+
+/* IL PIATTO DEL CODICE: il bottone che l'ha rivelato, trasformato.
+   Non e' un <div> travestito — resta un bottone, perche' un bottone
+   e' quello che e' diventato: si tocca e COPIA. L'aria-label lo dice
+   ai lettori di schermo, che l'icona non la vedono.
+   Il codice resta selezionabile a mano (user-select:all) dentro il
+   bottone: e' la strada del ripiego che `copiaBusta` promette quando
+   gli appunti non ci sono, e senza sarebbe una promessa falsa.
+   Codice vuoto = niente piatto: c'e' il caso vero del venditore che
+   manda il solo QR, e un piatto vuoto sarebbe un bottone che copia
+   il nulla. */
+function piattoCodice(b, svelato){
+  if (!b.codice) return '';
+  return `
+      <button type="button" class="btn codice-piatto${svelato?' codice-svelato':''}"
+        style="margin-top:10px" aria-label="Copia il codice di ritiro"
+        onclick="copiaBusta()"><span class="mono codice-cifre">${esc(b.codice)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
 }
 
 /* ---- L'INDIRIZZO DI CASA nell'ordine (ago 2026) ----
@@ -17506,13 +17592,40 @@ async function caricaBusta(){
 
 /* nessun confirm, ed e' il punto: aprire la busta non e' il gesto
    consequenziale della rivelazione digitale — e' leggere un
-   bigliettino, e non muove niente */
+   bigliettino, e non muove niente.
+   E NON PASSA PIU' DA openOrder: era quello il salto in cima —
+   verificato con una spia su window.scrollTo, non dedotto. Lo stack
+   diceva mostraBusta → openOrder → go → scrollTo(0, 0), da y=578 a
+   y=0, e di `focus()` non ce n'era NESSUNA: il sospetto del fuoco che
+   trascina (curato altrove con preventScroll) qui non c'entrava.
+   Il testo dell'overlay e' suo: `bottoneInAttesa` di serie dice
+   «Invio sats in corso…», che su una lettura e' falso — qui non si
+   muove un sat, e il pannello lo ripete due righe piu' giu'. */
 async function mostraBusta(btn){
   haptic();
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, 'Apro le istruzioni…');
   const d = await caricaBusta();
   ripristina();
-  if (d) openOrder(currentOrder.id);
+  if (!d) return;
+  bustaSvelata = currentOrder.id;
+  ridisegnaBusta();
+}
+
+/* IL RIDISEGNO E' DEL SOLO PANNELLO, e questa e' la cura del salto:
+   `openOrder` rifa' la vista intera e finisce in `go()`, che riporta
+   in cima (`posizioneDaRendere` vale 0 fuori dalla vetrina). Qui si
+   riscrive un nodo solo: quel che sta sopra non si muove, quindi il
+   piatto nasce esattamente dove stava il bottone e la pagina resta
+   dov'era. E' il pattern di `aggiornaCifreOrdine` e di
+   `aggiornaPrezzoDettaglio` — si ridisegna in place, non si riapre.
+   Il costruttore puo' tornare vuoto solo su un ordine che il pannello
+   non ce l'ha, cioe' da dove non si arriva: la guardia c'e' perche'
+   un pannello che sparisce sarebbe molto peggio di un tocco muto. */
+function ridisegnaBusta(){
+  const p = el('bustaPannello');
+  if (!p) return;
+  const html = pannelloBustaRitiro(currentOrder);
+  if (html) p.outerHTML = html;
 }
 
 function copiaBusta(){
