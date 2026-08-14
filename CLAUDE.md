@@ -7259,8 +7259,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   quella pagina non scorre.
   LA SORELLA TIENE UNA RIGA PIÙ LUNGA, ed è dichiarato e non una
   dimenticanza: «Vale sugli annunci che spedisci, anche su un oggetto
-  solo. Si somma allo sconto: guardano lo stesso numero, quindi
-  nessuna delle due spegne l'altra.» Porta le DUE cose che la sua
+  solo. Si somma allo sconto.» Porta le DUE cose che la sua
   anteprima non copre — il VINCOLO (vale solo dove si spedisce: senza,
   un negozio da solo ritiro accende una promessa che non scatta mai) e
   il CUMULO, che è l'unica cosa che solo lei può dire. Il taglio non
