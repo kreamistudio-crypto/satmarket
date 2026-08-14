@@ -3700,7 +3700,41 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Spedizione gratuita» è morto: le pillole di consegna sono TUTTE
   neutre (.pill, un solo cuore) con «gratuita» in grassetto, e il
   «🚚 gratis» in card parla l'inchiostro di casa (var(--ink), token:
-  di notte è crema) in grassetto. E dall'ago 2026 la REGOLA CSS
+  di notte è crema) in grassetto.
+  ⚠️ EMENDATA NELLA SOLA SCHEDA (ago 2026, decisione di Andrea): il
+  badge della spedizione nel DETTAGLIO prende il verde acceso
+  (`.pill-trust`, il token `--barra-a` della barra piena) quando su
+  quell'acquisto la spedizione non si paga. IL PERCHÉ DI ALLORA
+  RESTA VERO e governa tutto il resto: due chip colorati in fila si
+  facevano concorrenza, e quello che diceva meno compariva più
+  spesso — per questo le pillole di consegna restano neutre e in card
+  non entra nessun colore. IL PERCHÉ DI ADESSO è che quel badge ha
+  cambiato mestiere: dall'ago 2026 non dice più una PROPRIETÀ
+  dell'annuncio («questo venditore spedisce gratis») ma un ESITO su
+  quell'acquisto, che la quantità sposta — e un esito lo si vede o
+  non lo si vede, non lo si legge. Il verde qui NON dice «promessa
+  scattata», che è quel che significa in Paga e nel carrello: dice
+  «questa spedizione non si paga», che è più DEBOLE — non afferma che
+  una soglia sia stata superata — e più UTILE, perché è la sola cosa
+  che chi compra deve sapere. Le due ragioni (tariffa dichiarata a
+  zero, soglia raggiunta) diventano così indistinguibili, ed è voluto:
+  il fatto è lo stesso. E allinea la scheda alla pagina Paga, che quel
+  verde ce l'ha da quando il suo badge nasce dal fatto.
+  IN CARD NON ENTRA, e la ragione è misurata: lì il verde è già dello
+  SCONTO (il badge `--sconto` sulla foto), e due verdi che dicono due
+  cose diverse nello stesso riquadro sono peggio della divergenza che
+  si chiude — di giorno distano 4,10 di contrasto, **di sera 1,17,
+  cioè sono la stessa tinta**. Più il costo di posto: il gruppo icone
+  passerebbe da 64 a 76px e il comune da 57 a 45 (misurato su una card
+  da 159px). Chi vorrà distinguerli parta dalla PALETTE, non da un
+  ritocco qui.
+  NELLA SCHEDA UN SECONDO VERDE C'È, dichiarato: la pillola della
+  CONDIZIONE («Nuovo» pieno, «Come nuovo» tenue). Non collide — vive
+  nel TITOLO e non nella fila, e dice una cosa di un'altra famiglia
+  (una scala, non una promessa) — e i due si distinguono a schermo nei
+  due temi (misurati: acceso vs «Nuovo» 4,10 di giorno e 2,46 di sera;
+  vs «Come nuovo» 1,65 e 2,26, ma lì il tenue è quasi carta). Chi
+  aggiunge un TERZO verde alla scheda lo misuri contro questi due. E dall'ago 2026 la REGOLA CSS
   `.sped-badge` non c'è più: restava orfana a far credere a chi legge
   il foglio che qualcosa la usasse. I token --ship-soft/--ship-soft-on
   restano definiti — come --ship-card — ma senza più chi vestire: sono
@@ -3918,6 +3952,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   stesso modo, e il verde resta libero di dire un'altra cosa (lo
   sconto, vedi «LO SCONTO CARRELLO SI VEDE IN VETRINA»). Nessuna delle due
   promesse si ripete in due lingue.
+  LA PRIMA METÀ VALE PIÙ CHE MAI, LA SECONDA SOLO QUI (ago 2026,
+  decisione di Andrea): «il fatto e non il perché» è diventata la
+  regola di TUTTE E TRE le superfici — card, dettaglio, pagina Paga —
+  e nel DETTAGLIO quel fatto adesso si dice col verde acceso. In CARD
+  no, e il motivo è precisamente la riga qui sopra: **il verde è già
+  dello sconto**. Con la 🚚 verde ci sarebbero due verdi per due
+  promesse diverse nello stesso riquadro, che di sera sono la stessa
+  tinta (1,17 di contrasto fra loro) — la scheda quel conflitto non ce
+  l'ha, perché lì lo sconto parla col PREZZO e non con un badge.
+  Quindi in card la parola resta NERA e in grassetto, e la regola «una
+  promessa, una lingua» tiene: cambia solo che la lingua della card e
+  quella della scheda non sono più la stessa, ed è un prezzo pagato
+  sapendolo. Vedi «SFOLLAMENTO COLORI» per i numeri e per il secondo
+  verde della scheda (la condizione).
   Da qui `iconeCard` passa dal GIUDICE UNICO `spedGratis(l) ||
   spedGratisQui(l, 1)` invece del test a mano — che è anche ciò che
   quel giudice dichiarava di essere «da sempre»: «il giudice unico dei
@@ -6076,6 +6124,19 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   99 lascia sempre la fetta di carta col bordo netto — una barra,
   mai un fondo — contro la pillola INTERA bordo a bordo, e
   «Ancora N → …» contro «✅ …».
+  LE DUE SCATTATE SONO IDENTICHE FRA LORO, ed è dichiarato (ago 2026,
+  guardato a schermo): con tutte e due le promesse attive escono due
+  righe piene dello stesso `--barra-a`, IMPILATE — la fila è a righe
+  piene, non affiancate — e a distinguerle c'è solo il testo
+  («Spedizione gratis» / «Sconto −N%»). Va bene così: sono due fatti
+  dello stesso grado, e dargli due verdi diversi vorrebbe dire
+  graduare una cosa che gradi non ne ha. SE UN DOMANI SI VORRANNO
+  DISTINGUERE, LA STRADA È LA PALETTE E NON UN RITOCCO QUI: servirebbe
+  un secondo colore che significhi qualcosa in tutto il sistema — come
+  l'arancio è dell'acquisto e il rosso della lampo — non una tinta
+  scelta per far sembrare diverse due pillole. Un `--barra-a` variato
+  ad hoc su una delle due romperebbe l'identità col traguardo della
+  barra, che è la cosa che quel verde dice.
   Il progresso è `(soglia − mancano)/soglia`, nell'unità della
   promessa: in Paga coi numeri che il preventivo porta GIÀ (il
   client riceve, non calcola), nel carrello — dal 13 ago — coi

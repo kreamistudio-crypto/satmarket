@@ -7895,7 +7895,15 @@ function setQta(d){
      scavalcare la soglia della spedizione gratis. Si riscrive il
      CONTENUTO e non il guscio, o il nodo sparirebbe da sotto i piedi
      al giro dopo. */
-  q('[data-sped]').forEach(b => b.innerHTML = testoSpedBadge(l));
+  /* ...e col contenuto il COLORE, o il verde resterebbe acceso su un
+     ± che riporta l'articolo sotto soglia — e viceversa non si
+     accenderebbe su un + che la scavalca. La classe sta sul guscio,
+     che qui non si riscrive: si commuta, e dallo STESSO giudice del
+     testo. */
+  q('[data-sped]').forEach(b => {
+    b.innerHTML = testoSpedBadge(l);
+    b.classList.toggle('pill-trust', spedGratisOra(l));
+  });
   /* e il foglio dell'offerta, se e' aperto: lo stepper li' dentro
      chiama QUESTA funzione, quindi la riga e il totale si riscrivono
      al volo — e per costruzione dicono lo stesso numero della barra,
@@ -8051,13 +8059,24 @@ const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0)
    e li' si tace — vedi spedGratisQui. */
 function spedBadge(l){
   if (!spedisce(l)) return '';
-  return `<span class="pill" data-sped>${testoSpedBadge(l)}</span>`;
+  return `<span class="pill${spedGratisOra(l) ? ' pill-trust' : ''}"
+    data-sped>${testoSpedBadge(l)}</span>`;
 }
+/* SU QUESTO ACQUISTO LA SPEDIZIONE E' GRATIS? Il giudice del badge
+   della scheda, e ne servono TRE cose insieme — il testo, il colore
+   del guscio e il riallineamento a ogni ± dello stepper — quindi vive
+   in un posto solo: tre copie della stessa domanda direbbero, prima o
+   poi, tre cose diverse sullo stesso annuncio.
+   LE DUE RAGIONI STANNO INSIEME APPOSTA: la tariffa dichiarata a zero
+   dal venditore e la soglia del negozio raggiunta sono ragioni
+   diverse per lo stesso FATTO, e il badge dice il fatto (la regola di
+   Andrea, che vale su tutte e tre le superfici). */
+const spedGratisOra = l => spedGratis(l) || spedGratisQui(l, qtaScelta);
 /* Il contenuto del badge, staccato dal guscio perche' si RISCRIVE a
    ogni ± dello stepper (vedi setQta): la quantita' scelta sposta
    l'articolo, e con lui l'esito. */
 function testoSpedBadge(l){
-  return (spedGratis(l) || spedGratisQui(l, qtaScelta))
+  return spedGratisOra(l)
     ? '🚚 Spedizione <b>gratuita</b>'
     : '🚚 Spedizione disponibile';
 }

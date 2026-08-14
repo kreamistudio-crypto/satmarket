@@ -13600,8 +13600,18 @@ def prove_promesse_badge():
     # A decidere sono DUE soli giudici: la gratuita' piena (proprieta'
     # dell'annuncio) e il verdetto sulla soglia. Un terzo «if» qui
     # dentro e' una regola che non passa da nessuno dei due.
+    # ...e dall'ago 2026 la coppia vive in `spedGratisOra`, perche' la
+    # vogliono in TRE (il testo, il colore del guscio, e il
+    # riallineamento a ogni ± dello stepper): tre copie della stessa
+    # domanda direbbero prima o poi tre cose diverse sullo stesso
+    # annuncio.
     prova("i giudici della gratuita' sono due e non tre", True,
-          "spedGratis(l) || spedGratisQui(l, qtaScelta)" in _tsb)
+          "spedGratis(l) || spedGratisQui(l, qtaScelta)"
+          in pezzo_js(mini, "const spedGratisOra =", ";\n"))
+    prova("...e la coppia si scrive una volta sola", 1,
+          mini.count("const spedGratisOra ="))
+    prova("...e il testo del badge passa da li'", True,
+          "spedGratisOra(l)" in _tsb)
 
     # ---- 1-bis. IL GIUDICE DEL VERDETTO, e le tre decisioni di Andrea
     prova("il verdetto ha un giudice solo", 1,
@@ -13637,11 +13647,20 @@ def prove_promesse_badge():
     # LA QUANTITA' SPOSTA L'ESITO, quindi il badge si riscrive a ogni ±
     # insieme alle cifre di Acquista — e si riscrive il CONTENUTO, o il
     # nodo sparirebbe da sotto i piedi al giro dopo
+    _sq2 = pezzo_js(mini, "function setQta(d){", "\n}")
     prova("il badge si riscrive a ogni ± dello stepper", True,
-          "q('[data-sped]').forEach(b => b.innerHTML = testoSpedBadge(l));"
-          in pezzo_js(mini, "function setQta(d){", "\n}"))
+          "b.innerHTML = testoSpedBadge(l);" in _sq2)
+    # E COL CONTENUTO IL COLORE (ago 2026): la classe sta sul GUSCIO,
+    # che non si riscrive — senza questa riga il verde resterebbe
+    # acceso su un ± che riporta l'articolo sotto soglia, e non si
+    # accenderebbe su un + che la scavalca. E' la trappola di questo
+    # cantiere, e si vede solo muovendo lo stepper.
+    prova("...e col contenuto si commuta il COLORE", True,
+          "b.classList.toggle('pill-trust', spedGratisOra(l));" in _sq2)
+    prova("...dallo stesso giudice del testo, mai da una copia", 2,
+          _sq2.count("spedGratisOra(l)") + _tsb.count("spedGratisOra(l)"))
     prova("...e il guscio porta l'aggancio", True,
-          '<span class="pill" data-sped>' in _sb)
+          'data-sped>' in _sb)
 
     # ---- 2. LE DUE ETICHETTE CORTE: un registro diverso dalla prosa,
     # ma un giudice solo per la CIFRA (cifraSoglia, provato nel blocco
@@ -13967,18 +13986,26 @@ def prove_promesse_badge():
           "aggiornaInvitoSconto(tot);" in _bp
           and "aggiornaInvitoSpedGratis(tot);" in _bp)
 
-    # ---- 6. IL VERDE VIVE SOLO NEL CARRELLO (decisione di Andrea):
-    # li' e' la CONFERMA, cioe' il vestito che la riga di prosa aveva
-    # gia'. In scheda e in «Altri oggetti» la promessa e' una REGOLA e
-    # non un fatto compiuto — e nella fila del dettaglio il verde e'
-    # gia' preso dalla pillola della CONDIZIONE, che vuol dire
-    # un'altra cosa.
-    # ...e si guardano TUTTE E TRE le funzioni del badge, non il solo
-    # guscio: da quando il testo vive in `testoSpedBadge` una sentinella
-    # sul solo `spedBadge` lascia passare il verde messo dov'e' comodo
-    # (l'ha detto la tortura, non la rilettura).
-    prova("il verde non entra nella scheda", False,
-          "pill-trust" in _sb + _tsb + _sq)
+    # ---- 6. IL VERDE, E DOVE VIVE (ago 2026, decisione di Andrea che
+    # ROVESCIA A META' la riga di prima — «il verde vive solo nel
+    # carrello»).
+    # NELLA SCHEDA ADESSO C'E', ed e' un cambio di significato prima
+    # che di colore: li' il verde non dice «promessa scattata» ma
+    # «questa spedizione non si paga» — piu' debole e piu' utile — e
+    # allinea la scheda alla pagina Paga, che quel verde ce l'ha da
+    # quando il suo badge nasce dal fatto. La promessa non e' piu' una
+    # REGOLA da raccontare: e' un esito su QUESTO acquisto, e la
+    # quantita' lo sposta.
+    # IN CARD RESTA FUORI, e la ragione e' misurata: li' il verde e'
+    # gia' dello SCONTO (`--sconto`, il badge sulla foto), e due verdi
+    # che dicono due cose diverse nello stesso riquadro sono peggio
+    # della divergenza che si chiude — di sera sono la STESSA tinta
+    # (1,17 di contrasto fra loro). Chi vorra' distinguerli parta
+    # dalla palette, non da un ritocco qui.
+    prova("il verde entra nella scheda, e dal giudice unico", True,
+          "pill-trust" in _sb and "spedGratisOra(l)" in _sb)
+    prova("...ma NON in card, dove il verde e' dello sconto", False,
+          "pill-trust" in pezzo_js(mini, "function iconeCard(l){", "\n}"))
     prova("...ne' in «Altri oggetti»", False, "pill-trust" in _ao)
     _in = pezzo_js(mini, "function aggiornaInvitoSconto(tot){")
     prova("...e nel carrello lo portano tutti e due i badge scattati",
@@ -14309,8 +14336,8 @@ def prove_promesse_raggiungibili():
     _tb = pezzo_js(mini, "function testoSpedBadge(l){", "\n}")
     prova("in card il fatto comprende la tariffa dichiarata", True,
           "spedGratis(l) || spedGratisQui(l, 1)" in _ic)
-    prova("...e nel dettaglio pure", True,
-          "spedGratis(l) || spedGratisQui(l, qtaScelta)" in _tb)
+    prova("...e nel dettaglio pure, dal giudice che le tiene insieme",
+          True, "spedGratisOra(l)" in _tb)
 
     # ---- 3. IL GIUDICE DEL VERDE IN CARD: il gemello di spedGratisQui,
     # e ne eredita le decisioni parola per parola.
