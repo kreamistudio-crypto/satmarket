@@ -5802,17 +5802,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   una convenzione nuova, la colonna ha la stessa forma delle sorelle
   (`INTEGER DEFAULT 0`), e una soglia è una promessa di bottega — «da
   50 €», non «da 49,90», che è un trucco da listino.
-  IL CASSETTO NON PARLA PIÙ UNA VALUTA SOLA, e la nota si è sdoppiata:
-  `NOTA_SOGLIA_EURO` è diventata `notaSoglia(valuta)` — una FUNZIONE con
-  due testi, in un posto solo e portata da tutti e due i cassetti (il
-  patto di `AVVISO_INTERMEDIARIO`, che regge: due copie della stessa
-  avvertenza un giorno divergono). In euro dice che la soglia non cambia
-  da sola col cambio, in sats che è fissa in sats e che in compenso non
-  ha bisogno del cambio per scattare; tutte e due finiscono con «tu
-  incassi sempre in SATS», che è vero comunque ed è la riga che tiene
-  onesto il cassetto di un negozio che promette in euro. Il campo
-  d'aiuto in euro, i due `*DaEuro` e gli `≈` sulle pillole restano
-  CANCELLATI. Per chi COMPRA non si aggiunge niente: le righe pubbliche
+  IL CASSETTO NON SPIEGA PIÙ LA VALUTA (ago 2026, decisione di Andrea
+  nel giro dell'asciugatura): `notaSoglia(valuta)` — la funzione a due
+  testi che diceva, accanto al toggle, cosa comporta ognuna delle due
+  scelte — NON C'È PIÙ, e con lei la nota sulla lampo. A dire la
+  valuta restano le due pillole «€ euro / ₿ sats» e l'etichetta sopra
+  le soglie («Da quanti euro di articoli»).
+  ⚠️ QUEL CHE SE N'È ANDATO CON LEI, dichiarato perché era nato
+  apposta: «Tu incassi sempre in SATS», la riga che teneva onesto il
+  cassetto di un negozio che promette in EURO ma incassa in bitcoin —
+  col passaggio all'euro la parola «sats» era sparita da lì, e una
+  soglia in euro accanto a un negozio bitcoin si legge come «mi pagano
+  in euro». Se un venditore lo chiede, la risposta è quella riga e il
+  posto è il cassetto. Il campo d'aiuto in euro, i due `*DaEuro` e gli
+  `≈` sulle pillole restano CANCELLATI da prima. Per chi COMPRA non si aggiunge niente: le righe pubbliche
   restano una riga, e il momento in cui conta — il paySheet — parla sats
   da solo (`contoScomposto` scrive «sats» su ogni riga).
   LA MISURA È IL LORDO DEL CONTO, cioè l'articolo DOPO lampo e accordo
@@ -7171,7 +7174,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   davanti. Resta UNA riga, IN CIMA sotto il titolo — è un fatto
   costante, e in cima è la prima cosa che si legge aprendo, cioè la
   domanda che il venditore si fa per prima («mi mangia anche la
-  spedizione?») — e cambia col criterio: «La spedizione è a parte.
+  spedizione?») — nel CORPO delle altre prose dei cassetti del Profilo
+  (12,5px: ci è salita dagli 11,5 con cui era nata, che erano il corpo
+  delle note di servizio e non quello di una riga che si legge per
+  prima) — e cambia col criterio: «La spedizione è a parte.
   Più copie dello stesso articolo contano come più pezzi.» a pezzi,
   «La spedizione è a parte. Vale anche su un oggetto solo.» a valore.
   QUELLA SECONDA FRASE È IL PERIMETRO, e non è un ornamento: «più
@@ -7188,16 +7194,36 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sta per salvare. 2) «Chi ne prende N−1 paga pieno», il
   controesempio: si accetta di perderlo perché «da 2 pezzi» sulla
   pillola dice già che sotto non scatta — è l'unica delle tre che il
-  resto del cassetto implica. 3) LA LAMPO, l'unica delle tre
-  che non è implicata da niente: è tornata come riga sua
-  (`notaLampo`, «Le offerte lampo abbassano la cifra su cui si
-  misura»), SOTTO le pillole della cifra, perché è un caveat sulla
-  MISURA e non sul perimetro — la riga in cima dice dove vale, questa
-  con che numero si confronta. In UN posto e montata dai due
-  cassetti; SOLO dove una cifra c'è, che a criterio pezzi la lampo non
-  può far scendere niente e dirlo sarebbe falso. È il caso che questo
-  file dichiara «sembra un bug quando un venditore lo nota»: si lancia
-  un −50%, il carrello scende sotto soglia, la promessa non scatta.
+  resto del cassetto implica. 3) LA LAMPO — «la soglia guarda
+  l'acquisto DOPO le tue offerte lampo e gli accordi» — che NON è
+  implicata da niente e adesso non sta più da nessuna parte, in
+  nessuno dei due cassetti. È vissuta un giorno come riga sua
+  (`notaLampo`, sotto le pillole della cifra) ed è stata tolta il
+  giorno dopo, decisione di Andrea: «è normale che una lampo incida
+  sulla cifra, non serve ripeterlo». Resta il caso che questo file
+  dichiara «sembra un bug quando un venditore lo nota» — si lancia un
+  −50%, il carrello scende sotto soglia, la promessa non scatta — e da
+  oggi non lo dice nessuna superficie.
+  L'ARIA SOPRA IL BOTTONE È DEL CASSETTO (ago 2026, bug dal campo:
+  «Aggiorna lo sconto» tagliava le pillole delle percentuali).
+  Riprodotto e MISURATO prima di toccare: fra l'ultima fila di pillole
+  e il bottone c'erano **0px** — non una sovrapposizione di scatole ma
+  un contatto, che con la pillola accesa dello stesso arancio del
+  bottone fondeva i due in un blocco solo. La causa è quella
+  dichiarata altrove in questo file: `.btn` non ha margine di base
+  perché lo spazio è della COPPIA e non del bottone, e negli altri
+  cassetti l'aria la metteva il `margin-bottom` del CAMPO che sta
+  sopra — dove sopra c'è una fila di pillole, che margine sotto non ne
+  ha, non la mette nessuno. Censiti gli altri cassetti prima di
+  scegliere l'altezza della cura: 10, 14, 14 px contro gli 0 dei due
+  delle promesse. La regola sta sul CASSETTO (`.acc-b .btn`) e non sui
+  due blocchi che l'hanno scoperta, così la eredita anche il cassetto
+  di domani; dove l'aria c'era già i margini COLLASSANO (flusso
+  normale) e resta la più grande, quindi non si somma a niente. È la
+  TERZA volta che questa famiglia inciampa, dopo i bottoni dell'ordine
+  e quelli del dettaglio, e la lezione è sempre la stessa: sono righe
+  che un riordino non rompe e una rilettura non vede — si trovano solo
+  MISURANDO la pagina vera. C'è la sentinella.
   E IL CAMPO LIBERO SI ACCENDE COME UNA PILLOLA quando porta una
   cifra che nessuna pillola dice (bordo `--sats`, grassetto 800): con
   l'anteprima via, quello è l'UNICO riscontro che il numero scritto è
