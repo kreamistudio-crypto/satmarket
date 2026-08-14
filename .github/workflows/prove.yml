@@ -55,6 +55,8 @@ jobs:
              presenta_release.py config_esempio.py
              assegna_sottocategorie.py ripulisci_avatar_min.py
              anteprime.py collaudo_impersonazione.py
+             stima_coda_moderazione.py recupera_cambi_ordini.py
+             converti_soglie_euro.py collaudo_conto.py
              converti_soglie_euro.py recupera_cambi_ordini.py
              stima_coda_moderazione.py
 

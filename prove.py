@@ -14762,6 +14762,33 @@ def prove_guardia_is_bot():
                                  for g in guardie))
 
 
+def prove_script_nel_workflow():
+    """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
+
+    L'elenco del workflow e' scritto A MANO, e CLAUDE.md lo dichiara
+    da mesi come il punto in cui uno script nuovo si fa dimenticare —
+    «ai tre nati il 3 ago 2026 e' successo». Un file fuori da
+    quell'elenco non e' meno rotto: e' solo un file che nessuno
+    guarda, e se ne accorge chi lo lancia mesi dopo.
+
+    Questa riga chiude il buco: non tiene un secondo elenco (sarebbe
+    lo stesso problema spostato) ma GUARDA la cartella, e chiede che
+    ogni .py alla radice compaia nel comando. Chi ne aggiunge uno lo
+    sente dalla CI il giorno stesso, non fra sei mesi.
+
+    `config.py` resta fuori per costruzione: non e' tracciato, e in
+    CI non esiste (la regola ferrea 1)."""
+    print("\n[gli script del repo, e il compileall]")
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    riga = wf[wf.index("python -m compileall"):]
+    riga = riga[:riga.index("\n      -")]
+    nostri = sorted(f for f in os.listdir(".")
+                    if f.endswith(".py") and f != "config.py")
+    prova("il repo ha degli script da compilare", True, len(nostri) > 10)
+    fuori = [f for f in nostri if f not in riga]
+    prova("...e sono TUTTI nel compileall del workflow", [], fuori)
+
+
 def prove_sintassi_client():
     """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
     arrivato fino a main: un `*/` doppio in un commento di
@@ -14879,6 +14906,7 @@ def main():
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri,
               prove_guardia_is_bot,
+              prove_script_nel_workflow,
               prove_sintassi_client):
         try:
             f()
