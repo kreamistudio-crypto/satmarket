@@ -9677,10 +9677,66 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   mai il foglio. Raggiungerlo vorrebbe dire una una-tantum GLOBALE col
   timbro in `timbri` (la regola di `avvisa_sconto_su_mono`): è una
   decisione a parte, non è stata presa.
-  Il collaudo eseguibile è `collaudo_reti.py` (22 verdi su database
+  E LA SECONDA DOMANDA È IL TIPO: LOCKER O PUNTO COL BANCO (ago 2026,
+  la metà che mancava). La rete da sola non basta — InPost e Poste
+  hanno tutt'e due sia i locker sia i negozi convenzionati, e il
+  venditore compra un'ETICHETTA DIVERSA per i due: è il costo da cui
+  nasce tutto il cantiere. Colonna `ordini.tipo_punto` ('locker' |
+  'banco' | '' = non dichiarato), catalogo `TIPI_PUNTO` col gemello
+  nel client (id per sempre, etichette ritoccabili — il pattern di
+  CONDIZIONI — più il nome BREVE che il venditore legge nella frase).
+  DUE FILE E NON UNA MATRICE «Locker InPost / Punto InPost / …»
+  (decisione di Andrea), e le tre ragioni sono MISURATE dentro il
+  cassetto vero a 320px, dove la larghezza utile è 258: la matrice
+  occupa TRE righe contro le DUE delle file separate — ogni voce si
+  porta dietro il nome lungo della rete, e «Locker Poste Italiane» da
+  solo fa 156px; MOLTIPLICA invece di sommare, quindi con la lista
+  aperta delle reti diventerebbe sei pillole alla prima aggiunta; e
+  soprattutto IL TIPO SI SA SOLO DOPO AVER GUARDATO LA MAPPA, che
+  dipende dalla rete — quindi rete→mappa→tipo non è una scelta
+  d'interfaccia, è l'ordine in cui l'informazione esiste, e la matrice
+  chiederebbe tutto insieme prima che si possa sapere. (Con UNA rete
+  sola la matrice degenera comunque in «Locker / Punto», cioè nella
+  forma a due file: quella è la forma generale.)
+  IL PESO VERO, ed è il numero che risponde alla domanda «due domande
+  di fila sono tante?»: il cantiere aggiunge UN TOCCO SOLO a chiunque
+  — chi ha due reti oggi ne fa uno e passa a due, chi ne ha una oggi
+  non ne fa nessuno e passa a uno.
+  SI CHIEDE SEMPRE sulla via punto, anche senza reti dichiarate: il
+  tipo è indipendente dalla rete e al venditore serve comunque.
+  NIENTE DEFAULT (decisione di Andrea), ed è la riga da non
+  ammorbidire: preselezionare «locker» perché è il caso comune — e
+  perché la nota di casa già lo consiglia — farebbe comprare
+  l'etichetta sbagliata a chi sceglie una tabaccheria senza toccare
+  niente, cioè esattamente il costo da cui si è partiti. Il giudice
+  `tipo_punto_da_payload` NON RICEVE il punto, e non è un dettaglio:
+  è ciò che rende impossibile dedurre il tipo dal testo —
+  «tabaccheria» in un indirizzo non è una prova. Il vuoto lo accetta
+  il server e lo rifiuta il CLIENT, la stessa tolleranza della rete.
+  LA FRASE CHE SERVE A COMPRARE L'ETICHETTA la compone `nomePunto`,
+  giudice unico delle superfici che la scrivono: «Locker InPost —
+  Via Roma 1», «Punto InPost — Tabaccheria, Via Roma 1». Le tre
+  guardie del cassetto si presentano IN CASCATA e nell'ordine in cui
+  si decide — corriere, tipo, dove — e nessuna POST parte finché
+  manca qualcosa.
+  GLI ORDINI DI IERI restano a `''` e nessuno prova a indovinare: il
+  venditore legge la forma di prima con la coda «(tipo non
+  indicato)» — in silenzio varrebbe meno. Quelli ancora `locked` si
+  completano dal campo dentro l'ordine, dove il tipo si sceglie
+  accanto al punto e la chiave assente CONSERVA quel che c'era (il
+  patto dello stock).
+  Il collaudo eseguibile è `collaudo_reti.py` (29 verdi su database
   usa-e-getta: il backfill e la sua idempotenza, le due colonne che si
-  scrivono insieme, i tre casi della rete, il mondo di ieri intatto,
-  la ronda che tace).
+  scrivono insieme, i tre casi della rete, i due del tipo, il client
+  di ieri che non manda niente, il mondo di ieri intatto, la ronda che
+  tace).
+  E LA PROVA CHE VALE PIÙ DELLE SENTINELLE: `nomePunto` si fa GIRARE
+  con node sui sei casi, invece di guardarla soltanto. Le sentinelle
+  dicevano che il giudice esiste ed è uno, mai che rispondesse giusto
+  — e la mutazione che gli toglie il tipo lasciando la sola rete le
+  passava TUTTE. È la SESTA volta che una prova sulla forma certifica
+  un ramo disonesto: quella classe di sentinella va sempre in coppia
+  con una che fa girare il pezzo.
   LA VIA PUNTO SI OFFRE SEMPRE dove c'è la spedizione (secondo giro,
   ago 2026 — la decisione di Andrea che SUPERA quella del primo
   giro, «punto solo con spedizioniere dichiarato»; il perché:
