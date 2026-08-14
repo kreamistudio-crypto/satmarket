@@ -20430,6 +20430,21 @@ async function leggiEventoInfo(NT, relays, walletPub){
   } finally { try { relay.close(); } catch(e){} }
 }
 
+/* La chiave del wallet: 64 esadecimali, sempre. Due forme storte
+   meritano un messaggio invece di un'esplosione — la BARRA FINALE
+   dopo la pubkey (nostr+walletconnect://<chiave>/?...), dove il
+   parser di nostr-tools legge il percorso «/» al posto dell'host e
+   la chiave si riduce a un carattere, e la chiave scritta in npub.
+   Senza questa guardia il primo a lamentarsi e' nip04, con un «hex
+   string expected» che manda a cercare il guasto nel secret. */
+function chiaveNwc(con){
+  const pk = (con.pubkey || '').toLowerCase();
+  if (/^[0-9a-f]{64}$/.test(pk)) return pk;
+  if (pk.startsWith('npub1'))
+    throw new Error('la chiave del wallet è in npub: serve in esadecimale');
+  throw new Error('nella stringa non si legge la chiave del wallet');
+}
+
 /* Valida il collegamento con una STRETTA DI MANO vera: una chiamata
    get_info via NIP-47. Prova relay, secret e cifratura in un colpo
    solo. L'evento info è solo la prima scelta per scoprire la
@@ -20442,7 +20457,7 @@ async function infoNwc(stringa){
   const con = NT.nip47.parseConnectionString(stringa.trim());
   if (!/^[0-9a-f]{64}$/i.test(con.secret || ''))
     throw new Error('nella stringa manca un secret valido');
-  const walletPub = con.pubkey.toLowerCase();
+  const walletPub = chiaveNwc(con);
   let preferita = null;
   try {
     const ev = await leggiEventoInfo(NT, con.relays, walletPub);
@@ -20453,7 +20468,12 @@ async function infoNwc(stringa){
     console.log('🟪 [nwc] niente evento info (' + e.message + '): stringo la mano direttamente');
     if (/relay/.test(e.message || '')) throw e;   // relay giù: inutile insistere
   }
-  const daProvare = preferita ? [preferita] : ['nip04', 'nip44'];
+  /* la preferenza dichiarata dall'evento info ORDINA i tentativi,
+     non li esclude: un wallet puo' dichiarare una cifratura e volerne
+     un'altra, e con un elenco di uno solo resteremmo fuori per
+     sempre. Chi risponde al primo giro non paga niente in piu'. */
+  const daProvare = preferita === 'nip44' ? ['nip44', 'nip04']
+                                          : ['nip04', 'nip44'];
   let ultimo = null;
   for (const cifratura of daProvare) {
     let cliente = null;
@@ -20466,16 +20486,29 @@ async function infoNwc(stringa){
       return {pubkey: walletPub, relays: con.relays, cifratura};
     } catch(e){
       if (e.definitivo) throw e;
-      if (e.code) {
-        /* il wallet ha RISPOSTO (pur con un errore): relay, secret e
-           cifratura funzionano — per il collegamento basta e avanza */
+      const codice = String(e.code || '').toUpperCase();
+      if (codice === 'UNSUPPORTED_ENCRYPTION') {
+        /* il wallet ha risposto proprio per dire «questa lingua non
+           la parlo»: e' un NO su QUESTA cifratura, non un collegamento
+           vivo. Salvarlo qui vorrebbe dire un wallet che si collega e
+           poi non paga mai — si prova l'altra, e se non resta niente
+           da provare si dice com'e' andata. */
+        console.log('🟪 [nwc] il wallet rifiuta ' + cifratura + ': provo la seconda cifratura');
+        ultimo = e;
+      } else if (e.code) {
+        /* qualunque ALTRO errore vuol dire che il wallet ci ha letti:
+           relay, secret e cifratura funzionano — per il collegamento
+           basta e avanza */
         console.log('🟪 [nwc] il wallet risponde in ' + cifratura + ' (errore ' + e.code + '): connessione viva');
         return {pubkey: walletPub, relays: con.relays, cifratura};
+      } else {
+        console.log('🟪 [nwc] con ' + cifratura + ' non risponde: ' + (e.message || e));
+        ultimo = e;
       }
-      console.log('🟪 [nwc] con ' + cifratura + ' non risponde: ' + (e.message || e));
-      ultimo = e;
     } finally { if (cliente) cliente.chiudi(); }
   }
+  if (String((ultimo && ultimo.code) || '').toUpperCase() === 'UNSUPPORTED_ENCRYPTION')
+    throw new Error('il wallet parla una cifratura che non conosciamo');
   throw new Error(/relay/.test((ultimo && ultimo.message) || '')
     ? ultimo.message
     : 'il wallet non risponde alla stretta di mano (get_info): secret giusto?');
@@ -20488,12 +20521,20 @@ async function clientNwc(dati){
   await caricaNostrTools();
   const NT = window.NostrTools;
   const con = NT.nip47.parseConnectionString(dati.stringa.trim());
-  const walletPub = con.pubkey.toLowerCase();
+  const walletPub = chiaveNwc(con);
   const sk = NT.utils.hexToBytes(con.secret);
   const pubClient = NT.getPublicKey(sk);
   const con44 = dati.cifratura === 'nip44'
     ? NT.nip44.getConversationKey(sk, walletPub) : null;
   const cifra   = t => con44 ? NT.nip44.encrypt(t, con44) : NT.nip04.encrypt(sk, walletPub, t);
+  /* NIP-47: la cifratura si DICHIARA, e «l'assenza del tag
+     encryption indica nip04» — quindi il tag va messo solo per
+     nip44, e chi parla nip04 resta identico a ieri. Senza, un
+     wallet che segue la specifica prova a decifrare come nip04,
+     trova spazzatura e tace: per noi diventa un «non risponde»,
+     e per l'utente un «Barattolo non riconosce il mio wallet». */
+  const tagRichiesta = con44 ? [['p', walletPub], ['encryption', 'nip44_v2']]
+                             : [['p', walletPub]];
   const decifra = t => con44 ? NT.nip44.decrypt(t, con44) : NT.nip04.decrypt(sk, walletPub, t);
   let relay = null;
   for (const r of con.relays) {
@@ -20516,7 +20557,7 @@ async function clientNwc(dati){
   function chiama(metodo, params, timeoutMs){
     return new Promise((ok, no)=>{
       const ev = NT.finalizeEvent({kind:23194,
-        created_at: Math.floor(Date.now()/1000), tags:[['p', walletPub]],
+        created_at: Math.floor(Date.now()/1000), tags: tagRichiesta,
         content: cifra(JSON.stringify({method:metodo, params}))}, sk);
       attese[ev.id] = {ok, no};
       relay.publish(ev).catch(()=>{});

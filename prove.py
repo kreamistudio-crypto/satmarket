@@ -16734,6 +16734,166 @@ def prove_commenti_css(mini=None):
     prova("...e nessun commento resta aperto in fondo al foglio", 0, aperti)
 
 
+def prove_nwc_cifratura():
+    """La cifratura NWC si DICHIARA (ago 2026, dal campo: «Primal non
+    si collega»). NIP-47 dice che il client mette un tag `encryption`
+    nella richiesta e che «l'assenza del tag indica nip04»: noi il tag
+    non lo scrivevamo MAI, quindi il ripiego su nip44 spediva un
+    contenuto nip44 dentro un evento che si dichiarava nip04 — un
+    wallet che segue la specifica non lo decifra e tace, e per
+    l'utente diventa «Barattolo non riconosce il mio wallet».
+
+    E il rovescio era peggio del rifiuto: un wallet che RISPONDE
+    `UNSUPPORTED_ENCRYPTION` finiva nel ramo «connessione viva» e lo
+    SALVAVAMO — collegato in una cifratura che non parla, cioe' un
+    wallet che poi non paga mai.
+
+    Qui non si guarda la forma: si fa GIRARE `infoNwc` vera contro un
+    wallet di cartone nip44-only, e si chiede che si colleghi (e che
+    si colleghi in nip44). Una sentinella sulla forma direbbe che il
+    tag c'e', mai che la stretta di mano riesce."""
+    print("\n[NWC: la cifratura si dichiara]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import os as _os
+    node = _sh.which("node")
+    if not node:
+        salta("il wallet nip44-only si collega", "node non installato")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read()
+    pezzi = "\n\n".join(pezzo_js(mini, f) for f in (
+        "function chiaveNwc(con){",
+        "async function leggiEventoInfo(NT, relays, walletPub){",
+        "async function infoNwc(stringa){",
+        "async function clientNwc(dati){"))
+
+    # Il wallet di cartone: risponde SOLO alla cifratura che parla, e
+    # a quella sbagliata risponde `UNSUPPORTED_ENCRYPTION` come
+    # prescrive la specifica — cioe' PARLA, che e' esattamente il caso
+    # in cui prima lo salvavamo storto.
+    banco = """
+// le chiavi finte si COSTRUISCONO, mai scritte per esteso: lo
+// scanner dei segreti rifiuta 64 esadecimali di fila fuori da
+// vendor/, e quella regola e' larga apposta — un fixture non vale
+// un'eccezione (basta che siano esadecimali e lunghe giuste).
+const PK = 'b8'.repeat(32);
+const SEC = '71'.repeat(32);
+let PARLA = 'nip44';
+let ultimo = null, n = 0;
+function caricaNostrTools(){ return Promise.resolve(); }
+const eco = t => t;
+const relay = {
+  subscribe(filtri, h){
+    if ((filtri[0].kinds || []).includes(13194)) setTimeout(()=>h.oneose(), 0);
+    else relay.onev = h.onevent;
+  },
+  publish(ev){
+    ultimo = ev;
+    const tag44 = (ev.tags || []).some(t => t[0] === 'encryption' && /nip44/.test(t[1] || ''));
+    const giusta = (PARLA === 'nip44') === tag44;
+    const msg = giusta ? {result: {methods: ['pay_invoice']}}
+                       : {error: {code: 'UNSUPPORTED_ENCRYPTION', message: 'no'}};
+    setTimeout(()=>relay.onev({tags: [['e', ev.id]], content: JSON.stringify(msg)}), 0);
+    return Promise.resolve();
+  },
+  close(){},
+};
+const NT = {
+  nip47: {parseConnectionString: () => ({pubkey: PK, relays: ['wss://finto'], secret: SEC})},
+  utils: {hexToBytes: h => h},
+  getPublicKey: () => 'cli',
+  nip44: {getConversationKey: () => 'k', encrypt: eco, decrypt: eco},
+  nip04: {encrypt: (a, b, t) => t, decrypt: (a, b, t) => t},
+  finalizeEvent: (e) => Object.assign({}, e, {id: 'ev' + (++n)}),
+  Relay: {connect: () => Promise.resolve(relay)},
+};
+const window = {NostrTools: NT};
+const console2 = console; console = {log(){}};   // il client chiacchiera
+
+function chiavi(){
+  const casi = {};
+  for (const [nome, pk] of [['esadecimale', PK], ['maiuscola', PK.toUpperCase()],
+                            ['barra finale', '/'], ['npub', 'npub1hyfl7kc5fmvs0']]) {
+    try { casi[nome] = chiaveNwc({pubkey: pk}); }
+    catch(e){ casi[nome] = 'NO: ' + e.message; }
+  }
+  return casi;
+}
+
+(async () => {
+  const out = {chiavi: chiavi()};
+  for (const modo of ['nip44', 'nip04']) {
+    PARLA = modo; ultimo = null;
+    try {
+      const r = await infoNwc('nostr+walletconnect://' + PK + '?relay=wss://finto&secret=' + SEC);
+      out['esito_' + modo] = r.cifratura;
+    } catch(e){ out['esito_' + modo] = 'ESPLODE: ' + e.message; }
+    out['tag_' + modo] = (ultimo.tags || []).some(t => t[0] === 'encryption' && t[1] === 'nip44_v2');
+  }
+  console2.log(JSON.stringify(out));
+  process.exit(0);
+})();
+"""
+    f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    f.write(pezzi + "\n" + banco)
+    f.close()
+    try:
+        r = _sp.run([node, f.name], capture_output=True, text=True, timeout=60)
+    finally:
+        _os.unlink(f.name)
+    if r.returncode != 0:
+        prova("il banco NWC gira", "", r.stderr.strip()[:300])
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+
+    # 1) il tag encryption, come prescrive NIP-47
+    prova("verso un wallet nip44 la richiesta DICHIARA nip44_v2",
+          True, o["tag_nip44"])
+    prova("verso un wallet nip04 il tag NON si mette (l'assenza vale nip04)",
+          False, o["tag_nip04"])
+
+    # 2) UNSUPPORTED_ENCRYPTION non e' una connessione viva
+    prova("il wallet nip44-only si collega, e si collega in nip44",
+          "nip44", o["esito_nip44"])
+    prova("il wallet nip04 resta identico a ieri",
+          "nip04", o["esito_nip04"])
+
+    # 3) le due guardie sulla chiave
+    prova("la chiave esadecimale passa", "b8" * 32,
+          o["chiavi"]["esadecimale"])
+    prova("la chiave MAIUSCOLA si abbassa", "b8" * 32,
+          o["chiavi"]["maiuscola"])
+    prova("la barra finale non diventa una chiave", True,
+          o["chiavi"]["barra finale"].startswith("NO: "))
+    prova("l'npub lo dice, invece di far esplodere nip04", True,
+          "npub" in o["chiavi"]["npub"])
+
+    # la forma, per quel che l'eseguibile non puo' vedere: il ramo che
+    # SALVA non deve tornare raggiungibile per un codice qualunque.
+    corpo = pezzo_js(mini, "async function infoNwc(stringa){")
+    prova("il ramo del codice guarda UNSUPPORTED_ENCRYPTION prima di salvare",
+          True, corpo.index("UNSUPPORTED_ENCRYPTION") < corpo.index("connessione viva"))
+    prova("la preferenza dell'evento info ORDINA, non esclude",
+          True, "['nip44', 'nip04']" in corpo and "['nip04', 'nip44']" in corpo)
+
+    # e il giudice dev'essere COLLEGATO, non solo esistere: la tortura
+    # ha visto sopravvivere la mutazione che rimette `con.pubkey` nei
+    # due chiamanti — la guardia c'era e non la chiamava nessuno, e
+    # tutte le prove restavano verdi. Quindi un CENSIMENTO invece di
+    # un elenco: fuori da chiaveNwc la chiave del wallet non si legge
+    # a mano da nessuna parte, nemmeno dalla funzione che qualcuno
+    # aggiungera' qui fra sei mesi.
+    i = mini.index("const NWC_CHIAVE")
+    sezione = mini[i:mini.index("async function collegaWallet(")]
+    fuori = sezione.replace(pezzo_js(mini, "function chiaveNwc(con){"), "")
+    prova("fuori dal giudice nessuno si legge la pubkey a mano",
+          0, fuori.count("con.pubkey"))
+    prova("e il giudice lo chiamano tutti e due i chiamanti",
+          2, fuori.count("chiaveNwc(con)"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -16779,6 +16939,7 @@ def main():
               prove_guardia_is_bot,
               prove_altri_scorrimento,
               prove_script_nel_workflow,
+              prove_nwc_cifratura,
               prove_sintassi_client):
         try:
             f()
