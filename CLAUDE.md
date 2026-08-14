@@ -8965,7 +8965,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Coinos e altri NON lo pubblicano (verificato lug 2026), mai
   pretenderlo — e dall'ago 2026 ORDINA i tentativi senza escluderli,
   perché un wallet può dichiarare una cifratura e volerne un'altra, e
-  con un elenco di uno solo si resterebbe fuori per sempre.
+  con un elenco di uno solo si resterebbe fuori per sempre. E quel tag
+  è una LISTA («nip04 nip44_v2»), non un valore: nip44 si cerca DENTRO
+  il valore invece di confrontarlo, e chi lo pubblica spesso parla
+  tutt'e due (la nota è di Alan, PR #10).
   LA CIFRATURA SI DICHIARA (ago 2026, dal campo: «Primal non si
   collega»). NIP-47 dice che il client mette un tag `encryption` nella
   richiesta e che **l'assenza del tag indica nip04**: noi il tag non lo

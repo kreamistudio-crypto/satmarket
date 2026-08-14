@@ -20464,6 +20464,10 @@ async function infoNwc(stringa){
     preferita = (ev.tags || []).some(tag=>tag[0]==='encryption' && /nip44/.test(tag[1]||''))
       ? 'nip44' : 'nip04';
     console.log('🟪 [nwc] evento info trovato, cifratura dichiarata:', preferita);
+    /* Il tag `encryption` e' una LISTA («nip04 nip44_v2»), e chi lo
+       pubblica spesso parla tutt'e due: per questo nip44 si cerca
+       DENTRO il valore invece di confrontarlo, e per questo il suo
+       verdetto e' una preferenza e non un'esclusiva. */
   } catch(e){
     console.log('🟪 [nwc] niente evento info (' + e.message + '): stringo la mano direttamente');
     if (/relay/.test(e.message || '')) throw e;   // relay giù: inutile insistere
