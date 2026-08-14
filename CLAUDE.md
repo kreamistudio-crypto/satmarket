@@ -2914,6 +2914,129 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   turno per un guasto ha comunque il suo annuncio in vetrina, che è
   dove si compra. L'AGGREGATO non consuma il turno di nessuno: non
   nomina nessuno.
+  IL RITMO LO DECIDE IL BOT (ago 2026, chiesto da Andrea insieme al
+  canale «Barattolo Vetrina»): il freno qui sopra non è più l'ultima
+  parola. `/vetrina tutto | giorno | settimana` sceglie una POSIZIONE
+  e i tre numeri del ritmo — giorni fra due post dello stesso
+  venditore, post singoli all'ora, soglia dell'aggregato — vengono da
+  lì; `/vetrina` senza argomenti dice dov'è e cosa vuol dire,
+  `/vetrina config` annulla la scelta. Catalogo `RITMI` + giudice
+  unico `ritmo_vetrina()`, e il config resta il valore di PARTENZA,
+  esattamente come per `canale_id()`.
+  NEL DATABASE VA IL NOME, NON I NUMERI, ed è la scelta che tiene
+  semplice tutto il resto: una riga, una parola, e le tre cifre
+  restano nel codice dove hanno il loro commento accanto. Un nome
+  fuori catalogo — scritto a mano sul VPS, o rimasto da una posizione
+  che un domani si toglie — ricade sul config: fail-safe, perché
+  sbagliare qui non deve poter spegnere il canale. `nome_ritmo()` è
+  l'UNICO che va a leggere quella riga e `ritmo_vetrina()` deriva da
+  lui: due lettori potrebbero divergere fra una SELECT e l'altra, e
+  il pannello direbbe una posizione coi numeri di un'altra.
+  PERCHÉ `impostazioni` È IL POSTO GIUSTO: il suo recinto vieta i
+  segreti e le leve del DENARO, e un ritmo di pubblicazione non
+  accende niente — dice quanto il bot parla, e sbagliarlo si vede
+  subito nel canale. È la stessa famiglia dell'id del canale. Il
+  recinto ora ha DUE chiavi (`canale_telegram`, `ritmo_vetrina`) e a
+  sorvegliarlo è un CENSIMENTO che le estrae dal sorgente e le
+  confronta con l'elenco dichiarato — il vecchio `count(...) <= 2`
+  diceva quante VOLTE si legge, non COSA, e sarebbe passato liscio
+  davanti a una riga nuova che ne sostituisce una vecchia.
+  `_un_post_per_venditore` prende `giorni` come argomento
+  OBBLIGATORIO E SENZA DEFAULT (la lezione di `atteso_sats`), e
+  `_posta_promo_singolo` lo RICEVE dal chiamante invece di
+  rileggerlo: a metà drenaggio un `/vetrina` cambierebbe il freno
+  sotto i piedi al gruppo, e mezzo gruppo timbrato e mezzo no è il
+  modo in cui questo freno diventa impossibile da spiegare. A freno
+  spento NON si timbra, ed è deliberato: un timbro scritto mentre il
+  ritmo è «tutto» bloccherebbe per una settimana intera ogni
+  venditore il giorno che qualcuno stringe a «settimana».
+  LA VALVOLA RESTA in ogni posizione: con «tutto» un import CSV da
+  500 righe cade comunque nell'aggregato «📦 N nuovi annunci», che non
+  nomina nessuno. Il freno spento libera il caso normale, non le
+  raffiche. NIENTE CACHE al contrario di `_CANALE`: è una SELECT ogni
+  finestra di raggruppamento, e una seconda copia in RAM sarebbe una
+  copia da tenere allineata in cambio di niente.
+  E IL PANNELLO DELLE LEVE CHIEDE AL GIUDICE, non alle costanti — è
+  alla lettera la trappola che quella pagina esiste per non far
+  ricadere, già dichiarata per il canale; la riga del ritmo porta come
+  «chiave» il COMANDO `/vetrina` e non un nome del config, perché è da
+  lì che si cambia e mandare qualcuno sul VPS sarebbe un indirizzo
+  sbagliato (la sentinella delle chiavi ammette `/nome` di sole
+  lettere, così un percorso di file non passa). LA TORTURA HA CHIESTO
+  QUELLE ASSERZIONI: la mutazione che riportava il pannello alle
+  costanti non faceva rossa nessuna prova, perché il commento dello
+  stub prometteva un controllo che non c'era.
+  LO SCONTO LAMPO ESCE NEL CANALE (ago 2026, chiesto da Andrea):
+  `promo_lampo`, gancio in coda a `lancia_lampo` in `create_task` e
+  DOPO il commit — il patto di `accoda_promo`, un post fallito non
+  deve mai rompere il lancio di uno sconto. Rilegge la riga dal
+  database (mai fidarsi del payload) con le guardie di
+  `_posta_promo_singolo`: solo `attivo`, mai gli importati, mai un
+  venditore in ferie, e solo se la lampo è ancora viva.
+  UN POST NUOVO, E L'ORIGINALE NON SI TOCCA: la lampo non cambia
+  `prezzo_sats` (il listino non si tocca mai), quindi il post di
+  quando l'annuncio è nato NON MENTE — dice il listino, che è ancora
+  vero. È la differenza col ✅ Venduto, che invece riscrive quel post:
+  lì a cambiare era la DISPONIBILITÀ, qui si aggiunge un'occasione a
+  tempo. Così non c'è niente da dis-editare alla scadenza.
+  SOLO CANALE, NIENTE NOSTR, ed è una regola già scritta: lo sconto è
+  LOCALE, cioè il vantaggio di chi compra dentro Barattolo, e il
+  NIP-99 parla il prezzo pieno per costruzione. CONSUMA IL BUDGET
+  ORARIO e a budget pieno SALTA invece di aggregare (una lampo
+  aggregata non direbbe niente di utile): senza, il tetto dei post si
+  aggirerebbe lanciando sconti — `MAX_LAMPO_SETTIMANA` è 2 *per
+  annuncio*, quindi chi ne ha cinquanta può fare cento lampo a
+  settimana. Una lampo persa è un post perso, non un ordine perso.
+  `_riga_prezzo_lampo` rende il listino BARRATO accanto allo
+  scontato, ognuno da `_prezzo_promo` — una regola sola per tutti i
+  prezzi che escono dal canale; sul listino in EURO lo sconto si
+  applica anche all'equivalente in sats, o la riga direbbe due sconti
+  diversi. Leva `POST_LAMPO_CANALE` (True di serie) per spegnere gli
+  sconti senza spegnere gli annunci nuovi.
+  IMPERFEZIONE DICHIARATA: se l'annuncio si vende mentre la lampo è
+  viva, quel post resta senza il ✅ (l'originale ce l'ha). Il testo è
+  DATATO — «solo fino alle 18:00» — e il link apre la scheda vera, che
+  dice sempre la verità; nessuno può pagare. Se in rodaggio darà
+  fastidio la leva è una colonna `post_lampo_id` più una riga in
+  `promo_venduto`: qui si è scelto di non raddoppiare il ciclo di vita
+  per un post che si autodata.
+  IL RIEPILOGO DEL LUNEDÌ (ago 2026, chiesto da Andrea):
+  `riepilogo_settimana` nell'orologio accanto al termometro — annunci
+  nuovi, ordini e i tre articoli più venduti, nel canale e solo lì (su
+  Nostr il pubblico è un altro). Timbro `TIMBRO_RIEPILOGO` nella
+  tabella `timbri`, mai un globale.
+  MA QUI SI TIMBRA ANCHE QUANDO SI TACE, ed è la differenza col
+  termometro — che invece esce PRIMA di timbrare quando la coda è
+  sotto il minimo. Lì il conto è CUMULATIVO: saltare il turno lo
+  rimanda soltanto, e il lunedì dopo ricontrolla. Qui il conto è di
+  una SETTIMANA precisa, quindi ricontrollare martedì darebbe una
+  finestra sfasata e un riepilogo fuori cadenza: il turno si consuma,
+  magro o no. Chi legge i due insieme e li uniforma ne rompe uno.
+  I CONTI stanno in `_conta_settimana`, che LEGGE E BASTA e si gira in
+  CI su un database di cartone. ANNUNCI NUOVI: gli stati che sono
+  stati in vetrina davvero — un VENDUTO ci entra (è stato un annuncio
+  vero della settimana, è solo finito), un rimosso e uno in revisione
+  no. ORDINI: quelli in cui i sats sono ARRIVATI IN CASSAFORTE, cioè
+  il complemento di 'creato' e 'annullato' — la stessa definizione
+  della coda «⏸ Ordini fermi», detta ad alta voce invece di elencare
+  gli stati vivi; contare i soli 'released' direbbe quasi zero, che la
+  maggior parte degli ordini di una settimana è ancora in viaggio.
+  TOP 3: i pezzi per annuncio con una UNION fra la TESTATA (i mono,
+  `annuncio_id<>0`) e `ordine_righe` (i set) — i mono non hanno righe
+  MAI, quindi guardare le sole righe perderebbe quasi tutto. Il titolo
+  delle righe è quello FOTOGRAFATO all'acquisto; per i mono arriva dal
+  JOIN, e un annuncio sparito esce dal conto invece di comparire senza
+  nome. Pareggio su `annuncio_id DESC`: senza, due articoli con gli
+  stessi pezzi si scambierebbero di posto a ogni lunedì.
+  IL SILENZIO: sotto `RIEPILOGO_MINIMO` (3) annunci nuovi **e** zero
+  ordini non esce niente — un riepilogo che dice «0 ordini» fa più
+  danno del silenzio. I titoli passano da `html.escape`, che qui sono
+  tre in un colpo solo.
+  NIENTE LINK AL CANALE DENTRO L'APP (decisione di Andrea): il canale
+  per ora è il suo banco di prova — dentro c'è solo lui, e prima vuole
+  guardarlo. Nessuna fascia, nessun invito, e la strada per farlo il
+  giorno che servirà è quella già in casa di `renderFasciaTest`, che
+  dentro Telegram sa aprire anche gli inviti `t.me/+…`.
   IL BOT CHE SFOGLIA, MA LA MINI APP VIENE PRIMA (ago 2026, decisione
   di Andrea): `/start` non elenca comandi — un invito solo e il
   bottone che lo esaudisce, perché nella Mini App si compra e si paga
@@ -14000,6 +14123,47 @@ la prova in browser NON sono stati fatti. DA FARE al primo deploy: un
 ordine vero al punto con un QR caricato dentro Telegram — che
 l'immagine si veda in pagina sul telefono del compratore, e che il PDF
 finisca fra i suoi file.
+Il canale diventa la vetrina (ago 2026, chiesto da Andrea insieme al
+canale «Barattolo Vetrina»): tutti gli annunci nuovi nel canale invece
+di uno per venditore a settimana, gli sconti lampo raccontati lì, e il
+riepilogo del lunedì con annunci, ordini e i tre più venduti. Le
+quattro decisioni: UN canale solo (non un secondo posto da tenere
+allineato), freno spento ma col ritmo che si stringe **dal bot** e non
+dal config (`/vetrina tutto | giorno | settimana`), riepilogo pubblico
+che tace se la settimana è magra, e NIENTE link al canale dentro l'app
+— lì dentro per ora c'è solo Andrea, e prima vuole guardarlo. Vedi
+Architettura, «IL RITMO LO DECIDE IL BOT», per il nome-non-i-numeri nel
+database, per il freno che si RICEVE invece di rileggerlo a metà
+drenaggio, e per le due imperfezioni dichiarate (il post della lampo
+senza ✅ se l'annuncio si vende, e il turno del riepilogo che si consuma
+anche quando tace — che è il contrario del termometro).
+Collaudato: 2961 prove verdi in `prove.py` (erano 2794 — le pure dei
+giudici, il recinto delle impostazioni diventato un CENSIMENTO delle
+chiavi, l'elenco di chi parla col canale che ora si NOMINA invece di
+contarsi, `_conta_settimana` su un database di cartone coi mono **e** i
+set insieme, e il riepilogo girato DAVVERO tre volte su tre ambienti
+diversi con lo stesso database sotto — tre deploy, un post solo) più
+**VENTUNO MUTAZIONI**, una per riga sorvegliata, ognuna rossa da sola.
+LA TORTURA HA TROVATO TRE BUCHI VERI, ed è la parte da tenere: la
+soglia dell'aggregato che non era verificata da nessuna prova, la UNION
+dei set che si poteva togliere in silenzio, e — la peggiore — il
+pannello delle leve, dove il commento dello stub PROMETTEVA il
+controllo del ritmo effettivo e nessuna asserzione lo faceva. Più un
+collaudo eseguibile su DB usa-e-getta (27 verdi) che fa girare il
+drenatore VERO e `promo_lampo` VERA: due venditori a «settimana» → due
+post, tre a «tutto» → tre, quattro in una finestra → l'aggregato che
+non nomina nessuno, il negozio in ferie e l'importato che restano
+fuori, e il titolo cattivo che esce scappato coi grassetti pari.
+NON COLLAUDATO QUI: manca `fastapi`, quindi il giro col server acceso
+non si è fatto (il comando `/vetrina` è stato però eseguito sul pezzo
+vero, coi quattro casi e l'estraneo che non cambia niente).
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione — la
+tabella `impostazioni` e quella dei `timbri` esistono già, e le tre
+leve nuove hanno il default nel codice. POI, NELL'ORDINE: il bot
+amministratore del canale, `/canale -1003975076313` (deve arrivare il
+messaggio di prova), `/vetrina` per vedere dov'è, `/vetrina tutto`, e
+un annuncio vero da guardare. DA GUARDARE il primo lunedì: il
+riepilogo, **una volta sola** anche con un deploy in mezzo.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
