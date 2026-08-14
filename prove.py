@@ -8202,16 +8202,74 @@ def prove_pagina_acquisto():
     #    le misure di viewport mentono, e sticky occupa layout: a fine
     #    scorrimento l'ultima riga del conto non e' mai coperta) — con
     #    la safe-area SUA e il padding-bottom del corpo a zero, o a
-    #    fine pagina ci sarebbero due safe-area impilate. SOLO la
-    #    pagina Paga: il riepilogo del pacco tiene il fondo di sempre.
+    #    fine pagina ci sarebbero due safe-area impilate.
+    #    DALL'AGO 2026 LO EREDITA ANCHE IL CARRELLO, che questa pagina
+    #    se l'e' presa: qui c'era «SOLO la pagina Paga: il riepilogo
+    #    del pacco tiene il fondo di sempre», e quella riga e' morta
+    #    con la vista che nominava. Al suo posto il fatto nuovo, che e'
+    #    l'affermazione piu' forte: di fondi appiccicati ce n'e' UNO in
+    #    tutto il foglio — una prova sulla vista che non esiste piu'
+    #    sarebbe una che non puo' fallire.
     prova("il fondo di Paga e' appiccicato (sticky, mai fixed)", True,
           "#view-acquisto .ctrl-fondo{position:sticky" in mini3)
     prova("...con la safe-area sua e il corpo senza doppio fondo", True,
           "#view-acquisto .ctrl-corpo{padding-bottom:0}" in mini3
           and mini3.count("#view-acquisto .ctrl-fondo{position:sticky;"
                           "bottom:0") == 1)
-    prova("...e il riepilogo del pacco tiene il fondo di sempre", False,
-          "#view-controllapacco .ctrl-fondo{position:sticky" in mini3)
+    prova("...ed e' l'unico fondo appiccicato del client", 1,
+          mini3.count(".ctrl-fondo{position:sticky"))
+    #    LA CASSA E' UNA SOLA E SERVE I DUE ACQUISTI (ago 2026): il
+    #    carrello ci arriva diritto, e quel che e' SUO — i due
+    #    secondari e il bottone che riporta a comporre — vive gated su
+    #    d.tipo==='set'. Non basta contare i frammenti: si chiede che
+    #    la condizione sia nella stessa const, o domani ne nasce uno
+    #    che compare anche sul singolo.
+    _rac = pezzo_js(mini3, "function renderAcquisto(){", "\n}")
+    prova("i secondari sono del solo carrello", True,
+          "const secondari = d.tipo==='set'" in _rac)
+    prova("...e ci sono tutti e due", True,
+          'onclick="ctrlChiediInfo()"' in _rac
+          and "onclick=\"go('offertapresto')\"" in _rac)
+    #    IL BOTTONE CHE RIPORTA AL CARRELLO: solo sul carrello, e solo
+    #    con un invito APERTO — sotto un «✅ Sconto −10%» sarebbe un
+    #    invito a fare una cosa che non serve (decisione di Andrea).
+    prova("il «torna al carrello» e' del solo carrello, e solo con un"
+          " invito aperto", True,
+          "const tornaCarrello = (d.tipo==='set'"
+          " && pillole.includes('pill-barra'))" in _rac)
+    prova("...e sul singolo non nasce mai", 1,
+          _rac.count("tornaCarrello = "))
+    #    IL ⚡ RESTA DEL SOLO SINGOLO: il set paga dal paySheet (il suo
+    #    confermaSetSubito e' morto col foglio del riepilogo). La
+    #    regola viveva nel codice senza nessuna sentinella, e dopo la
+    #    fusione e' una riga che si puo' rompere senza accorgersene.
+    prova("il ⚡ Compra subito resta del solo singolo", True,
+          "d.tipo==='mono' && !DEMO && !VETRINA && walletNwc()" in _rac)
+    #    IL CARRELLO POTATO RIFA' IL CONTO (ago 2026): rileggiVenditore
+    #    MUTA setScelte, e renderAcquisto disegna dalla CACHE — senza
+    #    questa riga si vedrebbero due articoli a schermo e tre nel
+    #    totale. Prima era la cache per firma del riepilogo a salvare
+    #    la faccia; da quando quella pagina non c'e' piu', tocca qui.
+    #    E la soglia e' DUE: il set a una riga il server lo rifiuta.
+    _rs = pezzo_js(mini3, "async function rinfrescaSet(){", "\n}")
+    prova("il carrello potato rifa' il conto", True,
+          "caricaPreventivo()" in _rs)
+    prova("...e sotto i due articoli esce invece di restare", True,
+          "setScelte.size < 2" in _rs and "navIndietro()" in _rs)
+    #    LA PROVENIENZA SI RIALLINEA PRIMA DEL CONTO: currentListing
+    #    puo' essere rimasto su un annuncio di un ALTRO venditore (le
+    #    celle del carrello sono card, e il tocco apre il dettaglio), e
+    #    rinfrescaSet legge proprio lui per rileggere il negozio. La
+    #    riga arriva da controllaPacco, che non esiste piu': senza,
+    #    dopo un 409 si poterebbe il pacco col catalogo sbagliato.
+    _aas = pezzo_js(mini3, "function apriAcquistoSet(){", "\n}")
+    prova("la provenienza si riallinea prima del conto", True,
+          "currentListing = orig" in _aas)
+    #    IL RIENTRO E' ISTANTANEO: la cassa si apre e si chiude mentre
+    #    si compone, e la firma dice se il conto in mano e' ancora
+    #    quello — e' quel che la cache del riepilogo dava gia'.
+    prova("...e il rientro a composizione ferma non richiede il conto",
+          True, "acqDati.firma === f && acqDati.preventivo" in _aas)
     #    E L'UNITARIO RESTA IL PIENO col tag della regola quando lo
     #    sconto scatta (la via (c)): mai un numero unitario scontato —
     #    non esiste come intero e non torna moltiplicando — e mai un
@@ -8281,12 +8339,28 @@ def prove_pagina_acquisto():
     prova("consegnaEsplicita non si scrive piu'", False,
           "consegnaEsplicita =" in mini)
     # l'ordine nasce solo dai varchi noti: startBuy, startBuySet e
-    # confermaCompraSubito — piu' i due lettori del preventivo
+    # confermaCompraSubito — piu' l'UNICO lettore del preventivo
     prova("tre POST /orders (i varchi di sempre)", 3,
           mini.count("fetch(`${API_BASE}/orders`"))
-    prova("due lettori del preventivo (pagina e pacco)", 2,
+    # UN CONTO SOLO (ago 2026, il cantiere della cassa): i lettori del
+    # preventivo erano DUE — caricaPreventivo e caricaPreventivoPacco,
+    # col riepilogo che teneva la sua cache per firma — e adesso e'
+    # uno. E' la sentinella piu' preziosa del cantiere: certifica che
+    # non sia rinato un secondo posto che chiede il conto.
+    prova("un lettore solo del preventivo", 1,
           mini.count("fetch(`${API_BASE}/orders/preventivo`"))
+    prova("...e il secondo non e' tornato", (False, False),
+          ("function caricaPreventivoPacco" in mini, "ctrlPrev =" in mini))
     prova("la vista nuova esiste", True, 'id="view-acquisto"' in mini)
+    # LA PAGINA DEL RIEPILOGO NON ESISTE PIU' (ago 2026): il carrello
+    # pagava in tre pagine e quella di mezzo non decideva niente.
+    prova("il riepilogo del carrello non esiste piu'",
+          (False, False, False),
+          ('id="view-controllapacco"' in mini,
+           "function renderControlla" in mini,
+           "function controllaPacco(" in mini))
+    prova("...e il carrello entra dalla porta della cassa", True,
+          'id="paccoControlla" onclick="apriAcquistoSet()"' in mini)
     prova("il varco-mappa e' dichiarato dove andra' la mappa", True,
           "VARCO MAPPA" in mini)
     prova("il punto passa da esc() alla resa", True,
@@ -9021,7 +9095,9 @@ def prove_forma_sconto_pacco():
           "if (m === null || m === undefined" in _gi and "continue;" in _gi)
     prova("...e UNA sola frase pubblica", 1,
           mini.count("function frasePromessaSconto("))
-    prova("i lettori del preventivo restano due", 2,
+    # era «restano due» finche' il carrello aveva un riepilogo suo col
+    # suo caricatore: dall'ago 2026 il conto si chiede in un posto solo
+    prova("il lettore del preventivo resta uno", 1,
           mini.count("fetch(`${API_BASE}/orders/preventivo`"))
     prova("il giudice del ≈ resta UNO anche col meno", 1,
           mini.count("function cifraCtrl"))
@@ -15100,8 +15176,11 @@ def prove_promesse_badge():
     # coi marcatori): l'ordine reso lo decide la sola composizione.
     prova("la fila di Paga dice PRIMA la spedizione", True,
           "pillaSg + pillaSc" in _ra)
+    # fra la fila e le vie si e' infilato il bottone che riporta al
+    # carrello (ago 2026): e' la RISPOSTA all'invito, e sta sotto di
+    # lui — «il badge dice la cosa, il bottone da' la strada»
     prova("...e sta SOPRA la riga della consegna", True,
-          "${fila}${vie}" in _ra)
+          "${fila}${tornaCarrello}${vie}" in _ra)
     prova("in «Altri oggetti» la spedizione viene prima", True,
           _ao.index("sgOk ? `<span") < _ao.index("scOk.length ? `<span"))
     prova("nel carrello la scatola della spedizione sta sopra", True,
@@ -15188,7 +15267,11 @@ def prove_promesse_badge():
     # venditore»), non piu' il modello.
     prova("la testata del carrello e' appiccicata", True,
           ".pacco-appiccicato{position:sticky" in mini)
-    _vp = mini[mini.index('id="view-pacco"'):mini.index('id="view-controllapacco"')]
+    # l'ancora di coda era id="view-controllapacco", la vista che dal
+    # cantiere della cassa non esiste piu': adesso e' la cassa, che nel
+    # file segue subito il carrello. E' una fetta, quindi se l'ancora
+    # sparisce questa non diventa rossa: ESPLODE.
+    _vp = mini[mini.index('id="view-pacco"'):mini.index('id="view-acquisto"')]
     prova("...e testata e badge stanno DENTRO il blocco", True,
           _vp.index('class="pacco-appiccicato"')
           < _vp.index('class="pacco-testa"')
@@ -15285,6 +15368,20 @@ def prove_promesse_badge():
     # globale a zero, qui sopra.)
     prova("il badge scattato del carrello e' nudo", True,
           '>✅ Sconto <b>−${s.pct}%</b></span>' in _in)
+    # E IL CARRELLO PARLA LA LINGUA DELLA CASSA (ago 2026, decisione di
+    # Andrea col cantiere della cassa): la spedizione scattata portava
+    # il 🚚 dove la gemella dello sconto porta il ✅ — due emoji per lo
+    # stesso grado di fatto, nella stessa fila — e l'invito spezzava il
+    # grassetto («→ spedizione <b>gratis</b>» contro il
+    # «→ <b>spedizione gratis</b>» di Paga). Le due superfici divergono
+    # nella forma, mai nella lingua.
+    _sg2 = pezzo_js(mini, "function aggiornaInvitoSpedGratis(tot){", "\n}")
+    prova("la spedizione scattata del carrello dice ✅ come lo sconto",
+          True, '>✅ Spedizione <b>gratis</b></span>' in _sg2)
+    prova("...e il vecchio 🚚 della scattata non c'e' piu'", False,
+          '>🚚 Spedizione <b>gratis</b></span>' in _sg2)
+    prova("...e l'invito porta il grassetto intero, come in Paga", True,
+          "→ <b>spedizione gratis</b></span>" in _sg2)
     # ---- 6bis. LA BARRA E IL TOTALE SCONTATO DEL CARRELLO (13 ago
     # 2026, decisione di Andrea: il carrello parla la lingua di Paga
     # per intero). Il giudice dello scatto e' UNO (statoScontoPacco):

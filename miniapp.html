@@ -1741,11 +1741,21 @@
     #barraPacco{max-width:960px}
   }
 
-  /* ---------- la pagina «Controlla il pacco» (ago 2026) ----------
-     Il riepilogo del set, da foglio a pagina intera: testata coi
-     francobolli degli articoli, scelta della consegna, il conto in
-     righe col totale evidenziato, e in fondo Acquista coi due
-     secondari. Nessun token nuovo: pillole, unit e mono di casa. */
+  /* ---------- la CASSA: la pagina d'acquisto (ago 2026) ----------
+     Una vista sola per i due acquisti: il singolo e il carrello.
+     Testata, articoli (card col suo stepper sul singolo, striscia di
+     francobolli sul carrello), scelta della consegna, il conto in
+     righe col totale evidenziato, e in fondo Paga — coi due secondari
+     quando si compra un carrello. Nessun token nuovo: pillole, unit e
+     mono di casa.
+     LA VISTA DEL RIEPILOGO NON ESISTE PIU' (ago 2026): il carrello
+     pagava in tre pagine (composizione → riepilogo → Paga) e quella di
+     mezzo non decideva niente — diceva il conto della strada piu'
+     economica e rimandava. Adesso da «Controlla e paga» si arriva
+     DIRITTI qui, e questa pagina fa tutte e due le cose. Le regole
+     .ctrl-* sono restate col loro nome: sono il vestito della cassa,
+     non il nome di una vista (il patto dei nomi interni del carrello,
+     che si chiamano ancora «pacco»). */
   /* I BOTTONI IN FONDO ALLA PAGINA, PER COSTRUZIONE (ago 2026, dal
      feedback di Andrea: la prima versione sottraeva una costante
      stimata dall'altezza e i bottoni restavano a mezz'aria). La
@@ -1756,7 +1766,7 @@
      (le barre dei browser mobili), vh come ripiego; il padding in
      basso porta la safe-area della gesture bar. Su schermi corti i
      bottoni seguono il contenuto, mai coperti. */
-  #view-controllapacco.active,#view-acquisto.active{display:flex;
+  #view-acquisto.active{display:flex;
     flex-direction:column;min-height:calc(100vh / var(--fs-zoom,1));
     min-height:calc(100dvh / var(--fs-zoom,1))}
   .ctrl-corpo{padding:6px var(--pad) calc(26px + env(safe-area-inset-bottom));
@@ -1778,8 +1788,11 @@
      margin-bottom del conto. Fondo opaco con blur, riga di confine e
      safe-area sono DELLA BARRA (il pattern di #barraPacco e della
      nav), e il padding-bottom del corpo passa a lei — o a fine pagina
-     ci sarebbero due safe-area impilate. SOLO la pagina Paga: il
-     riepilogo del pacco tiene il fondo di sempre. */
+     ci sarebbero due safe-area impilate. E' l'UNICO fondo appiccicato
+     del client: dall'ago 2026 lo eredita anche il carrello, che questa
+     pagina se l'e' presa (prima il suo riepilogo teneva il fondo in
+     flusso — col carrello i bottoni diventano tre, e il conto sta
+     comodamente sotto i 176px che il ⚡ NWC porta gia' oggi). */
   #view-acquisto .ctrl-corpo{padding-bottom:0}
   #view-acquisto .ctrl-fondo{position:sticky;bottom:0;z-index:5;
     background:var(--nav-bg);backdrop-filter:blur(10px);
@@ -1789,7 +1802,7 @@
   @media (min-width:768px){
     /* da desktop #app porta 76px di topbar sopra e 40 sotto: la
        colonna li sconta, o la pagina scrollerebbe sempre di 116px */
-    #view-controllapacco.active,#view-acquisto.active{
+    #view-acquisto.active{
       min-height:calc(100vh / var(--fs-zoom,1) - 116px)}
   }
   /* la testata: il conteggio a sinistra non si stringe mai, i
@@ -1856,6 +1869,11 @@
      di Applica/Azzera: col basis 0 i bordi si sommano fuori) */
   .ctrl-secondari{display:flex;gap:10px;margin-top:10px}
   .ctrl-secondari .btn{margin-top:0;flex:1 1 50%;font-size:14px}
+  /* la risposta all'invito che sta appena sopra: la strada per tornare
+     a comporre. Corpo dei secondari (14px) perche' a 320px la frase
+     intera stia su una riga, e un filo d'aria in piu' sopra per
+     staccarla dalla fila delle promesse — e' un'altra cosa da loro */
+  .torna-carrello{font-size:14px;margin-top:12px}
   /* le vie della pagina d'acquisto: bottoni-radio col totale in mono
      a destra. Solo token di tema (chiaro/scuro gratis); l'unita' non
      si colora mai — la cifra passa da cifraCtrl col suo .unit */
@@ -2089,8 +2107,8 @@
        un buco sotto i bottoni: via, o il fondo non e' il fondo */
     body.senza-nav #app{padding-bottom:0}
   }
-  /* la pagina d'acquisto e' una cassa come il riepilogo del pacco:
-     stessa classe senza-nav, accesa da go() anche per lei */
+  /* la cassa (view-acquisto) porta la stessa classe senza-nav: e' una
+     cassa e non una vetrina, e Paga vive in pagina */
 
   /* ---------- dettaglio annuncio ---------- */
   /* (la forma rettangolare dei bottoni del dettaglio vive ora accanto
@@ -2168,8 +2186,9 @@
   .altri-promo{margin:6px 0 0}
   .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
   /* (Il foglio del set — #setLista, .set-riga, .set-check — non esiste
-     piu': il riepilogo e' la PAGINA «Controlla il pacco», vedi il suo
-     blocco CSS accanto a quello della pagina del pacco.) */
+     piu', e nemmeno la pagina del riepilogo che l'aveva sostituito: il
+     carrello si paga nella CASSA, vedi il suo blocco CSS accanto a
+     quello della pagina del pacco.) */
   .detail-price{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);
     font-weight:700;font-size:28px;margin:10px 0 2px}
   /* qui solo la MISURA: il colore lo mette il `.unit` nudo, una
@@ -3645,9 +3664,10 @@ document.getElementById('cartello')?.remove();</script>
        Aggiungi/Rimuovi sotto ogni card e la spunta verde sulla foto.
        La ✕ e il gesto indietro riportano al dettaglio di provenienza;
        la barra fissa in basso (#barraPacco, gemella di #barraCompra)
-       porta il totale dei soli articoli e «Controlla il carrello», che
-       dall'ago 2026 apre la PAGINA del riepilogo (view-controllapacco):
-       consegna, spedizione al MAX, stima taglia e conto vivono la'. -->
+       porta il totale dei soli articoli e «Controlla e paga», che
+       dall'ago 2026 apre DIRITTO la cassa (view-acquisto, modalita'
+       set): consegna, spedizione e conto vivono la', e di la' si
+       paga — il riepilogo di mezzo non esiste piu'. -->
   <div class="view" id="view-pacco">
     <!-- Testata e badge APPICCICATI in cima (12 ago 2026, decisione di
          Andrea): i numeri dei badge cambiano a ogni «Aggiungi», e chi
@@ -3690,62 +3710,33 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
   </div>
 
-  <!-- ============ VISTA: CONTROLLA IL PACCO (ago 2026) ============
-       Il riepilogo del set, da foglio a pagina intera (il vecchio
-       #setSheet non esiste piu'). Dall'alto: testata col conteggio e i
-       francobolli degli articoli scelti, la scelta della consegna
-       sull'intersezione delle strade del pacco, il conto in righe —
-       con la riga «Commissione» che esiste per dire che
-       oggi e' in promo — e in fondo Acquista coi due secondari.
-       La composizione NON si tocca qui: si torna alla pagina del
-       pacco col gesto indietro, selezione intatta. Il contenuto lo
-       scrive renderControlla(); la ← e' navIndietro come ovunque. -->
-  <div class="view" id="view-controllapacco">
-    <div class="pacco-testa">
-      <button type="button" class="pacco-x" onclick="navIndietro()" title="Torna al carrello" aria-label="Torna al carrello">←</button>
-      <div class="pacco-tit"><b>Controlla il carrello</b><span class="eur-hint" id="ctrlSub"></span></div>
-      <!-- il toggle €/₿ in alto a destra, come nella pagina del pacco:
-           stessa preferenza, si accendono insieme via data-cur -->
-      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
-        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
-        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
-      </div>
-    </div>
-    <div class="ctrl-corpo">
-      <div class="ctrl-articoli"><b id="ctrlConta"></b><div class="ctrl-strip" id="ctrlStrip"></div></div>
-      <div class="section-label">Consegna</div>
-      <div class="consegna-scelta" id="ctrlConsegna" style="margin-top:8px"></div>
-      <div class="section-label">Il conto</div>
-      <div class="ctrl-conto" id="ctrlConto"></div>
-      <!-- niente stima taglia e niente nota verde (decisione di
-           Andrea): la pagina dice il conto e basta, e i bottoni
-           scendono in fondo (.ctrl-fondo col margin-top:auto) -->
-      <div class="ctrl-fondo">
-        <!-- Acquista porta alla PAGINA D'ACQUISTO (ago 2026): la
-             scelta della consegna e il conto della strada vivono la',
-             l'ordine nasce solo da la' -->
-        <button class="btn orange" id="ctrlAcquista" onclick="apriAcquistoSet()">Acquista</button>
-        <div class="ctrl-secondari">
-          <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
-          <button type="button" class="btn ghost" onclick="go('offertapresto')">Fai un'offerta</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ VISTA: LA PAGINA D'ACQUISTO (ago 2026) ============
+  <!-- ============ VISTA: LA CASSA (ago 2026) ============
        L'ordine nasce SOLO da qui (salvo le aste, che hanno gia'
-       pagato). Dall'alto: gli articoli, la CONSEGNA a strade col
-       totale per pillola (ritiro / casa / punto di ritiro / codice
-       online — solo quelle offerte), il campo del punto, il CONTO del
-       SERVER (POST /orders/preventivo: il client mostra, mai
-       calcola), Acquista in fondo. Il contenuto lo disegna
-       renderAcquisto() da acqDati: qui solo la testata, il pattern
-       del riepilogo del pacco. -->
+       pagato), e da qui passano TUTTI E DUE gli acquisti: il singolo e
+       il carrello. Dall'alto: gli articoli, la CONSEGNA a strade col
+       costo per pillola (ritiro / casa / punto di ritiro / codice
+       online — solo quelle offerte), il campo del punto e quello
+       dell'indirizzo, il CONTO del SERVER (POST /orders/preventivo: il
+       client mostra, mai calcola), Paga in fondo.
+       IL CARRELLO NON HA PIU' UNA PAGINA SUA (ago 2026, decisione di
+       Andrea): il riepilogo «Controlla il carrello» era un passo che
+       non decideva niente — mostrava il conto della strada piu'
+       economica e rimandava qui per la scelta vera — e adesso e'
+       QUESTA la sua ultima pagina prima del pagamento. Il titolo lo
+       scrive renderAcquisto (#acqTit), che sul carrello dice ancora
+       «Controlla il carrello»: e' quel che il bottone promette, e la
+       pagina fa tutte e due le cose.
+       LA PAGINA PAGA RESTA PER IL SINGOLO, e il perche' e' che li'
+       serve anche a COMPORRE: c'e' lo stepper della quantita' e i
+       badge delle promesse invitano ad alzarla. Nel carrello quella
+       fase e' gia' avvenuta, quindi qui gli articoli non si toccano —
+       si torna indietro col bottone sotto le promesse, o con la ←.
+       Il contenuto lo disegna renderAcquisto() da acqDati: qui solo la
+       testata. -->
   <div class="view" id="view-acquisto">
     <div class="pacco-testa">
       <button type="button" class="pacco-x" onclick="navIndietro()" title="Torna indietro" aria-label="Torna indietro">←</button>
-      <div class="pacco-tit"><b>Acquista</b><span class="eur-hint" id="acqSub"></span></div>
+      <div class="pacco-tit"><b id="acqTit">Acquista</b><span class="eur-hint" id="acqSub"></span></div>
       <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
         <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
         <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
@@ -3755,12 +3746,14 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- ============ VISTA: L'OFFERTA SUL PACCO, PRESTO (ago 2026) ====
-       «Fai un'offerta» dal riepilogo porta qui: l'offerta sull'intero
+       «Fai un'offerta» dalla cassa porta qui: l'offerta sull'intero
        set e' un cantiere futuro, e una pagina che lo dice e' piu'
        onesta di un bottone che non c'e'. Lo stile e' quello del
        coming soon delle aste: markup fisso, nessun dato utente,
        .empty con la mascotte — chiaro e scuro gratis. Vista interna
-       (non radice): l'indietro riporta al riepilogo. -->
+       (non radice): l'indietro riporta alla cassa, e il bottone dice
+       «Torna indietro» invece di nominare il carrello — da qui si
+       torna al conto, non alla composizione. -->
   <div class="view" id="view-offertapresto">
     <div class="empty" style="padding-top:34px">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -3768,7 +3761,7 @@ document.getElementById('cartello')?.remove();</script>
       <b class="empty-title">L'offerta sul carrello sta arrivando</b>
       <span>Presto potrai proporre il tuo prezzo per l'intero carrello.<br>
         Sui singoli oggetti puoi già farlo, dalla loro scheda.</span>
-      <button class="btn orange" onclick="navIndietro()">← Torna al carrello</button>
+      <button class="btn orange" onclick="navIndietro()">← Torna indietro</button>
     </div>
   </div>
 
@@ -4331,15 +4324,17 @@ document.getElementById('cartello')?.remove();</script>
   <!-- La barra della pagina del pacco (ago 2026): gemella di
        #barraCompra per posizione e carta, ma qui il conto e' dei SOLI
        articoli — niente consegna e niente spedizione, che entrano
-       nella pagina del riepilogo. Solo totale e bottone: il toggle
+       nella cassa. Solo totale e bottone: il toggle
        €/₿ sta in testa alla pagina (deciso da Andrea, qui rubava
        spazio al numero). -->
   <div id="barraPacco">
     <div class="pacco-somma"><span class="pacco-viva"><b class="mono" id="paccoTot"></b><span class="sconto-tag" id="paccoTag"></span></span><s class="mono" id="paccoPieno"></s><span id="paccoConta"></span></div>
-    <!-- «Controlla e paga» (ago 2026, decisione di Andrea): il bottone
-         porta al riepilogo PRIMA di pagare, e il nome dice la sequenza —
-         Aggiungi al carrello → Controlla e paga → Paga. -->
-    <button class="btn orange" id="paccoControlla" onclick="controllaPacco()">Controlla e paga</button>
+    <!-- «Controlla e paga» (ago 2026, decisione di Andrea): il nome
+         dice la sequenza — Aggiungi al carrello → Controlla e paga.
+         L'ETICHETTA E' RESTATA E DAL CANTIERE DELLA CASSA E' PIU' VERA
+         DI PRIMA: porta alla pagina dove si controlla E si paga, non
+         piu' a un riepilogo che rimandava di un passo. -->
+    <button class="btn orange" id="paccoControlla" onclick="apriAcquistoSet()">Controlla e paga</button>
   </div>
 
   <nav>
@@ -4691,8 +4686,8 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- (Il foglio #setSheet «Riempi il barattolo» non esiste piu' —
-       ago 2026: il riepilogo del set e' la pagina «Controlla il
-       pacco», view-controllapacco.) -->
+       ago 2026 — e nemmeno la pagina del riepilogo che l'aveva
+       sostituito: il carrello si paga nella cassa, view-acquisto.) -->
 
   <!-- ============ SHEET INVITO (vetrina dal browser) ============ -->
   <div class="sheet" id="invitoSheet">
@@ -5775,7 +5770,7 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
    dove sei, e «dove sei» e' la strada che hai fatto. */
 function voceNav(view){
   if (['dettaglio','negozio','sicurezza','pacco',
-       'controllapacco','acquisto','offertapresto'].includes(view)) view = 'esplora';
+       'acquisto','offertapresto'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
@@ -5860,11 +5855,9 @@ function go(view){
      totale (il CSS decide dove: sotto i 768 sostituisce la nav, da
      desktop convive con la topbar) */
   document.body.classList.toggle('con-pacco', view==='pacco');
-  /* Nel riepilogo del pacco e nella pagina d'acquisto la tab bar
-     sparisce e basta: sono casse, non vetrine, e Acquista vive in
-     pagina */
-  document.body.classList.toggle('senza-nav',
-    view==='controllapacco' || view==='acquisto');
+  /* Nella cassa la tab bar sparisce e basta: e' una cassa, non una
+     vetrina, e Paga vive in pagina */
+  document.body.classList.toggle('senza-nav', view==='acquisto');
   /* la griglia si rifa' SOLO quando l'ordine per numero e' cambiato
      — rifarla a ogni entrata ricreerebbe 27 <img> per nulla, e
      mentre la si guarda non si riordina mai */
@@ -6035,10 +6028,7 @@ function navVista(){
                     : v==='ordine'    ? (currentOrder?.id || 0)
                     : v==='negozio'   ? (negozioPag.chi || '')
                     : v==='pacco'     ? (paccoDati?.origineId || 0)
-                    /* il riepilogo appartiene allo stesso pacco: la
-                       chiave e' la sua, e con lei la ricostruzione */
-                    : v==='controllapacco' ? (paccoDati?.origineId || 0)
-                    /* la pagina d'acquisto: l'annuncio per il mono,
+                    /* la cassa: l'annuncio per il mono,
                        il pacco per il set */
                     : v==='acquisto'  ? (!acqDati ? 0
                         : acqDati.tipo==='set'
@@ -6109,14 +6099,6 @@ function navRendiVista(b){
        spacciato per quello di prima */
     if (paccoDati && paccoDati.origineId===b.k
         && listings.some(x=>x.id===b.k)) { renderPacco(); return go('pacco'); }
-    return go('esplora');
-  }
-  if (b.v === 'controllapacco') {
-    /* stessa guardia del pacco, piu' una: senza almeno un articolo
-       scelto il conto non ha niente da dire */
-    if (paccoDati && paccoDati.origineId===b.k && setScelte.size
-        && listings.some(x=>x.id===b.k))
-      { renderControlla(); return go('controllapacco'); }
     return go('esplora');
   }
   if (b.v === 'acquisto') {
@@ -7508,9 +7490,7 @@ function setValuta(v){
   aggiornaPrezzoDettaglio();   // se una scheda e' aperta, segue anche lei
   /* e la pagina del pacco: card e totale della barra parlano valutaVista */
   if (el('view-pacco')?.classList.contains('active')) renderPacco();
-  /* e il riepilogo del pacco: il conto segue il toggle */
-  if (el('view-controllapacco')?.classList.contains('active')) renderControlla();
-  /* e la pagina d'acquisto: si ridisegna dal preventivo in CACHE —
+  /* e la cassa: si ridisegna dal preventivo in CACHE —
      il toggle e' una conversione di vista, mai un secondo fetch */
   if (el('view-acquisto')?.classList.contains('active')) renderAcquisto();
   /* e il foglio dell'offerta, se e' aperto: li' il toggle cambia
@@ -8916,8 +8896,9 @@ async function caricaAltriOggetti(){
    Piu' annunci DIVERSI dello stesso venditore in un ordine solo: una
    invoice, UNA spedizione (il MAX dei costi dichiarati), una conferma.
    Dall'ago 2026 la COMPOSIZIONE vive nella pagina del pacco (vedi
-   apriPacco piu' sotto) e il RIEPILOGO nella pagina «Controlla il
-   pacco» (renderControlla, il foglio #setSheet non esiste piu'):
+   apriPacco piu' sotto) e si paga nella CASSA (renderAcquisto in
+   modalita' set — ne' il foglio #setSheet ne' la pagina del riepilogo
+   esistono piu'):
    pillole di consegna sull'INTERSEZIONE delle strade fisiche, conto
    in righe col totale della matematica di totaleStima estesa. Il
    digitale e gli annunci senza modalita' restano fuori (cella spenta
@@ -9029,111 +9010,15 @@ function stimaTagliaSet(){
   return punti<=1 ? 'busta' : punti<=4 ? 'piccolo'
        : punti<=12 ? 'medio' : punti<=26 ? 'grande' : 'ingombrante';
 }
-/* ---------------- la pagina «Controlla il pacco» (ago 2026) --------
-   Il riepilogo del set, da foglio a pagina intera. La COMPOSIZIONE non
-   si tocca qui — spunte e stepper vivono nella pagina del pacco, e il
-   gesto indietro ci riporta con la selezione intatta — qui si sceglie
-   la strada, si legge il conto e si compra. La riga «Commissione
-   Barattolo» esiste per dire che oggi e' GRATIS (leva sospesa): il
-   giorno che la commissione si accendera', qui c'e' gia' il posto dove
-   scriverla. */
-function renderControlla(){
-  if (!paccoDati || !setScelte.size) return;
-  /* la testata: quanti articoli, e le loro facce in fila (il ×N sul
-     francobollo dice i pezzi della stessa riga) */
-  const pezzi = pezziSet();
-  el('ctrlConta').textContent = `${fmt(pezzi)} articol${pezzi===1?'o':'i'}`;
-  const strip = [];
-  for (const [id, qta] of setScelte){
-    const x = listings.find(t=>t.id===id);
-    if (!x) continue;
-    const t = (x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '';
-    strip.push(`<div class="ctrl-mini" title="${esc(x.title)}">${
-      t ? `<img src="${esc(t)}" alt="">` : `<span>${x.emoji}</span>`}${
-      qta>1 ? `<b class="ctrl-mini-n">×${fmt(qta)}</b>` : ''}</div>`);
-  }
-  el('ctrlStrip').innerHTML = strip.join('');
-  const primo = listings.find(x=>setScelte.has(x.id));
-  el('ctrlSub').textContent = primo ? `di ${primo.seller}` : '';
-  /* La consegna NON si sceglie piu' qui (ago 2026, decisione di
-     Andrea, stile Vinted): la scelta vera vive nella pagina
-     d'acquisto. Qui una riga onesta con le strade del pacco. */
-  const strade = stradeSet();
-  el('ctrlConsegna').innerHTML = `<div class="acq-nota" style="margin-top:2px">${
-    strade.map(v => v==='spedizione' ? '🚚 Spedizione' : '🤝 Ritiro in zona').join(' · ')
-    || '—'} — la scegli al passo dopo, con «Acquista».</div>`;
-  /* (la stima taglia qui non si mostra piu' — decisione di Andrea:
-     resta nell'ordine, dove la scrive il server; stimaTagliaSet e' il
-     gemello client che aspetta, come il vestito appeso di .carton) */
-  /* IL CONTO E' DEL SERVER anche qui (decisione 3 di Andrea): lo
-     stesso preventivo della pagina d'acquisto, mai due conti che
-     possono divergere. Con la scelta ancora aperta l'anteprima e' la
-     strada PIU' ECONOMICA, e la riga lo DICE. In DEMO resta la stima
-     client di totaleSet, dichiarata dal ≈. */
-  const p = ctrlPrev && ctrlPrev.firma===firmaSet() ? ctrlPrev.dati : null;
-  if (!DEMO && p) {
-    const vive = (p.strade||[]).filter(s => !s.cambio_assente);
-    const min = vive.length
-      ? vive.reduce((a, b) => b.totale_sats < a.totale_sats ? b : a) : null;
-    const sped = min ? min.spedizione_sats||0 : 0;
-    const tot = min ? min.totale_sats
-              : p.articolo_sats + (p.protezione_sats||0);
-    el('ctrlConto').innerHTML = contoRighe({
-      /* la riga «Prezzo» dice il LORDO e quella sotto lo sconto, cosi'
-         il conto torna a occhio; il ripiego copre il server di ieri,
-         che il lordo non lo manda */
-      art: p.articolo_lordo_sats || p.articolo_sats,
-      sped, prot: p.protezione_sats||0, tot,
-      circa: (p.stima || (min && min.stima)) ? '≈ ' : '',
-      artEur: p.articolo_lordo_eur || p.articolo_eur || 0,
-      sconto: p.sconto_sats||0, scontoEur: p.sconto_eur||0,
-      spedEur: min ? (min.spedizione_eur||0) : 0,
-      totEur: min ? (min.totale_eur||0) : 0,
-      suppl: min ? (min.supplemento_sats||0) : 0,
-      pezzi: min ? (min.pezzi||0) : 0,
-      /* «gratuita» solo se a costare zero e' una strada che SPEDISCE:
-         qui l'anteprima e' la piu' economica, e con un ritiro in
-         elenco lo zero potrebbe essere il suo — che spedizione non e'.
-         Se una via di spedizione sta a zero, il minimo e' zero pure
-         lui, quindi guardare l'esistenza basta. */
-      spedGratis: vive.some(s => (s.via==='casa' || s.via==='punto')
-                                 && !(s.spedizione_sats||0)),
-      spedLabel: vive.length > 1 ? 'Spedizione (dalla più economica)'
-                                 : 'Spedizione'});
-  } else {
-    el('ctrlConto').innerHTML = contoRighe({...totaleSet(),
-                                            circa: setCirca()});
-    if (!DEMO) caricaPreventivoPacco();   /* arriva e ridisegna */
-  }
-}
-/* Il preventivo del pacco, con la firma della composizione come
-   cache: cambia un pezzo o una quantita' e si richiede, altrimenti
-   mai due volte. Fail-open: senza risposta resta la stima client. */
-let ctrlPrev = null;   // {firma, dati|null}
+/* L'IMPRONTA DELLA COMPOSIZIONE (ago 2026). Nata come cache del
+   preventivo del riepilogo (`ctrlPrev`), gli e' sopravvissuta: da
+   quando il carrello si paga nella cassa serve a dire se il conto in
+   mano e' ancora QUELLO — cioe' se rientrando dal carrello si puo'
+   ridisegnare dalla cache invece di ricomprare l'attesa. Ordina le
+   stringhe e non i numeri: e' deterministica, che e' tutto quel che le
+   si chiede. */
 const firmaSet = () =>
   [...setScelte].map(([id, q]) => id + 'x' + q).sort().join(',');
-async function caricaPreventivoPacco(){
-  const f = firmaSet();
-  if (!f || (ctrlPrev && ctrlPrev.firma === f)) return;
-  ctrlPrev = {firma: f, dati: null};   /* prenota: mai due fetch gemelli */
-  /* con UNA riga il body e' quello MONO (ago 2026): il preventivo-set
-     sotto le due righe lo rifiuta il server per regola, e il riepilogo
-     deve dire comunque il conto del SERVER, mai la stima — le chiavi
-     della risposta sono le stesse e renderControlla non se ne accorge */
-  const righe = [...setScelte].map(([id, qta]) =>
-    ({annuncio_id:id, quantita:qta,
-      offerta_id: offertaAccettataPer(id)?.id || 0}));
-  const body = righe.length === 1 ? righe[0] : {righe};
-  try {
-    const r = await fetch(`${API_BASE}/orders/preventivo`, {method:'POST',
-      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-      body: JSON.stringify(body)});
-    const d = await r.json().catch(()=>({}));
-    if (r.ok && ctrlPrev && ctrlPrev.firma === f) ctrlPrev.dati = d;
-  } catch(e) {}
-  if (el('view-controllapacco')?.classList.contains('active'))
-    renderControlla();
-}
 /* IL GIUDICE DEL «≈» (ago 2026, bug visto dal telefono: il ≈
    compariva su ENTRAMBE le valute). La regola, in UNA funzione e non
    in condizioni sparse — che sono il modo in cui il bug e' nato:
@@ -9158,8 +9043,8 @@ function cifraCtrl(sats, circa, eurNativo, meno){
   }
   return `${sats>0 ? (circa||'') : ''}${m}${fmt(sats)}<span class="unit">sats</span>`;
 }
-/* Le righe del conto — UN vestito per il riepilogo del pacco e la
-   pagina d'acquisto: Prezzo, la commissione in promo, Spedizione
+/* Le righe del conto — UN vestito per i due acquisti della cassa, il
+   singolo e il carrello: Prezzo, la commissione in promo, Spedizione
    (che a costo 0 resta, invece di sparire), la protezione solo
    quando esiste, e il totale evidenziato. artEur/spedEur/totEur sono
    gli euro NATIVI dal server (0 = quella cifra e' nata in sats). */
@@ -9210,7 +9095,10 @@ function contoRighe(c){
     + r('Totale da pagare', cifraCtrl(c.tot, c.circa, c.totEur), 'tot');
 }
 /* «Chiedi info» → la pagina del venditore, coi ponti di contatto che
-   vivono gia' la'. Il codice negozio arriva dagli annunci del pacco. */
+   vivono gia' la'. Il codice negozio arriva dagli annunci del pacco.
+   Il nome porta ancora il ctrl- del riepilogo che l'ha vista nascere:
+   e' il patto dei nomi interni del carrello, che si chiamano «pacco»
+   da sempre — si rinominano i testi, mai le chiavi. */
 function ctrlChiediInfo(){
   haptic();
   const x = listings.find(t=>t.id===paccoDati?.origineId)
@@ -9345,10 +9233,17 @@ function apriAcquistoSet(){
      rifiuta per regola (2..MAX_RIGHE_SET) e la guardia dei soldi non
      si ammorbidisce — ma l'utente col carrello da un articolo deve
      solo poter andare avanti. Quindi da qui si imbocca il binario
-     MONO collaudato: stessa pagina Paga, stesso ordine di sempre
+     MONO collaudato: stessa cassa, stesso ordine di sempre
      (offerte, lampo e ripresa gia' funzionano la'). qtaScelta e' la
      variabile che apriAcquisto legge, lo stesso passamano dello
-     stepper del dettaglio. */
+     stepper del dettaglio.
+     IMPERFEZIONE DICHIARATA (ago 2026, col cantiere della cassa): da
+     quando «Controlla e paga» arriva qui DIRITTO, col carrello a un
+     articolo si atterra sulla pagina del SINGOLO — quindi con lo
+     stepper, senza i due secondari e senza il bottone che riporta al
+     carrello. Prima la deviazione si vedeva dopo il riepilogo, adesso
+     al posto suo. La ← in testata riporta al carrello comunque, e il
+     bottone dell'offerta il singolo ce l'ha nella sua scheda. */
   if (setScelte.size === 1) {
     const [id, qta] = [...setScelte][0];
     const l = listings.find(t=>t.id===id);
@@ -9368,7 +9263,28 @@ function apriAcquistoSet(){
           5000);
     return;
   }
-  acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0,
+  /* LA PROVENIENZA SI RIALLINEA PRIMA DEL CONTO, ed e' una riga che
+     sembra inutile e non lo e' (ereditata da controllaPacco, che
+     dall'ago 2026 non esiste piu'): girando per l'app currentListing
+     puo' essere rimasto su un annuncio di un ALTRO venditore — le
+     celle del carrello sono card, e il tocco apre il dettaglio — e
+     rinfrescaSet legge proprio lui per rileggere il negozio. Senza,
+     dopo un 409 si andrebbe a potare il pacco col catalogo del
+     venditore sbagliato. */
+  const orig = listings.find(x=>x.id===paccoDati?.origineId);
+  if (orig) currentListing = orig;
+  /* IL RIENTRO E' ISTANTANEO (ago 2026): la cassa si apre e si chiude
+     mentre si compone, e ricomprare l'attesa del conto a ogni giro
+     sarebbe una regressione su quel che il riepilogo dava gia' con la
+     sua cache. Se la composizione non e' cambiata (stessa firma) e un
+     conto ce l'abbiamo, si ridisegna e basta — mai un secondo fetch. */
+  const f = firmaSet();
+  if (acqDati?.tipo === 'set' && acqDati.firma === f && acqDati.preventivo) {
+    go('acquisto');
+    renderAcquisto();
+    return;
+  }
+  acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0, firma:f,
              preventivo:null, via:'', punto:'', puntoAperto:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
@@ -9483,6 +9399,10 @@ async function caricaPreventivo(){
       renderAcquisto(); return;
     }
     acqDati.preventivo = d;
+    /* la firma segue il conto: dopo una potatura (rinfrescaSet) la
+       composizione e' cambiata, e senza questa riga il rientro dal
+       carrello rifarebbe un fetch che non serve */
+    if (d0.tipo === 'set') acqDati.firma = firmaSet();
     /* il default lo dice viaDefault (spedizione prima, vedi sopra) —
        ma una via GIA' SCELTA si conserva se e' ancora viva (12 ago
        2026, con lo stepper): un ± non deve riportare chi aveva
@@ -9511,6 +9431,19 @@ function acqRipiega(d0, msg){
   qtaScelta = n;
   acqDati = {...d0, qta: n};
   renderAcquisto();
+}
+/* IL «RIPROVA» del ramo d'errore (ago 2026, col cantiere della cassa):
+   riapre la strada quando a cadere e' stata la rete, invece di
+   costringere a uscire e rientrare. RIASSEGNA acqDati invece di
+   azzerare il campo: l'identita' dell'oggetto e' il token della
+   guardia anti-race, quindi una risposta vecchia ancora in volo muore
+   da sola sul confronto — e' il patto di acqPasso. */
+function riprovaPreventivo(){
+  if (!acqDati) return;
+  haptic();
+  acqDati = {...acqDati, errore:''};
+  renderAcquisto();
+  caricaPreventivo();
 }
 /* IL ± DELLA PAGINA PAGA (12 ago 2026, chiesto da Andrea). Ogni tocco
    RIFA' il conto sul server — quella pagina E' il conto — e
@@ -9792,6 +9725,27 @@ function barreCorri(box, barraDa){
       }
     }));
 }
+/* La faccia di un articolo nel formato francobollo: la miniatura se
+   c'e', l'emoji se no. Estratta perche' la vogliono in tre — la
+   striscia del carrello, la card del singolo e lo scheletro che si
+   disegna mentre il conto arriva — e tre copie divergono al primo
+   ritocco. */
+function facciaMini(x, qta){
+  const t = x && ((x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '');
+  return `<div class="ctrl-mini"${x ? ` title="${esc(x.title)}"` : ''}>${
+    t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}${
+    (qta||0) > 1 ? `<b class="ctrl-mini-n">×${fmt(qta)}</b>` : ''}</div>`;
+}
+/* I francobolli del carrello: una faccia per RIGA (il ×N dice i pezzi
+   della stessa riga, non un secondo articolo). */
+function strisciaSet(){
+  const facce = [];
+  for (const [id, qta] of setScelte){
+    const x = listings.find(t=>t.id===id);
+    if (x) facce.push(facciaMini(x, qta));
+  }
+  return facce.join('');
+}
 /* Tutto si disegna da acqDati, MAI un fetch qui dentro: il toggle
    valuta e il cambio di pillola ridisegnano dal preventivo in cache. */
 function renderAcquisto(){
@@ -9807,32 +9761,49 @@ function renderAcquisto(){
     : (listings.find(x=>x.id===d.annuncioId)
        || myListings.find(x=>x.id===d.annuncioId));
   el('acqSub').textContent = primo ? `di ${primo.seller}` : '';
+  /* IL TITOLO DICE QUALE DEI DUE ACQUISTI E' (ago 2026): sul carrello
+     resta «Controlla il carrello», che e' quel che il bottone della
+     barra promette — e la pagina fa davvero tutte e due le cose. */
+  el('acqTit').textContent = d.tipo==='set' ? 'Controlla il carrello'
+                                            : 'Acquista';
   if (d.errore) {
+    /* IL «RIPROVA» ACCANTO AL «TORNA» (ago 2026, col cantiere della
+       cassa): il carrello aveva un riepilogo fail-open — conto storto,
+       restava la stima col ≈ — e qui invece l'errore si prende la
+       pagina intera. Sul pezzo venduto e' un guadagno (l'errore lo
+       NOMINA, e arriva un tocco prima); sulla rete caduta no, e senza
+       una strada per riprovare l'unica uscita sarebbe tornare indietro
+       e rientrare. */
     box.innerHTML = `<div class="acq-nota" style="margin-top:20px">⚠️ ${esc(d.errore)}</div>
-      <div class="ctrl-fondo"><button class="btn ghost" onclick="navIndietro()">← Torna</button></div>`;
+      <div class="ctrl-fondo"><button class="btn orange" onclick="riprovaPreventivo()">Riprova</button><button class="btn ghost" onclick="navIndietro()">← Torna</button></div>`;
     return;
   }
   if (!p) {
-    box.innerHTML = `<div class="acq-nota" style="margin-top:20px">Calcolo il conto…</div>`;
+    /* LO SCHELETRO MENTRE IL CONTO ARRIVA (ago 2026, col cantiere
+       della cassa). Prima qui c'era la sola riga «Calcolo il conto…»,
+       e per il singolo bastava: ci si arriva UNA volta, dal dettaglio.
+       Il carrello invece questa pagina la apre e la chiude mentre
+       compone, e una pagina che nasce vuota si legge come rotta. Gli
+       articoli si conoscono senza server, quindi si disegnano subito:
+       a mancare e' il conto, e il bottone spento lo dice.
+       IL BOTTONE SPENTO NON PORTA L'id acqCompra, ed e' voluto: quello
+       e' il bottone che PAGA, e ne esiste uno solo in tutta la pagina. */
+    const pezzi = pezziSet();
+    box.innerHTML = `${d.tipo==='set'
+        ? `<div class="ctrl-articoli"><b>${fmt(pezzi)} articol${pezzi===1?'o':'i'}</b><div class="ctrl-strip">${strisciaSet()}</div></div>`
+        : `<div class="acq-art">${facciaMini(primo, 0)}<div class="acq-col"><div class="acq-tit">${esc(primo ? primo.title : '')}</div></div></div>`}
+      <div class="section-label">Il conto</div>
+      <div class="acq-nota" style="margin-top:2px">Calcolo il conto…</div>
+      <div class="ctrl-fondo"><button class="btn orange" disabled>Paga</button></div>`;
     return;
   }
   /* --- gli articoli --- */
   let articoli;
   if (d.tipo==='set') {
-    const strip = [];
-    for (const [id, qta] of setScelte){
-      const x = listings.find(t=>t.id===id);
-      if (!x) continue;
-      const t = (x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '';
-      strip.push(`<div class="ctrl-mini" title="${esc(x.title)}">${
-        t ? `<img src="${esc(t)}" alt="">` : `<span>${x.emoji}</span>`}${
-        qta>1 ? `<b class="ctrl-mini-n">×${fmt(qta)}</b>` : ''}</div>`);
-    }
     articoli = `<div class="ctrl-articoli"><b>${fmt(p.quantita)} articol${p.quantita===1?'o':'i'}</b>
-      <div class="ctrl-strip">${strip.join('')}</div></div>`;
+      <div class="ctrl-strip">${strisciaSet()}</div></div>`;
   } else {
     const x = primo;
-    const t = x && ((x.thumbs && x.thumbs[0]) || (x.photos && x.photos[0]) || '');
     /* LO STEPPER NELLA PAGINA (12 ago 2026, chiesto da Andrea:
        l'invito dice «ancora 1 pezzo» e il pezzo si deve poter
        aggiungere QUI, non tornando alla scheda). stepperMini con
@@ -9873,7 +9844,7 @@ function renderAcquisto(){
       ? `<span class="mono">${cifraCtrl(nettoU, p.stima?'≈ ':'', p.articolo_unitario_netto_eur||0)}</span><span class="mono acq-barrato">${cifraPiena}</span>`
       : `<span class="mono">${cifraPiena}</span>`;
     articoli = `<div class="acq-art">
-      <div class="ctrl-mini">${t ? `<img src="${esc(t)}" alt="">` : `<span>${x ? x.emoji : '📦'}</span>`}</div>
+      ${facciaMini(x, 0)}
       <div class="acq-col"><div class="acq-tit">${esc(x ? x.title : '')}</div>${qtaUi}</div>
       <span class="acq-prezzo">${prezzoArt}${scontoTag}</span>
     </div>`;
@@ -10206,20 +10177,41 @@ function renderAcquisto(){
                             spedEur: viaOk ? (stradaSel.spedizione_eur||0) : 0,
                             totEur: viaOk ? (stradaSel.totale_eur||0)
                                   : ((p.protezione_sats||0) ? 0 : p.articolo_eur||0)});
-  /* --- il fondo: ⚡ NWC (solo mono, col wallet) e Acquista --- */
+  /* IL BOTTONE CHE RIPORTA AL CARRELLO (ago 2026, decisione di
+     Andrea): «Il badge dice la cosa, il bottone da' la strada» — sta
+     SOTTO la fila delle promesse, ed e' la risposta all'invito che
+     legge appena sopra. Compare SOLO col carrello e SOLO quando un
+     invito e' aperto (una pillola sotto soglia, cioe' .pill-barra):
+     sotto un «✅ Sconto −10%» sarebbe un invito a fare una cosa che
+     non serve, e a promesse assenti non c'e' niente a cui rispondere.
+     La strada resta comunque: la ← in testata riporta al carrello.
+     Da qui gli articoli NON si aggiungono — sono troppi e comporre in
+     una cassa sarebbe confuso, e lo stepper vive nel carrello. */
+  const tornaCarrello = (d.tipo==='set' && pillole.includes('pill-barra'))
+    ? `<button type="button" class="btn ghost torna-carrello" onclick="navIndietro()">← Aggiungi altro dal carrello</button>`
+    : '';
+  /* --- il fondo: ⚡ NWC (solo mono, col wallet), Paga, e i due
+     secondari del carrello (sul singolo non ci sono: l'offerta ce
+     l'ha la scheda, col suo bottone in barra) --- */
   const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
+  const secondari = d.tipo==='set'
+    ? `<div class="ctrl-secondari">
+         <button type="button" class="btn ghost" onclick="ctrlChiediInfo()">Chiedi info</button>
+         <button type="button" class="btn ghost" onclick="go('offertapresto')">Fai un'offerta</button>
+       </div>` : '';
   /* il «da» della corsa morbida si cattura PRIMA che l'innerHTML
      porti via i nodi — la meccanica intera (clientWidth, il computed
      interpolato, le partenze riunite) vive nei ferri condivisi
      barreCattura/barreCorri, qui sopra */
   const barraDa = barreCattura(box);
-  box.innerHTML = `${articoli}${accQta}${fila}${vie}${note}
+  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}
     <div class="section-label">Il conto</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
       <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>
+      ${secondari}
     </div>`;
   /* ...e il via: partenze e bersagli li mette barreCorri, il ferro
      condiviso — due fotogrammi, partenze riunite, lo scatto
@@ -10364,9 +10356,9 @@ function ctaAcquisto(){
    massa su CSS, viste e chiavi di navigazione, contro la regola dei
    diff piccoli. «🛒 Aggiungi al carrello» dal dettaglio apre una PAGINA in stile
    vetrina: il negozio del venditore, dove il pacco si compone toccando
-   Aggiungi sulle card. Il RIEPILOGO e' la pagina «Controlla il pacco»
-   (renderControlla): consegna, spedizione al MAX, stima taglia e conto
-   in righe vivono la'. Il pacco e' di UN
+   Aggiungi sulle card. Da «Controlla e paga» si va alla CASSA
+   (renderAcquisto in modalita' set): consegna, spedizione e conto in
+   righe vivono la', e di la' si paga. Il pacco e' di UN
    venditore solo (il suo pregio: una spedizione sola) e resta in piedi
    finche' non si paga: riaprirlo da un altro annuncio dello stesso
    venditore AGGIUNGE, non ricomincia. Il pull-to-refresh qui non
@@ -10909,10 +10901,17 @@ function aggiornaInvitoSpedGratis(tot){
   if (inEuroSg && !cambioVivo) { box.innerHTML = ''; return; }
   const ora = r.valuta === 'sats' ? (tot || 0)
                                   : Math.floor((tot || 0) * eurPerSat);
+  /* LE PAROLE SONO QUELLE DELLA CASSA (ago 2026, decisione di Andrea
+     col cantiere della cassa): la scattata portava il 🚚 dove la
+     gemella dello sconto porta il ✅ — due emoji per lo stesso grado
+     di fatto, nella stessa fila — e l'invito spezzava il grassetto
+     («→ spedizione <b>gratis</b>» contro «→ <b>spedizione gratis</b>»
+     di la'). Adesso le due superfici dicono la stessa promessa con le
+     stesse parole: divergono nella forma, non nella lingua. */
   if (ora >= r.quanto){
-    box.innerHTML = `<span class="pill pill-trust" data-barra="sg">🚚 Spedizione <b>gratis</b></span>`;
+    box.innerHTML = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b></span>`;
   } else {
-    box.innerHTML = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(r.quanto, r.quanto - ora)}>🚚 Ancora ${cifraSoglia(r.quanto - ora, r.valuta)} → spedizione <b>gratis</b></span>`;
+    box.innerHTML = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(r.quanto, r.quanto - ora)}>🚚 Ancora ${cifraSoglia(r.quanto - ora, r.valuta)} → <b>spedizione gratis</b></span>`;
   }
   barreCorri(box, da);
 }
@@ -10923,9 +10922,10 @@ function aggiornaInvitoSpedGratis(tot){
    schermo (le due sono viste, una sola puo' essere attiva). */
 function rinfrescaViste(){
   if (el('view-pacco')?.classList.contains('active')) renderPacco();
-  if (el('view-controllapacco')?.classList.contains('active')) renderControlla();
-  /* la pagina d'acquisto si ridisegna dal preventivo in CACHE: il
-     toggle e' una conversione di vista, mai un secondo fetch */
+  /* la cassa si ridisegna dal preventivo in CACHE: il
+     toggle e' una conversione di vista, mai un secondo fetch. A rifare
+     il CONTO quando la composizione e' stata potata ci pensa
+     rinfrescaSet, che e' l'unica a saperlo — vedi la' */
   if (el('view-acquisto')?.classList.contains('active')) renderAcquisto();
 }
 /* Il tocco su «Aggiungi»: la riga entra con UN pezzo. */
@@ -10979,19 +10979,6 @@ function aggiornaPezziCella(id, x){
   const s = c.querySelector('.pacco-spunta');
   if (s) { s.textContent = q>1 ? fmt(q) : '✓'; s.classList.toggle('conta', q>1); }
 }
-/* «Controlla il pacco» → la pagina del riepilogo. currentListing si
-   riallinea alla provenienza: girando per l'app puo' essere rimasto su
-   un annuncio di un altro venditore, e la rilettura del negozio dopo
-   un 409 (rinfrescaSet) guarderebbe il venditore sbagliato. */
-function controllaPacco(){
-  haptic();
-  if (!setScelte.size)
-    { toast('Il carrello è vuoto: tocca «Aggiungi» su qualche oggetto'); return; }
-  const orig = listings.find(x=>x.id===paccoDati.origineId);
-  if (orig) currentListing = orig;
-  renderControlla();
-  go('controllapacco');
-}
 /* La rilettura del catalogo del venditore: aggiorna gli annunci in
    memoria dal negozio (limit 100), spegne chi non c'e' piu' e pota
    dal pacco i pezzi spariti (e le quantita' oltre lo stock nuovo).
@@ -11027,18 +11014,32 @@ async function rileggiVenditore(l){
 }
 /* Dopo un 409/404 che nomina il pezzo: catalogo riletto, pacco potato,
    e la vista attiva si ridisegna — l'utente vede il buco, non un
-   vicolo cieco. Se la potatura ha svuotato il pacco, il riepilogo non
-   ha piu' niente da dire e si torna indietro da soli. */
+   vicolo cieco. Se la potatura ha lasciato la cassa senza abbastanza
+   articoli non c'e' piu' niente da dire e si torna indietro da soli.
+   E IL CONTO SI RIFA', che e' la meta' che si dimentica (ago 2026, col
+   cantiere della cassa): rileggiVenditore MUTA setScelte — cancella i
+   venduti, abbassa le quantita' oltre stock — mentre renderAcquisto
+   disegna dal preventivo in CACHE e la rete non la tocca mai. Senza
+   questa riga si vedrebbero due articoli a schermo e tre nel totale, e
+   startBuySet posterebbe le righe potate contro un conto vecchio.
+   Prima era la cache per firma del riepilogo a salvare la faccia: da
+   quando quella pagina non c'e' piu', tocca dirlo qui.
+   LA SOGLIA E' DUE E NON UNO: il set a una riga non esiste per regola
+   del server (400 sul preventivo, e startBuySet lo rifiuta), quindi
+   restare li' sarebbe un vicolo cieco. */
 async function rinfrescaSet(){
   await rileggiVenditore(currentListing);
   rinfrescaViste();
-  if (el('view-controllapacco')?.classList.contains('active') && !setScelte.size)
-    navIndietro();
+  const inCassaSet = el('view-acquisto')?.classList.contains('active')
+                  && acqDati?.tipo === 'set';
+  if (inCassaSet && setScelte.size < 2) { navIndietro(); return; }
+  if (inCassaSet) caricaPreventivo();   /* arriva e ridisegna */
 }
 /* Il gemello di startBuy: stesso paySheet, stesso poll, ma il body
-   viaggia a righe. Lo chiama l'«Acquista» della pagina del riepilogo;
-   sul no del server (che NOMINA il pezzo) si resta sulla pagina
-   rinfrescata: l'utente vede il buco, non un vicolo cieco. */
+   viaggia a righe. Lo chiama il «Paga» della cassa (per il ramo set —
+   il dispatch e' in ctaAcquisto); sul no del server (che NOMINA il
+   pezzo) si resta sulla pagina rinfrescata: l'utente vede il buco, non
+   un vicolo cieco. */
 async function startBuySet(){
   haptic();
   if (VETRINA || DEMO) { closeSheet(); return; }
@@ -11102,10 +11103,10 @@ async function startBuySet(){
   pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
 }
 /* (Il «⚡ Compra subito» NWC del set — confermaSetSubito — e' morto
-   col foglio del riepilogo, che era il suo unico chiamante: dalla
-   pagina «Controlla il pacco» si passa dal paySheet, dove il wallet
-   paga la stessa invoice. Sul singolo annuncio l'NWC vive come
-   sempre.) */
+   col foglio del riepilogo, che era il suo unico chiamante: il
+   carrello si paga dal paySheet, dove il wallet paga la stessa
+   invoice. Sul singolo annuncio l'NWC vive come sempre, ed e' anche il
+   motivo per cui il ⚡ della cassa resta gated su d.tipo==='mono'.) */
 
 function openDetail(id){
   currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
@@ -12096,10 +12097,9 @@ async function verificaOrdine(oid){
       closeSheet();
       /* qualunque pagamento riuscito azzera il pacco in composizione:
          lo stock e' appena cambiato, e un pacco stantio mentirebbe —
-         e con lui il preventivo della pagina d'acquisto, per la
-         stessa ragione */
+         e con lui il conto della cassa, per la stessa ragione */
       paccoDati = null; setScelte = new Map();
-      acqDati = null; ctrlPrev = null;
+      acqDati = null;
       /* niente toast (ago 2026): durava tre secondi e non lasciava
          niente da ritrovare. Adesso la ricevuta la manda il SERVER da
          _incassa_ordine — su questa strada come su quelle
