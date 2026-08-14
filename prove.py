@@ -8722,7 +8722,7 @@ def prove_conta_feedback():
     # restano, e sono queste due prove: mai l'oggetto comprato, mai un
     # recapito. Si guarda la QUERY, che e' l'unico posto da cui quei
     # campi potrebbero uscire.
-    i = _SORGENTE.index("feedback = [dict(r) for r in con.execute(")
+    i = _SORGENTE.index("feedback = [] if cursore else [dict(r)")
     query = _SORGENTE[i:_SORGENTE.index("(v[\"tg_id\"],))]", i)]
     prova("il nome di chi ha votato esce", True, "da_nome" in query)
     prova("la faccia rispetta la scelta «nessuna»", True,
@@ -15833,6 +15833,88 @@ def prove_script_nel_workflow():
     prova("...e sono TUTTI nel compileall del workflow", [], fuori)
 
 
+def prove_altri_scorrimento():
+    """«ALTRI OGGETTI DEL VENDITORE» A SCORRIMENTO CONTINUO (ago 2026):
+    in fondo al dettaglio si vede TUTTO il negozio, una pagina alla
+    volta, invece delle sei o sette card di ieri — il vecchio
+    `slice(0,8)` non ha mai morso, perche' il tetto vero era il
+    `limit=7` della fetch, e la promessa delle «quattro righe piene»
+    scritta nel commento non e' mai arrivata.
+    QUI SI DIFENDE LA FORMA. Che scorrendo si veda tutto il negozio UNA
+    VOLTA SOLA e nell'ordine giusto lo prova `collaudo_altri_oggetti.py`
+    sulla rotta vera: queste prove non hanno un database e non hanno un
+    endpoint, e un difetto di paginazione non fallisce da solo — non
+    alza eccezioni, fa sparire delle card.
+    Le righe sorvegliate, ognuna torturata rompendo il codice:
+    1) la sentinella sta FUORI da #detailContent — dentro morirebbe a
+       ogni apertura, che openDetail ne riscrive l'innerHTML, e si
+       porterebbe via il suo osservatore;
+    2) il GIRO si alza PRIMA della guardia `mio` e si controlla PRIMA
+       di scrivere lo stato: e' quel che impedisce a una pagina 2 del
+       venditore di ieri di appiccicarsi alla griglia di quello nuovo,
+       e il controllo d'identita' sull'annuncio non basta (lo stesso
+       annuncio si puo' riaprire);
+    3) `caricando` si spegne solo a giro invariato, o sul ramo catch si
+       scriverebbe sull'oggetto NUOVO sbloccandogli una pagina che non
+       ha chiesto;
+    4) catalogo si', griglia della vetrina MAI (il patto di inCatalogo);
+    5) col cursore il server tace le due liste, senza togliere le
+       chiavi."""
+    print("\n[«Altri oggetti» a scorrimento continuo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # 1) LA SENTINELLA, e soprattutto DOVE sta
+    prova("la sentinella esiste", True, 'id="altriSentinella"' in mini)
+    prova("...e sta DOPO #detailContent, mai dentro", True,
+          mini.index('<div id="altriSentinella"')
+          > mini.index('<div id="detailContent"></div>'))
+    prova("...ed e' armata dall'osservatore di casa", True,
+          "osservaSentinella('altriSentinella', caricaAltriOggetti);" in mini)
+    # censimento e non elenco: la quinta di domani entra nel conto da
+    # sola, e chi ne toglie una lo sente
+    prova("le sentinelle dello scroll infinito sono quattro", 4,
+          mini.count("\nosservaSentinella('"))
+
+    # 2) IL GIRO
+    sez = pezzo_js(mini, "async function sezioneAltriOggetti(l){")
+    prova("il giro si alza PRIMA della guardia `mio`", True,
+          sez.index("++altriGiro") < sez.index("const mio ="))
+    prova("...e lo stato di pagina riparte con lui", True,
+          "altriPag = {id:l.id" in sez)
+    prova("il giro si controlla PRIMA di scrivere lo stato", True,
+          sez.index("if (giro !== altriGiro) return;")
+          < sez.index("altriPag.cursore ="))
+    prova("la prima pagina non e' piu' sette card", True,
+          "?limit=${ALTRI_PAGINA}" in sez and "?limit=7" not in mini)
+    prova("il tetto che non mordeva se n'e' andato", False,
+          "altri.slice(0,8)" in mini)
+
+    # 3-4) LA PAGINA DOPO
+    car = pezzo_js(mini, "async function caricaAltriOggetti(){")
+    prova("le tre guardie di famiglia", True,
+          "if (DEMO || !altriPag.cursore || altriPag.caricando) return;"
+          in car)
+    prova("la guardia di giro dopo l'await", True,
+          "if (giro !== altriGiro) return;" in car)
+    prova("`caricando` si spegne solo a giro invariato", True,
+          "if (giro === altriGiro) altriPag.caricando = false;" in car)
+    prova("catalogo si'...", True, "inCatalogo(nuovi)" in car)
+    prova("...griglia della vetrina MAI", [],
+          [s for s in ("vetrina.push", "vetrina =", "vetrina.length",
+                       "renderGrid(") if s in car])
+    prova("le card si appendono, non si riscrivono", True,
+          "insertAdjacentHTML('beforeend'" in car)
+
+    # 5) IL SERVER TACE LE DUE LISTE, SENZA TOGLIERE LE CHIAVI
+    neg = pezzo("negozio")
+    prova("server: col cursore gli esauriti tacciono", True,
+          "esauriti = [] if cursore else" in neg)
+    prova("server: ...e i feedback pure", True,
+          "feedback = [] if cursore else" in neg)
+    prova("server: le chiavi restano comunque nella risposta", True,
+          '"esauriti": esauriti' in neg and '"feedback": feedback' in neg)
+
+
 def prove_sintassi_client():
     """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
     arrivato fino a main: un `*/` doppio in un commento di
@@ -15951,6 +16033,7 @@ def main():
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri,
               prove_guardia_is_bot,
+              prove_altri_scorrimento,
               prove_script_nel_workflow,
               prove_sintassi_client):
         try:

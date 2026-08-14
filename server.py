@@ -8690,7 +8690,19 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     # ignora e vede il negozio di ieri.
     # L'ordine e' `creato DESC` come ovunque: «venduto il» non esiste in
     # colonna, e non si inventa una colonna per uno scaffale.
-    esauriti = [dict(r) for r in con.execute(
+    # E LE DUE LISTE TACCIONO COL CURSORE (ago 2026): dalla seconda
+    # pagina in poi non le legge nessuno — ne' la sezione «Altri
+    # oggetti del venditore» del dettaglio, che da qui pagina il
+    # negozio, ne' lo scorrimento della pagina negozio, che gia' oggi
+    # si scarica fino a 12 esauriti arricchiti e 10 feedback per
+    # pagina e li butta (`caricaAltriNegozio` legge `annunci` e
+    # `cursore`, il resto lo ignora).
+    # LE CHIAVI RESTANO, VUOTE E MAI ASSENTI: un client in cache che
+    # scriva `d.feedback.length` non deve esplodere — un'assenza si
+    # dice con una lista vuota, non togliendo la chiave.
+    # Il `venditore` invece resta pieno: e' una riga sola, e serve
+    # comunque a risolvere `chi` in tg_id.
+    esauriti = [] if cursore else [dict(r) for r in con.execute(
         f"SELECT {campi}, a.stato FROM annunci a "
         "JOIN utenti u ON u.tg_id=a.venditore_id "
         "WHERE a.venditore_id=? AND a.stato='venduto' "
@@ -8713,7 +8725,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "",
     # loro regole (npub solo dal possesso dimostrato). Un contatto in
     # piu' qui sarebbe una seconda porta da tenere allineata.
     # f.id e' un numero opaco: serve solo al bottone rimuovi dell'admin.
-    feedback = [dict(r) for r in con.execute(
+    feedback = [] if cursore else [dict(r) for r in con.execute(
         "SELECT f.id, f.voto, f.commento, f.creato, "
         "CASE WHEN o.id IS NULL THEN 'utente' "
         "WHEN f.da_tg_id=o.compratore_id THEN 'acquirente' "

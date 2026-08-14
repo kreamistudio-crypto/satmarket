@@ -3556,6 +3556,13 @@ document.getElementById('cartello')?.remove();</script>
        sale a filo dello schermo, da hero immersiva -->
   <div class="view" id="view-dettaglio">
     <div id="detailContent"></div>
+    <!-- La sentinella dello scroll infinito di «Altri oggetti del
+         venditore». Sta FUORI da #detailContent apposta: openDetail ne
+         riscrive l'innerHTML a ogni apertura, e una sentinella li'
+         dentro morirebbe a ogni giro portandosi via il suo
+         osservatore. Qui e' armata una volta per sempre, e una vista
+         nascosta non interseca mai: a dettaglio chiuso tace da sola. -->
+    <div id="altriSentinella" style="height:1px"></div>
   </div>
 
   <!-- ============ VISTA: NEGOZIO DEL VENDITORE ============ -->
@@ -8652,8 +8659,30 @@ function aggiornaBarraCompra(view){
    piccolo) e finiscono in catalogo con inCatalogo, cosi' openDetail
    conosce gia' quegli id. Fail-open totale: senza nulla da mostrare
    (o con la rete storta) la sezione non nasce e il dettaglio resta
-   quello di sempre. */
+   quello di sempre.
+   DALL'AGO 2026 SI VEDE TUTTO IL NEGOZIO, a scorrimento continuo come
+   la vetrina: la prima pagina e' ALTRI_PAGINA, le altre le chiede la
+   sentinella #altriSentinella. Il tetto vero e' sempre stato il limit
+   della fetch — il vecchio `slice(0,8)` non ha mai morso, si
+   chiedevano sette card e se ne mostravano sei o sette, e la promessa
+   delle «quattro righe piene» del commento non e' mai arrivata —
+   quindi il tetto se n'e' andato insieme al limit.
+   IL GIRO SERVE, ed e' la regola gia' pagata in vetrina: il dettaglio
+   si svuota a ogni apertura, e le card di QUESTA sezione ne aprono un
+   altro restando nella stessa vista — una pagina 2 del venditore di
+   prima, arrivata in ritardo, si appiccicherebbe alla griglia del
+   venditore nuovo. Il controllo d'identita' sull'annuncio non basta:
+   lo stesso annuncio si puo' riaprire. */
+const ALTRI_PAGINA = 12;
+let altriPag = {id:null, chi:null, cursore:null, caricando:false};
+let altriGiro = 0;
+
 async function sezioneAltriOggetti(l){
+  /* il giro si alza PRIMA della guardia `mio`: se una pagina in volo
+     atterrasse su un dettaglio proprio — dove la sezione non nasce —
+     il giro non sarebbe avanzato e la guardia non morderebbe */
+  const giro = ++altriGiro;
+  altriPag = {id:l.id, chi:null, cursore:null, caricando:false};
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
   if (mio) return;
   let altri = [];
@@ -8666,10 +8695,17 @@ async function sezioneAltriOggetti(l){
     try {
       const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
       const r = await fetch(
-        `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=7`, opz);
+        `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${ALTRI_PAGINA}`, opz);
       if (!r.ok) return;
       const d = await r.json();
+      /* il giro PRIMA di scrivere lo stato: a dettaglio gia' cambiato
+         `altriPag` e' l'oggetto del venditore NUOVO, e scriverci il
+         cursore di quello vecchio gli darebbe una pagina 2 di un
+         altro negozio */
+      if (giro !== altriGiro) return;
       altri = (d.annunci||[]).map(mapListing).filter(x=>x.id!==l.id);
+      altriPag.chi = chi;
+      altriPag.cursore = d.cursore || null;
       inCatalogo(altri);
     } catch(e) { return; }
   }
@@ -8684,13 +8720,20 @@ async function sezioneAltriOggetti(l){
      della sezione e da li' si incolla in cima mentre si scorre — e'
      il CSS a farlo (.altri-azione), qui non serve nessun listener.
      Niente piu' vestito di cartone: e' il ghost di casa come tutti
-     gli altri secondari. Il tetto passa da 6 a 8, che con due
-     colonne fanno quattro righe piene invece di tre. */
+     gli altri secondari. Il tetto non c'e' piu': si vede tutto il
+     negozio, una pagina alla volta. */
   /* Se il venditore ha SOLO articoli digitali il carrello non esiste
      per lui: i digitali si comprano singolarmente (la regola della
-     griglia del carrello), e la striscia non deve portarci. Il
-     giudizio guarda l e i 7 della striscia: un pezzo fisico oltre il
-     settimo e' un caso raro, e al piu' si nasconde un bottone in piu'. */
+     griglia del carrello), e la sezione non deve portarci. IL
+     GIUDIZIO E' SULLA PRIMA PAGINA — l piu' i primi ALTRI_PAGINA — e
+     NON si rifa' quando ne arrivano altre: rifarlo vorrebbe dire far
+     comparire il blocco appiccicato a meta' scorsa, che e' peggio del
+     caso che cura. IMPERFEZIONE DICHIARATA, e col tetto tolto ora si
+     puo' VEDERE invece di restare teorica: un venditore di soli
+     digitali col primo pezzo fisico oltre il dodicesimo tiene il
+     bottone nascosto anche quando quel pezzo compare scorrendo. Chi
+     compra quel pezzo trova comunque il carrello nel SUO dettaglio,
+     dove il giudizio riparte da lui. */
   const tuttoDigitale = l.consegna==='digitale'
     && altri.every(x => x.consegna==='digitale');
   /* Le promesse del negozio, DOVE il carrello si comincia a comporre.
@@ -8747,8 +8790,38 @@ async function sezioneAltriOggetti(l){
     <div class="altri-sez">
       <div class="section-label altri-tit">Altri oggetti del venditore</div>
       ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button>${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}</div>` : ''}
-      <div class="grid altri-griglia">${altri.slice(0,8).map(cardHTML).join('')}</div>
+      <div class="grid altri-griglia">${altri.map(cardHTML).join('')}</div>
     </div>`);
+}
+
+/* La pagina dopo di «Altri oggetti»: il calco di caricaAltriNegozio,
+   con la guardia di GIRO in piu' (il perche' sta sopra). La sentinella
+   vive anche dove la sezione NON esiste — annuncio proprio, DEMO,
+   venditore con un oggetto solo — e a coprirli e' `!altriPag.cursore`,
+   che li' resta null: nessuna guardia in piu'. */
+async function caricaAltriOggetti(){
+  if (DEMO || !altriPag.cursore || altriPag.caricando) return;
+  const giro = altriGiro;
+  altriPag.caricando = true;
+  try {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(
+      `${API_BASE}/negozio/${encodeURIComponent(altriPag.chi)}`
+      + `?limit=${ALTRI_PAGINA}&cursore=${encodeURIComponent(altriPag.cursore)}`,
+      opz);
+    const d = await r.json();
+    if (giro !== altriGiro) return;   // il dettaglio e' un altro: si butta
+    const nuovi = (d.annunci||[]).map(mapListing).filter(x=>x.id!==altriPag.id);
+    altriPag.cursore = d.cursore || null;
+    inCatalogo(nuovi);            // catalogo si', griglia della vetrina mai
+    const g = document.querySelector('#detailContent .altri-griglia');
+    if (g && nuovi.length)
+      g.insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+  } catch(e) {}
+  /* solo a giro invariato: sul ramo catch con dettaglio gia' cambiato
+     si scriverebbe sull'oggetto NUOVO, sbloccandogli una pagina che
+     non ha mai chiesto */
+  if (giro === altriGiro) altriPag.caricando = false;
 }
 
 /* ---------------- il SET: «Riempi il barattolo» (lug 2026) ----------------
@@ -20570,6 +20643,7 @@ function osservaSentinella(id, cb){
 osservaSentinella('gridSentinella', caricaAltri);
 osservaSentinella('negozioSentinella', caricaAltriNegozio);
 osservaSentinella('mieiSentinella', caricaAltriMiei);
+osservaSentinella('altriSentinella', caricaAltriOggetti);
 
 /* LA TASTIERA NON DEVE COPRIRE QUEL CHE SI SCRIVE (ago 2026, dal
    campo: nel foglio dell'offerta si digitava alla cieca). Il perche'
