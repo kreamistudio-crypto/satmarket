@@ -6998,34 +6998,62 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'aveva: il suo verde è agganciato al FATTO (`sconto_sats > 0`) e
   sta PRIMA dell'invito. Il cantiere qui sopra ha dato la guardia
   all'invito senza togliere al verde il ramo che gliela scavalcava.
-  La cura è `else if (sgManca === 0)`: il caso non raggiungibile non
-  disegna NIENTE — un'assenza non è una bugia — e la prosa del cambio
-  muto resta al ramo di sopra, o quel `=== 0` direbbe il falso (lì
-  `sgManca` vale 0 perché la misura non c'è, non perché la soglia sia
-  raggiunta).
-  LA FORMA ROBUSTA È SCARTATA, E MISURATA (ago 2026, decisione di
-  Andrea): agganciare il verde al RISPARMIO (`sped_gratis_sats` della
-  strada) allineerebbe la 🚚 alla 🎁 e sembra la mossa pulita, ma
-  quella cifra vale zero quando la tariffa era GIÀ zero — cioè si
-  spegnerebbe il badge proprio dove la spedizione è davvero gratis.
-  **Corretta tecnicamente, sbagliata per chi guarda.** Il conto non è
-  ipotetico: **3 annunci di 2 venditori** hanno oggi la tariffa
-  dichiarata a zero con la promessa accesa (query in sola lettura nel
-  commit di questo cantiere: annunci attivi che spediscono, venditore
-  con la soglia accesa nella sua unità, tariffa a zero su almeno una
-  via — si rimisura così se un domani si volesse riaprire la
-  questione, ma il motivo non dipende dal numero: basta che non sia
-  zero).
+  La prima cura fu `else if (sgManca === 0)`, ed è durata mezza
+  giornata: chiudeva il caso «si paga» ma legava il badge alla SOGLIA,
+  e su una tariffa già a zero `sgManca` non è zero — non c'era niente
+  da pagare fin dall'inizio. Vedi la regola qui sotto, che la sostituisce.
+  IL BADGE DICE IL FATTO, LA SOGLIA È SOLO LA RAGIONE (ago 2026,
+  regola di Andrea, e vale su TUTTE E TRE le superfici — card in
+  vetrina, dettaglio, pagina Paga): **se su quell'acquisto la
+  spedizione non si paga, il badge lo dice.** Che sia gratis per la
+  tariffa dichiarata dal venditore o perché la soglia del negozio è
+  scattata è la RAGIONE, e la ragione non cambia il fatto. Dove si
+  paga davvero, il badge non compare — che è il difetto qui sopra,
+  chiuso per costruzione: se si paga, la cifra non è zero.
+  IN PAGINA PAGA IL FATTO È UN NUMERO DEL SERVER e non un giudizio da
+  rifare: `spedizione_sats` della via SCELTA (`sgGratisOra`), che è
+  zero in tutti e due i casi — la tariffa era zero, oppure
+  `_strade_preventivo` l'ha azzerata perché la promessa è scattata.
+  Card e dettaglio la stessa domanda la fanno a
+  `spedGratis(l) || spedGratisQui(l, …)`, che il preventivo non ce
+  l'hanno: tre strade, una regola.
+  `cambio_assente` NON È GRATIS, ed è la riga che si sbaglia per
+  prima: su una strada spenta dal cambio muto la chiave della tariffa
+  non c'è affatto, e un `||0` la leggerebbe come uno zero — cioè
+  prometterebbe gratis proprio dove non sappiamo quanto costa.
+  E IL FATTO STA DAVANTI ALLA SOGLIA, non solo per gerarchia: coi rami
+  in ordine inverso, a tariffa già zero e soglia lontana ma
+  raggiungibile, uscirebbe «Ancora 20 € → spedizione gratis» a chi la
+  spedizione ce l'ha gratis di suo. C'è la prova apposta, ed è l'unica
+  che quel rovesciamento fa diventare rossa.
+  DUE BUCHI CHIUSI INSIEME, di età diverse: la tariffa a ZERO sotto
+  soglia (regressione della prima cura) e la tariffa a ZERO con
+  NESSUNA soglia — quel verde non c'era MAI stato, perché il blocco
+  intero era gated su `sgSoglia > 0` dalla nascita, quindi un negozio
+  che spedisce gratis senza condizioni in pagina non lo diceva. Da qui
+  la soglia gatea le sole due righe che la USANO, la prosa e l'invito,
+  e mai il fatto. MISURATO e non dedotto: card e dettaglio erano già
+  conformi in tutti e sei i casi, fuori riga era solo la pagina Paga.
+  DA NON CONFONDERE CON LA FORMA SCARTATA, che le somiglia e non è la
+  stessa cosa: agganciare il verde al RISPARMIO
+  (`sped_gratis_sats > 0`, cioè «la promessa ha tolto qualcosa»)
+  allineerebbe la 🚚 alla 🎁, ma quella cifra vale zero quando la
+  tariffa era GIÀ zero — spegnerebbe il badge proprio dove la
+  spedizione è davvero gratis. **Corretta tecnicamente, sbagliata per
+  chi guarda** (decisione di Andrea), e il conto non è ipotetico:
+  **3 annunci di 2 venditori** hanno oggi la tariffa dichiarata a zero
+  con la promessa accesa (query in sola lettura nel commit di quel
+  cantiere; si rimisura così, ma il motivo non dipende dal numero:
+  basta che non sia zero). La differenza in una riga: il RISPARMIO
+  dice se la promessa ha agito, la TARIFFA FINALE dice se si paga — e
+  a chi guarda interessa la seconda.
   QUINDI L'ASIMMETRIA FRA LE DUE PROMESSE RESTA, ed è dichiarata: il
-  verde della 🚚 si aggancia alla MISURA (`sgManca === 0`), quello
-  della 🎁 al FATTO (`sconto_sats > 0`). Due forme diverse per due
-  ragioni diverse — uno sconto che non sconta niente non è uno sconto,
-  una spedizione che non costa niente è gratis lo stesso — e chi le
-  uniforma per simmetria rimette in piedi proprio il caso qui sopra.
-  IMPERFEZIONE DICHIARATA che ne esce: su quei 3 annunci, SOTTO
-  soglia, il badge tace mentre la spedizione è gratuita comunque. È
-  un'omissione e non una bugia, e a dirlo resta la riga «gratuita» del
-  conto, che quella tariffa la copre già.
+  verde della 🚚 guarda quanto costa ADESSO, quello della 🎁 il FATTO
+  che lo sconto abbia tolto qualcosa (`sconto_sats > 0`). Due forme
+  diverse per due ragioni diverse — uno sconto che non sconta niente
+  non è uno sconto, una spedizione che non costa niente è gratis lo
+  stesso — e chi le uniforma per simmetria rimette in piedi il caso
+  qui sopra.
   E LA LEZIONE VALE PIÙ DELLA CURA, che è di una riga: una sentinella
   sulla POSIZIONE di una guardia dice che la guardia c'è, MAI che il
   ramo accanto sia onesto — quella di ieri era verde col difetto vivo,
@@ -7036,7 +7064,16 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   pillola verde di renderAcquisto può nascere per esclusione, così la
   terza promessa di domani ci entra da sola — col conteggio accanto,
   che a zero verdi trovati direbbe una promozione invece di una
-  cecità. Torturate a cinque mutazioni, ognuna rossa da sola.
+  cecità.
+  E ACCANTO A TUTTE, LA PROVA CHE RISPONDE: il blocco si ritaglia da
+  miniapp.html e si fa GIRARE con node sui sette casi che contano —
+  le tre facce del «non si paga», le tre del «si paga», e la strada
+  spenta dal cambio muto, dove non si sa e non si promette. Una prova
+  sul testo dice com'è scritto il ramo, mai cosa risponde, e la regola
+  è sul cosa risponde: è lei a tenere le due famiglie distinte anche
+  il giorno che qualcuno riscrive il blocco da capo. Node c'è di serie
+  sui runner, e senza si SALTA contando (il patto di `salta`).
+  Torturate a otto mutazioni, ognuna rossa da sola.
   IL CONTO È DEL SERVER (`sconto_raggiungibile`,
   `sped_gratis_raggiungibile` nel preventivo MONO), il patto di
   `mancano_*`: è esattamente il posto dove vive un off-by-one, e il

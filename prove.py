@@ -14127,8 +14127,13 @@ def prove_promesse_raggiungibili():
     _ra = pezzo_js(mini, "function renderAcquisto(){", "\n}")
     prova("l'invito dello sconto guarda la raggiungibilita'", True,
           "scManca > 0 && p.sconto_raggiungibile !== false" in _ra)
+    # la 🚚 la porta SPEZZATA su due righe: si ricuce prima di cercare,
+    # o questa riga diventa rossa per un a-capo invece che per una
+    # guardia caduta (la lezione della sentinella dei sats, che si
+    # nascondevano nella piega di una stringa)
     prova("...e quello della spedizione pure", True,
-          "sgManca > 0 && p.sped_gratis_raggiungibile !== false" in _ra)
+          "sgManca > 0 && p.sped_gratis_raggiungibile !== false"
+          in re.sub(r"\s+", " ", _ra))
     prova("...tutti e due FAIL-OPEN, mai un && secco", (False, False),
           ("&& p.sconto_raggiungibile)" in mini,
            "&& p.sped_gratis_raggiungibile)" in mini))
@@ -14168,8 +14173,33 @@ def prove_promesse_raggiungibili():
                          if not r.strip().startswith("//"))
 
     _rac = _solo_codice(_ra)
-    prova("il verde della 🚚 ha la SUA condizione, mai un `else` nudo",
-          True, "else if (sgManca === 0)" in _rac)
+    # IL VERDE DELLA 🚚 NASCE DAL FATTO, e il fatto e' un numero del
+    # SERVER: la tariffa della via SCELTA. Zero vuol dire «su questo
+    # acquisto non si paga», che sia per la tariffa dichiarata dal
+    # venditore o perche' la soglia e' scattata — la ragione non cambia
+    # il fatto (regola di Andrea, ago 2026, su tutte e tre le
+    # superfici). Il ramo e' anche il PRIMO: prima si dice cos'e' vero,
+    # poi eventualmente cosa manca.
+    prova("il verde della 🚚 nasce dal fatto, ed e' il primo ramo", True,
+          "if (sgGratisOra)" in _rac
+          and _rac.index("if (sgGratisOra)")
+          < _rac.index("sgManca > 0"))
+    # `cambio_assente` NON E' GRATIS: su una strada spenta dal cambio
+    # muto la chiave della tariffa non c'e' affatto, e un `||0` la
+    # leggerebbe come uno zero — cioe' prometterebbe gratis proprio
+    # dove non sappiamo quanto costa. E' la riga che si sbaglia per
+    # prima, e la mutazione che la toglie e' la piu' silenziosa del
+    # cantiere.
+    prova("...e il fatto esclude la strada spenta dal cambio muto", True,
+          "!stradaSel.cambio_assente" in re.sub(r"\s+", " ", _rac))
+    prova("...e si legge sulla via SCELTA, non su una qualsiasi", True,
+          "(stradaSel.spedizione_sats||0) === 0" in _rac)
+    # LA SOGLIA GATEA SOLO CHI LA USA (prosa e invito), MAI IL FATTO:
+    # col gate sul blocco intero un negozio che spedisce gratis senza
+    # condizioni in pagina non lo diceva — buco vissuto dalla nascita
+    # del blocco, e piu' largo di quello che l'ha fatto trovare.
+    prova("la soglia non gatea piu' il blocco intero", False,
+          "if (sgSoglia > 0 && spedisceQui" in _rac)
     prova("...e quello della 🎁 resta agganciato al fatto", True,
           "else if ((p.sconto_sats||0) > 0)" in _rac)
     # CENSIMENTO e non elenco (la lezione del titolo nudo): ogni verde
@@ -14191,6 +14221,96 @@ def prove_promesse_raggiungibili():
     # (la lezione del censimento dei titoli scappati)
     prova("...e i verdi censiti sono i due che ci sono", 2,
           _rac.count("pill pill-trust"))
+
+    # ---- 2c. E ADESSO LA PROVA CHE RISPONDE, non che rilegge: il
+    # blocco si RITAGLIA da miniapp.html e si fa GIRARE con node sui
+    # casi che contano. Le sentinelle qui sopra dicono COM'E' SCRITTO
+    # il ramo, mai COSA RISPONDE — e la regola di Andrea e' sul cosa
+    # risponde: dove la spedizione non si paga il badge lo dice (per la
+    # tariffa dichiarata come per la soglia raggiunta), dove si paga
+    # davvero il badge non c'e'. Le due famiglie non si devono poter
+    # confondere, e questa prova le tiene distinte anche il giorno che
+    # qualcuno riscrive il blocco da capo — che e' precisamente quel
+    # che una sentinella sulla forma non puo' promettere.
+    import json as _json, shutil as _sh2, subprocess as _sp2
+    _node = _sh2.which("node")
+    if not _node:
+        salta("il badge della 🚚 risponde giusto sui due casi",
+              "node non installato")
+    else:
+        _blocco = mini[mini.index(
+            "  const spedisceQui = (p.strade||[]).some("):]
+        _blocco = _blocco[:_blocco.index("  /* LA FILA:")]
+
+        def _badge(strada, soglia=0, manca=0, ragg=True, sospese=False):
+            """Il blocco vero su un preventivo finto. Gli unici pezzi di
+            cartone sono i due ornamenti del testo (la cifra e la
+            barra), che non decidono MAI quale ramo si accende."""
+            p = {"strade": [strada], "sped_gratis_eur": soglia,
+                 "sped_gratis_soglia": 0, "sped_gratis_valuta": "eur",
+                 "mancano_sped_eur": manca, "mancano_sped_sats": 0,
+                 "sped_gratis_raggiungibile": ragg,
+                 "promesse_sospese": sospese}
+            js = ("const cifraSoglia=(n,v)=>`${n}`;"
+                  "const barraPromessa=()=>'';let note='';"
+                  "const p=" + _json.dumps(p) + ";const d={via:'casa'};"
+                  "const stradaSel=(p.strade||[]).find(s=>s.via===d.via)"
+                  "||null;" + _blocco +
+                  "console.log(pillaSg.includes('pill-trust')?'VERDE'"
+                  ":pillaSg.includes('pill-barra')?'invito'"
+                  ":note?'prosa':'niente');")
+            r = _sp2.run([_node, "-e", js], capture_output=True,
+                         text=True, encoding="utf-8")
+            return (r.stdout or r.stderr).strip()
+
+        def _via(sats):
+            return {"via": "casa", "spedizione_sats": sats,
+                    "totale_sats": 30_000 + sats}
+
+        # NON SI PAGA → il badge lo dice, per tutte e due le RAGIONI.
+        # I primi due sono i buchi chiusi da questo cantiere; il terzo
+        # e' la promessa che scatta, cioe' il caso di sempre.
+        prova("non si paga (tariffa a zero, nessuna soglia): il badge"
+              " c'e'", "VERDE", _badge(_via(0)))
+        prova("non si paga (tariffa a zero, soglia lontana): il badge"
+              " c'e'", "VERDE", _badge(_via(0), 50, 20, False))
+        # E QUI L'INVITO SAREBBE ASSURDO: «Ancora 20 € → spedizione
+        # gratis» a chi la spedizione ce l'ha gia' gratis. E' il caso
+        # che tiene il FATTO davanti alla soglia — con i rami in
+        # ordine inverso questa riga e' l'unica che diventa rossa.
+        prova("...anche quando quella soglia sarebbe raggiungibile",
+              "VERDE", _badge(_via(0), 50, 20, True))
+        prova("non si paga (soglia raggiunta, il server ha azzerato)",
+              "VERDE", _badge(_via(0), 50, 0))
+        # SI PAGA → il badge non c'e'. E' il difetto vero dal campo, e
+        # questa e' la riga che lo tiene chiuso: la prima delle tre e'
+        # esattamente il caso «L'individuo sovrano».
+        prova("si paga (soglia lontana, stock che non ci arriva):"
+              " niente", "niente", _badge(_via(5_000), 50, 20, False))
+        prova("si paga (soglia raggiungibile): l'invito, mai il verde",
+              "invito", _badge(_via(5_000), 50, 20, True))
+        prova("si paga (nessuna soglia): niente", "niente",
+              _badge(_via(5_000)))
+        # NON SI SA → mai una promessa: la strada spenta dal cambio
+        # muto non porta affatto la chiave della tariffa
+        prova("non si sa (strada spenta dal cambio muto): mai il verde",
+              "prosa", _badge({"via": "casa", "cambio_assente": True},
+                              50, 20, True, True))
+
+    # ---- 2d. LE TRE SUPERFICI DICONO LA STESSA COSA. La regola vale
+    # in card, nel dettaglio e in pagina Paga: card e dettaglio il
+    # fatto lo chiedono al giudice di casa (`spedGratis`, la tariffa
+    # dichiarata) piu' `spedGratisQui` per la soglia; la pagina Paga
+    # ce l'ha gia' contato dal server. Tre strade per la stessa
+    # domanda, e la prova qui e' che nessuna delle due di vetrina
+    # perda il pezzo della TARIFFA DICHIARATA — che e' il pezzo che in
+    # pagina Paga mancava.
+    _ic = pezzo_js(mini, "function iconeCard(l){", "\n}")
+    _tb = pezzo_js(mini, "function testoSpedBadge(l){", "\n}")
+    prova("in card il fatto comprende la tariffa dichiarata", True,
+          "spedGratis(l) || spedGratisQui(l, 1)" in _ic)
+    prova("...e nel dettaglio pure", True,
+          "spedGratis(l) || spedGratisQui(l, qtaScelta)" in _tb)
 
     # ---- 3. IL GIUDICE DEL VERDE IN CARD: il gemello di spedGratisQui,
     # e ne eredita le decisioni parola per parola.

@@ -9892,39 +9892,54 @@ function renderAcquisto(){
              || ((p.sped_gratis_soglia||0) > 0 ? 'sats' : 'eur');
   const sgSoglia = (p.sped_gratis_eur||0) || (p.sped_gratis_soglia||0);
   const sgManca = (p.mancano_sped_eur||0) || (p.mancano_sped_sats||0);
+  /* IL BADGE DICE IL FATTO, LA SOGLIA E' SOLO LA RAGIONE (ago 2026,
+     regola di Andrea che vale su TUTTE E TRE le superfici — card,
+     dettaglio, pagina Paga): se su questo acquisto la spedizione non
+     si paga, il badge lo dice. Che sia gratis per la tariffa
+     dichiarata dal venditore o perche' la soglia del negozio e'
+     scattata e' la RAGIONE, e la ragione non cambia il fatto.
+     QUI IL FATTO E' UN NUMERO DEL SERVER e non un giudizio da
+     rifare: `spedizione_sats` della via SCELTA, che e' zero in tutti
+     e due i casi — la tariffa era zero, oppure _strade_preventivo
+     l'ha azzerata perche' la promessa e' scattata. Card e dettaglio
+     la stessa cosa la chiedono a `spedGratis(l) || spedGratisQui(l)`,
+     che il preventivo non ce l'hanno.
+     `cambio_assente` NON E' GRATIS, ed e' la riga che si sbaglia per
+     prima: su una strada spenta dal cambio muto la chiave non c'e'
+     affatto, e un `||0` la leggerebbe come uno zero — cioe'
+     prometterebbe gratis proprio dove non sappiamo quanto costa.
+     DUE BUCHI CHIUSI INSIEME, e vale la pena tenerli distinti perche'
+     hanno eta' diverse: la tariffa a ZERO con la soglia SOTTO (il
+     verde spariva — regressione della cura del difetto qui sotto) e
+     la tariffa a ZERO con NESSUNA soglia (il verde non c'e' mai
+     stato: il blocco intero era gated su `sgSoglia > 0` dalla
+     nascita, quindi un negozio che spedisce gratis senza condizioni
+     in pagina non lo diceva). Da qui la soglia gatea le sole due
+     righe che la USANO — la prosa e l'invito — e mai il fatto.
+     IL DIFETTO DA CUI NASCE QUESTO RAMO: prima il verde arrivava da
+     un `else` NUDO che raccoglieva anche «soglia non raggiungibile
+     con questo stock», cioe' prometteva gratis dove il conto
+     addebitava (difetto vero dal campo, su OGNI annuncio del negozio
+     sotto soglia). IL CONTO NON HA MAI SBAGLIATO — `_sped_gratis`
+     decide nello stesso identico punto in _strade_preventivo e in
+     compra(), quindi preventivo, ordine e fattura dicevano la stessa
+     cifra — a mentire era il solo cartello. Il verde agganciato al
+     FATTO chiude quel caso per costruzione: dove si paga, la cifra
+     non e' zero, e il badge non c'e'. */
+  const sgGratisOra = !!stradaSel && !stradaSel.cambio_assente
+                   && (stradaSel.spedizione_sats||0) === 0;
   let pillaSg = '';
-  if (sgSoglia > 0 && spedisceQui
-      && d.via !== 'ritiro' && d.via !== 'digitale'){
-    if (p.promesse_sospese && sgVal === 'eur')
+  if (spedisceQui && d.via !== 'ritiro' && d.via !== 'digitale'){
+    if (sgGratisOra)
+      pillaSg = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b></span>`;
+    else if (sgSoglia > 0 && p.promesse_sospese && sgVal === 'eur')
       note += `<div class="acq-nota">🚚 Il negozio offre la spedizione da
            ${cifraSoglia(sgSoglia, sgVal)} di
            articoli, ma adesso non riusciamo a fare il cambio: per
            questo acquisto la spedizione si paga.</div>`;
-    else if (sgManca > 0 && p.sped_gratis_raggiungibile !== false)
+    else if (sgSoglia > 0 && sgManca > 0
+             && p.sped_gratis_raggiungibile !== false)
       pillaSg = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(sgSoglia, sgManca)}>🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
-    /* IL VERDE VUOLE LA SUA CONDIZIONE, MAI UN `else` NUDO (ago 2026,
-       difetto vero dal campo: «Spedizione gratis» sul badge e la
-       spedizione addebitata nel conto, su OGNI annuncio del negozio
-       che da solo non arrivava alla soglia). Il catch-all raccoglieva
-       due casi diversi — «la soglia e' raggiunta» e «la soglia non e'
-       raggiungibile con questo stock» — e al secondo prometteva una
-       cosa che la invoice poi non faceva. L'invito aveva guadagnato la
-       guardia della raggiungibilita' senza che il verde perdesse il
-       ramo che gliela scavalcava.
-       IL CONTO NON SBAGLIAVA MAI: `_sped_gratis` decide nello stesso
-       identico punto in _strade_preventivo e in compra(), quindi
-       preventivo, ordine e fattura dicevano la stessa cifra — a
-       mentire era il solo cartello.
-       `sgManca === 0` E' IL FATTO, ed e' il gemello di quello che la
-       🎁 chiede da sempre (`sconto_sats > 0`): la' il verde e' agganciato
-       al risultato e sta PRIMA dell'invito, qui arrivava per esclusione.
-       Il caso «non raggiungibile» adesso non disegna NIENTE, che e' quel
-       che il cantiere dell'invito voleva: un'assenza non e' una bugia.
-       La strada del cambio muto resta al ramo di sopra — li' `sgManca`
-       vale 0 perche' la misura non c'e', non perche' la soglia sia
-       raggiunta, e senza quella prosa questo `=== 0` direbbe il falso. */
-    else if (sgManca === 0)
-      pillaSg = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b></span>`;
   }
   /* LA FILA: 🚚 PRIMA della 🎁 (12 ago 2026, decisione di Andrea) —
      lo stesso ordine di «Altri oggetti», del carrello e della testata
