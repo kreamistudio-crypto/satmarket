@@ -2072,8 +2072,17 @@ def prove_busta_ritiro():
     pacco e' GIA' al punto."""
     print("\n[la busta di consegna]")
     import asyncio
+    import shutil
     import sqlite3
+    import tempfile
     import time as _t
+
+    # la whitelist delle firme e' una costante, non una funzione:
+    # si estrae per testo come tutto il resto, o la prova giudicherebbe
+    # una tabella scritta a mano invece di quella vera
+    _i = _SORGENTE.index("FIRME_DOC_BUSTA = (")
+    _firme_doc = _SORGENTE[_i:_SORGENTE.index("\n)\n", _i) + 3]
+    buste_dir = tempfile.mkdtemp(prefix="buste-prove-")
 
     # --- le sentinelle di forma: la SEPARAZIONE dall'escrow ---------
     dep = pezzo("deposita_busta_ritiro").split('"""')[-1]
@@ -2164,6 +2173,8 @@ def prove_busta_ritiro():
         busta_nome TEXT DEFAULT '', busta_codice TEXT DEFAULT '',
         busta_il INT DEFAULT 0, busta_corretta_il INT DEFAULT 0,
         busta_correzioni INT DEFAULT 0,
+        busta_file TEXT DEFAULT '', busta_file_tipo TEXT DEFAULT '',
+        busta_file_nome TEXT DEFAULT '',
         sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0);
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
         asta_base_sats INT DEFAULT 0);
@@ -2212,9 +2223,21 @@ def prove_busta_ritiro():
                "hashlib": __import__("hashlib"), "time": _t,
                "html": __import__("html"),   # segna_spedito scappa i suoi
                "CHIAVE_CONTENUTI_DIGITALI": "", "Fernet": None,
-               "MSG_BUSTA_PRONTA": "TI-ASPETTA"}
+               "MSG_BUSTA_PRONTA": "TI-ASPETTA",
+               # il documento di ritiro: cartella usa-e-getta, cosi'
+               # la prova scrive davvero un file e lo si puo' guardare
+               "os": __import__("os"), "re": __import__("re"),
+               "base64": __import__("base64"),
+               "secrets": __import__("secrets"),
+               "BUSTE_DIR": buste_dir, "MAX_DOC_BUSTA": 15 * 1024 * 1024,
+               "_e_immagine": lambda raw: True}
         exec(pezzo("_cifra_contenuto"), amb)
         exec(pezzo("_decifra_contenuto"), amb)
+        exec(pezzo("_cifra_blob"), amb)
+        exec(pezzo("_decifra_blob"), amb)
+        exec(_firme_doc, amb)
+        exec(pezzo("_documento_busta"), amb)
+        exec(pezzo("_etichetta_documento"), amb)
         return amb
 
     def corri(amb, nome, *args):
@@ -2241,9 +2264,12 @@ def prove_busta_ritiro():
           deposita(999, 1, busta))
     prova("niente busta fuori dalla via punto", True,
           str(deposita(222, 2, busta)).startswith("400 Questo ordine"))
-    prova("i due campi servono insieme", True,
+    prova("il nome serve sempre", True,
+          str(deposita(222, 1, {"codice": "PIN"})).startswith(
+              "400 Serve il nome"))
+    prova("...e poi una strada: senza codice ne' documento, no", True,
           str(deposita(222, 1, {"nome": "Mario"})).startswith(
-              "400 Servono entrambi"))
+              "400 Serve il codice"))
     prima = [tuple(r) for r in vero.execute(
         "SELECT stato, spedito_il, consegnato, aggiornato FROM ordini")]
     r1 = deposita(222, 1, busta)
@@ -2303,6 +2329,161 @@ def prove_busta_ritiro():
     prova("la lettura non scrive NIENTE (la prova regina)", dump,
           [tuple(r) for r in vero.execute(
               "SELECT * FROM ordini ORDER BY id")])
+
+    # --- il documento di ritiro: l'altra strada per il codice --------
+    # (ago 2026: un PIN si trascrive, un QR no)
+    import base64 as _b64
+    import os as _os
+    PDF = "data:application/pdf;base64," + _b64.b64encode(
+        b"%PDF-1.4 finto ma con la firma giusta").decode()
+    JPG = "data:image/jpeg;base64," + _b64.b64encode(
+        b"\xff\xd8\xff finto").decode()
+    prova("il tipo lo dicono i BYTE, non l'etichetta", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "P",
+                                "file": "data:image/jpeg;base64," +
+                                _b64.b64encode(b"%PDF- travestito"
+                                               ).decode()})
+              ).startswith("400") is False
+          # il PDF travestito da jpeg entra COME PDF, non come foto
+          and vero.execute("SELECT busta_file_tipo FROM ordini WHERE "
+                           "id=1").fetchone()[0] == "application/pdf")
+    prova("cio' che non si riconosce non entra", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "P",
+                                "file": "data:text/plain;base64," +
+                                _b64.b64encode(b"ciao").decode()})
+              ).startswith("400 Si possono caricare"))
+    prova("il troppo pesante lo dice, non tronca", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "P",
+                                "file": "data:image/jpeg;base64," +
+                                _b64.b64encode(b"\xff\xd8\xff" +
+                                               b"x" * (16 * 1024 * 1024)
+                                               ).decode()})
+              ).startswith("400 Il documento è troppo pesante"))
+    avvisi.clear()
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "",
+                      # il nome del file lo scrive il telefono del
+                      # venditore e finisce nel Content-Disposition:
+                      # il percorso lo toglie il basename, la
+                      # VIRGOLETTA e l'a-capo solo la ripulitura — e
+                      # una virgoletta li' dentro spezza l'header
+                      "file": JPG,
+                      "file_nome": '../etc/qr "locker"\n.jpg'})
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("il documento basta da solo: niente codice, e passa", True,
+          bool(o1["busta_file"]) and o1["busta_codice"] == "plain:")
+    prova("il nome del file e' ripulito (percorso, virgolette, a capo)",
+          "qr locker.jpg", o1["busta_file_nome"])
+    prova("il nome sul disco non si indovina dall'ordine", True,
+          o1["busta_file"].startswith("b1_")
+          and len(o1["busta_file"]) > 12)
+    su_disco = _os.path.join(buste_dir, o1["busta_file"])
+    grezzi = open(su_disco, "rb").read()
+    prova("sul disco NON c'e' un JPEG nudo: c'e' il trasporto di casa",
+          True, grezzi.startswith(b"plain:")
+          and not grezzi.startswith(b"\xff\xd8\xff"))
+    prova("...e i byte tornano indietro interi", True,
+          _amb(222)["_decifra_blob"](grezzi).startswith(b"\xff\xd8\xff"))
+    letto = leggi(111, 1)
+    prova("la lettura dice che c'e', il nome e il tipo", True,
+          letto["documento"] is True and letto["documento_tipo"]
+          == "image/jpeg" and letto["documento_nome"] == "qr locker.jpg")
+    prova("...ma MAI il nome sul disco (e' la maniglia, non un dato)",
+          [], [k for k, v in letto.items()
+               if isinstance(v, str) and v == o1["busta_file"]])
+    vecchio = o1["busta_file"]
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "", "file": PDF})
+    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("il documento nuovo si porta via il vecchio", True,
+          o1["busta_file"] != vecchio
+          and not _os.path.exists(_os.path.join(buste_dir, vecchio)))
+    prova("...e il tipo lo segue", "application/pdf",
+          o1["busta_file_tipo"])
+    resta = o1["busta_file"]
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "PIN 1"})
+    prova("chiave assente = si CONSERVA (il patto dello stock)", resta,
+          vero.execute("SELECT busta_file FROM ordini "
+                       "WHERE id=1").fetchone()[0])
+    prova("togliere e' un gesto ESPLICITO", "",
+          (deposita(222, 1, {"nome": "Mario Rossi", "codice": "PIN 1",
+                             "file_togli": 1}),
+           vero.execute("SELECT busta_file FROM ordini "
+                        "WHERE id=1").fetchone()[0])[1])
+    prova("...e col documento tolto il file sparisce dal disco", False,
+          _os.path.exists(_os.path.join(buste_dir, resta)))
+    prova("togliere l'ultima strada rimasta, no", True,
+          str(deposita(222, 1, {"nome": "Mario", "codice": "",
+                                "file_togli": 1})
+              ).startswith("400 Serve il codice"))
+
+    # --- la rotta dei byte, girata PER DAVVERO -----------------------
+    # e' la rotta che consegna la credenziale di ritiro: una sentinella
+    # sul testo dice che le righe ci sono, non che escono i byte giusti
+    # a chi di dovere. `Response` di cartone, il resto e' il pezzo vero.
+    class _Resp:
+        def __init__(self, content=None, media_type="", headers=None):
+            self.content, self.media_type = content, media_type
+            self.headers = headers or {}
+
+    deposita(222, 1, {"nome": "Mario Rossi", "codice": "",
+                      "file": JPG, "file_nome": "qr.jpg"})
+
+    def byte(chi, oid):
+        amb = _amb(chi)
+        amb["Response"] = _Resp
+        exec("async " + pezzo("leggi_documento_busta"), amb)
+        return corri(amb, "leggi_documento_busta", oid)
+
+    veri = _b64.b64decode(JPG.split(",", 1)[1])
+    r = byte(111, 1)
+    prova("il compratore riceve i byte VERI, decifrati", True,
+          isinstance(r, _Resp) and r.content == veri)
+    prova("...col tipo che il venditore ha caricato", "image/jpeg",
+          r.media_type)
+    prova("...e senza cache: una copia e' una copia del codice", True,
+          "no-store" in r.headers.get("Cache-Control", ""))
+    prova("il venditore rilegge il suo", True,
+          isinstance(byte(222, 1), _Resp))
+    prova("l'estraneo e l'ordine inesistente rispondono UGUALE", True,
+          byte(999, 1) == byte(111, 777) == "400 Operazione non permessa")
+    prova("l'ordine senza documento e' un 404 onesto", True,
+          str(byte(111, 2)).startswith("404"))
+    dump = [tuple(x) for x in vero.execute(
+        "SELECT * FROM ordini ORDER BY id")]
+    byte(111, 1); byte(111, 1)
+    prova("aprire il documento non scrive NIENTE (non e' una ricevuta)",
+          dump, [tuple(x) for x in vero.execute(
+              "SELECT * FROM ordini ORDER BY id")])
+    # il file sparito da sotto: si dice, non si consegnano byte rotti
+    _os.remove(_os.path.join(buste_dir, vero.execute(
+        "SELECT busta_file FROM ordini WHERE id=1").fetchone()[0]))
+    prova("documento sparito dal disco: 503 onesto, mai byte a caso",
+          True, str(byte(111, 1)).startswith("503"))
+    shutil.rmtree(buste_dir, ignore_errors=True)
+    avvisi.clear()   # i depositi qui sopra hanno avvisato: chi viene
+                     # dopo conta i SUOI squilli, non i nostri
+
+    # la rotta dei byte: le stesse regole della busta, riga per riga
+    fil = pezzo("leggi_documento_busta").split('"""')[-1]
+    prova("i byte: solo le due parti, mai l'admin", True,
+          "(compratore_id=? OR venditore_id=?)" in fil
+          and "e_admin" not in fil)
+    prova("i byte: l'autorizzazione PRIMA dell'esistenza", True,
+          fil.index("Operazione non permessa")
+          < fil.index("Nessun documento"))
+    prova("i byte: GET puro, nessuna scrittura", [],
+          [x for x in ("UPDATE", "INSERT", "commit()") if x in fil])
+    prova("i byte non si mettono MAI in cache", True,
+          "no-store" in fil)
+    prova("...e non si eseguono: nosniff e sandbox", True,
+          "nosniff" in fil and "sandbox" in fil)
+    prova("i documenti NON stanno in foto/", True,
+          "BUSTE_DIR" in fil and "FOTO_DIR" not in fil
+          and "BUSTE_DIR" in dep and "FOTO_DIR" not in dep)
+    prova("nessuna rotta serve la cartella dei documenti", 0,
+          _SORGENTE.count('"/buste'))
+    prova("dal client il documento viaggia col flag e basta", True,
+          'r.pop("busta_file_tipo"' in mo and 'r.pop("busta_file_nome"'
+          in mo and 'r.pop("busta_file", "")' in mo)
 
     # --- il promemoria al posto del gate -----------------------------
     vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
@@ -6575,6 +6756,44 @@ def prove_sped_gratis():
               for v in ("eur", "sats", "usd", "")))
 
     # ================================================================
+    # I DUE CATALOGHI DI SELECT DICONO LE STESSE PROMESSE
+    # ================================================================
+    # «I tuoi annunci» passa da CAMPI_MIEI e non da CAMPI_VETRINA:
+    # senza gli stessi alias, il PROPRIETARIO e' l'unico a non vedere
+    # la propria promessa sul proprio oggetto. E' successo davvero —
+    # la prima stesura portava il solo lato EURO, perche' era di prima
+    # che la valuta la scegliesse il venditore, e chi aveva messo la
+    # soglia in SATS restava fuori.
+    # E' un CENSIMENTO e non un elenco (la lezione del titolo nudo): si
+    # estraggono gli alias dai due cataloghi e si chiede che la vetrina
+    # non ne abbia uno in piu'. Il campo che qualcuno aggiungera' di la'
+    # fra sei mesi entra nel conto da solo, e il diff lo NOMINA invece
+    # di dire «due insiemi diversi».
+    def _alias(nome):
+        s = _SORGENTE[_SORGENTE.index(f"{nome} = ("):]
+        return set(re.findall(r"u\.(\w+) AS (venditore_\w+)",
+                              s[:s.index("\n\n")]))
+
+    def _promesse(alias):
+        return {a for c, a in alias
+                if c.startswith(("sconto_pacco", "sped_gratis", "ferie_fino"))}
+
+    in_vetrina = _promesse(_alias("CAMPI_VETRINA"))
+    in_miei = _promesse(_alias("CAMPI_MIEI"))
+    prova("CAMPI_MIEI porta tutte le promesse di CAMPI_VETRINA",
+          set(), in_vetrina - in_miei)
+    # ...e che il censimento VEDA davvero: con un predicato rotto, un
+    # insieme vuoto meno un insieme vuoto fa vuoto, e la riga qui sopra
+    # sembrerebbe una promozione invece che una cecita'.
+    prova("il censimento vede le promesse della vetrina", True,
+          len(in_vetrina) >= 9)
+    prova("...e i due lati della soglia, con la valuta che decide", True,
+          {"venditore_sconto_valore", "venditore_sconto_valore_eur",
+           "venditore_sconto_valuta", "venditore_sped_gratis",
+           "venditore_sped_gratis_eur",
+           "venditore_sped_gratis_valuta"} <= in_miei)
+
+    # ================================================================
     # LE DUE PROMESSE SONO INDIPENDENTI (decisione 3 di Andrea), ed e'
     # la parte che vale il cantiere: misurano ENTRAMBE l'articolo
     # LORDO, quindi nessuna delle due puo' spegnere l'altra. I quattro
@@ -9186,8 +9405,27 @@ def _censimento(acceso):
                  "GIORNI_DATA_ANNUNCIO", "ORE_CAMBIO_VALIDO",
                  "CAMBIO_RINFRESCO_S", "TETTO_DIGITALE_NUOVI",
                  "DIGITALE_MIN_VENDITE", "SUGGERIMENTI_DI_SERIE",
-                 "SUGGERIMENTI_OGNI_GIORNI"):
+                 "SUGGERIMENTI_OGNI_GIORNI", "PROMO_GIORNI_VENDITORE",
+                 "POST_LAMPO_CANALE", "RIEPILOGO_SETTIMANALE",
+                 "RIEPILOGO_MINIMO"):
         amb[nome] = acceso and 24
+    # Il canale non si legge piu' dalla costante: dall'ago 2026 lo
+    # decide il bot e il giudice e' `canale_id()`, che va a leggere il
+    # database. Qui si stuba — al pannello interessa il FATTO, e
+    # trascinare dentro una connessione renderebbe questa prova
+    # dipendente da un file su disco, che e' esattamente il tipo di
+    # prova che diventa rossa per conto suo.
+    amb["canale_id"] = (lambda: "@canale_finto") if acceso else (lambda: "")
+    # Il RITMO del canale, per la stessa ragione del canale: dall'ago
+    # 2026 lo decide `/vetrina` e i giudici vanno a leggere il
+    # database. Il pannello DEVE chiamare loro e non le costanti — la
+    # prova «il pannello dice il ritmo EFFETTIVO» piu' sotto vive
+    # proprio su questi stub, che dicono numeri che nessuna costante
+    # del config finto potrebbe dire.
+    amb["ritmo_vetrina"] = ((lambda: (1, 2, 3)) if acceso
+                            else (lambda: (0, 0, 0)))
+    amb["nome_ritmo"] = (lambda: "giorno") if acceso else (lambda: "")
+    amb["SPIEGA_RITMO"] = {"giorno": "uno al giorno per venditore"}
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
     amb["_NOSTR"] = ("chiave", "pubkey") if acceso else None
@@ -9201,6 +9439,592 @@ def _censimento(acceso):
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
     return gruppi, voci, json.dumps(gruppi, default=str, ensure_ascii=False)
+
+
+def prove_canale_bot():
+    """IL CANALE E IL BOT CHE SFOGLIA (ago 2026).
+
+    Quattro famiglie, e la prima e' quella che decide: il freno del
+    canale — un post per venditore a settimana, e fra i suoi il piu'
+    recente — perche' e' l'unico pezzo di questo cantiere che DECIDE
+    qualcosa invece di limitarsi a scrivere del testo."""
+    print("\n[il canale e il bot che sfoglia]")
+    import html
+
+    # --- 1) UN POST PER VENDITORE A SETTIMANA --------------------
+    import time as _time
+    amb = {"time": _time}
+    exec(pezzo("_un_post_per_venditore"), amb)
+    filtro = amb["_un_post_per_venditore"]
+    ora = 1_000_000_000
+
+    def ann(i, v, creato, ultimo=0):
+        return {"id": i, "venditore_id": v, "creato": creato,
+                "promo_canale_il": ultimo}
+
+    uno = filtro([ann(1, 10, 100), ann(2, 10, 200), ann(3, 10, 150)], 7, ora)
+    prova("tre annunci dello stesso venditore diventano uno", 1, len(uno))
+    prova("e vince il PIU' RECENTE", 2, uno[0]["id"])
+    due = filtro([ann(1, 10, 100), ann(2, 20, 100)], 7, ora)
+    prova("venditori diversi non si tolgono il posto", 2, len(due))
+    # il tie-break: due annunci nello stesso secondo esistono davvero
+    pari = filtro([ann(7, 10, 100), ann(9, 10, 100)], 7, ora)
+    prova("a pari secondo comanda l'id piu' alto", 9, pari[0]["id"])
+    # il timbro: chi ha gia' avuto il turno tace fino alla scadenza
+    ieri = ora - 86400
+    prova("chi ha postato ieri resta fuori",
+          [], filtro([ann(1, 10, 100, ieri)], 7, ora))
+    otto = ora - 8 * 86400
+    prova("chi ha postato otto giorni fa rientra",
+          1, len(filtro([ann(1, 10, 100, otto)], 7, ora)))
+    filo = ora - 7 * 86400
+    prova("al filo esatto dei sette giorni rientra",
+          1, len(filtro([ann(1, 10, 100, filo)], 7, ora)))
+    prova("chi non ha mai postato entra sempre",
+          1, len(filtro([ann(1, 10, 100, 0)], 7, ora)))
+    # l'ordine di arrivo si conserva: la coda e' cronologica
+    misto = filtro([ann(1, 10, 100), ann(2, 20, 300), ann(3, 10, 500)], 7, ora)
+    prova("l'ordine della coda si conserva", [2, 3],
+          [a["id"] for a in misto])
+    # IL FRENO A ZERO (la posizione «tutto»): nessun freno, nemmeno
+    # quello del «uno per venditore» — si riconosce che e' una
+    # posizione della vetrina e non una taratura.
+    prova("freno a 0: nessun freno, passa tutto",
+          3, len(filtro([ann(1, 10, 100, ora), ann(2, 10, 200),
+                         ann(3, 10, 300)], 0, ora)))
+    # A UN GIORNO: chi ha postato ieri rientra, chi ha postato adesso no.
+    prova("a un giorno chi ha postato ieri rientra",
+          1, len(filtro([ann(1, 10, 100, ieri)], 1, ora)))
+    prova("...e chi ha postato adesso resta fuori",
+          [], filtro([ann(1, 10, 100, ora)], 1, ora))
+    # LA FIRMA NON HA DEFAULT, ed e' la lezione di `atteso_sats`: il
+    # ritmo lo sceglie il chiamante, e chi se lo dimentica lo sente da
+    # Python invece di ereditare in silenzio il freno sbagliato.
+    try:
+        filtro([ann(1, 10, 100)])
+        senza = "passata"
+    except TypeError:
+        senza = "TypeError"
+    prova("chiamarla senza il freno e' un errore", "TypeError", senza)
+
+    # --- 2) LA CAPTION DEL CANALE --------------------------------
+    cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store"}
+    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
+              "_hashtag_promo", "_firma_venditore", "_caption_canale"):
+        exec(pezzo(f), cap)
+    a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
+         "valuta": "sats", "zona": "Torino (TO)", "categoria": "Strumenti musicali",
+         "venditore": "Alan", "venditore_username": "AlanBimbati",
+         "venditore_negozio": "abc12345"}
+    t = cap["_caption_canale"](a, 0)
+    prova("il titolo c'e' in grassetto", True,
+          "<b>Chitarra classica</b>" in t)
+    prova("il prezzo c'e'", True, "80.000 sats" in t)
+    prova("«Pagabile in Satoshi» c'e'", True, "Pagabile in Satoshi" in t)
+    prova("il link e' un'ancora «Apri su Barattolo»", True,
+          '<a href="https://barattolo.store/annuncio/42">🫙 Apri su '
+          'Barattolo</a>' in t)
+    # IL PUNTO DEL CANTIERE: l'URL non si vede in chiaro da nessuna
+    # parte. Si contano le occorrenze fuori dagli href — un URL nudo
+    # rimasto in coda sarebbe passato dalla prova qui sopra.
+    nudi = re.sub(r'href="[^"]*"', "", t)
+    prova("nessun URL nudo nel post", False, "https://" in nudi)
+    prova("la firma nomina l'@username", True,
+          "Annuncio da <b>@AlanBimbati</b>" in t)
+    prova("e porta al negozio con un'ancora", True,
+          '<a href="https://barattolo.store/negozio/abc12345">vedi il '
+          'suo negozio</a>' in t)
+    prova("la categoria esce come hashtag", True,
+          "#strumentimusicali" in t and "#barattolo" in t)
+    prova("il ✅ Venduto si aggiunge in coda", True,
+          cap["_caption_canale"](a, 0, venduto=True).endswith("✅ Venduto"))
+
+    # Il venditore SENZA username (i nativi Nostr): niente «@», o
+    # nascerebbe una menzione che Telegram non sa risolvere.
+    b = dict(a, venditore_username="", venditore="Soddisfatto Cliente")
+    t2 = cap["_caption_canale"](b, 0)
+    prova("senza username niente chiocciola", False, "@" in t2)
+    prova("e si usa il nome", True,
+          "Annuncio da <b>Soddisfatto Cliente</b>" in t2)
+    # senza codice negozio niente link: porterebbe a un 404
+    t3 = cap["_caption_canale"](dict(a, venditore_negozio=""), 0)
+    prova("senza codice negozio niente ponte", False, "/negozio/" in t3)
+
+    # L'ESCAPE, che qui non e' pignoleria: il titolo lo scrive
+    # l'utente e la caption e' HTML — un «<» spegnerebbe il post in
+    # silenzio, ed e' la lezione gia' pagata coi promemoria.
+    cattivo = cap["_caption_canale"](
+        dict(a, titolo="<b>SVENDO</b> & fuggo",
+             venditore_username="", venditore="<i>Tizio</i>"), 0)
+    prova("il titolo dell'utente passa da escape", True,
+          "&lt;b&gt;SVENDO&lt;/b&gt; &amp; fuggo" in cattivo)
+    prova("e cosi' il nome del venditore", True,
+          "&lt;i&gt;Tizio&lt;/i&gt;" in cattivo)
+
+    # --- 3) LA GRIGLIA DELLE CATEGORIE ---------------------------
+    # L'OTTAVA COPIA del catalogo: le emoji del bot devono dire le
+    # stesse cose di quelle della Mini App, o la griglia di Telegram e
+    # quella di Sfoglia mostrerebbero due reparti diversi con lo
+    # stesso nome. E' la rete di CATEGORIE_SENZA_CONDIZIONE.
+    amb2 = {}
+    i = _SORGENTE.index("EMOJI_CATEGORIA = {")
+    exec(_SORGENTE[i:_SORGENTE.index("}", i) + 1], amb2)
+    server_em = amb2["EMOJI_CATEGORIA"]
+    mini = open("miniapp.html", encoding="utf-8").read()
+    j = mini.index("const EMOJI_CAT = {")
+    client_em = dict(re.findall(r"'([^']+)':'([^']+)'",
+                                mini[j:mini.index("};", j)]))
+    prova("le emoji del bot e quelle della Mini App combaciano",
+          client_em, server_em)
+    i = _SORGENTE.index("CATEGORIE = (")
+    amb2["CATEGORIE"] = None
+    exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb2)
+    prova("e coprono tutto il catalogo",
+          sorted(amb2["CATEGORIE"]), sorted(server_em))
+
+    # La tastiera: due colonne, ordine FISSO del catalogo, e l'INDICE
+    # nel callback_data (64 byte scarsi, e il nome ci starebbe stretto).
+    amb2["EMOJI_CATEGORIA"] = server_em
+    amb2["URL_PUBBLICO"] = "https://barattolo.store"
+    exec(pezzo("_riga_webapp"), amb2)
+    exec(pezzo("tastiera_categorie"), amb2)
+    tast = amb2["tastiera_categorie"]()["inline_keyboard"]
+    prova("la Mini App e' la PRIMA riga di tastiera", True,
+          tast[0][0]["url"] == "https://barattolo.store")
+    griglia = tast[1:]
+    prova("due colonne", True, all(len(r) <= 2 for r in griglia))
+    prova("c'e' ogni categoria", len(amb2["CATEGORIE"]),
+          sum(len(r) for r in griglia))
+    prova("nell'ordine del catalogo", amb2["CATEGORIE"][0],
+          griglia[0][0]["text"].split(" ", 1)[1])
+    dati = [v["callback_data"] for r in griglia for v in r]
+    prova("il callback_data sta nei 64 byte", True,
+          all(len(d.encode()) <= 64 for d in dati))
+    prova("e porta l'INDICE, non il nome", "sfo:0:0", dati[0])
+
+    # --- 4) LA MINI APP VIENE PRIMA ------------------------------
+    # La regola di prodotto, e per questo e' una prova e non una
+    # buona intenzione: il bottone verso Barattolo e' esattamente la
+    # riga che si dimentica nella tastiera aggiunta fra sei mesi.
+    exec(pezzo("tastiera_bot"), amb2)
+    for nome, t in (("vuota", amb2["tastiera_bot"]()),
+                    ("con altre righe", amb2["tastiera_bot"](
+                        [[{"text": "x", "callback_data": "y"}]]))):
+        prova(f"tastiera {nome}: la Mini App e' in cima", True,
+              t["inline_keyboard"][0][0]["url"] == "https://barattolo.store")
+    sorgente_bot = pezzo("gestisci_update")
+    prova("/start non elenca comandi, invita ad aprire", True,
+          "tastiera_bot()" in sorgente_bot and "/canale" not in
+          sorgente_bot.split("if testo.startswith(\"/canale\")")[0]
+          .split("return await bot_api")[1])
+    prova("chi scrive altro riceve comunque i bottoni", True,
+          "sfo:menu:0" in sorgente_bot.rsplit("reply_markup", 1)[1]
+          or "sfo:menu:0" in sorgente_bot)
+
+    # --- 5) IL CANALE HA UN GIUDICE SOLO -------------------------
+    # Se un giorno divergessero, il ✅ Venduto finirebbe in un canale e
+    # il post originale in un altro.
+    # E' un CENSIMENTO e non un elenco (la lezione del titolo nudo, e
+    # qui e' servita subito: dall'ago 2026 le funzioni che scrivono nel
+    # canale sono SEI e questa lista ne diceva quattro). Si guarda
+    # tutto il file e si chiede che la COSTANTE del config non si
+    # nomini in nessuna funzione tranne il giudice, che la usa come
+    # valore di partenza, e il pannello, che ne mostra il nome. Chi
+    # scrivera' un post nuovo fra sei mesi entra nel conto da solo.
+    # I corpi si prendono da pezzo(), che taglia alla riga vuota
+    # doppia: affettare «da un def al successivo» si porterebbe dentro
+    # i commenti di modulo che stanno in mezzo, e questa prova
+    # nominerebbe funzioni che quella parola non l'hanno mai vista.
+    def _corpo(n):
+        try:                      # l'ultima funzione del file non ha
+            return pezzo(n)       # due righe vuote dopo di se'
+        except ValueError:
+            return _SORGENTE[_SORGENTE.index(f"def {n}("):]
+
+    _corpi = {n: _corpo(n) for n in set(re.findall(
+        r"(?m)^(?:async )?def ([a-z_][a-z_0-9]*)\(", _SORGENTE))}
+    prova("la costante del canale si nomina solo dove deve",
+          {"canale_id", "_leve_stato"},
+          {n for n, c in _corpi.items() if "TELEGRAM_CANALE_ID" in c})
+    # ...e ogni funzione che POSTA nel canale passa dal giudice.
+    for f in ("_posta_promo_singolo", "_posta_promo_aggregato",
+              "promo_lampo", "riepilogo_settimana"):
+        prova(f"{f} scrive col giudice", True,
+              'chat_id": canale_id()' in pezzo(f))
+    # L'ELENCO e non il conto: se qualcuno apre una settima bocca sul
+    # canale, il diff di questa prova la NOMINA invece di dire «7 != 6»
+    # e mandare a cercarla a mano.
+    prova("chi parla col canale e' questo e basta",
+          {"_posta_promo_singolo",    # l'annuncio nuovo
+           "_posta_promo_aggregato",  # la valvola delle raffiche
+           "promo_lampo",             # lo sconto a tempo
+           "promo_venduto",           # il ✅ sul post gia' fatto
+           "promo_rimuovi",           # il post cancellato
+           "riepilogo_settimana",     # il lunedi'
+           "comando_canale"},         # che il canale lo DICE, non ci posta
+          {n for n, c in _corpi.items()
+           if "canale_id()" in c and "bot_api(" in c})
+    # La caption RICOSTRUITA deve avere la firma: senza il JOIN il
+    # post riscritto col ✅ perderebbe il venditore che aveva da nuovo.
+    prova("promo_venduto rilegge anche il venditore", True,
+          "venditore_username" in pezzo("promo_venduto"))
+    prova("e cosi' il drenatore", True,
+          "venditore_negozio" in pezzo("_drena_promo"))
+    # Il timbro PRIMA dell'invio, il patto delle campagne.
+    corpo = pezzo("_posta_promo_singolo")
+    prova("il timbro del turno si scrive PRIMA di postare", True,
+          corpo.index("promo_canale_il") < corpo.index("bot_api"))
+
+    # --- 6) I COMANDI DI SERVIZIO SONO DEI DUE ADMIN -------------
+    amb3 = {}
+    exec(pezzo("e_admin"), amb3)
+    amb3.update(ADMIN_IDS=[555], MODALITA_COLLAUDO=False)
+    exec("ADMIN_BOT_USERNAME = " + repr(("alanbimbati", "aandreaiita")), amb3)
+    exec(pezzo("e_admin_bot"), amb3)
+    ok = amb3["e_admin_bot"]
+    prova("i due username passano", True,
+          ok({"id": 1, "username": "AlanBimbati"})
+          and ok({"id": 2, "username": "aandreaiita"}))
+    prova("maiuscole comprese", True, ok({"id": 1, "username": "ALANBIMBATI"}))
+    prova("i moderatori di sempre passano", True, ok({"id": 555}))
+    prova("un estraneo no", False, ok({"id": 3, "username": "tizio"}))
+    prova("e nemmeno chi non ha username", False, ok({"id": 3}))
+    # l'username si prende dal MESSAGGIO e non dalla riga `utenti`:
+    # quella potrebbe portarne uno vecchio, magari gia' preso da un
+    # altro. La firma dice tutto: riceve il mittente, non un tg_id.
+    prova("giudica il mittente, non un id", True,
+          "mittente" in pezzo("e_admin_bot").split("\n")[0])
+    # la risposta al non-admin non deve MAI dire «non sei
+    # autorizzato»: direbbe a un curioso che quel comando esiste. Si
+    # guarda il corpo, non la docstring, che la parola la spiega.
+    corpo_canale = pezzo("comando_canale").split('"""')[2]
+    prova("chi non e' admin non impara che il comando esiste", False,
+          "autorizzat" in corpo_canale.lower())
+    prova("il canale si prova prima di crederci", True,
+          pezzo("comando_canale").index('"chat_id": arg')
+          < pezzo("comando_canale").index("imposta_canale(arg)"))
+    # IL RECINTO DELLE IMPOSTAZIONI, che e' da NON allargare: mai
+    # segreti (finiscono nei backup) e mai leve del DENARO — quelle
+    # nascono spente nel codice apposta, perche' accenderle costi un
+    # gesto dal VPS.
+    # E' un CENSIMENTO e non un conteggio (la lezione del titolo nudo):
+    # si estraggono le chiavi VERE dal sorgente e si chiede che siano
+    # quelle dichiarate qui. Un `<= 2` diceva quante volte si legge,
+    # non COSA — e sarebbe passato liscio davanti a una riga nuova che
+    # ne sostituisce una vecchia. Chi ne aggiunge una la scrive qui, e
+    # nel farlo si rilegge la regola.
+    RECINTO = {"canale_telegram",   # dove parla il bot  (`/canale`)
+               "ritmo_vetrina"}     # quanto parla       (`/vetrina`)
+    chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
+    chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
+                             _SORGENTE))
+    prova("nel recinto delle impostazioni ci sono solo le chiavi note",
+          RECINTO, chiavi)
+
+
+def prove_vetrina_canale():
+    """IL CANALE DIVENTA LA VETRINA (ago 2026, chiesto da Andrea).
+
+    Tre cantieri in uno, e ognuno ha la sua famiglia qui sotto: il
+    RITMO che si decide dal bot invece che dal config, lo SCONTO LAMPO
+    raccontato nel canale, e il RIEPILOGO del lunedi'.
+
+    La prova che decide e' l'ultima: il riepilogo gira DAVVERO tre
+    volte su tre ambienti diversi con lo stesso database sotto — cioe'
+    tre deploy — e deve parlare una volta sola. E soprattutto deve
+    TIMBRARE ANCHE QUANDO TACE, che e' il contrario del termometro:
+    li' il conto e' cumulativo e saltare il turno lo rimanda, qui il
+    conto e' di una settimana precisa e ricontrollare martedi' darebbe
+    una finestra sfasata."""
+    print("\n[il canale diventa la vetrina]")
+    import asyncio as _aio
+    import html as _html
+    import sqlite3
+    import time as _time
+
+    # --- 1) I GIUDICI DEL RITMO ----------------------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE impostazioni(chiave TEXT PRIMARY KEY, "
+                "valore TEXT DEFAULT '')")
+    con.commit()
+
+    class ConFinta:
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass                  # su :memory: chiuderebbe il database
+
+    amb = {"db": lambda: ConFinta(), "sqlite3": sqlite3,
+           # i valori del CONFIG, riconoscibili: se un giudice li
+           # restituisce vuol dire che nessuna posizione e' in vigore
+           "PROMO_GIORNI_VENDITORE": 7, "POST_MAX_ORA": 6,
+           "SOGLIA_AGGREGA": 3}
+    for f in ("impostazione", "scrivi_impostazione", "nome_ritmo",
+              "ritmo_vetrina", "imposta_ritmo"):
+        exec(pezzo(f), amb)
+    # RITMI e' un dizionario di modulo, non una funzione: si prende dal
+    # sorgente per testo, come i cataloghi.
+    _ritmi_src = _SORGENTE[_SORGENTE.index("RITMI = {"):]
+    exec(_ritmi_src[:_ritmi_src.index("\n}") + 2], amb)
+    RITMI = amb["RITMI"]
+
+    prova("le posizioni sono tre", {"tutto", "giorno", "settimana"},
+          set(RITMI))
+    prova("«tutto» non ha freno per venditore", 0, RITMI["tutto"][0])
+    prova("«giorno» ne ha uno", 1, RITMI["giorno"][0])
+    # SENZA RIGA VALE IL CONFIG, cioe' il mondo di ieri byte per byte:
+    # e' la retrocompatibilita' di questo cantiere, ed e' la riga che
+    # si rompe per prima se qualcuno mette un default nel giudice.
+    prova("nessuna posizione: i numeri del config", (7, 6, 3),
+          amb["ritmo_vetrina"]())
+    prova("...e il nome e' vuoto, non «settimana»", "", amb["nome_ritmo"]())
+    amb["imposta_ritmo"]("tutto")
+    prova("scelta «tutto»: i suoi numeri", RITMI["tutto"],
+          amb["ritmo_vetrina"]())
+    prova("...e il nome lo dice", "tutto", amb["nome_ritmo"]())
+    prova("le maiuscole non contano", "giorno", amb["imposta_ritmo"]("GIORNO"))
+    # FAIL-SAFE: un nome fuori catalogo — scritto a mano sul VPS, o
+    # rimasto da una posizione tolta — non deve poter spegnere il
+    # canale: si ricade sul config.
+    amb["scrivi_impostazione"]("ritmo_vetrina", "fantasia")
+    prova("nome storto: si ricade sul config", (7, 6, 3),
+          amb["ritmo_vetrina"]())
+    prova("...e il nome torna vuoto", "", amb["nome_ritmo"]())
+    prova("imposta_ritmo rifiuta un nome storto", "",
+          amb["imposta_ritmo"]("fantasia"))
+    prova("«config» annulla la scelta", "", amb["imposta_ritmo"]("config"))
+    # UN SOLO LETTORE della riga: nome_ritmo. Se anche ritmo_vetrina
+    # andasse a leggerla, i due potrebbero divergere fra una SELECT e
+    # l'altra e il pannello direbbe una posizione coi numeri di
+    # un'altra.
+    prova("la riga la legge solo nome_ritmo", True,
+          'impostazione("ritmo_vetrina"' in pezzo("nome_ritmo")
+          and 'impostazione("ritmo_vetrina"' not in pezzo("ritmo_vetrina"))
+
+    # --- 2) IL DRENATORE USA IL GIUDICE, NON LE COSTANTI ---------
+    dre = codice(pezzo("_drena_promo"))
+    prova("il drenatore chiede il ritmo al giudice", True,
+          "ritmo_vetrina()" in dre)
+    for k in ("PROMO_GIORNI_VENDITORE", "POST_MAX_ORA", "SOGLIA_AGGREGA"):
+        prova(f"...e non nomina {k}", False, k in dre)
+    # UNA VOLTA SOLA in cima al giro: un `/vetrina` che arriva a meta'
+    # drenaggio non deve far uscire mezzo gruppo con una regola e
+    # mezzo con un'altra.
+    prova("il ritmo si legge una volta sola", 1, dre.count("ritmo_vetrina()"))
+    # ...e i tre numeri li USA davvero. Senza queste due righe, un
+    # confronto con una costante scritta a mano passerebbe liscio: le
+    # tre prove qui sopra guardano che le COSTANTI non si nominino,
+    # non che al loro posto ci siano i valori del giudice — l'ha detto
+    # la tortura, non la rilettura.
+    prova("la soglia dell'aggregato viene dal ritmo", True,
+          "len(annunci) <= soglia_aggrega" in dre)
+    prova("...e cosi' il tetto orario", True, "<= max_ora" in dre)
+    prova("...e il freno per venditore", True,
+          "_un_post_per_venditore(annunci, giorni)" in dre)
+    # e il timbro del turno lo RICEVE, non se lo rilegge. Si guarda il
+    # corpo DOPO la docstring: quella il giudice lo nomina apposta per
+    # spiegare da dove arriva, e una sentinella che ci inciampa dentro
+    # si fa aggiustare riscrivendo la prosa invece del codice.
+    sing = codice(pezzo("_posta_promo_singolo").split('"""')[2])
+    prova("chi posta riceve il freno dal chiamante", True,
+          "giorni > 0" in sing and "ritmo_vetrina" not in sing)
+
+    # --- 3) LO SCONTO LAMPO NEL CANALE ---------------------------
+    pl = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
+    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "_prezzo_lampo",
+              "_riga_prezzo_lampo"):
+        exec(pezzo(f), pl)
+    a_sats = {"prezzo_sats": 80000, "prezzo_eur": 0.0, "valuta": "sats"}
+    riga = pl["_riga_prezzo_lampo"](a_sats, 20, 0)
+    prova("il listino e' barrato", True, "<s>80.000 sats</s>" in riga)
+    prova("...e accanto c'e' lo scontato", True, "<b>64.000 sats</b>" in riga)
+    # SUL LISTINO IN EURO lo sconto vale anche sull'equivalente in
+    # sats: la stessa percentuale sulle due facce, o la riga direbbe
+    # due sconti diversi.
+    a_eur = {"prezzo_sats": 80000, "prezzo_eur": 40.0, "valuta": "eur"}
+    riga_eur = pl["_riga_prezzo_lampo"](a_eur, 25, 0)
+    prova("in euro si barra l'euro", True, "<s>40,00 €" in riga_eur)
+    prova("...e lo scontato e' l'euro scontato", True, "<b>30,00 €" in riga_eur)
+    prova("...e i sats sono scontati con lui", True, "60.000 sats" in riga_eur)
+    lam = codice(pezzo("promo_lampo"))
+    # SOLO CANALE, NIENTE NOSTR: lo sconto e' locale, e il NIP-99 parla
+    # il prezzo pieno per costruzione — e' una regola gia' scritta.
+    prova("la lampo non finisce su Nostr", False,
+          "_spedisci_ai_relay" in lam or "firma_evento" in lam)
+    # LE GUARDIE DI CHI POSTA, tutte e tre: un negozio chiuso o un
+    # annuncio importato non si annunciano in piazza.
+    for guardia in ("stato", "contatto_nostr", "in_ferie"):
+        prova(f"la lampo guarda {guardia}", True, guardia in lam)
+    prova("...e che la lampo sia ancora viva", True, "lampo_scadenza" in lam)
+    # IL BUDGET ORARIO: senza, il tetto dei post si aggirerebbe
+    # lanciando sconti (MAX_LAMPO_SETTIMANA e' 2 *per annuncio*).
+    prova("la lampo consuma il budget orario", True,
+          "_post_promo_recenti.append" in lam)
+    prova("...e a budget pieno salta invece di aggregare", True,
+          "ritmo_vetrina()[1]" in lam and "_posta_promo_aggregato" not in lam)
+    # IL TITOLO SCAPPATO: le notifiche sono HTML e un «<» spegne il
+    # messaggio in silenzio (la lezione dell'avviso di spedizione).
+    prova("il titolo della lampo e' scappato", True,
+          "html.escape(a['titolo'])" in lam)
+    # e il gancio: DOPO il commit e in create_task, il patto di
+    # accoda_promo — un post fallito non rompe il lancio di uno sconto
+    lan = codice(pezzo("lancia_lampo"))
+    prova("il gancio e' un create_task", True,
+          "asyncio.create_task(promo_lampo(" in lan)
+    prova("...e sta dopo il commit", True,
+          lan.index("con.commit()") < lan.index("promo_lampo("))
+
+    # --- 4) IL RIEPILOGO: I CONTI --------------------------------
+    con.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
+                             creato INTEGER, stato TEXT);
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INTEGER,
+                            quantita INTEGER, stato TEXT, creato INTEGER);
+        CREATE TABLE ordine_righe(ordine_id INTEGER, annuncio_id INTEGER,
+                                  titolo TEXT, quantita INTEGER);
+        CREATE TABLE timbri(nome TEXT PRIMARY KEY, valore TEXT DEFAULT '',
+                            quando INTEGER DEFAULT 0);
+    """)
+    ora = 1_000_000_000
+    da = ora - 7 * 86400
+    for i, (tit, quando, stato) in enumerate([
+            ("Miele di castagno", ora - 86400, "attivo"),
+            ("Cuffie AKG", ora - 2 * 86400, "attivo"),
+            ("Jade", ora - 3 * 86400, "venduto"),
+            ("Roba tolta", ora - 86400, "rimosso"),
+            ("In attesa", ora - 86400, "revisione"),
+            ("Vecchio", da - 86400, "attivo")], start=1):
+        con.execute("INSERT INTO annunci VALUES(?,?,?,?)",
+                    (i, tit, quando, stato))
+    # tre ordini mono sul miele (uno pagato x3, uno pagato x1) e uno
+    # ancora 'creato', che NON conta: li' i sats non sono in cassaforte
+    con.execute("INSERT INTO ordini VALUES(1,1,3,'locked',?)", (ora - 3600,))
+    con.execute("INSERT INTO ordini VALUES(2,1,1,'released',?)", (ora - 7200,))
+    con.execute("INSERT INTO ordini VALUES(3,2,9,'creato',?)", (ora - 60,))
+    con.execute("INSERT INTO ordini VALUES(4,2,9,'annullato',?)", (ora - 60,))
+    # un SET: la testata ha annuncio_id=0 e la merce sta nelle righe
+    con.execute("INSERT INTO ordini VALUES(5,0,3,'shipped',?)", (ora - 1800,))
+    con.execute("INSERT INTO ordine_righe VALUES(5,2,'Cuffie AKG',2)")
+    con.execute("INSERT INTO ordine_righe VALUES(5,3,'Jade',1)")
+    # un ordine fuori finestra: non deve entrare in nessun conto
+    con.execute("INSERT INTO ordini VALUES(6,1,50,'released',?)",
+                (da - 3600,))
+    con.commit()
+    amb2 = {}
+    exec(pezzo("_conta_settimana"), amb2)
+    nuovi, ordini, top = amb2["_conta_settimana"](con, da)
+    # gli stati che sono stati in vetrina DAVVERO: il venduto ci entra
+    # (e' stato un annuncio vero, e' solo finito), rimosso e revisione no
+    prova("gli annunci nuovi sono gli attivi e i venduti", 3, nuovi)
+    # i sats in cassaforte: il complemento di 'creato' e 'annullato'
+    prova("gli ordini sono quelli pagati", 3, ordini)
+    prova("la classifica ha tre voci", 3, len(top))
+    prova("in testa il miele con 4 pezzi",
+          ("Miele di castagno", 4), (top[0]["titolo"], top[0]["pezzi"]))
+    # IL SET CONTA: la sua merce vive nelle righe, e i mono non hanno
+    # righe MAI — guardare solo le righe perderebbe quasi tutto
+    prova("le cuffie contano i pezzi del set",
+          ("Cuffie AKG", 2), (top[1]["titolo"], top[1]["pezzi"]))
+    prova("e la Jade ne ha uno", ("Jade", 1), (top[2]["titolo"], top[2]["pezzi"]))
+    # IL PAREGGIO E' STABILE: due articoli con gli stessi pezzi non si
+    # scambiano di posto a ogni chiamata.
+    prova("il pareggio non balla",
+          [t["annuncio_id"] for t in top],
+          [t["annuncio_id"] for t in
+           amb2["_conta_settimana"](con, da)[2]])
+    _cs = codice(pezzo("_conta_settimana"))
+    prova("il pareggio si rompe sull'id", True,
+          "ORDER BY pezzi DESC, annuncio_id DESC" in _cs)
+    prova("_conta_settimana legge e basta", True,
+          not any(k in _cs.upper() for k in
+                  ("INSERT ", "UPDATE ", "DELETE ")))
+
+    # --- 5) IL RIEPILOGO: TRE DEPLOY, UN POST --------------------
+    class TempoFinto:
+        """Un lunedi' fisso: il gate del calendario deve restringere il
+        giorno, e dentro il giorno a decidere e' il timbro."""
+
+        def __init__(self, wday=0):
+            self.wday = wday
+
+        def time(self):
+            return ora
+
+        def strftime(self, f, *a):
+            return "2026-08-10"
+
+        def localtime(self, *a):
+            return type("t", (), {"tm_wday": self.wday})()
+
+    mandati = []
+
+    async def bot_api_finta(metodo, dati):
+        mandati.append(dati)
+        return {"ok": True, "result": {"message_id": 1}}
+
+    def processo(wday=0, minimo=3):
+        """UN DEPLOY: ambiente nuovo, database vecchio."""
+        a = {"db": lambda: ConFinta(), "time": TempoFinto(wday),
+             "html": _html, "print": lambda *x, **k: None,
+             "bot_api": bot_api_finta, "canale_id": lambda: "@vetrina",
+             "URL_PUBBLICO": "https://barattolo.store",
+             "RIEPILOGO_SETTIMANALE": True, "RIEPILOGO_MINIMO": minimo,
+             "TIMBRO_RIEPILOGO": "riepilogo_settimana"}
+        for f in ("timbro_letto", "timbro_scrivi", "_conta_settimana"):
+            exec(pezzo(f), a)
+        # pezzo() taglia dal «def», quindi l'«async » va rimesso a mano
+        exec("async " + pezzo("riepilogo_settimana"), a)
+        return a
+
+    for _ in range(3):
+        _aio.run(processo()["riepilogo_settimana"]())
+    prova("tre deploy nello stesso lunedi': UN post solo", 1, len(mandati))
+    testo = mandati[0]["text"]
+    prova("il post va nel canale", "@vetrina", mandati[0]["chat_id"])
+    prova("dice gli annunci nuovi", True, "🫙 3 nuovi annunci" in testo)
+    prova("dice gli ordini", True, "🛒 3 ordini" in testo)
+    prova("e la classifica col ×N solo dove serve", True,
+          "Miele di castagno ×4 · Cuffie AKG ×2 · Jade" in testo)
+    prova("niente ×1 su chi ne ha venduto uno", False, "Jade ×1" in testo)
+    # NON DI LUNEDI' non si parla, e non si consuma nemmeno il turno
+    mandati.clear()
+    con.execute("DELETE FROM timbri")
+    con.commit()
+    _aio.run(processo(wday=2)["riepilogo_settimana"]())
+    prova("di mercoledi' non esce niente", 0, len(mandati))
+    prova("...e il turno non si consuma", 0,
+          con.execute("SELECT COUNT(*) FROM timbri").fetchone()[0])
+
+    # --- 6) LA SETTIMANA MAGRA: TACE, MA TIMBRA ------------------
+    # E' il contrario del termometro, ed e' la riga che si sbaglia per
+    # prima: li' il conto e' CUMULATIVO e saltare il turno lo rimanda,
+    # qui il conto e' di una SETTIMANA e ricontrollare martedi' darebbe
+    # una finestra sfasata.
+    con.execute("DELETE FROM ordini")
+    con.execute("DELETE FROM annunci WHERE id>1")
+    con.execute("DELETE FROM timbri")
+    con.commit()
+    mandati.clear()
+    _aio.run(processo(minimo=3)["riepilogo_settimana"]())
+    prova("settimana magra: non esce niente", 0, len(mandati))
+    prova("...ma il turno SI CONSUMA lo stesso", "2026-08-10",
+          con.execute("SELECT valore FROM timbri WHERE nome=?",
+                      ("riepilogo_settimana",)).fetchone()[0])
+    # e con la soglia abbassata quella stessa settimana parla
+    con.execute("DELETE FROM timbri")
+    con.commit()
+    _aio.run(processo(minimo=1)["riepilogo_settimana"]())
+    prova("con la soglia bassa la stessa settimana parla", 1, len(mandati))
+    prova("...e senza ordini la riga degli ordini non c'e'", False,
+          "🛒" in mandati[0]["text"])
+    # IL TITOLO SCAPPATO, che qui sono tre in un colpo solo
+    rs = codice(pezzo("riepilogo_settimana"))
+    prova("i titoli della classifica sono scappati", True,
+          "html.escape(t[" in rs)
+    prova("il riepilogo non finisce su Nostr", False,
+          "_spedisci_ai_relay" in rs or "firma_evento" in rs)
 
 
 def prove_leve():
@@ -9239,6 +10063,24 @@ def prove_leve():
     prova("canale Telegram: solo acceso/spento",
           (True, False), (voci_on["TELEGRAM_CANALE_ID"]["valore"],
                           voci_off["TELEGRAM_CANALE_ID"]["valore"]))
+    # IL RITMO DEL CANALE DEV'ESSERE QUELLO EFFETTIVO, non le costanti
+    # del config: dall'ago 2026 lo decide `/vetrina` dal bot, e leggere
+    # le costanti direbbe lo stato di ieri — la trappola che questa
+    # pagina esiste per non far ricadere. I numeri arrivano dallo stub
+    # di `ritmo_vetrina` (1, 2, 3) e nessuna costante del config finto
+    # puo' dirli: se qualcuno rimette POST_MAX_ORA & co., qui si vede.
+    # LA TORTURA L'HA CHIESTA: senza queste righe la mutazione che
+    # riportava il pannello alle costanti non faceva rossa una prova.
+    prova("il pannello dice i giorni del giudice",
+          1, voci_on["PROMO_GIORNI_VENDITORE"]["valore"])
+    prova("...e i post all'ora del giudice",
+          2, voci_on["POST_MAX_ORA"]["valore"])
+    prova("...e la soglia dell'aggregato del giudice",
+          3, voci_on["SOGLIA_AGGREGA"]["valore"])
+    prova("la posizione del ritmo si dice col suo nome",
+          "giorno", voci_on["/vetrina"]["valore"])
+    prova("...e senza posizione si dice «config»",
+          "config", voci_off["/vetrina"]["valore"])
     prova("il percorso del database non e' una leva",
           False, "DB" in voci_on)
 
@@ -9248,8 +10090,18 @@ def prove_leve():
     prova("ogni voce ha nome, chiave e valore", True,
           all(v.get("nome") and v.get("chiave") and "valore" in v
               for v in voci_on.values()))
-    prova("le chiavi sono nomi di config, non valori", True,
-          all(c.isupper() or c.startswith("_") for c in voci_on))
+    # La chiave e' il NOME della cosa da andare a cambiare, mai il suo
+    # valore — un segreto finito li' dentro si vedrebbe da qui. Dalla
+    # voce del ritmo (ago 2026) e' ammesso anche un COMANDO del bot,
+    # perche' quella la si cambia da li' e mandare qualcuno sul VPS
+    # sarebbe un indirizzo sbagliato: `/nome` di sole lettere, cosi'
+    # un percorso di file (che comincia anche lui con «/») non passa.
+    def chiave_lecita(c):
+        return (c.isupper() or c.startswith("_")
+                or (c.startswith("/") and c[1:].isalpha()))
+
+    prova("le chiavi sono nomi di config o comandi, non valori", True,
+          all(chiave_lecita(c) for c in voci_on))
     prova("acceso e spento censiscono le stesse leve",
           set(voci_on), set(voci_off))
 
@@ -15084,8 +15936,9 @@ def main():
               prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_divisione_a_ritroso,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
-              prove_libro_mastro, prove_leve, prove_cambio,
-              prove_recupero_cambi,
+              prove_libro_mastro, prove_leve, prove_canale_bot,
+              prove_vetrina_canale,
+              prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,

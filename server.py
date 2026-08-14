@@ -440,6 +440,33 @@ try:
     from config import POST_MAX_ORA
 except ImportError:
     POST_MAX_ORA = 6
+# UN POST PER VENDITORE ALLA SETTIMANA (ago 2026, decisione di
+# Andrea). Il canale non e' la vetrina: e' una selezione, e un negozio
+# che pubblica trenta cose in un pomeriggio non deve poterselo
+# prendere tutto. Il ritmo e' quello dei suggerimenti dal bot, e per
+# la stessa ragione — chi si stufa se ne va, e da un canale ci si
+# esce con un tocco solo. Il post esce SUBITO (l'annuncio non aspetta
+# una settimana per farsi vedere) e da li' il timbro del venditore si
+# chiude per N giorni; se nella finestra di raggruppamento ne ha
+# pubblicati tre, esce il PIU' RECENTE. 0 = nessun freno, cioe' la
+# vetrina vera.
+# DALL'AGO 2026 QUESTI TRE NUMERI SONO IL VALORE DI PARTENZA E NON
+# PIU' L'ULTIMA PAROLA: il ritmo lo decide `/vetrina` dal bot e il
+# giudice e' `ritmo_vetrina()` — chi legge queste costanti per sapere
+# come si comporta il canale legge lo stato di ieri.
+try:
+    from config import PROMO_GIORNI_VENDITORE
+except ImportError:
+    PROMO_GIORNI_VENDITORE = 7
+
+# LO SCONTO LAMPO NEL CANALE (ago 2026, chiesto da Andrea): quando un
+# venditore lancia una lampo, il canale lo dice. Leva sua e non un
+# ramo di POST_AUTOMATICI, cosi' in rodaggio si spengono gli sconti
+# senza spegnere anche gli annunci nuovi.
+try:
+    from config import POST_LAMPO_CANALE
+except ImportError:
+    POST_LAMPO_CANALE = True
 
 # Il cartello «siamo in fase di test»: interruttore, testo e link del
 # canale vivono nel config, cosi' si cambiano senza cantieri e a
@@ -867,6 +894,22 @@ try:
     from config import TERMOMETRO_SOTTOCATEGORIE_MINIMO
 except ImportError:
     TERMOMETRO_SOTTOCATEGORIE_MINIMO = 5  # sotto, non vale il disturbo
+
+# IL RIEPILOGO SETTIMANALE NEL CANALE (ago 2026, chiesto da Andrea):
+# il lunedi', quanti annunci nuovi, quanti ordini e i tre articoli
+# piu' venduti. E' l'unico post del canale che non racconta un fatto
+# singolo ma una settimana, ed e' anche il modo di far vedere che il
+# mercatino e' vivo a chi ci passa e trova la vetrina ferma.
+try:
+    from config import RIEPILOGO_SETTIMANALE
+except ImportError:
+    RIEPILOGO_SETTIMANALE = True
+try:
+    from config import RIEPILOGO_MINIMO
+except ImportError:
+    RIEPILOGO_MINIMO = 3   # sotto tanti annunci nuovi E senza nemmeno
+                           # un ordine si tace: un riepilogo che dice
+                           # «0 ordini» fa piu' danno del silenzio
 try:
     from config import CONTROLLO_LIBRO_MASTRO
 except ImportError:
@@ -908,6 +951,79 @@ def db():
     con = sqlite3.connect(DB)
     con.row_factory = sqlite3.Row
     return con
+
+
+# ------------- IL CANALE TELEGRAM, DECISO DAL BOT -------------------
+# Fino all'ago 2026 il canale del mercatino viveva SOLO in
+# `TELEGRAM_CANALE_ID`, cioe' cambiarlo voleva dire entrare nel VPS,
+# ritoccare il config e riavviare. Adesso lo si dice al bot
+# (`/canale @nome`) e la scelta finisce nella tabella `impostazioni`,
+# che vince sul config.
+#
+# PERCHE' IL CONFIG NON BASTA PIU', e perche' questa NON e' una deroga
+# alla regola «le leve si guardano e basta» del pannello admin: quella
+# regola difende gli interruttori che muovono denaro — ASTA_ABILITATA,
+# IMPORT_NOSTR_APERTO, AUTO_SBLOCCO_ATTIVO nascono spenti apposta
+# perche' accenderli costi un gesto dal VPS. Un id di canale non
+# accende niente: dice DOVE il bot parla, e sbagliarlo si vede subito
+# e si corregge con un altro comando. Il config resta il valore di
+# PARTENZA (e quindi il modo di ripulire: si svuota la riga e si
+# torna a lui).
+#
+# La cache in memoria e' un tantum all'avvio: `_CANALE` = None vuol
+# dire «non ancora letto», e da li' in poi si rilegge solo quando
+# qualcuno lo cambia. Il processo e' uno solo (uvicorn mono-processo,
+# lo stesso patto di SFIDE_LOGIN e CODICI_FUSIONE), quindi non esiste
+# una seconda copia da tenere allineata.
+
+_CANALE = None          # None = mai letto; str = il valore che vale
+
+
+def impostazione(chiave: str, ripiego: str = "") -> str:
+    """Legge una riga di `impostazioni`. Fail-open: al primo avvio la
+    tabella puo' non esistere ancora e vale il ripiego."""
+    try:
+        con = db()
+        r = con.execute("SELECT valore FROM impostazioni WHERE chiave=?",
+                        (chiave,)).fetchone()
+        con.close()
+        return r["valore"] if r else ripiego
+    except sqlite3.OperationalError:
+        return ripiego
+
+
+def scrivi_impostazione(chiave: str, valore: str):
+    """Scrive (o riscrive) una riga di `impostazioni`."""
+    con = db()
+    con.execute("INSERT INTO impostazioni(chiave, valore) VALUES(?,?) "
+                "ON CONFLICT(chiave) DO UPDATE SET valore=excluded.valore",
+                (chiave, valore))
+    con.commit()
+    con.close()
+
+
+def canale_id() -> str:
+    """IL GIUDICE UNICO di «dove parla il bot». Vuoto = nessun canale,
+    e allora i post automatici semplicemente non escono (fail-open di
+    sempre). Da qui passano TUTTI i punti che scrivono, editano o
+    cancellano nel canale: se un giorno divergessero, il ✅ Venduto
+    finirebbe in un canale e il post originale in un altro."""
+    global _CANALE
+    if _CANALE is None:
+        _CANALE = impostazione("canale_telegram", TELEGRAM_CANALE_ID)
+    return _CANALE
+
+
+def imposta_canale(valore: str) -> str:
+    """Cambia il canale e riallinea la cache. Stringa vuota = spento
+    (e NON «torna al config»: chi spegne dal bot vuole il silenzio,
+    non il canale di ieri — per tornare al config si svuota la riga a
+    mano, che e' un gesto da VPS come lo era prima)."""
+    global _CANALE
+    valore = (valore or "").strip()
+    scrivi_impostazione("canale_telegram", valore)
+    _CANALE = valore
+    return valore
 
 
 def nuovo_codice_negozio(con) -> str:
@@ -1704,6 +1820,22 @@ def init_db():
         ON rimborsi_asta(puntata_id) WHERE motivo = 'eccedenza_ritiro';
     CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_eccedenza
         ON rimborsi_asta(puntata_id) WHERE motivo = 'eccedenza';
+    CREATE TABLE IF NOT EXISTS impostazioni(
+        -- Le poche cose che si cambiano DA FUORI senza un deploy
+        -- (ago 2026): oggi solo `canale_telegram`, il canale in cui il
+        -- bot annuncia i nuovi arrivi, che si dice al bot stesso con
+        -- `/canale`. Chiave-valore e non colonne perche' qui non c'e'
+        -- niente su cui interrogare: si legge una riga per nome, e
+        -- l'alternativa (una tabella a una riga con N colonne) vuole
+        -- una migrazione per ogni impostazione futura.
+        -- ATTENZIONE, e' il recinto da non allargare: qui NON vanno i
+        -- segreti (chiavi LNbits, token, nsec: vivono nel config e non
+        -- devono stare in un database che finisce nei backup) ne' le
+        -- leve che muovono denaro, che nascono spente nel CODICE
+        -- apposta perche' accenderle costi un gesto dal VPS.
+        chiave TEXT PRIMARY KEY,
+        valore TEXT DEFAULT ''
+    );
     CREATE TABLE IF NOT EXISTS moderazione_log(
         -- il REGISTRO della moderazione (lug 2026): ogni esito, della
         -- macchina e dell'umano, per correggere il prompt A MANO sui
@@ -1940,6 +2072,15 @@ def init_db():
                     # differenza del dismiss del wallet NWC, che il
                     # wallet ce l'ha solo quel telefono).
                     "avvisato_trasporto INTEGER DEFAULT 0",
+                    # UN POST IN CANALE A SETTIMANA (ago 2026): il
+                    # timbro dell'ultimo annuncio di questo venditore
+                    # finito nel canale Telegram. 0 = mai, quindi il
+                    # DEFAULT e' anche la migrazione — nessuno resta
+                    # zitto per una settimana solo perche' la colonna
+                    # e' nata oggi. Colonna e non memoria: un riavvio
+                    # non deve riaprire la porta a chi ha appena
+                    # avuto il suo turno.
+                    "promo_canale_il INTEGER DEFAULT 0",
                     # LA DIMENSIONE DEL TESTO (ago 2026): percentuale
                     # scelta dal lettore, valida su ogni dispositivo
                     # (vedi SCALE_FONT). 100 = la misura di sempre,
@@ -2555,6 +2696,17 @@ def init_db():
                     # Fatti, mai il contenuto.
                     "busta_corretta_il INTEGER DEFAULT 0",
                     "busta_correzioni INTEGER DEFAULT 0",
+                    # IL DOCUMENTO DI RITIRO (ago 2026): un PIN si
+                    # trascrive, un QR no — al locker il corriere manda
+                    # un PDF o un'immagine, e trascriverli a mano o non
+                    # si puo' o si sbaglia. Il file NON sta in foto/ e
+                    # non ha un URL pubblico: chi ce l'ha RITIRA IL
+                    # PACCO, quindi vive in buste/ coi byte CIFRATI e
+                    # lo serve una rotta autenticata. In colonna solo
+                    # il nome sul disco, il tipo e il nome originale.
+                    "busta_file TEXT DEFAULT ''",
+                    "busta_file_tipo TEXT DEFAULT ''",
+                    "busta_file_nome TEXT DEFAULT ''",
                     # il promemoria al venditore che non deposita la
                     # busta: colonne SUE, come per le sorelle — un
                     # contatore ereditato salterebbe al tetto
@@ -3780,6 +3932,37 @@ def _decifra_contenuto(blob: str) -> str:
     return blob
 
 
+# I gemelli sui BYTE, per il documento di ritiro. Stessa chiave e
+# stessi prefissi del testo — cosi' un database scritto ieri resta
+# leggibile domani e non c'e' una seconda ricetta da tenere in pari —
+# ma il prefisso vive nei BYTE del file, non in una colonna: chi
+# guarda buste/ da fuori non vede ne' un PDF ne' un JPEG.
+def _cifra_blob(raw: bytes) -> bytes:
+    if CHIAVE_CONTENUTI_DIGITALI and Fernet is not None:
+        return b"f2:" + Fernet(_chiave_fernet()).encrypt(raw)
+    return b"plain:" + raw
+
+
+def _decifra_blob(blob: bytes) -> bytes | None:
+    """None quando i byte non si sanno leggere, ed e' la differenza
+    col gemello del testo: li' si torna una frase onesta al posto del
+    codice, qui una frase non e' un PDF — chi chiama risponde 503 e
+    dice al venditore di ricaricare il documento."""
+    if blob.startswith(b"plain:"):
+        return blob[len(b"plain:"):]
+    for prefisso, versione in ((b"f2:", "f2"), (b"f:", "f")):
+        if not blob.startswith(prefisso):
+            continue
+        if not CHIAVE_CONTENUTI_DIGITALI or Fernet is None:
+            return None
+        try:
+            return Fernet(_chiave_fernet(versione)).decrypt(
+                blob[len(prefisso):])
+        except Exception:
+            return None
+    return None
+
+
 async def consegna_da_payload(d: dict, valuta: str):
     """Il giudice unico dei campi di consegna (lug 2026): legge il
     payload di pubblica/modifica e ritorna la 10-tupla
@@ -4572,6 +4755,281 @@ async def avvia_fusione(id_telegram: int, codice: str):
         ]]}})
 
 
+# ------------- IL BOT CHE SFOGLIA (e che spinge la Mini App) --------
+# Regola di prodotto (ago 2026, decisione di Andrea): LA MINI APP
+# VIENE PRIMA. Chi apre il bot deve trovare l'invito ad aprire
+# Barattolo, non un menu di comandi — nella Mini App si compra, si
+# paga, si tratta, e il bot quelle cose non le sa fare. Ma chi
+# smanetta non deve sbattere contro un muro: al primo messaggio che
+# non e' un comando compaiono i bottoni, e il bottone verso la Mini
+# App resta SEMPRE il primo, in ogni tastiera di questo blocco.
+# Per questo il bottone della Mini App si costruisce in un posto solo
+# (`_riga_webapp`): e' la riga che non deve mancare da nessuna parte,
+# ed e' esattamente il tipo di riga che si dimentica nella tastiera
+# aggiunta fra sei mesi.
+
+ADMIN_BOT_USERNAME = ("alanbimbati", "aandreaiita")
+SFOGLIA_PER_PAGINA = 5      # annunci per schermata nel bot
+
+# Il cappello della griglia. Dice in una riga che questa e' la vista
+# povera: si guarda, e per fare le cose si apre Barattolo.
+TESTO_SFOGLIA = ("🗂 <b>Sfoglia il mercatino</b>\n"
+                 "Scegli un reparto e ti mostro gli ultimi arrivi.\n"
+                 "Per comprare, trattare e pagare in satoshi apri "
+                 "Barattolo 👇")
+
+
+def e_admin_bot(mittente: dict) -> bool:
+    """Chi puo' dare i comandi di servizio al bot: i moderatori di
+    sempre (ADMIN_IDS) piu' i due username scritti qui sopra.
+    L'username arriva dal MESSAGGIO e non dal database, ed e' la cosa
+    da non allentare: e' Telegram a dirci chi ha scritto, mentre la
+    riga `utenti` la scriviamo noi e potrebbe portare uno username
+    vecchio di mesi — quello di uno che nel frattempo l'ha cambiato,
+    o peggio quello che qualcun altro si e' preso dopo di lui."""
+    if e_admin(mittente.get("id") or 0):
+        return True
+    return (mittente.get("username") or "").lower() in ADMIN_BOT_USERNAME
+
+
+def _riga_webapp() -> list:
+    """La riga che porta a Barattolo. Sta in cima a OGNI tastiera del
+    bot, e non e' una web_app button ma un link normale: la
+    `web_app` di Telegram apre la Mini App solo dentro l'app di
+    Telegram e in chat private, mentre il link funziona ovunque —
+    desktop, browser, client alternativi — e dentro Telegram il bot
+    e' comunque configurato col suo bottone di menu."""
+    return [{"text": "🫙 Apri Barattolo", "url": URL_PUBBLICO}]
+
+
+def tastiera_bot(righe: list = None) -> dict:
+    return {"inline_keyboard": [_riga_webapp()] + (righe or [])}
+
+
+def tastiera_categorie() -> dict:
+    """La griglia «Sfoglia», la stessa che si vede nella Mini App: due
+    colonne, ORDINE FISSO del catalogo (mai per numero di annunci —
+    una mappa che si riordina ogni giorno non si impara, e' la regola
+    di renderSfoglia) e l'icona del reparto davanti al nome.
+    Nel `callback_data` viaggia l'INDICE e non il nome: il campo ha 64
+    byte scarsi e «Console e videogiochi» in UTF-8 se ne mangia gia'
+    un terzo — piu' il fatto che un indice non puo' contenere il ':'
+    che separa i pezzi."""
+    voci = [{"text": f"{EMOJI_CATEGORIA.get(c, '📦')} {c}",
+             "callback_data": f"sfo:{i}:0"}
+            for i, c in enumerate(CATEGORIE)]
+    griglia = [voci[i:i + 2] for i in range(0, len(voci), 2)]
+    return {"inline_keyboard": [_riga_webapp()] + griglia}
+
+
+def _riga_sfoglia(a: dict, cambio: float) -> str:
+    """Un annuncio nell'elenco del bot: la forma corta del post di
+    canale — titolo, prezzo, il link nascosto dietro l'ancora."""
+    riga = (f"🫙 <b>{html.escape(a['titolo'])}</b>\n"
+            f"💰 {_prezzo_promo(dict(a), cambio)}")
+    if a["zona_comune"]:
+        riga += f" · 📍 {html.escape(a['zona_comune'])}"
+    riga += (f"\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+             "Apri su Barattolo</a>")
+    return riga
+
+
+async def mostra_categoria(chat: int, indice: int, pagina: int,
+                           message_id: int = 0):
+    """Una pagina di annunci di una categoria. Un messaggio solo, che
+    si RIEDITA a ogni tocco invece di accodarne uno nuovo: sfogliare
+    non deve lasciare in chat la scia di quel che si e' gia' visto.
+
+    Legge SOLO gli annunci attivi e non in ferie — le stesse guardie
+    della vetrina, che un elenco nel bot e' una vetrina anche lui — e
+    l'hashtag della categoria in coda e' quello dei post del canale
+    (`_hashtag_promo`), cosi' toccando l'hashtag di un post si ritrova
+    la stessa roba che il bot elenca qui."""
+    if not (0 <= indice < len(CATEGORIE)):
+        return
+    cat = CATEGORIE[indice]
+    pagina = max(0, pagina)
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        f"SELECT {CAMPI_VETRINA} FROM annunci a "
+        "JOIN utenti u ON u.tg_id=a.venditore_id "
+        "WHERE a.stato='attivo' AND a.categoria=? "
+        "ORDER BY a.creato DESC, a.id DESC LIMIT ? OFFSET ?",
+        (cat, SFOGLIA_PER_PAGINA + 1, pagina * SFOGLIA_PER_PAGINA))]
+    con.close()
+    righe = arricchisci_righe_vetrina(righe)
+    adesso = int(time.time())
+    righe = [r for r in righe if not in_ferie(r.get("venditore_ferie"), adesso)]
+    ancora = len(righe) > SFOGLIA_PER_PAGINA
+    righe = righe[:SFOGLIA_PER_PAGINA]
+    icona = EMOJI_CATEGORIA.get(cat, "📦")
+    if not righe:
+        testo = (f"{icona} <b>{html.escape(cat)}</b>\n\n"
+                 "Qui dentro non c'è ancora niente. Su Barattolo puoi "
+                 "farti avvisare quando arriva quello che cerchi 🔔")
+    else:
+        cambio = await cambio_btc_eur()
+        testo = (f"{icona} <b>{html.escape(cat)}</b>"
+                 + (f" · pagina {pagina + 1}" if pagina else "") + "\n\n"
+                 + "\n\n".join(_riga_sfoglia(r, cambio) for r in righe)
+                 + f"\n\n⚡ Tutto pagabile in Satoshi\n"
+                 + _hashtag_promo({"categoria": cat}))
+    frecce = []
+    if pagina:
+        frecce.append({"text": "◀️ Indietro",
+                       "callback_data": f"sfo:{indice}:{pagina - 1}"})
+    if ancora:
+        frecce.append({"text": "Avanti ▶️",
+                       "callback_data": f"sfo:{indice}:{pagina + 1}"})
+    righe_tastiera = ([frecce] if frecce else []) + [
+        [{"text": "🗂 Tutte le categorie", "callback_data": "sfo:menu:0"}]]
+    dati = {"chat_id": chat, "text": testo, "parse_mode": "HTML",
+            "reply_markup": tastiera_bot(righe_tastiera),
+            "disable_web_page_preview": True}
+    if message_id:
+        r = await bot_api("editMessageText", {**dati,
+                                              "message_id": message_id})
+        if r and r.get("ok"):
+            return
+        # il messaggio puo' non essere piu' modificabile (troppo
+        # vecchio, o cancellato a mano): si ripiega su uno nuovo invece
+        # di lasciare il tocco senza risposta
+    await bot_api("sendMessage", dati)
+
+
+async def _comando_sconosciuto(chat: int):
+    """La risposta di chi non e' admin a un comando di servizio.
+
+    IL SILENZIO NON E' UNA RISPOSTA, ed e' deliberato: rispondere «non
+    sei autorizzato» direbbe a un curioso che quel comando ESISTE, e da
+    li' si va a indovinare chi lo puo' dare. Chi non e' admin riceve la
+    risposta di un messaggio qualunque, cioe' i bottoni — che e' anche
+    quel che gli serve. Vive in un posto solo perche' i comandi di
+    servizio sono piu' d'uno: due copie divergono, e la copia che
+    divergesse racconterebbe proprio quel che questa nasconde."""
+    return await bot_api("sendMessage", {"chat_id": chat,
+        "text": "Non conosco questo comando 🤔 — ma posso "
+                "mostrarti il mercatino 👇",
+        "reply_markup": tastiera_bot(
+            [[{"text": "🗂 Sfoglia le categorie",
+               "callback_data": "sfo:menu:0"}]])})
+
+
+async def comando_canale(mittente: dict, testo: str):
+    """`/canale` — dove il bot annuncia i nuovi arrivi. Solo admin.
+
+    Senza argomenti DICE quello attuale (e come si cambia): un comando
+    che si limita a scrivere, e che per sapere cosa c'e' scritto
+    obbliga a entrare nel VPS, e' meta' comando."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    arg = testo.split(maxsplit=1)
+    arg = arg[1].strip() if len(arg) == 2 else ""
+    if not arg:
+        ora = canale_id()
+        stato = (f"Adesso scrivo in <code>{html.escape(ora)}</code>."
+                 if ora else "Adesso non scrivo in nessun canale.")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"📣 <b>Canale del mercatino</b>\n{stato}\n\n"
+                    "Per cambiarlo: <code>/canale @nomecanale</code> "
+                    "(oppure l'id numerico, che per i canali comincia "
+                    "con <code>-100</code>).\n"
+                    "Per spegnerlo: <code>/canale spento</code>.\n\n"
+                    "⚠️ Il bot dev'essere <b>amministratore</b> del "
+                    "canale, o non riuscirà a pubblicare.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if arg.lower() in ("spento", "off", "-", "nessuno"):
+        imposta_canale("")
+        await notifica_admin(f"📣 Canale spento da tg {chat}")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "🔕 Fatto: da adesso non pubblico più in nessun "
+                    "canale. I post già fatti restano dove sono."})
+    # SI PROVA PRIMA DI CREDERCI: un id sbagliato lo si scoprirebbe
+    # altrimenti solo al prossimo annuncio pubblicato, cioe' con un
+    # post perso e nessuno che se ne accorge. Il messaggio di prova
+    # e' anche la conferma visiva che il bot ha i diritti giusti.
+    r = await bot_api("sendMessage", {
+        "chat_id": arg, "parse_mode": "HTML",
+        "text": "🫙 <b>Barattolo è collegato a questo canale.</b>\n"
+                "Da adesso i nuovi annunci del mercatino compaiono qui."})
+    if not (r and r.get("ok")):
+        motivo = (r or {}).get("description") or "nessuna risposta"
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"❌ Non riesco a scrivere in <code>"
+                    f"{html.escape(arg)}</code>.\nTelegram dice: "
+                    f"<i>{html.escape(str(motivo))}</i>\n\n"
+                    "Controlla che il bot sia amministratore del "
+                    "canale e che il nome sia scritto giusto.",
+            "parse_mode": "HTML"})
+    imposta_canale(arg)
+    await notifica_admin(f"📣 Canale del mercatino cambiato in {arg} "
+                         f"(da tg {chat})")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ Fatto: da adesso pubblico in <code>"
+                f"{html.escape(arg)}</code>.",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
+# Cosa vuol dire ogni posizione, a parole: il comando le deve poter
+# SPIEGARE, o «/vetrina giorno» resta una parola magica da ricordare a
+# memoria. Vive accanto a RITMI e non dentro, perche' RITMI e' il
+# catalogo dei numeri e si tortura in CI senza prosa intorno.
+SPIEGA_RITMO = {
+    "tutto": "ogni annuncio nuovo è un post",
+    "giorno": "al massimo un annuncio al giorno per venditore",
+    "settimana": "al massimo un annuncio a settimana per venditore",
+}
+
+
+async def comando_vetrina(mittente: dict, testo: str):
+    """`/vetrina` — quanto parla il canale. Solo admin.
+
+    E' il gemello di `/canale`: quello dice DOVE, questo QUANTO. Sono
+    due comandi e non uno perche' si cambiano in momenti diversi — il
+    canale una volta, il ritmo ogni volta che lo si guarda e sembra
+    troppo — e perche' un solo comando con due argomenti diversi e' il
+    genere di cosa che si sbaglia col telefono in mano."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    arg = testo.split(maxsplit=1)
+    arg = arg[1].strip().lower() if len(arg) == 2 else ""
+    giorni, max_ora, soglia = ritmo_vetrina()
+    numeri = (f"Adesso: <b>{giorni}</b> giorni fra due post dello stesso "
+              f"venditore, <b>{max_ora}</b> post singoli all'ora, e da "
+              f"<b>{soglia}</b> annunci in una volta esce un post solo "
+              f"«📦 N nuovi annunci».")
+    if arg not in RITMI and arg not in ("config", "auto"):
+        nome = nome_ritmo()
+        stato = (f"Sei su <b>{nome}</b> — {SPIEGA_RITMO[nome]}."
+                 if nome else
+                 "Nessuna posizione scelta: valgono i valori del config.")
+        voci = "\n".join(
+            f"<code>/vetrina {n}</code> — {SPIEGA_RITMO[n]}" for n in RITMI)
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"🪟 <b>Ritmo della vetrina</b>\n{stato}\n{numeri}\n\n"
+                    f"{voci}\n<code>/vetrina config</code> — torna ai "
+                    "valori scritti nel config del server.\n\n"
+                    "La valvola resta comunque: una raffica (un import "
+                    "in blocco) esce sempre come un post solo, che non "
+                    "nomina nessuno.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    nome = imposta_ritmo("" if arg in ("config", "auto") else arg)
+    giorni, max_ora, soglia = ritmo_vetrina()
+    if nome:
+        detto = f"vale <b>{nome}</b> — {SPIEGA_RITMO[nome]}"
+    else:
+        detto = "valgono i valori del <b>config</b> del server"
+    await notifica_admin(f"🪟 Ritmo della vetrina: {nome or 'config'} "
+                         f"(da tg {chat})")
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": f"✅ Fatto: da adesso {detto}.\n"
+                f"{giorni} giorni fra due post dello stesso venditore, "
+                f"{max_ora} post singoli all'ora, aggregato da {soglia}.",
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
+
 async def gestisci_callback(cb: dict):
     """Il tocco sulla tastiera di conferma. Il token vale solo per il
     Telegram a cui era destinato: il tocco di chiunque altro non conta."""
@@ -4580,6 +5038,23 @@ async def gestisci_callback(cb: dict):
     if azione == "rev":
         # la tastiera ✅/❌ della revisione (solo moderatori)
         return await callback_revisione(cb, token)
+    if azione == "sfo":
+        # la griglia «Sfoglia»: aperta a tutti, non tocca niente e non
+        # dice niente di privato — nessun token da controllare
+        msg = cb.get("message") or {}
+        chat = (msg.get("chat") or {}).get("id")
+        if not chat:
+            return
+        indice, _, pagina = token.partition(":")
+        if indice == "menu":
+            return await bot_api("editMessageText", {
+                "chat_id": chat, "message_id": msg.get("message_id"),
+                "text": TESTO_SFOGLIA, "parse_mode": "HTML",
+                "reply_markup": tastiera_categorie()})
+        if not indice.isdigit() or not (pagina or "0").isdigit():
+            return
+        return await mostra_categoria(chat, int(indice), int(pagina or 0),
+                                      msg.get("message_id"))
     if azione not in ("fondi", "annulla"):
         return
     msg = cb.get("message") or {}
@@ -4637,18 +5112,46 @@ async def gestisci_update(update: dict):
     upsert_utente({"id": mittente["id"],
                    "first_name": mittente.get("first_name", ""),
                    "username": mittente.get("username", "")})
+    chat = mittente["id"]
     if testo.startswith("/start"):
         parti = testo.split(maxsplit=1)
         if len(parti) == 2:
-            return await avvia_fusione(mittente["id"], parti[1].strip())
-        return await bot_api("sendMessage", {"chat_id": mittente["id"],
-            "text": "🫙 Ciao! Sono il campanello del Barattolo: ti "
-                    "avviso quando succede qualcosa nei tuoi ordini. "
-                    "Il mercatino vero e' nella Mini App: aprila dal "
-                    f"bottone del menu qui sotto, o su {URL_PUBBLICO}"})
-    await bot_api("sendMessage", {"chat_id": mittente["id"],
-        "text": "Non sono un bot chiacchierone 😅 — tutto il mercatino "
-                "vive nella Mini App: aprila dal bottone del menu!"})
+            return await avvia_fusione(chat, parti[1].strip())
+        # IL PRIMO SGUARDO E' TUTTO PER LA MINI APP: niente elenco di
+        # comandi, un invito solo e il bottone che lo esaudisce. I
+        # bottoni dello sfoglia arrivano dopo, a chi li cerca — e
+        # arrivano da soli (vedi il ramo in fondo).
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "🫙 <b>Ciao, benvenuto nel Barattolo!</b>\n\n"
+                    "Il mercatino vive qui dentro: si sfoglia, si "
+                    "tratta e si paga in <b>satoshi</b>, coi sats al "
+                    "sicuro nel deposito di garanzia finché non "
+                    "confermi di aver ricevuto la roba.\n\n"
+                    "Da questa chat ti avviso quando succede qualcosa "
+                    "nei tuoi ordini. Per tutto il resto, apri "
+                    "Barattolo 👇",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if testo.startswith("/canale"):
+        return await comando_canale(mittente, testo)
+    if testo.startswith("/vetrina"):
+        return await comando_vetrina(mittente, testo)
+    if testo.startswith("/sfoglia") or testo.startswith("/categorie"):
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": TESTO_SFOGLIA, "parse_mode": "HTML",
+            "reply_markup": tastiera_categorie()})
+    # CHI SMANETTA NON SBATTE CONTRO UN MURO (ago 2026): prima qui
+    # c'era la sola riga «non sono un bot chiacchierone», che dice a
+    # una persona curiosa che ha sbagliato posto. Adesso al primo
+    # messaggio qualunque compaiono i bottoni — con quello della Mini
+    # App sempre per primo, che resta la strada buona.
+    await bot_api("sendMessage", {"chat_id": chat,
+        "text": "Non sono un bot chiacchierone 😅 — il mercatino vero, "
+                "con gli acquisti e le trattative, vive nella Mini "
+                "App.\n\nSe però vuoi solo dare un'occhiata da qui, "
+                "posso mostrarti i reparti 👇",
+        "reply_markup": tastiera_bot(
+            [[{"text": "🗂 Sfoglia le categorie",
+               "callback_data": "sfo:menu:0"}]])})
 
 
 @app.post("/api/telegram/aggiornamenti")
@@ -4722,6 +5225,18 @@ async def registra_webhook_telegram():
 
 FOTO_DIR = "foto"
 os.makedirs(FOTO_DIR, exist_ok=True)
+
+# I documenti di ritiro NON stanno in foto/, ed e' la riga da non
+# ammorbidire: la' dentro i nomi si servono a chiunque li indovini o
+# li riceva, e un QR di ritiro pubblico vuol dire che il pacco lo
+# prende chi passa di li'. Cartella sua, byte cifrati, nessuna rotta
+# che serva la cartella (regola ferrea 3): si esce solo da
+# /api/orders/{id}/busta-ritiro/file, che chiede chi sei.
+BUSTE_DIR = "buste"
+os.makedirs(BUSTE_DIR, exist_ok=True)
+
+# 15 MB (decisione di Andrea) sui byte VERI, mai sulla stringa base64.
+MAX_DOC_BUSTA = 15 * 1024 * 1024
 
 
 def converti_in_jpeg(raw: bytes):
@@ -4818,6 +5333,56 @@ def _e_immagine(raw: bytes) -> bool:
         return True
     except Exception:
         return False
+
+
+# Il documento di ritiro: il tipo lo dicono i BYTE e non l'etichetta
+# — e' la lezione gia' pagata col PDF rinominato .jpg, e qui pesa di
+# piu' perche' quel tipo torna indietro come Content-Type. Whitelist
+# di FORME, come NOME_FOTO: cio' che non si riconosce non entra.
+FIRME_DOC_BUSTA = (
+    (b"%PDF-", "application/pdf", "pdf"),
+    (b"\xff\xd8\xff", "image/jpeg", "jpg"),
+    (b"\x89PNG\r\n\x1a\n", "image/png", "png"),
+    (b"GIF8", "image/gif", "gif"),
+)
+
+
+def _documento_busta(dataurl: str) -> tuple[bytes, str, str]:
+    """Dal data URL del client ai byte veri, col tipo riconosciuto.
+    Solleva un 400 che DICE cosa non va: qui l'utente ripara da solo
+    (cambia file, o ne carica uno piu' leggero). Il WebP e' l'unico
+    riconosciuto in due pezzi (RIFF....WEBP), e sta fuori dalla
+    tabella per questo."""
+    m = re.match(r"^data:([\w.+/-]*);base64,(.+)$", dataurl or "", re.S)
+    if not m:
+        raise HTTPException(400, "Documento non leggibile: riprova a "
+                                 "sceglierlo")
+    try:
+        raw = base64.b64decode(m.group(2), validate=True)
+    except Exception:
+        raise HTTPException(400, "Documento non leggibile: riprova a "
+                                 "sceglierlo")
+    if not raw:
+        raise HTTPException(400, "Il documento è vuoto")
+    if len(raw) > MAX_DOC_BUSTA:
+        raise HTTPException(400, "Il documento è troppo pesante "
+                                 f"(massimo {MAX_DOC_BUSTA // (1024*1024)} "
+                                 "MB): carica un PDF più leggero o uno "
+                                 "screenshot del codice")
+    for firma, tipo, est in FIRME_DOC_BUSTA:
+        if raw.startswith(firma):
+            break
+    else:
+        if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+            tipo, est = "image/webp", "webp"
+        else:
+            raise HTTPException(400, "Si possono caricare solo PDF e "
+                                     "immagini (JPG, PNG, GIF, WebP)")
+    # cintura: un JPEG che Pillow non sa aprire non e' un JPEG
+    if tipo != "application/pdf" and not _e_immagine(raw):
+        raise HTTPException(400, "Questa immagine non si riesce a "
+                                 "leggere: riprova con un'altra")
+    return raw, tipo, est
 
 
 def salva_foto(annuncio_id: int, foto_lista: list,
@@ -6055,6 +6620,28 @@ CATEGORIE = ("Elettronica", "Informatica", "Telefonia", "Audio e video",
              # commento — prove.py estrae la tupla per testo e taglia
              # alla prima tonda chiusa.
              "Buoni ed esperienze", "Altro")
+
+
+# Le icone del reparto, gemelle di EMOJI_CAT nel client (ago 2026,
+# nate con la griglia «Sfoglia» dentro il bot). Sono un'OTTAVA copia
+# del catalogo e quindi un posto in piu' da tenere allineato: a farlo
+# non e' la buona volonta' ma `prove.py`, che incrocia questo dict con
+# quello di miniapp.html voce per voce e diventa rosso se divergono —
+# la stessa rete di CATEGORIE_SENZA_CONDIZIONE e del suo gemello.
+# Il ripiego e' il 📦 di «Altro», come nel client.
+EMOJI_CATEGORIA = {
+    "Elettronica": "🔌", "Informatica": "💻", "Telefonia": "📱",
+    "Audio e video": "🎧", "Console e videogiochi": "🎮",
+    "Foto e ottica": "📷", "Bitcoin": "₿", "Casa e giardino": "🏡",
+    "Elettrodomestici": "🍳", "Fai da te e utensili": "🔧",
+    "Alimenti e bevande": "🍎", "Bellezza e benessere": "🧴",
+    "Abbigliamento": "👕", "Scarpe e accessori": "👟",
+    "Orologi e gioielli": "⌚", "Bambini": "🧸", "Sport e hobby": "⚽",
+    "Biciclette": "🚲", "Motori": "🚗", "Animali": "🐾",
+    "Libri e media": "📚", "Musica e film": "🎬",
+    "Strumenti musicali": "🎸", "Collezionismo": "🏺",
+    "Arte e artigianato": "🎨", "Buoni ed esperienze": "🎟️",
+    "Altro": "📦"}
 
 
 def categoria_valida(c) -> str:
@@ -7816,6 +8403,31 @@ CAMPI_MIEI = (
     "u.npub AS venditore_npub, "
     "u.npub_verificata AS venditore_npub_verificata, "
     "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
+    # le ferie e le due promesse di negozio viaggiano anche qui, e non
+    # e' un di piu': la scheda di un annuncio aperta da «I tuoi
+    # annunci» passa da questa SELECT, e senza questi alias il
+    # proprietario era l'unico a NON vedere la riga della spedizione
+    # gratis sul proprio oggetto. Costo ZERO, il JOIN su `u` c'e' gia',
+    # e li normalizza `arricchisci_righe_vetrina` come per la vetrina.
+    # CI VANNO TUTTE E DUE LE FACCE DELLA SOGLIA, euro E sats, con la
+    # VALUTA che dice quale delle due vale: la prima stesura portava il
+    # solo lato euro — era di prima che la valuta la scegliesse il
+    # venditore — e il risultato era che chi aveva messo la soglia in
+    # SATS restava l'unico a non vedere la propria promessa sul proprio
+    # annuncio. Cioe' il bug che questi alias esistono per chiudere,
+    # richiuso a meta'. A tenerli in pari adesso c'e' una sentinella
+    # che incrocia questo elenco con CAMPI_VETRINA: il campo che
+    # qualcuno aggiungera' di la' fra sei mesi si fa sentire da qui.
+    "u.ferie_fino AS venditore_ferie, "
+    "u.sconto_pacco_criterio AS venditore_sconto_criterio, "
+    "u.sconto_pacco_soglia AS venditore_sconto_soglia, "
+    "u.sconto_pacco_valore AS venditore_sconto_valore, "
+    "u.sconto_pacco_valore_eur AS venditore_sconto_valore_eur, "
+    "u.sconto_pacco_valore_valuta AS venditore_sconto_valuta, "
+    "u.sconto_pacco_percento AS venditore_sconto_percento, "
+    "u.sped_gratis_soglia AS venditore_sped_gratis, "
+    "u.sped_gratis_soglia_eur AS venditore_sped_gratis_eur, "
+    "u.sped_gratis_valuta AS venditore_sped_gratis_valuta, "
     "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
@@ -9534,6 +10146,12 @@ def _leve_stato():
     """Il censimento, raggruppato per cantiere e ordinato per
     conseguenza: prima cio' che apre porte o muove soldi, poi le regole
     del mercatino, in fondo i limiti e gli avvisi di servizio."""
+    # Il ritmo del canale si chiede al GIUDICE e non alle costanti:
+    # dall'ago 2026 lo decide `/vetrina` dal bot e il config e' solo il
+    # valore di partenza — leggere le costanti direbbe lo stato di
+    # ieri, che e' esattamente la trappola che questo pannello esiste
+    # per non far ricadere (la stessa gia' dichiarata per il canale).
+    rit_giorni, rit_max_ora, rit_soglia = ritmo_vetrina()
     return [
         {"gruppo": "🚦 Sicurezza", "voci": [
             _leva("Modalità collaudo", "MODALITA_COLLAUDO",
@@ -9798,11 +10416,45 @@ def _leve_stato():
                   spento="i nuovi annunci non vengono raccontati da nessuna "
                          "parte (il ciclo di vita dei post già fatti "
                          "continua)"),
+            # il FATTO e non il valore, la regola dei segreti: qui
+            # basta sapere se il bot ha un canale dove parlare. E si
+            # chiede al giudice, non alla costante: dall'ago 2026 il
+            # canale lo decide il bot con `/canale` e la riga del
+            # config e' solo il valore di partenza — leggere la
+            # costante direbbe lo stato di ieri, che e' la trappola
+            # che questo pannello esiste per non far ricadere.
             _leva("Canale Telegram", "TELEGRAM_CANALE_ID",
-                  bool(TELEGRAM_CANALE_ID),
+                  bool(canale_id()),
                   spento="niente post sul canale; la nota Nostr vive lo "
                          "stesso"),
-            _leva("Post singoli all'ora", "POST_MAX_ORA", POST_MAX_ORA),
+            # la chiave qui NON e' una costante del config ma il
+            # COMANDO, perche' e' da li' che si cambia — il nome serve
+            # «per andarla a cambiare», e mandare qualcuno sul VPS
+            # sarebbe un indirizzo sbagliato. La nota c'e' sempre: il
+            # valore e' una parola, e una parola vuole la sua glossa.
+            _leva("Ritmo della vetrina", "/vetrina",
+                  nome_ritmo() or "config",
+                  acceso=SPIEGA_RITMO.get(
+                      nome_ritmo(),
+                      "nessuna posizione scelta dal bot: valgono i "
+                      "numeri scritti nel config")),
+            _leva("Post singoli all'ora", "POST_MAX_ORA", rit_max_ora),
+            _leva("Un post per venditore ogni (giorni)",
+                  "PROMO_GIORNI_VENDITORE", rit_giorni,
+                  spento="nessun freno: un negozio che pubblica venti "
+                         "cose si prende venti post"),
+            _leva("Da quanti annunci esce un post solo", "SOGLIA_AGGREGA",
+                  rit_soglia),
+            _leva("Sconti lampo nel canale", "POST_LAMPO_CANALE",
+                  bool(POST_LAMPO_CANALE),
+                  spento="una lampo lanciata non viene raccontata nel "
+                         "canale (i barattoli la sentono lo stesso)"),
+            _leva("Riepilogo settimanale", "RIEPILOGO_SETTIMANALE",
+                  bool(RIEPILOGO_SETTIMANALE),
+                  acceso="il lunedì il canale racconta la settimana: "
+                         "annunci nuovi, ordini e i tre più venduti"),
+            _leva("Annunci minimi per il riepilogo", "RIEPILOGO_MINIMO",
+                  RIEPILOGO_MINIMO),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
@@ -12754,6 +13406,11 @@ async def lancia_lampo(annuncio_id: int, req: Request,
     if savers:
         asyncio.create_task(
             _avvisa_savers_lampo(dict(a), percento, scadenza, savers))
+    # Il canale lo racconta: gancio DOPO il commit e in create_task, il
+    # patto di accoda_promo — un post fallito non deve mai rompere il
+    # lancio di uno sconto. Rilegge la riga da solo (qui `a` e' quella
+    # di PRIMA dell'UPDATE, senza le colonne lampo_*).
+    asyncio.create_task(promo_lampo(annuncio_id, percento, scadenza))
     return {"ok": True, "percento": percento, "scadenza": scadenza}
 
 
@@ -15009,6 +15666,19 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
 # deposito a pacco gia' dichiarato in viaggio (il caso normale) e
 # segna_spedito nel caso raro del codice immediato — e le due non
 # devono divergere.
+def _etichetta_documento(grezzo, estensione: str) -> str:
+    """Il nome che il compratore LEGGE, e che finisce anche nel
+    Content-Disposition del download. Lo scrive il venditore (glielo
+    manda il suo telefono col nome del file), quindi si ripulisce
+    duro: solo il basename, niente caratteri di controllo, niente
+    virgolette — una virgoletta in quell'header spezza il nome del
+    file scaricato, che e' la stessa famiglia del «<» che spegneva
+    l'avviso di spedizione, su un altro tubo."""
+    nome = os.path.basename(str(grezzo or "")).strip()
+    nome = re.sub(r'[\x00-\x1f\x7f"\\/]', "", nome)[:100].strip()
+    return nome or f"ritiro.{estensione}"
+
+
 MSG_BUSTA_PRONTA = (
     "📦 <b>Il tuo pacco ti aspetta al punto di ritiro!</b> Nell'ordine "
     "trovi il <b>nome del destinatario</b> e il <b>codice</b> per "
@@ -15044,9 +15714,15 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
     d = await leggi_json(req)
     nome = " ".join(str(d.get("nome") or "").split())
     codice = (d.get("codice") or "").strip()
-    if not nome or not codice:
-        raise HTTPException(400, "Servono entrambi: il nome del "
-                                 "destinatario e il codice di ritiro")
+    # Il DOCUMENTO e' l'altra strada per dare il codice (decisione di
+    # Andrea): un PIN si trascrive, un QR no. Chiave assente = si
+    # CONSERVA quello che c'e' (il patto dello stock: un client di
+    # ieri non sa che il campo esiste e non deve cancellarlo);
+    # `file_togli` e' il gesto esplicito per levarlo.
+    doc = d.get("file")
+    togli_doc = bool(d.get("file_togli"))
+    if not nome:
+        raise HTTPException(400, "Serve il nome del destinatario")
     # 400 espliciti, MAI il troncamento silenzioso del punto_ritiro:
     # un PIN troncato e' un PIN rotto, e il nome deve combaciare con
     # quello scritto sull'etichetta.
@@ -15056,6 +15732,12 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
     if len(codice) > 1000:
         raise HTTPException(400, "Il codice di ritiro è troppo lungo "
                                  "(massimo 1000 caratteri)")
+    # Il vaglio del documento sta PRIMA della connessione, che e' puro
+    # e non ha bisogno del database: cosi' il 400 non lascia mai un
+    # `con` aperto dietro di se'.
+    raw = est = ""
+    if doc and not togli_doc:
+        raw, tipo_doc, est = _documento_busta(doc)
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND venditore_id=? "
                     "AND stato IN ('locked','shipped','dispute')",
@@ -15067,25 +15749,74 @@ async def deposita_busta_ritiro(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo ordine non è una spedizione a "
                                  "un punto di ritiro")
+    vecchio = o["busta_file"]
+    if togli_doc:
+        file_nome = tipo_doc = etichetta = ""
+    elif raw:
+        # nome IMPREVEDIBILE (token_hex) e non derivato dall'ordine: la
+        # cartella non e' servita da nessuna rotta, ma un nome che si
+        # indovina invita a provarci — e chi indovina, ritira il pacco.
+        file_nome = f"b{ordine_id}_{secrets.token_hex(8)}.{est}"
+        etichetta = _etichetta_documento(d.get("file_nome"), est)
+    else:
+        # chiave assente: si CONSERVA (il patto dello stock)
+        file_nome = vecchio
+        tipo_doc = o["busta_file_tipo"]
+        etichetta = o["busta_file_nome"]
+    # La regola nuova: il nome serve sempre, e poi basta UNA delle due
+    # strade — il codice scritto o il documento. Non si resta mai con
+    # una busta vuota, che per il compratore sarebbe un vicolo cieco.
+    if not codice and not file_nome:
+        con.close()
+        raise HTTPException(400, "Serve il codice di ritiro, oppure "
+                                 "carica il documento del corriere")
+    # Il file si scrive PRIMA della colonna: se il disco dice di no,
+    # il database resta com'era e il venditore riprova su una busta
+    # intatta, invece di ritrovarsi una colonna che punta al nulla.
+    if raw:
+        try:
+            with open(os.path.join(BUSTE_DIR, file_nome), "wb") as out:
+                out.write(_cifra_blob(raw))
+        except Exception as e:
+            con.close()
+            print(f"⚠️ Ordine #{ordine_id}: documento di ritiro non "
+                  f"scritto: {e}")
+            raise HTTPException(503, "Non riesco a salvare il documento "
+                                     "adesso: riprova fra poco")
     adesso = int(time.time())
     correzione = o["busta_il"] > 0
     con.execute("UPDATE ordini SET busta_nome=?, busta_codice=?, "
+                "busta_file=?, busta_file_tipo=?, busta_file_nome=?, "
                 "busta_il=?, busta_corretta_il=?, busta_correzioni=? "
                 "WHERE id=?",
                 (_cifra_contenuto(nome), _cifra_contenuto(codice),
+                 file_nome, tipo_doc, etichetta,
                  o["busta_il"] or adesso,
                  adesso if correzione else o["busta_corretta_il"],
                  o["busta_correzioni"] + (1 if correzione else 0),
                  ordine_id))
     con.commit()
     con.close()
+    # il vecchio se ne va DOPO il commit, e solo se non e' piu' quello
+    # buono: il pattern di _scrivi_avatar, o si accumulano orfani
+    if vecchio and vecchio != file_nome:
+        try:
+            os.remove(os.path.join(BUSTE_DIR, vecchio))
+        except OSError:
+            pass
     # Il journal dice COSA (impronta, mai il testo: nel journal non
     # entrano segreti) e QUANDO — il pattern della consegna digitale.
     impronta = hashlib.sha256(codice.encode("utf-8")).hexdigest()[:16]
+    if raw:
+        stato_doc = f"{tipo_doc} da {len(raw)} byte"
+    elif togli_doc:
+        stato_doc = "tolto"
+    else:
+        stato_doc = "confermato" if file_nome else "assente"
     print(f"📦 Ordine #{ordine_id}: busta di consegna "
           f"{'corretta' if correzione else 'depositata'} "
           f"(nome {len(nome)} caratteri, codice {len(codice)}, "
-          f"impronta {impronta})")
+          f"impronta {impronta}, documento {stato_doc})")
     # La dedup del segnale d'arrivo: su 'locked' SILENZIO (parlera'
     # segna_spedito col suo ramo via_punto), sul primo deposito a
     # pacco gia' in viaggio parte il «ti aspetta», sulla correzione
@@ -15133,9 +15864,64 @@ async def leggi_busta_ritiro(ordine_id: int,
     return {"ok": True,
             "nome": _decifra_contenuto(o["busta_nome"]),
             "codice": _decifra_contenuto(o["busta_codice"]),
+            # del documento qui esce solo la SCHEDA — c'e', come si
+            # chiama, di che tipo e': i byte stanno di la', dietro la
+            # loro rotta, e non si trascinano in ogni lettura
+            "documento": bool(o["busta_file"]),
+            "documento_nome": o["busta_file_nome"],
+            "documento_tipo": o["busta_file_tipo"],
             "depositata_il": o["busta_il"],
             "corretta_il": o["busta_corretta_il"],
             "correzioni": o["busta_correzioni"]}
+
+
+@app.get("/api/orders/{ordine_id}/busta-ritiro/file")
+async def leggi_documento_busta(ordine_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """I byte del documento di ritiro, decifrati al volo. NON e' un
+    file statico e non lo diventera' mai: chi ha questo documento
+    RITIRA IL PACCO, quindi non esiste un URL che funzioni senza dire
+    chi sei — niente cartella montata (regola ferrea 3), niente nome
+    indovinabile, niente cache (`no-store`: su un telefono prestato o
+    condiviso, una copia in cache e' una copia del codice).
+    Le regole sono quelle della busta, riga per riga: SOLO le due
+    parti, il moderatore MAI, e l'autorizzazione PRIMA dell'esistenza
+    perche' l'estraneo non impari niente. GET PURO come il gemello:
+    aprire il documento non e' una ricevuta."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND "
+                    "(compratore_id=? OR venditore_id=?)",
+                    (ordine_id, user["id"], user["id"])).fetchone()
+    con.close()
+    if not o:
+        raise HTTPException(400, "Operazione non permessa")
+    if not o["busta_file"]:
+        raise HTTPException(404, "Nessun documento di ritiro su questo "
+                                 "ordine")
+    try:
+        with open(os.path.join(BUSTE_DIR, o["busta_file"]), "rb") as f:
+            raw = _decifra_blob(f.read())
+    except OSError:
+        raw = None
+    if raw is None:
+        # una frase non e' un PDF: qui si dice che non si puo' aprire,
+        # invece di consegnare byte che nessun lettore capirebbe
+        raise HTTPException(503, "Il documento non si riesce ad aprire: "
+                                 "chiedi al venditore di ricaricarlo")
+    etichetta = _etichetta_documento(o["busta_file_nome"], "pdf")
+    return Response(
+        content=raw,
+        media_type=o["busta_file_tipo"] or "application/octet-stream",
+        headers={"Content-Disposition":
+                 f'inline; filename="{etichetta}"',
+                 "Cache-Control": "no-store, private",
+                 # il documento non e' MAI una pagina: se un domani
+                 # ci finisse dentro un SVG o un HTML travestito, il
+                 # browser non deve eseguirlo sul nostro dominio
+                 "X-Content-Type-Options": "nosniff",
+                 "Content-Security-Policy": "sandbox; default-src 'none'"})
 
 
 @app.post("/api/orders/{ordine_id}/nascondi")
@@ -18151,6 +18937,75 @@ SOGLIA_AGGREGA = 3         # piu' di cosi' in una finestra = aggregato
 PAUSA_TRA_PROMO = 2        # secondi tra un post singolo e l'altro
 
 
+# ---------- IL RITMO DELLA VETRINA, DECISO DAL BOT -------------------
+# Quanto parla il canale sta in tre numeri — ogni quanti giorni uno
+# stesso venditore puo' tornare in canale, quanti post singoli si
+# fanno in un'ora, e da quanti annunci in una finestra si passa
+# all'aggregato. Erano tre costanti del config, cioe' cambiare il
+# ritmo voleva dire entrare nel VPS e riavviare; e il ritmo e'
+# proprio la cosa che si tara GUARDANDO il canale, non a tavolino.
+#
+# NEL DATABASE VA IL NOME, NON I NUMERI, ed e' la scelta che tiene
+# semplice il resto: una riga, una parola, e le tre cifre restano
+# qui, dove hanno il loro commento accanto. Un nome fuori catalogo —
+# scritto a mano, o rimasto da una posizione che un domani si toglie
+# — ricade sul config: fail-safe, perche' sbagliare qui non deve
+# poter spegnere il canale.
+#
+# PERCHE' `impostazioni` E' IL POSTO GIUSTO, e non e' una deroga alla
+# regola «le leve si guardano e basta» del pannello admin: quella
+# difende gli interruttori che muovono DENARO (ASTA_ABILITATA,
+# IMPORT_NOSTR_APERTO, AUTO_SBLOCCO_ATTIVO nascono spenti apposta
+# perche' accenderli costi un gesto dal VPS). Un ritmo di
+# pubblicazione non accende niente, dice quanto il bot parla, e
+# sbagliarlo si vede subito nel canale. E' la stessa famiglia dell'id
+# del canale, che da lassu' passa gia' di qui.
+#
+# NIENTE CACHE, al contrario di `_CANALE`: e' una SELECT ogni finestra
+# di raggruppamento (90 secondi), e una seconda copia in RAM sarebbe
+# una copia da tenere allineata in cambio di niente.
+
+RITMI = {                     # (giorni fra due post dello stesso
+                              #  venditore, post singoli all'ora,
+                              #  soglia dell'aggregato)
+    "tutto":     (0, 30, 20),   # la vetrina: ogni annuncio un post
+    "giorno":    (1,  6,  3),   # uno per venditore al giorno
+    "settimana": (7,  6,  3),   # la selezione: uno a settimana
+}
+
+
+def nome_ritmo() -> str:
+    """Come si chiama la posizione di adesso, e l'UNICO posto che va a
+    leggere quella riga. '' = nessuna posizione scelta, cioe' vale il
+    config — che e' un'informazione diversa da «settimana» anche
+    quando i numeri combaciano: chi legge il pannello deve poter
+    distinguere «l'ha deciso qualcuno» da «e' il valore di partenza».
+    Un nome fuori catalogo vale come '': fail-safe, perche' sbagliare
+    qui non deve poter spegnere il canale."""
+    nome = impostazione("ritmo_vetrina", "")
+    return nome if nome in RITMI else ""
+
+
+def ritmo_vetrina() -> tuple[int, int, int]:
+    """IL GIUDICE UNICO di «quanto parla il canale». Nessuna posizione
+    scelta = i valori del config, cioe' il mondo di ieri byte per
+    byte."""
+    return RITMI.get(nome_ritmo()) or (PROMO_GIORNI_VENDITORE,
+                                       POST_MAX_ORA, SOGLIA_AGGREGA)
+
+
+def imposta_ritmo(nome: str) -> str:
+    """Cambia la posizione e la restituisce. Un nome fuori catalogo si
+    scrive come stringa vuota, cioe' «torna al config»: e' anche il
+    modo di annullare la scelta senza andare a cancellare una riga a
+    mano sul VPS."""
+    nome = (nome or "").strip().lower()
+    if nome not in RITMI:
+        nome = ""
+    scrivi_impostazione("ritmo_vetrina", nome)
+    return nome
+
+
 def _fmt_sats(n) -> str:
     """80000 -> '80.000': i puntini delle migliaia all'italiana.
 
@@ -18232,18 +19087,92 @@ def _nota_promo(a: dict, cambio: float) -> str:
     return testo
 
 
+def _firma_venditore(a: dict) -> str:
+    """La riga «Annuncio da …» col ponte verso il negozio.
+
+    L'@username si mostra solo se c'e' DAVVERO: i nativi Nostr non ce
+    l'hanno, e scrivere «@» davanti a un nome proprio farebbe nascere
+    una menzione che Telegram non sa risolvere — cioe' un link morto
+    su ogni loro annuncio. Il negozio invece c'e' sempre (il codice si
+    assegna alla prima riga di `utenti` e non cambia mai), ma la
+    guardia resta: senza codice si scrive la sola firma, mai un link
+    a `/negozio/` che porterebbe a un 404."""
+    nome = a.get("venditore_username") or ""
+    chi = f"@{html.escape(nome)}" if nome else html.escape(
+        a.get("venditore") or "un venditore")
+    riga = f"Annuncio da <b>{chi}</b>"
+    if a.get("venditore_negozio"):
+        riga += (f" — <a href=\"{URL_PUBBLICO}/negozio/"
+                 f"{a['venditore_negozio']}\">vedi il suo negozio</a>")
+    return riga
+
+
 def _caption_canale(a: dict, cambio: float, venduto: bool = False) -> str:
     """La caption HTML del post nel canale Telegram (usata anche per
     RICOSTRUIRE il testo quando si edita col ✅ Venduto: cosi' non
-    serve salvarlo da nessuna parte)."""
-    testo = f"🫙 <b>{html.escape(a['titolo'])}</b>\n{_prezzo_promo(a, cambio)}"
+    serve salvarlo da nessuna parte — ed e' il motivo per cui questa
+    funzione dev'essere PURA rispetto alla riga che riceve).
+
+    IL LINK NON SI VEDE (ago 2026, decisione di Andrea): al posto
+    dell'URL nudo c'e' l'ancora «🫙 Apri su Barattolo». Non e' solo
+    estetica — un URL in chiaro in mezzo a un post e' anche la riga
+    che la gente copia e incolla altrove, mentre l'ancora tiene il
+    lettore dentro il messaggio; e la caption di Telegram ha 1024
+    caratteri, che i link lunghi si mangiano.
+    ATTENZIONE a chi la ritocca: `a` DEVE arrivare con le tre chiavi
+    del venditore (venditore, venditore_username, venditore_negozio),
+    cioe' letta col JOIN su `utenti` — senza, la firma esce anonima e
+    il post NUOVO e quello RIEDITATO col ✅ direbbero cose diverse."""
+    link = f"{URL_PUBBLICO}/annuncio/{a['id']}"
+    testo = f"🫙 <b>{html.escape(a['titolo'])}</b>"
+    testo += f"\n💰 {_prezzo_promo(a, cambio)}"
     if a.get("zona"):
         testo += f"\n📍 {html.escape(a['zona'])}"
-    testo += f"\n{URL_PUBBLICO}/annuncio/{a['id']}"
+    testo += f"\n\n<a href=\"{link}\">🫙 Apri su Barattolo</a>"
+    testo += "\n⚡ Pagabile in Satoshi"
+    testo += f"\n\n{_firma_venditore(a)}"
     testo += f"\n\n{_hashtag_promo(a)}"
     if venduto:
         testo += "\n\n✅ Venduto"
     return testo
+
+
+def _un_post_per_venditore(annunci: list[dict], giorni: int,
+                           adesso: int = 0) -> list[dict]:
+    """Il freno del canale: al massimo UN annuncio per venditore, e
+    solo se il suo ultimo post e' vecchio di `giorni`.
+    Fra i suoi vince il PIU' RECENTE (`creato`, poi `id` — lo stesso
+    tie-break dell'ordine della vetrina: due annunci pubblicati nello
+    stesso secondo esistono davvero, e senza il secondo campo la
+    scelta dipenderebbe dall'ordine di arrivo nella coda).
+
+    PURA APPOSTA, come le pure del conto: prende righe e restituisce
+    righe, non tocca ne' rete ne' database — cosi' si tortura in CI
+    invece di sperarci. A scrivere il timbro e' chi posta.
+    `giorni` e' OBBLIGATORIO E SENZA DEFAULT apposta (la lezione di
+    `atteso_sats`): dall'ago 2026 il ritmo lo decide `ritmo_vetrina()`
+    e non piu' una costante, e chi aggiungera' un chiamante domani
+    deve scegliere il freno invece di ereditarne uno in silenzio.
+    A 0 = nessun freno, cioe' la vetrina vera: si riconosce che e' una
+    posizione e non una taratura, quindi non si limita nemmeno a un
+    annuncio per venditore."""
+    if giorni <= 0:
+        return annunci
+    adesso = adesso or int(time.time())
+    soglia = adesso - giorni * 86400
+    migliori: dict[int, dict] = {}
+    for a in annunci:
+        if (a.get("promo_canale_il") or 0) > soglia:
+            continue          # ha gia' avuto il suo turno questa settimana
+        v = a["venditore_id"]
+        vecchio = migliori.get(v)
+        if not vecchio or (a.get("creato") or 0, a["id"]) > \
+                (vecchio.get("creato") or 0, vecchio["id"]):
+            migliori[v] = a
+    # l'ordine di arrivo si conserva: la coda e' cronologica, e un
+    # post che scavalca l'altro senza motivo si nota
+    scelti = set(id(a) for a in migliori.values())
+    return [a for a in annunci if id(a) in scelti]
 
 
 def accoda_promo(annuncio_id: int):
@@ -18264,7 +19193,11 @@ async def _drena_promo():
     quel che si e' accumulato e applica la regola unica — post singoli
     se sono pochi e il budget orario regge, un solo aggregato
     altrimenti. Rilegge ogni annuncio dal database: chi e' stato
-    venduto o rimosso durante l'attesa non viene mai annunciato."""
+    venduto o rimosso durante l'attesa non viene mai annunciato.
+
+    I tre numeri del ritmo si leggono UNA VOLTA in cima al giro: cosi'
+    un `/vetrina` che arriva a meta' drenaggio non fa uscire una parte
+    del gruppo con una regola e il resto con un'altra."""
     global _drenatore_promo_avviato
     await asyncio.sleep(ATTESA_RAGGRUPPO)
     ids = list(dict.fromkeys(CODA_PROMO))   # senza doppioni, in ordine
@@ -18278,22 +19211,27 @@ async def _drena_promo():
             # il ferie_fino del venditore viaggia col giro: un negozio
             # chiuso non si annuncia in piazza — sarebbe una vetrina
             # che promette una cosa che non si puo' comprare
-            a = con.execute("SELECT a.*, u.ferie_fino FROM annunci a "
-                            "JOIN utenti u ON u.tg_id=a.venditore_id "
-                            "WHERE a.id=?", (i,)).fetchone()
+            a = con.execute(
+                "SELECT a.*, u.ferie_fino, u.promo_canale_il, "
+                "u.nome AS venditore, u.username AS venditore_username, "
+                "u.negozio AS venditore_negozio "
+                "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+                "WHERE a.id=?", (i,)).fetchone()
             if a and a["stato"] == "attivo" and not a["contatto_nostr"] \
                     and not in_ferie(a["ferie_fino"], adesso_f):
                 annunci.append(dict(a))
         con.close()
+        giorni, max_ora, soglia_aggrega = ritmo_vetrina()
+        annunci = _un_post_per_venditore(annunci, giorni)
         if not annunci:
             return
         adesso = time.time()
         _post_promo_recenti[:] = [t for t in _post_promo_recenti
                                   if adesso - t < 3600]
-        if (len(annunci) <= SOGLIA_AGGREGA and
-                len(_post_promo_recenti) + len(annunci) <= POST_MAX_ORA):
+        if (len(annunci) <= soglia_aggrega and
+                len(_post_promo_recenti) + len(annunci) <= max_ora):
             for a in annunci:
-                await _posta_promo_singolo(a)
+                await _posta_promo_singolo(a, giorni)
                 _post_promo_recenti.append(time.time())
                 await asyncio.sleep(PAUSA_TRA_PROMO)
         else:
@@ -18305,11 +19243,32 @@ async def _drena_promo():
         print(f"⚠️ Post automatici saltati: {e}")
 
 
-async def _posta_promo_singolo(a: dict):
+async def _posta_promo_singolo(a: dict, giorni: int):
     """Un annuncio, un post per canale. Ogni canale fallisce per conto
     suo; i riferimenti (message_id, event id) si salvano per il ciclo
-    di vita (✅ Venduto, cancellazione)."""
+    di vita (✅ Venduto, cancellazione).
+
+    `giorni` arriva dal chiamante — che l'ha gia' letto da
+    `ritmo_vetrina()` — e non si rilegge qui: a meta' drenaggio un
+    `/vetrina` cambierebbe il freno sotto i piedi al gruppo, e mezzo
+    gruppo timbrato e mezzo no e' il modo in cui questo freno diventa
+    difficile da spiegare."""
     cambio = await cambio_btc_eur()
+    # Il timbro del turno si scrive PRIMA dell'invio, il patto delle
+    # campagne: un errore di rete puo' far perdere un post di vetrina,
+    # mai raddoppiarlo — e qui il doppio sarebbe proprio la cosa che il
+    # freno esiste per togliere. Chi salta il turno per un guasto ha
+    # comunque il suo annuncio in vetrina, che e' il posto dove si
+    # compra.
+    # A freno spento NON si timbra, ed e' deliberato: un timbro scritto
+    # mentre il ritmo e' «tutto» bloccherebbe per una settimana intera
+    # ogni venditore il giorno che qualcuno stringe a «settimana».
+    if giorni > 0 and a.get("venditore_id"):
+        con = db()
+        con.execute("UPDATE utenti SET promo_canale_il=? WHERE tg_id=?",
+                    (int(time.time()), a["venditore_id"]))
+        con.commit()
+        con.close()
     post_nostr_id, post_canale_id = "", 0
     if _NOSTR:
         try:
@@ -18321,17 +19280,17 @@ async def _posta_promo_singolo(a: dict):
                 post_nostr_id = evento["id"]
         except Exception as e:
             print(f"⚠️ Nota promo Nostr #{a['id']} saltata: {e}")
-    if TELEGRAM_CANALE_ID:
+    if canale_id():
         caption = _caption_canale(a, cambio)
         foto = _foto_url_nostr(a.get("foto", ""))
         r = None
         if foto:
             r = await bot_api("sendPhoto", {
-                "chat_id": TELEGRAM_CANALE_ID, "photo": foto[0],
+                "chat_id": canale_id(), "photo": foto[0],
                 "caption": caption, "parse_mode": "HTML"})
         if not (r and r.get("ok")):
             r = await bot_api("sendMessage", {
-                "chat_id": TELEGRAM_CANALE_ID, "text": caption,
+                "chat_id": canale_id(), "text": caption,
                 "parse_mode": "HTML"})
         if r and r.get("ok"):
             post_canale_id = r["result"]["message_id"]
@@ -18342,6 +19301,99 @@ async def _posta_promo_singolo(a: dict):
             "WHERE id=?", (post_nostr_id, post_canale_id, a["id"]))
         con.commit()
         con.close()
+
+
+def _riga_prezzo_lampo(a: dict, percento: int, cambio: float) -> str:
+    """Il prezzo del post della lampo: il listino BARRATO e accanto lo
+    scontato, ognuno reso da `_prezzo_promo` — cosi' la regola di come
+    si scrive un prezzo nel canale (quale valuta per prima, il ≈, il
+    caso col cambio muto) resta in un posto solo.
+
+    Sul listino in EURO lo sconto si applica anche all'equivalente in
+    sats, che per quei listini e' gia' «l'equivalente al cambio di
+    pubblicazione»: la stessa percentuale sulle due facce, o la riga
+    direbbe due sconti diversi."""
+    scontato = dict(a)
+    sats, eur = _prezzo_lampo(a, percento)
+    scontato["prezzo_sats"] = sats or (
+        a["prezzo_sats"] * (100 - percento) // 100)
+    scontato["prezzo_eur"] = eur
+    return (f"<s>{_prezzo_promo(a, cambio)}</s> → "
+            f"<b>{_prezzo_promo(scontato, cambio)}</b>")
+
+
+async def promo_lampo(annuncio_id: int, percento: int, scadenza: int):
+    """Lo sconto lampo raccontato nel canale (ago 2026, chiesto da
+    Andrea). Gancio in coda a `lancia_lampo`, in create_task e DOPO il
+    commit: il patto di `accoda_promo` — un post fallito non deve mai
+    rompere il lancio di uno sconto.
+
+    UN POST NUOVO, E L'ORIGINALE NON SI TOCCA. La lampo non cambia
+    `prezzo_sats` (il listino non si tocca MAI, e' la regola sua),
+    quindi il post di quando l'annuncio e' nato non mente: dice il
+    listino, che e' ancora vero. E' la differenza col ✅ Venduto, che
+    invece riscrive quel post — li' a cambiare era la DISPONIBILITA',
+    qui si aggiunge un'occasione a tempo. Cosi' non c'e' niente da
+    dis-editare alla scadenza.
+
+    SOLO CANALE, NIENTE NOSTR, ed e' una regola gia' scritta altrove:
+    lo sconto e' LOCALE, cioe' il vantaggio di chi compra dentro
+    Barattolo, e il NIP-99 parla il prezzo pieno per costruzione.
+
+    CONSUMA IL BUDGET ORARIO e a budget pieno SALTA invece di
+    aggregare (una lampo aggregata non direbbe niente di utile).
+    Senza, il tetto dei post si aggirerebbe lanciando sconti:
+    MAX_LAMPO_SETTIMANA e' 2 *per annuncio*, quindi chi ne ha cinquanta
+    puo' fare cento lampo a settimana. Una lampo persa e' un post
+    perso, non un ordine perso — chi la cerca ha la vetrina col filtro
+    «⚡ In offerta».
+
+    IMPERFEZIONE DICHIARATA: se l'annuncio si vende mentre la lampo e'
+    viva, questo post resta senza il ✅ (l'originale ce l'ha). Il testo
+    e' DATATO — «fino alle 18:00» — e il link apre la scheda vera, che
+    dice sempre la verita'; nessuno puo' pagare. Se in rodaggio dara'
+    fastidio la leva e' una colonna `post_lampo_id` piu' una riga in
+    `promo_venduto`: qui si e' scelto di non raddoppiare il ciclo di
+    vita per un post che si autodata."""
+    if not (POST_AUTOMATICI and POST_LAMPO_CANALE and canale_id()):
+        return
+    try:
+        con = db()
+        # si rilegge dal database e non ci si fida del payload, e con
+        # le guardie di _posta_promo_singolo: un negozio in ferie o un
+        # annuncio importato non si annunciano in piazza
+        a = con.execute(
+            "SELECT a.*, u.ferie_fino FROM annunci a "
+            "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.id=?",
+            (annuncio_id,)).fetchone()
+        con.close()
+        adesso = time.time()
+        if not a or a["stato"] != "attivo" or a["contatto_nostr"] \
+                or in_ferie(a["ferie_fino"], int(adesso)) \
+                or a["lampo_scadenza"] <= adesso:
+            return
+        _post_promo_recenti[:] = [t for t in _post_promo_recenti
+                                  if adesso - t < 3600]
+        if len(_post_promo_recenti) >= ritmo_vetrina()[1]:
+            print(f"⚡ Lampo #{annuncio_id} non annunciata: budget orario "
+                  f"dei post esaurito")
+            return
+        a = dict(a)
+        cambio = await cambio_btc_eur()
+        testo = (f"⚡ <b>-{percento}%</b> su "
+                 f"<b>{html.escape(a['titolo'])}</b>"
+                 f"\n💰 {_riga_prezzo_lampo(a, percento, cambio)}"
+                 f"\n⏳ solo fino {_quando_scade(scadenza)}"
+                 f"\n\n<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+                 "🫙 Apri su Barattolo</a>"
+                 f"\n\n{_hashtag_promo(a)}")
+        r = await bot_api("sendMessage", {
+            "chat_id": canale_id(), "text": testo,
+            "parse_mode": "HTML", "disable_web_page_preview": True})
+        if r and r.get("ok"):
+            _post_promo_recenti.append(time.time())
+    except Exception as e:
+        print(f"⚠️ Post della lampo #{annuncio_id} saltato: {e}")
 
 
 async def _posta_promo_aggregato(n: int):
@@ -18355,9 +19407,9 @@ async def _posta_promo_aggregato(n: int):
                 firma_evento(1, [["t", "barattolo"]], testo))
         except Exception as e:
             print(f"⚠️ Nota promo aggregata saltata: {e}")
-    if TELEGRAM_CANALE_ID:
+    if canale_id():
         await bot_api("sendMessage",
-                      {"chat_id": TELEGRAM_CANALE_ID, "text": testo})
+                      {"chat_id": canale_id(), "text": testo})
 
 
 # ---------- IL CAMPANELLO DEI NUOVI ISCRITTI (solo moderatori) -------
@@ -18718,14 +19770,21 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
     vetrina e il post non deve mentire)."""
     try:
         con = db()
-        a = con.execute("SELECT * FROM annunci WHERE id=?",
-                        (annuncio_id,)).fetchone()
+        # il JOIN sul venditore NON e' un di piu': _caption_canale
+        # RICOSTRUISCE il testo da capo, e senza queste tre chiavi il
+        # post riscritto col ✅ perderebbe la firma che aveva da nuovo
+        a = con.execute(
+            "SELECT a.*, u.nome AS venditore, "
+            "u.username AS venditore_username, "
+            "u.negozio AS venditore_negozio "
+            "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+            "WHERE a.id=?", (annuncio_id,)).fetchone()
         con.close()
-        if not a or not a["post_canale_id"] or not TELEGRAM_CANALE_ID:
+        if not a or not a["post_canale_id"] or not canale_id():
             return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
                                   venduto=venduto)
-        dati = {"chat_id": TELEGRAM_CANALE_ID,
+        dati = {"chat_id": canale_id(),
                 "message_id": a["post_canale_id"], "parse_mode": "HTML"}
         # Con la foto il testo vive nella caption, senza nel body — ma
         # il ripiego sendMessage di _posta_promo_singolo rende il tipo
@@ -18754,9 +19813,9 @@ async def promo_rimuovi(annuncio_id: int):
         con.close()
         if not a or not (a["post_canale_id"] or a["post_nostr_id"]):
             return
-        if a["post_canale_id"] and TELEGRAM_CANALE_ID:
+        if a["post_canale_id"] and canale_id():
             await bot_api("deleteMessage",
-                          {"chat_id": TELEGRAM_CANALE_ID,
+                          {"chat_id": canale_id(),
                            "message_id": a["post_canale_id"]})
         if a["post_nostr_id"] and _NOSTR:
             await _spedisci_ai_relay(
@@ -19424,6 +20483,12 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
             quando = time.strftime("%d/%m/%Y %H:%M",
                                    time.localtime(o["busta_il"]))
             stato_busta = f"istruzioni di ritiro depositate il {quando}"
+            # il documento e' un fatto quanto la data: al moderatore
+            # dice se il venditore ha dato al compratore qualcosa di
+            # inquadrabile o solo un codice a mano. Il contenuto no —
+            # nemmeno di quello, e da nessuna strada.
+            if o["busta_file"]:
+                stato_busta += " (con un documento allegato)"
             n = o["busta_correzioni"]
             if n:
                 ultima = time.strftime(
@@ -19876,6 +20941,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # QUANDO — per il compratore, e per il moderatore in disputa.
         r.pop("busta_nome", "")
         r.pop("busta_codice", "")
+        # e del documento non esce nemmeno il NOME DEL FILE: e' la
+        # maniglia sul disco, e non serve a nessun client — resta il
+        # flag, come per il contenuto digitale
+        r["busta_documento"] = bool(r.pop("busta_file", ""))
+        r.pop("busta_file_tipo", "")
+        r.pop("busta_file_nome", "")
         # La foto per la riga della lista: SOLO il primo nome (il
         # pattern di scheda() dei doppioni) — la galleria intera qui
         # non serve e gonfierebbe il payload. Per i set e' gia' la
@@ -23007,6 +24078,13 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Termometro sottocategorie saltato: {e}")
         try:
+            # il lunedi', nel canale: la settimana raccontata a chi
+            # guarda da fuori (e col turno che si consuma anche quando
+            # la settimana e' magra — vedi il cappello suo)
+            await riepilogo_settimana()
+        except Exception as e:
+            print(f"⚠️ Riepilogo settimanale saltato: {e}")
+        try:
             # DOPO l'import, ed e' la precedenza: chi ha appena
             # ricevuto il completamento ha il ritmo chiuso e qui non
             # passa (vedi suggerisci_funzioni)
@@ -23148,6 +24226,119 @@ async def termometro_sottocategorie():
         f"categorie più scoperte: {scoperte}.{riga_colmabili}\n"
         f"Sul VPS: <code>python assegna_sottocategorie.py --conta</code> "
         f"per i titoli, parole nuove nel dizionario per il resto.")
+
+
+# ============ IL RIEPILOGO SETTIMANALE (ago 2026) ===================
+# Il lunedi' il canale racconta la settimana: annunci nuovi, ordini e
+# i tre articoli piu' venduti. E' l'unico post che non racconta un
+# fatto singolo, ed e' anche quello che fa vedere che il mercatino e'
+# vivo a chi ci passa e trova la vetrina ferma.
+#
+# IL TIMBRO STA NEL DATABASE come per i fratelli, mai in un globale:
+# tre deploy in un'ora si sono gia' portati via tre volte lo stesso
+# avviso, e un lunedi' di lavoro sul VPS e' proprio il giorno in cui
+# succede.
+#
+# MA QUI SI TIMBRA ANCHE QUANDO SI TACE, ed e' la differenza col
+# termometro — che invece esce PRIMA di timbrare quando la coda e'
+# sotto il minimo. Li' il conto e' CUMULATIVO: saltare il turno lo
+# rimanda soltanto, e il lunedi' dopo ricontrolla. Qui il conto e' di
+# una SETTIMANA precisa, quindi ricontrollare martedi' darebbe una
+# finestra sfasata e un riepilogo fuori cadenza: il turno si consuma,
+# magro o no. Chi legge i due insieme e li uniforma rompe uno dei due.
+
+TIMBRO_RIEPILOGO = "riepilogo_settimana"   # il giorno dell'ultimo post
+
+
+def _conta_settimana(con, da: int) -> tuple[int, int, list]:
+    """(annunci nuovi, ordini, top 3) della finestra che parte da `da`.
+
+    PURA rispetto alla connessione che riceve — legge e basta, come i
+    controlli della ronda — cosi' si gira in CI su un database di
+    cartone invece di sperarci.
+
+    ANNUNCI NUOVI: gli stati che sono stati in vetrina davvero. Un
+    VENDUTO ci entra (e' stato un annuncio vero della settimana, e' solo
+    finito), un rimosso e uno in revisione no — il primo non c'e' piu',
+    il secondo non c'e' mai stato.
+
+    ORDINI: quelli in cui i sats sono ARRIVATI IN CASSAFORTE, cioe' il
+    complemento di 'creato' e 'annullato' — la stessa definizione della
+    coda «⏸ Ordini fermi», e si dice ad alta voce invece di elencare
+    gli stati vivi. Contare i soli 'released' direbbe quasi zero: la
+    maggior parte degli ordini di una settimana e' ancora in viaggio.
+
+    TOP 3: i pezzi per annuncio, con una UNION fra la TESTATA (i mono,
+    annuncio_id<>0) e `ordine_righe` (i set) — i mono non hanno righe
+    MAI, quindi guardare le sole righe perderebbe quasi tutto. Il
+    titolo delle righe e' quello FOTOGRAFATO all'acquisto; per i mono
+    arriva dal JOIN, e un annuncio sparito nel frattempo esce dal
+    conto invece di comparire senza nome. Pareggio su `annuncio_id`
+    DESC: senza, due articoli con gli stessi pezzi si scambierebbero
+    di posto a ogni chiamata."""
+    vivi = "o.stato NOT IN ('creato','annullato')"
+    nuovi = con.execute(
+        "SELECT COUNT(*) AS n FROM annunci WHERE creato>=? "
+        "AND stato IN ('attivo','venduto')", (da,)).fetchone()["n"]
+    ordini = con.execute(
+        f"SELECT COUNT(*) AS n FROM ordini o WHERE o.creato>=? AND {vivi}",
+        (da,)).fetchone()["n"]
+    top = con.execute(
+        "SELECT annuncio_id, titolo, SUM(pezzi) AS pezzi FROM ("
+        f"  SELECT o.annuncio_id, a.titolo AS titolo, o.quantita AS pezzi "
+        f"  FROM ordini o JOIN annunci a ON a.id=o.annuncio_id "
+        f"  WHERE o.creato>=? AND {vivi} AND o.annuncio_id<>0 "
+        "  UNION ALL "
+        f"  SELECT r.annuncio_id, r.titolo AS titolo, r.quantita AS pezzi "
+        f"  FROM ordine_righe r JOIN ordini o ON o.id=r.ordine_id "
+        f"  WHERE o.creato>=? AND {vivi}"
+        ") GROUP BY annuncio_id, titolo "
+        "ORDER BY pezzi DESC, annuncio_id DESC LIMIT 3", (da, da)).fetchall()
+    return nuovi, ordini, [dict(r) for r in top]
+
+
+async def riepilogo_settimana():
+    """Il post del lunedi' nel canale. Solo canale: su Nostr il
+    pubblico e' un altro e non e' stato chiesto."""
+    if not (RIEPILOGO_SETTIMANALE and canale_id()):
+        return
+    oggi = time.strftime("%Y-%m-%d")
+    if time.localtime().tm_wday != 0 or timbro_letto(TIMBRO_RIEPILOGO) == oggi:
+        return
+    con = db()
+    nuovi, ordini, top = _conta_settimana(con, int(time.time()) - 7 * 86400)
+    con.close()
+    # Il turno si consuma comunque, anche quando si tace: vedi il
+    # cappello qui sopra, e' la riga che si sbaglia per prima.
+    timbro_scrivi(TIMBRO_RIEPILOGO, oggi)
+    if nuovi < RIEPILOGO_MINIMO and not ordini:
+        print(f"📊 Riepilogo settimana ({oggi}): {nuovi} annunci, "
+              f"{ordini} ordini — settimana magra, non esce")
+        return
+    righe = [f"🫙 {nuovi} "
+             + ("nuovi annunci" if nuovi != 1 else "nuovo annuncio")]
+    if ordini:
+        righe.append(f"🛒 {ordini} "
+                     + ("ordini" if ordini != 1 else "ordine"))
+    if top:
+        # html.escape sul titolo: le notifiche sono HTML e un «<» spegne
+        # il messaggio in silenzio (la lezione dell'avviso di
+        # spedizione) — e qui i titoli sono tre in un colpo solo.
+        venduti = " · ".join(
+            html.escape(t["titolo"] or "") + (f" ×{t['pezzi']}"
+                                              if t["pezzi"] > 1 else "")
+            for t in top if t["titolo"])
+        if venduti:
+            righe.append(f"🏆 I più venduti: {venduti}")
+    print(f"📊 Riepilogo settimana ({oggi}): {nuovi} annunci, "
+          f"{ordini} ordini, {len(top)} in classifica — post mandato")
+    await bot_api("sendMessage", {
+        "chat_id": canale_id(), "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+        "text": "📊 <b>La settimana di Barattolo</b>\n\n"
+                + "\n".join(righe)
+                + f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Sfoglia il "
+                  "mercatino</a>"})
 
 
 # ============ LA RONDA DEL LIBRO MASTRO (ago 2026) ==================
@@ -24697,7 +25888,11 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
 # a-capo finale, e un nome che arriva da un URL puo' averlo)
 NOME_FOTO = re.compile(
     r"^(a\d+_\d+(_\d+)?(_min)?\.(jpg|png|webp|gif)"
-    r"|av_[0-9a-f]+_\d+\.jpg)\Z")
+    r"|av_[0-9a-f]+_\d+\.jpg"
+    # la vetrina del venditore su Nostr: il QUARTO scrittore di
+    # foto/, e la sua forma sta qui perche' senza, la figura
+    # pubblicata in piazza risponderebbe 404 a chiunque la apra
+    r"|v\d+_\d+\.jpg)\Z")
 TIPI_FOTO = {"jpg": "image/jpeg", "png": "image/png",
              "webp": "image/webp", "gif": "image/gif"}
 

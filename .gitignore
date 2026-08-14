@@ -5,6 +5,9 @@ config.py
 *.db
 foto/
 import_tmp/
+# I documenti di ritiro: cifrati sul disco, ma chi ha quel file
+# ritira il pacco — non escono di qui in nessun modo
+buste/
 
 # Python
 __pycache__/

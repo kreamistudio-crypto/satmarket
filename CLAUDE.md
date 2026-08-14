@@ -2870,6 +2870,203 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   message_id; in collaudo un finto id negativo da contatore, così
   anche edit e delete si collaudano). Fail-open totale, ganci DOPO i
   commit, coda in memoria (un riavvio la perde, accettato).
+  IL CANALE LO DECIDE IL BOT (ago 2026): `/canale @nome` (o l'id
+  numerico) lo cambia da Telegram, `/canale` senza argomenti dice
+  quello in uso, `/canale spento` lo spegne. Tabella `impostazioni`
+  (chiave-valore) + giudice unico `canale_id()`, che vince sul config:
+  `TELEGRAM_CANALE_ID` resta il valore di PARTENZA. NON è una deroga
+  alla regola «le leve si guardano e basta» del pannello admin: quella
+  difende gli interruttori che muovono DENARO (ASTA_ABILITATA,
+  IMPORT_NOSTR_APERTO, AUTO_SBLOCCO_ATTIVO nascono spenti perché
+  accenderli costi un gesto dal VPS); un id di canale non accende
+  niente, dice dove il bot parla, e sbagliarlo si vede subito. Il
+  recinto della tabella è da NON allargare: mai segreti (finiscono nei
+  backup) e mai leve del denaro. SI PROVA PRIMA DI CREDERCI — il
+  comando manda un messaggio di collaudo nel canale e salva solo se
+  Telegram risponde ok, col motivo vero in caso di no: altrimenti
+  l'errore si scoprirebbe al prossimo annuncio, cioè con un post perso
+  e nessuno che se ne accorge. Da qui passano TUTTI i punti che
+  scrivono, editano o cancellano nel canale, con la sentinella: se
+  divergessero, il ✅ Venduto finirebbe in un canale e il post
+  originale in un altro.
+  IL POST NON MOSTRA IL LINK (ago 2026, decisione di Andrea): titolo ·
+  💰 prezzo · 📍 zona · l'ancora «🫙 Apri su Barattolo» · «⚡ Pagabile
+  in Satoshi» · «Annuncio da @username — vedi il suo negozio» (ancora
+  su `/negozio/{codice}`) · gli hashtag. L'@ si scrive SOLO se lo
+  username c'è davvero: sui nativi Nostr nascerebbe una menzione che
+  Telegram non sa risolvere, cioè un link morto su ogni loro annuncio.
+  `_caption_canale` RICOSTRUISCE il testo per l'edit del ✅, quindi
+  deve ricevere la riga col JOIN su `utenti` (venditore,
+  venditore_username, venditore_negozio) — senza, il post riscritto
+  perderebbe la firma che aveva da nuovo, e `promo_venduto` legge di
+  conseguenza.
+  UN POST PER VENDITORE A SETTIMANA (ago 2026, decisione di Andrea):
+  il canale è una SELEZIONE, non la vetrina. Leva
+  `PROMO_GIORNI_VENDITORE` (7; 0 = nessun freno, emergenza e non
+  taratura), colonna `utenti.promo_canale_il` (0 = mai, quindi il
+  default È la migrazione), giudice PURO `_un_post_per_venditore` —
+  righe in, righe out, si tortura in CI. Il post esce SUBITO e da lì
+  il venditore tace: la strada «coda fino a fine settimana» è stata
+  scartata perché un annuncio può restare invisibile in canale per
+  sette giorni. Fra i suoi vince il più recente (`creato`, poi `id`:
+  due annunci nello stesso secondo esistono davvero). Il timbro si
+  scrive PRIMA dell'invio, il patto delle campagne — chi salta il
+  turno per un guasto ha comunque il suo annuncio in vetrina, che è
+  dove si compra. L'AGGREGATO non consuma il turno di nessuno: non
+  nomina nessuno.
+  IL RITMO LO DECIDE IL BOT (ago 2026, chiesto da Andrea insieme al
+  canale «Barattolo Vetrina»): il freno qui sopra non è più l'ultima
+  parola. `/vetrina tutto | giorno | settimana` sceglie una POSIZIONE
+  e i tre numeri del ritmo — giorni fra due post dello stesso
+  venditore, post singoli all'ora, soglia dell'aggregato — vengono da
+  lì; `/vetrina` senza argomenti dice dov'è e cosa vuol dire,
+  `/vetrina config` annulla la scelta. Catalogo `RITMI` + giudice
+  unico `ritmo_vetrina()`, e il config resta il valore di PARTENZA,
+  esattamente come per `canale_id()`.
+  NEL DATABASE VA IL NOME, NON I NUMERI, ed è la scelta che tiene
+  semplice tutto il resto: una riga, una parola, e le tre cifre
+  restano nel codice dove hanno il loro commento accanto. Un nome
+  fuori catalogo — scritto a mano sul VPS, o rimasto da una posizione
+  che un domani si toglie — ricade sul config: fail-safe, perché
+  sbagliare qui non deve poter spegnere il canale. `nome_ritmo()` è
+  l'UNICO che va a leggere quella riga e `ritmo_vetrina()` deriva da
+  lui: due lettori potrebbero divergere fra una SELECT e l'altra, e
+  il pannello direbbe una posizione coi numeri di un'altra.
+  PERCHÉ `impostazioni` È IL POSTO GIUSTO: il suo recinto vieta i
+  segreti e le leve del DENARO, e un ritmo di pubblicazione non
+  accende niente — dice quanto il bot parla, e sbagliarlo si vede
+  subito nel canale. È la stessa famiglia dell'id del canale. Il
+  recinto ora ha DUE chiavi (`canale_telegram`, `ritmo_vetrina`) e a
+  sorvegliarlo è un CENSIMENTO che le estrae dal sorgente e le
+  confronta con l'elenco dichiarato — il vecchio `count(...) <= 2`
+  diceva quante VOLTE si legge, non COSA, e sarebbe passato liscio
+  davanti a una riga nuova che ne sostituisce una vecchia.
+  `_un_post_per_venditore` prende `giorni` come argomento
+  OBBLIGATORIO E SENZA DEFAULT (la lezione di `atteso_sats`), e
+  `_posta_promo_singolo` lo RICEVE dal chiamante invece di
+  rileggerlo: a metà drenaggio un `/vetrina` cambierebbe il freno
+  sotto i piedi al gruppo, e mezzo gruppo timbrato e mezzo no è il
+  modo in cui questo freno diventa impossibile da spiegare. A freno
+  spento NON si timbra, ed è deliberato: un timbro scritto mentre il
+  ritmo è «tutto» bloccherebbe per una settimana intera ogni
+  venditore il giorno che qualcuno stringe a «settimana».
+  LA VALVOLA RESTA in ogni posizione: con «tutto» un import CSV da
+  500 righe cade comunque nell'aggregato «📦 N nuovi annunci», che non
+  nomina nessuno. Il freno spento libera il caso normale, non le
+  raffiche. NIENTE CACHE al contrario di `_CANALE`: è una SELECT ogni
+  finestra di raggruppamento, e una seconda copia in RAM sarebbe una
+  copia da tenere allineata in cambio di niente.
+  E IL PANNELLO DELLE LEVE CHIEDE AL GIUDICE, non alle costanti — è
+  alla lettera la trappola che quella pagina esiste per non far
+  ricadere, già dichiarata per il canale; la riga del ritmo porta come
+  «chiave» il COMANDO `/vetrina` e non un nome del config, perché è da
+  lì che si cambia e mandare qualcuno sul VPS sarebbe un indirizzo
+  sbagliato (la sentinella delle chiavi ammette `/nome` di sole
+  lettere, così un percorso di file non passa). LA TORTURA HA CHIESTO
+  QUELLE ASSERZIONI: la mutazione che riportava il pannello alle
+  costanti non faceva rossa nessuna prova, perché il commento dello
+  stub prometteva un controllo che non c'era.
+  LO SCONTO LAMPO ESCE NEL CANALE (ago 2026, chiesto da Andrea):
+  `promo_lampo`, gancio in coda a `lancia_lampo` in `create_task` e
+  DOPO il commit — il patto di `accoda_promo`, un post fallito non
+  deve mai rompere il lancio di uno sconto. Rilegge la riga dal
+  database (mai fidarsi del payload) con le guardie di
+  `_posta_promo_singolo`: solo `attivo`, mai gli importati, mai un
+  venditore in ferie, e solo se la lampo è ancora viva.
+  UN POST NUOVO, E L'ORIGINALE NON SI TOCCA: la lampo non cambia
+  `prezzo_sats` (il listino non si tocca mai), quindi il post di
+  quando l'annuncio è nato NON MENTE — dice il listino, che è ancora
+  vero. È la differenza col ✅ Venduto, che invece riscrive quel post:
+  lì a cambiare era la DISPONIBILITÀ, qui si aggiunge un'occasione a
+  tempo. Così non c'è niente da dis-editare alla scadenza.
+  SOLO CANALE, NIENTE NOSTR, ed è una regola già scritta: lo sconto è
+  LOCALE, cioè il vantaggio di chi compra dentro Barattolo, e il
+  NIP-99 parla il prezzo pieno per costruzione. CONSUMA IL BUDGET
+  ORARIO e a budget pieno SALTA invece di aggregare (una lampo
+  aggregata non direbbe niente di utile): senza, il tetto dei post si
+  aggirerebbe lanciando sconti — `MAX_LAMPO_SETTIMANA` è 2 *per
+  annuncio*, quindi chi ne ha cinquanta può fare cento lampo a
+  settimana. Una lampo persa è un post perso, non un ordine perso.
+  `_riga_prezzo_lampo` rende il listino BARRATO accanto allo
+  scontato, ognuno da `_prezzo_promo` — una regola sola per tutti i
+  prezzi che escono dal canale; sul listino in EURO lo sconto si
+  applica anche all'equivalente in sats, o la riga direbbe due sconti
+  diversi. Leva `POST_LAMPO_CANALE` (True di serie) per spegnere gli
+  sconti senza spegnere gli annunci nuovi.
+  IMPERFEZIONE DICHIARATA: se l'annuncio si vende mentre la lampo è
+  viva, quel post resta senza il ✅ (l'originale ce l'ha). Il testo è
+  DATATO — «solo fino alle 18:00» — e il link apre la scheda vera, che
+  dice sempre la verità; nessuno può pagare. Se in rodaggio darà
+  fastidio la leva è una colonna `post_lampo_id` più una riga in
+  `promo_venduto`: qui si è scelto di non raddoppiare il ciclo di vita
+  per un post che si autodata.
+  IL RIEPILOGO DEL LUNEDÌ (ago 2026, chiesto da Andrea):
+  `riepilogo_settimana` nell'orologio accanto al termometro — annunci
+  nuovi, ordini e i tre articoli più venduti, nel canale e solo lì (su
+  Nostr il pubblico è un altro). Timbro `TIMBRO_RIEPILOGO` nella
+  tabella `timbri`, mai un globale.
+  MA QUI SI TIMBRA ANCHE QUANDO SI TACE, ed è la differenza col
+  termometro — che invece esce PRIMA di timbrare quando la coda è
+  sotto il minimo. Lì il conto è CUMULATIVO: saltare il turno lo
+  rimanda soltanto, e il lunedì dopo ricontrolla. Qui il conto è di
+  una SETTIMANA precisa, quindi ricontrollare martedì darebbe una
+  finestra sfasata e un riepilogo fuori cadenza: il turno si consuma,
+  magro o no. Chi legge i due insieme e li uniforma ne rompe uno.
+  I CONTI stanno in `_conta_settimana`, che LEGGE E BASTA e si gira in
+  CI su un database di cartone. ANNUNCI NUOVI: gli stati che sono
+  stati in vetrina davvero — un VENDUTO ci entra (è stato un annuncio
+  vero della settimana, è solo finito), un rimosso e uno in revisione
+  no. ORDINI: quelli in cui i sats sono ARRIVATI IN CASSAFORTE, cioè
+  il complemento di 'creato' e 'annullato' — la stessa definizione
+  della coda «⏸ Ordini fermi», detta ad alta voce invece di elencare
+  gli stati vivi; contare i soli 'released' direbbe quasi zero, che la
+  maggior parte degli ordini di una settimana è ancora in viaggio.
+  TOP 3: i pezzi per annuncio con una UNION fra la TESTATA (i mono,
+  `annuncio_id<>0`) e `ordine_righe` (i set) — i mono non hanno righe
+  MAI, quindi guardare le sole righe perderebbe quasi tutto. Il titolo
+  delle righe è quello FOTOGRAFATO all'acquisto; per i mono arriva dal
+  JOIN, e un annuncio sparito esce dal conto invece di comparire senza
+  nome. Pareggio su `annuncio_id DESC`: senza, due articoli con gli
+  stessi pezzi si scambierebbero di posto a ogni lunedì.
+  IL SILENZIO: sotto `RIEPILOGO_MINIMO` (3) annunci nuovi **e** zero
+  ordini non esce niente — un riepilogo che dice «0 ordini» fa più
+  danno del silenzio. I titoli passano da `html.escape`, che qui sono
+  tre in un colpo solo.
+  NIENTE LINK AL CANALE DENTRO L'APP (decisione di Andrea): il canale
+  per ora è il suo banco di prova — dentro c'è solo lui, e prima vuole
+  guardarlo. Nessuna fascia, nessun invito, e la strada per farlo il
+  giorno che servirà è quella già in casa di `renderFasciaTest`, che
+  dentro Telegram sa aprire anche gli inviti `t.me/+…`.
+  IL BOT CHE SFOGLIA, MA LA MINI APP VIENE PRIMA (ago 2026, decisione
+  di Andrea): `/start` non elenca comandi — un invito solo e il
+  bottone che lo esaudisce, perché nella Mini App si compra e si paga
+  e il bot quelle cose non le sa fare; ma chi SMANETTA non sbatte
+  contro un muro, e al primo messaggio qualunque compaiono i bottoni.
+  Il bottone verso Barattolo sta in cima a OGNI tastiera e si
+  costruisce in un posto solo (`_riga_webapp`, chiamata da
+  `tastiera_bot` e `tastiera_categorie`): è esattamente la riga che si
+  dimentica nella tastiera aggiunta fra sei mesi, e c'è la prova.
+  È un link e non un `web_app` button: quello apre solo dentro
+  Telegram e in chat private, il link funziona ovunque.
+  `/sfoglia` apre la GRIGLIA delle categorie — le stesse della pagina
+  Sfoglia, due colonne, ORDINE FISSO del catalogo (mai per numero: una
+  mappa che si riordina non si impara) e l'icona del reparto. Le emoji
+  sono l'OTTAVA copia del catalogo (`EMOJI_CATEGORIA` in server.py) e
+  a tenerle allineate a `EMOJI_CAT` del client è `prove.py`, voce per
+  voce. Nel `callback_data` viaggia l'INDICE e non il nome: il campo
+  ha 64 byte scarsi. La pagina di annunci RIEDITA lo stesso messaggio
+  invece di accodarne uno nuovo (sfogliare non deve lasciare la scia
+  di quel che si è già visto), con ripiego su un messaggio nuovo se
+  non è più modificabile; guardie della vetrina (solo attivi, niente
+  negozi in ferie) e l'hashtag della categoria in coda, lo stesso dei
+  post — toccandolo si ritrova la stessa roba.
+  I COMANDI DI SERVIZIO sono dei moderatori di sempre più i due
+  username scritti nel CODICE (`ADMIN_BOT_USERNAME`: alanbimbati,
+  aandreaiita). L'username si legge dal MESSAGGIO e non dalla riga
+  `utenti`: quella potrebbe portarne uno vecchio di mesi, magari già
+  preso da qualcun altro. A chi non è admin NON si dice «non sei
+  autorizzato» — direbbe a un curioso che quel comando esiste: riceve
+  la risposta di un messaggio qualunque, cioè i bottoni.
   Negozio del venditore: colonna `utenti.negozio` = codice pubblico
   casuale di 8 caratteri (migrazione per chi c'era, `verifica_utente`
   per i nuovi; stabile per sempre, NON deriva dal tg_id).
@@ -9580,6 +9777,61 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `bustaLetta`, «👁 Mostra» SENZA confirm (non è la rivelazione:
   leggere un bigliettino non muove niente), tutto sotto esc(), admin
   senza nemmeno il bottone.
+  IL DOCUMENTO DI RITIRO (ago 2026, dal campo: al locker il corriere
+  manda un PDF o un QR — un PIN si trascrive, un QR NO). È L'ALTRA
+  STRADA PER IL CODICE e non un'aggiunta (decisione di Andrea): il
+  nome del destinatario serve sempre, poi basta UNA delle due — codice
+  scritto o documento — e il 400 lo dice. Colonne `busta_file`
+  (il nome sul disco), `busta_file_tipo`, `busta_file_nome`
+  (l'etichetta che il compratore legge). PDF e immagini, 15 MB.
+  IL FILE NON STA IN `foto/`, ed è la riga da non ammorbidire: là
+  dentro i nomi si servono a chiunque li riceva, e **chi ha questo
+  documento RITIRA IL PACCO** — non è una foto, è una credenziale.
+  Quindi cartella sua (`buste/`, in .gitignore), byte CIFRATI col
+  trasporto dei contenuti digitali (`_cifra_blob`/`_decifra_blob`,
+  stessa chiave e stessi prefissi del testo, ma dentro i BYTE: chi
+  guarda la cartella da fuori non vede né un PDF né un JPEG), NESSUNA
+  rotta che serva la cartella (regola ferrea 3, con la prova che conta
+  zero occorrenze di `"/buste`), e nome di file IMPREVEDIBILE
+  (`token_hex`) e non derivato dall'ordine — la cartella non è servita
+  da nessuno, ma un nome che si indovina invita a provarci.
+  Si esce SOLO da `GET /api/orders/{id}/busta-ritiro/file`, che ha le
+  regole del gemello riga per riga: solo le due parti, il moderatore
+  MAI, autorizzazione PRIMA dell'esistenza (estraneo e ordine
+  inesistente rispondono uguale), e GET PURO — aprire il documento non
+  è una ricevuta. Più `no-store` (su un telefono prestato una copia in
+  cache è una copia del codice) e `nosniff` + `sandbox`, che se un
+  domani ci finisse dentro un HTML travestito non deve eseguirsi sul
+  nostro dominio.
+  IL TIPO LO DICONO I BYTE, non l'etichetta — `FIRME_DOC_BUSTA` è una
+  whitelist di FORME come `NOME_FOTO`, e qui la lezione del PDF
+  rinominato `.jpg` pesa il doppio perché quel tipo torna indietro
+  come `Content-Type`. Un PDF etichettato `image/jpeg` entra come PDF;
+  ciò che non si riconosce non entra affatto. E `_etichetta_documento`
+  ripulisce duro il nome del file (basename, niente controlli, niente
+  virgolette): quel nome finisce nel `Content-Disposition`, ed è la
+  famiglia del «<» che spegneva l'avviso di spedizione, su un altro
+  tubo. Il caso di prova porta apposta una virgoletta E un a-capo, non
+  un percorso: col solo percorso a passare sarebbe `basename`, e la
+  ripulitura vera resterebbe non sorvegliata (l'ha detto la tortura).
+  CHIAVE ASSENTE = SI CONSERVA (il patto dello stock: un client di
+  ieri non sa che il campo esiste e non deve cancellarlo); `file_togli`
+  è il gesto esplicito, e togliere l'ULTIMA strada rimasta si rifiuta.
+  Il file si scrive PRIMA della colonna (disco che dice di no = busta
+  intatta, mai una colonna che punta al nulla) e il vecchio si cancella
+  DOPO il commit, il pattern di `_scrivi_avatar`. Da `/api/orders` esce
+  il solo FLAG `busta_documento`: nemmeno il nome del file, che è la
+  maniglia sul disco e non serve a nessun client. In disputa il
+  moderatore legge «(con un documento allegato)» — un fatto, come la
+  data — e il contenuto MAI, da nessuna strada.
+  CLIENT: il venditore sceglie il file e lo vede come chip
+  (`campoDocumentoBusta`, `bustaDoc` azzerato al cambio ordine); chi
+  legge trova l'IMMAGINE disegnata IN PAGINA — al banco del locker si
+  inquadra, e mandare qualcuno a cercare un download è il modo di
+  perdere il codice — mentre il PDF si scarica e LO SI DICE. Il PDF non
+  si apre in una scheda nuova, ed è una limitazione vera: un objectURL
+  vive solo in quella pagina e `tg.openLink` lo passerebbe a un browser
+  che non lo sa leggere. Per questo il testo del form consiglia il QR.
   LA PAGINA ORDINI RISTRUTTURATA (ago 2026): filtro «Solo attivi»,
   pillole [Tutti|Acquisti|Vendite], la foto vera al posto del 📦, e il
   NASCONDERE degli affari conclusi. Le definizioni, dichiarate:
@@ -13838,6 +14090,80 @@ layout-shift). IN PRODUZIONE basta il deploy: solo client. DA
 GUARDARE dal telefono: se la griglia vuota che resta (~1-1,5 s) dà
 ancora fastidio, il passo dichiarato sono le sagome-fantasma
 (~40-60 righe, stimate e non fatte apposta).
+Il documento di ritiro nella busta (ago 2026, dal campo): al locker il
+corriere manda un PDF o un QR, e un PIN si trascrive mentre un QR no —
+il venditore lo carica dentro l'ordine. È l'ALTRA strada per dare il
+codice e non un'aggiunta (decisione di Andrea): il nome del
+destinatario serve sempre, poi basta uno dei due. La riga che governa
+tutto il resto: **chi ha quel file ritira il pacco**, quindi non è una
+foto ma una credenziale — niente `foto/`, niente URL pubblico, byte
+cifrati in `buste/` e una rotta autenticata che decifra al volo, con le
+regole della busta riga per riga (solo le due parti, il moderatore mai,
+GET puro, `no-store`). Vedi Architettura, «IL DOCUMENTO DI RITIRO»,
+per la whitelist di FORME (il tipo lo dicono i byte, e qui quel tipo
+torna indietro come Content-Type) e per la limitazione dichiarata sul
+PDF, che si scarica invece di aprirsi in una scheda.
+Collaudato: 2892 prove verdi (33 nuove, erano 2859 — le stesse 3
+rosse di prima e di dopo, che sono `websocket` non installato qui) e
+soprattutto DODICI MUTAZIONI del codice, una per riga sorvegliata:
+cache rimessa, documento scritto in `foto/`, byte nudi sul disco,
+guardia allentata sulla rotta dei byte, whitelist tolta, «si conserva»
+tolto, vecchio file non cancellato, busta vuota ammessa, ripulitura del
+nome tolta, byte serviti ancora cifrati, 503 tolto, tipo sbagliato —
+ognuna diventa rossa da sola. La rotta dei byte GIRA per davvero nel
+banco di prova (Response di cartone, il resto è il pezzo vero): byte
+identici a quelli caricati, estraneo e inesistente indistinguibili, e
+il dump del database uguale prima e dopo due letture. UNA PROVA ERA
+VACUA e l'ha detto la tortura, non la rilettura: il caso della
+ripulitura del nome usava un percorso, che lo toglie già `basename` —
+ora porta una virgoletta e un a-capo, che solo la regex leva.
+NON COLLAUDATO QUI, e va detto: su questa macchina non ci sono
+`fastapi` né `anthropic`, quindi il giro end-to-end col server acceso e
+la prova in browser NON sono stati fatti. DA FARE al primo deploy: un
+ordine vero al punto con un QR caricato dentro Telegram — che
+l'immagine si veda in pagina sul telefono del compratore, e che il PDF
+finisca fra i suoi file.
+Il canale diventa la vetrina (ago 2026, chiesto da Andrea insieme al
+canale «Barattolo Vetrina»): tutti gli annunci nuovi nel canale invece
+di uno per venditore a settimana, gli sconti lampo raccontati lì, e il
+riepilogo del lunedì con annunci, ordini e i tre più venduti. Le
+quattro decisioni: UN canale solo (non un secondo posto da tenere
+allineato), freno spento ma col ritmo che si stringe **dal bot** e non
+dal config (`/vetrina tutto | giorno | settimana`), riepilogo pubblico
+che tace se la settimana è magra, e NIENTE link al canale dentro l'app
+— lì dentro per ora c'è solo Andrea, e prima vuole guardarlo. Vedi
+Architettura, «IL RITMO LO DECIDE IL BOT», per il nome-non-i-numeri nel
+database, per il freno che si RICEVE invece di rileggerlo a metà
+drenaggio, e per le due imperfezioni dichiarate (il post della lampo
+senza ✅ se l'annuncio si vende, e il turno del riepilogo che si consuma
+anche quando tace — che è il contrario del termometro).
+Collaudato: 2961 prove verdi in `prove.py` (erano 2794 — le pure dei
+giudici, il recinto delle impostazioni diventato un CENSIMENTO delle
+chiavi, l'elenco di chi parla col canale che ora si NOMINA invece di
+contarsi, `_conta_settimana` su un database di cartone coi mono **e** i
+set insieme, e il riepilogo girato DAVVERO tre volte su tre ambienti
+diversi con lo stesso database sotto — tre deploy, un post solo) più
+**VENTUNO MUTAZIONI**, una per riga sorvegliata, ognuna rossa da sola.
+LA TORTURA HA TROVATO TRE BUCHI VERI, ed è la parte da tenere: la
+soglia dell'aggregato che non era verificata da nessuna prova, la UNION
+dei set che si poteva togliere in silenzio, e — la peggiore — il
+pannello delle leve, dove il commento dello stub PROMETTEVA il
+controllo del ritmo effettivo e nessuna asserzione lo faceva. Più un
+collaudo eseguibile su DB usa-e-getta (27 verdi) che fa girare il
+drenatore VERO e `promo_lampo` VERA: due venditori a «settimana» → due
+post, tre a «tutto» → tre, quattro in una finestra → l'aggregato che
+non nomina nessuno, il negozio in ferie e l'importato che restano
+fuori, e il titolo cattivo che esce scappato coi grassetti pari.
+NON COLLAUDATO QUI: manca `fastapi`, quindi il giro col server acceso
+non si è fatto (il comando `/vetrina` è stato però eseguito sul pezzo
+vero, coi quattro casi e l'estraneo che non cambia niente).
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione — la
+tabella `impostazioni` e quella dei `timbri` esistono già, e le tre
+leve nuove hanno il default nel codice. POI, NELL'ORDINE: il bot
+amministratore del canale, `/canale -1003975076313` (deve arrivare il
+messaggio di prova), `/vetrina` per vedere dov'è, `/vetrina tutto`, e
+un annuncio vero da guardare. DA GUARDARE il primo lunedì: il
+riepilogo, **una volta sola** anche con un deploy in mezzo.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
