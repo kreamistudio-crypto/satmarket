@@ -9278,8 +9278,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   sesto giro sotto; il VARCO MAPPA — dal quarto giro c'è
   SEMPRE: con la rete dichiarata la sua mappa, senza tutte e due più
   la riga onesta) · le note
-  oneste («Spedisce con InPost», la regola asimmetrica del digitale,
-  il ≈ dei listini EUR) · IL CONTO in righe (Prezzo · Commissione
+  oneste (la riga di chi non ha dichiarato il corriere, la regola
+  asimmetrica del digitale) · IL CONTO in righe (Prezzo · Commissione
   «in promo» · Spedizione della via scelta · Protezione se >0 ·
   Totale, la grammatica `.ctrl-riga`/`contoRighe`, che dall'ago 2026
   veste i due acquisti della cassa e non più due pagine) · «PAGA» in
@@ -9599,8 +9599,12 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `utenti.spedizioniere` ('' = non dichiarato), endpoint
   `POST /api/me/spedizioniere` (pattern canale-notifiche), cassetto
   «📦 Come spedisci» nel Profilo con le voci da /api/me (mai
-  hardcodate; in DEMO sparisce). Il compratore lo vede in pagina:
-  «📦 Spedisce con InPost».
+  hardcodate; in DEMO sparisce). Il compratore lo legge DENTRO il
+  riquadro della via punto — le pillole della rete quando ce n'è più
+  d'una, la label del campo quando è una sola — e NON più in una riga
+  sotto (ago 2026, decisione di Andrea: quella riga diceva la stessa
+  cosa a due dita di distanza; vedi «IL CAMPO ARRIVA DOPO LE
+  SCELTE»). C'è la prova che non torni.
   I CORRIERI SONO PIÙ D'UNO, E LA RETE LA SCEGLIE CHI COMPRA (ago
   2026, caso vero dal campo): il compratore sceglie un locker InPost,
   il venditore spedisce con Poste, il punto più vicino di QUELLA rete
@@ -9841,6 +9845,44 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nome+cifra (`.via-riga`) tiene il layout dei fratelli, che restano
   `<button>` a una riga — le regole di `.via-opzione` non si
   toccano. Sentinelle in CI su tutte e quattro le righe.
+  E DAL SETTIMO GIRO IL CAMPO ARRIVA DOPO LE SCELTE (ago 2026,
+  decisione di Andrea): dentro il cassetto si legge in cascata —
+  prima «Con quale corriere?», poi «Che tipo di punto?», e SOLO
+  ALLORA il campo dove si scrive dov'è il punto. Non è un vezzo
+  d'interfaccia: è l'ordine in cui l'informazione ESISTE — il punto
+  si trova sulla MAPPA, che dipende dalla rete, e che tipo sia si sa
+  dopo averla guardata — quindi un campo aperto prima invita a
+  scrivere un indirizzo che poi va ripensato. Il giudice è
+  `scelteFatte` e il gate sta nella composizione di `campoAperto`:
+  una riga sola, e le pillole restano dove sono.
+  L'ECCEZIONE È DICHIARATA: senza NESSUN corriere dichiarato il campo
+  resta disponibile SUBITO, com'era — lì non c'è nessuna cascata da
+  rispettare (la mappa non si sa quale sia e si mostrano tutte, e chi
+  compra sceglie alla cieca: lo dice la riga onesta). Il TIPO resta
+  comunque obbligatorio anche lì, e a chiederlo è la guardia di
+  «Paga»: le sue pillole sono in pagina, quindi quel toast manda a
+  una scelta che si vede.
+  LE TRE GUARDIE NON SI RIORDINANO (rete → tipo → punto): quando
+  scatta la terza il campo esiste PER COSTRUZIONE, ed è ciò che
+  garantisce che nessun toast mandi mai a un campo che non c'è —
+  provato dal vivo, «Scegli con quale corriere» col cassetto aperto
+  sulle due file e nessun campo. Chi le riordina lo sente dalla CI.
+  CON LUI SE NE SONO ANDATE DUE RIGHE E MEZZA PAROLA. 1) La riga che
+  nominava il corriere del venditore sotto il riquadro: quel nome
+  ormai sta DENTRO (pillole o label del campo), e ripeterlo era la
+  stessa cosa detta due volte a due dita di distanza. 2) La
+  didascalia della conversione al cambio: spiegava un segno che il ≈
+  dice già da sé, accanto a ogni cifra che lo porta — IL ≈ NON SI
+  TOCCA, a sparire è la spiegazione (l'unico posto dove quel concetto
+  resta scritto è la pagina «Il pagamento protetto», alla voce dei
+  tempi, e lì è al posto giusto: è la pagina che spiega). 3) E il
+  segnaposto del campo ha perso il tipo («Es. Locker — Via Roma 1» →
+  «Es. Via Roma 1, Pavia»): il tipo l'ha appena scelto due dita
+  sopra, e ripeterlo lì faceva credere che andasse scritto anche nel
+  campo. LE DUE FORMULE SONO VIETATE DA UNA PROVA, e per questo NON
+  si citano nei commenti del client: quelle sentinelle leggono anche
+  i commenti — è il modo in cui una prova diventa vacua, o rossa per
+  colpa della prosa (la lezione già pagata con `_decifra_contenuto`).
   E LA NOTIFICA UNA-TANTUM (`avvisa_spedizioniere_mancante`,
   nell'orologio): ai venditori con annunci attivi che spediscono e
   senza spedizioniere — «da oggi i compratori possono scegliere il

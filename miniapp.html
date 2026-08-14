@@ -10101,13 +10101,34 @@ function renderAcquisto(){
        style="cursor:pointer">${t.emoji} ${esc(t.nome)}</button>`;
   const scelteTipo = `<label>Che tipo di punto?</label>
        <div class="fila-reti">${TIPI_PUNTO.map(tipoPill).join('')}</div>`;
-  const campoAperto = `${scelteRete}${scelteTipo}<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
+  /* IL CAMPO ARRIVA DOPO LE SCELTE (ago 2026, decisione di Andrea):
+     prima il corriere, poi locker o banco, e SOLO ALLORA si scrive
+     dove. Non e' un vezzo d'interfaccia, e' l'ordine in cui
+     l'informazione esiste — il punto si trova sulla MAPPA, che
+     dipende dalla rete, e che tipo sia si sa dopo averla guardata:
+     un campo aperto prima invita a scrivere un indirizzo che poi va
+     ripensato. Con questa regola la vecchia riga «Scegli prima il
+     corriere: la mappa e' diversa per ognuno» non serve piu' — quel
+     caso adesso non ha un campo da spiegare — e quando il campo
+     compare la mappa della rete scelta e' li' sotto.
+     SENZA NESSUN CORRIERE DICHIARATO il campo resta disponibile
+     SUBITO, com'era (decisione di Andrea): li' non c'e' nessuna
+     cascata da rispettare, la mappa non si sa quale sia (si mostrano
+     tutte) e chi compra sceglie alla cieca — lo dice la riga onesta
+     piu' sotto. Il TIPO resta comunque obbligatorio, e a chiederlo
+     e' la guardia di «Paga»: le sue pillole sono in pagina, quindi
+     quel toast manda a una scelta che si vede.
+     PER QUESTO LE GUARDIE RESTANO IN QUEST'ORDINE (rete → tipo →
+     punto): quando scatta la terza il campo esiste per costruzione,
+     e nessun toast manda a un campo che non c'e'. */
+  const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipo;
+  const campoDove = `<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
-      placeholder="Es. Locker — Via Roma 1, Pavia"
+      placeholder="Es. Via Roma 1, Pavia"
       oninput="if(acqDati)acqDati.punto=this.value">
-    ${(sceglieRete && !d.rete)
-      ? '<div class="hint" style="margin-top:6px">Scegli prima il corriere: la mappa dei punti è diversa per ognuno.</div>'
-      : linkMappePunti(retiMappa)}`;
+    ${linkMappePunti(retiMappa)}`;
+  const campoAperto =
+    `${scelteRete}${scelteTipo}${(!reti.length || scelteFatte) ? campoDove : ''}`;
   /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
      decisione di Andrea): il riquadro che li ospita ha gia' il locker
      della via, e due icone nello stesso riquadro sono una di troppo. */
@@ -10206,8 +10227,15 @@ function renderAcquisto(){
   }
   /* --- le note oneste --- */
   let note = '';
-  if (reti.length && (d.via==='casa' || d.via==='punto'))
-    note += `<div class="acq-nota">📦 Spedisce con <b>${reti.map(esc).join('</b> e <b>')}</b></div>`;
+  /* LA RIGA CHE NOMINAVA IL CORRIERE DEL VENDITORE E' MORTA (ago
+     2026, decisione di Andrea): quel nome ormai lo dichiara il
+     riquadro della via — con due reti si SCEGLIE li' dentro, con una
+     sola la porta la label del campo — e ripeterlo qui sotto era la
+     stessa cosa detta due volte a due dita di distanza. Chi la
+     rimettesse guardi prima il cassetto: se la rete e' gia' li',
+     questa riga non aggiunge niente. La sua formula e' vietata da
+     una prova, e per questo qui non si cita: la sentinella legge
+     anche i commenti. */
   /* la via punto SENZA rete dichiarata: la riga onesta del quarto
      giro — si sceglie un punto senza sapere la rete, e la rete di
      sicurezza e' la correzione dall'ordine */
@@ -10215,8 +10243,13 @@ function renderAcquisto(){
     note += `<div class="acq-nota">📦 Il venditore non ha ancora dichiarato il corriere: stai scegliendo il punto senza sapere con che rete viaggerà il pacco — puoi correggerlo dall'ordine finché non spedisce.</div>`;
   if (d.via==='digitale')
     note += `<div class="acq-nota">💾 Un codice, una volta rivelato, non torna indietro: hai <b>${TEMPI.confermaDig} ore</b> per aprire una disputa, poi l'acquisto è definitivo.</div>`;
-  if (p.stima || (stradaSel && stradaSel.stima))
-    note += `<div class="acq-nota">≈ convertito ora al cambio: il totale definitivo si fissa con la invoice (${TEMPI.invoice} minuti).</div>`;
+  /* E CON LEI LA RIGA CHE SPIEGAVA LA CONVERSIONE (ago 2026, stessa
+     decisione): era la didascalia di un segno che il ≈ dice gia' da
+     se', accanto a ogni cifra che lo porta. IL ≈ NON SI TOCCA —
+     resta il segno, e la regola di cifraCtrl (solo sulla valuta
+     convertita, mai su quella nativa) e' cio' che lo rende
+     leggibile senza spiegazioni. Anche questa formula e' vietata da
+     una prova, quindi non si cita nemmeno qui. */
   if (p.demo)
     note += `<div class="acq-nota">🧪 Stima dimostrativa: in demo il conto del server non c'è.</div>`;
   /* LE DUE PROMESSE DEL NEGOZIO, NELLA STESSA LINGUA (12 ago 2026,

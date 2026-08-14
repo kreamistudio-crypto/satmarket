@@ -1469,7 +1469,7 @@ def riallinea_spedizionieri(con):
 
     Senza, il giorno del deploy i venditori che una rete l'avevano
     dichiarata si ritroverebbero «non dichiarato» — e perderebbero la
-    mappa e la riga «Spedisce con X» in silenzio, che e' il modo
+    mappa e il nome della rete nel cassetto in silenzio, che e' il modo
     peggiore in cui questo cantiere poteva presentarsi. Sono 16
     venditori veri, contati in produzione prima di cominciare.
 
@@ -2097,8 +2097,10 @@ def init_db():
                     # OFFERTA lo stesso (decisione di Andrea: meglio
                     # l'accordo in chat che la porta chiusa), e il
                     # dichiarato serve a dire al compratore la rete
-                    # («Spedisce con InPost») invece della riga
-                    # «accordatevi in chat».
+                    # (dal ago 2026 dentro il cassetto del punto: le
+                    # pillole della scelta, o la label del campo con
+                    # una rete sola) invece della riga «accordatevi
+                    # in chat».
                     # DAL AGO 2026 E' LA PRIMA VOCE di `spedizionieri`,
                     # e non cambia significato: un nome non lo fa mai
                     # (il patto delle soglie in euro e della tariffa
@@ -2913,7 +2915,7 @@ def init_db():
     riallinea_quantita_max(con)
     # Le reti al plurale (ago 2026): chi ne aveva dichiarata una la
     # ritrova dentro la colonna nuova, o al deploy perderebbe mappa e
-    # riga «Spedisce con X» senza che nessuno gliel'abbia tolte.
+    # nome della rete nel cassetto senza che nessuno gliel'abbia tolti.
     riallinea_spedizionieri(con)
     # La prenotazione dello stock (lug 2026) conta gli ordini 'creato'
     # per annuncio a ogni acquisto: e' la prima query calda su ordini

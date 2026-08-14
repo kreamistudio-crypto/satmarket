@@ -8317,6 +8317,108 @@ def prove_pagina_acquisto():
           _nwc.index("apriPuntoAcquisto()")
           < _nwc.index("Indica il punto di ritiro"))
 
+    # 5quater-bis. IL SESTO GIRO — IL CAMPO ARRIVA DOPO LE SCELTE (ago
+    #    2026, decisione di Andrea): prima il corriere, poi locker o
+    #    banco, e SOLO ALLORA il campo dove si scrive dov'e' il punto.
+    #    Non e' un vezzo d'interfaccia, e' l'ordine in cui
+    #    l'informazione esiste — il punto si trova sulla MAPPA, che
+    #    dipende dalla rete — e un campo aperto prima invita a
+    #    scrivere un indirizzo che poi va ripensato.
+    #    L'ECCEZIONE E' DICHIARATA: senza NESSUN corriere dichiarato
+    #    il campo resta disponibile SUBITO, com'era, perche' li' non
+    #    c'e' nessuna cascata da rispettare (la mappa non si sa quale
+    #    sia e si mostrano tutte). Il tipo resta comunque obbligatorio
+    #    e a chiederlo e' la guardia di «Paga», le cui pillole sono in
+    #    pagina — ed e' l'ORDINE delle tre guardie (rete → tipo →
+    #    punto, sorvegliato qui sopra) a garantire che quando scatta
+    #    la terza il campo ci sia davvero: nessun toast manda mai a un
+    #    campo che non esiste.
+    prova("sesto giro: il gate delle scelte esiste", True,
+          "const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipo"
+          in mini3)
+    prova("...e il campo si disegna solo a scelte fatte (o senza reti)",
+          True,
+          "(!reti.length || scelteFatte) ? campoDove : ''" in mini3)
+    prova("...il segnaposto non ripete il tipo: li' va solo il dove",
+          False, "Locker — Via Roma" in mini3)
+    prova("...e la riga «scegli prima il corriere» e' morta con lui: "
+          "quel caso non ha piu' un campo da spiegare",
+          False, "la mappa dei punti è diversa per ognuno" in mini3)
+    # E SI FA GIRARE, che una sentinella sulla forma dice com'e'
+    # scritto il ramo e mai cosa risponde — la lezione ormai settima.
+    # Gli otto casi sono la matrice intera (due reti / una / nessuna,
+    # per rete scelta e tipo scelto): la mutazione che toglie
+    # l'eccezione dei venditori senza corriere fa rosso il settimo, e
+    # quella che si accontenta della rete fa rosso il secondo.
+    import json as _js4, shutil as _sh4, subprocess as _sp4, tempfile as _tf4
+    _node4 = _sh4.which("node")
+    _casi4 = [
+        (["InPost", "Poste"], {"rete": "",       "tipo": ""},       False),
+        (["InPost", "Poste"], {"rete": "InPost", "tipo": ""},       False),
+        (["InPost", "Poste"], {"rete": "",       "tipo": "locker"}, False),
+        (["InPost", "Poste"], {"rete": "InPost", "tipo": "locker"}, True),
+        (["InPost"],          {"rete": "",       "tipo": ""},       False),
+        (["InPost"],          {"rete": "",       "tipo": "banco"},  True),
+        ([],                  {"rete": "",       "tipo": ""},       True),
+        ([],                  {"rete": "",       "tipo": "locker"}, True),
+    ]
+    if not _node4:
+        salta("il gate del campo risponde giusto", "node non installato")
+    else:
+        try:
+            _sr4 = mini3[mini3.index("const sceglieRete ="):]
+            _sr4 = _sr4[:_sr4.index("\n")]
+            _sf4 = mini3[mini3.index("const scelteFatte ="):]
+            _sf4 = _sf4[:_sf4.index("\n")]
+            _cond4 = mini3[mini3.index("${(!reti.length") + 2:
+                           mini3.index(" ? campoDove")]
+            _prog4 = ("function campoCe(reti, d){" + _sr4 + _sf4
+                      + " return !!" + _cond4 + ";}\n"
+                      "const casi = "
+                      + _js4.dumps([[r, d] for r, d, _a in _casi4])
+                      + ";console.log(JSON.stringify("
+                      "casi.map(([r,d]) => campoCe(r,d))));")
+            _f4 = _tf4.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                          encoding="utf-8")
+            _f4.write(_prog4)
+            _f4.close()
+            _r4 = _sp4.run([_node4, _f4.name], capture_output=True,
+                           text=True, timeout=60, encoding="utf-8")
+            os.unlink(_f4.name)
+            _esiti4 = (_js4.loads(_r4.stdout.strip()) if _r4.returncode == 0
+                       else f"ERRORE: {_r4.stderr[:120]}")
+        except ValueError as _e4:
+            _esiti4 = f"ANCORA PERSA: {_e4}"
+        prova("...e il gate risponde giusto sugli otto casi",
+              [a for _r5, _d5, a in _casi4], _esiti4)
+
+    # 5quater-ter. LE DUE RIGHE TOLTE DALLA PAGINA (ago 2026,
+    #    decisioni di Andrea). La prima nominava il corriere del
+    #    venditore sotto il riquadro della via: ormai quel nome sta
+    #    DENTRO il riquadro (le pillole della rete, o la label del
+    #    campo con una rete sola), e ripeterlo era la stessa cosa
+    #    detta due volte a due dita di distanza. La seconda spiegava
+    #    il ≈ della conversione: era la didascalia di un segno che si
+    #    dice da se'.
+    #    ⚠️ Le due formule non si citano nei commenti del client —
+    #    queste sentinelle leggono anche quelli, ed e' il modo in cui
+    #    una prova diventa vacua (o rossa per colpa della prosa).
+    prova("la riga che nominava il corriere e' morta", False,
+          "Spedisce con" in mini3)
+    prova("...e quella che spiegava la conversione idem", False,
+          "convertito ora al cambio" in mini3
+          or "si fissa con la invoice" in mini3)
+    # IL ≈ RESTA, ed e' la meta' che conta: a sparire e' la
+    # didascalia, non il segno — le cifre convertite lo portano
+    # ancora, dal giudice unico.
+    prova("...ma il ≈ delle cifre resta vivo", True,
+          "(p.stima || (stradaSel && stradaSel.stima)) ? '≈ ' : ''"
+          in mini3)
+    # e la riga onesta di chi NON ha dichiarato un corriere non e' fra
+    # quelle tolte: quella dice una cosa che nessun altro dice
+    prova("...mentre la riga onesta senza corriere resta", True,
+          "senza sapere con che rete" in mini3)
+
     # 5quinquies. LE CIFRE DELLE VIE SOLO QUANDO DICONO QUALCOSA e IL
     #    CASSETTO DENTRO IL RIQUADRO (ago 2026, decisioni di Andrea).
     #    Le cifre di casa/punto compaiono solo quando DIVERGONO — il
