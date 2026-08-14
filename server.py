@@ -727,18 +727,27 @@ except ImportError:
                                        # terzo o il pacco e' lento o il
                                        # codice e' nel dimenticatoio
 
-# L'INDIRIZZO NON RESTA (ago 2026): quanti giorni dopo la CHIUSURA
-# dell'ordine la scopa cancella l'indirizzo di casa del compratore.
-# NON C'E' UN VALORE CHE LA SPEGNE, ed e' voluto: questa e' una
+# L'INDIRIZZO NON RESTA (ago 2026): la finestra per gli ordini che si
+# chiudono SENZA la conferma del compratore — un rimborso, una disputa
+# decisa da un moderatore. Chi conferma la ricezione invece lo perde
+# SUBITO, al primo giro dell'orologio: e' la regola di casa portata
+# fino in fondo — garantiamo la TRANSAZIONE, non la consegna, e da
+# quella conferma in poi quel che succede fra le parti non ci riguarda
+# (vedi pulisci_indirizzi).
+# DIECI GIORNI, e il conto e' questo: in quel ramo l'unico che puo'
+# ancora averne bisogno e' il VENDITORE, per un reclamo al corriere —
+# il moderatore non lo legge MAI per regola nostra, e il compratore ce
+# l'ha in testa. I termini dei corrieri per il danno sono ~8 giorni, e
+# per la perdita totale il reclamo e' gia' in corso PRIMA del rimborso,
+# cioe' mentre l'ordine e' ancora aperto e l'indirizzo c'e' comunque.
+# NON C'E' UN VALORE CHE SPEGNE LA SCOPA, ed e' voluto: questa e' una
 # promessa scritta nella pagina pubblica, e una promessa con un
 # interruttore che la revoca non e' una promessa. Si puo' allungare o
 # accorciare — 0 = alla prima passata dopo la chiusura — mai togliere.
-# La finestra di grazia serve ai casi storti: un reso tardivo, un
-# pacco tornato indietro, una coda dopo una disputa.
 try:
     from config import GIORNI_INDIRIZZO
 except ImportError:
-    GIORNI_INDIRIZZO = 30
+    GIORNI_INDIRIZZO = 10
 
 # LA CODA DEI FERMI (ago 2026): la soglia oltre la quale un ordine coi
 # sats in cassaforte, e su cui nessuno si muove, entra nella sezione
@@ -20052,9 +20061,39 @@ async def _notifica_match(tg_id: int, annunci: list, cambio: float):
 
 def pulisci_indirizzi():
     """LA SCOPA DEGLI INDIRIZZI (ago 2026): l'indirizzo di casa vive
-    quanto l'ordine, e GIORNI_INDIRIZZO giorni dopo la chiusura
-    sparisce. E' il pezzo che rende vera la parola «trasporta»: senza,
-    «non lo conserviamo» sarebbe una frase e basta.
+    quanto l'ordine e poi sparisce. E' il pezzo che rende vera la
+    parola «trasporta»: senza, «non lo conserviamo» sarebbe una frase
+    e basta.
+
+    DUE VELOCITA', ed e' una decisione di Andrea che viene dritta
+    dalla regola di casa — «garantiamo la TRANSAZIONE, non la
+    consegna»:
+    - alla CONFERMA DI RICEZIONE si cancella SUBITO (al primo giro
+      dell'orologio, entro dieci minuti). Il compratore ha detto che
+      l'oggetto e' arrivato: da li' in poi quel che succede fra loro
+      non ci riguarda piu', e l'indirizzo non serve a niente;
+    - gli ordini che si chiudono SENZA quella conferma — un rimborso,
+      una disputa decisa da un moderatore — hanno la finestra di
+      GIORNI_INDIRIZZO, perche' li' la conferma non arrivera' mai e
+      il pacco puo' essere ancora in giro.
+
+    IL DISCRIMINANTE E' `disputata`, E IL PERCHE' E' STRUTTURALE: con
+    AUTO_SBLOCCO_ATTIVO spenta a 'released' ci si arriva in due modi
+    soli — la conferma del compratore, o la decisione di un moderatore
+    su una disputa — e la seconda lascia `disputata=1` per sempre.
+    NON si guarda `consegnato`, che verrebbe naturale e sarebbe la
+    trappola: conferma_ricezione accetta anche 'locked' e 'shipped',
+    quindi quasi nessuno passa da 'delivered' (misurato: 14 released
+    su 14 col campo a zero) e la purga immediata non scatterebbe
+    quasi mai, credendo di essere piu' severa.
+    ⚠️ E IL GIORNO CHE L'AUTO-SBLOCCO SI RIACCENDE la regola
+    diventerebbe FALSA in silenzio: uno sblocco automatico lascia
+    `disputata=0` e nessuno ha confermato niente — anzi, e' proprio il
+    caso in cui il pacco potrebbe non essere mai arrivato. Per questo
+    la corsia veloce e' gated sulla leva: a leva accesa passano tutti
+    dalla finestra. E' lo stesso patto di sollecita_conferme_ferme,
+    che gira solo a leva spenta perche' e' il SOSTITUTO
+    dell'auto-sblocco e non un'aggiunta.
 
     TRE RIGHE DA NON AMMORBIDIRE.
     1) La guardia `indirizzo<>''` non e' un'ottimizzazione: senza,
@@ -20073,18 +20112,32 @@ def pulisci_indirizzi():
        dopo un'ora, quindi l'indirizzo di chi non ha mai pagato se ne
        va con la riga molto prima — ed e' la parte migliore del
        meccanismo, non un buco."""
+    adesso = int(time.time())
     try:
         con = db()
+        # 1) LA CORSIA VELOCE: chi ha confermato la ricezione. Due
+        #    UPDATE separati e non uno con l'SQL costruito a pezzi: qui
+        #    la differenza non e' di stile — una WHERE che cambia forma
+        #    secondo una leva e' una WHERE che si legge male il giorno
+        #    che qualcuno la deve capire in fretta.
+        veloce = 0
+        if not AUTO_SBLOCCO_ATTIVO:
+            veloce = con.execute(
+                "UPDATE ordini SET indirizzo='', indirizzo_purgato_il=? "
+                "WHERE indirizzo<>'' AND indirizzo_purgato_il=0 "
+                "AND stato='released' AND disputata=0",
+                (adesso,)).rowcount
+        # 2) LA FINESTRA: chi si e' chiuso senza quella conferma
         n = con.execute(
             "UPDATE ordini SET indirizzo='', indirizzo_purgato_il=? "
             "WHERE indirizzo<>'' AND indirizzo_purgato_il=0 "
             "AND stato IN ('released','refunded') AND aggiornato < ?",
-            (int(time.time()),
-             int(time.time()) - GIORNI_INDIRIZZO * 86400)).rowcount
+            (adesso, adesso - GIORNI_INDIRIZZO * 86400)).rowcount
         con.commit()
         con.close()
-        if n:
-            print(f"🏠 Indirizzi cancellati alla chiusura: {n}")
+        if veloce or n:
+            print(f"🏠 Indirizzi cancellati: {veloce} alla conferma, "
+                  f"{n} allo scadere della finestra")
     except Exception as e:
         print(f"⚠️ Pulizia indirizzi saltata: {e}")
 

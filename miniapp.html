@@ -3841,7 +3841,7 @@ document.getElementById('cartello')?.remove();</script>
            includesse sarebbe falsa. -->
       <h3>L'indirizzo per la spedizione</h3>
       <p>Se scegli la <b>spedizione a casa</b>, l'indirizzo lo scrivi al momento dell'acquisto e resta <b>dentro l'ordine</b>: lo vede <b>solo il venditore</b>, per stampare l'etichetta. Non lo pubblichiamo da nessuna parte, non lo usiamo per altro, e <b>i moderatori non lo leggono</b> — nemmeno per decidere una disputa: a loro risulta soltanto <i>se</i> l'hai indicato e quando.</p>
-      <p>E non lo conserviamo: <b>lo trasportiamo</b>. Nel database è cifrato, e <b><span data-giorni-ind></span> giorni dopo la chiusura dell'ordine</b> viene cancellato da solo. Finché l'ordine è aperto invece resta, perché è lì che serve: se un affare non si chiude mai, l'indirizzo lo aspetta.</p>
+      <p>E non lo conserviamo: <b>lo trasportiamo</b>. Nel database è cifrato, e <b>appena confermi di aver ricevuto l'oggetto viene cancellato</b> — da quel momento l'affare è chiuso e quello che succede fra te e il venditore non ci riguarda più. Se invece l'ordine si chiude <i>senza</i> la tua conferma — un rimborso, una disputa decisa da un moderatore — sparisce entro <b><span data-giorni-ind></span> giorni</b>. Finché l'ordine è aperto resta, perché è lì che serve: se un affare non si chiude mai, l'indirizzo lo aspetta.</p>
       <p class="sicu-nota">La strada che ne chiede di meno è il <b>punto di ritiro</b>: lì un indirizzo tuo non c'è proprio — al banco basta il nome del destinatario, che sceglie il venditore.</p>
 
       <h3>Dove stanno i sats, e per quanto</h3>
@@ -9954,7 +9954,7 @@ function renderAcquisto(){
         ${c.k==='telefono' ? 'type="tel"' : ''}
         placeholder="${esc(SEGNAPOSTO_IND[c.k]||'')}"
         oninput="setCampoIndirizzo('${c.k}', this.value)">`).join('')}
-    <div class="acq-nota">Lo vede solo il venditore, per spedire. Lo cancelliamo ${GIORNI_IND} giorni dopo la chiusura dell'ordine.</div>
+    <div class="acq-nota">Lo vede solo il venditore, per spedire. Lo cancelliamo appena confermi di aver ricevuto l'oggetto.</div>
   </form>`;
   const indScritto = indirizzoCompleto(iVal);
   const indChiuso = indScritto
@@ -16834,7 +16834,7 @@ function pannelloIndirizzoCasa(o){
           <h4>🏠 ${o.indirizzoIl?'Il tuo indirizzo di spedizione':'Indica l\'indirizzo di spedizione'}</h4>
           <div class="hint">${o.indirizzoIl
             ? `Indicato il ${data(o.indirizzoIl)}${corr}. Se correggi, il venditore riceve un avviso.`
-            : 'Al venditore serve per spedire il pacco: lo vede solo lui, e lo cancelliamo ' + GIORNI_IND + ' giorni dopo la chiusura dell\'ordine.'}</div>
+            : 'Al venditore serve per spedire il pacco: lo vede solo lui, e lo cancelliamo appena confermi di aver ricevuto l\'oggetto.'}</div>
           <form onsubmit="return false" class="ind-campi">
           ${CAMPI_IND.map(c => `<label for="ordInd_${c.k}">${c.et}</label>
             <input id="ordInd_${c.k}" maxlength="${c.max}" value="${esc(v[c.k]||'')}"
@@ -16868,7 +16868,7 @@ function pannelloIndirizzoCasa(o){
   return `
     <div class="payout">
       <h4>🏠 Indirizzo di spedizione</h4>
-      <div class="hint">L'acquirente l'ha indicato il ${data(o.indirizzoIl)}${corr}. Lo leggi solo tu, e sparisce ${GIORNI_IND} giorni dopo la chiusura dell'ordine.</div>
+      <div class="hint">L'acquirente l'ha indicato il ${data(o.indirizzoIl)}${corr}. Lo leggi solo tu, e sparisce appena lui conferma di aver ricevuto l'oggetto: se ti serve per un reclamo al corriere, tienilo da parte prima.</div>
       <button class="btn orange" style="margin-top:10px" onclick="mostraIndirizzo(this)">👁 Mostra l'indirizzo</button>
     </div>`;
 }

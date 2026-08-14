@@ -148,12 +148,17 @@ CHIAVE_CONTENUTI_DIGITALI = ""
 # ripiega sulla chat, invece di lasciare un'anagrafica in chiaro nel
 # database. Un PIN di ritiro in chiaro e' una degradazione
 # accettabile, il nome e la via di una persona no.
-# Quanti giorni dopo la CHIUSURA dell'ordine l'indirizzo si cancella
-# da solo. Si puo' allungare o accorciare (0 = alla prima passata dopo
-# la chiusura), MAI spegnere: e' una promessa scritta nella pagina
-# «Il pagamento protetto», e il numero che la pagina mostra viene da
-# qui — se lo cambi, cambia anche la frase che leggono gli utenti.
-GIORNI_INDIRIZZO = 30
+# L'indirizzo si cancella da solo APPENA il compratore conferma di
+# aver ricevuto l'oggetto: da li' in poi non serve piu' a niente
+# (garantiamo la transazione, non la consegna). Questi giorni valgono
+# SOLO per gli ordini che si chiudono senza quella conferma — un
+# rimborso, una disputa decisa da un moderatore — dove la conferma non
+# arrivera' mai e serve comunque una scadenza.
+# Si puo' allungare o accorciare (0 = alla prima passata dopo la
+# chiusura), MAI spegnere: e' una promessa scritta nella pagina «Il
+# pagamento protetto», e il numero che la pagina mostra viene da qui —
+# se lo cambi, cambia anche la frase che leggono gli utenti.
+GIORNI_INDIRIZZO = 10
 # Leve anti-frode, SPENTE di serie (0 = nessun limite):
 TETTO_DIGITALE_NUOVI = 0     # es. 50_000: un compratore senza acquisti
                              # conclusi non compra digitale sopra questa

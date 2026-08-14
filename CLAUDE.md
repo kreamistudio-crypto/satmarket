@@ -9920,12 +9920,42 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   due chat Telegram, per sempre e senza scadenza.
   IL MODELLO È «TRASPORTA, NON CONSERVA», e la parola diventa vera
   solo grazie alla SCOPA: `pulisci_indirizzi` nell'orologio azzera la
-  colonna sugli ordini chiusi da `GIORNI_INDIRIZZO` giorni (30) e
-  timbra `indirizzo_purgato_il`. È il pezzo che alla busta MANCA — lì
+  colonna e timbra `indirizzo_purgato_il`. È il pezzo che alla busta
+  MANCA — lì
   nome, codice e documento non muoiono mai, e il suo GET non ha
   nemmeno un gate di stato: la regola qui si è scritta da zero, e la
   voce pubblica parla dell'INDIRIZZO e non dei «dati della consegna»,
   o includerebbe la busta e sarebbe falsa.
+  DUE VELOCITÀ (ago 2026, decisione di Andrea, e la ragione è la
+  regola di casa: **garantiamo la TRANSAZIONE, non la consegna**).
+  Alla CONFERMA DI RICEZIONE l'indirizzo si cancella SUBITO — al primo
+  giro dell'orologio, entro dieci minuti: il compratore ha detto che
+  l'oggetto è arrivato, e da lì in poi quel che succede fra le parti
+  non ci riguarda. La finestra di `GIORNI_INDIRIZZO` resta SOLO per
+  gli ordini che si chiudono senza quella conferma — un rimborso, una
+  disputa decisa da un moderatore — dove la conferma non arriverà mai.
+  DIECI GIORNI E NON TRENTA, e il conto è questo: in quel ramo
+  l'unico che può ancora averne bisogno è il VENDITORE per un reclamo
+  al corriere (~8 giorni per il danno) — il moderatore non lo legge
+  MAI per regola nostra, e il compratore ce l'ha in testa. E per la
+  perdita totale il reclamo è già in corso PRIMA del rimborso, cioè
+  mentre l'ordine è ancora aperto e l'indirizzo c'è comunque.
+  ⚠️ «COPRIRE I RESI TARDIVI» NON È MAI STATO UN ARGOMENTO, ed era
+  scritto male nel primo commit: il reso avviene PRIMA del rimborso —
+  `refunded` **è** la chiusura — e finché l'ordine è in `dispute`,
+  `return_pending` o `return_shipped` l'indirizzo c'è. `released` e
+  `refunded` sono ASSORBENTI (`apri_disputa` accetta solo
+  locked/shipped/delivered), quindi la finestra non protegge nessuna
+  transizione: protegge solo la lettura umana del dato dopo la fine.
+  IL DISCRIMINANTE È `disputata`, E IL PERCHÉ È STRUTTURALE: con
+  `AUTO_SBLOCCO_ATTIVO` spenta a 'released' ci si arriva in due modi
+  soli — la conferma del compratore o la decisione di un moderatore su
+  una disputa — e la seconda lascia `disputata=1` per sempre.
+  NON si guarda `consegnato`, che verrebbe naturale ed è la trappola:
+  `conferma_ricezione` accetta anche 'locked' e 'shipped', quindi
+  quasi nessuno passa da 'delivered' — MISURATO, 14 released su 14 col
+  campo a zero — e una purga ancorata lì non scatterebbe quasi mai,
+  credendo di essere più severa.
   UNA COLONNA E NON SEI (`ordini.indirizzo`, il JSON dei sette campi
   cifrato, più `indirizzo_il`, `_corretto_il`, `_correzioni`,
   `_purgato_il`, `_atteso`): i campi separati sono una scelta della
@@ -9999,6 +10029,17 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   mai pagato se ne va con la riga molto prima, ed è la parte migliore
   del meccanismo. La leva non ha un valore che la SPEGNE: una
   promessa pubblica non ha un interruttore che la revoca.
+  E LA CORSIA VELOCE È GATED SULLA LEVA DELL'AUTO-SBLOCCO, o il
+  giorno del rientro col tracking verificato la regola diventerebbe
+  FALSA in silenzio: uno sblocco automatico lascia `disputata=0` e
+  nessuno ha confermato niente — anzi, è proprio il caso in cui il
+  pacco potrebbe non essere mai arrivato, e cancellare lì toglierebbe
+  l'indirizzo esattamente a chi serve. A leva accesa passano tutti
+  dalla finestra. È lo stesso patto di `sollecita_conferme_ferme`, che
+  gira solo a leva spenta perché è il SOSTITUTO dell'auto-sblocco e
+  non un'aggiunta. Due UPDATE separati e non uno con l'SQL costruito
+  a pezzi: una WHERE che cambia forma secondo una leva è una WHERE
+  che si legge male il giorno che va capita in fretta.
   IL LIBRO MASTRO ha «indirizzo fuori contratto», e il ramo che vale
   è `indirizzo_purgato_il>0 AND indirizzo<>''`. ATTENZIONE a non
   copiare la forma della busta (`(flag>0) <> (testo<>'')`): quella
@@ -14424,7 +14465,9 @@ riepilogo, **una volta sola** anche con un deploy in mezzo.
 L'indirizzo di casa dentro l'ordine (ago 2026): chi sceglie la
 spedizione a casa scrive l'indirizzo al momento dell'acquisto, viaggia
 cifrato come il codice della busta, lo legge solo il venditore e una
-finestra dopo la chiusura una scopa lo cancella. Prima passava in chat
+scopa lo cancella: SUBITO alla conferma di ricezione (garantiamo la
+transazione, non la consegna), e dopo dieci giorni per gli ordini che
+si chiudono senza quella conferma. Prima passava in chat
 privata — e chi non ha username Telegram né npub non poteva darlo a
 NESSUNO: lo stesso caso vero che ha fatto nascere la busta, sull'altra
 strada. Le quattro decisioni di Andrea (campi separati per il
@@ -14454,8 +14497,9 @@ della prova passava anche col guasto dentro, e l'ha detto la tortura.
 IN PRODUZIONE basta il deploy: le sei colonne nascono da sole
 (additive, tutte a 0) e la leva ha il default nel codice. DA GUARDARE
 al primo giro: il primo ordine vero a casa dentro Telegram — che il
-venditore trovi l'indirizzo nel suo pannello — e, fra un mese, che la
-riga «🏠 Indirizzi cancellati alla chiusura: N» compaia nel journal.
+venditore trovi l'indirizzo nel suo pannello — e, al primo affare
+confermato, la riga «🏠 Indirizzi cancellati: 1 alla conferma» nel
+journal entro dieci minuti.
 DA PROVARE SUL TELEFONO, che qui non si può: se il riempimento
 automatico degli indirizzi funziona dentro la WebView di Telegram.
 

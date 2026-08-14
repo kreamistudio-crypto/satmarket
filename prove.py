@@ -2601,12 +2601,24 @@ def prove_indirizzo_casa():
           'ind != mio["indirizzo"]' in _rip
           and "UPDATE ordini SET indirizzo=?" in _rip)
     # la scopa
-    prova("la scopa non riscrive tutto il database ogni giro", True,
-          "indirizzo<>''" in scopa and "indirizzo_purgato_il=0" in scopa)
+    prova("la scopa non riscrive tutto il database ogni giro", 2,
+          scopa.count("indirizzo<>'' AND indirizzo_purgato_il=0"))
     prova("...e NON tocca `aggiornato` (l'ancora dei fermi)", False,
           "aggiornato=" in scopa)
     prova("...solo gli stati assorbenti, mai un ordine vivo", True,
           "('released','refunded')" in scopa)
+    # LE DUE VELOCITA': la corsia veloce guarda `disputata` e mai
+    # `consegnato` — conferma_ricezione accetta anche 'locked' e
+    # 'shipped', quindi quasi nessuno passa da 'delivered' (misurato:
+    # 14 released su 14 col campo a zero) e una purga ancorata li' non
+    # scatterebbe quasi mai, credendo di essere piu' severa.
+    prova("la corsia veloce guarda la disputa, non `consegnato`", True,
+          "disputata=0" in scopa and "consegnato" not in scopa)
+    # ...ed e' gated sulla leva: a auto-sblocco riacceso «released e
+    # non disputato» comprende anche gli sblocchi automatici, dove
+    # nessuno ha confermato niente
+    prova("...ed e' spenta se l'auto-sblocco torna", True,
+          "if not AUTO_SBLOCCO_ATTIVO:" in scopa)
     # la RIGA intera e con la sua indentazione, o la definizione
     # («def pulisci_indirizzi():») entrerebbe nel conto e un
     # «pass  # pulisci_indirizzi()» la lascerebbe verde: la lezione
@@ -2657,7 +2669,7 @@ def prove_indirizzo_casa():
         indirizzo_corretto_il INT DEFAULT 0,
         indirizzo_correzioni INT DEFAULT 0,
         indirizzo_purgato_il INT DEFAULT 0,
-        indirizzo_atteso INT DEFAULT 0);
+        indirizzo_atteso INT DEFAULT 0, disputata INT DEFAULT 0);
       -- 1: spedizione a casa, in attesa dell'indirizzo
       INSERT INTO ordini(id, compratore_id, venditore_id, stato,
         indirizzo_atteso) VALUES(1, 111, 222, 'locked', 1);
@@ -2668,11 +2680,21 @@ def prove_indirizzo_casa():
       INSERT INTO ordini(id, compratore_id, venditore_id, stato,
         indirizzo, indirizzo_il, aggiornato)
         VALUES(3, 111, 222, 'released', 'plain:{}', 500, 1000);
-      -- 4: chiuso IERI (rispetto all'adesso finto della scopa, che e'
-      --    9_000_000_000): la finestra di grazia non e' ancora passata
+      -- 4: chiuso IERI da una DISPUTA (rispetto all'adesso finto della
+      --    scopa, che e' 9_000_000_000): nessuna conferma del
+      --    compratore, quindi vale la finestra e oggi resta
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        indirizzo, indirizzo_il, aggiornato, disputata)
+        VALUES(4, 111, 222, 'released', 'plain:{}', 500, 8999913600, 1);
+      -- 5: chiuso IERI dalla CONFERMA del compratore: la corsia
+      --    veloce lo prende comunque, la finestra non c'entra
       INSERT INTO ordini(id, compratore_id, venditore_id, stato,
         indirizzo, indirizzo_il, aggiornato)
-        VALUES(4, 111, 222, 'released', 'plain:{}', 500, 8999913600);
+        VALUES(5, 111, 222, 'released', 'plain:{}', 500, 8999913600);
+      -- 6: RIMBORSATO ieri: nessuno ha confermato niente, finestra
+      INSERT INTO ordini(id, compratore_id, venditore_id, stato,
+        indirizzo, indirizzo_il, aggiornato)
+        VALUES(6, 111, 222, 'refunded', 'plain:{}', 500, 8999913600);
     """)
     vero.commit()
 
@@ -2795,27 +2817,48 @@ def prove_indirizzo_casa():
           len({r1["indirizzo_il"], o1["indirizzo_il"]}))
     prova("...e il venditore lo viene a sapere", 1, len(avvisi))
 
-    # --- LA SCOPA, girata davvero ----------------------------------
-    amb = {"db": Con, "time": _t, "GIORNI_INDIRIZZO": 30,
-           "print": lambda *a, **k: None}
-    exec(pezzo("pulisci_indirizzi"), amb)
+    # --- LA SCOPA, girata davvero, a DUE VELOCITA' -----------------
+    # (decisione di Andrea: alla conferma di ricezione si cancella
+    #  SUBITO — garantiamo la transazione, non la consegna — e i
+    #  giorni restano solo per chi si chiude senza quella conferma.)
     _t_finto = type("T", (), {"time": staticmethod(lambda: 9_000_000_000)})
-    amb["time"] = _t_finto
-    amb["pulisci_indirizzi"]()
-    o3 = vero.execute("SELECT * FROM ordini WHERE id=3").fetchone()
-    o4 = vero.execute("SELECT * FROM ordini WHERE id=4").fetchone()
-    prova("l'ordine chiuso da un pezzo perde l'indirizzo", True,
-          o3["indirizzo"] == "" and o3["indirizzo_purgato_il"] > 0)
-    prova("...ma il resto della riga resta intero", True,
-          o3["indirizzo_il"] == 500 and o3["aggiornato"] == 1000
-          and o3["stato"] == "released")
-    prova("la finestra di grazia protegge il chiuso di ieri", True,
-          o4["indirizzo"] == "plain:{}"
-          and o4["indirizzo_purgato_il"] == 0)
-    o1 = vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
-    prova("e l'ordine VIVO non si tocca", True, bool(o1["indirizzo"]))
+
+    def scopa(leva=False):
+        amb = {"db": Con, "time": _t_finto, "GIORNI_INDIRIZZO": 10,
+               "AUTO_SBLOCCO_ATTIVO": leva,
+               "print": lambda *a, **k: None}
+        exec(pezzo("pulisci_indirizzi"), amb)
+        amb["pulisci_indirizzi"]()
+
+    def riga(i):
+        return vero.execute("SELECT * FROM ordini WHERE id=?", (i,)).fetchone()
+
+    # PRIMA a leva ACCESA: la corsia veloce non deve esistere, o il
+    # giorno del rientro dell'auto-sblocco cancelleremmo l'indirizzo
+    # di ordini che NESSUNO ha confermato
+    scopa(leva=True)
+    prova("a auto-sblocco ACCESO la corsia veloce e' spenta", True,
+          riga(5)["indirizzo"] == "plain:{}"
+          and riga(5)["indirizzo_purgato_il"] == 0)
+    prova("...ma la finestra lavora lo stesso", True,
+          riga(3)["indirizzo"] == "" and riga(3)["indirizzo_purgato_il"] > 0)
+    prova("...e il resto della riga resta intero", True,
+          riga(3)["indirizzo_il"] == 500 and riga(3)["aggiornato"] == 1000
+          and riga(3)["stato"] == "released")
+
+    scopa()
+    prova("chi ha confermato perde l'indirizzo SUBITO, senza finestra",
+          True, riga(5)["indirizzo"] == ""
+          and riga(5)["indirizzo_purgato_il"] > 0)
+    prova("la disputa decisa ieri passa dalla finestra e oggi resta",
+          True, riga(4)["indirizzo"] == "plain:{}"
+          and riga(4)["indirizzo_purgato_il"] == 0)
+    prova("...e il rimborso di ieri pure", True,
+          riga(6)["indirizzo"] == "plain:{}"
+          and riga(6)["indirizzo_purgato_il"] == 0)
+    prova("e l'ordine VIVO non si tocca", True, bool(riga(1)["indirizzo"]))
     dopo = [tuple(r) for r in vero.execute("SELECT * FROM ordini")]
-    amb["pulisci_indirizzi"]()
+    scopa()
     prova("la scopa e' idempotente: il secondo giro non fa niente",
           dopo, [tuple(r) for r in vero.execute("SELECT * FROM ordini")])
     prova("il purgato lo dice a chi lo cerca", True,
