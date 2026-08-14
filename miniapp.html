@@ -9902,7 +9902,28 @@ function renderAcquisto(){
            questo acquisto la spedizione si paga.</div>`;
     else if (sgManca > 0 && p.sped_gratis_raggiungibile !== false)
       pillaSg = `<span class="pill pill-barra" data-barra="sg"${barraPromessa(sgSoglia, sgManca)}>🚚 Ancora ${cifraSoglia(sgManca, sgVal)} → <b>spedizione gratis</b></span>`;
-    else
+    /* IL VERDE VUOLE LA SUA CONDIZIONE, MAI UN `else` NUDO (ago 2026,
+       difetto vero dal campo: «Spedizione gratis» sul badge e la
+       spedizione addebitata nel conto, su OGNI annuncio del negozio
+       che da solo non arrivava alla soglia). Il catch-all raccoglieva
+       due casi diversi — «la soglia e' raggiunta» e «la soglia non e'
+       raggiungibile con questo stock» — e al secondo prometteva una
+       cosa che la invoice poi non faceva. L'invito aveva guadagnato la
+       guardia della raggiungibilita' senza che il verde perdesse il
+       ramo che gliela scavalcava.
+       IL CONTO NON SBAGLIAVA MAI: `_sped_gratis` decide nello stesso
+       identico punto in _strade_preventivo e in compra(), quindi
+       preventivo, ordine e fattura dicevano la stessa cifra — a
+       mentire era il solo cartello.
+       `sgManca === 0` E' IL FATTO, ed e' il gemello di quello che la
+       🎁 chiede da sempre (`sconto_sats > 0`): la' il verde e' agganciato
+       al risultato e sta PRIMA dell'invito, qui arrivava per esclusione.
+       Il caso «non raggiungibile» adesso non disegna NIENTE, che e' quel
+       che il cantiere dell'invito voleva: un'assenza non e' una bugia.
+       La strada del cambio muto resta al ramo di sopra — li' `sgManca`
+       vale 0 perche' la misura non c'e', non perche' la soglia sia
+       raggiunta, e senza quella prosa questo `=== 0` direbbe il falso. */
+    else if (sgManca === 0)
       pillaSg = `<span class="pill pill-trust" data-barra="sg">✅ Spedizione <b>gratis</b></span>`;
   }
   /* LA FILA: 🚚 PRIMA della 🎁 (12 ago 2026, decisione di Andrea) —

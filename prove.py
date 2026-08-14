@@ -14147,6 +14147,51 @@ def prove_promesse_raggiungibili():
     prova("la guardia si scrive DUE volte: i due inviti, mai i due"
           " verdi", 2, _ra.count("raggiungibile !== false"))
 
+    # ---- 2b. E CHE COSA DICE IL RAMO CHE LA GUARDIA LASCIA PASSARE.
+    # La riga qui sopra guarda DOVE sta la guardia, ed era vera anche
+    # col difetto: per la 🎁 il verde e' agganciato al FATTO
+    # (`sconto_sats > 0`) e sta PRIMA dell'invito, per la 🚚 arrivava da
+    # un `else` NUDO che raccoglieva due casi diversi — «soglia
+    # raggiunta» e «soglia non raggiungibile con questo stock» — e al
+    # secondo prometteva «Spedizione gratis» dove il conto addebitava.
+    # Difetto vero dal campo (ago 2026), e su OGNI annuncio del negozio
+    # che da solo non arrivava alla soglia: non un caso limite, la
+    # regola per quel listino.
+    # LA LEZIONE, ed e' la QUINTA volta che questa classe di sentinella
+    # certifica meta' disegno: una prova sulla POSIZIONE di una guardia
+    # dice che la guardia c'e', mai che il ramo accanto sia onesto —
+    # e un disegno vero per una promessa puo' essere falso per la sua
+    # gemella. Da qui in poi va SEMPRE in coppia con una sul CONTENUTO.
+    def _solo_codice(js):
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                         if not r.strip().startswith("//"))
+
+    _rac = _solo_codice(_ra)
+    prova("il verde della 🚚 ha la SUA condizione, mai un `else` nudo",
+          True, "else if (sgManca === 0)" in _rac)
+    prova("...e quello della 🎁 resta agganciato al fatto", True,
+          "else if ((p.sconto_sats||0) > 0)" in _rac)
+    # CENSIMENTO e non elenco (la lezione del titolo nudo): ogni verde
+    # di renderAcquisto — anche la terza promessa che qualcuno
+    # aggiungera' fra sei mesi — deve nascere da una condizione SUA. Un
+    # `else` nudo davanti a una pillola `pill-trust` e' esattamente la
+    # forma del difetto, e da qui la CI la vede da sola.
+    _nudi = []
+    for _p in re.finditer(r"pill pill-trust", _rac):
+        _testa = _rac[:_p.start()]
+        _i = _testa.rfind("else")
+        _ramo = _testa[_i:].strip() if _i >= 0 else ""
+        if _ramo.startswith("else") and not _ramo.startswith("else if"):
+            _nudi.append(_rac[_p.start():_p.start() + 40])
+    prova("nessun verde nasce per esclusione: mai un `else` nudo", [],
+          _nudi)
+    # e il censimento vede DAVVERO i due verdi: a zero pillole trovate
+    # la riga qui sopra sarebbe una promozione invece di una cecita'
+    # (la lezione del censimento dei titoli scappati)
+    prova("...e i verdi censiti sono i due che ci sono", 2,
+          _rac.count("pill pill-trust"))
+
     # ---- 3. IL GIUDICE DEL VERDE IN CARD: il gemello di spedGratisQui,
     # e ne eredita le decisioni parola per parola.
     _sc = pezzo_js(mini, "function scontoQui(l, qta){", "\n}")
