@@ -112,6 +112,11 @@ jobs:
       # segnaposto INCOLLA_QUI di config_esempio.py.
       FORME: >-
         nsec1[0-9a-z]{50,}|[0-9]{8,12}:[A-Za-z0-9_-]{30,}|sk-ant-[A-Za-z0-9_-]{20,}|nostr\+walletconnect://[A-Za-z0-9._~:/?#@!$&*+,;=%-]{20,}|(LNBITS_INVOICE_KEY|LNBITS_ADMIN_KEY|TELEGRAM_WEBHOOK_SEGRETO|CHIAVE_CONTENUTI_DIGITALI)[[:space:]]*=[[:space:]]*['"][^'"]
+      # E la chiave Nostr in esadecimale nudo, che ha una regola sua
+      # perche' ha un'eccezione sua: vendor/nostr.bundle.js ne contiene
+      # per mestiere. Sta qui, accanto a FORME, per la stessa ragione
+      # di FORME — la guardano in due, e due copie divergono.
+      FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -162,7 +167,7 @@ jobs:
           # vendor/, dove nostr.bundle.js ne contiene per mestiere ed e'
           # l'unico file del repo che lo fa.
           if git ls-files -z -- . ':!vendor/' \
-               | xargs -0 grep -lIE '\b[0-9a-f]{64}\b' ; then
+               | xargs -0 grep -lIE "$FORMA_HEX" ; then
             echo "::error::Sembra esserci una chiave privata in esadecimale"
             exit 1
           fi
@@ -187,6 +192,23 @@ jobs:
           if git log --all -p --no-color | grep -a '^+' \
                | grep -aE "$FORME" | grep -av INCOLLA_QUI ; then
             echo "::error::Un segreto e' passato dalla repo in passato: va RUOTATO"
+            exit 1
+          fi
+          # E la stessa domanda per l'esadecimale nudo, che fino ad ago
+          # 2026 la cronologia non la faceva: era il buco piu' largo dei
+          # due, perche' l'albero di lavoro si ripulisce con un commit e
+          # la storia no. Misurato il giorno in cui si e' chiuso: due
+          # valori, tolti dai file un'ora prima e ancora li' dentro.
+          #
+          # Il --full-history NON e' un ornamento: con un pathspec git
+          # semplifica la storia e SALTA dei commit (misurato su questo
+          # repo: 867 invece di 868) — cioe' proprio quello che una
+          # passata di sicurezza non puo' permettersi. L'eccezione di
+          # vendor/ e' la stessa dei file di oggi, o il bundle si
+          # denuncerebbe da solo a ogni giro.
+          if git log --all --full-history -p --no-color -- . ':!vendor/' \
+               | grep -a '^+' | grep -aE "$FORMA_HEX" ; then
+            echo "::error::Una chiave esadecimale nuda e' passata dalla repo: va RUOTATA"
             exit 1
           fi
           echo "cronologia pulita"
