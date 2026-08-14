@@ -17108,6 +17108,15 @@ function chiavi(){
     i = mini.index("const NWC_CHIAVE")
     sezione = mini[i:mini.index("async function collegaWallet(")]
     fuori = sezione.replace(pezzo_js(mini, "function chiaveNwc(con){"), "")
+    # il verdetto del relay si stampa: senza, un evento rifiutato e un
+    # wallet muto si raccontano identici (un timeout), ed e' l'ambiguita'
+    # che ha reso difficile la diagnosi di Primal.
+    cn = pezzo_js(mini, "async function clientNwc(dati){")
+    prova("il rifiuto del relay non si ingoia in silenzio",
+          False, "catch(()=>{})" in cn.replace(" ", ""))
+    prova("...e si dice a chi guarda la console",
+          True, "il relay ha rifiutato" in cn)
+
     prova("fuori dal giudice nessuno si legge la pubkey a mano",
           0, fuori.count("con.pubkey"))
     prova("e il giudice lo chiamano tutti e due i chiamanti",

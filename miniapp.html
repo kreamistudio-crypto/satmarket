@@ -20854,7 +20854,14 @@ async function clientNwc(dati){
         created_at: Math.floor(Date.now()/1000), tags: tagRichiesta,
         content: cifra(JSON.stringify({method:metodo, params}))}, sk);
       attese[ev.id] = {ok, no};
-      relay.publish(ev).catch(()=>{});
+      /* il verdetto del relay NON si ingoia: un evento RIFIUTATO e un
+         wallet che tace, da fuori, sono la stessa cosa — un timeout — e
+         quell'ambiguita' e' costata una diagnosi intera (Primal, ago
+         2026: il relay ACCETTAVA, il silenzio era del wallet, e per
+         saperlo e' servita una sonda a mano sul filo). Si stampa e
+         basta: il ripiego resta quello di sempre, lo decide il timeout. */
+      relay.publish(ev).catch(e => console.log(
+        '🟪 [nwc] il relay ha rifiutato la richiesta: ' + ((e && e.message) || e)));
       setTimeout(()=>{ if (attese[ev.id]) { delete attese[ev.id];
         no(new Error('il wallet non risponde')); } }, timeoutMs || 30000);
     });
