@@ -1272,6 +1272,20 @@
   .acc.open .acc-h .fr{transform:rotate(180deg)}
   .acc-b{display:none;padding:0 14px 14px}
   .acc.open .acc-b{display:block}
+  /* L'ARIA SOPRA IL BOTTONE (ago 2026, bug dal campo: «Aggiorna lo
+     sconto» tagliava le pillole delle percentuali). `.btn` non ha
+     margine di base — e' la regola dichiarata, lo spazio e' della
+     COPPIA e non del bottone — e negli altri cassetti l'aria la
+     metteva il margin-bottom del campo che sta sopra. Dove sopra c'e'
+     una fila di PILLOLE, che margine sotto non ne ha, il bottone
+     arrivava a 0px: misurato, e con la pillola accesa dello stesso
+     arancio i due si fondevano in un blocco solo. Detta qui vale per
+     ogni cassetto, anche quello che qualcuno aggiungera' fra sei
+     mesi; dove l'aria c'era gia' i margini COLLASSANO (siamo in
+     flusso normale) e resta la piu' grande, quindi non si somma a
+     niente. E' la terza volta che questa famiglia inciampa: si trova
+     solo MISURANDO la pagina vera. */
+  .acc-b .btn{margin-top:14px}
   /* Nel pannello dei moderatori i cassetti tengono cio' che e' GIA'
      successo (le decisioni prese, il registro) e cio' che si consulta
      (lo stato delle leve): aperto resta solo cio' che aspetta una
@@ -14628,54 +14642,6 @@ async function setSpedizioniere(v){
   if (el('view-vendi')) aggiornaConsegnaForm();
 }
 
-/* La riga che tiene onesti tutti e due i cassetti (ago 2026, col
-   passaggio delle soglie all'euro). Prende il posto delle due che
-   dicevano «l'euro serve solo a scegliere, si salva in sats» — quindi
-   non allunga niente — e chiude il buco che quel passaggio apriva: da
-   quando le soglie parlano euro, nel cassetto del venditore la parola
-   «sats» non compariva PIU' da nessuna parte, e una soglia in euro
-   accanto a un negozio che incassa in bitcoin si legge facilmente come
-   «mi pagano in euro».
-   In UNA stringa e non a mano nei due cassetti: e' il patto di
-   AVVISO_INTERMEDIARIO, che sta in casa proprio perche' due copie
-   della stessa avvertenza un giorno divergono.
-   La prima frase e' anche la risposta a «perche' euro?», che e' la
-   domanda che il venditore si fa comunque.
-   E DALL'AGO 2026 SONO DUE, una per valuta, perche' la scelta e' del
-   venditore e il compromesso va detto in tutte e due le direzioni
-   invece di deciderlo al posto suo: in euro la soglia non deriva col
-   cambio, in sats non ha bisogno del cambio per scattare. Restano UNA
-   funzione — il patto vale ancora: due copie della stessa avvertenza
-   un giorno divergono — e tutte e due finiscono con «incassi in sats»,
-   che e' vero comunque. */
-function notaSoglia(valuta){
-  const testo = valuta === 'sats'
-    ? `La soglia è fissa in <b style="color:var(--ink)">sats</b>: se il
-       cambio si muove, in euro vale di più (o di meno). In compenso
-       non ha bisogno del cambio per scattare.`
-    : `La soglia si misura in <b style="color:var(--ink)">euro</b>, così
-       non cambia da sola col cambio.`;
-  return `
-  <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-    ${testo} Tu incassi sempre in
-    <b style="color:var(--ink)">sats</b>.</div>`;
-}
-
-/* LA LAMPO ABBASSA LA CIFRA MISURATA (ago 2026, decisione di Andrea):
-   e' l'unica delle tre cose che l'anteprima diceva da sola a NON essere
-   implicata da nient'altro, ed e' il caso che sembra un guasto quando
-   un venditore lo nota — lancia un −50%, il carrello scende sotto
-   soglia, la promessa non scatta. Sta sotto le pillole della cifra
-   perche' e' un caveat sulla MISURA e non sul perimetro: la riga in
-   cima dice dove vale, questa con che numero si confronta.
-   Solo dove una CIFRA c'e': a criterio pezzi la lampo non puo' far
-   scendere niente — li' si contano pezzi — e dirlo sarebbe falso. */
-function notaLampo(){
-  return `
-  <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-top:8px">
-    Le offerte lampo abbassano la cifra su cui si misura.</div>`;
-}
-
 /* ---- IL TOGGLE €/₿ DELLA SOGLIA (ago 2026) ----
    CONSERVA, NON CONVERTE, ed e' la decisione da non rovesciare: ogni
    valuta ha la sua colonna, e il toggle mostra cio' che il venditore ha
@@ -14881,7 +14847,7 @@ function renderScontoPacco(){
           prima cosa che si legge aprendo, ed e' la domanda che il
           venditore si fa per prima («mi mangia anche la spedizione?»).
           La seconda frase dipende dal criterio, che si sceglie SOTTO. */''}
-    <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-bottom:2px">
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
       La spedizione è a parte.${aValore
         ? ' Vale anche su un oggetto solo.'
         : ' Più copie dello stesso articolo contano come più pezzi.'}</div>
@@ -14903,7 +14869,6 @@ function renderScontoPacco(){
                                  : scontoPaccoLeve.min_valore_eur, b.valuta,
                           (inSats ? scontoPaccoLeve.valori_sats
                                   : scontoPaccoLeve.valori_eur)||[])}
-      ${notaSoglia(b.valuta)}${notaLampo()}
     ` : `
       <div class="section-label" style="margin-top:12px">Da quanti pezzi</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
@@ -15024,7 +14989,7 @@ function renderSpedGratis(){
   box.innerHTML = `
     ${/* in cima come nel gemello: il vincolo e il cumulo sono fatti
           costanti, e sono anche le due cose che l'anteprima non copre */''}
-    <div style="font-size:11.5px;color:var(--muted);font-weight:600;line-height:1.4;margin-bottom:2px">
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
       Vale sugli annunci che spedisci, anche su un oggetto solo. Si
       somma allo sconto: guardano lo stesso numero, quindi nessuna
       delle due spegne l'altra.</div>
@@ -15040,7 +15005,6 @@ function renderSpedGratis(){
                                : spedGratisLeve.min_eur, b.valuta,
                         (inSats ? spedGratisLeve.soglie_sats
                                 : spedGratisLeve.soglie_eur)||[])}
-    ${notaSoglia(b.valuta)}${notaLampo()}
     <button class="btn orange" onclick="setSpedGratis()">
       ${ora ? '🚚 Aggiorna la soglia' : '🚚 Attiva la spedizione gratis'}</button>
     ${ora ? `<button class="btn ghost" onclick="setSpedGratis(true)">Spegni la spedizione gratis</button>` : ''}`;

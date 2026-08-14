@@ -6788,31 +6788,34 @@ def prove_sped_gratis():
           mini.count("function regolaSpedGratis("))
     prova("...e UNA sola frase pubblica", 1,
           mini.count("function frasePromessaSpedGratis("))
-    # LA RIGA CHE DICE CHE SI INCASSA IN SATS vive in UN posto e la
-    # portano tutti e due i cassetti: e' il patto di AVVISO_INTERMEDIARIO
-    # — due copie della stessa avvertenza un giorno divergono. Serve
-    # perche' col passaggio all'euro la parola «sats» era sparita dal
-    # cassetto del venditore, e una soglia in euro accanto a un negozio
-    # che incassa in bitcoin si legge come «mi pagano in euro».
-    # Dall'ago 2026 e' una FUNZIONE e i testi sono due, uno per valuta:
-    # il compromesso va detto in tutte e due le direzioni invece di
-    # deciderlo al posto del venditore. Il patto pero' non cambia — una
-    # sola definizione, e la portano tutti e due i cassetti.
-    prova("la nota «incassi in sats» e' scritta UNA volta", 1,
-          mini.count("function notaSoglia("))
-    prova("...e la portano tutti e due i cassetti", 2,
-          mini.count("${notaSoglia("))
-    # ...e dice sempre che l'incasso e' in sats, in TUTTE E DUE le
-    # valute: e' la riga che tiene onesto il cassetto di un negozio
-    # che promette in euro ma incassa in bitcoin
-    _ns = mini[mini.index("function notaSoglia("):
-               mini.index("function toggleValutaSoglia(")]
-    prova("...e nomina i sats una volta sola, per tutte e due", 1,
-          _ns.count("Tu incassi sempre in"))
-    prova("la nota in sats avverte della deriva", True,
-          "se il\n       cambio si muove" in _ns)
-    prova("...e quella in euro dice che non deriva", True,
-          "non cambia da sola col cambio" in _ns)
+    # LE DUE NOTE DEI CASSETTI NON CI SONO PIU' (ago 2026, decisione
+    # di Andrea): quella sulla lampo — «e' normale che una lampo incida
+    # sulla cifra, non serve ripeterlo» — e quella su come si misura la
+    # soglia nelle due valute. Le prove CAMBIANO LATO: chiedevano che
+    # ci fossero in un posto solo e che le portassero tutti e due i
+    # cassetti, adesso chiedono che non ci sia piu' nessuna fonte —
+    # l'affermazione piu' forte, e impedisce che rientrino a meta'.
+    prova("la nota su come si misura la soglia non c'e' piu'", 0,
+          mini.count("notaSoglia"))
+    prova("...e nemmeno quella sulla lampo", 0,
+          mini.count("notaLampo"))
+    # ⚠️ QUEL CHE SI E' PERSO, dichiarato: «Tu incassi sempre in sats»
+    # viveva li' dentro, ed era la riga che teneva onesto il cassetto
+    # di un negozio che promette in EURO ma incassa in bitcoin (era
+    # nata apposta, col passaggio all'euro). Se un giorno un venditore
+    # chiede «ma allora mi pagate in euro?», la risposta e' questa riga
+    # e il posto e' il cassetto.
+
+    # L'ARIA SOPRA IL BOTTONE DEL CASSETTO (ago 2026, bug dal campo:
+    # «Aggiorna lo sconto» tagliava le pillole delle percentuali).
+    # `.btn` non ha margine di base — lo spazio e' della COPPIA — e
+    # dove sopra c'e' una fila di pillole, che margine sotto non ne ha,
+    # il bottone arrivava a ZERO. La regola sta sul CASSETTO e non sui
+    # due blocchi che l'hanno scoperta: cosi' la eredita anche il
+    # cassetto di domani. E' la terza volta che questa famiglia
+    # inciampa, e si trova solo misurando la pagina vera.
+    prova("i bottoni dei cassetti hanno aria sopra", 1,
+          mini.count(".acc-b .btn{margin-top"))
 
     # IL CAMPO LIBERO delle due soglie (ago 2026): le pillole non
     # riproducono le cifre nate dal travaso (14 €, 56 €), e chi se le
@@ -6846,37 +6849,6 @@ def prove_sped_gratis():
           "copie dello stesso articolo" in _riga)
     prova("...e «un oggetto solo paga pieno» non torna da nessuna porta",
           False, "paga pieno, per quanto costi" in mini)
-    # LA LAMPO ABBASSA LA CIFRA MISURATA (ago 2026): e' l'unica delle
-    # tre cose che l'anteprima diceva da sola a non essere implicata da
-    # nient'altro — lancia un −50%, il carrello scende sotto soglia, la
-    # promessa non scatta, e senza questa riga sembra un guasto. Vive in
-    # UN posto e la montano tutti e due i cassetti.
-    prova("la nota della lampo e' scritta UNA volta", 1,
-          mini.count("function notaLampo("))
-    prova("...e la montano tutti e due i cassetti", 2,
-          mini.count("notaLampo()}"))
-    # ...E DICE LA LAMPO, non «una nota» qualunque: le due prove qui
-    # sopra guardano DOVE sta la riga e non COSA dice, e da sole
-    # restano verdi svuotandola (l'ha detto la tortura, non la
-    # rilettura). Si affetta il corpo della funzione, o la parola
-    # «lampo» la si troverebbe altrove nel file.
-    _nl = pezzo_js(mini, "function notaLampo")
-    prova("...e dice la lampo e la cifra misurata", True,
-          "lampo" in _nl and "misura" in _nl)
-
-    # ...E SOLO DOVE UNA CIFRA C'E': a criterio pezzi la lampo non puo'
-    # far scendere niente sotto soglia — li' si contano pezzi — quindi
-    # dirlo sarebbe FALSO. La sentinella affetta il ternario del
-    # criterio invece di cercare la stringa nel file, o passerebbe
-    # anche con la riga sul ramo sbagliato.
-    _rs2 = pezzo_js(mini, "function renderScontoPacco")
-    _dopo = _rs2[_rs2.index("${aValore ? `"):]
-    _val, _pez = _dopo.split("` : `", 1)
-    prova("la nota della lampo vive nel ramo a VALORE", True,
-          "notaLampo()" in _val)
-    prova("...e non in quello a pezzi, dove sarebbe falsa", False,
-          "notaLampo()" in _pez)
-
     # NIENTE CLAMP MUTO: a limare al minimo sarebbe il client, e il
     # venditore vedrebbe un numero che non ha scritto. A dire la cifra
     # e' il 400 del server, che il cassetto rende dentro di se'.
