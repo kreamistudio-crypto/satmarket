@@ -3648,7 +3648,7 @@ document.getElementById('cartello')?.remove();</script>
        #setSheet non esiste piu'). Dall'alto: testata col conteggio e i
        francobolli degli articoli scelti, la scelta della consegna
        sull'intersezione delle strade del pacco, il conto in righe —
-       con la riga «Commissione Barattolo» che esiste per dire che
+       con la riga «Commissione» che esiste per dire che
        oggi e' in promo — e in fondo Acquista coi due secondari.
        La composizione NON si tocca qui: si torna alla pagina del
        pacco col gesto indietro, selezione intatta. Il contenuto lo
@@ -8974,18 +8974,20 @@ function contoRighe(c){
     + (c.sconto>0
         ? r('Sconto sugli articoli',
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
-    /* ⚠️ QUESTA RIGA TRONCA A 320px, ed e' l'unica: l'etichetta ne
-       chiede 148 e ne ha 135, quindi si legge «Commissione
-       Baratt…» — su OGNI acquisto, perche' il suo valore porta
-       sempre la pillola «in promo» accanto allo zero e non dipende
-       dalle cifre dell'ordine. Difetto vecchio, misurato ad ago
-       2026. La leva del respiro qui NON arriva: per farcela stare il
-       padding del riquadro dovrebbe scendere da 14 a 4, cioe' le
-       cifre contro il bordo. L'unica leva che basta e' l'etichetta —
-       «Commissione» da sola avanza 50px, e dentro il nostro
-       checkout di chi altri sarebbe? — ma e' un testo, e i testi si
-       decidono, non si accorciano di straforo. */
-    + r('Commissione Barattolo', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
+    /* «COMMISSIONE» E BASTA (ago 2026, decisione di Andrea): con
+       «Commissione Barattolo» questa riga TRONCAVA a 320px —
+       l'etichetta ne chiedeva 148 e ne aveva 135, e si leggeva
+       «Commissione Baratt…» su OGNI acquisto, perche' il suo valore
+       porta sempre la pillola «in promo» accanto allo zero e non
+       dipende dalle cifre dell'ordine. Difetto vecchio, trovato
+       misurando il rinome dello sconto. La leva del respiro NON ci
+       arrivava (per farla stare il padding del riquadro sarebbe
+       dovuto scendere da 14 a 4, cioe' le cifre contro il bordo):
+       l'unica che bastava era la parola. Dentro il nostro checkout
+       di chi altri sarebbe la commissione? — e le altre etichette
+       della colonna sono gia' nomi comuni: Prezzo, Spedizione,
+       Protezione acquisti. Adesso avanzano 50px. */
+    + r('Commissione', `<span class="promo-tag">in promo</span>${cifraCtrl(0)}`)
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
        stessa regola delle pillole delle vie, e vale per tutti e due i

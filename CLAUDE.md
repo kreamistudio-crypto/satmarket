@@ -7214,15 +7214,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   a chi ne ha bisogno. Misurato su tutta la scala (14/12 → 4/4): il
   massimo onesto è quello, e per arrivare a +25 il padding dovrebbe
   scendere a 4.
-  ⚠️ «COMMISSIONE BARATTOLO» TRONCA ANCORA, ed è l'unica: −13px a 320
-  dopo il respiro (era −25), si legge «Commissione Baratt…» su OGNI
-  acquisto — il suo valore porta sempre la pillola «in promo» accanto
-  allo zero, quindi non dipende dalle cifre dell'ordine. Difetto
-  PREESISTENTE, che non nasce col rinome dello sconto. La sola leva
-  che ci arriva è l'ETICHETTA: «Commissione» da sola avanza 50px, e
-  dentro il nostro checkout di chi altri sarebbe la commissione? — ma
-  è un testo, e i testi in questo progetto si decidono, non si
-  accorciano di straforo. Il commento accanto alla riga lo dice.
+  E «COMMISSIONE BARATTOLO» È DIVENTATA «COMMISSIONE» (ago 2026,
+  decisione di Andrea): con due parole quella riga TRONCAVA — −25px a
+  320, −13 dopo il respiro — e si leggeva «Commissione Baratt…» su
+  OGNI acquisto, perché il suo valore porta sempre la pillola «in
+  promo» accanto allo zero e non dipende dalle cifre dell'ordine.
+  Difetto PREESISTENTE, che non nasce col rinome dello sconto: l'ha
+  trovato la misura del rinome. La leva del respiro NON ci arrivava —
+  vedi la scala qui sopra — e l'unica che bastava era la parola:
+  adesso avanzano 50px. IL PERCHÉ, che vale oltre questa riga: dentro
+  il nostro checkout di chi altri sarebbe la commissione, e le altre
+  etichette della colonna sono già nomi comuni (Prezzo, Spedizione,
+  Protezione acquisti) — «Barattolo» era l'unica che nominava noi in
+  una colonna che descrive voci di conto. Il posto dove il nome della
+  piattaforma serve davvero è il memo della invoice, che lo tiene.
   Le altre due superfici del conto stanno larghe e non hanno mai avuto
   il problema: nel paySheet `.conto-scomposto` l'etichetta fa 117px su
   254 (una riga sola, 39 di margine, e lì la percentuale non c'è mai
@@ -7381,7 +7386,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   gemello client che aspetta, il vestito appeso di .carton); IL CONTO
   in righe (`contoControlla`/`cifraCtrl`, nella valuta del toggle: in
   euro sempre ≈, in sats il circa di `setCirca`, lo zero mai col ≈):
-  Prezzo, «Commissione Barattolo — 0 sats» con la pillolina «in
+  Prezzo, «Commissione — 0 sats» con la pillolina «in
   promo» (`.promo-tag`: la riga esiste per DIRE che oggi è gratis, ed
   è il posto già pronto per la cifra il giorno che la commissione si
   accenderà), Spedizione (il MAX di sempre; col ritiro vale 0 e la
