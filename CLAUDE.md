@@ -7162,24 +7162,45 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Sconto sopra soglia» (a criterio pezzi la soglia non è una spesa:
   direbbe metà regola) e «Sconto del negozio» (vero ma muto — nel
   Profilo è del negozio anche tutto il resto).
-  I DUE CASSETTI NON HANNO PIÙ UN SOTTOTITOLO (ago 2026, decisione di
-  Andrea: «la regola si capisce dalle scelte stesse»). Erano nati con
-  una riga che diceva la differenza fra i criteri e cambiava sotto le
-  dita — «a pezzi conta QUANTI, a valore conta QUANTO» — ed è durata
-  un giorno: un paragrafo che ripete quel che si sta toccando si
-  smette di leggere al secondo giro. A dire la regola restano LE
-  SCELTE: le due pillole del criterio, l'etichetta sopra le soglie
-  («Da quanti pezzi» / «Da quanti euro di articoli»), le pillole col
-  «da» davanti, e soprattutto L'ANTEPRIMA IN GRASSETTO, che il
-  perimetro lo dice già per criterio e con le cifre vere.
-  COSA SI È PERSO, misurato invece che supposto: solo la coppia
-  «serve prenderne più d'uno» / «basta la cifra», cioè la conseguenza
-  detta in una parola mentre si sceglie. La metà che sorprende — che
-  a valore basta un oggetto — la tiene la riga nuova; la metà a pezzi
-  la diceva già l'anteprima («Chi ne prende N−1 paga pieno»). Non è
-  un buco: è una ripetizione in meno.
-  SOTTO RESTA UNA RIGA SOLA, e cambia col criterio: «La spedizione è
-  a parte.» a pezzi, più «Vale anche su un oggetto solo.» a valore.
+  I DUE CASSETTI HANNO PERSO TUTTA LA PROSA TRANNE UNA RIGA (ago 2026,
+  decisione di Andrea in due tempi: prima il sottotitolo, poi
+  l'anteprima in grassetto — «guardando il cassetto le pillole mi
+  sembrano già chiare»). A dire la regola restano LE SCELTE: le due
+  pillole del criterio, l'etichetta sopra le soglie («Da quanti
+  pezzi» / «Da quanti euro di articoli») e le pillole col «da»
+  davanti. Resta UNA riga, IN CIMA sotto il titolo — è un fatto
+  costante, e in cima è la prima cosa che si legge aprendo, cioè la
+  domanda che il venditore si fa per prima («mi mangia anche la
+  spedizione?») — e cambia col criterio: «La spedizione è a parte.
+  Più copie dello stesso articolo contano come più pezzi.» a pezzi,
+  «La spedizione è a parte. Vale anche su un oggetto solo.» a valore.
+  QUELLA SECONDA FRASE È IL PERIMETRO, e non è un ornamento: «più
+  copie contano» è il rovesciamento del 12 ago 2026 — quello che è
+  costato una campagna una-tantum a cinque venditori — e non lo dice
+  nient'altro nell'app. C'è la sentinella su tutt'e due i rami, ed è
+  la stessa che sorvegliava l'anteprima: ha CAMBIATO LATO invece di
+  sparire.
+  ⚠️ COSA SI È PERSO TOGLIENDO L'ANTEPRIMA, dichiarato e non dedotto.
+  1) LA REGOLA COMPOSTA con le cifre vere: era l'unico posto dove
+  soglia e percentuale si leggevano INSIEME, e il timbro nell'header
+  dice il SALVATO e non la bozza — quindi fra l'ultimo tocco e
+  «Attiva lo sconto» non c'è più un punto in cui rileggere quel che si
+  sta per salvare. 2) «Chi ne prende N−1 paga pieno», il
+  controesempio: si accetta di perderlo perché «da 2 pezzi» sulla
+  pillola dice già che sotto non scatta — è l'unica delle tre che il
+  resto del cassetto implica. 3) LA LAMPO — «la soglia guarda
+  l'acquisto DOPO le tue offerte lampo e gli accordi» — che NON è
+  implicata da niente e adesso non sta più da nessuna parte, in
+  nessuno dei due cassetti: è il caso che questo file dichiara
+  «sembra un bug quando un venditore lo nota», e resta da collocare.
+  E IL CAMPO LIBERO SI ACCENDE COME UNA PILLOLA quando porta una
+  cifra che nessuna pillola dice (bordo `--sats`, grassetto 800): con
+  l'anteprima via, quello è l'UNICO riscontro che il numero scritto è
+  la scelta viva — senza, scrivere «37» spegneva tutte le pillole e
+  l'unico segnale restava un'ASSENZA, che si legge come «non ho
+  scelto niente». Zero prosa: parla la lingua che il cassetto ha già.
+  Lo scrivono in due, `campoSogliaLibera` al render (che per questo
+  riceve le voci delle pillole) e `sogliaLibera` a ogni tasto.
   IL «DA» STA SU TUTTE E DUE LE FAMIGLIE DI PILLOLE — «da 3 pezzi» e
   «da 25 €» — e su TUTTI E DUE i cassetti: la sorella ha una `pill`
   sua, e senza toccarla l'asimmetria si sarebbe solo spostata di un
