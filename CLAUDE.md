@@ -11103,6 +11103,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la descrizione avvelenata (la metà che un divieto scritto sul solo
   titolo perderebbe), una finta giacenza Poste (un ALTRO servizio), e
   tre regressioni: buoni leciti, servizi dubbi, armi vietate.
+- `collaudo_conto.py` (ago 2026) — IL CONTO fatto girare per davvero,
+  ed è l'altra metà che `prove.py` non può fare: le sue prove non hanno
+  un database, non hanno un endpoint e non coniano una invoice. Qui il
+  SERVER VERO gira su un database usa-e-getta con LNbits finto — il
+  modulo `config` si sostituisce PRIMA dell'import, o si aprirebbe il
+  database di casa — e non serve né rete né chiavi.
+  LA PROVA REGINA È **preventivo == compra, AL SAT**, e vale ogni volta
+  che qualcuno tocca il conto, non solo lo sconto: se le due cifre
+  divergono, chi compra vede un prezzo e ne paga un altro, e quel
+  difetto non fallisce da solo — nessuna eccezione, nessun log, due
+  numeri diversi. Accanto le altre tre domande che si fanno insieme a
+  quella: la BOLT11 chiede esattamente il totale che finisce in colonna
+  (se la fattura chiedesse il netto e `prezzo_sats` tenesse il lordo,
+  il payout pretenderebbe dalla cassaforte più di quanto quell'ordine
+  ha versato, e la cintura di `paga_venditore` non lo vedrebbe perché
+  per lei i conti tornerebbero), l'identità di bilancio RILETTA dal
+  database, e la ronda del libro mastro che deve TACERE.
+  Oggi copre lo sconto carrello coi suoi due criteri — il cantiere per
+  cui è nato — ma `confronta()` non sa niente di sconti: prende una
+  richiesta e fa le quattro domande, qualunque regola le abbia
+  prodotte. CHI TOCCA IL CONTO CI AGGIUNGA IL SUO CASO invece di
+  rifarsi un ambiente.
 - `prove.py` + `.github/workflows/prove.yml` (lug 2026) — la rete di
   sicurezza, a ogni push e ogni PR. Solo pezzi PURI: niente config,
   database, relay o Anthropic — una CI che dipende da un server altrui
@@ -11112,9 +11134,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   una funzione estratta deve aggiungere anche le sue dipendenze
   all'ambiente (è già successo con `_chiave_comune`, che
   `coordinate_da_zona` ha cominciato a usare). Il workflow fa anche
-  `compileall` di tutti gli script (elenco a mano: chi ne aggiunge uno
-  lo mette lì, o non lo guarda nessuno — ai tre nati il 3 ago 2026 è
-  successo) e cerca segreti nella repo (la regola ferrea 1 in CI:
+  `compileall` di tutti gli script (elenco a mano, ma dall'ago 2026 NON
+  PIÙ DA RICORDARE: `prove_script_nel_workflow` guarda la cartella e
+  chiede che ogni `.py` della radice compaia in quel comando, quindi
+  chi ne aggiunge uno lo sente dalla CI il giorno stesso invece che sei
+  mesi dopo — è il buco che questa riga dichiarava da mesi, «ai tre
+  nati il 3 ago 2026 è successo», e alla nascita della sentinella ne ha
+  pescati subito altri tre. Non tiene un secondo elenco, che sarebbe lo
+  stesso problema spostato: legge la directory) e cerca segreti nella
+  repo (la regola ferrea 1 in CI:
   `config.py`/`*.db`/`foto/` tracciati, nsec, token del bot Telegram e
   chiavi `sk-ant-`; lunghezze LARGHE apposta — meglio un falso allarme
   da guardare che un token vero che passa perché era un carattere più
