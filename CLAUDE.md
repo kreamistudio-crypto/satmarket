@@ -10281,6 +10281,104 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `spedito_il`, colonne SUE `sollecito_busta_il`/`solleciti_busta`;
   squilla SOLO il venditore — il compratore vede già l'attesa e ha i
   suoi bottoni — e al tetto 🧊 ai moderatori, poi silenzio).
+  E LA SORELLA SPECULARE, PER CHI HA COMPRATO (ago 2026): quella qui
+  sopra guarda `busta_il=0` — il venditore che non deposita — e
+  `sollecita_ritiri_al_punto` guarda la popolazione COMPLEMENTARE
+  `busta_il>0`: le istruzioni ci sono, e il tempo corre per chi deve
+  andare a ritirare. Fra il messaggio del deposito e il giorno 10 —
+  quando la coda «⏸ Ordini fermi» e `sollecita_conferme_ferme`
+  cominciano a guardare — non c'era NESSUNO squillo che parlasse del
+  ritiro, ed è la finestra in cui si fa ancora in tempo.
+  IL TEMPO NON È NOSTRO, ed è la riga da non ammorbidire: la giacenza
+  la decide il corriere (~3 giorni InPost, ~5 Poste/BRT) e cambia col
+  contratto del venditore, quindi il testo non promette MAI una
+  scadenza — dice da quanti giorni le istruzioni sono nell'ordine, che
+  è un fatto NOSTRO e certo, e per la data manda all'AVVISO DEL
+  CORRIERE, che ce l'ha e l'ha già mandato. Vale per ogni rete senza
+  tarare niente e non invecchia se un corriere cambia politica.
+  TRE PAROLE VIETATE, ognuna per un caso vero: «il codice» (la busta
+  si deposita anche col solo DOCUMENTO, e a quel compratore un codice
+  non è mai arrivato), «il pacco ti aspetta» (falso nel deposito su
+  'locked', dove il pacco viaggia ancora) e qualunque cifra di
+  giacenza. Il conto parte dal PRIMO deposito, quindi include i giorni
+  passati con un PIN sbagliato: ancorare a `busta_corretta_il`
+  sistemerebbe il numero e riaprirebbe la trappola dell'ancora mobile
+  — LA CURA STA NEL TESTO, e «le istruzioni sono nell'ordine da N
+  giorni» è vero in tutti e quattro i casi. La stima «di solito circa
+  3» resta SOLO in `MSG_BUSTA_PRONTA`, che si riceve una volta sola:
+  lì i giorni trascorsi sono zero e non c'è un fatto da dire al suo
+  posto. Nella hint del pannello, che si legge OGNI volta, è passata
+  al fatto (asimmetria dichiarata: la stima si dice una volta, il
+  fatto si ripete).
+  L'ANCORA è `MAX(busta_il, spedito_il)`, cioè il momento in cui il
+  compratore ha ricevuto l'avviso d'arrivo dalle due strade della
+  dedup qui sotto, e non si muove (`busta_il` si scrive `or adesso`,
+  `spedito_il` lo tocca solo segna_spedito e `correggi_tracking` lo
+  lascia stare — da questo cantiere `busta_il` è entrata nella tupla
+  delle ancore che quella funzione non deve scrivere). NIENTE guardia
+  `spedito_il>0` come la sorella: lì serve perché senza, la SUA ancora
+  varrebbe 0 e squillerebbe subito; qui `busta_il>0` è già nella WHERE
+  e il MAX non può essere zero — copiarla per simmetria escluderebbe
+  gli 'shipped' con `spedito_il=0`, che esistono e sono i più
+  dimenticati (chiude metà di quel buco gratis).
+  NESSUN 🧊 AI MODERATORI, e la ragione è strutturale: la finestra è
+  corta, il 🧊 cadrebbe intorno al giorno 8 e la coda dei fermi apre al
+  10 — si romperebbe l'invariante «se il 🧊 è partito, la riga c'è», e
+  LA PROVA NON POTREBBE NEMMENO VEDERLO, perché la distanza fra la sua
+  ancora (il deposito) e quella della coda (`spedito_il`) la decide il
+  venditore, cioè è un valore di RUNTIME e non un conto fra leve. Il
+  divieto è scritto accanto al dizionario `ghiacci` in `prove.py`, che
+  è dove qualcuno andrebbe ad aggiungerlo. Al tetto si tace e il caso
+  lo raccolgono le strutture che ci sono: la coda al giorno 10, e —
+  a leva `AUTO_SBLOCCO_ATTIVO` spenta — `sollecita_conferme_ferme`;
+  a leva accesa è `controlla_scadenze`, che a quel punto chiude da sé.
+  DA CUI IL TETTO STRETTO `<` E NON `<=` come la sorella: lì il giro
+  al tetto SERVE (è quello che manda il 🧊), qui non manderebbe niente
+  e lascerebbe un contatore che dice al moderatore «4 promemoria» di
+  un messaggio mai spedito — una bussata fantasma è peggio di nessuna.
+  LA STAFFETTA è `solleciti_conferma = 0`: le due funzioni si ancorano
+  a momenti diversi, quindi con una busta depositata tardi uno squillo
+  cadrebbe nello stesso battito dell'altra e il compratore leggerebbe
+  «vai a ritirare» e «conferma o apri una disputa» a secondi di
+  distanza. Qui si tace quando la fase della conferma è cominciata, e
+  l'ordine nell'orologio la rende vera senza altre precauzioni
+  (`sollecita_conferme_ferme` gira PRIMA — c'è la prova).
+  DESTINATARI INVERTITI rispetto a `sollecita_venditori_fermi`: il
+  compratore a ogni squillo (è lui che deve agire), il venditore SOLO
+  L'ULTIMO, quando il pacco sta per tornargli indietro con le spese di
+  reso — prima sarebbe un allarme su un'attesa normale. Là il caso
+  nasce grave e si attenua, qui nasce normale e si aggrava.
+  UNA LEVA SOLA (`PROMEMORIA_RITIRO_GIORNI`, 2) fa da finestra E da
+  passo — squilli a 2, 4, 6 — perché il passo dev'essere più corto
+  della finestra che sorveglia, o il secondo cade a giacenza finita: è
+  la ragione per cui qui NON si riusa `PROMEMORIA_CONFERMA_GIORNI`
+  come fanno le sorelle (con quel passo cadrebbero a 2, 5, 8 e solo il
+  primo sarebbe dentro). ATTENZIONE, facendo due mestieri A 0 NON
+  RALLENTA: azzera finestra e passo insieme, cioè squillerebbe a ogni
+  battito — **tre messaggi in mezz'ora su ogni ordine via punto
+  vivo**. La guardia in cima alla funzione non è una formalità copiata
+  dalle sorelle (che hanno una seconda leva già guardata): è l'unica
+  cosa fra 0 e la raffica, e c'è la prova. Il tetto resta
+  `PROMEMORIA_CONFERMA_MAX`, che «quante volte si bussa» è una
+  decisione uniforme del progetto.
+  Colonne SUE `sollecito_punto_il`/`solleciti_punto`, e il nome è
+  `punto` e non `ritiro` APPOSTA: `sollecito_ritiro_*` sono del ritiro
+  a MANO in zona. Il sesto contatore è entrato nei due `MAX` di
+  `_SQL_FERMI`, o la coda direbbe «🔕 mai sollecitato» su un ordine
+  bussato tre volte — che è il contrario del caso che quella riga
+  esiste per far notare.
+  I GIORNI SI CONTANO DAL DELTA VERO e mai dalla leva: l'orologio vive
+  solo mentre il server è acceso, quindi dopo un riavvio lungo il
+  primo squillo dirà «da 9 giorni» invece di 2 — vero, mentre «2, 4,
+  6» è un'aspirazione e non una garanzia.
+  IMPERFEZIONE DICHIARATA: nel caso raro del deposito su 'locked' il
+  conto parte dalla spedizione e il pacco sta ancora viaggiando, quindi
+  il primo promemoria può arrivare in anticipo di un giorno o due. Si
+  distingue in SQL (`busta_il < spedito_il`) se un domani darà
+  fastidio. E il VENDITORE non può ancora aprire una disputa
+  (`apri_disputa` filtra `compratore_id`): col pacco tornato indietro
+  la sua unica strada è aspettare il compratore o un moderatore — buco
+  vero, dichiarato, cantiere suo perché tocca il percorso dei soldi.
   LA DEDUP DEL SEGNALE D'ARRIVO, per il caso raro dei due momenti
   coincidenti (codice immediato, spedizione da un punto):
   `MSG_BUSTA_PRONTA` è UNA costante e parte da UNA sola delle due
