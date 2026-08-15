@@ -738,6 +738,26 @@ except ImportError:
                                        # terzo o il pacco e' lento o il
                                        # codice e' nel dimenticatoio
 
+# IL PROMEMORIA DEL RITIRO (ago 2026): l'altra meta' della sorella qui
+# sopra. Quando la busta C'E', il tempo comincia a correre per chi ha
+# comprato — al punto il pacco aspetta pochi giorni e poi torna al
+# venditore — e finora glielo dicevamo UNA volta sola, al deposito.
+# UNA leva sola fa da finestra E da passo (squilli a 2, 4, 6 giorni):
+# il passo dev'essere piu' corto della finestra che sorveglia, o il
+# secondo squillo cade a giacenza gia' finita — ed e' la ragione per
+# cui qui NON si riusa PROMEMORIA_CONFERMA_GIORNI come fanno le
+# sorelle. Tetto e cadenza del tetto restano PROMEMORIA_CONFERMA_MAX.
+# ATTENZIONE: facendo due mestieri, a 0 questa leva non rallenta —
+# azzera la finestra E il passo insieme, cioe' squillerebbe a ogni
+# battito. La guardia in cima alla funzione non e' una formalita'
+# copiata dalle sorelle: e' l'unica cosa fra 0 e la raffica.
+try:
+    from config import PROMEMORIA_RITIRO_GIORNI
+except ImportError:
+    PROMEMORIA_RITIRO_GIORNI = 2       # la giacenza piu' corta (InPost)
+                                       # e' ~3 giorni: al secondo si fa
+                                       # ancora in tempo ad andare
+
 # L'INDIRIZZO NON RESTA (ago 2026): la finestra per gli ordini che si
 # chiudono SENZA la conferma del compratore — un rimborso, una disputa
 # decisa da un moderatore. Chi conferma la ricezione invece lo perde
@@ -2870,6 +2890,15 @@ def init_db():
                     # contatore ereditato salterebbe al tetto
                     "sollecito_busta_il INTEGER DEFAULT 0",
                     "solleciti_busta INTEGER DEFAULT 0",
+                    # ...e il promemoria al COMPRATORE che non va a
+                    # ritirare, quando la busta invece c'e'. Il nome
+                    # e' `punto` e non `ritiro` APPOSTA: le colonne
+                    # sollecito_ritiro_* qui sopra sono del ritiro a
+                    # MANO in zona (sollecita_ritiri_fermi), e la
+                    # stessa parola per due cose diverse e' il posto
+                    # in cui fra sei mesi si legge la riga sbagliata.
+                    "sollecito_punto_il INTEGER DEFAULT 0",
+                    "solleciti_punto INTEGER DEFAULT 0",
                     # IL NASCONDERE DEGLI AFFARI CONCLUSI (ago 2026):
                     # NASCONDERE, mai cancellare — la riga resta nel
                     # database, perche' libro mastro, feedback, export
@@ -10294,12 +10323,14 @@ _SQL_FERMI = (
     "        COALESCE(o.solleciti_ritiro,0), "
     "        COALESCE(o.solleciti_conferma,0), "
     "        COALESCE(o.solleciti_incasso,0), "
-    "        COALESCE(o.solleciti_busta,0)) AS promemoria, "
+    "        COALESCE(o.solleciti_busta,0), "
+    "        COALESCE(o.solleciti_punto,0)) AS promemoria, "
     "    MAX(COALESCE(o.sollecito_venditore_il,0), "
     "        COALESCE(o.sollecito_ritiro_il,0), "
     "        COALESCE(o.sollecito_conferma_il,0), "
     "        COALESCE(o.sollecito_incasso_il,0), "
-    "        COALESCE(o.sollecito_busta_il,0)) AS promemoria_il, "
+    "        COALESCE(o.sollecito_busta_il,0), "
+    "        COALESCE(o.sollecito_punto_il,0)) AS promemoria_il, "
     # raggiungibile = la regola di notifica(): Telegram se il tg_id e'
     # positivo, Nostr solo da una chiave del possesso DIMOSTRATO. Un
     # nativo Nostr che ha perso la chiave non lo sente nessuno, e
@@ -10709,6 +10740,12 @@ def _leve_stato():
                   spento="il venditore che non deposita il codice di "
                          "ritiro non squilla: il compratore resta davanti "
                          "a un locker chiuso, in silenzio"),
+            _leva("Ritiro al punto: primo squillo e passo (giorni)",
+                  "PROMEMORIA_RITIRO_GIORNI", PROMEMORIA_RITIRO_GIORNI,
+                  spento="chi ha già le istruzioni non riceve nessun "
+                         "promemoria: se si dimentica del pacco la "
+                         "giacenza scade in silenzio e il pacco torna "
+                         "al venditore"),
             _leva("Sollecito degli incassi fermi (giorni)",
                   "SOLLECITO_INCASSO_GIORNI", SOLLECITO_INCASSO_GIORNI,
                   spento="il venditore senza metodo d'incasso non viene più "
@@ -23506,6 +23543,140 @@ async def sollecita_buste_ferme():
             print(f"⚠️ Promemoria busta saltato (#{r['id']}): {e}")
 
 
+async def sollecita_ritiri_al_punto():
+    """IL PROMEMORIA DEL RITIRO (ago 2026): la SORELLA SPECULARE di
+    sollecita_buste_ferme. Quella guarda `busta_il=0` — il venditore
+    che non deposita il codice — e squilla a lui; questa guarda la
+    popolazione COMPLEMENTARE `busta_il>0`: le istruzioni ci sono, e
+    il tempo corre per chi ha comprato. Al punto il pacco aspetta
+    pochi giorni e poi torna al mittente, e finora glielo dicevamo una
+    volta sola, al deposito: fra quel messaggio e il giorno 10 — quando
+    la coda «⏸ Ordini fermi» e sollecita_conferme_ferme cominciano a
+    guardare l'ordine — non c'era nessuno squillo che parlasse del
+    ritiro, ed e' esattamente la finestra in cui si fa ancora in tempo.
+
+    IL TEMPO NON E' NOSTRO, ed e' la riga da non ammorbidire: la
+    giacenza la decide il corriere (~3 giorni InPost, ~5 Poste/BRT) e
+    cambia col contratto del venditore, quindi il testo non promette
+    MAI una scadenza. Dice un fatto NOSTRO e certo — da quanti giorni
+    le istruzioni sono nell'ordine — e per la data manda all'avviso del
+    corriere, che ce l'ha. E dice «istruzioni», mai «il codice»: la
+    busta si puo' depositare col solo DOCUMENTO, e a quel compratore
+    un codice non e' mai arrivato. Nemmeno «il pacco ti aspetta», che
+    sarebbe falso nel caso raro del deposito su 'locked' (il pacco
+    viaggia ancora) e dopo una correzione della busta, visto che il
+    conto parte dal PRIMO deposito e include i giorni passati con un
+    PIN sbagliato. Ancorare alle correzioni sistemerebbe il numero e
+    riaprirebbe la trappola dell'ancora mobile: la cura sta nel TESTO.
+
+    L'ANCORA e' MAX(busta_il, spedito_il), che e' il momento in cui il
+    compratore ha ricevuto l'avviso d'arrivo — parte da due strade
+    mutuamente esclusive (deposito a pacco gia' in viaggio: subito dal
+    POST; deposito su 'locked': dopo, da segna_spedito, che il POST li'
+    tace apposta) — e non si muove: `busta_il` e' il primo deposito e
+    si scrive `or adesso`, `spedito_il` lo tocca solo segna_spedito e
+    correggi_tracking lo lascia stare per regola dichiarata. NIENTE
+    guardia `spedito_il>0` come la sorella: li' serve perche' senza
+    l'ancora varrebbe 0 e squillerebbe subito, qui `busta_il>0` e' gia'
+    nella WHERE e il MAX non puo' essere zero — copiarla per simmetria
+    escluderebbe gli 'shipped' con `spedito_il=0`, che esistono e sono
+    proprio i piu' dimenticati.
+
+    NESSUN 🧊 AI MODERATORI, e non e' una dimenticanza: la finestra e'
+    corta e il 🧊 cadrebbe intorno al giorno 8, mentre la coda degli
+    ordini fermi apre al 10 — si romperebbe l'invariante «se il 🧊 e'
+    partito, la riga c'e'», che una prova rifa' dai default. Allungare
+    il percorso oltre il 10 vorrebbe dire squillare a pacco gia'
+    tornato, cioe' il contrario di quel che serve. Il caso lo
+    raccolgono le strutture che ci sono: la coda al giorno 10 e — a
+    leva AUTO_SBLOCCO_ATTIVO spenta — sollecita_conferme_ferme; a leva
+    accesa e' controlla_scadenze, che a quel punto chiude da solo.
+    Conseguenza: il tetto e' `<` STRETTO e non `<=` come la sorella —
+    li' il giro al tetto serve a mandare il 🧊, qui non manderebbe
+    niente e lascerebbe un contatore che dice al moderatore «4
+    promemoria» di un messaggio mai spedito.
+
+    LA STAFFETTA e' `solleciti_conferma = 0`: le due funzioni si
+    ancorano a momenti diversi (questa al deposito, quella a
+    `spedito_il`), quindi con una busta depositata tardi uno squillo
+    cadrebbe nello stesso battito dell'altra e il compratore
+    riceverebbe «vai a ritirare» e «conferma o apri una disputa» a
+    secondi di distanza. Qui si tace quando la fase della conferma e'
+    gia' cominciata; l'ordine nell'orologio la rende vera senza altre
+    precauzioni (sollecita_conferme_ferme gira PRIMA). Il compratore
+    ogni squillo, il venditore SOLO l'ultimo — prima non ha niente da
+    fare, all'ultimo il pacco sta per tornargli indietro con le spese
+    di reso. E' il rovescio di sollecita_venditori_fermi, dove il
+    compratore riceve solo il primo: li' il caso nasce grave e si
+    attenua, qui nasce normale e si aggrava.
+
+    Qui i sats non si muovono mai, solo parole; notifiche DOPO il
+    commit, ognuna nel suo try."""
+    if PROMEMORIA_RITIRO_GIORNI <= 0:
+        return                       # leva a 0 = popolazione spenta
+    adesso = int(time.time())
+    passo = PROMEMORIA_RITIRO_GIORNI * 86400
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT o.id, o.compratore_id, o.venditore_id, o.annuncio_id, "
+        "o.solleciti_punto, MAX(o.busta_il, o.spedito_il) AS da_quando, "
+        "a.titolo FROM ordini o "
+        # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
+        "LEFT JOIN annunci a ON a.id = o.annuncio_id "
+        "WHERE o.stato='shipped' AND o.via_punto=1 AND o.busta_il>0 "
+        # STRETTO: senza il 🧊 non c'e' un giro al tetto da fare
+        "AND o.solleciti_punto < ? "
+        # la staffetta: da qui in poi parla il promemoria della conferma
+        "AND o.solleciti_conferma = 0 "
+        "AND MAX(MAX(o.busta_il, o.spedito_il) + ?, "
+        "        o.sollecito_punto_il + ?) < ?",
+        (PROMEMORIA_CONFERMA_MAX, passo, passo, adesso))]
+    if not righe:
+        con.close()
+        return
+    for r in righe:
+        if not r["annuncio_id"]:
+            r["titolo"] = _titolo_ordine([dict(x) for x in con.execute(
+                "SELECT titolo, quantita FROM ordine_righe "
+                "WHERE ordine_id=? ORDER BY id", (r["id"],))])
+        con.execute("UPDATE ordini SET sollecito_punto_il=?, "
+                    "solleciti_punto=solleciti_punto+1 WHERE id=?",
+                    (adesso, r["id"]))
+    con.commit()
+    con.close()
+    for r in righe:
+        # escape: le notifiche sono HTML e il titolo lo scrive un
+        # utente — un «<» spegnerebbe il promemoria in silenzio.
+        titolo = html.escape((r["titolo"] or "il tuo acquisto")[:60])
+        # i giorni si contano dal delta VERO e mai dalla leva: se il
+        # server e' stato spento, il primo squillo dira' «da 9 giorni»
+        # invece di 2 — vero, mentre «2, 4, 6» e' un'aspirazione.
+        giorni = max(1, (adesso - r["da_quando"]) // 86400)
+        quanti = f"{giorni} giorni" if giorni > 1 else "1 giorno"
+        try:
+            await notifica(r["compratore_id"],
+                f"📦 <b>«{titolo}»: le istruzioni di ritiro sono "
+                f"nell'ordine da {quanti}.</b> Al punto il pacco non "
+                f"aspetta per sempre: la data esatta di scadenza è "
+                f"nell'avviso del corriere, e dopo il pacco torna al "
+                f"venditore. Apri l'ordine, prendi il nome del "
+                f"destinatario e il codice, e dopo il ritiro "
+                f"<b>conferma</b> per sbloccare i sats.")
+            if r["solleciti_punto"] == PROMEMORIA_CONFERMA_MAX - 1:
+                # SOLO l'ultimo: prima non ha niente da fare, e un
+                # allarme su un'attesa normale e' rumore.
+                await notifica(r["venditore_id"],
+                    f"📦 <b>«{titolo}» potrebbe tornarti indietro.</b> "
+                    f"L'acquirente ha le istruzioni di ritiro da "
+                    f"{quanti} e non è ancora andato a prendere il "
+                    f"pacco: se la giacenza scade, il corriere lo "
+                    f"rimanda al mittente. Se hai modo di sentirlo, è "
+                    f"il momento. I sats restano nel deposito di "
+                    f"garanzia finché l'affare non si chiude.")
+        except Exception as e:
+            print(f"⚠️ Promemoria ritiro saltato (#{r['id']}): {e}")
+
+
 async def sollecita_rimborsi_puntate():
     """Il gemello di sollecita_incassi sul registro d'asta: un
     rimborso fermo in «Da riscuotere» riceve un promemoria ogni
@@ -25126,6 +25297,14 @@ async def orologio():
             await sollecita_buste_ferme()
         except Exception as e:
             print(f"⚠️ Promemoria buste ferme saltati: {e}")
+        try:
+            # la sorella speculare: la busta C'E' e il compratore non
+            # e' ancora andato a ritirare. Gira DOPO il promemoria
+            # della conferma apposta — la staffetta `solleciti_
+            # conferma = 0` conta sul contatore gia' aggiornato
+            await sollecita_ritiri_al_punto()
+        except Exception as e:
+            print(f"⚠️ Promemoria ritiri al punto saltati: {e}")
         try:
             await scadenze_offerte()
         except Exception as e:

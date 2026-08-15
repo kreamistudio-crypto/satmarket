@@ -18002,6 +18002,22 @@ function pannelloBustaRitiro(o){
         {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
   const corr = o.bustaCorrezioni
     ? ` — aggiornate ${o.bustaCorrezioni===1?'una volta':o.bustaCorrezioni+' volte'}` : '';
+  /* IL TEMPO NON E' NOSTRO: la giacenza la decide il corriere (~3
+     giorni InPost, ~5 Poste/BRT) e cambia col contratto del
+     venditore, quindi qui non si promette nessuna scadenza — si dice
+     da quanto le istruzioni sono in pagina, che e' un fatto NOSTRO e
+     certo, e per la data si manda all'avviso del corriere. La stima
+     resta nel messaggio che si riceve al deposito, una volta sola:
+     li' i giorni trascorsi sono zero e non c'e' un fatto da dire al
+     suo posto. Il NOT della forma positiva per la DEMO, dove bustaIl
+     non c'e' e la sottrazione fa NaN — e la guardia su bustaIl per
+     lo zero, che senza direbbe «da 20680 giorni», cioe' il 1970.
+     (Qui non si cita la stima con le sue parole: c'e' una sentinella
+     che legge anche i commenti, ed e' giusto che sia severa.) */
+  const gg = o.bustaIl
+    ? Math.floor((Date.now()/1000 - o.bustaIl) / 86400) : NaN;
+  const daQuando = !(gg >= 1) ? 'da oggi'
+    : gg === 1 ? 'da 1 giorno' : `da ${gg} giorni`;
   const b = bustaLetta[o.id];
   /* l'anello parte una volta sola, e la bandierina si consuma QUI:
      letta-e-azzerata prima di disegnare, come `navSpingi` */
@@ -18023,7 +18039,7 @@ function pannelloBustaRitiro(o){
     return `
       <div class="payout" id="bustaPannello">
         <h4>📦 Istruzioni per il ritiro</h4>
-        <div class="hint">Depositate il ${quando}${corr}: il nome del destinatario e il codice per ritirare il pacco al punto. <b>Leggerle non conferma nulla</b> — i sats restano nel deposito di garanzia finché non confermi tu il ritiro. ⏳ Ricorda la giacenza: al punto il pacco aspetta pochi giorni (di solito circa 3).</div>
+        <div class="hint">Depositate il ${quando}${corr}: il nome del destinatario e il codice per ritirare il pacco al punto. <b>Leggerle non conferma nulla</b> — i sats restano nel deposito di garanzia finché non confermi tu il ritiro. ⏳ Sono qui <b>${daQuando}</b>: la data esatta di scadenza è nell'avviso del corriere, dopo il pacco torna al venditore.</div>
         ${b ? piattoCodice(b, svelato)
             : `<button class="btn orange" style="margin-top:10px" onclick="mostraBusta(this)">👁 Mostra ${o.bustaDocumento?'le istruzioni':'il codice di ritiro'}</button>`}
         ${b ? `<div class="hint" style="margin-top:10px">Nome del destinatario sul pacco (lo ha scelto il venditore — se al banco te lo chiedono, è questo): <b class="mono" style="user-select:all">${esc(b.nome)}</b></div>

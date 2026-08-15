@@ -79,6 +79,13 @@ PROMEMORIA_SPEDIZIONE_GIORNI = 5  # ordine 'locked' col pacco mai partito:
                              # primo squillo al venditore (0 = spento)
 PROMEMORIA_DIGITALE_ORE = 48 # idem per il codice online mai consegnato:
                              # ore, non giorni — un codice si manda subito
+PROMEMORIA_RITIRO_GIORNI = 2 # spedizione a un punto, istruzioni gia'
+                             # depositate: ogni quanti giorni si ricorda
+                             # a chi ha comprato di andare a ritirare
+                             # (fa da prima finestra E da passo: la
+                             # giacenza dura pochi giorni, e un passo
+                             # piu' lungo cadrebbe a pacco gia' tornato.
+                             # 0 = spento, NON «piu' lento»)
 SOLLECITO_MANUALE_ORE = 48   # il promemoria A COMANDO: dopo quante ore
                              # dal pagamento chi ha comprato puo'
                              # sollecitare lui la spedizione (0 = mai)

@@ -2146,6 +2146,101 @@ def prove_busta_ritiro():
           _SORGENTE.count("await sollecita_buste_ferme()"))
     prova("il libro mastro sorveglia la busta fuori contratto", True,
           "busta fuori contratto" in _SORGENTE)
+
+    # --- LA SORELLA SPECULARE: il compratore che non va a ritirare ---
+    # Stessa famiglia, popolazione COMPLEMENTARE. Le righe qui sotto
+    # sono tutte cadute almeno una volta sotto tortura: si rompono da
+    # sole se qualcuno «uniforma» questa funzione alla sorella.
+    sr = pezzo("sollecita_ritiri_al_punto").split('"""')[-1]
+    prova("il ritiro pesca shipped+via_punto+busta PRESENTE", True,
+          "o.stato='shipped' AND o.via_punto=1 AND o.busta_il>0" in sr)
+    prova("...con l'ancora MAX(busta_il, spedito_il) e le colonne SUE",
+          True, "MAX(o.busta_il, o.spedito_il)" in sr
+          and "sollecito_punto_il" in sr and "solleciti_punto" in sr)
+    # la sorella ha `spedito_il>0` perche' senza, la SUA ancora
+    # varrebbe 0; qui busta_il>0 lo garantisce, e copiarla per
+    # simmetria escluderebbe gli 'shipped' con spedito_il=0
+    prova("...e NON copia la guardia spedito_il>0 della sorella", False,
+          "o.spedito_il>0" in sr)
+    # il tetto e' STRETTO: senza 🧊 non c'e' un giro al tetto da fare,
+    # e con `<=` l'ultimo giro timbrerebbe senza mandare niente
+    prova("il tetto e' stretto, non <= come la sorella", True,
+          "o.solleciti_punto < ?" in sr)
+    prova("...e la staffetta tace quando parla la conferma", True,
+          "o.solleciti_conferma = 0" in sr)
+    # LA RIGA CHE UN RIORDINO AGGIUNGE «per simmetria»: il 🧊 qui
+    # cadrebbe intorno al g.8, prima che la coda fermi apra al 10 —
+    # l'invariante di prove_coda_fermi non e' esprimibile su questa
+    # famiglia, perche' la distanza dall'ancora della coda dipende da
+    # QUANDO il venditore ha depositato, che e' un valore di runtime.
+    prova("il ritiro NON manda un 🧊 ai moderatori", False,
+          "notifica_admin" in sr)
+    # la leva fa due mestieri (finestra E passo): a 0 non rallenta,
+    # azzera tutti e due e squillerebbe a ogni battito
+    prova("la leva a 0 esce PRIMA di toccare il database", True,
+          sr.lstrip().startswith("if PROMEMORIA_RITIRO_GIORNI <= 0:"))
+    # la RIGA INTERA e non il nome: un «pass  # await ...()» lascia la
+    # stringa nel commento e il conto tornerebbe lo stesso, con la
+    # funzione mai chiamata. E' la lezione gia' pagata dal reaper, e
+    # questa sentinella e' l'unica sopravvissuta alla tortura del suo
+    # cantiere finche' cercava il nome.
+    prova("...ed e' agganciato all'orologio", True,
+          any(r.strip() == "await sollecita_ritiri_al_punto()"
+              for r in pezzo("orologio").splitlines()))
+    # gira DOPO la conferma, o la staffetta leggerebbe un contatore
+    # non ancora aggiornato nello stesso battito
+    prova("...dopo il promemoria della conferma", True,
+          _SORGENTE.index("await sollecita_conferme_ferme()")
+          < _SORGENTE.index("await sollecita_ritiri_al_punto()"))
+    # il testo non promette una scadenza che non conosciamo, e non
+    # nomina «il codice»: la busta puo' essere di soli documenti
+    prova("il testo non inventa la giacenza", False,
+          "circa 3" in sr or "3 giorni" in sr)
+    prova("...e dice «istruzioni», mai «il codice di ritiro»", True,
+          "istruzioni di ritiro sono" in sr
+          and "il codice per ritirar" not in sr)
+    prova("...e i giorni si contano dal delta vero, non dalla leva",
+          True, "adesso - r[\"da_quando\"]" in sr)
+    prova("il venditore riceve SOLO l'ultimo squillo", True,
+          'r["solleciti_punto"] == PROMEMORIA_CONFERMA_MAX - 1' in sr)
+    prova("la coda dei fermi impara il sesto contatore", True,
+          "COALESCE(o.solleciti_punto,0)) AS promemoria," in _SORGENTE
+          and "COALESCE(o.sollecito_punto_il,0)) AS promemoria_il,"
+          in _SORGENTE)
+    _mini = open("miniapp.html", encoding="utf-8").read()
+    prova("client: la hint dice da quanto, non quanto resta", True,
+          "Sono qui <b>${daQuando}</b>" in _mini)
+    prova("...e non promette piu' la giacenza che non conosciamo",
+          False, "di solito circa 3" in pezzo_js(
+              _mini, "function pannelloBustaRitiro(o){", "\n}"))
+    # IL CONTO SI FA GIRARE, non si rilegge: una sentinella dice come
+    # e' scritto il ramo, mai cosa risponde. Il caso `bustaIl=0` e'
+    # arrivato da qui — usciva «da 20680 giorni», cioe' il 1970: oggi
+    # quel ramo non lo raggiunge nessuno (senza busta si torna prima),
+    # ma la guardia impedisce che ce lo porti il prossimo riuso.
+    import subprocess as _sp, json as _json
+    _calcolo = _mini.split("const gg = o.bustaIl")[1].split(";", 1)[0]
+    _script = ("function q(o){const gg = o.bustaIl" + _calcolo + ";"
+               + _mini.split("const daQuando =")[1].split(";", 1)[0]
+                      .replace("const daQuando =", "")
+               + "; return daQuando;}"
+               ).replace("const daQuando", "const daQuando")
+    _script = ("function q(o){ const gg = o.bustaIl" + _calcolo + ";\n"
+               "const daQuando =" + _mini.split("const daQuando =")[1]
+               .split(";", 1)[0] + ";\n return daQuando; }\n"
+               "const G=86400, ora=Date.now()/1000;\n"
+               "console.log(JSON.stringify([q({bustaIl:ora-60}),"
+               "q({bustaIl:ora-1*G-60}), q({bustaIl:ora-2*G-60}),"
+               "q({bustaIl:ora-9*G-60}), q({}), q({bustaIl:0})]));")
+    try:
+        _r = _sp.run(["node", "-e", _script], capture_output=True,
+                     text=True, timeout=30)
+        _v = _json.loads(_r.stdout.strip())
+        prova("il conto dei giorni risponde giusto sui casi limite",
+              ["da oggi", "da 1 giorno", "da 2 giorni", "da 9 giorni",
+               "da oggi", "da oggi"], _v)
+    except FileNotFoundError:
+        salta("il conto dei giorni (node non c'e')")
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("client: bustaIl in mapOrder e pannello presente", True,
           "bustaIl:o.busta_il" in mini and "pannelloBustaRitiro" in mini)
@@ -2371,9 +2466,15 @@ def prove_busta_ritiro():
         busta_file_nome TEXT DEFAULT '',
         indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
         indirizzo_atteso INT DEFAULT 0,
-        sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0);
+        sollecito_busta_il INT DEFAULT 0, solleciti_busta INT DEFAULT 0,
+        sollecito_punto_il INT DEFAULT 0, solleciti_punto INT DEFAULT 0,
+        solleciti_conferma INT DEFAULT 0);
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
         asta_base_sats INT DEFAULT 0);
+      -- serve al ripiego dei SET: il titolo lo sintetizza
+      -- _titolo_ordine dalle righe, e senza tavolo la query esplode
+      CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+        titolo TEXT, quantita INT);
       INSERT INTO annunci(id, titolo) VALUES(1, 'Un oggetto');
       -- 1: via punto, gia' spedito (il caso normale del deposito)
       INSERT INTO ordini(id, compratore_id, venditore_id, stato,
@@ -2710,6 +2811,126 @@ def prove_busta_ritiro():
     asyncio.new_event_loop().run_until_complete(
         amb["sollecita_buste_ferme"]())
     prova("la leva a 0 spegne la popolazione", [], avvisi)
+
+    # --- LA SORELLA SPECULARE, GIRATA DAVVERO ------------------------
+    # La busta C'E' e il compratore non e' andato a ritirare. Qui non
+    # si guarda com'e' scritta la funzione: la si fa girare, e si
+    # guarda il CALENDARIO — chi riceve cosa, in che giorno, e quando
+    # smette. Il tempo lo muove `_t`, non l'orologio vero.
+    avvisi.clear()
+    ora = int(_t.time())
+    G = 86400
+    # id 10: busta depositata 2 giorni (e un'ora) fa, mai sollecitato.
+    # L'ora in piu' non e' cosmesi: la finestra si confronta STRETTA
+    # (`< adesso`, come nella sorella), quindi al secondo esatto non e'
+    # ancora ora — e con `ora - 2*G` tondi questa prova resta rossa.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il) "
+                 "VALUES(10, 111, 222, 'shipped', 1, ?, ?)",
+                 (ora - 3 * G, ora - 2 * G - 3600))
+    # id 11: la busta NON c'e' — e' della sorella, non di questa
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il) "
+                 "VALUES(11, 111, 222, 'shipped', 1, ?)", (ora - 9 * G,))
+    # id 12: la conferma ha gia' cominciato a parlare: qui si tace
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il, "
+                 "solleciti_conferma) "
+                 "VALUES(12, 111, 222, 'shipped', 1, ?, ?, 1)",
+                 (ora - 12 * G, ora - 5 * G))
+    # id 13: il caso RARO — deposito su 'locked', quindi busta_il e'
+    # PRIMA di spedito_il e a comandare dev'essere la spedizione
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il) "
+                 "VALUES(13, 111, 222, 'shipped', 1, ?, ?)",
+                 (ora - 1 * G, ora - 8 * G))
+    # id 14: un SET (annuncio_id=0). Senza il LEFT JOIN sparirebbe in
+    # silenzio — la lezione gia' pagata quattro volte dalle sorelle —
+    # e il titolo lo sintetizza _titolo_ordine dalle righe.
+    vero.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                 "stato, via_punto, spedito_il, busta_il, annuncio_id) "
+                 "VALUES(14, 111, 222, 'shipped', 1, ?, ?, 0)",
+                 (ora - 4 * G, ora - 3 * G))
+    vero.commit()
+    ambr = {"db": Con, "notifica": _notifica,
+            "_titolo_ordine": lambda righe: "un set",
+            "html": __import__("html"), "time": _t,
+            "PROMEMORIA_RITIRO_GIORNI": 2, "PROMEMORIA_CONFERMA_MAX": 3}
+    corpo_r = pezzo("sollecita_ritiri_al_punto")
+    exec("async " + corpo_r, ambr)
+
+    def giro():
+        asyncio.new_event_loop().run_until_complete(
+            ambr["sollecita_ritiri_al_punto"]())
+
+    giro()
+    # due destinatari attesi: l'ordine 10 (2 giorni) e il SET 14 (3)
+    prova("a 2 giorni dal deposito squilla il SOLO compratore",
+          [111, 111], [a[0] for a in avvisi])
+    detto = " || ".join(t for _, t in avvisi)
+    prova("...e il messaggio dice da quanto, col numero giusto", True,
+          "da 2 giorni" in detto)
+    # il SET (annuncio_id=0) non deve sparire: senza il LEFT JOIN il
+    # JOIN lo taglierebbe via, e nessuna sentinella sul testo se ne
+    # accorgerebbe — la mutazione INNER sopravviveva a tutto il resto
+    prova("...e il SET c'e', col titolo sintetizzato dalle righe", True,
+          "un set" in detto)
+    # le due popolazioni sono disgiunte: la busta assente e' della
+    # sorella, e il caso raro conta dalla SPEDIZIONE (1 giorno fa),
+    # quindi non e' ancora ora — mentre `busta_il` direbbe 8 giorni
+    prova("...e nessun altro ordine e' entrato nel giro",
+          2, len(avvisi))
+    avvisi.clear()
+    giro()
+    prova("non ribussa nello stesso giorno", [], avvisi)
+
+    # il calendario: al giorno 4 il secondo squillo, al 6 il terzo —
+    # e col terzo entra il VENDITORE, una volta sola
+    def sposta(id_ordine, giorni):
+        vero.execute("UPDATE ordini SET sollecito_punto_il=? WHERE id=?",
+                     (ora - giorni * G, id_ordine))
+        vero.commit()
+
+    sposta(10, 3)
+    giro()
+    prova("al secondo squillo parla ancora il solo compratore",
+          [111], [a[0] for a in avvisi])
+    avvisi.clear()
+    sposta(10, 3)
+    giro()
+    prova("al TERZO entra il venditore, e il compratore c'e' sempre",
+          [111, 222], sorted(a[0] for a in avvisi))
+    prova("...e a lui si dice che il pacco puo' tornare indietro", True,
+          "tornarti indietro" in
+          [t for chi, t in avvisi if chi == 222][0])
+    avvisi.clear()
+    sposta(10, 3)
+    giro()
+    # il tetto e' STRETTO: qui non c'e' un giro che manda il 🧊, quindi
+    # l'ultimo non deve nemmeno timbrare — un contatore che cresce
+    # senza un messaggio direbbe al moderatore una bussata mai fatta
+    prova("oltre il tetto: silenzio", [], avvisi)
+    prova("...e il contatore si ferma al tetto, senza bussate fantasma",
+          3, vero.execute("SELECT solleciti_punto FROM ordini WHERE "
+                          "id=10").fetchone()[0])
+
+    # la staffetta e la leva a zero
+    vero.execute("UPDATE ordini SET solleciti_punto=0, "
+                 "sollecito_punto_il=0 WHERE id=12")
+    vero.commit()
+    giro()
+    prova("l'ordine dove parla gia' la conferma resta muto", [], avvisi)
+    ambr["PROMEMORIA_RITIRO_GIORNI"] = 0
+    vero.execute("UPDATE ordini SET solleciti_punto=0, "
+                 "sollecito_punto_il=0 WHERE id=10")
+    vero.commit()
+    prima = vero.execute("SELECT solleciti_punto FROM ordini "
+                         "ORDER BY id").fetchall()
+    giro()
+    prova("la leva a 0 spegne, e NON accelera", [], avvisi)
+    prova("...e a leva spenta il database non si tocca", prima,
+          vero.execute("SELECT solleciti_punto FROM ordini "
+                       "ORDER BY id").fetchall())
     vero.close()
 
 
@@ -4217,7 +4438,12 @@ def prove_tracking_corretto():
     # correzione (la trappola gia' pagata con `aggiornato` in
     # sollecita_venditori_fermi). Nemmeno lo stato si tocca: la
     # correzione e' un dato di servizio, non una transizione.
-    for colonna in ("spedito_il=", "stato=", "aggiornato=", "consegnato="):
+    # `busta_il` e' entrata in questo elenco ad ago 2026: da quando
+    # esiste sollecita_ritiri_al_punto e' un'ancora anche lei — meta'
+    # di MAX(busta_il, spedito_il) — e riscriverla qui farebbe
+    # ripartire da capo l'attesa del RITIRO a ogni correzione.
+    for colonna in ("spedito_il=", "stato=", "aggiornato=", "consegnato=",
+                    "busta_il="):
         prova(f"la UPDATE non scrive {colonna.rstrip('=')}",
               False, colonna in ct)
     # e scrive quel che deve
@@ -12613,6 +12839,7 @@ def prove_titoli_scappati():
     for f in ("sollecita_incassi", "sollecita_ritiri_fermi",
               "sollecita_conferme_ferme", "sollecita_rimborsi_puntate",
               "sollecita_venditori_fermi", "sollecita_buste_ferme",
+              "sollecita_ritiri_al_punto",
               "_paga_rimborso", "_sblocca_sats", "_rimborsa_compratore",
               "_incassa_ordine", "_racconta_chiusura", "verifica_rilancio",
               "rispondi_offerta", "scadenze_offerte", "annulla_asta_admin",
@@ -15749,6 +15976,16 @@ def prove_ordini_fermi():
         m = re.search(rf"^    {nome} = (\d+)", _SORGENTE, re.M)
         return int(m.group(1))
 
+    # ⚠️ `sollecita_ritiri_al_punto` NON E' e NON PUO' ESSERE in questo
+    # elenco, ed e' una regola e non una dimenticanza: la sua ancora e'
+    # il DEPOSITO della busta, mentre la coda si ancora a `spedito_il`
+    # — la distanza fra le due la decide il venditore, quindi e' un
+    # valore di RUNTIME e l'invariante qui sotto non e' esprimibile.
+    # Col transito normale (0-2 giorni) un suo 🧊 cadrebbe al g.6-8,
+    # PRIMA che la coda apra al 10, che e' esattamente il fallimento
+    # contro cui questo conto esiste — e questa prova non potrebbe
+    # vederlo. Per questo quella funzione non manda nessun 🧊, e a
+    # dirlo c'e' una sentinella sul suo corpo.
     passo, tetto = leva("PROMEMORIA_CONFERMA_GIORNI"), leva(
         "PROMEMORIA_CONFERMA_MAX")
     inc_passo, inc_tetto = leva("SOLLECITO_INCASSO_GIORNI"), leva(
@@ -15807,6 +16044,7 @@ def prove_ordini_fermi():
           sollecito_conferma_il INT DEFAULT 0,
           solleciti_incasso INT DEFAULT 0, sollecito_incasso_il INT DEFAULT 0,
           solleciti_busta INT DEFAULT 0, sollecito_busta_il INT DEFAULT 0,
+          solleciti_punto INT DEFAULT 0, sollecito_punto_il INT DEFAULT 0,
           indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0);
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
