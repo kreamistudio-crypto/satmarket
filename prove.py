@@ -4656,6 +4656,150 @@ def prove_savers_proprietario():
           ".trust-note.nota-punto,.trust-note.nota-savers{" in src[i - 40:i + 90])
 
 
+def prove_barattolo_in_testata():
+    """LA SCORCIATOIA AL BARATTOLO (ago 2026, richiesta di Andrea): la
+    stessa icona che si riempie nel cassetto del Profilo, in testata
+    accanto alla levetta del tema. E' una SCORCIATOIA e non una vista
+    nuova — la lista dei preferiti resta disegnata in un posto solo, ed
+    e' la prima cosa che queste prove difendono.
+    Prima di oggi questa zona non aveva NESSUNA sentinella: ne' il
+    tappo, ne' la levetta, ne' la regia del riempimento."""
+    print("\n[il barattolo in testata]")
+    import re as _re
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    r = pezzo_js(mini, "function renderJarTesta(){", "\n}\n")
+    testa = "".join(_re.findall(r'<button class="jar-testa".*?</button>',
+                                mini, _re.S))
+
+    # --- 1) LA CLASSE NON PUO' CADERE NELL'ESCLUSIONE ---
+    # L'elenco si LEGGE dal codice invece di ribatterlo: il giorno che
+    # qualcuno aggiunge una terza classe a quell'esclusione, questa
+    # sentinella la copre da sola.
+    ag = pezzo_js(mini, "function aggiornaBarattolo(n){", "\n}\n")
+    sel = _re.search(r"\.closest\('([^']+)'\)", ag).group(1)
+    escluse = [c.strip().lstrip(".") for c in sel.split(",")]
+    prova("l'esclusione di aggiornaBarattolo si legge dal codice",
+          ["card-jar", "jar-btn"], escluse)
+    prova("la scorciatoia non porta nessuna classe esclusa", [],
+          [c for c in escluse if c in testa])
+    prova("...e la sua icona nasce dalla fabbrica unica", True, "jarSVG(" in r)
+
+    # --- 2) DUE ISTANZE, UNA CLASSE, UN GIRO SOLO ---
+    prova("le istanze in markup sono DUE", 2, mini.count('class="jar-testa"'))
+    prova("...e la regia le prende per classe, in un giro solo", 1,
+          r.count("querySelectorAll('.jar-testa')"))
+    prova("...mai per id: un id non si riusa in due", [],
+          [s for s in ("getElementById", "el('jarTesta", "#jarTesta") if s in r])
+    prova("una in testata e una in topbar", (1, 1),
+          (mini[:mini.index("</header>")].count('class="jar-testa"'),
+           mini[mini.index("<nav"):mini.index("</nav>")].count('class="jar-testa"')))
+
+    # --- 3) LA GUARDIA E' QUELLA DI bottoneJar, NON QUELLA DEL TAPPO ---
+    b = pezzo_js(mini, "function bottoneJar(l, classe, misura, prima){", "\n}\n")
+    guardia = _re.search(r"if \((DEMO[^)]+)\) return ''", b).group(1)
+    prova("la guardia del barattolino e' quella di sempre",
+          "DEMO || VETRINA || !myTgId", guardia)
+    prova("la scorciatoia porta LA STESSA guardia", True, guardia in r)
+    prova("...cioe' guarda anche DEMO, non il solo !VETRINA del tappo",
+          True, "DEMO" in r)
+    rp = pezzo_js(mini, "function renderPreferiti(){", "\n}\n")
+    prova("in DEMO il cassetto e' nascosto: e' la ragione della guardia",
+          True, "if (DEMO || VETRINA) {" in rp and "display = 'none'" in rp)
+
+    # --- 4) LA DESTINAZIONE E' LA STESSA VISTA, NON UNA COPIA ---
+    prova("la scorciatoia porta al cassetto che c'e' gia'", 2,
+          mini.count("apriCassettoProfilo('accPreferiti')"))
+    prova("...e quel cassetto e' uno solo", 1, mini.count('id="accPreferiti"'))
+    prova("...e non si inventa una vista sua", [],
+          [s for s in ("go('preferiti')", "go('barattolo')",
+                       "view-preferiti", "view-barattolo") if s in mini])
+    prova("LA LISTA SI DISEGNA IN UN POSTO SOLO", (1, 1, 1, 1),
+          (mini.count("myPreferiti.map(l =>"),
+           mini.count('id="preferitiBlocco"'),
+           mini.count("function renderPreferiti("),
+           mini.count("el('preferitiBlocco')")))
+
+    # --- 5) L'ORDINE NEL MARKUP E LA CATENA DEI MARGINI ---
+    def fetta(dopo, prima):
+        i = mini.index(dopo)
+        return mini[i:mini.index(prima, i)]
+
+    for nome, f in (("testata", fetta('<div class="brand">', "</header>")),
+                    ("topbar", fetta('<button id="nav-affari"', "</nav>"))):
+        prova(f"{nome}: l'ordine e' levetta → barattolo → tappo", True,
+              f.index('class="tema-btn"') < f.index('class="jar-testa"')
+              < f.index('class="avatar-btn"'))
+    prova("la spinta a destra e' della levetta, che c'e' sempre", True,
+          ".tema-btn{display:inline-flex;margin-left:auto}" in css)
+    i = css.index(".jar-testa{")
+    prova("...e non del barattolo, che si spegne", True,
+          "margin-left:auto" not in css[i:i + 90])
+    # col + la regola smette di combaciare col barattolo in mezzo, e il
+    # tappo ricade sul suo auto: DUE auto-margini, e la levetta migra
+    # in mezzo alla riga. Silenzioso, e si vede solo sui telefoni larghi.
+    prova("il tappo non dipende piu' dall'ADIACENZA della levetta", 0,
+          css.count(".tema-btn + .avatar-btn"))
+    prova("...ma dalla sola PRECEDENZA, in tutte e due le regole", 2,
+          css.count(".tema-btn ~ .avatar-btn"))
+    prova("la scorciatoia nasce spenta", True, ".jar-testa{display:none" in css)
+    prova("...e si accende solo dove deve, mai nuda", (1, 1, 0),
+          (css.count("header .brand .jar-testa.on{display:inline-flex}"),
+           css.count("nav .jar-testa.on{display:inline-flex"),
+           css.count("\n  .jar-testa.on{")))
+    prova("il bersaglio di tocco e' piu' largo del cerchietto", True,
+          ".jar-testa::after{content:'';position:absolute;inset:-6px" in css)
+
+    # --- 6) UN DISEGNO SOLO, INIETTATO UNA VOLTA, AL LIVELLO GIUSTO ---
+    prova("il vetro e' disegnato in un posto solo", 1,
+          mini.count("<clipPath id="))
+    prova("...e la clip resta a id unico per istanza", True,
+          "'jarClip' + (++jarClipN)" in mini)
+    prova("l'icona nasce gia' al livello del barattolo", True,
+          "jarSVG(livelloBarattolo(contaBarattolo())" in r)
+    prova("...e si inietta una volta sola per nodo", True,
+          "!b.querySelector('svg')" in r)
+    prova("il vetro PRIMA, l'accensione DOPO", True,
+          r.index("innerHTML") < r.index("classList.toggle('on'"))
+    prova("nessuna regia nuova: a livellare resta aggiornaBarattolo", 0,
+          r.count("classList.add('lv") + r.count("lv4"))
+
+    # --- 7) LE CHIAMATE, E L'ORDINE IN avvia() ---
+    prova("la scorciatoia si monta agli stessi punti del tappo",
+          mini.count("renderAvatar()"), mini.count("renderJarTesta()"))
+    i_avvia = mini.index("async function avvia(){")
+    prova("...e in avvia() esiste PRIMA che il riempimento giri", True,
+          mini.index("renderJarTesta()", i_avvia)
+          < mini.index("await caricaPreferiti()", i_avvia))
+
+    # --- 8) NIENTE NUMERO IN TESTATA ---
+    prova("in testata nessun numero: il livello E' il numero", [],
+          [s for s in ("jar-conta", "con-conta", "preferitiConta") if s in testa])
+    prova("...e il numero del cassetto resta uno solo", 1,
+          mini.count('id="preferitiConta"'))
+
+    # --- 9) SCORCIATOIA E DESTINAZIONE SI CHIAMANO UGUALE ---
+    prova("la scorciatoia ha il nome del cassetto a cui porta", (2, 2),
+          (mini.count('title="Nel tuo barattolo"'),
+           mini.count('aria-label="Nel tuo barattolo"')))
+    i_acc = mini.index('id="accPreferiti"')
+    prova("...ed e' il nome che il cassetto porta davvero", True,
+          "Nel tuo barattolo" in mini[i_acc:i_acc + 400])
+
+    # --- 10) LO SPAZIO: LA TESSERA CEDE, E C'E' L'AIRBAG ---
+    # A 320px il terzo cerchietto non ci stava: il lockup chiede 124px,
+    # la sottolinea 139, il fisso 152, e di contenuto ce n'e' 288.
+    prova("sotto i 360 la tessera del logo cede il posto", True,
+          "@media (max-width:359.98px){" in css
+          and "header .brand-jar{display:none}" in css)
+    prova("...ed e' scopata su header: quella classe veste anche la topbar",
+          0, css.count("\n    .brand-jar{display:none}"))
+    prova("l'airbag: il testo cede invece di far scorrere la PAGINA", True,
+          ".brand > div{min-width:0}" in css)
+    prova("...e a cedere e' la sottolinea, coi puntini", True,
+          ".brand small{overflow:hidden;text-overflow:ellipsis" in css)
+
+
 def prove_ferie():
     """IL NEGOZIO IN FERIE (ago 2026): si guarda, non si compra.
     Le due cose che questa famiglia difende: il gate e' in LETTURA
@@ -17875,7 +18019,7 @@ def main():
               prove_lista_ordini, prove_dettaglio_ordine,
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
-              prove_savers_proprietario,
+              prove_savers_proprietario, prove_barattolo_in_testata,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
               prove_ferie, prove_stock_raccontato,

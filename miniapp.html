@@ -399,12 +399,29 @@
     backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
     padding:14px var(--pad) 10px;
   }
-  .brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  /* gap 8 e non 10 (ago 2026, col barattolo in testata): sono quattro
+     spazi, cioe' 8px recuperati sulla riga piu' stretta dell'app —
+     misurata, a 320px non ne avanzava nemmeno uno */
+  .brand{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   /* Il barattolo accanto al lockup: JPEG su fondo arancione pieno,
      arrotondato a tessera come nel mockup (niente scontorno) */
   /* 42px ma col margine negativo la riga resta alta come la colonna
      di testo (~38px): la testata non cresce di un pixel */
   .brand-jar{width:42px;height:42px;border-radius:13px;flex:0 0 auto;margin:-2px 0}
+  /* SOTTO I 360px LA TESSERA CEDE IL POSTO (ago 2026, col barattolo in
+     testata). La riga .brand e' MISURATA: il lockup «Barattolo⚡» chiede
+     124px, la sottolinea 139 (e' lei la piu' larga, non il titolo), il
+     fisso 152 — e di contenuto a 320px ce n'e' 288. Questi 42+8 sono
+     esattamente i pixel che mancavano al terzo cerchietto: senza la
+     tessera restano 158px per un testo che ne chiede 139, e non si
+     tronca piu' niente (a 320 la sottolinea andava a capo GIA' PRIMA
+     di questo cantiere). Sotto i 360 il marchio resta il lockup con la
+     B che diventa ₿, che e' il marchio vero.
+     SCOPATA su header, mai `.brand-jar` nudo: la stessa classe veste
+     anche il logo della topbar, che qui non c'entra. */
+  @media (max-width:359.98px){
+    header .brand-jar{display:none}
+  }
   .brand small{display:block;margin-top:2px}
   /* Il lockup: Baloo 2 con la B che diventa ₿ — quattro trattini
      disegnati da due pseudo-elementi (ognuno sdoppiato via box-shadow) */
@@ -416,6 +433,17 @@
   .bmark::before{top:-.02em}
   .bmark::after{bottom:.09em}
   .brand small{color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+  /* L'AIRBAG della riga (ago 2026): la testata non ritaglia da nessuna
+     parte e in tutto il foglio non esiste un overflow-x:hidden globale,
+     quindi quando lo spazio finisce a scorrere e' la PAGINA — successo
+     gia' due volte in casa (la card a 320px, il badge da ~300px).
+     Col min-width:0 il blocco di testo puo' scendere sotto il suo
+     min-content e a cedere e' la SOTTOLINEA, coi puntini. Il lockup
+     resta SENZA nowrap, com'e' sempre stato: nel caso estremo — 320px
+     col carattere «Grande», dove --fs-zoom porta il contenuto a 246px —
+     va a capo invece di far scorrere la pagina di lato. */
+  .brand > div{min-width:0}
+  .brand small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* Il tasto Profilo in alto a destra: il TAPPO del barattolo
      (assets/tappo.jpeg, 128px ritagliato sul diametro) reso tondo da
      border-radius+cover — il fondo arancione del JPEG vive solo
@@ -457,13 +485,49 @@
      piu' su setTema(): stessa memoria e stesse pillole del Profilo
      (che passano su Chiaro o Scuro; Auto resta solo la'). C'e' sempre,
      anche in vetrina anonima: il tema e' di chi guarda. */
-  .tema-btn{flex:0 0 auto;width:34px;height:34px;margin-left:auto;
+  /* La ricetta del cerchietto di chrome: la dividono la levetta e il
+     barattolo (sotto). Non si prende da .share-btn, che vive SULLA
+     foto e ha colori fissi: qui sarebbe un buco chiaro nel tema scuro. */
+  .tema-btn,.jar-testa{flex:0 0 auto;width:34px;height:34px;
     border:1.5px solid var(--line);border-radius:50%;background:var(--card);
-    cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;align-items:center;justify-content:center;
     font-size:15px;line-height:1;padding:0;box-shadow:0 2px 0 rgba(35,40,44,.12)}
-  .tema-btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(35,40,44,.12)}
-  /* quando il tappo e' acceso accanto, l'auto-margine ce l'ha la levetta */
-  .tema-btn + .avatar-btn{margin-left:8px}
+  /* l'auto-margine che spinge il gruppo a destra sta sulla LEVETTA
+     apposta: e' l'unica dei tre che c'e' sempre — il barattolo si
+     spegne in demo e in vetrina, e dandolo a lui, a icona spenta, il
+     gruppo non verrebbe piu' spinto e levetta e tappo scivolerebbero
+     addosso al lockup. Regressione condizionale, cioe' invisibile in
+     sviluppo. */
+  .tema-btn{display:inline-flex;margin-left:auto}
+  .tema-btn:active,.jar-testa:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(35,40,44,.12)}
+  /* IL TAPPO DIPENDE DALLA PRECEDENZA, NON DALL'ADIACENZA (~ e non +,
+     ago 2026): fra la levetta e il tappo vive ora il barattolo, e col
+     + questa regola smetterebbe di combaciare — il tappo ricadrebbe
+     sul suo margin-left:auto di base, e con DUE auto-margini il flex
+     si spartisce lo spazio libero a meta', spingendo la levetta in
+     mezzo alla riga. Silenzioso, e si vede solo sui telefoni larghi.
+     Lo zero spegne quell'auto: il ritmo dei tre cerchietti lo da' il
+     solo gap della .brand, uguale fra tutti. */
+  .tema-btn ~ .avatar-btn{margin-left:0}
+  /* ---- LA SCORCIATOIA AL BARATTOLO (ago 2026) ----
+     La stessa icona che si riempie nel cassetto del Profilo, in testata
+     accanto alla levetta: un tocco e si e' nel cassetto che c'e' gia'.
+     Non e' una vista nuova, e non deve diventarlo.
+     LA CLASSE NON PUO' ESSERE .jar-btn NE' .card-jar: quelle due sono
+     l'esclusione di aggiornaBarattolo (li' i barattolini raccontano
+     l'ANNUNCIO, vuoto/pieno, non il barattolo intero), e da dentro
+     quell'esclusione l'icona resterebbe a lv0 per sempre, in silenzio.
+     Col nome suo il riempimento arriva gratis, senza una regia nuova.
+     `color` DICHIARATO e non ereditato: il vetro e' stroke:currentColor,
+     e nella topbar vincerebbe `nav button{color:var(--muted)}` — le due
+     istanze direbbero due colori diversi. --ink e' esattamente il
+     colore del gemello nel cassetto (.acc-h), quindi la resa nei due
+     temi e' quella gia' a schermo oggi. */
+  .jar-testa{display:none;position:relative;color:var(--ink)}
+  header .brand .jar-testa.on{display:inline-flex}
+  /* il bersaglio largo quanto il pollice, senza occupare layout: la
+     ricetta di .card-jar e dei pallini della galleria */
+  .jar-testa::after{content:'';position:absolute;inset:-6px;border-radius:50%}
   /* in nav vive solo da desktop (come il tappo): su mobile la nav e'
      la tab bar in basso e la levetta sta gia' in testata */
   nav .tema-btn{display:none}
@@ -3433,7 +3497,13 @@
     /* la levetta del tema in topbar: niente auto-margine (ci pensa
        gia' il margin-right del logo), spaziata come il tappo */
     nav .tema-btn{display:inline-flex;margin-left:10px;width:32px;height:32px}
-    nav .tema-btn + .avatar-btn{margin-left:10px}
+    /* la scorciatoia al barattolo, fra la levetta e il tappo come in
+       testata: qui la .brand non esiste (sparisce sopra i 768), quindi
+       senza questa riga da desktop non ci sarebbe */
+    nav .jar-testa.on{display:inline-flex;margin-left:10px;width:32px;height:32px}
+    /* ~ e non +, la stessa ragione della gemella in testata: col
+       barattolo in mezzo l'adiacenza non combacia piu' */
+    nav .tema-btn ~ .avatar-btn{margin-left:10px}
 
     /* la hero: titolo grande e mascotte fluttuante, solo qui */
     .hero{display:flex;align-items:center;gap:40px;padding:28px var(--pad) 0}
@@ -3595,6 +3665,7 @@ document.getElementById('cartello')?.remove();</script>
           <small>il mercatino in sats</small>
         </div>
         <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
+        <button class="jar-testa" onclick="apriCassettoProfilo('accPreferiti')" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
         <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
       </div>
       <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
@@ -4718,6 +4789,7 @@ document.getElementById('cartello')?.remove();</script>
          come arriva la roba -->
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
+    <button class="jar-testa" onclick="apriCassettoProfilo('accPreferiti')" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
 
@@ -18769,8 +18841,11 @@ function aggiornaBarattolo(n){
   document.querySelectorAll('.jar-ico').forEach(s=>{
     /* i barattolini TOCCABILI (griglia e scheda) raccontano
        l'ANNUNCIO — vuoto/pieno —, non il barattolo intero: il loro
-       livello lo fa aggiornaJarCards. Qui resta il solo 🫙
-       dell'header del cassetto, che il barattolo lo racconta davvero. */
+       livello lo fa aggiornaJarCards. Qui restano quelli che il
+       barattolo lo raccontano davvero: il 🫙 dell'header del cassetto
+       e, dall'ago 2026, la scorciatoia in testata — che si riempie
+       gratis proprio perche' non porta nessuna di quelle due classi
+       (vedi renderJarTesta). */
     if (s.closest('.card-jar,.jar-btn')) return;
     s.classList.remove('lv0','lv1','lv2','lv3','lv4');
     s.classList.add(lv);
@@ -18778,6 +18853,37 @@ function aggiornaBarattolo(n){
   const conta = el('preferitiConta');
   if (conta) conta.textContent =
     myPreferiti.length ? `(${n}/${MAX_PREFERITI})` : '';
+}
+
+/* ---- LA SCORCIATOIA AL BARATTOLO IN TESTATA (ago 2026) ----
+   Due istanze gemelle come la levetta del tema e il tappo — testata
+   mobile e topbar desktop —, una classe sola, un querySelectorAll solo.
+   Qui si CREA il vetro e si decide se accendere; a riempirlo poi e'
+   aggiornaBarattolo, che le .jar-ico fuori dai bottoni delle card le
+   livella gia' tutte: nessuna regia nuova, e la scossa di festa di
+   togglePreferito arriva in omaggio.
+   LA GUARDIA E' QUELLA DI bottoneJar, NON QUELLA DEL TAPPO (che guarda
+   il solo !VETRINA), ed e' la guardia del posto DOVE SI PORTA: il
+   tappo apre una vista che in demo esiste, questo un cassetto che in
+   demo renderPreferiti nasconde — il tocco finirebbe su uno
+   scrollIntoView verso un nodo senza box, cioe' su un Profilo scorso
+   a caso. Vale la regola di bottoneRifornisci: un bottone che porta a
+   un muro e' peggio di un bottone che non c'e'. E in demo il gesto che
+   riempie non esiste nemmeno (bottoneJar non nasce, caricaPreferiti
+   esce subito): sarebbe un misuratore fermo a vuoto per sempre.
+   Il vetro PRIMA, l'accensione DOPO: nessuno vede mai un cerchietto
+   vuoto. E nasce GIA' al livello giusto invece che a zero — oggi in
+   avvia() l'ordine e' favorevole (questa gira prima di
+   caricaPreferiti), ma e' una riga che un riordino puo' spostare senza
+   che nulla esploda, e sarebbe un barattolo vuoto al primo sguardo e
+   pieno al primo tocco: un difetto che non segnala nessuno. */
+function renderJarTesta(){
+  const on = !(DEMO || VETRINA || !myTgId);
+  document.querySelectorAll('.jar-testa').forEach(b=>{
+    if (on && !b.querySelector('svg'))
+      b.innerHTML = jarSVG(livelloBarattolo(contaBarattolo()), 18);
+    b.classList.toggle('on', on);
+  });
 }
 
 async function caricaPreferiti(){
@@ -21888,6 +21994,7 @@ async function avviaVetrina(){
     await loadListings(true);  // anonimo: nessun header, prima pagina
     VETRINA = true; DEMO = false; orders = [];
     renderAvatar();            // in vetrina anonima il tappo non compare
+    renderJarTesta();          // ...e il barattolo nemmeno: non c'e' cassetto
     mostraBanner(BANNER_VETRINA);
     bottoneLoginTelegram();
     bottoneLoginNostr();
@@ -21909,6 +22016,7 @@ async function avviaVetrina(){
     myAvatar = '';             // dati finti, facce vere no: iniziale
     mostraBanner(BANNER_DEMO);
     renderAvatar();            // in demo il Profilo c'e': il tappo pure
+    renderJarTesta();          // ...il cassetto dei preferiti no: spento
     renderGrid(); renderOrders();
   }
 }
@@ -21920,7 +22028,7 @@ async function avvia(){
   preparaCategoriaDaUrl();
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
-    DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderGrid(); renderOrders(); return;
+    DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderJarTesta(); renderGrid(); renderOrders(); return;
   }
   /* Il banner del rodaggio parte SUBITO, in parallelo col primo /me:
      quando le card saranno pronte la risposta e' gia' arrivata, e la
@@ -22020,6 +22128,7 @@ async function avvia(){
     renderIdentita();
     DEMO = false;
     renderAvatar();
+    renderJarTesta();
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
