@@ -16974,6 +16974,38 @@ function bottoneInAttesa(btn, testo){
   };
 }
 
+/* L'ATTESA RITARDATA, per i gesti che LEGGONO (ago 2026, dal campo:
+   toccando «Mostra il codice di ritiro» il barattolino compariva e
+   spariva, e un segnale che dura meno di un battito di ciglia si
+   legge come un guasto invece che come un'attesa).
+   E' la lezione del velo dello stepper della pagina Paga, applicata
+   a un bottone: la cura non e' togliere il segnale — sotto c'e' una
+   richiesta vera e su rete lenta l'attesa va detta — ma FARLO
+   ASPETTARE. Sotto i 180ms non compare mai; oltre, compare una volta
+   sola e resta fermo finche' la risposta non arriva.
+   NON SI USA DOVE SI MUOVONO I SATS, ed e' la riga da non
+   ammorbidire: li' il velo immediato non e' cortesia ma la GUARDIA
+   contro il secondo tocco su una cosa irreversibile, e ritardarla
+   aprirebbe una finestra di 180ms in cui la fattura si paga due
+   volte. Chi legge un bigliettino non ha niente da proteggere: la
+   sua guardia e' una bandierina in memoria, che non si vede. */
+const RITARDO_ATTESA = 180;
+function attesaRitardata(btn, testo){
+  let acceso = false, prima = '';
+  const t = setTimeout(()=>{
+    acceso = true;
+    el('attesaTesto').textContent = testo || 'Un attimo…';
+    el('attesaOverlay').classList.add('on');
+    if (btn) { prima = btn.innerHTML; btn.disabled = true; btn.innerHTML = '⏳ ' + (testo || 'Un attimo…'); }
+  }, RITARDO_ATTESA);
+  return ()=>{
+    clearTimeout(t);
+    if (!acceso) return;               // non e' mai comparso: niente da togliere
+    el('attesaOverlay').classList.remove('on');
+    if (btn) { btn.disabled = false; btn.innerHTML = prima; }
+  };
+}
+
 async function adminResolve(esito, btn){
   haptic();
   const msg = esito==='rimborso'
@@ -17993,14 +18025,31 @@ async function caricaBusta(){
    diceva mostraBusta → openOrder → go → scrollTo(0, 0), da y=578 a
    y=0, e di `focus()` non ce n'era NESSUNA: il sospetto del fuoco che
    trascina (curato altrove con preventScroll) qui non c'entrava.
-   Il testo dell'overlay e' suo: `bottoneInAttesa` di serie dice
-   «Invio sats in corso…», che su una lettura e' falso — qui non si
-   muove un sat, e il pannello lo ripete due righe piu' giu'. */
+   Il testo dell'overlay e' suo: l'attesa di serie dice «Invio sats in
+   corso…», che su una lettura e' falso — qui non si muove un sat, e
+   il pannello lo ripete due righe piu' giu'.
+   E L'ATTESA E' RITARDATA (ago 2026, dal campo): sotto c'e' una
+   richiesta vera — nome e codice NON viaggiano in /api/orders, il
+   server li poppa apposta e si leggono solo da /busta-ritiro — quindi
+   il segnale non si toglie, si fa aspettare: su rete viva la risposta
+   arriva prima dei 180ms e si vede solo il piatto col suo anello, su
+   rete lenta l'attesa compare una volta sola e resta.
+   LA GUARDIA DEL DOPPIO TOCCO NON E' PIU' IL BOTTONE, e non e' un
+   dettaglio: col velo ritardato i primi 180ms il bottone e' vivo, e
+   due tocchi farebbero due letture — la seconda risposta rialzerebbe
+   `bustaSvelata` e l'anello ripartirebbe da capo su un piatto gia'
+   svelato. La bandierina in memoria e' la stessa guardia di
+   `confermaAzione`, e in piu' non si vede (disabilitare il bottone
+   sbiadisce, cioe' sarebbe un altro lampo al posto di quello tolto). */
+let bustaInCorso = false;
 async function mostraBusta(btn){
   haptic();
-  const ripristina = bottoneInAttesa(btn, 'Apro le istruzioni…');
+  if (bustaInCorso) return;
+  bustaInCorso = true;
+  const ripristina = attesaRitardata(btn, 'Apro le istruzioni…');
   const d = await caricaBusta();
   ripristina();
+  bustaInCorso = false;
   if (!d) return;
   bustaSvelata = currentOrder.id;
   ridisegnaBusta();

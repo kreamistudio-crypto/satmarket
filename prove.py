@@ -2220,7 +2220,92 @@ def prove_busta_ritiro():
           True, "user-select:all;-webkit-user-select:all}" in mini)
     # l'overlay diceva «Invio sats in corso» su una LETTURA
     prova("l'attesa non parla di sats: qui non se ne muove nessuno",
-          True, "bottoneInAttesa(btn, \'Apro le istruzioni…\')" in mb)
+          True, "attesaRitardata(btn, \'Apro le istruzioni…\')" in mb)
+
+    # --- L'ATTESA CHE ASPETTA (ago 2026, dal campo) ----------------
+    # Il barattolino compariva e spariva: un segnale piu' corto di un
+    # battito di ciglia si legge come un guasto, non come un'attesa.
+    # Sotto pero' c'e' una richiesta VERA — nome e codice il server li
+    # poppa da /api/orders apposta — quindi il segnale non si toglie:
+    # si fa aspettare, la cura del velo dello stepper della pagina
+    # Paga. Sotto la soglia non compare mai, oltre compare una volta.
+    prova("la lettura non alza piu' il velo immediato", False,
+          "bottoneInAttesa" in mb)
+    _ar = pezzo_js(mini, "function attesaRitardata(btn, testo){")
+    prova("l'attesa ritardata arma un timer e non tocca subito il DOM",
+          True, "setTimeout(" in _ar
+          and _ar.index("setTimeout(") < _ar.index("classList.add('on')"))
+    prova("...e il ripristino lo ANNULLA (mai un velo dopo la risposta)",
+          True, "clearTimeout(t);" in _ar and "if (!acceso) return;" in _ar)
+    # lo stesso numero del velo del ±: due soglie da tenere in pari
+    # direbbero due attese diverse per la stessa idea
+    prova("il ritardo e' quello del velo dello stepper", (True, True),
+          ("const RITARDO_ATTESA = 180;" in mini, "}, 180);" in mini))
+    # IL CENSIMENTO: la ritardata NON si usa dove si muovono i sats —
+    # li' il velo immediato e' la guardia contro il secondo tocco su
+    # una cosa irreversibile. Definizione + l'unico chiamante.
+    prova("l'attesa ritardata ha un chiamante solo, ed e' una lettura",
+          2, mini.count("attesaRitardata("))
+    # e la guardia del doppio tocco e' una bandierina in memoria: col
+    # velo ritardato il bottone resta vivo per 180ms, e due letture
+    # rialzerebbero `bustaSvelata` facendo ripartire l'anello su un
+    # piatto gia' svelato (disabilitarlo sarebbe un altro lampo)
+    prova("il doppio tocco lo ferma una bandierina, non il bottone",
+          (True, False),
+          ("if (bustaInCorso) return;" in mb and "bustaInCorso = true;" in mb,
+           "disabled" in mb))
+
+    # E SI FA GIRARE ANCHE L'ATTESA, che una sentinella sulla forma
+    # dice che il timer c'e', mai che il velo resti spento quando la
+    # risposta e' svelta — ed e' precisamente quello il difetto da cui
+    # nasce il cantiere. Due scenari sullo stesso pezzo vero, con
+    # timer VERI: la risposta prima della soglia non deve accendere
+    # niente, quella dopo deve accendere UNA volta e poi spegnere,
+    # rimettendo al bottone l'etichetta di prima.
+    import json as _js4, shutil as _sh4, subprocess as _sp4, tempfile as _tf4
+    _node4 = _sh4.which("node")
+    if not _node4:
+        salta("l'attesa ritardata risponde giusto", "node non installato")
+    else:
+        _sog = int(re.search(r"const RITARDO_ATTESA = (\d+);", mini).group(1))
+        _ar_js = pezzo_js(mini, "const RITARDO_ATTESA = ", "\n\n")
+        _banco = ("const registro = [];\n"
+                  "const finti = {attesaTesto:{textContent:''},"
+                  " attesaOverlay:{classList:{"
+                  "  add:()=>registro.push('acceso'),"
+                  "  remove:()=>registro.push('spento')}}};\n"
+                  "const el = id => finti[id];\n")
+        _prog4 = (_banco + _ar_js + "\n"
+                  "const dorme = ms => new Promise(r=>setTimeout(r, ms));\n"
+                  "(async ()=>{\n"
+                  "  const esito = [];\n"
+                  f"  for (const ms of [20, {_sog} + 140]) {{\n"
+                  "    registro.length = 0;\n"
+                  "    const btn = {innerHTML:'👁 Mostra il codice', disabled:false};\n"
+                  "    const ripristina = attesaRitardata(btn, 'Apro le istruzioni…');\n"
+                  "    await dorme(ms);\n"
+                  "    ripristina();\n"
+                  f"    await dorme({_sog} + 120);\n"
+                  "    esito.push({velo: registro.join('+'),"
+                  "      etichetta: btn.innerHTML, spento: btn.disabled});\n"
+                  "  }\n"
+                  "  console.log(JSON.stringify(esito));\n"
+                  "})();")
+        _f4 = _tf4.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8")
+        _f4.write(_prog4)
+        _f4.close()
+        _r4 = _sp4.run([_node4, _f4.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+        os.unlink(_f4.name)
+        prova("l'attesa ritardata: muta se la risposta e' svelta, una "
+              "volta sola se e' lenta, e il bottone torna com'era",
+              [{"velo": "", "etichetta": "👁 Mostra il codice",
+                "spento": False},
+               {"velo": "acceso+spento", "etichetta": "👁 Mostra il codice",
+                "spento": False}],
+              _js4.loads(_r4.stdout.strip()) if _r4.returncode == 0
+              else f"ERRORE: {_r4.stderr[:160]}")
 
     # E SI FA GIRARE, che le sentinelle qui sopra dicono che il piatto
     # ESISTE, mai che risponda giusto (la lezione presa sette volte).
