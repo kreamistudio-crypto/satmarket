@@ -11721,8 +11721,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   sola animazione, la stessa in vetrina e nel dettaglio — e il
   riempimento a scatti dal conteggio GLOBALE nel dettaglio non c'è
   più: lì non si capiva, e ora il livello è per-ANNUNCIO come in
-  griglia (vuoto/pieno). Il globale resta solo dove racconta davvero
-  il barattolo: il 🫙 dell'header del cassetto, `#preferitiJar`.
+  griglia (vuoto/pieno). Il globale resta dove racconta davvero il
+  barattolo: il 🫙 dell'header del cassetto (`#preferitiJar`) e, dall'ago
+  2026, la scorciatoia in testata — vedi la voce sua, più sotto.
   LE SOGLIE SONO IN PROPORZIONE AL TETTO e non più scritte a mano
   (`livelloBarattolo`): con le vecchie (≤5→1, ≤10→2, poi 3) e il
   tetto a 10 il livello 3 non sarebbe esistito MAI — pieno a 10, ma
@@ -11756,6 +11757,112 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (#BFE3F0, di sera più tenue #7FA3B5) — ovunque il barattolino
   compare (card, cerchietto del dettaglio, cassetto); dettaglio, non
   protagonista: non copre la lettura del livello.
+  LA SCORCIATOIA IN TESTATA (ago 2026, richiesta di Andrea): la stessa
+  icona che si riempie nel cassetto, accanto alla levetta del tema —
+  `.jar-testa`, due istanze gemelle (testata mobile e topbar desktop)
+  come la levetta e il tappo, una classe sola e un `querySelectorAll`
+  solo (`renderJarTesta`, accanto ad `aggiornaBarattolo`). Un tocco e
+  si è nel cassetto: `apriCassettoProfilo('accPreferiti')`, che esisteva
+  già e guadagna il suo primo chiamante con quell'argomento. È una
+  SCORCIATOIA E NON UNA VISTA NUOVA, e la prova lo conta: `myPreferiti
+  .map(`, `#preferitiBlocco` e `renderPreferiti(` restano UNO ciascuno
+  — due liste che dicono la stessa cosa divergono al primo ritocco.
+  QUASI TUTTO ARRIVA GRATIS, ed è il pregio del cantiere:
+  `aggiornaBarattolo` livella ogni `.jar-ico` ESCLUSE quelle dentro
+  `.card-jar`/`.jar-btn`, quindi il vetro si riempie da solo dalle
+  quattro strade che già la chiamano (boot, ingresso nel Profilo,
+  pull-to-refresh, ogni `togglePreferito`), e la scossa di festa viene
+  in omaggio. ⚠️ LA CLASSE NON PUÒ ESSERE `.jar-btn` NÉ `.card-jar`:
+  sono quell'esclusione, e da lì dentro l'icona finirebbe sotto
+  `aggiornaJarCards`, che legge `b.dataset.id` → `undefined` →
+  `preferiti.has(NaN)` → **lv0 per sempre, in silenzio**. La sentinella
+  LEGGE l'elenco dal codice invece di ribatterlo: la terza classe di
+  domani la copre da sola.
+  A BARATTOLO VUOTO RESTA, SPENTA (lv0): il tocco porta comunque al
+  cassetto, che a vuoto ha già il testo che insegna a riempirlo —
+  quindi non è «un'icona che non fa niente». Ed è l'unico modo di
+  imparare cosa vuol dire il riempimento: si vede il vetro vuoto
+  prima, e il primo salvataggio lo fa salire sotto gli occhi. Un'icona
+  che appare dal nulla al primo salvataggio non insegnerebbe niente.
+  LA GUARDIA È QUELLA DI `bottoneJar` (`DEMO || VETRINA || !myTgId`) e
+  NON quella del tappo (`!VETRINA`), ed è la guardia del posto DOVE SI
+  PORTA: il tappo apre una vista che in DEMO esiste, questa un cassetto
+  che in DEMO `renderPreferiti` NASCONDE — il tocco finirebbe su uno
+  `scrollIntoView` verso un nodo senza box, cioè su un Profilo scorso a
+  caso. Vale la regola di `bottoneRifornisci`: un bottone che porta a
+  un muro è peggio di un bottone che non c'è. E in DEMO il gesto che
+  riempie non esiste nemmeno (`bottoneJar` non nasce, `caricaPreferiti`
+  esce subito): sarebbe un misuratore fermo a vuoto per sempre.
+  NIENTE NUMERO IN TESTATA: il livello È il numero. `#preferitiConta` è
+  un id e non si riusa, ma la domanda vera è se serva — i cinque
+  livelli esistono apposta per dire «quanto pieno» senza cifra; una
+  cifra accanto a un'icona si legge come NOTIFICA, e a 18px c'è
+  `.off-dot`, che quel significato ce l'ha davvero; `.jar-conta`
+  significa già un'altra cosa (quante PERSONE hanno messo QUELL'annuncio
+  nel loro barattolo); e soprattutto `aggiornaBarattolo` scrive `''` a
+  barattolo vuoto, quindi il cerchietto diventerebbe pastiglia e
+  viceversa MENTRE navighi, spingendo levetta e tappo avanti e indietro
+  dentro un header `sticky`. A voce il nome c'è: `aria-label`, e sono
+  LE STESSE PAROLE dell'header del cassetto — scorciatoia e
+  destinazione si chiamano uguale, e c'è la prova.
+  L'ORDINE È `[levetta][barattolo][tappo]`, e non prima della levetta:
+  l'auto-margine che spinge il gruppo a destra vive su `.tema-btn`
+  proprio perché è l'unica dei tre che C'È SEMPRE. Dandolo al
+  barattolo, che si spegne in DEMO e in vetrina, a icona spenta il
+  gruppo non verrebbe più spinto e levetta e tappo scivolerebbero
+  addosso al lockup: regressione CONDIZIONALE, cioè invisibile in
+  sviluppo.
+  ⚠️ E IL TAPPO DIPENDE ORA DALLA PRECEDENZA, NON DALL'ADIACENZA
+  (`.tema-btn ~ .avatar-btn`, un carattere): col barattolo in mezzo il
+  `+` smetteva di combaciare, il tappo ricadeva sul suo
+  `margin-left:auto` di base e con DUE auto-margini il flex si
+  spartisce lo spazio libero A METÀ — la levetta migra in mezzo alla
+  riga e il tappo si stacca. Silenzioso, e si vede solo sui telefoni
+  larghi. In topbar la regola gemella è passata a `~` per lo stesso
+  motivo (lì il danno non ci sarebbe, perché `nav .avatar-btn.on`
+  impone già il suo margine: si allinea per non lasciare una regola
+  morta).
+  LO SPAZIO NON C'ERA, ed è la parte MISURATA e non stimata (font veri
+  letti dai WOFF2 di `/vendor/font/`): il lockup «Barattolo⚡» chiede
+  **124,1px**, la sottolinea «IL MERCATINO IN SATS» **139,2** — è LEI
+  la più larga, non il titolo, quindi rimpicciolire il lockup non
+  guadagna un pixel finché non si tocca lei — il fisso della riga
+  **152**, e di contenuto a 320px ce n'è **288**. Cioè a 320 la
+  sottolinea andava a capo GIÀ PRIMA di questo cantiere, e il terzo
+  cerchietto (44px col solo gap) mancava di 47px a 320 e di 7 a 360.
+  TRE LEVE, e la terza è una decisione di Andrea: `gap` della `.brand`
+  da 10 a 8 (+8: sono quattro spazi), via il `+8px` del tappo (+8, e il
+  ritmo diventa regolare), e **la tessera del logo che cede sotto i
+  360px** (+50). Misurato dopo: restano **18,8px** d'avanzo a 320,
+  **8,8** a 360, **23,8** a 375, il sottotitolo su UNA riga a tutte e
+  tre e ZERO scorrimento laterale nei due temi e nei tre livelli del
+  vetro. Sotto i 360 il marchio resta il lockup con la B che diventa ₿,
+  che è il marchio vero; sopra, i due barattoli convivono (la tessera è
+  una foto su fondo arancione, il barattolino un SVG a tratto che si
+  riempie). La media query è SCOPATA su `header`, mai `.brand-jar`
+  nudo: la stessa classe veste anche il logo della topbar.
+  E L'AIRBAG È DENTRO IL PERIMETRO perché il cantiere aggiunge peso a
+  quella riga: `min-width:0` sul blocco di testo ed ellissi sul
+  sottotitolo. La testata non ritaglia da nessuna parte e in tutto il
+  foglio non esiste un `overflow-x:hidden` globale, quindi quando lo
+  spazio finisce a scorrere è la PAGINA — successo già due volte in
+  casa. Il lockup resta SENZA nowrap, com'è sempre stato: nel caso
+  estremo (320px col carattere «Grande», dove `--fs-zoom` porta il
+  contenuto a 246px e la riga sbordava già di 1,8px PRIMA di questo
+  cantiere) va a capo invece di far scorrere.
+  SU MOBILE VIVE SOLO IN ESPLORA, dichiarato: `<header>` sta dentro
+  `view-esplora`, quindi è dove vivono già i suoi due fratelli — ed è
+  dove serve, perché è lì che si mette roba nel barattolo. Da desktop
+  la topbar c'è ovunque.
+  DIFETTO PREESISTENTE DICHIARATO E NON CURATO (decisione di Andrea):
+  **la topbar desktop sborda di ~82px fra 768 e ~850px** di larghezza —
+  otto elementi che non si stringono (logo 175 + cinque voci + levetta
+  + tappo = ~818 contro 736 disponibili a 768px), difetto nato quando
+  il 🔨 delle Aste è diventato sempre visibile. Il barattolino lì
+  peggiora di 48px, ma lo sbordo c'è già senza di lui e da 1024px
+  avanzano 173px (verificato dal vivo a 1280: zero sbordo). Chi lo
+  curerà: la leva standard da tablet sono le sole icone sotto ~900px
+  (−208px).
   Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
   danno ai venditori appena arrivati); dal lug 2026 le accende il
   sistema di feedback (vedi server.py).
