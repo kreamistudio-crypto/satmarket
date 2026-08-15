@@ -10443,9 +10443,51 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   documento — il codice non lo disegnava nessuno — quindi col salto
   tolto il tocco sarebbe diventato un tocco che non fa NIENTE. È il
   suo codice: l'ha scritto lui, non gli si rivela niente di nuovo.
-  E L'ATTESA NON PARLA PIÙ DI SATS: `bottoneInAttesa` di serie dice
-  «Invio sats in corso…», che su una LETTURA è falso — qui non si
-  muove un sat, e il pannello lo ripete due righe più giù.
+  E L'ATTESA NON PARLA PIÙ DI SATS: l'attesa di serie dice «Invio sats
+  in corso…», che su una LETTURA è falso — qui non si muove un sat, e
+  il pannello lo ripete due righe più giù.
+  E ASPETTA PRIMA DI FARSI VEDERE (ago 2026, dal campo: il barattolino
+  compariva e spariva, e un segnale più corto di un battito di ciglia
+  si legge come un guasto invece che come un'attesa). MISURATO prima
+  di toccare, con un osservatore sull'overlay: su rete viva si
+  accendeva a 1ms e si spegneva a 6ms — CINQUE millisecondi.
+  SOTTO C'È UNA RICHIESTA VERA, ed è la prima cosa da sapere perché
+  invita alla cura sbagliata: nome e codice NON viaggiano in
+  `/api/orders` (il server li poppa apposta, sono una credenziale) e
+  si leggono solo da `/busta-ritiro`. Quindi il segnale non si toglie
+  — su rete lenta l'attesa va detta — si fa ASPETTARE: è la cura del
+  velo dello stepper della pagina Paga, applicata a un bottone.
+  `attesaRitardata` è il gemello di `bottoneInAttesa` che arma un
+  timer invece di alzare il velo, con `RITARDO_ATTESA` = 180, lo
+  stesso numero del velo del ± (due soglie da tenere in pari
+  direbbero due attese diverse per la stessa idea). Il ripristino
+  ANNULLA il timer e non tocca il DOM se il velo non è mai comparso, o
+  si vedrebbe un velo comparire DOPO la risposta.
+  NON SI USA DOVE SI MUOVONO I SATS, ed è la riga da non ammorbidire:
+  lì il velo immediato non è cortesia ma la GUARDIA contro il secondo
+  tocco su una cosa irreversibile, e ritardarla aprirebbe una finestra
+  di 180ms in cui la fattura si paga due volte. Il censimento dei
+  chiamanti è in CI: uno solo, ed è una lettura.
+  LA GUARDIA DEL DOPPIO TOCCO DIVENTA UNA BANDIERINA (`bustaInCorso`,
+  la stessa di `confermaAzione`): col velo ritardato per 180ms il
+  bottone è vivo, e due tocchi farebbero due letture — la seconda
+  rialzerebbe `bustaSvelata` e l'anello ripartirebbe da capo su un
+  piatto già svelato. Disabilitare il bottone no: `.btn:disabled`
+  sbiadisce, cioè sarebbe un altro lampo al posto di quello tolto.
+  LA STRADA SCARTATA, e va tenuta perché è quella che torna in mente:
+  chiedere la busta all'APERTURA dell'ordine, così il tocco non
+  aspetta niente. Il GET è puro, quindi si potrebbe — ma sarebbe una
+  richiesta a ogni apertura anche per chi non tocca, e soprattutto
+  quella credenziale starebbe in memoria senza che nessuno l'abbia
+  chiesta: qui la strada che il progetto sceglie è far arrivare presto
+  il segnale, non anticipare il dato.
+  LA PROVA CHE VALE È QUELLA CHE GIRA: la funzione vera con timer veri
+  su un DOM di cartone, due scenari — risposta a 20ms, il velo non si
+  accende MAI; risposta oltre la soglia, si accende una volta e si
+  spegne, col bottone che torna com'era. Le sentinelle dicono che il
+  timer c'è, mai che il velo resti spento quando la risposta è svelta,
+  che è precisamente il difetto. Otto mutazioni, otto rosse, e tre
+  mordono proprio lì.
   IMPERFEZIONE DICHIARATA: sul pannello del venditore che scrive, il
   bottone «Rileggi» sparisce dopo la rilettura, quindi il pannello si
   accorcia di ~63px; se si stava in fondo alla pagina il browser
