@@ -2112,6 +2112,14 @@
   #acqIndCampo .ind-form label:first-child{margin-top:0}
   .ind-facolt{font-weight:600;text-transform:none;letter-spacing:0;
     color:var(--muted)}
+  /* Il cassetto della nota: fratello dei due qui sopra, ma NON dentro
+     una via — sta fra le strade di consegna e «Il conto», quindi vuole
+     un respiro suo sopra (i due fratelli lo prendono dal riquadro che
+     li ospita). La riga compatta riusa .punto-riga/.punto-testo/
+     .punto-cambia: quello e' il VESTITO di «un testo lungo col Cambia
+     in fondo», non il nome di una promessa. */
+  #acqNotaCampo{margin-top:14px}
+  #acqNotaCampo .btn{margin-top:0}
   /* la card del singolo articolo: francobollo + titolo + unitario */
   .acq-art{display:flex;align-items:center;gap:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:var(--radius);
@@ -4174,11 +4182,16 @@ document.getElementById('cartello')?.remove();</script>
       </ul>
 
       <h3 id="priv-indirizzo">Quello che chiediamo solo quando serve</h3>
-      <p>Tre cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
+      <p>Quattro cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
       <ul class="sicu-lista">
         <li><b>L'indirizzo di casa</b>, se scegli la spedizione a casa. Lo vede <b>solo chi ti vende</b>, per stampare l'etichetta.</li>
-        <li><b>Il punto di ritiro</b> che scegli, se preferisci quella strada — lì un indirizzo tuo non c'è proprio. Questo, se vuoi, puoi anche <b>tenertelo nel profilo</b> per non riscriverlo ogni volta: è l'unica delle tre che si può salvare, e la ragione è che un punto di ritiro è un <i>luogo pubblico</i> — un locker, una tabaccheria — mentre casa tua no. Lo salvi con un tocco quando compri, mai da solo, e lo togli quando vuoi.</li>
+        <li><b>Il punto di ritiro</b> che scegli, se preferisci quella strada — lì un indirizzo tuo non c'è proprio. Questo, se vuoi, puoi anche <b>tenertelo nel profilo</b> per non riscriverlo ogni volta: è l'unica delle quattro che si può salvare, e la ragione è che un punto di ritiro è un <i>luogo pubblico</i> — un locker, una tabaccheria — mentre casa tua no. Lo salvi con un tocco quando compri, mai da solo, e lo togli quando vuoi.</li>
         <li><b>Il codice</b> di un buono o di un prodotto digitale, che chi vende consegna qui dentro invece che in chat.</li>
+        <!-- LA QUARTA (ago 2026). E' l'unica delle quattro che l'utente
+             sceglie di scrivere, ed e' anche l'unica che RESTA: va
+             detto qui e non solo fra le durate, perche' e' la voce che
+             si legge quando ci si chiede «cosa mi stanno chiedendo». -->
+        <li><b>La nota</b> che scrivi a chi vende, se la scrivi: la taglia, il numero, la variante. È facoltativa, e a differenza delle altre tre <b>resta nell'ordine</b> — non la cancelliamo, perché è parte di quello che vi siete detti. Scrivici quello che serve per prepararti l'oggetto, non il tuo recapito: per quello ci sono i campi qui sopra.</li>
       </ul>
       <!-- LA PRIMA DELLE TRE AFFERMAZIONI DELICATE (ago 2026). Questa
            voce dice ad alta voce una cosa che nessuna pagina aveva mai
@@ -4216,6 +4229,11 @@ document.getElementById('cartello')?.remove();</script>
              l'unica senza scadenza: per questo la strada per toglierla
              sta nella stessa riga, invece che da qualche altra parte. -->
         <li><b>I punti di ritiro che salvi</b>: <b>finché non li togli</b>. Li trovi nel Profilo, in «📍 Punti di ritiro», con una ✕ accanto a ognuno.</li>
+        <!-- Ricade sotto «tutto il resto non ha una scadenza», ma si
+             nomina lo stesso: e' testo LIBERO scritto da una persona, e
+             chi lo scrive ha diritto di sapere che resta. La strada per
+             toglierla sta nella stessa riga, come per i punti salvati. -->
+        <li><b>La nota che scrivi a chi vende</b>: <b>resta nell'ordine</b>, come il resto di quello che vi siete detti. Finché il pacco non parte puoi cambiarla o toglierla dall'ordine stesso.</li>
       </ul>
       <p><b>Tutto il resto non ha una scadenza</b>, e non è una dimenticanza: annunci, ordini, voti e reputazione <i>sono</i> la memoria degli affari fatti, e servono a te quanto a chi commercia con te — una recensione che sparisce dopo un anno non è una recensione. Un ordine concluso puoi <b>nasconderlo</b> dalla tua lista quando non vuoi più vederlo: sparisce dalla vista, la riga resta.</p>
 
@@ -4235,6 +4253,15 @@ document.getElementById('cartello')?.remove();</script>
            admin_disputa. -->
       <p><b>Il tuo indirizzo non lo legge.</b> Quando si apre una disputa un moderatore guarda l'ordine per decidere, e del tuo indirizzo non vede niente nemmeno lì: gli risulta soltanto <i>se</i> l'hai indicato e quando, mai una riga di quello che hai scritto. Lo stesso vale per il nome e il codice di ritiro della busta e per il documento del corriere: quelli li leggono solo chi compra e chi vende.</p>
       <p><b>Il contenuto di un buono o di un codice digitale invece sì.</b> Se apri una disputa su un acquisto digitale, il moderatore lo legge. Non c'è modo di decidere quella lite senza guardarlo — è l'oggetto stesso del contendere, e chi la apre di solito dice proprio che quel codice non funziona.</p>
+      <!-- LA QUARTA ASIMMETRIA (ago 2026), e per la STESSA ragione della
+           precedente: e' l'oggetto del contendere. Va detta qui e non
+           lasciata all'omissione — la nota esce da /api/orders come
+           ogni altra colonna, quindi un moderatore che apre un ordine
+           la vede, e una pagina che tace su questo e' vera solo per
+           quello che non dice. NIENTE «solo in disputa»: un moderatore
+           puo' aprire un ordine anche per numero, e la frase deve
+           combaciare col codice, non con l'intenzione. -->
+      <p><b>E la nota che hai scritto a chi vende, sì.</b> Se una disputa dice «avevo chiesto la taglia L», quella nota <i>è</i> la lite: senza leggerla non c'è modo di decidere. Vale la regola di sopra al contrario — un moderatore che apre un ordine la legge, in disputa o quando lo cerca per numero. È anche il motivo per cui il campo dice, mentre lo scrivi, di non usarlo per il tuo recapito.</p>
       <p class="sicu-nota">Fuori dalle dispute quel contenuto non lo legge nessuno tranne te e chi te l'ha venduto. Se non vuoi che lo veda nessun altro, la strada è non aprire la disputa.</p>
 
       <h3 id="priv-fuori">Cosa esce da qui</h3>
@@ -5684,6 +5711,13 @@ function mapOrder(o){
     /* la rete scelta da chi compra ('' = non dichiarata: ordini
        storici, venditore senza reti, o via diversa dal punto) */
     retePunto:o.rete_punto||'', tipoPunto:o.tipo_punto||'',
+    /* la nota del compratore (ago 2026): testo libero — alla resa
+       passa SEMPRE da esc(). A differenza dell'indirizzo e della busta
+       il TESTO viaggia in /api/orders, quindi lo legge anche l'ADMIN
+       quando apre un ordine in disputa: e' deliberato, ed e' l'unica
+       cosa scritta dal compratore che un moderatore legge — «avevo
+       chiesto la taglia L» e' una lite che senza non si decide. */
+    notaCompratore:o.nota_compratore||'',
     /* la busta di consegna (ago 2026): nome e codice NON viaggiano
        mai in /api/orders — qui arrivano solo il quando (bustaIl =
        PRIMO deposito, 0 = mai) e le correzioni; il testo lo serve
@@ -9803,6 +9837,7 @@ function apriAcquisto(l){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             nota:'', notaAperta:false,
              errore:''};
   go('acquisto');
   renderAcquisto();                 /* lo scheletro, subito */
@@ -9880,6 +9915,7 @@ function apriAcquistoSet(){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             nota:'', notaAperta:false,
              errore:''};
   go('acquisto');
   renderAcquisto();
@@ -10637,6 +10673,43 @@ function renderAcquisto(){
       onclick="event.stopPropagation()">
     ${d.indirizzoAperto ? campiIndirizzo : indChiuso}
   </div>`;
+  /* --- LA NOTA PER IL VENDITORE (ago 2026) --- il terzo cassetto
+     della cassa, e l'unico che NON vive dentro una via: la taglia e la
+     variante valgono uguale a mano, al punto, a casa e sul digitale —
+     parla dell'OGGETTO, non di come arriva. Quindi e' un FRATELLO del
+     radiogroup e non un suo figlio, e da li' due conseguenze: NIENTE
+     stopPropagation (non c'e' nessuna radio da riselezionare — chi un
+     domani lo spostasse dentro una via lo deve rimettere) e
+     setViaAcquisto non lo chiude mai.
+     DIETRO UN BOTTONE come i fratelli: e' FACOLTATIVA, e un campo
+     sempre aperto su una cosa che quasi nessuno scrive e' spazio morto
+     in una pagina gia' lunga.
+     ⚠️ In questa funzione «nota» ha gia' DUE significati (la
+     sottoetichetta «Consigliato» della via, e le righe oneste qui
+     sotto): gli identificatori di qui sono tutti suffissati, e lo
+     stato si legge sempre da d.nota. La lezione della chiave doppia in
+     acqDati e' la stessa famiglia — il parse non prende nessuna delle
+     due. */
+  const notaScritta = (d.nota || '').trim();
+  const campiNota = `<label for="acqNota">Nota per il venditore (facoltativa)</label>
+    <input id="acqNota" maxlength="${MAX_NOTA}" value="${esc(d.nota||'')}"
+      placeholder="${esc(segnaposNota(d.tipo==='set'))}"
+      oninput="if(acqDati)acqDati.nota=this.value">
+    ${/* LA PREVENZIONE STA NELLA FRASE BASE e non nel ramo «casa», ed
+          e' deliberato: e' sulle ALTRE vie che serve di piu' — li' un
+          campo per l'indirizzo non c'e', e senza questa mezza riga
+          qualcuno ci scriverebbe la via di casa. E' anche l'unica cosa
+          che tiene la nota fuori dai dati personali, visto che resta
+          nell'ordine e la legge un moderatore. */''}
+    <div class="acq-nota">Taglia, numero, colore: quello che gli serve per prepararti l'oggetto giusto — non il tuo recapito.${d.via==='casa' ? ' Per citofono, scala e orari c\'è «Note per il corriere», qui sopra nell\'indirizzo.' : ''} <span class="fine-frase">Resta nell'ordine. <button type="button" class="scopri-link" onclick="apriPrivacy('priv-moderatori')">Chi la legge</button></span></div>`;
+  const notaChiusa = notaScritta
+    ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
+        onclick="apriNotaAcquisto()"><span class="punto-testo">📝 ${esc(notaScritta)}</span><span class="punto-cambia">Cambia</span></button>`
+    : `<button type="button" class="btn ghost" aria-expanded="false"
+        onclick="apriNotaAcquisto()">📝 Lascia una nota per il venditore</button>`;
+  const cassettoNota = `<div class="${d.notaAperta?'field':''}" id="acqNotaCampo">
+    ${d.notaAperta ? campiNota : notaChiusa}
+  </div>`;
   /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
      (decisione di Andrea, ago 2026: il totale con dentro l'oggetto
      si leggeva come «costo di spedizione» — il totale lo dice IL
@@ -10922,7 +10995,7 @@ function renderAcquisto(){
      interpolato, le partenze riunite) vive nei ferri condivisi
      barreCattura/barreCorri, qui sopra */
   const barraDa = barreCattura(box);
-  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}
+  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}${cassettoNota}
     <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
@@ -10967,6 +11040,33 @@ function apriPuntoAcquisto(){
   acqDati.puntoAperto = true;
   renderAcquisto();
   el('acqPunto')?.focus();
+}
+/* Il tetto della nota, lo SPECCHIO di MAX_NOTA del server: qui si
+   ripete a mano — il patto di TEMPI — e a tenerli in pari c'e' la
+   prova, che legge il numero dal server e lo confronta con questo. Il
+   server resta comunque il giudice: questo e' solo il maxlength che
+   impedisce di digitare oltre. */
+const MAX_NOTA = 200;
+/* Il segnaposto, giudice unico delle due superfici (la cassa e il
+   campo dentro l'ordine). NEL CARRELLO LA NOTA E' UNA PER TUTTO
+   L'ORDINE — imperfezione dichiarata, decisione di Andrea — quindi
+   l'esempio invita a NOMINARE la cosa: con cinque oggetti «taglia L»
+   da sola non dice a quale, e a scioglierlo e' chi scrive. */
+const segnaposNota = eSet =>
+  eSet ? 'Es. la maglia rossa: taglia L, le scarpe: 42'
+       : 'Es. taglia L, oppure la variante blu';
+/* Il cassetto della nota si apre da un posto solo, come i fratelli.
+   Nessuna apertura automatica e nessuna guardia in «Paga»: e'
+   facoltativa, e si apre solo col dito. Il cursore va in FONDO — su
+   una correzione un focus() nudo lo mette all'inizio in mezzo browser,
+   e si scriverebbe davanti a quel che si e' gia' scritto. */
+function apriNotaAcquisto(){
+  if (!acqDati) return;
+  acqDati.notaAperta = true;
+  renderAcquisto();
+  const c = el('acqNota');
+  if (c){ c.focus({preventScroll:true});
+          c.setSelectionRange(c.value.length, c.value.length); }
 }
 /* ---- I PUNTI SALVATI (ago 2026) ----
    Chi compra si tiene il suo locker, e alla pagina d'acquisto arriva
@@ -11148,7 +11248,13 @@ const CAMPI_IND = [
   {k:'citta',     et:'Città',               ac:'address-level2',  max:60,  serve:true},
   {k:'provincia', et:'Provincia',           ac:'address-level1',  max:20,  serve:false},
   {k:'telefono',  et:'Telefono',            ac:'tel',             max:30,  serve:false},
-  {k:'note',      et:'Note per il corriere', ac:'',               max:120, serve:false},
+  /* ⚠️ L'etichetta dice il MESTIERE, e da quando esiste la nota per il
+     venditore (ago 2026) non e' un ornamento: sulla via casa i campi
+     liberi diventano DUE, e questo parla al CORRIERE del recapito
+     (va sull'etichetta, muore con l'indirizzo) mentre l'altro parla al
+     VENDITORE dell'oggetto. A distinguerli sono le parole. */
+  {k:'note',      et:'Note per il corriere (citofono, scala, orari)',
+                                            ac:'',               max:120, serve:false},
 ];
 function indirizzoVuoto(){
   const o = {}; CAMPI_IND.forEach(c => o[c.k] = ''); return o;
@@ -11185,9 +11291,22 @@ function apriIndirizzoAcquisto(){
    nessuna chiave (il server fa il flusso di sempre). */
 function corpoConsegna(){
   const v = acqDati?.via || '';
-  if (!v) return {};
-  if (v==='ritiro' || v==='digitale') return {consegna: v};
-  const out = {consegna:'spedizione',
+  /* LA NOTA VIAGGIA SEMPRE, e per questo si prepara qui in cima: la
+     funzione ha tre uscite — l'annuncio storico senza via, il
+     ritiro/digitale, e la spedizione — e la nota non appartiene a
+     nessuna delle tre, appartiene all'ORDINE.
+     STA DENTRO QUESTA FABBRICA E NON ACCANTO AI CHIAMANTI, ed e' la
+     riga da non spostare: i varchi che POSTano a /orders sono TRE
+     (startBuy, startBuySet e confermaCompraSubito, la strada del
+     wallet ⚡), e il terzo e' proprio quello che nessun collaudo
+     esercita — in locale un wallet non c'e'. Sparsa a mano, la nota
+     sparirebbe IN SILENZIO solo a chi paga col wallet collegato.
+     Chiave assente quando e' vuota: il patto dello stock. */
+  const nota = (acqDati?.nota || '').trim().slice(0, MAX_NOTA);
+  const extra = nota ? {nota_compratore: nota} : {};
+  if (!v) return extra;
+  if (v==='ritiro' || v==='digitale') return {consegna: v, ...extra};
+  const out = {consegna:'spedizione', ...extra,
                spedizione_via: v==='punto' ? 'punto' : 'casa'};
   /* dal quarto giro il punto c'e' sempre (ctaAcquisto lo esige
      prima di chiamare): il trim e' la cintura contro il vuoto */
@@ -15032,6 +15151,12 @@ function openOrder(id){
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
           ${(!o.viaPunto && o.indirizzoIl) ? `<div class="hint">🏠 L'acquirente ha scelto la <b>spedizione a casa</b>: trovi l'indirizzo nel riquadro qui sotto.</div>` : ''}
+          ${/* IL CARTELLO, MAI IL DATO: la nota si legge nel suo
+                riquadro qui sotto, e ripeterla qui sarebbe il dato
+                accanto al posto in cui si tocca — il peccato che il
+                punto ha gia' commesso e per cui e' stato corretto.
+                Stessa forma della riga dell'indirizzo, due sopra. */''}
+          ${o.notaCompratore ? `<div class="hint">📝 L'acquirente ha lasciato una <b>nota</b>: la leggi nel riquadro qui sotto.</div>` : ''}
           ${o.tagliaStimata ? `<div class="hint">📦 Pacco stimato per il set: <b>${esc(o.tagliaStimata)}</b> — è una stima dalle taglie dichiarate, verifica tu prima di spedire.</div>` : ''}
           ${/* IL CORRIERE ARRIVA GIA' SCELTO quando chi compra ha detto
                 la rete: il secondo argomento esisteva gia' (lo usa la
@@ -15048,6 +15173,7 @@ function openOrder(id){
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
         </div>`):''}
       ${pannelloContenutoDigitale(o)}
+      ${pannelloNota(o)}
       ${pannelloIndirizzoCasa(o)}
       ${pannelloBustaRitiro(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
@@ -18103,6 +18229,80 @@ function piattoCodice(b, svelato){
         style="margin-top:10px" aria-label="Copia il codice di ritiro"
         onclick="copiaBusta()"><span class="mono codice-cifre">${esc(b.codice)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
 }
+
+/* ---- LA NOTA DEL COMPRATORE nell'ordine (ago 2026) ----
+   Il posto dove il venditore la legge, e dove chi ha comprato la
+   corregge (o la aggiunge, se alla cassa se l'e' dimenticata) finche'
+   il pacco non parte.
+
+   ⚠️ NIENTE early return sull'admin, ed e' la differenza deliberata
+   dai due fratelli qui sotto: la nota il moderatore la LEGGE. Senza
+   questa riga un moderatore in disputa non vedrebbe niente — le due
+   superfici del punto sono seller-only e buyer-only — ed e'
+   precisamente il tipo di ramo che nessuno va a guardare. C'e' la
+   prova.
+
+   Il testo passa da esc() come ogni cosa scritta da una persona; e
+   siccome il giudice del server lo consegna su UNA riga sola (spazi
+   collassati, a-capo tolti) qui non serve nessun white-space:pre-wrap
+   — che e' la ragione per cui quel giudice fa cosi'. */
+function pannelloNota(o){
+  /* prima che i sats siano in cassaforte non c'e' un affare, e sulla
+     lapide non c'e' niente da preparare: la regola dei fratelli */
+  if (o.state==='creato' || o.state==='annullato') return '';
+  const scritta = o.notaCompratore || '';
+  /* il riquadro del compratore c'e' anche VUOTO, ed e' il prezzo per
+     poter AGGIUNGERE una nota dimenticata alla cassa; agli altri due
+     un riquadro vuoto non si mostra mai */
+  const mioEditabile = (o.role==='buyer' && o.state==='locked');
+  if (!scritta && !mioEditabile) return '';
+  if (o.role==='buyer') {
+    if (!mioEditabile)
+      return `<div class="payout"><h4>📝 La tua nota per il venditore</h4>
+        <div class="hint">${esc(scritta)}</div>
+        <div class="hint" style="margin-top:6px">Il venditore l'ha ricevuta. Da qui non si cambia più.</div></div>`;
+    return `<div class="payout"><h4>📝 La tua nota per il venditore</h4>
+      <div class="hint">Taglia, numero, colore: quello che gli serve per prepararti l'oggetto giusto. La legge prima di preparare la consegna, e puoi cambiarla o toglierla finché non spedisce.</div>
+      <input id="notaOrdineInp" maxlength="${MAX_NOTA}" value="${esc(scritta)}"
+        placeholder="${esc(segnaposNota(!!(o.righe && o.righe.length)))}">
+      <button class="btn orange" onclick="salvaNota()">${scritta ? 'Aggiorna la nota' : 'Salva la nota'}</button>
+      ${scritta ? `<button class="btn ghost" onclick="togliNota()">🗑 Togli la nota</button>` : ''}</div>`;
+  }
+  /* venditore e moderatore: la leggono e basta. Al moderatore si
+     dichiara l'asimmetria, o quel che vede sembrerebbe una svista. */
+  return `<div class="payout"><h4>📝 Nota dell'acquirente</h4>
+    <div class="hint">${esc(scritta)}</div>
+    ${o.role==='admin'
+      ? `<div class="hint" style="margin-top:6px">Questa la leggi: l'indirizzo di casa e la busta di ritiro no.</div>`
+      : `<div class="hint" style="margin-top:6px">Leggila prima di preparare la consegna: se ti chiede qualcosa che non puoi fare, dillo in chat prima di spedire.</div>`}</div>`;
+}
+/* Il calco di salvaPuntoRitiro, con UNA differenza: il vuoto si manda.
+   La nota e' facoltativa, e toglierla e' un gesto legittimo — il
+   server la accetta vuota apposta. Niente confirm: non muove un sat, e
+   il venditore riceve comunque l'avviso. */
+async function salvaNota(testo){
+  haptic();
+  const o = currentOrder; if (!o) return;
+  const nota = testo !== undefined
+    ? testo : (el('notaOrdineInp')?.value || '').trim();
+  const r = await fetch(`${API_BASE}/orders/${o.id}/nota`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({nota_compratore: nota})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  /* si scrive sulla riga di `orders` e non sul solo currentOrder, che
+     puo' essere DETACHED se la lista si e' ricaricata (la lezione dei
+     solleciti) */
+  const viva = orders.find(x => x.id === o.id);
+  o.notaCompratore = d.nota_compratore || '';
+  if (viva) viva.notaCompratore = o.notaCompratore;
+  toast(o.notaCompratore
+    ? '📝 Nota salvata: il venditore la vede nell\'ordine'
+    : '📝 Nota tolta');
+  openOrder(o.id);
+}
+function togliNota(){ salvaNota(''); }
 
 /* ---- L'INDIRIZZO DI CASA nell'ordine (ago 2026) ----
    Lo SPECCHIO di pannelloBustaRitiro: li' scrive il venditore e legge

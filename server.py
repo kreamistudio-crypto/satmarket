@@ -2812,6 +2812,35 @@ def init_db():
                     # dedurlo dal testo del punto: «tabaccheria» in un
                     # indirizzo non e' una prova.
                     "tipo_punto TEXT DEFAULT ''",
+                    # LA NOTA DEL COMPRATORE (ago 2026): quel che chi
+                    # compra deve poter dire sull'OGGETTO — la taglia,
+                    # il numero, la variante. Prima si diceva in chat,
+                    # o non si diceva: e chi non ha ne' username
+                    # Telegram ne' npub in chat non ci arriva proprio.
+                    # SEGUE IL MODELLO DEL PUNTO e non quello
+                    # dell'indirizzo, ed e' una decisione: in CHIARO
+                    # (il moderatore la legge, e senza chiave si scrive
+                    # lo stesso — una nota facoltativa non deve mai
+                    # poter bloccare un acquisto), SENZA TIMBRI (busta
+                    # e indirizzo hanno il trio _il/_corretto_il/
+                    # _correzioni perche' al moderatore il contenuto va
+                    # raccontato in fatti; qui il contenuto lo legge) e
+                    # SENZA SCOPA: resta nell'ordine come il punto,
+                    # perche' e' parte di cosa le due parti si sono
+                    # dette. Il DEFAULT '' E' la migrazione.
+                    # E' UNA PER ORDINE e non per articolo (decisione di
+                    # Andrea): nel carrello «taglia L» con cinque
+                    # oggetti resta ambigua, e a scioglierla e' il
+                    # segnaposto, che invita a nominare la cosa. Per
+                    # articolo vorrebbe dire una colonna qui E una su
+                    # ordine_righe — il mono righe non ne ha MAI — cioe'
+                    # due case per lo stesso dato.
+                    # DA NON CONFONDERE con «Note per il corriere», che
+                    # vive DENTRO l'indirizzo cifrato (CAMPI_INDIRIZZO),
+                    # va sull'etichetta e muore con lui: quella parla al
+                    # CORRIERE del recapito, questa al VENDITORE
+                    # dell'oggetto.
+                    "nota_compratore TEXT DEFAULT ''",
                     # LO SCONTO CARRELLO (ago 2026), voce di TESTATA.
                     # ATTENZIONE, ed e' la riga da leggere prima di
                     # toccare qualunque strada del denaro: questa e'
@@ -11409,6 +11438,62 @@ def _indirizzo_letto(blob: str):
     return dati if isinstance(dati, dict) else None
 
 
+MAX_NOTA = 200
+
+
+def _nota_da_payload(d) -> str:
+    """La nota del compratore al venditore, normalizzata.
+
+    UNA RIGA SOLA: gli spazi si collassano e gli a-capo se ne vanno,
+    come nel punto di ritiro. E' quel che fa bastare esc() alla resa —
+    niente white-space:pre-wrap da ricordarsi in tre posti — e fa
+    funzionare i puntini della riga compatta. Duecento caratteri di
+    preferenza non vogliono paragrafi: chi compra cinque cose scrive
+    «maglia rossa: L, scarpe: 42», e il segnaposto glielo insegna.
+
+    IL 400 E NON IL TRONCAMENTO, che e' l'unica cosa in cui non si
+    segue il punto (che tronca a 120 in silenzio): una prosa tagliata a
+    meta' resta leggibile e puo' INVERTIRSI — «taglia L, non la M»
+    diventa «taglia L, non la». E' la regola gia' scritta per la busta.
+    Qui per giunta non esiste il client di ieri — il campo nasce oggi —
+    quindi il 400 non puo' essere il vicolo cieco che la tolleranza del
+    punto esisteva per evitare.
+
+    CHIAVE ASSENTE E STRINGA VUOTA SONO LA STESSA COSA, al contrario
+    dell'indirizzo (dove la presenza della chiave E' la dichiarazione,
+    e accende indirizzo_atteso): qui non c'e' niente da dichiarare, e
+    il vuoto DEVE poter cancellare — una nota si toglie."""
+    testo = " ".join(str(d.get("nota_compratore") or "").split())
+    if len(testo) > MAX_NOTA:
+        raise HTTPException(400, f"La nota è troppo lunga (massimo "
+                                 f"{MAX_NOTA} caratteri)")
+    return testo
+
+
+def _coda_nota(prima: bool, dopo: bool) -> str:
+    """Cosa dire al venditore quando la nota cambia. Puro, come
+    _coda_ricevuta: prende due BOOL e non il testo, quindi nel
+    messaggio la nota non ci puo' entrare per costruzione.
+
+    TRE TRANSIZIONI E NON DUE: la nota TOLTA va detta, o chi vende
+    resta a preparare il pacco su una riga che non c'e' piu'.
+
+    STATICA, ed e' la regola da non ammorbidire: il testo del
+    compratore in un tubo HTML non ci entra MAI — un «<» spegnerebbe
+    l'avviso e nessuno se ne accorgerebbe (la lezione dell'avviso di
+    spedizione). La nota si legge nell'ordine, sotto esc()."""
+    if dopo and not prima:
+        return ("📝 <b>L'acquirente ti ha lasciato una nota</b> "
+                "sull'ordine: leggila prima di preparare la consegna.")
+    if dopo:
+        return ("📝 <b>L'acquirente ha cambiato la sua nota</b>: "
+                "rileggila prima di preparare la consegna.")
+    if prima:
+        return ("📝 <b>L'acquirente ha tolto la sua nota</b>: "
+                "nell'ordine non c'è più niente da leggere.")
+    return ""
+
+
 def _tariffa_dichiarata(a, via: str) -> tuple:
     """(sats, eur) della tariffa di spedizione per la via chiesta:
     'punto' con la dichiarazione accesa usa le colonne punto — anche
@@ -14393,6 +14478,16 @@ async def _compra_set(user: dict, d: dict) -> dict:
             con.close()
             raise
 
+    # LA NOTA DEL COMPRATORE, col patto del gemello nel mono: fuori da
+    # ogni ramo di via (parla dell'oggetto, non della strada) e prima
+    # della invoice. Qui vale il doppio: nel carrello la nota e' UNA
+    # per tutto l'ordine, e a dire di quale pezzo parla e' chi scrive.
+    try:
+        nota = _nota_da_payload(d)
+    except HTTPException:
+        con.close()
+        raise
+
     # --- Fail-fast di cortesia sullo stock, riga per riga (quello
     # che fa fede e' il ricontrollo dopo la invoice, come nel mono)
     for aid, qta in richieste.items():
@@ -14639,14 +14734,14 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
-        "tipo_punto,"
+        "tipo_punto,nota_compratore,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, rete, tipo, ind, adesso if ind else 0,
+         punto, via_punto, rete, tipo, nota, ind, adesso if ind else 0,
          ind_atteso,
          sped, prot, pezzi,
          # la percentuale si fotografa SOLO se lo sconto e' scattato,
@@ -14704,6 +14799,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
             "rete_punto": rete, "tipo_punto": tipo,
+            "nota_compratore": nota,
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
                        "titolo": r["titolo"], "quantita": r["quantita"],
@@ -15587,6 +15683,20 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             raise
 
+    # LA NOTA DEL COMPRATORE sta FUORI da ogni ramo di via, ed e' la
+    # riga da non spostare dentro un «if»: vale sulla spedizione come
+    # sul ritiro a mano, sul codice online e sull'ordine d'asta che una
+    # via non l'ha ancora scelta — parla dell'OGGETTO, non di come
+    # arriva. Qui come le sorelle: PRIMA della invoice (un 400 dopo
+    # lascerebbe una fattura viva senza un ordine su cui posarsi) e col
+    # con.close() sulla via del rifiuto, che a questo punto la
+    # connessione e' gia' aperta.
+    try:
+        nota = _nota_da_payload(d)
+    except HTTPException:
+        con.close()
+        raise
+
     # LA RIPRESA (ago 2026): il compratore pentito che RITENTA non e'
     # un rivale — il messaggio d'attesa resta SOLO per gli altri, che
     # e' l'anti-doppio-acquisto e va bene cosi'. Se ha gia' un ordine
@@ -15650,6 +15760,24 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     (ind, mio["indirizzo_il"] or int(time.time()),
                      mio["id"]))
                 con.commit()
+            # LA NOTA segue la stessa strada dell'indirizzo — fuori dal
+            # confronto e riscritta qui — ma per una ragione DIVERSA, e
+            # va detta: l'indirizzo sta fuori perche' il suo blob non e'
+            # confrontabile, la nota perche' NON TOCCA IL PREZZO —
+            # correggere un refuso non deve annullare l'ordine e coniare
+            # una fattura nuova. Il punto invece nel confronto c'e', e
+            # ci sta bene: cambiarlo puo' cambiare la tariffa.
+            # ⚠️ NIENTE «nota and», ed e' la trappola di questa riga: la
+            # guardia dell'indirizzo qui sopra ce l'ha perche' un
+            # indirizzo vuoto vuol dire «non su questa strada», mentre
+            # per la nota IL VUOTO E' UN VALORE — copiando la forma del
+            # vicino, «cancello la nota e ripago» fallirebbe in
+            # silenzio, lasciando in piedi la nota di prima.
+            if nota != (mio["nota_compratore"] or ""):
+                con.execute(
+                    "UPDATE ordini SET nota_compratore=? "
+                    "WHERE id=? AND stato='creato'", (nota, mio["id"]))
+                con.commit()
             con.close()
             # La divisione a ritroso RIAGGIUNGE lo sconto (ago 2026, il
             # mono sconta): prezzo_sats nasce gia' scontato, quindi
@@ -15673,6 +15801,10 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "consegna": mio["consegna_scelta"],
                     "punto_ritiro": mio["punto_ritiro"],
                     "via_punto": mio["via_punto"] or 0,
+                    # la nota FRESCA e non mio["nota_compratore"]: la
+                    # riga e' stata letta PRIMA dell'UPDATE qui sopra,
+                    # quindi quel campo e' gia' stantio
+                    "nota_compratore": nota,
                     "quantita": mio["quantita"],
                     "articolo_unitario_sats":
                         (art + sc) // (mio["quantita"] or 1),
@@ -15990,14 +16122,16 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO ordini(annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,punto_ritiro,via_punto,rete_punto,tipo_punto,"
+        "nota_compratore,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
          cambio_ordine, scelta, punto, via_punto, rete, tipo,
+         nota,
          ind, int(time.time()) if ind else 0, ind_atteso,
          sped, prot, richiesti,
          sconto, pct if sconto else 0, sped_gratis_sats))
@@ -16037,6 +16171,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "protezione_sats": prot, "consegna": scelta,
             "punto_ritiro": punto, "via_punto": via_punto,
             "rete_punto": rete, "tipo_punto": tipo,
+            "nota_compratore": nota,
             "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
 
@@ -16316,6 +16451,13 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         msg += ("\n\n🏠 Il compratore ha scelto la <b>spedizione a "
                 "casa</b>: indicherà l'indirizzo nell'ordine, e ti "
                 "avviseremo appena lo scrive.")
+    # LA NOTA e' un «if» a se' e non un quinto ramo della catena qui
+    # sopra: quella e' mutuamente esclusiva sulla STRADA, la nota no —
+    # si puo' avere una nota su qualunque via, e su nessuna. Il testo
+    # non ci entra: la frase la fa il giudice _coda_nota, che prende
+    # dei bool proprio per non poterlo interpolare.
+    if o["nota_compratore"]:
+        msg += "\n\n" + _coda_nota(False, True)
     await notifica(o["venditore_id"], msg)
     # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
     # ci passano il poll della Mini App e le due funzioni dell'orologio,
@@ -16403,6 +16545,59 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
                        "ritiro</b>: lo trovi nell'ordine, ora puoi "
                        "spedire.")
     return {"ok": True, "punto_ritiro": punto, "tipo_punto": tipo}
+
+
+@app.post("/api/orders/{ordine_id}/nota")
+async def indica_nota(ordine_id: int, req: Request,
+                      x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """Il COMPRATORE scrive, cambia o TOGLIE la sua nota al venditore
+    dentro l'ordine. La nota si lascia alla cassa, prima di «Paga»; qui
+    si corregge — e si aggiunge, per chi alla cassa se l'e' dimenticata
+    — finche' il venditore non spedisce.
+
+    TRE DIVERGENZE DAL FRATELLO indica_punto_ritiro, tutte dichiarate:
+
+    1) IL VUOTO SI AMMETTE, ed e' l'inverso esatto del punto. La' il
+       vuoto si rifiuta perche' segna_spedito ci si aggancia, e
+       svuotare rimetterebbe il venditore in trappola su un ordine gia'
+       compilato; la nota non e' la guardia di NIENTE, ed e'
+       facoltativa: una nota che non si puo' togliere e' una nota che
+       non si puo' correggere all'ingiu' («la variante blu non la
+       voglio piu'»). Chi «riparasse» l'omissione rimetterebbe un
+       vicolo cieco: c'e' la prova.
+    2) NESSUN GATE SULLA VIA. Il punto esige via_punto, l'indirizzo la
+       spedizione non-punto; la nota vale su tutte le strade e anche
+       sull'ordine d'asta che una via non l'ha ancora scelta.
+    3) L'UPDATE E' CONDIZIONATO al cambio, non solo la notifica: senza,
+       ri-salvare lo stesso testo squillerebbe al venditore per niente.
+
+    Il resto e' il calco: 400 opaco che non distingue «non e' tuo» da
+    «non esiste», nessuna colonna di servizio toccata, notifica STATICA
+    fuori dalla connessione."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    # il giudice PRIMA di aprire il db: un 400 non lascia mai una
+    # connessione dietro di se' (il patto del fratello)
+    nota = _nota_da_payload(d)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='locked'", (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    prima = o["nota_compratore"] or ""
+    if prima != nota:
+        con.execute("UPDATE ordini SET nota_compratore=? WHERE id=?",
+                    (nota, ordine_id))
+        con.commit()
+    con.close()
+    if prima != nota:
+        # il journal dice il FATTO e la misura, mai il testo (il patto
+        # del contenuto digitale)
+        print(f"📝 Nota ordine #{ordine_id}: {len(prima)} -> {len(nota)} car.")
+        await notifica(o["venditore_id"], _coda_nota(bool(prima), bool(nota)))
+    return {"ok": True, "nota_compratore": nota}
 
 
 @app.post("/api/orders/{ordine_id}/indirizzo")
@@ -21627,12 +21822,27 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
         nota_indirizzo = (
             f"\n🏠 Spedizione a CASA: {stato_ind}. L'indirizzo lo "
             f"leggono solo le parti: non è mostrato ai moderatori.")
+    # LA NOTA DEL COMPRATORE, e qui la regola SI ROVESCIA: di indirizzo
+    # e busta il moderatore vede il SE e il QUANDO, di questa vede anche
+    # il COSA — esce da /api/orders come ogni altra colonna, ed e' una
+    # scelta dichiarata anche nella pagina «I tuoi dati». Il motivo e'
+    # lo stesso del contenuto digitale: «avevo chiesto la taglia L» e'
+    # una lite che senza leggerla non si decide.
+    # Il testo comunque NON si interpola qui — si legge nell'ordine,
+    # sotto esc() — e la variabile non si chiama nota_* come le vicine:
+    # li' «nota» vuol dire «la riga PER il moderatore», e la cosa di cui
+    # si parla si chiama a sua volta nota.
+    avviso_nota = ""
+    if o["nota_compratore"]:
+        avviso_nota = ("\n📝 L'acquirente aveva lasciato una NOTA "
+                       "sull'ordine: la LEGGI nel dettaglio — a "
+                       "differenza dell'indirizzo e della busta.")
     con.close()
     for admin in ADMIN_IDS:
         await notifica(admin, f"⚠️ <b>Disputa aperta</b> sull'ordine #{ordine_id}. "
                               "I sats restano bloccati in attesa della tua "
                               "decisione." + nota_digitale + nota_punto
-                              + nota_indirizzo)
+                              + nota_indirizzo + avviso_nota)
     await notifica(o["venditore_id"],
                    "⚠️ L'acquirente ha aperto una <b>disputa</b>. Un moderatore "
                    "vi contattera' entrambi. I sats restano nel deposito "

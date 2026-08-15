@@ -3292,6 +3292,371 @@ def prove_indirizzo_casa():
     vero.close()
 
 
+def prove_nota_compratore():
+    """LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
+    dire sull'OGGETTO — la taglia, il numero, la variante.
+
+    SEGUE IL PUNTO E NON L'INDIRIZZO, ed e' quello che queste prove
+    sorvegliano: in chiaro, letta anche dal moderatore, senza scopa.
+    Le tre divergenze dal fratello punto — il vuoto ammesso, nessun
+    gate sulla via, l'UPDATE condizionato — sono le righe che un
+    riordino «uniformante» toglierebbe per prime."""
+    print("\n[la nota del compratore]")
+    import asyncio
+    import sqlite3
+    import time as _t
+
+    src = _SORGENTE
+    giu = pezzo("_nota_da_payload").split('"""')[-1]
+    coda = pezzo("_coda_nota").split('"""')[-1]
+    post = pezzo("indica_nota").split('"""')[-1]
+    compra = pezzo("compra")
+    cset = pezzo("_compra_set")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- il giudice: una riga, un tetto con un nome ------------------
+    prova("il tetto ha un nome e non un letterale", True,
+          "MAX_NOTA = 200" in src and "MAX_NOTA" in giu)
+    prova("...e il 400 e' esplicito, MAI il troncamento silenzioso",
+          True, "raise HTTPException(400" in giu
+          and "[:MAX_NOTA]" not in giu and "[:200]" not in giu)
+    prova("la nota resta UNA riga: spazi collassati, a-capo tolti",
+          True, '" ".join(' in giu and ".split()" in giu)
+    prova("il giudice e' UNO, con tre chiamanti",
+          4, src.count("_nota_da_payload("))
+    # --- dove si legge: fuori da ogni ramo di via, prima della invoice
+    for nome, corpo in (("compra", compra), ("_compra_set", cset)):
+        # l'indentazione di CORPO FUNZIONE (4 spazi): dentro un «if»
+        # sarebbero 8, ed e' cosi' che si vede se qualcuno l'ha
+        # infilata in un ramo della consegna
+        prova(f"{nome}: la nota si legge fuori da ogni ramo di via", 1,
+              corpo.count("\n        nota = _nota_da_payload(d)"))
+        prova(f"{nome}: ...e PRIMA della invoice", True,
+              corpo.index("_nota_da_payload")
+              < corpo.index("crea_invoice_escrow("))
+        prova(f"{nome}: ...col con.close() sulla via del rifiuto", True,
+              "nota = _nota_da_payload(d)\r\n    except HTTPException:"
+              in corpo.replace("\n", "\r\n").replace("\r\r", "\r"))
+        prova(f"{nome}: la colonna entra nell'INSERT", True,
+              "nota_compratore," in corpo)
+    # --- la ripresa: fuori dal confronto, ma RISCRITTA ---------------
+    _rip = compra[compra.index("stessa = ("):compra.index("# Rinnovo")]
+    # SI GUARDA IL NOME DELLA COLONNA dentro l'espressione `stessa`, e
+    # non una forma indovinata del confronto: la prima stesura cercava
+    # 'mio["nota_compratore"]) == nota' e la tortura ci e' passata
+    # attraverso — il codice vero scrive `(... or "") == nota`, che
+    # quella riga non vedeva. La sentinella che cerca UNA scrittura
+    # possibile certifica solo quella.
+    _stessa = compra[compra.index("stessa = ("):compra.index("viva = ")]
+    prova("la ripresa non confronta la nota (rifarebbe la fattura)",
+          False, "nota_compratore" in _stessa)
+    prova("...ma la RISCRIVE, o si corregge e non cambia niente", True,
+          'if nota != (mio["nota_compratore"] or ""):' in _rip
+          and "UPDATE ordini SET nota_compratore=?" in _rip)
+    # ⚠️ LA TRAPPOLA DEL CANTIERE: la guardia dell'indirizzo qui sopra
+    # ha un «ind and» perche' un indirizzo vuoto vuol dire «non su
+    # questa strada»; per la nota IL VUOTO E' UN VALORE, e copiando la
+    # forma del vicino «svuoto e ripago» fallirebbe in silenzio.
+    prova("...e NON ha il «nota and» copiato dall'indirizzo",
+          False, "if nota and" in _rip)
+    prova("...e la risposta porta la nota FRESCA, non quella letta",
+          True, '"nota_compratore": nota,' in _rip)
+    # --- l'endpoint: le tre divergenze dal punto ---------------------
+    prova("l'endpoint e' del COMPRATORE, su 'locked'", True,
+          "compratore_id=?" in post and "'locked'" in post)
+    prova("...col 400 opaco dei fratelli (chi enumera non impara)",
+          True, "Operazione non permessa" in post)
+    prova("DIVERGENZA 1: il vuoto si AMMETTE — la nota si toglie",
+          False, "if not nota:" in post)
+    prova("DIVERGENZA 2: nessun gate sulla via (vale su tutte)", [],
+          [x for x in ('o["via_punto"]', "consegna_scelta") if x in post])
+    prova("DIVERGENZA 3: l'UPDATE e' condizionato al cambio", True,
+          post.index("if prima != nota:") < post.index("UPDATE ordini"))
+    _set = post[post.index("UPDATE ordini SET"):post.index("WHERE id=?")]
+    prova("...e non tocca stato, aggiornato, consegnato", [],
+          [x for x in ("stato=", "aggiornato=", "consegnato=") if x in _set])
+    prova("il journal dice la misura, mai il testo", True,
+          "len(nota)" in post and "{nota}" not in post)
+    # --- le notifiche: statiche, e il testo non ci entra -------------
+    prova("la coda e' un giudice PURO: prende bool, non il testo", True,
+          "def _coda_nota(prima: bool, dopo: bool)" in src)
+    prova("...con TRE transizioni: la nota TOLTA va detta", True,
+          "ha tolto la sua nota" in coda)
+    prova("...e le tre frasi vivono in UN posto solo", [1, 1, 1],
+          [src.count("ti ha lasciato una nota"),
+           src.count("ha cambiato la sua nota"),
+           src.count("ha tolto la sua nota")])
+    prova("il testo non entra MAI in un tubo HTML", [],
+          [f for f in ("indica_nota", "_incassa_ordine", "apri_disputa")
+           if "{nota}" in pezzo(f) or "{nota_compratore}" in pezzo(f)])
+    _inc = pezzo("_incassa_ordine")
+    prova("«Hai venduto»: la nota e' un «if» a se', non un quinto elif",
+          True, 'if o["nota_compratore"]:' in _inc
+          and 'elif o["nota_compratore"]' not in _inc)
+    prova("...e passa dal giudice invece di scrivere la frase a mano",
+          True, "_coda_nota(False, True)" in _inc)
+    # LA RICEVUTA DEL COMPRATORE NON CRESCE: chi compra sa cosa ha
+    # scritto, e un sesto bool su un giudice puro a sei rami sarebbe
+    # un ramo in piu' per zero informazione.
+    prova("_coda_ricevuta resta cieca alla nota", False,
+          "nota" in pezzo("_coda_ricevuta"))
+    # --- il moderatore la LEGGE: niente pop, e la disputa lo dice ----
+    prova("lo strip di /api/orders NON la poppa", False,
+          'r.pop("nota_compratore"' in pezzo("miei_ordini"))
+    _ad = pezzo("apri_disputa")
+    prova("la disputa la nomina...", True, "avviso_nota" in _ad)
+    prova("...senza decifrare niente e senza il testo dentro", True,
+          "_decifra" not in _ad.replace("# ", "")
+          or "avviso_nota = (" in _ad)
+    # --- niente scopa: la nota resta ---------------------------------
+    prova("nessuna scopa la cancella (resta come il punto)", [],
+          [f for f in ("pulisci_indirizzi", "pulisci_ordini_fantasma")
+           if "nota_compratore" in pezzo(f)])
+    # --- le strade del denaro non sanno che esiste -------------------
+    for nome in ("_sblocca_sats", "_rimborsa_compratore", "paga_venditore"):
+        prova(f"{nome} e' cieco alla nota", False,
+              "nota_compratore" in pezzo(nome))
+    # --- Nostr non la vede: e' del checkout, non dell'annuncio -------
+    for nome in ("tag_commercio", "evento_annuncio"):
+        prova(f"{nome} non porta la nota fuori", False,
+              "nota_compratore" in pezzo(nome))
+
+    # --- il client ---------------------------------------------------
+    prova("client: il tetto e' lo specchio del server", True,
+          "const MAX_NOTA = 200;" in mini)
+    prova("client: la nota viaggia dalla FABBRICA e non dai varchi",
+          True, "out.nota_compratore" not in mini
+          and "nota_compratore: nota" in mini)
+    # i varchi che POSTano sono TRE (startBuy, startBuySet e il ⚡ NWC):
+    # sparsa a mano, il terzo la dimentica — e nessun collaudo lo
+    # esercita, perche' in locale un wallet non c'e'
+    prova("client: i chiamanti di corpoConsegna restano tre", 3,
+          mini.count("...corpoConsegna()"))
+    prova("client: ...e nessuno dei tre la aggiunge per conto suo", [],
+          [n for n, f in (("startBuy", "async function startBuy(){"),
+                          ("startBuySet", "async function startBuySet(){"),
+                          ("compraSubito",
+                           "async function confermaCompraSubito(btn){"))
+           if "nota_compratore" in pezzo_js(mini, f)])
+    prova("client: la nota sopravvive all'annuncio storico (via '')",
+          True, "if (!v) return extra;" in mini)
+    prova("client: il cassetto ha un id suo e lo stato in acqDati",
+          True, 'id="acqNotaCampo"' in mini
+          and "acqDati.notaAperta = true" in mini)
+    # ...ED E' MONTATO DAVVERO: che il cassetto esista come stringa non
+    # dice che qualcuno lo disegni — togliendolo dallo scheletro la
+    # riga di sopra restava verde (l'ha detto la tortura). Si guarda
+    # anche il POSTO: dopo le vie e prima del conto.
+    prova("client: ...ed e' montato nello scheletro, dopo le vie", True,
+          "${vie}${note}${cassettoNota}" in mini)
+    prova("client: le due chiavi nascono nei DUE costruttori", 2,
+          mini.count("nota:'', notaAperta:false,"))
+    prova("client: la resa passa da esc(), nella cassa e nell'ordine",
+          True, "esc(notaScritta)" in mini
+          and pezzo_js(mini, "function pannelloNota(o){").count(
+              "esc(scritta)") >= 3)
+    # NIENTE guardia: la nota e' facoltativa, e una guardia la
+    # renderebbe obbligatoria — e' la sola cosa che non deve succedere
+    _cta = pezzo_js(mini, "function ctaAcquisto(){")
+    _sub = pezzo_js(mini, "function compraSubito(){")
+    prova("client: «Paga» non la esige (e' facoltativa)", 0,
+          _cta.count("apriNotaAcquisto") + _sub.count("apriNotaAcquisto"))
+    # e il cassetto non appartiene a nessuna via: cambiare strada non
+    # deve chiuderlo
+    # il taglio STRETTO sulla graffa e non sul default a riga vuota:
+    # dopo setViaAcquisto non c'e' una riga bianca, e il default
+    # scavalcava la funzione fino a pescare apriNotaAcquisto — cioe'
+    # la sentinella sarebbe stata rossa per il motivo sbagliato
+    prova("client: cambiare via non chiude il cassetto della nota",
+          False, "notaAperta" in
+          pezzo_js(mini, "function setViaAcquisto(v){", "\n}"))
+    _pan = pezzo_js(mini, "function pannelloNota(o){")
+    prova("client: il MODERATORE la legge (nessun early return admin)",
+          False, "o.role==='admin') return ''" in _pan)
+    prova("client: ...e al moderatore si dichiara l'asimmetria", True,
+          "l'indirizzo di casa e la busta di ritiro no" in _pan)
+    prova("client: il pannello Spedisci fa da cartello, non ripete",
+          True, "la leggi nel riquadro qui sotto" in mini)
+    prova("client: il segnaposto ha un giudice unico, due chiamanti",
+          2, mini.count("segnaposNota("))
+    prova("client: ...e nel carrello invita a nominare la cosa", True,
+          "la maglia rossa: taglia L" in mini)
+    prova("client: le due etichette dicono la differenza", True,
+          "Note per il corriere (citofono, scala, orari)" in mini
+          and "Nota per il venditore (facoltativa)" in mini)
+    prova("client: il campo dice di non scriverci il recapito", True,
+          "non il tuo recapito" in mini)
+    prova("la pagina «I tuoi dati» dichiara la quarta cosa", True,
+          "Quattro cose non ce le dai" in mini)
+    prova("...e che la nota il moderatore la legge", True,
+          "E la nota che hai scritto a chi vende, sì." in mini)
+
+    # ================================================================
+    # IL FUNZIONALE: il giudice e l'endpoint VERI
+    # ================================================================
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    amb_g = {"HTTPException": _H, "MAX_NOTA": 200}
+    exec(pezzo("_nota_da_payload"), amb_g)
+    gd = amb_g["_nota_da_payload"]
+
+    def giudica(v):
+        try:
+            return gd({"nota_compratore": v})
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    prova("chiave assente = vuoto", "", gd({}))
+    prova("None = vuoto", "", giudica(None))
+    prova("solo spazi = vuoto (e cosi' si cancella)", "", giudica("   "))
+    prova("gli spazi si collassano", "taglia L", giudica("taglia   L"))
+    prova("gli a-capo diventano spazi: una riga sola",
+          "taglia L numero 42", giudica("taglia L\nnumero 42"))
+    prova("il testo si strippa", "taglia L", giudica("  taglia L  "))
+    prova("200 caratteri passano", 200, len(giudica("x" * 200)))
+    prova("201 no, col 400 esplicito e il numero dentro", True,
+          giudica("x" * 201) == "400 La nota è troppo lunga (massimo "
+                                "200 caratteri)")
+
+    amb_c = {}
+    exec(pezzo("_coda_nota"), amb_c)
+    cn = amb_c["_coda_nota"]
+    prova("la coda: nasce", True, "lasciato una nota" in cn(False, True))
+    prova("la coda: cambia", True, "cambiato la sua nota" in cn(True, True))
+    prova("la coda: si toglie", True, "tolto la sua nota" in cn(True, False))
+    prova("la coda: niente da dire", "", cn(False, False))
+
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.executescript("""
+      CREATE TABLE ordini(
+        id INTEGER PRIMARY KEY, compratore_id INT, venditore_id INT,
+        stato TEXT, consegna_scelta TEXT DEFAULT 'spedizione',
+        via_punto INT DEFAULT 0, aggiornato INT DEFAULT 0,
+        spedito_il INT DEFAULT 0, consegnato INT DEFAULT 0,
+        nota_compratore TEXT DEFAULT '');
+      -- 1 spedizione a casa · 2 via punto · 3 ritiro · 4 digitale
+      -- 5 asta senza via scelta · 6 gia' spedito · 7 chiuso
+      INSERT INTO ordini(id,compratore_id,venditore_id,stato,consegna_scelta,via_punto)
+        VALUES(1,111,222,'locked','spedizione',0),
+              (2,111,222,'locked','spedizione',1),
+              (3,111,222,'locked','ritiro',0),
+              (4,111,222,'locked','digitale',0),
+              (5,111,222,'locked','',0),
+              (6,111,222,'shipped','spedizione',0),
+              (7,111,222,'released','spedizione',0);
+    """)
+    vero.commit()
+
+    class Con:
+        def execute(self, q, p=()):
+            return vero.execute(q, p)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    avvisi = []
+
+    async def _notifica(tg, testo):
+        avvisi.append((tg, testo))
+
+    class _Req:
+        def __init__(self, d):
+            self._d = d
+
+    async def _leggi(req):
+        return req._d
+
+    def scrivi(chi, oid, testo):
+        amb = {"db": Con, "HTTPException": _H, "Request": object,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "verifica_utente": lambda h, s: {"id": chi},
+               "leggi_json": _leggi, "notifica": _notifica,
+               "MAX_NOTA": 200, "time": _t, "print": lambda *a, **k: None}
+        exec(pezzo("_nota_da_payload"), amb)
+        exec(pezzo("_coda_nota"), amb)
+        exec("async " + pezzo("indica_nota"), amb)
+        try:
+            return asyncio.new_event_loop().run_until_complete(
+                amb["indica_nota"](oid, _Req({"nota_compratore": testo})))
+        except _H as e:
+            return f"{e.code} {e.detail}"
+
+    prova("il venditore non la scrive", "400 Operazione non permessa",
+          scrivi(222, 1, "ciao"))
+    prova("l'estraneo nemmeno, e con la STESSA risposta",
+          "400 Operazione non permessa", scrivi(999, 1, "ciao"))
+    prova("...e l'ordine inesistente pure: chi enumera non impara",
+          "400 Operazione non permessa", scrivi(111, 404, "ciao"))
+    prova("a pacco partito non si tocca piu'",
+          "400 Operazione non permessa", scrivi(111, 6, "ciao"))
+    prova("...ne' a ordine chiuso", "400 Operazione non permessa",
+          scrivi(111, 7, "ciao"))
+    # LA DIVERGENZA CHE CONTA: nessun gate sulla via — la nota parla
+    # dell'oggetto, quindi vale anche dove una spedizione non c'e'
+    for oid, come in ((2, "punto"), (3, "ritiro"), (4, "digitale"),
+                      (5, "asta senza via")):
+        avvisi.clear()
+        prova(f"la nota vale anche su «{come}»", True,
+              isinstance(scrivi(111, oid, "taglia L"), dict))
+
+    avvisi.clear()
+    prima = [tuple(r) for r in vero.execute(
+        "SELECT stato, aggiornato, spedito_il, consegnato FROM ordini")]
+    r1 = scrivi(111, 1, "  taglia   L  ")
+    prova("il compratore la scrive, normalizzata", "taglia L",
+          r1["nota_compratore"])
+    prova("...e l'ordine non si e' mosso di un millimetro", prima,
+          [tuple(r) for r in vero.execute(
+              "SELECT stato, aggiornato, spedito_il, consegnato "
+              "FROM ordini")])
+    prova("...il venditore riceve UN avviso, senza il testo dentro",
+          True, len(avvisi) == 1 and avvisi[0][0] == 222
+          and "taglia" not in avvisi[0][1])
+
+    avvisi.clear()
+    scrivi(111, 1, "taglia L")
+    prova("riscrivere lo STESSO testo non squilla", [], avvisi)
+
+    avvisi.clear()
+    scrivi(111, 1, "taglia M")
+    prova("cambiarla squilla, e lo dice", True,
+          len(avvisi) == 1 and "cambiato" in avvisi[0][1])
+
+    avvisi.clear()
+    r2 = scrivi(111, 1, "")
+    prova("IL VUOTO CANCELLA (e' l'inverso del punto)", "",
+          r2["nota_compratore"])
+    prova("...la riga e' davvero vuota nel database", "",
+          vero.execute("SELECT nota_compratore FROM ordini "
+                       "WHERE id=1").fetchone()[0])
+    prova("...e al venditore si dice che non c'e' piu' niente", True,
+          len(avvisi) == 1 and "tolto" in avvisi[0][1])
+
+    avvisi.clear()
+    scrivi(111, 1, "")
+    prova("togliere una nota che non c'e' non squilla", [], avvisi)
+
+    # il testo ostile: nel database arriva INTERO, nell'avviso mai
+    avvisi.clear()
+    cattivo = 'taglia <b>L</b> & "grande"'
+    r3 = scrivi(111, 1, cattivo)
+    prova("il testo ostile arriva intero nel database", cattivo,
+          vero.execute("SELECT nota_compratore FROM ordini "
+                       "WHERE id=1").fetchone()[0])
+    prova("...ma nell'avviso non ci entra, e i <b> restano pari", True,
+          "<b>L</b>" not in avvisi[0][1]
+          and avvisi[0][1].count("<b>") == avvisi[0][1].count("</b>"))
+    prova("...e il 400 non rimanda mai il valore scritto", True,
+          "x" * 50 not in str(scrivi(111, 1, "x" * 300)))
+    vero.close()
+
+
 def prove_nascondi_ordine():
     """IL NASCONDERE DEGLI AFFARI CONCLUSI (ago 2026): nascondere, MAI
     cancellare — la riga resta nel database (libro mastro, feedback,
@@ -12642,6 +13007,7 @@ def prove_ricevuta_compratore():
               compratore_id INT, venditore_id INT, prezzo_sats INT,
               stato TEXT, quantita INT, consegna_scelta TEXT,
               via_punto INT DEFAULT 0, punto_ritiro TEXT DEFAULT '',
+              nota_compratore TEXT DEFAULT '',
               spedizione_sats INT DEFAULT 0, protezione_sats INT DEFAULT 0,
               sconto_sats INT DEFAULT 0,
               indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
@@ -12661,16 +13027,16 @@ def prove_ricevuta_compratore():
                 "venditore_id": 222, "prezzo_sats": 50000,
                 "stato": "creato", "quantita": 1,
                 "consegna_scelta": "spedizione", "via_punto": 0,
-                "punto_ritiro": ""}
+                "punto_ritiro": "", "nota_compratore": ""}
         riga.update(extra)
         con.execute(
             "INSERT INTO ordini(id,annuncio_id,compratore_id,venditore_id,"
             "prezzo_sats,stato,quantita,consegna_scelta,via_punto,"
-            "punto_ritiro) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "punto_ritiro,nota_compratore) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             tuple(riga[k] for k in
                   ("id", "annuncio_id", "compratore_id", "venditore_id",
                    "prezzo_sats", "stato", "quantita", "consegna_scelta",
-                   "via_punto", "punto_ritiro")))
+                   "via_punto", "punto_ritiro", "nota_compratore")))
         con.commit()
 
         class ConFinta:
@@ -18545,6 +18911,7 @@ def main():
               prove_pagamento_incerto, prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_indirizzo_casa,
+              prove_nota_compratore,
               prove_nascondi_ordine,
               prove_lista_ordini, prove_dettaglio_ordine,
               prove_ssrf_redirect, prove_quota_ricerca,
