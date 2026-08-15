@@ -4284,6 +4284,95 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   importati restano fuori per natura (consegna '': per consegnare il
   codice il venditore deve essere in piattaforma). Modello CSV con la
   riga d'esempio `digitale` (parser già coperto dal giudice unico).
+  LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
+  vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
+  codice di licenza» e che in colonna ha `consegna=''` — quel campo il
+  venditore non l'ha mai visto, non gliel'abbiamo mai offerto). Questa
+  voce EMENDA la riga qui sopra, «gli importati restano fuori per
+  natura»: restano fuori di DEFAULT, non per natura. NIENTE PANNELLO,
+  ed è una decisione presa sul numero: i casi misurati erano DUE su
+  cinque annunci senza via, e un pannello si giustifica solo se quel
+  numero cresce da solo a ogni giro d'import — si rimisura confrontando
+  due letture a una settimana di distanza, non a occhio. (I due erano
+  gli annunci 152 e 204, corretti a mano ad ago 2026.)
+  UN INDIZIO DAL CAMPO CHE VALE PIÙ DEL RAGIONAMENTO, e diventa il
+  criterio per il prossimo caso: quel venditore aveva GIÀ un terzo
+  annuncio dichiarato 'digitale' (il 197, Office 2021) — quindi la
+  strada la conosceva e l'aveva scelta altrove, e i due che mancavano
+  non erano una scelta diversa ma soltanto arrivati senza il campo.
+  È la prova più forte che il vuoto degli importati è un'ASSENZA e non
+  una preferenza. Quindi PRIMA di correggere si guarda se quel
+  venditore ha già dichiarato la via su un altro suo annuncio: se sì,
+  la deduzione non è più nostra — è la sua, letta su un'altra riga.
+  IL DANNO CHE RIPARA non è un campo mancante: con `consegna=''`
+  l'ordine nasce con `consegna_scelta=''`, cioè sul binario FISICO —
+  il pannello del codice risponde 400 (il gate è sull'ORDINE, non
+  sull'annuncio), l'unica strada resta `segna_spedito` col suo
+  corriere, e quindi **il codice passa in chat**, che è il principio
+  cardine della consegna digitale rovesciato. In più quell'ordine non
+  riceve NESSUN promemoria automatico: `sollecita_venditori_fermi`
+  filtra le due strade esplicite e la via non dichiarata resta fuori.
+  SOLO GLI IMPORTATI, e il perché non è «lì il campo non è stato
+  offerto» ma che l'importato non ha una via d'uscita in mano —
+  `modifica()` lo rifiuta apposta, perché l'import riporterebbe dentro
+  il testo. Il NATIVO con la via vuota è solo un annuncio più vecchio
+  del campo, e la Modifica è SUA: correggergliela sarebbe rovesciare
+  una scelta di qualcuno, e per giunta la sua ripassa da tutti gli
+  strati di moderazione mentre la nostra no.
+  LA FORMA DELL'UPDATE È QUELLA DEL GIUDICE: `consegna='digitale'`
+  azzera anche `anche_digitale`, `taglia_pacco` e tutte e sei le
+  colonne dei costi di spedizione — `consegna_da_payload` normalizza
+  così, e una riga che il giudice non potrebbe produrre è una riga che
+  la prima Modifica del venditore raddrizzerebbe in silenzio. La WHERE
+  RIPETE LA DECISIONE (`stato='attivo' AND consegna='' AND
+  contatto_nostr<>''`), quindi è idempotente e non tocca un nativo
+  nemmeno passandogli l'id (provato su una copia usa-e-getta: secondo
+  giro 0 righe, nativo nell'elenco 0 righe). `modificato` NON si tocca:
+  sugli importati è il timestamp dell'EVENTO, lo riscrive l'import a
+  ogni giro, e muoverlo sarebbe una bugia sulla data. `condizione`
+  nemmeno — il dato non si perde mai, a nasconderla dove non vuol dire
+  niente c'è `condizione_da_mostrare`: la regola degli alimentari.
+  LA SCORCIATOIA DA NON FARE, perché viene in mente per prima:
+  `anche_digitale=1` lasciando `consegna=''`. Funzionerebbe — le strade
+  disponibili guardano `consegna=='digitale' OR anche_digitale` — ma è
+  uno stato che il giudice dei payload NON può produrre (la combo vive
+  solo accanto a una modalità fisica), quindi la prima Modifica del
+  venditore lo azzererebbe senza dire niente a nessuno.
+  E LA CORREZIONE ARMA DUE TIMER, che è la parte da sapere prima di
+  lanciarla: i rami digitali di `controlla_scadenze` NON sono gatati da
+  `AUTO_SBLOCCO_ATTIVO` (24h dalla rivelazione, 48h dalla consegna mai
+  letta), quindi da lì in poi su quell'ordine i sats possono muoversi
+  da soli. È coerente col disarmo, che gatea i soli rami FISICI — là
+  l'ancora è la parola del venditore, qui un'azione del compratore o un
+  fatto che verifichiamo noi — ma chi corregge non sposta un'etichetta:
+  cambia il regime dell'ordine.
+  ECCEZIONE DICHIARATA, ed è la sola cosa che può far sparire la
+  correzione: `consegna=''` su un importato DIMOSTRA che il suo evento
+  non dichiara nessun tag di consegna — l'import scrive quella colonna
+  solo dentro `if spedisce or ritira`, e `scrivi_commercio` tocca le
+  sole chiavi dichiarate anche sul ramo UPDATE — quindi la correzione
+  sopravvive al giro orario PER COSTRUZIONE, senza nessun flag «non
+  ricoprire». Ma se un domani il venditore aggiunge un tag `shipping`
+  al suo evento, l'import riscrive `consegna` e azzera
+  `anche_digitale`: **la nostra correzione sparisce in silenzio.** È il
+  comportamento giusto — la sua dichiarazione vince sulla nostra
+  deduzione — e va scritto, o fra sei mesi sembrerà un guasto.
+  GLI ORDINI GIÀ NATI NON SI RIPARANO: `consegna_scelta` è fotografato
+  alla creazione e nessuna guardia lo rilegge dall'annuncio, quindi un
+  ordine vivo resta sul binario fisico per sempre e va chiuso a mano.
+  Si guarda PRIMA di correggere, non dopo.
+  E IL VENDITORE VA AVVISATO, che non è cortesia: la correzione gli
+  cambia il pannello sotto le mani — dove c'era «Spedisci» adesso c'è
+  il box del codice — e il DM lo raggiunge PER COSTRUZIONE, perché
+  l'import gli scrive la npub VERIFICATA e `notifica()` accetta proprio
+  quella (chi viene da Nostr non è senza contatto: è senza Telegram,
+  che è un'altra cosa). Il messaggio dice che il bottone adesso c'è e
+  che per premerlo deve entrare con la sua chiave — ed è la stessa cosa
+  che gli ha già detto `_chiedi_completamento`, che quella popolazione
+  la pesca da sé e nomina il caso del codice: la correzione a mano è
+  quel che resta DOPO che l'invito non ha funzionato, e non prima
+  (quel DM parte una volta sola per annuncio, `completamento_avvisato`,
+  quindi la strada dell'attesa è già finita).
   Offerte / contrattazione sul prezzo (lug 2026, modello Vinted; sara'
   la base del futuro «Lotto», fase 3): NON una chat — macchina a stati
   con al massimo UNA controproposta. Tabella `offerte` (annuncio,
