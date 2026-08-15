@@ -2621,6 +2621,19 @@
   .sicu-piede{margin-top:26px;padding:12px 14px;background:var(--card);
     border:1px solid var(--line);border-radius:14px;
     font-size:13.5px;font-weight:600;color:var(--ink-soft);text-align:center}
+  /* Il riquadro «documento in costruzione» in fondo a «I tuoi dati»:
+     l'unica regola che la pagina nuova aggiunge — tutto il resto lo
+     eredita dal vestito della sorella. La coppia ambra e' quella della
+     fascia del rodaggio (--sats-soft/--sats-text col bordo ₿): e' un
+     AVVISO e non un piede, e il piede grigio lo direbbe a voce troppo
+     bassa per una cosa che ammette quello che ancora manca.
+     Allineato a sinistra e non centrato: si legge, non si guarda. */
+  .priv-cantiere{margin-top:26px;padding:14px 16px;
+    background:var(--sats-soft);border:1.5px solid var(--sats);
+    border-radius:14px;font-size:13.5px;line-height:1.55;
+    font-weight:600;color:var(--sats-text)}
+  .priv-cantiere b{font-weight:800}
+  .priv-cantiere .btn{margin-top:10px}
   /* Lo stepper dentro Acquista: chip traslucido sull'arancio, tocchi
      da 26px, mai un <button> annidato (sono span con role) */
   .qta-mini{display:inline-flex;align-items:center;gap:2px;margin-left:12px;
@@ -4019,7 +4032,161 @@ document.getElementById('cartello')?.remove();</script>
       <button class="btn ghost" id="sicuShare"
               onclick="condividiSicurezza()">🔗 Condividi questa pagina</button>
 
+      <!-- Le due pagine sono sorelle e chi legge una cerca l'altra:
+           qui si spiega cosa succede ai tuoi SATS, di la' cosa succede
+           ai tuoi DATI. -->
+      <button class="btn ghost" style="margin-top:10px"
+              onclick="apriPrivacy()">🔐 E i tuoi dati?</button>
+
       <div class="sicu-piede">🫙 Domande, dubbi, o qualcosa che non torna? Scrivici: durante il rodaggio leggiamo tutto.</div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: I TUOI DATI ============ -->
+  <!-- La sorella di «Il pagamento protetto», e ne indossa il vestito:
+       le classi .sicu-* sono il VESTITO DELLA PAGINA LUNGA DI TESTO,
+       non il nome di un argomento — trenta regole gia' tarate per la
+       lettura. Rinominarle costerebbe trenta righe per zero pixel: e'
+       il patto dei nomi interni del carrello, che si chiamano «pacco»
+       da sempre.
+       Statica per intero (nessun dato utente: mai un esc() da
+       ricordare) tranne i numeri, che li scrivono scriviTempi(),
+       scriviGiorniIndirizzo() e scriviDurate() — e quei numeri NON si
+       battono a mano nemmeno qui: sono la promessa che facciamo su un
+       dato personale, e se l'operatore cambia una leva nel config del
+       VPS la pagina non deve dire il numero di ieri.
+       Raggiungibile anche dagli anonimi: uno cerca questa pagina
+       PRIMA di entrare, non dopo. -->
+  <div class="view" id="view-privacy">
+    <button class="back" onclick="tornaDaPrivacy()">← Torna</button>
+    <div class="sicu">
+      <div class="sicu-hero">
+        <img src="/assets/barattolo-hero.png" alt=""
+             onerror="this.onerror=null;this.src='/assets/barattolo.jpeg';this.classList.add('tessera')">
+        <div class="lockup" aria-hidden="true"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></div>
+        <h2>I tuoi dati</h2>
+        <p class="occhiello">Cosa sappiamo di te, per quanto tempo, e chi lo legge.</p>
+      </div>
+
+      <p class="sicu-apre">La risposta corta è: <b>pochissimo</b>. Per stare su Barattolo non ci lasci un'email, non scegli una password, non ci dai un numero di telefono. Entri con Telegram o con una chiave Nostr, e tutto il resto sono le cose che servono a fare un affare — quasi tutte le scrivi tu, quando servono, e alcune le cancelliamo da soli appena l'affare è finito.</p>
+
+      <h3>Chi sei, per noi</h3>
+      <p>Se entri da <b>Telegram</b> riceviamo quello che Telegram dà a tutte le sue Mini App: un <b>numero identificativo</b>, il tuo <b>nome</b> e lo <b>username</b> se ce l'hai. Se hai una foto profilo ne teniamo una copia nostra, piccola — mai un link ai file di Telegram, che portano dentro il token del bot e scadono. Se la tua foto è nascosta ai non-contatti, resta l'iniziale: quello è il tuo modo di dire no, e vale.</p>
+      <p>Se entri da <b>Nostr</b> riceviamo la tua <b>chiave pubblica</b>, e basta. La chiave privata non ce l'abbiamo mai: quando serve una firma la fa il tuo browser, o il tuo bunker, e quello che arriva qui è già firmato.</p>
+      <p>Password non ne abbiamo perché non esistono: la porta la apre Telegram, oppure una firma tua. Non c'è niente da rubarci che ti apra l'account.</p>
+
+      <h3>Cosa nasce mentre usi il mercatino</h3>
+      <ul class="sicu-lista">
+        <li>I tuoi <b>annunci</b>: sono pubblici per definizione — è il loro mestiere.</li>
+        <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
+        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello.</li>
+        <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu.</li>
+        <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
+      </ul>
+
+      <h3 id="priv-indirizzo">Quello che chiediamo solo quando serve</h3>
+      <p>Tre cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b>.</p>
+      <ul class="sicu-lista">
+        <li><b>L'indirizzo di casa</b>, se scegli la spedizione a casa. Lo vede <b>solo chi ti vende</b>, per stampare l'etichetta.</li>
+        <li><b>Il punto di ritiro</b> che scegli, se preferisci quella strada — lì un indirizzo tuo non c'è proprio.</li>
+        <li><b>Il codice</b> di un buono o di un prodotto digitale, che chi vende consegna qui dentro invece che in chat.</li>
+      </ul>
+      <!-- LA PRIMA DELLE TRE AFFERMAZIONI DELICATE (ago 2026). Questa
+           voce dice ad alta voce una cosa che nessuna pagina aveva mai
+           detto: se l'ordine non si chiude MAI, l'indirizzo resta —
+           nessuna delle due WHERE di pulisci_indirizzi tocca gli stati
+           locked/shipped/dispute. Non si ammorbidisce, e il paragrafo
+           finisce con la strada che l'utente ha in mano.
+           «Senza aspettare nessuna scadenza» e non «entro dieci
+           minuti»: quel numero e' l'intervallo dell'orologio, che non
+           e' una leva — battuto a mano violerebbe il patto delle
+           durate, e la frase e' vera comunque. -->
+      <p><b>L'indirizzo lo trasportiamo, non lo conserviamo.</b> Appena confermi di aver ricevuto l'oggetto viene cancellato, senza aspettare nessuna scadenza: da quel momento l'affare è chiuso e quello che succede fra te e chi vende non ci riguarda più. Se l'ordine si chiude <i>senza</i> quella conferma — un rimborso, una disputa decisa da un moderatore — sparisce entro <b><span data-giorni-ind></span> giorni</b>.</p>
+      <p><b>Ma se l'ordine non si chiude mai, il tuo indirizzo resta lì.</b> Non c'è nessun timer che lo cancelli comunque, ed è una scelta: finché un affare è aperto quell'indirizzo è l'unica cosa che permette a chi vende di spedirti il pacco, e cancellarlo vorrebbe dire chiudere l'affare al posto tuo. Non è un caso raro — un venditore che sparisce, un pacco che non parte — ed è la coda che finisce sotto gli occhi di un moderatore. Fino ad allora l'indirizzo aspetta insieme all'ordine.</p>
+      <p class="sicu-nota">Se vuoi che sparisca, la strada è chiudere l'affare: confermare la ricezione, o aprire una disputa.</p>
+
+      <h3 id="priv-cifrato">Cosa vuol dire «cifrato»</h3>
+      <!-- LA SECONDA. Il codice lo dice gia' di se' («cifrarlo protegge
+           un backup rubato, non di piu': il server resta il custode per
+           costruzione»), e qui lo si dice a chi legge. La chiave sul
+           VPS c'e' — verificata con Andrea — altrimenti busta e
+           contenuto digitale finirebbero in chiaro col prefisso
+           `plain:` e questa voce sarebbe falsa. -->
+      <p><b>Vuol dire al riparo da un database rubato, non da noi.</b> L'indirizzo di casa, il codice di ritiro della busta e il contenuto di un buono digitale non stanno in chiaro: sono cifrati, e la chiave non è dentro il database. Se qualcuno ne rubasse una copia — un backup, il file del database — quelle tre cose resterebbero illeggibili.</p>
+      <p><b>La chiave però sta sullo stesso server che ti risponde</b>, perché è lì che serve per mostrare l'indirizzo a chi vende quando apre l'ordine. Quindi finché quel dato è lì, il server lo può leggere — e chi amministra il server anche. Non lo facciamo e non abbiamo nessuno strumento che lo faccia; nei log restano le impronte e mai i contenuti, e i messaggi d'errore sono scritti apposta per non contenere un CAP. Ma è una promessa nostra, non una garanzia della matematica.</p>
+      <p><b>L'unica garanzia vera è che il dato duri poco.</b> È per questo che l'indirizzo si cancella da solo, invece di restare lì «tanto è cifrato».</p>
+
+      <h3 id="priv-durate">Per quanto teniamo le cose</h3>
+      <ul class="sicu-lista">
+        <li><b>L'indirizzo di casa</b>: fino alla tua conferma, o <span data-giorni-ind></span> giorni dalla chiusura senza conferma. Qui sopra c'è la storia per intero.</li>
+        <li><b>La sessione del browser</b>, se entri dal web: <b><span data-durata="sessione"></span> giorni</b>, poi si rientra. Nel database non c'è il tuo accesso ma solo la sua impronta.</li>
+        <li><b>L'accesso da dentro Telegram</b> vale <b><span data-durata="initdata"></span> ore</b>: dopo, riaprendo l'app, se ne fa uno nuovo.</li>
+        <li><b>La memoria di quali avvisi ti abbiamo già mandato</b>: <b><span data-durata="avvisi"></span> giorni</b>, così lo stesso annuncio non ti risuona addosso.</li>
+        <li><b>La fattura di un pagamento</b> vive <b><span data-tempo="invoice"></span> minuti</b>. Se non la paghi, l'ordine non è mai esistito.</li>
+      </ul>
+      <p><b>Tutto il resto non ha una scadenza</b>, e non è una dimenticanza: annunci, ordini, voti e reputazione <i>sono</i> la memoria degli affari fatti, e servono a te quanto a chi commercia con te — una recensione che sparisce dopo un anno non è una recensione. Un ordine concluso puoi <b>nasconderlo</b> dalla tua lista quando non vuoi più vederlo: sparisce dalla vista, la riga resta.</p>
+
+      <h3>Chi legge cosa</h3>
+      <ul class="sicu-lista">
+        <li><b>Chiunque</b>, anche senza entrare: i tuoi annunci, il tuo nome e username, la tua chiave Nostr se l'hai dichiarata, il tuo negozio, i voti e i distintivi. Il numero identificativo di Telegram <b>non esce mai</b>.</li>
+        <li><b>Chi compra e chi vende</b>, dentro il loro ordine: quello che serve a portarlo a termine, l'indirizzo e il codice compresi.</li>
+        <li><b>I moderatori</b>, quando si apre una disputa: vedi qui sotto.</li>
+        <li><b>Noi</b>, nei limiti scritti qui sopra: il server può leggere quello che ha, finché ce l'ha.</li>
+      </ul>
+
+      <h3 id="priv-moderatori">Cosa vede un moderatore</h3>
+      <!-- LA TERZA. E' l'unica delle tre asimmetrie che si potrebbe
+           leggere come una svista, e per questo la pagina la dice
+           invece di generalizzare: indirizzo, busta e documento hanno
+           la guardia alle due parti, il contenuto digitale ha il ramo
+           admin_disputa. -->
+      <p><b>Il tuo indirizzo non lo legge.</b> Quando si apre una disputa un moderatore guarda l'ordine per decidere, e del tuo indirizzo non vede niente nemmeno lì: gli risulta soltanto <i>se</i> l'hai indicato e quando, mai una riga di quello che hai scritto. Lo stesso vale per il nome e il codice di ritiro della busta e per il documento del corriere: quelli li leggono solo chi compra e chi vende.</p>
+      <p><b>Il contenuto di un buono o di un codice digitale invece sì.</b> Se apri una disputa su un acquisto digitale, il moderatore lo legge. Non c'è modo di decidere quella lite senza guardarlo — è l'oggetto stesso del contendere, e chi la apre di solito dice proprio che quel codice non funziona.</p>
+      <p class="sicu-nota">Fuori dalle dispute quel contenuto non lo legge nessuno tranne te e chi te l'ha venduto. Se non vuoi che lo veda nessun altro, la strada è non aprire la disputa.</p>
+
+      <h3 id="priv-fuori">Cosa esce da qui</h3>
+      <ul class="sicu-lista sicu-cose">
+        <li><span class="em">✈️</span><b>Telegram.</b> Gli avvisi te li mandiamo col bot, quindi Telegram vede che ti abbiamo scritto e cosa c'è nel messaggio. Per questo gli avvisi su indirizzo, busta e codici sono scritti <b>vuoti apposta</b>: dicono «apri l'ordine», mai il contenuto. E i bottoni per scrivere alla controparte ti portano <b>fuori</b>, in una chat di Telegram: quella conversazione è vostra e di Telegram, non nostra — non la leggiamo, non ce l'abbiamo, e in una disputa non possiamo usarla.</li>
+        <li><span class="em">🟣</span><b>Nostr.</b> Gli annunci vanno sui <b>relay</b>, che sono di altri. Ritirare un annuncio manda anche la richiesta di cancellarlo, e i relay che la rispettano lo tolgono — ma nessuno può garantire che l'abbiano fatto tutti. <b>Quello che finisce su Nostr non torna indietro.</b> È il prezzo della piazza aperta, ed è la stessa proprietà che rende il tuo annuncio <i>tuo</i> anche il giorno che Barattolo non ci fosse più.</li>
+        <li><span class="em">⚡</span><b>Il nodo dei pagamenti.</b> Quando paghi, la fattura porta il numero dell'annuncio e il suo titolo — mai chi sei.</li>
+        <li><span class="em">🤖</span><b>L'intelligenza artificiale</b> che controlla gli annunci e risponde alle ricerche a parole: le arriva il testo dell'annuncio, o la domanda che hai scritto. <b>Mai chi sei.</b></li>
+        <li><span class="em">💱</span><b>Il cambio euro/bitcoin</b>, che chiediamo noi una volta al minuto e non il tuo browser: così nessun terzo sa che stai guardando un prezzo.</li>
+      </ul>
+
+      <h3 id="priv-no">Cosa non facciamo</h3>
+      <ul class="sicu-lista">
+        <li><b>Nessun tracciamento.</b> Niente analytics, niente pixel, niente cookie di terzi: nella pagina non c'è nessuno oltre a noi. Da agosto 2026 <b>nemmeno i caratteri</b> — prima li chiedevamo a Google, e a ogni apertura il tuo indirizzo IP arrivava a Google. Adesso stanno qui.</li>
+        <li><b>Un cookie solo</b>, e serve a tenerti dentro se entri dal browser: contiene un numero casuale, e nel database c'è soltanto la sua impronta.</li>
+        <li><b>Non vendiamo niente a nessuno</b> e non ti profiliamo. Non c'è pubblicità, quindi non c'è nessuno a cui rivenderti.</li>
+        <li><b>Non chiediamo email, password o numero di telefono</b> per iscriverti. Un numero puoi scriverlo nell'indirizzo di spedizione, se vuoi che il corriere ti chiami: è facoltativo e sparisce con l'indirizzo.</li>
+        <li><b>Il tuo wallet non passa da qui.</b> Se lo colleghi, la connessione resta sul tuo dispositivo e non arriva mai ai nostri server.</li>
+      </ul>
+      <p class="sicu-nota">Una cosa che facciamo e va detta: il server, come ogni server del mondo, <b>vede l'indirizzo IP</b> di chi si collega mentre gli risponde. Finisce nel registro tecnico della macchina — non nel database, non in un profilo, e non lo incrociamo con niente.</p>
+
+      <h3>Quello che resta sul tuo telefono</h3>
+      <p>Alcune cose non arrivano mai qui: vivono nel tuo browser e se ne vanno se lo ripulisci. Sono il tema chiaro o scuro, la valuta con cui leggi i prezzi, la dimensione del testo, quali suggerimenti hai già visto, e — le due che contano — <b>la connessione al tuo wallet</b> e <b>la sessione con il tuo firmatario Nostr</b>.</p>
+
+      <h3>Cosa puoi fare adesso</h3>
+      <ul class="sicu-lista">
+        <li>Togliere la chiave Nostr dal profilo, o cambiarla.</li>
+        <li>Scegliere quale foto mostrare, o non mostrarne nessuna.</li>
+        <li>Scegliere dove ricevere gli avvisi, o spegnerli.</li>
+        <li>Mettere in pausa o cancellare i tuoi avvisi di ricerca.</li>
+        <li>Chiudere il negozio per ferie, e nascondere gli ordini conclusi.</li>
+        <li>Scaricare i tuoi affari in un file, dal Profilo.</li>
+      </ul>
+
+      <button class="btn ghost" id="privShare"
+              onclick="condividiPrivacy()">🔗 Condividi questa pagina</button>
+
+      <!-- IL CANTIERE DICHIARATO (ago 2026). Tre cose che mancano, e si
+           scrivono invece di lasciarle sottintese — una pagina sulla
+           privacy che tace su cosa non c'e' ancora e' la prima a non
+           meritare fiducia. Il contatto e' quello che ESISTE GIA' (il
+           canale del rodaggio): nessun secondo indirizzo da tenere
+           aggiornato, e senza canale nel config resta la riga che dice
+           comunque la cosa vera. Lo riempie renderPrivacy(). -->
+      <div class="priv-cantiere" id="privCantiere"></div>
     </div>
   </div>
 
@@ -4425,6 +4592,7 @@ document.getElementById('cartello')?.remove();</script>
            vetrina): qui la si cerca a mente fredda, non davanti a un
            acquisto. Non e' un cassetto — non ha niente da aprire. -->
       <button class="btn ghost" style="margin-top:20px" onclick="apriSicurezza()">🔒 Come funziona il pagamento protetto</button>
+      <button class="btn ghost" style="margin-top:10px" onclick="apriPrivacy()">🔐 I tuoi dati</button>
       <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
     </div>
   </div>
@@ -5771,6 +5939,15 @@ async function loadListings(anonimo){
     GIORNI_IND = Number(j.giorni_indirizzo) || 0;
     scriviGiorniIndirizzo();
   }
+  /* E le altre durate che la pagina «I tuoi dati» dice a chi legge:
+     stessa ragione, stesso canale. Si prendono una per una e non con
+     un assegnamento secco, cosi' un server che ne manda solo alcune
+     lascia le altre al ripiego invece di svuotarle. */
+  if (j.durate) {
+    for (const k in DURATE)
+      if (j.durate[k] !== undefined) DURATE[k] = Number(j.durate[k]) || 0;
+    scriviDurate();
+  }
   /* la leva delle aste per gli anonimi: decide se il 🔨 della nav
      porta alla vetrina delle aste o al «coming soon» */
   if (j.asta_abilitata !== undefined) {
@@ -5959,7 +6136,7 @@ function haptic(){ tg?.HapticFeedback?.impactOccurred('light'); }
    aperti da li' restano nel ramo per la stessa ragione: la nav dice
    dove sei, e «dove sei» e' la strada che hai fatto. */
 function voceNav(view){
-  if (['dettaglio','negozio','sicurezza','pacco',
+  if (['dettaglio','negozio','sicurezza','privacy','pacco',
        'acquisto','offertapresto'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
@@ -7320,6 +7497,58 @@ function apriSicurezza(ancora){
 function tornaDaSicurezza(){ navIndietro(); }
 function tornaDalNegozio(){ navIndietro(); }
 
+/* ---------------- la pagina «I tuoi dati» ----------------
+   La sorella di qui sopra, stessa liturgia: markup fisso, nessun dato
+   da caricare, vale anche per gli anonimi — anzi soprattutto per loro,
+   che questa pagina uno la cerca PRIMA di entrare.
+   `ancora` = l'id di un titolo (priv-indirizzo, priv-cifrato,
+   priv-durate, priv-moderatori, priv-fuori, priv-no): chi ci arriva
+   dal cassetto dell'indirizzo atterra sulla voce che gli interessa
+   invece che in cima a una pagina lunga. */
+function apriPrivacy(ancora){
+  go('privacy');
+  renderPrivacy();
+  /* stessa decisione a ogni apertura della gemella: DEMO cambia sotto
+     i piedi, e la' `location.origin` e' "null" — il link uscirebbe
+     rotto */
+  const sh = el('privShare');
+  if (sh) sh.style.display = DEMO ? 'none' : '';
+  if (!ancora) return;
+  const e = el(ancora);
+  if (e) { e.scrollIntoView({block:'start'}); window.scrollBy(0, -16); }
+}
+function tornaDaPrivacy(){ navIndietro(); }
+
+/* Il riquadro del cantiere dichiarato. Si disegna a ogni apertura e
+   non una volta all'avvio, per la stessa ragione del bottone
+   condividi: il canale del rodaggio arriva dal server dopo l'avvio, e
+   la pagina puo' essere gia' stata guardata prima che atterri.
+   SENZA CANALE NEL CONFIG resta la riga, che dice comunque la cosa
+   vera («scrivi ai moderatori»), invece di un bottone che non porta da
+   nessuna parte: il patto di notaTrackingSbagliato. */
+function renderPrivacy(){
+  const box = el('privCantiere');
+  if (!box) return;
+  box.innerHTML =
+    '<b>Questo documento è in costruzione.</b><br>'
+    + 'Barattolo è in rodaggio, e due cose ancora non ci sono: '
+    + 'il <b>titolare del trattamento</b> e un <b>recapito formale</b> '
+    + 'per esercitare i tuoi diritti sui dati. Le stiamo definendo, e '
+    + 'appena ci sono finiscono qui.<br>'
+    + 'E una cosa manca come strumento: <b>cancellare l\'account non si '
+    + 'può ancora fare con un bottone</b>. Quasi tutto lo puoi già '
+    + 'togliere da solo dal Profilo, ma un gesto che cancella tutto in '
+    + 'una volta non esiste — meglio dirlo che lasciarlo scoprire.<br>'
+    + 'Intanto, per qualsiasi cosa riguardi i tuoi dati, '
+    + (bannerTest?.link
+        ? 'scrivici sul canale del rodaggio: non è ancora il recapito '
+          + 'formale, ma le leggiamo tutte.'
+          + '<br><button type="button" class="btn ghost" '
+          + 'onclick="apriCanaleTest()">💬 Scrivici</button>'
+        : 'scrivi ai moderatori: non è ancora il recapito formale, ma '
+          + 'le leggiamo tutte.');
+}
+
 /* Dal dettaglio annuncio: il blocco venditore apre il suo negozio */
 function apriNegozioDaAnnuncio(){
   const l = currentListing;
@@ -8011,6 +8240,21 @@ function scriviGiorniIndirizzo(){
   document.querySelectorAll('[data-giorni-ind]').forEach(
     s => s.textContent = GIORNI_IND);
 }
+/* E la gemella per le durate della pagina «I tuoi dati» (ago 2026).
+   Stessa ragione della funzione qui sopra, e per questo NON stanno in
+   TEMPI: i numeri di TEMPI decidono se un bottone ha senso, questi
+   SONO la promessa che una pagina pubblica fa su un dato personale —
+   se l'operatore cambia una leva nel config del VPS, la pagina non
+   deve continuare a dire il numero di ieri.
+   `giorni_indirizzo` non e' qui dentro: ha gia' il suo canale e la sua
+   prova, e due sorgenti per lo stesso numero sono una divergenza che
+   aspetta solo di succedere. */
+function scriviDurate(){
+  document.querySelectorAll('[data-durata]').forEach(s => {
+    const v = DURATE[s.dataset.durata];
+    if (v !== undefined) s.textContent = v;
+  });
+}
 scriviTempi();
 
 /* La percentuale della protezione acquisti: arriva col server nella
@@ -8028,6 +8272,11 @@ let giorniData = 60;
    scritta nella pagina «Il pagamento protetto». 30 e' il ripiego per
    un server di ieri, e combacia col default del config. */
 let GIORNI_IND = 30;
+/* Le durate che la pagina «I tuoi dati» dice a chi legge. Arrivano dal
+   SERVER nella busta di prima pagina (chiave `durate`), per la stessa
+   ragione di GIORNI_IND qui sopra; questi sono i ripieghi per un
+   server di ieri, e combaciano coi default del codice. */
+let DURATE = {sessione: 30, initdata: 24, avvisi: 30};
 /* I segnaposto dei campi indirizzo: esempi, non istruzioni — il
    formato vero lo conosce il corriere, non noi. */
 const SEGNAPOSTO_IND = {nome:'Mario Rossi', via:'Via Roma 1',
@@ -8040,6 +8289,9 @@ const SEGNAPOSTO_IND = {nome:'Mario Rossi', via:'Via Roma 1',
    cascato scrivendo questo cantiere: la prova che lo prende e'
    prove_avvio_client. */
 scriviGiorniIndirizzo();
+/* stessa trappola e stessa cura: DURATE e' dichiarata poco piu' su e
+   questa riga sta DOPO, mai dentro scriviTempi() */
+scriviDurate();
 /* I sats di spedizione: spedEur pieno = costo IN EURO (listino EUR,
    oppure l'ancora all'euro dei listini sats) e i sats sono una STIMA
    al cambio vivo — il valore vero si fissa alla creazione
@@ -10239,7 +10491,20 @@ function renderAcquisto(){
         ${c.k==='telefono' ? 'type="tel"' : ''}
         placeholder="${esc(SEGNAPOSTO_IND[c.k]||'')}"
         oninput="setCampoIndirizzo('${c.k}', this.value)">`).join('')}
-    <div class="acq-nota">Lo vede solo il venditore, per spedire. Lo cancelliamo appena confermi di aver ricevuto l'oggetto.</div>
+    <!-- LA PORTA DELLA PAGINA «I tuoi dati» (ago 2026): la riga diceva
+         gia' le due cose essenziali, e il link ci attacca il resto —
+         qui nasce il dubbio, ed e' il pattern degli hint contestuali.
+         Il cassetto ferma la propagazione, quindi il tocco non
+         riseleziona la via; e lo stato dei campi vive in
+         acqDati.indirizzo (ci scrive setCampoIndirizzo a ogni tasto),
+         quindi andare a leggere e tornare indietro non perde una
+         lettera di quel che si stava scrivendo.
+         Il link e' legato all'ULTIMA PAROLA con .fine-frase: da solo a
+         capo somiglierebbe a un piede staccato. E dice «Che fine fa»
+         invece del «Scopri di piu'» dei fratelli, che portano a
+         un'ALTRA pagina: due destinazioni non possono avere le stesse
+         parole. -->
+    <div class="acq-nota">Lo vede solo il venditore, per spedire. Lo cancelliamo appena confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriPrivacy('priv-indirizzo')">Che fine fa</button></span></div>
   </form>`;
   const indScritto = indirizzoCompleto(iVal);
   const indChiuso = indScritto
@@ -15302,6 +15567,16 @@ function condividiSicurezza(){
   return condividiLink(`${location.origin}/sicurezza`,
     'Come funziona il pagamento protetto su Barattolo 🫙⚡',
     'Il pagamento protetto');
+}
+
+/* La gemella per «I tuoi dati». Il testo che accompagna il link dice
+   la COSA e non il nome della vista, come per la sorella: si manda a
+   chi ha chiesto «ma che dati si prendono?», che dei nomi delle nostre
+   pagine non sa niente. */
+function condividiPrivacy(){
+  return condividiLink(`${location.origin}/privacy`,
+    'Che dati raccoglie Barattolo, e per quanto 🫙',
+    'I tuoi dati');
 }
 
 /* «Come mi vedono gli altri»: NON una vista nuova — si apre la
@@ -21492,6 +21767,20 @@ function apriSicurezzaDaUrl(){
   apriSicurezza(anc ? 'sicu-' + anc : '');
 }
 
+/* /privacy — la gemella per «I tuoi dati». Stesso patto sul frammento:
+   nel markup gli id portano il prefisso `priv-` e l'indirizzo no, cosi'
+   `/privacy#indirizzo` resta corto da mandare e il prefisso lo rimette
+   il codice. Un'ancora che non esiste non fa niente: apriPrivacy cerca
+   l'elemento e, se non c'e', lascia la pagina in cima. */
+const PRIVACY_URL = location.pathname.match(/^\/privacy\/?$/);
+let privacyAperta = false;
+function apriPrivacyDaUrl(){
+  if (!PRIVACY_URL || privacyAperta) return;
+  privacyAperta = true;
+  const anc = (location.hash || '').replace(/^#/, '');
+  apriPrivacy(anc ? 'priv-' + anc : '');
+}
+
 /* /categoria/{slug} — il reparto come pagina vera (ago 2026). Il nome
    si ricava da CATS con slugCat, il gemello di slug_categoria: nessun
    secondo elenco da tenere allineato. Slug sconosciuto = `undefined`,
@@ -21552,6 +21841,7 @@ async function avviaVetrina(){
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
     apriSicurezzaDaUrl();
+    apriPrivacyDaUrl();
     apriCategoriaDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
        guardie interne decidono comunque se comparire */
@@ -21736,6 +22026,7 @@ async function avvia(){
     apriNegozioDaUrl();
     apriAnnuncioDaUrl();
     apriSicurezzaDaUrl();
+    apriPrivacyDaUrl();
     apriCategoriaDaUrl();
     /* Il cartello del rodaggio ha la precedenza su tutti: il tour
        one-shot (e poi il banner installa) partono alla sua chiusura */

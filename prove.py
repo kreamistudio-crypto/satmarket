@@ -12914,7 +12914,8 @@ def prove_anteprime():
                     '@app.get("/negozio/{chi}")',
                     '@app.get("/annuncio/{aid}")',
                     '@app.get("/categoria/{slug}")',
-                    '@app.get("/sicurezza")')
+                    '@app.get("/sicurezza")',
+                    '@app.get("/privacy")')
     for rotta in ROTTE_PAGINA:
         i = _SORGENTE.index(rotta)
         corpo = _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
@@ -13299,9 +13300,11 @@ def prove_seo():
           "phoenixwallet" in xml or "marshylift" in xml)
     prova("...e gli attivi ci sono tutti e tre", 3,
           sum(1 for x in loc if "/annuncio/" in x))
-    prova("...con la home e la pagina della sicurezza", True,
+    prova("...con la home e le due pagine che si mandano a chi chiede",
+          True,
           "https://barattolo.store" in loc
-          and "https://barattolo.store/sicurezza" in loc)
+          and "https://barattolo.store/sicurezza" in loc
+          and "https://barattolo.store/privacy" in loc)
     prova("nessuna data del 1970 nella mappa", False, "1970" in xml)
 
     # LA PROVA DI COERENZA: si chiama il costruttore di OGNI indirizzo
@@ -13451,7 +13454,7 @@ def prove_seo():
     # vuol dire che funziona in Telegram e in collaudo e NON funziona
     # esattamente per chi arriva dai motori.
     for f in ("apriNegozioDaUrl", "apriAnnuncioDaUrl", "apriSicurezzaDaUrl",
-              "apriCategoriaDaUrl"):
+              "apriPrivacyDaUrl", "apriCategoriaDaUrl"):
         prova(f"{f} si chiama da avvia() E da avviaVetrina()", 2,
               testo_mini.count(f"{f}();"))
 
@@ -17311,6 +17314,106 @@ def prove_commenti_css(mini=None):
     prova("...e nessun commento resta aperto in fondo al foglio", 0, aperti)
 
 
+def prove_pagina_dati():
+    """La pagina «I tuoi dati» (ago 2026), sorella di «Il pagamento
+    protetto».
+
+    LE PROVE CHE CONTANO sono quelle sulle TRE AFFERMAZIONI SCOMODE.
+    Una pagina sulla privacy si guasta in un modo solo: qualcuno
+    riscrive una frase in meglio di com'e' la realta', e nessuno se ne
+    accorge — non alza eccezioni, non fa cadere niente, e chi la legge
+    non ha modo di sapere che e' stata addolcita. Quelle tre frasi
+    dicono, nell'ordine: che se un ordine non si chiude mai l'indirizzo
+    resta; che «cifrato» non protegge da noi; e che sul contenuto
+    digitale il moderatore invece legge."""
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = mini.index('<div class="view" id="view-privacy">')
+    vista = mini[i:mini.index("VISTA: VENDI", i)]
+
+    # --- 1) le tre affermazioni scomode, per intero
+    prova("dati: l'indirizzo resta se l'ordine non si chiude mai", True,
+          "se l'ordine non si chiude mai, il tuo indirizzo resta lì"
+          in vista)
+    prova("...e la strada per farlo sparire si dice", True,
+          "la strada è chiudere l'affare" in vista)
+    prova("dati: «cifrato» non protegge da noi, e lo dice", True,
+          "al riparo da un database rubato, non da noi" in vista
+          and "il server lo può leggere" in vista)
+    prova("...e dice perche' la garanzia vera e' la durata", True,
+          "L'unica garanzia vera è che il dato duri poco" in vista)
+    prova("dati: sul contenuto digitale il moderatore LEGGE", True,
+          "codice digitale invece sì" in vista)
+    prova("...e sull'indirizzo no, con la sua asimmetria intera", True,
+          "Il tuo indirizzo non lo legge" in vista)
+
+    # --- 2) nessuna durata battuta a mano: solo segnaposto
+    prova("dati: i giorni dell'indirizzo vengono dal server", 2,
+          vista.count("data-giorni-ind"))
+    prova("dati: le tre durate nuove vengono dal server", 3,
+          vista.count("data-durata="))
+    prova("dati: la vita della invoice viene da TEMPI", True,
+          'data-tempo="invoice"' in vista)
+    # le chiavi della vista devono essere quelle che il server manda:
+    # una chiave sbagliata lascia il segnaposto VUOTO, e un buco al
+    # posto di un numero non lo vede nessuno finche' non apre la pagina
+    chiavi = set(re.findall(r'data-durata="([a-z]+)"', vista))
+    prova("dati: le chiavi combaciano con quelle della busta",
+          {"sessione", "initdata", "avvisi"}, chiavi)
+    for k in ("sessione", "initdata", "avvisi"):
+        prova(f'dati: il server manda «{k}»', True,
+              f'"{k}": ' in _SORGENTE)
+
+    # --- 3) l'impianto della vista, sul calco della sorella
+    prova("dati: la vista non e' una radice (l'indietro torna indietro)",
+          True, "'privacy'" in mini and "RADICI = " in mini
+          and "'privacy'" not in mini[mini.index("RADICI = "):
+                                      mini.index("RADICI = ") + 200])
+    prova("dati: la nav accende Esplora", True,
+          "'sicurezza','privacy'" in mini.replace(" ", ""))
+    prova("dati: niente pull-to-refresh (non c'e' nulla da rileggere)",
+          True, "privacy" not in mini[mini.index("VISTE_PTR = "):
+                                      mini.index("VISTE_PTR = ") + 120])
+    prova("dati: si condivide, e non in DEMO", True,
+          "condividiPrivacy" in mini and "privShare" in mini
+          and "DEMO ? 'none' : ''" in mini)
+
+    # --- 4) la porta dal cassetto dell'indirizzo: e' il momento in cui
+    #        nasce il dubbio, ed e' la ragione per cui la pagina esiste
+    prova("dati: dal cassetto dell'indirizzo si arriva alla voce giusta",
+          True, "apriPrivacy('priv-indirizzo')" in mini)
+    prova("...legata all'ultima parola, mai sola a capo", True,
+          '<span class="fine-frase">l\'oggetto. <button type="button" '
+          'class="scopri-link" onclick="apriPrivacy(' in mini)
+    prova("dati: e le due sorelle si rimandano", True,
+          'onclick="apriPrivacy()">🔐 E i tuoi dati?' in mini)
+
+    # --- 5) il cantiere dichiarato: le tre cose che mancano
+    #
+    # ⚠️ IL TESTO SI RICUCE PRIMA DI CERCARLO. renderPrivacy lo compone
+    # concatenando letterali, quindi «non si » e «può ancora» stanno in
+    # due stringhe diverse e una ricerca ingenua non trova la frase —
+    # ci si e' inciampati scrivendo questa prova, ed e' la stessa
+    # trappola gia' pagata col censimento dei sats. Si tolgono le
+    # cuciture (' + ') e le barre di escape, poi si cerca.
+    j = mini.index("function renderPrivacy")
+    corpo = mini[j:mini.index("\n}", j)]
+    cucito = re.sub(r"'\s*\+\s*'", "", corpo).replace("\\'", "'")
+    prova("dati: il documento dichiara di essere in costruzione", True,
+          "Questo documento è in costruzione" in cucito)
+    prova("...il titolare e il recapito mancano, e si dice", True,
+          "titolare del trattamento" in cucito
+          and "recapito formale" in cucito)
+    prova("...e che l'account non si cancella con un bottone", True,
+          "cancellare l'account non si può ancora fare con un bottone"
+          in cucito)
+    # il contatto e' quello che ESISTE GIA' (il canale del rodaggio):
+    # senza canale nel config resta la RIGA, che dice comunque la cosa
+    # vera, mai un bottone che non porta da nessuna parte
+    prova("dati: il contatto ripiega sulla riga senza canale", True,
+          "bannerTest?.link" in corpo
+          and "scrivi ai moderatori" in cucito)
+
+
 def prove_font():
     """I font serviti da casa (ago 2026). Il cantiere ha tolto l'ultima
     terza parte dal foglio: finche' la pagina li chiedeva a
@@ -17606,6 +17709,7 @@ def main():
               prove_altri_scorrimento,
               prove_script_nel_workflow,
               prove_nwc_cifratura,
+              prove_pagina_dati,
               prove_font,
               prove_sintassi_client):
         try:

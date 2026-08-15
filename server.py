@@ -8411,6 +8411,20 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # personale. Se l'operatore mette 90 e la pagina dicesse 30,
         # avremmo scritto il falso.
         risposta["giorni_indirizzo"] = GIORNI_INDIRIZZO
+        # LE DURATE DELLA PAGINA «I tuoi dati» (ago 2026), stessa
+        # ragione della riga qui sopra e non di TEMPI: quei numeri
+        # decidono se un bottone ha senso, questi SONO la promessa
+        # scritta su un dato personale — se l'operatore cambia una leva
+        # nel config del VPS, la pagina non deve continuare a dire il
+        # numero di ieri.
+        # `giorni_indirizzo` NON si ripete qui dentro: ha gia' il suo
+        # canale e la sua prova, e due sorgenti per lo stesso numero
+        # sono una divergenza che aspetta.
+        risposta["durate"] = {
+            "sessione": GIORNI_SESSIONE_WEB,   # giorni: il cookie del web
+            "initdata": ORE_INITDATA,          # ore: l'accesso da Telegram
+            "avvisi": GIORNI_DEDUP_AVVISI,     # giorni: la memoria degli avvisi
+        }
         # La leva delle aste anche agli ANONIMI (ago 2026): il tasto
         # 🔨 in nav ora c'e' sempre, e a leva spenta apre il «coming
         # soon». In vetrina /api/me non esiste, quindi senza questa
@@ -25739,6 +25753,17 @@ META_TESTO_SICUREZZA = (
     "finché chi compra non conferma. Cosa copre, cosa no, e dove "
     "stanno i sats.")
 
+# La sorella della pagina qui sopra (ago 2026). Il titolo dice la cosa
+# in italiano e l'indirizzo e' /privacy, che e' la parola che la gente
+# cerca: lo stesso scarto che c'e' gia' fra /sicurezza e «Il pagamento
+# protetto». La descrizione promette quello che la pagina mantiene —
+# cosa raccogliamo, per quanto, chi legge — e nomina la parte che ci
+# distingue, perche' e' quella per cui uno la cerca.
+TITOLO_PRIVACY = "I tuoi dati — Barattolo"
+META_TESTO_PRIVACY = (
+    "Cosa sappiamo di te, per quanto tempo e chi lo legge. E cosa non "
+    "raccogliamo: niente email, niente password, nessun tracciamento.")
+
 META_GENERICI = _meta_anteprima(TITOLO_HOME, META_TESTO_HOME, URL_PUBBLICO)
 
 META_SICUREZZA = _meta_anteprima(TITOLO_SICUREZZA, META_TESTO_SICUREZZA,
@@ -26029,6 +26054,13 @@ def _categoria_da_slug(slug: str) -> str:
 # domanda che si fa a un motore di ricerca.
 TESTA_SICUREZZA = _testa_seo(TITOLO_SICUREZZA, META_TESTO_SICUREZZA,
                              f"{URL_PUBBLICO}/sicurezza")
+
+# E la sua sorella, stesso patto: una pagina sola, nessun parametro,
+# testa costante. Si indicizza anche lei — «che dati raccoglie» e' una
+# domanda che si fa a un motore prima ancora che a noi, e una pagina
+# sulla privacy che non si trova non serve a niente.
+TESTA_PRIVACY = _testa_seo(TITOLO_PRIVACY, META_TESTO_PRIVACY,
+                           f"{URL_PUBBLICO}/privacy")
 
 
 # Quante schede entrano nel cartello di una pagina-elenco. Non e' una
@@ -26499,7 +26531,8 @@ def _sitemap() -> bytes:
     piu_recente = max([max(a["creato"], a["modificato"]) for a in annunci],
                       default=0)
     righe = [_riga_sitemap(URL_PUBBLICO, piu_recente),
-             _riga_sitemap(f"{URL_PUBBLICO}/sicurezza", 0)]
+             _riga_sitemap(f"{URL_PUBBLICO}/sicurezza", 0),
+             _riga_sitemap(f"{URL_PUBBLICO}/privacy", 0)]
     for nome, quando in reparti.items():
         if nome in CATEGORIE:
             righe.append(_riga_sitemap(
@@ -26601,6 +26634,24 @@ def pagina_sicurezza():
     manda a chi chiede «mi fido?», cioe' quello dove un'anteprima nuda
     faceva il danno peggiore."""
     return _pagina_con_meta(TESTA_SICUREZZA, TITOLO_SICUREZZA)
+
+
+@app.get("/privacy")
+def pagina_privacy():
+    """Link condivisibile della pagina «I tuoi dati»: la sorella di
+    /sicurezza, stessa liturgia — stessa Mini App, il JS legge
+    /privacy dall'URL e apre la vista, con l'ancora facoltativa
+    (`/privacy#indirizzo` atterra su quello che chiediamo solo quando
+    serve).
+
+    L'INDIRIZZO E' IN INGLESE E IL TITOLO IN ITALIANO, ed e' voluto:
+    «privacy» e' la parola che uno digita e che cerca su un motore, «I
+    tuoi dati» e' quella che dice la cosa a chi la legge. E' lo stesso
+    scarto della sorella, che vive su /sicurezza e si chiama «Il
+    pagamento protetto».
+    Nessun `{parametro}`: la pagina e' UNA, e per la stessa ragione la
+    sua testa e' una costante."""
+    return _pagina_con_meta(TESTA_PRIVACY, TITOLO_PRIVACY)
 
 
 @app.get("/vendor/nostr.js")
