@@ -11311,6 +11311,138 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   lui. La pagina promette quindi il possesso dell'EVENTO — che è vero
   e resta vero senza di noi — e non un flusso di modifica da fuori,
   che non esiste apposta.
+  I FONT VENGONO IN CASA (ago 2026): finché la pagina li chiedeva a
+  Google, l'IP e lo user-agent di OGNI visitatore — anche di chi passa
+  e non compra — arrivavano a un terzo a ogni apertura. Era l'ultima
+  terza parte del foglio (a parte `telegram.org`, che è la porta
+  d'ingresso) ed è la PRECONDIZIONE della pagina «I tuoi dati»: senza
+  chiuderla, quella pagina avrebbe dovuto dichiararlo. Sei `.woff2` in
+  `vendor/font/` serviti da `GET /vendor/font/{nome}` con whitelist —
+  il patto di `nostr.bundle.js` e `qrcode.js`, mai StaticFiles —, più
+  `*.woff2 binary` in `.gitattributes` (una conversione di fine-riga
+  dentro un woff2 lo rompe in silenzio) e la licenza OFL accanto ai
+  file, che è la condizione per ridistribuirli.
+  SONO VARIABILI, ED È PERCHÉ SEI BASTANO PER OTTO PESI: un file porta
+  tutta la famiglia (Baloo 2 700 e 800 leggono lo stesso file, Nunito
+  400/600/700/800 pure). I `@font-face` DICHIARANO I PESI UNO PER UNO
+  come faceva il CSS di Google e MAI come intervallo (`font-weight:400
+  800`): con l'intervallo il browser istanzia il peso esatto chiesto, e
+  `.sicu p{font-weight:500}` — che oggi ricade sul 400 perché il 500
+  non è dichiarato — cambierebbe aspetto. Qui si è spostato DA DOVE
+  arrivano i byte, non come si vede l'app. Gli `unicode-range` sono
+  copiati alla lettera: sono loro a far scaricare il solo sottoinsieme
+  che serve (in pratica tre file). IMPERFEZIONE DICHIARATA: cirillico,
+  greco, vietnamita e devanagari non si servono più — un nome in quegli
+  alfabeti (può arrivare da Nostr) cade sul font di sistema — e la DEMO
+  da `file://` perde i font del brand, che `/vendor/font/` è relativo
+  alla radice.
+  ⚠️ LA TRAPPOLA DEL BANCO, e vale per OGNI confronto pixel futuro:
+  **Chrome qui IGNORA `--window-size`**. Impagina SEMPRE a 500×705 e
+  poi RITAGLIA lo scatto alla misura chiesta — verificato in headless
+  nuovo E vecchio, a 320 e a 375. Quindi ogni scatto «a 320px» è una
+  pagina larga 500 tagliata a 320: le colonne cadono dove cadrebbero a
+  500, e un difetto che vive solo a 320 non si vede. È la cosa che ha
+  reso false le prime misure di questo cantiere. L'unica strada vera è
+  il protocollo (`Emulation.setDeviceMetricsOverride`), e per le pagine
+  lunghe serve `captureBeyondViewport`: senza, una pagina SCROLLATA
+  esce BIANCA (2805 byte di crema, ci si è persi mezz'ora). Il client
+  CDP vuole `--remote-allow-origins=*` o la stretta di mano torna 403,
+  e il target si CREA con `PUT /json/new`: in headless nuovo
+  `/json/list` può non contenere nessuna «page».
+  E DUE CONTROLLI SALVANO DAL CONCLUDERE MALE, perché qui il primo giro
+  dava 11/12 col caso che cambiava ogni volta: (a) fotografare la
+  STESSA pagina più volte — se non è deterministica, il confronto non
+  dice niente; (b) i font si CHIEDONO con `document.fonts.load()` e non
+  si aspetta `fonts.ready`, che su una pagina nascosta si risolve
+  SUBITO (il browser non disegna testo, quindi non chiede font: il
+  cancello apre prima che siano arrivati, cioè crea la gara che deve
+  chiudere).
+  LA MISURA BUONA, alle larghezze vere: «Il pagamento protetto» —
+  tutti e otto i pesi, due temi, 320/360/375 — è IDENTICA in tutti e
+  sei i confronti, ed è il test vero dei font. La VETRINA differisce in
+  due casi su sei, di **30 e 904 pixel** (0,006% e 0,16%), e la
+  differenza è tutta nel **₿ del lockup**, che è un glifo Baloo più due
+  barrette CSS. NON È UN PESO SBAGLIATO, ed è escluso misurando: i file
+  sono gli STESSI sui due lati (gli URL che Google serve per
+  `wght@700;800` e per `wght@500;600;700;800` coincidono), nessuna
+  regola chiede Baloo 500 o 600, e tutti e due i lati sono
+  deterministici (stessa pagina tre volte: identica; «prima» due volte
+  con profilo nuovo: identica). Resta che quel ₿ composito è sensibile
+  a QUANDO il font atterra, e col cambio atterra PRIMA invece che dopo
+  — cioè dal lato giusto. Ingrandito ×7 non si distingue a occhio.
+  IMPERFEZIONE DICHIARATA e non chiusa (decisione di Andrea): chi
+  rimisura trovi qui il perché invece di ricominciare da capo.
+  LA PAGINA «I TUOI DATI» (ago 2026, `view-privacy`, rotta `/privacy`):
+  la sorella di qui sopra — là cosa succede ai tuoi SATS, qui cosa
+  succede ai tuoi DATI. Nasce perché chi sta per scrivere il proprio
+  indirizzo in un campo cerca questa pagina PRIMA di scriverlo, e non
+  c'era: «Il pagamento protetto» parlava dell'INDIRIZZO e basta.
+  INDIRIZZO IN INGLESE E TITOLO IN ITALIANO, ed è voluto: «privacy» è
+  la parola che uno digita e cerca su un motore, «I tuoi dati» è quella
+  che dice la cosa a chi legge — lo stesso scarto che c'è già fra
+  `/sicurezza` e «Il pagamento protetto». Si indicizza (è la pagina che
+  uno cerca prima di fidarsi) ed è in sitemap, che le due cose non
+  possono contraddirsi.
+  IL VESTITO SI RIUSA: le classi `.sicu-*` sono IL VESTITO DELLA PAGINA
+  LUNGA DI TESTO e non il nome di un argomento — trenta regole già
+  tarate per la lettura. È il patto dei nomi interni del carrello («si
+  rinominano i testi, mai le chiavi»), e rinominarle costerebbe trenta
+  righe per zero pixel. Una regola nuova sola, `.priv-cantiere`: la
+  coppia ambra della fascia del rodaggio, perché è un AVVISO e non un
+  piede.
+  LE TRE AFFERMAZIONI SCOMODE sono la ragione per cui la pagina esiste,
+  e sono anche le uniche che possono diventare FALSE senza che nessuno
+  se ne accorga — non alzano eccezioni, non fanno cadere niente, e chi
+  legge non ha modo di sapere che sono state addolcite. Hanno le loro
+  sentinelle, torturate una per una.
+  1) **Se l'ordine non si chiude mai, l'indirizzo resta.** Nessuna
+  delle due WHERE di `pulisci_indirizzi` tocca locked/shipped/dispute,
+  e nessuna pagina l'aveva mai detto ad alta voce. Il paragrafo finisce
+  con la strada che l'utente ha in mano — chiudere l'affare — o la
+  parte scomoda resterebbe una confessione e basta.
+  2) **«Cifrato» vuol dire al riparo da un database rubato, non da
+  noi**: la chiave sta sullo stesso server, quindi finché il dato è lì
+  il server lo può leggere. È quello che il codice dice già di sé
+  («cifrarlo protegge un backup rubato, non di più»), detto a chi
+  legge; e l'unica garanzia vera è che il dato duri poco, che è il
+  motivo per cui l'indirizzo si cancella da solo.
+  3) **Sul contenuto digitale il moderatore LEGGE**, mentre indirizzo,
+  busta e documento non li vede nemmeno in disputa. È l'unica delle tre
+  asimmetrie che si potrebbe leggere come una svista, e per questo si
+  dice invece di generalizzare.
+  LE DURATE VENGONO DALLE LEVE, mai battute a mano: `giorni_indirizzo`
+  sul canale che aveva già, e le altre nella chiave **`durate`** della
+  busta di prima pagina (`sessione` = GIORNI_SESSIONE_WEB, `initdata` =
+  ORE_INITDATA, `avvisi` = **GIORNI_DEDUP_AVVISI**), lette da
+  `scriviDurate()` sui segnaposto `[data-durata]`. Il 30 della dedup
+  era un numero scritto a mano dentro `pulisci_avvisi` e ha un nome da
+  quando una pagina pubblica lo dice: se un domani cambia, la pagina
+  non mente. ⚠️ `scriviDurate()` va chiamata DOPO la sua `let`, mai
+  dentro `scriviTempi()`: è la temporal dead zone che uccide lo script
+  in silenzio (la lezione di `prove_avvio_client`).
+  TRE PORTE, come la sorella: il cassetto dell'indirizzo nella pagina
+  Paga — dove NASCE il dubbio, il pattern degli hint contestuali: la
+  riga diceva già le due cose essenziali e il link ci attacca il resto
+  —, il fondo di «Il pagamento protetto», il Profilo. Il link del
+  cassetto dice **«Che fine fa»** e non il «Scopri di più» dei
+  fratelli: quelli portano a un'ALTRA pagina, e due destinazioni non
+  possono avere le stesse parole. Tornare indietro dal cassetto non
+  perde una lettera di quel che si stava scrivendo, perché lo stato dei
+  campi vive in `acqDati.indirizzo` e `navRendiVista` sul ramo
+  'acquisto' fa `renderAcquisto()`, non `apriAcquisto()`.
+  IL DOCUMENTO DICHIARA COSA NON C'È: titolare del trattamento e
+  recapito formale per i diritti mancano (si stanno definendo), e la
+  cancellazione dell'account **non esiste come strumento** — quasi
+  tutto si toglie a mano dal Profilo, ma un gesto che cancella tutto in
+  una volta no. Una pagina sulla privacy che tace su cosa non c'è
+  ancora è la prima a non meritare fiducia. Il contatto è quello che
+  ESISTE GIÀ (il canale del rodaggio, `bannerTest?.link`): nessun
+  secondo indirizzo da tenere aggiornato, e senza canale nel config
+  resta la riga che dice comunque la cosa vera.
+  FUORI DAL CANTIERE, visto e non toccato: la BUSTA di consegna (nome,
+  codice, documento) non si cancella MAI, mentre l'indirizzo ha la sua
+  scopa — la pagina lo dice, ma darle una scopa è un'altra decisione
+  con la sua domanda (il codice serve ancora dopo la chiusura?).
   I TEMPI DELL'ESCROW STANNO IN UN POSTO SOLO (lug 2026): la costante
   `TEMPI` in cima al JS — `conferma` 72 ore, `autoSblocco` 10 giorni,
   `confermaDig` 24 ore, `silenzioDig` 48 ore, `invoice` 15 minuti —
@@ -11586,8 +11718,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   rilancia alza VERSIONE in sw.js: le icone sono in dispensa) +
   `sw.js` PRUDENTE servito dalla RADICE, sempre
   no-cache. Il SW: dispensa `statica-{VERSIONE}` con addAll atomico
-  (asset di casa + `/vendor/nostr.js` + `offline.html`), cache-first
-  runtime SOLO per i Google Fonts (`font-{VERSIONE}`), navigazioni
+  (asset di casa + `/vendor/nostr.js` + `offline.html` + i tre font
+  del latino), NIENTE cache-first runtime — c'era per i font di
+  Google, ed è sparita con loro (ago 2026): da quando i font stanno in
+  casa cadono nel ramo degli asset nostri, e `font-{VERSIONE}` e
+  `fontDallaDispensa` non esistono più. Navigazioni
   network-first con ripiego su `/offline.html` (mascotte dalla
   dispensa) a rete morta — gli header anti-cache di `/` restano
   sovrani. MAI toccate (nemmeno respondWith): `/api/*`, `/foto/*`
@@ -12542,11 +12677,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    su `SLUG_CATEGORIE`), `/sicurezza` (la pagina «Il pagamento
    protetto», link condivisibile con l'ancora facoltativa `#limiti`: si
    manda a chi chiede «mi fido?», cioè a chi Barattolo non ce l'ha
-   ancora), `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
+   ancora), `/privacy` (la sorella, «I tuoi dati», ago 2026: stessa
+   liturgia, ancora facoltativa `#indirizzo`),
+   `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito
    per ore),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
+   `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
+   da ago 2026 i font stanno in casa e non li chiede più nessuno a
+   Google — vedi «I FONT VENGONO IN CASA»),
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
    calcolata dal catalogo), `/assets/mascotte.jpeg`,
@@ -15044,6 +15184,37 @@ documento. Screenshot a 320/360/375 nei due temi, prima e dopo, più il
 codice LUNGO (il link di un QR), che va a capo senza sbordare.
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna rotta, nessuna
 leva — solo client.
+
+I font in casa e la pagina «I tuoi dati» (ago 2026, due commit): prima
+si è chiuso il debito — finché la pagina chiedeva i font a Google,
+l'IP e lo user-agent di OGNI visitatore arrivavano a un terzo a ogni
+apertura, e una pagina sulla privacy avrebbe dovuto dichiararlo — e
+poi si è scritta la pagina. Sei `.woff2` in `vendor/font/` con la loro
+rotta a whitelist, i pesi dichiarati uno per uno perché la resa non
+cambi di un pixel, il ramo cache-first verso Google tolto dal service
+worker (VERSIONE a v5). Poi `/privacy`: cosa raccogliamo, per quanto,
+chi legge cosa, cosa NON raccogliamo — e le tre affermazioni scomode
+per intero (l'indirizzo che resta se l'ordine non si chiude mai;
+«cifrato» che non protegge da noi; il moderatore che sul contenuto
+digitale legge). Vedi Architettura, «I FONT VENGONO IN CASA» e «LA
+PAGINA "I TUOI DATI"», anche per la trappola del banco (Chrome ignora
+`--window-size`) e per l'imperfezione dichiarata del ₿.
+Collaudato: 3670 prove verdi, con le sentinelle sulle tre frasi
+torturate una per una — addolcendone una qualunque diventa rossa la
+sua e nessun'altra — e il confronto pixel alle larghezze VERE (la
+pagina di solo testo identica in tutti e sei i confronti). Più il giro
+dal vivo col server vero su un database usa-e-getta: a 320/360/375 il
+documento è largo quanto il viewport, zero elementi oltre il bordo,
+zero segnaposto vuoti, i numeri tutti dal server.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva nuova. Il service worker si aggiorna alla visita
+successiva, come sempre. DA GUARDARE dopo il deploy: che nella pagina
+vera non parta NESSUNA richiesta verso Google, e la prima anteprima di
+`/privacy` condivisa in chat.
+DA DECIDERE, ed è la ragione per cui la pagina si dichiara in
+costruzione: il titolare del trattamento e il recapito per l'esercizio
+dei diritti (con Alan e col commercialista), e se dare un bottone alla
+cancellazione dell'account.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
