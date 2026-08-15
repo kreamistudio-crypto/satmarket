@@ -8338,7 +8338,10 @@ def prove_reti_corriere():
           all(t[1] in mini and t[2] in mini for t in amb["TIPI_PUNTO"]))
     prova("il nome che il venditore legge ha un giudice UNO", 1,
           mini.count("function nomePunto"))
-    prova("...e lo chiamano le superfici che lo scrivono", 2,
+    # TRE dall'ago 2026: la riga compatta della pagina Paga, la frase
+    # del pannello venditore, e il cassetto «📍 I tuoi punti di ritiro»
+    # nel Profilo — che quel nome lo scrive per ogni punto salvato.
+    prova("...e lo chiamano le superfici che lo scrivono", 3,
           mini.count("nomePunto(") - mini.count("function nomePunto("))
     # E SI FA GIRARE, non si guarda soltanto: le sentinelle qui sopra
     # dicono che il giudice ESISTE ed e' uno, mai che risponda giusto
@@ -8394,6 +8397,295 @@ def prove_reti_corriere():
     fabbrica = pezzo_js(mini, "  const tipoPill = (t) =>", "`;")
     prova("...e la pillola del tipo non nomina mai la rete", True,
           "esc(t.nome)" in fabbrica and "rete" not in fabbrica)
+
+
+# ====================================================================
+def prove_punti_salvati():
+    """I PUNTI DI RITIRO CHE CHI COMPRA SI TIENE (ago 2026).
+
+    Il locker sotto casa non cambia, e riscriverlo a ogni acquisto era
+    l'attrito rimasto nel checkout: si salva con un tocco e alla pagina
+    d'acquisto arriva gia' compilato.
+
+    Le cose che questa famiglia difende, e sono quelle che un riordino
+    toglierebbe per prime:
+    · il cantiere NON TOCCA IL PERCORSO DEI SOLDI — la tabella non
+      compare in `compra`, in `_compra_set` ne' nelle tre uscite;
+    · la precompilazione vive in `caricaPreventivo` e MAI nel render
+      (in DEMO il primo non gira, il secondo si — e riscriverebbe il
+      campo a ogni ridisegno);
+    · la guardia e' il TIMBRO e non «il campo e' vuoto»: chi svuota e
+      poi tocca un ±, con la guardia sul vuoto, si vedrebbe tornare il
+      testo che ha appena cancellato;
+    · `d.rete` si riempie SOLO quando la scelta esiste davvero, o il
+      client comincia a mandare una rete dove il patto dice di tacere;
+    · e la riga della RIPRESA, che senza rete e tipo restituisce la
+      fattura di prima col corriere sbagliato."""
+    print("\n[i punti di ritiro salvati]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    class _HTTP(Exception):
+        def __init__(self, codice, detail=""):
+            self.status_code, self.detail = codice, detail
+            super().__init__(detail)
+
+    amb = {"HTTPException": _HTTP}
+    i = src.index('SPEDIZIONIERI = ("')
+    exec(src[i:src.index("\n", i)], amb)
+    i = src.index("TIPI_PUNTO = ((")
+    exec(src[i:src.index("\n\n", i)], amb)
+    for nome in ("_testo_punto", "_punti_resi", "punti_per_venditore",
+                 "tipo_punto_da_payload", "reti_venditore"):
+        exec(pezzo(nome), amb)
+    P = lambda r, t, p, c: {"rete": r, "tipo": t, "punto": p, "creato": c}
+
+    # --- il normalizzatore, che ora e' UNO -----------------------------
+    prova("il testo del punto collassa gli spazi",
+          "Via Roma 1", amb["_testo_punto"]("  Via   Roma\n 1  "))
+    prova("...e si taglia a 120", 120, len(amb["_testo_punto"]("x" * 300)))
+    prova("...e il vuoto resta vuoto", "", amb["_testo_punto"](None))
+    # IL CENSIMENTO, sulla RIGA intera e non sulla parola: la copia a
+    # mano non deve poter tornare in nessuno dei quattro posti (i tre di
+    # ieri piu' l'endpoint del profilo). Se qualcuno la riscrive, questa
+    # riga lo dice — prima non la contava nessuno.
+    prova("il normalizzatore ha UN posto solo", 1,
+          src.count("def _testo_punto("))
+    prova("...e QUATTRO chiamanti (i due acquisti, la correzione, il "
+          "salvataggio)", 4,
+          src.count("_testo_punto(") - src.count("def _testo_punto("))
+    prova("...e nessuno se lo riscrive a mano", 0,
+          codice(src).count('" ".join(str(d.get("punto_ritiro")'))
+
+    # --- l'ordine e la resa -------------------------------------------
+    punti = [P("InPost", "locker", "Via Roma 1", 100),
+             P("Poste Italiane", "banco", "Tabaccheria", 200),
+             P("Altro", "banco", "Il portiere", 50)]
+    prova("l'ultimo SALVATO viene per primo",
+          ["Poste Italiane", "InPost", "Altro"],
+          [p["rete"] for p in amb["_punti_resi"](punti)])
+    prova("...col pareggio sulla rete, che due salvataggi nello stesso "
+          "secondo esistono davvero",
+          ["InPost", "Poste Italiane"],
+          [p["rete"] for p in amb["_punti_resi"](
+              [P("Poste Italiane", "banco", "b", 7),
+               P("InPost", "locker", "a", 7)])])
+    prova("«creato» non esce mai: e' il criterio, non un dato", False,
+          "creato" in amb["_punti_resi"](punti)[0])
+
+    # --- il match col venditore ---------------------------------------
+    prova("passa solo la rete che il venditore dichiara",
+          [{"rete": "InPost", "tipo": "locker", "punto": "Via Roma 1"}],
+          amb["punti_per_venditore"](punti, ["InPost"]))
+    prova("due reti: il piu' recente per primo",
+          ["Poste Italiane", "InPost"],
+          [p["rete"] for p in amb["punti_per_venditore"](
+              punti, ["InPost", "Poste Italiane"])])
+    prova("un venditore senza reti non precompila niente", [],
+          amb["punti_per_venditore"](punti, []))
+    # LA RETE USCITA DAL CATALOGO: `reti_venditore` la filtra, quindi non
+    # comparira' mai fra le reti di nessuno e il punto diventa inerte
+    # SENZA un ramo che lo dica. Il caso che nessuno esercitera' a mano.
+    prova("una rete uscita dal catalogo e' inerte, non un errore", [],
+          amb["punti_per_venditore"](
+              [P("Vecchia Rete", "locker", "x", 999)],
+              amb["reti_venditore"]("|Vecchia Rete|InPost|")))
+    prova("...e la riga non si cancella da sola: resta da elencare", 1,
+          len(amb["_punti_resi"]([P("Vecchia Rete", "locker", "x", 9)])))
+
+    # --- il percorso dei soldi non si tocca ---------------------------
+    # La prova che vale piu' di tutte: questo cantiere conserva una
+    # preferenza, non autorizza niente. Se un domani `punti_ritiro`
+    # comparisse in una di queste cinque, qualcuno starebbe facendo
+    # decidere a una tabella di comodita' dove vanno dei sats.
+    for f in ("compra", "_compra_set", "_sblocca_sats",
+              "_rimborsa_compratore", "paga_venditore"):
+        corpo = codice(pezzo(f))
+        prova(f"«{f}» non sa che i punti salvati esistono", 0,
+              corpo.count("punti_ritiro") + corpo.count("punti_salvati"))
+
+    # --- LA RIPRESA DEL PENTITO (il guasto B, ago 2026) ---------------
+    # `stessa` confrontava il punto e la via ma NON la rete e il tipo:
+    # chi sceglie «Locker», tocca Paga, si accorge che e' una
+    # tabaccheria e corregge in «Punto col banco» senza toccare
+    # l'indirizzo si ritrovava la fattura di PRIMA, col tipo vecchio —
+    # e il venditore comprava l'etichetta sbagliata, cioe' esattamente
+    # il costo da cui e' nato il cantiere delle reti. Preesistente a
+    # questo lavoro, che pero' rende quel gesto normale invece che raro.
+    # Si confrontano i valori NORMALIZZATI e mai il payload grezzo: con
+    # una rete sola il client tace e a fissarla e' `rete_da_payload`,
+    # quindi il grezzo direbbe «diversa» su un ordine identico.
+    ripresa = codice(pezzo("compra"))
+    i_st = ripresa.index("stessa = (")
+    condizione = ripresa[i_st:ripresa.index("viva =", i_st)]
+    for campo, atteso in (("punto_ritiro", 'or "") == punto'),
+                          ("via_punto", "or 0) == via_punto"),
+                          ("rete_punto", 'or "") == rete'),
+                          ("tipo_punto", 'or "") == tipo')):
+        prova(f"la ripresa confronta anche «{campo}»", True,
+              f'mio["{campo}"]' in condizione and atteso in condizione)
+    # ...e sui valori NORMALIZZATI. L'unico `d.get` che resta li' dentro
+    # e' quello dell'offerta, che dal payload viene davvero e non ha un
+    # gemello normalizzato: si conta invece di escluderlo a parole, cosi'
+    # un quarto campo grezzo infilato qui fa rossa la riga.
+    prova("...e sui valori normalizzati, non sul payload grezzo", 1,
+          condizione.count("d.get("))
+    prova("...cioe' nessuno dei tre campi del punto si rilegge grezzo",
+          True, not any(f'd.get("{c}")' in condizione
+                        for c in ("punto_ritiro", "rete_punto",
+                                  "tipo_punto")))
+
+    # --- l'endpoint ----------------------------------------------------
+    # La docstring si BUTTA prima di cercarci dentro: nomina
+    # `rete_da_payload` per dire che NON si usa, e una sentinella che
+    # legge anche la prosa certificherebbe il contrario di quel che
+    # vuole (il precedente e' `_decifra_contenuto`).
+    corpo_ep = pezzo("salva_punto_ritiro").split('"""')[-1]
+    prova("la rete si valida contro il CATALOGO, non contro un "
+          "venditore", True,
+          "SPEDIZIONIERI" in corpo_ep
+          and "rete_da_payload" not in corpo_ep)
+    prova("...e il tipo e' OBBLIGATORIO qui, che il vuoto e' tolleranza "
+          "verso un client di ieri", True,
+          "if punto and not tipo" in corpo_ep)
+    prova("il punto vuoto e' lo spegnimento, senza guardie", True,
+          "DELETE FROM punti_ritiro" in corpo_ep)
+    prova("«creato» si RINFRESCA sul conflitto, o «piu' recente» "
+          "vorrebbe dire un'altra cosa", True,
+          "creato=excluded.creato" in corpo_ep)
+    prova("la risposta si rilegge dal database", True,
+          "_punti_resi(_punti_utente(con" in corpo_ep)
+
+    # --- la fusione ----------------------------------------------------
+    fus = pezzo("esegui_fusione")
+    prova("i punti salvati seguono l'utente nella fusione", True,
+          "UPDATE OR IGNORE punti_ritiro SET tg_id=?" in fus)
+    prova("...e la meta' che muore non lascia righe", True,
+          "DELETE FROM punti_ritiro WHERE tg_id=?" in fus)
+
+    # IL CENSIMENTO DELLE TABELLE FIGLIE, che vale piu' delle due righe
+    # qui sopra e non parla dei punti: le uniche prove sulla fusione
+    # cercavano due stringhe nel corpo, quindi una tabella dimenticata
+    # era muta oggi e muta fra sei mesi. Qui si guarda lo SCHEMA — ogni
+    # CREATE TABLE con una colonna `tg_id` — e si chiede che la fusione
+    # la nomini. Cosi' la PROSSIMA tabella figlia entra nel conto da
+    # sola, invece di essere una riga da ricordare a mano.
+    tabelle = re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\((.*?)\n    \);",
+                         src, re.S)
+    con_tg = [n for n, corpo in tabelle
+              if re.search(r"^\s*tg_id\b", corpo, re.M)]
+    prova("il censimento vede le tabelle figlie (e non zero)", True,
+          len(con_tg) >= 12 and "punti_ritiro" in con_tg)
+    # `utenti` e' la riga stessa e non una figlia; le altre due sono
+    # LACUNE PREESISTENTI, trovate proprio da questo censimento il
+    # giorno che e' nato (ago 2026) e NON eccezioni per disegno:
+    # · `firme_nostr`: la coda delle firme resta col tg_id morto,
+    #   quindi quegli eventi non li chiede piu' nessuno;
+    # · `doppioni_ignorati`: la coppia gia' scartata torna a proporsi.
+    # Nessuna delle due tocca dei sats, e nessuna nasce da questo
+    # cantiere: si scrivono qui perche' smettano di essere invisibili.
+    NOTE = {"utenti", "firme_nostr", "doppioni_ignorati"}
+    prova("ogni tabella figlia dell'utente e' nominata nella fusione",
+          [], [t for t in con_tg if t not in NOTE and t not in fus])
+
+    # --- il client ------------------------------------------------------
+    # LA COLLOCAZIONE E' PORTANTE: in DEMO `apriAcquisto` monta
+    # preventivoDemo e TORNA senza chiamare caricaPreventivo, quindi
+    # dentro il conto la precompilazione non gira per costruzione;
+    # dentro il render girerebbe anche in demo e riscriverebbe il campo
+    # a ogni ridisegno, cioe' sotto le dita di chi scrive.
+    def fetta(firma):
+        """Il CORPO di una funzione del client, tagliato alla prossima
+        dichiarazione di livello zero.
+
+        `pezzo_js` si ferma alla prima riga VUOTA, che dentro una
+        funzione lunga cade quasi subito e su `renderAcquisto` corre per
+        49.000 caratteri — fin dentro le funzioni che vengono dopo. Una
+        fetta che sborda rende VACUA ogni sentinella che ci cerchi
+        dentro, e qui ne aveva gia' resa vacua una (trovata perche' la
+        prova diceva 1 dove doveva dire 0: il conteggio pescava la
+        DEFINIZIONE di precompilaPunto, che sta ottomila caratteri piu'
+        giu')."""
+        i = mini.index(firma)
+        dopo = i + len(firma)
+        fini = [x for x in (mini.find("\nfunction ", dopo),
+                            mini.find("\nasync function ", dopo)) if x > 0]
+        return mini[i:min(fini)]
+
+    prova("la precompilazione vive nel conto", True,
+          "precompilaPunto(d0, d);" in fetta("async function caricaPreventivo(){"))
+    prova("...e MAI nel render, o girerebbe anche in DEMO", 0,
+          fetta("function renderAcquisto(){").count("precompilaPunto("))
+    # ...e la contro-prova che la fetta VEDE davvero: senza, uno zero
+    # qui sopra sembrerebbe una promozione invece che una cecita'.
+    prova("(e la fetta del render e' quella giusta)", True,
+          0 < len(fetta("function renderAcquisto(){")) < 45000
+          and "cassettoPunto" in fetta("function renderAcquisto(){"))
+    prova("precompilaPunto ha UN chiamante solo", 1,
+          mini.count("precompilaPunto(")
+          - mini.count("function precompilaPunto("))
+    pre = fetta("function precompilaPunto(d0, p){")
+    prova("la guardia e' il TIMBRO e non «il campo e' vuoto»", True,
+          "if (d0.precompilato) return;" in pre
+          and "!d0.punto" not in pre)
+    prova("...e si timbra anche quando non c'e' niente da mettere", True,
+          pre.index("acqDati.precompilato = true")
+          < pre.index("punti_salvati"))
+    prova("la rete si riempie SOLO quando la scelta esiste davvero",
+          True, "(p.reti || []).length >= 2" in pre)
+    swap = fetta("function setReteAcquisto(r){")
+    prova("cambiando corriere il punto AUTO segue la rete nuova", True,
+          "applicaPuntoSalvato(puntoSalvatoPer(r))" in swap)
+    prova("...ma il testo scritto a mano resta: e' suo", True,
+          "!acqDati.puntoToccato" in swap)
+    prova("scrivere nel campo spegne la precompilazione", True,
+          "acqDati.puntoToccato=true" in mini)
+    riga = fetta("function rigaRicordaPunto(d, rete){")
+    prova("la riga che offre di ricordare non compare in DEMO ne' in "
+          "vetrina", True, "DEMO || VETRINA" in riga)
+    prova("...ne' senza rete o senza tipo", True,
+          "!rete || !d.tipoPunto" in riga)
+    prova("...ne' quando quel punto e' gia' salvato", True,
+          "gia.punto === punto && gia.tipo === d.tipoPunto" in riga)
+    prova("...e quando ce n'e' uno diverso lo DICE che sostituisce",
+          True, "Aggiorna il punto salvato per" in riga)
+    prova("la rete viaggia in un data-, mai dentro l'onclick", True,
+          'data-rete="${esc(rete)}"' in riga
+          and "ricordaPunto(this.dataset.rete)" in riga)
+    # LA RIGA SI RISCRIVE MENTRE SI DIGITA, e non col render intero —
+    # che rifarebbe l'input e porterebbe via cursore e fuoco. Senza,
+    # nel caso PIU' COMUNE (apro il cassetto, scelgo rete e tipo,
+    # scrivo il punto, premo Paga) nessun altro render scatta e la riga
+    # non compare MAI: trovato guardando uno scatto, non leggendo.
+    prova("...e si aggiorna mentre si scrive, in place", True,
+          "aggiornaRigaRicorda()" in mini
+          and 'id="acqRicorda"' in mini)
+    prova("...dall'oninput del campo, che e' l'unico posto che lo sa",
+          True, "acqDati.puntoToccato=true;aggiornaRigaRicorda()" in mini)
+    prova("la rete sotto cui si salva ha un giudice UNO", 1,
+          mini.count("function retePerSalvare"))
+    prova("...e lo chiamano il render e l'aggiornamento in place", 2,
+          mini.count("retePerSalvare(")
+          - mini.count("function retePerSalvare("))
+    cass = fetta("function renderPuntiRitiro(){")
+    prova("il cassetto sparisce in DEMO e a lista vuota", True,
+          "DEMO || !myPunti.length" in cass)
+    prova("...e dice quando una rete non serve piu' a nessuno", True,
+          "Nessun venditore usa più questa rete" in cass)
+    prova("...e non offre di aggiungerne uno da li'", True,
+          "Per aggiungerne uno, salvalo quando compri" in cass)
+
+    # --- la pagina «I tuoi dati» ---------------------------------------
+    # La pagina elenca cosa teniamo: un dato nuovo che non compare li'
+    # dentro e' la sola cosa che rende quella pagina falsa.
+    priv = mini[mini.index('id="view-privacy"'):mini.index("privShare")]
+    prova("la pagina dei dati dice che un punto si puo' salvare", True,
+          "tenertelo nel profilo" in priv)
+    prova("...e perche' proprio questo: e' un luogo pubblico", True,
+          "luogo pubblico" in priv)
+    prova("...e per quanto lo teniamo, con la strada per toglierlo",
+          True, "finché non li togli" in priv
+          and "Punti di ritiro" in priv)
 
 
 # ====================================================================
@@ -18032,6 +18324,7 @@ def main():
               prove_vetrina_canale,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,
+              prove_punti_salvati,
               prove_pagina_acquisto,
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_impersonazione, prove_avviso_spedizione,

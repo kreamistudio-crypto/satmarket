@@ -1703,6 +1703,43 @@ def init_db():
     -- — sarebbe una scansione della tabella intera.
     CREATE INDEX IF NOT EXISTS idx_preferiti_annuncio
       ON preferiti(annuncio_id);
+    CREATE TABLE IF NOT EXISTS punti_ritiro(
+        -- I punti di ritiro che CHI COMPRA si tiene (ago 2026): il
+        -- locker sotto casa non cambia, e riscriverlo a ogni acquisto
+        -- era l'attrito rimasto nel checkout. Alla pagina d'acquisto
+        -- rete, tipo e indirizzo arrivano gia' compilati.
+        --
+        -- LA PK E' LA REGOLA «uno per rete», e la fa rispettare il
+        -- database invece del codice: al massimo una riga per ognuna
+        -- delle voci di SPEDIZIONIERI, quindi il tetto cresce col
+        -- catalogo da solo — nessun MAX da tarare, nessuna guardia di
+        -- conteggio, nessuna leva. Salvare di nuovo per la stessa rete
+        -- SOSTITUISCE: «il punto che uso con InPost» e' un fatto
+        -- singolare. Chi ne usa due della stessa rete (casa e lavoro)
+        -- tiene l'ultimo e cambia a mano — cioe' quel che fa oggi:
+        -- imperfezione dichiarata, non si perde niente, si guadagna
+        -- solo meno.
+        --
+        -- QUESTA TABELLA NON TOCCA IL PERCORSO DEI SOLDI: il punto
+        -- viaggia nell'ordine come sempre (`ordini.punto_ritiro`), e
+        -- `rete_da_payload` continua a validarlo contro le reti di quel
+        -- venditore. Qui si conserva una preferenza, non si autorizza
+        -- niente.
+        --
+        -- La colonna si chiama `tipo` e NON `tipo_punto`: quel nome, in
+        -- una riga di schema, farebbe salire il censimento di
+        -- prove.py — che conta le due sole scritture negli INSERT degli
+        -- ordini — e il rosso sembrerebbe venire da un'altra parte.
+        tg_id  INTEGER NOT NULL,
+        rete   TEXT NOT NULL,       -- una voce di SPEDIZIONIERI
+        tipo   TEXT DEFAULT '',     -- 'locker' | 'banco'
+        punto  TEXT DEFAULT '',     -- il testo, gia' normalizzato
+        creato INTEGER,             -- l'ultimo SALVATO vince (vedi la pura)
+        PRIMARY KEY(tg_id, rete)
+    );
+    -- Niente indice, ed e' il rovescio del vicino: `preferiti` ne ha uno
+    -- perche' si conta per ANNUNCIO, qui non si interroga mai per rete
+    -- sola — si legge sempre per `tg_id`, che e' il prefisso della PK.
     CREATE TABLE IF NOT EXISTS offerte(
         -- la contrattazione strutturata (MAI una chat): proposta del
         -- compratore, al massimo UNA controproposta del venditore,
@@ -4715,6 +4752,19 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE preferiti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM preferiti WHERE tg_id=?", (id_nostr,))
+        # I punti di ritiro salvati seguono l'utente, stessa forma.
+        # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
+        # perche' qui la scelta non e' neutra come per i preferiti: la'
+        # le due righe dicono la stessa cosa, qui possono essere due
+        # INDIRIZZI diversi per InPost, e l'`UPDATE OR IGNORE` butta in
+        # silenzio quello della meta' che muore. Vince Telegram per il
+        # precedente di casa (`ln_address`, qui sotto: la meta' Telegram
+        # vince quando ha qualcosa), e perche' e' quella che sopravvive
+        # e da cui si continuera' a comprare. Costo massimo: un punto da
+        # risalvare al primo acquisto, con la riga che lo offre.
+        con.execute("UPDATE OR IGNORE punti_ritiro SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM punti_ritiro WHERE tg_id=?", (id_nostr,))
         # Le offerte seguono l'utente da entrambi i lati del banco;
         # le trattative tra le due meta' (auto-offerte, dopo la
         # fusione) muoiono qui, come i feedback degli auto-scambi.
@@ -7631,6 +7681,90 @@ def rete_da_payload(grezza: str, reti: list) -> str:
         raise HTTPException(400, "Questo venditore non spedisce con "
                                  "quel corriere: " + ", ".join(reti))
     return scelta
+
+
+def _testo_punto(grezzo) -> str:
+    """Il punto di ritiro come va in colonna: spazi collassati, tetto 120.
+
+    Era copiato IDENTICO in tre posti — `compra`, `_compra_set` e
+    `indica_punto_ritiro` — e il cantiere dei punti salvati ne
+    aggiungeva un quarto. Tre copie si tengono in pari, quattro no.
+
+    IL TETTO STA QUI E NON NELLA COLONNA, ed e' la ragione per cui il
+    taglio dev'essere lo stesso ovunque: un punto salvato troncato a una
+    misura e quello dell'ordine troncato a un'altra sarebbero due testi
+    diversi per la stessa cosa, e il confronto della RIPRESA
+    direbbe «richiesta diversa» su un punto che nessuno ha cambiato —
+    cioe' una fattura nuova al posto della sua."""
+    return " ".join(str(grezzo or "").split())[:120]
+
+
+def _punti_resi(punti) -> list:
+    """La forma in cui i punti salvati escono dal server: la rete, il
+    tipo e il testo — e MAI `creato`, che e' il criterio dell'ordine e
+    non un dato di chi guarda.
+
+    L'ordine e' «l'ultimo SALVATO per primo», col pareggio sulla rete in
+    ordine alfabetico: due punti salvati nello stesso secondo esistono
+    davvero, e senza il secondo criterio si scambierebbero di posto fra
+    una richiesta e l'altra. Sta QUI e non in un `ORDER BY`, cosi' il
+    Profilo e il preventivo non possono ordinare in due modi diversi —
+    e si tortura in CI senza un database."""
+    ordinati = sorted(punti, key=lambda p: (-(p["creato"] or 0), p["rete"]))
+    return [{"rete": p["rete"], "tipo": p["tipo"] or "",
+             "punto": p["punto"] or ""} for p in ordinati]
+
+
+def punti_per_venditore(punti, reti: list) -> list:
+    """I punti salvati da chi compra che valgono per QUESTO venditore:
+    quelli sulle reti che lui ha dichiarato, dal piu' recente salvato.
+
+    Giudice PURO come `reti_venditore`: prende le righe e le reti, mai
+    la connessione, cosi' si tortura in CI senza un database.
+
+    L'ORDINE E' «l'ultimo SALVATO vince» (`creato DESC`), che risponde
+    alla domanda «ho un punto per due reti di questo venditore, quale
+    mi precompila?». Deterministico e spiegabile in mezza riga. LA
+    STRADA SCARTATA, che torna in mente: una colonna `usato_il` scritta
+    all'acquisto — «l'ultimo che hai davvero usato» e' piu' vero, ma
+    vuole un UPDATE dentro `compra()` per un ordinamento, e il caso che
+    lo distingue (venditore con due reti E io con due punti salvati) e'
+    raro. Se in rodaggio si vedra', la leva e' una colonna in piu'.
+    Il pareggio va alla rete in ordine alfabetico: due punti salvati
+    nello stesso secondo esistono davvero, e senza il secondo criterio
+    si scambierebbero di posto fra una richiesta e l'altra.
+
+    IL MATCH LO FA IL SERVER, e non e' solo la regola «il client
+    mostra»: e' anche MINIMIZZAZIONE. La risposta di un endpoint che
+    parla di UN venditore porta i punti sulle reti che quel venditore ha
+    gia' dichiarato, e nient'altro; col filtro nel client viaggerebbe la
+    lista intera a ogni preventivo, reti che con lui non c'entrano
+    comprese. Chi un domani lo «semplifica» spostandolo di la' non
+    sposta un giudice: allarga cosa esce.
+
+    Una rete uscita dal catalogo non compare mai in `reti`
+    (`reti_venditore` filtra), quindi il suo punto diventa INERTE per
+    costruzione — nessun ramo da scrivere, e nessuna riga cancellata a
+    nessuno: resta nel Profilo con la sua ✕.
+
+    La lista VUOTA e' un venditore che non ha dichiarato niente, e
+    torna giustamente a mani vuote: li' la rete non si sa, e un punto
+    precompilato sotto un'etichetta che non c'e' direbbe il falso."""
+    ammesse = set(reti)
+    return _punti_resi([p for p in punti if p["rete"] in ammesse])
+
+
+def _punti_utente(con, tg_id: int):
+    """Le righe grezze di `punti_ritiro` di una persona. Lettore unico:
+    da qui passano il Profilo (che li vuole TUTTI, compresi quelli su
+    reti che nessun venditore dichiara piu') e i due preventivi, che poi
+    li filtrano col giudice. `creato` esce di qui e muore in
+    `_punti_resi`: al client non serve.
+
+    Una SELECT sola per pagina d'acquisto, sul prefisso della PK."""
+    return con.execute("SELECT rete, tipo, punto, creato "
+                       "FROM punti_ritiro WHERE tg_id=?",
+                       (tg_id,)).fetchall()
 
 # La dimensione del testo (ago 2026): chi ha bisogno di caratteri piu'
 # grandi la sceglie una volta e la ritrova OVUNQUE, perche' e' una
@@ -14174,7 +14308,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     if via not in ("casa", "punto"):
         con.close()
         raise HTTPException(400, "Strada di spedizione sconosciuta")
-    punto = " ".join(str(d.get("punto_ritiro") or "").split())[:120]
+    punto = _testo_punto(d.get("punto_ritiro"))
     if via == "punto":
         if scelta != "spedizione":
             con.close()
@@ -14767,6 +14901,12 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # legge una sola: gli si da' la prima, che e' un'omissione e non
     # una bugia (la regola d'oro di _sconto_pubblico)
     spedizioniere = reti[0] if reti else ""
+    # I PUNTI SALVATI da chi compra che valgono per QUESTO venditore
+    # (ago 2026): il match lo fa qui il server — vedi il perche' in
+    # `punti_per_venditore`, che e' anche minimizzazione e non solo la
+    # regola «il client mostra». Una SELECT sul prefisso della PK.
+    punti_salvati = punti_per_venditore(
+        _punti_utente(con, user["id"]), reti)
     regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
@@ -14949,6 +15089,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
+            "punti_salvati": punti_salvati,
             # ogni chiave porta il numero SOLO nella sua unita': la
             # `sped_gratis_soglia` e' in SATS e i client di prima del
             # passaggio all'euro la leggono cosi' — su un negozio in
@@ -15123,6 +15264,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     reti = reti_venditore(sp["spedizionieri"],
                           sp["spedizioniere"]) if sp else []
     spedizioniere = reti[0] if reti else ""
+    # il gemello del ramo mono: stesso giudice, stessa SELECT sola
+    punti_salvati = punti_per_venditore(
+        _punti_utente(con, user["id"]), reti)
     regole_sc = _regole_sconto(
         sp["sconto_pacco_criterio"] if sp else "",
         sp["sconto_pacco_valore_valuta"] if sp else "",
@@ -15247,6 +15391,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             "commissione_sats": conto["commissione"],
             "stima": listino_eur,
             "spedizioniere": spedizioniere, "reti": reti,
+            "punti_salvati": punti_salvati,
             # la seconda promessa del negozio, che guarda lo STESSO
             # lordo della prima: le due sono indipendenti
             # per costruzione, e nessuna delle due misura l'altra
@@ -15362,7 +15507,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     if via not in ("casa", "punto"):
         con.close()
         raise HTTPException(400, "Strada di spedizione sconosciuta")
-    punto = " ".join(str(d.get("punto_ritiro") or "").split())[:120]
+    punto = _testo_punto(d.get("punto_ritiro"))
     if via == "punto":
         if scelta != "spedizione":
             con.close()
@@ -15428,6 +15573,21 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                   # e' una richiesta diversa — la tariffa puo' cambiare
                   and (mio["punto_ritiro"] or "") == punto
                   and (mio["via_punto"] or 0) == via_punto
+                  # E LA RETE E IL TIPO (ago 2026, guasto trovato col
+                  # cantiere dei punti salvati): senza queste due righe
+                  # chi sceglie «Locker», tocca Paga, si accorge che e'
+                  # una tabaccheria e corregge in «Punto col banco»
+                  # senza toccare l'indirizzo, si ritrova la fattura di
+                  # PRIMA — col tipo vecchio — e il venditore compra
+                  # l'etichetta sbagliata: cioe' esattamente il costo da
+                  # cui e' nato il cantiere delle reti. Stesso gemello
+                  # sulla rete, che dal profilo si scambia con un tocco.
+                  # Si confrontano i valori NORMALIZZATI di qui sopra e
+                  # mai il payload grezzo: con una rete sola il client
+                  # tace e a fissarla e' `rete_da_payload`, quindi il
+                  # grezzo direbbe «diversa» su un ordine identico.
+                  and (mio["rete_punto"] or "") == rete
+                  and (mio["tipo_punto"] or "") == tipo
                   and (legame["id"] if legame else 0)
                   == int(d.get("offerta_id") or 0))
         viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
@@ -16173,7 +16333,7 @@ async def indica_punto_ritiro(ordine_id: int, req: Request,
     esc()."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    punto = " ".join(str(d.get("punto_ritiro") or "").split())[:120]
+    punto = _testo_punto(d.get("punto_ritiro"))
     if not punto:
         raise HTTPException(400, "Scrivi il punto di ritiro (nome o "
                                  "indirizzo del punto)")
@@ -17458,6 +17618,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
             "WHERE stato='revisione'").fetchone()["n"]
     # I titoli sbloccati si chiedono con la connessione ancora aperta
     sbloccati = set(titoli_disponibili(con, user["id"])) if u else set()
+    # ...e i punti di ritiro salvati per la stessa ragione: la chiave
+    # si monta piu' in basso, col suo commento, ma la lettura sta qui
+    # perche' e' qui che il database e' ancora aperto.
+    punti_miei = _punti_resi(_punti_utente(con, user["id"]))
     con.close()
     profilo = dict(u) if u else {}
     profilo["admin"] = e_admin(user["id"])
@@ -17505,6 +17669,16 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["spedizionieri"] = list(SPEDIZIONIERI)
     profilo["spedizionieri_miei"] = reti_venditore(
         u["spedizionieri"], u["spedizioniere"])
+    # I punti di ritiro che si e' tenuto CHI COMPRA (ago 2026). Qui
+    # escono TUTTI — anche quelli su una rete che nessun venditore
+    # dichiara piu' — perche' questo e' il cassetto in cui si tolgono, e
+    # una riga che non si vede non si puo' togliere. Il filtro «quali
+    # valgono per QUESTO venditore» e' un'altra domanda, e la fa il
+    # preventivo col suo giudice.
+    # NON esce dal SELECT * come le altre: e' una tabella, non una
+    # colonna di `utenti` — quindi nessuna rotta la puo' servire per
+    # sbaglio.
+    profilo["punti_ritiro"] = punti_miei
     # il tetto del foglio: il client non hardcoda mai un numero che
     # vive in una leva (il patto di max_barattolo). Il contatore esce
     # gia' dal SELECT * come `invito_corrieri`.
@@ -17897,6 +18071,74 @@ async def scegli_spedizioniere(req: Request,
     con.close()
     return {"ok": True, "spedizionieri": reti,
             "spedizioniere": reti[0] if reti else ""}
+
+
+@app.post("/api/me/punti-ritiro")
+async def salva_punto_ritiro(req: Request,
+                             x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """«📍 I tuoi punti di ritiro»: il locker o la tabaccheria che CHI
+    COMPRA si tiene, per non riscriverli a ogni acquisto.
+
+    UNO PER RETE, e la PK della tabella E' la regola: salvare di nuovo
+    per la stessa rete SOSTITUISCE, senza chiedere niente — «il punto
+    che uso con InPost» e' un fatto singolare, e la riga che apre questo
+    gesto nel client lo dice («Aggiorna il punto salvato per InPost»).
+
+    LA RETE SI VALIDA CONTRO IL CATALOGO, come in `scegli_spedizioniere`
+    e MAI con `rete_da_payload`: quella risponde a un'altra domanda —
+    «questo VENDITORE spedisce con quella rete?» — e qui di venditori
+    non ce n'e' nessuno. Piegarla per riusarla la farebbe nominare
+    SPEDIZIONIERI, che una prova le vieta apposta.
+
+    IL TIPO E' OBBLIGATORIO, ed e' l'unico posto in cui lo e': il vuoto
+    che `tipo_punto_da_payload` accetta e' tolleranza verso un client
+    rimasto in cache, non un dato che si sta scrivendo adesso. Un punto
+    salvato senza tipo precompilerebbe rete e indirizzo lasciando muta
+    proprio la domanda per cui il cantiere delle reti e' nato, e si
+    arriverebbe a «Paga» per prendersi un toast.
+
+    PUNTO VUOTO = SI TOGLIE, dichiarato, ed e' l'idioma di casa:
+    `percento <= 0` spegne lo sconto, `{fino: 0}` e' il rientro dalle
+    ferie. Togliere non ha guardie — non si toglie niente a nessuno, e
+    gli ordini gia' nati hanno il loro punto in colonna: questa tabella
+    non li tocca.
+
+    Si rilegge dal database invece di ricomporre la risposta dal
+    payload: e' il patto del pattern, e qui in piu' l'ordine lo decide
+    `_punti_resi` e non chi ha scritto per ultimo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    rete = (d.get("rete") or "").strip()
+    if rete not in SPEDIZIONIERI:
+        raise HTTPException(400, "Rete sconosciuta: "
+                            + ", ".join(SPEDIZIONIERI))
+    punto = _testo_punto(d.get("punto"))
+    tipo = tipo_punto_da_payload(d.get("tipo"))
+    if punto and not tipo:
+        raise HTTPException(400, "Dicci se è un locker automatico o un "
+                                 "punto col banco")
+    con = db()
+    if punto:
+        con.execute(
+            "INSERT INTO punti_ritiro(tg_id, rete, tipo, punto, creato) "
+            "VALUES(?,?,?,?,?) "
+            "ON CONFLICT(tg_id, rete) DO UPDATE SET "
+            "tipo=excluded.tipo, punto=excluded.punto, "
+            # `creato` si RINFRESCA, e non e' un dettaglio: la regola
+            # dell'ordine e' «l'ultimo salvato vince», quindi ri-salvare
+            # deve rimettere quella riga in testa. Conservandolo,
+            # «piu' recente» diventerebbe «salvato per la prima volta
+            # prima degli altri», che e' un'altra cosa.
+            "creato=excluded.creato",
+            (user["id"], rete, tipo, punto, int(time.time())))
+    else:
+        con.execute("DELETE FROM punti_ritiro WHERE tg_id=? AND rete=?",
+                    (user["id"], rete))
+    con.commit()
+    punti = _punti_resi(_punti_utente(con, user["id"]))
+    con.close()
+    return {"ok": True, "punti": punti}
 
 
 @app.post("/api/me/font-scala")

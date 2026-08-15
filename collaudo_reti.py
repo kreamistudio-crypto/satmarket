@@ -124,7 +124,17 @@ def avvio():
         lambda che torna None non si puo' awaitare."""
         return None
 
+    async def mai_pagata(_hash):
+        """La ripresa, quando la richiesta e' DIVERSA, chiede a LNbits
+        se la fattura di prima e' stata saldata prima di metterci una
+        lapide sopra. Qui nessuno paga mai, quindi la risposta e' no —
+        e senza questo stub la domanda uscirebbe davvero sulla rete
+        (nessuna prova ci era mai arrivata: il ramo l'ha aperto il
+        collaudo della ripresa col tipo corretto)."""
+        return False
+
     server.crea_invoice_escrow = invoice_finta
+    server.invoice_pagata = mai_pagata
     server.cambio_btc_eur = cambio_finto
     server.notifica = zitta
     server.polso_ordini_admin = lambda *a, **k: None
@@ -388,6 +398,195 @@ def prove_tipo_punto():
           (riga_ordine(oid)["punto_ritiro"], riga_ordine(oid)["tipo_punto"]))
 
 
+def punti_di(chi=111):
+    con = SRV.db()
+    r = [dict(x) for x in con.execute(
+        "SELECT rete, tipo, punto, creato FROM punti_ritiro "
+        "WHERE tg_id=? ORDER BY rete", (chi,)).fetchall()]
+    con.close()
+    return r
+
+
+def salva_punto(corpo):
+    return chiama(SRV.salva_punto_ritiro, corpo)
+
+
+def preventivo(aid, qta=1):
+    return chiama(SRV.preventivo_ordine,
+                  {"annuncio_id": aid, "quantita": qta, "offerta_id": 0})
+
+
+def prove_punti_salvati():
+    """I PUNTI CHE CHI COMPRA SI TIENE — l'endpoint e il match veri.
+
+    `prove.py` difende la forma; qui si gira la cosa: un punto si salva,
+    sostituisce, si toglie, e soprattutto ARRIVA (o non arriva) dentro
+    il preventivo secondo le reti che quel venditore ha dichiarato."""
+    print("\n── I PUNTI SALVATI: l'endpoint e il match ──")
+    con = SRV.db()
+    con.execute("DELETE FROM punti_ritiro")
+    con.commit()
+    con.close()
+
+    r = salva_punto({"rete": "InPost", "tipo": "locker",
+                     "punto": "  Locker   Via Roma 1  "})
+    prova("si salva, e il testo arriva normalizzato",
+          [{"rete": "InPost", "tipo": "locker", "punto": "Locker Via Roma 1"}],
+          r["punti"])
+    prova("...e in colonna c'e' una riga sola", 1, len(punti_di()))
+
+    salva_punto({"rete": "InPost", "tipo": "banco",
+                 "punto": "Tabaccheria Bianchi"})
+    prova("ri-salvare sulla stessa rete SOSTITUISCE, non aggiunge",
+          [("InPost", "banco", "Tabaccheria Bianchi")],
+          [(p["rete"], p["tipo"], p["punto"]) for p in punti_di()])
+
+    salva_punto({"rete": "Poste Italiane", "tipo": "banco",
+                 "punto": "Bar dello sport"})
+    prova("una rete diversa e' una riga diversa", 2, len(punti_di()))
+
+    alza("una rete fuori catalogo si rifiuta",
+         lambda: salva_punto({"rete": "PonyExpress", "tipo": "locker",
+                              "punto": "x"}), "sconosciuta")
+    alza("...e un punto senza tipo pure, che il tipo qui e' il dato",
+         lambda: salva_punto({"rete": "Altro", "tipo": "",
+                              "punto": "Il portiere"}), "locker")
+    prova("nessuno dei due rifiuti ha scritto niente", 2, len(punti_di()))
+
+    # --- IL MATCH: e' il cuore del cantiere -------------------------
+    aid = semina("|InPost|")
+    p = preventivo(aid)
+    prova("il venditore dichiara InPost: arriva il punto InPost",
+          [{"rete": "InPost", "tipo": "banco",
+            "punto": "Tabaccheria Bianchi"}], p["punti_salvati"])
+
+    aid = semina("|Poste Italiane|")
+    prova("dichiara solo Poste: arriva quello di Poste, non l'altro",
+          ["Poste Italiane"],
+          [x["rete"] for x in preventivo(aid)["punti_salvati"]])
+
+    aid = semina("|Altro|")
+    prova("dichiara una rete per cui non ho niente: niente da "
+          "precompilare", [], preventivo(aid)["punti_salvati"])
+
+    aid = semina("")
+    prova("non dichiara niente: niente, che li' la rete non si sa",
+          [], preventivo(aid)["punti_salvati"])
+
+    # DUE RETI E DUE PUNTI: vince il piu' recente SALVATO, ed e' la
+    # domanda a cui il cantiere doveva rispondere.
+    # `creato` si invecchia A MANO: i due salvataggi qui sopra cadono
+    # nello STESSO secondo, e a parita' comanda il pareggio sulla rete
+    # (che ha la sua prova in prove.py). Invecchiare InPost e' l'unico
+    # modo di provare l'ordine VERO invece del pareggio.
+    con = SRV.db()
+    con.execute("UPDATE punti_ritiro SET creato=creato-100 "
+                "WHERE tg_id=111 AND rete='InPost'")
+    con.commit()
+    con.close()
+    aid = semina("|InPost|Poste Italiane|")
+    prova("due reti: il piu' recente salvato viene per primo",
+          ["Poste Italiane", "InPost"],
+          [x["rete"] for x in preventivo(aid)["punti_salvati"]])
+    salva_punto({"rete": "InPost", "tipo": "locker", "punto": "Il nuovo"})
+    prova("...e ri-salvare l'altro lo rimette in testa",
+          ["InPost", "Poste Italiane"],
+          [x["rete"] for x in preventivo(aid)["punti_salvati"]])
+
+    prova("il criterio dell'ordine non esce mai dal server", False,
+          any("creato" in x for x in preventivo(aid)["punti_salvati"]))
+
+    # --- IL PUNTO VUOTO TOGLIE --------------------------------------
+    r = salva_punto({"rete": "InPost", "tipo": "", "punto": ""})
+    prova("il punto vuoto toglie quella rete, e solo quella",
+          ["Poste Italiane"], [x["rete"] for x in r["punti"]])
+    prova("...e togliere una rete che non c'e' non e' un errore",
+          ["Poste Italiane"],
+          [x["rete"] for x in
+           salva_punto({"rete": "Altro", "tipo": "", "punto": ""})["punti"]])
+
+    # --- L'ORDINE NON CAMBIA DI UN SAT ------------------------------
+    # La prova che il cantiere non tocca il denaro: si compra con lo
+    # stesso corpo di sempre e l'ordine nasce identico, punti salvati o
+    # no — la tabella conserva una preferenza, non autorizza niente.
+    aid = semina("|Poste Italiane|")
+    INVOICES.clear()
+    oid = compra(aid, {"punto_ritiro": "Bar dello sport",
+                       "tipo_punto": "banco"})["ordine_id"]
+    o = riga_ordine(oid)
+    prova("l'ordine porta il punto e la rete come sempre",
+          ("Bar dello sport", "Poste Italiane", "banco", 1),
+          (o["punto_ritiro"], o["rete_punto"], o["tipo_punto"],
+           o["via_punto"]))
+    prova("...e la fattura chiede il totale di sempre",
+          [o["prezzo_sats"]], INVOICES)
+
+
+def prove_ripresa_punto():
+    """LA RIPRESA col tipo corretto (il guasto B): correggere «locker»
+    in «punto col banco» senza toccare l'indirizzo DEVE fare una
+    fattura nuova. Prima tornava quella di prima, col tipo vecchio — e
+    il venditore comprava l'etichetta sbagliata."""
+    print("\n── LA RIPRESA: correggere il tipo non riusa la fattura ──")
+    aid = semina("|InPost|")
+    INVOICES.clear()
+    a = compra(aid, {"punto_ritiro": "Via Roma 1", "tipo_punto": "locker"})
+    prova("il primo acquisto conia una fattura", 1, len(INVOICES))
+    b = compra(aid, {"punto_ritiro": "Via Roma 1", "tipo_punto": "locker"})
+    prova("la richiesta IDENTICA riprende la sua, senza coniarne",
+          (a["ordine_id"], 1), (b["ordine_id"], len(INVOICES)))
+    c = compra(aid, {"punto_ritiro": "Via Roma 1", "tipo_punto": "banco"})
+    prova("cambiare il TIPO e' una richiesta diversa: fattura nuova",
+          2, len(INVOICES))
+    prova("...e l'ordine porta il tipo corretto, non quello di prima",
+          "banco", riga_ordine(c["ordine_id"])["tipo_punto"])
+
+    # e il gemello sulla rete, che dal profilo si scambia con un tocco
+    aid = semina("|InPost|Poste Italiane|")
+    INVOICES.clear()
+    compra(aid, {"punto_ritiro": "Da Mario", "rete_punto": "InPost",
+                 "tipo_punto": "banco"})
+    d = compra(aid, {"punto_ritiro": "Da Mario",
+                     "rete_punto": "Poste Italiane", "tipo_punto": "banco"})
+    prova("cambiare la RETE idem: la stessa tabaccheria su due reti "
+          "non e' lo stesso ordine", 2, len(INVOICES))
+    prova("...e l'ordine porta la rete nuova", "Poste Italiane",
+          riga_ordine(d["ordine_id"])["rete_punto"])
+
+
+def prove_fusione_punti():
+    """La tabella e' una figlia di `utenti`: se la fusione la
+    dimenticasse, i punti resterebbero attaccati a una riga morta."""
+    print("\n── LA FUSIONE: i punti seguono l'utente ──")
+    con = SRV.db()
+    con.execute("DELETE FROM punti_ritiro")
+    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,"
+                "registrato,npub_accesso) VALUES(-7,'Nativo','neg77777',"
+                "1,'npub1collaudo')")
+    for tg, rete, punto in ((111, "InPost", "Quello di Telegram"),
+                            (-7, "InPost", "Quello di Nostr"),
+                            (-7, "Poste Italiane", "Solo di Nostr")):
+        con.execute("INSERT OR REPLACE INTO punti_ritiro"
+                    "(tg_id,rete,tipo,punto,creato) VALUES(?,?,'banco',?,1)",
+                    (tg, rete, punto))
+    con.commit()
+    con.close()
+
+    # la firma e' (chi RESTA, chi muore): invertirla fa scattare la
+    # prima guardia e la fusione rifiuta con una frase gentile, cioe'
+    # la prova passerebbe per il motivo sbagliato — per questo si
+    # guarda anche il valore di ritorno.
+    esito = SRV.esegui_fusione(111, -7)
+    prova("la fusione e' avvenuta davvero (non un rifiuto gentile)",
+          True, not isinstance(esito, str))
+
+    prova("la meta' che muore non lascia righe", [], punti_di(-7))
+    prova("...e sulla stessa rete vince la meta' TELEGRAM, dichiarato",
+          [("InPost", "Quello di Telegram"),
+           ("Poste Italiane", "Solo di Nostr")],
+          [(p["rete"], p["punto"]) for p in punti_di(111)])
+
+
 def prove_libro_mastro():
     print("\n── LA RONDA DEVE TACERE ──")
     guasti = []
@@ -410,6 +609,9 @@ def main():
     prove_endpoint()
     prove_scelta()
     prove_tipo_punto()
+    prove_punti_salvati()
+    prove_ripresa_punto()
+    prove_fusione_punti()
     prove_libro_mastro()
     print("\n" + "=" * 66)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

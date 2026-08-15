@@ -2082,6 +2082,24 @@
     text-overflow:ellipsis;white-space:nowrap}
   .punto-riga .punto-cambia{flex:0 0 auto;font-weight:800;
     text-decoration:underline}
+  /* La riga che offre di ricordare il punto (ago 2026): un terziario,
+     cioe' testo e basta — il gesto e' facoltativo e non deve pesare
+     quanto le due scelte sopra, ne' somigliare a «Paga». Sta dentro il
+     cassetto, quindi eredita lo stop alla propagazione. */
+  .ricorda-punto{margin-top:8px;font-size:13px}
+  /* Le righe del cassetto nel Profilo: il testo che cede coi puntini e
+     la ✕ che non si stringe mai — la stessa grammatica della riga
+     compatta qui sopra. */
+  .punto-salvato{display:flex;align-items:flex-start;gap:10px;
+    padding:10px 0;border-top:1px solid var(--line-soft)}
+  .punto-salvato .ps-testo{flex:1 1 auto;min-width:0}
+  .punto-salvato .ps-dove{font-size:12.5px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .punto-salvato .ps-morta{font-size:12px;color:var(--muted);
+    margin-top:2px}
+  .punto-salvato .ps-x{flex:0 0 auto;background:none;border:0;
+    color:var(--muted);font-size:16px;line-height:1;padding:2px 4px;
+    cursor:pointer}
   /* Il cassetto dell'indirizzo di casa (ago 2026): stesso ospite e
      stessa forma del punto — riusa .punto-riga per la riga compatta,
      che e' il VESTITO di «un testo lungo col Cambia in fondo» e non
@@ -4156,10 +4174,10 @@ document.getElementById('cartello')?.remove();</script>
       </ul>
 
       <h3 id="priv-indirizzo">Quello che chiediamo solo quando serve</h3>
-      <p>Tre cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b>.</p>
+      <p>Tre cose non ce le dai per stare qui: te le chiediamo nel momento esatto in cui servono a un affare, e vivono <b>dentro quell'ordine</b> — tranne una, che puoi scegliere di tenerti.</p>
       <ul class="sicu-lista">
         <li><b>L'indirizzo di casa</b>, se scegli la spedizione a casa. Lo vede <b>solo chi ti vende</b>, per stampare l'etichetta.</li>
-        <li><b>Il punto di ritiro</b> che scegli, se preferisci quella strada — lì un indirizzo tuo non c'è proprio.</li>
+        <li><b>Il punto di ritiro</b> che scegli, se preferisci quella strada — lì un indirizzo tuo non c'è proprio. Questo, se vuoi, puoi anche <b>tenertelo nel profilo</b> per non riscriverlo ogni volta: è l'unica delle tre che si può salvare, e la ragione è che un punto di ritiro è un <i>luogo pubblico</i> — un locker, una tabaccheria — mentre casa tua no. Lo salvi con un tocco quando compri, mai da solo, e lo togli quando vuoi.</li>
         <li><b>Il codice</b> di un buono o di un prodotto digitale, che chi vende consegna qui dentro invece che in chat.</li>
       </ul>
       <!-- LA PRIMA DELLE TRE AFFERMAZIONI DELICATE (ago 2026). Questa
@@ -4194,6 +4212,10 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>L'accesso da dentro Telegram</b> vale <b><span data-durata="initdata"></span> ore</b>: dopo, riaprendo l'app, se ne fa uno nuovo.</li>
         <li><b>La memoria di quali avvisi ti abbiamo già mandato</b>: <b><span data-durata="avvisi"></span> giorni</b>, così lo stesso annuncio non ti risuona addosso.</li>
         <li><b>La fattura di un pagamento</b> vive <b><span data-tempo="invoice"></span> minuti</b>. Se non la paghi, l'ordine non è mai esistito.</li>
+        <!-- L'unica voce di questa lista che l'utente ci ha messo LUI, e
+             l'unica senza scadenza: per questo la strada per toglierla
+             sta nella stessa riga, invece che da qualche altra parte. -->
+        <li><b>I punti di ritiro che salvi</b>: <b>finché non li togli</b>. Li trovi nel Profilo, in «📍 Punti di ritiro», con una ✕ accanto a ognuno.</li>
       </ul>
       <p><b>Tutto il resto non ha una scadenza</b>, e non è una dimenticanza: annunci, ordini, voti e reputazione <i>sono</i> la memoria degli affari fatti, e servono a te quanto a chi commercia con te — una recensione che sparisce dopo un anno non è una recensione. Un ordine concluso puoi <b>nasconderlo</b> dalla tua lista quando non vuoi più vederlo: sparisce dalla vista, la riga resta.</p>
 
@@ -4243,6 +4265,7 @@ document.getElementById('cartello')?.remove();</script>
         <li>Scegliere quale foto mostrare, o non mostrarne nessuna.</li>
         <li>Scegliere dove ricevere gli avvisi, o spegnerli.</li>
         <li>Mettere in pausa o cancellare i tuoi avvisi di ricerca.</li>
+        <li>Togliere un punto di ritiro che avevi salvato.</li>
         <li>Chiudere il negozio per ferie, e nascondere gli ordini conclusi.</li>
         <li>Scaricare i tuoi affari in un file, dal Profilo.</li>
       </ul>
@@ -4587,6 +4610,22 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accSpedizioniere">
         <button class="acc-h" onclick="toggleAcc('accSpedizioniere')"><span class="em">📦</span>Come spedisci <span class="conta" id="spedizioniereConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="spedizioniereBlocco"></div></div>
+      </div>
+
+      <!-- I punti di ritiro che si tiene CHI COMPRA (ago 2026): il
+           gemello dall'altra parte del banco — sopra c'e' con quali
+           corrieri SPEDISCI, qui dove vuoi RICEVERE.
+           IL CASSETTO ELENCA E TOGLIE, e basta: non c'e' un form per
+           aggiungerne uno, ed e' deliberato. Dal Profilo non si sa
+           quali reti servano, e offrire tutte e tre inviterebbe a
+           salvare punti per corrieri che nessuno usa; il gesto sta al
+           checkout, dove la rete la dice il venditore e la mappa e' li'
+           sotto. Correggere un refuso si fa allo stesso posto: il punto
+           arriva precompilato, «Cambia» lo riapre, «Aggiorna» lo
+           sostituisce. -->
+      <div class="acc" id="accPuntiRitiro">
+        <button class="acc-h" onclick="toggleAcc('accPuntiRitiro')"><span class="em">📍</span>Punti di ritiro <span class="conta" id="puntiRitiroConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="puntiRitiroBlocco"></div></div>
       </div>
 
       <!-- Lo sconto sugli articoli (ago 2026): UNA regola per tutto il
@@ -9762,7 +9801,7 @@ function apriAcquisto(l){
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id)?.id || 0,
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
-             tipoPunto:'',
+             tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -9839,7 +9878,7 @@ function apriAcquistoSet(){
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0, firma:f,
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
-             tipoPunto:'',
+             tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -9964,6 +10003,7 @@ async function caricaPreventivo(){
     const vive = (d.strade||[]).filter(s => !s.cambio_assente);
     acqDati.via = vive.some(s => s.via === d0.via) ? d0.via
       : viaDefault(vive);
+    precompilaPunto(d0, d);
     renderAcquisto();
   } catch(e) {
     if (acqDati !== d0) return;
@@ -10536,8 +10576,9 @@ function renderAcquisto(){
   const campoDove = `<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Via Roma 1, Pavia"
-      oninput="if(acqDati)acqDati.punto=this.value">
-    ${linkMappePunti(retiMappa)}`;
+      oninput="if(acqDati){acqDati.punto=this.value;acqDati.puntoToccato=true;aggiornaRigaRicorda()}">
+    ${linkMappePunti(retiMappa)}
+    <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>`;
   const campoAperto =
     `${scelteRete}${scelteTipo}${(!reti.length || scelteFatte) ? campoDove : ''}`;
   /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
@@ -10927,6 +10968,133 @@ function apriPuntoAcquisto(){
   renderAcquisto();
   el('acqPunto')?.focus();
 }
+/* ---- I PUNTI SALVATI (ago 2026) ----
+   Chi compra si tiene il suo locker, e alla pagina d'acquisto arriva
+   gia' compilato: rete, tipo e indirizzo, senza toccare niente.
+   IL MATCH L'HA GIA' FATTO IL SERVER: `punti_salvati` viene col
+   preventivo, filtrato sulle reti di QUESTO venditore e ordinato dal
+   piu' recente salvato — qui si prende il primo. Il perche' sta nel
+   giudice di la' (e' anche minimizzazione: la lista intera non
+   viaggia).
+   VIVE IN caricaPreventivo E MAI IN renderAcquisto, ed e' portante: in
+   DEMO `apriAcquisto` monta preventivoDemo e TORNA senza chiamare
+   caricaPreventivo, quindi di la' non gira per costruzione; dentro il
+   render girerebbe anche in demo E rimetterebbe il punto a ogni
+   ridisegno, cioe' sotto le dita di chi sta scrivendo. */
+function puntoSalvatoPer(rete){
+  return (acqDati?.preventivo?.punti_salvati || [])
+    .find(p => p.rete === rete) || null;
+}
+/* Mette (o toglie) un punto salvato. Non tocca `rete`: nello swap l'ha
+   appena scelta chi compra, e nella precompilazione ha una regola sua
+   — vedi qui sotto. */
+function applicaPuntoSalvato(sp){
+  if (!acqDati) return;
+  acqDati.punto = sp ? sp.punto : '';
+  acqDati.tipoPunto = sp ? sp.tipo : '';
+}
+/* UNA VOLTA SOLA, al primo conto: «la pagina si apre gia' compilata»,
+   non «si ricompila a ogni giro». Senza il timbro un ± rifarebbe il
+   preventivo e riporterebbe la precompilazione addosso a chi nel
+   frattempo ha scelto un'altra rete con la pillola — cioe' gli
+   disferebbe la scelta sotto le dita. Il flag sopravvive allo spread
+   di `acqPasso` ({...d0}), come gli altri.
+   E si timbra ANCHE quando non c'e' niente da mettere: il primo conto
+   e' passato comunque, e chi non aveva un punto salvato non deve
+   trovarselo comparire al secondo ±. */
+function precompilaPunto(d0, p){
+  if (d0.precompilato) return;
+  acqDati.precompilato = true;
+  if (d0.puntoToccato) return;
+  const primo = (p.punti_salvati || [])[0];
+  if (!primo) return;
+  /* LA RETE SI RIEMPIE SOLO QUANDO LA SCELTA ESISTE (due reti o piu'):
+     con una rete sola il client TACE apposta e a fissarla e' il server
+     — `corpoConsegna` manda `rete_punto` solo se `acqDati.rete` c'e', e
+     il commento di la' dichiara che il client non deve poterla
+     contraddire. Riempirla qui farebbe divergere il patto scritto dal
+     codice: innocuo oggi, perche' il server la ignora, ed e' cosi' che
+     il giro dopo rompe qualcosa. */
+  if ((p.reti || []).length >= 2) acqDati.rete = primo.rete;
+  applicaPuntoSalvato(primo);
+}
+/* LA RIGA CHE OFFRE DI RICORDARE (ago 2026, decisione di Andrea):
+   NIENTE SI CONSERVA SENZA UN TOCCO. Non una spunta — una accesa di
+   serie sarebbe un salvataggio automatico travestito, una spenta non
+   la tocca nessuno — ma una riga che nasce dove nasce il dubbio e
+   sparisce da sola quando smette di essere vera, il pattern degli hint
+   contestuali.
+   Tre stati, e il secondo e' il modo onesto di dire che SOSTITUISCE:
+   nessun punto per quella rete -> «Ricorda questo punto»; ce n'e' gia'
+   uno DIVERSO -> «Aggiorna il punto salvato per InPost»; e' gia' quello
+   -> la riga non c'e'.
+   SENZA RETE non compare, e non e' pigrizia: la rete e' la CHIAVE con
+   cui il punto si ritrova, e un punto salvato sotto nessuna rete non
+   precompilerebbe mai niente. Senza TIPO nemmeno: il salvataggio lo
+   esige, ed e' la domanda per cui il cantiere delle reti e' nato. */
+/* La rete sotto cui un punto si SALVA: quella scelta quando la scelta
+   esiste, l'unica dichiarata quando ce n'e' una sola. E' la CHIAVE con
+   cui il punto si ritrova, quindi la calcolano nello stesso modo la
+   riga che offre di ricordare e il suo aggiornamento in place. */
+function retePerSalvare(d){
+  const reti = d?.preventivo?.reti || [];
+  return reti.length >= 2 ? (d.rete || '') : (reti[0] || '');
+}
+/* La riga si riscrive IN PLACE mentre si digita, e non col render
+   intero — che rifarebbe l'input e porterebbe via cursore e fuoco (il
+   pattern di `aggiornaCifreOrdine`). Senza questa riga la riga
+   «Ricorda questo punto» non comparirebbe MAI nel caso piu' comune:
+   chi apre il cassetto, sceglie rete e tipo e scrive il punto non fa
+   scattare nessun altro render prima di «Paga» — trovato guardando uno
+   scatto, non leggendo il codice. */
+function aggiornaRigaRicorda(){
+  const box = el('acqRicorda');
+  if (box && acqDati)
+    box.innerHTML = rigaRicordaPunto(acqDati, retePerSalvare(acqDati));
+}
+function rigaRicordaPunto(d, rete){
+  if (DEMO || VETRINA || !rete || !d.tipoPunto) return '';
+  const punto = (d.punto || '').trim();
+  if (!punto) return '';
+  const gia = puntoSalvatoPer(rete);
+  if (gia && gia.punto === punto && gia.tipo === d.tipoPunto) return '';
+  const testo = gia
+    ? `Aggiorna il punto salvato per ${esc(rete)}`
+    : 'Ricorda questo punto';
+  /* la rete viaggia in un data- e mai dentro la stringa dell'onclick:
+     e' il patto del filtro-alfabeto, e qui i nomi hanno gli spazi */
+  return `<button type="button" class="btn link ricorda-punto"
+      data-rete="${esc(rete)}"
+      onclick="ricordaPunto(this.dataset.rete)">📍 ${testo}</button>`;
+}
+async function ricordaPunto(rete){
+  haptic();
+  const d = acqDati;
+  if (!d || !rete) return;
+  const punto = (d.punto || '').trim();
+  if (!punto || !d.tipoPunto) return;
+  try {
+    const r = await fetch(`${API_BASE}/me/punti-ritiro`, {method:'POST',
+      headers:{'Content-Type':'application/json',
+               'X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({rete, tipo: d.tipoPunto, punto})});
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      toast(j.detail || 'Non ci sono riuscito, riprova', 6000); return;
+    }
+    if (acqDati !== d) return;    /* la pagina e' un'altra: si lascia stare */
+    myPunti = j.punti || [];
+    /* la lista del preventivo si riallinea dalla RISPOSTA, filtrata
+       sulle reti di questo venditore — che e' esattamente quel che il
+       server manderebbe al prossimo conto: cosi' la riga sparisce da
+       sola, senza un secondo giro di rete */
+    const reti = d.preventivo?.reti || [];
+    if (d.preventivo)
+      d.preventivo.punti_salvati = myPunti.filter(p => reti.includes(p.rete));
+    renderAcquisto();
+    toast('📍 Punto salvato: la prossima volta lo trovi già scritto');
+  } catch(e) { toast('Rete assente: riprova'); }
+}
 /* La rete scelta da chi compra: cambia la mappa che si apre e viaggia
    nell'ordine, dove il venditore la legge per spedire col corriere
    giusto. Il fuoco va al campo del punto — scelto il corriere, la
@@ -10936,6 +11104,19 @@ function setReteAcquisto(r){
   if (!acqDati) return;
   haptic();
   acqDati.rete = r;
+  /* LO SWAP (ago 2026, coi punti salvati): cambiando corriere cambia
+     anche il punto — quello salvato per la rete NUOVA, e NIENTE se per
+     quella rete non ce n'e' uno. Un punto messo da NOI appartiene alla
+     rete per cui e' stato salvato, e lasciarlo li' sotto l'etichetta di
+     un altro corriere lo farebbe dire da solo il falso; a campo vuoto
+     la guardia di «Paga» ferma tutto col suo toast, che e' il verso
+     giusto.
+     IL TESTO SCRITTO A MANO INVECE RESTA, ed e' la meta' da non
+     ammorbidire: e' suo, non nostro — e in Italia la stessa
+     tabaccheria e' spesso punto di due reti insieme, quindi
+     cancellarlo sarebbe sbagliato oltre che sgarbato. Il verso giusto
+     e' che chi ha scritto comanda. */
+  if (!acqDati.puntoToccato) applicaPuntoSalvato(puntoSalvatoPer(r));
   renderAcquisto();
   if (!acqDati.punto.trim()) el('acqPunto')?.focus({preventScroll:true});
 }
@@ -15774,6 +15955,7 @@ function renderIdentita(){
   box.innerHTML = tgRiga + nsRiga + fotoRiga;
   renderAvvisi();
   renderSpedizioniere();
+  renderPuntiRitiro();
   renderScontoPacco();
   renderSpedGratis();
   renderFerie();
@@ -15983,6 +16165,79 @@ async function salvaReti(){
     : 'Corrieri tolti: chi sceglie il punto si accorderà in chat');
   /* la riga del form segue la dichiarazione appena fatta */
   if (el('view-vendi')) aggiornaConsegnaForm();
+}
+
+/* ---- I PUNTI DI RITIRO SALVATI, dal lato di chi compra (ago 2026) ----
+   Il cassetto ELENCA E TOGLIE: si aggiunge dal checkout, dove la rete
+   la dice il venditore (il perche' sta nel commento del markup).
+   In DEMO sparisce, come il gemello sopra e come il blocco wallet: la'
+   non c'e' nessun server, e un elenco vuoto con dentro un'istruzione
+   che non si puo' seguire e' peggio di niente. Sparisce anche a lista
+   VUOTA, ed e' la stessa regola: prima del primo acquisto non c'e'
+   niente da elencare — a insegnare che si possono salvare e' la riga
+   del cassetto della pagina Paga, non un cassetto vuoto nel Profilo. */
+let myPunti = [];
+function renderPuntiRitiro(){
+  const box = el('puntiRitiroBlocco');
+  if (!box) return;
+  const sez = el('accPuntiRitiro');
+  if (DEMO || !myPunti.length) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  /* IL NUMERO E NON I NOMI DELLE RETI, ed e' una misura: coi nomi
+     («Poste Italiane e InPost») l'intestazione va a capo a 320px, e
+     sarebbe l'unico cassetto del Profilo a farlo — tutti gli altri
+     stanno in 50px. Il numero e' anche l'idioma della maggioranza
+     («Distintivi (5 di 11)»), e le reti si leggono un tocco sotto,
+     dove c'e' anche il punto per esteso. Niente «di 3»: tre non e' un
+     traguardo da raggiungere, e' solo quanti corrieri esistono. */
+  const conta = el('puntiRitiroConta');
+  if (conta) conta.textContent = `(${myPunti.length})`;
+  /* UNA RETE USCITA DAL CATALOGO non precompila piu' niente — il
+     giudice del server la scarta per costruzione — e senza una parola
+     la riga sembrerebbe rotta invece che inerte. Non si cancella da
+     sola: togliere il dato di qualcuno perche' NOI abbiamo cambiato un
+     catalogo e' il verso sbagliato (il precedente e' `utenti.comune`).
+     Il catalogo e' quello che il Profilo ha gia' per il venditore. */
+  const riga = (p) => {
+    const morta = spedizionieriCatalogo.length
+      && !spedizionieriCatalogo.includes(p.rete);
+    return `<div class="punto-salvato">
+      <div class="ps-testo">
+        <b>${esc(nomePunto(p.tipo, p.rete))}</b>
+        <div class="ps-dove">${esc(p.punto)}</div>
+        ${morta ? '<div class="ps-morta">Nessun venditore usa più questa rete</div>' : ''}
+      </div>
+      <button type="button" class="ps-x" data-rete="${esc(p.rete)}"
+        onclick="togliPunto(this.dataset.rete)"
+        aria-label="Togli questo punto">✕</button>
+    </div>`;
+  };
+  box.innerHTML =
+    `<div class="hint" style="margin-top:0">Quando compri con una di
+      queste reti, il punto arriva già scritto.</div>
+     ${myPunti.map(riga).join('')}
+     <div class="hint">Per aggiungerne uno, salvalo quando compri.</div>`;
+}
+async function togliPunto(rete){
+  haptic();
+  if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  try {
+    /* il punto VUOTO e' lo spegnimento, l'idioma di casa: nessun
+       endpoint a parte per togliere, e nessuna guardia — non si toglie
+       niente a nessuno, e gli ordini gia' nati hanno il loro punto in
+       colonna */
+    const r = await fetch(`${API_BASE}/me/punti-ritiro`, {method:'POST',
+      headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+      body: JSON.stringify({rete, tipo:'', punto:''})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myPunti = d.punti || [];
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderPuntiRitiro();
+  toast('Punto tolto');
 }
 
 /* «TU INCASSI SEMPRE IN SATS» (ago 2026, rimessa da Andrea il giorno
@@ -22078,6 +22333,13 @@ async function avvia(){
     mieRetiSped = me.spedizionieri_miei
       || (mySpedizioniere ? [mySpedizioniere] : []);
     retiBozza = null;      // la bozza si rifa' dal salvato appena arrivato
+    /* i punti di ritiro salvati da chi COMPRA: qui arrivano TUTTI,
+       anche quelli su una rete che nessun venditore dichiara piu' —
+       questo e' il cassetto in cui si tolgono, e una riga che non si
+       vede non si puo' togliere. Il filtro «quali valgono per QUESTO
+       venditore» e' un'altra domanda, e la risposta viene col
+       preventivo. */
+    myPunti = me.punti_ritiro || [];
     myInvitoCorrieri = me.invito_corrieri || 0;
     invitoCorrieriMax = me.invito_corrieri_max || 0;
     myFerieFino = me.ferie_fino || 0;
