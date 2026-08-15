@@ -9408,6 +9408,40 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   accanto a 320 e 375 — tre misure, mai più due. E la regola generale
   è quella già pagata in «Altri oggetti»: un contenuto ATOMICO e
   interattivo non si appende mai in coda a un testo clampato.
+  E `tipo` DICE QUALE ACQUISTO È, E BASTA (ago 2026, bug in
+  produzione): `acqDati` nasceva con `tipo` scritto DUE VOLTE —
+  `tipo:'mono'` e, dal cantiere del locker, `tipo:''` per il tipo di
+  PUNTO. In un object literal L'ULTIMA CHIAVE VINCE, quindi `tipo`
+  valeva '' e ogni ramo che chiedeva «mono o set?» rispondeva né
+  l'uno né l'altro. TRE CONSEGUENZE e non una, e la peggiore non è
+  quella segnalata: lo stepper moriva sulla PRIMA guardia di
+  `acqPasso` (il gestore c'era e veniva chiamato, usciva subito); il
+  CARRELLO non arrivava alla cassa, perché `caricaPreventivo` mandava
+  il body MONO con annuncio 0 e la pagina finiva sul ramo d'errore; e
+  il ⚡ NWC, gated su `d.tipo==='mono'`, non compariva mai.
+  A CEDERE È IL NOME NUOVO: `tipo` è di mono/set e lo leggono quindici
+  punti, il tipo di punto diventa `tipoPunto` — che è già il nome di
+  casa, l'ordine porta `o.tipoPunto`.
+  PERCHÉ NESSUNA DELLE 3670 PROVE L'HA VISTO, ed è la lezione da
+  tenere: **le chiavi doppie sono JS perfettamente lecito**. `node
+  --check` non fiata e `prove_avvio_client` vede lo script arrivare in
+  fondo, perché ci arriva davvero — non era un difetto di sintassi né
+  di esecuzione, era di SIGNIFICATO, e a quel livello non guardava
+  nessuno. Da qui `prove_chiavi_doppie`, nella famiglia del parse: un
+  lettore che estrae le chiavi di primo livello dei literal di
+  `acqDati` — l'oggetto più affollato del client, quello su cui
+  scrivono cantieri diversi a settimane di distanza — e le vuole
+  uniche. Perimetro DICHIARATO: un censimento di tutti gli object
+  literal vorrebbe un AST vero, e il giro esplorativo su 76 literal
+  dice che `acqDati` era l'unico sporco.
+  E LA TORTURA HA CHIESTO UNA PROVA IN PIÙ, che è anche la regola più
+  vera: la mutazione che fa divergere lo SCRITTORE dal lettore
+  (`acqDati.tipo = t` dentro `setTipoPuntoAcquisto`) passava liscia
+  davanti a tutto — e rimetterebbe la collisione IDENTICA a runtime,
+  al primo tocco su una pillola, con nessun literal sporco. Quindi
+  **`tipo` non si riscrive MAI dopo la nascita**: dice quale acquisto
+  è, non uno stato che cambia, e c'è la sentinella che conta zero
+  assegnazioni.
   IL GIUDICE DEL «≈» È UNO, `cifraCtrl` (ago 2026, bug visto dal
   telefono: il ≈ compariva su ENTRAMBE le valute — le condizioni
   sparse sono il modo in cui è nato). La regola: il ≈ sta SOLO sulla
