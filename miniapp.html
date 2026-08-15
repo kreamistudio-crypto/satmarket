@@ -9681,9 +9681,16 @@ function apriAcquisto(l){
     return;
   }
   currentListing = l;
+  /* `tipo` e' QUALE ACQUISTO E' ('mono' | 'set') e nient'altro; il
+     tipo di PUNTO sta in `tipoPunto`, come nell'ordine (o.tipoPunto).
+     Ago 2026: erano tutti e due `tipo`, e in un object literal l'ultima
+     chiave vince — quindi `tipo` valeva '' e lo stepper moriva sulla
+     sua prima guardia mentre il carrello non arrivava alla cassa. Il
+     parse non lo prende (chiavi doppie sono JS lecito): c'e' la prova. */
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
              offertaId: offertaAccettataPer(l.id)?.id || 0,
-             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'', tipo:'',
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             tipoPunto:'',
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -9759,7 +9766,8 @@ function apriAcquistoSet(){
     return;
   }
   acqDati = {tipo:'set', annuncioId:0, qta:pezziSet(), offertaId:0, firma:f,
-             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'', tipo:'',
+             preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
+             tipoPunto:'',
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              errore:''};
   go('acquisto');
@@ -10427,7 +10435,7 @@ function renderAcquisto(){
      perche' e' il caso comune farebbe comprare l'etichetta sbagliata
      a chi sceglie una tabaccheria senza toccare niente. */
   const tipoPill = (t) =>
-    `<button type="button" class="pill${d.tipo===t.id?' pill-trust':''}"
+    `<button type="button" class="pill${d.tipoPunto===t.id?' pill-trust':''}"
        data-tipo="${t.id}" onclick="setTipoPuntoAcquisto(this.dataset.tipo)"
        style="cursor:pointer">${t.emoji} ${esc(t.nome)}</button>`;
   const scelteTipo = `<label>Che tipo di punto?</label>
@@ -10452,7 +10460,7 @@ function renderAcquisto(){
      PER QUESTO LE GUARDIE RESTANO IN QUEST'ORDINE (rete → tipo →
      punto): quando scatta la terza il campo esiste per costruzione,
      e nessun toast manda a un campo che non c'e'. */
-  const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipo;
+  const scelteFatte = (!sceglieRete || !!d.rete) && !!d.tipoPunto;
   const campoDove = `<label>Indica il punto di ritiro (nome o indirizzo del punto${(!sceglieRete && reti.length)?' '+esc(reti[0]):(d.rete?' '+esc(d.rete):'')})</label>
     <input id="acqPunto" maxlength="120" value="${esc(d.punto)}"
       placeholder="Es. Via Roma 1, Pavia"
@@ -10465,7 +10473,7 @@ function renderAcquisto(){
      della via, e due icone nello stesso riquadro sono una di troppo. */
   const campoChiuso = puntoScritto
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
-        onclick="apriPuntoAcquisto()"><span class="punto-testo">${(d.tipo||d.rete)?esc(nomePunto(d.tipo, d.rete))+' — ':''}${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
+        onclick="apriPuntoAcquisto()"><span class="punto-testo">${(d.tipoPunto||d.rete)?esc(nomePunto(d.tipoPunto, d.rete))+' — ':''}${esc(puntoScritto)}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriPuntoAcquisto()">Indica il punto di ritiro</button>`;
   const cassettoPunto = `<div class="${d.puntoAperto?'field':''}" id="acqPuntoCampo"
@@ -10866,7 +10874,7 @@ function setReteAcquisto(r){
 function setTipoPuntoAcquisto(t){
   if (!acqDati) return;
   haptic();
-  acqDati.tipo = t;
+  acqDati.tipoPunto = t;
   renderAcquisto();
   if (!acqDati.punto.trim()) el('acqPunto')?.focus({preventScroll:true});
 }
@@ -10939,7 +10947,7 @@ function corpoConsegna(){
   /* il tipo viaggia SEMPRE sulla via punto, anche vuoto: per il
      server la sua presenza dice «questo client il campo ce l'ha»,
      il patto della chiave dell'indirizzo */
-  if (v==='punto') out.tipo_punto = acqDati.tipo || '';
+  if (v==='punto') out.tipo_punto = acqDati.tipoPunto || '';
   /* LA CHIAVE VIAGGIA SEMPRE sulla via casa, anche a campi vuoti: per
      il server la sua PRESENZA e' la dichiarazione «questo ordine
      l'indirizzo lo aspetta» (indirizzo_atteso), che e' cio' che
@@ -10964,7 +10972,7 @@ function reteMancante(d){
    SEMPRE sulla via punto — il tipo non dipende dalle reti e non si
    deduce da niente. Uno solo per le due strade che pagano. */
 function tipoPuntoMancante(d){
-  return d?.via === 'punto' && !d.tipo;
+  return d?.via === 'punto' && !d.tipoPunto;
 }
 
 function ctaAcquisto(){

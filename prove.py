@@ -8151,9 +8151,9 @@ def prove_reti_corriere():
           mini.count("tipoPuntoMancante(")
           - mini.count("function tipoPuntoMancante("))
     prova("...e vale SEMPRE sulla via punto (non dipende dalle reti)",
-          True, "d?.via === 'punto' && !d.tipo" in mini)
+          True, "d?.via === 'punto' && !d.tipoPunto" in mini)
     prova("il tipo viaggia sempre nel body sulla via punto", True,
-          "out.tipo_punto = acqDati.tipo || ''" in mini)
+          "out.tipo_punto = acqDati.tipoPunto || ''" in mini)
     prova("la scelta e' DUE FILE e non una matrice rete×tipo", True,
           "Che tipo di punto?" in mini and "Con quale corriere?" in mini)
     # e le pillole del tipo portano la SOLA etichetta del catalogo: se
@@ -8303,10 +8303,10 @@ def prove_pagina_acquisto():
     # e il Cambia al suo posto — cambia il prefisso, non la regola
     prova("...la riga compatta mostra il punto SCAPPATO, col Cambia",
           True,
-          "esc(nomePunto(d.tipo, d.rete))+' — '" in mini3
+          "esc(nomePunto(d.tipoPunto, d.rete))+' — '" in mini3
           and '${esc(puntoScritto)}</span>' in mini3)
     prova("...e il nome del punto passa anch'esso da esc()",
-          True, "esc(nomePunto(d.tipo, d.rete))" in mini3)
+          True, "esc(nomePunto(d.tipoPunto, d.rete))" in mini3)
     prova("...e a cedere coi puntini e' l'indirizzo, mai il Cambia",
           True, ".punto-testo{flex:1 1 auto;min-width:0;" in mini3)
     # SEI ora: ogni strada che paga fa TRE domande in fila — il
@@ -8363,14 +8363,14 @@ def prove_pagina_acquisto():
     import json as _js4, shutil as _sh4, subprocess as _sp4, tempfile as _tf4
     _node4 = _sh4.which("node")
     _casi4 = [
-        (["InPost", "Poste"], {"rete": "",       "tipo": ""},       False),
-        (["InPost", "Poste"], {"rete": "InPost", "tipo": ""},       False),
-        (["InPost", "Poste"], {"rete": "",       "tipo": "locker"}, False),
-        (["InPost", "Poste"], {"rete": "InPost", "tipo": "locker"}, True),
-        (["InPost"],          {"rete": "",       "tipo": ""},       False),
-        (["InPost"],          {"rete": "",       "tipo": "banco"},  True),
-        ([],                  {"rete": "",       "tipo": ""},       True),
-        ([],                  {"rete": "",       "tipo": "locker"}, True),
+        (["InPost", "Poste"], {"rete": "",       "tipoPunto": ""},       False),
+        (["InPost", "Poste"], {"rete": "InPost", "tipoPunto": ""},       False),
+        (["InPost", "Poste"], {"rete": "",       "tipoPunto": "locker"}, False),
+        (["InPost", "Poste"], {"rete": "InPost", "tipoPunto": "locker"}, True),
+        (["InPost"],          {"rete": "",       "tipoPunto": ""},       False),
+        (["InPost"],          {"rete": "",       "tipoPunto": "banco"},  True),
+        ([],                  {"rete": "",       "tipoPunto": ""},       True),
+        ([],                  {"rete": "",       "tipoPunto": "locker"}, True),
     ]
     if not _node4:
         salta("il gate del campo risponde giusto", "node non installato")
@@ -17154,6 +17154,7 @@ def prove_sintassi_client():
     prova("...e sw.js pure", 0, r.returncode)
     prove_avvio_client(mini, node)
     prove_commenti_css(mini)
+    prove_chiavi_doppie(mini)
 
 
 def prove_avvio_client(mini=None, node=None):
@@ -17312,6 +17313,114 @@ def prove_commenti_css(mini=None):
     prova("nessun «*/» che non chiude niente (il commento aperto male "
           "si mangia la regola dopo)", [], orfani)
     prova("...e nessun commento resta aperto in fondo al foglio", 0, aperti)
+
+
+def _chiavi_literal(src, apertura):
+    """Le chiavi di PRIMO livello di un object literal, letto a mano
+    dalla graffa che segue `apertura`. Salta stringhe (le tre specie),
+    commenti e tutto cio' che sta annidato: senza, un `{a:{a:1}}` o un
+    `${x?'a:':''}` dentro un template darebbero chiavi fantasma.
+    Torna None se il literal non si chiude (meglio niente che una
+    lista sbagliata: a dire che il file e' rotto c'e' node)."""
+    i = src.find(apertura)
+    if i < 0:
+        return None
+    i = src.find("{", i)
+    if i < 0:
+        return None
+    chiavi, prof, j, n = [], 0, i, len(src)
+    while j < n:
+        c = src[j]
+        if c in "\"'`":
+            fine, j = c, j + 1
+            while j < n and src[j] != fine:
+                j += 2 if src[j] == "\\" else 1
+            j += 1
+            continue
+        if src[j:j + 2] == "/*":
+            j = src.find("*/", j) + 2 or n
+            continue
+        if src[j:j + 2] == "//":
+            j = src.find("\n", j) + 1 or n
+            continue
+        if c in "{[(":
+            prof += 1
+            j += 1
+            continue
+        if c in "}])":
+            prof -= 1
+            if prof == 0:
+                return chiavi
+            j += 1
+            continue
+        if prof == 1:
+            m = re.match(r"([A-Za-z_$][\w$]*)\s*:", src[j:])
+            # solo a inizio voce: dopo `{` o dopo una virgola
+            if m:
+                k = j - 1
+                while k >= 0 and src[k] in " \t\r\n":
+                    k -= 1
+                if k >= 0 and src[k] in "{,":
+                    chiavi.append(m.group(1))
+                    j += m.end()
+                    continue
+        j += 1
+    return None
+
+
+def prove_chiavi_doppie(mini=None):
+    """DUE SIGNIFICATI, UN NOME (ago 2026, da un guasto VERO in
+    produzione). `acqDati` nasceva con `tipo` scritto DUE volte:
+    `tipo:'mono'` — quale acquisto e' — e, aggiunto dal cantiere del
+    locker, `tipo:''` per il tipo di punto. In un object literal
+    l'ULTIMA chiave vince, quindi `tipo` valeva '' e da li' lo stepper
+    della pagina Paga moriva sulla sua prima guardia (`d0.tipo !==
+    'mono'`) e il carrello non arrivava nemmeno alla cassa
+    (`caricaPreventivo` mandava il body mono con annuncio 0).
+
+    PERCHE' NESSUNA DELLE 3670 PROVE L'HA VISTO, ed e' la ragione per
+    cui questa sta qui e non altrove: le chiavi doppie sono JS
+    PERFETTAMENTE LECITO — `node --check` non fiata, e prove_avvio_client
+    vede lo script arrivare in fondo, perche' arriva davvero. Non e' un
+    difetto di sintassi ne' di esecuzione: e' un difetto di
+    SIGNIFICATO, e a quel livello nessuno stava guardando.
+
+    IL PERIMETRO E' DICHIARATO: si guardano i literal assegnati ad
+    `acqDati`, che e' l'oggetto piu' affollato del client (sedici
+    campi) e quello su cui scrivono cantieri diversi a settimane di
+    distanza — cioe' il posto dove due nomi si incontrano senza
+    vedersi. Un censimento di TUTTI gli object literal del file
+    vorrebbe un AST vero; se un domani servira', il lettore qui sopra
+    e' gia' quello giusto e cambia solo chi gli si da' in pasto."""
+    if mini is None:
+        mini = open("miniapp.html", encoding="utf-8").read()
+    literali = [("apriAcquisto", "acqDati = {tipo:'mono'"),
+                ("apriAcquistoSet", "acqDati = {tipo:'set'")]
+    for nome, apertura in literali:
+        chiavi = _chiavi_literal(mini, apertura)
+        prova(f"il literal di acqDati in {nome} si legge",
+              True, bool(chiavi) and len(chiavi) >= 10)
+        doppie = sorted({k for k in (chiavi or []) if (chiavi or []).count(k) > 1})
+        prova(f"...e nessuna sua chiave e' scritta due volte ({nome})",
+              [], doppie)
+    # il nome del tipo di punto e' quello dell'ordine (o.tipoPunto), e
+    # `tipo` resta di mono/set: se tornassero a chiamarsi uguale, il
+    # difetto tornerebbe identico
+    for nome, apertura in literali:
+        chiavi = _chiavi_literal(mini, apertura) or []
+        prova(f"il tipo di punto si chiama tipoPunto, non tipo ({nome})",
+              True, "tipoPunto" in chiavi and chiavi.count("tipo") == 1)
+    # E `tipo` NON SI RISCRIVE MAI dopo la nascita, che e' la meta' che
+    # il literal da solo non copre: `acqDati.tipo = 'locker'` a runtime
+    # rimetterebbe la collisione IDENTICA — stepper morto e carrello
+    # fuori strada — al primo tocco su una pillola, e nessun literal
+    # sarebbe sporco. Trovato con la tortura: la mutazione che fa
+    # divergere lo scrittore dal lettore passava liscia davanti a
+    # tutte le altre prove.
+    scritture = re.findall(r"(?:acqDati|d|d0)\.tipo\s*=(?!=)", mini)
+    prova("...e `tipo` non si riscrive MAI dopo la nascita "
+          "(dice quale acquisto e', non uno stato che cambia)",
+          [], scritture)
 
 
 def prove_pagina_dati():
