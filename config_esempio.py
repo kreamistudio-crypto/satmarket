@@ -481,6 +481,19 @@ RIEPILOGO_MINIMO = 3
 # figura e non un buco.
 RIEPILOGO_IMMAGINE = True
 
+# --- La raffica raccontata per negozio --------------------------------
+# Quando piu' annunci arrivano insieme, chi ne ha pubblicati almeno DUE
+# ha un post SUO: la figura coi barattoli in fila e un link per
+# annuncio, invece di sparire dentro un «N nuovi annunci» che non
+# nomina nessuno. Il TETTO e' quel che tiene la valvola una valvola:
+# oltre — e per chi ne ha pubblicato uno solo — resta l'aggregato
+# anonimo di sempre.
+MAX_NEGOZI_RAFFICA = 3
+# Quanti link nella didascalia. Il tetto vero e' quello di Telegram
+# (1024 caratteri per una caption): dieci righe con titolo e prezzo ci
+# stanno comode, e oltre si dice quanti ne restano.
+MAX_LINK_NEGOZIO = 10
+
 # --- Avviso "fase di test" (il cartello all'apertura) ----------------
 # Il cartello che accoglie chi apre l'app durante il rodaggio: si
 # mostra UNA VOLTA AL GIORNO per dispositivo, a tutti (anche a chi

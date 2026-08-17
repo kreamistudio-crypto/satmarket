@@ -560,6 +560,23 @@ try:
 except ImportError:
     POST_LAMPO_CANALE = True
 
+# LA RAFFICA RACCONTATA PER NEGOZIO (ago 2026, chiesto da Andrea): chi
+# pubblica piu' cose insieme ha un post SUO, con la figura dei
+# barattoli e i link, invece di sparire in un aggregato anonimo. Il
+# TETTO e' quel che tiene la valvola una valvola: oltre, e per chi ne
+# ha pubblicato uno solo, resta il post che non nomina nessuno.
+try:
+    from config import MAX_NEGOZI_RAFFICA
+except ImportError:
+    MAX_NEGOZI_RAFFICA = 3
+# Quanti link nella didascalia: il tetto vero e' quello di Telegram
+# (1024 caratteri per una caption), e dieci righe con titolo e prezzo
+# ci stanno comode. Oltre si dice quanti ne restano.
+try:
+    from config import MAX_LINK_NEGOZIO
+except ImportError:
+    MAX_LINK_NEGOZIO = 10
+
 # Il cartello «siamo in fase di test»: interruttore, testo e link del
 # canale vivono nel config, cosi' si cambiano senza cantieri e a
 # rodaggio finito basta un False. Se le chiavi mancano, il cartello e'
@@ -6028,7 +6045,7 @@ def genera_miniature_mancanti():
         # avatar: e' una figura gia' composta alla misura giusta, che
         # nessuno chiede col suffisso _min — la gemella sarebbe un file
         # inutile in piu' a ogni lunedi'.
-        if nome.startswith("pod_"):
+        if nome.startswith(("pod_", "neg_")):
             continue
         percorso_pieno = os.path.join(FOTO_DIR, nome)
         percorso_min = os.path.join(FOTO_DIR, nome[:-4] + "_min.jpg")
@@ -11374,6 +11391,12 @@ def _leve_stato():
                          "annunci nuovi, ordini e i tre più venduti"),
             _leva("Annunci minimi per il riepilogo", "RIEPILOGO_MINIMO",
                   RIEPILOGO_MINIMO),
+            _leva("Negozi raccontati per raffica", "MAX_NEGOZI_RAFFICA",
+                  MAX_NEGOZI_RAFFICA,
+                  spento="una raffica esce sempre come un post solo che "
+                         "non nomina nessuno"),
+            _leva("Link nella didascalia del negozio", "MAX_LINK_NEGOZIO",
+                  MAX_LINK_NEGOZIO),
             _leva("Podio nel riepilogo", "RIEPILOGO_IMMAGINE",
                   bool(RIEPILOGO_IMMAGINE),
                   spento="il riepilogo del lunedì esce senza la figura "
@@ -21641,10 +21664,31 @@ async def _drena_promo():
                 _post_promo_recenti.append(time.time())
                 await asyncio.sleep(PAUSA_TRA_PROMO)
         else:
-            # La valvola anti-spam: un solo post, passa sempre (non
-            # puo' spammare — al massimo uno a finestra, e solo se
-            # qualcuno pubblica davvero).
-            await _posta_promo_aggregato(len(annunci))
+            # LA RAFFICA SI RACCONTA PER NEGOZIO (ago 2026, decisione di
+            # Andrea): chi ne ha pubblicati almeno due in una finestra
+            # ha un post SUO — la figura coi barattoli e un link per
+            # annuncio — invece di sparire dentro un «📦 N nuovi
+            # annunci» che non nomina nessuno. Il caso vero e' proprio
+            # quello: le raffiche vengono quasi sempre da UN negozio
+            # (l'import CSV), e finora erano la cosa che il canale
+            # raccontava peggio.
+            # IL TETTO E' QUEL CHE TIENE LA VALVOLA UNA VALVOLA: senza,
+            # venti venditori con due annunci a testa farebbero venti
+            # post. Oltre `MAX_NEGOZI_RAFFICA` — e per chi ne ha
+            # pubblicato UNO solo — resta l'aggregato anonimo di
+            # sempre, che passa comunque e non nomina nessuno.
+            gruppi = _raggruppa_per_venditore(annunci)
+            raccontati = 0
+            for gruppo in gruppi[:MAX_NEGOZI_RAFFICA]:
+                if len(gruppo) < 2:
+                    break          # ordinati per numero: da qui in giu'
+                await _posta_negozio(gruppo, giorni)
+                _post_promo_recenti.append(time.time())
+                raccontati += len(gruppo)
+                await asyncio.sleep(PAUSA_TRA_PROMO)
+            resto = len(annunci) - raccontati
+            if resto:
+                await _posta_promo_aggregato(resto)
     except Exception as e:
         print(f"⚠️ Post automatici saltati: {e}")
 
@@ -21800,6 +21844,98 @@ async def promo_lampo(annuncio_id: int, percento: int, scadenza: int):
             _post_promo_recenti.append(time.time())
     except Exception as e:
         print(f"⚠️ Post della lampo #{annuncio_id} saltato: {e}")
+
+
+def _raggruppa_per_venditore(annunci: list) -> list:
+    """Gli annunci raccolti per venditore, i gruppi PIU' NUMEROSI per
+    primi — sono quelli che la figura serve meglio, e quelli che
+    dentro un aggregato anonimo si perdevano di piu'.
+
+    PURA come le sorelle del canale: righe in, righe out. A pari
+    numero comanda l'ordine di ARRIVO (la coda e' cronologica), o due
+    negozi con due annunci a testa si scambierebbero di posto a ogni
+    finestra senza motivo."""
+    per_uno: dict = {}
+    for a in annunci:
+        per_uno.setdefault(a["venditore_id"], []).append(a)
+    return sorted(per_uno.values(), key=lambda g: -len(g))
+
+
+def _riga_negozio(a: dict, cambio: float) -> str:
+    """Una riga della didascalia: l'emoji del reparto, il titolo che E'
+    il link, e il prezzo. Il titolo passa da `html.escape` — la
+    didascalia e' HTML e un «<» spegne il messaggio in silenzio, ed e'
+    la lezione dell'avviso di spedizione."""
+    return (f"{EMOJI_CATEGORIA.get(a.get('categoria'), '📦')} "
+            f"<a href=\"{URL_PUBBLICO}/annuncio/{a['id']}\">"
+            f"{html.escape(a['titolo'])}</a> — {_prezzo_promo(a, cambio)}")
+
+
+async def _posta_negozio(gruppo: list, giorni: int):
+    """UN post per il negozio che ha pubblicato piu' cose insieme: la
+    figura coi tre barattoli in FILA (non un podio: qui non c'e' nessuna
+    classifica, sono tre cose dello stesso banco) e un link per
+    annuncio nella didascalia.
+
+    I TRE DELLA FIGURA SONO I PIU' RECENTI, i link li elenca TUTTI fino
+    al tetto della didascalia: la figura ha una forma sola da tarare e
+    da guardare, l'elenco puo' crescere. Oltre il tetto si dice quanti
+    ne restano invece di troncare in silenzio.
+
+    Fail-open come il resto del canale: se la figura non si compone si
+    manda comunque il testo coi link, che e' la parte che serve."""
+    gruppo = sorted(gruppo, key=lambda a: (a.get("creato") or 0, a["id"]),
+                    reverse=True)
+    cambio = await cambio_btc_eur()
+    # il timbro del turno, come per il post singolo: un post-negozio E'
+    # il turno di quel venditore, e a freno acceso non deve poterne
+    # avere un secondo (oggi non ci si arriva — col freno ognuno ha un
+    # annuncio solo e questo ramo non parte — ma la regola vale lo
+    # stesso, ed e' quella che reggera' se il freno cambia)
+    if giorni > 0 and gruppo[0].get("venditore_id"):
+        con = db()
+        con.execute("UPDATE utenti SET promo_canale_il=? WHERE tg_id=?",
+                    (int(time.time()), gruppo[0]["venditore_id"]))
+        con.commit()
+        con.close()
+    righe = [_riga_negozio(a, cambio) for a in gruppo[:MAX_LINK_NEGOZIO]]
+    restanti = len(gruppo) - len(righe)
+    if restanti:
+        righe.append(f"…e altri {restanti} nel suo negozio")
+    chi = _firma_venditore(gruppo[0]).replace("Annuncio da ", "")
+    testo = (f"🫙 <b>{len(gruppo)} nuovi annunci</b>\n\n"
+             + "\n".join(righe) + f"\n\n{chi}\n\n#barattolo")
+    con = db()
+    nome = _salva_figura_negozio(con, gruppo)
+    con.close()
+    r = None
+    if nome:
+        r = await bot_api("sendPhoto", {
+            "chat_id": canale_id(), "parse_mode": "HTML",
+            "photo": f"{URL_PUBBLICO}/foto/{nome}", "caption": testo})
+    if not (r and r.get("ok")):
+        await bot_api("sendMessage", {
+            "chat_id": canale_id(), "parse_mode": "HTML",
+            "disable_web_page_preview": True, "text": testo})
+
+
+def _salva_figura_negozio(con, gruppo: list) -> str:
+    """La figura in FILA coi tre piu' recenti del gruppo. Torna il nome
+    del file o '' — e allora il post esce di solo testo, che coi link
+    dentro e' comunque quel che serve."""
+    if not (RIEPILOGO_IMMAGINE and gruppo
+            and ImmaginePillow and ImageDraw and ImageOps):
+        return ""
+    try:
+        tre = [{"annuncio_id": a["id"]} for a in gruppo[:3]]
+        nome = (f"neg_{gruppo[0]['venditore_id']}_"
+                f"{int(time.time())}.jpg")
+        disegna_figura(_foto_podio(con, tre), FILA_MISURE).save(
+            os.path.join(FOTO_DIR, nome), quality=88)
+        return nome
+    except Exception as e:
+        print(f"⚠️ Figura del negozio saltata: {e}")
+        return ""
 
 
 async def _posta_promo_aggregato(n: int):
@@ -27045,7 +27181,13 @@ PODIO_LARGA, PODIO_ALTA = 1200, 560
 # barattolo troppo alto le taglia a striscia, col soggetto che sparisce
 # ai lati. Il 3° e' anche piu' STRETTO del 2° e non solo piu' basso: a
 # pari larghezza si legge come un secondo posto accorciato.
+# (larghezza, centro) di ognuno. DUE DISPOSIZIONI e un disegnatore
+# solo: il PODIO dice una classifica — il 1° al centro e piu' grande —
+# la FILA dice «ecco tre cose», tre barattoli uguali. Sono la stessa
+# figura con misure diverse, e tenerle in due funzioni vorrebbe dire
+# ritoccare l'anatomia del barattolo in due posti.
 PODIO_MISURE = ((0.325, 0.500), (0.255, 0.178), (0.222, 0.822))
+FILA_MISURE = ((0.275, 0.175), (0.275, 0.500), (0.275, 0.825))
 
 
 def _foto_podio(con, top: list) -> list:
@@ -27077,7 +27219,7 @@ def _foto_podio(con, top: list) -> list:
     return fuori
 
 
-def _barattolo_podio(foto, largo: int, alto: int, tratto: int):
+def _barattolo(foto, largo: int, alto: int, tratto: int):
     """UN barattolo, RGBA trasparente, con la foto dentro.
 
     ANATOMIA, ed e' quel che lo fa leggere come un barattolo invece che
@@ -27137,9 +27279,10 @@ def _barattolo_podio(foto, largo: int, alto: int, tratto: int):
     return im
 
 
-def disegna_podio(foto3: list):
-    """La figura intera: 1° al centro e piu' grande, 2° a sinistra, 3°
-    a destra, appoggiati su una mensola."""
+def disegna_figura(foto3: list, misure=PODIO_MISURE):
+    """La figura intera: i barattoli appoggiati su una mensola, nelle
+    misure che il chiamante sceglie — PODIO_MISURE per la classifica
+    del lunedi', FILA_MISURE per «ecco tre cose di questo negozio»."""
     tela = ImmaginePillow.new("RGB", (PODIO_LARGA, PODIO_ALTA), PODIO_CREMA)
     base = int(PODIO_ALTA * 0.90)          # la riga su cui appoggiano
     # la mensola: senza, tre barattoli di misure diverse su un fondo
@@ -27150,11 +27293,11 @@ def disegna_podio(foto3: list):
         fill=PODIO_MENSOLA, width=3)
     # il 1° si disegna per ULTIMO: e' il piu' grande e sta davanti
     for i in (1, 2, 0):
-        largo = int(PODIO_LARGA * PODIO_MISURE[i][0])
+        largo = int(PODIO_LARGA * misure[i][0])
         alto = int(largo * 1.18)
         tratto = max(3, largo // 60)
-        x = int(PODIO_LARGA * PODIO_MISURE[i][1]) - largo // 2
-        b = _barattolo_podio(foto3[i] if i < len(foto3) else None,
+        x = int(PODIO_LARGA * misure[i][1]) - largo // 2
+        b = _barattolo(foto3[i] if i < len(foto3) else None,
                              largo, alto, tratto)
         h_om = max(6, int(alto * 0.045))
         om = ImmaginePillow.new("RGBA", (int(largo * 0.86), h_om),
@@ -27184,7 +27327,7 @@ def _salva_podio(con, top: list, oggi: str) -> str:
         return ""
     try:
         nome = f"pod_{oggi}.jpg"
-        disegna_podio(_foto_podio(con, top)).save(
+        disegna_figura(_foto_podio(con, top)).save(
             os.path.join(FOTO_DIR, nome), quality=88)
         return nome
     except Exception as e:
@@ -28999,7 +29142,10 @@ NOME_FOTO = re.compile(
     # il podio del riepilogo settimanale: e' un file che il canale
     # mostra per URL, quindi la sua forma va dichiarata qui o Telegram
     # si vedrebbe rispondere 404 dal nostro stesso server
-    r"|pod_\d{4}-\d{2}-\d{2}\.jpg)\Z")
+    r"|pod_\d{4}-\d{2}-\d{2}\.jpg"
+    # la figura del negozio nelle raffiche: stesso motivo del podio —
+    # il canale la mostra per URL
+    r"|neg_\d+_\d+\.jpg)\Z")
 TIPI_FOTO = {"jpg": "image/jpeg", "png": "image/png",
              "webp": "image/webp", "gif": "image/gif"}
 
