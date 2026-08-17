@@ -4862,6 +4862,14 @@ def prove_foto():
                  "av_f29bcbf7_1785852876_min.jpg"):
         prova(f"non si serve {nome!r}", False, ammesso(nome))
 
+    # IL PODIO del riepilogo e' il quarto scrittore: il canale lo mostra
+    # per URL, quindi senza la sua forma qui Telegram si vedrebbe
+    # rispondere 404 dal nostro stesso server.
+    prova("si serve il podio del lunedi'", True, ammesso("pod_2026-08-17.jpg"))
+    for nome in ("pod_2026-8-17.jpg", "pod_.jpg", "pod_2026-08-17.png",
+                 "pod_2026-08-17_min.jpg", "pod_../config.py"):
+        prova(f"non si serve {nome!r}", False, ammesso(nome))
+
     # --- SENTINELLE ---------------------------------------------------
     # La regola ferrea 3 diventa verificabile invece che raccomandata:
     # non si guardano le parole (i commenti la nominano apposta), si
@@ -12738,7 +12746,7 @@ def _censimento(acceso):
                  "DIGITALE_MIN_VENDITE", "SUGGERIMENTI_DI_SERIE",
                  "SUGGERIMENTI_OGNI_GIORNI", "PROMO_GIORNI_VENDITORE",
                  "POST_LAMPO_CANALE", "RIEPILOGO_SETTIMANALE",
-                 "RIEPILOGO_MINIMO"):
+                 "RIEPILOGO_MINIMO", "RIEPILOGO_IMMAGINE"):
         amb[nome] = acceso and 24
     # Il canale non si legge piu' dalla costante: dall'ago 2026 lo
     # decide il bot e il giudice e' `canale_id()`, che va a leggere il
@@ -13053,6 +13061,172 @@ def prove_canale_bot():
           RECINTO, chiavi)
 
 
+def prove_podio_riepilogo():
+    """IL PODIO DEL LUNEDI' (ago 2026, chiesto da Andrea): i tre piu'
+    venduti come tre barattoli con dentro la foto dell'articolo.
+
+    La prova che conta e' ESEGUIBILE: le funzioni VERE compongono la
+    figura su un disco di cartone, e si guarda cosa scelgono. Una
+    sentinella sulla forma direbbe che il codice e' scritto cosi', mai
+    che la figura esca — e qui il modo di fallire e' proprio uscire
+    sbagliata (tre vetri vuoti, o la foto di casa d'altri dentro)."""
+    print("\n[il podio del lunedi']")
+    import json as _json
+    import os as _os
+    import shutil
+    import sqlite3
+    import tempfile
+
+    # --- 1) LA FORMA, che gira anche senza Pillow ------------------
+    sal = codice(pezzo("_salva_podio"))
+    # FAIL-OPEN: senza Pillow, senza classifica o a leva spenta si esce
+    # a mani vuote e il lunedi' manda il post di TESTO. Il riepilogo non
+    # deve saltare per un disegno.
+    for guardia in ("RIEPILOGO_IMMAGINE", "top", "ImmaginePillow",
+                    "ImageDraw", "ImageOps"):
+        prova(f"il podio si spegne senza {guardia}", True, guardia in sal)
+    prova("...e su un errore qualunque torna a mani vuote", True,
+          'return ""' in sal and "except Exception" in sal)
+    # IL PODIO SI ALLEGA, NON SOSTITUISCE: la didascalia e' lo STESSO
+    # testo del post di sempre, scritto in un posto solo — due stesure
+    # divergono, e chi ha le immagini spente leggerebbe un'altra cosa.
+    rie = codice(pezzo("riepilogo_settimana"))
+    prova("la didascalia e il testo sono la stessa stringa", 1,
+          rie.count('testo = ("📊 <b>La settimana di Barattolo</b>'))
+    prova("...e la usano tutte e due le strade", True,
+          '"caption": testo' in rie and '"text": testo' in rie)
+    prova("con la figura si manda sendPhoto", True, '"sendPhoto"' in rie)
+    # e se Telegram la rifiuta, il riepilogo esce lo stesso: meglio
+    # senza figura che niente
+    prova("...e se la rifiuta si ripiega sul testo", True,
+          rie.index('"sendPhoto"') < rie.index('"sendMessage"'))
+    # la passata d'avvio non gli fa la gemella _min: nessuno la chiede
+    prova("la passata d'avvio salta il podio", True,
+          'nome.startswith("pod_")' in pezzo("genera_miniature_mancanti"))
+    # NIENTE FONT, ed e' la decisione: la classifica la dicono misura e
+    # posizione, i titoli stanno nella didascalia. Un font sarebbe un
+    # asset da committare — quel che manco' alle vetrine Nostr.
+    for f in ("_barattolo_podio", "disegna_podio"):
+        prova(f"{f} non scrive testo", True,
+              "ImageFont" not in pezzo(f) and ".text(" not in pezzo(f))
+
+    # --- 2) LA FIGURA, girata per davvero --------------------------
+    try:
+        from PIL import Image, ImageDraw, ImageOps
+    except ImportError:
+        salta("il podio composto per davvero", "Pillow non e' installata")
+        return
+
+    cartella = tempfile.mkdtemp()
+    try:
+        Image.new("RGB", (640, 640), (200, 60, 60)).save(
+            _os.path.join(cartella, "a1_0_min.jpg"))
+        Image.new("RGB", (900, 700), (60, 120, 200)).save(
+            _os.path.join(cartella, "a3_0.jpg"))
+        amb = {"ImmaginePillow": Image, "ImageDraw": ImageDraw,
+               "ImageOps": ImageOps, "json": _json, "os": _os,
+               "FOTO_DIR": cartella, "RIEPILOGO_IMMAGINE": True,
+               "print": lambda *a, **k: None}
+        for c in ("PODIO_CREMA", "PODIO_INK", "PODIO_ARANCIO",
+                  "PODIO_RIFLESSO", "PODIO_VETRO", "PODIO_OMBRA",
+                  "PODIO_MENSOLA", "PODIO_MISURE"):
+            riga = next(r for r in _SORGENTE.split("\n")
+                        if r.startswith(c + " ="))
+            exec(riga, amb)
+        exec(next(r for r in _SORGENTE.split("\n")
+                  if r.startswith("PODIO_LARGA")), amb)
+        for f in ("_foto_podio", "_barattolo_podio", "disegna_podio",
+                  "_salva_podio"):
+            exec(pezzo(f), amb)
+
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, foto TEXT)")
+        # IL CASO DELL'URL REMOTO VA SCELTO IN MODO CHE POSSA FALLIRE
+        # SOLO PER LA RAGIONE CHE SI SORVEGLIA (la lezione di
+        # `_pare_recapito`): con un `https://host/x.jpg` la prova
+        # passava anche TOGLIENDO la guardia — quel nome non esiste sul
+        # disco e sarebbe stato scartato lo stesso, per il motivo
+        # sbagliato. L'ha detto la tortura, non la rilettura. Qui il
+        # file c'e' DAVVERO, e allora a escluderlo puo' essere solo la
+        # guardia: se qualcuno la toglie, la foto di casa d'altri entra
+        # nella figura e questa riga diventa rossa.
+        Image.new("RGB", (40, 40)).save(_os.path.join(cartella, "http:x.jpg"))
+        Image.new("RGB", (40, 40)).save(_os.path.join(cartella, "data:y.jpg"))
+        for i, foto in ((1, ["a1_0.jpg"]),            # ha il francobollo
+                        (2, ["http:x.jpg"]),          # «remoto», ed esiste
+                        (3, ["a3_0.jpg"]),            # solo il pieno
+                        (4, ["a9_0.jpg"]),            # file sparito
+                        (5, []),                      # nessuna foto
+                        (6, ["data:y.jpg"]),          # base64, ed esiste
+                        (7, ["https://host-altrui.example/x.jpg"])):
+            con.execute("INSERT INTO annunci VALUES(?,?)",
+                        (i, _json.dumps(foto)))
+        con.commit()
+
+        def scelte(ids):
+            return amb["_foto_podio"](con, [{"annuncio_id": i} for i in ids])
+
+        f = scelte([1, 2, 3])
+        prova("prende il FRANCOBOLLO quando c'e'", "a1_0_min.jpg",
+              _os.path.basename(f[0]))
+        # SOLO LE NOSTRE FOTO, la regola dell'og:image: un URL remoto e'
+        # l'host di chi pubblica su Nostr, e comporlo in una figura
+        # nostra vorrebbe dire andarglielo a chiedere ogni lunedi'.
+        # Il file ESISTE sul disco di cartone: qui a escluderlo puo'
+        # essere solo la guardia.
+        prova("l'URL remoto resta FUORI anche se il file c'e'", None, f[1])
+        prova("...e cosi' il base64", [None], scelte([6]))
+        prova("...e l'URL vero, ovviamente", [None], scelte([7]))
+        prova("senza _min ripiega sul file pieno", "a3_0.jpg",
+              _os.path.basename(f[2]))
+        prova("il file sparito dal disco non si usa", [None, None],
+              scelte([4, 5]))
+        prova("l'annuncio cancellato non fa esplodere niente", [None],
+              scelte([999]))
+
+        # LA FIGURA: si compone, ed e' della misura dichiarata
+        nome = amb["_salva_podio"](con, [{"annuncio_id": i}
+                                         for i in (1, 2, 3)], "2026-08-17")
+        prova("il nome porta la data", "pod_2026-08-17.jpg", nome)
+        fig = Image.open(_os.path.join(cartella, nome))
+        prova("la figura e' della misura dichiarata",
+              (amb["PODIO_LARGA"], amb["PODIO_ALTA"]), fig.size)
+        # IL BARATTOLO VUOTO E' UNA FIGURA, NON UN BUCO: col 2° senza
+        # foto la figura si fa lo stesso — e' la decisione di Andrea, e
+        # a schermo si legge come vetro e non come un errore.
+        prova("col vetro in mezzo la figura si fa lo stesso", True,
+              bool(nome))
+        # e il RIFLESSO sta solo li': sopra una foto si legge come una
+        # sbavatura (provato a schermo). Due barattoli, uno pieno e uno
+        # vuoto, non possono avere gli stessi pixel.
+        pieno = amb["_barattolo_podio"](f[0], 300, 354, 5)
+        vuoto = amb["_barattolo_podio"](None, 300, 354, 5)
+        prova("il barattolo vuoto non e' quello pieno", True,
+              pieno.tobytes() != vuoto.tobytes())
+        prova("...e il vuoto porta il riflesso", True,
+              amb["PODIO_RIFLESSO"] + (255,) in vuoto.convert("RGBA")
+              .getcolors(maxcolors=1 << 20)[0][1:] or any(
+                  c[1][:3] == amb["PODIO_RIFLESSO"]
+                  for c in vuoto.getcolors(maxcolors=1 << 20)))
+        prova("...e il pieno no", False, any(
+            c[1][:3] == amb["PODIO_RIFLESSO"]
+            for c in pieno.getcolors(maxcolors=1 << 20)))
+
+        # FAIL-OPEN provato, non dedotto
+        amb["ImmaginePillow"] = None
+        prova("senza Pillow non esplode: torna a mani vuote", "",
+              amb["_salva_podio"](con, [{"annuncio_id": 1}], "2026-08-18"))
+        amb["ImmaginePillow"] = Image
+        prova("senza classifica non si disegna niente", "",
+              amb["_salva_podio"](con, [], "2026-08-18"))
+        amb["RIEPILOGO_IMMAGINE"] = False
+        prova("a leva spenta nemmeno", "",
+              amb["_salva_podio"](con, [{"annuncio_id": 1}], "2026-08-18"))
+    finally:
+        shutil.rmtree(cartella, ignore_errors=True)
+
+
 def prove_vetrina_canale():
     """IL CANALE DIVENTA LA VETRINA (ago 2026, chiesto da Andrea).
 
@@ -13302,7 +13476,13 @@ def prove_vetrina_canale():
              "bot_api": bot_api_finta, "canale_id": lambda: "@vetrina",
              "URL_PUBBLICO": "https://barattolo.store",
              "RIEPILOGO_SETTIMANALE": True, "RIEPILOGO_MINIMO": minimo,
-             "TIMBRO_RIEPILOGO": "riepilogo_settimana"}
+             "TIMBRO_RIEPILOGO": "riepilogo_settimana",
+             # il podio si stuba a mani vuote: qui si guarda il TESTO
+             # del riepilogo e la sua cadenza, e la figura ha le sue
+             # prove in prove_podio_riepilogo. A mani vuote si prende
+             # la strada del post di testo, cioe' quella che queste
+             # prove sorvegliano da sempre.
+             "_salva_podio": lambda con, top, oggi: ""}
         for f in ("timbro_letto", "timbro_scrivi", "_conta_settimana"):
             exec(pezzo(f), a)
         # pezzo() taglia dal «def», quindi l'«async » va rimesso a mano
@@ -20309,6 +20489,7 @@ def main():
               prove_divisione_a_ritroso,
               prove_sped_gratis, prove_valuta_soglia, prove_suggerimenti,
               prove_libro_mastro, prove_leve, prove_canale_bot,
+              prove_podio_riepilogo,
               prove_vetrina_canale,
               prove_cambio, prove_recupero_cambi,
               prove_consegna_payload_punto, prove_reti_corriere,

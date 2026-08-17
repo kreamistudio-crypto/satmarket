@@ -104,10 +104,14 @@ try:
     from PIL import Image as ImmaginePillow
     from PIL import ImageOps
     from PIL import ImageStat
+    # il disegno serve al podio del riepilogo: senza Pillow quella
+    # figura non si compone e il lunedi' esce il post di testo
+    from PIL import ImageDraw
 except ImportError:
     ImmaginePillow = None
     ImageOps = None
     ImageStat = None
+    ImageDraw = None
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
@@ -1045,6 +1049,11 @@ try:
     from config import RIEPILOGO_SETTIMANALE
 except ImportError:
     RIEPILOGO_SETTIMANALE = True
+try:
+    from config import RIEPILOGO_IMMAGINE
+except ImportError:
+    RIEPILOGO_IMMAGINE = True   # il podio dei tre piu' venduti allegato
+                                # al riepilogo; spenta, resta il testo
 try:
     from config import RIEPILOGO_MINIMO
 except ImportError:
@@ -6014,6 +6023,12 @@ def genera_miniature_mancanti():
         # avatarImg usa il nome pieno. 75 file inutili in produzione,
         # e uno in piu' a ogni cambio di foto profilo.
         if nome.startswith("av_"):
+            continue
+        # NEMMENO IL PODIO del riepilogo, per la stessa ragione degli
+        # avatar: e' una figura gia' composta alla misura giusta, che
+        # nessuno chiede col suffisso _min — la gemella sarebbe un file
+        # inutile in piu' a ogni lunedi'.
+        if nome.startswith("pod_"):
             continue
         percorso_pieno = os.path.join(FOTO_DIR, nome)
         percorso_min = os.path.join(FOTO_DIR, nome[:-4] + "_min.jpg")
@@ -11359,6 +11374,10 @@ def _leve_stato():
                          "annunci nuovi, ordini e i tre più venduti"),
             _leva("Annunci minimi per il riepilogo", "RIEPILOGO_MINIMO",
                   RIEPILOGO_MINIMO),
+            _leva("Podio nel riepilogo", "RIEPILOGO_IMMAGINE",
+                  bool(RIEPILOGO_IMMAGINE),
+                  spento="il riepilogo del lunedì esce senza la figura "
+                         "dei tre barattoli, solo testo"),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
@@ -26982,6 +27001,196 @@ async def termometro_sottocategorie():
 
 TIMBRO_RIEPILOGO = "riepilogo_settimana"   # il giorno dell'ultimo post
 
+# ---------- IL PODIO DEL LUNEDI' (ago 2026, chiesto da Andrea) -------
+# I tre piu' venduti disegnati come TRE BARATTOLI, con dentro la foto
+# dell'articolo: il 1° al centro e piu' grande, il 2° a sinistra, il 3°
+# a destra. La figura si allega al riepilogo; la didascalia resta
+# quella di sempre, coi titoli.
+#
+# NIENTE TESTO NELLA FIGURA (decisione di Andrea), e non e' una
+# rinuncia: la classifica la dicono MISURA e POSIZIONE, i titoli stanno
+# nella didascalia due righe sotto. Cosi' non serve nessun font — che
+# sarebbe un asset da committare e da tenere, ed e' precisamente quel
+# che manco' al cantiere delle vetrine Nostr — e la figura non puo'
+# troncare o sbagliare un titolo lungo.
+#
+# IL BARATTOLO VUOTO E' UNA FIGURA, NON UN BUCO (decisione di Andrea):
+# un articolo senza una nostra foto — importato da Nostr, o senza foto
+# affatto — resta vetro. Nel nostro alfabeto quella forma esiste gia',
+# e' il livello 0 di `jarSVG` in vetrina, e guardata a schermo si legge
+# come un barattolo vuoto e non come un errore. Il riflesso celeste si
+# disegna SOLO li': sopra una foto ogni forma di luce diventa una
+# sbavatura — provate le due pennellate di jarSVG (si leggono come
+# graffi) e un velo bianco sull'angolo (un alone), scartate tutte e due
+# guardandole.
+#
+# SOLO LE NOSTRE FOTO, la regola dell'og:image: un URL remoto in
+# colonna e' l'host di chi pubblica su Nostr, e comporlo in una figura
+# nostra vorrebbe dire andarglielo a chiedere ogni lunedi'.
+#
+# I COLORI sono quelli del tema CHIARO scritti a mano: qui non c'e' un
+# CSS da cui leggerli, e una figura non cambia colore di notte — e' il
+# patto dell'etichetta prezzo.
+PODIO_CREMA = (250, 244, 228)
+PODIO_INK = (35, 40, 44)
+PODIO_ARANCIO = (247, 147, 26)
+PODIO_RIFLESSO = (191, 227, 240)
+PODIO_VETRO = (255, 255, 255, 120)     # il vuoto: vetro, non un buco
+PODIO_OMBRA = (35, 40, 44, 46)
+PODIO_MENSOLA = (226, 216, 194)
+PODIO_LARGA, PODIO_ALTA = 1200, 560
+# larghezza e centro di ognuno, in frazione della tela. L'ALTEZZA SI
+# DERIVA dalla larghezza (×1.18, la forma del vasetto da conserva) e
+# non si sceglie: le foto sono QUADRATE — il francobollo `_min` — e un
+# barattolo troppo alto le taglia a striscia, col soggetto che sparisce
+# ai lati. Il 3° e' anche piu' STRETTO del 2° e non solo piu' basso: a
+# pari larghezza si legge come un secondo posto accorciato.
+PODIO_MISURE = ((0.325, 0.500), (0.255, 0.178), (0.222, 0.822))
+
+
+def _foto_podio(con, top: list) -> list:
+    """Il percorso su disco della foto di ognuno dei tre, o None.
+
+    Prende il FRANCOBOLLO `_min` quando c'e' — e' gia' quadrato e gia'
+    della misura giusta — col file pieno come ripiego. Salta gli URL
+    remoti (la regola dell'og:image) e i file spariti dal disco: in
+    tutti e due i casi resta un barattolo vuoto, che e' una figura."""
+    fuori = []
+    for t in top:
+        percorso = None
+        riga = con.execute("SELECT foto FROM annunci WHERE id=?",
+                           (t["annuncio_id"],)).fetchone()
+        try:
+            nomi = json.loads(riga["foto"] or "[]") if riga else []
+        except Exception:
+            nomi = []
+        for n in nomi[:1]:
+            if not n or n.startswith(("http", "data:")):
+                continue           # mai la foto di casa d'altri
+            base, _, est = n.rpartition(".")
+            for c in (f"{base}_min.{est}", n):
+                p = os.path.join(FOTO_DIR, c)
+                if os.path.exists(p):
+                    percorso = p
+                    break
+        fuori.append(percorso)
+    return fuori
+
+
+def _barattolo_podio(foto, largo: int, alto: int, tratto: int):
+    """UN barattolo, RGBA trasparente, con la foto dentro.
+
+    ANATOMIA, ed e' quel che lo fa leggere come un barattolo invece che
+    come una foto arrotondata (la prima stesura era proprio quello): il
+    coperchio SI APPOGGIA sul corpo — lo copre, non gli galleggia sopra
+    — il corpo ha una SPALLA piu' stretta del coperchio, e la foto sta
+    DENTRO con un bordo di vetro tutto intorno."""
+    im = ImmaginePillow.new("RGBA", (largo, alto), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    h_cop = int(alto * 0.115)              # il coperchio
+    spalla = int(largo * 0.055)            # di quanto il corpo rientra
+    y0 = int(h_cop * 0.55)                 # il corpo parte SOTTO di lui
+    raggio = int(largo * 0.13)
+    corpo = (spalla, y0, largo - spalla, alto - tratto)
+
+    # 1) il vetro: si vede dove la foto non arriva, ed e' il bordo che
+    #    fa sembrare la foto «dentro» invece che «ritagliata»
+    d.rounded_rectangle(corpo, radius=raggio, fill=PODIO_VETRO)
+
+    # 2) la foto, incassata di un bordo di vetro tutto intorno
+    if foto:
+        b = tratto * 3
+        dentro = (corpo[0] + b, corpo[1] + b, corpo[2] - b, corpo[3] - b)
+        w, h = dentro[2] - dentro[0], dentro[3] - dentro[1]
+        try:
+            f = ImageOps.fit(
+                ImmaginePillow.open(foto).convert("RGB"), (w, h),
+                method=ImmaginePillow.Resampling.LANCZOS,
+                centering=(0.5, 0.5))
+            mask = ImmaginePillow.new("L", (w, h), 0)
+            ImageDraw.Draw(mask).rounded_rectangle(
+                (0, 0, w - 1, h - 1), radius=max(2, raggio - b), fill=255)
+            im.paste(f, (dentro[0], dentro[1]), mask)
+        except Exception:
+            pass                    # foto illeggibile = barattolo vuoto
+
+    # 3) il riflesso SOLO sul vetro vuoto (vedi il cappello)
+    if not foto:
+        rx = corpo[0] + int(largo * 0.16)
+        d.line([(rx, y0 + int(alto * 0.18)), (rx, y0 + int(alto * 0.46))],
+               fill=PODIO_RIFLESSO, width=max(3, tratto + 2))
+        d.line([(rx + int(largo * 0.10), y0 + int(alto * 0.22)),
+                (rx + int(largo * 0.10), y0 + int(alto * 0.36))],
+               fill=PODIO_RIFLESSO, width=max(2, tratto))
+
+    # 4) il contorno del vetro, sopra la foto
+    d.rounded_rectangle(corpo, radius=raggio, outline=PODIO_INK,
+                        width=tratto)
+    # 5) il coperchio per ULTIMO — sta davanti — con la sua ghiera
+    #    sotto, che e' quel che lo fa «appoggiare» invece che fluttuare
+    d.rounded_rectangle((0, 0, largo - 1, h_cop),
+                        radius=int(h_cop * 0.38), fill=PODIO_ARANCIO,
+                        outline=PODIO_INK, width=tratto)
+    d.line([(int(largo * 0.06), h_cop - tratto),
+            (largo - int(largo * 0.06), h_cop - tratto)],
+           fill=PODIO_INK, width=max(1, tratto - 1))
+    return im
+
+
+def disegna_podio(foto3: list):
+    """La figura intera: 1° al centro e piu' grande, 2° a sinistra, 3°
+    a destra, appoggiati su una mensola."""
+    tela = ImmaginePillow.new("RGB", (PODIO_LARGA, PODIO_ALTA), PODIO_CREMA)
+    base = int(PODIO_ALTA * 0.90)          # la riga su cui appoggiano
+    # la mensola: senza, tre barattoli di misure diverse su un fondo
+    # piatto si leggono come tre ritagli incollati invece che come
+    # oggetti posati (guardato a schermo)
+    ImageDraw.Draw(tela).line(
+        [(int(PODIO_LARGA * 0.05), base), (int(PODIO_LARGA * 0.95), base)],
+        fill=PODIO_MENSOLA, width=3)
+    # il 1° si disegna per ULTIMO: e' il piu' grande e sta davanti
+    for i in (1, 2, 0):
+        largo = int(PODIO_LARGA * PODIO_MISURE[i][0])
+        alto = int(largo * 1.18)
+        tratto = max(3, largo // 60)
+        x = int(PODIO_LARGA * PODIO_MISURE[i][1]) - largo // 2
+        b = _barattolo_podio(foto3[i] if i < len(foto3) else None,
+                             largo, alto, tratto)
+        h_om = max(6, int(alto * 0.045))
+        om = ImmaginePillow.new("RGBA", (int(largo * 0.86), h_om),
+                                (0, 0, 0, 0))
+        ImageDraw.Draw(om).ellipse(
+            (0, 0, int(largo * 0.86) - 1, h_om - 1), fill=PODIO_OMBRA)
+        tela.paste(ImmaginePillow.alpha_composite(
+            ImmaginePillow.new("RGBA", om.size, PODIO_CREMA + (255,)),
+            om).convert("RGB"),
+            (x + int(largo * 0.07), base - h_om // 2))
+        tela.paste(b, (x, base - alto), b)
+    return tela
+
+
+def _salva_podio(con, top: list, oggi: str) -> str:
+    """Compone la figura e la scrive in foto/. Torna il NOME del file,
+    o '' se non si e' potuta fare — e allora il riepilogo esce come il
+    post di TESTO di sempre (fail-open come tutto il resto: senza
+    Pillow, senza classifica o con un errore qualunque, il lunedi' non
+    salta).
+
+    IL FILE NON SI CANCELLA MAI, ed e' voluto: il post nel canale lo
+    mostra per URL, e Telegram lo ricarica quando gli pare — toglierlo
+    lascerebbe un buco nei riepiloghi vecchi. Sono 52 file l'anno."""
+    if not (RIEPILOGO_IMMAGINE and top
+            and ImmaginePillow and ImageDraw and ImageOps):
+        return ""
+    try:
+        nome = f"pod_{oggi}.jpg"
+        disegna_podio(_foto_podio(con, top)).save(
+            os.path.join(FOTO_DIR, nome), quality=88)
+        return nome
+    except Exception as e:
+        print(f"⚠️ Podio del riepilogo saltato: {e}")
+        return ""
+
 
 def _conta_settimana(con, da: int) -> tuple[int, int, list]:
     """(annunci nuovi, ordini, top 3) della finestra che parte da `da`.
@@ -27063,15 +27272,32 @@ async def riepilogo_settimana():
             for t in top if t["titolo"])
         if venduti:
             righe.append(f"🏆 I più venduti: {venduti}")
+    testo = ("📊 <b>La settimana di Barattolo</b>\n\n"
+             + "\n".join(righe)
+             + f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Sfoglia il mercatino</a>")
+    # IL PODIO si ALLEGA, non sostituisce: la didascalia resta quella
+    # di sempre, coi titoli — chi ha le immagini spente, o un client
+    # che non le carica, legge la stessa cosa di prima. Se la figura
+    # non si compone, `nome` e' vuoto e si esce col post di TESTO: il
+    # lunedi' non salta per un disegno.
+    con = db()
+    nome = _salva_podio(con, top, oggi)
+    con.close()
     print(f"📊 Riepilogo settimana ({oggi}): {nuovi} annunci, "
-          f"{ordini} ordini, {len(top)} in classifica — post mandato")
+          f"{ordini} ordini, {len(top)} in classifica — post mandato"
+          + (f" col podio ({nome})" if nome else " (senza figura)"))
+    if nome:
+        r = await bot_api("sendPhoto", {
+            "chat_id": canale_id(), "parse_mode": "HTML",
+            "photo": f"{URL_PUBBLICO}/foto/{nome}", "caption": testo})
+        if r and r.get("ok"):
+            return
+        # Telegram non l'ha presa (URL non raggiungibile, figura troppo
+        # grande...): meglio il riepilogo senza figura che nessuno.
+        print("⚠️ Podio rifiutato da Telegram: esce il riepilogo di testo")
     await bot_api("sendMessage", {
         "chat_id": canale_id(), "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-        "text": "📊 <b>La settimana di Barattolo</b>\n\n"
-                + "\n".join(righe)
-                + f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Sfoglia il "
-                  "mercatino</a>"})
+        "disable_web_page_preview": True, "text": testo})
 
 
 # ============ LA RONDA DEL LIBRO MASTRO (ago 2026) ==================
@@ -28769,7 +28995,11 @@ NOME_FOTO = re.compile(
     # la vetrina del venditore su Nostr: il QUARTO scrittore di
     # foto/, e la sua forma sta qui perche' senza, la figura
     # pubblicata in piazza risponderebbe 404 a chiunque la apra
-    r"|v\d+_\d+\.jpg)\Z")
+    r"|v\d+_\d+\.jpg"
+    # il podio del riepilogo settimanale: e' un file che il canale
+    # mostra per URL, quindi la sua forma va dichiarata qui o Telegram
+    # si vedrebbe rispondere 404 dal nostro stesso server
+    r"|pod_\d{4}-\d{2}-\d{2}\.jpg)\Z")
 TIPI_FOTO = {"jpg": "image/jpeg", "png": "image/png",
              "webp": "image/webp", "gif": "image/gif"}
 

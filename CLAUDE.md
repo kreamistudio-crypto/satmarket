@@ -3199,6 +3199,67 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ordini non esce niente — un riepilogo che dice «0 ordini» fa più
   danno del silenzio. I titoli passano da `html.escape`, che qui sono
   tre in un colpo solo.
+  IL PODIO DEL LUNEDÌ (ago 2026, chiesto da Andrea): i tre più venduti
+  disegnati come TRE BARATTOLI con dentro la foto dell'articolo — il 1°
+  al centro e più grande, il 2° a sinistra, il 3° a destra, appoggiati
+  su una mensola. `disegna_podio` + `_barattolo_podio` + `_foto_podio`,
+  la figura si scrive in `foto/pod_{data}.jpg` e il post passa da
+  `sendPhoto` col riepilogo come CAPTION.
+  SI ALLEGA, NON SOSTITUISCE: la didascalia è lo STESSO testo del post
+  di sempre, scritto in un posto solo — chi ha le immagini spente legge
+  quello di prima. E se `_salva_podio` torna a mani vuote (niente
+  Pillow, niente classifica, leva spenta, un errore qualunque) esce il
+  post di TESTO: il lunedì non salta per un disegno. C'è anche il
+  ripiego sul rifiuto di Telegram, che è la stessa idea un gradino più
+  in là.
+  NIENTE TESTO NELLA FIGURA (decisione di Andrea), e non è una
+  rinuncia: la classifica la dicono MISURA e POSIZIONE, i titoli stanno
+  nella didascalia due righe sotto. Così **non serve nessun font** —
+  che sarebbe un asset da committare e da tenere, ed è precisamente
+  quel che mancò al cantiere delle vetrine Nostr e gli impedì di andare
+  in produzione — e la figura non può troncare o sbagliare un titolo
+  lungo. C'è la prova che `ImageFont` non compaia.
+  IL BARATTOLO VUOTO È UNA FIGURA, NON UN BUCO (decisione di Andrea,
+  contro il mio consiglio, e guardandola a schermo aveva ragione lui):
+  un articolo senza una nostra foto resta vetro. Quella forma nel
+  nostro alfabeto esiste già — è il livello 0 di `jarSVG` in vetrina,
+  quello che dice «non l'hai ancora messo via» — quindi si legge come
+  un barattolo vuoto e non come un errore.
+  IL RIFLESSO CELESTE STA SOLO LÌ, ed è la riga da non ammorbidire:
+  sopra una foto ogni forma di luce diventa una sbavatura. Provate e
+  scartate GUARDANDOLE tutte e due — le due pennellate di `jarSVG` si
+  leggono come graffi, un velo bianco sull'angolo come un alone —
+  mentre sul vetro vuoto servono, o resterebbe un rettangolo chiaro
+  senza mestiere.
+  L'ANATOMIA è quel che lo fa leggere come un barattolo invece che come
+  una foto arrotondata, che è esattamente com'era la prima stesura: il
+  coperchio SI APPOGGIA sul corpo (lo copre, non gli galleggia sopra) e
+  ha la sua ghiera sotto, il corpo ha una SPALLA più stretta, e la foto
+  sta DENTRO con un bordo di vetro tutto intorno. Più la MENSOLA: senza,
+  tre barattoli di misure diverse su un fondo piatto si leggono come
+  tre ritagli incollati invece che come oggetti posati.
+  L'ALTEZZA SI DERIVA DALLA LARGHEZZA (×1.18) e non si sceglie: le foto
+  sono QUADRATE (il francobollo `_min`) e un barattolo troppo alto le
+  taglia a striscia, col soggetto che sparisce ai lati. Il 3° è anche
+  più STRETTO del 2° e non solo più basso: a pari larghezza si legge
+  come un secondo posto accorciato.
+  SOLO LE NOSTRE FOTO, la regola dell'`og:image`: un URL remoto in
+  colonna è l'host di chi pubblica su Nostr, e comporlo in una figura
+  nostra vorrebbe dire andarglielo a chiedere ogni lunedì. IL CASO DI
+  PROVA VA SCELTO IN MODO CHE POSSA FALLIRE SOLO PER QUELLA RAGIONE —
+  la lezione di `_pare_recapito`, ripagata qui: con un
+  `https://host/x.jpg` la prova passava anche TOGLIENDO la guardia,
+  perché quel nome sul disco non esiste e sarebbe stato scartato lo
+  stesso. L'ha detto la tortura, non la rilettura. Adesso il file di
+  cartone si chiama `http:x.jpg` ed ESISTE: a escluderlo può essere
+  solo la guardia.
+  IL FILE NON SI CANCELLA MAI: il canale lo mostra per URL e Telegram
+  lo ricarica quando gli pare, quindi toglierlo lascerebbe un buco nei
+  riepiloghi vecchi. Sono 52 file l'anno. La sua forma va in
+  `NOME_FOTO` (o il nostro stesso server risponderebbe 404 a Telegram)
+  e `genera_miniature_mancanti` lo salta, per la ragione degli avatar:
+  è già della misura giusta e la gemella `_min` non la chiede nessuno.
+  Leva `RIEPILOGO_IMMAGINE` (True di serie).
   NIENTE LINK AL CANALE DENTRO L'APP (decisione di Andrea): il canale
   per ora è il suo banco di prova — dentro c'è solo lui, e prima vuole
   guardarlo. Nessuna fascia, nessun invito, e la strada per farlo il
