@@ -12851,7 +12851,14 @@ def prove_canale_bot():
 
     # --- 2) LA CAPTION DEL CANALE --------------------------------
     cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store"}
-    for f in ("_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
+    # la firma passa dal giudice della npub, che a sua volta vuole il
+    # bech32: chi estrae una funzione ne eredita le dipendenze
+    exec(next(r for r in _SORGENTE.split("\n")
+              if r.startswith("CHARSET_BECH32")), cap)
+    for f in ("_bech32_polymod", "npub_to_hex",
+              "hex_to_npub", "chiave_nostr_provata", "_npub_breve",
+              "_npub_venditore",
+              "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
               "_hashtag_promo", "_firma_venditore", "_caption_canale"):
         exec(pezzo(f), cap)
     a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
@@ -13142,7 +13149,85 @@ def prove_vetrina_negozio():
     prova("il post-negozio consuma il budget", 2,
           dre.count("_post_promo_recenti.append(time.time())"))
 
-    # --- 4) IL POST -------------------------------------------------
+    # --- 4) LA FIRMA DI CHI VIENE DA NOSTR --------------------------
+    # La npub PROVATA diventa un'ancora su njump. La riga che decide e'
+    # una sola: solo dal possesso dimostrato — `npub_accesso`, o il
+    # badge ma VERIFICATO. Questa firma sta in un post PUBBLICO, e una
+    # npub soltanto dichiarata manderebbe i lettori del canale sul
+    # profilo Nostr di un'altra persona.
+    fir = {"html": _html, "URL_PUBBLICO": "https://barattolo.store"}
+    exec(next(r for r in _SORGENTE.split("\n")
+              if r.startswith("CHARSET_BECH32")), fir)
+    for f in ("_bech32_polymod", "npub_to_hex", "hex_to_npub",
+              "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
+              "_firma_venditore"):
+        exec(pezzo(f), fir)
+    firma = fir["_firma_venditore"]
+    NPUB = ("npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqq"
+            "hrjdv9")
+
+    solo_tg = firma({"venditore": "Rosina", "venditore_username": "rosina",
+                     "venditore_negozio": "aaa11111"})
+    prova("chi non ha Nostr ha la firma di sempre", False,
+          "njump" in solo_tg)
+    prova("...con la sua menzione", True, "<b>@rosina</b>" in solo_tg)
+
+    nativo = firma({"venditore": "Rosina del Croco",
+                    "venditore_negozio": "bbb22222",
+                    "venditore_npub_accesso": NPUB})
+    # IL NOME DIVENTA IL LINK solo a chi non ha @username: dove la
+    # menzione c'e', avvolgerla in un'ancora la spegnerebbe.
+    prova("al nativo Nostr il NOME e' l'ancora njump", True,
+          f'<a href="https://njump.me/{NPUB}">Rosina del Croco</a>' in nativo)
+    prova("...e la npub si vede, abbreviata e copiabile", True,
+          "<code>npub1sn0wd…jdv9</code>" in nativo)
+
+    doppio = firma({"venditore": "Gino", "venditore_username": "gino",
+                    "venditore_negozio": "ccc33333",
+                    "venditore_npub": NPUB, "venditore_npub_verificata": 1})
+    prova("il doppio cittadino TIENE la menzione", True,
+          "<b>@gino</b>" in doppio)
+    prova("...e guadagna la npub accanto", True, "njump.me" in doppio)
+
+    # LA RIGA CHE DECIDE: dichiarata non basta, ci vuole la prova
+    nudo = firma({"venditore": "Furbo", "venditore_negozio": "ddd44444",
+                  "venditore_npub": NPUB, "venditore_npub_verificata": 0})
+    prova("una npub DICHIARATA e non verificata non esce", False,
+          "njump" in nudo or "npub1" in nudo)
+    # e una stringa storta non fa esplodere un post
+    storto = firma({"venditore": "Rotto", "venditore_negozio": "eee55555",
+                    "venditore_npub_accesso": "npub1nonvalida"})
+    prova("una npub storta non esce e non rompe niente", False,
+          "njump" in storto)
+    prova("...e il negozio resta al suo posto", True,
+          "vedi il suo negozio" in storto)
+
+    # NON DUE VOLTE LA STESSA COSA: chi non ha mai messo un nome sul
+    # kind-0 SI CHIAMA gia' con la npub abbreviata
+    senza_nome = firma({"venditore": "npub1sn0w…wfqq",
+                        "venditore_negozio": "b",
+                        "venditore_npub_accesso": NPUB})
+    prova("chi si chiama gia' come la sua npub non la ripete", 1,
+          senza_nome.count("<code>") + senza_nome.count("npub1sn0w…wfqq"))
+    prova("...ma il link ce l'ha lo stesso", True, "njump.me" in senza_nome)
+
+    # i tag restano PARI in tutti i casi, o Telegram rifiuta il parse
+    for nome, r in (("telegram", solo_tg), ("nativo", nativo),
+                    ("doppio", doppio), ("nudo", nudo), ("storto", storto),
+                    ("senza nome", senza_nome)):
+        prova(f"i tag della firma restano pari ({nome})",
+              (r.count("<a "), r.count("<b>"), r.count("<code>")),
+              (r.count("</a>"), r.count("</b>"), r.count("</code>")))
+
+    # E LE DUE SELECT DEVONO PORTARE I CAMPI, o la npub sparisce
+    # proprio quando il post si riscrive col ✅ Venduto — che e' la
+    # trappola gia' pagata con la firma del venditore.
+    for f in ("_drena_promo", "promo_venduto"):
+        prova(f"{f} rilegge anche la npub", True,
+              "venditore_npub_accesso" in pezzo(f)
+              and "venditore_npub_verificata" in pezzo(f))
+
+    # --- 5) IL POST -------------------------------------------------
     pn = codice(pezzo("_posta_negozio"))
     sfn = codice(pezzo("_salva_figura_negozio"))
     prova("la figura e' la FILA, non il podio", True, "FILA_MISURE" in sfn)

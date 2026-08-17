@@ -21516,6 +21516,38 @@ def _nota_promo(a: dict, cambio: float) -> str:
     return testo
 
 
+def _npub_venditore(a: dict) -> str:
+    """La npub del venditore, e SOLO dal possesso dimostrato: la regola
+    di `notifica()` e dei ponti di contatto — `npub_accesso`, oppure il
+    badge `npub` ma solo se VERIFICATO. Mai una npub nuda, che e' una
+    dichiarazione e non una prova.
+
+    Qui quella regola pesa piu' che altrove: questa riga finisce in un
+    post PUBBLICO, e una npub soltanto DICHIARATA manderebbe i lettori
+    del canale sul profilo Nostr di un'altra persona. '' quando non
+    c'e' niente di dimostrato, e allora la firma resta quella di
+    sempre.
+
+    Si passa dall'hex e si torna indietro con `hex_to_npub` apposta:
+    cosi' quel che si mostra e' la npub CANONICA bech32, non la
+    stringa che qualcuno ha incollato nel profilo."""
+    u = {"npub_accesso": a.get("venditore_npub_accesso") or "",
+         "npub": a.get("venditore_npub") or "",
+         "npub_verificata": a.get("venditore_npub_verificata") or 0}
+    # NIENTE try/except QUI, ed e' una cosa che ha detto la tortura:
+    # ce n'era uno sulla npub storta, e la mutazione che lo rendeva un
+    # `raise` non faceva rossa nessuna prova. Perche' era irraggiungibile
+    # — `chiave_nostr_provata` la stringa storta la scarta gia' da se'
+    # (`except ValueError: continue`) e torna '', quindi `hex_to_npub`
+    # su un hex rotto non ci arriva mai. Un except che non puo' scattare
+    # e' peggio di niente: promette una guardia che nessuno esercita.
+    # Se un domani `hex_to_npub` alzasse davvero, risale al fail-open
+    # del chiamante, che almeno lo STAMPA invece di lasciare la firma
+    # muta in silenzio.
+    hexk = chiave_nostr_provata(u)
+    return hex_to_npub(hexk) if hexk else ""
+
+
 def _firma_venditore(a: dict) -> str:
     """La riga «Annuncio da …» col ponte verso il negozio.
 
@@ -21525,11 +21557,35 @@ def _firma_venditore(a: dict) -> str:
     su ogni loro annuncio. Il negozio invece c'e' sempre (il codice si
     assegna alla prima riga di `utenti` e non cambia mai), ma la
     guardia resta: senza codice si scrive la sola firma, mai un link
-    a `/negozio/` che porterebbe a un 404."""
+    a `/negozio/` che porterebbe a un 404.
+
+    E CHI VIENE DA NOSTR HA LA SUA MANIGLIA (ago 2026, chiesto da
+    Andrea): la npub PROVATA diventa un'ancora su njump.me, con la npub
+    abbreviata dentro un `<code>` — che su Telegram si copia con un
+    tocco, ed e' il modo in cui quella stringa serve davvero.
+    IL NOME DIVENTA IL LINK SOLO A CHI NON HA @USERNAME, ed e' la riga
+    da non uniformare: dove lo username c'e', quello e' una MENZIONE
+    che Telegram risolve, e avvolgerla in un'ancora la spegnerebbe. Il
+    doppio cittadino tiene la menzione e guadagna la npub accanto; il
+    nativo Nostr — che una menzione non ce l'ha mai avuta, ed e' il
+    caso che ha aperto la voce — guadagna tutti e due."""
+    npub = _npub_venditore(a)
     nome = a.get("venditore_username") or ""
-    chi = f"@{html.escape(nome)}" if nome else html.escape(
-        a.get("venditore") or "un venditore")
+    if nome:
+        chi = f"@{html.escape(nome)}"          # una menzione vera
+    else:
+        chi = html.escape(a.get("venditore") or "un venditore")
+        if npub:
+            chi = f"<a href=\"https://njump.me/{npub}\">{chi}</a>"
     riga = f"Annuncio da <b>{chi}</b>"
+    # ...ma non due volte la stessa cosa: chi non ha mai messo un nome
+    # sul suo kind-0 SI CHIAMA gia' con la npub abbreviata (e' il nome
+    # che gli da' `crea_utente_nostr`), e ripeterla accanto sarebbe la
+    # stessa stringa due volte nella stessa riga. Il link ce l'ha gia'
+    # sul nome.
+    if npub and not (a.get("venditore") or "").startswith("npub1"):
+        riga += (f" · <a href=\"https://njump.me/{npub}\">🟣 "
+                 f"<code>{_npub_breve(npub)}</code></a>")
     if a.get("venditore_negozio"):
         riga += (f" — <a href=\"{URL_PUBBLICO}/negozio/"
                  f"{a['venditore_negozio']}\">vedi il suo negozio</a>")
@@ -21643,6 +21699,9 @@ async def _drena_promo():
             a = con.execute(
                 "SELECT a.*, u.ferie_fino, u.promo_canale_il, "
                 "u.nome AS venditore, u.username AS venditore_username, "
+                "u.npub AS venditore_npub, "
+                "u.npub_verificata AS venditore_npub_verificata, "
+                "u.npub_accesso AS venditore_npub_accesso, "
                 "u.negozio AS venditore_negozio "
                 "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
                 "WHERE a.id=?", (i,)).fetchone()
@@ -22404,6 +22463,9 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
         a = con.execute(
             "SELECT a.*, u.nome AS venditore, "
             "u.username AS venditore_username, "
+            "u.npub AS venditore_npub, "
+            "u.npub_verificata AS venditore_npub_verificata, "
+            "u.npub_accesso AS venditore_npub_accesso, "
             "u.negozio AS venditore_negozio "
             "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
             "WHERE a.id=?", (annuncio_id,)).fetchone()

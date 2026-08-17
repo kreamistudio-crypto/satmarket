@@ -3067,6 +3067,37 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   venditore_username, venditore_negozio) — senza, il post riscritto
   perderebbe la firma che aveva da nuovo, e `promo_venduto` legge di
   conseguenza.
+  E CHI VIENE DA NOSTR HA LA SUA MANIGLIA (ago 2026, chiesto da
+  Andrea): la npub PROVATA diventa un'ancora su njump.me, con la npub
+  abbreviata dentro un `<code>` — che su Telegram si copia con un
+  tocco, ed è il modo in cui quella stringa serve davvero. Giudice
+  `_npub_venditore`, e la regola è quella di sempre: **solo dal
+  possesso dimostrato** (`npub_accesso`, o il badge `npub` ma
+  VERIFICATO). Qui pesa più che altrove — questa riga sta in un post
+  PUBBLICO, e una npub soltanto DICHIARATA manderebbe i lettori del
+  canale sul profilo Nostr di un'altra persona.
+  IL NOME DIVENTA IL LINK SOLO A CHI NON HA @USERNAME, ed è la riga da
+  non uniformare: dove lo username c'è, quello è una MENZIONE che
+  Telegram risolve, e avvolgerla in un'ancora la spegnerebbe. Il doppio
+  cittadino tiene la menzione e guadagna la npub accanto; il nativo
+  Nostr — che una menzione non l'ha mai avuta, ed è il caso che ha
+  aperto la voce — guadagna tutti e due. E chi non ha mai messo un nome
+  sul suo kind-0 SI CHIAMA già con la npub abbreviata (gliela dà
+  `crea_utente_nostr`): lì la npub accanto NON si ripete, o sarebbe la
+  stessa stringa due volte nella stessa riga.
+  Si passa dall'hex e si torna con `hex_to_npub` apposta: quel che si
+  mostra è la npub CANONICA bech32, non la stringa incollata nel
+  profilo. E le DUE SELECT che alimentano la firma — il drenatore e
+  `promo_venduto` — devono portare i tre campi, o la npub sparirebbe
+  proprio quando il post si riscrive col ✅ Venduto: è la trappola già
+  pagata con `venditore_username`, e c'è la prova per tutte e due.
+  NIENTE try/except nel giudice, e l'ha detto la TORTURA: ce n'era uno
+  sulla npub storta, e la mutazione che lo rendeva un `raise` non
+  faceva rossa nessuna prova — perché era irraggiungibile,
+  `chiave_nostr_provata` la stringa storta la scarta già da sé. Un
+  except che non può scattare è peggio di niente: promette una guardia
+  che nessuno esercita. A essere sorvegliata è quella VERA, dentro
+  `chiave_nostr_provata`: togliendola, la prova diventa rossa.
   UN POST PER VENDITORE A SETTIMANA (ago 2026, decisione di Andrea):
   il canale è una SELEZIONE, non la vetrina. Leva
   `PROMO_GIORNI_VENDITORE` (7; 0 = nessun freno, emergenza e non
