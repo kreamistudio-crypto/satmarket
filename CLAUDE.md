@@ -12123,16 +12123,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (#BFE3F0, di sera più tenue #7FA3B5) — ovunque il barattolino
   compare (card, cerchietto del dettaglio, cassetto); dettaglio, non
   protagonista: non copre la lettura del livello.
-  LA SCORCIATOIA IN TESTATA (ago 2026, richiesta di Andrea): la stessa
+  IL BARATTOLO IN TESTATA (ago 2026, richiesta di Andrea): la stessa
   icona che si riempie nel cassetto, accanto alla levetta del tema —
   `.jar-testa`, due istanze gemelle (testata mobile e topbar desktop)
   come la levetta e il tappo, una classe sola e un `querySelectorAll`
-  solo (`renderJarTesta`, accanto ad `aggiornaBarattolo`). Un tocco e
-  si è nel cassetto: `apriCassettoProfilo('accPreferiti')`, che esisteva
-  già e guadagna il suo primo chiamante con quell'argomento. È una
-  SCORCIATOIA E NON UNA VISTA NUOVA, e la prova lo conta: `myPreferiti
-  .map(`, `#preferitiBlocco` e `renderPreferiti(` restano UNO ciascuno
-  — due liste che dicono la stessa cosa divergono al primo ritocco.
+  solo (`renderJarTesta`, accanto ad `aggiornaBarattolo`).
+  NATO SCORCIATOIA AL CASSETTO E DIVENTATO UN FILTRO nello stesso mese
+  (vedi «IL BARATTOLINO FILTRA LA HOME», sotto): un tocco NON porta
+  più nel Profilo, accende il filtro della vetrina. Resta vero — ed è
+  la prima cosa che le prove difendono — che NON È UNA VISTA NUOVA
+  (`go('barattolo')` e `view-barattolo` non esistono) e che la FONTE
+  della lista è una sola, `myPreferiti`: `#preferitiBlocco` e
+  `renderPreferiti(` restano UNO ciascuno. La riga che diceva «la
+  lista si disegna in un posto solo» è invece EMENDATA: i posti sono
+  due, con mestieri distinti.
   QUASI TUTTO ARRIVA GRATIS, ed è il pregio del cantiere:
   `aggiornaBarattolo` livella ogni `.jar-ico` ESCLUSE quelle dentro
   `.card-jar`/`.jar-btn`, quindi il vetro si riempie da solo dalle
@@ -12144,21 +12148,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `preferiti.has(NaN)` → **lv0 per sempre, in silenzio**. La sentinella
   LEGGE l'elenco dal codice invece di ribatterlo: la terza classe di
   domani la copre da sola.
-  A BARATTOLO VUOTO RESTA, SPENTA (lv0): il tocco porta comunque al
-  cassetto, che a vuoto ha già il testo che insegna a riempirlo —
-  quindi non è «un'icona che non fa niente». Ed è l'unico modo di
-  imparare cosa vuol dire il riempimento: si vede il vetro vuoto
-  prima, e il primo salvataggio lo fa salire sotto gli occhi. Un'icona
-  che appare dal nulla al primo salvataggio non insegnerebbe niente.
+  A BARATTOLO VUOTO RESTA, SPENTA (lv0), e il tocco ACCENDE LO STESSO
+  il filtro, mostrando lo stato vuoto col suo invito — un gesto, un
+  significato: mai un tocco che secondo lo stato fa due cose diverse.
+  Ed è l'unico modo di imparare cosa vuol dire il riempimento: si vede
+  il vetro vuoto prima, e il primo salvataggio lo fa salire sotto gli
+  occhi. Un'icona che appare dal nulla al primo salvataggio non
+  insegnerebbe niente.
   LA GUARDIA È QUELLA DI `bottoneJar` (`DEMO || VETRINA || !myTgId`) e
-  NON quella del tappo (`!VETRINA`), ed è la guardia del posto DOVE SI
-  PORTA: il tappo apre una vista che in DEMO esiste, questa un cassetto
-  che in DEMO `renderPreferiti` NASCONDE — il tocco finirebbe su uno
-  `scrollIntoView` verso un nodo senza box, cioè su un Profilo scorso a
-  caso. Vale la regola di `bottoneRifornisci`: un bottone che porta a
-  un muro è peggio di un bottone che non c'è. E in DEMO il gesto che
-  riempie non esiste nemmeno (`bottoneJar` non nasce, `caricaPreferiti`
-  esce subito): sarebbe un misuratore fermo a vuoto per sempre.
+  NON quella del tappo (`!VETRINA`). LA RAGIONE È CAMBIATA COL GESTO,
+  e va detto perché il commento vecchio si legge ancora in giro: prima
+  era il posto DOVE SI PORTAVA (un cassetto che in DEMO
+  `renderPreferiti` nasconde, quindi uno `scrollIntoView` verso un
+  nodo senza box); adesso è che in DEMO e in VETRINA il barattolo non
+  esiste AFFATTO — `bottoneJar` non nasce e `caricaPreferiti` esce
+  subito — quindi sarebbe un filtro che non può mai avere niente
+  dentro. Vale lo stesso la regola di `bottoneRifornisci`: un bottone
+  che porta a un muro è peggio di un bottone che non c'è.
   NIENTE NUMERO IN TESTATA: il livello È il numero. `#preferitiConta` è
   un id e non si riusa, ma la domanda vera è se serva — i cinque
   livelli esistono apposta per dire «quanto pieno» senza cifra; una
@@ -12169,8 +12175,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   barattolo vuoto, quindi il cerchietto diventerebbe pastiglia e
   viceversa MENTRE navighi, spingendo levetta e tappo avanti e indietro
   dentro un header `sticky`. A voce il nome c'è: `aria-label`, e sono
-  LE STESSE PAROLE dell'header del cassetto — scorciatoia e
-  destinazione si chiamano uguale, e c'è la prova.
+  LE STESSE PAROLE dell'header del cassetto E della pillola d'uscita —
+  la vista filtrata e il cassetto sono la stessa lista vista da due
+  posti, e chiamarle in due modi sarebbe la bugia; c'è la prova. Da
+  quando è un interruttore lo stato si dice anche con `aria-pressed`:
+  l'anello arancione lo vede solo chi guarda.
   L'ORDINE È `[levetta][barattolo][tappo]`, e non prima della levetta:
   l'auto-margine che spinge il gruppo a destra vive su `.tema-btn`
   proprio perché è l'unica dei tre che C'È SEMPRE. Dandolo al
@@ -12229,6 +12238,74 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   avanzano 173px (verificato dal vivo a 1280: zero sbordo). Chi lo
   curerà: la leva standard da tablet sono le sole icone sotto ~900px
   (−208px).
+  IL BARATTOLINO FILTRA LA HOME (ago 2026, decisione di Andrea): un
+  tocco e la vetrina mostra i soli annunci del barattolo, SENZA
+  cambiare vista; si spegne ritoccandolo, dalla pillola in vetrina, o
+  da qualunque gesto che ricarichi la vetrina.
+  ZERO RETE, ed è ciò che ha reso il cantiere tutto client: la lista
+  sta già in `myPreferiti` — `/api/me/preferiti` NON è paginato (una
+  richiesta sola, `LIMIT 100`) e le sue righe sono già passate da
+  `mapListing`, cioè hanno la forma delle card. E `renderGrid(items)`
+  esisteva già per disegnare una LISTA CHIUSA senza paginare: mette
+  `ultimaRicercaAI`, che è la guardia con cui `caricaAltri` esce
+  subito. Quel nome acquista un secondo mestiere e RESTA — significa
+  già «la griglia mostra una lista chiusa, non paginare», ed è il
+  patto dei nomi interni (`.lampo-was`, `pacco`, `sconto_pacco_*`).
+  Spegnendo, `renderGrid()` senza argomenti ridisegna `vetrina`, che è
+  rimasta intatta in memoria, e rimette quel flag a false da sé:
+  accendere e spegnere costano ZERO richieste.
+  LE QUATTRO DECISIONI DI ANDREA. 1) IL CASSETTO RESTA, coi mestieri
+  distinti: la home filtrata mostra i soli ATTIVI come merce, il
+  cassetto resta la GESTIONE — tutti, compresi i «non più disponibile»
+  che il server manda apposta, col bottone «Togli», che dalla vetrina
+  non si potrebbe fare perché quelle card non ci sono. Non è un
+  doppione: la FONTE è una sola, e l'unica cosa davvero duplicata era
+  il TESTO del vuoto, che ora vive in un posto solo. 2) I FILTRI SI
+  NASCONDONO (Ordina e Filtri via, le pillole categoria lasciano il
+  posto alla pillola d'uscita) e le loro variabili restano VIVE: si
+  nascondono, non si azzerano — uscendo la vetrina è com'era. Il
+  motivo tecnico è che quei controlli chiamano il SERVER, che del
+  barattolo non sa niente, e il ramo che filtra lato client è gated su
+  `DEMO` apposta («coi dati vivi li applica il server, riapplicarli
+  mentirebbe»). L'ordine resta quello del barattolo — l'ultimo messo
+  da parte — che non è nessuno dei tre di «Ordina». 3) TOGLIENDO UN
+  ANNUNCIO LA CARD SPARISCE SUBITO: la vista dice «il tuo barattolo» e
+  resta vera al secondo. È l'unica delle quattro che costa una riga —
+  oggi nessuno ridisegna la griglia — e il PREZZO È DICHIARATO: un
+  tocco per sbaglio toglie l'annuncio dalla vista in cui stavi, e per
+  rimetterlo bisogna uscire dal filtro e ritrovarlo. LA STRADA
+  SCARTATA era «la card resta col vetro vuoto», che sarebbe stata
+  gratis e reversibile ma — decisione di Andrea — più confusa. 4) A
+  BARATTOLO VUOTO il filtro si accende lo stesso e lo dice.
+  LO SPEGNIMENTO VIVE IN UN POSTO SOLO, `loadListings`: chi ricarica
+  la vetrina dal server sta chiedendo LA VETRINA. Così lo ereditano
+  per costruzione categoria, pillole, Sfoglia, Aste, Ordina, Filtri e
+  ogni strada futura — e anche la TIRATA di aggiornamento, dove vale
+  la regola già scritta in `aggiornaVista` per la ricerca AI: «si
+  torna alla vetrina, che è ciò che il gesto chiede». Il barattolo
+  eredita quella regola senza una riga.
+  NON ENTRA NELLA CRONOLOGIA: `chiaveVetrina` non lo guarda, quindi il
+  gesto indietro non lo spegne — come i filtri e l'ordinamento, che
+  non ci sono mai entrati. Farcelo entrare vorrebbe dire una entry che
+  nessuno sa RICOSTRUIRE (`navApplica` ri-applica la pila delle viste,
+  non le variabili della vetrina): è l'imperfezione già dichiarata del
+  motore, e non si allarga.
+  IL TESTO DEL VUOTO È UNO MA IN DUE PEZZI (`BARATTOLO_VUOTO` e
+  `BARATTOLO_INVITO`), e il perché si vede solo A SCHERMO: in vetrina
+  la constatazione la fa già il titolone dello stato vuoto, e
+  ripeterla nel corpo erano le stesse parole due volte di fila (preso
+  guardando lo scatto, non leggendo); nel cassetto un titolo non c'è e
+  servono tutt'e due. Lo stato vuoto ha il suo terzo blocco e il
+  bottone «🛍 Esplora il mercatino» al posto di «+ Metti in vendita»
+  (un barattolo vuoto non si riempie vendendo), e «🔔 Avvisami» NON
+  compare: lì non c'è nessuna ricerca a vuoto da salvare.
+  DUE PROVE HANNO CAMBIATO LATO invece di allentarsi — certificavano
+  che il barattolino portasse al cassetto e che la lista si disegnasse
+  in un posto solo, cioè le due premesse che questa decisione
+  rovescia — più 22 nuove, una ESEGUIBILE (il giudice
+  `preferitiInVetrina` fatto girare con node sui suoi casi: le
+  sentinelle dicono che esiste, mai che risponda giusto) e la tortura
+  a 17 mutazioni, tutte uccise una per una.
   Le stelle del rating si mostrano solo se rating > 0 ("0 ★" farebbe
   danno ai venditori appena arrivati); dal lug 2026 le accende il
   sistema di feedback (vedi server.py).
