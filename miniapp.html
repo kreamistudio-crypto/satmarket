@@ -528,6 +528,16 @@
   /* il bersaglio largo quanto il pollice, senza occupare layout: la
      ricetta di .card-jar e dei pallini della galleria */
   .jar-testa::after{content:'';position:absolute;inset:-6px;border-radius:50%}
+  /* IL FILTRO E' ACCESO: lo stesso anello arancione del tappo sulla
+     vista Profilo — un segno che si e' gia' imparato, non uno nuovo */
+  .jar-testa.attivo{box-shadow:0 0 0 2.5px var(--sats),0 2px 0 rgba(35,40,44,.25)}
+  /* ...e col barattolo acceso Ordina e Filtri non ci sono: quei
+     controlli chiamano il SERVER, che del barattolo non sa niente. Le
+     loro variabili restano VIVE e tornano uscendo (il patto dei filtri
+     di sessione): si nascondono, non si azzerano. Il blocco del
+     conteggio resta, che dice quanti oggetti hai messo da parte. */
+  body.solo-barattolo .strumenti #ordinaSelBtn,
+  body.solo-barattolo .strumenti #filtriBtn{display:none}
   /* in nav vive solo da desktop (come il tappo): su mobile la nav e'
      la tab bar in basso e la levetta sta gia' in testata */
   nav .tema-btn{display:none}
@@ -3691,7 +3701,7 @@ document.getElementById('cartello')?.remove();</script>
           <small>il mercatino in sats</small>
         </div>
         <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-        <button class="jar-testa" onclick="apriCassettoProfilo('accPreferiti')" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
+        <button class="jar-testa" onclick="alternaBarattolo()" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
         <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
       </div>
       <!-- Niente bottone Cerca: si cerca con Invio (o la lente della
@@ -3840,7 +3850,11 @@ document.getElementById('cartello')?.remove();</script>
       Hai qualcosa da vendere? 3 minuti e sei in vetrina.</span>
       <span id="emptyAste" style="display:none">Nessun'asta in corso in questo momento.<br>
       Metti tu qualcosa all'asta: base, durata, e vince chi offre di più.</span>
-      <button class="btn orange" onclick="go('vendi')">+ Metti in vendita</button>
+      <!-- Il barattolo vuoto: il testo lo scrive renderGrid dalla
+           costante unica, la stessa che dice il vuoto nel cassetto -->
+      <span id="emptyBarattolo" style="display:none"></span>
+      <button class="btn orange" id="emptyVendi" onclick="go('vendi')">+ Metti in vendita</button>
+      <button class="btn orange" id="emptyEsplora" style="display:none" onclick="alternaBarattolo()">🛍 Esplora il mercatino</button>
       <button class="btn ghost" id="btnAvvisami" style="display:none" onclick="avvisamiDaRicerca()">🔔 Avvisami se arriva</button>
     </div>
     <!-- La sentinella dello scroll infinito: quando si avvicina allo
@@ -4855,7 +4869,7 @@ document.getElementById('cartello')?.remove();</script>
          come arriva la roba -->
     <button id="nav-affari" onclick="go('affari')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.4l8.5 4.3v8.7L12 20.6l-8.5-4.2V7.7z"/><path d="M3.5 7.7L12 11.9l8.5-4.2"/><path d="M12 11.9v8.7"/></svg></span>Ordini<span class="off-dot" id="offDot"></span></button>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-    <button class="jar-testa" onclick="apriCassettoProfilo('accPreferiti')" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
+    <button class="jar-testa" onclick="alternaBarattolo()" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"></button>
     <button class="avatar-btn" onclick="go('profilo')" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
 
@@ -6050,6 +6064,15 @@ async function loadListings(anonimo){
      cambio categoria, i filtri, la ricerca e l'ordinamento: sono giri
      nuovi, non ritorni, e devono ripartire dalla cima. */
   vetrinaPos = null;
+  /* E IL FILTRO DEL BARATTOLO SI SPEGNE QUI, in un posto solo: chi
+     ricarica la vetrina dal server sta chiedendo LA VETRINA, non dieci
+     annunci messi da parte. Cosi' lo spegnimento lo ereditano per
+     costruzione categoria, pillole, Sfoglia, Aste, Ordina, Filtri e
+     ogni strada futura, senza che nessuno se ne debba ricordare — e
+     anche la tirata di aggiornamento, dove vale la regola gia' scritta
+     in aggiornaVista per la ricerca AI: «si torna alla vetrina, che e'
+     cio' che il gesto chiede». */
+  spegniBarattolo();
   const opz = (VETRINA || anonimo) ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
   const r = await fetch(`${API_BASE}/listings?${paramsVetrina()}`, opz);
   if (!r.ok) throw new Error('vetrina non disponibile');
@@ -7028,6 +7051,18 @@ function contaCategorie(){
   return conta;
 }
 function renderChips(){
+  /* A BARATTOLO ACCESO la fila dice una cosa sola: dove sei, e come si
+     esce. Le categorie non hanno senso qui — filtrare dieci oggetti
+     che hai scelto tu non serve a niente, e quelle pillole chiamano il
+     SERVER, che del barattolo non sa niente — quindi lasciano il posto
+     alla pillola d'uscita. E' anche la seconda strada per spegnere: il
+     barattolino in testata e' piccolo e sta in cima, e da solo non
+     basta a dire che il filtro e' acceso. */
+  if (vistaBarattolo) {
+    el('chips').innerHTML =
+      `<div class="chip active" onclick="alternaBarattolo()">🫙 Nel tuo barattolo ✕</div>`;
+    return;
+  }
   const conta = contaCategorie();
   const cats = CATS.slice(1).filter(c=>conta[c])
     .sort((a,b)=>conta[b]-conta[a]);   // sort stabile: pari merito in ordine di catalogo
@@ -7328,24 +7363,47 @@ function renderGrid(items){
   /* etichetta compatta: divide la riga con ordina+filtri, quindi
      dice solo il conteggio — «oggetti» in vetrina piena, «risultati»
      quando c'e' una ricerca o una categoria attiva */
+  /* col barattolo acceso sono «oggetti» e non «risultati»: non sono il
+     risultato di una ricerca, sono le cose che hai messo da parte — e
+     a dire QUALI c'e' la pillola accesa un centimetro sopra */
   el('gridLabel').innerHTML = `<span class="conta">${nTot}</span> `
-    + (items||q||activeCat!=='Tutto' ? `risultat${nTot===1?'o':'i'}`
-                                     : `oggett${nTot===1?'o':'i'}`);
+    + ((items||q||activeCat!=='Tutto') && !vistaBarattolo
+        ? `risultat${nTot===1?'o':'i'}`
+        : `oggett${nTot===1?'o':'i'}`);
   renderPionieri();
   el('gridEmpty').style.display = data.length ? 'none':'block';
   /* lo stato vuoto della radice Aste invita a metterci qualcosa: il
      bottone «+ Metti in vendita» porta gia' al form, dove vive il
      toggle dell'asta */
-  const vuotoAste = ramoVetrina === 'aste';
-  if (el('emptyStd')) el('emptyStd').style.display = vuotoAste ? 'none' : '';
+  const vuotoAste = ramoVetrina === 'aste' && !vistaBarattolo;
+  if (el('emptyStd'))
+    el('emptyStd').style.display = (vuotoAste || vistaBarattolo) ? 'none' : '';
   if (el('emptyAste')) el('emptyAste').style.display = vuotoAste ? '' : 'none';
+  /* IL BARATTOLO VUOTO si accende lo stesso e lo dice: un gesto, un
+     significato — mai un tocco che secondo lo stato fa due cose
+     diverse. Il testo e' quello del cassetto, che vive in un posto
+     solo; il bottone «+ Metti in vendita» qui non c'entra (un
+     barattolo vuoto non si riempie vendendo) e lascia il posto a
+     quello che riporta al mercatino. */
+  if (el('emptyBarattolo')) {
+    el('emptyBarattolo').style.display = vistaBarattolo ? '' : 'none';
+    el('emptyBarattolo').textContent = BARATTOLO_INVITO;
+  }
+  if (el('emptyVendi'))
+    el('emptyVendi').style.display = vistaBarattolo ? 'none' : '';
+  if (el('emptyEsplora'))
+    el('emptyEsplora').style.display = vistaBarattolo ? '' : 'none';
   if (el('emptyTitolo')) el('emptyTitolo').textContent =
-    vuotoAste ? '🔨 Nessuna asta in corso' : 'Il barattolo qui è vuoto';
+    vistaBarattolo ? `🫙 ${BARATTOLO_VUOTO}`
+    : vuotoAste ? '🔨 Nessuna asta in corso' : 'Il barattolo qui è vuoto';
   el('emptyQ').textContent = q || activeCat;
   /* «Avvisami se arriva»: solo per chi ha un account vero (in demo e
-     vetrina non ci sono avvisi da salvare) */
+     vetrina non ci sono avvisi da salvare) — e mai col barattolo
+     acceso, dove non c'e' nessuna ricerca a vuoto da salvare: la
+     griglia e' vuota perche' il barattolo lo e'. */
   const ba = el('btnAvvisami');
-  if (ba) ba.style.display = (!data.length && !DEMO && !VETRINA) ? '' : 'none';
+  if (ba) ba.style.display =
+    (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
   el('grid').innerHTML = data.map(cardHTML).join('');
   /* La griglia non ha piu' contatori da aggiornare (il badge dice
      solo la percentuale), ma allo scadere va comunque ridisegnata o
@@ -19147,6 +19205,29 @@ let MAX_PREFERITI = 10;
 /* Quanti nel barattolo DAVVERO: contano solo gli attivi, i venduti e
    i rimossi non occupano posto (comprare libera spazio da solo) */
 const contaBarattolo = () => myPreferiti.filter(l=>l.stato==='attivo').length;
+
+/* IL BARATTOLINO FILTRA LA HOME (ago 2026): un tocco sulla
+   scorciatoia in testata e la vetrina mostra i soli annunci del
+   barattolo, SENZA cambiare vista; si spegne ritoccandola, dalla
+   pillola in vetrina, o da qualunque gesto che ricarichi la vetrina.
+   Stato di SESSIONE e mai localStorage: la' dentro vivono valuta,
+   tema, corpo del testo, hint, cartello, festa, bunker e NWC. */
+let vistaBarattolo = false;
+/* IL GIUDICE di cosa entra in vetrina: i soli ATTIVI. Un venduto o un
+   rimosso in griglia sarebbe lo scudo anti-resurrezione bucato da
+   un'altra parte — quelli restano nel CASSETTO del Profilo, che e' il
+   posto che li racconta col loro «non piu' disponibile». */
+const preferitiInVetrina = () => myPreferiti.filter(l=>l.stato==='attivo');
+/* Il vuoto in UN POSTO SOLO — l'unica cosa che le due superfici
+   avevano davvero duplicata (la lista no: la fonte e' `myPreferiti`,
+   una sola) — ma in DUE PEZZI, la constatazione e l'invito.
+   IL PERCHE' DEI DUE PEZZI si vede solo a schermo: nella vetrina la
+   constatazione la fa gia' il titolone dello stato vuoto, e ripeterla
+   nel corpo erano le stesse parole due volte di fila; nel cassetto un
+   titolo non c'e', e servono tutt'e due. */
+const BARATTOLO_VUOTO = 'Il tuo barattolo è vuoto';
+const BARATTOLO_INVITO = 'Metti da parte gli annunci che ti piacciono '
+  + 'col 🫙 sulla loro foto.';
 /* I cinque livelli del vetro, in PROPORZIONE al tetto e non a
    soglie scritte a mano: con le vecchie (≤5, ≤10, poi 3) e il tetto a
    10 il livello 3 non sarebbe esistito mai — pieno a 10, ma «≤10» lo
@@ -19332,22 +19413,25 @@ function aggiornaBarattolo(n){
     myPreferiti.length ? `(${n}/${MAX_PREFERITI})` : '';
 }
 
-/* ---- LA SCORCIATOIA AL BARATTOLO IN TESTATA (ago 2026) ----
+/* ---- IL BARATTOLO IN TESTATA (ago 2026) ----
    Due istanze gemelle come la levetta del tema e il tappo — testata
    mobile e topbar desktop —, una classe sola, un querySelectorAll solo.
    Qui si CREA il vetro e si decide se accendere; a riempirlo poi e'
    aggiornaBarattolo, che le .jar-ico fuori dai bottoni delle card le
    livella gia' tutte: nessuna regia nuova, e la scossa di festa di
    togglePreferito arriva in omaggio.
+   DALL'AGO 2026 NON E' PIU' UNA SCORCIATOIA AL CASSETTO: e' il gesto
+   che FILTRA la vetrina (vedi alternaBarattolo). L'anello arancione
+   dice che il filtro e' acceso, ed e' lo stesso `.attivo` che il tappo
+   porta gia' quando la vista e' il Profilo.
    LA GUARDIA E' QUELLA DI bottoneJar, NON QUELLA DEL TAPPO (che guarda
-   il solo !VETRINA), ed e' la guardia del posto DOVE SI PORTA: il
-   tappo apre una vista che in demo esiste, questo un cassetto che in
-   demo renderPreferiti nasconde — il tocco finirebbe su uno
-   scrollIntoView verso un nodo senza box, cioe' su un Profilo scorso
-   a caso. Vale la regola di bottoneRifornisci: un bottone che porta a
-   un muro e' peggio di un bottone che non c'e'. E in demo il gesto che
-   riempie non esiste nemmeno (bottoneJar non nasce, caricaPreferiti
-   esce subito): sarebbe un misuratore fermo a vuoto per sempre.
+   il solo !VETRINA), e la RAGIONE e' cambiata col gesto: prima era il
+   posto dove si portava (un cassetto che in demo renderPreferiti
+   nasconde), adesso e' che in DEMO e in VETRINA il barattolo non
+   esiste AFFATTO — bottoneJar non nasce e caricaPreferiti esce subito,
+   quindi sarebbe un filtro che non puo' mai avere niente dentro. Vale
+   lo stesso la regola di bottoneRifornisci: un bottone che porta a un
+   muro e' peggio di un bottone che non c'e'.
    Il vetro PRIMA, l'accensione DOPO: nessuno vede mai un cerchietto
    vuoto. E nasce GIA' al livello giusto invece che a zero — oggi in
    avvia() l'ordine e' favorevole (questa gira prima di
@@ -19360,7 +19444,61 @@ function renderJarTesta(){
     if (on && !b.querySelector('svg'))
       b.innerHTML = jarSVG(livelloBarattolo(contaBarattolo()), 18);
     b.classList.toggle('on', on);
+    b.classList.toggle('attivo', on && vistaBarattolo);
+    /* da quando e' un interruttore lo stato si dice anche a voce:
+       l'anello arancione lo vede solo chi guarda */
+    b.setAttribute('aria-pressed', on && vistaBarattolo ? 'true' : 'false');
   });
+}
+
+/* IL GESTO: accende o spegne il filtro, e ridisegna. ZERO RETE, ed e'
+   la ragione per cui questo cantiere e' tutto client: la lista sta
+   gia' in memoria (`/api/me/preferiti` non e' paginato — una richiesta
+   sola, tetto 100 — e le sue righe sono gia' passate da mapListing,
+   cioe' hanno la forma delle card della vetrina).
+   `renderGrid(items)` esisteva gia' per disegnare una LISTA CHIUSA
+   senza paginare: mette `ultimaRicercaAI`, che e' la guardia con cui
+   caricaAltri esce subito. Quel nome acquista qui un secondo mestiere
+   e resta com'e' — nel progetto significa gia' «la griglia mostra una
+   lista chiusa, non paginare», ed e' il patto dei nomi interni
+   (`.lampo-was`, `pacco`, `sconto_pacco_*`): si rinominano i testi,
+   mai le chiavi. Spegnendo, `renderGrid()` senza argomenti ridisegna
+   `vetrina` — che e' rimasta intatta in memoria — e rimette quel
+   flag a false da se'.
+   NON E' UNA VISTA NUOVA: si resta in view-esplora, nessuna radice,
+   nessun ramoVetrina. E NON entra nella cronologia: chiaveVetrina non
+   lo guarda, quindi il gesto indietro non lo spegne — come i filtri e
+   l'ordinamento, che non ci sono mai entrati. Farcelo entrare
+   vorrebbe dire una entry che nessuno sa RICOSTRUIRE (navApplica
+   ri-applica la pila delle viste, non le variabili della vetrina):
+   e' l'imperfezione gia' dichiarata del motore, e non si allarga. */
+function alternaBarattolo(){
+  haptic();
+  vistaBarattolo = !vistaBarattolo;
+  scriviStatoBarattolo();
+  renderChips();
+  renderGrid(vistaBarattolo ? preferitiInVetrina() : undefined);
+  /* si torna in cima: la griglia e' un'altra, e la posizione di prima
+     non vuol dire piu' niente (la stessa ragione per cui loadListings
+     butta vetrinaPos) */
+  window.scrollTo(0, 0);
+}
+
+/* Le due superfici che seguono lo stato, in un posto solo: l'anello
+   sul barattolino e la classe sul body che nasconde Ordina e Filtri
+   (il linguaggio di casa di body.con-barra e body.senza-nav). Chi
+   scrive `vistaBarattolo` chiama questa, o l'anello resta acceso su
+   una vetrina intera. */
+function scriviStatoBarattolo(){
+  document.body.classList.toggle('solo-barattolo', vistaBarattolo);
+  renderJarTesta();
+}
+/* Lo SPEGNIMENTO, che ha un chiamante solo: loadListings. Vive qui e
+   non la' per stare accanto a cio' che governa. */
+function spegniBarattolo(){
+  if (!vistaBarattolo) return;
+  vistaBarattolo = false;
+  scriviStatoBarattolo();
 }
 
 async function caricaPreferiti(){
@@ -19487,6 +19625,15 @@ async function togglePreferito(id){
     aggiornaJarCards();
     /* e il numero pubblico accanto all'icona, col dato del server */
     if (d.barattoli !== undefined) aggiornaContaSavers(id, d.barattoli);
+    /* COL FILTRO ACCESO LA CARD SPARISCE SUBITO (ago 2026, decisione
+       di Andrea): la vista dice «il tuo barattolo» e resta vera al
+       secondo — una card che non c'e' piu' dentro sarebbe una bugia.
+       PREZZO ACCETTATO, e va detto perche' non lo copre niente: un
+       tocco per sbaglio toglie l'annuncio dalla vista in cui stavi, e
+       per rimetterlo bisogna uscire dal filtro e ritrovarlo.
+       E' l'unica riga che questa decisione costa: senza, la card
+       resterebbe col vetro vuoto, che era l'altra strada. */
+    if (vistaBarattolo) renderGrid(preferitiInVetrina());
   } catch(e) { toast('Rete assente: riprova'); }
 }
 
@@ -19510,7 +19657,7 @@ function renderPreferiti(){
   aggiornaBarattolo();
   if (!myPreferiti.length) {
     box.innerHTML = `<div style="color:var(--muted);font-weight:600;font-size:13.5px;padding:4px 0 10px">
-      Il tuo barattolo è vuoto: metti da parte gli annunci che ti piacciono col 🫙 sulla loro foto.</div>`;
+      ${BARATTOLO_VUOTO}. ${BARATTOLO_INVITO}</div>`;
     return;
   }
   box.innerHTML = myPreferiti.map(l => {

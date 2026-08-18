@@ -5248,13 +5248,19 @@ def prove_savers_proprietario():
 
 
 def prove_barattolo_in_testata():
-    """LA SCORCIATOIA AL BARATTOLO (ago 2026, richiesta di Andrea): la
-    stessa icona che si riempie nel cassetto del Profilo, in testata
-    accanto alla levetta del tema. E' una SCORCIATOIA e non una vista
-    nuova — la lista dei preferiti resta disegnata in un posto solo, ed
-    e' la prima cosa che queste prove difendono.
-    Prima di oggi questa zona non aveva NESSUNA sentinella: ne' il
-    tappo, ne' la levetta, ne' la regia del riempimento."""
+    """IL BARATTOLO IN TESTATA: la stessa icona che si riempie nel
+    cassetto del Profilo, accanto alla levetta del tema.
+    NATO SCORCIATOIA (ago 2026, richiesta di Andrea) e diventato un
+    FILTRO della vetrina nello stesso mese, sempre per decisione di
+    Andrea: un tocco e la home mostra i soli annunci del barattolo,
+    senza cambiare vista. Le prove che dicevano «porta al cassetto»
+    hanno CAMBIATO LATO invece di allentarsi — vedi la sezione 4.
+    Quel che NON e' cambiato, ed e' la prima cosa che queste prove
+    difendono: non e' una vista nuova, e la FONTE della lista resta
+    una sola (`myPreferiti`).
+    Prima del cantiere di nascita questa zona non aveva NESSUNA
+    sentinella: ne' il tappo, ne' la levetta, ne' la regia del
+    riempimento."""
     print("\n[il barattolo in testata]")
     import re as _re
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -5294,22 +5300,42 @@ def prove_barattolo_in_testata():
     prova("la scorciatoia porta LA STESSA guardia", True, guardia in r)
     prova("...cioe' guarda anche DEMO, non il solo !VETRINA del tappo",
           True, "DEMO" in r)
+    # La RAGIONE della guardia e' cambiata col gesto (prima era il posto
+    # dove si portava, adesso e' che in DEMO il barattolo non esiste
+    # affatto), ma il fatto che la regge e' lo stesso ed e' ancora vero.
     rp = pezzo_js(mini, "function renderPreferiti(){", "\n}\n")
-    prova("in DEMO il cassetto e' nascosto: e' la ragione della guardia",
+    prova("in DEMO il barattolo non esiste: e' la ragione della guardia",
           True, "if (DEMO || VETRINA) {" in rp and "display = 'none'" in rp)
 
-    # --- 4) LA DESTINAZIONE E' LA STESSA VISTA, NON UNA COPIA ---
-    prova("la scorciatoia porta al cassetto che c'e' gia'", 2,
+    # --- 4) IL GESTO: FILTRA LA VETRINA, E NON E' UNA VISTA NUOVA ---
+    # PROVA CHE HA CAMBIATO LATO (ago 2026): chiedeva che il barattolino
+    # portasse al cassetto — cioe' certificava il gesto che questo
+    # cantiere ha sostituito. Adesso chiede l'opposto, ed e'
+    # l'affermazione piu' forte delle due.
+    prova("il barattolino NON porta piu' al cassetto", 0,
           mini.count("apriCassettoProfilo('accPreferiti')"))
-    prova("...e quel cassetto e' uno solo", 1, mini.count('id="accPreferiti"'))
+    prova("...accende il filtro, dalle due istanze gemelle", 2,
+          mini.count('onclick="alternaBarattolo()" title="Nel tuo barattolo"'))
+    prova("...e quel cassetto resta uno solo", 1,
+          mini.count('id="accPreferiti"'))
+    # QUESTA invece non cambia, ed e' la sentinella della decisione
+    # «si resta in view-esplora»: il filtro non deve diventare una
+    # radice, un ramo o una vista sua.
     prova("...e non si inventa una vista sua", [],
           [s for s in ("go('preferiti')", "go('barattolo')",
                        "view-preferiti", "view-barattolo") if s in mini])
-    prova("LA LISTA SI DISEGNA IN UN POSTO SOLO", (1, 1, 1, 1),
+    # Anche questa ha cambiato lato: la lista adesso si DISEGNA in due
+    # posti (le righe del cassetto, le card della griglia) e sono due
+    # mestieri distinti — la scelta di Andrea. Quel che resta vero, e
+    # che conta, e' che la FONTE e' una sola e che a decidere cosa
+    # entra in vetrina c'e' UN giudice.
+    prova("LA FONTE DELLA LISTA E' UNA SOLA", (1, 1, 1, 1),
           (mini.count("myPreferiti.map(l =>"),
            mini.count('id="preferitiBlocco"'),
            mini.count("function renderPreferiti("),
            mini.count("el('preferitiBlocco')")))
+    prova("...e il giudice di cosa entra in vetrina e' UNO", 1,
+          mini.count("const preferitiInVetrina = "))
 
     # --- 5) L'ORDINE NEL MARKUP E LA CATENA DEI MARGINI ---
     def fetta(dopo, prima):
@@ -5356,8 +5382,16 @@ def prove_barattolo_in_testata():
           r.count("classList.add('lv") + r.count("lv4"))
 
     # --- 7) LE CHIAMATE, E L'ORDINE IN avvia() ---
-    prova("la scorciatoia si monta agli stessi punti del tappo",
-          mini.count("renderAvatar()"), mini.count("renderJarTesta()"))
+    # Il conteggio era «pari al tappo» e non lo e' piu': da quando il
+    # barattolino e' un interruttore, la regia la richiama anche chi
+    # cambia lo stato del filtro. Resta l'affermazione che serviva —
+    # OVUNQUE si monta il tappo si monta anche lui — piu' quella nuova
+    # sul chiamante in piu'.
+    prova("si monta ovunque si monta il tappo", True,
+          mini.count("renderJarTesta()") >= mini.count("renderAvatar()"))
+    prova("...e chi cambia lo stato del filtro la richiama", 1,
+          pezzo_js(mini, "function scriviStatoBarattolo(){", "\n}\n")
+          .count("renderJarTesta()"))
     i_avvia = mini.index("async function avvia(){")
     prova("...e in avvia() esiste PRIMA che il riempimento giri", True,
           mini.index("renderJarTesta()", i_avvia)
@@ -5369,13 +5403,22 @@ def prove_barattolo_in_testata():
     prova("...e il numero del cassetto resta uno solo", 1,
           mini.count('id="preferitiConta"'))
 
-    # --- 9) SCORCIATOIA E DESTINAZIONE SI CHIAMANO UGUALE ---
-    prova("la scorciatoia ha il nome del cassetto a cui porta", (2, 2),
+    # --- 9) LA VISTA E IL CASSETTO SI CHIAMANO UGUALE ---
+    # Diceva «scorciatoia e destinazione»: adesso non c'e' piu' una
+    # destinazione, ma il nome resta lo stesso da tutte e due le parti
+    # — la vetrina filtrata e il cassetto sono la stessa lista vista da
+    # due posti, e chiamarle in due modi sarebbe la bugia.
+    prova("il barattolino ha il nome della lista che mostra", (2, 2),
           (mini.count('title="Nel tuo barattolo"'),
            mini.count('aria-label="Nel tuo barattolo"')))
     i_acc = mini.index('id="accPreferiti"')
     prova("...ed e' il nome che il cassetto porta davvero", True,
           "Nel tuo barattolo" in mini[i_acc:i_acc + 400])
+    prova("...e quello che la pillola d'uscita dice in vetrina", True,
+          "🫙 Nel tuo barattolo ✕" in mini)
+    # da quando e' un interruttore lo stato si dice anche a voce
+    prova("lo stato si dichiara a chi non vede l'anello", True,
+          "aria-pressed" in r)
 
     # --- 10) LO SPAZIO: LA TESSERA CEDE, E C'E' L'AIRBAG ---
     # A 320px il terzo cerchietto non ci stava: il lockup chiede 124px,
@@ -5389,6 +5432,166 @@ def prove_barattolo_in_testata():
           ".brand > div{min-width:0}" in css)
     prova("...e a cedere e' la sottolinea, coi puntini", True,
           ".brand small{overflow:hidden;text-overflow:ellipsis" in css)
+
+
+def prove_barattolo_filtra():
+    """IL BARATTOLINO FILTRA LA HOME (ago 2026, decisione di Andrea):
+    un tocco e la vetrina mostra i soli annunci del barattolo, senza
+    cambiare vista.
+    Le righe da non ammorbidire, una per prova: ZERO RETE (la lista e'
+    gia' in memoria, e /api/me/preferiti non e' nemmeno paginato), il
+    giudice guarda i soli ATTIVI, lo spegnimento vive in UN posto solo,
+    la sentinella dello scroll resta guardata, e lo stato non finisce
+    in localStorage."""
+    print("\n[il barattolino filtra la home]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    alt = pezzo_js(mini, "function alternaBarattolo(){", "\n}\n")
+
+    # --- 1) ZERO RETE ---
+    # E' la ragione per cui questo cantiere e' tutto client: la lista
+    # sta gia' in `myPreferiti`. Se un domani qualcuno ci mette un
+    # fetch, ha sbagliato strada.
+    prova("il gesto non chiede NIENTE al server", [],
+          [s for s in ("fetch(", "await", "API_BASE") if s in alt])
+    prova("...e disegna dalla lista che ha gia' in mano", True,
+          "renderGrid(vistaBarattolo ? preferitiInVetrina() : undefined)"
+          in alt)
+
+    # --- 2) IL GIUDICE GUARDA I SOLI ATTIVI ---
+    # Un venduto o un rimosso in griglia sarebbe lo scudo
+    # anti-resurrezione bucato da un'altra parte.
+    giud = mini[mini.index("const preferitiInVetrina = "):]
+    giud = giud[:giud.index("\n")]
+    prova("in vetrina entrano i soli attivi", True,
+          "l.stato==='attivo'" in giud.replace(" ", "")
+          .replace("l.stato===", "l.stato==='").replace("''", "'"))
+    prova("...e il giudice esiste una volta sola", 1,
+          mini.count("const preferitiInVetrina = "))
+
+    # --- 3) LO SPEGNIMENTO STA IN UN POSTO SOLO ---
+    # Chi ricarica la vetrina dal server sta chiedendo LA VETRINA:
+    # categoria, pillole, Sfoglia, Aste, Ordina, Filtri e la tirata di
+    # aggiornamento lo ereditano per costruzione, senza che nessuno se
+    # ne debba ricordare.
+    ll = pezzo_js(mini, "async function loadListings(anonimo){", "\n}\n")
+    prova("chi ricarica la vetrina spegne il filtro", True,
+          "spegniBarattolo();" in ll)
+    prova("...e quello e' il suo unico chiamante", 1,
+          mini.count("spegniBarattolo();"))
+    prova("...e lo spegnimento passa dalla regia delle due superfici",
+          True,
+          "scriviStatoBarattolo();"
+          in pezzo_js(mini, "function spegniBarattolo(){", "\n}\n"))
+
+    # --- 4) LA SENTINELLA DELLO SCROLL RESTA GUARDATA ---
+    # renderGrid(items) mette `ultimaRicercaAI`, che e' la guardia con
+    # cui caricaAltri esce subito: e' quel flag a tenere spenta la
+    # paginazione sulla lista chiusa del barattolo.
+    ca = pezzo_js(mini, "async function caricaAltri(){", "\n}\n")
+    prova("la pagina 2 non si chiede su una lista chiusa", True,
+          "ultimaRicercaAI" in ca and "return;" in ca)
+    rg = pezzo_js(mini, "function renderGrid(items){", "\n}\n")
+    prova("...ed e' renderGrid a decidere, dall'argomento", True,
+          "ultimaRicercaAI = !!items" in rg)
+
+    # --- 5) IL TESTO DEL VUOTO IN UN POSTO SOLO, IN DUE PEZZI ---
+    # E' l'unica cosa che le due superfici avevano davvero duplicata.
+    # I due pezzi (constatazione + invito) sono nati guardando lo
+    # schermo: in vetrina la constatazione la fa il titolone, e
+    # ripeterla nel corpo erano le stesse parole due volte di fila.
+    prova("la constatazione e' scritta una volta sola", 1,
+          mini.count("const BARATTOLO_VUOTO = "))
+    prova("...e l'invito pure", 1,
+          mini.count("const BARATTOLO_INVITO = "))
+    prova("il cassetto le dice tutte e due", True,
+          "${BARATTOLO_VUOTO}. ${BARATTOLO_INVITO}" in mini)
+    prova("...e la vetrina mette la constatazione nel TITOLO e "
+          "l'invito nel corpo", True,
+          "`🫙 ${BARATTOLO_VUOTO}`" in rg
+          and "textContent = BARATTOLO_INVITO;" in rg)
+    prova("...senza che nessuno se le riscriva a mano", 0,
+          mini.count("Il tuo barattolo è vuoto:"))
+
+    # --- 6) LO STATO VUOTO NON PROMETTE COSE CHE NON C'ENTRANO ---
+    # «Avvisami se arriva» salva una RICERCA a vuoto: qui la griglia e'
+    # vuota perche' il barattolo lo e', e non c'e' niente da salvare.
+    prova("a barattolo vuoto non si offre di salvare una ricerca", True,
+          "!DEMO && !VETRINA && !vistaBarattolo" in rg)
+    prova("...e «Metti in vendita» lascia il posto a chi riporta in "
+          "vetrina", True,
+          "el('emptyVendi')" in rg and "el('emptyEsplora')" in rg)
+    prova("...che e' un bottone vero nel markup", True,
+          'id="emptyEsplora"' in mini and 'onclick="alternaBarattolo()"'
+          in mini[mini.index('id="emptyEsplora"'):
+                  mini.index('id="emptyEsplora"') + 200])
+
+    # --- 7) LO STATO E' DI SESSIONE, E FUORI DALLA CRONOLOGIA ---
+    # In localStorage vivono valuta, tema, corpo del testo, hint,
+    # cartello, festa, bunker e NWC: un filtro della vetrina no.
+    prova("il filtro non finisce in localStorage", [],
+          [s for s in ("barattolo_vista", "barattolo_filtro")
+           if s in mini])
+    prova("...e non entra nella chiave della cronologia", True,
+          "vistaBarattolo" not in
+          mini[mini.index("const chiaveVetrina = "):
+               mini.index("const chiaveVetrina = ") + 120])
+
+    # --- 8) LE DUE SUPERFICI CHE DICONO CHE E' ACCESO ---
+    prova("l'anello e' quello gia' imparato sul tappo", True,
+          ".jar-testa.attivo{box-shadow:0 0 0 2.5px var(--sats)" in css)
+    prova("Ordina e Filtri si nascondono col barattolo acceso", True,
+          "body.solo-barattolo .strumenti #ordinaSelBtn," in css
+          and "body.solo-barattolo .strumenti #filtriBtn{display:none}"
+          in css)
+    prova("...ma le loro variabili NON si azzerano (tornano uscendo)",
+          [], [s for s in ("filtroCond = ''", "filtroReg = ''",
+                           "filtroPrezzo = null") if s in alt])
+    rc = pezzo_js(mini, "function renderChips(){", "\n}\n")
+    prova("le categorie lasciano il posto alla pillola d'uscita", True,
+          "if (vistaBarattolo) {" in rc
+          and 'onclick="alternaBarattolo()"' in rc)
+
+    # --- 9) TOGLIERE FA SPARIRE LA CARD (decisione di Andrea) ---
+    # La vista dice «il tuo barattolo» e resta vera al secondo. E' la
+    # sola riga che quella decisione costa.
+    tp = pezzo_js(mini, "async function togglePreferito(id){", "\n}\n")
+    prova("col filtro acceso la card tolta sparisce subito", True,
+          "if (vistaBarattolo) renderGrid(preferitiInVetrina());" in tp)
+
+    # --- 10) E SI FA GIRARE ---
+    # Le sentinelle qui sopra dicono che il giudice ESISTE, mai che
+    # risponda giusto: la lezione presa otto volte.
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("preferitiInVetrina risponde giusto", "node non installato")
+    else:
+        _prog = ("let myPreferiti = [];\n" + giud + "\n"
+                 "const casi = [\n"
+                 "  [],\n"
+                 "  [{id:1,stato:'attivo'}],\n"
+                 "  [{id:1,stato:'venduto'},{id:2,stato:'rimosso'}],\n"
+                 "  [{id:1,stato:'attivo'},{id:2,stato:'venduto'},"
+                 "   {id:3,stato:'attivo'}],\n"
+                 "];\n"
+                 "const esito = casi.map(c => {\n"
+                 "  myPreferiti = c;\n"
+                 "  return preferitiInVetrina().map(l => l.id);\n"
+                 "});\n"
+                 "console.log(JSON.stringify(esito));")
+        _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8")
+        _f.write(_prog)
+        _f.close()
+        _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                     timeout=60, encoding="utf-8")
+        os.unlink(_f.name)
+        prova("preferitiInVetrina: gli attivi si', i venduti e i "
+              "rimossi no, e il barattolo vuoto resta vuoto",
+              [[], [1], [], [1, 3]],
+              _js.loads(_r.stdout.strip()) if _r.returncode == 0
+              else f"ERRORE: {_r.stderr[:160]}")
 
 
 def prove_ferie():
@@ -18917,6 +19120,7 @@ def main():
               prove_ssrf_redirect, prove_quota_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_savers_proprietario, prove_barattolo_in_testata,
+              prove_barattolo_filtra,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr, prove_conta_feedback,
               prove_ferie, prove_stock_raccontato,
