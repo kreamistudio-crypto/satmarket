@@ -18263,8 +18263,14 @@ function pannelloNota(o){
         <div class="hint" style="margin-top:6px">Il venditore l'ha ricevuta. Da qui non si cambia più.</div></div>`;
     return `<div class="payout"><h4>📝 La tua nota per il venditore</h4>
       <div class="hint">Taglia, numero, colore: quello che gli serve per prepararti l'oggetto giusto. La legge prima di preparare la consegna, e puoi cambiarla o toglierla finché non spedisce.</div>
-      <input id="notaOrdineInp" maxlength="${MAX_NOTA}" value="${esc(scritta)}"
-        placeholder="${esc(segnaposNota(!!(o.righe && o.righe.length)))}">
+      ${/* TEXTAREA e non input, come i fratelli puntoRitiroInp e
+            bustaNome: dentro .payout e' vestita solo lei (.payout
+            textarea) — un <input> qui esce nudo, col bordo del
+            browser, ed e' saltato fuori dal giro visivo e non dalla
+            lettura. Il valore sta sulla stessa riga del tag, zero
+            spazi: l'HTML mangia un solo \n iniziale e l'indentazione
+            finirebbe DENTRO la nota. */''}
+      <textarea id="notaOrdineInp" style="min-height:38px" maxlength="${MAX_NOTA}" placeholder="${esc(segnaposNota(!!(o.righe && o.righe.length)))}">${esc(scritta)}</textarea>
       <button class="btn orange" onclick="salvaNota()">${scritta ? 'Aggiorna la nota' : 'Salva la nota'}</button>
       ${scritta ? `<button class="btn ghost" onclick="togliNota()">🗑 Togli la nota</button>` : ''}</div>`;
   }
