@@ -10883,6 +10883,185 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   disputa continua a mandare le parti in chat per l'indirizzo del
   VENDITORE, che noi non abbiamo — l'asimmetria si vede solo adesso,
   ed è dichiarata, non risolta.
+  LA NOTA DEL COMPRATORE (ago 2026): quel che chi compra deve poter
+  dire sull'OGGETTO — la taglia, il numero, la variante. Si scrive
+  nella cassa prima di «Paga» e il venditore la legge dentro l'ordine,
+  nel momento in cui prepara il pacco. Prima si diceva in chat, o non
+  si diceva: ed è la TERZA volta che lo stesso caso vero bussa —
+  **chi non ha né username Telegram né npub in chat non ci arriva**,
+  che è quello che ha fatto nascere la busta e poi l'indirizzo.
+  QUATTRO DECISIONI DI ANDREA, e sono la voce.
+  1) **UNA PER ORDINE, non per articolo.** Nel carrello «taglia L» con
+  cinque oggetti resta ambigua, e a scioglierla è il SEGNAPOSTO, che
+  invita a nominare la cosa («Es. la maglia rossa: taglia L, le
+  scarpe: 42»). Per articolo vorrebbe dire una colonna qui E una su
+  `ordine_righe` — il mono righe non ne ha MAI, gliele sintetizza
+  `_righe_ordine` — cioè DUE CASE per lo stesso dato, più N campi
+  dentro la striscia dei francobolli, che andrebbe ridisegnata.
+  2) **IL MODELLO DEL PUNTO E NON QUELLO DELL'INDIRIZZO**: in CHIARO
+  (il moderatore la legge, e senza chiave si scrive lo stesso — una
+  nota facoltativa non deve mai poter bloccare un acquisto), SENZA
+  TIMBRI (busta e indirizzo hanno il trio `_il`/`_corretto_il`/
+  `_correzioni` perché al moderatore il contenuto va raccontato in
+  FATTI; qui il contenuto lo legge) e SENZA SCOPA: resta nell'ordine
+  come il punto, perché è parte di cosa le due parti si sono dette.
+  Una colonna sola, `ordini.nota_compratore`, e il DEFAULT `''` È la
+  migrazione.
+  3) **DIETRO UN BOTTONE**, coi tre stati del cassetto punto (bottone
+  / campo aperto / riga compatta col «Cambia», che riusa
+  `.punto-riga`/`.punto-testo`/`.punto-cambia` — quello è il VESTITO
+  di «un testo lungo col Cambia in fondo», non il nome di una
+  promessa): è FACOLTATIVA, e un campo sempre aperto su una cosa che
+  quasi nessuno scrive è spazio morto in una pagina già lunga.
+  4) **CONVIVE con «Note per il corriere»**, che esisteva già e che
+  nessuno si ricordava: `{k:'note'}` dentro `CAMPI_IND`, cioè DENTRO
+  il JSON cifrato dell'indirizzo, che va sull'etichetta e muore con
+  lui. Sono due mestieri — quella parla al CORRIERE del recapito
+  (citofono, scala, orari), questa al VENDITORE dell'oggetto — e a
+  distinguerle sono le ETICHETTE: la prima ha guadagnato la sua
+  parentesi apposta. Sulle vie punto, ritiro e digitale invece non
+  c'era NIENTE, ed è lì che la funzione mancava del tutto.
+  IL CASSETTO È L'UNICO CHE NON VIVE DENTRO UNA VIA, e da lì tutto il
+  resto: la nota non appartiene a nessuna strada, quindi è un
+  FRATELLO del radiogroup e non un suo figlio — niente
+  `stopPropagation` (non c'è nessuna radio da riselezionare: chi un
+  domani lo spostasse dentro una via lo deve rimettere) e
+  `setViaAcquisto` non lo chiude mai. Sta fra le vie e «Il conto»:
+  è l'ultima cosa che si aggiunge prima del totale.
+  ⚠️ IN `renderAcquisto` «nota» HA GIÀ DUE SIGNIFICATI — la
+  sottoetichetta «Consigliato» della via e le righe oneste — quindi
+  gli identificatori sono tutti suffissati (`notaScritta`,
+  `campiNota`, `notaChiusa`, `cassettoNota`) e lo stato si legge
+  sempre da `d.nota`. È la stessa famiglia della chiave doppia in
+  `acqDati`: il parse non prende nessuna delle due.
+  IL GIUDICE È UNO, `_nota_da_payload`, con tre chiamanti, e fa due
+  cose che vanno lette insieme. **UNA RIGA SOLA** (spazi collassati,
+  a-capo tolti, come il punto): è quel che fa bastare `esc()` alla
+  resa — niente `white-space:pre-wrap` da ricordarsi in tre posti — e
+  fa funzionare i puntini della riga compatta. E **IL 400 ESPLICITO**
+  a `MAX_NOTA` (200, il tetto di `feedback.commento`), che è l'unica
+  cosa in cui NON si segue il punto: quello tronca a 120 in silenzio,
+  ma una prosa tagliata resta leggibile e può INVERTIRSI — «taglia L,
+  non la M» diventa «taglia L, non la». Qui per giunta non esiste il
+  client di ieri (il campo nasce oggi), quindi cade anche l'unica
+  ragione della tolleranza del punto.
+  LA LETTURA STA FUORI DA OGNI RAMO DI VIA nei due compratori, ed è la
+  riga da non spostare dentro un «if»: vale su spedizione, punto,
+  ritiro a mano, codice online **e sull'ordine d'asta che una via non
+  l'ha ancora scelta**. Prima della invoice come le sorelle (un 400
+  dopo lascerebbe una fattura viva senza un ordine su cui posarsi) e
+  col `con.close()` sulla via del rifiuto, che lì la connessione è già
+  aperta. La sentinella guarda l'INDENTAZIONE di corpo funzione: in un
+  ramo sarebbero otto spazi.
+  ⚠️ LA TRAPPOLA DEL CANTIERE È NELLA RIPRESA DEL PENTITO. La nota sta
+  FUORI da `stessa` e si RISCRIVE nel ramo che esce, come l'indirizzo
+  — ma per una ragione DIVERSA, e va detta: l'indirizzo sta fuori
+  perché il suo blob non è confrontabile (Fernet non è
+  deterministico), la nota perché **NON TOCCA IL PREZZO** — correggere
+  un refuso non deve annullare l'ordine e coniare una fattura nuova.
+  Il punto invece nel confronto c'è, e ci sta bene: cambiarlo può
+  cambiare la tariffa. E la guardia si scrive `if nota != (...)`
+  **SENZA il «nota and»** del vicino: quello c'è perché un indirizzo
+  vuoto vuol dire «non su questa strada», mentre qui IL VUOTO È UN
+  VALORE — copiando la forma del vicino, «svuoto e ripago» fallirebbe
+  in SILENZIO lasciando in piedi la nota di prima. C'è la prova, e la
+  mutazione che la rimette diventa rossa. La risposta porta la nota
+  FRESCA e non `mio["nota_compratore"]`, che è già stantia (la riga si
+  legge prima dell'UPDATE — è lo stesso passo falso che il codice fa
+  già con `punto_ritiro`).
+  L'ENDPOINT `POST /api/orders/{id}/nota` è il calco di
+  `indica_punto_ritiro` con TRE DIVERGENZE, che sono le righe che un
+  riordino «uniformante» toglierebbe per prime. 1) **IL VUOTO SI
+  AMMETTE**: là si rifiuta perché `segna_spedito` ci si aggancia e
+  svuotare rimetterebbe il venditore in trappola su un ordine già
+  compilato; la nota non è la guardia di NIENTE, ed è facoltativa —
+  una nota che non si può togliere è una nota che non si può
+  correggere all'ingiù. 2) **NESSUN GATE SULLA VIA.** 3) **L'UPDATE È
+  CONDIZIONATO** al cambio e non solo la notifica: senza, ri-salvare
+  lo stesso testo squillerebbe al venditore per niente.
+  LE NOTIFICHE SONO STATICHE dal giudice puro `_coda_nota`, che prende
+  due BOOL e non il testo: nell'HTML di un avviso la nota non ci può
+  entrare PER COSTRUZIONE. **TRE TRANSIZIONI E NON DUE** — la nota
+  TOLTA va detta, o chi vende resta a preparare il pacco su una riga
+  che non c'è più. In `_incassa_ordine` è un «if» a sé DOPO la catena
+  della consegna e non un quinto `elif`: quella è mutuamente esclusiva
+  sulla STRADA, la nota no. `_coda_ricevuta` NON si tocca: chi compra
+  sa cosa ha scritto, e un sesto bool su un giudice a sei rami sarebbe
+  un ramo in più per zero informazione.
+  IL MODERATORE LA LEGGE, ed è l'unica cosa scritta dal compratore che
+  legga: «avevo chiesto la taglia L» è una lite indecidibile senza —
+  lo stesso argomento che la pagina «I tuoi dati» fa già per il codice
+  digitale. Sul server non costa NIENTE (lo strip di `/api/orders` è
+  una blacklist su `SELECT o.*`) e il perimetro è già quello giusto
+  senza scriverlo: ai moderatori vanno solo `dispute`/`return_*`/
+  `refund` più il singolo aperto per numero. Nel CLIENT invece la riga
+  è obbligatoria — `pannelloNota` NON ha l'early return sull'admin dei
+  due fratelli, e senza un moderatore in disputa non vedrebbe niente
+  (le due superfici del punto sono seller-only e buyer-only): c'è la
+  prova, perché è precisamente il ramo che nessuno va a guardare. E al
+  moderatore si DICHIARA l'asimmetria, o quel che vede sembrerebbe una
+  svista.
+  LA PAGINA «I TUOI DATI» guadagna quattro righe, e non sono
+  facoltative: è lei a rendere verificabile la promessa. «Tre cose»
+  diventa «Quattro» in `priv-indirizzo` (con la voce che dice
+  l'opposto delle altre: questa RESTA), la quarta asimmetria in
+  `priv-moderatori`, la durata in `priv-durate`. ⚠️ E la frase dice
+  «in disputa **o quando lo cerca per numero**»: un moderatore può
+  aprire un ordine anche così, e il testo deve combaciare col CODICE e
+  non con l'intenzione.
+  E IL CAMPO DICE DI NON SCRIVERCI IL RECAPITO, nella frase BASE e non
+  nel ramo «casa»: è sulle ALTRE vie che serve di più — lì un campo
+  per l'indirizzo non c'è — ed è l'unica cosa che tiene la nota fuori
+  dai dati personali, visto che resta nell'ordine e la legge un
+  moderatore.
+  LA NOTA VIAGGIA DA `corpoConsegna` E NON ACCANTO AI CHIAMANTI, ed è
+  la riga da non spostare: i varchi che POSTano a `/orders` sono TRE —
+  `startBuy`, `startBuySet` e `confermaCompraSubito`, la strada del
+  wallet ⚡ — e il terzo è proprio quello che **nessun collaudo
+  esercita**, perché in locale un wallet non c'è. Sparsa a mano, la
+  nota sparirebbe in silenzio solo a chi paga col wallet collegato.
+  Attenzione al ramo che esce subito: la fabbrica ritorna `{}`
+  sull'annuncio storico, e la nota deve viaggiare anche lì.
+  NESSUNA GUARDIA IN «PAGA»: la nota è facoltativa, e una guardia la
+  renderebbe obbligatoria — è la sola cosa che non deve succedere.
+  C'è la sentinella, o fra sei mesi qualcuno ci mette un toast «hai
+  dimenticato la nota?».
+  NIENTE controllo del LIBRO MASTRO, e il perché è la domanda di
+  sempre: con una colonna TEXT sola e nessun timbro non esiste uno
+  stato incoerente da trovare — un allarme che non può suonare è
+  peggio di nessun allarme.
+  LE PROVE: 24 MUTAZIONI, una per riga sorvegliata, ognuna rossa da
+  sola. DUE SOPRAVVISSUTE AL PRIMO GIRO, e sono la lezione: una
+  sentinella cercava UNA scrittura possibile del confronto
+  (`'mio["nota_compratore"]) == nota'`) invece del NOME DELLA COLONNA
+  dentro l'espressione `stessa` — il codice vero la scrive in un altro
+  modo e ci passava attraverso; e nessuna verificava che il cassetto
+  fosse MONTATO nello scheletro e non solo esistente come stringa.
+  Più `collaudo_nota.py`, il giro vero col server su un database
+  usa-e-getta (30 verdi): la nota in colonna su tutte e quattro le
+  vie, il 400 che non conia una fattura orfana, la RIPRESA che non
+  riconia e porta la nota nuova, lo svuotamento che cancella davvero,
+  e i tre ruoli che la leggono mentre indirizzo e busta al moderatore
+  non escono.
+  ⚠️ E LA TORTURA VA LANCIATA CON L'AMBIENTE VERO: col `PATH` ripulito
+  a mano `prove.py` prende un ramo «dipendenza mancante» e si porta
+  dietro un'esplosione spuria — ogni mutazione sembra uccisa, e il
+  conto non vuol dire niente. Lo stesso vale per le ancore: i due file
+  sono CRLF puri, e una mutazione scritta con `\n` non si applica
+  affatto (e si legge come «sopravvissuta» dove invece non è stata
+  nemmeno provata).
+  IMPERFEZIONI DICHIARATE. 1) Nel carrello la nota è UNA e con cinque
+  oggetti l'ambiguità la scioglie chi scrive: è la decisione 1, non un
+  difetto, ma il primo che la nota la chiamerà bug. 2) NIENTE TIMBRO,
+  quindi in disputa «l'avevo cambiata prima che spedisse» non è
+  decidibile — valutato e lasciato fuori per tenere piccolo il diff
+  sul percorso dei soldi mentre un'altra sessione ci lavorava; è
+  additivo (`nota_compratore_il`) e si può fare dopo senza toccare
+  niente. 3) Il re-render durante la digitazione perde il cursore,
+  come sul punto: l'unico re-render realistico è il `±`, lontano dal
+  campo, e alla riapertura `setSelectionRange` mette il cursore in
+  FONDO — su una correzione un `focus()` nudo lo metterebbe
+  all'inizio, e si scriverebbe davanti a quel che si è già scritto.
   LA PAGINA ORDINI RISTRUTTURATA (ago 2026): filtro «Solo attivi»,
   pillole [Tutti|Acquisti|Vendite], la foto vera al posto del 📦, e il
   NASCONDERE degli affari conclusi. Le definizioni, dichiarate:
