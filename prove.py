@@ -6395,11 +6395,24 @@ def prove_valuta_soglia():
     # infilata DOPO il go() lasciava la sentinella verde (l'ha detto la
     # tortura). Quello che deve valere e' che quando il ricalcolo parte
     # NESSUNA scrittura del prezzo sia ancora in arrivo.
-    _ed = pezzo_js(mini, "function editListing(id){", "\n}")
-    prova("la modifica precompila il prezzo PRIMA di aprire il form",
-          True,
-          0 < _ed.rfind("el('sellPrice').value")
-            < _ed.find("go('vendi')"))
+    # Dall'ago 2026 il prezzo lo scrive `riempiFormDa`, il giudice
+    # unico dei campi (nato col duplicato), quindi la catena da
+    # sorvegliare e' in DUE pezzi: dentro il giudice il prezzo si
+    # scrive, e nei chiamanti il giudice viene PRIMA del go().
+    # La sentinella e' diventata cieca quando quella riga e' traslocata
+    # — l'invariante non si era mai rotto — ed e' il motivo per cui
+    # guarda la catena e non piu' una riga sola.
+    # VALE ANCHE PER LA COPIA: anche li' l'annuncio puo' gia' scontare,
+    # e la riga viva deve parlare uguale.
+    prova("il giudice dei campi scrive il prezzo", True,
+          "el('sellPrice').value" in pezzo_js(
+              mini, "function riempiFormDa(l){", "\n}"))
+    for _chi in ("function editListing(id){",
+                 "async function duplicaListing(id){"):
+        _f = pezzo_js(mini, _chi, "\n}")
+        prova(f"{_chi.split('function ')[1][:14]}… riempie PRIMA di aprire "
+              "il form", True,
+              0 < _f.rfind("riempiFormDa(l);") < _f.find("go('vendi')"))
     prova("...e entrando in Vendi la riga si rifa'", True,
           "aggiornaHintPolitiche();"
           in pezzo_js(mini, "if (view==='vendi') {", "\n  }"))
@@ -16569,6 +16582,171 @@ def prove_widget():
           ".catch(" in cw and "a mano" in cw)
 
 
+def prove_duplica():
+    """CREA UN ANNUNCIO SIMILE (ago 2026): il form Vendi precompilato
+    da un annuncio proprio, ma con `editandoId` a null — cioè publish()
+    CREA invece di salvare.
+
+    Il modo tipico di sbagliare qui non è un errore: è un campo che
+    non si copia, o peggio un campo che si copia e non dovrebbe (una
+    copia che nasce all'asta, o legata all'evento Nostr di un altro).
+    Per questo le funzioni si fanno GIRARE su un DOM di cartone invece
+    di guardarle: una sentinella sul testo direbbe che la riga c'è,
+    non che il campo si riempie."""
+    print("\n[crea un annuncio simile]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- IL GIUDICE È UNO SOLO --------------------------------------
+    # Due elenchi di campi divergerebbero al primo campo nuovo, e a
+    # divergere sarebbe sempre la copia: chi aggiunge un campo pensa
+    # alla modifica, che è la strada che conosce.
+    prova("i campi li riempie un giudice solo", True,
+          "function riempiFormDa(l){" in mini)
+    for chi in ("editListing", "duplicaListing"):
+        prova(f"...e {chi} passa di lì", True,
+              "riempiFormDa(l);" in pezzo_js(mini, f"function {chi}("))
+    # Il conto dei chiamanti è ESATTO: il terzo di domani viene a
+    # leggere questa riga invece di ricopiarsi l'elenco.
+    prova("e i chiamanti sono due", 2, mini.count("riempiFormDa(l);"))
+
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("la copia gira per davvero su un DOM di cartone",
+              "node non installato")
+        return
+
+    def fn(nome):
+        i = mini.index(nome)
+        return mini[i:mini.index("\n}", i) + 2]
+
+    banco = """
+const campi = {};
+const el = id => campi[id] || (campi[id] = {value:'', style:{}, checked:false,
+  textContent:'', innerHTML:'', focus(){this._fuoco=true}, select(){}});
+let sellValuta='sats', spedValuta='sats', sellFoto=[], fotoAttuali=[];
+let editandoId=null, editandoTitolo='', editandoNostr=false, duplicandoDa='';
+let navSpingi=false, myListings=[], listings=[], DEMO=false;
+/* LA CHIAVE C'È APPOSTA: senza, la formula della modifica
+   (`!!l.nostr && !!myNpubAccesso`) darebbe false da sé e la
+   mutazione che la rimette qui sopravviverebbe — il caso di
+   prova non discriminerebbe niente. L'ha detto la tortura. */
+let myNpubAccesso='npub1mia';
+const toast=()=>{}, haptic=()=>{}, go=()=>{}, esc=t=>t;
+const impostaSellValuta=v=>{sellValuta=v;}, impostaConsegnaForm=()=>{};
+const aggiornaPickerVendi=()=>{}, aggiornaSpedCampo=()=>{};
+const renderFotoPreview=()=>{}, aggiornaAstaForm=()=>{};
+const aggiornaAstaVisibilita=()=>{}, aggiornaCondizioneForm=()=>{};
+const aggiornaHintPolitiche=()=>{}, aggiornaConsegnaForm=()=>{};
+const copiaFotoOriginale=()=>{};
+const document={querySelector:()=>({style:{}})};
+const window={scrollTo(){}};
+""" + fn("function riempiFormDa(") \
+        + fn("function duplicaListing(").replace("async function", "function") \
+        + fn("function aggiornaFormVendi(") + """
+const orig = {id:7, title:'Poster A1', desc:'stampa', cat:'Arte e artigianato',
+  zone:'Dro (TN)', price:54081, priceEur:30, valuta:'eur', consegna:'entrambe',
+  ancheDigitale:0, taglia:'medio', condizione:'nuovo', quantita:4,
+  sped:0, spedEur:5, spedPuntoDich:1, spedPuntoEur:3, spedExtraEur:1.5,
+  photos:['/foto/a7_0.jpg'], nostr:'npub1altrui'};
+const out = {};
+duplicaListing(7);                       // annuncio che non c'è
+out.inesistente = el('sellTitle').value === '';
+myListings = [orig];
+el('sellAsta').checked = true;           // l'originale era all'asta
+duplicaListing(7);
+out.titolo = el('sellTitle').value === orig.title;
+out.categoria = el('sellCat').value === 'Arte e artigianato';
+out.zona = el('sellZone').value === 'Dro (TN)';
+out.condizione = el('sellCond').value === 'nuovo';
+out.quantita = el('sellQta').value === 4;
+out.taglia = el('sellTaglia').value === 'medio';
+out.sped = el('sellSped').value === 5;
+out.spedPunto = el('sellSpedPunto').value === 3;
+out.spedExtra = el('sellSpedExtra').value === 1.5;
+out.valuta = sellValuta === 'eur' && el('sellPrice').value === 30;
+out.astaSpenta = el('sellAsta').checked === false;
+out.creaNonSalva = editandoId === null;
+out.nostrSpento = editandoNostr === false;
+out.fuoco = el('sellTitle')._fuoco === true;
+out.fotoNonEreditate = fotoAttuali.length === 0 && sellFoto.length === 0;
+out.banner = el('editBanner').innerHTML.indexOf('annuncio simile') >= 0
+             && el('editBanner').style.display === 'block';
+out.bottone = el('sellSubmit').textContent === '⚡ Pubblica annuncio';
+out.uscita = el('sellAnnulla').style.display === '';
+editandoId = 7; duplicandoDa = ''; aggiornaFormVendi();
+out.modificaIntatta = el('sellSubmit').textContent === '✏️ Salva le modifiche';
+console.log(JSON.stringify(out));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8") as f:
+        f.write(banco)
+        strada = f.name
+    r = _sp.run([node, strada], capture_output=True, text=True, cwd=".")
+    if r.returncode:
+        prova("la copia gira senza esplodere", "", r.stderr.strip()[:200])
+        return
+    import json as _json
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+
+    prova("un annuncio che non esiste non tocca il form", True,
+          o["inesistente"])
+    for campo, nome in (("titolo", "il titolo"), ("categoria", "la categoria"),
+                        ("zona", "la zona"), ("condizione", "la condizione"),
+                        ("quantita", "la quantità"), ("taglia", "la taglia"),
+                        ("sped", "la spedizione"),
+                        ("spedPunto", "la tariffa punto"),
+                        ("spedExtra", "il supplemento"),
+                        ("valuta", "prezzo e valuta")):
+        prova(f"si copia {nome}", True, o[campo])
+    # L'ASTA NON SI COPIA: è un modo di vendere e un evento a tempo,
+    # non un metadato dell'oggetto. E il toggle NON si spegne da solo
+    # (a `editandoId` null `aggiornaFormVendi` non lo tocca), quindi
+    # la riga che lo spegne serve davvero.
+    prova("l'asta NON si copia", True, o["astaSpenta"])
+    # E nemmeno il legame con Nostr: la copia di un importato nasce
+    # NATIVA — l'evento sui relay è di chi l'ha firmato.
+    prova("...e nemmeno il legame con Nostr", True, o["nostrSpento"])
+    # LA RIGA CHE FA LA DIFFERENZA FRA COPIA E MODIFICA: con
+    # `editandoId` valorizzato publish() SALVEREBBE sull'originale,
+    # cioè la copia si mangerebbe l'annuncio da cui è partita.
+    prova("publish CREA invece di salvare sull'originale", True,
+          o["creaNonSalva"])
+    prova("le foto dell'originale non diventano «le attuali»", True,
+          o["fotoNonEreditate"])
+    prova("il fuoco va sul titolo, che è la prima cosa da cambiare",
+          True, o["fuoco"])
+    prova("il banner dice da dove si è partiti", True, o["banner"])
+    prova("...e il bottone resta «Pubblica»", True, o["bottone"])
+    prova("l'uscita c'è anche nella copia", True, o["uscita"])
+    # La modifica passa dallo stesso `aggiornaFormVendi`: la faccia
+    # nuova non deve averle rubato la sua.
+    prova("la modifica non si è sporcata", True, o["modificaIntatta"])
+
+    # --- LE FOTO: fail-open, e lo dice -------------------------------
+    cf = pezzo_js(mini, "async function copiaFotoOriginale(")
+    prova("le foto si copiano al massimo cinque", True, ".slice(0, 5)" in cf)
+    prova("...e un fetch che fallisce non ferma le altre", True,
+          "catch (e)" in cf)
+    prova("...e se non ne arriva nessuna lo si dice", True,
+          "non si sono potute copiare" in cf)
+    # Chi nel frattempo è andato altrove non deve ritrovarsi le foto
+    # di un altro annuncio sotto le dita: la risposta in ritardo si
+    # butta, ed è il patto del `giro` della vetrina.
+    prova("le foto in ritardo non atterrano su un altro form", True,
+          "if (!duplicandoDa || editandoId) return;" in cf)
+
+    # E QUANDO L'ANNUNCIO È NATO IL BANNER SE NE VA: senza, resterebbe
+    # a dire «stai copiando X» davanti a un form vuoto. Sentinella e
+    # non prova eseguibile perché publish() è lunga e parla col
+    # server; la riga sta nello svuotamento, insieme ai campi.
+    pub = pezzo_js(mini, "async function publish(", "\n}")
+    prova("pubblicato, la copia si chiude", True,
+          "duplicandoDa = '';" in pub)
+    prova("...e il form si ridisegna, o il banner resterebbe a schermo",
+          True, "renderFotoPreview(); aggiornaFormVendi();" in pub)
+
+
 def prove_sintassi_client():
     """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
     arrivato fino a main: un `*/` doppio in un commento di
@@ -16688,7 +16866,7 @@ def main():
               prove_verde_e_filtri,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_ricerca, prove_feed_google,
-              prove_widget,
+              prove_widget, prove_duplica,
               prove_script_nel_workflow,
               prove_sintassi_client):
         try:

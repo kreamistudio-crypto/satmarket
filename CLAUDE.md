@@ -2780,6 +2780,71 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   tocchi svelti su due categorie: vince l'ultima, senza mescolare.
   REGOLA: chi aggiunge una vista paginata (negozio, miei) e la svuota
   prima di ricaricarla deve darle il suo giro, o si ricompra questo bug.
+  CREA UN ANNUNCIO SIMILE (ago 2026, chiesto da Andrea): dal dettaglio
+  di un PROPRIO annuncio, «📄 Crea un annuncio simile» apre il form
+  Vendi già pieno — chi vende dodici varianti dello stesso poster non
+  deve ricompilare dodici volte categoria, zona, condizione,
+  spedizione e taglia.
+  È IL FORM DELLA MODIFICA CON `editandoId` A NULL, cioè `publish()`
+  CREA invece di salvare — e la riga che fa la differenza è quella:
+  lasciandolo valorizzato la copia si mangerebbe l'annuncio da cui è
+  partita. Cantiere SOLO CLIENT: nessuna rotta, nessuna colonna.
+  IL GIUDICE DEI CAMPI È UNO, `riempiFormDa(l)`, e lo chiamano in due
+  (la modifica e la copia): due elenchi di campi divergerebbero al
+  primo campo nuovo, e a divergere sarebbe sempre la COPIA — chi
+  aggiunge un campo pensa alla modifica, che è la strada che conosce.
+  Il conto dei chiamanti è esatto in `prove.py`.
+  COSA NON SI COPIA, e ognuno per una ragione sua: l'ASTA (è un modo
+  di vendere e un evento a tempo, non un metadato dell'oggetto — e il
+  toggle NON si spegne da solo, perché a `editandoId` null
+  `aggiornaFormVendi` non lo tocca: la riga che lo spegne serve
+  davvero), la LAMPO e le offerte (vivono sull'annuncio di partenza),
+  e il legame con NOSTR — la copia di un importato nasce NATIVA,
+  perché l'evento sui relay è di chi l'ha firmato e noi stiamo facendo
+  un annuncio nuovo, non un secondo riflesso. La QUANTITÀ invece si
+  copia: chi vende a lotti ha lo stesso stock.
+  LE FOTO SI COPIANO QUANDO SI PUÒ, ed è il pezzo che rende il
+  duplicato una comodità vera invece che mezza — rimettere cinque foto
+  a mano sarebbe il lavoro più pesante rimasto. Si scaricano e si
+  rimettono nella filiera di sempre (un dataURL in `sellFoto`, come se
+  le avesse appena scelte), quindi il server le salva verbatim — il
+  patto della compressione unica — e la copia si ritrova FILE SUOI,
+  che sopravvivono alla cancellazione dell'originale. FAIL-OPEN: le
+  foto di un importato stanno su host di terzi e il fetch cade sul
+  CORS, e allora il form resta con le caselle vuote E LO DICE. La
+  risposta in ritardo si butta se nel frattempo si è andati altrove
+  (il patto del `giro` della vetrina): mai le foto di un annuncio
+  sotto le dita di chi ne sta scrivendo un altro.
+  IL FUOCO VA SUL TITOLO, col testo selezionato: è la prima cosa da
+  cambiare, perché due annunci con lo stesso titolo si confondono in
+  vetrina. IMPERFEZIONE DICHIARATA: chi duplica e pubblica in meno di
+  30 secondi senza toccare titolo E prezzo incontra lo SCUDO
+  ANTI-DOPPIONE di `pubblica()` — si ritrova l'id dell'originale e
+  nessun annuncio nuovo. Lo scudo non si allenta (è nato da un bug
+  vero, cinque annunci identici) e quel che promette è giusto: due
+  annunci identici in mezzo minuto sono un doppio invio.
+  IL FORM HA UNA TERZA FACCIA: non è la modifica (si pubblica un
+  annuncio nuovo, quindi il bottone resta «⚡ Pubblica annuncio») e non
+  è un form vuoto — il banner dice da dove si è partiti, e le due
+  uscite (✕ e «Annulla») valgono anche qui, perché anche nella copia
+  c'è del lavoro da buttare via. La domanda prima di buttarlo ha le
+  SUE parole: «l'annuncio da cui sei partito non si tocca», che nella
+  modifica sarebbe una rassicurazione su una cosa che non esiste —
+  con UNA sola chiamata a `chiediConferma` e i testi che variano, o il
+  censimento dei gesti che passano dalla domanda unica conterebbe due
+  gesti dove ce n'è uno.
+  DUE SENTINELLE PREESISTENTI SONO DIVENTATE ROSSE col refactor, e
+  vanno lette perché è il caso tipico: nessuna delle due era violata —
+  erano diventate CIECHE. Quella del prezzo precompilato (la riga viva
+  dello sconto vuole il prezzo nel campo PRIMA del `go('vendi')`)
+  guardava dentro `editListing`, e la riga era traslocata nel giudice:
+  ora sorveglia la CATENA in due pezzi, ed è stata estesa alla copia,
+  che ha lo stesso identico bisogno.
+  E LA TORTURA HA TROVATO DUE PROVE INSUFFICIENTI mie: il caso di
+  prova non aveva la chiave d'accesso Nostr, quindi la formula della
+  modifica dava `false` da sé e la mutazione che la rimetteva
+  sopravviveva; e sull'azzeramento del banner dopo la pubblicazione
+  non c'era niente scritto.
   Modifica annuncio (lug 2026): `POST /api/listings/{id}/modifica` —
   solo il proprietario su annunci attivi, 400 se esiste un ordine NON
   terminale (anche `creato`: chi sta pagando deve trovare l'annuncio
@@ -14662,6 +14727,38 @@ quel che c'è, aggiunge solo due rotte e un foglio. DA GUARDARE al
 primo giro: il primo widget incollato su un sito vero. E se un giorno
 si vorrà accendere la leva, PRIMA si apre Barattolo da Telegram Web
 (il browser, non l'app): è la sola strada che può chiudere.
+
+Crea un annuncio simile (ago 2026, chiesto da Andrea): dal dettaglio di
+un proprio annuncio si apre il form Vendi già pieno, e si cambia solo
+quel che cambia — chi vende dodici varianti dello stesso poster non
+ricompila dodici volte categoria, zona, condizione, spedizione e
+taglia. È il form della modifica con `editandoId` a null (publish CREA
+invece di salvare), i campi li riempie un giudice solo condiviso con la
+modifica, e le foto si ricopiano quando si può. Cantiere SOLO CLIENT:
+nessuna rotta, nessuna colonna, nessuna migrazione. Vedi Architettura,
+«CREA UN ANNUNCIO SIMILE», per cosa non si copia e perché (l'asta, la
+lampo, il legame con Nostr) e per l'imperfezione dichiarata dello scudo
+anti-doppione a 30 secondi.
+Collaudato: 3526 prove verdi in modalità severa (37 nuove) — fra cui
+una prova ESEGUIBILE che fa girare `duplicaListing` e
+`aggiornaFormVendi` VERE su un DOM di cartone, perché una sentinella
+sul testo direbbe che la riga c'è, non che il campo si riempie — più
+DIECI MUTAZIONI, una per riga sorvegliata, ognuna rossa da sola.
+DUE ERANO SOPRAVVISSUTE al primo giro ed erano due buchi nelle prove,
+non nel codice: il caso di prova non aveva la chiave d'accesso Nostr
+(quindi la formula della modifica dava `false` da sé e rimetterla non
+faceva fallire niente) e sull'azzeramento del banner dopo la
+pubblicazione non c'era scritto nulla.
+E DUE SENTINELLE PREESISTENTI sono diventate rosse: nessuna delle due
+era violata — erano diventate CIECHE perché la riga che sorvegliavano
+è traslocata nel giudice unico. Una l'ho sistemata nel CODICE (una sola
+chiamata a `chiediConferma` coi testi che variano, così il censimento
+dei gesti continua a contare i gesti), l'altra nella PROVA, che ora
+segue la catena ed è estesa anche alla copia.
+NON COLLAUDATO QUI: il giro visivo. Il form pieno, il banner della
+copia e le foto che si ricaricano vanno guardati dal telefono — su
+questa macchina non c'è un browser connesso.
+IN PRODUZIONE basta il deploy: solo client.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
