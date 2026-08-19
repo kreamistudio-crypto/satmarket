@@ -546,13 +546,36 @@ try:
 except ImportError:
     ORE_INITDATA = 24
 
-# Quante ricerche AI puo' fare un utente in un'ora (0 = nessun freno).
-# Trenta e' larghissima per una persona e stretta per uno script: e'
-# il numero che si tara quando ci sara' un dato d'uso vero.
+# `TETTO_RICERCHE_AI_ORA` non esiste piu' (ago 2026): era il freno
+# della ricerca AI, e la ricerca AI non c'e' piu' — l'indice full-text
+# non chiama nessuno e non ha niente da frenare. Una riga rimasta nel
+# config del VPS e' INERTE, il patto dei nomi che non cambiano
+# significato.
+
+# IL FEED DI GOOGLE MERCHANT (ago 2026). Nasce ACCESA: non muove
+# denaro e non manda niente a nessuno — espone una rotta pubblica che
+# racconta quel che la vetrina racconta gia'. Ma e' un interruttore e
+# non una costante, ed e' il punto: se Merchant Center comincia a
+# lamentarsi (il prezzo che non combacia e' il rischio dichiarato di
+# questo cantiere) il feed va spento IN FRETTA, con una riga nel
+# config e un riavvio, non al prossimo deploy.
 try:
-    from config import TETTO_RICERCHE_AI_ORA
+    from config import FEED_MERCHANT
 except ImportError:
-    TETTO_RICERCHE_AI_ORA = 30
+    FEED_MERCHANT = True
+
+# LA PORTA DELL'IFRAME (ago 2026, col widget). Nasce SPENTA — al
+# contrario delle altre leve di questo giro — e il perche' e' scritto
+# per esteso in `no_iframe`: e' l'unica riga di tutto il cantiere che
+# possa ROMPERE qualcosa (la Mini App su Telegram Web gira dentro un
+# iframe, e un frame-ancestors sbagliato la chiude fuori). Il widget
+# funziona identico senza di lei; accenderla e' una stretta in piu' su
+# una porta rimasta aperta da sempre, e si fa da qui dopo aver
+# guardato quella strada.
+try:
+    from config import PROTEGGI_IFRAME
+except ImportError:
+    PROTEGGI_IFRAME = False
 
 # QUANTO VALE UN CAMBIO VECCHIO (ago 2026, da un caso vero: due deploy
 # a quattordici minuti l'uno dall'altro, e in tutti e due CoinGecko
@@ -943,6 +966,62 @@ async def guardia_csrf(request, call_next):
             return JSONResponse({"detail": "Origine non consentita"},
                                 status_code=403)
     return await call_next(request)
+
+
+@app.middleware("http")
+async def no_iframe(request, call_next):
+    """NESSUNA PAGINA DI BARATTOLO STA DENTRO L'IFRAME DI UN ESTRANEO,
+    TRANNE IL WIDGET (ago 2026, col cantiere del widget).
+
+    Fino a ieri non c'era nessun `X-Frame-Options`: chiunque poteva
+    incorniciare barattolo.store in un iframe trasparente e far
+    toccare all'utente cose che credeva di toccare altrove — il
+    clickjacking di manuale. Il danno pratico era piccolo (col cookie
+    SameSite=Lax l'app in un iframe di terzi si vede sloggata, e
+    dentro Telegram l'initData li' dentro non c'e'), ma era una porta
+    aperta che non serviva a nessuno.
+    Adesso serve a UNA pagina sola, e il momento di chiudere le altre
+    e' proprio questo: da quando esiste il widget, «si puo' stare in un
+    iframe?» ha due risposte diverse, e senza distinguerle bisogna
+    dire di si' a tutti — che e' cio' che facciamo oggi senza averlo
+    scelto.
+    NIENTE `X-Frame-Options`, E QUESTA E' LA RIGA DA NON AGGIUNGERE
+    «per sicurezza»: quell'header e' BINARIO — o solo il proprio sito,
+    o nessuno — e su TELEGRAM WEB la Mini App gira dentro un iframe di
+    `web.telegram.org`. Un `SAMEORIGIN` di troppo qui non e' una
+    stretta: e' Barattolo che smette di aprirsi per chi usa Telegram
+    dal browser, e non se ne accorgerebbe nessuno finche' non lo prova
+    (dentro l'app di Telegram la WebView e' nativa e non c'entra: e'
+    esattamente il genere di guasto che si vede su una sola strada).
+    Si usa quindi il solo `frame-ancestors`, che una LISTA la sa
+    tenere — e che sui browser moderni ha comunque la precedenza
+    sull'header vecchio.
+    Il middleware puo' solo AGGIUNGERE, mai togliere: l'unica cosa che
+    sa fare e' rendere una pagina meno incorniciabile di prima. Chi
+    risponde gia' con una CSP sua (il documento della busta, che ha la
+    sandbox) resta com'e', ed e' il `setdefault` a garantirlo.
+
+    NASCE SPENTA, ed e' la ragione per cui questa leva esiste: il
+    widget NON ha bisogno di lei per funzionare — oggi tutto il sito
+    e' incorniciabile, widget compreso, quindi lasciare le cose
+    com'erano non toglie niente a nessuno. Questa e' una STRETTA in
+    piu', su una porta che era aperta da sempre senza che nessuno
+    l'avesse scelto, e l'unico pezzo di questo cantiere che possa
+    rompere qualcosa: se la lista dei domini di Telegram e' sbagliata
+    o incompleta, la Mini App smette di aprirsi da Telegram Web — e
+    non se ne accorge nessuno finche' qualcuno non ci prova.
+    Si accende dal config DOPO aver guardato quella strada, che e' il
+    patto di ASTA_ABILITATA e IMPORT_NOSTR_APERTO: una cosa che puo'
+    far male si accende con un gesto, mai per effetto di un deploy."""
+    if not PROTEGGI_IFRAME:
+        return await call_next(request)
+    r = await call_next(request)
+    if not request.url.path.startswith("/widget/"):
+        r.headers.setdefault(
+            "Content-Security-Policy",
+            "frame-ancestors 'self' https://web.telegram.org "
+            "https://*.telegram.org")
+    return r
 
 
 # ------------------------- DATABASE --------------------------------
@@ -2398,7 +2477,20 @@ def init_db():
                     # dipende dall'OGGETTO e non dalla destinazione (un
                     # sacco di riso pesa uguale ovunque vada).
                     "spedizione_extra_sats INTEGER DEFAULT 0",
-                    "spedizione_extra_eur REAL DEFAULT 0"):
+                    "spedizione_extra_eur REAL DEFAULT 0",
+                    # LA RICERCA (ago 2026): il timbro dell'indice
+                    # full-text. 0 = questa riga non e' indicizzata, o
+                    # il suo testo e' cambiato dopo l'ultima passata;
+                    # altrimenti la VERSIONE_RICERCA con cui e' stata
+                    # scritta, cosi' cambiando la ricetta (lo stemmer,
+                    # i campi, i sinonimi) basta alzare quel numero e
+                    # l'indice si rifa' da solo. Il DEFAULT 0 e' anche
+                    # la migrazione: tutte le righe di ieri nascono da
+                    # reindicizzare, e la prima passata d'avvio le
+                    # prende. A rimetterlo a 0 quando il testo cambia
+                    # e' un TRIGGER, non i chiamanti: vedi
+                    # `riallinea_ricerca`.
+                    "ricerca_v INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -2446,6 +2538,68 @@ def init_db():
     # (asta_scadenza, id) per le aste vive — chi scade prima in testa.
     con.execute("CREATE INDEX IF NOT EXISTS idx_annunci_asta "
                 "ON annunci(stato, asta_scadenza, id)")
+    # L'INDICE FULL-TEXT DELLA RICERCA (ago 2026). FTS5 e' dentro
+    # SQLite da sempre: nessuna dipendenza, nessuna compilazione — la
+    # stessa macchina che sta sotto a mezzo mondo. Il `rowid` E'
+    # `annunci.id`, ed e' quel che tiene le due tabelle legate senza
+    # una colonna in piu'.
+    # I QUATTRO CAMPI SONO SEPARATI perche' BM25 li possa PESARE
+    # diverso: una parola nel titolo conta piu' della stessa parola
+    # persa in fondo a una descrizione (la lezione di
+    # `sottocategoria_indovina`, dove il titolo pesa 2 e la
+    # descrizione 1). Dentro non ci va il testo dell'annuncio ma le
+    # sue RADICI — vedi `radici()`: e' quello a far trovare
+    # «collezione» cercando «collezionismo».
+    # `prefix='2 3 4'` fa l'indice dei prefissi corti, che serve al
+    # completamento automatico mentre si digita (l'ultima parola di
+    # una ricerca e' quasi sempre a meta').
+    # SOTTO `try`, E NON E' PRUDENZA GENERICA: FTS5 e' una funzione
+    # OPZIONALE di SQLite: c'e' in tutte le build che contano ed e'
+    # compilata di serie da anni, ma «quasi certamente» non basta
+    # quando il prezzo dell'errore e' che `init_db` esplode e IL
+    # MERCATINO NON PARTE. Tutto il resto della ricerca e' gia'
+    # fail-open — `cerca_ids` torna None e si ripiega sul LIKE di ieri
+    # — e questo era l'unico anello che poteva ancora far cadere
+    # l'avvio. Il journal lo dice, che un fail-open muto non e' un
+    # fail-open.
+    try:
+        con.execute("CREATE VIRTUAL TABLE IF NOT EXISTS annunci_fts "
+                    "USING fts5(titolo, descrizione, zona, categoria, "
+                    "tokenize='unicode61', prefix='2 3 4')")
+    except sqlite3.Error as e:
+        print(f"⚠️  Indice di ricerca non creato ({e}): la ricerca "
+              "lavora col filtro per parole di ieri", flush=True)
+    # IL TIMBRO LO AZZERA UN TRIGGER, NON I CHIAMANTI, ed e' la
+    # decisione che tiene in piedi tutto il resto: i posti che
+    # riscrivono il testo di un annuncio sono sette (pubblica,
+    # modifica, modifica firmata, import CSV, i due dell'import Nostr,
+    # lo spostamento di categoria) e diventeranno otto — un elenco a
+    # memoria invecchia e RIMPICCIOLISCE, la lezione del titolo nudo
+    # nelle notifiche. Il trigger invece non si puo' dimenticare, e
+    # copre gratis anche `importa_nostr.py`, che scrive dritto nel
+    # database e di questa colonna non sa niente (e deve restare
+    # cieco: dev'essere lanciabile su un Barattolo piu' vecchio).
+    # Il trigger INVALIDA e basta — stemmare vuole Python — e a
+    # rifare l'indice e' `riallinea_ricerca`.
+    try:
+        con.execute("""
+            CREATE TRIGGER IF NOT EXISTS annunci_ricerca_scaduta
+            AFTER UPDATE OF titolo, descrizione, zona, categoria,
+                            sottocategoria ON annunci
+            WHEN NEW.ricerca_v <> 0
+            BEGIN UPDATE annunci SET ricerca_v=0 WHERE id=NEW.id; END""")
+    except sqlite3.Error as e:
+        print(f"⚠️  Trigger della ricerca non creato ({e})", flush=True)
+    # Nessun `DELETE FROM annunci` esiste oggi, ed e' per questo che
+    # il trigger c'e': il giorno che ne nascesse uno, l'indice non
+    # deve restare a raccontare un annuncio che non c'e' piu'.
+    try:
+        con.execute("""
+            CREATE TRIGGER IF NOT EXISTS annunci_ricerca_sparita
+            AFTER DELETE ON annunci
+            BEGIN DELETE FROM annunci_fts WHERE rowid=OLD.id; END""")
+    except sqlite3.Error:
+        pass
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
@@ -8050,11 +8204,8 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         _sql, _par = _where_sped_gratis(_camb, _ora)
         dove += _sql
         par += _par
-    if q.strip():
-        # Ricerca semplice per la vetrina anonima (l'AI resta riservata
-        # agli autenticati): LIKE su titolo, descrizione e zona.
-        dove += " AND (a.titolo LIKE ? OR a.descrizione LIKE ? OR a.zona LIKE ?)"
-        par += [f"%{q.strip()}%"] * 3
+    # (la ricerca per parole vive piu' in basso, dopo `con = db()`:
+    # l'indice full-text vuole una connessione)
     # Filtro prezzo min/max: chi guarda in euro scrive euro, e la
     # conversione la fa il server col cambio corrente (la stessa
     # fonte del pagamento). Il confronto e' sempre su prezzo_sats:
@@ -8076,27 +8227,81 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         dove += " AND a.prezzo_sats <= ?"
         par.append(int(prezzo_max))
     con = db()
+    # LA RICERCA PER PAROLE (ago 2026): passa dall'indice full-text —
+    # radici, sinonimi e categoria — e NON dal LIKE sulla frase
+    # intera. Vedi «LA RICERCA E' UNA SOLA».
+    # Si ripara un po' d'indice prima di cercarci dentro: cosi' un
+    # annuncio appena pubblicato si trova SUBITO, senza aspettare un
+    # giro d'orologio. Col tetto, che chi cerca non deve pagare
+    # l'attesa di un import da cinquecento righe.
+    ordinati = None
+    if q.strip():
+        riallinea_ricerca(con, 300)
+        ids_q = cerca_ids(con, q.strip())
+        if ids_q is None:
+            # Indice non disponibile: la ricerca di ieri, che qualche
+            # risultato lo da'. Mai una vetrina vuota che finge.
+            dove += (" AND (a.titolo LIKE ? OR a.descrizione LIKE ? "
+                     "OR a.zona LIKE ?)")
+            par += [f"%{q.strip()}%"] * 3
+        else:
+            # I FILTRI SI APPLICANO ALLA ROSA INTERA, non alla pagina,
+            # o le pagine uscirebbero di lunghezze diverse e il totale
+            # direbbe il falso. Una lettura in piu' per una ricerca, e
+            # in cambio il conto e' esatto.
+            segni = ",".join("?" * len(ids_q)) or "NULL"
+            vivi = {r[0] for r in con.execute(
+                f"SELECT a.id FROM annunci a "
+                "JOIN utenti u ON u.tg_id = a.venditore_id "
+                f"WHERE {dove} AND a.id IN ({segni})", par + ids_q)} \
+                if ids_q else set()
+            ordinati = [i for i in ids_q if i in vivi]
     if not limit:
         # Client senza paginazione (JS vecchio in cache): l'array puro
         # di sempre, col tetto di sicurezza. Sotto i 500 annunci la
         # risposta e' IDENTICA a prima.
-        righe = [dict(r) for r in con.execute(
-            f"SELECT {campi} FROM annunci a "
-            "JOIN utenti u ON u.tg_id = a.venditore_id "
-            f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
-            par + [TETTO_LEGACY])]
+        righe = (_righe_per_id(con, campi, ordinati[:TETTO_LEGACY])
+                 if ordinati is not None else
+                 arricchisci_righe_vetrina([dict(r) for r in con.execute(
+                     f"SELECT {campi} FROM annunci a "
+                     "JOIN utenti u ON u.tg_id = a.venditore_id "
+                     f"WHERE {dove} ORDER BY a.creato DESC, a.id DESC LIMIT ?",
+                     par + [TETTO_LEGACY])]))
         con.close()
-        return arricchisci_righe_vetrina(righe)
+        return righe
     limit = min(limit, LIMITE_PAGINA_MAX)
-    righe, prossimo = pagina_annunci(con, campi, dove, par, limit, cursore,
-                                     ordina)
-    risposta = {"annunci": arricchisci_righe_vetrina(righe),
-                "cursore": prossimo}
+    totale_ricerca = None
+    if ordinati is not None:
+        # CON UNA RICERCA ATTIVA L'ORDINE E' LA PERTINENZA, e il
+        # cursore keyset non serve piu': quello pagina su una COLONNA
+        # (data o prezzo), e il punteggio di una ricerca colonna non
+        # e'. Si pagina sulla POSIZIONE nella rosa — «r{quanti ne ho
+        # gia' visti}» — che e' stabile perche' il punteggio e'
+        # deterministico: la stessa domanda da' sempre la stessa fila.
+        # Le voci di Ordina restano scritte nel campo e non si
+        # applicano finche' si cerca: chi cerca vuole la cosa piu'
+        # pertinente in cima, ed e' la stessa regola per cui il filtro
+        # di un'occasione si porta dietro il suo ordine.
+        inizio = (int(cursore[1:]) if cursore[:1] == "r"
+                  and cursore[1:].isdigit() else 0)
+        righe = _righe_per_id(con, campi, ordinati[inizio:inizio + limit])
+        prossimo = (f"r{inizio + limit}"
+                    if inizio + limit < len(ordinati) else None)
+        totale_ricerca = len(ordinati)
+    else:
+        righe, prossimo = pagina_annunci(con, campi, dove, par, limit,
+                                         cursore, ordina)
+        righe = arricchisci_righe_vetrina(righe)
+    risposta = {"annunci": righe, "cursore": prossimo}
     if not cursore:
         # Solo in prima pagina: il totale della vista corrente (per
         # l'etichetta "N oggetti") e i conteggi GLOBALI per categoria
         # (le pillole devono dire la verita' anche a pagine parziali).
-        risposta["totale"] = con.execute(
+        # Con una ricerca attiva il totale e' la rosa gia' contata: la
+        # WHERE da sola non lo saprebbe dire, che la rosa la decide
+        # l'indice.
+        risposta["totale"] = totale_ricerca if totale_ricerca is not None \
+            else con.execute(
             f"SELECT COUNT(*) AS n FROM annunci a WHERE {dove}",
             par).fetchone()["n"]
         risposta["conteggi"] = {
@@ -10175,10 +10380,21 @@ def _leve_stato():
                   ORE_INITDATA, allarme=not ORE_INITDATA,
                   spento="un initData catturato apre quell'account per "
                          "sempre: è il freno d'emergenza, non una scelta"),
-            _leva("Ricerche AI per utente all'ora", "TETTO_RICERCHE_AI_ORA",
-                  TETTO_RICERCHE_AI_ORA,
-                  spento="nessun freno: ogni ricerca è una chiamata ad "
-                         "Anthropic, e un ciclo banale brucia il credito"),
+            _leva("Stemmer della ricerca", "pip install snowballstemmer",
+                  _STEMMER is not None,
+                  spento="la ricerca lavora a troncamento invece che a "
+                         "radici: più grossolana, mai muta"),
+            _leva("Porta dell'iframe chiusa", "PROTEGGI_IFRAME",
+                  PROTEGGI_IFRAME,
+                  spento="chiunque può incorniciare Barattolo nel proprio "
+                         "sito: è com'è sempre stato, e accenderla è una "
+                         "stretta — ma prima va provata la Mini App da "
+                         "Telegram Web, che gira in un iframe"),
+            _leva("Feed Google Merchant", "FEED_MERCHANT", FEED_MERCHANT,
+                  acceso="/feed/google.xml è pubblico: i prezzi in sats "
+                         "escono convertiti in euro al cambio del momento, "
+                         "e un disallineamento con la scheda può far "
+                         "sospendere l'account Merchant Center"),
             _leva("Bot in ascolto (webhook)", "TELEGRAM_WEBHOOK_SEGRETO",
                   webhook_attivo(),
                   spento="il bot manda e basta: niente /start, niente "
@@ -10577,134 +10793,361 @@ async def messaggio_utente_admin(tg_id: int, req: Request,
     return {"ok": True}
 
 
-# ---------------------- API: RICERCA AI -----------------------------
+# ------------------------- API: LA RICERCA --------------------------
+# LA RICERCA E' UNA SOLA (ago 2026, decisione di Andrea: «l'AI nella
+# ricerca eliminala proprio»). Fino a ieri erano DUE, e rispondevano
+# diverso alla stessa domanda: per gli anonimi un LIKE sulla FRASE
+# INTERA in titolo/descrizione/zona — quindi «bici da corsa» non
+# trovava «bicicletta da corsa», e «collezionismo» non trovava la
+# categoria Collezionismo, che il LIKE nemmeno guardava — e per chi
+# era dentro Telegram Haiku, cioe' l'unica rotta del progetto dove UNA
+# richiesta di un utente qualunque era UNA chiamata al modello, con un
+# prompt di dimensione massima FISSA: la shortlist si riempiva fino a
+# 300 annunci anche quando la domanda non trovava niente, quindi ogni
+# ricerca costava uguale, tanto.
+# Adesso e' un indice full-text di casa: deterministico, senza rete,
+# senza credito, uguale per tutti — e PROVABILE IN CI, che di un'AI
+# non si puo' dire. Il ripiego dell'AI (il match sulla frase intera)
+# era per giunta la strada che si vedeva proprio quando le cose
+# andavano male, cioe' la peggiore da lasciare zoppa.
+# DOVE VIVE: dentro `/api/listings`, cioe' nella VETRINA — ed e' quel
+# che la rende componibile con categoria, prezzo, regione e filtri, e
+# paginata come tutto il resto, senza una riga in piu'. `/api/search`
+# resta come guscio per i client vecchi rimasti in cache.
 
-# Con centinaia di annunci il catalogo intero non entra piu' nel
-# prompt: all'AI arriva una SHORTLIST — prima i match letterali sulle
-# parole della richiesta, poi i piu' recenti a riempire. Compromesso
-# dichiarato: un annuncio che combacia SOLO per sinonimo e non e' tra
-# i piu' freschi puo' sfuggire. L'AI continua a fare la parte fine
-# (sinonimi, prezzo, zona) dentro la rosa.
-TETTO_CATALOGO_AI = 300
+# La ricetta dell'indice. Alzarla di uno fa reindicizzare TUTTO al
+# primo avvio: e' la leva da girare quando cambia lo stemmer, o i
+# campi, o i sinonimi che ci entrano dentro.
+VERSIONE_RICERCA = 1
 
-# Il freno della ricerca AI (ago 2026, audit). Era l'unica rotta dove
-# UNA richiesta di un utente qualunque = UNA chiamata ad Anthropic, e
-# con un prompt di dimensione massima FISSA: il catalogo si riempie
-# fino a 300 annunci anche quando la domanda non trova niente, quindi
-# ogni ricerca costa uguale, tanto. L'unico recinto era
-# l'autenticazione — che lo passa chiunque abbia un account.
-# Pattern di IMPORT_QUOTA, con l'ora al posto del giorno: dizionario
-# in memoria, si azzera al riavvio e va bene cosi' (le raffiche vere
-# durano meno di un riavvio).
-RICERCA_QUOTA: dict[int, list] = {}     # tg_id -> [ora, ricerche]
+# Il tetto dei risultati di una ricerca. Oltre non si pagina: chi
+# scorre mille risultati non li guarda, e a stringere c'e' il resto
+# del pannello Filtri.
+TETTO_RICERCA = 500
+
+# LO STEMMER E' SNOWBALL, e non una tabella di desinenze fatta in casa
+# (decisione di Andrea: «ci vuole un sistema gia' collaudato, non per
+# forza le prime 5 lettere»). `snowballstemmer` e' Python puro, ~100
+# KB, zero dipendenze, ed e' l'algoritmo che sta sotto Lucene,
+# Elasticsearch e PostgreSQL: le regole dell'italiano le ha scritte
+# qualcun altro vent'anni fa e sono state pestate da mezzo mondo.
+# Import FAIL-OPEN come Pillow e coincurve — ma DICHIARATO all'avvio,
+# il patto della chiave dei contenuti digitali: un fail-open che non
+# si vede nemmeno da chi guarda il server non e' dichiarato, e'
+# soltanto silenzio.
+try:
+    import snowballstemmer
+    _STEMMER = snowballstemmer.stemmer("italian")
+except Exception:
+    _STEMMER = None
+    print("⚠️  snowballstemmer non c'è: la ricerca lavora a troncamento "
+          "invece che a radici (più grossolana, mai muta). "
+          "pip install snowballstemmer")
 
 
-def _ricerca_ai_concessa(tg_id: int) -> bool:
-    """Consuma un gettone della quota oraria. False = si risponde col
-    filtro per parole, che non costa niente e qualche risultato lo
-    da' — meglio di un vicolo cieco."""
-    if not TETTO_RICERCHE_AI_ORA:       # 0 = nessun freno
-        return True
-    ora = time.strftime("%Y-%m-%d %H")
-    voce = RICERCA_QUOTA.get(tg_id)
-    if not voce or voce[0] != ora:
-        voce = [ora, 0]
-        RICERCA_QUOTA[tg_id] = voce
-    if voce[1] >= TETTO_RICERCHE_AI_ORA:
-        return False
-    voce[1] += 1
-    return True
+def radice(parola: str) -> str:
+    """La radice di una parola italiana: 'collezione', 'collezionismo'
+    e 'collezionista' diventano tutte 'collezion'; 'biciclette' e
+    'bicicletta' diventano 'biciclett'. E' questo a far trovare l'una
+    cercando l'altra.
+
+    VALE A INDICE E A DOMANDA INSIEME, ed e' la riga da non
+    ammorbidire: se le due parti stemmassero in modo diverso non si
+    incontrerebbero mai, e la ricerca tornerebbe vuota senza un errore
+    e senza una riga di journal.
+
+    Le parole di due lettere si lasciano stare: sotto non c'e'
+    desinenza da togliere, e accorciarle impasterebbe cose diverse.
+
+    SENZA lo stemmer si ripiega sul TRONCAMENTO, che sulla famiglia
+    che conta ottiene lo stesso ('collezione' e 'collezionismo'
+    finiscono tutt'e due su 'collez'): piu' grossolano — impasta anche
+    parole che non c'entrano — ma mai muto.
+    """
+    p = (parola or "").strip()
+    if len(p) < 3:
+        return p
+    if _STEMMER is None:
+        return p[:6]
+    return _STEMMER.stemWord(p) or p
+
+
+def termini(parola: str) -> tuple[str, ...]:
+    """I termini con cui una parola entra nell'indice — e con cui la
+    si cerca. Sono DUE: la radice, e il TRONCAMENTO a cinque lettere.
+
+    IL TRONCAMENTO NON E' UN RIPIEGO, e' la toppa a un difetto vero
+    dello stemmer, MISURATO e non temuto: su 28 coppie
+    singolare/plurale di un mercatino ne sbaglia 4 — «tastiera →
+    tastier» ma «tastiere → tast», e cosi' telefono/telefoni,
+    cassettiera, caffettiera (Snowball tratta '-iera' come una
+    desinenza da togliere, e sul plurale arriva prima un'altra
+    regola). Chi cerca «tastiere» non troverebbe «tastiera»: il 14%
+    delle coppie, e dentro ci sono le parole che la gente scrive
+    davvero.
+    Su tutti e quattro i casi le due radici divergenti hanno le prime
+    CINQUE lettere in comune, ed e' da li' che esce la cura: si
+    indicizzano tutt'e due le forme e si cercano in «o». Cinque e non
+    quattro perche' quattro impasta cose diverse ('coll' prende
+    collana, collo, collega); cinque discrimina quanto una parola
+    corta.
+    Il prezzo dichiarato e' un indice piu' grosso — al piu' il doppio
+    dei termini — e qualche accostamento in piu' nel giro largo, che
+    BM25 ricaccia in fondo perche' pesa quante volte una parola
+    combacia davvero."""
+    p = (parola or "").strip()
+    if len(p) < 3:
+        return (p,) if p else ()
+    r = radice(p)
+    corto = p[:5]
+    return (r,) if r == corto else (r, corto)
+
+
+def radici(testo: str) -> list[str]:
+    """Il testo ridotto ai termini dell'indice. Passa da `normalizza`,
+    che e' il setaccio di casa (minuscole, accenti sciolti,
+    punteggiatura in spazi) — lo STESSO del filtro parole, degli
+    avvisi di ricerca e del motore geografico: un secondo setaccio
+    direbbe 'citta' di qua e 'città' di la', e i due lati non si
+    incontrerebbero mai."""
+    return [t for p in normalizza(testo).split() if len(p) >= 2
+            for t in termini(p)]
+
+
+# I SINONIMI ENTRANO NELL'INDICE, NON NELLA DOMANDA (ago 2026), ed e'
+# la scelta che tiene veloce la ricerca: espandere la DOMANDA vuol
+# dire una query che si allunga con quante parole conosciamo — e la
+# domanda si fa a ogni tasto —, espandere l'INDICE costa una volta
+# sola, quando l'annuncio si scrive. Cosi' «pc» trova gli annunci di
+# Informatica e «hifi» quelli di Audio e video, e i due cataloghi di
+# sinonimi che il progetto ha gia' — quello delle categorie e quello
+# delle sottocategorie — si mettono a servire anche la ricerca senza
+# una riga di dizionario nuova da tenere in pari.
+_SINONIMI_DI_CATEGORIA: dict[str, list[str]] = {}
+for _parola_sin, _cat_sin in SINONIMI_CATEGORIA.items():
+    _SINONIMI_DI_CATEGORIA.setdefault(_cat_sin, []).append(_parola_sin)
+
+
+def _campi_indice(r) -> tuple[str, str, str, str]:
+    """I quattro campi che finiscono in `annunci_fts`, gia' in radici.
+
+    Il quarto NON e' solo la categoria: ci stanno anche l'etichetta
+    della sottocategoria e i sinonimi di tutt'e due. E' un campo suo e
+    non un pezzo del titolo perche' BM25 lo possa pesare per conto
+    proprio — deve valere piu' di una parola persa in descrizione e
+    meno del titolo, che e' quello che il venditore ha scelto."""
+    cat = r["categoria"] or ""
+    chiavi = r.keys() if hasattr(r, "keys") else r
+    sotto = (r["sottocategoria"] or "") if "sottocategoria" in chiavi else ""
+    voci = [cat] + _SINONIMI_DI_CATEGORIA.get(cat, [])
+    if sotto:
+        voci += [e for i, e in SOTTOCATEGORIE.get(cat, ()) if i == sotto]
+        voci += list(SINONIMI_SOTTOCATEGORIA.get(cat, {}).get(sotto, ()))
+    return (" ".join(radici(r["titolo"])),
+            " ".join(radici(r["descrizione"])),
+            " ".join(radici(r["zona"])),
+            " ".join(radici(" ".join(voci))))
+
+
+def _indicizza(con, r) -> None:
+    """Riscrive la riga nell'indice. Prima si toglie e poi si rimette:
+    in FTS5 non esiste un UPDATE per rowid, e due copie della stessa
+    riga farebbero contare due volte ogni parola nel punteggio."""
+    con.execute("DELETE FROM annunci_fts WHERE rowid=?", (r["id"],))
+    con.execute("INSERT INTO annunci_fts"
+                "(rowid, titolo, descrizione, zona, categoria) "
+                "VALUES(?,?,?,?,?)", (r["id"],) + _campi_indice(r))
+    con.execute("UPDATE annunci SET ricerca_v=? WHERE id=?",
+                (VERSIONE_RICERCA, r["id"]))
+
+
+def riallinea_ricerca(con, tetto: int = 0) -> int:
+    """Rifa' l'indice delle righe che il trigger ha invalidato (o che
+    non ci sono mai entrate). Idempotente, e si puo' interrompere a
+    meta': quel che resta lo prende il giro dopo.
+
+    E' un SISTEMA AUTO-RIPARANTE e non una catena di ganci da
+    ricordare — il pattern di `riallinea_quantita_max` e della passata
+    dei distintivi: chi scrive un annuncio non deve sapere che esiste
+    una ricerca, e il giorno che nasce l'ottavo posto che riscrive un
+    titolo l'indice lo segue da solo.
+
+    `tetto` limita quanto si lavora in un colpo: sulla strada calda
+    della ricerca si ripara un po' per volta invece di far aspettare
+    chi cerca dietro a un import da 500 righe. Torna quante righe ha
+    rifatto."""
+    sql = ("SELECT id, titolo, descrizione, zona, categoria, sottocategoria "
+           "FROM annunci WHERE ricerca_v<>?")
+    if tetto:
+        sql += f" LIMIT {int(tetto)}"
+    # FAIL-OPEN COME `cerca_ids`, e questo `try` e' arrivato da una
+    # prova e non da una rilettura: su un SQLite senza FTS5 il server
+    # partiva (l'indice non si crea, e lo si dice) ma la prima ricerca
+    # dava 500 — perche' la riparazione SCRIVE nell'indice, e a
+    # guardarsi le spalle era solo chi legge. Qui non c'e' niente da
+    # salvare: se l'indice non c'e' non si ripara, e la ricerca
+    # ripiega sul LIKE di ieri.
+    try:
+        righe = con.execute(sql, (VERSIONE_RICERCA,)).fetchall()
+        for r in righe:
+            _indicizza(con, r)
+        if righe:
+            con.commit()
+        return len(righe)
+    except sqlite3.Error as e:
+        print(f"⚠️  Indice di ricerca non riparato ({e})", flush=True)
+        return 0
+
+
+def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
+    """La domanda dell'utente tradotta in due query FTS5: la STRETTA
+    (tutte le parole) e la LARGA (almeno una).
+
+    SI PROVA PRIMA LA STRETTA E POI LA LARGA, ed e' il compromesso che
+    regge a tutti i volumi: «tastiera meccanica» deve dare le tastiere
+    meccaniche e non tutte le tastiere del mercatino, ma su un
+    catalogo piccolo l'intersezione e' spesso vuota — e una vetrina
+    vuota, quando qualcosa da mostrare c'era, e' peggio di una vetrina
+    imprecisa.
+
+    OGNI PAROLA E' UN GRUPPO, non un termine: dentro ci stanno la sua
+    radice e il suo troncamento in «o» (vedi `termini`), e sono i
+    GRUPPI a legarsi in «e». Cosi' «tastiera meccanica» vuole tutt'e
+    due le parole, ma ognuna nella forma che combacia.
+
+    L'ULTIMA PAROLA E' UN PREFISSO perche' chi digita ce l'ha quasi
+    sempre a meta': cercando «collezio» si vede gia' qualcosa. I
+    termini escono da `normalizza`, quindi sono solo lettere e cifre e
+    non possono contenere la virgoletta che chiuderebbe la stringa —
+    si virgoletta lo stesso, che una guardia che oggi non serve e' la
+    guardia che regge domani."""
+    parole = [p for p in normalizza(q).split() if len(p) >= 2]
+    if not parole:
+        return ("", "")
+    gruppi = []
+    for i, p in enumerate(parole):
+        coda = "*" if prefisso and i == len(parole) - 1 else ""
+        voci = [f'"{t}"{coda}' for t in termini(p)]
+        gruppi.append(voci[0] if len(voci) == 1
+                      else "(" + " OR ".join(voci) + ")")
+    return (" AND ".join(gruppi), " OR ".join(gruppi))
+
+
+def cerca_ids(con, q: str, tetto: int = TETTO_RICERCA,
+              prefisso: bool = True) -> list[int] | None:
+    """Gli id degli annunci che rispondono alla domanda, DAL PIU'
+    PERTINENTE. Torna `None` — e non una lista vuota — quando l'indice
+    non c'e': sono due cose diverse, e chi chiama deve poter ripiegare
+    sul LIKE di ieri invece di dire «nessun risultato», che sarebbe
+    una bugia.
+
+    I PESI di BM25 sono l'ordine delle cose: il titolo e' quello che
+    il venditore ha scelto per farsi trovare, la categoria e' un fatto
+    dichiarato, la descrizione e' prosa e la zona e' un luogo — una
+    parola nel titolo vale cinque volte la stessa parola in
+    descrizione. Il punteggio di BM25 e' NEGATIVO e piu' basso vuol
+    dire meglio: l'ORDER BY crescente non e' un refuso.
+
+    Lo STATO non si guarda qui: l'indice tiene tutti gli annunci e a
+    dire quali si mostrano restano le WHERE della vetrina, che quelle
+    regole le sanno gia' tutte (venduti, ferie, revisione...)."""
+    stretta, larga = _domanda_fts(q, prefisso)
+    if not stretta:
+        return []
+    try:
+        for domanda in (stretta, larga):
+            righe = con.execute(
+                "SELECT rowid FROM annunci_fts WHERE annunci_fts MATCH ? "
+                "ORDER BY bm25(annunci_fts, 10.0, 2.0, 1.0, 4.0) LIMIT ?",
+                (domanda, tetto)).fetchall()
+            if righe:
+                return [r[0] for r in righe]
+        return []
+    except sqlite3.Error as e:
+        # FTS5 assente (un SQLite molto vecchio) o indice rotto: la
+        # ricerca non deve sparire, torna quella di ieri.
+        print(f"⚠️  Indice di ricerca non disponibile ({e}): uso il LIKE")
+        return None
+
+
+@app.on_event("startup")
+async def scalda_ricerca():
+    """La passata d'avvio: indicizza tutto quel che manca — al primo
+    deploy sono TUTTI gli annunci (la colonna nasce a zero), poi solo
+    quel che e' cambiato mentre il server era spento, che di solito e'
+    niente.
+
+    NON e' in `init_db`, ed e' una ragione di ordine e non di gusto:
+    quella gira all'import del modulo, quando lo stemmer e i giudici
+    di qui non sono ancora stati definiti. Qui invece si e' dopo, e
+    prima che uvicorn accetti la prima richiesta — la stessa finestra
+    di `scalda_cambio`.
+
+    Fail-open: se qualcosa va storto la ricerca ripara comunque un po'
+    per volta a ogni domanda, e il server parte."""
+    try:
+        con = db()
+        quante = riallinea_ricerca(con)
+        con.close()
+        if quante:
+            print(f"🔎 Indice di ricerca: {quante} annunci indicizzati "
+                  f"(stemmer {'sì' if _STEMMER else 'NO, a troncamento'})",
+                  flush=True)
+    except Exception as e:
+        print(f"⚠️  Indice di ricerca non scaldato: {e}", flush=True)
 
 
 @app.get("/api/search")
 def cerca(q: str, busta: int = 0, x_tg_init_data: str = Header(""),
-                  barattolo_sessione: str = Cookie("")):
-    """Ricerca in linguaggio naturale: l'AI legge la richiesta
-    ("tastiera sotto i 100k vicino Milano") e seleziona gli annunci.
+          barattolo_sessione: str = Cookie("")):
+    """Il GUSCIO della ricerca di ieri, per i client rimasti in cache.
 
-    `busta=1` avvolge la risposta in {annunci, ai} per dire QUANDO
-    l'AI non e' stata usata (quota finita, o chiamata fallita): senza
-    il parametro resta l'array di sempre, e un client vecchio in cache
-    vede i risultati come li ha sempre visti — il patto della
-    paginazione."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    base = ("SELECT a.*, u.nome AS venditore, u.username AS venditore_username, "
-            "u.npub AS venditore_npub, "
-            "u.npub_verificata AS venditore_npub_verificata, "
-            "u.negozio AS venditore_negozio, u.titolo AS venditore_titolo, "
-            "(CASE WHEN u.avatar_scelta='nessuna' THEN '' ELSE u.avatar END) "
-            "AS venditore_avatar, "
-            "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
-            " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
-            "u.rating FROM annunci a "
-            "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.stato='attivo'")
+    Da quando la ricerca vive in `/api/listings` questa rotta non ha
+    piu' un motore suo: chiama lo stesso giudice e risponde nella
+    forma di sempre. `busta=1` continua a rispondere `{annunci, ai}`
+    con `ai` a FALSO — che adesso e' semplicemente vero per tutti, e
+    il client vecchio lo dice con la sua riga «ricerca veloce per
+    parole», che e' onesta.
+    Resta AUTENTICATA com'era: non e' piu' credito da difendere, ma
+    aprire una superficie che non serve piu' a nessuno sarebbe solo
+    superficie (la lezione di `/api/comuni`)."""
+    verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    # Le parole "sostanziose" della richiesta (>=3 lettere, max 6)
-    parole = [p for p in re.findall(r"\w+", q.lower()) if len(p) >= 3][:6]
-    annunci = []
-    if parole:
+    riallinea_ricerca(con, 300)
+    ids = cerca_ids(con, q)
+    if ids is None:                     # indice assente: il LIKE di ieri
+        parole = [p for p in re.findall(r"\w+", q.lower()) if len(p) >= 3][:6]
         cond = " OR ".join("(a.titolo LIKE ? OR a.descrizione LIKE ? "
                            "OR a.categoria LIKE ? OR a.zona LIKE ?)"
-                           for _ in parole)
-        par = [f"%{p}%" for p in parole for _ in range(4)]
-        annunci = [dict(r) for r in con.execute(
-            base + f" AND ({cond}) ORDER BY a.creato DESC LIMIT ?",
-            par + [TETTO_CATALOGO_AI])]
-    if len(annunci) < TETTO_CATALOGO_AI:
-        # Si riempie la rosa coi piu' freschi: l'AI vede sempre un
-        # catalogo pieno e puo' pescare i sinonimi che il LIKE non sa.
-        ids = tuple(a["id"] for a in annunci) or (0,)
-        annunci += [dict(r) for r in con.execute(
-            base + f" AND a.id NOT IN ({','.join('?' * len(ids))}) "
+                           for _ in parole) or "0"
+        righe = con.execute(
+            f"SELECT a.id FROM annunci a WHERE a.stato='attivo' AND ({cond}) "
             "ORDER BY a.creato DESC LIMIT ?",
-            list(ids) + [TETTO_CATALOGO_AI - len(annunci)])]
-    annunci = arricchisci_righe_vetrina(annunci)
+            [f"%{p}%" for p in parole for _ in range(4)] + [TETTO_RICERCA])
+        ids = [r[0] for r in righe]
+    annunci = _righe_per_id(con, CAMPI_VETRINA, ids, "a.stato='attivo'")
     con.close()
-    def risposta(righe, ai_usata=True):
-        return {"annunci": righe, "ai": ai_usata} if busta else righe
+    return {"annunci": annunci, "ai": False} if busta else annunci
 
-    def filtro_semplice():
-        ql = q.lower()
-        return [a for a in annunci
-                if ql in (a["titolo"] + a["descrizione"]).lower()]
 
-    if not annunci:
-        return risposta([])
-    # Il freno PRIMA di costruire il catalogo: a quota finita non si
-    # spende nemmeno il tempo di impaginare 300 annunci.
-    if not _ricerca_ai_concessa(user["id"]):
-        return risposta(filtro_semplice(), False)
+def _righe_per_id(con, campi: str, ids: list[int],
+                  dove: str = "1=1") -> list[dict]:
+    """Le righe di vetrina degli id dati, NELL'ORDINE IN CUI ARRIVANO.
 
-    catalogo = "\n".join(
-        f"ID {a['id']}: {a['titolo']} | {a['categoria']} | "
-        f"{a['prezzo_sats']} sats"
-        + (f" ({a['prezzo_eur']:.2f} EUR)" if a["valuta"] == "eur" else "")
-        + (f" | {CONDIZIONI[condizione_da_mostrare(a)]}"
-           if condizione_da_mostrare(a) in CONDIZIONI else "")
-        + (f" | ne restano {a['quantita']}"
-           if (a.get("quantita") or 1) > 1 else "")
-        + f" | {a['zona']} | {a['descrizione'][:120]}"
-        for a in annunci)
-    try:
-        r = ai.messages.create(
-            model=MODELLO_RICERCA, max_tokens=200, timeout=20,
-            system=("Sei il motore di ricerca di un mercatino. Data la richiesta "
-                    "dell'utente e il catalogo, rispondi SOLO con un array JSON "
-                    "degli ID pertinenti, dal piu' rilevante. Capisci sinonimi "
-                    "(bici=mtb=bicicletta) e vincoli di prezzo/zona. "
-                    "Le categorie del catalogo sono: "
-                    + ", ".join(CATEGORIE) + ". Se la richiesta indica una "
-                    "categoria (es. 'giochi per bambini'), privilegiala. "
-                    "Nessun risultato pertinente = []"),
-            messages=[{"role": "user",
-                       "content": f"RICHIESTA: {q}\n\nCATALOGO:\n{catalogo}"}])
-        ids = json.loads("".join(b.text for b in r.content if b.type == "text")
-                         .replace("```json", "").replace("```", "").strip())
-        per_id = {a["id"]: a for a in annunci}
-        return risposta([per_id[i] for i in ids if i in per_id])
-    except Exception as e:
-        print(f"Ricerca AI fallita, uso filtro semplice: {e}")
-        return risposta(filtro_semplice(), False)
+    Quell'ordine e' il punteggio della ricerca, e SQL non lo conosce:
+    si rimette in fila in Python, o `IN (...)` servirebbe le righe
+    nell'ordine che gli pare — cioe' la pertinenza si perderebbe
+    proprio nell'ultimo passo, che e' il modo piu' silenzioso in cui
+    una ricerca puo' smettere di funzionare (i risultati ci sono
+    tutti, solo nell'ordine sbagliato)."""
+    if not ids:
+        return []
+    segni = ",".join("?" * len(ids))
+    righe = {r["id"]: dict(r) for r in con.execute(
+        f"SELECT {campi} FROM annunci a "
+        "JOIN utenti u ON u.tg_id = a.venditore_id "
+        f"WHERE {dove} AND a.id IN ({segni})", ids)}
+    return arricchisci_righe_vetrina([righe[i] for i in ids if i in righe])
 
 
 # ------------------------- API: OFFERTE -----------------------------
@@ -18290,6 +18733,19 @@ def disabilita_accesso_nostr(x_tg_init_data: str = Header(""),
 # avviso in console. Gli utenti solo-Telegram non vedono nulla.
 
 URL_PUBBLICO = "https://barattolo.store"
+
+# La coda promozionale che finisce in fondo al content NIP-99. E' una
+# COSTANTE e non una stringa scritta due volte apposta: la compone
+# `evento_annuncio` e la RICONOSCE `_descrizione_feed`, che deve
+# toglierla — se le due copie divergessero, il taglio smetterebbe di
+# funzionare in silenzio e Google si ritroverebbe dei link in
+# descrizione.
+# IL NOME PORTA IL «NIP99» APPOSTA: `CODA_PROMO` esiste gia' ed e' la
+# coda dei post del canale. Chiamarla cosi' la sovrascriveva, e
+# `evento_annuncio` si sarebbe ritrovato una LISTA dentro una
+# f-string — cioe' le note Nostr rotte. L'ha presa il primo feed
+# generato dal vivo, non la rilettura.
+CODA_PROMO_NIP99 = "🫙⚡ In vendita su Barattolo,"
 LINK_BOT = "https://t.me/ilbarattolobot"
 
 
@@ -18546,7 +19002,7 @@ def evento_annuncio(a: dict, status: str) -> dict:
                f"\n\nPrezzo: {prezzo_txt} — zona: "
                f"{a.get('zona') or 'Italia'}{condizione_txt}{quantita_txt}"
                f"{consegna_txt}"
-               f"\n\n🫙⚡ In vendita su Barattolo, il mercatino in sats "
+               f"\n\n{CODA_PROMO_NIP99} il mercatino in sats "
                f"con escrow Lightning: {URL_PUBBLICO} · {LINK_BOT}")
     return firma_evento(30402, tags, content)
 
@@ -19683,12 +20139,8 @@ def pulisci_avvisi():
     oggi = time.strftime("%Y-%m-%d")
     for tg_id in [t for t, v in AVVISI_QUOTA.items() if v[0] != oggi]:
         AVVISI_QUOTA.pop(tg_id, None)
-    # e i gettoni delle ricerche AI delle ore passate: la scopa serve
-    # solo a non far crescere il dizionario per sempre — il rinnovo
-    # della quota e' implicito nella lettura, come per gli avvisi
-    ora = time.strftime("%Y-%m-%d %H")
-    for tg_id in [t for t, v in RICERCA_QUOTA.items() if v[0] != ora]:
-        RICERCA_QUOTA.pop(tg_id, None)
+    # (i gettoni delle ricerche AI non ci sono piu': la ricerca non
+    # chiama nessuno e non ha una quota da spazzare)
 
 
 # ------------------- offerta lampo: «ha fatto colpo» -----------------
@@ -25269,6 +25721,30 @@ def _prezzo_ld(a: dict):
     return f"{sats // 100_000_000}.{sats % 100_000_000:08d}", "BTC"
 
 
+def _prezzo_ld_eur(a: dict) -> str:
+    """L'EURO ANCHE PER I LISTINI IN SATS (ago 2026, col feed di Google
+    Merchant), e senza questa riga il feed non poteva funzionare: li'
+    il prezzo si dichiara per forza in euro, mentre la pagina diceva
+    BTC — e Google confronta le due cifre. Non «ogni tanto»: SEMPRE, e
+    il mismatch e' quello che a ventotto giorni sospende l'account.
+
+    Si legge dalla STESSA fonte del feed (`cambio_noto_ora`, la cache,
+    mai la rete): cosi' le due cifre possono divergere per il TEMPO
+    che passa fra i due crawl, mai per la ricetta.
+
+    Cambio a zero = stringa vuota, cioe' nessuna offerta in euro: e'
+    lo stesso fail-closed di `_prezzo_feed` — meglio non dire un
+    prezzo che dirne uno inventato.
+    Sul listino nato in EURO non serve: quello ce l'ha gia'."""
+    if a.get("valuta") == "eur":
+        return ""
+    sats = int(a.get("prezzo_sats") or 0)
+    cambio = cambio_noto_ora()
+    if sats <= 0 or cambio <= 0:
+        return ""
+    return f"{sats / 100_000_000 * cambio:.2f}"
+
+
 def _disponibilita_ld(a: dict):
     """(availability, availabilityStarts) — e le ferie sono il caso che
     merita il paio: l'oggetto c'e' e il prezzo e' vero, ma oggi non si
@@ -25311,8 +25787,19 @@ def _ld_annuncio(a: dict, url: str, img: str) -> dict:
             venditore["url"] = _url_negozio(a["venditore_negozio"],
                                             a["venditore"])
         offerta["seller"] = venditore
+    # DUE OFFERTE quando il listino e' in sats e il cambio si sa: la
+    # stessa merce dichiarata in due valute, che schema.org ammette.
+    # L'euro sta PRIMO perche' e' quello che i motori sanno leggere —
+    # ed e' quello che deve combaciare col feed di Merchant Center —
+    # mentre il BTC resta e dice la cifra ESATTA, che e' il prezzo
+    # vero. Nessuna delle due si perde, e nessuna dice il falso.
+    eur = _prezzo_ld_eur(a)
+    if eur:
+        offerte = [dict(offerta, price=eur, priceCurrency="EUR"), offerta]
+    else:
+        offerte = offerta
     dati = {"@context": "https://schema.org", "@type": "Product",
-            "@id": url, "name": a["titolo"], "offers": offerta}
+            "@id": url, "name": a["titolo"], "offers": offerte}
     if a.get("descrizione"):
         dati["description"] = _taglia_meta(a["descrizione"], 500)
     if img:
@@ -25671,6 +26158,443 @@ def _sitemap() -> bytes:
 def sitemap_xml():
     return Response(_sitemap(), media_type="application/xml",
                     headers={"Cache-Control": "public, max-age=3600"})
+
+
+# ------------------- IL FEED DI GOOGLE MERCHANT ---------------------
+# (ago 2026) Il catalogo in un formato che Google Shopping sa leggere:
+# RSS 2.0 col namespace `g`, scaricato da Merchant Center a intervalli
+# suoi. Una rotta sola, nessuna tabella, nessun job: si genera al volo
+# e si mette in cache, come la sitemap.
+#
+# LA VALUTA E' IL MURO, ed e' la cosa da leggere prima di toccare
+# qualunque riga qui sotto: Merchant Center accetta SOLO codici ISO
+# 4217 — BTC per Google non esiste — e pretende che il prezzo del feed
+# COMBACI con quello della pagina di destinazione. Un disallineamento
+# non disapprova un annuncio: a ventotto giorni sospende l'ACCOUNT.
+# Quindi qui i sats si convertono in euro, e questa e' una DECISIONE DI
+# ANDREA presa sapendo il rischio: il prezzo in euro di un listino in
+# sats si muove col cambio, mentre Google ricontrolla la pagina quando
+# gli pare, e le due cifre possono non combaciare.
+# QUEL CHE SI PUO' FARE PER RIDURLO, e che e' fatto: feed e pagina
+# leggono lo STESSO cambio dalla STESSA fonte (`cambio_noto_ora`), e
+# il JSON-LD di un annuncio in sats dichiara adesso anche un'offerta
+# in EUR — vedi `_prezzo_ld`. Cosi' le due cifre divergono solo per il
+# tempo che passa fra i due crawl, mai per la ricetta: prima
+# divergevano SEMPRE, perche' la pagina diceva BTC e il feed euro.
+# LA LEVA `FEED_MERCHANT` e' il freno d'emergenza: spenta, la rotta
+# risponde 404 e il feed sparisce dal giorno alla notte. Serve se
+# Merchant Center comincia a lamentarsi, perche' li' il rimedio va
+# preso in fretta e non al prossimo deploy.
+
+_FEED_CACHE = {"xml": b"", "quando": 0.0}
+CACHE_FEED = 900          # 15 minuti: il cambio si muove, il feed segue
+TETTO_FEED = 5000         # oltre, Merchant Center vuole piu' file
+
+# La condizione, tradotta nei tre valori che Google ammette. Il
+# «da_sistemare» diventa `used` e non `refurbished`, per la stessa
+# ragione gia' scritta nei dati strutturati: «ricondizionato» vuol dire
+# rimesso a nuovo da un professionista, ed e' la mappatura sbagliata
+# che verrebbe naturale.
+CONDIZIONE_GOOGLE = {"nuovo": "new", "come_nuovo": "used",
+                     "buono": "used", "accettabile": "used",
+                     "da_sistemare": "used"}
+
+
+def _condizione_feed(a: dict) -> str:
+    """La condizione da dichiarare a Google, che e' OBBLIGATORIA.
+
+    Dove il venditore l'ha detta si dice la sua. Dove manca — gli
+    annunci storici e quelli importati da Nostr — si dice `used`
+    (decisione di Andrea: e' un mercatino dell'usato, ed e' il default
+    statisticamente vero), CON UNA ECCEZIONE che non e' un
+    ripensamento: nelle categorie dove la condizione non vuol dire
+    niente — alimenti, bellezza, buoni — la merce e' nuova per
+    definizione, e «usato» su un vasetto di miele sarebbe falso. Il
+    giudice e' `senza_condizione`, lo stesso di form, dettaglio,
+    vetrina, NIP-99 e import: qui non nasce nessuna regola nuova."""
+    c = condizione_da_mostrare(a)
+    if c in CONDIZIONE_GOOGLE:
+        return CONDIZIONE_GOOGLE[c]
+    return "new" if senza_condizione(a.get("categoria") or "",
+                                     a.get("consegna") or "") else "used"
+
+
+def _prezzo_feed(a: dict, cambio: float) -> str:
+    """«45.00 EUR», o stringa vuota se non si sa dirlo.
+
+    Il listino nato in euro si dichiara com'e': e' un prezzo vero e
+    fisso, e la pagina dice gia' lui. Quello in sats si converte col
+    cambio corrente — la stessa fonte del JSON-LD, o le due cifre
+    divergerebbero per costruzione e non per il tempo.
+    Cambio a zero = NIENTE PREZZO, cioe' l'annuncio resta fuori dal
+    feed: un prezzo inventato qui non e' un'imprecisione, e' la riga
+    che fa sospendere l'account."""
+    if a.get("valuta") == "eur" and a.get("prezzo_eur"):
+        return f"{float(a['prezzo_eur']):.2f} EUR"
+    sats = int(a.get("prezzo_sats") or 0)
+    if sats <= 0 or cambio <= 0:
+        return ""
+    return f"{sats / 100_000_000 * cambio:.2f} EUR"
+
+
+def _riga_feed(a: dict, cambio: float) -> str:
+    """Un annuncio come voce del feed, o stringa vuota se non ci deve
+    stare.
+
+    CHI RESTA FUORI, e ognuno per una ragione sua:
+      · le ASTE — il prezzo di un'asta e' una BASE, non un prezzo
+        d'acquisto: dichiararlo a Google vorrebbe dire promettere una
+        cifra a cui quell'oggetto non si compra;
+      · le LAMPO VIVE — quel prezzo scade in ore e il feed vive in
+        cache per giorni, quindi il mismatch sarebbe garantito. E'
+        la stessa ragione per cui l'anteprima dei link dichiara il
+        LISTINO e non lo sconto a tempo;
+      · chi non ha una FOTO — `image_link` e' obbligatoria;
+      · chi non ha un prezzo dicibile in euro (vedi `_prezzo_feed`).
+    Chi e' in ferie o esaurito ci sta invece, ma `out_of_stock`: e'
+    la verita', e toglierlo e rimetterlo a ogni rientro farebbe
+    ballare il feed."""
+    if a.get("asta_base_sats"):
+        return ""
+    if (a.get("lampo_percento") or 0) > 0 \
+            and (a.get("lampo_scadenza") or 0) > int(time.time()):
+        return ""
+    # La foto passa dal giudice delle anteprime, che sa gia' saltare
+    # gli URL di terzi. Il suo ripiego al BRAND qui NON va bene — un
+    # feed col nostro logo su ogni prodotto e' una disapprovazione in
+    # blocco — quindi chi ci ricade resta fuori.
+    foto = _immagine_anteprima(a.get("foto") or "")[0]
+    if not foto or foto == IMMAGINE_BRAND[0]:
+        return ""
+    prezzo = _prezzo_feed(a, cambio)
+    if not prezzo:
+        return ""
+    url = _url_annuncio(a["id"], a["titolo"])
+    esaurito = int(a.get("quantita") or 0) <= 0
+    ferie = in_ferie(int(a.get("venditore_ferie") or 0), int(time.time()))
+    voce = [
+        f"<g:id>{a['id']}</g:id>",
+        # I 150 caratteri sono il tetto di Google; il taglio passa da
+        # `_taglia_meta`, che e' quello che il progetto usa gia' per i
+        # titoli delle anteprime.
+        f"<title>{_xml(_taglia_meta(a['titolo'], 150))}</title>",
+        f"<description>{_xml(_descrizione_feed(a))}</description>",
+        f"<link>{_xml(url)}</link>",
+        f"<g:image_link>{_xml(foto)}</g:image_link>",
+        f"<g:price>{prezzo}</g:price>",
+        "<g:availability>"
+        + ("out_of_stock" if (esaurito or ferie) else "in_stock")
+        + "</g:availability>",
+        f"<g:condition>{_condizione_feed(a)}</g:condition>",
+        # NIENTE GTIN E NIENTE MPN, e va DICHIARATO invece che omesso:
+        # un pezzo unico di seconda mano un codice a barre non ce l'ha,
+        # e `identifier_exists` = no e' il modo in cui Google vuole
+        # sentirselo dire. Senza, i prodotti vengono disapprovati per
+        # «identificatore mancante».
+        "<g:identifier_exists>no</g:identifier_exists>",
+        f"<g:product_type>{_xml(a.get('categoria') or 'Altro')}</g:product_type>",
+    ]
+    return "<item>" + "".join(voce) + "</item>"
+
+
+def _descrizione_feed(a: dict) -> str:
+    """La descrizione ripulita di quel che Google non ammette.
+
+    IL CASO E' VERO e si e' visto al primo feed generato sui dati di
+    collaudo: parecchi annunci hanno in colonna la CODA PROMOZIONALE
+    che componiamo noi per Nostr — «Prezzo: 26000 sats — zona: … 🫙⚡
+    In vendita su Barattolo … https://…» — perche' rientra dall'import
+    quando il venditore ripubblica da un client suo. Nel feed quella
+    roba fa due danni: Google disapprova le descrizioni che contengono
+    PREZZI, SPEDIZIONE o LINK, e soprattutto quel «26000 sats» e' la
+    cifra che contraddice il `g:price` in euro — cioe' e' benzina sul
+    fuoco del disallineamento che questo cantiere gia' rischia.
+    Si taglia dal NOSTRO marcatore in poi, e con lui la riga «Prezzo:»
+    che lo precede: sono parole nostre finite in un campo del
+    venditore, non parole sue. Il DATO NON SI TOCCA — in colonna resta
+    quello che c'e', qui cambia solo cosa si racconta a Google.
+    Un venditore che scriva «Prezzo:» di suo non perde niente: la riga
+    si toglie solo quando e' attaccata al marcatore."""
+    testo = (a.get("descrizione") or a["titolo"] or "").strip()
+    i = testo.find(CODA_PROMO_NIP99)
+    if i >= 0:
+        testo = testo[:i].rstrip()
+        righe = testo.split("\n")
+        if righe and righe[-1].startswith("Prezzo: "):
+            testo = "\n".join(righe[:-1]).rstrip()
+    # E GLI INDIRIZZI DEL VENDITORE, che sono un caso a parte e si
+    # sono visti anche loro al primo giro (due su trentasei): Google
+    # non ammette LINK in descrizione, punto — non i nostri, non i
+    # suoi. Qui non si giudica se quel link sia buono: si toglie dal
+    # feed, e nella scheda vera resta intero. Chi compra non perde
+    # niente, e il prodotto non viene disapprovato per una riga che
+    # il venditore ha scritto senza sapere di Google.
+    testo = _re_url.sub("", testo)
+    return _taglia_meta(" ".join(testo.split()) or a["titolo"], 5000)
+
+
+_re_url = re.compile(r"\b(?:https?://|www\.)\S+", re.I)
+
+
+def _xml(t: str) -> str:
+    """Testo dentro un nodo XML. `html.escape` copre &, <, > e le
+    virgolette; qui in piu' si tolgono i caratteri di controllo, che in
+    XML 1.0 sono ILLEGALI — non «brutti»: un solo byte di quelli rende
+    il feed intero non leggibile, e Merchant Center lo rifiuta senza
+    dire quale riga. Il titolo lo scrive un venditore, quindi il caso
+    non e' teorico."""
+    pulito = "".join(c for c in (t or "")
+                     if c in "\t\n\r" or (ord(c) >= 0x20 and ord(c) != 0x7F))
+    return html.escape(pulito, quote=True)
+
+
+def _feed_google() -> bytes:
+    adesso = time.time()
+    if _FEED_CACHE["xml"] and adesso - _FEED_CACHE["quando"] < CACHE_FEED:
+        return _FEED_CACHE["xml"]
+    cambio = cambio_noto_ora()
+    con = db()
+    try:
+        righe = [dict(r) for r in con.execute(
+            f"SELECT {CAMPI_VETRINA} FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.stato='attivo' ORDER BY a.id LIMIT ?",
+            (TETTO_FEED,))]
+    finally:
+        con.close()
+    righe = arricchisci_righe_vetrina(righe)
+    voci = [v for v in (_riga_feed(a, cambio) for a in righe) if v]
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">'
+           "<channel>"
+           f"<title>{_xml(TITOLO_HOME)}</title>"
+           f"<link>{_xml(URL_PUBBLICO)}</link>"
+           "<description>Mercatino dell'usato in satoshi, "
+           "col deposito di garanzia</description>"
+           + "".join(voci) + "</channel></rss>").encode("utf-8")
+    _FEED_CACHE.update(quando=adesso, xml=xml)
+    return xml
+
+
+# ---------------------- IL WIDGET DA INCORPORARE --------------------
+# (ago 2026) Un annuncio, o la vetrina di un negozio, dentro il sito di
+# qualcun altro: `<iframe src="https://barattolo.store/widget/...">`.
+#
+# L'IFRAME E NON UNO SCRIPT, ed e' la decisione che porta via tutto il
+# resto. Uno script che inietta HTML nella pagina ospite e' la strada
+# che tutti conoscono e ha tre difetti veri: il CSS del sito ospite
+# entra nel nostro (e viceversa), noi ci prendiamo il diritto di
+# eseguire codice su un dominio che non e' nostro — cioe' chiediamo a
+# un estraneo una fiducia che non ci serve — e ogni ritocco al nostro
+# markup puo' rompere la pagina di qualcun altro. L'iframe e' isolato
+# per costruzione: il peggio che puo' fare e' non caricarsi.
+#
+# NON SI SERVE `miniapp.html`: quella pesa quasi un mega ed e' un'app,
+# non un biglietto da visita. Qui c'e' una pagina SUA, markup fisso e
+# dati escapati, qualche kilobyte — la stessa ragione per cui il
+# cartello SEO esiste separato dal client.
+#
+# NIENTE DATI PRIVATI e niente azioni: si legge la vetrina (la
+# whitelist `CAMPI_VETRINA`, quella di sempre) e l'unico gesto e' un
+# LINK che porta su Barattolo. Un widget che potesse comprare sarebbe
+# un checkout dentro il sito di un estraneo.
+
+CACHE_WIDGET = 300        # 5 minuti: la vetrina cambia, il widget segue
+WIDGET_MAX = 12           # quante card al massimo nel negozio
+WIDGET_DEFAULT = 6
+
+# Il vestito, in linea: un widget non deve chiedere un secondo giro di
+# rete per un foglio di stile. I colori sono i token di casa scritti
+# per esteso — qui non c'e' il resto dell'app da cui ereditarli — e il
+# tema scuro segue quello del SITO OSPITE (`prefers-color-scheme`),
+# che e' la cosa giusta: il widget e' un ospite, non decide lui.
+WIDGET_CSS = """
+:root{--carta:#FFF8EA;--ink:#23282C;--muted:#6B6257;--bordo:#E8DFC9;
+ --sats:#D97706;--ombra:rgba(35,40,44,.10)}
+@media (prefers-color-scheme:dark){:root{--carta:#2C2517;--ink:#F3EAD8;
+ --muted:#B3A691;--bordo:#463C28;--sats:#F7931A;--ombra:rgba(0,0,0,.35)}}
+*{box-sizing:border-box}
+body{margin:0;padding:10px;font:15px/1.4 system-ui,-apple-system,
+ "Segoe UI",Roboto,sans-serif;color:var(--ink);background:transparent}
+a{text-decoration:none;color:inherit;display:block}
+.w{background:var(--carta);border:1px solid var(--bordo);border-radius:14px;
+ box-shadow:0 2px 6px var(--ombra);overflow:hidden}
+.w-uno{display:flex;gap:12px;padding:12px;align-items:center}
+.ph{width:96px;height:96px;flex:0 0 96px;border-radius:10px;
+ object-fit:cover;background:var(--bordo)}
+.dati{min-width:0;flex:1}
+.tit{font-weight:700;margin:0 0 4px;font-size:16px;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+ overflow:hidden}
+.prezzo{color:var(--sats);font-weight:800;font-size:17px}
+.meta{color:var(--muted);font-size:13px;margin-top:3px}
+.cta{margin-top:8px;display:inline-block;background:var(--sats);
+ color:#fff;font-weight:700;font-size:13px;padding:7px 14px;
+ border-radius:9px}
+.testa{display:flex;align-items:center;gap:9px;padding:11px 12px;
+ border-bottom:1px solid var(--bordo)}
+.testa b{font-size:15px}
+.griglia{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+ gap:9px;padding:11px}
+.cella .ph{width:100%;height:auto;aspect-ratio:1/1;flex:none}
+.cella .tit{font-size:13px;margin:6px 0 2px}
+.cella .prezzo{font-size:14px}
+.piede{padding:9px 12px;border-top:1px solid var(--bordo);
+ color:var(--muted);font-size:12.5px;display:flex;
+ justify-content:space-between;gap:8px;align-items:center}
+.vuoto{padding:22px 12px;text-align:center;color:var(--muted)}
+"""
+
+# L'altezza la dice il widget al sito ospite: chi vuole puo'
+# ascoltarla e ridimensionare l'iframe. Chi non fa niente si tiene
+# l'altezza che ha scritto, ed e' il caso normale — quindi lo snippet
+# che diamo da copiare porta gia' una misura sensata.
+WIDGET_JS = """
+<script>
+(function(){function d(){try{parent.postMessage({barattolo:1,
+altezza:document.documentElement.scrollHeight},'*')}catch(e){}}
+addEventListener('load',d);addEventListener('resize',d);d()})();
+</script>"""
+
+
+def _widget_pagina(corpo: str, titolo: str) -> Response:
+    """Il guscio. `X-Frame-Options` NON si mette qui, ed e' il punto di
+    tutta la rotta: questa e' l'unica pagina del sito fatta per stare
+    dentro l'iframe di un estraneo. Tutte le altre lo prendono (vedi
+    `no_iframe`), e la differenza fra le due e' cio' che rende sicuro
+    aprire questa."""
+    html_ = (f'<!doctype html><html lang="it"><head><meta charset="utf-8">'
+             f'<meta name="viewport" content="width=device-width,'
+             f'initial-scale=1"><meta name="robots" content="noindex">'
+             f"<title>{_testo(titolo)}</title><style>{WIDGET_CSS}</style>"
+             f"</head><body>{corpo}{WIDGET_JS}</body></html>")
+    return Response(html_, media_type="text/html; charset=utf-8",
+                    headers={"Cache-Control":
+                             f"public, max-age={CACHE_WIDGET}"})
+
+
+def _widget_niente(messaggio: str) -> Response:
+    """Un widget che non trova la sua merce non e' un errore da 404:
+    e' un riquadro che lo dice. Un 404 dentro l'iframe di qualcun
+    altro si vede come una pagina rotta, e a rimetterci e' il sito
+    ospite — che con noi non c'entra niente."""
+    return _widget_pagina(
+        f'<div class="w"><div class="vuoto">{_testo(messaggio)}<br>'
+        f'<a class="cta" style="margin-top:10px" target="_blank" '
+        f'rel="noopener" href="{_attr(URL_PUBBLICO)}">Vai su Barattolo</a>'
+        f"</div></div>", "Barattolo")
+
+
+def _widget_prezzo(a: dict, cambio: float) -> str:
+    """Il prezzo del widget: quello del post di canale, che e' gia' il
+    giudice di come si scrive un prezzo fuori dall'app — valuta del
+    listino per prima, l'altra col ≈, e senza cambio il ≈ si omette."""
+    return _prezzo_promo(a, cambio)
+
+
+def _widget_card(a: dict, cambio: float, cella: bool = False) -> str:
+    """Una card. `cella` = dentro la griglia del negozio, dove la foto
+    sta sopra invece che di lato."""
+    foto = _immagine_anteprima(a.get("foto") or "")[0]
+    url = _url_annuncio(a["id"], a["titolo"])
+    venduto = a.get("stato") == "venduto"
+    riga_stato = ('<div class="meta">✅ Venduto</div>' if venduto else "")
+    if cella:
+        return (f'<a class="cella" target="_blank" rel="noopener" '
+                f'href="{_attr(url)}">'
+                f'<img class="ph" loading="lazy" alt="" '
+                f'src="{_attr(foto)}">'
+                f'<div class="tit">{_testo(a["titolo"])}</div>'
+                f'<div class="prezzo">{_testo(_widget_prezzo(a, cambio))}'
+                f"</div>{riga_stato}</a>")
+    luogo = a.get("zona_comune") or ""
+    return (f'<div class="w"><a class="w-uno" target="_blank" '
+            f'rel="noopener" href="{_attr(url)}">'
+            f'<img class="ph" alt="" src="{_attr(foto)}">'
+            f'<div class="dati"><div class="tit">{_testo(a["titolo"])}</div>'
+            f'<div class="prezzo">{_testo(_widget_prezzo(a, cambio))}</div>'
+            + (f'<div class="meta">📍 {_testo(luogo)}</div>' if luogo else "")
+            + riga_stato
+            + '<span class="cta">'
+            + ("Vedi su Barattolo" if venduto else "Compra su Barattolo")
+            + "</span></div></a></div>")
+
+
+@app.get("/widget/annuncio/{aid}")
+def widget_annuncio(aid: str):
+    """Un annuncio solo, da mettere sul proprio sito.
+
+    Serve anche il VENDUTO, spento e col suo badge: e' la stessa regola
+    della scheda e dell'anteprima dei link — un link mandato a un amico
+    non deve morire con le scorte, e chi ha incollato il widget sul suo
+    sito non deve ritrovarsi un buco il giorno che vende. Il rimosso e
+    quello in revisione no: quelli non raccontano niente di se'."""
+    ident = _id_da_percorso(aid)
+    if not ident:
+        return _widget_niente("Annuncio non trovato")
+    con = db()
+    try:
+        r = con.execute(
+            f"SELECT {CAMPI_VETRINA}, a.stato FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
+            (ident,)).fetchone()
+    finally:
+        con.close()
+    if not r:
+        return _widget_niente("Questo annuncio non è più disponibile")
+    a = arricchisci_righe_vetrina([dict(r)])[0]
+    return _widget_pagina(_widget_card(a, cambio_noto_ora()), a["titolo"])
+
+
+@app.get("/widget/negozio/{chi}")
+def widget_negozio(chi: str, n: int = WIDGET_DEFAULT):
+    """La vetrina di un negozio: le ultime N cose in vendita.
+
+    `chi` e' lo username o il codice, e si spacca sul primo trattino
+    come le rotte sorelle — un widget copiato dall'indirizzo canonico
+    porta lo slug appresso, e senza quello spacco non troverebbe
+    nessuno (la regressione gia' pagata su /negozio)."""
+    chi = _chi_da_percorso(chi)
+    n = max(1, min(int(n or WIDGET_DEFAULT), WIDGET_MAX))
+    con = db()
+    try:
+        u = con.execute(
+            "SELECT tg_id, nome, negozio FROM utenti "
+            "WHERE (username=? COLLATE NOCASE OR negozio=?) AND negozio!=''",
+            (chi, chi)).fetchone()
+        righe = [] if not u else [dict(x) for x in con.execute(
+            f"SELECT {CAMPI_VETRINA} FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.venditore_id=? AND a.stato='attivo' "
+            "ORDER BY a.creato DESC, a.id DESC LIMIT ?", (u["tg_id"], n))]
+    finally:
+        con.close()
+    if not u:
+        return _widget_niente("Negozio non trovato")
+    righe = arricchisci_righe_vetrina(righe)
+    cambio = cambio_noto_ora()
+    url = _url_negozio(u["negozio"], u["nome"] or "")
+    celle = "".join(_widget_card(a, cambio, cella=True) for a in righe)
+    corpo = (f'<div class="w"><div class="testa">🫙 <b>'
+             f'{_testo(u["nome"] or "Negozio")}</b></div>'
+             + (f'<div class="griglia">{celle}</div>' if celle else
+                '<div class="vuoto">Nessun oggetto in vendita</div>')
+             + f'<div class="piede"><span>⚡ Pagamenti in satoshi, col '
+               f'deposito di garanzia</span>'
+               f'<a class="cta" target="_blank" rel="noopener" '
+               f'href="{_attr(url)}">Vedi tutto</a></div></div>')
+    return _widget_pagina(corpo, u["nome"] or "Negozio")
+
+
+@app.get("/feed/google.xml")
+def feed_google():
+    """Il feed per Merchant Center. Rotta ESPLICITA come ogni altra
+    cosa pubblica (regola ferrea 3), e spenta dalla leva."""
+    if not FEED_MERCHANT:
+        raise HTTPException(404, "Non trovato")
+    return Response(_feed_google(), media_type="application/xml",
+                    headers={"Cache-Control": "public, max-age=900"})
 
 
 @app.get("/")

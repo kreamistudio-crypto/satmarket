@@ -36,7 +36,11 @@ FONDATORI = []               # es. [123456789, 987654321]
 # Finche' resta il segnaposto, il bot resta solo-invio come prima.
 TELEGRAM_WEBHOOK_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 
-# --- Anthropic (ricerca AI in linguaggio naturale) -------------------
+# --- Anthropic (moderazione, ricategorizzazione, import a lotti) -----
+# NON serve piu' alla ricerca: dall'ago 2026 quella e' un indice
+# full-text di casa (vedi lo stemmer, in fondo). Serve agli strati che
+# GIUDICANO: la moderazione degli annunci, la ricategorizzazione e la
+# moderazione a lotti dell'import CSV.
 ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"
 MODELLO_RICERCA = "claude-haiku-4-5"
 
@@ -461,12 +465,38 @@ AVVISI_ORDINI_ADMIN = True
 # freno d'emergenza, non una scelta.
 ORE_INITDATA = 24
 
-# Quante ricerche AI puo' fare un utente in un'ora. E' l'unica rotta
-# dove una richiesta qualunque diventa una chiamata ad Anthropic, e il
-# prompt e' sempre grande uguale (fino a 300 annunci): senza freno, un
-# ciclo banale brucia il credito. Finita la quota si risponde col
-# filtro per parole, che non costa niente. 0 = nessun freno.
-TETTO_RICERCHE_AI_ORA = 30
+# --- Il feed di Google Merchant (ago 2026) ---------------------------
+# `GET /feed/google.xml`, il catalogo in un formato che Google Shopping
+# sa leggere. Nasce ACCESO: non muove denaro e non manda niente a
+# nessuno. Ma e' un INTERRUTTORE apposta — Merchant Center pretende che
+# il prezzo del feed combaci con quello della scheda, e i listini in
+# sats ci escono convertiti in euro al cambio del momento: se comincia
+# a lamentarsi, il feed va spento in fretta (una riga qui e un riavvio,
+# non un deploy).
+FEED_MERCHANT = True
+
+# --- La porta dell'iframe (ago 2026, col widget) ---------------------
+# Accesa, nessun sito estraneo puo' incorniciare Barattolo in un
+# iframe (tranne il widget, che esiste apposta). NASCE SPENTA, cioe'
+# com'e' sempre stato: e' una stretta in piu' su una porta rimasta
+# aperta, e il widget funziona identico senza.
+# PRIMA DI ACCENDERLA, provare la Mini App da TELEGRAM WEB (il browser,
+# non l'app): li' gira dentro un iframe di web.telegram.org, ed e' la
+# sola strada che questa leva puo' chiudere.
+PROTEGGI_IFRAME = False
+
+# LA RICERCA NON HA PIU' UNA QUOTA (ago 2026): `TETTO_RICERCHE_AI_ORA`
+# frenava le chiamate ad Anthropic della ricerca, e la ricerca non
+# chiama piu' nessuno — e' un indice full-text dentro SQLite. Una riga
+# rimasta qui e' inerte e si puo' togliere.
+#
+# Quel che le serve e' un PACCHETTO, non una leva:
+#     pip install snowballstemmer
+# E' lo stemmer italiano (Python puro, ~100 KB, nessuna dipendenza:
+# l'algoritmo Snowball che sta sotto Lucene ed Elasticsearch), ed e'
+# quello che fa trovare «collezione» cercando «collezionismo».
+# Senza, il server parte lo stesso e la ricerca lavora a troncamento:
+# piu' grossolana, mai muta — e l'avvio lo dice con una riga.
 
 # Quanto resta buono un cambio BTC/EUR che non riusciamo a rinfrescare.
 # L'ultimo cambio letto vive nel database e torna in cache a ogni

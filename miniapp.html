@@ -3419,8 +3419,9 @@ document.getElementById('cartello')?.remove();</script>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
-         prezzo. La ricerca AI coi vincoli scritti ("sotto i 50
-         euro") resta com'e': questi servono a chi sfoglia.
+         prezzo. Sono un'altra cosa dalla ricerca per parole, e si
+         COMPONGONO con lei: chi cerca «bici» e poi stringe il prezzo
+         resta dentro la sua ricerca.
          I conteggi vivono QUI, incolonnati accanto ai controlli: una
          fascia sola tra le pillole e le foto. La riga dei pionieri
          compare solo se il server manda il numero (interruttore spento
@@ -4595,6 +4596,25 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
+  <!-- ============ SHEET WIDGET DA INCORPORARE (ago 2026) ============
+       Il codice da incollare sul proprio sito. Un IFRAME e non uno
+       script nostro: il widget resta isolato dal sito ospite, e noi
+       non chiediamo a nessuno il diritto di eseguire codice su un
+       dominio che non e' nostro (vedi la voce in server.py).
+       Il campo e' `readonly` e non `disabled`: da un disabled il
+       testo non si seleziona, e la strada a mano — selezionare e
+       copiare — deve restare aperta se la clipboard fa i capricci. -->
+  <div class="sheet" id="widgetSheet">
+    <div class="grab"></div>
+    <h3>&lt;/&gt; Widget per il web</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:10px">Incolla questo codice nel tuo sito: mostra <span id="widgetChe">il tuo negozio</span> e porta chi tocca qui su Barattolo.</div>
+    <textarea id="widgetCodice" readonly rows="4" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.4;padding:10px;border-radius:10px;border:1.5px solid var(--bordo, #E8DFC9);background:var(--card);color:var(--ink);resize:none"></textarea>
+    <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:8px;line-height:1.4">L'altezza è quella che vedi nel codice: cambiala se ti serve. Il widget si adatta da solo alla larghezza che gli dai.</div>
+    <button class="btn orange" style="margin-top:12px" onclick="copiaWidget()">📋 Copia il codice</button>
+    <button class="btn ghost" onclick="apriAnteprimaWidget()">👁 Guarda come viene</button>
+    <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
+  </div>
+
   <!-- ============ SHEET RILANCIO DELL'ASTA (ago 2026) ============
        Era un prompt() del sistema che chiedeva «Per quanti giorni?
        (1 / 3 / 7 / 14 / 30)» e si aspettava un numero battuto a mano:
@@ -5248,7 +5268,7 @@ let vetrinaGiro = 0;
    display:none) e si rilegge SOLO tornando indietro. Vive per la
    sessione, come i filtri: niente localStorage. */
 let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
-let conteggiServer = null, ultimaRicercaAI = false;
+let conteggiServer = null;
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
 let pionieri = 0;   // quante persone sono entrate (0 = riga spenta)
 let datiVivi = false;   // al primo carico vero il seme demo si butta
@@ -5303,9 +5323,12 @@ let filtroReg = '';          // regione ('' = tutta l'Italia)
 function paramsVetrina(){
   const p = new URLSearchParams({limit: LIMITE_PAGINA});
   if (activeCat !== 'Tutto') p.set('cat', activeCat);
-  /* La ricerca semplice lato server e' della vetrina anonima:
-     dentro Telegram il campo Cerca parla con l'AI */
-  if (VETRINA) { const q = el('q').value.trim(); if (q) p.set('q', q); }
+  /* LA RICERCA E' DI TUTTI (ago 2026): vive qui dentro, quindi vale
+     per gli anonimi come per chi è dentro Telegram — prima questa
+     riga era `if (VETRINA)`, perché di là il campo Cerca parlava con
+     l'AI. In DEMO non si manda: lì il server non c'è, e a filtrare i
+     dati finti pensa renderGrid */
+  if (!DEMO) { const q = el('q').value.trim(); if (q) p.set('q', q); }
   /* l'ordine EFFETTIVO: quello scelto, o quello ereditato dalla
      spunta dell'occasione (vedi ordinaEffettivo) */
   const _ord = ordinaEffettivo();
@@ -5532,14 +5555,13 @@ async function loadListings(anonimo){
     astaLevaPubblica = !!j.asta_abilitata;
     aggiornaAstaVisibilita();
   }
-  ultimaRicercaAI = false;
   renderChips();   // le pillole seguono i dati: conteggi e ordine freschi
 }
 
 /* La pagina dopo, agganciata in fondo alla griglia senza ridisegnare
    quello che c'e' gia' (niente flicker ne' foto ricaricate) */
 async function caricaAltri(){
-  if (DEMO || ultimaRicercaAI || !vetrinaCursore || vetrinaCaricando) return;
+  if (DEMO || !vetrinaCursore || vetrinaCaricando) return;
   vetrinaCaricando = true;
   /* il giro con cui si parte: se cambia mentre la pagina e' per strada
      questa risposta appartiene a una vetrina che non esiste piu' */
@@ -6432,8 +6454,10 @@ async function aggiornaVista(){
   const v = ptrVista();
   if (v === 'esplora') {
     if (DEMO) { renderGrid(); return; }
-    /* la ricerca AI non si rifa' da sola (costerebbe credito a ogni
-       tirata): si torna alla vetrina, che e' cio' che il gesto chiede */
+    /* la ricerca ci va dentro da sola: `paramsVetrina` legge il campo
+       Cerca, quindi tirando giu' su una ricerca si rilegge QUELLA —
+       che e' cio' che il gesto chiede. Prima non poteva, che rifare
+       la ricerca AI a ogni tirata era credito buttato. */
     await loadListings();
     renderGrid();
     if (!VETRINA) { try { await caricaPreferiti(); aggiornaJarCards(); } catch(e){} }
@@ -6707,16 +6731,23 @@ function vaiEsplora(){
 }
 
 let prossimaLampo = 0;   // unix della prima lampo che scade in griglia
-function renderGrid(items){
-  ultimaRicercaAI = !!items;   // coi risultati AI lo scroll non pagina
-  const q = el('q').value.trim().toLowerCase();
-  let data = items || vetrina.filter(l =>
+function renderGrid(){
+  /* LA RICERCA LA FA IL SERVER (ago 2026), e questa riga e' quella da
+     non ammorbidire: la risposta arriva GIA' filtrata dall'indice, e
+     riapplicare qui un `includes` butterebbe via proprio i risultati
+     che l'indice ha trovato per RADICE o per CATEGORIA — cercando
+     «collezionismo» l'annuncio che dice «collezione» sparirebbe
+     nell'ultimo passo, cioe' la ricerca nuova non funzionerebbe e non
+     ci sarebbe un errore da nessuna parte. In DEMO invece il server
+     non c'e' e il filtro e' questo. */
+  const q = DEMO ? el('q').value.trim().toLowerCase() : '';
+  let data = vetrina.filter(l =>
     (activeCat==='Tutto' || l.cat===activeCat) &&
     (!q || (l.title+l.desc+l.zone).toLowerCase().includes(q)));
   /* In DEMO ordinamento e filtro prezzo vivono qui, sui dati finti
      (coi dati vivi li applica il server, riapplicarli mentirebbe:
      il suo cambio euro puo' differire di un pelo dal nostro) */
-  if (!items && DEMO) {
+  if (DEMO) {
     if (filtroPrezzo) {
       const inSats = v => filtroPrezzo.valuta==='eur' ? Math.round(v/eurPerSat) : v;
       data = data.filter(l =>
@@ -7020,36 +7051,21 @@ async function doSearch(){
     return;
   }
   if (DEMO) {
-    /* In demo: filtro semplice. Col backend attivo qui parte la
-       ricerca AI in linguaggio naturale (capisce "sotto i 100k" ecc.) */
+    /* In demo non c'è nessun server che cerchi: filtro sui dati
+       finti, che è quel che renderGrid sa già fare */
     renderGrid();
-    toast('Col backend attivo qui cerca l\'AI 🧠');
-  } else if (VETRINA) {
-    /* Anonimi: ricerca semplice LATO SERVER (LIKE su titolo,
-       descrizione e zona), paginata come la vetrina: si cerca su
-       TUTTI gli annunci, non solo sulle pagine gia' caricate. La
-       ricerca AI resta a chi e' dentro Telegram (pubblica, sarebbe
-       credito API regalato ai bot) */
-    loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
-  } else {
-    /* busta=1: la risposta dice anche SE l'AI è stata usata. Un
-       server vecchio ignora il parametro e risponde con l'array di
-       sempre, quindi si accettano tutt'e due le forme. */
-    const r = await fetch(
-      `${API_BASE}/search?busta=1&q=${encodeURIComponent(q)}`,
-      {headers:{'X-Tg-Init-Data': authHdr()}});
-    const d = await r.json();
-    const ris = (Array.isArray(d) ? d : (d.annunci || [])).map(mapListing);
-    /* Anche i risultati AI entrano nel catalogo: openDetail deve
-       trovarli pure se vengono da oltre le pagine caricate */
-    inCatalogo(ris);
-    renderGrid(ris);
-    /* Quando l'AI non c'è (quota oraria finita, o chiamata fallita) i
-       risultati arrivano dal filtro per parole: si dice, invece di
-       far sembrare che l'AI abbia capito poco. */
-    if (!Array.isArray(d) && d.ai === false)
-      toast('🔎 Ricerca veloce per parole: l\'AI torna fra un\'ora', 5000);
+    return;
   }
+  /* UNA STRADA SOLA per tutti (ago 2026), autenticati e anonimi: la
+     ricerca vive dentro la VETRINA — `/api/listings?q=` — quindi è
+     paginata come il resto e si compone con categoria, prezzo,
+     regione e filtri senza una riga in più. Prima erano due, e
+     rispondevano diverso alla stessa domanda: il LIKE sulla frase
+     intera per gli anonimi, e Haiku per chi era dentro Telegram (con
+     `/api/search`, che ora è solo un guscio per i client rimasti in
+     cache). Con l'AI se n'è andato anche il toast che diceva quando
+     non c'era. */
+  loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
 
 /* ---------------- negozio del venditore ---------------- */
@@ -11066,6 +11082,7 @@ function openDetail(id){
              ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
            <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
+           <button class="btn ghost" onclick="apriWidget('annuncio',${l.id})">&lt;/&gt; Widget per il web</button>
            <!-- L'uscita della colonna, e ora un bottone vero: il
                 testuale sottolineato spariva fra due ghost — proprio
                 il gesto che non si torna indietro. Il testo dice solo
@@ -12128,6 +12145,7 @@ function closeSheet(){
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
+  el('widgetSheet').classList.remove('open');
   el('rilancioSheet').classList.remove('open');
   el('riscuotiSheet').classList.remove('open');
   el('paccoSvuotaSheet').classList.remove('open');
@@ -14220,7 +14238,8 @@ function renderProfilo(){
       </div>
     </div>
     ${(myUsername||myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" style="margin-top:0" onclick="apriMioNegozio()">👁 Guarda il tuo negozio come lo vedono tutti</button>`:''}
-    ${(myUsername||myNegozio)?`<button class="btn ghost" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}`;
+    ${(myUsername||myNegozio)?`<button class="btn ghost" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}
+    ${(myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" onclick="apriWidget('negozio')">&lt;/&gt; Widget per il web</button>`:''}`;
   if (el('profiloEsci')) el('profiloEsci').style.display = WEB ? '' : 'none';
   renderLnAddress();
   renderLivello();
@@ -14554,6 +14573,56 @@ function apriMioNegozio(){
   const chi = myNegozio || myUsername;
   if (!chi) { toast('Non hai ancora un negozio'); return; }
   apriNegozio(chi);
+}
+
+/* ---------------- IL WIDGET DA INCORPORARE (ago 2026) ----------------
+   Il venditore mette il suo negozio — o un annuncio — sul proprio
+   sito. Qui si compone solo il CODICE da copiare: la pagina che ci
+   finisce dentro la serve il server (/widget/...), ed e' una pagina
+   sua e leggera, mai miniapp.html.
+   L'ALTEZZA E' SCRITTA NEL CODICE, e non si calcola: il widget
+   annuncia la propria via postMessage per chi vuole ascoltarla, ma
+   chi incolla e basta deve ottenere qualcosa di sensato senza fare
+   niente — quindi il numero che diamo e' gia' quello giusto per il
+   caso normale (una card sola, o due righe di griglia). */
+let widgetUrl = '';
+function apriWidget(tipo, id){
+  haptic();
+  const base = location.origin;
+  if (tipo === 'annuncio') {
+    widgetUrl = `${base}/widget/annuncio/${id}`;
+    el('widgetChe').textContent = 'questo annuncio';
+  } else {
+    if (!myNegozio) { toast('Non hai ancora un negozio'); return; }
+    widgetUrl = `${base}/widget/negozio/${myNegozio}`;
+    el('widgetChe').textContent = 'il tuo negozio';
+  }
+  const alto = tipo === 'annuncio' ? 140 : 420;
+  el('widgetCodice').value =
+    `<iframe src="${widgetUrl}" width="100%" height="${alto}" `
+    + `style="border:0" loading="lazy" title="Barattolo"></iframe>`;
+  el('sheetBg').classList.add('open');
+  el('widgetSheet').classList.add('open');
+}
+
+function copiaWidget(){
+  const t = el('widgetCodice');
+  t.select();
+  navigator.clipboard?.writeText(t.value)
+    .then(()=>toast('📋 Codice copiato: incollalo nel tuo sito'))
+    /* se la clipboard non c'e' o dice di no, il testo resta
+       SELEZIONATO e si copia a mano: mai far credere che sia
+       negli appunti quando non c'e' (la regola del codice di
+       @trackbot) */
+    .catch(()=>toast('Selezionato: copialo a mano', 4000));
+}
+
+function apriAnteprimaWidget(){
+  if (!widgetUrl) return;
+  /* dentro Telegram il link esterno passa dal client, fuori e' una
+     scheda nuova: la stessa scala di condividiLink */
+  if (tg?.initData && tg.openLink) tg.openLink(widgetUrl);
+  else window.open(widgetUrl, '_blank', 'noopener');
 }
 
 function condividiMioNegozio(){
@@ -20645,8 +20714,8 @@ async function avvia(){
   }
 }
 /* Le sentinelle dello scroll infinito: un osservatore per griglia,
-   armato una volta per sempre. Le guardie (demo, ricerca AI, fine
-   lista, caricamento in corso) vivono DENTRO le callback: qui non
+   armato una volta per sempre. Le guardie (demo, fine lista,
+   caricamento in corso) vivono DENTRO le callback: qui non
    serve sapere in che modalita' siamo. Una vista nascosta non
    interseca mai: le sentinelle degli altri pannelli tacciono da sole.
    600px di anticipo: la pagina dopo arriva prima che si veda il fondo. */

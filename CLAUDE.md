@@ -18,7 +18,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   incollarne una nuova. È il comportamento corretto — non si paga la
   cifra sbagliata — ma il giorno dell'accensione va guardata la coda
   degli ordini `confirmed` con una invoice già depositata),
-  notifiche via bot Telegram, ricerca AI (Haiku), orologio asyncio per gli
+  notifiche via bot Telegram, ricerca full-text (FTS5), orologio asyncio per gli
   sblocchi automatici (72h dalla consegna, 10gg dalla spedizione).
   L'IMPORTO DI OGNI BOLT11 IN USCITA SI CONTROLLA CONTRO IL DOVUTO
   (ago 2026, C-1 dell'audit, ed è la regola da non ammorbidire).
@@ -133,8 +133,9 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   distingue «non è tuo» da «non esiste»: chi enumera non impara nulla.
   `/api/listings` è PUBBLICA (vetrina anche senza Telegram) ma serve solo
   la whitelist esplicita `CAMPI_VETRINA`: `venditore_id` esce solo alle
-  richieste autenticate. La ricerca AI resta riservata agli autenticati
-  (pubblica sarebbe credito API regalato ai bot). Tutto il resto è
+  richieste autenticate. La RICERCA vive dentro `/api/listings` ed è
+  quindi pubblica come lei: non costa più niente a nessuno, e il
+  recinto di ieri («credito API regalato ai bot») non ha più oggetto. Tutto il resto è
   autenticato via `verifica_utente`. Moderazione a tre strati su
   `pubblica()`: filtro `PAROLE_VIETATE` (parole intere su testo
   normalizzato), parere AI opzionale (fail-open se la chiave manca o
@@ -1305,7 +1306,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   catalogo); resta solo la migrazione VECCHIA in `init_db` (Sport →
   Sport e hobby ecc. con COLLATE NOCASE, che raddrizza le maiuscole
   storte dei vecchi import, 'casa'). La lista entra nel
-  prompt della ricerca AI; nel NIP-99 il tag `t` è la prima parola
+  catalogo della ricerca; nel NIP-99 il tag `t` è la prima parola
   minuscola ("Casa e giardino" → "casa": un hashtag non ha spazi).
   LE ICONE (`EMOJI_CAT` nel client) dicono il REPARTO, non un
   prodotto: 🍳 Elettrodomestici (il cesto 🧺 e' dove finisce il bucato,
@@ -1777,7 +1778,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   ●●●○○ provati al loro posto si confondevano con le stelle delle
   recensioni — bocciati, non riproporli). Riga «— condizione:
   …» nel content NIP-99 (nessun tag: la spec non ne ha uno, pattern
-  della spedizione) e nel catalogo della ricerca AI; colonna
+  della spedizione) e nell'indice della ricerca; colonna
   facoltativa `condizione` nel CSV d'import con `condizione_tollerante`
   (SINONIMI_CONDIZIONE: «ottimo» → come_nuovo, «da riparare» →
   da_sistemare…, sconosciuta = non dichiarata, mai uno scarto).
@@ -1791,7 +1792,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Buoni ed esperienze»: un buono è nuovo per definizione, anche la
   tessera fisica) e il giudice unico è
   `senza_condizione(categoria, consegna)`, da cui passano form,
-  dettaglio, vetrina, NIP-99, ricerca AI e import — o divergono. Il
+  dettaglio, vetrina, NIP-99, ricerca e import — o divergono. Il
   secondo asse è la CONSEGNA: un codice Zalando è nuovo per
   definizione come la marmellata, ma vale solo per il digitale
   ESCLUSIVO (`consegna=='digitale'`) — sulla combo la merce fisica c'è
@@ -1901,8 +1902,8 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   nella valuta del toggle attivo al momento di Applica, stato per
   SESSIONE (mai localStorage) che sopravvive al cambio categoria
   (patto delle app di mercatino), in DEMO client-side sui dati finti.
-  La ricerca AI coi vincoli scritti resta separata da questi filtri
-  di navigazione. Le MINIATURE dal lug 2026 sono QUADRATE
+  La ricerca per parole SI COMPONE con questi filtri, e non è una
+  strada a parte: vive nella stessa rotta (vedi «LA RICERCA»). Le MINIATURE dal lug 2026 sono QUADRATE
   (ImageOps.fit al centro, 640 q87 LANCZOS, `MINIATURA_LATO/QUALITA`):
   la card 1:1 col cover ingrandiva il lato corto delle vecchie
   rettangolari (la sgranatura); il backfill rifà da solo quelle di
@@ -1911,21 +1912,141 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `GET /api/listings/{id}` (registrato DOPO /miei: l'ordine delle
   rotte conta) per il deep-link /annuncio/{id} oltre le pagine
   caricate.
-  LA RICERCA AI HA UN FRENO (ago 2026, audit): era l'unica rotta dove
-  UNA richiesta di un utente qualunque = UNA chiamata ad Anthropic, e
-  con un prompt di dimensione massima FISSA — la shortlist si riempie
-  fino a 300 annunci anche quando la domanda non trova niente, quindi
-  ogni ricerca costa uguale, tanto. L'unico recinto era
-  l'autenticazione, che la passa chiunque abbia un account.
-  `TETTO_RICERCHE_AI_ORA` (30, leva; 0 = nessun freno) col pattern di
-  `IMPORT_QUOTA` e l'ora al posto del giorno; purga in `pulisci_avvisi`.
-  A quota finita NON si sbatte la porta: si risponde col filtro per
-  parole — che esisteva già come ripiego dell'eccezione e non costa
-  niente — E LO SI DICE, invece di far sembrare che l'AI abbia capito
-  poco. Il discriminatore è `busta=1` → `{annunci, ai}`; senza il
-  parametro resta l'array di sempre, che è il patto della paginazione,
-  e il client regge tutt'e due le forme. Più il `timeout` sulla
-  chiamata, che era l'unica delle quattro del file a non averlo.
+  LA RICERCA È UNA SOLA (ago 2026, decisione di Andrea: «l'AI nella
+  ricerca eliminala proprio»). Fino a ieri erano DUE, e rispondevano
+  diverso alla stessa domanda: per gli anonimi un LIKE sulla FRASE
+  INTERA in titolo/descrizione/zona — quindi «bici da corsa» non
+  trovava «bicicletta da corsa», e «collezionismo» non trovava la
+  categoria Collezionismo, che il LIKE nemmeno guardava — e per gli
+  autenticati Haiku, cioè l'unica rotta del progetto dove UNA
+  richiesta di un utente qualunque era UNA chiamata al modello, col
+  prompt sempre pieno (300 annunci) anche quando la domanda non
+  trovava niente. Adesso è un indice full-text di casa: senza rete,
+  senza credito, uguale per tutti, e PROVABILE IN CI — che di un'AI
+  non si può dire. Il ripiego dell'AI era per giunta la strada che si
+  vedeva proprio quando le cose andavano male, cioè la peggiore da
+  lasciare zoppa.
+  DOVE VIVE: dentro `/api/listings`, cioè nella VETRINA — ed è quel
+  che la rende componibile con categoria, prezzo, regione e filtri, e
+  paginata come tutto il resto, senza una riga in più. `/api/search`
+  resta un GUSCIO che chiama lo stesso giudice, per i client rimasti
+  in cache: `busta=1` risponde ancora `{annunci, ai}` con `ai` a
+  FALSO, che adesso è semplicemente vero per tutti.
+  LO STEMMER È SNOWBALL, e non una tabella di desinenze fatta in casa
+  (decisione di Andrea: «ci vuole un sistema già collaudato, non per
+  forza le prime 5 lettere»): `snowballstemmer`, Python puro, ~100 KB,
+  zero dipendenze, l'algoritmo che sta sotto Lucene, Elasticsearch e
+  PostgreSQL. `collezione`, `collezionismo` e `collezionista`
+  diventano tutte `collezion`. Import FAIL-OPEN ma DICHIARATO
+  all'avvio (il patto della chiave dei contenuti digitali): senza il
+  pacchetto si ripiega sul TRONCAMENTO, più grossolano e mai muto.
+  IL TRONCAMENTO A 5 NON È SOLO IL RIPIEGO, è anche una toppa a un
+  difetto vero dello stemmer, MISURATO e non temuto: su 28 coppie
+  singolare/plurale di un mercatino ne sbaglia 4 — «tastiera →
+  tastier» ma «tastiere → tast», e così telefono/telefoni,
+  cassettiera, caffettiera (Snowball tratta '-iera' come una desinenza
+  e sul plurale arriva prima un'altra regola). Il 14%, e dentro ci
+  sono le parole che la gente scrive davvero. Su tutti e quattro i
+  casi le due radici divergenti hanno le prime CINQUE lettere in
+  comune: da lì la cura — `termini()` indicizza e cerca TUTT'E DUE le
+  forme, in «o». Cinque e non quattro perché quattro impasta cose
+  diverse («coll» prende collana, collo, collega).
+  L'INDICE è `annunci_fts` (FTS5, `rowid` = `annunci.id`) con QUATTRO
+  campi separati perché BM25 li possa PESARE: titolo 10, categoria 4,
+  descrizione 2, zona 1 — una parola nel titolo vale cinque volte la
+  stessa parola persa in fondo a una descrizione, ed è la lezione di
+  `sottocategoria_indovina`. Il punteggio di BM25 è NEGATIVO e più
+  basso vuol dire meglio: l'ORDER BY crescente non è un refuso.
+  I SINONIMI ENTRANO NELL'INDICE, NON NELLA DOMANDA, ed è la scelta
+  che tiene veloce la ricerca: espandere la DOMANDA vuol dire una
+  query che si allunga con quante parole conosciamo — e la domanda si
+  fa a ogni tasto —, espandere l'INDICE costa una volta sola, quando
+  l'annuncio si scrive. Nel quarto campo ci stanno la categoria, la
+  sottocategoria con la sua etichetta e i sinonimi di tutt'e due:
+  così «pc» trova l'Informatica e «hifi» l'Audio e video, e i due
+  cataloghi di sinonimi che il progetto ha già si mettono a servire
+  anche la ricerca senza un dizionario nuovo da tenere in pari.
+  L'INDICE SI TIENE IN PARI DA SOLO, e questa è la riga da non
+  ammorbidire: a invalidarlo è un TRIGGER SQL (`ricerca_v` a zero su
+  ogni UPDATE di titolo/descrizione/zona/categoria/sottocategoria), e
+  a rifarlo `riallinea_ricerca`. I posti che riscrivono il testo di un
+  annuncio sono SETTE e diventeranno otto — un elenco a memoria
+  invecchia e RIMPICCIOLISCE, la lezione del titolo nudo nelle
+  notifiche — mentre un trigger non si può dimenticare, e copre gratis
+  anche `importa_nostr.py`, che scrive dritto nel database e di questa
+  colonna non sa niente (e deve restare cieco: dev'essere lanciabile
+  su un Barattolo più vecchio). Il trigger INVALIDA e basta — stemmare
+  vuole Python. La riparazione gira in DUE posti: la passata d'avvio
+  (`scalda_ricerca`, un evento di startup e NON `init_db`, che gira
+  all'import quando lo stemmer non è ancora definito) e la strada
+  calda della ricerca, 300 righe per volta — così un annuncio appena
+  pubblicato si trova SUBITO senza aspettare un giro d'orologio, e chi
+  cerca non paga l'attesa di un import da cinquecento righe.
+  `VERSIONE_RICERCA` è la leva: alzarla di uno rifà tutto l'indice al
+  primo avvio, ed è quel che si tocca cambiando stemmer, campi o pesi.
+  LA DOMANDA si prova STRETTA e poi LARGA (tutte le parole, poi almeno
+  una): «tastiera meccanica» deve dare le tastiere meccaniche e non
+  tutte le tastiere, ma su un catalogo piccolo l'intersezione è spesso
+  vuota — e una vetrina vuota, quando qualcosa da mostrare c'era, è
+  peggio di una imprecisa. Ogni parola è un GRUPPO (radice «o»
+  troncamento) e sono i gruppi a legarsi in «e»; l'ULTIMA parola è un
+  prefisso, perché chi digita ce l'ha quasi sempre a metà. I termini
+  escono da `normalizza` — il setaccio di casa, lo STESSO del filtro
+  parole e del motore geografico — quindi sono solo lettere e cifre e
+  non possono spezzare la stringa FTS da fuori.
+  CON UNA RICERCA ATTIVA L'ORDINE È LA PERTINENZA, e il cursore keyset
+  non serve più: quello pagina su una COLONNA, e un punteggio colonna
+  non è. Si pagina sulla POSIZIONE nella rosa (`r{quanti ne ho già
+  visti}`), stabile perché il punteggio è deterministico. I FILTRI si
+  applicano alla ROSA INTERA e non alla pagina, o le pagine
+  uscirebbero di lunghezze diverse e il totale direbbe il falso: una
+  lettura in più per ricerca, e in cambio il conto è esatto. Le voci
+  di Ordina restano scritte nel campo e non si applicano finché si
+  cerca — la stessa regola per cui il filtro di un'occasione si porta
+  dietro il suo ordine. Tetto `TETTO_RICERCA` 500.
+  FAIL-OPEN NEL VERSO GIUSTO: `cerca_ids` torna `None` — e non una
+  lista vuota — quando l'indice non c'è (un SQLite senza FTS5, un
+  indice rotto). Sono due cose diverse, e chi chiama ripiega sul LIKE
+  di ieri invece di dire «nessun risultato», che sarebbe una bugia.
+  E IL FAIL-OPEN VALE ANCHE ALL'AVVIO, che è dove il prezzo dell'errore
+  è più alto: FTS5 è una funzione OPZIONALE di SQLite, e senza il `try`
+  sul `CREATE VIRTUAL TABLE` una build che non ce l'ha farebbe esplodere
+  `init_db` — cioè non «la ricerca peggiore», ma **il mercatino giù**.
+  Lo stesso `try` sta su `riallinea_ricerca`, ed è arrivato da una
+  PROVA e non da una rilettura: la prima stesura guardava le spalle
+  solo a chi LEGGE, quindi il server partiva e la prima ricerca dava
+  500 — perché la riparazione SCRIVE nell'indice. Il caso si gira per
+  davvero in CI, con una connessione che alza come farebbe quella
+  build.
+  I NUMERI, misurati su un catalogo grande come quello di produzione
+  (900 annunci, descrizioni vere): la passata d'avvio **1,0 secondo**
+  una volta sola, una ricerca **0,7 ms**, e a regime la passata non
+  costa niente (0,3 ms, non trova nulla da fare).
+  LA TRAPPOLA DEL DOPPIO FILTRO, trovata costruendo e sorvegliata da
+  una sentinella: `renderGrid` rifiltrava la griglia con un
+  `includes(q)` sul testo, e coi dati vivi avrebbe buttato via PROPRIO
+  i risultati che l'indice trova per radice o per categoria —
+  «collezionismo» che pesca l'annuncio che dice «collezione» sarebbe
+  sparito nell'ultimo passo. La ricerca nuova non avrebbe funzionato,
+  e non ci sarebbe stato un errore da nessuna parte: il modo più
+  silenzioso in cui questo cantiere poteva fallire. Ora quel filtro
+  vive SOLO in DEMO, dove il server non c'è.
+  IL COLLAUDO È ESEGUIBILE (`collaudo_ricerca.py`, il server VERO su un
+  database usa-e-getta): il caso che ha aperto il cantiere, la
+  composizione coi filtri, l'unione delle pagine, il totale, l'indice
+  che si ripara, e che venduto/rimosso/revisione non escano MAI. Due
+  fixture ci stanno APPOSTA e vanno tenute — un annuncio in
+  Collezionismo il cui testo non nomina nessuna collezione (senza,
+  togliere la categoria dall'indice non fa fallire niente) e uno che
+  ripete la parola quattro volte in descrizione (senza, appiattire i
+  pesi di BM25 non fa fallire niente): tutt'e due sono mutazioni
+  sopravvissute al primo giro di tortura, e il collaudo le ha
+  imparate da lì.
+  RESTA DA FARE: il completamento automatico mentre si digita
+  (`prefix='2 3 4'` è già nell'indice apposta, e i termini veri li
+  espone `fts5vocab` senza una tabella da mantenere) e il «forse
+  intendevi» con `difflib`, che è già il motore di
+  `suggerisci_comune`.
   ANCHE LO SCARICATORE DI FOTO È UNO SOLO (ago 2026, audit):
   `scarica_foto_url` in server.py, con `url_foto_ammesso` sulla
   partenza E su ogni salto (`_RedirectControllato`), timeout e tetto
@@ -1938,10 +2059,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   Nostr. Ora l'import RICEVE lo scaricatore del server, ed è il patto
   del `vaglio`: quel che ha bisogno delle guardie del server vive nel
   server, e lo script lanciato a mano resta identico.
-  La ricerca AI legge una SHORTLIST (`TETTO_CATALOGO_AI`
-  300): match LIKE sulle parole della query + i più recenti a
-  riempire — compromesso dichiarato: il sinonimo puro fuori dai 300
-  più freschi può sfuggire. FOTO: accanto a ogni JPEG pieno nasce
+  FOTO: accanto a ogni JPEG pieno nasce
   `a{id}_{i}{ver}_min.jpg` (vedi ricetta miniature più sotto) — nel DB
   restano SOLO i nomi pieni, `_min` è convenzione che il frontend
   deriva (`fotoMini`); backfill idempotente all'avvio
@@ -2395,6 +2513,152 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dal database, e `mtime-size` servirebbe un 304 su una scheda ormai
   cambiata; sarebbe una seconda formula, cioè la sentinella dell'ETag
   unico che si mette a urlare. Rimandata, e scritto qui.
+  IL FEED DI GOOGLE MERCHANT (ago 2026): `GET /feed/google.xml`, RSS
+  2.0 col namespace `g`, generato al volo e in cache 15 minuti come la
+  sitemap. Nessuna tabella, nessun job, una rotta esplicita (regola
+  ferrea 3).
+  LA VALUTA È IL MURO, ed è la cosa da leggere prima di toccare una
+  riga: Merchant Center accetta SOLO codici ISO 4217 — **BTC per
+  Google non esiste** — e pretende che il prezzo del feed COMBACI con
+  quello della pagina di destinazione. Un disallineamento non
+  disapprova un annuncio: a ventotto giorni **sospende l'ACCOUNT**.
+  Quindi i sats si convertono in euro, ed è una DECISIONE DI ANDREA
+  presa sapendo il rischio — il prezzo in euro di un listino in sats
+  si muove col cambio mentre Google ricontrolla la pagina quando gli
+  pare. La strada sicura (mandare i soli listini nati in EUR) è stata
+  proposta e scartata.
+  QUEL CHE RIDUCE IL RISCHIO, e che è fatto: feed e pagina leggono lo
+  STESSO cambio dalla STESSA fonte (`cambio_noto_ora`, la cache, mai
+  la rete), e il JSON-LD di un annuncio in sats dichiara adesso DUE
+  offerte — prima l'EUR, che è quella che Google legge, poi la BTC,
+  che resta la cifra esatta. Prima le due cifre divergevano SEMPRE e
+  per costruzione (la pagina diceva BTC, il feed euro); adesso possono
+  divergere solo per il TEMPO che passa fra i due crawl. `_prezzo_ld_eur`
+  è quella riga, e senza di lei il feed non poteva funzionare.
+  CHI RESTA FUORI, e ognuno per una ragione sua: le ASTE (quel prezzo
+  è una BASE, non un prezzo d'acquisto — dichiararlo vorrebbe dire
+  promettere una cifra a cui l'oggetto non si compra), le LAMPO VIVE
+  (scadono in ore mentre il feed vive in cache per giorni: è la stessa
+  ragione per cui l'anteprima dei link dichiara il listino), chi non
+  ha una FOTO (`image_link` è obbligatoria, e il ripiego al brand
+  delle anteprime qui NON va bene — un feed col nostro logo su ogni
+  prodotto è una disapprovazione in blocco) e chi non ha un prezzo
+  dicibile in euro. Ferie ed esauriti ci stanno invece, ma
+  `out_of_stock`: è la verità, e toglierli e rimetterli a ogni rientro
+  farebbe ballare il feed.
+  LA CONDIZIONE È OBBLIGATORIA e dove manca vale `used` (decisione di
+  Andrea: è un mercatino dell'usato, ed è il default statisticamente
+  vero), CON UNA ECCEZIONE che non è un ripensamento: dove la
+  condizione non vuol dire niente — alimenti, bellezza, buoni, codice
+  online — la merce è nuova per definizione, e «usato» su un vasetto
+  di miele sarebbe una dichiarazione FALSA a Google, che le
+  misrepresentation le sanziona. Il giudice è `senza_condizione`, lo
+  stesso di form, dettaglio, vetrina, NIP-99 e import: qui non nasce
+  nessuna regola nuova. `da_sistemare` → `used` e MAI `refurbished`,
+  la stessa mappatura sbagliata già evitata nei dati strutturati.
+  TRE COSE LE HA TROVATE IL PRIMO FEED GENERATO SUI DATI VERI, non la
+  rilettura, ed è la parte da tenere. 1) LA DESCRIZIONE portava la
+  nostra CODA PROMOZIONALE — «Prezzo: 26000 sats — zona: … 🫙⚡ In
+  vendita su Barattolo … https://…» — che rientra dall'import quando
+  il venditore ripubblica da un client suo: Google **disapprova le
+  descrizioni che contengono prezzi, spedizione o link**, e quel
+  «26000 sats» è per giunta la cifra che contraddice il `g:price` in
+  euro. Si taglia dal nostro marcatore in poi, con la riga «Prezzo:»
+  che lo precede; il DATO NON SI TOCCA — cambia solo cosa si racconta
+  a Google — e un «Prezzo:» scritto dal venditore resta, perché la
+  riga si toglie solo quando è attaccata al marcatore. 2) Gli
+  INDIRIZZI DEL VENDITORE nella descrizione (due su trentasei): via
+  anche quelli, e nella scheda vera restano interi. 3) Il `g:brand`
+  diceva il nome del VENDITORE, cioè «Barattolo» su ogni prodotto —
+  il nome di chi vende non è la marca di uno shoyu, e con
+  `identifier_exists: no` Google non la chiede: la marca si OMETTE
+  invece di inventarla.
+  `CODA_PROMO_NIP99` PORTA IL SUFFISSO APPOSTA: `CODA_PROMO` esiste
+  già ed è la coda dei post del canale. Chiamarla così la
+  sovrascriveva, e `evento_annuncio` si sarebbe ritrovato una LISTA
+  dentro una f-string — cioè le note Nostr rotte. L'ha presa il primo
+  feed generato dal vivo.
+  LA LEVA `FEED_MERCHANT` nasce ACCESA (non muove denaro e non manda
+  niente a nessuno: espone una rotta che racconta quel che la vetrina
+  racconta già) ma è un interruttore e non una costante, ed è il
+  punto: se Merchant Center comincia a lamentarsi il feed va spento IN
+  FRETTA, con una riga nel config e un riavvio.
+  RESTA DA FARE PRIMA DI ATTIVARLO, e non è codice: una POLITICA DI
+  RESO pubblica e raggiungibile senza login (Merchant Center la
+  pretende; il reso nel flusso ordini c'è ed è descritto, ma non c'è
+  una pagina che lo dichiari a chi non è ancora entrato) e la
+  dichiarazione di essere un MARKETPLACE MULTI-VENDITORE. Senza,
+  il feed viene rifiutato comunque.
+  IL WIDGET DA INCORPORARE (ago 2026): un annuncio, o la vetrina di un
+  negozio, dentro il sito di qualcun altro —
+  `<iframe src="…/widget/negozio/{codice}">`. Due rotte esplicite
+  (regola ferrea 3), una pagina SUA di due kilobyte col CSS in linea,
+  cache 5 minuti.
+  L'IFRAME E NON UNO SCRIPT, ed è la decisione che porta via tutto il
+  resto. Uno script che inietta HTML nella pagina ospite è la strada
+  che tutti conoscono e ha tre difetti veri: il CSS del sito ospite
+  entra nel nostro e viceversa, noi ci prendiamo il diritto di
+  ESEGUIRE CODICE su un dominio che non è nostro — cioè chiediamo a un
+  estraneo una fiducia che non ci serve — e ogni ritocco al nostro
+  markup può rompere la pagina di qualcun altro. L'iframe è isolato
+  per costruzione: il peggio che può fare è non caricarsi.
+  NON SI SERVE `miniapp.html`: quella pesa quasi un mega ed è un'app,
+  non un biglietto da visita — la stessa ragione per cui il cartello
+  SEO esiste separato dal client.
+  NIENTE DATI PRIVATI E NIENTE AZIONI: si legge `CAMPI_VETRINA`, la
+  whitelist di sempre (con `a.*` uscirebbe il `venditore_id`, cioè il
+  tg_id, sul sito di un estraneo — il posto peggiore in cui possa
+  finire), e l'unico gesto è un LINK che porta su Barattolo. Un widget
+  che potesse comprare sarebbe un checkout dentro casa d'altri.
+  IL VENDUTO SI SERVE, spento e col suo badge: è la regola della
+  scheda e dell'anteprima dei link — chi ha incollato il widget sul
+  suo sito non deve ritrovarsi un buco il giorno che vende. Il rimosso
+  e quello in revisione no: non raccontano niente di sé.
+  UN WIDGET NON DÀ MAI 404: dentro l'iframe di qualcun altro un 404 si
+  vede come una pagina rotta, e a rimetterci è il sito ospite, che con
+  noi non c'entra niente — quindi `_widget_niente` è un riquadro che
+  lo dice, con la via d'uscita verso Barattolo.
+  IL TEMA LO DECIDE IL SITO OSPITE (`prefers-color-scheme`), e non
+  noi: il widget è un ospite. L'ALTEZZA è scritta nel codice da
+  copiare e non si calcola — il widget la annuncia via `postMessage`
+  per chi vuole ascoltarla, ma chi incolla e basta deve ottenere
+  qualcosa di sensato senza fare niente.
+  E IL ROVESCIO È LA METÀ CHE CONTA, MA NASCE SPENTO: da quando esiste
+  il widget, «si può stare in un iframe?» ha DUE risposte diverse — e
+  finché non si distinguevano bisognava dire di sì a tutti, che è quel
+  che il sito fa **senza averlo scelto** (nessun header, quindi
+  barattolo.store incorniciabile da chiunque: il clickjacking di
+  manuale, col danno limitato dal cookie SameSite=Lax e dall'initData
+  che in un iframe di terzi non c'è). Il middleware `no_iframe` mette
+  `frame-ancestors 'self' https://web.telegram.org` a tutto tranne
+  `/widget/` — ma solo a leva `PROTEGGI_IFRAME` ACCESA, e quella nasce
+  FALSE nel codice.
+  IL PERCHÉ DELLA LEVA (decisione di Andrea: «non si deve rompere
+  nulla»): il widget NON ha bisogno di quella stretta per funzionare —
+  oggi tutto è incorniciabile, widget compreso — quindi tenerla spenta
+  non toglie niente a nessuno e lascia il cantiere ADDITIVO PURO. È
+  l'unico pezzo che possa rompere qualcosa, e quel qualcosa si vede su
+  una strada sola: la Mini App da Telegram Web. Si accende dal config
+  dopo averla guardata, che è il patto di ASTA_ABILITATA e
+  IMPORT_NOSTR_APERTO — una cosa che può far male si accende con un
+  gesto, mai per effetto di un deploy.
+  NIENTE `X-Frame-Options`, E QUESTA È LA RIGA DA NON AGGIUNGERE «per
+  sicurezza»: quell'header è BINARIO — o solo il proprio sito, o
+  nessuno — e su TELEGRAM WEB la Mini App gira dentro un iframe di
+  `web.telegram.org`. Un `SAMEORIGIN` di troppo lì non è una stretta:
+  è Barattolo che smette di aprirsi per chi usa Telegram dal browser,
+  e non se ne accorge nessuno finché non lo prova (dentro l'app di
+  Telegram la WebView è nativa e non c'entra — è esattamente il genere
+  di guasto che si vede su una sola strada). `frame-ancestors` una
+  lista la sa tenere, e sui browser moderni ha comunque la precedenza.
+  `setdefault` e non assegnazione: il documento della busta ha già una
+  CSP sua, con la sandbox, e non deve perderla.
+  DOVE SI PRENDE IL CODICE: foglio `#widgetSheet` — «Widget per il
+  web» (il nome l'ha scelto Andrea) — aperto dal Profilo e dal
+  dettaglio del PROPRIO annuncio. Il campo è `readonly` e non `disabled` — da un disabled il
+  testo non si seleziona, e se la clipboard fa i capricci la strada a
+  mano deve restare aperta; quando non riesce lo si DICE, che è la
+  regola del codice di @trackbot.
   E DA QUI È NATO `_fmt_eur` (ago 2026): **un euro si scrive in un modo
   solo in tutta l'app**. Gemello di `_fmt_sats`, con la VIRGOLA dei
   decimali — col punto una cifra grande si legge per un fattore mille —
@@ -2411,11 +2675,10 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   SPECIFICA. Per la stessa ragione restano col punto le due righe di
   prosa del content (`Prezzo:`, `spedizione:`), che stanno nello stesso
   evento dei tag e li ripetono a parole — divergere da loro sarebbe
-  peggio —, e la riga del catalogo che va in pasto ad Haiku, che una
-  persona non legge. Il CSV la virgola ce l'ha già per conto suo.
+  peggio. Il CSV la virgola ce l'ha già per conto suo.
   LA SENTINELLA che rende il principio verificabile invece che
-  raccomandato conta tre cose: zero `:.2f} €`, tre `:.2f} EUR` (i soli
-  che una persona non legge) e otto `:.2f}` in tutto, che è il
+  raccomandato conta tre cose: zero `:.2f} €`, DUE `:.2f} EUR` (i soli
+  che una persona non legge) e OTTO `:.2f}` in tutto, che è il
   censimento completo dei superstiti. Serve perché QUESTA FAMIGLIA SI
   NASCONDE: cercando il solo `€` il primo censimento ne aveva mancati
   tre, tutti che scrivevano «EUR» a parole, ed è stata la sentinella a
@@ -2429,10 +2692,13 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   con lo spazio fatto a mano. Ora ci passano tutte e 33 le cifre che
   una persona legge come parole di Barattolo (notifiche, avvisi ai
   moderatori, polso ordini, messaggi d'errore, memo della invoice).
-  RESTANO FUORI QUATTRO, e sono la stessa famiglia delle eccezioni
-  dell'euro: una riga di journal (log diagnostico, un lettore solo),
-  la riga del catalogo che va in pasto ad Haiku, e le due righe di
-  prosa del NIP-99 che ripetono i tag a parole.
+  RESTANO FUORI TRE, e sono la stessa famiglia delle eccezioni
+  dell'euro: una riga di journal (log diagnostico, un lettore solo) e
+  le due righe di prosa del NIP-99 che ripetono i tag a parole.
+  I DUE CONTI SONO SCESI DI UNO ALL'AGO 2026, e va detto perché è il
+  genere di numero che sembra sbagliato: il superstite in più era la
+  riga del catalogo che andava in pasto ad Haiku, e se n'è andata con
+  la ricerca AI (vedi «LA RICERCA È UNA SOLA»).
   E IL RIFIUTO DI `paga_venditore` HA TRE MOTIVI, non uno, e ognuno
   vuole le sue parole: una bolt11 che non si decodifica NON «chiede
   None sats» — è **illeggibile**, e l'avviso lo dice. Sembra cosmesi e
@@ -3392,7 +3658,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   `arricchisci_righe_vetrina` (si chiamava `espandi_distintivi_
   vetrina` finché faceva una cosa sola) è il COLLO DI BOTTIGLIA da
   cui passano tutte e sei le rotte che diventano card — vetrina,
-  negozio, singolo, miei, ricerca AI, preferiti. È lì che si
+  negozio, singolo, miei, ricerca, preferiti. È lì che si
   aggiungono i campi derivati, ed è per questo che `zona_comune` non
   ha bisogno di nessun ripiego lato client: le rotte che servono
   l'annuncio INTERO (`/api/search`, `/api/listings/miei`) passano da
@@ -4820,7 +5086,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   mai raddoppiarlo. Dice che si può prolungare.
   SUPERFICIE: `u.ferie_fino AS venditore_ferie` in `CAMPI_VETRINA` a
   costo ZERO (il JOIN su `u` c'era già), quindi arriva in un colpo
-  solo a vetrina, negozio, singolo, miei, ricerca AI e preferiti;
+  solo a vetrina, negozio, singolo, miei, ricerca e preferiti;
   `ferie_fino` nel profilo di `/api/negozio`; `ferie_leve` in
   `/api/me` (il client non hardcoda mai un tetto, il patto di
   `max_barattolo`). Endpoint `POST /api/me/ferie` col pattern di
@@ -5663,7 +5929,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   decide il flag `ultimo` col giudice puro `ultimo_pezzo(quantita,
   quantita_max)` e lo POPPA — grezzo racconterebbe «ne ha venduti N»,
   un dato nuovo che nessuno ha chiesto, e il pop copre anche le rotte
-  che servono l'annuncio intero con `a.*` (ricerca AI, i tuoi annunci).
+  che servono l'annuncio intero con `a.*` (ricerca, i tuoi annunci).
   È il pattern di `zona_comune`: un campo derivato che porta già dentro
   la risposta alla domanda.
   IL BADGE «ULTIMO» esiste solo dove la scarsità è una NOTIZIA — ne ha
@@ -8025,7 +8291,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   in Vendi — colonne `annunci.valuta` ('sats' default: zero impatti
   sugli annunci esistenti) e `annunci.prezzo_eur`. Per i listini EUR
   `prezzo_sats` resta l'EQUIVALENTE al cambio di pubblicazione (serve
-  al tetto, alla ricerca AI e come ripiego display). Il pagamento è
+  al tetto, all'indice della ricerca e come ripiego display). Il pagamento è
   SEMPRE in sats: `compra()` converte al cambio corrente alla
   creazione della invoice (la vita della invoice, 15 min, È il lock
   del prezzo: scaduta, si riconverte; 503 se il cambio non è mai
@@ -8391,7 +8657,7 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   (non è un indietro), mentre arrivandoci da un'altra radice si ritrova
   la vetrina dov'era — che è la convenzione dei tab.
   DUE DENTI DELLO STESSO LUCCHETTO, e servono tutt'e due: il CONTO
-  delle card (`n`) dice che la griglia è ancora quella — ricerca AI,
+  delle card (`n`) dice che la griglia è ancora quella — una ricerca,
   potatura, un annuncio sparito fanno ripartire dalla cima invece di
   atterrare nel vuoto, che il cantiere dichiara peggio di niente — e
   `loadListings` BUTTA `vetrinaPos` accanto al giro, perché due vetrine
@@ -11807,7 +12073,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    ancora), `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito
-   per ore),
+   per ore), `/feed/google.xml` (il feed di Merchant Center, spento
+   dalla leva `FEED_MERCHANT`), `/widget/annuncio/{id}` e
+   `/widget/negozio/{chi}` (le UNICHE pagine fatte per stare
+   nell'iframe di un estraneo — tutte le altre lo vietano con
+   `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
@@ -13204,7 +13474,7 @@ sola, nessuna sopravvive. Più il giro dal vivo sul server locale con le
 misure a mano — 90 card e 4200px ritrovati identici da dettaglio,
 negozio, carrello e pagina d'acquisto, salto multiplo compreso; e i
 casi che NON devono ripristinare, verificati uno per uno: vetrina
-ricaricata mentre si è via (→ cima, mai il clamp in fondo), ricerca AI,
+ricaricata mentre si è via (→ cima, mai il clamp in fondo), ricerca,
 cambio categoria, tab Esplora su Esplora, deep link `/annuncio/{id}`.
 Più due screenshot CDP prima/dopo identici pixel per pixel, e zero
 errori JS. Un difetto PREESISTENTE trovato di striscia e chiuso qui: il
@@ -14238,6 +14508,160 @@ amministratore del canale, `/canale -1003975076313` (deve arrivare il
 messaggio di prova), `/vetrina` per vedere dov'è, `/vetrina tutto`, e
 un annuncio vero da guardare. DA GUARDARE il primo lunedì: il
 riepilogo, **una volta sola** anche con un deploy in mezzo.
+
+La ricerca diventa una sola, e l'AI ne esce (ago 2026, decisione di
+Andrea: «l'AI nella ricerca eliminala proprio»). Cercando
+«collezionismo» ora si trovano gli annunci che dicono «collezione» e
+quelli della categoria Collezionismo — che il LIKE di ieri non
+guardava nemmeno. Sotto c'è FTS5, che è dentro SQLite da sempre (zero
+dipendenze, zero compilazioni), con lo stemmer italiano di Snowball
+per le desinenze e i sinonimi delle categorie cotti DENTRO l'indice.
+Vive in `/api/listings`, cioè nella vetrina: si compone coi filtri e
+pagina come tutto il resto, e `/api/search` resta un guscio per i
+client in cache. Vedi Architettura, «LA RICERCA È UNA SOLA», per lo
+stemmer misurato (su 28 coppie singolare/plurale ne sbaglia 4 —
+tastiera, telefono, cassettiera, caffettiera — e da lì esce il
+troncamento a 5), per il trigger che invalida al posto di sette
+chiamanti da ricordare, e per la trappola del doppio filtro nel
+client, che è il modo più silenzioso in cui questo cantiere poteva
+fallire.
+Collaudato: 3421 prove verdi in modalità severa (39 nuove, più una
+famiglia ROVESCIATA — certificava il freno della ricerca AI e adesso
+certifica che di quella strada non resti niente) e un collaudo
+ESEGUIBILE, `collaudo_ricerca.py`, col server VERO su un database
+usa-e-getta: 32 verdi. Più **UNDICI MUTAZIONI** del codice, una per
+riga sorvegliata (categoria fuori dall'indice, via i sinonimi, pesi
+di BM25 appiattiti, via il troncamento, ordine di pertinenza perso,
+indice che non si ripara sulla strada calda, filtri applicati alla
+pagina invece che alla rosa, cursore che non avanza, totale che
+mente, giro stretto saltato, trigger che non invalida): ognuna
+diventa rossa da sola. LE PRIME DUE erano SOPRAVVISSUTE al primo
+giro, ed è la parte da ricordare: il catalogo di prova non aveva né
+un annuncio la cui categoria è l'unica cosa che lo fa trovare, né uno
+che ripete la parola in descrizione — le due fixture sono nate dalla
+tortura e non dal piano. Più il giro dal vivo col server acceso su un
+database usa-e-getta (le cinque domande di esempio, coi totali che
+tornano) e il parse del client con node.
+NON COLLAUDATO QUI, e va detto: su questa macchina non c'è un browser
+connesso, quindi il giro VISIVO non è stato fatto — la searchbar, lo
+scorrimento infinito su una ricerca e la tirata di aggiornamento
+dentro una ricerca vanno guardati dal telefono.
+NON SI ROMPE NIENTE SE FTS5 NON C'È: provato per davvero con una
+connessione che alza come farebbe un SQLite senza quel modulo — il
+server parte, lo dice nel journal, e la ricerca ripiega sul LIKE di
+ieri (10 risultati su «poster», gli stessi di prima).
+IN PRODUZIONE: il deploy fa nascere la colonna `ricerca_v` (a zero,
+cioè tutto da indicizzare), la tabella `annunci_fts` e i due trigger;
+al primo avvio la passata indicizza tutti gli annunci e lo dice con
+una riga («🔎 Indice di ricerca: N annunci indicizzati»). PRIMA del
+riavvio serve `pip install snowballstemmer` nell'ambiente del
+servizio: senza, il server parte lo stesso e la ricerca lavora a
+troncamento — e la riga d'avvio lo dichiara. DA GUARDARE al primo
+giro: quella riga, e le prime ricerche vere in produzione (se
+`snowballstemmer` manca, «tastiere» e «tastiera» smettono di
+trovarsi fra loro). Se il config del VPS ha una riga
+`TETTO_RICERCHE_AI_ORA`, è diventata INERTE e si può togliere.
+RESTA DA FARE, il secondo passo di questo cantiere: il completamento
+automatico mentre si digita e il «forse intendevi» — i mattoni sono
+già in casa (l'indice dei prefissi, `fts5vocab`, `difflib`).
+
+Il feed di Google Merchant (ago 2026): `GET /feed/google.xml`, RSS 2.0
+col namespace `g`, in cache 15 minuti come la sitemap. LA VALUTA È IL
+MURO — Merchant Center accetta solo ISO 4217, BTC per Google non
+esiste, e il prezzo del feed deve COMBACIARE con la pagina: un
+disallineamento a ventotto giorni sospende l'ACCOUNT. Decisione di
+Andrea: si mandano TUTTI convertendo i sats in euro, sapendo il
+rischio (la strada sicura — i soli listini nati in EUR — è stata
+proposta e scartata). Quel che riduce il rischio ed è fatto: feed e
+pagina leggono lo STESSO cambio dalla STESSA fonte, e il JSON-LD di un
+annuncio in sats dichiara adesso due offerte, prima l'EUR poi la BTC —
+prima le due cifre divergevano SEMPRE e per costruzione. Vedi
+Architettura, «IL FEED DI GOOGLE MERCHANT», per chi resta fuori (aste,
+lampo vive, senza foto) e per la condizione, che dove manca vale
+`used` tranne dove la merce è nuova per definizione.
+TRE COSE LE HA TROVATE IL PRIMO FEED GENERATO SUI DATI VERI e non la
+rilettura, ed è la parte da ricordare: la descrizione portava la
+nostra coda promozionale (con dentro un prezzo in sats e due link —
+Google disapprova le descrizioni che contengono prezzi, spedizione o
+link); due descrizioni su trentasei avevano l'indirizzo web del
+venditore; e il `g:brand` diceva «Barattolo» su ogni prodotto, che il
+nome di chi vende non è la marca di uno shoyu. Più una collisione di
+nome vera: `CODA_PROMO` esisteva già ed è la coda dei post del canale,
+e la costante nuova la sovrascriveva — cioè le note Nostr rotte.
+Collaudato: 3464 prove verdi in modalità severa (46 nuove) e TREDICI
+MUTAZIONI del codice, una per riga sorvegliata (alimenti dichiarati
+usati, prezzo inventato senza cambio, asta e lampo dentro il feed,
+link e coda promozionale rimasti, caratteri di controllo passati, leva
+che non spegne, JSON-LD tornato a dire solo BTC, euro non più per
+primo, euro raddoppiato sui listini in euro): ognuna diventa rossa da
+sola. UNA ERA SOPRAVVISSUTA al primo giro — proprio quella del JSON-LD,
+cioè la riga che rende possibile il feed — perché la prova guardava se
+la funzione ESISTE e non se viene USATA; ora `_ld_annuncio` gira per
+davvero. Più l'XML fatto parsare con dentro un titolo ostile (tag,
+virgolette e caratteri di controllo), e il feed generato dal vivo col
+server acceso sui 36 annunci del database di collaudo: XML ben
+formato, zero link in descrizione, zero brand, prezzi in euro.
+NON COLLAUDATO QUI: la rotta non ha un collaudo eseguibile suo — è
+stata provata a mano col server acceso, non da uno script.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione, e
+la leva ha il default nel codice. MA IL FEED NON SI ATTIVA ANCORA, e
+mancano tre cose che non sono codice: una POLITICA DI RESO pubblica e
+raggiungibile senza login, la dichiarazione di MARKETPLACE
+MULTI-VENDITORE, e il numero che manca — quanti annunci attivi hanno
+il listino in euro e quanti in sats, che dice quanto è grosso il
+rischio di disallineamento. DA GUARDARE al primo giro vero: la
+diagnostica di Merchant Center dopo il primo scaricamento, e in
+particolare quanti prodotti escono `used` su merce che nuova lo è
+davvero (nel database di collaudo sono 36 su 36, perché quasi nessuno
+dichiara la condizione).
+
+Il widget da incorporare (ago 2026): un annuncio o la vetrina di un
+negozio dentro il sito di qualcun altro, in un `<iframe>` — due rotte
+esplicite, una pagina sua di due kilobyte col CSS in linea, e il
+codice da copiare in un foglio del Profilo (o dal dettaglio del
+proprio annuncio). L'IFRAME E NON UNO SCRIPT: uno script nostro sulla
+pagina di un estraneo mescolerebbe i due CSS e ci prenderebbe il
+diritto di eseguire codice su un dominio che non è nostro — una
+fiducia che non ci serve. Vedi Architettura, «IL WIDGET DA
+INCORPORARE», per il venduto che si serve, per il 404 che non si dà
+mai dentro l'iframe di qualcun altro, e per il rovescio.
+IL ROVESCIO C'È MA NASCE SPENTO (decisione di Andrea: «non si deve
+rompere nulla»): non c'era NESSUN header sul frame, quindi
+barattolo.store era incorniciabile da chiunque — non l'avevamo deciso,
+era il default — e adesso `frame-ancestors` vale su tutto tranne
+`/widget/`, ma solo a leva `PROTEGGI_IFRAME` accesa. Spenta, il
+comportamento è identico a oggi BYTE PER BYTE (verificato: zero header
+nuovi su home e API), e il widget funziona uguale: la stretta non gli
+serve. È l'unico pezzo dei tre cantieri che possa rompere qualcosa, e
+si accende con un gesto dopo aver guardato la sola strada che tocca.
+E NIENTE `X-Frame-Options`, che è la riga che verrebbe voglia di
+aggiungere «per sicurezza»: è binario, e su Telegram Web la Mini App
+gira dentro un iframe di web.telegram.org — un SAMEORIGIN lì è
+Barattolo che smette di aprirsi per chi usa Telegram dal browser, e
+non se ne accorge nessuno finché non lo prova. Stavo per metterlo:
+l'ha fermato il controllo di come Telegram Web apre le mini app.
+Collaudato: 3491 prove verdi in modalità severa (27 nuove) e OTTO
+MUTAZIONI del codice, una per riga sorvegliata (CSP sovrascritta al
+posto di setdefault, CSP tolta a tutti, Telegram fuori dalla lista,
+rimossi serviti dal widget, tetto delle card sparito, slug non più
+digerito, `a.*` al posto della whitelist, iframe diventato script):
+ognuna diventa rossa da sola. Più il giro dal vivo col server acceso
+su una copia del database di collaudo — le due rotte, il negozio per
+codice e con lo slug appresso, `n` limato al tetto, il venduto col suo
+badge, l'annuncio e il negozio inesistenti che rispondono col riquadro
+e non con un 404, e gli header verificati uno per uno (la CSP c'è su
+home e API, non c'è sul widget).
+NON COLLAUDATO QUI: il widget non è stato GUARDATO A SCHERMO — su
+questa macchina non c'è un browser connesso — quindi l'aspetto, il
+tema scuro che segue il sito ospite e il comportamento dentro un
+iframe vero vanno visti dal vivo. E il `postMessage` dell'altezza non
+è stato esercitato da nessun ospite.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione, e
+`PROTEGGI_IFRAME` nasce spenta — quindi il deploy non cambia NIENTE di
+quel che c'è, aggiunge solo due rotte e un foglio. DA GUARDARE al
+primo giro: il primo widget incollato su un sito vero. E se un giorno
+si vorrà accendere la leva, PRIMA si apre Barattolo da Telegram Web
+(il browser, non l'app): è la sola strada che può chiudere.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
