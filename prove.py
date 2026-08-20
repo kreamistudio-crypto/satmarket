@@ -1745,10 +1745,11 @@ def prove_pagamento_incerto():
             "compratore_id INT, venditore_id INT, prezzo_sats INT, "
             "protezione_sats INT, quantita INT, stato TEXT, disputata INT, "
             "invoice_venditore TEXT, aggiornato INT, cambio_eur REAL, "
-            "payout_stato TEXT, payout_hash TEXT, payout_verso TEXT)")
+            "payout_stato TEXT, payout_hash TEXT, payout_verso TEXT, "
+            "sbloccato_auto_il INT DEFAULT 0)")
         vero.execute(
             "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,'delivered',0,"
-            f"'',0,0,'{payout_stato}','','')")
+            f"'',0,0,'{payout_stato}','','',0)")
         vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
                      "vendite_ok INT, acquisti_ok INT)")
         vero.execute("INSERT INTO utenti VALUES(222,'io@wallet.tld',0,0)")
@@ -1876,15 +1877,21 @@ def prove_disputa_incagliata():
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
     con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
-                "disputata INT)")
-    con.executemany("INSERT INTO ordini VALUES(?,?,?)", [
-        (1, "dispute", 1),          # la coda di sempre
-        (2, "return_shipped", 1),   # idem
-        (3, "confirmed", 1),        # incagliato: sblocco fallito
-        (4, "refund", 1),           # incagliato: rimborso fallito
-        (5, "confirmed", 0),        # un ordine normale: NON e' una disputa
-        (6, "released", 1),         # chiuso davvero: mai piu' in coda
-        (7, "refunded", 1)])        # idem
+                "disputata INT, sbloccato_auto_il INT DEFAULT 0)")
+    con.executemany("INSERT INTO ordini VALUES(?,?,?,?)", [
+        (1, "dispute", 1, 0),        # la coda di sempre
+        (2, "return_shipped", 1, 0), # idem
+        (3, "confirmed", 1, 0),      # incagliato: sblocco fallito
+        (4, "refund", 1, 0),         # incagliato: rimborso fallito
+        (5, "confirmed", 0, 0),      # un ordine normale: NON e' una disputa
+        (6, "released", 1, 0),       # chiuso davvero: mai piu' in coda
+        (7, "refunded", 1, 0),       # idem
+        # LA PORTA DEL TIMER (ago 2026): nessuno ha disputato, ha
+        # deciso una macchina — e i sats sono ancora in cassaforte
+        (8, "confirmed", 0, 1712),
+        # il timbro su un affare gia' pagato e' inerte: li' i sats
+        # sono usciti e non c'e' piu' niente da decidere
+        (9, "released", 0, 1712)])
     con.commit()
 
     # la WHERE vera, estratta dal sorgente invece che riscritta a mano
@@ -1894,9 +1901,14 @@ def prove_disputa_incagliata():
     sql = "".join(re.findall(r'"([^"]*)"', where))
     visti = [r["id"] for r in con.execute(
         sql.replace("id=?", "id=id") + " ORDER BY id", ())]
-    prova("la coda vede le dispute aperte e le due incagliate",
-          [1, 2, 3, 4], visti)
+    prova("la coda vede le dispute aperte, le due incagliate e "
+          "l'affare chiuso da un timer", [1, 2, 3, 4, 8], visti)
+    # LA META' CHE TIENE FERMA LA DECISIONE: chi ha confermato di
+    # persona resta chiuso, e il timbro su un 'released' non riapre
+    # niente — la porta esiste solo finche' i sats sono nostri.
     prova("un 'confirmed' normale non e' una disputa", True, 5 not in visti)
+    prova("e un affare pagato non torna in coda per il timbro", True,
+          9 not in visti)
     prova("un affare gia' chiuso non torna in coda", True,
           6 not in visti and 7 not in visti)
     con.close()
@@ -16614,7 +16626,8 @@ def prove_ordini_fermi():
           solleciti_incasso INT DEFAULT 0, sollecito_incasso_il INT DEFAULT 0,
           solleciti_busta INT DEFAULT 0, sollecito_busta_il INT DEFAULT 0,
           solleciti_punto INT DEFAULT 0, sollecito_punto_il INT DEFAULT 0,
-          indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0);
+          indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
+          sbloccato_auto_il INT DEFAULT 0);
         CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
           titolo TEXT, quantita INT);
@@ -16809,9 +16822,17 @@ def prove_ordini_fermi():
           "disputata=1 AND stato IN ('confirmed','refund')"
           in _SORGENTE.replace("\n", " ").replace("  ", " ")
           or "(disputata=1 AND stato IN ('confirmed','refund'))" in _SORGENTE)
+    # Dalla PORTA DEL TIMER (ago 2026) la condizione vive in un
+    # giudice: questa sentinella cambia LATO e si stringe, invece di
+    # allentarsi — il pannello deve passare di li', e il giudice deve
+    # tenersi la meta' di ieri, o il caso incagliato tornerebbe
+    # scoperto senza che nessuna prova diventi rossa.
     prova("...e ora il client offre i bottoni", True,
           "isAdmin && (s==='dispute' ||" in mini
-          and "(o.disputata && ['confirmed','refund'].includes(s)))" in mini)
+          and "decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto))"
+          in mini
+          and "['confirmed','refund'].includes(stato)" in pezzo_js(
+              mini, "function decidibileDalModeratore(", "\n}"))
     prova("...con `disputata` che arriva fino al client", True,
           "disputata:o.disputata||0," in mini)
 
@@ -19099,6 +19120,232 @@ function chiavi(){
           2, fuori.count("chiaveNwc(con)"))
 
 
+# ====================================================================
+def prove_porta_timer():
+    """LA PORTA DEL TIMER (ago 2026). Sul digitale i due timer corti
+    restano armati anche col disarmo, e chiamano _sblocca_sats con
+    `automatico=True`: se il venditore non ha un metodo d'incasso il
+    pagamento non parte e l'ordine finisce in 'confirmed' con
+    `disputata` a 0. Da li' i sats erano ancora in cassaforte e NESSUNA
+    rotta poteva renderli — apri_disputa non accetta 'confirmed',
+    risolvi_disputa voleva disputata=1, _rimborsa_compratore e' gatata
+    a monte — mentre deposita_invoice e sollecita_incassi continuavano
+    a spingere verso l'unica uscita rimasta, quella del venditore.
+
+    Il difetto non era che 'confirmed' fosse irreversibile: era che a
+    decidere era stata una MACCHINA. Quindi si registra COME ci si e'
+    arrivati e la porta si apre SOLO su quel ramo, e SOLO al
+    moderatore."""
+    print("\n[la porta del timer]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    sbl = pezzo("_sblocca_sats")
+    ris = pezzo("risolvi_disputa")
+
+    # --- 1) la colonna e il timbro ---------------------------------
+    prova("la colonna e' fra le migrazioni additive di ordini", True,
+          '"sbloccato_auto_il INTEGER DEFAULT 0"' in src)
+    prova("il timbro vale 0 quando a chiamare e' una persona", True,
+          "auto_il = int(time.time()) if automatico else 0" in codice(sbl))
+    # I DUE rami, non solo quello che apre la porta: il nome resta
+    # onesto ovunque e il censimento dei timer non e' monco.
+    # DENTRO il ramo riuscito, e coi suoi parametri: cercare il MAX in
+    # tutta la funzione non poteva fallire — il ramo confirmed lo ha
+    # uguale, e toglierlo di qui lasciava la sentinella verde (l'ha
+    # detto la tortura, non la rilettura).
+    rilasciato = sbl[sbl.index("stato='released'"):sbl.index("# Niente pagamento")]
+    prova("il ramo riuscito timbra col MAX", True,
+          "sbloccato_auto_il=MAX(sbloccato_auto_il, ?)" in rilasciato
+          and "(cambio, auto_il, int(time.time()), ordine_id)" in rilasciato)
+    conf = sbl[sbl.index("stato='confirmed'"):]
+    prova("...e anche il ramo che apre la porta", True,
+          "sbloccato_auto_il=MAX(sbloccato_auto_il, ?)" in conf)
+    prova("il MAX non si assegna secco (un timbro non si cancella)",
+          False, "sbloccato_auto_il=?" in codice(sbl))
+
+    # --- 2) la porta -----------------------------------------------
+    # Nomina la colonna E lo stato: su 'refund' un timer non ci arriva,
+    # e allargare a tutti i 'confirmed' vorrebbe dire poter rimborsare
+    # anche chi ha confermato di persona.
+    where = codice(ris)[:codice(ris).index("fetchone()")]
+    prova("la porta nomina il timbro", True, "sbloccato_auto_il > 0" in where)
+    prova("...e si apre solo su 'confirmed'", True,
+          "sbloccato_auto_il > 0 AND stato='confirmed'" in where)
+    prova("...senza allentare la clausola di ieri", True,
+          "disputata=1 AND stato IN ('confirmed','refund')" in where)
+    # La riapertura timbra la disputa: senza, decidendo poi a favore
+    # del venditore, _sblocca_sats direbbe «l'acquirente ha confermato
+    # la ricezione» a un affare che nessuno ha confermato.
+    prova("la riapertura scrive disputata=1", True,
+          "UPDATE ordini SET stato='dispute', disputata=1, " in ris)
+
+    # --- 3) i testi del server -------------------------------------
+    prova("il testo al venditore ha TRE casi", True,
+          '"⏳ <b>Il tempo di conferma è scaduto!</b>"' in sbl
+          and "if automatico else" in codice(sbl))
+    prova("il compratore riceve la sua unica maniglia", True,
+          "if automatico and primo_giro:" in codice(sbl))
+    # LA DECISIONE DI PRODOTTO, tenuta ferma da una prova: sul ramo
+    # RIUSCITO i sats sono usciti e nessun moderatore li puo' muovere —
+    # invitare a scrivere sarebbe promettere una porta che non si apre.
+    riuscito = codice(
+        sbl[sbl.index("if esito == PAGATO:"):sbl.index("# Niente pagamento")])
+    prova("il ramo riuscito NON invita a scrivere ai moderatori", False,
+          "moderatori" in riuscito)
+
+    # --- 4) la coda dei fermi --------------------------------------
+    fermi = src[src.index("_SQL_FERMI = ("):src.index("def coda_fermi")
+                if "def coda_fermi" in src else src.index("_SQL_FERMI = (") + 4000]
+    prova("la coda dei fermi porta il timbro", True,
+          '"    o.sbloccato_auto_il, "' in fermi)
+
+    # --- 5) il client: i giudici e i loro chiamanti ----------------
+    prova("il campo arriva al client", True,
+          "sbloccatoAuto:o.sbloccato_auto_il||0," in mini)
+    prova("i due giudici esistono, uno ciascuno",
+          (1, 1),
+          (mini.count("function chiusoDalTimer("),
+           mini.count("function decidibileDalModeratore(")))
+    prova("il pannello del moderatore passa dal giudice", True,
+          "decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto)" in mini)
+    prova("...e il badge della coda pure", True,
+          "decidibileDalModeratore(o.stato, o.disputata, o.sbloccato_auto_il)"
+          in mini)
+    prova("la riga del compratore su 'confirmed' e' spaccata in due", True,
+          "s==='confirmed' && !chiusoDalTimer(s, o.sbloccatoAuto)" in mini)
+    # LA RIGA DA NON AMMORBIDIRE: la riga del compratore legge la META'
+    # TIMER e non tutta la porta. Sul 'confirmed' con disputata=1 la
+    # porta c'e' gia', ma «il tempo e' scaduto e l'affare si e' chiuso
+    # da solo» sarebbe FALSO: li' ha deciso un moderatore.
+    riga = pezzo_js(mini, "function notaChiusoDalTimer(o, s){", "\n}") + "\n}"
+    prova("la riga NON passa dal giudice della porta", False,
+          "decidibileDalModeratore" in riga)
+    prova("...ma dalla sua meta' timer", True, "chiusoDalTimer(s," in riga)
+
+    # --- 6) i giudici fatti GIRARE (le sentinelle dicono che ci sono,
+    #        mai che rispondano giusto: la lezione presa otto volte) --
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("i giudici della porta rispondono giusto", "node non installato")
+    else:
+        g1 = pezzo_js(mini, "function chiusoDalTimer(stato, autoIl){",
+                      "\n}") + "\n}"
+        g2 = pezzo_js(mini,
+                      "function decidibileDalModeratore(stato, disputata, autoIl){",
+                      "\n}") + "\n}"
+        prog = (g1 + "\n" + g2 + "\n" + riga
+                + "\nvar bannerTest = {link:'https://t.me/x'};"
+                + "\nconst casi = ["
+                # chiuso dal timer: porta aperta E riga accesa
+                "{p:decidibileDalModeratore('confirmed',0,1712), "
+                " r:notaChiusoDalTimer({role:'buyer',id:42,sbloccatoAuto:1712},'confirmed')!==''},"
+                # disputa decisa, pagamento fallito: porta aperta, riga SPENTA
+                "{p:decidibileDalModeratore('confirmed',1,0), "
+                " r:notaChiusoDalTimer({role:'buyer',id:42,sbloccatoAuto:0},'confirmed')!==''},"
+                # confermato a mano: niente porta e niente riga
+                "{p:decidibileDalModeratore('confirmed',0,0), "
+                " r:notaChiusoDalTimer({role:'buyer',id:42,sbloccatoAuto:0},'confirmed')!==''},"
+                # il timbro su 'released' e' inerte: l'affare e' chiuso
+                "{p:decidibileDalModeratore('released',0,1712), "
+                " r:notaChiusoDalTimer({role:'buyer',id:42,sbloccatoAuto:1712},'released')!==''},"
+                # e la riga e' di chi ha comprato, non del venditore
+                "{p:decidibileDalModeratore('refund',1,0), "
+                " r:notaChiusoDalTimer({role:'seller',id:42,sbloccatoAuto:1712},'confirmed')!==''}];"
+                "console.log(JSON.stringify(casi));")
+        f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                   encoding="utf-8")
+        f.write(prog)
+        f.close()
+        r = _sp.run([_node, f.name], capture_output=True, text=True,
+                    timeout=60, encoding="utf-8")
+        os.unlink(f.name)
+        prova("i giudici: porta e riga, caso per caso",
+              [{"p": True, "r": True},      # timer: tutti e due
+               {"p": True, "r": False},     # disputa decisa: solo la porta
+               {"p": False, "r": False},    # confermato a mano: niente
+               {"p": False, "r": False},    # released: il timbro e' inerte
+               {"p": True, "r": False}],    # refund: porta si', riga mai
+              _js.loads(r.stdout.strip()) if r.returncode == 0
+              else f"ERRORE: {r.stderr[:200]}")
+
+    # --- 7) e _sblocca_sats fatta girare DAVVERO -------------------
+    # Su sqlite vero, cosi' il MAX(...) dell'UPDATE viene eseguito e il
+    # timbro si rilegge dalla colonna invece di essere creduto.
+    import asyncio
+    import sqlite3
+    import html as _html
+    import time as _time
+
+    def gira(automatico):
+        class Con(sqlite3.Connection):
+            def close(self):        # la funzione chiude presto e poi
+                pass                # riusa: qui la teniamo aperta
+
+        con = sqlite3.connect(":memory:", factory=Con)
+        con.row_factory = sqlite3.Row
+        con.execute("CREATE TABLE ordini (id INTEGER PRIMARY KEY, stato TEXT, "
+                    "payout_stato TEXT DEFAULT '', venditore_id INT, "
+                    "compratore_id INT, prezzo_sats INT, protezione_sats INT "
+                    "DEFAULT 0, invoice_venditore TEXT DEFAULT '', "
+                    "disputata INT DEFAULT 0, annuncio_id INT DEFAULT 0, "
+                    "cambio_eur REAL DEFAULT 0, aggiornato INT DEFAULT 0, "
+                    "sbloccato_auto_il INT DEFAULT 0)")
+        con.execute("INSERT INTO ordini (id, stato, venditore_id, "
+                    "compratore_id, prezzo_sats) VALUES (7,'delivered',222,111,50000)")
+        # il venditore SENZA metodo d'incasso: e' il caso del buco
+        con.execute("CREATE TABLE utenti (tg_id INT, ln_address TEXT DEFAULT '')")
+        con.execute("INSERT INTO utenti (tg_id) VALUES (222)")
+        con.commit()
+
+        detto = []
+
+        async def notifica_finta(chi, testo, *a, **k):
+            detto.append((chi, testo))
+
+        async def mai(*a, **k):
+            raise AssertionError("non si doveva chiamare")
+
+        amb = {"_lucchetti_ordine": __import__("collections").defaultdict(
+                   asyncio.Lock),
+               "db": lambda: con, "time": _time, "html": _html,
+               "netto_venditore": lambda n: n,
+               "_fmt_sats": reale("_fmt_sats"),
+               "notifica": notifica_finta,
+               "paga_venditore": mai, "invoice_da_ln_address": mai,
+               "_congela_pagamento": mai,
+               "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
+               "INCERTO": "incerto"}
+        exec("async " + sbl, amb)
+        esito = asyncio.run(amb["_sblocca_sats"](7, automatico=automatico))
+        riga = con.execute("SELECT * FROM ordini WHERE id=7").fetchone()
+        return esito, dict(riga), detto
+
+    esito, riga, detto = gira(True)
+    prova("il timer chiude in 'confirmed'", "confirmed", esito["stato"])
+    prova("...e la colonna porta il timbro", True, riga["sbloccato_auto_il"] > 0)
+    a_chi = [c for c, _ in detto]
+    prova("...il compratore riceve UNA notifica", 1, a_chi.count(111))
+    testo_c = "".join(t for c, t in detto if c == 111)
+    prova("...che dice dove scrivere", True, "moderatori" in testo_c)
+    prova("...e nomina l'ordine", True, "#7" in testo_c)
+    testo_v = "".join(t for c, t in detto if c == 222)
+    prova("il venditore non si sente dire che l'acquirente ha confermato",
+          False, "ha confermato la ricezione" in testo_v)
+    prova("...ma che e' scaduto il tempo", True,
+          "tempo di conferma è scaduto" in testo_v)
+
+    # IL ROVESCIO: la conferma a mano non timbra niente e non apre
+    # nessuna porta — e' l'altra meta' della decisione.
+    esito2, riga2, detto2 = gira(False)
+    prova("la conferma a mano NON timbra", 0, riga2["sbloccato_auto_il"])
+    prova("...e al compratore non manda niente", 0,
+          [c for c, _ in detto2].count(111))
+    prova("...e al venditore dice che l'acquirente ha confermato", True,
+          "ha confermato la ricezione" in "".join(
+              t for c, t in detto2 if c == 222))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -19151,6 +19398,7 @@ def main():
               prove_nwc_cifratura,
               prove_pagina_dati,
               prove_font,
+              prove_porta_timer,
               prove_sintassi_client):
         try:
             f()

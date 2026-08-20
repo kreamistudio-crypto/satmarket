@@ -5703,6 +5703,10 @@ function mapOrder(o){
        disputa risolta, ed e' cio' che rende un ordine finito in
        'confirmed'/'refund' ancora DECIDIBILE da un moderatore */
     disputata:o.disputata||0,
+    /* LA PORTA DEL TIMER (ago 2026): quando uno sblocco AUTOMATICO e'
+       passato di qui (0 = mai). Su 'confirmed' dice che a chiudere
+       l'affare e' stato il TEMPO e non una persona */
+    sbloccatoAuto:o.sbloccato_auto_il||0,
     /* il conto scomposto (lug 2026): listing.price resta il TOTALE
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
@@ -15138,11 +15142,13 @@ function openOrder(id){
            coda degli ordini fermi ce lo porta davanti, e senza
            questa riga sarebbe un vicolo cieco visibile. */''}
       ${isAdmin && (s==='dispute' ||
-          (o.disputata && ['confirmed','refund'].includes(s))) ? `
+          decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto)) ? `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
           <div class="hint">${s==='dispute'
             ? 'I sats sono congelati nel deposito di garanzia. Ascolta le due parti, poi decidi: la scelta è definitiva.'
+            : chiusoDalTimer(s, o.sbloccatoAuto) && !o.disputata
+            ? "Nessuno ha disputato: è scaduto il tempo per confermare e l'affare si è chiuso da solo, ma il venditore non ha un modo per incassare — i sats sono ancora nel deposito. Decidi tu dove vanno."
             : 'Questa disputa era stata decisa, ma il pagamento non è riuscito: i sats sono ancora nel deposito. Puoi confermare la stessa strada o cambiarla.'}</div>
           <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>
           <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
@@ -15254,7 +15260,12 @@ function openOrder(id){
             SOPRA a «Ho ricevuto» e i ponti dopo la disputa. */''}
       ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && o.consegnaScelta==='ritiro')) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${o.role==='buyer' && s==='shipped' && o.consegnaScelta!=='digitale' ? `<button class="btn ghost" onclick="markDelivered()">${o.consegnaScelta==='ritiro'?`📬 L'ho ritirato — lo controllo`:`📬 È arrivato — lo controllo`}</button>`:''}
-      ${o.role==='buyer' && s==='confirmed' ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
+      ${/* A 'confirmed' ci si arriva in DUE modi, e fino a ieri la
+            riga ne raccontava uno solo: «Hai confermato… per te e'
+            tutto fatto!», che a chi l'affare l'ha chiuso un TIMER dice
+            l'esatto contrario del vero. */''}
+      ${o.role==='buyer' && s==='confirmed' && !chiusoDalTimer(s, o.sbloccatoAuto) ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
+      ${notaChiusoDalTimer(o, s)}
       ${notaFermo(o)}
       ${bottoneSollecito(o)}
       ${['released','refunded'].includes(s) && o.role!=='admin' ? feedbackPanel(o) : ''}
@@ -18790,6 +18801,40 @@ function statoSollecito(o){
   if (!(o.sollecitoManualeIl + SOLLECITO.pausa*3600 <= adesso)) return 'pausa';
   return 'ok';
 }
+/* I DUE GIUDICI DELLA PORTA DEL TIMER (ago 2026), puri e coi CAMPI e
+   non con la riga (il patto di in_ferie): i chiamanti hanno in mano
+   oggetti di forma diversa — l'ordine mappato e la riga grezza della
+   coda dei fermi.
+   COMPOSTI e non uno solo, ed e' la riga da non ammorbidire: la porta
+   del moderatore si apre in DUE casi (una disputa decisa il cui
+   pagamento e' fallito, e l'affare chiuso da un timer), ma la riga che
+   legge il COMPRATORE parla solo del secondo — sul primo «il tempo e'
+   scaduto e l'affare si e' chiuso da solo» sarebbe FALSO: li' ha
+   deciso un moderatore, e quel compratore ha gia' il suo messaggio. */
+function chiusoDalTimer(stato, autoIl){
+  return stato==='confirmed' && autoIl>0;
+}
+function decidibileDalModeratore(stato, disputata, autoIl){
+  return chiusoDalTimer(stato, autoIl)
+      || (!!disputata && ['confirmed','refund'].includes(stato));
+}
+/* La riga permanente per chi ha comprato. LA NOTIFICA PASSA, LA RIGA
+   RESTA: chi apre l'ordine tre giorni dopo per capire cos'e' successo
+   trova il fatto e la strada, non un «concluso» muto — e' la lezione
+   dei promemoria e dell'invito allo sconto. AMBRA come notaFermo: qui
+   non c'e' ancora nessun problema conclamato, e il rosso resta alla
+   disputa. */
+function notaChiusoDalTimer(o, s){
+  if (o.role!=='buyer' || !chiusoDalTimer(s, o.sbloccatoAuto)) return '';
+  /* il canale del rodaggio e' l'unico contatto che esiste gia': niente
+     secondo indirizzo da tenere aggiornato (il pattern di
+     notaTrackingSbagliato), e senza canale nel config si dice
+     comunque la cosa vera invece di fingere un bottone */
+  const dove = bannerTest?.link
+    ? `scrivi ai moderatori col numero dell'ordine (<b>#${o.id}</b>): <button type="button" class="btn link" style="display:inline;padding:0;margin:0;font-size:inherit" onclick="apriCanaleTest()">apri il canale ›</button>`
+    : `scrivi ai moderatori col numero dell'ordine (<b>#${o.id}</b>).`;
+  return `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>L'acquisto si è chiuso da solo:</b> è scaduto il tempo per confermare o aprire una disputa. I sats <b>non sono ancora usciti</b> — il venditore non ci ha dato un modo per riceverli — quindi sono ancora nel deposito di garanzia. Se quello che hai comprato non ha funzionato, ${dove} Finché sono lì, il caso si può ancora decidere.</span></div>`;
+}
 /* LA RIGA CHE RESTA (ago 2026): chi ha pagato riceve UNA sola
    notifica, al primo squillo automatico, e se non la legge nessuno gli
    ripete che i suoi sats sono fermi e che la disputa e' aperta dal
@@ -19974,7 +20019,7 @@ const rigaFermo = o => {
       <div class="sub" style="margin-top:2px">${o.promemoria
         ? `🔔 ${o.promemoria} promemoria, l'ultimo il ${new Date(o.promemoria_il*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short'})}`
         : '🔕 <b>mai sollecitato</b>: nessun promemoria copre questo caso'}${
-        o.disputata && ['confirmed','refund'].includes(o.stato)
+        decidibileDalModeratore(o.stato, o.disputata, o.sbloccato_auto_il)
           ? ' · ⚖️ <b>decidibile</b>' : ''}</div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <span class="badge" onclick="apriOrdinePerId(${o.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">Apri l'ordine</span>

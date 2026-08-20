@@ -59,7 +59,7 @@ jobs:
              converti_soglie_euro.py collaudo_conto.py
              converti_soglie_euro.py recupera_cambi_ordini.py
              stima_coda_moderazione.py collaudo_altri_oggetti.py
-             collaudo_reti.py collaudo_nota.py
+             collaudo_reti.py collaudo_nota.py collaudo_porta_timer.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.

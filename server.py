@@ -2978,7 +2978,18 @@ def init_db():
                     # 'locked' gia' in produzione.
                     "indirizzo_atteso INTEGER DEFAULT 0",
                     "nascosto_compratore INTEGER DEFAULT 0",
-                    "nascosto_venditore INTEGER DEFAULT 0"):
+                    "nascosto_venditore INTEGER DEFAULT 0",
+                    # LA PORTA DEL TIMER (ago 2026): QUANDO uno sblocco
+                    # AUTOMATICO e' passato di qui (0 = mai). Serve a
+                    # distinguere le DUE storie che portano a
+                    # 'confirmed' — «l'ha chiuso un timer» e «l'ha
+                    # confermato una persona» — che il database non
+                    # sapeva raccontare, perche' `automatico` era solo
+                    # un parametro di funzione. Su 'confirmed' e' la
+                    # chiave della porta del moderatore; su 'released'
+                    # e' inerte, e resta il censimento di quante volte
+                    # i timer del digitale sono scattati davvero.
+                    "sbloccato_auto_il INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -10333,6 +10344,9 @@ _SQL_FERMI = (
     "SELECT * FROM ("
     "  SELECT o.id, o.stato, o.annuncio_id, o.prezzo_sats AS importo, "
     "    o.consegna_scelta, o.via_punto, o.disputata, "
+    # il timbro del timer: senza, il badge della riga direbbe «non
+    # decidibile» proprio sui casi che questa coda esiste per mostrare
+    "    o.sbloccato_auto_il, "
     # perche' un ordine e' fermo: la via punto lo diceva gia', e da
     # oggi anche «aspetta l'indirizzo» e' una ragione che esiste
     "    o.indirizzo_atteso, o.indirizzo_il, "
@@ -21215,6 +21229,13 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # compratore resta in cassaforte, alla piattaforma. Sugli
         # ordini di ieri la quota e' 0 e non cambia nulla.
         netto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+        # LA PORTA DEL TIMER: il timbro di questo giro, 0 se a chiamare
+        # e' stata una persona. Si scrive in TUTTI E DUE i rami qui
+        # sotto — anche in quello riuscito, dove non apre niente — o il
+        # nome direbbe una mezza verita' e il censimento dei timer
+        # sarebbe monco. Il MAX e' l'idioma di quantita_max: una
+        # chiamata non automatica non cancella mai un timbro gia' li'.
+        auto_il = int(time.time()) if automatico else 0
 
         # Con 'uscito' il pagamento e' GIA' partito e un moderatore
         # l'ha verificato su LNbits: non si conia nessuna fattura e
@@ -21241,8 +21262,9 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 titolo = "il tuo acquisto"
             cambio = await cambio_btc_eur()
             con.execute("UPDATE ordini SET stato='released', cambio_eur=?, "
+                        "sbloccato_auto_il=MAX(sbloccato_auto_il, ?), "
                         "aggiornato=? WHERE id=?",
-                        (cambio, int(time.time()), ordine_id))
+                        (cambio, auto_il, int(time.time()), ordine_id))
             con.execute("UPDATE utenti SET vendite_ok=vendite_ok+1 WHERE tg_id=?",
                         (o["venditore_id"],))
             con.execute("UPDATE utenti SET acquisti_ok=acquisti_ok+1 WHERE tg_id=?",
@@ -21317,7 +21339,9 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # gioco e' la coda di risolvi_disputa, che ora guarda anche qui.
         primo_giro = o["stato"] != "confirmed"
         con.execute("UPDATE ordini SET invoice_venditore='', stato='confirmed', "
-                    "aggiornato=? WHERE id=?", (int(time.time()), ordine_id))
+                    "sbloccato_auto_il=MAX(sbloccato_auto_il, ?), "
+                    "aggiornato=? WHERE id=?",
+                    (auto_il, int(time.time()), ordine_id))
         con.commit()
         con.close()
         # Chi ha perso la disputa ha diritto di saperlo, e UNA volta
@@ -21330,6 +21354,27 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 "I sats gli spettano; appena ci dà un modo per riceverli "
                 "l'ordine si chiude. Se pensi che ci sia stato un errore, "
                 "scrivi ai moderatori.")
+        # E CHI NON HA DISPUTATO NIENTE, ma si e' visto chiudere
+        # l'affare da un timer? Fino a ieri non riceveva NULLA: questo
+        # ramo parlava solo a chi aveva perso una disputa, e il
+        # messaggio del ramo riuscito qui non arriva mai. E' l'unica
+        # cosa che quella persona riceve, quindi porta anche la
+        # maniglia — e qui la porta esiste davvero, perche' i sats sono
+        # ancora nostri (sul ramo 'released' invece non si invita
+        # nessuno a scrivere: la' sarebbe una porta che non si apre).
+        # UNA volta sola, nel giro in cui l'ordine cambia stato
+        # davvero, come la gemella qui sopra.
+        if automatico and primo_giro:
+            await notifica(
+                o["compratore_id"],
+                f"⏳ <b>L'acquisto si è chiuso da solo:</b> il tempo per "
+                f"confermare o aprire una disputa è scaduto. I sats "
+                f"<b>non sono ancora usciti</b> — il venditore non ci ha dato "
+                f"un modo per riceverli — quindi sono ancora nel deposito di "
+                f"garanzia. Se quello che hai comprato non ha funzionato, "
+                f"scrivi ai moderatori col numero dell'ordine "
+                f"(<b>#{ordine_id}</b>): finché i sats sono lì, il caso si "
+                f"può ancora decidere.")
         if o["invoice_venditore"] or (v and v["ln_address"]):
             msg = ("⚠️ Il pagamento automatico dei tuoi sats e' <b>fallito</b> "
                    "(il tuo wallet non ha risposto come doveva). I sats sono al "
@@ -21337,8 +21382,13 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                    "per riprovare "
                    f"con una invoice da <b>{_fmt_sats(netto)} sats</b>.")
         else:
+            # Tre casi e non due: sul ramo del timer nessuno ha
+            # confermato niente — e' scaduto il tempo — e dirgli che
+            # l'acquirente ha confermato sarebbe falso.
             testa = ("⚖️ <b>La disputa è stata decisa a tuo favore!</b>"
                      if o["disputata"] else
+                     "⏳ <b>Il tempo di conferma è scaduto!</b>"
+                     if automatico else
                      "✅ <b>L'acquirente ha confermato la ricezione!</b>")
             msg = (f"{testa} Per incassare "
                    f"i tuoi <b>{_fmt_sats(netto)} sats</b>: apri l'ordine nella Mini App e "
@@ -21495,9 +21545,25 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     if esito not in ("venditore", "rimborso", "reso"):
         raise HTTPException(400, "Esito non valido")
     con = db()
+    # LA PORTA DEL TIMER (ago 2026): un ordine digitale chiuso da uno
+    # dei due timer corti, con un venditore senza metodo d'incasso,
+    # finiva in 'confirmed' con `disputata` a 0 — cioe' fuori da questa
+    # query e fuori da ogni altra: i sats erano ancora in cassaforte e
+    # NESSUNO poteva piu' renderli, nemmeno un moderatore, mentre
+    # deposita_invoice e sollecita_incassi continuavano a spingere
+    # verso l'unica uscita rimasta, quella del venditore. Il difetto
+    # non era che 'confirmed' fosse irreversibile: era che a decidere
+    # era stata una MACCHINA. Per questo si apre SOLO su quel ramo —
+    # chi ha confermato di persona resta chiuso, e nessuno puo'
+    # riaprire da solo un affare concluso. Solo 'confirmed': a
+    # 'refund' un timer non ci arriva. E la finestra non si tara:
+    # appena il venditore incassa l'ordine passa a 'released' e la
+    # porta si chiude da sola, cioe' esiste esattamente finche' i sats
+    # sono ancora nostri.
     o = con.execute("SELECT * FROM ordini WHERE id=? AND ("
                     "  stato IN ('dispute','return_pending','return_shipped') "
-                    "  OR (disputata=1 AND stato IN ('confirmed','refund')))",
+                    "  OR (disputata=1 AND stato IN ('confirmed','refund')) "
+                    "  OR (sbloccato_auto_il > 0 AND stato='confirmed'))",
                     (ordine_id,)).fetchone()
     con.close()
     if not o:
@@ -21512,8 +21578,20 @@ async def risolvi_disputa(ordine_id: int, req: Request,
         # verita': il caso torna in mano al moderatore, e da li' si
         # decide come la prima volta.
         con = db()
-        con.execute("UPDATE ordini SET stato='dispute', aggiornato=? "
-                    "WHERE id=? AND stato=?",
+        # `disputata=1` e' un no-op sul caso di ieri (era gia' 1) e
+        # serve su quello del timer: senza, decidendo poi a favore del
+        # venditore, _sblocca_sats cadrebbe nel suo `else` e direbbe al
+        # venditore «L'acquirente ha confermato la ricezione» e al
+        # compratore «Affare concluso, grazie» — due bugie. Con 1
+        # prendono il ramo della disputa, che e' la verita': un
+        # moderatore ha deciso il caso. IL PREZZO E' DICHIARATO
+        # (decisione di Andrea): quel caso conta come disputa per lo
+        # Specchiato e nel conteggio che il moderatore legge, cioe'
+        # come se il compratore avesse disputato e perso — che e' in
+        # sostanza quel che e' successo, e la verita' nelle notifiche
+        # vale piu' della statistica.
+        con.execute("UPDATE ordini SET stato='dispute', disputata=1, "
+                    "aggiornato=? WHERE id=? AND stato=?",
                     (int(time.time()), ordine_id, stato))
         con.commit()
         con.close()
