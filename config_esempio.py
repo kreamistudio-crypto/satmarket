@@ -287,6 +287,30 @@ SPED_GRATIS_MIN_EUR = 1         # una cintura contro lo zero travestito:
                                 # prezzo dell'annuncio (costo 0)
 SPED_GRATIS_MIN_SATS = 1        # idem, in sats
 
+# --- Codici sconto del venditore -------------------------------------
+# «SATOSHI10» scritto alla cassa vale -X% sugli articoli. E' la TERZA
+# leva accanto allo sconto sugli articoli e alla spedizione gratis, ma
+# di natura diversa: quelle sono promesse PUBBLICHE scritte in vetrina
+# e uguali per tutti, un codice e' un SEGRETO che il venditore da' a
+# chi vuole — e infatti non esce MAI da nessuna superficie pubblica.
+# VINCE IL MAGGIORE fra il codice e lo sconto sugli articoli: si
+# applica solo il piu' generoso, mai la somma.
+CODICI_SCONTO_ATTIVI = True     # False = i codici non valgono piu' alla
+                                # cassa e il cassetto risponde 400, ma
+                                # le righe restano e tornano vive
+CODICI_SCONTO_MAX_PERCENTO = 30  # TIENILO PARI a SCONTO_PACCO_MAX_
+                                # PERCENTO: con «vince il maggiore» il
+                                # tetto della cascata e' il max dei due,
+                                # e alzare solo questo sposta il fondo
+CODICI_SCONTO_PERCENTI = (5, 10, 15, 20)     # le pillole del venditore
+CODICI_SCONTO_DURATE_GIORNI = (7, 30, 90, 0)  # lo 0 = senza scadenza
+CODICI_SCONTO_MAX_PER_VENDITORE = 20   # quanti codici puo' avere
+CODICI_SCONTO_MAX_USI = 100_000        # cintura contro il numero
+                                # incollato per sbaglio
+CODICI_SCONTO_TENTATIVI_ORA = 20  # il freno a chi prova a indovinare i
+                                # codici altrui: si consuma SOLO sui
+                                # tentativi sbagliati (0 = nessun freno)
+
 # --- Suggerimenti dal bot --------------------------------------------
 # I consigli che il bot manda al venditore: cosa manca a un annuncio, e
 # le leve del negozio che non ha ancora acceso. ACCESI di serie

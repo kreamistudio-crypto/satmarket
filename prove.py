@@ -6816,8 +6816,8 @@ def prove_sconto_pacco():
     print("\n[lo sconto carrello]")
     amb = {}
     for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
-              "_eur_interi", "_sconto_pacco", "_sconto_pacco_eur",
-              "_conto_ordine"):
+              "_eur_interi", "_sconto_percento", "_sconto_pacco",
+              "_sconto_pacco_eur", "_conto_ordine"):
         exec(pezzo(f), amb)
     conto, unit = amb["_conto_ordine"], amb["_unitario_effettivo"]
     # Un cambio tondo per tutte le prove: 1 BTC = 100.000 €, cioe'
@@ -8134,8 +8134,9 @@ def prove_sped_gratis():
     amb = {"SPED_GRATIS_ATTIVO": True, "SPED_GRATIS_MIN_EUR": 1,
            "SPED_GRATIS_MIN_SATS": 1, "VALUTE_SOGLIA": ("eur", "sats")}
     for f in ("_importo_accordo", "_prezzo_lampo", "_unitario_effettivo",
-              "_eur_interi", "_sped_gratis", "_sconto_pacco",
-              "_conto_ordine", "_valuta_soglia", "_regola_sped_gratis"):
+              "_eur_interi", "_sped_gratis", "_sconto_percento",
+              "_sconto_pacco", "_conto_ordine", "_valuta_soglia",
+              "_regola_sped_gratis"):
         exec(pezzo(f), amb)
     conto, unit = amb["_conto_ordine"], amb["_unitario_effettivo"]
     _sg, _rg = amb["_sped_gratis"], amb["_regola_sped_gratis"]
@@ -10127,9 +10128,21 @@ def prove_pagina_acquisto():
     #    trappola già pagata col «punto» e con la nota della valuta)
     _cr = re.sub(r"/\*[\s\S]*?\*/", "",
                  pezzo_js(mini3, "function contoRighe(c){", "\n}"))
+    #    LA SENTINELLA CAMBIA LATO (ago 2026, coi codici sconto):
+    #    l'etichetta resta SECCA, ma guadagna UNA parola quando a
+    #    scontare e' stato un codice — « codice», misurata: ~48px su
+    #    83 di margine, con 35 che restano a 320px in vista sats.
+    #    Non e' un ritorno alla formula lunga, che resta VIETATA dalla
+    #    riga qui sotto: e' la distinzione fra due sconti che nel
+    #    conto si sommerebbero a occhio se si chiamassero uguale.
+    #    IL CODICE IN CHIARO NON ENTRA: in un tag arriva a 178 esatti,
+    #    zero margine — si legge nella riga compatta un dito sopra.
     prova("nel conto l'etichetta dello sconto e' secca", (True, False),
-          ("r(`Sconto${c.scontoPct" in _cr,
+          ("r(`Sconto${c.scontoOrigine==='codice' ? ' codice' : ''}"
+           "${c.scontoPct" in _cr,
            "Sconto sugli articoli" in _cr))
+    prova("...e il codice in chiaro non entra nel conto", (False, False),
+          ("codice_sconto" in _cr, "codRisp" in _cr))
     #    E LO STESSO NEL paySheet (ago 2026): le righe sono le stesse
     #    — Articolo, Sconto, Spedizione, Totale — quindi il contrasto
     #    c'e' e vale lo stesso ragionamento. La percentuale e' il NONO
@@ -10139,8 +10152,17 @@ def prove_pagina_acquisto():
     #    vede finche' non lo guarda qualcuno col conto scontato aperto.
     _cs = re.sub(r"/\*[\s\S]*?\*/", "",
                  pezzo_js(mini3, "function contoScomposto(", "\n}"))
+    #    E CAMBIA LATO COME LA GEMELLA (ago 2026, coi codici sconto):
+    #    l'etichetta resta secca e guadagna « codice» quando a scontare
+    #    e' stato un codice. Qui la MISURA non e' il vincolo — nel
+    #    paySheet l'etichetta ha 254px con 117 usati — il vincolo e' che
+    #    le due superfici dicano la STESSA cosa: la pagina d'acquisto e
+    #    il foglio di pagamento si vedono a un istante di distanza, e
+    #    due etichette diverse sullo stesso schermo si leggono «il
+    #    prezzo e' cambiato», un attimo prima che i sats escano.
     prova("anche nel paySheet l'etichetta e' secca", (True, False),
-          ("r(sconto, `Sconto${scontoPct" in _cs,
+          ("r(sconto, `Sconto${scontoOrigine==='codice' ? ' codice' : ''}"
+           "${scontoPct" in _cs,
            "Sconto sugli articoli" in _cs))
     # le parentesi si contano DAVVERO invece di una regex annidata a
     # un livello: una chiamata ne ha due (`(via && via.pezzi)||0`) e
@@ -10164,6 +10186,15 @@ def prove_pagina_acquisto():
     prova("...e OGNI chiamata le passa la percentuale",
           (6, []), (len(_chiamate),
                     [c[:40] for c in _chiamate if "_percento" not in c]))
+    #    E L'ORIGINE, che e' la gemella nata coi codici sconto: le sei
+    #    chiamate si dividono TRE dal preventivo e TRE dalla risposta di
+    #    POST /orders, quindi l'origine deve uscire da TUTTE E DUE — o
+    #    il foglio direbbe «Sconto codice» prima di pagare e «Sconto» un
+    #    istante dopo, sullo stesso schermo. Chi ne aggiunge una settima
+    #    e la dimentica lascia l'etichetta nuda, che non alza niente.
+    prova("...e OGNI chiamata le passa anche l'ORIGINE",
+          (6, []), (len(_chiamate),
+                    [c[:40] for c in _chiamate if "sconto_origine" not in c]))
     prova("...e porta la percentuale, dal server e mai dedotta", True,
           '<span class="sconto-tag">−${c.scontoPct}%</span>' in _cr
           and "scontoPct: p.sconto_percento" in mini3)
@@ -10524,10 +10555,15 @@ def prove_libro_mastro():
           indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
           indirizzo_purgato_il INT DEFAULT 0,
           nascosto_compratore INT DEFAULT 0,
-          nascosto_venditore INT DEFAULT 0);
+          nascosto_venditore INT DEFAULT 0,
+          codice_sconto TEXT DEFAULT '', codice_sconto_id INT DEFAULT 0,
+          venditore_id INT DEFAULT 0);
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
           annuncio_id INT, quantita INT, unitario_sats INT,
           titolo TEXT DEFAULT '');
+        CREATE TABLE codici_sconto(id INTEGER PRIMARY KEY, venditore_id INT,
+          codice TEXT, percento INT, scadenza INT DEFAULT 0,
+          usi_max INT DEFAULT 0, attivo INT DEFAULT 1, creato INT DEFAULT 0);
         CREATE TABLE puntate(id INTEGER PRIMARY KEY, annuncio_id INT,
           tg_id INT, offerto_sats INT, versato_sats INT, proxy INT
           DEFAULT 0, stato TEXT);
@@ -10592,6 +10628,20 @@ def prove_libro_mastro():
           busta_nome,busta_codice,busta_il)
           VALUES(4, 9, 1000, 'shipped', 1,
                  'plain:Mario Rossi', 'plain:PIN 4321', 123);
+        -- UN CODICE SANO e un ordine scontato da lui: il codice e'
+        -- del venditore 222, l'ordine 7 e' del venditore 222, l'id e
+        -- il nome ci sono tutti e due, e lo sconto e' scattato.
+        -- Piu' un ordine (8) che porta il NOME senza l'id: e' il
+        -- codice VALIDO che ha PERSO il confronto col maggiore, ed e'
+        -- lo stato LEGITTIMO che il biconditionale farebbe suonare.
+        INSERT INTO codici_sconto(id,venditore_id,codice,percento,attivo)
+          VALUES(1, 222, 'SATOSHI10', 10, 1);
+        INSERT INTO ordini(id,annuncio_id,venditore_id,prezzo_sats,
+          sconto_sats,sconto_percento,quantita,codice_sconto,codice_sconto_id)
+          VALUES(7, 9, 222, 9000, 1000, 10, 1, 'SATOSHI10', 1);
+        INSERT INTO ordini(id,annuncio_id,venditore_id,prezzo_sats,
+          sconto_sats,sconto_percento,quantita,codice_sconto)
+          VALUES(8, 9, 222, 8000, 2000, 20, 1, 'SATOSHI10');
         -- UN NASCOSTO SANO: released, il compratore l'ha messo via —
         -- e' il caso LEGITTIMO, e non deve suonare
         INSERT INTO ordini(id,annuncio_id,prezzo_sats,stato,
@@ -10737,6 +10787,20 @@ def prove_libro_mastro():
         # che una parte non vede piu'
         ("UPDATE ordini SET nascosto_venditore=1 WHERE id=2",
          "ordine nascosto su uno stato non finale", "2"),
+        # I CODICI SCONTO. Le due colonne si scrivono nello STESSO
+        # INSERT e si implicano: l'id c'e' solo se il codice ha VINTO,
+        # e chi vince ha scontato qualcosa.
+        ("UPDATE ordini SET sconto_sats=0, sconto_percento=0 WHERE id=7",
+         "codice sconto senza sconto", "7"),
+        ("UPDATE ordini SET codice_sconto='' WHERE id=7",
+         "codice sconto scordato", "7"),
+        # la guardia dello scope caduta costa sats al venditore
+        # sbagliato: il codice e' del 222, l'ordine diventa del 333
+        ("UPDATE ordini SET venditore_id=333 WHERE id=7",
+         "codice sconto di un altro negozio", "7"),
+        # un volantino in giro che non sconta mai, in silenzio
+        ("UPDATE codici_sconto SET percento=0 WHERE id=1",
+         "codice sconto che non puo' scattare", "1"),
         # l'indirizzo di casa, nei suoi quattro modi. L'ULTIMO E'
         # QUELLO CHE CONTA: se la scopa ha timbrato la cancellazione
         # ma il testo e' ancora li', la promessa scritta nella pagina
@@ -10867,13 +10931,22 @@ def prove_forma_sconto_pacco():
     # mono sconta): il preventivo e la invoice devono dire la stessa
     # cifra per costruzione, non per disciplina.
     prova("lo sconto ha UN giudice solo", 1, src.count("def _sconto_pacco("))
-    # I QUATTRO PERCORSI ORA PASSANO DALL'HELPER (ago 2026, i due
-    # criteri insieme): _sconto_regole prende la lista delle gambe vive
-    # e ne fa il MAX, cosi' «basta che ne scatti una» vive in un posto
-    # solo. La sentinella si e' spostata su di lui e il conto resta
-    # QUATTRO — chi ne aggiungesse un quinto, o tornasse a chiamare il
-    # giudice singolo dentro un percorso, lo sente dalla CI.
+    # I QUATTRO PERCORSI ORA PASSANO DAL COMPOSITORE (ago 2026, i
+    # codici sconto): _sconto_vincente sceglie il MAGGIORE fra il
+    # codice e la regola del negozio, quindi e' LUI a stare nei quattro
+    # punti. La sentinella si e' spostata su di lui — e' la terza volta
+    # (prima _sconto_pacco, poi _sconto_regole) e il conto resta
+    # QUATTRO: chi ne aggiungesse un quinto, o tornasse a chiamare uno
+    # dei giudici sotto dentro un percorso, lo sente dalla CI.
     prova("...e i chiamanti sono i quattro percorsi del conto", 4,
+          src.count("= _sconto_vincente("))
+    prova("il compositore del maggiore e' UNO", 1,
+          src.count("def _sconto_vincente("))
+    # E _sconto_regole ha UN chiamante solo: _sconto_vincente. Se ne
+    # spuntasse un secondo, un percorso starebbe applicando la sola
+    # regola del negozio e ignorando il codice — cioe' facendo pagare
+    # di piu' di quanto la pagina ha promesso.
+    prova("...e l'helper delle gambe lo chiama solo il compositore", 1,
           src.count("= _sconto_regole("))
     prova("l'helper delle gambe e' UNO", 1,
           src.count("def _sconto_regole("))
@@ -10947,6 +11020,23 @@ def prove_forma_sconto_pacco():
         prova(f"{chi}: la regola arriva dalla riga del VENDITORE", True,
               "_regole_sconto(" in corpo and "WHERE tg_id=?" in corpo)
 
+    # E COL CODICE SCONTO LA REGOLA SI RIFORMULA, IN POSITIVO: DAL
+    # PAYLOAD ARRIVA SOLO UN NOME, MAI UNA CIFRA. La percentuale viene
+    # sempre dalla riga del VENDITORE — un `d.get("codice_percento")`
+    # sarebbe uno sconto scelto da chi paga, con un nome diverso.
+    # La riga qui sopra resterebbe verde PER FORTUNA (`d.get("codice_`
+    # non contiene `d.get("sconto`), e una prova che passa per caso non
+    # prova niente: questa lo dice per struttura.
+    # Fette STRETTE con pezzo(): `corpo_set` arriva fino a
+    # _preventivo_set e si porta dentro preventivo_ordine, quindi li'
+    # il conto sarebbe due e non uno.
+    for _chi in ("_compra_set", "compra", "preventivo_ordine",
+                 "_preventivo_set"):
+        _c = pezzo(_chi)
+        prova(f"{_chi}: dal payload arriva solo il NOME del codice", True,
+              _c.count('d.get("codice') == 1
+              and 'd.get("codice_sconto")' in _c)
+
     # 4) IL MONO SCONTA (ago 2026, decisione di Andrea che ROVESCIA il
     # 6 ago: tre copie della stessa cosa sono tre pezzi). La divisione
     # a ritroso di _righe_ordine RIAGGIUNGE sconto_sats — una copia
@@ -10954,12 +11044,17 @@ def prove_forma_sconto_pacco():
     # ordine, notifiche e CSV, in silenzio. Il censimento delle copie
     # sta in prove_divisione_a_ritroso; qui la forma dei due rami.
     prova("compra (mono): lo sconto c'e'", True,
-          "_sconto_regole" in corpo_mono and "sconto_sats" in corpo_mono)
+          "_sconto_vincente" in corpo_mono and "sconto_sats" in corpo_mono)
     # ...FINISCE IN COLONNA (senza, la ricevuta e la divisione a
     # ritroso leggerebbero uno sconto che non e' mai stato scritto,
     # e l'ordine racconterebbe un prezzo che il conto non spiega)
     prova("compra (mono): l'INSERT scrive sconto_sats e percento", True,
           "protezione_sats,quantita,sconto_sats,sconto_percento,"
+          in corpo_mono)
+    # ...e le due colonne del codice IN CODA, dopo sped_gratis_sats:
+    # il nome (che la ripresa confronta) e l'id (che il tetto conta)
+    prova("compra (mono): l'INSERT scrive anche le colonne del codice",
+          True, "sped_gratis_sats,codice_sconto,codice_sconto_id) "
           in corpo_mono)
     # ...e `articolo_sats` e' il NETTO su tutti e due i percorsi mono,
     # come nel set: lordo e sconto sono chiavi in piu' che si sommano
@@ -11010,7 +11105,7 @@ def prove_forma_sconto_pacco():
                        ("preventivo_ordine", pezzo("preventivo_ordine"))):
         prova(f"{chi}: il tetto giudica PRIMA dello sconto", True,
               corpo.index("TETTO_SATS_ANNUNCIO")
-              < corpo.index("_sconto_regole("))
+              < corpo.index("_sconto_vincente("))
 
     # 7) IL DOVUTO IN USCITA NON CONOSCE LO SCONTO. La colonna e' un
     # TESTIMONE: chi ne facesse un netto_venditore(prezzo + sconto)
@@ -11856,7 +11951,8 @@ def _censimento(acceso):
                  "SCONTO_PACCO_SOGLIE", "SCONTO_PACCO_SCONTI",
                  "SCONTO_PACCO_VALORI_EUR", "SCONTO_PACCO_VALORI_SATS",
                  "SCONTO_PACCO_CRITERI", "VALUTE_SOGLIA",
-                 "SPED_GRATIS_SOGLIE_EUR", "SPED_GRATIS_SOGLIE_SATS"):
+                 "SPED_GRATIS_SOGLIE_EUR", "SPED_GRATIS_SOGLIE_SATS",
+                 "CODICI_SCONTO_PERCENTI", "CODICI_SCONTO_DURATE_GIORNI"):
         amb[nome] = [1, 2, 3]
     # ADMIN_IDS esce come CONTEGGIO: gli id dei moderatori non sono
     # roba da mostrare, nemmeno a un moderatore.
@@ -11864,7 +11960,8 @@ def _censimento(acceso):
     # Le leve booleane e i numeri che l'interruttore governa.
     for nome in ("MODALITA_COLLAUDO", "AUTO_SBLOCCO_ATTIVO",
                  "ASTA_ABILITATA", "ASTA_PROXY_ATTIVO", "LAMPO_ATTIVE",
-                 "SCONTO_PACCO_ATTIVO", "FERIE_ATTIVE", "BANNER_TEST",
+                 "SCONTO_PACCO_ATTIVO", "CODICI_SCONTO_ATTIVI",
+                 "CODICI_SCONTO_TENTATIVI_ORA", "FERIE_ATTIVE", "BANNER_TEST",
                  "BANNER_TEST_LINK", "CONTATORE_UTENTI", "POST_AUTOMATICI",
                  "IMPORT_NOSTR_APERTO", "RICATEGORIZZA_AUTO",
                  "MODERAZIONE_REVISIONE", "AVVISI_ISCRITTI",
@@ -15976,7 +16073,10 @@ def prove_fogli_di_casa():
     # condiviso: se qualcuno si scrive un foglio suo, CALA — ed e'
     # quello il verso da sorvegliare. Cresce a mano quando un gesto
     # nuovo lo adotta, come il censimento delle leve-lista.
-    prova("i gesti che passano dalla domanda unica sono cinque", 5,
+    # SEI dall'ago 2026: il sesto e' l'eliminazione di un codice
+    # sconto. Una superficie NUOVA non aumenta il debito dei confirm()
+    # di sistema — eliminaRicerca usa ancora quello, ed e' dichiarato.
+    prova("i gesti che passano dalla domanda unica sono sei", 6,
           solo_codice(mini).count("chiediConferma({"))
     for chi, dove in (("il ritiro", "function ritiraOfferta("),
                       ("accetta e rifiuta", "function rispondiOfferta(")):
@@ -17283,8 +17383,22 @@ def prove_promesse_badge():
     # su rete viva; cosi' compare solo quando l'attesa si sente — mai
     # numeri vecchi spacciati per freschi, mai un lampeggio sul caso
     # normale. E muore a ogni render, che E' la risposta.
+    # LA SENTINELLA HA CAMBIATO LATO (ago 2026, coi codici sconto):
+    # il velo e' stato ESTRATTO in acqVelo perche' i chiamanti sono
+    # diventati due — il ± e l'Applica del codice sconto — e una
+    # seconda stesura direbbe la stessa cosa con un altro numero, con
+    # le due attese che lampeggiano diverso. Quindi si guarda dentro il
+    # ferro condiviso, E si contano i chiamanti.
+    _velo = pezzo_js(mini, "function acqVelo(box){", "\n}")
     prova("il velo d'attesa e' ritardato (niente lampeggi)", True,
-          "setTimeout(" in _ap2 and "acq-attesa" in _ap2)
+          "setTimeout(" in _velo and "acq-attesa" in _velo)
+    prova("...ed e' UNO SOLO, condiviso", 1,
+          mini.count("function acqVelo("))
+    # quattro: la definizione, il ±, l'Applica del codice sconto e il
+    # suo Togli (che rifa' il conto anche lui). Il quinto di domani
+    # entra nel conto da solo, o si accorgera' che il velo l'ha
+    # riscritto per conto suo.
+    prova("...coi suoi chiamanti", 4, mini.count("acqVelo("))
     prova("...e muore a ogni render", True,
           "clearTimeout(acqAttesaTimer);" in pezzo_js(
               mini, "function renderAcquisto(){", "\n}"))
@@ -17497,7 +17611,11 @@ def prove_promesse_raggiungibili():
     # ---- 1. IL SERVER CONTA LA RAGGIUNGIBILITA' (il patto di
     # `mancano_*`: il client riceve, non calcola — e' lo stesso posto
     # dove vivrebbe un off-by-one).
-    prova("le due chiavi escono dal preventivo", (1, 1),
+    # LA PRIMA ESCE DA DUE POSTI (ago 2026, coi codici sconto): il
+    # preventivo mono come sempre, e il SET quando un codice COPRE la
+    # promessa — l'unica eccezione al «nel set non si afferma», qui
+    # sotto, e l'unica ragione per cui questo conto e' due.
+    prova("le due chiavi escono dal preventivo", (2, 1),
           (src.count('"sconto_raggiungibile":'),
            src.count('"sped_gratis_raggiungibile":')))
     # ZERO GIUDICI NUOVI: la domanda «esiste una quantita' che la fa
@@ -17543,8 +17661,20 @@ def prove_promesse_raggiungibili():
     # preventivo del set, non il file intero.
     _pset = src[src.index("async def _preventivo_set("):]
     _pset = _pset[:_pset.index("\ndef ") if "\ndef " in _pset else len(_pset)]
-    prova("nel SET la raggiungibilita' non si afferma", False,
-          "raggiungibile" in _pset)
+    prova("nel SET la spedizione gratis non si afferma", False,
+          "sped_gratis_raggiungibile" in _pset)
+    # PER LO SCONTO LA PROVA CAMBIA LATO (ago 2026, coi codici sconto):
+    # nel set la chiave ADESSO esce, ma SOLO per colpa di un codice che
+    # COPRE la promessa — e quello non e' una previsione sulla
+    # composizione, e' un fatto di adesso. Senza, il client inviterebbe
+    # verso uno sconto che aggiungendo pezzi non arriverebbe mai.
+    # LA GUARDIA E' LA META' CHE CONTA (`cod_pct and ... not _sc_vive`):
+    # senza il primo termine la chiave uscirebbe False su OGNI set senza
+    # promesse, e il set tornerebbe ad affermare quel che ha sempre
+    # taciuto.
+    prova("...ma lo sconto la afferma se un codice copre", True,
+          '"sconto_raggiungibile": False' in _pset
+          and "if cod_pct and regole_sc and not _sc_vive" in _pset)
 
     # ---- 2. IL CLIENT LE LEGGE FAIL-OPEN. `!== false` e non `&&`:
     # chiave assente = invito come oggi (il set, la DEMO, i server di
@@ -17626,8 +17756,15 @@ def prove_promesse_raggiungibili():
     # del blocco, e piu' largo di quello che l'ha fatto trovare.
     prova("la soglia non gatea piu' il blocco intero", False,
           "if (sgSoglia > 0 && spedisceQui" in _rac)
+    # IL VERDE DELLA 🎁 RESTA AGGANCIATO AL FATTO, e dall'ago 2026 al
+    # fatto che QUELLA promessa abbia scontato: col codice sconto
+    # vincente `sconto_percento` porta la percentuale di un'altra cosa,
+    # e senza la guardia la pillola direbbe «la promessa del negozio e'
+    # scattata» mostrando il numero del codice. Il fatto del codice lo
+    # dicono la riga del conto e la riga compatta del cassetto.
     prova("...e quello della 🎁 resta agganciato al fatto", True,
-          "else if ((p.sconto_sats||0) > 0)" in _rac)
+          "else if ((p.sconto_sats||0) > 0 && p.sconto_origine !== 'codice')"
+          in _rac)
     # CENSIMENTO e non elenco (la lezione del titolo nudo): ogni verde
     # di renderAcquisto — anche la terza promessa che qualcuno
     # aggiungera' fra sei mesi — deve nascere da una condizione SUA. Un

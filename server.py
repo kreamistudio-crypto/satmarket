@@ -382,6 +382,81 @@ try:
 except ImportError:
     VALUTE_SOGLIA = ("eur", "sats")
 
+# I CODICI SCONTO DEL VENDITORE (ago 2026): «SATOSHI10» scritto alla
+# cassa vale -X% sugli articoli. E' la TERZA leva accanto allo sconto
+# sugli articoli e alla spedizione gratis, ma di natura diversa —
+# quelle sono promesse PUBBLICHE, scritte in vetrina e uguali per
+# tutti; questa e' un SEGRETO del venditore, che la da' a chi vuole.
+# Da li' discende la regola che governa meta' del cantiere: il codice
+# non esce MAI da nessuna superficie pubblica.
+# Nasce ACCESA come le due gemelle, e per la stessa ragione: non muove
+# denaro verso l'esterno, abbassa un conto in entrata. Spegnerla e'
+# fail-closed — i codici smettono di valere alla cassa e gli endpoint
+# rispondono 400, ma le righe restano in tabella e tornano vive
+# riaccendendo: e' un freno d'emergenza, non una cancellazione.
+try:
+    from config import CODICI_SCONTO_ATTIVI
+except ImportError:
+    CODICI_SCONTO_ATTIVI = True
+
+# IL TETTO DELLA PERCENTUALE, e questa e' la parte che conta: e' LO
+# STESSO NUMERO di SCONTO_PACCO_MAX_PERCENTO, non per simmetria ma
+# perche' con «vince il maggiore» il tetto della cascata e' il max()
+# dei due — tenerli pari lascia il FONDO dichiarato ad alta voce da
+# una prova (lampo 70% + sconto 30% = il 21% del listino) esattamente
+# dov'e'. Alzare QUESTO da solo lo sposta, e a dirlo sara' soltanto
+# quella prova che diventa rossa.
+# Leva SUA e non un riuso di quella dello sconto carrello: un giorno
+# si potrebbe voler concedere di piu' a un codice mirato che a una
+# regola pubblica, ed e' una decisione che va potuta prendere.
+try:
+    from config import CODICI_SCONTO_MAX_PERCENTO
+except ImportError:
+    CODICI_SCONTO_MAX_PERCENTO = 30
+
+# Le pillole del venditore, il patto di LAMPO_SCONTI: il client non
+# hardcoda mai una cifra, le riceve da /api/me.
+try:
+    from config import CODICI_SCONTO_PERCENTI
+except ImportError:
+    CODICI_SCONTO_PERCENTI = (5, 10, 15, 20)
+
+# Le durate offerte, IN GIORNI. Lo ZERO sta NEL CATALOGO e vuol dire
+# «senza scadenza»: detto qui invece che come caso speciale dentro il
+# codice. La scadenza si dichiara in giorni e mai come timestamp dal
+# client — il calco di ORE_LAMPO_OPZIONI: un istante che arriva da
+# fuori metterebbe la deriva dell'orologio dentro una promessa.
+try:
+    from config import CODICI_SCONTO_DURATE_GIORNI
+except ImportError:
+    CODICI_SCONTO_DURATE_GIORNI = (7, 30, 90, 0)
+
+# Quanti codici puo' avere un negozio: il gemello di MAX_AVVISI_UTENTE
+# — un guardrail contro la lista infinita, non un giudizio sul negozio.
+try:
+    from config import CODICI_SCONTO_MAX_PER_VENDITORE
+except ImportError:
+    CODICI_SCONTO_MAX_PER_VENDITORE = 20
+
+# La cintura contro il numero incollato per sbaglio, la regola di
+# MAX_QUANTITA_ANNUNCIO: quanti clienti ha lo sa il venditore, non noi.
+try:
+    from config import CODICI_SCONTO_MAX_USI
+except ImportError:
+    CODICI_SCONTO_MAX_USI = 100_000
+
+# IL FRENO ai tentativi FALLITI, il calco di TETTO_RICERCHE_AI_ORA
+# (0 = nessun freno). Serve contro chi prova a indovinare i codici
+# altrui, ed e' anche cio' che chiude il canale temporale residuo
+# dell'anti-oracolo. SI CONSUMA SOLO SUI FALLITI, ed e' la riga che
+# decide: il preventivo si rilancia a ogni ± dello stepper e il client
+# rimanda il codice ogni volta — un gettone per chiamata brucerebbe la
+# quota di chi ha un codice VALIDO solo cambiando quantita'.
+try:
+    from config import CODICI_SCONTO_TENTATIVI_ORA
+except ImportError:
+    CODICI_SCONTO_TENTATIVI_ORA = 20
+
 # I SUGGERIMENTI DAL BOT (ago 2026, decisione di Andrea che ROVESCIA
 # l'opt-in di luglio): «💡 Suggerimenti sui miei annunci» nasce ACCESO.
 # Il motivo del rovesciamento e' che l'opt-in, in pratica, non lo
@@ -1695,6 +1770,63 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_avvisi_ricerca_tg
         ON avvisi_ricerca(tg_id);
+    CREATE TABLE IF NOT EXISTS codici_sconto(
+        -- I CODICI SCONTO DEL VENDITORE (ago 2026): «SATOSHI10»
+        -- scritto alla cassa vale -X% sugli articoli. Il venditore lo
+        -- distribuisce a chi vuole — nel suo canale, di persona, a un
+        -- cliente affezionato.
+        -- LA DIFFERENZA CON LE DUE GEMELLE, ed e' quella che governa
+        -- meta' del cantiere: lo sconto sugli articoli e la spedizione
+        -- gratis sono promesse PUBBLICHE, scritte in vetrina e uguali
+        -- per tutti; un codice e' un SEGRETO. Non esce MAI da nessuna
+        -- superficie pubblica — se uscisse non sarebbe piu' «lo do a
+        -- chi voglio», sarebbe un ribasso di listino con piu' passaggi.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        venditore_id INTEGER NOT NULL,
+        -- Gia' NORMALIZZATO da _codice_normalizza (maiuscolo, A-Z0-9):
+        -- la colonna contiene solo la forma canonica, perche'
+        -- creazione e riscatto devono normalizzare IDENTICAMENTE o la
+        -- UNIQUE e la ricerca non si parlano.
+        codice TEXT NOT NULL,
+        -- L'unica leva del codice. NESSUNA colonna `valuta`: una
+        -- percentuale non ha unita', e va detto ad alta voce o la
+        -- simmetria con sconto_pacco_* invitera' ad aggiungere un
+        -- `codice_valuta TEXT DEFAULT 'eur'` per bellezza, che non
+        -- significherebbe niente.
+        -- NESSUNA soglia (minimo_pezzi/minimo_valore): rifarebbe
+        -- _regola_sconto dentro una tabella nuova e riaprirebbe la
+        -- domanda «si somma o vince il maggiore?», gia' chiusa.
+        percento INTEGER NOT NULL DEFAULT 0,
+        -- 0 = mai. Gate in LETTURA come lampo, asta e ferie: il codice
+        -- scade da solo, nessun orologio che lo spenga. L'idioma e'
+        -- quello LETTERALE di offerte.scadenza (`0 < x < adesso`), o
+        -- qualcuno dovra' chiedersi da che parte arrotonda il filo.
+        scadenza INTEGER NOT NULL DEFAULT 0,
+        -- 0 = illimitato, il patto di prezzo_max_sats e raggio_km.
+        -- Gli usi NON si contano qui: si DERIVANO dagli ordini
+        -- (_usi_codice, il modello di _riservati), cosi' non c'e'
+        -- nessun contatore da tenere in pari e nessuna restituzione da
+        -- scrivere quando un ordine viene abbandonato.
+        usi_max INTEGER NOT NULL DEFAULT 0,
+        -- 0 = in pausa. `pausa` e `elimina` sono DUE gesti diversi:
+        -- la pausa e' «torna presto» (id e conteggio restano), la
+        -- cancellazione toglie la riga — e ricreare lo stesso nome da'
+        -- un id nuovo e un tetto fresco, che e' la lettura onesta («un
+        -- codice nuovo e' un codice nuovo»). Il contrario esigerebbe
+        -- un soft delete, cioe' un secondo significato per `attivo`.
+        attivo INTEGER NOT NULL DEFAULT 1,
+        creato INTEGER,
+        -- La UNIQUE e' (venditore, codice) e NON (codice): un
+        -- namespace globale farebbe accaparrare «SCONTO10» al primo
+        -- arrivato, e non c'e' niente da difendere — un codice si
+        -- spende solo contro un ordine di quel negozio, e il carrello
+        -- e' di UN venditore per costruzione. Ed e' la UNIQUE a fare
+        -- da GIUDICE dei doppioni (il patto di xp_eventi): mai una
+        -- SELECT prima, che aprirebbe una finestra.
+        UNIQUE(venditore_id, codice)
+    );
+    CREATE INDEX IF NOT EXISTS idx_codici_venditore
+        ON codici_sconto(venditore_id);
     CREATE TABLE IF NOT EXISTS avvisi_notificati(
         -- dedup: lo stesso annuncio non suona MAI due volte per lo
         -- stesso utente (modifiche, re-import). Nel DB e non in
@@ -2880,6 +3012,36 @@ def init_db():
                     # Si scrive SOLO quando la promessa e' scattata su
                     # una via che spediva: 0 ovunque altrove.
                     "sped_gratis_sats INTEGER DEFAULT 0",
+                    # I CODICI SCONTO (ago 2026). DUE colonne e non
+                    # una, ed e' la coppia che regge sia la corsa sia
+                    # la ripresa del pentito:
+                    # `codice_sconto` e' il FATTO DELLA RICHIESTA — il
+                    # nome speso, scritto ANCHE quando il codice ha
+                    # PERSO il confronto col maggiore. Serve alla
+                    # RIPRESA (che confronta la richiesta e gira molto
+                    # prima che si sappia chi vince) e sopravvive alla
+                    # cancellazione della riga in codici_sconto, dove
+                    # un JOIN direbbe «?».
+                    "codice_sconto TEXT DEFAULT ''",
+                    # `codice_sconto_id` e' il MOTORE DEL CONTEGGIO,
+                    # scritto SOLO quando il codice ha VINTO: un tetto
+                    # di usi conta gli sconti DATI, non le digitazioni.
+                    # E siccome il conteggio va per id, rinominare un
+                    # codice non azzera il tetto e non riscrive la
+                    # storia. La differenza fra le due colonne e'
+                    # esattamente «ho usato il codice» contro «il
+                    # codice mi ha fatto risparmiare», e un tetto e' la
+                    # seconda.
+                    # COLONNE TESTIMONE, NON MOTORI — e vale parola per
+                    # parola l'avvertimento di sconto_sats qui sopra:
+                    # l'unico numero che comanda e' prezzo_sats, che
+                    # NASCE GIA' SCONTATO. Chi leggesse queste e ne
+                    # facesse un netto_venditore(prezzo + sconto) per
+                    # «rimborsare al venditore la promozione» farebbe
+                    # uscire dall'escrow DI ALTRI ORDINI la differenza,
+                    # e la cintura di paga_venditore non lo vedrebbe
+                    # (per lei dovuto e bolt11 combacerebbero).
+                    "codice_sconto_id INTEGER DEFAULT 0",
                     # LA BUSTA DI CONSEGNA (ago 2026): sugli ordini con
                     # la via del punto di ritiro il venditore deposita
                     # il nome del destinatario e il codice di ritiro —
@@ -3039,6 +3201,13 @@ def init_db():
     # (finora la tabella viveva senza indici).
     con.execute("CREATE INDEX IF NOT EXISTS idx_ordini_annuncio "
                 "ON ordini(annuncio_id, stato)")
+    # Gli usi di un codice sconto si DERIVANO dagli ordini (il modello
+    # di _riservati), quindi il conteggio e' una query calda su una
+    # colonna che quasi tutti gli ordini portano a 0: l'indice e'
+    # PARZIALE, o sarebbe una copia dell'intera tabella per servire
+    # una manciata di righe.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_ordini_codice "
+                "ON ordini(codice_sconto_id) WHERE codice_sconto_id<>0")
     # Distintivi: passata silenziosa su TUTTI gli utenti, a ogni avvio.
     # E' idempotente (INSERT OR IGNORE) e auto-riparante: fusioni,
     # rimozioni e criteri nuovi si sistemano al riavvio successivo.
@@ -10891,6 +11060,31 @@ def _leve_stato():
             _leva("Soglia minima (sats)", "SPED_GRATIS_MIN_SATS",
                   SPED_GRATIS_MIN_SATS),
         ]},
+        {"gruppo": "🎟 Codici sconto del venditore", "voci": [
+            _leva("Codici sconto", "CODICI_SCONTO_ATTIVI",
+                  bool(CODICI_SCONTO_ATTIVI),
+                  spento="nessun codice vale piu' alla cassa e il "
+                         "cassetto del venditore risponde 400; le righe "
+                         "restano e tornano vive riaccendendo"),
+            _leva("Sconto massimo (%)", "CODICI_SCONTO_MAX_PERCENTO",
+                  CODICI_SCONTO_MAX_PERCENTO,
+                  acceso="tenerlo pari a quello dello sconto articoli: "
+                       "con «vince il maggiore» il tetto della cascata "
+                       "e' il max dei due"),
+            _leva("Sconti proposti (%)", "CODICI_SCONTO_PERCENTI",
+                  _elenco(CODICI_SCONTO_PERCENTI)),
+            _leva("Durate proposte (giorni)", "CODICI_SCONTO_DURATE_GIORNI",
+                  _elenco(CODICI_SCONTO_DURATE_GIORNI),
+                  acceso="lo 0 in elenco vuol dire «senza scadenza»"),
+            _leva("Codici per venditore", "CODICI_SCONTO_MAX_PER_VENDITORE",
+                  CODICI_SCONTO_MAX_PER_VENDITORE),
+            _leva("Usi massimi per codice", "CODICI_SCONTO_MAX_USI",
+                  CODICI_SCONTO_MAX_USI),
+            _leva("Tentativi sbagliati all'ora",
+                  "CODICI_SCONTO_TENTATIVI_ORA", CODICI_SCONTO_TENTATIVI_ORA,
+                  spento="nessun freno a chi prova a indovinare i codici "
+                         "altrui"),
+        ]},
         {"gruppo": "💰 Offerte e 🌴 ferie", "voci": [
             _leva("Offerta minima (% del listino)",
                   "OFFERTA_MINIMA_PERCENTO", OFFERTA_MINIMA_PERCENTO),
@@ -11141,6 +11335,53 @@ def _ricerca_ai_concessa(tg_id: int) -> bool:
         return False
     voce[1] += 1
     return True
+
+
+# IL FRENO DEI CODICI SCONTO (ago 2026), gemello del precedente. Serve
+# contro chi prova a indovinare i codici altrui — e siccome un codice
+# vale su un negozio solo, indovinarne uno vuol dire regalarsi lo
+# sconto che il venditore aveva dato a qualcun altro.
+# SI CONSUMA SOLO SUI TENTATIVI FALLITI, ed e' la riga che decide: il
+# preventivo si rilancia a ogni ± dello stepper e il client rimanda il
+# codice ogni volta, quindi un gettone per chiamata brucerebbe la
+# quota di chi ha un codice VALIDO solo cambiando quantita'. Chi non
+# digita mai un codice non tocca il freno.
+CODICE_QUOTA: dict[int, list] = {}      # tg_id -> [ora, tentativi falliti]
+
+
+def _codice_quota_libera(tg_id: int) -> bool:
+    """C'e' ancora un gettone per provare un codice? GUARDA E BASTA.
+
+    Sta separata dal consumo perche' il gettone si spende solo sui
+    tentativi FALLITI: consumare-e-restituire direbbe la stessa cosa
+    peggio, con una finestra in cui il conto e' falso e un ramo di
+    restituzione da non dimenticare.
+    A quota finita si risponde con lo STESSO messaggio di sempre e MAI
+    con un 429 — un 429 confermerebbe l'esistenza del freno e ne
+    farebbe tarare il ritmo — e soprattutto NON SI INTERROGA IL
+    DATABASE: il freno e' anche un freno di costo."""
+    if not CODICI_SCONTO_TENTATIVI_ORA:     # 0 = nessun freno
+        return True
+    voce = CODICE_QUOTA.get(tg_id)
+    return (not voce or voce[0] != time.strftime("%Y-%m-%d %H")
+            or voce[1] < CODICI_SCONTO_TENTATIVI_ORA)
+
+
+def _codice_tentativo_speso(tg_id: int) -> None:
+    """Un gettone in meno: si chiama SOLO quando il codice non valeva.
+
+    Chi non digita mai un codice non tocca il freno, e chi ne ha uno
+    buono nemmeno — il preventivo si rilancia a ogni ± dello stepper e
+    il client rimanda il codice ogni volta, quindi un gettone per
+    chiamata brucerebbe la quota di chi non ha sbagliato niente."""
+    if not CODICI_SCONTO_TENTATIVI_ORA:
+        return
+    ora = time.strftime("%Y-%m-%d %H")
+    voce = CODICE_QUOTA.get(tg_id)
+    if not voce or voce[0] != ora:
+        voce = [ora, 0]
+        CODICE_QUOTA[tg_id] = voce
+    voce[1] += 1
 
 
 @app.get("/api/search")
@@ -11685,6 +11926,31 @@ def _sped_gratis(articolo: int, articolo_eur, soglia: int,
     return misura is not None and misura >= soglia
 
 
+def _sconto_percento(articolo: int, percento: int) -> int:
+    """LA SOTTRAZIONE di uno sconto percentuale sugli articoli, e basta.
+
+    E' l'aritmetica che era l'ultima riga di _sconto_pacco, ESTRATTA
+    (ago 2026) perche' i codici sconto la riusano identica: una
+    percentuale sugli articoli si toglie in un modo solo, e due copie
+    divergerebbero al primo ritocco — con la meta' degli ordini
+    scontati in un modo e meta' nell'altro, in silenzio.
+    IL NETTO COL FLOOR E LO SCONTO PER DIFFERENZA, la ricetta di
+    _prezzo_lampo: cosi' `articolo - sconto` E' il netto per
+    costruzione (mai un sat di scarto fra la riga mostrata e il
+    totale) e il sat di dubbio resta a CHI PAGA, come la protezione
+    col suo floor. Il max(1) e' la cintura della lampo: mai gratis.
+    LA DECISIONE NON ABITA QUI: se lo sconto SPETTA lo dice il
+    chiamante — la soglia in _sconto_pacco, la riga del venditore in
+    _codice_vale. Qui si sa solo sottrarre.
+    LA GUARDIA e' una CINTURA PER IL CHIAMANTE NUOVO e non puo'
+    cambiare un risultato di _sconto_pacco: li' la riga sopra ha gia'
+    garantito `percento > 0` e `articolo > 1` prima di arrivare qui.
+    C'e' la prova che tortura la coppia sugli stessi input."""
+    if percento <= 0 or articolo <= 1:
+        return 0
+    return articolo - max(1, articolo * (100 - min(percento, 100)) // 100)
+
+
 def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
                   soglia: int, percento: int, valuta: str) -> int:
     """LO SCONTO CARRELLO in sats (ago 2026): la regola del negozio —
@@ -11762,7 +12028,7 @@ def _sconto_pacco(articolo: int, articolo_eur, pezzi: int, criterio: str,
         return 0        # criterio che nessun ramo sa applicare: si tace
     if percento <= 0 or soglia < minimo or misura < soglia or articolo <= 1:
         return 0
-    return articolo - max(1, articolo * (100 - min(percento, 100)) // 100)
+    return _sconto_percento(articolo, percento)
 
 
 def _sconto_regole(articolo: int, articolo_eur, pezzi: int, regole) -> int:
@@ -11799,6 +12065,119 @@ def _sconto_vuole_cambio(regole) -> bool:
     questo — una promessa che non si sa valutare non scatta e l'ordine
     parte a prezzo pieno."""
     return any(c == "valore" and v == "eur" for c, _s, _p, v in regole)
+
+
+# La forma di un codice sconto. Sono NUMERI DI STRUTTURA e non leve:
+# il minimo tiene fuori i codici che si indovinano a caso, il massimo
+# e' quanto sta comodo in un campo e si detta a voce.
+CODICE_SCONTO_MIN_LEN = 3
+CODICE_SCONTO_MAX_LEN = 24
+
+
+def _codice_normalizza(codice) -> str:
+    """Il codice come si scrive in colonna e come si confronta.
+
+    Maiuscolo, e SOLO lettere e cifre: tutto il resto cade. Vive in un
+    posto solo perche' CREAZIONE E RISCATTO DEVONO NORMALIZZARE
+    IDENTICAMENTE — se i due divergessero, la UNIQUE e la ricerca non
+    si parlerebbero e un codice creato non si potrebbe piu' spendere.
+    DECISIONE DA DICHIARARE: togliendo la punteggiatura, «SATOSHI-10»
+    e «SATOSHI10» sono lo STESSO codice. Chi lo legge da un volantino
+    o se lo sente dettare a voce non deve indovinare i trattini, e chi
+    ne creasse due che si distinguono solo per un trattino prende il
+    400 della UNIQUE, che glielo dice. L'alfabeto stretto e' anche
+    cio' che rende il codice sicuro dentro un attributo HTML e dentro
+    una stringa JS — il patto del filtro-alfabeto.
+    Il taglio a MAX_LEN e' l'ultima riga e non la prima: si taglia
+    quello che RESTA dopo aver buttato via il resto, o un codice fatto
+    di trattini si accorcerebbe a niente prima di essere ripulito."""
+    pulito = "".join(c for c in str(codice or "").upper()
+                     if c.isascii() and c.isalnum())
+    return pulito[:CODICE_SCONTO_MAX_LEN]
+
+
+def _codice_vale(percento, scadenza, usi_max, attivo, di_chi: int,
+                 venditore_id: int, adesso: int, usi: int) -> int:
+    """La percentuale di un codice sconto, o 0 se non vale.
+
+    Il ruolo di _regola_sconto per la terza promessa: PRENDE I CAMPI E
+    NON LA RIGA (il patto di in_ferie), cosi' lo stesso giudice serve
+    la riga del database alla cassa, la lista del venditore nel suo
+    cassetto e la prova in CI — senza un database. Se ce ne fossero
+    due, il venditore leggerebbe «valido» su un codice che alla cassa
+    non scatta, ed e' esattamente il tipo di divergenza che nessuno
+    scopre finche' non protesta un compratore.
+    FAIL-CLOSED SU OGNI STRADA, e ognuna da' LO STESSO ZERO: leva
+    spenta, codice in pausa, percentuale a zero, scaduto, tetto
+    esaurito, di un altro negozio. Nessun chiamante deve ricordarsi i
+    casi, e il motivo del rifiuto NON esce di qui — vedi
+    l'anti-oracolo: c'e' un messaggio solo.
+    IL TAPPO min(percento, MAX) e' la CINTURA contro una colonna
+    scritta a mano o il rollback da una leva piu' generosa; il VARCO
+    e' il 400 dell'endpoint, che invece la cifra la dice (la lezione
+    di quantita_da_payload: si lima dove il dato e' gia' in casa, si
+    rifiuta dove lo si sta accettando).
+    LA SCADENZA usa l'idioma LETTERALE di offerte.scadenza
+    (`0 < scadenza < adesso`): lo zero e' «mai», e al filo esatto il
+    codice vale ancora — come _asta_viva e in_ferie.
+    GLI USI arrivano gia' contati dal chiamante (_usi_codice): qui non
+    si legge niente, o questa funzione smetterebbe di essere pura."""
+    if not CODICI_SCONTO_ATTIVI or not attivo:
+        return 0
+    if not percento or percento <= 0:
+        return 0
+    if di_chi != venditore_id:
+        return 0
+    if 0 < (scadenza or 0) < adesso:
+        return 0
+    if (usi_max or 0) > 0 and usi >= usi_max:
+        return 0
+    return min(percento, CODICI_SCONTO_MAX_PERCENTO)
+
+
+def _sconto_vincente(articolo: int, articolo_eur, pezzi: int, regole,
+                     codice_percento: int) -> tuple:
+    """VINCE IL MAGGIORE fra il codice sconto e la regola del negozio.
+
+    Torna `(sconto_sats, percento, chi)`, dove `chi` e' 'codice' quando
+    ha vinto il codice e '' negli altri due casi (la regola, o niente).
+    SI APPLICA SOLO IL PIU' GENEROSO, MAI LA SOMMA (ago 2026,
+    decisione di Andrea). Le ragioni sono le stesse per cui la somma
+    era gia' stata respinta fra le due gambe dello sconto carrello, e
+    non dipendono dai gusti: 20+20 buca SCONTO_PACCO_MAX_PERCENTO, che
+    e' una cintura vera; e sposta il FONDO della cascata lampo+sconto
+    (oggi il 21% del listino) che una prova dichiara ad alta voce.
+    In piu' qui ce n'e' una terza: codice e sconto carrello sono LO
+    STESSO MESTIERE — una percentuale sugli articoli — e due sconti
+    sulla stessa cosa vogliono due righe nel conto che chi legge deve
+    sommare da se'.
+    E' QUESTA DECISIONE A TENERE PICCOLO IL CANTIERE: non esistendo
+    mai una somma, UNA colonna basta. Lo sconto del codice atterra in
+    ordini.sconto_sats, la colonna di sempre, quindi la divisione a
+    ritroso dell'unitario (_righe_ordine, la ripresa, la riga del
+    client) la riaggiunge gia' e non cambia di un carattere. Con una
+    colonna sua, le tre copie della divisione sbaglierebbero
+    l'unitario in ordine, notifiche e CSV — in silenzio.
+    A PARI MERITO VINCE LA REGOLA (il `>` e' stretto), e serve un
+    tie-break deterministico: due percentuali diverse che dopo il
+    floor danno gli stessi sats farebbero dire alla pagina una cosa e
+    alla ricevuta un'altra. La regola e' la promessa che il compratore
+    ha gia' letto in vetrina, e soprattutto UN USO NON SI BRUCIA PER
+    DARE QUELLO CHE ERA GIA' DATO — da cui la regola derivata, che si
+    prova in una riga: si consuma un uso solo quando `chi == 'codice'`.
+    LA PERCENTUALE CHE ESCE E' QUELLA DEL VINCITORE, e finisce in
+    ordini.sconto_percento: quella colonna e' «la fotografia della
+    REGOLA che ha scontato», quindi se ha vinto il 20% del codice la
+    ricevuta deve dire 20% — dedurla da sconto/articolo direbbe
+    19,99%. Zero quando non ha scontato nessuno, cosi' il
+    `pct if sconto else 0` dei chiamanti resta una cintura e non un
+    motore."""
+    da_regola = _sconto_regole(articolo, articolo_eur, pezzi, regole)
+    da_codice = _sconto_percento(articolo, codice_percento)
+    if da_codice > da_regola:
+        return da_codice, codice_percento, "codice"
+    return da_regola, (regole[0][2] if regole and da_regola else 0), ""
+
 
 
 def _gamba_invito(regole, pezzi: int, articolo: int, articolo_eur):
@@ -14311,6 +14690,77 @@ def _riservati(con, annuncio_id: int) -> int:
     return mono + nei_set
 
 
+# UN USO E' UN ORDINE CHE PORTA QUEL CODICE E NON E' ANNULLATO: i
+# pagati per sempre, i 'creato' finche' la loro fattura e' viva.
+# Il frammento e' una COSTANTE perche' lo condividono la cassa e la
+# lista del venditore: scritto due volte e' il posto esatto in cui i
+# due direbbero due numeri diversi sullo stesso codice.
+USI_CODICE_DOVE = ("stato<>'annullato' AND (stato<>'creato' OR creato>=?)")
+
+
+def _usi_codice(con, codice_id: int) -> int:
+    """Gli usi consumati da un codice sconto, DERIVATI dagli ordini.
+
+    IL MODELLO E' _riservati, ed e' la risposta gia' scelta da questo
+    progetto per lo stesso identico problema — una risorsa scarsa
+    prenotata da ordini non ancora pagati: niente contatore da tenere
+    allineato, niente restituzione da scrivere quando un ordine viene
+    abbandonato, e la finestra dei 30 minuti (la soglia di
+    pulisci_ordini_fantasma, che copre i 15 della invoice) rende
+    innocue le righe stantie anche col reaper pigro.
+    LA STRADA SCARTATA, e va tenuta perche' e' quella che torna in
+    mente: un contatore `codici_sconto.usi` con UPDATE condizionato
+    (`WHERE id=? AND (usi_max=0 OR usi<usi_max)`, si guarda rowcount).
+    E' piu' forte in teoria — reggerebbe anche multi-processo — e
+    costa QUATTRO punti di restituzione (annulla_ordine,
+    controlla_abbandonati, pulisci_ordini_fantasma, piu' la
+    RI-consumazione in controlla_annullati): uno dimenticato perde usi
+    per sempre, in silenzio. E' il difetto che _riservati e' nato per
+    non avere, su una risorsa molto piu' preziosa di questa. Chi la
+    riproponga porti prima il multi-processo.
+    DICHIARATO: un rimborso NON restituisce l'uso. Lo sconto e' stato
+    dato e la vendita c'e' stata; restituirlo farebbe calare il
+    conteggio del venditore mesi dopo, senza che abbia fatto niente.
+    Si conta per ID e non per nome: rinominare un codice non azzera il
+    tetto e non riscrive la storia."""
+    soglia = int(time.time()) - 1800
+    return con.execute(
+        f"SELECT COUNT(*) AS n FROM ordini "
+        f"WHERE codice_sconto_id=? AND {USI_CODICE_DOVE}",
+        (codice_id, soglia)).fetchone()["n"]
+
+
+def _codice_sconto(con, venditore_id: int, codice: str,
+                   adesso: int) -> tuple:
+    """(percento, id) del codice speso su QUESTO negozio, o (0, 0).
+
+    UN SOLO ESITO IN USCITA, e nessun motivo: non esiste, e' spento,
+    e' scaduto, il tetto e' pieno, e' di un altro venditore — tutto
+    da' lo stesso zero, e chi chiama alza sempre lo stesso messaggio.
+    E' l'anti-oracolo: chi prova a indovinare non deve poter
+    distinguere «non esiste» da «esiste ma non vale per te», o gli
+    basta una lista di parole per scoprire i codici di un negozio.
+    Il conteggio degli usi si chiede SOLO se serve davvero (cioe' se
+    il codice ha un tetto): una query in meno sul caso normale.
+    RESIDUO DICHIARATO: il caso «esaurito» fa quella query in piu'
+    rispetto al caso «non esiste», cioe' un canale temporale. Si
+    scrive invece di fingere che non ci sia — a chiuderlo per davvero
+    c'e' il freno, che e' anche la ragione per cui esiste."""
+    if not CODICI_SCONTO_ATTIVI or not codice:
+        return 0, 0
+    r = con.execute("SELECT id, venditore_id, percento, scadenza, usi_max, "
+                    "attivo FROM codici_sconto "
+                    "WHERE venditore_id=? AND codice=?",
+                    (venditore_id, codice)).fetchone()
+    if not r:
+        return 0, 0
+    usi = _usi_codice(con, r["id"]) if r["usi_max"] else 0
+    pct = _codice_vale(r["percento"], r["scadenza"], r["usi_max"],
+                       r["attivo"], r["venditore_id"], venditore_id,
+                       adesso, usi)
+    return (pct, r["id"]) if pct else (0, 0)
+
+
 async def _compra_set(user: dict, d: dict) -> dict:
     """Il ramo SET di compra() (lug 2026, «Riempi il barattolo»):
     piu' annunci DIVERSI dello stesso venditore in UN ordine solo —
@@ -14587,7 +15037,26 @@ async def _compra_set(user: dict, d: dict) -> dict:
         ven["sconto_pacco_valore"] if ven else 0,
         ven["sconto_pacco_valore_eur"] if ven else 0,
         ven["sconto_pacco_percento"] if ven else 0)
-    pct = regole_sc[0][2] if regole_sc else 0
+    # IL CODICE SCONTO di questo negozio (che nel set e' UNO per
+    # costruzione, quindi lo scope non e' mai ambiguo). Qui non c'e'
+    # una ripresa da rispettare — _compra_set non ne ha — quindi
+    # normalizzazione e giudizio stanno insieme.
+    # Un codice presente che non vale NON lascia nascere un ordine a
+    # prezzo pieno in silenzio: chi paga ha letto un totale scontato,
+    # e fargli firmare un totale diverso senza dirglielo e' peggio di
+    # un errore. Nel PREVENTIVO invece si risponde 200 col conto pieno
+    # e il motivo in una chiave: li' si sta PROVANDO un codice.
+    # Il gettone del freno si consuma SOLO qui, cioe' solo su un
+    # tentativo fallito davvero.
+    cod_nome = _codice_normalizza(d.get("codice_sconto"))
+    cod_pct, cod_id = 0, 0
+    if cod_nome:
+        cod_pct, cod_id = _codice_sconto(con, venditore_id, cod_nome,
+                                         int(time.time()))
+        if not cod_pct:
+            con.close()
+            _codice_tentativo_speso(user["id"])
+            raise HTTPException(400, MSG_CODICE_NO)
     sog_gratis, val_sg = _regola_sped_gratis(
         ven["sped_gratis_soglia"] if ven else 0,
         ven["sped_gratis_soglia_eur"] if ven else 0,
@@ -14696,7 +15165,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # LORDO, ed e' l'ordine giusto: e' un vincolo del listino, non del
     # checkout — altrimenti si pubblicherebbe sopra il tetto e ci si
     # rientrerebbe dietro una regola di sconto.
-    sconto = _sconto_regole(articolo, misura_eur, pezzi, regole_sc)
+    # VINCE IL MAGGIORE fra il codice sconto e la regola del negozio,
+    # mai la somma: la percentuale del vincitore esce di qui, e `pct`
+    # non si assegna piu' al momento della lettura delle regole.
+    sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, pezzi,
+                                           regole_sc, cod_pct)
     # La spedizione gratis sopra soglia, sullo STESSO lordo dello
     # sconto: le due promesse sono indipendenti apposta, e
     # l'ordine fra queste due righe non conta — nessuna delle due
@@ -14730,6 +15203,16 @@ async def _compra_set(user: dict, d: dict) -> dict:
             raise HTTPException(409, f"«{tutti[aid]['titolo'][:40]}» ti è "
                                      f"stato soffiato mentre componevi il "
                                      f"set: toglilo e riprova")
+    # E IL TETTO DEL CODICE SCONTO, nello stesso blocco atomico e UNA
+    # VOLTA SOLA, fuori dal loop delle righe: il codice e' dell'ORDINE,
+    # non della riga. Vale parola per parola il commento del mono, il
+    # 409 COL MOTIVO compreso — l'unica deroga all'anti-oracolo, e il
+    # perche' e' scritto la'.
+    if cod_id and _codice_sconto(con, venditore_id, cod_nome,
+                                 int(time.time()))[0] <= 0:
+        con.close()
+        raise HTTPException(409, "Il codice sconto è appena finito: "
+                                 "togli il codice e riprova")
     adesso = int(time.time())
     # IL CAMBIO DEL GIORNO SI CONGELA QUI (ago 2026), ed e' la stessa
     # riga del mono: quanto valeva in euro questo affare e' un FATTO
@@ -14751,8 +15234,9 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "tipo_punto,nota_compratore,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
-        "sconto_sats,sconto_percento,sped_gratis_sats) "
-        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "sconto_sats,sconto_percento,sped_gratis_sats,"
+        "codice_sconto,codice_sconto_id) "
+        "VALUES(0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
          punto, via_punto, rete, tipo, nota, ind, adesso if ind else 0,
@@ -14761,7 +15245,10 @@ async def _compra_set(user: dict, d: dict) -> dict:
          # la percentuale si fotografa SOLO se lo sconto e' scattato,
          # o la ricevuta di un ordine sotto soglia dichiarerebbe uno
          # sconto che non c'e'
-         sconto, pct if sconto else 0, sped_gratis_sats))
+         sconto, pct if sconto else 0, sped_gratis_sats,
+         # il NOME anche se il codice ha PERSO (lo confronta la
+         # ripresa del mono), l'ID solo se ha VINTO (lo conta il tetto)
+         cod_nome, cod_id if chi_sc else 0))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     for r in righe:
         con.execute(
@@ -14797,9 +15284,20 @@ async def _compra_set(user: dict, d: dict) -> dict:
             # per prima la gamba gia' scattata — e non 'entrambi', che
             # direbbe la regola del negozio invece del fatto di questo
             # ordine.
-            "sconto_criterio": (_gamba_invito(regole_sc, pezzi, articolo,
-                                              misura_eur) or ("",))[0]
-                               if sconto else "",
+            # CHI ha vinto il max. Esce anche di qui e non solo dal
+            # preventivo: il paySheet riscrive le sue righe con le
+            # cifre della RISPOSTA un istante dopo averle scritte con
+            # quelle del preventivo, e due etichette diverse sullo
+            # stesso schermo si leggono «il prezzo e' cambiato».
+            "sconto_origine": ("codice" if chi_sc
+                               else ("negozio" if sconto else "")),
+            "codice_sconto": cod_nome if chi_sc else "",
+            # col codice vincente non si nomina nessuna gamba: sarebbe
+            # dire una cosa che non e' successa
+            "sconto_criterio": "" if chi_sc else
+                               ((_gamba_invito(regole_sc, pezzi, articolo,
+                                               misura_eur) or ("",))[0]
+                                if sconto else ""),
             "spedizione_sats": sped,
             # la parte per-pezzo, e i pezzi: sono le due chiavi con cui
             # il paySheet tiene la riga «spedizione per N pezzi» che la
@@ -15061,7 +15559,26 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
         sp["sconto_pacco_valore"] if sp else 0,
         sp["sconto_pacco_valore_eur"] if sp else 0,
         sp["sconto_pacco_percento"] if sp else 0)
-    pct = regole_sc[0][2] if regole_sc else 0
+    # IL CODICE SCONTO, e qui la differenza col percorso che paga e'
+    # tutta: SI RISPONDE SEMPRE 200. Un codice storto torna in una
+    # chiave, accanto a un conto valido a prezzo pieno — e' il patto di
+    # `promesse_sospese`, ed e' anche l'unica forma che regge nel
+    # client: caricaPreventivo su una risposta non-ok cade su
+    # acqRipiega o sulla pagina d'errore, cioe' UN REFUSO NEL CAMPO
+    # BUTTEREBBE INDIETRO TUTTA LA PAGINA.
+    # L'anti-oracolo non ne soffre: e' il MESSAGGIO a essere unico, non
+    # lo stato — e un 200 uniforme e' perfino piu' opaco di un 400.
+    # E' QUESTO il posto in cui si prova un codice, quindi e' qui che
+    # il freno morde: si GUARDA prima (a quota finita non si interroga
+    # nemmeno il database) e si SPENDE solo se il tentativo e' fallito.
+    cod_nome = _codice_normalizza(d.get("codice_sconto"))
+    cod_pct, cod_id = 0, 0
+    if cod_nome and _codice_quota_libera(user["id"]):
+        cod_pct, cod_id = _codice_sconto(con, a["venditore_id"], cod_nome,
+                                         int(time.time()))
+        if not cod_pct:
+            _codice_tentativo_speso(user["id"])
+
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
         sp["sped_gratis_soglia_eur"] if sp else 0,
@@ -15121,7 +15638,15 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # quantita' richiesta, la misura a valore e' lo stesso lordo della
     # promessa gemella. Il gemello in euro si aziona SOLO dietro al
     # fratello in sats: la decisione e' una sola (vedi _sconto_pacco).
-    sconto = _sconto_regole(articolo, misura_eur, richiesti, regole_sc)
+    # VINCE IL MAGGIORE fra il codice sconto e la regola del negozio,
+    # mai la somma. `pct` esce di qui — la percentuale del VINCITORE —
+    # quindi la riga dell'euro nativo qui sotto lo segue da sola, senza
+    # un ramo suo: _sconto_pacco_eur era gia' parametrizzato sulla sola
+    # percentuale, ed e' il motivo per cui NON si e' estratto niente da
+    # lui. La cintura di _strade_preventivo (`sconto == 0 or
+    # sconto_eur > 0`) regge e ne esce rafforzata.
+    sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, richiesti,
+                                           regole_sc, cod_pct)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
     conto = _conto_ordine(articolo, 0, PROTEZIONE_PERCENTO,
                           COMMISSIONE_PERCENTO, sconto)
@@ -15170,9 +15695,23 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # due gambe si inviterebbe verso quella col progresso maggiore
     # anche quando e' proprio lei a non essere percorribile con questo
     # stock, lasciando muta l'altra — che e' piu' lontana ma possibile.
+    # E UNA GAMBA CHE UN CODICE COPRE GIA' NON E' PIU' RAGGIUNGIBILE
+    # (ago 2026, coi codici sconto): con «vince il maggiore», invitare
+    # a «ancora 2 pezzi → -10%» chi ha gia' -20% da un codice chiede
+    # una cosa che non sposta il totale di un sat. E' la stessa
+    # famiglia dell'invito che non si puo' accettare, per un'altra
+    # ragione: la' non era percorribile, qui e' INUTILE.
+    # IL GATE NON E' «C'E' UN CODICE», E' «IL CODICE COPRE GIA'»: con
+    # codice -5% e promessa -10% da 3 pezzi l'invito e' ancora vero e
+    # utile, e spegnerlo toglierebbe un'informazione buona. Il giudizio
+    # lo da' il SERVER e il client riceve, come per i `mancano_*`, e
+    # `sconto_raggiungibile` si riformula come «c'e' ancora qualcosa da
+    # guadagnare aggiungendo pezzi» — che e' cio' che ha sempre voluto
+    # dire.
     _sc_ragg = [r for r in regole_sc
-                if _sconto_pacco(_art_max, _eur_max, _max_pezzi,
-                                 r[0], r[1], r[2], r[3]) > 0]
+                if r[2] > cod_pct
+                and _sconto_pacco(_art_max, _eur_max, _max_pezzi,
+                                  r[0], r[1], r[2], r[3]) > 0]
     _g_sc = _gamba_invito(_sc_ragg, richiesti, articolo, misura_eur)
     _crit_sc, _sog_sc, _val_sc, _manca_sc = (
         (_g_sc[0], _g_sc[1], _g_sc[3], _g_sc[4]) if _g_sc else ("", 0, "", 0))
@@ -15255,6 +15794,29 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # raggiungibile» non si puo' affermare.
             # con due gambe basta che ne sia raggiungibile UNA: e' la
             # lista filtrata qui sopra, gia' pronta
+            # IL CODICE SCONTO in una chiave sua, coi TRE stati che il
+            # client rende: 'applicato' (ha vinto e sconta), 'coperto'
+            # (e' VALIDO, ha solo perso contro una promessa piu'
+            # generosa) e 'rifiutato'. La distinzione fra i primi due e'
+            # l'unico posto in cui «vince il maggiore» si spiega a chi
+            # paga: dire «rifiutato» a un codice buono lo manderebbe a
+            # cercarne un altro che non esiste.
+            # Il motivo e' UNO SOLO (l'anti-oracolo) e il codice che
+            # esce e' quello NORMALIZZATO: il client mostra, non
+            # calcola — cosi' chi scrive «satoshi 10» si rivede
+            # «SATOSHI10» e capisce cosa abbiamo capito.
+            "codice_sconto": ({"codice": cod_nome,
+                               "stato": ("applicato" if chi_sc
+                                         else ("coperto" if cod_pct
+                                               else "rifiutato")),
+                               "motivo": ("" if cod_pct else MSG_CODICE_NO)}
+                              if cod_nome else None),
+            # CHI ha vinto il max: il client spegne la pillola verde
+            # della promessa del negozio quando ha vinto il codice —
+            # quel verde dice la promessa DEL NEGOZIO, e mostrarne la
+            # percentuale di un'altra cosa sarebbe una bugia.
+            "sconto_origine": ("codice" if chi_sc
+                               else ("negozio" if sconto else "")),
             "sconto_raggiungibile": bool(_sc_ragg),
             "sped_gratis_raggiungibile": bool(
                 _sped_gratis(_art_max, _eur_max, sog_gratis, val_sg)),
@@ -15421,7 +15983,26 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
         sp["sconto_pacco_valore"] if sp else 0,
         sp["sconto_pacco_valore_eur"] if sp else 0,
         sp["sconto_pacco_percento"] if sp else 0)
-    pct = regole_sc[0][2] if regole_sc else 0
+    # IL CODICE SCONTO, e qui la differenza col percorso che paga e'
+    # tutta: SI RISPONDE SEMPRE 200. Un codice storto torna in una
+    # chiave, accanto a un conto valido a prezzo pieno — e' il patto di
+    # `promesse_sospese`, ed e' anche l'unica forma che regge nel
+    # client: caricaPreventivo su una risposta non-ok cade su
+    # acqRipiega o sulla pagina d'errore, cioe' UN REFUSO NEL CAMPO
+    # BUTTEREBBE INDIETRO TUTTA LA PAGINA.
+    # L'anti-oracolo non ne soffre: e' il MESSAGGIO a essere unico, non
+    # lo stato — e un 200 uniforme e' perfino piu' opaco di un 400.
+    # E' QUESTO il posto in cui si prova un codice, quindi e' qui che
+    # il freno morde: si GUARDA prima (a quota finita non si interroga
+    # nemmeno il database) e si SPENDE solo se il tentativo e' fallito.
+    cod_nome = _codice_normalizza(d.get("codice_sconto"))
+    cod_pct, cod_id = 0, 0
+    if cod_nome and _codice_quota_libera(user["id"]):
+        cod_pct, cod_id = _codice_sconto(con, venditore_id, cod_nome,
+                                         int(time.time()))
+        if not cod_pct:
+            _codice_tentativo_speso(user["id"])
+
     sog_gratis, val_sg = _regola_sped_gratis(
         sp["sped_gratis_soglia"] if sp else 0,
         sp["sped_gratis_soglia_eur"] if sp else 0,
@@ -15479,11 +16060,21 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # DICHIARATA: la chiave dell'altra unita' resta a zero, cosi'
     # nessuno puo' leggere dei sats come euro
     _misura_sg = articolo if val_sg == "sats" else misura_eur
-    sconto = _sconto_regole(articolo, misura_eur, pezzi, regole_sc)
+    # VINCE IL MAGGIORE, come nel mono: la percentuale del vincitore
+    # esce di qui e la porta con se' anche l'euro nativo, due righe
+    # piu' giu'.
+    sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, pezzi,
+                                           regole_sc, cod_pct)
     # LA GAMBA PIU' VICINA, e qui fra TUTTE: nel set la raggiungibilita'
     # non si afferma (la composizione puo' sempre crescere di un altro
     # articolo del negozio), quindi non c'e' niente da filtrare prima.
-    _g_sc = _gamba_invito(regole_sc, pezzi, articolo, misura_eur)
+    # LE GAMBE NON COPERTE DAL CODICE. Nel set non si filtra per
+    # RAGGIUNGIBILITA' — la' la composizione puo' sempre crescere e
+    # «non raggiungibile» non si puo' affermare — ma una gamba che il
+    # codice copre gia' e' inutile qui come nel mono: aggiungere pezzi
+    # non sposterebbe il totale di un sat.
+    _sc_vive = [r for r in regole_sc if r[2] > cod_pct]
+    _g_sc = _gamba_invito(_sc_vive, pezzi, articolo, misura_eur)
     _crit_sc, _sog_sc, _val_sc, _manca_sc = (
         (_g_sc[0], _g_sc[1], _g_sc[3], _g_sc[4]) if _g_sc else ("", 0, "", 0))
     # il gemello in euro si aziona SOLO dietro al fratello in sats: la
@@ -15522,6 +16113,36 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # euro. I client di prima del passaggio all'euro leggono le
             # chiavi in sats, e su un negozio in sats le trovano giuste.
             "sconto_percento": pct,
+            # IL CODICE SCONTO in una chiave sua, coi TRE stati che il
+            # client rende: 'applicato' (ha vinto e sconta), 'coperto'
+            # (e' VALIDO, ha solo perso contro una promessa piu'
+            # generosa) e 'rifiutato'. La distinzione fra i primi due e'
+            # l'unico posto in cui «vince il maggiore» si spiega a chi
+            # paga: dire «rifiutato» a un codice buono lo manderebbe a
+            # cercarne un altro che non esiste.
+            # Il motivo e' UNO SOLO (l'anti-oracolo) e il codice che
+            # esce e' quello NORMALIZZATO: il client mostra, non
+            # calcola — cosi' chi scrive «satoshi 10» si rivede
+            # «SATOSHI10» e capisce cosa abbiamo capito.
+            "codice_sconto": ({"codice": cod_nome,
+                               "stato": ("applicato" if chi_sc
+                                         else ("coperto" if cod_pct
+                                               else "rifiutato")),
+                               "motivo": ("" if cod_pct else MSG_CODICE_NO)}
+                              if cod_nome else None),
+            # CHI ha vinto il max: il client spegne la pillola verde
+            # della promessa del negozio quando ha vinto il codice —
+            # quel verde dice la promessa DEL NEGOZIO, e mostrarne la
+            # percentuale di un'altra cosa sarebbe una bugia.
+            "sconto_origine": ("codice" if chi_sc
+                               else ("negozio" if sconto else "")),
+            # NEL SET la raggiungibilita' non si afferma MAI... TRANNE
+            # quando a spegnere l'invito e' un CODICE che copre: quello
+            # e' un fatto di adesso e non una previsione sulla
+            # composizione, e senza questa riga il client inviterebbe
+            # verso uno sconto che non arrivera' mai.
+            **({"sconto_raggiungibile": False}
+               if cod_pct and regole_sc and not _sc_vive else {}),
             "sconto_criterio": _crit_sc,
             "sconto_valuta": _val_sc,
             "sconto_soglia": _sog_sc if _crit_sc == "pezzi" else 0,
@@ -15685,6 +16306,19 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         rete = tipo = ""
     via_punto = 1 if via == "punto" else 0
 
+    # IL CODICE SCONTO, normalizzato QUI e non piu' in la': e' una pura
+    # senza database, e deve stare SOPRA la ripresa, che lo confronta.
+    # L'ORDINE DEI BLOCCHI E' IL VINCOLO DI SEQUENZA PIU' IMPORTANTE DEL
+    # CANTIERE (la lezione gia' scritta sopra il blocco della quantita'
+    # dell'offerta: «portare questo blocco sopra la RIPRESA sembra la
+    # mossa pulita ed e' una regressione»). Qui si NORMALIZZA e basta;
+    # a GIUDICARE si va dopo che la ripresa e' uscita di scena, o
+    # nascerebbe un guasto che si vede solo al tetto: il compratore che
+    # ha consumato l'ultimo uso ha un ordine 'creato' che conta nel suo
+    # STESSO `usi`, quindi si vedrebbe negare la fattura che gia'
+    # possiede legittimamente.
+    cod_nome = _codice_normalizza(d.get("codice_sconto"))
+
     # L'INDIRIZZO DI CASA, col patto del gemello nel set: il giudice
     # sta qui, PRIMA della invoice (un 400 dopo lascerebbe una fattura
     # senza ordine) e prima del blocco atomico, che di uno scrypt non
@@ -15749,6 +16383,27 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                   # grezzo direbbe «diversa» su un ordine identico.
                   and (mio["rete_punto"] or "") == rete
                   and (mio["tipo_punto"] or "") == tipo
+                  # E IL CODICE SCONTO, che il prezzo lo cambia per
+                  # costruzione — quindi entra nel confronto come tutto
+                  # cio' che lo cambia, al contrario dell'indirizzo (che
+                  # non lo tocca, vedi sotto). Senza questa riga, chi
+                  # paga, trova il codice sul volantino, torna e lo
+                  # digita si ritroverebbe LA FATTURA DI PRIMA a prezzo
+                  # pieno, e concluderebbe che il codice non funziona:
+                  # e' letteralmente il guasto per cui sono state
+                  # aggiunte le due righe qui sopra.
+                  # Si confronta il valore NORMALIZZATO e mai il grezzo:
+                  # `satoshi10` e `SATOSHI10` direbbero «diversa» su una
+                  # richiesta identica.
+                  # ED E' QUI CHE SI VEDE PERCHE' LE COLONNE SONO DUE:
+                  # `codice_sconto` porta il nome anche quando il codice
+                  # ha PERSO il confronto col maggiore. Se portasse solo
+                  # i vincitori, questo confronto dovrebbe sapere «chi
+                  # vincerebbe adesso» — che si scopre duecento righe
+                  # piu' in basso, dopo tutto il conto — e chi digita un
+                  # codice perdente conierebbe una fattura nuova a ogni
+                  # tocco su Paga.
+                  and (mio["codice_sconto"] or "") == cod_nome
                   and (legame["id"] if legame else 0)
                   == int(d.get("offerta_id") or 0))
         viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
@@ -15974,7 +16629,27 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         ven["sconto_pacco_valore"] if ven else 0,
         ven["sconto_pacco_valore_eur"] if ven else 0,
         ven["sconto_pacco_percento"] if ven else 0)
-    pct = regole_sc[0][2] if regole_sc else 0
+    # IL CODICE SCONTO di QUESTO negozio. Il giudice sta qui — dopo la
+    # ripresa, prima della invoice — ed e' una LETTURA: il vincolo
+    # «niente DML su questa connessione prima del ricontrollo» resta
+    # intatto, la stessa ragione per cui era lecita la SELECT delle
+    # promesse due righe piu' su.
+    # UN CODICE PRESENTE CHE NON VALE NON LASCIA NASCERE UN ORDINE A
+    # PREZZO PIENO IN SILENZIO: chi paga ha letto un totale scontato,
+    # e fargli firmare un totale diverso senza dirglielo e' peggio di
+    # un errore. Nel PREVENTIVO invece si risponde 200 col conto pieno
+    # e il motivo in una chiave — li' si sta provando un codice, e un
+    # 400 butterebbe indietro tutta la pagina per un refuso.
+    # Il gettone del freno si consuma SOLO qui, cioe' solo quando il
+    # tentativo e' fallito davvero.
+    cod_pct, cod_id = 0, 0
+    if cod_nome:
+        cod_pct, cod_id = _codice_sconto(con, a["venditore_id"], cod_nome,
+                                         adesso)
+        if not cod_pct:
+            con.close()
+            _codice_tentativo_speso(user["id"])
+            raise HTTPException(400, MSG_CODICE_NO)
     sog_gratis, val_sg = 0, ""
     if scelta == "spedizione":
         sog_gratis, val_sg = _regola_sped_gratis(
@@ -16069,7 +16744,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # _strade_preventivo — preventivo e invoice devono dire la stessa
     # cifra per costruzione.
     misura_eur = _eur_interi(articolo, cambio_misura)
-    sconto = _sconto_regole(articolo, misura_eur, richiesti, regole_sc)
+    # VINCE IL MAGGIORE fra il codice sconto e la regola del negozio:
+    # si applica solo il piu' generoso, mai la somma. La percentuale
+    # del vincitore esce di qui — `pct` non si assegna piu' al momento
+    # della lettura delle regole — e finisce in ordini.sconto_percento.
+    sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, richiesti,
+                                           regole_sc, cod_pct)
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
     if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
         # intera, supplemento compreso: e' quello che il venditore
@@ -16114,6 +16794,27 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         con.close()
         raise HTTPException(409, "Qualcun altro ti ha preceduto su questo "
                                  "annuncio: riprova tra qualche minuto")
+    # E IL TETTO DEL CODICE SCONTO, nello stesso blocco atomico: due
+    # compratori con lo stesso codice e l'ultimo uso libero sono la
+    # corsa che questo cantiere deve chiudere. E' una LETTURA sulla
+    # connessione gia' aperta — nessun await, nessun DML — quindi il
+    # patto «da qui all'INSERT il blocco e' atomico» resta intatto.
+    # DOPO LO STOCK E NON PRIMA: se falliscono tutti e due, il
+    # compratore deve sentire il no che non puo' aggirare.
+    # 409 E COL MOTIVO, ed e' L'UNICA DEROGA all'anti-oracolo — va
+    # scritto qui perche' sembrera' un'incoerenza. A questo punto il
+    # compratore ha gia' ottenuto un preventivo e una invoice con quel
+    # codice, quindi sa gia' che esisteva ed era valido un secondo fa:
+    # dire «e' finito» non gli rivela niente di nuovo. E NON DIRLO lo
+    # manderebbe in un vicolo cieco — «riprova» senza «togli il
+    # codice» e' un ciclo infinito. La fattura appena nata muore da
+    # sola in 15 minuti, come nel 409 dello stock: non e' stato pagato
+    # niente.
+    if cod_id and _codice_sconto(con, a["venditore_id"], cod_nome,
+                                 int(time.time()))[0] <= 0:
+        con.close()
+        raise HTTPException(409, "Il codice sconto è appena finito: "
+                                 "togli il codice e riprova")
     # IL CAMBIO DEL GIORNO SI CONGELA QUI (ago 2026): quanto valeva in
     # euro questo affare e' un FATTO dell'affare, come il prezzo, e va
     # fissato adesso — domani il cambio sara' un altro e la ricevuta
@@ -16139,8 +16840,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "nota_compratore,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
-        "sped_gratis_sats) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "sped_gratis_sats,codice_sconto,codice_sconto_id) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
@@ -16148,7 +16849,10 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
          nota,
          ind, int(time.time()) if ind else 0, ind_atteso,
          sped, prot, richiesti,
-         sconto, pct if sconto else 0, sped_gratis_sats))
+         sconto, pct if sconto else 0, sped_gratis_sats,
+         # il NOME anche se il codice ha perso (lo confronta la
+         # ripresa), l'ID solo se ha VINTO (lo conta il tetto)
+         cod_nome, cod_id if chi_sc else 0))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
@@ -16168,11 +16872,23 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
             "sconto_sats": sconto, "sconto_percento": pct if sconto else 0,
+            # CHI ha vinto il max. Deve uscire anche di qui e non solo
+            # dal preventivo: il paySheet riscrive le sue righe con le
+            # cifre della RISPOSTA un istante dopo averle scritte con
+            # quelle del preventivo, e due etichette diverse sullo
+            # stesso schermo si leggono «il prezzo e' cambiato» — il
+            # motivo per cui «per N pezzi» viaggia fin li'.
+            "sconto_origine": ("codice" if chi_sc
+                               else ("negozio" if sconto else "")),
+            "codice_sconto": cod_nome if chi_sc else "",
             # la gamba che ha fatto scattare lo sconto, non la regola del
-            # negozio: la fotografia di questo ordine (vedi _compra_set)
-            "sconto_criterio": (_gamba_invito(regole_sc, richiesti, articolo,
-                                              misura_eur) or ("",))[0]
-                               if sconto else "",
+            # negozio: la fotografia di questo ordine (vedi _compra_set).
+            # Col codice vincente non si nomina nessuna gamba: sarebbe
+            # dire una cosa che non e' successa.
+            "sconto_criterio": "" if chi_sc else
+                               ((_gamba_invito(regole_sc, richiesti, articolo,
+                                               misura_eur) or ("",))[0]
+                                if sconto else ""),
             "spedizione_sats": sped,
             # la parte per-pezzo e i pezzi: le due chiavi che tengono
             # viva nel paySheet la riga «spedizione per N pezzi» gia'
@@ -17971,6 +18687,16 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         "soglie_sats": list(SPED_GRATIS_SOGLIE_SATS),
         "min_eur": SPED_GRATIS_MIN_EUR,
         "min_sats": SPED_GRATIS_MIN_SATS}
+    # I CODICI SCONTO: le cifre delle pillole vengono da qui e mai dal
+    # client — il patto di LAMPO_SCONTI. `attivo` e' anche cio' che
+    # nasconde il cassetto quando la leva e' spenta.
+    profilo["codici_sconto_leve"] = {
+        "attivo": bool(CODICI_SCONTO_ATTIVI),
+        "max": CODICI_SCONTO_MAX_PER_VENDITORE,
+        "sconti": list(CODICI_SCONTO_PERCENTI),
+        "durate": list(CODICI_SCONTO_DURATE_GIORNI),
+        "max_percento": CODICI_SCONTO_MAX_PERCENTO,
+        "max_usi": CODICI_SCONTO_MAX_USI}
     # I SUGGERIMENTI escono come STATO EFFETTIVO e non come valore
     # grezzo: `suggerimenti_annunci` esce dal SELECT * ed e' 0 anche
     # per chi non ha mai toccato niente — cioe' per chi li riceve. Un
@@ -18434,6 +19160,17 @@ MSG_CLIENT_VECCHIO = (
     "riapri Barattolo, poi riprova. Intanto la tua promessa è rimasta "
     "com'era."
 )
+
+
+# UN MESSAGGIO SOLO per ogni modo in cui un codice sconto puo' non
+# valere: non esiste, e' spento, e' scaduto, il tetto e' finito, e' di
+# un altro negozio. E' l'anti-oracolo, ed e' anche il motivo per cui
+# non c'e' un 404 sul «non esiste»: sarebbe lo STATO a fare da
+# oracolo, la lezione del 400 di verifica_pagamento.
+# L'UNICA DEROGA vive nel ricontrollo della corsa in compra(), e li'
+# e' scritto perche'.
+MSG_CODICE_NO = ("Questo codice sconto non vale per questo acquisto: "
+                 "controlla di averlo scritto giusto.")
 
 
 @app.post("/api/me/sconto-pacco")
@@ -19251,6 +19988,198 @@ async def elimina_avviso_ricerca(avviso_id: int,
     con = db()
     con.execute("DELETE FROM avvisi_ricerca WHERE id=? AND tg_id=?",
                 (avviso_id, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
+# --- I codici sconto del venditore -----------------------------------
+# Il modello e' `avvisi_ricerca` e NON i due cassetti delle promesse:
+# li' c'e' UNA regola con UN bottone che salva e uno che spegne, qui
+# una LISTA con un tetto. Tutta la grammatica di renderScontoPacco
+# (bozza unica, pillole che scelgono, sogliaMancante) e' la grammatica
+# sbagliata per una lista.
+
+
+def _codice_pubblico(r, usi: int, adesso: int) -> dict:
+    """La riga come la legge il SUO venditore.
+
+    `vale` lo dice lo STESSO _codice_vale che gira alla cassa: e' il
+    posto in cui il venditore scopre che il suo codice e' morto, e con
+    due giudici leggerebbe «valido» su un codice che alla cassa non
+    scatta — la divergenza che nessuno scopre finche' non protesta un
+    compratore."""
+    return {"id": r["id"], "codice": r["codice"], "percento": r["percento"],
+            "scadenza": r["scadenza"], "usi_max": r["usi_max"],
+            "attivo": r["attivo"], "creato": r["creato"], "usi": usi,
+            "vale": bool(_codice_vale(r["percento"], r["scadenza"],
+                                      r["usi_max"], r["attivo"],
+                                      r["venditore_id"], r["venditore_id"],
+                                      adesso, usi))}
+
+
+@app.get("/api/me/codici-sconto")
+async def lista_codici_sconto(x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    righe = con.execute("SELECT * FROM codici_sconto WHERE venditore_id=? "
+                        "ORDER BY creato DESC, id DESC",
+                        (user["id"],)).fetchall()
+    # IL CONTEGGIO E' UNA QUERY SOLA e non N chiamate a _usi_codice —
+    # e passa dallo STESSO frammento costante della cassa, o la lista
+    # e il conto direbbero due numeri diversi sullo stesso codice.
+    usi = {}
+    if righe:
+        segni = ",".join("?" * len(righe))
+        for u in con.execute(
+                f"SELECT codice_sconto_id AS cid, COUNT(*) AS n FROM ordini "
+                f"WHERE codice_sconto_id IN ({segni}) AND {USI_CODICE_DOVE} "
+                f"GROUP BY codice_sconto_id",
+                [r["id"] for r in righe] + [int(time.time()) - 1800]):
+            usi[u["cid"]] = u["n"]
+    con.close()
+    adesso = int(time.time())
+    return {"codici": [_codice_pubblico(r, usi.get(r["id"], 0), adesso)
+                       for r in righe],
+            "max": CODICI_SCONTO_MAX_PER_VENDITORE,
+            "attivo": bool(CODICI_SCONTO_ATTIVI),
+            "sconti": list(CODICI_SCONTO_PERCENTI),
+            "durate": list(CODICI_SCONTO_DURATE_GIORNI),
+            "max_percento": CODICI_SCONTO_MAX_PERCENTO,
+            "max_usi": CODICI_SCONTO_MAX_USI}
+
+
+@app.post("/api/me/codici-sconto")
+async def salva_codice_sconto(req: Request,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Crea un codice sconto, o lo aggiorna se il payload porta un id.
+
+    NIENTE `_impegni_aperti` e NIENTE `guardia_ferie_venditore`, per le
+    due ragioni gia' scritte per esteso in imposta_sconto_pacco: qui
+    non si toglie niente a nessuno — gli ordini gia' nati portano il
+    loro sconto fotografato e la loro escrow e' gia' scontata — e
+    sistemare il listino mentre si e' via e' esattamente cio' che si fa
+    in ferie."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not CODICI_SCONTO_ATTIVI:
+        raise HTTPException(400, "I codici sconto non sono attivi")
+    d = await leggi_json(req)
+    cid = int(d.get("id") or 0)
+
+    codice = _codice_normalizza(d.get("codice"))
+    if len(codice) < CODICE_SCONTO_MIN_LEN:
+        raise HTTPException(400, f"Un codice sconto vuole almeno "
+                                 f"{CODICE_SCONTO_MIN_LEN} caratteri fra "
+                                 f"lettere e numeri: gli spazi e la "
+                                 f"punteggiatura non contano.")
+    try:
+        percento = int(d.get("percento") or 0)
+        usi_max = int(d.get("usi_max") or 0)
+        giorni = int(d.get("giorni") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Numeri del codice non leggibili")
+    if percento < 1 or percento > CODICI_SCONTO_MAX_PERCENTO:
+        raise HTTPException(400, f"Lo sconto di un codice va da 1% a "
+                                 f"{CODICI_SCONTO_MAX_PERCENTO}%.")
+    if usi_max < 0 or usi_max > CODICI_SCONTO_MAX_USI:
+        raise HTTPException(400, f"Gli usi di un codice arrivano a "
+                                 f"{_fmt_sats(CODICI_SCONTO_MAX_USI)}: "
+                                 f"lascia 0 per non metterci un tetto.")
+    # LA SCADENZA SI DICHIARA IN GIORNI e mai come istante: il calco di
+    # ORE_LAMPO_OPZIONI. Un timestamp che arriva da fuori metterebbe la
+    # deriva dell'orologio del telefono dentro una promessa.
+    if giorni not in CODICI_SCONTO_DURATE_GIORNI:
+        raise HTTPException(400, "Durata non prevista per un codice sconto")
+    scadenza = (int(time.time()) + giorni * 86400) if giorni else 0
+
+    con = db()
+    if cid:
+        # AGGIORNAMENTO. Proprieta' nella WHERE, mai una SELECT prima.
+        # ⚠️ LA TRAPPOLA DI MSG_CLIENT_VECCHIO, ROVESCIATA: qui lo ZERO
+        # e' il PERMISSIVO («mai», «illimitato»), quindi una chiave
+        # assente NON puo' valere zero — un client di ieri renderebbe
+        # eterno e illimitato un codice che aveva un tetto, in silenzio
+        # e nella direzione che costa. Si conserva col COALESCE.
+        sc = None if d.get("giorni") is None else scadenza
+        um = None if d.get("usi_max") is None else usi_max
+        try:
+            n = con.execute("UPDATE codici_sconto SET codice=?, percento=?, "
+                            "scadenza=COALESCE(?, scadenza), "
+                            "usi_max=COALESCE(?, usi_max) "
+                            "WHERE id=? AND venditore_id=?",
+                            (codice, percento, sc, um, cid,
+                             user["id"])).rowcount
+        except sqlite3.IntegrityError:
+            con.close()
+            raise HTTPException(400, "Hai già un codice che si scrive così")
+        if not n:
+            con.close()
+            raise HTTPException(400, "Codice sconto non trovato")
+    else:
+        quanti = con.execute("SELECT COUNT(*) AS n FROM codici_sconto "
+                             "WHERE venditore_id=?",
+                             (user["id"],)).fetchone()["n"]
+        if quanti >= CODICI_SCONTO_MAX_PER_VENDITORE:
+            con.close()
+            raise HTTPException(400, f"Hai già "
+                                     f"{CODICI_SCONTO_MAX_PER_VENDITORE} "
+                                     f"codici: eliminane uno per farne di "
+                                     f"nuovi.")
+        # L'UNICITA' LA FA LA UNIQUE, non una SELECT prima (che aprirebbe
+        # una finestra fra il controllo e la scrittura): il patto di
+        # xp_eventi, dove il vincolo E' il giudice.
+        try:
+            con.execute("INSERT INTO codici_sconto(venditore_id, codice, "
+                        "percento, scadenza, usi_max, attivo, creato) "
+                        "VALUES(?,?,?,?,?,1,?)",
+                        (user["id"], codice, percento, scadenza, usi_max,
+                         int(time.time())))
+        except sqlite3.IntegrityError:
+            con.close()
+            raise HTTPException(400, "Hai già un codice che si scrive così")
+        cid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    r = con.execute("SELECT * FROM codici_sconto WHERE id=?",
+                    (cid,)).fetchone()
+    usi = _usi_codice(con, cid)
+    con.close()
+    return {"ok": True, "codice": _codice_pubblico(r, usi, int(time.time()))}
+
+
+@app.post("/api/me/codici-sconto/{codice_id}/pausa")
+async def pausa_codice_sconto(codice_id: int,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """Spegne o riaccende un codice. `pausa` NON e' `elimina`: qui l'id
+    resta, quindi il conteggio degli usi resta — e riaccendendo il
+    tetto riparte da dov'era."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    con.execute("UPDATE codici_sconto SET attivo=1-attivo "
+                "WHERE id=? AND venditore_id=?", (codice_id, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
+@app.post("/api/me/codici-sconto/{codice_id}/elimina")
+async def elimina_codice_sconto(codice_id: int,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Toglie la riga. DICHIARATO: ricreare lo stesso nome da' un id
+    NUOVO e un tetto FRESCO — gli ordini di prima restano legati al
+    vecchio id e non contano piu'. E' la lettura onesta («un codice
+    nuovo e' un codice nuovo»); il contrario esigerebbe un soft delete,
+    cioe' un secondo significato per `attivo`, e «spento» smetterebbe
+    di essere uno stato solo.
+    Gli ordini gia' nati non si toccano: portano il NOME fotografato,
+    che sopravvive alla riga — un JOIN direbbe «?»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    con.execute("DELETE FROM codici_sconto WHERE id=? AND venditore_id=?",
+                (codice_id, user["id"]))
     con.commit()
     con.close()
     return {"ok": True}
@@ -20985,6 +21914,9 @@ def pulisci_avvisi():
     ora = time.strftime("%Y-%m-%d %H")
     for tg_id in [t for t, v in RICERCA_QUOTA.items() if v[0] != ora]:
         RICERCA_QUOTA.pop(tg_id, None)
+    # e i gettoni dei codici sconto sbagliati, per la stessa ragione
+    for tg_id in [t for t, v in CODICE_QUOTA.items() if v[0] != ora]:
+        CODICE_QUOTA.pop(tg_id, None)
 
 
 # ------------------- offerta lampo: «ha fatto colpo» -----------------
@@ -26130,6 +27062,60 @@ CONTROLLI_LIBRO_MASTRO = (
      "SELECT id FROM ordini "
      "WHERE (nascosto_compratore=1 OR nascosto_venditore=1) "
      "AND stato NOT IN ('released','refunded')"),
+    # I CODICI SCONTO (ago 2026). Le due colonne si scrivono nello
+    # STESSO INSERT e si implicano per costruzione: l'id c'e' solo se
+    # il codice ha VINTO, e chi vince ha scontato qualcosa.
+    ("codice sconto senza sconto",
+     "un ordine dichiara di essere stato scontato da un codice ma lo "
+     "sconto in colonna e' zero: una delle due righe e' falsa, e una "
+     "delle due e' la ricevuta di qualcuno",
+     "SELECT id FROM ordini WHERE codice_sconto_id<>0 AND sconto_sats<=0"),
+    # NON il biconditionale: «nome senza id» e' lo stato LEGITTIMO del
+    # codice valido che ha PERSO il confronto col maggiore.
+    ("codice sconto scordato",
+     "l'ordine porta l'id di un codice ma non il suo nome: una "
+     "scrittura a meta', e la ricevuta non sa piu' dire quale codice "
+     "e' stato speso",
+     "SELECT id FROM ordini WHERE codice_sconto_id<>0 AND codice_sconto=''"),
+    # La guardia dello scope caduta costa sats AL VENDITORE SBAGLIATO.
+    # Il JOIN salta da solo i codici cancellati, ed e' giusto: la' non
+    # c'e' piu' niente da controllare.
+    ("codice sconto di un altro negozio",
+     "un ordine e' stato scontato con un codice che non e' del suo "
+     "venditore: la guardia dello scope e' caduta, e a pagarla e' un "
+     "negozio che quel codice non l'ha mai scritto",
+     "SELECT o.id FROM ordini o "
+     "JOIN codici_sconto c ON c.id=o.codice_sconto_id "
+     "WHERE c.venditore_id<>o.venditore_id"),
+    # Il gemello di «promessa di sconto che non puo' scattare»: un
+    # volantino in giro che non sconta mai, in silenzio. Numeri A MANO
+    # e mai le leve — un allarme agganciato a una leva suona al primo
+    # ritocco della leva.
+    ("codice sconto che non puo' scattare",
+     "un codice acceso con una percentuale che non sconta niente: chi "
+     "l'ha ricevuto lo scrivera' alla cassa e non succedera' nulla",
+     "SELECT id FROM codici_sconto WHERE attivo=1 AND percento<=0"),
+    # QUALI NON NASCONO, e la domanda che decide («esiste uno stato
+    # TRANSITORIO LEGITTIMO in cui e' falsa?»):
+    # - «usi <= usi_max»: NO, e va scritto perche' e' il primo che
+    #   viene in mente. `usi_max` e' una scrittura ASSOLUTA — «quanti
+    #   ne voglio dare, ORA», la regola di ricarica_quantita — quindi
+    #   passare da 100 a 5 con 30 usi gia' spesi e' un gesto
+    #   perfettamente legittimo: vuol dire «basta». L'invariante
+    #   sarebbe FALSO PER SEMPRE su quel venditore e suonerebbe ogni
+    #   giorno, che e' precisamente il modo in cui gli allarmi
+    #   muoiono. Al suo posto il venditore vede «31/5» nella sua
+    #   lista, che si legge «l'ho chiuso», e la cassa e' fail-closed.
+    #   Corollario da dichiarare: abbassare il tetto NON riprende mai
+    #   uno sconto gia' dato — sconto_sats e' fotografato,
+    #   prezzo_sats e' gia' scontato, l'escrow non si muove.
+    # - «ogni codice_sconto_id punta a una riga esistente»: NO,
+    #   cancellare e' un gesto che offriamo e l'ordine orfano e' lo
+    #   stato normale del dopo-pulizia (il contrasto con «righe
+    #   orfane», che invece entra, e' che li' nessuno cancella
+    #   legittimamente un ordine).
+    # - «codice scaduto usato»: NO, la scadenza si puo' accorciare
+    #   dopo e un ordine di ieri diventerebbe illegale domani.
 )
 
 TIMBRO_LIBRO_MASTRO = "libro_mastro"     # il giorno dell'ultima ronda

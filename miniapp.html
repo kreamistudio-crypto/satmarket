@@ -4694,6 +4694,18 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="spedGratisBlocco"></div></div>
       </div>
 
+      <!-- I CODICI SCONTO (ago 2026): il venditore ne crea uno e lo
+           da' a chi vuole. E' una LISTA con un tetto, non una regola
+           sola — quindi il modello e' «Avvisi di ricerca» e non i due
+           cassetti delle promesse qui sopra. Sta FRA la spedizione
+           gratis e le ferie: le tre promesse commerciali restano
+           adiacenti, e le ferie — che sono l'interruzione — continuano
+           a chiudere il gruppo. -->
+      <div class="acc" id="accCodici">
+        <button class="acc-h" onclick="toggleAcc('accCodici')"><span class="em">🎟</span>Codici sconto <span class="conta" id="codiciConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="codiciBlocco"></div></div>
+      </div>
+
       <!-- Il negozio in ferie (ago 2026): si chiude la bottega con la
            data di rientro. Gli annunci RESTANO in vetrina — si
            guardano, non si comprano — e al rientro tornano
@@ -8685,7 +8697,15 @@ let offertaMinPercento = 0;
 /* Le righe del conto scomposto per i fogli di pagamento: compaiono
    solo quando c'e' qualcosa oltre all'articolo. Numeri e basta. */
 function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped,
-                        scontoPct){
+                        scontoPct, scontoOrigine){
+  /* ⚠️ IL DECIMO POSIZIONALE, ed e' una STRINGA e non un booleano
+     apposta: al sito di chiamata si legge COSA si sta passando
+     (`p.sconto_origine||''`, non un `1` muto). Il censimento delle sei
+     chiamate in prove.py esiste proprio perche' il nono si dimenticava,
+     e adesso conta anche questo.
+     DA SCRIVERE QUI: L'UNDICESIMO ARGOMENTO E' IL MOMENTO DI PASSARE
+     A UN OGGETTO come contoRighe(c). Sei siti da riscrivere una volta,
+     e l'undicesimo non arriverebbe mai. */
   const pezzi = qta || 1;
   /* i pezzi della SPEDIZIONE sono un'altra cosa dalla quantita' della
      riga «Articolo × N»: in un carrello l'articolo non ha un numero
@@ -8707,7 +8727,7 @@ function contoScomposto(art, sped, prot, tot, qta, sconto, suppl, pezziSped,
           dal SERVER (sconto_percento), mai dedotta: chi la dimentica
           degrada all'etichetta nuda, non rompe niente. */
        + (sconto>0
-           ? r(sconto, `Sconto${scontoPct
+           ? r(sconto, `Sconto${scontoOrigine==='codice' ? ' codice' : ''}${scontoPct
                ? ` <span class="sconto-tag">−${scontoPct}%</span>` : ''}`,
                0, 1) : '')
        /* «per N pezzi» viaggia fin qui apposta: la pagina d'acquisto
@@ -9731,8 +9751,20 @@ function contoRighe(c){
        IL TAG E' `.sconto-tag`, lo stesso vestito che la percentuale
        porta gia' sull'unitario e nella barra del carrello: un terzo
        verde per la stessa cosa sarebbe un colore da spiegare. */
+    /* «SCONTO CODICE» quando a scontare e' stato un codice sconto e
+          non la promessa del negozio. LA MISURA: a 320px in vista sats
+          l'etichetta ha ~178px e «Sconto» col suo tag ne prende ~95;
+          « codice» ne chiede ~48, cioe' ~143 su 178 con 35 di margine
+          (e a 360/375 sale di 40 e 55). IL CODICE IN CHIARO NO: in un
+          tag arriva a 178 esatti, zero margine — escluso DALLA MISURA,
+          non dal gusto, e a cedere sarebbe l'etichetta coi puntini col
+          tag della percentuale mangiato, il difetto gia' pagato con
+          «Commissione Baratt…».
+          Il codice si legge nella riga compatta un dito sopra: la
+          divisione gia' in casa — la pillola e' il cartello, il conto
+          e' il fatto. */
     + (c.sconto>0
-        ? r(`Sconto${c.scontoPct ? ` <span class="sconto-tag">−${c.scontoPct}%</span>` : ''}`,
+        ? r(`Sconto${c.scontoOrigine==='codice' ? ' codice' : ''}${c.scontoPct ? ` <span class="sconto-tag">−${c.scontoPct}%</span>` : ''}`,
             cifraCtrl(c.sconto, c.circa, c.scontoEur, 1), 'sconto') : '')
     /* «COMMISSIONE» E BASTA (ago 2026, decisione di Andrea): con
        «Commissione Barattolo» questa riga TRONCAVA a 320px —
@@ -9900,6 +9932,7 @@ function apriAcquisto(l){
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              nota:'', notaAperta:false,
+             codice:'', codiceAperto:false,
              errore:''};
   go('acquisto');
   renderAcquisto();                 /* lo scheletro, subito */
@@ -9978,6 +10011,7 @@ function apriAcquistoSet(){
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
              nota:'', notaAperta:false,
+             codice:'', codiceAperto:false,
              errore:''};
   go('acquisto');
   renderAcquisto();
@@ -10075,6 +10109,11 @@ async function caricaPreventivo(){
         quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}))}
     : {annuncio_id: d0.annuncioId, quantita: d0.qta,
        offerta_id: d0.offertaId};
+  /* IL CODICE SCONTO anche qui, ed e' il varco che conta: senza,
+     la pagina direbbe un prezzo e la invoice ne chiederebbe un altro.
+     Va sui QUATTRO — questo, startBuy, startBuySet e la strada del
+     wallet — e il censimento in prove.py li conta. */
+  Object.assign(body, corpoCodiceSconto());
   try {
     const r = await fetch(`${API_BASE}/orders/preventivo`, {method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
@@ -10102,6 +10141,16 @@ async function caricaPreventivo(){
     acqDati.via = vive.some(s => s.via === d0.via) ? d0.via
       : viaDefault(vive);
     precompilaPunto(d0, d);
+    /* IL RIFIUTO NON PERDE QUEL CHE SI E' DIGITATO: il cassetto resta
+       aperto col testo dentro (che vive in acqDati, non nel DOM) e il
+       motivo scritto sotto — la ricetta del foglio rifornimento, dove
+       c'e' un valore da CORREGGERE. Applicato o coperto: si richiude
+       sulla riga compatta, che e' la conferma del gesto.
+       Il motivo si rilegge da `p` a ogni render, quindi SOPRAVVIVE a
+       un ±: il conto non puo' cambiare in silenzio sotto un rifiuto
+       dimenticato. */
+    if (d.codice_sconto)
+      acqDati.codiceAperto = (d.codice_sconto.stato === 'rifiutato');
     renderAcquisto();
   } catch(e) {
     if (acqDati !== d0) return;
@@ -10157,6 +10206,25 @@ function riprovaPreventivo(){
    qtaScelta si sincronizza: tornando alla scheda lo stepper di la'
    dice lo stesso numero — un solo stato, mai due che divergono. */
 let acqAttesaTimer = null;
+/* IL VELO D'ATTESA, RITARDATO. Estratto da acqPasso (ago 2026, coi
+   codici sconto) perche' i chiamanti sono diventati due: il ± e
+   l'Applica del codice sconto. Una seconda stesura direbbe la stessa
+   cosa con un altro numero, e le due attese lampeggerebbero diverso.
+   IL RITARDO E' LA META' CHE CONTA: secco, il velo lampeggerebbe a
+   OGNI tocco su rete viva; cosi' sul caso normale non si vede mai, su
+   rete lenta compare UNA volta — 180ms dopo l'ULTIMO tocco, perche'
+   ogni tocco riarma il timer — e resta finche' il conto vero non
+   arriva. Mai numeri vecchi spacciati per freschi, mai un lampeggio.
+   Il timer muore in testa a renderAcquisto: il render E' la risposta. */
+function acqVelo(box){
+  if (!box) return;
+  clearTimeout(acqAttesaTimer);
+  acqAttesaTimer = setTimeout(()=>{
+    box.querySelectorAll('.ctrl-conto, .pills, [role="radiogroup"]')
+      .forEach(e=>e.classList.add('acq-attesa'));
+  }, 180);
+}
+
 function acqPasso(delta){
   const d0 = acqDati;
   if (!d0 || d0.tipo !== 'mono' || d0.offertaId || !d0.preventivo) return;
@@ -10183,11 +10251,7 @@ function acqPasso(delta){
     box.querySelectorAll('.qta-mini .qm-num').forEach(e=>{ e.textContent = fmt(n); });
     box.querySelectorAll('.qta-mini .qm-meno').forEach(e=>e.classList.toggle('off', n <= 1));
     box.querySelectorAll('.qta-mini .qm-piu').forEach(e=>e.classList.toggle('off', n >= stock));
-    clearTimeout(acqAttesaTimer);
-    acqAttesaTimer = setTimeout(()=>{
-      box.querySelectorAll('.ctrl-conto, .pills, [role="radiogroup"]')
-        .forEach(e=>e.classList.add('acq-attesa'));
-    }, 180);
+    acqVelo(box);
   }
   if (DEMO) {
     /* niente rete in demo: preventivoDemo legge qtaScelta, appena
@@ -10772,6 +10836,61 @@ function renderAcquisto(){
   const cassettoNota = `<div class="${d.notaAperta?'field':''}" id="acqNotaCampo">
     ${d.notaAperta ? campiNota : notaChiusa}
   </div>`;
+  /* --- IL CODICE SCONTO (ago 2026). Sta QUI: dopo la fila delle
+     promesse, dopo le vie e le note, IMMEDIATAMENTE SOPRA IL CONTO —
+     e' attaccato a cio' che cambia, perche' il suo unico effetto
+     visibile e' una riga del conto, due dita sotto.
+     NON PUO' STARE SOTTO IL CONTO: il fondo e' position:sticky, e la
+     lezione di «Altri oggetti» e' categorica — contenuto corto e
+     ATOMICO non si mette sotto un elemento sticky; e con la tastiera
+     aperta il conto uscirebbe di schermo PROPRIO MENTRE si applica il
+     codice, cioe' la prova del gesto sparirebbe nel momento del gesto.
+     ⚠️ LA TRAPPOLA DI NOME: «codice» in quest'app significa gia' tre
+     cose — il codice ONLINE (la via digitale, che puo' stare su
+     QUESTA STESSA schermata), il codice di RITIRO della busta, e il
+     codice NEGOZIO. In prosa qui dentro mai «codice» nudo: sempre
+     «codice sconto». Nei globali il nome e' pieno; dentro acqDati,
+     dove il namespace e' la cassa, resta corto.
+     NIENTE stopPropagation, al contrario dei cassetti del punto e
+     dell'indirizzo: quelli vivono dentro un role="radio" che
+     riselezionerebbe la via, questo e' un fratello del conto e non ha
+     nessun tocco da fermare — copiarlo sarebbe cargo cult. */
+  const codScritto = (d.codice || '').trim();
+  const codRisp = p.codice_sconto || null;
+  const codStato = codRisp ? codRisp.stato : '';
+  /* la riga compatta ha DUE facce, e la seconda e' l'unico posto in
+     cui «vince il maggiore» si spiega a chi paga: un codice COPERTO e'
+     VALIDO — ha solo perso contro una promessa piu' generosa — e
+     dirgli «non vale» lo manderebbe a cercarne un altro che non c'e' */
+  const codDetto = codStato === 'applicato'
+    ? `🎟 ${esc(codRisp.codice)} — <b>−${p.sconto_percento||0}%</b>`
+    : `🎟 ${esc(codRisp ? codRisp.codice : codScritto)} — lo sconto del negozio è più alto`;
+  const codChiuso = (codScritto && codStato && codStato !== 'rifiutato')
+    ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
+        onclick="apriCodiceSconto()"><span class="punto-testo">${codDetto}</span><span class="punto-cambia">Togli</span></button>`
+    : `<button type="button" class="btn ghost" aria-expanded="false"
+        onclick="apriCodiceSconto()">Hai un codice sconto?</button>`;
+  const codCampo = `<label for="acqCodiceSconto">Codice sconto</label>
+    <input id="acqCodiceSconto" maxlength="24" value="${esc(d.codice||'')}"
+      placeholder="Es. SATOSHI10" autocomplete="off"
+      style="text-transform:uppercase"
+      oninput="if(acqDati)acqDati.codice=this.value">
+    ${/* MAI `this.value = this.value.toUpperCase()` qui sopra:
+          riscrivere `value` durante l'input riporta il cursore in
+          fondo — innocuo scrivendo da sinistra a destra, rotto appena
+          si corregge una lettera in mezzo. Il maiuscolo lo da' il CSS,
+          la normalizzazione vera la fa il SERVER e la rieccheggia in
+          codice_sconto.codice: il client mostra, non calcola. */''}
+    ${codStato === 'rifiutato'
+      ? `<div class="acq-nota">⚠️ ${esc(codRisp.motivo)}</div>` : ''}
+    <div style="display:flex;gap:8px">
+      <button type="button" class="btn orange" onclick="applicaCodiceSconto(this)">Applica</button>
+      ${codScritto ? `<button type="button" class="btn ghost" onclick="togliCodiceSconto()">Togli</button>` : ''}
+    </div>`;
+  const cassettoCodice = `<div class="${d.codiceAperto?'field':''}" id="acqCodiceCampo">
+    ${d.codiceAperto ? codCampo : codChiuso}
+  </div>`;
+
   /* --- le vie: la cifra a destra e' il SOLO costo di spedizione
      (decisione di Andrea, ago 2026: il totale con dentro l'oggetto
      si leggeva come «costo di spedizione» — il totale lo dice IL
@@ -10914,7 +11033,15 @@ function renderAcquisto(){
                    && scVal === 'eur';
     if (scSospeso)
       note += `<div class="acq-nota">🎁 Il negozio fa −${scPct}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
-    else if ((p.sconto_sats||0) > 0)
+    /* IL VERDE DICE LA PROMESSA DEL NEGOZIO, e col codice sconto
+          vincente `sconto_percento` porta la percentuale di UN'ALTRA
+          COSA: senza questa guardia la pillola direbbe «la promessa e'
+          scattata» mostrando il numero del codice. Il fatto del codice
+          lo dicono la riga del conto e la riga compatta del cassetto.
+          Coerente con l'asimmetria gia' dichiarata fra le due
+          promesse: il verde della 🎁 e' agganciato al FATTO che QUELLA
+          promessa abbia tolto qualcosa. */
+    else if ((p.sconto_sats||0) > 0 && p.sconto_origine !== 'codice')
       pillaSc = `<span class="pill pill-trust" data-barra="sc">✅ Sconto <b>−${scPct}%</b></span>`;
     else if (scManca > 0 && p.sconto_raggiungibile !== false)
       pillaSc = `<span class="pill pill-barra" data-barra="sc"${barraPromessa(scSogliaPag, scManca)}>🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
@@ -11019,6 +11146,7 @@ function renderAcquisto(){
                                dal server (mai dedotta da sconto/
                                articolo, che direbbe 9,99%) */
                             scontoPct: p.sconto_percento||0,
+                            scontoOrigine: p.sconto_origine||'',
                             /* qui la via e' SCELTA, quindi il giudizio
                                e' esatto: spedisce e non si paga */
                             spedGratis: viaOk && !sped
@@ -11057,7 +11185,7 @@ function renderAcquisto(){
      interpolato, le partenze riunite) vive nei ferri condivisi
      barreCattura/barreCorri, qui sopra */
   const barraDa = barreCattura(box);
-  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}${cassettoNota}
+  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}${cassettoNota}${cassettoCodice}
     <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
@@ -11103,6 +11231,67 @@ function apriPuntoAcquisto(){
   renderAcquisto();
   el('acqPunto')?.focus();
 }
+
+/* IL CASSETTO DEL CODICE SCONTO nasce CHIUSO, e nessuno dei motivi e'
+   di gusto: la pagina e' un conto da LEGGERE e non un modulo da
+   compilare (l'argomento che ha deciso il quinto giro del cassetto del
+   punto, e qui e' piu' forte — il punto e' obbligatorio sulla via di
+   serie, un codice sconto ce l'ha una minoranza); un campo «codice
+   sconto» aperto e' una FUGA, perche' dice a chiunque che esiste uno
+   sconto che lui non sta avendo e lo manda a cercarlo fuori dalla
+   cassa; costa ~150px contro ~44, cioe' tre righe di conto sotto la
+   piega a 320px; e NON C'E' NIENTE DA CONSERVARE — un codice sconto
+   non ha memoria, quindi il caso «aperto perche' tanto c'e' gia'
+   dentro qualcosa» qui non esiste proprio. */
+function apriCodiceSconto(){
+  if (!acqDati) return;
+  acqDati.codiceAperto = true;
+  renderAcquisto();
+  el('acqCodiceSconto')?.focus();      /* mai il fuoco su un campo che non c'e' */
+}
+
+/* Applica: un giro di preventivo col codice sconto nel corpo.
+   SI RIASSEGNA acqDati e non si muta in place — l'oggetto E' il token
+   della guardia anti-raffica di caricaPreventivo, e mutarlo farebbe
+   vincere l'ultima risposta ad ARRIVARE invece dell'ultima CHIESTA.
+   L'attesa e' il VELO RITARDATO condiviso con lo stepper e non
+   bottoneInAttesa: quello blocca lo schermo intero ed e' la guardia
+   contro il secondo tocco DOVE SI MUOVONO I SATS — qui non si muove
+   niente, si rifa' un conto. */
+function applicaCodiceSconto(btn){
+  haptic();
+  const v = (el('acqCodiceSconto')?.value || '').trim();
+  if (!v || !acqDati) return;          /* vuoto: si resta aperti, niente rete */
+  if (btn) btn.disabled = true;        /* un doppio tocco = due preventivi */
+  acqDati = {...acqDati, codice: v};
+  acqVelo(el('acqCorpo'));
+  caricaPreventivo();
+}
+
+function togliCodiceSconto(){
+  haptic();
+  if (!acqDati) return;
+  acqDati = {...acqDati, codice:'', codiceAperto:false};
+  acqVelo(el('acqCorpo'));
+  caricaPreventivo();
+}
+
+/* Il codice sconto nei corpi che pagano. CHIAVE A PARTE e MAI dentro
+   corpoConsegna: un codice non e' una consegna — ma l'argomento che
+   chiude la discussione e' un bug vero. corpoConsegna apre con
+   `if (!v) return {}`, quindi su un annuncio STORICO (consegna '')
+   esce subito e IL CODICE NON PARTIREBBE: la pagina mostrerebbe lo
+   sconto e la invoice chiederebbe il pieno. Silenzioso, su una fetta
+   piccola e vecchia del catalogo — il tipo di difetto che vive mesi.
+   ASSENTE quando non c'e', e l'asimmetria con tipo_punto e' voluta:
+   la' la PRESENZA della chiave e' la dichiarazione «questo client il
+   campo ce l'ha», qui non c'e' niente da dichiarare — un codice vuoto
+   e un codice assente sono la stessa cosa. */
+function corpoCodiceSconto(){
+  const c = (acqDati?.codice || '').trim();
+  return c ? {codice_sconto: c.slice(0, 40)} : {};
+}
+
 /* Il tetto della nota, lo SPECCHIO di MAX_NOTA del server: qui si
    ripete a mano — il patto di TEMPI — e a tenerli in pari c'e' la
    prova, che legge il numero dal server e lo confronta con questo. Il
@@ -12166,7 +12355,8 @@ async function startBuySet(){
                                                 1, c.sconto||0,
                                                 (via && via.supplemento_sats)||0,
                                                 (via && via.pezzi)||0,
-                                                (p && p.sconto_percento)||0);
+                                                (p && p.sconto_percento)||0,
+                                                (p && p.sconto_origine)||'');
   el('payEurNota').style.display = 'none';
   el('sheetBg').classList.add('open');
   el('paySheet').classList.add('open');
@@ -12176,7 +12366,8 @@ async function startBuySet(){
   const r = await fetch(`${API_BASE}/orders`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({righe, ...corpoConsegna()})});
+    body: JSON.stringify({righe, ...corpoConsegna(),
+                          ...corpoCodiceSconto()})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) {
     toast(d.detail || 'Errore nella creazione dell\'ordine', 6000);
@@ -12194,7 +12385,7 @@ async function startBuySet(){
     d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
     d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats, 1,
     d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
-    d.sconto_percento||0);
+    d.sconto_percento||0, d.sconto_origine||'');
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   if (pollTimer) clearInterval(pollTimer);
@@ -13138,7 +13329,8 @@ async function startBuy(){
                                                 scS,
                                                 (via && via.supplemento_sats)||0,
                                                 (via && via.pezzi)||0,
-                                                (p && p.sconto_percento)||0);
+                                                (p && p.sconto_percento)||0,
+                                                (p && p.sconto_origine)||'');
   el('payEurNota').style.display = inEur ? 'block' : 'none';
   if (inEur) el('payEurNota').textContent =
     `${offAcc ? 'Accordo ' + cifraAccordo(offAcc) : 'Listino ' + fmtEur(l.priceEur) + ' €'} — convertito ora in sats: la invoice vale ${TEMPI.invoice} minuti`;
@@ -13159,7 +13351,8 @@ async function startBuy(){
     body: JSON.stringify({annuncio_id: l.id,
                           quantita: acqDati?.qta || qtaScelta,
                           offerta_id: offAcc ? offAcc.id : 0,
-                          ...corpoConsegna()})});
+                          ...corpoConsegna(),
+                          ...corpoCodiceSconto()})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
   currentOrderId = d.ordine_id;
@@ -13169,7 +13362,7 @@ async function startBuy(){
       d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
       d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
-      d.sconto_percento||0);
+      d.sconto_percento||0, d.sconto_origine||'');
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
@@ -13262,7 +13455,7 @@ function compraSubito(){
     p.articolo_lordo_sats||p.articolo_sats,
     via.spedizione_sats||0, p.protezione_sats||0, via.totale_sats,
     p.quantita||1, p.sconto_sats||0, via.supplemento_sats||0, via.pezzi||0,
-    p.sconto_percento||0);
+    p.sconto_percento||0, p.sconto_origine||'');
   el('sheetBg').classList.add('open');
   el('nwcConfermaSheet').classList.add('open');
 }
@@ -13286,7 +13479,8 @@ async function confermaCompraSubito(btn){
       body: JSON.stringify({annuncio_id: currentListing.id,
                             quantita: acqDati?.qta || qtaScelta,
                             offerta_id: offertaAccettataPer(currentListing.id)?.id || 0,
-                            ...corpoConsegna()})});
+                            ...corpoConsegna(),
+                            ...corpoCodiceSconto()})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.detail || 'Errore nella creazione dell\'ordine');
     currentOrderId = d.ordine_id;
@@ -13296,7 +13490,7 @@ async function confermaCompraSubito(btn){
       d.articolo_lordo_sats||d.articolo_sats||d.prezzo_sats,
       d.spedizione_sats||0, d.protezione_sats||0, d.prezzo_sats,
       d.quantita||1, d.sconto_sats||0, d.supplemento_sats||0, d.pezzi||0,
-      d.sconto_percento||0) : '';
+      d.sconto_percento||0, d.sconto_origine||'') : '';
     /* 2) il poll su LNbits parte SUBITO: è lui la fonte di verità,
        qualunque cosa dica (o non dica) il wallet */
     if (pollTimer) clearInterval(pollTimer);
@@ -16153,6 +16347,7 @@ function renderIdentita(){
   renderPuntiRitiro();
   renderScontoPacco();
   renderSpedGratis();
+  renderCodici();
   renderFerie();
   renderRicerche();
 }
@@ -16775,6 +16970,207 @@ async function setScontoPacco(spegni){
    salva, come nel gemello: dall'ago 2026 accanto a loro c'e' anche il
    CAMPO LIBERO (vedi sogliaLibera), e con due modi di dire lo stesso
    numero un salvataggio per tocco lascerebbe il campo indietro. */
+
+/* --- I CODICI SCONTO DEL VENDITORE (ago 2026) --------------------
+   IL MODELLO E' renderRicerche e NON renderSpedGratis: li' c'e' UNA
+   regola con UN bottone che salva e uno che spegne, qui una LISTA con
+   un tetto. Tutta la grammatica dei due cassetti gemelli (bozza unica,
+   pillole che scelgono, un bottone che salva) e' la grammatica
+   sbagliata per una lista.
+   ⚠️ DUE DISCIPLINE DIVERSE, e il perche' va scritto in tutti e due i
+   posti o il prossimo cantiere copiera' quello sbagliato: QUI il form
+   si ridisegna solo sul tocco di una pillola, quindi i valori di TESTO
+   si leggono dal DOM al salvataggio (il patto di salvaRicerca); nella
+   CASSA il valore deve sopravvivere a un render provocato da un ±,
+   quindi vive in acqDati. */
+let myCodici = null;          /* cache, azzerata dopo ogni mutazione */
+let codiciLeve = null;        /* le cifre vengono dal server, mai qui */
+let codiceInModifica = 0;
+let bozzaCodice = null;
+
+function bozzaCod(){
+  if (!bozzaCodice)
+    bozzaCodice = {pct: (codiciLeve && codiciLeve.sconti || [10])[0],
+                   giorni: (codiciLeve && codiciLeve.durate || [0])[0],
+                   usi: 0};
+  return bozzaCodice;
+}
+
+async function renderCodici(){
+  const box = el('codiciBlocco');
+  if (!box) return;
+  const sez = el('accCodici');
+  if (DEMO || VETRINA || !(codiciLeve && codiciLeve.attivo)){
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  if (!myCodici) {
+    try {
+      const r = await fetch(`${API_BASE}/me/codici-sconto`,
+                            {headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json();
+      myCodici = d.codici || [];
+      codiciLeve = {...codiciLeve, ...d};
+    } catch(e) { myCodici = []; }
+  }
+  const tetto = codiciLeve.max || 20;
+  el('codiciConta').textContent = `(${myCodici.length} di ${tetto})`;
+  const b = bozzaCod();
+  const pill = (v, testo, campo) =>
+    `<button data-campo="${campo}" data-v="${v}" onclick="codicePill('${campo}',${v})" style="font:inherit;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+  const durata = g => g ? `${g} giorni` : 'senza scadenza';
+  const riga = c => {
+    /* ESAURITO O SCADUTO NON E' «IN PAUSA», E' MORTO: lo dice in
+       grigio e RESTA in lista — e' storia, e con ✏️ si rianima
+       alzando il tetto o spostando la data. Un codice che sparisce da
+       solo e' un codice che il venditore crede ancora vivo. */
+    const morto = !c.vale && c.attivo;
+    const perche = (c.usi_max && c.usi >= c.usi_max) ? 'esaurito'
+                 : (c.scadenza && c.scadenza * 1000 < Date.now()) ? 'scaduto'
+                 : 'non valido';
+    return `<div class="ps-riga${c.attivo ? '' : ' off'}">
+      <div class="ps-testo">
+        <b class="mono">${esc(c.codice)}</b> · −${c.percento}%
+        · ${c.usi_max ? `${fmt(c.usi)}/${fmt(c.usi_max)} usi` : `${fmt(c.usi)} usi`}
+        · ${c.scadenza ? 'scade il ' + new Date(c.scadenza*1000).toLocaleDateString('it-IT') : 'senza scadenza'}
+        ${!c.attivo ? '<span class="ps-morta">⏸ in pausa</span>' : ''}
+        ${morto ? `<span class="ps-morta">${perche}</span>` : ''}
+      </div>
+      <div class="az">
+        <button onclick="modificaCodice(${c.id})" title="Modifica">✏️</button>
+        <button onclick="pausaCodice(${c.id})" title="${c.attivo?'Metti in pausa':'Riattiva'}">${c.attivo?'⏸':'▶️'}</button>
+        <button onclick="eliminaCodice(${c.id})" title="Elimina">🗑</button>
+      </div></div>`;
+  };
+  const pieno = myCodici.length >= tetto && !codiceInModifica;
+  box.innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
+      Un codice lo dai a chi vuoi: chi lo scrive alla cassa ha lo
+      sconto. Vale sugli articoli, mai sulla spedizione.
+      <b style="color:var(--ink)">Se il tuo sconto del negozio è più
+      alto vince quello</b> — e il codice non consuma un uso.</div>
+    <div id="codiciErrore"></div>
+    ${myCodici.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun codice, per ora.</div>'}
+    ${pieno ? `<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:12px">Hai già ${tetto} codici: eliminane uno per farne di nuovi.</div>` : `
+    <div class="section-label" style="margin-top:14px">${codiceInModifica ? 'Modifica il codice' : 'Nuovo codice'}</div>
+    <div class="field"><input id="codCodice" maxlength="24"
+      placeholder="Es. SATOSHI10" autocomplete="off"
+      style="text-transform:uppercase" value="${esc(b.codice||'')}"></div>
+    <div class="section-label" style="margin-top:10px">Quanto sconto</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${(codiciLeve.sconti||[]).map(p => pill(p, `−${p}%`, 'pct')).join('')}</div>
+    <div class="section-label" style="margin-top:12px">Per quanto vale</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${(codiciLeve.durate||[]).map(g => pill(g, durata(g), 'giorni')).join('')}</div>
+    <div class="section-label" style="margin-top:12px">Quante volte in tutto</div>
+    ${/* ⚠️ NON si riusa campoSogliaLibera/sogliaLibera: quella coppia
+          e' legata a SOGLIE_LIBERE e sceglie il campo IN BASE ALLA
+          VALUTA — innestarci un terzo «quale» farebbe passare un
+          CONTEGGIO DI USI dentro un percorso che commuta unita', cioe'
+          il posto piu' facile in cui un'unita' diventa un'altra. */''}
+    <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--muted)">
+      <input id="codUsi" type="number" inputmode="numeric" min="0" step="1"
+        value="${b.usi || ''}" placeholder="illimitato"
+        style="font:inherit;width:96px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--ink)">
+      <span>usi (0 = illimitato)</span></div>
+    <button class="btn orange" onclick="salvaCodice(this)">${codiceInModifica ? '💾 Salva le modifiche' : '🎟 Crea il codice'}</button>
+    ${codiceInModifica ? `<button class="btn ghost" onclick="annullaModificaCodice()">Annulla la modifica</button>` : ''}`}`;
+}
+
+function codicePill(campo, v){
+  haptic();
+  const b = bozzaCod();
+  /* il testo si tiene PRIMA di ridisegnare, o il tocco su una pillola
+     cancellerebbe il codice appena digitato */
+  b.codice = el('codCodice')?.value || b.codice || '';
+  b.usi = parseInt(el('codUsi')?.value || '0', 10) || 0;
+  b[campo] = v;
+  renderCodici();
+}
+
+function modificaCodice(id){
+  const c = (myCodici || []).find(x => x.id === id);
+  if (!c) return;
+  haptic();
+  codiceInModifica = id;
+  bozzaCodice = {codice: c.codice, pct: c.percento, usi: c.usi_max,
+                 giorni: 0};
+  renderCodici();
+}
+
+function annullaModificaCodice(){
+  haptic();
+  codiceInModifica = 0;
+  bozzaCodice = null;
+  renderCodici();
+}
+
+async function salvaCodice(btn){
+  haptic();
+  const b = bozzaCod();
+  const corpo = {codice: el('codCodice')?.value || '',
+                 percento: b.pct, giorni: b.giorni,
+                 usi_max: parseInt(el('codUsi')?.value || '0', 10) || 0};
+  if (codiceInModifica) corpo.id = codiceInModifica;
+  const dove = el('codiciErrore');
+  if (dove) dove.innerHTML = '';
+  const ripristina = bottoneInAttesa(btn, 'Salvo…');
+  try {
+    const r = await fetch(`${API_BASE}/me/codici-sconto`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(corpo)});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      /* IL 400 SI RENDE DENTRO IL CASSETTO, la ricetta delle ferie:
+         in un toast sparirebbe in tre secondi, e qui c'e' un valore da
+         CORREGGERE */
+      if (dove) dove.innerHTML =
+        `<div class="trust-note" style="margin-top:10px">⚠️ <span style="white-space:pre-line">${esc(d.detail || 'Non ci sono riuscito, riprova')}</span></div>`;
+      else toast(d.detail || 'Non ci sono riuscito, riprova', 6000);
+      return;
+    }
+    myCodici = null;
+    codiceInModifica = 0;
+    bozzaCodice = null;
+    await renderCodici();
+    toast(corpo.id ? 'Codice aggiornato' : 'Codice creato');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+
+async function pausaCodice(id){
+  haptic();
+  try {
+    await fetch(`${API_BASE}/me/codici-sconto/${id}/pausa`, {method:'POST',
+      headers:{'X-Tg-Init-Data':authHdr()}});
+    myCodici = null;
+    await renderCodici();
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+function eliminaCodice(id){
+  const c = (myCodici || []).find(x => x.id === id);
+  if (!c) return;
+  /* LA DOMANDA PASSA DAL FOGLIO DI CASA e non dal confirm() di
+     sistema: eliminaRicerca usa ancora quello — debito dichiarato —
+     ma una superficie NUOVA non lo aumenta. E chiediConferma e' anche
+     la guardia contro il doppio tocco. */
+  chiediConferma({
+    titolo: 'Eliminare il codice?',
+    corpo: `«${c.codice}» non varrà più alla cassa. Gli ordini già `
+         + `fatti restano com'erano. Se un giorno lo ricrei con lo `
+         + `stesso nome sarà un codice nuovo, col suo tetto da capo.`,
+    etichetta: 'Elimina',
+    poi: async () => {
+      await fetch(`${API_BASE}/me/codici-sconto/${id}/elimina`,
+                  {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      myCodici = null;
+      await renderCodici();
+      toast('Codice eliminato');
+    }});
+}
+
 function renderSpedGratis(){
   const box = el('spedGratisBlocco');
   if (!box) return;
@@ -22781,6 +23177,10 @@ async function avvia(){
                     valuta: me.sped_gratis_valuta || 'eur'};
     spedGratisLeve = me.sped_gratis_leve || null;   // idem
     spedGratisBozza = null;                         // idem, stessa ragione
+    codiciLeve = me.codici_sconto_leve || null;     // idem
+    myCodici = null;        // la lista si rilegge: puo' essere cambiata
+    bozzaCodice = null;     // e la bozza si butta, o resterebbe fissata
+    codiceInModifica = 0;   // a una regola letta prima di questo giro
     myVenditeOk = me.vendite_ok || 0; myAcquistiOk = me.acquisti_ok || 0;
     myRating = me.rating || 0; myNFeedback = me.n_feedback || 0;
     myNRecensori = me.n_recensori || 0;

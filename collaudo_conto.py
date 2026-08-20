@@ -48,6 +48,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+import time
 import types
 
 QUI = os.path.dirname(os.path.abspath(__file__))
@@ -168,6 +169,47 @@ def semina(criterio, soglia, valore_eur, pct, prezzo=30_000, quantita=9,
     con.commit()
     con.close()
     return ids
+
+
+
+
+def semina_codice(codice="SATOSHI10", pct=20, giorni=0, usi_max=0,
+                  attivo=1, di_chi=222):
+    """Un codice sconto in tabella. Torna il suo id."""
+    con = SRV.db()
+    con.execute("DELETE FROM codici_sconto")
+    scad = (int(time.time()) + giorni * 86400) if giorni else 0
+    cur = con.execute(
+        "INSERT INTO codici_sconto(venditore_id,codice,percento,scadenza,"
+        "usi_max,attivo,creato) VALUES(?,?,?,?,?,?,?)",
+        (di_chi, codice, pct, scad, usi_max, attivo, int(time.time())))
+    con.commit()
+    cid = cur.lastrowid
+    con.close()
+    return cid
+
+
+def paga(ordine_id):
+    """Porta l'ordine a 'locked', come farebbe il pagamento.
+
+    Serve al tetto degli usi: due compra() di fila sullo stesso
+    annuncio innescherebbero la RIPRESA del pentito, e il suo ramo di
+    rinnovo chiama invoice_pagata — cioe' LNbits vero. Qui invece si
+    fa quel che succede nella realta' fra un uso e l'altro: il primo
+    ordine viene pagato."""
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='locked' WHERE id=?", (ordine_id,))
+    con.commit()
+    con.close()
+
+
+def usi_di(cid):
+    """Quanti usi risultano consumati, letti come li legge il server."""
+    con = SRV.db()
+    n = SRV._usi_codice(con, cid)
+    con.close()
+    return n
+
 
 
 def confronta(nome, richiesta, via="ritiro"):
@@ -306,6 +348,162 @@ def prove_regressione():
     prova("...e non c'e' nessuno sconto", 0, p["sconto_sats"])
 
 
+
+
+def prove_codice_sconto():
+    """I CODICI SCONTO (ago 2026): il venditore ne crea uno e lo da' a
+    chi vuole; chi lo scrive alla cassa ha -X% sugli articoli.
+    VINCE IL MAGGIORE fra il codice e la promessa del negozio: mai la
+    somma, e a PARI MERITO vince il negozio — perche' un uso non si
+    brucia per dare quello che era gia' dato."""
+    print("\n[6] I CODICI SCONTO — «vince il maggiore»")
+
+    # --- LA PROVA REGINA, col codice: preventivo == compra AL SAT
+    a, b = semina("pezzi", 3, 0, 10)          # promessa: -10% da 3 pezzi
+    semina_codice("SATOSHI10", 20)            # codice:   -20%
+    p = confronta("codice sul mono",
+                  {"annuncio_id": a, "quantita": 1,
+                   "codice_sconto": "SATOSHI10"})
+    prova("...e a scontare e' stato il CODICE", "codice", p["sconto_origine"])
+    prova("...col suo 20%, non col 10% del negozio", 6_000, p["sconto_sats"])
+
+    # il set: strada diversa nel codice, stessa risposta
+    a, b = semina("pezzi", 3, 0, 10)
+    semina_codice("SATOSHI10", 20)
+    confronta("codice sul carrello",
+              {"righe": [{"annuncio_id": a, "quantita": 1},
+                         {"annuncio_id": b, "quantita": 1}],
+               "codice_sconto": "SATOSHI10"})
+
+    # --- VINCE IL MAGGIORE, nei tre casi
+    a, _ = semina("pezzi", 3, 0, 30)          # promessa piu' generosa
+    semina_codice("PICCOLO", 10)
+    p = confronta("il negozio batte il codice",
+                  {"annuncio_id": a, "quantita": 3, "codice_sconto": "PICCOLO"})
+    prova("...vince il NEGOZIO", "negozio", p["sconto_origine"])
+    prova("...col suo 30%", 27_000, p["sconto_sats"])
+    prova("...e il codice si dice COPERTO, non rifiutato", "coperto",
+          p["codice_sconto"]["stato"])
+
+    # PARI MERITO: vince il negozio, e il codice NON consuma un uso
+    a, _ = semina("pezzi", 3, 0, 10)
+    cid = semina_codice("PARI", 10)
+    p = confronta("pari merito",
+                  {"annuncio_id": a, "quantita": 3, "codice_sconto": "PARI"})
+    prova("...vince il negozio", "negozio", p["sconto_origine"])
+    prova("...e l'uso NON si brucia per dare quel che era gia' dato",
+          0, usi_di(cid))
+
+    # LA SOMMA NON ESISTE: 30.000 x 3 con promessa -10% e codice -20%
+    a, _ = semina("pezzi", 3, 0, 10)
+    semina_codice("VENTI", 20)
+    p = confronta("scattano tutte e due",
+                  {"annuncio_id": a, "quantita": 3, "codice_sconto": "VENTI"})
+    prova("...e lo sconto NON si somma", 18_000, p["sconto_sats"])
+
+    # --- L'USO SI CONTA UNA VOLTA SOLA, E ALLA FATTURA
+    a, _ = semina("pezzi", 0, 0, 0)           # nessuna promessa
+    cid = semina_codice("CONTA", 10)
+    for _ in range(3):
+        chiama(SRV.preventivo_ordine,
+               {"annuncio_id": a, "quantita": 1, "codice_sconto": "CONTA"})
+    prova("tre preventivi non muovono il contatore", 0, usi_di(cid))
+    chiama(SRV.compra, {"annuncio_id": a, "quantita": 1,
+                        "consegna": "ritiro", "codice_sconto": "CONTA"})
+    prova("...e la fattura si', UNA volta", 1, usi_di(cid))
+    # LA RIPRESA DEL PENTITO non incrementa: e' la mutazione piu' facile
+    # da scrivere e la piu' difficile da vedere
+    r = chiama(SRV.compra, {"annuncio_id": a, "quantita": 1,
+                            "consegna": "ritiro", "codice_sconto": "CONTA"})
+    prova("...e la ripresa ripresenta la stessa fattura", True,
+          bool(r.get("ripresa")))
+    prova("...senza consumare un secondo uso", 1, usi_di(cid))
+
+    # --- I DUE LIMITI, letti dal database
+    a, _ = semina("pezzi", 0, 0, 0)
+    semina_codice("VECCHIO", 10, giorni=-1)   # scaduto ieri
+    p = chiama(SRV.preventivo_ordine,
+               {"annuncio_id": a, "quantita": 1, "codice_sconto": "VECCHIO"})
+    prova("un codice scaduto e' rifiutato", "rifiutato",
+          p["codice_sconto"]["stato"])
+    prova("...e il conto resta PIENO", 0, p["sconto_sats"])
+    prova("...ma il preventivo risponde lo stesso (200, mai un errore)",
+          30_000, p["articolo_sats"])
+
+    # IL FILO DEL TETTO: l'uso N scatta, l'N+1 no. E' dove vive sempre
+    # un off-by-one.
+    a, _ = semina("pezzi", 0, 0, 0)
+    cid = semina_codice("DUEVOLTE", 10, usi_max=2)
+    for giro in (1, 2):
+        c = chiama(SRV.compra, {"annuncio_id": a, "quantita": giro,
+                                "consegna": "ritiro",
+                                "codice_sconto": "DUEVOLTE"})
+        prova(f"il tetto a 2: l'uso {giro} scatta", True,
+              c["sconto_sats"] > 0)
+        paga(c["ordine_id"])
+    prova("...e gli usi contati sono due", 2, usi_di(cid))
+    p = chiama(SRV.preventivo_ordine,
+               {"annuncio_id": a, "quantita": 3, "codice_sconto": "DUEVOLTE"})
+    prova("...il terzo no", "rifiutato", p["codice_sconto"]["stato"])
+    # e la CORSA: chi ci prova lo stesso non fa nascere un ordine
+    # scontato — il fail-fast lo ferma prima della invoice
+    try:
+        chiama(SRV.compra, {"annuncio_id": a, "quantita": 3,
+                            "consegna": "ritiro",
+                            "codice_sconto": "DUEVOLTE"})
+        prova("...e la fattura non nasce", "400", "nessun errore")
+    except SRV.HTTPException as e:
+        prova("...e la fattura non nasce", 400, e.status_code)
+    prova("...ne' si e' consumato un uso di troppo", 2, usi_di(cid))
+
+    # --- IL CODICE NON ATTRAVERSA I NEGOZI
+    a, _ = semina("pezzi", 0, 0, 0)
+    semina_codice("ALTRUI", 20, di_chi=999)   # e' di un altro venditore
+    p = chiama(SRV.preventivo_ordine,
+               {"annuncio_id": a, "quantita": 1, "codice_sconto": "ALTRUI"})
+    prova("il codice di un altro negozio e' rifiutato", "rifiutato",
+          p["codice_sconto"]["stato"])
+    prova("...e non sconta un sat", 0, p["sconto_sats"])
+
+    # --- L'ANTI-ORACOLO: chi indovina non impara niente
+    a, _ = semina("pezzi", 0, 0, 0)
+    semina_codice("ESISTE", 10, attivo=0)     # esiste ma e' spento
+    motivi = set()
+    for tentativo in ("ESISTE", "NONESISTE", "ALTRO123"):
+        p = chiama(SRV.preventivo_ordine,
+                   {"annuncio_id": a, "quantita": 1,
+                    "codice_sconto": tentativo})
+        motivi.add((p["codice_sconto"]["stato"], p["codice_sconto"]["motivo"]))
+    prova("esistente-ma-spento e inesistente si raccontano IDENTICI",
+          1, len(motivi))
+
+    # --- LA NORMALIZZAZIONE: si scrive come capita, vale lo stesso
+    a, _ = semina("pezzi", 0, 0, 0)
+    semina_codice("SATOSHI10", 10)
+    p = chiama(SRV.preventivo_ordine,
+               {"annuncio_id": a, "quantita": 1,
+                "codice_sconto": " satoshi-10 "})
+    prova("il codice si normalizza (minuscole, spazi, trattini)",
+          "applicato", p["codice_sconto"]["stato"])
+    prova("...e torna scritto come l'abbiamo capito", "SATOSHI10",
+          p["codice_sconto"]["codice"])
+
+    # --- LA DIVISIONE A RITROSO regge coi numeri, non solo di forma
+    a, _ = semina("pezzi", 0, 0, 0, prezzo=10_000)
+    semina_codice("TERZI", 10)
+    c = chiama(SRV.compra, {"annuncio_id": a, "quantita": 3,
+                            "consegna": "ritiro", "codice_sconto": "TERZI"})
+    con = SRV.db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (c["ordine_id"],)).fetchone()
+    con.close()
+    lordo = (o["prezzo_sats"] - o["spedizione_sats"] - o["protezione_sats"]
+             + o["sconto_sats"])
+    prova("la divisione a ritroso resta ESATTA col codice", 0, lordo % 3)
+    prova("...e l'unitario e' quello di sempre", 10_000, lordo // 3)
+
+
+
 def prove_ronda():
     """La ronda del libro mastro LEGGE E BASTA, e su un database sano
     deve TACERE: un allarme che suona sul normale e' peggio di nessun
@@ -323,6 +521,7 @@ def main():
     prove_set()
     prove_invito()
     prove_regressione()
+    prove_codice_sconto()
     prove_ronda()
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")
