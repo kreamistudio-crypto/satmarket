@@ -4701,7 +4701,24 @@ document.getElementById('cartello')?.remove();</script>
       Dimostri di possedere la tua chiave firmando una sfida.
       La chiave privata <b>non viene mai inviata</b> a nessuno.
     </div>
-    <button class="btn primary" style="margin-top:14px" onclick="loginNostrEstensione()">🧩 Con l'estensione (consigliato)</button>
+    <!-- AMBER PER PRIMO, e non e' una preferenza: qui dentro si e' su
+         un TELEFONO, dove l'estensione del browser non esiste e la
+         nsec si incollerebbe a mano. Amber e' un'app che tiene la
+         chiave e firma per conto tuo: si inquadra un codice e si
+         entra. -->
+    <button class="btn primary" style="margin-top:14px" onclick="loginNostrQr()">📱 Con Amber (Android)</button>
+    <div id="nostrQrBox" style="display:none;margin-top:10px;text-align:center">
+      <div id="nostrQrCode" class="qr"></div>
+      <div id="nostrQrStato" style="font-size:12.5px;color:var(--muted);font-weight:700;margin-top:8px"></div>
+      <!-- DUE STRADE, e servono tutt'e due: chi ha Amber su QUESTO
+           telefono non puo' inquadrare il proprio schermo, e per lui
+           il link apre l'app di colpo; chi ce l'ha su un altro
+           dispositivo inquadra il codice. -->
+      <a id="nostrQrLink" class="btn ghost" style="margin-top:8px;display:block" href="#">📲 Ho Amber su questo telefono — aprilo</a>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:2px">Altrimenti inquadra il codice qui sopra con Amber.</div>
+    </div>
+    <button class="btn ghost" style="margin-top:10px" onclick="apriGuidaNostr()">🆕 Non ho ancora un'identità Nostr</button>
+    <button class="btn ghost" onclick="loginNostrEstensione()">🧩 Con l'estensione del browser</button>
     <details style="margin-top:10px">
       <summary style="cursor:pointer;font-weight:700;font-size:14px;padding:6px 0">🔗 Con un bunker remoto (NIP-46)</summary>
       <div class="field" style="margin-top:8px">
@@ -4722,6 +4739,38 @@ document.getElementById('cartello')?.remove();</script>
       <button class="btn primary" onclick="loginNostrNsec()">Entra</button>
     </details>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ GUIDA: farsi un'identità Nostr con Amber ============
+       Chi arriva qui non ha una chiave e quasi sempre non sa nemmeno
+       cosa sia. La guida NON spiega Nostr: dice i quattro gesti da
+       fare, in ordine, e cosa aspettarsi dopo ognuno — il resto lo si
+       impara usandolo.
+       AMBER e non «un client qualsiasi» perché è un SIGNER: tiene la
+       chiave e basta, e le app le chiedono il permesso una per una.
+       Consigliare un client che la chiave se la tiene dentro sarebbe
+       insegnare l'abitudine che questo progetto rifiuta dal primo
+       giorno (regola ferrea 2). -->
+  <div class="sheet" id="guidaNostrSheet">
+    <div class="grab"></div>
+    <h3>🆕 Farsi un'identità Nostr</h3>
+    <div style="font-size:13px;color:var(--muted);font-weight:600;line-height:1.45">
+      Su Nostr non c'è nessuna registrazione: <b>l'identità è una chiave</b>, e
+      te la fai in due minuti. A tenerla ci pensa <b>Amber</b>, un'app che fa
+      solo quello — firma per te quando un sito glielo chiede, e la chiave
+      non esce mai da lì.
+    </div>
+    <ol style="font-size:13.5px;font-weight:600;line-height:1.5;padding-left:20px;margin:12px 0">
+      <li style="margin-bottom:9px">Installa <b>Amber</b> da F-Droid o dal sito:
+        <a class="btn ghost" style="margin-top:6px;display:block" id="guidaAmberLink" href="https://f-droid.org/packages/com.greenart7c3.nostrsigner/" target="_blank" rel="noopener">⬇️ Scarica Amber</a>
+      </li>
+      <li style="margin-bottom:9px">Aprila e scegli <b>di crearti una chiave nuova</b>: te la genera lei, non serve né email né numero.</li>
+      <li style="margin-bottom:9px"><b>Mettila al sicuro.</b> Amber ti mostra la chiave privata: salvala dove tieni le cose importanti. Se la perdi non la recupera nessuno — non c'è nessun «password dimenticata».</li>
+      <li>Torna qui e tocca <b>«Con Amber»</b>: inquadri il codice, Amber ti chiede il permesso, e sei dentro.</li>
+    </ol>
+    <div class="trust-note">🔒 <span>Barattolo non vede mai la tua chiave privata: <b>chiede una firma e Amber decide</b>. Vale per l'accesso e per ogni annuncio che pubblichi.</span></div>
+    <button class="btn primary" style="margin-top:12px" onclick="tornaAlLoginNostr()">Ho Amber, entriamo</button>
+    <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
   </div>
 
   <!-- ============ SHEET COLLEGAMENTO (npub già verificata) ============ -->
@@ -12054,6 +12103,11 @@ function caricaQrcode(){
 }
 let qrGiro = 0;   /* il caricamento e' async: un giro vecchio arrivato
                      in ritardo non deve disegnare sopra quello nuovo */
+/* L'ascolto del login QR, da smontare uscendo dal foglio. Sta QUI e
+   non accanto a `loginNostrQr` perche' la legge `closeSheet`, che
+   vive piu' in alto: una `let` piu' in basso sarebbe in zona morta —
+   la lezione gia' pagata col duplicato e col motore di navigazione. */
+let qrLoginChiudi = null;
 async function mostraQr(invoice){
   const box = el('payQr'), giro = ++qrGiro;
   /* si disegna solo una bolt11 vera: in demo (stringa finta) e negli
@@ -12065,16 +12119,31 @@ async function mostraQr(invoice){
     box.classList.remove('pronto'); box.innerHTML = ''; return;
   }
   if (giro !== qrGiro) return;
-  const testo = ('lightning:' + invoice.trim()).toUpperCase();
+  /* MAIUSCOLO e modalita' Alphanumeric: e' il formato dei wallet
+     Lightning, e fa un codice piu' rado da inquadrare. */
+  disegnaQr(box, ('lightning:' + invoice.trim()).toUpperCase(), 'Alphanumeric');
+}
+
+/* IL DISEGNATORE, condiviso (ago 2026, col login QR di Amber): due
+   codici diversi con lo stesso pennello — la zona quieta, la scala e
+   i colori fissi valgono per tutti e due, e due copie divergerebbero
+   al primo ritocco.
+   IL MODO NON E' UN DETTAGLIO: la bolt11 sta in `Alphanumeric` (A-Z,
+   cifre e pochi simboli) perche' e' maiuscola; un `nostrconnect://`
+   ha minuscole e punteggiatura e vuole `Byte`, che fa un codice piu'
+   fitto — inevitabile, e per questo il riquadro e' grande.
+   Scuro su BIANCO in tutti e due i temi: un codice si legge col
+   contrasto, non col tema (il patto dell'etichetta prezzo). */
+function disegnaQr(box, testo, modo){
   let qr;
   try {
     qr = qrcode(0, 'M');            /* versione automatica, correzione M */
-    qr.addData(testo, 'Alphanumeric');
+    qr.addData(testo, modo);
     qr.make();
   } catch(e) {
     /* fuori misura o carattere imprevisto: meglio nessun QR che un QR
-       sbagliato — resta la invoice da copiare */
-    box.classList.remove('pronto'); box.innerHTML = ''; return;
+       sbagliato — resta il testo da copiare */
+    box.classList.remove('pronto'); box.innerHTML = ''; return false;
   }
   /* moduli scuri su bianco con 4 moduli di zona quieta DENTRO il
      canvas; la scala punta a ~500px veri, poi il CSS lo posa a 230
@@ -12093,6 +12162,7 @@ async function mostraQr(invoice){
         g.fillRect((quieto + col) * scala, (quieto + r) * scala, scala, scala);
   box.innerHTML = ''; box.appendChild(c);
   box.classList.add('pronto');
+  return true;
 }
 
 /* L'«Annulla» del foglio pagamento ANNULLA DAVVERO (ago 2026): prima
@@ -12137,6 +12207,11 @@ function closeSheet(){
   el('paySheet').classList.remove('open');
   el('invitoSheet').classList.remove('open');
   el('nostrSheet').classList.remove('open');
+  el('guidaNostrSheet').classList.remove('open');
+  /* uscendo dal login si smonta l'ascolto del QR: una websocket
+     orfana resterebbe aperta a sentire un signer che non arriva */
+  if (qrLoginChiudi) { qrLoginChiudi(); qrLoginChiudi = null; }
+  const _qb = el('nostrQrBox'); if (_qb) _qb.style.display = 'none';
   el('collegaSheet').classList.remove('open');
   el('nwcConfermaSheet').classList.remove('open');
   el('installSheet').classList.remove('open');
@@ -19900,7 +19975,7 @@ function firmatarioEstensione(){
    Con skHex si RIUSA la chiave client di una sessione già approvata
    (conservata in localStorage, vedi ricordaBunker): il bunker ci
    riconosce e non rifà il rito dell'autorizzazione. */
-async function firmatarioBunker(uri, skHex){
+async function firmatarioBunker(uri, skHex, giaConnesso){
   await caricaNostrTools();
   const NT = window.NostrTools;
   const m = uri.trim().match(/^bunker:\/\/([0-9a-f]{64})\??(.*)$/i);
@@ -19963,9 +20038,15 @@ async function firmatarioBunker(uri, skHex){
      sul telefono. Chiederli qui = un'autorizzazione sola, chiara.
      Timeout umano (120s): la prima connect può voler dire aprire
      l'app del bunker e approvare, in 30s non ci si sta. */
+  /* `giaConnesso` = il login col QR (nostrconnect): la stretta di mano
+     l'ha gia' fatta il SIGNER scansionando il codice, e rifarla qui
+     vorrebbe dire chiedere a chi ha appena approvato di approvare una
+     seconda volta. Il resto del canale — relay, chiave, `chiama` — e'
+     lo stesso, ed e' tutto quel che serve riusare. */
   try {
-    await chiama('connect', [bunkerPub, par.get('secret') || '',
-                             'sign_event:22242,sign_event:30402'], 120000);
+    if (!giaConnesso)
+      await chiama('connect', [bunkerPub, par.get('secret') || '',
+                               'sign_event:22242,sign_event:30402'], 120000);
   } catch(e){
     if (!/already connected/i.test(e.message || '')) {
       try { relay.close(); } catch(_){}   // niente websocket orfane
@@ -20098,6 +20179,118 @@ async function loginNostrBunker(){
   } catch(e){ toast(`Bunker: ${e.message || 'non risponde'}`, 6000); }
   finally { if (f) f.chiudi(); }   // la websocket si chiude comunque
 }
+/* ------------- 2-bis) IL LOGIN COL QR (Amber, ago 2026) -------------
+   Il verso OPPOSTO del bunker, ed e' quel che lo rende usabile da un
+   telefono: col `bunker://` e' l'utente a incollarci un indirizzo —
+   sessanta caratteri esadecimali, dentro Telegram, a mano. Col
+   `nostrconnect://` siamo NOI a metterci in ascolto e a mostrare un
+   codice: il signer lo inquadra e ci chiama lui.
+
+   Il giro, per intero: si genera una chiave CLIENT (nostra, mai
+   quella dell'utente) e un `secret` a caso; si costruisce l'URI col
+   nostro pubkey, i relay su cui ascoltiamo e quel secret; Amber lo
+   scansiona, chiede il permesso all'utente e manda una risposta
+   `connect` sui relay. Da quell'evento impariamo DUE cose: chi e' il
+   signer (l'AUTORE) e se e' davvero lui (il `secret` che ci
+   restituisce).
+   IL SECRET SI CONTROLLA, e non e' pignoleria: senza, chiunque stia
+   guardando quel relay potrebbe rispondere al posto del signer e
+   farci entrare nel proprio account — la NIP-46 lo dice a chiare
+   lettere. È l'unica riga di sicurezza vera di questo pezzo.
+   Poi non si riscrive niente: scoperto il signer si costruisce un
+   `bunker://` e si riusa `firmatarioBunker`, col `giaConnesso` alzato
+   perche' la stretta di mano e' gia' avvenuta. */
+const RELAY_QR = ['wss://relay.nsec.app', 'wss://relay.damus.io'];
+
+async function loginNostrQr(){
+  const box = el('nostrQrBox');
+  try {
+    await Promise.all([caricaNostrTools(), caricaQrcode()]);
+  } catch(e){ toast('Non riesco a preparare il codice, riprova', 6000); return; }
+  const NT = window.NostrTools;
+  const sk = NT.generateSecretKey(), pub = NT.getPublicKey(sk);
+  const segreto = NT.utils.bytesToHex(NT.generateSecretKey()).slice(0, 32);
+  /* si ascolta SOLO sui relay a cui siamo riusciti a connetterci, e
+     nell'URI si dichiarano quelli: prometterne uno che non stiamo
+     ascoltando vuol dire perdere la risposta se il signer sceglie
+     proprio quello */
+  const vivi = [];
+  for (const url of RELAY_QR) {
+    try { vivi.push({url, r: await NT.Relay.connect(url)}); }
+    catch(e){ console.log(`🟪 [qr] relay non raggiungibile: ${url}`); }
+  }
+  if (!vivi.length) { toast('Nessun relay raggiungibile: riprova', 6000); return; }
+  const uri = 'nostrconnect://' + pub + '?'
+    + vivi.map(v=>'relay=' + encodeURIComponent(v.url)).join('&')
+    + '&secret=' + segreto
+    + '&perms=' + encodeURIComponent('sign_event:22242,sign_event:30402')
+    + '&name=' + encodeURIComponent('Barattolo');
+  console.log(`🟪 [qr] in ascolto come ${pub.slice(0,8)}… su ${vivi.map(v=>v.url).join(' ')}`);
+  box.style.display = '';
+  el('nostrQrLink').href = uri;
+  disegnaQr(el('nostrQrCode'), uri, 'Byte');
+  el('nostrQrStato').textContent = 'In attesa che Amber si colleghi…';
+
+  const chiudi = () => { vivi.forEach(v=>{ try { v.r.close(); } catch(e){} }); };
+  qrLoginChiudi = chiudi;
+  let fatto = false;
+  const arrivato = (ev) => {
+    if (fatto) return;
+    let msg;
+    /* la chiave di conversazione si calcola COL SIGNER, che si scopre
+       adesso: e' l'autore dell'evento — prima non lo sapevamo */
+    try {
+      msg = JSON.parse(NT.nip44.decrypt(
+        ev.content, NT.nip44.getConversationKey(sk, ev.pubkey)));
+    } catch(e){ return; }            // non era per noi
+    if (msg.result === 'auth_url') { apriAutorizzazioneBunker(msg.error); return; }
+    if (msg.result !== segreto) {
+      console.log('🟪 [qr] risposta con un secret che non torna: la butto');
+      return;                        // qualcun altro sul relay: si ignora
+    }
+    fatto = true;
+    console.log(`🟪 [qr] collegato al signer ${ev.pubkey.slice(0,8)}…`);
+    chiudi(); qrLoginChiudi = null;
+    collegaDopoQr(ev.pubkey, vivi.map(v=>v.url), NT.utils.bytesToHex(sk));
+  };
+  vivi.forEach(v => v.r.subscribe([{kinds:[24133], '#p':[pub]}],
+                                  {onevent: arrivato}));
+  /* tre minuti: installare Amber e creare una chiave e' un giro lungo,
+     e un codice che scade sotto le dita e' peggio di nessun codice */
+  setTimeout(()=>{
+    if (fatto || qrLoginChiudi !== chiudi) return;
+    chiudi(); qrLoginChiudi = null;
+    if (el('nostrQrStato'))
+      el('nostrQrStato').textContent =
+        'Il codice è scaduto: tocca di nuovo «Con Amber» per rifarlo.';
+  }, 180000);
+}
+
+/* La guida sta SOPRA il foglio del login e non al suo posto: chi la
+   chiude si ritrova dov'era, col codice ancora lì. */
+function apriGuidaNostr(){
+  haptic();
+  el('sheetBg').classList.add('open');
+  el('guidaNostrSheet').classList.add('open');
+}
+function tornaAlLoginNostr(){
+  el('guidaNostrSheet').classList.remove('open');
+  el('nostrSheet').classList.add('open');
+}
+
+async function collegaDopoQr(signerPub, relays, skHex){
+  let f = null;
+  try {
+    toast('🟣 Amber collegato: entro…');
+    const uri = 'bunker://' + signerPub + '?'
+      + relays.map(u=>'relay=' + encodeURIComponent(u)).join('&');
+    f = await firmatarioBunker(uri, skHex, true);
+    ricordaBunker(f.sessione);       // le firme dopo non rifanno il rito
+    await consegnaFirmatario(f);
+  } catch(e){ toast(`Amber: ${e.message || 'non risponde'}`, 6000); }
+  finally { if (f) f.chiudi(); }
+}
+
 async function loginNostrNsec(){
   const nsec = el('nsecInput').value;
   el('nsecInput').value = '';         // via subito dal campo, comunque vada

@@ -16747,6 +16747,156 @@ console.log(JSON.stringify(out));
           True, "renderFotoPreview(); aggiornaFormVendi();" in pub)
 
 
+def prove_login_amber():
+    """IL LOGIN COL QR e la guida per farsi un'identità (ago 2026).
+
+    Il `nostrconnect://` è il verso opposto del bunker: siamo NOI a
+    metterci in ascolto e a mostrare un codice, e il signer (Amber)
+    ci chiama. Il pezzo che va sorvegliato non è il QR — è il
+    CONTROLLO DEL SECRET: senza, chiunque stia guardando quel relay
+    potrebbe rispondere al posto del signer e farci entrare nel
+    proprio account. La NIP-46 lo dice a chiare lettere, ed è l'unica
+    riga di sicurezza vera di questo pezzo."""
+    print("\n[login con Amber]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- LA GUIDA ----------------------------------------------------
+    # AMBER e non «un client qualsiasi»: è un SIGNER, tiene la chiave e
+    # basta. Consigliare un client che la chiave se la tiene dentro
+    # sarebbe insegnare l'abitudine che la regola ferrea 2 rifiuta.
+    g = mini[mini.index('id="guidaNostrSheet"'):]
+    g = g[:g.index("<!-- ====")]
+    prova("la guida manda su F-Droid", True,
+          "f-droid.org/packages/com.greenart7c3.nostrsigner" in g)
+    prova("...dice di crearsi una chiave nuova", True,
+          "chiave nuova" in g)
+    prova("...e dice che se la perde non la recupera nessuno", True,
+          "non la recupera nessuno" in g)
+    # La riga che non deve sparire: è il patto della regola ferrea 2,
+    # detto a chi sta per fidarsi.
+    prova("...e che noi la chiave non la vediamo mai", True,
+          "non vede mai la tua chiave privata" in g)
+    prova("il link si apre fuori, in sicurezza", True,
+          'target="_blank" rel="noopener"' in g)
+
+    # --- L'ASCOLTO SI SMONTA USCENDO ---------------------------------
+    # Una websocket orfana resterebbe aperta a sentire un signer che
+    # non arriva più.
+    cs = pezzo_js(mini, "function closeSheet(){", "\n}")
+    prova("uscendo dal foglio l'ascolto del QR si chiude", True,
+          "if (qrLoginChiudi) { qrLoginChiudi(); qrLoginChiudi = null; }" in cs)
+    prova("...e il riquadro del codice sparisce", True,
+          "nostrQrBox" in cs)
+
+    # --- IL CANALE SI RIUSA, NON SI RISCRIVE -------------------------
+    # Scoperto il signer si costruisce un `bunker://` e si passa dal
+    # firmatario di sempre: relay, chiave e `chiama` sono gli stessi.
+    # Il `giaConnesso` evita di chiedere una seconda approvazione a chi
+    # ha appena approvato scansionando.
+    fb = pezzo_js(mini, "async function firmatarioBunker(", "\n}")
+    prova("il firmatario accetta «già connesso»", True,
+          "async function firmatarioBunker(uri, skHex, giaConnesso){" in mini)
+    prova("...e col QR non rifà la stretta di mano", True,
+          "if (!giaConnesso)" in fb)
+    cq = pezzo_js(mini, "async function collegaDopoQr(", "\n}")
+    prova("il QR riusa il firmatario del bunker", True,
+          "firmatarioBunker(uri, skHex, true)" in cq)
+    prova("...e la sessione si conserva come per il bunker", True,
+          "ricordaBunker(f.sessione)" in cq)
+
+    # --- E IL GIRO VERO, su relay di cartone --------------------------
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("il login QR gira per davvero", "node non installato")
+        return
+
+    def fn(nome):
+        i = mini.index(nome)
+        return mini[i:mini.index("\n}", i) + 2]
+
+    banco = """
+let iscritti=[], chiusi=0;
+const relayFinto = url => ({url, subscribe(f,{onevent}){iscritti.push({url,onevent});return{}},
+                            close(){chiusi++;}});
+const NT = {
+  generateSecretKey: () => new Uint8Array(32).fill(iscritti.length+1),
+  getPublicKey: sk => 'ab'.repeat(32),
+  utils: {bytesToHex: b => Buffer.from(b).toString('hex'),
+          hexToBytes: h => Uint8Array.from(Buffer.from(h,'hex'))},
+  nip44: {getConversationKey: () => 'k', decrypt: c => c},
+  Relay: {connect: async url => relayFinto(url)},
+};
+global.window = {NostrTools: NT};
+const campi={};
+const el = id => campi[id] || (campi[id]={style:{},textContent:'',href:'',
+  innerHTML:'', classList:{add(){},remove(){}}});
+const caricaNostrTools=async()=>{}, caricaQrcode=async()=>{};
+let disegnato=null, collegato=null, qrLoginChiudi=null;
+const disegnaQr=(box,testo,modo)=>{disegnato={testo,modo};return true;};
+const toast=()=>{}, haptic=()=>{}, apriAutorizzazioneBunker=()=>{};
+const collegaDopoQr=(p,r,sk)=>{collegato={p,r,sk};};
+const RELAY_QR=['wss://relay.nsec.app','wss://relay.damus.io'];
+""" + fn("async function loginNostrQr(") + """
+(async () => {
+  const out = {};
+  await loginNostrQr();
+  const q = new URLSearchParams(disegnato.testo.split('?')[1]);
+  out.schema = disegnato.testo.indexOf('nostrconnect://ab') === 0;
+  out.modo = disegnato.modo === 'Byte';
+  out.relay = q.getAll('relay').length === 2;
+  out.secret = (q.get('secret')||'').length >= 16;
+  out.perms = (q.get('perms')||'').indexOf('22242') >= 0;
+  out.nome = q.get('name') === 'Barattolo';
+  out.link = el('nostrQrLink').href === disegnato.testo;
+  out.ascolto = iscritti.length === 2;
+  const segreto = q.get('secret');
+  iscritti[0].onevent({pubkey:'ff'.repeat(32),
+    content: JSON.stringify({id:'1', result:'sbagliato'})});
+  out.impostore = collegato === null;
+  iscritti[0].onevent({pubkey:'cd'.repeat(32),
+    content: JSON.stringify({id:'1', result: segreto})});
+  out.signer = !!collegato && collegato.p === 'cd'.repeat(32);
+  out.relayAlBunker = !!collegato && collegato.r.length === 2;
+  out.chiuse = chiusi === 2;
+  const prima = collegato;
+  iscritti[0].onevent({pubkey:'ee'.repeat(32),
+    content: JSON.stringify({id:'2', result: segreto})});
+  out.unaVolta = collegato === prima;
+  console.log(JSON.stringify(out));
+  process.exit(0);   // il timeout dei tre minuti terrebbe vivo node
+})();
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8") as f:
+        f.write(banco)
+        strada = f.name
+    r = _sp.run([node, strada], capture_output=True, text=True, timeout=60)
+    if r.returncode:
+        prova("il login QR gira senza esplodere", "", r.stderr.strip()[:200])
+        return
+    import json as _json
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+
+    prova("l'URI è un nostrconnect col nostro pubkey", True, o["schema"])
+    # Il QR del pagamento è `Alphanumeric` perché la bolt11 è
+    # maiuscola; un nostrconnect ha minuscole e punteggiatura e vuole
+    # `Byte`. Sbagliare modo qui vuol dire un codice che non si genera.
+    prova("...e si disegna in modalità Byte", True, o["modo"])
+    prova("i relay dichiarati sono quelli su cui ascoltiamo", True,
+          o["relay"] and o["ascolto"])
+    prova("c'è un secret", True, o["secret"])
+    prova("si chiedono i permessi che servono", True, o["perms"])
+    prova("l'app si presenta col suo nome", True, o["nome"])
+    prova("il link apre Amber sullo stesso telefono", True, o["link"])
+    # LA RIGA DI SICUREZZA: chi risponde col secret sbagliato non entra.
+    prova("un impostore sul relay viene respinto", True, o["impostore"])
+    prova("...e il signer vero viene accettato", True, o["signer"])
+    prova("al bunker si passano i relay giusti", True, o["relayAlBunker"])
+    prova("le websocket si chiudono dopo il collegamento", True, o["chiuse"])
+    prova("un secondo evento non rifà il login", True, o["unaVolta"])
+
+
 def prove_sintassi_client():
     """IL PARSE DEL CLIENT (13 ago 2026, nata da un guasto VERO
     arrivato fino a main: un `*/` doppio in un commento di
@@ -16866,7 +17016,7 @@ def main():
               prove_verde_e_filtri,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_ricerca, prove_feed_google,
-              prove_widget, prove_duplica,
+              prove_widget, prove_duplica, prove_login_amber,
               prove_script_nel_workflow,
               prove_sintassi_client):
         try:

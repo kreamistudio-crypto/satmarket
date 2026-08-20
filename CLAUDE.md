@@ -3475,6 +3475,57 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   committato a versione bloccata e servito da `GET /vendor/nostr.js`
   (file singolo, MAI CDN: nessun terzo deve poter cambiare la pagina
   dove si può incollare una nsec).
+  IL LOGIN COL QR, E LA GUIDA PER FARSI UNA CHIAVE (ago 2026, chiesto
+  da Andrea): il foglio «Entra con Nostr» si apre ora su «📱 Con Amber
+  (Android)», e chi una chiave non ce l'ha trova «🆕 Non ho ancora
+  un'identità Nostr».
+  IL PERCHÉ DELL'ORDINE: qui dentro si è su un TELEFONO, dove
+  l'estensione del browser non esiste e il `bunker://` vorrebbe dire
+  incollare a mano sessanta caratteri esadecimali dentro Telegram —
+  cioè le due strade che c'erano erano quelle giuste per il desktop.
+  IL QR È IL VERSO OPPOSTO DEL BUNKER, ed è tutta la differenza:
+  `nostrconnect://` lo generiamo NOI (chiave CLIENT nostra, mai quella
+  dell'utente, più i relay su cui ascoltiamo e un `secret` a caso), il
+  signer lo inquadra e ci chiama lui. Dalla sua risposta si imparano
+  DUE cose: chi è il signer — l'AUTORE dell'evento, che prima non
+  sapevamo, quindi la chiave di conversazione si calcola solo lì — e
+  se è davvero lui.
+  IL SECRET SI CONTROLLA, ed è l'unica riga di sicurezza vera del
+  pezzo: senza, chiunque stia guardando quel relay può rispondere al
+  posto del signer e farci entrare NEL PROPRIO account. Lo dice la
+  NIP-46 a chiare lettere, e c'è la prova che un impostore venga
+  respinto.
+  SI ASCOLTA SOLO SUI RELAY CHE SI DICHIARANO: prometterne uno che non
+  stiamo ascoltando vuol dire perdere la risposta se il signer sceglie
+  proprio quello.
+  E POI NON SI RISCRIVE NIENTE: scoperto il signer si costruisce un
+  `bunker://` e si riusa `firmatarioBunker` — relay, chiave e `chiama`
+  sono gli stessi — col `giaConnesso` alzato, che è l'unica riga
+  aggiunta là dentro: la stretta di mano l'ha già fatta chi ha
+  scansionato, e rifarla vorrebbe dire chiedergli di approvare due
+  volte. La sessione si conserva come per il bunker.
+  DUE STRADE E SERVONO TUTT'E DUE: il QR per chi ha Amber su un altro
+  dispositivo, e il LINK (`nostrconnect://` come href, che apre l'app)
+  per chi ce l'ha su questo — dal proprio schermo non si inquadra.
+  IL DISEGNATORE DEL QR È CONDIVISO col paySheet (`disegnaQr`), e il
+  MODO non è un dettaglio: la bolt11 è maiuscola e sta in
+  `Alphanumeric`, un `nostrconnect://` ha minuscole e punteggiatura e
+  vuole `Byte` — sbagliarlo vuol dire un codice che non si genera.
+  TRE MINUTI di validità: installare Amber e crearsi una chiave è un
+  giro lungo, e un codice che scade sotto le dita è peggio di nessun
+  codice. Uscendo dal foglio l'ascolto si SMONTA (`qrLoginChiudi` in
+  `closeSheet`), o resterebbe una websocket aperta a sentire un signer
+  che non arriva più.
+  LA GUIDA DICE QUATTRO GESTI, non spiega Nostr: installa Amber da
+  F-Droid, creati una chiave nuova, METTILA AL SICURO («se la perdi
+  non la recupera nessuno — non c'è nessun password dimenticata»),
+  torna e inquadra. AMBER e non «un client qualsiasi» perché è un
+  SIGNER: tiene la chiave e basta, e le app le chiedono il permesso
+  una per una — consigliare un client che la chiave se la tiene dentro
+  sarebbe insegnare l'abitudine che la regola ferrea 2 rifiuta dal
+  primo giorno. C'è la prova che la riga «Barattolo non vede mai la
+  tua chiave privata» non sparisca: è il patto della regola 2 detto a
+  chi sta per fidarsi.
   Doppia cittadinanza (lug 2026): le due direzioni del collegamento.
   Telegram→Nostr: `POST /api/me/npub/abilita-accesso` promuove il
   badge VERIFICATO a `npub_accesso` (indice unico = giudice: 409 se
@@ -14759,6 +14810,40 @@ NON COLLAUDATO QUI: il giro visivo. Il form pieno, il banner della
 copia e le foto che si ricaricano vanno guardati dal telefono — su
 questa macchina non c'è un browser connesso.
 IN PRODUZIONE basta il deploy: solo client.
+
+Entrare con Amber, e farsi una chiave (ago 2026, chiesto da Andrea):
+il foglio del login Nostr si apre su «📱 Con Amber (Android)» — si
+inquadra un codice e si entra — e chi una chiave non ce l'ha trova una
+guida in quattro gesti che manda su F-Droid. Il perché dell'ordine è
+che qui dentro si è su un telefono: l'estensione del browser non
+esiste, e il bunker vorrebbe dire incollare a mano sessanta caratteri
+esadecimali dentro Telegram.
+Sotto c'è `nostrconnect://` — il verso opposto del bunker: lo
+generiamo noi e il signer ci chiama. Il pezzo da sorvegliare non è il
+QR ma il CONTROLLO DEL SECRET: senza, chiunque guardi quel relay
+potrebbe rispondere al posto del signer e farci entrare nel proprio
+account. Vedi Architettura, «IL LOGIN COL QR», anche per il canale che
+si riusa invece di riscriverlo (una riga sola aggiunta a
+`firmatarioBunker`) e per le due strade che servono tutt'e due (il QR
+per chi ha Amber su un altro telefono, il link per chi ce l'ha su
+questo).
+Collaudato: 3549 prove verdi in modalità severa (23 nuove), fra cui
+una prova ESEGUIBILE che fa girare `loginNostrQr` VERA su relay di
+cartone — con dentro un IMPOSTORE che risponde col secret sbagliato e
+deve essere respinto — più UNDICI MUTAZIONI, una per riga sorvegliata
+(secret non controllato, secret fuori dall'URI, modalità del QR
+sbagliata, permessi non chiesti, ascolto su un relay solo, login due
+volte, websocket appese, seconda approvazione chiesta, guida che manda
+altrove, guida che non promette più la regola 2): ognuna rossa da
+sola.
+NON COLLAUDATO QUI, ed è la parte che conta: **non è mai stato provato
+con Amber vero**. Su questa macchina non c'è né un telefono né un
+browser, quindi il giro end-to-end — installare Amber, scansionare,
+approvare, entrare — va fatto dal vivo. Il banco di prova dice che
+l'URI è a norma e che il secret si controlla; non dice che Amber lo
+digerisca.
+IN PRODUZIONE basta il deploy: solo client, nessuna rotta e nessuna
+colonna.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
