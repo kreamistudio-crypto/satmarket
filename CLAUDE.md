@@ -7226,6 +7226,178 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   della valuta i numeri da tenere in pari sono due (la soglia e la sua
   unità), cioè lo stesso mezzo secondo con una regola a metà che nello
   sconto è il motivo del bottone unico.
+  I CODICI SCONTO DEL VENDITORE 🎟 (ago 2026, chiesto da Andrea): il
+  venditore crea un codice (SATOSHI10) e lo distribuisce a chi vuole —
+  nel suo canale, di persona, a un cliente affezionato; chi lo scrive
+  alla cassa ottiene −X% sugli articoli. È la terza leva accanto allo
+  sconto sugli articoli e alla spedizione gratis, ma di natura diversa,
+  ed è la riga che governa metà del cantiere: **quelle sono promesse
+  PUBBLICHE, scritte in vetrina e uguali per tutti; questa è un
+  SEGRETO del venditore.** Da lì il censimento — il codice non esce MAI
+  da CAMPI_VETRINA, dal profilo del negozio, dal NIP-99, dai post di
+  canale (⚠️ il riepilogo del lunedì è il posto dove verrà in mente «i
+  codici più usati»: sarebbe la lista dei codici in piazza), dalle
+  anteprime OG, dal catalogo della ricerca AI. Esce solo da
+  `/api/orders`, ed è giusto: è l'ordine delle due parti.
+  LE TRE DECISIONI DI ANDREA. 1) **VINCE IL MAGGIORE**: si applica solo
+  il più generoso fra codice e promessa, mai la somma — le ragioni sono
+  quelle già scritte per le due gambe dello sconto carrello (20+20 buca
+  il tetto, e sposta il FONDO della cascata lampo+sconto che una prova
+  dichiara ad alta voce), più una terza: codice e sconto carrello sono
+  LO STESSO MESTIERE, e due sconti sulla stessa cosa vogliono due righe
+  che chi legge deve sommare da sé. 2) Un codice fa **solo una
+  percentuale sugli articoli** — mai la spedizione, mai una cifra
+  fissa. 3) I limiti sono DUE, scadenza e tetto totale di usi;
+  **niente «una volta per persona»**, e l'imperfezione va dichiarata:
+  chi ha il codice può consumarne il tetto da solo.
+  È «VINCE IL MAGGIORE» A TENERE PICCOLO IL CANTIERE, ed è la cosa da
+  capire prima di toccarlo: non esistendo mai una somma, **UNA colonna
+  basta**. Lo sconto del codice atterra in `ordini.sconto_sats`, la
+  colonna di sempre, quindi la divisione a ritroso dell'unitario
+  (`_righe_ordine`, la ripresa, la riga del client) la riaggiunge già e
+  NON CAMBIA DI UN CARATTERE — `prove_divisione_a_ritroso` resta
+  invariata, e non è un caso: è la prova che la scelta era giusta. Con
+  una colonna sua le tre copie della divisione sbaglierebbero
+  l'unitario in ordine, notifiche e CSV, in silenzio.
+  I GIUDICI: `_sconto_percento` (l'aritmetica ESTRATTA dall'ultima riga
+  di `_sconto_pacco`, che ora la chiama — la guardia interna non può
+  cambiarne un risultato, la riga sopra l'ha già garantita, e c'è la
+  prova che tortura la coppia); `_codice_normalizza` (maiuscolo, solo
+  `A-Z0-9`: **`SATOSHI-10` e `SATOSHI10` sono lo STESSO codice**, chi
+  lo legge da un volantino non deve indovinare i trattini, e l'alfabeto
+  stretto è ciò che lo rende sicuro dentro un attributo); `_codice_vale`
+  (prende i CAMPI e non la riga, il patto di `in_ferie`, così lo stesso
+  giudice serve la cassa, la lista del venditore e la CI — con due, il
+  venditore leggerebbe «valido» su un codice che alla cassa non
+  scatta); `_sconto_vincente`, il compositore, col `>` STRETTO — a pari
+  merito vince la REGOLA, e da lì cade la regola derivata che si prova
+  in una riga: **un uso non si brucia per dare quello che era già
+  dato**.
+  IL CONTEGGIO DEGLI USI SI DERIVA DAGLI ORDINI (`_usi_codice`, il
+  modello di `_riservati`): un uso è un ordine che porta quel
+  `codice_sconto_id` e non è annullato — i pagati per sempre, i
+  'creato' finché la fattura è viva (la finestra dei 30 minuti). LA
+  STRADA SCARTATA, e va tenuta perché è quella che torna in mente: un
+  contatore `codici_sconto.usi` con UPDATE condizionato e `rowcount`.
+  È più forte in teoria — reggerebbe multi-processo — e costa QUATTRO
+  punti di restituzione (`annulla_ordine`, `controlla_abbandonati`,
+  `pulisci_ordini_fantasma`, più la RI-consumazione in
+  `controlla_annullati`): uno dimenticato perde usi per sempre, in
+  silenzio. È il difetto che `_riservati` è nato per non avere, su una
+  risorsa molto più preziosa. Chi la riproponga porti prima il
+  multi-processo. DICHIARATO: un rimborso NON restituisce l'uso.
+  DUE COLONNE SU `ordini` E NON UNA, ed è la coppia che regge sia la
+  corsa sia la ripresa: `codice_sconto` è il FATTO DELLA RICHIESTA — il
+  nome speso, scritto **anche quando il codice ha PERSO** — e serve
+  alla ripresa, che gira molto prima che si sappia chi vince;
+  `codice_sconto_id` è il MOTORE DEL CONTEGGIO, scritto solo quando ha
+  VINTO, perché un tetto conta gli sconti DATI e non le digitazioni. La
+  differenza è «ho usato il codice» contro «il codice mi ha fatto
+  risparmiare», e un tetto è la seconda. Restano COLONNE TESTIMONE e
+  non motori: vale parola per parola l'avvertimento di `sconto_sats`.
+  L'ASIMMETRIA FRA CHI PAGA E CHI PROVA: nel PREVENTIVO un codice
+  storto risponde **200** col conto pieno e il motivo in una chiave —
+  il patto di `promesse_sospese`, e l'unica forma che regge nel client,
+  dove `caricaPreventivo` su una risposta non-ok cade su `acqRipiega`
+  e **un refuso nel campo butterebbe indietro tutta la pagina**;
+  in `compra` invece un codice che non vale NON lascia nascere un
+  ordine a prezzo pieno in silenzio (400 prima della invoice).
+  L'ANTI-ORACOLO è `MSG_CODICE_NO`, uno solo per non esiste / spento /
+  scaduto / esaurito / di un altro negozio, e **mai un 404**: sarebbe
+  lo STATO a fare da oracolo. L'UNICA DEROGA è il 409 del ricontrollo
+  della corsa, che il motivo lo dà — a quel punto il compratore ha già
+  avuto un preventivo e una invoice con quel codice, quindi sa già che
+  esisteva, e non dirglielo lo manderebbe in un vicolo cieco («riprova»
+  senza «togli il codice» è un ciclo infinito). Più il FRENO in due
+  pezzi (`_codice_quota_libera` guarda, `_codice_tentativo_speso`
+  consuma): il gettone si spende SOLO sui tentativi falliti, o il
+  preventivo — che si rilancia a ogni ± dello stepper — brucerebbe la
+  quota di chi ha un codice VALIDO.
+  ⚠️ L'ORDINE DEI BLOCCHI NEL MONO È IL VINCOLO DI SEQUENZA PIÙ
+  IMPORTANTE (la lezione già scritta sopra il blocco della quantità
+  dell'offerta): si NORMALIZZA sopra la ripresa — che confronta il
+  nome, e senza quella riga chi trova il codice sul volantino e torna
+  si ritroverebbe la fattura di prima a prezzo pieno — e si GIUDICA
+  dopo. Col giudice sopra la ripresa nasce un guasto che si vede solo
+  al tetto: chi ha consumato l'ultimo uso ha un ordine 'creato' che
+  conta nel suo STESSO `usi`, e si vedrebbe negare la fattura che già
+  possiede.
+  CLIENT: un cassetto **chiuso** in cassa, sopra il conto (non sotto —
+  il fondo è sticky, e la lezione di «Altri oggetti» è categorica; e
+  con la tastiera aperta il conto uscirebbe di schermo proprio mentre
+  si applica il codice). Nasce chiuso perché la pagina è un conto da
+  LEGGERE e non un modulo da compilare, e perché **un campo «codice
+  sconto» aperto è una fuga**: dice a chiunque che esiste uno sconto
+  che lui non sta avendo. Tre stati, e il terzo ha DUE facce —
+  `applicato` e `coperto`, che è l'unico posto in cui «vince il
+  maggiore» si spiega a chi paga: un codice coperto è VALIDO, e dirgli
+  «non vale» lo manderebbe a cercarne un altro che non c'è. Il rifiuto
+  RESTA APERTO col testo dentro e il motivo sotto (la ricetta del
+  rifornimento), e il testo vive in `acqDati` e mai nel DOM.
+  ⚠️ LA TRAPPOLA DI NOME: «codice» in quest'app significa già tre cose
+  — il codice ONLINE (la via digitale, che può stare sulla STESSA
+  schermata), il codice di RITIRO della busta, il codice NEGOZIO. In
+  prosa dentro la cassa mai «codice» nudo: sempre «codice sconto».
+  IL CONTO dice «Sconto codice», misurato: a 320px in vista sats
+  l'etichetta ha ~178px, «Sconto» col tag ne prende ~95 e « codice» ~48
+  — 143 su 178, con 35 di margine. IL CODICE IN CHIARO NO: in un tag
+  arriva a 178 esatti, zero margine, e a cedere sarebbe il tag della
+  percentuale (il difetto già pagato con «Commissione Baratt…»). Si
+  legge nella riga compatta un dito sopra: **la pillola è il cartello,
+  il conto è il fatto**. Vale anche nel paySheet — `contoScomposto`
+  guadagna un DECIMO posizionale, e il commento dichiara che
+  l'undicesimo è il momento di passare a un oggetto.
+  LA PILLOLA VERDE DELLA 🎁 tace quando ha vinto il codice: quel verde
+  dice la promessa DEL NEGOZIO, e `sconto_percento` porterebbe la
+  percentuale di un'altra cosa. E l'INVITO si spegne quando il codice
+  COPRE la promessa — non quando «c'è un codice»: con codice −5% e
+  promessa −10% da 3 pezzi l'invito è ancora vero e utile. Il giudizio
+  lo dà il SERVER, estendendo il filtro `_sc_ragg`, e
+  `sconto_raggiungibile` si riformula come «c'è ancora qualcosa da
+  guadagnare aggiungendo pezzi». Nel SET quella chiave adesso ESCE, ma
+  solo per colpa di un codice che copre — la prova che diceva «nel set
+  non si afferma» ha cambiato lato.
+  IL CASSETTO DEL VENDITORE è una LISTA con un tetto, quindi il modello
+  è `renderRicerche` e NON i due gemelli: sta fra la spedizione gratis
+  e le ferie, che continuano a chiudere il gruppo. Esaurito o scaduto
+  non è «in pausa», è MORTO: lo dice in grigio e RESTA in lista, perché
+  con ✏️ si rianima. `pausa` ≠ `elimina`: ricreare lo stesso nome dà un
+  id NUOVO e un tetto FRESCO (dichiarato). ⚠️ Il campo «quanti usi» NON
+  riusa `campoSogliaLibera`: quella coppia sceglie il campo in base
+  alla VALUTA, e innestarci un conteggio di usi lo farebbe passare per
+  un percorso che commuta unità.
+  IL LIBRO MASTRO sale a 20 controlli con quattro voci; **quali NON
+  nascono** è la metà da leggere. `usi ≤ usi_max` NO: `usi_max` è una
+  scrittura ASSOLUTA (la regola di `ricarica_quantita`), quindi
+  passare da 100 a 5 con 30 usi già spesi è legittimo — vuol dire
+  «basta» — e l'invariante sarebbe falso per sempre su quel venditore,
+  cioè il modo in cui gli allarmi muoiono. Corollario: abbassare il
+  tetto non riprende mai uno sconto già dato. Fuori anche «ogni id
+  punta a una riga» (cancellare è un gesto che offriamo) e «codice
+  scaduto usato» (la scadenza si può accorciare dopo).
+  ⚠️ LE DUE LEVE-LISTA (`CODICI_SCONTO_PERCENTI`,
+  `CODICI_SCONTO_DURATE_GIORNI`) vanno a mano nel censimento di
+  `prove.py`: chi le dimentica non vede una prova rossa, vede **la
+  suite che ESPLODE** (`TypeError: 'int' object is not iterable` —
+  verificato togliendo la riga). E `CODICI_SCONTO_MAX_PERCENTO` va
+  tenuto PARI a `SCONTO_PACCO_MAX_PERCENTO`: con «vince il maggiore»
+  il tetto della cascata è il max dei due, e alzare solo questo sposta
+  il FONDO dichiarato.
+  Provato con 52 prove nuove in `prove.py` (3989 verdi) e 44 in
+  `collaudo_conto.py` (99 verdi): la PROVA REGINA col codice su mono e
+  set, «vince il maggiore» nei tre casi col pari merito che non brucia
+  un uso, tre preventivi che non muovono il contatore, **la ripresa del
+  pentito che non incrementa** (la mutazione più facile da scrivere e
+  la più difficile da vedere), il FILO del tetto (l'uso N scatta,
+  l'N+1 no), il codice che non attraversa i negozi, l'anti-oracolo che
+  racconta identici l'esistente-spento e l'inesistente, e la divisione
+  a ritroso esatta coi numeri. Sei sentinelle hanno CAMBIATO LATO col
+  perché scritto, nessuna allentata — fra cui `«lo sconto non si legge
+  dal payload»`, che ha guadagnato la gemella POSITIVA «dal payload
+  arriva solo il NOME, mai una cifra»: la vecchia restava verde PER
+  FORTUNA, perché `d.get("codice_sconto"` non contiene
+  `d.get("sconto`, e una prova che passa per caso non prova niente.
+
   LE PROMESSE DIVENTANO BADGE (ago 2026, decisione di Andrea): le due
   righe di prosa grigia passano a PILLOLE su tre superfici — scheda
   annuncio, «Altri oggetti», carrello. Erano righe che si leggono una
