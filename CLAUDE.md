@@ -117,6 +117,94 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   riaperto per niente. E chi PERDE una disputa ora lo viene a sapere:
   nel ramo fallito veniva avvisata solo la parte che aspettava i sats.
   Una volta sola, nel giro in cui l'ordine cambia stato davvero.
+  E LA GEMELLA È LA PORTA DEL TIMER (ago 2026): a `confirmed` ci si
+  arriva in DUE modi, e per uno dei due non c'era nessuna strada
+  indietro. Sul digitale i due timer corti restano armati anche col
+  disarmo e chiamano `_sblocca_sats(automatico=True)`; se il venditore
+  non ha un metodo d'incasso il pagamento non parte e l'ordine finisce
+  in 'confirmed' con `disputata` a 0 — cioè fuori dalla query di
+  `risolvi_disputa` e fuori da ogni altra. **Era l'unico stato in cui
+  i sats sono ancora in cassaforte e nessuno può renderli**, nemmeno
+  un moderatore, mentre `deposita_invoice` e `sollecita_incassi`
+  continuano a spingere verso l'unica uscita rimasta, quella del
+  venditore. La coda «⏸ Ordini fermi» ce lo portava pure davanti: il
+  vicolo cieco visibile della gemella, un piano più in basso.
+  IL DIFETTO NON ERA CHE 'confirmed' FOSSE IRREVERSIBILE, era che a
+  decidere era stata una MACCHINA — ed è la distinzione che governa la
+  cura: si registra COME ci si è arrivati (`ordini.sbloccato_auto_il`,
+  additiva, DEFAULT 0 = il mondo di ieri) e la porta si apre SOLO su
+  quel ramo. Chi ha CONFERMATO DI PERSONA resta chiuso, perché lì
+  «confermare è definitivo» è la regola dichiarata prima
+  dell'acquisto, non un incidente.
+  E SOLO AL MODERATORE (decisione di Andrea), non al compratore:
+  ridargli `apri_disputa` su 'confirmed' avrebbe coperto lo stesso
+  caso, ma gli avrebbe anche permesso di congelare da solo un incasso
+  su cui la finestra dichiarata è scaduta — su un bene digitale, dove
+  l'asimmetria è voluta a favore di chi consegna. Il compratore
+  scrive, e a decidere resta chi decide già le dispute.
+  LA FINESTRA NON SI TARA, ed è la proprietà che rende la scelta
+  gratuita: la porta esiste esattamente finché i sats sono ancora
+  NOSTRI — appena il venditore incassa l'ordine passa a 'released' e
+  la porta si chiude da sola. Nessun numero nuovo da ricordare.
+  IL TIMBRO SI SCRIVE IN TUTTI E DUE I RAMI, anche in quello riuscito
+  dove non apre niente: il nome resta onesto ovunque, e in cambio si
+  guadagna il CENSIMENTO che oggi si può fare solo dal journal —
+  «quante volte sono scattati i timer del digitale» diventa una
+  domanda SQL. `MAX(sbloccato_auto_il, ?)` con 0 quando a chiamare è
+  una persona (l'idioma di `quantita_max`): una chiamata non
+  automatica non cancella mai un timbro già lì.
+  LA RIAPERTURA TIMBRA ANCHE `disputata=1`, che è un no-op sul caso di
+  ieri e serve su questo: senza, decidendo poi a favore del venditore,
+  `_sblocca_sats` cadrebbe nel suo `else` e direbbe al venditore
+  «L'acquirente ha confermato la ricezione» e al compratore «Affare
+  concluso, grazie» — due bugie. IL PREZZO È DICHIARATO (decisione di
+  Andrea): quel caso conta come disputa per lo Specchiato e nel
+  conteggio che il moderatore legge, cioè come se il compratore avesse
+  disputato e perso — che è in sostanza quel che è successo, e la
+  verità nelle notifiche vale più della statistica.
+  TRE TESTI DICEVANO IL FALSO sullo stesso ramo, ed è la metà del
+  cantiere: al venditore «l'acquirente ha confermato la ricezione»
+  (nessuno ha confermato: è scaduto il tempo), al compratore la riga
+  «Hai confermato la ricezione… per te è tutto fatto!», e soprattutto
+  al compratore NIENTE — quel ramo notificava solo chi aveva perso una
+  disputa, e il messaggio del ramo riuscito lì non arriva mai. Adesso
+  riceve la sua unica notifica, con dentro la maniglia (il numero
+  dell'ordine e dove scrivere).
+  SUL RAMO RIUSCITO NON SI INVITA NESSUNO A SCRIVERE, ed è la riga da
+  non uniformare per simmetria: lì i sats sono usciti da Lightning e
+  nessun moderatore li può muovere — sarebbe promettere una porta che
+  non si apre, che è il contrario del patto di questo progetto. C'è la
+  prova che quel ramo non nomini i moderatori.
+  E LA RIGA RESTA NELL'ORDINE (decisione di Andrea): la notifica
+  passa, la riga no — chi apre l'ordine tre giorni dopo per capire
+  cos'è successo deve trovare il fatto e la strada, non un «concluso»
+  muto. È la lezione di «CHI HA PAGATO SE LO SENTE DIRE SEMPRE» e
+  dell'invito allo sconto. AMBRA come `notaFermo`: non c'è ancora
+  nessun problema conclamato, e il rosso resta alla disputa.
+  NEL CLIENT IL GIUDICE È UNO E COMPOSTO
+  (`chiusoDalTimer` + `decidibileDalModeratore`), e il perché è la
+  riga da non ammorbidire: la porta si apre in DUE casi (la disputa
+  decisa il cui pagamento è fallito, e l'affare chiuso da un timer) ma
+  la riga del COMPRATORE parla solo del secondo — sul primo «il tempo
+  è scaduto e l'affare si è chiuso da solo» sarebbe falso, lì ha
+  deciso un moderatore e quel compratore ha già il suo messaggio. Tre
+  chiamanti: il pannello, il badge «⚖️ decidibile» della coda dei
+  fermi, e la riga (che legge la sola metà timer). C'è la prova che la
+  riga NON passi dal giudice della porta.
+  LE STRADE SCARTATE, e vanno tenute perché tornano in mente: 1)
+  allargare `risolvi_disputa` a TUTTI i 'confirmed' — una clausola
+  sola, ma darebbe al moderatore il potere di rimborsare anche
+  l'ordine confermato a mano, dove il venditore aspetta legittimamente
+  i suoi sats; 2) non far entrare l'ordine nella trappola (il timer
+  che non chiude se il venditore non può incassare) — zero colonne,
+  ma l'ordine resterebbe nella query di `controlla_scadenze` a ogni
+  giro e `_sblocca_sats` rinotificherebbe il venditore ogni dieci
+  minuti: vorrebbe comunque un timbro, speso peggio.
+  LA TORTURA HA TROVATO UNA SENTINELLA CHE NON POTEVA FALLIRE, per
+  l'ennesima volta e sempre allo stesso modo: «il ramo riuscito timbra
+  col MAX» cercava la riga in TUTTA `_sblocca_sats`, e il ramo
+  confirmed ce l'ha uguale — toglierla dal ramo riuscito la lasciava
+  verde. Ora guarda dentro il suo ramo, e coi suoi parametri.
   `verifica-pagamento` È DI CHI HA COMPRATO (ago 2026): chiamava
   `verifica_utente` e ne buttava via il risultato, poi leggeva
   l'ordine per solo id — l'unica rotta `/api/orders/{id}/…` senza
@@ -15841,6 +15929,34 @@ DA DECIDERE, ed è la ragione per cui la pagina si dichiara in
 costruzione: il titolare del trattamento e il recapito per l'esercizio
 dei diritti (con Alan e col commercialista), e se dare un bottone alla
 cancellazione dell'account.
+
+La porta del timer (ago 2026, dal caso limite trovato guardando i due
+timer del digitale): quando un timer chiudeva un affare e il venditore
+non aveva un metodo d'incasso, l'ordine finiva in `confirmed` con
+`disputata` a 0 — i sats ancora in cassaforte e **nessuna rotta per
+renderli, nemmeno a un moderatore**. La query in produzione tornava
+vuota, quindi nessun pregresso da decidere a mano: il cantiere chiude
+solo il futuro. La cura registra COME ci si è arrivati e apre la porta
+al SOLO moderatore su quel ramo — chi ha confermato di persona resta
+chiuso — più i tre testi che dicevano il falso e la notifica che al
+compratore non arrivava affatto. Vedi Architettura, «E LA GEMELLA È LA
+PORTA DEL TIMER», per la finestra che si chiude da sola, per il prezzo
+dichiarato di `disputata=1` e per le due strade scartate.
+Collaudato: 3969 prove verdi (32 nuove, più due che hanno CAMBIATO
+LATO — certificavano l'espressione di ieri) e **16 mutazioni, una per
+riga sorvegliata, zero sopravvissute**; `collaudo_conto.py` resta 55/55
+con tutte le pure del conto INTATTE byte per byte, e il nuovo
+`collaudo_porta_timer.py` cammina il giro vero su database
+usa-e-getta (20 verdi): codice consegnato, rivelato, timer, porta,
+rimborso — più la regressione di chi ha confermato a mano, che resta
+chiuso e non si muove di un byte.
+IN PRODUZIONE basta il deploy: colonna additiva a 0, nessuna leva,
+nessuna rotta nuova, nessun backfill; un client vecchio in cache non
+vede il campo e si comporta come oggi. DA GUARDARE al primo giro: che
+la colonna cominci a timbrarsi — è anche il censimento dei timer, cioè
+la risposta a «sono mai scattati?» che oggi si può dare solo dal
+journal — e il primo ordine che entra nella coda «⏸ Ordini fermi» col
+badge «⚖️ decidibile» acceso.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
