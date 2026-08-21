@@ -17402,6 +17402,40 @@ def prove_promesse_badge():
     prova("...e muore a ogni render", True,
           "clearTimeout(acqAttesaTimer);" in pezzo_js(
               mini, "function renderAcquisto(){", "\n}"))
+
+    # ---- I TRE DIFETTI USCITI GUARDANDO (ago 2026), e nessuna prova
+    # poteva prenderli: si vedono solo misurando la pagina vera.
+    # 1) L'ARIA FRA DUE CASSETTI DELLA CASSA e' della COPPIA e non del
+    # secondo — la stessa lezione dei bottoni dell'ordine e del
+    # dettaglio, alla TERZA volta. `.btn` non ha margine di base e lo
+    # spazio lo mette il campo SOPRA, che un cassetto CHIUSO (un
+    # `.btn ghost` nudo) non ha: misurato a 320px, 14px sopra la nota,
+    # 16 sotto il codice sconto e ZERO fra i due.
+    prova("l'aria fra i cassetti della cassa e' della coppia", True,
+          ".cassetto-cassa + .cassetto-cassa{margin-top:10px}" in mini)
+    # ...e i cassetti la portano TUTTI: il quarto di domani mette la
+    # classe e ha finito — se se la dimentica, si ricompra lo zero
+    prova("...e i cassetti della cassa la portano tutti", 2,
+          mini.count('class="cassetto-cassa '))
+    # 2) «APPLICA» NON COMPETE CON «PAGA»: a tutta larghezza e arancio
+    # era IDENTICO al bottone che paga due dita sotto — stessa misura
+    # (288px a 320) e stesso rgb(247,147,26). L'arancione pieno resta
+    # dei bottoni d'acquisto.
+    prova("«Applica» del codice sconto e' un ghost, non un arancio",
+          True, 'class="btn ghost" onclick="applicaCodiceSconto(this)"'
+          in mini)
+    prova("...e l'unico arancio della cassa resta quello che paga", 1,
+          mini.count('class="btn orange" id="acqCompra"'))
+    # 3) LE RIGHE DELLA LISTA DEL VENDITORE hanno la veste di
+    # renderRicerche, con gli stili INLINE come la': `.ps-*` vive sotto
+    # `.punto-salvato` e `.az` non esiste, quindi le classi inventate
+    # lasciavano la riga NUDA — zero flex, zero separatore, i tre
+    # bottoni a capo e le righe che si toccano.
+    _rc = pezzo_js(mini, "async function renderCodici(){", "\n}")
+    prova("le righe dei codici hanno la veste degli avvisi", True,
+          "border-bottom:1px dashed var(--line)" in _rc)
+    prova("...e non classi che in quello scope non esistono",
+          (False, False), ('class="ps-riga' in _rc, 'class="az"' in _rc))
     # L'ERRORE SU UN ± NON BUTTA LA PAGINA: si ripiega sull'ultimo
     # conto buono — la quantita' TORNA a quella del preventivo vero,
     # mai numeri nuovi su un conto vecchio — e il ramo distruttivo

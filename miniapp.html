@@ -1830,6 +1830,16 @@
      acqPasso — su rete viva non si vede mai, su rete lenta e' fermo e
      onesto. La transizione evita il gradino quando compare. */
   .acq-attesa{opacity:.55;transition:opacity .2s}
+  /* L'ARIA FRA DUE CASSETTI DELLA CASSA E' DELLA COPPIA, non del
+     secondo — la stessa lezione dei bottoni dell'ordine e del
+     dettaglio, alla terza volta: `.btn` non ha margine di base, e lo
+     spazio lo mette il `margin-bottom` del campo SOPRA, che un
+     cassetto CHIUSO (un `.btn ghost` nudo) non ha. Misurato a 320px:
+     14px sopra la nota, 16 sotto il codice sconto, ZERO fra i due.
+     Detto sulla COPPIA il buco si chiude per sempre, e il quarto
+     cassetto di domani mette la classe e ha finito; a cassetto APERTO
+     i margini COLLASSANO col `.field`, quindi non si somma a niente. */
+  .cassetto-cassa + .cassetto-cassa{margin-top:10px}
   /* spento col motivo scritto sotto: il perche' non sta mai nel bottone */
   .pacco-cella .btn.pacco-btn[disabled]{opacity:.45;box-shadow:none}
   .pacco-motivo{font-size:11.5px;color:var(--muted);font-weight:600;
@@ -10833,7 +10843,7 @@ function renderAcquisto(){
         onclick="apriNotaAcquisto()"><span class="punto-testo">📝 ${esc(notaScritta)}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriNotaAcquisto()">📝 Lascia una nota per il venditore</button>`;
-  const cassettoNota = `<div class="${d.notaAperta?'field':''}" id="acqNotaCampo">
+  const cassettoNota = `<div class="cassetto-cassa ${d.notaAperta?'field':''}" id="acqNotaCampo">
     ${d.notaAperta ? campiNota : notaChiusa}
   </div>`;
   /* --- IL CODICE SCONTO (ago 2026). Sta QUI: dopo la fila delle
@@ -10883,11 +10893,17 @@ function renderAcquisto(){
           codice_sconto.codice: il client mostra, non calcola. */''}
     ${codStato === 'rifiutato'
       ? `<div class="acq-nota">⚠️ ${esc(codRisp.motivo)}</div>` : ''}
+    ${/* «APPLICA» E' UN GHOST E NON UN ARANCIO PIENO: guardato a
+          schermo, a tutta larghezza e arancio era IDENTICO a «Paga»
+          due dita sotto — stessa misura (288px a 320) e stesso
+          rgb(247,147,26) — cioe' due bottoni che si somigliano dove
+          uno paga e l'altro no. L'arancione pieno resta dei bottoni
+          d'acquisto, ed e' una regola di casa. */''}
     <div style="display:flex;gap:8px">
-      <button type="button" class="btn orange" onclick="applicaCodiceSconto(this)">Applica</button>
+      <button type="button" class="btn ghost" onclick="applicaCodiceSconto(this)">Applica</button>
       ${codScritto ? `<button type="button" class="btn ghost" onclick="togliCodiceSconto()">Togli</button>` : ''}
     </div>`;
-  const cassettoCodice = `<div class="${d.codiceAperto?'field':''}" id="acqCodiceCampo">
+  const cassettoCodice = `<div class="cassetto-cassa ${d.codiceAperto?'field':''}" id="acqCodiceCampo">
     ${d.codiceAperto ? codCampo : codChiuso}
   </div>`;
 
@@ -17020,6 +17036,7 @@ async function renderCodici(){
   const pill = (v, testo, campo) =>
     `<button data-campo="${campo}" data-v="${v}" onclick="codicePill('${campo}',${v})" style="font:inherit;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
   const durata = g => g ? `${g} giorni` : 'senza scadenza';
+  const azCod = 'font:inherit;background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px';
   const riga = c => {
     /* ESAURITO O SCADUTO NON E' «IN PAUSA», E' MORTO: lo dice in
        grigio e RESTA in lista — e' storia, e con ✏️ si rianima
@@ -17029,19 +17046,22 @@ async function renderCodici(){
     const perche = (c.usi_max && c.usi >= c.usi_max) ? 'esaurito'
                  : (c.scadenza && c.scadenza * 1000 < Date.now()) ? 'scaduto'
                  : 'non valido';
-    return `<div class="ps-riga${c.attivo ? '' : ' off'}">
-      <div class="ps-testo">
-        <b class="mono">${esc(c.codice)}</b> · −${c.percento}%
+    /* LA VESTE E' QUELLA DI renderRicerche, e con gli stili INLINE
+       come la' — non con classi: `.ps-*` vive sotto `.punto-salvato` e
+       `.az` non esiste, quindi inventarle qui lascia la riga NUDA (zero
+       flex, zero separatore, i tre bottoni a capo). Visto a schermo, e
+       nessuna prova poteva prenderlo. */
+    return `<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px dashed var(--line)">
+      <div style="flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.4;color:${c.attivo && !morto ? 'var(--ink)' : 'var(--muted)'}">
+        ${c.attivo ? '' : '⏸ '}<b class="mono">${esc(c.codice)}</b> · −${c.percento}%
         · ${c.usi_max ? `${fmt(c.usi)}/${fmt(c.usi_max)} usi` : `${fmt(c.usi)} usi`}
         · ${c.scadenza ? 'scade il ' + new Date(c.scadenza*1000).toLocaleDateString('it-IT') : 'senza scadenza'}
-        ${!c.attivo ? '<span class="ps-morta">⏸ in pausa</span>' : ''}
-        ${morto ? `<span class="ps-morta">${perche}</span>` : ''}
+        ${morto ? `<span style="color:var(--danger);font-weight:800"> · ${perche}</span>` : ''}
       </div>
-      <div class="az">
-        <button onclick="modificaCodice(${c.id})" title="Modifica">✏️</button>
-        <button onclick="pausaCodice(${c.id})" title="${c.attivo?'Metti in pausa':'Riattiva'}">${c.attivo?'⏸':'▶️'}</button>
-        <button onclick="eliminaCodice(${c.id})" title="Elimina">🗑</button>
-      </div></div>`;
+      <button style="${azCod}" title="Modifica" onclick="modificaCodice(${c.id})">✏️</button>
+      <button style="${azCod}" title="${c.attivo?'Metti in pausa':'Riattiva'}" onclick="pausaCodice(${c.id})">${c.attivo?'⏸':'▶️'}</button>
+      <button style="${azCod}" title="Elimina" onclick="eliminaCodice(${c.id})">🗑</button>
+    </div>`;
   };
   const pieno = myCodici.length >= tetto && !codiceInModifica;
   box.innerHTML = `
