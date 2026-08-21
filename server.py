@@ -2621,6 +2621,7 @@ def init_db():
                     # secondo giro. Serve a UNA domanda sola: la
                     # scarsita' e' una notizia? Su un mercatino
                     # dell'usato quasi tutto e' unico, quindi un badge
+                    # (premessa datata: la nota sta in `ultimo_pezzo`)
                     # «ultimo disponibile» su ogni annuncio sarebbe vero
                     # e insignificante — e smetterebbe di essere letto.
                     # 0 = non lo sappiamo, e allora non si dice niente.
@@ -6858,7 +6859,7 @@ avvisa_soglie_da_convertire()
 
 
 PROMPT_MODERAZIONE = (
-    "Sei il moderatore di un mercatino dell'usato italiano. Valuta se "
+    "Sei il moderatore di un mercatino italiano. Valuta se "
     "l'annuncio e' lecito. E' VIETATO vendere: armi da fuoco VERE e "
     "funzionanti, munizioni, armi bianche da offesa; droghe; servizi "
     "sessuali o prostituzione; refurtiva; contraffazioni; documenti "
@@ -8367,10 +8368,11 @@ def arricchisci_righe_vetrina(righe):
         # ragione di zona_comune: il nome porta gia' dentro la risposta
         # alla domanda, e chi legge non deve fare il confronto.
         # La soglia e' tutta qui e non c'e' niente da tarare: su un
-        # mercatino dell'usato quasi tutto e' unico, quindi «ultimo» su
-        # un pezzo unico sarebbe vero e insignificante. Dove il dato non
-        # c'e' (storici mai ricaricati, importati freschi) esce 0, cioe'
-        # non si dice niente: mai un'urgenza fabbricata.
+        # mercatino dell'usato quasi tutto e' unico (premessa datata: la
+        # nota sta in `ultimo_pezzo`), quindi «ultimo» su un pezzo unico
+        # sarebbe vero e insignificante. Dove il dato non c'e' (storici
+        # mai ricaricati, importati freschi) esce 0, cioe' non si dice
+        # niente: mai un'urgenza fabbricata.
         # Il pop e' la meta' che conta — il massimo non deve uscire da
         # NESSUNA rotta, nemmeno da quelle che servono l'annuncio intero
         # con `a.*` (ricerca AI, i tuoi annunci), che passano di qui.
@@ -12700,6 +12702,14 @@ def ultimo_pezzo(quantita: int, quantita_max: int) -> bool:
     mercatino dell'usato quasi ogni oggetto e' unico, quindi un badge
     acceso su `quantita == 1` sarebbe vero dappertutto — e un badge che
     dice sempre la stessa cosa smette di essere letto dopo il terzo.
+    LA PREMESSA E' DATATA, E VA RIGUARDATA SE CADE (ago 2026): «quasi
+    ogni oggetto e' unico» regge ancora sulla maggior parte del
+    catalogo, ma non su tutto — licenze, poster, olio e birre si
+    vendono a piu' copie, ed e' la stessa fetta che ha fatto cadere
+    «usato» dal sottotitolo. Il giorno che il multi-copia diventasse
+    la norma, il badge smetterebbe di essere RARO e tornerebbe la
+    tappezzeria che questa regola esiste per non essere: allora la
+    soglia vuole un numero vero, non piu' «ne ha avuti piu' d'uno».
     Su un ESAURITO e' falso da solo (quantita 0), e sull'ASTA anche (la
     quantita' e' forzata a 1 alla pubblicazione: li' l'unicita' e' il
     formato, non una notizia).

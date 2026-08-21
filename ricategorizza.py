@@ -84,7 +84,7 @@ def catalogo() -> list:
 
 
 PROMPT = (
-    "Sei il magazziniere di un mercatino dell'usato italiano. Ti do una "
+    "Sei il magazziniere di un mercatino italiano. Ti do una "
     "lista di annunci e per ciascuno devi dire in quale categoria del "
     "catalogo starebbe meglio.\n\n"
     "CATEGORIE AMMESSE (usa il nome ESATTO, nessun altro):\n{cat}\n\n"
