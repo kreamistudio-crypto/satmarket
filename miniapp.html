@@ -6467,7 +6467,8 @@ function go(view){
   if (view==='affari') {
     if (!DEMO) {
       loadOrders().then(renderOrders).catch(()=>renderOrders());
-      loadOfferte().then(renderOfferte).catch(()=>{});
+      loadOfferte().then(() => { renderOfferte(); rinfrescaAccordi(); })
+    .catch(()=>{});
       loadPuntate().then(renderPuntate).catch(()=>{});
     } else { renderOrders(); renderOfferte(); renderPuntate(); }
   }
@@ -7352,6 +7353,7 @@ function vaiEsplora(){
 }
 
 let prossimaLampo = 0;   // unix della prima lampo che scade in griglia
+let prossimoAccordo = 0; // e la prima offerta accettata che scade
 function renderGrid(items){
   ultimaRicercaAI = !!items;   // coi risultati AI lo scroll non pagina
   const q = el('q').value.trim().toLowerCase();
@@ -7563,7 +7565,14 @@ const cardHTML = l => {
   const esa = esaurito(l);
   const ferie = !esa && inFerie(l);
   const asta = astaE(l);
-  const lampo = !esa && !asta && !ferie && lampoAttiva(l);
+  /* IL GIUDICE DEL PREZZO DICE ANCHE CHI HA VINTO (ago 2026): con un
+     accordo accettato il cartellino parla la cifra pattuita, e lampo e
+     accordo non convivono per costruzione — a sceglierli e' il MIN di
+     giudizioPrezzo, un posto solo. Sui tre stati che non si comprano
+     non si giudica: il prezzo li' e' grigio e il cartellino dice altro. */
+  const g = (esa || ferie || asta) ? {v: l, motivo: ''} : giudizioPrezzo(l);
+  const lampo = g.motivo === 'lampo';
+  const acc = g.motivo === 'accordo';
   /* IL VERDE DELLO SCONTO CARRELLO (ago 2026, decisione di Andrea):
      quando un articolo raggiunge DA SOLO la soglia del negozio la card
      lo dice — prezzo SCONTATO col listino barrato e badge verde in
@@ -7577,8 +7586,13 @@ const cardHTML = l => {
      misura QUEL prezzo, quindi una lampo generosa puo' far scendere
      l'articolo sotto la soglia. Quando la lampo finisce, l'articolo
      torna al prezzo scontato normale: lo fa da solo il re-render
-     della scadenza, senza un ramo apposta. */
-  const sconto = !esa && !ferie && !asta && !lampo && scontoQui(l, 1);
+     della scadenza, senza un ramo apposta.
+     E SI SPEGNE ANCHE PER L'ACCORDO (ago 2026): il verde direbbe
+     «−15%» sopra una cifra che non e' il listino meno il 15% — e' la
+     cifra pattuita. Non e' un pareggio: l'accordo e' il LORDO su cui
+     lo sconto si misura, e a scontarlo e' la pagina Paga. */
+  const sconto = !esa && !ferie && !asta && !lampo && !acc
+    && scontoQui(l, 1);
   /* Ultimo posto in fila, ed e' la sua misura giusta: uno stato che
      dice «sbrigati» non deve mai coprirne uno che dice «non si puo'
      comprare».
@@ -7661,7 +7675,7 @@ const cardHTML = l => {
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
-        <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${(lampo||sconto)?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
+        <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${(lampo||sconto||(acc&&piuBasso(g.v,l)))?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${p.big}</div><div class="price-sub">${p.small}</div></div>
         ${flash}
       </div>
       <div class="info">
@@ -8296,21 +8310,97 @@ function conSconto(l){
   if (l.priceEur > 0) s.priceEur = scontaEur(l.priceEur, rs[0].pct);
   return s;
 }
+/* ---------- L'ACCORDO: LA TERZA VISTA DEL PREZZO ----------
+   (ago 2026, decisione di Andrea) Chi ha un'offerta ACCETTATA deve
+   vedere la cifra pattuita SUBITO — fino a ieri il listino pieno lo
+   seguiva fin dentro il carrello, e la cifra vera compariva solo alla
+   cassa, dove la manda il server.
+   Gemella esatta di conLampo: stessa forma di l, i prezzi
+   dell'accordo nella valuta del listino. Senza accordo torna l COSI'
+   COM'E', e il chiamante lo riconosce dall'identita'.
+   LA VALUTA SI RISCRIVE, e non e' pignoleria: l'accordo fotografa la
+   valuta del listino AL MOMENTO DELLA PROPOSTA, quindi un annuncio
+   pubblicato in EUR puo' portarsi un accordo in sats (basta che il
+   venditore abbia cambiato valuta dopo la stretta di mano). Senza
+   `v.valuta` satsAnnuncio prenderebbe il ramo dell'altra faccia e
+   tornerebbe una CONVERSIONE al posto della cifra pattuita.
+   LA CIFRA E' L'UNITARIA (accordoDi), come ogni prezzo di questa app:
+   i pezzi li moltiplica chi fa il conto, mai il giudice. */
+function conAccordo(l){
+  const off = offertaAccettataPer(l.id);
+  if (!off) return l;
+  const a = accordoDi(off);
+  const v = Object.assign({}, l);
+  if (off.valuta === 'eur') {
+    v.valuta = 'eur'; v.priceEur = a.eur;
+    /* il ripiego a cambio muto, la stessa proporzione che artStima
+       usava da sempre: il listino di pubblicazione sta all'accordo
+       come i suoi sats stanno ai suoi euro */
+    v.price = l.priceEur > 0 ? Math.round(l.price * a.eur / l.priceEur)
+                             : l.price;
+  } else {
+    /* lo zero qui non e' una cifra, e' «questa faccia non esiste»:
+       prezzoParte lo legge come listino-in-sats e converte da se' */
+    v.valuta = 'sats'; v.price = a.sats; v.priceEur = 0;
+  }
+  return v;
+}
+/* CHI VINCE FRA ACCORDO E LAMPO, IN UN POSTO SOLO — e torna anche il
+   MOTIVO, perche' card e scheda devono sapere CHI ha vinto senza
+   ricostruirlo da fuori: sarebbero tre copie di una condizione
+   sottile, e un `===` su una vista appena uscita da Object.assign non
+   e' nemmeno stabile fra due chiamate.
+   IL MIN E' IL PATTO DEL SERVER (_unitario_effettivo): chi paga paga
+   sempre il meglio dei due, e una lampo generosa non peggiora mai un
+   accordo. Il pareggio va all'ACCORDO — a parita' di sats la sua
+   faccia euro e' la cifra pattuita esatta, quella della lampo un
+   derivato.
+   QUI DENTRO LO SCONTO CARRELLO NON ENTRA MAI, e non e' una scelta di
+   gusto: `scontoQui` chiama `artStima`, che chiama questa — sarebbe un
+   anello. Ed e' anche la regola del conto, dove l'accordo e' il LORDO
+   su cui lo sconto si misura: a scontarlo e' la pagina Paga. */
+function giudizioPrezzo(l){
+  const acc = conAccordo(l);
+  if (acc === l)
+    return {v: conLampo(l), motivo: lampoAttiva(l) ? 'lampo' : ''};
+  if (!lampoAttiva(l)) return {v: acc, motivo: 'accordo'};
+  const lam = conLampo(l);
+  return satsAnnuncio(acc) <= satsAnnuncio(lam)
+    ? {v: acc, motivo: 'accordo'} : {v: lam, motivo: 'lampo'};
+}
+function vistaArticolo(l){ return giudizioPrezzo(l).v; }
+/* IL BARRATO DICE «PRIMA COSTAVA DI PIU'», e va chiesto: con la lampo
+   e collo sconto e' sempre vero (una percentuale riduce), con un
+   accordo NO — si puo' accettare un'offerta al listino pieno, o calare
+   il listino dopo la stretta di mano. Mai la stessa cifra due volte.
+   E' una domanda di RESA e non di prezzo: la VISTA resta quella
+   dell'accordo anche quando e' piu' alta, o si mentirebbe sul conto. */
+function piuBasso(v, l){ return satsAnnuncio(v) < satsAnnuncio(l); }
 /* IL PREZZO CHE LA VETRINA MOSTRA, in un posto solo: lo chiamano la
    card, il dettaglio e il riscrittore del toggle valuta, e tre copie
    della precedenza divergerebbero al primo ritocco.
+   LA CATENA E' accordo|lampo > sconto, e i primi due non sono due
+   gradini ma UNO: a dire quale dei due ha vinto e' giudizioPrezzo,
+   col MIN.
    LA LAMPO VINCE SULLO SCONTO (decisione di Andrea), e non e' un
    pareggio arbitrario: e' la stessa regola del conto, dove `artStima`
    applica la lampo e lo sconto misura QUEL prezzo — cioe' una lampo
    generosa puo' far scendere l'articolo sotto la soglia. Quando la
    lampo finisce, l'articolo torna al prezzo scontato normale, che e'
    esattamente cio' che questa riga fa da sola al primo re-render.
+   E L'ACCORDO BATTE LO SCONTO SENZA MIN, per la ragione detta in
+   giudizioPrezzo. Cosi' si chiude anche un'incoerenza che c'era GIA':
+   `scontoQui` misurava la cifra dell'accordo (ci passa da artStima)
+   mentre `conSconto` scontava il LISTINO — accordo 30k, listino 50k,
+   sconto 10% davano a schermo 45k, che non e' il prezzo di nessuno.
+   Quel ramo adesso non si raggiunge piu'.
    Il verdetto e' a QUANTITA' 1 anche nel dettaglio, dove i pezzi si
    scelgono: la domanda e' «questo articolo, DA SOLO, fa scattare lo
    sconto?», il numero grande e' un unitario, e cosi' il prezzo non
    balla sotto le dita a ogni ±. Il conto del carrello resta di Paga. */
 function prezzoMostrato(l){
-  if (lampoAttiva(l)) return conLampo(l);
+  const g = giudizioPrezzo(l);
+  if (g.motivo) return g.v;
   return scontoQui(l, 1) ? conSconto(l) : l;
 }
 /* Quanto manca, detto in breve: «2h 14m», «14m», «40s» */
@@ -8428,13 +8518,26 @@ setInterval(() => {
                                          : 'in aggiudicazione…';
   });
   if (prossimaLampo && prossimaLampo * 1000 <= adesso) morta = true;
+  /* e l'accordo che scade: il prezzo torna pieno da solo, come per la
+     lampo. IL RICALCOLO NON E' FACOLTATIVO — questo numero non lo
+     rifa' renderGrid (l'accordo non sta sull'annuncio): senza, da qui
+     in poi si ridisegnerebbe una volta al secondo, per sempre. */
+  if (prossimoAccordo && prossimoAccordo * 1000 <= adesso) {
+    morta = true; ricalcolaProssimoAccordo();
+  }
   if (!morta) return;
   renderGrid();               // ricalcola anche la prossima scadenza
-  /* la scheda aperta torna a prezzo pieno da sola: il barrato ancora
-     in pagina su una lampo ormai morta e' il segno che va riaperta */
+  /* la scheda aperta torna a prezzo pieno da sola: il countdown ancora
+     in pagina su una lampo ormai morta e' il segno che va riaperta.
+     SI GUARDA `.lampo-count` E NON `.lampo-was` (ago 2026): quella
+     classe e' il VESTITO della riga e la portano anche lo sconto e
+     l'accordo, quindi bastava una lampo scaduta su un'ALTRA card in
+     vetrina per riaprire una scheda che non aveva niente da rimettere
+     a posto — perdendo la strada di consegna scelta. Il countdown ce
+     l'ha solo la lampo: e' il discriminante giusto. */
   if (currentListing && !lampoAttiva(currentListing)
       && el('view-dettaglio')?.classList.contains('active')
-      && document.querySelector('#detailContent .lampo-was'))
+      && document.querySelector('#detailContent .lampo-count'))
     openDetail(currentListing.id);
 }, 1000);
 /* ============ I TEMPI DELL'ESCROW, IN UN POSTO SOLO ============
@@ -8723,20 +8826,17 @@ function totaleStima(l){
 /* L'articolo per le stime dei bottoni compra: la cifra pattuita
    dell'offerta accettata, se c'e'; altrimenti il listino. Per gli
    accordi in EUR vale il cambio vivo, con la proporzione sul cambio
-   di pubblicazione come ripiego onesto. */
+   di pubblicazione come ripiego onesto.
+   UNA RIGA SOLA, ed e' il punto (ago 2026): la decisione «accordo o
+   lampo, col MIN» viveva qui e il numero grande della vetrina non la
+   vedeva — due strade che rispondevano sulla stessa cosa. Adesso
+   decide `giudizioPrezzo` e questa ne prende i SATS: cambia il tipo,
+   mai il numero. Il nome e la firma restano quelli di sempre — i
+   cinque chiamanti a valle (totaleStima, totaleSet, preventivoDemo,
+   spedGratisQui, scontoQui) devono ricevere esattamente quello che
+   ricevevano. */
 function artStima(l){
-  /* con la lampo viva il listino e' quello scontato; se coesiste un
-     accordo individuale vince il MINIMO — lo stesso patto di compra()
-     sul server: chi paga paga sempre il meglio dei due */
-  const base = satsAnnuncio(conLampo(l));
-  const off = offertaAccettataPer(l.id);
-  if (!off) return base;
-  const a = accordoDi(off);
-  let acc;
-  if (off.valuta !== 'eur') acc = a.sats;
-  else if (cambioVivo) acc = Math.round(a.eur / eurPerSat);
-  else acc = l.priceEur > 0 ? Math.round(l.price * a.eur / l.priceEur) : l.price;
-  return lampoAttiva(l) ? Math.min(acc, base) : acc;
+  return satsAnnuncio(vistaArticolo(l));
 }
 /* La soglia minima delle offerte: arriva col server nella prima
    pagina, come protPercento (mai hardcodata qui). */
@@ -9974,7 +10074,7 @@ function apriAcquisto(l){
      sua prima guardia mentre il carrello non arrivava alla cassa. Il
      parse non lo prende (chiavi doppie sono JS lecito): c'e' la prova. */
   acqDati = {tipo:'mono', annuncioId:l.id, qta:qtaScelta,
-             offertaId: offertaAccettataPer(l.id)?.id || 0,
+             offertaId: offertaAccettataPer(l.id, true)?.id || 0,
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
@@ -10153,7 +10253,7 @@ async function caricaPreventivo(){
   const d0 = acqDati; if (!d0) return;
   const body = d0.tipo==='set'
     ? {righe: [...setScelte].map(([id, qta]) => ({annuncio_id:id,
-        quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}))}
+        quantita:qta, offerta_id: offertaAccettataPer(id, true)?.id || 0}))}
     : {annuncio_id: d0.annuncioId, quantita: d0.qta,
        offerta_id: d0.offertaId};
   /* IL CODICE SCONTO anche qui, ed e' il varco che conta: senza,
@@ -12455,7 +12555,7 @@ async function startBuySet(){
   currentOrderId = null;     /* il patto di startBuy: l'Annulla non deve
                                 mai colpire un ordine di un giro prima */
   const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
-    quantita:qta, offerta_id: offertaAccettataPer(id)?.id || 0}));
+    quantita:qta, offerta_id: offertaAccettataPer(id, true)?.id || 0}));
   /* le cifre del foglio dal PREVENTIVO della pagina d'acquisto
      (stessi numeri per costruzione), con la stima client di ripiego */
   const p = acqDati?.preventivo;
@@ -12603,6 +12703,10 @@ function openDetail(id){
            ${astaDeserta ? `<button class="btn ghost" onclick="rilanciaAsta(${l.id})">🔨 Rilancia l'asta</button>
            <button class="btn ghost" onclick="convertiAsta(${l.id})">🏷 Converti a prezzo fisso</button>` : ''}
            <button class="btn allarme" onclick="deleteListing(${l.id}, true)">🗑 Elimina l'annuncio</button>`;
+  /* IL GIUDICE DEL PREZZO, una volta sola per la scheda: dice la
+     vista (accordo, lampo o listino) e CHI ha vinto. Sugli stati che
+     non si comprano non si giudica, come in card. */
+  const gp = (esa || ferie || asta) ? {v: l, motivo: ''} : giudizioPrezzo(l);
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
@@ -12611,7 +12715,7 @@ function openDetail(id){
       ${luogoRiga(l)}
       <div class="prezzo-riga">
         <div class="prezzo-col">
-          <div class="detail-price${esa?' esaurito':ferie?' ferie':asta?' asta':lampoAttiva(l)?' lampo':scontoQui(l,1)?' sconto':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : prezzoMostrato(l)).big}</div>
+          <div class="detail-price${esa?' esaurito':ferie?' ferie':asta?' asta':gp.motivo==='accordo'?'':lampoAttiva(l)?' lampo':scontoQui(l,1)?' sconto':''}">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : prezzoMostrato(l)).big}</div>
           <div class="eur-hint">${prezzoParte(asta ? Object.assign({}, l, {price: astaCifra(l)}) : prezzoMostrato(l)).small}</div>
           ${esa?`<div class="esaurito-riga"><b>Esaurito</b> — al momento non c'è nessun pezzo disponibile</div>`:''}
           ${ferie?`<div class="ferie-riga">🌴 <b>Il negozio è in ferie</b> — torna il ${ferieData(l.ferie)}</div>`:''}
@@ -12620,7 +12724,7 @@ function openDetail(id){
                lampo_* restano vive anche a scorte finite, e «Scade tra
                2h» su una cosa che non si compra e' l'unica riga di
                questa pagina che direbbe il falso -->
-          ${!esa && !ferie && !asta && lampoAttiva(l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
+          ${!esa && !ferie && !asta && gp.motivo==='lampo'?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge">⚡ −${l.lampoPct}%</span><span class="lampo-resta">Scade tra <b class="lampo-count mono" data-fine="${l.lampoFine}">${lampoResta(l.lampoFine)}</b></span></div>`:''}
           <!-- lo sconto carrello nella scheda: la stessa riga «prezzo
                di prima» della lampo, col suo chip verde e SENZA il
                countdown — questo non scade. La CLASSE resta lampo-was
@@ -12633,7 +12737,17 @@ function openDetail(id){
                ATTENZIONE: questo commento vive DENTRO un template
                literal, quindi niente apici inversi qui — chiuderebbero
                la stringa e ammazzerebbero l'intero script al parse. -->
-          ${!esa && !ferie && !asta && !lampoAttiva(l) && scontoQui(l,1)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge sconto-badge">−${l.scontoPct}%</span></div>`:''}
+          ${!esa && !ferie && !asta && !gp.motivo && scontoQui(l,1)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s><span class="lampo-badge sconto-badge">−${l.scontoPct}%</span></div>`:''}
+          <!-- L'ACCORDO (ago 2026): la stessa riga «prezzo di prima»,
+               col listino barrato e SENZA chip — l'accordo non prende
+               un badge ne' un colore (decisione di Andrea), cosi' i
+               colori del prezzo in card restano quattro e in scheda il
+               numero grande resta l'arancio di sempre. A dire perche'
+               costa meno c'e' il banner dell'accordo, due dita sotto.
+               Il barrato lo chiede piuBasso: un'offerta si puo'
+               accettare al listino pieno, e la stessa cifra due volte
+               non e' una riga, e' un refuso. -->
+          ${!esa && !ferie && !asta && gp.motivo==='accordo' && piuBasso(gp.v,l)?`<div class="lampo-was"><s>${prezzoParte(l).big}</s></div>`:''}
         </div>
         <!-- il gemello del toggle della vetrina: qui si sceglie in che
              valuta LEGGERE questo annuncio, e la scelta e' la stessa -->
@@ -13446,8 +13560,10 @@ async function startBuy(){
      sats esatti li decide comunque il server tra un attimo. */
   const l = currentListing, inEur = l.valuta==='eur' && l.priceEur>0;
   /* con un'offerta accettata l'articolo e' la cifra pattuita, e
-     l'ordine viaggia con offerta_id: il server fa i conti su quella */
-  const offAcc = offertaAccettataPer(l.id);
+     l'ordine viaggia con offerta_id: il server fa i conti su quella —
+     ANCHE SCADUTA, perche' e' proprio l'id che sta per partire nel
+     POST: a dire se vale e' il server, non l'orologio del telefono */
+  const offAcc = offertaAccettataPer(l.id, true);
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
   /* «Articolo» dice il LORDO e lo sconto ha la sua riga (ago 2026, il
@@ -13619,7 +13735,7 @@ async function confermaCompraSubito(btn){
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({annuncio_id: currentListing.id,
                             quantita: acqDati?.qta || qtaScelta,
-                            offerta_id: offertaAccettataPer(currentListing.id)?.id || 0,
+                            offerta_id: offertaAccettataPer(currentListing.id, true)?.id || 0,
                             ...corpoConsegna(),
                             ...corpoCodiceSconto()})});
     const d = await r.json().catch(()=>({}));
@@ -14018,6 +14134,58 @@ async function loadOfferte(){
     offerteDati = await r.json();
     offerteMie = offerteDati.offerte || [];
   } catch(e) {}
+  ricalcolaProssimoAccordo();
+}
+/* LA PRIMA SCADENZA D'ACCORDO, gemella di `prossimaLampo`: un numero
+   solo da confrontare nel battito, invece di frugare in offerteMie
+   ogni secondo.
+   NON SI AUTO-AZZERA COME LA SORELLA, ed e' la trappola di questo
+   cantiere: `prossimaLampo` lo ricalcola renderGrid (l'accordo pero'
+   non sta sull'annuncio, sta in offerteMie, e loadOfferte nel battito
+   non gira). Senza il ricalcolo esplicito dopo lo scatto, dal primo
+   accordo scaduto in poi la griglia si ridisegnerebbe una volta al
+   secondo, per sempre. */
+function ricalcolaProssimoAccordo(){
+  const adesso = Date.now();
+  prossimoAccordo = offerteMie.reduce((min, o) =>
+    (o.stato==='accettata' && o.compratore_id===myTgId
+     && o.scadenza > 0 && o.scadenza*1000 > adesso
+     && (!min || o.scadenza < min)) ? o.scadenza : min, 0);
+}
+/* QUEL CHE SI RIDISEGNA QUANDO GLI ACCORDI CAMBIANO (ago 2026): la
+   vetrina se un accordo tocca una card gia' in pagina, e la scheda
+   aperta se e' la sua. Nasce dal blocco che viveva dentro avvia() —
+   ma loadOfferte ha CINQUE chiamanti (l'avvio, l'ingresso negli
+   Ordini, l'invio, la risposta e il ritiro di un'offerta), e un
+   predicato ricopiato in cinque posti e' un predicato che un giorno
+   diverge.
+   SI GUARDA IL CAMBIAMENTO E NON LA PRESENZA, ed e' un difetto trovato
+   DAL VIVO e non leggendo: chiedendo «c'e' un accordo su questa card?»
+   il rinfresco si accendeva quando l'accordo NASCE e taceva quando
+   SPARISCE — cioe' proprio al RITIRO, dove la scheda tornava al
+   listino e la card restava a dire la cifra pattuita di un accordo
+   che non c'era piu'. Si tiene l'insieme di quel che l'ultimo giro ha
+   disegnato e si ridisegna su chi e' ENTRATO o USCITO: il pattern
+   della firma di `sfogliaDaRifare`. Il primo giro trova l'insieme
+   vuoto, quindi ogni accordo vivo e' un'entrata — cioe' il
+   comportamento dell'avvio, senza un ramo apposta.
+   LA SCADENZA NON PASSA DI QUI, ed e' voluto: finche' il server non
+   timbra la riga lo stato resta 'accettata' e questo insieme non
+   cambia. A quello pensa il BATTITO, che guarda il TEMPO — due cause
+   diverse, due meccanismi, e nessuno dei due copre l'altro per caso. */
+let accordiDisegnati = new Set();
+function rinfrescaAccordi(){
+  if (DEMO || VETRINA) return;
+  const ora = new Set(offerteMie.filter(o => o.stato==='accettata'
+    && o.compratore_id===myTgId).map(o => o.annuncio_id));
+  const tocchi = new Set([...ora].filter(id => !accordiDisegnati.has(id))
+    .concat([...accordiDisegnati].filter(id => !ora.has(id))));
+  accordiDisegnati = ora;
+  if (!tocchi.size) return;
+  if (vetrina.some(l => tocchi.has(l.id))) renderGrid();
+  if (currentListing && el('view-dettaglio')?.classList.contains('active')
+      && tocchi.has(currentListing.id))
+    openDetail(currentListing.id);
 }
 /* la cifra nella valuta del listino: qui niente «≈», non e' una conversione */
 function cifraOff(valuta, sats, eur){
@@ -14051,10 +14219,24 @@ function cifraAccordo(o){
   const a = accordoDi(o);
   return cifraPezzi(o.valuta, a.sats, a.eur, o.quantita||0);
 }
-function offertaAccettataPer(annuncioId){
+/* L'ACCORDO SCADUTO NON VALE PIU', ed e' un GATE IN LETTURA come per
+   la lampo, l'asta e le ferie (ago 2026): la riga sul server la timbra
+   `scadenze_offerte`, che passa ogni dieci minuti — e fino a ieri, in
+   quella finestra e dopo ogni ora senza ricaricare, il client
+   continuava a promettere un accordo morto: il prezzo pattuito, il
+   banner 🤝, lo stepper pinnato, il tasto «Fai un'offerta» nascosto.
+   FAIL-OPEN sulla scadenza mancante o a zero (un server di ieri, una
+   riga senza appuntamento): l'assenza non spegne un accordo.
+   `ancheScaduta` LO SCAVALCA, e serve ai soli punti che mandano
+   `offerta_id` al SERVER: l'orologio del telefono e' il giudice di
+   cosa si DISEGNA, mai dei soldi — l'id parte sempre, e a dire se
+   vale e' il server. Nell'altro verso si perderebbe in silenzio un
+   accordo che il server avrebbe onorato. */
+function offertaAccettataPer(annuncioId, ancheScaduta){
   if (DEMO || VETRINA) return null;
   return offerteMie.find(o => o.annuncio_id===annuncioId
-    && o.stato==='accettata' && o.compratore_id===myTgId) || null;
+    && o.stato==='accettata' && o.compratore_id===myTgId
+    && (ancheScaduta || !o.scadenza || o.scadenza*1000 > Date.now())) || null;
 }
 
 /* I pezzi dell'offerta sono `qtaScelta`, LA STESSA variabile del
@@ -14388,7 +14570,8 @@ async function inviaOfferta(btn){
     if (!r.ok) { toast(d.detail||'Offerta non inviata', 5000); return; }
     closeSheet();
     toast('💰 Offerta inviata! Ti avvisiamo appena il venditore risponde', 5000);
-    loadOfferte().then(renderOfferte).catch(()=>{});
+    loadOfferte().then(() => { renderOfferte(); rinfrescaAccordi(); })
+    .catch(()=>{});
   } catch(e) { toast('Rete assente: riprova'); }
   finally { ripristina(); }
 }
@@ -14802,7 +14985,8 @@ async function inviaRisposta(id, azione, importo){
              : azione==='rifiuta' ? 'Offerta rifiutata'
              : '↔ Controproposta inviata');
   } catch(e) { toast('Rete assente: riprova'); }
-  loadOfferte().then(renderOfferte).catch(()=>{});
+  loadOfferte().then(() => { renderOfferte(); rinfrescaAccordi(); })
+    .catch(()=>{});
 }
 /* LA DOMANDA DI CASA, al posto del confirm() del sistema operativo.
    Chi chiama passa i testi e l'AZIONE; qui si apre il foglio e la si
@@ -14900,7 +15084,8 @@ async function inviaRitiro(id){
     toast(r.ok ? 'Offerta ritirata'
                : (d.detail || 'Operazione non riuscita'), r.ok ? 3000 : 5000);
   } catch(e) { toast('Rete assente: riprova'); }
-  loadOfferte().then(renderOfferte).catch(()=>{});
+  loadOfferte().then(() => { renderOfferte(); rinfrescaAccordi(); })
+    .catch(()=>{});
 }
 /* «Paga ora»: si riapre il dettaglio, che con l'offerta accettata
    mostra il banner e i totali pattuiti — pillole consegna, NWC e
@@ -23529,15 +23714,11 @@ async function avvia(){
     /* le offerte seguono l'identita' come i preferiti: si rileggono
        (servono anche a openDetail per il banner dell'accordo) */
     offerteMie = [];
-    await loadOfferte(); renderOfferte();
-    /* il verde dell'accordo in card (scontoQui via artStima) legge
-       offerteMie, che al render qui sopra era vuota: se un accordo
-       vivo tocca la vetrina si ridisegna — altrimenti il render resta
-       UNO, e nessuna foto lampeggia per niente */
-    if (offerteMie.some(o => o.stato==='accettata'
-        && o.compratore_id===myTgId
-        && vetrina.some(l => l.id===o.annuncio_id)))
-      renderGrid();
+    /* il prezzo dell'accordo in card legge offerteMie, che al render
+       qui sopra era vuota: se un accordo vivo tocca la vetrina si
+       ridisegna — altrimenti il render resta UNO, e nessuna foto
+       lampeggia per niente */
+    await loadOfferte(); renderOfferte(); rinfrescaAccordi();
     await loadPuntate(); renderPuntate();
     myListings = [];          // la lista "i tuoi annunci" della vecchia identità non vale più
     if (editandoId) annullaModifica();   // una modifica a metà non segue l'identità nuova

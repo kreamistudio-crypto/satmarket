@@ -6541,9 +6541,14 @@ def prove_stock_raccontato():
     fra = mini[i:mini.index('`<div class="escrow-zone">', i)]
     prova("fra l'esaurito e il recinto c'e' la cintura degli stati",
           True, "(l.stato||'attivo') !== 'attivo'" in fra)
-    # e la lampo tace: le colonne restano vive anche a scorte finite
+    # e la lampo tace: le colonne restano vive anche a scorte finite.
+    # LA SENTINELLA HA CAMBIATO FORMA (ago 2026, l'accordo nel prezzo):
+    # la riga non chiede piu' `lampoAttiva` ma il MOTIVO del giudice,
+    # che sugli stati che non si comprano nasce vuoto per costruzione
+    # — quindi la garanzia e' la stessa e in piu' la riga tace anche
+    # quando a vincere e' un accordo. I tre `!` restano la cintura.
     prova("il countdown della lampo tace su un esaurito", True,
-          "${!esa && !ferie && !asta && lampoAttiva(l)?" in mini)
+          "${!esa && !ferie && !asta && gp.motivo==='lampo'?" in mini)
 
 
 def prove_pausa():
@@ -16151,18 +16156,21 @@ def prove_seo():
     prova("le card non aspettano ordini/preferiti/offerte/puntate",
           True, avvia_js.index("await fasciaPrima()")
           < avvia_js.index("await loadOrders()"))
-    # esatto, non «almeno»: il demo-path, quello dopo la fascia, e il
-    # ridisegno dell'accordo — un quarto (o un ritorno del render in
-    # coda) deve farsi vedere qui
-    prova("...e i renderGrid di avvia sono tre", 3,
+    # esatto, non «almeno»: il demo-path e quello dopo la fascia. Il
+    # TERZO se n'e' andato (ago 2026, l'accordo nel prezzo): il
+    # ridisegno vive in `rinfrescaAccordi`, che loadOfferte ha CINQUE
+    # chiamanti e un predicato ricopiato cinque volte e' un predicato
+    # che un giorno diverge. Un terzo render qui deve farsi vedere.
+    prova("...e i renderGrid di avvia sono due", 2,
           avvia_js.count("renderGrid()"))
     # l'accordo accettato e' l'unico dato tardivo che cambia una card
-    # intera (il verde di scontoQui via artStima legge offerteMie):
-    # senza questo ramo sparirebbe dal primo render e nessuno lo
-    # ridisegnerebbe mai
+    # intera (dall'ago 2026 il PREZZO, non piu' il solo verde): senza
+    # il ridisegno sparirebbe dal primo render e nessuno lo
+    # rimetterebbe mai. La SENTINELLA HA CAMBIATO POSTO col ramo:
+    # adesso e' una chiamata, e si chiede che stia DOPO la lettura.
     prova("un accordo vivo sulla vetrina ridisegna la griglia", True,
-          "o.stato==='accettata'" in avvia_js
-          and avvia_js.index("o.stato==='accettata'")
+          "rinfrescaAccordi();" in avvia_js
+          and avvia_js.index("rinfrescaAccordi();")
           > avvia_js.index("await loadOfferte()"))
     # la cache del banner-test e' la PROMESSA, non il risultato: col
     # gate booleano il secondo chiamante in corsa prendeva null, e
@@ -19147,9 +19155,12 @@ def prove_promesse_raggiungibili():
     # della catena (con la lampo non convive: quel prezzo e' gia' rosso
     # e artStima applica la lampo, che puo' far SCENDERE sotto soglia).
     _ch = pezzo_js(mini, "const cardHTML = l => {", "\n};")
+    # E NON SCATTA MAI SU UN ACCORDO (ago 2026): la sua cifra e' il
+    # LORDO su cui lo sconto si misura, e a scontarlo e' la pagina Paga
+    # — un «−15%» sopra il prezzo pattuito direbbe il falso.
     prova("la card sa quando lo sconto scatta da solo", True,
-          "const sconto = !esa && !ferie && !asta && !lampo"
-          " && scontoQui(l, 1);" in _ch)
+          "const sconto = !esa && !ferie && !asta && !lampo && !acc"
+          in _ch)
     prova("...e il colore e' l'ultimo della catena", True,
           "lampo?' in-lampo':sconto?' in-sconto':''" in _ch)
     # «Ne resta 1» CONVIVE: e' un badge sulla foto, questo e' il colore
@@ -19236,10 +19247,16 @@ def prove_verde_e_filtri():
     # prezzo nella scheda, il riscrittore del toggle valuta)
     prova("...e lo chiamano card, scheda e toggle valuta", 5,
           mini.count("prezzoMostrato(l)"))
-    # LA LAMPO VINCE, ed e' la regola del conto: artStima applica la
-    # lampo e lo sconto misura QUEL prezzo.
+    # LA LAMPO VINCE SULLO SCONTO, ed e' la regola del conto: artStima
+    # applica la lampo e lo sconto misura QUEL prezzo.
+    # LA SENTINELLA HA CAMBIATO LATO (ago 2026, l'accordo nel prezzo):
+    # la catena ha un anello in piu' — accordo|lampo > sconto — e i
+    # primi due non sono due gradini ma UNO, perche' a sceglierli e' il
+    # MIN di giudizioPrezzo. Il giudice qui non li distingue piu': si
+    # fida del motivo, e la precedenza sullo sconto resta la riga sotto.
     prova("la lampo vince sullo sconto", True,
-          "if (lampoAttiva(l)) return conLampo(l);" in _pm)
+          "const g = giudizioPrezzo(l);" in _pm
+          and "if (g.motivo) return g.v;" in _pm)
     prova("...e lo sconto viene dopo, a quantita' 1", True,
           "return scontoQui(l, 1) ? conSconto(l) : l;" in _pm)
     # la ricetta e' quella del server (_sconto_pacco: netto col FLOOR,
@@ -19282,8 +19299,12 @@ def prove_verde_e_filtri():
     # ---- 2. IL SEGNO IN CARD: badge nell'angolo della lampo e listino
     # barrato. I due badge non convivono MAI — stesso angolo.
     _ch = pezzo_js(mini, "const cardHTML = l => {", "\n};")
+    # ...E PER L'ACCORDO, ma solo quando e' piu' basso (ago 2026):
+    # un'offerta si puo' accettare al listino pieno, e la stessa cifra
+    # barrata sopra se stessa non e' una riga, e' un refuso. Lampo e
+    # sconto non ci arrivano mai — una percentuale riduce sempre.
     prova("il barrato compare per la lampo E per lo sconto", True,
-          "${(lampo||sconto)?" in _ch)
+          "${(lampo||sconto||(acc&&piuBasso(g.v,l)))?" in _ch)
     prova("il prezzo della card viene dal giudice", True,
           ": prezzoMostrato(l));" in _ch)
     # «Ne resta 1» si spegne anche per lo sconto: da quando il verde ha
@@ -19291,10 +19312,12 @@ def prove_verde_e_filtri():
     prova("«Ne resta 1» si spegne per lo sconto", True,
           "const ultimo = !esa && !ferie && !asta && !lampo && !sconto"
           in _ch)
-    # ...e lo sconto si spegne per la lampo, non il contrario
+    # ...e lo sconto si spegne per la lampo, non il contrario — E PER
+    # L'ACCORDO (ago 2026): il verde direbbe «−15%» sopra una cifra che
+    # non e' il listino meno il 15%, e' la cifra pattuita.
     prova("...e lo sconto si spegne per la lampo", True,
-          "const sconto = !esa && !ferie && !asta && !lampo"
-          " && scontoQui(l, 1);" in _ch)
+          "const sconto = !esa && !ferie && !asta && !lampo && !acc"
+          in _ch)
 
     # ---- 3. LA SCHEDA dice la stessa cosa: prezzo dal giudice, chip
     # verde e NIENTE countdown (questo non scade).
@@ -19669,6 +19692,299 @@ def prove_verde_e_filtri():
     prova("«Spedizione gratis» sta accanto a «Spedizione»",
           ["Sped", "SpedGratis", "Ritiro", "Dig", "Lampo", "Sconto"],
           _spunte)
+
+
+def prove_prezzo_accordo():
+    """IL PREZZO DELL'ACCORDO SI VEDE SUBITO (ago 2026, decisione di
+    Andrea). Chi ha un'offerta ACCETTATA vedeva il listino pieno
+    dappertutto — scheda, vetrina, negozio, «Altri oggetti», e perfino
+    nelle celle del carrello, dove la barra sotto diceva gia' la cifra
+    pattuita: due numeri nella stessa schermata. La cifra vera
+    compariva solo alla cassa, dove la manda il server.
+    Il dato c'era: `artStima` decideva gia' «accordo o lampo, col MIN»
+    ma tornava sats, e il numero grande passava da un'altra strada.
+    Adesso il giudice e' UNO — `giudizioPrezzo`, che torna la vista e
+    il MOTIVO — e artStima ne prende i sats: cambia il tipo, mai il
+    numero."""
+    print("\n[il prezzo dell'accordo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # gli attrezzi delle due prove eseguibili, in cima perche' le
+    # vogliono tutte e due
+    import json as _jz, shutil as _sz, subprocess as _pz, tempfile as _tz
+
+    # ---- 1. IL GIUDICE E' UNO, E IL MIN VIVE LI' ------------------
+    prova("il giudizio del prezzo ha un posto solo", (1, 1, 1),
+          (mini.count("function giudizioPrezzo("),
+           mini.count("function conAccordo("),
+           mini.count("function vistaArticolo(")))
+    _g = pezzo_js(mini, "function giudizioPrezzo(l){", "\n}")
+    prova("il MIN e' li' dentro, e il pareggio va all'accordo", True,
+          "satsAnnuncio(acc) <= satsAnnuncio(lam)" in _g)
+    # L'ANELLO: `scontoQui` chiama `artStima`, che chiama questa. Un
+    # giudice che guardasse lo sconto si richiamerebbe da se' — ed e'
+    # anche la regola del conto, dove l'accordo e' il LORDO su cui lo
+    # sconto si misura.
+    prova("...e lo sconto non entra nel giudice", (False, False),
+          ("scontoQui(" in _g, "conSconto(" in _g))
+
+    # ---- 2. artStima E' DERIVATA, non una seconda strada ----------
+    _as = pezzo_js(mini, "function artStima(l){", "\n}")
+    prova("artStima e' una riga sola sul giudice", True,
+          "return satsAnnuncio(vistaArticolo(l));" in _as)
+    prova("...e non si rifa' il conto in casa", (False, False, False),
+          ("accordoDi(" in _as, "Math.min(" in _as, "eurPerSat" in _as))
+
+    # ---- 3. conAccordo RISCRIVE LA VALUTA -------------------------
+    # La trappola del cantiere: l'accordo fotografa la valuta del
+    # listino al momento della PROPOSTA, quindi un annuncio in EUR
+    # puo' portarsi un accordo in sats. Senza `v.valuta` satsAnnuncio
+    # prenderebbe il ramo dell'altra faccia e tornerebbe una
+    # CONVERSIONE al posto della cifra pattuita.
+    _ca = pezzo_js(mini, "function conAccordo(l){", "\n}")
+    prova("conAccordo riscrive la valuta nei due rami", (True, True),
+          ("v.valuta = 'eur';" in _ca, "v.valuta = 'sats';" in _ca))
+    prova("...e senza accordo torna l'annuncio com'e'", True,
+          "if (!off) return l;" in _ca)
+    # non e' un gemello di conLampo su questo piano: qui non c'e'
+    # nessuna percentuale da applicare, c'e' una cifra da leggere
+    prova("...e non sconta nessuna percentuale", (False, False),
+          ("scontaSats(" in _ca, "scontaEur(" in _ca))
+
+    # ---- 4. IL GATE DELLA SCADENZA --------------------------------
+    _oa = pezzo_js(mini, "function offertaAccettataPer(annuncioId, "
+                         "ancheScaduta){", "\n}")
+    prova("l'accordo scaduto non vale piu'", True,
+          "o.scadenza*1000 > Date.now()" in _oa)
+    # FAIL-OPEN: una scadenza assente o a zero (un server di ieri) non
+    # deve spegnere un accordo vero.
+    prova("...ma una scadenza che non c'e' non lo spegne", True,
+          "!o.scadenza ||" in _oa)
+    # IL CENSIMENTO, non un elenco: chi manda `offerta_id` al SERVER lo
+    # scavalca, perche' l'orologio del telefono e' il giudice di cosa
+    # si DISEGNA, mai dei soldi. Sono i due preventivi, i due startBuy
+    # e il pagamento col wallet: un sesto deve farsi vedere qui.
+    prova("...e lo scavalcano i cinque che parlano col server", 5,
+          len([1 for r in mini.split("\n")
+               if "offertaAccettataPer(" in r and ", true)" in r]))
+
+    # ---- 5. IL RITORNO AL PREZZO PIENO ----------------------------
+    _tick = mini[mini.index("setInterval(() => {"):]
+    _tick = _tick[:_tick.index("}, 1000);")]
+    prova("il battito guarda anche la scadenza dell'accordo", True,
+          "prossimoAccordo * 1000 <= adesso" in _tick)
+    # SENZA IL RICALCOLO si ridisegnerebbe UNA VOLTA AL SECONDO PER
+    # SEMPRE: questo numero non lo rifa' renderGrid, perche' l'accordo
+    # non sta sull'annuncio ma in offerteMie. Si guarda DENTRO il suo
+    # ramo: cercarlo nel battito intero non potrebbe fallire.
+    _ramo = _tick[_tick.index("if (prossimoAccordo"):]
+    prova("...e nel suo ramo lo ricalcola", True,
+          "ricalcolaProssimoAccordo();"
+          in _ramo[:_ramo.index("if (!morta)")])
+    # LA RIAPERTURA GUARDA IL COUNTDOWN e non il barrato: `.lampo-was`
+    # e' il VESTITO della riga e lo portano anche lo sconto e
+    # l'accordo, quindi una lampo scaduta su un'ALTRA card riapriva
+    # una scheda che non aveva niente da rimettere a posto — perdendo
+    # la strada di consegna scelta.
+    prova("la scheda si riapre solo per un countdown morto",
+          (True, False),
+          ("#detailContent .lampo-count" in _tick,
+           "#detailContent .lampo-was" in _tick))
+    _lo = pezzo_js(mini, "async function loadOfferte(){", "\n}")
+    prova("la prossima scadenza si rifa' a ogni lettura", True,
+          "ricalcolaProssimoAccordo();" in _lo)
+    # il predicato vive in un posto solo: loadOfferte ha CINQUE
+    # chiamanti (avvio, ingresso negli Ordini, invio, risposta, ritiro)
+    prova("il rinfresco ha un posto solo e cinque chiamanti", (1, 5),
+          (mini.count("function rinfrescaAccordi("),
+           mini.count("rinfrescaAccordi();")))
+    # ...E SI ACCENDE ANCHE QUANDO L'ACCORDO SPARISCE. E' un difetto
+    # trovato DAL VIVO e non leggendo: chiedendo «c'e' un accordo su
+    # questa card?» il rinfresco scattava alla nascita e taceva al
+    # RITIRO — la scheda tornava al listino e la card restava a dire
+    # la cifra pattuita di un accordo che non c'era piu'. Le sentinelle
+    # dicevano che la funzione esiste, mai che si accendesse nel verso
+    # giusto: si fa girare, e i giri sono QUATTRO perche' il caso e' la
+    # SEQUENZA — nasce, non si ripete, sparisce, non si ripete.
+    _n2 = _sz.which("node")
+    if not _n2:
+        salta("il rinfresco si accende nei due versi",
+              "node non installato")
+    else:
+        _rf = mini[mini.index("let accordiDisegnati = new Set();"):]
+        _rf = _rf[:_rf.index("\n}") + 2]
+        p2 = ("let DEMO=false, VETRINA=false, offerteMie=[], myTgId=7,\n"
+              "    vetrina=[{id:1}], currentListing=null,\n"
+              "    render=0, riaperta=0;\n"
+              "function renderGrid(){ render++; }\n"
+              "function openDetail(){ riaperta++; }\n"
+              "const el = () => ({classList:{contains:()=>false}});\n"
+              + _rf + "\n"
+              "const acc=[{annuncio_id:1,stato:'accettata',"
+              "compratore_id:7}];\n"
+              "const esiti=[];\n"
+              "offerteMie=acc;      rinfrescaAccordi(); esiti.push(render);\n"
+              "offerteMie=acc;      rinfrescaAccordi(); esiti.push(render);\n"
+              "offerteMie=[];       rinfrescaAccordi(); esiti.push(render);\n"
+              "offerteMie=[];       rinfrescaAccordi(); esiti.push(render);\n"
+              "console.log(JSON.stringify(esiti));")
+        f2 = _tz.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8")
+        f2.write(p2)
+        f2.close()
+        r2 = _pz.run([_n2, f2.name], capture_output=True, text=True,
+                     timeout=60, encoding="utf-8")
+        os.unlink(f2.name)
+        # nasce (1), non si ripete (1), SPARISCE (2), non si ripete (2)
+        prova("il rinfresco si accende nei due versi", [1, 1, 2, 2],
+              _jz.loads(r2.stdout.strip()) if r2.returncode == 0
+              else "ERRORE: " + r2.stderr[:300])
+
+    # ---- 6. LA RESA: cifra e barrato, mai un badge ----------------
+    # L'accordo NON prende un segno (decisione di Andrea): cosi' i
+    # colori del prezzo in card restano quattro e il numero grande
+    # della scheda resta l'arancio di sempre. A dire perche' costa
+    # meno c'e' il banner dell'accordo, due dita sotto.
+    prova("l'accordo non prende un colore in card", (False, False),
+          (".card.in-accordo" in mini, ".card-accordo" in mini))
+    prova("...ne' nella scheda", False, ".detail-price.accordo" in mini)
+    prova("...e nemmeno un chip nella riga del barrato", 0,
+          len([1 for r in mini.split("\n")
+               if "gp.motivo==='accordo' && piuBasso" in r
+               and "lampo-badge" in r]))
+    # IL BARRATO SI CHIEDE, non si da' per scontato: un'offerta si puo'
+    # accettare al listino pieno, o il listino puo' calare dopo la
+    # stretta di mano — e la stessa cifra barrata sopra se stessa non
+    # e' una riga, e' un refuso. Lampo e sconto non ci arrivano mai.
+    prova("il barrato dell'accordo passa da piuBasso", (True, True),
+          ("acc&&piuBasso(g.v,l)" in mini,
+           "gp.motivo==='accordo' && piuBasso(gp.v,l)" in mini))
+    prova("...e piuBasso e' un giudice suo, non un test a mano", 1,
+          mini.count("function piuBasso("))
+
+    # ---- 7. E ADESSO IL GIUDICE RISPONDE, invece di esistere ------
+    # Le sentinelle qui sopra dicono COM'E' SCRITTO, mai COSA RISPONDE
+    # — la lezione presa otto volte. Si fanno girare i giudici veri su
+    # casi con l'atteso scritto a mano. Di cartone c'e' solo lo sconto,
+    # che questo cantiere non tocca: non decide mai quale ramo si
+    # accende, lo dichiara.
+    _node = _sz.which("node")
+    if not _node:
+        salta("i giudici del prezzo rispondono giusto",
+              "node non installato")
+        return
+    pezzi = [pezzo_js(mini, "function " + n, "\n}") + "\n}" for n in (
+        "satsAnnuncio(l){", "lampoAttiva(l){", "conLampo(l){",
+        "scontaSats(v, pct){", "scontaEur(v, pct){", "accordoDi(o){",
+        "offertaAccettataPer(annuncioId, ancheScaduta){",
+        "conAccordo(l){", "giudizioPrezzo(l){", "prezzoMostrato(l){",
+        "artStima(l){")]
+    pezzi += ["function vistaArticolo(l){ return giudizioPrezzo(l).v; }",
+              "function piuBasso(v, l){ "
+              "return satsAnnuncio(v) < satsAnnuncio(l); }",
+              "function scontoQui(l, q){ return !!scontoFinto; }",
+              "function conSconto(l){ "
+              "return Object.assign({}, l, {marcato: true}); }"]
+    # il listino: 100.000 sats, oppure 50 euro pubblicati a 90.000.
+    # eurPerSat 0.0005 = un euro vale 2.000 sats.
+    prog = ("let DEMO=false, VETRINA=false, offerteMie=[], myTgId=7,\n"
+            "    cambioVivo=true, eurPerSat=0.0005, scontoFinto=false;\n"
+            + "\n".join(pezzi) + "\n"
+            "const SATS={id:1,price:100000,priceEur:0,valuta:'sats',"
+            "lampoPct:0,lampoFine:0};\n"
+            "const EUR={id:1,price:90000,priceEur:50,valuta:'eur',"
+            "lampoPct:0,lampoFine:0};\n"
+            "const fra=Math.floor(Date.now()/1000)+3600,"
+            "ieri=Math.floor(Date.now()/1000)-3600;\n"
+            "const off=(v,s,e,sc)=>({annuncio_id:1,stato:'accettata',"
+            "compratore_id:7,valuta:v,importo_sats:s,importo_eur:e,"
+            "contro_sats:0,contro_eur:0,scadenza:sc});\n"
+            "const casi=[];\n"
+            "function giro(nome,l,o,opt){\n"
+            "  opt=opt||{};\n"
+            "  offerteMie = o?[o]:[]; DEMO=!!opt.demo;\n"
+            "  cambioVivo = opt.muto?false:true;\n"
+            "  scontoFinto = !!opt.sconto;\n"
+            "  const g=giudizioPrezzo(l);\n"
+            "  casi.push({nome, art:artStima(l), motivo:g.motivo,\n"
+            "    basso:piuBasso(g.v,l),\n"
+            "    scontato:!!prezzoMostrato(l).marcato});\n"
+            "  DEMO=false; cambioVivo=true; scontoFinto=false;\n"
+            "}\n"
+            "const lam=p=>Object.assign({},SATS,"
+            "{lampoPct:p,lampoFine:fra});\n"
+            "giro('listino nudo',SATS,null);\n"
+            "giro('accordo in sats',SATS,off('sats',60000,0,fra));\n"
+            "giro('accordo in sats su listino EUR',EUR,"
+            "off('sats',60000,0,fra));\n"
+            "giro('accordo in euro',EUR,off('eur',0,30,fra));\n"
+            "giro('accordo in euro, cambio muto',EUR,"
+            "off('eur',0,30,fra),{muto:true});\n"
+            "giro('accordo piu basso della lampo',lam(20),"
+            "off('sats',60000,0,fra));\n"
+            "giro('lampo piu bassa dell accordo',lam(50),"
+            "off('sats',90000,0,fra));\n"
+            "giro('accordo pari al listino',SATS,"
+            "off('sats',100000,0,fra));\n"
+            "giro('accordo scaduto',SATS,off('sats',60000,0,ieri));\n"
+            "giro('accordo senza scadenza',SATS,off('sats',60000,0,0));\n"
+            "giro('accordo in DEMO',SATS,off('sats',60000,0,fra),"
+            "{demo:true});\n"
+            "giro('sconto senza accordo',SATS,null,{sconto:true});\n"
+            "giro('sconto con accordo',SATS,off('sats',60000,0,fra),"
+            "{sconto:true});\n"
+            "console.log(JSON.stringify(casi));")
+    f = _tz.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    f.write(prog)
+    f.close()
+    r = _pz.run([_node, f.name], capture_output=True, text=True,
+                timeout=60, encoding="utf-8")
+    os.unlink(f.name)
+    # L'atteso, scritto a mano. `art` e' anche la prova che artStima
+    # risponde gli STESSI NUMERI di prima: i tre rami della vecchia
+    # conversione (cifra in sats, cambio vivo, cambio muto) sono i
+    # casi 2, 3, 4 e 5.
+    atteso = [
+        # niente accordo: il listino, e nessun motivo
+        {"nome": "listino nudo", "art": 100000, "motivo": "",
+         "basso": False, "scontato": False},
+        {"nome": "accordo in sats", "art": 60000, "motivo": "accordo",
+         "basso": True, "scontato": False},
+        # la trappola: senza `v.valuta` qui uscirebbe 100.000 (i 50
+        # euro al cambio) invece della cifra pattuita
+        {"nome": "accordo in sats su listino EUR", "art": 60000,
+         "motivo": "accordo", "basso": True, "scontato": False},
+        # 30 euro a 2.000 sats per euro
+        {"nome": "accordo in euro", "art": 60000, "motivo": "accordo",
+         "basso": True, "scontato": False},
+        # senza cambio la proporzione sul listino: 90.000 x 30 / 50
+        {"nome": "accordo in euro, cambio muto", "art": 54000,
+         "motivo": "accordo", "basso": True, "scontato": False},
+        # il MIN nei due versi
+        {"nome": "accordo piu basso della lampo", "art": 60000,
+         "motivo": "accordo", "basso": True, "scontato": False},
+        {"nome": "lampo piu bassa dell accordo", "art": 50000,
+         "motivo": "lampo", "basso": True, "scontato": False},
+        # la cifra pattuita resta anche quando non e' piu' bassa: a
+        # cedere e' il BARRATO, mai il prezzo
+        {"nome": "accordo pari al listino", "art": 100000,
+         "motivo": "accordo", "basso": False, "scontato": False},
+        # il gate in lettura, e il suo fail-open
+        {"nome": "accordo scaduto", "art": 100000, "motivo": "",
+         "basso": False, "scontato": False},
+        {"nome": "accordo senza scadenza", "art": 60000,
+         "motivo": "accordo", "basso": True, "scontato": False},
+        {"nome": "accordo in DEMO", "art": 100000, "motivo": "",
+         "basso": False, "scontato": False},
+        # lo sconto carrello resta dov'era... ma non su un accordo
+        {"nome": "sconto senza accordo", "art": 100000, "motivo": "",
+         "basso": False, "scontato": True},
+        {"nome": "sconto con accordo", "art": 60000, "motivo": "accordo",
+         "basso": True, "scontato": False},
+    ]
+    prova("i giudici del prezzo rispondono giusto", atteso,
+          _jz.loads(r.stdout.strip()) if r.returncode == 0
+          else "ERRORE: " + r.stderr[:300])
 
 
 def prove_guardia_is_bot():
@@ -20873,7 +21189,7 @@ def main():
               prove_sat_non_e_barattolo, prove_ai_segnala,
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,
-              prove_verde_e_filtri,
+              prove_verde_e_filtri, prove_prezzo_accordo,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget,
               prove_script_nel_workflow,
