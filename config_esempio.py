@@ -472,6 +472,14 @@ RIEPILOGO_SETTIMANALE = True
 # turno della settimana si consuma lo stesso — il lunedi' dopo si
 # ricomincia da capo con una finestra nuova.
 RIEPILOGO_MINIMO = 3
+# IL PODIO: i tre piu' venduti disegnati come tre barattoli, con
+# dentro la foto dell'articolo, allegati al riepilogo. La didascalia
+# resta quella di sempre coi titoli: la figura si AGGIUNGE, e se non si
+# compone (manca Pillow, o non c'e' classifica) esce il post di testo.
+# Un articolo senza una nostra foto — importato da Nostr, o senza foto
+# — resta un barattolo di vetro vuoto, che nel nostro alfabeto e' una
+# figura e non un buco.
+RIEPILOGO_IMMAGINE = True
 
 # --- Avviso "fase di test" (il cartello all'apertura) ----------------
 # Il cartello che accoglie chi apre l'app durante il rodaggio: si
