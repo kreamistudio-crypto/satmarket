@@ -4321,17 +4321,38 @@ document.getElementById('cartello')?.remove();</script>
         <li>Scaricare i tuoi affari in un file, dal Profilo.</li>
       </ul>
 
+      <!-- IL CONTATTO PER I DIRITTI (ago 2026, deciso da Andrea).
+           NON e' il canale del rodaggio, ed e' la riga da non
+           ammorbidire: quello e' la porta del FEEDBACK e sta in
+           piazza, qui si parla dei dati di UNA persona e la risposta
+           e' privata. La stringa vive in CONTATTO_DATI e MAI dentro
+           un onclick: il patto di linkCanaleTest. -->
+      <h3 id="priv-contatto">Chi contattare</h3>
+      <p>Per qualsiasi cosa riguardi i tuoi dati — sapere cosa abbiamo, farlo correggere, farlo cancellare — <b>scrivici in privato su Telegram</b>. Risponde una persona, e le leggiamo tutte.</p>
+      <button class="btn ghost"
+              onclick="apriContattoDati()">💬 Scrivici per i tuoi dati</button>
+
       <button class="btn ghost" id="privShare"
               onclick="condividiPrivacy()">🔗 Condividi questa pagina</button>
 
-      <!-- IL CANTIERE DICHIARATO (ago 2026). Tre cose che mancano, e si
-           scrivono invece di lasciarle sottintese — una pagina sulla
+      <!-- IL CANTIERE DICHIARATO (ago 2026). Cosa manca ancora, e si
+           scrive invece di lasciarlo sottinteso — una pagina sulla
            privacy che tace su cosa non c'e' ancora e' la prima a non
-           meritare fiducia. Il contatto e' quello che ESISTE GIA' (il
-           canale del rodaggio): nessun secondo indirizzo da tenere
-           aggiornato, e senza canale nel config resta la riga che dice
-           comunque la cosa vera. Lo riempie renderPrivacy(). -->
-      <div class="priv-cantiere" id="privCantiere"></div>
+           meritare fiducia. E' markup FISSO come tutto il resto della
+           pagina: da quando il contatto qui sopra e' un indirizzo
+           nostro, qui dentro non arriva piu' niente dal server, e con
+           la sua ragione e' sparita anche renderPrivacy(). -->
+      <div class="priv-cantiere">
+        <b>Questo documento è in costruzione.</b><br>
+        Barattolo è in rodaggio, e una cosa ancora non c'è: il
+        <b>titolare del trattamento</b>. Finché non c'è, il contatto
+        qui sopra non è un <b>recapito formale</b> — ma è vero, lo
+        leggiamo e rispondiamo.<br>
+        E una cosa manca come strumento: <b>cancellare l'account non si
+        può ancora fare con un bottone</b>. Quasi tutto lo puoi già
+        togliere da solo dal Profilo, ma un gesto che cancella tutto in
+        una volta non esiste — meglio dirlo che lasciarlo scoprire.
+      </div>
     </div>
   </div>
 
@@ -7775,12 +7796,11 @@ function tornaDalNegozio(){ navIndietro(); }
    da caricare, vale anche per gli anonimi — anzi soprattutto per loro,
    che questa pagina uno la cerca PRIMA di entrare.
    `ancora` = l'id di un titolo (priv-indirizzo, priv-cifrato,
-   priv-durate, priv-moderatori, priv-fuori, priv-no): chi ci arriva
-   dal cassetto dell'indirizzo atterra sulla voce che gli interessa
-   invece che in cima a una pagina lunga. */
+   priv-durate, priv-moderatori, priv-fuori, priv-no, priv-contatto):
+   chi ci arriva dal cassetto dell'indirizzo atterra sulla voce che
+   gli interessa invece che in cima a una pagina lunga. */
 function apriPrivacy(ancora){
   go('privacy');
-  renderPrivacy();
   /* stessa decisione a ogni apertura della gemella: DEMO cambia sotto
      i piedi, e la' `location.origin` e' "null" — il link uscirebbe
      rotto */
@@ -7792,34 +7812,23 @@ function apriPrivacy(ancora){
 }
 function tornaDaPrivacy(){ navIndietro(); }
 
-/* Il riquadro del cantiere dichiarato. Si disegna a ogni apertura e
-   non una volta all'avvio, per la stessa ragione del bottone
-   condividi: il canale del rodaggio arriva dal server dopo l'avvio, e
-   la pagina puo' essere gia' stata guardata prima che atterri.
-   SENZA CANALE NEL CONFIG resta la riga, che dice comunque la cosa
-   vera («scrivi ai moderatori»), invece di un bottone che non porta da
-   nessuna parte: il patto di notaTrackingSbagliato. */
-function renderPrivacy(){
-  const box = el('privCantiere');
-  if (!box) return;
-  box.innerHTML =
-    '<b>Questo documento è in costruzione.</b><br>'
-    + 'Barattolo è in rodaggio, e due cose ancora non ci sono: '
-    + 'il <b>titolare del trattamento</b> e un <b>recapito formale</b> '
-    + 'per esercitare i tuoi diritti sui dati. Le stiamo definendo, e '
-    + 'appena ci sono finiscono qui.<br>'
-    + 'E una cosa manca come strumento: <b>cancellare l\'account non si '
-    + 'può ancora fare con un bottone</b>. Quasi tutto lo puoi già '
-    + 'togliere da solo dal Profilo, ma un gesto che cancella tutto in '
-    + 'una volta non esiste — meglio dirlo che lasciarlo scoprire.<br>'
-    + 'Intanto, per qualsiasi cosa riguardi i tuoi dati, '
-    + (bannerTest?.link
-        ? 'scrivici sul canale del rodaggio: non è ancora il recapito '
-          + 'formale, ma le leggiamo tutte.'
-          + '<br><button type="button" class="btn ghost" '
-          + 'onclick="apriCanaleTest()">💬 Scrivici</button>'
-        : 'scrivi ai moderatori: non è ancora il recapito formale, ma '
-          + 'le leggiamo tutte.');
+/* IL CONTATTO PER I TUOI DATI (ago 2026, deciso da Andrea): la chat
+   diretta su Telegram, scritta nel markup della pagina.
+   NON E' IL CANALE DEL RODAGGIO, ed e' la riga da non ammorbidire:
+   quello e' la porta del FEEDBACK e lo leggono tutti, qui si parla dei
+   dati di UNA persona e la risposta e' privata. Da quando il contatto
+   e' un indirizzo NOSTRO il riquadro del cantiere non ha piu' niente
+   che arrivi dal server, quindi e' tornato markup fisso e
+   renderPrivacy() non esiste piu'.
+   La stringa vive QUI e mai dentro un onclick (il patto di
+   linkCanaleTest); dentro Telegram apre il client, fuori una scheda
+   nuova — la scala di apriCanaleTest, che il t.me lo sa gestire. */
+const CONTATTO_DATI = 'https://t.me/barattolostore?direct';
+function apriContattoDati(){
+  if (tg?.initData && tg.openTelegramLink) {
+    try { tg.openTelegramLink(CONTATTO_DATI); return; } catch(e){}
+  }
+  window.open(CONTATTO_DATI, '_blank', 'noopener');
 }
 
 /* Dal dettaglio annuncio: il blocco venditore apre il suo negozio */

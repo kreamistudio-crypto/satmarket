@@ -20666,31 +20666,59 @@ def prove_pagina_dati():
     prova("dati: e le due sorelle si rimandano", True,
           'onclick="apriPrivacy()">🔐 E i tuoi dati?' in mini)
 
-    # --- 5) il cantiere dichiarato: le tre cose che mancano
+    # --- 5) il cantiere dichiarato: cosa manca ancora
     #
-    # ⚠️ IL TESTO SI RICUCE PRIMA DI CERCARLO. renderPrivacy lo compone
-    # concatenando letterali, quindi «non si » e «può ancora» stanno in
-    # due stringhe diverse e una ricerca ingenua non trova la frase —
-    # ci si e' inciampati scrivendo questa prova, ed e' la stessa
-    # trappola gia' pagata col censimento dei sats. Si tolgono le
-    # cuciture (' + ') e le barre di escape, poi si cerca.
-    j = mini.index("function renderPrivacy")
-    corpo = mini[j:mini.index("\n}", j)]
-    cucito = re.sub(r"'\s*\+\s*'", "", corpo).replace("\\'", "'")
+    # ⚠️ IL TESTO SI RICUCE PRIMA DI CERCARLO. Adesso e' markup, e una
+    # frase va a capo con l'indentazione in mezzo: una ricerca ingenua
+    # non la trova. Prima si schiacciano gli spazi, poi si cerca — e'
+    # la stessa trappola del censimento dei sats, che qui si e' gia'
+    # pagata una volta quando il testo lo cuciva renderPrivacy.
+    piatto = re.sub(r"\s+", " ", vista)
     prova("dati: il documento dichiara di essere in costruzione", True,
-          "Questo documento è in costruzione" in cucito)
-    prova("...il titolare e il recapito mancano, e si dice", True,
-          "titolare del trattamento" in cucito
-          and "recapito formale" in cucito)
+          "Questo documento è in costruzione" in piatto)
+    prova("...il titolare manca, e si dice", True,
+          "titolare del trattamento" in piatto)
+    prova("...e che fino ad allora il contatto non e' un recapito"
+          " formale", True,
+          "non è un <b>recapito formale</b>" in piatto)
     prova("...e che l'account non si cancella con un bottone", True,
           "cancellare l'account non si può ancora fare con un bottone"
-          in cucito)
-    # il contatto e' quello che ESISTE GIA' (il canale del rodaggio):
-    # senza canale nel config resta la RIGA, che dice comunque la cosa
-    # vera, mai un bottone che non porta da nessuna parte
-    prova("dati: il contatto ripiega sulla riga senza canale", True,
-          "bannerTest?.link" in corpo
-          and "scrivi ai moderatori" in cucito)
+          in piatto)
+
+    # --- 6) il contatto per i diritti (ago 2026, deciso da Andrea)
+    #
+    # NON E' IL CANALE DEL RODAGGIO, ed e' la riga da non ammorbidire:
+    # quello e' la porta del feedback e lo leggono tutti, qui si parla
+    # dei dati di UNA persona e la risposta e' privata. Una pagina che
+    # promette un contatto per i diritti e poi manda in piazza sarebbe
+    # peggio di una che non lo promette.
+    prova("dati: c'e' il contatto per i diritti", True,
+          'id="priv-contatto"' in vista
+          and 'onclick="apriContattoDati()"' in vista)
+    k = mini.index("function apriContattoDati")
+    apri = mini[k:mini.index("\n}", k)]
+    prova("...e non passa dal canale del rodaggio", True,
+          "bannerTest" not in apri and "apriCanaleTest" not in vista)
+    prova("...la stringa vive in una costante, mai in un onclick", True,
+          "const CONTATTO_DATI = 'https://t.me/barattolostore?direct';"
+          in mini and "t.me" not in vista)
+    # dentro Telegram apre il client, fuori una scheda nuova: la scala
+    # di apriCanaleTest, e senza il ripiego chi entra dal browser non
+    # ci scrive
+    prova("...dentro Telegram apre il client, fuori una scheda", True,
+          "tg.openTelegramLink(CONTATTO_DATI)" in apri
+          and "window.open(CONTATTO_DATI" in apri)
+    # il riquadro e' tornato markup fisso: niente da disegnare a ogni
+    # apertura, e niente innerHTML dove non serve. Si cerca la
+    # DEFINIZIONE e la CHIAMATA e mai il nome nudo: i commenti della
+    # pagina raccontano perche' quella funzione non c'e' piu', e una
+    # prova che legge la prosa diventa rossa per colpa di una
+    # spiegazione.
+    a = mini.index("function apriPrivacy")
+    prova("dati: il riquadro e' markup fisso (niente renderPrivacy)",
+          True, "function renderPrivacy" not in mini
+          and "renderPrivacy(" not in mini[a:mini.index("\n}", a)]
+          and 'class="priv-cantiere"' in vista)
 
 
 def prove_font():

@@ -13040,15 +13040,43 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   perde una lettera di quel che si stava scrivendo, perché lo stato dei
   campi vive in `acqDati.indirizzo` e `navRendiVista` sul ramo
   'acquisto' fa `renderAcquisto()`, non `apriAcquisto()`.
-  IL DOCUMENTO DICHIARA COSA NON C'È: titolare del trattamento e
-  recapito formale per i diritti mancano (si stanno definendo), e la
-  cancellazione dell'account **non esiste come strumento** — quasi
-  tutto si toglie a mano dal Profilo, ma un gesto che cancella tutto in
-  una volta no. Una pagina sulla privacy che tace su cosa non c'è
-  ancora è la prima a non meritare fiducia. Il contatto è quello che
-  ESISTE GIÀ (il canale del rodaggio, `bannerTest?.link`): nessun
-  secondo indirizzo da tenere aggiornato, e senza canale nel config
-  resta la riga che dice comunque la cosa vera.
+  IL DOCUMENTO DICHIARA COSA NON C'È: il titolare del trattamento
+  manca (si sta definendo), e la cancellazione dell'account **non
+  esiste come strumento** — quasi tutto si toglie a mano dal Profilo,
+  ma un gesto che cancella tutto in una volta no. Una pagina sulla
+  privacy che tace su cosa non c'è ancora è la prima a non meritare
+  fiducia.
+  IL CONTATTO PER I DIRITTI È SUO (ago 2026, decisione di Andrea, e
+  questa riga ROVESCIA quella di ieri — «il contatto è quello che
+  ESISTE GIÀ, il canale del rodaggio: nessun secondo indirizzo da
+  tenere aggiornato»): sezione «Chi contattare» (`priv-contatto`) col
+  bottone verso la chat diretta su Telegram, `CONTATTO_DATI` =
+  https://t.me/barattolostore?direct. IL PERCHÉ DEL ROVESCIAMENTO, che
+  è la riga da non ammorbidire: **il canale del rodaggio è la porta del
+  FEEDBACK e lo leggono tutti**, mentre qui si parla dei dati di UNA
+  persona — mandare in piazza chi chiede di cancellare il proprio
+  indirizzo sarebbe il contrario di quel che la pagina promette. Il
+  costo dichiarato è il secondo indirizzo da tenere aggiornato, e si
+  paga sapendolo.
+  IL CANTIERE RESTA, ma dice un'altra cosa: finché il titolare non c'è,
+  quel contatto **non è un recapito formale** — e lo si scrive, invece
+  di lasciar credere che l'obbligo sia assolto. Le tre frasi scomode
+  non si toccano.
+  IL RIQUADRO È TORNATO MARKUP FISSO e `renderPrivacy()` NON ESISTE
+  PIÙ: esisteva per una ragione sola — il canale del rodaggio arriva
+  dal server dopo l'avvio, quindi il testo andava ridisegnato a ogni
+  apertura — e con un indirizzo NOSTRO in quel riquadro non arriva più
+  niente dal server. Una funzione che scrive una costante in un
+  `innerHTML` è markup travestito; e il commento che la giustificava
+  sarebbe diventato falso, che è la cosa peggiore. La stringa vive in
+  `CONTATTO_DATI` e MAI dentro un onclick (il patto di
+  `linkCanaleTest`), e `apriContattoDati` è la scala di
+  `apriCanaleTest`: dentro Telegram apre il client, fuori una scheda
+  nuova — senza il ripiego chi entra dal browser non ci scrive.
+  IL BOTTONE C'È ANCHE IN DEMO, al contrario di «Condividi questa
+  pagina»: quello si spegne perché là `location.origin` è "null" e il
+  link uscirebbe rotto, questo è un indirizzo scritto a mano e
+  funziona ovunque.
   FUORI DAL CANTIERE, visto e non toccato: la BUSTA di consegna (nome,
   codice, documento) non si cancella MAI, mentre l'indirizzo ha la sua
   scopa — la pagina lo dice, ma darle una scopa è un'altra decisione
@@ -17119,10 +17147,12 @@ nessuna leva nuova. Il service worker si aggiorna alla visita
 successiva, come sempre. DA GUARDARE dopo il deploy: che nella pagina
 vera non parta NESSUNA richiesta verso Google, e la prima anteprima di
 `/privacy` condivisa in chat.
-DA DECIDERE, ed è la ragione per cui la pagina si dichiara in
-costruzione: il titolare del trattamento e il recapito per l'esercizio
-dei diritti (con Alan e col commercialista), e se dare un bottone alla
-cancellazione dell'account.
+DA DECIDERE, ed è la ragione per cui la pagina si dichiara ancora in
+costruzione: il titolare del trattamento (con Alan e col
+commercialista), e se dare un bottone alla cancellazione
+dell'account. Il CONTATTO per i diritti invece c'è dall'ago 2026 — la
+chat diretta su Telegram, vedi «IL CONTATTO PER I DIRITTI È SUO» — e
+diventerà il recapito formale il giorno che il titolare avrà un nome.
 
 La porta del timer (ago 2026, dal caso limite trovato guardando i due
 timer del digitale): quando un timer chiudeva un affare e il venditore
