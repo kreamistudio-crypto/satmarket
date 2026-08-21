@@ -10531,6 +10531,56 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   si citano nei commenti del client: quelle sentinelle leggono anche
   i commenti — è il modo in cui una prova diventa vacua, o rossa per
   colpa della prosa (la lezione già pagata con `_decifra_contenuto`).
+  I PUNTI SALVATI, E LA RIGA CHE SPIEGA UN VUOTO (ago 2026). Chi
+  compra si tiene il suo locker — tabella `punti_ritiro`, uno per
+  rete, si salva col tocco su «📍 Ricorda questo punto» sotto il
+  campo e alla cassa arriva già compilato: rete, tipo e indirizzo,
+  senza toccare niente. IL MATCH LO FA IL SERVER: `punti_salvati`
+  viaggia col preventivo GIÀ filtrato sulle reti di QUEL venditore
+  (`punti_per_venditore`, giudice puro), ed è anche minimizzazione —
+  col filtro nel client viaggerebbe la lista intera a ogni conto. Il
+  resto di quel cantiere vive nei commenti del codice, che questo
+  file non ha mai riassunto.
+  DA LÌ IL BUCO: se chi compra ha un punto InPost e il venditore
+  spedisce solo con Poste, quella lista arriva VUOTA — cioè
+  indistinguibile da «non ne hai nessuno» — e il campo si apre vuoto
+  come al primo acquisto della vita. Senza una parola, la funzione
+  sembra non aver funzionato proprio a chi l'aveva usata.
+  `rigaPuntoAltrove` la dice, sotto le pillole del tipo e sopra il
+  campo: «Hai un punto salvato per InPost, ma questo venditore
+  spedisce solo con Poste Italiane». È IL PRECEDENTE DEL PROFILO —
+  «Nessun venditore usa più questa rete»: una riga inerte si dice a
+  voce, invece di lasciarla sembrare rotta. Qui però si NOMINANO le
+  reti dei due lati, che è il PERCHÉ e non solo il cosa (decisione di
+  Andrea). LA POSIZIONE È CONTENUTO: spiega un vuoto, quindi si legge
+  PRIMA di trovarlo — e col tipo non ancora scelto il campo non c'è
+  nemmeno, mentre la riga sì.
+  PERIMETRO: solo col venditore che le reti le ha DICHIARATE
+  (decisione di Andrea). A zero reti non esiste un «spedisce solo con
+  X» da scrivere, la frase diventerebbe contorta per un caso raro, e
+  quel caso ha già la sua riga onesta fra le note — meglio tacere che
+  scrivere male.
+  LE RETI MORTE NON SI NOMINANO: una uscita dal catalogo non
+  precompilerebbe da NESSUN venditore, quindi darne la colpa a QUESTO
+  sarebbe un'accusa sbagliata, e a dirlo c'è già la riga del Profilo.
+  Si filtra con la forma del gemello di là (solo a catalogo noto:
+  `spedizionieriCatalogo` e `myPunti` arrivano dalla stessa /api/me,
+  quindi un catalogo vuoto vuol dire lista vuota e il caso non si
+  presenta).
+  NON SI GATA SUL CAMPO GIÀ SCRITTO, ed è deliberato: dice un FATTO
+  che resta vero anche mentre si digita, e spegnerlo alla prima
+  lettera vorrebbe dire riscriverla in place a ogni tasto come
+  `aggiornaRigaRicorda` — una seconda riga da tenere viva per un
+  guadagno di rumore minimo. Sparisce da sola quando smette di essere
+  vera (salvato un punto per la rete giusta la lista non è più
+  vuota), ed è il patto degli hint contestuali: così CONVIVE con
+  «Ricorda questo punto» qui sotto, e insieme raccontano la storia
+  intera — il tuo InPost qui non vale, ricorda questo per Poste.
+  NUDA E SENZA EMOJI, la lingua della riga del Profilo (il riquadro
+  ha già il locker della via); e IL RESPIRO SOTTO È SUO, trovato
+  MISURANDO e non rileggendo: la label del campo nasce senza margine
+  sopra, quindi le due si toccavano — 10px sopra e ZERO sotto. È la
+  famiglia dell'aria fra due bottoni dei cassetti, alla quarta volta.
   E LA NOTIFICA UNA-TANTUM (`avvisa_spedizioniere_mancante`,
   nell'orologio): ai venditori con annunci attivi che spediscono e
   senza spedizioniere — «da oggi i compratori possono scegliere il
@@ -16575,6 +16625,33 @@ l'idempotenza, il venditore che torna a rifornire, l'import che non
 ri-adotta, la coppia che arriva col flag, la NIP-09 che non spegne più
 la riga nata qui. La SQL è una costante di quel file: un collaudo che
 prova una query DIVERSA da quella che si lancia non prova niente.
+
+Il punto salvato che qui non vale, detto a voce (ago 2026, da una
+domanda in sola lettura di Andrea): chi si è tenuto un locker InPost e
+apre la cassa su un venditore che spedisce solo con Poste trovava il
+campo vuoto ESATTAMENTE come chi non ha mai salvato niente — il server
+manda `punti_salvati` già filtrato, e una lista vuota non sa dire quale
+dei due casi sia. Una riga sotto le pillole del tipo, nella lingua di
+quella del Profilo, che però NOMINA le reti dei due lati: «Hai un punto
+salvato per InPost, ma questo venditore spedisce solo con Poste
+Italiane». Perimetro deciso da Andrea: solo col venditore che le reti le
+ha dichiarate — a zero reti la frase è contorta e il caso è raro, meglio
+tacere. Vedi Architettura, «I PUNTI SALVATI, E LA RIGA CHE SPIEGA UN
+VUOTO», per le reti morte che non si nominano e per il gate che NON si
+mette sul campo già scritto.
+Collaudata: 4141 prove verdi (11 nuove, di cui una ESEGUIBILE — il
+giudice fatto girare con node sui dieci casi, perché le altre dicono che
+esiste ed è uno, mai che risponda giusto, e il caso che solo
+l'esecuzione prende è la rete morta in mezzo alle vive) e DODICI
+MUTAZIONI una per riga sorvegliata, zero sopravvissute. Più il giro dal
+vivo col server su un database usa-e-getta a 320/360/375 nei due temi
+(riga su due righe, nessuno sbordo, zero errori JS) e la contro-verifica
+che il caso normale non cambia: col punto della rete giusta il campo si
+apre precompilato e la riga non c'è. Lì è saltata fuori l'unica
+correzione del giro, e solo MISURANDO: la riga toccava la label del
+campo (10px sopra, ZERO sotto).
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — solo client.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
