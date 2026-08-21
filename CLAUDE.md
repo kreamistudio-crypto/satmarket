@@ -268,11 +268,22 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   intanto il conto smette di essere leggibile. La stessa ragione per
   cui l'atteso resta STRETTO (mai «VIETATO o DUBBIO»): i giri devono
   poter tornare pieni, o una regressione vera si perde nel rumore.
-  Il prompt NON si è mai toccato in tutta questa storia, ed è ciò che
-  ha reso possibile il ritorno: la sua riga DUBBIO è sempre stata
-  viva, tenuta in piedi anche da «Barattolo Ufficiale — store».
+  Il prompt NON si è mai toccato PER INSEGUIRE IL MODELLO, ed è la
+  distinzione che tiene in piedi tutto il resto: è quella che ha reso
+  possibile il ritorno — la sua riga DUBBIO è sempre stata viva,
+  tenuta in piedi anche da «Barattolo Ufficiale — store».
   Se un domani cadessero tutt'e due, la voce è scivolata verso il
   rifiuto e va guardata.
+  TOCCATO SÌ, MA MAI PER QUELLA RAGIONE (ago 2026): la prima riga del
+  prompt diceva «Sei il moderatore di un mercatino dell'usato
+  italiano», e «usato» è caduto insieme al sottotitolo (vedi la voce
+  del LESSICO). Non è un ripensamento sul giudizio e non risponde a
+  niente che il modello abbia detto: era una premessa FALSA su cosa
+  vendiamo, che orientava chi giudica proprio sulla fetta nuova del
+  catalogo — licenze, poster, olio, birre. La regola resta intera:
+  l'atteso segue il prompt, e il prompt non rincorre il modello. Il
+  collaudo si rilancia come per ogni altro ritocco, e il conto atteso
+  non cambia: 19/19.
   DUE CONTRO-REGOLE, e sono la metà che conta: quelle che un riordino
   toglie per prime perché sembrano un ripensamento. 1) **Nominare
   Barattolo è lecito e non è MAI di per sé un motivo** («gadget di
@@ -4988,6 +4999,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «Ordini», non piu' «Affari» — in TUTTI i testi (notifiche, UI,
   confirm); gli id interni (go('affari'), #nav-affari, view-affari)
   restano.
+  NON È PIÙ SOLO L'USATO (ago 2026, decisione di Andrea): il
+  sottotitolo è «il mercatino in sats», senza «dell'usato» — su
+  licenze, poster, olio e birre quella parola era falsa, ed erano
+  una fetta grossa del catalogo. IL CENSIMENTO HA DETTO CHE ERA GIÀ
+  QUASI FATTO, ed è la parte da ricordare prima di ricontarli: la
+  formula nuova viveva già in SETTE posti (il `<title>`, il `<small>`
+  della testata, `manifest.json`, `TITOLO_HOME`, il footer NIP-99 in
+  coda a ogni annuncio su Nostr, la nota di `presenta_release`, il
+  README) e «dell'usato» sopravviveva in UNO solo, la hero da
+  desktop. Post di canale e notifiche del bot lo slogan non lo
+  portano affatto.
+  NELLA HERO L'INVITO BATTE IL NOME (decisione di Andrea): lì non si
+  è messo «il mercatino in sats» ma **«Compra e vendi in sats»** — è
+  l'unico posto dove chi arriva deve capire in tre secondi cosa può
+  FARE, e il nome ce l'ha già il lockup due dita più su. Negli altri
+  sette la formula resta quella che c'è: si cambia dove serve, non
+  ovunque per simmetria.
+  E IL SOTTOTITOLO DELLA HERO È CAMBIATO CON LUI, che non era
+  facoltativo: diceva «**Compra e vendi in** Lightning…», cioè le tre
+  parole del titolo nuovo a un centimetro di distanza. Ora dice
+  «Pagamenti in Lightning…» — il titolo dice COSA fai, il sottotitolo
+  COME si paga, e nessuno dei due ripete l'altro. MISURATO a 768px,
+  la larghezza dove la hero nasce ed è la sola che poteva rompersi:
+  la riga più lunga passa da 396px a **266**, il margine da 65 a 195.
+  Il titolo nuovo è più STRETTO di quello che girava in produzione,
+  quindi non può sfondare dove il vecchio non sfondava.
+  I DUE PROMPT SONO PARTE DELLA STESSA DECISIONE e non un contorno:
+  `PROMPT_MODERAZIONE` e quello di `ricategorizza.py` si
+  presentavano al modello come «un mercatino dell'usato italiano»,
+  cioè gli insegnavano la premessa sbagliata proprio dove decide su
+  quella fetta. Si è tolta la parola e basta, MAI aggiunto «nuovo e
+  usato»: togliere una premessa falsa non può introdurre un
+  comportamento nuovo, aggiungerne una sì — e quel prompt è
+  collaudato riga per riga. Se il collaudo mostrerà che il modello
+  resta orientato all'usato, la formula esplicita è il passo dopo.
+  DOVE «USATO» RESTA E NON SI TOCCA: le CONDIZIONI dell'oggetto
+  («Nuovo — mai usato», «usato ma ben conservato») e i loro sinonimi
+  d'import, dove descrive lo STATO di una cosa e non l'identità del
+  mercatino; e `PAROLE_FUNZIONE_IT`, dove è una parola-spia per
+  riconoscere l'italiano su Nostr e non afferma niente su di noi.
+  FUORI DAL REPO, e il censimento da solo non basta: la descrizione
+  del bot e della Mini App su BotFather, la descrizione del canale,
+  `zapstore.yaml` e il README di `barattolo-releases`, i kind-0
+  Nostr. Più `proposte/nip99-commerce-metadata.md`, che in inglese ci
+  descrive ancora come «second-hand marketplace»: non è deployato, ma
+  il giorno che si manda ai NIP va corretto insieme.
   IL NEGOZIO IN FERIE 🌴 (ago 2026): il venditore che parte chiude la
   bottega con la data di rientro. Gli annunci RESTANO in vetrina —
   prezzo in grigio, badge «🌴 In ferie» sulla card, la data nella
@@ -5939,6 +5996,18 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   singolare di «N disponibili» nella stessa fila, e parla col GRASSETTO
   e non col colore (la regola dello sfollamento, quella di «spedizione
   gratuita»): a cedere è il luogo, mai il significato.
+  LA PREMESSA DEL BADGE È DATATA, ed è annotata nel giudice
+  `ultimo_pezzo` perché è lì che si atterra chiedendosi «perché
+  questa regola?» (ago 2026): «su un mercatino dell'usato quasi ogni
+  oggetto è unico» regge ancora sulla maggior parte del catalogo, ma
+  è la stessa fetta che ha fatto cadere «usato» dal sottotitolo a
+  eroderla. Il giorno che il multi-copia diventasse la norma il badge
+  smetterebbe di essere RARO e tornerebbe la tappezzeria che questa
+  regola esiste per non essere — e allora la soglia vorrebbe un
+  numero vero, non più «ne ha avuti più d'uno». I due commenti che
+  ripetono la premessa a mano (lo schema e
+  `arricchisci_righe_vetrina`) rimandano lì, così nessuno deve sapere
+  che il giudice esiste.
   PRECEDENZA IN CARD: esaurito > ferie > asta > lampo > ultimo.
   L'esaurito vince ed è l'unica precedenza che non è una cintura ma una
   regola — le colonne `lampo_*` restano vive anche a scorte finite, e
