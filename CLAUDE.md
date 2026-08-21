@@ -8186,6 +8186,21 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   «non vale» lo manderebbe a cercarne un altro che non c'è. Il rifiuto
   RESTA APERTO col testo dentro e il motivo sotto (la ricetta del
   rifornimento), e il testo vive in `acqDati` e mai nel DOM.
+  E DALL'AGO 2026 IL CASSETTO COMPARE SOLO SE C'È QUALCOSA DA
+  SCRIVERCI (chiesto da Andrea): il preventivo porta `codici_esistono`
+  — IL SOLO BOOLEANO, mai un nome o una percentuale: è l'oracolo
+  parziale ACCETTATO esplicitamente («solo sì/no» — rivela che un
+  negozio ha codici vivi, mai quali), e una prova tiene il perimetro.
+  Il giudice è `_codici_vivi`, e «vivo» lo decide `_codice_vale` — lo
+  STESSO giudice dell'Applica, mai una seconda WHERE che divergerebbe
+  al primo ritocco; gli usi si chiedono solo sui codici col tetto
+  (la forma di `_codice_sconto`), e a leva spenta esce False: il
+  cassetto di una funzione spenta sarebbe una porta su un muro. Il
+  client gata col fail-open di `sconto_raggiungibile` (chiave assente
+  = si mostra: server di ieri e DEMO restano il mondo di prima) PIÙ
+  la cintura del codice GIÀ scritto, che non sparisce mai col testo
+  dentro. Zero fetch nuovi: il preventivo È già la risposta della
+  cassa.
   ⚠️ LA TRAPPOLA DI NOME: «codice» in quest'app significa già tre cose
   — il codice ONLINE (la via digitale, che può stare sulla STESSA
   schermata), il codice di RITIRO della busta, il codice NEGOZIO. In
@@ -10906,28 +10921,52 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dichiarate → solo le loro mappe, nessuna rete → tutte, una rete
   senza mappa («Altro») → NIENTE, che un link fuorviante è peggio di
   nessun link.
-  L'INVITO È UN FOGLIO COL TETTO (decisione di Andrea): chi pubblica
-  con la spedizione e non ha dichiarato niente trova `#corrieriSheet`
-  al tocco di «Pubblica» — le pillole lì dentro, «Salva e pubblica» e
-  «Pubblica lo stesso». INSISTENTE MA MAI BLOCCANTE: tutti e due i
-  bottoni richiamano `publish()`, e c'è la prova. Il tetto è
-  `INVITO_CORRIERI_MAX` (3) col contatore in `utenti.invito_corrieri`
-  — colonna e non localStorage, è un fatto della PERSONA (il patto di
-  `avvisato_trasporto`) — e sale quando il foglio SI APRE, non quando
-  si legge: chiuderlo senza leggere è una scelta. Esaurito il tetto
-  RESTA LA RIGA nel form, che è derivata dai dati veri e sparisce da
-  sola il giorno che il venditore dichiara (quindi senza dismiss, la
-  regola della checklist). IL TETTO È LA METÀ CHE CONTA, ed è misurato:
-  nel form Vendi ci sono NOVE hint condizionali e nel caso peggiore se
-  ne accendono otto insieme — un cartello che compare sempre uguale si
-  impara a scavalcare senza leggerlo. Il ritiro e il codice online non
-  lo vedono MAI per costruzione: la prima domanda della condizione è la
-  spunta «Spedizione», la stessa della riga. L'aggancio in `publish()`
-  sta DOPO l'ultima validazione e PRIMA di `bottoneInAttesa` (l'ultimo
-  return a stato pulito, con l'overlay ancora spento), e un flag di
-  SESSIONE spezza la ricorsione — `chiediConferma` non è await-abile e
-  il pattern di casa è early-return + callback che richiama la
-  funzione, come `annullaModificaChiedendo`.
+  E DALL'AGO 2026 IL CASSETTO DICE LA RETE (chiesto da Andrea):
+  `linkMappePunti` scrive un MESSAGGIO per casistica — «Il venditore
+  spedisce con InPost: assicurati di indicare un locker o un punto
+  InPost», il gemello Poste, il ramo che le nomina tutte e due, e il
+  neutro onesto di chi non ha dichiarato niente. Nella cassa con due
+  reti il campo appare a rete già SCELTA, quindi il messaggio nomina
+  QUELLA (più preciso del generico, tenuto così per decisione di
+  Andrea); il ramo a due resta per chi passa le reti non filtrate, e
+  la sola 'Altro' non arriva al messaggio (nessuna mappa, il return
+  di sempre). I trova-punto sono BOTTONCINI `.btn.mini` — la variante
+  piccola del ghost nata qui (inline, largo quanto il testo, ombra
+  bassa, `margin-top:0` contro la regola dei fratelli) — e la stessa
+  veste l'ha preso «📍 Ricorda questo punto», che era un testuale
+  sottolineato e non si trovava. NOTA_LOCKER resta in coda, com'era;
+  il pannello ordine eredita tutto per costruzione (secondo chiamante
+  del giudice unico).
+  L'INVITO È UN FOGLIO, E DALL'AGO 2026 SENZA TETTO (decisione di
+  Andrea che ROVESCIA i 3 inviti — il perché di ieri va tenuto perché
+  resta vero: «un cartello che compare sempre uguale si impara a
+  scavalcare senza leggerlo», e in Vendi ci sono NOVE hint
+  condizionali; ha perso contro il costo dell'altro verso — un
+  venditore senza rete dichiarata è un compratore che sceglie il
+  locker alla cieca): chi pubblica con la spedizione e non ha
+  dichiarato niente trova `#corrieriSheet` («📦 Come spedirai?», il
+  testo consiglia InPost/Poste per la privacy dei locker e lascia la
+  porta agli altri corrieri) al tocco di «Pubblica», a OGNI
+  pubblicazione finché non dichiara. INSISTENTE MA MAI BLOCCANTE, e
+  questo NON si è rovesciato: «Pubblica lo stesso» pubblica davvero,
+  tutti e due i bottoni richiamano `publish()`, e c'è la prova. Il
+  flag di sessione che spezza la ricorsione si RIARMA a pubblicazione
+  RIUSCITA (il prossimo annuncio della stessa sessione rivede la
+  domanda — è l'«a ogni pubblicazione»; su un errore resta alzato: la
+  riprova non richiede quel che ha appena chiesto). La leva
+  `INVITO_CORRIERI_MAX` resta l'INTERRUTTORE D'EMERGENZA (0 = niente
+  foglio) e il contatore `utenti.invito_corrieri` continua a salire
+  all'APERTURA — diagnostica innocua, il pattern delle colonne
+  inerti — ma NON gata più: la sentinella del tetto è rovesciata col
+  perché. La RIGA nel form resta, derivata dai dati veri e senza
+  dismiss (la regola della checklist). Il ritiro e il codice online
+  non lo vedono MAI per costruzione: la prima domanda della
+  condizione è la spunta «Spedizione», la stessa della riga.
+  L'aggancio in `publish()` sta DOPO l'ultima validazione e PRIMA di
+  `bottoneInAttesa` (l'ultimo return a stato pulito, con l'overlay
+  ancora spento) — `chiediConferma` non è await-abile e il pattern di
+  casa è early-return + callback che richiama la funzione, come
+  `annullaModificaChiedendo`.
   RESTA FUORI, dichiarato: il catalogo largo dei SETTE corrieri del
   tracking (per BRT, GLS, SDA, DHL e UPS non abbiamo l'URL della loro
   mappa dei punti, e una voce senza mappa è lo stato «Altro»); UNA
@@ -12105,6 +12144,20 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   di «un testo lungo col Cambia in fondo», non il nome di una
   promessa): è FACOLTATIVA, e un campo sempre aperto su una cosa che
   quasi nessuno scrive è spazio morto in una pagina già lunga.
+  AFFINATA dall'ago 2026 (decisione di Andrea): il toggle chiuso è il
+  LINK DISCRETO «+ Aggiungi una nota» (`scopri-link` sul grigio — il
+  bottone ghost full-width pesava quanto le vie), e nelle categorie
+  con varianti da scegliere il campo nasce GIÀ APERTO: lì la domanda
+  è quasi certa, e farla cercare dietro un link è il contrario del
+  servizio. Il giudice è `notaApertaDefault(cats)` con
+  `CAT_NOTA_APERTA` = Abbigliamento, Scarpe e accessori, Arte e
+  artigianato (il nome VERO del catalogo: mai «Artigianato»), Bambini
+  — prende una LISTA (nel carrello basta UN articolo in elenco) e lo
+  chiamano i DUE costruttori di `acqDati`, o mono e set aprirebbero
+  con due regole diverse (sentinella rovesciata: il `notaAperta:false`
+  secco non esiste più). E il default aperto NON ALZA LA TASTIERA: il
+  focus vive SOLO in `apriNotaAcquisto`, mai in un render — c'è la
+  prova. La riga compatta con la nota scritta resta com'era.
   4) **CONVIVE con «Note per il corriere»**, che esisteva già e che
   nessuno si ricordava: `{k:'note'}` dentro `CAMPI_IND`, cioè DENTRO
   il JSON cifrato dell'indirizzo, che va sull'etichetta e muore con
@@ -12457,8 +12510,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   miniatura versionata, stessa catena: la fabbrica è UNA
   (`fotoOrdine(o, grande)`), perché la parte delicata è il RIPIEGO e
   due copie divergono al primo ritocco. Il raggio dell'`<img>` è
-  `inherit`, così il quadratino da 38 della lista e quello da 48 del
-  dettaglio non hanno una seconda misura da tenere in pari; e il
+  `inherit`, così il quadratino della lista e quello del dettaglio
+  non hanno una seconda misura da tenere in pari — dall'ago 2026 sono
+  **56 e 64px** (erano 38 e 48, francobolli: chiesto da Andrea,
+  misure verificate a 320/360/375 — zero sbordo, badge e ✕ mai
+  spinti fuori, e a 320 il costo è una riga di titolo in più sulle
+  sole card che già andavano a capo, ché il titolo della lista non
+  tronca ed è il comportamento di sempre); e il
   titolo, che lì è un figlio flex, porta `min-width:0` — senza, una
   parola lunga senza spazi allargherebbe la PAGINA (la lezione del
   riquadro venditore). La catena degli ordini si riconosce dal 📦
@@ -17498,6 +17556,34 @@ stato non è quello promesso. IN PRODUZIONE basta il deploy: zero
 colonne, zero migrazioni, zero leve, zero campi nuovi nel payload. DA
 GUARDARE al primo giro: il primo compratore che vota da `confirmed`, e
 che il suo voto sia ancora lì quando il venditore incassa.
+
+Il pacchetto UX acquisto e spedizione (ago 2026, sei punti di Andrea in
+un giro): le foto degli ordini a 56/64 (erano francobolli da 38/48 —
+solo CSS, la fabbrica ha il raggio inherit apposta); il cassetto «Hai
+un codice sconto?» gated sul sì/no del preventivo (`codici_esistono`,
+l'oracolo parziale accettato: mai un dato del codice — giudice
+`_codici_vivi` che riusa `_codice_vale`, fail-open nel client);
+la nota al venditore discreta ovunque («+ Aggiungi una nota») e GIÀ
+aperta nelle 4 categorie con varianti, senza tastiera; il cassetto del
+punto che dice la RETE per casistica coi trova-punto promossi a
+bottoncini (`.btn.mini`, la variante piccola del ghost nata qui, presa
+anche da «Ricorda questo punto»); l'invito corrieri SENZA tetto (si
+richiede a ogni pubblicazione finché non dichiara, «Pubblica lo
+stesso» resta — il mai-bloccante non si è rovesciato, il tetto sì);
+e la pagina «I tuoi dati» che dichiara il codice sconto rimasto
+nell'ordine (la lacuna trovata esplorando). Vedi le voci loro in
+Architettura. Collaudato: 4393 prove verdi (da 4383: nuove più tre
+rovesciate col perché — i due costruttori della nota, il tetto
+dell'invito), collaudo_conto 99/99 intatto, e il giro dal vivo sul
+server locale con la copia del db: il flag dei codici nei tre stati
+(senza/con/in pausa) su mono E set, la nota nei due comportamenti,
+il foglio corrieri col contatore a 99 e il riarmo al secondo
+annuncio, le misure delle foto a tre larghezze. IN PRODUZIONE basta
+il deploy: nessuna colonna, nessuna migrazione, nessuna leva nuova —
+`codici_esistono` è una chiave in più nel preventivo e il client
+vecchio non la legge. DA GUARDARE al primo giro: il primo venditore
+vero davanti al foglio senza tetto (che non lo senta come un muro), e
+il cassetto dei codici che compare solo dai negozi giusti.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
