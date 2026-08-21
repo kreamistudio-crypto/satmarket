@@ -15873,7 +15873,7 @@ async function inviaFeedback(btn){
     currentOrder.mioVoto = stellaScelta; currentOrder.mioCommento = commento;
     stellaScelta = 0; toast('⭐ Feedback inviato!'); openOrder(currentOrder.id); return;
   }
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, '⭐ Invio il feedback…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/feedback`, {
     method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
     body: JSON.stringify({voto: stellaScelta, commento})});
