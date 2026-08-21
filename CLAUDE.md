@@ -13065,6 +13065,77 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   successivo — l'ordine dei lavori era vincolante, prima il tappo e poi
   la pulizia, ed è la stessa trappola per chiunque ripulisca a mano dei
   doppioni: si guarda cosa stava riparando la riga che si sta togliendo.
+  L'ANNUNCIO A DUE TESTE (ago 2026, dal campo: gli annunci 208 e 209 —
+  il TERZO membro della famiglia, e il più largo). L'anello importava
+  NOI; il riflesso importava lo specchio di una riga nata qui; questo
+  si prende una riga nativa QUALUNQUE. La strada è il match per TITOLO,
+  che fra i candidati accetta `venditore_id=?`: il venditore pubblica
+  qui, firma col BIVIO, e pubblica lo stesso oggetto dal suo client con
+  un `d` suo — l'import non trova niente per `d`, ripiega sul titolo e
+  scrive `contatto_nostr` sulla riga nativa senza azzerare
+  `nostr_event_id`, che l'UPDATE non nomina proprio.
+  LA DIREZIONE È CERTA E NON DIPENDE DAI DATI, ed è il modo di leggere
+  qualunque riga a due teste che ricapiti: `contatto_nostr` lo scrive
+  SOLO l'import, e un `nostr_event_id` non vuoto lo scrivono due posti
+  — `annuncio_su_nostr`, che è guardato, e il POST della firma. Quindi
+  la riga era NATIVA e l'import se l'è presa, mai il contrario.
+  IL FIX DEL RIFLESSO NON LO COPRE, e non è una svista: `e_riflesso`
+  pretende la riga NATIVA e guarda solo gli eventi con
+  `d = barattolo-N` — su una riga già adottata risponde False, cioè
+  smette di proteggerla proprio perché è stata adottata.
+  IL TAPPO È UNA CLAUSOLA SUL SOLO MATCH PER TITOLO (`nostr_event_id=''
+  OR IS NULL`): chi ha già una testa non si adotta, e l'import gli crea
+  una riga NUOVA — le due restano DUE e la deduplica, che esiste
+  apposta per la coppia (importato, nativo) e ha il suo bottone, torna
+  a vederle. Adottare invece FONDE due identità in silenzio e porta via
+  il bottone. `IS NULL` e non `=''` secco: chi non ha una testa deve
+  restare adottabile, è il caso legacy per cui quel match esiste.
+  MAI SUL MATCH PER `d`, ed è la riga da non ammorbidire: una riga
+  nativa non ha MAI `nostr_origine_d` (lo scrive solo l'import), quindi
+  da lì le due teste non possono nascere — mentre guardarlo
+  smetterebbe di ritrovare le righe già adottate e l'import ne
+  creerebbe copie nuove. Stessa ragione per lo scudo
+  anti-resurrezione, dove trasformerebbe uno «skip» in un INSERT.
+  LA CINTURA È DALL'ALTRA PORTA: il POST della firma
+  (`firma_nostr_fatta`) scriveva `nostr_event_id` senza guardare
+  `contatto_nostr` — la riga può essere stata adottata mentre la firma
+  era per strada (il browser pubblica sui relay PRIMA di tornare qui).
+  L'ASIMMETRIA È IL PUNTO: scrivere una testa nuova su una riga
+  importata no, TOGLIERLA sì — il ramo 'ritira' passa sempre, ed è
+  anche una delle strade di guarigione. E la coda si svuota da sola nel
+  GET, col patto che c'è già due righe più su («senza chiave quelle
+  firme non arriveranno mai»): senza, `svuotaFirmeNostr` gira a ogni
+  apertura e il browser RIFIRMA e RIPUBBLICA quell'evento sui relay
+  ogni volta, più il nag di `sollecita_firme_nostr`.
+  IL «PERCHÉ» DELL'ALLARME DICEVA IL FALSO, e vale più della cura:
+  «la deduplica confronterebbe un annuncio con sé stesso» — mentre le
+  due liste di `trova_doppioni_nostr` sono DISGIUNTE su
+  `contatto_nostr`, quindi la riga cade solo fra gli importati e la
+  coppia SPARISCE dalla coda. Chi leggeva quel 🧊 andava a cercare
+  dalla parte sbagliata; e il danno vero non è la deduplica, è il
+  venditore chiuso fuori da un annuncio nato qui (niente Modifica,
+  niente rifornimento, e nemmeno «ritira il doppione», che rifiuta le
+  righe con `contatto_nostr`). Corretto in DUE posti — il catalogo e il
+  gemello `query_libro_mastro.sql` — dove cade anche «firmato da noi»:
+  col BIVIO la testa può essere sua, ed è proprio questo caso.
+  LA PROVA CHE VALE È `collaudo_due_teste.py`, che ricostruisce il 15
+  agosto con l'import VERO su un database usa-e-getta e relay di
+  cartone: se un domani qualcuno allenta la clausola, quella prova
+  MOSTRA il difetto — la riga adottata, stampata — invece di
+  descriverlo. Le sentinelle di `prove_anello` estraggono la query dal
+  SORGENTE e la fanno girare, e l'endpoint della firma gira per davvero
+  con `pezzo()`: una sentinella sulla forma direbbe che la clausola c'è,
+  mai che escluda la riga giusta lasciando passare le altre tre.
+  DUE COSE VISTE E NON TOCCATE, che tornano insieme il giorno della
+  cura delle righe: 1) il match per titolo del ramo `sold` ha la stessa
+  WHERE senza la guardia, quindi un evento suo marcato `sold` può
+  spegnere come «venduto» una riga NATIVA omonima di quel venditore
+  (nessun sat a rischio, `spegni_annuncio` filtra `stato='attivo'`) —
+  e diventa un rischio concreto per 208/209 appena torneranno native e
+  omonime; 2) `ritira_doppione` su una coppia col BIVIO risponde 502
+  «i relay non rispondono» mentre in realtà ha ACCODATO una firma e
+  funziona al giro dopo — oggi irraggiungibile perché la coppia non si
+  forma mai, e il tappo lo rende raggiungibile.
   MODERAZIONE, e qui i due strati finiscono in modo DIVERSO:
   le PAROLE VIETATE restano uno scarto secco (deterministico: armi e
   droga non vogliono una coda ma una porta chiusa; resta nel registro,
@@ -16257,6 +16328,35 @@ la colonna cominci a timbrarsi — è anche il censimento dei timer, cioè
 la risposta a «sono mai scattati?» che oggi si può dare solo dal
 journal — e il primo ordine che entra nella coda «⏸ Ordini fermi» col
 badge «⚖️ decidibile» acceso.
+Il tappo delle «due teste» (ago 2026, dalla ronda del libro mastro: gli
+annunci 208 e 209). Non un sanguinamento ma un EPISODIO — la ronda
+suona dal 16, sempre 1 controllo, nessun caso prima né dopo — e la
+diagnosi si è fatta tutta sul CODICE, in sola lettura, prima di toccare
+qualunque cosa: gli scrittori di quelle due colonne sono pochissimi e
+si contano, quindi la direzione («la riga era nativa e l'import se l'è
+presa») era certa senza guardare il database. Il tappo è una clausola
+sul solo match per titolo, la cintura sul POST della firma, la coda che
+si svuota da sola, e il «perché» dell'allarme corretto in due posti,
+che diceva il falso e mandava a cercare dalla parte sbagliata. Vedi
+Architettura, «L'ANNUNCIO A DUE TESTE», per la riga da non ammorbidire
+(mai sul match per `d`) e per le due cose viste e non toccate.
+Collaudato: 4090 prove verdi (13 nuove, eseguibili dove conta — la
+query estratta dal sorgente e girata, l'endpoint della firma fatto
+girare per davvero) più `collaudo_due_teste.py`, che ricostruisce il 15
+agosto con l'import VERO (12 verdi), e SEI mutazioni, una per riga
+sorvegliata, ognuna rossa da sola — quella che allenta la clausola fa
+rosse anche sei righe del collaudo, che è il punto: mostra il difetto
+invece di descriverlo.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta. **IL TAPPO NON SPEGNE L'ALLARME**: 208 e
+209 continuano a matchare per `d` e la ronda continua a suonare finché
+le righe non si toccano.
+RESTA DA DECIDERE, ed è un giro suo perché le due cose vanno insieme:
+la CURA DELLE DUE RIGHE (renderle di nuovo native azzerando
+`contatto_nostr` e i tre `nostr_origine_*` — ripara il danno e lascia
+la testa, che è legittimamente sua; togliere `nostr_event_id`
+curerebbe l'allarme e non il danno) e il ramo `sold`, perché da native
+e omonime ci ricadono.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
