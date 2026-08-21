@@ -642,6 +642,18 @@ try:
 except ImportError:
     TETTO_RICERCHE_AI_ORA = 30
 
+# LA PORTA DELL'IFRAME (ago 2026, col widget). Nasce SPENTA e il
+# perche' e' scritto per esteso in `no_iframe`: e' l'unica riga di
+# tutto il cantiere che possa ROMPERE qualcosa (la Mini App su
+# Telegram Web gira dentro un iframe, e un frame-ancestors sbagliato
+# la chiude fuori). Il widget funziona identico senza di lei;
+# accenderla e' una stretta in piu' su una porta rimasta aperta da
+# sempre, e si fa da qui dopo aver guardato quella strada.
+try:
+    from config import PROTEGGI_IFRAME
+except ImportError:
+    PROTEGGI_IFRAME = False
+
 # QUANTO VALE UN CAMBIO VECCHIO (ago 2026, da un caso vero: due deploy
 # a quattordici minuti l'uno dall'altro, e in tutti e due CoinGecko
 # muta — un compratore si e' trovato la pagina d'acquisto bloccata da
@@ -1084,6 +1096,62 @@ async def guardia_csrf(request, call_next):
             return JSONResponse({"detail": "Origine non consentita"},
                                 status_code=403)
     return await call_next(request)
+
+
+@app.middleware("http")
+async def no_iframe(request, call_next):
+    """NESSUNA PAGINA DI BARATTOLO STA DENTRO L'IFRAME DI UN ESTRANEO,
+    TRANNE IL WIDGET (ago 2026, col cantiere del widget).
+
+    Fino a ieri non c'era nessun `X-Frame-Options`: chiunque poteva
+    incorniciare barattolo.store in un iframe trasparente e far
+    toccare all'utente cose che credeva di toccare altrove — il
+    clickjacking di manuale. Il danno pratico era piccolo (col cookie
+    SameSite=Lax l'app in un iframe di terzi si vede sloggata, e
+    dentro Telegram l'initData li' dentro non c'e'), ma era una porta
+    aperta che non serviva a nessuno.
+    Adesso serve a UNA pagina sola, e il momento di chiudere le altre
+    e' proprio questo: da quando esiste il widget, «si puo' stare in un
+    iframe?» ha due risposte diverse, e senza distinguerle bisogna
+    dire di si' a tutti — che e' cio' che facciamo oggi senza averlo
+    scelto.
+    NIENTE `X-Frame-Options`, E QUESTA E' LA RIGA DA NON AGGIUNGERE
+    «per sicurezza»: quell'header e' BINARIO — o solo il proprio sito,
+    o nessuno — e su TELEGRAM WEB la Mini App gira dentro un iframe di
+    `web.telegram.org`. Un `SAMEORIGIN` di troppo qui non e' una
+    stretta: e' Barattolo che smette di aprirsi per chi usa Telegram
+    dal browser, e non se ne accorgerebbe nessuno finche' non lo prova
+    (dentro l'app di Telegram la WebView e' nativa e non c'entra: e'
+    esattamente il genere di guasto che si vede su una sola strada).
+    Si usa quindi il solo `frame-ancestors`, che una LISTA la sa
+    tenere — e che sui browser moderni ha comunque la precedenza
+    sull'header vecchio.
+    Il middleware puo' solo AGGIUNGERE, mai togliere: l'unica cosa che
+    sa fare e' rendere una pagina meno incorniciabile di prima. Chi
+    risponde gia' con una CSP sua (il documento della busta, che ha la
+    sandbox) resta com'e', ed e' il `setdefault` a garantirlo.
+
+    NASCE SPENTA, ed e' la ragione per cui questa leva esiste: il
+    widget NON ha bisogno di lei per funzionare — oggi tutto il sito
+    e' incorniciabile, widget compreso, quindi lasciare le cose
+    com'erano non toglie niente a nessuno. Questa e' una STRETTA in
+    piu', su una porta che era aperta da sempre senza che nessuno
+    l'avesse scelto, e l'unico pezzo di questo cantiere che possa
+    rompere qualcosa: se la lista dei domini di Telegram e' sbagliata
+    o incompleta, la Mini App smette di aprirsi da Telegram Web — e
+    non se ne accorge nessuno finche' qualcuno non ci prova.
+    Si accende dal config DOPO aver guardato quella strada, che e' il
+    patto di ASTA_ABILITATA e IMPORT_NOSTR_APERTO: una cosa che puo'
+    far male si accende con un gesto, mai per effetto di un deploy."""
+    if not PROTEGGI_IFRAME:
+        return await call_next(request)
+    r = await call_next(request)
+    if not request.url.path.startswith("/widget/"):
+        r.headers.setdefault(
+            "Content-Security-Policy",
+            "frame-ancestors 'self' https://web.telegram.org "
+            "https://*.telegram.org")
+    return r
 
 
 # ------------------------- DATABASE --------------------------------
@@ -11034,6 +11102,12 @@ def _leve_stato():
                   TETTO_RICERCHE_AI_ORA,
                   spento="nessun freno: ogni ricerca è una chiamata ad "
                          "Anthropic, e un ciclo banale brucia il credito"),
+            _leva("Porta dell'iframe chiusa", "PROTEGGI_IFRAME",
+                  PROTEGGI_IFRAME,
+                  spento="chiunque può incorniciare Barattolo nel proprio "
+                         "sito: è com'è sempre stato, e accenderla è una "
+                         "stretta — ma prima va provata la Mini App da "
+                         "Telegram Web, che gira in un iframe"),
             _leva("Bot in ascolto (webhook)", "TELEGRAM_WEBHOOK_SEGRETO",
                   webhook_attivo(),
                   spento="il bot manda e basta: niente /start, niente "
@@ -28490,6 +28564,217 @@ def _sitemap() -> bytes:
 def sitemap_xml():
     return Response(_sitemap(), media_type="application/xml",
                     headers={"Cache-Control": "public, max-age=3600"})
+
+
+# ---------------------- IL WIDGET DA INCORPORARE --------------------
+# (ago 2026) Un annuncio, o la vetrina di un negozio, dentro il sito di
+# qualcun altro: `<iframe src="https://barattolo.store/widget/...">`.
+#
+# L'IFRAME E NON UNO SCRIPT, ed e' la decisione che porta via tutto il
+# resto. Uno script che inietta HTML nella pagina ospite e' la strada
+# che tutti conoscono e ha tre difetti veri: il CSS del sito ospite
+# entra nel nostro (e viceversa), noi ci prendiamo il diritto di
+# eseguire codice su un dominio che non e' nostro — cioe' chiediamo a
+# un estraneo una fiducia che non ci serve — e ogni ritocco al nostro
+# markup puo' rompere la pagina di qualcun altro. L'iframe e' isolato
+# per costruzione: il peggio che puo' fare e' non caricarsi.
+#
+# NON SI SERVE `miniapp.html`: quella pesa quasi un mega ed e' un'app,
+# non un biglietto da visita. Qui c'e' una pagina SUA, markup fisso e
+# dati escapati, qualche kilobyte — la stessa ragione per cui il
+# cartello SEO esiste separato dal client.
+#
+# NIENTE DATI PRIVATI e niente azioni: si legge la vetrina (la
+# whitelist `CAMPI_VETRINA`, quella di sempre) e l'unico gesto e' un
+# LINK che porta su Barattolo. Un widget che potesse comprare sarebbe
+# un checkout dentro il sito di un estraneo.
+
+CACHE_WIDGET = 300        # 5 minuti: la vetrina cambia, il widget segue
+WIDGET_MAX = 12           # quante card al massimo nel negozio
+WIDGET_DEFAULT = 6
+
+# Il vestito, in linea: un widget non deve chiedere un secondo giro di
+# rete per un foglio di stile. I colori sono i token di casa scritti
+# per esteso — qui non c'e' il resto dell'app da cui ereditarli — e il
+# tema scuro segue quello del SITO OSPITE (`prefers-color-scheme`),
+# che e' la cosa giusta: il widget e' un ospite, non decide lui.
+WIDGET_CSS = """
+:root{--carta:#FFF8EA;--ink:#23282C;--muted:#6B6257;--bordo:#E8DFC9;
+ --sats:#D97706;--ombra:rgba(35,40,44,.10)}
+@media (prefers-color-scheme:dark){:root{--carta:#2C2517;--ink:#F3EAD8;
+ --muted:#B3A691;--bordo:#463C28;--sats:#F7931A;--ombra:rgba(0,0,0,.35)}}
+*{box-sizing:border-box}
+body{margin:0;padding:10px;font:15px/1.4 system-ui,-apple-system,
+ "Segoe UI",Roboto,sans-serif;color:var(--ink);background:transparent}
+a{text-decoration:none;color:inherit;display:block}
+.w{background:var(--carta);border:1px solid var(--bordo);border-radius:14px;
+ box-shadow:0 2px 6px var(--ombra);overflow:hidden}
+.w-uno{display:flex;gap:12px;padding:12px;align-items:center}
+.ph{width:96px;height:96px;flex:0 0 96px;border-radius:10px;
+ object-fit:cover;background:var(--bordo)}
+.dati{min-width:0;flex:1}
+.tit{font-weight:700;margin:0 0 4px;font-size:16px;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+ overflow:hidden}
+.prezzo{color:var(--sats);font-weight:800;font-size:17px}
+.meta{color:var(--muted);font-size:13px;margin-top:3px}
+.cta{margin-top:8px;display:inline-block;background:var(--sats);
+ color:#fff;font-weight:700;font-size:13px;padding:7px 14px;
+ border-radius:9px}
+.testa{display:flex;align-items:center;gap:9px;padding:11px 12px;
+ border-bottom:1px solid var(--bordo)}
+.testa b{font-size:15px}
+.griglia{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+ gap:9px;padding:11px}
+.cella .ph{width:100%;height:auto;aspect-ratio:1/1;flex:none}
+.cella .tit{font-size:13px;margin:6px 0 2px}
+.cella .prezzo{font-size:14px}
+.piede{padding:9px 12px;border-top:1px solid var(--bordo);
+ color:var(--muted);font-size:12.5px;display:flex;
+ justify-content:space-between;gap:8px;align-items:center}
+.vuoto{padding:22px 12px;text-align:center;color:var(--muted)}
+"""
+
+# L'altezza la dice il widget al sito ospite: chi vuole puo'
+# ascoltarla e ridimensionare l'iframe. Chi non fa niente si tiene
+# l'altezza che ha scritto, ed e' il caso normale — quindi lo snippet
+# che diamo da copiare porta gia' una misura sensata.
+WIDGET_JS = """
+<script>
+(function(){function d(){try{parent.postMessage({barattolo:1,
+altezza:document.documentElement.scrollHeight},'*')}catch(e){}}
+addEventListener('load',d);addEventListener('resize',d);d()})();
+</script>"""
+
+
+def _widget_pagina(corpo: str, titolo: str) -> Response:
+    """Il guscio. `X-Frame-Options` NON si mette qui, ed e' il punto di
+    tutta la rotta: questa e' l'unica pagina del sito fatta per stare
+    dentro l'iframe di un estraneo. Tutte le altre lo prendono (vedi
+    `no_iframe`), e la differenza fra le due e' cio' che rende sicuro
+    aprire questa."""
+    html_ = (f'<!doctype html><html lang="it"><head><meta charset="utf-8">'
+             f'<meta name="viewport" content="width=device-width,'
+             f'initial-scale=1"><meta name="robots" content="noindex">'
+             f"<title>{_testo(titolo)}</title><style>{WIDGET_CSS}</style>"
+             f"</head><body>{corpo}{WIDGET_JS}</body></html>")
+    return Response(html_, media_type="text/html; charset=utf-8",
+                    headers={"Cache-Control":
+                             f"public, max-age={CACHE_WIDGET}"})
+
+
+def _widget_niente(messaggio: str) -> Response:
+    """Un widget che non trova la sua merce non e' un errore da 404:
+    e' un riquadro che lo dice. Un 404 dentro l'iframe di qualcun
+    altro si vede come una pagina rotta, e a rimetterci e' il sito
+    ospite — che con noi non c'entra niente."""
+    return _widget_pagina(
+        f'<div class="w"><div class="vuoto">{_testo(messaggio)}<br>'
+        f'<a class="cta" style="margin-top:10px" target="_blank" '
+        f'rel="noopener" href="{_attr(URL_PUBBLICO)}">Vai su Barattolo</a>'
+        f"</div></div>", "Barattolo")
+
+
+def _widget_prezzo(a: dict, cambio: float) -> str:
+    """Il prezzo del widget: quello del post di canale, che e' gia' il
+    giudice di come si scrive un prezzo fuori dall'app — valuta del
+    listino per prima, l'altra col ≈, e senza cambio il ≈ si omette."""
+    return _prezzo_promo(a, cambio)
+
+
+def _widget_card(a: dict, cambio: float, cella: bool = False) -> str:
+    """Una card. `cella` = dentro la griglia del negozio, dove la foto
+    sta sopra invece che di lato."""
+    foto = _immagine_anteprima(a.get("foto") or "")[0]
+    url = _url_annuncio(a["id"], a["titolo"])
+    venduto = a.get("stato") == "venduto"
+    riga_stato = ('<div class="meta">✅ Venduto</div>' if venduto else "")
+    if cella:
+        return (f'<a class="cella" target="_blank" rel="noopener" '
+                f'href="{_attr(url)}">'
+                f'<img class="ph" loading="lazy" alt="" '
+                f'src="{_attr(foto)}">'
+                f'<div class="tit">{_testo(a["titolo"])}</div>'
+                f'<div class="prezzo">{_testo(_widget_prezzo(a, cambio))}'
+                f"</div>{riga_stato}</a>")
+    luogo = a.get("zona_comune") or ""
+    return (f'<div class="w"><a class="w-uno" target="_blank" '
+            f'rel="noopener" href="{_attr(url)}">'
+            f'<img class="ph" alt="" src="{_attr(foto)}">'
+            f'<div class="dati"><div class="tit">{_testo(a["titolo"])}</div>'
+            f'<div class="prezzo">{_testo(_widget_prezzo(a, cambio))}</div>'
+            + (f'<div class="meta">📍 {_testo(luogo)}</div>' if luogo else "")
+            + riga_stato
+            + '<span class="cta">'
+            + ("Vedi su Barattolo" if venduto else "Compra su Barattolo")
+            + "</span></div></a></div>")
+
+
+@app.get("/widget/annuncio/{aid}")
+def widget_annuncio(aid: str):
+    """Un annuncio solo, da mettere sul proprio sito.
+
+    Serve anche il VENDUTO, spento e col suo badge: e' la stessa regola
+    della scheda e dell'anteprima dei link — un link mandato a un amico
+    non deve morire con le scorte, e chi ha incollato il widget sul suo
+    sito non deve ritrovarsi un buco il giorno che vende. Il rimosso e
+    quello in revisione no: quelli non raccontano niente di se'."""
+    ident = _id_da_percorso(aid)
+    if not ident:
+        return _widget_niente("Annuncio non trovato")
+    con = db()
+    try:
+        r = con.execute(
+            f"SELECT {CAMPI_VETRINA}, a.stato FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
+            (ident,)).fetchone()
+    finally:
+        con.close()
+    if not r:
+        return _widget_niente("Questo annuncio non è più disponibile")
+    a = arricchisci_righe_vetrina([dict(r)])[0]
+    return _widget_pagina(_widget_card(a, cambio_noto_ora()), a["titolo"])
+
+
+@app.get("/widget/negozio/{chi}")
+def widget_negozio(chi: str, n: int = WIDGET_DEFAULT):
+    """La vetrina di un negozio: le ultime N cose in vendita.
+
+    `chi` e' lo username o il codice, e si spacca sul primo trattino
+    come le rotte sorelle — un widget copiato dall'indirizzo canonico
+    porta lo slug appresso, e senza quello spacco non troverebbe
+    nessuno (la regressione gia' pagata su /negozio)."""
+    chi = _chi_da_percorso(chi)
+    n = max(1, min(int(n or WIDGET_DEFAULT), WIDGET_MAX))
+    con = db()
+    try:
+        u = con.execute(
+            "SELECT tg_id, nome, negozio FROM utenti "
+            "WHERE (username=? COLLATE NOCASE OR negozio=?) AND negozio!=''",
+            (chi, chi)).fetchone()
+        righe = [] if not u else [dict(x) for x in con.execute(
+            f"SELECT {CAMPI_VETRINA} FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.venditore_id=? AND a.stato='attivo' "
+            "ORDER BY a.creato DESC, a.id DESC LIMIT ?", (u["tg_id"], n))]
+    finally:
+        con.close()
+    if not u:
+        return _widget_niente("Negozio non trovato")
+    righe = arricchisci_righe_vetrina(righe)
+    cambio = cambio_noto_ora()
+    url = _url_negozio(u["negozio"], u["nome"] or "")
+    celle = "".join(_widget_card(a, cambio, cella=True) for a in righe)
+    corpo = (f'<div class="w"><div class="testa">🫙 <b>'
+             f'{_testo(u["nome"] or "Negozio")}</b></div>'
+             + (f'<div class="griglia">{celle}</div>' if celle else
+                '<div class="vuoto">Nessun oggetto in vendita</div>')
+             + f'<div class="piede"><span>⚡ Pagamenti in satoshi, col '
+               f'deposito di garanzia</span>'
+               f'<a class="cta" target="_blank" rel="noopener" '
+               f'href="{_attr(url)}">Vedi tutto</a></div></div>')
+    return _widget_pagina(corpo, u["nome"] or "Negozio")
 
 
 @app.get("/")
