@@ -5741,7 +5741,115 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   l'articolo sotto la soglia. Quando la lampo finisce, l'articolo
   torna al prezzo scontato normale: lo fa da solo il re-render della
   scadenza, senza un ramo apposta. La catena intera è
-  esaurito > ferie > asta > lampo > sconto.
+  esaurito > ferie > asta > (accordo | lampo) > sconto.
+  IL PREZZO DELL'ACCORDO SI VEDE SUBITO (ago 2026, decisione di
+  Andrea): chi ha un'offerta ACCETTATA vedeva il LISTINO PIENO
+  dappertutto — scheda, vetrina, negozio, «Altri oggetti» e perfino
+  nelle celle del carrello, dove la barra sotto diceva già la cifra
+  pattuita: due numeri nella stessa schermata. La cifra vera compariva
+  solo alla cassa, dove la manda il server. Adesso il prezzo mostrato è
+  quello dell'accordo, col listino BARRATO accanto — la resa che lampo
+  e sconto hanno già.
+  IL DATO C'ERA, ED È LA RAGIONE PER CUI IL CANTIERE È PICCOLO:
+  `offerteMie` sta in memoria dall'avvio (prima di qualunque
+  `openDetail`) e `accordoDi` dà la cifra UNITARIA nella valuta del
+  listino — zero rete, zero campi nuovi, zero server. E la decisione
+  «accordo o lampo, col MIN» viveva GIÀ dentro `artStima`: solo che
+  quella torna sats e il numero grande passava da un'altra strada.
+  IL GIUDICE È UNO E TORNA ANCHE IL MOTIVO: `giudizioPrezzo(l)` →
+  `{v, motivo}` con `'accordo' | 'lampo' | ''`, e `artStima` diventa
+  UNA RIGA (`satsAnnuncio(vistaArticolo(l))`) — cambia il TIPO, mai il
+  numero, e il nome e la firma non si toccano perché cinque chiamanti a
+  valle (totaleStima, totaleSet, preventivoDemo, spedGratisQui,
+  scontoQui) devono ricevere quel che ricevevano. Il motivo serve
+  perché card e scheda devono sapere CHI ha vinto senza ricostruirlo da
+  fuori: sarebbero tre copie di una condizione sottile, e un `===` su
+  una vista appena uscita da `Object.assign` non è nemmeno stabile fra
+  due chiamate.
+  `conAccordo` È IL GEMELLO DI `conLampo` ma con una riga che quello
+  non ha — **riscrive la `valuta`**: l'accordo fotografa la valuta del
+  listino AL MOMENTO DELLA PROPOSTA, quindi un annuncio in EUR può
+  portarsi un accordo in sats (basta che il venditore abbia cambiato
+  valuta dopo la stretta di mano), e senza `v.valuta` `satsAnnuncio`
+  prende il ramo dell'altra faccia e torna una CONVERSIONE al posto
+  della cifra pattuita. È la trappola numero uno, e ha la sua prova.
+  QUI DENTRO LO SCONTO CARRELLO NON ENTRA MAI, e non è una scelta di
+  gusto: `scontoQui` chiama `artStima`, che chiama il giudice — sarebbe
+  un ANELLO. Ed è anche la regola del conto, dove l'accordo è il LORDO
+  su cui lo sconto si misura: a scontarlo è la pagina Paga. Da qui
+  l'accordo batte lo sconto senza MIN — e si chiude un'incoerenza che
+  c'era GIÀ: `scontoQui` misurava la cifra dell'accordo mentre
+  `conSconto` scontava il LISTINO (accordo 30k, listino 50k, sconto
+  10% davano a schermo 45k, che non è il prezzo di nessuno).
+  NIENTE BADGE E NIENTE COLORE (decisione di Andrea): solo la cifra e
+  il barrato. Così i colori del prezzo in card restano QUATTRO — il
+  censimento non si tocca — l'angolo in alto a sinistra resta libero
+  («Ne resta 1» può convivere), il numero grande della scheda resta
+  l'arancio di sempre e la riga del barrato è senza chip. **Zero regole
+  CSS nuove: il cantiere è tutto JS.** A dire PERCHÉ costa meno c'è il
+  banner 🤝, due dita sotto. Il badge dello SCONTO invece si spegne,
+  o direbbe «−15%» sopra una cifra che non è il listino meno il 15%.
+  IMPERFEZIONE DICHIARATA E ACCETTATA: in card la cifra più bassa non
+  dice perché, e con un accordo per 3 pezzi quell'unitario si ottiene
+  solo comprandone 3 — lo dicono la scheda e il `× 3` dentro Acquista.
+  IL BARRATO SI CHIEDE (`piuBasso`), e questa è la riga che lampo e
+  sconto non hanno mai avuto bisogno di scrivere: una percentuale
+  riduce sempre, un accordo NO — si può accettare un'offerta al listino
+  pieno, o calare il listino dopo. La stessa cifra barrata sopra sé
+  stessa non è una riga, è un refuso. È una domanda di RESA e non di
+  prezzo: la VISTA resta quella dell'accordo anche quando è più alta, o
+  si mentirebbe sul conto.
+  LA QUANTITÀ NON VUOLE NIENTE: in grande va l'UNITARIO, perché il
+  prezzo di questa app è unitario ovunque; il totale lo dice già
+  `cifraAccordo` nel banner («360.000 sats per 3 pezzi (120.000 al
+  pezzo)») e il `× 3` statico dentro Acquista.
+  L'ACCORDO SCADUTO NON VALE PIÙ, col GATE IN LETTURA di lampo, asta e
+  ferie — dentro `offertaAccettataPer`, così lo ereditano tutti: fino a
+  ieri, nei dieci minuti fra la scadenza e il giro dell'orologio (e per
+  sempre senza ricaricare), il client prometteva un accordo morto —
+  prezzo, banner, stepper pinnato e tasto «Fai un'offerta» nascosto.
+  FAIL-OPEN sulla scadenza assente o a zero: un'assenza non spegne un
+  accordo. L'ECCEZIONE SONO I CINQUE CHE MANDANO `offerta_id` AL
+  SERVER (`ancheScaduta`), ed è un CENSIMENTO e non un elenco:
+  **l'orologio del telefono è il giudice di cosa si disegna, mai dei
+  soldi** — l'id parte sempre, e a dire se vale è il server; nell'altro
+  verso si perderebbe in silenzio un accordo che il server avrebbe
+  onorato.
+  IL RITORNO AL PREZZO PIENO HA DUE CAUSE E DUE MECCANISMI, e nessuno
+  dei due copre l'altro per caso. Il TEMPO lo guarda il battito, con
+  `prossimoAccordo` gemello di `prossimaLampo` — ⚠️ ma quello si
+  auto-azzera dentro `renderGrid` e questo NO (l'accordo non sta
+  sull'annuncio, sta in `offerteMie`): senza il ricalcolo esplicito nel
+  suo ramo, dal primo accordo scaduto in poi la griglia si
+  ridisegnerebbe UNA VOLTA AL SECONDO PER SEMPRE. Il CAMBIO DI STATO lo
+  guarda `rinfrescaAccordi`, estratta dal blocco che viveva in
+  `avvia()` perché `loadOfferte` ha CINQUE chiamanti e un predicato
+  ricopiato cinque volte è un predicato che un giorno diverge.
+  E GUARDA IL CAMBIAMENTO, NON LA PRESENZA — difetto trovato DAL VIVO
+  e non leggendo: chiedendo «c'è un accordo su questa card?» il
+  rinfresco scattava alla NASCITA e taceva alla SPARIZIONE, cioè
+  proprio al RITIRO, dove la scheda tornava al listino e la card
+  restava a dire la cifra di un accordo che non c'era più. Si tiene
+  l'insieme di quel che l'ultimo giro ha disegnato e si ridisegna su
+  chi è ENTRATO o USCITO (il pattern della firma di `sfogliaDaRifare`);
+  il primo giro trova l'insieme vuoto, quindi ogni accordo vivo è
+  un'entrata — cioè il comportamento dell'avvio, senza un ramo apposta.
+  E LA RIAPERTURA DELLA SCHEDA GUARDA IL COUNTDOWN, non il barrato
+  (correzione di un difetto preesistente che il cantiere avrebbe
+  peggiorato): `.lampo-was` è il VESTITO della riga e lo portano anche
+  lo sconto e l'accordo, quindi una lampo scaduta su un'ALTRA card in
+  vetrina riapriva una scheda che non aveva niente da rimettere a
+  posto — perdendo la strada di consegna scelta. `.lampo-count` ce
+  l'ha solo la lampo.
+  FUORI RESTANO, dichiarati: il BARATTOLO (`renderPreferiti` ha una
+  riga sua che mostra il listino crudo — ignora accordo, lampo e
+  sconto: difetto preesistente, non toccato per decisione di Andrea),
+  «I tuoi annunci» (vista del venditore, dove il listino è corretto per
+  definizione) e la pagina Paga (le cifre le manda il server).
+  E L'IMPERFEZIONE DEI FILTRI SI ALLARGA: il predicato SQL guarda il
+  listino e non conosce gli accordi — sono per compratore, mentre la
+  vetrina è di tutti — quindi da oggi la card può mostrare una cifra
+  che filtri e ordinamento del server non conoscono.
   «NE RESTA 1» SI SPEGNE PER LO SCONTO, e questa riga ROVESCIA quella
   del giro prima («convivono: due slot diversi»): era vera finché il
   verde era solo un colore del prezzo, e ha smesso di esserlo il
@@ -16982,6 +17090,48 @@ quel che c'è, aggiunge solo due rotte e un foglio. DA GUARDARE al
 primo giro: il primo widget incollato su un sito vero. E se un giorno
 si vorrà accendere la leva, PRIMA si apre Barattolo da Telegram Web
 (il browser, non l'app): è la sola strada che può chiudere.
+
+Il prezzo dell'accordo si vede subito (ago 2026, decisione di Andrea):
+chi ha un'offerta accettata vedeva il listino pieno dappertutto — e
+nelle celle del carrello la barra sotto diceva già la cifra pattuita,
+cioè due numeri nella stessa schermata. Adesso il prezzo mostrato è
+quello dell'accordo col listino barrato accanto, in tutte e cinque le
+superfici che passano dal giudice unico. Niente badge e niente colore
+(i colori del prezzo in card restano quattro), niente CSS nuovo,
+niente server: il dato era già in memoria dall'avvio e la decisione
+«accordo o lampo, col MIN» viveva già dentro `artStima`, che adesso è
+una riga derivata dal giudice. Vedi Architettura, «IL PREZZO
+DELL'ACCORDO SI VEDE SUBITO», per la trappola della valuta riscritta,
+per il gate della scadenza coi cinque POST che lo scavalcano, e per il
+battito che senza il ricalcolo esplicito ridisegnerebbe la griglia una
+volta al secondo per sempre.
+DUE DIFETTI TROVATI DAL VIVO e non leggendo: il rinfresco si accendeva
+quando un accordo NASCE e taceva quando SPARISCE — cioè proprio al
+ritiro, dove la scheda tornava al listino e la card restava a dire la
+cifra di un accordo che non c'era più (adesso guarda il CAMBIAMENTO,
+col pattern della firma); e la riapertura della scheda nel battito
+guardava `.lampo-was`, che è il vestito condiviso, quindi una lampo
+scaduta su un'altra card riapriva una scheda che non aveva niente da
+rimettere a posto. E una LEZIONE DI METODO: la prima prova della
+scadenza diceva «il battito non scatta», ed era la SONDA a essere
+rotta — ricalcolavo io la prossima scadenza subito dopo averla messa
+nel passato, togliendo al battito la cosa che doveva vedere.
+Collaudato: 4242 prove verdi (+94, fra cui DUE eseguibili — i giudici
+del prezzo su 13 casi con l'atteso scritto a mano, che è anche la
+prova che `artStima` risponde gli stessi numeri di prima, e il
+rinfresco che si accende nei due versi), sette sentinelle rovesciate
+col motivo, e **15 mutazioni, 0 sopravvissute**. Più il giro dal vivo
+col server vero su un database usa-e-getta: offerta per 3 pezzi →
+accettazione → card, scheda, toggle valuta nei due versi, carrello
+(dove cella e barra dicono finalmente la stessa cosa), la scadenza
+sotto il battito vero (UN ridisegno, e non si ripete) e il ritiro dal
+foglio di conferma. Screenshot a 320/360/375 nei due temi.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
+nessuna leva, nessuna rotta — e in DEMO e in vetrina non cambia un
+pixel, che lì `offertaAccettataPer` torna sempre null. DA GUARDARE al
+primo giro: il primo accordo vero dentro Telegram, e che alla scadenza
+la card torni al listino da sola.
+
 
 Via il bottone «📬 È arrivato — lo controllo» (ago 2026): il passo
 intermedio fra 'shipped' e 'delivered' se n'è andato col suo endpoint,
