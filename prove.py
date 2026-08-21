@@ -24494,6 +24494,45 @@ def prove_annotazioni_negli_ambienti():
           [], scoperti)
 
 
+def prove_condivisione_venditore():
+    """IL TESTO CONDIVISO DICE CHI VENDE (ago 2026).
+
+    Un link mandato a un amico portava titolo e prezzo e basta: chi
+    lo riceve non sa da chi sta comprando, e su un mercatino la
+    persona e' meta' della decisione. La riga si aggiunge al testo,
+    mai al LINK — quello resta l'indirizzo parlante di sempre.
+
+    LE DUE RIGHE DA SORVEGLIARE. 1) UN MODO SOLO di dire la persona:
+    username, poi nome, poi npub, in cascata — due di fila
+    («@rosina (Rosina)») sarebbero la stessa persona detta due volte.
+    2) IL TRATTINO NON E' UN NOME: `mapListing` mette '—' quando il
+    nome manca, e senza quella guardia si condividerebbe «Annuncio
+    di —», che e' peggio del silenzio."""
+    print("\n[il testo condiviso dice chi vende]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ca = pezzo_js(mini, "function condividiAnnuncio(){", "\n}\n")
+    prova("chi vende entra nel testo condiviso", True,
+          "Annuncio di ${chi}" in ca)
+    prova("...in cascata, un modo solo per persona", True,
+          "l.username ?" in ca and "l.seller" in ca
+          and "l.sellerNpub" in ca)
+    prova("...col trattino escluso, che segnaposto non e' un nome",
+          True, "l.seller !== '—'" in ca)
+    prova("...e senza nessuno dei tre la riga non si scrive", True,
+          "(chi ? `\\nAnnuncio di ${chi}`" in ca)
+    # Il LINK non si tocca: e' l'indirizzo parlante, e il testo gli
+    # sta accanto. Se un domani qualcuno ci infilasse il venditore
+    # dentro, l'indirizzo smetterebbe di combaciare col canonical.
+    prova("il link resta l'indirizzo parlante di sempre", True,
+          "/annuncio/${l.id}${s ? '-' + s : ''}" in ca)
+    # E i tre campi ESISTONO davvero in mapListing: se uno sparisse,
+    # la cascata scivolerebbe sul successivo senza un errore — la
+    # riga direbbe una cosa diversa da quella che si e' scritta.
+    ml = pezzo_js(mini, "function mapListing(", "\n}\n")
+    for campo in ("seller:", "username:", "sellerNpub:"):
+        prova(f"...e `{campo}` arriva da mapListing", True, campo in ml)
+
+
 def prove_altri_scorrimento():
     """«ALTRI OGGETTI DEL VENDITORE» A SCORRIMENTO CONTINUO (ago 2026):
     in fondo al dettaglio si vede TUTTO il negozio, una pagina alla
@@ -30083,6 +30122,7 @@ def main():
               prove_scoprire_p2p,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
+              prove_condivisione_venditore,
               prove_script_nel_workflow,
               prove_annotazioni_negli_ambienti,
               prove_nwc_cifratura,

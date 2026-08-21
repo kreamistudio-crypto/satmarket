@@ -18404,9 +18404,22 @@ function condividiAnnuncio(){
      payload (mai ricalcolato qui) e senza di lui il link resta quello
      di sempre, che continua a funzionare. */
   const s = String(l.slug || '').replace(/[^a-z0-9-]/g, '');
+  /* CHI VENDE, nell'ordine in cui esiste: username Telegram, nome,
+     npub. UNO SOLO, mai due modi di dire la stessa persona — e se non
+     c'e' nessuno dei tre la riga non si scrive affatto, che «Annuncio
+     di —» sarebbe peggio del silenzio (il trattino e' il segnaposto
+     che il payload usa per il nome mancante, non un nome).
+     Il testo lo compone questa funzione e non `condividiLink`, che e'
+     il tubo condiviso con la pagina del deposito: la' non c'e' nessun
+     venditore da nominare. */
+  const chi = l.username ? `@${l.username}`
+    : (l.seller && l.seller !== '—' ? l.seller : (l.sellerNpub || ''));
+  const testo = `${l.title} — ${prezzo} su Barattolo 🫙`
+    + (chi ? `\nAnnuncio di ${chi}` : '')
+    + `\nPagamento in satoshi`;
   return condividiLink(
     `${location.origin}/annuncio/${l.id}${s ? '-' + s : ''}`,
-                       `${l.title} — ${prezzo} su Barattolo 🫙`, l.title);
+    testo, l.title);
 }
 
 /* Il link della spiegazione lunga del deposito. Il testo che
