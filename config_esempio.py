@@ -562,12 +562,18 @@ AVVISI_ORDINI_ADMIN = True
 # freno d'emergenza, non una scelta.
 ORE_INITDATA = 24
 
-# Quante ricerche AI puo' fare un utente in un'ora. E' l'unica rotta
-# dove una richiesta qualunque diventa una chiamata ad Anthropic, e il
-# prompt e' sempre grande uguale (fino a 300 annunci): senza freno, un
-# ciclo banale brucia il credito. Finita la quota si risponde col
-# filtro per parole, che non costa niente. 0 = nessun freno.
-TETTO_RICERCHE_AI_ORA = 30
+# LA RICERCA NON HA PIU' UNA QUOTA (ago 2026): `TETTO_RICERCHE_AI_ORA`
+# frenava le chiamate ad Anthropic della ricerca, e la ricerca non
+# chiama piu' nessuno — e' un indice full-text dentro SQLite. Una riga
+# rimasta qui e' inerte e si puo' togliere.
+#
+# Quel che le serve e' un PACCHETTO, non una leva:
+#     pip install snowballstemmer
+# E' lo stemmer italiano (Python puro, ~100 KB, nessuna dipendenza:
+# l'algoritmo Snowball che sta sotto Lucene ed Elasticsearch), ed e'
+# quello che fa trovare «collezione» cercando «collezionismo».
+# Senza, il server parte lo stesso e la ricerca lavora a troncamento:
+# piu' grossolana, mai muta — e l'avvio lo dice con una riga.
 
 # --- La porta dell'iframe (ago 2026, col widget) ---------------------
 # Accesa, nessun sito estraneo puo' incorniciare Barattolo in un

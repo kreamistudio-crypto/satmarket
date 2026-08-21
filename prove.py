@@ -15,6 +15,7 @@ import ast
 import os
 import re
 import sys
+import textwrap
 
 QUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, QUI)
@@ -4791,56 +4792,53 @@ def prove_ssrf_redirect():
           "scarica=None)" in imp and "esito = scarica(url)" in imp)
 
 
-def prove_quota_ricerca():
-    """Il freno della ricerca AI (ago 2026, audit). Era l'unica rotta
-    dove UNA richiesta di un utente qualunque = UNA chiamata ad
-    Anthropic, con un prompt di dimensione massima fissa: il credito
-    si bruciava con un ciclo banale."""
-    print("\n[la quota delle ricerche]")
-    import time as _t
+def prove_niente_ai_nella_ricerca():
+    """L'AI E' USCITA DALLA RICERCA (ago 2026, decisione di Andrea).
+    Questa famiglia ha CAMBIATO LATO: prima certificava il freno della
+    ricerca AI — la quota oraria, il catalogo da 300, il ripiego a
+    quota finita — e adesso certifica che di quella strada non resti
+    niente. Il precedente e' la sentinella del reaper sui 'creato' e
+    quella degli avatar.
 
-    def monta(tetto):
-        amb = {"TETTO_RICERCHE_AI_ORA": tetto, "RICERCA_QUOTA": {},
-               "time": _t}
-        exec(pezzo("_ricerca_ai_concessa"), amb)
-        return amb["_ricerca_ai_concessa"], amb["RICERCA_QUOTA"]
-
-    concessa, quota = monta(3)
-    prova("le prime tre passano", [True, True, True],
-          [concessa(111) for _ in range(3)])
-    prova("la quarta no", False, concessa(111))
-    prova("...ma solo per lui", True, concessa(222))
-    prova("il contatore e' per utente", 2, len(quota))
-
-    concessa, _ = monta(0)
-    prova("tetto a 0 = nessun freno", [True] * 50,
-          [concessa(111) for _ in range(50)])
-
-    # il gettone si consuma solo quando si passa: chi e' gia' oltre il
-    # tetto non deve far crescere il contatore all'infinito
-    concessa, quota = monta(2)
-    for _ in range(10):
-        concessa(111)
-    prova("oltre il tetto il contatore si ferma", 2, quota[111][1])
-
-    # --- SENTINELLE -------------------------------------------------
+    Perche' serve una prova, e non basta aver cancellato: una chiamata
+    ad Anthropic che rientrasse di soppiatto nella ricerca non
+    romperebbe nulla di visibile — costerebbe credito a ogni tasto, e
+    lo si scoprirebbe dalla fattura."""
+    print("\n[niente AI nella ricerca]")
     c = pezzo("cerca")
-    prova("sentinella: l'utente della ricerca non si butta via", True,
-          "user = verifica_utente(" in c)
-    prova("sentinella: il freno sta PRIMA di impaginare il catalogo",
-          True, c.index("_ricerca_ai_concessa") < c.index("catalogo = "))
-    prova("sentinella: la chiamata AI ha un timeout", True,
-          "max_tokens=200, timeout=" in c)
-    # a quota finita si risponde lo stesso: il filtro per parole non
-    # costa niente, e un vicolo cieco non serve a nessuno
-    prova("a quota finita si risponde col filtro per parole", True,
-          "return risposta(filtro_semplice(), False)" in c)
-    # e la forma vecchia resta per i client in cache
+    prova("la ricerca non chiama piu' il modello", True,
+          "ai.messages.create" not in c)
+    prova("...ne' costruisce un catalogo per lui", True,
+          "catalogo" not in c)
+    prova("il freno a gettoni non esiste piu'", 0,
+          _SORGENTE.count("_ricerca_ai_concessa"))
+    prova("...ne' la sua quota in memoria", 0,
+          _SORGENTE.count("RICERCA_QUOTA"))
+    prova("...ne' il tetto del catalogo", 0,
+          _SORGENTE.count("TETTO_CATALOGO_AI"))
+    # La rotta resta AUTENTICATA: non e' piu' credito da difendere, ma
+    # una superficie pubblica senza un motivo e' solo superficie (la
+    # lezione di /api/comuni).
+    prova("il guscio resta autenticato", True, "verifica_utente(" in c)
+    # E la forma della risposta non si tocca, per i client in cache.
     prova("senza busta resta l'array di sempre", True,
-          '{"annunci": righe, "ai": ai_usata} if busta else righe' in c)
+          '{"annunci": annunci, "ai": False} if busta else annunci' in c)
     mini = open("miniapp.html", encoding="utf-8").read()
-    prova("il client regge tutte e due le forme", True,
-          "Array.isArray(d) ? d : (d.annunci || [])" in mini)
+    # Il client non chiama piu' `/api/search` affatto: la ricerca
+    # passa dalla vetrina, e a reggere le due forme della risposta —
+    # l'array di ieri e la busta paginata — resta `leggiPagina`, che
+    # e' il posto dove quel patto e' sempre vissuto.
+    prova("il client non chiama piu' /api/search", 0,
+          mini.count("API_BASE}/search"))
+    prova("...e le due forme della risposta le regge leggiPagina", True,
+          "const leggiPagina = j => Array.isArray(j) ? "
+          "{annunci: j, cursore: null} : j;" in mini)
+    # IL MODELLO RESTA DOVE SERVE: la moderazione, la
+    # ricategorizzazione e l'import a lotti continuano a chiamarlo.
+    # Questa prova e' la meta' che impedisce di leggere la famiglia
+    # come «via l'AI da Barattolo».
+    prova("l'AI resta dov'e' il suo mestiere", True,
+          _SORGENTE.count("ai.messages.create") >= 3)
 
 
 def prove_initdata():
@@ -12952,7 +12950,7 @@ def _censimento(acceso):
                  "AVVISI_ORDINI_ADMIN", "TERMOMETRO_SOTTOCATEGORIE",
                  "CONTROLLO_LIBRO_MASTRO", "ORE_INITDATA",
                  "PROTEGGI_IFRAME",
-                 "TETTO_RICERCHE_AI_ORA", "COMMISSIONE_PERCENTO",
+                 "COMMISSIONE_PERCENTO",
                  "PROTEZIONE_PERCENTO", "TETTO_SATS_ANNUNCIO",
                  "SOLLECITO_INCASSO_GIORNI", "PROMEMORIA_CONFERMA_GIORNI",
                  "PROMEMORIA_SPEDIZIONE_GIORNI", "PROMEMORIA_DIGITALE_ORE",
@@ -14007,9 +14005,16 @@ def prove_leve():
     # perche' quella la si cambia da li' e mandare qualcuno sul VPS
     # sarebbe un indirizzo sbagliato: `/nome` di sole lettere, cosi'
     # un percorso di file (che comincia anche lui con «/») non passa.
+    # E dallo stemmer della ricerca (ago 2026) e' ammesso anche un
+    # «pip install nome»: quella leva non e' una riga del config ma un
+    # PACCHETTO, e mandare a cercarla nel config sarebbe l'indirizzo
+    # sbagliato. Resta il patto: e' il NOME della cosa da andare a
+    # cambiare, e un segreto non ha questa forma.
     def chiave_lecita(c):
         return (c.isupper() or c.startswith("_")
-                or (c.startswith("/") and c[1:].isalpha()))
+                or (c.startswith("/") and c[1:].isalpha())
+                or (c.startswith("pip install ")
+                    and c[12:].replace("-", "").isalnum()))
 
     prova("le chiavi sono nomi di config o comandi, non valori", True,
           all(chiave_lecita(c) for c in voci_on))
@@ -15362,26 +15367,28 @@ def prove_anteprime():
     # censimento ne aveva mancati tre (testo_prezzo dei moderatori e i
     # due avvisi gemelli del drift del cambio), ed e' stata questa
     # sentinella a prenderli.
-    # I TRE superstiti non li legge una persona: le due righe di prosa
-    # del NIP-99 («Prezzo:» e «spedizione:»), che stanno nello stesso
-    # evento dei tag e li ripetono a parole — divergere da loro sarebbe
-    # peggio —, e la riga del catalogo che va in pasto ad Haiku, dove
-    # il formato compatto e' per la macchina.
-    prova("...ne' quelli che scrivono EUR a parole (restano i tre che "
-          "una persona non legge)", 3, _SORGENTE.count(":.2f} EUR"))
+    # I DUE superstiti non li legge una persona: sono le righe di
+    # prosa del NIP-99 («Prezzo:» e «spedizione:»), che stanno nello
+    # stesso evento dei tag e li ripetono a parole — divergere da loro
+    # sarebbe peggio.
+    # ERANO TRE fino all'ago 2026: il terzo era la riga del catalogo
+    # che andava in pasto ad Haiku, e se n'e' andata con la ricerca AI.
+    prova("...ne' quelli che scrivono EUR a parole (restano i due che "
+          "una persona non legge)", 2, _SORGENTE.count(":.2f} EUR"))
     # Il censimento completo dei superstiti, che vale come elenco: i
     # tre TAG NIP-99 (price ×2, delivery) e le due righe di prosa che
     # li accompagnano — campi di protocollo che importa_nostr rilegge,
-    # dove il punto e' la specifica e non una nostra scelta —, la riga
-    # del catalogo che va all'AI (non la legge una persona), _fmt_eur
+    # dove il punto e' la specifica e non una nostra scelta —, _fmt_eur
     # stesso, il CSV (che la virgola ce l'ha gia' per conto suo) e —
     # dall'ago 2026 — il prezzo dei DATI STRUTTURATI in _prezzo_ld, che
     # e' della stessa famiglia dei tag NIP-99: schema.org vuole il
     # punto decimale, e una virgola li' dentro non sarebbe uno stile
     # italiano ma un numero illeggibile per chi lo consuma.
+    # ERANO NOVE fino all'ago 2026: il nono era la riga del catalogo
+    # che andava all'AI, e se n'e' andata con la ricerca AI.
     # Se questo numero cambia: o e' nato un campo di protocollo nuovo,
     # o qualcuno ha ricominciato a scrivere un euro a mano.
-    prova("...e i nove superstiti sono tutti censiti", 9,
+    prova("...e gli otto superstiti sono tutti censiti", 8,
           _SORGENTE.count(":.2f}"))
 
     # LA SENTINELLA DEI SATS, gemella. Le stringhe spezzate su piu'
@@ -15392,13 +15399,15 @@ def prove_anteprime():
     cucito = _re.sub(r'"\s*\n\s*f?"', "", _SORGENTE)
     grezzi = [m for m in _re.findall(r"\{[^{}]*\} ?sats", cucito)
               if "_fmt_sats" not in m]
-    # I QUATTRO superstiti, e nessuno di loro e' testo per una
-    # persona: una riga di journal (log diagnostico, un lettore solo),
-    # la riga del catalogo che va in pasto ad Haiku, e le due righe di
-    # prosa del NIP-99 che ripetono i tag a parole. Se il numero
-    # cambia, qualcuno ha ricominciato a scrivere una cifra a mano.
-    prova("nessuna cifra in sats sfugge a _fmt_sats (restano i quattro "
-          "che una persona non legge)", 4, len(grezzi))
+    # I TRE superstiti, e nessuno di loro e' testo per una persona:
+    # una riga di journal (log diagnostico, un lettore solo) e le due
+    # righe di prosa del NIP-99 che ripetono i tag a parole. Erano
+    # QUATTRO fino all'ago 2026: il quarto era la riga del catalogo
+    # che andava in pasto ad Haiku, e se n'e' andata con la ricerca
+    # AI. Se il numero cambia, qualcuno ha ricominciato a scrivere una
+    # cifra a mano.
+    prova("nessuna cifra in sats sfugge a _fmt_sats (restano i tre "
+          "che una persona non legge)", 3, len(grezzi))
     # e le due convenzioni straniere non devono tornare: la virgola
     # inglese di {n:,} e lo spazio del .replace, che erano il terzo e
     # il quarto formato
@@ -20669,6 +20678,297 @@ def prove_widget():
     prova("client: se la copia non riesce si dice", True,
           ".catch(" in cw and "a mano" in cw)
 
+def _ambiente_ricerca():
+    """L'ambiente della ricerca: i pezzi VERI di server.py e un
+    database usa-e-getta con l'indice VERO. Non una simulazione — la
+    domanda che conta e' se FTS5 e lo stemmer si incontrano davvero, e
+    a quella una sentinella sul testo non risponde."""
+    import sqlite3
+    amb = {"re": re, "unicodedata": __import__("unicodedata"),
+           "sqlite3": sqlite3, "print": lambda *a, **k: None}
+    for nome in ("normalizza",):
+        exec(pezzo(nome), amb)
+    for catalogo, fine in (("SINONIMI_CATEGORIA = {", "\n}"),
+                           ("SOTTOCATEGORIE = {", "\n}"),
+                           ("SINONIMI_SOTTOCATEGORIA = {", "\n}")):
+        i = _SORGENTE.index(catalogo)
+        exec(_SORGENTE[i:_SORGENTE.index(fine, i) + 2], amb)
+    # lo stemmer col suo import fail-open, esattamente com'e' scritto
+    i = _SORGENTE.index("try:\n    import snowballstemmer")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    for riga in ("VERSIONE_RICERCA = ", "TETTO_RICERCA = "):
+        i = _SORGENTE.index(riga)
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    i = _SORGENTE.index("_SINONIMI_DI_CATEGORIA: dict")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    for nome in ("radice", "termini", "radici", "_campi_indice",
+                 "_indicizza", "riallinea_ricerca", "_domanda_fts",
+                 "cerca_ids"):
+        exec(pezzo(nome), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT, "
+                "descrizione TEXT, zona TEXT, categoria TEXT, "
+                "sottocategoria TEXT DEFAULT '', ricerca_v INTEGER DEFAULT 0)")
+    # L'INDICE E I TRIGGER SI PRENDONO DA `init_db`, non si
+    # riscrivono: una seconda copia della ricetta e' una copia che un
+    # giorno diverge — e diverge in silenzio, perche' la prova
+    # girerebbe su un indice diverso da quello vero e resterebbe
+    # verde. Si leggono le `con.execute` di init_db e si tengono
+    # quelle che nominano l'indice.
+    sql = _sql_di(pezzo("init_db"), "annunci_ricerca") \
+        + _sql_di(pezzo("init_db"), "annunci_fts USING")
+    for s in sql:
+        con.execute(s)
+    return amb, con, len(sql)
+
+
+def _sql_di(sorgente: str, spia: str) -> list:
+    """Le stringhe SQL passate a `con.execute` dentro un pezzo di
+    codice, quelle che nominano `spia`. Si leggono dall'ALBERO e non
+    con una regex: cosi' le stringhe spezzate su piu' righe — che in
+    questo file sono la norma — arrivano gia' ricucite."""
+    fuori = []
+    for nodo in ast.walk(ast.parse(textwrap.dedent(sorgente))):
+        if not (isinstance(nodo, ast.Call)
+                and isinstance(nodo.func, ast.Attribute)
+                and nodo.func.attr == "execute" and nodo.args):
+            continue
+        primo = nodo.args[0]
+        if isinstance(primo, ast.Constant) and isinstance(primo.value, str) \
+                and spia in primo.value:
+            fuori.append(primo.value)
+    return fuori
+
+
+def prove_ricerca():
+    """LA RICERCA (ago 2026): l'indice full-text che ha preso il posto
+    del LIKE sulla frase intera e della chiamata ad Haiku.
+
+    Le prove girano sul PEZZO VERO e su un indice VERO, perche' qui il
+    modo tipico di fallire non e' un'eccezione: e' una vetrina vuota,
+    o dei risultati nell'ordine sbagliato — cose che non alzano
+    niente e non scrivono una riga di journal."""
+    print("\n[ricerca]")
+    import sqlite3
+    try:
+        amb, con, pezzi = _ambiente_ricerca()
+    except Exception as e:
+        salta("l'indice di ricerca", f"non si monta: {e}")
+        return
+    # IL CONTO PRIMA DI TUTTO: la prima stesura di questo ambiente
+    # pescava da init_db la sola tabella e non i due trigger, quindi
+    # meta' delle prove qui sotto girava su un database senza
+    # invalidazione — e una di loro era VERDE per il motivo sbagliato
+    # (l'indice non si aggiornava mai, quindi «il cancellato esce
+    # dall'indice» era vera per caso). Se un domani nascesse un terzo
+    # trigger, questa riga diventa rossa e chi la vede viene a
+    # leggere.
+    prova("l'ambiente ha preso indice e trigger da init_db", 3, pezzi)
+    stemmer = amb["_STEMMER"] is not None
+    if not stemmer:
+        salta("le radici vere dello stemmer",
+              "snowballstemmer non installato (si prova il troncamento)")
+
+    radice, termini_, radici_ = amb["radice"], amb["termini"], amb["radici"]
+
+    # --- LE DESINENZE ------------------------------------------------
+    if stemmer:
+        prova("«collezionismo» e «collezione» hanno la stessa radice",
+              True, radice("collezionismo") == radice("collezione")
+              == radice("collezionista"))
+        prova("«biciclette» e «bicicletta» pure", True,
+              radice("biciclette") == radice("bicicletta"))
+        # IL CASO CHE HA FATTO NASCERE `termini`: qui le due RADICI
+        # divergono, e a tenerle insieme e' il troncamento. Se un
+        # domani lo stemmer cambiasse e le radici combaciassero, la
+        # riga resterebbe verde — e' un'affermazione sull'ESITO.
+        prova("«tastiera» e «tastiere» si trovano lo stesso", True,
+              bool(set(termini_("tastiera")) & set(termini_("tastiere"))))
+        prova("«telefono» e «telefoni» pure", True,
+              bool(set(termini_("telefono")) & set(termini_("telefoni"))))
+    prova("le parole corte si lasciano stare", ("tv",), termini_("tv"))
+    if stemmer:
+        prova("un termine solo quando radice e troncamento combaciano",
+              ("scarp",), termini_("scarpe"))
+
+    # --- L'INDICE SI TIENE IN PARI DA SOLO ---------------------------
+    def annuncio(i, titolo, descr="", zona="Carmagnola (TO)",
+                 cat="Altro", sotto=""):
+        con.execute("INSERT INTO annunci(id,titolo,descrizione,zona,"
+                    "categoria,sottocategoria) VALUES(?,?,?,?,?,?)",
+                    (i, titolo, descr, zona, cat, sotto))
+        con.commit()
+
+    annuncio(1, "Album di figurine Panini 1990", "pezzo da collezione",
+             cat="Collezionismo")
+    annuncio(2, "Bicicletta da corsa Bianchi", "telaio in acciaio",
+             cat="Biciclette")
+    annuncio(3, "Tastiera meccanica Keychron", "switch marroni",
+             cat="Informatica", sotto="componenti-periferiche")
+    annuncio(4, "Vaso di ceramica", "fatto al tornio", cat="Casa e giardino")
+
+    quante = amb["riallinea_ricerca"](con)
+    prova("la prima passata indicizza tutto", 4, quante)
+    prova("...e la seconda non ha piu' niente da fare", 0,
+          amb["riallinea_ricerca"](con))
+
+    def cerca(q):
+        return amb["cerca_ids"](con, q)
+
+    prova("«collezionismo» trova l'annuncio che dice «collezione»",
+          True, 1 in (cerca("collezionismo") or []))
+    prova("...e anche cercando «collezione» (la categoria)", True,
+          1 in (cerca("collezione") or []))
+    prova("la categoria si cerca anche quando il testo non la dice",
+          True, 2 in (cerca("biciclette") or []))
+    prova("i sinonimi della categoria sono nell'indice: «pc»", True,
+          3 in (cerca("pc") or []))
+    prova("«bici da corsa» trova «Bicicletta da corsa»", True,
+          2 in (cerca("bici da corsa") or []))
+    prova("una parola che non c'e' non pesca niente", [],
+          cerca("elicottero"))
+
+    # IL TITOLO PESA PIU' DELLA DESCRIZIONE: chi cerca «tastiera» deve
+    # trovare in cima la tastiera, non l'annuncio che la nomina di
+    # sfuggita. E' il motivo per cui i campi dell'indice sono quattro.
+    annuncio(5, "Sedia da ufficio", "ci si appoggia bene la tastiera")
+    amb["riallinea_ricerca"](con)
+    prova("il titolo pesa piu' della descrizione", 3, (cerca("tastiera")
+                                                       or [0])[0])
+
+    # IL TRIGGER: nessuno chiama niente, e l'indice segue.
+    con.execute("UPDATE annunci SET titolo='Monopattino elettrico' WHERE id=4")
+    con.commit()
+    prova("un titolo riscritto invalida il timbro da solo", 0,
+          con.execute("SELECT ricerca_v FROM annunci WHERE id=4"
+                      ).fetchone()[0])
+    prova("...e prima della riparazione l'indice dice ancora il vecchio",
+          True, 4 in (cerca("vaso") or []))
+    amb["riallinea_ricerca"](con)
+    prova("dopo la riparazione dice il nuovo", True,
+          4 in (cerca("monopattino") or []))
+    prova("...e il vecchio non lo dice piu'", [], cerca("vaso"))
+    prova("l'annuncio cancellato esce dall'indice", True,
+          (con.execute("DELETE FROM annunci WHERE id=4"), con.commit(),
+           cerca("monopattino"))[2] == [])
+
+    # LA VERSIONE E' LA LEVA: alzarla rifa' tutto.
+    amb["VERSIONE_RICERCA"] += 1
+    prova("alzare la versione fa reindicizzare tutto", 4,
+          amb["riallinea_ricerca"](con))
+    amb["VERSIONE_RICERCA"] -= 1
+
+    # --- LA DOMANDA --------------------------------------------------
+    dom = amb["_domanda_fts"]
+    stretta, larga = dom("tastiera meccanica")
+    prova("le parole si legano in «e»", True, " AND " in stretta)
+    prova("...e nel giro largo in «o»", True, " OR " in larga)
+    prova("l'ultima parola e' un prefisso", True, stretta.rstrip(")")
+          .endswith('*') or '*)' in stretta)
+    prova("una domanda vuota non cerca niente", ("", ""), dom("!!! ..."))
+    # LA VIRGOLETTA NON PUO' USCIRE VIVA: `normalizza` la trasforma in
+    # spazio, quindi la stringa FTS non si puo' spezzare da fuori.
+    # La prova guarda la FORMA di quel che esce — solo termini
+    # virgolettati, parentesi e operatori — e non «non c'e' la
+    # virgoletta», che su una stringa piena di virgolette non
+    # vorrebbe dire niente.
+    ostili = ['tastiera" OR titolo:', 'a" NEAR/9 "b', "bici*)(", "-- drop"]
+    prova("nessuna domanda ostile esce dalla forma", [],
+          [s for s in ostili
+           if not re.fullmatch(r'(?:"[a-z0-9]+"\*?|[()* ]|AND|OR)*',
+                               dom(s)[0])])
+    # Gli operatori ostili NON prendono: `normalizza` li ha gia'
+    # ridotti a parole, quindi restano una ricerca qualunque — quel
+    # che deve valere e' che nessuna esploda e che la forma tenga.
+    prova("...e nessuna ricerca ostile esplode", [True] * 4,
+          [isinstance(cerca(s), list) for s in ostili])
+
+    # --- LA PERTINENZA, che e' l'unica cosa che si perde in silenzio --
+    ids = cerca("collezione")
+    prova("i risultati arrivano in ordine di pertinenza", True,
+          ids == sorted(ids, key=lambda i: 0 if i == 1 else 1))
+    con.close()
+
+    # --- SENZA FTS5 IL MERCATINO PARTE LO STESSO ---------------------
+    # Il caso peggiore, e non e' teorico: FTS5 e' una funzione
+    # OPZIONALE di SQLite. Se il server non partisse, il danno non
+    # sarebbe «la ricerca peggiore» ma «Barattolo giu'».
+    # LA PROVA E' ESEGUIBILE e gira sulle funzioni vere con una
+    # connessione che alza come farebbe una build senza quel modulo:
+    # la prima stesura aveva il `try` solo su chi LEGGE, e il server
+    # partiva ma la prima ricerca dava 500 — perche' la riparazione
+    # SCRIVE. L'ha trovato questa prova, non la rilettura.
+    class ConSenzaFts:
+        def __init__(self, c):
+            self._c = c
+
+        def execute(self, sql, *a, **k):
+            if "annunci_fts" in sql:
+                raise sqlite3.OperationalError("no such module: fts5")
+            return self._c.execute(sql, *a, **k)
+
+        def __getattr__(self, n):
+            return getattr(self._c, n)
+
+    con2 = sqlite3.connect(":memory:")
+    con2.row_factory = sqlite3.Row
+    con2.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT, "
+                 "descrizione TEXT, zona TEXT, categoria TEXT, "
+                 "sottocategoria TEXT DEFAULT '', ricerca_v INTEGER "
+                 "DEFAULT 0)")
+    con2.execute("INSERT INTO annunci(id,titolo,descrizione,zona,categoria) "
+                 "VALUES(1,'Cosa','bella','Torino (TO)','Altro')")
+    con2.commit()
+    cieco = ConSenzaFts(con2)
+    try:
+        riparate = amb["riallinea_ricerca"](cieco)
+        esploso = False
+    except Exception as e:
+        riparate, esploso = None, f"{type(e).__name__}: {e}"
+    prova("senza FTS5 la riparazione non esplode", False, esploso)
+    prova("...e dice che non ha riparato niente", 0, riparate)
+    prova("...e la ricerca torna None, non «nessun risultato»", None,
+          amb["cerca_ids"](cieco, "cosa"))
+    con2.close()
+
+    # --- IL CLIENT ---------------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # LA TRAPPOLA DEL DOPPIO FILTRO, trovata costruendo: `renderGrid`
+    # rifiltrava la griglia con un `includes(q)` sul testo, e coi dati
+    # vivi avrebbe buttato via PROPRIO i risultati che l'indice trova
+    # per radice o per categoria — «collezionismo» che pesca
+    # l'annuncio che dice «collezione» sparirebbe nell'ultimo passo.
+    # La ricerca nuova non funzionerebbe, e non ci sarebbe un errore
+    # da nessuna parte: e' il modo piu' silenzioso in cui questo
+    # cantiere poteva fallire.
+    rg = pezzo_js(mini, "function renderGrid(")
+    prova("client: il filtro per parole vive SOLO in demo", True,
+          "const q = DEMO ? el('q').value.trim().toLowerCase() : '';" in rg)
+    # `renderGrid(items)` e `ultimaRicercaAI` RESTANO, e la prima
+    # stesura di questo cantiere chiedeva il contrario — le due
+    # asserzioni «renderGrid non riceve piu' una lista da fuori» e
+    # «niente piu' guardia sui risultati AI» sono state TOLTE qui.
+    # Il motivo e' che nel frattempo quel flag ha preso un SECONDO
+    # mestiere: il barattolo in vetrina disegna una lista chiusa con
+    # `renderGrid(items)` e conta su quella guardia per non paginare.
+    # Erano vere quando la ricerca AI era l'unica a passare una lista;
+    # tenerle avrebbe voluto dire certificare la rimozione di una
+    # funzione viva. La prova che quel meccanismo regge vive dov'e'
+    # sempre stata, in `prove_barattolo_filtra`.
+    prova("client: la lista chiusa passa ancora da renderGrid", True,
+          "function renderGrid(items){" in mini)
+    # LA RICERCA E' DI TUTTI: la `q` entra nei parametri della vetrina
+    # anche fuori dalla vetrina anonima. Con `if (VETRINA)` gli
+    # autenticati cercherebbero a vuoto — la griglia resterebbe quella
+    # di prima, senza un errore.
+    pv = pezzo_js(mini, "function paramsVetrina(")
+    prova("client: la q si manda a tutti tranne che in demo", True,
+          "if (!DEMO) { const q = el('q').value.trim(); if (q) p.set('q', q); }"
+          in pv)
+    prova("client: doSearch passa dalla vetrina e non da /search", True,
+          "/search?busta=1" not in mini)
+
 
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
@@ -22745,7 +23045,7 @@ def main():
               prove_nota_compratore,
               prove_nascondi_ordine,
               prove_lista_ordini, prove_dettaglio_ordine,
-              prove_ssrf_redirect, prove_quota_ricerca,
+              prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_savers_proprietario, prove_barattolo_in_testata,
               prove_barattolo_filtra,
@@ -22776,7 +23076,7 @@ def main():
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri, prove_prezzo_accordo,
               prove_guardia_is_bot,
-              prove_altri_scorrimento, prove_widget,
+              prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_script_nel_workflow,
               prove_nwc_cifratura,
               prove_pagina_dati,
