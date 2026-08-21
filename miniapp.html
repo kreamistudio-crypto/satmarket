@@ -10756,7 +10756,7 @@ function renderAcquisto(){
     ${linkMappePunti(retiMappa)}
     <div id="acqRicorda">${rigaRicordaPunto(d, retePerSalvare(d))}</div>`;
   const campoAperto =
-    `${scelteRete}${scelteTipo}${(!reti.length || scelteFatte) ? campoDove : ''}`;
+    `${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}${(!reti.length || scelteFatte) ? campoDove : ''}`;
   /* Il bottone e la riga compatta sono NUDI, senza 📍 (ago 2026,
      decisione di Andrea): il riquadro che li ospita ha gia' il locker
      della via, e due icone nello stesso riquadro sono una di troppo. */
@@ -11437,6 +11437,74 @@ function rigaRicordaPunto(d, rete){
   return `<button type="button" class="btn link ricorda-punto"
       data-rete="${esc(rete)}"
       onclick="ricordaPunto(this.dataset.rete)">📍 ${testo}</button>`;
+}
+/* LA RIGA CHE SPIEGA UN VUOTO (ago 2026, decisione di Andrea): chi ha
+   un punto salvato e apre il cassetto su un venditore che quella rete
+   non la usa trova il campo vuoto ESATTAMENTE come chi non ha mai
+   salvato niente. Il filtro l'ha fatto il server (`punti_per_venditore`)
+   e la lista arriva vuota, che e' la stessa cosa che arriva a chi non
+   ne ha nessuno: senza una parola, quella funzione sembra non aver
+   funzionato proprio a chi l'aveva usata.
+   E' IL PRECEDENTE DEL PROFILO — «Nessun venditore usa piu' questa
+   rete»: una riga inerte si dice a voce, invece di lasciarla sembrare
+   rotta. Qui pero' si NOMINANO le reti, di qua e di la': «hai un punto
+   InPost, questo venditore spedisce solo con Poste» dice il PERCHE' e
+   non solo il cosa, ed e' la differenza che ha fatto nascere la riga.
+   PERIMETRO: solo col venditore che le reti le ha DICHIARATE
+   (decisione di Andrea). A zero reti non esiste un «spedisce solo con
+   X» da scrivere e la frase diventerebbe contorta per un caso raro —
+   meglio tacere che scrivere male; e quel caso ha gia' la sua riga
+   onesta fra le note («non ha ancora dichiarato il corriere»).
+   LE RETI MORTE NON SI NOMINANO: una uscita dal catalogo non
+   precompilerebbe da NESSUN venditore, quindi darla come colpa di
+   QUESTO sarebbe un'accusa sbagliata — e a dirlo c'e' gia' la riga del
+   Profilo. Si filtra con la forma del gemello di la' (solo a catalogo
+   noto: `spedizionieriCatalogo` e `myPunti` arrivano dalla stessa
+   /api/me, quindi un catalogo vuoto vuol dire lista vuota e il caso
+   non si presenta).
+   NON SI GATA SUL CAMPO GIA' SCRITTO, ed e' deliberato: dice un FATTO
+   che resta vero anche mentre si digita, e spegnerlo alla prima
+   lettera vorrebbe dire riscriverla in place a ogni tasto come
+   `aggiornaRigaRicorda` — una seconda riga da tenere viva per un
+   guadagno di rumore minimo. Sparisce da sola quando smette di essere
+   vera: salvato un punto per la rete giusta la lista non e' piu'
+   vuota, ed e' il patto degli hint contestuali. Cosi' convive con
+   «Ricorda questo punto» qui sotto, e insieme raccontano la storia
+   intera — il tuo InPost qui non vale, ricorda questo per Poste.
+   NUDA, senza emoji: la lingua e' quella della riga del Profilo, e il
+   riquadro che la ospita ha gia' il locker della via — la stessa
+   ragione per cui il bottone e la riga compatta non ne portano. */
+function rigaPuntoAltrove(d, reti){
+  if (DEMO || VETRINA) return '';
+  if (!reti.length) return '';
+  if ((d?.preventivo?.punti_salvati || []).length) return '';
+  const vive = (r) => !spedizionieriCatalogo.length
+    || spedizionieriCatalogo.includes(r);
+  const mie = myPunti.map(p => p.rete).filter(vive);
+  if (!mie.length) return '';
+  /* i nomi vengono dal catalogo, ma passano da esc() come ogni testo
+     che entra in un template: e' la regola, non un giudizio sul dato.
+     Oggi le reti sono tre, quindi quando questa riga compare i due
+     elenchi hanno al massimo DUE voci per lato — con tutte e tre
+     salvate, un venditore che ne dichiara una combacia per forza — ma
+     l'elenco regge lo stesso se il catalogo cresce. */
+  const lista = (a) => {
+    const b = a.map(r => `<b>${esc(r)}</b>`);
+    return b.length < 2 ? (b[0] || '')
+      : b.slice(0, -1).join(', ') + ' e ' + b[b.length - 1];
+  };
+  const tuoi = mie.length === 1
+    ? `Hai un punto salvato per ${lista(mie)}`
+    : `Hai punti salvati per ${lista(mie)}`;
+  const suo = reti.length === 1
+    ? `spedisce solo con ${lista(reti)}`
+    : `spedisce con ${lista(reti)}`;
+  /* IL RESPIRO SOTTO E' SUO, e non e' cosmesi: la label del campo
+     che segue nasce senza margine sopra, quindi le due si toccavano
+     (misurato a schermo: 10px sopra e ZERO sotto). E' la famiglia
+     dell'aria fra due bottoni — righe che un riordino non rompe e
+     una rilettura non vede: si trovano solo misurando la pagina. */
+  return `<div class="acq-nota" style="margin-bottom:10px">${tuoi}, ma questo venditore ${suo}.</div>`;
 }
 async function ricordaPunto(rete){
   haptic();

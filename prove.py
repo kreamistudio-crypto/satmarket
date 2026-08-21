@@ -10129,6 +10129,120 @@ def prove_punti_salvati():
     prova("...e non offre di aggiungerne uno da li'", True,
           "Per aggiungerne uno, salvalo quando compri" in cass)
 
+    # --- LA RIGA CHE SPIEGA UN VUOTO (ago 2026) ------------------------
+    # Chi ha un punto salvato su una rete che QUESTO venditore non usa
+    # trovava il campo vuoto come chi non ne ha mai avuto uno: il
+    # server manda `punti_salvati` gia' filtrato, e una lista vuota non
+    # sa dire quale dei due casi sia. Il precedente e' la riga del
+    # Profilo — una riga inerte si dice a voce — e qui in piu' si
+    # NOMINANO le reti, che e' il perche' e non solo il cosa.
+    alt = fetta("function rigaPuntoAltrove(d, reti){")
+    prova("la riga che spiega il vuoto ha un giudice UNO", 1,
+          mini.count("function rigaPuntoAltrove"))
+    prova("...e UN chiamante solo", 1,
+          mini.count("rigaPuntoAltrove(")
+          - mini.count("function rigaPuntoAltrove("))
+    # LA POSIZIONE E' CONTENUTO e non forma: spiega un vuoto, quindi si
+    # legge PRIMA di trovarlo — sotto le pillole del tipo e sopra il
+    # campo, che con le scelte non ancora fatte non c'e' nemmeno.
+    prova("...e sta sotto le pillole del tipo, prima del campo", True,
+          "${scelteRete}${scelteTipo}${rigaPuntoAltrove(d, reti)}" in mini)
+    prova("il perimetro e' il venditore che le reti le ha DICHIARATE",
+          True, "if (!reti.length) return '';" in alt)
+    prova("...e tace quando un punto buono per lui c'e' gia'", True,
+          "punti_salvati || []).length) return ''" in alt)
+    prova("...e in DEMO e in vetrina", True, "DEMO || VETRINA" in alt)
+    prova("le reti morte non si nominano, con la forma del Profilo",
+          True, "spedizionieriCatalogo.includes(r)" in alt
+          and "!spedizionieriCatalogo.length" in alt)
+    prova("i nomi passano da esc(), come ogni testo in un template",
+          True, "esc(r)" in alt)
+    # L'ARIA SOTTO: misurata a schermo, la label del campo che segue
+    # nasce senza margine sopra e le due si toccavano (10px sopra, ZERO
+    # sotto). E' la famiglia dell'aria fra due bottoni dei cassetti —
+    # righe che una rilettura non vede.
+    prova("...e la riga porta il suo respiro sotto, o tocca la label",
+          True, 'style="margin-bottom:10px"' in alt)
+    # NUDA come la riga del Profilo e come il bottone del cassetto: il
+    # riquadro che la ospita ha gia' il locker della via.
+    prova("...e la riga e' nuda, senza emoji", True,
+          not any(e in alt for e in ("\U0001F4CD", "\U0001F4E6",
+                                     "\U0001F512", "\U0001F3EA")))
+    # NON SI GATA SUL CAMPO GIA' SCRITTO, ed e' deliberato: dice un
+    # FATTO che resta vero anche mentre si digita, e spegnerlo alla
+    # prima lettera vorrebbe dire riscriverla in place a ogni tasto
+    # (`aggiornaRigaRicorda`) per un guadagno di rumore minimo. Sparisce
+    # da sola quando la lista non e' piu' vuota.
+    prova("...e non guarda il campo, che si riscriverebbe a ogni tasto",
+          False, "d.punto" in alt)
+    # E SI FA GIRARE, non si guarda soltanto: le sentinelle qui sopra
+    # dicono che il giudice esiste ed e' uno, mai che risponda giusto —
+    # ed e' la settima volta che questo file lo scrive. Il caso che
+    # solo l'esecuzione prende e' la rete MORTA in mezzo alle vive: la
+    # forma del filtro c'e' comunque, ma solo girando si vede che
+    # nomina la viva e tace sull'altra.
+    import json as _js3, os as _os3, shutil as _sh3b
+    import subprocess as _sp3b, tempfile as _tf3b
+    _node3 = _sh3b.which("node")
+    if not _node3:
+        salta("rigaPuntoAltrove risponde giusto", "node non installato")
+    else:
+        _escv = mini[mini.index("const esc = s =>"):
+                     mini.index("const el = id =>")]
+        _CAT = ["InPost", "Poste Italiane", "Altro"]
+        _R = lambda s: "<b>" + s + "</b>"
+        _P1 = "Hai un punto salvato per " + _R("InPost") + ", ma questo "
+        _SOLO = "venditore spedisce solo con " + _R("Poste Italiane") + "."
+        _casi3 = [
+            # (demo, catalogo, i miei punti, le reti del venditore,
+            #  punti_salvati che il server ha fatto passare, atteso)
+            (False, _CAT, ["InPost"], ["Poste Italiane"], [], _P1 + _SOLO),
+            (False, _CAT, ["InPost"], ["Poste Italiane", "Altro"], [],
+             _P1 + "venditore spedisce con " + _R("Poste Italiane")
+             + " e " + _R("Altro") + "."),
+            (False, _CAT, ["InPost", "Altro"], ["Poste Italiane"], [],
+             "Hai punti salvati per " + _R("InPost") + " e " + _R("Altro")
+             + ", ma questo " + _SOLO),
+            # una rete morta in mezzo alle vive: si nomina la viva e si
+            # tace sull'altra — la colpa non e' di questo venditore
+            (False, _CAT, ["Vecchia Rete", "InPost"], ["Poste Italiane"],
+             [], _P1 + _SOLO),
+            # ...e da sola non fa comparire niente
+            (False, _CAT, ["Vecchia Rete"], ["Poste Italiane"], [], ""),
+            # catalogo non ancora noto: non si filtra, si dice
+            (False, [], ["InPost"], ["Poste Italiane"], [], _P1 + _SOLO),
+            # il punto buono c'e': la pagina si apre compilata, niente
+            (False, _CAT, ["InPost"], ["InPost"],
+             [{"rete": "InPost", "tipo": "locker", "punto": "Via Roma 1"}],
+             ""),
+            (False, _CAT, [], ["Poste Italiane"], [], ""),   # non ne ho
+            (False, _CAT, ["InPost"], [], [], ""),           # zero reti
+            (True, _CAT, ["InPost"], ["Poste Italiane"], [], ""),  # demo
+        ]
+        _prog3 = (
+            "let DEMO=false, VETRINA=false, spedizionieriCatalogo=[], "
+            "myPunti=[];\n" + _escv + alt + "\n"
+            "const casi = " + _js3.dumps([list(c[:5]) for c in _casi3])
+            + ";\n"
+            "const esiti = casi.map(([demo, cat, miei, reti, salv]) => {\n"
+            "  DEMO = demo; spedizionieriCatalogo = cat;\n"
+            "  myPunti = miei.map(r => ({rete:r, tipo:'locker', punto:'x'}));\n"
+            "  return rigaPuntoAltrove({preventivo:{punti_salvati:salv}}, reti);\n"
+            "});\nconsole.log(JSON.stringify(esiti));")
+        _f3 = _tf3b.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                       encoding="utf-8")
+        _f3.write(_prog3)
+        _f3.close()
+        _r3 = _sp3b.run([_node3, _f3.name], capture_output=True, text=True,
+                        timeout=60, encoding="utf-8")
+        _os3.unlink(_f3.name)
+        _atteso3 = ['<div class="acq-nota" style="margin-bottom:10px">'
+                    + c[5] + "</div>" if c[5] else "" for c in _casi3]
+        prova("rigaPuntoAltrove risponde giusto sui dieci casi",
+              _atteso3,
+              _js3.loads(_r3.stdout.strip()) if _r3.returncode == 0
+              else "ERRORE: " + _r3.stderr[:200])
+
     # --- la pagina «I tuoi dati» ---------------------------------------
     # La pagina elenca cosa teniamo: un dato nuovo che non compare li'
     # dentro e' la sola cosa che rende quella pagina falsa.
