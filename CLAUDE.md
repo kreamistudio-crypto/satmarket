@@ -3955,6 +3955,102 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   male sono affari veri, escluderli gonfierebbe i profili —
   definitivo (niente modifica: chiude il ricatto «cambia il
   feedback o…»; la valvola è `POST /api/admin/feedback/{id}/rimuovi`).
+  IL FEEDBACK RIGUARDA L'AFFARE, NON L'INCASSO (ago 2026, decisione di
+  Andrea da un caso vero): chi ha comprato vota appena dichiara di aver
+  ricevuto l'oggetto, senza aspettare che il venditore abbia messo un
+  wallet — quella è una leva SUA, non di chi compra. Prima il
+  compratore che confermava e trovava un venditore senza metodo
+  d'incasso finiva in `confirmed`, dove il voto era rifiutato: l'affare
+  era finito per lui, e la porta restava chiusa per colpa di un altro.
+  Il giudice è `_ammette_feedback(stato, disputata, sbloccato_auto_il)`,
+  che prende i CAMPI e non la riga (il patto di `in_ferie`) e si
+  tortura in CI; `STATI_FEEDBACK` NON si allarga — resta la lista degli
+  ASSORBENTI, o il nome mente.
+  SI APRE SOLO SUL `confirmed` NON RIAPRIBILE (`disputata=0 AND
+  sbloccato_auto_il=0`), ed è la metà che regge tutto: quella
+  condizione è il COMPLEMENTO ESATTO delle due porte di
+  `risolvi_disputa`, cioè il confirmed che può averlo prodotto solo una
+  CONFERMA DI PERSONA — e lì il commento della porta lo dichiara già
+  («chi ha confermato di persona resta chiuso, e nessuno può riaprire
+  da solo un affare concluso»). Così l'invariante di sempre NON si
+  perde — **il feedback si lascia solo dove lo stato non può più
+  cambiare** — e la domanda «e se dopo finisce in disputa?» non si
+  pone: quei casi restano fuori, e non serve né un ritiro automatico né
+  una modifica (che è la regola contro il ricatto, e non si tocca).
+  CHI RESTA FUORI: il confirmed chiuso da un TIMER (nessuno ha
+  confermato niente, è scaduto il tempo — e la porta del moderatore è
+  aperta) e quello da DISPUTA decisa (c'è stata una lite, ed è ancora
+  ridecidibile). Fuori anche `refund`, DICHIARATO: è il gemello dal
+  lato rimborso, ma ci si arriva solo da una disputa o da un reso,
+  quindi ha praticamente sempre `disputata=1` — nominarlo vorrebbe dire
+  un caso in elenco che non scatta mai, e un elenco con dentro un caso
+  vuoto confonde.
+  VOTANO ENTRAMBE LE PARTI (decisione di Andrea): nessuna regola di
+  RUOLO nuova — il gate resta uno — e si evita che il venditore veda un
+  voto ricevuto con accanto un modulo spento proprio mentre gli si
+  chiede di sistemare il wallet. L'argomento contro, onesto: chi vende
+  è fermo per una leva sua, quindi il principio «non dipende da chi
+  compra» copre il compratore e non lui.
+  ⚠️ SE QUALCUNO ALLARGA LA WHERE DI `risolvi_disputa`, il giudice
+  diventa falso IN SILENZIO: a impedirlo c'è LA PROVA REGINA, che
+  ESTRAE quella query dal sorgente, la fa GIRARE su un database di
+  cartone per ogni combinazione (stato × `disputata` × timbro) e chiede
+  che il giudice e la porta non siano MAI veri insieme. È l'unico modo
+  in cui questo cantiere può rompersi senza fallire da solo.
+  ZERO COLONNE, zero migrazioni, zero leve, zero campi nuovi nel
+  payload: `/api/orders` porta già stato, `disputata` e
+  `sbloccato_auto_il`. E NESSUNA NOTIFICA NUOVA, dichiarato — chi
+  conferma è DAVANTI ALLO SCHERMO (`confirmReceived` fa `openOrder`
+  subito dopo, quindi vede il pannello comparire all'istante), e
+  appendere l'invito ⭐ al messaggio del venditore, che gli chiede di
+  mettere il wallet, sarebbe rumore dentro un messaggio operativo.
+  NEL CLIENT IL GIUDICE NON È NUOVO: `puoiLasciareFeedback` riusa
+  `decidibileDalModeratore` ROVESCIATO — è esattamente la stessa
+  domanda, «questo confirmed lo può ancora toccare un moderatore?» —
+  e scriverne un secondo vorrebbe dire due risposte possibili su un
+  ordine solo. Muore anche il letterale `['released','refunded']` che
+  duplicava `NASCONDIBILI` senza riferirlo: la parità col server ora si
+  GIRA con node sui 48 casi invece di sperarci (prima il gate non aveva
+  NESSUNA prova — `STATI_FEEDBACK` non compariva mai in `prove.py`).
+  E LA TRUST-NOTE DEL COMPRATORE SI È ALLINEATA (decisione di Andrea):
+  «Hai confermato la ricezione… per te è tutto fatto!» escludeva il
+  timer ma NON la disputa, quindi a chi aveva PERSO una disputa diceva
+  il falso — difetto preesistente, che lasciando i due giudici diversi
+  sarebbe finito nella stessa vista (nota accesa e pannello assente a
+  due righe). Ora chiama lo stesso giudice del pannello. CONSEGUENZA
+  VOLUTA: sul confirmed disputato non si accende NESSUNA delle due
+  righe, e va bene — quel compratore ha già il suo messaggio dal bot, e
+  `notaFermo` copre l'ordine che si attarda. DA NON CONFONDERE con la
+  riga del TIMER (`notaChiusoDalTimer`), che resta sulla METÀ timer e
+  ha la sua prova apposta: lì «il tempo è scaduto» su una disputa
+  sarebbe falso.
+  IL COLLAUDO ESEGUIBILE è `collaudo_feedback_confermato.py` (22
+  verdi): il giro vero fino a `confirmed`, i due che si votano, il
+  venditore che poi incassa col feedback che SOPRAVVIVE al passaggio a
+  `released`, i quattro rifiuti e l'estraneo che prende il 403 (non il
+  400 dello stato: le due guardie restano distinte). Ha una RETE
+  contro il banco bugiardo, e non è teorica — scrivendolo il venditore
+  aveva già il wallet dal passo precedente, quindi gli ordini dei
+  rifiuti volavano a `released` e passavano PER LA RAGIONE SBAGLIATA,
+  dicendo verde: adesso `ordine_confermato` alza se lo stato non è
+  quello promesso.
+  IL FEEDBACK AUTOMATICO, quando si farà: il timer parte DALLA
+  CONFERMA e non dall'incasso — se partisse dall'incasso, un venditore
+  che non mette il wallet ritarderebbe il feedback automatico di chi ha
+  comprato da lui, cioè la propria reputazione E quella dell'altro:
+  lo stesso difetto di questo cantiere, spostato di un piano. MA
+  L'ANCORA NON ESISTE E NON SI È PIANTATA (decisione di Andrea):
+  `aggiornato` viene riscritto dal passaggio `confirmed → released` (la
+  trappola già pagata tre volte), `sbloccato_auto_il` è 0 proprio sul
+  caso che interessa, e `consegnato` non lo scrive
+  `conferma_ricezione`. Conseguenza accettata: per gli ordini di oggi
+  quel momento è PERSO, e quel cantiere partirà dal pregresso a zero.
+  Due vincoli che troverà comunque, a verbale da adesso: la UNIQUE
+  `(ordine_id, da_tg_id)` fa sì che un automatico scritto col
+  `da_tg_id` vero BRUCI il feedback che quella persona potrebbe ancora
+  scrivere; e `_ricalcola_rating` non distingue umano da automatico —
+  entrerebbe dritto nella media E in `n_recensori`, il numero che
+  esiste apposta per dire «quante PERSONE diverse».
   Commento sotto `controlla_vietato` (niente AI: 200 caratteri legati
   a una transazione pagata). `utenti.rating` e `n_feedback` si
   aggiornano SEMPRE per RICALCOLO (`_ricalcola_rating`: AVG/COUNT
@@ -17320,6 +17416,34 @@ adesso c'è. IN PRODUZIONE basta il deploy: nessuna colonna, nessuna
 migrazione, nessuna leva. DA GUARDARE al primo giro: il primo dei sei
 che dichiara la spedizione, e che il suo evento su njump porti il tag
 `delivery` — è l'unica prova che il cerchio si chiude davvero.
+
+Il feedback si apre alla conferma, non all'incasso (ago 2026, decisione
+di Andrea da un caso vero): chi ha comprato vota appena dichiara di aver
+ricevuto l'oggetto, anche se il venditore non ha ancora un wallet e
+l'ordine è fermo in `confirmed` — quella è una leva sua, non di chi
+compra. Si apre SOLO sul confirmed non riapribile (`disputata=0 AND
+sbloccato_auto_il=0`), che è il complemento esatto delle due porte di
+`risolvi_disputa`: così l'invariante di sempre resta intatto — il
+feedback si lascia solo dove lo stato non può più cambiare — e la
+domanda «e se dopo finisce in disputa?» non si pone. Votano entrambe le
+parti; `refund` resta fuori dichiarato. Vedi Architettura, «IL FEEDBACK
+RIGUARDA L'AFFARE, NON L'INCASSO», anche per la trust-note del
+compratore che si è allineata (diceva «hai confermato» a chi aveva
+PERSO una disputa) e per l'ancora del feedback automatico, dichiarata e
+NON piantata. Collaudato: 4271 prove verdi (28 nuove, fra cui LA PROVA
+REGINA — la WHERE della porta estratta dal sorgente e fatta GIRARE su
+48 combinazioni, perché giudice e porta non possano mai essere veri
+insieme — e la parità client↔server girata con node) più OTTO
+MUTAZIONI, una per riga sorvegliata, ognuna rossa da sola; e
+`collaudo_feedback_confermato.py`, 22 verdi, che cammina il giro vero
+su un database usa-e-getta. IL BANCO HA MENTITO UNA VOLTA, ed è la
+lezione del giro: al passo del wallet il venditore ne guadagnava uno,
+quindi gli ordini dei rifiuti volavano a `released` e passavano PER LA
+RAGIONE SBAGLIATA dicendo verde — adesso `ordine_confermato` alza se lo
+stato non è quello promesso. IN PRODUZIONE basta il deploy: zero
+colonne, zero migrazioni, zero leve, zero campi nuovi nel payload. DA
+GUARDARE al primo giro: il primo compratore che vota da `confirmed`, e
+che il suo voto sia ancora lì quando il venditore incassa.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel
