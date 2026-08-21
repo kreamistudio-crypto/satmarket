@@ -5065,24 +5065,29 @@ document.getElementById('cartello')?.remove();</script>
        locker InPost, il venditore spedisce con Poste e il punto piu'
        vicino di quella rete e' a 50 km — l'affare si blocca coi sats
        dentro).
-       INSISTENTE MA MAI BLOCCANTE (decisione di Andrea): «Pubblica lo
-       stesso» pubblica davvero, e il foglio torna al massimo
-       INVITO_CORRIERI_MAX volte — poi resta la sola riga nel form. Il
-       tetto e' la meta' che conta: un cartello che compare SEMPRE
-       uguale si impara a scavalcare senza leggerlo, e in quel form ci
-       sono gia' nove righe che si contendono l'attenzione.
-       Il contatore sale quando il foglio SI APRE, il patto del
-       trasporto qui sopra: chiuderlo senza leggere e' una scelta. -->
+       INSISTENTE MA MAI BLOCCANTE, e dall'ago 2026 SENZA TETTO
+       (decisione di Andrea che rovescia i 3 inviti): la domanda torna
+       a OGNI pubblicazione con la spedizione spuntata, finche' non
+       dichiara — «Pubblica lo stesso» pubblica davvero, e quel patto
+       non si tocca. Il perche' di ieri («un cartello che compare
+       sempre uguale si impara a scavalcare») resta vero e perde
+       contro il costo dell'altro verso: un venditore senza rete
+       dichiarata e' un compratore che sceglie il locker alla cieca.
+       La leva INVITO_CORRIERI_MAX resta l'interruttore d'emergenza
+       (0 = niente foglio); il contatore sale ancora all'APERTURA —
+       diagnostica, non piu' un gate. -->
   <div class="sheet" id="corrieriSheet" role="dialog" aria-modal="true"
        aria-labelledby="corrieriTit">
     <div class="grab"></div>
-    <h3 id="corrieriTit">📦 Con quali corrieri spedisci?</h3>
+    <h3 id="corrieriTit">📦 Come spedirai?</h3>
     <div style="font-size:13.5px;color:var(--desc);font-weight:600;
       line-height:1.55;margin-bottom:12px">
-      Chi compra può farsi mandare il pacco a un <b>locker o punto di
-      ritiro</b>. Se sa con quale corriere spedisci, sceglie un punto
-      della rete giusta — altrimenti tocca accordarsi in chat, e il
-      punto più vicino della rete sbagliata può essere lontanissimo.
+      Seleziona <b>con quali corrieri spedirai</b>: chi compra
+      sceglierà il locker o il punto di ritiro della rete giusta,
+      senza accordi in chat. Per spedizioni senza intoppi — e per
+      proteggere la tua privacy coi locker — ti consigliamo
+      <b>InPost o Poste Italiane</b>; puoi comunque spedire con altri
+      corrieri, se ti trovi meglio così.
     </div>
     <div id="corrieriPillole" style="display:flex;gap:6px;flex-wrap:wrap;
       margin-bottom:14px"></div>
@@ -15983,26 +15988,32 @@ function trasportoScopri(){
    Si apre al tocco di «Pubblica» quando chi vende offre la spedizione
    e non ha detto con chi spedisce. Il gemello e' il foglio del
    trasporto qui sopra, con UNA differenza: quello e' una-tantum,
-   questo torna fino a INVITO_CORRIERI_MAX volte — insistente, come
-   chiesto, e con un tetto perche' resti leggibile.
+   questo torna A OGNI PUBBLICAZIONE finche' non dichiara (ago 2026,
+   decisione di Andrea che ROVESCIA il tetto dei 3 — l'insistenza non
+   ha piu' un contatore che la spegne). «Pubblica lo stesso» RESTA:
+   il patto «mai bloccante» non si tocca, e con lui le sue prove. La
+   leva INVITO_CORRIERI_MAX resta l'interruttore d'emergenza (0 =
+   niente foglio) e il contatore continua a salire — diagnostica
+   innocua, il pattern delle colonne inerti — ma non gata piu'.
 
    IL FLAG DI SESSIONE spezza la ricorsione: `publish()` richiama se
    stessa dopo il foglio, e senza questo si riaprirebbe all'infinito.
    Vive per la pagina e non in localStorage — non e' una preferenza,
-   e' «l'ho gia' chiesto in questo giro». */
+   e' «l'ho gia' chiesto in questo giro» — e si RIARMA a pubblicazione
+   riuscita: il prossimo annuncio della stessa sessione rivede la
+   domanda, che e' l'«a ogni pubblicazione» chiesto. */
 let corrieriChiesto = false;
 let retiFoglio = null;      // le spunte dentro il foglio
 
 /* «Va chiesto adesso?»: le stesse condizioni della riga nel form
    (chi spedisce, non un'asta, non in DEMO, catalogo arrivato, nessuna
-   rete dichiarata) piu' il tetto e il flag di sessione.
+   rete dichiarata) piu' la leva on/off e il flag di sessione.
    Il ritiro e il codice online non ci entrano MAI, e per costruzione:
    la prima domanda e' la spunta «Spedizione». */
 function serveInvitoCorrieri(){
   return !DEMO && !VETRINA && !editandoNostr
       && !corrieriChiesto
       && invitoCorrieriMax > 0
-      && myInvitoCorrieri < invitoCorrieriMax
       && spedizionieriCatalogo.length
       && !mieRetiSped.length
       && el('sellConsSped')?.checked && !astaAccesa();
@@ -22361,6 +22372,12 @@ async function publish(){
         hintPubblicazione = {id:'nostrpub', annuncio:nuovoId};
     }
   }
+  /* il flag dell'invito corrieri si RIARMA a pubblicazione riuscita:
+     il prossimo annuncio della stessa sessione rivede la domanda —
+     e' l'«a ogni pubblicazione» del rovesciamento del tetto (ago
+     2026). Su un errore resta alzato: la RIPROVA dello stesso
+     annuncio non deve richiedere quel che ha appena chiesto. */
+  corrieriChiesto = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
    'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
   el('sellTaglia').value = '';

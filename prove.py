@@ -9820,8 +9820,23 @@ def prove_reti_corriere():
     prova("...e il flag di sessione spezza la ricorsione di publish",
           True, "corrieriChiesto = true" in inv)
     serve = pezzo_js(mini, "function serveInvitoCorrieri(){", "\n}")
-    prova("l'invito guarda il TETTO", True,
-          "myInvitoCorrieri < invitoCorrieriMax" in serve)
+    # ROVESCIATA (ago 2026, decisione di Andrea): il TETTO non gata
+    # piu' — la domanda torna a OGNI pubblicazione finche' non
+    # dichiara. La leva resta l'interruttore d'emergenza (0 = niente
+    # foglio) e il contatore continua a salire, diagnostica; il
+    # «mai bloccante» NON si rovescia, e le sue prove qui sotto
+    # restano dritte.
+    prova("l'invito NON guarda piu' il tetto (insistente senza tetto)",
+          False, "myInvitoCorrieri < invitoCorrieriMax" in serve)
+    prova("...ma la leva resta l'interruttore d'emergenza", True,
+          "invitoCorrieriMax > 0" in serve)
+    # ...e il flag di sessione si RIARMA a pubblicazione riuscita: il
+    # prossimo annuncio della stessa sessione rivede la domanda —
+    # senza questa riga «a ogni pubblicazione» varrebbe una volta per
+    # apertura dell'app. Si guarda il corpo di publish, non il file.
+    prova("...e publish riarma il flag a pubblicazione riuscita", True,
+          "corrieriChiesto = false;" in
+          pezzo_js(mini, "async function publish(){", "\n}"))
     prova("...e chi ha gia' dichiarato non lo vede mai", True,
           "!mieRetiSped.length" in serve)
     prova("...ne' chi non spedisce: ritiro e codice online fuori "
