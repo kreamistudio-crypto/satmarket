@@ -12738,6 +12738,7 @@ def _censimento(acceso):
                  "MODERAZIONE_REVISIONE", "AVVISI_ISCRITTI",
                  "AVVISI_ORDINI_ADMIN", "TERMOMETRO_SOTTOCATEGORIE",
                  "CONTROLLO_LIBRO_MASTRO", "ORE_INITDATA",
+                 "PROTEGGI_IFRAME",
                  "TETTO_RICERCHE_AI_ORA", "COMMISSIONE_PERCENTO",
                  "PROTEZIONE_PERCENTO", "TETTO_SATS_ANNUNCIO",
                  "SOLLECITO_INCASSO_GIORNI", "PROMEMORIA_CONFERMA_GIORNI",
@@ -19651,6 +19652,122 @@ def prove_guardia_is_bot():
                                  for g in guardie))
 
 
+def prove_widget():
+    """IL WIDGET DA INCORPORARE (ago 2026): un annuncio o un negozio
+    dentro il sito di qualcun altro, in un iframe.
+
+    Le due cose che qui possono andare storte non si vedono guardando
+    la pagina: che il widget racconti qualcosa che non deve (dati di
+    chi vende, o merce non più in vetrina), e che aprendo la porta
+    dell'iframe a lui la si apra anche a tutto il resto del sito."""
+    print("\n[widget da incorporare]")
+    wa, wn = pezzo("widget_annuncio"), pezzo("widget_negozio")
+    card = pezzo("_widget_card")
+
+    # --- SOLO LA VETRINA, E SOLO QUEL CHE È PUBBLICO ----------------
+    # I campi sono la whitelist di sempre: un widget che pescasse con
+    # `a.*` porterebbe fuori il venditore_id (il tg_id) sul sito di un
+    # estraneo, che è il posto peggiore in cui possa finire.
+    for nome, f in (("annuncio", wa), ("negozio", wn)):
+        prova(f"il widget {nome} pesca dalla whitelist di vetrina", True,
+              "CAMPI_VETRINA" in f)
+        prova(f"...e mai con a.*", False, "SELECT a.*" in f)
+    # Il VENDUTO si serve (è uno scaffale vuoto, e un widget incollato
+    # su un sito non deve bucarsi il giorno che l'oggetto si vende);
+    # il rimosso e quello in revisione no — quelli non raccontano
+    # niente di sé, ed è la stessa regola delle anteprime dei link.
+    prova("l'annuncio: attivo e venduto, nient'altro", True,
+          "a.stato IN ('attivo','venduto')" in wa)
+    prova("il negozio mostra i soli attivi", True,
+          "a.stato='attivo'" in wn)
+    # E NIENTE AZIONI: l'unico gesto è un link che porta via. Un
+    # widget che potesse comprare sarebbe un checkout dentro il sito
+    # di un estraneo.
+    for nome, f in (("annuncio", wa), ("negozio", wn), ("card", card)):
+        prova(f"il widget {nome} non scrive niente", [],
+              [v for v in ("INSERT", "UPDATE", "DELETE") if v in codice(f)])
+    prova("i link escono con rel=noopener", 2, card.count('rel="noopener"'))
+    prova("...e in una scheda nuova", 2, card.count('target="_blank"'))
+
+    # --- IL TETTO, che è anche la guardia del parametro -------------
+    amb = {}
+    for r in ("WIDGET_MAX = ", "WIDGET_DEFAULT = "):
+        i = _SORGENTE.index(r)
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    prova("il numero di card si lima al tetto", True,
+          "max(1, min(int(n or WIDGET_DEFAULT), WIDGET_MAX))" in wn)
+    prova("...e il tetto è più del default", True,
+          amb["WIDGET_MAX"] > amb["WIDGET_DEFAULT"] >= 1)
+
+    # --- IL NEGOZIO SI SPACCA SUL TRATTINO --------------------------
+    # Chi copia l'indirizzo canonico si porta appresso lo slug, e
+    # senza questo spacco il widget non troverebbe nessuno: è la
+    # regressione già pagata su /negozio.
+    prova("il widget del negozio digerisce lo slug", True,
+          "_chi_da_percorso(chi)" in wn)
+
+    # --- UN WIDGET NON DÀ 404 ---------------------------------------
+    # Dentro l'iframe di qualcun altro un 404 si vede come una pagina
+    # rotta, e a rimetterci è il sito ospite, che con noi non c'entra.
+    prova("l'annuncio che non c'è è un riquadro, non un 404", True,
+          "_widget_niente(" in wa and "HTTPException" not in wa)
+    prova("...e così il negozio", True,
+          "_widget_niente(" in wn and "HTTPException" not in wn)
+
+    # --- LA PORTA DELL'IFRAME ---------------------------------------
+    # È la parte da non ammorbidire: si apre a UNA pagina sola, e
+    # tutte le altre si chiudono nello stesso momento — senza
+    # distinguerle bisognerebbe dire di sì a tutti, che è quel che il
+    # sito faceva senza averlo scelto.
+    mw = pezzo("no_iframe")
+    # LA LEVA NASCE SPENTA, ed è la riga che tiene il cantiere a
+    # rischio zero: il widget funziona identico senza, e questa è
+    # l'unica cosa che possa rompere qualcosa (Telegram Web). Il patto
+    # di ASTA_ABILITATA: si accende con un gesto, mai per deploy.
+    i = _SORGENTE.index("    PROTEGGI_IFRAME = ")
+    prova("la porta dell'iframe nasce spenta", "    PROTEGGI_IFRAME = False",
+          _SORGENTE[i:_SORGENTE.index("\n", i)])
+    prova("...e la guardia è la prima riga del middleware", True,
+          "if not PROTEGGI_IFRAME:" in mw)
+    prova("la CSP si mette a tutto il resto", True,
+          'if not request.url.path.startswith("/widget/"):' in mw)
+    prova("...e il widget ne resta fuori", True, "frame-ancestors" in mw)
+    # NIENTE X-Frame-Options, ed è la riga che verrebbe voglia di
+    # aggiungere «per sicurezza»: quell'header è BINARIO, e su
+    # TELEGRAM WEB la Mini App gira dentro un iframe di
+    # web.telegram.org — un SAMEORIGIN qui è Barattolo che smette di
+    # aprirsi per chi usa Telegram dal browser.
+    # Si conta l'HEADER (fra virgolette, come si scriverebbe), non la
+    # parola: nelle docstring compare apposta, a dire perché non c'è.
+    prova("niente X-Frame-Options, o Telegram Web si rompe", 0,
+          _SORGENTE.count('"X-Frame-Options"'))
+    prova("...e Telegram è nella lista di chi può incorniciare", True,
+          "https://web.telegram.org" in mw)
+    # `setdefault` e non assegnazione: il documento della busta ha già
+    # una CSP sua (con la sandbox) e non deve perderla.
+    prova("il middleware aggiunge, non sovrascrive", True,
+          "headers.setdefault(" in mw)
+
+    # --- IL CLIENT ---------------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    aw = pezzo_js(mini, "function apriWidget(")
+    prova("client: il codice da copiare è un iframe", True,
+          "<iframe src=" in aw)
+    # NON uno script nostro sul dominio altrui: è la decisione del
+    # cantiere, e un `<script src=` qui dentro sarebbe il suo
+    # rovesciamento.
+    prova("client: e non uno script da eseguire in casa d'altri", False,
+          "<script" in aw)
+    prova("client: il foglio si chiude con gli altri", True,
+          "el('widgetSheet').classList.remove('open')" in mini)
+    # La copia che fallisce lo DICE, e il testo resta selezionato: mai
+    # far credere che sia negli appunti quando non c'è (la regola del
+    # codice di @trackbot).
+    cw = pezzo_js(mini, "function copiaWidget(")
+    prova("client: se la copia non riesce si dice", True,
+          ".catch(" in cw and "a mano" in cw)
+
+
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
 
@@ -20692,7 +20809,7 @@ def main():
               prove_promesse_badge, prove_promesse_raggiungibili,
               prove_verde_e_filtri,
               prove_guardia_is_bot,
-              prove_altri_scorrimento,
+              prove_altri_scorrimento, prove_widget,
               prove_script_nel_workflow,
               prove_nwc_cifratura,
               prove_pagina_dati,

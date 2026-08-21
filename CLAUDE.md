@@ -2494,6 +2494,76 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   dal database, e `mtime-size` servirebbe un 304 su una scheda ormai
   cambiata; sarebbe una seconda formula, cioè la sentinella dell'ETag
   unico che si mette a urlare. Rimandata, e scritto qui.
+  IL WIDGET DA INCORPORARE (ago 2026): un annuncio, o la vetrina di un
+  negozio, dentro il sito di qualcun altro —
+  `<iframe src="…/widget/negozio/{codice}">`. Due rotte esplicite
+  (regola ferrea 3), una pagina SUA di due kilobyte col CSS in linea,
+  cache 5 minuti.
+  L'IFRAME E NON UNO SCRIPT, ed è la decisione che porta via tutto il
+  resto. Uno script che inietta HTML nella pagina ospite è la strada
+  che tutti conoscono e ha tre difetti veri: il CSS del sito ospite
+  entra nel nostro e viceversa, noi ci prendiamo il diritto di
+  ESEGUIRE CODICE su un dominio che non è nostro — cioè chiediamo a un
+  estraneo una fiducia che non ci serve — e ogni ritocco al nostro
+  markup può rompere la pagina di qualcun altro. L'iframe è isolato
+  per costruzione: il peggio che può fare è non caricarsi.
+  NON SI SERVE `miniapp.html`: quella pesa quasi un mega ed è un'app,
+  non un biglietto da visita — la stessa ragione per cui il cartello
+  SEO esiste separato dal client.
+  NIENTE DATI PRIVATI E NIENTE AZIONI: si legge `CAMPI_VETRINA`, la
+  whitelist di sempre (con `a.*` uscirebbe il `venditore_id`, cioè il
+  tg_id, sul sito di un estraneo — il posto peggiore in cui possa
+  finire), e l'unico gesto è un LINK che porta su Barattolo. Un widget
+  che potesse comprare sarebbe un checkout dentro casa d'altri.
+  IL VENDUTO SI SERVE, spento e col suo badge: è la regola della
+  scheda e dell'anteprima dei link — chi ha incollato il widget sul
+  suo sito non deve ritrovarsi un buco il giorno che vende. Il rimosso
+  e quello in revisione no: non raccontano niente di sé.
+  UN WIDGET NON DÀ MAI 404: dentro l'iframe di qualcun altro un 404 si
+  vede come una pagina rotta, e a rimetterci è il sito ospite, che con
+  noi non c'entra niente — quindi `_widget_niente` è un riquadro che
+  lo dice, con la via d'uscita verso Barattolo.
+  IL TEMA LO DECIDE IL SITO OSPITE (`prefers-color-scheme`), e non
+  noi: il widget è un ospite. L'ALTEZZA è scritta nel codice da
+  copiare e non si calcola — il widget la annuncia via `postMessage`
+  per chi vuole ascoltarla, ma chi incolla e basta deve ottenere
+  qualcosa di sensato senza fare niente.
+  E IL ROVESCIO È LA METÀ CHE CONTA, MA NASCE SPENTO: da quando esiste
+  il widget, «si può stare in un iframe?» ha DUE risposte diverse — e
+  finché non si distinguevano bisognava dire di sì a tutti, che è quel
+  che il sito fa **senza averlo scelto** (nessun header, quindi
+  barattolo.store incorniciabile da chiunque: il clickjacking di
+  manuale, col danno limitato dal cookie SameSite=Lax e dall'initData
+  che in un iframe di terzi non c'è). Il middleware `no_iframe` mette
+  `frame-ancestors 'self' https://web.telegram.org` a tutto tranne
+  `/widget/` — ma solo a leva `PROTEGGI_IFRAME` ACCESA, e quella nasce
+  FALSE nel codice.
+  IL PERCHÉ DELLA LEVA (decisione di Andrea: «non si deve rompere
+  nulla»): il widget NON ha bisogno di quella stretta per funzionare —
+  oggi tutto è incorniciabile, widget compreso — quindi tenerla spenta
+  non toglie niente a nessuno e lascia il cantiere ADDITIVO PURO. È
+  l'unico pezzo che possa rompere qualcosa, e quel qualcosa si vede su
+  una strada sola: la Mini App da Telegram Web. Si accende dal config
+  dopo averla guardata, che è il patto di ASTA_ABILITATA e
+  IMPORT_NOSTR_APERTO — una cosa che può far male si accende con un
+  gesto, mai per effetto di un deploy.
+  NIENTE `X-Frame-Options`, E QUESTA È LA RIGA DA NON AGGIUNGERE «per
+  sicurezza»: quell'header è BINARIO — o solo il proprio sito, o
+  nessuno — e su TELEGRAM WEB la Mini App gira dentro un iframe di
+  `web.telegram.org`. Un `SAMEORIGIN` di troppo lì non è una stretta:
+  è Barattolo che smette di aprirsi per chi usa Telegram dal browser,
+  e non se ne accorge nessuno finché non lo prova (dentro l'app di
+  Telegram la WebView è nativa e non c'entra — è esattamente il genere
+  di guasto che si vede su una sola strada). `frame-ancestors` una
+  lista la sa tenere, e sui browser moderni ha comunque la precedenza.
+  `setdefault` e non assegnazione: il documento della busta ha già una
+  CSP sua, con la sandbox, e non deve perderla.
+  DOVE SI PRENDE IL CODICE: foglio `#widgetSheet` — «Widget per il
+  web» (il nome l'ha scelto Andrea) — aperto dal Profilo e dal
+  dettaglio del PROPRIO annuncio. Il campo è `readonly` e non `disabled` — da un disabled il
+  testo non si seleziona, e se la clipboard fa i capricci la strada a
+  mano deve restare aperta; quando non riesce lo si DICE, che è la
+  regola del codice di @trackbot.
   E DA QUI È NATO `_fmt_eur` (ago 2026): **un euro si scrive in un modo
   solo in tutta l'app**. Gemello di `_fmt_sats`, con la VIRGOLA dei
   decimali — col punto una cifra grande si legge per un fattore mille —
@@ -14124,7 +14194,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
    trovare»: la prima è una costante PURA che non tocca il database e
    non può sollevare — un 5xx lì sospende la scansione di tutto il sito
-   per ore),
+   per ore), `/widget/annuncio/{id}` e
+   `/widget/negozio/{chi}` (le UNICHE pagine fatte per stare
+   nell'iframe di un estraneo — tutte le altre lo vietano con
+   `frame-ancestors`, vedi «IL WIDGET DA INCORPORARE»),
    `/foto/*`, `/vendor/nostr.js`, `/vendor/qrcode.js`,
    `/vendor/font/{nome}` (i sei .woff2 del brand, whitelist `FILE_FONT`:
    da ago 2026 i font stanno in casa e non li chiede più nessuno a
@@ -16789,6 +16862,57 @@ correzione del giro, e solo MISURANDO: la riga toccava la label del
 campo (10px sopra, ZERO sotto).
 IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione,
 nessuna leva, nessuna rotta — solo client.
+
+Il widget da incorporare (ago 2026): un annuncio o la vetrina di un
+negozio dentro il sito di qualcun altro, in un `<iframe>` — due rotte
+esplicite, una pagina sua di due kilobyte col CSS in linea, e il
+codice da copiare in un foglio del Profilo (o dal dettaglio del
+proprio annuncio). L'IFRAME E NON UNO SCRIPT: uno script nostro sulla
+pagina di un estraneo mescolerebbe i due CSS e ci prenderebbe il
+diritto di eseguire codice su un dominio che non è nostro — una
+fiducia che non ci serve. Vedi Architettura, «IL WIDGET DA
+INCORPORARE», per il venduto che si serve, per il 404 che non si dà
+mai dentro l'iframe di qualcun altro, e per il rovescio.
+IL ROVESCIO C'È MA NASCE SPENTO (decisione di Andrea: «non si deve
+rompere nulla»): non c'era NESSUN header sul frame, quindi
+barattolo.store era incorniciabile da chiunque — non l'avevamo deciso,
+era il default — e adesso `frame-ancestors` vale su tutto tranne
+`/widget/`, ma solo a leva `PROTEGGI_IFRAME` accesa. Spenta, il
+comportamento è identico a oggi BYTE PER BYTE (verificato: zero header
+nuovi su home e API), e il widget funziona uguale: la stretta non gli
+serve. È l'unico pezzo dei tre cantieri che possa rompere qualcosa, e
+si accende con un gesto dopo aver guardato la sola strada che tocca.
+E NIENTE `X-Frame-Options`, che è la riga che verrebbe voglia di
+aggiungere «per sicurezza»: è binario, e su Telegram Web la Mini App
+gira dentro un iframe di web.telegram.org — un SAMEORIGIN lì è
+Barattolo che smette di aprirsi per chi usa Telegram dal browser, e
+non se ne accorge nessuno finché non lo prova. Stavo per metterlo:
+l'ha fermato il controllo di come Telegram Web apre le mini app.
+Collaudato: **27 prove nuove** in modalità severa — il DELTA misurato
+contro il main del giorno, che è il numero che si può difendere: il
+totale dipende dal ramo su cui il cantiere atterra, e questo è nato
+dentro un commit più grosso poi spezzato in tre — e OTTO
+MUTAZIONI del codice, una per riga sorvegliata (CSP sovrascritta al
+posto di setdefault, CSP tolta a tutti, Telegram fuori dalla lista,
+rimossi serviti dal widget, tetto delle card sparito, slug non più
+digerito, `a.*` al posto della whitelist, iframe diventato script):
+ognuna diventa rossa da sola. Più il giro dal vivo col server acceso
+su una copia del database di collaudo — le due rotte, il negozio per
+codice e con lo slug appresso, `n` limato al tetto, il venduto col suo
+badge, l'annuncio e il negozio inesistenti che rispondono col riquadro
+e non con un 404, e gli header verificati uno per uno (la CSP c'è su
+home e API, non c'è sul widget).
+NON COLLAUDATO QUI: il widget non è stato GUARDATO A SCHERMO — su
+questa macchina non c'è un browser connesso — quindi l'aspetto, il
+tema scuro che segue il sito ospite e il comportamento dentro un
+iframe vero vanno visti dal vivo. E il `postMessage` dell'altezza non
+è stato esercitato da nessun ospite.
+IN PRODUZIONE basta il deploy: nessuna colonna, nessuna migrazione, e
+`PROTEGGI_IFRAME` nasce spenta — quindi il deploy non cambia NIENTE di
+quel che c'è, aggiunge solo due rotte e un foglio. DA GUARDARE al
+primo giro: il primo widget incollato su un sito vero. E se un giorno
+si vorrà accendere la leva, PRIMA si apre Barattolo da Telegram Web
+(il browser, non l'app): è la sola strada che può chiudere.
 
 Backlog concordato: commissione minima fissa; poi post-lancio: tracking
 verificato via API corrieri (che porterà la MAPPA dei punti nel

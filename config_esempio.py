@@ -549,6 +549,16 @@ ORE_INITDATA = 24
 # filtro per parole, che non costa niente. 0 = nessun freno.
 TETTO_RICERCHE_AI_ORA = 30
 
+# --- La porta dell'iframe (ago 2026, col widget) ---------------------
+# Accesa, nessun sito estraneo puo' incorniciare Barattolo in un
+# iframe (tranne il widget, che esiste apposta). NASCE SPENTA, cioe'
+# com'e' sempre stato: e' una stretta in piu' su una porta rimasta
+# aperta, e il widget funziona identico senza.
+# PRIMA DI ACCENDERLA, provare la Mini App da TELEGRAM WEB (il browser,
+# non l'app): li' gira dentro un iframe di web.telegram.org, ed e' la
+# sola strada che questa leva puo' chiudere.
+PROTEGGI_IFRAME = False
+
 # Quanto resta buono un cambio BTC/EUR che non riusciamo a rinfrescare.
 # L'ultimo cambio letto vive nel database e torna in cache a ogni
 # riavvio (prima la cache nasceva vuota, e un deploy dentro
