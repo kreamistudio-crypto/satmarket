@@ -2716,9 +2716,33 @@ def prove_busta_ritiro():
           ("const RITARDO_ATTESA = 180;" in mini, "}, 180);" in mini))
     # IL CENSIMENTO: la ritardata NON si usa dove si muovono i sats —
     # li' il velo immediato e' la guardia contro il secondo tocco su
-    # una cosa irreversibile. Definizione + l'unico chiamante.
-    prova("l'attesa ritardata ha un chiamante solo, ed e' una lettura",
-          2, mini.count("attesaRitardata("))
+    # una cosa irreversibile. I chiamanti si NOMINANO invece di
+    # contarli: col solo conteggio, quello di domani passa cambiando
+    # un numero, e se muove sats non se ne accorge nessuno.
+    def _chi_chiama(gancio):
+        fuori = set()
+        for _m in re.finditer(r"(?<!function )" + re.escape(gancio), mini):
+            _t = mini.rfind("function ", 0, _m.start())
+            fuori.add(mini[_t + 9:mini.index("(", _t + 9)])
+        return fuori
+    prova("l'attesa ritardata la chiamano solo le quattro LETTURE",
+          {"mostraBusta", "mostraContenuto", "mostraIndirizzo",
+           "apriDocBusta"},
+          _chi_chiama("attesaRitardata(btn,"))
+    # IL GEMELLO: chi non passa un testo si prende «Invio sats in
+    # corso…», quindi il default puo' restare SOLO a chi i sats li
+    # muove davvero — e' cosi' che quella frase e' finita sopra il
+    # salvataggio di un feedback (ago 2026, dal campo).
+    prova("il default dei sats resta ai sei gesti che li muovono",
+          {"saveLnAddress", "salvaLnAddressProfilo", "adminResolve",
+           "saveSellerInvoice", "confirmReceived", "resoRicevuto"},
+          _chi_chiama("bottoneInAttesa(btn);"))
+    # e l'etichetta del bottone e' la stessa frase del velo: due
+    # posti da tenere in pari sono un posto che un giorno diverge
+    prova("l'etichetta echeggia il testo, in tutte e due le sorelle",
+          (True, True),
+          ("btn.innerHTML = '⏳ ' + (testo || 'Invio in corso…');" in mini,
+           "btn.innerHTML = '⏳ ' + (testo || 'Un attimo…');" in mini))
     # e la guardia del doppio tocco e' una bandierina in memoria: col
     # velo ritardato il bottone resta vivo per 180ms, e due letture
     # rialzerebbero `bustaSvelata` facendo ripartire l'anello su un

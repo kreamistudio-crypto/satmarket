@@ -18308,12 +18308,24 @@ function refundPanel(o){
 /* ---- decisione admin sulle dispute ---- */
 /* Pagare su Lightning richiede qualche secondo: il bottone lo dice,
    così l'app non sembra bloccata. Restituisce la funzione che lo
-   ripristina (da chiamare appena arriva la risposta). */
+   ripristina (da chiamare appena arriva la risposta).
+   IL TESTO SI PASSA SEMPRE, e il default parla di sats APPOSTA: è la
+   frase di chi i sats li muove davvero, e chi non gliene dà uno se
+   la prende in prestito — è così che «Invio sats in corso…» è finito
+   sopra il salvataggio di un feedback (ago 2026, dal campo). A
+   restare senza testo sono i SEI gesti dei sats, e c'è il censimento
+   in CI che li nomina: il settimo di domani viene a rileggere qui.
+   E L'ETICHETTA ECHEGGIA IL TESTO, come nella sorella qui sotto: un
+   velo che dice una cosa e un bottone che ne dice un'altra sono due
+   posti da tenere in pari, e il secondo è quello che si dimentica.
+   Il prezzo dichiarato è il doppio glifo sui testi con l'emoji
+   («⏳ 🔨 Preparo la fattura…»): quel bottone sta sotto un velo
+   sfocato, e li' non lo legge nessuno. */
 function bottoneInAttesa(btn, testo){
   el('attesaTesto').textContent = testo || 'Invio sats in corso…';
   el('attesaOverlay').classList.add('on');    /* blocca tutto: i sats viaggiano */
   const prima = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Invio in corso…'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ' + (testo || 'Invio in corso…'); }
   return ()=>{
     el('attesaOverlay').classList.remove('on');
     if (btn) { btn.disabled = false; btn.innerHTML = prima; }
@@ -18334,7 +18346,15 @@ function bottoneInAttesa(btn, testo){
    contro il secondo tocco su una cosa irreversibile, e ritardarla
    aprirebbe una finestra di 180ms in cui la fattura si paga due
    volte. Chi legge un bigliettino non ha niente da proteggere: la
-   sua guardia e' una bandierina in memoria, che non si vede. */
+   sua guardia e' una bandierina in memoria, che non si vede.
+   I CHIAMANTI SONO QUATTRO E SONO TUTTI LETTURE (ago 2026): le
+   istruzioni di ritiro, il contenuto digitale riletto dal venditore,
+   l'indirizzo di consegna, il documento della busta. Il censimento
+   in CI li NOMINA invece di contarli, cosi' il quinto di domani
+   viene a rileggere questa riga.
+   E «LETTURA» NON VUOL DIRE «GET»: rivelaContenuto legge e basta, ma
+   quella lettura E' la ricevuta, e non torna indietro — quindi resta
+   col velo immediato, che li' e' proprio la guardia. */
 const RITARDO_ATTESA = 180;
 function attesaRitardata(btn, testo){
   let acceso = false, prima = '';
@@ -18945,7 +18965,7 @@ async function caricaContenutoDigitale(){
 async function rivelaContenuto(btn){
   haptic();
   if (!confirm(`Rivelare il contenuto?\n\nUn codice rivelato non torna indietro. Provalo subito: hai ${TEMPI.confermaDig} ore per aprire una disputa se qualcosa non va, poi l'acquisto è definitivo.`)) return;
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, '🔓 Rivelo il contenuto…');
   const d = await caricaContenutoDigitale();
   ripristina();
   if (!d) return;
@@ -18957,7 +18977,7 @@ async function rivelaContenuto(btn){
 
 async function mostraContenuto(btn){
   haptic();
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = attesaRitardata(btn, 'Apro il contenuto…');
   const d = await caricaContenutoDigitale();
   ripristina();
   if (d) openOrder(currentOrder.id);
@@ -18977,7 +18997,7 @@ async function consegnaContenuto(btn){
   const testo = (el('digContenuto').value||'').trim();
   if (!testo) { toast('Scrivi il contenuto da consegnare'); return; }
   if (!confirm('Consegnare questo contenuto all\'acquirente?\n\nLa piattaforma lo registra come prova della consegna; l\'acquirente lo rivelerà con un tocco.')) return;
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, '💾 Consegno il codice…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/consegna-digitale`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
@@ -19313,7 +19333,7 @@ async function caricaIndirizzo(){
    ragione per cui non ne chiede uno mostraBusta */
 async function mostraIndirizzo(btn){
   haptic();
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = attesaRitardata(btn, 'Apro l\'indirizzo…');
   const d = await caricaIndirizzo();
   ripristina();
   if (d) openOrder(currentOrder.id);
@@ -19327,7 +19347,7 @@ async function salvaIndirizzo(btn){
     toast('Servono almeno nome, via, CAP e città');
     return;
   }
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, '🏠 Salvo l\'indirizzo…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/indirizzo`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
@@ -19424,7 +19444,7 @@ async function apriDocBusta(btn){
   const o = currentOrder, b = bustaLetta[o.id];
   let url = bustaDocVisto[o.id];
   if (!url){
-    const ripristina = bottoneInAttesa(btn);
+    const ripristina = attesaRitardata(btn, 'Apro il documento…');
     const r = await fetch(`${API_BASE}/orders/${o.id}/busta-ritiro/file`,
       {headers:{'X-Tg-Init-Data':authHdr()}});
     if (!r.ok){
@@ -19543,7 +19563,7 @@ async function depositaBusta(btn){
         + (currentOrder.state==='locked'
            ? ' (l\'avviso gli arriva quando segni la spedizione).'
            : ' e riceve subito l\'avviso «il tuo pacco ti aspetta».'))) return;
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, '📦 Deposito le istruzioni…');
   const r = await fetch(`${API_BASE}/orders/${currentOrder.id}/busta-ritiro`, {
     method:'POST',
     headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
@@ -19832,7 +19852,7 @@ async function correggiTracking(reso, btn){
   if (!tracking) { toast('Inserisci il tracciamento corretto'); return; }
   if (!trackingDaControllare(corriere, tracking, 'admAvviso')) return;
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
-  const ripristina = bottoneInAttesa(btn);
+  const ripristina = bottoneInAttesa(btn, '🛠 Correggo il tracciamento…');
   try {
     const r = await fetch(
       `${API_BASE}/admin/orders/${currentOrder.id}/tracking`, {
