@@ -3856,8 +3856,24 @@ def prove_nota_compratore():
     # anche il POSTO: dopo le vie e prima del conto.
     prova("client: ...ed e' montato nello scheletro, dopo le vie", True,
           "${vie}${note}${cassettoNota}" in mini)
-    prova("client: le due chiavi nascono nei DUE costruttori", 2,
-          mini.count("nota:'', notaAperta:false,"))
+    # ROVESCIATA (ago 2026, la nota per categoria): il default non e'
+    # piu' un false secco — lo decide notaApertaDefault, e i DUE
+    # costruttori devono passare dallo STESSO giudice, o mono e set
+    # aprirebbero il campo con due regole diverse.
+    prova("client: le due chiavi nascono nei DUE costruttori, dal giudice",
+          2, mini.count("notaAperta: notaApertaDefault("))
+    prova("client: ...e il vecchio default secco non esiste piu'", 0,
+          mini.count("notaAperta:false"))
+    # IL DEFAULT APERTO NON ALZA LA TASTIERA: il focus sul campo nota
+    # vive SOLO in apriNotaAcquisto (il dito), mai in un render — con
+    # un focus nel render, aprire la cassa su un capo d'abbigliamento
+    # alzerebbe la tastiera in faccia a chi voleva leggere il conto.
+    prova("client: nessun focus sulla nota dentro renderAcquisto", 0,
+          pezzo_js(mini, "function renderAcquisto(){").count(
+              "acqNota').focus"))
+    prova("client: il giudice conosce le 4 categorie con varianti", True,
+          "'Abbigliamento', 'Scarpe e accessori'" in mini
+          and "'Arte e artigianato', 'Bambini'" in mini)
     prova("client: la resa passa da esc(), nella cassa e nell'ordine",
           True, "esc(notaScritta)" in mini
           and pezzo_js(mini, "function pannelloNota(o){").count(
@@ -18658,9 +18674,10 @@ def prove_promesse_badge():
     # 1) L'ARIA FRA DUE CASSETTI DELLA CASSA e' della COPPIA e non del
     # secondo — la stessa lezione dei bottoni dell'ordine e del
     # dettaglio, alla TERZA volta. `.btn` non ha margine di base e lo
-    # spazio lo mette il campo SOPRA, che un cassetto CHIUSO (un
-    # `.btn ghost` nudo) non ha: misurato a 320px, 14px sopra la nota,
-    # 16 sotto il codice sconto e ZERO fra i due.
+    # spazio lo mette il campo SOPRA, che un cassetto CHIUSO (il ghost
+    # del codice, o il link discreto della nota) non ha: misurato a
+    # 320px, 14px sopra la nota, 16 sotto il codice sconto e ZERO fra
+    # i due.
     prova("l'aria fra i cassetti della cassa e' della coppia", True,
           ".cassetto-cassa + .cassetto-cassa{margin-top:10px}" in mini)
     # ...e i cassetti la portano TUTTI: il quarto di domani mette la

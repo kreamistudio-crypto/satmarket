@@ -2148,6 +2148,9 @@
      in fondo», non il nome di una promessa. */
   #acqNotaCampo{margin-top:14px}
   #acqNotaCampo .btn{margin-top:0}
+  /* il toggle discreto della nota: la lingua di scopri-link, spento
+     sul grigio — e' un invito facoltativo, non una via */
+  .scopri-link.nota-aggiungi{font-size:13.5px;color:var(--muted)}
   /* la card del singolo articolo: francobollo + titolo + unitario */
   .acq-art{display:flex;align-items:center;gap:12px;background:var(--card);
     border:1.5px solid var(--line);border-radius:var(--radius);
@@ -10110,7 +10113,7 @@ function apriAcquisto(l){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
-             nota:'', notaAperta:false,
+             nota:'', notaAperta: notaApertaDefault([l.cat]),
              codice:'', codiceAperto:false,
              errore:''};
   go('acquisto');
@@ -10189,7 +10192,8 @@ function apriAcquistoSet(){
              preventivo:null, via:'', punto:'', puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
-             nota:'', notaAperta:false,
+             nota:'', notaAperta: notaApertaDefault([...setScelte.keys()]
+               .map(id => (listings.find(t => t.id === id) || {}).cat)),
              codice:'', codiceAperto:false,
              errore:''};
   go('acquisto');
@@ -10986,9 +10990,15 @@ function renderAcquisto(){
      stopPropagation (non c'e' nessuna radio da riselezionare — chi un
      domani lo spostasse dentro una via lo deve rimettere) e
      setViaAcquisto non lo chiude mai.
-     DIETRO UN BOTTONE come i fratelli: e' FACOLTATIVA, e un campo
-     sempre aperto su una cosa che quasi nessuno scrive e' spazio morto
-     in una pagina gia' lunga.
+     DISCRETA DI DEFAULT, APERTA DOVE SERVE (ago 2026, decisione di
+     Andrea che AFFINA il «dietro un bottone»): il toggle chiuso e' un
+     link discreto — il bottone ghost full-width pesava quanto le vie —
+     e nelle categorie con varianti da scegliere (CAT_NOTA_APERTA) il
+     campo nasce GIA' aperto: li' la domanda e' quasi certa, e farla
+     cercare dietro un link e' il contrario del servizio. Il default lo
+     decide notaApertaDefault nei DUE costruttori; nessun focus
+     all'apertura — la tastiera si alza solo col dito
+     (apriNotaAcquisto), c'e' la prova.
      ⚠️ In questa funzione «nota» ha gia' DUE significati (la
      sottoetichetta «Consigliato» della via, e le righe oneste qui
      sotto): gli identificatori di qui sono tutti suffissati, e lo
@@ -11010,8 +11020,8 @@ function renderAcquisto(){
   const notaChiusa = notaScritta
     ? `<button type="button" class="btn ghost punto-riga" aria-expanded="false"
         onclick="apriNotaAcquisto()"><span class="punto-testo">📝 ${esc(notaScritta)}</span><span class="punto-cambia">Cambia</span></button>`
-    : `<button type="button" class="btn ghost" aria-expanded="false"
-        onclick="apriNotaAcquisto()">📝 Lascia una nota per il venditore</button>`;
+    : `<button type="button" class="scopri-link nota-aggiungi" aria-expanded="false"
+        onclick="apriNotaAcquisto()">+ Aggiungi una nota</button>`;
   const cassettoNota = `<div class="cassetto-cassa ${d.notaAperta?'field':''}" id="acqNotaCampo">
     ${d.notaAperta ? campiNota : notaChiusa}
   </div>`;
@@ -11491,9 +11501,24 @@ const MAX_NOTA = 200;
 const segnaposNota = eSet =>
   eSet ? 'Es. la maglia rossa: taglia L, le scarpe: 42'
        : 'Es. taglia L, oppure la variante blu';
+/* LA NOTA NASCE APERTA DOVE C'E' UNA VARIANTE DA DIRE (ago 2026,
+   decisione di Andrea): taglia, numero, colore — nelle categorie in
+   elenco la domanda e' quasi certa e il campo si trova gia' aperto;
+   altrove resta il link discreto. Nel carrello basta UN articolo in
+   elenco. Il giudice prende una LISTA di categorie e non la riga (il
+   patto di in_ferie): cosi' lo stesso giudice serve il mono, il set e
+   la prova. I nomi sono quelli ESATTI di CATEGORIE in server.py —
+   «Arte e artigianato», mai «Artigianato». */
+const CAT_NOTA_APERTA = ['Abbigliamento', 'Scarpe e accessori',
+                         'Arte e artigianato', 'Bambini'];
+function notaApertaDefault(cats){
+  return (cats || []).some(c => CAT_NOTA_APERTA.includes(c));
+}
 /* Il cassetto della nota si apre da un posto solo, come i fratelli.
-   Nessuna apertura automatica e nessuna guardia in «Paga»: e'
-   facoltativa, e si apre solo col dito. Il cursore va in FONDO — su
+   L'apertura AUTOMATICA e' solo quella del default per categoria qui
+   sopra, e non passa di qui: resta facoltativa, nessuna guardia in
+   «Paga», e la TASTIERA si alza solo col dito — il focus vive in
+   questa funzione e in nessun render. Il cursore va in FONDO — su
    una correzione un focus() nudo lo mette all'inizio in mezzo browser,
    e si scriverebbe davanti a quel che si e' gia' scritto. */
 function apriNotaAcquisto(){
