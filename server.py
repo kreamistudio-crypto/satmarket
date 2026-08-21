@@ -691,6 +691,17 @@ try:
     from config import PROTEGGI_IFRAME
 except ImportError:
     PROTEGGI_IFRAME = False
+# IL FEED DI GOOGLE MERCHANT (ago 2026). Nasce ACCESA: non muove
+# denaro e non manda niente a nessuno — espone una rotta pubblica che
+# racconta quel che la vetrina racconta gia'. Ma e' un interruttore e
+# non una costante, ed e' il punto: se Merchant Center comincia a
+# lamentarsi (il prezzo che non combacia e' il rischio dichiarato di
+# questo cantiere) il feed va spento IN FRETTA, con una riga nel
+# config e un riavvio, non al prossimo deploy.
+try:
+    from config import FEED_MERCHANT
+except ImportError:
+    FEED_MERCHANT = True
 
 # QUANTO VALE UN CAMBIO VECCHIO (ago 2026, da un caso vero: due deploy
 # a quattordici minuti l'uno dall'altro, e in tutti e due CoinGecko
@@ -12846,6 +12857,11 @@ def _leve_stato():
                          "l'interruttore d'emergenza: False e riavvia — i "
                          "collegamenti restano in tabella e gli annunci "
                          "dove sono, semplicemente nessuno li rilegge"),
+            _leva("Feed Google Merchant", "FEED_MERCHANT", FEED_MERCHANT,
+                  acceso="/feed/google.xml è pubblico: i prezzi in sats "
+                         "escono convertiti in euro al cambio del momento, "
+                         "e un disallineamento con la scheda può far "
+                         "sospendere l'account Merchant Center"),
             _leva("Bot in ascolto (webhook)", "TELEGRAM_WEBHOOK_SEGRETO",
                   webhook_attivo(),
                   spento="il bot manda e basta: niente /start, niente "
@@ -24090,6 +24106,19 @@ def disabilita_accesso_nostr(x_tg_init_data: str = Header(""),
 # avviso in console. Gli utenti solo-Telegram non vedono nulla.
 
 URL_PUBBLICO = "https://barattolo.store"
+
+# La coda promozionale che finisce in fondo al content NIP-99. E' una
+# COSTANTE e non una stringa scritta due volte apposta: la compone
+# `evento_annuncio` e la RICONOSCE `_descrizione_feed`, che deve
+# toglierla — se le due copie divergessero, il taglio smetterebbe di
+# funzionare in silenzio e Google si ritroverebbe dei link in
+# descrizione.
+# IL NOME PORTA IL «NIP99» APPOSTA: `CODA_PROMO` esiste gia' ed e' la
+# coda dei post del canale. Chiamarla cosi' la sovrascriveva, e
+# `evento_annuncio` si sarebbe ritrovato una LISTA dentro una
+# f-string — cioe' le note Nostr rotte. L'ha presa il primo feed
+# generato dal vivo, non la rilettura.
+CODA_PROMO_NIP99 = "🫙⚡ In vendita su Barattolo,"
 LINK_BOT = "https://t.me/ilbarattolobot"
 
 
@@ -24374,7 +24403,7 @@ def evento_annuncio(a: dict, status: str) -> dict:
                f"\n\nPrezzo: {prezzo_txt} — zona: "
                f"{a.get('zona') or 'Italia'}{condizione_txt}{quantita_txt}"
                f"{consegna_txt}"
-               f"\n\n🫙⚡ In vendita su Barattolo, il mercatino in sats "
+               f"\n\n{CODA_PROMO_NIP99} il mercatino in sats "
                f"con escrow Lightning: {URL_PUBBLICO} · {LINK_BOT}")
     return firma_evento(30402, tags, content)
 
@@ -33644,6 +33673,30 @@ def _prezzo_ld(a: dict):
     return f"{sats // 100_000_000}.{sats % 100_000_000:08d}", "BTC"
 
 
+def _prezzo_ld_eur(a: dict) -> str:
+    """L'EURO ANCHE PER I LISTINI IN SATS (ago 2026, col feed di Google
+    Merchant), e senza questa riga il feed non poteva funzionare: li'
+    il prezzo si dichiara per forza in euro, mentre la pagina diceva
+    BTC — e Google confronta le due cifre. Non «ogni tanto»: SEMPRE, e
+    il mismatch e' quello che a ventotto giorni sospende l'account.
+
+    Si legge dalla STESSA fonte del feed (`cambio_noto_ora`, la cache,
+    mai la rete): cosi' le due cifre possono divergere per il TEMPO
+    che passa fra i due crawl, mai per la ricetta.
+
+    Cambio a zero = stringa vuota, cioe' nessuna offerta in euro: e'
+    lo stesso fail-closed di `_prezzo_feed` — meglio non dire un
+    prezzo che dirne uno inventato.
+    Sul listino nato in EURO non serve: quello ce l'ha gia'."""
+    if a.get("valuta") == "eur":
+        return ""
+    sats = int(a.get("prezzo_sats") or 0)
+    cambio = cambio_noto_ora()
+    if sats <= 0 or cambio <= 0:
+        return ""
+    return f"{sats / 100_000_000 * cambio:.2f}"
+
+
 def _disponibilita_ld(a: dict):
     """(availability, availabilityStarts) — e le ferie sono il caso che
     merita il paio: l'oggetto c'e' e il prezzo e' vero, ma oggi non si
@@ -33686,8 +33739,19 @@ def _ld_annuncio(a: dict, url: str, img: str) -> dict:
             venditore["url"] = _url_negozio(a["venditore_negozio"],
                                             a["venditore"])
         offerta["seller"] = venditore
+    # DUE OFFERTE quando il listino e' in sats e il cambio si sa: la
+    # stessa merce dichiarata in due valute, che schema.org ammette.
+    # L'euro sta PRIMO perche' e' quello che i motori sanno leggere —
+    # ed e' quello che deve combaciare col feed di Merchant Center —
+    # mentre il BTC resta e dice la cifra ESATTA, che e' il prezzo
+    # vero. Nessuna delle due si perde, e nessuna dice il falso.
+    eur = _prezzo_ld_eur(a)
+    if eur:
+        offerte = [dict(offerta, price=eur, priceCurrency="EUR"), offerta]
+    else:
+        offerte = offerta
     dati = {"@context": "https://schema.org", "@type": "Product",
-            "@id": url, "name": a["titolo"], "offers": offerta}
+            "@id": url, "name": a["titolo"], "offers": offerte}
     if a.get("descrizione"):
         dati["description"] = _taglia_meta(a["descrizione"], 500)
     if img:
@@ -34258,6 +34322,230 @@ def widget_negozio(chi: str, n: int = WIDGET_DEFAULT):
                f'<a class="cta" target="_blank" rel="noopener" '
                f'href="{_attr(url)}">Vedi tutto</a></div></div>')
     return _widget_pagina(corpo, u["nome"] or "Negozio")
+# ------------------- IL FEED DI GOOGLE MERCHANT ---------------------
+# (ago 2026) Il catalogo in un formato che Google Shopping sa leggere:
+# RSS 2.0 col namespace `g`, scaricato da Merchant Center a intervalli
+# suoi. Una rotta sola, nessuna tabella, nessun job: si genera al volo
+# e si mette in cache, come la sitemap.
+#
+# LA VALUTA E' IL MURO, ed e' la cosa da leggere prima di toccare
+# qualunque riga qui sotto: Merchant Center accetta SOLO codici ISO
+# 4217 — BTC per Google non esiste — e pretende che il prezzo del feed
+# COMBACI con quello della pagina di destinazione. Un disallineamento
+# non disapprova un annuncio: a ventotto giorni sospende l'ACCOUNT.
+# Quindi qui i sats si convertono in euro, e questa e' una DECISIONE DI
+# ANDREA presa sapendo il rischio: il prezzo in euro di un listino in
+# sats si muove col cambio, mentre Google ricontrolla la pagina quando
+# gli pare, e le due cifre possono non combaciare.
+# QUEL CHE SI PUO' FARE PER RIDURLO, e che e' fatto: feed e pagina
+# leggono lo STESSO cambio dalla STESSA fonte (`cambio_noto_ora`), e
+# il JSON-LD di un annuncio in sats dichiara adesso anche un'offerta
+# in EUR — vedi `_prezzo_ld`. Cosi' le due cifre divergono solo per il
+# tempo che passa fra i due crawl, mai per la ricetta: prima
+# divergevano SEMPRE, perche' la pagina diceva BTC e il feed euro.
+# LA LEVA `FEED_MERCHANT` e' il freno d'emergenza: spenta, la rotta
+# risponde 404 e il feed sparisce dal giorno alla notte. Serve se
+# Merchant Center comincia a lamentarsi, perche' li' il rimedio va
+# preso in fretta e non al prossimo deploy.
+
+_FEED_CACHE = {"xml": b"", "quando": 0.0}
+CACHE_FEED = 900          # 15 minuti: il cambio si muove, il feed segue
+TETTO_FEED = 5000         # oltre, Merchant Center vuole piu' file
+
+# La condizione, tradotta nei tre valori che Google ammette. Il
+# «da_sistemare» diventa `used` e non `refurbished`, per la stessa
+# ragione gia' scritta nei dati strutturati: «ricondizionato» vuol dire
+# rimesso a nuovo da un professionista, ed e' la mappatura sbagliata
+# che verrebbe naturale.
+CONDIZIONE_GOOGLE = {"nuovo": "new", "come_nuovo": "used",
+                     "buono": "used", "accettabile": "used",
+                     "da_sistemare": "used"}
+
+
+def _condizione_feed(a: dict) -> str:
+    """La condizione da dichiarare a Google, che e' OBBLIGATORIA.
+
+    Dove il venditore l'ha detta si dice la sua. Dove manca — gli
+    annunci storici e quelli importati da Nostr — si dice `used`
+    (decisione di Andrea: e' un mercatino dell'usato, ed e' il default
+    statisticamente vero), CON UNA ECCEZIONE che non e' un
+    ripensamento: nelle categorie dove la condizione non vuol dire
+    niente — alimenti, bellezza, buoni — la merce e' nuova per
+    definizione, e «usato» su un vasetto di miele sarebbe falso. Il
+    giudice e' `senza_condizione`, lo stesso di form, dettaglio,
+    vetrina, NIP-99 e import: qui non nasce nessuna regola nuova."""
+    c = condizione_da_mostrare(a)
+    if c in CONDIZIONE_GOOGLE:
+        return CONDIZIONE_GOOGLE[c]
+    return "new" if senza_condizione(a.get("categoria") or "",
+                                     a.get("consegna") or "") else "used"
+
+
+def _prezzo_feed(a: dict, cambio: float) -> str:
+    """«45.00 EUR», o stringa vuota se non si sa dirlo.
+
+    Il listino nato in euro si dichiara com'e': e' un prezzo vero e
+    fisso, e la pagina dice gia' lui. Quello in sats si converte col
+    cambio corrente — la stessa fonte del JSON-LD, o le due cifre
+    divergerebbero per costruzione e non per il tempo.
+    Cambio a zero = NIENTE PREZZO, cioe' l'annuncio resta fuori dal
+    feed: un prezzo inventato qui non e' un'imprecisione, e' la riga
+    che fa sospendere l'account."""
+    if a.get("valuta") == "eur" and a.get("prezzo_eur"):
+        return f"{float(a['prezzo_eur']):.2f} EUR"
+    sats = int(a.get("prezzo_sats") or 0)
+    if sats <= 0 or cambio <= 0:
+        return ""
+    return f"{sats / 100_000_000 * cambio:.2f} EUR"
+
+
+def _riga_feed(a: dict, cambio: float) -> str:
+    """Un annuncio come voce del feed, o stringa vuota se non ci deve
+    stare.
+
+    CHI RESTA FUORI, e ognuno per una ragione sua:
+      · le ASTE — il prezzo di un'asta e' una BASE, non un prezzo
+        d'acquisto: dichiararlo a Google vorrebbe dire promettere una
+        cifra a cui quell'oggetto non si compra;
+      · le LAMPO VIVE — quel prezzo scade in ore e il feed vive in
+        cache per giorni, quindi il mismatch sarebbe garantito. E'
+        la stessa ragione per cui l'anteprima dei link dichiara il
+        LISTINO e non lo sconto a tempo;
+      · chi non ha una FOTO — `image_link` e' obbligatoria;
+      · chi non ha un prezzo dicibile in euro (vedi `_prezzo_feed`).
+    Chi e' in ferie o esaurito ci sta invece, ma `out_of_stock`: e'
+    la verita', e toglierlo e rimetterlo a ogni rientro farebbe
+    ballare il feed."""
+    if a.get("asta_base_sats"):
+        return ""
+    if (a.get("lampo_percento") or 0) > 0 \
+            and (a.get("lampo_scadenza") or 0) > int(time.time()):
+        return ""
+    # La foto passa dal giudice delle anteprime, che sa gia' saltare
+    # gli URL di terzi. Il suo ripiego al BRAND qui NON va bene — un
+    # feed col nostro logo su ogni prodotto e' una disapprovazione in
+    # blocco — quindi chi ci ricade resta fuori.
+    foto = _immagine_anteprima(a.get("foto") or "")[0]
+    if not foto or foto == IMMAGINE_BRAND[0]:
+        return ""
+    prezzo = _prezzo_feed(a, cambio)
+    if not prezzo:
+        return ""
+    url = _url_annuncio(a["id"], a["titolo"])
+    esaurito = int(a.get("quantita") or 0) <= 0
+    ferie = in_ferie(int(a.get("venditore_ferie") or 0), int(time.time()))
+    voce = [
+        f"<g:id>{a['id']}</g:id>",
+        # I 150 caratteri sono il tetto di Google; il taglio passa da
+        # `_taglia_meta`, che e' quello che il progetto usa gia' per i
+        # titoli delle anteprime.
+        f"<title>{_xml(_taglia_meta(a['titolo'], 150))}</title>",
+        f"<description>{_xml(_descrizione_feed(a))}</description>",
+        f"<link>{_xml(url)}</link>",
+        f"<g:image_link>{_xml(foto)}</g:image_link>",
+        f"<g:price>{prezzo}</g:price>",
+        "<g:availability>"
+        + ("out_of_stock" if (esaurito or ferie) else "in_stock")
+        + "</g:availability>",
+        f"<g:condition>{_condizione_feed(a)}</g:condition>",
+        # NIENTE GTIN E NIENTE MPN, e va DICHIARATO invece che omesso:
+        # un pezzo unico di seconda mano un codice a barre non ce l'ha,
+        # e `identifier_exists` = no e' il modo in cui Google vuole
+        # sentirselo dire. Senza, i prodotti vengono disapprovati per
+        # «identificatore mancante».
+        "<g:identifier_exists>no</g:identifier_exists>",
+        f"<g:product_type>{_xml(a.get('categoria') or 'Altro')}</g:product_type>",
+    ]
+    return "<item>" + "".join(voce) + "</item>"
+
+
+def _descrizione_feed(a: dict) -> str:
+    """La descrizione ripulita di quel che Google non ammette.
+
+    IL CASO E' VERO e si e' visto al primo feed generato sui dati di
+    collaudo: parecchi annunci hanno in colonna la CODA PROMOZIONALE
+    che componiamo noi per Nostr — «Prezzo: 26000 sats — zona: … 🫙⚡
+    In vendita su Barattolo … https://…» — perche' rientra dall'import
+    quando il venditore ripubblica da un client suo. Nel feed quella
+    roba fa due danni: Google disapprova le descrizioni che contengono
+    PREZZI, SPEDIZIONE o LINK, e soprattutto quel «26000 sats» e' la
+    cifra che contraddice il `g:price` in euro — cioe' e' benzina sul
+    fuoco del disallineamento che questo cantiere gia' rischia.
+    Si taglia dal NOSTRO marcatore in poi, e con lui la riga «Prezzo:»
+    che lo precede: sono parole nostre finite in un campo del
+    venditore, non parole sue. Il DATO NON SI TOCCA — in colonna resta
+    quello che c'e', qui cambia solo cosa si racconta a Google.
+    Un venditore che scriva «Prezzo:» di suo non perde niente: la riga
+    si toglie solo quando e' attaccata al marcatore."""
+    testo = (a.get("descrizione") or a["titolo"] or "").strip()
+    i = testo.find(CODA_PROMO_NIP99)
+    if i >= 0:
+        testo = testo[:i].rstrip()
+        righe = testo.split("\n")
+        if righe and righe[-1].startswith("Prezzo: "):
+            testo = "\n".join(righe[:-1]).rstrip()
+    # E GLI INDIRIZZI DEL VENDITORE, che sono un caso a parte e si
+    # sono visti anche loro al primo giro (due su trentasei): Google
+    # non ammette LINK in descrizione, punto — non i nostri, non i
+    # suoi. Qui non si giudica se quel link sia buono: si toglie dal
+    # feed, e nella scheda vera resta intero. Chi compra non perde
+    # niente, e il prodotto non viene disapprovato per una riga che
+    # il venditore ha scritto senza sapere di Google.
+    testo = _re_url.sub("", testo)
+    return _taglia_meta(" ".join(testo.split()) or a["titolo"], 5000)
+
+
+_re_url = re.compile(r"\b(?:https?://|www\.)\S+", re.I)
+
+
+def _xml(t: str) -> str:
+    """Testo dentro un nodo XML. `html.escape` copre &, <, > e le
+    virgolette; qui in piu' si tolgono i caratteri di controllo, che in
+    XML 1.0 sono ILLEGALI — non «brutti»: un solo byte di quelli rende
+    il feed intero non leggibile, e Merchant Center lo rifiuta senza
+    dire quale riga. Il titolo lo scrive un venditore, quindi il caso
+    non e' teorico."""
+    pulito = "".join(c for c in (t or "")
+                     if c in "\t\n\r" or (ord(c) >= 0x20 and ord(c) != 0x7F))
+    return html.escape(pulito, quote=True)
+
+
+def _feed_google() -> bytes:
+    adesso = time.time()
+    if _FEED_CACHE["xml"] and adesso - _FEED_CACHE["quando"] < CACHE_FEED:
+        return _FEED_CACHE["xml"]
+    cambio = cambio_noto_ora()
+    con = db()
+    try:
+        righe = [dict(r) for r in con.execute(
+            f"SELECT {CAMPI_VETRINA} FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.stato='attivo' ORDER BY a.id LIMIT ?",
+            (TETTO_FEED,))]
+    finally:
+        con.close()
+    righe = arricchisci_righe_vetrina(righe)
+    voci = [v for v in (_riga_feed(a, cambio) for a in righe) if v]
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">'
+           "<channel>"
+           f"<title>{_xml(TITOLO_HOME)}</title>"
+           f"<link>{_xml(URL_PUBBLICO)}</link>"
+           "<description>Mercatino dell'usato in satoshi, "
+           "col deposito di garanzia</description>"
+           + "".join(voci) + "</channel></rss>").encode("utf-8")
+    _FEED_CACHE.update(quando=adesso, xml=xml)
+    return xml
+
+
+@app.get("/feed/google.xml")
+def feed_google():
+    """Il feed per Merchant Center. Rotta ESPLICITA come ogni altra
+    cosa pubblica (regola ferrea 3), e spenta dalla leva."""
+    if not FEED_MERCHANT:
+        raise HTTPException(404, "Non trovato")
+    return Response(_feed_google(), media_type="application/xml",
+                    headers={"Cache-Control": "public, max-age=900"})
 
 
 @app.get("/")

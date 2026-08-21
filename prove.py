@@ -61,6 +61,25 @@ def pezzo(nome, fine="\n\n\n"):
     return src[i:src.index(fine, i)]
 
 
+def costante(nome):
+    """Il sorgente di una costante di modulo, presa dall'ALBERO e non a
+    colpi di `index`: un dict che finisce sulla stessa riga dell'ultima
+    voce, un frozenset avvolto in una chiamata, una stringa su piu'
+    righe — ognuno vorrebbe la sua regola, e la regola sbagliata non
+    fallisce: estrae un pezzo di codice storto che poi esplode altrove
+    (successo scrivendo le prove del feed)."""
+    albero = ast.parse(_SORGENTE)
+    righe = _SORGENTE.split("\n")
+    for n in albero.body:
+        if isinstance(n, ast.Assign) and any(
+                isinstance(b, ast.Name) and b.id == nome for b in n.targets):
+            return "\n".join(righe[n.lineno - 1:n.end_lineno])
+        if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name) \
+                and n.target.id == nome:
+            return "\n".join(righe[n.lineno - 1:n.end_lineno])
+    raise ValueError(f"costante non trovata: {nome}")
+
+
 def codice(testo):
     """Le sole righe di CODICE: via i commenti. Serve alle sentinelle
     che cercano una parola-spia (`await `, `INSERT`...) dentro una
@@ -14464,6 +14483,7 @@ def _censimento(acceso):
                  "AVVISI_ORDINI_ADMIN", "TERMOMETRO_SOTTOCATEGORIE",
                  "CONTROLLO_LIBRO_MASTRO", "ORE_INITDATA",
                  "PROTEGGI_IFRAME",
+                 "FEED_MERCHANT",
                  "COMMISSIONE_PERCENTO",
                  "PROTEZIONE_PERCENTO", "TETTO_SATS_ANNUNCIO",
                  "SOLLECITO_INCASSO_GIORNI", "PROMEMORIA_CONFERMA_GIORNI",
@@ -16788,6 +16808,7 @@ def _amb_seo():
               "_immagine_anteprima", "_testa_seo", "_url_annuncio",
               "_url_negozio", "_categoria_da_slug", "_schede_cartello",
               "_link_categorie", "_seo_niente", "_prezzo_ld",
+              "_prezzo_ld_eur",
               "_disponibilita_ld", "_ld_annuncio", "_seo_annuncio",
               "_seo_negozio", "_seo_categoria", "_seo_home",
               "_seo_o_generici", "_spezza_pagina", "_monta_pagina",
@@ -16929,14 +16950,17 @@ def prove_anteprime():
     # censimento ne aveva mancati tre (testo_prezzo dei moderatori e i
     # due avvisi gemelli del drift del cambio), ed e' stata questa
     # sentinella a prenderli.
-    # I DUE superstiti non li legge una persona: sono le righe di
-    # prosa del NIP-99 («Prezzo:» e «spedizione:»), che stanno nello
-    # stesso evento dei tag e li ripetono a parole — divergere da loro
-    # sarebbe peggio.
-    # ERANO TRE fino all'ago 2026: il terzo era la riga del catalogo
-    # che andava in pasto ad Haiku, e se n'e' andata con la ricerca AI.
-    prova("...ne' quelli che scrivono EUR a parole (restano i due che "
-          "una persona non legge)", 2, _SORGENTE.count(":.2f} EUR"))
+    # I QUATTRO superstiti non li legge una PERSONA, ed e' il criterio
+    # di sempre: due sono le righe di prosa del NIP-99 («Prezzo:» e
+    # «spedizione:»), che stanno nello stesso evento dei tag e li
+    # ripetono a parole — divergere da loro sarebbe peggio —, e due
+    # sono il PREZZO DEL FEED di Google Merchant, dove il formato lo
+    # detta la specifica di Google (ISO 4217, punto decimale) e non
+    # noi. Erano TRE fino all'ago 2026 e poi DUE: il terzo era la riga
+    # del catalogo che andava in pasto ad Haiku, se n'e' andata con la
+    # ricerca AI, e i due del feed sono arrivati col cantiere dopo.
+    prova("...ne' quelli che scrivono EUR a parole (restano i quattro "
+          "che una persona non legge)", 4, _SORGENTE.count(":.2f} EUR"))
     # Il censimento completo dei superstiti, che vale come elenco: i
     # tre TAG NIP-99 (price ×2, delivery) e le due righe di prosa che
     # li accompagnano — campi di protocollo che importa_nostr rilegge,
@@ -16946,11 +16970,13 @@ def prove_anteprime():
     # e' della stessa famiglia dei tag NIP-99: schema.org vuole il
     # punto decimale, e una virgola li' dentro non sarebbe uno stile
     # italiano ma un numero illeggibile per chi lo consuma.
-    # ERANO NOVE fino all'ago 2026: il nono era la riga del catalogo
-    # che andava all'AI, e se n'e' andata con la ricerca AI.
+    # Piu' i TRE del feed di Google e dei suoi dati strutturati —
+    # stessa famiglia: la' il formato lo detta Google.
+    # ERANO NOVE fino all'ago 2026, poi OTTO: il nono era la riga del
+    # catalogo che andava all'AI, e se n'e' andata con la ricerca.
     # Se questo numero cambia: o e' nato un campo di protocollo nuovo,
     # o qualcuno ha ricominciato a scrivere un euro a mano.
-    prova("...e gli otto superstiti sono tutti censiti", 8,
+    prova("...e gli undici superstiti sono tutti censiti", 11,
           _SORGENTE.count(":.2f}"))
 
     # LA SENTINELLA DEI SATS, gemella. Le stringhe spezzate su piu'
@@ -17555,6 +17581,37 @@ def prove_seo():
           "itemCondition" in amb["_ld_annuncio"](miele, "u", ""))
     prova("...anche col residuo in colonna", "",
           amb["condizione_da_mostrare"](miele))
+
+    # --- 6-bis) L'EURO ANCHE SUI SATS (ago 2026, col feed di Google
+    # Merchant). E' la riga che rende POSSIBILE il feed: li' il prezzo
+    # si dichiara per forza in euro, e se la pagina dicesse solo BTC
+    # Google troverebbe due cifre diverse — che non disapprova un
+    # annuncio, sospende l'ACCOUNT.
+    # LA PROVA GIRA `_ld_annuncio` PER DAVVERO e non guarda se la
+    # funzione esiste: la prima stesura faceva cosi', e la mutazione
+    # che rimetteva l'offerta singola sopravviveva a tutta la suite.
+    amb["cambio_noto_ora"] = lambda: 50_000.0
+    in_sats = {"titolo": "Cosa", "valuta": "sats", "prezzo_sats": 100_000,
+               "stato": "attivo", "quantita": 1, "categoria": "Motori",
+               "consegna": "ritiro", "condizione": "buono"}
+    off = amb["_ld_annuncio"](in_sats, "u", "")["offers"]
+    prova("un listino in sats dichiara DUE offerte", 2,
+          len(off) if isinstance(off, list) else 1)
+    prova("...e l'euro sta per primo, che è quello che Google legge",
+          ["EUR", "BTC"], [o["priceCurrency"] for o in off])
+    prova("...con la cifra convertita, non inventata", "50.00",
+          off[0]["price"])
+    prova("...e quella in BTC resta esatta", "0.00100000", off[1]["price"])
+    # Il listino NATO in euro ce l'ha già: niente doppione.
+    in_eur = dict(in_sats, valuta="eur", prezzo_eur=40.0)
+    prova("il listino in euro resta una offerta sola", "EUR",
+          amb["_ld_annuncio"](in_eur, "u", "")["offers"]["priceCurrency"])
+    # E SENZA CAMBIO non si inventa niente: si torna a BTC e basta —
+    # lo stesso fail-closed di `_prezzo_feed`, dove un prezzo sbagliato
+    # non è un'imprecisione ma la riga che fa sospendere l'account.
+    amb["cambio_noto_ora"] = lambda: 0.0
+    prova("senza cambio resta la sola offerta in BTC", "BTC",
+          amb["_ld_annuncio"](in_sats, "u", "")["offers"]["priceCurrency"])
 
     # --- 7) MAI il voto del VENDITORE sul prodotto -----------------
     # E' forte la tentazione (u.rating ce l'abbiamo), ma quel voto e'
@@ -23474,6 +23531,194 @@ rifai();
 dice('chi non ha votato la vede anche senza occasioni', ['p2p'],
      idCard());
 """
+def prove_feed_google():
+    """IL FEED DI GOOGLE MERCHANT (ago 2026).
+
+    Qui il modo tipico di fallire non è un'eccezione: è un XML che
+    Merchant Center rifiuta senza dire quale riga, o — molto peggio —
+    un prezzo che non combacia con la scheda, che a ventotto giorni
+    sospende l'ACCOUNT. Quindi le prove girano sui pezzi VERI e l'XML
+    si fa parsare per davvero, con dentro il testo più ostile che un
+    venditore possa scrivere."""
+    print("\n[feed Google Merchant]")
+    import time
+    import xml.dom.minidom
+
+    amb = {"re": re, "html": __import__("html"), "time": __import__("time"),
+           "unicodedata": __import__("unicodedata")}
+    for nome in ("CODA_PROMO_NIP99", "_re_url", "CONDIZIONE_GOOGLE",
+                 "URL_PUBBLICO", "IMMAGINE_BRAND",
+                 "CATEGORIE_SENZA_CONDIZIONE", "CONDIZIONI",
+                 "TLD_RECAPITO", "_RECAPITO", "MAX_SLUG"):
+        exec(costante(nome), amb)
+    for nome in ("normalizza", "senza_condizione", "condizione_da_mostrare",
+                 "_taglia_meta", "_slug", "_pare_recapito", "_url_annuncio",
+                 "_condizione_feed", "_prezzo_feed", "_descrizione_feed",
+                 "_xml", "_riga_feed", "in_ferie"):
+        exec(pezzo(nome), amb)
+    # `_immagine_anteprima` vuole il disco: qui basta un finto che dica
+    # sì o no, che è tutto quel che `_riga_feed` gli chiede.
+    amb["_immagine_anteprima"] = lambda f: (
+        (f"{amb['URL_PUBBLICO']}/foto/x_min.jpg", 0, 0) if f
+        else amb["IMMAGINE_BRAND"])
+    cond, prezzo = amb["_condizione_feed"], amb["_prezzo_feed"]
+    desc, riga = amb["_descrizione_feed"], amb["_riga_feed"]
+
+    # --- LA CONDIZIONE, che è obbligatoria e che Google controlla ----
+    prova("«nuovo» diventa new", "new",
+          cond({"condizione": "nuovo", "categoria": "Motori"}))
+    prova("«buono» diventa used", "used",
+          cond({"condizione": "buono", "categoria": "Motori"}))
+    # «da_sistemare» NON è «refurbished»: ricondizionato vuol dire
+    # rimesso a nuovo da un professionista, ed è la mappatura sbagliata
+    # che verrebbe naturale (la stessa nota sta nei dati strutturati).
+    prova("«da_sistemare» resta used, non refurbished", "used",
+          cond({"condizione": "da_sistemare", "categoria": "Motori"}))
+    # IL DEFAULT DI ANDREA: dove il venditore non l'ha detta, «used».
+    prova("senza condizione: used", "used",
+          cond({"condizione": "", "categoria": "Motori"}))
+    # ...CON L'ECCEZIONE che non è un ripensamento: dove la condizione
+    # non vuol dire niente la merce è nuova per definizione, e «usato»
+    # su un vasetto di miele sarebbe una dichiarazione falsa a Google.
+    # Il giudice è `senza_condizione`, lo stesso di form e vetrina.
+    prova("...ma sugli alimenti è new", "new",
+          cond({"condizione": "", "categoria": "Alimenti e bevande"}))
+    prova("...e sui buoni pure", "new",
+          cond({"condizione": "", "categoria": "Buoni ed esperienze"}))
+    prova("...e sul codice online pure", "new",
+          cond({"condizione": "", "categoria": "Motori",
+                "consegna": "digitale"}))
+
+    # --- IL PREZZO, che è il muro di questo cantiere -----------------
+    prova("il listino in euro si dichiara com'è", "40.00 EUR",
+          prezzo({"valuta": "eur", "prezzo_eur": 40.0}, 50_000))
+    prova("quello in sats si converte", "50.00 EUR",
+          prezzo({"valuta": "sats", "prezzo_sats": 100_000}, 50_000))
+    # FAIL-CLOSED: senza cambio non si inventa un prezzo — un numero
+    # sbagliato qui non è un'imprecisione, è la riga che fa sospendere
+    # l'account.
+    prova("senza cambio NIENTE prezzo", "",
+          prezzo({"valuta": "sats", "prezzo_sats": 100_000}, 0))
+    prova("...e nemmeno a prezzo zero", "",
+          prezzo({"valuta": "sats", "prezzo_sats": 0}, 50_000))
+
+    # --- LA DESCRIZIONE: Google non ammette prezzi né link -----------
+    promo = amb["CODA_PROMO_NIP99"]
+    prova("la coda promozionale si taglia", "Bella cappa",
+          desc({"titolo": "X", "descrizione":
+                "Bella cappa\n\nPrezzo: 26000 sats — zona: Dro (TN)\n\n"
+                + promo + " il mercatino: https://barattolo.store"}))
+    prova("gli indirizzi del venditore se ne vanno", "Motore remoto. ottimo",
+          desc({"titolo": "X",
+                "descrizione": "Motore remoto. https://www.elica.com/x ottimo"}))
+    prova("...anche senza schema", "Info: ecco",
+          desc({"titolo": "X", "descrizione": "Info: www.untempoperte.it ecco"}))
+    # ...ma un «Prezzo:» scritto DAL VENDITORE non si tocca: la riga si
+    # toglie solo quando è attaccata al nostro marcatore.
+    prova("un «Prezzo:» suo resta", "Prezzo: trattabile",
+          desc({"titolo": "X", "descrizione": "Prezzo: trattabile"}))
+    prova("una descrizione vuota ripiega sul titolo", "Solo titolo",
+          desc({"titolo": "Solo titolo", "descrizione": ""}))
+
+    # --- CHI RESTA FUORI, e ognuno per una ragione sua ---------------
+    def base(**extra):
+        a = {"id": 1, "titolo": "Cosa", "descrizione": "bella",
+             "categoria": "Motori", "condizione": "buono", "consegna": "ritiro",
+             "valuta": "sats", "prezzo_sats": 100_000, "quantita": 1,
+             "foto": '["a1_0.jpg"]', "venditore": "Tizio",
+             "venditore_ferie": 0, "lampo_percento": 0, "lampo_scadenza": 0,
+             "asta_base_sats": 0}
+        a.update(extra)
+        return a
+
+    prova("un annuncio normale entra", True, bool(riga(base(), 50_000)))
+    # L'ASTA: quel prezzo è una BASE, non un prezzo d'acquisto —
+    # dichiararlo vorrebbe dire promettere una cifra a cui l'oggetto
+    # non si compra.
+    prova("l'asta resta fuori", "", riga(base(asta_base_sats=1000), 50_000))
+    # LA LAMPO: scade in ore, il feed vive in cache per giorni. È la
+    # stessa ragione per cui l'anteprima dei link dichiara il listino.
+    prova("la lampo viva resta fuori", "",
+          riga(base(lampo_percento=20,
+                    lampo_scadenza=int(time.time()) + 3600), 50_000))
+    prova("...ma una lampo scaduta non fa niente", True,
+          bool(riga(base(lampo_percento=20, lampo_scadenza=1), 50_000)))
+    prova("senza foto resta fuori", "", riga(base(foto=""), 50_000))
+    prova("senza prezzo dicibile resta fuori", "", riga(base(), 0))
+    # CHI C'È MA NON SI COMPRA ci sta, e lo dice: toglierlo e
+    # rimetterlo a ogni rientro dalle ferie farebbe ballare il feed.
+    prova("l'esaurito è out_of_stock", True,
+          "<g:availability>out_of_stock</g:availability>"
+          in riga(base(quantita=0), 50_000))
+    prova("le ferie sono out_of_stock", True,
+          "<g:availability>out_of_stock</g:availability>"
+          in riga(base(venditore_ferie=int(time.time()) + 86400), 50_000))
+    # LA MARCA NON C'È e non si inventa: il nome del venditore non è il
+    # brand di uno shoyu, e con `identifier_exists: no` Google non la
+    # chiede. Ci si è inciampati al primo feed generato sui dati veri,
+    # dove ogni prodotto usciva col brand «Barattolo».
+    r = riga(base(), 50_000)
+    prova("niente brand inventato", False, "<g:brand>" in r)
+    prova("...e si dichiara che l'identificatore non c'è", True,
+          "<g:identifier_exists>no</g:identifier_exists>" in r)
+
+    # --- L'XML DEVE FARSI PARSARE, col testo più ostile --------------
+    # Un solo carattere di controllo rende il feed intero illeggibile,
+    # e Merchant Center lo rifiuta senza dire quale riga. Il titolo lo
+    # scrive un venditore: il caso non è teorico.
+    cattivo = base(titolo='Cuffie <b>AKG</b> & "K371" \x07\x00',
+                   descrizione="prima\x0briga & <script>alert(1)</script>")
+    feed = ('<?xml version="1.0" encoding="UTF-8"?>'
+            '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">'
+            "<channel>" + riga(cattivo, 50_000) + "</channel></rss>")
+    try:
+        xml.dom.minidom.parseString(feed.encode("utf-8"))
+        ok = True
+    except Exception as e:
+        ok = f"{type(e).__name__}: {e}"
+    prova("l'XML regge un titolo ostile", True, ok)
+    prova("...e i caratteri di controllo se ne sono andati", True,
+          "\x07" not in feed and "\x00" not in feed)
+
+    # --- SENTINELLE --------------------------------------------------
+    # LA COSTANTE È UNA SOLA, e vive in due posti: la compone
+    # `evento_annuncio` e la riconosce `_descrizione_feed`. Due copie
+    # che divergono vorrebbero dire un taglio che smette di funzionare
+    # in silenzio, e dei link in descrizione.
+    # Il LETTERALE una volta sola: nella docstring di
+    # `_descrizione_feed` la frase e' citata a parole, e va bene —
+    # quel che non deve succedere e' che qualcuno la riscriva in
+    # CODICE, perche' da li' le due copie divergono e il taglio
+    # smette di funzionare in silenzio.
+    prova("la coda promozionale è una stringa sola", 1,
+          _SORGENTE.count('"🫙⚡ In vendita su Barattolo,"'))
+    prova("...e la usano in due: chi la scrive e chi la toglie", 3,
+          _SORGENTE.count("CODA_PROMO_NIP99"))   # + la definizione
+    # ...e il nome porta il «NIP99» APPOSTA: `CODA_PROMO` esiste già ed
+    # è la coda dei post del canale. Chiamarla così la sovrascriveva —
+    # `evento_annuncio` si sarebbe ritrovato una LISTA dentro una
+    # f-string, cioè le note Nostr rotte. L'ha presa il primo feed
+    # generato dal vivo, non la rilettura.
+    prova("...e non ruba il nome alla coda del canale", True,
+          "CODA_PROMO: list[int]" in _SORGENTE)
+    # LA LEVA è il freno d'emergenza: il rimedio a un Merchant Center
+    # che si lamenta va preso in fretta, non al prossimo deploy.
+    fg = pezzo("feed_google")
+    prova("la rotta si spegne dalla leva", True,
+          "if not FEED_MERCHANT:" in codice(fg))
+    prova("...e spenta risponde 404", True, "404" in fg)
+    # IL PREZZO DELLA PAGINA E QUELLO DEL FEED LEGGONO LA STESSA FONTE,
+    # o divergerebbero per costruzione e non per il tempo: è la sola
+    # cosa che rende sostenibile mandare a Google i listini in sats.
+    prova("il JSON-LD dichiara l'euro anche sui sats", True,
+          "def _prezzo_ld_eur" in _SORGENTE)
+    for f in ("_prezzo_ld_eur", "_feed_google"):
+        prova(f"{f} legge il cambio dalla cache, mai dalla rete", True,
+              "cambio_noto_ora()" in pezzo(f))
+    prova("...e nessuno dei due va a chiamare CoinGecko", 0,
+          sum(pezzo(f).count("await cambio_btc_eur")
+              for f in ("_prezzo_ld_eur", "_feed_google")))
+
 
 def prove_script_nel_workflow():
     """OGNI SCRIPT DEL REPO PASSA DAL compileall (ago 2026).
@@ -28615,6 +28860,7 @@ def main():
               prove_scoprire_p2p,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
+              prove_feed_google,
               prove_script_nel_workflow,
               prove_nwc_cifratura,
               prove_pagina_dati,

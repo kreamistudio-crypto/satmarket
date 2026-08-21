@@ -774,6 +774,15 @@ ORE_INITDATA = 24
 # non l'app): li' gira dentro un iframe di web.telegram.org, ed e' la
 # sola strada che questa leva puo' chiudere.
 PROTEGGI_IFRAME = False
+# --- Il feed di Google Merchant (ago 2026) ---------------------------
+# `GET /feed/google.xml`, il catalogo in un formato che Google Shopping
+# sa leggere. Nasce ACCESO: non muove denaro e non manda niente a
+# nessuno. Ma e' un INTERRUTTORE apposta — Merchant Center pretende che
+# il prezzo del feed combaci con quello della scheda, e i listini in
+# sats ci escono convertiti in euro al cambio del momento: se comincia
+# a lamentarsi, il feed va spento in fretta (una riga qui e un riavvio,
+# non un deploy).
+FEED_MERCHANT = True
 
 # Quanto resta buono un cambio BTC/EUR che non riusciamo a rinfrescare.
 # L'ultimo cambio letto vive nel database e torna in cache a ogni
