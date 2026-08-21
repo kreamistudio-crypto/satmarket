@@ -16120,31 +16120,62 @@ function renderDoppioni(){
     <div class="sub"><span class="mono" style="color:var(--sats-deep)">${a.valuta==='eur'&&a.prezzo_eur>0 ? fmtEur(a.prezzo_eur)+' €' : fmt(a.prezzo_sats)+' sats'}</span></div>`;
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:4px">
-      Questi annunci sembrano lo <b>stesso oggetto</b> pubblicato due
-      volte su Nostr: una volta da te, una da Barattolo. Se vuoi,
-      ritiriamo la <b>nostra</b> copia — la tua originale non si tocca mai.</div>
+      Questi annunci sembrano lo <b>stesso oggetto</b>, pubblicato due
+      volte su Nostr: uno l'hai messo dal tuo client, l'altro è nato
+      qui su Barattolo e ha un suo evento sui relay. Se vuoi ritiriamo
+      quel secondo evento — il tuo originale non si tocca mai.
+      <div style="margin-top:4px">In vetrina restano comunque due
+      annunci: se ne vuoi uno solo, togli l'altro da
+      «📋 I tuoi annunci».</div></div>
+    ${/* L'etichetta del NATIVO dice chi ha firmato DAVVERO: col BIVIO
+          quell'evento e' suo, e attribuirlo a noi sul suo stesso
+          annuncio e' il modo di fargli perdere fiducia in questo
+          cassetto. La formula di ieri non si cita nemmeno qui: la
+          sentinella che la vieta legge anche i commenti. */''}
     ${myDoppioni.map(c => `
       <div class="order">
-        ${riga(c.importato, '🟣 dal tuo profilo Nostr')}
-        ${riga(c.nativo, '🫙 pubblicato da Barattolo')}
+        ${riga(c.importato, '🟣 nato sul tuo client Nostr')}
+        ${/* «da te» / «da noi»: due facce della stessa domanda, e la
+              seconda rientra nei 258px della riga a 320 (misurata: la
+              formula lunga ne chiedeva 194 e si mangiava 8px del
+              padding destro della card). */''}
+        ${riga(c.nativo, c.firmato_da_te ? '🫙 nato qui, firmato da te'
+                                         : '🫙 nato qui, firmato da noi')}
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
-          <button class="btn ghost" style="margin:0;flex:1" onclick="ritiraDoppione(${c.nativo.id})">Ritira il doppione di Barattolo</button>
+          <button class="btn ghost" style="margin:0;flex:1" onclick="ritiraDoppione(${c.nativo.id},${c.firmato_da_te?1:0})">Ritira il doppione dai relay</button>
           <button class="btn link" style="margin:0" onclick="ignoraDoppione(${c.importato.id},${c.nativo.id})">Non è un doppione</button>
         </div>
       </div>`).join('')}`;
 }
 
-async function ritiraDoppione(idNativo){
+async function ritiraDoppione(idNativo, tua){
   haptic();
-  if (!confirm('Ritira dai relay Nostr la copia firmata da Barattolo.\n\n'
-    + 'Il tuo annuncio originale resta tuo e non si tocca. L\'annuncio '
-    + 'qui su Barattolo resta attivo: solo, non sarà più ripubblicato '
-    + 'su Nostr.\n\nProcedere?')) return;
+  /* Due domande, perche' sono due gesti diversi: se l'evento e' NOSTRO
+     lo ritiriamo noi e finisce li'; se e' SUO (il BIVIO) noi possiamo
+     solo preparare la richiesta, e a firmarla e' il suo browser. */
+  const coda = 'Il tuo annuncio originale non si tocca mai. E l\'annuncio '
+    + 'qui su Barattolo resta attivo: solo, non sarà più pubblicato '
+    + 'su Nostr.\n\nProcedere?';
+  if (!confirm(tua
+    ? 'Ritiriamo dai relay Nostr l\'evento di questo annuncio.\n\n'
+      + 'È firmato con la tua chiave: la richiesta la prepariamo noi, '
+      + 'ma a firmarla sei tu — te la chiediamo alla prossima '
+      + 'apertura.\n\n' + coda
+    : 'Ritiriamo dai relay Nostr l\'evento di questo annuncio, quello '
+      + 'firmato da Barattolo.\n\n' + coda)) return;
   try {
     const r = await fetch(`${API_BASE}/me/doppioni/${idNativo}/ritira`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Ritiro non riuscito, riprova'); return; }
+    /* Sul ramo accodato la coppia RESTA: non e' fatto, e sparira' da
+       sola quando la firma passa (la coda gira all'apertura). Farla
+       sparire adesso direbbe che e' successo qualcosa che non e'
+       ancora successo. */
+    if (d.firma) {
+      toast('🟣 Richiesta di ritiro pronta: la firmi tu alla prossima apertura');
+      return;
+    }
     myDoppioni = myDoppioni.filter(c => c.nativo.id !== idNativo);
     renderDoppioni();
     toast('🟣 Doppione ritirato dai relay');
@@ -19552,7 +19583,13 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
       <div class="row mio-riga">
         <b class="mio-tit"${apre?` onclick="openDetail(${l.id})" style="cursor:pointer"`:''}>${l.photos&&l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:10px;flex:none${spento?';filter:grayscale(1);opacity:.6':''}">`
-          : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span></b>
+          : `<span style="font-size:22px${spento?';filter:grayscale(1);opacity:.6':''}">${l.emoji}</span>`}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span>${
+        /* Il 🟣 dell'IMPORTATO (ago 2026): senza, un annuncio che vive
+           sui relay e uno nato qui sono indistinguibili in questa
+           lista — li si separava solo aprendoli — e «togli quello
+           importato» non aveva un referente. Il dato e' gia' in mano
+           al client (mapListing porta `nostr`): zero server. */
+        l.nostr ? `<span title="Importato dal tuo client Nostr: il testo lo comandano i relay" style="color:var(--nostr);flex:none">🟣</span>` : ''}</b>
       </div>
       ${/* in coda alla meta il conteggio dei barattoli, nudo (saversPunto):
            qui il venditore i suoi annunci li guarda in fila, ed e' il

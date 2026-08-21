@@ -18374,8 +18374,14 @@ def trova_doppioni_nostr(con, tg_id: int) -> list:
     """Le coppie (importato, nativo) dello stesso venditore che
     sembrano lo stesso oggetto. Restano fuori le coppie archiviate
     con «non e' un doppione». Guardia d'ingresso: chi non ha annunci
-    importati — la quasi totalita' degli utenti — esce subito."""
-    campi = "id, titolo, prezzo_sats, valuta, prezzo_eur, foto"
+    importati — la quasi totalita' degli utenti — esce subito.
+
+    `firmato_da_te` sta sulla COPPIA e non sulla riga (ago 2026): la
+    domanda e' «chi ha firmato l'evento del NATIVO», e col BIVIO la
+    risposta e' cambiata — quell'evento puo' essere suo, e allora il
+    ritiro lo puo' fare solo lui. Esce un BOOL, mai la chiave."""
+    campi = ("id, titolo, prezzo_sats, valuta, prezzo_eur, foto, "
+             "nostr_autore")
     importati = con.execute(
         f"SELECT {campi} FROM annunci WHERE venditore_id=? "
         "AND stato='attivo' AND contatto_nostr!=''", (tg_id,)).fetchall()
@@ -18407,7 +18413,8 @@ def trova_doppioni_nostr(con, tg_id: int) -> list:
                     != _impronta_titolo(nat["titolo"])
                     or not _prezzi_compatibili(imp, nat)):
                 continue
-            coppie.append({"importato": scheda(imp), "nativo": scheda(nat)})
+            coppie.append({"importato": scheda(imp), "nativo": scheda(nat),
+                           "firmato_da_te": bool(nat["nostr_autore"])})
     return coppie
 
 
@@ -18917,18 +18924,25 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
 async def ritira_doppione(annuncio_id: int,
                           x_tg_init_data: str = Header(""),
                           barattolo_sessione: str = Cookie("")):
-    """Ritira dai relay la copia del doppione firmata dalla
-    PIATTAFORMA (mai l'originale dell'utente, che non si tocca).
+    """Ritira dai relay l'evento del doppione NATO QUI (mai
+    l'originale dell'utente, che non si tocca).
     L'annuncio su Barattolo resta com'e': diventa solo-locale, e con
     nostr_event_id vuoto nessun gancio lo ripubblichera' piu'.
     Lo stato non conta: ritirare l'evento di un nativo nel frattempo
-    venduto o rimosso e' innocuo e deduplica comunque."""
+    venduto o rimosso e' innocuo e deduplica comunque.
+
+    DUE ESITI E NON UNO (ago 2026): col BIVIO quell'evento puo' essere
+    firmato dall'UTENTE, e allora la NIP-09 la puo' fare solo lui —
+    ritira_da_nostr lo sa e ACCODA la firma, tornando 0 relay. Zero li'
+    non e' un fallimento, e dirgli «non e' cambiato nulla» era la bugia
+    peggiore: il ritiro parte davvero alla prima apertura, e lui
+    andrebbe a riprovare una cosa che ha gia' funzionato."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not _NOSTR:
         raise HTTPException(503, "La funzione Nostr non e' attiva sul server")
     con = db()
     a = con.execute(
-        "SELECT venditore_id, contatto_nostr, nostr_event_id "
+        "SELECT venditore_id, contatto_nostr, nostr_event_id, nostr_autore "
         "FROM annunci WHERE id=?", (annuncio_id,)).fetchone()
     con.close()
     if not a or a["venditore_id"] != user["id"]:
@@ -18939,6 +18953,14 @@ async def ritira_doppione(annuncio_id: int,
     if not a["nostr_event_id"]:
         raise HTTPException(400, "Gia' sistemato: questo annuncio non "
                                  "e' piu' pubblicato su Nostr")
+    if a["nostr_autore"]:
+        # L'evento e' suo: qui si prepara e basta. A chiedersi chi ha
+        # firmato e' il CHIAMANTE, che la riga ce l'ha gia' in mano —
+        # ritira_da_nostr tiene il suo contratto («quanti relay hanno
+        # accettato»), e la regola di chi puo' cancellare cosa resta
+        # scritta in un posto solo, dentro di lei.
+        await ritira_da_nostr(annuncio_id)
+        return {"ok": True, "firma": True}
     # Qui si ASPETTA il risultato dei relay (niente create_task):
     # l'utente ha chiesto un'azione e merita una risposta onesta.
     ok = await ritira_da_nostr(annuncio_id, esigi_ok=True)

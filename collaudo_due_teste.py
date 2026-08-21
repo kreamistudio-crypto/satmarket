@@ -35,6 +35,7 @@ download) e il cambio si passa a mano, o l'import chiamerebbe CoinGecko.
 USO:  python collaudo_due_teste.py
 """
 
+import asyncio
 import os
 import sys
 import tempfile
@@ -48,6 +49,16 @@ SRV = IMP = None
 VENDITORE = 955197830
 CHIAVE = "bb" * 32                       # la sua, in esadecimale
 NPUB = ""                                # la stessa in bech32 (in avvio)
+EV_ESS, EV_ADV = "1a" * 32, "2b" * 32    # gli id dei suoi due eventi
+
+# L'UPDATE che si lancia in produzione, VERBATIM. La WHERE e' la query
+# del libro mastro parola per parola — «cura tutte le righe che
+# l'allarme segnala» — quindi e' idempotente per costruzione: dopo,
+# quell'insieme e' vuoto. Sta qui perche' un collaudo che prova una
+# SQL DIVERSA da quella che si lancia non prova niente.
+CURA = ("UPDATE annunci SET contatto_nostr='', nostr_origine_d='', "
+        "nostr_origine_id='', nostr_origine_foto='' "
+        "WHERE contatto_nostr <> '' AND nostr_event_id <> ''")
 
 
 def prova(nome, atteso, avuto):
@@ -92,18 +103,65 @@ def avvio():
     # ogni giro. Zero rete, zero foto, zero CoinGecko.
     IMP.RELAYS = ["wss://finto"]
     IMP.DB = db
+
+    # I ganci verso il mondo di fuori: contatori, mai rete. Servono a
+    # `ricarica_quantita`, che e' il modo VERO di dimostrare che il
+    # venditore ha riavuto in mano il suo annuncio.
+    async def muto(*a, **k):
+        return None
+    server.annuncio_su_nostr = muto
+    server.promo_venduto = muto
+    server.notifica = muto
+    server.verifica_utente = lambda *a, **k: {"id": VENDITORE}
     return db
 
 
-def evento(d, titolo, sats=50_000, descrizione="Licenza annuale."):
+def chiama(fn, *args, corpo=None):
+    """Una rotta vera, col suo corpo JSON. I ganci sono create_task:
+    senza cedere il controllo almeno una volta il loop si chiuderebbe
+    prima che partano (il patto di collaudo_pausa)."""
+    async def leggi(_req):
+        return corpo if corpo is not None else {}
+    SRV.leggi_json = leggi
+
+    async def giro():
+        r = await fn(*args)
+        await asyncio.sleep(0.02)
+        return r
+    return asyncio.run(giro())
+
+
+def rifornisce(aid, quanti):
+    """Il gesto che l'adozione gli aveva tolto: torna il numero nuovo,
+    o il codice dell'errore se la porta e' ancora chiusa."""
+    try:
+        d = chiama(SRV.ricarica_quantita, aid, None,
+                   corpo={"quantita": quanti})
+        return d.get("quantita")
+    except Exception as e:
+        return f"{getattr(e, 'status_code', '?')}"
+
+
+def evento(d, titolo, sats=50_000, descrizione="Licenza annuale.",
+           venduto=False, eid=None):
     """Un NIP-99 suo: firmato dalla SUA chiave, con una coordinata sua
     (mai `barattolo-N`, che sarebbe un riflesso e lo filtra un'altra
     guardia). Niente tag `image`: cosi' non si scarica niente."""
-    return {"id": "ff" * 32, "pubkey": CHIAVE, "kind": 30402,
+    tags = [["d", d], ["title", titolo], ["price", str(sats), "SAT"],
+            ["location", "Pavia (PV)"]]
+    if venduto:
+        tags.append(["status", "sold"])
+    return {"id": eid or ("ff" * 32), "pubkey": CHIAVE, "kind": 30402,
             "created_at": int(time.time()), "content": descrizione,
-            "tags": [["d", d], ["title", titolo],
-                     ["price", str(sats), "SAT"],
-                     ["location", "Pavia (PV)"]]}
+            "tags": tags}
+
+
+def cancellazione(eid):
+    """Una NIP-09 sua (kind 5) sull'evento `eid`: e' cosi' che un suo
+    ripensamento su Amethyst arriva fin qui."""
+    return {"id": "ee" * 32, "pubkey": CHIAVE, "kind": 5,
+            "created_at": int(time.time()), "content": "",
+            "tags": [["e", eid]]}
 
 
 def relay_risponde(eventi):
@@ -149,6 +207,32 @@ def semina():
     con.close()
 
 
+def semina_adottate():
+    """Lo stato di PRODUZIONE del 20 agosto: le due righe native
+    ADOTTATE dall'import — `contatto_nostr` scritto sopra, la loro
+    testa ancora li' (e' la riga a due teste) e le coordinate
+    dell'evento di LUI addosso."""
+    semina()
+    con = SRV.db()
+    for aid, d, eid in ((208, "panda-essential", EV_ESS),
+                        (209, "panda-advanced", EV_ADV)):
+        con.execute(
+            "UPDATE annunci SET contatto_nostr=?, nostr_origine_d=?, "
+            "nostr_origine_id=?, nostr_origine_foto=? WHERE id=?",
+            (NPUB, d, eid, '["http://suo/1.jpg"]', aid))
+    con.commit()
+    con.close()
+
+
+def cura():
+    """L'UPDATE di produzione, VERBATIM. Torna quante righe ha toccato."""
+    con = SRV.db()
+    n = con.execute(CURA).rowcount
+    con.commit()
+    con.close()
+    return n
+
+
 def riga(aid):
     con = SRV.db()
     r = con.execute("SELECT contatto_nostr, nostr_event_id, nostr_autore, "
@@ -157,6 +241,14 @@ def riga(aid):
     con.close()
     return None if not r else (r["contatto_nostr"], r["nostr_event_id"],
                                r["nostr_autore"], r["nostr_origine_d"])
+
+
+def stato(aid):
+    con = SRV.db()
+    r = con.execute("SELECT stato FROM annunci WHERE id=?",
+                    (aid,)).fetchone()
+    con.close()
+    return None if not r else r["stato"]
 
 
 def elenco():
@@ -184,7 +276,8 @@ def due_teste():
 
 def doppioni():
     con = SRV.db()
-    coppie = [(c["importato"]["id"], c["nativo"]["id"])
+    coppie = [(c["importato"]["id"], c["nativo"]["id"],
+               c["firmato_da_te"])
               for c in SRV.trova_doppioni_nostr(con, VENDITORE)]
     con.close()
     return coppie
@@ -216,8 +309,9 @@ def main():
                  key=lambda x: x[1], reverse=True))
     prova("il libro mastro TACE: nessuna riga a due teste", [], due_teste())
     prova("e la coppia compare nella deduplica, col suo bottone",
-          sorted([(n[0], 208) if "Essential" in n[1] else (n[0], 209)
-                  for n in nuove]), sorted(doppioni()))
+          sorted([(n[0], 208, True) if "Essential" in n[1]
+                  else (n[0], 209, True) for n in nuove]),
+          sorted(doppioni()))
 
     print("\n[il giro dopo non ricomincia da capo]")
     importati2, aggiornati2, _ = importa()
@@ -238,6 +332,65 @@ def main():
     relay_risponde([evento("d-mai-visto", "Mouse verticale", sats=30_000)])
     importati4, _, _ = importa()
     prova("un annuncio mai visto qui entra come sempre", 1, importati4)
+
+    print("\n[il ramo «sold»]")
+    semina()
+    # Il suo annuncio Amethyst si vende. La riga NATIVA omonima e' un
+    # ALTRO annuncio, col suo stock e la sua storia: spegnerla come
+    # «venduto» le toglierebbe la vetrina, e al riavvio dopo la
+    # riparazione dell'invariante le azzererebbe anche i pezzi.
+    relay_risponde([evento("panda-essential",
+                           "Antivirus Panda Dome Essential", venduto=True)])
+    importa()
+    prova("un `sold` suo non spegne la riga nativa con la sua testa",
+          "attivo", stato(208))
+    # ...ma sull'importato di ieri, senza testa, deve spegnere ancora
+    relay_risponde([evento("d-suo", "Vecchio importato", venduto=True)])
+    importa()
+    prova("...e spegne ancora l'importato di ieri", "venduto", stato(300))
+
+    print("\n[la cura, provata prima di lanciarla]")
+    semina_adottate()
+    prova("si parte dallo stato di produzione: due righe a due teste",
+          [208, 209], due_teste())
+    prova("...e da li' il venditore non puo' rifornire", "400",
+          rifornisce(208, 5))
+    prova("l'UPDATE tocca esattamente quelle due righe", 2, cura())
+    prova("il libro mastro tace", [], due_teste())
+    prova("rilanciarlo non tocca piu' niente (e' idempotente)", 0, cura())
+    prova("la riga e' tornata NATIVA, con la sua testa e il suo autore",
+          ("", "ev-208", CHIAVE, ""), riga(208))
+    prova("...e il venditore puo' rifornirla di nuovo", 5,
+          rifornisce(208, 5))
+    # E adesso il giro d'import vero: le due native restano, nascono le
+    # due importate, e la coppia arriva nella deduplica col flag.
+    relay_risponde([evento("panda-essential",
+                           "Antivirus Panda Dome Essential", eid=EV_ESS),
+                    evento("panda-advanced",
+                           "Antivirus Panda Dome Advanced", eid=EV_ADV)])
+    importati5, aggiornati5, _ = importa()
+    prova("l'import non le ri-adotta e crea due righe nuove",
+          (2, 0), (importati5, aggiornati5))
+    prova("...e le due curate sono ancora native", ["", ""],
+          [riga(208)[0], riga(209)[0]])
+    coppie = doppioni()
+    prova("la coppia arriva nella deduplica", 2, len(coppie))
+    prova("...e dice che l'evento del nativo l'ha firmato LUI",
+          [True, True], [c[2] for c in coppie])
+    prova("il libro mastro tace anche dopo l'import", [], due_teste())
+    # La ragione per cui si azzera anche `nostr_origine_id`: e'
+    # l'aggancio delle NIP-09. Lasciandolo addosso alla riga curata, un
+    # suo ripensamento su Amethyst spegnerebbe l'annuncio nato QUI —
+    # adesso spegne il solo importato, che e' la riga di quell'evento.
+    # (Va per ULTIMO: la lapide vale per sempre, e messo prima si
+    # portava via l'evento dal giro d'import qui sopra.)
+    nuovo = [r[0] for r in elenco() if r[2] and r[1].endswith("Essential")]
+    relay_risponde([cancellazione(EV_ESS)])
+    importa()
+    prova("una sua NIP-09 non spegne piu' la riga nata qui",
+          "attivo", stato(208))
+    prova("...e spegne l'importato, che e' la riga di quell'evento",
+          ["rimosso"], [stato(i) for i in nuovo])
 
     print(f"\n{'=' * 58}\n  {PASSATE} passate, {FALLITE} fallite\n{'=' * 58}")
     return 1 if FALLITE else 0

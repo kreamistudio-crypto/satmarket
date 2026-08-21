@@ -403,14 +403,15 @@ def prove_anello():
     import asyncio
     import sqlite3
 
-    def sql_di(blocco):
+    def sql_di(blocco, param="(a["):
         """La query dentro un `con.execute(...)`: i pezzi di stringa
-        fino ai parametri, che cominciano sempre con `(a[`. Se non la
+        fino ai parametri, che cominciano sempre con `(a[` (o con quel
+        che dice `param`: il ramo «sold» passa `(tt[`). Se non la
         ritrova torna '' e la prova FALLISCE invece di esplodere — una
         prova che si schianta fa rossa la CI senza dire quale patto e'
         saltato (la lezione del find() al posto dell'index())."""
         i = blocco.find("con.execute(")
-        j = blocco.find("(a[", i + 1)
+        j = blocco.find(param, i + 1)
         if i < 0 or j < 0:
             return ""
         return "".join(re.findall(r'"([^"]*)"', blocco[i:j]))
@@ -565,6 +566,116 @@ def prove_anello():
           "la 'ritira' e le righe native", [209, 301],
           [r[0] for r in c2.execute("SELECT annuncio_id FROM firme_nostr "
                                     "ORDER BY annuncio_id")])
+
+    # --- IL RAMO «SOLD» (ago 2026) --------------------------------
+    # Lo stesso match per titolo, e la stessa clausola: un evento suo
+    # marcato `sold` non deve spegnere come «venduto» una riga NATIVA
+    # omonima. Non e' cosmesi — al riavvio dopo, la riparazione
+    # dell'invariante (`quantita=0 WHERE stato='venduto'`) le azzera
+    # anche lo stock.
+    i3 = corpo.find('if st and st[1] == "sold":')
+    i4 = corpo.find("if not morto and tt:", i3) if i3 >= 0 else -1
+    i5 = corpo.find("if morto:", i4) if i4 >= 0 else -1
+    sql_sold = sql_di(corpo[i4:i5], "(tt[") if 0 <= i4 < i5 else ""
+    sql_sold_d = (sql_di(corpo[i3:i4], "(dt[") if 0 <= i3 < i4 else "")
+    prova("si ritrova la query per titolo del ramo sold", True,
+          "WHERE titolo=?" in sql_sold and "stato='attivo'" in sql_sold)
+
+    def spegne(titolo):
+        if not sql_sold:
+            return "QUERY NON RITROVATA"
+        r = con_i.execute(sql_sold,
+                          (titolo, 955, "npub1lui", "d-suo")).fetchone()
+        return r[0] if r else None
+
+    prova("un `sold` suo non spegne la riga NATIVA con la sua testa",
+          None, spegne("con testa"))
+    prova("...ma spegne ancora l'importato di ieri senza testa",
+          300, spegne("legacy importato"))
+    prova("...e il nativo senza testa, come sempre", 301,
+          spegne("nativo nudo"))
+    prova("anche qui il match per `d` resta senza clausola", False,
+          "nostr_event_id" in sql_sold_d)
+
+    # --- LA DEDUPLICA NELL'ERA DEL BIVIO --------------------------
+    # Il ritiro di un doppione il cui evento e' firmato dall'UTENTE non
+    # e' un fallimento: e' un'attesa. Si fa girare l'endpoint VERO,
+    # con dentro il ritira_da_nostr VERO e il suo accoda_firma VERO —
+    # cosi' la prova non dice «c'e' un ramo», dice «non alza il 502 e
+    # la firma finisce in coda».
+    corpo_rit = pezzo("ritira_doppione")
+
+    def ritira(autore, relay_ok):
+        c = sqlite3.connect(":memory:")
+        c.row_factory = sqlite3.Row
+        c.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
+          contatto_nostr TEXT, nostr_event_id TEXT, nostr_autore TEXT);
+        CREATE TABLE firme_nostr(annuncio_id INTEGER PRIMARY KEY,
+          tg_id INT, azione TEXT, creato INT);
+        """)
+        c.execute("INSERT INTO annunci VALUES(7,955,'','ev7',?)", (autore,))
+        spediti = []
+
+        async def ai_relay(_ev):
+            spediti.append(_ev)
+            return relay_ok
+
+        amb = {"Header": lambda d: d, "Cookie": lambda d: d,
+               "HTTPException": _Err, "db": lambda: _SenzaClose(c),
+               "verifica_utente": lambda *a: {"id": 955},
+               "_NOSTR": (None, "aa" * 32),
+               "firma_evento": lambda *a: {"id": "ev-morte"},
+               "_spedisci_ai_relay": ai_relay,
+               "RELAYS_VERIFICA": ["uno"],
+               "time": type("t", (), {"time": staticmethod(lambda: 1)})}
+        # accoda_firma nello STESSO ambiente e non con reale(): quello
+        # esegue il pezzo in un env suo, dove `time` non c'e' — e il
+        # try/except di ritira_da_nostr si mangerebbe il NameError
+        # lasciando la coda vuota senza dire perche' (ci si e'
+        # inciampati scrivendo questa prova: l'ha detto lei, non la
+        # rilettura).
+        exec(pezzo("accoda_firma"), amb)
+        exec("async " + pezzo("ritira_da_nostr"), amb)
+        exec("async " + corpo_rit, amb)
+        try:
+            d = asyncio.run(amb["ritira_doppione"](7))
+        except _Err as e:
+            d = f"{e.codice}"
+        coda = [r[0] for r in c.execute("SELECT azione FROM firme_nostr")]
+        testa = c.execute("SELECT nostr_event_id FROM annunci "
+                          "WHERE id=7").fetchone()[0]
+        return d, coda, testa, len(spediti)
+
+    d, coda, testa, spediti = ritira("bb" * 32, 0)
+    prova("evento SUO: niente 502, si dice che la firma e' pronta",
+          {"ok": True, "firma": True}, d)
+    prova("...la richiesta di ritiro finisce in coda", ["ritira"], coda)
+    prova("...e ai relay non si e' spedito niente", 0, spediti)
+    prova("...e la testa resta finche' lui non firma", "ev7", testa)
+    d, coda, testa, spediti = ritira("", 1)
+    prova("evento NOSTRO coi relay che rispondono: ritirato",
+          {"ok": True, "relay": 1}, d)
+    prova("...e la testa se ne va", "", testa)
+    prova("...senza chiedere nessuna firma", [], coda)
+    d, _, testa, _ = ritira("", 0)
+    prova("evento NOSTRO coi relay muti: 502, ed e' vero", "502", d)
+    prova("...e non e' cambiato niente", "ev7", testa)
+
+    # I testi del cassetto: la bugia di ieri non deve tornare, e il
+    # flag deve viaggiare fin dentro il bottone.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il cassetto non chiama piu' «di Barattolo» un evento suo",
+          False, "pubblicato da Barattolo" in mini
+                 or "Ritira il doppione di Barattolo" in mini)
+    prova("l'etichetta del nativo si sceglie su chi ha firmato", True,
+          "firmato da te" in mini and "firmato da noi" in mini)
+    prova("...e il flag arriva dal server", True,
+          '"firmato_da_te": bool(nat["nostr_autore"])' in _SORGENTE)
+    prova("il cassetto dice anche cosa il bottone NON fa", True,
+          "In vetrina restano comunque due" in mini)
+    prova("e l'importato si riconosce in «I tuoi annunci»", True,
+          "Importato dal tuo client Nostr" in mini)
 
 
 # ====================================================================

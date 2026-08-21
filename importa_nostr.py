@@ -953,12 +953,23 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
                     "AND (venditore_id=? OR contatto_nostr=?)",
                     (dt[1], venditore_id, npub)).fetchone()
             if not morto and tt:
+                # La clausola del gemello qui sotto, per la stessa
+                # ragione (ago 2026, il tappo delle «due teste»): una
+                # riga NATIVA con una testa sua non e' la riga di
+                # QUESTO evento, e spegnerla come «venduto» perche' un
+                # ALTRO annuncio del venditore e' stato venduto sui
+                # relay le toglie la vetrina — e al riavvio dopo la
+                # riparazione dell'invariante le azzera pure lo stock
+                # (`quantita=0 WHERE stato='venduto'`).
+                # Il match per `d` qui sopra resta senza guardia, ed e'
+                # giusto: quella E' la riga di questo evento.
                 morto = con.execute(
                     "SELECT id, titolo FROM annunci WHERE titolo=? "
                     "AND stato='attivo' "
                     "AND (venditore_id=? OR contatto_nostr=?) "
                     "AND (nostr_origine_d='' OR nostr_origine_d IS NULL "
-                    "     OR nostr_origine_d=?)",
+                    "     OR nostr_origine_d=?) "
+                    "AND (nostr_event_id='' OR nostr_event_id IS NULL)",
                     (tt[1].strip()[:120], venditore_id, npub,
                      dt[1] if dt else "")).fetchone()
             if morto:
