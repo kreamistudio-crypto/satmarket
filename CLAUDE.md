@@ -11821,8 +11821,32 @@ Collaboratore: Alan (25% ricavi netti, accordo scritto). Lingua: italiano.
   NON SI USA DOVE SI MUOVONO I SATS, ed è la riga da non ammorbidire:
   lì il velo immediato non è cortesia ma la GUARDIA contro il secondo
   tocco su una cosa irreversibile, e ritardarla aprirebbe una finestra
-  di 180ms in cui la fattura si paga due volte. Il censimento dei
-  chiamanti è in CI: uno solo, ed è una lettura.
+  di 180ms in cui la fattura si paga due volte.
+  I CHIAMANTI SONO QUATTRO E SONO TUTTI LETTURE (ago 2026): le
+  istruzioni di ritiro, il contenuto digitale riletto dal venditore,
+  l'indirizzo di consegna, il documento della busta. Il censimento in
+  CI li NOMINA e non li conta — col solo numero quello di domani passa
+  cambiando una cifra, e se muove sats non se ne accorge nessuno — e
+  ha il GEMELLO dall'altra parte: chi resta senza testo si prende il
+  default di `bottoneInAttesa`, quindi quel default può essere solo
+  dei SEI gesti dei sats (i due Lightning address, la decisione della
+  disputa, la invoice del venditore, la conferma di ricezione, il reso
+  ricevuto).
+  «LETTURA» NON VUOL DIRE «GET», ed è la distinzione che decide chi va
+  di qua e chi di là: `rivelaContenuto` legge e basta, ma quella
+  lettura È la ricevuta e non torna indietro — resta col velo
+  immediato, che lì è proprio la guardia.
+  IL DEFAULT PARLA DI SATS APPOSTA (ago 2026, dal campo: «Invio sats
+  in corso…» compariva sopra il salvataggio di un FEEDBACK, e su altri
+  sette gesti che un sat non lo muovono). È la frase di chi i sats li
+  muove davvero, e chi non gliene dà una se la prende in prestito: il
+  testo si passa SEMPRE.
+  E L'ETICHETTA DEL BOTTONE ECHEGGIA IL TESTO in tutte e due le
+  sorelle — un velo che dice una cosa e un bottone che ne dice
+  un'altra sono due posti da tenere in pari, e il secondo è quello che
+  si dimentica. Il prezzo dichiarato è il doppio glifo sui testi che
+  già portano un'emoji («⏳ 🔨 Preparo la fattura…»): quel bottone sta
+  sotto un velo sfocato, e lì non lo legge nessuno.
   LA GUARDIA DEL DOPPIO TOCCO DIVENTA UNA BANDIERINA (`bustaInCorso`,
   la stessa di `confermaAzione`): col velo ritardato per 180ms il
   bottone è vivo, e due tocchi farebbero due letture — la seconda
