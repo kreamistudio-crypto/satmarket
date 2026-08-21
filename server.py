@@ -103,9 +103,11 @@ except ImportError:
 try:
     from PIL import Image as ImmaginePillow
     from PIL import ImageOps
+    from PIL import ImageStat
 except ImportError:
     ImmaginePillow = None
     ImageOps = None
+    ImageStat = None
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
@@ -5767,6 +5769,61 @@ def miniatura_jpeg(raw: bytes):
         return None
 
 
+# LA FOTO CHE NON MOSTRA NIENTE (ago 2026, caso dal campo: un
+# annuncio e' rimasto in vetrina SEI GIORNI con una foto che a
+# schermo era un rettangolo viola, e l'abbiamo saputo solo perche' il
+# venditore ha scritto). Il file era un JPEG sano — 704x628, 252KB,
+# Pillow lo legge senza fiatare — e dentro aveva OTTO colonne larghe
+# UN PIXEL ripetute 88 volte: a schermo si fondono in una tinta
+# piatta. NON NASCE DA NOI, ed e' la prima cosa da sapere: il client
+# ha un solo drawImage, e un drawImage non puo' ripetere niente (per
+# 88 ripetizioni servirebbe un createPattern, che non esiste), quindi
+# il pattern era gia' nei pixel che il canvas ha letto — un'estensione
+# che avvelena il canvas, o una GPU che gli restituisce una texture
+# sbagliata. Succedeva solo dal browser del PC, mai dall'app.
+# Impedirlo non possiamo; tenerlo in vetrina in silenzio si'.
+#
+# IL GIUDIZIO E' UNA CONGIUNZIONE, e nessuna delle due meta' regge da
+# sola — misurato sulle foto vere della vetrina e su grafiche piatte
+# costruite apposta:
+#   1) POCHISSIMI COLORI: le foto vere ne hanno da 4.153 in su (la
+#      piu' povera di tutte quelle in vetrina), questa ne aveva 8.
+#   2) E PIATTA DA LONTANO: ridotta a 16x16, cioe' come la vede chi
+#      sfoglia, non varia. Il rotto sta a 4; le grafiche piatte
+#      legittime a 117-127, perche' le loro tinte formano ZONE.
+# Da sola la prima rifiuterebbe una BANDIERA a bande (4 colori, meno
+# del rotto); da sola la seconda un buono con una scritta piccola su
+# fondo bianco (0,9 di variazione, ma 161 colori). Insieme non
+# prendono ne' l'una ne' l'altro. Chi ritocca i due numeri li
+# rimisuri sulle foto vere, non a intuito.
+FOTO_COLORI_MIN = 32
+FOTO_PIATTA_SD = 6
+MSG_FOTO_VUOTA = "immagine vuota — riprova, o caricala da un altro browser"
+
+
+def _foto_vuota(raw: bytes) -> bool:
+    """Vero se questa foto, a schermo, non mostra niente (la ricetta
+    sta qui sopra). Fail-OPEN come `_e_immagine`: senza Pillow, o su
+    qualunque errore, si risponde di no — meglio una foto storta in
+    vetrina che una buona rifiutata."""
+    if not raw or not ImmaginePillow:
+        return False
+    try:
+        img = ImmaginePillow.open(io.BytesIO(raw)).convert("RGB")
+        # I colori si contano per PRIMI e con un tetto: su una foto
+        # vera Pillow si ferma appena lo supera e torna None, quindi
+        # il caso normale costa una scansione e nient'altro.
+        if img.getcolors(maxcolors=FOTO_COLORI_MIN) is None:
+            return False
+        # BOX e' la media esatta dei pixel, che e' il modo in cui
+        # l'occhio fonde un pattern fitto. LANCZOS qui no: sui pattern
+        # periodici oscilla, e misurerebbe il filtro invece della foto.
+        piccola = img.resize((16, 16), ImmaginePillow.Resampling.BOX)
+        return max(ImageStat.Stat(piccola).stddev) <= FOTO_PIATTA_SD
+    except Exception:
+        return False
+
+
 def _salva_una_foto(annuncio_id: int, indice: int, raw: bytes,
                     versione: str = "") -> str | None:
     """Il nucleo della filiera: scrive il JPEG pieno (gia' pronto,
@@ -5902,6 +5959,13 @@ def salva_foto(annuncio_id: int, foto_lista: list,
             # PNG/WebP grezzi: gia' prima finivano in un file .jpg;
             # con Pillow diventano JPEG per davvero
             raw = converti_in_jpeg(raw) or raw
+        # La foto che non mostra niente (vedi _foto_vuota): il file
+        # e' sano e il caricamento e' andato, ma in vetrina sarebbe un
+        # rettangolo di un colore solo. Si dice subito, invece di
+        # farlo scoprire dopo sei giorni a chi l'ha pubblicata.
+        if _foto_vuota(raw):
+            scarti.append(MSG_FOTO_VUOTA)
+            continue
         nome = _salva_una_foto(annuncio_id, i, raw, versione)
         if nome:
             nomi.append(nome)

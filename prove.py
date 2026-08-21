@@ -88,6 +88,21 @@ def reale(nome):
     return amb[nome]
 
 
+def foto_finta(larghezza=60, altezza=40):
+    """Una FOTO per le prove, non una tinta unita. Da quando esiste
+    _foto_vuota (ago 2026) una tela di un colore solo viene rifiutata —
+    ed e' esattamente il suo mestiere — quindi chi ha bisogno di una
+    foto BUONA deve darne una con dei colori dentro. Deterministica:
+    niente random, o due giri della suite direbbero cose diverse."""
+    from PIL import Image
+    im = Image.new("RGB", (larghezza, altezza))
+    px = im.load()
+    for x in range(larghezza):
+        for y in range(altezza):
+            px[x, y] = ((x * 7) % 256, (y * 11) % 256, (x * y) % 256)
+    return im
+
+
 # ====================================================================
 def prove_filtro_italiano():
     """Il filtro lingua dell'import aperto, sui casi VERI incontrati
@@ -4780,7 +4795,7 @@ def prove_foto_scarti():
     import tempfile
 
     try:
-        from PIL import Image, ImageOps
+        from PIL import Image, ImageOps, ImageStat
     except ImportError:
         salta("gli scarti di salva_foto, girati per davvero",
               "Pillow non e' installata")
@@ -4788,12 +4803,17 @@ def prove_foto_scarti():
         with tempfile.TemporaryDirectory() as tmp:
             amb = {"os": os, "io": io, "re": re, "base64": base64,
                    "ImmaginePillow": Image, "ImageOps": ImageOps,
+                   "ImageStat": ImageStat,
                    "pillow_heif": None, "FOTO_DIR": tmp,
                    "print": lambda *a, **k: None}
             i = _SORGENTE.index("MINIATURA_LATO = ")
             exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
-            for f in ("converti_in_jpeg", "miniatura_jpeg", "_salva_una_foto",
-                      "_e_immagine", "salva_foto"):
+            # e le tre leve della foto vuota, che vivono in un blocco
+            # loro: chi estrae una funzione ne eredita le dipendenze
+            i = _SORGENTE.index("FOTO_COLORI_MIN = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+            for f in ("converti_in_jpeg", "miniatura_jpeg", "_foto_vuota",
+                      "_salva_una_foto", "_e_immagine", "salva_foto"):
                 exec(pezzo(f), amb)
 
             def uri(raw, tipo="jpeg"):
@@ -4801,7 +4821,9 @@ def prove_foto_scarti():
                         + base64.b64encode(raw).decode())
 
             out = io.BytesIO()
-            Image.new("RGB", (60, 40), (200, 120, 40)).save(out, "JPEG")
+            # una FOTO e non una tinta unita: quella oggi la rifiuta
+            # _foto_vuota, che e' il suo mestiere (vedi foto_finta)
+            foto_finta().save(out, "JPEG")
             buona = out.getvalue()
             pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n"
 
@@ -4883,6 +4905,162 @@ def prove_foto_scarti():
           len(re.findall(r"\w+, \w+ = await asyncio.to_thread\(\s*salva_foto|"
                          r"\w+, \w+ = await asyncio\.to_thread\(salva_foto",
                          _SORGENTE)))
+
+
+def prove_foto_vuota():
+    """LA FOTO CHE NON MOSTRA NIENTE (ago 2026, caso dal campo):
+    l'annuncio 254 e' rimasto in vetrina SEI GIORNI con una foto che a
+    schermo era un rettangolo viola — un JPEG sano con dentro otto
+    colonne larghe un pixel ripetute 88 volte, che l'occhio fonde in
+    una tinta piatta — e l'abbiamo saputo solo perche' il venditore ha
+    scritto.
+
+    Il giudice si gira per DAVVERO su immagini vere: una sentinella
+    sulla forma direbbe che la guardia c'e', mai che risponda giusto, e
+    qui il punto e' esattamente COSA rifiuta e cosa no. Meta' dei casi
+    sono grafiche piatte LEGITTIME, perche' il rischio di questa difesa
+    e' tutto di quel lato."""
+    print("\n[la foto che non mostra niente]")
+    import base64
+    import io
+    import os
+    import re
+    import tempfile
+
+    try:
+        from PIL import Image, ImageDraw, ImageOps, ImageStat
+    except ImportError:
+        salta("il giudice della foto vuota, girato per davvero",
+              "Pillow non e' installata")
+    else:
+        amb = {"io": io, "ImmaginePillow": Image, "ImageStat": ImageStat}
+        i = _SORGENTE.index("FOTO_COLORI_MIN = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        exec(pezzo("_foto_vuota"), amb)
+        vuota = amb["_foto_vuota"]
+
+        def jpeg(im):
+            """Come il canvas del client: q90, senza sottocampionare."""
+            b = io.BytesIO()
+            im.convert("RGB").save(b, "JPEG", quality=90, subsampling=0)
+            return b.getvalue()
+
+        # --- QUEL CHE DEVE PASSARE ------------------------------------
+        # La bandiera e' il caso che dice perche' il numero dei colori
+        # DA SOLO non basterebbe: ne ha QUATTRO, meno del file rotto.
+        im = Image.new("RGB", (1024, 1024))
+        d = ImageDraw.Draw(im)
+        for k in range(0, 1024, 128):
+            d.rectangle((k, 0, k + 127, 1024),
+                        fill=[(255, 0, 0), (0, 255, 0), (0, 0, 255),
+                              (255, 255, 0)][(k // 128) % 4])
+        prova("passa: bandiera a bande (4 colori, meno del rotto)",
+              False, vuota(jpeg(im)))
+
+        im = Image.new("RGB", (600, 600), (255, 255, 255))
+        ImageDraw.Draw(im).rectangle((0, 0, 600, 300), fill=(20, 20, 20))
+        prova("passa: due meta' bianco e nero", False, vuota(jpeg(im)))
+
+        im = Image.new("RGB", (1000, 1000), (255, 255, 255))
+        ImageDraw.Draw(im).ellipse((200, 200, 800, 800), fill=(247, 147, 26))
+        prova("passa: un logo su fondo bianco", False, vuota(jpeg(im)))
+
+        # e questo dice perche' non basta nemmeno l'altra meta': e' PIU'
+        # piatto del rotto (0,9 di variazione contro 4), ma ha 161
+        # colori — l'antialiasing del testo — e la prima domanda lo salva
+        im = Image.new("RGB", (900, 900), (252, 252, 252))
+        ImageDraw.Draw(im).text((380, 440), "COD: 7788-2211", fill=(0, 0, 0))
+        prova("passa: un buono con una scritta piccola su bianco",
+              False, vuota(jpeg(im)))
+
+        # --- QUEL CHE DEVE PRENDERE -----------------------------------
+        prova("prende: la tela nera (l'alpha appiattito, il canvas di iOS)",
+              True, vuota(jpeg(Image.new("RGB", (704, 628), (0, 0, 0)))))
+        prova("prende: la tela bianca",
+              True, vuota(jpeg(Image.new("RGB", (704, 628), (255, 255, 255)))))
+
+        # IL CASO VERO, ricostruito al pixel dai colori del file che era
+        # in vetrina: otto colonne da 1px nell'ordine che aveva lui
+        pal = [(243, 88, 102), (184, 182, 232), (182, 129, 183),
+               (180, 147, 102), (95, 61, 52), (84, 28, 135),
+               (43, 69, 4), (38, 60, 224)]
+        im = Image.new("RGB", (704, 628))
+        px = im.load()
+        for x in range(704):
+            for y in range(628):
+                px[x, y] = pal[[6, 3, 5, 7, 0, 4, 2, 1][x % 8]]
+        prova("prende: il pattern dell'annuncio 254", True, vuota(jpeg(im)))
+
+        # --- FAIL-OPEN ------------------------------------------------
+        prova("niente byte, nessun giudizio", False, vuota(b""))
+        prova("byte che non sono un'immagine, nessun giudizio",
+              False, vuota(b"%PDF-1.4 non sono una foto"))
+        senza = {"io": io, "ImmaginePillow": None, "ImageStat": None,
+                 "FOTO_COLORI_MIN": amb["FOTO_COLORI_MIN"],
+                 "FOTO_PIATTA_SD": amb["FOTO_PIATTA_SD"]}
+        exec(pezzo("_foto_vuota"), senza)
+        prova("senza Pillow non si rifiuta niente (fail-open)",
+              False, senza["_foto_vuota"](jpeg(
+                  Image.new("RGB", (704, 628), (0, 0, 0)))))
+
+        # --- E IL GIRO INTERO, dalla foto allo scarto -----------------
+        with tempfile.TemporaryDirectory() as tmp:
+            amb2 = {"os": os, "io": io, "re": re, "base64": base64,
+                    "ImmaginePillow": Image, "ImageOps": ImageOps,
+                    "ImageStat": ImageStat, "pillow_heif": None,
+                    "FOTO_DIR": tmp, "print": lambda *a, **k: None}
+            i = _SORGENTE.index("MINIATURA_LATO = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
+            i = _SORGENTE.index("FOTO_COLORI_MIN = ")
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb2)
+            for f in ("converti_in_jpeg", "miniatura_jpeg", "_foto_vuota",
+                      "_salva_una_foto", "_e_immagine", "salva_foto"):
+                exec(pezzo(f), amb2)
+
+            def uri(raw):
+                return "data:image/jpeg;base64," + base64.b64encode(
+                    raw).decode()
+
+            buona = jpeg(foto_finta())
+            # una foto vera, anche piccola, non deve mai cadere qui
+            prova("una foto vera non e' vuota", False,
+                  amb2["_foto_vuota"](buona))
+            nera = jpeg(Image.new("RGB", (704, 628), (0, 0, 0)))
+            nomi, scarti = amb2["salva_foto"](77, [uri(buona), uri(nera)])
+            prova("la foto vuota non si salva", 1, len(nomi))
+            prova("...col motivo che dice cosa fare",
+                  [amb2["MSG_FOTO_VUOTA"]], scarti)
+            prova("...e sul disco non ci finisce",
+                  ["a77_0.jpg", "a77_0_min.jpg"],
+                  sorted(f for f in os.listdir(tmp) if f.startswith("a77_")))
+
+    # --- SENTINELLE ---------------------------------------------------
+    corpo = pezzo("salva_foto")
+    prova("sentinella: la guardia vive in salva_foto", True,
+          "_foto_vuota(raw)" in corpo)
+    # PRIMA di scrivere sul disco, o il file rotto ci finirebbe lo
+    # stesso e resterebbe li' a farsi servire
+    prova("sentinella: e scatta prima che il file tocchi il disco", True,
+          corpo.index("_foto_vuota(raw)") < corpo.index("_salva_una_foto("))
+    prova("sentinella: il motivo e' la costante, non una frase a mano",
+          True, "scarti.append(MSG_FOTO_VUOTA)" in corpo)
+    giudice = pezzo("_foto_vuota")
+    # il fail-open e' la meta' che protegge chi pubblica: senza Pillow
+    # non si giudica nessuno
+    prova("sentinella: senza Pillow il giudice si astiene", True,
+          "if not raw or not ImmaginePillow:" in giudice)
+    # BOX e' la media esatta — LANCZOS sui pattern periodici oscilla, e
+    # misurerebbe il filtro invece della foto
+    # `codice()` toglie i commenti: LANCZOS il giudice lo NOMINA, per
+    # dire perche' non lo usa, e una sentinella che legge la prosa
+    # diventa rossa per colpa di una spiegazione
+    prova("sentinella: si riduce con BOX, mai con LANCZOS",
+          (True, False), ("Resampling.BOX" in codice(giudice),
+                          "LANCZOS" in codice(giudice)))
+    # i due numeri non si ribattono a mano da nessuna parte
+    prova("sentinella: le due soglie sono leve, non numeri sparsi",
+          (True, True), ("maxcolors=FOTO_COLORI_MIN" in giudice,
+                         "<= FOTO_PIATTA_SD" in giudice))
 
 
 def prove_avatar():
@@ -19928,7 +20106,8 @@ def main():
               prove_pagina_dati,
               prove_font,
               prove_porta_timer,
-              prove_sintassi_client):
+              prove_sintassi_client,
+              prove_foto_vuota):
         try:
             f()
         except Exception as e:
